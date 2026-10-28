@@ -37,8 +37,10 @@ export function wallet() {
       if (evm) evm.manifest.name = window.ethereum ? 'MetaMask & EVM wallets (detected)' : 'MetaMask & EVM wallets';
       if (evm && window.ethereum) connector.wallets = [evm, ...connector.wallets.filter(w => w !== evm)];
       // MyNearWallet's NEAR Connect script has a testnet path (testnet.mynearwallet.com), but the manifest has no testnet flag.
+      // Its own site says it is deprecated on 31 Oct 2026: from then on it leaves the list and shows greyed with that reason.
       const mnw = connector.wallets.find(w => w.manifest.id === 'mynearwallet');
-      if (mnw) { mnw.manifest.features.testnet = true; (mnw.manifest.permissions.allowsOpen ||= []).push('https://testnet.mynearwallet.com'); mnw.manifest.name = 'MyNearWallet (testnet)'; mnw.manifest.website = 'https://testnet.mynearwallet.com'; }
+      if (mnw && mnwSunset()) connector.wallets = connector.wallets.filter(w => w !== mnw);
+      else if (mnw) { mnw.manifest.features.testnet = true; (mnw.manifest.permissions.allowsOpen ||= []).push('https://testnet.mynearwallet.com'); mnw.manifest.name = 'MyNearWallet (testnet, ends 31 Oct)'; mnw.manifest.website = 'https://testnet.mynearwallet.com'; }
     }).catch(() => {});
   }
   return connector;
@@ -55,6 +57,9 @@ const UNAVAILABLE = [
   ['Sender', 'Not in NEAR Connect.'],
   ['Bitte Wallet', 'Not in NEAR Connect.'],
 ];
+// MyNearWallet sunset: 31 Oct 2026, 00:00 Cairo (UTC+3). Nothing else in the house flow uses it.
+export const MNW_SUNSET = Date.UTC(2026, 9, 30, 21, 0, 0);
+const mnwSunset = () => Date.now() >= MNW_SUNSET;
 function unavailable(r) {
   r.querySelectorAll?.('.modal-body').forEach(body => {
     if (!body.querySelector('.connect-item') || body.querySelector('.nc-unavailable')) return;
@@ -64,7 +69,7 @@ function unavailable(r) {
     const h = document.createElement('p'); h.textContent = 'Not available on testnet';
     h.style.cssText = 'margin:4px 8px;font-size:12px;opacity:.7;color:#fff';
     box.append(h);
-    for (const [name, why] of UNAVAILABLE) {
+    for (const [name, why] of mnwSunset() ? [['MyNearWallet', 'Sunset: its own site set 31 Oct 2026 as the end date.'], ...UNAVAILABLE] : UNAVAILABLE) {
       const row = document.createElement('div');
       row.setAttribute('aria-disabled', 'true'); row.title = why; row.dataset.wallet = name;
       row.style.cssText = 'display:flex;flex-direction:column;padding:6px 8px;opacity:.45;cursor:not-allowed;color:#fff';
