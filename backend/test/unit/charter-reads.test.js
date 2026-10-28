@@ -37,3 +37,9 @@ test('rules: passes the clause id, 404 for an unknown clause, 400 for bad input'
   assert.equal((await app.request('/api/charter/c1.testnet/rules/' + encodeURIComponent('a b'))).status, 400);
   assert.equal((await app.request('/api/charter/' + encodeURIComponent('Bad..Acct') + '/reputation')).status, 400);
 });
+
+test('reputation: RPC overload (429 everywhere) is a 503 with Retry-After, not a 500', async () => {
+  mock(() => new Response('slow down', { status: 429 }));
+  const r = await makeApp().request('/api/charter/busy.testnet/reputation');
+  assert.equal(r.status, 503); assert.equal(r.headers.get('retry-after'), '10');
+});

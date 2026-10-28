@@ -146,6 +146,8 @@ export function makeApp() {
     catch (e) {
       const m = String(e.message);
       if (/MethodNotFound|CodeDoesNotExist|does not exist/i.test(m)) return c.json({ account: a, supported: false, note: 'needs an R16 oath charter' });
+      // upstream RPC overload (429/5xx/timeout on every endpoint): say so instead of a generic 500
+      if (/http (429|5\d\d)|timeout|aborted/i.test(m)) { c.header('Retry-After', '10'); return c.json({ error: 'rpc busy, retry shortly' }, 503); }
       throw e;
     }
   };
