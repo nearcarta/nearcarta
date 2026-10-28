@@ -15,7 +15,8 @@ window.__alog=[]; // audio event log (t in story seconds) for the offline video 
 let stopped=false; const fallback=why=>{ if(stopped) return; stopped=true; window.__3dStop=why; return import('./fb.js').then(m=>m.fallback(why)); };
 
 // ---------- sound: tiny WebAudio bank (off until the visitor turns it on) ----------
-const SND={ allowed:'d7/assets/audio/allowed.ogg', refuse:'d7/assets/audio/refuse.ogg', freeze:'d7/assets/audio/freeze.ogg', send:'d7/assets/audio/send.ogg', water:'d7/assets/audio/water.ogg', click:'d7/assets/audio/ui-click.ogg', music:'d7/assets/audio/music-ambient.ogg',
+// d7 cues come from the D2_game copy (same bytes) that the D8 rooms also load, so the town fetches each file once
+const SND={ allowed:'../D2_game/d7/assets/audio/allowed.ogg', refuse:'../D2_game/d7/assets/audio/refuse.ogg', freeze:'../D2_game/d7/assets/audio/freeze.ogg', send:'../D2_game/d7/assets/audio/send.ogg', water:'../D2_game/d7/assets/audio/water.ogg', click:'../D2_game/d7/assets/audio/ui-click.ogg', music:'../D2_game/d7/assets/audio/music-ambient.ogg',
   step0:'assets/audio9/footstep00.ogg', step1:'assets/audio9/footstep01.ogg', step2:'assets/audio9/footstep02.ogg', step3:'assets/audio9/footstep03.ogg', step4:'assets/audio9/footstep04.ogg',
   lamp:'assets/audio9/metalClick.ogg', glass:'assets/audio9/glass_001.ogg', cloth:'assets/audio9/cloth1.ogg', cloth2:'assets/audio9/cloth2.ogg', door:'assets/audio9/doorOpen_1.ogg', doorC:'assets/audio9/doorClose_1.ogg', page:'assets/audio9/bookFlip1.ogg', creak:'assets/audio9/creak1.ogg', latch:'assets/audio9/metalLatch.ogg' };
 const A={ ctx:null, buf:{}, on:false, bed:null };
