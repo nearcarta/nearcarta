@@ -14,6 +14,7 @@ All commands are read-only unless marked.
 5b. NEAR AI TEE (needs `NEARAI_CLOUD_API_KEY`; non-billable): `npm run tee` → `PASS` for each check on the gateway and on every model report, then `TEE preflight verified`. Offline tamper tests (wrong nonce, swapped signer, edited app_compose, forged event, flipped quote byte, expired collateral) are in `npm test`.
 6. Contracts: `cd contracts/oath && cargo test --lib` (38) and `cd contracts/arena && cargo test --lib` (14). Then `cd contracts/oath && cargo test --test exploits` (10 attacks in a near-workspaces sandbox against the deployed wasm; all must be refused).
 7. Browser: `npm run e2e` (13 tests; `BASE_URL=https://nearcarta.vercel.app npm run e2e` runs them against the deploy; set BASE_URL to test a deployed preview).
+   The counts in README.md and this file are written by `npm run readme-numbers` from these outputs; `npm run readme-numbers -- --check` fails if any is stale.
 8. (Writes to testnet; needs the agent key) `AGENT_KEY_FILE=… node backend/scripts/guardhouse-demo.js`: one allowed and one refused proposal. Output goes to judges/proofs/guardhouse-demo.json.
 9. Mist Bank, the private payout (read-only; `npm start` first):
    - `curl -s localhost:8787/api/mistbank` → `street.amount_hidden: true`, `oath.memo_on_chain: true`, `binds: true`.
