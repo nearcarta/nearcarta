@@ -82,13 +82,14 @@ function fakeTx({ method = 'propose', memo = 'arena:neo:lookalike', signer = 'c.
   const args = Buffer.from(JSON.stringify({ p: { memo } })).toString('base64');
   const log = 'EVENT_JSON:' + JSON.stringify({ standard: 'oath', version: '2.0.0', event: 'action', data: [{ decision, reason: 'receiver_not_allowlisted' }] });
   return { transaction: { signer_id: signer, receiver_id: 'c.f.testnet', actions: [{ FunctionCall: { method_name: method, args } }] },
-    transaction_outcome: { id: 't', outcome: { executor_id: signer, logs: [], status: {} } },
+    transaction_outcome: { id: 't', block_hash: 'B', outcome: { executor_id: signer, logs: [], status: {} } },
     receipts_outcome: [{ id: 'r', outcome: { executor_id: 'c.f.testnet', logs: [log], status: failed ? { Failure: {} } : { SuccessValue: '' } } }] };
 }
 
 test('verifyAttempt accepts only real arena refusals on factory charters', async () => {
   _attempts.clear();
-  const ok = await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(), facts });
+  const ok = await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(), facts, blockTime: async () => 1234 });
+  assert.equal(ok.at, 1234);
   assert.equal(ok.attack, 'lookalike'); assert.equal(ok.tag, 'neo'); assert.equal(ok.decision, 'denied'); assert.equal(ok.owner, 'alice.testnet');
   const cases = [{ method: 'set_clause' }, { memo: 'hello' }, { memo: 'arena:neo:unknown-attack' }, { signer: 'x.testnet' }, { failed: true }];
   for (const c of cases) { _attempts.clear(); assert.equal(await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(c), facts }), null, JSON.stringify(c)); }

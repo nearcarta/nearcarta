@@ -8,8 +8,9 @@
 // budget) bounds what an allowed step can move. The key is read lazily and never logged or returned.
 import { DEP, cfg } from './config.js';
 import { rpc, view, viewAccount, accessKeys, txStatus, eventsFromOutcome, explorerTx } from './near.js';
-import { ATTACKS, ATTACK_IDS, MEMO_RE, TAG_RE, pickClause, plan, proposal } from '../../shared/vault/attacks.js';
+import { ATTACKS, ATTACK_IDS, MEMO_RE } from '../../shared/vault/attacks.js';
 import { keyFrom, sendPropose, rpcClient } from '../../shared/vault/tx.js';
+import { runSteps } from '../../shared/vault/run.js';
 
 export const V = DEP.vault || null;
 const ACCOUNT_RE = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -32,9 +33,10 @@ async function cached(key, ms, fn) {
 }
 export const _clearCache = () => cache.clear();
 
-export async function charterFacts(id) {
+export async function charterFacts(id, { fresh = false } = {}) {
   if (!V) throw bad('vault not deployed', 503);
   if (!isAccount(id)) throw bad('bad account id');
+  if (fresh) cache.delete('facts:' + id);
   return cached('facts:' + id, 15_000, async () => {
     const reg = await view(V.factory, 'get_charter', { account_id: id });
     let acct = null;
@@ -73,24 +75,9 @@ const serial = fn => { const run = queue.then(fn, fn); queue = run.catch(() => {
 
 /** Run one attack on a charter with a key that may call `propose` on it. Stops at the first refusal. */
 export async function runAttack({ charter, key, attackId, tag, rpcCall = rpcClient(cfg.rpc), viewF = view, send = sendPropose }) {
-  if (!ATTACK_IDS.includes(attackId)) throw bad('unknown attack');
-  if (!TAG_RE.test(tag)) throw bad('nickname: 1-20 of a-z 0-9 -');
-  const clauses = await viewF(charter, 'get_clauses');
-  const { id: clauseId, clause } = pickClause(clauses);
-  const u = await viewF(charter, 'get_usage', { clause_id: clauseId });
-  const steps = plan(attackId, clause, { spent: (BigInt(u.spent) + BigInt(u.reserved || 0)).toString(), count: u.count });
-  const out = [];
-  for (const step of steps) {
-    const st = await viewF(charter, 'get_state');
-    const p = proposal({ clauseId, step, nonce: st.next_nonce, policyVersion: st.policy_version, tag, attackId });
-    const r = await send(rpcCall, { key, charter, p });
-    const v = r.value || {};
-    out.push({ tx: r.hash, url: explorerTx(r.hash), receiver: step.receiver, amount: step.amount,
-      decision: r.ok ? v.decision : 'failed', reason: r.ok ? (v.reason ?? null) : r.error });
-    if (!r.ok || v.decision === 'denied') break;
-  }
-  const last = out[out.length - 1];
-  const result = { charter, attack: attackId, tag, clause_id: clauseId, steps: out, refused: last?.decision === 'denied', reason: last?.reason ?? null };
+  const result = await runSteps({ charter, key, attackId, tag, rpcCall, viewF, send });
+  for (const st of result.steps) st.url = explorerTx(st.tx);
+  const last = result.steps[result.steps.length - 1];
   if (result.refused) remember({ hash: last.tx, charter, attack: attackId, tag, decision: 'denied', reason: last.reason, at: Date.now() });
   return result;
 }
@@ -107,8 +94,12 @@ const attempts = new Map(); // tx hash -> verified attempt
 function remember(a) { if (attempts.size > 50_000) attempts.clear(); attempts.set(a.hash, a); }
 export const _attempts = attempts;
 
-/** Verify one tx is an arena attempt on a factory charter running the R14 code. */
-export async function verifyAttempt(hash, charter, { status = txStatus, facts = charterFacts } = {}) {
+/** Verify one tx is an arena attempt on a factory charter running the audited oath code (R14). */
+async function blockTimeMs(blockHash) {
+  try { const b = await rpc('block', { block_id: blockHash }); return Math.floor(Number(BigInt(b.header.timestamp_nanosec) / 1_000_000n)); } catch { return null; }
+}
+
+export async function verifyAttempt(hash, charter, { status = txStatus, facts = charterFacts, blockTime = blockTimeMs } = {}) {
   if (!/^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(hash) || !isAccount(charter)) throw bad('bad tx hash or charter');
   if (attempts.has(hash)) return attempts.get(hash);
   const f = await facts(charter);
@@ -127,6 +118,8 @@ export async function verifyAttempt(hash, charter, { status = txStatus, facts = 
   const d = ev.data?.[0] || {};
   const a = { hash, charter, owner: f.owner, attack: m[2], tag: m[1], decision: d.decision, reason: d.reason || null,
     shared: charter === V.arena.charter, at: null };
+  const bh = tx.transaction_outcome?.block_hash;
+  if (bh) a.at = await blockTime(bh);
   remember(a);
   return a;
 }
@@ -176,7 +169,7 @@ export async function leaderboard() {
   if (!V) throw bad('vault not deployed', 503);
   const fill = await cached('backfill', 20_000, () => backfill());
   const rows = [...attempts.values()].filter(Boolean);
-  return { rule: 'Each row counts final testnet propose txs on factory charters running the R14 code, memo arena:<tag>:<attack>, re-verified via RPC. Own-charter rows are keyed by the charter owner (verified); shared-charter rows by nickname (not verified).',
+  return { rule: 'Each row counts final testnet propose txs on factory charters running the audited oath code (R14), memo arena:<tag>:<attack>, re-verified via RPC. Own-charter rows are keyed by the charter owner (verified); shared-charter rows by nickname (not verified).',
     indexed: rows.length, complete: fill.complete, players: board(rows).slice(0, 50),
     recent: rows.sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
 }
@@ -185,7 +178,7 @@ export function register(app, { limiter, globalCap }) {
   app.get('/api/vault/config', limiter(30), c => c.json(config()));
   app.get('/api/vault/charters', limiter(30), async c => c.json(await listCharters(c.req.query('from'), c.req.query('limit'))));
   app.get('/api/vault/charter/:id', limiter(30), async c => {
-    const f = await charterFacts(c.req.param('id'));
+    const f = await charterFacts(c.req.param('id'), { fresh: c.req.query('fresh') === '1' });
     let use = null;
     if (f.runs_r14 && f.clauses) use = Object.fromEntries(await Promise.all(Object.keys(f.clauses).map(async k => [k, await usage(f.charter, k)])));
     return c.json({ ...f, usage: use });
