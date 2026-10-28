@@ -1,0 +1,58 @@
+{
+ "at": "2026-10-28T20:00:38.958Z",
+ "base": "https://nearcarta.vercel.app",
+ "wallet": "NEAR Connect, injected guest wallet (fresh faucet account)",
+ "account": "ncguest-333a0m4v6n.testnet",
+ "charter": "gd-mvsjfv2u.nccharters-53681.testnet",
+ "steps": [
+  {
+   "step": "poisoned-invoice: payee check",
+   "verdict": "block",
+   "reasons": [
+    "block\nAttack-demo payee. A prompt-injected agent tried to pay it; the Guardhouse charter refused, then the owner removed it from the vendor clause.\ndetails",
+    "warn\nfirst seen 22 h ago",
+    "warn\nnot on your list and never paid before"
+   ]
+  },
+  {
+   "step": "poisoned-invoice: sent anyway",
+   "refused": "✕ refused · you never allowed that account",
+   "tx": "Mda2skivi1Vpa8jEsigRW9d7GDsPa6BV2K3MvJYnUUL",
+   "url": "https://testnet.nearblocks.io/txns/Mda2skivi1Vpa8jEsigRW9d7GDsPa6BV2K3MvJYnUUL"
+  },
+  {
+   "step": "lookalike: payee check",
+   "verdict": "Payee check · c4fe.ncpub-17102.testnet · BLOCK",
+   "reasons": [
+    "block\nthe account does not exist on chain",
+    "block\nlooks like cafe.ncpub-17102.testnet, which you allow"
+   ]
+  },
+  {
+   "step": "lookalike: sent anyway",
+   "refused": "✕ refused · you never allowed that account",
+   "tx": "GrtiVdz7DFcdBFySFStMD4ZqUqui7Nz6vsTbokQ7JkQA",
+   "url": "https://testnet.nearblocks.io/txns/GrtiVdz7DFcdBFySFStMD4ZqUqui7Nz6vsTbokQ7JkQA"
+  },
+  {
+   "step": "mist bank: TEE panel",
+   "badge": "✓ Verified · NEAR AI TEE · z-ai/glm-5.3-flash · 11:00 PM",
+   "rows": [
+    "✓ pass\nIntel TDX quotes verified\ndcap-qvl · TCB UpToDate / UpToDate",
+    "✓ pass\nDebug mode off\ngateway and model",
+    "✓ pass\nYour nonce is in the quote\n12322133be…",
+    "✓ pass\nSigning key bound to the quote\n0x3b753b4406…",
+    "✓ pass\nApp config measured\ncompose 5f7ebd85cf…",
+    "✓ pass\nEvent log replays RTMR3\n8 + 11 events",
+    "✓ pass\nNVIDIA GPUs attested\n8 GPUs"
+   ]
+  },
+  {
+   "step": "mist bank: private send",
+   "rule": "✕ refused · you never allowed that account",
+   "tx": "8gBVQZYaScx52YrKj3TbnsTHMAymsh2iczDnavkt41sK",
+   "url": "https://testnet.nearblocks.io/txns/8gBVQZYaScx52YrKj3TbnsTHMAymsh2iczDnavkt41sK"
+  }
+ ],
+ "page_errors": []
+}
