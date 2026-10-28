@@ -160,3 +160,6 @@ impl TownHall {
         self.rewards.get(&account).copied().unwrap_or(0)
     }
 }
+
+#[cfg(test)]
+mod tests;
