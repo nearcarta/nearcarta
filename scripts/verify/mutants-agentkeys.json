@@ -1,0 +1,54 @@
+{
+ "file": "shared/vault/agentkeys.js",
+ "test": "backend/test/unit/agentkeys.test.js",
+ "mutants": [
+  [
+   "const promote = onChain.includes(pend);",
+   "const promote = !!pend;"
+  ],
+  [
+   "const promote = onChain.includes(pend);",
+   "const promote = false;"
+  ],
+  [
+   "onChain.filter(pk => pk !== mine);",
+   "onChain.filter(pk => true);"
+  ],
+  [
+   "const mine = promote ? pend : held;",
+   "const mine = held;"
+  ],
+  [
+   "const pendLeft = promote ? null : pend;",
+   "const pendLeft = pend;"
+  ],
+  [
+   "const keyLive = !!mine && onChain.includes(mine);",
+   "const keyLive = !!mine;"
+  ],
+  [
+   "const pendWaiting = !!pendLeft && queued.includes(pendLeft);",
+   "const pendWaiting = !!pendLeft;"
+  ],
+  [
+   "const pendLost = !!pendLeft && !pendWaiting;",
+   "const pendLost = !pendWaiting;"
+  ],
+  [
+   "const pendLost = !!pendLeft && !pendWaiting;",
+   "const pendLost = !!pendLeft;"
+  ],
+  [
+   "const revocable = others.filter(pk => pk === current);",
+   "const revocable = others;"
+  ],
+  [
+   "const stray = others.filter(pk => pk !== current);",
+   "const stray = [];"
+  ],
+  [
+   "export const keyToAdd = (pendSecret, make) => pendSecret || make();",
+   "export const keyToAdd = (pendSecret, make) => make();"
+  ]
+ ]
+}
