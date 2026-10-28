@@ -98,7 +98,7 @@ test('mist bank: the street shows a hidden amount and only the commitment is pub
   expect(m.payout.txid).toBe(dep.mistbank.payout.txid);
   await page.goto('/design/D8_shops/?2d');
   const b = await page.evaluate(async () => (await import('/design/D6_dashboards/src/data.js')).BANK);
-  expect(b.src).toBe('testnet'); expect(b.street.hidden).toBe(true); expect(b.ledger.commitment).toBe(m.commitment.value);
+  expect(b.src).toBe('testnet'); expect(b.street.hidden).toBe(true); expect(b.commitment.value).toBe(m.commitment.value);
   expect(JSON.stringify(b)).not.toMatch(/uview|ufvk|salt=|"salt"|"zats"|"taz"|"amount"/i);
 });
 
