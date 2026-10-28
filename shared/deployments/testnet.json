@@ -114,5 +114,19 @@
       "oath_allowed_commitment": "5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
       "oath_memo_too_long_denied": "9riHoM2rG8nWsNCW5qtnpwcbKu1GUB7LpZB7CPgBm6Xy"
     }
+  },
+  "house": {
+    "oath": "r11house-31474.testnet",
+    "owner": "r11hown-31474.testnet",
+    "dao": null,
+    "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
+    "note": "Second charter on the R11 wasm for Your House. No DAO, so the owner may unfreeze. Agent key: propose only.",
+    "proof_txs": {
+      "deploy_init": "Bd3qdM2WaCVCnJQaggLHFKybTv2XXcB3jtSWJfSZyebw",
+      "set_clause": "AhZBGPuQtgoX2Rw9ofqX8A7gzmMWbTtbgnzEsthX6nTE",
+      "set_agent_key": "CDa3s9a9ZAXTUFCAET9RgsGmETpAz3K3S9m93HKkMCCp",
+      "policy_delay_90s": "D4qeFFNgKNBmD4cbcVRR8XXrfrnfoUTQyhY1CpMN9pSY",
+      "full_access_key_deleted": "A4QENSGxhhixhdLiyaprTh2Rzg25QsyaFMK49f84PCkC"
+    }
   }
 }
