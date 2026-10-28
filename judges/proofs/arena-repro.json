@@ -2,7 +2,7 @@
  "what": "Vault Arena reproducible build: a fresh cargo-near reproducible build of contracts/arena at 864d0f5 is byte-identical to contracts/artifacts/arena.wasm and to the code on arena.r6vamvr9brhx-arena2.testnet",
  "contract": "arena.r6vamvr9brhx-arena2.testnet",
  "source_rev": "864d0f5b7315be2a2ea3b40a0ffefaf6e5016144",
- "source_tag": "build-864d0f5",
+ "source_tag": "build-864d0f5 (pushed to origin, so the embedded rev is reachable)",
  "source_note": "git diff 864d0f5 HEAD -- contracts/arena is empty at 3709807, so main still builds the same wasm",
  "command": "cd contracts/arena && cargo near build reproducible-wasm",
  "cargo_near": "0.22.0",
@@ -22,5 +22,14 @@
   "source_code_snapshot": "git+https://github.com/nearcarta/nearcarta?rev=864d0f5b7315be2a2ea3b40a0ffefaf6e5016144",
   "contract_path": "contracts/arena"
  },
- "chain": null
+ "chain": {
+  "rpc": "https://rpc.testnet.near.org",
+  "method": "view_account (finality final)",
+  "block_height": 275215086,
+  "code_hash": "5PwtMjcC2oUTr5g2E2uWHyqHs3wkYGryY1ZWCuTvSZc5",
+  "equals_bs58_of_build_sha256": true,
+  "contract_source_metadata_rev": "864d0f5b7315be2a2ea3b40a0ffefaf6e5016144",
+  "access_keys": 0,
+  "checked": "2026-10-29 Cairo (UTC+3)"
+ }
 }
