@@ -352,7 +352,7 @@ const toCharter=(hash='')=>{ if(inShop||exiting){ goTo(CHARTER+hash); return; } 
 rb.addEventListener('click',e=>{ if(e.metaKey||e.ctrlKey||e.shiftKey||e.button) return; e.preventDefault(); body.classList.remove('cta'); sfx('click',{g:.3}); toCharter(); });
 function pointRules(){ body.classList.add('cta'); setTimeoutSim(()=>body.classList.remove('cta'),12); }
 // a wallet that connects during this visit: straight to Your House and "Create my charter"
-{ let out=false, done=false; const chk=()=>{ if(done) return; if(document.querySelector('[data-testid=hud-guest],[data-x=in]')) out=true; else if(out&&document.querySelector('[data-testid=hud-account]')){ done=true; onWallet(); } };
+{ let out=false, done=false; const chk=()=>{ if(done) return; if(document.querySelector('[data-testid=hud-guest],[data-x=in]')) out=true; else if(out&&document.querySelector('[data-testid=hud-account]')){ done=true; if(!body.classList.contains('in-shop')) onWallet(); } }; /* signed in inside a room: the room shows the next step */
   new MutationObserver(chk).observe(body,{childList:true,subtree:true}); addEventListener('nearcarta:signin',()=>{ if(!done){ done=true; onWallet(); } }); }
 function onWallet(){ if(mode==='story') endStory(); toCharter('#create'); }
 world.toCharter=toCharter;
