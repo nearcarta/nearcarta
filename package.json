@@ -1,0 +1,26 @@
+{
+  "name": "nearcarta",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "backend",
+    "app"
+  ],
+  "scripts": {
+    "test": "npm -w backend test",
+    "test:integration": "npm -w backend run test:integration",
+    "build": "npm -w app run build",
+    "e2e": "playwright test -c e2e/playwright.config.js",
+    "verify": "node backend/scripts/verify-proofs.js",
+    "start": "node backend/src/server.js",
+    "test:contracts": "cd contracts/oath && cargo test && cd ../arena && cargo test --lib",
+    "tee": "node backend/scripts/record-tee.js",
+    "wasm-hash": "node -e \"const c=require('crypto'),b=require('bs58').default;console.log(b.encode(c.createHash('sha256').update(require('fs').readFileSync('contracts/artifacts/oath.wasm')).digest()))\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
+  }
+}
