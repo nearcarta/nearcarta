@@ -2,7 +2,7 @@
 
 A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money, and each move is checked first by the charter (the `oath` contract on NEAR), which holds the agent's rules. Agents ask. The charter answers. Each shop below is real on NEAR testnet, or real on 1Click mainnet as a dry quote (no spend).
 
-Deployed (testnet, read-only, no keys): https://nearcarta.vercel.app. Example: `/api/health`, `/api/guardhouse`. The e2e run against it is in `judges/proofs/e2e-vercel.json`: 11 passed, 2 skipped (the confidential quote and the TEE check need server keys that this deploy does not have). `render.yaml` describes the same API for Render (free plan, testnet); it is not deployed yet.
+Deployed (testnet, read-only, no keys): https://nearcarta.vercel.app. Example: `/api/health`, `/api/guardhouse`. The e2e run against it is in `judges/proofs/e2e-vercel.json`: 11 passed, 2 skipped (the confidential quote and the TEE check need server keys that this deploy does not have). The same API with its server keys runs on Render (free plan, testnet) from the `Dockerfile` image: https://nearcarta-api.onrender.com. There `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. Signing stays off (`signing: false`).
 
 ## Run it (2 minutes)
 ```
