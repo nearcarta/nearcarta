@@ -86,6 +86,15 @@ test('shop interiors get live data through the data interface', async ({ page })
   await expect(page.locator('#t-title')).toHaveText('Ferry');
 });
 
+test('mist bank: the street shows a hidden amount and the ledger binds to the oath', async ({ page, request }) => {
+  const m = await (await request.get('/api/mistbank')).json();
+  expect(m.street.amount_hidden).toBe(true); expect(m.oath.memo_on_chain).toBe(true); expect(m.binds).toBe(true);
+  expect(m.payout.txid).toBe(dep.mistbank.payout.txid);
+  await page.goto('/design/D8_shops/?2d');
+  const b = await page.evaluate(async () => (await import('/design/D6_dashboards/src/data.js')).BANK);
+  expect(b.src).toBe('testnet'); expect(b.street.hidden).toBe(true); expect(b.ledger.binds).toBe(true);
+});
+
 test('town view loads', async ({ page }) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/design/D9_world/');
