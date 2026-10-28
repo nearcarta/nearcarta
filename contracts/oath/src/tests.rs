@@ -1374,3 +1374,73 @@ fn batch_items_settle_one_by_one() {
 fn agent_key_scope_is_propose_and_propose_batch() {
     assert_eq!(AGENT_METHODS, "propose,propose_batch");
 }
+
+// R16.1 boundaries the first batch tests left open (found by cargo-mutants on the 85e0563 diff).
+#[test]
+fn batch_exactly_at_budget_is_allowed_and_ids_advance() {
+    let mut o = round(); // budget 2.5 NEAR
+    let ps = props(&o, &[("bob.test", NEAR / 2); 5]);
+    set("oath.test", T0);
+    assert!(o.propose_batch(ps).iter().all(|x| x.decision == "allowed"), "total == budget must pass");
+    assert_eq!(o.next_action, 5);
+    assert_eq!(o.usage_today(&"round".to_string()).count, 5);
+}
+
+#[test]
+fn batch_count_counts_earlier_actions_and_allows_exactly_the_max() {
+    let mut o = round();
+    let mut c = clause(&["bob.test", "bakery.test", "carol.test"], NEAR, 5 * NEAR / 2, false, None);
+    c.max_actions_per_day = 3;
+    set("owner.test", T0); let _ = o.set_clause("round".into(), c);
+    let p = prop(&o, "round", "bob.test", 5); assert_eq!(deny_reason(&mut o, p), "PROMISE"); // 1 used
+    let ps = props(&o, &[("bob.test", 5); 3]);
+    set("oath.test", T0);
+    assert!(o.propose_batch(ps).iter().all(|x| x.reason == "over_daily_action_count"), "1 + 3 > 3");
+    let ps = props(&o, &[("bob.test", 5); 2]);
+    set("oath.test", T0);
+    assert!(o.propose_batch(ps).iter().all(|x| x.decision == "allowed"), "1 + 2 == 3 must pass");
+    let ps = props(&o, &[("bob.test", 5); 2]);
+    set("oath.test", T0);
+    let out = o.propose_batch(ps); // the per-item check already sees 3 of 3 used
+    assert_eq!((out[0].reason.as_str(), out[1].reason.as_str()), ("over_daily_action_count", "batch_refused"));
+}
+
+#[test]
+fn batch_storage_reserve_exact_boundary() {
+    let mut o = round();
+    let amount = NEAR / 100;
+    let byte_cost = { set("oath.test", T0); env::storage_byte_cost().as_yoctonear() };
+    // storage now + 600 bytes per item, plus the 0.1 NEAR reserve, plus the native total.
+    let need = (2_000u128 + 600 * 3) * byte_cost + NEAR / 10 + 3 * amount;
+    for (bal, want_ok) in [(need - 1, false), (need, true)] {
+        let ps = props(&o, &[("bob.test", amount), ("bakery.test", amount), ("carol.test", amount)]);
+        let mut b = ctx("oath.test", T0); b.account_balance(NearToken::from_yoctonear(bal)).storage_usage(2_000); testing_env!(b.build());
+        let out = o.propose_batch(ps);
+        if want_ok { assert!(out.iter().all(|x| x.decision == "allowed"), "balance == need must pass: {:?}", out[0].reason); }
+        else { assert!(out.iter().all(|x| x.reason == "storage_reserve_low"), "{:?}", out[0].reason); }
+    }
+}
+
+#[test]
+#[should_panic(expected = "ERR_LOW_GAS")]
+fn batch_ft_needs_ft_gas_for_every_item() {
+    let mut o = round();
+    let mut c = clause(&["bob.test", "carol.test"], NEAR, 5 * NEAR / 2, false, None);
+    c.asset = Asset::Ft { token: acc("usdc.test") };
+    set("owner.test", T0); let _ = o.set_clause("round".into(), c);
+    let ps = props(&o, &[("bob.test", 1), ("carol.test", 1)]);
+    // 100 Tgas covers 2 native items (2 x 25) but not 2 token items (2 x 60).
+    let mut b = ctx("oath.test", T0); b.prepaid_gas(Gas::from_tgas(100)); testing_env!(b.build());
+    o.propose_batch(ps);
+}
+
+#[test]
+#[should_panic(expected = "ERR_NOT_AGENT_KEY")]
+fn batch_with_wrong_key_panics() {
+    let mut o = round();
+    let ps = props(&o, &[("bob.test", 1), ("carol.test", 1)]);
+    let mut b = ctx("oath.test", T0);
+    b.signer_account_pk("ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847".parse().unwrap());
+    testing_env!(b.build());
+    o.propose_batch(ps);
+}
