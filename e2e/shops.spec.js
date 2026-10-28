@@ -42,6 +42,7 @@ test('guardhouse: oath account has no full-access key and a propose-only agent k
 
 test('guardhouse: NEAR AI TEE preflight verifies gateway and model quotes for a browser nonce', async ({ page }) => {
   test.setTimeout(90_000);
+  test.skip(!(await (await page.request.get('/api/health')).json()).features.nearAi, 'no NEAR AI key on this deploy');
   await page.goto('/#guardhouse');
   await page.getByTestId('tee-btn').click();
   const v = page.getByTestId('tee-verdict');
