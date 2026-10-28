@@ -40,7 +40,7 @@ Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-re
 `$API` is `http://localhost:8787` after `npm start`.
 
 ## Layout
-- `contracts/oath`: the agent charter (Rust, near-sdk). 38 unit tests, plus near-workspaces sandbox and 10 exploit reproductions in `tests/`.
+- `contracts/oath`: the agent charter (Rust, near-sdk). 50 unit tests, plus near-workspaces sandbox and 10 exploit reproductions in `tests/`.
 - `contracts/artifacts`: the deployed charter wasm. `npm run wasm-hash` prints its hash, which equals the on-chain code_hash.
 - `contracts/townhall`, `contracts/arena`, `contracts/toll`, `contracts/mock_ft`: the shop contracts.
 - `backend/`: Hono API that reads chain, 1Click and NEAR AI. `scripts/` holds the testnet demo and the proof checker.
