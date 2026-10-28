@@ -2,6 +2,8 @@
 
 A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money, and each move is checked first by an on-chain oath: a contract that holds the agent's rules. Each shop below is real on NEAR testnet, or real on 1Click mainnet as a dry quote (no spend).
 
+Deployed (testnet, read-only, no keys): https://nearcarta.vercel.app. Example: `/api/health`, `/api/guardhouse`. The e2e run against it is in `judges/proofs/e2e-vercel.json`: 10 passed, 2 skipped (the confidential quote and the TEE check need server keys that this deploy does not have). The same API runs on Render via `render.yaml`.
+
 ## Run it (2 minutes)
 ```
 npm ci
