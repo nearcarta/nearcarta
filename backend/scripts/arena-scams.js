@@ -2,7 +2,7 @@
 // The agent here is scripted to be fooled every time: it proposes exactly what the scam asks for.
 // That is the worst case for a model. The Arena contract (the charter) decides each proposal on chain.
 // Each prompt is committed as sha256 before the agent acts, then revealed on chain.
-// Usage: ARENA_KEYS_FILE=... [ARENA=contract OWNER_ROLE=role FC_KEYS_FILE=...] node backend/scripts/arena-scams.js   (testnet only)
+// Usage: ARENA_KEYS_FILE=... ARENA=arena.r6vamvr9brhx-arena2.testnet FC_KEYS_FILE=... [OWNER_ROLE=role] node backend/scripts/arena-scams.js   (testnet only)
 // FC_KEYS_FILE holds the function-call keys scoped to ARENA (written by arena-fresh.js).
 import { Account, JsonRpcProvider, actions as A } from 'near-api-js';
 import fs from 'node:fs';
@@ -14,7 +14,7 @@ const K = JSON.parse(fs.readFileSync(process.env.ARENA_KEYS_FILE));
 const OUT = process.env.OUT || new URL('../../judges/proofs/arena-scams.json', import.meta.url).pathname;
 const provider = new JsonRpcProvider({ url: RPC });
 const id = r => K[r].account_id;
-const OWNER = process.env.OWNER_ROLE || 'arena3';
+const OWNER = process.env.OWNER_ROLE || 'arena2'; // owner of the 0-key arena.r6vamvr9brhx-arena2 contract
 const C = process.env.ARENA || id(OWNER);
 if (process.env.FC_KEYS_FILE) for (const [r, v] of Object.entries(JSON.parse(fs.readFileSync(process.env.FC_KEYS_FILE)))) K[r].fc_private_key = v.private_key;
 const N = x => (BigInt(Math.round(x * 1000)) * 10n ** 21n).toString();

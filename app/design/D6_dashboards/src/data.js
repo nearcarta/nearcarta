@@ -120,13 +120,13 @@ export const POOLS = [
   { tok: 'BTC', size: 0.39, unit: 'BTC' },
 ];
 
-// R7 Town Hall (Trezu template), all testnet
+// R7 Town Hall (DAO proposal template), all testnet
 export const TH = {
   dao: 'r7thmvr8maey.sputnikv2.testnet', oath: 'r7thmvr8maey-oath.testnet', agent: 'r7thmvr8maey-agent.testnet',
   versions: [
     { v: 1, cap: 1, total: 2, threshold: 2, how: 'Deployed with the oath', tx: 'GrFkigzFJJ4SzfN5bNZb27RCsg9Ej7xt5C5ws9MpVTxG' },
     { v: 2, cap: 0.25, total: 1, threshold: 2, how: 'Proposal 1 · council 2/0', tx: '8cRCU3LgsrL6zGzZZHWUfAwwzxhCEqdotEbxcJ4UJMQB', deny: 'newcomer' },
-    { v: 3, cap: 0.15, total: 0.5, threshold: 1, how: 'Proposal 4 · Trezu template', tx: 'wk37jmF1SYGoQMG4CYW6Y3VXpQKHMpUW3DppwDwfzs8' },
+    { v: 3, cap: 0.15, total: 0.5, threshold: 1, how: 'Proposal 4 · DAO proposal template', tx: 'wk37jmF1SYGoQMG4CYW6Y3VXpQKHMpUW3DppwDwfzs8' },
   ],
   log: [
     { id: 'N1', who: 'Councillor', what: 'set_policy called directly', res: 'ERR_NOT_DAO', tx: '8En5bHgASdofGvDXi8L2b458xNwRa5GFzwMiPQMdmtdx' },
@@ -139,7 +139,7 @@ export const TH = {
     { id: 'N9', who: 'Agent', what: 'votes on its own proposal', res: 'ERR_PERMISSION_DENIED', tx: 'Vgop8whFzJezu3ddCj3ZNzjTJPHQs78pA2muGWAPncY' },
     { id: 'N10', who: 'Agent', what: 'rewards after the freeze vote', res: 'ERR_FROZEN', tx: '9X2Yza6z2KCJ7qKh4qLN993ztpRVNKxJekbzRKvJuxhA' },
   ],
-  proposal: { id: 4, tag: '[trezu-tmpl:town-hall-oath]', filed: 'D4pcyLz9TLmg9A8GqsvtpG9FWvujWtDg21WydsFiJUzT', votes: ['wk37jmF1SYGoQMG4CYW6Y3VXpQKHMpUW3DppwDwfzs8', 'BK9MrTrBsxor3pKRo8U32KjSwKHZdCLPLGsGdVRKLQn9'] },
+  proposal: { id: 4, filed: 'D4pcyLz9TLmg9A8GqsvtpG9FWvujWtDg21WydsFiJUzT', votes: ['wk37jmF1SYGoQMG4CYW6Y3VXpQKHMpUW3DppwDwfzs8', 'BK9MrTrBsxor3pKRo8U32KjSwKHZdCLPLGsGdVRKLQn9'] },
 };
 
 // R4 Chain Signatures (testnet MPC v1.signer-prod.testnet v3.17.0)

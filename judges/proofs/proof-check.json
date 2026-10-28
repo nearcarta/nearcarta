@@ -1,5 +1,5 @@
 {
- "at": "2026-10-28T03:41:19.921Z",
+ "at": "2026-10-28T05:49:10.990Z",
  "rows": [
   {
    "shop": "guardhouse",
@@ -211,167 +211,223 @@
   },
   {
    "shop": "townhall",
-   "label": "create_dao",
-   "hash": "3Pd1KauqoGDCDqt8ZLuXqi1gAm6LQcBzuSb6piqUwHk7",
-   "url": "https://testnet.nearblocks.io/txns/3Pd1KauqoGDCDqt8ZLuXqi1gAm6LQcBzuSb6piqUwHk7",
-   "signer": "r7thmvr8maey-council1.testnet",
-   "receiver": "sputnikv2.testnet",
-   "method": "create",
-   "result": {
-    "ok": true,
-    "value": null
-   },
-   "events": [],
-   "found": true
-  },
-  {
-   "shop": "townhall",
-   "label": "agent_paid_v1",
-   "hash": "4stGNNjVP2e5jQ944xWv58SiqCk26KbZJd6bk492b51i",
-   "url": "https://testnet.nearblocks.io/txns/4stGNNjVP2e5jQ944xWv58SiqCk26KbZJd6bk492b51i",
-   "signer": "r7thmvr8maey-agent.testnet",
-   "receiver": "r7thmvr8maey-oath.testnet",
-   "method": "agent_reward",
+   "label": "dao_creates_charter",
+   "hash": "ARcbZf4kTdcPGuS2kM8zv4Lruhz8NCFLaes14VbK1huZ",
+   "url": "https://testnet.nearblocks.io/txns/ARcbZf4kTdcPGuS2kM8zv4Lruhz8NCFLaes14VbK1huZ",
+   "signer": "r7thmvr8maey-council2.testnet",
+   "receiver": "r7thmvr8maey.sputnikv2.testnet",
+   "method": "act_proposal",
    "result": {
     "ok": true,
     "value": null
    },
    "events": [
-    "reward_paid"
+    "charter_requested",
+    "policy",
+    "charter_created"
    ],
    "found": true
   },
   {
    "shop": "townhall",
-   "label": "oath_v2_proposal",
-   "hash": "33ZBFx5ATQd4e3uF3a1NVC9UB5t6gp4VB4g3nvYdxzMA",
-   "url": "https://testnet.nearblocks.io/txns/33ZBFx5ATQd4e3uF3a1NVC9UB5t6gp4VB4g3nvYdxzMA",
+   "label": "dao_votes_rule",
+   "hash": "GaAehnV8NgJuT46yCRrJFyqi7149tgEjKtfch1Hv78ou",
+   "url": "https://testnet.nearblocks.io/txns/GaAehnV8NgJuT46yCRrJFyqi7149tgEjKtfch1Hv78ou",
    "signer": "r7thmvr8maey-council2.testnet",
-   "receiver": "r7thmvr8maey.sputnikv2.testnet",
-   "method": "add_proposal",
-   "result": {
-    "ok": true,
-    "value": 1
-   },
-   "events": [],
-   "found": true
-  },
-  {
-   "shop": "townhall",
-   "label": "over_cap_refused",
-   "hash": "71Y4a3a1Lb8UDJnJgmuk8NPUUoSA8Z8cSCZ2o4K57rw7",
-   "url": "https://testnet.nearblocks.io/txns/71Y4a3a1Lb8UDJnJgmuk8NPUUoSA8Z8cSCZ2o4K57rw7",
-   "signer": "r7thmvr8maey-agent.testnet",
-   "receiver": "r7thmvr8maey-oath.testnet",
-   "method": "agent_reward",
-   "result": {
-    "ok": false,
-    "error": "Smart contract panicked: ERR_OATH_PER_REWARD_CAP"
-   },
-   "events": [],
-   "found": true
-  },
-  {
-   "shop": "townhall",
-   "label": "denied_newcomer",
-   "hash": "8T7octBPa5cWSXdLR7p1ycs7FjX4bSChuPy4KhceMHqT",
-   "url": "https://testnet.nearblocks.io/txns/8T7octBPa5cWSXdLR7p1ycs7FjX4bSChuPy4KhceMHqT",
-   "signer": "r7thmvr8maey-agent.testnet",
-   "receiver": "r7thmvr8maey-oath.testnet",
-   "method": "agent_reward",
-   "result": {
-    "ok": false,
-    "error": "Smart contract panicked: ERR_OATH_DENY"
-   },
-   "events": [],
-   "found": true
-  },
-  {
-   "shop": "townhall",
-   "label": "fake_evidence",
-   "hash": "2ycXdfvEx37s5ykTNHnZvhaVWbBU6BKZc5RBynaZhmTK",
-   "url": "https://testnet.nearblocks.io/txns/2ycXdfvEx37s5ykTNHnZvhaVWbBU6BKZc5RBynaZhmTK",
-   "signer": "r7thmvr8maey-agent.testnet",
-   "receiver": "r7thmvr8maey-oath.testnet",
-   "method": "agent_reward",
-   "result": {
-    "ok": false,
-    "error": "Smart contract panicked: ERR_NO_EVIDENCE"
-   },
-   "events": [],
-   "found": true
-  },
-  {
-   "shop": "townhall",
-   "label": "replay_refused",
-   "hash": "7RGcNseeSTXq6xgzqBd88TgbWPueQhDfCUafaC1Yzhis",
-   "url": "https://testnet.nearblocks.io/txns/7RGcNseeSTXq6xgzqBd88TgbWPueQhDfCUafaC1Yzhis",
-   "signer": "r7thmvr8maey-agent.testnet",
-   "receiver": "r7thmvr8maey-oath.testnet",
-   "method": "agent_reward",
-   "result": {
-    "ok": false,
-    "error": "Smart contract panicked: ERR_ALREADY_CLAIMED"
-   },
-   "events": [],
-   "found": true
-  },
-  {
-   "shop": "townhall",
-   "label": "agent_votes_own_refused",
-   "hash": "Vgop8whFzJezu3ddCj3ZNzjTJPHQs78pA2muGWAPncY",
-   "url": "https://testnet.nearblocks.io/txns/Vgop8whFzJezu3ddCj3ZNzjTJPHQs78pA2muGWAPncY",
-   "signer": "r7thmvr8maey-agent.testnet",
    "receiver": "r7thmvr8maey.sputnikv2.testnet",
    "method": "act_proposal",
    "result": {
-    "ok": false,
-    "error": "Smart contract panicked: panicked at 'ERR_PERMISSION_DENIED', sputnikdao2/src/proposals.rs:546:9"
+    "ok": true,
+    "value": null
    },
-   "events": [],
+   "events": [
+    "policy",
+    "agent_key",
+    "policy",
+    "policy",
+    "agent_key"
+   ],
    "found": true
   },
   {
    "shop": "townhall",
-   "label": "freeze_proposal",
-   "hash": "HQFV3C34a9ym4oZiU28JQYBPZCmmLEawzxHvLSnnDmyU",
-   "url": "https://testnet.nearblocks.io/txns/HQFV3C34a9ym4oZiU28JQYBPZCmmLEawzxHvLSnnDmyU",
-   "signer": "r7thmvr8maey-council1.testnet",
-   "receiver": "r7thmvr8maey.sputnikv2.testnet",
-   "method": "add_proposal",
+   "label": "agent_reward_allowed",
+   "hash": "9nZBURPsxpWFy5pJCrLbMeyvZQXPLgHXM8UXxAogxpBZ",
+   "url": "https://testnet.nearblocks.io/txns/9nZBURPsxpWFy5pJCrLbMeyvZQXPLgHXM8UXxAogxpBZ",
+   "signer": "townhall.nccharters-17102.testnet",
+   "receiver": "townhall.nccharters-17102.testnet",
+   "method": "propose",
    "result": {
     "ok": true,
-    "value": 3
+    "value": {
+     "action_id": "0",
+     "decision": "allowed",
+     "status": "confirmed",
+     "reason": "ok"
+    }
+   },
+   "events": [
+    "action",
+    "settle"
+   ],
+   "found": true
+  },
+  {
+   "shop": "townhall",
+   "label": "over_cap_denied",
+   "hash": "Ff6x3wtSwwHET5gaPKVb9k6Gen5RsnhUB3JhZPmqb1x5",
+   "url": "https://testnet.nearblocks.io/txns/Ff6x3wtSwwHET5gaPKVb9k6Gen5RsnhUB3JhZPmqb1x5",
+   "signer": "townhall.nccharters-17102.testnet",
+   "receiver": "townhall.nccharters-17102.testnet",
+   "method": "propose",
+   "result": {
+    "ok": true,
+    "value": {
+     "action_id": null,
+     "decision": "denied",
+     "status": "denied",
+     "reason": "over_per_action_cap"
+    }
+   },
+   "events": [
+    "action"
+   ],
+   "found": true
+  },
+  {
+   "shop": "townhall",
+   "label": "newcomer_denied",
+   "hash": "HdSjQqyiwEnHTy4z6dDJuBUrmqURwrteHevGybMwrWBQ",
+   "url": "https://testnet.nearblocks.io/txns/HdSjQqyiwEnHTy4z6dDJuBUrmqURwrteHevGybMwrWBQ",
+   "signer": "townhall.nccharters-17102.testnet",
+   "receiver": "townhall.nccharters-17102.testnet",
+   "method": "propose",
+   "result": {
+    "ok": true,
+    "value": {
+     "action_id": null,
+     "decision": "denied",
+     "status": "denied",
+     "reason": "receiver_not_allowlisted"
+    }
+   },
+   "events": [
+    "action"
+   ],
+   "found": true
+  },
+  {
+   "shop": "townhall",
+   "label": "council_member_direct_refused",
+   "hash": "2oj5tpL8FPSMHVG9yKVWkBfDoiStgWQHgSNqJ3htVLnS",
+   "url": "https://testnet.nearblocks.io/txns/2oj5tpL8FPSMHVG9yKVWkBfDoiStgWQHgSNqJ3htVLnS",
+   "signer": "r7thmvr8maey-council1.testnet",
+   "receiver": "townhall.nccharters-17102.testnet",
+   "method": "set_clause",
+   "result": {
+    "ok": false,
+    "error": "Smart contract panicked: ERR_NOT_GOVERNOR"
    },
    "events": [],
    "found": true
   },
   {
    "shop": "townhall",
-   "label": "reward_after_freeze_refused",
-   "hash": "9X2Yza6z2KCJ7qKh4qLN993ztpRVNKxJekbzRKvJuxhA",
-   "url": "https://testnet.nearblocks.io/txns/9X2Yza6z2KCJ7qKh4qLN993ztpRVNKxJekbzRKvJuxhA",
-   "signer": "r7thmvr8maey-agent.testnet",
-   "receiver": "r7thmvr8maey-oath.testnet",
-   "method": "agent_reward",
+   "label": "dao_freeze",
+   "hash": "FGY3jGnftpgEZsvXP1aA7sXgPuiiAn76SyqFyy7m5sDd",
+   "url": "https://testnet.nearblocks.io/txns/FGY3jGnftpgEZsvXP1aA7sXgPuiiAn76SyqFyy7m5sDd",
+   "signer": "r7thmvr8maey-council2.testnet",
+   "receiver": "r7thmvr8maey.sputnikv2.testnet",
+   "method": "act_proposal",
+   "result": {
+    "ok": true,
+    "value": null
+   },
+   "events": [
+    "freeze"
+   ],
+   "found": true
+  },
+  {
+   "shop": "townhall",
+   "label": "agent_after_freeze_denied",
+   "hash": "Eti3ptLi4diQxxnzLkTQrMcj3zv8W5DCeVcFejLQJucj",
+   "url": "https://testnet.nearblocks.io/txns/Eti3ptLi4diQxxnzLkTQrMcj3zv8W5DCeVcFejLQJucj",
+   "signer": "townhall.nccharters-17102.testnet",
+   "receiver": "townhall.nccharters-17102.testnet",
+   "method": "propose",
+   "result": {
+    "ok": true,
+    "value": {
+     "action_id": null,
+     "decision": "denied",
+     "status": "denied",
+     "reason": "frozen"
+    }
+   },
+   "events": [
+    "action"
+   ],
+   "found": true
+  },
+  {
+   "shop": "townhall",
+   "label": "council_unfreeze_refused",
+   "hash": "Gqos6woVSGGaMN985qitBF89KBBbVZyVF3dwtN2aRNMw",
+   "url": "https://testnet.nearblocks.io/txns/Gqos6woVSGGaMN985qitBF89KBBbVZyVF3dwtN2aRNMw",
+   "signer": "r7thmvr8maey-council1.testnet",
+   "receiver": "townhall.nccharters-17102.testnet",
+   "method": "unfreeze",
    "result": {
     "ok": false,
-    "error": "Smart contract panicked: ERR_FROZEN"
+    "error": "Smart contract panicked: ERR_DAO_ONLY_UNFREEZE"
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "townhall",
+   "label": "dao_unfreeze",
+   "hash": "G2GVPUAmatWGAuLD1qUQT4TomYFPzaVGcRaQohCxkPCG",
+   "url": "https://testnet.nearblocks.io/txns/G2GVPUAmatWGAuLD1qUQT4TomYFPzaVGcRaQohCxkPCG",
+   "signer": "r7thmvr8maey-council2.testnet",
+   "receiver": "r7thmvr8maey.sputnikv2.testnet",
+   "method": "act_proposal",
+   "result": {
+    "ok": true,
+    "value": null
+   },
+   "events": [
+    "freeze"
+   ],
+   "found": true
+  },
+  {
+   "shop": "arena",
+   "label": "deploy",
+   "hash": "AZBSvvZeuf1vXLQoSWvSDHzLz1DwmU4zNiLCXkTwVM5g",
+   "url": "https://testnet.nearblocks.io/txns/AZBSvvZeuf1vXLQoSWvSDHzLz1DwmU4zNiLCXkTwVM5g",
+   "signer": "r6vamvr9brhx-arena2.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
+   "method": "0,Transfer,DeployContract,new",
+   "result": {
+    "ok": true,
+    "value": null
    },
    "events": [],
    "found": true
   },
   {
    "shop": "arena",
-   "label": "deploy",
-   "hash": "7gsEXZAHxckdX1iz6EkweyEFcAZpCvbngCV8VBihkuvK",
-   "url": "https://testnet.nearblocks.io/txns/7gsEXZAHxckdX1iz6EkweyEFcAZpCvbngCV8VBihkuvK",
-   "signer": "r6vamvr9brhx-arena3.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
-   "method": "DeployContract",
+   "label": "not_owner_mint_refused",
+   "hash": "6LppacZpfpRT2kKCo8FCx3RJksuyfsUT7jjivTuoNoqB",
+   "url": "https://testnet.nearblocks.io/txns/6LppacZpfpRT2kKCo8FCx3RJksuyfsUT7jjivTuoNoqB",
+   "signer": "r6vamvr9brhx-mallory.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
+   "method": "mint_guardian",
    "result": {
-    "ok": true,
-    "value": null
+    "ok": false,
+    "error": "Smart contract panicked: ERR_OWNER_ONLY"
    },
    "events": [],
    "found": true
@@ -379,10 +435,10 @@
   {
    "shop": "arena",
    "label": "jailbreak_cap_refused",
-   "hash": "7ci2TXx5Um6AWqpsNWq23wLnyvAoJJCsGis4oV8oekdn",
-   "url": "https://testnet.nearblocks.io/txns/7ci2TXx5Um6AWqpsNWq23wLnyvAoJJCsGis4oV8oekdn",
+   "hash": "GVPhkBgMMoBkw7Ezb78bCkeuMPB1WL2fJYfYBh17Eoqj",
+   "url": "https://testnet.nearblocks.io/txns/GVPhkBgMMoBkw7Ezb78bCkeuMPB1WL2fJYfYBh17Eoqj",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -397,10 +453,10 @@
   {
    "shop": "arena",
    "label": "new_phone_allowlist_refused",
-   "hash": "4apPdjCPLux3xFPQBK328D4j1YSjQFj1viVxaMkShqCb",
-   "url": "https://testnet.nearblocks.io/txns/4apPdjCPLux3xFPQBK328D4j1YSjQFj1viVxaMkShqCb",
+   "hash": "GNVB7nCyZHtVzie1ZAx8HV82ZgNUkWUm5wrgTp8twFg1",
+   "url": "https://testnet.nearblocks.io/txns/GNVB7nCyZHtVzie1ZAx8HV82ZgNUkWUm5wrgTp8twFg1",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -415,10 +471,10 @@
   {
    "shop": "arena",
    "label": "fake_password_refused",
-   "hash": "FabRj9boXtMj6rMiPD4Z7Y5JHTYCVnJNcw2MENTPc1G4",
-   "url": "https://testnet.nearblocks.io/txns/FabRj9boXtMj6rMiPD4Z7Y5JHTYCVnJNcw2MENTPc1G4",
+   "hash": "5cgdGosrf7Vki2WNRBPaCybD7TW4xpXujVn3FU5BZsFB",
+   "url": "https://testnet.nearblocks.io/txns/5cgdGosrf7Vki2WNRBPaCybD7TW4xpXujVn3FU5BZsFB",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -433,10 +489,10 @@
   {
    "shop": "arena",
    "label": "gift_nft_refused",
-   "hash": "8uiZJJhcnPvpYz289ZdFDYuQxv3sGvjMGFbrXKUVRnBR",
-   "url": "https://testnet.nearblocks.io/txns/8uiZJJhcnPvpYz289ZdFDYuQxv3sGvjMGFbrXKUVRnBR",
+   "hash": "HUpoJ4bLHUixTPcYP9dbDp8AxuzkVa27fpYYULeWEc1a",
+   "url": "https://testnet.nearblocks.io/txns/HUpoJ4bLHUixTPcYP9dbDp8AxuzkVa27fpYYULeWEc1a",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -450,11 +506,47 @@
   },
   {
    "shop": "arena",
-   "label": "bounty_solved",
-   "hash": "Gt4AaoqmpPWwd9kgLEdhsFtxAJ45CXoHsspCdcWdvAGY",
-   "url": "https://testnet.nearblocks.io/txns/Gt4AaoqmpPWwd9kgLEdhsFtxAJ45CXoHsspCdcWdvAGY",
+   "label": "handoff_without_approval_refused",
+   "hash": "CNWJwgCKjq5ct5548CpKZ8UrA6WbC9z3J1PAwxsbcR99",
+   "url": "https://testnet.nearblocks.io/txns/CNWJwgCKjq5ct5548CpKZ8UrA6WbC9z3J1PAwxsbcR99",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
+   "method": "agent_act",
+   "result": {
+    "ok": true,
+    "value": "C8_NO_APPROVAL"
+   },
+   "events": [
+    "mt_mint",
+    "decision"
+   ],
+   "found": true
+  },
+  {
+   "shop": "arena",
+   "label": "pay_allowlisted",
+   "hash": "9q819hWJxgyW52WGoN5m5aB2GgixVzVuXv5iq9KgjCEp",
+   "url": "https://testnet.nearblocks.io/txns/9q819hWJxgyW52WGoN5m5aB2GgixVzVuXv5iq9KgjCEp",
+   "signer": "r6vamvr9brhx-agent.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
+   "method": "agent_act",
+   "result": {
+    "ok": true,
+    "value": "ALLOW"
+   },
+   "events": [
+    "decision",
+    "settled"
+   ],
+   "found": true
+  },
+  {
+   "shop": "arena",
+   "label": "bounty_solved",
+   "hash": "BYxwXepAkUypXeqyYomYrCDoqTpVZwzg9LfLrgbk5dNd",
+   "url": "https://testnet.nearblocks.io/txns/BYxwXepAkUypXeqyYomYrCDoqTpVZwzg9LfLrgbk5dNd",
+   "signer": "r6vamvr9brhx-agent.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -470,10 +562,10 @@
   {
    "shop": "arena",
    "label": "sell_mid_payout_refused",
-   "hash": "3frX2RwkuqQb4BY9ka9C3436xXCam72euNLK3fmhV1en",
-   "url": "https://testnet.nearblocks.io/txns/3frX2RwkuqQb4BY9ka9C3436xXCam72euNLK3fmhV1en",
-   "signer": "r6vamvr9brhx-carol.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "hash": "3DWtGfKGoQyRvMYnzwDzXMZzyN2XsxeVAxzowFWRSvNF",
+   "url": "https://testnet.nearblocks.io/txns/3DWtGfKGoQyRvMYnzwDzXMZzyN2XsxeVAxzowFWRSvNF",
+   "signer": "r6vamvr9brhx-market.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "nft_transfer",
    "result": {
     "ok": false,
@@ -484,11 +576,62 @@
   },
   {
    "shop": "arena",
+   "label": "sealed_after_sale_refused",
+   "hash": "5xNbTgzae2yUDGMcJNoWnA2VCTHBDXY4tsPekoC6Nz5t",
+   "url": "https://testnet.nearblocks.io/txns/5xNbTgzae2yUDGMcJNoWnA2VCTHBDXY4tsPekoC6Nz5t",
+   "signer": "r6vamvr9brhx-agent.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
+   "method": "agent_act",
+   "result": {
+    "ok": true,
+    "value": "C0_FROZEN"
+   },
+   "events": [
+    "mt_mint",
+    "decision"
+   ],
+   "found": true
+  },
+  {
+   "shop": "arena",
+   "label": "std_transfer_outside_policy_refused",
+   "hash": "AsDqTQD7byQuSs7t1jJxYKwHAGDsCPYSR542Rd362bTj",
+   "url": "https://testnet.nearblocks.io/txns/AsDqTQD7byQuSs7t1jJxYKwHAGDsCPYSR542Rd362bTj",
+   "signer": "r6vamvr9brhx-agent.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
+   "method": "nft_transfer",
+   "result": {
+    "ok": false,
+    "error": "Smart contract panicked: ERR_OATH_C7_HANDOFF"
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "arena",
+   "label": "handoff_under_policy",
+   "hash": "DSjL7BmDMwjyuvpPuHtrzrU1UiKZUZDK5JC6YCKrkjpW",
+   "url": "https://testnet.nearblocks.io/txns/DSjL7BmDMwjyuvpPuHtrzrU1UiKZUZDK5JC6YCKrkjpW",
+   "signer": "r6vamvr9brhx-agent.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
+   "method": "agent_act",
+   "result": {
+    "ok": true,
+    "value": "ALLOW"
+   },
+   "events": [
+    "nft_transfer",
+    "decision"
+   ],
+   "found": true
+  },
+  {
+   "shop": "arena",
    "label": "season_close",
-   "hash": "614BiQmKEjnamR1ZJMkfgwPEn9e7jAxUa3XgvNv7srq5",
-   "url": "https://testnet.nearblocks.io/txns/614BiQmKEjnamR1ZJMkfgwPEn9e7jAxUa3XgvNv7srq5",
-   "signer": "r6vamvr9brhx-arena3.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "hash": "2QEE5p9xyfdQpFXZTv3icBam1yS9XG6KbEESdySVhN23",
+   "url": "https://testnet.nearblocks.io/txns/2QEE5p9xyfdQpFXZTv3icBam1yS9XG6KbEESdySVhN23",
+   "signer": "r6vamvr9brhx-arena2.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "season_close",
    "result": {
     "ok": true,
@@ -502,10 +645,10 @@
   {
    "shop": "arena",
    "label": "scam_fake_invoice_refused",
-   "hash": "3YY2fuD1uZeHvTYt3kZMeXgnF2PsN4vuYfDC2DSZEuHF",
-   "url": "https://testnet.nearblocks.io/txns/3YY2fuD1uZeHvTYt3kZMeXgnF2PsN4vuYfDC2DSZEuHF",
+   "hash": "2kRG9QE4LKF4nDsDD44dpkVWEoHvEWVwM3fcc7WFfWdb",
+   "url": "https://testnet.nearblocks.io/txns/2kRG9QE4LKF4nDsDD44dpkVWEoHvEWVwM3fcc7WFfWdb",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -519,10 +662,10 @@
   {
    "shop": "arena",
    "label": "scam_injected_recipient_refused",
-   "hash": "J1gXQC4aceKn9Ttm9i28EoDAxERzHkqhfQRGWcpWFQZQ",
-   "url": "https://testnet.nearblocks.io/txns/J1gXQC4aceKn9Ttm9i28EoDAxERzHkqhfQRGWcpWFQZQ",
+   "hash": "6qULxsrbUaGNE5LmcGuniPNGxqmZGUoSqE9MM6B8Biwi",
+   "url": "https://testnet.nearblocks.io/txns/6qULxsrbUaGNE5LmcGuniPNGxqmZGUoSqE9MM6B8Biwi",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -536,10 +679,10 @@
   {
    "shop": "arena",
    "label": "scam_authority_urgency_refused",
-   "hash": "D7TKcU5LK6fCgMEHypegqhn1WGLUCQ8Exigmy9VZpHnt",
-   "url": "https://testnet.nearblocks.io/txns/D7TKcU5LK6fCgMEHypegqhn1WGLUCQ8Exigmy9VZpHnt",
+   "hash": "FiaHEsXEYkBpCnb8CU7iYUcNwmbAKNUgmfAjeGYHpbHo",
+   "url": "https://testnet.nearblocks.io/txns/FiaHEsXEYkBpCnb8CU7iYUcNwmbAKNUgmfAjeGYHpbHo",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -553,10 +696,10 @@
   {
    "shop": "arena",
    "label": "scam_lookalike_refused",
-   "hash": "TNCp754ADywpUCYqeZDfkcv1FTzVwkhWEzg2kC2JvQ4",
-   "url": "https://testnet.nearblocks.io/txns/TNCp754ADywpUCYqeZDfkcv1FTzVwkhWEzg2kC2JvQ4",
+   "hash": "95PgMqSuM1pG7CrnmFMSQfB8kPvQnvaNRvEJ4Dn2TYym",
+   "url": "https://testnet.nearblocks.io/txns/95PgMqSuM1pG7CrnmFMSQfB8kPvQnvaNRvEJ4Dn2TYym",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -570,10 +713,10 @@
   {
    "shop": "arena",
    "label": "scam_split_under_cap_refused",
-   "hash": "FpfccoSPEaoo3qzcp15FoJhh5kPoXnGvLyHxH4KJZeH8",
-   "url": "https://testnet.nearblocks.io/txns/FpfccoSPEaoo3qzcp15FoJhh5kPoXnGvLyHxH4KJZeH8",
+   "hash": "9UWjcJZoXjK6QsMRQ7YokmQM3okwdVhGwXx9pSdjnkT6",
+   "url": "https://testnet.nearblocks.io/txns/9UWjcJZoXjK6QsMRQ7YokmQM3okwdVhGwXx9pSdjnkT6",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -588,10 +731,10 @@
   {
    "shop": "arena",
    "label": "scam_repeat_drain_refused",
-   "hash": "4qH1zbrWNXeJ4pscPiVpaZg9eW666jLsTA9o9hLSZZ8Z",
-   "url": "https://testnet.nearblocks.io/txns/4qH1zbrWNXeJ4pscPiVpaZg9eW666jLsTA9o9hLSZZ8Z",
+   "hash": "DZ5Xs5pjRVw1HC6SaPj86UzpGqHF39YvDamPXs1dYY9w",
+   "url": "https://testnet.nearblocks.io/txns/DZ5Xs5pjRVw1HC6SaPj86UzpGqHF39YvDamPXs1dYY9w",
    "signer": "r6vamvr9brhx-agent.testnet",
-   "receiver": "r6vamvr9brhx-arena3.testnet",
+   "receiver": "arena.r6vamvr9brhx-arena2.testnet",
    "method": "agent_act",
    "result": {
     "ok": true,
@@ -605,11 +748,11 @@
   {
    "shop": "toll",
    "label": "deploy",
-   "hash": "5o4Mk8bLbiU9GhZvTSzAecXkgLFGYxMd2PTP8vzm5syL",
-   "url": "https://testnet.nearblocks.io/txns/5o4Mk8bLbiU9GhZvTSzAecXkgLFGYxMd2PTP8vzm5syL",
+   "hash": "6vFJ1oqDQnTvbVqpUK5fcJRfCmQ1joSZFcsuXUJpFCoZ",
+   "url": "https://testnet.nearblocks.io/txns/6vFJ1oqDQnTvbVqpUK5fcJRfCmQ1joSZFcsuXUJpFCoZ",
    "signer": "r4csmvr86zk4.testnet",
-   "receiver": "oath.r4csmvr86zk4.testnet",
-   "method": "0,Transfer,AddKey,DeployContract,new",
+   "receiver": "toll.r4csmvr86zk4.testnet",
+   "method": "0,Transfer,DeployContract,new,AddKey",
    "result": {
     "ok": true,
     "value": null
@@ -620,10 +763,10 @@
   {
    "shop": "toll",
    "label": "signed_allowlisted",
-   "hash": "ErwqgHH5br68jK1qz2ZAsfQpankMHke4CMUjruEtbt3s",
-   "url": "https://testnet.nearblocks.io/txns/ErwqgHH5br68jK1qz2ZAsfQpankMHke4CMUjruEtbt3s",
-   "signer": "oath.r4csmvr86zk4.testnet",
-   "receiver": "oath.r4csmvr86zk4.testnet",
+   "hash": "6omU7nBC5WE4DEP3fr4EvyAMqcduP4ovRafh8PwTVArw",
+   "url": "https://testnet.nearblocks.io/txns/6omU7nBC5WE4DEP3fr4EvyAMqcduP4ovRafh8PwTVArw",
+   "signer": "toll.r4csmvr86zk4.testnet",
+   "receiver": "toll.r4csmvr86zk4.testnet",
    "method": "pay",
    "result": {
     "ok": true,
@@ -633,8 +776,8 @@
      "nonce": 0,
      "status": "signed",
      "unsigned_hash": "e338813ed18f9953467ed6021b34d85645fbc2a319d9e219f550df7096085d82",
-     "raw_signed": "0x02f87283014a3480830f42408405f5e10082520894552ad18e18a49ddad1e7d96b7ddf813b04a9cfb58609184e72a00080c080a05a3d4a72bb88a13f9d97cc68d2abfd6f909f31e512c486cf4c069e5930994b31a0752b3e3b49857b59d5e04869476d0c43566c132739bada4371dc0041dc7ab29c",
-     "tx_hash": "0xf7ed6482a8380c1fe84be32973256d00960f522cd0d70fe9fe16165190dbc43b",
+     "raw_signed": "0x02f87283014a3480830f42408405f5e10082520894552ad18e18a49ddad1e7d96b7ddf813b04a9cfb58609184e72a00080c080a08d7873e1cb7dd63200497fc5706e16dbdf5fe541b826959c53f6c0fa8a406c3ba07ac356c2562f9930db89d893d907691d1f77e1c1a54403d49f3a973d8b7aa947",
+     "tx_hash": "0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
      "proof_payload_hash": null
     }
    },
@@ -647,10 +790,10 @@
   {
    "shop": "toll",
    "label": "refused_not_allowlisted",
-   "hash": "88tRkqz9RLMEXd7kAegyQZsozfGMs4CYDrgMjpDCPnCE",
-   "url": "https://testnet.nearblocks.io/txns/88tRkqz9RLMEXd7kAegyQZsozfGMs4CYDrgMjpDCPnCE",
-   "signer": "oath.r4csmvr86zk4.testnet",
-   "receiver": "oath.r4csmvr86zk4.testnet",
+   "hash": "8cEWWg2PPPy6kutUy7TLe42HDxxdz9DRwf7UaHZkzesb",
+   "url": "https://testnet.nearblocks.io/txns/8cEWWg2PPPy6kutUy7TLe42HDxxdz9DRwf7UaHZkzesb",
+   "signer": "toll.r4csmvr86zk4.testnet",
+   "receiver": "toll.r4csmvr86zk4.testnet",
    "method": "pay",
    "result": {
     "ok": false,
@@ -662,10 +805,10 @@
   {
    "shop": "toll",
    "label": "refused_over_cap",
-   "hash": "Crd3jTD5FmY8VX4q3sc1AXywsHywJHnFnGKTntBJvGtT",
-   "url": "https://testnet.nearblocks.io/txns/Crd3jTD5FmY8VX4q3sc1AXywsHywJHnFnGKTntBJvGtT",
-   "signer": "oath.r4csmvr86zk4.testnet",
-   "receiver": "oath.r4csmvr86zk4.testnet",
+   "hash": "4dbS8a9RotBK932DJb6ww5ce1KVw2yxwz2t6PSZu73yJ",
+   "url": "https://testnet.nearblocks.io/txns/4dbS8a9RotBK932DJb6ww5ce1KVw2yxwz2t6PSZu73yJ",
+   "signer": "toll.r4csmvr86zk4.testnet",
+   "receiver": "toll.r4csmvr86zk4.testnet",
    "method": "pay",
    "result": {
     "ok": false,
@@ -676,27 +819,60 @@
   },
   {
    "shop": "toll",
-   "label": "finalized_proof",
-   "hash": "GHFJoQdSKTK9Q9pUYEepeViMKhbyrmY7J4bMhuEw5fEV",
-   "url": "https://testnet.nearblocks.io/txns/GHFJoQdSKTK9Q9pUYEepeViMKhbyrmY7J4bMhuEw5fEV",
+   "label": "refused_fee_over_cap",
+   "hash": "EKNfo3fumLbTBbnTKFFX34KhW39gdQBdfqEWFFVnrnJi",
+   "url": "https://testnet.nearblocks.io/txns/EKNfo3fumLbTBbnTKFFX34KhW39gdQBdfqEWFFVnrnJi",
+   "signer": "toll.r4csmvr86zk4.testnet",
+   "receiver": "toll.r4csmvr86zk4.testnet",
+   "method": "pay",
+   "result": {
+    "ok": false,
+    "error": "Smart contract panicked: REFUSED: gas fee over cap"
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "toll",
+   "label": "owner_freeze",
+   "hash": "FmCDKaQ7Qs1kcKfg5gmhiKJFnka9cf1y3VtmLe5WapSy",
+   "url": "https://testnet.nearblocks.io/txns/FmCDKaQ7Qs1kcKfg5gmhiKJFnka9cf1y3VtmLe5WapSy",
    "signer": "r4csmvr86zk4.testnet",
-   "receiver": "v1.signer-prod.testnet",
-   "method": "verify_foreign_transaction",
+   "receiver": "toll.r4csmvr86zk4.testnet",
+   "method": "freeze",
    "result": {
     "ok": true,
-    "value": {
-     "payload_hash": "2473efe1fd9e552ef5769cb0f5526e4f84d75dcfc196168ce004df53961b647d",
-     "signature": {
-      "scheme": "Secp256k1",
-      "big_r": {
-       "affine_point": "028e21ed109ee8c954c1123e00493c325211ee3ffaf26f81ab2331960c9173a126"
-      },
-      "s": {
-       "scalar": "067d9616dd0c937f18b92e45840df63eda70a01f91bec1804b5eadd946096243"
-      },
-      "recovery_id": 1
-     }
-    }
+    "value": null
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "toll",
+   "label": "refused_while_frozen",
+   "hash": "L9h2WoiiBPKheddP4bVwVZ2necmHKbp3DzqjERjV2hZ",
+   "url": "https://testnet.nearblocks.io/txns/L9h2WoiiBPKheddP4bVwVZ2necmHKbp3DzqjERjV2hZ",
+   "signer": "toll.r4csmvr86zk4.testnet",
+   "receiver": "toll.r4csmvr86zk4.testnet",
+   "method": "pay",
+   "result": {
+    "ok": false,
+    "error": "Smart contract panicked: REFUSED: oath frozen"
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "toll",
+   "label": "owner_unfreeze",
+   "hash": "BHhoRStQwim3AdAhi2D526aogqgyuyfyrYuayC3nVfMq",
+   "url": "https://testnet.nearblocks.io/txns/BHhoRStQwim3AdAhi2D526aogqgyuyfyrYuayC3nVfMq",
+   "signer": "r4csmvr86zk4.testnet",
+   "receiver": "toll.r4csmvr86zk4.testnet",
+   "method": "unfreeze",
+   "result": {
+    "ok": true,
+    "value": null
    },
    "events": [],
    "found": true
@@ -911,10 +1087,10 @@
   {
    "shop": "toll",
    "label": "base_sepolia_broadcast",
-   "hash": "0xf7ed6482a8380c1fe84be32973256d00960f522cd0d70fe9fe16165190dbc43b",
-   "url": "https://sepolia.basescan.org/tx/0xf7ed6482a8380c1fe84be32973256d00960f522cd0d70fe9fe16165190dbc43b",
+   "hash": "0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
+   "url": "https://sepolia.basescan.org/tx/0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
    "found": true,
-   "from": "0x004c194d852b1c5fc47f54a3921615ff581314b1",
+   "from": "0xfbd30296c4c1c0055c628e4dbfb07da8c6a5254e",
    "to": "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5"
   },
   {

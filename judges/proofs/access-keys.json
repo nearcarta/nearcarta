@@ -1,0 +1,119 @@
+{
+  "checked_at": "2026-10-28T05:50:48.552Z",
+  "source": "view_account + view_access_key_list, finality final, testnet RPC",
+  "contracts": 11,
+  "with_full_access_key": [
+    "r6vamvr9brhx-arena2.testnet",
+    "v1.signer-prod.testnet"
+  ],
+  "rows": [
+    {
+      "account": "arena.r6vamvr9brhx-arena2.testnet",
+      "code_hash": "5PwtMjcC2oUTr5g2E2uWHyqHs3wkYGryY1ZWCuTvSZc5",
+      "block_height": 275108752,
+      "full_access_keys": 0,
+      "function_call_keys": []
+    },
+    {
+      "account": "deed-mvronpbm.nc-vault-mvrojr9w.testnet",
+      "code_hash": "9xqVzKnPgToCggnkStuEgM2ZgdyfbCcejTKf1jehED4m",
+      "block_height": 275108756,
+      "full_access_keys": 0,
+      "function_call_keys": []
+    },
+    {
+      "account": "nccharters-17102.testnet",
+      "code_hash": "CnMZr5DQjWsdNrLDGWdf5mS8S1uK41sDfJ9FFqhRFTw6",
+      "block_height": 275108757,
+      "full_access_keys": 0,
+      "function_call_keys": []
+    },
+    {
+      "account": "nccharters-85831.testnet",
+      "code_hash": "2dA4HymactrRrBL5e1iT2SDZbfcCg2gi3pt5ooUfuVSV",
+      "block_height": 275108758,
+      "full_access_keys": 0,
+      "function_call_keys": []
+    },
+    {
+      "account": "r11house-31474.testnet",
+      "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
+      "block_height": 275108759,
+      "full_access_keys": 0,
+      "function_call_keys": [
+        {
+          "receiver_id": "r11house-31474.testnet",
+          "method_names": [
+            "propose"
+          ]
+        }
+      ]
+    },
+    {
+      "account": "r11oath-82930.testnet",
+      "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
+      "block_height": 275108760,
+      "full_access_keys": 0,
+      "function_call_keys": [
+        {
+          "receiver_id": "r11oath-82930.testnet",
+          "method_names": [
+            "propose"
+          ]
+        }
+      ]
+    },
+    {
+      "account": "r16oath.r14own-46135.testnet",
+      "code_hash": "4vxachQCQqMShPRyKB6FfNAa9MmPNjSCna8dhXfxPN1s",
+      "block_height": 275108762,
+      "full_access_keys": 0,
+      "function_call_keys": [
+        {
+          "receiver_id": "r16oath.r14own-46135.testnet",
+          "method_names": [
+            "propose"
+          ]
+        }
+      ]
+    },
+    {
+      "account": "r6vamvr9brhx-arena2.testnet",
+      "code_hash": "D7r681CT3ZDSr8T2rBFdCJ56dFTanCrNeFAuPqAMXDRT",
+      "block_height": 275108762,
+      "full_access_keys": 1,
+      "function_call_keys": [],
+      "note": "Owner (signer) account of the arena, not a contract the app calls. It still carries an older arena build from an earlier run; nothing in backend/src or app/src calls it. The live arena is arena.r6vamvr9brhx-arena2.testnet, which never had a key"
+    },
+    {
+      "account": "r7thmvr8maey.sputnikv2.testnet",
+      "code_hash": "AA4nA45vauiac3jdVwJTzSdUP3oj2r1fDaPAb2mHdgcH",
+      "block_height": 275108764,
+      "full_access_keys": 0,
+      "function_call_keys": []
+    },
+    {
+      "account": "toll.r4csmvr86zk4.testnet",
+      "code_hash": "5kybowQxddWXhEYkUsxzwDKwDPrKmiHwQmVL5rA6LJn8",
+      "block_height": 275108765,
+      "full_access_keys": 0,
+      "function_call_keys": [
+        {
+          "receiver_id": "toll.r4csmvr86zk4.testnet",
+          "method_names": [
+            "pay",
+            "settle"
+          ]
+        }
+      ]
+    },
+    {
+      "account": "v1.signer-prod.testnet",
+      "code_hash": "DAE5ng4ZFR2ctMx9SizQBqmGkVbKUutgZ4ZECD4R8Sm9",
+      "block_height": 275108766,
+      "full_access_keys": 4,
+      "function_call_keys": [],
+      "note": "NEAR testnet MPC signer (Chain Signatures), operated by NEAR, not by this project"
+    }
+  ]
+}
