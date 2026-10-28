@@ -1,21 +1,47 @@
 // HTTP protections for the public API: real client IP, per-route and global quotas, a leak guard.
 
-// The client IP comes from the header the platform's edge OVERWRITES, never from a header the
-// client can type. Render sits behind Cloudflare: CF-Connecting-IP / True-Client-IP are set by the
-// edge. Render appends to X-Forwarded-For instead of replacing it, so its first entry is
-// client-controlled and is never used. Vercel sets x-real-ip itself. Locally: the socket address.
+// The client IP comes from a header that a proxy we can identify OVERWRITES, never from one the client types.
+// Render sits behind Cloudflare: CF-Connecting-IP / True-Client-IP are the address that connected to it
+// (a client cannot set them: Cloudflare answers error 1000). Render appends to X-Forwarded-For, so its first
+// entry is client-controlled and never used.
+// The site calls the API through a Vercel rewrite, so for those requests CF-Connecting-IP is a Vercel
+// egress address shared by many visitors. Vercel overwrites X-Vercel-Forwarded-For with the visitor's IP
+// (measured: a client-sent value is replaced). A client that calls Render directly can type that header,
+// though. So:
+//   * verified proxy (env PROXY_SECRET set and header x-nearcarta-proxy matches, timing-safe): the visitor IP
+//     from X-Vercel-Forwarded-For is the key, with no other limit.
+//   * unverified: the claimed visitor IP is the key AND the real connecting address (CF-Connecting-IP) gets
+//     its own bucket at EGRESS_MULT x the quota. Faking visitor IPs then buys at most EGRESS_MULT x one quota.
+import { timingSafeEqual } from 'node:crypto';
 export const onRender = env => Boolean(env.RENDER || env.RENDER_SERVICE_ID || env.RENDER_INSTANCE_ID);
-export function clientIpSource(c, env = process.env) {
+const IPV4 = /^(\d{1,3}\.){3}\d{1,3}$/, IPV6 = /^[0-9a-f:]{2,39}$/i;
+export const isIp = v => Boolean(v) && (IPV4.test(v) || (v.includes(':') && IPV6.test(v)));
+export const EGRESS_MULT = 20;
+export function proxyVerified(c, env = process.env) {
+  const want = env.PROXY_SECRET, got = c.req.header('x-nearcarta-proxy');
+  if (!want || want.length < 32 || !got) return false;
+  const a = Buffer.from(want), b = Buffer.from(got);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+// Returns [source, key, egressKeyOrNull].
+export function clientIdentity(c, env = process.env) {
   const h = n => c.req.header(n)?.trim() || null;
   if (onRender(env)) {
-    for (const n of ['cf-connecting-ip', 'true-client-ip']) if (h(n)) return [n, h(n)];
-    return ['render:unknown', 'render:unknown'];
+    let edge = null;
+    for (const n of ['cf-connecting-ip', 'true-client-ip']) if (h(n)) { edge = [n, h(n)]; break; }
+    const vff = h('x-vercel-forwarded-for');
+    if (isIp(vff)) {
+      if (proxyVerified(c, env)) return ['x-vercel-forwarded-for (verified proxy)', vff, null];
+      return ['x-vercel-forwarded-for (capped per connecting ip)', vff, edge ? `egress:${edge[1]}` : 'egress:unknown'];
+    }
+    return edge ? [edge[0], edge[1], null] : ['render:unknown', 'render:unknown', null];
   }
-  if (env.VERCEL) return h('x-real-ip') ? ['x-real-ip', h('x-real-ip')] : ['vercel:unknown', 'vercel:unknown'];
+  if (env.VERCEL) return h('x-real-ip') ? ['x-real-ip', h('x-real-ip'), null] : ['vercel:unknown', 'vercel:unknown', null];
   const sock = c.env?.incoming?.socket?.remoteAddress; // @hono/node-server
-  return ['socket', sock || 'local'];
+  return ['socket', sock || 'local', null];
 }
-export const clientIp = (c, env = process.env) => clientIpSource(c, env)[1];
+export const clientIpSource = (c, env = process.env) => clientIdentity(c, env).slice(0, 2);
+export const clientIp = (c, env = process.env) => clientIdentity(c, env)[1];
 
 const MAX_KEYS = 20000;
 function bucket(store, key, max, windowMs, now) {
@@ -26,10 +52,12 @@ function bucket(store, key, max, windowMs, now) {
 }
 
 // Per-route, per-client quota. One instance per route, so each route has its own counter.
-export function limiter(max, windowMs = 60e3, { ip = clientIp, now = Date.now } = {}) {
+export function limiter(max, windowMs = 60e3, { ip, identity = clientIdentity, now = Date.now } = {}) {
   const hits = new Map();
   return async (c, next) => {
-    const wait = bucket(hits, ip(c), max, windowMs, now());
+    const [, key, egress] = ip ? [null, ip(c), null] : identity(c);
+    const t = now();
+    const wait = (egress && bucket(hits, egress, max * EGRESS_MULT, windowMs, t)) || bucket(hits, key, max, windowMs, t);
     if (wait) { c.header('Retry-After', String(wait)); return c.json({ error: 'rate limited' }, 429); }
     return next();
   };

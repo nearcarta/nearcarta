@@ -13,7 +13,7 @@ import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import { view, rpcStats } from './near.js';
-import { limiter, clientIpSource, globalCap, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
+import { limiter, clientIpSource, clientIdentity, globalCap, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
@@ -99,10 +99,10 @@ export function makeApp() {
   // the client IP, the IP-related header values, and the names (not values) of every other header.
   const IP_HEADERS = ['cf-connecting-ip', 'true-client-ip', 'x-forwarded-for', 'x-vercel-forwarded-for', 'x-real-ip', 'x-vercel-ip-country'];
   app.get('/api/whoami', limiter(20), c => {
-    const [from, ip] = clientIpSource(c);
+    const [from, ip, egress] = clientIdentity(c);
     const raw = c.req.raw.headers, seen = {};
     for (const n of IP_HEADERS) if (raw.get(n)) seen[n] = raw.get(n);
-    return c.json({ client_ip_from: from, client_ip: ip, ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
+    return c.json({ client_ip_from: from, client_ip: ip, shared_cap: egress, ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
 
