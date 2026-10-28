@@ -254,13 +254,16 @@ function feedLine(t) {
   if (t.error || !t.method) return null;
   const m = String(t.method).replace(/_/g, ' '); return { k: '', h: esc(m[0].toUpperCase() + m.slice(1)) };
 }
-let feedBusy = null;
+// The tx index can lag a fresh tx by a few seconds: after this tab sends a tx on its own charter, the chain feed
+// takes over the story only once it lists that tx (polled up to 5 times), so it never shows an older picture.
+let feedBusy = null, want = null, misses = 0;
 function loadFeed() {
   if (!charter || feedBusy) return feedBusy;
   feedBusy = (async () => {
     let j = null;
     for (let i = 0; i < 3 && !j; i++) { j = await api(`/api/chronicle/${charter}?limit=12`).catch(e => (/not a Nearcarta/.test(e.message) ? 'no' : null)); if (!j) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
     if (!j || j === 'no') return; // API without the charter feed yet, or busy: keep this tab's story
+    if (want && !(j.txs || []).some(t => t.hash === want)) { if (++misses < 5) setTimeout(loadFeed, 3000); return; }
     const rows = (j.txs || []).map(t => ({ t, l: feedLine(t) })).filter(x => x.l);
     if (!rows.length) return;
     const ok = rows.filter(x => x.l.d === 'allowed'), no = rows.filter(x => x.l.d === 'denied');
@@ -277,6 +280,7 @@ function tell(html, kind) { toast(html, kind); }
 function record(s, who) {
   if (!s || !s.decision) return;
   tries.push({ ...s, who });
+  if (s.tx && !/^Shared/.test(who)) { want = s.tx; misses = 0; $('#story').dataset.src = ''; }
   const ok = tries.filter(t => t.decision === 'allowed'), no = tries.filter(t => t.decision !== 'allowed');
   const total = ok.reduce((a, t) => a + BigInt(t.amount || 0), 0n);
   const reasons = Object.entries(no.reduce((m, t) => (m[plain(t.reason)] = (m[plain(t.reason)] || 0) + 1, m), {})).map(([r, n]) => `${n} ${r}`).join(', ');
