@@ -18,7 +18,8 @@ const listeners = new Set();
 
 export function wallet() {
   if (!connector) {
-    connector = new NearConnector({ network: 'testnet', features: { testnet: true, signAndSendTransaction: true }, footerBranding: null });
+    // Pass the page's CSP nonce so the wallet's sandboxed iframe may run its scripts.
+    connector = new NearConnector({ network: 'testnet', features: { testnet: true, signAndSendTransaction: true }, footerBranding: null, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
     const ping = () => listeners.forEach(f => f());
     connector.on('wallet:signIn', ping); connector.on('wallet:signOut', ping);
     // Clear EVM label; wallets this browser already has go first.

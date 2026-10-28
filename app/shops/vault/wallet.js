@@ -64,7 +64,7 @@ async function createGuest(rpc) {
 export function makeConnector(rpc) {
   const guest = guestWallet(rpc);
   window.addEventListener('near-selector-ready', () => window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: guest })));
-  const connector = new NearConnector({ network: 'testnet', footerBranding: null });
+  const connector = new NearConnector({ network: 'testnet', footerBranding: null, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
   window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: guest }));
   return { connector, GUEST_ID };
 }
