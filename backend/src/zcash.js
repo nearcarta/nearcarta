@@ -1,6 +1,6 @@
 // Zcash recipient check for the Ferry. Decodes a Unified Address (ZIP 316: bech32m + F4Jumble + TLV)
 // and reports which receivers it carries. A transparent recipient is public on Zcash; an Orchard-only
-// UA is the shielded path.
+// UA is the shielded path (since NU6.3 an Orchard receiver is paid into the Ironwood pool, ZIP 258).
 import { bech32m } from '@scure/base';
 import { blake2b } from '@noble/hashes/blake2.js';
 
