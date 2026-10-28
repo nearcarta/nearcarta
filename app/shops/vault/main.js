@@ -88,7 +88,7 @@ async function createCharter() {
   busy($('#create-btn'), true, 'Approve in your wallet…');
   const w = await connector.wallet();
   const res = await w.signAndSendTransaction({ receiverId: CFG.factory, actions: [{ type: 'FunctionCall', params: { methodName: 'create_charter', args, gas: (150n * TG).toString(), deposit: toY(dep) } }] });
-  const h = txHashOf(res); const id = `${name}.${CFG.factory}`;
+  const h = txHashOf(res); const id = `${name}.${CFG.factory}`; noteSent(h, id);
   const f = await facts(id, f => f.registered && f.exists && !f.pending);
   if (!f.registered) throw Object.assign(new Error('charter not created (name taken? the deposit was refunded minus gas)'), { tx: h });
   toast(`Charter created · ${txl(h)}`, 'good'); await useCharter(id);
@@ -196,7 +196,7 @@ async function ownerCall(methodName, args, btn, done) {
   try {
     const w = await connector.wallet();
     const res = await w.signAndSendTransaction({ receiverId: charter, actions: [{ type: 'FunctionCall', params: { methodName, args, gas: (60n * TG).toString(), deposit: '0' } }] });
-    toast(`${esc(done)} · ${txl(txHashOf(res))}`, 'good');
+    noteSent(txHashOf(res)); toast(`${esc(done)} · ${txl(txHashOf(res))}`, 'good');
   } finally { busy(btn, false); }
   await renderFacts();
 }
@@ -236,7 +236,7 @@ async function saveRules(keyLive) {
   busy($('#rules-btn'), true, 'Approve in your wallet…');
   const w = await connector.wallet();
   const res = await w.signAndSendTransaction({ receiverId: charter, actions });
-  toast(`Rules sent${keyLive ? '' : ' with a new agent key'} · ${txl(txHashOf(res))}`, 'good');
+  noteSent(txHashOf(res)); toast(`Rules sent${keyLive ? '' : ' with a new agent key'} · ${txl(txHashOf(res))}`, 'good');
   await renderFacts();
   const f = await facts(charter);
   if (Object.keys(f.pending_changes || {}).length) toast('Some changes loosen the rules, so they wait in the timelock. Apply or cancel them in step 2.', 'info');
@@ -265,13 +265,22 @@ function feedLine(t) {
 }
 // The tx index can lag a fresh tx by a few seconds: after this tab sends a tx on its own charter, the chain feed
 // takes over the story only once it lists that tx (polled up to 5 times), so it never shows an older picture.
-let feedBusy = null, want = null, misses = 0;
+// This tab's own tx hashes per charter (session only): sent as `known` so the server can re-read them from RPC
+// when the tx index lags or is busy; the server keeps only txs that really belong to the charter.
+function noteSent(h, id = charter) {
+  if (!h || !id) return;
+  try { const k = 'nc-sent:' + id, a = JSON.parse(sessionStorage.getItem(k) || '[]').filter(x => x !== h); a.push(h); sessionStorage.setItem(k, JSON.stringify(a.slice(-12))); } catch { /* private mode */ }
+}
+const sentList = () => { try { return JSON.parse(sessionStorage.getItem('nc-sent:' + charter) || '[]'); } catch { return []; } };
+let feedBusy = null, want = null, misses = 0, busyLeft = 12;
 function loadFeed() {
   if (!charter || feedBusy) return feedBusy;
   feedBusy = (async () => {
     let j = null;
-    for (let i = 0; i < 3 && !j; i++) { j = await api(`/api/chronicle/${charter}?limit=12`).catch(e => (/not a Nearcarta/.test(e.message) ? 'no' : null)); if (j?.busy) j = null; if (!j) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
-    if (!j || j === 'no') return; // API without the charter feed yet, or busy: keep this tab's story
+    const known = sentList().join(',');
+    for (let i = 0; i < 3 && !j; i++) { j = await api(`/api/chronicle/${charter}?limit=12${known ? '&known=' + known : ''}`).catch(e => (/not a Nearcarta/.test(e.message) ? 'no' : null)); if (j?.busy) j = null; if (!j) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
+    if (!j && busyLeft-- > 0) { setTimeout(loadFeed, 5000); return; } // index busy: keep this tab's story, ask again shortly
+    if (!j || j === 'no') return; // API without the charter feed yet
     if (want && !(j.txs || []).some(t => t.hash === want)) { if (++misses < 5) setTimeout(loadFeed, 3000); return; }
     const rows = (j.txs || []).map(t => ({ t, l: feedLine(t) })).filter(x => x.l);
     if (!rows.length) return;
@@ -289,7 +298,7 @@ function tell(html, kind) { toast(html, kind); }
 function record(s, who) {
   if (!s || !s.decision) return;
   tries.push({ ...s, who });
-  if (s.tx && !/^Shared/.test(who)) { want = s.tx; misses = 0; $('#story').dataset.src = ''; }
+  if (s.tx && !/^Shared/.test(who)) { want = s.tx; misses = 0; noteSent(s.tx); $('#story').dataset.src = ''; }
   const ok = tries.filter(t => t.decision === 'allowed'), no = tries.filter(t => t.decision !== 'allowed');
   const total = ok.reduce((a, t) => a + BigInt(t.amount || 0), 0n);
   const reasons = Object.entries(no.reduce((m, t) => (m[plain(t.reason)] = (m[plain(t.reason)] || 0) + 1, m), {})).map(([r, n]) => `${n} ${r}`).join(', ');
