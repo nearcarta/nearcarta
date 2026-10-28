@@ -44,6 +44,8 @@ Run honest jobs first, because scams spend the day's limits.
 | `GET /api/vault/tasks?charter=` | the honest jobs and the receiver and amount each would pay on that charter |
 | `POST /api/vault/task` `{task, nickname}` | runs an honest job on the shared arena (runner-signed) |
 | `POST /api/vault/attack` `{attack, nickname}` | runs a scam on the shared arena (runner-signed) |
+| `POST /api/vault/ask/plan` `{text, charter?}` | "Ask the agent to pay", nothing signed: the plain-words parse (`receiver`, `amount` in yocto, `note`, `memo` `ask:<note>`), `on_allowlist`, `per_action_cap`, and the exact `proposal` your agent key would send to `propose` (nonce and policy version read from the charter). Without `charter` it plans on the shared arena |
+| `POST /api/vault/ask` `{text}` | "Ask the agent to pay" on the shared arena (runner-signed, one `propose`, counts against the runner's daily tx cap): `decision`, `reason`, `tx`, `url`. The charter decides; an off-allowlist payee or an amount over the cap comes back `denied` |
 | `POST /api/vault/record` `{tx, charter}` | verifies a tx from chain and records it on the board if it counts |
 | `GET /api/vault/score/:charter` | per job and scam: counted or not, and why; `score`/`max_score` |
 | `GET /api/vault/leaderboard` | players with `score`, `tasks`, `patterns`, `not_counted`, `verified` (owner) or nickname rows (`server_signed`), `last_tx` |
@@ -52,6 +54,20 @@ Run honest jobs first, because scams spend the day's limits.
 A refusal **counts** only when the tx is final on chain, the proposal matches the scam's plan for
 that charter's rules, and the reason is one the scam targets. Otherwise, `why` says why not
 (`not_verified_yet`, `not_refused`, `wrong_reason`, …).
+
+## Mist Bank private send queue (backend/src/mistqueue.js)
+Render only queues a request. A separate worker on the operator's machine (backend/scripts/mist-worker.js)
+holds the Zcash testnet wallet, re-checks every request on chain, and sends after a random delay.
+No response ever contains the amount, the salt, the address or a viewing key.
+
+| Route | What it does |
+|---|---|
+| `GET /api/mistbank/send` | `open` (worker seen in the last 5 minutes), the limits, and the charter code hashes accepted |
+| `POST /api/mistbank/send/prepare` `{ua}` | checks the address (testnet, Orchard-only Unified Address) and returns the `memo` (`mbq1:…`, a hash of the address) which goes into one `propose` your agent key sends to your own charter (shop `mistbank`, any clause that allows it) |
+| `POST /api/mistbank/send` `{ua, charter, approval_tx}` | 202 `{id, state:'queued', status_url}`. `approval_tx` must be a final `propose` signed by the charter's own agent key and allowed by it: shop `mistbank`, memo = the prepared memo, at most 24 h old, on a charter with an accepted code hash and 0 full-access keys. 503 if the worker is offline; 409 if the approval was already used; 429 for the per-charter, per-IP or daily limit |
+| `GET /api/mistbank/send/:id` | `state` queued, waiting, sending, sent or failed (with `error`); when sent, the Zcash testnet `txid`, explorer link and amount `commitment` |
+
+The address is dropped from Render as soon as the worker takes the request.
 
 ## Hook it into the city
 - **Build.** `app/build.mjs` calls `buildShops(dist, esbuild)` from `app/shops/build.mjs`. The

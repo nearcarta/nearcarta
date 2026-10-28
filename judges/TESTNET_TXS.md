@@ -1,6 +1,6 @@
 # Testnet transactions
 
-Every row was read back from chain by `npm run verify` (backend/scripts/verify-proofs.js) at 2026-10-28T05:49:10.990Z (UTC); this file is written from that output by backend/scripts/txs-table.js. Raw output: judges/proofs/proof-check.json.
+Every row was read back from chain by `npm run verify` (backend/scripts/verify-proofs.js) at 2026-10-28T18:18:17.129Z (UTC); this file is written from that output by backend/scripts/txs-table.js. Raw output: judges/proofs/proof-check.json.
 
 **62/62 found.**
 

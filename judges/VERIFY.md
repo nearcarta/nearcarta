@@ -3,7 +3,7 @@
 All commands are read-only unless marked.
 
 1. Proof txs exist and have the stated outcome:
-   `npm run verify` → `53/53 proof txs found on testnet` (it also re-reads the Zcash testnet payout and checks the amount is hidden). The output is in judges/proofs/proof-check.json, and `npm run txs` turns it into TESTNET_TXS.md.
+   `npm run verify` → `62/62 proof txs found on testnet` (it also re-reads the Zcash testnet payout and checks the amount is hidden). The output is in judges/proofs/proof-check.json, and `npm run txs` turns it into TESTNET_TXS.md.
 2. The charter account cannot be drained by a key:
    `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"r11oath-82930.testnet"}}'`
    → exactly one key, with `FunctionCall` and `method_names:["propose"]`.

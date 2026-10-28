@@ -6,9 +6,11 @@ import { DEP } from '../src/config.js';
 
 const RPCS = ['https://test.rpc.fastnear.com', 'https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'];
 const EMPTY = '11111111111111111111111111111111';
-const NOT_OURS = {
-  'v1.signer-prod.testnet': 'NEAR testnet MPC signer (Chain Signatures), operated by NEAR, not by this project',
-  'r6vamvr9brhx-arena2.testnet': 'Owner (signer) account of the arena, not a contract the app calls. It still carries an older arena build from an earlier run; nothing in backend/src or app/src calls it. The live arena is arena.r6vamvr9brhx-arena2.testnet, which never had a key',
+// Accounts that hold code but are not contracts this project runs. role: external (operated by NEAR) or
+// wallet (a signer account; a wallet needs a full-access key to sign).
+const ROLE = {
+  'v1.signer-prod.testnet': ['external', 'NEAR testnet MPC signer (Chain Signatures), operated by NEAR, not by this project'],
+  'r6vamvr9brhx-arena2.testnet': ['wallet', 'Owner (signer) account of the arena, not a contract the app calls. It still carries an older arena build from an earlier run; nothing in backend/src or app/src calls it. The live arena is arena.r6vamvr9brhx-arena2.testnet, which never had a key'],
 };
 
 async function rpc(method, params) {
@@ -44,9 +46,12 @@ for (const id of [...ids].sort()) {
     method_names: k.access_key.permission.FunctionCall.method_names,
   }));
   rows.push({ account: id, code_hash: acc.code_hash, block_height: acc.block_height, full_access_keys: fak,
-    function_call_keys: fc, ...(NOT_OURS[id] ? { note: NOT_OURS[id] } : {}) });
+    function_call_keys: fc, role: ROLE[id]?.[0] || 'contract', ...(ROLE[id] ? { note: ROLE[id][1] } : {}) });
 }
 const out = { checked_at: new Date().toISOString(), source: 'view_account + view_access_key_list, finality final, testnet RPC',
-  contracts: rows.length, with_full_access_key: rows.filter((r) => r.full_access_keys > 0).map((r) => r.account), rows };
+  contracts: rows.filter((r) => r.role === 'contract').length,
+  contracts_with_full_access_key: rows.filter((r) => r.role === 'contract' && r.full_access_keys > 0).map((r) => r.account),
+  not_our_contracts: rows.filter((r) => r.role !== 'contract').map((r) => ({ account: r.account, role: r.role, full_access_keys: r.full_access_keys })), rows };
 writeFileSync(new URL('../../judges/proofs/access-keys.json', import.meta.url), JSON.stringify(out, null, 2) + '\n');
-for (const r of rows) console.log(String(r.full_access_keys).padStart(2), 'FAK', String(r.function_call_keys.length).padStart(2), 'FC ', r.account, r.note ? '(' + r.note.split(' (')[0] + ')' : '');
+for (const r of rows) console.log(String(r.full_access_keys).padStart(2), 'FAK', String(r.function_call_keys.length).padStart(2), 'FC ', r.account, r.role);
+console.log('our contracts with a full-access key:', out.contracts_with_full_access_key.length);

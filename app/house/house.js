@@ -53,7 +53,6 @@ const UNAVAILABLE = [
   ['OKX Wallet', 'Mainnet only in NEAR Connect (no testnet support listed).'],
   ['NEAR Mobile', 'Mainnet only: its NEAR Connect script refuses testnet.'],
   ['Hana Wallet', 'Mainnet only in NEAR Connect (no testnet support listed).'],
-  ['Trezu Wallet', 'Mainnet only: its NEAR Connect script has only a mainnet URL.'],
   ['Sender', 'Not in NEAR Connect.'],
   ['Bitte Wallet', 'Not in NEAR Connect.'],
 ];

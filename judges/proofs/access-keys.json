@@ -1,44 +1,57 @@
 {
-  "checked_at": "2026-10-28T05:50:48.552Z",
+  "checked_at": "2026-10-28T18:17:21.265Z",
   "source": "view_account + view_access_key_list, finality final, testnet RPC",
-  "contracts": 11,
-  "with_full_access_key": [
-    "r6vamvr9brhx-arena2.testnet",
-    "v1.signer-prod.testnet"
+  "contracts": 9,
+  "contracts_with_full_access_key": [],
+  "not_our_contracts": [
+    {
+      "account": "r6vamvr9brhx-arena2.testnet",
+      "role": "wallet",
+      "full_access_keys": 1
+    },
+    {
+      "account": "v1.signer-prod.testnet",
+      "role": "external",
+      "full_access_keys": 4
+    }
   ],
   "rows": [
     {
       "account": "arena.r6vamvr9brhx-arena2.testnet",
       "code_hash": "5PwtMjcC2oUTr5g2E2uWHyqHs3wkYGryY1ZWCuTvSZc5",
-      "block_height": 275108752,
+      "block_height": 275186116,
       "full_access_keys": 0,
-      "function_call_keys": []
+      "function_call_keys": [],
+      "role": "contract"
     },
     {
       "account": "deed-mvronpbm.nc-vault-mvrojr9w.testnet",
       "code_hash": "9xqVzKnPgToCggnkStuEgM2ZgdyfbCcejTKf1jehED4m",
-      "block_height": 275108756,
+      "block_height": 275186118,
       "full_access_keys": 0,
-      "function_call_keys": []
+      "function_call_keys": [],
+      "role": "contract"
     },
     {
       "account": "nccharters-17102.testnet",
       "code_hash": "CnMZr5DQjWsdNrLDGWdf5mS8S1uK41sDfJ9FFqhRFTw6",
-      "block_height": 275108757,
+      "block_height": 275186120,
       "full_access_keys": 0,
-      "function_call_keys": []
+      "function_call_keys": [],
+      "role": "contract"
     },
     {
       "account": "nccharters-85831.testnet",
       "code_hash": "2dA4HymactrRrBL5e1iT2SDZbfcCg2gi3pt5ooUfuVSV",
-      "block_height": 275108758,
+      "block_height": 275186120,
       "full_access_keys": 0,
-      "function_call_keys": []
+      "function_call_keys": [],
+      "role": "contract"
     },
     {
       "account": "r11house-31474.testnet",
       "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
-      "block_height": 275108759,
+      "block_height": 275186121,
       "full_access_keys": 0,
       "function_call_keys": [
         {
@@ -47,12 +60,13 @@
             "propose"
           ]
         }
-      ]
+      ],
+      "role": "contract"
     },
     {
       "account": "r11oath-82930.testnet",
       "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
-      "block_height": 275108760,
+      "block_height": 275186123,
       "full_access_keys": 0,
       "function_call_keys": [
         {
@@ -61,12 +75,13 @@
             "propose"
           ]
         }
-      ]
+      ],
+      "role": "contract"
     },
     {
       "account": "r16oath.r14own-46135.testnet",
       "code_hash": "4vxachQCQqMShPRyKB6FfNAa9MmPNjSCna8dhXfxPN1s",
-      "block_height": 275108762,
+      "block_height": 275186124,
       "full_access_keys": 0,
       "function_call_keys": [
         {
@@ -75,27 +90,30 @@
             "propose"
           ]
         }
-      ]
+      ],
+      "role": "contract"
     },
     {
       "account": "r6vamvr9brhx-arena2.testnet",
       "code_hash": "D7r681CT3ZDSr8T2rBFdCJ56dFTanCrNeFAuPqAMXDRT",
-      "block_height": 275108762,
+      "block_height": 275186125,
       "full_access_keys": 1,
       "function_call_keys": [],
+      "role": "wallet",
       "note": "Owner (signer) account of the arena, not a contract the app calls. It still carries an older arena build from an earlier run; nothing in backend/src or app/src calls it. The live arena is arena.r6vamvr9brhx-arena2.testnet, which never had a key"
     },
     {
       "account": "r7thmvr8maey.sputnikv2.testnet",
       "code_hash": "AA4nA45vauiac3jdVwJTzSdUP3oj2r1fDaPAb2mHdgcH",
-      "block_height": 275108764,
+      "block_height": 275186126,
       "full_access_keys": 0,
-      "function_call_keys": []
+      "function_call_keys": [],
+      "role": "contract"
     },
     {
       "account": "toll.r4csmvr86zk4.testnet",
       "code_hash": "5kybowQxddWXhEYkUsxzwDKwDPrKmiHwQmVL5rA6LJn8",
-      "block_height": 275108765,
+      "block_height": 275186127,
       "full_access_keys": 0,
       "function_call_keys": [
         {
@@ -105,14 +123,16 @@
             "settle"
           ]
         }
-      ]
+      ],
+      "role": "contract"
     },
     {
       "account": "v1.signer-prod.testnet",
       "code_hash": "DAE5ng4ZFR2ctMx9SizQBqmGkVbKUutgZ4ZECD4R8Sm9",
-      "block_height": 275108766,
+      "block_height": 275186128,
       "full_access_keys": 4,
       "function_call_keys": [],
+      "role": "external",
       "note": "NEAR testnet MPC signer (Chain Signatures), operated by NEAR, not by this project"
     }
   ]
