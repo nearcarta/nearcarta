@@ -370,5 +370,39 @@
       "foreign_tx": "0xee42361cea2ff228cc1703e91188acc8b39c412bb2bf09335c72169be7139ed7",
       "note": "Direct verify_foreign_transaction call: the testnet MPC verified a finalized Arbitrum Sepolia tx (block 323769632). Its payload hash 6e6b1eb1\u2026 is pinned in contracts/toll/src/tests.rs."
     }
+  },
+  "townhall_r16": {
+    "charter": "townhall.r7thmvr8maey-council2.testnet",
+    "release": "R16.1",
+    "owner": "r7thmvr8maey.sputnikv2.testnet",
+    "dao": "r7thmvr8maey.sputnikv2.testnet",
+    "clause": "reward",
+    "code_hash": "494WuJZuykrSYamM3gc7stvscHhcoiytbq8YRsBEubuF",
+    "artifact": "contracts/artifacts/oath.r16_1.wasm",
+    "wasm_sha256": "2ea3aeaad62107f7e35aa0eedea700f444ff3230bc2391c443182be343a1464e",
+    "full_access_keys": 0,
+    "agent_key_methods": [
+      "propose",
+      "propose_batch"
+    ],
+    "receivers": [
+      "r14own-46135.testnet",
+      "r4csmvr86zk4.testnet",
+      "town-lab-38241.testnet"
+    ],
+    "caps": {
+      "per_action_cap_near": 0.05,
+      "daily_budget_near": 0.1,
+      "max_actions_per_day": 10
+    },
+    "policy_delay_s": 600,
+    "note": "Town Hall moved to the R16.1 charter: created, funded, deployed and initialised in one batch with no key (owner and governor = the DAO). The DAO voted the round clause and the agent key (2-of-2 council, proposal 9). One propose_batch paid 3 receivers 0.02 NEAR each; a second batch (3 x 0.03, past the 0.1 NEAR daily total) was refused whole before any transfer.",
+    "proof_txs": {
+      "deploy_batch_no_key": "E2dV52YKF9ydiGd4WZ2iRGLBDisReby6E2hRurP2Eu4c",
+      "dao_votes_round": "7ccSUZ4yN4MyzjVL8P8brEumpUV3UDgmpZXdMo7NSqkd",
+      "batch_3_receivers": "GcG64HQvauzbYbbS56UXn7eVdQS27vwshUyBpZaYe9am",
+      "batch_over_total_refused": "B71RpChqtuERZ2TZmafJ1ZBsDGwUNBY7Lq2J4ryuRFv"
+    },
+    "proof": "judges/proofs/townhall-r16.json"
   }
 }
