@@ -1,0 +1,12 @@
+node_modules/
+app/dist/
+.secrets/
+.env
+.env.*
+*.pem
+test-results/
+playwright-report/
+.vercel/
+target/
+*.wasm
+!contracts/artifacts/*.wasm
