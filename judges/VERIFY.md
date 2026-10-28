@@ -27,3 +27,22 @@ All commands are read-only unless marked.
 10. Owner approval of a large move: TESTNET_TXS rows *escalated owner approved* and *owner resolve approve*. Then `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"r11oath-82930.testnet","method_name":"get_action","args_base64":"'$(printf '{"action_id":"4"}' | base64)'"}}'` → `status: confirmed`, `clause_id: tip`, `amount: 100001000000000000000000` (0.100001 NEAR, over the 0.1 NEAR cap). The raw run is in judges/proofs/escalation-approved.json. (It writes to testnet and needs the agent and owner keys: `node backend/scripts/escalation-demo.js`.)
 11. Vault Arena attack corpus: `curl -s "localhost:8787/api/arena/attempts?from=0&limit=25"` → every attempt with its player, `prompt_hash_hex`, block, verdict and `revealed` (true once someone calls `reveal_prompt` with text whose sha256 equals the hash).
 
+## Sweep, 2026-10-28 (05:30–06:05 Cairo, UTC+3; commit f54b8ae)
+
+Each check below was run with the command shown. The result is what it printed.
+
+| # | Check | Command | Result |
+|---|---|---|---|
+| S1 | Vercel API, every route | `python3` loop of `GET https://nearcarta.vercel.app{path}` over /api/health, /deployments, /guardhouse, /guardhouse/action/4, /mistbank, /mistbank/verify?zats=1370000&salt=67d5…4f83, /townhall, /arena, /arena/attempts, /toll, /chronicle/r11oath-82930.testnet, /ferry/tokens, /ai/attestation, /ai/tee | 12 × 200. action 4 `status=confirmed clause=tip`; mistbank `amount_hidden=true binds=true`; verify `matches=true`; 208 ferry tokens. /ai/attestation and /ai/tee → 503 as designed (this deploy has no server keys). health `nearAi:false, confidentialQuotes:false, signing:false` |
+| S2 | Render API, every route | the same loop against `https://nearcarta-api.onrender.com` | 14 × 200. health `nearAi:true, confidentialQuotes:true, signing:false`; /api/ai/tee `ok:true` (z-ai/glm-5.3-flash) |
+| S3 | Ferry via Render, dry 1Click | `curl -X POST $RENDER/api/ferry/quote` with USDC(base)→ZEC, 2.5, the integration test's UA and refund address, `privacy` public and basic | public: `ok dry shielded`, echo `public`; basic: `ok dry shielded`, echo `basic` |
+| S4 | Browser e2e on Vercel | `BASE_URL=https://nearcarta.vercel.app npm run e2e` | 11 passed, 2 skipped (they need server keys), 0 flaky → judges/proofs/e2e-vercel.json |
+| S5 | Unit | `npm test` | 35/35 |
+| S6 | Live integration (testnet, 1Click dry, NEAR AI TEE) | `npm run test:integration` | 14/14 |
+| S7 | Proof txs on testnet | `npm run verify` | `38/38 proof txs found on testnet` |
+| S8 | Charter code = committed wasm | `npm run wasm-hash`; `view_account r11oath-82930.testnet` | both `EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq` (match) |
+| S9 | Other contracts vs a committed build | `view_account` on each | Town Hall charter `HfvSVL7m…`, Toll charter `AbLiWuPP…` (both pre-R11; no committed artifact, labelled pre-R11 in README). Vault Arena `D7r681CT…`. A fresh `cargo near build non-reproducible-wasm` of contracts/arena gives `FmFUbaDz…`, so **the Arena deploy is not reproducible from this tree yet** |
+| S10 | Contracts | `cd contracts/oath && cargo test --lib`; `cd contracts/arena && cargo test --lib`; `cd contracts/oath && cargo test --test exploits` | 38/38, 14/14, 10/10 exploits refused (oath run in the `rust:1.95` docker image, because the host lacks OpenSSL headers) |
+| S11 | CI | GitHub Actions run 40621427513 on f54b8ae | success: jobs secrets (gitleaks), node (ci, test, verify, build), contracts (oath 38, arena 14) |
+| S12 | Secret scan | `gitleaks git --config .gitleaks.toml --redact .` and `gitleaks dir …` | no leaks found (history and working tree) |
+| S13 | Image has no secrets | `.dockerignore` is a whitelist (package files, backend/src, shared, one proof file); the keys are Render service env | GHCR package `nearcarta-api` visibility: private |
