@@ -81,7 +81,7 @@ export function makeApp() {
   // ?deep=1 runs every read route's handler (not the AI or quote routes, which spend credits) and reports
   // each one's status and time, plus the RPC retry/fallback/stale counters.
   app.get('/api/health', limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: await shops.health(),
-    features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false } }));
+    features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: await vault.runnerStatus() }));
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
 
   // Ferry
