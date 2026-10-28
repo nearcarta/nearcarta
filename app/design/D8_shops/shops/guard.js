@@ -1,12 +1,12 @@
 // Guardhouse: the oath is a pane across the gate. A forged invoice (real lab attack S2) knocks and bounces off.
 import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, tok, C } from '../js/core.js';
 import { ATTACKS, LAB } from '../../D6_dashboards/src/data.js';
-import { row, h3, note, proof, esc, acct, paper, vaultLink } from './_ui.js';
+import { row, h3, note, proof, esc, acct, paper } from './_ui.js';
 import { M as PM, brassM, mesh, lantern, banner } from './_props.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
 const S2 = ATTACKS.find(a => a.id === 'S2');
-export const PROOF = proof(vaultLink(),
+export const PROOF = proof(
       h3('This knock · lab attack S2'), row({ k: S2.name, why: S2.reason + ' · ' + S2.secs + ' s', st: 'no', stText: 'refused', tx: S2.tx }),
       `<pre class="kv">${esc(S2.tool.split('\n')[1])}</pre>`, note(`The agent read the hidden line and proposed it. The oath ${acct(LAB.oath)} refused before any money moved.`),
       h3('Other knocks on the same gate'), ...ATTACKS.filter(a => a.id !== 'S2').map(a => row({ k: a.name, why: a.reason, st: 'no', stText: 'refused', tx: a.tx })),
@@ -47,10 +47,10 @@ export default async function guard(ctx) {
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(48)), new THREE.LineDashedMaterial({ color: C.no, dashSize: .12, gapSize: .1, transparent: true, opacity: 0 })); line.computeLineDistances(); scene.add(line);
   const rob = await makeRobot(scene); rob.at(1.9, 2.1); rob.lookAt(new THREE.Vector3(0, 0, .3));
   const S2 = ATTACKS.find(a => a.id === 'S2');
-  const tags = [{ obj: inv, pos: new THREE.Vector3(0, .26, 0), html: `<span aria-hidden="true">→</span>forged invoice`, cls: '' }];
+  const tags = [{ obj: inv, pos: new THREE.Vector3(0, .26, 0), html: `<span aria-hidden="true">→</span>attacker`, cls: '' }];
   let t = 0;
   return {
-    scene, camera, tags,
+    rob, scene, camera, tags,
     panel: { title: 'Guardhouse', src: 'testnet', label: 'Forged invoice asks', hero: tok('5', 'NEAR'), action: 'Let it knock' },
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(1.15, 0, 1.75)]); rob.lookAt(pane.position); },

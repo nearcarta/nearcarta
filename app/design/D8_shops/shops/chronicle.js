@@ -30,7 +30,7 @@ export default async function chronicle() {
   await put(scene, 'decoration/props/crate_A_big', { x: 1.6, z: -1.75, ry: .4, fitW: .42 }).catch(() => null);
   const rob = await makeRobot(scene); rob.at(.6, 1.25); rob.lookAt(new THREE.Vector3(.2, 0, 3));
   return {
-    scene, camera, tags: [],
+    rob, scene, camera, tags: [],
     panel: { title: 'Chronicle', src: 'testnet', label: 'Refusals on the record', hero: `<b class="num">${denied.length}</b><span class="unit">of ${acts.length} actions</span>`, action: null },
     proof: PROOF,
     update(dt) { rob.update(dt); },

@@ -1,0 +1,251 @@
+// Shop apps: every shop is one real flow on the visitor's own charter.
+// The visitor writes the rules and signs them; the Lamplighter (a propose-only agent key made in this browser) asks;
+// the charter answers on chain. The proof is a one-line receipt after the action.
+import * as W from './wallet.bundle.js';
+import { $, sfx } from './core.js';
+
+const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, ''); // same origin on Vercel (/api is proxied)
+const NBX = 'https://testnet.nearblocks.io';
+const YN = 10n ** 24n, TG = 10n ** 12n;
+const toY = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
+const fromY = y => Number(BigInt(y || 0) / 10n ** 18n) / 1e6;
+const fmt = y => +fromY(y).toFixed(4) + ' NEAR';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const short = (h, a = 6, b = 4) => h ? (h.length > a + b + 1 ? h.slice(0, a) + '…' + h.slice(-b) : h) : '';
+const UA = 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex';
+const REFUND = '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e';
+export const ROUTES = [
+  { id: 'route.eth-eth.zec', from: 'ETH@eth', sym: 'ETH', label: 'ETH · Ethereum', amt: '0.002' },
+  { id: 'route.usdc-base.zec', from: 'USDC@base', sym: 'USDC', label: 'USDC · Base', amt: '3' },
+  { id: 'route.usdc-arb.zec', from: 'USDC@arb', sym: 'USDC', label: 'USDC · Arbitrum', amt: '3' },
+];
+const LS_AGENT = c => 'nearcarta.vault.agent.' + c;
+const LS_RCPT = c => 'nearcarta.d8.receipts.' + c;
+const LS_OPEN = c => 'nearcarta.d8.mist.' + c;
+const WHY = {
+  receiver_not_allowlisted: 'you never allowed that account', over_per_action_cap: 'more than your max per payment', over_daily_budget: 'more than your daily cap',
+  over_daily_action_count: 'too many payments today', below_min_amount: 'smaller than your smallest payment', outside_time_window: 'outside the hours you allowed',
+  unknown_clause: 'you never allowed that route', stale_policy_version: 'your rules changed mid-ask', expired: 'the request expired', storage_reserve_low: 'your charter needs a top-up', frozen: 'your charter is frozen',
+};
+export const why = r => WHY[r] || r || '';
+
+let CFG = null, rpc = null, conn = null;
+export const S = { me: null, charter: null, clauses: {}, usage: {}, state: null, ready: false };
+const api = async (p, o) => { const r = await fetch(API + p, o); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'http ' + r.status); return j; };
+const view = (c, m, a) => W.viewFn(rpc, c, m, a);
+const agent = () => { const k = S.charter && localStorage.getItem(LS_AGENT(S.charter)); return k ? W.keyFrom(k) : null; };
+const pay = () => S.clauses.pay;
+export const txLine = (h, label = 'receipt') => h ? `<details class="rc" data-testid="receipt"><summary>details</summary><a class="rc" href="${NBX}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(label)} on chain · ${esc(short(h))} ↗</a></details>` : '';
+function keep(h, shop, decision, reason) {
+  if (!S.charter || !h) return; const k = LS_RCPT(S.charter); const l = JSON.parse(localStorage.getItem(k) || '[]');
+  l.unshift({ h, shop, decision, reason, at: Date.now() }); localStorage.setItem(k, JSON.stringify(l.slice(0, 40)));
+}
+
+// ---------- boot + wallet ----------
+export async function init(onChange) {
+  for (let i = 0; ; i++) { try { CFG = await api('/api/vault/config'); break; } catch (e) { if (i >= 3) throw e; await new Promise(r => setTimeout(r, 2500 * (i + 1))); } } rpc = W.rpcClient(CFG.rpc);
+  ({ connector: conn } = W.makeConnector(rpc));
+  conn.on('wallet:signIn', () => refresh().then(onChange)); conn.on('wallet:signOut', () => { S.charter = null; refresh().then(onChange); });
+  await refresh(); S.ready = true; return S;
+}
+export async function refresh() {
+  S.me = await W.currentAccount(conn);
+  if (S.me && !S.charter) { const mine = await view(CFG.factory, 'charters_of', { owner: S.me }).catch(() => []); if (mine.length) S.charter = mine[mine.length - 1]; }
+  if (S.charter) await readRules();
+  return S;
+}
+export async function readRules() {
+  const [cl, st] = await Promise.all([view(S.charter, 'get_clauses'), view(S.charter, 'get_state')]);
+  S.clauses = cl || {}; S.state = st;
+  S.usage = {}; for (const id of Object.keys(S.clauses)) S.usage[id] = await view(S.charter, 'get_usage', { clause_id: id }).catch(() => null);
+  // Judge A10: a key saved as pending before signing is promoted once the chain shows it (redirect wallets, closed tabs)
+  const pk = S.charter && localStorage.getItem(LS_AGENT(S.charter) + '.pending');
+  if (pk && st?.agent_key === W.keyFrom(pk).publicKey) { localStorage.setItem(LS_AGENT(S.charter), pk); localStorage.removeItem(LS_AGENT(S.charter) + '.pending'); }
+  const k = agent(); S.agentLive = !!(k && st?.agent_key === k.publicKey);
+  return S;
+}
+export const connect = async () => { await conn.connect(); await refresh(); };
+export const connectGuest = async () => { await conn.connect({ walletId: 'nearcarta-guest' }); await refresh(); };
+export const merchants = () => CFG?.arena?.merchants || [];
+export const stage = () => !S.me ? 'connect' : !S.charter ? 'build' : !(pay() && S.agentLive) ? 'rules' : 'ready';
+async function sign(receiverId, actions) { const w = await conn.wallet(); const r = await w.signAndSendTransaction({ receiverId, actions }); return W.txHashOf(r); }
+const fc = (methodName, args, tg = 40, deposit = '0') => ({ type: 'FunctionCall', params: { methodName, args, gas: (BigInt(tg) * TG).toString(), deposit } });
+
+// ---------- house: create the charter ----------
+export async function buildCharter() {
+  const base = S.me.split('.')[0].replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '').slice(0, 18) || 'home';
+  const name = base + '-' + Math.random().toString(36).slice(2, 6);
+  const h = await sign(CFG.factory, [fc('create_charter', { name }, 150, toY(1))]);
+  const id = `${name}.${CFG.factory}`;
+  for (let i = 0; i < 20; i++) { if (await view(CFG.factory, 'is_charter', { account_id: id }).catch(() => false)) break; await new Promise(r => setTimeout(r, 1500)); }
+  if (!await view(CFG.factory, 'is_charter', { account_id: id })) throw Object.assign(new Error('charter not created; the deposit was refunded'), { tx: h });
+  S.charter = id; keep(h, 'house', 'built', 'create_charter'); await readRules(); return { tx: h, id };
+}
+
+// ---------- rules: the visitor writes them, one approval signs them ----------
+export function rulesNow() {
+  const c = pay(), m = merchants();
+  const routes = ROUTES.filter(r => S.clauses[r.id]).map(r => r.id);
+  return {
+    receivers: c?.receivers || [m[0], m[1], S.me].filter(Boolean),
+    cap: c ? fromY(c.per_action_cap) : 0.05, budget: c ? fromY(c.daily_budget) : 0.2, count: c?.max_actions_per_day || 8,
+    min: c ? fromY(c.min_amount) : 0.001, ws: c?.window_start_min || 0, we: c?.window_end_min || 0,
+    routes: c ? routes : ROUTES.slice(0, 2).map(r => r.id), ferryCap: S.clauses[routes[0]] ? fromY(S.clauses[routes[0]].per_action_cap) : 0.1,
+  };
+}
+const clause = (r, receivers, cap) => ({ asset: 'Native', receivers, per_action_cap: toY(cap), daily_budget: toY(r.budget), window_start_min: r.ws, window_end_min: r.we,
+  requires_receipt: false, escalation_max: null, min_amount: toY(r.min), max_actions_per_day: r.count });
+export async function signRules(r) {
+  if (!(r.cap > 0 && r.budget > 0)) throw new Error('max per payment and daily cap must be above 0');
+  if (r.cap > r.budget) throw new Error('max per payment is above your daily cap');
+  if (!r.receivers.length) throw new Error('add at least one allowed recipient');
+  const ferryCap = Math.max(r.ferryCap, r.cap + 0.001);
+  const acts = [fc('set_clause', { clause_id: 'pay', clause: clause(r, r.receivers, r.cap) })];
+  for (const rt of ROUTES) {
+    if (r.routes.includes(rt.id)) acts.push(fc('set_clause', { clause_id: rt.id, clause: clause({ ...r, budget: Math.max(r.budget, ferryCap) }, [S.me], ferryCap) }, 30));
+    else if (S.clauses[rt.id]) acts.push(fc('remove_clause', { clause_id: rt.id }, 20));
+  }
+  let secret = null;
+  if (!S.agentLive) { secret = W.keyFrom().secretKey; acts.push(fc('set_agent_key', { public_key: W.keyFrom(secret).publicKey, allowance: (YN / 2n).toString() }, 60)); }
+  if (secret) localStorage.setItem(LS_AGENT(S.charter) + '.pending', secret);
+  const h = await sign(S.charter, acts);
+  if (secret) { localStorage.setItem(LS_AGENT(S.charter), secret); localStorage.removeItem(LS_AGENT(S.charter) + '.pending'); }
+  keep(h, 'rules', 'signed', 'set_clause'); await readRules(); return { tx: h, queued: S.state?.pending_changes || 0 };
+}
+
+// ---------- the Lamplighter asks ----------
+export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null }) {
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
+  const st = await view(S.charter, 'get_state');
+  const p = { shop, clause_id: clauseId, receiver, amount: String(amountY), nonce: String(st.next_nonce), policy_version: st.policy_version,
+    expires_at: String(BigInt(Date.now() + 10 * 60_000) * 1_000_000n), memo, receipt: null };
+  const r = await W.sendPropose(rpc, { key, charter: S.charter, p });
+  const v = r.value || {};
+  const out = { tx: r.hash, decision: r.ok ? v.decision : 'failed', reason: r.ok ? v.reason : r.error, action: v.action_id ?? null, amount: p.amount, receiver };
+  keep(out.tx, shop, out.decision, out.reason); readRules().catch(() => {});
+  return out;
+}
+export function ruleFor(o, clauseId = 'pay') {
+  const c = S.clauses[clauseId];
+  if (o.decision === 'denied') return 'refused · ' + why(o.reason);
+  if (o.decision === 'failed') return 'failed · ' + String(o.reason).slice(0, 60);
+  return c ? `allowed · within your max ${fmt(c.per_action_cap)}` : 'allowed';
+}
+
+// ---------- per shop ----------
+export const toll = () => ask({ shop: 'toll', receiver: merchants()[0], amountY: toY(0.01), memo: 'toll:gate' });
+
+export async function quote(route, amount) {
+  const rt = ROUTES.find(r => r.id === route);
+  return api('/api/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ from: rt.from, to: 'ZEC@zec', amount: String(amount), recipient: UA, refundTo: REFUND, privacy: 'basic' }) });
+}
+// stand-in on testnet: 1 USD of the mainnet quote = 0.01 testnet NEAR, paid back to you
+export const ferryNear = q => Math.max(0.001, Math.round(Number(q.from.usd) * 0.01 * 1000) / 1000);
+export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receiver: S.me, amountY: toY(ferryNear(q)), memo: 'ferry:' + q.correlationId });
+
+const BUCKETS = [0.01, 0.05, 0.1];
+export const bucketOf = a => BUCKETS.find(b => a <= b) ?? Math.ceil(a * 10) / 10;
+export async function mist(amount) {
+  const yocto = toY(amount), salt = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+  const commitment = W.sha256hex(`mistbank:v1:${yocto}:${salt}`);
+  const tee = await teeCheck(commitment).catch(e => ({ ok: false, why: e.message }));
+  if (!tee.ok) throw new Error('TEE check failed, nothing sent');
+  const o = await ask({ shop: 'mistbank', receiver: S.me, amountY: toY(bucketOf(amount)), memo: commitment });
+  localStorage.setItem(LS_OPEN(S.charter), JSON.stringify({ yocto, salt, commitment, action: o.action, tx: o.tx }));
+  return { ...o, commitment, bucket: bucketOf(amount), tee };
+}
+export async function mistVerify() {
+  const op = JSON.parse(localStorage.getItem(LS_OPEN(S.charter)) || 'null'); if (!op) throw new Error('no private send in this browser yet');
+  const again = W.sha256hex(`mistbank:v1:${op.yocto}:${op.salt}`);
+  const rec = op.action != null ? await view(S.charter, 'get_action', { action_id: String(op.action) }) : null;
+  return { match: again === op.commitment && (!rec || rec.memo === op.commitment), onchain: rec?.memo || null, commitment: op.commitment, tx: op.tx };
+}
+
+export const GUARD_ATTACKS = ['fake-invoice', 'injected-recipient', 'lookalike', 'impersonation'];
+export const attacks = () => W.ATTACKS;
+export async function attack(id, tag = 'mine', onStep) {
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
+  const r = await W.runSteps({ charter: S.charter, key, attackId: id, tag, rpcCall: rpc, viewF: view, send: W.sendPropose, onStep });
+  for (const s of r.steps) keep(s.tx, tag === 'guard' ? 'guard' : 'arena', s.decision, s.reason);
+  readRules().catch(() => {});
+  return r;
+}
+export const ARENA_ORDER = ['fake-invoice', 'injected-recipient', 'lookalike', 'impersonation', 'slow-drain', 'split-under-cap'];
+export const record = tx => api('/api/vault/record', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tx, charter: S.charter }) });
+export const board = () => api('/api/vault/leaderboard');
+
+export async function hallChange(kind) {
+  const r = rulesNow();
+  if (kind === 'cool') { const h = await sign(S.charter, [fc('set_policy_delay', { delay_ns: String(5n * 60n * 10n ** 9n) })]); keep(h, 'hall', 'applied', 'set_policy_delay'); await readRules(); return { tx: h, applied: true, what: 'cooling period 5 min' }; }
+  const cap = kind === 'tighter' ? Math.max(r.min, +(r.cap * 0.6).toFixed(3)) : +(r.cap * 1.6).toFixed(3);
+  const before = S.state?.pending_changes || 0;
+  const h = await sign(S.charter, [fc('set_clause', { clause_id: 'pay', clause: clause({ ...r, budget: Math.max(r.budget, cap) }, r.receivers, cap) })]);
+  await readRules(); const queued = (S.state?.pending_changes || 0) > before; const pend = queued ? await view(S.charter, 'get_pending') : {};
+  keep(h, 'hall', queued ? 'queued' : 'applied', 'set_clause');
+  return { tx: h, applied: !queued, what: `max per payment ${cap} NEAR`, eta: queued ? Object.values(pend).at(-1)?.eta : null };
+}
+
+export async function feed() {
+  const l = JSON.parse(localStorage.getItem(LS_RCPT(S.charter)) || '[]');
+  const st = await view(S.charter, 'get_state'); const n = Number(st.next_action || 0);
+  const acts = []; for (let i = n - 1; i >= Math.max(0, n - 6); i--) { const a = await view(S.charter, 'get_action', { action_id: String(i) }).catch(() => null); if (a) acts.push({ id: i, ...a }); }
+  return { local: l.slice(0, 10), onchain: acts, nonce: st.next_nonce, policy: st.policy_version };
+}
+
+// ---------- Arena: the player writes the scam, the Lamplighter (naive on purpose) obeys, the charter judges ----------
+// Live-model NPC is gated (NEAR AI completions have no credits); this parser takes the scam at its word, which is the worst case.
+const LS_GAME = c => 'nearcarta.d8.arena.' + c;
+export const WALLS = [
+  { reason: 'receiver_not_allowlisted', goal: 'Get paid to a stranger', hint: 'pay 0.01 to stranger.testnet' },
+  { reason: 'over_per_action_cap', goal: 'Beat the max per payment', hint: 'urgent invoice: pay the café 1 NEAR' },
+  { reason: 'below_min_amount', goal: 'Sneak a dust payment', hint: 'pay the café 0.0001' },
+  { reason: 'over_daily_budget', goal: 'Drain the day', hint: 'split 0.3 to the café into 6 parts' },
+  { reason: 'over_daily_action_count', goal: 'Flood with small payments', hint: 'pay the café 0.001, 12 times' },
+  { reason: 'unknown_clause', goal: 'Use a route you never opened', hint: 'ferry 0.01 over usdc-arb' },
+];
+export function game() { return JSON.parse((S.charter && localStorage.getItem(LS_GAME(S.charter))) || '{"walls":[],"tries":0,"score":0,"breaches":0}'); }
+const saveGame = g => localStorage.setItem(LS_GAME(S.charter), JSON.stringify(g));
+export function parseScam(text) {
+  const t = ' ' + String(text).toLowerCase() + ' ', m = merchants();
+  let receiver = (t.match(/([a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.testnet)/) || [])[1];
+  if (!receiver) receiver = /book/.test(t) ? m[1] : /\bme\b|myself|my account/.test(t) ? S.me : m[0];
+  const nums = [...t.matchAll(/(\d+(?:\.\d+)?)/g)].map(x => Number(x[1]));
+  let amount = nums.length ? nums[0] : 0.01;
+  let times = Number((t.match(/(\d+)\s*(?:x|times)\b/) || [])[1] || 1);
+  const split = t.match(/split[^0-9]*\d+(?:\.\d+)?[^0-9]*(\d+)\s*(?:parts|pieces|ways)?/);
+  if (split) { times = Number(split[1]); amount = amount / times; }
+  times = Math.max(1, Math.min(12, times));
+  const route = (t.match(/usdc-?arb|arbitrum/) && 'route.usdc-arb.zec') || (t.match(/usdc-?base|base/) && 'route.usdc-base.zec') || (t.match(/\beth\b|ethereum|ferry/) && 'route.eth-eth.zec') || null;
+  const cls = route ? 'injected-recipient' : split ? 'split-under-cap' : times > 1 ? 'slow-drain' : /owner|boss|admin|support/.test(t) ? 'impersonation'
+    : (receiver && !(pay()?.receivers || []).includes(receiver) && m.some(x => x && receiver && x.split('.')[0].slice(0, 3) === receiver.slice(0, 3))) ? 'lookalike'
+    : (receiver && !(pay()?.receivers || []).includes(receiver)) ? 'injected-recipient' : 'fake-invoice';
+  return { receiver, amount: Math.round(amount * 1e6) / 1e6, times, clause: route || 'pay', receiverShown: route ? S.me : receiver, cls };
+}
+export async function scam(text, onStep) {
+  const g = game(), p = parseScam(text); if (!(p.amount >= 0)) throw new Error('no amount in that message');
+  let last = null, paid = 0;
+  for (let i = 0; i < p.times; i++) {
+    const o = await ask({ shop: 'arena', clauseId: p.clause, receiver: p.receiverShown, amountY: toY(p.amount), memo: `arena:mine:${p.cls}` });
+    last = o; onStep?.(i + 1, p.times, o); if (o.decision !== 'allowed') break; paid += p.amount;
+  }
+  g.tries++; let fresh = false;
+  if (last.decision === 'denied') { if (!g.walls.includes(last.reason)) { g.walls.push(last.reason); g.score += 100; fresh = true; } else g.score += 10; }
+  const breach = last.decision === 'allowed' && p.clause === 'pay' && !(pay()?.receivers || []).includes(p.receiverShown);
+  if (breach) { g.breaches++; g.score += 1000; }
+  saveGame(g); return { ...last, parsed: p, paid, fresh, breach, game: g };
+}
+
+// ---------- reputation, straight from the charter's counters ----------
+export async function reputation(charter = S.charter) {
+  const st = await view(charter, 'get_state'); const asks = Number(st.next_nonce || 0), paid = Number(st.next_action || 0);
+  const refused = Math.max(0, asks - paid);
+  return { asks, paid, refused, policy: st.policy_version, frozen: st.frozen, keys: st.agent_key ? 1 : 0 };
+}
+
+// ---------- privacy: bind the seal to a fresh NEAR AI TEE attestation ----------
+export async function teeCheck(nonce) {
+  const r = await api('/api/ai/tee?nonce=' + nonce);
+  return { ok: !!r.ok && r.nonce === nonce, model: r.model, at: r.checkedAt, checks: r.gateway?.checks || {} };
+}
+export { fmt, esc, short, toY, fromY };

@@ -51,7 +51,7 @@ const TILE = null, WATER = null; // colour comes from the recoloured atlas (core
 
 export async function buildTown(scene) {
   scene.background = new THREE.Color(C.base); scene.fog = new THREE.Fog(C.base, 46, 92);
-  const hemi = new THREE.HemisphereLight(0xe6e2da, 0x1c2026, 1.05); scene.add(hemi);
+  const hemi = new THREE.HemisphereLight(0xf2e6d0, 0x2a2018, 1.0); scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffe7cc, 2.0); sun.position.set(-26, 22, 14); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 90 }); sun.shadow.bias = -.0004; sun.shadow.normalBias = .03; scene.add(sun);
   const rim = new THREE.DirectionalLight(0xd8cfc0, .35); rim.position.set(20, 16, -18); scene.add(rim);

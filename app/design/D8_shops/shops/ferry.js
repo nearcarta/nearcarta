@@ -16,7 +16,7 @@ const diffTxt = r => r.diffs ? r.diffs.map(d => `${d.field}: sent ${d.sent}, ech
 const utc3 = s => { const d = new Date(s.replace(' UTC', 'Z').replace(' ', 'T')); if (isNaN(d)) return s; d.setUTCHours(d.getUTCHours() + 3); return d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC+3'; };
 export const PROOF = proof(
   h3(`The quote · live read, ${Q.api}`),
-  row({ k: `${Q.from.amt} ${Q.from.sym} on ${Q.from.chain} → ${Q.to.exact} ${Q.to.sym}`, why: `confidentiality ${Q.privacy} · ETA ${Q.eta} · ${Q.fee} · signed cost ${(Q.costBps / 100).toFixed(1)}%${Q.costBps > 200 ? " on this small amount (the Zcash withdrawal fee is fixed)" : ", under 2%"}`, st: Q.sig ? 'ok' : 'no', stText: Q.sig ? 'signed' : 'bad signature', src: 'live' }),
+  row({ k: `${Q.from.amt} ${Q.from.sym} on ${Q.from.chain} → ${Q.to.exact} ${Q.to.sym}`, why: `confidentiality ${Q.privacy} · ETA ${Q.eta} · ${Q.fee} · signed cost ${(Q.costBps / 100).toFixed(1)}% on this small amount`, st: Q.sig ? 'ok' : 'no', stText: Q.sig ? 'signed' : 'bad signature', src: 'live' }),
   h3('The recipient · Orchard-only UA check'),
   row({ k: `${short(Q.ua.addr)} · receivers: ${Q.ua.receivers.join(', ')}`, why: "shielded into Zcash's Ironwood pool via an Orchard-only UA", st: Q.ua.orchardOnly ? 'ok' : 'no', stText: Q.ua.orchardOnly ? 'Orchard-only' : 'refused', src: 'live' }),
   h3('Refused · anything that weakens the shielding'),
@@ -59,7 +59,7 @@ export default async function ferry(ctx) {
   const swapsTo = () => { tags[0].el.innerHTML = icon('ZEC', 'Zcash'); };
   let t = 0;
   return {
-    scene, camera, tags,
+    rob, scene, camera, tags,
     panel: { title: 'Ferry', src: 'live', srcNote: `Dry 1Click quote read through ${Q.api}. No swap was executed.`, label: LABEL, hero: HERO, action: 'Load the cargo' },
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },

@@ -65,6 +65,9 @@ function placeTags() {
 function onPointer(e) { if (mode !== 'town' || e.target.id !== 'gl') return; const m = new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(m, cam); const hit = ray.intersectObjects(Object.values(B), true)[0]; if (hit) { let o = hit.object; while (o && !o.userData.id) o = o.parent; if (o) { const id = o.userData.id; addEventListener('pointerup', () => enter(id), { once: true }); } } }
 
 // --- tray (one primary action) + proof drawer ---
+// Shops are real apps on the visitor's own charter; ?scripted keeps the old cinematic for the walkthrough film.
+const APP = !P.has('scripted'); let apps = null;
+const loadApps = () => apps || (apps = import('./shopui.js').then(m => { m.boot(); return m; }));
 const tray = () => $('#tray');
 function ui() {
   sound.button($('#snd'));
@@ -72,10 +75,11 @@ function ui() {
   if (CAPTURE && P.has('snd')) { const b = $('#snd'); b.setAttribute('aria-pressed', 'true'); b.setAttribute('aria-label', 'Sound on. Click to mute'); }
   $('#back').onclick = () => leave(); $('#t-proof').onclick = () => drawer(true); $('#d-close').onclick = () => drawer(false);
   addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('#drawer').classList.contains('open')) drawer(false); else if (shop) leave(); } });
+  if (APP) { $('#wallet').hidden = false; $('#t-say').hidden = false; document.body.classList.add('apps'); loadApps(); return; }
   $('#t-act').onclick = () => { if (!shop?.act || $('#t-act').disabled) return; sfx('click'); $('#t-act').disabled = true; $('#t-act').classList.add('busy'); run(shop.act()); };
 }
 function drawer(on) { const d = $('#drawer'); d.classList.toggle('open', on); d.setAttribute('aria-hidden', on ? 'false' : 'true'); $('#t-proof').setAttribute('aria-expanded', on); if (on) { sfx('click'); $('#d-close').focus(); } }
-export function setResult(kind, text) { const b = $('#t-act'); b.classList.remove('busy'); b.className = 'act res ' + kind; b.disabled = true; b.innerHTML = `<span class="glyph" aria-hidden="true">${kind === 'no' ? '✕' : kind === 'ok' ? '✓' : '○'}</span>${text}`; b.setAttribute('aria-live', 'polite'); }
+export function setResult(kind, text) { if (APP) return; const b = $('#t-act'); b.classList.remove('busy'); b.className = 'act res ' + kind; b.disabled = true; b.innerHTML = `<span class="glyph" aria-hidden="true">${kind === 'no' ? '✕' : kind === 'ok' ? '✓' : '○'}</span>${text}`; b.setAttribute('aria-live', 'polite'); }
 export function setHero(html) { const h = $('#t-hero'); h.innerHTML = html; h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); }
 const SRC = { testnet: 'testnet', live: 'live read' };
 function fillTray(sh) { const p = sh.panel; $('#t-title').innerHTML = `${i3(SHOPS[sh.id].icon, 28)}<span>${p.title}</span>`; const s = $('#t-src'); s.textContent = SRC[p.src]; s.className = 'src ' + p.src; s.title = p.srcNote || '';
@@ -90,7 +94,7 @@ export async function enter(id, { instant = false } = {}) {
   if (busy || shop) return; busy = true; sfx('click');
   const mod = await LOADERS[id](); const tk = {}; const live = () => shop && shop.tk === tk; const sh = await mod.default({ setResult: (...a) => live() && setResult(...a), setHero: (...a) => live() && setHero(...a), live }); sh.id = id; sh.tk = tk; shop = sh; frameShop(sh.camera);
   sh.tags?.forEach(t => { if (t.html) { t.el = document.createElement('div'); t.el.className = 'stag ' + (t.cls || ''); t.el.innerHTML = t.html; $('#stags').appendChild(t.el); } });
-  fillTray(sh); controls.enabled = false; Object.values(labels).forEach(l => l.classList.add('gone'));
+  fillTray(sh); if (APP) loadApps().then(m => live() && m.mount(id, sh, run)); controls.enabled = false; Object.values(labels).forEach(l => l.classList.add('gone'));
   const { b, dir } = doorPos(id); const from = cam.position.clone(), look0 = controls.target.clone();
   const look1 = b.clone().add(new THREE.Vector3(0, .7, 0)), to = b.clone().addScaledVector(dir, 3.2).add(new THREE.Vector3(0, 1.4, 0));
   const home = sh.camera.position.clone(), look = sh.camera.userData.look; const far = home.clone().sub(look).multiplyScalar(1.22).add(look);
@@ -108,7 +112,7 @@ export async function enter(id, { instant = false } = {}) {
 }
 export function leave() {
   if (!shop || busy) return; busy = true; sfx('click'); drawer(false);
-  const sh = shop; tray().hidden = true; $('#stags').hidden = true; $('#stags').innerHTML = ''; $('#back').hidden = true; $('#brand').hidden = false; document.body.classList.remove('in-shop');
+  const sh = shop; if (APP) apps?.then(m => m.unmount()); tray().hidden = true; $('#stags').hidden = true; $('#stags').innerHTML = ''; $('#back').hidden = true; $('#brand').hidden = false; document.body.classList.remove('in-shop');
   const { b, dir } = doorPos(sh.id); const look1 = b.clone().add(new THREE.Vector3(0, .7, 0)), at = b.clone().addScaledVector(dir, 3.2).add(new THREE.Vector3(0, 1.4, 0));
   run((function* () {
     if (!RM) { cam.position.copy(at); cam.lookAt(look1); mode = 'iris'; v.copy(look1).project(cam); irisC.set(v.x * .5 + .5, v.y * .5 + .5);

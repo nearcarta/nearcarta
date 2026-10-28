@@ -115,8 +115,14 @@ export function desat(mat, k = .55) { mat.onBeforeCompile = sh => { sh.fragmentS
  diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(.299,.587,.114))), diffuseColor.rgb, ${k.toFixed(2)});`); }; mat.customProgramCacheKey = () => 'desat' + k; return mat; }
 // a "little world": a hex island in an empty void (Monument Valley, RESEARCH B7)
 export const SQ3 = Math.sqrt(3); export const hx = (q, r) => new THREE.Vector3(2 * q + r, 0, SQ3 * r);
+let _sky; function duskSky() { if (_sky) return _sky; const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, '#b97f56'); gr.addColorStop(.3, '#e9b98a'); gr.addColorStop(1, '#e9b98a'); g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  _sky = new THREE.CanvasTexture(c); _sky.colorSpace = THREE.SRGBColorSpace; return _sky; }
 export async function room({ tiles = null, cam = [0, 6.5, 11], look = [0, .6, 0], fov = 30 } = {}) {
-  const scene = new THREE.Scene(); scene.background = new THREE.Color(C.base);
+  // Judge B #5: no void. A warm dusk sky, a meadow to the horizon, fog that melts the two, and a closer camera
+  const scene = new THREE.Scene(); scene.background = duskSky(); scene.fog = new THREE.Fog(0xe9b98a, 12, 40);
+  const k0 = .86; cam = cam.map((v, i) => look[i] + (v - look[i]) * k0); cam[1] -= .5;
+  const meadow = new THREE.Mesh(new THREE.CircleGeometry(120, 48), new THREE.MeshLambertMaterial({ color: 0x6f7a45 })); meadow.rotation.x = -Math.PI / 2; meadow.position.y = -1.1; meadow.receiveShadow = true; scene.add(meadow);
   // bright, warm and even: no detail is left in shadow (owner QA 28 Oct); the front fill lifts tile sides and faces
   const hemi = new THREE.HemisphereLight(0xfff4e2, 0x5a4632, 1.55); scene.add(hemi);
   const key = new THREE.DirectionalLight(0xffe7cc, 2.5); key.position.set(-6, 9, 6); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 30 }); key.shadow.bias = -.0005; key.shadow.normalBias = .03; scene.add(key);

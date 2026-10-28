@@ -30,7 +30,7 @@ export default async function toll() {
   const rob = await makeRobot(scene); rob.at(1.75, -.95); rob.g.rotation.y = -.35;
   const sig = MPC.oathPay;
   return {
-    scene, camera,
+    rob, scene, camera,
     tags: [{ pos: new THREE.Vector3(5.6, .6, .3), html: `<img src="${D7}assets/tokens/chains/base.svg" width="20" height="20" alt="Base">`, cls: 'bare' }],
     panel: { title: 'Toll', src: 'testnet', label: 'MPC signature for Base Sepolia', hero: `<b class="num">11</b><span class="unit">of ${MPC.nodes} nodes</span>`, action: null },
     proof: PROOF,

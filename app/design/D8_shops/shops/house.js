@@ -40,7 +40,7 @@ export default async function house() {
   const rob = await makeRobot(scene); rob.at(.25, 1.05); rob.lookAt(sheet.position);
   const tip = CLAUSES[0]; let tt = 0;
   return {
-    scene, camera, tags: [],
+    rob, scene, camera, tags: [],
     panel: { title: 'Your House', src: 'testnet', label: `Tip cap · policy v${CORE.policyVersion}`, hero: tok(String(tip.cap), 'NEAR'), action: null },
     proof: PROOF,
     update(dt) { tt += dt; rob.update(dt); fire.material.opacity = .75 + .2 * Math.sin(tt * 9) * Math.sin(tt * 3.7); flames.forEach((f, i) => f.scale.y = 1 + .18 * Math.sin(tt * (7 + i * 2.3) + i)); fl.intensity = 1.4 + .3 * Math.sin(tt * 7); },

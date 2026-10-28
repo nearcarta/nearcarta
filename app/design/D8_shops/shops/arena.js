@@ -2,10 +2,10 @@
 import { THREE, room, put, makeRobot, load, Char, C, CSS, radial } from '../js/core.js';
 import { M as PM, brassM, mesh, lantern, banner } from './_props.js';
 import { ATTACKS, LAB } from '../../D6_dashboards/src/data.js';
-import { row, h3, note, proof, acct, vaultLink } from './_ui.js';
+import { row, h3, note, proof, acct } from './_ui.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
-export const PROOF = proof(vaultLink(), h3('Attacks on ' + LAB.oath), ...ATTACKS.map(a => row({ k: a.name, why: a.cls + ' · ' + a.reason, st: 'no', stText: 'refused', tx: a.tx })), note(`Lab oath ${acct(LAB.oath)}. The Guardians are a picture of the checks, not separate code.`));
+export const PROOF = proof(h3('Attacks on ' + LAB.oath), ...ATTACKS.map(a => row({ k: a.name, why: a.cls + ' · ' + a.reason, st: 'no', stText: 'refused', tx: a.tx })), note(`Lab oath ${acct(LAB.oath)}. The Guardians are a picture of the checks, not separate code.`));
 export default async function arena() {
   const { scene, camera } = await room({ cam: [0, 5, 9], look: [0, .8, 0] });
   const metal = new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: .5, metalness: .25 }); // bronze, lit: the vault reads as an object, not a hole
@@ -31,7 +31,7 @@ export default async function arena() {
   const kg = await load('chars/Knight.glb'); const guards = [[-1.7, .3, .9], [1.7, .3, -.9]].map(([x, z, f]) => { const k = new Char(kg, scene, { h: 1.0 }); k.root.traverse(m => { if (/Offhand|Rectangle|Round_Shield|Spike|2H_Sword/.test(m.name)) m.visible = false; }); k.at(x, z); k.g.rotation.y = f; k.play('Idle'); return k; });
   let t = 0; const rob = await makeRobot(scene); rob.at(.6, 2.2); rob.lookAt(new THREE.Vector3(0, 0, 0), { toViewer: .82 }); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
   return {
-    scene, camera, tags: [],
+    rob, scene, camera, tags: [],
     panel: { title: 'Vault Arena', src: 'testnet', label: `${ATTACKS.length} attacks on the lab oath`, hero: `<b class="num">0</b><span class="unit">breaches</span>`, action: null },
     proof: PROOF,
     update(dt) { t += dt; rings.forEach(r => { const k = ((t * .6 + r.ph) % 1); r.m.scale.setScalar(1 + k * .9); r.m.material.opacity = .85 * (1 - k); }); rob.update(dt); guards.forEach(g => g.update(dt)); },

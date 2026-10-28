@@ -23,6 +23,10 @@ await (await import('esbuild')).build({ entryPoints: [here + 'house/house.js'], 
 // WalletConnect client, fetched only when someone picks a WalletConnect wallet. The project id is a public client id.
 await (await import('esbuild')).build({ entryPoints: [here + 'house/wc.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
   outfile: dist + '/wc.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' }, logLevel: 'warning' });
+// Shop apps (design/D8_shops/js/apps.js): the site wallet layer and signer, bundled from source so they never drift.
+await (await import('esbuild')).build({ entryPoints: [here + 'design/D8_shops/js/wallet/entry.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
+  outfile: shops + '/js/wallet.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' }, logLevel: 'warning' });
+rmSync(shops + '/js/wallet', { recursive: true, force: true });
 // Shop modules (charter office + Vault Arena): app/shops, see app/shops/INTEGRATION.md
 await (await import('./shops/build.mjs')).buildShops(dist, await import('esbuild'));
 // On Vercel the API is same origin (/api is proxied to Render in vercel.json), so no CORS and one origin in the CSP story.

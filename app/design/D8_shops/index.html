@@ -15,6 +15,7 @@
 <header id="top">
   <span id="brand"><b>Nearcarta</b><span class="src testnet">testnet</span></span>
   <button id="back" class="ghost" hidden><span aria-hidden="true">←</span> Town</button>
+  <button id="wallet" class="ghost wallet" hidden>Connect wallet</button>
   <button id="snd" class="icon"></button>
 </header>
 <nav id="tags" aria-label="Buildings"></nav>
@@ -23,12 +24,23 @@
 <section id="tray" hidden aria-live="polite">
   <div class="t-head"><h1 id="t-title"></h1><span id="t-src" class="src"></span></div>
   <p id="t-label" class="label"></p>
+  <p id="t-say" class="say" hidden></p>
   <div id="t-hero" class="hero"></div>
-  <div class="t-row"><button id="t-act" class="act primary"></button><button id="t-proof" class="link" aria-controls="drawer" aria-expanded="false">Show proof</button></div>
+  <div id="t-form" class="form" hidden></div>
+  <div class="t-row"><button id="t-act" class="act primary"></button></div>
+  <p id="t-rcpt" class="rcpt"></p>
+  <div class="t-links"><button id="t-rules" class="link" hidden>Your rules</button><button id="t-proof" class="link" aria-controls="drawer" aria-expanded="false">How it works</button></div>
 </section>
 <aside id="drawer" aria-hidden="true" aria-labelledby="d-title">
   <div class="d-head"><h2 id="d-title">Proof</h2><button id="d-close" class="icon" aria-label="Close proof">✕</button></div>
   <div id="d-body"></div>
+</aside>
+<aside id="rules" aria-hidden="true" aria-labelledby="r-title">
+  <div class="d-head"><h2 id="r-title">Your rules</h2><button id="r-close" class="icon" aria-label="Close rules">✕</button></div>
+  <p class="r-lede">I can only act inside these. Your charter checks every ask.</p>
+  <div id="r-body"></div>
+  <button id="r-sign" class="act primary">Sign my rules</button>
+  <p id="r-status" class="rcpt"></p>
 </aside>
 <div id="load"><span class="ring" aria-hidden="true"></span></div>
 <script type="module" src="js/main.js"></script>

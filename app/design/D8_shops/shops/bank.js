@@ -26,7 +26,7 @@ function live(b) {
     h3('The desk · NEAR Intents Confidential, dry quotes'),
     ...(b.desk?.length ? b.desk.map(l => row({ k: LEG[l.leg] || l.leg, why: `privacy ${l.privacy} · signature ${l.sig ? 'verified' : 'FAILED'} · echo ${l.echo ? 'ok' : 'differs'}`, st: l.ok ? 'ok' : 'no', stText: l.ok ? 'quoted' : 'rejected', src: 'live' }))
       : [row({ k: 'Confidential quotes', why: 'not available on this server', st: 'no', stText: 'off', src: 'live' })]),
-    note('Dry quotes only: no deposit address exists and nothing was spent. A mainnet confidential deposit needs the owner\'s go-ahead.'));
+    note('Dry quotes only: no deposit address exists and nothing was spent.'));
 }
 const HERO = `<span class="commit" title="sha256 commitment on NEAR testnet">${esc(String(B.commitment?.value || '').slice(0, 8))}…</span><span class="unit">amount hidden</span>`;
 // For the 2D fallback (js/flat.js)
@@ -73,7 +73,7 @@ export default async function bank() {
   const rob = await makeRobot(scene); rob.at(1.45, .95); rob.lookAt(new THREE.Vector3(.75, 0, .55), { toViewer: .8 }); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
   let t = 0;
   return {
-    scene, camera, tags: [],
+    rob, scene, camera, tags: [],
     panel: { title: 'Mist Bank', src: 'testnet', label: FLAT.label, hero: HERO, action: null },
     proof: PROOF,
     update(dt) { t += dt; rob.update(dt); mist.forEach((m, i) => { m.position.x = wx - .42 + ((t * .08 + i * .3) % .84); m.material.opacity = .25 + .12 * Math.sin(t + i); }); shape.material.opacity = .6 + .15 * Math.sin(t * .8); wheel.rotation.z = Math.sin(t * .3) * .08; },

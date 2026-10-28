@@ -8,7 +8,6 @@ export const row = ({ k, why = '', st = null, stText = '', tx = null, src = 'tes
   return `<div class="row"><div class="k">${esc(k)}${why ? `<span class="why">${esc(why)}</span>` : ''}</div><div class="v">${s}${tx ? txLink(tx) : tag}</div></div>`;
 };
 export const h3 = t => `<h3>${esc(t)}</h3>`;
-export const vaultLink = () => `<a class="vaultgo" data-testid="vault-link" href="/shops/vault/">Make your own charter and try to break it · Charter office &amp; Vault Arena →</a>`;
 export const note = t => `<p class="note">${t}</p>`;
 export const proof = (...parts) => `<div class="pf">${parts.join('')}</div>`;
 export const acct = a => `<a class="tx" href="https://testnet.nearblocks.io/address/${a}" target="_blank" rel="noopener">${esc(a)} ↗</a>`;

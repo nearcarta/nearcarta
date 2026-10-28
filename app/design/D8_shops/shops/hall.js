@@ -46,7 +46,7 @@ export default async function hall(ctx) {
   const rob = await makeRobot(scene); rob.at(1.9, 3.2); rob.lookAt(new THREE.Vector3(0, 0, 0)); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
   const v2 = TH.versions[1], v3 = TH.versions[2];
   return {
-    scene, camera, tags: [],
+    rob, scene, camera, tags: [],
     panel: { title: 'Town Hall', src: 'testnet', label: 'Reward cap · Proposal 4', hero: tok('0.25', 'NEAR'), action: 'Count the votes' },
     proof: PROOF,
   // intro: the robot walks to beside the table, not behind it

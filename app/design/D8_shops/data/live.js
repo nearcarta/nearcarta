@@ -1,12 +1,12 @@
-// Snapshot of live reads (tools/snapshot.mjs, 2026-10-28 04:03 UTC, nearcarta-api.onrender.com). Hosted app replaces these with fresh reads.
+// Snapshot of live reads (tools/snapshot.mjs, 2026-10-28 05:00 UTC, nearcarta-api.onrender.com). Hosted app replaces these with fresh reads.
 export const BANK = {
  "src": "testnet",
- "at": "2026-10-28 04:03 UTC",
+ "at": "2026-10-28 05:00 UTC",
  "street": {
   "txid": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
   "url": "https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
   "height": 4549357,
-  "confirmations": 324,
+  "confirmations": 460,
   "fee": "20000",
   "hidden": true,
   "reasons": [],
@@ -61,7 +61,7 @@ export const BANK = {
 };
 export const QUOTE = {
  "src": "live",
- "at": "2026-10-28 03:19 UTC",
+ "at": "2026-10-28 05:00 UTC",
  "api": "nearcarta-api.onrender.com",
  "from": {
   "sym": "USDC",
@@ -71,13 +71,13 @@ export const QUOTE = {
  "to": {
   "sym": "ZEC",
   "chain": "Zcash",
-  "amt": "0.00196",
-  "exact": "0.00195967"
+  "amt": "0.00195",
+  "exact": "0.00195219"
  },
  "eta": "≈ 152 s",
  "etaS": 152,
  "feeBps": 20,
- "costBps": 1430,
+ "costBps": 1441,
  "privacy": "basic",
  "sig": true,
  "dry": true,
