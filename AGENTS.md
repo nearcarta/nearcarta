@@ -28,7 +28,7 @@ Run `npm run readme-numbers -- --check` before a commit that touches tests or pr
 - Testnet only. Ferry and the Confidential Intents legs use 1Click mainnet as `dry:true` quotes: no deposit address, no spend. Never sign a mainnet tx.
 - The deployed API holds no keys and never signs. Keys live outside the repo (`.secrets/` is ignored). Never commit, log or print a key or token.
 - `AI_PROVE_ENABLED` stays off unless the account has credits; the TEE evidence check is free and always on.
-- Every claim in a doc links to a test or a testnet tx. If you cannot point to one, do not write the claim. Competitor cells quote the competitor's own page and give the fetch date.
+- Every claim in a doc links to a test or a testnet tx. If you cannot point to one, do not write the claim.
 - Contract view args: U64 values are strings (`"4"`, not `4`). `get_action` takes `action_id`; its record has `clause_id`.
 - The agent in the town is the Lamplighter. Agents get no human names.
 - Run `gitleaks git --config .gitleaks.toml --redact .` before every push.

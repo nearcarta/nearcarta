@@ -16,7 +16,7 @@ npx playwright install chromium && npm run e2e   # 13 browser tests
 Optional: `ONECLICK_PARTNER_KEY` enables confidential quotes. `NEARAI_CLOUD_API_KEY` enables the live NEAR AI TEE check (`npm run tee`; non-billable). Without them the public paths still run.
 
 ## Check each shop: do X, see Y
-Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-read from chain by `npm run verify`. Competitor comparison per shop: [docs/COMPARE.md](docs/COMPARE.md).
+Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-read from chain by `npm run verify`.
 
 | Shop | Do | See | Proof |
 |---|---|---|---|
