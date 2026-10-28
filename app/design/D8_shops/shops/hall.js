@@ -26,7 +26,7 @@ export default async function hall(ctx) {
     x.strokeStyle = '#d6b46a'; x.lineWidth = 10; x.beginPath(); x.arc(cx, cy, R + 20, Math.PI, 0); x.stroke();
     [[0, .15, '#00ec97'], [.15, .25, '#d6b46a'], [.25, .30, '#ff6b6b']].forEach(([a0, a1, c]) => { x.strokeStyle = c; x.lineWidth = 22; x.beginPath(); x.arc(cx, cy, R - 14, ang(a0) + .01, ang(a1) - .01); x.stroke(); });
     for (let i = 0; i <= 30; i++) { const a = ang(i / 100), maj = i % 5 === 0, r0 = R - (maj ? 58 : 40); x.strokeStyle = maj ? '#f3ead8' : '#9c9182'; x.lineWidth = maj ? 5 : 2; x.beginPath(); x.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); x.lineTo(cx + Math.cos(a) * (R - 30), cy + Math.sin(a) * (R - 30)); x.stroke(); }
-    x.fillStyle = '#f3ead8'; x.font = '600 28px Inter, sans-serif'; x.textAlign = 'center'; [[.15, '0.15'], [.25, '0.25']].forEach(([c, t]) => { const a = ang(c); x.fillText(t, cx + Math.cos(a) * (R - 92), cy + Math.sin(a) * (R - 92) + 10); });
+    x.fillStyle = '#f3ead8'; x.font = '700 34px Inter, sans-serif'; x.textAlign = 'center'; [[.15, '0.15', -.38], [.25, '0.25', .2]].forEach(([c, t, off]) => { const a = ang(c) + off; x.fillText(t, cx + Math.cos(a) * (R - 96), cy + Math.sin(a) * (R - 96) + 12); }); // labels sit beside their tick, so the needle never covers them
   });
   const dial = mesh(scene, new THREE.PlaneGeometry(1.1, 1.1 * 300 / 512), new THREE.MeshStandardMaterial({ map: face, roughness: .6 }), [0, 1.18, -1.615], { cast: false });
   const piv = new THREE.Group(); piv.position.set(0, 1.18 - (1.1 * 300 / 512) / 2 + 1.1 * 34 / 512, -1.6); scene.add(piv);
@@ -43,13 +43,14 @@ export default async function hall(ctx) {
   await put(scene, 'decoration/props/crate_A_big', { x: -2.3, z: -.5, ry: .4, fitW: .45 });
   await put(scene, 'decoration/props/flag_blue', { x: -1.6, z: -1.5 });
   const stones = [0, 1].map(i => { const s = new THREE.Mesh(new THREE.IcosahedronGeometry(.09, 0), new THREE.MeshStandardMaterial({ color: 0xd9d6cf, roughness: .8 })); s.castShadow = true; s.position.set(stools[i].position.x * .75, .78, .4); scene.add(s); return s; });
-  const rob = await makeRobot(scene); rob.at(1.9, 3.2);
+  const rob = await makeRobot(scene); rob.at(1.9, 3.2); rob.lookAt(new THREE.Vector3(0, 0, 0)); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
   const v2 = TH.versions[1], v3 = TH.versions[2];
   return {
     scene, camera, tags: [],
     panel: { title: 'Town Hall', src: 'testnet', label: 'Reward cap · Proposal 4', hero: tok('0.25', 'NEAR'), action: 'Count the votes' },
     proof: PROOF,
-    *intro() { setCap(v2.cap); yield rob.walk([new THREE.Vector3(1.2, 0, -1.2)]); rob.lookAt(slab.position); },
+  // intro: the robot walks to beside the table, not behind it
+    *intro() { setCap(v2.cap); yield rob.walk([new THREE.Vector3(1.95, 0, -.35)]); rob.lookAt(slab.position); },
     *act() {
       for (const s of stones) { const y0 = s.position.y, p0 = s.position.clone(); sfx('click'); yield tween(.5, k => { s.position.lerpVectors(p0, new THREE.Vector3(stones.indexOf(s) ? .05 : -.05, .74, 0), k); s.position.y = y0 + Math.sin(k * Math.PI) * .35 - .04 * k; }); yield wait(.25); }
       yield wait(.2); sfx('swap');

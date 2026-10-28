@@ -35,13 +35,15 @@ function resize() { if (!renderer) return; const w = innerWidth, h = innerHeight
 
 // --- frame (shared by rAF and capture stepping) ---
 const ray = new THREE.Raycaster(); let fpsN = 0, fpsT = 0; window.__fps = [];
+// Shops are lit for detail (1.18); the town keeps a lower, warmer exposure so the map stays readable.
+const SHOP_EXP = 1.18, TOWN_EXP = 1.0;
 function frame(dt) {
   if (!renderer || !town) return; // called before boot finished (capture tools, early resize): nothing to draw yet
   clock.T += dt; tickRoutines(); robot?.update(dt); if (shop) shop.update?.(dt, clock.T);
   if (controls.enabled) controls.update();
-  if (mode === 'shop') { renderer.setRenderTarget(null); renderer.render(shop.scene, shop.camera); }
-  else if (iris > 0 && shop) { renderer.setRenderTarget(rt); renderer.render(shop.scene, shop.camera); renderer.setRenderTarget(null); renderer.render(town, cam); qmat.uniforms.r.value = iris; renderer.autoClear = false; renderer.render(quad.userData.scene, qcam); renderer.autoClear = true; }
-  else { renderer.setRenderTarget(null); renderer.render(town, cam); }
+  if (mode === 'shop') { renderer.setRenderTarget(null); (renderer.toneMappingExposure = SHOP_EXP, renderer.render(shop.scene, shop.camera)); }
+  else if (iris > 0 && shop) { renderer.setRenderTarget(rt); (renderer.toneMappingExposure = SHOP_EXP, renderer.render(shop.scene, shop.camera)); renderer.setRenderTarget(null); (renderer.toneMappingExposure = TOWN_EXP, renderer.render(town, cam)); qmat.uniforms.r.value = iris; renderer.autoClear = false; renderer.render(quad.userData.scene, qcam); renderer.autoClear = true; }
+  else { renderer.setRenderTarget(null); (renderer.toneMappingExposure = TOWN_EXP, renderer.render(town, cam)); }
   placeTags(); fpsN++; const now = performance.now(); if (!fpsT) fpsT = now; if (now - fpsT >= 1000) { window.__fps.push(fpsN * 1000 / (now - fpsT)); fpsN = 0; fpsT = now; }
 }
 window.__advance = (sec, fps = 30) => { const n = Math.round(sec * fps); for (let i = 0; i < n; i++) frame(1 / fps); };
@@ -75,7 +77,7 @@ function ui() {
 function drawer(on) { const d = $('#drawer'); d.classList.toggle('open', on); d.setAttribute('aria-hidden', on ? 'false' : 'true'); $('#t-proof').setAttribute('aria-expanded', on); if (on) { sfx('click'); $('#d-close').focus(); } }
 export function setResult(kind, text) { const b = $('#t-act'); b.classList.remove('busy'); b.className = 'act res ' + kind; b.disabled = true; b.innerHTML = `<span class="glyph" aria-hidden="true">${kind === 'no' ? '✕' : kind === 'ok' ? '✓' : '○'}</span>${text}`; b.setAttribute('aria-live', 'polite'); }
 export function setHero(html) { const h = $('#t-hero'); h.innerHTML = html; h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); }
-const SRC = { testnet: 'testnet', live: 'live read', sample: 'SAMPLE' };
+const SRC = { testnet: 'testnet', live: 'live read' };
 function fillTray(sh) { const p = sh.panel; $('#t-title').innerHTML = `${i3(SHOPS[sh.id].icon, 28)}<span>${p.title}</span>`; const s = $('#t-src'); s.textContent = SRC[p.src]; s.className = 'src ' + p.src; s.title = p.srcNote || '';
   $('#t-label').textContent = p.label; $('#t-hero').innerHTML = p.hero; const b = $('#t-act'); b.className = 'act primary'; b.disabled = false; b.hidden = !p.action; b.textContent = p.action || '';
   $('#d-title').textContent = p.title + ' · proof'; $('#d-body').innerHTML = sh.proof + '<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>'; }

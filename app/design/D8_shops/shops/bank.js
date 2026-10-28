@@ -1,4 +1,5 @@
-// Mist Bank: a vault with a street window. The street sees that a payout happened; only the ledger inside holds the amount.
+// Mist Bank: a vault with a street window. The street sees that a payout happened; the ledger shows only the on-chain
+// commitment to the amount. The API no longer returns the amount, salt or viewing key, and this view never shows an amount.
 // Data: D6 BANK when the host provides it (tech app), else the live-read snapshot in data/live.js (tools/snapshot.mjs).
 import { THREE, room, put, makeRobot, C, CSS, radial } from '../js/core.js';
 import { row, h3, note, proof, paper, esc } from './_ui.js';
@@ -6,8 +7,9 @@ import * as D from '../../D6_dashboards/src/data.js';
 import { BANK } from '../data/live.js';
 import { M as PM, brassM, mesh, lantern, candle, rug } from './_props.js';
 
-const B = D.BANK || BANK || null;
-const LEG = { shield: 'Shield ZEC into a confidential balance', transfer: 'Private transfer between confidential balances', unshield: 'Unshield to a public Intents balance' };
+const B = D.BANK || BANK;
+const LEG = { shield: 'Shield ZEC into a confidential balance', transfer: 'Transfer between confidential balances', unshield: 'Unshield to a public Intents balance' };
+const short = c => `${String(c).slice(0, 8)}…${String(c).slice(-6)}`;
 function live(b) {
   const s = b.street;
   return proof(
@@ -16,20 +18,20 @@ function live(b) {
     note(`<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.txid.slice(0, 12))}… ↗</a> · ${esc(String(s.confirmations))} confirmations${b.at ? ' · read ' + esc(b.at) : ''}`),
     h3('The oath · NEAR testnet'),
     row({ k: `Payout approved by clause ${b.oath.clause}`, why: 'the memo on chain holds only a commitment to the amount', st: b.oath.ok ? 'ok' : 'no', stText: b.oath.ok ? 'allowed' : 'not verified', tx: b.oath.tx }),
-    h3('The ledger · opened with the payee viewing key'),
-    row({ k: `Commitment on chain: ${esc(String(b.ledger.commitment || '').slice(0, 12))}…`, why: 'sha256 of the amount and a secret salt. Only the payee, or an auditor they hand the viewing key to, can check it; the amount, the salt and the key are never served to this page', st: 'pend', stText: 'auditor only', src: 'testnet' }),
+    h3('The commitment · NEAR testnet memo'),
+    row({ k: `sha256 ${short(b.commitment.value)}`, why: 'binds the paid amount without showing it; this app never receives the amount, salt or viewing key', st: 'ok', stText: 'amount hidden', src: 'testnet' }),
+    `<p class="kv">${esc(b.commitment.value)}</p>`,
+    note(`Auditor check: with the payee viewing key, read the amount and salt from the encrypted memo and hash them, or ${esc(b.auditor?.verify || 'POST /api/mistbank/verify')}. A match proves the paid amount is the committed one.`),
+    ...(b.binding && !b.binding.capsAmount ? [note('The charter approves the payout and stores the commitment; it does not cap the Zcash amount.')] : []),
     h3('The desk · NEAR Intents Confidential, dry quotes'),
     ...(b.desk?.length ? b.desk.map(l => row({ k: LEG[l.leg] || l.leg, why: `privacy ${l.privacy} · signature ${l.sig ? 'verified' : 'FAILED'} · echo ${l.echo ? 'ok' : 'differs'}`, st: l.ok ? 'ok' : 'no', stText: l.ok ? 'quoted' : 'rejected', src: 'live' }))
       : [row({ k: 'Confidential quotes', why: 'not available on this server', st: 'no', stText: 'off', src: 'live' })]),
     note('Dry quotes only: no deposit address exists and nothing was spent. A mainnet confidential deposit needs the owner\'s go-ahead.'));
 }
-const HERO = `<span class="blurnum" aria-label="hidden amount">••••</span><span class="unit">TAZ</span>`;
+const HERO = `<span class="commit" title="sha256 commitment on NEAR testnet">${esc(String(B.commitment?.value || '').slice(0, 8))}…</span><span class="unit">amount hidden</span>`;
 // For the 2D fallback (js/flat.js)
 export const FLAT = { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount', hero: HERO };
-// Last resort when no live read and no snapshot loaded: the recorded testnet payout, with its explorer link.
-const RECORDED = proof(h3('What this room shows'), row({ k: 'Street: Zcash testnet tx d0b52067…', why: 'public tx, hidden amount: only the fee leaves the Ironwood pool', src: 'testnet' }), row({ k: 'Ledger: only the payee\'s viewing key opens it', why: 'amount and salt hash to the commitment the oath approved; neither is shown here', src: 'testnet' }),
-  note('Recorded testnet payout d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897 (live data did not load). Check it: <a class="tx" href="https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897" target="_blank" rel="noopener">cipherscan ↗</a>'));
-export const PROOF = B ? live(B) : RECORDED;
+export const PROOF = live(B);
 
 export default async function bank() {
   const { scene, camera } = await room({ cam: [2.6, 3.8, 8.2], look: [0, .9, 0] });
@@ -51,13 +53,14 @@ export default async function bank() {
   const wheel = new THREE.Group(); wheel.position.set(vx, vy, vz + .1); scene.add(wheel);
   for (let i = 0; i < 3; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(.42, .035, .035), PM.dark); sp.rotation.z = i * Math.PI / 3; wheel.add(sp); }
   wheel.add(new THREE.Mesh(new THREE.TorusGeometry(.21, .02, 8, 32), PM.dark));
-  // the ledger desk: open book with the amount (inside only), the brass viewing key, a candle
+  // the ledger desk: open book with the commitment and a wax seal (no amount anywhere), the brass viewing key, a candle
   const desk = mesh(scene, new THREE.BoxGeometry(1.3, .1, .66), PM.wood, [.75, .7, .55]);
   [[-.58, -.27], [.58, -.27], [-.58, .27], [.58, .27]].forEach(([x, z]) => mesh(scene, new THREE.BoxGeometry(.07, .66, .07), PM.dark, [.75 + x, .33, .55 + z]));
-  const taz = '••••'; // the amount is the payee's, never shown here
+  const cm = String(B.commitment?.value || '');
   const page = paper(THREE, 320, 200, (x, w, h) => { x.fillStyle = '#efe6d2'; x.fillRect(0, 0, w, h); x.fillStyle = '#c9b993'; x.fillRect(w / 2 - 2, 0, 4, h);
-    x.fillStyle = '#7b6a55'; for (let i = 0; i < 6; i++) { x.fillRect(16, 22 + i * 26, 100 - (i * 17) % 40, 4); x.fillRect(w / 2 + 16, 22 + i * 26, 90 - (i * 23) % 40, 4); }
-    x.fillStyle = '#3b2a1e'; x.font = '700 30px Inter, sans-serif'; x.fillText(taz, w / 2 + 16, 150); x.font = '600 18px Inter, sans-serif'; x.fillText('TAZ', w / 2 + 16, 176); });
+    x.fillStyle = '#7b6a55'; for (let i = 0; i < 6; i++) { x.fillRect(16, 22 + i * 26, 100 - (i * 17) % 40, 4); if (i < 3) x.fillRect(w / 2 + 16, 22 + i * 26, 90 - (i * 23) % 40, 4); }
+    x.fillStyle = '#3b2a1e'; x.font = '600 15px ui-monospace, Menlo, monospace'; for (let i = 0; i < 4; i++) x.fillText(cm.slice(i * 8, i * 8 + 8), w / 2 + 16, 116 + i * 18);
+    x.fillStyle = '#c0463e'; x.beginPath(); x.arc(w - 34, 168, 17, 0, Math.PI * 2); x.fill(); x.fillStyle = '#8a2b26'; x.beginPath(); x.arc(w - 34, 168, 9, 0, Math.PI * 2); x.fill(); });
   mesh(scene, new THREE.PlaneGeometry(.78, .49), new THREE.MeshStandardMaterial({ map: page, roughness: 1 }), [.75, .757, .55], { rx: -Math.PI / 2, cast: false });
   const key = new THREE.Group(); key.position.set(1.28, .77, .42); key.rotation.y = .5; scene.add(key);
   const kb = new THREE.Mesh(new THREE.TorusGeometry(.05, .016, 8, 20), brassM()); kb.rotation.x = Math.PI / 2; key.add(kb);
@@ -67,7 +70,7 @@ export default async function bank() {
   await put(scene, 'decoration/props/sack', { x: -1.55, z: .1, fitW: .42 }); await put(scene, 'decoration/props/sack', { x: -1.2, z: -.3, ry: 1.2, fitW: .38 });
   await put(scene, 'decoration/props/crate_B_small', { x: -1.75, z: .75, fitW: .45 });
   lantern(scene, -1.9, -.5, { h: 1.5 });
-  const rob = await makeRobot(scene); rob.at(.6, 1.35); rob.lookAt(new THREE.Vector3(.75, 0, .55));
+  const rob = await makeRobot(scene); rob.at(1.45, .95); rob.lookAt(new THREE.Vector3(.75, 0, .55), { toViewer: .8 }); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
   let t = 0;
   return {
     scene, camera, tags: [],

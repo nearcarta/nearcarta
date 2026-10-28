@@ -37,7 +37,8 @@ export const BANK = mb?.built ? { src: 'testnet', at, live: true,
     hidden: mb.street.amount_hidden === true, reasons: mb.street.reasons || [], pool: Object.entries(mb.street.value_balance_zat || {}).find(([, v]) => v !== '0')?.[0] || 'shielded', actions: mb.street.actions },
   oath: { tx: mb.oath.tx, ok: mb.oath.success && mb.oath.decision === 'allowed' && mb.oath.memo_on_chain, clause: mb.oath.clause_id },
   // Never the amount, the salt or the viewing key: only the commitment on chain.
-  ledger: { commitment: mb.commitment?.value, scheme: mb.commitment?.scheme },
+  commitment: { value: mb.commitment?.value, scheme: mb.commitment?.scheme },
+  binding: { capsAmount: mb.binding?.charter_caps_zec_amount === true, timing: mb.binding?.timing }, auditor: { verify: mb.auditor?.verify },
   desk: mb.desk?.available ? Object.entries(mb.desk.legs).map(([k, l]) => ({ leg: k, ok: l.ok, privacy: l.privacy, sig: l.signature, echo: l.echo?.ok, out: l.amountOut })) : [] }
   : { ...SNAP.BANK, live: false };
 

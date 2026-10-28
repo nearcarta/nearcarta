@@ -25,12 +25,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .ghost { height: 40px; padding: 0 var(--s2); border-radius: var(--r); background: var(--raised); border: 1px solid var(--line); display: flex; gap: var(--s1); align-items: center; }
 .ghost:hover { border-color: var(--muted); }
 
-/* source tag: testnet = solid dot, live read = ring, SAMPLE = dashed outline */
+/* source tag: testnet = solid dot, live read = ring */
 .src { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 var(--s1); border-radius: 999px; font-size: 12px; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
 .src::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
 .src.live::before { background: none; border: 1.5px solid var(--muted); width: 5px; height: 5px; }
-.src.sample { border-style: dashed; letter-spacing: .04em; }
-.src.sample::before { display: none; }
 
 /* town labels: icon + name only */
 #tags { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
@@ -125,3 +123,9 @@ pre.kv { white-space: pre-wrap; background: var(--raised); border: 1px solid var
 .src.error { color: var(--no); border-color: color-mix(in srgb, var(--no) 55%, transparent); }
 .src.error::before { background: var(--no); }
 .note.proof-error, .note.proof-missing { color: var(--no); }
+/* Mist Bank hero: the on-chain commitment stands in for the amount, which is never shown */
+.hero .commit { font-family: var(--mono); font-size: 28px; letter-spacing: .02em; color: var(--accent); }
+.hero .commit + .unit { font-size: 18px; }
+
+.vaultgo { display: block; padding: 10px 12px; border-radius: 10px; background: #e8b86a; color: #1f1a15; font-weight: 600; text-decoration: none; text-align: center; }
+.vaultgo:hover { background: #f0c987; }

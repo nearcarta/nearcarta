@@ -70,7 +70,7 @@ export class Char {
     this.root.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(this.root); const s = h / (box.max.y - box.min.y); this.root.scale.setScalar(s); this.root.position.y = -box.min.y * s; this.h = h;
     // a thin dark inverted-hull outline so characters read against bright scenes (owner QA: stronger characters)
     if (outline != null) { this.root.updateMatrixWorld(true); const skin = []; this.root.traverse(m => { if (m.isSkinnedMesh) skin.push(m); });
-      skin.forEach(m => { const ws = new THREE.Vector3(); m.getWorldScale(ws); const ow = (.012 / ws.x).toFixed(5);
+      skin.forEach(m => { const ws = new THREE.Vector3(); m.getWorldScale(ws); const ow = (.016 / ws.x).toFixed(5);
         const om = new THREE.MeshBasicMaterial({ color: outline, side: THREE.BackSide }); om.onBeforeCompile = sh => { sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n transformed += normalize(normal) * ${ow};`); }; om.customProgramCacheKey = () => 'outline' + ow;
         const o = new THREE.SkinnedMesh(m.geometry, om); o.bind(m.skeleton, m.bindMatrix); o.position.copy(m.position); o.quaternion.copy(m.quaternion); o.scale.copy(m.scale); o.frustumCulled = false; o.castShadow = false;
         if (m.morphTargetInfluences) { o.morphTargetInfluences = m.morphTargetInfluences; o.morphTargetDictionary = m.morphTargetDictionary; } m.parent.add(o); }); }
@@ -81,7 +81,7 @@ export class Char {
   at(x, z) { this.g.position.set(x, 0, z); return this; }
   walk(pts) { if (RM) { const l = pts[pts.length - 1]; this.g.position.set(l.x, 0, l.z); const p = pts.length > 1 ? pts[pts.length - 2] : null; if (p) this.faceGoal = Math.atan2(l.x - p.x, l.z - p.z); this.play('Idle'); return () => true; } this.path = pts.map(p => p.clone()); this.play('Walking'); return () => this.path.length === 0; }
   // in a shop (room() puts its camera on the scene) the character turns half-way to the viewer, so we see a face, not a back
-  lookAt(v, { toViewer = .5 } = {}) { const p = this.g.position; let a = Math.atan2(v.x - p.x, v.z - p.z); const cam = this.scene?.userData.camera;
+  lookAt(v, { toViewer = .65 } = {}) { const p = this.g.position; let a = Math.atan2(v.x - p.x, v.z - p.z); const cam = this.scene?.userData.camera;
     if (cam && toViewer) { const c = Math.atan2(cam.position.x - p.x, cam.position.z - p.z); let d = c - a; d = Math.atan2(Math.sin(d), Math.cos(d)); a += d * toViewer; }
     this.faceGoal = a; if (RM) this.face = this.faceGoal; }
   update(dt) {
@@ -94,8 +94,8 @@ export class Char {
 }
 export async function makeRobot(scene) {
   const g = await load('chars/RobotExpressive.glb'); const c = new Char(g, scene, { tint: ['Main', 0xd9a441, 0x4a2a00] });
-  const lan = new THREE.Sprite(new THREE.SpriteMaterial({ map: radial(CSS.accent || '#e2b35b'), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: .5, fog: false })); lan.scale.setScalar(.38); lan.position.set(.3, .8, .12); c.g.add(lan); c.lan = lan;
-  const L = new THREE.PointLight(C.accent, 1.0, 2.4, 1.6); L.position.set(.3, .85, .1); c.g.add(L); c.play('Idle'); return c;
+  const lan = new THREE.Sprite(new THREE.SpriteMaterial({ map: radial(CSS.accent || '#e2b35b'), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: .38, fog: false })); lan.scale.setScalar(.26); lan.position.set(.46, .5, .18); c.g.add(lan); c.lan = lan;
+  const L = new THREE.PointLight(C.accent, .6, 2.0, 1.6); L.position.set(.5, .5, .35); c.g.add(L); c.play('Idle'); return c; // lantern low and to the side: lights the floor, not a blown-out head
 }
 
 // tokens and icons (D7 files; every amount gets its icon)

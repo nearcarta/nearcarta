@@ -26,8 +26,8 @@ export default async function chronicle() {
   mesh(scene, new THREE.CylinderGeometry(.06, .06, .02, 20), new THREE.MeshStandardMaterial({ color: 0xc0463e, roughness: .5, emissive: 0x3a0c08 }), [1.84, .88, .53], { rx: .5 });
   const scroll = new THREE.MeshStandardMaterial({ color: 0xe9dcc0, roughness: 1 }); [[-1.25, .2, .55, 0], [-1.05, .2, .7, .5], [-1.15, .34, .62, .25]].forEach(([x, y, z, r]) => mesh(scene, new THREE.CylinderGeometry(.06, .06, .5, 12), scroll, [x, y - .1, z], { rz: Math.PI / 2, ry: r }));
   banner(scene, -.85, 2.25, -.05, 0xa8644a, { w: .2, h: .45 }); banner(scene, .85, 2.25, -.05, 0xa8644a, { w: .2, h: .45 });
-  lantern(scene, -2.35, .7, { h: 1.3 }); lantern(scene, 2.6, -.75, { h: 1.3, light: false }); rug(scene, 0, 1.0, 2.6, 1.3, 0x5e3427);
-  await put(scene, 'decoration/props/crate_A_big', { x: 2.05, z: -1.45, ry: .4, fitW: .42 }).catch(() => null);
+  lantern(scene, -2.35, .7, { h: 1.3 }); lantern(scene, 2.05, -1.25, { h: 1.3, light: false }); rug(scene, 0, 1.0, 2.6, 1.3, 0x5e3427);
+  await put(scene, 'decoration/props/crate_A_big', { x: 1.6, z: -1.75, ry: .4, fitW: .42 }).catch(() => null);
   const rob = await makeRobot(scene); rob.at(.6, 1.25); rob.lookAt(new THREE.Vector3(.2, 0, 3));
   return {
     scene, camera, tags: [],

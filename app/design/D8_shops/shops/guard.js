@@ -1,12 +1,12 @@
 // Guardhouse: the oath is a pane across the gate. A forged invoice (real lab attack S2) knocks and bounces off.
 import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, tok, C } from '../js/core.js';
 import { ATTACKS, LAB } from '../../D6_dashboards/src/data.js';
-import { row, h3, note, proof, esc, acct, paper } from './_ui.js';
+import { row, h3, note, proof, esc, acct, paper, vaultLink } from './_ui.js';
 import { M as PM, brassM, mesh, lantern, banner } from './_props.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
 const S2 = ATTACKS.find(a => a.id === 'S2');
-export const PROOF = proof(
+export const PROOF = proof(vaultLink(),
       h3('This knock · lab attack S2'), row({ k: S2.name, why: S2.reason + ' · ' + S2.secs + ' s', st: 'no', stText: 'refused', tx: S2.tx }),
       `<pre class="kv">${esc(S2.tool.split('\n')[1])}</pre>`, note(`The agent read the hidden line and proposed it. The oath ${acct(LAB.oath)} refused before any money moved.`),
       h3('Other knocks on the same gate'), ...ATTACKS.filter(a => a.id !== 'S2').map(a => row({ k: a.name, why: a.reason, st: 'no', stText: 'refused', tx: a.tx })),
@@ -38,7 +38,7 @@ export default async function guard(ctx) {
   mesh(scene, new THREE.PlaneGeometry(.3, .38), new THREE.MeshStandardMaterial({ map: list, roughness: 1 }), [1.55, .945, .965], { rx: .5 - Math.PI / 2 });
   lantern(scene, -1.25, -.15, { h: 1.35 }); lantern(scene, 1.25, -.6, { h: 1.35, light: false });
   banner(scene, -gw / 2 - .3, fy1 - .05, pz, 0xa8644a, { w: .3, h: .55 }); banner(scene, gw / 2 + .3, fy1 - .05, pz, 0xa8644a, { w: .3, h: .55 });
-  await put(scene, 'decoration/props/bucket_arrows', { x: -1.95, z: -.3, fitW: .32 }); await put(scene, 'decoration/props/target', { x: -2.1, z: 1.1, ry: .8, fitW: .7 });
+  await put(scene, 'decoration/props/bucket_arrows', { x: -1.95, z: -.3, fitW: .32 }); await put(scene, 'decoration/props/target', { x: -1.65, z: .55, ry: .7, fitW: .7 });
   // the forged invoice
   const inv = new THREE.Mesh(new THREE.PlaneGeometry(.42, .3), new THREE.MeshStandardMaterial({ color: 0xe9e3d6, side: THREE.DoubleSide, roughness: 1 })); inv.castShadow = true;
   const seal = new THREE.Mesh(new THREE.CircleGeometry(.05, 16), new THREE.MeshBasicMaterial({ color: C.no })); seal.position.set(.12, -.07, .002); inv.add(seal);

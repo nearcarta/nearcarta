@@ -1,12 +1,12 @@
-// Snapshot of live reads (tools/snapshot.mjs, 2026-10-28 03:19 UTC, nearcarta-api.onrender.com). Hosted app replaces these with fresh reads.
+// Snapshot of live reads (tools/snapshot.mjs, 2026-10-28 04:03 UTC, nearcarta-api.onrender.com). Hosted app replaces these with fresh reads.
 export const BANK = {
  "src": "testnet",
- "at": "2026-10-28 03:19 UTC",
+ "at": "2026-10-28 04:03 UTC",
  "street": {
   "txid": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
   "url": "https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
   "height": 4549357,
-  "confirmations": 224,
+  "confirmations": 324,
   "fee": "20000",
   "hidden": true,
   "reasons": [],
@@ -20,12 +20,20 @@ export const BANK = {
  },
  "oath": {
   "tx": "5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+  "url": "https://testnet.nearblocks.io/txns/5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
   "ok": true,
   "clause": "tip2"
  },
- "ledger": {
-  "commitment": "b22cc85878be366a3edb1d4ef3afbeea0813d4be02aec95a387242fa9a6055ce",
+ "commitment": {
+  "value": "b22cc85878be366a3edb1d4ef3afbeea0813d4be02aec95a387242fa9a6055ce",
   "scheme": "sha256(\"mistbank:v1:<amount>:<salt>\")"
+ },
+ "binding": {
+  "capsAmount": false,
+  "timing": "Future payouts wait a random delay after the NEAR approval before the Zcash send, so the two are not linkable by time. The first payout (2026-10-28) had no delay: mined 29 s after its approval."
+ },
+ "auditor": {
+  "verify": "POST /api/mistbank/verify"
  },
  "desk": [
   {
@@ -33,24 +41,21 @@ export const BANK = {
    "ok": true,
    "privacy": "basic",
    "sig": true,
-   "echo": true,
-   "out": "0.1"
+   "echo": true
   },
   {
    "leg": "transfer",
    "ok": true,
    "privacy": "basic",
    "sig": true,
-   "echo": true,
-   "out": "1.0"
+   "echo": true
   },
   {
    "leg": "unshield",
    "ok": true,
    "privacy": "basic",
    "sig": true,
-   "echo": true,
-   "out": "1.0"
+   "echo": true
   }
  ]
 };
