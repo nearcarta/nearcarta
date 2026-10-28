@@ -97,3 +97,14 @@ test('NEAR AI TEE preflight: gateway + model quotes verify (dcap-qvl, nonce, sig
   for (const m of r.models) { assert.equal(m.ok, true, JSON.stringify(m.checks)); if (m.gpu?.present) assert.equal(m.gpu.ok, true); }
   assert.equal(r.ok, true);
 });
+
+test('mist bank: Zcash testnet payout hides its amount, its NEAR oath carries the commitment, the ledger binds', async () => {
+  const { mistbank } = await import('../../src/mistbank.js');
+  const m = await mistbank({ fresh: true });
+  assert.equal(m.built, true);
+  assert.equal(m.street.amount_hidden, true, m.street.reasons.join());
+  assert.ok(m.street.confirmations >= 1);
+  assert.equal(m.oath.success, true); assert.equal(m.oath.decision, 'allowed'); assert.equal(m.oath.memo_on_chain, true); assert.equal(m.oath.shop, 'mistbank');
+  assert.equal(m.binds, true);
+  if (has.oneClick()) for (const [k, l] of Object.entries(m.desk.legs)) { assert.equal(l.ok, true, k); assert.equal(l.privacy, 'basic'); assert.equal(l.dry, true); }
+});
