@@ -30,15 +30,15 @@ export function findToken(list, { symbol, chain, assetId }) {
 
 export function toUnits(amount, decimals) {
   const [w, f = ''] = String(amount).split('.');
-  if (!/^\d+$/.test(w) || !/^\d*$/.test(f)) throw new Error('bad amount');
-  if (f.length > decimals) throw new Error('too many decimals');
+  if (!/^\d+$/.test(w) || !/^\d*$/.test(f)) throw Object.assign(new Error('bad amount'), { status: 400 });
+  if (f.length > decimals) throw Object.assign(new Error('too many decimals'), { status: 400 });
   return (BigInt(w) * 10n ** BigInt(decimals) + BigInt((f + '0'.repeat(decimals)).slice(0, decimals) || '0')).toString();
 }
 
 export const PRIVACY = ['public', 'basic', 'advanced'];
 
 export function buildQuoteRequest({ from, to, amount, recipient, refundTo, privacy = 'public', slippageBps = 100, deadlineMin = 60 }) {
-  if (!PRIVACY.includes(privacy)) throw new Error('privacy must be public|basic|advanced');
+  if (!PRIVACY.includes(privacy)) throw Object.assign(new Error('privacy must be public|basic|advanced'), { status: 400 });
   const body = {
     dry: true,
     swapType: 'EXACT_INPUT',
