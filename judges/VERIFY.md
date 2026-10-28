@@ -3,7 +3,7 @@
 All commands are read-only unless marked.
 
 1. Proof txs exist and have the stated outcome:
-   `npm run verify` → `68/68 proof txs found on testnet` (it also re-reads the Zcash testnet payout and checks the amount is hidden). The output is in judges/proofs/proof-check.json, and `npm run txs` turns it into TESTNET_TXS.md.
+   `npm run verify` → `69/69 proof txs found on testnet` (it also re-reads the Zcash testnet payout and checks the amount is hidden). The output is in judges/proofs/proof-check.json, and `npm run txs` turns it into TESTNET_TXS.md.
 2. The charter account cannot be drained by a key:
    `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"r11oath-82930.testnet"}}'`
    → exactly one key, with `FunctionCall` and `method_names:["propose"]`.
@@ -14,8 +14,8 @@ All commands are read-only unless marked.
 5. Live: `npm run test:integration`. It runs 15 tests against testnet, 1Click (dry) and the NEAR AI TEE check.
 5c. Attested models only: `curl -s https://nearcarta-api.onrender.com/api/ai/tee/models` lists the NEAR AI catalog models whose attestation report has a model attestation. On 2026-10-28 that was 9 of 61; the other 52 answer 503 on /v1/attestation/report and are left out. `/api/ai/tee?model=<id>` refuses (400) any model not on that list, and `?model=Qwen/Qwen3.8-27B` → `ok: true`.
 5b. NEAR AI TEE (needs `NEARAI_CLOUD_API_KEY`; non-billable): `npm run tee` → `PASS` for each check on the gateway and on every model report, then `TEE preflight verified`. Offline tamper tests (wrong nonce, swapped signer, edited app_compose, forged event, flipped quote byte, expired collateral) are in `npm test`.
-6. Contracts: `cd contracts/oath && cargo test --lib` (70) and `cd contracts/arena && cargo test --lib` (14). Then `cd contracts/oath && cargo test --test exploits` (10 attacks in a near-workspaces sandbox against the deployed wasm; all must be refused).
-7. Browser: `npm run e2e` (13 tests; `BASE_URL=https://nearcarta.vercel.app npm run e2e` runs them against the deploy; set BASE_URL to test a deployed preview).
+6. Contracts: `cd contracts/oath && cargo test --lib` (122) and `cd contracts/arena && cargo test --lib` (14). Then `cd contracts/oath && cargo test --test exploits` (10 attacks in a near-workspaces sandbox against the deployed wasm; all must be refused).
+7. Browser: `npm run e2e` (31 tests; `BASE_URL=https://nearcarta.vercel.app npm run e2e` runs them against the deploy; set BASE_URL to test a deployed preview).
    The counts in README.md and this file are written by `npm run readme-numbers` from these outputs; `npm run readme-numbers -- --check` fails if any is stale.
 8. (Writes to testnet; needs the agent key) `AGENT_KEY_FILE=… node backend/scripts/guardhouse-demo.js`: one allowed and one refused proposal. Output goes to judges/proofs/guardhouse-demo.json.
    `AGENT_KEY_FILE=… node backend/scripts/attack-demo.js`: prompt-injection run. Prints `PASS` when the honest payee is paid, the injected payee is blocked before signing, and the bypassed run is `denied receiver_not_allowlisted`. Output goes to judges/proofs/attack-demo.{json,log}.

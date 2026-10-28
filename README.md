@@ -2,16 +2,16 @@
 
 A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money, and each move is checked first by the charter (the `oath` contract on NEAR), which holds the agent's rules. Agents ask. The charter answers. Each shop below is real on NEAR testnet, or real on 1Click mainnet as a dry quote (no spend).
 
-Deployed (testnet): https://nearcarta.vercel.app serves the pages, and its `/api/*` is passed to the API on Render (free plan, testnet, built from the `Dockerfile` image): https://nearcarta-api.onrender.com. Example: `/api/health`, `/api/guardhouse`. The latest e2e run against Vercel (Your House and NEAR Connect specs) is in `judges/proofs/e2e-vercel.json`: 21 passed, 5 skipped. `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`.
+Deployed (testnet): https://nearcarta.vercel.app serves the pages, and its `/api/*` is passed to the API on Render (free plan, testnet, built from the `Dockerfile` image): https://nearcarta-api.onrender.com. Example: `/api/health`, `/api/guardhouse`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 21 passed, 10 skipped. `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`.
 
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 150 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
-npm run verify           # reads every proof tx back from testnet (68/68 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
+npm test                 # 176 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm run verify           # reads every proof tx back from testnet (69/69 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 npm run build && node app/serve.mjs &   # UI on :5173
-npx playwright install chromium && npm run e2e   # 13 browser tests
+npx playwright install chromium && npm run e2e   # 31 browser tests
 ```
 Optional: `ONECLICK_PARTNER_KEY` enables confidential quotes. `NEARAI_CLOUD_API_KEY` enables the live NEAR AI TEE check (`npm run tee`; non-billable). Without them the public paths still run.
 
@@ -52,7 +52,7 @@ Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-re
 - **License.** MIT, see [LICENSE](LICENSE).
 
 ## Layout
-- `contracts/oath`: the agent charter (Rust, near-sdk). 70 unit tests, plus near-workspaces sandbox and 10 exploit reproductions in `tests/`.
+- `contracts/oath`: the agent charter (Rust, near-sdk). 122 unit tests, plus near-workspaces sandbox and 10 exploit reproductions in `tests/`.
 - `contracts/artifacts`: the deployed charter wasm. `npm run wasm-hash` prints its hash, which equals the on-chain code_hash.
 - `contracts/townhall`, `contracts/arena`, `contracts/toll`, `contracts/mock_ft`: the shop contracts.
 - `backend/`: Hono API that reads chain, 1Click and NEAR AI. `scripts/` holds the testnet demo and the proof checker.

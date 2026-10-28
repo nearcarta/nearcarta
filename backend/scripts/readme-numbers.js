@@ -24,7 +24,8 @@ if (unitFail) throw new Error(`${unitFail} unit tests fail; fix them before writ
 const n = {
   unit: unitPass,
   proofsFound: rows.filter(r => r.found).length, proofs: rows.length,
-  e2e: e2e.expected + e2e.unexpected + e2e.flaky + e2e.skipped,
+  // the suite size comes from the latest full run (the live Vercel run when it is newer)
+  e2e: Math.max(e2e.expected + e2e.unexpected + e2e.flaky + e2e.skipped, vercel.expected + vercel.unexpected + vercel.flaky + vercel.skipped),
   vercelPassed: vercel.expected, vercelSkipped: vercel.skipped,
   integration: count('backend/test/integration', /^\s*test\(/gm),
   oath: count('contracts/oath/src', /#\[test\]/g),
