@@ -1,28 +1,23 @@
 {
- "at": "2026-10-28T20:55:12.561Z",
+ "at": "2026-10-28T21:39:34.235Z",
  "limit_ms": 15000,
  "runs": [
   {
    "width": 1440,
    "base": "https://nearcarta.vercel.app",
-   "charter": "feed-mvsldvqi.nccharters-53681.testnet",
-   "feed_fill_ms_after_rules": 829,
+   "charter": "feed-mvsmyqdp.nccharters-53681.testnet",
+   "feed_fill_ms_after_rules": 1350,
    "rows_after_rules": 2,
    "ask_txs": [
-    "7gZJayh9y6KTNc65wCK1Fh3armeAcMU9xJ5B7wiz5mwU"
+    "EyVRJCH2XNKV5ScTHPRRa7Tfin4exnyKnrVFDFGnQRST"
    ],
-   "ask_in_feed_ms": 2083,
+   "ask_in_feed_ms": 1570,
    "feed": [
     "Paid 0.01 NEAR to cafe just now details↗",
     "Rules saved just now details↗",
     "Charter created just now details↗"
    ],
    "chronicle_responses": [
-    {
-     "status": 200,
-     "busy": false,
-     "source": "tx.test.fastnear.com list + rpc EXPERIMENTAL_tx_status"
-    },
     {
      "status": 200,
      "busy": false,
@@ -39,13 +34,13 @@
   {
    "width": 1280,
    "base": "https://nearcarta.vercel.app",
-   "charter": "feed-mvslehod.nccharters-53681.testnet",
-   "feed_fill_ms_after_rules": 224,
+   "charter": "feed-mvsmzb5s.nccharters-53681.testnet",
+   "feed_fill_ms_after_rules": 1334,
    "rows_after_rules": 2,
    "ask_txs": [
-    "978DamhcvHqEkDf4ja9K3Yooo7iW8NtQVYn5Y9KU1eyh"
+    "B11wzWDNZEVj7dzPpBd4qrvvjD3jcj73BPS63T36WgrY"
    ],
-   "ask_in_feed_ms": 1569,
+   "ask_in_feed_ms": 1565,
    "feed": [
     "Paid 0.01 NEAR to cafe just now details↗",
     "Rules saved just now details↗",
@@ -68,13 +63,13 @@
   {
    "width": 390,
    "base": "https://nearcarta.vercel.app",
-   "charter": "feed-mvslf2fc.nccharters-53681.testnet",
-   "feed_fill_ms_after_rules": 844,
+   "charter": "feed-mvsn043p.nccharters-53681.testnet",
+   "feed_fill_ms_after_rules": 866,
    "rows_after_rules": 2,
    "ask_txs": [
-    "41BzCUdrLoTPkUs2ZmEg6Z2JfEzoHCnUSDv4sXs4i1Zt"
+    "A5tLcWhvgNJc58P4QvJ9cmDBpDS3Yf8ow2tFqP6YtaFf"
    ],
-   "ask_in_feed_ms": 1871,
+   "ask_in_feed_ms": 1584,
    "feed": [
     "Paid 0.01 NEAR to cafe just now details↗",
     "Rules saved just now details↗",
