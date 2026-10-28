@@ -1,0 +1,101 @@
+[
+ {
+  "ua": "u1l8xunezsvhq8fgzfl7404m450nwnd76zshscn6nfys7vyz2ywyh4cc5daaq0c7q2su5lqfh23sp7fkf3kt27ve5948mzpfdvckzaect2jtte308mkwlycj2u0eac077wu70vqcetkxf",
+  "expect": [
+   "P2PKH",
+   "Sapling"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u1fl5mprj0t9p4jg92hjjy8q5myvwc60c9wv0xachauqpn3c3k4xwzlaueafq27dcg7tzzzaz5jl8tyj93wgs983y0jq0qfhzu6n4r8rakpv5f4gg2lrw4z6pyqqcrcqx04d38yunc6je",
+  "expect": [
+   "P2PKH",
+   "Sapling"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u1qxqf8ctkxlsdh7xdcgkdtyw4mku7dxma8tsz45xd6ttgs322gdk7kazg3sdn52z7na3tzcrzf7lt3xrdtfp9d4pccderalchvvxk8hghduxrky5guzqlw65fmgp6x7aj4k8v5jkgwuw",
+  "expect": [
+   "P2PKH",
+   "Sapling"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u1pg2aaph7jp8rpf6yhsza25722sg5fcn3vaca6ze27hqjw7jvvhhuxkpcg0ge9xh6drsgdkda8qjq5chpehkcpxf87rnjryjqwymdheptpvnljqqrjqzjwkc2ma6hcq666kgwfytxwac8eyex6ndgr6ezte66706e3vaqrd25dzvzkc69kw0jgywtd0cmq52q5lkw6uh7hyvzjse8ksx",
+  "expect": [
+   "Orchard",
+   "P2PKH",
+   "Sapling"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u19mzuf4l37ny393m59v4mxx4t3uyxkh7qpqjdfvlfk9f504cv9w4fpl7cql0kqvssz8jay8mgl8lnrtvg6yzh9pranjj963acc3h2z2qt7007du0lsmdf862dyy40c3wmt0kq35k5z836tfljgzsqtdsccchayfjpygqzkx24l77ga3ngfgskqddyepz8we7ny4ggmt7q48cgvgu57mz",
+  "expect": [
+   "Orchard",
+   "P2PKH",
+   "Sapling"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u1mtxw5nras5glkxz093282sv3n2h8qs7cpxcmmaxj96vtzjzl6rmdaxs4e9es7mxwmd0h3k5wz3ce4ll5g4jz2pn9su4pufq74pxhp4t235n6j7aed3hh8ss7pf3sekf7apsf6vtg84ue5zcq2k9q3xv5yth3q50fu4czdm8sn8q4de3m5k76g2vwwyjsf50hqfxgmwxqxu0rsy22ktw",
+  "expect": [
+   "Orchard",
+   "P2PKH",
+   "Sapling"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u1ay3aawlldjrmxqnjf5medr5ma6p3acnet464ht8lmwplq5cd3ugytcmlf96rrmtgwldc75x94qn4n8pgen36y8tywlq6yjk7lkf3fa8wzjrav8z2xpxqnrnmjxh8tmz6jhfh425t7f3vy6p4pd3zmqayq49efl2c4xydc0gszg660q9p",
+  "expect": [
+   "Orchard",
+   "Sapling"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u19a4vmx7ysmtavmnaz4d2dgl9pyshexw35rl5ezg5dkkxktg08p42lng7kf9hqtn2fhr63qzyhe8gtnvgtfl9yvne46x6zfzwgedx7c0chnrxty0k5r5qqph8k02zs8e3keul9vj8myju7rvqgjaysa9kt0fucxpzuky6kf0pjgy0a6hx",
+  "expect": [
+   "Orchard",
+   "Sapling"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u13p2teem3xlvy4kwlke24hng5el2z6mn4ftj8xarwn8fy7dqt0flgcfpaxe6sk5cwawwh4tynzu7z2uschaf8tfa3tp2xgt8g4kx5lahhglcjm26jnvw7am6ld33708g0kv35pq83eg6gj82a0aau80enrhywpgr4v4m4vve7tg8vd4hz",
+  "expect": [
+   "Orchard",
+   "Sapling"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u1snf9yr883aj2hm8pksp9aymnqdwzy42rpzuffevj35hhxeckays5pcpeq7vy2mtgzlcuc4mnh9443qnuyje0yx6h59angywka4v2ap6kchh2j96ezf9w0c0auyz3wwts2lx5gmk2sk9",
+  "expect": [
+   "Orchard",
+   "P2PKH"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u1szwcx2zdxalyp7cfqwrptv95rnpyajejs6jmwacz4cgm2g3vzdxl5perhpg3nyhnuplvptdr4g63gupdfj5zal9v35s3e6adqsckv68hyrclan3gxaj6mz8aejzsnhqjyn32jcpnpra",
+  "expect": [
+   "Orchard",
+   "P2PKH"
+  ],
+  "unknown": false
+ },
+ {
+  "ua": "u1glq6lzrxc7n7r4c922qht20zmpxyl0asfuldrjcaddagfspxpc3040fdfwdf5crw4j6j6wkx4r038s0w24w7enpyfmmdfu9t9p2amxazgvasms8l03l3j5yhrrfqy6xzue5uggef4p8",
+  "expect": [
+   "Orchard",
+   "P2PKH"
+  ],
+  "unknown": false
+ }
+]
