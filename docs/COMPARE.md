@@ -50,6 +50,8 @@ Open gap: no execution (mainnet spend is not allowed). The Mist Bank desk shows 
 | [OutLayer](https://app.outlayer.ai/) | Inside Intel TDX ("spending caps and allowlists enforced in the TEE") | Yes | Yes: "large transfers wait for your approval" | Not stated | "cryptographic receipts on-chain for every action" | Yes; enclave measurements "approved on NEAR by a DAO" |
 | [Shore](https://shore.markets/) | Their service | Yes: "You set the limits" | Yes: "approve the big moves" | Yes: "freeze it with one tap" | Not stated | Not stated |
 | [ICME PreFlight](https://www.icme.io/) | A solver before the action runs ("SAT or UNSAT") | Your rules | Not stated | Blocks the action | Yes: a zero-knowledge proof per check, verifiable "without seeing your rules or your data" | No |
+| [Emet](https://emetguard.tech/) | On chain (EVM, Robinhood Chain): "Every UserOp verified against rules before and after execution" (ERC-4337/7579) | Yes: assets, size, loss, venues, expiry | Not stated | Yes: "One call to erase() and the account freezes instantly" | Trades on chain; "Refusals are logged by the SDK" (off chain). Page: "TESTNET PREVIEW · DEMO DATA"; product "Testnet is live"; no public repo linked; has a token ($EMET) | Not stated |
+| [Gleipnir](https://gleipnir.dev/) | Off chain, on your servers: "Self-hosted AI agents for ops, with limits they can't change" | Tool grants; "token and tool-call caps" | Yes: "Holds tools you mark for a person" | Not stated | Server-side records of "every trigger, tool call, result and approval decision" | No (self-hosted; BUSL-1.1 source; $250 a month at work) |
 
 Gap closed this round: owner approval of a big move was built but never shown on chain. Now it is (0.100001 NEAR over the 0.1 NEAR cap → escalated → owner approved → settled; `judges/proofs/escalation-approved.json`, in `npm run verify` 38/38).
 Open gaps:
@@ -68,7 +70,7 @@ Open gaps:
 
 Open gap: approve and freeze buttons need wallet signing in the browser, which is not wired. The approval itself is proven on chain (Guardhouse).
 
-## Chronicle
+## Chronicle (read from chain)
 
 ### Competitors (pages fetched 2026-10-28)
 | | Any account | Decodes the charter's policy events (clause, decision, reason, policy hash) | Drops events from failed receipts | Testnet | Whole-chain search and analytics |
