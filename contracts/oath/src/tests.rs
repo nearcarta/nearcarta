@@ -803,12 +803,12 @@ fn r14_add_key_failure_after_later_change_does_not_clobber() {
 }
 
 #[test]
-fn r15_add_key_success_keeps_new_old_already_deleted_in_batch() {
+fn r16_add_key_success_keeps_new_old_already_deleted_in_batch() {
     let mut o = setup(0);
     o.agent_key = Some(pk2());
     set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
     let r = o.on_agent_key(Some(agent_pk()), pk2());
-    assert_eq!(val(&r), Some(true), "R15: nothing left to delete in the callback");
+    assert_eq!(val(&r), Some(true), "R16: nothing left to delete in the callback");
     assert_eq!(o.agent_key, Some(pk2()));
     assert!(has_log("added"));
 }
@@ -885,7 +885,7 @@ fn r14_on_agent_key_deletes_exactly_the_right_keys() {
     set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
     let _ = o.on_agent_key(Some(agent_pk()), pk2());
     assert_eq!(deleted_keys(), vec![String::from(&pk2())]);
-    // normal rotation: the old key went in the AddKey batch (R15), so the callback deletes nothing.
+    // normal rotation: the old key went in the AddKey batch (R16), so the callback deletes nothing.
     let mut o = setup(0);
     o.agent_key = Some(pk2());
     set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
@@ -998,7 +998,7 @@ fn setup_window_stays_closed_when_the_closing_key_lands() {
     assert!(!o.setup_open);
 }
 
-// ---------------- R15: Judge A11 / A12 and user-set rules + reputation ----------------
+// ---------------- R16: Judge A11 / A12 and user-set rules + reputation ----------------
 fn relayed(ts: u64) {
     let mut b = ctx("oath.test", ts); b.signer_account_id(acc("relayer.test")); testing_env!(b.build());
 }
@@ -1008,7 +1008,7 @@ fn rotate_to_pk2(o: &mut Oath) {
 }
 
 #[test]
-fn r15_a11_rotation_adds_new_and_deletes_old_in_one_receipt() {
+fn r16_a11_rotation_adds_new_and_deletes_old_in_one_receipt() {
     let mut o = setup(0);
     rotate_to_pk2(&mut o);
     let rs = near_sdk::test_utils::get_created_receipts();
@@ -1020,7 +1020,7 @@ fn r15_a11_rotation_adds_new_and_deletes_old_in_one_receipt() {
 }
 
 #[test]
-fn r15_a11_old_key_refused_on_both_paths_during_rotation() {
+fn r16_a11_old_key_refused_on_both_paths_during_rotation() {
     let mut o = setup(0);
     rotate_to_pk2(&mut o);
     // direct path: the old key no longer matches state
@@ -1043,7 +1043,7 @@ fn r15_a11_old_key_refused_on_both_paths_during_rotation() {
 }
 
 #[test]
-fn r15_a11_failed_rotation_clears_flag_and_rolls_back() {
+fn r16_a11_failed_rotation_clears_flag_and_rolls_back() {
     let mut o = setup(0);
     rotate_to_pk2(&mut o);
     set_results("oath.test", T0, vec![PromiseResult::Failed]);
@@ -1053,7 +1053,7 @@ fn r15_a11_failed_rotation_clears_flag_and_rolls_back() {
 }
 
 #[test]
-fn r15_a11_revoke_clears_rotation_flag() {
+fn r16_a11_revoke_clears_rotation_flag() {
     let mut o = setup(0);
     rotate_to_pk2(&mut o);
     set("owner.test", T0);
@@ -1062,7 +1062,7 @@ fn r15_a11_revoke_clears_rotation_flag() {
 }
 
 #[test]
-fn r15_a12_spend_reserved_before_midnight_counts_after_it() {
+fn r16_a12_spend_reserved_before_midnight_counts_after_it() {
     let mut o = setup(0);
     let p = prop(&o, "tip", "bob.test", NEAR / 2);
     set("oath.test", T0);
@@ -1078,7 +1078,7 @@ fn r15_a12_spend_reserved_before_midnight_counts_after_it() {
 }
 
 #[test]
-fn r15_a12_failed_settle_after_midnight_counts_nothing() {
+fn r16_a12_failed_settle_after_midnight_counts_nothing() {
     let mut o = setup(0);
     let p = prop(&o, "tip", "bob.test", NEAR / 2);
     set("oath.test", T0);
@@ -1091,7 +1091,7 @@ fn r15_a12_failed_settle_after_midnight_counts_nothing() {
 }
 
 #[test]
-fn r15_expiry_refuses_after_deadline() {
+fn r16_expiry_refuses_after_deadline() {
     let mut o = setup(0);
     set("owner.test", T0);
     let _ = o.set_clause_expiry("tip".into(), Some(U64(T0 + 10)));
@@ -1102,7 +1102,7 @@ fn r15_expiry_refuses_after_deadline() {
 }
 
 #[test]
-fn r15_expiry_earlier_applies_now_later_or_none_waits_for_delay() {
+fn r16_expiry_earlier_applies_now_later_or_none_waits_for_delay() {
     let mut o = setup(1_000);
     set("owner.test", T0);
     let v0 = o.policy_version;
@@ -1119,7 +1119,7 @@ fn r15_expiry_earlier_applies_now_later_or_none_waits_for_delay() {
 }
 
 #[test]
-fn r15_expiry_is_gov_only_and_needs_a_clause() {
+fn r16_expiry_is_gov_only_and_needs_a_clause() {
     let mut o = setup(0);
     set("mallory.test", T0);
     assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.set_clause_expiry("tip".into(), Some(U64(1))); })).is_err());
@@ -1128,7 +1128,7 @@ fn r15_expiry_is_gov_only_and_needs_a_clause() {
 }
 
 #[test]
-fn r15_remove_clause_clears_its_expiry() {
+fn r16_remove_clause_clears_its_expiry() {
     let mut o = setup(0);
     set("owner.test", T0);
     let _ = o.set_clause_expiry("tip".into(), Some(U64(T0 + 5)));
@@ -1137,7 +1137,7 @@ fn r15_remove_clause_clears_its_expiry() {
 }
 
 #[test]
-fn r15_get_rules_returns_every_user_set_rule() {
+fn r16_get_rules_returns_every_user_set_rule() {
     let mut o = setup(0);
     set("owner.test", T0);
     let _ = o.set_clause_expiry("tip".into(), Some(U64(T0 + 5)));
@@ -1151,7 +1151,7 @@ fn r15_get_rules_returns_every_user_set_rule() {
 }
 
 #[test]
-fn r15_reputation_counts_on_chain_refusals() {
+fn r16_reputation_counts_on_chain_refusals() {
     let mut o = setup(0);
     for to in ["mallory.test", "mallory.test", "evil.test"] { let p = prop(&o, "tip", to, 1); assert_eq!(deny_reason(&mut o, p), "receiver_not_allowlisted"); }
     let p = prop(&o, "tip", "bob.test", 10 * NEAR);
@@ -1170,7 +1170,7 @@ fn r15_reputation_counts_on_chain_refusals() {
 }
 
 #[test]
-fn r15_reputation_score_math() {
+fn r16_reputation_score_math() {
     let mut r = Reputation::default();
     r.proposals = 4; r.allowed = 4;
     assert_eq!(reputation_score(&r), None);
@@ -1179,7 +1179,7 @@ fn r15_reputation_score_math() {
 }
 
 #[test]
-fn r15_reputation_denial_never_grows_storage() {
+fn r16_reputation_denial_never_grows_storage() {
     // The mock resets storage_usage per testing_env!, so check the record itself: allocated by
     // gov-paid set_clause, same size after denials. Real storage is checked in tests/exploits.rs.
     let mut o = setup(0);
@@ -1192,7 +1192,7 @@ fn r15_reputation_denial_never_grows_storage() {
 }
 
 #[test]
-fn r15_refusal_buckets() {
+fn r16_refusal_buckets() {
     assert_eq!(REFUSAL_BUCKETS[refusal_bucket("receiver_not_allowlisted")], "receiver_not_allowlisted");
     assert_eq!(REFUSAL_BUCKETS[refusal_bucket("receipt_replayed")], "receipt");
     assert_eq!(REFUSAL_BUCKETS[refusal_bucket("unknown_receipt_signer")], "receipt");

@@ -39,7 +39,7 @@ const GAS_FT_STORAGE_CB: Gas = Gas::from_tgas(30);
 const GAS_ESCALATION_CB: Gas = Gas::from_tgas(60);
 const GAS_AGENT_KEY_CB: Gas = Gas::from_tgas(5);
 /// R14: set/execute of SetAgentKey needs room for AddKey + on_agent_key (+ its DeleteKey).
-const GAS_MIN_AGENT_KEY: Gas = Gas::from_tgas(25); // R15: +1 DeleteKey action in the AddKey batch
+const GAS_MIN_AGENT_KEY: Gas = Gas::from_tgas(25); // R16: +1 DeleteKey action in the AddKey batch
 /// Minimum prepaid gas per path, checked before anything is logged, so a
 /// starved call reverts cleanly instead of leaving a phantom `submitted` log.
 const MIN_GAS_NATIVE: Gas = Gas::from_tgas(25);
@@ -47,10 +47,10 @@ const MIN_GAS_FT: Gas = Gas::from_tgas(60);
 const MIN_GAS_ESCALATE: Gas = Gas::from_tgas(75);
 /// Settled action records older than the newest KEEP_RECENT are pruned.
 pub const KEEP_RECENT: u64 = 32;
-/// R15 data lives under its own raw storage keys, so the root state layout is unchanged.
-const K_ROTATING: &[u8] = b"r15:rot";
-const K_REPUTATION: &[u8] = b"r15:rep";
-fn k_expiry(clause_id: &str) -> Vec<u8> { [b"r15:exp:".as_slice(), clause_id.as_bytes()].concat() }
+/// R16 data lives under its own raw storage keys, so the root state layout is unchanged.
+const K_ROTATING: &[u8] = b"r16:rot";
+const K_REPUTATION: &[u8] = b"r16:rep";
+fn k_expiry(clause_id: &str) -> Vec<u8> { [b"r16:exp:".as_slice(), clause_id.as_bytes()].concat() }
 fn clause_expiry(clause_id: &str) -> Option<u64> {
     env::storage_read(&k_expiry(clause_id)).and_then(|v| v.try_into().ok()).map(u64::from_le_bytes)
 }
@@ -214,7 +214,7 @@ pub enum Change {
     SetDao { dao: Option<AccountId> },
     SetPolicyDelay { delay_ns: U64 },
     Upgrade { code_hash: String },
-    /// R15: a later expiry or none (a widening change) waits for the policy delay.
+    /// R16: a later expiry or none (a widening change) waits for the policy delay.
     SetClauseExpiry { clause_id: String, expires_at: Option<U64> },
 }
 
@@ -377,7 +377,7 @@ impl Oath {
                 emit("policy", json!({"change": "upgrade_ready", "code_hash": code_hash, "change_id": U64(id)}));
             }
             Change::SetAgentKey { public_key, allowance } => {
-                // R15: AddKey(new) and DeleteKey(old) run as ONE batch receipt. A batch is atomic,
+                // R16: AddKey(new) and DeleteKey(old) run as ONE batch receipt. A batch is atomic,
                 // so the old key is gone in the same receipt that adds the new one, and if AddKey
                 // fails the delete is rolled back too: the account never has neither key.
                 // State switches to the new key at once (direct path); until the callback runs a
