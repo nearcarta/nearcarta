@@ -504,9 +504,16 @@ const RULE = 'Rows are final testnet propose txs on factory charters running the
   'One honest request of your own (memo ask:<nickname>:<note>) scores once per player if the contract allowed and settled it to a payee on the clause allowlist, within its cap. Memos are labels, never proof. ' +
   'Own-charter rows are keyed by the charter owner (verified); shared-charter rows are signed by this server\'s runner (server_signed) and keyed by nickname.';
 
+// Pages never wait long on the index: refresh in the background, answer from the rows already verified.
+let lastFill = { complete: false };
+export async function refreshBoard(waitMs = 2500, fill = () => cached('backfill', 20_000, () => backfill())) {
+  const p = Promise.resolve().then(fill).then(r => (lastFill = r), () => lastFill);
+  let t; const timeout = new Promise(r => { t = setTimeout(() => r(lastFill), waitMs); t.unref?.(); });
+  try { return await Promise.race([p, timeout]); } finally { clearTimeout(t); }
+}
 export async function leaderboard() {
   if (!V) throw bad('vault not deployed', 503);
-  const fill = await cached('backfill', 20_000, () => backfill());
+  const fill = await refreshBoard();
   const rows = [...attempts.values()];
   return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild }, players: board(rows).slice(0, 50),
     recent: rows.sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
@@ -516,7 +523,7 @@ export async function leaderboard() {
 export async function score(charter) {
   if (!V) throw bad('vault not deployed', 503);
   if (!isAccount(charter)) throw bad('bad account id');
-  await cached('backfill', 20_000, () => backfill()).catch(() => null);
+  await refreshBoard();
   const rows = [...attempts.values()].filter(r => r.charter === charter).sort((a, b) => (b.at || 0) - (a.at || 0));
   const best = pick => { const all = rows.filter(pick); const r = all.find(x => x.counted) || all[0]; return r ? { counted: r.counted, why: r.why, decision: r.decision, reason: r.reason, tx: r.hash, url: explorerTx(r.hash), tries: all.length } : null; };
   const tasks = [...TASKS.map(t => ({ id: t.id, name: t.name, expects: 'allowed', result: best(r => r.kind === 'task' && r.task === t.id) })),

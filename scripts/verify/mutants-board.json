@@ -1,16 +1,74 @@
-{ "file": "backend/src/vault.js", "test": "backend/test/unit/vault.test.js", "mutants": [
-  ["if (r?.ok) return r.json();", "if (r) return r.json();"],
-  ["if (r && r.status !== 429 && r.status < 500) throw", "if (r && r.status < 500) throw"],
-  ["if (i >= 3) throw new Error", "if (i >= 0) throw new Error"],
-  ["if (!resume || !(j.account_txs || []).length) return out;", "return out;"],
-  ["x.is_signer && x.is_receiver && x.is_function_call", "x.is_signer && x.is_function_call"],
-  ["BigInt(x.tx_block_timestamp) / 1_000_000n", "BigInt(x.tx_block_timestamp) / 1_000n"],
-  ["try { list = await charters(fa.factory); } catch { errors++; continue; }", "try { list = await charters(fa.factory); } catch { continue; }"],
-  ["try { ts = await txs(c.charter); } catch { errors++; continue; }", "try { ts = await txs(c.charter); } catch { continue; }"],
-  ["if (checked >= budget) return { checked, errors, complete: false };", "if (checked >= budget) return { checked, errors, complete: true };"],
-  ["} else { notArena.set(t.hash, 1); scheduleSave(); }", "}"],
-  ["if (a) { if (!a.at) a.at = t.at; }", "if (a) { }"],
-  ["return { checked, errors, complete: errors === 0 };", "return { checked, errors, complete: true };"],
-  ["if (r.complete) { rebuild.complete_at = Date.now(); return; }", "rebuild.complete_at = Date.now(); return;"],
-  ["setTimeout(step, wait).unref?.();\n", "\n"]
-] }
+{
+ "file": "backend/src/vault.js",
+ "test": "backend/test/unit/vault.test.js",
+ "mutants": [
+  [
+   "if (r?.ok) return r.json();",
+   "if (r) return r.json();"
+  ],
+  [
+   "if (r && r.status !== 429 && r.status < 500) throw",
+   "if (r && r.status < 500) throw"
+  ],
+  [
+   "if (i >= 3) throw new Error",
+   "if (i >= 0) throw new Error"
+  ],
+  [
+   "if (!resume || !(j.account_txs || []).length) return out;",
+   "return out;"
+  ],
+  [
+   "x.is_signer && x.is_receiver && x.is_function_call",
+   "x.is_signer && x.is_function_call"
+  ],
+  [
+   "BigInt(x.tx_block_timestamp) / 1_000_000n",
+   "BigInt(x.tx_block_timestamp) / 1_000n"
+  ],
+  [
+   "try { list = await charters(fa.factory); } catch { errors++; continue; }",
+   "try { list = await charters(fa.factory); } catch { continue; }"
+  ],
+  [
+   "try { ts = await txs(c.charter); } catch { errors++; continue; }",
+   "try { ts = await txs(c.charter); } catch { continue; }"
+  ],
+  [
+   "if (checked >= budget) return { checked, errors, complete: false };",
+   "if (checked >= budget) return { checked, errors, complete: true };"
+  ],
+  [
+   "} else { notArena.set(t.hash, 1); scheduleSave(); }",
+   "}"
+  ],
+  [
+   "if (a) { if (!a.at) a.at = t.at; }",
+   "if (a) { }"
+  ],
+  [
+   "return { checked, errors, complete: errors === 0 };",
+   "return { checked, errors, complete: true };"
+  ],
+  [
+   "if (r.complete) { rebuild.complete_at = Date.now(); return; }",
+   "rebuild.complete_at = Date.now(); return;"
+  ],
+  [
+   "setTimeout(step, wait).unref?.();\n",
+   "\n"
+  ],
+  [
+   "then(r => (lastFill = r), () => lastFill)",
+   "then(r => r, () => lastFill)"
+  ],
+  [
+   "then(r => (lastFill = r), () => lastFill)",
+   "then(r => (lastFill = r))"
+  ],
+  [
+   "try { return await Promise.race([p, timeout]); }",
+   "try { return await p; }"
+  ]
+ ]
+}

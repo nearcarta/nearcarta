@@ -364,3 +364,15 @@ test('boot keeps filling after index errors until a pass completes', async () =>
   assert.equal(calls, 3);
   assert.ok(rebuild.complete_at >= rebuild.started_at);
 });
+
+test('refreshBoard answers within its wait and keeps the last fill result', async () => {
+  const { refreshBoard } = await import('../../src/vault.js');
+  assert.deepEqual(await refreshBoard(50, async () => ({ complete: true })), { complete: true });
+  const t0 = Date.now();
+  const r = await refreshBoard(50, () => new Promise(res => setTimeout(() => res({ complete: false }), 400)));
+  assert.ok(Date.now() - t0 < 300);
+  assert.deepEqual(r, { complete: true }); // slow fill: last known result
+  assert.deepEqual(await refreshBoard(50, async () => { throw new Error('429'); }), { complete: true });
+  await new Promise(res => setTimeout(res, 450));
+  assert.deepEqual(await refreshBoard(50, async () => { throw new Error('429'); }), { complete: false }); // the slow fill landed
+});
