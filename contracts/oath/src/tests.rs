@@ -34,7 +34,7 @@ fn clause(receivers: &[&str], cap: u128, budget: u128, receipt: bool, esc: Optio
 /// Oath with owner/dao, agent key set, clause "tip" (bob, cap 1, budget 5, esc 3).
 fn setup(delay: u64) -> Oath {
     set("owner.test", T0);
-    let mut o = Oath::new(acc("owner.test"), Some(acc("dao.test")), Some(U64(0)), None);
+    let mut o = Oath::new(acc("owner.test"), Some(acc("dao.test")), Some(U64(0)), None, None);
     let _ = o.set_clause("tip".into(), clause(&["bob.test", "bakery.test"], NEAR, 5 * NEAR, false, Some(3 * NEAR)));
     o.agent_key = Some(agent_pk());
     if delay > 0 { let _ = o.set_policy_delay(U64(delay)); }
@@ -908,4 +908,92 @@ fn r14_ready_upgrades_get_distinct_change_ids() {
     let _ = o.queue_upgrade("b".repeat(64));
     assert_eq!(o.next_change, n0 + 2);
     assert_eq!(o.pending.len(), 2, "second ready hash must not overwrite the first");
+}
+
+// ---------------- setup window (factory charters) ----------------
+fn fresh_setup(delay: u64) -> Oath {
+    set("owner.test", T0);
+    Oath::new(acc("owner.test"), None, Some(U64(delay)), None, Some(true))
+}
+
+#[test]
+fn setup_window_applies_first_rules_and_key_at_once_then_closes() {
+    let mut o = fresh_setup(DELAY);
+    assert!(o.setup_open);
+    let r = o.set_clause("pay".into(), clause(&["bob.test"], NEAR, 2 * NEAR, false, None));
+    assert!(!is_promise(&r));
+    assert!(o.clauses.contains_key("pay") && o.pending.is_empty());
+    let r = o.set_agent_key(pk2(), U128(NEAR));
+    assert!(is_promise(&r));
+    assert_eq!(o.agent_key, Some(pk2()));
+    assert!(!o.setup_open);
+    assert_eq!(o.get_state()["setup_open"], json!(false));
+    // after setup, widening waits for the delay
+    let _ = o.set_clause("pay".into(), clause(&["bob.test", "eve.test"], NEAR, 2 * NEAR, false, None));
+    assert_eq!(o.pending.len(), 1);
+    assert_eq!(o.clauses["pay"].receivers.len(), 1);
+    let _ = o.set_agent_key(pk3(), U128(NEAR));
+    assert_eq!(o.pending.len(), 2);
+    assert_eq!(o.agent_key, Some(pk2()));
+    // tightening stays instant
+    let _ = o.set_clause("pay".into(), clause(&["bob.test"], NEAR / 2, 2 * NEAR, false, None));
+    assert_eq!(o.clauses["pay"].per_action_cap, U128(NEAR / 2));
+}
+
+#[test]
+fn setup_window_never_exempts_dao_delay_or_upgrade() {
+    let mut o = fresh_setup(DELAY);
+    let _ = o.set_dao(Some(acc("dao.test")));
+    let _ = o.set_policy_delay(U64(0));
+    let _ = o.queue_upgrade("ab".repeat(32));
+    assert_eq!(o.pending.len(), 3);
+    assert_eq!(o.dao, None);
+    assert_eq!(o.policy_delay_ns, DELAY);
+    assert!(o.setup_open);
+}
+
+#[test]
+fn setup_window_off_by_default_and_closable() {
+    set("owner.test", T0);
+    let mut o = Oath::new(acc("owner.test"), None, Some(U64(DELAY)), None, None);
+    assert!(!o.setup_open);
+    let _ = o.set_clause("pay".into(), clause(&["bob.test"], NEAR, 2 * NEAR, false, None));
+    assert_eq!(o.pending.len(), 1);
+    let mut o = fresh_setup(DELAY);
+    set("eve.test", T0);
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| o.close_setup()));
+    assert!(r.is_err());
+    set("owner.test", T0);
+    o.close_setup();
+    assert!(!o.setup_open);
+    let _ = o.set_clause("pay".into(), clause(&["bob.test"], NEAR, 2 * NEAR, false, None));
+    assert_eq!(o.pending.len(), 1);
+}
+
+#[test]
+fn setup_window_reopens_when_the_closing_key_fails_to_land() {
+    let mut o = fresh_setup(DELAY);
+    let _ = o.set_agent_key(pk2(), U128(NEAR));
+    assert!(!o.setup_open);
+    set_results("oath.test", T0, vec![PromiseResult::Failed]);
+    let _ = o.on_agent_key(None, pk2());
+    assert!(o.setup_open);
+    assert_eq!(o.agent_key, None);
+    assert_eq!(o.setup_key, None);
+}
+
+#[test]
+fn setup_window_stays_closed_when_the_closing_key_lands() {
+    let mut o = fresh_setup(DELAY);
+    let _ = o.set_agent_key(pk2(), U128(NEAR));
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let _ = o.on_agent_key(None, pk2());
+    assert!(!o.setup_open);
+    assert_eq!(o.setup_key, None);
+    // a later failed rotation does not reopen it
+    set("owner.test", T0 + DELAY);
+    o.agent_key = Some(pk3());
+    set_results("oath.test", T0 + DELAY, vec![PromiseResult::Failed]);
+    let _ = o.on_agent_key(Some(pk2()), pk3());
+    assert!(!o.setup_open);
 }

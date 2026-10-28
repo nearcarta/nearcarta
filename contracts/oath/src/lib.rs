@@ -16,6 +16,11 @@
 //!   FT path checks `storage_balance_of(receiver)` before `ft_transfer`.
 //! - Owner-key theft: policy-widening changes are queued behind `policy_delay_ns`;
 //!   tightening and freeze are instant; when a DAO is set only the DAO can unfreeze.
+//! - Setup window (opt-in at `new`, used by the charter factory): until the first
+//!   agent key is added, the first rules, receipt signers and agent key apply at
+//!   once even with a delay set, so a new charter is usable in one approval. There
+//!   is no agent key yet, so nothing can be spent while it is open. DAO, delay and
+//!   upgrade changes are never exempt. Adding the agent key (or `close_setup`) ends it.
 use near_sdk::json_types::{Base64VecU8, U128, U64};
 use near_sdk::serde_json::{self, json};
 use near_sdk::store::{LookupMap, LookupSet};
@@ -203,6 +208,9 @@ pub struct Oath {
     storage_reserve: u128,
     pending: BTreeMap<u64, Pending>,
     next_change: u64,
+    setup_open: bool,
+    /// The agent key whose AddKey closed the setup window; a rollback of that key reopens it.
+    setup_key: Option<PublicKey>,
 }
 
 fn reason(o: Option<U64>, decision: &str, status: &str, r: &str) -> Outcome {
@@ -212,7 +220,7 @@ fn reason(o: Option<U64>, decision: &str, status: &str, r: &str) -> Outcome {
 #[near]
 impl Oath {
     #[init]
-    pub fn new(owner: AccountId, dao: Option<AccountId>, policy_delay_ns: Option<U64>, storage_reserve: Option<U128>) -> Self {
+    pub fn new(owner: AccountId, dao: Option<AccountId>, policy_delay_ns: Option<U64>, storage_reserve: Option<U128>, setup_window: Option<bool>) -> Self {
         let mut s = Self {
             owner,
             dao,
@@ -233,6 +241,8 @@ impl Oath {
             storage_reserve: storage_reserve.map(|r| r.0).unwrap_or(NearToken::from_millinear(100).as_yoctonear()),
             pending: BTreeMap::new(),
             next_change: 0,
+            setup_open: setup_window.unwrap_or(false),
+            setup_key: None,
         };
         s.bump_policy("init");
         s
@@ -266,7 +276,9 @@ impl Oath {
 
     /// Widening changes wait `policy_delay_ns`; with delay 0 they apply now.
     fn queue_or_apply(&mut self, change: Change) -> PromiseOrValue<serde_json::Value> {
-        if self.policy_delay_ns == 0 {
+        let setup_exempt = self.setup_open
+            && matches!(change, Change::SetClause { .. } | Change::SetReceiptSigner { .. } | Change::SetAgentKey { .. });
+        if self.policy_delay_ns == 0 || setup_exempt {
             return self.apply(change);
         }
         let id = self.next_change;
@@ -314,6 +326,11 @@ impl Oath {
                 let me = env::current_account_id();
                 let prev = self.agent_key.clone();
                 self.agent_key = Some(public_key.clone());
+                if self.setup_open {
+                    self.setup_open = false;
+                    self.setup_key = Some(public_key.clone());
+                    emit("policy", json!({"change": "setup_closed", "by": env::predecessor_account_id()}));
+                }
                 emit("agent_key", json!({"op": "set", "public_key": public_key, "allowance": allowance}));
                 let a = Allowance::limited(NearToken::from_yoctonear(allowance.0)).expect("ERR_ALLOWANCE_ZERO");
                 let add = Promise::new(me.clone()).add_access_key_allowance(public_key.clone(), a, me.clone(), "propose".to_string());
@@ -411,6 +428,8 @@ impl Oath {
     #[private]
     pub fn on_agent_key(&mut self, prev: Option<PublicKey>, new: PublicKey) -> PromiseOrValue<bool> {
         let ok = env::promise_result_checked(0, 64).is_ok();
+        let closed_setup = self.setup_key.as_ref() == Some(&new);
+        if closed_setup { self.setup_key = None; }
         if ok {
             let me = env::current_account_id();
             let mut del: Option<Promise> = None;
@@ -427,6 +446,11 @@ impl Oath {
             }
             return match del { Some(p) => PromiseOrValue::Promise(p), None => PromiseOrValue::Value(true) };
         }
+        if closed_setup && self.agent_key.as_ref() == Some(&new) {
+            // The key that ended setup never landed: the charter still has no working agent.
+            self.setup_open = true;
+            emit("policy", json!({"change": "setup_reopened"}));
+        }
         if self.agent_key.as_ref() == Some(&new) {
             self.agent_key = prev.clone();
             emit("agent_key", json!({"op": "rollback", "failed_key": new, "restored": prev}));
@@ -434,6 +458,15 @@ impl Oath {
             emit("agent_key", json!({"op": "add_failed_stale", "failed_key": new}));
         }
         PromiseOrValue::Value(false)
+    }
+
+    /// Ends the setup window early (tightening, instant).
+    pub fn close_setup(&mut self) {
+        self.assert_gov();
+        if self.setup_open {
+            self.setup_open = false;
+            emit("policy", json!({"change": "setup_closed", "by": env::predecessor_account_id()}));
+        }
     }
 
     pub fn revoke_agent(&mut self) -> Promise {
@@ -772,6 +805,7 @@ impl Oath {
             "policy_delay_ns": U64(self.policy_delay_ns),
             "storage_reserve": U128(self.storage_reserve),
             "pending_changes": self.pending.len(),
+            "setup_open": self.setup_open,
             "storage_usage": U64(env::storage_usage()),
         })
     }
