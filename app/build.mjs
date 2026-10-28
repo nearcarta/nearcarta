@@ -25,7 +25,8 @@ await (await import('esbuild')).build({ entryPoints: [here + 'house/wc.js'], bun
   outfile: dist + '/wc.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' }, logLevel: 'warning' });
 // Shop modules (charter office + Vault Arena): app/shops, see app/shops/INTEGRATION.md
 await (await import('./shops/build.mjs')).buildShops(dist, await import('esbuild'));
-const api = process.env.NEARCARTA_API ?? 'https://nearcarta-api.onrender.com';
+// On Vercel the API is same origin (/api is proxied to Render in vercel.json), so no CORS and one origin in the CSP story.
+const api = process.env.NEARCARTA_API ?? (process.env.VERCEL ? '' : 'https://nearcarta-api.onrender.com');
 writeFileSync(dist + '/config.js', `window.NEARCARTA_API=${JSON.stringify(api)};globalThis.NEARCARTA_API=window.NEARCARTA_API;\n`);
 // config.js before the first module, in the interiors and the town.
 const addHead = (file, html) => writeFileSync(file, readFileSync(file, 'utf8').replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + html));
@@ -39,7 +40,7 @@ writeFileSync(dist + '/index.html', world.replace('<meta charset="utf-8">', `<me
 <script>if(${JSON.stringify(tabs)}.includes(location.hash.slice(1)))location.replace('/console'+location.hash);</script>
 <base href="/design/D9_world/">
 <script src="/config.js"></script>
-<script>window.NEARCARTA_API&&fetch(window.NEARCARTA_API+'/api/health').catch(()=>{});</script>
+<script>fetch((window.NEARCARTA_API||'')+'/api/health').catch(()=>{});</script>
 <style>#inCard a[hidden]{display:none}body.story #acct{opacity:1;pointer-events:auto}#brand .what{display:block;max-width:34ch;font-size:12px;line-height:1.35;opacity:.92;margin-top:2px}#acct{position:fixed;top:58px;right:18px;z-index:20;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}#wallet{display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;align-items:center}#acct a.pill{text-decoration:none}#acct [data-testid=wallet-note]{position:absolute;top:100%;right:0;margin-top:6px;width:min(360px,calc(100vw - 16px));box-sizing:border-box;z-index:22}@media (max-width:600px){#acct{top:62px;right:8px;left:8px}#acct .pill{font-size:12px;padding:6px 10px}#brand .what{position:fixed;top:104px;left:10px;right:64px;max-width:none;font-size:11.5px;text-shadow:0 1px 3px #0009}}#skipIntro{position:fixed;right:18px;bottom:calc(7.5vh + 12px);z-index:21;display:none}body.story #skipIntro{display:inline-flex}</style>`)
   // One line on what this is, and a wallet button (NEAR Connect) with the testnet faucet, in the town HUD.
   .replace('<small>independent, not affiliated with NEAR Foundation</small>', '<span class="what">A town where an AI agent spends only what its owner\'s on-chain charter allows. NEAR testnet, no real money.</span><small>independent, not affiliated with NEAR Foundation</small>')
