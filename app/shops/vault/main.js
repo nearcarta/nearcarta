@@ -449,8 +449,13 @@ function showTab(id) {
   if (id === 'p-board') loadBoard().catch(() => {});
 }
 
+// Bound before the config fetch so a click during page start waits for the connector instead of being lost.
+let booted; const boot = new Promise((ok, no) => { booted = { ok, no }; }); boot.catch(() => {});
+$('#connect').onclick = () => boot.then(() => connector.connect()).catch(fail);
+$('#guest').onclick = async () => { busy($('#guest'), true, 'Asking the testnet faucet…'); try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { fail(e); } finally { busy($('#guest'), false); } };
+
 async function main() {
-  CFG = await api('/api/vault/config');
+  CFG = await api('/api/vault/config').catch(e => { booted.no(e); throw e; });
   // Same order as the server runner: the primary RPC, then the fallbacks when one answers 429/5xx or is unreachable.
   rpc = rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])]);
   ({ connector } = makeConnector(rpc));
@@ -470,9 +475,8 @@ async function main() {
   quickCards(); setTarget('shared');
   const rl = CFG.runner; if (rl) $('#runner').title = `Shared runner: ${rl.left_today} of ${rl.daily_tx_cap} transactions left today (UTC), ${rl.gas_tgas} Tgas each.`;
   connector.on('wallet:signIn', () => refreshWho().then(signedIn).catch(fail));
+  booted.ok();
   connector.on('wallet:signOut', () => { charter = null; ready = false; refreshWho().catch(fail); });
-  $('#connect').onclick = () => connector.connect().catch(fail);
-  $('#guest').onclick = async () => { busy($('#guest'), true, 'Asking the testnet faucet…'); try { await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { fail(e); } finally { busy($('#guest'), false); } };
   $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); charter = null; ready = false; await refreshWho(); };
   await refreshWho(); await loadBoard().catch(e => { $('#board').textContent = e.message; });
 }
