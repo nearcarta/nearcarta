@@ -60,8 +60,11 @@ export function outcomeOf(r) {
   try { return { ok: true, value: JSON.parse(txt) }; } catch { return { ok: true, value: txt }; }
 }
 
+/** 30 Tgas covers an allowed native payment with its settle callback (sandbox-checked); a refusal uses far less. */
+export const PROPOSE_TGAS = 30;
+
 /** Sign and send one `propose` with an agent key on its own charter; waits for FINAL. */
-export async function sendPropose(rpc, { key, charter, p, gasTgas = 100 }) {
+export async function sendPropose(rpc, { key, charter, p, gasTgas = PROPOSE_TGAS }) {
   const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: charter, public_key: key.publicKey });
   const signed = signTx({ key, signerId: charter, receiverId: charter, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
     actions: [functionCall('propose', { p }, BigInt(gasTgas) * 10n ** 12n)] });
