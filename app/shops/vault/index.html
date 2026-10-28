@@ -9,24 +9,49 @@
 </head>
 <body data-step="none">
 <header class="top">
-  <div><h1>Charter office</h1><p class="sub">Give an AI agent a wallet it cannot misuse. The rules live in a NEAR contract, so a refused payment is a public transaction, not a promise. <span class="net">testnet</span></p></div>
+  <div><h1>Charter office</h1><p class="sub">Give an AI agent a wallet it cannot misuse. You set the rules; a NEAR contract enforces them, so every payment and every refusal is a public transaction, not a promise. <span class="net">testnet</span></p></div>
   <div class="who"><span id="who">Loading…</span>
     <button id="connect" class="primary" data-testid="connect">Connect a NEAR wallet</button>
     <button id="guest" data-testid="guest" title="Creates a new testnet account from the public faucet. Its key stays in this browser.">No wallet? Make a guest testnet account</button>
     <button id="signout" hidden>Sign out</button></div>
 </header>
+<nav class="tabs" role="tablist" aria-label="Charter office">
+  <button role="tab" id="tab-mine" data-tab="p-mine" aria-selected="true" data-testid="tab-mine">My charter</button>
+  <button role="tab" id="tab-arena" data-tab="p-arena" aria-selected="false" data-testid="tab-arena">Shared arena</button>
+  <button role="tab" id="tab-board" data-tab="p-board" aria-selected="false" data-testid="tab-board">Leaderboard</button>
+</nav>
 <main>
-  <section class="card" id="s-create"><h2><span class="num">1</span>Your charter</h2><div id="create"></div><p class="factory muted" id="factory"></p></section>
-  <section class="card" id="s-rules"><h2><span class="num">2</span>Rules and agent key</h2><div id="facts"></div><div id="rules"></div></section>
-  <section class="card arena" id="mine" hidden><h2><span class="num">3</span>Attack your own charter</h2>
-    <p class="muted">You play the scammer. Your browser signs with the agent key, exactly like a tricked agent would. Watch the contract say no. Look-alike example: <code id="ex-look"></code></p>
-    <div class="atks"></div><div class="result" aria-live="polite"></div></section>
-  <section class="card arena" id="shared"><h2><span class="num">★</span>Vault Arena: the shared charter</h2>
-    <p class="muted">No wallet needed. Attack <code id="arena-id"></code>, a factory charter with tight rules. Allowed steps pay our two test shops; every refusal is a final testnet transaction. Daily limits are shared by everyone. <span id="shared-note"></span></p>
-    <label class="nick">Your nickname on the board <input id="nick" maxlength="20" placeholder="guest" pattern="[a-z0-9-]+"></label>
-    <div class="atks"></div><div class="result" aria-live="polite"></div></section>
-  <section class="card" id="s-board"><h2>Leaderboard, rebuilt from chain</h2><div id="board">Loading…</div></section>
-  <section class="card"><h2>What happened</h2><ul id="log" aria-live="polite"></ul></section>
+  <div class="panel" id="p-mine" role="tabpanel" aria-labelledby="tab-mine">
+    <section class="card wide" id="dash" hidden><h2>Dashboard <span id="dash-id" class="muted"></span></h2><div id="gauges"></div></section>
+    <section class="card wide arena" id="mine" hidden>
+      <div id="ask"><h2><span class="num">★</span>Ask the agent to pay</h2>
+        <p class="muted">Tell your agent what to pay. It signs one payment with its own key; your charter's rules decide. The request is read in your browser by a simple parser (no AI model), and the charter has the final word.</p>
+        <form id="ask-form" class="askrow"><input id="ask-text" data-testid="ask-text" maxlength="200" placeholder="pay the cafe 0.01 NEAR for team coffee" aria-label="What should the agent pay?"><button class="primary" id="ask-btn" data-testid="ask">Ask the agent</button></form>
+        <p class="muted">Or one tap on a useful job your rules should allow:</p>
+        <div class="atks tsks"></div><div class="result" aria-live="polite"></div></div>
+      <p class="muted">Then play the scammer: <button class="mini" id="go-arena" data-testid="go-arena">Try to trick it in the Arena →</button></p>
+      <h3>Your charter's score</h3><div class="score" id="score-mine-box" aria-live="polite"><p class="muted">Run a job to score.</p></div>
+    </section>
+    <section class="card" id="s-create"><h2><span class="num">1</span>Your charter</h2><div id="create"></div><p class="factory muted" id="factory"></p></section>
+    <section class="card" id="s-rules"><h2><span class="num">2</span>Rules and agent key</h2><div id="facts"></div><div id="rules"></div></section>
+    <section class="card wide"><h2>What happened</h2><p id="story" class="story" data-testid="story">Nothing yet. Connect, make a charter, then ask your agent to pay.</p><ul id="log" aria-live="polite"></ul></section>
+  </div>
+  <div class="panel" id="p-arena" role="tabpanel" aria-labelledby="tab-arena" hidden>
+    <section class="card wide arena" id="arena"><h2>Try to trick it</h2>
+      <div class="target" role="radiogroup" aria-label="Which charter to attack">Target:
+        <label><input type="radio" name="target" value="mine" data-testid="target-mine"> My charter <span id="t-mine-note" class="muted"></span></label>
+        <label><input type="radio" name="target" value="shared" data-testid="target-shared" checked> Shared arena <code id="arena-id"></code></label></div>
+      <p class="muted" id="target-help"></p>
+      <p class="muted" id="runner"></p>
+      <label class="nick" id="nick-box">Your nickname on the board <input id="nick" maxlength="20" pattern="[a-z0-9-]+" data-testid="nick"></label>
+      <h3>Honest jobs first: they use today's budget</h3><div class="atks tsks"></div>
+      <h3>Scams the charter should refuse</h3><p class="muted">Look-alike example: <code id="ex-look"></code></p><div class="atks scams"></div>
+      <div class="result" aria-live="polite"></div>
+      <h3 id="score-h">Score</h3><div class="score" aria-live="polite"></div></section>
+  </div>
+  <div class="panel" id="p-board" role="tabpanel" aria-labelledby="tab-board" hidden>
+    <section class="card wide" id="s-board"><h2>Leaderboard, rebuilt from chain</h2><div id="board">Loading…</div></section>
+  </div>
 </main>
 <script type="module" src="vault.bundle.js"></script>
 </body>

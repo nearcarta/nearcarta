@@ -1,7 +1,8 @@
 // Charter shop + Vault Arena. Wallet signs owner steps; the agent key made here signs `propose`.
 import { makeConnector, currentAccount, txHashOf, hasGuest, forgetGuest } from './wallet.js';
 import { rpcClient, viewFn, keyFrom, sendPropose } from '../../../shared/vault/tx.js';
-import { runSteps } from '../../../shared/vault/run.js';
+import { runSteps, runTask, runAsk } from '../../../shared/vault/run.js';
+import { parseAsk } from '../../../shared/vault/ask.js';
 import { lookalike } from '../../../shared/vault/attacks.js';
 
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
@@ -11,7 +12,8 @@ const YN = 10n ** 24n, TG = 10n ** 12n;
 const toY = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const fmt = y => { if (y == null) return '–'; const v = Number(BigInt(y) / 10n ** 18n) / 1e6; return (v < 0.01 && v > 0 ? v.toFixed(3) : +v.toFixed(4)) + ' NEAR'; };
 const short = h => h ? h.slice(0, 6) + '…' + h.slice(-4) : '';
-let CFG, rpc, connector, me = null, charter = null;
+let lastRules = null;
+let CFG, rpc, connector, me = null, charter = null, ready = false, target = 'shared';
 
 async function api(path, opts) {
   const r = await fetch(API + path, opts); const j = await r.json().catch(() => ({}));
@@ -20,6 +22,14 @@ async function api(path, opts) {
 const view = (c, m, a) => viewFn(rpc, c, m, a);
 const txl = (h, label) => h ? `<a class="tx" data-testid="tx" href="${esc(CFG.explorer || 'https://testnet.nearblocks.io')}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(label || short(h))}<span aria-hidden="true">↗</span></a>` : '';
 const agentLS = c => 'nearcarta.vault.agent.' + c;
+// A key made for a wallet approval that has not shown up on chain yet. Saved BEFORE signing so a
+// redirect wallet or a closed tab never leaves a live key on chain that nobody holds.
+const pendLS = c => 'nearcarta.vault.agent.pending.' + c;
+const NS = 1_000_000_000n;
+const dur = ns => { const s = Number(BigInt(ns || 0) / NS); if (!s) return 'none'; if (s % 86400 === 0) return s / 86400 + (s === 86400 ? ' day' : ' days');
+  if (s % 3600 === 0) return s / 3600 + (s === 3600 ? ' hour' : ' hours'); return Math.round(s / 60) + ' min'; };
+const when = ns => new Date(Number(BigInt(ns) / 1_000_000n)).toLocaleString();
+const post = (path, body) => api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 function toast(html, kind = 'info') { const t = $('#log'); const li = document.createElement('li'); li.className = kind; li.innerHTML = html; t.prepend(li); }
 function busy(btn, on, label) { if (!btn) return; btn.disabled = on; if (on) { btn.dataset.l = btn.textContent; btn.textContent = label || 'Waiting for chain…'; } else if (btn.dataset.l) btn.textContent = btn.dataset.l; }
 const fail = e => toast(`<b>Stopped:</b> ${esc(e.message)}${e.tx ? ' · ' + txl(e.tx) : ''}`, 'bad');
@@ -45,17 +55,28 @@ function renderCreate() {
   const base = me.split('.')[0].replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'my';
   box.innerHTML = `<label>Name <span class="suffix"><input id="cname" value="${esc(base)}" maxlength="32" pattern="[a-z0-9-]+" aria-describedby="cname-h"><span>.${esc(CFG.factory)}</span></span></label>
     <label>Money to put in <span class="suffix"><input id="cdep" type="number" min="0.3" max="5" step="0.1" value="0.5"><span>NEAR</span></span></label>
+    <label>Timelock on loosening the rules <select id="cdelay" data-testid="delay">${delayOptions()}</select></label>
+    <label>Co-guardian DAO (optional) <input id="cdao" placeholder="e.g. mydao.sputnik-dao.near" maxlength="64" data-testid="dao"></label>
+    <p class="muted">After setup, a wider allowlist, a bigger cap or a new agent key waits this long before it applies, and the owner (or the DAO) can cancel it meanwhile. Tightening is always instant. The DAO can also freeze the charter or cancel changes.</p>
     <p id="cname-h" class="muted">The factory creates the account, points it at the audited oath code (by hash, nothing is uploaded), and makes you the owner. It keeps 0.01 NEAR as a fee.</p>
     <button id="create-btn" class="primary" data-testid="create">Create my charter</button>`;
   $('#create-btn').onclick = () => createCharter().catch(fail).finally(() => busy($('#create-btn'), false));
+}
+function delayOptions() {
+  const pd = CFG.policy_delay || {}; const min = BigInt(pd.min_ns || 600n * NS), max = BigInt(pd.max_ns || 30n * 86400n * NS), def = BigInt(pd.default_ns || 86400n * NS);
+  return [600n, 3600n, 21600n, 86400n, 604800n].map(s => s * NS).filter(ns => ns >= min && ns <= max)
+    .map(ns => `<option value="${ns}"${ns === def ? ' selected' : ''}>${dur(ns)}${ns === def ? ' (default)' : ''}</option>`).join('');
 }
 async function createCharter() {
   const name = $('#cname').value.trim().toLowerCase(), dep = Number($('#cdep').value);
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) throw new Error('name: a-z, 0-9 and single dashes');
   if (!(dep >= 0.3 && dep <= 5)) throw new Error('deposit must be 0.3 to 5 NEAR');
+  const dao = $('#cdao').value.trim().toLowerCase();
+  if (dao && !/^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(dao)) throw new Error('DAO: a NEAR account id');
+  const args = { name, policy_delay_ns: $('#cdelay').value, ...(dao ? { dao } : {}) };
   busy($('#create-btn'), true, 'Approve in your wallet…');
   const w = await connector.wallet();
-  const res = await w.signAndSendTransaction({ receiverId: CFG.factory, actions: [{ type: 'FunctionCall', params: { methodName: 'create_charter', args: { name }, gas: (150n * TG).toString(), deposit: toY(dep) } }] });
+  const res = await w.signAndSendTransaction({ receiverId: CFG.factory, actions: [{ type: 'FunctionCall', params: { methodName: 'create_charter', args, gas: (150n * TG).toString(), deposit: toY(dep) } }] });
   const h = txHashOf(res); const id = `${name}.${CFG.factory}`;
   const f = await facts(id, f => f.registered && f.exists && !f.pending);
   if (!f.registered) throw Object.assign(new Error('charter not created (name taken? the deposit was refunded minus gas)'), { tx: h });
@@ -63,7 +84,7 @@ async function createCharter() {
 }
 
 // ---------- step 3: rules + agent key ----------
-async function useCharter(id) { charter = id; document.body.dataset.step = 'charter'; renderCreate(); await renderFacts(); }
+async function useCharter(id) { charter = id; document.body.dataset.step = 'charter'; renderCreate(); await renderFacts(); if (ready) setTarget('mine'); loadScore('mine').catch(() => {}); }
 // Fresh charter facts; retried while RPC nodes catch up with a tx that just landed.
 async function facts(id, ready = f => !f.pending, tries = 20) {
   let f = null;
@@ -77,21 +98,78 @@ async function facts(id, ready = f => !f.pending, tries = 20) {
 }
 async function renderFacts() {
   const f = await facts(charter);
-  const cl = f.clauses?.pay; const u = f.usage?.pay;
+  const cl = f.clauses?.pay; const u = f.usage?.pay; lastRules = cl;
+  const onChain = (f.agent_keys || []).map(a => a.public_key);
+  const queued = Object.entries(f.pending_changes || {});
+  const queuedKey = pk => queued.some(([, p]) => p.change?.SetAgentKey?.public_key === pk);
+  // Promote a pending key once the chain shows it; keep it while its change waits in the timelock.
+  const pend = localStorage.getItem(pendLS(charter)); const pendPk = pend ? keyFrom(pend).publicKey : null;
+  if (pend && onChain.includes(pendPk)) { localStorage.setItem(agentLS(charter), pend); localStorage.removeItem(pendLS(charter)); }
   const k = localStorage.getItem(agentLS(charter)); const agentPk = k ? keyFrom(k).publicKey : null;
-  const keyLive = agentPk && (f.agent_keys || []).some(a => a.public_key === agentPk);
+  const keyLive = !!agentPk && onChain.includes(agentPk);
+  const pendWaiting = pend && !onChain.includes(pendPk) && queuedKey(pendPk);
+  const pendLost = pend && !onChain.includes(pendPk) && !queuedKey(pendPk);
+  const orphans = onChain.filter(pk => pk !== agentPk && pk !== pendPk);
   $('#facts').innerHTML = `<ul class="facts" data-testid="facts">
     <li class="${f.runs_r14 ? 'ok' : 'no'}">Runs the audited oath code <code title="${esc(CFG.code_hash)}">${esc(short(CFG.code_hash))}</code></li>
     <li class="${f.full_access_keys === 0 ? 'ok' : 'no'}">${f.full_access_keys} full-access keys (nobody can bypass the rules)</li>
     <li class="${f.owner === me ? 'ok' : 'no'}">Owner: ${esc(f.owner)}</li>
+    <li class="${BigInt(f.policy_delay_ns || 0) > 0n ? 'ok' : 'no'}" data-testid="timelock">Timelock: loosening the rules waits ${esc(dur(f.policy_delay_ns))}</li>
+    <li class="${f.dao ? 'ok' : ''}">Co-guardian DAO: ${f.dao ? `<code>${esc(f.dao)}</code>` : 'none'}</li>
+    <li class="${f.setup_open ? 'todo' : 'ok'}" data-testid="setup">${f.setup_open ? 'Setup window open: the first rules and agent key apply at once. Adding the agent key closes it.' : 'Setup closed: loosening rules or a new agent key now waits the timelock'}</li>
     <li>Balance: ${fmt(f.balance)}</li>
     <li class="${cl ? 'ok' : 'todo'}">${cl ? `Rules: pays only ${cl.receivers.map(esc).join(', ')} · max ${fmt(cl.per_action_cap)} each · ${fmt(cl.daily_budget)} a day · ${cl.max_actions_per_day || '∞'} payments a day` : 'No rules yet'}</li>
     ${u ? `<li>Today: spent ${fmt(u.spent)} in ${u.count} payments</li>` : ''}
-    <li class="${keyLive ? 'ok' : 'todo'}">${keyLive ? `Agent key in this browser, can only call <code>propose</code>` : 'No agent key in this browser yet'}</li></ul>`;
-  renderRules(cl, keyLive);
-  $('#mine').hidden = !(cl && keyLive);
+    <li class="${keyLive ? 'ok' : 'todo'}" data-testid="agent-key">${keyLive ? `Agent key in this browser, can only call <code>propose</code>` : pendWaiting ? 'New agent key made in this browser, waiting for its timelock' : 'No agent key in this browser yet'}</li></ul>
+    ${queued.length ? `<h3>Waiting in the timelock</h3><ul class="facts" data-testid="pending">${queued.map(([id, p]) => {
+      const ready = Date.now() * 1e6 >= Number(p.eta); const kind = Object.keys(p.change || {})[0] || 'change';
+      return `<li class="todo"><b>${esc(kind)}</b> #${esc(id)} · by ${esc(p.by)} · ${ready ? 'ready now' : 'ready ' + esc(when(p.eta))}
+        <button class="mini" data-exec="${esc(id)}" ${ready ? '' : 'disabled'}>Apply</button> <button class="mini" data-cancel="${esc(id)}">Cancel</button></li>`; }).join('')}</ul>` : ''}
+    ${pendLost ? `<p class="verdict bad" data-testid="pend-lost">A key made in this browser for an earlier approval never reached the chain. <button class="mini" id="forget-pend">Forget it</button></p>` : ''}
+    ${orphans.length ? `<p class="verdict bad" data-testid="orphans">${orphans.length} agent key${orphans.length > 1 ? 's' : ''} on this charter ${orphans.length > 1 ? 'are' : 'is'} not held by this browser (${orphans.map(x => `<code>${esc(short(x))}</code>`).join(' ')}). Revoke ${orphans.length > 1 ? 'them' : 'it'} so a lost key cannot spend its allowance, then issue a new one. <button class="mini" id="revoke">Revoke</button></p>` : ''}`;
+  for (const b of $('#facts').querySelectorAll('[data-exec]')) b.onclick = () => ownerCall('execute_change', { change_id: b.dataset.exec }, b, 'Change applied').catch(fail);
+  for (const b of $('#facts').querySelectorAll('[data-cancel]')) b.onclick = () => ownerCall('cancel_change', { change_id: b.dataset.cancel }, b, 'Change cancelled').catch(fail);
+  if ($('#forget-pend')) $('#forget-pend').onclick = () => { localStorage.removeItem(pendLS(charter)); renderFacts().catch(fail); };
+  if ($('#revoke')) $('#revoke').onclick = () => ownerCall('revoke_agent', {}, $('#revoke'), 'Agent key revoked').catch(fail);
+  renderRules(cl, keyLive || pendWaiting, f);
+  const was = ready; ready = !!(cl && keyLive);
+  $('#mine').hidden = !ready;
+  renderDash(f, cl, u);
+  if (was !== ready) setTarget(target); // only when the target list changes: a rerender mid-run would wipe the result
 }
-function renderRules(cl, keyLive) {
+// ---------- dashboard: today's use against the rules, and the freeze switch ----------
+const pct = (a, b) => b > 0n ? Math.min(100, Number((a * 100n) / b)) : 0;
+const gauge = (label, used, max, show, testid) => { const p = pct(used, max);
+  return `<div class="gauge" data-testid="${testid}"><div class="gl"><span>${esc(label)}</span><b>${show}</b></div><div class="bar ${p >= 100 ? 'full' : p >= 75 ? 'hot' : ''}"><span style="width:${p}%"></span></div></div>`; };
+function renderDash(f, cl, u) {
+  $('#dash').hidden = !cl;
+  if (!cl) return;
+  $('#dash-id').textContent = charter;
+  const today = u && Number(u.day) === Math.floor(Date.now() / 86400000); // usage resets at 00:00 UTC
+  const frozen = !!f.state?.frozen;
+  const spent = BigInt(today ? u.spent : 0), bud = BigInt(cl.daily_budget), cnt = BigInt(today ? u.count : 0), max = BigInt(cl.max_actions_per_day || 0);
+  const canUnfreeze = !f.dao || f.dao === me;
+  $('#gauges').innerHTML = `<div class="gauges">
+    ${gauge('Spent today', spent, bud, `${fmt(spent)} of ${fmt(bud)}`, 'gauge-spent')}
+    ${max ? gauge('Payments today', cnt, max, `${cnt} of ${max}`, 'gauge-count') : ''}
+    <div class="gauge"><div class="gl"><span>Max per payment</span><b>${fmt(cl.per_action_cap)}</b></div><div class="gl"><span>Balance</span><b>${fmt(f.balance)}</b></div></div>
+    <div class="gauge freeze ${frozen ? 'on' : ''}"><div class="gl"><span>Status</span><b data-testid="frozen">${frozen ? 'FROZEN: every payment is refused' : 'Active'}</b></div>
+      ${frozen ? `<button id="unfreeze" data-testid="unfreeze" ${canUnfreeze ? '' : 'disabled title="Only the DAO can unfreeze this charter"'}>Unfreeze</button>`
+        : `<button id="freeze" class="danger" data-testid="freeze" title="Stops the agent at once. Instant, one wallet approval.">Freeze the agent</button>`}</div></div>
+    <p class="muted">Today means the current UTC day; the counters reset at 00:00 UTC. A freeze is instant; ${f.dao ? 'only the DAO can undo it' : 'you can undo it'}.</p>`;
+  if ($('#freeze')) $('#freeze').onclick = () => ownerCall('freeze', {}, $('#freeze'), 'Charter frozen').then(() => tell('You froze the charter. Every payment the agent tries now is refused on chain.', 'info')).catch(fail);
+  if ($('#unfreeze')) $('#unfreeze').onclick = () => ownerCall('unfreeze', {}, $('#unfreeze'), 'Charter unfrozen').catch(fail);
+}
+async function ownerCall(methodName, args, btn, done) {
+  busy(btn, true, 'Approve in your wallet…');
+  try {
+    const w = await connector.wallet();
+    const res = await w.signAndSendTransaction({ receiverId: charter, actions: [{ type: 'FunctionCall', params: { methodName, args, gas: (60n * TG).toString(), deposit: '0' } }] });
+    toast(`${esc(done)} · ${txl(txHashOf(res))}`, 'good');
+  } finally { busy(btn, false); }
+  await renderFacts();
+}
+function renderRules(cl, keyLive, f = {}) {
   const m = CFG.arena.merchants;
   $('#rules').innerHTML = `<div class="grid2">
     <label>Allowed payee 1<input id="r1" value="${esc(cl?.receivers?.[0] || m[0])}"></label>
@@ -100,7 +178,7 @@ function renderRules(cl, keyLive) {
     <label>Daily budget<span class="suffix"><input id="rbud" type="number" step="0.01" min="0.002" value="${cl ? Number(BigInt(cl.daily_budget) / 10n ** 18n) / 1e6 : 0.1}"><span>NEAR</span></span></label>
     <label>Payments per day<input id="rmax" type="number" min="1" max="50" value="${cl?.max_actions_per_day || 4}"></label>
     <label>Smallest payment<span class="suffix"><input id="rmin" type="number" step="0.001" min="0.001" value="0.001"><span>NEAR</span></span></label></div>
-    <p class="muted">One wallet approval does two things: saves these rules on chain and adds a fresh agent key made in this browser. That key can only call <code>propose</code> on this charter; it cannot move money around the rules.</p>
+    <p class="muted">One wallet approval does two things: saves these rules on chain and adds a fresh agent key made in this browser. That key can only call <code>propose</code> on this charter; it cannot move money around the rules.${f.setup_open === false ? ' Setup is closed, so a looser rule or a new key waits the timelock; a tighter rule applies at once.' : ''}</p>
     <button id="rules-btn" class="primary" data-testid="rules">${cl && keyLive ? 'Update rules' : 'Save rules and issue agent key'}</button>`;
   $('#rules-btn').onclick = () => saveRules(keyLive).catch(fail).finally(() => busy($('#rules-btn'), false));
 }
@@ -110,74 +188,192 @@ async function saveRules(keyLive) {
     window_start_min: 0, window_end_min: 0, requires_receipt: false, escalation_max: null, min_amount: toY($('#rmin').value), max_actions_per_day: Number($('#rmax').value) };
   if (BigInt(clause.per_action_cap) > BigInt(clause.daily_budget)) throw new Error('max per payment is above the daily budget');
   const actions = [{ type: 'FunctionCall', params: { methodName: 'set_clause', args: { clause_id: 'pay', clause }, gas: (40n * TG).toString(), deposit: '0' } }];
-  let k = localStorage.getItem(agentLS(charter));
-  if (!keyLive) { k = keyFrom().secretKey;
+  if (!keyLive) { const k = keyFrom().secretKey;
+    localStorage.setItem(pendLS(charter), k); // before signing: a redirect wallet must not lose it
     actions.push({ type: 'FunctionCall', params: { methodName: 'set_agent_key', args: { public_key: keyFrom(k).publicKey, allowance: (YN / 2n).toString() }, gas: (60n * TG).toString(), deposit: '0' } }); }
   busy($('#rules-btn'), true, 'Approve in your wallet…');
   const w = await connector.wallet();
   const res = await w.signAndSendTransaction({ receiverId: charter, actions });
-  if (!keyLive) localStorage.setItem(agentLS(charter), k);
-  toast(`Rules saved${keyLive ? '' : ' and agent key issued'} · ${txl(txHashOf(res))}`, 'good');
+  toast(`Rules sent${keyLive ? '' : ' with a new agent key'} · ${txl(txHashOf(res))}`, 'good');
   await renderFacts();
+  const f = await facts(charter);
+  if (Object.keys(f.pending_changes || {}).length) toast('Some changes loosen the rules, so they wait in the timelock. Apply or cancel them in step 2.', 'info');
+  if (!f.setup_open) tell('Your rules are live. Ask the agent to pay (top of this tab) or try to trick it in the Arena.', 'info');
 }
 
-// ---------- step 4 + arena ----------
-function attackCards() {
-  const tpl = (where) => CFG.attacks.map(a => `<button class="atk" data-where="${where}" data-attack="${esc(a.id)}" data-testid="atk-${where}-${esc(a.id)}">
-    <b>${esc(a.name)}</b><span>${esc(a.story)}</span><em>expect: ${esc(a.expects)}</em></button>`).join('');
-  $('#mine .atks').innerHTML = tpl('mine'); $('#shared .atks').innerHTML = tpl('shared');
-  for (const b of document.querySelectorAll('.atk')) b.onclick = () => attack(b).catch(fail).finally(() => { for (const x of document.querySelectorAll('.atk')) x.disabled = false; });
+// ---------- "What happened": a plain story of every payment the agent tried in this tab ----------
+const WHY = { receiver_not_allowlisted: 'payee not on your allowlist', over_per_action_cap: 'over the max per payment', over_daily_budget: "over today's budget",
+  over_daily_action_count: 'over the payments-per-day limit', below_min_amount: 'below the smallest payment', frozen: 'the charter is frozen', expired: 'the request expired',
+  stale_policy_version: 'the rules changed meanwhile', outside_time_window: 'outside the allowed hours' };
+const plain = r => WHY[r] || String(r || 'failed').replace(/_/g, ' ');
+const tries = [];
+function tell(html, kind) { toast(html, kind); }
+function record(s, who) {
+  if (!s || !s.decision) return;
+  tries.push({ ...s, who });
+  const ok = tries.filter(t => t.decision === 'allowed'), no = tries.filter(t => t.decision !== 'allowed');
+  const total = ok.reduce((a, t) => a + BigInt(t.amount || 0), 0n);
+  const reasons = Object.entries(no.reduce((m, t) => (m[plain(t.reason)] = (m[plain(t.reason)] || 0) + 1, m), {})).map(([r, n]) => `${n} ${r}`).join(', ');
+  $('#story').innerHTML = `Your agent tried <b>${tries.length}</b> payment${tries.length > 1 ? 's' : ''}: <b>${ok.length} allowed</b>${ok.length ? ` (${fmt(total)} paid)` : ''}, <b>${no.length} refused</b>${no.length ? ': ' + esc(reasons) : ''}.`;
+  toast(`${esc(who)}: ${fmt(s.amount)} to <code>${esc(s.receiver)}</code> · <b>${s.decision === 'allowed' ? 'allowed' : 'refused: ' + esc(plain(s.reason))}</b> · ${txl(s.tx)}`, s.decision === 'allowed' ? 'good' : 'bad');
+}
+
+// ---------- ask the agent to pay ----------
+function quickCards() {
+  $('#mine .tsks').innerHTML = CFG.tasks.map(t => `<button class="atk tsk" data-where="mine" data-task="${esc(t.id)}" data-testid="task-mine-${esc(t.id)}">
+    <b>${esc(t.name)}</b><span>${esc(t.story)}</span><em class="ok">expect: allowed</em></button>`).join('');
+  for (const b of $('#mine .tsks').querySelectorAll('.tsk')) b.onclick = () => task(b).catch(fail).finally(unlock);
+}
+async function ask(e) {
+  e.preventDefault();
+  const out = $('#mine .result'); const btn = $('#ask-btn');
+  let q; try { q = parseAsk($('#ask-text').value, CFG.arena.merchants.concat(lastRules?.receivers || [])); }
+  catch (er) { out.innerHTML = `<p class="verdict bad" data-testid="verdict">${esc(er.message)}</p>`; return; }
+  lock(); busy(btn, true, 'Agent is paying…');
+  out.innerHTML = `<p class="muted">Your agent proposes ${fmt(q.amount)} to <code>${esc(q.receiver)}</code>${q.note ? ' for ' + esc(q.note) : ''}. Waiting for the charter's decision on chain…</p><ol class="steps"></ol>`;
+  try {
+    const r = await runAsk({ charter, key: keyFrom(localStorage.getItem(agentLS(charter))), receiver: q.receiver, amount: q.amount, memo: q.memo, rpcCall: rpc, viewF: view, send: sendPropose });
+    out.querySelector('.steps').innerHTML = stepRow(r, 1, 1); record(r, 'You asked');
+    out.insertAdjacentHTML('beforeend', r.passed
+      ? `<p class="verdict good" data-testid="verdict">ALLOWED: the charter paid ${fmt(r.amount)} to <code>${esc(r.receiver)}</code>. ${txl(r.tx, 'see the transaction')}</p>`
+      : `<p class="verdict bad" data-testid="verdict">REFUSED: ${esc(plain(r.reason))}. Nothing was paid. ${txl(r.tx, 'see the refusal')}</p>`);
+    out.insertAdjacentHTML('beforeend', '<p class="muted">Your own requests are real payments but are not scored: the board counts the fixed jobs and scams below.</p>');
+    renderFacts().catch(() => {});
+  } finally { busy(btn, false); unlock(); }
+}
+
+// ---------- arena: one grid, two targets ----------
+function setTarget(t) {
+  target = t === 'mine' && ready ? 'mine' : 'shared';
+  const r = document.querySelector(`input[name=target][value=${target}]`); if (r) r.checked = true;
+  $('input[name=target][value=mine]').disabled = !ready;
+  $('#t-mine-note').textContent = ready ? `(${charter})` : '(make a charter and an agent key first)';
+  $('#nick-box').hidden = target !== 'shared';
+  $('#runner').hidden = target !== 'shared';
+  $('#target-help').textContent = target === 'mine'
+    ? 'Your browser signs with your agent key, exactly as a tricked agent would. Honest jobs first: scams spend today\'s limits.'
+    : `No wallet needed: our server's runner key signs for you on a factory charter with tight rules. Daily limits are shared by everyone.${CFG.attack_enabled ? '' : ' The shared runner is off on this deployment.'}`;
+  $('#score-h').textContent = target === 'mine' ? "Your charter's score" : 'Shared charter score';
+  arenaCards(); $('#arena .result').innerHTML = ''; loadScore(target).catch(() => {});
+}
+function arenaCards() {
+  const w = target;
+  $('#arena .tsks').innerHTML = CFG.tasks.map(t => `<button class="atk tsk" data-where="${w}" data-task="${esc(t.id)}" data-testid="task-${w}-${esc(t.id)}">
+    <b>${esc(t.name)}</b><span>${esc(t.story)}</span><em class="ok">expect: allowed</em></button>`).join('');
+  $('#arena .scams').innerHTML = CFG.attacks.map(a => `<button class="atk scam" data-where="${w}" data-attack="${esc(a.id)}" data-testid="atk-${w}-${esc(a.id)}">
+    <b>${esc(a.name)}</b><span>${esc(a.story)}</span><em>expect: refused · ${esc(plain(a.expects))}</em></button>`).join('');
+  for (const b of $('#arena .tsks').querySelectorAll('.tsk')) b.onclick = () => task(b).catch(fail).finally(unlock);
+  for (const b of $('#arena .scams').querySelectorAll('.scam')) b.onclick = () => attack(b).catch(fail).finally(unlock);
+  if (w === 'mine') for (const b of $('#arena').querySelectorAll('.atk')) b.dataset.dup = '1';
+}
+const lock = () => { for (const x of document.querySelectorAll('.atk')) x.disabled = true; };
+const unlock = () => { for (const x of document.querySelectorAll('.atk')) x.disabled = false; };
+const outFor = btn => btn.closest('#mine') ? $('#mine .result') : $('#arena .result');
+async function task(btn) {
+  lock();
+  const where = btn.dataset.where, id = btn.dataset.task;
+  const out = outFor(btn);
+  out.innerHTML = `<p class="muted">Running job <b>${esc(id)}</b>: one real testnet payment, waiting for finality…</p><ol class="steps"></ol>`;
+  let r;
+  if (where === 'mine') {
+    r = await runTask({ charter, key: keyFrom(localStorage.getItem(agentLS(charter))), taskId: id, tag: 'mine', rpcCall: rpc, viewF: view, send: sendPropose });
+    if (r.tx) await post('/api/vault/record', { tx: r.tx, charter }).catch(e => toast('Scoreboard did not take it: ' + esc(e.message), 'bad'));
+    renderFacts().catch(() => {});
+  } else r = await post('/api/vault/task', { task: id, nickname: nick() });
+  out.querySelector('.steps').innerHTML = stepRow(r, 1, 1); record(r, where === 'mine' ? 'Job ' + id : 'Shared job ' + id);
+  out.insertAdjacentHTML('beforeend', r.passed
+    ? `<p class="verdict good" data-testid="verdict">ALLOWED: the charter allowed the honest payment: ${fmt(r.amount)} to <code>${esc(r.receiver)}</code>. ${txl(r.tx, 'see the transaction')}</p>`
+    : `<p class="verdict bad" data-testid="verdict">The honest payment did not go through: ${esc(plain(r.reason || r.decision))}</p>`);
+  loadScore(where).catch(() => {}); loadBoard().catch(() => {});
+}
+function nick() {
+  const v = ($('#nick').value || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20);
+  if (v) localStorage.setItem('nearcarta.vault.nick', v);
+  return v || 'guest';
+}
+// A friendly default name, kept in this browser; anyone can change it.
+function defaultNick() {
+  let n = localStorage.getItem('nearcarta.vault.nick');
+  if (!n) { const A = ['brave', 'calm', 'quick', 'sly', 'keen', 'bold', 'wise', 'lucky'], B = ['otter', 'heron', 'lynx', 'fox', 'owl', 'badger', 'gecko', 'crane'];
+    const r = crypto.getRandomValues(new Uint16Array(3)); n = `${A[r[0] % 8]}-${B[r[1] % 8]}-${r[2] % 100}`; localStorage.setItem('nearcarta.vault.nick', n); }
+  return n;
+}
+async function loadScore(where) {
+  const id = where === 'mine' ? charter : CFG.arena.charter; if (!id) return;
+  const s = await api('/api/vault/score/' + id);
+  const cell = r => !r ? '<span class="muted">not run</span>' : r.counted ? `<span class="tag ok">counted</span> ${txl(r.tx)}` : `<span class="tag">${esc(r.why || r.reason || r.decision)}</span> ${txl(r.tx)}`;
+  const html = `<p><b data-testid="score-${where}">${s.score}/${s.max_score}</b> · ${s.tasks_passed} of ${s.tasks.length} honest payments allowed · ${s.scams_blocked} of ${s.attacks.length} scams refused for the right reason</p>
+    <table><thead><tr><th>Job</th><th>Should be</th><th>Result</th></tr></thead><tbody>
+    ${[...s.tasks, ...s.attacks].map(x => `<tr><td>${esc(x.name)}</td><td>${Array.isArray(x.expects) ? 'refused: ' + x.expects.map(plain).map(esc).join(' or ') : 'allowed'}</td><td>${cell(x.result)}</td></tr>`).join('')}</tbody></table>`;
+  if (where === 'mine') $('#score-mine-box').innerHTML = html.replace('data-testid="score-mine"', 'data-testid="score-mine-top"');
+  if (where === target) $('#arena .score').innerHTML = html;
 }
 function stepRow(s, i, n) {
   const cls = s.decision === 'denied' ? 'denied' : s.decision === 'allowed' ? 'allowed' : 'failed';
   return `<li class="${cls}"><span class="n">${i}${n ? '/' + n : ''}</span><span class="d" data-testid="decision">${s.decision === 'denied' ? 'REFUSED' : esc(s.decision)}</span>
-    <span>${fmt(s.amount)} → <code>${esc(s.receiver)}</code></span><span class="r">${esc(s.reason || '')}</span>${txl(s.tx)}</li>`;
+    <span>${fmt(s.amount)} → <code>${esc(s.receiver)}</code></span><span class="r">${esc(s.reason ? plain(s.reason) : '')}</span>${txl(s.tx)}</li>`;
 }
 async function attack(btn) {
-  for (const x of document.querySelectorAll('.atk')) x.disabled = true;
+  lock();
   const where = btn.dataset.where, id = btn.dataset.attack;
-  const out = $(`#${where} .result`);
+  const out = outFor(btn);
   out.innerHTML = `<p class="muted">Running <b>${esc(id)}</b>: each step is a real testnet transaction, waiting for finality…</p><ol class="steps"></ol>`;
   let r;
   if (where === 'mine') {
     const key = keyFrom(localStorage.getItem(agentLS(charter)));
     r = await runSteps({ charter, key, attackId: id, tag: 'mine', rpcCall: rpc, viewF: view, send: sendPropose,
-      onStep: (s, i, n) => out.querySelector('.steps').insertAdjacentHTML('beforeend', stepRow(s, i, n)) });
-    if (r.refused) await api('/api/vault/record', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tx: r.steps.at(-1).tx, charter }) }).catch(e => toast('Leaderboard did not take it: ' + esc(e.message), 'bad'));
+      onStep: (s, i, n) => { out.querySelector('.steps').insertAdjacentHTML('beforeend', stepRow(s, i, n)); record(s, 'Scam ' + id); } });
+    if (r.refused) await post('/api/vault/record', { tx: r.steps.at(-1).tx, charter }).catch(e => toast('Leaderboard did not take it: ' + esc(e.message), 'bad'));
     renderFacts().catch(() => {});
   } else {
-    const nick = ($('#nick').value || 'guest').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'guest';
-    r = await api('/api/vault/attack', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ attack: id, nickname: nick }) });
+    r = await post('/api/vault/attack', { attack: id, nickname: nick() });
     out.querySelector('.steps').innerHTML = r.steps.map((s, i) => stepRow(s, i + 1, r.steps.length)).join('');
+    for (const s of r.steps) record(s, 'Shared scam ' + id);
   }
   out.insertAdjacentHTML('beforeend', r.refused
-    ? `<p class="verdict good" data-testid="verdict">The charter refused it: <b>${esc(r.reason)}</b>. The refusal is on chain: ${txl(r.steps.at(-1).tx, 'see the transaction')}</p>`
+    ? `<p class="verdict good" data-testid="verdict">The charter refused it: <b>${esc(plain(r.reason))}</b> (<code>${esc(r.reason)}</code>). The refusal is on chain: ${txl(r.steps.at(-1).tx, 'see the transaction')}</p>`
     : `<p class="verdict bad" data-testid="verdict">Not refused${r.steps.length ? '' : ' (no step ran)'}. ${esc(r.reason || '')}</p>`);
-  loadBoard().catch(() => {});
+  if (r.why && r.why !== 'not_refused') out.insertAdjacentHTML('beforeend', `<p class="muted">Not counted on the board: ${esc(r.why)}</p>`);
+  loadScore(where).catch(() => {}); loadBoard().catch(() => {});
 }
 
 async function loadBoard() {
   const b = await api('/api/vault/leaderboard');
-  $('#board').innerHTML = `<table data-testid="board"><thead><tr><th>#</th><th>Player</th><th>Patterns refused</th><th>Refusals</th><th>Last proof</th></tr></thead><tbody>
-    ${b.players.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.player)} ${p.verified ? '<span class="tag ok" title="owner of the charter, checked on chain">owner</span>' : '<span class="tag" title="nickname on the shared charter, not verified">nick</span>'}</td>
-    <td>${p.patterns.map(x => `<span class="pill">${esc(x)}</span>`).join(' ')}</td><td>${p.refusals}</td><td>${txl(p.last_tx)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No refusals yet.</td></tr>'}</tbody></table>
+  $('#board').innerHTML = `<table data-testid="board"><thead><tr><th>#</th><th>Player</th><th>Score</th><th>Honest payments allowed</th><th>Scams refused</th><th>Not counted</th><th>Last proof</th></tr></thead><tbody>
+    ${b.players.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.player)} ${p.verified ? '<span class="tag ok" title="owner of the charter, checked on chain">owner</span>' : '<span class="tag" title="nickname on the shared charter; the txs are signed by this server\'s runner">nick · server-signed</span>'}</td>
+    <td><b>${p.score}/${p.max_score}</b></td><td>${p.tasks.map(x => `<span class="pill">${esc(x)}</span>`).join(' ') || '–'}</td>
+    <td>${p.patterns.map(x => `<span class="pill">${esc(x)}</span>`).join(' ') || '–'}</td><td>${p.not_counted}</td><td>${txl(p.last_tx)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Nothing counted yet.</td></tr>'}</tbody></table>
     <p class="muted">${esc(b.rule)} ${b.complete ? '' : '(still indexing)'}</p>`;
+}
+function showTab(id) {
+  for (const t of document.querySelectorAll('[role=tab]')) { const on = t.dataset.tab === id; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; $('#' + t.dataset.tab).hidden = !on; }
+  if (id === 'p-board') loadBoard().catch(() => {});
 }
 
 async function main() {
   CFG = await api('/api/vault/config');
   rpc = rpcClient(CFG.rpc);
   ({ connector } = makeConnector(rpc));
+  for (const t of document.querySelectorAll('[role=tab]')) {
+    t.onclick = () => { showTab(t.dataset.tab); history.replaceState(null, '', '#' + t.id.slice(4)); };
+    t.onkeydown = e => { const all = [...document.querySelectorAll('[role=tab]')]; const i = all.indexOf(t) + (e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0);
+      if (i !== all.indexOf(t)) { const n = all[(i + all.length) % all.length]; n.focus(); n.click(); } };
+  }
+  const h = location.hash.slice(1); if (['mine', 'arena', 'board'].includes(h)) showTab('p-' + h);
+  $('#go-arena').onclick = () => { showTab('p-arena'); setTarget('mine'); };
+  for (const r of document.querySelectorAll('input[name=target]')) r.onchange = () => setTarget(r.value);
+  $('#nick').value = defaultNick();
+  $('#ask-form').onsubmit = e => ask(e).catch(fail);
   $('#factory').innerHTML = `Factory <code>${esc(CFG.factory)}</code> · code hash <code title="${esc(CFG.code_hash)}">${esc(short(CFG.code_hash))}</code> · ${txl(CFG.proof_txs?.factory_full_access_key_deleted, 'factory keys deleted')}`;
   $('#arena-id').textContent = CFG.arena.charter;
-  $('#shared-note').textContent = CFG.attack_enabled ? '' : 'The shared runner is off on this deployment. Use your own charter above.';
   $('#ex-look').textContent = lookalike(CFG.arena.merchants[0]);
-  attackCards();
+  quickCards(); setTarget('shared');
+  const rl = CFG.runner; if (rl) $('#runner').textContent = `Shared runner: ${rl.left_today} of ${rl.daily_tx_cap} transactions left today (UTC), ${rl.gas_tgas} Tgas each.`;
   connector.on('wallet:signIn', () => refreshWho().catch(fail));
-  connector.on('wallet:signOut', () => { charter = null; refreshWho().catch(fail); });
+  connector.on('wallet:signOut', () => { charter = null; ready = false; refreshWho().catch(fail); });
   $('#connect').onclick = () => connector.connect().catch(fail);
   $('#guest').onclick = async () => { busy($('#guest'), true, 'Asking the testnet faucet…'); try { await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { fail(e); } finally { busy($('#guest'), false); } };
-  $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); charter = null; await refreshWho(); };
+  $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); charter = null; ready = false; await refreshWho(); };
   await refreshWho(); await loadBoard().catch(e => { $('#board').textContent = e.message; });
 }
 main().catch(fail);
