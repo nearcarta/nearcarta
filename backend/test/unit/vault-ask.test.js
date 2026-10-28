@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { askPlan, askReceivers, sharedAsk, V } from '../../src/vault.js';
+// Hermetic: the model path is covered in agent.test.js with a fake model; never bill a live call here.
+delete process.env.NEARAI_CLOUD_API_KEY;
 
 const merchant = V.arena.merchants[0];
 const clauses = { pay: { asset: 'Native', receivers: [merchant, 'cafe-1.testnet'], per_action_cap: '20000000000000000000000' } };

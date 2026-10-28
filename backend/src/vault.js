@@ -23,6 +23,7 @@ import { TASKS, TASK_IDS, TASK_MEMO_RE, matchesTask, planTask } from '../../shar
 import { keyFrom, sendPropose, rpcClient, viewFn, PROPOSE_TGAS } from '../../shared/vault/tx.js';
 import { runSteps, runTask, runAsk } from '../../shared/vault/run.js';
 import { ASK_MEMO_RE, parseAsk } from '../../shared/vault/ask.js';
+import * as agent from './agent.js';
 
 export const V = DEP.vault || null;
 const ACCOUNT_RE = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -244,13 +245,15 @@ export async function askReceivers(charter, viewF = view) {
 }
 
 /** "Ask the agent to pay" without signing: the parsed request and the proposal the owner's agent key would sign. */
-export async function askPlan(text, charter = null, { viewF = view, nowMs = Date.now() } = {}) {
+export async function askPlan(text, charter = null, { viewF = view, nowMs = Date.now(), propose = agent.propose, tag = 'mine' } = {}) {
   if (!V) throw bad('vault not deployed', 503);
   if (charter !== null && !isAccount(charter)) throw bad('charter: a testnet account id');
   const id = charter || V.arena.charter;
-  let q;
-  try { q = parseAsk(text, await askReceivers(id, viewF)); } catch (e) { throw bad(e.message); }
   const clauses = await viewF(id, 'get_clauses');
+  const receivers = await askReceivers(id, async () => clauses);
+  let a;
+  try { a = await propose(text, { clauses, receivers, tag }); } catch (e) { throw bad(e.message, e.status && e.status < 500 ? e.status : 400); }
+  const q = a.parsed;
   const { id: clauseId, clause } = pickClause(clauses);
   const st = await viewF(id, 'get_state');
   return { charter: id, parsed: q, clause_id: clauseId,
@@ -258,16 +261,23 @@ export async function askPlan(text, charter = null, { viewF = view, nowMs = Date
     proposal: { shop: 'ask', clause_id: clauseId, receiver: q.receiver, amount: q.amount, nonce: String(st.next_nonce),
       policy_version: st.policy_version, expires_at: String(BigInt(nowMs + 10 * 60_000) * 1_000_000n), memo: q.memo, receipt: null },
     sign: 'call `propose` on the charter with {"p": proposal} using your agent function-call key; the charter decides',
-    parser: 'plain-words parser (shared/vault/ask.js), not an AI model' };
+    by: a.by, model: a.model, parser: a.by === 'model' ? `NEAR AI model ${a.model} in a TEE (proposes only; the charter decides)` : a.parser,
+    fallback_why: a.fallback_why || null, verification: a.verification || null, tee: a.tee || null, cost: a.cost || null };
 }
 
 /** "Ask the agent to pay" on the SHARED arena charter: one server-signed `propose`, decided on chain. */
-export async function sharedAsk(text, { run = runAsk, nickname = 'guest' } = {}) {
+export async function sharedAsk(text, { run = runAsk, nickname = 'guest', propose = agent.propose, viewF = view } = {}) {
   if (!V) throw bad('vault not deployed', 503);
   const secret = agentSecret();
   if (!secret) throw bad('shared arena runner is off on this deployment (no agent key set)', 503);
-  let q;
-  try { q = parseAsk(text, V.arena.merchants || [], nickname || 'guest'); } catch (e) { throw bad(e.message); }
+  let a;
+  try {
+    const clauses = await viewF(V.arena.charter, 'get_clauses').catch(() => ({}));
+    a = await propose(text, { clauses, receivers: V.arena.merchants || [], tag: nickname || 'guest' });
+  } catch (e) { throw bad(e.message, e.status && e.status < 500 ? e.status : 400); }
+  const q = a.parsed;
+  const brain = { by: a.by, model: a.model, parser: a.parser || null, fallback_why: a.fallback_why || null,
+    suspicious: q.suspicious ?? null, why_flag: q.why || null, verification: a.verification || null, cost: a.cost || null };
   return serial(async () => {
     const release = reserve(1);
     let used = 0;
@@ -276,7 +286,7 @@ export async function sharedAsk(text, { run = runAsk, nickname = 'guest' } = {})
       const r = await run({ charter: V.arena.charter, key: keyFrom(secret), receiver: q.receiver, amount: q.amount, memo: q.memo,
         rpcCall, viewF: (a, m, x) => viewFn(rpcCall, a, m, x), send: sendPropose });
       used = r.tx ? 1 : 0;
-      return { ...r, note: q.note, url: r.tx ? explorerTx(r.tx) : null, server_signed: true };
+      return { ...r, note: q.note, ...brain, url: r.tx ? explorerTx(r.tx) : null, server_signed: true };
     } catch (e) { used = (e.status && e.status < 500) ? 0 : 1; throw e; }
     finally { release(used); }
   });
@@ -685,11 +695,16 @@ export function register(app, { limiter, globalCap }) {
     const b = await c.req.json().catch(() => ({}));
     return c.json(await sharedTask(String(b.task || ''), String(b.nickname || '').toLowerCase()));
   });
-  app.post('/api/vault/ask/plan', limiter(20), async c => {
+  // The NEAR AI model proposes (backend/src/agent.js); spend is capped per guest (8/min, 40/day) and globally.
+  const askPerDay = limiter(Number(process.env.AGENT_PER_GUEST_DAY || 40), 24 * 3600e3);
+  const agentCap = globalCap('nearai-agent', Number(process.env.CAP_AGENT_PER_MIN || 20));
+  app.get('/api/agent/budget', limiter(30), c => c.json(agent.budgetStatus()));
+  app.post('/api/vault/ask/plan', limiter(8), askPerDay, agentCap, async c => {
     const b = await c.req.json().catch(() => ({}));
-    return c.json(await askPlan(String(b.text || ''), b.charter == null || b.charter === '' ? null : String(b.charter)));
+    const tag = String(b.nickname || '').toLowerCase() || 'mine';
+    return c.json(await askPlan(String(b.text || ''), b.charter == null || b.charter === '' ? null : String(b.charter), { tag }));
   });
-  app.post('/api/vault/ask', limiter(6), globalCap('vault-attack', 30), async c => {
+  app.post('/api/vault/ask', limiter(6), askPerDay, agentCap, globalCap('vault-attack', 30), async c => {
     const b = await c.req.json().catch(() => ({}));
     return c.json(await sharedAsk(String(b.text || ''), { nickname: String(b.nickname || '').toLowerCase() || 'guest' }));
   });
