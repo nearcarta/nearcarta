@@ -1,4 +1,5 @@
-//! oath-lab: a policy ("oath") contract that owns a Base Sepolia wallet via NEAR Chain Signatures.
+//! oath-lab: a policy ("oath") contract that owns an EVM wallet (Base Sepolia, Arbitrum Sepolia, ...) via NEAR Chain Signatures.
+//! One chain per instance: `chain_id` for the tx it signs, `verify_chain` for the MPC foreign-tx proof that settles it.
 //! The agent can only *propose*; this contract checks the clauses, builds the EIP-1559 tx itself,
 //! asks the MPC network to sign it (predecessor = this contract, so the key belongs to the oath),
 //! and later settles it only on an MPC foreign-tx proof (verify_foreign_transaction).
@@ -38,20 +39,48 @@ pub struct Oath {
     next_nonce: u64,
     frozen: bool,
     txs: LookupMap<u64, TxRec>,
+    verify_chain: String,     // MPC ForeignChainRpcRequest variant name, e.g. "Base", "Arbitrum"
 }
 
 fn hx(b: &[u8]) -> String { hex::encode(b) }
 fn unhex(s: &str) -> Vec<u8> { hex::decode(s.trim_start_matches("0x")).expect("bad hex") }
 
+/// EVM chains the MPC network verifies (v1.signer-prod.testnet get_available_foreign_chains), with the
+/// borsh index of each in ForeignChainRpcRequest and the chain ids (mainnet, testnet) that belong to it.
+pub fn evm_chain(name: &str) -> Option<(u8, [u64; 2])> {
+    match name {
+        "Bnb" => Some((5, [56, 97])),
+        "Base" => Some((6, [8453, 84532])),
+        "Arbitrum" => Some((7, [42161, 421614])),
+        "Polygon" => Some((8, [137, 80002])),
+        "Avalanche" => Some((13, [43114, 43113])),
+        _ => None,
+    }
+}
+
+/// borsh(ForeignTxSignPayload::V1{ <chain>{tx_id,[BlockHash],Finalized}, [Evm(BlockHash(bh))] }); the MPC signs sha256 of this.
+pub fn proof_payload(chain_index: u8, tx_hash: &str, block_hash: &str) -> Vec<u8> {
+    let mut b = vec![0u8, chain_index];
+    b.extend(unhex(tx_hash));
+    b.extend(1u32.to_le_bytes()); b.push(0); b.push(2);
+    b.extend(1u32.to_le_bytes()); b.push(1); b.push(0);
+    b.extend(unhex(block_hash));
+    b
+}
+
 #[near]
 impl Oath {
     #[init]
     pub fn new(owner: AccountId, mpc: AccountId, path: String, chain_id: u64, foreign_address: String,
-               fx_root_key: String, allow_to: Vec<String>, max_per_tx: U128, budget: U128, max_fee_cap: U128) -> Self {
+               fx_root_key: String, allow_to: Vec<String>, max_per_tx: U128, budget: U128, max_fee_cap: U128,
+               verify_chain: Option<String>) -> Self {
+        let verify_chain = verify_chain.unwrap_or_else(|| "Base".into());
+        let (_, ids) = evm_chain(&verify_chain).expect("verify_chain not supported");
+        require!(ids.contains(&chain_id), "chain_id does not belong to verify_chain");
         Self { owner, mpc, path, chain_id, foreign_address: foreign_address.to_lowercase(), fx_root_key,
                allow_to: allow_to.into_iter().map(|a| a.to_lowercase()).collect(),
                max_per_tx: max_per_tx.0, budget: budget.0, spent: 0, max_fee_cap: max_fee_cap.0,
-               next_nonce: 0, frozen: false, txs: LookupMap::new(b"t") }
+               next_nonce: 0, frozen: false, txs: LookupMap::new(b"t"), verify_chain }
     }
 
     fn assert_owner(&self) { require!(env::predecessor_account_id() == self.owner, "only owner"); }
@@ -64,7 +93,7 @@ impl Oath {
                "foreign_address": self.foreign_address, "allow_to": self.allow_to,
                "max_per_tx": self.max_per_tx.to_string(), "budget": self.budget.to_string(),
                "spent": self.spent.to_string(), "max_fee_cap": self.max_fee_cap.to_string(),
-               "next_nonce": self.next_nonce, "frozen": self.frozen})
+               "next_nonce": self.next_nonce, "frozen": self.frozen, "verify_chain": self.verify_chain})
     }
     pub fn get_tx(&self, nonce: u64) -> Option<TxRec> { self.txs.get(&nonce).cloned() }
 
@@ -135,7 +164,9 @@ impl Oath {
         let rec = self.txs.get(&nonce).cloned().expect("no rec");
         require!(rec.status == "signed" || rec.status == "refused_proof", "not settleable");
         let txh = rec.tx_hash.clone().unwrap();
-        let args = json!({"request": {"request": {"Base": {"tx_id": txh.trim_start_matches("0x"), "extractors": ["BlockHash"], "finality": "Finalized"}},
+        let mut req = serde_json::Map::new();
+        req.insert(self.verify_chain.clone(), json!({"tx_id": txh.trim_start_matches("0x"), "extractors": ["BlockHash"], "finality": "Finalized"}));
+        let args = json!({"request": {"request": Value::Object(req),
                                        "domain_id": 3, "payload_version": 1}});
         Promise::new(self.mpc.clone())
             .function_call("verify_foreign_transaction".to_string(), args.to_string().into_bytes(), NearToken::from_yoctonear(1), Gas::from_tgas(50))
@@ -146,13 +177,8 @@ impl Oath {
     pub fn on_verified(&mut self, nonce: u64, block_hash: String, #[callback_result] resp: Result<Value, PromiseError>) -> Option<TxRec> {
         let mut rec = self.txs.get(&nonce).cloned().expect("no rec");
         let resp = match resp { Ok(v) => v, Err(_) => { log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"proof_failed","data":{"nonce":nonce}})); return Some(rec); } };
-        // recompute borsh(ForeignTxSignPayload::V1{ Base{tx_id,[BlockHash],Finalized}, [Evm(BlockHash(bh))] })
-        let mut b = vec![0u8, 6u8];
-        b.extend(unhex(rec.tx_hash.as_ref().unwrap()));
-        b.extend(1u32.to_le_bytes()); b.push(0); b.push(2);
-        b.extend(1u32.to_le_bytes()); b.push(1); b.push(0);
-        b.extend(unhex(&block_hash));
-        let expect = env::sha256(&b);
+        let (idx, _) = evm_chain(&self.verify_chain).unwrap();
+        let expect = env::sha256(&proof_payload(idx, rec.tx_hash.as_ref().unwrap(), &block_hash));
         let got = resp["payload_hash"].as_str().unwrap_or("").to_string();
         // independent check of the MPC signature against the ForeignTx root key
         let big_r = unhex(resp["signature"]["big_r"]["affine_point"].as_str().unwrap());

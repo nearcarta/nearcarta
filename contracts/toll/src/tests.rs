@@ -19,7 +19,7 @@ fn toll() -> Oath {
     set("owner.test");
     Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "toll".into(), 84532,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.to_uppercase().replace("0X", "0x")],
-        U128(100), U128(150), U128(10))
+        U128(100), U128(150), U128(10), None)
 }
 fn pay(o: &mut Oath, to: &str, v: u128) -> Promise { o.pay(to.into(), U128(v), U128(5), U128(1), 21000) }
 fn spent(o: &Oath) -> String { o.policy()["spent"].as_str().unwrap().to_string() }
@@ -101,3 +101,40 @@ fn failed_signature_releases_the_reservation() {
 #[test]
 #[should_panic(expected = "not settleable")]
 fn unsigned_tx_cannot_settle() { let mut o = toll(); let _ = pay(&mut o, TO, 1); let _ = o.settle(0, "00".repeat(32)); }
+
+fn arb(chain_id: u64, chain: &str) -> Oath {
+    set("owner.test");
+    Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "arb-1".into(), chain_id,
+        "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
+        U128(100), U128(150), U128(10), Some(chain.into()))
+}
+
+#[test]
+fn default_verify_chain_is_base() { assert_eq!(toll().policy()["verify_chain"], "Base"); }
+
+#[test]
+fn arbitrum_sepolia_instance() { let o = arb(421614, "Arbitrum"); assert_eq!(o.policy()["verify_chain"], "Arbitrum"); assert_eq!(o.policy()["chain_id"], 421614); }
+
+#[test]
+#[should_panic(expected = "chain_id does not belong to verify_chain")]
+fn chain_id_must_match_verify_chain() { let _ = arb(84532, "Arbitrum"); }
+
+#[test]
+#[should_panic(expected = "verify_chain not supported")]
+fn non_evm_or_unknown_verify_chain_refused() { let _ = arb(421614, "Solana"); }
+
+// Real MPC proofs from v1.signer-prod.testnet (domain 3): the payload this contract rebuilds must hash
+// to the payload_hash the network signed.
+#[test]
+fn payload_matches_real_base_sepolia_proof() {
+    let b = crate::proof_payload(6, "0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
+        "0xa800c2bbcf63fc22ef17020b725efd17b681682b7fa913c2d7603055c03b44e3");
+    assert_eq!(hex::encode(near_sdk::env::sha256(&b)), "d8c7513c35354b6184108ad58a63430bf88934460f30fc1420ffa3d595506025");
+}
+
+#[test]
+fn payload_matches_real_arbitrum_sepolia_proof() {
+    let b = crate::proof_payload(7, "ee42361cea2ff228cc1703e91188acc8b39c412bb2bf09335c72169be7139ed7",
+        "0x64ee2745f7637d236ceaa471fbebb4fd98621184acba8360f1595d49df73455c");
+    assert_eq!(hex::encode(near_sdk::env::sha256(&b)), "6e6b1eb1dd56ee291e591de942f006b4ce40eb2476ba2456f1132ba77b9d1f48");
+}
