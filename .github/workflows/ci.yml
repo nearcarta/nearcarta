@@ -12,12 +12,27 @@ jobs:
       - run: npm run verify
       - run: npm run build
   contracts:
+    # Unit tests of every crate whose wasm is deployed or shown (near-sdk unit-testing dev-feature).
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: [oath, arena, toll, townhall, charter_factory]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - run: cd contracts/${{ matrix.crate }} && cargo test --lib --locked
+  factory-sandbox:
+    # Local near-sandbox: publish the committed charter as a global contract, deploy the factory,
+    # create a charter through it and drive it (no testnet, no keys).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.95.0
-      - run: cd contracts/oath && cargo test --lib
-      - run: cd contracts/arena && cargo test --lib
+        with: { targets: wasm32-unknown-unknown }
+      - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh | sh
+      - run: cd contracts/charter_factory && cargo near build non-reproducible-wasm --locked
+      - run: cd contracts/charter_factory && cargo test --test sandbox --locked
   secrets:
     runs-on: ubuntu-latest
     steps:
