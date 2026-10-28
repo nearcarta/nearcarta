@@ -55,18 +55,19 @@ const APPS = {
     },
   },
   bank: {
-    label: 'Mist Bank · private send', idle: 'Tell me the amount. I\u2019ll show only its seal.',
+    label: 'Mist Bank · private send', idle: 'Pick a note. Fixed sizes keep every send alike.',
     form: () => { const ps = A.bankPayees(), to = extra.to || A.bankDefault();
-      return `<label class="amt"><input id="m-amt" type="number" min="0.001" step="0.001" value="${esc(extra.amt || '0.03')}"><span>NEAR, hidden</span></label>`
+      const note = A.NOTES.includes(+extra.amt) ? +extra.amt : A.NOTES[0];
+      return `<div class="seg notes" role="radiogroup" aria-label="Note size" data-testid="bank-notes">${A.NOTES.map(n => `<label><input type="radio" name="note" id="m-note-${String(n).replace('.', '')}" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div>`
         + `<label class="to">To <select id="m-to" data-testid="bank-to">${ps.map(a => `<option value="${esc(a)}" ${a === to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(short(a, 14, 8))}</option>`).join('')}</select></label>` + teePanel(extra.tee); },
-    bind: () => { $('#m-amt').oninput = e => { extra.amt = e.target.value; }; const t = $('#m-to'); if (t) t.onchange = e => { extra.to = e.target.value; }; const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Checking the TEE…'; try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } form(APPS.bank.form()); APPS.bank.bind(); }; },
-    btn: () => extra.sent ? 'Verify the seal' : 'Send privately',
+    bind: () => { document.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { extra.amt = r.value; if (!extra.sent) btn(APPS.bank.btn()); }; }); const t = $('#m-to'); if (t) t.onchange = e => { extra.to = e.target.value; }; const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Checking the TEE…'; try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } form(APPS.bank.form()); APPS.bank.bind(); }; },
+    btn: () => extra.sent ? 'Verify the seal' : `Send ${A.NOTES.includes(+extra.amt) ? +extra.amt : A.NOTES[0]} NEAR privately`,
     hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(extra.sent.commitment.slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
     run: async () => {
-      if (extra.sent) { const v = await A.mistVerify(); extra.sent = null; return { keep: true, kind: v.match ? 'ok' : 'no', say: v.match ? 'Seal matches the chain. Amount still hidden.' : 'Seal does not match.', rc: A.txLine(v.tx, 'on-chain memo') }; }
-      const o = await A.mist(Number(extra.amt || 0.03), extra.to || A.bankDefault());
+      if (extra.sent) { const v = await A.mistVerify(); extra.sent = null; return { keep: true, kind: v.match ? 'ok' : 'no', say: v.match ? 'Seal matches the chain.' : 'Seal does not match.', rc: A.txLine(v.tx, 'on-chain memo') }; }
+      const o = await A.mist(A.NOTES.includes(+extra.amt) ? +extra.amt : A.NOTES[0], extra.to || A.bankDefault());
       extra.tee = o.tee; if (o.decision === 'allowed') extra.sent = o;
-      return { o, keep: o.decision === 'allowed', hero: o.decision === 'allowed' ? APPS.bank.hero() : null, say: o.decision === 'allowed' ? `Sealed and sent to ${o.to === A.S.me ? 'you' : esc(short(o.to, 12, 6))}. Approved under the ${o.bucket} ceiling.` : `Refused: ${A.why(o.reason)}.`, rc: `<span class="rc">${o.tee?.ok ? 'TEE verified' : 'TEE checked'} · ZEC payout: mainnet only</span>` + A.txLine(o.tx) };
+      return { o, keep: o.decision === 'allowed', hero: o.decision === 'allowed' ? APPS.bank.hero() : null, say: o.decision === 'allowed' ? `Sent one ${o.bucket} NEAR note to ${o.to === A.S.me ? 'you' : esc(short(o.to, 12, 6))}, sealed.` : `Refused: ${A.why(o.reason)}.`, rc: `<span class="rc">${o.tee?.ok ? 'TEE verified' : 'TEE checked'} · ZEC payout: mainnet only</span>` + A.txLine(o.tx) };
     },
   },
   guard: {
