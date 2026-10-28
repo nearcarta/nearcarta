@@ -3,9 +3,14 @@ import assert from 'node:assert/strict';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { ATTACKS, lookalike, invoicePayee, pickClause, plan, proposal, MEMO_RE } from '../../../shared/vault/attacks.js';
-import { keyFrom, signTx, functionCall, outcomeOf } from '../../../shared/vault/tx.js';
-import { runAttack, verifyAttempt, board, isAccount, _attempts } from '../../src/vault.js';
+import { createHash } from 'node:crypto';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ATTACKS, lookalike, invoicePayee, pickClause, plan, proposal, MEMO_RE, matchesPlan, acceptedReasons } from '../../../shared/vault/attacks.js';
+import { TASKS, TASK_IDS, TASK_MEMO_RE, planTask, matchesTask, taskAmount, taskProposal } from '../../../shared/vault/tasks.js';
+import { keyFrom, signTx, functionCall, outcomeOf, PROPOSE_TGAS } from '../../../shared/vault/tx.js';
+import { runAttack, doTask, verifyAttempt, board, isAccount, _attempts, _notArena, Lru, saveBoard, loadBoard, runnerStatus } from '../../src/vault.js';
 
 const M = 10n ** 21n; // milliNEAR
 const clause = { asset: 'Native', receivers: ['cafe.pub.testnet', 'books.pub.testnet'], per_action_cap: String(50n * M),
@@ -80,36 +85,123 @@ test('runAttack stops at the first refusal and re-verifies it from chain', async
 
 const H = '4a633Ss2gs8n9XpEDJLacvbnn1TDddVBcs9KrdPSkcjp';
 const facts = async c => ({ charter: c, registered: true, runs_r14: true, owner: 'alice.testnet' });
-function fakeTx({ method = 'propose', memo = 'arena:neo:lookalike', signer = 'c.f.testnet', failed = false, decision = 'denied' } = {}) {
+const at = async () => clause;
+const hex = s => createHash('sha256').update(s).digest('hex');
+function fakeTx({ method = 'propose', memo = 'arena:neo:lookalike', signer = 'c.f.testnet', failed = false, decision = 'denied',
+  reason = 'receiver_not_allowlisted', receiver = 'c4fe.pub.testnet', amount = String(25n * M), memoHash, settle } = {}) {
   const args = Buffer.from(JSON.stringify({ p: { memo } })).toString('base64');
-  const log = 'EVENT_JSON:' + JSON.stringify({ standard: 'oath', version: '2.0.0', event: 'action', data: [{ decision, reason: 'receiver_not_allowlisted' }] });
+  const ev = (event, data) => 'EVENT_JSON:' + JSON.stringify({ standard: 'oath', version: '2.0.0', event, data: [data] });
+  const logs = [ev('action', { action_id: decision === 'allowed' ? '7' : null, clause_id: 'pay', receiver, amount, memo_hash: memoHash ?? hex(memo), decision, reason: decision === 'allowed' ? null : reason })];
+  const rs = [{ id: 'r', block_hash: 'RB', outcome: { executor_id: 'c.f.testnet', logs, status: failed ? { Failure: {} } : { SuccessValue: '' } } }];
+  if (settle) rs.push({ id: 's', block_hash: 'SB', outcome: { executor_id: 'c.f.testnet', logs: [ev('settle', { action_id: '7', status: 'executed', reason: settle })], status: { SuccessValue: '' } } });
   return { transaction: { signer_id: signer, receiver_id: 'c.f.testnet', actions: [{ FunctionCall: { method_name: method, args } }] },
-    transaction_outcome: { id: 't', block_hash: 'B', outcome: { executor_id: signer, logs: [], status: {} } },
-    receipts_outcome: [{ id: 'r', outcome: { executor_id: 'c.f.testnet', logs: [log], status: failed ? { Failure: {} } : { SuccessValue: '' } } }] };
+    transaction_outcome: { id: 't', block_hash: 'B', outcome: { executor_id: signer, logs: [], status: {} } }, receipts_outcome: rs };
 }
+const fresh = () => { _attempts.clear(); _notArena.clear(); };
 
-test('verifyAttempt accepts only real arena refusals on factory charters', async () => {
-  _attempts.clear();
-  const ok = await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(), facts, blockTime: async () => 1234 });
-  assert.equal(ok.at, 1234);
-  assert.equal(ok.attack, 'lookalike'); assert.equal(ok.tag, 'neo'); assert.equal(ok.decision, 'denied'); assert.equal(ok.owner, 'alice.testnet');
-  const cases = [{ method: 'set_clause' }, { memo: 'hello' }, { memo: 'arena:neo:unknown-attack' }, { signer: 'x.testnet' }, { failed: true }];
-  for (const c of cases) { _attempts.clear(); assert.equal(await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(c), facts }), null, JSON.stringify(c)); }
-  _attempts.clear();
+test('verifyAttempt counts only refusals that match the attack plan and reason', async () => {
+  fresh();
+  let asked = null;
+  const ok = await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(), facts, blockTime: async () => 1234, clause: async (c, id, b) => { asked = [c, id, b]; return clause; } });
+  assert.deepEqual(asked, ['c.f.testnet', 'pay', 'RB'], 'clause read at the receipt block');
+  assert.equal(ok.at, 1234); assert.equal(ok.kind, 'attack'); assert.equal(ok.counted, true, ok.why);
+  assert.equal(ok.attack, 'lookalike'); assert.equal(ok.tag, 'neo'); assert.equal(ok.owner, 'alice.testnet'); assert.equal(ok.receiver, 'c4fe.pub.testnet');
+  const notCounted = [
+    [{ reason: 'over_per_action_cap' }, 'wrong_reason'],
+    [{ receiver: 'someone.testnet' }, 'not_the_attack_plan'],
+    [{ amount: String(24n * M) }, 'not_the_attack_plan'],
+    [{ memo: 'arena:neo:impersonation' }, 'wrong_reason'],
+    [{ decision: 'allowed', receiver: 'cafe.pub.testnet' }, 'not_refused'],
+    [{ memoHash: 'ff' }, 'memo_mismatch'],
+  ];
+  for (const [c, why] of notCounted) { fresh(); const r = await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(c), facts, blockTime: async () => 1, clause: at }); assert.equal(r.counted, false, JSON.stringify(c)); assert.equal(r.why, why, JSON.stringify(c)); }
+  fresh();
+  assert.equal((await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(), facts, blockTime: async () => 1, clause: async () => null })).why, 'clause_unknown');
+  const nulls = [{ method: 'set_clause' }, { memo: 'hello' }, { memo: 'arena:neo:unknown-attack' }, { signer: 'x.testnet' }, { failed: true }];
+  for (const c of nulls) { fresh(); assert.equal(await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(c), facts, clause: at }), null, JSON.stringify(c)); }
+  fresh();
+  assert.equal(await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(), facts, clause: async () => { throw new Error('rpc down'); } }), null, 'rpc trouble is not cached as a verdict');
+  assert.equal(_attempts.size, 0);
   assert.equal(await verifyAttempt(H, 'c.f.testnet', { status: async () => fakeTx(), facts: async () => ({ registered: true, runs_r14: false }) }), null);
   await assert.rejects(verifyAttempt('nothash', 'c.f.testnet', { status: async () => fakeTx(), facts }), /bad tx hash/);
 });
 
-test('board ranks by patterns, then refusals; shared rows are nicknames', () => {
+test('verifyAttempt scores tasks: allowed, settled ok, the planned payee and amount', async () => {
+  const t = c => fakeTx({ memo: 'task:neo:coffee-run', decision: 'allowed', receiver: 'cafe.pub.testnet', amount: String(12_500n * 10n ** 18n), settle: 'ok', ...c });
+  fresh();
+  const ok = await verifyAttempt(H, 'c.f.testnet', { status: async () => t(), facts, blockTime: async () => 1, clause: at });
+  assert.equal(ok.kind, 'task'); assert.equal(ok.task, 'coffee-run'); assert.equal(ok.counted, true, ok.why);
+  for (const [c, why] of [[{ decision: 'denied', reason: 'over_daily_budget' }, 'not_allowed'], [{ receiver: 'books.pub.testnet' }, 'not_the_task_plan'],
+    [{ amount: String(50n * M) }, 'not_the_task_plan'], [{ settle: 'execution_failed_budget_released' }, 'payment_failed']]) {
+    fresh(); const r = await verifyAttempt(H, 'c.f.testnet', { status: async () => t(c), facts, blockTime: async () => 1, clause: at }); assert.equal(r.why, why, JSON.stringify(c));
+  }
+});
+
+test('attack plans match their own steps and nothing else', () => {
+  for (const a of ATTACKS) {
+    for (const st of plan(a.id, clause)) assert.ok(matchesPlan(a.id, st, clause), a.id);
+    assert.ok(acceptedReasons(a.id).includes(a.expects));
+  }
+  assert.ok(!matchesPlan('lookalike', { receiver: 'cafe.pub.testnet', amount: String(25n * M) }, clause), 'allowlisted is never a look-alike');
+  assert.ok(!matchesPlan('impersonation', { receiver: 'cafe.pub.testnet', amount: String(51n * M) }, clause));
+  assert.ok(!matchesPlan('slow-drain', { receiver: 'cafe.pub.testnet', amount: String(50n * M) }, clause));
+  assert.ok(!matchesPlan('nope', { receiver: 'x', amount: '1' }, clause));
+  assert.ok(!matchesPlan('lookalike', { receiver: 'c4fe.pub.testnet', amount: 'x' }, clause));
+  assert.deepEqual(acceptedReasons('slow-drain'), ['over_daily_action_count', 'over_daily_budget']);
+});
+
+test('tasks pay an allowlisted merchant a quarter of the cap, and stop when the day is used', () => {
+  assert.deepEqual(TASKS.map(t => t.id), ['coffee-run', 'book-order']);
+  assert.deepEqual(planTask('coffee-run', clause), { receiver: 'cafe.pub.testnet', amount: String(12_500n * 10n ** 18n) });
+  assert.equal(planTask('book-order', clause).receiver, 'books.pub.testnet');
+  assert.equal(taskAmount({ ...clause, per_action_cap: '8', min_amount: '5' }), 5n);
+  assert.throws(() => planTask('coffee-run', clause, { spent: String(95n * M), count: 1 }), /budget/);
+  assert.throws(() => planTask('coffee-run', clause, { spent: '0', count: 4 }), /count/);
+  assert.throws(() => planTask('nope', clause), /unknown task/);
+  for (const id of TASK_IDS) assert.ok(matchesTask(id, planTask(id, clause), clause));
+  assert.ok(!matchesTask('coffee-run', planTask('book-order', clause), clause));
+  const p = taskProposal({ clauseId: 'pay', step: planTask('coffee-run', clause), nonce: 3, policyVersion: 2, tag: 'neo', taskId: 'coffee-run', nowMs: 0 });
+  assert.equal(p.memo, 'task:neo:coffee-run'); assert.ok(TASK_MEMO_RE.test(p.memo)); assert.equal(p.shop, 'tasks');
+});
+
+test('doTask signs one propose and re-verifies it', async () => {
+  const sent = [];
+  const viewF = async (_c, m) => m === 'get_clauses' ? { pay: clause } : m === 'get_usage' ? { spent: '0', reserved: '0', count: 0 } : { next_nonce: '9', policy_version: 2 };
+  const send = async (_rpc, a) => { sent.push(a); return { hash: 'T1', ok: true, value: { decision: 'allowed', reason: null } }; };
+  const r = await doTask({ charter: 'arena.f.testnet', key: keyFrom(), taskId: 'book-order', tag: 'neo', viewF, send, rpcCall: null, verify: async () => ({ counted: true, why: null }) });
+  assert.equal(r.passed, true); assert.equal(r.counted, true); assert.equal(sent.length, 1); assert.equal(sent[0].p.receiver, 'books.pub.testnet');
+  assert.equal(sent[0].gasTgas, undefined, 'default gas from sendPropose'); assert.equal(PROPOSE_TGAS, 30);
+});
+
+test('board scores tasks passed plus scams blocked, counting only verified rows', () => {
   const rows = board([
-    { hash: 'a', charter: 'x', owner: 'o1', attack: 'lookalike', tag: 't', decision: 'denied', shared: false, at: 1 },
-    { hash: 'b', charter: 'x', owner: 'o1', attack: 'lookalike', tag: 't', decision: 'denied', shared: false, at: 2 },
-    { hash: 'c', charter: 's', owner: 'arena', attack: 'lookalike', tag: 'neo', decision: 'denied', shared: true, at: 3 },
-    { hash: 'd', charter: 's', owner: 'arena', attack: 'impersonation', tag: 'neo', decision: 'denied', shared: true, at: 4 },
-    { hash: 'e', charter: 's', owner: 'arena', attack: 'slow-drain', tag: 'neo', decision: 'allowed', shared: true, at: 5 },
+    { hash: 'a', charter: 'x', owner: 'o1', kind: 'attack', attack: 'lookalike', tag: 't', decision: 'denied', counted: true, shared: false, at: 1 },
+    { hash: 'b', charter: 'x', owner: 'o1', kind: 'task', task: 'coffee-run', tag: 't', decision: 'allowed', counted: true, shared: false, at: 2 },
+    { hash: 'c', charter: 's', owner: 'arena', kind: 'attack', attack: 'lookalike', tag: 'neo', decision: 'denied', counted: true, shared: true, server_signed: true, at: 3 },
+    { hash: 'd', charter: 's', owner: 'arena', kind: 'attack', attack: 'impersonation', tag: 'neo', decision: 'denied', counted: false, why: 'wrong_reason', shared: true, server_signed: true, at: 4 },
+    { hash: 'e', charter: 's', owner: 'arena', kind: 'attack', attack: 'slow-drain', tag: 'neo', decision: 'allowed', counted: false, shared: true, server_signed: true, at: 5 },
   ]);
-  assert.equal(rows[0].player, 'neo'); assert.equal(rows[0].verified, false); assert.equal(rows[0].pattern_count, 2); assert.equal(rows[0].attempts, 3);
-  assert.equal(rows[1].player, 'o1'); assert.equal(rows[1].verified, true); assert.equal(rows[1].refusals, 2);
+  assert.equal(rows[0].player, 'o1'); assert.equal(rows[0].score, 2); assert.equal(rows[0].max_score, 8); assert.equal(rows[0].verified, true);
+  assert.equal(rows[1].player, 'neo'); assert.equal(rows[1].score, 1); assert.equal(rows[1].server_signed, true); assert.equal(rows[1].refusals, 1); assert.equal(rows[1].not_counted, 1);
+});
+
+test('LRU refreshes on read and evicts the oldest', () => {
+  const l = new Lru(2); l.set('a', 1).set('b', 2); l.get('a'); l.set('c', 3);
+  assert.deepEqual([...l.entries()].map(e => e[0]), ['a', 'c']); assert.equal(l.size, 2);
+});
+
+test('board persists to disk and loads back', () => {
+  fresh();
+  const file = join(mkdtempSync(join(tmpdir(), 'vb-')), 'board.json');
+  _attempts.set('h1', { hash: 'h1', charter: 'x', counted: true }); _notArena.set('h2', 1);
+  assert.ok(saveBoard(file)); fresh();
+  assert.equal(loadBoard(file), 1); assert.ok(_notArena.has('h2')); fresh();
+});
+
+test('runner status reports the 30 Tgas gas and daily cap', async () => {
+  const s = await runnerStatus();
+  if (s.enabled === false && !s.daily_tx_cap) return; // vault not on this network
+  assert.equal(s.gas_tgas, 30); assert.ok(s.daily_tx_cap >= 0); assert.ok(s.resets_at.endsWith('Z'));
 });
 
 test('account ids', () => {
