@@ -1,0 +1,637 @@
+{
+ "tokens": {
+  "wNEAR": {
+   "file": "tokens/near.svg",
+   "icon": "NEAR",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "ETH": {
+   "file": "tokens/eth.svg",
+   "icon": "ETH",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "USDC": {
+   "file": "tokens/usdc.svg",
+   "icon": "USDC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "FRAX": {
+   "file": "tokens/frax.svg",
+   "icon": "FRAX",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "AURORA": {
+   "file": "tokens/aurora.svg",
+   "icon": "AURORA",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "wBTC": {
+   "file": "tokens/wbtc.svg",
+   "icon": "WBTC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "ZEC": {
+   "file": "tokens/zec.svg",
+   "icon": "ZEC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "GNEAR": {
+   "file": "tokens/near.svg",
+   "icon": "NEAR",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "HAPI": {
+   "file": "tokens/hapi.svg",
+   "icon": "HAPI",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "NPRO": {
+   "file": "tokens/npro.svg",
+   "icon": "NPRO",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "USDT": {
+   "file": "tokens/usdt.svg",
+   "icon": "USDT",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "XAUT": {
+   "file": "tokens/xaut.svg",
+   "icon": "XAUT",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "SUI": {
+   "file": "tokens/sui.svg",
+   "icon": "SUI",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "BTC": {
+   "file": "tokens/btc.svg",
+   "icon": "BTC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "cbBTC": {
+   "file": "tokens/btc.svg",
+   "icon": "BTC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "SOL": {
+   "file": "tokens/sol.svg",
+   "icon": "SOL",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "FOGO": {
+   "file": "tokens/fogo.svg",
+   "icon": "FOGO",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "ARB": {
+   "file": "tokens/arb.svg",
+   "icon": "ARB",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "DOGE": {
+   "file": "tokens/doge.svg",
+   "icon": "DOGE",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "XRP": {
+   "file": "tokens/xrp.svg",
+   "icon": "XRP",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "KNC": {
+   "file": "tokens/knc.svg",
+   "icon": "KNC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "DAI": {
+   "file": "tokens/dai.svg",
+   "icon": "DAI",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "GNO": {
+   "file": "tokens/gno.svg",
+   "icon": "GNO",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "COW": {
+   "file": "tokens/cow.svg",
+   "icon": "COW",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "SAFE": {
+   "file": "tokens/safe.svg",
+   "icon": "SAFE",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "AAVE": {
+   "file": "tokens/aave.svg",
+   "icon": "AAVE",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "UNI": {
+   "file": "tokens/uni.svg",
+   "icon": "UNI",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "LINK": {
+   "file": "tokens/link.svg",
+   "icon": "LINK",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "STRK": {
+   "file": "tokens/strk.svg",
+   "icon": "STRK",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "BNB": {
+   "file": "tokens/bnb.svg",
+   "icon": "BNB",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "POL": {
+   "file": "tokens/pol.svg",
+   "icon": "POL",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "TRX": {
+   "file": "tokens/trx.svg",
+   "icon": "TRX",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "GRAM": {
+   "file": "tokens/gram.svg",
+   "icon": "GRAM",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "OP": {
+   "file": "tokens/op.svg",
+   "icon": "OP",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "AVAX": {
+   "file": "tokens/avax.svg",
+   "icon": "AVAX",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "XLM": {
+   "file": "tokens/xlm.svg",
+   "icon": "XLM",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "WBTC": {
+   "file": "tokens/wbtc.svg",
+   "icon": "WBTC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "ADA": {
+   "file": "tokens/ada.svg",
+   "icon": "ADA",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "APT": {
+   "file": "tokens/apt.svg",
+   "icon": "APT",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "LTC": {
+   "file": "tokens/ltc.svg",
+   "icon": "LTC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "SPX": {
+   "file": "tokens/spx.svg",
+   "icon": "SPX",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "BCH": {
+   "file": "tokens/bch.svg",
+   "icon": "BCH",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "ADI": {
+   "file": "tokens/adi.svg",
+   "icon": "ADI",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "SHIB": {
+   "file": "tokens/shib.svg",
+   "icon": "SHIB",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "PEPE": {
+   "file": "tokens/pepe.svg",
+   "icon": "PEPE",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "ALEO": {
+   "file": "tokens/aleo.svg",
+   "icon": "ALEO",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "DASH": {
+   "file": "tokens/dash.svg",
+   "icon": "DASH",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "xBTC": {
+   "file": "tokens/btc.svg",
+   "icon": "BTC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "WETH": {
+   "file": "tokens/eth.svg",
+   "icon": "ETH",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "USDT0": {
+   "file": "tokens/usdt.svg",
+   "icon": "USDT",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "xDAI": {
+   "file": "tokens/dai.svg",
+   "icon": "DAI",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "SWEAT": {
+   "file": "tokens/sweat.svg",
+   "icon": "SWEAT",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "NEAR": {
+   "file": "tokens/near.svg",
+   "icon": "NEAR",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "sUSDC": {
+   "file": "tokens/usdc.svg",
+   "icon": "USDC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "USDT0(DEPRECATED)": {
+   "file": "tokens/usdt.svg",
+   "icon": "USDT",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "USDCx": {
+   "file": "tokens/usdc.svg",
+   "icon": "USDC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "stNEAR": {
+   "file": "tokens/near.svg",
+   "icon": "NEAR",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "GMX": {
+   "file": "tokens/gmx.svg",
+   "icon": "GMX",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "steakUSDC": {
+   "file": "tokens/usdc.svg",
+   "icon": "USDC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "MOG": {
+   "file": "tokens/mog.svg",
+   "icon": "MOG",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "gtUSDCp": {
+   "file": "tokens/usdc.svg",
+   "icon": "USDC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "sparkUSDC": {
+   "file": "tokens/usdc.svg",
+   "icon": "USDC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "mwUSDC": {
+   "file": "tokens/usdc.svg",
+   "icon": "USDC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "laUSDC": {
+   "file": "tokens/usdc.svg",
+   "icon": "USDC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "EURe": {
+   "file": "tokens/eure.svg",
+   "icon": "EURE",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "nrUsdt": {
+   "file": "tokens/usdt.svg",
+   "icon": "USDT",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "hemiBTC": {
+   "file": "tokens/btc.svg",
+   "icon": "BTC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "MOVE": {
+   "file": "tokens/move.svg",
+   "icon": "MOVE",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "USDe": {
+   "file": "tokens/usde.svg",
+   "icon": "USDE",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": false
+  },
+  "wstETH": {
+   "file": "tokens/eth.svg",
+   "icon": "ETH",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "cNEAR": {
+   "file": "tokens/near.svg",
+   "icon": "NEAR",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "BTC(OMNI)": {
+   "file": "tokens/btc.svg",
+   "icon": "BTC",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliased": true
+  },
+  "BASE": {
+   "file": "chains/base.svg",
+   "icon": "base",
+   "source": "web3icons networks (MIT)"
+  }
+ },
+ "chains": {
+  "near": {
+   "file": "chains/near.svg",
+   "icon": "near-protocol"
+  },
+  "base": {
+   "file": "chains/base.svg",
+   "icon": "base"
+  },
+  "eth": {
+   "file": "chains/eth.svg",
+   "icon": "ethereum"
+  },
+  "abs": {
+   "file": "chains/abs.svg",
+   "icon": "abstract"
+  },
+  "sui": {
+   "file": "chains/sui.svg",
+   "icon": "sui"
+  },
+  "btc": {
+   "file": "chains/btc.svg",
+   "icon": "bitcoin"
+  },
+  "sol": {
+   "file": "chains/sol.svg",
+   "icon": "solana"
+  },
+  "arb": {
+   "file": "chains/arb.svg",
+   "icon": "arbitrum-one"
+  },
+  "doge": {
+   "file": "chains/doge.svg",
+   "icon": "dogechain"
+  },
+  "xrp": {
+   "file": "chains/xrp.svg",
+   "icon": "xrp"
+  },
+  "gnosis": {
+   "file": "chains/gnosis.svg",
+   "icon": "gnosis"
+  },
+  "starknet": {
+   "file": "chains/starknet.svg",
+   "icon": "starknet"
+  },
+  "bera": {
+   "file": "chains/bera.svg",
+   "icon": "berachain"
+  },
+  "bsc": {
+   "file": "chains/bsc.svg",
+   "icon": "binance-smart-chain"
+  },
+  "monad": {
+   "file": "chains/monad.svg",
+   "icon": "monad"
+  },
+  "xlayer": {
+   "file": "chains/xlayer.svg",
+   "icon": "x-layer"
+  },
+  "plasma": {
+   "file": "chains/plasma.svg",
+   "icon": "plasma"
+  },
+  "pol": {
+   "file": "chains/pol.svg",
+   "icon": "polygon"
+  },
+  "tron": {
+   "file": "chains/tron.svg",
+   "icon": "tron"
+  },
+  "ton": {
+   "file": "chains/ton.svg",
+   "icon": "ton"
+  },
+  "op": {
+   "file": "chains/op.svg",
+   "icon": "optimism"
+  },
+  "avax": {
+   "file": "chains/avax.svg",
+   "icon": "avalanche"
+  },
+  "stellar": {
+   "file": "chains/stellar.svg",
+   "icon": "stellar"
+  },
+  "cardano": {
+   "file": "chains/cardano.svg",
+   "icon": "cardano"
+  },
+  "aptos": {
+   "file": "chains/aptos.svg",
+   "icon": "aptos"
+  },
+  "ltc": {
+   "file": "chains/ltc.svg",
+   "icon": "litecoin"
+  },
+  "hood": {
+   "file": "chains/hood.svg",
+   "icon": "robinhood"
+  },
+  "scroll": {
+   "file": "chains/scroll.svg",
+   "icon": "scroll"
+  },
+  "movement": {
+   "file": "chains/movement.svg",
+   "icon": "movement"
+  },
+  "hypercore": {
+   "file": "chains/hypercore.svg",
+   "icon": "hyper-evm"
+  },
+  "zec": {
+   "file": "chains/zec.svg",
+   "icon": "ZEC (token mark)"
+  },
+  "bch": {
+   "file": "chains/bch.svg",
+   "icon": "BCH (token mark)"
+  },
+  "dash": {
+   "file": "chains/dash.svg",
+   "icon": "DASH (token mark)"
+  },
+  "aleo": {
+   "file": "chains/aleo.svg",
+   "icon": "ALEO (token mark)"
+  },
+  "fogo": {
+   "file": "chains/fogo.svg",
+   "icon": "FOGO (token mark)"
+  }
+ },
+ "missing": [
+  "BLACKDRAGON",
+  "SHITZU",
+  "ABG",
+  "NOEAR",
+  "mpDAO",
+  "JAMBO",
+  "NearKat",
+  "TESTNEBULA",
+  "RHEA",
+  "PUBLIC",
+  "ITLX",
+  "CFI",
+  "SSC1_PIT",
+  "QTC",
+  "TURBO",
+  "$WIF",
+  "BOME",
+  "TRUMP",
+  "BERA",
+  "ASTER",
+  "MON",
+  "OKB",
+  "XPL_(DEPRECATED)",
+  "XPL",
+  "KAITO",
+  "INX",
+  "PENGU",
+  "TITN",
+  "USD1",
+  "VVV",
+  "USDG",
+  "PONS",
+  "CASHCAT",
+  "PURGE",
+  "USAD",
+  "kV-gtSOLb",
+  "TLO",
+  "BRETT",
+  "FMS",
+  "MELANIA",
+  "LOUD",
+  "NEARKAT",
+  "wNEARKAT",
+  "GBPe",
+  "USDf",
+  "STJACK",
+  "EVAA",
+  "COCA",
+  "PRL",
+  "chain:qtc",
+  "chain:adi"
+ ],
+ "note": "Symbols in missing[] render as a generated monogram chip (no third-party art). Source list: GET https://1click.chaindefuser.com/v0/tokens fetched 2026-10-28."
+}
