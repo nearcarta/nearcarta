@@ -37,7 +37,7 @@ export async function charterFacts(id, { fresh = false } = {}) {
   if (!V) throw bad('vault not deployed', 503);
   if (!isAccount(id)) throw bad('bad account id');
   if (fresh) cache.delete('facts:' + id);
-  return cached('facts:' + id, 15_000, async () => {
+  const f = await cached('facts:' + id, 15_000, async () => {
     const reg = await view(V.factory, 'get_charter', { account_id: id });
     let acct = null;
     try { acct = await viewAccount(id); } catch { /* missing account */ }
@@ -49,11 +49,15 @@ export async function charterFacts(id, { fresh = false } = {}) {
       allowance: k.access_key.permission.FunctionCall.allowance }));
     const runsR14 = acct.global_contract_hash === V.code_hash;
     let state = null, clauses = null;
-    if (runsR14) { state = await view(id, 'get_state'); clauses = await view(id, 'get_clauses'); }
+    // Right after create_charter, RPC nodes can lag behind each other: the account is there before its state.
+    let pending = false;
+    if (runsR14) { try { state = await view(id, 'get_state'); clauses = await view(id, 'get_clauses'); } catch { pending = true; } }
     return { charter: id, exists: true, registered: !!reg, owner: reg?.owner ?? state?.owner ?? null, created_at: reg?.created_at ?? null,
       code_hash: acct.global_contract_hash || acct.code_hash, runs_r14: runsR14, full_access_keys: full, agent_keys: agentKeys,
-      balance: acct.amount, state, clauses, verified: !!reg && runsR14 && full === 0 };
+      balance: acct.amount, state, clauses, verified: !!reg && runsR14 && full === 0, ...(pending ? { pending: true } : {}) };
   });
+  if (!f.exists || f.pending) cache.delete('facts:' + id); // never cache a half-visible charter
+  return f;
 }
 
 export async function usage(id, clauseId) { return view(id, 'get_usage', { clause_id: clauseId }); }
@@ -180,7 +184,7 @@ export function register(app, { limiter, globalCap }) {
   app.get('/api/vault/charter/:id', limiter(30), async c => {
     const f = await charterFacts(c.req.param('id'), { fresh: c.req.query('fresh') === '1' });
     let use = null;
-    if (f.runs_r14 && f.clauses) use = Object.fromEntries(await Promise.all(Object.keys(f.clauses).map(async k => [k, await usage(f.charter, k)])));
+    if (f.runs_r14 && f.clauses) use = Object.fromEntries(await Promise.all(Object.keys(f.clauses).map(async k => [k, await usage(f.charter, k).catch(() => null)])));
     return c.json({ ...f, usage: use });
   });
   app.post('/api/vault/attack', limiter(6), globalCap('vault-attack', 30), async c => {
