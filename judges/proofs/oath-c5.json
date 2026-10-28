@@ -1,0 +1,424 @@
+{
+ "charter": "c5oath.r14own-46135.testnet",
+ "owner": "r14own-46135.testnet",
+ "wasm": "contracts/artifacts/oath.c5.wasm",
+ "steps": [
+  {
+   "step": "deploy_batch",
+   "signer": "r14own-46135.testnet",
+   "wasm_sha256": "a6d611463f9d1c10403ee3985b7ed258e7dfc62742e53c148a1d8a79570c5271",
+   "wasm_bytes": 401313,
+   "init": {
+    "owner": "r14own-46135.testnet",
+    "dao": null,
+    "policy_delay_ns": "90000000000",
+    "storage_reserve": null,
+    "setup_window": true
+   },
+   "tx": "9EkutddrdNWxTMvKrs8Pm1V3HbJSxKSQYeCkdH7XcKGg",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"policy_version\":1,\"policy_hash\":\"b6aee9cc1c1f9250bc9810d8581d6765091800a9f08fe971638bd18fc4a273ba\",\"change\":\"init\",\"by\":\"r14own-46135.testnet\"}]}"
+   ]
+  },
+  {
+   "step": "charter_keys_after_deploy",
+   "count": 0,
+   "keys": []
+  },
+  {
+   "step": "rule_set_clause",
+   "signer": "r14own-46135.testnet",
+   "method": "set_clause",
+   "args": {
+    "clause_id": "tip",
+    "clause": {
+     "asset": "Native",
+     "receivers": [
+      "r14rcv-46135.testnet"
+     ],
+     "per_action_cap": "20000000000000000000000",
+     "daily_budget": "50000000000000000000000",
+     "window_start_min": 0,
+     "window_end_min": 0,
+     "requires_receipt": false,
+     "escalation_max": null,
+     "min_amount": "1000000000000000000000",
+     "max_actions_per_day": 5,
+     "min_receiver_age_days": 0,
+     "code_hash_pins": {}
+    }
+   },
+   "expect": "applied (setup window)",
+   "tx": "4EmQAt32feYqx1hknr8fq5cqQK4fWsmjkaqATbSSSHRP",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"policy_version\":2,\"policy_hash\":\"b69022d459f1e2e3843dd19aef2a51bf02498628a07de305545edb8cb2625c61\",\"change\":\"set_clause:tip\",\"by\":\"r14own-46135.testnet\"}]}"
+   ],
+   "ret": "{\"applied\":true,\"policy_version\":2}"
+  },
+  {
+   "step": "commitment_offchain",
+   "note": "only the hash goes on chain until the reveal",
+   "commitment": "f9c04766cc9a121fff6872e7b2846b5f3d225080c01674e15d15b2b00031f49d"
+  },
+  {
+   "step": "seal_rule",
+   "signer": "r14own-46135.testnet",
+   "method": "seal_rule",
+   "args": {
+    "clause_id": "tip",
+    "commitment": "f9c04766cc9a121fff6872e7b2846b5f3d225080c01674e15d15b2b00031f49d"
+   },
+   "expect": "applied (first seal)",
+   "tx": "HhHozx11Dk1HduthDVsMdgqtH2AtNgvKbb4b9e6zmjx4",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"change\":\"seal\",\"clause_id\":\"tip\",\"commitment\":\"f9c04766cc9a121fff6872e7b2846b5f3d225080c01674e15d15b2b00031f49d\"}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"policy_version\":3,\"policy_hash\":\"b69022d459f1e2e3843dd19aef2a51bf02498628a07de305545edb8cb2625c61\",\"change\":\"set_seal:tip\",\"by\":\"r14own-46135.testnet\"}]}"
+   ],
+   "ret": "{\"applied\":true,\"policy_version\":3}"
+  },
+  {
+   "step": "get_seal",
+   "view": "get_seal",
+   "args": {
+    "clause_id": "tip"
+   },
+   "value": "f9c04766cc9a121fff6872e7b2846b5f3d225080c01674e15d15b2b00031f49d"
+  },
+  {
+   "step": "agent_key_k1",
+   "signer": "r14own-46135.testnet",
+   "method": "set_agent_key",
+   "args": {
+    "public_key": "ed25519:8yG3vx9NUUXr2Mqfafwhty1oXmaAh2iuWojvUXy2W4Kp",
+    "allowance": "250000000000000000000000"
+   },
+   "expect": "applied; closes setup",
+   "tx": "3ov7ox1F18BNqMUXXisTsKmAJTYowuArG7sSpQkoSeUM",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"change\":\"setup_closed\",\"by\":\"r14own-46135.testnet\"}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"agent_key\",\"data\":[{\"op\":\"set\",\"public_key\":\"ed25519:8yG3vx9NUUXr2Mqfafwhty1oXmaAh2iuWojvUXy2W4Kp\",\"allowance\":\"250000000000000000000000\"}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"agent_key\",\"data\":[{\"op\":\"added\",\"public_key\":\"ed25519:8yG3vx9NUUXr2Mqfafwhty1oXmaAh2iuWojvUXy2W4Kp\"}]}"
+   ],
+   "ret": "true"
+  },
+  {
+   "step": "charter_keys_with_k1",
+   "count": 1,
+   "keys": [
+    {
+     "public_key": "ed25519:8yG3vx9NUUXr2Mqfafwhty1oXmaAh2iuWojvUXy2W4Kp",
+     "permission": {
+      "methods": [
+       "propose",
+       "propose_batch"
+      ],
+      "receiver": "c5oath.r14own-46135.testnet"
+     }
+    }
+   ]
+  },
+  {
+   "step": "rules_tip",
+   "view": "get_rules",
+   "args": {
+    "clause_id": "tip"
+   },
+   "value": {
+    "clause_id": "tip",
+    "clause": {
+     "asset": "Native",
+     "receivers": [
+      "r14rcv-46135.testnet"
+     ],
+     "per_action_cap": "20000000000000000000000",
+     "daily_budget": "50000000000000000000000",
+     "window_start_min": 0,
+     "window_end_min": 0,
+     "requires_receipt": false,
+     "escalation_max": null,
+     "min_amount": "1000000000000000000000",
+     "max_actions_per_day": 5,
+     "min_receiver_age_days": 0,
+     "code_hash_pins": {}
+    },
+    "expires_at": null,
+    "usage": {
+     "day": 20754,
+     "spent": "0",
+     "reserved": "0",
+     "count": 0
+    },
+    "policy_version": 3,
+    "hidden_rule_sealed": true
+   }
+  },
+  {
+   "step": "p_held_over_hidden_cap",
+   "signer": "c5oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "c5-proof",
+     "clause_id": "tip",
+     "receiver": "r14rcv-46135.testnet",
+     "amount": "15000000000000000000000",
+     "nonce": "0",
+     "policy_version": 3,
+     "expires_at": "1793228720836000000",
+     "memo": "p_held_over_hidden_cap",
+     "receipt": null
+    }
+   },
+   "expect": "held hidden_rule_check",
+   "tx": "ExJ2iX7W4vDghrx6ktMBePnggYJ783yKGBTZWDiXjDUg",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"action\",\"data\":[{\"action_id\":\"0\",\"agent\":\"c5oath.r14own-46135.testnet\",\"shop\":\"c5-proof\",\"clause_id\":\"tip\",\"policy_version\":3,\"policy_hash\":\"b69022d459f1e2e3843dd19aef2a51bf02498628a07de305545edb8cb2625c61\",\"freeze_epoch\":0,\"action_hash\":\"2a092d02382d03d3dad22191cdd7d08fa74806284af5ddb6e34b5d958e8ef365\",\"receiver\":\"r14rcv-46135.testnet\",\"amount\":\"15000000000000000000000\",\"nonce\":\"0\",\"memo_hash\":\"ea145b70246e18902019654d052e3588daed767ce0a60b92d8cdf78567842aaa\",\"decision\":\"held\",\"status\":\"held\",\"reason\":\"hidden_rule_check\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":\"0\",\"decision\":\"held\",\"status\":\"held\",\"reason\":\"hidden_rule_check\"}"
+  },
+  {
+   "step": "p_held_under_hidden_cap",
+   "signer": "c5oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "c5-proof",
+     "clause_id": "tip",
+     "receiver": "r14rcv-46135.testnet",
+     "amount": "5000000000000000000000",
+     "nonce": "1",
+     "policy_version": 3,
+     "expires_at": "1793228724535000000",
+     "memo": "p_held_under_hidden_cap",
+     "receipt": null
+    }
+   },
+   "expect": "held hidden_rule_check",
+   "tx": "58tDGTN8uoY9YE7JPU2vAMPX3PkuLJE41YKRr7iX7FvG",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"action\",\"data\":[{\"action_id\":\"1\",\"agent\":\"c5oath.r14own-46135.testnet\",\"shop\":\"c5-proof\",\"clause_id\":\"tip\",\"policy_version\":3,\"policy_hash\":\"b69022d459f1e2e3843dd19aef2a51bf02498628a07de305545edb8cb2625c61\",\"freeze_epoch\":0,\"action_hash\":\"74c3c74d1c783c7cf6788d2e87ca719687ab5d500846011ad6d513d441150fd4\",\"receiver\":\"r14rcv-46135.testnet\",\"amount\":\"5000000000000000000000\",\"nonce\":\"1\",\"memo_hash\":\"b2aa94b5da2cd711d902815ac86b26118730ac38607ae120c23c8a4b7a5e9026\",\"decision\":\"held\",\"status\":\"held\",\"reason\":\"hidden_rule_check\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":\"1\",\"decision\":\"held\",\"status\":\"held\",\"reason\":\"hidden_rule_check\"}"
+  },
+  {
+   "step": "hold_eta_1",
+   "view": "get_hold",
+   "args": {
+    "action_id": "0"
+   },
+   "value": "1793229921972399053"
+  },
+  {
+   "step": "reveal_wrong_salt",
+   "signer": "r14own-46135.testnet",
+   "method": "reveal_hidden",
+   "args": {
+    "action_id": "1",
+    "rule": {
+     "max_amount": "10000000000000000000000",
+     "deny": []
+    },
+    "salt": "wrong-salt-0123456789"
+   },
+   "expect": "ERR_SEAL_MISMATCH (nothing changes)",
+   "tx": "7va6ajwq6ziyiKGCUpShaXg72YgJDodpScAD39tgrvQS",
+   "ok": false,
+   "error": "Smart contract panicked: ERR_SEAL_MISMATCH",
+   "logs": []
+  },
+  {
+   "step": "reveal_refuses",
+   "signer": "r14own-46135.testnet",
+   "method": "reveal_hidden",
+   "args": {
+    "action_id": "0",
+    "rule": {
+     "max_amount": "10000000000000000000000",
+     "deny": []
+    },
+    "salt": "9db94bd4bf43c712acd58d588944ad04"
+   },
+   "expect": "denied hidden_rule_cap; reserve released",
+   "tx": "Cy1pFPc6vDbs5CA4tbQcknsLtQoqpSSMUkMJs11pEfVQ",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"reveal\",\"data\":[{\"action_id\":\"0\",\"clause_id\":\"tip\",\"commitment\":\"f9c04766cc9a121fff6872e7b2846b5f3d225080c01674e15d15b2b00031f49d\",\"rule\":{\"max_amount\":\"10000000000000000000000\",\"deny\":[]},\"salt\":\"9db94bd4bf43c712acd58d588944ad04\"}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"settle\",\"data\":[{\"action_id\":\"0\",\"agent\":\"c5oath.r14own-46135.testnet\",\"shop\":\"c5-proof\",\"clause_id\":\"tip\",\"policy_version\":3,\"action_policy_version\":3,\"freeze_epoch\":0,\"status\":\"denied\",\"reason\":\"hidden_rule_cap\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":\"0\",\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"hidden_rule_cap\"}"
+  },
+  {
+   "step": "reveal_allows",
+   "signer": "r14own-46135.testnet",
+   "method": "reveal_hidden",
+   "args": {
+    "action_id": "1",
+    "rule": {
+     "max_amount": "10000000000000000000000",
+     "deny": []
+    },
+    "salt": "9db94bd4bf43c712acd58d588944ad04"
+   },
+   "expect": "approved hidden_rule_passed; 0.005 NEAR paid",
+   "tx": "GjYQczzVUGXqMeyoxrT9vkWmAsJQWxRiA4Ksh5kwiGkP",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"reveal\",\"data\":[{\"action_id\":\"1\",\"clause_id\":\"tip\",\"commitment\":\"f9c04766cc9a121fff6872e7b2846b5f3d225080c01674e15d15b2b00031f49d\",\"rule\":{\"max_amount\":\"10000000000000000000000\",\"deny\":[]},\"salt\":\"9db94bd4bf43c712acd58d588944ad04\"}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"settle\",\"data\":[{\"action_id\":\"1\",\"agent\":\"c5oath.r14own-46135.testnet\",\"shop\":\"c5-proof\",\"clause_id\":\"tip\",\"policy_version\":3,\"action_policy_version\":3,\"freeze_epoch\":0,\"status\":\"approved\",\"reason\":\"hidden_rule_passed\",\"receipt_hash\":null}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"settle\",\"data\":[{\"action_id\":\"1\",\"agent\":\"c5oath.r14own-46135.testnet\",\"shop\":\"c5-proof\",\"clause_id\":\"tip\",\"policy_version\":3,\"action_policy_version\":3,\"freeze_epoch\":0,\"status\":\"confirmed\",\"reason\":\"ok\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":\"1\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}"
+  },
+  {
+   "step": "receiver_balance_delta",
+   "receiver": "r14rcv-46135.testnet",
+   "before": "8034303691788941599999998",
+   "after": "8039303691788941599999998",
+   "delta": "5000000000000000000000"
+  },
+  {
+   "step": "action_1",
+   "view": "get_action",
+   "args": {
+    "action_id": "0"
+   },
+   "value": {
+    "shop": "c5-proof",
+    "clause_id": "tip",
+    "receiver": "r14rcv-46135.testnet",
+    "amount": "15000000000000000000000",
+    "day": 20754,
+    "status": "denied",
+    "receipt_hash": null,
+    "yield_id": null,
+    "policy_version": 3,
+    "freeze_epoch": 0,
+    "asset": "Native",
+    "memo": "p_held_over_hidden_cap"
+   }
+  },
+  {
+   "step": "action_2",
+   "view": "get_action",
+   "args": {
+    "action_id": "1"
+   },
+   "value": {
+    "shop": "c5-proof",
+    "clause_id": "tip",
+    "receiver": "r14rcv-46135.testnet",
+    "amount": "5000000000000000000000",
+    "day": 20754,
+    "status": "confirmed",
+    "receipt_hash": null,
+    "yield_id": null,
+    "policy_version": 3,
+    "freeze_epoch": 0,
+    "asset": "Native",
+    "memo": "p_held_under_hidden_cap"
+   }
+  },
+  {
+   "step": "reputation_final",
+   "view": "get_reputation",
+   "value": {
+    "score": null,
+    "min_proposals_for_score": 5,
+    "counts": {
+     "proposals": 2,
+     "allowed": 0,
+     "escalated": 1,
+     "refused": 1,
+     "refusals": {
+      "other": 1
+     }
+    },
+    "refusal_buckets": [
+     "receiver_not_allowlisted",
+     "over_per_action_cap",
+     "over_daily_budget",
+     "over_daily_action_count",
+     "below_min_amount",
+     "outside_time_window",
+     "clause_expired",
+     "frozen",
+     "stale_policy_version",
+     "expired",
+     "unknown_clause",
+     "receipt",
+     "other"
+    ],
+    "rotating_key": false
+   }
+  },
+  {
+   "step": "state_final",
+   "view": "get_state",
+   "value": {
+    "owner": "r14own-46135.testnet",
+    "dao": null,
+    "agent_key": "ed25519:8yG3vx9NUUXr2Mqfafwhty1oXmaAh2iuWojvUXy2W4Kp",
+    "frozen": false,
+    "freeze_epoch": 0,
+    "policy_version": 3,
+    "policy_hash": "b69022d459f1e2e3843dd19aef2a51bf02498628a07de305545edb8cb2625c61",
+    "next_nonce": "2",
+    "next_action": "2",
+    "prune_cursor": "0",
+    "policy_delay_ns": "90000000000",
+    "storage_reserve": "100000000000000000000000",
+    "pending_changes": 0,
+    "setup_open": false,
+    "storage_usage": "402633"
+   }
+  },
+  {
+   "step": "charter_keys_end",
+   "count": 1,
+   "keys": [
+    {
+     "public_key": "ed25519:8yG3vx9NUUXr2Mqfafwhty1oXmaAh2iuWojvUXy2W4Kp",
+     "permission": {
+      "methods": [
+       "propose",
+       "propose_batch"
+      ],
+      "receiver": "c5oath.r14own-46135.testnet"
+     }
+    }
+   ]
+  }
+ ],
+ "build": {
+  "source_rev": "370980711a0c3cc2af4956d4d7c638aa5dcc0146",
+  "command": "cd contracts/oath && cargo near build reproducible-wasm",
+  "image": "sourcescan/cargo-near:0.22.0-rust-1.99.1@sha256:c9655eaf7436b90c87ea8b25739f91063032c5c30ba24cfeafe72c142943b5bb",
+  "wasm_sha256": "a6d611463f9d1c10403ee3985b7ed258e7dfc62742e53c148a1d8a79570c5271",
+  "wasm_bs58": "CEG11eK9iE23uEJXowQ5kBbsk27TX1mhbhoaGmaP5pjr",
+  "live_code_hash": "CEG11eK9iE23uEJXowQ5kBbsk27TX1mhbhoaGmaP5pjr",
+  "live_block": 275215308,
+  "embedded_rev": "370980711a0c3cc2af4956d4d7c638aa5dcc0146"
+ },
+ "commitment_check": {
+  "text": "oath-hidden-v1|c5oath.r14own-46135.testnet|tip|10000000000000000000000||9db94bd4bf43c712acd58d588944ad04",
+  "sha256": "f9c04766cc9a121fff6872e7b2846b5f3d225080c01674e15d15b2b00031f49d",
+  "equals_on_chain_seal": true
+ },
+ "summary": {
+  "refusal_tx": "Cy1pFPc6vDbs5CA4tbQcknsLtQoqpSSMUkMJs11pEfVQ",
+  "allow_tx": "GjYQczzVUGXqMeyoxrT9vkWmAsJQWxRiA4Ksh5kwiGkP",
+  "wrong_salt_tx": "7va6ajwq6ziyiKGCUpShaXg72YgJDodpScAD39tgrvQS",
+  "receiver_delta_yocto": "5000000000000000000000",
+  "notes": [
+   "Both proposals passed the visible clause (cap 0.02 NEAR) and were held; the sealed rule (cap 0.01 NEAR) refused 0.015 and paid 0.005.",
+   "The rule and salt become public at the first reveal (reveal event); to hide it again the owner seals a new commitment with a new salt, and a replacement seal is a widening change behind policy_delay_ns.",
+   "A held action that is paid stays counted as escalated in get_reputation (allowed 0, escalated 1, refused 1), the same as an escalation that the owner approves."
+  ]
+ }
+}
