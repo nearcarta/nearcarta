@@ -118,7 +118,7 @@ function paint() {
   wallet(); ruleChip(); label(app.label);
   if (phase === 'busy') return;
   if (st === 'load') { say('Lighting the lamp…'); form(''); hero(null); btn('Connect wallet', 'primary', true); return; }
-  if (st === 'connect') { say('Connect a testnet wallet and I\u2019ll work for you.'); form(''); hero(null); btn('Connect wallet'); return; }
+  if (st === 'connect') { say('Connect to begin.'); form(''); hero(null); btn('Connect wallet'); return; }
   if (st === 'build') { say('First I need a charter you own.'); form(''); hero(null); btn('Build my charter'); return; }
   if (st === 'rules') { say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return; }
   if (phase === 'idle') say(app.idle);
