@@ -27,7 +27,9 @@ export const oathMemo = c => `mb1:${Buffer.from(c, 'hex').toString('base64url')}
 export async function fetchStreet(txid) {
   if (!/^[0-9a-f]{64}$/.test(txid)) throw Object.assign(new Error('bad txid'), { status: 400 });
   const r = await fetch(`${ZEC_TESTNET_API}/api/tx/${txid}`, { headers: UA });
-  if (!r.ok) throw new Error(`zcash explorer http ${r.status}`);
+  // A just-broadcast tx is not on the explorer until it is mined (about 75 s on testnet): say so instead of 'internal'.
+  if (r.status === 404) throw Object.assign(new Error('tx not found on the Zcash testnet explorer (not mined yet, or unknown)'), { status: 404 });
+  if (!r.ok) throw Object.assign(new Error(`zcash explorer http ${r.status}`), { status: 502 });
   return r.json();
 }
 
