@@ -11,3 +11,7 @@ form button{grid-column:span 4;background:var(--amber);border:0;padding:9px;bord
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
 .pass{color:var(--ok)}.fail{color:var(--bad)}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;font-size:13px;vertical-align:top}
 code{font-size:12px;word-break:break-all;color:var(--mute)}
+.hero{max-width:62ch;margin:6px 0 10px;font-size:15px;line-height:1.45}
+.warn{color:#e0a84a}
+form button.ghost{background:transparent;color:var(--amber);border:1px solid var(--amber)}
+#wallet{display:inline-flex;gap:6px;align-items:center;vertical-align:middle}#wallet .pill{background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:3px 10px;border-radius:999px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none}#wallet .pill.go{background:var(--amber);color:#2b1a0c;border-color:var(--amber);font-weight:600}
