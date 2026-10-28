@@ -9,7 +9,8 @@ import { view, txStatus, eventsFromOutcome, txResult, explorerTx, accessKeys } f
 const G = DEP.guardhouse;
 export const oathId = G.oath;
 
-export async function snapshot() {
+export async function snapshot(oath = oathId) {
+  const oathId = oath;
   const [state, clauses, keys] = await Promise.all([view(oathId, 'get_state'), view(oathId, 'get_clauses'), accessKeys(oathId)]);
   const usage = {};
   for (const id of Object.keys(clauses || {})) usage[id] = await view(oathId, 'get_usage', { clause_id: id }).catch(() => null);
@@ -19,10 +20,10 @@ export async function snapshot() {
   return { oath: oathId, state, clauses, usage, keys: { fullAccess, functionCall: fc } };
 }
 
-export const action = id => view(oathId, 'get_action', { action_id: id });
+export const action = (id, oath = oathId) => view(oath, 'get_action', { action_id: id });
 
-export async function proposal({ clause_id, receiver, amount, memo = null, shop = 'guardhouse', ttlSec = 3600 }) {
-  const s = await view(oathId, 'get_state');
+export async function proposal({ clause_id, receiver, amount, memo = null, shop = 'guardhouse', ttlSec = 3600 }, oath = oathId) {
+  const s = await view(oath, 'get_state');
   return { shop, clause_id, receiver, amount: String(amount), nonce: s.next_nonce, policy_version: s.policy_version,
     expires_at: String(BigInt(Date.now()) * 1000000n + BigInt(ttlSec) * 1000000000n), memo, receipt: null };
 }
@@ -34,13 +35,13 @@ export function agentFromFile(path) {
   return new Account(k.account_id, provider, KeyPairSigner.fromSecretKey(k.private_key));
 }
 
-export async function propose(account, p, { gasTgas = 150 } = {}) {
+export async function propose(account, p, { gasTgas = 150, oath = oathId } = {}) {
   const out = await account.signAndSendTransaction({
-    receiverId: oathId,
+    receiverId: oath,
     actions: [(await import('near-api-js')).actions.functionCall('propose', { p }, BigInt(gasTgas) * 10n ** 12n, 0n)],
     waitUntil: 'FINAL',
   });
-  return explain(out.transaction.hash);
+  return explain(out.transaction.hash, oath);
 }
 
 // Read any oath tx back from chain: verdict, events (phantoms dropped) and link.
