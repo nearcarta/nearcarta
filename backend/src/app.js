@@ -50,10 +50,14 @@ export function makeApp() {
   });
   app.post('/api/ferry/quote', limiter(10), oneClick, async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    for (const k of ['from', 'to', 'amount', 'recipient', 'refundTo']) if (!str(b[k], 300)) return bad(c, `missing or bad ${k}`);
+    // from/to: {symbol, chain}, {assetId} or a string such as 'USDC@base' (see ferry.tokenRef).
+    const from = ferry.tokenRef(b.from), to = ferry.tokenRef(b.to);
+    if (!from) return bad(c, 'missing or bad from: use {symbol, chain} or "SYMBOL@chain"');
+    if (!to) return bad(c, 'missing or bad to: use {symbol, chain} or "SYMBOL@chain"');
+    for (const k of ['amount', 'recipient', 'refundTo']) if (!str(b[k], 300)) return bad(c, `missing or bad ${k}`);
     if (b.privacy !== undefined && !['public', 'basic', 'advanced'].includes(b.privacy)) return bad(c, 'privacy must be public|basic|advanced');
     if (b.slippageBps !== undefined && !(Number.isInteger(Number(b.slippageBps)) && Number(b.slippageBps) >= 0 && Number(b.slippageBps) <= 1000)) return bad(c, 'slippageBps must be 0..1000');
-    return c.json(await ferry.quote({ from: b.from, to: b.to, amount: b.amount, recipient: b.recipient, refundTo: b.refundTo,
+    return c.json(await ferry.quote({ from, to, amount: b.amount, recipient: b.recipient, refundTo: b.refundTo,
       privacy: b.privacy || 'public', slippageBps: Number(b.slippageBps || 100) }));
   });
   app.get('/api/ferry/zcash/:addr', limiter(30), c => {

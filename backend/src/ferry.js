@@ -23,9 +23,26 @@ export async function tokens() {
   return list;
 }
 
-export function findToken(list, { symbol, chain, assetId }) {
-  if (assetId) return list.find(t => t.assetId === assetId);
-  return list.find(t => t.symbol.toUpperCase() === symbol.toUpperCase() && t.blockchain === chain);
+// A token reference from a client: {symbol, chain}, {assetId}, 'USDC@base', 'USDC:base' or a raw
+// 1Click asset id ('nep141:…', 'nep245:…'). Returns {symbol, chain} or {assetId}, or null if malformed.
+const SYM = /^[A-Za-z0-9.$_-]{1,20}$/, CHAIN = /^[a-z0-9_-]{1,20}$/, ASSET = /^nep(141|245):[\w.:@-]{1,200}$/;
+export function tokenRef(v) {
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (ASSET.test(s)) return { assetId: s };
+    const m = s.match(/^([^@:]+)[@:]([^@:]+)$/);
+    return m ? tokenRef({ symbol: m[1], chain: m[2].toLowerCase() }) : null;
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  if (v.assetId !== undefined) return typeof v.assetId === 'string' && ASSET.test(v.assetId) ? { assetId: v.assetId } : null;
+  const chain = typeof v.chain === 'string' ? v.chain.toLowerCase() : v.chain;
+  return typeof v.symbol === 'string' && SYM.test(v.symbol) && typeof chain === 'string' && CHAIN.test(chain) ? { symbol: v.symbol, chain } : null;
+}
+
+export function findToken(list, ref) {
+  const r = tokenRef(ref); if (!r) return undefined;
+  if (r.assetId) return list.find(t => t.assetId === r.assetId);
+  return list.find(t => String(t.symbol).toUpperCase() === r.symbol.toUpperCase() && t.blockchain === r.chain);
 }
 
 export function toUnits(amount, decimals) {
@@ -93,7 +110,7 @@ export async function quote(input) {
   if (!from || !to) throw Object.assign(new Error('unknown token'), { status: 400 });
   let zec = null;
   if (to.blockchain === 'zec') {
-    zec = zcashRecipient(input.recipient);
+    try { zec = zcashRecipient(input.recipient); } catch { throw Object.assign(new Error('recipient is not a valid Zcash address'), { status: 400 }); }
     const g = orchardOnly(zec.receivers);
     zec.orchard_only = g.ok;
     if (!g.ok) return { ok: false, refused: 'recipient_not_orchard_only', error: `Refused before quoting: ${g.why}. The Ferry pays ZEC only to an Orchard-only unified address.`, zcash: zec };
