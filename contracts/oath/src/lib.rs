@@ -21,6 +21,13 @@
 //!   once even with a delay set, so a new charter is usable in one approval. There
 //!   is no agent key yet, so nothing can be spent while it is open. DAO, delay and
 //!   upgrade changes are never exempt. Adding the agent key (or `close_setup`) ends it.
+//! - C5 hidden rules (opt-in, commit-reveal): the owner may seal a secret extra rule on a clause
+//!   (a lower cap and/or blocked receivers), stored only as sha256 of its canonical text + a salt.
+//!   The agent and anyone reading `get_rules` see that a seal exists, not what it says. A proposal
+//!   that passes the visible rules under a sealed clause is held (budget reserved, nothing paid);
+//!   the owner/DAO then reveals the rule for that action: if it passes the money moves, if not the
+//!   action is refused and the reserve released. No reveal within SEAL_HOLD_NS: anyone may expire
+//!   the hold (refused). A revealed rule is public from then on; re-seal with a new salt.
 use near_sdk::json_types::{Base64VecU8, U128, U64};
 use near_sdk::serde_json::{self, json};
 use near_sdk::store::{LookupMap, LookupSet};
@@ -59,6 +66,19 @@ fn clause_expiry(clause_id: &str) -> Option<u64> {
     env::storage_read(&k_expiry(clause_id)).and_then(|v| v.try_into().ok()).map(u64::from_le_bytes)
 }
 fn rotating() -> bool { env::storage_has_key(K_ROTATING) }
+/// C5: sealed hidden rule commitment per clause, and the hold deadline per held action.
+fn k_seal(clause_id: &str) -> Vec<u8> { [b"c5:seal:".as_slice(), clause_id.as_bytes()].concat() }
+fn k_hold(action_id: u64) -> Vec<u8> { [b"c5:hold:".as_slice(), &action_id.to_le_bytes()].concat() }
+fn seal_of(clause_id: &str) -> Option<String> {
+    env::storage_read(&k_seal(clause_id)).map(|v| String::from_utf8(v).unwrap_or_default())
+}
+fn hold_eta(action_id: u64) -> Option<u64> {
+    env::storage_read(&k_hold(action_id)).and_then(|v| v.try_into().ok()).map(u64::from_le_bytes)
+}
+/// How long a held action waits for the reveal before anyone may expire it (refused).
+pub const SEAL_HOLD_NS: u64 = 30 * NS_PER_MIN;
+/// Shortest salt accepted at reveal: a short salt would let anyone guess the rule from its hash.
+pub const MIN_SALT: usize = 16;
 
 /// Refusal buckets counted per charter. Fixed-size on purpose: a denied `propose` only rewrites
 /// these bytes and never grows storage (the anti-grief invariant in tests/exploits.rs).
@@ -149,6 +169,17 @@ pub struct Clause {
     pub code_hash_pins: BTreeMap<AccountId, String>,
 }
 
+/// C5: the secret part of a clause, revealed per held action. Only its commitment is stored.
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct HiddenRule {
+    /// Hidden per-action cap (lower than the visible one to be useful).
+    pub max_amount: Option<U128>,
+    /// Hidden blocked receivers.
+    #[serde(default)]
+    pub deny: Vec<AccountId>,
+}
+
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Debug, Default)]
 pub struct Usage {
@@ -220,6 +251,8 @@ pub enum Change {
     Upgrade { code_hash: String },
     /// R16: a later expiry or none (a widening change) waits for the policy delay.
     SetClauseExpiry { clause_id: String, expires_at: Option<U64> },
+    /// C5: replacing or removing a seal can loosen the rules, so it waits for the policy delay.
+    SetSeal { clause_id: String, commitment: Option<String> },
 }
 
 #[near(serializers = [borsh, json])]
@@ -373,6 +406,14 @@ impl Oath {
                 }
                 self.bump_policy(&format!("set_clause_expiry:{clause_id}"));
             }
+            Change::SetSeal { clause_id, commitment } => {
+                match &commitment {
+                    Some(c) => { env::storage_write(&k_seal(&clause_id), c.as_bytes()); }
+                    None => { env::storage_remove(&k_seal(&clause_id)); }
+                }
+                emit("policy", json!({"change": "seal", "clause_id": clause_id, "commitment": commitment}));
+                self.bump_policy(&format!("set_seal:{clause_id}"));
+            }
             Change::Upgrade { code_hash } => {
                 // Executing marks the hash as ready; `upgrade` consumes it.
                 let id = self.next_change;
@@ -445,9 +486,27 @@ impl Oath {
         if narrowing { self.apply(ch) } else { self.queue_or_apply(ch) }
     }
 
+    /// C5: seal a hidden rule on a clause. `commitment` = hex sha256 of `hidden_rule_text(..)`.
+    /// A first seal only adds a check (tightening, instant); replacing one waits for the delay.
+    pub fn seal_rule(&mut self, clause_id: String, commitment: String) -> PromiseOrValue<serde_json::Value> {
+        self.assert_gov();
+        require!(self.clauses.contains_key(&clause_id), "ERR_NO_CLAUSE");
+        require!(commitment.len() == 64 && commitment.bytes().all(|b| b.is_ascii_hexdigit()), "ERR_COMMITMENT");
+        let ch = Change::SetSeal { clause_id: clause_id.clone(), commitment: Some(commitment.to_ascii_lowercase()) };
+        if seal_of(&clause_id).is_none() { self.apply(ch) } else { self.queue_or_apply(ch) }
+    }
+
+    /// C5: drop the hidden rule (widening: waits for the policy delay).
+    pub fn unseal_rule(&mut self, clause_id: String) -> PromiseOrValue<serde_json::Value> {
+        self.assert_gov();
+        require!(seal_of(&clause_id).is_some(), "ERR_NOT_SEALED");
+        self.queue_or_apply(Change::SetSeal { clause_id, commitment: None })
+    }
+
     pub fn remove_clause(&mut self, clause_id: String) {
         self.assert_gov();
         env::storage_remove(&k_expiry(&clause_id));
+        env::storage_remove(&k_seal(&clause_id));
         self.clauses.remove(&clause_id);
         self.bump_policy(&format!("remove_clause:{clause_id}"));
     }
@@ -648,6 +707,15 @@ impl Oath {
                     memo: p.memo.clone(),
                 };
                 self.auto_prune(2);
+                // C5: a sealed clause holds the action until the owner reveals the hidden rule.
+                // The reveal is a governor-signed decision, so it also covers the escalation band.
+                if seal_of(&p.clause_id).is_some() {
+                    rec.status = "held".into();
+                    self.actions.insert(id, rec);
+                    env::storage_write(&k_hold(id), &(env::block_timestamp() + SEAL_HOLD_NS).to_le_bytes());
+                    self.chronicle(Some(id), &p, "held", "held", "hidden_rule_check", receipt_hash, &ah);
+                    return PromiseOrValue::Value(reason(Some(U64(id)), "held", "held", "hidden_rule_check"));
+                }
                 if !cfg!(feature = "lean") && escalate {
                     let args = json!({"action_id": U64(id)}).to_string();
                     env::promise_yield_create(
@@ -740,6 +808,7 @@ impl Oath {
             if let Some(c) = self.clauses.get(&cid) {
                 if c.requires_receipt { return Err((Some(i), "batch_receipt_clause".into())); }
             }
+            if seal_of(&cid).is_some() { return Err((Some(i), "batch_sealed_clause".into())); }
             let (c, _, escalate) = self.check(p, &hashes[i]).map_err(|r| (Some(i), r))?;
             if escalate { return Err((Some(i), "over_per_action_cap".into())); }
             clause = Some(c);
@@ -858,6 +927,74 @@ impl Oath {
         Ok(())
     }
 
+    /// C5: the owner/DAO reveals the sealed rule for one held action. A wrong rule or salt panics
+    /// (nothing changes). A matching rule decides: pass -> the payment runs; fail -> refused, reserve released.
+    pub fn reveal_hidden(&mut self, action_id: U64, rule: HiddenRule, salt: String) -> PromiseOrValue<Outcome> {
+        self.assert_gov();
+        let id = action_id.0;
+        let mut rec = self.actions.get(&id).cloned().expect("ERR_NO_ACTION");
+        require!(rec.status == "held", "ERR_NOT_HELD");
+        require!(salt.len() >= MIN_SALT, "ERR_SALT_SHORT");
+        let sealed = seal_of(&rec.clause_id);
+        let verdict = match &sealed {
+            None => Err("seal_removed".to_string()),
+            Some(c) => {
+                require!(*c == hidden_commitment(&rec.clause_id, &rule, &salt), "ERR_SEAL_MISMATCH");
+                self.recheck_held(&rec).and_then(|_| hidden_checks(&rule, &rec.receiver, rec.amount.0))
+            }
+        };
+        if verdict.is_ok() {
+            let need = match rec.asset { Asset::Native => MIN_GAS_NATIVE, Asset::Ft { .. } => MIN_GAS_FT };
+            require!(env::prepaid_gas() >= need, "ERR_LOW_GAS");
+        }
+        env::storage_remove(&k_hold(id));
+        if let Some(c) = &sealed {
+            emit("reveal", json!({"action_id": action_id, "clause_id": rec.clause_id, "commitment": c, "rule": &rule, "salt": salt}));
+        }
+        match verdict {
+            Err(r) => PromiseOrValue::Value(self.refuse_held(id, &mut rec, &r)),
+            Ok(()) => {
+                rec.status = "submitted".into();
+                self.actions.insert(id, rec.clone());
+                self.settle_event(id, &rec, "approved", "hidden_rule_passed");
+                PromiseOrValue::Promise(execute(&rec.asset, &rec.receiver, rec.amount.0, rec.memo.clone(), id))
+            }
+        }
+    }
+
+    /// C5: fail closed. After SEAL_HOLD_NS without a reveal anyone may refuse the held action.
+    pub fn expire_hold(&mut self, action_id: U64) -> Outcome {
+        let id = action_id.0;
+        let mut rec = self.actions.get(&id).cloned().expect("ERR_NO_ACTION");
+        require!(rec.status == "held", "ERR_NOT_HELD");
+        let eta = hold_eta(id).expect("ERR_NO_HOLD");
+        require!(env::block_timestamp() >= eta, "ERR_HOLD_NOT_EXPIRED");
+        env::storage_remove(&k_hold(id));
+        self.refuse_held(id, &mut rec, "hidden_rule_not_revealed")
+    }
+
+    /// C5: what could have changed while the action was held (same idea as F4).
+    fn recheck_held(&self, rec: &ActionRec) -> Result<(), String> {
+        if self.frozen { return Err("frozen".into()); }
+        if self.freeze_epoch != rec.freeze_epoch { return Err("freeze_epoch_changed".into()); }
+        if self.policy_version != rec.policy_version { return Err("policy_changed".into()); }
+        Ok(())
+    }
+
+    /// C5: a held action that ends refused: release the reserve and count it as a refusal.
+    fn refuse_held(&mut self, id: u64, rec: &mut ActionRec, why: &str) -> Outcome {
+        self.release(rec);
+        rec.status = "denied".into();
+        self.actions.insert(id, rec.clone());
+        let mut r = reputation_read();
+        r.escalated = r.escalated.saturating_sub(1);
+        r.refused += 1;
+        r.refusals[refusal_bucket(why)] += 1;
+        env::storage_write(K_REPUTATION, &near_sdk::borsh::to_vec(&r).expect("ERR_REP"));
+        self.settle_event(id, rec, "denied", why);
+        reason(Some(U64(id)), "denied", "denied", why)
+    }
+
     #[private]
     pub fn on_ft_storage(&mut self, action_id: U64) -> PromiseOrValue<Outcome> {
         let id = action_id.0;
@@ -941,7 +1078,7 @@ impl Oath {
         r.proposals += 1;
         match decision {
             "allowed" => r.allowed += 1,
-            "escalated" => r.escalated += 1,
+            "escalated" | "held" => r.escalated += 1,
             _ => { r.refused += 1; r.refusals[refusal_bucket(why)] += 1; }
         }
         env::storage_write(K_REPUTATION, &near_sdk::borsh::to_vec(&r).expect("ERR_REP"));
@@ -1001,8 +1138,13 @@ impl Oath {
     pub fn get_rules(&self, clause_id: String) -> Option<serde_json::Value> {
         let c = self.clauses.get(&clause_id)?;
         Some(json!({"clause_id": clause_id, "clause": c, "expires_at": clause_expiry(&clause_id).map(U64),
-            "usage": self.usage_today(&clause_id), "policy_version": self.policy_version}))
+            "usage": self.usage_today(&clause_id), "policy_version": self.policy_version,
+            "hidden_rule_sealed": seal_of(&clause_id).is_some()}))
     }
+    /// C5: the commitment of the sealed hidden rule on a clause (the rule itself is never stored).
+    pub fn get_seal(&self, clause_id: String) -> Option<String> { seal_of(&clause_id) }
+    /// C5: when a held action may be expired by anyone.
+    pub fn get_hold(&self, action_id: U64) -> Option<U64> { hold_eta(action_id.0).map(U64) }
     /// Agent reputation from this charter's own on-chain decisions.
     pub fn get_reputation(&self) -> serde_json::Value {
         let r = reputation_read();
@@ -1025,6 +1167,22 @@ pub fn clause_checks(c: &Clause, receiver: &AccountId, amount: u128) -> Result<b
         return match c.escalation_max { Some(m) if amount <= m.0 => Ok(true), _ => Err("over_per_action_cap".into()) };
     }
     Ok(false)
+}
+
+/// C5: canonical text of a hidden rule, bound to this charter and clause. Commitment = sha256(text).
+pub fn hidden_rule_text(clause_id: &str, r: &HiddenRule, salt: &str) -> String {
+    let max = r.max_amount.map(|m| m.0.to_string()).unwrap_or_else(|| "none".into());
+    let deny: Vec<&str> = r.deny.iter().map(|a| a.as_str()).collect();
+    format!("oath-hidden-v1|{}|{}|{}|{}|{}", env::current_account_id(), clause_id, max, deny.join(","), salt)
+}
+pub fn hidden_commitment(clause_id: &str, r: &HiddenRule, salt: &str) -> String {
+    hex::encode(env::sha256_array(hidden_rule_text(clause_id, r, salt).as_bytes()))
+}
+/// C5: the hidden checks themselves.
+pub fn hidden_checks(r: &HiddenRule, receiver: &AccountId, amount: u128) -> Result<(), String> {
+    if r.deny.contains(receiver) { return Err("hidden_rule_receiver".into()); }
+    if let Some(m) = r.max_amount { if amount > m.0 { return Err("hidden_rule_cap".into()); } }
+    Ok(())
 }
 
 /// Anything that lets the agent do more than before counts as widening.

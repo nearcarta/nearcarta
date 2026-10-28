@@ -1444,3 +1444,390 @@ fn batch_with_wrong_key_panics() {
     testing_env!(b.build());
     o.propose_batch(ps);
 }
+
+// ---------------- C5: optional hidden rules (commit-reveal) ----------------
+const SALT: &str = "salt-0123456789ab";
+fn hrule(max: Option<u128>, deny: &[&str]) -> HiddenRule {
+    HiddenRule { max_amount: max.map(U128), deny: deny.iter().map(|a| acc(a)).collect() }
+}
+/// "tip" sealed with: hidden cap 0.5 NEAR, bakery.test blocked.
+fn the_rule() -> HiddenRule { hrule(Some(NEAR / 2), &["bakery.test"]) }
+fn sealed(delay: u64) -> Oath {
+    let mut o = setup(delay);
+    set("owner.test", T0);
+    let _ = o.seal_rule("tip".into(), hidden_commitment("tip", &the_rule(), SALT));
+    o
+}
+fn held(o: &mut Oath, to: &str, amount: u128) -> u64 {
+    let p = prop(o, "tip", to, amount);
+    set("oath.test", T0);
+    let r = outcome(o.propose(p)).expect("held is a value");
+    assert_eq!((r.decision.as_str(), r.status.as_str(), r.reason.as_str()), ("held", "held", "hidden_rule_check"));
+    r.action_id.unwrap().0
+}
+fn reveal(o: &mut Oath, id: u64, r: HiddenRule, salt: &str) -> Option<Outcome> {
+    set("owner.test", T0);
+    outcome(o.reveal_hidden(U64(id), r, salt.into()))
+}
+
+#[test]
+fn c5_commitment_text_is_canonical_and_bound() {
+    set("owner.test", T0);
+    let r = hrule(Some(500), &["eve.test", "mal.test"]);
+    assert_eq!(hidden_rule_text("tip", &r, SALT), format!("oath-hidden-v1|oath.test|tip|500|eve.test,mal.test|{SALT}"));
+    assert_eq!(hidden_rule_text("tip", &hrule(None, &[]), SALT), format!("oath-hidden-v1|oath.test|tip|none||{SALT}"));
+    use sha2::Digest;
+    let want = hex::encode(sha2::Sha256::digest(hidden_rule_text("tip", &r, SALT).as_bytes()));
+    assert_eq!(hidden_commitment("tip", &r, SALT), want);
+    assert_ne!(hidden_commitment("tip", &r, SALT), hidden_commitment("tap", &r, SALT));
+    assert_ne!(hidden_commitment("tip", &r, SALT), hidden_commitment("tip", &r, "salt-0123456789ac"));
+}
+
+#[test]
+fn c5_hidden_checks_cap_and_deny() {
+    let r = hrule(Some(10), &["bakery.test"]);
+    assert_eq!(hidden_checks(&r, &acc("bob.test"), 10), Ok(()));
+    assert_eq!(hidden_checks(&r, &acc("bob.test"), 11), Err("hidden_rule_cap".into()));
+    assert_eq!(hidden_checks(&r, &acc("bakery.test"), 1), Err("hidden_rule_receiver".into()));
+    assert_eq!(hidden_checks(&r, &acc("bakery.test"), 11), Err("hidden_rule_receiver".into()));
+    assert_eq!(hidden_checks(&hrule(None, &[]), &acc("bob.test"), u128::MAX), Ok(()));
+}
+
+#[test]
+#[should_panic(expected = "ERR_NOT_GOVERNOR")]
+fn c5_seal_by_outsider_panics() {
+    let mut o = setup(0);
+    set("eve.test", T0);
+    let _ = o.seal_rule("tip".into(), "ab".repeat(32));
+}
+#[test]
+#[should_panic(expected = "ERR_NO_CLAUSE")]
+fn c5_seal_unknown_clause_panics() {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.seal_rule("nope".into(), "ab".repeat(32));
+}
+#[test]
+#[should_panic(expected = "ERR_COMMITMENT")]
+fn c5_seal_short_commitment_panics() {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.seal_rule("tip".into(), "ab".repeat(31));
+}
+#[test]
+#[should_panic(expected = "ERR_COMMITMENT")]
+fn c5_seal_non_hex_commitment_panics() {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.seal_rule("tip".into(), "zz".repeat(32));
+}
+#[test]
+#[should_panic(expected = "ERR_NOT_SEALED")]
+fn c5_unseal_without_seal_panics() {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.unseal_rule("tip".into());
+}
+#[test]
+#[should_panic(expected = "ERR_NOT_GOVERNOR")]
+fn c5_unseal_by_outsider_panics() {
+    let mut o = sealed(0);
+    set("eve.test", T0);
+    let _ = o.unseal_rule("tip".into());
+}
+
+#[test]
+fn c5_first_seal_is_instant_replace_and_unseal_wait() {
+    let mut o = setup(3600 * 1_000_000_000);
+    let v0 = o.policy_version;
+    set("owner.test", T0);
+    let r = o.seal_rule("tip".into(), "AB".repeat(32));
+    assert!(matches!(r, PromiseOrValue::Value(ref v) if v["applied"] == json!(true)));
+    assert_eq!(o.get_seal("tip".into()), Some("ab".repeat(32)), "stored lower-case");
+    assert_eq!(o.policy_version, v0 + 1);
+    assert_eq!(o.get_rules("tip".into()).unwrap()["hidden_rule_sealed"], json!(true));
+    assert!(get_logs().iter().any(|l| l.contains("\"change\":\"seal\"")));
+    set("owner.test", T0);
+    let _ = o.seal_rule("tip".into(), "cd".repeat(32));
+    assert_eq!(o.get_seal("tip".into()), Some("ab".repeat(32)), "replacing waits");
+    assert_eq!(o.pending.len(), 1);
+    set("owner.test", T0);
+    let _ = o.unseal_rule("tip".into());
+    assert_eq!(o.pending.len(), 2);
+    assert_eq!(o.policy_version, v0 + 1);
+    let ids: Vec<u64> = o.pending.keys().cloned().collect();
+    set("owner.test", T0 + 3600 * 1_000_000_000);
+    let _ = o.execute_change(U64(ids[0]));
+    assert_eq!(o.get_seal("tip".into()), Some("cd".repeat(32)));
+    set("owner.test", T0 + 3600 * 1_000_000_000);
+    let _ = o.execute_change(U64(ids[1]));
+    assert_eq!(o.get_seal("tip".into()), None);
+    assert_eq!(o.get_rules("tip".into()).unwrap()["hidden_rule_sealed"], json!(false));
+    assert_eq!(o.policy_version, v0 + 3);
+}
+
+#[test]
+fn c5_remove_clause_drops_the_seal() {
+    let mut o = sealed(0);
+    set("owner.test", T0);
+    o.remove_clause("tip".into());
+    assert_eq!(o.get_seal("tip".into()), None);
+}
+
+#[test]
+fn c5_sealed_propose_is_held_with_budget_reserved() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", NEAR / 4);
+    let rec = o.get_action(U64(id)).unwrap();
+    assert_eq!(rec.status, "held");
+    assert_eq!(o.usage_today(&"tip".to_string()).reserved.0, NEAR / 4);
+    assert_eq!(o.get_hold(U64(id)), Some(U64(T0 + SEAL_HOLD_NS)));
+    assert_eq!(SEAL_HOLD_NS, 30 * 60 * 1_000_000_000);
+    let r = o.get_reputation();
+    assert_eq!((r["counts"]["escalated"].clone(), r["counts"]["refused"].clone()), (json!(1), json!(0)));
+    assert!(get_logs().iter().any(|l| l.contains("\"decision\":\"held\"") && l.contains("hidden_rule_check")));
+    // Visible refusals still come first: no hold for a receiver outside the allowlist.
+    let p = prop(&o, "tip", "eve.test", 5);
+    assert_eq!(deny_reason(&mut o, p), "receiver_not_allowlisted");
+    // An unsealed clause is not held.
+    set("owner.test", T0);
+    let _ = o.set_clause("open".into(), clause(&["bob.test"], NEAR, 5 * NEAR, false, None));
+    let p = prop(&o, "open", "bob.test", 5);
+    assert_eq!(deny_reason(&mut o, p), "PROMISE");
+}
+
+#[test]
+fn c5_reveal_pass_pays_and_settles() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", NEAR / 2);
+    assert!(reveal(&mut o, id, the_rule(), SALT).is_none(), "payment promise");
+    assert_eq!(o.get_action(U64(id)).unwrap().status, "submitted");
+    assert_eq!(o.get_hold(U64(id)), None);
+    let logs = get_logs();
+    assert!(logs.iter().any(|l| l.contains("\"event\":\"reveal\"") && l.contains(SALT)));
+    assert!(logs.iter().any(|l| l.contains("hidden_rule_passed")));
+    assert_eq!(settle(&mut o, id, true).status, "confirmed");
+    let u = o.usage_today(&"tip".to_string());
+    assert_eq!((u.spent.0, u.reserved.0), (NEAR / 2, 0));
+}
+
+#[test]
+fn c5_reveal_over_hidden_cap_refuses_and_releases() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", NEAR / 2 + 1);
+    let r = reveal(&mut o, id, the_rule(), SALT).expect("refusal is a value");
+    assert_eq!((r.decision.as_str(), r.status.as_str(), r.reason.as_str()), ("denied", "denied", "hidden_rule_cap"));
+    assert_eq!(r.action_id, Some(U64(id)));
+    assert_eq!(o.get_action(U64(id)).unwrap().status, "denied");
+    assert_eq!(o.usage_today(&"tip".to_string()).reserved.0, 0);
+    assert_eq!(o.get_hold(U64(id)), None);
+    let rep = o.get_reputation();
+    assert_eq!(rep["counts"]["escalated"], json!(0));
+    assert_eq!(rep["counts"]["refused"], json!(1));
+    assert_eq!(rep["counts"]["refusals"]["other"], json!(1));
+    assert!(get_logs().iter().any(|l| l.contains("\"event\":\"settle\"") && l.contains("hidden_rule_cap")));
+}
+
+#[test]
+fn c5_reveal_denied_receiver_refuses() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bakery.test", 5);
+    assert_eq!(reveal(&mut o, id, the_rule(), SALT).unwrap().reason, "hidden_rule_receiver");
+}
+
+#[test]
+#[should_panic(expected = "ERR_NOT_HELD")]
+fn c5_reveal_twice_panics() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", NEAR);
+    let _ = reveal(&mut o, id, the_rule(), SALT);
+    let _ = reveal(&mut o, id, the_rule(), SALT);
+}
+#[test]
+#[should_panic(expected = "ERR_SEAL_MISMATCH")]
+fn c5_reveal_wrong_salt_panics() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", NEAR);
+    let _ = reveal(&mut o, id, the_rule(), "salt-0123456789ac");
+}
+#[test]
+#[should_panic(expected = "ERR_SEAL_MISMATCH")]
+fn c5_reveal_other_rule_panics() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", NEAR);
+    let _ = reveal(&mut o, id, hrule(None, &[]), SALT);
+}
+#[test]
+#[should_panic(expected = "ERR_SALT_SHORT")]
+fn c5_reveal_short_salt_panics() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", NEAR);
+    let _ = reveal(&mut o, id, the_rule(), "short-salt-1234");
+}
+#[test]
+#[should_panic(expected = "ERR_NOT_GOVERNOR")]
+fn c5_reveal_by_agent_panics() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", NEAR);
+    set("oath.test", T0);
+    let _ = o.reveal_hidden(U64(id), the_rule(), SALT.into());
+}
+#[test]
+#[should_panic(expected = "ERR_NOT_HELD")]
+fn c5_reveal_on_plain_action_panics() {
+    let mut o = setup(0);
+    let p = prop(&o, "tip", "bob.test", 5); deny_reason(&mut o, p);
+    let _ = reveal(&mut o, 0, the_rule(), SALT);
+}
+
+#[test]
+fn c5_salt_of_exactly_min_length_is_accepted() {
+    let salt = "a".repeat(MIN_SALT);
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.seal_rule("tip".into(), hidden_commitment("tip", &the_rule(), &salt));
+    let id = held(&mut o, "bob.test", 5);
+    assert!(reveal(&mut o, id, the_rule(), &salt).is_none());
+    assert_eq!(MIN_SALT, 16);
+}
+
+#[test]
+fn c5_reveal_rechecks_freeze_and_policy() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", 5);
+    set("owner.test", T0); o.freeze();
+    assert_eq!(reveal(&mut o, id, the_rule(), SALT).unwrap().reason, "frozen");
+
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", 5);
+    set("owner.test", T0); o.freeze();
+    set("dao.test", T0); o.unfreeze();
+    assert_eq!(reveal(&mut o, id, the_rule(), SALT).unwrap().reason, "freeze_epoch_changed");
+
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", 5);
+    set("owner.test", T0);
+    let _ = o.set_clause("tip".into(), clause(&["bob.test", "bakery.test"], NEAR / 2, 5 * NEAR, false, Some(3 * NEAR)));
+    assert_eq!(reveal(&mut o, id, the_rule(), SALT).unwrap().reason, "policy_changed");
+    assert_eq!(o.usage_today(&"tip".to_string()).reserved.0, 0);
+}
+
+#[test]
+fn c5_unsealed_before_reveal_refuses() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", 5);
+    set("owner.test", T0);
+    let _ = o.unseal_rule("tip".into());
+    // No commitment to check against: refused even with a garbage rule.
+    assert_eq!(reveal(&mut o, id, hrule(None, &[]), SALT).unwrap().reason, "seal_removed");
+    assert!(!get_logs().iter().any(|l| l.contains("\"event\":\"reveal\"")));
+}
+
+#[test]
+fn c5_expire_hold_fails_closed_at_the_deadline() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", 5);
+    set("anyone.test", T0 + SEAL_HOLD_NS);
+    let r = o.expire_hold(U64(id));
+    assert_eq!((r.decision.as_str(), r.reason.as_str()), ("denied", "hidden_rule_not_revealed"));
+    assert_eq!(o.get_action(U64(id)).unwrap().status, "denied");
+    assert_eq!(o.usage_today(&"tip".to_string()).reserved.0, 0);
+    assert_eq!(o.get_hold(U64(id)), None);
+}
+#[test]
+#[should_panic(expected = "ERR_HOLD_NOT_EXPIRED")]
+fn c5_expire_hold_too_early_panics() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", 5);
+    set("anyone.test", T0 + SEAL_HOLD_NS - 1);
+    let _ = o.expire_hold(U64(id));
+}
+#[test]
+#[should_panic(expected = "ERR_NOT_HELD")]
+fn c5_expire_plain_action_panics() {
+    let mut o = setup(0);
+    let p = prop(&o, "tip", "bob.test", 5); deny_reason(&mut o, p);
+    set("anyone.test", T0 + SEAL_HOLD_NS);
+    let _ = o.expire_hold(U64(0));
+}
+#[test]
+#[should_panic(expected = "ERR_NOT_HELD")]
+fn c5_expire_after_reveal_panics() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", 5);
+    let _ = reveal(&mut o, id, the_rule(), SALT);
+    set("anyone.test", T0 + SEAL_HOLD_NS);
+    let _ = o.expire_hold(U64(id));
+}
+
+fn reveal_gas(o: &mut Oath, id: u64, g: Gas) -> Option<Outcome> {
+    testing_env!(ctx("owner.test", T0).prepaid_gas(g).build());
+    outcome(o.reveal_hidden(U64(id), the_rule(), SALT.into()))
+}
+#[test]
+fn c5_reveal_gas_floor_is_inclusive_and_skipped_for_refusals() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", NEAR);
+    assert_eq!(reveal_gas(&mut o, id, Gas::from_tgas(20)).unwrap().reason, "hidden_rule_cap");
+    // Exactly the floor passes the check (the mock VM then runs out while building the promise).
+    let id = held(&mut o, "bob.test", 5);
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = reveal_gas(&mut o, id, MIN_GAS_NATIVE); }));
+    let msg = r.err().and_then(|e| e.downcast_ref::<String>().cloned()).unwrap_or_default();
+    assert!(!msg.contains("ERR_LOW_GAS"), "{msg}");
+}
+#[test]
+#[should_panic(expected = "ERR_LOW_GAS")]
+fn c5_reveal_pass_with_low_gas_panics() {
+    let mut o = sealed(0);
+    let id = held(&mut o, "bob.test", 5);
+    let _ = reveal_gas(&mut o, id, Gas::from_gas(MIN_GAS_NATIVE.as_gas() - 1));
+}
+#[test]
+#[should_panic(expected = "ERR_LOW_GAS")]
+fn c5_reveal_ft_needs_the_ft_floor() {
+    let mut o = setup(0);
+    let mut c = clause(&["bob.test"], NEAR, 5 * NEAR, false, None);
+    c.asset = Asset::Ft { token: acc("usdc.test") };
+    set("owner.test", T0);
+    let _ = o.set_clause("tip".into(), c);
+    set("owner.test", T0);
+    let _ = o.seal_rule("tip".into(), hidden_commitment("tip", &the_rule(), SALT));
+    let id = held(&mut o, "bob.test", 5);
+    let _ = reveal_gas(&mut o, id, MIN_GAS_NATIVE);
+}
+
+#[test]
+fn c5_escalation_band_is_held_not_yielded() {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.seal_rule("tip".into(), hidden_commitment("tip", &hrule(None, &[]), SALT));
+    let id = held(&mut o, "bob.test", 2 * NEAR);
+    assert!(o.get_action(U64(id)).unwrap().yield_id.is_none());
+    // The governor-signed reveal is the approval for the over-cap amount.
+    assert!(reveal(&mut o, id, hrule(None, &[]), SALT).is_none());
+    assert_eq!(o.get_action(U64(id)).unwrap().status, "submitted");
+}
+
+#[test]
+fn c5_batch_refuses_a_sealed_clause() {
+    let mut o = round();
+    set("owner.test", T0);
+    let _ = o.seal_rule("round".into(), hidden_commitment("round", &the_rule(), SALT));
+    let ps = props(&o, &[("bob.test", 5), ("carol.test", 5)]);
+    set("oath.test", T0);
+    let out = o.propose_batch(ps);
+    assert_eq!(out[0].reason, "batch_sealed_clause");
+    assert_eq!(out[1].reason, "batch_refused");
+    assert_eq!(o.next_action, 0);
+}
+#[test]
+fn c5_holds_are_per_action() {
+    let mut o = sealed(0);
+    let a = held(&mut o, "bob.test", 5);
+    let b = held(&mut o, "bob.test", 6);
+    let _ = reveal(&mut o, a, the_rule(), SALT);
+    assert_eq!(o.get_hold(U64(a)), None);
+    assert_eq!(o.get_hold(U64(b)), Some(U64(T0 + SEAL_HOLD_NS)));
+    set("anyone.test", T0 + SEAL_HOLD_NS);
+    assert_eq!(o.expire_hold(U64(b)).reason, "hidden_rule_not_revealed");
+}
