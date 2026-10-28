@@ -22,9 +22,13 @@ const zats = Number(process.env.MIST_ZATS || 1370000);
 const z = (...a) => execFileSync(ZCASH_DEVTOOL, a, { cwd: MIST_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 900e3 });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Resume mode (after a crash past the send): RESUME_OATH=<near tx> RESUME_TXID=<zcash txid>.
+// Resume mode (after a crash past the send): RESUME_OATH=<near tx> RESUME_TXID=<zcash txid> RESUME_ACCOUNT=<payee account name>.
 // The salt is then recovered from the encrypted memo by the view-only wallet below.
 let salt, c, o, txid, payeeUa, decision;
+// One payee account per payout, so its viewing key discloses this payout and nothing else
+// (ZIP 32 account keys are hardened: one account's UFVK says nothing about another's).
+let payeeName = process.env.RESUME_ACCOUNT || 'mist-payee';
+const accountBlock = name => z('wallet', '-w', join(MIST_DIR, 'payee'), 'list-accounts').split(/\n(?=Account )/).find(b => new RegExp(`Name: ${name}\\s`).test(b + '\n'));
 const agent = agentFromFile(AGENT_KEY_FILE);
 if (process.env.RESUME_TXID) {
   txid = process.env.RESUME_TXID;
@@ -40,7 +44,10 @@ if (process.env.RESUME_TXID) {
   console.log('oath', o.hash, decision);
   if (decision !== 'allowed') { console.error('oath did not allow the payout; stopping before any Zcash send'); process.exit(1); }
   // 3. shielded payout to an address with an Orchard-protocol receiver only (lands in the bank's pool)
-  payeeUa = z('wallet', '-w', join(MIST_DIR, 'payee'), 'generate-address', '-p', 'orchard').match(/utest1[0-9a-z]+/)[0];
+  payeeName = `mb-${salt.slice(0, 8)}`;
+  z('wallet', '-w', join(MIST_DIR, 'payee'), 'generate-account', '-i', join(MIST_DIR, 'age-identity.txt'), '--name', payeeName);
+  const uuid = accountBlock(payeeName).match(/Account ([0-9a-f-]{36})/)[1];
+  payeeUa = z('wallet', '-w', join(MIST_DIR, 'payee'), 'generate-address', uuid, '-p', 'orchard').match(/utest1[0-9a-z]+/)[0];
   const memo = `nearcarta mistbank v1 oath=${o.hash} salt=${salt}`;
   z('wallet', '-w', join(MIST_DIR, 'bank'), 'sync');
   const sent = z('wallet', '-w', join(MIST_DIR, 'bank'), 'send', '-i', join(MIST_DIR, 'age-identity.txt'), '--address', payeeUa, '--value', String(zats), '--memo', memo);
@@ -56,8 +63,7 @@ if (!street?.blockHeight) { console.error('tx not mined yet; rerun the ledger st
 const check = streetCheck(street);
 
 // 5. ledger: view-only wallet from the payee's UFVK (testnet viewing key, safe to publish)
-const accounts = z('wallet', '-w', join(MIST_DIR, 'payee'), 'list-accounts');
-const ufvk = accounts.match(/uviewtest1[0-9a-z]+/)[0];
+const ufvk = accountBlock(payeeName).match(/uviewtest1[0-9a-z]+/)[0];
 const view = mkdtempSync(join(tmpdir(), 'mist-view-'));
 z('wallet', '-w', view, 'init-fvk', '--name', 'judge-view', '--fvk', ufvk, '--birthday', String(Number(street.blockHeight) - 5));
 z('wallet', '-w', view, 'sync');
