@@ -1,0 +1,55 @@
+{
+ "at": "2026-10-28T03:22:32.273Z",
+ "wallet": "MyNearWallet (testnet) via @near-wallet-selector 10.1.4",
+ "house": "r11house-31474.testnet",
+ "owner": "r11hown-31474.testnet",
+ "steps": [
+  {
+   "step": "sign-in",
+   "wallet_buttons": [
+    "Next",
+    "Connect"
+   ]
+  },
+  {
+   "step": "freeze",
+   "tx": "56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae",
+   "url": "https://testnet.nearblocks.io/txns/56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae",
+   "wallet_buttons": [
+    "Approve"
+   ]
+  },
+  {
+   "step": "unfreeze",
+   "tx": "HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ",
+   "url": "https://testnet.nearblocks.io/txns/HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ",
+   "wallet_buttons": [
+    "Approve"
+   ]
+  },
+  {
+   "step": "agent-over-cap",
+   "action_id": "1"
+  },
+  {
+   "step": "approve",
+   "tx": "EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy",
+   "url": "https://testnet.nearblocks.io/txns/EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy",
+   "wallet_buttons": [
+    "Approve"
+   ]
+  },
+  {
+   "step": "held-spend-paid",
+   "action_id": "1",
+   "propose_tx": "3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
+   "url": "https://testnet.nearblocks.io/txns/3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
+   "final_status": "confirmed",
+   "events": [
+    "action",
+    "settle",
+    "settle"
+   ]
+  }
+ ]
+}
