@@ -58,13 +58,24 @@
   <section id="tray" aria-live="polite">
     <div class="t-head"><h1 id="t-title"></h1><span id="t-src" class="src"></span></div>
     <p id="t-label" class="label"></p>
+    <p id="t-say" class="say" hidden></p>
     <div id="t-hero" class="hero"></div>
+    <div id="t-form" class="form" hidden></div>
     <a id="t-cta" class="act primary cta" hidden></a>
-    <div class="t-row"><button id="t-act" type="button" class="act primary"></button><button id="t-proof" type="button" class="link" aria-controls="drawer" aria-expanded="false">Show proof</button></div>
+    <div class="t-row"><button id="t-act" type="button" class="act primary"></button></div>
+    <p id="t-rcpt" class="rcpt"></p>
+    <div class="t-links"><button id="t-rules" type="button" class="link" hidden>Your rules</button><button id="t-proof" type="button" class="link" aria-controls="drawer" aria-expanded="false">How it works</button></div>
   </section>
   <aside id="drawer" aria-hidden="true" aria-labelledby="d-title">
     <div class="d-head"><h2 id="d-title">Proof</h2><button id="d-close" type="button" class="icon" aria-label="Close proof">&#x2715;</button></div>
     <div id="d-body"></div>
+  </aside>
+  <aside id="rules" aria-hidden="true" aria-labelledby="r-title">
+    <div class="d-head"><h2 id="r-title">Your rules</h2><button id="r-close" type="button" class="icon" aria-label="Close rules">&#x2715;</button></div>
+    <p class="r-lede">I can only act inside these. Your charter checks every ask.</p>
+    <div id="r-body"></div>
+    <button id="r-sign" type="button" class="act primary">Sign my rules</button>
+    <p id="r-status" class="rcpt"></p>
   </aside>
 </div>
 <div id="loading" role="status" aria-live="polite"><img src="shots/fallback_1920x1080.jpg" alt=""><div class="lc"><b>Nearcarta</b><span id="ltxt">Opening the town</span><i class="lt"><i id="lbar"></i></i><small>independent · not affiliated with NEAR Foundation</small></div></div>

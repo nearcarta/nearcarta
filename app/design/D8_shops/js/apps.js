@@ -146,14 +146,19 @@ export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receive
 
 const BUCKETS = [0.01, 0.05, 0.1];
 export const bucketOf = a => BUCKETS.find(b => a <= b) ?? Math.ceil(a * 10) / 10;
-export async function mist(amount) {
+// Mist Bank pays one of YOUR allowed payees (the pay clause's receivers), never an account the rules do not name.
+// Default: yourself if you listed yourself, else the first payee you added.
+export const bankPayees = () => (pay()?.receivers || []);
+export const bankDefault = () => { const r = bankPayees(); return r.includes(S.me) ? S.me : r[0] || null; };
+export async function mist(amount, to = bankDefault()) {
+  if (!to) throw new Error('add a payee to your rules first');
   const yocto = toY(amount), salt = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
   const commitment = W.sha256hex(`mistbank:v1:${yocto}:${salt}`);
   const tee = await teeCheck(commitment).catch(e => ({ ok: false, why: e.message }));
   if (!tee.ok) throw new Error('TEE check failed, nothing sent');
-  const o = await ask({ shop: 'mistbank', receiver: S.me, amountY: toY(bucketOf(amount)), memo: commitment });
+  const o = await ask({ shop: 'mistbank', receiver: to, amountY: toY(bucketOf(amount)), memo: commitment });
   localStorage.setItem(LS_OPEN(S.charter), JSON.stringify({ yocto, salt, commitment, action: o.action, tx: o.tx }));
-  return { ...o, commitment, bucket: bucketOf(amount), tee };
+  return { ...o, commitment, bucket: bucketOf(amount), tee, to };
 }
 export async function mistVerify() {
   const op = JSON.parse(localStorage.getItem(LS_OPEN(S.charter)) || 'null'); if (!op) throw new Error('no private send in this browser yet');

@@ -278,3 +278,57 @@ body.in-shop #rulesBtn,body.entering #rulesBtn{opacity:0;pointer-events:none}
   #rulesBtn{white-space:nowrap}
   #hint{white-space:nowrap;max-width:none;font-size:11.5px}
 }
+
+/* ---- shop apps inside the town (D8 js/shopui.js): robot line, form, one full-width button, one-line receipt, rules sheet ---- */
+#shopUI .say{display:flex;gap:10px;align-items:flex-start;margin:0 0 var(--s2);font-size:15px;line-height:22px}
+#shopUI .say .lamp{flex:none;width:10px;height:10px;margin-top:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+#shopUI .say.bump{animation:shbump .32s var(--ease)}
+body[data-app=err] #shopUI .say .lamp{background:var(--no);box-shadow:0 0 12px var(--no)}
+body.apps #shopUI .hero{margin:4px 0 var(--s2);font-size:32px;line-height:40px}
+#shopUI .form{margin:0 0 var(--s2);display:grid;gap:var(--s1)}
+#shopUI .seg,#shopUI .chips{display:flex;flex-wrap:wrap;gap:6px}
+#shopUI .seg label,#shopUI .chips label{position:relative}
+#shopUI .seg input,#shopUI .chips input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+#shopUI .seg span,#shopUI .chips span{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:13px;white-space:nowrap}
+#shopUI .seg input:checked+span,#shopUI .chips input:checked+span{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+#shopUI .seg input:focus-visible+span,#shopUI .chips input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+#shopUI .amt{display:flex;align-items:center;gap:var(--s1);height:48px;width:100%;padding:0 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--base)}
+#shopUI .amt input{flex:1;min-width:0;background:none;border:0;color:var(--text);font:600 20px/28px Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;outline:none}
+#shopUI .amt span{color:var(--muted);font-size:13px}
+#shopUI .form .to{display:flex;align-items:center;gap:var(--s1);font-size:12px;color:var(--muted)}
+#shopUI .form .to select{flex:1;height:32px;padding:0 8px;border-radius:var(--r);border:1px solid var(--line);background:var(--base);color:var(--text);font:500 13px Inter,system-ui,sans-serif}
+#shopUI #t-form textarea{width:100%;resize:none;padding:10px 12px;border-radius:var(--r);border:1px solid var(--line);background:var(--base);color:var(--text);font:400 14px/20px Inter,system-ui,sans-serif}
+#shopUI #t-form textarea:focus{outline:none;border-color:var(--accent)}
+body.apps #shopUI .t-row{display:block}
+body.apps #shopUI #t-act{height:48px;width:100%;justify-content:center;font-size:16px}
+body.apps #shopUI #t-act[disabled]{opacity:.55;cursor:progress}
+body.apps #shopUI #t-act.busy::before{content:'';width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+#shopUI .rcpt{min-height:20px;margin-top:var(--s1);display:flex;flex-wrap:wrap;gap:4px var(--s1);align-items:center;font-size:12px;line-height:16px}
+#shopUI .rule{font-weight:600} #shopUI .rule.ok{color:var(--ok)} #shopUI .rule.no{color:var(--no)}
+#shopUI .rc{font-family:var(--mono);font-size:12px;color:var(--muted);text-decoration:none} #shopUI .rc:hover{color:var(--text)}
+#shopUI details.rc{display:inline-block} #shopUI details.rc summary{cursor:pointer;list-style:none;color:var(--muted);font-family:Inter,system-ui,sans-serif;font-size:12px;text-decoration:underline dotted;text-underline-offset:3px}
+#shopUI details.rc summary::-webkit-details-marker{display:none} #shopUI details.rc[open] summary{display:none}
+#shopUI .t-links{display:flex;flex-wrap:wrap;gap:0 var(--s2)} #shopUI .t-links .link{height:28px;font-size:12px}
+#shopUI a.cta8{display:inline-flex;align-items:center;height:28px;font-size:12px;margin:0 0 var(--s1)}
+#shopUI .commit{font-family:var(--mono);font-size:22px;color:var(--ice)}
+#shopUI .goal{font-size:12px;color:var(--accent);font-weight:600;letter-spacing:.02em}
+#shopUI .pts{font-size:14px;color:var(--muted);margin-left:var(--s1)}
+#shopUI .feed{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:176px;overflow:auto;font-size:12px}
+#shopUI .feed li{display:grid;grid-template-columns:72px 1fr auto;gap:var(--s1);padding:6px 0;border-top:1px solid var(--line)}
+#shopUI .feed li.no span:nth-child(2){color:var(--no)} #shopUI .feed li.ok span:nth-child(2){color:var(--ok)}
+#shopUI .feed.checks li,#shopUI .feed.tee li{grid-template-columns:56px 1fr auto}
+#shopUI .hidden-line{font:400 11px/15px var(--mono);color:var(--no);background:color-mix(in srgb,var(--no) 8%,transparent);border:1px dashed color-mix(in srgb,var(--no) 45%,transparent);border-radius:6px;padding:4px 6px}
+#shopUI .v-block{color:var(--no)} #shopUI .v-warn{color:var(--accent)} #shopUI .v-allow{color:var(--ok)}
+#shopUI .tee-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ok);letter-spacing:.04em;text-transform:uppercase} #shopUI .tee-badge.no{color:var(--no)}
+#shopUI .tee-btn{background:none;border:0;padding:4px 0;cursor:pointer;color:var(--accent);font:600 12px Inter,system-ui,sans-serif;text-decoration:underline;text-underline-offset:3px} #shopUI .tee-btn:disabled{color:var(--muted);cursor:progress}
+#shopUI #rules{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:100vw;background:var(--base);border-left:1px solid var(--line);padding:var(--s3);transform:translateX(100%);transition:transform .24s var(--ease);z-index:8;overflow:auto;display:flex;flex-direction:column;gap:var(--s2)}
+#shopUI #rules.open{transform:none} #shopUI #rules .d-head{margin-bottom:0} #shopUI .r-lede{color:var(--muted)}
+#shopUI #r-body{display:grid;gap:var(--s2)} #shopUI #r-body fieldset{border:0;display:grid;gap:var(--s1);padding:0;margin:0;min-width:0}
+#shopUI #r-body legend,#shopUI #r-body label{font-size:12px;color:var(--muted)} #shopUI #r-body label{display:grid;gap:4px} #shopUI #r-body label.off{opacity:.55}
+#shopUI .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#shopUI #r-body input:not([type=checkbox]),#shopUI #r-body select{height:40px;padding:0 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--raised);color:var(--text);font:500 14px/20px Inter,system-ui,sans-serif;width:100%}
+#shopUI .sfx{position:relative;display:block} #shopUI .sfx i{position:absolute;right:10px;top:10px;font-style:normal;color:var(--muted);font-size:12px}
+#shopUI #r-sign{height:48px;justify-content:center;font-size:16px;flex:none}
+body.apps:has(#rules.open) #shopUI #tray{opacity:.35;pointer-events:none}
+body.apps:has(#rules.open) #back{visibility:hidden}
+@media (max-width:720px){ #shopUI #tray{left:8px;right:8px;bottom:8px;width:auto;padding:16px;max-height:62vh;overflow:auto} body.apps #shopUI .hero{font-size:26px;line-height:32px} }

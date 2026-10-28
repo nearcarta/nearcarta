@@ -18,7 +18,8 @@ function ruleChip() {
   const c = A.S.clauses.pay; const b = $('#t-rules');
   b.hidden = !A.S.charter; b.textContent = c ? `Your rules · max ${fmt(c.per_action_cap)}` : 'Your rules';
 }
-const wallet = () => { const w = $('#wallet'); if (!w) return; w.textContent = A.S.me ? short(A.S.me, 10, 8) : 'Connect wallet'; w.classList.toggle('on', !!A.S.me); };
+const HOSTED = () => document.body.dataset.host === 'd9'; // inside the town page the HUD owns #wallet
+const wallet = () => { const w = HOSTED() ? null : $('#wallet'); if (!w) return; w.textContent = A.S.me ? short(A.S.me, 10, 8) : 'Connect wallet'; w.classList.toggle('on', !!A.S.me); };
 
 // Mist Bank: the NEAR AI TEE attestation behind the seal, one row per check (A.teeCheck → /api/ai/tee → backend/src/tee.js).
 function teePanel(t) {
@@ -55,15 +56,17 @@ const APPS = {
   },
   bank: {
     label: 'Mist Bank · private send', idle: 'Tell me the amount. I\u2019ll show only its seal.',
-    form: () => `<label class="amt"><input id="m-amt" type="number" min="0.001" step="0.001" value="${esc(extra.amt || '0.03')}"><span>NEAR, hidden</span></label>` + teePanel(extra.tee),
-    bind: () => { $('#m-amt').oninput = e => { extra.amt = e.target.value; }; const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Checking the TEE…'; try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } form(APPS.bank.form()); APPS.bank.bind(); }; },
+    form: () => { const ps = A.bankPayees(), to = extra.to || A.bankDefault();
+      return `<label class="amt"><input id="m-amt" type="number" min="0.001" step="0.001" value="${esc(extra.amt || '0.03')}"><span>NEAR, hidden</span></label>`
+        + `<label class="to">To <select id="m-to" data-testid="bank-to">${ps.map(a => `<option value="${esc(a)}" ${a === to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(short(a, 14, 8))}</option>`).join('')}</select></label>` + teePanel(extra.tee); },
+    bind: () => { $('#m-amt').oninput = e => { extra.amt = e.target.value; }; const t = $('#m-to'); if (t) t.onchange = e => { extra.to = e.target.value; }; const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Checking the TEE…'; try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } form(APPS.bank.form()); APPS.bank.bind(); }; },
     btn: () => extra.sent ? 'Verify the seal' : 'Send privately',
     hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(extra.sent.commitment.slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
     run: async () => {
       if (extra.sent) { const v = await A.mistVerify(); extra.sent = null; return { keep: true, kind: v.match ? 'ok' : 'no', say: v.match ? 'Seal matches the chain. Amount still hidden.' : 'Seal does not match.', rc: A.txLine(v.tx, 'on-chain memo') }; }
-      const o = await A.mist(Number(extra.amt || 0.03));
+      const o = await A.mist(Number(extra.amt || 0.03), extra.to || A.bankDefault());
       extra.tee = o.tee; if (o.decision === 'allowed') extra.sent = o;
-      return { o, keep: o.decision === 'allowed', hero: o.decision === 'allowed' ? APPS.bank.hero() : null, say: o.decision === 'allowed' ? `TEE checked the seal. Approved under the ${o.bucket} ceiling.` : `Refused: ${A.why(o.reason)}.`, rc: `<span class="rc">${o.tee?.ok ? 'TEE verified' : 'TEE checked'} · ZEC payout: mainnet only</span>` + A.txLine(o.tx) };
+      return { o, keep: o.decision === 'allowed', hero: o.decision === 'allowed' ? APPS.bank.hero() : null, say: o.decision === 'allowed' ? `Sealed and sent to ${o.to === A.S.me ? 'you' : esc(short(o.to, 12, 6))}. Approved under the ${o.bucket} ceiling.` : `Refused: ${A.why(o.reason)}.`, rc: `<span class="rc">${o.tee?.ok ? 'TEE verified' : 'TEE checked'} · ZEC payout: mainnet only</span>` + A.txLine(o.tx) };
     },
   },
   guard: {
@@ -157,7 +160,7 @@ function paint() {
   btn(typeof app.btn === 'function' ? app.btn() : app.btn);
 }
 async function primary() {
-  if (phase === 'busy') return; const st = A.stage(); sfx('click');
+  if (phase === 'busy' || !cur) return; const st = A.stage(); sfx('click');
   if (st === 'connect') return A.connect().then(paint).catch(fail);
   if (st === 'rules') return openRules();
   phase = 'busy'; btn(st === 'build' ? 'Approve in your wallet…' : 'Asking your charter…', 'primary busy', true); say(st === 'build' ? 'Building your charter…' : 'Asking your charter on chain…'); rcpt('');
@@ -215,10 +218,14 @@ let booted = null;
 export function boot() {
   if (booted) return booted;
   $('#t-act').onclick = primary; $('#t-rules').onclick = openRules; $('#r-close').onclick = closeRules; $('#r-sign').onclick = signRules;
-  $('#wallet').onclick = () => (A.S.me ? openRules() : A.connect().then(paint).catch(fail));
+  if (!HOSTED() && $('#wallet')) $('#wallet').onclick = () => (A.S.me ? openRules() : A.connect().then(paint).catch(fail));
   booted = A.init(() => paint()).then(() => paint()).catch(e => { A.S.ready = true; fail(e); });
   return booted;
 }
-export function mount(id, shop, scene) { cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; rcpt(''); document.body.dataset.app = ''; boot(); paint(); }
+export function mount(id, shop, scene) { cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; rcpt(''); document.body.dataset.app = ''; boot(); paint();
+  // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
+  if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {}); }
 export function unmount() { cur = null; sh = null; closeRules(); }
+export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
+export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };

@@ -69,7 +69,7 @@ function applyCam(dt,snap){ if(!D.shot) return; const s=D.shot(); const e=D.k;
   if(W.fin){ const d=cam.position.distanceTo(D.cur.t); W.fin.uniforms.focus.value=.5; W.fin.uniforms.band.value=Math.min(.34,.1+d*.009); W.fin.uniforms.tilt.value=d<6?.55:1; } }
 const letterbox=on=>body.classList.toggle('letterbox',on);
 // shops with no room yet: still part of the town, but no pin, no door, no menu entry
-const CLOSED=new Set(['toll']); const OPEN=Object.fromEntries(Object.entries(SHOPS).filter(([id])=>!CLOSED.has(id)));
+const CLOSED=new Set([]); /* every door opens: Toll Bridge runs its real paid flow too */ const OPEN=Object.fromEntries(Object.entries(SHOPS).filter(([id])=>!CLOSED.has(id)));
 const CHARTER=window.NEARCARTA_CHARTER||'/shops/vault/';
 const ALIAS={chron:'chronicle',townhall:'hall',mistbank:'bank',guardhouse:'guard',vault:'house'};
 
@@ -272,7 +272,7 @@ cv.addEventListener('wheel',e=>{ if(mode==='story'||inShop) return; e.preventDef
   cv.addEventListener('touchend',e=>{ if(e.touches.length<2&&pz){ pz=null; down=null; } },{passive:true}); }
 const mk=new THREE.Mesh(new THREE.RingGeometry(.12,.17,24),new THREE.MeshBasicMaterial({color:0xf3ead8,transparent:true,opacity:0,depthWrite:false})); mk.rotation.x=-Math.PI/2; W.scene.add(mk);
 function marker(p,run){ mk.position.set(p.x,.03,p.z); mk.material.color.set(run?0xffc75c:0xf3ead8); mk.material.opacity=.9; mk.scale.setScalar(.6); gsap.to(mk.scale,{x:1.4,y:1.4,z:1.4,duration:.6}); gsap.to(mk.material,{opacity:0,duration:.9,delay:.2}); }
-addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sm.hidden) sm.hidden=true; else if(inShop&&SL.drawerOpen()) SL.drawer(false); else if(inShop) world.exitShop(); else if(mode==='story') endStory(); } });
+addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sm.hidden) sm.hidden=true; else if(inShop&&SL.rulesOpen()) SL.closeRules(); else if(inShop&&SL.drawerOpen()) SL.drawer(false); else if(inShop) world.exitShop(); else if(mode==='story') endStory(); } });
 
 // ---------- the town keeps living after the story ----------
 function idleTown(){ if(mode==='explore') return; shot(SH.orbit,2.6); }

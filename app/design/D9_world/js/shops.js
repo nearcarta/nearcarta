@@ -7,6 +7,11 @@ import { skyCols } from './world.js';
 const D8=new URL('../../D8_shops/',import.meta.url).href;
 const $=s=>document.querySelector(s);
 let core=null; const core8=()=>core||(core=import(D8+'js/core.js'));
+// Real app flows: every room runs D8's shop app (js/shopui.js) on the visitor's own wallet and charter.
+// ?scripted keeps the old one-click scripted demo for captures only.
+export const APP=!/[?&]scripted\b/.test(location.search);
+document.body.dataset.host='d9'; // D8's shop app leaves the town HUD wallet (#wallet) alone
+let ui=null; const ui8=()=>ui||(ui=import(D8+'js/shopui.js').then(m=>{ m.boot(); return m; }).catch(e=>{ ui=null; throw e; }));
 export const L={ sh:null, C8:null };
 const SRC={ testnet:'testnet', live:'live read' };
 const NAMES={ guard:'Guardhouse', ferry:'Ferry', hall:'Town Hall', bank:'Mist Bank', arena:'Vault Arena', toll:'Toll Bridge', chronicle:'Chronicle', house:'Your House' };
@@ -15,11 +20,11 @@ export function setHero(html){ const h=$('#t-hero'); h.innerHTML=html; h.classLi
 export function drawer(on){ const d=$('#drawer'); d.classList.toggle('open',on); d.setAttribute('aria-hidden',on?'false':'true'); $('#t-proof').setAttribute('aria-expanded',String(on)); if(on) $('#d-close').focus(); }
 export const drawerOpen=()=>$('#drawer').classList.contains('open');
 // warm it now (core + three addons + the D2 tile set) so the first door does not wait on the network
-export function preload(){ return core8().catch(()=>null); }
+export function preload(){ return core8().then(()=>APP&&ui8()).catch(()=>null); }
 // build one room; resolves {sh} or {err}
 export async function load(id){
   try{ const C8=L.C8=await core8(); const mod=await import(D8+'shops/'+id+'.js'); const tk={}; const live=()=>L.sh&&L.sh.tk===tk;
-    const sh=await mod.default({ setResult:(...a)=>live()&&setResult(...a), setHero:(...a)=>live()&&setHero(...a), live }); sh.id=id; sh.tk=tk; dress(sh.scene); return {sh}; }
+    const sh=await mod.default({ setResult:(...a)=>live()&&!APP&&setResult(...a), setHero:(...a)=>live()&&setHero(...a), live }); sh.id=id; sh.tk=tk; dress(sh.scene); return {sh}; }
   catch(err){ console.error(`[Nearcarta] shop "${id}" failed to load:`,err); return {err}; } }
 // back the room with the town's evening: sky gradient, the sea under the island, and a fog that melts the sea into the horizon
 function dress(scene){ const k=skyCols(); const c=document.createElement('canvas'); c.width=4; c.height=256; const x=c.getContext('2d'); const g=x.createLinearGradient(0,0,0,256);
@@ -33,15 +38,21 @@ export function frame(c){ const a=innerWidth/innerHeight; c.aspect=a; const ox=i
   return a<1?Math.min(1.8,1+(1-a)*1.3):a<1.3?1.12:1; }
 // every room that is about rules offers the way to write your own: Your House is the Charter office
 const CTA={ house:"Set your agent's rules →", guard:'Write a rule like this for your agent →', arena:'Put your own charter in the arena →' };
-export function cta(id){ const a=$('#t-cta'); const t=CTA[id]; a.hidden=!t; if(t){ a.textContent=t; a.href=(window.NEARCARTA_CHARTER||'/shops/vault/')+(id==='house'?'#create':''); } }
+const CTA_APP={ house:'Open the charter office →' };
+export function cta(id){ const a=$('#t-cta'); const t=(APP?CTA_APP:CTA)[id]; a.hidden=!t; a.className=APP?'link cta8':'act primary cta'; if(t){ a.textContent=t; a.href=(window.NEARCARTA_CHARTER||'/shops/vault/')+(id==='house'&&!APP?'#create':''); a.dataset.testid='vault-link'; } }
 export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; $('#t-title').textContent=p.title||NAMES[sh.id]; const s=$('#t-src'); s.textContent=SRC[p.src]||p.src; s.className='src '+p.src; s.title=p.srcNote||'';
   $('#t-label').textContent=p.label; $('#t-hero').innerHTML=p.hero; const b=$('#t-act'); b.className='act primary'; b.disabled=false; b.hidden=!p.action; b.textContent=p.action||'';
   $('#d-title').textContent=(p.title||NAMES[sh.id])+' · proof'; $('#d-body').innerHTML=sh.proof+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>';
-  sh.tags?.forEach(t=>{ if(t.html){ t.el=document.createElement('div'); t.el.className='stag '+(t.cls||''); t.el.innerHTML=t.html; $('#stags').appendChild(t.el); } }); frame(sh.camera); }
+  sh.tags?.forEach(t=>{ if(t.html){ t.el=document.createElement('div'); t.el.className='stag '+(t.cls||''); t.el.innerHTML=t.html; $('#stags').appendChild(t.el); } }); frame(sh.camera);
+  document.body.classList.toggle('apps',APP); $('#t-say').hidden=!APP; if(!APP) return;
+  b.hidden=false; b.disabled=true; b.textContent='Opening…';
+  ui8().then(m=>{ if(L.sh===sh) m.mount(sh.id,sh,g=>L.C8.run(g)); }).catch(e=>{ if(L.sh!==sh) return; console.warn('[Nearcarta] shop app failed to load',e); b.disabled=false; b.textContent='Try again'; b.dataset.retry=sh.id; }); }
+export const rulesOpen=()=>!!ui&&$('#rules').classList.contains('open');
+export function closeRules(){ ui?.then(m=>m.closeRules()); }
 export function showError(id,err){ $('#t-title').textContent=NAMES[id]||id; const s=$('#t-src'); s.textContent='error'; s.className='src error'; $('#t-label').textContent='This room could not load'; $('#t-hero').innerHTML='';
   const b=$('#t-act'); b.hidden=false; b.disabled=false; b.className='act primary'; b.textContent='Try again'; b.dataset.retry=id; $('#d-title').textContent='Error'; $('#d-body').textContent=String(err&&err.message||err); }
-export function act(){ const sh=L.sh; const b=$('#t-act'); if(!sh?.act||b.disabled) return false; b.disabled=true; b.classList.add('busy'); L.C8.run(sh.act()); return true; }
+export function act(){ if(APP) return false; const sh=L.sh; const b=$('#t-act'); if(!sh?.act||b.disabled) return false; b.disabled=true; b.classList.add('busy'); L.C8.run(sh.act()); return true; }
 const v=new THREE.Vector3();
 export function tick(dt){ const sh=L.sh, C8=L.C8; if(!C8) return; C8.clock.T+=dt; C8.tickRoutines(); if(sh) sh.update?.(dt,C8.clock.T); }
 export function placeTags(){ const sh=L.sh; if(!sh?.tags) return; const w=innerWidth,h=innerHeight; for(const t of sh.tags){ if(!t.el) continue; if(t.obj){ t.obj.updateMatrixWorld(); v.setFromMatrixPosition(t.obj.matrixWorld).add(t.pos); } else v.copy(t.pos); v.project(sh.camera); const x=(v.x*.5+.5)*w, y=(-v.y*.5+.5)*h; t.el.style.transform=`translate(${x|0}px,${y|0}px) translate(-50%,-100%)`; t.el.style.visibility=v.z<1?'':'hidden'; } }
-export function clear(){ const sh=L.sh; L.sh=null; $('#stags').innerHTML=''; drawer(false); if(!sh) return; L.C8?.killAll(); try{ sh.dispose?.(); }catch(e){} sh.scene.background?.dispose?.(); }
+export function clear(){ const sh=L.sh; L.sh=null; $('#stags').innerHTML=''; drawer(false); if(ui) ui.then(m=>m.unmount()).catch(()=>{}); $('#t-form').hidden=true; $('#t-rcpt').innerHTML=''; $('#t-say').hidden=true; if(!sh) return; L.C8?.killAll(); try{ sh.dispose?.(); }catch(e){} sh.scene.background?.dispose?.(); }
