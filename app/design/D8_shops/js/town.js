@@ -47,7 +47,7 @@ async function flush(scene) {
 
 export const B = {}; export let robot = null;
 export const doorPos = id => { const s = SHOPS[id]; const b = hx(s.q, s.r), d = hx(...s.door); return { b, d, dir: d.clone().sub(b).normalize() }; };
-const TILE = 0x9aa58f, WATER = 0x8fa3ab;
+const TILE = null, WATER = null; // colour comes from the recoloured atlas (core.js), no grey multiply
 
 export async function buildTown(scene) {
   scene.background = new THREE.Color(C.base); scene.fog = new THREE.Fog(C.base, 46, 92);

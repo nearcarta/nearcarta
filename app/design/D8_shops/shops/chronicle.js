@@ -1,8 +1,12 @@
 // Chronicle (static): the crier's scroll. One mark per real decision from the core testnet run; refusals in the refused colour.
-import { THREE, room, makeRobot, C, CSS } from '../js/core.js';
+import { THREE, room, put, makeRobot, C, CSS } from '../js/core.js';
+import { M as PM, brassM, mesh, lantern, banner, candle, rug } from './_props.js';
 import { CORE_TXS, CORE } from '../../D6_dashboards/src/data.js';
 import { row, h3, note, proof, paper, acct } from './_ui.js';
 
+// Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
+const acts = CORE_TXS.filter(t => t.kind === 'action');
+export const PROOF = proof(h3('Every action the agent tried'), ...acts.map(a => row({ k: a.what, why: (a.reason || a.clause).replaceAll('_', ' '), st: a.decision === 'denied' ? 'no' : a.decision === 'allowed' ? 'ok' : 'pend', stText: a.decision, tx: a.tx })), note(`Oath ${acct(CORE.oath)}. One mark on the scroll per row.`));
 export default async function chronicle() {
   const { scene, camera } = await room({ cam: [0, 3.6, 7.6], look: [0, 1.1, 0] });
   const acts = CORE_TXS.filter(t => t.kind === 'action'); const denied = acts.filter(t => t.decision === 'denied');
@@ -14,11 +18,21 @@ export default async function chronicle() {
   const rollT = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, 1.9, 12), wood); rollT.rotation.z = Math.PI / 2; rollT.position.set(0, 2.05, .02); const rollB = rollT.clone(); rollB.position.y = .55;
   const sheet = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.45), new THREE.MeshStandardMaterial({ map: tex, roughness: 1, side: THREE.DoubleSide })); sheet.position.set(0, 1.3, .03);
   [post, post2, rollT, rollB, sheet].forEach(m => { m.castShadow = true; scene.add(m); });
-  const rob = await makeRobot(scene); rob.at(1.4, 1.1); rob.lookAt(new THREE.Vector3(0, 0, 3));
+  // the crier's square: a brass bell on a yoke, a lectern with the day's seal, rolled scrolls waiting, lanterns either side
+  mesh(scene, new THREE.BoxGeometry(.08, 1.6, .08), PM.dark, [-2.0, .8, -.2]); mesh(scene, new THREE.BoxGeometry(.08, 1.6, .08), PM.dark, [-1.5, .8, -.2]); mesh(scene, new THREE.BoxGeometry(.66, .08, .1), PM.dark, [-1.75, 1.6, -.2]);
+  const bell = mesh(scene, new THREE.CylinderGeometry(.08, .19, .3, 20, 1, true), brassM(), [-1.75, 1.38, -.2]); bell.material.side = THREE.DoubleSide; mesh(scene, new THREE.SphereGeometry(.08, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), brassM(), [-1.75, 1.53, -.2]);
+  mesh(scene, new THREE.SphereGeometry(.035, 8, 6), PM.dark, [-1.75, 1.22, -.2]);
+  mesh(scene, new THREE.BoxGeometry(.1, .8, .1), PM.wood, [1.75, .4, .5]); mesh(scene, new THREE.BoxGeometry(.5, .05, .38), PM.wood, [1.75, .83, .5], { rx: .5 }); mesh(scene, new THREE.BoxGeometry(.4, .012, .28), new THREE.MeshStandardMaterial({ color: 0xf3ead8, roughness: 1 }), [1.75, .863, .515], { rx: .5 }); // the day's sheet, tilted to the viewer
+  mesh(scene, new THREE.CylinderGeometry(.06, .06, .02, 20), new THREE.MeshStandardMaterial({ color: 0xc0463e, roughness: .5, emissive: 0x3a0c08 }), [1.84, .88, .53], { rx: .5 });
+  const scroll = new THREE.MeshStandardMaterial({ color: 0xe9dcc0, roughness: 1 }); [[-1.25, .2, .55, 0], [-1.05, .2, .7, .5], [-1.15, .34, .62, .25]].forEach(([x, y, z, r]) => mesh(scene, new THREE.CylinderGeometry(.06, .06, .5, 12), scroll, [x, y - .1, z], { rz: Math.PI / 2, ry: r }));
+  banner(scene, -.85, 2.25, -.05, 0xa8644a, { w: .2, h: .45 }); banner(scene, .85, 2.25, -.05, 0xa8644a, { w: .2, h: .45 });
+  lantern(scene, -2.35, .7, { h: 1.3 }); lantern(scene, 2.6, -.75, { h: 1.3, light: false }); rug(scene, 0, 1.0, 2.6, 1.3, 0x5e3427);
+  await put(scene, 'decoration/props/crate_A_big', { x: 2.05, z: -1.45, ry: .4, fitW: .42 }).catch(() => null);
+  const rob = await makeRobot(scene); rob.at(.6, 1.25); rob.lookAt(new THREE.Vector3(.2, 0, 3));
   return {
     scene, camera, tags: [],
     panel: { title: 'Chronicle', src: 'testnet', label: 'Refusals on the record', hero: `<b class="num">${denied.length}</b><span class="unit">of ${acts.length} actions</span>`, action: null },
-    proof: proof(h3('Every action the agent tried'), ...acts.map(a => row({ k: a.what, why: (a.reason || a.clause).replaceAll('_', ' '), st: a.decision === 'denied' ? 'no' : a.decision === 'allowed' ? 'ok' : 'pend', stText: a.decision, tx: a.tx })), note(`Oath ${acct(CORE.oath)}. One mark on the scroll per row.`)),
+    proof: PROOF,
     update(dt) { rob.update(dt); },
   };
 }

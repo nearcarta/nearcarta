@@ -8,13 +8,13 @@ window.__events = events;
 
 const webgl = (() => { try { const c = document.createElement('canvas'); return !!c.getContext('webgl2'); } catch (e) { return false; } })();
 
-let renderer, town, cam, controls, rt, quad, qcam, qmat; let shop = null, mode = 'town', iris = 0, irisC = new THREE.Vector2(.5, .5);
+let renderer = null, town = null, cam = null, controls = null, rt = null, quad = null, qcam = null, qmat = null; let shop = null, mode = 'town', iris = 0, irisC = new THREE.Vector2(.5, .5);
 const labels = {};
 async function boot() {
   const tl = document.getElementById('tokens'); if (tl && !tl.sheet) await new Promise(r => { tl.onload = tl.onerror = r; }); readTokens();
   renderer = new THREE.WebGLRenderer({ canvas: $('#gl'), antialias: true, preserveDrawingBuffer: CAPTURE, powerPreference: 'high-performance' });
   renderer.setPixelRatio(CAPTURE ? 1 : Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.18; renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   town = new THREE.Scene(); cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, .5, 220); townCamera(cam);
   controls = new MapControls(cam, renderer.domElement); controls.target.copy(cam.userData.look); controls.enableDamping = !CAPTURE; controls.minDistance = 18; controls.maxDistance = 60; controls.maxPolarAngle = 1.1; controls.minPolarAngle = .5; controls.update();
   // iris composite: interior rendered offscreen, revealed through a circle that grows from the door
@@ -23,7 +23,7 @@ async function boot() {
     vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }',
     fragmentShader: 'uniform sampler2D tex; uniform vec2 c; uniform float r, asp; uniform vec3 ac; varying vec2 vUv; void main(){ vec2 d=(vUv-c)*vec2(asp,1.); float L=length(d); float a=1.-smoothstep(r-.004,r+.004,L); vec4 t=texture2D(tex,vUv); float edge=smoothstep(r-.02,r,L)*a; gl_FragColor=vec4(mix(t.rgb, ac, edge*.6), a);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}' });
   quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), qmat); quad.frustumCulled = false; const qs = new THREE.Scene(); qs.add(quad); qcam = new THREE.Camera(); quad.userData.scene = qs;
-  resize(); addEventListener('resize', resize);
+  resize(); addEventListener('resize', resize); addEventListener('pointerdown', onPointer);
   await buildTown(town); robot.quiet = true;
   makeLabels(); ui();
   const start = P.get('shop'); if (start && LOADERS[start]) await enter(start, { instant: true }); 
@@ -31,11 +31,12 @@ async function boot() {
   window.__ready = true;
   if (!CAPTURE) { let last = performance.now(); const loop = now => { const dt = Math.min(.05, (now - last) / 1000); last = now; frame(dt); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
 }
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); const pr = renderer.getPixelRatio(); rt.setSize(w * pr, h * pr); qmat.uniforms.asp.value = w / h; if (shop) frameShop(shop.camera); }
+function resize() { if (!renderer) return; const w = innerWidth, h = innerHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); const pr = renderer.getPixelRatio(); rt.setSize(w * pr, h * pr); qmat.uniforms.asp.value = w / h; if (shop) frameShop(shop.camera); }
 
 // --- frame (shared by rAF and capture stepping) ---
 const ray = new THREE.Raycaster(); let fpsN = 0, fpsT = 0; window.__fps = [];
 function frame(dt) {
+  if (!renderer || !town) return; // called before boot finished (capture tools, early resize): nothing to draw yet
   clock.T += dt; tickRoutines(); robot?.update(dt); if (shop) shop.update?.(dt, clock.T);
   if (controls.enabled) controls.update();
   if (mode === 'shop') { renderer.setRenderTarget(null); renderer.render(shop.scene, shop.camera); }
@@ -59,12 +60,14 @@ function placeTags() {
       el.style.transform = `translate(${r.x | 0}px,${r.y | 0}px)`; } }
   if (shop?.tags) for (const t of shop.tags) { if (!t.el) continue; if (t.obj) { t.obj.updateMatrixWorld(); v.setFromMatrixPosition(t.obj.matrixWorld).add(t.pos); } else v.copy(t.pos); v.project(shop.camera); const x = (v.x * .5 + .5) * w, y = (-v.y * .5 + .5) * h; t.el.style.transform = `translate(${x | 0}px,${y | 0}px) translate(-50%,-100%)`; }
 }
-renderer?.domElement; addEventListener('pointerdown', e => { if (mode !== 'town' || e.target.id !== 'gl') return; const m = new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(m, cam); const hit = ray.intersectObjects(Object.values(B), true)[0]; if (hit) { let o = hit.object; while (o && !o.userData.id) o = o.parent; if (o) { const id = o.userData.id; addEventListener('pointerup', () => enter(id), { once: true }); } } });
+function onPointer(e) { if (mode !== 'town' || e.target.id !== 'gl') return; const m = new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(m, cam); const hit = ray.intersectObjects(Object.values(B), true)[0]; if (hit) { let o = hit.object; while (o && !o.userData.id) o = o.parent; if (o) { const id = o.userData.id; addEventListener('pointerup', () => enter(id), { once: true }); } } }
 
 // --- tray (one primary action) + proof drawer ---
 const tray = () => $('#tray');
 function ui() {
   sound.button($('#snd'));
+  // the walkthrough video has a sound track, so its icon must read 'sound on' (a capture page is never unlocked by a gesture)
+  if (CAPTURE && P.has('snd')) { const b = $('#snd'); b.setAttribute('aria-pressed', 'true'); b.setAttribute('aria-label', 'Sound on. Click to mute'); }
   $('#back').onclick = () => leave(); $('#t-proof').onclick = () => drawer(true); $('#d-close').onclick = () => drawer(false);
   addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('#drawer').classList.contains('open')) drawer(false); else if (shop) leave(); } });
   $('#t-act').onclick = () => { if (!shop?.act || $('#t-act').disabled) return; sfx('click'); $('#t-act').disabled = true; $('#t-act').classList.add('busy'); run(shop.act()); };
