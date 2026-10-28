@@ -10,6 +10,8 @@ export const DEP = JSON.parse(readFileSync(depPath, 'utf8'));
 export const cfg = {
   port: Number(process.env.PORT || 8787),
   rpc: process.env.NEAR_RPC || DEP.rpc,
+  // Tried in order when the main testnet RPC answers 429/5xx or is unreachable (free RPCs rate-limit shared host IPs).
+  rpcFallbacks: (process.env.NEAR_RPC_FALLBACKS ?? 'https://rpc.testnet.near.org').split(',').map(s => s.trim()).filter(Boolean),
   // mainnet RPC is used only for free view calls (intents.near simulate / token reads). Never for signing.
   mainnetRpc: process.env.NEAR_MAINNET_RPC || 'https://free.rpc.fastnear.com',
   oneClick: process.env.ONECLICK_URL || DEP.ferry.oneclick,

@@ -2,12 +2,23 @@
 import { cfg } from './config.js';
 
 let rpcId = 0;
+// A rate limit (429), a 5xx or a network error on the main testnet RPC moves on to the next endpoint
+// in cfg.rpcFallbacks. RPC-level errors (bad account, contract panic) are answers and are not retried.
 export async function rpc(method, params, url = cfg.rpc) {
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }),
-  });
+  const urls = url === cfg.rpc ? [url, ...cfg.rpcFallbacks.filter(u => u !== url)] : [url];
+  let r, err;
+  for (const u of urls) {
+    try {
+      r = await fetch(u, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }),
+      });
+      if (r.status === 429 || r.status >= 500) { err = new Error(`rpc ${method} http ${r.status}`); continue; }
+      err = null; break;
+    } catch (e) { err = new Error(`rpc ${method} unreachable`); }
+  }
+  if (err) throw err;
   if (!r.ok) throw new Error(`rpc ${method} http ${r.status}`);
   const j = await r.json();
   if (j.error) throw new Error(`rpc ${method}: ${j.error.cause?.name || j.error.name || 'error'} ${JSON.stringify(j.error.data ?? j.error.cause?.info ?? '')}`);

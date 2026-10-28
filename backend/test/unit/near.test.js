@@ -26,3 +26,24 @@ test('txResult decodes SuccessValue and reports the first failure', () => {
   assert.equal(f.ok, false);
   assert.match(f.error, /ERR_FROZEN/);
 });
+
+test('rpc moves to the fallback endpoint on 429 and keeps RPC errors as answers', async () => {
+  const { rpc } = await import('../../src/near.js');
+  const { cfg } = await import('../../src/config.js');
+  const saved = { fetch: globalThis.fetch, fb: cfg.rpcFallbacks };
+  const hits = [];
+  cfg.rpcFallbacks = ['https://fallback.invalid'];
+  globalThis.fetch = async (u) => {
+    hits.push(u);
+    if (u === cfg.rpc) return new Response('slow down', { status: 429 });
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: 1 } }), { status: 200 });
+  };
+  try {
+    assert.deepEqual(await rpc('status', []), { ok: 1 });
+    assert.deepEqual(hits, [cfg.rpc, 'https://fallback.invalid']);
+    hits.length = 0;
+    globalThis.fetch = async (u) => { hits.push(u); return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, error: { name: 'HANDLER_ERROR', cause: { name: 'UNKNOWN_ACCOUNT' } } }), { status: 200 }); };
+    await assert.rejects(rpc('query', {}), /UNKNOWN_ACCOUNT/);
+    assert.equal(hits.length, 1);
+  } finally { globalThis.fetch = saved.fetch; cfg.rpcFallbacks = saved.fb; }
+});
