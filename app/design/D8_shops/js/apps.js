@@ -35,7 +35,8 @@ const api = async (p, o) => { const r = await fetch(API + p, o); const j = await
 const view = (c, m, a) => W.viewFn(rpc, c, m, a);
 const agent = () => { const k = S.charter && localStorage.getItem(LS_AGENT(S.charter)); return k ? W.keyFrom(k) : null; };
 const pay = () => S.clauses.pay;
-export const txLine = (h, label = 'receipt') => h ? `<details class="rc" data-testid="receipt"><summary>details</summary><a class="rc" href="${NBX}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(label)} on chain · ${esc(short(h))} ↗</a></details>` : '';
+// every signed result shows its tx as one visible link (round-2 judges: a collapsed "details" read as no link at all)
+export const txLine = (h, label = 'receipt') => h ? `<a class="rc tx" data-testid="receipt" href="${NBX}/txns/${esc(h)}" target="_blank" rel="noopener" title="${esc(label)} on chain">${label === '↗' ? '↗' : `tx ${esc(short(h))} ↗`}</a>` : '';
 function keep(h, shop, decision, reason) {
   if (!S.charter || !h) return; const k = LS_RCPT(S.charter); const l = JSON.parse(localStorage.getItem(k) || '[]');
   l.unshift({ h, shop, decision, reason, at: Date.now() }); localStorage.setItem(k, JSON.stringify(l.slice(0, 40)));

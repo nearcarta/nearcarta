@@ -341,3 +341,4 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 
 /* 390: name-only pins (the room says what it is), so all 8 fit between the HUD and the rules CTA */
 @media (max-width:600px){ body.fb .fbpin span,body.fb .fbpin::after{display:none} body.fb .fbpin{padding:7px 11px;font-size:13px} }
+#shopUI .rc.tx{text-decoration:underline dotted;text-underline-offset:3px}

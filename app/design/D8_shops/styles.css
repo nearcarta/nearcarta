@@ -199,3 +199,5 @@ body:not(.in-shop) #wallet { display: none; }
 .tee-badge.no { color: var(--no); }
 .tee-btn { background: none; border: 0; padding: 4px 0; cursor: pointer; color: var(--accent); font: 600 12px Inter, system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; }
 .tee-btn:disabled { color: var(--muted); cursor: progress; }
+
+.rc.tx { text-decoration: underline dotted; text-underline-offset: 3px; }
