@@ -868,3 +868,44 @@ fn r14_set_agent_key_low_gas_reverts_before_state_or_log() {
     let _ = o.set_agent_key(pk2(), U128(NEAR));
     assert_eq!(o.agent_key, Some(pk2()));
 }
+
+// ---------------- R14: tests added for mutants missed in the R14 run ----------------
+fn deleted_keys() -> Vec<String> {
+    near_sdk::test_utils::get_created_receipts().iter().flat_map(|r| r.actions.iter()).filter_map(|a| match a {
+        near_sdk::mock::MockAction::DeleteKey { public_key, .. } => Some(public_key.to_string()),
+        _ => None,
+    }).collect()
+}
+
+#[test]
+fn r14_on_agent_key_deletes_exactly_the_right_keys() {
+    // prev is current again: only the stale new key is deleted, never prev.
+    let mut o = setup(0);
+    o.agent_key = Some(agent_pk());
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let _ = o.on_agent_key(Some(agent_pk()), pk2());
+    assert_eq!(deleted_keys(), vec![String::from(&pk2())]);
+    // normal rotation: only the old key is deleted.
+    let mut o = setup(0);
+    o.agent_key = Some(pk2());
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let _ = o.on_agent_key(Some(agent_pk()), pk2());
+    assert_eq!(deleted_keys(), vec![String::from(&agent_pk())]);
+    // same key re-set, then revoked meanwhile: the key is deleted once, not twice.
+    let mut o = setup(0);
+    o.agent_key = None;
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let _ = o.on_agent_key(Some(pk2()), pk2());
+    assert_eq!(deleted_keys(), vec![String::from(&pk2())]);
+}
+
+#[test]
+fn r14_ready_upgrades_get_distinct_change_ids() {
+    let mut o = setup(0); // delay 0: queue_upgrade applies at once and marks the hash ready
+    let n0 = o.next_change;
+    set("dao.test", T0);
+    let _ = o.queue_upgrade("a".repeat(64));
+    let _ = o.queue_upgrade("b".repeat(64));
+    assert_eq!(o.next_change, n0 + 2);
+    assert_eq!(o.pending.len(), 2, "second ready hash must not overwrite the first");
+}
