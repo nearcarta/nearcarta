@@ -1,0 +1,19 @@
+# Render Blueprint: the read-only API as a free web service (testnet config).
+services:
+  - type: web
+    name: nearcarta-api
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm ci --omit=dev
+    startCommand: node backend/src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEAR_RPC
+        value: https://test.rpc.fastnear.com
+      - key: ONECLICK_PARTNER_KEY
+        sync: false
+      - key: NEARAI_CLOUD_API_KEY
+        sync: false
