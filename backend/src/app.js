@@ -11,6 +11,7 @@ import * as mist from './mistbank.js';
 import * as shops from './shops.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
+import * as vault from './vault.js';
 import { view } from './near.js';
 import { limiter, clientIpSource, globalCap, leakGuard, onError, allowedOrigins } from './http-guard.js';
 
@@ -115,5 +116,7 @@ export function makeApp() {
     if (process.env.AI_PROVE_ENABLED !== '1') return c.json({ error: 'completions disabled on this deployment (AI_PROVE_ENABLED!=1)' }, 403);
     return c.json(await ai.prove());
   });
+  // Charters (factory) and Vault Arena: backend/src/vault.js
+  vault.register(app, { limiter, globalCap });
   return app;
 }
