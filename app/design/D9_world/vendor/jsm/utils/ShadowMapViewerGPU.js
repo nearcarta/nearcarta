@@ -8,7 +8,7 @@ import {
 	PlaneGeometry,
 	Scene,
 	Texture
-} from '../../three.module.js';
+} from 'three';
 import { texture } from 'three/tsl';
 
 /**

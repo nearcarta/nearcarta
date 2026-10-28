@@ -5,7 +5,7 @@ import {
 	LineSegments,
 	Matrix3,
 	Mesh
-} from '../../three.module.js';
+} from 'three';
 
 import { mergeGeometries } from './BufferGeometryUtils.js';
 

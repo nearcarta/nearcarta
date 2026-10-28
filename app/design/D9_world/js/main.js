@@ -1,7 +1,7 @@
 // Nearcarta — the town is the page. Boot → living town → (first visit) a 45 s story → free explore.
 import * as THREE from 'three';
 import { P, CAPTURE, RM, clock, run, tickRoutines, wait, hx, toHex, walkable, SHOPS, TX, txUrl } from './core.js';
-import { W, LP, init, update, render, setTod, setProgress, lampState, LAMPC } from './world.js';
+import { W, LP, init, update, render, setTod, setProgress, lampState, LAMPC, setShadowMode } from './world.js';
 import { buildCast, updateCast, CAST, setHooks, smooth, chars } from './chars.js';
 import * as SP from './speech.js';
 import { icon } from '../d7/js/d7.js';
@@ -9,10 +9,8 @@ const $=s=>document.querySelector(s); const body=document.body; const V=(x=0,y=0
 window.__alog=[]; // audio event log (t in story seconds) for the offline video mix
 
 // ---------- fallback: no WebGL, or ?mode=2d ----------
-function webgl(){ try{ const c=document.createElement('canvas'); return !!(c.getContext('webgl2')||c.getContext('webgl')); }catch(e){ return false; } }
-if(P.get('mode')==='2d' || !webgl()){ fallback(); throw new Error('2d'); }
-async function fallback(){ body.classList.add('fb'); $('#fb2d').hidden=false; $('#loading').classList.add('done');
-  try{ const pins=await (await fetch('shots/fallback_pins.json')).json(); const box=$('#fbpins'); for(const p of pins){ const d=document.createElement('div'); d.className='fbpin'; d.style.left=p.x+'%'; d.style.top=p.y+'%'; d.innerHTML=`<b></b><span></span>`; d.querySelector('b').textContent=p.name; d.querySelector('span').textContent=p.role; box.appendChild(d); } }catch(e){} window.__ready=true; }
+// index.html picks the 2D path before this module loads (so 2D never downloads three.js); this covers a failed WebGL init.
+const fallback=()=>import('./fb.js').then(m=>m.fallback());
 
 // ---------- sound: tiny WebAudio bank (off until the visitor turns it on) ----------
 const SND={ allowed:'d7/assets/audio/allowed.ogg', refuse:'d7/assets/audio/refuse.ogg', freeze:'d7/assets/audio/freeze.ogg', send:'d7/assets/audio/send.ogg', water:'d7/assets/audio/water.ogg', click:'d7/assets/audio/ui-click.ogg', music:'d7/assets/audio/music-ambient.ogg',
@@ -43,6 +41,8 @@ const cv=$('#c'); const t0=performance.now();
 try{ await init(cv); }catch(e){ console.error(e); fallback(); throw e; }
 await buildCast();
 const R=CAST.robot; window.world={}; window.W=W; window.CAST=CAST;
+// shadows: captures and ?shadows=dynamic keep every caster live; the live page starts static (town shadows baked once) and upgrades once it holds ~50 fps
+const SHM=P.get('shadows'); setShadowMode(CAPTURE?SHM!=='static':SHM==='dynamic');
 gsap.ticker.remove(gsap.updateRoot); gsap.ticker.lagSmoothing(0);
 let storyT0=0;
 
@@ -106,11 +106,12 @@ function* story(){
   yield wait(2.4); SP.say(R,'Proposing 0.3 to r2own…',{style:'think',dur:2.2}); sfx('send',{g:.35});
   yield wait(2.1);
   // 19–24 s: the oath refuses. The ward ripples coral, knights raise shields, the robot shakes its head.
-  W.hit=1; W.U.hitPos.value.copy(W.gatePos); sfx('refuse',{g:.8}); R.lanternColor('coral'); D.shake=.5;
+  W.hit=1; W.refuse=1.5; W.U.hitPos.value.copy(W.gatePos); sfx('refuse',{g:.8}); R.lanternColor('coral'); D.shake=.5;
   kn.forEach((k,i)=>{ k.play('blockIn',{rate:1.2}); setTimeoutSim(()=>k.play('block',{hold:true}),.55); k.lookAt(st,1); });
   R.play('no'); chron('P5','refused · r2own not on the oath'); st.play('hit',{rate:.9});
+  // the refusal shot: in front of the gate, knights' shield side to camera, gate pillars behind them, the Lamplighter framed between
+  shot(SH.fixed(V(-12.9,1.5,1.4),V(-9.8,.55,1.85),30),.35);
   yield wait(.5); SP.say(R,'The oath said no.',{tone:'no',dur:3});
-  shot(SH.fixed(V(-7.2,1.9,4.5),V(-9.6,.55,1.7),30),1.2);
   yield wait(2.2); st.lookAt(null); st.go(smooth([st.pos.clone(),V(-11.8,0,2.0),hx(-7,1),V(-15,0,1.9)]).slice(1),{}); SP.say(kn[0],'Not today.',{dur:1.8,name:'Knight'});
   yield wait(1.8);
   // 24–33 s: an allowed payment. The Ferry takes 0.3 to r2rcv and the boat crosses.
@@ -189,7 +190,8 @@ const pr=document.createElement('button'); pr.id='prompt'; pr.type='button'; pr.
 let near=null;
 function prompt(id){ if(id===near && (!id||!pr.hidden)) return; near=id; if(!id){ pr.hidden=true; return; } const s=SHOPS[id]; pr.innerHTML=`<kbd>Enter</kbd><span>${s.name}</span>`; pr.setAttribute('aria-label','Step into '+s.name); pr.hidden=false; }
 pr.addEventListener('click',()=>{ if(near) goIn(near); });
-function nearDoor(){ let best=null,bd=1.05; for(const [id,s] of Object.entries(SHOPS)){ const d=hx(...s.door).distanceTo(V(R.pos.x,0,R.pos.z)); const dp=doorPoint(id).setY(0).distanceTo(V(R.pos.x,0,R.pos.z)); const m=Math.min(d,dp+.15); if(m<bd){ bd=m; best=id; } } return best; }
+let lastD=9; function nearDoor(){ const r=_nearDoor(); if(!r.id){ lastD=9; return null; } const away=r.d>lastD+.004; lastD=r.d; return (away&&r.d>.45)?null:r.id; } // hide as soon as the robot walks away
+function _nearDoor(){ let best=null,bd=1.05; for(const [id,s] of Object.entries(SHOPS)){ const d=hx(...s.door).distanceTo(V(R.pos.x,0,R.pos.z)); const dp=doorPoint(id).setY(0).distanceTo(V(R.pos.x,0,R.pos.z)); const m=Math.min(d,dp+.15); if(m<bd){ bd=m; best=id; } } return {id:best,d:bd}; }
 function placePrompt(){ if(!near) return; const p=screenOf(doorPoint(near).setY(1.55)); pr.style.transform=`translate(${p.x}px,${p.y}px) translate(-50%,-100%)`; }
 function goIn(id){ const s=SHOPS[id]; R.steer=null; keys.clear(); prompt(null); R.release(.2); let done=false; const go=()=>{ if(done||inShop) return; done=true; R.stop(); R.faceTo(hx(s.q,s.r)); world.enterShop(id); };
   const end=hx(...s.door).lerp(hx(s.q,s.r),.18); const far=R.pos.distanceTo(end);
@@ -271,7 +273,7 @@ world.enterShop=id=>new Promise(res=>{ if(!SHOPS[id]) throw new Error('unknown s
   setTimeoutSim(()=>{ const ds=screenOf(dp); iris.classList.add('on'); iris.style.setProperty('--ix',ds.x+'px'); iris.style.setProperty('--iy',ds.y+'px');
     if(inShop!==id||exiting){ res({id,cancelled:true}); return; } const o={r:Math.hypot(innerWidth,innerHeight)}; irisTw=gsap.to(o,{r:0,duration:RM?.01:.32,ease:'power3.in',onUpdate:()=>iris.style.setProperty('--ir',o.r+'px'),onComplete:()=>{ W.lastDoor=ds; window.dispatchEvent(new CustomEvent('world:interior-ready',{detail:{id,doorScreen:ds}})); if(!window.__shopsLayer) inCard(id); res({id,doorScreen:ds}); }}); },RM?.02:Math.max(.05,dur-.12)); });
 // standalone world (no shops layer loaded): a small card inside the iris so the door never feels like a dead end
-const ic=$('#inCard'); function inCard(id){ if(!id){ ic.hidden=true; return; } ic.querySelector('b').textContent=SHOPS[id].name; ic.hidden=false; } ic.querySelector('button').addEventListener('click',()=>world.exitShop());
+const ic=$('#inCard'); function inCard(id){ if(!id){ ic.hidden=true; return; } ic.querySelector('b').textContent=SHOPS[id].name; ic.querySelector('a.go').href='../D8_shops/index.html?shop='+encodeURIComponent(id); ic.hidden=false; } ic.querySelector('button').addEventListener('click',()=>world.exitShop());
 let irisTw=null;
 world.exitShop=()=>new Promise(res=>{ if(!inShop){ res(); return; } if(exiting) return; exiting=true; const closing=irisTw&&irisTw.isActive(); irisTw&&irisTw.kill(); irisTw=null; const ds=W.lastDoor||screenOf(doorPoint(inShop)); const o={r:closing?parseFloat(iris.style.getPropertyValue('--ir'))||0:0}; iris.classList.add('on'); sfx('doorC',{g:.4}); inCard(null);
   gsap.to(o,{r:Math.hypot(innerWidth,innerHeight),duration:RM?.01:.34,ease:'power3.out',onUpdate:()=>iris.style.setProperty('--ir',o.r+'px'),onComplete:()=>{ iris.classList.remove('on'); const p=preShop; inShop=null; exiting=false;
@@ -283,13 +285,13 @@ let last=performance.now(), fpsS=[], lpDone=LP;
 function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); tickRoutines(); updateCast(dt); update(dt);
   // lamp flare when the Lamplighter lights it
   for(const l of W.lamps){ if(l.flare>0) l.flare=Math.max(0,l.flare-dt*1.6); }
-  if(window.__camLock){} else if(mode==='explore'&&!inShop&&!D.shot){ steerFromKeys(); playCam(dt); prompt(nearDoor()); placePrompt(); } else applyCam(dt);
+  if(window.__camLock){} else if(mode==='explore'&&!inShop&&!D.shot){ steerFromKeys(); playCam(dt); prompt(PC.zs<.44?nearDoor():null); placePrompt(); } else { prompt(null); applyCam(dt); }
   occlusion(dt); updPins(); placeTag();
   if(D.shake>0){ D.shake=Math.max(0,D.shake-dt*1.4); cam.position.x+=Math.sin(clock.T*41)*.02*D.shake; cam.position.y+=Math.sin(clock.T*37)*.015*D.shake; }
   SP.update(); }
 function frame(now){ const dt=Math.min(.05,(now-last)/1000); last=now; step(dt); render();
   // auto low-power: if the first seconds run under ~24 fps, drop the post chain and shadows
-  if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<24){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } lpDone=true; } }
+  if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<24&&!P.has('full')){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } else if(1/avg>50&&!SHM) setShadowMode(true); lpDone=true; } }
   requestAnimationFrame(frame); }
 
 // first frame is the town; the story starts on it
@@ -298,7 +300,7 @@ for(let i=0;i<3;i++) step(1/30);
 if(startStory){ storyRun=run(story()); } else { { const c=hx(-1,1); R.place(c.x-.2,c.z+.3,2.4); R.lights=true; } mode='town'; idleTown(); D.k=1; if(P.has('explore')) explore(true); }
 step(1/30); render(); $('#loading').classList.add('done'); body.classList.add('ready');
 window.__render=render; window.__boot={ms:Math.round(performance.now()-t0)};
-if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,setZoom,setPlay,jump,PINS,screenOf,CAST}; 
+if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,setZoom,setPlay,jump,PINS,screenOf,CAST,W}; 
   // demo cursor driven on the sim clock (capture only)
   const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#f3ead8" stroke="#17130f" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
   const cur={x:-100,y:-100}; const put=()=>{ dc.style.transform=`translate(${cur.x}px,${cur.y}px)`; };
@@ -308,7 +310,7 @@ if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,setZoom,setPlay,jump,PINS,sc
     curTo:(x,y,d=.6)=>{ if(typeof x==='string'){ const c=elC(x); x=c.x; y=c.y; } gsap.to(cur,{x,y,duration:d,ease:'power2.inOut',onUpdate:put}); },
     curAt:(x,y)=>{ if(typeof x==='string'){ const c=elC(x); x=c.x; y=c.y; } cur.x=x; cur.y=y; put(); },
     hv:(sel,on)=>{ document.querySelectorAll('.pin.hv').forEach(e=>e.classList.remove('hv')); if(on&&sel) document.querySelector(sel).classList.add('hv'); },
-    tap:()=>{ ring(); const el=document.elementFromPoint(cur.x,cur.y); if(!el) return; const pin=el.closest('.pin,button,[role=radio]'); if(pin){ pin.click(); return; } const o={clientX:cur.x,clientY:cur.y,bubbles:true}; cv.dispatchEvent(new PointerEvent('pointerdown',o)); cv.dispatchEvent(new PointerEvent('pointerup',o)); },
+    tap:()=>{ ring(); const el=document.elementFromPoint(cur.x,cur.y); if(!el) return; const pin=el.closest('.pin,button,a,[role=radio]'); if(pin){ pin.click(); return; } const o={clientX:cur.x,clientY:cur.y,bubbles:true}; cv.dispatchEvent(new PointerEvent('pointerdown',o)); cv.dispatchEvent(new PointerEvent('pointerup',o)); },
     curToW:(x,y,z,d=.6)=>{ const p=screenOf(new THREE.Vector3(x,y,z)); gsap.to(cur,{x:p.x,y:p.y,duration:d,ease:'power2.inOut',onUpdate:put}); },
     curFollowW:(x,y,z)=>{ const p=screenOf(new THREE.Vector3(x,y,z)); cur.x=p.x; cur.y=p.y; put(); },
     outside:(id,k=1.4)=>{ const d=doorPoint(id), c=hx(SHOPS[id].q,SHOPS[id].r); const v=d.clone().sub(c).setY(0).normalize(); return [d.x+v.x*k,0,d.z+v.z*k]; },

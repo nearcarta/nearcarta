@@ -76,6 +76,8 @@ body.letterbox #lb i{height:7.5vh}
 /* 2D / low-power fallback */
 #fb2d{position:fixed;inset:0;z-index:1} #fb2d[hidden]{display:none} #fb2d img{width:100%;height:100%;object-fit:cover;display:block}
 .fbpin{position:absolute;transform:translate(-50%,-100%);background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:5px 9px;font-size:12px;white-space:nowrap}
+.fbpin{color:inherit;text-decoration:none;cursor:pointer;transition:transform .12s,border-color .12s} .fbpin:hover,.fbpin:focus-visible{border-color:var(--brass,#c9a066);transform:translate(-50%,-100%) scale(1.06);outline:none}
+.fbpin::after{content:'Open \2192';display:block;font-size:10px;color:var(--brass,#c9a066);margin-top:2px}
 .fbpin b{font-weight:600} .fbpin span{display:block;font-size:11px;color:var(--parch2)}
 body.fb #c{display:none}
 
@@ -141,3 +143,8 @@ body.story #zoom{opacity:0;pointer-events:none}
 /* capture-only demo cursor */
 #demoCur{position:fixed;left:0;top:0;z-index:99;width:22px;height:22px;pointer-events:none;transform:translate(-100px,-100px);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
 #demoCur i{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;border:2px solid #f0c987;opacity:0;transform:scale(.4)}
+/* 2D / low-power fallback: hide controls that only drive the 3D camera */
+body.fb #modeBtn,body.fb #playSeg,body.fb #zoom,body.fb #pins,body.fb #tag,body.fb #hint,body.fb #inCard{display:none!important}
+/* modeBtn only appears as "Watch" while exploring; story end HUD shows no Explore button */
+body:not(.explore) #modeBtn{display:none!important}
+#inCard a.go{text-decoration:none;background:var(--brass,#c9a066);color:#17130f;border-color:transparent}

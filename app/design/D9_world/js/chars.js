@@ -3,6 +3,7 @@
 // footsteps from foot contact, head look-at, one-shot emotes, and (for the Lamplighter) a hand lantern.
 import * as THREE from 'three';
 import { clone as skClone } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { P, clock, rnd, hx, key, toHex, walkPath, walkable, isTown, RM } from './core.js';
 import { W, load, LAMPC, lampState, radial } from './world.js';
 
@@ -22,18 +23,54 @@ const RIG={
   kay:{ idle:'Idle', walk:'Walking_A', walk2:'Walking_B', run:'Running_A', block:'Blocking', blockIn:'Block', cheer:'Cheer', interact:'Interact', hit:'Hit_A', sit:'Sit_Floor_Idle', cast:'Spellcast_Raise', use:'Use_Item', head:'head', feet:['footl','footr'], walkV:.5, runV:1.35, alt:['interact','use'] },
 };
 
+// draw calls: a KayKit character is ~10 skinned parts on one skeleton with one texture. Bake each part's bind matrix into
+// its vertices and merge the visible parts per material into a single SkinnedMesh (attached bind mode, identity bind matrix),
+// remapping joints onto one shared bone list. Rigid props parented to hand bones stay as they are.
+const SKA=['position','normal','uv','skinIndex','skinWeight'];
+function mergeSkin(root){ const groups=new Map(); root.updateMatrixWorld(true);
+  const shown=m=>{ for(let p=m;p;p=p.parent) if(!p.visible) return false; return true; };
+  const boneOf=m=>{ for(let p=m.parent;p;p=p.parent) if(p.isBone) return p; return null; };
+  let ref=null; root.traverse(m=>{ if(!ref&&m.isSkinnedMesh) ref=m.skeleton; });
+  root.traverse(m=>{ if(!m.isMesh||!shown(m)||m.morphTargetInfluences) return; const k=m.material.map?m.material.map.uuid:m.material.uuid;
+    if(m.isSkinnedMesh?SKA.every(a=>m.geometry.attributes[a]):(ref&&boneOf(m)&&ref.bones.includes(boneOf(m))&&m.geometry.attributes.uv&&m.geometry.attributes.normal)) (groups.get(k)||groups.set(k,[]).get(k)).push(m); });
+  for(let parts of groups.values()){ const bones=[], inv=[], bi=new Map();
+    // skinned parts first; quantized parts carry their own inverse-bind frames, so each part gets a correction C into the shared frame
+    parts=parts.filter(m=>m.isSkinnedMesh).concat(parts.filter(m=>!m.isSkinnedMesh)); if(parts.length<2||!parts[0].isSkinnedMesh) continue;
+    parts=parts.filter(m=>m.isSkinnedMesh||(()=>{ const b=boneOf(m); return ref.bones.includes(b); })());
+    const geos=parts.map(m=>{ const g=new THREE.BufferGeometry(), src=m.geometry, n=src.attributes.position.count;
+      let sk=m.skeleton, bm, rigid=null, map;
+      if(m.isSkinnedMesh){ let C=new THREE.Matrix4(); const k0=sk.bones.findIndex(b=>bi.has(b)); if(k0>=0) C.copy(inv[bi.get(sk.bones[k0])]).invert().multiply(sk.boneInverses[k0]);
+        const Ci=C.clone().invert(); bm=C.clone().multiply(m.bindMatrix);
+        map=sk.bones.map((b,i)=>{ if(!bi.has(b)){ bi.set(b,bones.length); bones.push(b); inv.push(sk.boneInverses[i].clone().multiply(Ci)); } return bi.get(b); }); }
+      else { // rigid prop under a hand/head/chest bone: one joint at weight 1, vertices moved into that joint's bind space
+        const b=boneOf(m); if(!bi.has(b)){ bi.set(b,bones.length); bones.push(b); inv.push(ref.boneInverses[ref.bones.indexOf(b)].clone()); }
+        rigid=0; map=[bi.get(b)]; bm=inv[bi.get(b)].clone().invert().multiply(new THREE.Matrix4().copy(b.matrixWorld).invert().multiply(m.matrixWorld)); }
+      const f=(a,sz)=>{ const A=src.attributes[a], o=new Float32Array(n*sz); for(let i=0;i<n;i++) for(let c=0;c<sz;c++) o[i*sz+c]=A.getComponent(i,c); return o; };
+      const pos=new THREE.BufferAttribute(f('position',3),3), nor=new THREE.BufferAttribute(f('normal',3),3);
+      pos.applyMatrix4(bm); nor.applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(bm)); for(let i=0;i<n;i++){ tv.fromBufferAttribute(nor,i).normalize(); nor.setXYZ(i,tv.x,tv.y,tv.z); }
+      const si=new Uint16Array(n*4), SI=src.attributes.skinIndex; for(let i=0;i<n;i++) for(let c=0;c<4;c++) si[i*4+c]=rigid!==null?map[rigid]:map[SI.getComponent(i,c)]||0;
+      g.setAttribute('position',pos); g.setAttribute('normal',nor); g.setAttribute('uv',new THREE.BufferAttribute(f('uv',2),2));
+      g.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(si,4)); g.setAttribute('skinWeight',new THREE.BufferAttribute(rigid!==null?new Float32Array(n*4).map((_,i)=>i%4?0:1):f('skinWeight',4),4));
+      if(src.index){ const I=src.index, ix=new Uint32Array(I.count); for(let i=0;i<I.count;i++) ix[i]=I.getX(i); g.setIndex(new THREE.BufferAttribute(ix,1)); } else { g.setIndex([...Array(n).keys()]); }
+      return g; });
+    const mg=mergeGeometries(geos); if(!mg) continue; const p0=parts.find(m=>m.isSkinnedMesh)||parts[0]; if(!p0.isSkinnedMesh) continue;
+    const sm=new THREE.SkinnedMesh(mg,p0.material); sm.name=p0.name+'+merged'; sm.castShadow=true; sm.userData.dynCast=true; sm.frustumCulled=false;
+    sm.bind(new THREE.Skeleton(bones,inv),new THREE.Matrix4()); p0.parent.add(sm); parts.forEach(m=>m.removeFromParent()); }
+}
+
 export class Char{
   constructor(g,{rig='kay',scale=.22,name='',keep=null,hide=[],tint=null,voice=1,height=.62}={}){
     this.rig=RIG[rig]; this.kind=rig; this.name=name; this.voice=voice;
-    const o=this.root=skClone(g.scene); o.scale.setScalar(scale*SCL); height*=SCL; this.height=height;
+    const o=this.root=skClone(g.scene); if(rig==='kay') o.traverse(m=>{ if(m.isBone) m.name=m.name.replace(/_\d+$/,''); }); /* the 5 KayKit rigs share one glb: GLTFLoader suffixes their bones (hips_4), the clips target the bare names */ o.scale.setScalar(scale*SCL); height*=SCL; this.height=height;
     // gait: wv/rv are the clip reference speeds (stride x scale); walkSpd/runSpd are the actual brisk speeds
     this.wv=this.rig.walkV*SCL; this.rv=this.rig.runV*SCL; this.walkSpd=this.wv*1.42; this.runSpd=this.rv*1.2; this.obj=new THREE.Group(); this.obj.add(o); W.scene.add(this.obj);
-    o.traverse(m=>{ if(m.isMesh){ m.castShadow=true; m.receiveShadow=false; m.frustumCulled=false;
+    o.traverse(m=>{ if(m.isMesh){ m.castShadow=true; m.userData.dynCast=true; m.receiveShadow=false; m.frustumCulled=false;
         if(keep && /Shield|Sword|Axe|Knife|Crossbow|Throwable|Wand|Staff|Spellbook|Mug/.test(m.name) && !keep.includes(m.name)) m.visible=false;
         if(hide.includes(m.name)) m.visible=false;
         if(tint && m.material){ m.material=m.material.clone(); m.material.color.multiply(new THREE.Color(tint)); }
         if(m.morphTargetDictionary && 'Surprised' in m.morphTargetDictionary) this.face=m; }
       if(m.isBone){ if(m.name===this.rig.head) this.head=m; if(m.name===this.rig.feet[0]) this.fl=m; if(m.name===this.rig.feet[1]) this.fr=m; if(m.name==='Palm2L'||m.name==='handslotl') this.handL=m; if(m.name==='Palm2R'||m.name==='handslotr') this.handR=m; if(m.name==='UpperArmL'||m.name==='upperarml') this.armL=m; if(m.name==='UpperArmR'||m.name==='upperarmr') this.armR=m; } });
+    if(rig==='kay') mergeSkin(o);
     this.mixer=new THREE.AnimationMixer(o); this.A={};
     for(const [k,n] of Object.entries(this.rig)){ if(typeof n!=='string') continue; const c=g.animations.find(a=>a.name===n); if(c) this.A[k]=this.mixer.clipAction(c); }
     for(const k of ['idle','walk','run']){ const a=this.A[k]; if(a){ a.play(); a.setEffectiveWeight(k==='idle'?1:0); } }
@@ -149,12 +186,12 @@ export async function buildCast(){
   const R=CAST.robot=new Char(robot,{rig:'robot',scale:.135,name:'Lamplighter',voice:1.25,height:.7}); R.addLantern(); R.lights=true; R.immune=false;
   // the Lamplighter's palette: brass body instead of the stock yellow, so it reads as a lantern-bearer, not a toy
   R.root.traverse(m=>{ if(m.isMesh&&m.material){ m.material=m.material.clone(); const c=m.material.color; const hsl={}; c.getHSL(hsl); if(hsl.s>.4&&hsl.h>.08&&hsl.h<.2) c.set(0xc9a066); } });
-  // knights at the ward gate: shields up on a refusal
+  // knights hold the ward gate, facing out: shield arm toward the road, shields up on a refusal
   const g=W.gatePos; const gd=new THREE.Vector3(1,0,0);
-  CAST.knights=[0,1].map(i=>new Char(knight,{scale:.22,name:'Knight',keep:[i?'Round_Shield':'Badge_Shield','1H_Sword'],voice:.8,height:.62}).place(g.x+.55+i*.1,g.z+(i?.62:-.62),Math.PI/2));
+  CAST.knights=[0,1].map(i=>new Char(knight,{scale:.22,name:'Knight',keep:[i?'Round_Shield':'Badge_Shield','1H_Sword'],voice:.8,height:.62}).place(g.x-.3,g.z+(i?.6:-.6),-Math.PI/2));
   CAST.knights.forEach(k=>{ k.noAlt=true; k.guard=true; });
   // the hooded stranger waits just outside the gate
-  CAST.stranger=new Char(hooded,{scale:.21,name:'Stranger',keep:[],voice:.7,height:.6}).place(g.x-.9,g.z+.2,Math.PI/2); CAST.stranger.noAlt=true;
+  CAST.stranger=new Char(hooded,{scale:.21,name:'Stranger',keep:[],voice:.7,height:.6}).place(g.x-1.2,g.z+.1,Math.PI/2); CAST.stranger.noAlt=true;
   // the ferryman on the jetty
   const J=W.jetty; CAST.ferryman=new Char(barb,{scale:.21,name:'Ferryman',keep:['Mug'],voice:.75,height:.62}).place(J.stand.x,J.stand.z,0); CAST.ferryman.noAlt=false;
   // council on the hall steps
@@ -175,9 +212,13 @@ export async function buildCast(){
   return CAST;
 }
 const TOWN=[[0,1],[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[2,-1],[-2,1],[-2,0],[0,-2],[1,-3],[-1,-1],[2,0],[-3,1],[0,2],[-1,3],[1,1],[2,-2],[-3,2]];
+const _fr=new THREE.Frustum(), _pm=new THREE.Matrix4(), _sp=new THREE.Sphere();
 export function updateCast(dt){
   const R=CAST.robot;
   if(R&&CAST.keepers) for(const k of Object.values(CAST.keepers)){ const d=Math.hypot(k.pos.x-R.pos.x,k.pos.z-R.pos.z); k.waveCD-=dt;
     if(d<2.4){ k.lookAt(R,1); if(k.waveCD<=0&&!k.emote&&R.speed>.05){ k.wave(); k.waveCD=9; onEvent('emote:wave',k); } } else if(k.look){ k.lookAt(null); } }
+  // frustum-cull each character as a whole (the merged skinned meshes have no reliable bounds of their own)
+  const cam=W.camera; if(cam){ cam.updateMatrixWorld(); _pm.multiplyMatrices(cam.projectionMatrix,cam.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm); }
+  for(const c of chars){ if(cam){ _sp.center.set(c.pos.x,c.pos.y+c.height*.5,c.pos.z); _sp.radius=c.height*.9; c.root.visible=_fr.intersectsSphere(_sp); } }
   for(const c of chars){ if(c.wanderer && !c.hold){ if(!c.path.length||c.pi>=c.path.length){ c.wT-=dt; if(c.wT<0&&!c.emote){ const t=TOWN[(rnd()*TOWN.length)|0]; if(walkable(...t)) c.goHex(t,{end:hx(...t).add(new THREE.Vector3((rnd()-.5)*.7,0,(rnd()-.5)*.7))}); c.wT=3+rnd()*6; } } } c.update(dt); }
 }
