@@ -13,9 +13,9 @@ use near_workspaces::{Account, AccountId, Contract, Worker};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-const OATH_ARTIFACT: &str = "../artifacts/oath.r15.wasm";
+const OATH_ARTIFACT: &str = "../artifacts/oath.r16.oz.wasm";
 const FACTORY_WASM: &str = "target/near/charter_factory.wasm";
-const R14_HASH: &str = "FaheXbWkhFnsJaxhKksACWnLhFEVQUx5dTWk5CqkigF9"; // R15 build of 4d4d047
+const R14_HASH: &str = "AWw8zu6mcbkdmTf49wPB2BdXEUjbbWKVHAfjfiQho89r"; // R16: binaryen 133 wasm-opt -Oz of the reproducible 5099a7c build
 const NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 const MILLI: u128 = NEAR / 1000;
 
@@ -74,12 +74,12 @@ async fn factory_end_to_end() -> anyhow::Result<()> {
     let w = near_workspaces::sandbox().await?;
     let root = w.root_account()?;
     let code = std::fs::read(OATH_ARTIFACT)?;
-    assert_eq!(bs58::encode(Sha256::digest(&code)).into_string(), R14_HASH, "artifact is not the R14 build");
+    assert_eq!(bs58::encode(Sha256::digest(&code)).into_string(), R14_HASH, "artifact is not the pinned R16 -Oz build");
 
     // 1. publish the R14 oath code once, by hash
     let publisher = root.create_subaccount("publisher").initial_balance(NearToken::from_near(100)).transact().await?.into_result()?;
     deploy_global(&w, &publisher, code).await?;
-    println!("STEP global oath published by hash {R14_HASH}");
+    println!("STEP global oath (R16 -Oz) published by hash {R14_HASH}");
 
     // 2. factory pinned to that hash; init is private
     let factory_acct = root.create_subaccount("charters").initial_balance(NearToken::from_near(20)).transact().await?.into_result()?;
