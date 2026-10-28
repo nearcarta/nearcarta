@@ -39,7 +39,7 @@ const GAS_FT_STORAGE_CB: Gas = Gas::from_tgas(30);
 const GAS_ESCALATION_CB: Gas = Gas::from_tgas(60);
 const GAS_AGENT_KEY_CB: Gas = Gas::from_tgas(5);
 /// R14: set/execute of SetAgentKey needs room for AddKey + on_agent_key (+ its DeleteKey).
-const GAS_MIN_AGENT_KEY: Gas = Gas::from_tgas(20);
+const GAS_MIN_AGENT_KEY: Gas = Gas::from_tgas(25); // R15: +1 DeleteKey action in the AddKey batch
 /// Minimum prepaid gas per path, checked before anything is logged, so a
 /// starved call reverts cleanly instead of leaving a phantom `submitted` log.
 const MIN_GAS_NATIVE: Gas = Gas::from_tgas(25);
@@ -47,6 +47,34 @@ const MIN_GAS_FT: Gas = Gas::from_tgas(60);
 const MIN_GAS_ESCALATE: Gas = Gas::from_tgas(75);
 /// Settled action records older than the newest KEEP_RECENT are pruned.
 pub const KEEP_RECENT: u64 = 32;
+/// R15 data lives under its own raw storage keys, so the root state layout is unchanged.
+const K_ROTATING: &[u8] = b"r15:rot";
+const K_REPUTATION: &[u8] = b"r15:rep";
+fn k_expiry(clause_id: &str) -> Vec<u8> { [b"r15:exp:".as_slice(), clause_id.as_bytes()].concat() }
+fn clause_expiry(clause_id: &str) -> Option<u64> {
+    env::storage_read(&k_expiry(clause_id)).and_then(|v| v.try_into().ok()).map(u64::from_le_bytes)
+}
+fn rotating() -> bool { env::storage_has_key(K_ROTATING) }
+
+/// Per-charter record of what the agent tried, counted on chain at every `propose`.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Reputation {
+    pub proposals: u64,
+    pub allowed: u64,
+    pub escalated: u64,
+    pub refused: u64,
+    /// Refusal reason -> count (e.g. receiver_not_allowlisted, over_per_action_cap).
+    pub refusals: BTreeMap<String, u64>,
+}
+fn reputation_read() -> Reputation {
+    env::storage_read(K_REPUTATION).and_then(|v| near_sdk::borsh::from_slice(&v).ok()).unwrap_or_default()
+}
+/// Score 0..=100: the share of proposals that stayed inside the rules. None until 5 proposals.
+pub fn reputation_score(r: &Reputation) -> Option<u64> {
+    if r.proposals < 5 { return None; }
+    Some((r.allowed + r.escalated) * 100 / r.proposals)
+}
 /// Storage headroom (bytes) one new action may need; used by the reserve check.
 const ACTION_STORAGE_HEADROOM: u64 = 600;
 const MAX_MEMO: usize = 64;
@@ -163,6 +191,8 @@ pub enum Change {
     SetDao { dao: Option<AccountId> },
     SetPolicyDelay { delay_ns: U64 },
     Upgrade { code_hash: String },
+    /// R15: a later expiry or none (a widening change) waits for the policy delay.
+    SetClauseExpiry { clause_id: String, expires_at: Option<U64> },
 }
 
 #[near(serializers = [borsh, json])]
@@ -277,7 +307,7 @@ impl Oath {
     /// Widening changes wait `policy_delay_ns`; with delay 0 they apply now.
     fn queue_or_apply(&mut self, change: Change) -> PromiseOrValue<serde_json::Value> {
         let setup_exempt = self.setup_open
-            && matches!(change, Change::SetClause { .. } | Change::SetReceiptSigner { .. } | Change::SetAgentKey { .. });
+            && matches!(change, Change::SetClause { .. } | Change::SetClauseExpiry { .. } | Change::SetReceiptSigner { .. } | Change::SetAgentKey { .. });
         if self.policy_delay_ns == 0 || setup_exempt {
             return self.apply(change);
         }
@@ -308,6 +338,13 @@ impl Oath {
                 self.policy_delay_ns = delay_ns.0;
                 self.bump_policy("set_policy_delay");
             }
+            Change::SetClauseExpiry { clause_id, expires_at } => {
+                match expires_at {
+                    Some(t) => { env::storage_write(&k_expiry(&clause_id), &t.0.to_le_bytes()); }
+                    None => { env::storage_remove(&k_expiry(&clause_id)); }
+                }
+                self.bump_policy(&format!("set_clause_expiry:{clause_id}"));
+            }
             Change::Upgrade { code_hash } => {
                 // Executing marks the hash as ready; `upgrade` consumes it.
                 let id = self.next_change;
@@ -316,11 +353,11 @@ impl Oath {
                 emit("policy", json!({"change": "upgrade_ready", "code_hash": code_hash, "change_id": U64(id)}));
             }
             Change::SetAgentKey { public_key, allowance } => {
-                // R14: AddKey runs alone in its own receipt, then `on_agent_key` checks it.
-                // State switches to the new key at once (the old key stops working now);
-                // if AddKey fails the callback rolls `agent_key` back to `prev`. The old key
-                // is deleted only after AddKey succeeded, so a failure never leaves the
-                // account with neither key.
+                // R15: AddKey(new) and DeleteKey(old) run as ONE batch receipt. A batch is atomic,
+                // so the old key is gone in the same receipt that adds the new one, and if AddKey
+                // fails the delete is rolled back too: the account never has neither key.
+                // State switches to the new key at once (direct path); until the callback runs a
+                // `rotating` flag also refuses NEP-366 relayed proposes, which cannot name their key.
                 // Checked before any state change or log: a call that cannot fund the callback reverts whole.
                 require!(env::prepaid_gas() >= GAS_MIN_AGENT_KEY, "ERR_LOW_GAS");
                 let me = env::current_account_id();
@@ -333,7 +370,9 @@ impl Oath {
                 }
                 emit("agent_key", json!({"op": "set", "public_key": public_key, "allowance": allowance}));
                 let a = Allowance::limited(NearToken::from_yoctonear(allowance.0)).expect("ERR_ALLOWANCE_ZERO");
-                let add = Promise::new(me.clone()).add_access_key_allowance(public_key.clone(), a, me.clone(), "propose".to_string());
+                let mut add = Promise::new(me.clone()).add_access_key_allowance(public_key.clone(), a, me.clone(), "propose".to_string());
+                if let Some(old) = prev.clone().filter(|o| *o != public_key) { add = add.delete_key(old); }
+                env::storage_write(K_ROTATING, &[1]);
                 let cb = Promise::new(me).function_call_weight(
                     "on_agent_key",
                     json!({"prev": prev, "new": public_key}).to_string().into_bytes(),
@@ -363,8 +402,23 @@ impl Oath {
         }
     }
 
+    /// Rule expiry for one clause: after `expires_at` (ns) every proposal under it is refused
+    /// with `clause_expired`. An earlier expiry applies at once; a later one or none is a widening change.
+    pub fn set_clause_expiry(&mut self, clause_id: String, expires_at: Option<U64>) -> PromiseOrValue<serde_json::Value> {
+        self.assert_gov();
+        require!(self.clauses.contains_key(&clause_id), "ERR_NO_CLAUSE");
+        let narrowing = match (clause_expiry(&clause_id), expires_at) {
+            (_, None) => false,
+            (None, Some(_)) => true,
+            (Some(old), Some(new)) => new.0 <= old,
+        };
+        let ch = Change::SetClauseExpiry { clause_id, expires_at };
+        if narrowing { self.apply(ch) } else { self.queue_or_apply(ch) }
+    }
+
     pub fn remove_clause(&mut self, clause_id: String) {
         self.assert_gov();
+        env::storage_remove(&k_expiry(&clause_id));
         self.clauses.remove(&clause_id);
         self.bump_policy(&format!("remove_clause:{clause_id}"));
     }
@@ -430,12 +484,11 @@ impl Oath {
         let ok = env::promise_result_checked(0, 64).is_ok();
         let closed_setup = self.setup_key.as_ref() == Some(&new);
         if closed_setup { self.setup_key = None; }
+        env::storage_remove(K_ROTATING);
         if ok {
             let me = env::current_account_id();
+            // The old key was already deleted in the AddKey batch.
             let mut del: Option<Promise> = None;
-            if let Some(old) = prev.filter(|o| *o != new && self.agent_key.as_ref() != Some(o)) {
-                del = Some(Promise::new(me.clone()).delete_key(old));
-            }
             if self.agent_key.as_ref() != Some(&new) {
                 // Revoked or replaced while AddKey was in flight: do not leave it on the account.
                 emit("agent_key", json!({"op": "added_stale_removed", "public_key": new}));
@@ -472,6 +525,7 @@ impl Oath {
     pub fn revoke_agent(&mut self) -> Promise {
         self.assert_gov();
         let pk = self.agent_key.take().expect("ERR_NO_AGENT");
+        env::storage_remove(K_ROTATING);
         emit("agent_key", json!({"op": "revoke", "public_key": pk}));
         Promise::new(env::current_account_id()).delete_key(pk)
     }
@@ -527,6 +581,9 @@ impl Oath {
         // THIS account (and its FC scope), so predecessor == self is the binding guarantee.
         if env::signer_account_id() == env::current_account_id() {
             require!(Some(env::signer_account_pk()) == self.agent_key, "ERR_NOT_AGENT_KEY");
+        } else {
+            // Relayed: the inner key is not visible here, so no relayed propose while a rotation is in flight.
+            require!(!rotating(), "ERR_KEY_ROTATING");
         }
         require!(p.nonce.0 == self.next_nonce, "ERR_NONCE");
         self.next_nonce += 1;
@@ -588,6 +645,7 @@ impl Oath {
         if !valid_field(&p.shop) || !valid_field(&p.clause_id) { return Err("bad_field".into()); }
         if p.memo.as_ref().map(|m| m.len() > MAX_MEMO).unwrap_or(false) { return Err("memo_too_long".into()); }
         let c = self.clauses.get(&p.clause_id).cloned().ok_or("unknown_clause")?;
+        if clause_expiry(&p.clause_id).map(|t| env::block_timestamp() >= t).unwrap_or(false) { return Err("clause_expired".into()); }
         let escalate = clause_checks(&c, &p.receiver, p.amount.0)?;
         let u = self.usage_today(&p.clause_id);
         if u.spent.0 + u.reserved.0 + p.amount.0 > c.daily_budget.0 { return Err("over_daily_budget".into()); }
@@ -719,7 +777,9 @@ impl Oath {
         let ok = env::promise_result_checked(0, 1024).is_ok();
         let mut u = self.usage_today(&rec.clause_id);
         u.reserved.0 = u.reserved.0.saturating_sub(rec.amount.0);
-        if ok && u.day == rec.day { u.spent.0 += rec.amount.0; }
+        // A12: the reservation was carried across UTC midnight by usage_today (reserved is not reset),
+        // so the settled amount is charged to the day the money actually moves.
+        if ok { u.spent.0 += rec.amount.0; }
         self.usage.insert(rec.clause_id.clone(), u);
         rec.status = if ok { "confirmed".into() } else { "failed_released".into() };
         self.actions.insert(id, rec.clone());
@@ -759,6 +819,14 @@ impl Oath {
 
     #[allow(clippy::too_many_arguments)]
     fn chronicle(&self, id: Option<u64>, p: &Proposal, decision: &str, status: &str, why: &str, receipt_hash: Option<String>, ah: &str) {
+        let mut r = reputation_read();
+        r.proposals += 1;
+        match decision {
+            "allowed" => r.allowed += 1,
+            "escalated" => r.escalated += 1,
+            _ => { r.refused += 1; *r.refusals.entry(why.chars().take(MAX_FIELD).collect()).or_default() += 1; }
+        }
+        env::storage_write(K_REPUTATION, &near_sdk::borsh::to_vec(&r).expect("ERR_REP"));
         emit("action", json!({
             "action_id": id.map(U64),
             "agent": env::current_account_id(),
@@ -810,6 +878,18 @@ impl Oath {
         })
     }
     pub fn get_clauses(&self) -> &BTreeMap<String, Clause> { &self.clauses }
+    pub fn get_clause_expiry(&self, clause_id: String) -> Option<U64> { clause_expiry(&clause_id).map(U64) }
+    /// Every user-set rule for one clause in one read: cap, allowlist, asset, daily count, escalation, expiry, usage.
+    pub fn get_rules(&self, clause_id: String) -> Option<serde_json::Value> {
+        let c = self.clauses.get(&clause_id)?;
+        Some(json!({"clause_id": clause_id, "clause": c, "expires_at": clause_expiry(&clause_id).map(U64),
+            "usage": self.usage_today(&clause_id), "policy_version": self.policy_version}))
+    }
+    /// Agent reputation from this charter's own on-chain decisions.
+    pub fn get_reputation(&self) -> serde_json::Value {
+        let r = reputation_read();
+        json!({"score": reputation_score(&r), "min_proposals_for_score": 5, "counts": r, "rotating_key": rotating()})
+    }
     pub fn get_usage(&self, clause_id: String) -> Usage { self.usage_today(&clause_id) }
     pub fn get_action(&self, action_id: U64) -> Option<ActionRec> { self.actions.get(&action_id.0).cloned() }
     pub fn get_pending(&self) -> &BTreeMap<u64, Pending> { &self.pending }

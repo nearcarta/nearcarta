@@ -803,12 +803,12 @@ fn r14_add_key_failure_after_later_change_does_not_clobber() {
 }
 
 #[test]
-fn r14_add_key_success_keeps_new_and_deletes_old() {
+fn r15_add_key_success_keeps_new_old_already_deleted_in_batch() {
     let mut o = setup(0);
     o.agent_key = Some(pk2());
     set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
     let r = o.on_agent_key(Some(agent_pk()), pk2());
-    assert!(is_promise(&r));
+    assert_eq!(val(&r), Some(true), "R15: nothing left to delete in the callback");
     assert_eq!(o.agent_key, Some(pk2()));
     assert!(has_log("added"));
 }
@@ -859,12 +859,12 @@ fn r14_add_key_success_prev_restored_elsewhere_not_deleted() {
 fn r14_set_agent_key_low_gas_reverts_before_state_or_log() {
     let mut o = setup(0);
     let before = o.agent_key.clone();
-    let mut b = ctx("owner.test", T0); b.prepaid_gas(Gas::from_tgas(19)); testing_env!(b.build());
+    let mut b = ctx("owner.test", T0); b.prepaid_gas(Gas::from_tgas(24)); testing_env!(b.build());
     let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.set_agent_key(pk2(), U128(NEAR)); }));
     assert!(r.is_err());
     assert!(get_logs().is_empty());
     assert_eq!(o.agent_key, before);
-    let mut b = ctx("owner.test", T0); b.prepaid_gas(Gas::from_tgas(20)); testing_env!(b.build());
+    let mut b = ctx("owner.test", T0); b.prepaid_gas(Gas::from_tgas(25)); testing_env!(b.build());
     let _ = o.set_agent_key(pk2(), U128(NEAR));
     assert_eq!(o.agent_key, Some(pk2()));
 }
@@ -885,12 +885,12 @@ fn r14_on_agent_key_deletes_exactly_the_right_keys() {
     set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
     let _ = o.on_agent_key(Some(agent_pk()), pk2());
     assert_eq!(deleted_keys(), vec![String::from(&pk2())]);
-    // normal rotation: only the old key is deleted.
+    // normal rotation: the old key went in the AddKey batch (R15), so the callback deletes nothing.
     let mut o = setup(0);
     o.agent_key = Some(pk2());
     set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
     let _ = o.on_agent_key(Some(agent_pk()), pk2());
-    assert_eq!(deleted_keys(), vec![String::from(&agent_pk())]);
+    assert_eq!(deleted_keys(), Vec::<String>::new());
     // same key re-set, then revoked meanwhile: the key is deleted once, not twice.
     let mut o = setup(0);
     o.agent_key = None;
@@ -996,4 +996,184 @@ fn setup_window_stays_closed_when_the_closing_key_lands() {
     set_results("oath.test", T0 + DELAY, vec![PromiseResult::Failed]);
     let _ = o.on_agent_key(Some(pk2()), pk3());
     assert!(!o.setup_open);
+}
+
+// ---------------- R15: Judge A11 / A12 and user-set rules + reputation ----------------
+fn relayed(ts: u64) {
+    let mut b = ctx("oath.test", ts); b.signer_account_id(acc("relayer.test")); testing_env!(b.build());
+}
+fn rotate_to_pk2(o: &mut Oath) {
+    set("owner.test", T0);
+    let _ = o.set_agent_key(pk2(), U128(NEAR));
+}
+
+#[test]
+fn r15_a11_rotation_adds_new_and_deletes_old_in_one_receipt() {
+    let mut o = setup(0);
+    rotate_to_pk2(&mut o);
+    let rs = near_sdk::test_utils::get_created_receipts();
+    let batch = rs.iter().find(|r| r.actions.iter().any(|a| matches!(a, near_sdk::mock::MockAction::AddKeyWithFunctionCall { .. }))).expect("AddKey receipt");
+    let dels: Vec<String> = batch.actions.iter().filter_map(|a| match a {
+        near_sdk::mock::MockAction::DeleteKey { public_key, .. } => Some(public_key.to_string()), _ => None }).collect();
+    assert_eq!(dels, vec![String::from(&agent_pk())], "old key deleted in the same atomic batch as AddKey");
+    assert!(rotating());
+}
+
+#[test]
+fn r15_a11_old_key_refused_on_both_paths_during_rotation() {
+    let mut o = setup(0);
+    rotate_to_pk2(&mut o);
+    // direct path: the old key no longer matches state
+    let p = prop(&o, "tip", "bob.test", 1);
+    set("oath.test", T0);
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.propose(p); }));
+    assert!(r.is_err(), "direct old key refused");
+    // relayed path: refused while the rotation is in flight
+    let p = prop(&o, "tip", "bob.test", 1);
+    relayed(T0);
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.propose(p); }));
+    assert!(r.is_err(), "relayed propose refused while rotating");
+    // callback lands: relayed path open again (the old key is gone from the account by now)
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let _ = o.on_agent_key(Some(agent_pk()), pk2());
+    assert!(!rotating());
+    let p = prop(&o, "tip", "bob.test", 1);
+    relayed(T0);
+    let _ = o.propose(p);
+}
+
+#[test]
+fn r15_a11_failed_rotation_clears_flag_and_rolls_back() {
+    let mut o = setup(0);
+    rotate_to_pk2(&mut o);
+    set_results("oath.test", T0, vec![PromiseResult::Failed]);
+    let _ = o.on_agent_key(Some(agent_pk()), pk2());
+    assert!(!rotating());
+    assert_eq!(o.agent_key, Some(agent_pk()));
+}
+
+#[test]
+fn r15_a11_revoke_clears_rotation_flag() {
+    let mut o = setup(0);
+    rotate_to_pk2(&mut o);
+    set("owner.test", T0);
+    let _ = o.revoke_agent();
+    assert!(!rotating());
+}
+
+#[test]
+fn r15_a12_spend_reserved_before_midnight_counts_after_it() {
+    let mut o = setup(0);
+    let p = prop(&o, "tip", "bob.test", NEAR / 2);
+    set("oath.test", T0);
+    let _ = o.propose(p);
+    let id = o.next_action - 1;
+    assert_eq!(o.usage_today(&"tip".to_string()).reserved.0, NEAR / 2);
+    let next_day = T0 + NS_PER_DAY;
+    set_results("oath.test", next_day, vec![PromiseResult::Successful(vec![])]);
+    let _ = o.on_settle(U64(id));
+    let u = o.usage_today(&"tip".to_string());
+    assert_eq!(u.reserved.0, 0);
+    assert_eq!(u.spent.0, NEAR / 2, "settled after midnight still counts toward spent");
+}
+
+#[test]
+fn r15_a12_failed_settle_after_midnight_counts_nothing() {
+    let mut o = setup(0);
+    let p = prop(&o, "tip", "bob.test", NEAR / 2);
+    set("oath.test", T0);
+    let _ = o.propose(p);
+    let id = o.next_action - 1;
+    set_results("oath.test", T0 + NS_PER_DAY, vec![PromiseResult::Failed]);
+    let _ = o.on_settle(U64(id));
+    let u = o.usage_today(&"tip".to_string());
+    assert_eq!((u.reserved.0, u.spent.0), (0, 0));
+}
+
+#[test]
+fn r15_expiry_refuses_after_deadline() {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.set_clause_expiry("tip".into(), Some(U64(T0 + 10)));
+    assert_eq!(o.get_clause_expiry("tip".into()), Some(U64(T0 + 10)));
+    let p = prop(&o, "tip", "bob.test", 1);
+    set("oath.test", T0 + 10);
+    assert_eq!(outcome(o.propose(p)).unwrap().reason, "clause_expired");
+}
+
+#[test]
+fn r15_expiry_earlier_applies_now_later_or_none_waits_for_delay() {
+    let mut o = setup(1_000);
+    set("owner.test", T0);
+    let v0 = o.policy_version;
+    let r = o.set_clause_expiry("tip".into(), Some(U64(T0 + 100)));
+    assert!(matches!(r, PromiseOrValue::Value(ref j) if j.get("applied").is_some()), "first expiry narrows");
+    assert!(o.policy_version > v0);
+    let r = o.set_clause_expiry("tip".into(), Some(U64(T0 + 50)));
+    assert!(matches!(r, PromiseOrValue::Value(ref j) if j.get("applied").is_some()), "earlier expiry narrows");
+    let r = o.set_clause_expiry("tip".into(), Some(U64(T0 + 500)));
+    assert!(matches!(r, PromiseOrValue::Value(ref j) if j.get("queued").is_some()), "later expiry widens");
+    let r = o.set_clause_expiry("tip".into(), None);
+    assert!(matches!(r, PromiseOrValue::Value(ref j) if j.get("queued").is_some()), "removing expiry widens");
+    assert_eq!(o.get_clause_expiry("tip".into()), Some(U64(T0 + 50)));
+}
+
+#[test]
+fn r15_expiry_is_gov_only_and_needs_a_clause() {
+    let mut o = setup(0);
+    set("mallory.test", T0);
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.set_clause_expiry("tip".into(), Some(U64(1))); })).is_err());
+    set("owner.test", T0);
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.set_clause_expiry("nope".into(), Some(U64(1))); })).is_err());
+}
+
+#[test]
+fn r15_remove_clause_clears_its_expiry() {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.set_clause_expiry("tip".into(), Some(U64(T0 + 5)));
+    o.remove_clause("tip".into());
+    assert_eq!(o.get_clause_expiry("tip".into()), None);
+}
+
+#[test]
+fn r15_get_rules_returns_every_user_set_rule() {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.set_clause_expiry("tip".into(), Some(U64(T0 + 5)));
+    let r = o.get_rules("tip".into()).unwrap();
+    assert_eq!(r["clause"]["per_action_cap"], json!(NEAR.to_string()));
+    assert_eq!(r["clause"]["receivers"], json!(["bob.test", "bakery.test"]));
+    assert_eq!(r["clause"]["max_actions_per_day"], json!(50));
+    assert_eq!(r["clause"]["escalation_max"], json!((3 * NEAR).to_string()));
+    assert_eq!(r["expires_at"], json!((T0 + 5).to_string()));
+    assert!(o.get_rules("nope".into()).is_none());
+}
+
+#[test]
+fn r15_reputation_counts_on_chain_refusals() {
+    let mut o = setup(0);
+    for to in ["mallory.test", "mallory.test", "evil.test"] { let p = prop(&o, "tip", to, 1); assert_eq!(deny_reason(&mut o, p), "receiver_not_allowlisted"); }
+    let p = prop(&o, "tip", "bob.test", 10 * NEAR);
+    assert_eq!(deny_reason(&mut o, p), "over_per_action_cap");
+    assert_eq!(o.get_reputation()["score"], json!(null), "no score under 5 proposals");
+    let p = prop(&o, "tip", "bob.test", 1);
+    set("oath.test", T0);
+    let _ = o.propose(p);
+    let r = o.get_reputation();
+    assert_eq!(r["counts"]["proposals"], json!(5));
+    assert_eq!(r["counts"]["allowed"], json!(1));
+    assert_eq!(r["counts"]["refused"], json!(4));
+    assert_eq!(r["counts"]["refusals"]["receiver_not_allowlisted"], json!(3));
+    assert_eq!(r["counts"]["refusals"]["over_per_action_cap"], json!(1));
+    assert_eq!(r["score"], json!(20));
+}
+
+#[test]
+fn r15_reputation_score_math() {
+    let mut r = Reputation::default();
+    r.proposals = 4; r.allowed = 4;
+    assert_eq!(reputation_score(&r), None);
+    r.proposals = 10; r.allowed = 6; r.escalated = 1; r.refused = 3;
+    assert_eq!(reputation_score(&r), Some(70));
 }
