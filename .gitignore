@@ -10,3 +10,4 @@ playwright-report/
 target/
 *.wasm
 !contracts/artifacts/*.wasm
+.vercel
