@@ -1,0 +1,26 @@
+{
+ "what": "Vault Arena reproducible build: a fresh cargo-near reproducible build of contracts/arena at 864d0f5 is byte-identical to contracts/artifacts/arena.wasm and to the code on arena.r6vamvr9brhx-arena2.testnet",
+ "contract": "arena.r6vamvr9brhx-arena2.testnet",
+ "source_rev": "864d0f5b7315be2a2ea3b40a0ffefaf6e5016144",
+ "source_tag": "build-864d0f5",
+ "source_note": "git diff 864d0f5 HEAD -- contracts/arena is empty at 3709807, so main still builds the same wasm",
+ "command": "cd contracts/arena && cargo near build reproducible-wasm",
+ "cargo_near": "0.22.0",
+ "image": "sourcescan/cargo-near:0.22.0-rust-1.99.1@sha256:c9655eaf7436b90c87ea8b25739f91063032c5c30ba24cfeafe72c142943b5bb",
+ "build_output": {
+  "bytes": 328567,
+  "sha256": "414f95af72cf44d71d0435f54081bfe8fc8739d509bf36d01732f5e363e92e6a",
+  "bs58": "5PwtMjcC2oUTr5g2E2uWHyqHs3wkYGryY1ZWCuTvSZc5"
+ },
+ "artifact": {
+  "path": "contracts/artifacts/arena.wasm",
+  "sha256": "414f95af72cf44d71d0435f54081bfe8fc8739d509bf36d01732f5e363e92e6a",
+  "cmp": "identical bytes"
+ },
+ "embedded_nep330": {
+  "link": "https://github.com/nearcarta/nearcarta/tree/864d0f5b7315be2a2ea3b40a0ffefaf6e5016144",
+  "source_code_snapshot": "git+https://github.com/nearcarta/nearcarta?rev=864d0f5b7315be2a2ea3b40a0ffefaf6e5016144",
+  "contract_path": "contracts/arena"
+ },
+ "chain": null
+}
