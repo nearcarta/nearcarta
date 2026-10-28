@@ -70,13 +70,13 @@ export async function fpost(path, body, f = fetch, waitMs = 700) {
     await new Promise(res => setTimeout(res, waitMs * (i + 1)));
   }
 }
-// Pages poll the feed 2.5 s after every tx: one upstream read per account+limit per 4 s (shared by concurrent callers),
+// Pages poll the feed after every tx: concurrent callers for one account+limit share one upstream read (1 s reuse),
 // and the last good feed (marked stale) when the index is still busy after retries.
 const feeds = new Map();
 export async function chronicle(account, limit = 8, read = chronicleOnce) {
   const k = account + '|' + limit, hit = feeds.get(k), now = Date.now();
   if (hit?.p) return hit.p;
-  if (hit?.v && now - hit.at < 4_000) return hit.v;
+  if (hit?.v && now - hit.at < 1_000) return hit.v;
   const p = read(account, limit).then(v => { feeds.set(k, { v, at: Date.now() }); return v; },
     e => { if (hit?.v) { feeds.set(k, hit); return { ...hit.v, stale: true }; } feeds.delete(k); throw e; });
   feeds.set(k, { ...hit, p });
