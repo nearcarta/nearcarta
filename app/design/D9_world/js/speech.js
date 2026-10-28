@@ -22,6 +22,10 @@ export function say(who,text,{style='say',tone='',dur=null,name=null}={}){
 }
 export function hush(who){ for(const b of live) if(!who||b.who===who) b.end=Math.min(b.end,clock.T); }
 export function clear(){ for(const b of live) b.el.remove(); live.length=0; }
+// keep bubbles under the visible top HUD (brand card, wallet row): on a phone it fills the top ~160 px
+let hudR=[], hudT=-1;
+function topFloor(x,bw){ if(hudT!==clock.T){ hudT=clock.T; hudR=[]; for(const e of document.querySelectorAll('.hud,.hud .what')){ const r=e.getBoundingClientRect(); if(!r.height||r.top>innerHeight*.3) continue; let o=1; for(let n=e;n&&n.nodeType===1;n=n.parentElement) o*=+getComputedStyle(n).opacity; if(o>.1) hudR.push(r); } }
+  let y=10; for(const r of hudR) if(x<r.right+6&&x+bw+6>r.left) y=Math.max(y,r.bottom+8); return y; }
 export function update(){
   const T=clock.T, cam=W.camera, w=innerWidth, h=innerHeight;
   for(let i=live.length-1;i>=0;i--){ const b=live[i]; if(T>b.end+.35){ b.el.remove(); live.splice(i,1); } }
@@ -42,7 +46,7 @@ export function update(){
   vis.sort((a,b)=>b.ay-a.ay); const placed=[];
   for(const b of vis){ let x=b.ax-b.w*.3, y=b.ay-b.h-14; x=Math.max(10,Math.min(w-b.w-10,x));
     for(let it=0;it<8;it++){ const hit=placed.find(o=>x<o.x+o.w+8 && x+b.w+8>o.x && y<o.y+o.h+6 && y+b.h+6>o.y); if(!hit) break; y=hit.y-b.h-8; }
-    y=Math.max(10,y);
+    y=Math.max(topFloor(x,b.w),y);
     // ease toward the slot so bubbles never jitter
     if(b.x==null||RM){ b.x=x; b.y=y; } else { b.x+=(x-b.x)*.35; b.y+=(y-b.y)*.35; }
     placed.push({x:b.x,y:b.y,w:b.w,h:b.h});
