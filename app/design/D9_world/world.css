@@ -332,3 +332,7 @@ body.apps #shopUI #t-act.busy::before{content:'';width:14px;height:14px;border-r
 body.apps:has(#rules.open) #shopUI #tray{opacity:.35;pointer-events:none}
 body.apps:has(#rules.open) #back{visibility:hidden}
 @media (max-width:720px){ #shopUI #tray{left:8px;right:8px;bottom:8px;width:auto;padding:16px;max-height:62vh;overflow:auto} body.apps #shopUI .hero{font-size:26px;line-height:32px} }
+#shopUI .amt{box-sizing:border-box} #shopUI .form .to select{min-width:0;max-width:100%}
+#shopUI .feed li{grid-template-columns:56px minmax(0,1fr) minmax(0,40%)} #shopUI .feed:not(.checks):not(.tee) li{grid-template-columns:72px minmax(0,1fr) minmax(0,40%)}
+#shopUI .feed li>span{min-width:0;overflow:hidden;text-overflow:ellipsis} #shopUI .feed li>span:nth-child(3){white-space:nowrap;text-align:right}
+@media (max-width:720px){ #shopUI #tray{overflow-x:hidden;box-sizing:border-box} }
