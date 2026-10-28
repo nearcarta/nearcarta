@@ -21,6 +21,12 @@ export function wallet() {
     connector = new NearConnector({ network: 'testnet', features: { testnet: true, signAndSendTransaction: true }, footerBranding: null });
     const ping = () => listeners.forEach(f => f());
     connector.on('wallet:signIn', ping); connector.on('wallet:signOut', ping);
+    // Clear EVM label; wallets this browser already has go first.
+    connector.whenManifestLoaded.then(() => {
+      const evm = connector.wallets.find(w => w.manifest.id === 'ethereum-wallets');
+      if (evm) evm.manifest.name = window.ethereum ? 'MetaMask & EVM wallets (detected)' : 'MetaMask & EVM wallets';
+      if (evm && window.ethereum) connector.wallets = [evm, ...connector.wallets.filter(w => w !== evm)];
+    }).catch(() => {});
   }
   return connector;
 }
@@ -28,17 +34,32 @@ export function onWallet(f) { listeners.add(f); }
 export async function account() {
   try { const { accounts } = await wallet().getConnectedWallet(); return accounts?.[0]?.accountId || null; } catch { return null; }
 }
-export async function connect() { await wallet().connect(); return account(); }
+// Opens the wallet list, then signs in. `note` gets plain-text progress and errors (never swallowed).
+export async function connect(note = () => {}) {
+  const c = wallet();
+  let id;
+  try { id = await c.selectWallet(); } catch { note(''); return account(); }
+  if (id === 'ethereum-wallets') note('In the evm-on-near.dev window that opens, press Connect Wallet, then MetaMask, and approve in MetaMask (it adds NEAR Protocol Testnet, chain 398). If no window opened, allow pop-ups for this site.');
+  else note('Waiting for your wallet…');
+  try { await c.connect({ walletId: id }); note(''); }
+  catch (e) { note(`Could not connect: ${e?.message || e}`); throw e; }
+  return account();
+}
 export async function disconnect() { await wallet().disconnect().catch(() => {}); }
 
 // A small "Connect wallet" control for any page (the town uses it).
 export async function mountConnect(el) {
+  let msg;
   const draw = async () => {
     const who = await account();
     el.innerHTML = who
       ? `<a class="pill" href="/console#house" title="${esc(who)}">${esc(short(who))} · Your House</a><button type="button" class="pill" data-x="out">Sign out</button>`
       : `<button type="button" class="pill go" data-x="in">Connect wallet</button><a class="pill" href="${FAUCET}" target="_blank" rel="noopener">Free testnet NEAR</a>`;
-    el.querySelector('[data-x="in"]')?.addEventListener('click', () => connect().then(draw).catch(() => draw()));
+    if (!msg) { msg = document.createElement('div'); msg.dataset.testid = 'wallet-note'; msg.setAttribute('role', 'status'); msg.style.cssText = 'flex-basis:100%;max-width:360px;font-size:12px;line-height:1.35;margin-top:4px;background:#2a1d14ee;color:#fbe9d0;padding:6px 8px;border-radius:8px'; }
+    el.appendChild(msg);
+    const note = t => { msg.textContent = t; msg.hidden = !t; };
+    msg.hidden = !msg.textContent;
+    el.querySelector('[data-x="in"]')?.addEventListener('click', () => connect(note).then(draw).catch(() => draw()));
     el.querySelector('[data-x="out"]')?.addEventListener('click', () => disconnect().then(draw));
   };
   onWallet(draw); await draw();
@@ -82,7 +103,7 @@ async function call(methodName, args) {
 
 async function act(b) {
   const a = b.dataset.act;
-  if (a === 'signin') { await connect(); return render(); }
+  if (a === 'signin') { await connect(t => t && log(esc(t))); return render(); }
   if (a === 'signout') { await disconnect(); return render(); }
   b.disabled = true; log(`${esc(a)}: waiting for your wallet…`);
   const hash = a === 'freeze' ? await call('freeze', {}) : a === 'unfreeze' ? await call('unfreeze', {})
