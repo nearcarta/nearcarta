@@ -15,7 +15,7 @@
     "start": "node backend/src/server.js",
     "test:contracts": "cd contracts/oath && cargo test && cd ../arena && cargo test --lib",
     "tee": "node backend/scripts/record-tee.js",
-    "wasm-hash": "node -e \"const c=require('crypto'),b=require('bs58').default;console.log(b.encode(c.createHash('sha256').update(require('fs').readFileSync('contracts/artifacts/oath.wasm')).digest()))\"",
+    "wasm-hash": "node -e \"const c=require('crypto'),b=require('bs58').default;console.log(b.encode(c.createHash('sha256').update(require('fs').readFileSync(process.argv[1]||'contracts/artifacts/oath.wasm')).digest()))\"",
     "txs": "node backend/scripts/txs-table.js",
     "readme-numbers": "node backend/scripts/readme-numbers.js"
   },
