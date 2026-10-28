@@ -43,3 +43,13 @@ test('POST /api/ferry/quote accepts both shapes and refuses malformed ones with 
     assert.match((await b4.json()).error, /Zcash/);
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('findToken survives upstream entries with missing fields (no toUpperCase on undefined)', async () => {
+  const { findToken, validToken } = await import('../../src/ferry.js');
+  const list = [null, {}, { symbol: null, blockchain: 'zec' }, { assetId: 'nep141:x', blockchain: 'zec', decimals: 8 },
+    { assetId: 'nep141:zec.omft.near', symbol: 'ZEC', blockchain: 'zec', decimals: 8 }];
+  assert.equal(findToken(list, 'zec@zec').assetId, 'nep141:zec.omft.near');
+  assert.equal(findToken(list, { symbol: 'X' }), undefined);
+  assert.equal(findToken(undefined, 'ZEC@zec'), undefined);
+  assert.equal(list.filter(validToken).length, 1);
+});

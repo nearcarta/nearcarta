@@ -18,7 +18,9 @@ export async function tokens() {
   if (tokenCache.list && Date.now() - tokenCache.at < 5 * 60e3) return tokenCache.list;
   const r = await fetch(`${cfg.oneClick}/v0/tokens`, { headers: UA });
   if (!r.ok) throw new Error(`1click tokens http ${r.status}`);
-  const list = await r.json();
+  const raw = await r.json();
+  // Drop upstream entries with a missing or non-string field, so no lookup can call a string method on undefined.
+  const list = (Array.isArray(raw) ? raw : []).filter(validToken);
   tokenCache = { at: Date.now(), list };
   return list;
 }
@@ -39,10 +41,13 @@ export function tokenRef(v) {
   return typeof v.symbol === 'string' && SYM.test(v.symbol) && typeof chain === 'string' && CHAIN.test(chain) ? { symbol: v.symbol, chain } : null;
 }
 
+export const validToken = t => !!t && typeof t === 'object' && typeof t.assetId === 'string' && typeof t.symbol === 'string'
+  && typeof t.blockchain === 'string' && Number.isInteger(t.decimals);
+
 export function findToken(list, ref) {
   const r = tokenRef(ref); if (!r) return undefined;
   if (r.assetId) return list.find(t => t.assetId === r.assetId);
-  return list.find(t => String(t.symbol).toUpperCase() === r.symbol.toUpperCase() && t.blockchain === r.chain);
+  return (list || []).filter(validToken).find(t => t.symbol.toUpperCase() === r.symbol.toUpperCase() && t.blockchain === r.chain);
 }
 
 export function toUnits(amount, decimals) {
