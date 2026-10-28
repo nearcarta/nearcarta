@@ -32,6 +32,9 @@ const GAS_FT: Gas = Gas::from_tgas(10);
 const GAS_FT_STORAGE_VIEW: Gas = Gas::from_tgas(5);
 const GAS_FT_STORAGE_CB: Gas = Gas::from_tgas(30);
 const GAS_ESCALATION_CB: Gas = Gas::from_tgas(60);
+const GAS_AGENT_KEY_CB: Gas = Gas::from_tgas(5);
+/// R14: set/execute of SetAgentKey needs room for AddKey + on_agent_key (+ its DeleteKey).
+const GAS_MIN_AGENT_KEY: Gas = Gas::from_tgas(20);
 /// Minimum prepaid gas per path, checked before anything is logged, so a
 /// starved call reverts cleanly instead of leaving a phantom `submitted` log.
 const MIN_GAS_NATIVE: Gas = Gas::from_tgas(25);
@@ -301,15 +304,27 @@ impl Oath {
                 emit("policy", json!({"change": "upgrade_ready", "code_hash": code_hash, "change_id": U64(id)}));
             }
             Change::SetAgentKey { public_key, allowance } => {
+                // R14: AddKey runs alone in its own receipt, then `on_agent_key` checks it.
+                // State switches to the new key at once (the old key stops working now);
+                // if AddKey fails the callback rolls `agent_key` back to `prev`. The old key
+                // is deleted only after AddKey succeeded, so a failure never leaves the
+                // account with neither key.
+                // Checked before any state change or log: a call that cannot fund the callback reverts whole.
+                require!(env::prepaid_gas() >= GAS_MIN_AGENT_KEY, "ERR_LOW_GAS");
                 let me = env::current_account_id();
-                let mut p = Promise::new(me.clone());
-                if let Some(old) = self.agent_key.take() {
-                    p = p.delete_key(old);
-                }
+                let prev = self.agent_key.clone();
                 self.agent_key = Some(public_key.clone());
                 emit("agent_key", json!({"op": "set", "public_key": public_key, "allowance": allowance}));
                 let a = Allowance::limited(NearToken::from_yoctonear(allowance.0)).expect("ERR_ALLOWANCE_ZERO");
-                return PromiseOrValue::Promise(p.add_access_key_allowance(public_key, a, me, "propose".to_string()));
+                let add = Promise::new(me.clone()).add_access_key_allowance(public_key.clone(), a, me.clone(), "propose".to_string());
+                let cb = Promise::new(me).function_call_weight(
+                    "on_agent_key",
+                    json!({"prev": prev, "new": public_key}).to_string().into_bytes(),
+                    NearToken::from_yoctonear(0),
+                    GAS_AGENT_KEY_CB,
+                    near_sdk::GasWeight(1),
+                );
+                return PromiseOrValue::Promise(add.then(cb));
             }
         }
         PromiseOrValue::Value(json!({"applied": true, "policy_version": self.policy_version}))
@@ -321,6 +336,9 @@ impl Oath {
         require!(clause.window_start_min < 1440 && clause.window_end_min <= 1440, "ERR_WINDOW");
         require!(valid_field(&clause_id), "ERR_CLAUSE_ID");
         require!(clause.min_amount.0 >= 1, "ERR_MIN_AMOUNT");
+        // R14 lean build: no receipt verification and no NEP-519 escalation compiled in.
+        #[cfg(feature = "lean")]
+        require!(!clause.requires_receipt && clause.escalation_max.is_none(), "ERR_LEAN_BUILD");
         if is_widening(self.clauses.get(&clause_id), &clause) {
             self.queue_or_apply(Change::SetClause { clause_id, clause })
         } else {
@@ -384,6 +402,38 @@ impl Oath {
         self.assert_gov();
         let p = self.pending.remove(&change_id.0).expect("ERR_NO_CHANGE");
         emit("policy_cancelled", json!({"change_id": change_id, "queued_by": p.by, "by": env::predecessor_account_id()}));
+    }
+
+    /// R14: result of the AddKey receipt from `set_agent_key`.
+    /// Success: delete the previous key (if any and different). Failure (e.g.
+    /// `AddKeyAlreadyExists`, whose existing permission we cannot see): roll
+    /// `agent_key` back to `prev`, but only if no later change replaced it.
+    #[private]
+    pub fn on_agent_key(&mut self, prev: Option<PublicKey>, new: PublicKey) -> PromiseOrValue<bool> {
+        let ok = env::promise_result_checked(0, 64).is_ok();
+        if ok {
+            let me = env::current_account_id();
+            let mut del: Option<Promise> = None;
+            if let Some(old) = prev.filter(|o| *o != new && self.agent_key.as_ref() != Some(o)) {
+                del = Some(Promise::new(me.clone()).delete_key(old));
+            }
+            if self.agent_key.as_ref() != Some(&new) {
+                // Revoked or replaced while AddKey was in flight: do not leave it on the account.
+                emit("agent_key", json!({"op": "added_stale_removed", "public_key": new}));
+                let d = Promise::new(me).delete_key(new);
+                del = Some(match del { Some(p) => p.and(d), None => d });
+            } else {
+                emit("agent_key", json!({"op": "added", "public_key": new}));
+            }
+            return match del { Some(p) => PromiseOrValue::Promise(p), None => PromiseOrValue::Value(true) };
+        }
+        if self.agent_key.as_ref() == Some(&new) {
+            self.agent_key = prev.clone();
+            emit("agent_key", json!({"op": "rollback", "failed_key": new, "restored": prev}));
+        } else {
+            emit("agent_key", json!({"op": "add_failed_stale", "failed_key": new}));
+        }
+        PromiseOrValue::Value(false)
     }
 
     pub fn revoke_agent(&mut self) -> Promise {
@@ -479,7 +529,7 @@ impl Oath {
                     memo: p.memo.clone(),
                 };
                 self.auto_prune(2);
-                if escalate {
+                if !cfg!(feature = "lean") && escalate {
                     let args = json!({"action_id": U64(id)}).to_string();
                     env::promise_yield_create(
                         "on_escalation", args.as_bytes(), GAS_ESCALATION_CB, GasWeight(0), 0);
@@ -513,16 +563,27 @@ impl Oath {
         let need = (env::storage_usage() + ACTION_STORAGE_HEADROOM) as u128 * env::storage_byte_cost().as_yoctonear()
             + self.storage_reserve + native;
         if env::account_balance().as_yoctonear() < need { return Err("storage_reserve_low".into()); }
-        let mut rh = None;
-        if c.requires_receipt {
-            let r = p.receipt.as_ref().ok_or("receipt_required")?;
-            rh = Some(self.verify_receipt(r, p, &c, ah)?);
+        #[cfg(feature = "lean")]
+        {
+            let _ = ah;
+            if c.requires_receipt { return Err("receipt_required".into()); }
+            if escalate { return Err("over_per_action_cap".into()); }
+            Ok((c, None, false))
         }
-        Ok((c, rh, escalate))
+        #[cfg(not(feature = "lean"))]
+        {
+            let mut rh = None;
+            if c.requires_receipt {
+                let r = p.receipt.as_ref().ok_or("receipt_required")?;
+                rh = Some(self.verify_receipt(r, p, &c, ah)?);
+            }
+            Ok((c, rh, escalate))
+        }
     }
 
     /// NEAR AI style envelope: signer signs `MODEL:sha256(request):sha256(response)`.
     /// The response must be EXACTLY the canonical verdict JSON (see `parse_receipt_body`).
+    #[cfg(not(feature = "lean"))]
     fn verify_receipt(&mut self, r: &Receipt, p: &Proposal, c: &Clause, ah: &str) -> Result<String, String> {
         let pk = self.receipt_signers.get(&r.signer_key_id).ok_or("unknown_receipt_signer")?;
         if !valid_job_id(&r.job_id) { return Err("receipt_job_id_invalid".into()); }
@@ -542,6 +603,7 @@ impl Oath {
     }
 
     /// Owner/DAO answers a yielded escalation (NEP-519).
+    #[cfg(not(feature = "lean"))]
     pub fn resolve_escalation(&mut self, action_id: U64, approve: bool) -> bool {
         self.assert_gov();
         let rec = self.actions.get(&action_id.0).cloned().expect("ERR_NO_ACTION");
@@ -550,6 +612,7 @@ impl Oath {
         env::promise_yield_resume(&y, json!({"approve": approve}).to_string().as_bytes())
     }
 
+    #[cfg(not(feature = "lean"))]
     #[private]
     pub fn on_escalation(&mut self, action_id: U64) -> PromiseOrValue<Outcome> {
         let id = action_id.0;
@@ -573,6 +636,7 @@ impl Oath {
     }
 
     /// F4: everything that could have changed while the action waited.
+    #[cfg(not(feature = "lean"))]
     fn recheck_escalation(&self, rec: &ActionRec, approved: bool, timed_out: bool) -> Result<(), String> {
         if timed_out { return Err("escalation_timed_out".into()); }
         if !approved { return Err("owner_rejected".into()); }

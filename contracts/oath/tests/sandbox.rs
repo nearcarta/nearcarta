@@ -36,7 +36,7 @@ async fn setup() -> anyhow::Result<Env> {
     let agent_sk = SecretKey::from_random(KeyType::ED25519);
     let r = owner.call(oath.id(), "set_agent_key")
         .args_json(json!({"public_key": agent_sk.public_key(), "allowance": NEAR.to_string()}))
-        .transact().await?;
+        .gas(near_workspaces::types::Gas::from_tgas(30)).transact().await?;
     assert!(r.is_success(), "{:?}", r.failures());
     println!("GAS set_agent_key: {}", r.total_gas_burnt);
     let agent = Account::from_secret_key(oath.id().clone(), agent_sk, &w);
@@ -320,4 +320,54 @@ fn short(r: &Result<near_workspaces::result::ExecutionFinalResult, near_workspac
         Ok(x) => format!("executed success={} failures={:?}", x.is_success(), x.failures().iter().map(|f| format!("{:?}", (*f).clone().into_result().err())).collect::<Vec<_>>()).chars().take(300).collect(),
         Err(e) => format!("REJECTED: {}", e.to_string().chars().take(300).collect::<String>()),
     }
+}
+
+/// R14: set_agent_key with a key that already exists on the account (the contract's own
+/// full-access key) -> AddKeyAlreadyExists -> on_agent_key rolls agent_key back; the old agent
+/// key is NOT deleted and still works. Then a clean rotation deletes the old key.
+#[tokio::test]
+async fn r14_set_agent_key_rollback_and_rotation() -> anyhow::Result<()> {
+    let e = setup().await?;
+    let old_pk = e.agent.secret_key().public_key();
+    let full_pk = e.oath.as_account().secret_key().public_key();
+    let st0: Value = e.oath.view("get_state").await?.json()?;
+    assert_eq!(st0["agent_key"], json!(old_pk));
+
+    // 1. failure path
+    let r = e.owner.call(e.oath.id(), "set_agent_key")
+        .args_json(json!({"public_key": full_pk, "allowance": NEAR.to_string()}))
+        .gas(near_workspaces::types::Gas::from_tgas(50)).transact().await?;
+    let logs = r.logs().join("\n");
+    println!("R14 rollback tx success={} logs={}", r.is_success(), logs);
+    assert!(logs.contains("\"op\":\"rollback\""), "no rollback log: {logs}");
+    let st1: Value = e.oath.view("get_state").await?.json()?;
+    assert_eq!(st1["agent_key"], json!(old_pk), "agent_key not restored");
+    let keys = e.w.view_access_keys(e.oath.id()).await?;
+    assert!(keys.iter().any(|k| k.public_key == old_pk), "old agent key must still exist");
+    // the restored agent key still signs
+
+    let n = nonce(&e).await?; let v = pv(&e).await?;
+    let (_v, r) = propose(&e, proposal("nonexistent", e.bob.id(), 1, n, v)).await?;
+    println!("R14 old key after rollback: success={} (deny or panic both prove the key signs)", r.is_success());
+    assert!(!r.logs().is_empty() || r.is_failure());
+
+    // 2. success path: rotate to a fresh key -> old one deleted
+    let new_sk = SecretKey::from_random(KeyType::ED25519);
+    let r = e.owner.call(e.oath.id(), "set_agent_key")
+        .args_json(json!({"public_key": new_sk.public_key(), "allowance": NEAR.to_string()}))
+        .gas(near_workspaces::types::Gas::from_tgas(50)).transact().await?;
+    assert!(r.is_success(), "{:?}", r.failures());
+    println!("GAS set_agent_key (rotation, with callback): {}", r.total_gas_burnt);
+    let keys = e.w.view_access_keys(e.oath.id()).await?;
+    assert!(keys.iter().any(|k| k.public_key == new_sk.public_key()), "new key missing");
+    assert!(!keys.iter().any(|k| k.public_key == old_pk), "old key not deleted");
+    let st2: Value = e.oath.view("get_state").await?.json()?;
+    assert_eq!(st2["agent_key"], json!(new_sk.public_key()));
+
+    // 3. on_agent_key is private
+    let r = e.owner.call(e.oath.id(), "on_agent_key")
+        .args_json(json!({"prev": null, "new": new_sk.public_key()})).transact().await?;
+    assert!(r.is_failure());
+    println!("R14 on_agent_key by owner: {:?}", r.failures().first().map(|f| format!("{:?}", (*f).clone().into_result().err())).unwrap_or_default().chars().take(160).collect::<String>());
+    Ok(())
 }

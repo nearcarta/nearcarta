@@ -752,3 +752,119 @@ fn receipt_code_hash_64_chars_accepted() {
     assert_eq!(check_receipt_body(&mk(&"a".repeat(64)), "ah", &acc("bob.test"), 5, JOB, &c), Ok(()));
     assert_eq!(check_receipt_body(&mk(&"a".repeat(65)), "ah", &acc("bob.test"), 5, JOB, &c), Err("receipt_malformed".into()));
 }
+
+// ---------------- R14: set_agent_key callback with rollback ----------------
+fn pk2() -> PublicKey { "ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847".parse().unwrap() }
+fn pk3() -> PublicKey { "ed25519:H9k5eiU4xXS3M4z8HzKJSLaZdqGdGwBG49o7orNC4eZW".parse().unwrap() }
+fn is_promise<T>(r: &PromiseOrValue<T>) -> bool { matches!(r, PromiseOrValue::Promise(_)) }
+fn val<T: Copy>(r: &PromiseOrValue<T>) -> Option<T> { match r { PromiseOrValue::Value(v) => Some(*v), _ => None } }
+fn has_log(op: &str) -> bool { get_logs().iter().any(|l| l.contains(&format!("\"op\":\"{op}\""))) }
+
+#[test]
+fn r14_set_agent_key_switches_state_and_returns_promise() {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let r = o.set_agent_key(pk2(), U128(NEAR));
+    assert!(is_promise(&r));
+    assert_eq!(o.agent_key, Some(pk2()));
+}
+
+#[test]
+fn r14_add_key_failure_rolls_back_to_prev() {
+    let mut o = setup(0);
+    o.agent_key = Some(pk2());
+    set_results("oath.test", T0, vec![PromiseResult::Failed]);
+    let r = o.on_agent_key(Some(agent_pk()), pk2());
+    assert_eq!(val(&r), Some(false));
+    assert_eq!(o.agent_key, Some(agent_pk()));
+    assert!(has_log("rollback"));
+}
+
+#[test]
+fn r14_add_key_failure_with_no_prev_clears_key() {
+    let mut o = setup(0);
+    o.agent_key = Some(pk2());
+    set_results("oath.test", T0, vec![PromiseResult::Failed]);
+    let r = o.on_agent_key(None, pk2());
+    assert_eq!(val(&r), Some(false));
+    assert_eq!(o.agent_key, None);
+}
+
+#[test]
+fn r14_add_key_failure_after_later_change_does_not_clobber() {
+    let mut o = setup(0);
+    o.agent_key = Some(pk3());
+    set_results("oath.test", T0, vec![PromiseResult::Failed]);
+    let r = o.on_agent_key(Some(agent_pk()), pk2());
+    assert_eq!(val(&r), Some(false));
+    assert_eq!(o.agent_key, Some(pk3()));
+    assert!(has_log("add_failed_stale"));
+    assert!(!has_log("rollback"));
+}
+
+#[test]
+fn r14_add_key_success_keeps_new_and_deletes_old() {
+    let mut o = setup(0);
+    o.agent_key = Some(pk2());
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let r = o.on_agent_key(Some(agent_pk()), pk2());
+    assert!(is_promise(&r));
+    assert_eq!(o.agent_key, Some(pk2()));
+    assert!(has_log("added"));
+}
+
+#[test]
+fn r14_add_key_success_same_key_no_delete() {
+    let mut o = setup(0);
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let r = o.on_agent_key(Some(agent_pk()), agent_pk());
+    assert_eq!(val(&r), Some(true));
+    assert_eq!(o.agent_key, Some(agent_pk()));
+}
+
+#[test]
+fn r14_add_key_success_first_key_no_delete() {
+    let mut o = setup(0);
+    o.agent_key = Some(pk2());
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let r = o.on_agent_key(None, pk2());
+    assert_eq!(val(&r), Some(true));
+}
+
+#[test]
+fn r14_add_key_success_after_revoke_removes_stale_key() {
+    let mut o = setup(0);
+    o.agent_key = None;
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let r = o.on_agent_key(Some(agent_pk()), pk2());
+    assert!(is_promise(&r));
+    assert_eq!(o.agent_key, None);
+    assert!(has_log("added_stale_removed"));
+}
+
+#[test]
+fn r14_add_key_success_prev_restored_elsewhere_not_deleted() {
+    // prev is current again (e.g. a later rotation back): it must not be deleted, the new one must.
+    let mut o = setup(0);
+    o.agent_key = Some(agent_pk());
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    let r = o.on_agent_key(Some(agent_pk()), pk2());
+    assert!(is_promise(&r));
+    assert_eq!(o.agent_key, Some(agent_pk()));
+    assert!(has_log("added_stale_removed"));
+}
+// Note: #[private] is enforced by the wasm wrapper only; checked in tests/sandbox.rs (r14_on_agent_key_private).
+
+#[test]
+fn r14_set_agent_key_low_gas_reverts_before_state_or_log() {
+    let mut o = setup(0);
+    let before = o.agent_key.clone();
+    let mut b = ctx("owner.test", T0); b.prepaid_gas(Gas::from_tgas(19)); testing_env!(b.build());
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.set_agent_key(pk2(), U128(NEAR)); }));
+    assert!(r.is_err());
+    assert!(get_logs().is_empty());
+    assert_eq!(o.agent_key, before);
+    let mut b = ctx("owner.test", T0); b.prepaid_gas(Gas::from_tgas(20)); testing_env!(b.build());
+    let _ = o.set_agent_key(pk2(), U128(NEAR));
+    assert_eq!(o.agent_key, Some(pk2()));
+}
