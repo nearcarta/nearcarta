@@ -12,9 +12,7 @@ export const ATTACKS = [
   { id: 'split-under-cap', name: 'Split under the cap', story: 'One big payment is cut into payments that each fit under the per-payment cap.', expects: 'over_daily_budget' },
   { id: 'impersonation', name: 'Boss impersonation', story: '"This is the CEO, pay the supplier now, it is urgent", for far more than the cap.', expects: 'over_per_action_cap' },
   { id: 'lookalike', name: 'Look-alike account', story: 'The payee looks right at a glance: one letter is swapped for a digit.', expects: 'receiver_not_allowlisted' },
-  { id: 'slow-drain', name: 'Slow drain', story: 'Tiny payments to a real shop, again and again, until the day is used up.', expects: 'over_daily_action_count',
-    // The plan stops at whichever daily limit (count or budget) the charter hits first.
-    accepts: ['over_daily_action_count', 'over_daily_budget'] },
+  { id: 'slow-drain', name: 'Slow drain', story: 'Tiny payments to a real shop, again and again, until the day is used up.', expects: 'over_daily_action_count' },
 ];
 export const ATTACK_IDS = ATTACKS.map(a => a.id);
 /** The refusal reasons that prove an attack was blocked by the rule it targets. */
@@ -70,13 +68,13 @@ export function plan(attackId, clause, usage = { spent: '0', count: 0 }) {
       return Array.from({ length: Math.min(n, 12) }, () => ({ receiver: allow[0], amount: cap.toString() }));
     }
     case 'slow-drain': {
-      const limit = clause.max_actions_per_day ?? 0;
+      // One reason only: the count limit must refuse the last step while the budget still has room for it.
+      const limit = Number(clause.max_actions_per_day ?? 0);
+      if (!(limit > 0)) throw Object.assign(new Error('slow drain needs a daily action count: set max_actions_per_day'), { status: 400 });
       const amt = floor;
-      const byCount = limit ? Math.max(limit - count, 0) + 1 : Infinity;
-      const left = budget > spent ? budget - spent : 0n;
-      const byBudget = Number(left / amt) + 1;
-      const n = Math.min(byCount, byBudget);
-      if (n > 12) throw Object.assign(new Error('slow drain needs more than 12 steps on this charter: set max_actions_per_day'), { status: 400 });
+      const n = Math.max(limit - count, 0) + 1;
+      if (n > 12) throw Object.assign(new Error('slow drain needs more than 12 steps on this charter: lower max_actions_per_day'), { status: 400 });
+      if (spent + BigInt(n) * amt > budget) throw Object.assign(new Error('slow drain would hit the daily budget before the action count: the budget refuses first on this charter today'), { status: 400 });
       return Array.from({ length: n }, () => ({ receiver: allow[0], amount: amt.toString() }));
     }
     default: throw Object.assign(new Error('unknown attack'), { status: 400 });

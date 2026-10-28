@@ -38,7 +38,11 @@ test('plans aim at the right limit', () => {
   // 4 actions/day -> 4 allowed + 1 refused; after 3 used -> 2 steps
   assert.equal(plan('slow-drain', clause).length, 5);
   assert.equal(plan('slow-drain', clause, { spent: String(3n * M), count: 3 }).length, 2);
-  assert.throws(() => plan('slow-drain', { ...clause, max_actions_per_day: 0 }), /12 steps/);
+  assert.throws(() => plan('slow-drain', { ...clause, max_actions_per_day: 0 }), /daily action count/);
+  assert.throws(() => plan('slow-drain', { ...clause, max_actions_per_day: 20 }), /12 steps/);
+  // 4 more 1-unit steps after 99 spent would pass the 100 budget: the budget would refuse first
+  assert.throws(() => plan('slow-drain', clause, { spent: String(99n * M), count: 1 }), /budget refuses first/);
+  assert.equal(plan('slow-drain', clause, { spent: String(95n * M), count: 0 }).length, 5);
   assert.throws(() => plan('nope', clause), /unknown attack/);
 });
 
@@ -149,7 +153,7 @@ test('attack plans match their own steps and nothing else', () => {
   assert.ok(!matchesPlan('slow-drain', { receiver: 'cafe.pub.testnet', amount: String(50n * M) }, clause));
   assert.ok(!matchesPlan('nope', { receiver: 'x', amount: '1' }, clause));
   assert.ok(!matchesPlan('lookalike', { receiver: 'c4fe.pub.testnet', amount: 'x' }, clause));
-  assert.deepEqual(acceptedReasons('slow-drain'), ['over_daily_action_count', 'over_daily_budget']);
+  assert.deepEqual(acceptedReasons('slow-drain'), ['over_daily_action_count']);
 });
 
 test('tasks pay an allowlisted merchant a quarter of the cap, and stop when the day is used', () => {
