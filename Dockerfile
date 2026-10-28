@@ -8,6 +8,7 @@ COPY backend/package.json backend/
 COPY app/package.json app/
 RUN npm ci --omit=dev -w backend && npm cache clean --force
 COPY backend/src backend/src
+COPY backend/data backend/data
 COPY shared shared
 COPY judges/proofs/mistbank-payout.json judges/proofs/
 USER node

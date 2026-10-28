@@ -6,3 +6,4 @@
 !backend/src/**
 !shared/**
 !judges/proofs/mistbank-payout.json
+!backend/data/**
