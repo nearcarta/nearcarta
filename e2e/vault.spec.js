@@ -72,7 +72,7 @@ test('visitor makes a charter and the contract refuses scams on chain', async ({
     proof.txs.push({ step: 'attack ' + atk, refused: reason, txs: steps }); save();
     await page.locator('#arena').screenshot({ path: shots + `vault-3-${atk}.png` });
   }
-  await expect(page.getByTestId('score-mine')).toHaveText('5/8', { timeout: 60_000 });
+  await expect(page.getByTestId('score-mine')).toHaveText('6/9', { timeout: 60_000 });
   proof.score = await page.getByTestId('score-mine').textContent();
   await expect(page.getByTestId('story')).toContainText('refused');
   await page.getByTestId('tab-board').click();

@@ -294,7 +294,7 @@ function quickCards() {
 async function ask(e) {
   e.preventDefault();
   const out = $('#mine .result'); const btn = $('#ask-btn');
-  let q; try { q = parseAsk($('#ask-text').value, CFG.arena.merchants.concat(lastRules?.receivers || [])); }
+  let q; try { q = parseAsk($('#ask-text').value, CFG.arena.merchants.concat(lastRules?.receivers || []), 'mine'); }
   catch (er) { out.innerHTML = `<p class="verdict bad" data-testid="verdict">${esc(er.message)}</p>`; return; }
   lock(); busy(btn, true, 'Agent is paying…');
   out.innerHTML = `<p class="muted">Your agent proposes ${fmt(q.amount)} to <code>${esc(q.receiver)}</code>${q.note ? ' for ' + esc(q.note) : ''}. Waiting for the charter's decision on chain…</p><ol class="steps"></ol>`;
@@ -304,8 +304,9 @@ async function ask(e) {
     out.insertAdjacentHTML('beforeend', r.passed
       ? `<p class="verdict good" data-testid="verdict">ALLOWED: the charter paid ${fmt(r.amount)} to <code>${esc(r.receiver)}</code>. ${txl(r.tx, 'see the transaction')}</p>`
       : `<p class="verdict bad" data-testid="verdict">REFUSED: ${esc(plain(r.reason))}. Nothing was paid. ${txl(r.tx, 'see the refusal')}</p>`);
-    out.insertAdjacentHTML('beforeend', '<p class="muted">Your own requests are real payments but are not scored: the board counts the fixed jobs and scams below.</p>');
-    renderFacts().catch(() => {});
+    out.insertAdjacentHTML('beforeend', '<p class="muted">One allowed request to a shop on your allowlist, within your max per payment, scores a point (once). The charter decides, not this page.</p>');
+    if (r.tx) await post('/api/vault/record', { tx: r.tx, charter }).catch(e => toast('Scoreboard did not take it: ' + esc(e.message), 'bad'));
+    renderFacts().catch(() => {}); loadScore('mine').catch(() => {});
   } finally { busy(btn, false); unlock(); }
 }
 
