@@ -15,3 +15,8 @@ regexes = ['''^\s*"[a-z0-9_]+": "[1-9A-HJ-NP-Za-km-z]{43,44}",?$''']
 description = "NEP-171 deed token ids are the holder's public testnet account id"
 regexTarget = "line"
 regexes = ['''^\s*"token_id": "([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*\.testnet",?$''']
+
+[[allowlists]]
+description = "NEAR RPC error text 'access key ed25519:<public key>': a 32-byte public key (<=44 base58 chars); 64-byte private keys (~88 chars) stay flagged"
+regexTarget = "match"
+regexes = ['''(?i)access key ed25519:[1-9A-HJ-NP-Za-km-z]{1,44}\s*$''']
