@@ -122,6 +122,14 @@ async function freshView(accountId, method, args = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// True when `id` is a charter a vault factory (current or legacy) created: suffix check first, then one cached
+// registry read (get_charter), so random ids under the factory cost a single view, never the full charterFacts.
+export async function isFactoryCharter(id, v = view) {
+  if (!isAccount(id)) return false;
+  const fa = FACTORIES.find(f => f.factory && id.endsWith('.' + f.factory));
+  if (!fa) return false;
+  try { return await cached('reg:' + id, 60_000, async () => !!(await v(fa.factory, 'get_charter', { account_id: id }))); } catch { return false; }
+}
 export async function usage(id, clauseId, v = view) { return v(id, 'get_usage', { clause_id: clauseId }); }
 
 export async function listCharters(from = 0, limit = 50, factory = V?.factory) {

@@ -208,7 +208,9 @@ export function makeApp() {
   app.get('/api/toll', limiter(20), async c => c.json(await reads.toll()));
   app.get('/api/chronicle/:account', limiter(20), async c => {
     const a = c.req.param('account');
-    if (!knownAccounts.has(a)) return c.json({ error: 'not a Nearcarta contract' }, 400);
+    // Visitor charters made by the vault factory count too (B13 "What happened" feed): the id must sit under the
+    // factory and the factory registry must list it, so this never becomes an open tx-index proxy.
+    if (!knownAccounts.has(a) && !(await vault.isFactoryCharter(a))) return c.json({ error: 'not a Nearcarta contract' }, 400);
     return c.json(await shops.chronicle(a, Math.min(Number(c.req.query('limit') || 8), 15)));
   });
   // R16 oath charters: on-chain reputation (refusal buckets) and one clause's user-set rules. Read-only views;

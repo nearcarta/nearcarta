@@ -298,3 +298,17 @@ test('vault config gives the browser the same RPC fallbacks as the runner', asyn
   let c; try { c = config(); } catch { return; } // vault not on this network
   assert.ok(Array.isArray(c.rpc_fallbacks) && c.rpc_fallbacks.length > 0); assert.ok(!c.rpc_fallbacks.includes(c.rpc));
 });
+
+test('isFactoryCharter: only ids under a vault factory that its registry lists', async () => {
+  const { isFactoryCharter, V: VV } = await import('../../src/vault.js');
+  if (!VV) return;
+  let calls = 0;
+  const v = async (_f, _m, a) => { calls++; return a.account_id.startsWith('real.') ? { owner: 'o.testnet' } : null; };
+  assert.equal(await isFactoryCharter('x.someone-else.testnet', v), false);
+  assert.equal(await isFactoryCharter('Bad..id', v), false);
+  assert.equal(calls, 0, 'no RPC for ids outside the factories');
+  assert.equal(await isFactoryCharter('real.' + VV.factory, v), true);
+  assert.equal(await isFactoryCharter('fake.' + VV.factory, v), false);
+  assert.equal(await isFactoryCharter('fake.' + VV.factory, v), false);
+  assert.equal(calls, 2, 'registry answers are cached');
+});
