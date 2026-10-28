@@ -1,0 +1,31 @@
+{
+  "what": "The three retired testnet accounts that still held a full-access key had it deleted. Their code and state can now change only through their own contract methods.",
+  "script": "backend/scripts/retire-legacy-keys.js",
+  "checked_with": "view_access_key_list, finality final",
+  "accounts": [
+    {
+      "account": "oath.r4csmvr86zk4.testnet",
+      "role": "old Toll oath (R4)",
+      "delete_key_tx": "DRPYzuskvyC2mnPySvc1bgSrcLYKyDqxMfBYcEqsgpZ6",
+      "explorer": "https://testnet.nearblocks.io/txns/DRPYzuskvyC2mnPySvc1bgSrcLYKyDqxMfBYcEqsgpZ6",
+      "full_access_keys_after": 0,
+      "function_call_keys_after": 1
+    },
+    {
+      "account": "r7thmvr8maey-oath.testnet",
+      "role": "old Town Hall oath (R7)",
+      "delete_key_tx": "DMjunM6AnkP1pbffWpsuH8eXaKpXYek3gHR29offuMmB",
+      "explorer": "https://testnet.nearblocks.io/txns/DMjunM6AnkP1pbffWpsuH8eXaKpXYek3gHR29offuMmB",
+      "full_access_keys_after": 0,
+      "function_call_keys_after": 0
+    },
+    {
+      "account": "r6vamvr9brhx-arena3.testnet",
+      "role": "old arena build (R6 run 3)",
+      "delete_key_tx": "CMAJsKta7JVPLbug8BjFL8MhNJz2Mu6eY661uYJ4G3bb",
+      "explorer": "https://testnet.nearblocks.io/txns/CMAJsKta7JVPLbug8BjFL8MhNJz2Mu6eY661uYJ4G3bb",
+      "full_access_keys_after": 0,
+      "function_call_keys_after": 0
+    }
+  ]
+}
