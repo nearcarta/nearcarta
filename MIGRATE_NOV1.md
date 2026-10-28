@@ -1,20 +1,34 @@
-# Fresh testnet deploy on 1 November 2026
+# Hackathon window and baseline tags
 
-The hackathon runs 1–14 November 2026 (UTC). Every testnet account and transaction in
-`shared/deployments/testnet.json` today was made before that window. On 1 November we redeploy
-the same reproducible artifacts to fresh accounts, rerun the proofs, and regenerate the numbers.
-Mainnet is not used.
+The hackathon rules count code written from the announcement on 2026-10-19 until 2026-11-14
+(HACKATHON.md, Rules FAQ Q-001). A new repo is not required. A project can mark its baseline with
+the tags `pre-hackathon` and `hackathon-submission` and link the diff from its README (Q-003).
 
-## Check first (sends nothing)
+This repo's first commit is 2026-10-28 (license, gitignore and gitleaks config only). Every
+contract, testnet account and transaction in `shared/deployments/testnet.json` was made after
+2026-10-19, so we keep this repo and these accounts. Nothing is redeployed for the window.
+
+## Tags
+
+| Tag | Commit | When |
+|---|---|---|
+| `pre-hackathon` | the root commit (license and config, no code) | set now |
+| `hackathon-submission` | the commit we submit | set when we submit |
+
+The judged work is the diff
+[`pre-hackathon...hackathon-submission`](https://github.com/nearcarta/nearcarta/compare/pre-hackathon...hackathon-submission).
+Tags are annotated, never moved and never force-pushed.
+
+## Optional: fresh testnet redeploy
+
+Only needed if a key or viewing key is exposed or an account has to be retired. The dry run
+checks every artifact and sends nothing:
 
     bash scripts/fresh-deploy.sh
 
-For each step this prints the script, the artifact's sha256 and its NEAR code hash
-(base58 of the sha256). Those hashes must equal the `code_hash` values in
-`shared/deployments/testnet.json` and the reproducible builds listed in `judges/VERIFY.md`.
-The script exits non-zero if an artifact or script is missing.
-
-## Order (run from `backend/`, testnet only, smallest amounts)
+For each step it prints the script, the artifact's sha256 and its NEAR code hash (base58 of the
+sha256). Those must equal the `code_hash` values in `shared/deployments/testnet.json` and the
+reproducible builds in `judges/VERIFY.md`. It exits non-zero if an artifact or script is missing.
 
 | # | Part | Script | Artifact |
 |---|------|--------|----------|
@@ -27,16 +41,7 @@ The script exits non-zero if an artifact or script is missing.
 | 7 | Mist Bank payout | `scripts/mistbank-record.js` with a payee whose viewing key was never public | — |
 | 8 | Proof check + tables | `scripts/verify-proofs.js`, `scripts/txs-table.js`, `scripts/readme-numbers.js` | — |
 
-Each script writes the new account names and tx hashes into its proof file. Copy them into
-`shared/deployments/testnet.json` before the next step, because later steps read them
-(for example, the deed needs the new House charter).
-
-## Rules for the run
-
-- Keys are created fresh per step and stay outside the repo. No contract account keeps a
-  full-access key: each deploy is one batch (create, fund, deploy, init) with no AddKey.
-- Accounts whose keys or viewing keys were ever shown are retired and not reused.
-- `scripts/fresh-deploy.sh --run` refuses before 2026-11-01 UTC. Even after that date it only
-  prints the order, because each step needs the previous step's outputs.
-- After the run, the API on Render picks up the new `shared/deployments/testnet.json` on redeploy.
-  `GET /api/health?deep=1` must report `routes_ok: true`.
+Each script writes new account names and tx hashes into its proof file; copy them into
+`shared/deployments/testnet.json` before the next step. Keys are made per step and stay outside
+the repo, and no contract account keeps a full-access key. Accounts whose keys were ever shown
+are retired. After a redeploy, `GET /api/health?deep=1` must report `routes_ok: true`.

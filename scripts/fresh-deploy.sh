@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fresh testnet redeploy plan for 1 Nov 2026 (see MIGRATE_NOV1.md).
+# Optional fresh testnet redeploy (see MIGRATE_NOV1.md; not needed for the hackathon window).
 # Default is a DRY RUN: it checks every reproducible artifact (sha256 + NEAR code hash) and the
 # script each step uses, then prints the plan. It sends no transaction and reads no key.
 #   bash scripts/fresh-deploy.sh            # dry run (default)
