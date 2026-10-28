@@ -1,0 +1,46 @@
+{
+ "at": "2026-10-28T04:06:48.313Z",
+ "base": "http://127.0.0.1:5173",
+ "wallet": "NEAR Connect 0.12.0, injected guest wallet (fresh faucet account)",
+ "account": "ncguest-2e0w662m3y.testnet",
+ "charter": "e2e-mvrldqyo.nccharters-17102.testnet",
+ "txs": [
+  {
+   "step": "create_charter",
+   "tx": "7qK2MLHyHoG3kfkR7Y1udrSAPRZZ5HxvfjdLQut1z49D"
+  },
+  {
+   "step": "set_clause + set_agent_key",
+   "tx": "GLjoDe4CWX3ETjpjcedjdCHKMhi8bV9PnsGmo6m2Du5t"
+  },
+  {
+   "step": "attack lookalike",
+   "refused": "receiver_not_allowlisted",
+   "txs": [
+    "BpXWPXBJeQiJuWdVr2cX1fWCNBLv8MWYvARzrGBsQfN7"
+   ]
+  },
+  {
+   "step": "attack impersonation",
+   "refused": "over_per_action_cap",
+   "txs": [
+    "6MwqDsdjB7ybQgZtVxgeQWZ82EwRt6RCGfq3nFhBkyZC"
+   ]
+  },
+  {
+   "step": "attack split-under-cap",
+   "refused": "over_daily_budget",
+   "txs": [
+    "CQMmFFh6Xu7a1jtzX6tQCJ8u9vdNWvFA2zSba1NQTvjt",
+    "6cRfcLvB6V4PC86JGmJM9mzPGwNiC6Uz189mNZMsU4ya",
+    "J2K5HkNCGWq9yTQKvhSEyx1noM4fLLQw3ao43MFH7e7R"
+   ]
+  },
+  {
+   "step": "shared fake-invoice",
+   "txs": [
+    "BgrEVEKGV9CGjhLb4Z3Hbaa1Md6q1wDWYQ2w7uKfh4VQ"
+   ]
+  }
+ ]
+}
