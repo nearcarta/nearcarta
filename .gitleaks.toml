@@ -25,3 +25,8 @@ regexes = ['''(?i)access key ed25519:[1-9A-HJ-NP-Za-km-z]{1,44}\s*$''']
 description = "Public Circle test USDC contract on Base Sepolia (an address, not a secret)"
 regexTarget = "match"
 regexes = ['''(?i)0x036cbd53842c5426634e7929541ec2318f3dcf7e''']
+
+[[allowlists]]
+description = "a NEAR public key named in a log line ('key ed25519:<32-byte key>', <=44 base58 chars); 64-byte private keys (~88 chars) stay flagged"
+regexTarget = "match"
+regexes = ['''(?i)\bkey ed25519:[1-9A-HJ-NP-Za-km-z]{43,44}\s*$''']
