@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { commitment, oathMemo, streetCheck, parseLedger, deskRequests } from '../../src/mistbank.js';
+import { commitment, oathMemo, streetCheck, parseLedger, deskRequests, verifyOpening } from '../../src/mistbank.js';
 import { DEP } from '../../src/config.js';
 
 const fx = f => readFileSync(new URL(`../fixtures/${f}`, import.meta.url), 'utf8');
@@ -52,4 +52,10 @@ test('desk requests are dry and always name the privacy level (1Click defaults i
     assert.equal(r.transfer.depositType, 'CONFIDENTIAL_INTENTS'); assert.equal(r.transfer.recipientType, 'CONFIDENTIAL_INTENTS');
     assert.equal(r.unshield.recipientType, 'INTENTS');
   }
+});
+
+test('the opening check matches the recorded commitment and rejects any other amount', () => {
+  assert.equal(verifyOpening('1370000', '67d50c7f78cc0cfdc145392edd674f83').matches, true);
+  assert.equal(verifyOpening('1370001', '67d50c7f78cc0cfdc145392edd674f83').matches, false);
+  assert.throws(() => verifyOpening('1.5', 'zz'));
 });

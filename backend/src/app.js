@@ -54,6 +54,7 @@ export function makeApp() {
 
   // Other shops
   app.get('/api/mistbank', limiter(20, 60e3), async c => c.json(await mist.mistbank()));
+  app.get('/api/mistbank/verify', c => c.json(mist.verifyOpening(c.req.query('zats'), c.req.query('salt'))));
   app.get('/api/mistbank/street/:txid', limiter(20, 60e3), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
   app.get('/api/townhall', async c => c.json(await shops.townhall()));
   app.get('/api/arena', async c => c.json(await shops.arena()));

@@ -97,6 +97,13 @@ const proofPath = new URL('../../judges/proofs/mistbank-payout.json', import.met
 // The recorder writes judges/proofs/mistbank-payout.json; the same record is in shared/deployments (bundled).
 export const proof = () => DEP.mistbank || (existsSync(proofPath) ? JSON.parse(readFileSync(proofPath, 'utf8')) : null);
 
+// Anyone holding the disclosed amount and salt can check them against the recorded commitment.
+export function verifyOpening(zats, salt, p = proof()) {
+  if (!/^\d{1,16}$/.test(String(zats)) || !/^[0-9a-f]{32}$/.test(String(salt))) throw Object.assign(new Error('zats must be an integer and salt 32 hex chars'), { status: 400 });
+  const c = commitment(String(Number(zats)), salt);
+  return { commitment: c, recorded: p?.commitment?.value ?? null, matches: !!p && c === p.commitment.value, oath_memo: oathMemo(c) };
+}
+
 export async function oathCheck(p) {
   const tx = await txStatus(p.oath.tx, p.oath.sender);
   const ok = !!tx?.status?.SuccessValue || tx?.status?.SuccessValue === '';
