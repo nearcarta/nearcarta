@@ -1,0 +1,77 @@
+{
+ "model": "z-ai/glm-5.3-flash",
+ "nonce": "211e5ecee7f8071e5b3bba129dce4bbe324705f411f3119bb328f4fc309c8859",
+ "signingAlgo": "ecdsa",
+ "checkedAt": "2026-10-28T01:19:44.000Z",
+ "policy": {
+  "acceptedTcb": [
+   "UpToDate"
+  ],
+  "gpuRequired": true
+ },
+ "gateway": {
+  "checks": {
+   "quote": true,
+   "debugOff": true,
+   "signerBound": true,
+   "nonceBound": true,
+   "echoedNonce": true,
+   "configBound": true,
+   "rtmr3": true,
+   "composeEvent": true
+  },
+  "signing_address": "0xb98a789cdc4817275f5155593ba73ef2a957e779",
+  "signing_algo": "ecdsa",
+  "tcbStatus": "UpToDate",
+  "advisories": [],
+  "composeHash": "56444a2f3f5a709d2067e0150cfe9442345fbde2dd0e1998e705485a029d3865",
+  "rtmr3Events": 8,
+  "measured": {
+   "app-id": "f550fdfb4eb8ad787c1bcd423f091cbb4a4431ae",
+   "compose-hash": "56444a2f3f5a709d2067e0150cfe9442345fbde2dd0e1998e705485a029d3865",
+   "instance-id": "c9ea083792752f6ac92820bf7010351e556da8f6",
+   "os-image-hash": "da9a3d5cc196a1a76d953fb27069be428ddf60a1ce10b0534c3cf968d3053fde",
+   "key-provider": "{\"name\":\"kms\",\"id\":\"3059301306072a8648ce3d020106082a8648ce3d03010703420004394aaed2c745e6a457cb835f7f47423f57ff3ead71b92a"
+  },
+  "mrTd": "f06dfda6dce1cf904d4e2bab1dc370634cf95cefa2ceb2de2eee127c9382698090d7a4a13e14c536ec6c9c3c8fa87077",
+  "rtMr3": "1ac2116d786bea24f39ae2b6d9a3ade9509d41e35327ecff732099435c0b30430176c98c100ec3d9f754fc46c8c42820",
+  "ok": true
+ },
+ "models": [
+  {
+   "checks": {
+    "quote": true,
+    "debugOff": true,
+    "signerBound": true,
+    "nonceBound": true,
+    "echoedNonce": true,
+    "configBound": true,
+    "rtmr3": true,
+    "composeEvent": true
+   },
+   "signing_address": "0x3b753b4406613c5e70ae640508632b600424fa0c",
+   "signing_algo": "ecdsa",
+   "tcbStatus": "UpToDate",
+   "advisories": [],
+   "composeHash": "5f7ebd85cf1f480a118f75dd10fd0cb277e4ddbb23845f1c20d8ea0f1e87efa6",
+   "rtmr3Events": 11,
+   "measured": {
+    "app-id": "2c0a0c96cb6dbd659bf1446e2f3fce58172ff91b",
+    "compose-hash": "5f7ebd85cf1f480a118f75dd10fd0cb277e4ddbb23845f1c20d8ea0f1e87efa6",
+    "instance-id": "7bb9af0ac5b0e22dde3903218f58e56f743164a1",
+    "os-image-hash": "91fd5d69ccee3e5ea4f2aeb8c9b632c4358c4ecfc29ba1aa6fb1e402af209829",
+    "key-provider": "{\"name\":\"kms\",\"id\":\"3059301306072a8648ce3d020106082a8648ce3d03010703420004394aaed2c745e6a457cb835f7f47423f57ff3ead71b92a"
+   },
+   "mrTd": "df4d77c857de652bd0fafa343a2026b51071ee03773d076d283abf1a7d36ff91ffa279ee4a617ac664f7e2a2c8d5891b",
+   "rtMr3": "83e150eac931ff70f8838e2075ebf6689b1b4269c8447027469e581c783f8e6faf8c0d774da4d58995f24d139c9c0d44",
+   "ok": true,
+   "model_name": "z-ai/glm-5.3-flash",
+   "gpu": {
+    "present": true,
+    "ok": true,
+    "gpus": 8
+   }
+  }
+ ],
+ "ok": true
+}
