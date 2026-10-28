@@ -18,6 +18,7 @@ All commands are read-only unless marked.
 7. Browser: `npm run e2e` (13 tests; `BASE_URL=https://nearcarta.vercel.app npm run e2e` runs them against the deploy; set BASE_URL to test a deployed preview).
    The counts in README.md and this file are written by `npm run readme-numbers` from these outputs; `npm run readme-numbers -- --check` fails if any is stale.
 8. (Writes to testnet; needs the agent key) `AGENT_KEY_FILE=… node backend/scripts/guardhouse-demo.js`: one allowed and one refused proposal. Output goes to judges/proofs/guardhouse-demo.json.
+   `AGENT_KEY_FILE=… node backend/scripts/attack-demo.js`: prompt-injection run. Prints `PASS` when the honest payee is paid, the injected payee is blocked before signing, and the bypassed run is `denied receiver_not_allowlisted`. Output goes to judges/proofs/attack-demo.{json,log}.
 9. Mist Bank, the private payout (read-only; `npm start` first):
    - `curl -s localhost:8787/api/mistbank` → `street.amount_hidden: true`, `oath.memo_on_chain: true`, `binding.charter_caps_zec_amount: false`. `curl -s localhost:8787/api/mistbank | grep -cE 'uview|salt=|zats'` → `0`: no viewing key, amount or salt is served.
    - The street view, straight from a public Zcash testnet explorer: `curl -s https://api.testnet.cipherscan.app/api/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897` → no transparent inputs or outputs. The value balance is the fee only (20000 zatoshi); the amount paid does not appear.
