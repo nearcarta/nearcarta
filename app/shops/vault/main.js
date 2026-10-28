@@ -1,6 +1,7 @@
 // Charter shop + Vault Arena. Wallet signs owner steps; the agent key made here signs `propose`.
 import { makeConnector, currentAccount, txHashOf, hasGuest, forgetGuest } from './wallet.js';
 import { rpcClient, viewFn, keyFrom, sendPropose } from '../../../shared/vault/tx.js';
+import { keyPlan, keyToAdd } from '../../../shared/vault/agentkeys.js';
 import { runSteps, runTask, runAsk } from '../../../shared/vault/run.js';
 import { parseAsk } from '../../../shared/vault/ask.js';
 import { lookalike } from '../../../shared/vault/attacks.js';
@@ -111,15 +112,13 @@ async function renderFacts() {
   const cl = f.clauses?.pay; const u = f.usage?.pay; lastRules = cl;
   const onChain = (f.agent_keys || []).map(a => a.public_key);
   const queued = Object.entries(f.pending_changes || {});
-  const queuedKey = pk => queued.some(([, p]) => p.change?.SetAgentKey?.public_key === pk);
-  // Promote a pending key once the chain shows it; keep it while its change waits in the timelock.
+  const queuedPks = queued.map(([, p]) => p.change?.SetAgentKey?.public_key).filter(Boolean);
   const pend = localStorage.getItem(pendLS(charter)); const pendPk = pend ? keyFrom(pend).publicKey : null;
-  if (pend && onChain.includes(pendPk)) { localStorage.setItem(agentLS(charter), pend); localStorage.removeItem(pendLS(charter)); }
-  const k = localStorage.getItem(agentLS(charter)); const agentPk = k ? keyFrom(k).publicKey : null;
-  const keyLive = !!agentPk && onChain.includes(agentPk);
-  const pendWaiting = pend && !onChain.includes(pendPk) && queuedKey(pendPk);
-  const pendLost = pend && !onChain.includes(pendPk) && !queuedKey(pendPk);
-  const orphans = onChain.filter(pk => pk !== agentPk && pk !== pendPk);
+  const held = localStorage.getItem(agentLS(charter)); const heldPk = held ? keyFrom(held).publicKey : null;
+  const kp = keyPlan({ onChain, current: f.state?.agent_key ?? null, held: heldPk, pend: pendPk, queued: queuedPks });
+  // Promote a pending key once the chain shows it; keep it while its change waits in the timelock.
+  if (kp.promote) { localStorage.setItem(agentLS(charter), pend); localStorage.removeItem(pendLS(charter)); }
+  const { keyLive, pendWaiting, pendLost, revocable: orphans, stray } = kp;
   $('#facts').innerHTML = `<ul class="facts" data-testid="facts">
     <li class="${f.runs_r14 ? 'ok' : 'no'}">Runs the audited oath code <code title="${esc(CFG.code_hash)}">${esc(short(CFG.code_hash))}</code></li>
     <li class="${f.full_access_keys === 0 ? 'ok' : 'no'}">${f.full_access_keys} full-access keys (nobody can bypass the rules)</li>
@@ -136,7 +135,8 @@ async function renderFacts() {
       return `<li class="todo"><b>${esc(kind)}</b> #${esc(id)} · by ${esc(p.by)} · ${ready ? 'ready now' : 'ready ' + esc(when(p.eta))}
         <button class="mini" data-exec="${esc(id)}" ${ready ? '' : 'disabled'}>Apply</button> <button class="mini" data-cancel="${esc(id)}">Cancel</button></li>`; }).join('')}</ul>` : ''}
     ${pendLost ? `<p class="verdict bad" data-testid="pend-lost">A key made in this browser for an earlier approval never reached the chain. <button class="mini" id="forget-pend">Forget it</button></p>` : ''}
-    ${orphans.length ? `<p class="verdict bad" data-testid="orphans">${orphans.length} agent key${orphans.length > 1 ? 's' : ''} on this charter ${orphans.length > 1 ? 'are' : 'is'} not held by this browser (${orphans.map(x => `<code>${esc(short(x))}</code>`).join(' ')}). Revoke ${orphans.length > 1 ? 'them' : 'it'} so a lost key cannot spend its allowance, then issue a new one. <button class="mini" id="revoke">Revoke</button></p>` : ''}`;
+    ${orphans.length ? `<p class="verdict bad" data-testid="orphans">The charter's agent key <code>${esc(short(orphans[0]))}</code> is not held by this browser. Revoke it so a lost key cannot spend its allowance, then issue a new one. <button class="mini" id="revoke">Revoke</button></p>` : ''}
+    ${stray.length ? `<p class="muted" data-testid="stray">Other function-call keys on this account, not the charter's agent key: ${stray.map(x => `<code>${esc(short(x))}</code>`).join(' ')}.</p>` : ''}`;
   for (const b of $('#facts').querySelectorAll('[data-exec]')) b.onclick = () => ownerCall('execute_change', { change_id: b.dataset.exec }, b, 'Change applied').catch(fail);
   for (const b of $('#facts').querySelectorAll('[data-cancel]')) b.onclick = () => ownerCall('cancel_change', { change_id: b.dataset.cancel }, b, 'Change cancelled').catch(fail);
   if ($('#forget-pend')) $('#forget-pend').onclick = () => { localStorage.removeItem(pendLS(charter)); renderFacts().catch(fail); };
@@ -221,7 +221,7 @@ async function saveRules(keyLive) {
   const actions = [{ type: 'FunctionCall', params: { methodName: 'set_clause', args: { clause_id: 'pay', clause }, gas: (40n * TG).toString(), deposit: '0' } }];
   const days = Number($('#rexp')?.value || 0);
   if (days) actions.push({ type: 'FunctionCall', params: { methodName: 'set_clause_expiry', args: { clause_id: 'pay', expires_at: String(BigInt(Date.now() + days * 864e5) * 1_000_000n) }, gas: (30n * TG).toString(), deposit: '0' } });
-  if (!keyLive) { const k = keyFrom().secretKey;
+  if (!keyLive) { const k = keyToAdd(localStorage.getItem(pendLS(charter)), () => keyFrom().secretKey); // reuse a pending key: its approval may still land
     localStorage.setItem(pendLS(charter), k); // before signing: a redirect wallet must not lose it
     actions.push({ type: 'FunctionCall', params: { methodName: 'set_agent_key', args: { public_key: keyFrom(k).publicKey, allowance: (YN / 2n).toString() }, gas: (60n * TG).toString(), deposit: '0' } }); }
   busy($('#rules-btn'), true, 'Approve in your wallet…');
