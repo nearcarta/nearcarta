@@ -13,6 +13,7 @@ import * as shops from './shops.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
+import * as cp from './counterparty.js';
 import { view, rpcStats } from './near.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 
@@ -170,6 +171,20 @@ export function makeApp() {
     const token = await view(D.contract, 'nft_token', { token_id: a });
     return token ? c.json({ contract: D.contract, token }) : c.json({ contract: D.contract, token: null, mint: deedTx(null) }, 404);
   });
+  // Counterparty check before a payment: allow / warn / block with reasons (backend/src/counterparty.js).
+  // ?charter= must be a Nearcarta charter (served or made by the factory), so this never views arbitrary contracts.
+  const cpCache = new Map();
+  app.get('/api/guardhouse/check/:account', limiter(12), async c => {
+    const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
+    const charter = c.req.query('charter') || DEP.guardhouse.oath;
+    if (!ACCT.test(charter) || (!knownAccounts.has(charter) && !(await vault.isFactoryCharter(charter)))) return bad(c, 'charter must be a Nearcarta charter');
+    const k = a + '|' + charter, hit = cpCache.get(k);
+    if (hit && Date.now() - hit.at < 20_000) return c.json(hit.v);
+    const v = await cp.check(a, { charter });
+    cpCache.set(k, { at: Date.now(), v }); if (cpCache.size > 500) cpCache.delete(cpCache.keys().next().value);
+    return c.json(v);
+  });
+  app.get('/api/guardhouse/denylist', limiter(30), c => c.json(cp.DENY));
   app.get('/api/guardhouse/action/:id', limiter(30), async c => {
     const id = c.req.param('id'); if (!/^\d{1,9}$/.test(id)) return bad(c, 'action id must be a number');
     return c.json(await guard.action(id));

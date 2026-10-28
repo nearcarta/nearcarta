@@ -1,0 +1,14 @@
+{
+  "about": "Shared deny list for the counterparty check. Each entry needs evidence a judge can open: a testnet tx. Add by pull request; never remove without a tx showing why.",
+  "entries": [
+    {
+      "account": "attacker.r10own-19371.testnet",
+      "reason": "Attack-demo payee. A prompt-injected agent tried to pay it; the Guardhouse charter refused, then the owner removed it from the vendor clause.",
+      "evidence": [
+        "AHhGaJCpW5erBFWpWuNkNhPzKiR4BeigJyWvqV1Uzzpf",
+        "8vzCbyrRSDzwP1WFw95KJZB2SRuKLrb9S7uRao4eH2Sd"
+      ],
+      "added": "2026-10-28"
+    }
+  ]
+}
