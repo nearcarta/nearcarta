@@ -1,49 +1,49 @@
 {
- "at": "2026-10-28T03:22:32.273Z",
- "wallet": "MyNearWallet (testnet) via @near-wallet-selector 10.1.4",
+ "at": "2026-10-28T05:55:06.415Z",
+ "wallet": "NEAR Connect (@hot-labs/near-connect 0.12.0), in-browser key slot \"Guest testnet account\"",
+ "site": "https://nearcarta.vercel.app",
  "house": "r11house-31474.testnet",
  "owner": "r11hown-31474.testnet",
  "steps": [
   {
    "step": "sign-in",
-   "wallet_buttons": [
-    "Next",
-    "Connect"
+   "wallet_list": [
+    "Guest testnet account",
+    "Meteor Wallet",
+    "Intear Wallet",
+    "Ledger",
+    "MyNearWallet (testnet, ends 31 Oct)",
+    "Nightly Wallet",
+    "Wallet Connect",
+    "Unity Wallet",
+    "MetaMask & EVM wallets",
+    "NEAR CLI"
    ]
   },
   {
    "step": "freeze",
-   "tx": "56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae",
-   "url": "https://testnet.nearblocks.io/txns/56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae",
-   "wallet_buttons": [
-    "Approve"
-   ]
+   "tx": "ADLLPwD7y5DN3vgnFABokKwSqag998pTPWFyXav8dLTe",
+   "url": "https://testnet.nearblocks.io/txns/ADLLPwD7y5DN3vgnFABokKwSqag998pTPWFyXav8dLTe"
   },
   {
    "step": "unfreeze",
-   "tx": "HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ",
-   "url": "https://testnet.nearblocks.io/txns/HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ",
-   "wallet_buttons": [
-    "Approve"
-   ]
+   "tx": "DYCCpusn8c4BvsoeT6zn6PrM61cYXoV2qAAFhXHdRjAq",
+   "url": "https://testnet.nearblocks.io/txns/DYCCpusn8c4BvsoeT6zn6PrM61cYXoV2qAAFhXHdRjAq"
   },
   {
    "step": "agent-over-cap",
-   "action_id": "1"
+   "action_id": "3"
   },
   {
    "step": "approve",
-   "tx": "EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy",
-   "url": "https://testnet.nearblocks.io/txns/EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy",
-   "wallet_buttons": [
-    "Approve"
-   ]
+   "tx": "GMKNy6ypXbuf3gQZfA7snLpvrdEBUQHhrj7uxJ23PkHh",
+   "url": "https://testnet.nearblocks.io/txns/GMKNy6ypXbuf3gQZfA7snLpvrdEBUQHhrj7uxJ23PkHh"
   },
   {
    "step": "held-spend-paid",
-   "action_id": "1",
-   "propose_tx": "3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
-   "url": "https://testnet.nearblocks.io/txns/3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
+   "action_id": "3",
+   "propose_tx": "7ooWVeP5JAcByTVqeKcFaLmWgHgNZc5CtWcZ7uaWtfuQ",
+   "url": "https://testnet.nearblocks.io/txns/7ooWVeP5JAcByTVqeKcFaLmWgHgNZc5CtWcZ7uaWtfuQ",
    "final_status": "confirmed",
    "events": [
     "action",
@@ -51,5 +51,6 @@
     "settle"
    ]
   }
- ]
+ ],
+ "page_errors": 0
 }
