@@ -50,6 +50,7 @@ Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-re
 
 ## Limits (stated plainly)
 - 1Click has no testnet. Ferry quotes are mainnet `dry:true`: no deposit address is created and nothing is swapped.
+- The Vault Arena contract on testnet (`r6vamvr9brhx-arena3.testnet`, code hash `D7r681CT…`) was built before this repo; a fresh build of `contracts/arena` gives a different hash (`FmFUbaDz…`). Only the charter (`r11oath-82930.testnet`) is proven to equal a committed wasm.
 - NEAR AI Cloud: the TEE evidence check runs live and is free. Chat completions are billable and the account has no credits (HTTP 402), so `/api/ai/prove` is off unless `AI_PROVE_ENABLED=1`. When enabled, it verifies the TEE first and sends the completion only if every check passes, then matches the response signer to the verified report.
 - Mist Bank runs on Zcash testnet (TAZ) and NEAR testnet. The Confidential Intents legs are dry quotes; no real confidential deposit is made (that would be a mainnet spend). Anyone holding the viewing key learns the opening, which is intended: they are the auditor.
 - The deployed API is read-only. Agent txs are sent only by `backend/scripts/guardhouse-demo.js`, `escalation-demo.js` and `mistbank-record.js` from a machine that holds the keys.
