@@ -71,7 +71,8 @@ export async function deepHealth() {
 
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 const ACCT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
-const knownAccounts = new Set([DEP.guardhouse.oath, DEP.townhall.charter, DEP.townhall.dao, DEP.arena.contract, DEP.toll.oath].filter(Boolean));
+const knownAccounts = new Set([DEP.guardhouse.oath, DEP.townhall.charter, DEP.townhall.dao, DEP.arena.contract, DEP.toll.oath,
+  DEP.townhall_r16?.charter, DEP.toll_arbitrum?.oath, DEP.toll_usdc?.toll].filter(Boolean));
 const bad = (c, m) => c.json({ error: m }, 400);
 async function jsonBody(c) {
   try { const b = await c.req.json(); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; }

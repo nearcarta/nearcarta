@@ -23,7 +23,22 @@ export async function townhall() {
     council: policy.roles.filter(r => r.kind?.Group).map(r => ({ role: r.name, members: r.kind.Group })),
     proposals: proposals.map(p => ({ id: p.id, proposer: p.proposer, status: p.status, kind: Object.keys(p.kind)[0], description: String(p.description).slice(0, 160) })),
     lastProposalId: lastId, proof_txs: T.proof_txs,
+    r16: await townhallR16(),
   };
+}
+
+// Town Hall on the R16.1 charter (propose_batch): pays a reward round in one all-or-nothing batch.
+async function townhallR16() {
+  const R = DEP.townhall_r16;
+  if (!R) return null;
+  try {
+    const snap = await snapshot(R.charter);
+    const reward = snap.clauses?.[R.clause || 'reward'] || null;
+    return { charter: R.charter, release: R.release, owner: snap.state.owner, dao: snap.state.dao, agent_key: snap.state.agent_key, keys: snap.keys,
+      frozen: snap.state.frozen, policy_version: snap.state.policy_version, next_action: snap.state.next_action,
+      caps_near: { per_reward: yocto(reward?.per_action_cap), total: yocto(reward?.daily_budget), total_is: 'per UTC day' },
+      receivers: reward?.receivers || [], usage: snap.usage, proof_txs: R.proof_txs };
+  } catch { return null; }
 }
 
 export async function arena() {
@@ -52,7 +67,23 @@ export async function toll() {
   const policy = await view(T.oath, 'policy');
   const recent = [];
   for (let n = Math.max(0, policy.next_nonce - 5); n < policy.next_nonce; n++) recent.push(await view(T.oath, 'get_tx', { nonce: n }).catch(() => null));
-  return { oath: T.oath, mpc: T.mpc, policy, recent: recent.filter(Boolean), foreign_explorer: `https://sepolia.basescan.org/address/${policy.foreign_address}` };
+  const instances = (await Promise.all(TOLL_INSTANCES.map(tollInstance))).filter(Boolean);
+  return { oath: T.oath, mpc: T.mpc, policy, recent: recent.filter(Boolean), foreign_explorer: `https://sepolia.basescan.org/address/${policy.foreign_address}`, instances };
+}
+
+// Further Toll instances from the deployments file: the Arbitrum Sepolia Toll and the USDC Toll (v3).
+// Each is read from chain; one that cannot be read is left out rather than failing the route.
+const EXPLORER = { Base: 'https://sepolia.basescan.org', Arbitrum: 'https://sepolia.arbiscan.io' };
+const TOLL_INSTANCES = [['arbitrum', DEP.toll_arbitrum?.oath], ['usdc', DEP.toll_usdc?.toll]].filter(([, id]) => id);
+async function tollInstance([label, id]) {
+  try {
+    const policy = await view(id, 'policy');
+    const recent = [];
+    for (let n = Math.max(0, policy.next_nonce - 3); n < policy.next_nonce; n++) recent.push(await view(id, 'get_tx', { nonce: n }).catch(() => null));
+    const ex = EXPLORER[policy.verify_chain] || EXPLORER.Base;
+    return { label, oath: id, chain_id: policy.chain_id, verify_chain: policy.verify_chain || 'Base', asset: policy.asset || 'native',
+      policy, recent: recent.filter(Boolean), foreign_explorer: `${ex}/address/${policy.foreign_address}` };
+  } catch { return null; }
 }
 
 // Chronicle: recent txs of a shop contract (FastNEAR tx index for the list), each re-read from NEAR RPC
