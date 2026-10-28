@@ -69,7 +69,7 @@ export async function charterFacts(id, { fresh = false } = {}) {
   if (!isAccount(id)) throw bad('bad account id');
   if (fresh) cache.delete('facts:' + id);
   // fresh=1 follows a tx the page just sent: skip the short RPC cache for the charter's own state.
-  const v = fresh ? ((rc) => (a, m, x) => viewFn(rc, a, m, x))(rpcClient(cfg.rpc)) : view;
+  const v = fresh ? freshView : view;
   const f = await cached('facts:' + id, 15_000, async () => {
     let reg = null, home = FACTORIES[0];
     for (const fa of FACTORIES) {
@@ -99,6 +99,15 @@ export async function charterFacts(id, { fresh = false } = {}) {
   });
   if (!f.exists || f.pending) cache.delete('facts:' + id); // never cache a half-visible charter
   return f;
+}
+
+// Optimistic finality is never cached in near.js but keeps its retries and RPC fallbacks (429s on shared hosts).
+async function freshView(accountId, method, args = {}) {
+  const res = await rpc('query', { request_type: 'call_function', finality: 'optimistic', account_id: accountId, method_name: method,
+    args_base64: Buffer.from(JSON.stringify(args)).toString('base64') });
+  if (res.error) throw new Error(`view ${accountId}.${method}: ${res.error}`);
+  const txt = Buffer.from(res.result).toString('utf8');
+  return txt ? JSON.parse(txt) : null;
 }
 
 export async function usage(id, clauseId, v = view) { return v(id, 'get_usage', { clause_id: clauseId }); }
@@ -423,7 +432,7 @@ export function register(app, { limiter, globalCap }) {
   app.get('/api/vault/charter/:id', limiter(30), async c => {
     const fresh = c.req.query('fresh') === '1';
     const f = await charterFacts(c.req.param('id'), { fresh });
-    const v = fresh ? ((rc) => (a, m, x) => viewFn(rc, a, m, x))(rpcClient(cfg.rpc)) : view;
+    const v = fresh ? freshView : view;
     let use = null;
     if (f.runs_r14 && f.clauses) use = Object.fromEntries(await Promise.all(Object.keys(f.clauses).map(async k => [k, await usage(f.charter, k, v).catch(() => null)])));
     return c.json({ ...f, usage: use });
