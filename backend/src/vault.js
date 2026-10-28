@@ -68,6 +68,8 @@ export async function charterFacts(id, { fresh = false } = {}) {
   if (!V) throw bad('vault not deployed', 503);
   if (!isAccount(id)) throw bad('bad account id');
   if (fresh) cache.delete('facts:' + id);
+  // fresh=1 follows a tx the page just sent: skip the short RPC cache for the charter's own state.
+  const v = fresh ? ((rc) => (a, m, x) => viewFn(rc, a, m, x))(rpcClient(cfg.rpc)) : view;
   const f = await cached('facts:' + id, 15_000, async () => {
     let reg = null, home = FACTORIES[0];
     for (const fa of FACTORIES) {
@@ -87,7 +89,7 @@ export async function charterFacts(id, { fresh = false } = {}) {
     let state = null, clauses = null, pendingChanges = null;
     let pending = false; // RPC nodes can lag right after create_charter: the account shows before its state
     if (audited) {
-      try { state = await view(id, 'get_state'); clauses = await view(id, 'get_clauses'); pendingChanges = await view(id, 'get_pending'); } catch { pending = true; }
+      try { state = await v(id, 'get_state'); clauses = await v(id, 'get_clauses'); pendingChanges = await v(id, 'get_pending'); } catch { pending = true; }
     }
     return { charter: id, exists: true, registered: !!reg, factory: home.factory, legacy: home.factory !== V.factory,
       owner: reg?.owner ?? state?.owner ?? null, created_at: reg?.created_at ?? null,
@@ -99,7 +101,7 @@ export async function charterFacts(id, { fresh = false } = {}) {
   return f;
 }
 
-export async function usage(id, clauseId) { return view(id, 'get_usage', { clause_id: clauseId }); }
+export async function usage(id, clauseId, v = view) { return v(id, 'get_usage', { clause_id: clauseId }); }
 
 export async function listCharters(from = 0, limit = 50, factory = V?.factory) {
   if (!V) throw bad('vault not deployed', 503);
@@ -419,9 +421,11 @@ export function register(app, { limiter, globalCap }) {
   app.get('/api/vault/config', limiter(30), c => c.json(config()));
   app.get('/api/vault/charters', limiter(30), async c => c.json(await listCharters(c.req.query('from'), c.req.query('limit'))));
   app.get('/api/vault/charter/:id', limiter(30), async c => {
-    const f = await charterFacts(c.req.param('id'), { fresh: c.req.query('fresh') === '1' });
+    const fresh = c.req.query('fresh') === '1';
+    const f = await charterFacts(c.req.param('id'), { fresh });
+    const v = fresh ? ((rc) => (a, m, x) => viewFn(rc, a, m, x))(rpcClient(cfg.rpc)) : view;
     let use = null;
-    if (f.runs_r14 && f.clauses) use = Object.fromEntries(await Promise.all(Object.keys(f.clauses).map(async k => [k, await usage(f.charter, k).catch(() => null)])));
+    if (f.runs_r14 && f.clauses) use = Object.fromEntries(await Promise.all(Object.keys(f.clauses).map(async k => [k, await usage(f.charter, k, v).catch(() => null)])));
     return c.json({ ...f, usage: use });
   });
   app.get('/api/vault/tasks', limiter(30), async c => c.json(await catalog(c.req.query('charter') || null)));
