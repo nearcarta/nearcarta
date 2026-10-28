@@ -2,7 +2,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as skClone } from 'three/addons/utils/SkeletonUtils.js';
-import { audio } from '../../D2_game/d7/js/audio.js';
 export { THREE };
 
 export const P = new URLSearchParams(location.search);
@@ -26,7 +25,11 @@ export const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 
 
 // event log: every sound cue gets a timestamp, so the video's audio track can be rebuilt in ffmpeg
 export const events = [];
-const snd = audio({ base: D7 + 'assets/audio/', howler: D7 + 'assets/engines/howler/howler.min.js' });
+// Inside the D9 town (body[data-host=d9]) the town owns sound: no second Howler and no second music bed.
+// Cues go to the town's player when it exposes window.__townSfx(name); otherwise the room stays silent.
+const HOSTED = document.body?.dataset.host === 'd9';
+const quiet = { on: false, play(n) { window.__townSfx?.(n); }, toggle() {}, onChange(f) { f(false); return () => {}; }, button(el) { return el; } };
+const snd = HOSTED ? quiet : (await import('../../D2_game/d7/js/audio.js')).audio({ base: D7 + 'assets/audio/', howler: D7 + 'assets/engines/howler/howler.min.js' });
 export const sound = snd;
 export function sfx(name, opt) { events.push({ t: +clock.T.toFixed(3), name }); snd.play(name, opt); }
 
