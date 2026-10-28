@@ -10,7 +10,7 @@ async function signerOf(hash) {
   const j = await r.json(); return j.transactions?.[0]?.transaction?.signer_id ?? null;
 }
 const out = [];
-for (const shop of ['guardhouse', 'townhall', 'arena', 'toll']) {
+for (const shop of ['guardhouse', 'townhall', 'arena', 'toll', 'mistbank']) {
   for (const [label, hash] of Object.entries(DEP[shop].proof_txs || {})) {
     const row = { shop, label, hash, url: explorerTx(hash) };
     try {
@@ -34,6 +34,16 @@ for (const shop of ['guardhouse', 'townhall', 'arena', 'toll']) {
   const ok = r.result?.status === '0x1' && r.result.from.toLowerCase() === DEP.toll.foreign_address.toLowerCase();
   out.push({ shop: 'toll', label: 'base_sepolia_broadcast', hash: h, url: 'https://sepolia.basescan.org/tx/' + h, found: ok, from: r.result?.from, to: r.result?.to });
   console.log(ok ? 'FOUND ' : 'MISSING', 'toll'.padEnd(10), 'base_sepolia_broadcast'.padEnd(28), 'from MPC-derived address', r.result?.from);
+}
+// The Mist Bank payout on Zcash testnet: mined, and the amount hidden from the street.
+{
+  const { fetchStreet, streetCheck } = await import('../src/mistbank.js');
+  const h = DEP.mistbank.payout.txid;
+  const st = await fetchStreet(h).catch(e => ({ error: e.message }));
+  const c = st.error ? null : streetCheck(st);
+  const ok = !!(st.blockHeight && c?.amount_hidden);
+  out.push({ shop: 'mistbank', label: 'zcash_payout_amount_hidden', hash: h, url: 'https://testnet.cipherscan.app/tx/' + h, found: ok, height: st.blockHeight, hidden: c?.amount_hidden, reasons: c?.reasons });
+  console.log(ok ? 'FOUND ' : 'MISSING', 'mistbank'.padEnd(10), 'zcash_payout_amount_hidden'.padEnd(28), 'height', st.blockHeight, 'hidden', c?.amount_hidden);
 }
 writeFileSync(new URL('../../judges/proofs/proof-check.json', import.meta.url), JSON.stringify({ at: new Date().toISOString(), rows: out }, null, 1));
 const missing = out.filter(r => !r.found).length;

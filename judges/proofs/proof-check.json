@@ -1,5 +1,5 @@
 {
- "at": "2026-10-28T01:12:51.608Z",
+ "at": "2026-10-28T02:04:44.762Z",
  "rows": [
   {
    "shop": "guardhouse",
@@ -166,6 +166,45 @@
    "result": {
     "ok": false,
     "error": "Smart contract panicked: ERR_DAO_ONLY_UNFREEZE"
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "guardhouse",
+   "label": "escalated_owner_approved",
+   "hash": "AxYjEL2XxpDFLA1Fpkw5EiqGJK7j2sFZymNBbkiVwWkD",
+   "url": "https://testnet.nearblocks.io/txns/AxYjEL2XxpDFLA1Fpkw5EiqGJK7j2sFZymNBbkiVwWkD",
+   "signer": "r11oath-82930.testnet",
+   "receiver": "r11oath-82930.testnet",
+   "method": "propose",
+   "result": {
+    "ok": true,
+    "value": {
+     "action_id": "4",
+     "decision": "escalated",
+     "status": "escalated",
+     "reason": "over_cap_waiting_owner"
+    }
+   },
+   "events": [
+    "action",
+    "settle",
+    "settle"
+   ],
+   "found": true
+  },
+  {
+   "shop": "guardhouse",
+   "label": "owner_resolve_approve",
+   "hash": "EduSJN1HNLhQU8kNe2nydaHxB9bd6NUDR3ry8DCZL8KE",
+   "url": "https://testnet.nearblocks.io/txns/EduSJN1HNLhQU8kNe2nydaHxB9bd6NUDR3ry8DCZL8KE",
+   "signer": "r11own-82930.testnet",
+   "receiver": "r11oath-82930.testnet",
+   "method": "resolve_escalation",
+   "result": {
+    "ok": true,
+    "value": true
    },
    "events": [],
    "found": true
@@ -560,6 +599,51 @@
    "found": true
   },
   {
+   "shop": "mistbank",
+   "label": "oath_allowed_commitment",
+   "hash": "5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+   "url": "https://testnet.nearblocks.io/txns/5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+   "signer": "r11oath-82930.testnet",
+   "receiver": "r11oath-82930.testnet",
+   "method": "propose",
+   "result": {
+    "ok": true,
+    "value": {
+     "action_id": "3",
+     "decision": "allowed",
+     "status": "confirmed",
+     "reason": "ok"
+    }
+   },
+   "events": [
+    "action",
+    "settle"
+   ],
+   "found": true
+  },
+  {
+   "shop": "mistbank",
+   "label": "oath_memo_too_long_denied",
+   "hash": "9riHoM2rG8nWsNCW5qtnpwcbKu1GUB7LpZB7CPgBm6Xy",
+   "url": "https://testnet.nearblocks.io/txns/9riHoM2rG8nWsNCW5qtnpwcbKu1GUB7LpZB7CPgBm6Xy",
+   "signer": "r11oath-82930.testnet",
+   "receiver": "r11oath-82930.testnet",
+   "method": "propose",
+   "result": {
+    "ok": true,
+    "value": {
+     "action_id": null,
+     "decision": "denied",
+     "status": "denied",
+     "reason": "memo_too_long"
+    }
+   },
+   "events": [
+    "action"
+   ],
+   "found": true
+  },
+  {
    "shop": "toll",
    "label": "base_sepolia_broadcast",
    "hash": "0xf7ed6482a8380c1fe84be32973256d00960f522cd0d70fe9fe16165190dbc43b",
@@ -567,6 +651,16 @@
    "found": true,
    "from": "0x004c194d852b1c5fc47f54a3921615ff581314b1",
    "to": "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5"
+  },
+  {
+   "shop": "mistbank",
+   "label": "zcash_payout_amount_hidden",
+   "hash": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
+   "url": "https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
+   "found": true,
+   "height": "4549357",
+   "hidden": true,
+   "reasons": []
   }
  ]
 }
