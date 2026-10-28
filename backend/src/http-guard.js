@@ -4,13 +4,15 @@
 // Render sits behind Cloudflare: CF-Connecting-IP / True-Client-IP are the address that connected to it
 // (a client cannot set them: Cloudflare answers error 1000). Render appends to X-Forwarded-For, so its first
 // entry is client-controlled and never used.
-// The site calls the API through a Vercel rewrite, so for those requests CF-Connecting-IP is a Vercel
+// The site calls the API through Vercel (middleware.js rewrites /api/* and adds x-nearcarta-proxy from the
+// Vercel env NC_PROXY_SECRET), so for those requests CF-Connecting-IP is a Vercel
 // egress address shared by many visitors. Vercel overwrites X-Vercel-Forwarded-For with the visitor's IP
 // (measured: a client-sent value is replaced). A client that calls Render directly can type that header,
 // though. So:
 //   * verified proxy (env PROXY_SECRET set and header x-nearcarta-proxy matches, timing-safe): the visitor IP
 //     from X-Vercel-Forwarded-For is the key, with no other limit.
-//   * unverified: the claimed visitor IP is the key AND the real connecting address (CF-Connecting-IP) gets
+//   * secret set, header missing or wrong: X-Vercel-Forwarded-For is ignored; CF-Connecting-IP is the key.
+//   * no secret configured (local or a fresh deploy only): the claimed visitor IP is the key AND the real connecting address (CF-Connecting-IP) gets
 //     its own bucket at EGRESS_MULT x the quota. Faking visitor IPs then buys at most EGRESS_MULT x one quota.
 import { timingSafeEqual } from 'node:crypto';
 export const onRender = env => Boolean(env.RENDER || env.RENDER_SERVICE_ID || env.RENDER_INSTANCE_ID);
@@ -30,8 +32,10 @@ export function clientIdentity(c, env = process.env) {
     let edge = null;
     for (const n of ['cf-connecting-ip', 'true-client-ip']) if (h(n)) { edge = [n, h(n)]; break; }
     const vff = h('x-vercel-forwarded-for');
-    if (isIp(vff)) {
-      if (proxyVerified(c, env)) return ['x-vercel-forwarded-for (verified proxy)', vff, null];
+    const strict = Boolean(env.PROXY_SECRET && env.PROXY_SECRET.length >= 32);
+    if (isIp(vff) && proxyVerified(c, env)) return ['x-vercel-forwarded-for (verified proxy)', vff, null];
+    // With the secret set, an unverified X-Vercel-Forwarded-For is ignored: the connecting address is the key.
+    if (isIp(vff) && !strict) {
       return ['x-vercel-forwarded-for (capped per connecting ip)', vff, edge ? `egress:${edge[1]}` : 'egress:unknown'];
     }
     return edge ? [edge[0], edge[1], null] : ['render:unknown', 'render:unknown', null];

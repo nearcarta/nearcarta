@@ -19,7 +19,7 @@ test('through Vercel: visitor IP is the key, the Vercel egress gets a capped buc
 test('verified proxy secret: visitor IP, no egress bucket; a wrong or short secret is not verified', () => {
   const h = { 'cf-connecting-ip': '54.70.0.1', 'x-vercel-forwarded-for': '2.2.2.2', 'x-nearcarta-proxy': SECRET };
   assert.equal(ctx(h, { ...RENDER, PROXY_SECRET: SECRET })[2], null);
-  assert.equal(ctx({ ...h, 'x-nearcarta-proxy': 'b'.repeat(40) }, { ...RENDER, PROXY_SECRET: SECRET })[2], 'egress:54.70.0.1');
+  assert.deepEqual(ctx({ ...h, 'x-nearcarta-proxy': 'b'.repeat(40) }, { ...RENDER, PROXY_SECRET: SECRET }), ['cf-connecting-ip', '54.70.0.1', null]);
   assert.equal(ctx(h, { ...RENDER, PROXY_SECRET: 'short' })[2], 'egress:54.70.0.1');
 });
 test('a non-IP X-Vercel-Forwarded-For is ignored', () => {
@@ -41,4 +41,12 @@ test('a direct caller faking X-Vercel-Forwarded-For gets at most EGRESS_MULT x o
   const a = app(); let ok = 0;
   for (let i = 0; i < 3 * EGRESS_MULT + 20; i++) if (await hit(a, { 'cf-connecting-ip': '9.9.9.9', 'x-vercel-forwarded-for': `10.0.${i >> 8}.${i & 255}` }) === 200) ok++;
   assert.equal(ok, 3 * EGRESS_MULT);
+});
+
+test('secret set: an unverified X-Vercel-Forwarded-For is ignored (connecting IP is the key); verified uses the visitor', () => {
+  const env = { ...RENDER, PROXY_SECRET: SECRET };
+  const h = { 'cf-connecting-ip': '9.9.9.9', 'x-vercel-forwarded-for': '2.2.2.2' };
+  assert.deepEqual(ctx(h, env), ['cf-connecting-ip', '9.9.9.9', null]);
+  assert.deepEqual(ctx({ ...h, 'x-nearcarta-proxy': 'b'.repeat(40) }, env), ['cf-connecting-ip', '9.9.9.9', null]);
+  assert.deepEqual(ctx({ ...h, 'x-nearcarta-proxy': SECRET }, env), ['x-vercel-forwarded-for (verified proxy)', '2.2.2.2', null]);
 });

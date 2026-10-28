@@ -1,11 +1,28 @@
-// Adds a per-request CSP nonce to every HTML page (see csp.mjs).
+// Adds a per-request CSP nonce to every HTML page (see csp.mjs), and sends /api/* to the Render API with
+// a proxy header (x-nearcarta-proxy = Vercel env NC_PROXY_SECRET, a Secret-type value never sent to the browser).
+// Render trusts the visitor IP in X-Vercel-Forwarded-For only when that header matches its PROXY_SECRET
+// (backend/src/http-guard.js). Without the env value, the vercel.json rewrite carries /api/* as before.
 import { policy, nonce, withNonce } from './csp.mjs';
 
-export const config = { matcher: ['/', '/((?!api/).*\\.html)', '/((?!api/)[^.]*)'] };
+export const config = { matcher: ['/', '/api/:path*', '/((?!api/).*\\.html)', '/((?!api/)[^.]*)'] };
+const API = 'https://nearcarta-api.onrender.com';
+
+function toApi(req, u, secret) {
+  const h = new Headers({ 'x-middleware-rewrite': API + u.pathname + u.search });
+  const keys = [];
+  for (const [k, v] of req.headers) if (k !== 'x-nearcarta-proxy') { h.set('x-middleware-request-' + k, v); keys.push(k); }
+  h.set('x-middleware-request-x-nearcarta-proxy', secret); keys.push('x-nearcarta-proxy');
+  h.set('x-middleware-override-headers', keys.join(','));
+  return new Response(null, { headers: h });
+}
 
 const pass = () => new Response(null, { headers: { 'x-middleware-next': '1' } });
 
 export default async function middleware(req) {
+  if (new URL(req.url).pathname.startsWith('/api/')) {
+    const secret = process.env.NC_PROXY_SECRET;
+    return secret ? toApi(req, new URL(req.url), secret) : pass();
+  }
   if (req.headers.get('x-nc-inner') || !['GET', 'HEAD'].includes(req.method)) return pass();
   const u = new URL(req.url);
   const p = u.pathname;
