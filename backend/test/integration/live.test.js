@@ -98,14 +98,16 @@ test('NEAR AI TEE preflight: gateway + model quotes verify (dcap-qvl, nonce, sig
   assert.equal(r.ok, true);
 });
 
-test('mist bank: Zcash testnet payout hides its amount, its NEAR oath carries the commitment, the ledger binds', async () => {
+test('mist bank: Zcash testnet payout hides its amount, its NEAR oath carries the commitment, nothing secret is served', async () => {
   const { mistbank } = await import('../../src/mistbank.js');
   const m = await mistbank({ fresh: true });
   assert.equal(m.built, true);
   assert.equal(m.street.amount_hidden, true, m.street.reasons.join());
   assert.ok(m.street.confirmations >= 1);
   assert.equal(m.oath.success, true); assert.equal(m.oath.decision, 'allowed'); assert.equal(m.oath.memo_on_chain, true); assert.equal(m.oath.shop, 'mistbank');
-  assert.equal(m.binds, true);
+  assert.equal(m.binding.charter_caps_zec_amount, false); // stated plainly
+  assert.doesNotMatch(JSON.stringify(m), /uview(test)?1|salt=|"zats"|payee_address/);
+  assert.equal(m.ledger, undefined); assert.equal(m.disclosure, undefined);
   if (has.oneClick()) for (const [k, l] of Object.entries(m.desk.legs)) { assert.equal(l.ok, true, k); assert.equal(l.privacy, 'basic'); assert.equal(l.dry, true); }
 });
 

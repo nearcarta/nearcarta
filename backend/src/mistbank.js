@@ -4,9 +4,11 @@
 //    value leaving the shielded pools is the fee. A payout that crosses pools (for example Ironwood to
 //    Sapling) shows the crossing amount on chain, so it fails this check, as faucet payouts do.
 //  Oath (public): NEAR testnet approval of the payout. Its memo carries only a commitment
-//    sha256("mistbank:v1:<zats>:<salt>") (as "mb1:<base64url>"), never the amount.
-//  Ledger (disclosed): amount and memo decrypted by a view-only wallet from the payee's published
-//    testnet viewing key (judges/proofs/mistbank-payout.json). Anyone can recompute the commitment.
+//    sha256("mistbank:v1:<amount>:<salt>") (as "mb1:<base64url>"), never the amount.
+//  Ledger (auditor only): the amount and salt sit in the encrypted Zcash memo. Only an auditor
+//    given the payee viewing key out of band can read them; the API never serves the key, the
+//    amount or the salt. The auditor sends the opening to POST /api/mistbank/verify (or hashes it).
+//  Honest limit: the charter stores the commitment; it does not cap or move the Zcash amount.
 //  Desk (live): dry NEAR Intents 1Click quotes for the confidential legs (shield into Confidential
 //    Intents, private transfer, unshield), each checked for the 1Click signature and the echo guard.
 import { createHash } from 'node:crypto';
@@ -97,12 +99,21 @@ const proofPath = new URL('../../judges/proofs/mistbank-payout.json', import.met
 // The recorder writes judges/proofs/mistbank-payout.json; the same record is in shared/deployments (bundled).
 export const proof = () => DEP.mistbank || (existsSync(proofPath) ? JSON.parse(readFileSync(proofPath, 'utf8')) : null);
 
-// Anyone holding the disclosed amount and salt can check them against the recorded commitment.
-export function verifyOpening(zats, salt, p = proof()) {
-  if (!/^\d{1,16}$/.test(String(zats)) || !/^[0-9a-f]{32}$/.test(String(salt))) throw Object.assign(new Error('zats must be an integer and salt 32 hex chars'), { status: 400 });
-  const c = commitment(String(Number(zats)), salt);
+// An auditor who read the opening (amount, salt) with the viewing key checks it against the
+// recorded commitment. The response never echoes the opening back.
+export function verifyOpening(amount, salt, p = proof()) {
+  if (!/^\d{1,16}$/.test(String(amount)) || !/^[0-9a-f]{32}$/.test(String(salt))) throw Object.assign(new Error('amount must be an integer (zatoshi) and salt 32 hex chars'), { status: 400 });
+  const c = commitment(String(Number(amount)), salt);
   return { commitment: c, recorded: p?.commitment?.value ?? null, matches: !!p && c === p.commitment.value, oath_memo: oathMemo(c) };
 }
+
+// What the charter does and does not bind, stated plainly in every public response.
+export const BINDING = {
+  kind: 'commitment',
+  charter_caps_zec_amount: false,
+  says: 'The NEAR charter approves the payout and stores sha256 of (amount, salt) on chain. It does not cap or move the Zcash amount: the bank wallet sends it off chain. An auditor with the viewing key can prove the amount paid matches the committed one.',
+  timing: 'Future payouts wait a random delay after the NEAR approval before the Zcash send, so the two are not linkable by time. The first payout (2026-10-28) had no delay: mined 29 s after its approval.',
+};
 
 export async function oathCheck(p) {
   const tx = await txStatus(p.oath.tx, p.oath.sender);
@@ -126,9 +137,10 @@ export async function mistbank({ fresh = false } = {}) {
     oathCheck(p).catch(e => ({ error: e.message })),
     desk('basic').catch(e => ({ available: false, reason: e.message })),
   ]);
-  const ledger = p.ledger;
-  const binds = !!ledger && commitment(ledger.zats, (ledger.memo?.match(/salt=([0-9a-f]{32})/) || [])[1]) === p.commitment.value && ledger.memo.includes(p.oath.tx);
-  const v = { built: true, network: p.network, payout: p.payout, street, oath, ledger, disclosure: p.disclosure, commitment: p.commitment, binds, desk: deskBasic, src: 'live' };
+  // Public view: commitment + proof links only. No amount, salt or viewing key (auditor only).
+  const v = { built: true, network: p.network, payout: { txid: p.payout.txid, height: p.payout.height, explorer: p.payout.explorer },
+    street, oath, commitment: p.commitment, binding: BINDING, auditor: { how: p.auditor?.how ?? null, verify: 'POST /api/mistbank/verify {"amount":"<zatoshi>","salt":"<32 hex>"}' },
+    desk: deskBasic, src: 'live' };
   cache = { at: Date.now(), v };
   return v;
 }

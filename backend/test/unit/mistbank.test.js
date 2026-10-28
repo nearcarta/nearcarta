@@ -1,13 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { commitment, oathMemo, streetCheck, parseLedger, deskRequests, verifyOpening } from '../../src/mistbank.js';
 import { DEP } from '../../src/config.js';
 
 const fx = f => readFileSync(new URL(`../fixtures/${f}`, import.meta.url), 'utf8');
 const payout = JSON.parse(fx('zec-testnet-mistbank-payout.json'));   // our payout, Ironwood -> Ironwood
 const crossing = JSON.parse(fx('zec-testnet-faucet-crossing.json')); // a faucet payment that crosses pools
-const PAYOUT = 'd0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897';
+// Synthetic list-tx output (made-up amount, salt and txid): the real opening is auditor-only.
+const FX_TX = 'ab'.repeat(32), FX_AMOUNT = 4200000, FX_SALT = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+const AUDITOR = process.env.MIST_AUDITOR_FILE; // optional: the auditor's copy, never in the repo
 
 test('the street sees our payout, but no amount: only the fee leaves the pool', () => {
   const s = streetCheck(payout);
@@ -28,20 +30,35 @@ test('transparent parts and coinbase are flagged', () => {
 });
 
 test('the oath memo is a commitment that fits the 64-byte oath limit', () => {
-  const c = commitment(1370000, '67d50c7f78cc0cfdc145392edd674f83');
+  const c = commitment(FX_AMOUNT, FX_SALT);
   assert.match(c, /^[0-9a-f]{64}$/);
   assert.ok(Buffer.byteLength(oathMemo(c)) <= 64);
-  assert.notEqual(commitment(1370001, '67d50c7f78cc0cfdc145392edd674f83'), c); // one zat changes it
+  assert.notEqual(commitment(FX_AMOUNT + 1, FX_SALT), c); // one zat changes it
 });
 
-test('the ledger opened with the viewing key binds to the commitment recorded on chain', () => {
-  const l = parseLedger(fx('zec-testnet-view-list-tx.txt'), PAYOUT);
-  assert.equal(l.zats, 1370000); assert.equal(l.height, 4549357);
-  const salt = l.memo.match(/salt=([0-9a-f]{32})/)[1], oathTx = l.memo.match(/oath=(\w+)/)[1];
-  assert.equal(oathTx, DEP.mistbank.oath.tx);
-  assert.equal(commitment(l.zats, salt), DEP.mistbank.commitment.value);
-  assert.equal(oathMemo(DEP.mistbank.commitment.value), DEP.mistbank.oath.memo);
+test('the auditor parses amount and salt from a view-only list-tx and rebuilds the commitment', () => {
+  const l = parseLedger(fx('zec-testnet-view-list-tx.txt'), FX_TX);
+  assert.equal(l.zats, FX_AMOUNT); assert.equal(l.height, 4500000);
+  const salt = l.memo.match(/salt=([0-9a-f]{32})/)[1];
+  assert.equal(salt, FX_SALT);
+  const p = { commitment: { value: commitment(FX_AMOUNT, FX_SALT) } };
+  assert.equal(verifyOpening(String(l.zats), salt, p).matches, true);
   assert.equal(parseLedger(fx('zec-testnet-view-list-tx.txt'), 'f'.repeat(64)), null);
+});
+
+test('the public record carries no viewing key, amount or salt', () => {
+  const blob = JSON.stringify(DEP);
+  assert.doesNotMatch(blob, /uview(test)?1|salt=|"zats"|payee_address/);
+  assert.equal(DEP.mistbank.ledger, undefined); assert.equal(DEP.mistbank.disclosure, undefined);
+  assert.match(DEP.mistbank.commitment.value, /^[0-9a-f]{64}$/);
+});
+
+test('real payout: the auditor opening matches the commitment on chain', { skip: !(AUDITOR && existsSync(AUDITOR)) && 'set MIST_AUDITOR_FILE (auditor only)' }, () => {
+  const a = JSON.parse(readFileSync(AUDITOR, 'utf8'));
+  const salt = a.ledger.memo.match(/salt=([0-9a-f]{32})/)[1];
+  assert.ok(a.ledger.memo.includes(DEP.mistbank.oath.tx));
+  assert.equal(verifyOpening(String(a.ledger.zats), salt).matches, true);
+  assert.equal(oathMemo(DEP.mistbank.commitment.value), DEP.mistbank.oath.memo);
 });
 
 test('desk requests are dry and always name the privacy level (1Click defaults it silently)', () => {
@@ -55,7 +72,10 @@ test('desk requests are dry and always name the privacy level (1Click defaults i
 });
 
 test('the opening check matches the recorded commitment and rejects any other amount', () => {
-  assert.equal(verifyOpening('1370000', '67d50c7f78cc0cfdc145392edd674f83').matches, true);
-  assert.equal(verifyOpening('1370001', '67d50c7f78cc0cfdc145392edd674f83').matches, false);
+  const p = { commitment: { value: commitment(FX_AMOUNT, FX_SALT) } };
+  assert.equal(verifyOpening(String(FX_AMOUNT), FX_SALT, p).matches, true);
+  assert.equal(verifyOpening(String(FX_AMOUNT + 1), FX_SALT, p).matches, false);
+  assert.equal(verifyOpening(String(FX_AMOUNT), FX_SALT).matches, false); // not the real payout's opening
+  assert.ok(!('salt' in verifyOpening(String(FX_AMOUNT), FX_SALT, p))); // never echoes the opening
   assert.throws(() => verifyOpening('1.5', 'zz'));
 });

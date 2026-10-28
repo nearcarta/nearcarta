@@ -5,7 +5,7 @@
   "zcash": "testnet"
  },
  "commitment": {
-  "scheme": "sha256(\"mistbank:v1:<zats>:<salt>\")",
+  "scheme": "sha256(\"mistbank:v1:<amount>:<salt>\")",
   "value": "b22cc85878be366a3edb1d4ef3afbeea0813d4be02aec95a387242fa9a6055ce"
  },
  "oath": {
@@ -40,17 +40,11 @@
   "amount_hidden": true,
   "reasons": []
  },
- "disclosure": {
-  "ufvk": "uviewtest1yjdau2fdgn3elmph0rht7wajh2xcw6q2shfhh6kxkt4j25tmvgjkmyxyadg93cjez5j0u4rhylyef2y8h2qcpg6p5e000xxsrkqmfgze6u7gx5lwukh4xal26l8yvwwvqujqtmeaum3rntwwzhqvh6emyt4nwzz6a47hfz9mrmglpxqafwgaflz3ymkgws6ynl5rtdgrwfpxufnawmktk0ua448gu3mms3nawp6zsvjzaqeefmmlfm80xmagy2947gqw4ng4xrvjcj5xfkf2dqsfh6jnnmx6acmczz5rq2kh2tlp7hdqc80espxen7ynrp6vtakf7vzqp6562jjzatuyqrcpqmapwwj3zdf6f7ewylu6rx3dcjkfug3c23lg4sfu75c2whpnuf6s38azyxjmwzvw9mmgllu99epfegrhngujuwznzwxjhdf59mdf9kajg9j8gk5fee2cnkmj2pl4jpcw8af6mk53y3x9mnrvc5xe6cfhptcm",
-  "payee_address": "utest14l9yactcwyjk0dtxmc4jjy3v3xaxwg4gs33q79wlsacp02uaxh5verm9ydhwpw7g5ltf22p0ssweexxr6t4xhmq0lhe3vwqazc2p450d",
-  "how": "zcash-devtool wallet -w <dir> init-fvk --name view --fvk <ufvk> --birthday <height-5>; wallet sync; wallet enhance; wallet list-tx"
+ "auditor": {
+  "held_by": "the owner, given to an auditor out of band; never served by the API or committed",
+  "contains": "the payee viewing key (UFVK) and the opening (amount in zatoshi and salt)",
+  "how": "the auditor imports the UFVK into their own zcash-devtool view-only wallet (init-fvk, sync, enhance, list-tx), reads the amount and the salt from the encrypted memo, then checks the opening against the commitment on chain with POST /api/mistbank/verify or by hashing it locally",
+  "rotated": "the first payout key was public until 2026-10-28; that payee account is retired and future payouts use a fresh payee wallet"
  },
- "ledger": {
-  "txid": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
-  "height": 4549357,
-  "zats": 1370000,
-  "taz": "0.01370000",
-  "memo": "nearcarta mistbank v1 oath=5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua salt=67d50c7f78cc0cfdc145392edd674f83"
- },
- "binds": true
+ "binds_checked_by_auditor": true
 }

@@ -1,11 +1,11 @@
 Transactions:
-d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897
-     Mined: 4549357 (2026-10-28 1:49:56.0 +00:00:00)
-    Amount:   0.01370000 TAZ
+abababababababababababababababababababababababababababababababab
+     Mined: 4500000 (2026-10-01 0:00:00.0 +00:00:00)
+    Amount:   0.04200000 TAZ
   Fee paid:   0.00020000 TAZ
   Sent 0 notes, received 1 notes, 1 memos
   Output 1 (Ironwood)
-    Value:   0.01370000 TAZ
-    Received by account: d8f5a61f-f452-494e-97b2-ca9bf720d7f2 (judge-view)
-    To: utest14l9yactcwyjk0dtxmc4jjy3v3xaxwg4gs33q79wlsacp02uaxh5verm9ydhwpw7g5ltf22p0ssweexxr6t4xhmq0lhe3vwqazc2p450d
-    Memo: Memo::Text("nearcarta mistbank v1 oath=5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua salt=67d50c7f78cc0cfdc145392edd674f83")
+    Value:   0.04200000 TAZ
+    Received by account: 00000000-0000-4000-8000-000000000000 (judge-view)
+    To: utest1syntheticfixtureaddressnotarealpayee
+    Memo: Memo::Text("nearcarta mistbank v1 oath=SyntheticOathTx1111111111111111111111111111 salt=a1b2c3d4e5f60718293a4b5c6d7e8f90")

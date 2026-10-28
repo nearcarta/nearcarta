@@ -88,7 +88,8 @@ test('shop interiors get live data through the data interface', async ({ page })
 
 test('mist bank: the street shows a hidden amount and the ledger binds to the oath', async ({ page, request }) => {
   const m = await (await request.get('/api/mistbank')).json();
-  expect(m.street.amount_hidden).toBe(true); expect(m.oath.memo_on_chain).toBe(true); expect(m.binds).toBe(true);
+  expect(m.street.amount_hidden).toBe(true); expect(m.oath.memo_on_chain).toBe(true);
+  expect(JSON.stringify(m)).not.toMatch(/uview(test)?1|salt=|"zats"/); expect(m.binding.charter_caps_zec_amount).toBe(false);
   expect(m.payout.txid).toBe(dep.mistbank.payout.txid);
   await page.goto('/design/D8_shops/?2d');
   const b = await page.evaluate(async () => (await import('/design/D6_dashboards/src/data.js')).BANK);
