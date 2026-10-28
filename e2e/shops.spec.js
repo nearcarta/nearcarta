@@ -8,6 +8,8 @@ test('health: the API reads NEAR testnet and cannot sign', async ({ request }) =
 
 test('ferry: dry 1Click quote USDC (Base) -> ZEC to a shielded address passes all checks', async ({ page }) => {
   await page.goto('/#ferry');
+  await expect(page.locator('input[name=recipient]')).toHaveValue(''); await expect(page.locator('input[name=amount]')).toHaveValue('30');
+  await page.getByRole('button', { name: 'Fill sample addresses' }).click();
   await expect(page.getByTestId('zec-check')).toContainText('shielded');
   await page.getByRole('button', { name: 'Get dry quote' }).click();
   const q = page.getByTestId('quote');
@@ -20,6 +22,7 @@ test('ferry: dry 1Click quote USDC (Base) -> ZEC to a shielded address passes al
 test('ferry: confidential (basic) quote echoes the privacy level', async ({ page }) => {
   test.skip(!(await (await page.request.get('/api/health')).json()).features.confidentialQuotes, 'no partner key on this deploy');
   await page.goto('/#ferry');
+  await page.getByRole('button', { name: 'Fill sample addresses' }).click();
   await page.locator('select[name=privacy]').selectOption('basic');
   await page.getByRole('button', { name: 'Get dry quote' }).click();
   await expect(page.getByTestId('verdict')).toHaveText('ACCEPTED', { timeout: 30_000 });
@@ -28,6 +31,7 @@ test('ferry: confidential (basic) quote echoes the privacy level', async ({ page
 
 test('ferry: a transparent Zcash address is flagged as public', async ({ page }) => {
   await page.goto('/#ferry');
+  await page.getByRole('button', { name: 'Fill sample addresses' }).click();
   await page.locator('input[name=recipient]').fill('t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC');
   await page.locator('input[name=recipient]').dispatchEvent('change');
   await expect(page.getByTestId('zec-check')).toContainText('public on Zcash');
@@ -35,7 +39,8 @@ test('ferry: a transparent Zcash address is flagged as public', async ({ page })
 
 test('guardhouse: oath account has no full-access key and a propose-only agent key', async ({ page }) => {
   await page.goto('/#guardhouse');
-  await expect(page.getByTestId('oath-state')).toContainText(dep.guardhouse.oath, { timeout: 30_000 });
+  // Accounts show a readable name; the full id is the link title and target.
+  await expect(page.getByTestId('oath-state').locator(`a[title="${dep.guardhouse.oath}"]`).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('fak')).toHaveText('0');
   await expect(page.getByTestId('oath-state')).toContainText('propose');
 });
@@ -61,13 +66,13 @@ test('chronicle: the guardhouse shows one allowed and one denied proposal from c
 
 test('town hall: oath is frozen by a DAO vote', async ({ page }) => {
   await page.goto('/#townhall');
-  await expect(page.getByTestId('hall-state')).toContainText('FROZEN by DAO vote', { timeout: 30_000 });
-  await expect(page.getByTestId('hall-state')).toContainText(dep.townhall.dao);
+  await expect(page.getByTestId('hall-state')).toContainText('frozen by a DAO vote', { timeout: 30_000 });
+  await expect(page.getByTestId('hall-state').locator(`a[title="${dep.townhall.dao}"]`).first()).toBeVisible();
 });
 
 test('arena: guardian g1 and its case tokens are read from chain', async ({ page }) => {
   await page.goto('/#arena');
-  await expect(page.getByTestId('arena-state')).toContainText(dep.arena.contract, { timeout: 30_000 });
+  await expect(page.getByTestId('arena-state').locator(`a[title="${dep.arena.contract}"]`).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('#arena')).toContainText('case:C1_CAP');
 });
 
@@ -86,14 +91,15 @@ test('shop interiors get live data through the data interface', async ({ page })
   await expect(page.locator('#t-title')).toHaveText('Ferry');
 });
 
-test('mist bank: the street shows a hidden amount and the ledger binds to the oath', async ({ page, request }) => {
+test('mist bank: the street shows a hidden amount and only the commitment is public', async ({ page, request }) => {
   const m = await (await request.get('/api/mistbank')).json();
   expect(m.street.amount_hidden).toBe(true); expect(m.oath.memo_on_chain).toBe(true);
   expect(JSON.stringify(m)).not.toMatch(/uview(test)?1|salt=|"zats"/); expect(m.binding.charter_caps_zec_amount).toBe(false);
   expect(m.payout.txid).toBe(dep.mistbank.payout.txid);
   await page.goto('/design/D8_shops/?2d');
   const b = await page.evaluate(async () => (await import('/design/D6_dashboards/src/data.js')).BANK);
-  expect(b.src).toBe('testnet'); expect(b.street.hidden).toBe(true); expect(b.ledger.binds).toBe(true);
+  expect(b.src).toBe('testnet'); expect(b.street.hidden).toBe(true); expect(b.ledger.commitment).toBe(m.commitment.value);
+  expect(JSON.stringify(b)).not.toMatch(/uview|ufvk|salt|zats|taz/i);
 });
 
 test('town view loads', async ({ page }) => {
