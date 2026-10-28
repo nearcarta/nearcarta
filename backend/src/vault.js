@@ -161,7 +161,10 @@ export async function runnerStatus() {
 }
 
 /** Run one attack on a charter with a key that may call `propose` on it. Stops at the first refusal. */
-export async function runAttack({ charter, key, attackId, tag, rpcCall = rpcClient(cfg.rpc), viewF = (a, m, x) => viewFn(rpcCall, a, m, x), send = sendPropose, verify = verifyAttempt }) {
+// The runner signs on the server: primary RPC first, then the fallbacks when one answers 429/5xx.
+const runnerRpc = () => rpcClient([cfg.rpc, ...cfg.rpcFallbacks.filter(u => u !== cfg.rpc)]);
+
+export async function runAttack({ charter, key, attackId, tag, rpcCall = runnerRpc(), viewF = (a, m, x) => viewFn(rpcCall, a, m, x), send = sendPropose, verify = verifyAttempt }) {
   const result = await runSteps({ charter, key, attackId, tag, rpcCall, viewF, send });
   for (const st of result.steps) st.url = explorerTx(st.tx);
   // The board only takes what the chain says: re-read the refusal like any recorded attempt.
@@ -172,7 +175,7 @@ export async function runAttack({ charter, key, attackId, tag, rpcCall = rpcClie
   return result;
 }
 
-export async function doTask({ charter, key, taskId, tag, rpcCall = rpcClient(cfg.rpc), viewF = (a, m, x) => viewFn(rpcCall, a, m, x), send = sendPropose, verify = verifyAttempt }) {
+export async function doTask({ charter, key, taskId, tag, rpcCall = runnerRpc(), viewF = (a, m, x) => viewFn(rpcCall, a, m, x), send = sendPropose, verify = verifyAttempt }) {
   const r = await runTask({ charter, key, taskId, tag, rpcCall, viewF, send });
   r.url = explorerTx(r.tx);
   const v = r.tx ? await verify(r.tx, charter).catch(() => null) : null;

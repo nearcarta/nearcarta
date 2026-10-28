@@ -244,3 +244,18 @@ test('runAsk sends one propose with the parsed payee and an ask memo', async () 
   assert.equal(r.passed, false); assert.equal(r.reason, 'receiver_not_allowlisted');
   assert.equal(sent[0].shop, 'ask'); assert.equal(sent[0].memo, 'ask:refund'); assert.equal(sent[0].nonce, '3'); assert.equal(sent[0].clause_id, 'pay');
 });
+
+test('rpcClient falls through to the next RPC on 429 and never retries a JSON-RPC error', async () => {
+  const { rpcClient } = await import('../../../shared/vault/tx.js');
+  const hits = [];
+  const fake = (answers) => async (url) => { hits.push(url); const a = answers[url].shift(); return { ok: a.status === 200, status: a.status, json: async () => a.body }; };
+  let c = rpcClient(['https://a', 'https://b'], fake({ 'https://a': [{ status: 429 }], 'https://b': [{ status: 200, body: { result: 7 } }] }), { sleep: async () => {} });
+  assert.equal(await c('block', {}), 7);
+  assert.deepEqual(hits, ['https://a', 'https://b']);
+  hits.length = 0;
+  c = rpcClient(['https://a', 'https://b'], fake({ 'https://a': [{ status: 200, body: { error: { name: 'HANDLER_ERROR', cause: { name: 'INVALID_TRANSACTION' } } } }], 'https://b': [] }), { sleep: async () => {} });
+  await assert.rejects(c('send_tx', {}), /INVALID_TRANSACTION/);
+  assert.deepEqual(hits, ['https://a']);
+  c = rpcClient('https://a', fake({ 'https://a': [{ status: 503 }, { status: 503 }] }), { rounds: 2, sleep: async () => {} });
+  await assert.rejects(c('block', {}), /http 503/);
+});

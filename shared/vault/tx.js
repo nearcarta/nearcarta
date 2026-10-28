@@ -32,14 +32,26 @@ export function signTx({ key, signerId, receiverId, nonce, blockHash, actions })
 }
 
 /** JSON-RPC helper bound to an endpoint. */
-export function rpcClient(url, fetchImpl = fetch) {
+// `urls` may be one URL or a list. HTTP 408/429/5xx means the node did not take the request, so the
+// next URL is tried (rounds with backoff). A JSON-RPC error or a network failure is not retried here:
+// a send_tx that may have reached a node must not be sent twice.
+const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+export function rpcClient(urls, fetchImpl = fetch, { rounds = 3, backoffMs = 300, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
+  const list = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
   let id = 0;
   return async (method, params) => {
-    const r = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }) });
-    if (!r.ok) throw new Error(`rpc ${method} http ${r.status}`);
-    const j = await r.json();
-    if (j.error) { const e = new Error(`rpc ${method}: ${j.error.cause?.name || j.error.name || 'error'} ${JSON.stringify(j.error.data ?? j.error.cause?.info ?? '').slice(0, 300)}`); e.rpc = j.error; throw e; }
-    return j.result;
+    let last;
+    for (let round = 0; round < rounds; round++) {
+      for (const url of list) {
+        const r = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }) });
+        if (!r.ok) { last = new Error(`rpc ${method} http ${r.status}`); if (RETRY_STATUS.has(r.status)) continue; throw last; }
+        const j = await r.json();
+        if (j.error) { const e = new Error(`rpc ${method}: ${j.error.cause?.name || j.error.name || 'error'} ${JSON.stringify(j.error.data ?? j.error.cause?.info ?? '').slice(0, 300)}`); e.rpc = j.error; throw e; }
+        return j.result;
+      }
+      if (round + 1 < rounds) await sleep(backoffMs * 2 ** round);
+    }
+    throw last;
   };
 }
 
