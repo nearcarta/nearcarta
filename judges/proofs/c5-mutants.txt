@@ -1,0 +1,75 @@
+cargo-mutants 27.1.0 on the C5 diff (git diff 1853a26 3709807 -- contracts/oath/src/lib.rs), run: cargo mutants --in-diff <diff> -- --lib
+result: 69 mutants, 46 caught, 23 unviable, 0 missed, 0 timeout
+
+## missed
+## caught
+src/lib.rs:70:41: replace k_seal -> Vec<u8> with vec![]
+src/lib.rs:71:40: replace k_hold -> Vec<u8> with vec![0]
+src/lib.rs:71:40: replace k_hold -> Vec<u8> with vec![1]
+src/lib.rs:73:5: replace seal_of -> Option<String> with None
+src/lib.rs:73:5: replace seal_of -> Option<String> with Some(String::new())
+src/lib.rs:73:5: replace seal_of -> Option<String> with Some("xyzzy".into())
+src/lib.rs:76:5: replace hold_eta -> Option<u64> with None
+src/lib.rs:76:5: replace hold_eta -> Option<u64> with Some(0)
+src/lib.rs:76:5: replace hold_eta -> Option<u64> with Some(1)
+src/lib.rs:79:34: replace * with +
+src/lib.rs:79:34: replace * with /
+src/lib.rs:70:41: replace k_seal -> Vec<u8> with vec![0]
+src/lib.rs:70:41: replace k_seal -> Vec<u8> with vec![1]
+src/lib.rs:71:40: replace k_hold -> Vec<u8> with vec![]
+src/lib.rs:507:9: replace Oath::remove_clause with ()
+src/lib.rs:715:78: replace + with - in Oath::propose
+src/lib.rs:715:78: replace + with * in Oath::propose
+src/lib.rs:978:9: replace Oath::recheck_held -> Result<(), String> with Ok(())
+src/lib.rs:979:30: replace != with == in Oath::recheck_held
+src/lib.rs:980:32: replace != with == in Oath::recheck_held
+src/lib.rs:991:19: replace += with -= in Oath::refuse_held
+src/lib.rs:991:19: replace += with *= in Oath::refuse_held
+src/lib.rs:992:41: replace += with -= in Oath::refuse_held
+src/lib.rs:992:41: replace += with *= in Oath::refuse_held
+src/lib.rs:1077:9: replace Oath::chronicle with ()
+src/lib.rs:1080:36: replace += with -= in Oath::chronicle
+src/lib.rs:1080:13: delete match arm "allowed" in Oath::chronicle
+src/lib.rs:1081:13: delete match arm "escalated" | "held" in Oath::chronicle
+src/lib.rs:1080:36: replace += with *= in Oath::chronicle
+src/lib.rs:1081:49: replace += with *= in Oath::chronicle
+src/lib.rs:1081:49: replace += with -= in Oath::chronicle
+src/lib.rs:1139:9: replace Oath::get_rules -> Option<serde_json::Value> with None
+src/lib.rs:1139:9: replace Oath::get_rules -> Option<serde_json::Value> with Some(Default::default())
+src/lib.rs:1145:67: replace Oath::get_seal -> Option<String> with Some(String::new())
+src/lib.rs:1145:67: replace Oath::get_seal -> Option<String> with None
+src/lib.rs:1145:67: replace Oath::get_seal -> Option<String> with Some("xyzzy".into())
+src/lib.rs:1147:61: replace Oath::get_hold -> Option<U64> with None
+src/lib.rs:1147:61: replace Oath::get_hold -> Option<U64> with Some(Default::default())
+src/lib.rs:1174:5: replace hidden_rule_text -> String with String::new()
+src/lib.rs:1174:5: replace hidden_rule_text -> String with "xyzzy".into()
+src/lib.rs:1179:5: replace hidden_commitment -> String with String::new()
+src/lib.rs:1179:5: replace hidden_commitment -> String with "xyzzy".into()
+src/lib.rs:1183:5: replace hidden_checks -> Result<(), String> with Ok(())
+src/lib.rs:1184:47: replace > with == in hidden_checks
+src/lib.rs:1184:47: replace > with < in hidden_checks
+src/lib.rs:1184:47: replace > with >= in hidden_checks
+## unviable
+src/lib.rs:385:9: replace Oath::apply -> PromiseOrValue<serde_json::Value> with PromiseOrValue::new()
+src/lib.rs:385:9: replace Oath::apply -> PromiseOrValue<serde_json::Value> with PromiseOrValue::from_iter([Default::default()])
+src/lib.rs:385:9: replace Oath::apply -> PromiseOrValue<serde_json::Value> with PromiseOrValue::new(Default::default())
+src/lib.rs:385:9: replace Oath::apply -> PromiseOrValue<serde_json::Value> with PromiseOrValue::from(Default::default())
+src/lib.rs:492:9: replace Oath::seal_rule -> PromiseOrValue<serde_json::Value> with PromiseOrValue::new()
+src/lib.rs:492:9: replace Oath::seal_rule -> PromiseOrValue<serde_json::Value> with PromiseOrValue::from_iter([Default::default()])
+src/lib.rs:492:9: replace Oath::seal_rule -> PromiseOrValue<serde_json::Value> with PromiseOrValue::new(Default::default())
+src/lib.rs:492:9: replace Oath::seal_rule -> PromiseOrValue<serde_json::Value> with PromiseOrValue::from(Default::default())
+src/lib.rs:501:9: replace Oath::unseal_rule -> PromiseOrValue<serde_json::Value> with PromiseOrValue::new()
+src/lib.rs:501:9: replace Oath::unseal_rule -> PromiseOrValue<serde_json::Value> with PromiseOrValue::from_iter([Default::default()])
+src/lib.rs:501:9: replace Oath::unseal_rule -> PromiseOrValue<serde_json::Value> with PromiseOrValue::new(Default::default())
+src/lib.rs:501:9: replace Oath::unseal_rule -> PromiseOrValue<serde_json::Value> with PromiseOrValue::from(Default::default())
+src/lib.rs:666:9: replace Oath::propose -> PromiseOrValue<Outcome> with PromiseOrValue::new()
+src/lib.rs:666:9: replace Oath::propose -> PromiseOrValue<Outcome> with PromiseOrValue::from_iter([Default::default()])
+src/lib.rs:666:9: replace Oath::propose -> PromiseOrValue<Outcome> with PromiseOrValue::new(Default::default())
+src/lib.rs:666:9: replace Oath::propose -> PromiseOrValue<Outcome> with PromiseOrValue::from(Default::default())
+src/lib.rs:804:9: replace Oath::check_batch -> Result<Clause, (Option<usize>, String)> with Ok(Default::default())
+src/lib.rs:933:9: replace Oath::reveal_hidden -> PromiseOrValue<Outcome> with PromiseOrValue::new()
+src/lib.rs:933:9: replace Oath::reveal_hidden -> PromiseOrValue<Outcome> with PromiseOrValue::from_iter([Default::default()])
+src/lib.rs:933:9: replace Oath::reveal_hidden -> PromiseOrValue<Outcome> with PromiseOrValue::new(Default::default())
+src/lib.rs:933:9: replace Oath::reveal_hidden -> PromiseOrValue<Outcome> with PromiseOrValue::from(Default::default())
+src/lib.rs:967:9: replace Oath::expire_hold -> Outcome with Default::default()
+src/lib.rs:986:9: replace Oath::refuse_held -> Outcome with Default::default()
