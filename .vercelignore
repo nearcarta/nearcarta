@@ -1,0 +1,13 @@
+node_modules
+contracts
+e2e
+backend/test
+.github
+test-results
+playwright-report
+app/dist
+.secrets
+.env
+.env.*
+*.pem
+*.wasm
