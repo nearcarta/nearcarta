@@ -1,6 +1,30 @@
-// Mist Bank (static, SAMPLE): a vault with a street window. The street sees that a deposit happened; only the ledger inside holds the amount.
+// Mist Bank: a vault with a street window. The street sees that a payout happened; only the ledger inside holds the amount.
+// Data comes through the D6 data interface (BANK); without it the room keeps its SAMPLE text.
 import { THREE, room, put, makeRobot, tok, C, CSS } from '../js/core.js';
-import { row, h3, note, proof, paper } from './_ui.js';
+import { row, h3, note, proof, paper, esc } from './_ui.js';
+import * as D from '../../D6_dashboards/src/data.js';
+
+const B = D.BANK || null;
+const LEG = { shield: 'Shield ZEC into a confidential balance', transfer: 'Private transfer between confidential balances', unshield: 'Unshield to a public Intents balance' };
+function live(b) {
+  const s = b.street;
+  return proof(
+    h3('The street window · public explorer, live read'),
+    row({ k: `Zcash testnet payout at height ${s.height}`, why: s.hidden ? `no transparent inputs or outputs; only the ${s.fee} zat fee leaves the ${s.pool} pool` : `amount visible: ${s.reasons.join(', ')}`, st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'amount hidden' : 'amount visible', src: 'live' }),
+    note(`<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.txid.slice(0, 12))}… ↗</a> · ${esc(String(s.confirmations))} confirmations`),
+    h3('The oath · NEAR testnet'),
+    row({ k: `Payout approved by clause ${b.oath.clause}`, why: 'the memo on chain holds only a commitment to the amount', st: b.oath.ok ? 'ok' : 'no', stText: b.oath.ok ? 'allowed' : 'not verified', tx: b.oath.tx }),
+    h3('The ledger · opened with the payee viewing key'),
+    row({ k: `${b.ledger.taz} TAZ to the payee`, why: 'the memo names the oath tx; sha256(amount, salt) equals the commitment on chain', st: b.ledger.binds ? 'ok' : 'no', stText: b.ledger.binds ? 'binds' : 'mismatch', src: 'testnet' }),
+    h3('The desk · NEAR Intents Confidential, dry quotes'),
+    ...(b.desk.length ? b.desk.map(l => row({ k: LEG[l.leg] || l.leg, why: `privacy ${l.privacy} · signature ${l.sig ? 'verified' : 'FAILED'} · echo ${l.echo ? 'ok' : 'differs'}`, st: l.ok ? 'ok' : 'no', stText: l.ok ? 'quoted' : 'rejected', src: 'live' }))
+      : [row({ k: 'Confidential quotes', why: 'not available on this server', st: 'no', stText: 'off', src: 'live' })]),
+    note('Dry quotes only: no deposit address exists and nothing was spent. A mainnet confidential deposit needs the owner\'s go-ahead.'));
+}
+
+// For the 2D fallback (js/flat.js): the same live tray and proof list, or null to keep its SAMPLE text.
+export const FLAT = B ? { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount · Zcash testnet', hero: '<span class="blurnum">••••</span> TAZ' } : null;
+export const PROOF = B ? live(B) : null;
 
 export default async function bank() {
   const { scene, camera } = await room({ cam: [2.6, 3.8, 8.2], look: [0, .9, 0] });
@@ -17,8 +41,9 @@ export default async function bank() {
   const rob = await makeRobot(scene); rob.at(.2, 1.2); rob.lookAt(book.position);
   return {
     scene, camera, tags: [],
-    panel: { title: 'Mist Bank', src: 'sample', label: 'Street sees a deposit, not the amount', hero: `<span class="blurnum" aria-label="hidden amount">••••</span>${tok(null, 'USDC').replace('<span class="sym">USDC</span>', '')}`, action: null },
-    proof: proof(h3('What this room shows'), row({ k: 'Window: a deposit happened', why: 'the amount is not on the street side', src: 'sample' }), row({ k: 'Ledger: amount and payee', why: 'held inside the bank', src: 'sample' }),
+    panel: B ? { title: 'Mist Bank', src: 'testnet', label: 'Street sees a payout, not the amount · Zcash testnet', hero: `<span class="blurnum" aria-label="hidden amount">••••</span> TAZ`, action: null }
+      : { title: 'Mist Bank', src: 'sample', label: 'Street sees a deposit, not the amount', hero: `<span class="blurnum" aria-label="hidden amount">••••</span>${tok(null, 'USDC').replace('<span class="sym">USDC</span>', '')}`, action: null },
+    proof: B ? live(B) : proof(h3('What this room shows'), row({ k: 'Window: a deposit happened', why: 'the amount is not on the street side', src: 'sample' }), row({ k: 'Ledger: amount and payee', why: 'held inside the bank', src: 'sample' }),
       note('SAMPLE. No shielded transfer was run for this build, so nothing here is linked to a transaction.')),
     update(dt) { rob.update(dt); },
   };
