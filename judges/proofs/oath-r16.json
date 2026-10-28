@@ -1,0 +1,589 @@
+{
+ "charter": "r16oath.r14own-46135.testnet",
+ "owner": "r14own-46135.testnet",
+ "wasm": "contracts/artifacts/oath.r16.wasm",
+ "steps": [
+  {
+   "step": "deploy_batch",
+   "signer": "r14own-46135.testnet",
+   "wasm_sha256": "3a65b00c5112d375cc5b492f05570b7e574a7a2d0dfb0506f04116ccb4a84d46",
+   "wasm_bytes": 370342,
+   "init": {
+    "owner": "r14own-46135.testnet",
+    "dao": null,
+    "policy_delay_ns": "90000000000",
+    "storage_reserve": null,
+    "setup_window": true
+   },
+   "tx": "C6eq4D8q7VfghqND1Ci1DgQkJ2bK7NSJPM32NQns6yih",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"policy_version\":1,\"policy_hash\":\"b6aee9cc1c1f9250bc9810d8581d6765091800a9f08fe971638bd18fc4a273ba\",\"change\":\"init\",\"by\":\"r14own-46135.testnet\"}]}"
+   ]
+  },
+  {
+   "step": "charter_keys_after_deploy",
+   "count": 0,
+   "keys": []
+  },
+  {
+   "step": "state_after_deploy",
+   "view": "get_state",
+   "value": {
+    "owner": "r14own-46135.testnet",
+    "dao": null,
+    "agent_key": null,
+    "frozen": false,
+    "freeze_epoch": 0,
+    "policy_version": 1,
+    "policy_hash": "b6aee9cc1c1f9250bc9810d8581d6765091800a9f08fe971638bd18fc4a273ba",
+    "next_nonce": "0",
+    "next_action": "0",
+    "prune_cursor": "0",
+    "policy_delay_ns": "90000000000",
+    "storage_reserve": "100000000000000000000000",
+    "pending_changes": 0,
+    "setup_open": true,
+    "storage_usage": "370822"
+   }
+  },
+  {
+   "step": "rule_set_clause",
+   "signer": "r14own-46135.testnet",
+   "method": "set_clause",
+   "args": {
+    "clause_id": "pay",
+    "clause": {
+     "asset": "Native",
+     "receivers": [
+      "r14rcv-46135.testnet"
+     ],
+     "per_action_cap": "20000000000000000000000",
+     "daily_budget": "50000000000000000000000",
+     "window_start_min": 0,
+     "window_end_min": 0,
+     "requires_receipt": false,
+     "escalation_max": null,
+     "min_amount": "1000000000000000000000",
+     "max_actions_per_day": 3,
+     "min_receiver_age_days": 0,
+     "code_hash_pins": {}
+    }
+   },
+   "expect": "applied (setup window)",
+   "tx": "Hhmi3CcVvpGfMipAPfzTnq1PD95xL3g3nNwWguwKdh9g",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"policy_version\":2,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"change\":\"set_clause:pay\",\"by\":\"r14own-46135.testnet\"}]}"
+   ],
+   "ret": "{\"applied\":true,\"policy_version\":2}"
+  },
+  {
+   "step": "rule_set_expiry_1h",
+   "signer": "r14own-46135.testnet",
+   "method": "set_clause_expiry",
+   "args": {
+    "clause_id": "pay",
+    "expires_at": "1793167682562000000"
+   },
+   "expect": "applied (narrowing)",
+   "tx": "EutqjqgjbyYnxmjWE32vZE3rNJ5XT6M4Ld9BpdpQrAzJ",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"policy_version\":3,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"change\":\"set_clause_expiry:pay\",\"by\":\"r14own-46135.testnet\"}]}"
+   ],
+   "ret": "{\"applied\":true,\"policy_version\":3}"
+  },
+  {
+   "step": "agent_key_k1",
+   "signer": "r14own-46135.testnet",
+   "method": "set_agent_key",
+   "args": {
+    "public_key": "ed25519:GJgG9ts8XP8V7LteVb41WvpmW2V4eKBZGDSkBqFB65UH",
+    "allowance": "250000000000000000000000"
+   },
+   "expect": "applied; closes setup",
+   "tx": "dJxv3hBjPs4QqBxUD8G8Kee4uRnXLDsXqwCQYHyrMQN",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"change\":\"setup_closed\",\"by\":\"r14own-46135.testnet\"}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"agent_key\",\"data\":[{\"op\":\"set\",\"public_key\":\"ed25519:GJgG9ts8XP8V7LteVb41WvpmW2V4eKBZGDSkBqFB65UH\",\"allowance\":\"250000000000000000000000\"}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"agent_key\",\"data\":[{\"op\":\"added\",\"public_key\":\"ed25519:GJgG9ts8XP8V7LteVb41WvpmW2V4eKBZGDSkBqFB65UH\"}]}"
+   ],
+   "ret": "true"
+  },
+  {
+   "step": "charter_keys_with_k1",
+   "count": 1,
+   "keys": [
+    {
+     "public_key": "ed25519:GJgG9ts8XP8V7LteVb41WvpmW2V4eKBZGDSkBqFB65UH",
+     "permission": {
+      "methods": [
+       "propose"
+      ],
+      "receiver": "r16oath.r14own-46135.testnet"
+     }
+    }
+   ]
+  },
+  {
+   "step": "rules_pay",
+   "view": "get_rules",
+   "args": {
+    "clause_id": "pay"
+   },
+   "value": {
+    "clause_id": "pay",
+    "clause": {
+     "asset": "Native",
+     "receivers": [
+      "r14rcv-46135.testnet"
+     ],
+     "per_action_cap": "20000000000000000000000",
+     "daily_budget": "50000000000000000000000",
+     "window_start_min": 0,
+     "window_end_min": 0,
+     "requires_receipt": false,
+     "escalation_max": null,
+     "min_amount": "1000000000000000000000",
+     "max_actions_per_day": 3,
+     "min_receiver_age_days": 0,
+     "code_hash_pins": {}
+    },
+    "expires_at": "1793167682562000000",
+    "usage": {
+     "day": 20754,
+     "spent": "0",
+     "reserved": "0",
+     "count": 0
+    },
+    "policy_version": 3
+   }
+  },
+  {
+   "step": "p_allowed",
+   "signer": "r16oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "r16-proof",
+     "clause_id": "pay",
+     "receiver": "r14rcv-46135.testnet",
+     "amount": "10000000000000000000000",
+     "nonce": "0",
+     "policy_version": 3,
+     "expires_at": "1793164692267000000",
+     "memo": "p_allowed",
+     "receipt": null
+    }
+   },
+   "expect": "allowed",
+   "tx": "8fqR59uRmauTQCTMQgQNsEVh7UBwqPLtmSQELjAyJpdF",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"action\",\"data\":[{\"action_id\":\"0\",\"agent\":\"r16oath.r14own-46135.testnet\",\"shop\":\"r16-proof\",\"clause_id\":\"pay\",\"policy_version\":3,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"freeze_epoch\":0,\"action_hash\":\"e96f23d3fc7f98d774f8e97f3c7065b99a75371a0d5790a58a85ad9d86f56dfe\",\"receiver\":\"r14rcv-46135.testnet\",\"amount\":\"10000000000000000000000\",\"nonce\":\"0\",\"memo_hash\":\"91aa880803b843c1e360a9fabd31b6f5df1fa2d172c292086ead4408f95d9421\",\"decision\":\"allowed\",\"status\":\"submitted\",\"reason\":\"ok\",\"receipt_hash\":null}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"settle\",\"data\":[{\"action_id\":\"0\",\"agent\":\"r16oath.r14own-46135.testnet\",\"shop\":\"r16-proof\",\"clause_id\":\"pay\",\"policy_version\":3,\"action_policy_version\":3,\"freeze_epoch\":0,\"status\":\"confirmed\",\"reason\":\"ok\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":\"0\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}"
+  },
+  {
+   "step": "p_not_allowlisted",
+   "signer": "r16oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "r16-proof",
+     "clause_id": "pay",
+     "receiver": "town-lab-38241.testnet",
+     "amount": "10000000000000000000000",
+     "nonce": "1",
+     "policy_version": 3,
+     "expires_at": "1793164697228000000",
+     "memo": "p_not_allowlisted",
+     "receipt": null
+    }
+   },
+   "expect": "denied receiver_not_allowlisted",
+   "tx": "HTq71Zsb3X1q1Ag2BQtaP3vaEXR6MjyvKBG9uxUwSras",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"action\",\"data\":[{\"action_id\":null,\"agent\":\"r16oath.r14own-46135.testnet\",\"shop\":\"r16-proof\",\"clause_id\":\"pay\",\"policy_version\":3,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"freeze_epoch\":0,\"action_hash\":\"2b5fffc2554ebbc703f98c5d7290f922700d331a522d371a55a657ff30fdd23d\",\"receiver\":\"town-lab-38241.testnet\",\"amount\":\"10000000000000000000000\",\"nonce\":\"1\",\"memo_hash\":\"d4ed23ec34910d9d66a62e6b72479f0b8e77d16bdd218a7e797da75fb8e91f96\",\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"receiver_not_allowlisted\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"receiver_not_allowlisted\"}"
+  },
+  {
+   "step": "p_over_cap",
+   "signer": "r16oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "r16-proof",
+     "clause_id": "pay",
+     "receiver": "r14rcv-46135.testnet",
+     "amount": "30000000000000000000000",
+     "nonce": "2",
+     "policy_version": 3,
+     "expires_at": "1793164700535000000",
+     "memo": "p_over_cap",
+     "receipt": null
+    }
+   },
+   "expect": "denied over_per_action_cap",
+   "tx": "6LSLQZjmK4svwZ1PQ5ztQ7nmm7nD3JmJAZguWJikXuCm",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"action\",\"data\":[{\"action_id\":null,\"agent\":\"r16oath.r14own-46135.testnet\",\"shop\":\"r16-proof\",\"clause_id\":\"pay\",\"policy_version\":3,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"freeze_epoch\":0,\"action_hash\":\"d5f8ad126a9a01aafd300686094ed77909dee5b07f1d9a386fb759416fbf7f0e\",\"receiver\":\"r14rcv-46135.testnet\",\"amount\":\"30000000000000000000000\",\"nonce\":\"2\",\"memo_hash\":\"2bb73719d34e537fc8d0f7eb7191b993b213f9345e465a936e15f16d7d3ea46c\",\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_per_action_cap\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_per_action_cap\"}"
+  },
+  {
+   "step": "p_below_min",
+   "signer": "r16oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "r16-proof",
+     "clause_id": "pay",
+     "receiver": "r14rcv-46135.testnet",
+     "amount": "500000000000000000000",
+     "nonce": "3",
+     "policy_version": 3,
+     "expires_at": "1793164703847000000",
+     "memo": "p_below_min",
+     "receipt": null
+    }
+   },
+   "expect": "denied below_min_amount",
+   "tx": "5tP6fLpSsViurVjEkkv16ukmihX8xFrDHduwS9pnd6BF",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"action\",\"data\":[{\"action_id\":null,\"agent\":\"r16oath.r14own-46135.testnet\",\"shop\":\"r16-proof\",\"clause_id\":\"pay\",\"policy_version\":3,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"freeze_epoch\":0,\"action_hash\":\"91d22d9cbe2a5d7a21464061e8fe140fd4978aac658c449547435032c9ac51d6\",\"receiver\":\"r14rcv-46135.testnet\",\"amount\":\"500000000000000000000\",\"nonce\":\"3\",\"memo_hash\":\"4fa23d2e7fc21da7a7cfc98486a4ec84892c23aa2ac6e4e064b436efd1e4140f\",\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"below_min_amount\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"below_min_amount\"}"
+  },
+  {
+   "step": "p_unknown_clause",
+   "signer": "r16oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "r16-proof",
+     "clause_id": "nope",
+     "receiver": "r14rcv-46135.testnet",
+     "amount": "10000000000000000000000",
+     "nonce": "4",
+     "policy_version": 3,
+     "expires_at": "1793164706955000000",
+     "memo": "p_unknown_clause",
+     "receipt": null
+    }
+   },
+   "expect": "denied unknown_clause",
+   "tx": "GZf6JPmE6NuTQG4wdBby4r9TfnZmggajcrUSfrcNn5x",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"action\",\"data\":[{\"action_id\":null,\"agent\":\"r16oath.r14own-46135.testnet\",\"shop\":\"r16-proof\",\"clause_id\":\"nope\",\"policy_version\":3,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"freeze_epoch\":0,\"action_hash\":\"2cbe3183046026a0c20f10e72f5290bcc78be459732052764d5fdb221527b855\",\"receiver\":\"r14rcv-46135.testnet\",\"amount\":\"10000000000000000000000\",\"nonce\":\"4\",\"memo_hash\":\"b5e59246f2ffe98e264673c4109c8c61b6014715c7264021e3311fa7aa8f1c7b\",\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"unknown_clause\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"unknown_clause\"}"
+  },
+  {
+   "step": "reputation_after_5",
+   "view": "get_reputation",
+   "value": {
+    "score": 20,
+    "min_proposals_for_score": 5,
+    "counts": {
+     "proposals": 5,
+     "allowed": 1,
+     "escalated": 0,
+     "refused": 4,
+     "refusals": {
+      "receiver_not_allowlisted": 1,
+      "over_per_action_cap": 1,
+      "below_min_amount": 1,
+      "unknown_clause": 1
+     }
+    },
+    "refusal_buckets": [
+     "receiver_not_allowlisted",
+     "over_per_action_cap",
+     "over_daily_budget",
+     "over_daily_action_count",
+     "below_min_amount",
+     "outside_time_window",
+     "clause_expired",
+     "frozen",
+     "stale_policy_version",
+     "expired",
+     "unknown_clause",
+     "receipt",
+     "other"
+    ],
+    "rotating_key": false
+   }
+  },
+  {
+   "step": "rotate_queue_k2",
+   "signer": "r14own-46135.testnet",
+   "method": "set_agent_key",
+   "args": {
+    "public_key": "ed25519:7KUwf8qtY9uMAAQSR2qS3p5hWG2TNAvqGZjw7dsTxXym",
+    "allowance": "250000000000000000000000"
+   },
+   "expect": "queued (timelock)",
+   "tx": "G3SJpQDonfuGnKzn2DMqKqAZFYxakYKb2D3k8ZWt8vwq",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy_queued\",\"data\":[{\"change_id\":\"0\",\"eta\":\"1793164201188589330\",\"change\":{\"SetAgentKey\":{\"public_key\":\"ed25519:7KUwf8qtY9uMAAQSR2qS3p5hWG2TNAvqGZjw7dsTxXym\",\"allowance\":\"250000000000000000000000\"}},\"by\":\"r14own-46135.testnet\"}]}"
+   ],
+   "ret": "{\"queued\":\"0\",\"eta\":\"1793164201188589330\"}"
+  },
+  {
+   "step": "pending_rotation",
+   "view": "get_pending",
+   "value": {
+    "0": {
+     "change": {
+      "SetAgentKey": {
+       "public_key": "ed25519:7KUwf8qtY9uMAAQSR2qS3p5hWG2TNAvqGZjw7dsTxXym",
+       "allowance": "250000000000000000000000"
+      }
+     },
+     "eta": "1793164201188589330",
+     "by": "r14own-46135.testnet"
+    }
+   }
+  },
+  {
+   "step": "rotate_execute_too_early",
+   "signer": "r14own-46135.testnet",
+   "method": "execute_change",
+   "args": {
+    "change_id": "0"
+   },
+   "expect": "ERR_TIMELOCK_NOT_READY",
+   "tx": "H9zHxxkeNBaEhFPNNrQauFB1QWuEcfUWbg7mruEujD32",
+   "ok": false,
+   "error": "Smart contract panicked: ERR_TIMELOCK_NOT_READY",
+   "logs": []
+  },
+  {
+   "step": "rotate_execute",
+   "signer": "r14own-46135.testnet",
+   "method": "execute_change",
+   "args": {
+    "change_id": "0"
+   },
+   "expect": "AddKey(k2)+DeleteKey(k1) in one receipt",
+   "tx": "CWbdJoVMPrStUgdE1ce6T79YPRp7xRHV1BbEeoCfHbSK",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy_executed\",\"data\":[{\"change_id\":\"0\",\"by\":\"r14own-46135.testnet\"}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"agent_key\",\"data\":[{\"op\":\"set\",\"public_key\":\"ed25519:7KUwf8qtY9uMAAQSR2qS3p5hWG2TNAvqGZjw7dsTxXym\",\"allowance\":\"250000000000000000000000\"}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"agent_key\",\"data\":[{\"op\":\"added\",\"public_key\":\"ed25519:7KUwf8qtY9uMAAQSR2qS3p5hWG2TNAvqGZjw7dsTxXym\"}]}"
+   ],
+   "ret": "true"
+  },
+  {
+   "step": "charter_keys_after_rotation",
+   "count": 1,
+   "keys": [
+    {
+     "public_key": "ed25519:7KUwf8qtY9uMAAQSR2qS3p5hWG2TNAvqGZjw7dsTxXym",
+     "permission": {
+      "methods": [
+       "propose"
+      ],
+      "receiver": "r16oath.r14own-46135.testnet"
+     }
+    }
+   ]
+  },
+  {
+   "step": "p_old_key_k1",
+   "signer": "r16oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "r16-proof",
+     "clause_id": "pay",
+     "receiver": "r14rcv-46135.testnet",
+     "amount": "10000000000000000000000",
+     "nonce": "5",
+     "policy_version": 3,
+     "expires_at": "1793164809183000000",
+     "memo": "p_old_key_k1",
+     "receipt": null
+    }
+   },
+   "expect": "rejected by the protocol: k1 no longer exists",
+   "ok": false,
+   "error": "\"Access key ed25519:GJgG9ts8XP8V7LteVb41WvpmW2V4eKBZGDSkBqFB65UH does not exist at block height 275104558\""
+  },
+  {
+   "step": "p_new_key_k2",
+   "signer": "r16oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "r16-proof",
+     "clause_id": "pay",
+     "receiver": "r14rcv-46135.testnet",
+     "amount": "10000000000000000000000",
+     "nonce": "5",
+     "policy_version": 3,
+     "expires_at": "1793164809615000000",
+     "memo": "p_new_key_k2",
+     "receipt": null
+    }
+   },
+   "expect": "allowed",
+   "tx": "BRDkcxjvfERYA6sZaW4zkq3ReuAqnvU3xRhPVv3xk6J7",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"action\",\"data\":[{\"action_id\":\"1\",\"agent\":\"r16oath.r14own-46135.testnet\",\"shop\":\"r16-proof\",\"clause_id\":\"pay\",\"policy_version\":3,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"freeze_epoch\":0,\"action_hash\":\"cbb327511974a0fd404396c879e280dd57dc99ee19bb1bdc4fc32c2d21ab3197\",\"receiver\":\"r14rcv-46135.testnet\",\"amount\":\"10000000000000000000000\",\"nonce\":\"5\",\"memo_hash\":\"e2335dbeb9b359a73e24fc7f29d34d577f8954189163a75cdf6371e4e870eaf9\",\"decision\":\"allowed\",\"status\":\"submitted\",\"reason\":\"ok\",\"receipt_hash\":null}]}",
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"settle\",\"data\":[{\"action_id\":\"1\",\"agent\":\"r16oath.r14own-46135.testnet\",\"shop\":\"r16-proof\",\"clause_id\":\"pay\",\"policy_version\":3,\"action_policy_version\":3,\"freeze_epoch\":0,\"status\":\"confirmed\",\"reason\":\"ok\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":\"1\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}"
+  },
+  {
+   "step": "rule_expiry_narrow_20s",
+   "signer": "r14own-46135.testnet",
+   "method": "set_clause_expiry",
+   "args": {
+    "clause_id": "pay",
+    "expires_at": "1793164233729000000"
+   },
+   "expect": "applied (narrowing)",
+   "tx": "vf7rEM9H7abTfucCXo4DZUVu6CV8ZNu9M3F8iGHrxkQ",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy\",\"data\":[{\"policy_version\":4,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"change\":\"set_clause_expiry:pay\",\"by\":\"r14own-46135.testnet\"}]}"
+   ],
+   "ret": "{\"applied\":true,\"policy_version\":4}"
+  },
+  {
+   "step": "p_after_expiry",
+   "signer": "r16oath.r14own-46135.testnet",
+   "method": "propose",
+   "args": {
+    "p": {
+     "shop": "r16-proof",
+     "clause_id": "pay",
+     "receiver": "r14rcv-46135.testnet",
+     "amount": "10000000000000000000000",
+     "nonce": "6",
+     "policy_version": 4,
+     "expires_at": "1793164839022000000",
+     "memo": "p_after_expiry",
+     "receipt": null
+    }
+   },
+   "expect": "denied clause_expired",
+   "tx": "Hmb2URktxxvhMkU4gDCLrpoSovVHML9LTy5ANv9SLUy6",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"action\",\"data\":[{\"action_id\":null,\"agent\":\"r16oath.r14own-46135.testnet\",\"shop\":\"r16-proof\",\"clause_id\":\"pay\",\"policy_version\":4,\"policy_hash\":\"d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80\",\"freeze_epoch\":0,\"action_hash\":\"24663e2ebd6508284fb4ca2c15338d19fd6c005ed3142def8b3b6f2252c095e2\",\"receiver\":\"r14rcv-46135.testnet\",\"amount\":\"10000000000000000000000\",\"nonce\":\"6\",\"memo_hash\":\"16c0df4b573bd03b3500d8e2f73d724614dc4cc520136c864cba5ecdfa79f225\",\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"clause_expired\",\"receipt_hash\":null}]}"
+   ],
+   "ret": "{\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"clause_expired\"}"
+  },
+  {
+   "step": "rule_expiry_widen_queued",
+   "signer": "r14own-46135.testnet",
+   "method": "set_clause_expiry",
+   "args": {
+    "clause_id": "pay",
+    "expires_at": null
+   },
+   "expect": "queued (widening)",
+   "tx": "A4fKcFTAm2Zzp5CR57P5Z2pKmw1TxowZRQN2so383xU4",
+   "ok": true,
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"oath\",\"version\":\"2.0.0\",\"event\":\"policy_queued\",\"data\":[{\"change_id\":\"1\",\"eta\":\"1793164334138518068\",\"change\":{\"SetClauseExpiry\":{\"clause_id\":\"pay\",\"expires_at\":null}},\"by\":\"r14own-46135.testnet\"}]}"
+   ],
+   "ret": "{\"queued\":\"1\",\"eta\":\"1793164334138518068\"}"
+  },
+  {
+   "step": "expiry_now",
+   "view": "get_clause_expiry",
+   "args": {
+    "clause_id": "pay"
+   },
+   "value": "1793164233729000000"
+  },
+  {
+   "step": "reputation_final",
+   "view": "get_reputation",
+   "value": {
+    "score": 28,
+    "min_proposals_for_score": 5,
+    "counts": {
+     "proposals": 7,
+     "allowed": 2,
+     "escalated": 0,
+     "refused": 5,
+     "refusals": {
+      "receiver_not_allowlisted": 1,
+      "over_per_action_cap": 1,
+      "below_min_amount": 1,
+      "clause_expired": 1,
+      "unknown_clause": 1
+     }
+    },
+    "refusal_buckets": [
+     "receiver_not_allowlisted",
+     "over_per_action_cap",
+     "over_daily_budget",
+     "over_daily_action_count",
+     "below_min_amount",
+     "outside_time_window",
+     "clause_expired",
+     "frozen",
+     "stale_policy_version",
+     "expired",
+     "unknown_clause",
+     "receipt",
+     "other"
+    ],
+    "rotating_key": false
+   }
+  },
+  {
+   "step": "state_final",
+   "view": "get_state",
+   "value": {
+    "owner": "r14own-46135.testnet",
+    "dao": null,
+    "agent_key": "ed25519:7KUwf8qtY9uMAAQSR2qS3p5hWG2TNAvqGZjw7dsTxXym",
+    "frozen": false,
+    "freeze_epoch": 0,
+    "policy_version": 4,
+    "policy_hash": "d1ca66485c4eb7dd92a794bbdb9854a956adda1d22039c40a31c41c66cfe3e80",
+    "next_nonce": "7",
+    "next_action": "2",
+    "prune_cursor": "0",
+    "policy_delay_ns": "90000000000",
+    "storage_reserve": "100000000000000000000000",
+    "pending_changes": 1,
+    "setup_open": false,
+    "storage_usage": "371620"
+   }
+  },
+  {
+   "step": "charter_keys_end",
+   "count": 1,
+   "keys": [
+    {
+     "public_key": "ed25519:7KUwf8qtY9uMAAQSR2qS3p5hWG2TNAvqGZjw7dsTxXym",
+     "permission": {
+      "methods": [
+       "propose"
+      ],
+      "receiver": "r16oath.r14own-46135.testnet"
+     }
+    }
+   ]
+  }
+ ]
+}
