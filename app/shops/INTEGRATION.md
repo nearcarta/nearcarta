@@ -11,7 +11,7 @@ Self-contained. Nothing in `app/design` or `app/src` is changed.
    stays in that browser's localStorage. The backend never sees it.
 2. **Create a charter.** The wallet signs `create_charter(name, policy_delay_ns, dao?)` on the
    factory with a 0.3–5 NEAR deposit. The timelock defaults to 24 hours (10 minutes to 30 days);
-   the DAO is optional. The factory creates `<name>.<factory>`, points it at the global R15 oath
+   the DAO is optional. The factory creates `<name>.<factory>`, points it at the global R16 oath
    code by hash, and makes the visitor the owner.
 3. **Rules and agent key.** One wallet approval sends `set_clause("pay", …)` and
    `set_agent_key(pk)`. The agent key is made in the browser, saved as *pending* before the wallet
