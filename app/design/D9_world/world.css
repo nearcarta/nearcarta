@@ -337,3 +337,4 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #shopUI .feed li>span{min-width:0;overflow:hidden;text-overflow:ellipsis} #shopUI .feed li>span:nth-child(3){white-space:nowrap;text-align:right}
 @media (max-width:720px){ #shopUI #tray{overflow-x:hidden;box-sizing:border-box} }
 @media (max-width:720px){ body.in-shop #brand .what{display:none} }
+#shopUI .form{grid-template-columns:minmax(0,1fr)} #shopUI .form>*,#shopUI .form [data-testid=tee-panel]{min-width:0;max-width:100%}
