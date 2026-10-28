@@ -13,7 +13,7 @@ import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import { view, rpcStats } from './near.js';
-import { limiter, clientIpSource, globalCap, leakGuard, onError, allowedOrigins, OVERLOAD } from './http-guard.js';
+import { limiter, clientIpSource, globalCap, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
@@ -81,7 +81,7 @@ export function makeApp() {
   // Global caps (all clients together) on routes that spend a paid key: 1Click partner key, NEAR AI key.
   const oneClick = globalCap('1click', Number(process.env.CAP_1CLICK_PER_MIN || 60));
   const nearAi = globalCap('nearai', Number(process.env.CAP_NEARAI_PER_MIN || 12));
-  app.use('/api/*', cors({ origin: allowedOrigins(), allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['content-type'], maxAge: 600 }));
+  app.use('/api/*', cors({ origin: corsOrigin(allowedOrigins()), allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['content-type'], maxAge: 600 }));
   app.use('/api/*', secureHeaders({
     contentSecurityPolicy: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
     crossOriginResourcePolicy: 'cross-origin', referrerPolicy: 'no-referrer', strictTransportSecurity: 'max-age=31536000; includeSubDomains',

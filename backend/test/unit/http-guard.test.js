@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Hono } from 'hono';
-import { clientIp, limiter, globalCap, leakGuard, onError, allowedOrigins } from '../../src/http-guard.js';
+import { clientIp, limiter, globalCap, leakGuard, onError, allowedOrigins, corsOrigin } from '../../src/http-guard.js';
 import { makeApp } from '../../src/app.js';
 
 const fake = (h, env) => clientIp({ req: { header: n => h[n] }, env: {} }, env);
@@ -70,4 +70,13 @@ test('CORS allows only our origins; security headers are set; the opening is POS
   assert.equal((await app.request('/api/mistbank/verify?amount=1&salt=00')).status, 405);
   const bad = await app.request('/api/ferry/quote', { method: 'POST', body: '{not json', headers: { 'content-type': 'application/json' } });
   assert.equal(bad.status, 400);
+});
+
+test('CORS: production, local and this project\'s Vercel previews only', () => {
+  const ok = corsOrigin(allowedOrigins(undefined));
+  for (const o of ['https://nearcarta.vercel.app', 'https://nearcarta-lh12aplz3-jol5.vercel.app', 'https://nearcarta-git-t1-jol5.vercel.app', 'http://localhost:5173'])
+    assert.equal(ok(o), o, o);
+  for (const o of ['https://evil.vercel.app', 'https://nearcarta-x-other.vercel.app', 'http://nearcarta-abc-jol5.vercel.app',
+    'https://nearcarta-abc-jol5.vercel.app.evil.com', 'https://xnearcarta-abc-jol5.vercel.app', undefined, ''])
+    assert.equal(ok(o), null, String(o));
 });

@@ -75,3 +75,8 @@ export function onError(e, c) {
 export const DEFAULT_ORIGINS = ['https://nearcarta.vercel.app', 'http://localhost:8787', 'http://127.0.0.1:8787', 'http://localhost:5173'];
 export const allowedOrigins = (v = process.env.CORS_ORIGIN) =>
   (!v || v.trim() === '*') ? DEFAULT_ORIGINS : v.split(',').map(s => s.trim()).filter(Boolean);
+// Vercel preview deployments of this project only (team scope jol5): nearcarta-<hash>-jol5.vercel.app
+// and nearcarta-git-<branch>-jol5.vercel.app. Another team's project cannot get a hostname ending in -jol5.
+export const PREVIEW_ORIGIN = /^https:\/\/nearcarta-[a-z0-9-]{1,80}-jol5\.vercel\.app$/;
+export const corsOrigin = (list = allowedOrigins()) => origin =>
+  (list.includes(origin) || PREVIEW_ORIGIN.test(origin || '')) ? origin : null;
