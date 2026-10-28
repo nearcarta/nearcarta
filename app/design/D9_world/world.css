@@ -336,3 +336,4 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #shopUI .feed li{grid-template-columns:56px minmax(0,1fr) minmax(0,40%)} #shopUI .feed:not(.checks):not(.tee) li{grid-template-columns:72px minmax(0,1fr) minmax(0,40%)}
 #shopUI .feed li>span{min-width:0;overflow:hidden;text-overflow:ellipsis} #shopUI .feed li>span:nth-child(3){white-space:nowrap;text-align:right}
 @media (max-width:720px){ #shopUI #tray{overflow-x:hidden;box-sizing:border-box} }
+@media (max-width:720px){ body.in-shop #brand .what{display:none} }
