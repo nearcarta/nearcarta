@@ -33,22 +33,62 @@ test('visitor makes a charter and the contract refuses scams on chain', async ({
   proof.txs.push({ step: 'create_charter', tx: (await hashes(page.locator('#log')))[0] });
   await expect(page.locator('[data-testid=facts] li.ok', { hasText: 'audited oath code' })).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('[data-testid=facts] li.ok', { hasText: '0 full-access keys' })).toBeVisible();
+  await expect(page.getByTestId('timelock')).toContainText('1 day');
+  await expect(page.getByTestId('setup')).toContainText('Setup window open');
 
+  await page.locator('#rmax').fill('8'); // room for the ask, two jobs and the split attack before the budget bites
   await page.getByTestId('rules').click();
   await expect(page.locator('#mine')).toBeVisible({ timeout: 120_000 });
   proof.txs.push({ step: 'set_clause + set_agent_key', tx: (await hashes(page.locator('#log')))[0] });
   await page.screenshot({ path: shots + 'vault-2-charter.png', fullPage: true });
+  await expect(page.getByTestId('setup')).toContainText('Setup closed', { timeout: 60_000 });
+  await expect(page.getByTestId('agent-key')).toContainText('Agent key in this browser');
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('nearcarta.vault.agent.pending.')).length)).toBe(0);
 
+  // The main card: ask the agent in plain words; the charter allows a useful payment.
+  await expect(page.getByTestId('gauge-spent')).toBeVisible();
+  await page.getByTestId('ask-text').fill('pay the cafe 0.01 NEAR for team coffee');
+  await page.getByTestId('ask').click();
+  await expect(page.locator('#mine [data-testid=verdict]')).toContainText('ALLOWED', { timeout: 180_000 });
+  proof.txs.push({ step: 'ask: pay the cafe 0.01 NEAR for team coffee', allowed: true, txs: await hashes(page.locator('#mine .steps')) }); save();
+  await expect(page.getByTestId('story')).toContainText('1 allowed');
+  await page.screenshot({ path: shots + 'vault-2b-ask.png', fullPage: true });
+
+  // Honest jobs first: real allowlisted payments the charter must ALLOW.
+  for (const t of ['coffee-run', 'book-order']) {
+    await page.getByTestId('task-mine-' + t).click();
+    await expect(page.locator('#mine [data-testid=verdict]')).toContainText('allowed the honest payment', { timeout: 180_000 });
+    proof.txs.push({ step: 'task ' + t, allowed: true, txs: await hashes(page.locator('#mine .steps')) }); save();
+  }
+
+  await page.getByTestId('go-arena').click();
+  await expect(page.getByTestId('target-mine')).toBeChecked();
   for (const [atk, reason] of [['lookalike', 'receiver_not_allowlisted'], ['impersonation', 'over_per_action_cap'], ['split-under-cap', 'over_daily_budget']]) {
     await page.getByTestId('atk-mine-' + atk).click();
-    const v = page.locator('#mine [data-testid=verdict]');
-    await expect(v).toContainText('refused it: ' + reason, { timeout: 180_000 });
-    const steps = await hashes(page.locator('#mine .steps'));
+    const v = page.locator('#arena [data-testid=verdict]');
+    await expect(v).toContainText('refused it', { timeout: 180_000 });
+    await expect(v).toContainText(reason);
+    const steps = await hashes(page.locator('#arena .steps'));
     proof.txs.push({ step: 'attack ' + atk, refused: reason, txs: steps }); save();
-    await page.locator('#mine').screenshot({ path: shots + `vault-3-${atk}.png` });
+    await page.locator('#arena').screenshot({ path: shots + `vault-3-${atk}.png` });
   }
+  await expect(page.getByTestId('score-mine')).toHaveText('5/8', { timeout: 60_000 });
+  proof.score = await page.getByTestId('score-mine').textContent();
+  await expect(page.getByTestId('story')).toContainText('refused');
+  await page.getByTestId('tab-board').click();
   await expect(page.locator('[data-testid=board]')).toContainText(proof.account, { timeout: 60_000 });
   await page.locator('#s-board').screenshot({ path: shots + 'vault-4-board.png' });
+
+  // Freeze: one owner approval, after which even an allowed payment is refused on chain.
+  await page.getByTestId('tab-mine').click();
+  await page.getByTestId('freeze').click();
+  await expect(page.getByTestId('frozen')).toContainText('FROZEN', { timeout: 120_000 });
+  proof.txs.push({ step: 'freeze', tx: (await hashes(page.locator('#log')))[0] });
+  await page.getByTestId('ask-text').fill('pay the cafe 0.01 NEAR for coffee');
+  await page.getByTestId('ask').click();
+  await expect(page.locator('#mine [data-testid=verdict]')).toContainText('REFUSED: the charter is frozen', { timeout: 180_000 });
+  proof.txs.push({ step: 'ask while frozen', refused: 'frozen', txs: await hashes(page.locator('#mine .steps')) });
+  await page.screenshot({ path: shots + 'vault-6-frozen.png', fullPage: true });
   save();
 });
 
@@ -57,9 +97,14 @@ test('shared arena: attack without a wallet', async ({ page }) => {
   await page.goto('/shops/vault/');
   const cfg = await page.evaluate(async () => (await fetch((window.NEARCARTA_API || '') + '/api/vault/config')).json());
   test.skip(!cfg.attack_enabled, 'shared runner has no agent key on this deployment');
+  await page.getByTestId('tab-arena').click();
+  await expect(page.getByTestId('target-shared')).toBeChecked();
+  await expect(page.locator('#nick')).toHaveValue(/^[a-z]+-[a-z]+-\d+$/);
   await page.locator('#nick').fill('e2e');
   await page.getByTestId('atk-shared-fake-invoice').click();
-  await expect(page.locator('#shared [data-testid=verdict]')).toContainText('refused it: receiver_not_allowlisted', { timeout: 120_000 });
-  proof.txs.push({ step: 'shared fake-invoice', txs: await hashes(page.locator('#shared .steps')) }); save();
-  await page.locator('#shared').screenshot({ path: shots + 'vault-5-shared.png' });
+  const v = page.locator('#arena [data-testid=verdict]');
+  await expect(v).toContainText('refused it', { timeout: 120_000 });
+  await expect(v).toContainText('receiver_not_allowlisted');
+  proof.txs.push({ step: 'shared fake-invoice', txs: await hashes(page.locator('#arena .steps')) }); save();
+  await page.locator('#arena').screenshot({ path: shots + 'vault-5-shared.png' });
 });
