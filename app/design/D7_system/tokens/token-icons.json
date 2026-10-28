@@ -1,0 +1,476 @@
+{
+ "_note": "Paths are relative to design/assets/. Keyed by symbol as listed by the 1Click /v0/tokens API plus common NEAR tokens. Unknown symbols: use tokenIcon() monogram fallback.",
+ "tokens": {
+  "wNEAR": {
+   "src": "tokens/tokens/near.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "ETH": {
+   "src": "tokens/tokens/eth.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "USDC": {
+   "src": "tokens/tokens/usdc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "FRAX": {
+   "src": "tokens/tokens/frax.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "AURORA": {
+   "src": "tokens/tokens/aurora.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "wBTC": {
+   "src": "tokens/tokens/wbtc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "ZEC": {
+   "src": "tokens/tokens/zec.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "GNEAR": {
+   "src": "tokens/tokens/near.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "HAPI": {
+   "src": "tokens/tokens/hapi.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "NPRO": {
+   "src": "tokens/tokens/npro.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "USDT": {
+   "src": "tokens/tokens/usdt.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "XAUT": {
+   "src": "tokens/tokens/xaut.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "SUI": {
+   "src": "tokens/tokens/sui.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "BTC": {
+   "src": "tokens/tokens/btc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "cbBTC": {
+   "src": "tokens/tokens/btc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "SOL": {
+   "src": "tokens/tokens/sol.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "FOGO": {
+   "src": "tokens/tokens/fogo.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "ARB": {
+   "src": "tokens/tokens/arb.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "DOGE": {
+   "src": "tokens/tokens/doge.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "XRP": {
+   "src": "tokens/tokens/xrp.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "KNC": {
+   "src": "tokens/tokens/knc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "DAI": {
+   "src": "tokens/tokens/dai.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "GNO": {
+   "src": "tokens/tokens/gno.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "COW": {
+   "src": "tokens/tokens/cow.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "SAFE": {
+   "src": "tokens/tokens/safe.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "AAVE": {
+   "src": "tokens/tokens/aave.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "UNI": {
+   "src": "tokens/tokens/uni.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "LINK": {
+   "src": "tokens/tokens/link.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "STRK": {
+   "src": "tokens/tokens/strk.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "BNB": {
+   "src": "tokens/tokens/bnb.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "POL": {
+   "src": "tokens/tokens/pol.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "TRX": {
+   "src": "tokens/tokens/trx.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "GRAM": {
+   "src": "tokens/tokens/gram.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "OP": {
+   "src": "tokens/tokens/op.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "AVAX": {
+   "src": "tokens/tokens/avax.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "XLM": {
+   "src": "tokens/tokens/xlm.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "WBTC": {
+   "src": "tokens/tokens/wbtc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "ADA": {
+   "src": "tokens/tokens/ada.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "APT": {
+   "src": "tokens/tokens/apt.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "LTC": {
+   "src": "tokens/tokens/ltc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "SPX": {
+   "src": "tokens/tokens/spx.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "BCH": {
+   "src": "tokens/tokens/bch.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "ADI": {
+   "src": "tokens/tokens/adi.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "SHIB": {
+   "src": "tokens/tokens/shib.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "PEPE": {
+   "src": "tokens/tokens/pepe.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "ALEO": {
+   "src": "tokens/tokens/aleo.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "DASH": {
+   "src": "tokens/tokens/dash.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "xBTC": {
+   "src": "tokens/tokens/btc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "WETH": {
+   "src": "tokens/tokens/eth.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "USDT0": {
+   "src": "tokens/tokens/usdt.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "xDAI": {
+   "src": "tokens/tokens/dai.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "SWEAT": {
+   "src": "tokens/tokens/sweat.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "NEAR": {
+   "src": "tokens/tokens/near.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "sUSDC": {
+   "src": "tokens/tokens/usdc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "USDT0(DEPRECATED)": {
+   "src": "tokens/tokens/usdt.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "USDCx": {
+   "src": "tokens/tokens/usdc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "stNEAR": {
+   "src": "tokens/tokens/near.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "GMX": {
+   "src": "tokens/tokens/gmx.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "steakUSDC": {
+   "src": "tokens/tokens/usdc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "MOG": {
+   "src": "tokens/tokens/mog.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "gtUSDCp": {
+   "src": "tokens/tokens/usdc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "sparkUSDC": {
+   "src": "tokens/tokens/usdc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "mwUSDC": {
+   "src": "tokens/tokens/usdc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "laUSDC": {
+   "src": "tokens/tokens/usdc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "EURe": {
+   "src": "tokens/tokens/eure.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "nrUsdt": {
+   "src": "tokens/tokens/usdt.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "hemiBTC": {
+   "src": "tokens/tokens/btc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "MOVE": {
+   "src": "tokens/tokens/move.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "USDe": {
+   "src": "tokens/tokens/usde.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)"
+  },
+  "wstETH": {
+   "src": "tokens/tokens/eth.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "cNEAR": {
+   "src": "tokens/tokens/near.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "BTC(OMNI)": {
+   "src": "tokens/tokens/btc.svg",
+   "source": "web3icons @web3icons/core 4.0.58 (MIT)",
+   "aliasOf": true
+  },
+  "BASE": {
+   "src": "tokens/chains/base.svg",
+   "source": "web3icons networks (MIT)"
+  }
+ },
+ "chains": {
+  "near": {
+   "src": "tokens/chains/near.svg"
+  },
+  "base": {
+   "src": "tokens/chains/base.svg"
+  },
+  "eth": {
+   "src": "tokens/chains/eth.svg"
+  },
+  "abs": {
+   "src": "tokens/chains/abs.svg"
+  },
+  "sui": {
+   "src": "tokens/chains/sui.svg"
+  },
+  "btc": {
+   "src": "tokens/chains/btc.svg"
+  },
+  "sol": {
+   "src": "tokens/chains/sol.svg"
+  },
+  "arb": {
+   "src": "tokens/chains/arb.svg"
+  },
+  "doge": {
+   "src": "tokens/chains/doge.svg"
+  },
+  "xrp": {
+   "src": "tokens/chains/xrp.svg"
+  },
+  "gnosis": {
+   "src": "tokens/chains/gnosis.svg"
+  },
+  "starknet": {
+   "src": "tokens/chains/starknet.svg"
+  },
+  "bera": {
+   "src": "tokens/chains/bera.svg"
+  },
+  "bsc": {
+   "src": "tokens/chains/bsc.svg"
+  },
+  "monad": {
+   "src": "tokens/chains/monad.svg"
+  },
+  "xlayer": {
+   "src": "tokens/chains/xlayer.svg"
+  },
+  "plasma": {
+   "src": "tokens/chains/plasma.svg"
+  },
+  "pol": {
+   "src": "tokens/chains/pol.svg"
+  },
+  "tron": {
+   "src": "tokens/chains/tron.svg"
+  },
+  "ton": {
+   "src": "tokens/chains/ton.svg"
+  },
+  "op": {
+   "src": "tokens/chains/op.svg"
+  },
+  "avax": {
+   "src": "tokens/chains/avax.svg"
+  },
+  "stellar": {
+   "src": "tokens/chains/stellar.svg"
+  },
+  "cardano": {
+   "src": "tokens/chains/cardano.svg"
+  },
+  "aptos": {
+   "src": "tokens/chains/aptos.svg"
+  },
+  "ltc": {
+   "src": "tokens/chains/ltc.svg"
+  },
+  "hood": {
+   "src": "tokens/chains/hood.svg"
+  },
+  "scroll": {
+   "src": "tokens/chains/scroll.svg"
+  },
+  "movement": {
+   "src": "tokens/chains/movement.svg"
+  },
+  "hypercore": {
+   "src": "tokens/chains/hypercore.svg"
+  },
+  "zec": {
+   "src": "tokens/chains/zec.svg"
+  },
+  "bch": {
+   "src": "tokens/chains/bch.svg"
+  },
+  "dash": {
+   "src": "tokens/chains/dash.svg"
+  },
+  "aleo": {
+   "src": "tokens/chains/aleo.svg"
+  },
+  "fogo": {
+   "src": "tokens/chains/fogo.svg"
+  }
+ },
+ "monogram": [
+  "BLACKDRAGON",
+  "SHITZU",
+  "ABG",
+  "NOEAR",
+  "mpDAO",
+  "JAMBO",
+  "NearKat",
+  "TESTNEBULA",
+  "RHEA",
+  "PUBLIC",
+  "ITLX",
+  "CFI",
+  "SSC1_PIT",
+  "QTC",
+  "TURBO",
+  "$WIF",
+  "BOME",
+  "TRUMP",
+  "BERA",
+  "ASTER",
+  "MON",
+  "OKB",
+  "XPL_(DEPRECATED)",
+  "XPL",
+  "KAITO",
+  "INX",
+  "PENGU",
+  "TITN",
+  "USD1",
+  "VVV",
+  "USDG",
+  "PONS",
+  "CASHCAT",
+  "PURGE",
+  "USAD",
+  "kV-gtSOLb",
+  "TLO",
+  "BRETT",
+  "FMS",
+  "MELANIA",
+  "LOUD",
+  "NEARKAT",
+  "wNEARKAT",
+  "GBPe",
+  "USDf",
+  "STJACK",
+  "EVAA",
+  "COCA",
+  "PRL"
+ ]
+}

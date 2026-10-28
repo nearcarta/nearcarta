@@ -1,0 +1,93 @@
+{
+ "_note": "Paths relative to design/assets/audio/. ogg first, mp3 fallback. Played by js/audio.js (howler 2.2.4, MIT).",
+ "sounds": {
+  "click": {
+   "ogg": "ui-click.ogg",
+   "mp3": "ui-click.mp3",
+   "volume": 0.5,
+   "loop": false,
+   "use": "any press",
+   "license": "CC0 1.0, Kenney (kenney.nl)"
+  },
+  "hover": {
+   "ogg": "ui-hover.ogg",
+   "mp3": "ui-hover.mp3",
+   "volume": 0.18,
+   "loop": false,
+   "use": "pointer over a control (throttled 90 ms)",
+   "license": "CC0 1.0, Kenney (kenney.nl)"
+  },
+  "allowed": {
+   "ogg": "allowed.ogg",
+   "mp3": "allowed.mp3",
+   "volume": 0.7,
+   "loop": false,
+   "use": "oath allowed a spend",
+   "license": "CC0 1.0, Kenney (kenney.nl)"
+  },
+  "refuse": {
+   "ogg": "refuse.ogg",
+   "mp3": "refuse.mp3",
+   "volume": 0.8,
+   "loop": false,
+   "use": "oath refused",
+   "license": "CC0 1.0, Kenney (kenney.nl)"
+  },
+  "freeze": {
+   "ogg": "freeze.ogg",
+   "mp3": "freeze.mp3",
+   "volume": 0.75,
+   "loop": false,
+   "use": "agent frozen",
+   "license": "CC0 1.0, Kenney (kenney.nl)"
+  },
+  "swap": {
+   "ogg": "swap.ogg",
+   "mp3": "swap.mp3",
+   "volume": 0.55,
+   "loop": false,
+   "use": "swap / quote",
+   "license": "CC0 1.0, Kenney (kenney.nl)"
+  },
+  "send": {
+   "ogg": "send.ogg",
+   "mp3": "send.mp3",
+   "volume": 0.55,
+   "loop": false,
+   "use": "payment sent",
+   "license": "CC0 1.0, Kenney (kenney.nl)"
+  },
+  "step-a": {
+   "ogg": "step-a.ogg",
+   "mp3": "step-a.mp3",
+   "volume": 0.22,
+   "loop": false,
+   "use": "footstep (alternate with step-b)",
+   "license": "CC0 1.0, Kenney (kenney.nl)"
+  },
+  "step-b": {
+   "ogg": "step-b.ogg",
+   "mp3": "step-b.mp3",
+   "volume": 0.22,
+   "loop": false,
+   "use": "footstep",
+   "license": "CC0 1.0, Kenney (kenney.nl)"
+  },
+  "water": {
+   "ogg": "water.ogg",
+   "mp3": "water.mp3",
+   "volume": 0.35,
+   "loop": false,
+   "use": "ferry / water",
+   "license": "CC0 1.0, \"Water Waves\" by transitking (OpenGameArt)"
+  },
+  "music": {
+   "ogg": "music-ambient.ogg",
+   "mp3": "music-ambient.mp3",
+   "volume": 0.32,
+   "loop": true,
+   "use": "ambient loop, ducks to 0.1 under allowed/refuse/freeze/water",
+   "license": "CC0 1.0, \"Ambient Relaxing Loop\" by isaiah658 (OpenGameArt)"
+  }
+ }
+}
