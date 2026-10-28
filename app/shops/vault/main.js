@@ -345,8 +345,10 @@ async function ask(e) {
       ? `<p class="verdict good" data-testid="verdict">ALLOWED: the charter paid ${fmt(r.amount)} to <code>${esc(r.receiver)}</code>. ${txl(r.tx, 'see the transaction')}</p>`
       : `<p class="verdict bad" data-testid="verdict">REFUSED: ${esc(plain(r.reason))}. Nothing was paid. ${txl(r.tx, 'see the refusal')}</p>`);
     out.insertAdjacentHTML('beforeend', '<p class="muted">One allowed request to a shop on your allowlist, within your max per payment, scores a point (once). The charter decides, not this page.</p>');
-    if (r.tx) await post('/api/vault/record', { tx: r.tx, charter }).catch(e => toast('Scoreboard did not take it: ' + esc(e.message), 'bad'));
-    renderFacts().catch(() => {}); loadScore('mine').catch(() => {});
+    // the verdict is in: free the button now; the scoreboard write and the refresh follow in the background
+    busy(btn, false); unlock();
+    (r.tx ? post('/api/vault/record', { tx: r.tx, charter }).catch(e => toast('Scoreboard did not take it: ' + esc(e.message), 'bad')) : Promise.resolve())
+      .then(() => { renderFacts().catch(() => {}); loadScore('mine').catch(() => {}); });
   } finally { busy(btn, false); unlock(); }
 }
 
