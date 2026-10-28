@@ -468,5 +468,24 @@
       "refundReason": "PARTIAL_DEPOSIT"
     },
     "proof": "judges/proofs/ferry-tidepool.json"
+  },
+  "oath_c5": {
+    "charter": "c5oath.r14own-46135.testnet",
+    "owner": "r14own-46135.testnet",
+    "dao": null,
+    "wasm": "contracts/artifacts/oath.c5.wasm",
+    "code_hash": "CEG11eK9iE23uEJXowQ5kBbsk27TX1mhbhoaGmaP5pjr",
+    "source_commit": "370980711a0c3cc2af4956d4d7c638aa5dcc0146",
+    "full_access_keys": 0,
+    "policy_delay_s": 90,
+    "clause": "tip",
+    "note": "C5 optional hidden rules (commit-reveal): sealed clause holds actions until the owner reveals rule+salt; fails closed after 30 min. Deployed in one batch with no full-access key.",
+    "proof_txs": {
+      "deploy": "9EkutddrdNWxTMvKrs8Pm1V3HbJSxKSQYeCkdH7XcKGg",
+      "seal_rule": "HhHozx11Dk1HduthDVsMdgqtH2AtNgvKbb4b9e6zmjx4",
+      "reveal_wrong_salt_panics": "7va6ajwq6ziyiKGCUpShaXg72YgJDodpScAD39tgrvQS",
+      "reveal_refuses_hidden_rule_cap": "Cy1pFPc6vDbs5CA4tbQcknsLtQoqpSSMUkMJs11pEfVQ",
+      "reveal_allows_paid": "GjYQczzVUGXqMeyoxrT9vkWmAsJQWxRiA4Ksh5kwiGkP"
+    }
   }
 }
