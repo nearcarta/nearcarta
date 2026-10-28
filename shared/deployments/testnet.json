@@ -1,0 +1,74 @@
+{
+  "network": "testnet",
+  "rpc": "https://test.rpc.fastnear.com",
+  "explorer": "https://testnet.nearblocks.io",
+  "guardhouse": {
+    "oath": "r11oath-82930.testnet",
+    "owner": "r11own-82930.testnet",
+    "dao": "dao.r11own-82930.testnet",
+    "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
+    "allowed_receiver": "bakery.r10own-19371.testnet",
+    "attacker": "attacker.r10own-19371.testnet",
+    "proof_txs": {
+      "deploy_init_fc_key": "CasiK1id64Fage1wUNobGBuK6j86xav6BSVdm1pWQZ3p",
+      "full_access_key_deleted": "2WyiCazxV1JTLYKRz6QzU7YaFh4etp3WwQqv5Z8Le3TL",
+      "valid_receipt_paid": "9zQenpg2yjs3xYd6SQ3UMHqW72ppNB1SW25xXUf7Y6ff",
+      "block_receipt_denied": "DUhFvCq15nV9cMa5hzLeFWUPs1uF2sZjYD2CZd4BTB7F",
+      "escalated_over_cap": "8aJZ3rjbL5m8KGmRjhrtm8NYuzUhWUuP1C1LgGa2SiTa",
+      "timelock_not_ready": "rpvix4gCgNzJmDSLLgGWtN1tvkk7BU7uyWhyYGwni4V",
+      "queued_widening_denied": "573gVwsp2Fbyzmffbo6CbZ8C9TwPaKpAHHeF8ym5jJii",
+      "dao_freeze": "7xkk5cPxNwttBAYrk6EZRuxyuajGKTmdeddtiYVdTgLX",
+      "owner_unfreeze_refused": "9a2AqaPVuFcPegRue67ycdfEuwz4k6RaWJaogDpQiak7"
+    }
+  },
+  "townhall": {
+    "dao": "r7thmvr8maey.sputnikv2.testnet",
+    "oath": "r7thmvr8maey-oath.testnet",
+    "agent": "r7thmvr8maey-agent.testnet",
+    "proof_txs": {
+      "create_dao": "3Pd1KauqoGDCDqt8ZLuXqi1gAm6LQcBzuSb6piqUwHk7",
+      "agent_paid_v1": "4stGNNjVP2e5jQ944xWv58SiqCk26KbZJd6bk492b51i",
+      "oath_v2_proposal": "33ZBFx5ATQd4e3uF3a1NVC9UB5t6gp4VB4g3nvYdxzMA",
+      "over_cap_refused": "71Y4a3a1Lb8UDJnJgmuk8NPUUoSA8Z8cSCZ2o4K57rw7",
+      "denied_newcomer": "8T7octBPa5cWSXdLR7p1ycs7FjX4bSChuPy4KhceMHqT",
+      "fake_evidence": "2ycXdfvEx37s5ykTNHnZvhaVWbBU6BKZc5RBynaZhmTK",
+      "replay_refused": "7RGcNseeSTXq6xgzqBd88TgbWPueQhDfCUafaC1Yzhis",
+      "agent_votes_own_refused": "Vgop8whFzJezu3ddCj3ZNzjTJPHQs78pA2muGWAPncY",
+      "freeze_proposal": "HQFV3C34a9ym4oZiU28JQYBPZCmmLEawzxHvLSnnDmyU",
+      "reward_after_freeze_refused": "9X2Yza6z2KCJ7qKh4qLN993ztpRVNKxJekbzRKvJuxhA"
+    }
+  },
+  "arena": {
+    "contract": "r6vamvr9brhx-arena3.testnet",
+    "proof_txs": {
+      "deploy": "7gsEXZAHxckdX1iz6EkweyEFcAZpCvbngCV8VBihkuvK",
+      "jailbreak_cap_refused": "7ci2TXx5Um6AWqpsNWq23wLnyvAoJJCsGis4oV8oekdn",
+      "new_phone_allowlist_refused": "4apPdjCPLux3xFPQBK328D4j1YSjQFj1viVxaMkShqCb",
+      "fake_password_refused": "FabRj9boXtMj6rMiPD4Z7Y5JHTYCVnJNcw2MENTPc1G4",
+      "gift_nft_refused": "8uiZJJhcnPvpYz289ZdFDYuQxv3sGvjMGFbrXKUVRnBR",
+      "bounty_solved": "Gt4AaoqmpPWwd9kgLEdhsFtxAJ45CXoHsspCdcWdvAGY",
+      "sell_mid_payout_refused": "3frX2RwkuqQb4BY9ka9C3436xXCam72euNLK3fmhV1en",
+      "season_close": "614BiQmKEjnamR1ZJMkfgwPEn9e7jAxUa3XgvNv7srq5"
+    }
+  },
+  "toll": {
+    "oath": "oath.r4csmvr86zk4.testnet",
+    "mpc": "v1.signer-prod.testnet",
+    "foreign_chain": "base-sepolia",
+    "foreign_address": "0x004c194d852b1c5fc47f54a3921615ff581314b1",
+    "proof_txs": {
+      "deploy": "5o4Mk8bLbiU9GhZvTSzAecXkgLFGYxMd2PTP8vzm5syL",
+      "signed_allowlisted": "ErwqgHH5br68jK1qz2ZAsfQpankMHke4CMUjruEtbt3s",
+      "refused_not_allowlisted": "88tRkqz9RLMEXd7kAegyQZsozfGMs4CYDrgMjpDCPnCE",
+      "refused_over_cap": "Crd3jTD5FmY8VX4q3sc1AXywsHywJHnFnGKTntBJvGtT",
+      "finalized_proof": "GHFJoQdSKTK9Q9pUYEepeViMKhbyrmY7J4bMhuEw5fEV"
+    },
+    "foreign_txs": { "base_sepolia_broadcast": "0xf7ed6482a8380c1fe84be32973256d00960f522cd0d70fe9fe16165190dbc43b" }
+  },
+  "ferry": {
+    "oneclick": "https://1click.chaindefuser.com",
+    "verifier_mainnet": "intents.near",
+    "quote_signer": "ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc",
+    "note": "1Click has no testnet. Quotes are dry:true (no deposit address, nothing spent)."
+  }
+}
