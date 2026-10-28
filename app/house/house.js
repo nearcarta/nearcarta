@@ -41,7 +41,9 @@ export function wallet() {
 }
 export function onWallet(f) { listeners.add(f); }
 export async function account() {
-  try { const { accounts } = await wallet().getConnectedWallet(); return accounts?.[0]?.accountId || null; } catch { return null; }
+  // A wallet picked earlier but never finished (e.g. a WalletConnect QR left open) must not hold the HUD forever.
+  const slow = new Promise(r => setTimeout(() => r(null), 12000));
+  try { const { accounts } = await Promise.race([wallet().getConnectedWallet(), slow.then(() => ({}))]); return accounts?.[0]?.accountId || null; } catch { return null; }
 }
 // Opens the wallet list, then signs in. `note` gets plain-text progress and errors (never swallowed).
 export async function connect(note = () => {}) {
