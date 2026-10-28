@@ -232,5 +232,39 @@
         "note": "Earlier release, kept so its charters and arena history stay verifiable. Its charters had no default timelock."
       }
     ]
+  },
+  "oath_r16": {
+    "charter": "r16oath.r14own-46135.testnet",
+    "owner": "r14own-46135.testnet",
+    "dao": null,
+    "wasm": "contracts/artifacts/oath.r16.wasm",
+    "code_hash": "4vxachQCQqMShPRyKB6FfNAa9MmPNjSCna8dhXfxPN1s",
+    "source_commit": "5099a7c442086ca7610e67e4af29edab1fe6143e",
+    "full_access_keys": 0,
+    "agent_key_methods": [
+      "propose"
+    ],
+    "policy_delay_s": 90,
+    "clause": "pay",
+    "note": "R16 oath: atomic agent-key rotation (old key deleted in the AddKey receipt), clause expiry, and on-chain reputation from its own refusals. Deployed in one batch with no full-access key. Factory charters still use R15.",
+    "reads": {
+      "reputation": "/api/charter/r16oath.r14own-46135.testnet/reputation",
+      "rules": "/api/charter/r16oath.r14own-46135.testnet/rules/pay"
+    },
+    "proof": "judges/proofs/oath-r16.json",
+    "proof_txs": {
+      "deploy_batch": "C6eq4D8q7VfghqND1Ci1DgQkJ2bK7NSJPM32NQns6yih",
+      "rule_set_clause": "Hhmi3CcVvpGfMipAPfzTnq1PD95xL3g3nNwWguwKdh9g",
+      "agent_key_k1": "dJxv3hBjPs4QqBxUD8G8Kee4uRnXLDsXqwCQYHyrMQN",
+      "p_allowed": "8fqR59uRmauTQCTMQgQNsEVh7UBwqPLtmSQELjAyJpdF",
+      "p_not_allowlisted": "HTq71Zsb3X1q1Ag2BQtaP3vaEXR6MjyvKBG9uxUwSras",
+      "p_over_cap": "6LSLQZjmK4svwZ1PQ5ztQ7nmm7nD3JmJAZguWJikXuCm",
+      "p_below_min": "5tP6fLpSsViurVjEkkv16ukmihX8xFrDHduwS9pnd6BF",
+      "rotate_execute": "CWbdJoVMPrStUgdE1ce6T79YPRp7xRHV1BbEeoCfHbSK",
+      "p_new_key_k2": "BRDkcxjvfERYA6sZaW4zkq3ReuAqnvU3xRhPVv3xk6J7",
+      "rule_expiry_narrow_20s": "vf7rEM9H7abTfucCXo4DZUVu6CV8ZNu9M3F8iGHrxkQ",
+      "p_after_expiry": "Hmb2URktxxvhMkU4gDCLrpoSovVHML9LTy5ANv9SLUy6",
+      "rule_expiry_widen_queued": "A4fKcFTAm2Zzp5CR57P5Z2pKmw1TxowZRQN2so383xU4"
+    }
   }
 }
