@@ -270,6 +270,10 @@ const lock = () => { for (const x of document.querySelectorAll('.atk')) x.disabl
 const unlock = () => { for (const x of document.querySelectorAll('.atk')) x.disabled = false; };
 const outFor = btn => btn.closest('#mine') ? $('#mine .result') : $('#arena .result');
 async function task(btn) {
+  try { return await taskRun(btn); }
+  catch (e) { outFor(btn).insertAdjacentHTML('beforeend', `<p class="verdict bad" data-testid="task-error">Stopped before a verdict: ${esc(e.message)}. Try again in a minute.</p>`); throw e; }
+}
+async function taskRun(btn) {
   lock();
   const where = btn.dataset.where, id = btn.dataset.task;
   const out = outFor(btn);
@@ -314,6 +318,10 @@ function stepRow(s, i, n) {
     <span>${fmt(s.amount)} → <code>${esc(s.receiver)}</code></span><span class="r">${esc(s.reason ? plain(s.reason) : '')}</span>${txl(s.tx)}</li>`;
 }
 async function attack(btn) {
+  try { return await attackRun(btn); }
+  catch (e) { outFor(btn).insertAdjacentHTML('beforeend', `<p class="verdict bad" data-testid="attack-error">Stopped before a verdict: ${esc(e.message)}. Nothing was counted; try again in a minute.</p>`); throw e; }
+}
+async function attackRun(btn) {
   lock();
   const where = btn.dataset.where, id = btn.dataset.attack;
   const out = outFor(btn);
