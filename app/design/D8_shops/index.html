@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nearcarta</title>
+<link rel="preload" href="fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+<link id="tokens" rel="stylesheet" href="../D7_system/tokens/tokens.css">
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","three/addons/":"../D2_game/vendor/jsm/","../D2_game/vendor/three.module.js":"./vendor/three.module.min.js"}}</script>
+</head>
+<body>
+<canvas id="gl" aria-label="The town. Pick a building to enter it."></canvas>
+<header id="top">
+  <span id="brand"><b>Nearcarta</b><span class="src testnet">testnet</span></span>
+  <button id="back" class="ghost" hidden><span aria-hidden="true">←</span> Town</button>
+  <button id="snd" class="icon"></button>
+</header>
+<nav id="tags" aria-label="Buildings"></nav>
+<div id="stags" hidden></div>
+<p id="legal">Independent, not affiliated with NEAR Foundation</p>
+<section id="tray" hidden aria-live="polite">
+  <div class="t-head"><h1 id="t-title"></h1><span id="t-src" class="src"></span></div>
+  <p id="t-label" class="label"></p>
+  <div id="t-hero" class="hero"></div>
+  <div class="t-row"><button id="t-act" class="act primary"></button><button id="t-proof" class="link" aria-controls="drawer" aria-expanded="false">Show proof</button></div>
+</section>
+<aside id="drawer" aria-hidden="true" aria-labelledby="d-title">
+  <div class="d-head"><h2 id="d-title">Proof</h2><button id="d-close" class="icon" aria-label="Close proof">✕</button></div>
+  <div id="d-body"></div>
+</aside>
+<div id="load"><span class="ring" aria-hidden="true"></span></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
