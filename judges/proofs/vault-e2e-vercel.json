@@ -1,0 +1,46 @@
+{
+ "at": "2026-10-28T04:18:28.183Z",
+ "base": "https://nearcarta.vercel.app",
+ "wallet": "NEAR Connect 0.12.0, injected guest wallet (fresh faucet account)",
+ "account": "ncguest-6u6v02351g.testnet",
+ "charter": "e2e-mvrlssfw.nccharters-17102.testnet",
+ "txs": [
+  {
+   "step": "create_charter",
+   "tx": "4NcdbcZzXDwrUnhGbsyHWvjKc4L1vzZRC8KAkyZZ2Vmu"
+  },
+  {
+   "step": "set_clause + set_agent_key",
+   "tx": "41sqWMxE4htzPgyd5RHfsNXrtNjN8gPRpj9xgLyMcCrG"
+  },
+  {
+   "step": "attack lookalike",
+   "refused": "receiver_not_allowlisted",
+   "txs": [
+    "9o6LoJhWaEuQ8h2jAc59fxS53HomFqtucX18eAfk8LA6"
+   ]
+  },
+  {
+   "step": "attack impersonation",
+   "refused": "over_per_action_cap",
+   "txs": [
+    "FDS9TH7qnN1Q7tmrYndNuMJRcNu2NmB1xfnC245hXGPu"
+   ]
+  },
+  {
+   "step": "attack split-under-cap",
+   "refused": "over_daily_budget",
+   "txs": [
+    "AtpeWc8DUzVsWYtPe13sCtKHpbu9WqBkaL6RixA32USB",
+    "9asVtvX14mvKE71mAFemkMcg267FtgB2K3JgvuZ14swH",
+    "HmAg5hYxcyAVxM9GMq5fZ9QmU3zoE9WmAwSuY2AaKowC"
+   ]
+  },
+  {
+   "step": "shared fake-invoice",
+   "txs": [
+    "FzLxUdx5JdZWEhBkkfiJ2DSJg1PaS1wVmdBVqGPNb5LL"
+   ]
+  }
+ ]
+}
