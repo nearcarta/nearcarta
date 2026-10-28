@@ -6,10 +6,11 @@ import { DEP } from '../src/config.js';
 
 const RPCS = ['https://test.rpc.fastnear.com', 'https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'];
 const EMPTY = '11111111111111111111111111111111';
-// Accounts that hold code but are not contracts this project runs. role: external (operated by NEAR) or
+// Accounts that hold code but are not contracts this project runs. role: external (operated by NEAR or a third party) or
 // wallet (a signer account; a wallet needs a full-access key to sign).
 const ROLE = {
   'v1.signer-prod.testnet': ['external', 'NEAR testnet MPC signer (Chain Signatures), operated by NEAR, not by this project'],
+  'verifier.tidepool-sandbox.testnet': ['external', 'Tidepool community testnet verifier (defuse v0.4.2 code), operated by Tidepool, not by this project; the Ferry only reads its code hash'],
   'r6vamvr9brhx-arena2.testnet': ['wallet', 'Owner (signer) account of the arena, not a contract the app calls. It still carries an older arena build from an earlier run; nothing in backend/src or app/src calls it. The live arena is arena.r6vamvr9brhx-arena2.testnet, which never had a key'],
 };
 
