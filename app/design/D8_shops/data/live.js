@@ -3,29 +3,29 @@ export const BANK = {
  "src": "testnet",
  "at": "2026-10-28 05:00 UTC",
  "street": {
-  "txid": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
-  "url": "https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
-  "height": 4549357,
-  "confirmations": 460,
-  "fee": "20000",
+  "txid": "446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
+  "url": "https://testnet.cipherscan.app/tx/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
+  "height": 4552488,
+  "confirmations": 1,
+  "fee": "10000",
   "hidden": true,
   "reasons": [],
   "pool": "ironwood",
   "actions": {
-   "ironwood": 4,
+   "ironwood": 2,
    "orchard": 0,
    "sapling_spends": 0,
    "sapling_outputs": 0
   }
  },
  "oath": {
-  "tx": "5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
-  "url": "https://testnet.nearblocks.io/txns/5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+  "tx": "Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
+  "url": "https://testnet.nearblocks.io/txns/Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
   "ok": true,
   "clause": "tip2"
  },
  "commitment": {
-  "value": "b22cc85878be366a3edb1d4ef3afbeea0813d4be02aec95a387242fa9a6055ce",
+  "value": "76f7dc33248f69c986cc1e3a901f8670303874de4cf48426c842e9f47a00d868",
   "scheme": "sha256(\"mistbank:v1:<amount>:<salt>\")"
  },
  "binding": {

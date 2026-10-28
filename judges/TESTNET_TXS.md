@@ -62,7 +62,7 @@ Every row was read back from chain by `npm run verify` (backend/scripts/verify-p
 | toll_arbitrum | refused not allowlisted | pay | "Smart contract panicked: REFUSED: recipient not in oath allowlist" | [D2P5Y71YAe…](https://testnet.nearblocks.io/txns/D2P5Y71YAeZfJCZwhonGYcvg36HHnbkKCuFZAHVYutnE) |
 | toll_arbitrum | refused over cap | pay | "Smart contract panicked: REFUSED: value over per-tx cap" | [GpdLAhoQZi…](https://testnet.nearblocks.io/txns/GpdLAhoQZiVieiRUYp2j3jo3c1BXNaKqHFZU9k3C3wr9) |
 | toll_arbitrum | refused fee over cap | pay | "Smart contract panicked: REFUSED: gas fee over cap" | [7nAT5QzRMR…](https://testnet.nearblocks.io/txns/7nAT5QzRMRMcJX8GxL4h8dNFN1gxAkUrzJv3TWYFprzu) |
-| mistbank | oath allowed commitment | propose | {"action_id":"3","decision":"allowed","status":"confirmed","reason":"ok"} | [5HG5SPJ53M…](https://testnet.nearblocks.io/txns/5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua) |
+| mistbank | oath allowed commitment | propose | {"action_id":"8","decision":"allowed","status":"confirmed","reason":"ok"} | [Df7D29qiAK…](https://testnet.nearblocks.io/txns/Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh) |
 | mistbank | oath memo too long denied | propose | {"action_id":null,"decision":"denied","status":"denied","reason":"memo_too_long"} | [9riHoM2rG8…](https://testnet.nearblocks.io/txns/9riHoM2rG8nWsNCW5qtnpwcbKu1GUB7LpZB7CPgBm6Xy) |
 | house | deploy init | DeployContract,new | "ok" | [Bd3qdM2WaC…](https://testnet.nearblocks.io/txns/Bd3qdM2WaCVCnJQaggLHFKybTv2XXcB3jtSWJfSZyebw) |
 | house | set clause | set_clause | {"applied":true,"policy_version":2} | [AhZBGPuQtg…](https://testnet.nearblocks.io/txns/AhZBGPuQtgoX2Rw9ofqX8A7gzmMWbTtbgnzEsthX6nTE) |
@@ -75,7 +75,7 @@ Every row was read back from chain by `npm run verify` (backend/scripts/verify-p
 | house | wallet resolve approve | resolve_escalation | true | [EPGmaTnZ5w…](https://testnet.nearblocks.io/txns/EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy) |
 | toll | base sepolia broadcast | eth tx | status 1 on Base Sepolia, sent from the MPC-derived address | [0x86bab7a9…](https://sepolia.basescan.org/tx/0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054) |
 | toll_usdc | base sepolia usdc payout | eth tx | "ok" | [0xf5e5d0ba…](https://sepolia.basescan.org/tx/0xf5e5d0ba6c9a2f16357d272bbcd268b4bff8eb6ac5155849a62dfa66252ca150) |
-| mistbank | zcash payout amount hidden | zcash tx | mined at height 4549357; amount hidden: true | [d0b5206733…](https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897) |
+| mistbank | zcash payout amount hidden | zcash tx | mined at height 4552488; amount hidden: true | [446dde4a68…](https://testnet.cipherscan.app/tx/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984) |
 
 ## Arena scam set
 

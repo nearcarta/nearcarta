@@ -131,31 +131,31 @@
     },
     "commitment": {
       "scheme": "sha256(\"mistbank:v1:<amount>:<salt>\")",
-      "value": "b22cc85878be366a3edb1d4ef3afbeea0813d4be02aec95a387242fa9a6055ce"
+      "value": "76f7dc33248f69c986cc1e3a901f8670303874de4cf48426c842e9f47a00d868"
     },
     "oath": {
-      "tx": "5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
-      "url": "https://testnet.nearblocks.io/txns/5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+      "tx": "Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
+      "url": "https://testnet.nearblocks.io/txns/Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
       "decision": "allowed",
       "sender": "r11oath-82930.testnet",
-      "memo": "mb1:sizIWHi-Nmo-2x1O86--6ggT1L4CrslaOHJC-ppgVc4"
+      "memo": "mb1:dvfcMySPacmGzB46kB-GcDA4dN5M9IQmyELp9HoA2Gg"
     },
     "payout": {
-      "txid": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
-      "height": 4549357,
-      "explorer": "https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
-      "explorer_api": "https://api.testnet.cipherscan.app/api/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897"
+      "txid": "446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
+      "height": 4552488,
+      "explorer": "https://testnet.cipherscan.app/tx/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
+      "explorer_api": "https://api.testnet.cipherscan.app/api/tx/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984"
     },
     "zcash_explorer_api": "https://api.testnet.cipherscan.app",
     "proof_txs": {
-      "oath_allowed_commitment": "5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+      "oath_allowed_commitment": "Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
       "oath_memo_too_long_denied": "9riHoM2rG8nWsNCW5qtnpwcbKu1GUB7LpZB7CPgBm6Xy"
     },
     "auditor": {
       "held_by": "the owner, given to an auditor out of band; never served by the API or committed",
       "contains": "the payee viewing key (UFVK) and the opening (amount in zatoshi and salt)",
       "how": "the auditor imports the UFVK into their own zcash-devtool view-only wallet (init-fvk, sync, enhance, list-tx), reads the amount and the salt from the encrypted memo, then checks the opening against the commitment on chain with POST /api/mistbank/verify or by hashing it locally",
-      "rotated": "the first payout key was public until 2026-10-28; that payee account is retired and future payouts use a fresh payee wallet"
+      "rotated": "the first payout (d0b52067…, payee account mist-payee, wallet payee) had its viewing key in git history until 2026-10-28; that account is retired. This payout goes to a fresh account in the payee-r2 wallet whose key was never committed or served; each later payout gets its own fresh account"
     }
   },
   "house": {
@@ -369,7 +369,7 @@
       "near_tx": "Abr2cKQFLk115MWVoG3RMFxQP9ya7S1d76mggdUSafLr",
       "chain": "Arbitrum",
       "foreign_tx": "0xee42361cea2ff228cc1703e91188acc8b39c412bb2bf09335c72169be7139ed7",
-      "note": "Direct verify_foreign_transaction call: the testnet MPC verified a finalized Arbitrum Sepolia tx (block 323769632). Its payload hash 6e6b1eb1\u2026 is pinned in contracts/toll/src/tests.rs."
+      "note": "Direct verify_foreign_transaction call: the testnet MPC verified a finalized Arbitrum Sepolia tx (block 323769632). Its payload hash 6e6b1eb1… is pinned in contracts/toll/src/tests.rs."
     }
   },
   "townhall_r16": {

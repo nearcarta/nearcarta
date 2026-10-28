@@ -1,38 +1,38 @@
 {
- "at": "2026-10-28T01:52:42.448Z",
+ "at": "2026-10-28T23:35:58.348Z",
  "network": {
   "near": "testnet",
   "zcash": "testnet"
  },
  "commitment": {
   "scheme": "sha256(\"mistbank:v1:<amount>:<salt>\")",
-  "value": "b22cc85878be366a3edb1d4ef3afbeea0813d4be02aec95a387242fa9a6055ce"
+  "value": "76f7dc33248f69c986cc1e3a901f8670303874de4cf48426c842e9f47a00d868"
  },
  "oath": {
-  "tx": "5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
-  "url": "https://testnet.nearblocks.io/txns/5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+  "tx": "Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
+  "url": "https://testnet.nearblocks.io/txns/Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
   "decision": "allowed",
   "sender": "r11oath-82930.testnet",
-  "memo": "mb1:sizIWHi-Nmo-2x1O86--6ggT1L4CrslaOHJC-ppgVc4"
+  "memo": "mb1:dvfcMySPacmGzB46kB-GcDA4dN5M9IQmyELp9HoA2Gg"
  },
  "payout": {
-  "txid": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
-  "height": 4549357,
-  "explorer": "https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
-  "explorer_api": "https://api.testnet.cipherscan.app/api/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897"
+  "txid": "446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
+  "height": 4552488,
+  "explorer": "https://testnet.cipherscan.app/tx/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
+  "explorer_api": "https://api.testnet.cipherscan.app/api/tx/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984"
  },
  "street": {
-  "txid": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
-  "height": 4549357,
-  "confirmations": 2,
-  "fee_zat": "20000",
+  "txid": "446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
+  "height": 4552488,
+  "confirmations": 1,
+  "fee_zat": "10000",
   "value_balance_zat": {
    "sapling": "0",
    "orchard": "0",
-   "ironwood": "20000"
+   "ironwood": "10000"
   },
   "actions": {
-   "ironwood": 4,
+   "ironwood": 2,
    "orchard": 0,
    "sapling_spends": 0,
    "sapling_outputs": 0
@@ -40,11 +40,9 @@
   "amount_hidden": true,
   "reasons": []
  },
+ "delay_s": 1424,
  "auditor": {
   "held_by": "the owner, given to an auditor out of band; never served by the API or committed",
-  "contains": "the payee viewing key (UFVK) and the opening (amount in zatoshi and salt)",
-  "how": "the auditor imports the UFVK into their own zcash-devtool view-only wallet (init-fvk, sync, enhance, list-tx), reads the amount and the salt from the encrypted memo, then checks the opening against the commitment on chain with POST /api/mistbank/verify or by hashing it locally",
-  "rotated": "the first payout key was public until 2026-10-28; that payee account is retired and future payouts use a fresh payee wallet"
- },
- "binds_checked_by_auditor": true
+  "how": "the auditor imports the UFVK into their own zcash-devtool view-only wallet (init-fvk, sync, enhance, list-tx), reads the amount and the salt from the encrypted memo, then checks the opening against the commitment on chain with POST /api/mistbank/verify or by hashing it locally"
+ }
 }
