@@ -1,5 +1,5 @@
 {
- "at": "2026-10-28T19:15:35.141Z",
+ "at": "2026-10-28T19:23:28.101Z",
  "rows": [
   {
    "shop": "guardhouse",
@@ -875,6 +875,32 @@
     "value": null
    },
    "events": [],
+   "found": true
+  },
+  {
+   "shop": "toll",
+   "label": "settle_mpc_verified",
+   "hash": "2PUvy9row3aSN5vd9tbYYRUhJG6BG4XXydtd6TsBo54F",
+   "url": "https://testnet.nearblocks.io/txns/2PUvy9row3aSN5vd9tbYYRUhJG6BG4XXydtd6TsBo54F",
+   "signer": "toll.r4csmvr86zk4.testnet",
+   "receiver": "toll.r4csmvr86zk4.testnet",
+   "method": "settle",
+   "result": {
+    "ok": true,
+    "value": {
+     "to": "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5",
+     "value": "10000000000000",
+     "nonce": 0,
+     "status": "confirmed",
+     "unsigned_hash": "e338813ed18f9953467ed6021b34d85645fbc2a319d9e219f550df7096085d82",
+     "raw_signed": "0x02f87283014a3480830f42408405f5e10082520894552ad18e18a49ddad1e7d96b7ddf813b04a9cfb58609184e72a00080c080a08d7873e1cb7dd63200497fc5706e16dbdf5fe541b826959c53f6c0fa8a406c3ba07ac356c2562f9930db89d893d907691d1f77e1c1a54403d49f3a973d8b7aa947",
+     "tx_hash": "0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
+     "proof_payload_hash": "d8c7513c35354b6184108ad58a63430bf88934460f30fc1420ffa3d595506025"
+    }
+   },
+   "events": [
+    "confirmed"
+   ],
    "found": true
   },
   {

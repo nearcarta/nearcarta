@@ -101,13 +101,21 @@
       "refused_fee_over_cap": "EKNfo3fumLbTBbnTKFFX34KhW39gdQBdfqEWFFVnrnJi",
       "owner_freeze": "FmCDKaQ7Qs1kcKfg5gmhiKJFnka9cf1y3VtmLe5WapSy",
       "refused_while_frozen": "L9h2WoiiBPKheddP4bVwVZ2necmHKbp3DzqjERjV2hZ",
-      "owner_unfreeze": "BHhoRStQwim3AdAhi2D526aogqgyuyfyrYuayC3nVfMq"
+      "owner_unfreeze": "BHhoRStQwim3AdAhi2D526aogqgyuyfyrYuayC3nVfMq",
+      "settle_mpc_verified": "2PUvy9row3aSN5vd9tbYYRUhJG6BG4XXydtd6TsBo54F"
     },
     "foreign_txs": {
       "base_sepolia_broadcast": "0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
       "funding_in": "0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f884b82916d635723724b40d3"
     },
-    "pending": "settle(nonce 0) with a finalized Base Sepolia proof once the block is final"
+    "settled": {
+      "nonce": 0,
+      "status": "confirmed",
+      "base_block": 51194847,
+      "base_block_hash": "0xa800c2bbcf63fc22ef17020b725efd17b681682b7fa913c2d7603055c03b44e3",
+      "proof_payload_hash": "d8c7513c35354b6184108ad58a63430bf88934460f30fc1420ffa3d595506025",
+      "note": "settle(0): the MPC network (verify_foreign_transaction, domain 3) checked the finalized Base Sepolia tx and the Toll matched the payload hash; the record is now confirmed."
+    }
   },
   "ferry": {
     "oneclick": "https://1click.chaindefuser.com",

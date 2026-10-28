@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-28T19:24Z",
+  "toll": "toll.r4csmvr86zk4.testnet",
+  "caller_key": "function-call key (pay, settle) on the Toll",
+  "near_tx": "2PUvy9row3aSN5vd9tbYYRUhJG6BG4XXydtd6TsBo54F",
+  "near_url": "https://testnet.nearblocks.io/txns/2PUvy9row3aSN5vd9tbYYRUhJG6BG4XXydtd6TsBo54F",
+  "ms": 14287,
+  "base_sepolia_tx": "0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
+  "base_url": "https://sepolia.basescan.org/tx/0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
+  "base_block": 51194847,
+  "base_finalized_head_at_settle": 51462389,
+  "result": {
+    "nonce": 0,
+    "status": "confirmed",
+    "to": "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5",
+    "value_wei": "10000000000000",
+    "proof_payload_hash": "d8c7513c35354b6184108ad58a63430bf88934460f30fc1420ffa3d595506025"
+  }
+}
