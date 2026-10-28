@@ -312,3 +312,55 @@ test('isFactoryCharter: only ids under a vault factory that its registry lists',
   assert.equal(await isFactoryCharter('fake.' + VV.factory, v), false);
   assert.equal(calls, 2, 'registry answers are cached');
 });
+
+// ---------- board survives a restart: rebuilt from chain, honest about gaps ----------
+import { backfill, charterTxs, boot, rebuild } from '../../src/vault.js';
+
+test('charterTxs retries index 429s, pages to the end, keeps only self-called function txs', async () => {
+  let n = 0;
+  const pages = [
+    { account_txs: [{ transaction_hash: 'a', is_signer: true, is_receiver: true, is_function_call: true, tx_block_timestamp: '2000000000' },
+      { transaction_hash: 'x', is_signer: true, is_receiver: false, is_function_call: true, tx_block_timestamp: '1' }], resume_token: 'r1' },
+    { account_txs: [{ transaction_hash: 'b', is_signer: true, is_receiver: true, is_function_call: true, tx_block_timestamp: '3000000000' }] },
+  ];
+  const f = async (_u, o) => { n++; if (n === 1) return { ok: false, status: 429 }; const b = JSON.parse(o.body); return { ok: true, json: async () => pages[b.resume_token ? 1 : 0] }; };
+  assert.deepEqual(await charterTxs('c.testnet', { f, waitMs: 1 }), [{ hash: 'a', at: 2000 }, { hash: 'b', at: 3000 }]);
+  assert.equal(n, 3);
+  await assert.rejects(charterTxs('c.testnet', { f: async () => ({ ok: false, status: 429 }), waitMs: 1 }), /429/);
+  await assert.rejects(charterTxs('c.testnet', { f: async () => ({ ok: false, status: 400 }), waitMs: 1 }), /400/);
+});
+
+test('backfill rebuilds an empty board from chain and is incomplete while the index fails', async () => {
+  fresh();
+  const factories = [{ factory: 'f.testnet' }];
+  const charters = async () => [{ charter: 'own.f.testnet' }, { charter: 'arena.f.testnet' }];
+  const rows = { 'own.f.testnet': [{ hash: 'h1', at: 1 }, { hash: 'h2', at: 2 }], 'arena.f.testnet': [{ hash: 'h3', at: 3 }] };
+  let down = true;
+  const txs = async c => { if (down && c === 'arena.f.testnet') throw new Error('tx index http 429'); return rows[c]; };
+  const verify = async (h, c) => h === 'h2' ? null : (_attempts.set(h, { hash: h, charter: c, counted: true, at: null }), _attempts.get(h));
+  let r = await backfill({ factories, charters, txs, verify });
+  assert.deepEqual([r.complete, r.errors, _attempts.size], [false, 1, 1]);
+  down = false;
+  r = await backfill({ factories, charters, txs, verify });
+  assert.deepEqual([r.complete, r.errors, _attempts.size], [true, 0, 2]);
+  assert.ok(_notArena.has('h2'));
+  assert.equal(_attempts.get('h3').at, 3);
+  // budget: stops early and says so
+  fresh();
+  r = await backfill({ factories, charters, txs, verify, budget: 1 });
+  assert.equal(r.complete, false);
+  // a charter list failure is never "complete"
+  r = await backfill({ factories, charters: async () => { throw new Error('rpc 429'); }, txs, verify });
+  assert.equal(r.complete, false);
+  fresh();
+});
+
+test('boot keeps filling after index errors until a pass completes', async () => {
+  let calls = 0;
+  const fill = async () => (++calls < 3 ? { complete: false, errors: 1 } : { complete: true, errors: 0 });
+  const t0 = Date.now();
+  boot({ fill, firstMs: 0 });
+  while (!rebuild.complete_at && Date.now() - t0 < 10_000) await new Promise(r => setTimeout(r, 50));
+  assert.equal(calls, 3);
+  assert.ok(rebuild.complete_at >= rebuild.started_at);
+});

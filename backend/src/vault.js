@@ -399,53 +399,83 @@ export async function verifyAttempt(hash, charter, { status = txStatus, facts = 
 }
 
 const FASTNEAR_TX = process.env.FASTNEAR_TX_API || 'https://tx.test.fastnear.com';
-async function charterTxs(charter, maxPages = 5) {
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+/** One page of the tx index; 429/5xx and network errors are retried with backoff, then thrown. */
+async function indexPage(body, f = fetch, waitMs = 1500) {
+  for (let i = 0; ; i++) {
+    let r = null;
+    try { r = await f(`${FASTNEAR_TX}/v0/account`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); } catch { /* network */ }
+    if (r?.ok) return r.json();
+    if (r && r.status !== 429 && r.status < 500) throw new Error('tx index http ' + r.status);
+    if (i >= 3) throw new Error('tx index ' + (r ? 'http ' + r.status : 'unreachable'));
+    await sleep(waitMs * 2 ** i);
+  }
+}
+export async function charterTxs(charter, { maxPages = 50, f = fetch, waitMs } = {}) {
   const out = [];
   let resume = null;
   for (let i = 0; i < maxPages; i++) {
-    const r = await fetch(`${FASTNEAR_TX}/v0/account`, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ account_id: charter, is_signer: true, limit: 200, ...(resume ? { resume_token: resume } : {}) }) });
-    if (!r.ok) throw new Error('tx index http ' + r.status);
-    const j = await r.json();
+    const j = await indexPage({ account_id: charter, is_signer: true, limit: 200, ...(resume ? { resume_token: resume } : {}) }, f, waitMs);
     out.push(...(j.account_txs || []).filter(x => x.is_signer && x.is_receiver && x.is_function_call)
       .map(x => ({ hash: x.transaction_hash, at: Math.floor(Number(BigInt(x.tx_block_timestamp) / 1_000_000n)) })));
     resume = j.resume_token;
-    if (!resume || !(j.account_txs || []).length) break;
+    if (!resume || !(j.account_txs || []).length) return out;
   }
-  return out;
+  throw new Error('tx index: more than ' + maxPages + ' pages');
 }
 
-/** Pull each charter's propose txs from the index, verify the new ones on RPC (bounded per call). */
-export async function backfill({ budget = 40 } = {}) {
-  let checked = 0;
-  for (const fa of FACTORIES) {
-    let charters = [];
-    try { charters = (await listCharters(0, 100, fa.factory)).charters; } catch { continue; }
-    for (const c of charters) {
-      let txs = [];
-      try { txs = await cached('txs:' + c.charter, 30_000, () => charterTxs(c.charter)); } catch { continue; }
-      for (const t of txs) {
+/** Every charter of a factory, page by page up to its on-chain count. */
+async function allCharters(factory) {
+  const out = [];
+  for (let from = 0; ; from += 100) {
+    const r = await listCharters(from, 100, factory);
+    out.push(...r.charters);
+    if (r.charters.length < 100 || out.length >= r.count) return out;
+  }
+}
+
+/**
+ * Rebuild the board from chain: every factory charter's propose txs from the index, each new one re-verified on RPC
+ * (bounded per call). There is no disk on the free plan, so this is how the board survives a restart. `complete` is
+ * true only when every charter list and tx list was read and every tx was checked; an index error leaves it false.
+ */
+export async function backfill({ budget = 40, factories = FACTORIES, charters = allCharters, txs = c => cached('txs:' + c, 30_000, () => charterTxs(c)), verify = verifyAttempt } = {}) {
+  let checked = 0, errors = 0;
+  for (const fa of factories) {
+    let list = [];
+    try { list = await charters(fa.factory); } catch { errors++; continue; }
+    // The shared arena first: it holds most rows, so a partial rebuild still shows the busiest charter.
+    list.sort((a, b) => Number(isShared(b.charter)) - Number(isShared(a.charter)));
+    for (const c of list) {
+      let ts = [];
+      try { ts = await txs(c.charter); } catch { errors++; continue; }
+      for (const t of ts) {
         if (notArena.has(t.hash)) continue;
         if (attempts.has(t.hash)) { const a = attempts.get(t.hash); if (a && !a.at) a.at = t.at; continue; }
-        if (checked >= budget) return { checked, complete: false };
+        if (checked >= budget) return { checked, errors, complete: false };
         checked++;
-        try { const a = await verifyAttempt(t.hash, c.charter); if (a) { if (!a.at) a.at = t.at; } else { notArena.set(t.hash, 1); scheduleSave(); } } catch { /* retry next time */ }
+        try { const a = await verify(t.hash, c.charter); if (a) { if (!a.at) a.at = t.at; } else { notArena.set(t.hash, 1); scheduleSave(); } } catch { errors++; }
       }
     }
   }
-  return { checked, complete: true };
+  return { checked, errors, complete: errors === 0 };
 }
 
-/** Load the saved board, then keep filling from chain in the background until complete. */
-export function boot({ loops = 30 } = {}) {
+export const rebuild = { started_at: null, complete_at: null, passes: 0, rows: 0 };
+/** Load the saved board if this instance still has it, then fill from chain until a pass completes (backoff to 60 s). */
+export function boot({ fill = backfill, firstMs = 1000 } = {}) {
   if (!V) return;
   loadBoard();
-  let n = 0;
+  rebuild.started_at = Date.now();
+  let wait = 1500;
   const step = async () => {
-    const r = await backfill({ budget: 60 }).catch(() => ({ complete: false }));
-    if (!r.complete && ++n < loops) setTimeout(step, 1500).unref?.();
+    const r = await fill({ budget: 60 }).catch(() => ({ complete: false, errors: 1 }));
+    rebuild.passes++; rebuild.rows = attempts.size;
+    if (r.complete) { rebuild.complete_at = Date.now(); return; }
+    wait = r.errors ? Math.min(60_000, wait * 2) : 1500; // budget used up: go on; index trouble: back off
+    setTimeout(step, wait).unref?.();
   };
-  setTimeout(step, 1000).unref?.();
+  setTimeout(step, firstMs).unref?.();
 }
 
 export function board(list = [...attempts.values()]) {
@@ -478,7 +508,7 @@ export async function leaderboard() {
   if (!V) throw bad('vault not deployed', 503);
   const fill = await cached('backfill', 20_000, () => backfill());
   const rows = [...attempts.values()];
-  return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, players: board(rows).slice(0, 50),
+  return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild }, players: board(rows).slice(0, 50),
     recent: rows.sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
 }
 
