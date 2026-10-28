@@ -19,7 +19,7 @@ fn toll() -> Oath {
     set("owner.test");
     Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "toll".into(), 84532,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.to_uppercase().replace("0X", "0x")],
-        U128(100), U128(150), U128(10), None, None, None)
+        U128(100), U128(150), U128(10), None, None, None, None)
 }
 fn pay(o: &mut Oath, to: &str, v: u128) -> Promise { o.pay(to.into(), U128(v), U128(5), U128(1), 21000) }
 fn spent(o: &Oath) -> String { o.policy()["spent"].as_str().unwrap().to_string() }
@@ -106,7 +106,7 @@ fn arb(chain_id: u64, chain: &str) -> Oath {
     set("owner.test");
     Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "arb-1".into(), chain_id,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
-        U128(100), U128(150), U128(10), Some(chain.into()), None, None)
+        U128(100), U128(150), U128(10), Some(chain.into()), None, None, None)
 }
 
 #[test]
@@ -146,7 +146,7 @@ fn usdc() -> Oath {
     set("owner.test");
     Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "usdc-1".into(), 84532,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
-        U128(1_000_000), U128(3_000_000), U128(10), None, Some(USDC.into()), Some(acc("dao.test")))
+        U128(1_000_000), U128(3_000_000), U128(10), None, Some(USDC.into()), Some(acc("dao.test")), None)
 }
 
 #[test]
@@ -206,5 +206,173 @@ fn dao_can_freeze_and_unfreeze() {
 fn bad_token_address_refused() {
     set("owner.test");
     let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "x".into(), 84532, "0x01".into(), "00".into(), vec![],
-        U128(1), U128(1), U128(1), None, Some("0x1234".into()), None);
+        U128(1), U128(1), U128(1), None, Some("0x1234".into()), None, None);
 }
+
+// ---------------- v4: the visitor gate (pay_for after the guest's own charter paid) ----------------
+fn gate_cfg() -> Gate {
+    Gate { factory: acc("factory.test"), payee: acc("cafe.test"), fee: U128(10), memo: "toll:base-sepolia".into(),
+           evm_to: TO.to_uppercase().replace("0X", "0x"), evm_value: U128(7), max_fee_per_gas: U128(5), max_priority_fee_per_gas: U128(1) }
+}
+fn gated() -> Oath {
+    set("owner.test");
+    Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "gate-1".into(), 84532,
+        "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
+        U128(10), U128(20), U128(10), None, None, None, Some(gate_cfg()))
+}
+fn paid() -> Value { json!({"shop":"toll","clause_id":"pay","receiver":"cafe.test","amount":"10","status":"confirmed","asset":"Native","memo":"toll:base-sepolia"}) }
+fn visit(o: &mut Oath, id: u64, a: Value) -> Promise {
+    set("toll.test");
+    o.on_visit_checked(acc("guest-1.factory.test"), U64(id), acc("guest.test"), Ok(true), Ok(Some(a)))
+}
+fn with(k: &str, v: Value) -> Value { let mut a = paid(); a[k] = v; a }
+
+#[test]
+fn paid_charter_action_opens_the_gate_with_the_fixed_payout() {
+    let mut o = gated();
+    let _ = visit(&mut o, 3, paid());
+    let rec = o.get_tx(0).unwrap();
+    assert_eq!((rec.status.as_str(), rec.to.as_str(), rec.value.0), ("signing", TO, 7));
+    let v = o.get_visit(0).unwrap();
+    assert_eq!((v.charter.as_str(), v.action_id, v.by.as_str()), ("guest-1.factory.test", 3, "guest.test"));
+    assert_eq!(o.visit_nonce(acc("guest-1.factory.test"), U64(3)), Some(0));
+    assert_eq!(spent(&o), "7");
+}
+
+#[test]
+fn gate_payout_hash_equals_the_owner_paying_the_same_tx() {
+    let mut a = gated(); let _ = visit(&mut a, 0, paid());
+    let mut b = gated(); set("owner.test"); let _ = b.pay(TO.into(), U128(7), U128(5), U128(1), 21000);
+    assert_eq!(a.get_tx(0).unwrap().unsigned_hash, b.get_tx(0).unwrap().unsigned_hash);
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: this charter action already opened the gate")]
+fn one_charter_action_opens_the_gate_once() { let mut o = gated(); let _ = visit(&mut o, 1, paid()); let _ = visit(&mut o, 1, paid()); }
+
+#[test]
+#[should_panic(expected = "REFUSED: this charter action already opened the gate")]
+fn pay_for_refuses_a_used_action_before_any_call() {
+    let mut o = gated(); let _ = visit(&mut o, 1, paid());
+    set("guest.test"); let _ = o.pay_for(acc("guest-1.factory.test"), U64(1));
+}
+
+#[test]
+fn another_action_of_the_same_charter_opens_it_again() {
+    let mut o = gated(); let _ = visit(&mut o, 1, paid()); let _ = visit(&mut o, 2, paid());
+    assert_eq!(o.policy()["next_nonce"], json!(2)); assert_eq!(spent(&o), "14");
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: budget exhausted")]
+fn gate_payouts_count_against_the_oath_budget() { let mut o = gated(); for i in 0..3 { let _ = visit(&mut o, i, paid()); } }
+
+#[test]
+#[should_panic(expected = "REFUSED: not a charter from the gate's factory")]
+fn non_factory_account_refused() {
+    let mut o = gated(); set("toll.test");
+    let _ = o.on_visit_checked(acc("fake.test"), U64(0), acc("guest.test"), Ok(false), Ok(Some(paid())));
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: not a charter from the gate's factory")]
+fn failed_factory_read_refused() {
+    let mut o = gated(); set("toll.test");
+    let _ = o.on_visit_checked(acc("fake.test"), U64(0), acc("guest.test"), Err(PromiseError::Failed), Ok(Some(paid())));
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: the charter has no such action")]
+fn missing_action_refused() {
+    let mut o = gated(); set("toll.test");
+    let _ = o.on_visit_checked(acc("guest-1.factory.test"), U64(9), acc("guest.test"), Ok(true), Ok(None));
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: the action did not pay the toll payee")]
+fn action_to_another_receiver_refused() { let mut o = gated(); let _ = visit(&mut o, 0, with("receiver", json!("books.test"))); }
+
+#[test]
+#[should_panic(expected = "REFUSED: the toll is paid in NEAR")]
+fn ft_action_refused() { let mut o = gated(); let _ = visit(&mut o, 0, with("asset", json!({"Ft": {"token": "usdc.test"}}))); }
+
+#[test]
+#[should_panic(expected = "REFUSED: the action paid less than the toll")]
+fn underpaid_action_refused() { let mut o = gated(); let _ = visit(&mut o, 0, with("amount", json!("9"))); }
+
+#[test]
+fn fee_is_a_minimum() { let mut o = gated(); let _ = visit(&mut o, 0, with("amount", json!("11"))); assert_eq!(spent(&o), "7"); }
+
+#[test]
+#[should_panic(expected = "REFUSED: the action is not a toll payment")]
+fn other_memo_refused() { let mut o = gated(); let _ = visit(&mut o, 0, with("memo", json!("coffee"))); }
+
+#[test]
+#[should_panic(expected = "REFUSED: the action is not a toll payment")]
+fn no_memo_refused() { let mut o = gated(); let _ = visit(&mut o, 0, with("memo", Value::Null)); }
+
+#[test]
+#[should_panic(expected = "REFUSED: the charter has not paid (action not confirmed)")]
+fn submitted_but_unsettled_action_refused() { let mut o = gated(); let _ = visit(&mut o, 0, with("status", json!("submitted"))); }
+
+#[test]
+#[should_panic(expected = "REFUSED: the charter has not paid (action not confirmed)")]
+fn failed_transfer_refused() { let mut o = gated(); let _ = visit(&mut o, 0, with("status", json!("failed_released"))); }
+
+#[test]
+#[should_panic(expected = "REFUSED: oath frozen")]
+fn frozen_gate_refuses_pay_for() { let mut o = gated(); o.freeze(); set("guest.test"); let _ = o.pay_for(acc("guest-1.factory.test"), U64(0)); }
+
+#[test]
+#[should_panic(expected = "REFUSED: oath frozen")]
+fn frozen_while_reading_refuses_in_the_callback() { let mut o = gated(); o.freeze(); let _ = visit(&mut o, 0, paid()); }
+
+#[test]
+#[should_panic(expected = "REFUSED: this toll has no visitor gate")]
+fn toll_without_gate_refuses_pay_for() { let mut o = toll(); set("guest.test"); let _ = o.pay_for(acc("guest-1.factory.test"), U64(0)); }
+
+#[test]
+#[should_panic(expected = "attach at least 150 Tgas")]
+fn pay_for_needs_gas() {
+    let mut o = gated();
+    testing_env!(ctx("guest.test").prepaid_gas(Gas::from_tgas(149)).build());
+    let _ = o.pay_for(acc("guest-1.factory.test"), U64(0));
+}
+
+#[test]
+fn anyone_may_call_pay_for() { let mut o = gated(); set("guest.test"); let _ = o.pay_for(acc("guest-1.factory.test"), U64(0)); assert_eq!(o.policy()["next_nonce"], json!(0)); }
+
+#[test]
+#[should_panic(expected = "gate evm_to must be in allow_to")]
+fn gate_recipient_must_be_allowlisted() {
+    set("owner.test"); let mut g = gate_cfg(); g.evm_to = OTHER.into();
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
+        U128(10), U128(20), U128(10), None, None, None, Some(g));
+}
+
+#[test]
+#[should_panic(expected = "gate evm_value over per-tx cap")]
+fn gate_value_within_cap() {
+    set("owner.test"); let mut g = gate_cfg(); g.evm_value = U128(11);
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
+        U128(10), U128(20), U128(10), None, None, None, Some(g));
+}
+
+#[test]
+#[should_panic(expected = "gate fees over cap")]
+fn gate_fees_within_cap() {
+    set("owner.test"); let mut g = gate_cfg(); g.max_fee_per_gas = U128(11);
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
+        U128(10), U128(20), U128(10), None, None, None, Some(g));
+}
+
+#[test]
+#[should_panic(expected = "gate is for native-coin tolls")]
+fn gate_not_for_token_tolls() {
+    set("owner.test");
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
+        U128(10), U128(20), U128(10), None, Some(USDC.into()), None, Some(gate_cfg()));
+}
+
+#[test]
+fn policy_shows_the_gate() { let o = gated(); assert_eq!(o.policy()["gate"]["memo"], "toll:base-sepolia"); assert_eq!(o.policy()["gate"]["evm_to"], TO); }

@@ -6,8 +6,13 @@
 //! v3: an optional ERC-20 `token` (e.g. Circle USDC on Base Sepolia). With a token set, `pay` builds
 //! `token.transfer(to, value)` itself (EVM value 0), and the caps and budget count token units.
 //! v3: an optional `dao`. With a DAO set, only the DAO can unfreeze (the owner can still freeze).
+//! v4: an optional visitor `gate`. `pay_for(charter, action_id)` is open to anyone, but it signs only after
+//! it has read, on chain, that `charter` was made by the gate's charter factory and that this charter's
+//! own action `action_id` paid the toll fee in NEAR to the gate's payee with the gate's memo and settled.
+//! Each charter action opens the gate once. The EVM payout is fixed by the gate (recipient, value, fees),
+//! so a visitor can not choose where the oath's coins go; the oath's own caps and budget still apply.
 mod rlp;
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::store::LookupMap;
 use near_sdk::{env, log, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseError};
 use serde_json::{json, Value};
@@ -45,7 +50,32 @@ pub struct Oath {
     verify_chain: String,     // MPC ForeignChainRpcRequest variant name, e.g. "Base", "Arbitrum"
     token: Option<String>,    // v3: ERC-20 contract; None = native coin
     dao: Option<AccountId>,   // v3: if set, the only account that can unfreeze
+    gate: Option<Gate>,       // v4: visitor gate; None = owner/agent only
+    visits: LookupMap<String, u64>, // v4: "charter#action_id" -> EVM nonce it opened
+    visit_of: LookupMap<u64, Visit>, // v4: EVM nonce -> the charter action that paid for it
 }
+
+/// v4: what a visitor's charter must have paid on NEAR, and the fixed EVM payout it buys.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Gate {
+    pub factory: AccountId,   // charters must come from this factory (is_charter)
+    pub payee: AccountId,     // the charter action's receiver
+    pub fee: U128,            // minimum NEAR (yocto) the action paid
+    pub memo: String,         // the action's memo, e.g. "toll:base-sepolia"
+    pub evm_to: String,       // fixed EVM recipient (must be in allow_to)
+    pub evm_value: U128,      // fixed EVM value (wei)
+    pub max_fee_per_gas: U128,
+    pub max_priority_fee_per_gas: U128,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Visit { pub charter: AccountId, pub action_id: u64, pub by: AccountId }
+
+/// v4: gas for the visitor callback (it starts the MPC sign: 50 Tgas + on_signed 30 Tgas).
+pub const GATE_CB_GAS: u64 = 110;
+pub const GATE_MIN_GAS: u64 = 150;
 
 /// v3: gas limit cap for an ERC-20 transfer (a USDC transfer uses about 40-60k).
 pub const ERC20_GAS_CAP: u64 = 100_000;
@@ -59,6 +89,18 @@ pub fn erc20_transfer_data(to: &str, value: u128) -> Vec<u8> {
 }
 
 fn hx(b: &[u8]) -> String { hex::encode(b) }
+fn visit_key(charter: &AccountId, id: u64) -> String { format!("{charter}#{id}") }
+
+/// v4: the charter's own record must show the toll paid: receiver = payee, native NEAR, at least the fee,
+/// the gate's memo, and status "confirmed" (the charter's transfer settled).
+pub fn check_visit(g: &Gate, a: &Value) {
+    require!(a["receiver"].as_str() == Some(g.payee.as_str()), "REFUSED: the action did not pay the toll payee");
+    require!(a["asset"] == json!("Native"), "REFUSED: the toll is paid in NEAR");
+    let amt: u128 = a["amount"].as_str().and_then(|x| x.parse().ok()).unwrap_or(0);
+    require!(amt >= g.fee.0, "REFUSED: the action paid less than the toll");
+    require!(a["memo"].as_str() == Some(g.memo.as_str()), "REFUSED: the action is not a toll payment");
+    require!(a["status"].as_str() == Some("confirmed"), "REFUSED: the charter has not paid (action not confirmed)");
+}
 fn unhex(s: &str) -> Vec<u8> { hex::decode(s.trim_start_matches("0x")).expect("bad hex") }
 
 /// EVM chains the MPC network verifies (v1.signer-prod.testnet get_available_foreign_chains), with the
@@ -89,16 +131,27 @@ impl Oath {
     #[init]
     pub fn new(owner: AccountId, mpc: AccountId, path: String, chain_id: u64, foreign_address: String,
                fx_root_key: String, allow_to: Vec<String>, max_per_tx: U128, budget: U128, max_fee_cap: U128,
-               verify_chain: Option<String>, token: Option<String>, dao: Option<AccountId>) -> Self {
+               verify_chain: Option<String>, token: Option<String>, dao: Option<AccountId>, gate: Option<Gate>) -> Self {
         let verify_chain = verify_chain.unwrap_or_else(|| "Base".into());
         let (_, ids) = evm_chain(&verify_chain).expect("verify_chain not supported");
         require!(ids.contains(&chain_id), "chain_id does not belong to verify_chain");
         let token = token.map(|t| t.to_lowercase());
         if let Some(t) = &token { require!(t.len() == 42 && unhex(t).len() == 20, "token must be a 0x address"); }
+        let allow_to: Vec<String> = allow_to.into_iter().map(|a| a.to_lowercase()).collect();
+        let gate = gate.map(|mut g| {
+            g.evm_to = g.evm_to.to_lowercase();
+            require!(token.is_none(), "gate is for native-coin tolls");
+            require!(allow_to.contains(&g.evm_to), "gate evm_to must be in allow_to");
+            require!(g.evm_value.0 <= max_per_tx.0, "gate evm_value over per-tx cap");
+            require!(g.max_fee_per_gas.0 <= max_fee_cap.0 && g.max_priority_fee_per_gas.0 <= g.max_fee_per_gas.0, "gate fees over cap");
+            require!(g.fee.0 > 0 && !g.memo.is_empty(), "gate needs a fee and a memo");
+            g
+        });
         Self { owner, mpc, path, chain_id, foreign_address: foreign_address.to_lowercase(), fx_root_key,
-               allow_to: allow_to.into_iter().map(|a| a.to_lowercase()).collect(),
+               allow_to,
                max_per_tx: max_per_tx.0, budget: budget.0, spent: 0, max_fee_cap: max_fee_cap.0,
-               next_nonce: 0, frozen: false, txs: LookupMap::new(b"t"), verify_chain, token, dao }
+               next_nonce: 0, frozen: false, txs: LookupMap::new(b"t"), verify_chain, token, dao,
+               gate, visits: LookupMap::new(b"v"), visit_of: LookupMap::new(b"w") }
     }
 
     fn assert_owner(&self) { require!(env::predecessor_account_id() == self.owner, "only owner"); }
@@ -119,14 +172,53 @@ impl Oath {
                "max_per_tx": self.max_per_tx.to_string(), "budget": self.budget.to_string(),
                "spent": self.spent.to_string(), "max_fee_cap": self.max_fee_cap.to_string(),
                "next_nonce": self.next_nonce, "frozen": self.frozen, "verify_chain": self.verify_chain,
-               "asset": self.token.as_ref().map(|t| json!({"erc20": t})).unwrap_or(json!("native")), "dao": self.dao})
+               "asset": self.token.as_ref().map(|t| json!({"erc20": t})).unwrap_or(json!("native")), "dao": self.dao,
+               "gate": self.gate})
     }
+    /// v4: the charter action that paid for EVM nonce `nonce`, if it came through the gate.
+    pub fn get_visit(&self, nonce: u64) -> Option<Visit> { self.visit_of.get(&nonce).cloned() }
+    /// v4: the EVM nonce a charter action opened, if any.
+    pub fn visit_nonce(&self, charter: AccountId, action_id: U64) -> Option<u64> { self.visits.get(&visit_key(&charter, action_id.0)).copied() }
     pub fn get_tx(&self, nonce: u64) -> Option<TxRec> { self.txs.get(&nonce).cloned() }
 
     /// Agent entry point. Callable by the owner or by a function-call key on this account (the agent).
     pub fn pay(&mut self, to: String, value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128, gas_limit: u64) -> Promise {
         let caller = env::predecessor_account_id();
         require!(caller == self.owner || caller == env::current_account_id(), "caller not owner/agent");
+        self.start_sign(to, value, max_fee_per_gas, max_priority_fee_per_gas, gas_limit)
+    }
+
+    /// v4: open to anyone. Reads the factory and the charter on chain, then signs the gate's fixed payout.
+    pub fn pay_for(&mut self, charter: AccountId, action_id: U64) -> Promise {
+        let g = self.gate.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no visitor gate"));
+        require!(!self.frozen, "REFUSED: oath frozen");
+        require!(!self.visits.contains_key(&visit_key(&charter, action_id.0)), "REFUSED: this charter action already opened the gate");
+        require!(env::prepaid_gas() >= Gas::from_tgas(GATE_MIN_GAS), "attach at least 150 Tgas");
+        let a = Promise::new(g.factory.clone()).function_call("is_charter".to_string(), json!({"account_id": charter}).to_string().into_bytes(), NearToken::from_yoctonear(0), Gas::from_tgas(5));
+        let b = Promise::new(charter.clone()).function_call("get_action".to_string(), json!({"action_id": action_id}).to_string().into_bytes(), NearToken::from_yoctonear(0), Gas::from_tgas(10));
+        a.and(b).then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(GATE_CB_GAS))
+            .on_visit_checked(charter, action_id, env::predecessor_account_id()))
+    }
+
+    /// v4: both reads are back. Every check panics with REFUSED, so a refused visit changes nothing.
+    #[private]
+    pub fn on_visit_checked(&mut self, charter: AccountId, action_id: U64, by: AccountId,
+                            #[callback_result] is_charter: Result<bool, PromiseError>,
+                            #[callback_result] action: Result<Option<Value>, PromiseError>) -> Promise {
+        let g = self.gate.clone().expect("no gate");
+        require!(matches!(is_charter, Ok(true)), "REFUSED: not a charter from the gate's factory");
+        let a = action.ok().flatten().unwrap_or_else(|| env::panic_str("REFUSED: the charter has no such action"));
+        check_visit(&g, &a);
+        let key = visit_key(&charter, action_id.0);
+        require!(!self.visits.contains_key(&key), "REFUSED: this charter action already opened the gate");
+        let nonce = self.next_nonce;
+        self.visits.insert(key, nonce);
+        self.visit_of.insert(nonce, Visit { charter: charter.clone(), action_id: action_id.0, by });
+        log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"visit_paid","data":{"nonce":nonce,"charter":charter,"action_id":action_id}}));
+        self.start_sign(g.evm_to.clone(), g.evm_value, g.max_fee_per_gas, g.max_priority_fee_per_gas, 21000)
+    }
+
+    fn start_sign(&mut self, to: String, value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128, gas_limit: u64) -> Promise {
         require!(!self.frozen, "REFUSED: oath frozen");
         let to = to.to_lowercase();
         require!(self.allow_to.contains(&to), "REFUSED: recipient not in oath allowlist");
