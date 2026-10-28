@@ -108,3 +108,19 @@ test('mist bank: Zcash testnet payout hides its amount, its NEAR oath carries th
   assert.equal(m.binds, true);
   if (has.oneClick()) for (const [k, l] of Object.entries(m.desk.legs)) { assert.equal(l.ok, true, k); assert.equal(l.privacy, 'basic'); assert.equal(l.dry, true); }
 });
+
+test('arena corpus: every attempt is on chain with a prompt hash, refusals outnumber allows', async () => {
+  const d = await shops.arenaAttempts(0, 25);
+  assert.ok(d.attempts.length >= 20);
+  for (const a of d.attempts) assert.match(a.prompt_hash_hex, /^[0-9a-f]{64}$/);
+  const allows = d.attempts.filter(a => a.verdict === 'ALLOW').length;
+  assert.ok(d.attempts.length - allows > allows);
+  const page2 = await shops.arenaAttempts(10, 5);
+  assert.equal(page2.attempts[0].id, 10);
+});
+
+test('guardhouse: the owner-approved escalation settled on chain', async () => {
+  const a = await guard.action('4');
+  assert.equal(a.status, 'confirmed');
+  assert.equal(a.clause_id, 'tip');
+});
