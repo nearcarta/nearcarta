@@ -17,7 +17,7 @@ const FLAT = {
   guard: { src: 'testnet', cls: 'testnet', label: 'Forged invoice asks', hero: tok('5', 'NEAR') },
   ferry: { src: 'live read', cls: 'live', label: 'Signed quote', hero: `${tok('3', 'USDC', { chain: 'Base' })}<span class="arrow">→</span>${tok('0.640', 'NEAR')}` },
   hall: { src: 'testnet', cls: 'testnet', label: 'Reward cap · Proposal 4', hero: tok('0.15', 'NEAR') },
-  bank: { src: 'SAMPLE', cls: 'sample', label: 'Street sees a deposit, not the amount', hero: '<span class="blurnum">••••</span>' },
+  bank: { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount · Zcash testnet d0b52067… (recorded)', hero: '<span class="blurnum">••••</span> TAZ' },
   arena: { src: 'testnet', cls: 'testnet', label: '5 attacks on the lab oath', hero: '<b class="num">0</b><span class="unit">breaches</span>' },
   toll: { src: 'testnet', cls: 'testnet', label: 'MPC signature for Base Sepolia', hero: '<b class="num">11</b><span class="unit">of 16 nodes</span>' },
   chronicle: { src: 'testnet', cls: 'testnet', label: 'Refusals on the record', hero: '<b class="num">6</b><span class="unit">of 10 actions</span>' },

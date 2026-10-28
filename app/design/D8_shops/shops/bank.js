@@ -1,5 +1,5 @@
 // Mist Bank: a vault with a street window. The street sees that a payout happened; only the ledger inside holds the amount.
-// Data comes through the D6 data interface (BANK); without it the room keeps its SAMPLE text.
+// Data comes through the D6 data interface (BANK); without it the room shows the recorded testnet payout d0b52067….
 import { THREE, room, put, makeRobot, tok, C, CSS } from '../js/core.js';
 import { row, h3, note, proof, paper, esc } from './_ui.js';
 import * as D from '../../D6_dashboards/src/data.js';
@@ -22,7 +22,7 @@ function live(b) {
     note('Dry quotes only: no deposit address exists and nothing was spent. A mainnet confidential deposit needs the owner\'s go-ahead.'));
 }
 
-// For the 2D fallback (js/flat.js): the same live tray and proof list, or null to keep its SAMPLE text.
+// For the 2D fallback (js/flat.js): the same live tray and proof list, or null to use the recorded testnet payout.
 export const FLAT = B ? { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount · Zcash testnet', hero: '<span class="blurnum">••••</span> TAZ' } : null;
 export const PROOF = B ? live(B) : null;
 
@@ -42,9 +42,9 @@ export default async function bank() {
   return {
     scene, camera, tags: [],
     panel: B ? { title: 'Mist Bank', src: 'testnet', label: 'Street sees a payout, not the amount · Zcash testnet', hero: `<span class="blurnum" aria-label="hidden amount">••••</span> TAZ`, action: null }
-      : { title: 'Mist Bank', src: 'sample', label: 'Street sees a deposit, not the amount', hero: `<span class="blurnum" aria-label="hidden amount">••••</span>${tok(null, 'USDC').replace('<span class="sym">USDC</span>', '')}`, action: null },
-    proof: B ? live(B) : proof(h3('What this room shows'), row({ k: 'Window: a deposit happened', why: 'the amount is not on the street side', src: 'sample' }), row({ k: 'Ledger: amount and payee', why: 'held inside the bank', src: 'sample' }),
-      note('SAMPLE. No shielded transfer was run for this build, so nothing here is linked to a transaction.')),
+      : { title: 'Mist Bank', src: 'testnet', label: 'Street sees a payout, not the amount · Zcash testnet (recorded)', hero: `<span class="blurnum" aria-label="hidden amount">••••</span> TAZ`, action: null },
+    proof: B ? live(B) : proof(h3('What this room shows'), row({ k: 'Street: Zcash testnet tx d0b52067…', why: 'public tx, hidden amount: only the fee leaves the Ironwood pool', src: 'testnet' }), row({ k: 'Ledger: the viewing key opens it', why: 'amount and salt hash to the commitment the oath approved', src: 'testnet' }),
+      note('Recorded testnet payout d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897 (live data did not load). Check it: https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897')),
     update(dt) { rob.update(dt); },
   };
 }
