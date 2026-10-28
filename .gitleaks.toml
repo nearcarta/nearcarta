@@ -20,3 +20,8 @@ regexes = ['''^\s*"token_id": "([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+
 description = "NEAR RPC error text 'access key ed25519:<public key>': a 32-byte public key (<=44 base58 chars); 64-byte private keys (~88 chars) stay flagged"
 regexTarget = "match"
 regexes = ['''(?i)access key ed25519:[1-9A-HJ-NP-Za-km-z]{1,44}\s*$''']
+
+[[allowlists]]
+description = "Public Circle test USDC contract on Base Sepolia (an address, not a secret)"
+regexTarget = "match"
+regexes = ['''(?i)0x036cbd53842c5426634e7929541ec2318f3dcf7e''']

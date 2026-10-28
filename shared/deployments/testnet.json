@@ -404,5 +404,47 @@
       "batch_over_total_refused": "B71RpChqtuERZ2TZmafJ1ZBsDGwUNBY7Lq2J4ryuRFv"
     },
     "proof": "judges/proofs/townhall-r16.json"
+  },
+  "toll_usdc": {
+    "toll": "toll-usdc.r14own-46135.testnet",
+    "owner": "r14own-46135.testnet",
+    "dao": "r7thmvr8maey.sputnikv2.testnet",
+    "path": "usdc-1",
+    "chain_id": 84532,
+    "token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+    "derived_address": "0x2010fa71347b99f4a42dce85c0a697b7f6fdb036",
+    "code_hash": "GwU1PRa4wRR4kKvyG6S7oYQ1UFHarJE5uXHYo62Yb6iG",
+    "artifact": "contracts/artifacts/toll.v3.wasm",
+    "wasm_sha256": "ecd334412fbdcc9a42f012085c0a3270343b6ff762db597e47cffd02766ca82d",
+    "source_rev": "1b8fd86 (tag build-1b8fd86)",
+    "full_access_keys": 0,
+    "agent_key_methods": [
+      "pay",
+      "settle"
+    ],
+    "rules": {
+      "allow_to": [
+        "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5"
+      ],
+      "max_per_tx_usdc": "1.000000",
+      "budget_usdc": "3.000000",
+      "max_fee_cap_wei": "50000000",
+      "erc20_gas_cap": 100000,
+      "unfreeze": "DAO only"
+    },
+    "foreign_chain": "base-sepolia",
+    "verify_chain": "Base",
+    "note": "Toll v3: USDC payouts signed by the MPC only after the contract's own checks pass; the DAO alone can unfreeze; no full-access key, no upgrade method.",
+    "signed": {
+      "evm_tx_hash": "0xf5e5d0ba6c9a2f16357d272bbcd268b4bff8eb6ac5155849a62dfa66252ca150",
+      "near_tx": "ACdXTYd5mAWVRssa7m9pMfefegAQg7rmfcvm7nyxiA1q",
+      "broadcast": false
+    },
+    "refused_txs": [
+      "BYziKkLvreS7wog9BUbdNkdeUsMX3ojSQz4DttwqELNV",
+      "ARSVXR5jTg4mbUhN6ov3ScqKMa3wASV2yW297fJvjpYs",
+      "J5REQDt3CkeT3FvayiK5uwV8HYup9nV31HADbwhKCnXr"
+    ],
+    "proof": "judges/proofs/toll-usdc.json"
   }
 }
