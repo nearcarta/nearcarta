@@ -226,7 +226,11 @@ export function makeApp() {
     // Visitor charters made by the vault factory count too (B13 "What happened" feed): the id must sit under the
     // factory and the factory registry must list it, so this never becomes an open tx-index proxy.
     if (!knownAccounts.has(a) && !(await vault.isFactoryCharter(a))) return c.json({ error: 'not a Nearcarta contract' }, 400);
-    return c.json(await shops.chronicle(a, Math.min(Number(c.req.query('limit') || 8), 15)));
+    // A busy tx index on a charter with no cached feed yet is not an error for the page (it keeps its own story and
+    // polls again): answer 200 busy + Retry-After instead of 503, so a fresh visitor's console stays clean.
+    try { return c.json(await shops.chronicle(a, Math.min(Number(c.req.query('limit') || 8), 15))); }
+    catch (e) { if (e.status || !/http (429|5\d\d)|timeout|aborted|fetch failed/i.test(e.message)) throw e;
+      c.header('Retry-After', '10'); return c.json({ account: a, count: 0, txs: [], busy: true }); }
   });
   // R16 oath charters: on-chain reputation (refusal buckets) and one clause's user-set rules. Read-only views;
   // older charters (R14/R15) have no such method and answer { supported: false }.
