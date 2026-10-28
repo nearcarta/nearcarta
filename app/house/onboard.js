@@ -2,7 +2,8 @@
 // Testnet only. Keys made here stay in this browser; nothing is sent to our backend.
 import { keyFrom, signTx, rpcClient, viewFn } from '../../shared/vault/tx.js';
 import { guestWallet, hasGuest } from '../shops/vault/wallet.js';
-import DEP from '../../shared/deployments/testnet.json';
+import { rpc as RPC, vault, townhall, arena } from '../../shared/deployments/testnet.json'; // named: guardhouse test accounts stay out of the bundle
+const DEP = { rpc: RPC, vault, townhall, arena };
 
 export const rpc = rpcClient(DEP.rpc);
 export const FACTORY = DEP.vault?.factory || DEP.townhall.factory;
