@@ -4,10 +4,12 @@
 //  2. the echo guard: every field we asked for must come back unchanged in quoteRequest.
 //     confidentiality, appFees and rebates are NOT covered by the signature, so a quote whose echo
 //     differs from our request (for example a silent downgrade from basic to public) is rejected.
-//  3. for ZEC, the recipient kind (transparent vs shielded) from the address itself.
+//  3. for ZEC, the recipient must be an Orchard-only UA (decoded from the address itself);
+//     Orchard+Sapling and Orchard+transparent are refused before 1Click is asked.
 import { verifyQuoteSignature } from '@defuse-protocol/one-click-sdk-typescript';
 import { cfg, secret, DEP } from './config.js';
 import { zcashRecipient } from './zcash.js';
+import { echoGuard, orchardOnly } from './ferry-guard.js';
 
 const UA = { 'User-Agent': 'nearcarta-ferry/0.1 (+curl/8.5.0)', 'content-type': 'application/json' };
 let tokenCache = { at: 0, list: null };
@@ -55,29 +57,8 @@ export function buildQuoteRequest({ from, to, amount, recipient, refundTo, priva
   return body;
 }
 
-// Fields that must echo back exactly. confidentiality is compared as "public" when absent.
-const ECHO = ['dry', 'swapType', 'slippageTolerance', 'originAsset', 'depositType', 'destinationAsset', 'amount',
-  'refundTo', 'refundType', 'recipient', 'recipientType', 'confidentiality', 'rebates'];
-const norm = (k, v) => (k === 'confidentiality' ? v || 'public' : k === 'rebates' ? JSON.stringify(v || []) : v);
-// 1Click appends its own protocol fee to appFees (seen live: 20 bps, 1 bp on stable routes).
-// Our own fee entries must come back unchanged; extra entries are disclosed and capped.
-export const PROTOCOL_FEE_MAX_BPS = 20;
-
-export function echoGuard(sent, quoteRequest) {
-  const diffs = [];
-  for (const k of ECHO) {
-    const a = norm(k, sent[k]), b = norm(k, quoteRequest?.[k]);
-    if (a !== b) diffs.push({ field: k, sent: a, got: b });
-  }
-  const ours = sent.appFees || [], got = [...(quoteRequest?.appFees || [])];
-  for (const f of ours) {
-    const i = got.findIndex(g => g.recipient === f.recipient && g.fee === f.fee);
-    if (i < 0) diffs.push({ field: 'appFees', sent: f, got: null }); else got.splice(i, 1);
-  }
-  const protocolBps = got.reduce((s, g) => s + Number(g.fee || 0), 0);
-  if (protocolBps > PROTOCOL_FEE_MAX_BPS) diffs.push({ field: 'appFees', sent: `protocol <= ${PROTOCOL_FEE_MAX_BPS} bps`, got: `${protocolBps} bps` });
-  return { ok: diffs.length === 0, diffs, protocolFeeBps: protocolBps };
-}
+// The echo guard and the Orchard-only check live in ./ferry-guard.js (no deps, importable by the frontend).
+export { echoGuard, orchardOnly, ferryGuard, PROTOCOL_FEE_MAX_BPS } from './ferry-guard.js';
 
 // Cost from SIGNED fields only (amountInUsd / amountOutUsd are covered by the signature).
 export function signedCostBps(q) {
@@ -111,7 +92,12 @@ export async function quote(input) {
   const from = findToken(list, input.from), to = findToken(list, input.to);
   if (!from || !to) throw Object.assign(new Error('unknown token'), { status: 400 });
   let zec = null;
-  if (to.blockchain === 'zec') zec = zcashRecipient(input.recipient);
+  if (to.blockchain === 'zec') {
+    zec = zcashRecipient(input.recipient);
+    const g = orchardOnly(zec.receivers);
+    zec.orchard_only = g.ok;
+    if (!g.ok) return { ok: false, refused: 'recipient_not_orchard_only', error: `Refused before quoting: ${g.why}. The Ferry pays ZEC only to an Orchard-only unified address.`, zcash: zec };
+  }
   const sent = buildQuoteRequest({ ...input, from, to });
   const res = await postQuote(sent, { auth: sent.confidentiality !== undefined });
   if (res.http !== 201) return { ok: false, http: res.http, ms: res.ms, error: `1Click refused the quote (${res.body?.message || 'no reason'}). Common cause: the recipient does not exist on the destination chain.`, sent: redact(sent) };

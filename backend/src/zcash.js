@@ -3,6 +3,7 @@
 // UA is the shielded path (since NU6.3 an Orchard receiver is paid into the Ironwood pool, ZIP 258).
 import { bech32m } from '@scure/base';
 import { blake2b } from '@noble/hashes/blake2.js';
+import { orchardOnly } from './ferry-guard.js';
 
 const enc = new TextEncoder();
 const TYPES = { 0: 'P2PKH', 1: 'P2SH', 2: 'Sapling', 3: 'Orchard' };
@@ -61,8 +62,9 @@ export function zcashRecipient(addr) {
   if (/^u1|^utest1/.test(addr)) {
     const { receivers } = decodeUnifiedAddress(addr);
     const shieldedOnly = receivers.every(r => r === 'Orchard' || r === 'Sapling');
-    return { kind: 'unified', shielded: shieldedOnly, receivers,
-      note: shieldedOnly ? 'Unified address with shielded receivers only.' : 'Unified address that also carries a transparent receiver; a sender may pick it.' };
+    const oo = orchardOnly(receivers).ok;
+    return { kind: 'unified', shielded: shieldedOnly, orchard_only: oo, receivers,
+      note: oo ? 'Orchard-only unified address: the Ferry accepts it.' : shieldedOnly ? 'Unified address with Orchard and Sapling receivers; the Ferry refuses it, a sender may pick Sapling.' : 'Unified address that also carries a transparent receiver; a sender may pick it. The Ferry refuses it.' };
   }
   throw new Error('unknown Zcash address format');
 }
