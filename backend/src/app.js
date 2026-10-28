@@ -12,12 +12,51 @@ import * as shops from './shops.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
-import { view } from './near.js';
+import { view, rpcStats } from './near.js';
 import { limiter, clientIpSource, globalCap, leakGuard, onError, allowedOrigins } from './http-guard.js';
+
+// Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
+async function houseView() {
+  const H = DEP.house; if (!H) return null;
+  const [snap, pending] = await Promise.all([guard.snapshot(H.oath), view(H.oath, 'get_pending')]);
+  // get_pending is queued policy changes; held agent spends are actions with status "escalated", so read the latest few.
+  const next = Number(snap.state.next_action || 0), actions = {};
+  await Promise.all(Array.from({ length: Math.min(next, 8) }, (_, i) => String(next - 1 - i)).map(async id => { actions[id] = await guard.action(id, H.oath).catch(() => null); }));
+  return { ...snap, owner: H.owner, dao: H.dao, code_hash: H.code_hash, pending, actions, proof_txs: H.proof_txs, demo: H.demo || null };
+}
+
+// One handler per public read route, shared by the routes and by /api/health?deep=1.
+const reads = {
+  guardhouse: () => guard.snapshot(),
+  house: houseView,
+  mistbank: () => mist.mistbank(),
+  townhall: () => shops.townhall(),
+  arena: () => shops.arena(),
+  arena_attempts: () => shops.arenaAttempts(undefined, '2'),
+  toll: () => shops.toll(),
+  chronicle: () => shops.chronicle(DEP.guardhouse.oath, 2),
+  ferry_tokens: () => ferry.tokens(),
+};
+
+let deepCache = null; // { at, value }: deep checks cost ~20 RPC calls, so they are shared for 30 s
+export async function deepHealth() {
+  if (deepCache && Date.now() - deepCache.at < 30_000) return deepCache.value;
+  const routes = {};
+  await Promise.all(Object.entries(reads).map(async ([name, fn]) => {
+    const t0 = Date.now();
+    try {
+      const v = await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout 20s')), 20_000))]);
+      routes[name] = { ok: v != null, ms: Date.now() - t0 };
+    } catch (e) { routes[name] = { ok: false, ms: Date.now() - t0, error: String(e.message).slice(0, 160) }; }
+  }));
+  const value = { routes_ok: Object.values(routes).every(r => r.ok), routes, rpc: { ...rpcStats, primary: cfg.rpc, fallback_urls: cfg.rpcFallbacks } };
+  deepCache = { at: Date.now(), value };
+  return value;
+}
 
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 const ACCT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
-const knownAccounts = new Set([DEP.guardhouse.oath, DEP.townhall.oath, DEP.townhall.dao, DEP.arena.contract, DEP.toll.oath]);
+const knownAccounts = new Set([DEP.guardhouse.oath, DEP.townhall.charter, DEP.townhall.dao, DEP.arena.contract, DEP.toll.oath].filter(Boolean));
 const bad = (c, m) => c.json({ error: m }, 400);
 async function jsonBody(c) {
   try { const b = await c.req.json(); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; }
@@ -39,7 +78,9 @@ export function makeApp() {
   app.onError(onError);
   app.notFound(c => c.json({ error: 'not found' }, 404));
 
-  app.get('/api/health', limiter(60), async c => c.json({ ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: await shops.health(),
+  // ?deep=1 runs every read route's handler (not the AI or quote routes, which spend credits) and reports
+  // each one's status and time, plus the RPC retry/fallback/stale counters.
+  app.get('/api/health', limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: await shops.health(),
     features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false } }));
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
 
@@ -65,16 +106,9 @@ export function makeApp() {
   });
 
   // Guardhouse
-  app.get('/api/guardhouse', limiter(30), async c => c.json(await guard.snapshot()));
+  app.get('/api/guardhouse', limiter(30), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
-  app.get('/api/house', limiter(20), async c => {
-    const H = DEP.house; if (!H) return c.json({ error: 'no house' }, 404);
-    const [snap, pending] = await Promise.all([guard.snapshot(H.oath), view(H.oath, 'get_pending')]);
-    // get_pending is queued policy changes; held agent spends are actions with status "escalated", so read the latest few.
-    const next = Number(snap.state.next_action || 0), actions = {};
-    await Promise.all(Array.from({ length: Math.min(next, 8) }, (_, i) => String(next - 1 - i)).map(async id => { actions[id] = await guard.action(id, H.oath).catch(() => null); }));
-    return c.json({ ...snap, owner: H.owner, dao: H.dao, code_hash: H.code_hash, pending, actions, proof_txs: H.proof_txs, demo: H.demo || null });
-  });
+  app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
   app.get('/api/guardhouse/action/:id', limiter(30), async c => {
     const id = c.req.param('id'); if (!/^\d{1,9}$/.test(id)) return bad(c, 'action id must be a number');
     return c.json(await guard.action(id));
@@ -82,7 +116,7 @@ export function makeApp() {
 
   // Other shops
   // The desk's 1Click calls are cached 60 s inside mist.mistbank(), so this route cannot drain the key.
-  app.get('/api/mistbank', limiter(20), async c => c.json(await mist.mistbank()));
+  app.get('/api/mistbank', limiter(20), async c => c.json(await reads.mistbank()));
   // Auditor flow: the opening is POSTed (not in a URL, so not in access logs) and never echoed back.
   app.post('/api/mistbank/verify', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
@@ -90,10 +124,10 @@ export function makeApp() {
   });
   app.get('/api/mistbank/verify', c => c.json({ error: 'POST {"amount":"<zatoshi>","salt":"<32 hex>"}; the opening is auditor-only and never goes in a URL' }, 405));
   app.get('/api/mistbank/street/:txid', limiter(10), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
-  app.get('/api/townhall', limiter(20), async c => c.json(await shops.townhall()));
-  app.get('/api/arena', limiter(20), async c => c.json(await shops.arena()));
+  app.get('/api/townhall', limiter(20), async c => c.json(await reads.townhall()));
+  app.get('/api/arena', limiter(20), async c => c.json(await reads.arena()));
   app.get('/api/arena/attempts', limiter(20), async c => c.json(await shops.arenaAttempts(c.req.query('from'), c.req.query('limit'))));
-  app.get('/api/toll', limiter(20), async c => c.json(await shops.toll()));
+  app.get('/api/toll', limiter(20), async c => c.json(await reads.toll()));
   app.get('/api/chronicle/:account', limiter(20), async c => {
     const a = c.req.param('account');
     if (!knownAccounts.has(a)) return c.json({ error: 'not a Nearcarta contract' }, 400);

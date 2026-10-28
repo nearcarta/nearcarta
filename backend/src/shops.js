@@ -1,21 +1,28 @@
 // Read-only live views for Town Hall, Arena and Toll, plus the Chronicle indexer.
 import { DEP } from './config.js';
 import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, rpc } from './near.js';
+import { snapshot } from './guardhouse.js';
 
 const yocto = s => (s == null ? null : Number(BigInt(s) * 10000n / 10n ** 24n) / 1e4);
 
 export async function townhall() {
+  // Town Hall is the R14 charter the DAO created through the charter factory: the DAO is owner and governor,
+  // the agent holds a propose-only key, and there is no full-access key.
   const T = DEP.townhall;
-  const [oath, bounties, policy, lastId] = await Promise.all([
-    view(T.oath, 'get_state'), view(T.oath, 'get_bounties'), view(T.dao, 'get_policy'), view(T.dao, 'get_last_proposal_id')]);
+  const [snap, policy, lastId] = await Promise.all([snapshot(T.charter), view(T.dao, 'get_policy'), view(T.dao, 'get_last_proposal_id')]);
   const proposals = await view(T.dao, 'get_proposals', { from_index: Math.max(0, lastId - 6), limit: 6 }).catch(() => []);
+  const reward = snap.clauses?.[T.clause || 'reward'] || null;
   return {
-    dao: T.dao, oath: T.oath, agent: T.agent, oathState: oath,
-    caps_near: { per_reward: yocto(oath.policy?.per_reward_cap), total: yocto(oath.policy?.total_cap) },
-    bounties: bounties.map(([hash, b]) => ({ hash, amount_near: yocto(b.amount), claimed_by: b.claimed_by, policy_version: b.policy_version })),
+    dao: T.dao, oath: T.charter, charter: T.charter, factory: T.factory, agent_key: snap.state.agent_key, keys: snap.keys,
+    // oathState keeps the field names the console reads (version, frozen, policy.deny).
+    oathState: { ...snap.state, version: snap.state.policy_version, policy: { deny: [] } },
+    clauses: snap.clauses, usage: snap.usage,
+    caps_near: { per_reward: yocto(reward?.per_action_cap), total: yocto(reward?.daily_budget), total_is: 'per UTC day' },
+    receivers: reward?.receivers || [],
+    bounties: [],
     council: policy.roles.filter(r => r.kind?.Group).map(r => ({ role: r.name, members: r.kind.Group })),
     proposals: proposals.map(p => ({ id: p.id, proposer: p.proposer, status: p.status, kind: Object.keys(p.kind)[0], description: String(p.description).slice(0, 160) })),
-    lastProposalId: lastId,
+    lastProposalId: lastId, proof_txs: T.proof_txs,
   };
 }
 

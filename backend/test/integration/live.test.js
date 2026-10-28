@@ -15,9 +15,18 @@ const REFUND = '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e';
 const proof = JSON.parse(readFileSync(new URL('../../../judges/proofs/guardhouse-demo.json', import.meta.url)));
 
 test('every deployed contract account exists on testnet', async () => {
-  for (const a of [DEP.guardhouse.oath, DEP.townhall.oath, DEP.townhall.dao, DEP.arena.contract, DEP.toll.oath]) {
+  for (const a of [DEP.guardhouse.oath, DEP.townhall.charter, DEP.townhall.dao, DEP.arena.contract, DEP.toll.oath]) {
     const v = await viewAccount(a);
-    assert.notEqual(v.code_hash, '11111111111111111111111111111111', `${a} has code`);
+    // A factory charter runs global code: code_hash is all ones and global_contract_hash is set.
+    const hasCode = v.code_hash !== '11111111111111111111111111111111' || !!(v.global_contract_hash || v.global_contract_account_id);
+    assert.ok(hasCode, `${a} has code`);
+  }
+});
+
+test('no shown contract account holds a full-access key', async () => {
+  for (const a of [DEP.guardhouse.oath, DEP.townhall.charter, DEP.arena.contract, DEP.toll.oath, DEP.house?.oath].filter(Boolean)) {
+    const ks = (await accessKeys(a)).keys;
+    assert.equal(ks.filter(k => k.access_key.permission === 'FullAccess').length, 0, `${a} has no full-access key`);
   }
 });
 
@@ -43,16 +52,22 @@ test('recorded proof txs in deployments resolve on chain', async () => {
   const g = DEP.guardhouse.proof_txs;
   const paid = await guard.explain(g.valid_receipt_paid);
   assert.equal(paid.result.value.decision, 'allowed');
-  const frozen = await shops.explainAny(DEP.townhall.proof_txs.reward_after_freeze_refused, DEP.townhall.agent);
-  assert.equal(frozen.result.ok, false);
-  assert.match(frozen.result.error, /FROZEN/);
+  const T = DEP.townhall;
+  const allowed = await shops.explainAny(T.proof_txs.agent_reward_allowed, T.charter);
+  assert.equal(allowed.result.value.decision, 'allowed');
+  const over = await shops.explainAny(T.proof_txs.over_cap_denied, T.charter);
+  assert.equal(over.result.value.reason, 'over_per_action_cap');
+  const frozen = await shops.explainAny(T.proof_txs.agent_after_freeze_denied, T.charter);
+  assert.equal(frozen.result.value.reason, 'frozen');
 });
 
-test('town hall: oath frozen by DAO, caps and deny list live', async () => {
+test('town hall: R14 charter owned by the DAO, propose-only agent key, live caps', async () => {
   const t = await shops.townhall();
-  assert.equal(t.oathState.frozen, true);
-  assert.equal(t.caps_near.per_reward, 0.15);
-  assert.ok(t.oathState.policy.deny.length >= 1);
+  assert.equal(t.charter, DEP.townhall.charter);
+  assert.equal(t.oathState.owner, DEP.townhall.dao);
+  assert.equal(t.keys.fullAccess, 0);
+  assert.deepEqual(t.keys.functionCall.map(k => k.methods), [['propose']]);
+  assert.equal(t.caps_near.per_reward, 0.05);
   assert.ok(t.council[0].members.length >= 2);
 });
 
