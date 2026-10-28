@@ -2,16 +2,13 @@
   "config": {
     "argv": [
       "/usr/bin/node",
-      "/workspace/near/tech/nearcarta/node_modules/.bin/playwright",
+      "/workspace/near/tech/nearcarta-t1/node_modules/.bin/playwright",
       "test",
       "-c",
-      "e2e/playwright.config.js",
-      "e2e/house.spec.js",
-      "e2e/connect.spec.js",
-      "--retries=0"
+      "e2e/playwright.config.js"
     ],
-    "configFile": "/workspace/near/tech/nearcarta/e2e/playwright.config.js",
-    "rootDir": "/workspace/near/tech/nearcarta/e2e",
+    "configFile": "/workspace/near/tech/nearcarta-t1/e2e/playwright.config.js",
+    "rootDir": "/workspace/near/tech/nearcarta-t1/e2e",
     "failOnFlakyTests": false,
     "forbidOnly": false,
     "fullyParallel": false,
@@ -27,15 +24,15 @@
     "preserveOutput": "always",
     "projects": [
       {
-        "outputDir": "/workspace/near/tech/nearcarta/test-results",
+        "outputDir": "/workspace/near/tech/nearcarta-t1/test-results",
         "repeatEach": 1,
-        "retries": 0,
+        "retries": 1,
         "metadata": {
           "actualWorkers": 2
         },
         "id": "",
         "name": "",
-        "testDir": "/workspace/near/tech/nearcarta/e2e",
+        "testDir": "/workspace/near/tech/nearcarta-t1/e2e",
         "testIgnore": [],
         "testMatch": [
           "**/*.@(spec|test).?(c|m)[jt]s?(x)"
@@ -47,15 +44,15 @@
       {
         "grep": {},
         "grepInvert": null,
-        "outputDir": "/workspace/near/tech/nearcarta/test-results",
+        "outputDir": "/workspace/near/tech/nearcarta-t1/test-results",
         "repeatEach": 1,
-        "retries": 0,
+        "retries": 1,
         "metadata": {
           "actualWorkers": 2
         },
         "name": "",
-        "testDir": "/workspace/near/tech/nearcarta/e2e",
-        "snapshotDir": "/workspace/near/tech/nearcarta/e2e",
+        "testDir": "/workspace/near/tech/nearcarta-t1/e2e",
+        "snapshotDir": "/workspace/near/tech/nearcarta-t1/e2e",
         "testIgnore": [],
         "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
         "timeout": 90000,
@@ -116,12 +113,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 6876,
+                  "duration": 1276,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T05:54:29.077Z",
+                  "startTime": "2026-10-28T19:20:20.377Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -150,12 +147,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 31601,
+                  "duration": 952,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T05:54:36.127Z",
+                  "startTime": "2026-10-28T19:20:21.820Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -184,12 +181,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1735,
+                  "duration": 642,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T05:55:07.821Z",
+                  "startTime": "2026-10-28T19:20:22.803Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -218,12 +215,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 868,
+                  "duration": 673,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T05:55:09.638Z",
+                  "startTime": "2026-10-28T19:20:23.475Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -234,6 +231,82 @@
           "id": "18dd010e2552a361d8c1-dd1fe18b09a904842199",
           "file": "connect.spec.js",
           "line": 26,
+          "column": 3
+        }
+      ]
+    },
+    {
+      "title": "evm-wallet.spec.js",
+      "file": "evm-wallet.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "evm wallet: opens the evm-on-near.dev window",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1179,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:20.305Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2684ecfc8f680c82c5f3-241c021bf932f5d53c28",
+          "file": "evm-wallet.spec.js",
+          "line": 5,
+          "column": 3
+        },
+        {
+          "title": "evm wallet: blocked pop-up shows an error",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1020,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:21.638Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2684ecfc8f680c82c5f3-96cca86a3aff84fcd971",
+          "file": "evm-wallet.spec.js",
+          "line": 5,
           "column": 3
         }
       ]
@@ -255,40 +328,58 @@
                 {
                   "type": "serial",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/house.spec.js",
+                    "file": "/workspace/near/tech/nearcarta-t1/e2e/house.spec.js",
                     "line": 0,
                     "column": 0
                   }
+                },
+                {
+                  "type": "skip",
+                  "description": "set HOUSE_OWNER_KEY_FILE and HOUSE_AGENT_KEY_FILE to run against testnet",
+                  "location": {
+                    "file": "/workspace/near/tech/nearcarta-t1/e2e/house.spec.js",
+                    "line": 17,
+                    "column": 8
+                  }
                 }
               ],
-              "expectedStatus": "passed",
+              "expectedStatus": "skipped",
               "projectId": "",
               "projectName": "",
               "results": [
                 {
                   "workerIndex": 1,
                   "parallelIndex": 1,
-                  "status": "passed",
-                  "duration": 37298,
+                  "status": "skipped",
+                  "duration": 1,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T05:54:29.165Z",
+                  "startTime": "2026-10-28T19:20:22.727Z",
                   "annotations": [
                     {
                       "type": "serial",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/house.spec.js",
+                        "file": "/workspace/near/tech/nearcarta-t1/e2e/house.spec.js",
                         "line": 0,
                         "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set HOUSE_OWNER_KEY_FILE and HOUSE_AGENT_KEY_FILE to run against testnet",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-t1/e2e/house.spec.js",
+                        "line": 17,
+                        "column": 8
                       }
                     }
                   ],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "skipped"
             }
           ],
           "id": "77f510a8e7074d097df7-3665d75f8a51ab3f2d0d",
@@ -297,14 +388,813 @@
           "column": 1
         }
       ]
+    },
+    {
+      "title": "shops.spec.js",
+      "file": "shops.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "health: the API reads NEAR testnet and cannot sign",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 758,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:22.757Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-ecd22ed00dce83a58248",
+          "file": "shops.spec.js",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "title": "ferry: dry 1Click quote USDC (Base) -> ZEC to a shielded address passes all checks",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1645,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:23.546Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-a069f1c05d460722fbfc",
+          "file": "shops.spec.js",
+          "line": 9,
+          "column": 1
+        },
+        {
+          "title": "ferry: confidential (basic) quote echoes the privacy level",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1846,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:25.212Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-81111cd24dfd0e822200",
+          "file": "shops.spec.js",
+          "line": 22,
+          "column": 1
+        },
+        {
+          "title": "ferry: a transparent Zcash address is flagged as public",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1445,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:27.086Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-24a5ca6356b4572da13f",
+          "file": "shops.spec.js",
+          "line": 32,
+          "column": 1
+        },
+        {
+          "title": "guardhouse: oath account has no full-access key and a propose-only agent key",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4331,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:28.551Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-40c648e334fb9e4bc6f6",
+          "file": "shops.spec.js",
+          "line": 40,
+          "column": 1
+        },
+        {
+          "title": "guardhouse: NEAR AI TEE preflight verifies gateway and model quotes for a browser nonce",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 7344,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:32.910Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-573f8032b41051135587",
+          "file": "shops.spec.js",
+          "line": 48,
+          "column": 1
+        },
+        {
+          "title": "chronicle: the guardhouse shows one allowed and one denied proposal from chain",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2339,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:40.303Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-d8038822d04264cd484f",
+          "file": "shops.spec.js",
+          "line": 60,
+          "column": 1
+        },
+        {
+          "title": "town hall: the DAO froze and unfroze the oath by vote, and the page shows the live state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4581,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:42.677Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-e342116ed3c15aee626a",
+          "file": "shops.spec.js",
+          "line": 67,
+          "column": 1
+        },
+        {
+          "title": "arena: guardian g1 and its case tokens are read from chain",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 14228,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:47.283Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-375bb67bc8d84b7efb9b",
+          "file": "shops.spec.js",
+          "line": 77,
+          "column": 1
+        },
+        {
+          "title": "toll: Chain Signatures oath shows its Base Sepolia address and a signed tx",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1387,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:21:01.539Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-e79a798733b7df2f5e5c",
+          "file": "shops.spec.js",
+          "line": 83,
+          "column": 1
+        },
+        {
+          "title": "shop interiors get live data through the data interface",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4596,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:21:02.949Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-9cabba31baf570716cd0",
+          "file": "shops.spec.js",
+          "line": 89,
+          "column": 1
+        },
+        {
+          "title": "mist bank: the street shows a hidden amount and only the commitment is public",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 3431,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:21:07.559Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-fbb163ced24de17ed809",
+          "file": "shops.spec.js",
+          "line": 98,
+          "column": 1
+        },
+        {
+          "title": "town view loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 816,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:21:11.008Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-667e3858efcad007d0b0",
+          "file": "shops.spec.js",
+          "line": 109,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "vault-create.spec.js",
+      "file": "vault-create.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "charter office #create at 1280",
+          "file": "vault-create.spec.js",
+          "line": 8,
+          "column": 8,
+          "specs": [
+            {
+              "title": "guest first and focused, no sideways scroll",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1447,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T19:20:24.173Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "691584d3a1d95b30af6a-9f66e4444ef45e26a272",
+              "file": "vault-create.spec.js",
+              "line": 11,
+              "column": 5
+            },
+            {
+              "title": "guest sign-in sends nearcarta:signin and focuses Create",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_FAUCET=1 to make a faucet account",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-t1/e2e/vault-create.spec.js",
+                        "line": 26,
+                        "column": 12
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 96,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T19:20:25.638Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "set VAULT_FAUCET=1 to make a faucet account",
+                          "location": {
+                            "file": "/workspace/near/tech/nearcarta-t1/e2e/vault-create.spec.js",
+                            "line": 26,
+                            "column": 12
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "691584d3a1d95b30af6a-23bccd92535479836073",
+              "file": "vault-create.spec.js",
+              "line": 25,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "charter office #create at 390",
+          "file": "vault-create.spec.js",
+          "line": 8,
+          "column": 8,
+          "specs": [
+            {
+              "title": "guest first and focused, no sideways scroll",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1323,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T19:20:25.744Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "691584d3a1d95b30af6a-18a423577acdc2faa74a",
+              "file": "vault-create.spec.js",
+              "line": 11,
+              "column": 5
+            },
+            {
+              "title": "guest sign-in sends nearcarta:signin and focuses Create",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_FAUCET=1 to make a faucet account",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-t1/e2e/vault-create.spec.js",
+                        "line": 26,
+                        "column": 12
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 96,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T19:20:27.089Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "set VAULT_FAUCET=1 to make a faucet account",
+                          "location": {
+                            "file": "/workspace/near/tech/nearcarta-t1/e2e/vault-create.spec.js",
+                            "line": 26,
+                            "column": 12
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "691584d3a1d95b30af6a-5af7f0536e975f9589e9",
+              "file": "vault-create.spec.js",
+              "line": 25,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "vault.spec.js",
+      "file": "vault.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "visitor makes a charter and the contract refuses scams on chain",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 420000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/workspace/near/tech/nearcarta-t1/e2e/vault.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                  "location": {
+                    "file": "/workspace/near/tech/nearcarta-t1/e2e/vault.spec.js",
+                    "line": 11,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:27.199Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-t1/e2e/vault.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-t1/e2e/vault.spec.js",
+                        "line": 11,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "88f3c38d2dbea463e1e4-6febfbb31cd1ff44051d",
+          "file": "vault.spec.js",
+          "line": 17,
+          "column": 1
+        },
+        {
+          "title": "shared arena: attack without a wallet",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 420000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/workspace/near/tech/nearcarta-t1/e2e/vault.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                  "location": {
+                    "file": "/workspace/near/tech/nearcarta-t1/e2e/vault.spec.js",
+                    "line": 11,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T19:20:27.199Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-t1/e2e/vault.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-t1/e2e/vault.spec.js",
+                        "line": 11,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "88f3c38d2dbea463e1e4-57d844c9b0831a917042",
+          "file": "vault.spec.js",
+          "line": 95,
+          "column": 1
+        }
+      ]
     }
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-28T05:54:28.100Z",
-    "duration": 42534.045,
-    "expected": 5,
-    "skipped": 0,
+    "startTime": "2026-10-28T19:20:19.247Z",
+    "duration": 52707.725000000006,
+    "expected": 21,
+    "skipped": 5,
     "unexpected": 0,
     "flaky": 0
   }

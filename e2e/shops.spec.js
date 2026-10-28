@@ -64,9 +64,13 @@ test('chronicle: the guardhouse shows one allowed and one denied proposal from c
   await expect(c).toContainText('allowed'); await expect(c).toContainText('denied');
 });
 
-test('town hall: oath is frozen by a DAO vote', async ({ page }) => {
+test('town hall: the DAO froze and unfroze the oath by vote, and the page shows the live state', async ({ page }) => {
+  const t = await (await page.request.get('/api/townhall')).json();
+  const ok = d => t.proposals.some(p => p.status === 'Approved' && p.description.startsWith(d));
+  expect(ok('Freeze the Town Hall agent')).toBe(true); expect(ok('Unfreeze the Town Hall agent')).toBe(true);
+  expect(t.oathState.freeze_epoch).toBeGreaterThanOrEqual(1);
   await page.goto('/#townhall');
-  await expect(page.getByTestId('hall-state')).toContainText('frozen by a DAO vote', { timeout: 30_000 });
+  await expect(page.getByTestId('hall-state')).toContainText(t.oathState.frozen ? 'frozen by a DAO vote' : 'active', { timeout: 30_000 });
   await expect(page.getByTestId('hall-state').locator(`a[title="${dep.townhall.dao}"]`).first()).toBeVisible();
 });
 
