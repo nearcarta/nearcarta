@@ -50,7 +50,7 @@ async function refreshWho() {
 // ---------- step 2: create ----------
 function renderCreate() {
   const box = $('#create');
-  if (!me) { box.innerHTML = '<p class="muted">Connect first. A charter is a NEAR account that holds your agent\'s money and its rules.</p>'; return; }
+  if (!me) { box.innerHTML = '<p class="muted">Connect first. A charter is a NEAR account that holds your agent\'s money and its rules.</p>'; focusCreate(); return; }
   if (charter) { box.innerHTML = `<p>Your charter: <b data-testid="charter-id">${esc(charter)}</b></p>`; return; }
   const base = me.split('.')[0].replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'my';
   box.innerHTML = `<label>Name <span class="suffix"><input id="cname" value="${esc(base)}" maxlength="32" pattern="[a-z0-9-]+" aria-describedby="cname-h"><span>.${esc(CFG.factory)}</span></span></label>
@@ -61,7 +61,17 @@ function renderCreate() {
     <p id="cname-h" class="muted">The factory creates the account, points it at the audited oath code (by hash, nothing is uploaded), and makes you the owner. It keeps 0.01 NEAR as a fee.</p>
     <button id="create-btn" class="primary" data-testid="create">Create my charter</button>`;
   $('#create-btn').onclick = () => createCharter().catch(fail).finally(() => busy($('#create-btn'), false));
+  focusCreate();
 }
+// The town sends new owners to /shops/vault/#create: bring the next step into view and focus it.
+function focusCreate() {
+  if (location.hash !== '#create') return;
+  const el = $('#create-btn') || (!me && $('#guest'));
+  if (!el || el.hidden) return;
+  el.scrollIntoView({ block: 'center' }); el.focus({ preventScroll: true });
+}
+// Tells the rest of the town (and anything listening) that a wallet just signed in.
+const signedIn = () => currentAccount(connector).then(a => a && window.dispatchEvent(new CustomEvent('nearcarta:signin', { detail: { accountId: a } })));
 function delayOptions() {
   const pd = CFG.policy_delay || {}; const min = BigInt(pd.min_ns || 600n * NS), max = BigInt(pd.max_ns || 30n * 86400n * NS), def = BigInt(pd.default_ns || 86400n * NS);
   return [600n, 3600n, 21600n, 86400n, 604800n].map(s => s * NS).filter(ns => ns >= min && ns <= max)
@@ -377,7 +387,7 @@ async function main() {
   $('#ex-look').textContent = lookalike(CFG.arena.merchants[0]);
   quickCards(); setTarget('shared');
   const rl = CFG.runner; if (rl) $('#runner').textContent = `Shared runner: ${rl.left_today} of ${rl.daily_tx_cap} transactions left today (UTC), ${rl.gas_tgas} Tgas each.`;
-  connector.on('wallet:signIn', () => refreshWho().catch(fail));
+  connector.on('wallet:signIn', () => refreshWho().then(signedIn).catch(fail));
   connector.on('wallet:signOut', () => { charter = null; ready = false; refreshWho().catch(fail); });
   $('#connect').onclick = () => connector.connect().catch(fail);
   $('#guest').onclick = async () => { busy($('#guest'), true, 'Asking the testnet faucet…'); try { await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { fail(e); } finally { busy($('#guest'), false); } };
