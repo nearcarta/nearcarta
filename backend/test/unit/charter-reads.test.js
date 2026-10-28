@@ -50,3 +50,13 @@ test('health: RPC 429 on status still answers 200 (Render health check must not 
   assert.equal(r.status, 200);
   const j = await r.json(); assert.equal(j.ok, true); assert.match(j.near.error, /429/);
 });
+
+test('rules: valid_until mirrors the on-chain clause expiry (ns) with an ISO copy', async () => {
+  mock(() => viewResult({ clause_id: 'pay', expires_at: '1793000000000000000' }));
+  const j = await (await makeApp().request('/api/charter/c1.testnet/rules/pay')).json();
+  assert.equal(j.valid_until, '1793000000000000000');
+  assert.equal(j.valid_until_iso, new Date(1793000000000).toISOString());
+  mock(() => viewResult({ clause_id: 'pay', expires_at: null }));
+  const k = await (await makeApp().request('/api/charter/c2.testnet/rules/pay')).json();
+  assert.equal(k.valid_until, null); assert.equal(k.valid_until_iso, null);
+});

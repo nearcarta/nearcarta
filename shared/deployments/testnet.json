@@ -266,5 +266,28 @@
       "p_after_expiry": "Hmb2URktxxvhMkU4gDCLrpoSovVHML9LTy5ANv9SLUy6",
       "rule_expiry_widen_queued": "A4fKcFTAm2Zzp5CR57P5Z2pKmw1TxowZRQN2so383xU4"
     }
+  },
+  "house_deed": {
+    "contract": "deed-mvronpbm.nc-vault-mvrojr9w.testnet",
+    "standard": "NEP-171 + NEP-177 metadata + NEP-178 approvals + NEP-181 enumeration",
+    "code_hash": "9xqVzKnPgToCggnkStuEgM2ZgdyfbCcejTKf1jehED4m",
+    "wasm": "contracts/artifacts/house_nft.wasm",
+    "wasm_sha256": "852b475fedbe00c4e42773050ee1cf35fa898c50042bdeeb9879b55d107d05b2",
+    "repro_commit": "59896befe6c565e111c8eab9758208df88397be6",
+    "access_keys": 0,
+    "mint": {
+      "method": "mint_deed",
+      "args": {
+        "house": "optional charter account"
+      },
+      "deposit_yocto": "20000000000000000000000",
+      "gas": "30000000000000"
+    },
+    "proof": "judges/proofs/house-deed.json",
+    "proof_txs": {
+      "deploy_batch": "GvqA8LTfZk1KWCMk5cLgXuTumLT6hktpZUjUnfgSdXxu",
+      "mint_deed": "7RxQxK5WnzsaVdQGxxikNVPsWV2zy6MLpKGvJAKzqw6H",
+      "mint_again_refused": "7bwM6hTAThLSpymxqvkQCJXrK4WivKZyiGm58PQaZJGL"
+    }
   }
 }

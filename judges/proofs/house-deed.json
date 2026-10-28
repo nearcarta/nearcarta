@@ -1,0 +1,77 @@
+{
+ "contract": "deed-mvronpbm.nc-vault-mvrojr9w.testnet",
+ "funder": "nc-vault-mvrojr9w.testnet",
+ "wasm_sha256": "852b475fedbe00c4e42773050ee1cf35fa898c50042bdeeb9879b55d107d05b2",
+ "wasm_bytes": 208519,
+ "steps": [
+  {
+   "step": "deploy_batch",
+   "tx": "GvqA8LTfZk1KWCMk5cLgXuTumLT6hktpZUjUnfgSdXxu",
+   "ok": true
+  },
+  {
+   "step": "mint_deed",
+   "tx": "7RxQxK5WnzsaVdQGxxikNVPsWV2zy6MLpKGvJAKzqw6H",
+   "ok": true,
+   "ret": {
+    "token_id": "nc-vault-mvrojr9w.testnet",
+    "owner_id": "nc-vault-mvrojr9w.testnet",
+    "metadata": {
+     "title": "House of nc-vault-mvrojr9w.testnet",
+     "description": "Charter: r11house-31474.testnet",
+     "media": null,
+     "media_hash": null,
+     "copies": 1,
+     "issued_at": "1793165872174",
+     "expires_at": null,
+     "starts_at": null,
+     "updated_at": null,
+     "extra": null,
+     "reference": null,
+     "reference_hash": null
+    },
+    "approved_account_ids": {}
+   }
+  },
+  {
+   "step": "mint_again_refused",
+   "tx": "7bwM6hTAThLSpymxqvkQCJXrK4WivKZyiGm58PQaZJGL",
+   "ok": false,
+   "error": "\"ActionError\":{\"index\":0,\"kind\":{\"FunctionCallError\":{\"ExecutionError\":\"Smart contract panicked: this account already has a deed\""
+  },
+  {
+   "step": "reads",
+   "nft_metadata": {
+    "spec": "nft-1.0.0",
+    "name": "Nearcarta House deeds",
+    "symbol": "DEED",
+    "icon": null,
+    "base_uri": null,
+    "reference": null,
+    "reference_hash": null
+   },
+   "nft_total_supply": "1",
+   "nft_token": {
+    "token_id": "nc-vault-mvrojr9w.testnet",
+    "owner_id": "nc-vault-mvrojr9w.testnet",
+    "metadata": {
+     "title": "House of nc-vault-mvrojr9w.testnet",
+     "description": "Charter: r11house-31474.testnet",
+     "media": null,
+     "media_hash": null,
+     "copies": 1,
+     "issued_at": "1793165872174",
+     "expires_at": null,
+     "starts_at": null,
+     "updated_at": null,
+     "extra": null,
+     "reference": null,
+     "reference_hash": null
+    },
+    "approved_account_ids": {}
+   },
+   "code_hash": "9xqVzKnPgToCggnkStuEgM2ZgdyfbCcejTKf1jehED4m",
+   "access_keys": 0
+  }
+ ]
+}

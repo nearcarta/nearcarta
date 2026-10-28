@@ -138,6 +138,28 @@ export function makeApp() {
   app.get('/api/guardhouse', limiter(30), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
+  // House deed (NEP-171). The server never signs: /mint returns the unsigned call for the visitor's wallet
+  // (NEAR Connect signAndSendTransaction); the deed's token_id is the signer's own account id.
+  const D = DEP.house_deed;
+  const deedTx = (house) => ({ receiverId: D.contract, actions: [{ type: 'FunctionCall', params: { methodName: 'mint_deed',
+    args: { house: house || null }, gas: D.mint.gas, deposit: D.mint.deposit_yocto } }] });
+  app.get('/api/house/deed', limiter(20), async c => {
+    if (!D) return c.json({ error: 'no deed contract' }, 404);
+    const [metadata, total] = await Promise.all([view(D.contract, 'nft_metadata'), view(D.contract, 'nft_total_supply')]);
+    return c.json({ ...D, metadata, total_supply: total });
+  });
+  app.get('/api/house/deed/mint', limiter(20), async c => {
+    if (!D) return c.json({ error: 'no deed contract' }, 404);
+    const house = c.req.query('house');
+    if (house && !ACCT.test(house)) return c.json({ error: 'house must be an account id' }, 400);
+    return c.json({ signer: 'the visitor (one deed per account; token_id = signer)', transaction: deedTx(house), note: 'unsigned; sign with your wallet. Excess deposit is refunded.' });
+  });
+  app.get('/api/house/deed/:account', limiter(20), async c => {
+    if (!D) return c.json({ error: 'no deed contract' }, 404);
+    const a = c.req.param('account'); if (!ACCT.test(a)) return c.json({ error: 'not an account id' }, 400);
+    const token = await view(D.contract, 'nft_token', { token_id: a });
+    return token ? c.json({ contract: D.contract, token }) : c.json({ contract: D.contract, token: null, mint: deedTx(null) }, 404);
+  });
   app.get('/api/guardhouse/action/:id', limiter(30), async c => {
     const id = c.req.param('id'); if (!/^\d{1,9}$/.test(id)) return bad(c, 'action id must be a number');
     return c.json(await guard.action(id));
@@ -170,7 +192,12 @@ export function makeApp() {
     try {
       const v = await view(a, method, args(c));
       if (v == null) return c.json({ error: 'no such clause' }, 404);
-      return c.json({ account: a, supported: true, [method === 'get_reputation' ? 'reputation' : 'rules']: v });
+      if (method === 'get_rules') {
+        // valid_until: the clause's on-chain expiry (R16 set_clause_expiry, ns) under the name the shops use; null = no expiry.
+        const ns = v.expires_at ?? null;
+        return c.json({ account: a, supported: true, rules: v, valid_until: ns, valid_until_iso: ns ? new Date(Number(BigInt(ns) / 1_000_000n)).toISOString() : null });
+      }
+      return c.json({ account: a, supported: true, reputation: v });
     }
     catch (e) {
       const m = String(e.message);
