@@ -72,6 +72,8 @@ export async function mountConnect(el) {
     const who = await account();
     const [bal, mine] = who ? await Promise.all([balance(who), deeds(who)]) : [null, []];
     const low = who && bal != null && bal < 10n ** 24n;
+    // A house built a moment ago can lag on the RPC node: look again a few times.
+    if (who && !mine.length && (draw.n = (draw.n || 0) + 1) < 6) setTimeout(draw, 6000);
     el.innerHTML = who
       ? `<a class="pill" href="/console#house" title="${esc(who)}" data-testid="hud-account">${esc(short(who))} · ${fmt(bal)} NEAR</a>`
         + (mine.length ? `<a class="pill" href="/shops/vault/" data-testid="hud-deed" title="Your house deed in the charter factory">Your house: ${esc(short(mine[0]))}</a>`
