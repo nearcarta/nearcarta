@@ -173,6 +173,19 @@ test('doTask signs one propose and re-verifies it', async () => {
   assert.equal(sent[0].gasTgas, undefined, 'default gas from sendPropose'); assert.equal(PROPOSE_TGAS, 30);
 });
 
+test('a stale nonce view never reuses a landed nonce', async () => {
+  let chain = 20; const sent = [];
+  // The view is stuck at 20 (cache or lagging node) while the chain moves on.
+  const viewF = async (_c, m) => m === 'get_clauses' ? { pay: clause } : m === 'get_usage' ? { spent: '0', reserved: '0', count: 0 } : { next_nonce: '20', policy_version: 2 };
+  const send = async (_rpc, a) => { sent.push(Number(a.p.nonce));
+    if (Number(a.p.nonce) !== chain) return { hash: 'X' + sent.length, ok: false, error: 'Smart contract panicked: ERR_NONCE' };
+    chain++; return { hash: 'T' + sent.length, ok: true, value: { decision: 'allowed', reason: 'ok' } }; };
+  const opts = { charter: 'nonce.f.testnet', key: keyFrom(), tag: 'neo', viewF, send, rpcCall: null, verify: async () => ({ counted: true, why: null }) };
+  assert.equal((await doTask({ ...opts, taskId: 'coffee-run' })).passed, true);
+  assert.equal((await doTask({ ...opts, taskId: 'book-order' })).passed, true);
+  assert.deepEqual(sent, [20, 21]);
+});
+
 test('board scores tasks passed plus scams blocked, counting only verified rows', () => {
   const rows = board([
     { hash: 'a', charter: 'x', owner: 'o1', kind: 'attack', attack: 'lookalike', tag: 't', decision: 'denied', counted: true, shared: false, at: 1 },

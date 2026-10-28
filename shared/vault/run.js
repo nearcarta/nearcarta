@@ -4,6 +4,26 @@ import { ATTACK_IDS, TAG_RE, pickClause, plan, proposal } from './attacks.js';
 import { TASK_IDS, planTask, taskProposal } from './tasks.js';
 
 const bad = (msg, status = 400) => Object.assign(new Error(msg), { status });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Last nonce this process landed per charter: a lagging or cached view must never make us reuse it.
+const landed = new Map();
+
+/** Read state, build a proposal, send it; on ERR_NONCE (a stale view) re-read and try once more. */
+async function proposeFresh({ charter, key, viewF, send, rpcCall, build }) {
+  let r;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) await sleep(1500);
+    const st = await viewF(charter, 'get_state');
+    const floor = landed.has(charter) ? landed.get(charter) + 1 : 0;
+    const nonce = Math.max(Number(st.next_nonce), floor);
+    const p = build({ nonce, policyVersion: st.policy_version });
+    r = await send(rpcCall, { key, charter, p });
+    if (r.ok) landed.set(charter, nonce);
+    if (r.ok || !/ERR_NONCE/.test(String(r.error))) break;
+  }
+  return r;
+}
 
 export async function runSteps({ charter, key, attackId, tag, viewF, send, rpcCall, onStep = () => {} }) {
   if (!ATTACK_IDS.includes(attackId)) throw bad('unknown attack');
@@ -14,9 +34,8 @@ export async function runSteps({ charter, key, attackId, tag, viewF, send, rpcCa
   const steps = plan(attackId, clause, { spent: (BigInt(u.spent) + BigInt(u.reserved || 0)).toString(), count: u.count });
   const out = [];
   for (const step of steps) {
-    const st = await viewF(charter, 'get_state');
-    const p = proposal({ clauseId, step, nonce: st.next_nonce, policyVersion: st.policy_version, tag, attackId });
-    const r = await send(rpcCall, { key, charter, p });
+    const r = await proposeFresh({ charter, key, viewF, send, rpcCall,
+      build: ({ nonce, policyVersion }) => proposal({ clauseId, step, nonce, policyVersion, tag, attackId }) });
     const v = r.value || {};
     const s = { tx: r.hash, receiver: step.receiver, amount: step.amount,
       decision: r.ok ? v.decision : 'failed', reason: r.ok ? (v.reason ?? null) : r.error };
@@ -36,9 +55,8 @@ export async function runTask({ charter, key, taskId, tag, viewF, send, rpcCall 
   const { id: clauseId, clause } = pickClause(clauses);
   const u = await viewF(charter, 'get_usage', { clause_id: clauseId });
   const step = planTask(taskId, clause, { spent: (BigInt(u.spent) + BigInt(u.reserved || 0)).toString(), count: u.count });
-  const st = await viewF(charter, 'get_state');
-  const p = taskProposal({ clauseId, step, nonce: st.next_nonce, policyVersion: st.policy_version, tag, taskId });
-  const r = await send(rpcCall, { key, charter, p });
+  const r = await proposeFresh({ charter, key, viewF, send, rpcCall,
+    build: ({ nonce, policyVersion }) => taskProposal({ clauseId, step, nonce, policyVersion, tag, taskId }) });
   const v = r.value || {};
   const decision = r.ok ? v.decision : 'failed';
   return { charter, task: taskId, tag, clause_id: clauseId, tx: r.hash, receiver: step.receiver, amount: step.amount,
