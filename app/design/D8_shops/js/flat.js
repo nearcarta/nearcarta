@@ -9,7 +9,8 @@ export function flat() {
   async function open(id) { const m = await import(`../shops/${id}.js`).catch(() => null); bg.style.backgroundImage = `url(shots/fallback_${id}.jpg)`; nav.hidden = true; $('#back').hidden = false; $('#brand').hidden = true; document.body.classList.add('in-shop');
     // the 2D tray shows the end state (no scene to animate)
     const end = { guard: ['no', 'Refused · not on the list'], ferry: ['pend', 'Crossed · SAMPLE run'], hall: ['ok', 'Passed · 2 votes'] }[id];
-    const info = m?.FLAT || FLAT[id]; // a shop module may export FLAT/PROOF from the data interface (live data) $('#t-title').textContent = SH[id]; $('#t-src').textContent = info.src; $('#t-src').className = 'src ' + info.cls; $('#t-label').textContent = info.label; $('#t-hero').innerHTML = info.hero;
+    const info = m?.FLAT || FLAT[id]; // a shop module may export FLAT/PROOF from the data interface (live data)
+    $('#t-title').textContent = SH[id]; $('#t-src').textContent = info.src; $('#t-src').className = 'src ' + info.cls; $('#t-label').textContent = info.label; $('#t-hero').innerHTML = info.hero;
     const b = $('#t-act'); b.hidden = !end; if (end) { b.className = 'act res ' + end[0]; b.disabled = true; b.textContent = end[1]; } $('#d-body').innerHTML = m?.PROOF || '<p class="note">Open this page with WebGL2 for the full proof list.</p>'; $('#tray').hidden = false; }
 }
 const FLAT = {
