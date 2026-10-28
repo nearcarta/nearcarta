@@ -15,7 +15,7 @@ async function j(path, body) {
 
 const DEP = await j('/api/deployments');
 const [q, g, ch] = await Promise.all([
-  j('/api/ferry/quote', { from: { symbol: 'USDC', chain: 'base' }, to: { symbol: 'wNEAR', chain: 'near' }, amount: '3', recipient: '561e8ef0fecb621469da30250dc6cdcd1e47a66e561e8ef0fecb621469da3025' /* placeholder implicit account: dry quote only, no deposit address exists */, refundTo: '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e' }),
+  j('/api/ferry/quote', { from: { symbol: 'USDC', chain: 'base' }, to: { symbol: 'wNEAR', chain: 'near' }, amount: '30', recipient: '561e8ef0fecb621469da30250dc6cdcd1e47a66e561e8ef0fecb621469da3025' /* placeholder implicit account: dry quote only, no deposit address exists */, refundTo: '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e' }),
   j('/api/guardhouse'),
   DEP ? j(`/api/chronicle/${DEP.guardhouse.oath}?limit=12`) : null,
 ]);
@@ -54,6 +54,6 @@ export const BANK = mb?.built ? {
   street: { txid: mb.payout.txid, url: mb.payout.explorer, height: mb.street.height, confirmations: mb.street.confirmations, fee: mb.street.fee_zat,
     hidden: mb.street.amount_hidden === true, reasons: mb.street.reasons || [], pool: Object.entries(mb.street.value_balance_zat || {}).find(([, v]) => v !== '0')?.[0] || 'shielded' },
   oath: { tx: mb.oath.tx, ok: mb.oath.success && mb.oath.decision === 'allowed' && mb.oath.memo_on_chain, clause: mb.oath.clause_id },
-  ledger: { taz: mb.ledger?.taz, binds: mb.binds === true, ufvk: mb.disclosure?.ufvk },
+  ledger: { commitment: mb.commitment?.value, scheme: mb.commitment?.scheme },
   desk: mb.desk?.available ? Object.entries(mb.desk.legs).map(([k, l]) => ({ leg: k, ok: l.ok, privacy: l.privacy, sig: l.signature, echo: l.echo?.ok, out: l.amountOut })) : [],
 } : null;
