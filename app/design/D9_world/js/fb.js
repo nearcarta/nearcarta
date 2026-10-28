@@ -12,9 +12,17 @@ export async function fallback(why){ if(started) return; started=true; body.clas
   const img=$('#fbimg'); const town=img.getAttribute('src');
   try{ const pins=await (await fetch('shots/fallback_pins.json')).json(); const box=$('#fbpins'); const els=[];
     for(const p of pins){ const d=document.createElement('button'); d.type='button'; d.className='fbpin'; d.dataset.id=p.id; d.title=`Enter ${p.name}`; d.innerHTML=`<b></b><span></span>`; d.querySelector('b').textContent=p.name; d.querySelector('span').textContent=p.role; d.onclick=()=>open(p.id); box.appendChild(d); els.push([d,p]); }
+    /* Pins stay clear of the HUD (brand, account row, blurb on top; rules CTA and curfew below) and of each other,
+       so every shop is tappable at 390 too. Each pin hangs above its anchor (translate -50%,-100%). */
+    const vis=e=>{ if(!e) return null; const r=e.getBoundingClientRect(); return r.width&&r.height&&getComputedStyle(e).visibility!=='hidden'?r:null; };
     const lay=()=>{ const W=innerWidth,H=innerHeight,s=Math.max(W/1920,H/1080),ox=(W-1920*s)/2,oy=(H-1080*s)/2;
-      for(const [d,p] of els){ const x=ox+p.x/100*1920*s, y=oy+p.y/100*1080*s; d.style.left=Math.max(70,Math.min(W-70,x))+'px'; d.style.top=Math.max(48,Math.min(H-40,y))+'px'; } };
-    lay(); addEventListener('resize',lay);
+      let top=48, bot=H-8; for(const e of document.querySelectorAll('#brand,#brand .what,#acct,#acct *')){ const r=vis(e); if(r&&r.top<H/3) top=Math.max(top,r.bottom+8); }
+      for(const e of document.querySelectorAll('.hud,#rulesBtn')){ const r=vis(e); if(r&&r.top>H/2&&!e.closest('#fb2d')) bot=Math.min(bot,r.top-8); }
+      const placed=[]; for(const [d,p] of els.slice().sort((a,b)=>a[1].y-b[1].y)){ const w=d.offsetWidth, h=d.offsetHeight;
+        const x=Math.max(w/2+6,Math.min(W-w/2-6,ox+p.x/100*1920*s)); let y=Math.max(top+h,Math.min(bot,oy+p.y/100*1080*s));
+        for(let k=0;k<12;k++){ const hit=placed.find(q=>Math.abs(q.x-x)<(q.w+w)/2+4&&Math.abs(q.y-(y-h/2))<(q.h+h)/2+4); if(!hit) break; y=hit.y+(hit.h+h)/2+4+h/2; }
+        if(y>bot) y=bot; d.style.left=x+'px'; d.style.top=y+'px'; placed.push({x,y:y-h/2,w,h}); } };
+    lay(); addEventListener('resize',lay); const acct=$('#acct'); if(acct&&'ResizeObserver' in window) new ResizeObserver(lay).observe(acct); setTimeout(lay,1500);
   }catch(e){ console.error('[Nearcarta] 2D pins failed',e); }
   const APP=!/[?&]scripted\b/.test(location.search); let ui8m=null;
   const ui=$('#shopUI'), dr=$('#drawer'); const drawer=on=>{ dr.classList.toggle('open',on); dr.setAttribute('aria-hidden',on?'false':'true'); };

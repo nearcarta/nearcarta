@@ -338,3 +338,6 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 @media (max-width:720px){ #shopUI #tray{overflow-x:hidden;box-sizing:border-box} }
 @media (max-width:720px){ body.in-shop #brand .what{display:none} }
 #shopUI .form{grid-template-columns:minmax(0,1fr)} #shopUI .form>*,#shopUI .form [data-testid=tee-panel]{min-width:0;max-width:100%}
+
+/* 390: name-only pins (the room says what it is), so all 8 fit between the HUD and the rules CTA */
+@media (max-width:600px){ body.fb .fbpin span,body.fb .fbpin::after{display:none} body.fb .fbpin{padding:7px 11px;font-size:13px} }

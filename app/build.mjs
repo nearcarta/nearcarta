@@ -53,6 +53,9 @@ writeFileSync(dist + '/index.html', world.replace('<meta charset="utf-8">', `<me
   .replace('</body>', `<button id="skipIntro" type="button" class="pill">Skip intro <kbd>Esc</kbd></button>
 <script>(()=>{const out=()=>{if(document.body.classList.contains('story'))dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));};
 document.getElementById('skipIntro').addEventListener('click',out);document.getElementById('c').addEventListener('pointerdown',out);})();</script>
+<script>(()=>{/* phones: the one-line blurb sits under the account row, never under its buttons (the row wraps once signed in) */
+const a=document.getElementById('acct'),w=document.querySelector('#brand .what');if(!a||!w||!('ResizeObserver'in window))return;
+const f=()=>{w.style.top=innerWidth<=600?Math.round(a.getBoundingClientRect().bottom+6)+'px':'';};new ResizeObserver(f).observe(a);addEventListener('resize',f);f();})();</script>
 <script type="module">import('/house.bundle.js').then(m=>m.mountConnect(document.getElementById('wallet'))).catch(()=>{});</script>
 </body>`));
 if (!readFileSync(dist + '/index.html', 'utf8').includes('id="wallet"')) throw new Error('wallet slot not injected');
