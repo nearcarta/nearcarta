@@ -84,6 +84,8 @@ Open gap, by design: no whole-chain search. Chronicle explains one agent's actio
 
 ## Town Hall
 
+Pre-R11: this shop runs its own smaller contract (contracts/townhall), not the R11 `oath`. Its account still has a full-access key. The DAO freeze holds (rewards after it fail with ERR_FROZEN), but there is no policy timelock or escalation.
+
 ### Competitors (pages fetched 2026-10-28)
 | | Who approves | Approves single payments or rules | Agent pays within the rules | Confidential payments | Funding rounds |
 |---|---|---|---|---|---|
@@ -123,6 +125,8 @@ Open gaps:
 Open gap: no marketplace listing.
 
 ## Toll
+
+Pre-R11: this shop runs its own smaller contract (contracts/toll), not the R11 `oath`. Its account still has a full-access key, its owner can unfreeze it, and it has no policy timelock or escalation.
 
 ### Competitors (pages fetched 2026-10-28)
 | | Policy checked before signing | Chains | Tokens | Settlement verified back on NEAR | Custody |
