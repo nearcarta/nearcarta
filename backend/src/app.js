@@ -95,6 +95,15 @@ export function makeApp() {
   // each one's status and time, plus the RPC retry/fallback/stale counters.
   app.get('/api/health', limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: await shops.health(),
     features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: await vault.runnerStatus() }));
+  // Shows the caller only what Render received about the caller's own request: which header decides
+  // the client IP, the IP-related header values, and the names (not values) of every other header.
+  const IP_HEADERS = ['cf-connecting-ip', 'true-client-ip', 'x-forwarded-for', 'x-vercel-forwarded-for', 'x-real-ip', 'x-vercel-ip-country'];
+  app.get('/api/whoami', limiter(20), c => {
+    const [from, ip] = clientIpSource(c);
+    const raw = c.req.raw.headers, seen = {};
+    for (const n of IP_HEADERS) if (raw.get(n)) seen[n] = raw.get(n);
+    return c.json({ client_ip_from: from, client_ip: ip, ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
+  });
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
 
   // Ferry
