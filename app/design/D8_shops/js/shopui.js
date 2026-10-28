@@ -33,9 +33,9 @@ function teePanel(t, again = true) {
 // ---------- shop apps ----------
 const APPS = {
   toll: {
-    label: 'Toll gate · 0.01 NEAR', idle: 'Toll is 0.01. I\u2019ll ask your charter.', btn: 'Pay the toll',
+    label: 'Toll gate · 0.01 NEAR', idle: 'Toll is 0.01 NEAR on testnet. I\u2019ll ask your charter.', btn: 'Pay the toll',
     hero: () => num('0.01', 'NEAR'),
-    run: async () => { const o = await A.toll(); return { o, hero: num('0.01', 'NEAR'), say: o.decision === 'allowed' ? 'Paid. Your rule allowed it.' : `Refused: ${A.why(o.reason)}.` }; },
+    run: async () => { const o = await A.toll(); return { o, hero: num('0.01', 'NEAR'), say: o.decision === 'allowed' ? `Paid 0.01 NEAR to ${esc(short(A.merchants()[0] || '', 10, 6))}. Your rule allowed it.` : `Refused: ${A.why(o.reason)}.` }; },
   },
   ferry: {
     label: 'Ferry · to shielded ZEC', idle: 'Pick a route. I\u2019ll fetch a live quote.',
@@ -148,10 +148,29 @@ const APPS = {
   },
 };
 
+// ---------- proof drawer: the visitor's own charter first; the lab record stays below as reference ----------
+let lab = '';
+const NBA = a => `https://testnet.nearblocks.io/address/${esc(a)}`;
+const prow = (k, why = '', v = '') => `<div class="row"><div class="k">${k}${why ? `<span class="why">${why}</span>` : ''}</div><div class="v">${v}</div></div>`;
+function proofDrawer() {
+  const d = $('#d-body'); if (!d || !cur) return; const S = A.S, c = S.clauses?.pay;
+  let g = '';
+  if (!S.charter) g = `<h3>Your charter</h3><p class="note">${S.me ? 'Build your charter here; its proof shows in this drawer.' : 'Connect to see your own charter here.'}</p>`;
+  else {
+    const mine = A.receipts().filter(r => (cur === 'house' ? true : r.shop === cur)).slice(0, 6);
+    g = '<h3>Your charter</h3>' + prow(esc(short(S.charter, 14, 8)), S.me ? 'owner ' + esc(short(S.me, 14, 6)) : '', `<a class="tx" href="${NBA(S.charter)}" target="_blank" rel="noopener">account ↗</a>`)
+      + (S.state ? prow('Policy v' + esc(S.state.policy_version), S.state.frozen ? 'frozen' : 'live, read just now', '<span class="src live">live read</span>') : '')
+      + (c ? prow(`Max ${fmt(c.per_action_cap)} · ${fmt(c.daily_budget)} a day`, 'payees ' + esc((c.receivers || []).map(r => short(r, 10, 6)).join(', '))) : '')
+      + `<h3>${cur === 'house' ? 'Signed by you' : 'Signed here'}</h3>`
+      + (mine.length ? mine.map(r => prow(esc(r.shop) + ' · ' + esc(r.decision), r.reason && r.decision !== 'allowed' ? esc(A.why(r.reason)) : '', `<span class="st ${r.decision === 'denied' ? 'no' : 'ok'}">${r.decision === 'denied' ? '✕' : '✓'}</span>${A.txLine(r.h)}`)).join('') : '<p class="note">Nothing signed here yet.</p>');
+  }
+  d.innerHTML = `<div class="pf" data-testid="guest-proof" data-guest="1">${g}</div>` + (lab ? `<details class="lab"><summary>Lab record · reference, not your charter</summary>${lab}</details>` : '');
+}
+
 // ---------- gate: wallet → charter → rules → shop ----------
 function paint() {
   const app = APPS[cur]; if (!app) return; const st = A.S.ready ? A.stage() : 'load';
-  wallet(); ruleChip(); label(app.label);
+  wallet(); ruleChip(); label(app.label); proofDrawer();
   if (phase === 'busy') return;
   if (st === 'load') { say('Lighting the lamp…'); form(''); hero(null); btn('Connect wallet', 'primary', true); return; }
   if (st === 'connect') { say('Connect to begin.'); form(''); hero(null); btn('Connect wallet'); return; }
@@ -176,7 +195,7 @@ async function primary() {
     say(res.say); react(kind);
     rcpt((rule ? `<span class="rule ${kind}" data-testid="rule">${kind === 'ok' ? '✓' : '✕'} ${esc(rule)}</span>` : '') + (res.rc || A.txLine(res.o?.tx)));
     const app = APPS[cur]; btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : 'Again')); if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
-    document.body.dataset.app = kind; ruleChip();
+    document.body.dataset.app = kind; ruleChip(); proofDrawer();
   } catch (e) { fail(e); }
 }
 function fail(e) { phase = 'idle'; say(`Stopped: ${esc(String(e.message || e).slice(0, 90))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); const app = APPS[cur]; btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
@@ -224,7 +243,8 @@ export function boot() {
   booted = A.init(() => paint()).then(() => paint()).catch(e => { A.S.ready = true; fail(e); });
   return booted;
 }
-export function mount(id, shop, scene) { cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; rcpt(''); document.body.dataset.app = ''; boot(); paint();
+export function mount(id, shop, scene) { cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; rcpt(''); document.body.dataset.app = '';
+  { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {}); }
 export function unmount() { cur = null; sh = null; closeRules(); }

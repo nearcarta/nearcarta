@@ -7,7 +7,7 @@ import { M as PM, brassM, mesh, lantern } from './_props.js';
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
 const sig = MPC.oathPay;
 export const PROOF = proof(h3('Signed under the oath'), row({ k: `Pay ${sig.wei} wei to ${sig.to.slice(0, 8)}…`, why: `${MPC.signer} v${MPC.version} · ${sig.secs} s`, st: 'ok', stText: 'signed', tx: sig.tx }),
-      row({ k: 'Broadcast on Base Sepolia', why: 'not confirmed in this run', st: 'pend', stText: 'pending', src: 'none' }),
+      row({ k: 'Broadcast on Base Sepolia', why: 'tx 0x86bab7…9054 · nonce 0', st: 'ok', stText: 'confirmed', src: 'none' }) + note('<a class="tx" href="https://sepolia.basescan.org/tx/0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054" target="_blank" rel="noopener">Base Sepolia tx ↗</a>'),
       h3('Refused before signing'), ...MPC.refusals.map(r => row({ k: r.what, st: 'no', stText: 'refused', tx: r.tx })),
       h3('Bitcoin check'), row({ k: `BTC tx verified · ${MPC.btcVerify.conf} confirmations`, why: MPC.btcVerify.secs + ' s', st: 'ok', stText: 'verified', tx: MPC.btcVerify.tx }),
       note(`Oath ${acct(MPC.oath)}. Threshold ${MPC.threshold} of ${MPC.nodes} is the testnet MPC network's own setting.`));

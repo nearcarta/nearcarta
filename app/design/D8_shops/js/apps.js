@@ -37,6 +37,7 @@ const agent = () => { const k = S.charter && localStorage.getItem(LS_AGENT(S.cha
 const pay = () => S.clauses.pay;
 // every signed result shows its tx as one visible link (round-2 judges: a collapsed "details" read as no link at all)
 export const txLine = (h, label = 'receipt') => h ? `<a class="rc tx" data-testid="receipt" href="${NBX}/txns/${esc(h)}" target="_blank" rel="noopener" title="${esc(label)} on chain">${label === '↗' ? '↗' : `tx ${esc(short(h))} ↗`}</a>` : '';
+export const receipts = () => (S.charter ? JSON.parse(localStorage.getItem(LS_RCPT(S.charter)) || '[]') : []);
 function keep(h, shop, decision, reason) {
   if (!S.charter || !h) return; const k = LS_RCPT(S.charter); const l = JSON.parse(localStorage.getItem(k) || '[]');
   l.unshift({ h, shop, decision, reason, at: Date.now() }); localStorage.setItem(k, JSON.stringify(l.slice(0, 40)));
@@ -46,7 +47,8 @@ function keep(h, shop, decision, reason) {
 export async function init(onChange) {
   for (let i = 0; ; i++) { try { CFG = await api('/api/vault/config'); break; } catch (e) { if (i >= 3) throw e; await new Promise(r => setTimeout(r, 2500 * (i + 1))); } } rpc = W.rpcClient(CFG.rpc);
   ({ connector: conn } = W.makeConnector(rpc));
-  conn.on('wallet:signIn', () => refresh().then(onChange)); conn.on('wallet:signOut', () => { S.charter = null; refresh().then(onChange); });
+  const tell = () => dispatchEvent(new CustomEvent('nearcarta:wallet')); // the town HUD has its own connector: let it redraw
+  conn.on('wallet:signIn', () => refresh().then(onChange).then(tell)); conn.on('wallet:signOut', () => { S.charter = null; refresh().then(onChange).then(tell); });
   await refresh(); S.ready = true; return S;
 }
 export async function refresh() {
