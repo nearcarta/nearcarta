@@ -3,24 +3,14 @@
   "buildCommand": "npm run build",
   "outputDirectory": "app/dist",
   "installCommand": "npm ci --omit=dev",
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "shared/**",
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     {
       "source": "/console",
       "destination": "/console.html"
     },
     {
-      "source": "/api/ai/(.*)",
-      "destination": "https://nearcarta-api.onrender.com/api/ai/$1"
-    },
-    {
       "source": "/api/(.*)",
-      "destination": "/api/index.js"
+      "destination": "https://nearcarta-api.onrender.com/api/$1"
     }
   ],
   "headers": [
@@ -34,6 +24,10 @@
         {
           "key": "Referrer-Policy",
           "value": "no-referrer"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         }
       ]
     }
