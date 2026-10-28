@@ -134,3 +134,27 @@ export async function proveTee({ model = cfg.nearAiModel, signingAlgo = 'ecdsa',
   return { model, nonce: rep.nonce, signingAlgo, checkedAt: new Date(rep.fetchedAt * 1000).toISOString(), policy: { acceptedTcb: ACCEPTED_TCB, gpuRequired: gpu },
     gateway, models, ok };
 }
+
+// Models that serve a TEE attestation report. The NEAR AI catalog (/v1/models) also lists models routed
+// to outside providers; for those the report endpoint answers 503 and they are left out. Being listed
+// means a report with at least one model_attestations[] entry was served; /api/ai/tee?model=… then
+// runs the full check above on that report. Cached 10 minutes.
+let attestedCache = { at: 0, list: null };
+export async function attestedModels({ concurrency = 6, ttlMs = 10 * 60e3, fetchImpl = fetch, report = fetchReport } = {}) {
+  if (attestedCache.list && Date.now() - attestedCache.at < ttlMs) return attestedCache.list;
+  const r = await fetchImpl(`${cfg.nearAi}/v1/models`, { headers: { accept: 'application/json' } });
+  if (!r.ok) throw Object.assign(new Error(`models http ${r.status}`), { status: 502 });
+  const ids = ((await r.json()).data || []).map(m => m.id).filter(Boolean);
+  const attested = []; let i = 0;
+  await Promise.all(Array.from({ length: concurrency }, async () => {
+    while (i < ids.length) {
+      const id = ids[i++];
+      try { const n = ((await report({ model: id })).body.model_attestations || []).length; if (n > 0) attested.push({ id, attestations: n }); } catch { /* no report: not attested */ }
+    }
+  }));
+  attested.sort((a, b) => a.id.localeCompare(b.id));
+  const list = { checkedAt: new Date().toISOString(), catalog: ids.length, attested, left_out: ids.length - attested.length,
+    rule: 'listed only if /v1/attestation/report serves at least one model attestation' };
+  attestedCache = { at: Date.now(), list };
+  return list;
+}

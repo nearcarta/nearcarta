@@ -76,3 +76,15 @@ test('collateral is time-bound: a far-future clock is refused', async () => {
   const r = await checkNearReport(clone(F.gateway.report), F.nonce, { collateral: F.gateway.collateral, now: F.fetchedAt + 400 * 86400 });
   assert.equal(r.checks.quote, false);
 });
+
+test('attestedModels lists only models whose report has a model attestation', async () => {
+  const { attestedModels } = await import('../../src/tee.js');
+  const fetchImpl = async () => new Response(JSON.stringify({ data: [{ id: 'tee/a' }, { id: 'proxied/b' }, { id: 'tee/empty' }] }));
+  const report = async ({ model }) => {
+    if (model === 'proxied/b') throw new Error('attestation http 503');
+    return { body: { model_attestations: model === 'tee/a' ? [{ signing_address: '0x1' }] : [] } };
+  };
+  const r = await attestedModels({ fetchImpl, report, ttlMs: 0 });
+  assert.deepEqual(r.attested, [{ id: 'tee/a', attestations: 1 }]);
+  assert.equal(r.catalog, 3); assert.equal(r.left_out, 2);
+});
