@@ -12,7 +12,7 @@ import * as shops from './shops.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
 import { view } from './near.js';
-import { limiter, globalCap, leakGuard, onError, allowedOrigins } from './http-guard.js';
+import { limiter, clientIpSource, globalCap, leakGuard, onError, allowedOrigins } from './http-guard.js';
 
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 const ACCT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -38,7 +38,7 @@ export function makeApp() {
   app.onError(onError);
   app.notFound(c => c.json({ error: 'not found' }, 404));
 
-  app.get('/api/health', limiter(60), async c => c.json({ ok: true, network: DEP.network, near: await shops.health(),
+  app.get('/api/health', limiter(60), async c => c.json({ ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: await shops.health(),
     features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false } }));
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
 

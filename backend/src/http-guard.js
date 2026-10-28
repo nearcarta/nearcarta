@@ -4,13 +4,18 @@
 // client can type. Render sits behind Cloudflare: CF-Connecting-IP / True-Client-IP are set by the
 // edge. Render appends to X-Forwarded-For instead of replacing it, so its first entry is
 // client-controlled and is never used. Vercel sets x-real-ip itself. Locally: the socket address.
-export function clientIp(c, env = process.env) {
+export const onRender = env => Boolean(env.RENDER || env.RENDER_SERVICE_ID || env.RENDER_INSTANCE_ID);
+export function clientIpSource(c, env = process.env) {
   const h = n => c.req.header(n)?.trim() || null;
-  if (env.RENDER) return h('cf-connecting-ip') || h('true-client-ip') || 'render:unknown';
-  if (env.VERCEL) return h('x-real-ip') || 'vercel:unknown';
+  if (onRender(env)) {
+    for (const n of ['cf-connecting-ip', 'true-client-ip']) if (h(n)) return [n, h(n)];
+    return ['render:unknown', 'render:unknown'];
+  }
+  if (env.VERCEL) return h('x-real-ip') ? ['x-real-ip', h('x-real-ip')] : ['vercel:unknown', 'vercel:unknown'];
   const sock = c.env?.incoming?.socket?.remoteAddress; // @hono/node-server
-  return sock || 'local';
+  return ['socket', sock || 'local'];
 }
+export const clientIp = (c, env = process.env) => clientIpSource(c, env)[1];
 
 const MAX_KEYS = 20000;
 function bucket(store, key, max, windowMs, now) {
