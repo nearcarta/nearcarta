@@ -2,6 +2,7 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
+import { policy, nonce, withNonce } from '../csp.mjs';
 const root = new URL('./dist', import.meta.url).pathname;
 const api = process.env.API_ORIGIN || 'http://127.0.0.1:8787';
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav' };
@@ -16,6 +17,7 @@ createServer(async (req, res) => {
   let p = decodeURIComponent(REWRITES[u.pathname] || u.pathname);
   let f = normalize(join(root, p)); if (!f.startsWith(root)) { res.writeHead(403); return res.end(); }
   try { if ((await stat(f)).isDirectory()) f = join(f, 'index.html'); const b = await readFile(f);
+    if (extname(f) === '.html') { const n = nonce(); res.writeHead(200, { 'content-type': 'text/html', 'content-security-policy': policy(n) }); return res.end(withNonce(b.toString(), n)); }
     res.writeHead(200, { 'content-type': types[extname(f)] || 'application/octet-stream' }); res.end(b);
   } catch { res.writeHead(404); res.end('not found'); }
 }).listen(Number(process.env.PORT || 5173), () => console.log('app on', process.env.PORT || 5173));
