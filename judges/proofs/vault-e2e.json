@@ -1,76 +1,76 @@
 {
- "at": "2026-10-28T05:07:53.886Z",
- "base": "http://127.0.0.1:15173",
+ "at": "2026-10-28T05:29:19.935Z",
+ "base": "https://nearcarta.vercel.app",
  "wallet": "NEAR Connect 0.12.0, injected guest wallet (fresh faucet account)",
- "account": "ncguest-511p1m1144.testnet",
- "charter": "e2e-mvrnjmfl.nccharters-85831.testnet",
+ "account": "ncguest-0100381n1j.testnet",
+ "charter": "e2e-mvrob3s0.nccharters-85831.testnet",
  "txs": [
   {
    "step": "create_charter",
-   "tx": "F3stf3u5YA5FEExd2XvZCyAwydXjiJAHNPhPAB5xqkC5"
+   "tx": "G5rptbRyLcQDxCT8GxiLnYExdMFxDkBPGm5tX4HHamuH"
   },
   {
    "step": "set_clause + set_agent_key",
-   "tx": "C62z4imDB4EG8UN73KySsmJcVVMkvrw74bitm7uaXcZq"
+   "tx": "76hg571jfup2fwAz9TwB32NhQMaHfgkqYPSVWmc5cmdK"
   },
   {
    "step": "ask: pay the cafe 0.01 NEAR for team coffee",
    "allowed": true,
    "txs": [
-    "F5j55q6jZdoZWFs8UGBjhHDYPnLh2UFbWJX2Jqt5Q5JH"
+    "6VPu1NGGpbgF8pX1NNpshae1iPwFYSiWjYSfZxLTcdbk"
    ]
   },
   {
    "step": "task coffee-run",
    "allowed": true,
    "txs": [
-    "A3CRGoiKoycdBdUb7du8KeUfrBgo1LDDZg5GwpriH5ZS"
+    "CK3sv66xDC2yZnd1JVXk49e4YwvLQDPoSsTicL6yN4Xb"
    ]
   },
   {
    "step": "task book-order",
    "allowed": true,
    "txs": [
-    "Cu29dFjxrvrXchytndQSQrh4BfZEgxd9BMZZH2dFw321"
+    "Cr4MqjsYPvn4RmPyorjc46TaGiZbyazrvQmo5rVBuyyG"
    ]
   },
   {
    "step": "attack lookalike",
    "refused": "receiver_not_allowlisted",
    "txs": [
-    "55ghp5XKNUCebXcq176Ch3sPf3N2RBhS7bR5m4KV4PAn"
+    "FG9HbaKZdDETHMfqNiAeWGA9a2w6pVWdFVs4AU47XbpB"
    ]
   },
   {
    "step": "attack impersonation",
    "refused": "over_per_action_cap",
    "txs": [
-    "D3E8tBgN321eM1AbFRBrww7GRCJr4prPURP4ZDTedq8u"
+    "CuFTVson3eajHWC4rYcWgSaFAhwLsBKJdauCMUbRnxKg"
    ]
   },
   {
    "step": "attack split-under-cap",
    "refused": "over_daily_budget",
    "txs": [
-    "BcE5XZcmDsn6n6GxJBQj7BHSVgn8FGvEopXdo6iUJRhx",
-    "9jzCzXqGCcJVSthShnVhEzxQVooZtUfqwqWDHkNjmpYU"
+    "5KATkU28mSRYg6jKdMUNCdwY4bVPuQ2ffxZ1tqqDqU9T",
+    "EMnQhz6nRwMtGrCXuTd1ziiGjtQCMioNNj7aD4274UDP"
    ]
   },
   {
    "step": "freeze",
-   "tx": "CJ7Mbwv9T3pfrDqP5v2Zw5Nmx4Pb7mG1TTJckuBkd2cs"
+   "tx": "2bsJjUfHdAmiTZ9SrGwsh6JriEnXswrQnjk9KwYCHGQf"
   },
   {
    "step": "ask while frozen",
    "refused": "frozen",
    "txs": [
-    "279BgwoTgnVuqQJkGunm2QraM1B5w7XMVhJimw3pzZMj"
+    "AEfHpm3GsAkiKML3F6hrU8TmG1VCj92hVv68Rk1uCFdU"
    ]
   },
   {
    "step": "shared fake-invoice",
    "txs": [
-    "7UQiVSoVadAq27KQhyffCGYHUgE7JwfS1bKXxCSUwr4B"
+    "DsPKp3MzXXRchDe1jqBJuVvXMBr9sA2jX93UQTpNECgY"
    ]
   }
  ],
