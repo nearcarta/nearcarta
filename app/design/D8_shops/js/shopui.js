@@ -84,7 +84,7 @@ const APPS = {
         const p = await A.trickPlan(id); const c = await A.checkPayee(p.receiver); extra.chk = c;
         if (c.verdict === 'allow') return APPS.guard.send(id);
         const first = c.reasons.find(r => r.level === c.verdict) || c.reasons[0];
-        return { keep: true, kind: 'ok', say: c.verdict === 'block' ? `Stopped before signing: ${esc(first.text)}.` : `Wait: ${esc(first.text)}. Your call.`,
+        return { keep: true, kind: 'ok', say: c.verdict === 'block' ? `Stopped before signing: ${esc(first.text).replace(/[.!?]+$/, "")}.` : `Wait: ${esc(first.text)}. Your call.`,
           rule: c.verdict === 'block' ? 'payee check · blocked, nothing signed' : 'payee check · needs you', rc: '<span class="rc">checked off chain: deny list, account age, code changes, your past payments</span>' };
       }
       return APPS.guard.send(id);
