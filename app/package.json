@@ -1,2 +1,17 @@
-{ "name": "nearcarta-app", "private": true, "type": "module",
-  "scripts": { "build": "node build.mjs", "serve": "node serve.mjs" } }
+{
+  "name": "nearcarta-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "@near-js/transactions": "^2.3.0",
+    "@near-wallet-selector/core": "^10.1.4",
+    "@near-wallet-selector/meteor-wallet": "^10.1.4",
+    "@near-wallet-selector/my-near-wallet": "^10.1.4",
+    "esbuild": "^0.28.2",
+    "util": "^0.12.5"
+  }
+}

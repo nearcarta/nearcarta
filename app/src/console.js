@@ -1,5 +1,5 @@
 // Live console: every value below is fetched from the Nearcarta API, which reads NEAR testnet RPC,
-// 1Click (dry) and NEAR AI Cloud. Nothing here signs or spends.
+// 1Click (dry) and NEAR AI Cloud. Nothing here signs or spends; only the Your House tab asks your own wallet to sign.
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -16,7 +16,7 @@ async function get(path, opts) {
 }
 
 const loaded = {};
-const loaders = { guardhouse, townhall, arena, toll, chronicle };
+const loaders = { guardhouse, townhall, arena, toll, chronicle, house: () => import('/house.bundle.js').then(m => m.mountHouse()) };
 for (const b of document.querySelectorAll('#tabs button')) b.onclick = () => show(b.dataset.tab);
 function show(t) {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
