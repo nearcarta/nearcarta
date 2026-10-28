@@ -4,12 +4,12 @@ Notes for coding agents (and people) working in this repo. Read README.md first;
 
 ## Layout
 - `contracts/oath`: the charter (Rust, near-sdk). It is the only door to the agent's account. Deployed on testnet as `r11oath-82930.testnet` (R11 code).
-- `contracts/arena`, `contracts/toll`, `contracts/townhall`, `contracts/mock_ft`: one contract per shop. Toll and Town Hall are pre-R11 (see README, Limits).
+- `contracts/arena`, `contracts/toll`, `contracts/townhall`, `contracts/mock_ft`: one contract per shop. Toll runs its own smaller contract; Town Hall runs the charter (R14, R16.1) owned by a Sputnik DAO (see README, Limits).
 - `backend/src`: the API (`server.js`, one module per shop). `backend/scripts`: proof recorders and checkers; apart from the arena runner's `propose` (`backend/src/vault.js`), only these sign txs.
 - `app/src`: the console UI. `app/design`: the 3D town and shop interiors. They get live data only through `app/src/live/data.js` (and `app/design/D6_dashboards/src/data.js`); keep data wiring in those interfaces.
 - `shared/deployments/testnet.json`: every testnet account, contract and proof tx. Code and docs read ids from here; do not hardcode them.
 - `judges/`: VERIFY.md, TESTNET_TXS.md (generated) and `proofs/*.json` (generated).
-- `api/` and `vercel.json`: the Vercel deploy of the same read-only API.
+- `vercel.json` and `middleware.js`: Vercel serves the pages and passes `/api/*` to the Render API (`render.yaml`, `Dockerfile`).
 
 ## Commands
 ```bash
@@ -26,7 +26,7 @@ Run `npm run readme-numbers -- --check` before a commit that touches tests or pr
 
 ## Rules
 - Testnet only. Ferry and the Confidential Intents legs use 1Click mainnet as `dry:true` quotes: no deposit address, no spend. Never sign a mainnet tx.
-- The deployed API holds one key: the arena runner's function-call key (`ARENA_AGENT_KEY`), which can only call `propose` on `arena.nccharters-53681.testnet`. It holds no owner, full-access or Zcash key, and signs nothing else. Keys live outside the repo (`.secrets/` is ignored). Never commit, log or print a key or token.
+- The deployed API holds one NEAR key: the arena runner's function-call key (`ARENA_AGENT_KEY`), which can only call `propose` on `arena.nccharters-53681.testnet`. It holds no owner, full-access or Zcash key, and signs nothing else. Keys live outside the repo (`.secrets/` is ignored). Never commit, log or print a key or token.
 - `AI_PROVE_ENABLED` stays off unless the account has credits; the TEE evidence check is free and always on.
 - Every claim in a doc links to a test or a testnet tx. If you cannot point to one, do not write the claim.
 - Contract view args: U64 values are strings (`"4"`, not `4`). `get_action` takes `action_id`; its record has `clause_id`.
