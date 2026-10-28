@@ -579,10 +579,11 @@ export function boot({ fill = backfill, firstMs = 1000, snapshotFile, reread: rr
   const check = async () => {
     // Arena rows first, then the rest; failures stay pending for the next round.
     const list = [...pending].sort((x, y) => Number(isShared(attempts.get(y)?.charter || '')) - Number(isShared(attempts.get(x)?.charter || '')));
+    const before = pending.size;
     await pool(list, conc, h => rr(h).catch(() => {}));
     rebuild.pending = pending.size;
     if (!pending.size) { rebuild.reread_at = Date.now(); return; }
-    rwait = Math.min(60_000, rwait * 2);
+    rwait = pending.size < before ? 2000 : Math.min(60_000, rwait * 2); // progress: go on soon; no progress: back off
     setTimeout(check, rwait).unref?.();
   };
   setTimeout(step, firstMs).unref?.();
