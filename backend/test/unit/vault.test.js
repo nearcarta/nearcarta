@@ -64,14 +64,16 @@ test('outcomeOf reads success and failure', () => {
   assert.equal(outcomeOf({ status: { Failure: { ActionError: { kind: { FunctionCallError: { ExecutionError: 'ERR_NONCE' } } } } } }).error, 'ERR_NONCE');
 });
 
-test('runAttack stops at the first refusal and remembers it', async () => {
+test('runAttack stops at the first refusal and re-verifies it from chain', async () => {
   const sent = [];
   const viewF = async (_c, m) => m === 'get_clauses' ? { pay: clause } : m === 'get_usage' ? { spent: '0', reserved: '0', count: 0 } : { next_nonce: String(sent.length), policy_version: 2 };
   const send = async (_rpc, { p }) => { sent.push(p); return { hash: 'H' + sent.length, ok: true, value: { decision: sent.length < 3 ? 'allowed' : 'denied', reason: sent.length < 3 ? null : 'over_daily_budget' } }; };
-  const r = await runAttack({ charter: 'arena.f.testnet', key: keyFrom(), attackId: 'split-under-cap', tag: 'neo', viewF, send, rpcCall: null });
+  const checked = [];
+  const verify = async (h, c) => { checked.push([h, c]); return null; };
+  const r = await runAttack({ charter: 'arena.f.testnet', key: keyFrom(), attackId: 'split-under-cap', tag: 'neo', viewF, send, rpcCall: null, verify });
   assert.equal(r.steps.length, 3); assert.ok(r.refused); assert.equal(r.reason, 'over_daily_budget');
   assert.deepEqual(sent.map(p => p.nonce), ['0', '1', '2']);
-  assert.ok(_attempts.has('H3'));
+  assert.deepEqual(checked, [['H3', 'arena.f.testnet']]);
   await assert.rejects(runAttack({ charter: 'a.testnet', key: null, attackId: 'nope', tag: 'x', viewF, send }), /unknown attack/);
   await assert.rejects(runAttack({ charter: 'a.testnet', key: null, attackId: 'lookalike', tag: 'X Y', viewF, send }), /nickname/);
 });

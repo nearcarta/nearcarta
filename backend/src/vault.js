@@ -78,11 +78,12 @@ let queue = Promise.resolve();
 const serial = fn => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
 
 /** Run one attack on a charter with a key that may call `propose` on it. Stops at the first refusal. */
-export async function runAttack({ charter, key, attackId, tag, rpcCall = rpcClient(cfg.rpc), viewF = view, send = sendPropose }) {
+export async function runAttack({ charter, key, attackId, tag, rpcCall = rpcClient(cfg.rpc), viewF = view, send = sendPropose, verify = verifyAttempt }) {
   const result = await runSteps({ charter, key, attackId, tag, rpcCall, viewF, send });
   for (const st of result.steps) st.url = explorerTx(st.tx);
+  // The board only takes what the chain says: re-read the refusal like any recorded attempt.
   const last = result.steps[result.steps.length - 1];
-  if (result.refused) remember({ hash: last.tx, charter, attack: attackId, tag, decision: 'denied', reason: last.reason, at: Date.now() });
+  if (result.refused) await verify(last.tx, charter).catch(() => null);
   return result;
 }
 
