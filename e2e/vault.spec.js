@@ -53,9 +53,10 @@ test('visitor makes a charter and the contract refuses scams on chain', async ({
 });
 
 test('shared arena: attack without a wallet', async ({ page }) => {
-  const cfg = await (await page.request.get('/api/vault/config')).json();
-  test.skip(!cfg.attack_enabled, 'shared runner has no agent key on this deployment');
+  // Ask the API the page itself uses (config.js may point at another host than BASE_URL).
   await page.goto('/shops/vault/');
+  const cfg = await page.evaluate(async () => (await fetch((window.NEARCARTA_API || '') + '/api/vault/config')).json());
+  test.skip(!cfg.attack_enabled, 'shared runner has no agent key on this deployment');
   await page.locator('#nick').fill('e2e');
   await page.getByTestId('atk-shared-fake-invoice').click();
   await expect(page.locator('#shared [data-testid=verdict]')).toContainText('refused it: receiver_not_allowlisted', { timeout: 120_000 });
