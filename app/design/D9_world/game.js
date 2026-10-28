@@ -40,7 +40,7 @@ const SHOPS = {
   guard:{q:-4,r:2, m:'buildings/blue/building_barracks_blue', name:'Guardhouse', tr:'GUARD', st:'<i class="c-mint">●</i> 3 clauses armed'},
   arena:{q:1,r:3, m:'buildings/blue/building_archeryrange_blue', name:'Vault Arena', tr:'GAM', st:'<i class="c-mint">●</i> 0 breaches'},
   house:{q:-4,r:0, m:'buildings/blue/building_home_A_blue', name:'Your House', tr:'HOME', st:'<i class="c-mint">●</i> owner key · offline'},
-  toll:{q:-1,r:5, m:'buildings/blue/building_tower_base_blue', name:'Toll', tr:'GATED · G10', st:'<i class="c-gold">○</i> not built yet', gated:true},
+  toll:{q:-1,r:5, m:'buildings/blue/building_tower_base_blue', name:'Toll', tr:'GATED · G10', st:'<i class="c-mint">●</i> pay per call', gated:true},
 };
 const GATE={q:-5,r:1,dir:3}; // west gate of the oath (edge W of tile -5,1)
 const tiles=new Map(); // key -> {q,r,kind}
