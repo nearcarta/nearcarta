@@ -19,7 +19,7 @@ import { DEP, cfg } from './config.js';
 import { rpc, view, viewAccount, accessKeys, txStatus, eventsFromOutcome, explorerTx } from './near.js';
 import { ATTACKS, ATTACK_IDS, MEMO_RE, acceptedReasons, matchesPlan, pickClause, plan } from '../../shared/vault/attacks.js';
 import { TASKS, TASK_IDS, TASK_MEMO_RE, matchesTask, planTask } from '../../shared/vault/tasks.js';
-import { keyFrom, sendPropose, rpcClient, PROPOSE_TGAS } from '../../shared/vault/tx.js';
+import { keyFrom, sendPropose, rpcClient, viewFn, PROPOSE_TGAS } from '../../shared/vault/tx.js';
 import { runSteps, runTask } from '../../shared/vault/run.js';
 
 export const V = DEP.vault || null;
@@ -29,6 +29,8 @@ export const isAccount = a => typeof a === 'string' && ACCOUNT_RE.test(a);
 const ARCHIVAL = process.env.ARCHIVAL_RPC || 'https://archival-rpc.testnet.fastnear.com';
 
 /** Factories whose charters count: the live one first, then earlier releases (kept for history). */
+const ARENAS = new Set(V ? [V.arena.charter, ...(V.legacy || []).map(l => l.arena?.charter).filter(Boolean)] : []);
+export const isShared = c => ARENAS.has(c);
 const FACTORIES = V ? [{ factory: V.factory, code_hash: V.code_hash }, ...(V.legacy || []).map(l => ({ factory: l.factory, code_hash: l.code_hash }))] : [];
 
 export function config() {
@@ -106,7 +108,7 @@ export async function listCharters(from = 0, limit = 50, factory = V?.factory) {
     const [config, rows] = await Promise.all([view(factory, 'get_config'), view(factory, 'list', { from_index: f, limit: l })]);
     return { factory, count: config.count, code_hash: config.code_hash,
       charters: rows.map(([charter, c]) => ({ charter, owner: c.owner, created_at: c.created_at, index: c.index,
-        policy_delay_ns: c.policy_delay_ns ?? null, dao: c.dao ?? null, shared: charter === V.arena.charter })) };
+        policy_delay_ns: c.policy_delay_ns ?? null, dao: c.dao ?? null, shared: isShared(charter) })) };
   });
 }
 
@@ -148,18 +150,18 @@ export async function runnerStatus() {
 }
 
 /** Run one attack on a charter with a key that may call `propose` on it. Stops at the first refusal. */
-export async function runAttack({ charter, key, attackId, tag, rpcCall = rpcClient(cfg.rpc), viewF = view, send = sendPropose, verify = verifyAttempt }) {
+export async function runAttack({ charter, key, attackId, tag, rpcCall = rpcClient(cfg.rpc), viewF = (a, m, x) => viewFn(rpcCall, a, m, x), send = sendPropose, verify = verifyAttempt }) {
   const result = await runSteps({ charter, key, attackId, tag, rpcCall, viewF, send });
   for (const st of result.steps) st.url = explorerTx(st.tx);
   // The board only takes what the chain says: re-read the refusal like any recorded attempt.
   const last = result.steps[result.steps.length - 1];
   const v = result.refused && last?.tx ? await verify(last.tx, charter).catch(() => null) : null;
   if (last && v) { last.counted = v.counted; last.why = v.why; }
-  result.counted = !!v?.counted; result.why = v?.why ?? (result.refused ? 'not_verified_yet' : 'not_refused');
+  result.counted = !!v?.counted; result.why = v ? v.why : (result.refused ? 'not_verified_yet' : 'not_refused');
   return result;
 }
 
-export async function doTask({ charter, key, taskId, tag, rpcCall = rpcClient(cfg.rpc), viewF = view, send = sendPropose, verify = verifyAttempt }) {
+export async function doTask({ charter, key, taskId, tag, rpcCall = rpcClient(cfg.rpc), viewF = (a, m, x) => viewFn(rpcCall, a, m, x), send = sendPropose, verify = verifyAttempt }) {
   const r = await runTask({ charter, key, taskId, tag, rpcCall, viewF, send });
   r.url = explorerTx(r.tx);
   const v = r.tx ? await verify(r.tx, charter).catch(() => null) : null;
@@ -270,7 +272,7 @@ export async function verifyAttempt(hash, charter, { status = txStatus, facts = 
   const id = kind === 'attack' ? am[2] : tm[2];
   const a = { hash, charter, owner: f.owner, kind, [kind]: id, tag: kind === 'attack' ? am[1] : tm[1],
     decision: d.decision, reason: d.reason || null, receiver: d.receiver ?? null, amount: d.amount ?? null, clause_id: d.clause_id ?? null,
-    shared: charter === V.arena.charter, server_signed: charter === V.arena.charter, counted: false, why: null, at: null };
+    shared: isShared(charter), server_signed: isShared(charter), counted: false, why: null, at: null };
   if (kind === 'attack') a.expects = acceptedReasons(id);
   // The logged memo hash must be this memo (the event, not the args, is what the contract judged).
   if (d.memo_hash && d.memo_hash !== sha256hex(memo)) a.why = 'memo_mismatch';
@@ -392,7 +394,7 @@ export async function score(charter) {
   const tasks = TASKS.map(t => ({ id: t.id, name: t.name, expects: 'allowed', result: best(r => r.kind === 'task' && r.task === t.id) }));
   const attacks = ATTACKS.map(x => ({ id: x.id, name: x.name, expects: acceptedReasons(x.id), result: best(r => r.kind === 'attack' && r.attack === x.id && r.decision === 'denied') }));
   const passed = tasks.filter(t => t.result?.counted).length, blocked = attacks.filter(a => a.result?.counted).length;
-  return { charter, shared: charter === V.arena.charter, tasks_passed: passed, scams_blocked: blocked, score: passed + blocked, max_score: TASKS.length + ATTACKS.length, tasks, attacks, rule: RULE };
+  return { charter, shared: isShared(charter), tasks_passed: passed, scams_blocked: blocked, score: passed + blocked, max_score: TASKS.length + ATTACKS.length, tasks, attacks, rule: RULE };
 }
 
 /** Catalog of tasks and attacks; with a charter, the exact steps each would sign right now. */
