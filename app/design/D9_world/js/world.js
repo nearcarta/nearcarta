@@ -229,11 +229,15 @@ function signTex(id){ const c=document.createElement('canvas'); c.width=c.height
 const signs=[];
 function buildSigns(){ const wood=new THREE.MeshLambertMaterial({color:0x4a3020}), iron=new THREE.MeshLambertMaterial({color:0x2b2622});
   const lampM=new THREE.MeshBasicMaterial({color:0xffc477,fog:true}); const spillT=softT;
+  // static ironwork and lantern boxes of all seven shops are one draw each; the door spills are one instanced draw and the halos one Points draw (was 4 draws per shop)
+  const armG=[], lampG=[], n=Object.keys(SHOPS).length; let si=0;
+  const pools=new THREE.InstancedMesh(new THREE.CircleGeometry(.55,20).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:spillT,color:0xffa050,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}),n);
+  const hp=new Float32Array(n*3), hc=new Float32Array(n*3), hs=new Float32Array(n);
   for(const [id,s] of Object.entries(SHOPS)){ const c=hx(s.q,s.r), d=hx(...s.door); const dir=d.clone().sub(c).setY(0).normalize(); const side=new THREE.Vector3(-dir.z,0,dir.x);
     const sc=id==='chronicle'||id==='hall'?1.18:1.28; const front=c.clone().addScaledVector(dir,.62*sc);
     // bracket + swinging sign, off to one side of the door
     const g=new THREE.Group(); g.position.copy(front).addScaledVector(side,.34).setY(1.02); g.rotation.y=Math.atan2(dir.x,dir.z)+Math.PI/2;
-    const arm=new THREE.Mesh(new THREE.BoxGeometry(.04,.04,.36),iron); arm.position.set(0,0,0); g.add(arm);
+    g.updateMatrixWorld(true); armG.push(new THREE.BoxGeometry(.04,.04,.36).applyMatrix4(g.matrixWorld));
     const pv=new THREE.Group(); pv.position.set(0,-.02,.0); g.add(pv);
     const tex=signTex(id); const face=new THREE.MeshLambertMaterial({map:tex,emissive:0x3a2614,emissiveMap:tex,emissiveIntensity:.0});
     // four wood sides in one group, two painted faces in the other: 2 draws per sign, not 6
@@ -241,13 +245,20 @@ function buildSigns(){ const wood=new THREE.MeshLambertMaterial({color:0x4a3020}
     g.traverse(m=>{ if(m.isMesh) m.userData.id=id; }); W.pickables.push(board);
     W.scene.add(g); signs.push({pv,face,ph:rnd()*6});
     // door lantern and a warm spill on the step
-    const lp=front.clone().addScaledVector(side,-.3).setY(.78); const lm=new THREE.Mesh(new THREE.BoxGeometry(.07,.1,.07),lampM); lm.position.copy(lp); W.scene.add(lm);
-    const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:spillT,color:0xffb060,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:.5})); halo.position.copy(lp); halo.scale.setScalar(.5); W.scene.add(halo);
-    const pool=new THREE.Mesh(new THREE.CircleGeometry(.55,20),new THREE.MeshBasicMaterial({map:spillT,color:0xffa050,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:.3})); pool.rotation.x=-Math.PI/2; pool.position.copy(front).addScaledVector(dir,.3).setY(.03); W.scene.add(pool);
-    signs[signs.length-1].halo=halo; signs[signs.length-1].pool=pool; signs[signs.length-1].lm=lm; }
+    const lp=front.clone().addScaledVector(side,-.3).setY(.78); lampG.push(new THREE.BoxGeometry(.07,.1,.07).translate(lp.x,lp.y,lp.z));
+    hp.set([lp.x,lp.y,lp.z],si*3); const pp=front.clone().addScaledVector(dir,.3).setY(.03); pools.setMatrixAt(si,new THREE.Matrix4().makeTranslation(pp.x,pp.y,pp.z)); pools.setColorAt(si,C('#000'));
+    signs[signs.length-1].i=si++; }
+  const arms=new THREE.Mesh(mergeGeometries(armG,false),iron), lms=new THREE.Mesh(mergeGeometries(lampG,false),lampM); arms.name='signArms'; lms.name='signLamps';
+  const hg=new THREE.BufferGeometry(); hg.setAttribute('position',new THREE.BufferAttribute(hp,3)); hg.setAttribute('color',new THREE.BufferAttribute(hc,3)); hg.setAttribute('size',new THREE.BufferAttribute(hs,1));
+  const halos=new THREE.Points(hg,W.lampFx.halos.material); halos.frustumCulled=pools.frustumCulled=false; pools.name='signPools'; halos.name='signHalos';
+  W.signFx={pools,halos,lampM}; W.scene.add(arms,lms,pools,halos);
 }
-function updSigns(T,dt){ const k=W.lampAmb||0; for(const s of signs){ s.pv.rotation.x=Math.sin(T*1.3+s.ph)*.09*(1-W.frz)*U.wind.value; s.face.emissiveIntensity=k*.6;
-  const f=.85+.15*Math.sin(T*9+s.ph*3)*Math.sin(T*3.7+s.ph); s.halo.material.opacity=k*.5*f*(1-W.frz*.6); s.pool.material.opacity=k*.32*f*(1-W.frz*.6); s.halo.visible=s.halo.material.opacity>.004; s.pool.visible=s.pool.material.opacity>.004; s.halo.scale.setScalar(.36+k*.2); s.lm.material.color.setHex(W.frz>.5?0xbfe6ff:0xffc477); } }
+function updSigns(T,dt){ const k=W.lampAmb||0, F=W.signFx; if(!F) return; const hc=F.halos.geometry.attributes.color, hs=F.halos.geometry.attributes.size, tc=new THREE.Color();
+  for(const s of signs){ s.pv.rotation.x=Math.sin(T*1.3+s.ph)*.09*(1-W.frz)*U.wind.value; s.face.emissiveIntensity=k*.6;
+    const f=(.85+.15*Math.sin(T*9+s.ph*3)*Math.sin(T*3.7+s.ph))*(1-W.frz*.6);
+    tc.setHex(0xffb060).multiplyScalar(k*.5*f); hc.setXYZ(s.i,tc.r,tc.g,tc.b); hs.setX(s.i,.36+k*.2);
+    const o=k*.32*f; tc.setRGB(o,o,o); F.pools.setColorAt(s.i,tc); }
+  hc.needsUpdate=hs.needsUpdate=true; F.pools.instanceColor.needsUpdate=true; F.lampM.color.setHex(W.frz>.5?0xbfe6ff:0xffc477); }
 const clouds=[];
 
 // ---------- water: one stylized plane, shallow→deep by an island distance field, two foam bands ----------
@@ -407,8 +418,12 @@ function buildFerry(){
   const J=W.jetty; J.home=a.clone().lerp(rv,.7).setY(-.06); J.mid=rv.clone().lerp(far,.4).setY(-.06); J.far=rv.clone().lerp(far,.86).setY(-.06); J.stand=a.clone().lerp(rv,.42).setY(0);
   const wood=new THREE.MeshLambertMaterial({color:0x7a5236}), dark=new THREE.MeshLambertMaterial({color:0x4b3324});
   const dir=rv.clone().sub(a).setY(0).normalize(); const side=new THREE.Vector3(-dir.z,0,dir.x);
-  for(let i=0;i<7;i++){ const pl=new THREE.Mesh(new THREE.BoxGeometry(.16,.05,.62),i%2?wood:dark); const p=a.clone().lerp(rv,.38+i*.045); pl.position.set(p.x,.04,p.z); pl.lookAt(p.x+side.x,.04,p.z+side.z); pl.castShadow=pl.receiveShadow=true; W.scene.add(pl); }
-  for(let i=0;i<4;i++){ const pp=new THREE.Mesh(new THREE.CylinderGeometry(.04,.045,.55,6),dark); const p=a.clone().lerp(rv,.42+.1*(i>>1)).addScaledVector(side,(i%2?1:-1)*.33); pp.position.set(p.x,-.05,p.z); pp.castShadow=true; W.scene.add(pp); }
+  // jetty planks and posts: baked into one mesh per wood tone (2 draws, was 11)
+  { const JW=[], JD=[], o=new THREE.Object3D();
+    for(let i=0;i<7;i++){ const p=a.clone().lerp(rv,.38+i*.045); o.position.set(p.x,.04,p.z); o.lookAt(p.x+side.x,.04,p.z+side.z); o.updateMatrix(); (i%2?JW:JD).push(new THREE.BoxGeometry(.16,.05,.62).applyMatrix4(o.matrix)); }
+    for(let i=0;i<4;i++){ const p=a.clone().lerp(rv,.42+.1*(i>>1)).addScaledVector(side,(i%2?1:-1)*.33); JD.push(new THREE.CylinderGeometry(.04,.045,.55,6).toNonIndexed().translate(p.x,-.05,p.z)); }
+    JD.forEach((g,i)=>{ if(g.index) JD[i]=g.toNonIndexed(); }); JW.forEach((g,i)=>{ JW[i]=g.toNonIndexed(); });
+    [[JW,wood],[JD,dark]].forEach(([G,m])=>{ const j=new THREE.Mesh(mergeGeometries(G,false),m); j.castShadow=j.receiveShadow=true; j.name='jetty'; W.scene.add(j); }); }
   const b=W.boat=new THREE.Group(); const hull=new THREE.Mesh(new THREE.CylinderGeometry(.36,.24,.22,8,1,false),wood); hull.scale.set(2.0,1,.85); hull.castShadow=true; hull.userData.dynCast=true; b.add(hull);
   const rim=new THREE.Mesh(new THREE.TorusGeometry(.36,.025,4,16),dark); rim.rotation.x=Math.PI/2; rim.scale.set(2.0,.85,1); rim.position.y=.11; b.add(rim);
   const mast=new THREE.Mesh(new THREE.CylinderGeometry(.022,.026,1.05,5),dark); mast.position.set(.15,.6,0); b.add(mast);
@@ -541,7 +556,7 @@ export function update(dt){ const T=clock.T; U.time.value=T;
   flushPuffs();
 }
 function fireSpark(){ const sp=sparks.find(s=>s.t<0); if(!sp) return; const c=hx(SHOPS.arena.q,SHOPS.arena.r); const a=rnd()*Math.PI*2; sp.from.set(c.x+Math.cos(a)*4,.5,c.z+Math.sin(a)*3); const d=sp.from.clone().sub(c).setY(0).normalize(); sp.to.set(c.x+d.x*1.2,.6,c.z+d.z*1.); sp.t=0; }
-export function render(){ const r=W.renderer; if(!W.composer){ r.setRenderTarget(null); r.render(W.scene,W.camera); return; }
+export function render(){ const r=W.renderer; W.updBlobs?.(); if(!W.composer){ r.setRenderTarget(null); r.render(W.scene,W.camera); return; }
   r.setRenderTarget(W.sceneRT); r.clear(); r.render(W.scene,W.camera);
   W.bloom.render(r,null,W.sceneRT,0,false);
   const f=W.fin.uniforms; f.tDepth.value=W.sceneRT.depthTexture; f.cn.value=W.camera.near; f.cf.value=W.camera.far; W.fin.renderToScreen=false; W.fin.render(r,W.postRT,W.sceneRT,0,false);
