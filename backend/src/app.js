@@ -5,6 +5,7 @@ import { DEP, cfg, has } from './config.js';
 import * as ferry from './ferry.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
+import * as mist from './mistbank.js';
 import * as shops from './shops.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
@@ -52,6 +53,8 @@ export function makeApp() {
   app.get('/api/guardhouse/action/:id', async c => c.json(await guard.action(c.req.param('id'))));
 
   // Other shops
+  app.get('/api/mistbank', limiter(20, 60e3), async c => c.json(await mist.mistbank()));
+  app.get('/api/mistbank/street/:txid', limiter(20, 60e3), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
   app.get('/api/townhall', async c => c.json(await shops.townhall()));
   app.get('/api/arena', async c => c.json(await shops.arena()));
   app.get('/api/toll', async c => c.json(await shops.toll()));
