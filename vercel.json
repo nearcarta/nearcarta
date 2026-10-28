@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "app/dist",
+  "installCommand": "npm ci --omit=dev",
+  "functions": { "api/[...path].js": { "includeFiles": "shared/**", "maxDuration": 30 } },
+  "rewrites": [
+    { "source": "/design/D6_dashboards/src/data.js", "destination": "/live/data.js" }
+  ],
+  "headers": [
+    { "source": "/(.*)", "headers": [
+      { "key": "X-Content-Type-Options", "value": "nosniff" },
+      { "key": "Referrer-Policy", "value": "no-referrer" }
+    ] }
+  ]
+}
