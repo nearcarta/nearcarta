@@ -1,0 +1,172 @@
+{
+ "label": "community testnet, not 1Click",
+ "api": "https://www.usetidepool.tech",
+ "wallet": "r14rcv-46135.testnet",
+ "cases": {
+  "success": {
+   "depositAddress": "686d5081966331934a8af3ebc73fad91fbf01612261bc519e80123f703bdbbfb",
+   "quote": {
+    "amountIn": "2000000",
+    "minAmountIn": "2000000",
+    "amountOut": "419866616455696166240000",
+    "deadline": "2026-10-28T20:07:31.064Z",
+    "signature": "present (Tidepool maker key, not 1Click)"
+   },
+   "deposited": "2000000",
+   "deposit_tx": "AzhrbbgTbnKNtaKZUp7Gbz3roUUzMgT5DtEiM1ghdfjQ",
+   "statuses": [
+    {
+     "status": "PROCESSING",
+     "at": "2026-10-28T19:57:37.020Z"
+    },
+    {
+     "status": "SUCCESS",
+     "at": "2026-10-28T19:57:41.422Z"
+    }
+   ],
+   "final": {
+    "status": "SUCCESS",
+    "updatedAt": "2026-10-28T19:57:38.179Z",
+    "swapDetails": {
+     "intentHashes": [
+      "6pXcPijCJiyTratUc6Gyd2jQJGfGTKuyRAqpsQ9uPAmD",
+      "AR1JKCBod5jpHMsWgcYdv3FTuLRjX6WZZ38Dqif5anWd"
+     ],
+     "nearTxHashes": [
+      "2zXYvRS2K4LJYST6kJk9b6RBHZdCzxAGwtApuKui4MGU"
+     ],
+     "originChainTxHashes": [
+      {
+       "hash": "AzhrbbgTbnKNtaKZUp7Gbz3roUUzMgT5DtEiM1ghdfjQ",
+       "explorerUrl": "https://testnet.nearblocks.io/txns/AzhrbbgTbnKNtaKZUp7Gbz3roUUzMgT5DtEiM1ghdfjQ"
+      }
+     ],
+     "destinationChainTxHashes": [
+      {
+       "hash": "2zXYvRS2K4LJYST6kJk9b6RBHZdCzxAGwtApuKui4MGU",
+       "explorerUrl": "https://testnet.nearblocks.io/txns/2zXYvRS2K4LJYST6kJk9b6RBHZdCzxAGwtApuKui4MGU"
+      }
+     ],
+     "amountIn": "2000000",
+     "amountInFormatted": "2",
+     "amountInUsd": "1.9992",
+     "amountOut": "419866616455696166240000",
+     "amountOutFormatted": "0.41986661645569616624",
+     "amountOutUsd": "1.9902",
+     "depositedAmount": "2000000",
+     "depositedAmountFormatted": "2",
+     "depositedAmountUsd": "1.9992"
+    }
+   },
+   "track": "https://www.usetidepool.tech/v0/status?depositAddress=686d5081966331934a8af3ebc73fad91fbf01612261bc519e80123f703bdbbfb"
+  },
+  "refund_partial_deposit": {
+   "depositAddress": "452122de2cfae50b6a09af025951edd3e52610f55cf165458db11d1804c4b87c",
+   "quote": {
+    "amountIn": "2000000",
+    "minAmountIn": "2000000",
+    "amountOut": "419866616455696166240000",
+    "deadline": "2026-10-28T19:58:56.423Z",
+    "signature": "present (Tidepool maker key, not 1Click)"
+   },
+   "deposited": "1000000",
+   "deposit_tx": "B6WtdmRZuLTzyZFtgqD2sgqR9zUbMfG83VuRQ3Uty6vb",
+   "statuses": [
+    {
+     "status": "KNOWN_DEPOSIT_TX",
+     "at": "2026-10-28T19:57:46.849Z"
+    },
+    {
+     "status": "INCOMPLETE_DEPOSIT",
+     "at": "2026-10-28T19:57:51.237Z"
+    },
+    {
+     "status": "REFUNDED",
+     "at": "2026-10-28T19:59:02.614Z"
+    }
+   ],
+   "final": {
+    "status": "REFUNDED",
+    "updatedAt": "2026-10-28T19:59:02.125Z",
+    "swapDetails": {
+     "intentHashes": [
+      "8M9Cj1KKrd2VDYt9kffNyP6FStMXF5LXt7a8Di1D6aPD"
+     ],
+     "nearTxHashes": [
+      "HS7zQktv79jFi4VEwmtRNoT1HBwwV7MyUQP4kxosCm9Q"
+     ],
+     "originChainTxHashes": [
+      {
+       "hash": "B6WtdmRZuLTzyZFtgqD2sgqR9zUbMfG83VuRQ3Uty6vb",
+       "explorerUrl": "https://testnet.nearblocks.io/txns/B6WtdmRZuLTzyZFtgqD2sgqR9zUbMfG83VuRQ3Uty6vb"
+      }
+     ],
+     "destinationChainTxHashes": [
+      {
+       "hash": "HS7zQktv79jFi4VEwmtRNoT1HBwwV7MyUQP4kxosCm9Q",
+       "explorerUrl": "https://testnet.nearblocks.io/txns/HS7zQktv79jFi4VEwmtRNoT1HBwwV7MyUQP4kxosCm9Q"
+      }
+     ],
+     "depositedAmount": "1000000",
+     "depositedAmountFormatted": "1",
+     "depositedAmountUsd": "0.9996",
+     "refundedAmount": "1000000",
+     "refundedAmountFormatted": "1",
+     "refundedAmountUsd": "0.9996",
+     "refundReason": "PARTIAL_DEPOSIT"
+    }
+   },
+   "track": "https://www.usetidepool.tech/v0/status?depositAddress=452122de2cfae50b6a09af025951edd3e52610f55cf165458db11d1804c4b87c"
+  }
+ },
+ "verifier_check": {
+  "verifier": "verifier.tidepool-sandbox.testnet",
+  "code_hash_hex": "f67f9559b3b512c52dfa11723a28b9119bcf773ac01780370d6409e5f1fb20e5",
+  "expected": "f67f9559b3b512c52dfa11723a28b9119bcf773ac01780370d6409e5f1fb20e5",
+  "ok": true,
+  "release": "https://github.com/near/intents/releases/tag/defuse/v0.4.2",
+  "at": "2026-10-28T19:57:13.026Z"
+ },
+ "faucet": {
+  "ok": true,
+  "at": "2026-10-28T19:57:30.815Z",
+  "drips": [
+   {
+    "token": "USDC",
+    "amount": "100"
+   },
+   {
+    "token": "USDT",
+    "amount": "100"
+   },
+   {
+    "token": "wNEAR",
+    "amount": "40"
+   },
+   {
+    "token": "wBTC",
+    "amount": "0.001"
+   },
+   {
+    "token": "ETH",
+    "amount": "0.03"
+   },
+   {
+    "token": "XAUT",
+    "amount": "0.03"
+   }
+  ]
+ },
+ "what": "Ferry deposit and status tracker on Tidepool (ENV=TIDEPOOL): one real quote -> INTENTS deposit -> SUCCESS settle, and one partial deposit refunded at the deadline (PARTIAL_DEPOSIT). Community testnet, not 1Click: Tidepool is a community-run 1Click-compatible sandbox; its test tokens have no value.",
+ "how_deposit": "ft_transfer_call on usdc.tidepool-sandbox.testnet to verifier.tidepool-sandbox.testnet with msg = depositAddress, signed by the wallet; then POST /v0/deposit/submit.",
+ "onchain_check": {
+  "at": "2026-10-28T20:00Z",
+  "verifier_mt_balance_of": {
+   "nep141:usdc.tidepool-sandbox.testnet": "1000000 (the refunded 1 USDC)",
+   "nep141:wnear.tidepool-sandbox.testnet": "419866616455696166240000 (0.41987 wNEAR from the settled swap)"
+  }
+ },
+ "tracker": "GET /api/ferry/status?depositAddress=<addr> (backend), proxying Tidepool /v0/status with the verifier code-hash check attached",
+ "script": "backend/scripts/ferry-tidepool.js",
+ "not_1click": "Quotes are signed by the Tidepool maker, not 1Click. The live Ferry tab still quotes real 1Click in dry mode only; no mainnet deposit was made."
+}

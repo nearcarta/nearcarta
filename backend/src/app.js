@@ -146,6 +146,16 @@ export function makeApp() {
     try { return c.json(zcashRecipient(c.req.param('addr'))); } catch { return bad(c, 'not a valid Zcash address'); }
   });
 
+  // Ferry deposit and status tracker (ENV=TIDEPOOL: community testnet, not 1Click). Any deposit address from a
+  // Tidepool quote; the answer carries the status, refund amount and reason, and the verifier code-hash check.
+  app.get('/api/ferry/status', limiter(30), async c => {
+    const env = (c.req.query('env') || 'TIDEPOOL').toUpperCase();
+    if (env !== 'TIDEPOOL') return bad(c, 'only env=TIDEPOOL deposits are tracked (live 1Click quotes are dry, no deposits)');
+    try { return c.json(await ferry.tidepoolStatus(c.req.query('depositAddress'))); }
+    catch (e) { return c.json({ error: e.message }, e.status || 502); }
+  });
+  app.get('/api/ferry/tidepool', limiter(20), c => c.json(DEP.ferry_tidepool ? { ...DEP.ferry_tidepool, label: ferry.TIDEPOOL.label } : { error: 'none' }, DEP.ferry_tidepool ? 200 : 404));
+
   // Guardhouse
   app.get('/api/guardhouse', limiter(30), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
