@@ -42,7 +42,7 @@ Each check below was run with the command shown. The result is what it printed.
 | S2 | Render API, every route | the same loop against `https://nearcarta-api.onrender.com` | 15 × 200 (2026-10-28 22:20 Cairo), the same answers as S1, except whoami `proxy_verified: false` (direct calls carry no proxy secret) |
 | S3 | Ferry via Render, dry 1Click | `curl -X POST $RENDER/api/ferry/quote` with USDC(base)→ZEC, 2.5, the integration test's UA and refund address, `privacy` public and basic | 2026-10-28 22:20 Cairo: public `ok`, echo `public`; basic `ok`, echo `basic` (dry quotes: nothing is deposited) |
 | S4 | Browser e2e on Vercel | `BASE_URL=https://nearcarta.vercel.app npm run e2e` | 21 passed, 5 skipped (they need house keys, a faucet or the vault e2e switch), 0 failed, 0 flaky (2026-10-28 22:20 Cairo) → judges/proofs/e2e-vercel.json. The town hall test reads the DAO's approved Freeze (proposal 7) and Unfreeze (proposal 8) votes and checks the page shows the live state (now `active`) |
-| S5 | Unit | `npm test` | 150 pass, 0 fail, 1 skip (2026-10-28 22:36 Cairo) |
+| S5 | Unit | `npm test` | 150 pass, 0 fail, 1 skip (2026-10-28 22:34 Cairo) |
 | S6 | Live integration (testnet, 1Click dry, NEAR AI TEE) | `npm run test:integration` | 15/15 (2026-10-28 22:20 Cairo) |
 | S7 | Proof txs on testnet | `npm run verify` | `63/63 proof txs found on testnet` (2026-10-28 22:26 Cairo, judges/proofs/proof-check.json) |
 | S8 | Charter code = committed wasm | `npm run wasm-hash`; `view_account r11oath-82930.testnet` | both `EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq` (match) |
