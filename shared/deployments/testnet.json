@@ -136,5 +136,37 @@
       "escalated_paid_after_approve": "3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
       "wallet_resolve_approve": "EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy"
     }
+  },
+  "vault": {
+    "factory": "nccharters-17102.testnet",
+    "code_hash": "6iazbQxXNWY6puNN9hC3njiiErrNyCvWzXL9fX95vRSe",
+    "code_source": "contracts/artifacts/oath.wasm (R14 reproducible build, see judges/VERIFY.md)",
+    "factory_sha256": "af0ef26ea95840c30eea0dd371052068f01054454eb3798552e9f611892a1b99",
+    "factory_artifact": "contracts/artifacts/charter_factory.wasm",
+    "min_deposit": "300000000000000000000000",
+    "arena": {
+      "charter": "arena.nccharters-17102.testnet",
+      "owner": "ncarena-17102.testnet",
+      "merchants": [
+        "cafe.ncpub-17102.testnet",
+        "books.ncpub-17102.testnet"
+      ]
+    },
+    "proof_txs": {
+      "oath_deployed_as_global_by_hash": "HjKZMC2vXq9H6fvsKXWixPuxYpQYQpJHaAYk7CQ6X49N",
+      "factory_deploy_init": "4xeM3o7odc3m7EEXoxcEPx9Zh2mKMq9M9FHqsZB42ZGX",
+      "factory_full_access_key_deleted": "2iEEDHpqxBh7Q1kL4RoN4imtFPTxDfb8UQc8CxG9HPcK",
+      "arena_charter_created_by_factory": "HqNVc8aLXBwdyDCWNwnYrmcsKCyzApug7eCufcNM4j6B",
+      "arena_set_clause": "G5bX48ZUozhB5YMaBg1yj8ynFVvWT5QQS7upP5WPCYt8",
+      "arena_set_agent_key": "D9LdxXPosQnkz6ZqrX5hckEw2QjvssdxuXgLo9mtCJZT",
+      "refused_fake_invoice": "BKNcd9JynSYkMEDZRDsoELMaCTakVQBbcpfS3KMQUcWZ",
+      "refused_injected_recipient": "F1JJtrd4PNF69ajmpCVkwfvwtf8dTAQFr5ANjeofmJYP",
+      "refused_lookalike": "2kVz8dXWY3XtWvJiAj6U39YxTL58pQ818cuQ9HrRZPfz",
+      "refused_impersonation": "4a633Ss2gs8n9XpEDJLacvbnn1TDddVBcs9KrdPSkcjp",
+      "split_under_cap_allowed_1": "BQ6afJDguCRqmR9ZUybDcfmwkCvtz9oRp76CYR2nMXnk",
+      "split_under_cap_allowed_2": "C5pnbW8koh78VCf7Bhjs7prK8fXhYEbmr14WH6N65HQR",
+      "refused_split_under_cap": "JB6VBQ1SGhc1p3DZUYg4MnEveYRbskwkTAntB21Hahho",
+      "refused_slow_drain": "28ssrzizYXw2iMNWSikpaw83f5Bx48mp1rvhQ3qak7xf"
+    }
   }
 }
