@@ -38,7 +38,7 @@ export const SHOPS = {
   guard:    {q:-4,r:2, m:'buildings/blue/building_barracks_blue', name:'Guardhouse', role:'ward gate · knights'},
   arena:    {q:1,r:3,  m:'buildings/blue/building_archeryrange_blue',name:'Vault Arena', role:'try to break the vault'},
   house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'House', role:'owner key · oath plaque'},
-  toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'chain signatures'},
+  toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay per call'},
 };
 export const GATE={q:-5,r:1,dir:3};
 export const tiles=new Map();

@@ -21,6 +21,7 @@
   <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l11 6v14l-11 6-11-6V9z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 9.5c3 2.4 4.4 4.7 4.4 7a4.4 4.4 0 0 1-8.8 0c0-2.3 1.4-4.6 4.4-7z" fill="currentColor"/></svg>
   <div><b>Nearcarta</b><small>independent, not affiliated with NEAR Foundation</small></div>
 </header>
+<a id="rulesBtn" class="hud pill go" href="/shops/vault/" data-testid="rules-cta" title="Your House is the Charter office: write what your agent may spend, and on what"><span class="k" aria-hidden="true">&#9873;</span>Set your agent&rsquo;s rules<span class="cue" aria-hidden="true">Start here</span></a>
 
 <nav id="ctl" class="hud" aria-label="Controls">
   <div id="playSeg" role="radiogroup" aria-label="How to get around">
@@ -32,7 +33,7 @@
   <button id="curfewBtn" class="pill ice" type="button" title="Hold: only your house key can freeze the agent"><span class="fi"></span><span class="t">Hold for curfew</span></button>
 </nav>
 
-<aside id="chron" class="hud" aria-label="Chronicle (testnet)">
+<aside id="chron" class="hud" aria-label="Chronicle (testnet)" hidden>
   <div class="ch"><span class="dot"></span>Chronicle <em>testnet</em></div>
   <ol id="clist"></ol>
 </aside>
@@ -50,8 +51,23 @@
   <button type="button" class="zb" data-d="1" aria-label="Zoom out to the overview">&minus;</button>
   <span class="zl">Street</span>
 </div>
-<div id="inCard" hidden><b></b><span>Step inside to use this shop on testnet.</span><a class="pill go" href="/design/D8_shops/index.html">Open the room</a><button type="button" class="pill">Step back out <kbd>Esc</kbd></button></div>
-<div id="loading"><i id="lbar"></i></div>
+<div id="fade" aria-hidden="true"><span class="ring"></span></div>
+<div id="shopUI" hidden>
+  <button id="back" type="button"><span aria-hidden="true">&larr;</span> Back to the street <kbd>Esc</kbd></button>
+  <div id="stags"></div>
+  <section id="tray" aria-live="polite">
+    <div class="t-head"><h1 id="t-title"></h1><span id="t-src" class="src"></span></div>
+    <p id="t-label" class="label"></p>
+    <div id="t-hero" class="hero"></div>
+    <a id="t-cta" class="act primary cta" hidden></a>
+    <div class="t-row"><button id="t-act" type="button" class="act primary"></button><button id="t-proof" type="button" class="link" aria-controls="drawer" aria-expanded="false">Show proof</button></div>
+  </section>
+  <aside id="drawer" aria-hidden="true" aria-labelledby="d-title">
+    <div class="d-head"><h2 id="d-title">Proof</h2><button id="d-close" type="button" class="icon" aria-label="Close proof">&#x2715;</button></div>
+    <div id="d-body"></div>
+  </aside>
+</div>
+<div id="loading" role="status" aria-live="polite"><img src="shots/fallback_1920x1080.jpg" alt=""><div class="lc"><b>Nearcarta</b><span id="ltxt">Opening the town</span><i class="lt"><i id="lbar"></i></i><small>independent · not affiliated with NEAR Foundation</small></div></div>
 
 <div id="fb2d" hidden>
   <img id="fbimg" loading="lazy" src="shots/fallback_1920x1080.jpg" alt="Nearcarta at dusk: the island town, the ward, the ferry.">
@@ -59,15 +75,22 @@
 </div>
 
 <script type="module">
-// Boot: decide 2D vs 3D first, so the 2D / low-power path never downloads three.js, GSAP or the models.
-// 3D loads one bundled module (dist/main.js, built by tools/build.sh); ?dev uses the unbundled sources.
-const q=new URLSearchParams(location.search);
-const gl=(()=>{ try{ const c=document.createElement('canvas'), x=c.getContext('webgl2')||c.getContext('webgl'); x&&x.getExtension('WEBGL_lose_context')?.loseContext(); return !!x; }catch(e){ return false; } })();
+// Boot: decide 2D vs 3D first, so the 2D path never downloads three.js, GSAP or the models.
+// 3D needs WebGL2 on real hardware: no context, a "major performance caveat" or a software rasteriser (SwiftShader,
+// llvmpipe) means the 2D town, unless ?3d / ?full / ?capture forces 3D (captures and perf runs use SwiftShader on purpose).
+// Until the first lit frame the poster + progress bar stay up and the canvas stays hidden, so no black frame is ever shown;
+// if 3D has not drawn within 25 s, or a script fails, the 2D town takes over.
+const q=new URLSearchParams(location.search); const force=q.has('3d')||q.has('full')||q.has('capture');
+const cap=(()=>{ try{ const c=document.createElement('canvas'); const x=c.getContext('webgl2',{failIfMajorPerformanceCaveat:!force,powerPreference:'high-performance'}); if(!x) return {ok:false,why:'WebGL2 unavailable or software-only'};
+  const d=x.getExtension('WEBGL_debug_renderer_info'); const r=d?String(x.getParameter(d.UNMASKED_RENDERER_WEBGL)):''; x.getExtension('WEBGL_lose_context')?.loseContext();
+  const soft=/swiftshader|llvmpipe|softpipe|software|basic render/i.test(r); return {ok:force||!soft,why:soft?'software WebGL: '+r:'',r}; }catch(e){ return {ok:false,why:String(e)}; } })();
+window.__gl=cap; const go2d=why=>import('./js/fb.js').then(m=>m.fallback(why));
 const script=src=>new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
 const pre=h=>{ const l=document.createElement('link'); l.rel='preload'; l.as='fetch'; l.crossOrigin='anonymous'; l.href=h; document.head.appendChild(l); };
-if(q.get('mode')==='2d'||!gl){ if(!q.has('t')) import('./js/fb.js').then(m=>m.fallback()); }
+if(q.get('mode')==='2d'||!cap.ok){ if(!q.has('t')) go2d(q.get('mode')==='2d'?'':cap.why); }
 else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpressive.glb'].forEach(pre);
-  script('vendor/gsap/gsap.min.js').then(()=>import(q.has('t')?'./js/test_main.js':q.has('dev')?'./js/main.js':'./dist/main.js')); }
+  script('vendor/gsap/gsap.min.js').then(()=>import(q.has('t')?'./js/test_main.js':q.has('dev')?'./js/main.js':'./dist/main.js')).catch(e=>{ console.error('[Nearcarta] 3D failed to load',e); go2d('3D failed to load'); });
+  if(!force) setTimeout(()=>{ if(!document.body.classList.contains('ready')&&!document.body.classList.contains('fb')){ window.__3dStop='slow start'; go2d('3D did not start within 25 s'); } },25000); }
 </script>
 </body>
 </html>

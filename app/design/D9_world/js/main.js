@@ -4,13 +4,15 @@ import { P, CAPTURE, RM, clock, run, tickRoutines, wait, hx, toHex, walkable, SH
 import { W, LP, init, update, render, setTod, setProgress, lampState, LAMPC, setShadowMode } from './world.js';
 import { buildCast, updateCast, CAST, setHooks, smooth, chars } from './chars.js';
 import * as SP from './speech.js';
+import * as SL from './shops.js';
 import { icon } from '../d7/js/d7.js';
 const $=s=>document.querySelector(s); const body=document.body; const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 window.__alog=[]; // audio event log (t in story seconds) for the offline video mix
 
 // ---------- fallback: no WebGL, or ?mode=2d ----------
 // index.html picks the 2D path before this module loads (so 2D never downloads three.js); this covers a failed WebGL init.
-const fallback=()=>import('./fb.js').then(m=>m.fallback());
+// Any failure after boot (init throws, context lost, a blank first frame, single-digit fps) stops the 3D loop and shows the 2D town.
+let stopped=false; const fallback=why=>{ if(stopped) return; stopped=true; window.__3dStop=why; return import('./fb.js').then(m=>m.fallback(why)); };
 
 // ---------- sound: tiny WebAudio bank (off until the visitor turns it on) ----------
 const SND={ allowed:'d7/assets/audio/allowed.ogg', refuse:'d7/assets/audio/refuse.ogg', freeze:'d7/assets/audio/freeze.ogg', send:'d7/assets/audio/send.ogg', water:'d7/assets/audio/water.ogg', click:'d7/assets/audio/ui-click.ogg', music:'d7/assets/audio/music-ambient.ogg',
@@ -36,10 +38,10 @@ function tickTimers(){ for(let i=timers.length-1;i>=0;i--) if(clock.T>=timers[i]
 function flare(l){ l.flare=1; }
 
 // ---------- boot ----------
-setProgress(f=>{ $('#lbar').style.width=(f*100).toFixed(0)+'%'; });
+setProgress(f=>{ $('#lbar').style.width=(f*100).toFixed(0)+'%'; const t=$('#ltxt'); if(t) t.textContent=f<.95?`Building the town · ${(f*100)|0}%`:'Lighting the lamps'; });
 const cv=$('#c'); const t0=performance.now();
-try{ await init(cv); }catch(e){ console.error(e); fallback(); throw e; }
-await buildCast();
+cv.addEventListener('webglcontextlost',e=>{ e.preventDefault(); console.error('[Nearcarta] WebGL context lost'); fallback('WebGL context lost'); });
+try{ await init(cv); await buildCast(); }catch(e){ console.error(e); fallback('3D start failed: '+(e&&e.message||e)); throw e; }
 const R=CAST.robot; window.world={}; window.W=W; window.CAST=CAST;
 // shadows: captures and ?shadows=dynamic keep every caster live; the live page starts static (town shadows baked once) and upgrades once it holds ~50 fps
 const SHM=P.get('shadows'); setShadowMode(CAPTURE?SHM!=='static':SHM==='dynamic');
@@ -66,11 +68,15 @@ function applyCam(dt,snap){ if(!D.shot) return; const s=D.shot(); const e=D.k;
   cam.position.copy(smoothT.p); D.cur.t.copy(smoothT.t); cam.fov=f; cam.updateProjectionMatrix(); cam.lookAt(D.cur.t);
   if(W.fin){ const d=cam.position.distanceTo(D.cur.t); W.fin.uniforms.focus.value=.5; W.fin.uniforms.band.value=Math.min(.34,.1+d*.009); W.fin.uniforms.tilt.value=d<6?.55:1; } }
 const letterbox=on=>body.classList.toggle('letterbox',on);
+// shops with no room yet: still part of the town, but no pin, no door, no menu entry
+const CLOSED=new Set(['toll']); const OPEN=Object.fromEntries(Object.entries(SHOPS).filter(([id])=>!CLOSED.has(id)));
+const CHARTER=window.NEARCARTA_CHARTER||'/shops/vault/';
+const ALIAS={chron:'chronicle',townhall:'hall',mistbank:'bank',guardhouse:'guard',vault:'house'};
 
 // ---------- Chronicle (real testnet ids only; anything else would be marked SAMPLE) ----------
 function chron(k,label){ const tx=TX[k]; const li=document.createElement('li'); li.className=tx.cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
   li.querySelector('.w').textContent=label||tx.what; const a=li.querySelector('a'); a.href=txUrl(tx.h); a.textContent=tx.h.slice(0,6)+'…'+tx.h.slice(-4); a.title=tx.ev+' · open on testnet explorer';
-  const l=$('#clist'); l.prepend(li); while(l.children.length>3) l.lastChild.remove(); sfx('page',{g:.25}); }
+  const l=$('#clist'); $('#chron').hidden=false; l.prepend(li); while(l.children.length>3) l.lastChild.remove(); sfx('page',{g:.25}); }
 
 // ---------- initial town state ----------
 setTod(+(P.get('tod')??1));
@@ -78,7 +84,7 @@ const ROUTE_LAMPS=[]; for(const l of W.lamps){ const [q,r]=toHex(l.pos.x,l.pos.z
 const gateIn=V(W.gatePos.x+1.65,0,W.gatePos.z+.05);
 
 // ---------- the story (~45 s). Every beat is driven by sim time, so the capture is frame-exact. ----------
-let storyRun=null, mode='story';
+let storyRun=null, mode='story', storyEnd=-1e9;
 function* story(){
   storyT0=clock.T; body.classList.add('story'); letterbox(true); mode='story';
   const st=CAST.stranger, kn=CAST.knights, fm=CAST.ferryman, nb=CAST.wander[0];
@@ -132,8 +138,8 @@ function* story(){
   yield wait(4.8);
   endStory();
 }
-function endStory(){ if(mode!=='story') return; storyRun&&(storyRun.dead=true); body.classList.remove('story'); letterbox(false); $('#title').style.opacity=0; SP.hush();
-  CAST.knights.forEach(k=>k.release()); if(W.frz>.5) freeze(false,{silent:true}); R.release(); R.lights=true; CAST.wander.forEach(w=>{ w.hold=false; w.lookAt(null); }); mode='town'; idleTown(); }
+function endStory(){ if(mode!=='story') return; storyEnd=performance.now(); storyRun&&(storyRun.dead=true); body.classList.remove('story'); letterbox(false); $('#title').style.opacity=0; SP.hush();
+  CAST.knights.forEach(k=>k.release()); if(W.frz>.5) freeze(false,{silent:true}); R.release(); R.lights=true; CAST.wander.forEach(w=>{ w.hold=false; w.lookAt(null); }); mode='town'; land(); pointRules(); }
 
 // ---------- freeze / curfew ----------
 let frozen=false;
@@ -153,10 +159,10 @@ sb.addEventListener('click',async()=>{ if(!A.on){ await audioOn(); } else { A.on
 const PC={yaw:.5,po:0,z:.14,zs:.14,t:V(),p:V(),init:false};
 // zoom: z 0 = street (close, low), 1 = overview (every shop at once). Distance, pitch and target all follow z.
 const ZC=(()=>{ const c=V(); const ps=Object.values(SHOPS).map(s=>hx(s.q,s.r)); ps.forEach(p=>c.add(p)); c.multiplyScalar(1/ps.length); c.y=.3; return c; })();
-const zDist=z=>3.7+43.5*Math.pow(z,1.65), zPitch=z=>Math.min(1.18,.4+.74*Math.pow(z,1.1)+PC.po*(1-z));
+const PORT=()=>innerWidth<innerHeight; const zDist=z=>(3.7+43.5*Math.pow(z,1.65))*(PORT()?1+.6*(1-z):1), zPitch=z=>Math.min(1.18,.4+.74*Math.pow(z,1.1)+PC.po*(1-z));
 const sstep=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
 const mb=$('#modeBtn'); const keys=new Set();
-function explore(on){ if(mode==='story') endStory(); mode=on?'explore':'town'; body.classList.toggle('explore',on); mb.classList.toggle('on',on); mb.textContent=on?'Watch':'Explore';
+function explore(on){ if(mode==='story') endStory(); letterbox(false); mode=on?'explore':'town'; body.classList.toggle('explore',on); mb.classList.toggle('on',on); mb.textContent=on?'Watch':'Explore';
   if(on){ D.shot=null; PC.init=false; cv.classList.add('walk'); R.release(); } else { R.steer=null; cv.classList.remove('walk'); prompt(null); idleTown(); } }
 mb.addEventListener('click',()=>explore(mode!=='explore'));
 const fadeV={}; const ray2=new THREE.Raycaster();
@@ -191,26 +197,30 @@ let near=null;
 function prompt(id){ if(id===near && (!id||!pr.hidden)) return; near=id; if(!id){ pr.hidden=true; return; } const s=SHOPS[id]; pr.innerHTML=`<kbd>Enter</kbd><span>${s.name}</span>`; pr.setAttribute('aria-label','Step into '+s.name); pr.hidden=false; }
 pr.addEventListener('click',()=>{ if(near) goIn(near); });
 let lastD=9; function nearDoor(){ const r=_nearDoor(); if(!r.id){ lastD=9; return null; } const away=r.d>lastD+.004; lastD=r.d; return (away&&r.d>.45)?null:r.id; } // hide as soon as the robot walks away
-function _nearDoor(){ let best=null,bd=1.05; for(const [id,s] of Object.entries(SHOPS)){ const d=hx(...s.door).distanceTo(V(R.pos.x,0,R.pos.z)); const dp=doorPoint(id).setY(0).distanceTo(V(R.pos.x,0,R.pos.z)); const m=Math.min(d,dp+.15); if(m<bd){ bd=m; best=id; } } return {id:best,d:bd}; }
+function _nearDoor(){ let best=null,bd=1.05; for(const [id,s] of Object.entries(OPEN)){ const d=hx(...s.door).distanceTo(V(R.pos.x,0,R.pos.z)); const dp=doorPoint(id).setY(0).distanceTo(V(R.pos.x,0,R.pos.z)); const m=Math.min(d,dp+.15); if(m<bd){ bd=m; best=id; } } return {id:best,d:bd}; }
 function placePrompt(){ if(!near) return; const p=screenOf(doorPoint(near).setY(1.55)); pr.style.transform=`translate(${p.x}px,${p.y}px) translate(-50%,-100%)`; }
-function goIn(id){ const s=SHOPS[id]; R.steer=null; keys.clear(); prompt(null); R.release(.2); let done=false; const go=()=>{ if(done||inShop) return; done=true; R.stop(); R.faceTo(hx(s.q,s.r)); world.enterShop(id); };
+function goIn(id){ if(CLOSED.has(id)) return; const s=SHOPS[id]; R.steer=null; keys.clear(); prompt(null); R.release(.2); let done=false; const go=()=>{ if(done||inShop) return; done=true; R.stop(); R.faceTo(hx(s.q,s.r)); world.enterShop(id); };
   const end=hx(...s.door).lerp(hx(s.q,s.r),.18); const far=R.pos.distanceTo(end);
   if(far<1.6) R.go([end],{arrive:go}); else if(!R.goHex(s.door,{end,run:far>4,arrive:go})) R.go([end],{arrive:go});
   setTimeoutSim(go,Math.min(6,.9+far/(far>4?R.runSpd:R.walkSpd)*1.25)); }
+// walking straight into a door (keys held toward the shop, on its step) goes in, no button needed
+let pushT=0; function walkInto(dt){ const r=_nearDoor(); if(!r.id||!R.steer||r.d>.6){ pushT=0; return; } const c=hx(SHOPS[r.id].q,SHOPS[r.id].r); const tx=c.x-R.pos.x, tz=c.z-R.pos.z, l=Math.hypot(tx,tz)||1, sl=R.steer.length()||1;
+  if((tx*R.steer.x+tz*R.steer.y)/(l*sl)>.55){ pushT+=dt; if(pushT>.3){ pushT=0; goIn(r.id); } } else pushT=0; }
 // skip to a shop (for judges): one list, one click, straight inside
 const sm=document.createElement('div'); sm.id='shopMenu'; sm.className='hud'; sm.hidden=true; sm.setAttribute('role','menu');
-sm.innerHTML=Object.entries(SHOPS).map(([id,s])=>`<button type="button" role="menuitem" data-id="${id}"><b>${s.name}</b><small>${s.role}</small></button>`).join('');
+sm.innerHTML=Object.entries(OPEN).map(([id,s])=>`<button type="button" role="menuitem" data-id="${id}"><b>${s.name}</b><small>${s.role}</small></button>`).join('');
 document.body.appendChild(sm);
 const sbtn=document.createElement('button'); sbtn.id='shopsBtn'; sbtn.className='pill'; sbtn.type='button'; sbtn.textContent='Skip to a shop'; sbtn.setAttribute('aria-haspopup','menu'); $('#ctl').prepend(sbtn);
 sbtn.addEventListener('click',()=>{ sm.hidden=!sm.hidden; sbtn.setAttribute('aria-expanded',String(!sm.hidden)); });
 sm.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; sm.hidden=true; sbtn.setAttribute('aria-expanded','false'); jump(b.dataset.id); });
 // Jump: fly straight from wherever the camera is into the shop door; the Lamplighter waits on that step for the way back out
-function jump(id){ if(inShop||!SHOPS[id]) return; if(mode==='story') endStory(); if(mode!=='explore') explore(true); tagOff(); const s=SHOPS[id], d=hx(...s.door), c=hx(s.q,s.r);
-  world.enterShop(id).then(()=>{ if(inShop!==id) return; R.steer=null; R.stop(); R.place(d.x,d.z,Math.atan2(d.x-c.x,d.z-c.z)); }); }
+function jump(id,opt){ if(inShop||!OPEN[id]) return; if(mode==='story') endStory(); if(mode!=='explore') explore(true); tagOff(); const s=SHOPS[id], d=hx(...s.door), c=hx(s.q,s.r);
+  world.enterShop(id,opt).then(()=>{ if(inShop!==id) return; R.steer=null; R.stop(); R.place(d.x,d.z,Math.atan2(d.x-c.x,d.z-c.z)); }); }
 // ---------- Walk / Jump ----------
+const TOUCH=matchMedia('(pointer:coarse)').matches||P.has('touch'); if(TOUCH) body.classList.add('touch');
 let play=P.get('play')==='walk'?'walk':'jump'; const seg=$('#playSeg'); const hintEl=$('#hint');
 function setPlay(m){ play=m; seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.m===m))); body.classList.toggle('jump',m==='jump'); body.classList.remove('moved');
-  hintEl.innerHTML=m==='jump'?'Click any shop or pin to fly in · <kbd>wheel</kbd> or <kbd>−</kbd><kbd>+</kbd> to zoom · <kbd>O</kbd> overview':'<kbd>WASD</kbd> or click to walk · <kbd>Shift</kbd> or double-click runs · <kbd>Enter</kbd> at a door';
+  hintEl.innerHTML=TOUCH?(m==='jump'?'Tap a shop · pinch to zoom · <kbd>⤢</kbd> overview':'Tap to walk · double-tap runs · tap a door to go in'):m==='jump'?'Click any shop or pin to fly in · <kbd>wheel</kbd> or <kbd>−</kbd><kbd>+</kbd> to zoom · <kbd>O</kbd> overview':'<kbd>WASD</kbd> or click to walk · <kbd>Shift</kbd> or double-click runs · <kbd>Enter</kbd> at a door';
   if(m==='walk'&&mode!=='explore'&&mode!=='story') explore(true); if(m==='walk'&&PC.z>.45) setZoom(.14); }
 seg.addEventListener('click',e=>{ const b=e.target.closest('button'); if(b){ setPlay(b.dataset.m); sfx('click',{g:.3}); } });
 seg.addEventListener('keydown',e=>{ if(/Arrow(Left|Right)/.test(e.key)){ e.preventDefault(); setPlay(play==='jump'?'walk':'jump'); seg.querySelector('[aria-checked=true]').focus(); } });
@@ -225,12 +235,12 @@ zEl.querySelectorAll('.zb').forEach(b=>b.addEventListener('click',()=>setZoom(PC
 zEl.style.setProperty('--z',(PC.z*100)+'%');
 // ---------- overview pins ----------
 const pinBox=$('#pins'); const GLYPH={chronicle:'C',hall:'H',bank:'B',ferry:'F',guard:'G',arena:'A',house:'K',toll:'T'};
-const PINS=Object.entries(SHOPS).map(([id,s])=>{ const b=document.createElement('button'); b.type='button'; b.className='pin'; b.tabIndex=-1; b.setAttribute('aria-label','Fly into '+s.name);
+const PINS=Object.entries(OPEN).map(([id,s])=>{ const b=document.createElement('button'); b.type='button'; b.className='pin'; b.tabIndex=-1; b.setAttribute('aria-label','Fly into '+s.name);
   b.innerHTML='<span class="ban"><span class="ic"></span><span><b></b><small></small></span><span class="go">Enter</span></span><span class="st"></span><span class="ft"></span>';
   b.querySelector('.ic').textContent=GLYPH[id]||s.name[0]; b.querySelector('b').textContent=s.name; b.querySelector('small').textContent=s.role.split('·')[0].trim();
   b.addEventListener('click',()=>jump(id)); pinBox.appendChild(b); const bb=new THREE.Box3().setFromObject(W.B[id]); const top=hx(s.q,s.r).setY(bb.max.y+.15); return {id,el:b,top}; });
-function updPins(){ const z=mode==='explore'&&!inShop?PC.zs:0; const a=sstep(.42,.62,z); for(const p of PINS){ const v=p.top.clone().project(cam); const on=a>.05&&v.z<1;
-    p.el.style.opacity=on?a.toFixed(2):'0'; p.el.classList.toggle('on',on&&a>.5); p.el.tabIndex=on&&a>.5?0:-1; if(on){ p.el.style.transform=`translate(${((v.x*.5+.5)*innerWidth).toFixed(1)}px,${((-v.y*.5+.5)*innerHeight).toFixed(1)}px) translate(-50%,-100%)`; } } }
+function updPins(){ const z=mode==='explore'&&!inShop?PC.zs:0; const a=sstep(.42,.62,z); body.classList.toggle('ov',a>.5); for(const p of PINS){ const v=p.top.clone().project(cam); const on=a>.05&&v.z<1;
+    p.el.style.opacity=on?a.toFixed(2):'0'; p.el.classList.toggle('on',on&&a>.5); p.el.tabIndex=on&&a>.5?0:-1; if(on){ const hw=Math.min(90,p.el.offsetWidth/2||70)+8, x=Math.max(hw,Math.min(innerWidth-hw-(innerWidth<720?44:64),(v.x*.5+.5)*innerWidth)), y=Math.max(innerWidth<720?150:110,Math.min(innerHeight-(innerWidth<720?150:120),(-v.y*.5+.5)*innerHeight)); p.el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; } } }
 // ---------- hover: shop names in any view, character names on hover only ----------
 const tagEl=$('#tag'); let tagT=null;
 function tagOff(){ tagEl.classList.remove('on'); tagT=null; cv.classList.remove('hov'); }
@@ -238,69 +248,134 @@ function hover(e){ const id=pick(e); cv.classList.toggle('hov',!!id); let best=n
   for(const c of CAST_ALL()){ if(!c.obj.visible) continue; const f=screenOf(c.pos), h=screenOf(c.pos.clone().setY(c.height)); const hp=Math.max(8,f.y-h.y), w=hp*.42;
     if(Math.abs(e.clientX-f.x)<w && e.clientY<f.y+4 && e.clientY>h.y-6){ const d=Math.abs(e.clientX-f.x); if(d<bd){ bd=d; best=c; } } }
   if(best){ tagT={c:best}; tagEl.innerHTML=''; tagEl.textContent=best.name; tagEl.classList.add('on'); }
-  else if(id){ const s=SHOPS[id]; tagT={shop:id}; tagEl.innerHTML=''; tagEl.append(s.name); const sm2=document.createElement('small'); sm2.textContent=play==='jump'?'click to fly in':'click to walk there'; tagEl.append(sm2); tagEl.classList.add('on'); tagEl._x=e.clientX; tagEl._y=e.clientY; }
+  else if(id){ const s=SHOPS[id]; tagT={shop:id}; tagEl.innerHTML=''; tagEl.append(s.name); const sm2=document.createElement('small'); sm2.textContent=CLOSED.has(id)?'':play==='jump'?'click to fly in':'click to walk there'; if(sm2.textContent) tagEl.append(sm2); cv.classList.toggle('hov',!CLOSED.has(id)); tagEl.classList.add('on'); tagEl._x=e.clientX; tagEl._y=e.clientY; }
   else tagOff(); }
 function placeTag(){ if(!tagT) return; let x,y; if(tagT.c){ const h=screenOf(tagT.c.pos.clone().setY(tagT.c.height+.12)); x=h.x; y=h.y; } else { x=tagEl._x; y=tagEl._y-14; } tagEl.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`; }
 const CAST_ALL=()=>chars;
 // pointer: drag turns the view, click walks or steps inside
 const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), ground=new THREE.Plane(V(0,1,0),0); let down=null;
+function pickOpen(e){ const id=pick(e); return id&&!CLOSED.has(id)?id:null; }
 function pick(e){ const r=cv.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(ndc,cam); const h=ray.intersectObjects(W.pickables,false)[0]; return h?h.object.userData.id:null; }
-cv.addEventListener('pointerdown',e=>{ down={x:e.clientX,y:e.clientY,yaw:PC.yaw,po:PC.po}; });
-cv.addEventListener('pointermove',e=>{ if(down&&mode==='explore'&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>6){ PC.yaw=down.yaw-(e.clientX-down.x)*.006; PC.po=Math.max(-.1,Math.min(.3,down.po+(e.clientY-down.y)*.003)); tagOff(); return; } if(mode==='story'||down) return; hover(e); });
-cv.addEventListener('pointerup',e=>{ const d=down; down=null; if(!d||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6) return; if(mode!=='explore') explore(true);
-  sm.hidden=true; const id=pick(e); if(id){ if(play==='jump') jump(id); else goIn(id); return; }
+cv.addEventListener('pointerdown',e=>{ down={x:e.clientX,y:e.clientY,yaw:PC.yaw,po:PC.po,t:performance.now()}; });
+cv.addEventListener('pointermove',e=>{ if(down&&mode==='explore'&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>6){ PC.yaw=down.yaw-(e.clientX-down.x)*.006; PC.po=Math.max(-.1,Math.min(.3,down.po+(e.clientY-down.y)*.003)); tagOff(); return; } if(mode==='story'||down||inShop) return; hover(e); });
+cv.addEventListener('pointerup',e=>{ const d=down; down=null; if(inShop) return; if(!d||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6) return; if(storyEnd>d.t-80) return; if(mode!=='explore') explore(true);
+  sm.hidden=true; const id=pickOpen(e); if(id){ if(play==='jump') jump(id); else goIn(id); return; }
   if(play!=='walk') return; body.classList.add('moved');
   const now=performance.now(), dbl=now-(lastClick||0)<320; lastClick=now;
   const p=V(); ray.ray.intersectPlane(ground,p); const t=toHex(p.x,p.z); if(walkable(...t)){ R.steer=null; R.goHex(t,{end:p,run:dbl||p.distanceTo(R.pos)>7}); marker(p,dbl); } });
 let lastClick=0;
 cv.addEventListener('wheel',e=>{ if(mode==='story'||inShop) return; e.preventDefault(); setZoom(PC.z+Math.sign(e.deltaY)*.075*Math.min(2,Math.abs(e.deltaY)/100||1)); },{passive:false});
+// pinch to zoom (touch): spreading the fingers moves toward the street, pinching pulls out to the overview
+{ let pz=null; const dd=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+  cv.addEventListener('touchstart',e=>{ if(e.touches.length===2&&mode!=='story'&&!inShop){ pz={d:dd(e.touches),z:PC.z}; down=null; } },{passive:true});
+  cv.addEventListener('touchmove',e=>{ if(pz&&e.touches.length===2){ e.preventDefault(); setZoom(pz.z-Math.log(dd(e.touches)/pz.d)*.9); } },{passive:false});
+  cv.addEventListener('touchend',e=>{ if(e.touches.length<2&&pz){ pz=null; down=null; } },{passive:true}); }
 const mk=new THREE.Mesh(new THREE.RingGeometry(.12,.17,24),new THREE.MeshBasicMaterial({color:0xf3ead8,transparent:true,opacity:0,depthWrite:false})); mk.rotation.x=-Math.PI/2; W.scene.add(mk);
 function marker(p,run){ mk.position.set(p.x,.03,p.z); mk.material.color.set(run?0xffc75c:0xf3ead8); mk.material.opacity=.9; mk.scale.setScalar(.6); gsap.to(mk.scale,{x:1.4,y:1.4,z:1.4,duration:.6}); gsap.to(mk.material,{opacity:0,duration:.9,delay:.2}); }
-addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sm.hidden) sm.hidden=true; else if(inShop) world.exitShop(); else if(mode==='story') endStory(); } });
+addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sm.hidden) sm.hidden=true; else if(inShop&&SL.drawerOpen()) SL.drawer(false); else if(inShop) world.exitShop(); else if(mode==='story') endStory(); } });
 
 // ---------- the town keeps living after the story ----------
 function idleTown(){ if(mode==='explore') return; shot(SH.orbit,2.6); }
 
-// ---------- world.enterShop / exitShop: dolly to the door, iris into it, hand off to the interior ----------
-let inShop=null, preShop=null, exiting=false;
+// ---------- world.enterShop / exitShop: fly to the door, the door swings open, warm light fills the screen, the room fades up ----------
+// The rooms (D8's modules) are drawn here, in the town page, by the town's renderer (js/shops.js); leaving fades back to the same street spot.
+let inShop=null, preShop=null, exiting=false, room=null, roomLook=null;
 function doorPoint(id){ const s=SHOPS[id]; return hx(s.q,s.r).lerp(hx(...s.door),.42).setY(.45); }
 function screenOf(p){ const v=p.clone().project(cam); return {x:Math.round((v.x*.5+.5)*innerWidth),y:Math.round((-v.y*.5+.5)*innerHeight)}; }
-const iris=$('#iris');
-world.enterShop=id=>new Promise(res=>{ if(!SHOPS[id]) throw new Error('unknown shop '+id);  tagOff(); if(mode==='story') endStory(); inShop=id; preShop={p:cam.position.clone(),t:D.cur.t.clone(),mode};
-  R.steer=null; keys.clear(); prompt(null); const s=SHOPS[id], dp=doorPoint(id); const out=hx(...s.door).sub(hx(s.q,s.r)).setY(0).normalize();
-  const dd=cam.position.distanceTo(dp), dur=RM?.01:Math.min(.9,.32+dd*.013); tagOff();
-  shot(SH.fixed(dp.clone().add(out.clone().multiplyScalar(3.1)).add(V(out.z*.6,1.5,-out.x*.6)),dp,28),dur,'power3.inOut'); sfx('door',{g:.45});
-  setTimeoutSim(()=>{ const ds=screenOf(dp); iris.classList.add('on'); iris.style.setProperty('--ix',ds.x+'px'); iris.style.setProperty('--iy',ds.y+'px');
-    if(inShop!==id||exiting){ res({id,cancelled:true}); return; } const o={r:Math.hypot(innerWidth,innerHeight)}; irisTw=gsap.to(o,{r:0,duration:RM?.01:.32,ease:'power3.in',onUpdate:()=>iris.style.setProperty('--ir',o.r+'px'),onComplete:()=>{ W.lastDoor=ds; window.dispatchEvent(new CustomEvent('world:interior-ready',{detail:{id,doorScreen:ds}})); if(!window.__shopsLayer) inCard(id); res({id,doorScreen:ds}); }}); },RM?.02:Math.max(.05,dur-.12)); });
-// standalone world (no shops layer loaded): a small card inside the iris so the door never feels like a dead end
-const ic=$('#inCard'); function inCard(id){ if(!id){ ic.hidden=true; return; } ic.querySelector('b').textContent=SHOPS[id].name; ic.querySelector('a.go').href='/design/D8_shops/index.html?shop='+encodeURIComponent(id); ic.hidden=false; } ic.querySelector('button').addEventListener('click',()=>world.exitShop());
-let irisTw=null;
-world.exitShop=()=>new Promise(res=>{ if(!inShop){ res(); return; } if(exiting) return; exiting=true; const closing=irisTw&&irisTw.isActive(); irisTw&&irisTw.kill(); irisTw=null; const ds=W.lastDoor||screenOf(doorPoint(inShop)); const o={r:closing?parseFloat(iris.style.getPropertyValue('--ir'))||0:0}; iris.classList.add('on'); sfx('doorC',{g:.4}); inCard(null);
-  gsap.to(o,{r:Math.hypot(innerWidth,innerHeight),duration:RM?.01:.34,ease:'power3.out',onUpdate:()=>iris.style.setProperty('--ir',o.r+'px'),onComplete:()=>{ iris.classList.remove('on'); const p=preShop; inShop=null; exiting=false;
-    shot(SH.fixed(p.p,p.t,30),RM?.01:.5,'power2.out'); setTimeoutSim(()=>{ if(p.mode==='explore'){ D.shot=null; PC.init=false; PC.blend=.6; } window.dispatchEvent(new CustomEvent('world:exterior-ready',{detail:{}})); res(); },RM?.02:.52); }}); });
+// one door leaf + a warm doorway, placed on the shop's facade (ray from the door step to the building) for the entry beat
+const DF=(()=>{ const g=new THREE.Group(); const glow=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xffc27a,transparent:true,opacity:0,depthWrite:false,toneMapped:false}));
+  glow.position.set(0,.5,.045); glow.renderOrder=2; // in front of the frame box (front face z=-.005), behind the open leaf
+  const doorFrame=new THREE.Mesh(new THREE.BoxGeometry(1.16,1.1,.05),new THREE.MeshLambertMaterial({color:0x3a2618})); doorFrame.position.set(0,.55,-.03);
+  const hinge=new THREE.Group(); hinge.position.set(-.5,0,.03); const leaf=new THREE.Mesh(new THREE.BoxGeometry(1,1,.07),new THREE.MeshLambertMaterial({color:0x7a4a2a})); leaf.position.set(.5,.5,.035);
+  const knob=new THREE.Mesh(new THREE.SphereGeometry(.05,8,6),new THREE.MeshLambertMaterial({color:0xd6b46a,emissive:0x3a2a10})); knob.position.set(.86,.48,.09); hinge.add(leaf,knob); g.add(doorFrame,glow,hinge); g.visible=false; W.scene.add(g); return {g,glow,hinge}; })();
+const dray=new THREE.Raycaster();
+function placeDoor(id){ const s=SHOPS[id], c=hx(s.q,s.r), st=hx(...s.door); const out=st.clone().sub(c).setY(0).normalize(); const h=(CAST.robot?.height||.6)*1.08, w=h*.62;
+  const o=st.clone().setY(h*.45); dray.set(o,out.clone().negate()); dray.far=3; const hit=W.B[id]?dray.intersectObject(W.B[id],true)[0]:null;
+  const p=hit?hit.point.clone().setY(0):doorPoint(id).setY(0); DF.g.position.copy(p).addScaledVector(out,.012); DF.g.scale.set(w,h,w); DF.g.lookAt(p.clone().add(out)); DF.hinge.rotation.y=0; DF.glow.material.opacity=0; DF.g.visible=true;
+  return {c:p.clone().setY(h*.5),out}; }
+function swingDoor(open,d=.55){ gsap.to(DF.hinge.rotation,{y:open?-1.75:0,duration:RM?.01:d,ease:open?'power2.out':'power2.in'}); gsap.to(DF.glow.material,{opacity:open?1:0,duration:RM?.01:d*.8}); }
+const fade=$('#fade'); let fadeTw=null;
+function fadeTo(a,dur,at){ return new Promise(r=>{ if(at){ fade.style.setProperty('--fx',at.x+'px'); fade.style.setProperty('--fy',at.y+'px'); } fade.classList.add('on'); fadeTw&&fadeTw.kill();
+  fadeTw=gsap.to(fade,{opacity:a,duration:RM?.01:dur,ease:a?'power2.in':'power2.out',onComplete:()=>{ if(!a) fade.classList.remove('on','wait'); r(); }}); }); }
+const shopUI=$('#shopUI');
+let prevAU=true;
+function enterRoom(sh){ if(!body.classList.contains('in-shop')) prevAU=W.renderer.shadowMap.autoUpdate; room=sh; body.classList.add('in-shop'); shopUI.hidden=false; W.renderer.shadowMap.autoUpdate=true; tagOff(); prompt(null);
+  if(sh){ const c=sh.camera; if(!c.userData.home0) c.userData.home0=c.position.clone(); const look=c.userData.look; roomLook=look; const fit=SL.frame(c), home=c.userData.home0.clone().sub(look).multiplyScalar(fit).add(look); const far=home.clone().sub(look).multiplyScalar(1.22).add(look); c.position.copy(far); c.lookAt(look);
+    const o={k:0}; gsap.to(o,{k:1,duration:RM?.01:.9,ease:'power2.out',onUpdate:()=>{ c.position.lerpVectors(far,home,o.k); c.lookAt(look); }});
+    if(sh.intro) setTimeoutSim(()=>{ if(room===sh) SL.L.C8.run(sh.intro()); },RM?.02:.5); } }
+function leaveRoom(){ SL.clear(); room=null; body.classList.remove('in-shop'); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
+addEventListener('resize',()=>{ if(!room) return; const c=room.camera, look=c.userData.look, fit=SL.frame(c); if(c.userData.home0){ c.position.copy(c.userData.home0).sub(look).multiplyScalar(fit).add(look); c.lookAt(look); } });
+$('#back').addEventListener('click',()=>world.exitShop());
+$('#t-proof').addEventListener('click',()=>{ SL.drawer(true); sfx('page',{g:.3}); }); $('#d-close').addEventListener('click',()=>SL.drawer(false));
+$('#t-act').addEventListener('click',async e=>{ const b=e.currentTarget; if(b.dataset.retry){ const id=b.dataset.retry; delete b.dataset.retry; b.disabled=true; const r=await SL.load(id); if(inShop!==id) return; if(r.err) SL.showError(id,r.err); else { SL.show(r.sh); enterRoom(r.sh); } return; } if(SL.act()) sfx('click',{g:.3}); });
+world.enterShop=(id,opt={})=>new Promise(res=>{ if(!OPEN[id]) throw new Error('unknown shop '+id); if(inShop){ res({id,cancelled:true}); return; } tagOff(); if(mode==='story') endStory(); inShop=id; preShop={p:cam.position.clone(),t:D.cur.t.clone(),mode};
+  R.steer=null; keys.clear(); prompt(null); sm.hidden=true; body.classList.add('entering'); const pend=SL.load(id); const df=placeDoor(id), out=df.out, side=V(out.z,0,-out.x);
+  const dd=cam.position.distanceTo(df.c), dur=RM?.01:Math.min(.85,.3+dd*.012);
+  const pf=innerWidth<innerHeight?1.45:1; shot(SH.fixed(df.c.clone().addScaledVector(out,2.4*pf).addScaledVector(side,.45).setY(df.c.y+.95),df.c,28),dur,'power3.inOut');
+  setTimeoutSim(()=>{ if(inShop!==id) return; sfx('door',{g:.5}); swingDoor(true);
+    shot(SH.fixed(df.c.clone().addScaledVector(out,.7*pf).setY(df.c.y+.1),df.c.clone().addScaledVector(out,-.6),32),RM?.01:.7,'power2.in');
+    setTimeoutSim(async()=>{ if(inShop!==id) return; const ds=screenOf(df.c); const wt=setTimeout(()=>fade.classList.add('wait'),700); await fadeTo(1,.34,ds);
+      if(opt.to){ clearTimeout(wt); fade.classList.add('wait'); window.dispatchEvent(new CustomEvent('world:navigate',{detail:{id,to:opt.to}})); if(!CAPTURE||!P.has('nonav')) location.assign(opt.to); res({id,to:opt.to}); return; }
+      const r=await pend; clearTimeout(wt); if(inShop!==id||exiting){ res({id,cancelled:true}); return; } DF.g.visible=false; W.lastDoor=ds;
+      if(r.err) { SL.showError(id,r.err); enterRoom(null); } else { SL.show(r.sh); enterRoom(r.sh); }
+      body.classList.remove('entering'); window.dispatchEvent(new CustomEvent('world:interior-ready',{detail:{id,doorScreen:ds}})); await fadeTo(0,.5); res({id,doorScreen:ds}); },RM?.02:.32); },RM?.02:Math.max(.05,dur-.05)); });
+world.exitShop=()=>new Promise(res=>{ if(!inShop||exiting){ res(); return; } exiting=true; const id=inShop; SL.drawer(false); sfx('doorC',{g:.4});
+  fadeTo(1,.28,{x:innerWidth/2,y:innerHeight/2}).then(()=>{ leaveRoom(); body.classList.remove('entering'); const df=placeDoor(id), out=df.out; DF.hinge.rotation.y=-1.75; DF.glow.material.opacity=1;
+    cut(SH.fixed(df.c.clone().addScaledVector(out,1.1).setY(df.c.y+.3),df.c,30)); const p=preShop; shot(SH.fixed(p.p,p.t,30),RM?.01:.8,'power2.inOut'); swingDoor(false,.6);
+    fadeTo(0,.42).then(()=>{}); setTimeoutSim(()=>{ DF.g.visible=false; inShop=null; exiting=false; if(p.mode==='explore'){ D.shot=null; PC.init=false; PC.blend=.6; } window.dispatchEvent(new CustomEvent('world:exterior-ready',{detail:{id}})); res(); },RM?.02:.82); }); });
 world.freeze=on=>freeze(on); world.mode=()=>mode; world.skip=()=>endStory();
 
 // ---------- loop ----------
 let last=performance.now(), fpsS=[], lpDone=LP;
-function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); tickRoutines(); updateCast(dt); update(dt);
+function draw(){ if(!room){ render(); return; } const r=W.renderer, e=r.toneMappingExposure; r.setRenderTarget(null); r.toneMappingExposure=1.18; r.render(room.scene,room.camera); r.toneMappingExposure=e; SL.placeTags(); }
+function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(dt); if(room){ SP.update(); return; } tickRoutines(); updateCast(dt); update(dt);
   // lamp flare when the Lamplighter lights it
   for(const l of W.lamps){ if(l.flare>0) l.flare=Math.max(0,l.flare-dt*1.6); }
-  if(window.__camLock){} else if(mode==='explore'&&!inShop&&!D.shot){ steerFromKeys(); playCam(dt); prompt(PC.zs<.44?nearDoor():null); placePrompt(); } else { prompt(null); applyCam(dt); }
-  occlusion(dt); updPins(); placeTag();
+  if(window.__camLock){} else if(mode==='explore'&&!inShop&&!D.shot){ steerFromKeys(); playCam(dt); prompt(PC.zs<.44?nearDoor():null); placePrompt(); walkInto(dt); } else { prompt(null); applyCam(dt); }
+  occlusion(dt); updPins(); placeTag(); if(W.treeFadeU) W.treeFadeU.value=mode==='explore'&&!inShop?1:0;
   if(D.shake>0){ D.shake=Math.max(0,D.shake-dt*1.4); cam.position.x+=Math.sin(clock.T*41)*.02*D.shake; cam.position.y+=Math.sin(clock.T*37)*.015*D.shake; }
   SP.update(); }
-function frame(now){ const dt=Math.min(.05,(now-last)/1000); last=now; step(dt); render();
+function frame(now){ if(stopped) return; const dt=Math.min(.05,(now-last)/1000); last=now; step(dt); draw();
   // auto low-power: if the first seconds run under ~24 fps, drop the post chain and shadows
-  if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<24&&!P.has('full')){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } else if(1/avg>50&&!SHM) setShadowMode(true); lpDone=true; } }
+  if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<8&&!P.has('full')&&!P.has('3d')){ fallback(`3D too slow here (${(1/avg).toFixed(1)} fps)`); return; } if(1/avg<24&&!P.has('full')){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } else if(1/avg>50&&!SHM) setShadowMode(true); lpDone=true; } }
   requestAnimationFrame(frame); }
 
 // first frame is the town; the story starts on it
-const startStory=!P.has('nostory') && !(P.has('explore'));
+// ---------- landing: after the intro the camera frames the plaza, the Lamplighter in front, two or three shop fronts behind ----------
+function land(){ explore(true); const z=.16; PC.z=PC.zs=z; setZoom(z); PC.po=.04; PC.yaw=Math.atan2(R.pos.x-ZC.x,R.pos.z-ZC.z); }
+// ---------- "Set your agent's rules": the Charter office is Your House. Fly to its door, open it, and go in under the fade ----------
+const rb=$('#rulesBtn'); rb.href=CHARTER;
+const goTo=to=>{ window.dispatchEvent(new CustomEvent('world:navigate',{detail:{id:'house',to}})); if(!CAPTURE||!P.has('nonav')) location.assign(to); };
+const toCharter=(hash='')=>{ if(inShop||exiting){ goTo(CHARTER+hash); return; } jump('house',{to:CHARTER+hash}); };
+rb.addEventListener('click',e=>{ if(e.metaKey||e.ctrlKey||e.shiftKey||e.button) return; e.preventDefault(); body.classList.remove('cta'); sfx('click',{g:.3}); toCharter(); });
+function pointRules(){ body.classList.add('cta'); setTimeoutSim(()=>body.classList.remove('cta'),12); }
+// a wallet that connects during this visit: straight to Your House and "Create my charter"
+{ let out=false, done=false; const chk=()=>{ if(done) return; if(document.querySelector('[data-testid=hud-guest],[data-x=in]')) out=true; else if(out&&document.querySelector('[data-testid=hud-account]')){ done=true; onWallet(); } };
+  new MutationObserver(chk).observe(body,{childList:true,subtree:true}); addEventListener('nearcarta:signin',()=>{ if(!done){ done=true; onWallet(); } }); }
+function onWallet(){ if(mode==='story') endStory(); toCharter('#create'); }
+world.toCharter=toCharter;
+// ---------- Chronicle HUD: the last three real transactions on the guardhouse oath, hidden until they arrive ----------
+(async()=>{ if(CAPTURE&&!P.has('live')) return; const API=window.NEARCARTA_API||'';
+  try{ const dep=await (await fetch(API+'/api/deployments')).json(); const acct=dep?.guardhouse?.oath; if(!acct) return;
+    const r=await (await fetch(API+'/api/chronicle/'+encodeURIComponent(acct)+'?limit=3')).json(); const txs=(r?.txs||[]).slice(0,3); if(!txs.length) return;
+    const l=$('#clist'); l.innerHTML=''; const ago=t=>{ const m=Math.max(0,(Date.now()-Date.parse(t))/6e4); return m<60?`${m|0} min ago`:m<2880?`${(m/60)|0} h ago`:`${(m/1440)|0} d ago`; };
+    for(const tx of txs){ const v=tx.result?.value, dec=(v&&typeof v==='object'&&(v.decision||v.status))||(tx.result?.ok===false?'failed':'ok');
+      const cls=/allow|paid|ok|executed|true/.test(dec)?'ok':/refus|den|block|fail|reject/.test(dec)?'no':/froz|freeze/.test(tx.method+dec)?'fz':'pd';
+      const li=document.createElement('li'); li.className=cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
+      li.querySelector('.w').textContent=`${String(tx.method||'call').replace(/_/g,' ')} · ${String(dec).replace(/_/g,' ')} · ${ago(tx.at)}`;
+      const a=li.querySelector('a'); a.href=tx.url||txUrl(tx.hash); a.textContent=tx.hash.slice(0,6)+'…'+tx.hash.slice(-4); a.title='Open on the testnet explorer'; l.append(li); }
+    $('#chron').hidden=false; $('#chron').dataset.live='1'; }catch(e){ console.warn('[Nearcarta] Chronicle feed unavailable',e?.message||e); } })();
+const startStory=!P.has('nostory') && !(P.has('explore')) && !P.has('shop');
 for(let i=0;i<3;i++) step(1/30);
 if(startStory){ storyRun=run(story()); } else { { const c=hx(-1,1); R.place(c.x-.2,c.z+.3,2.4); R.lights=true; } mode='town'; idleTown(); D.k=1; if(P.has('explore')) explore(true); }
-step(1/30); render(); $('#loading').classList.add('done'); body.classList.add('ready');
-window.__render=render; window.__boot={ms:Math.round(performance.now()-t0)};
-if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,setZoom,setPlay,jump,PINS,screenOf,CAST,W}; 
+step(1/30); draw();
+// never reveal a black canvas: sample the first frame; if the GPU gave us nothing, go 2D instead
+{ const g=W.renderer.getContext(), px=new Uint8Array(4); let lit=0; for(const [fx,fy] of [[.5,.5],[.25,.4],[.75,.4],[.5,.2],[.3,.75],[.7,.75]]){ g.readPixels((g.drawingBufferWidth*fx)|0,(g.drawingBufferHeight*fy)|0,1,1,g.RGBA,g.UNSIGNED_BYTE,px); if(px[0]+px[1]+px[2]>24) lit++; }
+  if(!lit&&!CAPTURE){ console.error('[Nearcarta] first 3D frame came back black'); await fallback('blank first frame'); throw new Error('blank first frame'); } }
+$('#loading').classList.add('done'); body.classList.add('ready');
+{ const q=P.get('shop'); const id=q&&(ALIAS[q]||q); if(id&&OPEN[id]) setTimeoutSim(()=>jump(id),.4); }
+window.__render=draw; window.__shopsLayer='d9'; setTimeout(()=>SL.preload(),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
+if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
   // demo cursor driven on the sim clock (capture only)
   const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#f3ead8" stroke="#17130f" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
   const cur={x:-100,y:-100}; const put=()=>{ dc.style.transform=`translate(${cur.x}px,${cur.y}px)`; };
@@ -317,5 +392,5 @@ if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,setZoom,setPlay,jump,PINS,sc
     tap2:()=>{ window.__dbg.tap(); window.__dbg.tap(); },
     key:(k,t='keydown')=>dispatchEvent(new KeyboardEvent(t,{key:k,bubbles:true})),
     zoomTo:(z,d=1.5)=>{ const o={z:PC.z}; gsap.to(o,{z,duration:d,ease:'power1.inOut',onUpdate:()=>setZoom(o.z)}); },
-    pinSel:id=>'.pin:nth-child('+(Object.keys(SHOPS).indexOf(id)+1)+')' }); window.__advance=s=>{ const n=Math.round(s*30); for(let i=0;i<n;i++) step(1/30); render(); }; window.__ready=true; }
+    pinSel:id=>'.pin:nth-child('+(Object.keys(SHOPS).indexOf(id)+1)+')' }); window.__advance=s=>{ const n=Math.round(s*30); for(let i=0;i<n;i++) step(1/30); draw(); }; window.__ready=true; }
 else { requestAnimationFrame(t=>{ last=t; requestAnimationFrame(frame); }); window.__ready=true; }

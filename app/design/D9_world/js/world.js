@@ -35,8 +35,8 @@ export let onProgress = ()=>{}; export function setProgress(f){ onProgress=f; }
 // ---------- the Nearcarta atlas: KayKit's palette atlas, recoloured swatch by swatch ----------
 // 8x4 vertical-gradient swatches. Blues/navies become slate and terracotta; grass becomes olive-sage; water becomes sea-glass teal.
 const SW = {
-  8:['#7fb3ad','#3f6f6d'],   // light blue → shallow sea-glass (water)
-  9:['#6fa39e','#2f5b5b'],   // blue→navy (water) → sea-glass to deep teal
+  8:['#93ad95','#4d6b58'],   // light blue → shallow sea-glass (water)
+  9:['#84a088','#3d5a4a'],   // blue→navy (water) → sea-glass to deep teal
   12:['#93a46c','#52653b'],  // bright grass → olive-sage
   16:['#8f9d63','#55663a'],  // acid yellow-olive → dry meadow
   17:['#6f8a58','#32503a'],  // emerald → moss / leaves
@@ -57,9 +57,9 @@ function makeAtlas(img){ const c=document.createElement('canvas'); c.width=img.w
 // ---------- colour script ----------
 const C = h=>new THREE.Color(h);
 const KEYS = [ // day, dusk, night
-  { top:C('#9fb3bb'), mid:C('#d9d6c4'), hor:C('#efe2c6'), fog:C('#d8cfb8'), sun:C('#fff1d6'), sunI:2.3, hemiS:C('#f1ead8'), hemiG:C('#6b5a40'), hemiI:1.15, sea:C('#4f8784'), deep:C('#2f5a5c'), elev:.95, lift:C('#000000'), sat:.92, lamp:0, fly:0 },
-  { top:C('#7d6a6e'), mid:C('#e0a184'), hor:C('#fbd29a'), fog:C('#e8c39c'), sun:C('#ffc884'), sunI:2.45, hemiS:C('#f6dcbc'), hemiG:C('#7a5c40'), hemiI:1.5, sea:C('#4a7a76'), deep:C('#2c4f50'), elev:.62, lift:C('#0a0604'), sat:1.02, lamp:.75, fly:.45 } /* late golden hour: details read, lamps still glow */,
-  { top:C('#17141a'), mid:C('#2c2329'), hor:C('#3b3036'), fog:C('#2a2328'), sun:C('#c9d4dc'), sunI:.5, hemiS:C('#6c6670'), hemiG:C('#1c1612'), hemiI:.55, sea:C('#1f3433'), deep:C('#121e1f'), elev:.7, lift:C('#0a0708'), sat:.8, lamp:1, fly:1 },
+  { top:C('#9fb3bb'), mid:C('#d9d6c4'), hor:C('#efe2c6'), fog:C('#d8cfb8'), sun:C('#fff1d6'), sunI:2.3, hemiS:C('#f1ead8'), hemiG:C('#6b5a40'), hemiI:1.15, sea:C('#6b8873'), deep:C('#3c584b'), elev:.95, lift:C('#000000'), sat:.92, lamp:0, fly:0 },
+  { top:C('#7d6a6e'), mid:C('#e0a184'), hor:C('#fbd29a'), fog:C('#e8c39c'), sun:C('#ffc884'), sunI:2.45, hemiS:C('#f6dcbc'), hemiG:C('#7a5c40'), hemiI:1.5, sea:C('#647a66'), deep:C('#384d41'), elev:.62, lift:C('#0a0604'), sat:1.02, lamp:.75, fly:.45 } /* late golden hour: details read, lamps still glow */,
+  { top:C('#17141a'), mid:C('#2c2329'), hor:C('#3b3036'), fog:C('#2a2328'), sun:C('#c9d4dc'), sunI:.5, hemiS:C('#6c6670'), hemiG:C('#1c1612'), hemiI:.55, sea:C('#24302a'), deep:C('#151c18'), elev:.7, lift:C('#0a0708'), sat:.8, lamp:1, fly:1 },
 ];
 const ICE = C('#cfe6f5');
 const mixK=(t)=>{ const i=Math.min(1,Math.floor(t)), f=Math.min(1,t-i), a=KEYS[i], b=KEYS[Math.min(2,i+1)]; const o={}; for(const k in a) o[k]= a[k].isColor? a[k].clone().lerp(b[k],f) : a[k]+(b[k]-a[k])*f; return o; };
@@ -81,12 +81,16 @@ export async function init(canvas){
   const img = await new Promise(res=>{ const i=new Image(); i.onload=()=>res(i); i.src='assets/hex/tiles/base/hexagons_medieval.png'; });
   const atlas = makeAtlas(img);
   atlasMat = new THREE.MeshLambertMaterial({ map:atlas, vertexColors:true, emissiveMap:W.winTex, emissive:0xffffff, emissiveIntensity:0 }); W.winMats=[atlasMat];
-  treeMat = new THREE.MeshLambertMaterial({ map:atlas, vertexColors:true });
+  treeMat = new THREE.MeshLambertMaterial({ map:atlas, vertexColors:true }); W.treeFadeU={value:0};
   treeMat.onBeforeCompile = sh=>{ sh.uniforms.time=U.time; sh.uniforms.wind=U.wind; sh.vertexShader='uniform float time; uniform float wind;\n'+sh.vertexShader.replace('#include <begin_vertex>',
     `#include <begin_vertex>
      float h=max(position.y-.22,0.); float ph=position.x*.37+position.z*.29;
      transformed.x += (sin(time*1.4+ph)*.035 + sin(time*3.1+ph*2.)*.012)*h*wind;
-     transformed.z += cos(time*1.1+ph)*.025*h*wind;`); };
+     transformed.z += cos(time*1.1+ph)*.025*h*wind;`);
+    // walk camera: trees right in front of the lens dissolve (dither) instead of filling the frame with dark leaves
+    sh.uniforms.tfade=W.treeFadeU; sh.fragmentShader='uniform float tfade;\n'+sh.fragmentShader.replace('#include <clipping_planes_fragment>',
+    `#include <clipping_planes_fragment>
+     if(tfade>0.){ float cd=length(vViewPosition); float ign=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715)))); if(smoothstep(1.3,2.9,cd)*tfade+(1.-tfade)<ign) discard; }`); };
   await buildIsland();
   buildWater(); buildGrass(); buildLamps(); buildWard(); buildFerry(); buildArena(); buildMist(); buildSmoke(); buildBirds(); buildFireflies(); buildBell(); buildPlaque(); buildSigns();
   if(!LP) buildPost();
@@ -252,7 +256,7 @@ function buildWater(){
   const land=[...tiles.values()];
   [[28,.25],[14,.45],[6,.7],[2,1]].forEach(([b,a])=>{ x.filter=`blur(${b}px)`; x.globalAlpha=a; x.fillStyle='#fff'; land.forEach(t=>hexPoly(t.q,t.r,1.18)); }); x.filter='none'; x.globalAlpha=1;
   const df=new THREE.CanvasTexture(cv); df.flipY=false;
-  seaMat=new THREE.ShaderMaterial({ fog:true, transparent:false, uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{ df:{value:df}, S:{value:S}, time:U.time, shallow:{value:C('#3d6766')}, deep:{value:C('#223f42')}, foam:{value:C('#f3ead8')}, sunC:{value:C('#ffb070')}, frz:U.frz }]),
+  seaMat=new THREE.ShaderMaterial({ fog:true, transparent:false, uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{ df:{value:df}, S:{value:S}, time:U.time, shallow:{value:C('#577160')}, deep:{value:C('#2d4136')}, foam:{value:C('#f3ead8')}, sunC:{value:C('#ffb070')}, frz:U.frz }]),
     vertexShader:`varying vec3 vW;
 #include <fog_pars_vertex>
 void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vec4 mvPosition=viewMatrix*w; gl_Position=projectionMatrix*mvPosition;
@@ -541,3 +545,5 @@ export function render(){ const r=W.renderer; if(!W.composer){ r.setRenderTarget
   W.bloom.render(r,null,W.sceneRT,0,false);
   const f=W.fin.uniforms; f.tDepth.value=W.sceneRT.depthTexture; f.cn.value=W.camera.near; f.cf.value=W.camera.far; W.fin.renderToScreen=false; W.fin.render(r,W.postRT,W.sceneRT,0,false);
   W.outp.renderToScreen=true; W.outp.render(r,null,W.postRT,0,false); }
+// the town's current sky and sea, so a shop room is lit and backed by the same evening (js/shops.js)
+export function skyCols(){ const su=sky.material.uniforms; return { top:su.top.value.clone(), mid:su.mid.value.clone(), hor:su.hor.value.clone(), sea:seaMat.uniforms.shallow.value.clone(), deep:seaMat.uniforms.deep.value.clone(), fog:W.scene.fog.color.clone() }; }

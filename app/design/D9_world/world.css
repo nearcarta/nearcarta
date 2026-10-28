@@ -70,14 +70,18 @@ body.letterbox #lb i{height:7.5vh}
 #iris.on{opacity:1}
 
 /* loading: a hairline only; the first frame is the town */
-#loading{position:fixed;left:0;right:0;top:0;height:2px;z-index:40;transition:opacity .6s} #loading i{display:block;height:100%;width:0;background:var(--brass);transition:width .3s}
-#loading.done{opacity:0}
+#loading{position:fixed;inset:0;z-index:40;background:#17130f;transition:opacity .6s,visibility 0s .6s} #loading>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.62) saturate(.9);animation:lpz 30s linear both}
+#loading .lc{position:absolute;left:50%;bottom:14vh;transform:translateX(-50%);display:grid;justify-items:center;gap:10px;text-align:center;color:#f3ead8;text-shadow:0 1px 10px rgba(23,19,15,.8)}
+#loading .lc b{font-size:28px;letter-spacing:.01em} #loading .lc span{font-size:14px;color:#e9dcc2} #loading .lc small{font-size:11px;color:#bfb29c}
+#loading .lt{display:block;width:min(260px,60vw);height:3px;border-radius:3px;background:rgba(243,234,216,.18);overflow:hidden} #lbar{display:block;height:100%;width:4%;background:#d6b46a;transition:width .3s}
+#loading.done{opacity:0;visibility:hidden;pointer-events:none} @keyframes lpz{to{transform:scale(1.04)}}
+body:not(.ready) #c{opacity:0} body:not(.ready) .hud,body:not(.ready) #pins{visibility:hidden} body.fb .hud#brand{visibility:visible}
 
 /* 2D / low-power fallback */
 #fb2d{position:fixed;inset:0;z-index:1} #fb2d[hidden]{display:none} #fb2d img{width:100%;height:100%;object-fit:cover;display:block}
 .fbpin{position:absolute;transform:translate(-50%,-100%);background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:5px 9px;font-size:12px;white-space:nowrap}
 .fbpin{color:inherit;text-decoration:none;cursor:pointer;transition:transform .12s,border-color .12s} .fbpin:hover,.fbpin:focus-visible{border-color:var(--brass,#c9a066);transform:translate(-50%,-100%) scale(1.06);outline:none}
-.fbpin::after{content:'Open \2192';display:block;font-size:10px;color:var(--brass,#c9a066);margin-top:2px}
+.fbpin::after{content:'Enter \2192';display:block;font-size:10px;color:var(--brass,#c9a066);margin-top:2px}
 .fbpin b{font-weight:600} .fbpin span{display:block;font-size:11px;color:var(--parch2)}
 body.fb #c{display:none}
 
@@ -135,16 +139,142 @@ body.story #zoom{opacity:0;pointer-events:none}
 #tag.on{opacity:1} #tag small{color:var(--brass);font-weight:500;margin-left:5px}
 
 /* ---------- placeholder card inside the iris (the real interiors live in the shops layer) ---------- */
-#inCard{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:31;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;animation:rowin .25s ease both}
-#inCard[hidden]{display:none}
-#inCard b{font:500 34px/1 var(--serif);color:var(--parch)} #inCard>span{color:var(--parch2);font-size:13px}
-#inCard kbd{font:600 10px var(--mono);background:rgba(23,19,15,.2);border-radius:5px;padding:1px 5px}
 @media (max-width:900px){ #zoom{right:10px} #zoom .ztrack{height:110px} #playSeg button{padding:0 9px} }
 /* capture-only demo cursor */
 #demoCur{position:fixed;left:0;top:0;z-index:99;width:22px;height:22px;pointer-events:none;transform:translate(-100px,-100px);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
 #demoCur i{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;border:2px solid #f0c987;opacity:0;transform:scale(.4)}
 /* 2D / low-power fallback: hide controls that only drive the 3D camera */
-body.fb #modeBtn,body.fb #playSeg,body.fb #zoom,body.fb #pins,body.fb #tag,body.fb #hint,body.fb #inCard{display:none!important}
+body.fb #modeBtn,body.fb #playSeg,body.fb #zoom,body.fb #pins,body.fb #tag,body.fb #hint{display:none!important}
 /* modeBtn only appears as "Watch" while exploring; story end HUD shows no Explore button */
 body:not(.explore) #modeBtn{display:none!important}
-#inCard a.go{text-decoration:none;background:var(--brass,#c9a066);color:#17130f;border-color:transparent}
+
+/* ---------- shop rooms inside the town (js/shops.js). Tray + proof drawer ported from D8_shops/styles.css, scoped to #shopUI ---------- */
+#shopUI{ --base:var(--c-scene,#17130f); --raised:var(--c-pane,#1f1a15); --line:var(--c-line-strong,#3a3128); --text:var(--c-text,#f3ead8); --muted:var(--c-text-3,#9c9182);
+  --accent:var(--c-brass,#d6b46a); --on-accent:var(--c-on-accent,#17130f); --ok:var(--p-verified-mark,#00ec97); --no:var(--p-check-failed-mark,#ff6b6b); --ice:var(--p-freeze-mark,#a8d8ff);
+  --s1:8px; --s2:16px; --s3:24px; --r:8px; --R:16px; --ease:cubic-bezier(.16,1,.3,1); --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:var(--text); font:400 14px/20px Inter,system-ui,sans-serif }
+#shopUI[hidden]{display:none} #shopUI *{box-sizing:border-box} #shopUI h1,#shopUI h2,#shopUI h3,#shopUI p{margin:0} #shopUI button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+#shopUI .icon{width:40px;height:40px;display:grid;place-items:center;border-radius:var(--r);background:var(--raised);border:1px solid var(--line);color:var(--muted)}
+#back{position:fixed;top:16px;right:16px;z-index:7;height:40px;padding:0 16px;border-radius:999px!important;background:color-mix(in srgb,var(--raised) 92%,transparent)!important;border:1px solid var(--line)!important;display:flex;align-items:center;gap:8px;font-weight:600}
+#back:hover{border-color:var(--accent)!important} #back kbd{font:600 10px/1 var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:2px 4px}
+#shopUI .note.legal{margin-top:24px}
+body.in-shop #ctl,body.in-shop #chron,body.in-shop #zoom,body.in-shop #pins,body.in-shop #hint,body.in-shop #tag,body.in-shop #bubbles,body.in-shop #prompt,body.in-shop #title,body.in-shop #lb{display:none!important}
+body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt{opacity:0;pointer-events:none;transition:opacity .2s}
+@media (max-width:720px){ #back{top:12px;right:12px;height:36px;padding:0 12px} #back kbd{display:none} body.in-shop #brand small{display:none} #shopUI #drawer{width:100vw} }
+/* the door's light: a warm radial wash from the doorway, never a black frame */
+#fade{position:fixed;inset:0;z-index:30;opacity:0;pointer-events:none;display:none;background:radial-gradient(circle at var(--fx,50%) var(--fy,50%),#fff0cf 0,#f4c27a 14%,#c98a4a 34%,#5a3a22 70%,#2a1f16 100%)}
+#fade.on{display:block;pointer-events:auto} #fade .ring{position:absolute;left:50%;top:50%;width:28px;height:28px;margin:-14px;border-radius:50%;border:2px solid rgba(23,19,15,.25);border-top-color:#17130f;opacity:0;transition:opacity .3s;animation:spin .8s linear infinite}
+#fade.wait .ring{opacity:.8} @keyframes spin{to{transform:rotate(360deg)}}
+#shopUI .src { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 var(--s1); border-radius: 999px; font-size: 12px; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+#shopUI .src::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+#shopUI .src.live::before { background: none; border: 1.5px solid var(--muted); width: 5px; height: 5px; }
+/* town labels: icon + name only */
+#shopUI .coin { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--muted); color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1; }
+#shopUI .hero .coin { width: 32px; height: 32px; font-size: 16px; }
+/* in-scene tags (anchored to objects) */
+#shopUI #stags { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+#shopUI .stag { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: color-mix(in srgb, var(--base) 86%, transparent); border: 1px solid var(--line); font-size: 12px; white-space: nowrap; transition: opacity .2s var(--ease); }
+#shopUI .stag.bare { padding: 4px; }
+#shopUI .stag.no { border-color: var(--no); color: var(--no); }
+#shopUI .stag.hide { opacity: 0; }
+#shopUI .stag .tok .sym { display: none; }
+/* the tray: bottom-left counter slip, one primary action */
+#shopUI #tray { position: fixed; left: var(--s3); bottom: var(--s3); width: 360px; padding: var(--s3); background: var(--raised); border: 1px solid var(--line); border-radius: var(--R); z-index: 4; animation: shup .24s var(--ease); }
+@keyframes shup { from { transform: translateY(8px); opacity: 0; } }
+#shopUI .t-head { display: flex; align-items: center; gap: var(--s1); margin-bottom: var(--s2); }
+#shopUI #t-title { display: flex; align-items: center; gap: var(--s1); font-size: 20px; line-height: 28px; flex: 1; }
+#shopUI .label { color: var(--muted); font-size: 12px; line-height: 16px; }
+#shopUI .hero { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s1); font-size: 40px; line-height: 48px; margin: 4px 0 var(--s3); font-variant-numeric: tabular-nums; }
+#shopUI .hero .arrow { color: var(--muted); font-size: 24px; }
+#shopUI .hero .unit { font-size: 20px; color: var(--muted); font-weight: 400; }
+#shopUI .hero.bump { animation: shbump .32s var(--ease); }
+@keyframes shbump { 40% { transform: translateY(-3px); } }
+#shopUI .tok { display: inline-flex; align-items: center; gap: 6px; }
+#shopUI .tok .tic { position: relative; display: inline-grid; }
+#shopUI .tok .ci { position: absolute; right: -3px; bottom: -3px; border-radius: 50%; box-shadow: 0 0 0 2px var(--raised); }
+#shopUI .hero .tok .ti { width: 32px; height: 32px; } #shopUI .hero .tok .ci { width: 14px; height: 14px; }
+#shopUI .hero .tok .sym { font-size: 20px; color: var(--muted); font-weight: 400; }
+#shopUI .t-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+#shopUI .act, #shopUI .link { white-space: nowrap; }
+#shopUI .act { height: 40px; padding: 0 var(--s2); border-radius: var(--r); font-weight: 600; display: inline-flex; align-items: center; gap: var(--s1); }
+#shopUI .act.primary { background: var(--accent); color: var(--on-accent); }
+#shopUI .act.primary:hover { filter: brightness(1.06); }
+#shopUI .act.primary:active { transform: translateY(1px); }
+#shopUI .act.busy { opacity: .6; cursor: progress; }
+#shopUI .act.res { background: transparent; border: 1px solid var(--line); cursor: default; padding-left: 12px; }
+#shopUI .act.res.no { color: var(--no); border-color: color-mix(in srgb, var(--no) 45%, transparent); }
+#shopUI .act.res.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+#shopUI .act.res .glyph { font-size: 14px; }
+#shopUI .link { color: var(--muted); height: 40px; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line); }
+#shopUI .link:hover { color: var(--text); }
+#shopUI .act[hidden] + .link { margin-left: 0; }
+/* proof drawer */
+#shopUI #drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 440px; max-width: 100vw; background: var(--base); border-left: 1px solid var(--line); padding: var(--s3); transform: translateX(100%); transition: transform .24s var(--ease); z-index: 6; overflow-y: auto; }
+#shopUI #drawer.open { transform: none; }
+#shopUI .d-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s3); }
+#shopUI .d-head h2 { font-size: 20px; line-height: 28px; }
+#shopUI .pf { display: grid; gap: var(--s1); }
+#shopUI .pf h3 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-top: var(--s3); }
+#shopUI .row { display: grid; grid-template-columns: 1fr auto; gap: 4px var(--s2); padding: 12px 0; border-top: 1px solid var(--line); }
+#shopUI .row .k { color: var(--text); }
+#shopUI .row .k .why { display: block; color: var(--muted); font-size: 12px; font-family: var(--mono); }
+#shopUI .row .v { text-align: right; display: grid; gap: 4px; justify-items: end; }
+#shopUI .row .st { font-size: 12px; display: inline-flex; gap: 6px; align-items: center; }
+#shopUI .st.no { color: var(--no); } #shopUI .st.ok { color: var(--ok); } #shopUI .st.ice { color: var(--ice); } #shopUI .st.pend { color: var(--muted); }
+#shopUI .tx { font-family: var(--mono); font-size: 12px; color: var(--muted); text-decoration: none; }
+#shopUI .tx:hover { color: var(--text); }
+#shopUI .note { color: var(--muted); font-size: 12px; line-height: 18px; margin-top: var(--s2); }
+#shopUI .kv { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; }
+#shopUI .blurnum { letter-spacing: .12em; color: var(--muted); filter: blur(1.5px); }
+/* two-token heroes (Ferry quote) stay on one line */
+#shopUI .hero:has(.arrow) { flex-wrap: nowrap; white-space: nowrap; font-size: 30px; line-height: 40px; gap: 6px; }
+#shopUI .hero:has(.arrow) .tok .ti { width: 26px; height: 26px; font-size: 13px; }
+#shopUI .hero:has(.arrow) .tok .sym { font-size: 16px; }
+#shopUI .hero:has(.arrow) .arrow { font-size: 18px; }
+/* 2D view: a shop module that failed to load (js/flat.js) */
+#shopUI .src.error { color: var(--no); border-color: color-mix(in srgb, var(--no) 55%, transparent); }
+#shopUI .src.error::before { background: var(--no); }
+#shopUI .note.proof-error, #shopUI .note.proof-missing { color: var(--no); }
+/* Mist Bank hero: the on-chain commitment stands in for the amount, which is never shown */
+#shopUI .hero .commit { font-family: var(--mono); font-size: 28px; letter-spacing: .02em; color: var(--accent); }
+#shopUI .hero .commit + .unit { font-size: 18px; }
+.fbpin{font:inherit;text-align:left} #fbpins[hidden]{display:none}
+
+#shopUI [hidden]{display:none!important}
+
+/* ---- Judge B pass: one clear first step, legible HUD, phone layout ---- */
+#brand{background:rgba(26,22,18,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:8px 14px 8px 10px;border-radius:12px;border:1px solid rgba(243,234,216,.1);text-shadow:none}
+#brand small{color:#e9dcc2;opacity:1}
+.pill.go{background:#e0bd72;color:#1f1a15;border-color:transparent;font-weight:600;text-decoration:none}
+.pill.go:hover{background:#ebc983}
+#rulesBtn{top:18px;left:50%;transform:translateX(-50%);height:38px;border-radius:19px;padding:0 16px;font-size:14px;box-shadow:0 6px 20px rgba(23,19,15,.35)}
+#rulesBtn .k{font-size:13px}
+#rulesBtn .cue{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:#1f1a15;background:#f3ead8;border-radius:8px;padding:3px 8px;opacity:0;transition:opacity .4s;pointer-events:none}
+#rulesBtn .cue::before{content:'';position:absolute;bottom:100%;left:50%;margin-left:-5px;border:5px solid transparent;border-bottom-color:#f3ead8}
+body.cta #rulesBtn .cue{opacity:1}
+body.cta #rulesBtn{animation:ctaPulse 1.6s ease-in-out 4}
+@keyframes ctaPulse{0%,100%{box-shadow:0 6px 20px rgba(23,19,15,.35),0 0 0 0 rgba(224,189,114,.55)}50%{box-shadow:0 6px 20px rgba(23,19,15,.35),0 0 0 10px rgba(224,189,114,0)}}
+body.in-shop #rulesBtn,body.entering #rulesBtn{opacity:0;pointer-events:none}
+#chron[hidden]{display:none}
+#shopUI .act.cta{display:flex;justify-content:center;width:100%;box-sizing:border-box;margin:0 0 10px;text-decoration:none}
+@media (max-width:900px){ #brand small{display:block;font-size:10px} }
+@media (max-width:1366px) and (min-width:721px){ #rulesBtn{top:auto;bottom:18px;left:auto;right:18px;transform:none} #rulesBtn .cue{top:auto;bottom:calc(100% + 8px)} #rulesBtn .cue::before{bottom:auto;top:100%;border-bottom-color:transparent;border-top-color:#f3ead8} }
+@media (max-width:720px){
+  #brand{top:8px;left:8px;padding:6px 10px 6px 8px} #brand b{font-size:16px} #brand .mark{width:22px;height:22px}
+  #ctl{top:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:8px;right:8px;flex-wrap:wrap;justify-content:center;gap:6px}
+  #ctl .pill,#ctl .ib{height:34px;font-size:12.5px} #ctl .pill{padding:0 11px}
+  #rulesBtn{top:auto;bottom:calc(96px + env(safe-area-inset-bottom,0px));height:40px}
+  #rulesBtn .cue{top:auto;bottom:calc(100% + 8px)} #rulesBtn .cue::before{bottom:auto;top:100%;border-bottom-color:transparent;border-top-color:#f3ead8}
+  #chron{left:8px;right:8px;width:auto;bottom:calc(146px + env(safe-area-inset-bottom,0px));padding:8px 10px}
+  #hint{bottom:auto;top:168px;max-width:calc(100vw - 80px);text-align:center;white-space:normal}
+}
+@media (max-width:900px) and (min-width:721px){ #rulesBtn{bottom:150px} }
+#c{touch-action:none}
+/* mobile: compact pins (name only), the hint steps aside while pins are up, one-line CTA */
+@media (max-width:720px){
+  .pin .ban{padding:4px 8px 5px 6px;gap:6px;border-radius:8px}
+  .pin .ic{width:18px;height:18px;font-size:10px}
+  .pin b{font-size:12.5px} .pin small{display:none} .pin .st{height:14px}
+  body.ov #hint{opacity:0!important}
+  #rulesBtn{white-space:nowrap}
+  #hint{white-space:nowrap;max-width:none;font-size:11.5px}
+}
