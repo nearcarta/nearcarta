@@ -55,7 +55,7 @@ fn min_deposit_must_cover_fee() {
 fn deposit_too_low() {
     let mut f = factory();
     testing_env!(ctx("alice.testnet", NearToken::from_millinear(299), 100).build());
-    f.create_charter("alice".into());
+    f.create_charter("alice".into(), None, None);
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn deposit_too_low() {
 fn deposit_too_high() {
     let mut f = factory();
     testing_env!(ctx("alice.testnet", NearToken::from_millinear(5001), 100).build());
-    f.create_charter("alice".into());
+    f.create_charter("alice".into(), None, None);
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn deposit_too_high() {
 fn gas_floor() {
     let mut f = factory();
     testing_env!(ctx("alice.testnet", NearToken::from_near(1), 79).build());
-    f.create_charter("alice".into());
+    f.create_charter("alice".into(), None, None);
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn gas_floor() {
 fn bad_name() {
     let mut f = factory();
     testing_env!(ctx("alice.testnet", NearToken::from_near(1), 100).build());
-    f.create_charter("a.b".into());
+    f.create_charter("a.b".into(), None, None);
 }
 
 #[test]
@@ -87,18 +87,18 @@ fn bad_name() {
 fn pending_name_is_reserved() {
     let mut f = factory();
     testing_env!(ctx("alice.testnet", NearToken::from_near(1), 100).build());
-    f.create_charter("shop".into());
+    f.create_charter("shop".into(), None, None);
     testing_env!(ctx("bob.testnet", NearToken::from_near(1), 100).build());
-    f.create_charter("shop".into());
+    f.create_charter("shop".into(), None, None);
 }
 
 #[test]
 fn success_registers() {
     let mut f = factory();
     testing_env!(ctx("alice.testnet", NearToken::from_near(1), 100).build());
-    f.create_charter("shop".into());
+    f.create_charter("shop".into(), None, None);
     with_result("charters.testnet", true);
-    assert!(f.on_created(acc("shop.charters.testnet"), acc("alice.testnet"), U128(NearToken::from_near(1).as_yoctonear())));
+    assert!(f.on_created(acc("shop.charters.testnet"), acc("alice.testnet"), U128(NearToken::from_near(1).as_yoctonear()), U64(DEFAULT_POLICY_DELAY_NS), None));
     assert!(f.is_charter(acc("shop.charters.testnet")));
     assert_eq!(f.charters_of(acc("alice.testnet")), vec![acc("shop.charters.testnet")]);
     let c = f.get_charter(acc("shop.charters.testnet")).unwrap();
@@ -114,25 +114,25 @@ fn success_registers() {
 fn taken_after_success() {
     let mut f = factory();
     testing_env!(ctx("alice.testnet", NearToken::from_near(1), 100).build());
-    f.create_charter("shop".into());
+    f.create_charter("shop".into(), None, None);
     with_result("charters.testnet", true);
-    f.on_created(acc("shop.charters.testnet"), acc("alice.testnet"), U128(1));
+    f.on_created(acc("shop.charters.testnet"), acc("alice.testnet"), U128(1), U64(DEFAULT_POLICY_DELAY_NS), None);
     testing_env!(ctx("bob.testnet", NearToken::from_near(1), 100).build());
-    f.create_charter("shop".into());
+    f.create_charter("shop".into(), None, None);
 }
 
 #[test]
 fn failure_refunds_and_frees_name() {
     let mut f = factory();
     testing_env!(ctx("alice.testnet", NearToken::from_near(1), 100).build());
-    f.create_charter("shop".into());
+    f.create_charter("shop".into(), None, None);
     with_result("charters.testnet", false);
-    assert!(!f.on_created(acc("shop.charters.testnet"), acc("alice.testnet"), U128(NearToken::from_near(1).as_yoctonear())));
+    assert!(!f.on_created(acc("shop.charters.testnet"), acc("alice.testnet"), U128(NearToken::from_near(1).as_yoctonear()), U64(DEFAULT_POLICY_DELAY_NS), None));
     assert!(!f.is_charter(acc("shop.charters.testnet")));
     assert!(get_logs().iter().any(|l| l.contains("\"charter_failed\"")));
     // the name is free again
     testing_env!(ctx("bob.testnet", NearToken::from_near(1), 100).build());
-    f.create_charter("shop".into());
+    f.create_charter("shop".into(), None, None);
 }
 
 #[test]
@@ -142,9 +142,9 @@ fn owner_limit() {
     for i in 0..=MAX_PER_OWNER {
         let name = format!("shop{i}");
         testing_env!(ctx("alice.testnet", NearToken::from_near(1), 100).build());
-        f.create_charter(name.clone());
+        f.create_charter(name.clone(), None, None);
         with_result("charters.testnet", true);
-        f.on_created(format!("{name}.charters.testnet").parse().unwrap(), acc("alice.testnet"), U128(1));
+        f.on_created(format!("{name}.charters.testnet").parse().unwrap(), acc("alice.testnet"), U128(1), U64(DEFAULT_POLICY_DELAY_NS), None);
     }
 }
 
@@ -154,11 +154,73 @@ fn list_paging() {
     for (i, who) in ["a1.testnet", "a2.testnet", "a3.testnet"].iter().enumerate() {
         let name = format!("c{i}");
         testing_env!(ctx(who, NearToken::from_near(1), 100).build());
-        f.create_charter(name.clone());
+        f.create_charter(name.clone(), None, None);
         with_result("charters.testnet", true);
-        f.on_created(format!("{name}.charters.testnet").parse().unwrap(), acc(who), U128(1));
+        f.on_created(format!("{name}.charters.testnet").parse().unwrap(), acc(who), U128(1), U64(DEFAULT_POLICY_DELAY_NS), None);
     }
     assert_eq!(f.list(Some(1), Some(1))[0].0, acc("c1.charters.testnet"));
     assert_eq!(f.list(Some(2), Some(10)).len(), 1);
     assert_eq!(f.list(Some(9), None).len(), 0);
 }
+
+fn created(f: &mut Factory, who: &str, name: &str, delay: Option<u64>, dao: Option<&str>) -> String {
+    testing_env!(ctx(who, NearToken::from_near(1), 100).build());
+    f.create_charter(name.into(), delay.map(U64), dao.map(acc));
+    get_logs().join("\n")
+}
+
+#[test]
+fn default_timelock_is_24h_and_passed_to_oath_with_setup_window() {
+    let mut f = factory();
+    let logs = created(&mut f, "alice.testnet", "shop", None, None);
+    assert!(logs.contains(&format!("\"policy_delay_ns\":\"{DEFAULT_POLICY_DELAY_NS}\"")), "{logs}");
+    assert_eq!(DEFAULT_POLICY_DELAY_NS, 86_400_000_000_000);
+    let c = f.get_config();
+    assert_eq!(c.default_policy_delay_ns.0, DEFAULT_POLICY_DELAY_NS);
+    assert_eq!(c.min_policy_delay_ns.0, 600_000_000_000);
+    with_result("charters.testnet", true);
+    f.on_created(acc("shop.charters.testnet"), acc("alice.testnet"), U128(1), U64(DEFAULT_POLICY_DELAY_NS), None);
+    let ch = f.get_charter(acc("shop.charters.testnet")).unwrap();
+    assert_eq!(ch.policy_delay_ns.0, DEFAULT_POLICY_DELAY_NS);
+    assert_eq!(ch.dao, None);
+}
+
+#[test]
+fn custom_delay_and_dao_are_recorded() {
+    let mut f = factory();
+    let logs = created(&mut f, "alice.testnet", "shop", Some(MIN_POLICY_DELAY_NS), Some("dao.testnet"));
+    assert!(logs.contains("\"dao\":\"dao.testnet\""), "{logs}");
+    with_result("charters.testnet", true);
+    assert!(f.on_created(acc("shop.charters.testnet"), acc("alice.testnet"), U128(1), U64(MIN_POLICY_DELAY_NS), Some(acc("dao.testnet"))));
+    let ch = f.get_charter(acc("shop.charters.testnet")).unwrap();
+    assert_eq!(ch.policy_delay_ns.0, MIN_POLICY_DELAY_NS);
+    assert_eq!(ch.dao, Some(acc("dao.testnet")));
+    assert!(get_logs().iter().any(|l| l.contains("\"charter_created\"") && l.contains("dao.testnet")));
+}
+
+#[test]
+#[should_panic(expected = "ERR_DELAY")]
+fn zero_delay_rejected() { let mut f = factory(); created(&mut f, "alice.testnet", "shop", Some(0), None); }
+
+#[test]
+#[should_panic(expected = "ERR_DELAY")]
+fn delay_below_min_rejected() { let mut f = factory(); created(&mut f, "alice.testnet", "shop", Some(MIN_POLICY_DELAY_NS - 1), None); }
+
+#[test]
+#[should_panic(expected = "ERR_DELAY")]
+fn delay_above_max_rejected() { let mut f = factory(); created(&mut f, "alice.testnet", "shop", Some(MAX_POLICY_DELAY_NS + 1), None); }
+
+#[test]
+fn delay_bounds_accepted() {
+    let mut f = factory();
+    created(&mut f, "alice.testnet", "lo", Some(MIN_POLICY_DELAY_NS), None);
+    created(&mut f, "alice.testnet", "hi", Some(MAX_POLICY_DELAY_NS), None);
+}
+
+#[test]
+#[should_panic(expected = "ERR_DAO")]
+fn dao_cannot_be_owner() { let mut f = factory(); created(&mut f, "alice.testnet", "shop", None, Some("alice.testnet")); }
+
+#[test]
+#[should_panic(expected = "ERR_DAO")]
+fn dao_cannot_be_the_charter() { let mut f = factory(); created(&mut f, "alice.testnet", "shop", None, Some("shop.charters.testnet")); }

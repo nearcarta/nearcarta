@@ -6,6 +6,14 @@
 //! `new(owner = caller)` in one atomic receipt. No access key is added, so the
 //! charter starts with zero keys; the caller governs it through the oath methods.
 //!
+//! Every charter starts with a nonzero timelock (`policy_delay_ns`, default 24 h,
+//! 10 min to 30 days): after setup, any widening change (new receiver, higher cap,
+//! new agent key, DAO or delay change, upgrade) waits that long and can be
+//! cancelled, so a stolen owner key cannot drain the charter at once. An optional
+//! DAO can co-govern, cancel queued changes and is the only one able to unfreeze.
+//! The oath setup window lets the first rules and agent key apply in one approval;
+//! it ends when the agent key is added.
+//!
 //! The factory has no owner and no admin method. After `new`, its own full-access
 //! key is deleted, so the pinned code hash and the rules below cannot change.
 
@@ -24,6 +32,10 @@ pub const GAS_INIT: Gas = Gas::from_tgas(30);
 pub const GAS_CALLBACK: Gas = Gas::from_tgas(20);
 /// create_charter itself + the batch receipt + the callback.
 pub const MIN_GAS_CREATE: Gas = Gas::from_tgas(80);
+pub const NS_PER_MIN: u64 = 60_000_000_000;
+pub const DEFAULT_POLICY_DELAY_NS: u64 = 24 * 60 * NS_PER_MIN;
+pub const MIN_POLICY_DELAY_NS: u64 = 10 * NS_PER_MIN;
+pub const MAX_POLICY_DELAY_NS: u64 = 30 * 24 * 60 * NS_PER_MIN;
 
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Debug, PartialEq)]
@@ -31,6 +43,8 @@ pub struct Charter {
     pub owner: AccountId,
     pub created_at: U64,
     pub index: u32,
+    pub policy_delay_ns: U64,
+    pub dao: Option<AccountId>,
 }
 
 #[near(serializers = [json])]
@@ -41,6 +55,9 @@ pub struct Config {
     pub registry_fee: U128,
     pub max_per_owner: u32,
     pub count: u32,
+    pub default_policy_delay_ns: U64,
+    pub min_policy_delay_ns: U64,
+    pub max_policy_delay_ns: U64,
 }
 
 #[near(contract_state)]
@@ -93,8 +110,9 @@ impl Factory {
 
     /// Creates `<name>.<factory>` running the pinned oath code, owned by the caller.
     /// The attached deposit minus REGISTRY_FEE becomes the charter's balance.
+    /// `policy_delay_ns` defaults to 24 h; `dao` is an optional second governor.
     #[payable]
-    pub fn create_charter(&mut self, name: String) -> Promise {
+    pub fn create_charter(&mut self, name: String, policy_delay_ns: Option<U64>, dao: Option<AccountId>) -> Promise {
         require!(valid_name(&name), "ERR_NAME");
         require!(env::prepaid_gas() >= MIN_GAS_CREATE, "ERR_LOW_GAS");
         let deposit = env::attached_deposit().as_yoctonear();
@@ -106,9 +124,18 @@ impl Factory {
         let owner = env::predecessor_account_id();
         let owned = self.by_owner.get(&owner).map(|v| v.len()).unwrap_or(0);
         require!(owned < MAX_PER_OWNER, "ERR_OWNER_LIMIT");
+        let delay = policy_delay_ns.map(|d| d.0).unwrap_or(DEFAULT_POLICY_DELAY_NS);
+        require!((MIN_POLICY_DELAY_NS..=MAX_POLICY_DELAY_NS).contains(&delay), "ERR_DELAY");
+        if let Some(d) = &dao {
+            require!(d != &owner && d != &account && d != &env::current_account_id(), "ERR_DAO");
+        }
         self.pending.insert(account.clone());
-        emit("charter_requested", json!({"charter": account, "owner": owner, "deposit": U128(deposit)}));
-        let init = json!({"owner": owner, "dao": null, "policy_delay_ns": null, "storage_reserve": null});
+        emit("charter_requested", json!({
+            "charter": account, "owner": owner, "deposit": U128(deposit), "policy_delay_ns": U64(delay), "dao": dao,
+        }));
+        let init = json!({
+            "owner": owner, "dao": dao, "policy_delay_ns": U64(delay), "storage_reserve": null, "setup_window": true,
+        });
         Promise::new(account.clone())
             .create_account()
             .transfer(NearToken::from_yoctonear(deposit - REGISTRY_FEE.as_yoctonear()))
@@ -117,18 +144,18 @@ impl Factory {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_CALLBACK)
-                    .on_created(account, owner, U128(deposit)),
+                    .on_created(account, owner, U128(deposit), U64(delay), dao),
             )
     }
 
     /// Registers the charter if the batch succeeded; otherwise refunds the full deposit.
     #[private]
-    pub fn on_created(&mut self, charter: AccountId, owner: AccountId, deposit: U128) -> bool {
+    pub fn on_created(&mut self, charter: AccountId, owner: AccountId, deposit: U128, policy_delay_ns: U64, dao: Option<AccountId>) -> bool {
         self.pending.remove(&charter);
         if env::promise_result_checked(0, 1024).is_ok() {
             let index = self.list.len();
             self.list.push(charter.clone());
-            let c = Charter { owner: owner.clone(), created_at: U64(env::block_timestamp()), index };
+            let c = Charter { owner: owner.clone(), created_at: U64(env::block_timestamp()), index, policy_delay_ns, dao: dao.clone() };
             self.charters.insert(charter.clone(), c);
             let mut v = self.by_owner.get(&owner).cloned().unwrap_or_default();
             v.push(charter.clone());
@@ -136,6 +163,7 @@ impl Factory {
             emit("charter_created", json!({
                 "charter": charter, "owner": owner, "index": index,
                 "code_hash": Base58CryptoHash::from(self.code_hash),
+                "policy_delay_ns": policy_delay_ns, "dao": dao,
             }));
             true
         } else {
@@ -154,6 +182,9 @@ impl Factory {
             registry_fee: U128(REGISTRY_FEE.as_yoctonear()),
             max_per_owner: MAX_PER_OWNER as u32,
             count: self.list.len(),
+            default_policy_delay_ns: U64(DEFAULT_POLICY_DELAY_NS),
+            min_policy_delay_ns: U64(MIN_POLICY_DELAY_NS),
+            max_policy_delay_ns: U64(MAX_POLICY_DELAY_NS),
         }
     }
     pub fn get_charter(&self, account_id: AccountId) -> Option<Charter> { self.charters.get(&account_id).cloned() }
