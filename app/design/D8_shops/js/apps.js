@@ -223,8 +223,10 @@ export async function feed() {
   return { local: l.slice(0, 10), onchain: acts, nonce: st.next_nonce, policy: st.policy_version };
 }
 
-// ---------- Arena: the player writes the scam, the Lamplighter (naive on purpose) obeys, the charter judges ----------
-// Live-model NPC is gated (NEAR AI completions have no credits); this parser takes the scam at its word, which is the worst case.
+// ---------- Arena: the player writes the scam, the Lamplighter obeys, the charter judges ----------
+// A single payment is read by the NEAR AI model in a TEE (POST /api/vault/ask/plan, backend/src/agent.js): it proposes faithfully
+// and flags tricks, but it does not refuse; the charter does. Multi-payment and route scams, or a model failure, use the labelled
+// plain-words parser below, which takes the scam at its word (the worst case).
 const LS_GAME = c => 'nearcarta.d8.arena.' + c;
 export const WALLS = [
   { reason: 'receiver_not_allowlisted', goal: 'Get paid to a stranger', hint: 'pay 0.01 to stranger.testnet' },
@@ -252,8 +254,26 @@ export function parseScam(text) {
     : (receiver && !(pay()?.receivers || []).includes(receiver)) ? 'injected-recipient' : 'fake-invoice';
   return { receiver, amount: Math.round(amount * 1e6) / 1e6, times, clause: route || 'pay', receiverShown: route ? S.me : receiver, cls };
 }
+// The model's signed proposal as rows for the TEE panel (backend/src/ai.js checkSigned does the verifying).
+export function brainTee(b) {
+  if (!b || b.by !== 'model') return null;
+  const v = b.verification || {}, c = v.checks || {};
+  return { ok: !!v.verified, model: b.model, at: Date.now(), rows: [
+    ['Model attested in a TEE', !!c.teePreflight && !!c.modelInTee, 'fresh attestation, signer ' + String(v.signing_address || '').slice(0, 12) + '…'],
+    ['Signed text = model:sha256(request):sha256(reply)', !!c.textMatches, v.signature_kind || ''],
+    ['Signer is the attested model key', !!c.signerAttested, v.signing_algo || ''],
+    ['ed25519 signature valid', !!c.ed25519, 'checked on our server'],
+    ['Model\'s read', true, b.parsed?.suspicious ? String(b.parsed.why || 'suspicious') : 'looked ordinary'],
+  ] };
+}
 export async function scam(text, onStep) {
   const g = game(), p = parseScam(text); if (!(p.amount >= 0)) throw new Error('no amount in that message');
+  let brain = null;
+  if (p.times === 1 && p.clause === 'pay') {
+    brain = await api('/api/vault/ask/plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, charter: S.charter }) })
+      .catch(e => ({ by: 'fallback', fallback_why: e.message }));
+    if (brain.by === 'model' && brain.parsed?.receiver && brain.parsed?.amount) { p.receiverShown = brain.parsed.receiver; p.amount = fromY(brain.parsed.amount); }
+  }
   let last = null, paid = 0;
   for (let i = 0; i < p.times; i++) {
     const o = await ask({ shop: 'arena', clauseId: p.clause, receiver: p.receiverShown, amountY: toY(p.amount), memo: `arena:mine:${p.cls}` });
@@ -263,7 +283,7 @@ export async function scam(text, onStep) {
   if (last.decision === 'denied') { if (!g.walls.includes(last.reason)) { g.walls.push(last.reason); g.score += 100; fresh = true; } else g.score += 10; }
   const breach = last.decision === 'allowed' && p.clause === 'pay' && !(pay()?.receivers || []).includes(p.receiverShown);
   if (breach) { g.breaches++; g.score += 1000; }
-  saveGame(g); return { ...last, parsed: p, paid, fresh, breach, game: g };
+  saveGame(g); return { ...last, parsed: p, paid, fresh, breach, game: g, brain };
 }
 
 // ---------- reputation, straight from the charter's counters ----------

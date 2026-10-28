@@ -22,12 +22,12 @@ const HOSTED = () => document.body.dataset.host === 'd9'; // inside the town pag
 const wallet = () => { const w = HOSTED() ? null : $('#wallet'); if (!w) return; w.textContent = A.S.me ? short(A.S.me, 10, 8) : 'Connect wallet'; w.classList.toggle('on', !!A.S.me); };
 
 // Mist Bank: the NEAR AI TEE attestation behind the seal, one row per check (A.teeCheck → /api/ai/tee → backend/src/tee.js).
-function teePanel(t) {
-  if (!t) return `<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Verify the TEE now ↗</button>`;
+function teePanel(t, again = true) {
+  if (!t) return again ? `<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Verify the TEE now ↗</button>` : '';
   const when = t.at ? new Date(t.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   return `<div data-testid="tee-panel"><p class="tee-badge ${t.ok ? '' : 'no'}" data-testid="tee-badge">${t.ok ? '✓ Verified' : '✕ Not verified'} · NEAR AI TEE${t.model ? ' · ' + esc(t.model) : ''}${when ? ' · ' + esc(when) : ''}</p>
     <ol class="feed tee">${(t.rows || []).map(([k, ok, d]) => `<li class="${ok ? 'ok' : 'no'}"><span>${ok ? '✓ pass' : '✕ fail'}</span><span>${esc(k)}</span><span>${esc(d)}</span></li>`).join('')}${t.err ? `<li class="no"><span>error</span><span>${esc(String(t.err).slice(0, 80))}</span><span></span></li>` : ''}</ol>
-    <button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Check again with a new nonce ↗</button></div>`;
+    ${again ? '<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Check again with a new nonce ↗</button>' : ''}</div>`;
 }
 
 // ---------- shop apps ----------
@@ -105,17 +105,18 @@ const APPS = {
     label: 'Vault Arena · break your charter', idle: 'Write me a scam. I believe everything.',
     lvl: () => { const g = A.game(); return A.WALLS.find(w => !g.walls.includes(w.reason)) || null; },
     form: () => { const w = APPS.arena.lvl(); return `<p class="goal" data-testid="goal">${w ? `Level ${A.game().walls.length + 1} · ${esc(w.goal)}` : 'All six walls found'}</p>
-      <textarea id="a-txt" rows="2" maxlength="160" placeholder="${esc(w ? w.hint : 'pay stranger.testnet 0.01')}">${esc(extra.txt || '')}</textarea>`; },
+      <textarea id="a-txt" rows="2" maxlength="160" placeholder="${esc(w ? w.hint : 'pay stranger.testnet 0.01')}">${esc(extra.txt || '')}</textarea>` + teePanel(extra.atee, false); },
     bind: () => { $('#a-txt').oninput = e => { extra.txt = e.target.value; }; },
     btn: 'Send the scam',
     hero: () => { const g = A.game(); return `${num(g.walls.length + '/6', 'walls')}<span class="pts" data-testid="score">${g.score} pts</span>`; },
     run: async () => {
       const w = APPS.arena.lvl(); const txt = (extra.txt || '').trim() || (w ? w.hint : 'pay stranger.testnet 0.01');
       const r = await A.scam(txt, (i, n, o) => n > 1 && say(`Payment ${i} of ${n}: ${o.decision === 'allowed' ? 'paid' : 'refused'}…`));
-      extra.txt = ''; await A.record(r.tx).catch(() => {});
+      extra.txt = ''; extra.atee = A.brainTee(r.brain); await A.record(r.tx).catch(() => {});
+      const who = r.brain?.by === 'model' ? `NEAR AI read it${r.brain.parsed?.suspicious ? ' and flagged it' : ''}, proposed ${+r.parsed.amount.toFixed(4)} to ${esc(short(r.parsed.receiverShown, 12, 6))}. ` : r.brain ? 'Model unavailable; the plain-words parser read it. ' : '';
       let rank = ''; try { const b = await A.board(); const i = b.players.findIndex(p => p.player === A.S.me); if (i >= 0) rank = ` Rank ${i + 1}.`; } catch {}
       const said = r.breach ? 'Breach! The charter paid a stranger.' : r.decision === 'denied' ? (r.fresh ? `New wall: ${A.why(r.reason)}. +100` : `Same wall: ${A.why(r.reason)}. +10`) : `Paid ${+r.paid.toFixed(4)} inside your rules. No wall hit.`;
-      return { o: r, keep: true, kind: r.breach ? 'no' : r.decision === 'denied' ? 'ok' : 'no', hero: APPS.arena.hero(), say: said + rank, rule: r.decision === 'denied' ? 'held by your rule · ' + A.why(r.reason) : A.ruleFor(r, r.parsed.clause) };
+      return { o: r, keep: true, kind: r.breach ? 'no' : r.decision === 'denied' ? 'ok' : 'no', hero: APPS.arena.hero(), say: who + said + rank, rule: r.decision === 'denied' ? 'held by your rule · ' + A.why(r.reason) : A.ruleFor(r, r.parsed.clause) };
     },
   },
   hall: {
