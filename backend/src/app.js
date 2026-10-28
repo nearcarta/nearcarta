@@ -239,9 +239,25 @@ export function makeApp() {
     if (!knownAccounts.has(a) && !(await vault.isFactoryCharter(a))) return c.json({ error: 'not a Nearcarta contract' }, 400);
     // A busy tx index on a charter with no cached feed yet is not an error for the page (it keeps its own story and
     // polls again): answer 200 busy + Retry-After instead of 503, so a fresh visitor's console stays clean.
-    try { return c.json(await shops.chronicle(a, Math.min(Number(c.req.query('limit') || 8), 15))); }
-    catch (e) { if (e.status || !/http (429|5\d\d)|timeout|aborted|fetch failed/i.test(e.message)) throw e;
-      c.header('Retry-After', '10'); return c.json({ account: a, count: 0, txs: [], busy: true, source: 'tx index busy; try again in 10 s' }); }
+    const limit = Math.min(Number(c.req.query('limit') || 8), 15);
+    // `known`: tx hashes the page itself sent (each re-read from RPC and kept only if it belongs to this account), so a
+    // fresh charter's feed fills even when the index lags or is busy; the server adds the rows it already verified.
+    const known = String(c.req.query('known') || '').split(',').filter(h => /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(h)).slice(0, 15);
+    let j;
+    try { j = await shops.chronicle(a, limit); }
+    catch (e) {
+      if (e.status || !/busy|http (429|5\d\d)|timeout|aborted|fetch failed/i.test(e.message)) throw e;
+      const hashes = [...known, ...vault.knownTxs(a).slice(-15)];
+      if (hashes.length) { const f = await shops.chronicleFrom(a, hashes, limit); if (f.txs.length) return c.json(f); }
+      c.header('Retry-After', '10'); return c.json({ account: a, count: 0, txs: [], busy: true, source: 'tx index busy; try again in 10 s' });
+    }
+    const have = new Set((j.txs || []).map(t => t.hash)), lag = known.filter(h => !have.has(h));
+    if (lag.length) { // the index has not listed the page's newest txs yet: add them from RPC
+      const f = await shops.chronicleFrom(a, lag, limit);
+      if (f.txs.length) j = { ...j, txs: [...f.txs, ...j.txs].sort((x, y) => String(y.at).localeCompare(String(x.at))).slice(0, limit), source: j.source + ' + known tx hashes' };
+      j.count = j.txs.length;
+    }
+    return c.json(j);
   });
   // R16 oath charters: on-chain reputation (refusal buckets) and one clause's user-set rules. Read-only views;
   // older charters (R14/R15) have no such method and answer { supported: false }.
