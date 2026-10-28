@@ -2,6 +2,7 @@
 name = "townhall_oath"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/nearcarta/nearcarta"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
