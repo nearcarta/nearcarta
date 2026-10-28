@@ -224,3 +224,27 @@ fn dao_cannot_be_owner() { let mut f = factory(); created(&mut f, "alice.testnet
 #[test]
 #[should_panic(expected = "ERR_DAO")]
 fn dao_cannot_be_the_charter() { let mut f = factory(); created(&mut f, "alice.testnet", "shop", None, Some("shop.charters.testnet")); }
+
+#[test]
+fn delay_bounds_are_the_documented_literals() {
+    // 10 min, 24 h and 30 days in ns, written out so a changed constant cannot hide behind itself.
+    assert_eq!(MIN_POLICY_DELAY_NS, 600_000_000_000);
+    assert_eq!(DEFAULT_POLICY_DELAY_NS, 86_400_000_000_000);
+    assert_eq!(MAX_POLICY_DELAY_NS, 2_592_000_000_000_000);
+    let mut f = factory();
+    created(&mut f, "alice.testnet", "month", Some(2_592_000_000_000_000), None);
+}
+
+#[test]
+fn charter_is_funded_with_deposit_minus_registry_fee() {
+    let mut f = factory();
+    testing_env!(ctx("alice.testnet", NearToken::from_millinear(1234), 100).build());
+    f.create_charter("shop".into(), None, None).detach();
+    let receipts = near_sdk::test_utils::get_created_receipts();
+    let batch = receipts.iter().find(|r| r.receiver_id == acc("shop.charters.testnet")).expect("batch receipt");
+    let transfers: Vec<u128> = batch.actions.iter().filter_map(|a| match a {
+        near_sdk::mock::MockAction::Transfer { deposit, .. } => Some(deposit.as_yoctonear()),
+        _ => None,
+    }).collect();
+    assert_eq!(transfers, vec![NearToken::from_millinear(1224).as_yoctonear()]);
+}
