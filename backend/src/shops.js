@@ -58,12 +58,32 @@ export async function toll() {
 // Chronicle: recent txs of a shop contract (FastNEAR tx index for the list), each re-read from NEAR RPC
 // so events come from chain. Events from failed receipts are dropped (phantom events).
 const FASTNEAR_TX = 'https://tx.test.fastnear.com/v0';
-async function fpost(path, body) {
-  const r = await fetch(`${FASTNEAR_TX}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  if (!r.ok) throw Object.assign(new Error(`fastnear tx http ${r.status}`), { status: 502 });
-  return r.json();
+// The FastNEAR tx index rate-limits per IP (Render's egress is shared): retry 429/5xx twice with a short backoff,
+// then throw without a status so onError answers 503 + Retry-After instead of a bare 502.
+export async function fpost(path, body, f = fetch, waitMs = 700) {
+  for (let i = 0; ; i++) {
+    const r = await f(`${FASTNEAR_TX}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.ok) return r.json();
+    const busy = r.status === 429 || r.status >= 500;
+    if (!busy) throw Object.assign(new Error(`fastnear tx http ${r.status}`), { status: 502 });
+    if (i >= 2) throw new Error(`fastnear tx http ${r.status}`);
+    await new Promise(res => setTimeout(res, waitMs * (i + 1)));
+  }
 }
-export async function chronicle(account, limit = 8) {
+// Pages poll the feed 2.5 s after every tx: one upstream read per account+limit per 4 s (shared by concurrent callers),
+// and the last good feed (marked stale) when the index is still busy after retries.
+const feeds = new Map();
+export async function chronicle(account, limit = 8, read = chronicleOnce) {
+  const k = account + '|' + limit, hit = feeds.get(k), now = Date.now();
+  if (hit?.p) return hit.p;
+  if (hit?.v && now - hit.at < 4_000) return hit.v;
+  const p = read(account, limit).then(v => { feeds.set(k, { v, at: Date.now() }); return v; },
+    e => { if (hit?.v) { feeds.set(k, hit); return { ...hit.v, stale: true }; } feeds.delete(k); throw e; });
+  feeds.set(k, { ...hit, p });
+  if (feeds.size > 500) feeds.delete(feeds.keys().next().value);
+  return p;
+}
+async function chronicleOnce(account, limit = 8) {
   const { account_txs = [] } = await fpost('/account', { account_id: account, max_block_height: null });
   const list = account_txs.slice(0, limit);
   const { transactions = [] } = list.length ? await fpost('/transactions', { tx_hashes: list.map(t => t.transaction_hash) }) : {};
