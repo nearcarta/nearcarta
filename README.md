@@ -7,7 +7,7 @@ Deployed (testnet, read-only, no keys): https://nearcarta.vercel.app. Example: `
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 43 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm test                 # 44 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
 npm run verify           # reads every proof tx back from testnet (47/47 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # read-only API on :8787 (no route signs)
 npm run build && node app/serve.mjs &   # UI on :5173
