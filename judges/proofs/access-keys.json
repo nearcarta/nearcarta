@@ -1,7 +1,7 @@
 {
-  "checked_at": "2026-10-28T19:16:49.180Z",
+  "checked_at": "2026-10-28T19:33:29.776Z",
   "source": "view_account + view_access_key_list, finality final, testnet RPC",
-  "contracts": 10,
+  "contracts": 11,
   "contracts_with_full_access_key": [],
   "not_our_contracts": [
     {
@@ -19,7 +19,7 @@
     {
       "account": "arena.r6vamvr9brhx-arena2.testnet",
       "code_hash": "5PwtMjcC2oUTr5g2E2uWHyqHs3wkYGryY1ZWCuTvSZc5",
-      "block_height": 275192393,
+      "block_height": 275194142,
       "full_access_keys": 0,
       "function_call_keys": [],
       "role": "contract"
@@ -27,7 +27,7 @@
     {
       "account": "deed-mvronpbm.nc-vault-mvrojr9w.testnet",
       "code_hash": "9xqVzKnPgToCggnkStuEgM2ZgdyfbCcejTKf1jehED4m",
-      "block_height": 275192395,
+      "block_height": 275194146,
       "full_access_keys": 0,
       "function_call_keys": [],
       "role": "contract"
@@ -35,7 +35,7 @@
     {
       "account": "nccharters-17102.testnet",
       "code_hash": "CnMZr5DQjWsdNrLDGWdf5mS8S1uK41sDfJ9FFqhRFTw6",
-      "block_height": 275192397,
+      "block_height": 275194147,
       "full_access_keys": 0,
       "function_call_keys": [],
       "role": "contract"
@@ -43,7 +43,7 @@
     {
       "account": "nccharters-53681.testnet",
       "code_hash": "2dA4HymactrRrBL5e1iT2SDZbfcCg2gi3pt5ooUfuVSV",
-      "block_height": 275192398,
+      "block_height": 275194148,
       "full_access_keys": 0,
       "function_call_keys": [],
       "role": "contract"
@@ -51,7 +51,7 @@
     {
       "account": "nccharters-85831.testnet",
       "code_hash": "2dA4HymactrRrBL5e1iT2SDZbfcCg2gi3pt5ooUfuVSV",
-      "block_height": 275192398,
+      "block_height": 275194149,
       "full_access_keys": 0,
       "function_call_keys": [],
       "role": "contract"
@@ -59,7 +59,7 @@
     {
       "account": "r11house-31474.testnet",
       "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
-      "block_height": 275192399,
+      "block_height": 275194150,
       "full_access_keys": 0,
       "function_call_keys": [
         {
@@ -74,7 +74,7 @@
     {
       "account": "r11oath-82930.testnet",
       "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
-      "block_height": 275192400,
+      "block_height": 275194150,
       "full_access_keys": 0,
       "function_call_keys": [
         {
@@ -89,7 +89,7 @@
     {
       "account": "r16oath.r14own-46135.testnet",
       "code_hash": "4vxachQCQqMShPRyKB6FfNAa9MmPNjSCna8dhXfxPN1s",
-      "block_height": 275192402,
+      "block_height": 275194152,
       "full_access_keys": 0,
       "function_call_keys": [
         {
@@ -104,7 +104,7 @@
     {
       "account": "r6vamvr9brhx-arena2.testnet",
       "code_hash": "D7r681CT3ZDSr8T2rBFdCJ56dFTanCrNeFAuPqAMXDRT",
-      "block_height": 275192403,
+      "block_height": 275194153,
       "full_access_keys": 1,
       "function_call_keys": [],
       "role": "wallet",
@@ -113,15 +113,31 @@
     {
       "account": "r7thmvr8maey.sputnikv2.testnet",
       "code_hash": "AA4nA45vauiac3jdVwJTzSdUP3oj2r1fDaPAb2mHdgcH",
-      "block_height": 275192404,
+      "block_height": 275194154,
       "full_access_keys": 0,
       "function_call_keys": [],
       "role": "contract"
     },
     {
+      "account": "toll-arb.r4csmvr86zk4.testnet",
+      "code_hash": "FLeqLrp4VdSqCxUpiC3zFBQTY8z4bATzAwDtvuwY7jTi",
+      "block_height": 275194155,
+      "full_access_keys": 0,
+      "function_call_keys": [
+        {
+          "receiver_id": "toll-arb.r4csmvr86zk4.testnet",
+          "method_names": [
+            "pay",
+            "settle"
+          ]
+        }
+      ],
+      "role": "contract"
+    },
+    {
       "account": "toll.r4csmvr86zk4.testnet",
       "code_hash": "5kybowQxddWXhEYkUsxzwDKwDPrKmiHwQmVL5rA6LJn8",
-      "block_height": 275192405,
+      "block_height": 275194155,
       "full_access_keys": 0,
       "function_call_keys": [
         {
@@ -137,7 +153,7 @@
     {
       "account": "v1.signer-prod.testnet",
       "code_hash": "DAE5ng4ZFR2ctMx9SizQBqmGkVbKUutgZ4ZECD4R8Sm9",
-      "block_height": 275192406,
+      "block_height": 275194157,
       "full_access_keys": 4,
       "function_call_keys": [],
       "role": "external",

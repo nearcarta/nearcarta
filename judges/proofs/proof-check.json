@@ -1,5 +1,5 @@
 {
- "at": "2026-10-28T19:23:28.101Z",
+ "at": "2026-10-28T19:33:20.320Z",
  "rows": [
   {
    "shop": "guardhouse",
@@ -901,6 +901,93 @@
    "events": [
     "confirmed"
    ],
+   "found": true
+  },
+  {
+   "shop": "toll_arbitrum",
+   "label": "deploy",
+   "hash": "CH4YEXKN5exV9URpxqwJd6vs8Q2wwDjdUJmsPAssSXk1",
+   "url": "https://testnet.nearblocks.io/txns/CH4YEXKN5exV9URpxqwJd6vs8Q2wwDjdUJmsPAssSXk1",
+   "signer": "r4csmvr86zk4.testnet",
+   "receiver": "toll-arb.r4csmvr86zk4.testnet",
+   "method": "0,Transfer,DeployContract,new,AddKey",
+   "result": {
+    "ok": true,
+    "value": null
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "toll_arbitrum",
+   "label": "signed_allowlisted",
+   "hash": "F7AVN8oqGvDstRHbiy7gsxzXUekQPHPrCatc8HmDd1aF",
+   "url": "https://testnet.nearblocks.io/txns/F7AVN8oqGvDstRHbiy7gsxzXUekQPHPrCatc8HmDd1aF",
+   "signer": "toll-arb.r4csmvr86zk4.testnet",
+   "receiver": "toll-arb.r4csmvr86zk4.testnet",
+   "method": "pay",
+   "result": {
+    "ok": true,
+    "value": {
+     "to": "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5",
+     "value": "1000000000000",
+     "nonce": 0,
+     "status": "signed",
+     "unsigned_hash": "99eca8b76c965a96c18581fd82371e6eb14e26338981288c9e79aabd69d4d961",
+     "raw_signed": "0x02f87183066eee80830f42408405f5e10082520894552ad18e18a49ddad1e7d96b7ddf813b04a9cfb585e8d4a5100080c001a053a2ecb6dd186ce1cb61ef8aefdc6ea414dc6d3826eec95280781fd64326d4e9a07cefa0f6233f7dd8d45eb110397b791472a4333522774e23e8c48fbd2fd83656",
+     "tx_hash": "0x6ff101fbf71bcade7f3527a23177e7313f3fa7f083727eccc12c9d97199f8cf0",
+     "proof_payload_hash": null
+    }
+   },
+   "events": [
+    "sign_requested",
+    "signed"
+   ],
+   "found": true
+  },
+  {
+   "shop": "toll_arbitrum",
+   "label": "refused_not_allowlisted",
+   "hash": "D2P5Y71YAeZfJCZwhonGYcvg36HHnbkKCuFZAHVYutnE",
+   "url": "https://testnet.nearblocks.io/txns/D2P5Y71YAeZfJCZwhonGYcvg36HHnbkKCuFZAHVYutnE",
+   "signer": "toll-arb.r4csmvr86zk4.testnet",
+   "receiver": "toll-arb.r4csmvr86zk4.testnet",
+   "method": "pay",
+   "result": {
+    "ok": false,
+    "error": "Smart contract panicked: REFUSED: recipient not in oath allowlist"
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "toll_arbitrum",
+   "label": "refused_over_cap",
+   "hash": "GpdLAhoQZiVieiRUYp2j3jo3c1BXNaKqHFZU9k3C3wr9",
+   "url": "https://testnet.nearblocks.io/txns/GpdLAhoQZiVieiRUYp2j3jo3c1BXNaKqHFZU9k3C3wr9",
+   "signer": "toll-arb.r4csmvr86zk4.testnet",
+   "receiver": "toll-arb.r4csmvr86zk4.testnet",
+   "method": "pay",
+   "result": {
+    "ok": false,
+    "error": "Smart contract panicked: REFUSED: value over per-tx cap"
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "toll_arbitrum",
+   "label": "refused_fee_over_cap",
+   "hash": "7nAT5QzRMRMcJX8GxL4h8dNFN1gxAkUrzJv3TWYFprzu",
+   "url": "https://testnet.nearblocks.io/txns/7nAT5QzRMRMcJX8GxL4h8dNFN1gxAkUrzJv3TWYFprzu",
+   "signer": "toll-arb.r4csmvr86zk4.testnet",
+   "receiver": "toll-arb.r4csmvr86zk4.testnet",
+   "method": "pay",
+   "result": {
+    "ok": false,
+    "error": "Smart contract panicked: REFUSED: gas fee over cap"
+   },
+   "events": [],
    "found": true
   },
   {
