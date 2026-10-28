@@ -2,13 +2,13 @@
   "config": {
     "argv": [
       "/usr/bin/node",
-      "./node_modules/.bin/playwright",
+      "/workspace/near/tech/nearcarta/node_modules/.bin/playwright",
       "test",
       "-c",
       "e2e/playwright.config.js"
     ],
-    "configFile": "./e2e/playwright.config.js",
-    "rootDir": "./e2e",
+    "configFile": "/workspace/near/tech/nearcarta/e2e/playwright.config.js",
+    "rootDir": "/workspace/near/tech/nearcarta/e2e",
     "failOnFlakyTests": false,
     "forbidOnly": false,
     "fullyParallel": false,
@@ -24,7 +24,7 @@
     "preserveOutput": "always",
     "projects": [
       {
-        "outputDir": "./test-results",
+        "outputDir": "/workspace/near/tech/nearcarta/test-results",
         "repeatEach": 1,
         "retries": 1,
         "metadata": {
@@ -32,7 +32,7 @@
         },
         "id": "",
         "name": "",
-        "testDir": "./e2e",
+        "testDir": "/workspace/near/tech/nearcarta/e2e",
         "testIgnore": [],
         "testMatch": [
           "**/*.@(spec|test).?(c|m)[jt]s?(x)"
@@ -44,15 +44,15 @@
       {
         "grep": {},
         "grepInvert": null,
-        "outputDir": "./test-results",
+        "outputDir": "/workspace/near/tech/nearcarta/test-results",
         "repeatEach": 1,
         "retries": 1,
         "metadata": {
           "actualWorkers": 1
         },
         "name": "",
-        "testDir": "./e2e",
-        "snapshotDir": "./e2e",
+        "testDir": "/workspace/near/tech/nearcarta/e2e",
+        "snapshotDir": "/workspace/near/tech/nearcarta/e2e",
         "testIgnore": [],
         "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
         "timeout": 90000,
@@ -113,12 +113,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 210,
+                  "duration": 172,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:34.952Z",
+                  "startTime": "2026-10-28T01:56:19.199Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -147,12 +147,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1115,
+                  "duration": 1004,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:35.200Z",
+                  "startTime": "2026-10-28T01:56:19.401Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -181,12 +181,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1275,
+                  "duration": 1094,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:36.459Z",
+                  "startTime": "2026-10-28T01:56:20.483Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -215,12 +215,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 207,
+                  "duration": 127,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:37.756Z",
+                  "startTime": "2026-10-28T01:56:21.590Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -249,12 +249,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 979,
+                  "duration": 900,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:37.980Z",
+                  "startTime": "2026-10-28T01:56:21.727Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -283,12 +283,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2289,
+                  "duration": 2404,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:38.972Z",
+                  "startTime": "2026-10-28T01:56:22.636Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -317,12 +317,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2420,
+                  "duration": 2435,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:41.270Z",
+                  "startTime": "2026-10-28T01:56:25.049Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -332,7 +332,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-d8038822d04264cd484f",
           "file": "shops.spec.js",
-          "line": 54,
+          "line": 55,
           "column": 1
         },
         {
@@ -356,7 +356,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:43.703Z",
+                  "startTime": "2026-10-28T01:56:27.495Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -366,7 +366,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-8867e905a46a04a2834f",
           "file": "shops.spec.js",
-          "line": 61,
+          "line": 62,
           "column": 1
         },
         {
@@ -385,12 +385,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2460,
+                  "duration": 2418,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:44.619Z",
+                  "startTime": "2026-10-28T01:56:28.419Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -400,7 +400,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-375bb67bc8d84b7efb9b",
           "file": "shops.spec.js",
-          "line": 67,
+          "line": 68,
           "column": 1
         },
         {
@@ -419,12 +419,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 475,
+                  "duration": 400,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:47.090Z",
+                  "startTime": "2026-10-28T01:56:30.852Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -434,7 +434,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-e79a798733b7df2f5e5c",
           "file": "shops.spec.js",
-          "line": 73,
+          "line": 74,
           "column": 1
         },
         {
@@ -453,12 +453,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3252,
+                  "duration": 2847,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:47.579Z",
+                  "startTime": "2026-10-28T01:56:31.263Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -468,7 +468,41 @@
           ],
           "id": "e3b5e6ee814041738c3d-9cabba31baf570716cd0",
           "file": "shops.spec.js",
-          "line": 79,
+          "line": 80,
+          "column": 1
+        },
+        {
+          "title": "mist bank: the street shows a hidden amount and the ledger binds to the oath",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2634,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T01:56:34.122Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e3b5e6ee814041738c3d-7050bec6c91e34c2bf65",
+          "file": "shops.spec.js",
+          "line": 89,
           "column": 1
         },
         {
@@ -487,12 +521,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 422,
+                  "duration": 257,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T01:21:50.842Z",
+                  "startTime": "2026-10-28T01:56:36.769Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -502,7 +536,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-667e3858efcad007d0b0",
           "file": "shops.spec.js",
-          "line": 88,
+          "line": 98,
           "column": 1
         }
       ]
@@ -510,9 +544,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-28T01:21:34.137Z",
-    "duration": 17205.843999999997,
-    "expected": 12,
+    "startTime": "2026-10-28T01:56:18.659Z",
+    "duration": 18411.929,
+    "expected": 13,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0
