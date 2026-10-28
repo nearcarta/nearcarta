@@ -1,0 +1,59 @@
+{
+ "sent": {
+  "dry": true,
+  "swapType": "EXACT_INPUT",
+  "slippageTolerance": 100,
+  "originAsset": "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+  "depositType": "ORIGIN_CHAIN",
+  "destinationAsset": "nep141:zec.omft.near",
+  "amount": "2500000",
+  "refundTo": "0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e",
+  "refundType": "ORIGIN_CHAIN",
+  "recipient": "u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex",
+  "recipientType": "DESTINATION_CHAIN",
+  "deadline": "2026-10-28T02:03:00.985Z",
+  "confidentiality": "basic"
+ },
+ "response": {
+  "quote": {
+   "amountIn": "2500000",
+   "amountInFormatted": "2.5",
+   "amountInUsd": "2.498352500000",
+   "minAmountIn": "2500000",
+   "amountOut": "159958",
+   "amountOutFormatted": "0.00159958",
+   "amountOutUsd": "2.075135134000",
+   "minAmountOut": "158358",
+   "timeEstimate": 152,
+   "refundFee": "2400",
+   "withdrawFee": "32000"
+  },
+  "quoteRequest": {
+   "dry": true,
+   "depositMode": "SIMPLE",
+   "swapType": "EXACT_INPUT",
+   "slippageTolerance": 100,
+   "originAsset": "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+   "depositType": "ORIGIN_CHAIN",
+   "destinationAsset": "nep141:zec.omft.near",
+   "amount": "2500000",
+   "refundTo": "0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e",
+   "refundType": "ORIGIN_CHAIN",
+   "recipient": "u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex",
+   "recipientType": "DESTINATION_CHAIN",
+   "deadline": "2026-10-28T02:03:00.985Z",
+   "confidentiality": "basic",
+   "quoteWaitingTimeMs": 0,
+   "insured": false,
+   "appFees": [
+    {
+     "recipient": "2238fd089f1c92b206c218cd16b8676cb98964e0d50f8ab729c6396a81e07805",
+     "fee": 20
+    }
+   ]
+  },
+  "signature": "ed25519:76vUCSDPUkKS5Qyx7CSmWXnRU6DfMj5C7ooSwj5a4MDtVT5ya853GgKDmLi8dsYzri5g1QabjF2anFdUNZ37KMg",
+  "timestamp": "2026-10-28T01:03:00.569Z",
+  "correlationId": "1d2cb54c-692c-417f-bb8b-6ba183a4ff3a"
+ }
+}
