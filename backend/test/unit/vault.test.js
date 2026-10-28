@@ -285,4 +285,16 @@ test('rpcClient falls through to the next RPC on 429 and never retries a JSON-RP
   assert.deepEqual(hits, ['https://a']);
   c = rpcClient('https://a', fake({ 'https://a': [{ status: 503 }, { status: 503 }] }), { rounds: 2, sleep: async () => {} });
   await assert.rejects(c('block', {}), /http 503/);
+  // An unreachable host (fetch throws, as with CORS or DNS in a browser) falls through too.
+  hits.length = 0;
+  c = rpcClient(['https://a', 'https://b'], async url => { hits.push(url); if (url === 'https://a') throw new TypeError('Failed to fetch'); return { ok: true, status: 200, json: async () => ({ result: 9 }) }; }, { sleep: async () => {} });
+  assert.equal(await c('block', {}), 9); assert.deepEqual(hits, ['https://a', 'https://b']);
+  c = rpcClient(['https://a'], async () => { throw new TypeError('Failed to fetch'); }, { rounds: 2, sleep: async () => {} });
+  await assert.rejects(c('block', {}), /network error at https:\/\/a/);
+});
+
+test('vault config gives the browser the same RPC fallbacks as the runner', async () => {
+  const { config } = await import('../../src/vault.js');
+  let c; try { c = config(); } catch { return; } // vault not on this network
+  assert.ok(Array.isArray(c.rpc_fallbacks) && c.rpc_fallbacks.length > 0); assert.ok(!c.rpc_fallbacks.includes(c.rpc));
 });

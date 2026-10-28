@@ -43,7 +43,10 @@ export function rpcClient(urls, fetchImpl = fetch, { rounds = 3, backoffMs = 300
     let last;
     for (let round = 0; round < rounds; round++) {
       for (const url of list) {
-        const r = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }) });
+        let r;
+        // A network error (offline host, DNS, CORS) falls through to the next URL like a 429.
+        try { r = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }) }); }
+        catch (e) { last = new Error(`rpc ${method} network error at ${url}: ${e.message}`); continue; }
         if (!r.ok) { last = new Error(`rpc ${method} http ${r.status}`); if (RETRY_STATUS.has(r.status)) continue; throw last; }
         const j = await r.json();
         if (j.error) { const e = new Error(`rpc ${method}: ${j.error.cause?.name || j.error.name || 'error'} ${JSON.stringify(j.error.data ?? j.error.cause?.info ?? '').slice(0, 300)}`); e.rpc = j.error; throw e; }
