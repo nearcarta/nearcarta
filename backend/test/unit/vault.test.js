@@ -338,19 +338,20 @@ test('backfill rebuilds an empty board from chain and is incomplete while the in
   let down = true;
   const txs = async c => { if (down && c === 'arena.f.testnet') throw new Error('tx index http 429'); return rows[c]; };
   const verify = async (h, c) => h === 'h2' ? null : (_attempts.set(h, { hash: h, charter: c, counted: true, at: null }), _attempts.get(h));
-  let r = await backfill({ factories, charters, txs, verify });
+  const next = async () => null; // no nonce counter readable: the index decides
+  let r = await backfill({ factories, charters, txs, verify, next });
   assert.deepEqual([r.complete, r.errors, _attempts.size], [false, 1, 1]);
   down = false;
-  r = await backfill({ factories, charters, txs, verify });
+  r = await backfill({ factories, charters, txs, verify, next });
   assert.deepEqual([r.complete, r.errors, _attempts.size], [true, 0, 2]);
   assert.ok(_notArena.has('h2'));
   assert.equal(_attempts.get('h3').at, 3);
   // budget: stops early and says so
   fresh();
-  r = await backfill({ factories, charters, txs, verify, budget: 1 });
+  r = await backfill({ factories, charters, txs, verify, next, budget: 1 });
   assert.equal(r.complete, false);
   // a charter list failure is never "complete"
-  r = await backfill({ factories, charters: async () => { throw new Error('rpc 429'); }, txs, verify });
+  r = await backfill({ factories, charters: async () => { throw new Error('rpc 429'); }, txs, verify, next });
   assert.equal(r.complete, false);
   fresh();
 });
@@ -359,7 +360,7 @@ test('boot keeps filling after index errors until a pass completes', async () =>
   let calls = 0;
   const fill = async () => (++calls < 3 ? { complete: false, errors: 1 } : { complete: true, errors: 0 });
   const t0 = Date.now();
-  boot({ fill, firstMs: 0 });
+  boot({ fill, firstMs: 0, snapshotFile: null });
   while (!rebuild.complete_at && Date.now() - t0 < 10_000) await new Promise(r => setTimeout(r, 50));
   assert.equal(calls, 3);
   assert.ok(rebuild.complete_at >= rebuild.started_at);

@@ -14,6 +14,7 @@
 // daily tx cap. The key is read lazily and never logged or returned. Rows it signs are labelled
 // server_signed.
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { indexPost } from './txindex.js';
 import { createHash } from 'node:crypto';
 import { DEP, cfg } from './config.js';
 import { rpc, view, viewAccount, accessKeys, txStatus, eventsFromOutcome, explorerTx } from './near.js';
@@ -32,7 +33,7 @@ const ARCHIVAL = process.env.ARCHIVAL_RPC || 'https://archival-rpc.testnet.fastn
 /** Factories whose charters count: the live one first, then earlier releases (kept for history). */
 const ARENAS = new Set(V ? [V.arena.charter, ...(V.legacy || []).map(l => l.arena?.charter).filter(Boolean)] : []);
 export const isShared = c => ARENAS.has(c);
-const FACTORIES = V ? [{ factory: V.factory, code_hash: V.code_hash }, ...(V.legacy || []).map(l => ({ factory: l.factory, code_hash: l.code_hash }))] : [];
+export const FACTORIES = V ? [{ factory: V.factory, code_hash: V.code_hash }, ...(V.legacy || []).map(l => ({ factory: l.factory, code_hash: l.code_hash }))] : [];
 
 export function config() {
   if (!V) throw bad('vault not deployed on this network', 503);
@@ -284,11 +285,57 @@ export async function sharedAsk(text, { run = runAsk, nickname = 'guest' } = {})
 // ---------- verified attempts (LRU, persisted, rebuilt from chain) ----------
 const MAX_ROWS = Number(process.env.VAULT_BOARD_MAX || 20_000);
 const attempts = new Lru(MAX_ROWS); // tx hash -> verified row
-const notArena = new Lru(MAX_ROWS); // tx hashes that are not arena/task rows
+const notArena = new Lru(MAX_ROWS); // tx hash -> { charter } for txs that are not arena/task rows
+const nonceOf = new Lru(MAX_ROWS); // tx hash -> [charter, [propose nonces it consumed]]
+const seen = new Map(); // charter -> Set of nonces held by a known tx
+const pending = new Set(); // hashes loaded from the committed snapshot, not yet re-read from chain this boot
 export const _attempts = attempts;
 export const _notArena = notArena;
+export const _pending = pending;
+export const _seen = seen;
+
+/** Nonces a tx consumed: oath's propose bumps next_nonce on every call whose own receipt succeeds (refusals too). */
+export function proposeNonces(tx, charter) {
+  const t = tx?.transaction;
+  if (!t || t.receiver_id !== charter || t.signer_id !== charter) return [];
+  const rid = tx.transaction_outcome?.outcome?.receipt_ids?.[0];
+  const first = (tx.receipts_outcome || []).find(o => o.id === rid);
+  if (!first || first.outcome?.status?.Failure || !('SuccessValue' in (first.outcome?.status || {}) || 'SuccessReceiptId' in (first.outcome?.status || {}))) return [];
+  const out = [];
+  for (const a of t.actions || []) {
+    const fc = a.FunctionCall;
+    if (!fc) continue;
+    let args; try { args = JSON.parse(Buffer.from(fc.args, 'base64').toString('utf8')); } catch { continue; }
+    if (fc.method_name === 'propose' && args?.p?.nonce != null) out.push(Number(args.p.nonce));
+    if (fc.method_name === 'propose_batch' && Array.isArray(args?.ps)) for (const q of args.ps) if (q?.nonce != null) out.push(Number(q.nonce));
+  }
+  return out.filter(Number.isSafeInteger);
+}
+function noteNonces(hash, charter, ns) {
+  forgetNonces(hash);
+  if (!ns?.length) return;
+  nonceOf.set(hash, [charter, ns]);
+  let set = seen.get(charter);
+  if (!set) seen.set(charter, set = new Set());
+  for (const n of ns) set.add(n);
+}
+function forgetNonces(hash) {
+  const old = nonceOf.get(hash);
+  if (!old) return;
+  nonceOf.delete(hash);
+  const set = seen.get(old[0]);
+  if (set) for (const n of old[1]) set.delete(n);
+}
+/** True when known txs hold every nonce 0..next-1, i.e. this charter has no propose we have not seen. */
+export function covered(charter, next) {
+  if (!Number.isSafeInteger(next) || next < 0) return false;
+  const set = seen.get(charter);
+  for (let i = 0; i < next; i++) if (!set?.has(i)) return false;
+  return true;
+}
 const BOARD_FILE = process.env.VAULT_BOARD_FILE || '/tmp/nearcarta-vault-board.json';
-const ROW_VERSION = 2;
+const ROW_VERSION = 3;
+const SNAPSHOT_FILE = process.env.VAULT_SNAPSHOT_FILE || new URL('../data/vault-board-snapshot.json', import.meta.url).pathname;
 let saveTimer = null;
 function scheduleSave() {
   if (process.env.NODE_ENV === 'test' || saveTimer) return;
@@ -298,20 +345,28 @@ function scheduleSave() {
 export function saveBoard(file = BOARD_FILE) {
   try {
     const tmp = file + '.tmp';
-    writeFileSync(tmp, JSON.stringify({ version: ROW_VERSION, factory: V?.factory, rows: [...attempts.values()], skip: [...notArena.entries()].map(([k]) => k) }));
+    writeFileSync(tmp, JSON.stringify(boardData()));
     renameSync(tmp, file); return true;
   } catch { return false; }
 }
-export function loadBoard(file = BOARD_FILE) {
+export function boardData() {
+  return { version: ROW_VERSION, factory: V?.factory, rows: [...attempts.values()],
+    skip: [...notArena.entries()].map(([k, v]) => [k, v?.charter ?? null]), nonces: [...nonceOf.entries()] };
+}
+/** Load a saved board. With `snapshot`, every hash is also queued to be re-read from chain (see reread). */
+export function loadBoard(file = BOARD_FILE, { snapshot = false } = {}) {
   try {
     const j = JSON.parse(readFileSync(file, 'utf8'));
     if (j.version !== ROW_VERSION) return 0;
-    for (const r of j.rows || []) if (r?.hash) attempts.set(r.hash, r);
-    for (const h of j.skip || []) notArena.set(h, 1);
-    return attempts.size;
+    let n = 0;
+    for (const r of j.rows || []) if (r?.hash && !attempts.has(r.hash)) { attempts.set(r.hash, r); n++; if (snapshot) pending.add(r.hash); }
+    for (const e of j.skip || []) { const [h, c] = Array.isArray(e) ? e : [e, null]; if (h && !notArena.has(h) && !attempts.has(h)) { notArena.set(h, { charter: c }); if (snapshot && c) pending.add(h); } }
+    for (const [h, [c, ns]] of j.nonces || []) if (!nonceOf.has(h)) noteNonces(h, c, ns);
+    return n;
   } catch { return 0; }
 }
-function remember(a) { attempts.set(a.hash, a); notArena.delete(a.hash); scheduleSave(); }
+export const loadSnapshot = (file = SNAPSHOT_FILE) => loadBoard(file, { snapshot: true });
+function remember(a) { attempts.set(a.hash, a); notArena.delete(a.hash); pending.delete(a.hash); scheduleSave(); }
 
 async function blockTimeMs(blockHash) {
   try { const b = await rpc('block', { block_id: blockHash }); return Math.floor(Number(BigInt(b.header.timestamp_nanosec) / 1_000_000n)); } catch { return null; }
@@ -343,12 +398,13 @@ export function askWhy(a, cl, settle) {
  * charter running its audited oath; otherwise a row whose `counted` says whether it scores and
  * `why` says why not.
  */
-export async function verifyAttempt(hash, charter, { status = txStatus, facts = charterFacts, blockTime = blockTimeMs, clause = clauseAt } = {}) {
+export async function verifyAttempt(hash, charter, { status = txStatus, facts = charterFacts, blockTime = blockTimeMs, clause = clauseAt, strict = false } = {}) {
   if (!/^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(hash) || !isAccount(charter)) throw bad('bad tx hash or charter');
   if (attempts.has(hash)) return attempts.get(hash);
   const f = await facts(charter);
   if (!f.registered || !f.runs_r14) return null;
   const tx = await status(hash, charter);
+  noteNonces(hash, charter, proposeNonces(tx, charter));
   const t = tx.transaction;
   if (t.signer_id !== charter || t.receiver_id !== charter || t.actions?.length !== 1) return null;
   const fc = t.actions[0].FunctionCall;
@@ -376,7 +432,7 @@ export async function verifyAttempt(hash, charter, { status = txStatus, facts = 
   let cl = null;
   if (!a.why) {
     try { cl = bh && a.clause_id ? await clause(charter, a.clause_id, bh) : null; } catch { cl = undefined; }
-    if (cl === undefined) return null; // RPC trouble: don't cache a verdict, retry later
+    if (cl === undefined) { if (strict) throw bad('chain busy: clause not readable', 503); return null; } // RPC trouble: no verdict, retry later
     if (!cl) a.why = 'clause_unknown';
   }
   if (!a.why && kind === 'attack') {
@@ -398,18 +454,10 @@ export async function verifyAttempt(hash, charter, { status = txStatus, facts = 
   return a;
 }
 
-const FASTNEAR_TX = process.env.FASTNEAR_TX_API || 'https://tx.test.fastnear.com';
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-/** One page of the tx index; 429/5xx and network errors are retried with backoff, then thrown. */
+/** One page of the tx index through the shared gate, at low priority: page feeds go first, and a busy index
+ * ends this pass (the next pass retries) instead of holding the IP's quota. Tests pass `f` and a short `waitMs`. */
 async function indexPage(body, f = fetch, waitMs = 1500) {
-  for (let i = 0; ; i++) {
-    let r = null;
-    try { r = await f(`${FASTNEAR_TX}/v0/account`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); } catch { /* network */ }
-    if (r?.ok) return r.json();
-    if (r && r.status !== 429 && r.status < 500) throw new Error('tx index http ' + r.status);
-    if (i >= 3) throw new Error('tx index ' + (r ? 'http ' + r.status : 'unreachable'));
-    await sleep(waitMs * 2 ** i);
-  }
+  return indexPost('/v0/account', body, { prio: 'low', f, baseMs: waitMs, tries: 4, deadlineMs: 20_000 + waitMs * 16 });
 }
 export async function charterTxs(charter, { maxPages = 50, f = fetch, waitMs } = {}) {
   const out = [];
@@ -425,7 +473,7 @@ export async function charterTxs(charter, { maxPages = 50, f = fetch, waitMs } =
 }
 
 /** Every charter of a factory, page by page up to its on-chain count. */
-async function allCharters(factory) {
+export async function allCharters(factory) {
   const out = [];
   for (let from = 0; ; from += 100) {
     const r = await listCharters(from, 100, factory);
@@ -434,48 +482,112 @@ async function allCharters(factory) {
   }
 }
 
-/**
- * Rebuild the board from chain: every factory charter's propose txs from the index, each new one re-verified on RPC
- * (bounded per call). There is no disk on the free plan, so this is how the board survives a restart. `complete` is
- * true only when every charter list and tx list was read and every tx was checked; an index error leaves it false.
- */
-export async function backfill({ budget = 40, factories = FACTORIES, charters = allCharters, txs = c => cached('txs:' + c, 30_000, () => charterTxs(c)), verify = verifyAttempt } = {}) {
-  let checked = 0, errors = 0;
-  for (const fa of factories) {
-    let list = [];
-    try { list = await charters(fa.factory); } catch { errors++; continue; }
-    // The shared arena first: it holds most rows, so a partial rebuild still shows the busiest charter.
-    list.sort((a, b) => Number(isShared(b.charter)) - Number(isShared(a.charter)));
-    for (const c of list) {
-      let ts = [];
-      try { ts = await txs(c.charter); } catch { errors++; continue; }
-      for (const t of ts) {
-        if (notArena.has(t.hash)) continue;
-        if (attempts.has(t.hash)) { const a = attempts.get(t.hash); if (a && !a.at) a.at = t.at; continue; }
-        if (checked >= budget) return { checked, errors, complete: false };
-        checked++;
-        try { const a = await verify(t.hash, c.charter); if (a) { if (!a.at) a.at = t.at; } else { notArena.set(t.hash, 1); scheduleSave(); } } catch { errors++; }
-      }
-    }
-  }
-  return { checked, errors, complete: errors === 0 };
+/** Run `fn` over `items` with at most `n` in flight. */
+export async function pool(items, n, fn) {
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) { const x = items[i++]; await fn(x); } }));
+}
+/** The charter's on-chain propose counter (oath get_state.next_nonce); null when it has none or is unreadable. */
+export async function nextNonce(charter) {
+  try { const st = await view(charter, 'get_state'); const n = Number(st?.next_nonce); return Number.isSafeInteger(n) ? n : null; } catch { return null; }
+}
+/** Tx hashes this server holds for a charter (verified rows, skipped txs, nonce owners): a feed source that needs no index. */
+export function knownTxs(charter) {
+  const out = new Set();
+  for (const a of attempts.values()) if (a?.charter === charter) out.add(a.hash);
+  for (const [h, v] of nonceOf.entries()) if (v?.[0] === charter) out.add(h);
+  return [...out];
 }
 
-export const rebuild = { started_at: null, complete_at: null, passes: 0, rows: 0 };
-/** Load the saved board if this instance still has it, then fill from chain until a pass completes (backoff to 60 s). */
-export function boot({ fill = backfill, firstMs = 1000 } = {}) {
+/**
+ * Rebuild the board from chain. A charter is complete when known txs hold every propose nonce 0..next_nonce-1 (oath
+ * bumps next_nonce on every propose whose own receipt succeeds, refusals too), so most charters need one view call and
+ * no index at all; only a charter with a gap is read from the tx index (low priority), and its new txs are re-verified
+ * on RPC (bounded per call). A charter whose gap the index cannot explain (e.g. a relayed propose, not signed by the
+ * charter) is complete once the index was read in full. `complete` is true only when every charter list was read and
+ * every charter is complete; any error leaves it false.
+ */
+export async function backfill({ budget = 40, factories = FACTORIES, charters = allCharters, txs = c => cached('txs:' + c, 30_000, () => charterTxs(c)),
+  verify = (h, c) => verifyAttempt(h, c, { strict: true }), next = nextNonce, conc = 6 } = {}) {
+  let checked = 0, errors = 0, byNonce = 0, byIndex = 0, over = false;
+  const list = [];
+  for (const fa of factories) {
+    try { list.push(...await charters(fa.factory)); } catch { errors++; }
+  }
+  // The shared arena first: it holds most rows, so a partial rebuild still shows the busiest charter.
+  list.sort((a, b) => Number(isShared(b.charter)) - Number(isShared(a.charter)));
+  await pool(list, conc, async c => {
+    const n = await next(c.charter);
+    if (n !== null && covered(c.charter, n)) { byNonce++; return; }
+    let ts;
+    try { ts = await txs(c.charter); } catch { errors++; return; }
+    for (const t of ts) {
+      if (notArena.has(t.hash)) continue;
+      if (attempts.has(t.hash)) { const a = attempts.get(t.hash); if (a && !a.at) a.at = t.at; continue; }
+      if (checked >= budget) { over = true; return; }
+      checked++;
+      try { const a = await verify(t.hash, c.charter); if (a) { if (!a.at) a.at = t.at; } else { notArena.set(t.hash, { charter: c.charter }); scheduleSave(); } } catch { errors++; }
+    }
+    byIndex++;
+  });
+  return { checked, errors, complete: errors === 0 && !over, charters: list.length, by_nonce: byNonce, by_index: byIndex };
+}
+
+/**
+ * Re-read one snapshot hash from chain and replace what the snapshot said about it. On RPC trouble the snapshot entry
+ * stays (and stays pending); a hash that is no longer an arena row on chain moves to the skip list.
+ */
+export async function reread(hash, { verify = (h, c) => verifyAttempt(h, c, { strict: true }) } = {}) {
+  const old = attempts.get(hash), skip = notArena.get(hash), nn = nonceOf.get(hash);
+  const charter = old?.charter ?? skip?.charter ?? nn?.[0];
+  if (!charter) { pending.delete(hash); return null; }
+  attempts.delete(hash); notArena.delete(hash); // nonces stay until verify re-notes them (no coverage gap meanwhile)
+  try {
+    const a = await verify(hash, charter);
+    if (!a) notArena.set(hash, { charter });
+    if (old && (!a || a.counted !== old.counted || a.why !== old.why)) rebuild.changed++;
+    pending.delete(hash); scheduleSave();
+    return a;
+  } catch (e) {
+    if (old) attempts.set(hash, old);
+    if (skip) notArena.set(hash, skip);
+    if (nn && !nonceOf.has(hash)) noteNonces(hash, nn[0], nn[1]);
+    throw e;
+  }
+}
+
+export const rebuild = { started_at: null, complete_at: null, reread_at: null, passes: 0, rows: 0, snapshot_rows: 0, pending: 0, changed: 0, last: null };
+/**
+ * Load the saved board (this instance) and the committed snapshot (tx hashes and nonces; every one re-read from chain
+ * below), then fill until a pass completes (backoff to 60 s) while the snapshot hashes are re-read in parallel.
+ */
+export function boot({ fill = backfill, firstMs = 1000, snapshotFile, reread: rr = reread, conc = 6 } = {}) {
   if (!V) return;
   loadBoard();
+  rebuild.snapshot_rows = snapshotFile === null ? 0 : loadSnapshot(snapshotFile);
   rebuild.started_at = Date.now();
+  rebuild.pending = pending.size;
   let wait = 1500;
   const step = async () => {
     const r = await fill({ budget: 60 }).catch(() => ({ complete: false, errors: 1 }));
-    rebuild.passes++; rebuild.rows = attempts.size;
+    rebuild.passes++; rebuild.rows = attempts.size; rebuild.last = r;
     if (r.complete) { rebuild.complete_at = Date.now(); return; }
     wait = r.errors ? Math.min(60_000, wait * 2) : 1500; // budget used up: go on; index trouble: back off
     setTimeout(step, wait).unref?.();
   };
+  let rwait = 2000;
+  const check = async () => {
+    // Arena rows first, then the rest; failures stay pending for the next round.
+    const list = [...pending].sort((x, y) => Number(isShared(attempts.get(y)?.charter || '')) - Number(isShared(attempts.get(x)?.charter || '')));
+    await pool(list, conc, h => rr(h).catch(() => {}));
+    rebuild.pending = pending.size;
+    if (!pending.size) { rebuild.reread_at = Date.now(); return; }
+    rwait = Math.min(60_000, rwait * 2);
+    setTimeout(check, rwait).unref?.();
+  };
   setTimeout(step, firstMs).unref?.();
+  if (pending.size) setTimeout(check, firstMs).unref?.();
+  else rebuild.reread_at = Date.now();
 }
 
 export function board(list = [...attempts.values()]) {
@@ -515,7 +627,7 @@ export async function leaderboard() {
   if (!V) throw bad('vault not deployed', 503);
   const fill = await refreshBoard();
   const rows = [...attempts.values()];
-  return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild }, players: board(rows).slice(0, 50),
+  return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild, pending: pending.size }, players: board(rows).slice(0, 50),
     recent: rows.sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
 }
 
