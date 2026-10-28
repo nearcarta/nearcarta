@@ -1,45 +1,45 @@
 {
- "at": "2026-10-28T04:18:28.183Z",
+ "at": "2026-10-28T04:26:23.328Z",
  "base": "https://nearcarta.vercel.app",
  "wallet": "NEAR Connect 0.12.0, injected guest wallet (fresh faucet account)",
- "account": "ncguest-6u6v02351g.testnet",
- "charter": "e2e-mvrlssfw.nccharters-17102.testnet",
+ "account": "ncguest-1j3o4j2u6n.testnet",
+ "charter": "e2e-mvrm311o.nccharters-17102.testnet",
  "txs": [
   {
    "step": "create_charter",
-   "tx": "4NcdbcZzXDwrUnhGbsyHWvjKc4L1vzZRC8KAkyZZ2Vmu"
+   "tx": "94M9C43GqgFhP2XkoEEcHdqVoL4ECQGgGSTJRQwVqFMr"
   },
   {
    "step": "set_clause + set_agent_key",
-   "tx": "41sqWMxE4htzPgyd5RHfsNXrtNjN8gPRpj9xgLyMcCrG"
+   "tx": "CW3gKogCU55ZnmvWuyeunx4zLBSYMhfRLCdH4VX2qvDG"
   },
   {
    "step": "attack lookalike",
    "refused": "receiver_not_allowlisted",
    "txs": [
-    "9o6LoJhWaEuQ8h2jAc59fxS53HomFqtucX18eAfk8LA6"
+    "5eBbK9bYDVzz1sGx1TiGooySzsoorc1vua6ErM3Y9UEw"
    ]
   },
   {
    "step": "attack impersonation",
    "refused": "over_per_action_cap",
    "txs": [
-    "FDS9TH7qnN1Q7tmrYndNuMJRcNu2NmB1xfnC245hXGPu"
+    "CyDck7wMSu7LXKUpGqp3rMSpqiZkBYa5aHpEJvdLmxA4"
    ]
   },
   {
    "step": "attack split-under-cap",
    "refused": "over_daily_budget",
    "txs": [
-    "AtpeWc8DUzVsWYtPe13sCtKHpbu9WqBkaL6RixA32USB",
-    "9asVtvX14mvKE71mAFemkMcg267FtgB2K3JgvuZ14swH",
-    "HmAg5hYxcyAVxM9GMq5fZ9QmU3zoE9WmAwSuY2AaKowC"
+    "4ibJqR412Zdaw97BAVngXHky9XYj3bCWqk278Uf3hALw",
+    "FFWXWS5DQpZk7HbqpxGdveerxrierqgBTZ74WVAWZe5f",
+    "9hKMDTv8XrdRWhE9FdqAJbu2f2cLS7dQ1YvGxwWbkYcf"
    ]
   },
   {
    "step": "shared fake-invoice",
    "txs": [
-    "FzLxUdx5JdZWEhBkkfiJ2DSJg1PaS1wVmdBVqGPNb5LL"
+    "Ehxkijn38SyhRpi999K9pkzSd6nqAfXvifhLKJjYL94j"
    ]
   }
  ]

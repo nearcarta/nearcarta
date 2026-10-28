@@ -1,0 +1,144 @@
+{
+ "checked_via": "public testnet RPC tx (wait_until FINAL), independent of the Nearcarta API",
+ "api": "https://nearcarta-api.onrender.com",
+ "page": "https://nearcarta.vercel.app/shops/vault/",
+ "explorer": "https://testnet.nearblocks.io/txns/",
+ "txs": [
+  {
+   "run": "vercel",
+   "step": "attack lookalike",
+   "tx": "5eBbK9bYDVzz1sGx1TiGooySzsoorc1vua6ErM3Y9UEw",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "receiver_not_allowlisted"
+  },
+  {
+   "run": "vercel",
+   "step": "attack impersonation",
+   "tx": "CyDck7wMSu7LXKUpGqp3rMSpqiZkBYa5aHpEJvdLmxA4",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "over_per_action_cap"
+  },
+  {
+   "run": "vercel",
+   "step": "attack split-under-cap",
+   "tx": "4ibJqR412Zdaw97BAVngXHky9XYj3bCWqk278Uf3hALw",
+   "final": "FINAL",
+   "decision": "allowed",
+   "reason": "ok"
+  },
+  {
+   "run": "vercel",
+   "step": "attack split-under-cap",
+   "tx": "FFWXWS5DQpZk7HbqpxGdveerxrierqgBTZ74WVAWZe5f",
+   "final": "FINAL",
+   "decision": "allowed",
+   "reason": "ok"
+  },
+  {
+   "run": "vercel",
+   "step": "attack split-under-cap",
+   "tx": "9hKMDTv8XrdRWhE9FdqAJbu2f2cLS7dQ1YvGxwWbkYcf",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "over_daily_budget"
+  },
+  {
+   "run": "vercel",
+   "step": "shared fake-invoice",
+   "tx": "Ehxkijn38SyhRpi999K9pkzSd6nqAfXvifhLKJjYL94j",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "receiver_not_allowlisted"
+  },
+  {
+   "run": "render",
+   "step": "attack lookalike",
+   "tx": "ENe3k79yFpvTN2ZuWrY1e4PiwjzjdauF7VhD7fWkv6V8",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "receiver_not_allowlisted"
+  },
+  {
+   "run": "render",
+   "step": "attack impersonation",
+   "tx": "AVpLPGSSskHsd3wcEtSYVGpCrjcGQerGwQzcDQnWdTfk",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "over_per_action_cap"
+  },
+  {
+   "run": "render",
+   "step": "attack split-under-cap",
+   "tx": "Bkuhq7kMsnnQpXn4wfj1269eFjnHG5iLZYACtgKPeGWi",
+   "final": "FINAL",
+   "decision": "allowed",
+   "reason": "ok"
+  },
+  {
+   "run": "render",
+   "step": "attack split-under-cap",
+   "tx": "8vJ6vb9XoYuexXaEj9pD9Wkv5ACspiGBZ1UwGgLm45pM",
+   "final": "FINAL",
+   "decision": "allowed",
+   "reason": "ok"
+  },
+  {
+   "run": "render",
+   "step": "attack split-under-cap",
+   "tx": "677Ui8akco5R78GYdmeZ5EE6CzqZLgYADAezG3QJb8K8",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "over_daily_budget"
+  },
+  {
+   "run": "render",
+   "step": "shared fake-invoice",
+   "tx": "5oC9mmaks7yhHiwH93nudsmhBibjwnppZvuBtFSCyEgP",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "receiver_not_allowlisted"
+  },
+  {
+   "run": "api",
+   "step": "shared injected-recipient",
+   "tx": "F5FL5bTCXRp5tMrx6bDT9ytUjnzxqrMMsJxfExX9p6WT",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "receiver_not_allowlisted"
+  },
+  {
+   "run": "api",
+   "step": "shared lookalike",
+   "tx": "7vwVN5mjcQfgUuMmvmcvTacjMUvuk5HdwL39w1TcjWRM",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "receiver_not_allowlisted"
+  },
+  {
+   "run": "api",
+   "step": "shared impersonation",
+   "tx": "G6MfFF587GfCnWyGsqyhcvkZzdMdstfruR82xnnoWp5H",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "over_per_action_cap"
+  },
+  {
+   "run": "api",
+   "step": "shared split-under-cap",
+   "tx": "EbowRXMZ8vDPCL9HZKPdxxUDsq6i5ThNqSutN38qrf71",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "over_daily_budget"
+  },
+  {
+   "run": "api",
+   "step": "shared slow-drain",
+   "tx": "Gw9ZxUyuDVkNnJFbZyLZbAohedvNAsbzNpWsdDh5F6si",
+   "final": "FINAL",
+   "decision": "denied",
+   "reason": "over_daily_budget"
+  }
+ ]
+}
