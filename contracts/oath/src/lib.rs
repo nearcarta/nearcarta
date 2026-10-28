@@ -56,19 +56,42 @@ fn clause_expiry(clause_id: &str) -> Option<u64> {
 }
 fn rotating() -> bool { env::storage_has_key(K_ROTATING) }
 
+/// Refusal buckets counted per charter. Fixed-size on purpose: a denied `propose` only rewrites
+/// these bytes and never grows storage (the anti-grief invariant in tests/exploits.rs).
+pub const REFUSAL_BUCKETS: [&str; 13] = ["receiver_not_allowlisted", "over_per_action_cap", "over_daily_budget",
+    "over_daily_action_count", "below_min_amount", "outside_time_window", "clause_expired", "frozen",
+    "stale_policy_version", "expired", "unknown_clause", "receipt", "other"];
+fn refusal_bucket(why: &str) -> usize {
+    if why.starts_with("receipt_") || why == "unknown_receipt_signer" { return 11; }
+    REFUSAL_BUCKETS.iter().position(|b| *b == why).unwrap_or(REFUSAL_BUCKETS.len() - 1)
+}
+
 /// Per-charter record of what the agent tried, counted on chain at every `propose`.
-#[near(serializers = [borsh, json])]
+#[near(serializers = [borsh])]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Reputation {
     pub proposals: u64,
     pub allowed: u64,
     pub escalated: u64,
     pub refused: u64,
-    /// Refusal reason -> count (e.g. receiver_not_allowlisted, over_per_action_cap).
-    pub refusals: BTreeMap<String, u64>,
+    /// Count per REFUSAL_BUCKETS entry.
+    pub refusals: [u64; 13],
+}
+impl Reputation {
+    pub fn to_json(&self) -> serde_json::Value {
+        let refusals: serde_json::Map<String, serde_json::Value> = REFUSAL_BUCKETS.iter().zip(self.refusals.iter())
+            .filter(|(_, n)| **n > 0).map(|(b, n)| (b.to_string(), json!(n))).collect();
+        json!({"proposals": self.proposals, "allowed": self.allowed, "escalated": self.escalated, "refused": self.refused, "refusals": refusals})
+    }
 }
 fn reputation_read() -> Reputation {
     env::storage_read(K_REPUTATION).and_then(|v| near_sdk::borsh::from_slice(&v).ok()).unwrap_or_default()
+}
+/// Gov-paid calls (init, set_clause) allocate the record so the agent's first denial does not.
+fn reputation_alloc() {
+    if !env::storage_has_key(K_REPUTATION) {
+        env::storage_write(K_REPUTATION, &near_sdk::borsh::to_vec(&Reputation::default()).expect("ERR_REP"));
+    }
 }
 /// Score 0..=100: the share of proposals that stayed inside the rules. None until 5 proposals.
 pub fn reputation_score(r: &Reputation) -> Option<u64> {
@@ -251,6 +274,7 @@ fn reason(o: Option<U64>, decision: &str, status: &str, r: &str) -> Outcome {
 impl Oath {
     #[init]
     pub fn new(owner: AccountId, dao: Option<AccountId>, policy_delay_ns: Option<U64>, storage_reserve: Option<U128>, setup_window: Option<bool>) -> Self {
+        reputation_alloc();
         let mut s = Self {
             owner,
             dao,
@@ -392,6 +416,7 @@ impl Oath {
         require!(clause.window_start_min < 1440 && clause.window_end_min <= 1440, "ERR_WINDOW");
         require!(valid_field(&clause_id), "ERR_CLAUSE_ID");
         require!(clause.min_amount.0 >= 1, "ERR_MIN_AMOUNT");
+        reputation_alloc();
         // R14 lean build: no receipt verification and no NEP-519 escalation compiled in.
         #[cfg(feature = "lean")]
         require!(!clause.requires_receipt && clause.escalation_max.is_none(), "ERR_LEAN_BUILD");
@@ -824,7 +849,7 @@ impl Oath {
         match decision {
             "allowed" => r.allowed += 1,
             "escalated" => r.escalated += 1,
-            _ => { r.refused += 1; *r.refusals.entry(why.chars().take(MAX_FIELD).collect()).or_default() += 1; }
+            _ => { r.refused += 1; r.refusals[refusal_bucket(why)] += 1; }
         }
         env::storage_write(K_REPUTATION, &near_sdk::borsh::to_vec(&r).expect("ERR_REP"));
         emit("action", json!({
@@ -888,7 +913,7 @@ impl Oath {
     /// Agent reputation from this charter's own on-chain decisions.
     pub fn get_reputation(&self) -> serde_json::Value {
         let r = reputation_read();
-        json!({"score": reputation_score(&r), "min_proposals_for_score": 5, "counts": r, "rotating_key": rotating()})
+        json!({"score": reputation_score(&r), "min_proposals_for_score": 5, "counts": r.to_json(), "refusal_buckets": REFUSAL_BUCKETS, "rotating_key": rotating()})
     }
     pub fn get_usage(&self, clause_id: String) -> Usage { self.usage_today(&clause_id) }
     pub fn get_action(&self, action_id: U64) -> Option<ActionRec> { self.actions.get(&action_id.0).cloned() }

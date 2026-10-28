@@ -1177,3 +1177,25 @@ fn r15_reputation_score_math() {
     r.proposals = 10; r.allowed = 6; r.escalated = 1; r.refused = 3;
     assert_eq!(reputation_score(&r), Some(70));
 }
+
+#[test]
+fn r15_reputation_denial_never_grows_storage() {
+    // The mock resets storage_usage per testing_env!, so check the record itself: allocated by
+    // gov-paid set_clause, same size after denials. Real storage is checked in tests/exploits.rs.
+    let mut o = setup(0);
+    let n0 = env::storage_read(K_REPUTATION).expect("allocated by set_clause").len();
+    for to in ["mallory.test", "evil.test", "x.test"] { let p = prop(&o, "tip", to, 1); let _ = deny_reason(&mut o, p); }
+    let p = prop(&o, "tip", "bob.test", 10 * NEAR);
+    assert_eq!(deny_reason(&mut o, p), "over_per_action_cap");
+    assert_eq!(env::storage_read(K_REPUTATION).unwrap().len(), n0, "denials only rewrite the fixed-size counters");
+    assert_eq!(o.get_reputation()["counts"]["refused"], json!(4));
+}
+
+#[test]
+fn r15_refusal_buckets() {
+    assert_eq!(REFUSAL_BUCKETS[refusal_bucket("receiver_not_allowlisted")], "receiver_not_allowlisted");
+    assert_eq!(REFUSAL_BUCKETS[refusal_bucket("receipt_replayed")], "receipt");
+    assert_eq!(REFUSAL_BUCKETS[refusal_bucket("unknown_receipt_signer")], "receipt");
+    assert_eq!(REFUSAL_BUCKETS[refusal_bucket("memo_too_long")], "other");
+    assert_eq!(REFUSAL_BUCKETS[refusal_bucket("clause_expired")], "clause_expired");
+}
