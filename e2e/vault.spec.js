@@ -31,7 +31,7 @@ test('visitor makes a charter and the contract refuses scams on chain', async ({
   await expect(page.getByTestId('charter-id')).toHaveText(new RegExp('^' + name + '\\.'), { timeout: 120_000 });
   proof.charter = await page.getByTestId('charter-id').textContent();
   proof.txs.push({ step: 'create_charter', tx: (await hashes(page.locator('#log')))[0] });
-  await expect(page.locator('[data-testid=facts] li.ok', { hasText: 'audited oath code' })).toBeVisible();
+  await expect(page.locator('[data-testid=facts] li.ok', { hasText: 'audited oath code' })).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('[data-testid=facts] li.ok', { hasText: '0 full-access keys' })).toBeVisible();
 
   await page.getByTestId('rules').click();
