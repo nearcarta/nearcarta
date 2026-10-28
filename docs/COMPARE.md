@@ -7,7 +7,7 @@ Every competitor cell quotes or summarises the competitor's own page, fetched on
 ### Competitors (pages fetched 2026-10-28)
 | | Amount hidden from the public | Disclosure to a chosen party | Disclosure scope | Approval rule visible and checkable on chain | Approval bound to the private payment | Agent spend limits | Testnet proof a judge can rerun |
 |---|---|---|---|---|---|---|---|
-| **Mist Bank** | Yes (Zcash shielded, checked per tx) | Yes: testnet UFVK published | One payout (one account per payout) | Yes: oath clause, cap, receiver, on NEAR testnet | Yes: sha256 commitment in the oath memo, opened from the encrypted Zcash memo | Yes (oath clause cap + receiver list) | Yes |
+| **Mist Bank** | Yes (Zcash shielded, checked per tx) | Yes: testnet UFVK published | One payout (one account per payout) | Yes: charter clause, cap, receiver, on NEAR testnet | Yes: sha256 commitment in the charter memo, opened from the encrypted Zcash memo | Yes (charter clause cap + receiver list) | Yes |
 | [near.com](https://near.com) | Yes: "Balances and transactions stay confidential when you want them to" | Yes: "Choose what you reveal. Share specific activity when needed" | Specific activity (their words) | Not stated | Not stated | Not stated | No (mainnet product) |
 | [NEAR Business](https://business.near.com/) | Yes: "Balances are not visible to the public" | Yes: "Auditors get everything; the chain gets nothing", "Audit-ready exports", "Confidential receipts" | The whole treasury (exports) | Yes: "Multisig approvals", "Every Treasury Contract transaction follows the rules you set" | Not stated | Not for agents | No |
 | [Trezu](https://trezu.org/) | Yes: "confidential receipt … never to a block explorer" | Team and exports ("Audit-ready exports") | Team | Yes: "Multisig approvals", "Granular permissions" | Not stated | Not for agents | No |
@@ -17,10 +17,10 @@ Every competitor cell quotes or summarises the competitor's own page, fetched on
 | [Zodl (ex-Zashi)](https://zodl.com) | Yes (shielded ZEC) | Zashi 3.15.0 (2026-09-23) exports incoming/full viewing keys; view-only import is still an open request (zodl-project #55) | Account | No | No | No | Wallet only |
 
 ### What we do that they do not (each checkable)
-1. **The approval and the private payment are bound together.** The oath tx on NEAR holds a commitment. The Zcash memo, readable only with the viewing key, holds the opening. Nobody else we checked links a public policy decision to a private payment. `GET /api/mistbank` → `binds:true`; `GET /api/mistbank/verify?zats=1370000&salt=67d50c7f78cc0cfdc145392edd674f83` → `matches:true`.
+1. **The approval and the private payment are bound together.** The charter tx on NEAR holds a commitment. The Zcash memo, readable only with the viewing key, holds the opening. Nobody else we checked links a public policy decision to a private payment. `GET /api/mistbank` → `binds:true`; `GET /api/mistbank/verify?zats=1370000&salt=67d50c7f78cc0cfdc145392edd674f83` → `matches:true`.
 2. **Disclosure is one payout, by construction.** A fresh ZIP-32 account per payout, so the published UFVK opens one payout. Railgun keys are irrevocable and account-wide today; Confidential Intents disclosure is still planned.
 3. **A street check for any tx.** `GET /api/mistbank/street/<txid>` reports whether a Zcash testnet tx leaks its amount (transparent parts, pool crossing, coinbase). Shown on a real leaking faucet tx.
-4. **The agent cannot overpay or pay a stranger**, because the oath refuses first. The recorder stops before any Zcash send unless the decision is `allowed`.
+4. **The agent cannot overpay or pay a stranger**, because the charter refuses first. The recorder stops before any Zcash send unless the decision is `allowed`.
 
 ### Gaps
 - Testnet ZEC (TAZ) only. The Confidential Intents desk is dry quotes. A real confidential deposit is a mainnet spend and needs the owner's OK.
@@ -71,7 +71,7 @@ Open gap: approve and freeze buttons need wallet signing in the browser, which i
 ## Chronicle
 
 ### Competitors (pages fetched 2026-10-28)
-| | Any account | Decodes the oath's policy events (clause, decision, reason, policy hash) | Drops events from failed receipts | Testnet | Whole-chain search and analytics |
+| | Any account | Decodes the charter's policy events (clause, decision, reason, policy hash) | Drops events from failed receipts | Testnet | Whole-chain search and analytics |
 |---|---|---|---|---|---|
 | **Chronicle** | Yes: `GET /api/chronicle/<account>` | Yes | Yes (`phantomEventsDropped`) | Yes | No |
 | [NearBlocks](https://nearblocks.io) | Yes | Shows raw logs | Not stated | Yes (testnet.nearblocks.io; its testnet API returned `{"txns":[]}` for our accounts on 2026-10-28) | Yes ("The leading blockchain explorer dedicated to the NEAR ecosystem") |
@@ -90,7 +90,7 @@ Open gap, by design: no whole-chain search. Chronicle explains one agent's actio
 | [NEAR Business](https://business.near.com/) | "Multisig approvals" | Payments; "Every Treasury Contract transaction follows the rules you set" | No agent | Yes: "Balances are not visible to the public" | No |
 | [POTLOCK](https://www.potlock.org/) | Funders and rounds | Grants | No agent | Not stated | Yes: "quadratic funding rounds" |
 
-Gap closed this round: confidential payments. Mist Bank pays privately under an oath clause; the commitment on NEAR binds the approval to the amount.
+Gap closed this round: confidential payments. Mist Bank pays privately under a charter clause; the commitment on NEAR binds the approval to the amount.
 Open gaps: no bulk payments, no rounds.
 
 ## Vault Arena
@@ -98,7 +98,7 @@ Open gaps: no bulk payments, no rounds.
 ### Competitors (pages fetched 2026-10-28)
 | | Who scores an attack | Refusal enforced by | Attempt record | Anyone can play | Attack corpus | Rewards |
 |---|---|---|---|---|---|---|
-| **Vault Arena** | The contract (verdict codes C0–C9 / ALLOW) | The oath contract, not a model judge | On chain: sha256(prompt) committed before the answer | Yes: any testnet account calls `attempt` | On chain: every attempt's prompt hash and verdict, paged at `GET /api/arena/attempts`. The text is public only after `reveal_prompt` (checked against the hash): 1 of 20 so far | NEP-245 case badge per clause hit; bounty |
+| **Vault Arena** | The contract (verdict codes C0–C9 / ALLOW) | The charter contract, not a model judge | On chain: sha256(prompt) committed before the answer | Yes: any testnet account calls `attempt` | On chain: every attempt's prompt hash and verdict, paged at `GET /api/arena/attempts`. The text is public only after `reveal_prompt` (checked against the hash): 1 of 20 so far | NEP-245 case badge per clause hit; bounty |
 | [Gandalf (Lakera)](https://gandalf.lakera.ai/) | Lakera's game ("Test your AI hacking skills") | The model and its guards | Not stated / off chain | Yes | Not stated | Levels |
 | [HackAPrompt](https://www.hackaprompt.com) | Their platform ("How are points awarded?") | The model | Off chain | Yes ("30K+ Competitors") | "open-sourced all submissions from our Pliny track" | Money: "over $100,000 in prizes" |
 | [Freysa](https://www.freysa.ai/) | — | — | — | — | — | The page is now "Launch your own AI agent on its own machine"; the prize game is no longer shown |
@@ -113,7 +113,7 @@ Open gaps:
 ### Competitors (pages fetched 2026-10-28)
 | | What is traded | Rights move with the token | Transfer refused while a payout is in flight | Marketplace |
 |---|---|---|---|---|
-| **Guardian NFT** | The guardian g1 (arena contract) | Yes, under the oath | Yes: ERR_INFLIGHT_PAYOUT `3frX2Rwk…`; gift refused C7_HANDOFF `8uiZJJhc…` | No |
+| **Guardian NFT** | The guardian g1 (arena contract) | Yes, under the charter | Yes: ERR_INFLIGHT_PAYOUT `3frX2Rwk…`; gift refused C7_HANDOFF `8uiZJJhc…` | No |
 | [NameSky](https://www.namesky.app) | NEAR accounts ("Buy & Sell NEAR accounts as NFTs") | The whole account | Not stated | Yes |
 | [Mintbase](https://www.mintbase.xyz) | NFTs (the fetch returned HTTP 402; current page not read) | — | — | — |
 | [paras.id](https://paras.id) | The domain now serves "Narrative Protocol", no longer an NFT marketplace page | — | — | — |

@@ -4,7 +4,7 @@ All commands are read-only unless marked.
 
 1. Proof txs exist and have the stated outcome:
    `npm run verify` → `38/38 proof txs found on testnet` (it also re-reads the Zcash testnet payout and checks the amount is hidden). The output is in judges/proofs/proof-check.json, and `npm run txs` turns it into TESTNET_TXS.md.
-2. The oath account cannot be drained by a key:
+2. The charter account cannot be drained by a key:
    `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"r11oath-82930.testnet"}}'`
    → exactly one key, with `FunctionCall` and `method_names:["propose"]`.
 3. The deployed code is the committed build:
@@ -21,8 +21,8 @@ All commands are read-only unless marked.
    - The auditor view, using the viewing key published in `shared/deployments/testnet.json` (`mistbank.disclosure.ufvk`) and zcash-devtool:
      `zcash-devtool wallet -w /tmp/view init-fvk --name view --fvk <ufvk> --birthday 4549352 && zcash-devtool wallet -w /tmp/view sync && zcash-devtool wallet -w /tmp/view enhance && zcash-devtool wallet -w /tmp/view list-tx`
      → `d0b52067…` mined at 4549357, `0.01370000 TAZ`, memo `nearcarta mistbank v1 oath=5HG5SPJ5… salt=67d50c7f78cc0cfdc145392edd674f83`. Run from a fresh directory on 2026-10-28; it connects to testnet.zec.rocks.
-   - The binding: `curl -s "localhost:8787/api/mistbank/verify?zats=1370000&salt=67d50c7f78cc0cfdc145392edd674f83"` → `matches: true`: sha256 of the opening equals the commitment in the oath's approved action (tx 5HG5SPJ5…). With any other amount → `matches: false`.
+   - The binding: `curl -s "localhost:8787/api/mistbank/verify?zats=1370000&salt=67d50c7f78cc0cfdc145392edd674f83"` → `matches: true`: sha256 of the opening equals the commitment in the charter's approved action (tx 5HG5SPJ5…). With any other amount → `matches: false`.
    - Contrast: `curl -s localhost:8787/api/mistbank/street/17a9a84d758b4feebea5d8fc2c556a95cd0778506cce791c7de23c4a08e0b497` (a faucet payment) → `amount_hidden: false`, `pool_crossing_reveals_amount`.
 10. Owner approval of a large move: TESTNET_TXS rows *escalated owner approved* and *owner resolve approve*. Then `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"r11oath-82930.testnet","method_name":"get_action","args_base64":"'$(printf '{"action_id":"4"}' | base64)'"}}'` → `status: confirmed`, `clause_id: tip`, `amount: 100001000000000000000000` (0.100001 NEAR, over the 0.1 NEAR cap). The raw run is in judges/proofs/escalation-approved.json. (It writes to testnet and needs the agent and owner keys: `node backend/scripts/escalation-demo.js`.)
-11. Arena attack corpus: `curl -s "localhost:8787/api/arena/attempts?from=0&limit=25"` → every attempt with its player, `prompt_hash_hex`, block, verdict and `revealed` (true once someone calls `reveal_prompt` with text whose sha256 equals the hash).
+11. Vault Arena attack corpus: `curl -s "localhost:8787/api/arena/attempts?from=0&limit=25"` → every attempt with its player, `prompt_hash_hex`, block, verdict and `revealed` (true once someone calls `reveal_prompt` with text whose sha256 equals the hash).
 
