@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test test/unit/",
-    "test:integration": "node --test --test-concurrency=1 test/integration/"
+    "test": "node --test test/unit/*.test.js",
+    "test:integration": "node --test --test-concurrency=1 test/integration/*.test.js"
   },
   "engines": {
     "node": ">=20"
