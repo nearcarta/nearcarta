@@ -94,7 +94,7 @@ const APPS = {
       const r = await A.trickSend(id); const s = r.steps.at(-1) || {};
       if (r.refused && sh?.act && runScene) runScene(sh.act());
       const two = was === 'block' && r.refused;
-      return { o: { decision: r.refused ? 'denied' : s.decision, reason: r.reason, tx: s.tx }, say: r.refused ? `${two ? 'Second wall: the charter' : 'Blocked:'} ${A.why(r.reason)}.` : 'It got through. Tighten your rules.' };
+      return { o: { decision: r.refused ? 'denied' : s.decision, reason: r.reason, tx: s.tx }, say: r.refused ? (w => two ? `Second wall: the charter refused. ${w.charAt(0).toUpperCase() + w.slice(1)}.` : `Blocked: ${w}.`)(A.why(r.reason)) : 'It got through. Tighten your rules.' };
     },
   },
   arena: {
