@@ -18,7 +18,9 @@
       "timelock_not_ready": "rpvix4gCgNzJmDSLLgGWtN1tvkk7BU7uyWhyYGwni4V",
       "queued_widening_denied": "573gVwsp2Fbyzmffbo6CbZ8C9TwPaKpAHHeF8ym5jJii",
       "dao_freeze": "7xkk5cPxNwttBAYrk6EZRuxyuajGKTmdeddtiYVdTgLX",
-      "owner_unfreeze_refused": "9a2AqaPVuFcPegRue67ycdfEuwz4k6RaWJaogDpQiak7"
+      "owner_unfreeze_refused": "9a2AqaPVuFcPegRue67ycdfEuwz4k6RaWJaogDpQiak7",
+      "escalated_owner_approved": "AxYjEL2XxpDFLA1Fpkw5EiqGJK7j2sFZymNBbkiVwWkD",
+      "owner_resolve_approve": "EduSJN1HNLhQU8kNe2nydaHxB9bd6NUDR3ry8DCZL8KE"
     }
   },
   "townhall": {
@@ -107,6 +109,10 @@
       "taz": "0.01370000",
       "memo": "nearcarta mistbank v1 oath=5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua salt=67d50c7f78cc0cfdc145392edd674f83"
     },
-    "zcash_explorer_api": "https://api.testnet.cipherscan.app"
+    "zcash_explorer_api": "https://api.testnet.cipherscan.app",
+    "proof_txs": {
+      "oath_allowed_commitment": "5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+      "oath_memo_too_long_denied": "9riHoM2rG8nWsNCW5qtnpwcbKu1GUB7LpZB7CPgBm6Xy"
+    }
   }
 }
