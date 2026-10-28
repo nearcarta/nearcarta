@@ -27,9 +27,9 @@ export async function fallback(why){ if(started) return; started=true; body.clas
   const APP=!/[?&]scripted\b/.test(location.search); let ui8m=null;
   const ui=$('#shopUI'), dr=$('#drawer'); const drawer=on=>{ dr.classList.toggle('open',on); dr.setAttribute('aria-hidden',on?'false':'true'); };
   $('#t-proof').onclick=()=>drawer(true); $('#d-close').onclick=()=>drawer(false);
-  const close=()=>{ drawer(false); ui.hidden=true; ui8m?.unmount(); body.classList.remove('apps'); img.onerror=null; img.src=town; body.classList.remove('in-shop'); $('#fbpins').hidden=false; };
+  const close=()=>{ fbCur=null; drawer(false); ui.hidden=true; ui8m?.unmount(); body.classList.remove('apps'); img.onerror=null; img.src=town; body.classList.remove('in-shop'); $('#fbpins').hidden=false; };
   $('#back').onclick=close; addEventListener('keydown',e=>{ if(e.key==='Escape'&&!ui.hidden){ dr.classList.contains('open')?drawer(false):close(); } });
-  async function open(id){ let m=null, err=null, core=null;
+  let fbCur=null; async function open(id){ fbCur=id; let m=null, err=null, core=null;
     try{ [core,m]=await Promise.all([import(D8+'js/core.js'),import(D8+'shops/'+id+'.js')]); }catch(e){ err=e; console.error(`[Nearcarta 2D] shop "${id}" failed to load:`,e); }
     img.onerror=null; img.src=D8+'shots/fallback_'+id+'.jpg'; /* D8 room still (shots/rooms/ was never shipped, so no 404 first) */ /* D9-dressed still (sky, sea), D8 still if missing */ $('#fbpins').hidden=true; body.classList.add('in-shop'); ui.hidden=false; { const CT={house:"Set your agent's rules →",guard:'Write a rule like this for your agent →',arena:'Put your own charter in the arena →'}, c=$('#t-cta'); c.hidden=!CT[id]; if(CT[id]){ c.textContent=CT[id]; c.href=(window.NEARCARTA_CHARTER||'/shops/vault/')+(id==='house'?'#create':''); } } $('#t-title').textContent=NAMES[id];
     const b=$('#t-act'), d=$('#d-body'), src=$('#t-src');
@@ -45,7 +45,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
     if(APP){ // same real wallet flows as the 3D rooms (D8 shopui), not the scripted result
       body.dataset.host='d9'; body.classList.add('apps'); $('#t-say').hidden=false; $('#t-hero').innerHTML=''; b.className='act primary'; b.hidden=false; b.disabled=true; b.textContent='Opening…';
       const c=$('#t-cta'); c.hidden=id!=='house'; c.className='link cta8'; if(id==='house'){ c.textContent='Open the charter office →'; c.href=window.NEARCARTA_CHARTER||'/shops/vault/'; }
-      import(D8+'js/shopui.js').then(async u=>{ await u.boot(); ui8m=u; if(ui.hidden||$('#t-title').textContent!==NAMES[id]) return; u.mount(id,{id},()=>{}); b.onclick=()=>window.__apps?.primary(); })
+      import(D8+'js/shopui.js').then(u=>{ ui8m=u; if(ui.hidden||fbCur!==id) return; u.mount(id,{id},()=>{}); /* mount boots the wallet and paints its own state: no waiting on "Opening…" */ b.onclick=()=>window.__apps?.primary(); })
         .catch(e=>{ console.warn('[Nearcarta 2D] shop app failed to load',e); b.disabled=false; b.textContent='Try again'; b.onclick=()=>open(id); }); } }
   const A={chron:'chronicle',townhall:'hall',mistbank:'bank',guardhouse:'guard',vault:'house'}; const q=new URLSearchParams(location.search).get('shop'); const start=q&&(A[q]||q); if(start&&NAMES[start]) open(start);
   window.__ready=true; }

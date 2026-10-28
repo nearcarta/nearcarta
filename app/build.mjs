@@ -56,7 +56,7 @@ document.getElementById('skipIntro').addEventListener('click',out);document.getE
 <script>(()=>{/* phones: the one-line blurb sits under the account row, never under its buttons (the row wraps once signed in) */
 const a=document.getElementById('acct'),w=document.querySelector('#brand .what');if(!a||!w||!('ResizeObserver'in window))return;
 const f=()=>{w.style.top=innerWidth<=600?Math.round(a.getBoundingClientRect().bottom+6)+'px':'';};new ResizeObserver(f).observe(a);addEventListener('resize',f);f();})();</script>
-<script type="module">import('/house.bundle.js').then(m=>m.mountConnect(document.getElementById('wallet'))).catch(()=>{});</script>
+<script type="module">const mc=()=>import('/house.bundle.js').then(m=>m.mountConnect(document.getElementById('wallet'))).catch(()=>{});mc();addEventListener('nearcarta:wallet',mc);</script>
 </body>`));
 if (!readFileSync(dist + '/index.html', 'utf8').includes('id="wallet"')) throw new Error('wallet slot not injected');
 // The town has no confirm card any more (#inCard): its HUD CTA #rulesBtn links to the Charter office.

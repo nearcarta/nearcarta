@@ -46,7 +46,10 @@ export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; $('#t-title').t
   sh.tags?.forEach(t=>{ if(t.html){ t.el=document.createElement('div'); t.el.className='stag '+(t.cls||''); t.el.innerHTML=t.html; $('#stags').appendChild(t.el); } }); frame(sh.camera);
   document.body.classList.toggle('apps',APP); $('#t-say').hidden=!APP; if(!APP) return;
   b.hidden=false; b.disabled=true; b.textContent='Opening…';
-  ui8().then(m=>{ if(L.sh===sh) m.mount(sh.id,sh,g=>L.C8.run(g)); }).catch(e=>{ if(L.sh!==sh) return; console.warn('[Nearcarta] shop app failed to load',e); b.disabled=false; b.textContent='Try again'; b.dataset.retry=sh.id; }); }
+  // mount by room id (the same room can be re-shown while the app module loads), and never leave "Opening…" up:
+  // if the label is still there after 8 s, mount again; the app paints its own state on mount.
+  const go=()=>ui8().then(m=>{ if(L.sh?.id===sh.id) m.mount(sh.id,L.sh,g=>L.C8.run(g)); }).catch(e=>{ if(L.sh?.id!==sh.id) return; console.warn('[Nearcarta] shop app failed to load',e); b.disabled=false; b.textContent='Try again'; b.dataset.retry=sh.id; });
+  go(); setTimeout(()=>{ if(L.sh?.id===sh.id&&b.textContent==='Opening…') go(); },8000); }
 export const rulesOpen=()=>!!ui&&$('#rules').classList.contains('open');
 export function closeRules(){ ui?.then(m=>m.closeRules()); }
 export function showError(id,err){ $('#t-title').textContent=NAMES[id]||id; const s=$('#t-src'); s.textContent='error'; s.className='src error'; $('#t-label').textContent='This room could not load'; $('#t-hero').innerHTML='';
