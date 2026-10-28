@@ -11,7 +11,12 @@ export const cfg = {
   port: Number(process.env.PORT || 8787),
   rpc: process.env.NEAR_RPC || DEP.rpc,
   // Tried in order when the main testnet RPC answers 429/5xx or is unreachable (free RPCs rate-limit shared host IPs).
-  rpcFallbacks: (process.env.NEAR_RPC_FALLBACKS ?? 'https://rpc.testnet.near.org').split(',').map(s => s.trim()).filter(Boolean),
+  rpcFallbacks: (process.env.NEAR_RPC_FALLBACKS || 'https://rpc.testnet.fastnear.com,https://rpc.testnet.near.org').split(',').map((s) => s.trim()).filter(Boolean),
+  rpcRetries: Number(process.env.NEAR_RPC_RETRIES || 3),
+  rpcBackoffMs: Number(process.env.NEAR_RPC_BACKOFF_MS || 250),
+  rpcTimeoutMs: Number(process.env.NEAR_RPC_TIMEOUT_MS || 8000),
+  rpcCacheMs: Number(process.env.NEAR_RPC_CACHE_MS || 5000),
+  rpcStaleMs: Number(process.env.NEAR_RPC_STALE_MS || 10 * 60 * 1000),
   // mainnet RPC is used only for free view calls (intents.near simulate / token reads). Never for signing.
   mainnetRpc: process.env.NEAR_MAINNET_RPC || 'https://free.rpc.fastnear.com',
   oneClick: process.env.ONECLICK_URL || DEP.ferry.oneclick,

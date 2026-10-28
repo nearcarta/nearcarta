@@ -2,27 +2,61 @@
 import { cfg } from './config.js';
 
 let rpcId = 0;
-// A rate limit (429), a 5xx or a network error on the main testnet RPC moves on to the next endpoint
-// in cfg.rpcFallbacks. RPC-level errors (bad account, contract panic) are answers and are not retried.
-export async function rpc(method, params, url = cfg.rpc) {
-  const urls = url === cfg.rpc ? [url, ...cfg.rpcFallbacks.filter(u => u !== url)] : [url];
-  let r, err;
-  for (const u of urls) {
-    try {
-      r = await fetch(u, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }),
-      });
-      if (r.status === 429 || r.status >= 500) { err = new Error(`rpc ${method} http ${r.status}`); continue; }
-      err = null; break;
-    } catch (e) { err = new Error(`rpc ${method} unreachable`); }
-  }
-  if (err) throw err;
-  if (!r.ok) throw new Error(`rpc ${method} http ${r.status}`);
+// Testnet RPCs rate-limit (HTTP 429) under load. Each call retries with backoff, falls through to fallback
+// URLs, and read-only queries are cached briefly; if every endpoint fails, a recent cached answer is served
+// (marked stale in /api/health) instead of a 500.
+const RETRY_HTTP = new Set([408, 425, 429, 500, 502, 503, 504]);
+const RETRY_RPC = /TIMEOUT_ERROR|InternalError|Too Many Requests|SERVER_ERROR/i;
+const CACHEABLE = new Set(['query', 'EXPERIMENTAL_protocol_config', 'block']);
+const cache = new Map(); // key -> { at, value }
+export const rpcStats = { calls: 0, retries: 0, fallbacks: 0, cacheHits: 0, staleServed: 0, lastError: null };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+export function _resetRpcCache() { cache.clear(); }
+
+async function once(url, method, params) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }),
+    signal: AbortSignal.timeout(cfg.rpcTimeoutMs),
+  });
+  if (!r.ok) { const e = new Error(`rpc ${method} http ${r.status}`); e.retry = RETRY_HTTP.has(r.status); throw e; }
   const j = await r.json();
-  if (j.error) throw new Error(`rpc ${method}: ${j.error.cause?.name || j.error.name || 'error'} ${JSON.stringify(j.error.data ?? j.error.cause?.info ?? '')}`);
+  if (j.error) {
+    const e = new Error(`rpc ${method}: ${j.error.cause?.name || j.error.name || 'error'} ${JSON.stringify(j.error.data ?? j.error.cause?.info ?? '')}`);
+    e.retry = RETRY_RPC.test(JSON.stringify(j.error)); throw e;
+  }
   return j.result;
+}
+
+export async function rpc(method, params, url = cfg.rpc) {
+  rpcStats.calls++;
+  const finalityOk = !params || params.finality !== 'optimistic';
+  const key = CACHEABLE.has(method) && finalityOk ? method + JSON.stringify(params) : null;
+  const hit = key && cache.get(key);
+  if (hit && Date.now() - hit.at < cfg.rpcCacheMs) { rpcStats.cacheHits++; return hit.value; }
+  // A caller that passes its own URL (e.g. mainnet views) gets retries on that URL only.
+  const urls = url === cfg.rpc ? [cfg.rpc, ...cfg.rpcFallbacks.filter((u) => u !== cfg.rpc)] : [url];
+  let last;
+  // Each round tries every URL once (primary first); rounds are separated by an exponential backoff.
+  for (let round = 0; round < cfg.rpcRetries; round++) {
+    for (let i = 0; i < urls.length; i++) {
+      try {
+        const value = await once(urls[i], method, params);
+        if (key) { cache.set(key, { at: Date.now(), value }); if (cache.size > 2000) cache.delete(cache.keys().next().value); }
+        return value;
+      } catch (e) {
+        last = e;
+        const retry = e.retry || e.name === 'TimeoutError' || e.name === 'AbortError' || e.cause?.code || /fetch failed/.test(e.message);
+        if (!retry) throw e; // a real answer (unknown account, contract panic): no point retrying
+        if (i + 1 < urls.length) rpcStats.fallbacks++; else rpcStats.retries++;
+      }
+    }
+    if (round + 1 < cfg.rpcRetries) await sleep(cfg.rpcBackoffMs * 2 ** round + Math.floor(Math.random() * 100));
+  }
+  rpcStats.lastError = { at: new Date().toISOString(), message: String(last?.message).slice(0, 200) };
+  if (hit && Date.now() - hit.at < cfg.rpcStaleMs) { rpcStats.staleServed++; return hit.value; }
+  throw last;
 }
 
 export async function view(accountId, method, args = {}, url = cfg.rpc) {
