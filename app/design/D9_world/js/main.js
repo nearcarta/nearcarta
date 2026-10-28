@@ -25,6 +25,7 @@ async function audioOn(){ if(!A.ctx){ A.ctx=new (window.AudioContext||window.web
   await A.ctx.resume(); A.on=true; if(!A.bed){ A.bed=loop('music',.16); loop('water',.1); } }
 function loop(n,g){ const b=A.buf[n]; if(!b) return; const s=A.ctx.createBufferSource(), v=A.ctx.createGain(); s.buffer=b; s.loop=true; v.gain.value=g; s.connect(v).connect(A.out); s.start(); return v; }
 function sfx(n,{g=1,rate=1,pan=0}={}){ __alog.push({t:+(clock.T-storyT0).toFixed(3),n,g,rate}); if(!A.on||!A.buf[n]) return; const s=A.ctx.createBufferSource(), v=A.ctx.createGain(); s.buffer=A.buf[n]; s.playbackRate.value=rate; v.gain.value=g;
+window.__townSfx=n=>sfx(n,{g:.6}); /* D8 rooms play allowed/refuse cues through the town player: one player, one mute */
   const p=A.ctx.createStereoPanner?A.ctx.createStereoPanner():null; if(p){ p.pan.value=pan; s.connect(v).connect(p).connect(A.out); } else s.connect(v).connect(A.out); s.start(); }
 // speech blip: a soft pitched tick per letter pair; pitch from the speaker's voice
 SP.setBlip((voice,style,ch)=>{ const f=(style==='warn'?150:style==='think'?300:240)*voice*(1+((ch.charCodeAt(0)%5)-2)*.03); __alog.push({t:+(clock.T-storyT0).toFixed(3),n:'blip',f:+f.toFixed(1),g:style==='think'?.035:.05});
