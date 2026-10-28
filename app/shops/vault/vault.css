@@ -100,3 +100,6 @@ details.how{margin:var(--s-2) 0 var(--s-3)}details.how summary{cursor:pointer;co
 .gl b{text-align:right}
 label select{display:block;width:100%;margin-top:6px}
 .grid2 .hint{grid-column:1/-1;margin:-4px 0 0;color:var(--c-text-2,#cbbfa8);font-size:14px}
+#s-what:has(#story:empty):has(#feed[hidden]):has(#log:empty){display:none}
+.atk em{margin-top:6px}
+.facts-box summary{margin-bottom:6px}
