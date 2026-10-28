@@ -7,7 +7,7 @@
 // attack or task under the clause in force at that block, and the expected decision:
 //   attack -> denied, with the reason the attack targets;   task -> allowed and settled ok.
 //
-// Exception to "no route can sign": POST /api/vault/attack and /api/vault/task sign `propose` on
+// Exception to "no route can sign": POST /api/vault/attack, /api/vault/task and /api/vault/ask sign `propose` on
 // the SHARED arena charter with ARENA_AGENT_KEY. That key is a function-call key that can only call
 // `propose` on that one charter, with a gas allowance; the charter's clause (allowlist, small caps,
 // daily budget) bounds what an allowed step can move. The runner signs at 30 Tgas and stops at a
@@ -20,7 +20,8 @@ import { rpc, view, viewAccount, accessKeys, txStatus, eventsFromOutcome, explor
 import { ATTACKS, ATTACK_IDS, MEMO_RE, acceptedReasons, matchesPlan, pickClause, plan } from '../../shared/vault/attacks.js';
 import { TASKS, TASK_IDS, TASK_MEMO_RE, matchesTask, planTask } from '../../shared/vault/tasks.js';
 import { keyFrom, sendPropose, rpcClient, viewFn, PROPOSE_TGAS } from '../../shared/vault/tx.js';
-import { runSteps, runTask } from '../../shared/vault/run.js';
+import { runSteps, runTask, runAsk } from '../../shared/vault/run.js';
+import { parseAsk } from '../../shared/vault/ask.js';
 
 export const V = DEP.vault || null;
 const ACCOUNT_RE = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -218,6 +219,56 @@ export async function sharedTask(taskId, tag) {
     let used = 0;
     try { const r = await doTask({ charter: V.arena.charter, key: keyFrom(secret), taskId, tag }); used = r.tx ? 1 : 0; return { ...r, server_signed: true }; }
     catch (e) { used = (e.status && e.status < 500) ? 0 : 1; throw e; }
+    finally { release(used); }
+  });
+}
+
+/** Payees a request may name: the charter's Native allowlists (when readable), then the arena merchants. */
+export async function askReceivers(charter, viewF = view) {
+  const out = new Set();
+  if (charter) {
+    const cl = await viewF(charter, 'get_clauses').catch(() => null);
+    for (const c of Object.values(cl || {})) if (c?.asset === 'Native') for (const r of c.receivers || []) out.add(r);
+  }
+  for (const r of V?.arena?.merchants || []) out.add(r);
+  return [...out];
+}
+
+/** "Ask the agent to pay" without signing: the parsed request and the proposal the owner's agent key would sign. */
+export async function askPlan(text, charter = null, { viewF = view, nowMs = Date.now() } = {}) {
+  if (!V) throw bad('vault not deployed', 503);
+  if (charter !== null && !isAccount(charter)) throw bad('charter: a testnet account id');
+  const id = charter || V.arena.charter;
+  let q;
+  try { q = parseAsk(text, await askReceivers(id, viewF)); } catch (e) { throw bad(e.message); }
+  const clauses = await viewF(id, 'get_clauses');
+  const { id: clauseId, clause } = pickClause(clauses);
+  const st = await viewF(id, 'get_state');
+  return { charter: id, parsed: q, clause_id: clauseId,
+    on_allowlist: (clause.receivers || []).includes(q.receiver), per_action_cap: clause.per_action_cap ?? null,
+    proposal: { shop: 'ask', clause_id: clauseId, receiver: q.receiver, amount: q.amount, nonce: String(st.next_nonce),
+      policy_version: st.policy_version, expires_at: String(BigInt(nowMs + 10 * 60_000) * 1_000_000n), memo: q.memo, receipt: null },
+    sign: 'call `propose` on the charter with {"p": proposal} using your agent function-call key; the charter decides',
+    parser: 'plain-words parser (shared/vault/ask.js), not an AI model' };
+}
+
+/** "Ask the agent to pay" on the SHARED arena charter: one server-signed `propose`, decided on chain. */
+export async function sharedAsk(text, { run = runAsk } = {}) {
+  if (!V) throw bad('vault not deployed', 503);
+  const secret = agentSecret();
+  if (!secret) throw bad('shared arena runner is off on this deployment (no agent key set)', 503);
+  let q;
+  try { q = parseAsk(text, V.arena.merchants || []); } catch (e) { throw bad(e.message); }
+  return serial(async () => {
+    const release = reserve(1);
+    let used = 0;
+    try {
+      const rpcCall = runnerRpc();
+      const r = await run({ charter: V.arena.charter, key: keyFrom(secret), receiver: q.receiver, amount: q.amount, memo: q.memo,
+        rpcCall, viewF: (a, m, x) => viewFn(rpcCall, a, m, x), send: sendPropose });
+      used = r.tx ? 1 : 0;
+      return { ...r, note: q.note, url: r.tx ? explorerTx(r.tx) : null, server_signed: true };
+    } catch (e) { used = (e.status && e.status < 500) ? 0 : 1; throw e; }
     finally { release(used); }
   });
 }
@@ -459,6 +510,14 @@ export function register(app, { limiter, globalCap }) {
   app.post('/api/vault/task', limiter(6), globalCap('vault-attack', 30), async c => {
     const b = await c.req.json().catch(() => ({}));
     return c.json(await sharedTask(String(b.task || ''), String(b.nickname || '').toLowerCase()));
+  });
+  app.post('/api/vault/ask/plan', limiter(20), async c => {
+    const b = await c.req.json().catch(() => ({}));
+    return c.json(await askPlan(String(b.text || ''), b.charter == null || b.charter === '' ? null : String(b.charter)));
+  });
+  app.post('/api/vault/ask', limiter(6), globalCap('vault-attack', 30), async c => {
+    const b = await c.req.json().catch(() => ({}));
+    return c.json(await sharedAsk(String(b.text || '')));
   });
   app.post('/api/vault/record', limiter(30), async c => {
     const b = await c.req.json().catch(() => ({}));
