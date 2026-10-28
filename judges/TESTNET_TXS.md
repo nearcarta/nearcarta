@@ -1,8 +1,8 @@
 # Testnet transactions
 
-Every row was read back from chain by `npm run verify` (backend/scripts/verify-proofs.js) at 2026-10-28T02:04:44.762Z (UTC); this file is written from that output by backend/scripts/txs-table.js. Raw output: judges/proofs/proof-check.json.
+Every row was read back from chain by `npm run verify` (backend/scripts/verify-proofs.js) at 2026-10-28T03:23:31.645Z (UTC); this file is written from that output by backend/scripts/txs-table.js. Raw output: judges/proofs/proof-check.json.
 
-**38/38 found.**
+**47/47 found.**
 
 | shop | what it proves | method | on-chain result | tx |
 |---|---|---|---|---|
@@ -42,6 +42,15 @@ Every row was read back from chain by `npm run verify` (backend/scripts/verify-p
 | toll | finalized proof | verify_foreign_transaction | {"payload_hash":"2473efe1fd9e552ef5769cb0f5526e4f84d75dcfc196168ce004df53961b647d","signature":{"scheme":"Secp | [GHFJoQdSKT…](https://testnet.nearblocks.io/txns/GHFJoQdSKTK9Q9pUYEepeViMKhbyrmY7J4bMhuEw5fEV) |
 | mistbank | oath allowed commitment | propose | {"action_id":"3","decision":"allowed","status":"confirmed","reason":"ok"} | [5HG5SPJ53M…](https://testnet.nearblocks.io/txns/5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua) |
 | mistbank | oath memo too long denied | propose | {"action_id":null,"decision":"denied","status":"denied","reason":"memo_too_long"} | [9riHoM2rG8…](https://testnet.nearblocks.io/txns/9riHoM2rG8nWsNCW5qtnpwcbKu1GUB7LpZB7CPgBm6Xy) |
+| house | deploy init | DeployContract,new | "ok" | [Bd3qdM2WaC…](https://testnet.nearblocks.io/txns/Bd3qdM2WaCVCnJQaggLHFKybTv2XXcB3jtSWJfSZyebw) |
+| house | set clause | set_clause | {"applied":true,"policy_version":2} | [AhZBGPuQtg…](https://testnet.nearblocks.io/txns/AhZBGPuQtgoX2Rw9ofqX8A7gzmMWbTtbgnzEsthX6nTE) |
+| house | set agent key | set_agent_key | "ok" | [CDa3s9a9ZA…](https://testnet.nearblocks.io/txns/CDa3s9a9ZAXTUFCAET9RgsGmETpAz3K3S9m93HKkMCCp) |
+| house | policy delay 90s | set_policy_delay | {"applied":true,"policy_version":3} | [D4qeFFNgKN…](https://testnet.nearblocks.io/txns/D4qeFFNgKNBmD4cbcVRR8XXrfrnfoUTQyhY1CpMN9pSY) |
+| house | full access key deleted | DeleteKey | "ok" | [A4QENSGxhh…](https://testnet.nearblocks.io/txns/A4QENSGxhhixhdLiyaprTh2Rzg25QsyaFMK49f84PCkC) |
+| house | wallet freeze | freeze | "ok" | [56K4Yzk46V…](https://testnet.nearblocks.io/txns/56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae) |
+| house | wallet unfreeze | unfreeze | "ok" | [HEEGDfCs1T…](https://testnet.nearblocks.io/txns/HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ) |
+| house | escalated paid after approve | propose | {"action_id":"1","decision":"escalated","status":"escalated","reason":"over_cap_waiting_owner"} | [3omqdk7SXm…](https://testnet.nearblocks.io/txns/3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT) |
+| house | wallet resolve approve | resolve_escalation | true | [EPGmaTnZ5w…](https://testnet.nearblocks.io/txns/EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy) |
 | toll | base sepolia broadcast | eth tx | status 1 on Base Sepolia, sent from the MPC-derived address | [0xf7ed6482…](https://sepolia.basescan.org/tx/0xf7ed6482a8380c1fe84be32973256d00960f522cd0d70fe9fe16165190dbc43b) |
 | mistbank | zcash payout amount hidden | zcash tx | mined at height 4549357; amount hidden: true | [d0b5206733…](https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897) |
 
@@ -49,4 +58,5 @@ Every row was read back from chain by `npm run verify` (backend/scripts/verify-p
 
 - Fresh Guardhouse run (backend/scripts/guardhouse-demo.js): allowed [4dxGpv8Y…](https://testnet.nearblocks.io/txns/4dxGpv8YkmTW79vcMDg7bXPmNN3JFrNBFLEKDXDXN6R3), denied receiver_not_allowlisted [AHhGaJCp…](https://testnet.nearblocks.io/txns/AHhGaJCpW5erBFWpWuNkNhPzKiR4BeigJyWvqV1Uzzpf).
 - Owner approves a big move (backend/scripts/escalation-demo.js, judges/proofs/escalation-approved.json): 0.100001 NEAR over the 0.1 NEAR cap → `escalated` → owner `resolve_escalation(approve)` → `settle:approved`, `settle:confirmed`.
+- Your House (e2e/house.spec.js, judges/proofs/house-wallet.json): the owner signs freeze, unfreeze and `resolve_escalation(approve)` in a real MyNearWallet testnet popup through Wallet Selector. The House charter r11house-31474.testnet has 0 full-access keys.
 - Mist Bank (backend/scripts/mistbank-record.js, judges/proofs/mistbank-payout.json): the Zcash testnet faucet tx [17a9a84d…](https://testnet.cipherscan.app/tx/17a9a84d758b4feebea5d8fc2c556a95cd0778506cce791c7de23c4a08e0b497) is the counter-example. It crosses pools, so its amount is public, and `GET /api/mistbank/street/<txid>` flags it.

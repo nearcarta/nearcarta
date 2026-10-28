@@ -126,7 +126,11 @@
       "set_clause": "AhZBGPuQtgoX2Rw9ofqX8A7gzmMWbTtbgnzEsthX6nTE",
       "set_agent_key": "CDa3s9a9ZAXTUFCAET9RgsGmETpAz3K3S9m93HKkMCCp",
       "policy_delay_90s": "D4qeFFNgKNBmD4cbcVRR8XXrfrnfoUTQyhY1CpMN9pSY",
-      "full_access_key_deleted": "A4QENSGxhhixhdLiyaprTh2Rzg25QsyaFMK49f84PCkC"
+      "full_access_key_deleted": "A4QENSGxhhixhdLiyaprTh2Rzg25QsyaFMK49f84PCkC",
+      "wallet_freeze": "56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae",
+      "wallet_unfreeze": "HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ",
+      "escalated_paid_after_approve": "3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
+      "wallet_resolve_approve": "EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy"
     }
   }
 }

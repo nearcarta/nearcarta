@@ -1,5 +1,5 @@
 {
- "at": "2026-10-28T02:31:07.714Z",
+ "at": "2026-10-28T03:23:31.645Z",
  "rows": [
   {
    "shop": "guardhouse",
@@ -641,6 +641,168 @@
    "events": [
     "action"
    ],
+   "found": true
+  },
+  {
+   "shop": "house",
+   "label": "deploy_init",
+   "hash": "Bd3qdM2WaCVCnJQaggLHFKybTv2XXcB3jtSWJfSZyebw",
+   "url": "https://testnet.nearblocks.io/txns/Bd3qdM2WaCVCnJQaggLHFKybTv2XXcB3jtSWJfSZyebw",
+   "signer": "r11house-31474.testnet",
+   "receiver": "r11house-31474.testnet",
+   "method": "DeployContract,new",
+   "result": {
+    "ok": true,
+    "value": null
+   },
+   "events": [
+    "policy"
+   ],
+   "found": true
+  },
+  {
+   "shop": "house",
+   "label": "set_clause",
+   "hash": "AhZBGPuQtgoX2Rw9ofqX8A7gzmMWbTtbgnzEsthX6nTE",
+   "url": "https://testnet.nearblocks.io/txns/AhZBGPuQtgoX2Rw9ofqX8A7gzmMWbTtbgnzEsthX6nTE",
+   "signer": "r11hown-31474.testnet",
+   "receiver": "r11house-31474.testnet",
+   "method": "set_clause",
+   "result": {
+    "ok": true,
+    "value": {
+     "applied": true,
+     "policy_version": 2
+    }
+   },
+   "events": [
+    "policy"
+   ],
+   "found": true
+  },
+  {
+   "shop": "house",
+   "label": "set_agent_key",
+   "hash": "CDa3s9a9ZAXTUFCAET9RgsGmETpAz3K3S9m93HKkMCCp",
+   "url": "https://testnet.nearblocks.io/txns/CDa3s9a9ZAXTUFCAET9RgsGmETpAz3K3S9m93HKkMCCp",
+   "signer": "r11hown-31474.testnet",
+   "receiver": "r11house-31474.testnet",
+   "method": "set_agent_key",
+   "result": {
+    "ok": true,
+    "value": null
+   },
+   "events": [
+    "agent_key"
+   ],
+   "found": true
+  },
+  {
+   "shop": "house",
+   "label": "policy_delay_90s",
+   "hash": "D4qeFFNgKNBmD4cbcVRR8XXrfrnfoUTQyhY1CpMN9pSY",
+   "url": "https://testnet.nearblocks.io/txns/D4qeFFNgKNBmD4cbcVRR8XXrfrnfoUTQyhY1CpMN9pSY",
+   "signer": "r11hown-31474.testnet",
+   "receiver": "r11house-31474.testnet",
+   "method": "set_policy_delay",
+   "result": {
+    "ok": true,
+    "value": {
+     "applied": true,
+     "policy_version": 3
+    }
+   },
+   "events": [
+    "policy"
+   ],
+   "found": true
+  },
+  {
+   "shop": "house",
+   "label": "full_access_key_deleted",
+   "hash": "A4QENSGxhhixhdLiyaprTh2Rzg25QsyaFMK49f84PCkC",
+   "url": "https://testnet.nearblocks.io/txns/A4QENSGxhhixhdLiyaprTh2Rzg25QsyaFMK49f84PCkC",
+   "signer": "r11house-31474.testnet",
+   "receiver": "r11house-31474.testnet",
+   "method": "DeleteKey",
+   "result": {
+    "ok": true,
+    "value": null
+   },
+   "events": [],
+   "found": true
+  },
+  {
+   "shop": "house",
+   "label": "wallet_freeze",
+   "hash": "56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae",
+   "url": "https://testnet.nearblocks.io/txns/56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae",
+   "signer": "r11hown-31474.testnet",
+   "receiver": "r11house-31474.testnet",
+   "method": "freeze",
+   "result": {
+    "ok": true,
+    "value": null
+   },
+   "events": [
+    "freeze"
+   ],
+   "found": true
+  },
+  {
+   "shop": "house",
+   "label": "wallet_unfreeze",
+   "hash": "HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ",
+   "url": "https://testnet.nearblocks.io/txns/HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ",
+   "signer": "r11hown-31474.testnet",
+   "receiver": "r11house-31474.testnet",
+   "method": "unfreeze",
+   "result": {
+    "ok": true,
+    "value": null
+   },
+   "events": [
+    "freeze"
+   ],
+   "found": true
+  },
+  {
+   "shop": "house",
+   "label": "escalated_paid_after_approve",
+   "hash": "3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
+   "url": "https://testnet.nearblocks.io/txns/3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
+   "signer": "r11house-31474.testnet",
+   "receiver": "r11house-31474.testnet",
+   "method": "propose",
+   "result": {
+    "ok": true,
+    "value": {
+     "action_id": "1",
+     "decision": "escalated",
+     "status": "escalated",
+     "reason": "over_cap_waiting_owner"
+    }
+   },
+   "events": [
+    "action",
+    "settle",
+    "settle"
+   ],
+   "found": true
+  },
+  {
+   "shop": "house",
+   "label": "wallet_resolve_approve",
+   "hash": "EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy",
+   "url": "https://testnet.nearblocks.io/txns/EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy",
+   "signer": "r11hown-31474.testnet",
+   "receiver": "r11house-31474.testnet",
+   "method": "resolve_escalation",
+   "result": {
+    "ok": true,
+    "value": true
+   },
+   "events": [],
    "found": true
   },
   {

@@ -10,7 +10,7 @@ async function signerOf(hash) {
   const j = await r.json(); return j.transactions?.[0]?.transaction?.signer_id ?? null;
 }
 const out = [];
-for (const shop of ['guardhouse', 'townhall', 'arena', 'toll', 'mistbank']) {
+for (const shop of ['guardhouse', 'townhall', 'arena', 'toll', 'mistbank', 'house']) {
   for (const [label, hash] of Object.entries(DEP[shop].proof_txs || {})) {
     const row = { shop, label, hash, url: explorerTx(hash) };
     try {
