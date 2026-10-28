@@ -17,15 +17,15 @@ Every competitor cell quotes or summarises the competitor's own page, fetched on
 | [Zodl (ex-Zashi)](https://zodl.com) | Yes (shielded ZEC) | Zashi 3.15.0 (2026-09-23) exports incoming/full viewing keys; view-only import is still an open request (zodl-project #55) | Account | No | No | No | Wallet only |
 
 ### What we do that they do not (each checkable)
-1. **The approval and the private payment are bound together.** The charter tx on NEAR holds a commitment. The Zcash memo, readable only with the viewing key, holds the opening. Nobody else we checked links a public policy decision to a private payment. `GET /api/mistbank` → `binds:true`; `GET /api/mistbank/verify?zats=1370000&salt=67d50c7f78cc0cfdc145392edd674f83` → `matches:true`.
-2. **Disclosure is one payout, by construction.** A fresh ZIP-32 account per payout, so the published UFVK opens one payout. Railgun keys are irrevocable and account-wide today; Confidential Intents disclosure is still planned.
+1. **The approval and the private payment are linked by a commitment.** The charter tx on NEAR holds a commitment. The Zcash memo, readable only with the viewing key, holds the opening. An auditor with the key checks it with `POST /api/mistbank/verify` → `matches:true`. Limit: the charter does not cap or move the Zcash amount; the bank wallet sends it off chain, and the link is checkable, not enforced.
+2. **Disclosure is one payout, by construction.** A fresh ZIP-32 account per payout, so a viewing key given to an auditor opens one payout. The keys are no longer published (the first one was public until 2026-10-28; that payee wallet is retired). Railgun keys are irrevocable and account-wide today; Confidential Intents disclosure is still planned.
 3. **A street check for any tx.** `GET /api/mistbank/street/<txid>` reports whether a Zcash testnet tx leaks its amount (transparent parts, pool crossing, coinbase). Shown on a real leaking faucet tx.
 4. **The agent cannot overpay or pay a stranger**, because the charter refuses first. The recorder stops before any Zcash send unless the decision is `allowed`.
 
 ### Gaps
 - Testnet ZEC (TAZ) only. The Confidential Intents desk is dry quotes. A real confidential deposit is a mainnet spend and needs the owner's OK.
 - The commitment opening is in the payout memo, so any viewing-key holder learns the salt. That is intended (they are the auditor), but the commitment is not hiding against them.
-- Gap closed this round: the first recorder reused one payee account. It now makes one account per payout. The current proof's account has exactly one tx (see `list-tx` in the ledger fixture).
+- Gap closed this round: the first recorder reused one payee account. It now makes one account per payout. The current proof's account has exactly one tx (checked by the auditor with the viewing key).
 - near.com's "share specific activity" may be finer-grained in-app; we could not test it without an account.
 
 ## Ferry
@@ -94,7 +94,7 @@ Pre-R11: this shop runs its own smaller contract (contracts/townhall), not the R
 | [NEAR Business](https://business.near.com/) | "Multisig approvals" | Payments; "Every Treasury Contract transaction follows the rules you set" | No agent | Yes: "Balances are not visible to the public" | No |
 | [POTLOCK](https://www.potlock.org/) | Funders and rounds | Grants | No agent | Not stated | Yes: "quadratic funding rounds" |
 
-Gap closed this round: confidential payments. Mist Bank pays privately under a charter clause; the commitment on NEAR binds the approval to the amount.
+Gap closed this round: confidential payments. Mist Bank pays privately under a charter clause; the commitment on NEAR lets an auditor check that the amount paid is the amount approved.
 Open gaps: no bulk payments, no rounds.
 
 ## Vault Arena
