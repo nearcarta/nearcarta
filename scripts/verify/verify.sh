@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-command verify (no `make` needed). Each step prints PASS/FAIL/SKIP; exit != 0 on any FAIL. Testnet reads only, no keys.
 # Usage: scripts/verify/verify.sh [--offline]   (--offline skips the testnet RPC recheck)
-# Overrides: OATH_SRC (contract dir), PINNED_WASM (expected build), MUTANT_RE (fns to mutate), MUTANTS_OUT,
+# Overrides: OATH_SRC (contract dir), PINNED_WASM (expected build), PIN_REV (commit it was built from), MUTANT_RE (fns to mutate), MUTANTS_OUT,
 #            EXTRA_SCAN (another dir to secret-scan; its own .gitleaks.toml wins if present), RECHECK_DIR / RECHECK_CMD.
 set -uo pipefail
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -14,8 +14,10 @@ step(){ local n="$1"; shift; if "$@" >"$LOG" 2>&1; then echo "PASS $n"; else ech
 # 1 unit + sandbox + exploit tests (near-workspaces sandbox lives in the contract crate)
 step "cargo test (unit+sandbox)" bash -c "cd '$OATH' && cargo test --release -q"
 # 2 reproducible build (cargo near, docker) -> sha256 must equal the pinned artifact
-if command -v docker >/dev/null; then echo "INFO reproducible-wasm available (docker)"; else echo "SKIP reproducible-wasm (no docker; falls back to a non-reproducible build, whose hash may differ)"; fi
-step "build + sha256 == pinned" bash -c "cd '$OATH' && { cargo near build reproducible-wasm >/dev/null 2>&1 || cargo near build non-reproducible-wasm >/dev/null; } && f=\$(ls target/near/*.wasm|head -1) && [ \"\$(sha256sum \$f|cut -c1-64)\" = \"\$(sha256sum '$PINNED'|cut -c1-64)\" ]"
+command -v docker >/dev/null || echo "NOTE reproducible-wasm needs Docker; the build step fails without it"
+# The reproducible build records its source commit, so it is rebuilt from a clean clone of PIN_REV (oath.r16.wasm = 5099a7c).
+REV="${PIN_REV:-5099a7c}"; BDIR="$(mktemp -d)"
+step "build $REV + sha256 == pinned" bash -c "git clone -q '$ROOT' '$BDIR/r' && cd '$BDIR/r' && git checkout -q '$REV' && cd \"\$(realpath --relative-to='$ROOT' '$OATH')\" && cargo near build reproducible-wasm >/dev/null 2>&1 && [ \"\$(sha256sum target/near/oath.wasm|cut -c1-64)\" = \"\$(sha256sum '$PINNED'|cut -c1-64)\" ]"
 # 3 mutation testing: any surviving mutant in the policy fns is a FAIL (cargo-mutants exits 3 on timeouts, so missed.txt is checked too)
 if command -v cargo-mutants >/dev/null; then step "cargo mutants (policy fns; 0 missed, timeouts=caught)" bash -c "cd '$OATH' && cargo mutants -f src/lib.rs --re '$MRE' --no-shuffle -j4 --timeout 60 -o '$MOUT' -- --lib; rc=\$?; m='$MOUT/mutants.out/missed.txt'; [ ! -s \$m ] || { echo MISSED:; cat \$m; false; } && { [ \$rc = 0 ] || [ \$rc = 3 ]; }"; else echo "SKIP cargo-mutants not installed (cargo install cargo-mutants)"; fi
 # 4 secrets scan: the contract dir with this folder's config, the repo with the repo config, EXTRA_SCAN with its own config if it has one
