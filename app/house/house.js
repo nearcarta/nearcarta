@@ -129,8 +129,10 @@ export async function mountConnect(el) {
     const note = t => { msg.innerHTML = t; msg.hidden = !t; };
     msg.hidden = !msg.textContent;
     const on = (x, f) => el.querySelector(`[data-x="${x}"]`)?.addEventListener('click', e => { e.currentTarget.disabled = true; f().then(draw).catch(() => draw()); });
-    on('in', () => connect(t => note(esc(t))));
-    on('guest', () => startGuest(t => note(esc(t))));
+    // After a sign-in, tell the town (it flies to the House and opens /shops/vault/#create).
+    const told = a => { if (a) dispatchEvent(new CustomEvent('nearcarta:signin', { detail: { accountId: a } })); return a; };
+    on('in', () => connect(t => note(esc(t))).then(told));
+    on('guest', () => startGuest(t => note(esc(t))).then(told));
     on('drip', async () => { try { const h = await faucet(who, t => note(esc(t))); note(`10 testnet NEAR sent: ${txl(h)}`); } catch (e) { note(esc('Faucet: ' + e.message)); } });
     on('out', () => disconnect());
   };
