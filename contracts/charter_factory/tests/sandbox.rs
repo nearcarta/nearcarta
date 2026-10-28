@@ -1,4 +1,4 @@
-//! Sandbox: publish the committed R14 oath artifact as a global contract (by hash),
+//! Sandbox: publish the committed R15 oath artifact (R14 + setup window) as a global contract (by hash),
 //! deploy the factory, then walk a visitor through create -> clauses -> agent key ->
 //! a refused spend and an allowed spend, plus the failure and refund paths.
 use near_jsonrpc_client::{methods, JsonRpcClient};
@@ -13,9 +13,9 @@ use near_workspaces::{Account, AccountId, Contract, Worker};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-const OATH_ARTIFACT: &str = "../artifacts/oath.wasm";
+const OATH_ARTIFACT: &str = "../artifacts/oath.r15.wasm";
 const FACTORY_WASM: &str = "target/near/charter_factory.wasm";
-const R14_HASH: &str = "6iazbQxXNWY6puNN9hC3njiiErrNyCvWzXL9fX95vRSe";
+const R14_HASH: &str = "FaheXbWkhFnsJaxhKksACWnLhFEVQUx5dTWk5CqkigF9"; // R15 build of 4d4d047
 const NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 const MILLI: u128 = NEAR / 1000;
 
@@ -57,10 +57,16 @@ async fn create(visitor: &Account, factory: &Contract, name: &str, deposit: u128
 
 async fn propose(agent: &Account, charter: &AccountId, pv: u64, nonce: &mut u64, recv: &AccountId, amount: u128, memo: &str)
     -> anyhow::Result<near_workspaces::result::ExecutionFinalResult> {
+    propose_gas(agent, charter, pv, nonce, recv, amount, memo, 100).await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn propose_gas(agent: &Account, charter: &AccountId, pv: u64, nonce: &mut u64, recv: &AccountId, amount: u128, memo: &str, tgas: u64)
+    -> anyhow::Result<near_workspaces::result::ExecutionFinalResult> {
     let p = json!({"shop": "arena", "clause_id": "pay", "receiver": recv, "amount": amount.to_string(),
         "nonce": nonce.to_string(), "policy_version": pv, "expires_at": u64::MAX.to_string(), "memo": memo, "receipt": null});
     *nonce += 1;
-    Ok(agent.call(charter, "propose").args_json(json!({"p": p})).gas(Gas::from_tgas(100)).transact().await?)
+    Ok(agent.call(charter, "propose").args_json(json!({"p": p})).gas(Gas::from_tgas(tgas)).transact().await?)
 }
 
 #[tokio::test]
@@ -98,6 +104,10 @@ async fn factory_end_to_end() -> anyhow::Result<()> {
     assert_eq!(info["owner"], alice.id().to_string());
     let st: Value = w.view(&charter, "get_state").await?.json()?;
     assert_eq!(st["owner"], alice.id().to_string());
+    // default 24 h timelock, setup window open until the first agent key
+    assert_eq!(st["policy_delay_ns"], "86400000000000");
+    assert_eq!(st["setup_open"], true);
+    assert_eq!(info["policy_delay_ns"], "86400000000000");
     // the charter runs the global R14 code and has no access keys of its own
     let acct = w.view_account(&charter).await?;
     println!("STEP charter account {:?}", acct);
@@ -115,6 +125,17 @@ async fn factory_end_to_end() -> anyhow::Result<()> {
     let agent = Account::from_secret_key(charter.clone(), agent_sk, &w);
     let st: Value = w.view(&charter, "get_state").await?.json()?;
     let pv = st["policy_version"].as_u64().unwrap();
+    assert_eq!(st["setup_open"], false, "agent key closes setup");
+    assert_eq!(st["pending_changes"], 0, "first rules + key applied in one go");
+    let keys = w.view_access_keys(&charter).await?;
+    assert_eq!(keys.len(), 1, "exactly the agent key");
+    // after setup a widening change waits for the timelock
+    let r = alice.call(&charter, "set_clause").args_json(json!({"clause_id": "pay", "clause": native_clause(vec![merchant.id(), lookalike.id()], 100 * MILLI, 150 * MILLI)}))
+        .transact().await?;
+    let q: Value = r.json()?;
+    assert!(q["queued"].is_string() && q["eta"].is_string(), "queued with a change id and eta: {q}");
+    let st2: Value = w.view(&charter, "get_state").await?.json()?;
+    assert_eq!(st2["policy_version"].as_u64().unwrap(), pv, "queued change does not touch the live policy");
 
     let mut nonce = 0u64;
     // refused: look-alike payee
@@ -127,7 +148,9 @@ async fn factory_end_to_end() -> anyhow::Result<()> {
     assert_eq!(out["decision"], "denied"); println!("DENY over cap -> {}", out["reason"]);
     // allowed, then split-under-cap blows the daily budget
     let m0 = merchant.view_account().await?.balance;
-    let r = propose(&agent, &charter, pv, &mut nonce, merchant.id(), 90 * MILLI, "invoice-1").await?;
+    // the shared runner signs with 30 Tgas: an allowed payment must settle with that
+    let r = propose_gas(&agent, &charter, pv, &mut nonce, merchant.id(), 90 * MILLI, "task:t:coffee-run", 30).await?;
+    assert!(r.is_success(), "{:?}", r.failures());
     let out: Value = r.json()?;
     assert_ne!(out["decision"], "denied", "{out}");
     let m1 = merchant.view_account().await?.balance;
@@ -136,13 +159,25 @@ async fn factory_end_to_end() -> anyhow::Result<()> {
     let out: Value = r.json()?;
     assert_eq!(out["decision"], "denied"); println!("DENY split -> {}", out["reason"]);
 
-    // 5. failure paths
+    // 5. a charter with a custom delay and a DAO
+    let dao = root.create_subaccount("dao").initial_balance(NearToken::from_near(5)).transact().await?.into_result()?;
+    let r = alice.call(factory.id(), "create_charter").args_json(json!({"name": "alice-dao", "policy_delay_ns": "600000000000", "dao": dao.id()}))
+        .deposit(NearToken::from_yoctonear(NEAR)).gas(Gas::from_tgas(120)).transact().await?;
+    assert!(r.is_success(), "{:?}", r.failures());
+    let c2: AccountId = format!("alice-dao.{}", factory.id()).parse()?;
+    let st: Value = w.view(&c2, "get_state").await?.json()?;
+    assert_eq!(st["policy_delay_ns"], "600000000000"); assert_eq!(st["dao"], dao.id().to_string());
+    let r = alice.call(factory.id(), "create_charter").args_json(json!({"name": "alice-zero", "policy_delay_ns": "0"}))
+        .deposit(NearToken::from_yoctonear(NEAR)).gas(Gas::from_tgas(120)).transact().await?;
+    assert!(r.is_failure(), "zero delay must fail");
+
+    // 6. failure paths
     let r = create(&alice, &factory, "alice-shop", NEAR).await?;
     assert!(r.is_failure(), "taken name must fail");
     let r = create(&alice, &factory, "cheap", 100 * MILLI).await?;
     assert!(r.is_failure(), "low deposit must fail");
     let r = outsider.call(factory.id(), "on_created")
-        .args_json(json!({"charter": "x.charters.test.near", "owner": outsider.id(), "deposit": "1"})).transact().await?;
+        .args_json(json!({"charter": "x.charters.test.near", "owner": outsider.id(), "deposit": "1", "policy_delay_ns": "600000000000", "dao": null})).transact().await?;
     assert!(r.is_failure(), "callback must be private");
     // account exists already (pre-made by someone else) -> callback refunds the whole deposit
     let squat = factory_acct.create_subaccount("squat").initial_balance(NearToken::from_near(1)).transact().await?.into_result()?;
@@ -154,7 +189,7 @@ async fn factory_end_to_end() -> anyhow::Result<()> {
     let isc: bool = factory.view("is_charter").args_json(json!({"account_id": squat.id()})).await?.json()?;
     assert!(!isc);
     let mine: Value = factory.view("charters_of").args_json(json!({"owner": alice.id()})).await?.json()?;
-    assert_eq!(mine.as_array().unwrap().len(), 1);
+    assert_eq!(mine.as_array().unwrap().len(), 2);
     println!("STEP refund ok, gas only {} yN", b0 - b1);
     Ok(())
 }
