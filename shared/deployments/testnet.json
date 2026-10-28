@@ -168,12 +168,12 @@
     }
   },
   "vault": {
-    "release": "R15",
-    "factory": "nccharters-85831.testnet",
-    "code_hash": "FaheXbWkhFnsJaxhKksACWnLhFEVQUx5dTWk5CqkigF9",
-    "code_source": "contracts/artifacts/oath.r15.wasm (reproducible build of commit 4d4d0471, sha256 d8a5be4fed5868d092fed8e9aaa6b25f288a8863adcd18a9f405376fb3ea8788)",
+    "release": "R16",
+    "factory": "nccharters-53681.testnet",
+    "code_hash": "AWw8zu6mcbkdmTf49wPB2BdXEUjbbWKVHAfjfiQho89r",
+    "code_source": "contracts/artifacts/oath.r16.oz.wasm = binaryen 133 `wasm-opt -Oz` of contracts/artifacts/oath.r16.wasm (reproducible build of commit 5099a7c, sha256 3a65b00c5112d375cc5b492f05570b7e574a7a2d0dfb0506f04116ccb4a84d46); -Oz sha256 8d643d5e48fef54421006ad48b7693f6340be2787928d4f64224b866284ea64d, 367202 bytes",
     "factory_sha256": "181ed629e9da61bde286e266cde7896287a648490549e6381ff589aed2c00e96",
-    "factory_artifact": "contracts/artifacts/charter_factory.r15.wasm",
+    "factory_artifact": "contracts/artifacts/charter_factory.r15.wasm (factory source unchanged; only the pinned code_hash differs)",
     "factory_full_access_keys": 0,
     "min_deposit": "300000000000000000000000",
     "policy_delay": {
@@ -182,22 +182,59 @@
       "max_ns": "2592000000000000"
     },
     "arena": {
-      "charter": "arena.nccharters-85831.testnet",
-      "owner": "ncarena-85831.testnet",
+      "charter": "arena.nccharters-53681.testnet",
+      "owner": "ncarena-53681.testnet",
       "merchants": [
         "cafe.ncpub-17102.testnet",
         "books.ncpub-17102.testnet"
       ]
     },
+    "redteam": {
+      "charter": "redteam.nccharters-53681.testnet",
+      "owner": "ncarena-53681.testnet",
+      "purpose": "H14/H15 exploit replays on a factory-made R16 charter"
+    },
+    "proof": "judges/proofs/r16-factory.json",
     "proof_txs": {
-      "oath_deployed_as_global_by_hash": "3bzL8MffXkjo765J16pQictrdKSyjtDyuYmTDph2hoBp",
-      "factory_deploy_init": "BBtEhMhrZzR3yHgRHQ7VQRKmafYwvRJL9ShDitfHPAdL",
-      "factory_full_access_key_deleted": "3b9aZpwL9hT2XZW2hozKn5RFZTrp1AP4ymUq4876mQrT",
-      "arena_charter_created_by_factory": "Btk7LooZEn8DcSPtvXdzQBPdGe7jXP2TZx7mRwDEzqFa",
-      "arena_set_clause_in_setup_window": "9jaH5gHdtox5n2sGNmXYmtjENtm8trtFMGJpy5onJsfD",
-      "arena_set_agent_key_closes_setup": "51Hokt12oQFpBo8MAUMGr6p8WUCZhdTDur7HBQjLxQF7"
+      "oath_deployed_as_global_by_hash": "HjtqV8X6GZgc7zNp1Me2G6fqN5DBemD1fj7o2mY4ZXaM",
+      "factory_deploy_init": "DSLDca13SWjnquvfJ6aGYCwJBusNCn5xMrgvhZf2tSqx",
+      "factory_full_access_key_deleted": "B8cW1TrFSPjmFQ6dzU2Sd9yetRhKDyQa1ZdiXbF9SA9F",
+      "arena_charter_created_by_factory": "912H2oZ5AL6kiG2eXEyHkCs8eLGRGE4TyCz5ia9kPp4L",
+      "arena_set_clause_in_setup_window": "AT8R9VTtcmgMceBaKsbzsum6GJDVPBnPwkRY4hNB4mPs",
+      "arena_set_agent_key_closes_setup": "E6D8o6CQRfvncTJpSsXmkMCoH5ZJ5bEE9E8wsdvHxUxP",
+      "redteam_charter_created_by_factory": "2bW63Yjb3rZGzdXi62WzYxVnKWmxFDDKKGp9BniPVRLv",
+      "h14_low_gas": "96WKCBh1ST6gAaN6VyCkQFd6VQm2Vt1g49Pif74yN76s",
+      "h14_control": "Rmorj4ZAUeSdbssxNrpMCKau96DkLWSSsFp23iRL1Wr",
+      "h15_below_min": "BjyTxDJNS2oUExBjjYCC5UecqRWwDoGM6yCqu5gnmbfk",
+      "h15_over_daily_action_count": "5WMXzkNfRPGpZkEP5Z5RZq7b1pYxjNmNdHrwybSjpav7",
+      "h15_storage_reserve_low": "7dZSt6iVCViMX92LhxfeyFvZH1koG5HGXkcx68PkMKaW"
     },
     "legacy": [
+      {
+        "release": "R15",
+        "factory": "nccharters-85831.testnet",
+        "code_hash": "FaheXbWkhFnsJaxhKksACWnLhFEVQUx5dTWk5CqkigF9",
+        "code_source": "contracts/artifacts/oath.r15.wasm (reproducible build of commit 4d4d0471, sha256 d8a5be4fed5868d092fed8e9aaa6b25f288a8863adcd18a9f405376fb3ea8788)",
+        "factory_sha256": "181ed629e9da61bde286e266cde7896287a648490549e6381ff589aed2c00e96",
+        "factory_artifact": "contracts/artifacts/charter_factory.r15.wasm",
+        "arena": {
+          "charter": "arena.nccharters-85831.testnet",
+          "owner": "ncarena-85831.testnet",
+          "merchants": [
+            "cafe.ncpub-17102.testnet",
+            "books.ncpub-17102.testnet"
+          ]
+        },
+        "proof_txs": {
+          "oath_deployed_as_global_by_hash": "3bzL8MffXkjo765J16pQictrdKSyjtDyuYmTDph2hoBp",
+          "factory_deploy_init": "BBtEhMhrZzR3yHgRHQ7VQRKmafYwvRJL9ShDitfHPAdL",
+          "factory_full_access_key_deleted": "3b9aZpwL9hT2XZW2hozKn5RFZTrp1AP4ymUq4876mQrT",
+          "arena_charter_created_by_factory": "Btk7LooZEn8DcSPtvXdzQBPdGe7jXP2TZx7mRwDEzqFa",
+          "arena_set_clause_in_setup_window": "9jaH5gHdtox5n2sGNmXYmtjENtm8trtFMGJpy5onJsfD",
+          "arena_set_agent_key_closes_setup": "51Hokt12oQFpBo8MAUMGr6p8WUCZhdTDur7HBQjLxQF7"
+        },
+        "note": "R15 factory (setup-window oath). Read-only: its charters and arena rows still verify; new charters use R16."
+      },
       {
         "release": "R14",
         "factory": "nccharters-17102.testnet",
@@ -246,7 +283,7 @@
     ],
     "policy_delay_s": 90,
     "clause": "pay",
-    "note": "R16 oath: atomic agent-key rotation (old key deleted in the AddKey receipt), clause expiry, and on-chain reputation from its own refusals. Deployed in one batch with no full-access key. Factory charters still use R15.",
+    "note": "R16 oath: atomic agent-key rotation (old key deleted in the AddKey receipt), clause expiry, and on-chain reputation from its own refusals. Deployed in one batch with no full-access key. Factory charters use R16 (vault.factory, the -Oz build of the same commit).",
     "reads": {
       "reputation": "/api/charter/r16oath.r14own-46135.testnet/reputation",
       "rules": "/api/charter/r16oath.r14own-46135.testnet/rules/pay"
