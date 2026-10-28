@@ -191,3 +191,11 @@ details.rc summary::-webkit-details-marker { display: none; }
 details.rc[open] summary { display: none; }
 .amt { box-sizing: border-box; width: 100%; max-width: 100%; margin-top: 8px; }
 body:not(.in-shop) #wallet { display: none; }
+/* Guardhouse payee check and Mist Bank TEE panel */
+.hidden-line { font: 400 11px/15px ui-monospace, Menlo, monospace; color: var(--no); background: color-mix(in srgb, var(--no) 8%, transparent); border: 1px dashed color-mix(in srgb, var(--no) 45%, transparent); border-radius: 6px; padding: 4px 6px; }
+.v-block { color: var(--no); } .v-warn { color: var(--accent); } .v-allow { color: var(--ok); }
+.feed.checks li, .feed.tee li { grid-template-columns: 56px 1fr auto; }
+.tee-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ok); letter-spacing: .04em; text-transform: uppercase; }
+.tee-badge.no { color: var(--no); }
+.tee-btn { background: none; border: 0; padding: 4px 0; cursor: pointer; color: var(--accent); font: 600 12px Inter, system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; }
+.tee-btn:disabled { color: var(--muted); cursor: progress; }

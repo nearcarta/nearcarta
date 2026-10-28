@@ -20,6 +20,15 @@ function ruleChip() {
 }
 const wallet = () => { const w = $('#wallet'); if (!w) return; w.textContent = A.S.me ? short(A.S.me, 10, 8) : 'Connect wallet'; w.classList.toggle('on', !!A.S.me); };
 
+// Mist Bank: the NEAR AI TEE attestation behind the seal, one row per check (A.teeCheck → /api/ai/tee → backend/src/tee.js).
+function teePanel(t) {
+  if (!t) return `<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Verify the TEE now ↗</button>`;
+  const when = t.at ? new Date(t.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  return `<div data-testid="tee-panel"><p class="tee-badge ${t.ok ? '' : 'no'}" data-testid="tee-badge">${t.ok ? '✓ Verified' : '✕ Not verified'} · NEAR AI TEE${t.model ? ' · ' + esc(t.model) : ''}${when ? ' · ' + esc(when) : ''}</p>
+    <ol class="feed tee">${(t.rows || []).map(([k, ok, d]) => `<li class="${ok ? 'ok' : 'no'}"><span>${ok ? '✓ pass' : '✕ fail'}</span><span>${esc(k)}</span><span>${esc(d)}</span></li>`).join('')}${t.err ? `<li class="no"><span>error</span><span>${esc(String(t.err).slice(0, 80))}</span><span></span></li>` : ''}</ol>
+    <button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Check again with a new nonce ↗</button></div>`;
+}
+
 // ---------- shop apps ----------
 const APPS = {
   toll: {
@@ -46,26 +55,46 @@ const APPS = {
   },
   bank: {
     label: 'Mist Bank · private send', idle: 'Tell me the amount. I\u2019ll show only its seal.',
-    form: () => `<label class="amt"><input id="m-amt" type="number" min="0.001" step="0.001" value="${esc(extra.amt || '0.03')}"><span>NEAR, hidden</span></label>`,
-    bind: () => { $('#m-amt').oninput = e => { extra.amt = e.target.value; }; },
+    form: () => `<label class="amt"><input id="m-amt" type="number" min="0.001" step="0.001" value="${esc(extra.amt || '0.03')}"><span>NEAR, hidden</span></label>` + teePanel(extra.tee),
+    bind: () => { $('#m-amt').oninput = e => { extra.amt = e.target.value; }; const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Checking the TEE…'; try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } form(APPS.bank.form()); APPS.bank.bind(); }; },
     btn: () => extra.sent ? 'Verify the seal' : 'Send privately',
     hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(extra.sent.commitment.slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
     run: async () => {
       if (extra.sent) { const v = await A.mistVerify(); extra.sent = null; return { keep: true, kind: v.match ? 'ok' : 'no', say: v.match ? 'Seal matches the chain. Amount still hidden.' : 'Seal does not match.', rc: A.txLine(v.tx, 'on-chain memo') }; }
       const o = await A.mist(Number(extra.amt || 0.03));
-      if (o.decision === 'allowed') extra.sent = o;
-      return { o, keep: o.decision === 'allowed', hero: o.decision === 'allowed' ? APPS.bank.hero() : null, say: o.decision === 'allowed' ? `TEE checked the seal. Approved under the ${o.bucket} ceiling.` : `Refused: ${A.why(o.reason)}.`, rc: `<span class="rc">TEE checked · ZEC payout: mainnet only</span>` + A.txLine(o.tx) };
+      extra.tee = o.tee; if (o.decision === 'allowed') extra.sent = o;
+      return { o, keep: o.decision === 'allowed', hero: o.decision === 'allowed' ? APPS.bank.hero() : null, say: o.decision === 'allowed' ? `TEE checked the seal. Approved under the ${o.bucket} ceiling.` : `Refused: ${A.why(o.reason)}.`, rc: `<span class="rc">${o.tee?.ok ? 'TEE verified' : 'TEE checked'} · ZEC payout: mainnet only</span>` + A.txLine(o.tx) };
     },
   },
   guard: {
-    label: 'Guardhouse · pick an attack', idle: 'Pick a trick. I\u2019ll try it on your charter.',
-    form: () => `<div class="seg" role="radiogroup">${A.attacks().filter(a => A.GUARD_ATTACKS.includes(a.id)).map((a, i) => `<label><input type="radio" name="atk" value="${a.id}" ${a.id === (extra.atk || 'fake-invoice') ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>`,
-    bind: () => { for (const i of document.querySelectorAll('input[name=atk]')) i.onchange = () => { extra.atk = i.value; }; },
-    btn: 'Try to trick my agent',
+    label: 'Guardhouse · pick an attack', idle: 'Pick a trick. I\u2019ll check the payee before I sign.',
+    form: () => {
+      const pick = `<div class="seg" role="radiogroup">${A.attacks().filter(a => A.GUARD_ATTACKS.includes(a.id)).map(a => `<label><input type="radio" name="atk" value="${a.id}" ${a.id === (extra.atk || 'poisoned-invoice') ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>`;
+      const inv = (extra.atk || 'poisoned-invoice') === 'poisoned-invoice' && !extra.chk ? (() => { const v = A.poisonedInvoice(); return `<p class="goal" data-testid="invoice">${esc(v.shown)}</p><p class="hidden-line" data-testid="hidden-line">hidden: ${esc(v.hidden)}</p>`; })() : '';
+      const c = extra.chk;
+      const chk = c ? `<p class="goal" data-testid="check-verdict">Payee check · ${esc(short(c.account, 14, 10))} · <b class="v-${c.verdict}">${c.verdict.toUpperCase()}</b></p>
+        <ol class="feed checks" data-testid="check-reasons">${(c.reasons.length ? c.reasons : [{ level: 'allow', code: 'ok', text: 'on your list and paid before' }]).map(r => `<li class="${r.level === 'allow' ? 'ok' : 'no'}"><span>${esc(r.level)}</span><span>${esc(r.text)}</span>${r.evidence?.[0] ? A.txLine(r.evidence[0], 'evidence') : '<span></span>'}</li>`).join('')}</ol>` : '';
+      return pick + inv + chk;
+    },
+    bind: () => { for (const i of document.querySelectorAll('input[name=atk]')) i.onchange = () => { extra.atk = i.value; extra.chk = null; paint(); }; },
+    btn: () => !extra.chk ? 'Try to trick my agent' : extra.chk.verdict === 'block' ? 'Let it knock anyway' : extra.chk.verdict === 'warn' ? 'I checked. Ask the charter' : 'Ask the charter',
     run: async () => {
-      const r = await A.attack(extra.atk || 'fake-invoice', 'guard'); const s = r.steps.at(-1) || {};
+      const id = extra.atk || 'poisoned-invoice';
+      if (!extra.chk) {
+        const p = await A.trickPlan(id); const c = await A.checkPayee(p.receiver); extra.chk = c;
+        if (c.verdict === 'allow') return APPS.guard.send(id);
+        const first = c.reasons.find(r => r.level === c.verdict) || c.reasons[0];
+        return { keep: true, kind: 'ok', say: c.verdict === 'block' ? `Stopped before signing: ${esc(first.text)}.` : `Wait: ${esc(first.text)}. Your call.`,
+          rule: c.verdict === 'block' ? 'payee check · blocked, nothing signed' : 'payee check · needs you', rc: '<span class="rc">checked off chain: deny list, account age, code changes, your past payments</span>' };
+      }
+      return APPS.guard.send(id);
+    },
+    send: async id => {
+      const was = extra.chk?.verdict; extra.chk = null;
+      const r = await A.trickSend(id); const s = r.steps.at(-1) || {};
       if (r.refused && sh?.act && runScene) runScene(sh.act());
-      return { o: { decision: r.refused ? 'denied' : s.decision, reason: r.reason, tx: s.tx }, say: r.refused ? `Blocked: ${A.why(r.reason)}.` : 'It got through. Tighten your rules.' };
+      const two = was === 'block' && r.refused;
+      return { o: { decision: r.refused ? 'denied' : s.decision, reason: r.reason, tx: s.tx }, say: r.refused ? `${two ? 'Second wall: the charter' : 'Blocked:'} ${A.why(r.reason)}.` : 'It got through. Tighten your rules.' };
     },
   },
   arena: {
