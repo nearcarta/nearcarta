@@ -6,6 +6,9 @@
 const YOCTO = 10n ** 24n;
 const ACCOUNT_RE = /\b(?:[a-z\d]+[-_])*[a-z\d]+(?:\.(?:[a-z\d]+[-_])*[a-z\d]+)+\b/g;
 const AMOUNT_RE = /(\d+(?:\.\d{1,6})?|\.\d{1,6})\s*(near|Ⓝ|n\b)?/i;
+/** A scored request memo: ask:<nickname>:<note>. Older `ask:<note>` memos are not scored. */
+export const ASK_MEMO_RE = /^ask:([a-z0-9-]{1,20}):([a-z0-9-]{1,40})$/;
+const TAG_RE = /^[a-z0-9-]{1,20}$/;
 
 /** "0.0125" NEAR -> yocto string (up to 6 decimals). */
 export function nearToYocto(s) {
@@ -16,8 +19,9 @@ export function nearToYocto(s) {
 const label = r => r.split('.')[0].toLowerCase();
 const stems = r => { const l = label(r); return [...new Set([l, l.replace(/s$/, ''), l.replace(/-.*$/, '')])].filter(x => x.length >= 3); };
 
-/** Parse a request. Returns { receiver, amount, note, memo } or throws with a plain message. */
-export function parseAsk(text, receivers = []) {
+/** Parse a request. Returns { receiver, amount, note, memo } or throws with a plain message. The tag (nickname) labels the memo. */
+export function parseAsk(text, receivers = [], tag = 'mine') {
+  if (!TAG_RE.test(tag)) throw new Error('nickname: 1-20 of a-z 0-9 -');
   const t = String(text || '').trim().toLowerCase();
   if (!t) throw new Error('Type what the agent should pay, e.g. "pay the cafe 0.01 NEAR for coffee".');
   if (t.length > 200) throw new Error('Keep it under 200 characters.');
@@ -37,6 +41,6 @@ export function parseAsk(text, receivers = []) {
     receiver = receivers.find(r => stems(r).some(s => words.some(w => w === s || w.replace(/s$/, '') === s || (s.length >= 4 && w.startsWith(s))))) || null;
   }
   if (!receiver) throw new Error(`Name the payee: one of ${receivers.map(label).join(', ') || 'your allowlisted shops'}, or a full account id.`);
-  const slug = (note || 'payment').replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 40);
-  return { receiver, amount, note, memo: `ask:${slug}` };
+  const slug = (note || 'payment').replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 40) || 'payment';
+  return { receiver, amount, note, memo: `ask:${tag}:${slug}` };
 }

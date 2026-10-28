@@ -16,7 +16,7 @@ test('askPlan: plain words -> the unsigned proposal, nonce and policy from chain
   const p = await askPlan('pay the cafe 0.01 NEAR for coffee', 'x.testnet', { viewF, nowMs: 0 });
   assert.equal(p.parsed.receiver, merchant); // the arena cafe (first allowlisted 'cafe' account)
   assert.equal(p.proposal.amount, '10000000000000000000000');
-  assert.deepEqual([p.proposal.shop, p.proposal.clause_id, p.proposal.nonce, p.proposal.policy_version, p.proposal.memo], ['ask', 'pay', '7', 3, 'ask:coffee']);
+  assert.deepEqual([p.proposal.shop, p.proposal.clause_id, p.proposal.nonce, p.proposal.policy_version, p.proposal.memo], ['ask', 'pay', '7', 3, 'ask:mine:coffee']);
   assert.equal(p.on_allowlist, true);
 });
 

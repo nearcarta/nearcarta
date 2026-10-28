@@ -192,6 +192,27 @@ test('a stale nonce view never reuses a landed nonce', async () => {
   assert.deepEqual(sent, [20, 21]);
 });
 
+test('verifyAttempt scores an honest ask: allowed, settled ok, allowlisted, within the cap', async () => {
+  const k = c => fakeTx({ memo: 'ask:neo:team-coffee', decision: 'allowed', receiver: 'cafe.pub.testnet', amount: String(10n * M), settle: 'ok', ...c });
+  fresh();
+  const ok = await verifyAttempt(H, 'c.f.testnet', { status: async () => k(), facts, blockTime: async () => 1, clause: at });
+  assert.equal(ok.kind, 'ask'); assert.equal(ok.ask, 'team-coffee'); assert.equal(ok.tag, 'neo'); assert.equal(ok.counted, true, ok.why);
+  for (const [c, why] of [[{ decision: 'denied', reason: 'receiver_not_allowlisted', receiver: 'c4fe.pub.testnet' }, 'not_allowed'],
+    [{ receiver: 'someone.testnet' }, 'not_on_allowlist_or_over_cap'], [{ amount: String(51n * M) }, 'not_on_allowlist_or_over_cap'],
+    [{ settle: 'transfer_failed' }, 'payment_failed'], [{ memoHash: 'ff' }, 'memo_mismatch']]) {
+    fresh(); const r = await verifyAttempt(H, 'c.f.testnet', { status: async () => k(c), facts, blockTime: async () => 1, clause: at });
+    assert.equal(r.counted, false, JSON.stringify(c)); assert.equal(r.why, why, JSON.stringify(c));
+  }
+  fresh(); assert.equal(await verifyAttempt(H, 'c.f.testnet', { status: async () => k({ memo: 'ask:team-coffee' }), facts, clause: at }), null, 'old untagged ask memos are not scored');
+  fresh();
+});
+
+test('board counts one honest ask per player as an honest payment', () => {
+  const ask = (h, at) => ({ hash: h, charter: 'x', owner: 'o1', kind: 'ask', ask: 'coffee', tag: 'mine', decision: 'allowed', counted: true, shared: false, at });
+  const [p] = board([ask('a', 1), ask('b', 2), { ...ask('c', 3), counted: false, why: 'not_allowed', decision: 'denied' }]);
+  assert.equal(p.score, 1); assert.deepEqual(p.tasks, ['honest-ask']); assert.equal(p.tasks_passed, 2); assert.equal(p.not_counted, 1); assert.equal(p.max_score, 9);
+});
+
 test('board scores tasks passed plus scams blocked, counting only verified rows', () => {
   const rows = board([
     { hash: 'a', charter: 'x', owner: 'o1', kind: 'attack', attack: 'lookalike', tag: 't', decision: 'denied', counted: true, shared: false, at: 1 },
@@ -200,7 +221,7 @@ test('board scores tasks passed plus scams blocked, counting only verified rows'
     { hash: 'd', charter: 's', owner: 'arena', kind: 'attack', attack: 'impersonation', tag: 'neo', decision: 'denied', counted: false, why: 'wrong_reason', shared: true, server_signed: true, at: 4 },
     { hash: 'e', charter: 's', owner: 'arena', kind: 'attack', attack: 'slow-drain', tag: 'neo', decision: 'allowed', counted: false, shared: true, server_signed: true, at: 5 },
   ]);
-  assert.equal(rows[0].player, 'o1'); assert.equal(rows[0].score, 2); assert.equal(rows[0].max_score, 8); assert.equal(rows[0].verified, true);
+  assert.equal(rows[0].player, 'o1'); assert.equal(rows[0].score, 2); assert.equal(rows[0].max_score, 9); assert.equal(rows[0].verified, true);
   assert.equal(rows[1].player, 'neo'); assert.equal(rows[1].score, 1); assert.equal(rows[1].server_signed, true); assert.equal(rows[1].refusals, 1); assert.equal(rows[1].not_counted, 1);
 });
 
@@ -229,7 +250,9 @@ test('account ids', () => {
 
 test('parseAsk reads plain requests and names the payee', () => {
   const R = ['cafe.pub.testnet', 'books.pub.testnet'];
-  assert.deepEqual(parseAsk('Pay the cafe 0.01 NEAR for team coffee', R), { receiver: 'cafe.pub.testnet', amount: String(10n * M), note: 'team coffee', memo: 'ask:team-coffee' });
+  assert.deepEqual(parseAsk('Pay the cafe 0.01 NEAR for team coffee', R), { receiver: 'cafe.pub.testnet', amount: String(10n * M), note: 'team coffee', memo: 'ask:mine:team-coffee' });
+  assert.equal(parseAsk('pay the cafe 0.01 NEAR', R, 'neo').memo, 'ask:neo:payment');
+  assert.throws(() => parseAsk('pay the cafe 0.01 NEAR', R, 'Bad Nick'), /nickname/);
   assert.equal(parseAsk('send 0.02 to the bookshop', R).receiver, 'books.pub.testnet');
   assert.equal(parseAsk('pay book 0.005 near', R).amount, String(5n * M));
   // An account off the allowlist is parsed as asked: the charter, not the parser, refuses it.

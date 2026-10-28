@@ -21,7 +21,7 @@ import { ATTACKS, ATTACK_IDS, MEMO_RE, acceptedReasons, matchesPlan, pickClause,
 import { TASKS, TASK_IDS, TASK_MEMO_RE, matchesTask, planTask } from '../../shared/vault/tasks.js';
 import { keyFrom, sendPropose, rpcClient, viewFn, PROPOSE_TGAS } from '../../shared/vault/tx.js';
 import { runSteps, runTask, runAsk } from '../../shared/vault/run.js';
-import { parseAsk } from '../../shared/vault/ask.js';
+import { ASK_MEMO_RE, parseAsk } from '../../shared/vault/ask.js';
 
 export const V = DEP.vault || null;
 const ACCOUNT_RE = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -253,12 +253,12 @@ export async function askPlan(text, charter = null, { viewF = view, nowMs = Date
 }
 
 /** "Ask the agent to pay" on the SHARED arena charter: one server-signed `propose`, decided on chain. */
-export async function sharedAsk(text, { run = runAsk } = {}) {
+export async function sharedAsk(text, { run = runAsk, nickname = 'guest' } = {}) {
   if (!V) throw bad('vault not deployed', 503);
   const secret = agentSecret();
   if (!secret) throw bad('shared arena runner is off on this deployment (no agent key set)', 503);
   let q;
-  try { q = parseAsk(text, V.arena.merchants || []); } catch (e) { throw bad(e.message); }
+  try { q = parseAsk(text, V.arena.merchants || [], nickname || 'guest'); } catch (e) { throw bad(e.message); }
   return serial(async () => {
     const release = reserve(1);
     let used = 0;
@@ -320,6 +320,16 @@ export async function clauseAt(charter, clauseId, blockHash) {
 
 const sha256hex = s => createHash('sha256').update(s, 'utf8').digest('hex');
 
+/** An honest request counts when the charter allowed and settled it to an allowlisted payee within the clause limits. */
+export const HONEST_ASK = { id: 'honest-ask', name: 'Your own honest request', expects: 'allowed' };
+export function askWhy(a, cl, settle) {
+  if (a.decision !== 'allowed') return 'not_allowed';
+  let amt; try { amt = BigInt(a.amount); } catch { return 'not_on_allowlist_or_over_cap'; }
+  if (!(cl.receivers || []).includes(a.receiver) || amt > BigInt(cl.per_action_cap) || amt < BigInt(cl.min_amount ?? '1')) return 'not_on_allowlist_or_over_cap';
+  if (settle && settle.data[0].reason !== 'ok') return 'payment_failed';
+  return null;
+}
+
 /**
  * Re-read one tx from chain. Returns null when it is not an arena or task propose on a factory
  * charter running its audited oath; otherwise a row whose `counted` says whether it scores and
@@ -338,15 +348,16 @@ export async function verifyAttempt(hash, charter, { status = txStatus, facts = 
   let p;
   try { p = JSON.parse(Buffer.from(fc.args, 'base64').toString('utf8')).p; } catch { return null; }
   const memo = typeof p?.memo === 'string' ? p.memo : '';
-  const am = MEMO_RE.exec(memo), tm = TASK_MEMO_RE.exec(memo);
-  const kind = am && ATTACK_IDS.includes(am[2]) ? 'attack' : tm && TASK_IDS.includes(tm[2]) ? 'task' : null;
+  const am = MEMO_RE.exec(memo), tm = TASK_MEMO_RE.exec(memo), km = ASK_MEMO_RE.exec(memo);
+  const kind = am && ATTACK_IDS.includes(am[2]) ? 'attack' : tm && TASK_IDS.includes(tm[2]) ? 'task' : km ? 'ask' : null;
   if (!kind) return null;
   const { events } = eventsFromOutcome(tx);
   const ev = events.find(e => e.standard === 'oath' && e.event === 'action' && e.executor === charter);
   if (!ev) return null;
   const d = ev.data?.[0] || {};
-  const id = kind === 'attack' ? am[2] : tm[2];
-  const a = { hash, charter, owner: f.owner, kind, [kind]: id, tag: kind === 'attack' ? am[1] : tm[1],
+  const m = kind === 'attack' ? am : kind === 'task' ? tm : km;
+  const id = m[2];
+  const a = { hash, charter, owner: f.owner, kind, [kind]: id, tag: m[1],
     decision: d.decision, reason: d.reason || null, receiver: d.receiver ?? null, amount: d.amount ?? null, clause_id: d.clause_id ?? null,
     shared: isShared(charter), server_signed: isShared(charter), counted: false, why: null, at: null };
   if (kind === 'attack') a.expects = acceptedReasons(id);
@@ -371,6 +382,7 @@ export async function verifyAttempt(hash, charter, { status = txStatus, facts = 
     else if (!matchesTask(id, a, cl)) a.why = 'not_the_task_plan';
     else if (settle && settle.data[0].reason !== 'ok') a.why = 'payment_failed';
   }
+  if (!a.why && kind === 'ask') a.why = askWhy(a, cl, events.find(e => e.standard === 'oath' && e.event === 'settle' && e.executor === charter && e.data?.[0]?.action_id === d.action_id));
   a.counted = !a.why;
   const tb = tx.transaction_outcome?.block_hash;
   if (tb) a.at = await blockTime(tb);
@@ -437,19 +449,21 @@ export function board(list = [...attempts.values()]) {
       charters: new Set(), patterns: new Set(), tasks: new Set(), refusals: 0, tasks_passed: 0, attempts: 0, not_counted: 0, last_tx: null, last_at: 0 };
     p.attempts++; p.charters.add(a.charter);
     if (a.counted && a.kind === 'task') { p.tasks_passed++; p.tasks.add(a.task); }
+    else if (a.counted && a.kind === 'ask') { p.tasks_passed++; p.tasks.add(HONEST_ASK.id); }
     else if (a.counted) { p.refusals++; p.patterns.add(a.attack); }
-    else if (a.kind === 'task' || a.decision === 'denied') p.not_counted++;
+    else if (a.kind === 'task' || a.kind === 'ask' || a.decision === 'denied') p.not_counted++;
     if ((a.at || 0) >= p.last_at) { p.last_at = a.at || 0; p.last_tx = a.hash; }
     players.set(key, p);
   }
   return [...players.values()].map(p => ({ ...p, charters: [...p.charters], patterns: [...p.patterns].sort(), tasks: [...p.tasks].sort(),
-    pattern_count: p.patterns.size, task_count: p.tasks.size, score: p.patterns.size + p.tasks.size, max_score: ATTACKS.length + TASKS.length }))
+    pattern_count: p.patterns.size, task_count: p.tasks.size, score: p.patterns.size + p.tasks.size, max_score: ATTACKS.length + TASKS.length + 1 }))
     .sort((x, y) => y.score - x.score || y.pattern_count - x.pattern_count || y.refusals - x.refusals || x.last_at - y.last_at);
 }
 
 const RULE = 'Rows are final testnet propose txs on factory charters running their audited oath release, re-read from chain. ' +
   'An attack scores only if the contract refused it with the reason that attack targets, and its logged payee and amount match the attack plan under the clause in force at that block. ' +
-  'A task scores only if the contract allowed and settled the planned allowlisted payment. Memos are labels, never proof. ' +
+  'A task scores only if the contract allowed and settled the planned allowlisted payment. ' +
+  'One honest request of your own (memo ask:<nickname>:<note>) scores once per player if the contract allowed and settled it to a payee on the clause allowlist, within its cap. Memos are labels, never proof. ' +
   'Own-charter rows are keyed by the charter owner (verified); shared-charter rows are signed by this server\'s runner (server_signed) and keyed by nickname.';
 
 export async function leaderboard() {
@@ -467,15 +481,17 @@ export async function score(charter) {
   await cached('backfill', 20_000, () => backfill()).catch(() => null);
   const rows = [...attempts.values()].filter(r => r.charter === charter).sort((a, b) => (b.at || 0) - (a.at || 0));
   const best = pick => { const all = rows.filter(pick); const r = all.find(x => x.counted) || all[0]; return r ? { counted: r.counted, why: r.why, decision: r.decision, reason: r.reason, tx: r.hash, url: explorerTx(r.hash), tries: all.length } : null; };
-  const tasks = TASKS.map(t => ({ id: t.id, name: t.name, expects: 'allowed', result: best(r => r.kind === 'task' && r.task === t.id) }));
+  const tasks = [...TASKS.map(t => ({ id: t.id, name: t.name, expects: 'allowed', result: best(r => r.kind === 'task' && r.task === t.id) })),
+    { ...HONEST_ASK, result: best(r => r.kind === 'ask') }];
   const attacks = ATTACKS.map(x => ({ id: x.id, name: x.name, expects: acceptedReasons(x.id), result: best(r => r.kind === 'attack' && r.attack === x.id && r.decision === 'denied') }));
   const passed = tasks.filter(t => t.result?.counted).length, blocked = attacks.filter(a => a.result?.counted).length;
-  return { charter, shared: isShared(charter), tasks_passed: passed, scams_blocked: blocked, score: passed + blocked, max_score: TASKS.length + ATTACKS.length, tasks, attacks, rule: RULE };
+  return { charter, shared: isShared(charter), tasks_passed: passed, scams_blocked: blocked, score: passed + blocked, max_score: tasks.length + ATTACKS.length, tasks, attacks, rule: RULE };
 }
 
 /** Catalog of tasks and attacks; with a charter, the exact steps each would sign right now. */
 export async function catalog(charter) {
-  const out = { tasks: TASKS, attacks: ATTACKS.map(a => ({ ...a, accepts: acceptedReasons(a.id) })), memo: { task: 'task:<nickname>:<task-id>', attack: 'arena:<nickname>:<attack-id>' },
+  const out = { tasks: TASKS, attacks: ATTACKS.map(a => ({ ...a, accepts: acceptedReasons(a.id) })), memo: { task: 'task:<nickname>:<task-id>', attack: 'arena:<nickname>:<attack-id>', ask: 'ask:<nickname>:<note>' },
+    honest_ask: HONEST_ASK,
     order: 'Run the tasks first: attacks spend the daily budget and action count, after which an honest task is refused too.' };
   if (!charter) return out;
   if (!isAccount(charter)) throw bad('bad account id');
@@ -517,7 +533,7 @@ export function register(app, { limiter, globalCap }) {
   });
   app.post('/api/vault/ask', limiter(6), globalCap('vault-attack', 30), async c => {
     const b = await c.req.json().catch(() => ({}));
-    return c.json(await sharedAsk(String(b.text || '')));
+    return c.json(await sharedAsk(String(b.text || ''), { nickname: String(b.nickname || '').toLowerCase() || 'guest' }));
   });
   app.post('/api/vault/record', limiter(30), async c => {
     const b = await c.req.json().catch(() => ({}));
