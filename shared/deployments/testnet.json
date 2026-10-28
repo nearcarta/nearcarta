@@ -50,8 +50,18 @@
       "gift_nft_refused": "8uiZJJhcnPvpYz289ZdFDYuQxv3sGvjMGFbrXKUVRnBR",
       "bounty_solved": "Gt4AaoqmpPWwd9kgLEdhsFtxAJ45CXoHsspCdcWdvAGY",
       "sell_mid_payout_refused": "3frX2RwkuqQb4BY9ka9C3436xXCam72euNLK3fmhV1en",
-      "season_close": "614BiQmKEjnamR1ZJMkfgwPEn9e7jAxUa3XgvNv7srq5"
-    }
+      "season_close": "614BiQmKEjnamR1ZJMkfgwPEn9e7jAxUa3XgvNv7srq5",
+      "scam_fake_invoice_refused": "3YY2fuD1uZeHvTYt3kZMeXgnF2PsN4vuYfDC2DSZEuHF",
+      "scam_injected_recipient_refused": "J1gXQC4aceKn9Ttm9i28EoDAxERzHkqhfQRGWcpWFQZQ",
+      "scam_authority_urgency_refused": "D7TKcU5LK6fCgMEHypegqhn1WGLUCQ8Exigmy9VZpHnt",
+      "scam_lookalike_refused": "TNCp754ADywpUCYqeZDfkcv1FTzVwkhWEzg2kC2JvQ4",
+      "scam_split_under_cap_refused": "FpfccoSPEaoo3qzcp15FoJhh5kPoXnGvLyHxH4KJZeH8",
+      "scam_repeat_drain_refused": "4qH1zbrWNXeJ4pscPiVpaZg9eW666jLsTA9o9hLSZZ8Z"
+    },
+    "scam_guardians": [
+      "scam1",
+      "scam2"
+    ]
   },
   "toll": {
     "oath": "oath.r4csmvr86zk4.testnet",
