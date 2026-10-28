@@ -1,0 +1,340 @@
+{
+ "note": "R16 oath as the charter factory's global code, testnet only. Times are Cairo (UTC+3), 28 Oct 2026. Every claim was re-read from testnet RPC afterwards (recheck below); explorer pages can lag behind RPC. cargo-mutants: 1 oath timeout, counted as caught by verify.sh.",
+ "source": {
+  "commit": "5099a7c",
+  "reproducible_build": "cargo near build reproducible-wasm (sourcescan/cargo-near:0.22.0-rust-1.99.1), independent rebuild sha256 == contracts/artifacts/oath.r16.wasm",
+  "oath.r16.wasm": {
+   "sha256": "3a65b00c5112d375cc5b492f05570b7e574a7a2d0dfb0506f04116ccb4a84d46",
+   "bytes": 370342
+  }
+ },
+ "lean_artifact": {
+  "file": "contracts/artifacts/oath.r16.oz.wasm",
+  "how": "binaryen version_133 wasm-opt -Oz --enable-nontrapping-float-to-int --enable-bulk-memory contracts/artifacts/oath.r16.wasm (deterministic; re-run inside the recheck)",
+  "binaryen_tarball_sha256": "2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489",
+  "sha256": "8d643d5e48fef54421006ad48b7693f6340be2787928d4f64224b866284ea64d",
+  "bytes": 367202,
+  "code_hash": "AWw8zu6mcbkdmTf49wPB2BdXEUjbbWKVHAfjfiQho89r"
+ },
+ "factory": {
+  "account": "nccharters-53681.testnet",
+  "wasm": "contracts/artifacts/charter_factory.r15.wasm (factory source unchanged since R15)",
+  "sha256": "181ed629e9da61bde286e266cde7896287a648490549e6381ff589aed2c00e96",
+  "global_code_hash": "AWw8zu6mcbkdmTf49wPB2BdXEUjbbWKVHAfjfiQho89r",
+  "full_access_keys": 0,
+  "replaces": "nccharters-85831.testnet (R15, kept in deployments vault.legacy)"
+ },
+ "charters": {
+  "arena": "arena.nccharters-53681.testnet",
+  "redteam": "redteam.nccharters-53681.testnet",
+  "merchants": [
+   "cafe.ncpub-17102.testnet",
+   "books.ncpub-17102.testnet"
+  ]
+ },
+ "steps": [
+  {
+   "time_cairo": "08:35:28",
+   "step": "consolidate ncfund1-53681.testnet -> publisher",
+   "status": "OK",
+   "gas_tgas": 0.67,
+   "tx": "AmynDAGy2CWxewSuLJkA4xuKWQSgJZbJ394eAm7SH8L",
+   "url": "https://testnet.nearblocks.io/txns/AmynDAGy2CWxewSuLJkA4xuKWQSgJZbJ394eAm7SH8L"
+  },
+  {
+   "time_cairo": "08:35:38",
+   "step": "consolidate ncfund2-53681.testnet -> publisher",
+   "status": "OK",
+   "gas_tgas": 0.67,
+   "tx": "DZzo8hDtsJNggg6ohd3SGZxnzrZfxUiJJ4GGEpFXFMU5",
+   "url": "https://testnet.nearblocks.io/txns/DZzo8hDtsJNggg6ohd3SGZxnzrZfxUiJJ4GGEpFXFMU5"
+  },
+  {
+   "time_cairo": "08:35:47",
+   "step": "consolidate ncfund3-53681.testnet -> publisher",
+   "status": "OK",
+   "gas_tgas": 0.67,
+   "tx": "8wKfKDiBdAuGM3tdSVBnH9KHqajAN1bTeU4vYY58adQo",
+   "url": "https://testnet.nearblocks.io/txns/8wKfKDiBdAuGM3tdSVBnH9KHqajAN1bTeU4vYY58adQo"
+  },
+  {
+   "time_cairo": "08:35:56",
+   "step": "consolidate ncfund4-53681.testnet -> publisher",
+   "status": "OK",
+   "gas_tgas": 0.67,
+   "tx": "CKwDv5G2ngK7ZznkGbXLAT4HEb1Fdtw8NpkDPKuBpJxX",
+   "url": "https://testnet.nearblocks.io/txns/CKwDv5G2ngK7ZznkGbXLAT4HEb1Fdtw8NpkDPKuBpJxX"
+  },
+  {
+   "time_cairo": "08:36:05",
+   "step": "deploy-as-global r16 oath (by hash)",
+   "status": "OK",
+   "gas_tgas": 29.01,
+   "tx": "HjtqV8X6GZgc7zNp1Me2G6fqN5DBemD1fj7o2mY4ZXaM",
+   "url": "https://testnet.nearblocks.io/txns/HjtqV8X6GZgc7zNp1Me2G6fqN5DBemD1fj7o2mY4ZXaM"
+  },
+  {
+   "time_cairo": "08:36:09",
+   "step": "deploy factory + new(code_hash)",
+   "status": "OK",
+   "gas_tgas": 14.7,
+   "tx": "DSLDca13SWjnquvfJ6aGYCwJBusNCn5xMrgvhZf2tSqx",
+   "url": "https://testnet.nearblocks.io/txns/DSLDca13SWjnquvfJ6aGYCwJBusNCn5xMrgvhZf2tSqx"
+  },
+  {
+   "time_cairo": "08:36:12",
+   "step": "delete factory full-access key (factory locked)",
+   "status": "OK",
+   "gas_tgas": 0.63,
+   "tx": "B8cW1TrFSPjmFQ6dzU2Sd9yetRhKDyQa1ZdiXbF9SA9F",
+   "url": "https://testnet.nearblocks.io/txns/B8cW1TrFSPjmFQ6dzU2Sd9yetRhKDyQa1ZdiXbF9SA9F"
+  },
+  {
+   "time_cairo": "08:36:27",
+   "step": "create shared arena charter via factory (default timelock)",
+   "status": "OK true",
+   "gas_tgas": 15.79,
+   "tx": "912H2oZ5AL6kiG2eXEyHkCs8eLGRGE4TyCz5ia9kPp4L",
+   "url": "https://testnet.nearblocks.io/txns/912H2oZ5AL6kiG2eXEyHkCs8eLGRGE4TyCz5ia9kPp4L"
+  },
+  {
+   "time_cairo": "08:36:32",
+   "step": "arena set_clause pay",
+   "status": "OK {\"applied\":true,\"policy_version\":2}",
+   "gas_tgas": 2.38,
+   "tx": "AT8R9VTtcmgMceBaKsbzsum6GJDVPBnPwkRY4hNB4mPs",
+   "url": "https://testnet.nearblocks.io/txns/AT8R9VTtcmgMceBaKsbzsum6GJDVPBnPwkRY4hNB4mPs"
+  },
+  {
+   "time_cairo": "08:36:37",
+   "step": "arena set_agent_key (propose-only)",
+   "status": "OK true",
+   "gas_tgas": 5.73,
+   "tx": "E6D8o6CQRfvncTJpSsXmkMCoH5ZJ5bEE9E8wsdvHxUxP",
+   "url": "https://testnet.nearblocks.io/txns/E6D8o6CQRfvncTJpSsXmkMCoH5ZJ5bEE9E8wsdvHxUxP"
+  },
+  {
+   "time_cairo": "08:36:43",
+   "step": "create redteam charter via factory",
+   "status": "OK true",
+   "gas_tgas": 15.82,
+   "tx": "2bW63Yjb3rZGzdXi62WzYxVnKWmxFDDKKGp9BniPVRLv",
+   "url": "https://testnet.nearblocks.io/txns/2bW63Yjb3rZGzdXi62WzYxVnKWmxFDDKKGp9BniPVRLv"
+  },
+  {
+   "time_cairo": "08:36:47",
+   "step": "redteam set_clause tip (cap 0.1, min 0.001, max 3/day)",
+   "status": "OK {\"applied\":true,\"policy_version\":2}",
+   "gas_tgas": 2.36,
+   "tx": "JoDtn8eyNVGMSxAtxSgGNhLQpVGEGQThwPMq4L59RTA",
+   "url": "https://testnet.nearblocks.io/txns/JoDtn8eyNVGMSxAtxSgGNhLQpVGEGQThwPMq4L59RTA"
+  },
+  {
+   "time_cairo": "08:36:51",
+   "step": "redteam set_clause big (cap 1000; the reserve is the guard)",
+   "status": "OK {\"applied\":true,\"policy_version\":3}",
+   "gas_tgas": 2.39,
+   "tx": "CaMp9oHMNC4ezH1J6gPWwPchKdWVtuyJjr6WDZNhEUU5",
+   "url": "https://testnet.nearblocks.io/txns/CaMp9oHMNC4ezH1J6gPWwPchKdWVtuyJjr6WDZNhEUU5"
+  },
+  {
+   "time_cairo": "08:36:57",
+   "step": "redteam set_agent_key (propose-only)",
+   "status": "OK true",
+   "gas_tgas": 5.7,
+   "tx": "8taTLXobMKZivPcJYgwwZrQ1DwvHWh9g3SmL6TMobeXD",
+   "url": "https://testnet.nearblocks.io/txns/8taTLXobMKZivPcJYgwwZrQ1DwvHWh9g3SmL6TMobeXD"
+  },
+  {
+   "time_cairo": "08:37:01",
+   "step": "H14 propose 0.01 NEAR with 12 Tgas (floor 25)",
+   "status": "FAILURE {\"ActionError\": {\"index\": 0, \"kind\": {\"FunctionCallError\": {\"ExecutionError\": \"Smart contract panicked: ERR_LOW_GAS\"}}}}",
+   "gas_tgas": 2.19,
+   "tx": "96WKCBh1ST6gAaN6VyCkQFd6VQm2Vt1g49Pif74yN76s",
+   "url": "https://testnet.nearblocks.io/txns/96WKCBh1ST6gAaN6VyCkQFd6VQm2Vt1g49Pif74yN76s"
+  },
+  {
+   "time_cairo": "08:37:06",
+   "step": "H14 control: same proposal with 30 Tgas",
+   "status": "OK {\"action_id\":\"0\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}",
+   "gas_tgas": 6.7,
+   "tx": "Rmorj4ZAUeSdbssxNrpMCKau96DkLWSSsFp23iRL1Wr",
+   "url": "https://testnet.nearblocks.io/txns/Rmorj4ZAUeSdbssxNrpMCKau96DkLWSSsFp23iRL1Wr"
+  },
+  {
+   "time_cairo": "08:37:10",
+   "step": "H15 min_amount: propose 1 yocto (min 0.001 NEAR)",
+   "status": "OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"below_min_amount\"}",
+   "gas_tgas": 2.81,
+   "tx": "BjyTxDJNS2oUExBjjYCC5UecqRWwDoGM6yCqu5gnmbfk",
+   "url": "https://testnet.nearblocks.io/txns/BjyTxDJNS2oUExBjjYCC5UecqRWwDoGM6yCqu5gnmbfk"
+  },
+  {
+   "time_cairo": "08:37:14",
+   "step": "H15 count: tip action 2 of 3",
+   "status": "OK {\"action_id\":\"1\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}",
+   "gas_tgas": 6.73,
+   "tx": "C7HATJGo5QQLxceTrXUsCahE6sBMc7nKcuNJ89FU21Us",
+   "url": "https://testnet.nearblocks.io/txns/C7HATJGo5QQLxceTrXUsCahE6sBMc7nKcuNJ89FU21Us"
+  },
+  {
+   "time_cairo": "08:37:19",
+   "step": "H15 count: tip action 3 of 3",
+   "status": "OK {\"action_id\":\"2\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}",
+   "gas_tgas": 6.73,
+   "tx": "AjEdJB8buZZq76qqrT6a6jaV9XkGVf1hfEf1eoUiL5mC",
+   "url": "https://testnet.nearblocks.io/txns/AjEdJB8buZZq76qqrT6a6jaV9XkGVf1hfEf1eoUiL5mC"
+  },
+  {
+   "time_cairo": "08:37:23",
+   "step": "H15 count: 4th tip action (max 3/day)",
+   "status": "OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_daily_action_count\"}",
+   "gas_tgas": 2.9,
+   "tx": "5WMXzkNfRPGpZkEP5Z5RZq7b1pYxjNmNdHrwybSjpav7",
+   "url": "https://testnet.nearblocks.io/txns/5WMXzkNfRPGpZkEP5Z5RZq7b1pYxjNmNdHrwybSjpav7"
+  },
+  {
+   "time_cairo": "08:37:27",
+   "step": "H15 storage_reserve_low: amount = balance - (storage+600 B)*byte_cost - reserve + 1 yocto",
+   "status": "OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"storage_reserve_low\"}",
+   "gas_tgas": 2.89,
+   "tx": "7dZSt6iVCViMX92LhxfeyFvZH1koG5HGXkcx68PkMKaW",
+   "url": "https://testnet.nearblocks.io/txns/7dZSt6iVCViMX92LhxfeyFvZH1koG5HGXkcx68PkMKaW"
+  },
+  {
+   "time_cairo": "08:37:45",
+   "step": "arena attack fake-invoice",
+   "status": "OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"receiver_not_allowlisted\"}",
+   "gas_tgas": 2.92,
+   "tx": "4L4Lg9PLQk4CwNXGSNHnPntTXVJktnsXPpFiZQb3Scuf",
+   "url": "https://testnet.nearblocks.io/txns/4L4Lg9PLQk4CwNXGSNHnPntTXVJktnsXPpFiZQb3Scuf"
+  },
+  {
+   "time_cairo": "08:37:48",
+   "step": "arena attack injected-recipient",
+   "status": "OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"receiver_not_allowlisted\"}",
+   "gas_tgas": 2.91,
+   "tx": "Bg1oeUCRBQqSGftoWsqY4Y3bJNisiv7PGBB3Yc2wSARd",
+   "url": "https://testnet.nearblocks.io/txns/Bg1oeUCRBQqSGftoWsqY4Y3bJNisiv7PGBB3Yc2wSARd"
+  },
+  {
+   "time_cairo": "08:37:53",
+   "step": "arena attack lookalike",
+   "status": "OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"receiver_not_allowlisted\"}",
+   "gas_tgas": 2.91,
+   "tx": "GwekXcWhYDyVrUeTtfAcGBTqk8nANVHj7fzyf1aNhL7n",
+   "url": "https://testnet.nearblocks.io/txns/GwekXcWhYDyVrUeTtfAcGBTqk8nANVHj7fzyf1aNhL7n"
+  },
+  {
+   "time_cairo": "08:37:57",
+   "step": "arena attack impersonation",
+   "status": "OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_per_action_cap\"}",
+   "gas_tgas": 2.91,
+   "tx": "fow4a9XDvVfbg61SKyemkpkESDpUzYudV2uxjSTyDGK",
+   "url": "https://testnet.nearblocks.io/txns/fow4a9XDvVfbg61SKyemkpkESDpUzYudV2uxjSTyDGK"
+  }
+ ],
+ "exploit_replays": {
+  "H14": "propose with 12 Tgas: ERR_LOW_GAS panic, no log in any receipt; the same proposal with 30 Tgas is allowed",
+  "H15": "below_min_amount, over_daily_action_count (4th tip on a 3/day clause), storage_reserve_low all denied",
+  "arena_scams": "fake-invoice, injected-recipient, lookalike: receiver_not_allowlisted; impersonation: over_per_action_cap"
+ },
+ "cargo_mutants": {
+  "oath_policy_fns": {
+   "caught": 184,
+   "missed": 0,
+   "timeout": 1,
+   "unviable": 48
+  },
+  "factory": {
+   "caught": 37,
+   "missed": 0,
+   "timeout": 0,
+   "unviable": 6
+  }
+ },
+ "recheck": {
+  "exit": 0,
+  "lines": [
+   "OK   oath.r16.wasm sha256 3a65b00c.. (reproducible build of 5099a7c)",
+   "OK   binaryen version_133 tarball sha256 2dc9c781.. (official release checksum)",
+   "OK   wasm-opt -Oz re-run == oath.r16.oz.wasm (370342 -> 367202 bytes, sha256 8d643d5e..)",
+   "OK   code_hash AWw8zu6mcbkdmTf49wPB2BdXEUjbbWKVHAfjfiQho89r",
+   "OK   global code on chain is byte-equal to oath.r16.oz.wasm",
+   "OK   factory nccharters-53681.testnet code_hash == sha256(charter_factory.r15.wasm) 181ed629..",
+   "OK   factory get_config.code_hash == R16 -Oz",
+   "OK   factory has 0 access keys (locked)",
+   "OK   arena.nccharters-53681.testnet runs global code AWw8zu6m..",
+   "OK   arena.nccharters-53681.testnet registered by the factory",
+   "OK   arena.nccharters-53681.testnet: 1 key, propose-only, == get_state.agent_key",
+   "OK   redteam.nccharters-53681.testnet runs global code AWw8zu6m..",
+   "OK   redteam.nccharters-53681.testnet registered by the factory",
+   "OK   redteam.nccharters-53681.testnet: 1 key, propose-only, == get_state.agent_key",
+   "OK   consolidate ncfund1-53681.testnet -> publisher: OK ",
+   "OK   consolidate ncfund2-53681.testnet -> publisher: OK ",
+   "OK   consolidate ncfund3-53681.testnet -> publisher: OK ",
+   "OK   consolidate ncfund4-53681.testnet -> publisher: OK ",
+   "OK   deploy-as-global r16 oath (by hash): OK ",
+   "OK   deploy factory + new(code_hash): OK ",
+   "OK   delete factory full-access key (factory locked): OK ",
+   "OK   create shared arena charter via factory (default timelock): OK true",
+   "OK   arena set_clause pay: OK {\"applied\":true,\"policy_version\":2}",
+   "OK   arena set_agent_key (propose-only): OK true",
+   "OK   create redteam charter via factory: OK true",
+   "OK   redteam set_clause tip (cap 0.1, min 0.001, max 3/day): OK {\"applied\":true,\"policy_version\":2}",
+   "OK   redteam set_clause big (cap 1000; the reserve is the guard): OK {\"applied\":true,\"policy_version\":3}",
+   "OK   redteam set_agent_key (propose-only): OK true",
+   "OK   H14 propose 0.01 NEAR with 12 Tgas (floor 25): FAILURE {\"ActionError\": {\"index\": 0, \"kind\": {\"FunctionCallError\": {\"ExecutionError\": \"Sma",
+   "OK     expect FAILURE containing ERR_LOW_GAS",
+   "OK     no log in any receipt of the reverted tx (no phantom event)",
+   "OK   H14 control: same proposal with 30 Tgas: OK {\"action_id\":\"0\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}",
+   "OK     expect OK containing \"allowed\"",
+   "OK   H15 min_amount: propose 1 yocto (min 0.001 NEAR): OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"below_min_amount\"}",
+   "OK     expect OK containing below_min_amount",
+   "OK   H15 count: tip action 2 of 3: OK {\"action_id\":\"1\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}",
+   "OK     expect OK containing \"allowed\"",
+   "OK   H15 count: tip action 3 of 3: OK {\"action_id\":\"2\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}",
+   "OK     expect OK containing \"allowed\"",
+   "OK   H15 count: 4th tip action (max 3/day): OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_daily_action_cou",
+   "OK     expect OK containing over_daily_action_count",
+   "OK   H15 storage_reserve_low: amount = balance - (storage+600 B)*byte_cost : OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"storage_reserve_low\"}",
+   "OK     expect OK containing storage_reserve_low",
+   "OK   arena attack fake-invoice: OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"receiver_not_allowlis",
+   "OK     expect OK containing receiver_not_allowlisted",
+   "OK   arena attack injected-recipient: OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"receiver_not_allowlis",
+   "OK     expect OK containing receiver_not_allowlisted",
+   "OK   arena attack lookalike: OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"receiver_not_allowlis",
+   "OK     expect OK containing receiver_not_allowlisted",
+   "OK   arena attack impersonation: OK {\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_per_action_cap\"}",
+   "OK     expect OK containing over_per_action_cap",
+   "OK   all 11 expected claims present (11); 25 txs re-read",
+   "RESULT PASS"
+  ]
+ },
+ "verify": {
+  "command": "verify.sh on a clean checkout of 5099a7c + extra steps (oath suites against the -Oz bytes, factory tests, factory mutants)",
+  "summary": [
+   "start 2026-10-28 21:12:58 EEST",
+   "PASS cargo test (unit+sandbox)",
+   "INFO reproducible-wasm available (docker)",
+   "PASS build + sha256 == pinned",
+   "PASS cargo mutants (policy fns; 0 missed, timeouts=caught)",
+   "PASS gitleaks (r10 + contract + EXTRA_SCAN)",
+   "PASS recheck.py vs testnet RPC",
+   "verify.sh exit=0",
+   "PASS oath sandbox+exploits against oath.r16.oz.wasm",
+   "test result: ok. 70 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s",
+   "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.73s",
+   "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.83s",
+   "PASS factory unit + sandbox (R16 -Oz global code)",
+   "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+   "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.44s",
+   "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+   "43 mutants tested in 5m: 37 caught, 6 unviable",
+   "PASS factory cargo mutants (0 missed)",
+   "extra exit=0",
+   "exit=0",
+   "end 2026-10-28 21:34:50 EEST"
+  ]
+ }
+}
