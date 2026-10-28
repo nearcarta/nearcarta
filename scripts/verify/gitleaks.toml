@@ -1,0 +1,10 @@
+# Default gitleaks rules + allowlist for cargo build output (third-party crate test vectors inside .rmeta files).
+[extend]
+useDefault = true
+[allowlist]
+description = "build artifacts"
+paths = ['''(^|/)target/''', '''(^|/)mutants\.out(\.old)?/''']
+# R14: NEAR RPC error text "access key ed25519:<base58 public key>" is a public key (32 B -> <=44 chars), not a secret.
+# Private keys are 64 B (~88 chars) and stay flagged.
+regexTarget = "match"
+regexes = ['''access key ed25519:[1-9A-HJ-NP-Za-km-z]{1,44}"?$''']
