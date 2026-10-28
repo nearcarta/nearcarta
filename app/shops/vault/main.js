@@ -32,7 +32,7 @@ const when = ns => new Date(Number(BigInt(ns) / 1_000_000n)).toLocaleString();
 const post = (path, body) => api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 function toast(html, kind = 'info') { const t = $('#log'); const li = document.createElement('li'); li.className = kind; li.innerHTML = html; t.prepend(li); }
 function busy(btn, on, label) { if (!btn) return; btn.disabled = on; if (on) { btn.dataset.l = btn.textContent; btn.textContent = label || 'Waiting for chain…'; } else if (btn.dataset.l) btn.textContent = btn.dataset.l; }
-const fail = e => toast(`<b>Stopped:</b> ${esc(e.message)}${e.tx ? ' · ' + txl(e.tx) : ''}`, 'bad');
+const fail = e => toast(`<b>Stopped:</b> ${esc(e.message)}${e.tx ? ' · ' + txl(e.tx) : ''}`, 'bad err');
 
 // ---------- step 1: wallet ----------
 async function refreshWho() {
@@ -57,8 +57,8 @@ function renderCreate() {
     <label>Money to put in <span class="suffix"><input id="cdep" type="number" min="0.3" max="5" step="0.1" value="0.5"><span>NEAR</span></span></label>
     <label>Timelock on loosening the rules <select id="cdelay" data-testid="delay">${delayOptions()}</select></label>
     <label>Co-guardian DAO (optional) <input id="cdao" placeholder="e.g. mydao.sputnik-dao.near" maxlength="64" data-testid="dao"></label>
-    <p class="muted">After setup, a wider allowlist, a bigger cap or a new agent key waits this long before it applies, and the owner (or the DAO) can cancel it meanwhile. Tightening is always instant. The DAO can also freeze the charter or cancel changes.</p>
-    <p id="cname-h" class="muted">The factory creates the account, points it at the audited oath code (by hash, nothing is uploaded), and makes you the owner. It keeps 0.01 NEAR as a fee.</p>
+    <details class="how"><summary>How this works</summary><p class="muted">After setup, a wider allowlist, a bigger cap or a new agent key waits this long before it applies, and the owner (or the DAO) can cancel it meanwhile. Tightening is always instant. The DAO can also freeze the charter or cancel changes.</p>
+    <p id="cname-h" class="muted">The factory creates the account, points it at the audited oath code (by hash, nothing is uploaded), and makes you the owner. It keeps 0.01 NEAR as a fee.</p></details>
     <button id="create-btn" class="primary" data-testid="create">Create my charter</button>`;
   $('#create-btn').onclick = () => createCharter().catch(fail).finally(() => busy($('#create-btn'), false));
   focusCreate();
@@ -151,23 +151,43 @@ async function renderFacts() {
 const pct = (a, b) => b > 0n ? Math.min(100, Number((a * 100n) / b)) : 0;
 const gauge = (label, used, max, show, testid) => { const p = pct(used, max);
   return `<div class="gauge" data-testid="${testid}"><div class="gl"><span>${esc(label)}</span><b>${show}</b></div><div class="bar ${p >= 100 ? 'full' : p >= 75 ? 'hot' : ''}"><span style="width:${p}%"></span></div></div>`; };
+// Time left: the oath's daily counters reset at 00:00 UTC. Rule expiry: valid_until from /api/charter/<id>/rules/pay
+// (R16 set_clause_expiry). Charters on R15 code answer supported:false, so the gauge says "No expiry" and that is true.
+const nextReset = () => (Math.floor(Date.now() / 86400000) + 1) * 86400000;
+const dayPct = () => Math.round(((Date.now() % 86400000) / 86400000) * 100);
+const left = ms => { if (ms <= 0) return 'now'; const m = Math.round(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m % 60}m` : `${m % 60} min`; };
+let expiry = { ms: null, known: false };
+const expiryText = () => !expiry.known ? '…' : expiry.ms == null ? 'No expiry' : expiry.ms <= Date.now() ? 'Expired' : 'in ' + left(expiry.ms - Date.now());
+const expiryBar = () => expiry.ms == null ? '' : `<div class="bar ${expiry.ms - Date.now() < 3600e3 ? 'hot' : ''}"><span id="exp-bar" style="width:${Math.max(0, Math.min(100, Math.round((expiry.ms - Date.now()) / 25920000)))}%"></span></div>`;
+async function loadExpiry() {
+  const r = await api(`/api/charter/${charter}/rules/pay`).catch(() => null);
+  if (!r) return; // busy RPC: keep the last answer
+  expiry = { known: true, ms: r.supported && r.valid_until ? Number(BigInt(r.valid_until) / 1_000_000n) : null };
+  const b = $('#exp-left'); if (b) { b.textContent = expiryText(); b.closest('.gauge').querySelector('.bar')?.remove(); b.closest('.gauge').insertAdjacentHTML('beforeend', expiryBar()); }
+}
+setInterval(() => { const a = $('#reset-left'); if (a) { a.textContent = left(nextReset() - Date.now()); $('#reset-bar').style.width = dayPct() + '%'; }
+  const e = $('#exp-left'); if (e && expiry.known) e.textContent = expiryText(); }, 30000);
 function renderDash(f, cl, u) {
   $('#dash').hidden = !cl;
   if (!cl) return;
+  loadExpiry(); loadFeed();
   $('#dash-id').textContent = charter;
   const today = u && Number(u.day) === Math.floor(Date.now() / 86400000); // usage resets at 00:00 UTC
   const frozen = !!f.state?.frozen;
   const spent = BigInt(today ? u.spent : 0), bud = BigInt(cl.daily_budget), cnt = BigInt(today ? u.count : 0), max = BigInt(cl.max_actions_per_day || 0);
   const canUnfreeze = !f.dao || f.dao === me;
   $('#gauges').innerHTML = `<div class="gauges">
-    ${gauge('Spent today', spent, bud, `${fmt(spent)} of ${fmt(bud)}`, 'gauge-spent')}
+    ${gauge('Spent today', spent, bud, `${fmt(spent)} / ${fmt(bud)}`, 'gauge-spent')}
     ${max ? gauge('Payments today', cnt, max, `${cnt} of ${max}`, 'gauge-count') : ''}
+    <div class="gauge" data-testid="gauge-reset"><div class="gl"><span>Limits reset in</span><b id="reset-left">${left(nextReset() - Date.now())}</b></div><div class="bar day"><span id="reset-bar" style="width:${dayPct()}%"></span></div></div>
+    <div class="gauge" data-testid="gauge-expiry"><div class="gl"><span>Rules expire</span><b id="exp-left">${expiryText()}</b></div>${expiryBar()}</div>
     <div class="gauge"><div class="gl"><span>Max per payment</span><b>${fmt(cl.per_action_cap)}</b></div><div class="gl"><span>Balance</span><b>${fmt(f.balance)}</b></div></div>
-    <div class="gauge freeze ${frozen ? 'on' : ''}"><div class="gl"><span>Status</span><b data-testid="frozen">${frozen ? 'FROZEN: every payment is refused' : 'Active'}</b></div>
+    <div class="gauge freeze ${frozen ? 'on' : ''}"><div class="gl"><span>Status</span><b data-testid="frozen">${frozen ? 'FROZEN · all refused' : 'Active'}</b></div>
       ${frozen ? `<button id="unfreeze" data-testid="unfreeze" ${canUnfreeze ? '' : 'disabled title="Only the DAO can unfreeze this charter"'}>Unfreeze</button>`
         : `<button id="freeze" class="danger" data-testid="freeze" title="Stops the agent at once. Instant, one wallet approval.">Freeze the agent</button>`}</div></div>
-    <p class="muted">Today means the current UTC day; the counters reset at 00:00 UTC. A freeze is instant; ${f.dao ? 'only the DAO can undo it' : 'you can undo it'}.</p>`;
-  if ($('#freeze')) $('#freeze').onclick = () => ownerCall('freeze', {}, $('#freeze'), 'Charter frozen').then(() => tell('You froze the charter. Every payment the agent tries now is refused on chain.', 'info')).catch(fail);
+    <p class="muted">Counters reset at 00:00 UTC. Freeze is instant${f.dao ? '; only the DAO can undo it' : ''}.</p>`;
+  if ($('#freeze')) $('#freeze').onclick = () => ownerCall('freeze', {}, $('#freeze'), 'Charter frozen').then(() => tell('Frozen. Every payment is now refused on chain.', 'info')).catch(fail);
   if ($('#unfreeze')) $('#unfreeze').onclick = () => ownerCall('unfreeze', {}, $('#unfreeze'), 'Charter unfrozen').catch(fail);
 }
 async function ownerCall(methodName, args, btn, done) {
@@ -187,8 +207,9 @@ function renderRules(cl, keyLive, f = {}) {
     <label>Max per payment<span class="suffix"><input id="rcap" type="number" step="0.01" min="0.002" value="${cl ? Number(BigInt(cl.per_action_cap) / 10n ** 18n) / 1e6 : 0.05}"><span>NEAR</span></span></label>
     <label>Daily budget<span class="suffix"><input id="rbud" type="number" step="0.01" min="0.002" value="${cl ? Number(BigInt(cl.daily_budget) / 10n ** 18n) / 1e6 : 0.1}"><span>NEAR</span></span></label>
     <label>Payments per day<input id="rmax" type="number" min="1" max="50" value="${cl?.max_actions_per_day || 4}"></label>
-    <label>Smallest payment<span class="suffix"><input id="rmin" type="number" step="0.001" min="0.001" value="0.001"><span>NEAR</span></span></label></div>
-    <p class="muted">One wallet approval does two things: saves these rules on chain and adds a fresh agent key made in this browser. That key can only call <code>propose</code> on this charter; it cannot move money around the rules.${f.setup_open === false ? ' Setup is closed, so a looser rule or a new key waits the timelock; a tighter rule applies at once.' : ''}</p>
+    <label>Smallest payment<span class="suffix"><input id="rmin" type="number" step="0.001" min="0.001" value="0.001"><span>NEAR</span></span></label>
+    ${f.legacy ? '' : `<label>Rules expire<select id="rexp" data-testid="rexp"><option value="">Keep as is</option><option value="1">In 1 day</option><option value="7"${cl ? '' : ' selected'}>In 7 days</option><option value="30">In 30 days</option></select></label>`}</div>
+    <details class="how"><summary>How this works</summary><p class="muted">One wallet approval does two things: saves these rules on chain and adds a fresh agent key made in this browser. That key can only call <code>propose</code> on this charter; it cannot move money around the rules.${f.setup_open === false ? ' Setup is closed, so a looser rule or a new key waits the timelock; a tighter rule applies at once.' : ''}</p></details>
     <button id="rules-btn" class="primary" data-testid="rules">${cl && keyLive ? 'Update rules' : 'Save rules and issue agent key'}</button>`;
   $('#rules-btn').onclick = () => saveRules(keyLive).catch(fail).finally(() => busy($('#rules-btn'), false));
 }
@@ -198,6 +219,8 @@ async function saveRules(keyLive) {
     window_start_min: 0, window_end_min: 0, requires_receipt: false, escalation_max: null, min_amount: toY($('#rmin').value), max_actions_per_day: Number($('#rmax').value) };
   if (BigInt(clause.per_action_cap) > BigInt(clause.daily_budget)) throw new Error('max per payment is above the daily budget');
   const actions = [{ type: 'FunctionCall', params: { methodName: 'set_clause', args: { clause_id: 'pay', clause }, gas: (40n * TG).toString(), deposit: '0' } }];
+  const days = Number($('#rexp')?.value || 0);
+  if (days) actions.push({ type: 'FunctionCall', params: { methodName: 'set_clause_expiry', args: { clause_id: 'pay', expires_at: String(BigInt(Date.now() + days * 864e5) * 1_000_000n) }, gas: (30n * TG).toString(), deposit: '0' } });
   if (!keyLive) { const k = keyFrom().secretKey;
     localStorage.setItem(pendLS(charter), k); // before signing: a redirect wallet must not lose it
     actions.push({ type: 'FunctionCall', params: { methodName: 'set_agent_key', args: { public_key: keyFrom(k).publicKey, allowance: (YN / 2n).toString() }, gas: (60n * TG).toString(), deposit: '0' } }); }
@@ -212,10 +235,43 @@ async function saveRules(keyLive) {
 }
 
 // ---------- "What happened": a plain story of every payment the agent tried in this tab ----------
-const WHY = { receiver_not_allowlisted: 'payee not on your allowlist', over_per_action_cap: 'over the max per payment', over_daily_budget: "over today's budget",
+const WHY = { clause_expired: 'the rules expired', receiver_not_allowlisted: 'payee not on your allowlist', over_per_action_cap: 'over the max per payment', over_daily_budget: "over today's budget",
   over_daily_action_count: 'over the payments-per-day limit', below_min_amount: 'below the smallest payment', frozen: 'the charter is frozen', expired: 'the request expired',
   stale_policy_version: 'the rules changed meanwhile', outside_time_window: 'outside the allowed hours' };
 const plain = r => WHY[r] || String(r || 'failed').replace(/_/g, ' ');
+// The feed is read back from chain (/api/chronicle/<charter>: tx index + RPC), so it survives a reload and shows
+// what other tabs or the agent did too. Each line is one transaction; the hash sits behind "details".
+const ago = iso => { const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + ' min ago' : s < 86400 ? Math.floor(s / 3600) + ' h ago' : Math.floor(s / 86400) + ' d ago'; };
+const nm = a => String(a || '').split('.')[0];
+function feedLine(t) {
+  const act = (t.events || []).find(e => e.event === 'action')?.data?.[0];
+  if (t.method === 'propose' && act) return act.decision === 'allowed'
+    ? { k: 'good', d: 'allowed', h: `Paid <b>${fmt(act.amount)}</b> to ${esc(nm(act.receiver))}` }
+    : { k: 'bad', d: 'denied', r: act.reason, h: `Refused ${fmt(act.amount)} to ${esc(nm(act.receiver))}: ${esc(plain(act.reason))}` };
+  const L = { freeze: ['bad', 'You froze the charter'], unfreeze: ['good', 'You unfroze the charter'], set_clause: ['', 'Rules saved'], set_agent_key: ['', 'Agent key added'],
+    revoke_agent: ['', 'Agent key revoked'], execute_change: ['', 'Waiting change applied'], cancel_change: ['', 'Waiting change cancelled'], set_clause_expiry: ['', 'Rule expiry set'], create_charter: ['', 'Charter created'] }[t.method];
+  if (L) return { k: L[0], h: L[1] };
+  if (t.error || !t.method) return null;
+  const m = String(t.method).replace(/_/g, ' '); return { k: '', h: esc(m[0].toUpperCase() + m.slice(1)) };
+}
+let feedBusy = null;
+function loadFeed() {
+  if (!charter || feedBusy) return feedBusy;
+  feedBusy = (async () => {
+    let j = null;
+    for (let i = 0; i < 3 && !j; i++) { j = await api(`/api/chronicle/${charter}?limit=12`).catch(e => (/not a Nearcarta/.test(e.message) ? 'no' : null)); if (!j) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
+    if (!j || j === 'no') return; // API without the charter feed yet, or busy: keep this tab's story
+    const rows = (j.txs || []).map(t => ({ t, l: feedLine(t) })).filter(x => x.l);
+    if (!rows.length) return;
+    const ok = rows.filter(x => x.l.d === 'allowed'), no = rows.filter(x => x.l.d === 'denied');
+    const paid = ok.reduce((a, x) => a + BigInt((x.t.events.find(e => e.event === 'action').data[0].amount) || 0), 0n);
+    $('#story').innerHTML = ok.length + no.length ? `<b>${ok.length} allowed</b> (${fmt(paid)} paid) · <b>${no.length} refused</b> · last ${rows.length} transactions`
+      : `${rows.length} transactions on chain, no payments yet`;
+    $('#feed').innerHTML = rows.map(({ t, l }) => `<li class="${l.k}" data-testid="feed-row"><span>${l.h}</span><span class="when">${esc(ago(t.at))}</span>${t.hash ? `<a class="tx" href="${esc(t.url)}" target="_blank" rel="noopener" title="${esc(t.hash)}">details<span aria-hidden="true">↗</span></a>` : ''}</li>`).join('');
+    $('#feed').hidden = false; $('#story').dataset.src = 'chain';
+  })().finally(() => { feedBusy = null; });
+  return feedBusy;
+}
 const tries = [];
 function tell(html, kind) { toast(html, kind); }
 function record(s, who) {
@@ -224,7 +280,8 @@ function record(s, who) {
   const ok = tries.filter(t => t.decision === 'allowed'), no = tries.filter(t => t.decision !== 'allowed');
   const total = ok.reduce((a, t) => a + BigInt(t.amount || 0), 0n);
   const reasons = Object.entries(no.reduce((m, t) => (m[plain(t.reason)] = (m[plain(t.reason)] || 0) + 1, m), {})).map(([r, n]) => `${n} ${r}`).join(', ');
-  $('#story').innerHTML = `Your agent tried <b>${tries.length}</b> payment${tries.length > 1 ? 's' : ''}: <b>${ok.length} allowed</b>${ok.length ? ` (${fmt(total)} paid)` : ''}, <b>${no.length} refused</b>${no.length ? ': ' + esc(reasons) : ''}.`;
+  if ($('#story').dataset.src !== 'chain') $('#story').innerHTML = `Your agent tried <b>${tries.length}</b> payment${tries.length > 1 ? 's' : ''}: <b>${ok.length} allowed</b>${ok.length ? ` (${fmt(total)} paid)` : ''}, <b>${no.length} refused</b>${no.length ? ': ' + esc(reasons) : ''}.`;
+  setTimeout(loadFeed, 2500);
   toast(`${esc(who)}: ${fmt(s.amount)} to <code>${esc(s.receiver)}</code> · <b>${s.decision === 'allowed' ? 'allowed' : 'refused: ' + esc(plain(s.reason))}</b> · ${txl(s.tx)}`, s.decision === 'allowed' ? 'good' : 'bad');
 }
 

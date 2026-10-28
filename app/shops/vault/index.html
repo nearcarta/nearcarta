@@ -9,7 +9,7 @@
 </head>
 <body data-step="none">
 <header class="top">
-  <div><h1>Charter office</h1><p class="sub">Give an AI agent a wallet it cannot misuse. You set the rules; a NEAR contract enforces them, so every payment and every refusal is a public transaction, not a promise. <span class="net">testnet</span></p></div>
+  <div><h1>Charter office</h1><p class="sub">Give your AI agent a wallet it cannot misuse. Your rules, enforced on chain. <span class="net">testnet</span></p></div>
   <div class="who"><span id="who">Loading…</span>
     <button id="guest" class="primary" data-testid="guest" title="Creates a new testnet account from the public faucet. Its key stays in this browser.">Start free: guest testnet account</button>
     <button id="connect" data-testid="connect">Connect a NEAR wallet</button>
@@ -23,18 +23,19 @@
 <main>
   <div class="panel" id="p-mine" role="tabpanel" aria-labelledby="tab-mine">
     <section class="card wide" id="dash" hidden><h2>Dashboard <span id="dash-id" class="muted"></span></h2><div id="gauges"></div></section>
+    <section class="card wide" id="s-what"><h2>What happened</h2><p id="story" class="story" data-testid="story">Nothing yet. Connect, make a charter, then ask your agent to pay.</p><ul id="feed" data-testid="feed" hidden></ul><ul id="log" aria-live="polite"></ul></section>
     <section class="card wide arena" id="mine" hidden>
       <div id="ask"><h2><span class="num">★</span>Ask the agent to pay</h2>
-        <p class="muted">Tell your agent what to pay. It signs one payment with its own key; your charter's rules decide. The request is read in your browser by a simple parser (no AI model), and the charter has the final word.</p>
+        <p class="muted">Plain words in, one real payment out. Your charter decides.</p>
         <form id="ask-form" class="askrow"><input id="ask-text" data-testid="ask-text" maxlength="200" placeholder="pay the cafe 0.01 NEAR for team coffee" aria-label="What should the agent pay?"><button class="primary" id="ask-btn" data-testid="ask">Ask the agent</button></form>
-        <p class="muted">Or one tap on a useful job your rules should allow:</p>
+        <p class="muted">Or one tap:</p>
         <div class="atks tsks"></div><div class="result" aria-live="polite"></div></div>
       <p class="muted">Then play the scammer: <button class="mini" id="go-arena" data-testid="go-arena">Try to trick it in the Arena →</button></p>
       <h3>Your charter's score</h3><div class="score" id="score-mine-box" aria-live="polite"><p class="muted">Run a job to score.</p></div>
     </section>
     <section class="card" id="s-create"><h2><span class="num">1</span>Your charter</h2><div id="create"></div><p class="factory muted" id="factory"></p></section>
     <section class="card" id="s-rules"><h2><span class="num">2</span>Rules and agent key</h2><div id="facts"></div><div id="rules"></div></section>
-    <section class="card wide"><h2>What happened</h2><p id="story" class="story" data-testid="story">Nothing yet. Connect, make a charter, then ask your agent to pay.</p><ul id="log" aria-live="polite"></ul></section>
+
   </div>
   <div class="panel" id="p-arena" role="tabpanel" aria-labelledby="tab-arena" hidden>
     <section class="card wide arena" id="arena"><h2>Try to trick it</h2>
