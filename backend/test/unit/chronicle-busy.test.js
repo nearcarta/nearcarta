@@ -10,5 +10,5 @@ test('chronicle: tx index still busy and nothing cached -> 200 busy + Retry-Afte
   globalThis.fetch = async () => new Response('{}', { status: 429 });
   const r = await makeApp().request(`/api/chronicle/${DEP.guardhouse.oath}?limit=13`);
   assert.equal(r.status, 200); assert.equal(r.headers.get('retry-after'), '10');
-  const j = await r.json(); assert.equal(j.busy, true); assert.deepEqual(j.txs, []);
+  const j = await r.json(); assert.equal(j.busy, true); assert.deepEqual(j.txs, []); assert.match(j.source, /busy/);
 });

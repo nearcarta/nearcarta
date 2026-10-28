@@ -230,7 +230,7 @@ export function makeApp() {
     // polls again): answer 200 busy + Retry-After instead of 503, so a fresh visitor's console stays clean.
     try { return c.json(await shops.chronicle(a, Math.min(Number(c.req.query('limit') || 8), 15))); }
     catch (e) { if (e.status || !/http (429|5\d\d)|timeout|aborted|fetch failed/i.test(e.message)) throw e;
-      c.header('Retry-After', '10'); return c.json({ account: a, count: 0, txs: [], busy: true }); }
+      c.header('Retry-After', '10'); return c.json({ account: a, count: 0, txs: [], busy: true, source: 'tx index busy; try again in 10 s' }); }
   });
   // R16 oath charters: on-chain reputation (refusal buckets) and one clause's user-set rules. Read-only views;
   // older charters (R14/R15) have no such method and answer { supported: false }.
