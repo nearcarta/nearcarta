@@ -13,7 +13,7 @@ import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import { view, rpcStats } from './near.js';
-import { limiter, clientIpSource, globalCap, leakGuard, onError, allowedOrigins } from './http-guard.js';
+import { limiter, clientIpSource, globalCap, leakGuard, onError, allowedOrigins, OVERLOAD } from './http-guard.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
@@ -25,8 +25,21 @@ async function houseView() {
   return { ...snap, owner: H.owner, dao: H.dao, code_hash: H.code_hash, pending, actions, proof_txs: H.proof_txs, demo: H.demo || null };
 }
 
+// Last good value per read: when every RPC endpoint is overloaded, serve it marked stale instead of failing.
+const good = new Map();
+const lastGood = (name, fn) => async () => {
+  try { const v = await fn(); if (v != null) good.set(name, { at: Date.now(), v }); return v; }
+  catch (e) {
+    const g = good.get(name);
+    if (g && OVERLOAD.test(String(e.message)) && Date.now() - g.at < 15 * 60e3)
+      return g.v && typeof g.v === 'object' && !Array.isArray(g.v) ? { ...g.v, stale: true, stale_age_s: Math.round((Date.now() - g.at) / 1000) } : g.v;
+    throw e;
+  }
+};
+export const _resetLastGood = () => good.clear();
+
 // One handler per public read route, shared by the routes and by /api/health?deep=1.
-const reads = {
+const reads = Object.fromEntries(Object.entries({
   guardhouse: () => guard.snapshot(),
   house: houseView,
   mistbank: () => mist.mistbank(),
@@ -36,7 +49,7 @@ const reads = {
   toll: () => shops.toll(),
   chronicle: () => shops.chronicle(DEP.guardhouse.oath, 2),
   ferry_tokens: () => ferry.tokens(),
-};
+}).map(([k, fn]) => [k, lastGood(k, fn)]));
 
 let deepCache = null; // { at, value }: deep checks cost ~20 RPC calls, so they are shared for 30 s
 export async function deepHealth() {
@@ -89,7 +102,21 @@ export function makeApp() {
     const list = await ferry.tokens();
     return c.json(list.map(t => ({ assetId: t.assetId, symbol: t.symbol, chain: t.blockchain, decimals: t.decimals, price: t.price })));
   });
-  app.post('/api/ferry/quote', limiter(10), oneClick, async c => {
+  // Several shops load the same dry quote at once: identical requests within 5 s share one 1Click call,
+  // and a cached answer does not count against the per-client quota.
+  const quoteKey = b => b && JSON.stringify([ferry.tokenRef(b.from), ferry.tokenRef(b.to), b.amount, b.recipient, b.refundTo, b.privacy || 'public', Number(b.slippageBps || 100)]);
+  const quoteCache = new Map(), quoteInflight = new Map();
+  const quoteShared = async (c, next) => {
+    const k = quoteKey(await jsonBody(c)); if (!k) return next();
+    const hit = quoteCache.get(k);
+    if (hit && Date.now() - hit.at < 5000) { c.header('X-Quote-Cache', 'hit'); return c.json(hit.v); }
+    if (quoteInflight.has(k)) { const v = await quoteInflight.get(k); if (v) { c.header('X-Quote-Cache', 'shared'); return c.json(v); } return next(); }
+    // Register before any await so concurrent twins wait for this call; a refused or failed call shares nothing (null).
+    let done; quoteInflight.set(k, new Promise(r => { done = r; }));
+    c.set('quoteDone', v => { if (quoteCache.size > 500) quoteCache.clear(); quoteCache.set(k, { at: Date.now(), v }); done(v); });
+    try { await next(); } finally { done(null); quoteInflight.delete(k); }
+  };
+  app.post('/api/ferry/quote', quoteShared, limiter(10), oneClick, async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
     // from/to: {symbol, chain}, {assetId} or a string such as 'USDC@base' (see ferry.tokenRef).
     const from = ferry.tokenRef(b.from), to = ferry.tokenRef(b.to);
@@ -98,8 +125,10 @@ export function makeApp() {
     for (const k of ['amount', 'recipient', 'refundTo']) if (!str(b[k], 300)) return bad(c, `missing or bad ${k}`);
     if (b.privacy !== undefined && !['public', 'basic', 'advanced'].includes(b.privacy)) return bad(c, 'privacy must be public|basic|advanced');
     if (b.slippageBps !== undefined && !(Number.isInteger(Number(b.slippageBps)) && Number(b.slippageBps) >= 0 && Number(b.slippageBps) <= 1000)) return bad(c, 'slippageBps must be 0..1000');
-    return c.json(await ferry.quote({ from, to, amount: b.amount, recipient: b.recipient, refundTo: b.refundTo,
-      privacy: b.privacy || 'public', slippageBps: Number(b.slippageBps || 100) }));
+    const v = await ferry.quote({ from, to, amount: b.amount, recipient: b.recipient, refundTo: b.refundTo,
+      privacy: b.privacy || 'public', slippageBps: Number(b.slippageBps || 100) });
+    c.get('quoteDone')?.(v);
+    return c.json(v);
   });
   app.get('/api/ferry/zcash/:addr', limiter(30), c => {
     try { return c.json(zcashRecipient(c.req.param('addr'))); } catch { return bad(c, 'not a valid Zcash address'); }

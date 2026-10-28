@@ -58,9 +58,16 @@ export const leakGuard = async (c, next) => {
 };
 
 // Errors: our own validation errors (4xx) keep their message; anything else is generic.
+// Upstream overload (every RPC endpoint answered 429/5xx or timed out) is not our bug: say 503 + Retry-After.
+export const OVERLOAD = /http (429|5\d\d)\b|timeout|aborted|fetch failed|ECONNRESET/i;
 export function onError(e, c) {
   const s = Number(e.status) || 500;
   if (s >= 400 && s < 500) return c.json({ error: e.message }, s);
+  if (!e.status && OVERLOAD.test(String(e.message))) {
+    console.error(c.req.method, c.req.path, e.message);
+    c.header('Retry-After', '3');
+    return c.json({ error: 'rpc busy, retry shortly', retry: true }, 503);
+  }
   console.error(c.req.method, c.req.path, e.message);
   return c.json({ error: s === 503 ? 'unavailable' : s === 502 ? 'upstream error' : 'internal' }, s >= 500 && s < 600 ? s : 500);
 }

@@ -64,7 +64,18 @@ async function cached(key, ms, fn) {
 }
 export const _clearCache = () => cache.clear();
 
-export async function charterFacts(id, { fresh = false } = {}) {
+// fresh=1 runs right after create_charter, when public RPCs often rate-limit or lag: wait and retry
+// a couple of times before giving up (the API then answers 503 + Retry-After, never a bare 500).
+export async function charterFacts(id, opts = {}) {
+  for (let i = 0; ; i++) {
+    try { return await charterFactsOnce(id, opts); }
+    catch (e) {
+      if (!opts.fresh || i >= 2 || e.status || !/http (429|5\d\d)\b|timeout|aborted/i.test(String(e.message))) throw e;
+      await new Promise(r => setTimeout(r, opts.retryMs ?? 800 * (i + 1)));
+    }
+  }
+}
+async function charterFactsOnce(id, { fresh = false } = {}) {
   if (!V) throw bad('vault not deployed', 503);
   if (!isAccount(id)) throw bad('bad account id');
   if (fresh) cache.delete('facts:' + id);
