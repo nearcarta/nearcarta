@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nearcarta · Charter office and Vault Arena (testnet)</title>
+<link rel="stylesheet" href="../../design/D7_system/tokens/tokens.css">
+<link rel="stylesheet" href="vault.css">
+<script src="../../config.js"></script>
+</head>
+<body data-step="none">
+<header class="top">
+  <div><h1>Charter office</h1><p class="sub">Give an AI agent a wallet it cannot misuse. The rules live in a NEAR contract, so a refused payment is a public transaction, not a promise. <span class="net">testnet</span></p></div>
+  <div class="who"><span id="who">Loading…</span>
+    <button id="connect" class="primary" data-testid="connect">Connect a NEAR wallet</button>
+    <button id="guest" data-testid="guest" title="Creates a new testnet account from the public faucet. Its key stays in this browser.">No wallet? Make a guest testnet account</button>
+    <button id="signout" hidden>Sign out</button></div>
+</header>
+<main>
+  <section class="card" id="s-create"><h2><span class="num">1</span>Your charter</h2><div id="create"></div><p class="factory muted" id="factory"></p></section>
+  <section class="card" id="s-rules"><h2><span class="num">2</span>Rules and agent key</h2><div id="facts"></div><div id="rules"></div></section>
+  <section class="card arena" id="mine" hidden><h2><span class="num">3</span>Attack your own charter</h2>
+    <p class="muted">You play the scammer. Your browser signs with the agent key, exactly like a tricked agent would. Watch the contract say no. Look-alike example: <code id="ex-look"></code></p>
+    <div class="atks"></div><div class="result" aria-live="polite"></div></section>
+  <section class="card arena" id="shared"><h2><span class="num">★</span>Vault Arena: the shared charter</h2>
+    <p class="muted">No wallet needed. Attack <code id="arena-id"></code>, a factory charter with tight rules. Allowed steps pay our two test shops; every refusal is a final testnet transaction. Daily limits are shared by everyone. <span id="shared-note"></span></p>
+    <label class="nick">Your nickname on the board <input id="nick" maxlength="20" placeholder="guest" pattern="[a-z0-9-]+"></label>
+    <div class="atks"></div><div class="result" aria-live="polite"></div></section>
+  <section class="card" id="s-board"><h2>Leaderboard, rebuilt from chain</h2><div id="board">Loading…</div></section>
+  <section class="card"><h2>What happened</h2><ul id="log" aria-live="polite"></ul></section>
+</main>
+<script type="module" src="vault.bundle.js"></script>
+</body>
+</html>

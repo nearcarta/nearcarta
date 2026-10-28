@@ -20,6 +20,8 @@ cpSync(here + '../backend/src/ferry-guard.js', dist + '/live/ferry-guard.js');
 // Your House: NEAR Wallet Selector bundled into one ES module (the only part of the console that asks a wallet to sign).
 await (await import('esbuild')).build({ entryPoints: [here + 'house/house.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
   outfile: dist + '/house.bundle.js', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning' });
+// Shop modules (charter office + Vault Arena): app/shops, see app/shops/INTEGRATION.md
+await (await import('./shops/build.mjs')).buildShops(dist, await import('esbuild'));
 const api = process.env.NEARCARTA_API ?? 'https://nearcarta-api.onrender.com';
 writeFileSync(dist + '/config.js', `window.NEARCARTA_API=${JSON.stringify(api)};globalThis.NEARCARTA_API=window.NEARCARTA_API;\n`);
 // config.js before the first module, in the interiors and the town.
