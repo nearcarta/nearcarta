@@ -27,7 +27,8 @@ export function wallet() {
     connector = new NearConnector({ network: 'testnet', features: { testnet: true, signAndSendTransaction: true }, footerBranding: null, walletConnect, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
     // The picker's "⋯" header button has no text: name it for screen readers and hover.
     const label = r => r.querySelectorAll?.('.settings-button:not([aria-label])').forEach(b => { b.setAttribute('aria-label', 'Wallet list settings'); b.title = 'Wallet list settings'; });
-    new MutationObserver(() => { label(document); document.querySelectorAll('body > *').forEach(e => e.shadowRoot && label(e.shadowRoot)); }).observe(document.body, { childList: true, subtree: true });
+    const fix = r => { label(r); unavailable(r); };
+    new MutationObserver(() => { fix(document); document.querySelectorAll('body > *').forEach(e => e.shadowRoot && fix(e.shadowRoot)); }).observe(document.body, { childList: true, subtree: true });
     const ping = () => listeners.forEach(f => f());
     connector.on('wallet:signIn', ping); connector.on('wallet:signOut', ping);
     // Clear EVM label; wallets this browser already has go first.
@@ -35,9 +36,44 @@ export function wallet() {
       const evm = connector.wallets.find(w => w.manifest.id === 'ethereum-wallets');
       if (evm) evm.manifest.name = window.ethereum ? 'MetaMask & EVM wallets (detected)' : 'MetaMask & EVM wallets';
       if (evm && window.ethereum) connector.wallets = [evm, ...connector.wallets.filter(w => w !== evm)];
+      // MyNearWallet's NEAR Connect script has a testnet path (testnet.mynearwallet.com), but the manifest has no testnet flag.
+      const mnw = connector.wallets.find(w => w.manifest.id === 'mynearwallet');
+      if (mnw) { mnw.manifest.features.testnet = true; (mnw.manifest.permissions.allowsOpen ||= []).push('https://testnet.mynearwallet.com'); mnw.manifest.name = 'MyNearWallet (testnet)'; mnw.manifest.website = 'https://testnet.mynearwallet.com'; }
     }).catch(() => {});
   }
   return connector;
+}
+// Wallets people ask for that NEAR Connect does not offer on testnet. Each reason was checked in the NEAR Connect
+// manifest (hot-dao/near-selector repository/manifest.json) and the wallet's own NEAR Connect script.
+const UNAVAILABLE = [
+  ['HOT Wallet', 'Mainnet only: its NEAR Connect script refuses testnet.'],
+  ['HERE Wallet', 'Now HOT Wallet (same app), so mainnet only.'],
+  ['OKX Wallet', 'Mainnet only in NEAR Connect (no testnet support listed).'],
+  ['NEAR Mobile', 'Mainnet only: its NEAR Connect script refuses testnet.'],
+  ['Hana Wallet', 'Mainnet only in NEAR Connect (no testnet support listed).'],
+  ['Trezu Wallet', 'Mainnet only: its NEAR Connect script has only a mainnet URL.'],
+  ['Sender', 'Not in NEAR Connect.'],
+  ['Bitte Wallet', 'Not in NEAR Connect.'],
+];
+function unavailable(r) {
+  r.querySelectorAll?.('.modal-body').forEach(body => {
+    if (!body.querySelector('.connect-item') || body.querySelector('.nc-unavailable')) return;
+    const box = document.createElement('div');
+    box.className = 'nc-unavailable'; box.setAttribute('data-testid', 'wallets-unavailable');
+    box.style.cssText = 'margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,.12)';
+    const h = document.createElement('p'); h.textContent = 'Not available on testnet';
+    h.style.cssText = 'margin:4px 8px;font-size:12px;opacity:.7;color:#fff';
+    box.append(h);
+    for (const [name, why] of UNAVAILABLE) {
+      const row = document.createElement('div');
+      row.setAttribute('aria-disabled', 'true'); row.title = why; row.dataset.wallet = name;
+      row.style.cssText = 'display:flex;flex-direction:column;padding:6px 8px;opacity:.45;cursor:not-allowed;color:#fff';
+      const a = document.createElement('span'); a.textContent = name; a.style.fontSize = '14px';
+      const b = document.createElement('span'); b.textContent = why; b.style.fontSize = '12px';
+      row.append(a, b); box.append(row);
+    }
+    body.append(box);
+  });
 }
 export function onWallet(f) { listeners.add(f); }
 export async function account() {
