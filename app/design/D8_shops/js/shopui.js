@@ -134,10 +134,12 @@ const APPS = {
   },
   chronicle: {
     label: 'Chronicle · your feed', idle: 'Every ask I made, every answer.',
-    btn: 'My history',
-    run: async () => { const f = await A.feed(); const rows = f.local.slice(0, 6).map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(A.why(x.reason)) : '✓ ' + esc(x.decision)}</span>${A.txLine(x.h, '↗').replace('receipt', 'feed')}</li>`).join('');
-      form(`<ol class="feed" data-testid="feed">${rows || '<li>Nothing yet</li>'}</ol>`);
-      return { keep: true, kind: 'ok', noform: true, hero: num(f.nonce, 'asks'), say: `${f.local.length} answers in this browser, ${f.onchain.length} payments on chain.` }; },
+    btn: 'Sign today\u2019s entry',
+    form: () => extra.feed ? `<ol class="feed" data-testid="feed">${extra.feed.local.slice(0, 5).map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(A.why(x.reason)) : '✓ ' + esc(x.decision)}</span>${A.txLine(x.h, '↗').replace('receipt', 'feed')}</li>`).join('') || '<li>Nothing yet</li>'}</ol>` : '',
+    // a real entry: the agent asks the charter to pay the scribe 0.001 NEAR; allowed or refused, the answer is on chain
+    run: async () => { const o = await A.ask({ shop: 'chronicle', receiver: A.merchants()[0], amountY: A.toY(0.001), memo: 'chronicle:entry' });
+      extra.feed = await A.feed();
+      return { o, keep: true, hero: num(extra.feed.nonce, 'asks'), say: o.decision === 'allowed' ? 'Entry signed. The scribe got 0.001.' : `Entry signed. Refused: ${A.why(o.reason)}.` }; },
   },
 };
 
