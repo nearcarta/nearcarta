@@ -313,13 +313,31 @@ function quickCards() {
     <b>${esc(t.name)}</b><em class="ok">allowed</em></button>`).join('');
   for (const b of $('#mine .tsks').querySelectorAll('.tsk')) b.onclick = () => task(b).catch(fail).finally(unlock);
 }
+// Who proposed the payment: the NEAR AI model in a TEE (signature checked by our server) or the labelled plain-words fallback.
+function brainLine(b) {
+  if (!b) return '';
+  if (b.by !== 'model') return `<p class="muted" data-testid="brain">Proposed by the plain-words fallback parser, not the AI model${b.fallback_why ? ' (' + esc(b.fallback_why) + ')' : ''}. The charter still decides.</p>`;
+  const v = b.verification || {}, ok = v.verified ? 'signature verified' : 'signature NOT verified';
+  const flag = b.parsed?.suspicious ? ` It flagged this as suspicious: ${esc(b.parsed.why || '')}.` : '';
+  return `<p class="muted" data-testid="brain">Proposed by NEAR AI model <code>${esc(b.model || '')}</code> in a TEE · ${ok}${v.signing_address ? ' by <code>' + esc(v.signing_address.slice(0, 10)) + '…</code>' : ''}.${flag} The model only proposes; the charter decides.</p>`;
+}
 async function ask(e) {
   e.preventDefault();
   const out = $('#mine .result'); const btn = $('#ask-btn');
-  let q; try { q = parseAsk($('#ask-text').value, CFG.arena.merchants.concat(lastRules?.receivers || []), 'mine'); }
-  catch (er) { out.innerHTML = `<p class="verdict bad" data-testid="verdict">${esc(er.message)}</p>`; return; }
+  const text = $('#ask-text').value;
+  let q, brain = null;
+  busy(btn, true, 'NEAR AI model is reading…');
+  try {
+    brain = await post('/api/vault/ask/plan', { text, charter });
+    q = brain.parsed;
+  } catch (er) { brain = { by: 'fallback', fallback_why: 'model route failed: ' + er.message }; }
+  finally { busy(btn, false); }
+  if (!q) {
+    try { q = parseAsk(text, CFG.arena.merchants.concat(lastRules?.receivers || []), 'mine'); }
+    catch (er) { out.innerHTML = `<p class="verdict bad" data-testid="verdict">${esc(er.message)}</p>`; return; }
+  }
   lock(); busy(btn, true, 'Agent is paying…');
-  out.innerHTML = `<p class="muted">Your agent proposes ${fmt(q.amount)} to <code>${esc(q.receiver)}</code>${q.note ? ' for ' + esc(q.note) : ''}. Waiting for the charter's decision on chain…</p><ol class="steps"></ol>`;
+  out.innerHTML = brainLine(brain) + `<p class="muted">Your agent proposes ${fmt(q.amount)} to <code>${esc(q.receiver)}</code>${q.note ? ' for ' + esc(q.note) : ''}. Waiting for the charter's decision on chain…</p><ol class="steps"></ol>`;
   try {
     const r = await runAsk({ charter, key: keyFrom(localStorage.getItem(agentLS(charter))), receiver: q.receiver, amount: q.amount, memo: q.memo, rpcCall: rpc, viewF: view, send: sendPropose });
     out.querySelector('.steps').innerHTML = stepRow(r, 1, 1); record(r, 'You asked');
