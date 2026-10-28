@@ -58,6 +58,7 @@ export function makeApp() {
   app.get('/api/mistbank/street/:txid', limiter(20, 60e3), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
   app.get('/api/townhall', async c => c.json(await shops.townhall()));
   app.get('/api/arena', async c => c.json(await shops.arena()));
+  app.get('/api/arena/attempts', limiter(20, 60e3), async c => c.json(await shops.arenaAttempts(c.req.query('from'), c.req.query('limit'))));
   app.get('/api/toll', async c => c.json(await shops.toll()));
   app.get('/api/chronicle/:account', limiter(30, 60e3), async c => {
     const a = c.req.param('account');

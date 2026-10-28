@@ -29,6 +29,17 @@ export async function arena() {
   return { contract: A, season, guardian, balance_near: yocto(acct.amount), tokens: cases.map((t, i) => ({ token_id: t, supply: supply[i] })), attempts };
 }
 
+// The attack corpus, paged: every attempt is committed on chain by prompt hash, and anyone may reveal the prompt.
+export async function arenaAttempts(from = 0, limit = 25) {
+  const A = DEP.arena.contract;
+  from = Math.max(0, Math.floor(Number(from) || 0)); limit = Math.min(25, Math.max(1, Math.floor(Number(limit) || 25)));
+  const got = await Promise.all(Array.from({ length: limit }, (_, k) => view(A, 'get_attempt', { attempt_id: from + k }).catch(() => null)));
+  const attempts = [];
+  for (let k = 0; k < got.length && got[k]; k++) attempts.push({ id: from + k, ...got[k] });
+  return { contract: A, from, attempts, next: attempts.length === limit ? from + limit : null,
+    reveal: 'call reveal_prompt {attempt_id, prompt}; the contract checks sha256(prompt) against the commitment and emits a vaultarena "reveal" event' };
+}
+
 export async function toll() {
   const T = DEP.toll;
   const policy = await view(T.oath, 'policy');
