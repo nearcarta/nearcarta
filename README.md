@@ -7,7 +7,7 @@ Deployed (testnet, read-only, no keys): https://nearcarta.vercel.app. Example: `
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 53 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm test                 # 88 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
 npm run verify           # reads every proof tx back from testnet (53/53 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # read-only API on :8787 (no route signs)
 npm run build && node app/serve.mjs &   # UI on :5173
@@ -40,7 +40,7 @@ Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-re
 `$API` is `http://localhost:8787` after `npm start`.
 
 ## Layout
-- `contracts/oath`: the agent charter (Rust, near-sdk). 50 unit tests, plus near-workspaces sandbox and 10 exploit reproductions in `tests/`.
+- `contracts/oath`: the agent charter (Rust, near-sdk). 70 unit tests, plus near-workspaces sandbox and 10 exploit reproductions in `tests/`.
 - `contracts/artifacts`: the deployed charter wasm. `npm run wasm-hash` prints its hash, which equals the on-chain code_hash.
 - `contracts/townhall`, `contracts/arena`, `contracts/toll`, `contracts/mock_ft`: the shop contracts.
 - `backend/`: Hono API that reads chain, 1Click and NEAR AI. `scripts/` holds the testnet demo and the proof checker.
