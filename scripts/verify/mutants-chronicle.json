@@ -1,0 +1,5 @@
+{ "file": "backend/src/shops.js", "test": "backend/test/unit/vault-rebuild.test.js", "mutants": [
+  ["if (t.signer_id === account || t.receiver_id === account) return true;", "return true;"],
+  ["if (fc?.method_name !== 'create_charter') return false;", ""],
+  [".name}.${t.receiver_id}` === account;", ".name}.${t.receiver_id}` !== account;"]
+] }

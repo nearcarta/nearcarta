@@ -3,18 +3,6 @@
  "test": "backend/test/unit/vault.test.js",
  "mutants": [
   [
-   "if (r?.ok) return r.json();",
-   "if (r) return r.json();"
-  ],
-  [
-   "if (r && r.status !== 429 && r.status < 500) throw",
-   "if (r && r.status < 500) throw"
-  ],
-  [
-   "if (i >= 3) throw new Error",
-   "if (i >= 0) throw new Error"
-  ],
-  [
    "if (!resume || !(j.account_txs || []).length) return out;",
    "return out;"
   ],
@@ -27,19 +15,19 @@
    "BigInt(x.tx_block_timestamp) / 1_000n"
   ],
   [
-   "try { list = await charters(fa.factory); } catch { errors++; continue; }",
-   "try { list = await charters(fa.factory); } catch { continue; }"
+   "try { list.push(...await charters(fa.factory)); } catch { errors++; }",
+   "try { list.push(...await charters(fa.factory)); } catch { }"
   ],
   [
-   "try { ts = await txs(c.charter); } catch { errors++; continue; }",
-   "try { ts = await txs(c.charter); } catch { continue; }"
+   "try { ts = await txs(c.charter); } catch { errors++; return; }",
+   "try { ts = await txs(c.charter); } catch { return; }"
   ],
   [
-   "if (checked >= budget) return { checked, errors, complete: false };",
-   "if (checked >= budget) return { checked, errors, complete: true };"
+   "if (checked >= budget) { over = true; return; }",
+   "if (checked >= budget) { return; }"
   ],
   [
-   "} else { notArena.set(t.hash, 1); scheduleSave(); }",
+   "} else { notArena.set(t.hash, { charter: c.charter }); scheduleSave(); }",
    "}"
   ],
   [
@@ -47,8 +35,8 @@
    "if (a) { }"
   ],
   [
-   "return { checked, errors, complete: errors === 0 };",
-   "return { checked, errors, complete: true };"
+   "complete: errors === 0 && !over,",
+   "complete: true,"
   ],
   [
    "if (r.complete) { rebuild.complete_at = Date.now(); return; }",

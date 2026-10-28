@@ -1,0 +1,6 @@
+{ "file": "backend/src/txindex.js", "test": "backend/test/unit/txindex.test.js", "mutants": [
+  ["prio === 'low' && gate.high > 0 ? 250 : 0", "0"],
+  ["if (r.status !== 429 && r.status < 500) throw", "if (false) throw"],
+  ["gate.until = Math.max(gate.until, now() + baseMs * 2 ** (gate.strikes - 1));", "gate.until = gate.until;"],
+  ["gate.strikes = 0; gate.stats.ok++;", "gate.stats.ok++;"]
+] }

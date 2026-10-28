@@ -1,0 +1,34 @@
+{
+ "file": "backend/src/vault.js",
+ "test": "backend/test/unit/vault-rebuild.test.js",
+ "mutants": [
+  [
+   "t.receiver_id !== charter || t.signer_id !== charter",
+   "t.receiver_id !== charter"
+  ],
+  [
+   "if (fc.method_name === 'propose' && args?.p?.nonce != null)",
+   "if (fc.method_name === 'propose_x' && args?.p?.nonce != null)"
+  ],
+  [
+   "if (fc.method_name === 'propose_batch' && Array.isArray(args?.ps))",
+   "if (false)"
+  ],
+  [
+   "for (let i = 0; i < next; i++) if (!set?.has(i)) return false;",
+   "for (let i = 1; i < next; i++) if (!set?.has(i)) return false;"
+  ],
+  [
+   "if (!Number.isSafeInteger(next) || next < 0) return false;",
+   "if (!Number.isSafeInteger(next) || next < 0) return true;"
+  ],
+  [
+   "if (strict) throw bad('chain busy: clause not readable', 503); return null;",
+   "return null;"
+  ],
+  [
+   "if (n !== null && covered(c.charter, n)) { byNonce++; return; }",
+   "if (n !== null) { byNonce++; return; }"
+  ]
+ ]
+}
