@@ -7,8 +7,8 @@ Deployed (testnet, read-only, no keys): https://nearcarta.vercel.app. Example: `
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 44 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
-npm run verify           # reads every proof tx back from testnet (47/47 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
+npm test                 # 46 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm run verify           # reads every proof tx back from testnet (53/53 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # read-only API on :8787 (no route signs)
 npm run build && node app/serve.mjs &   # UI on :5173
 npx playwright install chromium && npm run e2e   # 13 browser tests
@@ -33,7 +33,7 @@ Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-re
 | Guardhouse (TEE) | UI `#guardhouse` → *Verify NEAR AI TEE now*, or `npm run tee` | The browser makes a 32-byte nonce. The gateway and model (z-ai/glm-5.3-flash) Intel TDX quotes are checked with dcap-qvl (TCB UpToDate, debug off). report_data binds the signer and our nonce, MRCONFIGID = sha256(app_compose), RTMR3 replays from the event log, and NVIDIA NRAS approves the GPUs. Code: `backend/src/tee.js` | [judges/proofs/tee-check.json](judges/proofs/tee-check.json); tamper tests `backend/test/unit/tee.test.js` |
 | Chronicle (read from chain) | UI `#chronicle`, or `curl $API/api/chronicle/<any testnet account>` | The latest txs with decision/reason decoded from the charter's NEP-297 events; events from failed receipts are dropped | integration "chronicle lists charter txs and decodes events from chain" |
 | Town Hall (pre-R11 contract) | UI `#townhall` | The Sputnik DAO voted the charter FROZEN; rewards after the freeze fail with ERR_FROZEN; the agent cannot vote on its own proposal | TESTNET_TXS rows *townhall* |
-| Vault Arena | UI `#arena`, or `curl "$API/api/arena/attempts?from=0&limit=25"` | Guardian g1; every attempt committed on chain by prompt hash (20: 14 refused, 6 allowed; 1 text revealed); one NEP-245 case token per refused attack class | TESTNET_TXS rows *arena*; integration "arena corpus" |
+| Vault Arena | UI `#arena`, or `curl "$API/api/arena/attempts?from=0&limit=25"` | Guardian g1, plus scam1 and scam2 for the scam set; every attempt committed on chain by prompt hash (32: 20 refused, 12 allowed; 13 texts revealed); one NEP-245 case token per refused attack class. Six scam patterns (fake-invoice payee swap, prompt-injected recipient, urgency or authority impersonation, allowlist look-alike, split payments under the cap, repeat drain over time) each end in a refused tx: the model was fooled; the charter refused | TESTNET_TXS rows *arena*; integration "arena corpus" |
 | Toll (pre-R11 contract) | UI `#toll` | The charter asks `v1.signer-prod.testnet` to sign a Base Sepolia tx only for an allowlisted recipient under cap; the broadcast tx is from the MPC-derived address | TESTNET_TXS rows *toll* |
 | Town | `/design/D9_world/` and `/design/D8_shops/` | The 3D town and shop interiors. Interiors read live chain data through `app/src/live/data.js` (the bank interior reads `BANK` from `/api/mistbank`) | e2e "town view loads" |
 
@@ -50,6 +50,7 @@ Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-re
 
 ## Limits (stated plainly)
 - 1Click has no testnet. Ferry quotes are mainnet `dry:true`: no deposit address is created and nothing is swapped.
+- The Arena scam set uses a scripted agent that always does what the scam asks. It stands in for a fooled model; no live model was prompted, because NEAR AI completions are billable and the account has no credits (HTTP 402).
 - The Vault Arena contract on testnet (`r6vamvr9brhx-arena3.testnet`, code hash `D7r681CT…`) was built before this repo; a fresh build of `contracts/arena` gives a different hash (`FmFUbaDz…`). Only the charter (`r11oath-82930.testnet`) is proven to equal a committed wasm.
 - NEAR AI Cloud: the TEE evidence check runs live and is free. Chat completions are billable and the account has no credits (HTTP 402), so `/api/ai/prove` is off unless `AI_PROVE_ENABLED=1`. When enabled, it verifies the TEE first and sends the completion only if every check passes, then matches the response signer to the verified report.
 - Mist Bank runs on Zcash testnet (TAZ) and NEAR testnet. The Confidential Intents legs are dry quotes; no real confidential deposit is made (that would be a mainnet spend). Anyone holding the viewing key learns the opening, which is intended: they are the auditor.
