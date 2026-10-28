@@ -10,6 +10,8 @@ import { join } from 'node:path';
 import { ATTACKS, lookalike, invoicePayee, pickClause, plan, proposal, MEMO_RE, matchesPlan, acceptedReasons } from '../../../shared/vault/attacks.js';
 import { TASKS, TASK_IDS, TASK_MEMO_RE, planTask, matchesTask, taskAmount, taskProposal } from '../../../shared/vault/tasks.js';
 import { keyFrom, signTx, functionCall, outcomeOf, PROPOSE_TGAS } from '../../../shared/vault/tx.js';
+import { parseAsk, nearToYocto } from '../../../shared/vault/ask.js';
+import { runAsk } from '../../../shared/vault/run.js';
 import { runAttack, doTask, verifyAttempt, board, isAccount, _attempts, _notArena, Lru, saveBoard, loadBoard, runnerStatus } from '../../src/vault.js';
 
 const M = 10n ** 21n; // milliNEAR
@@ -219,4 +221,26 @@ test('runner status reports the 30 Tgas gas and daily cap', async () => {
 
 test('account ids', () => {
   assert.ok(isAccount('arena.nccharters-17102.testnet')); assert.ok(!isAccount('Bad..id')); assert.ok(!isAccount('a'));
+});
+
+test('parseAsk reads plain requests and names the payee', () => {
+  const R = ['cafe.pub.testnet', 'books.pub.testnet'];
+  assert.deepEqual(parseAsk('Pay the cafe 0.01 NEAR for team coffee', R), { receiver: 'cafe.pub.testnet', amount: String(10n * M), note: 'team coffee', memo: 'ask:team-coffee' });
+  assert.equal(parseAsk('send 0.02 to the bookshop', R).receiver, 'books.pub.testnet');
+  assert.equal(parseAsk('pay book 0.005 near', R).amount, String(5n * M));
+  // An account off the allowlist is parsed as asked: the charter, not the parser, refuses it.
+  assert.equal(parseAsk('pay refund-desk.testnet 0.01 NEAR', R).receiver, 'refund-desk.testnet');
+  assert.equal(parseAsk('pay c4fe.pub.testnet 1', R).amount, String(1000n * M));
+  assert.throws(() => parseAsk('pay the cafe', R), /how much/);
+  assert.throws(() => parseAsk('pay 0.01 NEAR', R), /Name the payee/);
+  assert.equal(nearToYocto('.5'), String(500n * M));
+});
+
+test('runAsk sends one propose with the parsed payee and an ask memo', async () => {
+  const sent = [];
+  const viewF = async (_c, m) => m === 'get_clauses' ? { pay: clause } : { next_nonce: '3', policy_version: 2 };
+  const send = async (_rpc, a) => { sent.push(a.p); return { hash: 'A1', ok: true, value: { decision: 'denied', reason: 'receiver_not_allowlisted' } }; };
+  const r = await runAsk({ charter: 'ask.f.testnet', key: keyFrom(), receiver: 'refund-desk.testnet', amount: String(M), memo: 'ask:refund', viewF, send, rpcCall: null });
+  assert.equal(r.passed, false); assert.equal(r.reason, 'receiver_not_allowlisted');
+  assert.equal(sent[0].shop, 'ask'); assert.equal(sent[0].memo, 'ask:refund'); assert.equal(sent[0].nonce, '3'); assert.equal(sent[0].clause_id, 'pay');
 });

@@ -62,3 +62,15 @@ export async function runTask({ charter, key, taskId, tag, viewF, send, rpcCall 
   return { charter, task: taskId, tag, clause_id: clauseId, tx: r.hash, receiver: step.receiver, amount: step.amount,
     decision, reason: r.ok ? (v.reason ?? null) : r.error, passed: decision === 'allowed' };
 }
+
+/** One payment the owner asked for in plain words (see ask.js): a single `propose`, decided by the charter. */
+export async function runAsk({ charter, key, receiver, amount, memo, viewF, send, rpcCall, nowMs = Date.now() }) {
+  const clauses = await viewF(charter, 'get_clauses');
+  const { id: clauseId } = pickClause(clauses);
+  const r = await proposeFresh({ charter, key, viewF, send, rpcCall,
+    build: ({ nonce, policyVersion }) => ({ shop: 'ask', clause_id: clauseId, receiver, amount, nonce: String(nonce), policy_version: policyVersion,
+      expires_at: String(BigInt(nowMs + 10 * 60_000) * 1_000_000n), memo, receipt: null }) });
+  const v = r.value || {};
+  return { charter, clause_id: clauseId, tx: r.hash, receiver, amount, memo,
+    decision: r.ok ? v.decision : 'failed', reason: r.ok ? (v.reason ?? null) : r.error, passed: r.ok && v.decision === 'allowed' };
+}
