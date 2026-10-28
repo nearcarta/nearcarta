@@ -2,7 +2,8 @@
 // The agent here is scripted to be fooled every time: it proposes exactly what the scam asks for.
 // That is the worst case for a model. The Arena contract (the charter) decides each proposal on chain.
 // Each prompt is committed as sha256 before the agent acts, then revealed on chain.
-// Usage: ARENA_KEYS_FILE=... node backend/scripts/arena-scams.js   (testnet only)
+// Usage: ARENA_KEYS_FILE=... [ARENA=contract OWNER_ROLE=role FC_KEYS_FILE=...] node backend/scripts/arena-scams.js   (testnet only)
+// FC_KEYS_FILE holds the function-call keys scoped to ARENA (written by arena-fresh.js).
 import { Account, JsonRpcProvider, actions as A } from 'near-api-js';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -13,7 +14,9 @@ const K = JSON.parse(fs.readFileSync(process.env.ARENA_KEYS_FILE));
 const OUT = process.env.OUT || new URL('../../judges/proofs/arena-scams.json', import.meta.url).pathname;
 const provider = new JsonRpcProvider({ url: RPC });
 const id = r => K[r].account_id;
-const C = id('arena3');
+const OWNER = process.env.OWNER_ROLE || 'arena3';
+const C = process.env.ARENA || id(OWNER);
+if (process.env.FC_KEYS_FILE) for (const [r, v] of Object.entries(JSON.parse(fs.readFileSync(process.env.FC_KEYS_FILE)))) K[r].fc_private_key = v.private_key;
 const N = x => (BigInt(Math.round(x * 1000)) * 10n ** 21n).toString();
 const TG = t => BigInt(t) * 10n ** 12n;
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
@@ -56,8 +59,8 @@ const exists = async t => (await provider.query({ request_type: 'call_function',
   args_base64: Buffer.from(JSON.stringify({ token_id: t })).toString('base64') }).then(r => JSON.parse(Buffer.from(r.result).toString())));
 for (const [t, title] of [['scam1', 'Warden of the Ledger'], ['scam2', 'Warden of the Slow Tap']]) {
   if (!(await exists(t))) {
-    run.steps.push({ step: `mint_${t}`, ...(await call(`mint_${t}`, 'arena3', 'mint_guardian', { token_id: t, receiver_id: id('alice'), agent: id('agent'), oath, title }, N(0.1))) });
-    run.steps.push({ step: `fund_${t}`, ...(await call(`fund_${t}`, 'arena3', 'fund', { token_id: t }, N(0.05))) });
+    run.steps.push({ step: `mint_${t}`, ...(await call(`mint_${t}`, OWNER, 'mint_guardian', { token_id: t, receiver_id: id('alice'), agent: id('agent'), oath, title }, N(0.1))) });
+    run.steps.push({ step: `fund_${t}`, ...(await call(`fund_${t}`, OWNER, 'fund', { token_id: t }, N(0.05))) });
     save();
   }
 }
