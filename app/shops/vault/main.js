@@ -199,6 +199,11 @@ async function ownerCall(methodName, args, btn, done) {
   } finally { busy(btn, false); }
   await renderFacts();
 }
+const hrs = ns => { const m = Number(BigInt(ns) / NS / 60n); return m % 60 ? m + ' min' : m / 60 + ' h'; };
+function expiryHint(f) {
+  const def = BigInt(CFG.policy_delay?.default_ns || 86400n * NS), own = f.policy_delay_ns ? BigInt(f.policy_delay_ns) : def;
+  return `Extending waits for your timelock (${own === def ? 'default ' + hrs(def) : hrs(own)}); renew at least a day early.`;
+}
 function renderRules(cl, keyLive, f = {}) {
   const m = CFG.arena.merchants;
   $('#rules').innerHTML = `<div class="grid2">
@@ -208,7 +213,8 @@ function renderRules(cl, keyLive, f = {}) {
     <label>Daily budget<span class="suffix"><input id="rbud" type="number" step="0.01" min="0.002" value="${cl ? Number(BigInt(cl.daily_budget) / 10n ** 18n) / 1e6 : 0.1}"><span>NEAR</span></span></label>
     <label>Payments per day<input id="rmax" type="number" min="1" max="50" value="${cl?.max_actions_per_day || 4}"></label>
     <label>Smallest payment<span class="suffix"><input id="rmin" type="number" step="0.001" min="0.001" value="0.001"><span>NEAR</span></span></label>
-    ${f.legacy ? '' : `<label>Rules expire<select id="rexp" data-testid="rexp"><option value="">Keep as is</option><option value="1">In 1 day</option><option value="7"${cl ? '' : ' selected'}>In 7 days</option><option value="30">In 30 days</option></select></label>`}</div>
+    ${f.legacy ? '' : `<label>Rules expire<select id="rexp" data-testid="rexp"><option value="">Keep as is</option><option value="1">In 1 day</option><option value="7"${cl ? '' : ' selected'}>In 7 days</option><option value="30">In 30 days</option></select></label>
+    <p class="hint" data-testid="rexp-hint">${expiryHint(f)}</p>`}</div>
     <details class="how"><summary>How this works</summary><p class="muted">One wallet approval does two things: saves these rules on chain and adds a fresh agent key made in this browser. That key can only call <code>propose</code> on this charter; it cannot move money around the rules.${f.setup_open === false ? ' Setup is closed, so a looser rule or a new key waits the timelock; a tighter rule applies at once.' : ''}</p></details>
     <button id="rules-btn" class="primary" data-testid="rules">${cl && keyLive ? 'Update rules' : 'Save rules and issue agent key'}</button>`;
   $('#rules-btn').onclick = () => saveRules(keyLive).catch(fail).finally(() => busy($('#rules-btn'), false));

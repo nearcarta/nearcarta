@@ -99,3 +99,4 @@ details.how{margin:var(--s-2) 0 var(--s-3)}details.how summary{cursor:pointer;co
 #feed li{animation:none}#feed:not([hidden])~#log li:not(.err){display:none}
 .gl b{text-align:right}
 label select{display:block;width:100%;margin-top:6px}
+.grid2 .hint{grid-column:1/-1;margin:-4px 0 0;color:var(--c-text-2,#cbbfa8);font-size:14px}
