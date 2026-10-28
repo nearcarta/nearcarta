@@ -57,16 +57,26 @@ async function createCharter() {
   const w = await connector.wallet();
   const res = await w.signAndSendTransaction({ receiverId: CFG.factory, actions: [{ type: 'FunctionCall', params: { methodName: 'create_charter', args: { name }, gas: (150n * TG).toString(), deposit: toY(dep) } }] });
   const h = txHashOf(res); const id = `${name}.${CFG.factory}`;
-  for (let i = 0; i < 20; i++) { const f = await api('/api/vault/charter/' + id + '?fresh=1').catch(() => null); if (f?.registered) break; await new Promise(r => setTimeout(r, 1500)); }
-  const f = await api('/api/vault/charter/' + id + '?fresh=1');
+  const f = await facts(id, f => f.registered && f.exists && !f.pending);
   if (!f.registered) throw Object.assign(new Error('charter not created (name taken? the deposit was refunded minus gas)'), { tx: h });
   toast(`Charter created · ${txl(h)}`, 'good'); await useCharter(id);
 }
 
 // ---------- step 3: rules + agent key ----------
 async function useCharter(id) { charter = id; document.body.dataset.step = 'charter'; renderCreate(); await renderFacts(); }
+// Fresh charter facts; retried while RPC nodes catch up with a tx that just landed.
+async function facts(id, ready = f => !f.pending, tries = 20) {
+  let f = null;
+  for (let i = 0; i < tries; i++) {
+    f = await api('/api/vault/charter/' + id + '?fresh=1').catch(() => null);
+    if (f && ready(f)) return f;
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  if (!f) throw new Error('could not read the charter from chain, try again');
+  return f;
+}
 async function renderFacts() {
-  const f = await api('/api/vault/charter/' + charter + '?fresh=1');
+  const f = await facts(charter);
   const cl = f.clauses?.pay; const u = f.usage?.pay;
   const k = localStorage.getItem(agentLS(charter)); const agentPk = k ? keyFrom(k).publicKey : null;
   const keyLive = agentPk && (f.agent_keys || []).some(a => a.public_key === agentPk);
