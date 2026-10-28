@@ -47,6 +47,10 @@ const MIN_GAS_FT: Gas = Gas::from_tgas(60);
 const MIN_GAS_ESCALATE: Gas = Gas::from_tgas(75);
 /// Settled action records older than the newest KEEP_RECENT are pruned.
 pub const KEEP_RECENT: u64 = 32;
+/// R16.1: largest all-or-nothing batch (`propose_batch`).
+pub const MAX_BATCH: usize = 5;
+/// Agent key scope: the only methods the agent's function-call key may call.
+pub const AGENT_METHODS: &str = "propose,propose_batch";
 /// R16 data lives under its own raw storage keys, so the root state layout is unchanged.
 const K_ROTATING: &[u8] = b"r16:rot";
 const K_REPUTATION: &[u8] = b"r16:rep";
@@ -394,7 +398,7 @@ impl Oath {
                 }
                 emit("agent_key", json!({"op": "set", "public_key": public_key, "allowance": allowance}));
                 let a = Allowance::limited(NearToken::from_yoctonear(allowance.0)).expect("ERR_ALLOWANCE_ZERO");
-                let mut add = Promise::new(me.clone()).add_access_key_allowance(public_key.clone(), a, me.clone(), "propose".to_string());
+                let mut add = Promise::new(me.clone()).add_access_key_allowance(public_key.clone(), a, me.clone(), AGENT_METHODS.to_string());
                 if let Some(old) = prev.clone().filter(|o| *o != public_key) { add = add.delete_key(old); }
                 env::storage_write(K_ROTATING, &[1]);
                 let cb = Promise::new(me).function_call_weight(
@@ -661,6 +665,95 @@ impl Oath {
                 PromiseOrValue::Promise(execute(&clause.asset, &p.receiver, p.amount.0, p.memo.clone(), id))
             }
         }
+    }
+
+    /// R16.1: an all-or-nothing batch for one clause (e.g. a Town Hall reward round).
+    /// Every item passes the same checks as `propose`, then the batch TOTAL and COUNT are checked
+    /// against what is left of the clause's daily budget and action count, and the storage reserve
+    /// against all items, before any transfer. If anything fails the whole batch is refused: nothing
+    /// is reserved or paid, the nonces are used up (no replay) and every item counts as a refusal.
+    /// Not for clauses that need a receipt or for amounts that would escalate (use `propose`).
+    pub fn propose_batch(&mut self, ps: Vec<Proposal>) -> Vec<Outcome> {
+        require!(env::predecessor_account_id() == env::current_account_id(), "ERR_NOT_AGENT");
+        if env::signer_account_id() == env::current_account_id() {
+            require!(Some(env::signer_account_pk()) == self.agent_key, "ERR_NOT_AGENT_KEY");
+        } else {
+            require!(!rotating(), "ERR_KEY_ROTATING");
+        }
+        let n = ps.len();
+        require!((2..=MAX_BATCH).contains(&n), "ERR_BATCH_SIZE");
+        for (i, p) in ps.iter().enumerate() { require!(p.nonce.0 == self.next_nonce + i as u64, "ERR_NONCE"); }
+        let per = match self.clauses.get(&ps[0].clause_id).map(|c| &c.asset) { Some(Asset::Ft { .. }) => MIN_GAS_FT, _ => MIN_GAS_NATIVE };
+        let need_gas = Gas::from_gas(per.as_gas() * n as u64);
+        require!(env::prepaid_gas() >= need_gas, "ERR_LOW_GAS");
+        self.next_nonce += n as u64;
+        let hashes: Vec<String> = ps.iter().map(action_hash).collect();
+        let verdict = self.check_batch(&ps, &hashes);
+        let total: u128 = ps.iter().map(|p| p.amount.0).sum();
+        match verdict {
+            Err((bad, why)) => {
+                let mut out = Vec::with_capacity(n);
+                for (i, p) in ps.iter().enumerate() {
+                    let r = if Some(i) == bad || bad.is_none() { why.clone() } else { "batch_refused".to_string() };
+                    self.chronicle(None, p, "denied", "denied", &r, None, &hashes[i]);
+                    out.push(reason(None, "denied", "denied", &r));
+                }
+                emit("batch", json!({"agent": env::current_account_id(), "clause_id": ps[0].clause_id, "items": n,
+                    "total": U128(total), "decision": "denied", "reason": why, "bad_item": bad}));
+                out
+            }
+            Ok(clause) => {
+                let ids: Vec<u64> = (0..n as u64).map(|i| self.next_action + i).collect();
+                self.next_action += n as u64;
+                let day = today();
+                let mut u = self.usage_today(&ps[0].clause_id);
+                u.reserved.0 += total;
+                u.count += n as u32;
+                self.usage.insert(ps[0].clause_id.clone(), u);
+                self.auto_prune(2);
+                let mut out = Vec::with_capacity(n);
+                for (i, p) in ps.iter().enumerate() {
+                    let id = ids[i];
+                    self.actions.insert(id, ActionRec {
+                        shop: p.shop.clone(), clause_id: p.clause_id.clone(), receiver: p.receiver.clone(), amount: p.amount,
+                        day, status: "submitted".into(), receipt_hash: None, yield_id: None,
+                        policy_version: self.policy_version, freeze_epoch: self.freeze_epoch, asset: clause.asset.clone(), memo: p.memo.clone(),
+                    });
+                    self.chronicle(Some(id), p, "allowed", "submitted", "ok", None, &hashes[i]);
+                    // Detached: each transfer settles through its own on_settle callback.
+                    let _ = execute(&clause.asset, &p.receiver, p.amount.0, p.memo.clone(), id);
+                    out.push(reason(Some(U64(id)), "allowed", "submitted", "ok"));
+                }
+                emit("batch", json!({"agent": env::current_account_id(), "clause_id": ps[0].clause_id, "items": n,
+                    "total": U128(total), "decision": "allowed", "action_ids": ids.iter().map(|i| U64(*i)).collect::<Vec<_>>()}));
+                out
+            }
+        }
+    }
+
+    /// Err((Some(i), why)) names the failing item; Err((None, why)) is a batch-wide failure (total, count, reserve).
+    fn check_batch(&mut self, ps: &[Proposal], hashes: &[String]) -> Result<Clause, (Option<usize>, String)> {
+        let cid = ps[0].clause_id.clone();
+        let mut clause = None;
+        for (i, p) in ps.iter().enumerate() {
+            if p.clause_id != cid { return Err((Some(i), "batch_mixed_clauses".into())); }
+            if let Some(c) = self.clauses.get(&cid) {
+                if c.requires_receipt { return Err((Some(i), "batch_receipt_clause".into())); }
+            }
+            let (c, _, escalate) = self.check(p, &hashes[i]).map_err(|r| (Some(i), r))?;
+            if escalate { return Err((Some(i), "over_per_action_cap".into())); }
+            clause = Some(c);
+        }
+        let c = clause.expect("ERR_EMPTY");
+        let total: u128 = ps.iter().map(|p| p.amount.0).sum();
+        let u = self.usage_today(&cid);
+        if u.spent.0 + u.reserved.0 + total > c.daily_budget.0 { return Err((None, "over_daily_budget".into())); }
+        if u.count as usize + ps.len() > c.max_actions_per_day as usize { return Err((None, "over_daily_action_count".into())); }
+        let native = if c.asset == Asset::Native { total } else { 0 };
+        let need = (env::storage_usage() + ACTION_STORAGE_HEADROOM * ps.len() as u64) as u128 * env::storage_byte_cost().as_yoctonear()
+            + self.storage_reserve + native;
+        if env::account_balance().as_yoctonear() < need { return Err((None, "storage_reserve_low".into())); }
+        Ok(c)
     }
 
     fn check(&mut self, p: &Proposal, ah: &str) -> Result<(Clause, Option<String>, bool), String> {

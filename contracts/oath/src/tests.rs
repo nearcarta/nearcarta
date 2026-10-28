@@ -1199,3 +1199,178 @@ fn r16_refusal_buckets() {
     assert_eq!(REFUSAL_BUCKETS[refusal_bucket("memo_too_long")], "other");
     assert_eq!(REFUSAL_BUCKETS[refusal_bucket("clause_expired")], "clause_expired");
 }
+
+// ---------------- R16.1: propose_batch (all-or-nothing reward round) ----------------
+/// Clause "round": three receivers, cap 1 NEAR each, daily budget 2.5 NEAR, no escalation.
+fn round() -> Oath {
+    let mut o = setup(0);
+    set("owner.test", T0);
+    let _ = o.set_clause("round".into(), clause(&["bob.test", "bakery.test", "carol.test"], NEAR, 5 * NEAR / 2, false, None));
+    o
+}
+fn props(o: &Oath, items: &[(&str, u128)]) -> Vec<Proposal> {
+    items.iter().enumerate().map(|(i, (to, a))| { let mut p = prop(o, "round", to, *a); p.nonce = U64(o.next_nonce + i as u64); p }).collect()
+}
+
+#[test]
+fn batch_pays_three_receivers_and_reserves_the_total() {
+    let mut o = round();
+    let ps = props(&o, &[("bob.test", NEAR / 2), ("bakery.test", NEAR / 2), ("carol.test", NEAR / 2)]);
+    set("oath.test", T0);
+    let out = o.propose_batch(ps);
+    assert_eq!(out.len(), 3);
+    assert!(out.iter().all(|x| x.decision == "allowed" && x.status == "submitted"));
+    let u = o.usage_today(&"round".to_string());
+    assert_eq!(u.reserved.0, 3 * NEAR / 2);
+    assert_eq!(u.count, 3);
+    assert_eq!(o.next_nonce, 3);
+    assert_eq!(o.get_action(U64(2)).unwrap().receiver, acc("carol.test"));
+    assert!(get_logs().iter().any(|l| l.contains("\"event\":\"batch\"") && l.contains("\"decision\":\"allowed\"")));
+}
+
+#[test]
+fn batch_over_total_is_refused_whole_and_pays_nobody() {
+    let mut o = round();
+    // Each item is under the 1 NEAR cap, but the total 3 NEAR is over the 2.5 NEAR budget.
+    let ps = props(&o, &[("bob.test", NEAR), ("bakery.test", NEAR), ("carol.test", NEAR)]);
+    set("oath.test", T0);
+    let out = o.propose_batch(ps);
+    assert!(out.iter().all(|x| x.decision == "denied" && x.reason == "over_daily_budget"));
+    let u = o.usage_today(&"round".to_string());
+    assert_eq!((u.reserved.0, u.spent.0, u.count), (0, 0, 0));
+    assert_eq!(o.next_nonce, 3, "nonces are used up so the refused batch cannot be replayed");
+    assert_eq!(o.next_action, 0);
+    let r = o.get_reputation();
+    assert_eq!(r["counts"]["refused"], json!(3));
+    assert_eq!(r["counts"]["allowed"], json!(0));
+    assert_eq!(r["counts"]["refusals"]["over_daily_budget"], json!(3));
+    assert!(get_logs().iter().any(|l| l.contains("\"event\":\"batch\"") && l.contains("\"decision\":\"denied\"")));
+}
+
+#[test]
+fn batch_counts_what_is_already_reserved_today() {
+    let mut o = round();
+    let ps = props(&o, &[("bob.test", NEAR), ("bakery.test", NEAR)]);
+    set("oath.test", T0);
+    assert!(o.propose_batch(ps).iter().all(|x| x.decision == "allowed"));
+    // 2 NEAR reserved; a second round of 2 x 0.3 NEAR would make 2.6 > 2.5.
+    let ps = props(&o, &[("bob.test", 3 * NEAR / 10), ("carol.test", 3 * NEAR / 10)]);
+    set("oath.test", T0);
+    assert!(o.propose_batch(ps).iter().all(|x| x.reason == "over_daily_budget"));
+}
+
+#[test]
+fn batch_with_one_bad_item_names_it_and_refuses_the_rest() {
+    let mut o = round();
+    let ps = props(&o, &[("bob.test", NEAR / 10), ("mallory.test", NEAR / 10), ("carol.test", NEAR / 10)]);
+    set("oath.test", T0);
+    let out = o.propose_batch(ps);
+    assert_eq!(out[1].reason, "receiver_not_allowlisted");
+    assert_eq!(out[0].reason, "batch_refused");
+    assert_eq!(out[2].reason, "batch_refused");
+    assert_eq!(o.usage_today(&"round".to_string()).reserved.0, 0);
+}
+
+#[test]
+fn batch_refuses_over_cap_item_instead_of_escalating() {
+    let mut o = setup(0); // clause "tip" escalates between 1 and 3 NEAR
+    let mut a = prop(&o, "tip", "bob.test", NEAR / 10);
+    let mut b = prop(&o, "tip", "bakery.test", 2 * NEAR);
+    a.nonce = U64(0); b.nonce = U64(1);
+    set("oath.test", T0);
+    let out = o.propose_batch(vec![a, b]);
+    assert_eq!(out[1].reason, "over_per_action_cap");
+    assert!(o.get_pending().is_empty());
+    assert_eq!(o.usage_today(&"tip".to_string()).reserved.0, 0);
+}
+
+#[test]
+fn batch_refuses_mixed_clauses_and_receipt_clauses() {
+    let mut o = round();
+    let mut ps = props(&o, &[("bob.test", NEAR / 10), ("bob.test", NEAR / 10)]);
+    ps[1].clause_id = "tip".into();
+    set("oath.test", T0);
+    assert_eq!(o.propose_batch(ps)[1].reason, "batch_mixed_clauses");
+    let mut o = setup(0);
+    let _ = screened(&mut o);
+    let mut a = prop(&o, "scr", "bob.test", 1); let mut b = prop(&o, "scr", "bob.test", 1);
+    a.nonce = U64(0); b.nonce = U64(1);
+    set("oath.test", T0);
+    assert_eq!(o.propose_batch(vec![a, b])[0].reason, "batch_receipt_clause");
+}
+
+#[test]
+fn batch_refused_while_frozen() {
+    let mut o = round();
+    set("owner.test", T0);
+    o.freeze();
+    let ps = props(&o, &[("bob.test", NEAR / 10), ("carol.test", NEAR / 10)]);
+    set("oath.test", T0);
+    assert_eq!(o.propose_batch(ps)[0].reason, "frozen");
+}
+
+#[test]
+#[should_panic(expected = "ERR_BATCH_SIZE")]
+fn batch_of_one_panics() {
+    let mut o = round();
+    let ps = props(&o, &[("bob.test", 1)]);
+    set("oath.test", T0);
+    o.propose_batch(ps);
+}
+
+#[test]
+#[should_panic(expected = "ERR_BATCH_SIZE")]
+fn batch_over_max_panics() {
+    let mut o = round();
+    let ps = props(&o, &[("bob.test", 1); 6]);
+    set("oath.test", T0);
+    o.propose_batch(ps);
+}
+
+#[test]
+#[should_panic(expected = "ERR_NONCE")]
+fn batch_nonces_must_be_consecutive() {
+    let mut o = round();
+    let mut ps = props(&o, &[("bob.test", 1), ("carol.test", 1)]);
+    ps[1].nonce = U64(5);
+    set("oath.test", T0);
+    o.propose_batch(ps);
+}
+
+#[test]
+#[should_panic(expected = "ERR_NOT_AGENT")]
+fn batch_only_from_the_agent_account() {
+    let mut o = round();
+    let ps = props(&o, &[("bob.test", 1), ("carol.test", 1)]);
+    set("bob.test", T0);
+    o.propose_batch(ps);
+}
+
+#[test]
+#[should_panic(expected = "ERR_LOW_GAS")]
+fn batch_needs_gas_for_every_item() {
+    let mut o = round();
+    let ps = props(&o, &[("bob.test", 1), ("carol.test", 1), ("bakery.test", 1)]);
+    let mut b = ctx("oath.test", T0); b.prepaid_gas(Gas::from_tgas(60));
+    testing_env!(b.build());
+    o.propose_batch(ps);
+}
+
+#[test]
+fn batch_items_settle_one_by_one() {
+    let mut o = round();
+    let ps = props(&o, &[("bob.test", NEAR / 2), ("carol.test", NEAR / 2)]);
+    set("oath.test", T0);
+    let _ = o.propose_batch(ps);
+    set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
+    assert_eq!(o.on_settle(U64(0)).status, "confirmed");
+    set_results("oath.test", T0, vec![PromiseResult::Failed]);
+    assert_eq!(o.on_settle(U64(1)).status, "failed_released");
+    let u = o.usage_today(&"round".to_string());
+    assert_eq!((u.spent.0, u.reserved.0), (NEAR / 2, 0));
+}
+
+#[test]
+fn agent_key_scope_is_propose_and_propose_batch() {
+    assert_eq!(AGENT_METHODS, "propose,propose_batch");
+}
