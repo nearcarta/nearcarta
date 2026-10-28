@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nearcarta · Town Hall proposals (testnet)</title>
+<link rel="stylesheet" href="../../design/D7_system/tokens/tokens.css">
+<link rel="stylesheet" href="../vault/vault.css">
+<link rel="stylesheet" href="hall.css">
+<script src="../../config.js"></script>
+</head>
+<body data-step="none">
+<header class="top">
+  <div><h1>Town Hall</h1><p class="sub">The town's charter changes only by a DAO vote. Anyone can file a proposal. <span class="net">testnet</span></p></div>
+  <div class="who"><span id="who"></span>
+    <button id="guest" class="primary" data-testid="guest" title="Creates a new testnet account from the public faucet. Its key stays in this browser.">Start free</button>
+    <button id="connect" data-testid="connect">Connect wallet</button>
+    <button id="signout" hidden>Sign out</button></div>
+</header>
+<main>
+  <section class="card" id="s-file"><h2><span class="num">1</span>File a proposal</h2>
+    <form id="file-form">
+      <fieldset class="kinds"><legend>What should the DAO vote on?</legend>
+        <label><input type="radio" name="kind" value="join" checked data-testid="kind-join"> Add my account to the charter's reward list</label>
+        <label><input type="radio" name="kind" value="motion" data-testid="kind-motion"> A motion (text only, no charter change)</label></fieldset>
+      <label>Why <textarea id="desc" data-testid="desc" maxlength="280" rows="3" placeholder="I fixed the town map, please add me to the reward round"></textarea></label>
+      <p class="muted" id="bond"></p>
+      <button class="primary" id="file" data-testid="file" disabled>File proposal</button>
+    </form>
+    <div class="result" id="result" aria-live="polite" data-testid="result"></div>
+    <ul id="log" aria-live="polite"></ul>
+  </section>
+  <section class="card" id="s-who"><h2><span class="num">2</span>Who decides</h2><div id="facts">Loading…</div></section>
+  <section class="card wide" id="s-list"><h2>Latest proposals</h2><div id="list" data-testid="list">Loading…</div></section>
+</main>
+<script type="module" src="hall.bundle.js"></script>
+</body>
+</html>

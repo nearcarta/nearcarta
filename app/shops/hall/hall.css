@@ -1,0 +1,10 @@
+.kinds{border:0;padding:0;margin:0 0 var(--s-3);display:grid;gap:6px}
+.kinds legend{font-weight:600;margin-bottom:6px}
+#file-form label{display:block;margin-bottom:var(--s-3)}
+#file-form textarea{width:100%;font:inherit;padding:8px;border-radius:var(--r-md);border:1px solid var(--c-line);background:var(--c-glass);color:var(--c-text)}
+.props{list-style:none;padding:0;margin:0;display:grid;gap:var(--s-2)}
+.props li{border:1px solid var(--c-line);border-radius:var(--r-md);padding:var(--s-3)}
+.props .st{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-left:6px}
+.props .mine{outline:2px solid var(--c-accent-text)}
+.kinds label{display:flex!important;flex-direction:row!important;gap:8px;align-items:center;margin:0!important}
+.kinds input{width:auto!important;margin:0}
