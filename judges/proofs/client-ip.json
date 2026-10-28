@@ -1,0 +1,17 @@
+{
+ "what": "client IP behind the Vercel rewrite",
+ "measured_utc": "2026-10-28T05:47:10Z",
+ "render_commit": "57da6d7",
+ "before": {
+  "through_vercel": "cf-connecting-ip = Vercel egress (54.70.167.218, 35.94.204.218, 52.33.97.25 seen), so every visitor on one egress shared one quota",
+  "spoof_through_vercel": "client-sent X-Vercel-Forwarded-For / X-Forwarded-For / X-Real-IP are replaced by Vercel with the real visitor IP",
+  "spoof_direct": "a client-sent X-Vercel-Forwarded-For reaches Render unchanged when Render is called directly; client-sent CF-Connecting-IP is refused by Cloudflare (error 1000)"
+ },
+ "rule": "key = X-Vercel-Forwarded-For when it is an IP; the real connecting IP (CF-Connecting-IP) also gets a bucket at 20x the quota unless PROXY_SECRET verifies (x-nearcarta-proxy, timing-safe). Direct calls: CF-Connecting-IP.",
+ "two_ip_test": {
+  "route": "/api/whoami (limit 20/min)",
+  "visitor_A": "140.248.52.96, 22 requests over one HTTP/2 connection: 20x200 then 2x429",
+  "visitor_B": "3 requests from 140.248.52.69 / .18 / .75 through the same Vercel egress 54.70.167.218 and 52.33.97.25: all 200"
+ },
+ "unit_tests": "backend/test/unit/client-ip.test.js (6 tests)"
+}
