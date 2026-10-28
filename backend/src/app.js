@@ -8,12 +8,13 @@ import * as ferry from './ferry.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
 import * as mist from './mistbank.js';
+import * as mq from './mistqueue.js';
 import * as shops from './shops.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import { view, rpcStats } from './near.js';
-import { limiter, clientIpSource, clientIdentity, globalCap, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
+import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
@@ -102,7 +103,7 @@ export function makeApp() {
     const [from, ip, egress] = clientIdentity(c);
     const raw = c.req.raw.headers, seen = {};
     for (const n of IP_HEADERS) if (raw.get(n)) seen[n] = raw.get(n);
-    return c.json({ client_ip_from: from, client_ip: ip, shared_cap: egress, ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
+    return c.json({ client_ip_from: from, client_ip: ip, shared_cap: egress, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
 
@@ -183,6 +184,23 @@ export function makeApp() {
     return c.json(mist.verifyOpening(b.amount, b.salt));
   });
   app.get('/api/mistbank/verify', c => c.json({ error: 'POST {"amount":"<zatoshi>","salt":"<32 hex>"}; the opening is auditor-only and never goes in a URL' }, 405));
+  // Per-visitor private send: verify the charter approval and queue it. The box worker holds the Zcash
+  // key, sends after a random delay and reports back the txid + commitment only (src/mistqueue.js).
+  app.get('/api/mistbank/send', limiter(20), c => c.json(mq.info()));
+  app.post('/api/mistbank/send/prepare', limiter(20), async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    return c.json(mq.prepare(b.ua));
+  });
+  app.post('/api/mistbank/send', limiter(mq.LIMITS.per_ip_per_hour, 3600e3), async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    return c.json(await mq.enqueue(b), 202);
+  });
+  app.get('/api/mistbank/send/:id', limiter(30), c => c.json(mq.status(c.req.param('id'))));
+  app.post('/api/mistbank/worker/sync', limiter(10), async c => {
+    if (!mq.workerAuth(c.req.header('authorization'))) return c.json({ error: 'unauthorized' }, 401);
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    return c.json(mq.sync(b.records));
+  });
   app.get('/api/mistbank/street/:txid', limiter(10), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
   app.get('/api/townhall', limiter(20), async c => c.json(await reads.townhall()));
   app.get('/api/arena', limiter(20), async c => c.json(await reads.arena()));
