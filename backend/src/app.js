@@ -85,7 +85,12 @@ export function makeApp() {
   app.get('/api/ai/attestation', limiter(10, 60e3), async c => c.json(await ai.attestation(cfg.nearAiModel)));
   // Full TEE preflight (dcap-qvl quote, nonce + signer binding, MRCONFIGID, RTMR3 replay, NVIDIA NRAS).
   // Non-billable. ?nonce= lets the caller supply its own 32-byte hex nonce.
-  app.get('/api/ai/tee', limiter(6, 60e3), async c => c.json(await tee.proveTee({ nonce: c.req.query('nonce') || undefined })));
+  app.get('/api/ai/tee/models', limiter(6, 60e3), async c => c.json(await tee.attestedModels()));
+  app.get('/api/ai/tee', limiter(6, 60e3), async c => {
+    const model = c.req.query('model');
+    if (model && !(await tee.attestedModels()).attested.some(m => m.id === model)) return c.json({ error: `${model} has no TEE attestation; see /api/ai/tee/models` }, 400);
+    return c.json(await tee.proveTee({ nonce: c.req.query('nonce') || undefined, ...(model ? { model } : {}) }));
+  });
   app.post('/api/ai/prove', limiter(3, 60e3), async c => {
     // Completions are billable. Off unless AI_PROVE_ENABLED=1 (the account currently has no credits: HTTP 402).
     if (process.env.AI_PROVE_ENABLED !== '1') return c.json({ error: 'completions disabled on this deployment (AI_PROVE_ENABLED!=1)' }, 403);
