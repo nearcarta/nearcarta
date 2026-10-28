@@ -45,3 +45,15 @@ const acts = (ch?.txs || []).filter(t => t.method === 'propose' && t.result?.ok)
     decision: t.result.value.decision, reason: t.result.value.reason === 'ok' ? undefined : t.result.value.reason, amount: N(e.amount), clause: e.clause_id, tx: t.hash, src: 'testnet' };
 });
 export const CORE_TXS = acts.length ? acts : S.CORE_TXS;
+
+// Mist Bank: a real Zcash testnet shielded payout, its NEAR testnet oath approval, the ledger
+// disclosed with the payee viewing key, and live dry Confidential Intents quotes. null = keep SAMPLE.
+const mb = await j('/api/mistbank');
+export const BANK = mb?.built ? {
+  src: 'testnet',
+  street: { txid: mb.payout.txid, url: mb.payout.explorer, height: mb.street.height, confirmations: mb.street.confirmations, fee: mb.street.fee_zat,
+    hidden: mb.street.amount_hidden === true, reasons: mb.street.reasons || [], pool: Object.entries(mb.street.value_balance_zat || {}).find(([, v]) => v !== '0')?.[0] || 'shielded' },
+  oath: { tx: mb.oath.tx, ok: mb.oath.success && mb.oath.decision === 'allowed' && mb.oath.memo_on_chain, clause: mb.oath.clause_id },
+  ledger: { taz: mb.ledger?.taz, binds: mb.binds === true, ufvk: mb.disclosure?.ufvk },
+  desk: mb.desk?.available ? Object.entries(mb.desk.legs).map(([k, l]) => ({ leg: k, ok: l.ok, privacy: l.privacy, sig: l.signature, echo: l.echo?.ok, out: l.amountOut })) : [],
+} : null;
