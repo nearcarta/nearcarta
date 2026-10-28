@@ -63,12 +63,50 @@
       "refused_over_cap": "Crd3jTD5FmY8VX4q3sc1AXywsHywJHnFnGKTntBJvGtT",
       "finalized_proof": "GHFJoQdSKTK9Q9pUYEepeViMKhbyrmY7J4bMhuEw5fEV"
     },
-    "foreign_txs": { "base_sepolia_broadcast": "0xf7ed6482a8380c1fe84be32973256d00960f522cd0d70fe9fe16165190dbc43b" }
+    "foreign_txs": {
+      "base_sepolia_broadcast": "0xf7ed6482a8380c1fe84be32973256d00960f522cd0d70fe9fe16165190dbc43b"
+    }
   },
   "ferry": {
     "oneclick": "https://1click.chaindefuser.com",
     "verifier_mainnet": "intents.near",
     "quote_signer": "ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc",
     "note": "1Click has no testnet. Quotes are dry:true (no deposit address, nothing spent)."
+  },
+  "mistbank": {
+    "network": {
+      "near": "testnet",
+      "zcash": "testnet"
+    },
+    "commitment": {
+      "scheme": "sha256(\"mistbank:v1:<zats>:<salt>\")",
+      "value": "b22cc85878be366a3edb1d4ef3afbeea0813d4be02aec95a387242fa9a6055ce"
+    },
+    "oath": {
+      "tx": "5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+      "url": "https://testnet.nearblocks.io/txns/5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua",
+      "decision": "allowed",
+      "sender": "r11oath-82930.testnet",
+      "memo": "mb1:sizIWHi-Nmo-2x1O86--6ggT1L4CrslaOHJC-ppgVc4"
+    },
+    "payout": {
+      "txid": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
+      "height": 4549357,
+      "explorer": "https://testnet.cipherscan.app/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
+      "explorer_api": "https://api.testnet.cipherscan.app/api/tx/d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897"
+    },
+    "disclosure": {
+      "ufvk": "uviewtest1yjdau2fdgn3elmph0rht7wajh2xcw6q2shfhh6kxkt4j25tmvgjkmyxyadg93cjez5j0u4rhylyef2y8h2qcpg6p5e000xxsrkqmfgze6u7gx5lwukh4xal26l8yvwwvqujqtmeaum3rntwwzhqvh6emyt4nwzz6a47hfz9mrmglpxqafwgaflz3ymkgws6ynl5rtdgrwfpxufnawmktk0ua448gu3mms3nawp6zsvjzaqeefmmlfm80xmagy2947gqw4ng4xrvjcj5xfkf2dqsfh6jnnmx6acmczz5rq2kh2tlp7hdqc80espxen7ynrp6vtakf7vzqp6562jjzatuyqrcpqmapwwj3zdf6f7ewylu6rx3dcjkfug3c23lg4sfu75c2whpnuf6s38azyxjmwzvw9mmgllu99epfegrhngujuwznzwxjhdf59mdf9kajg9j8gk5fee2cnkmj2pl4jpcw8af6mk53y3x9mnrvc5xe6cfhptcm",
+      "payee_address": "utest14l9yactcwyjk0dtxmc4jjy3v3xaxwg4gs33q79wlsacp02uaxh5verm9ydhwpw7g5ltf22p0ssweexxr6t4xhmq0lhe3vwqazc2p450d",
+      "how": "zcash-devtool wallet -w <dir> init-fvk --name view --fvk <ufvk> --birthday <height-5>; wallet sync; wallet enhance; wallet list-tx"
+    },
+    "ledger": {
+      "txid": "d0b520673362ff6acd8d4ff9eb87beda9fa89f258ed9a07a5ffc57dfbcfa6897",
+      "height": 4549357,
+      "zats": 1370000,
+      "taz": "0.01370000",
+      "memo": "nearcarta mistbank v1 oath=5HG5SPJ53MhW799NjbqJGyUS1ymEiRvP9BWwLem1a3ua salt=67d50c7f78cc0cfdc145392edd674f83"
+    },
+    "zcash_explorer_api": "https://api.testnet.cipherscan.app"
   }
 }
