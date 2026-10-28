@@ -13,7 +13,7 @@ test('fpost retries a 429 and returns the answer', async () => {
 test('fpost: still 429 after retries -> error without status (onError answers 503 + Retry-After)', async () => {
   let n = 0;
   await assert.rejects(fpost('/account', {}, async () => { n++; return res(429); }, 1), e => /http 429/.test(e.message) && e.status === undefined);
-  assert.equal(n, 3);
+  assert.equal(n, 6); // a page feed is high priority: up to 6 tries through the shared cooldown, within its deadline
 });
 
 test('fpost: a 4xx other than 429 is not retried', async () => {

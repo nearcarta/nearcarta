@@ -2,6 +2,7 @@
 import { DEP } from './config.js';
 import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, rpc } from './near.js';
 import { snapshot } from './guardhouse.js';
+import { indexPost } from './txindex.js';
 
 const yocto = s => (s == null ? null : Number(BigInt(s) * 10000n / 10n ** 24n) / 1e4);
 
@@ -88,18 +89,12 @@ async function tollInstance([label, id]) {
 
 // Chronicle: recent txs of a shop contract (FastNEAR tx index for the list), each re-read from NEAR RPC
 // so events come from chain. Events from failed receipts are dropped (phantom events).
-const FASTNEAR_TX = 'https://tx.test.fastnear.com/v0';
-// The FastNEAR tx index rate-limits per IP (Render's egress is shared): retry 429/5xx twice with a short backoff,
-// then throw without a status so onError answers 503 + Retry-After instead of a bare 502.
+// The FastNEAR tx index rate-limits per IP (Render's egress is shared). Every call goes through one gate
+// (txindex.js): deadlines, one shared 429 cooldown, and page feeds ('high') ahead of the board rebuild ('low').
+// Still busy at the deadline -> an error without a status, so the route answers busy + Retry-After.
 export async function fpost(path, body, f = fetch, waitMs = 700) {
-  for (let i = 0; ; i++) {
-    const r = await f(`${FASTNEAR_TX}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    if (r.ok) return r.json();
-    const busy = r.status === 429 || r.status >= 500;
-    if (!busy) throw Object.assign(new Error(`fastnear tx http ${r.status}`), { status: 502 });
-    if (i >= 2) throw new Error(`fastnear tx http ${r.status}`);
-    await new Promise(res => setTimeout(res, waitMs * (i + 1)));
-  }
+  try { return await indexPost('/v0' + path, body, { prio: 'high', f, baseMs: waitMs }); }
+  catch (e) { if (e.status) throw Object.assign(new Error(`fastnear ${e.message}`), { status: e.status }); throw new Error(`fastnear ${e.message}`); }
 }
 // Pages poll the feed after every tx: concurrent callers for one account+limit share one upstream read (1 s reuse),
 // and the last good feed (marked stale) when the index is still busy after retries.
@@ -121,15 +116,40 @@ async function chronicleOnce(account, limit = 8) {
   const signer = Object.fromEntries(transactions.map(t => [t.transaction.hash, t.transaction.signer_id]));
   const out = [];
   for (const t of list) {
-    try {
-      const tx = await txStatus(t.transaction_hash, signer[t.transaction_hash] || account);
-      const { events, dropped } = eventsFromOutcome(tx);
-      out.push({ hash: t.transaction_hash, url: explorerTx(t.transaction_hash), at: new Date(Number(BigInt(t.tx_block_timestamp) / 1000000n)).toISOString(),
-        signer: tx.transaction.signer_id, method: tx.transaction.actions?.[0]?.FunctionCall?.method_name || Object.keys(tx.transaction.actions?.[0] || {})[0],
-        result: txResult(tx), events: events.map(e => ({ standard: e.standard, event: e.event, data: e.data })), phantomDropped: dropped });
-    } catch (e) { out.push({ hash: t.transaction_hash, error: e.message.slice(0, 120) }); }
+    try { out.push(txRow(await txStatus(t.transaction_hash, signer[t.transaction_hash] || account), new Date(Number(BigInt(t.tx_block_timestamp) / 1000000n)).toISOString())); }
+    catch (e) { out.push({ hash: t.transaction_hash, error: e.message.slice(0, 120) }); }
   }
   return { account, count: out.length, source: 'tx.test.fastnear.com list + rpc EXPERIMENTAL_tx_status', txs: out };
+}
+function txRow(tx, at) {
+  const h = tx.transaction.hash;
+  const { events, dropped } = eventsFromOutcome(tx);
+  return { hash: h, url: explorerTx(h), at, signer: tx.transaction.signer_id,
+    method: tx.transaction.actions?.[0]?.FunctionCall?.method_name || Object.keys(tx.transaction.actions?.[0] || {})[0],
+    result: txResult(tx), events: events.map(e => ({ standard: e.standard, event: e.event, data: e.data })), phantomDropped: dropped };
+}
+/** Does this tx belong to the account's feed: signed by it, sent to it, or the factory call that created it. */
+export function txOf(tx, account) {
+  const t = tx?.transaction;
+  if (!t) return false;
+  if (t.signer_id === account || t.receiver_id === account) return true;
+  const fc = t.actions?.[0]?.FunctionCall;
+  if (fc?.method_name !== 'create_charter') return false;
+  try { return `${JSON.parse(Buffer.from(fc.args, 'base64').toString('utf8')).name}.${t.receiver_id}` === account; } catch { return false; }
+}
+/**
+ * The feed without the index: given tx hashes (the page's own txs, or rows this server already verified), re-read
+ * each from RPC and keep only those that belong to the account. Nothing is taken on trust from the caller.
+ */
+export async function chronicleFrom(account, hashes, limit = 8, { status = txStatus, blockAt = blockIso } = {}) {
+  const rows = (await Promise.all([...new Set(hashes)].slice(0, 30).map(async h => {
+    try { const tx = await status(h, account); return txOf(tx, account) ? txRow(tx, await blockAt(tx.transaction_outcome?.block_hash)) : null; }
+    catch { return null; }
+  }))).filter(Boolean).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  return { account, count: Math.min(rows.length, limit), source: 'known tx hashes + rpc EXPERIMENTAL_tx_status (tx index busy)', partial: true, txs: rows.slice(0, limit) };
+}
+async function blockIso(blockHash) {
+  try { const b = await rpc('block', { block_id: blockHash }); return new Date(Number(BigInt(b.header.timestamp_nanosec) / 1000000n)).toISOString(); } catch { return null; }
 }
 
 export async function explainAny(hash, sender) {
