@@ -8,7 +8,7 @@ Deployed (testnet, read-only, no keys): https://nearcarta.vercel.app. Example: `
 ```
 npm ci
 npm test                 # 35 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
-npm run verify           # reads every proof tx back from testnet (38/38 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
+npm run verify           # reads every proof tx back from testnet (47/47 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # read-only API on :8787 (no route signs)
 npm run build && node app/serve.mjs &   # UI on :5173
 npx playwright install chromium && npm run e2e   # 13 browser tests
@@ -53,5 +53,6 @@ Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-re
 - The Vault Arena contract on testnet (`r6vamvr9brhx-arena3.testnet`, code hash `D7r681CT…`) was built before this repo; a fresh build of `contracts/arena` gives a different hash (`FmFUbaDz…`). Only the charter (`r11oath-82930.testnet`) is proven to equal a committed wasm.
 - NEAR AI Cloud: the TEE evidence check runs live and is free. Chat completions are billable and the account has no credits (HTTP 402), so `/api/ai/prove` is off unless `AI_PROVE_ENABLED=1`. When enabled, it verifies the TEE first and sends the completion only if every check passes, then matches the response signer to the verified report.
 - Mist Bank runs on Zcash testnet (TAZ) and NEAR testnet. The Confidential Intents legs are dry quotes; no real confidential deposit is made (that would be a mainnet spend). Anyone holding the viewing key learns the opening, which is intended: they are the auditor.
-- The deployed API is read-only. Agent txs are sent only by `backend/scripts/guardhouse-demo.js`, `escalation-demo.js` and `mistbank-record.js` from a machine that holds the keys.
-- Toll and Town Hall run their own smaller contracts (`contracts/toll`, `contracts/townhall`), built before the R11 hardening of the charter. Their accounts still have a full-access key, and they have no policy timelock or escalation. Guardhouse, Mist Bank and Your House use the R11 charter `r11oath-82930.testnet` (0 full-access keys).
+- The deployed API is read-only. Agent txs are sent only by `backend/scripts/guardhouse-demo.js`, `escalation-demo.js`, `mistbank-record.js` and `house-escalate.js` from a machine that holds the keys. In Your House the owner signs freeze, unfreeze, approve and deny in their own wallet; the server never holds the owner key.
+- Your House signs through NEAR Wallet Selector 10.1.4 with MyNearWallet and Meteor on testnet. MyNearWallet says it is planned to be deprecated on 31 October 2026, and NEAR docs now point to NEAR Connect. The Playwright proof (`e2e/house.spec.js`) used MyNearWallet; moving to NEAR Connect is open work.
+- Toll and Town Hall run their own smaller contracts (`contracts/toll`, `contracts/townhall`), built before the R11 hardening of the charter. Their accounts still have a full-access key, and they have no policy timelock or escalation. Guardhouse and Mist Bank use the R11 charter `r11oath-82930.testnet`; Your House runs its own instance of the same wasm, `r11house-31474.testnet` (same code hash). Both have 0 full-access keys.
