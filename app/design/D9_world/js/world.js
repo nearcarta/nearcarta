@@ -236,7 +236,8 @@ function buildSigns(){ const wood=new THREE.MeshLambertMaterial({color:0x4a3020}
     const arm=new THREE.Mesh(new THREE.BoxGeometry(.04,.04,.36),iron); arm.position.set(0,0,0); g.add(arm);
     const pv=new THREE.Group(); pv.position.set(0,-.02,.0); g.add(pv);
     const tex=signTex(id); const face=new THREE.MeshLambertMaterial({map:tex,emissive:0x3a2614,emissiveMap:tex,emissiveIntensity:.0});
-    const board=new THREE.Mesh(new THREE.BoxGeometry(.03,.3,.3),[wood,wood,wood,wood,face,face]); board.rotation.y=Math.PI/2; board.position.y=-.19; board.castShadow=true; board.userData.dynCast=true; pv.add(board);
+    // four wood sides in one group, two painted faces in the other: 2 draws per sign, not 6
+    const bg=new THREE.BoxGeometry(.03,.3,.3); bg.clearGroups(); bg.addGroup(0,24,0); bg.addGroup(24,12,1); const board=new THREE.Mesh(bg,[wood,face]); board.rotation.y=Math.PI/2; board.position.y=-.19; board.castShadow=true; board.userData.dynCast=true; pv.add(board);
     g.traverse(m=>{ if(m.isMesh) m.userData.id=id; }); W.pickables.push(board);
     W.scene.add(g); signs.push({pv,face,ph:rnd()*6});
     // door lantern and a warm spill on the step
@@ -246,7 +247,7 @@ function buildSigns(){ const wood=new THREE.MeshLambertMaterial({color:0x4a3020}
     signs[signs.length-1].halo=halo; signs[signs.length-1].pool=pool; signs[signs.length-1].lm=lm; }
 }
 function updSigns(T,dt){ const k=W.lampAmb||0; for(const s of signs){ s.pv.rotation.x=Math.sin(T*1.3+s.ph)*.09*(1-W.frz)*U.wind.value; s.face.emissiveIntensity=k*.6;
-  const f=.85+.15*Math.sin(T*9+s.ph*3)*Math.sin(T*3.7+s.ph); s.halo.material.opacity=k*.5*f*(1-W.frz*.6); s.pool.material.opacity=k*.32*f*(1-W.frz*.6); s.halo.scale.setScalar(.36+k*.2); s.lm.material.color.setHex(W.frz>.5?0xbfe6ff:0xffc477); } }
+  const f=.85+.15*Math.sin(T*9+s.ph*3)*Math.sin(T*3.7+s.ph); s.halo.material.opacity=k*.5*f*(1-W.frz*.6); s.pool.material.opacity=k*.32*f*(1-W.frz*.6); s.halo.visible=s.halo.material.opacity>.004; s.pool.visible=s.pool.material.opacity>.004; s.halo.scale.setScalar(.36+k*.2); s.lm.material.color.setHex(W.frz>.5?0xbfe6ff:0xffc477); } }
 const clouds=[];
 
 // ---------- water: one stylized plane, shallow→deep by an island distance field, two foam bands ----------
@@ -294,7 +295,7 @@ function cellInst(geo,mat,items,{cell=7,lod=null,far=null,farD=26,shadow=false,n
     m.receiveShadow=true; m.castShadow=shadow; m.computeBoundingSphere(); m.userData.cell={n:arr.length,lod,far,near:geo,farD}; grp.add(m); LODC.push(m); }
   W.scene.add(grp); return grp; }
 function updLod(){ const cp=W.camera.position; for(const m of LODC){ const u=m.userData.cell; const d=cp.distanceTo(m.boundingSphere.center);
-    if(u.lod) m.count=Math.max(0,Math.min(u.n,Math.round(u.n*u.lod(d)))); if(u.far) m.geometry=d>u.farD?u.far:u.near; } }
+    if(u.lod){ m.count=Math.max(0,Math.min(u.n,Math.round(u.n*u.lod(d)))); m.visible=m.count>0; } if(u.far) m.geometry=d>u.farD?u.far:u.near; } }
 // ---------- instanced grass tufts with wind ----------
 function buildGrass(){
   const blade=new THREE.BufferGeometry(); const P=[],Cc=[]; for(let i=0;i<3;i++){ const a=i/3*Math.PI+rnd()*.4, w=.035, h=.16+rnd()*.06, lx=Math.cos(a)*.03, lz=Math.sin(a)*.03;
