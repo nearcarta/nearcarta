@@ -19,7 +19,7 @@ fn toll() -> Oath {
     set("owner.test");
     Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "toll".into(), 84532,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.to_uppercase().replace("0X", "0x")],
-        U128(100), U128(150), U128(10), None)
+        U128(100), U128(150), U128(10), None, None, None)
 }
 fn pay(o: &mut Oath, to: &str, v: u128) -> Promise { o.pay(to.into(), U128(v), U128(5), U128(1), 21000) }
 fn spent(o: &Oath) -> String { o.policy()["spent"].as_str().unwrap().to_string() }
@@ -106,7 +106,7 @@ fn arb(chain_id: u64, chain: &str) -> Oath {
     set("owner.test");
     Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "arb-1".into(), chain_id,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
-        U128(100), U128(150), U128(10), Some(chain.into()))
+        U128(100), U128(150), U128(10), Some(chain.into()), None, None)
 }
 
 #[test]
@@ -137,4 +137,74 @@ fn payload_matches_real_arbitrum_sepolia_proof() {
     let b = crate::proof_payload(7, "ee42361cea2ff228cc1703e91188acc8b39c412bb2bf09335c72169be7139ed7",
         "0x64ee2745f7637d236ceaa471fbebb4fd98621184acba8360f1595d49df73455c");
     assert_eq!(hex::encode(near_sdk::env::sha256(&b)), "6e6b1eb1dd56ee291e591de942f006b4ce40eb2476ba2456f1132ba77b9d1f48");
+}
+
+// ---------------- v3: ERC-20 (USDC) payouts and DAO-only unfreeze ----------------
+const USDC: &str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+/// USDC toll: cap 1 USDC per tx, budget 3 USDC (6 decimals), DAO set.
+fn usdc() -> Oath {
+    set("owner.test");
+    Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "usdc-1".into(), 84532,
+        "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
+        U128(1_000_000), U128(3_000_000), U128(10), None, Some(USDC.into()), Some(acc("dao.test")))
+}
+
+#[test]
+fn erc20_calldata_matches_abi_encoding() {
+    assert_eq!(hx(&erc20_transfer_data(TO, 1_000_000)),
+        "a9059cbb000000000000000000000000111111111111111111111111111111111111111100000000000000000000000000000000000000000000000000000000000f4240");
+}
+
+#[test]
+fn usdc_payout_hash_matches_viem() {
+    // viem serializeTransaction({eip1559, chainId 84532, nonce 0, prio 1, maxFee 5, gas 60000, to USDC, value 0, data transfer(TO, 1 USDC)})
+    let mut o = usdc();
+    let _ = o.pay(TO.into(), U128(1_000_000), U128(5), U128(1), 60_000);
+    let rec = o.get_tx(0).unwrap();
+    assert_eq!(rec.unsigned_hash, "644cc0d7af5fb45075ef793486cd85964ceb7381f09063badf26e09c12c0cc10");
+    assert_eq!((rec.to.as_str(), rec.value.0), (TO, 1_000_000));
+    assert_eq!(o.policy()["asset"]["erc20"], json!(USDC.to_lowercase()));
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: value over per-tx cap")]
+fn usdc_over_cap_refused() { let mut o = usdc(); let _ = o.pay(TO.into(), U128(1_000_001), U128(5), U128(1), 60_000); }
+
+#[test]
+#[should_panic(expected = "REFUSED: recipient not in oath allowlist")]
+fn usdc_recipient_outside_allowlist_refused() { let mut o = usdc(); let _ = o.pay(OTHER.into(), U128(1), U128(5), U128(1), 60_000); }
+
+#[test]
+#[should_panic(expected = "REFUSED: budget exhausted")]
+fn usdc_budget_counts_token_units() {
+    let mut o = usdc();
+    for _ in 0..3 { let _ = o.pay(TO.into(), U128(1_000_000), U128(5), U128(1), 60_000); }
+    let _ = o.pay(TO.into(), U128(1), U128(5), U128(1), 60_000);
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: gas limit over ERC-20 cap")]
+fn usdc_gas_over_cap_refused() { let mut o = usdc(); let _ = o.pay(TO.into(), U128(1), U128(5), U128(1), 100_001); }
+
+#[test]
+#[should_panic(expected = "only dao unfreezes")]
+fn with_a_dao_the_owner_cannot_unfreeze() { let mut o = usdc(); o.freeze(); o.unfreeze(); }
+
+#[test]
+fn dao_can_freeze_and_unfreeze() {
+    let mut o = usdc();
+    set("dao.test"); o.freeze();
+    assert_eq!(o.policy()["frozen"], json!(true));
+    o.unfreeze();
+    set("owner.test");
+    let _ = o.pay(TO.into(), U128(1), U128(5), U128(1), 60_000);
+    assert_eq!(spent(&o), "1");
+}
+
+#[test]
+#[should_panic(expected = "token must be a 0x address")]
+fn bad_token_address_refused() {
+    set("owner.test");
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "x".into(), 84532, "0x01".into(), "00".into(), vec![],
+        U128(1), U128(1), U128(1), None, Some("0x1234".into()), None);
 }

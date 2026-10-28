@@ -3,6 +3,9 @@
 //! The agent can only *propose*; this contract checks the clauses, builds the EIP-1559 tx itself,
 //! asks the MPC network to sign it (predecessor = this contract, so the key belongs to the oath),
 //! and later settles it only on an MPC foreign-tx proof (verify_foreign_transaction).
+//! v3: an optional ERC-20 `token` (e.g. Circle USDC on Base Sepolia). With a token set, `pay` builds
+//! `token.transfer(to, value)` itself (EVM value 0), and the caps and budget count token units.
+//! v3: an optional `dao`. With a DAO set, only the DAO can unfreeze (the owner can still freeze).
 mod rlp;
 use near_sdk::json_types::U128;
 use near_sdk::store::LookupMap;
@@ -40,6 +43,19 @@ pub struct Oath {
     frozen: bool,
     txs: LookupMap<u64, TxRec>,
     verify_chain: String,     // MPC ForeignChainRpcRequest variant name, e.g. "Base", "Arbitrum"
+    token: Option<String>,    // v3: ERC-20 contract; None = native coin
+    dao: Option<AccountId>,   // v3: if set, the only account that can unfreeze
+}
+
+/// v3: gas limit cap for an ERC-20 transfer (a USDC transfer uses about 40-60k).
+pub const ERC20_GAS_CAP: u64 = 100_000;
+
+/// ABI calldata for `transfer(address,uint256)`.
+pub fn erc20_transfer_data(to: &str, value: u128) -> Vec<u8> {
+    let mut d = vec![0xa9, 0x05, 0x9c, 0xbb];
+    d.extend([0u8; 12]); d.extend(unhex(to));
+    d.extend([0u8; 16]); d.extend(value.to_be_bytes());
+    d
 }
 
 fn hx(b: &[u8]) -> String { hex::encode(b) }
@@ -73,19 +89,28 @@ impl Oath {
     #[init]
     pub fn new(owner: AccountId, mpc: AccountId, path: String, chain_id: u64, foreign_address: String,
                fx_root_key: String, allow_to: Vec<String>, max_per_tx: U128, budget: U128, max_fee_cap: U128,
-               verify_chain: Option<String>) -> Self {
+               verify_chain: Option<String>, token: Option<String>, dao: Option<AccountId>) -> Self {
         let verify_chain = verify_chain.unwrap_or_else(|| "Base".into());
         let (_, ids) = evm_chain(&verify_chain).expect("verify_chain not supported");
         require!(ids.contains(&chain_id), "chain_id does not belong to verify_chain");
+        let token = token.map(|t| t.to_lowercase());
+        if let Some(t) = &token { require!(t.len() == 42 && unhex(t).len() == 20, "token must be a 0x address"); }
         Self { owner, mpc, path, chain_id, foreign_address: foreign_address.to_lowercase(), fx_root_key,
                allow_to: allow_to.into_iter().map(|a| a.to_lowercase()).collect(),
                max_per_tx: max_per_tx.0, budget: budget.0, spent: 0, max_fee_cap: max_fee_cap.0,
-               next_nonce: 0, frozen: false, txs: LookupMap::new(b"t"), verify_chain }
+               next_nonce: 0, frozen: false, txs: LookupMap::new(b"t"), verify_chain, token, dao }
     }
 
     fn assert_owner(&self) { require!(env::predecessor_account_id() == self.owner, "only owner"); }
-    pub fn freeze(&mut self) { self.assert_owner(); self.frozen = true; }
-    pub fn unfreeze(&mut self) { self.assert_owner(); self.frozen = false; }
+    pub fn freeze(&mut self) {
+        let c = env::predecessor_account_id();
+        require!(c == self.owner || Some(&c) == self.dao.as_ref(), "only owner");
+        self.frozen = true;
+    }
+    pub fn unfreeze(&mut self) {
+        match &self.dao { Some(d) => require!(&env::predecessor_account_id() == d, "only dao unfreezes"), None => self.assert_owner() }
+        self.frozen = false;
+    }
     pub fn set_nonce(&mut self, nonce: u64) { self.assert_owner(); self.next_nonce = nonce; }
 
     pub fn policy(&self) -> Value {
@@ -93,7 +118,8 @@ impl Oath {
                "foreign_address": self.foreign_address, "allow_to": self.allow_to,
                "max_per_tx": self.max_per_tx.to_string(), "budget": self.budget.to_string(),
                "spent": self.spent.to_string(), "max_fee_cap": self.max_fee_cap.to_string(),
-               "next_nonce": self.next_nonce, "frozen": self.frozen, "verify_chain": self.verify_chain})
+               "next_nonce": self.next_nonce, "frozen": self.frozen, "verify_chain": self.verify_chain,
+               "asset": self.token.as_ref().map(|t| json!({"erc20": t})).unwrap_or(json!("native")), "dao": self.dao})
     }
     pub fn get_tx(&self, nonce: u64) -> Option<TxRec> { self.txs.get(&nonce).cloned() }
 
@@ -107,7 +133,10 @@ impl Oath {
         require!(value.0 <= self.max_per_tx, "REFUSED: value over per-tx cap");
         require!(self.spent + value.0 <= self.budget, "REFUSED: budget exhausted");
         require!(max_fee_per_gas.0 <= self.max_fee_cap && max_priority_fee_per_gas.0 <= max_fee_per_gas.0, "REFUSED: gas fee over cap");
-        require!(gas_limit <= 21000, "REFUSED: only plain transfers (gas 21000)");
+        match self.token {
+            None => require!(gas_limit <= 21000, "REFUSED: only plain transfers (gas 21000)"),
+            Some(_) => require!(gas_limit <= ERC20_GAS_CAP, "REFUSED: gas limit over ERC-20 cap"),
+        }
         let nonce = self.next_nonce;
         let fields = self.fields(nonce, max_priority_fee_per_gas.0, max_fee_per_gas.0, gas_limit, &to, value.0);
         let mut pre = vec![0x02u8];
@@ -124,9 +153,14 @@ impl Oath {
             .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(30)).on_signed(nonce, max_fee_per_gas, max_priority_fee_per_gas, gas_limit))
     }
 
+    /// `to`/`value` are the payout's recipient and amount; with a token the EVM tx goes to the token with value 0.
     fn fields(&self, nonce: u64, prio: u128, maxfee: u128, gas: u64, to: &str, value: u128) -> Vec<Vec<u8>> {
+        let (evm_to, evm_value, data) = match &self.token {
+            None => (unhex(to), value, vec![]),
+            Some(t) => (unhex(t), 0, erc20_transfer_data(to, value)),
+        };
         vec![rlp::enc_uint(self.chain_id as u128), rlp::enc_uint(nonce as u128), rlp::enc_uint(prio), rlp::enc_uint(maxfee),
-             rlp::enc_uint(gas as u128), rlp::enc_bytes(&unhex(to)), rlp::enc_uint(value), rlp::enc_bytes(&[]), rlp::enc_list(&[])]
+             rlp::enc_uint(gas as u128), rlp::enc_bytes(&evm_to), rlp::enc_uint(evm_value), rlp::enc_bytes(&data), rlp::enc_list(&[])]
     }
 
     #[private]
