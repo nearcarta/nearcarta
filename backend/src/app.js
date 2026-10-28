@@ -9,6 +9,7 @@ import * as mist from './mistbank.js';
 import * as shops from './shops.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
+import { view } from './near.js';
 
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 const ACCT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -50,6 +51,15 @@ export function makeApp() {
 
   // Guardhouse
   app.get('/api/guardhouse', async c => c.json(await guard.snapshot()));
+  // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
+  app.get('/api/house', async c => {
+    const H = DEP.house; if (!H) return c.json({ error: 'no house' }, 404);
+    const [snap, pending] = await Promise.all([guard.snapshot(H.oath), view(H.oath, 'get_pending')]);
+    // get_pending is queued policy changes; held agent spends are actions with status "escalated", so read the latest few.
+    const next = Number(snap.state.next_action || 0), actions = {};
+    await Promise.all(Array.from({ length: Math.min(next, 8) }, (_, i) => String(next - 1 - i)).map(async id => { actions[id] = await guard.action(id, H.oath).catch(() => null); }));
+    return c.json({ ...snap, owner: H.owner, dao: H.dao, code_hash: H.code_hash, pending, actions, proof_txs: H.proof_txs, demo: H.demo || null });
+  });
   app.get('/api/guardhouse/action/:id', async c => c.json(await guard.action(c.req.param('id'))));
 
   // Other shops
