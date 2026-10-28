@@ -32,7 +32,7 @@
   "to": "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5",
   "value_usdc_units": "500000",
   "evm_nonce": 0,
-  "status_on_near": "signed",
+  "status_on_near": "confirmed",
   "unsigned_hash": "1f4ae2387fb20f9f259d7f0f38bf3864c796bc1a1d5f3a7105867f00c701c891",
   "evm_tx_hash": "0xf5e5d0ba6c9a2f16357d272bbcd268b4bff8eb6ac5155849a62dfa66252ca150",
   "raw_signed": "0x02f8b283014a3480830f42408401312d0083015f9094036cbd53842c5426634e7929541ec2318f3dcf7e80b844a9059cbb000000000000000000000000552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5000000000000000000000000000000000000000000000000000000000007a120c001a0c857a7b7692b21626674c99272b57facf5aa485a8cfdb8c077f43a509ad512aea035d612a3a1e43189a3cac52fbe431afe8380bf161df7b1c643ef8f7ed7f3cdec",
@@ -61,6 +61,42 @@
   "value_wei": "10000000000000",
   "block": 51476020
  },
- "not_done": "Broadcast and settle. The derived address 0x2010\u2026b036 has 0 test USDC (checked 2026-10-28 22:55 Cairo, UTC+3): the faucet USDC went to the first Toll's address 0xfbd3\u2026254e, and that Toll (v2) signs native ETH transfers only and has no upgrade method, so those 20 USDC stay there by design. When 0x2010\u2026b036 holds >= 0.5 USDC, the signed tx above is broadcast unchanged and settle(0) proves it through the MPC (domain 3, Base).",
- "nep330_note": "The wasm metadata names rev 1b8fd86; that commit was rebased to 6079a71 on main with an identical contracts/ tree and is kept reachable by tag build-1b8fd86."
+ "nep330_note": "The wasm metadata names rev 1b8fd86; that commit was rebased to 6079a71 on main with an identical contracts/ tree and is kept reachable by tag build-1b8fd86.",
+ "broadcast": {
+  "evm_tx_hash": "0xf5e5d0ba6c9a2f16357d272bbcd268b4bff8eb6ac5155849a62dfa66252ca150",
+  "raw": "the signed bytes above, broadcast unchanged",
+  "receipt_status": 1,
+  "block": 51480343,
+  "block_hash": "0x1ce477746e64065ad85bcd3101fdf3232db762c54f634fc7f790122c8cb00302",
+  "block_time": "2026-10-28 23:05 Cairo (UTC+3)",
+  "gas_used": 62159,
+  "after": {
+   "0x2010fa71347b99f4a42dce85c0a697b7f6fdb036": {
+    "usdc_units": "19500000",
+    "nonce": 1
+   },
+   "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5": {
+    "usdc_units": "500000"
+   }
+  },
+  "funded_by": "Circle Base Sepolia USDC faucet, 20 USDC to 0x2010\u2026b036 (an ordinary testnet faucet request; the Toll does not mint or receive anything else)"
+ },
+ "settle": {
+  "call": "settle({nonce:0, block_hash})",
+  "after": "Base finalized block >= 51480343",
+  "attempts": [
+   {
+    "near_tx": "3WMF2KTAxKRFFciZGw7HxYcW12E4ZjK1976pqrEjm4Xt",
+    "mpc": "v1.signer-prod.testnet verify_foreign_transaction (domain 3, Base, finality Finalized)",
+    "result": "MPC panicked 'Request has timed out.'; the Toll logged proof_failed and kept status signed, so the record stayed settleable"
+   },
+   {
+    "near_tx": "BwYucg5W4Jh9UaKGZQcrZuSeL9Ha6bxHAbC6Gsocvkzo",
+    "result": "confirmed",
+    "proof_payload_hash": "21e9008d1977db3878ab580e4b0e960f66992070567a35ada46e53edb692eb07",
+    "event": "town-chronicle confirmed {nonce 0, tx_hash 0xf5e5d0ba\u2026, block_hash 0x1ce47774\u2026}"
+   }
+  ],
+  "check": "near view toll-usdc.r14own-46135.testnet get_tx '{\"nonce\":0}' -> status confirmed"
+ }
 }

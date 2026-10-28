@@ -438,7 +438,10 @@
     "signed": {
       "evm_tx_hash": "0xf5e5d0ba6c9a2f16357d272bbcd268b4bff8eb6ac5155849a62dfa66252ca150",
       "near_tx": "ACdXTYd5mAWVRssa7m9pMfefegAQg7rmfcvm7nyxiA1q",
-      "broadcast": false
+      "broadcast": true,
+      "block": 51480343,
+      "settle_near_tx": "BwYucg5W4Jh9UaKGZQcrZuSeL9Ha6bxHAbC6Gsocvkzo",
+      "status": "confirmed"
     },
     "refused_txs": [
       "BYziKkLvreS7wog9BUbdNkdeUsMX3ojSQz4DttwqELNV",
