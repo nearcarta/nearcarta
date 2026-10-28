@@ -1,0 +1,37 @@
+[package]
+name = "oath"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.near.reproducible_build]
+image = "sourcescan/cargo-near:0.22.0-rust-1.95.0"
+image_digest = ""
+passed_env = []
+container_build_command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+
+[dependencies]
+near-sdk = "5.30.0"
+hex = "0.4"
+
+[dev-dependencies]
+near-workspaces = { version = "0.24.0", features = ["unstable"] }
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+near-sdk = { version = "5.30.0", features = ["unit-testing"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
