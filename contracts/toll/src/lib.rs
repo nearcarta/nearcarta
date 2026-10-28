@@ -173,3 +173,6 @@ impl Oath {
         Some(rec)
     }
 }
+
+#[cfg(test)]
+mod tests;
