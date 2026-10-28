@@ -1,0 +1,8 @@
+**
+!package.json
+!package-lock.json
+!backend/package.json
+!app/package.json
+!backend/src/**
+!shared/**
+!judges/proofs/mistbank-payout.json
