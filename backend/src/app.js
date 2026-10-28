@@ -133,6 +133,27 @@ export function makeApp() {
     if (!knownAccounts.has(a)) return c.json({ error: 'not a Nearcarta contract' }, 400);
     return c.json(await shops.chronicle(a, Math.min(Number(c.req.query('limit') || 8), 15)));
   });
+  // R16 oath charters: on-chain reputation (refusal buckets) and one clause's user-set rules. Read-only views;
+  // older charters (R14/R15) have no such method and answer { supported: false }.
+  const oathRead = (method, args) => async c => {
+    const a = c.req.param('account');
+    if (!ACCT.test(a)) return c.json({ error: 'not an account id' }, 400);
+    try {
+      const v = await view(a, method, args(c));
+      if (v == null) return c.json({ error: 'no such clause' }, 404);
+      return c.json({ account: a, supported: true, [method === 'get_reputation' ? 'reputation' : 'rules']: v });
+    }
+    catch (e) {
+      const m = String(e.message);
+      if (/MethodNotFound|CodeDoesNotExist|does not exist/i.test(m)) return c.json({ account: a, supported: false, note: 'needs an R16 oath charter' });
+      throw e;
+    }
+  };
+  app.get('/api/charter/:account/reputation', limiter(20), oathRead('get_reputation', () => ({})));
+  app.get('/api/charter/:account/rules/:clause', limiter(20), async (c, n) => {
+    if (!/^[a-z0-9_-]{1,64}$/.test(c.req.param('clause'))) return c.json({ error: 'bad clause id' }, 400);
+    return oathRead('get_rules', c => ({ clause_id: c.req.param('clause') }))(c, n);
+  });
   app.get('/api/tx/:hash', limiter(20), async c => {
     const h = c.req.param('hash'), s = c.req.query('sender');
     if (!HASH.test(h) || !s || !ACCT.test(s)) return c.json({ error: 'need tx hash and ?sender=' }, 400);

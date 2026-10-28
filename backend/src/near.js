@@ -56,7 +56,7 @@ export async function rpc(method, params, url = cfg.rpc) {
   }
   rpcStats.lastError = { at: new Date().toISOString(), message: String(last?.message).slice(0, 200) };
   if (hit && Date.now() - hit.at < cfg.rpcStaleMs) { rpcStats.staleServed++; return hit.value; }
-  throw last;
+  throw last ?? new Error(`rpc ${method}: no attempt made (rpcRetries < 1)`);
 }
 
 export async function view(accountId, method, args = {}, url = cfg.rpc) {
