@@ -1,5 +1,5 @@
 {
- "at": "2026-10-28T23:16:50.259Z",
+ "at": "2026-10-28T23:23:10.792Z",
  "rows": [
   {
    "shop": "guardhouse",
@@ -421,6 +421,22 @@
    "events": [
     "freeze"
    ],
+   "found": true
+  },
+  {
+   "shop": "townhall",
+   "label": "visitor_files_proposal",
+   "hash": "8HEfCM16UeKbNbKnY3tGE2biQvYsFK8L9KmnRnWKdN1D",
+   "url": "https://testnet.nearblocks.io/txns/8HEfCM16UeKbNbKnY3tGE2biQvYsFK8L9KmnRnWKdN1D",
+   "signer": "ncguest-296t703o3g.testnet",
+   "source": "fastnear",
+   "receiver": "r7thmvr8maey.sputnikv2.testnet",
+   "method": "add_proposal",
+   "result": {
+    "ok": true,
+    "value": 10
+   },
+   "events": [],
    "found": true
   },
   {
@@ -1155,7 +1171,7 @@
    "hash": "D4qeFFNgKNBmD4cbcVRR8XXrfrnfoUTQyhY1CpMN9pSY",
    "url": "https://testnet.nearblocks.io/txns/D4qeFFNgKNBmD4cbcVRR8XXrfrnfoUTQyhY1CpMN9pSY",
    "signer": "r11hown-31474.testnet",
-   "source": "rpc",
+   "source": "fastnear",
    "receiver": "r11house-31474.testnet",
    "method": "set_policy_delay",
    "result": {
@@ -1176,7 +1192,7 @@
    "hash": "A4QENSGxhhixhdLiyaprTh2Rzg25QsyaFMK49f84PCkC",
    "url": "https://testnet.nearblocks.io/txns/A4QENSGxhhixhdLiyaprTh2Rzg25QsyaFMK49f84PCkC",
    "signer": "r11house-31474.testnet",
-   "source": "rpc",
+   "source": "fastnear",
    "receiver": "r11house-31474.testnet",
    "method": "DeleteKey",
    "result": {
@@ -1192,7 +1208,7 @@
    "hash": "56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae",
    "url": "https://testnet.nearblocks.io/txns/56K4Yzk46VDcKCuZ9ViJ4D7QsHcHEW1B6EJpm1PwXNae",
    "signer": "r11hown-31474.testnet",
-   "source": "rpc",
+   "source": "fastnear",
    "receiver": "r11house-31474.testnet",
    "method": "freeze",
    "result": {
@@ -1210,7 +1226,7 @@
    "hash": "HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ",
    "url": "https://testnet.nearblocks.io/txns/HEEGDfCs1TWXGpDk3jKD96xehgcsh7qBnjmfvSqqV8PQ",
    "signer": "r11hown-31474.testnet",
-   "source": "rpc",
+   "source": "fastnear",
    "receiver": "r11house-31474.testnet",
    "method": "unfreeze",
    "result": {
@@ -1228,7 +1244,7 @@
    "hash": "3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
    "url": "https://testnet.nearblocks.io/txns/3omqdk7SXmQa8cgKCEoKNQzjouhHSkrGXvN4oUEackLT",
    "signer": "r11house-31474.testnet",
-   "source": "rpc",
+   "source": "fastnear",
    "receiver": "r11house-31474.testnet",
    "method": "propose",
    "result": {
@@ -1253,7 +1269,7 @@
    "hash": "EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy",
    "url": "https://testnet.nearblocks.io/txns/EPGmaTnZ5waT1EQqa8ZNQgTmzv2xtAMsQopsGGcpuDFy",
    "signer": "r11hown-31474.testnet",
-   "source": "rpc",
+   "source": "fastnear",
    "receiver": "r11house-31474.testnet",
    "method": "resolve_escalation",
    "result": {

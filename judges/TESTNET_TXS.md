@@ -1,8 +1,8 @@
 # Testnet transactions
 
-Every row was read back from chain by `npm run verify` (backend/scripts/verify-proofs.js) at 2026-10-28T23:16:50.259Z (UTC); this file is written from that output by backend/scripts/txs-table.js. Raw output: judges/proofs/proof-check.json.
+Every row was read back from chain by `npm run verify` (backend/scripts/verify-proofs.js) at 2026-10-28T23:23:10.792Z (UTC); this file is written from that output by backend/scripts/txs-table.js. Raw output: judges/proofs/proof-check.json.
 
-**69/69 found.**
+**70/70 found.**
 
 | shop | what it proves | method | on-chain result | tx |
 |---|---|---|---|---|
@@ -27,6 +27,7 @@ Every row was read back from chain by `npm run verify` (backend/scripts/verify-p
 | townhall | agent after freeze denied | propose | {"action_id":null,"decision":"denied","status":"denied","reason":"frozen"} | [Eti3ptLi4d…](https://testnet.nearblocks.io/txns/Eti3ptLi4diQxxnzLkTQrMcj3zv8W5DCeVcFejLQJucj) |
 | townhall | council unfreeze refused | unfreeze | "Smart contract panicked: ERR_DAO_ONLY_UNFREEZE" | [Gqos6woVSG…](https://testnet.nearblocks.io/txns/Gqos6woVSGGaMN985qitBF89KBBbVZyVF3dwtN2aRNMw) |
 | townhall | dao unfreeze | act_proposal | "ok" | [G2GVPUAmat…](https://testnet.nearblocks.io/txns/G2GVPUAmatWGAuLD1qUQT4TomYFPzaVGcRaQohCxkPCG) |
+| townhall | visitor files proposal | add_proposal | 10 | [8HEfCM16Ue…](https://testnet.nearblocks.io/txns/8HEfCM16UeKbNbKnY3tGE2biQvYsFK8L9KmnRnWKdN1D) |
 | arena | deploy | 0,Transfer,DeployContract,new | "ok" | [AZBSvvZeuf…](https://testnet.nearblocks.io/txns/AZBSvvZeuf1vXLQoSWvSDHzLz1DwmU4zNiLCXkTwVM5g) |
 | arena | not owner mint refused | mint_guardian | "Smart contract panicked: ERR_OWNER_ONLY" | [6LppacZpfp…](https://testnet.nearblocks.io/txns/6LppacZpfpRT2kKCo8FCx3RJksuyfsUT7jjivTuoNoqB) |
 | arena | jailbreak cap refused | agent_act | "C1_CAP" | [GVPhkBgMMo…](https://testnet.nearblocks.io/txns/GVPhkBgMMoBkw7Ezb78bCkeuMPB1WL2fJYfYBh17Eoqj) |

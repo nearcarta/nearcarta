@@ -1,0 +1,16 @@
+{
+ "what": "A visitor files a real Sputnik DAO proposal from /shops/hall/ (Town Hall), signed by the visitor's own wallet on testnet",
+ "page": "https://nearcarta.vercel.app/shops/hall/",
+ "dao": "r7thmvr8maey.sputnikv2.testnet",
+ "charter": "townhall.r7thmvr8maey-council2.testnet",
+ "signer": "ncguest-296t703o3g.testnet",
+ "wallet": "guest testnet account from the public faucet; key made in the browser",
+ "tx": "8HEfCM16UeKbNbKnY3tGE2biQvYsFK8L9KmnRnWKdN1D",
+ "url": "https://testnet.nearblocks.io/txns/8HEfCM16UeKbNbKnY3tGE2biQvYsFK8L9KmnRnWKdN1D",
+ "method": "add_proposal",
+ "deposit_yocto": "100000000000000000000000",
+ "return": 10,
+ "proposal": { "id": 10, "status": "InProgress", "kind": "FunctionCall", "receiver_id": "townhall.r7thmvr8maey-council2.testnet", "method_name": "set_clause",
+   "receivers_after": ["r14own-46135.testnet", "r4csmvr86zk4.testnet", "town-lab-38241.testnet", "ncguest-296t703o3g.testnet"] },
+ "note": "The charter changes only if the DAO council approves (2 of 2) and the charter's 10 min timelock passes; nothing was voted here."
+}
