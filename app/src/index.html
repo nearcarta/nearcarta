@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nearcarta · live shops (testnet)</title>
+<link rel="stylesheet" href="/console.css">
+<script src="/config.js"></script>
+</head>
+<body>
+<header>
+  <h1>Nearcarta <small>live shops · NEAR testnet</small></h1>
+  <nav id="tabs">
+    <button data-tab="ferry" class="on">Ferry</button><button data-tab="guardhouse">Guardhouse</button>
+    <button data-tab="townhall">Town Hall</button><button data-tab="arena">Arena</button>
+    <button data-tab="toll">Toll</button><button data-tab="chronicle">Chronicle</button>
+  </nav>
+  <p class="links"><a href="/design/D9_world/">Walk the town (3D)</a> · <a href="/design/D8_shops/">Shop interiors</a> · <a href="/judges.html">For judges</a> · <span id="health">checking chain…</span></p>
+</header>
+<main>
+<section id="ferry" class="tab on">
+  <h2>Ferry · private cross-chain swap quote</h2>
+  <p class="note">Dry quotes from NEAR Intents 1Click: no deposit address is created, nothing can be spent. Each quote is checked before it is shown.</p>
+  <form id="ferry-form">
+    <label>From <select name="from"><option value="USDC|base">USDC on Base</option><option value="ETH|base">ETH on Base</option><option value="USDC|near">USDC on NEAR</option></select></label>
+    <label>Amount <input name="amount" value="2.5" inputmode="decimal"></label>
+    <label>To <select name="to"><option value="ZEC|zec">ZEC (Zcash)</option><option value="wNEAR|near">wNEAR</option></select></label>
+    <label>Privacy <select name="privacy"><option value="public">public</option><option value="basic">confidential (basic)</option><option value="advanced">confidential (advanced)</option></select></label>
+    <label class="wide">Recipient <input name="recipient" value="u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex"></label>
+    <label class="wide">Refund to (origin chain) <input name="refundTo" value="0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e"></label>
+    <button type="submit">Get dry quote</button>
+  </form>
+  <div id="ferry-zec"></div>
+  <div id="ferry-out" aria-live="polite"></div>
+</section>
+<section id="guardhouse" class="tab"><h2>Guardhouse · the agent's oath</h2><div class="out"></div></section>
+<section id="townhall" class="tab"><h2>Town Hall · DAO-governed oath</h2><div class="out"></div></section>
+<section id="arena" class="tab"><h2>Arena · guardian vs jailbreakers</h2><div class="out"></div></section>
+<section id="toll" class="tab"><h2>Toll · Chain Signatures with an oath</h2><div class="out"></div></section>
+<section id="chronicle" class="tab"><h2>Chronicle · what happened on chain</h2>
+  <label>Contract <select id="chron-acct"></select></label><div class="out"></div></section>
+</main>
+<script type="module" src="/console.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+:root{--bg:#1f1611;--panel:#2b1f17;--ink:#f6ead8;--mute:#c9b49a;--amber:#f2a93b;--ok:#8fc46a;--bad:#e2664b;--line:#4a3628}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+header{padding:16px 24px;border-bottom:1px solid var(--line)}h1{margin:0;font-size:22px;color:var(--amber)}h1 small{color:var(--mute);font-weight:400;font-size:14px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}nav button{background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:6px 12px;border-radius:6px;cursor:pointer}
+nav button.on{background:var(--amber);color:#2b1a0c;border-color:var(--amber)}a{color:var(--amber)}.links{margin:0;color:var(--mute)}
+main{padding:16px 24px;max-width:1100px}.tab{display:none}.tab.on{display:block}.note{color:var(--mute)}
+form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;background:var(--panel);padding:14px;border-radius:8px}
+form .wide{grid-column:span 2}label{display:flex;flex-direction:column;font-size:13px;color:var(--mute);gap:4px}
+input,select{background:#170f0b;color:var(--ink);border:1px solid var(--line);padding:6px;border-radius:4px;font:inherit}
+form button{grid-column:span 4;background:var(--amber);border:0;padding:9px;border-radius:6px;font-weight:600;cursor:pointer}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
+.pass{color:var(--ok)}.fail{color:var(--bad)}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;font-size:13px;vertical-align:top}
+code{font-size:12px;word-break:break-all;color:var(--mute)}
