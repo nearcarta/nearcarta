@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [oath, arena, toll, townhall, charter_factory]
+        crate: [oath, arena, toll, townhall, charter_factory, house_nft]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.95.0
