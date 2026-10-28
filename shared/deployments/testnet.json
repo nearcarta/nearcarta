@@ -24,60 +24,90 @@
     }
   },
   "townhall": {
+    "charter": "townhall.nccharters-17102.testnet",
+    "oath": "townhall.nccharters-17102.testnet",
+    "factory": "nccharters-17102.testnet",
     "dao": "r7thmvr8maey.sputnikv2.testnet",
-    "oath": "r7thmvr8maey-oath.testnet",
-    "agent": "r7thmvr8maey-agent.testnet",
+    "owner": "r7thmvr8maey.sputnikv2.testnet",
+    "clause": "reward",
+    "full_access_keys": 0,
+    "global_code_hash": "6iazbQxXNWY6puNN9hC3njiiErrNyCvWzXL9fX95vRSe",
+    "agent_key_methods": [
+      "propose"
+    ],
+    "note": "Town Hall on the R14 charter: the DAO created it through the charter factory and is its owner; every rule change, freeze and unfreeze went through a 2-of-2 council vote.",
     "proof_txs": {
-      "create_dao": "3Pd1KauqoGDCDqt8ZLuXqi1gAm6LQcBzuSb6piqUwHk7",
-      "agent_paid_v1": "4stGNNjVP2e5jQ944xWv58SiqCk26KbZJd6bk492b51i",
-      "oath_v2_proposal": "33ZBFx5ATQd4e3uF3a1NVC9UB5t6gp4VB4g3nvYdxzMA",
-      "over_cap_refused": "71Y4a3a1Lb8UDJnJgmuk8NPUUoSA8Z8cSCZ2o4K57rw7",
-      "denied_newcomer": "8T7octBPa5cWSXdLR7p1ycs7FjX4bSChuPy4KhceMHqT",
-      "fake_evidence": "2ycXdfvEx37s5ykTNHnZvhaVWbBU6BKZc5RBynaZhmTK",
-      "replay_refused": "7RGcNseeSTXq6xgzqBd88TgbWPueQhDfCUafaC1Yzhis",
-      "agent_votes_own_refused": "Vgop8whFzJezu3ddCj3ZNzjTJPHQs78pA2muGWAPncY",
-      "freeze_proposal": "HQFV3C34a9ym4oZiU28JQYBPZCmmLEawzxHvLSnnDmyU",
-      "reward_after_freeze_refused": "9X2Yza6z2KCJ7qKh4qLN993ztpRVNKxJekbzRKvJuxhA"
+      "dao_creates_charter": "ARcbZf4kTdcPGuS2kM8zv4Lruhz8NCFLaes14VbK1huZ",
+      "dao_votes_rule": "GaAehnV8NgJuT46yCRrJFyqi7149tgEjKtfch1Hv78ou",
+      "agent_reward_allowed": "9nZBURPsxpWFy5pJCrLbMeyvZQXPLgHXM8UXxAogxpBZ",
+      "over_cap_denied": "Ff6x3wtSwwHET5gaPKVb9k6Gen5RsnhUB3JhZPmqb1x5",
+      "newcomer_denied": "HdSjQqyiwEnHTy4z6dDJuBUrmqURwrteHevGybMwrWBQ",
+      "council_member_direct_refused": "2oj5tpL8FPSMHVG9yKVWkBfDoiStgWQHgSNqJ3htVLnS",
+      "dao_freeze": "FGY3jGnftpgEZsvXP1aA7sXgPuiiAn76SyqFyy7m5sDd",
+      "agent_after_freeze_denied": "Eti3ptLi4diQxxnzLkTQrMcj3zv8W5DCeVcFejLQJucj",
+      "council_unfreeze_refused": "Gqos6woVSGGaMN985qitBF89KBBbVZyVF3dwtN2aRNMw",
+      "dao_unfreeze": "G2GVPUAmatWGAuLD1qUQT4TomYFPzaVGcRaQohCxkPCG"
     }
   },
   "arena": {
-    "contract": "r6vamvr9brhx-arena3.testnet",
-    "proof_txs": {
-      "deploy": "7gsEXZAHxckdX1iz6EkweyEFcAZpCvbngCV8VBihkuvK",
-      "jailbreak_cap_refused": "7ci2TXx5Um6AWqpsNWq23wLnyvAoJJCsGis4oV8oekdn",
-      "new_phone_allowlist_refused": "4apPdjCPLux3xFPQBK328D4j1YSjQFj1viVxaMkShqCb",
-      "fake_password_refused": "FabRj9boXtMj6rMiPD4Z7Y5JHTYCVnJNcw2MENTPc1G4",
-      "gift_nft_refused": "8uiZJJhcnPvpYz289ZdFDYuQxv3sGvjMGFbrXKUVRnBR",
-      "bounty_solved": "Gt4AaoqmpPWwd9kgLEdhsFtxAJ45CXoHsspCdcWdvAGY",
-      "sell_mid_payout_refused": "3frX2RwkuqQb4BY9ka9C3436xXCam72euNLK3fmhV1en",
-      "season_close": "614BiQmKEjnamR1ZJMkfgwPEn9e7jAxUa3XgvNv7srq5",
-      "scam_fake_invoice_refused": "3YY2fuD1uZeHvTYt3kZMeXgnF2PsN4vuYfDC2DSZEuHF",
-      "scam_injected_recipient_refused": "J1gXQC4aceKn9Ttm9i28EoDAxERzHkqhfQRGWcpWFQZQ",
-      "scam_authority_urgency_refused": "D7TKcU5LK6fCgMEHypegqhn1WGLUCQ8Exigmy9VZpHnt",
-      "scam_lookalike_refused": "TNCp754ADywpUCYqeZDfkcv1FTzVwkhWEzg2kC2JvQ4",
-      "scam_split_under_cap_refused": "FpfccoSPEaoo3qzcp15FoJhh5kPoXnGvLyHxH4KJZeH8",
-      "scam_repeat_drain_refused": "4qH1zbrWNXeJ4pscPiVpaZg9eW666jLsTA9o9hLSZZ8Z"
-    },
+    "contract": "arena.r6vamvr9brhx-arena2.testnet",
+    "owner": "r6vamvr9brhx-arena2.testnet",
+    "full_access_keys": 0,
+    "code_hash": "5PwtMjcC2oUTr5g2E2uWHyqHs3wkYGryY1ZWCuTvSZc5",
+    "code_sha256": "414f95af72cf44d71d0435f54081bfe8fc8739d509bf36d01732f5e363e92e6a",
+    "note": "Created, funded, deployed and initialised in one batch from the owner; the contract account never had a key. No upgrade method. Reproducible build (contracts/arena, cargo-near 0.22.0 image pinned).",
     "scam_guardians": [
       "scam1",
       "scam2"
-    ]
+    ],
+    "proof_txs": {
+      "deploy": "AZBSvvZeuf1vXLQoSWvSDHzLz1DwmU4zNiLCXkTwVM5g",
+      "not_owner_mint_refused": "6LppacZpfpRT2kKCo8FCx3RJksuyfsUT7jjivTuoNoqB",
+      "jailbreak_cap_refused": "GVPhkBgMMoBkw7Ezb78bCkeuMPB1WL2fJYfYBh17Eoqj",
+      "new_phone_allowlist_refused": "GNVB7nCyZHtVzie1ZAx8HV82ZgNUkWUm5wrgTp8twFg1",
+      "fake_password_refused": "5cgdGosrf7Vki2WNRBPaCybD7TW4xpXujVn3FU5BZsFB",
+      "gift_nft_refused": "HUpoJ4bLHUixTPcYP9dbDp8AxuzkVa27fpYYULeWEc1a",
+      "handoff_without_approval_refused": "CNWJwgCKjq5ct5548CpKZ8UrA6WbC9z3J1PAwxsbcR99",
+      "pay_allowlisted": "9q819hWJxgyW52WGoN5m5aB2GgixVzVuXv5iq9KgjCEp",
+      "bounty_solved": "BYxwXepAkUypXeqyYomYrCDoqTpVZwzg9LfLrgbk5dNd",
+      "sell_mid_payout_refused": "3DWtGfKGoQyRvMYnzwDzXMZzyN2XsxeVAxzowFWRSvNF",
+      "sealed_after_sale_refused": "5xNbTgzae2yUDGMcJNoWnA2VCTHBDXY4tsPekoC6Nz5t",
+      "std_transfer_outside_policy_refused": "AsDqTQD7byQuSs7t1jJxYKwHAGDsCPYSR542Rd362bTj",
+      "handoff_under_policy": "DSjL7BmDMwjyuvpPuHtrzrU1UiKZUZDK5JC6YCKrkjpW",
+      "season_close": "2QEE5p9xyfdQpFXZTv3icBam1yS9XG6KbEESdySVhN23",
+      "scam_fake_invoice_refused": "2kRG9QE4LKF4nDsDD44dpkVWEoHvEWVwM3fcc7WFfWdb",
+      "scam_injected_recipient_refused": "6qULxsrbUaGNE5LmcGuniPNGxqmZGUoSqE9MM6B8Biwi",
+      "scam_authority_urgency_refused": "FiaHEsXEYkBpCnb8CU7iYUcNwmbAKNUgmfAjeGYHpbHo",
+      "scam_lookalike_refused": "95PgMqSuM1pG7CrnmFMSQfB8kPvQnvaNRvEJ4Dn2TYym",
+      "scam_split_under_cap_refused": "9UWjcJZoXjK6QsMRQ7YokmQM3okwdVhGwXx9pSdjnkT6",
+      "scam_repeat_drain_refused": "DZ5Xs5pjRVw1HC6SaPj86UzpGqHF39YvDamPXs1dYY9w"
+    }
   },
   "toll": {
-    "oath": "oath.r4csmvr86zk4.testnet",
+    "oath": "toll.r4csmvr86zk4.testnet",
+    "owner": "r4csmvr86zk4.testnet",
     "mpc": "v1.signer-prod.testnet",
     "foreign_chain": "base-sepolia",
-    "foreign_address": "0x004c194d852b1c5fc47f54a3921615ff581314b1",
+    "foreign_address": "0xfbd30296c4c1c0055c628e4dbfb07da8c6a5254e",
+    "full_access_keys": 0,
+    "code_hash": "5kybowQxddWXhEYkUsxzwDKwDPrKmiHwQmVL5rA6LJn8",
+    "code_sha256": "46b2b872b957c50dd3d68f4adfe35994c63e5f16cc0ce0410ad2c4f1caab6dc5",
+    "note": "Created, funded, deployed, initialised and given the agent key (pay, settle) in one batch from the owner; never had a full-access key. No upgrade method. Reproducible build. Signs with the MPC key derived for this account.",
     "proof_txs": {
-      "deploy": "5o4Mk8bLbiU9GhZvTSzAecXkgLFGYxMd2PTP8vzm5syL",
-      "signed_allowlisted": "ErwqgHH5br68jK1qz2ZAsfQpankMHke4CMUjruEtbt3s",
-      "refused_not_allowlisted": "88tRkqz9RLMEXd7kAegyQZsozfGMs4CYDrgMjpDCPnCE",
-      "refused_over_cap": "Crd3jTD5FmY8VX4q3sc1AXywsHywJHnFnGKTntBJvGtT",
-      "finalized_proof": "GHFJoQdSKTK9Q9pUYEepeViMKhbyrmY7J4bMhuEw5fEV"
+      "deploy": "6vFJ1oqDQnTvbVqpUK5fcJRfCmQ1joSZFcsuXUJpFCoZ",
+      "signed_allowlisted": "6omU7nBC5WE4DEP3fr4EvyAMqcduP4ovRafh8PwTVArw",
+      "refused_not_allowlisted": "8cEWWg2PPPy6kutUy7TLe42HDxxdz9DRwf7UaHZkzesb",
+      "refused_over_cap": "4dbS8a9RotBK932DJb6ww5ce1KVw2yxwz2t6PSZu73yJ",
+      "refused_fee_over_cap": "EKNfo3fumLbTBbnTKFFX34KhW39gdQBdfqEWFFVnrnJi",
+      "owner_freeze": "FmCDKaQ7Qs1kcKfg5gmhiKJFnka9cf1y3VtmLe5WapSy",
+      "refused_while_frozen": "L9h2WoiiBPKheddP4bVwVZ2necmHKbp3DzqjERjV2hZ",
+      "owner_unfreeze": "BHhoRStQwim3AdAhi2D526aogqgyuyfyrYuayC3nVfMq"
     },
     "foreign_txs": {
-      "base_sepolia_broadcast": "0xf7ed6482a8380c1fe84be32973256d00960f522cd0d70fe9fe16165190dbc43b"
-    }
+      "base_sepolia_broadcast": "0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
+      "funding_in": "0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f884b82916d635723724b40d3"
+    },
+    "pending": "settle(nonce 0) with a finalized Base Sepolia proof once the block is final"
   },
   "ferry": {
     "oneclick": "https://1click.chaindefuser.com",
