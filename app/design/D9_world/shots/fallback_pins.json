@@ -1,0 +1,51 @@
+[
+ {
+  "id": "chronicle",
+  "name": "Chronicle",
+  "role": "crier tower · every decision posted",
+  "x": 55.2,
+  "y": 39.2
+ },
+ {
+  "id": "hall",
+  "name": "Town Hall",
+  "role": "bell tower · council",
+  "x": 35.7,
+  "y": 19.1
+ },
+ {
+  "id": "bank",
+  "name": "Mist Bank",
+  "role": "vault · amounts stay in the mist",
+  "x": 68.1,
+  "y": 18.1
+ },
+ {
+  "id": "ferry",
+  "name": "Ferry",
+  "role": "dock · the only way across",
+  "x": 85.3,
+  "y": 33.5
+ },
+ {
+  "id": "guard",
+  "name": "Guardhouse",
+  "role": "ward gate · knights",
+  "x": 9.6,
+  "y": 41.3
+ },
+ {
+  "id": "arena",
+  "name": "Vault Arena",
+  "role": "try to break the vault",
+  "x": 83.1,
+  "y": 95.7
+ },
+ {
+  "id": "house",
+  "name": "House",
+  "role": "owner key · oath plaque",
+  "x": 16.5,
+  "y": 25.4
+ }
+]

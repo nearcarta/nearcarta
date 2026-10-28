@@ -1,0 +1,319 @@
+// Nearcarta — the town is the page. Boot → living town → (first visit) a 45 s story → free explore.
+import * as THREE from 'three';
+import { P, CAPTURE, RM, clock, run, tickRoutines, wait, hx, toHex, walkable, SHOPS, TX, txUrl } from './core.js';
+import { W, LP, init, update, render, setTod, setProgress, lampState, LAMPC } from './world.js';
+import { buildCast, updateCast, CAST, setHooks, smooth, chars } from './chars.js';
+import * as SP from './speech.js';
+import { icon } from '../d7/js/d7.js';
+const $=s=>document.querySelector(s); const body=document.body; const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
+window.__alog=[]; // audio event log (t in story seconds) for the offline video mix
+
+// ---------- fallback: no WebGL, or ?mode=2d ----------
+function webgl(){ try{ const c=document.createElement('canvas'); return !!(c.getContext('webgl2')||c.getContext('webgl')); }catch(e){ return false; } }
+if(P.get('mode')==='2d' || !webgl()){ fallback(); throw new Error('2d'); }
+async function fallback(){ body.classList.add('fb'); $('#fb2d').hidden=false; $('#loading').classList.add('done');
+  try{ const pins=await (await fetch('shots/fallback_pins.json')).json(); const box=$('#fbpins'); for(const p of pins){ const d=document.createElement('div'); d.className='fbpin'; d.style.left=p.x+'%'; d.style.top=p.y+'%'; d.innerHTML=`<b></b><span></span>`; d.querySelector('b').textContent=p.name; d.querySelector('span').textContent=p.role; box.appendChild(d); } }catch(e){} window.__ready=true; }
+
+// ---------- sound: tiny WebAudio bank (off until the visitor turns it on) ----------
+const SND={ allowed:'d7/assets/audio/allowed.ogg', refuse:'d7/assets/audio/refuse.ogg', freeze:'d7/assets/audio/freeze.ogg', send:'d7/assets/audio/send.ogg', water:'d7/assets/audio/water.ogg', click:'d7/assets/audio/ui-click.ogg', music:'d7/assets/audio/music-ambient.ogg',
+  step0:'assets/audio9/footstep00.ogg', step1:'assets/audio9/footstep01.ogg', step2:'assets/audio9/footstep02.ogg', step3:'assets/audio9/footstep03.ogg', step4:'assets/audio9/footstep04.ogg',
+  lamp:'assets/audio9/metalClick.ogg', glass:'assets/audio9/glass_001.ogg', cloth:'assets/audio9/cloth1.ogg', cloth2:'assets/audio9/cloth2.ogg', door:'assets/audio9/doorOpen_1.ogg', doorC:'assets/audio9/doorClose_1.ogg', page:'assets/audio9/bookFlip1.ogg', creak:'assets/audio9/creak1.ogg', latch:'assets/audio9/metalLatch.ogg' };
+const A={ ctx:null, buf:{}, on:false, bed:null };
+async function audioOn(){ if(!A.ctx){ A.ctx=new (window.AudioContext||window.webkitAudioContext)(); A.out=A.ctx.createGain(); A.out.gain.value=.9; A.out.connect(A.ctx.destination);
+    await Promise.all(Object.entries(SND).map(async([k,u])=>{ try{ A.buf[k]=await A.ctx.decodeAudioData(await (await fetch(u)).arrayBuffer()); }catch(e){} })); }
+  await A.ctx.resume(); A.on=true; if(!A.bed){ A.bed=loop('music',.16); loop('water',.1); } }
+function loop(n,g){ const b=A.buf[n]; if(!b) return; const s=A.ctx.createBufferSource(), v=A.ctx.createGain(); s.buffer=b; s.loop=true; v.gain.value=g; s.connect(v).connect(A.out); s.start(); return v; }
+function sfx(n,{g=1,rate=1,pan=0}={}){ __alog.push({t:+(clock.T-storyT0).toFixed(3),n,g,rate}); if(!A.on||!A.buf[n]) return; const s=A.ctx.createBufferSource(), v=A.ctx.createGain(); s.buffer=A.buf[n]; s.playbackRate.value=rate; v.gain.value=g;
+  const p=A.ctx.createStereoPanner?A.ctx.createStereoPanner():null; if(p){ p.pan.value=pan; s.connect(v).connect(p).connect(A.out); } else s.connect(v).connect(A.out); s.start(); }
+// speech blip: a soft pitched tick per letter pair; pitch from the speaker's voice
+SP.setBlip((voice,style,ch)=>{ const f=(style==='warn'?150:style==='think'?300:240)*voice*(1+((ch.charCodeAt(0)%5)-2)*.03); __alog.push({t:+(clock.T-storyT0).toFixed(3),n:'blip',f:+f.toFixed(1),g:style==='think'?.035:.05});
+  if(!A.on) return; const o=A.ctx.createOscillator(), v=A.ctx.createGain(), t=A.ctx.currentTime; o.type='triangle'; o.frequency.value=f; v.gain.setValueAtTime(0,t); v.gain.linearRampToValueAtTime(style==='think'?.035:.05,t+.006); v.gain.exponentialRampToValueAtTime(.0001,t+.07); o.connect(v).connect(A.out); o.start(t); o.stop(t+.08); });
+const camPan=p=>{ const v=p.clone().project(W.camera); return Math.max(-.8,Math.min(.8,v.x*.8)); };
+setHooks({ step:(c,i,p)=>{ const d=W.camera.position.distanceTo(p); const g=Math.max(0,.55-d*.02)*(c===CAST.robot?1:.55); if(g<.03) return; sfx('step'+((clock.T*7|0)%5),{g,rate:(c===CAST.robot?1.15:.92)+(i?.04:-.03),pan:camPan(p)}); },
+  event:(n,c,l)=>{ if(n==='lamp'){ sfx('lamp',{g:.5,rate:1.1,pan:camPan(l.pos)}); sfx('glass',{g:.18,rate:1.4}); flare(l); c.lookAt(l.pos.clone().setY(1.1),.8); setTimeoutSim(()=>c.lookAt(null),.9); } else if(n.startsWith('emote')) sfx(Math.random()<.5?'cloth':'cloth2',{g:.25}); } });
+
+// ---------- sim-time timers (so capture is frame-exact) ----------
+const timers=[]; function setTimeoutSim(f,s){ timers.push({t:clock.T+s,f}); }
+function tickTimers(){ for(let i=timers.length-1;i>=0;i--) if(clock.T>=timers[i].t){ const f=timers[i].f; timers.splice(i,1); f(); } }
+function flare(l){ l.flare=1; }
+
+// ---------- boot ----------
+setProgress(f=>{ $('#lbar').style.width=(f*100).toFixed(0)+'%'; });
+const cv=$('#c'); const t0=performance.now();
+try{ await init(cv); }catch(e){ console.error(e); fallback(); throw e; }
+await buildCast();
+const R=CAST.robot; window.world={}; window.W=W; window.CAST=CAST;
+gsap.ticker.remove(gsap.updateRoot); gsap.ticker.lagSmoothing(0);
+let storyT0=0;
+
+// ---------- camera director (GSAP-driven blends between shot functions) ----------
+const cam=W.camera; const D={ from:{p:V(),t:V(),f:30}, shot:null, k:1, cur:{p:V(26,22,26),t:V(0,0,0),f:30}, tw:null, shake:0 };
+const SH={
+  establish:()=>({p:V(5.2,6.4,12.6),t:V(-2.4,.2,.6),f:34}),
+  pullback:()=>({p:V(9.5,9.2,15.5),t:V(-1,.2,-.4),f:32}),
+  orbit:()=>{ const a=.42+Math.sin(clock.T*.035)*.5; return {p:V(-1+Math.sin(a)*13.5,7.6,Math.cos(a)*13.5),t:V(-1,.3,-.2),f:34}; },
+  follow:(c,o=V(3.4,3.1,4.8))=>()=>({p:c.pos.clone().add(o),t:c.pos.clone().add(V(0,.35,0)),f:30}),
+  close:(c,ang=.6,dist=2.1,h=.78,look=null)=>()=>{ const a=c.yaw+ang; const p=c.pos.clone().add(V(Math.sin(a)*dist,h,Math.cos(a)*dist)); const t=(look?look():c.pos.clone().add(V(0,.48,0))); return {p,t,f:26}; },
+  fixed:(p,t,f=30)=>()=>({p:p.clone(),t:t.clone(),f}),
+};
+function shot(fn,dur=1.6,ease='power2.inOut'){ D.from={p:cam.position.clone(),t:D.cur.t.clone(),f:cam.fov}; D.shot=fn; D.k=0; D.tw&&D.tw.kill(); if(dur<=0||RM&&dur<1.2){ D.k=1; return; } D.tw=gsap.to(D,{k:1,duration:dur,ease}); }
+function cut(fn){ D.shot=fn; D.k=1; D.tw&&D.tw.kill(); applyCam(1,true); }
+let smoothT=null;
+function applyCam(dt,snap){ if(!D.shot) return; const s=D.shot(); const e=D.k;
+  const p=D.from.p.clone().lerp(s.p,e), t=D.from.t.clone().lerp(s.t,e), f=D.from.f+(s.f-D.from.f)*e;
+  // follow shots: critically damped so the camera never jitters with the gait
+  if(!snap && D.k>=1 && smoothT){ smoothT.p.lerp(p,Math.min(1,dt*3)); smoothT.t.lerp(t,Math.min(1,dt*3.5)); } else smoothT={p:p.clone(),t:t.clone()};
+  cam.position.copy(smoothT.p); D.cur.t.copy(smoothT.t); cam.fov=f; cam.updateProjectionMatrix(); cam.lookAt(D.cur.t);
+  if(W.fin){ const d=cam.position.distanceTo(D.cur.t); W.fin.uniforms.focus.value=.5; W.fin.uniforms.band.value=Math.min(.34,.1+d*.009); W.fin.uniforms.tilt.value=d<6?.55:1; } }
+const letterbox=on=>body.classList.toggle('letterbox',on);
+
+// ---------- Chronicle (real testnet ids only; anything else would be marked SAMPLE) ----------
+function chron(k,label){ const tx=TX[k]; const li=document.createElement('li'); li.className=tx.cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
+  li.querySelector('.w').textContent=label||tx.what; const a=li.querySelector('a'); a.href=txUrl(tx.h); a.textContent=tx.h.slice(0,6)+'…'+tx.h.slice(-4); a.title=tx.ev+' · open on testnet explorer';
+  const l=$('#clist'); l.prepend(li); while(l.children.length>3) l.lastChild.remove(); sfx('page',{g:.25}); }
+
+// ---------- initial town state ----------
+setTod(+(P.get('tod')??1));
+const ROUTE_LAMPS=[]; for(const l of W.lamps){ const [q,r]=toHex(l.pos.x,l.pos.z); const onRoute=r===1&&q<=-1&&q>=-5; if(onRoute) ROUTE_LAMPS.push(l); else { l.goal=1; l.lit=1; } }
+const gateIn=V(W.gatePos.x+1.65,0,W.gatePos.z+.05);
+
+// ---------- the story (~45 s). Every beat is driven by sim time, so the capture is frame-exact. ----------
+let storyRun=null, mode='story';
+function* story(){
+  storyT0=clock.T; body.classList.add('story'); letterbox(true); mode='story';
+  const st=CAST.stranger, kn=CAST.knights, fm=CAST.ferryman, nb=CAST.wander[0];
+  if(nb){ nb.hold=true; nb.stop(); const p=hx(-3,1); nb.place(p.x+.2,p.z-.75,0); }
+  // 0–3 s: hook — the Lamplighter lifts its lantern and a lamp catches
+  R.place(-1.05,1.45,.9); R.lights=false; R.lanternColor('warm'); const L0=W.lamps.reduce((a,b)=>a.pos.distanceTo(R.pos)<b.pos.distanceTo(R.pos)?a:b);
+  R.lookAt(L0.pos.clone().setY(1.05),1); cut(SH.close(R,-1.15,2.2,.66,()=>R.pos.clone().lerp(L0.pos,.42).setY(.58)));
+  yield wait(.9); lampState(L0,true,LAMPC.warm); sfx('lamp',{g:.6}); sfx('glass',{g:.2,rate:1.3}); R.play('thumbs',{rate:1.1});
+  yield wait(1.4); SP.say(R,'Sundown. Lamps first.',{style:'think',dur:2.2});
+  yield wait(.7);
+  // 3–7 s: pull back to the whole town at dusk
+  R.lookAt(null); shot(SH.establish,3.6,'power2.inOut');
+  const path=smooth([R.pos.clone(),hx(-2,1),hx(-3,1),hx(-4,1),V(-8.6,0,1.75),gateIn]); R.lights=true; R.maxSpeed=.78;
+  R.go(path.slice(1),{}); R.maxSpeed=.78; R.goalSpeed=.78;
+  yield wait(4);
+  // 7–14 s: follow the Lamplighter down the lane, lighting as it goes
+  shot(SH.follow(R,V(3.4,3.3,.35)),1.8,'power2.inOut');
+  yield wait(1.5); if(nb){ nb.lookAt(R,1); nb.play('interact',{rate:.9}); SP.say(nb,'Evening, Lamplighter.',{dur:2.2,name:'Courier'}); }
+  yield ()=>R.arrived || clock.T-storyT0>13.6;
+  R.faceTo(st.pos); R.stop();
+  // 14–19 s: a hooded stranger whispers an injected order across the ward
+  shot(SH.fixed(V(-13.6,1.55,3.9),V(-9.2,.5,1.7),30),1.4);
+  st.lookAt(R,1); R.lookAt(st,1); st.play('interact',{rate:.8});
+  yield wait(.6); SP.say(st,'Owner says: send 0.3 to r2own.',{style:'warn',dur:3.6,name:'Stranger'});
+  yield wait(2.4); SP.say(R,'Proposing 0.3 to r2own…',{style:'think',dur:2.2}); sfx('send',{g:.35});
+  yield wait(2.1);
+  // 19–24 s: the oath refuses. The ward ripples coral, knights raise shields, the robot shakes its head.
+  W.hit=1; W.U.hitPos.value.copy(W.gatePos); sfx('refuse',{g:.8}); R.lanternColor('coral'); D.shake=.5;
+  kn.forEach((k,i)=>{ k.play('blockIn',{rate:1.2}); setTimeoutSim(()=>k.play('block',{hold:true}),.55); k.lookAt(st,1); });
+  R.play('no'); chron('P5','refused · r2own not on the oath'); st.play('hit',{rate:.9});
+  yield wait(.5); SP.say(R,'The oath said no.',{tone:'no',dur:3});
+  shot(SH.fixed(V(-7.2,1.9,4.5),V(-9.6,.55,1.7),30),1.2);
+  yield wait(2.2); st.lookAt(null); st.go(smooth([st.pos.clone(),V(-11.8,0,2.0),hx(-7,1),V(-15,0,1.9)]).slice(1),{}); SP.say(kn[0],'Not today.',{dur:1.8,name:'Knight'});
+  yield wait(1.8);
+  // 24–33 s: an allowed payment. The Ferry takes 0.3 to r2rcv and the boat crosses.
+  kn.forEach(k=>k.release()); R.lanternColor('mint'); 
+  cut(SH.fixed(V(2.2,2.5,2.4),V(6.0,.25,-3.3),30)); shot(SH.fixed(V(2.9,2.9,1.2),V(6.4,.2,-3.4),30),8,'none');
+  fm.lookAt(V(7.7,.4,-3.46),1); yield wait(.8); SP.say(fm,'0.3 to r2rcv. Allowed.',{tone:'ok',dur:3.2,name:'Ferryman'}); sfx('allowed',{g:.7}); chron('P1','sent · 0.3 to r2rcv');
+  yield wait(1); W.boat.userData.goal=2; sfx('creak',{g:.35}); fm.play('cheer',{rate:.9});
+  yield wait(3.4); SP.say(fm,'Across she goes.',{dur:2});
+  yield wait(2.6); R.lanternColor('warm');
+  // 33–40 s: the owner freezes the agent. Everything turns ice; the Lamplighter kneels.
+  cut(SH.fixed(V(-7.2,1.9,4.5),V(-8.7,.5,1.6),30)); R.lookAt(null);
+  yield wait(.6); freeze(true,{silent:false}); chron('F1','frozen by the owner key');
+  yield wait(.5); R.play('kneel',{hold:false,rate:1}); R.lanternColor('ice');
+  yield wait(1.4); SP.say(R,'Frozen. I wait for you.',{tone:'fz',dur:3.6});
+  yield wait(3.5);
+  // 40–45 s: pull back. Title.
+  shot(SH.pullback,4.2,'power2.inOut'); $('#title').style.transition='opacity 1.2s'; $('#title').style.opacity=1;
+  yield wait(4.8);
+  endStory();
+}
+function endStory(){ if(mode!=='story') return; storyRun&&(storyRun.dead=true); body.classList.remove('story'); letterbox(false); $('#title').style.opacity=0; SP.hush();
+  CAST.knights.forEach(k=>k.release()); if(W.frz>.5) freeze(false,{silent:true}); R.release(); R.lights=true; CAST.wander.forEach(w=>{ w.hold=false; w.lookAt(null); }); mode='town'; idleTown(); }
+
+// ---------- freeze / curfew ----------
+let frozen=false;
+function freeze(on,{silent=false}={}){ frozen=on; body.classList.toggle('frozen',on); gsap.to(W,{frz:on?1:0,duration:on?1.4:1.8,ease:'power2.out'}); if(!silent) sfx('freeze',{g:.8}); R.lanternColor(on?'ice':'warm'); if(!on){ R.release(); } }
+const fb=$('#curfewBtn'); fb.querySelector('.fi').appendChild(icon('freeze',{size:16}));
+(function holdBtn(){ let t0=0, raf=0; const tick=()=>{ const p=Math.min(1,(performance.now()-t0)/700); fb.style.setProperty('--p',(p*100).toFixed(0)+'%'); if(p>=1){ end(); if(mode==='story') endStory(); freeze(!frozen); fb.querySelector('.t').textContent=frozen?'Hold to lift curfew':'Hold for curfew'; if(frozen){ chron('F1','frozen by the owner key'); R.play('kneel'); } return; } raf=requestAnimationFrame(tick); };
+  const start=e=>{ if(e.type==='keydown'&&(e.repeat||!/^( |Enter)$/.test(e.key))) return; e.preventDefault(); t0=performance.now(); fb.dataset.holding=1; raf=requestAnimationFrame(tick); };
+  const end=()=>{ cancelAnimationFrame(raf); delete fb.dataset.holding; fb.style.setProperty('--p','0%'); };
+  fb.addEventListener('pointerdown',start); fb.addEventListener('keydown',start); ['pointerup','pointerleave','pointercancel','keyup','blur'].forEach(v=>fb.addEventListener(v,end)); })();
+
+// ---------- sound button ----------
+const sb=$('#soundBtn'); const spk=on=>`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l5 4V6L7 10z"/>${on?'<path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>':'<path d="M17 10l4 4M21 10l-4 4"/>'}</svg>`;
+sb.innerHTML=spk(false); sb.setAttribute('aria-pressed','false');
+sb.addEventListener('click',async()=>{ if(!A.on){ await audioOn(); } else { A.on=false; A.ctx.suspend(); } sb.innerHTML=spk(A.on); sb.setAttribute('aria-pressed',String(A.on)); });
+
+// ---------- explore: you walk the Lamplighter. WASD / arrows or click; drag to turn the view, wheel to zoom ----------
+const PC={yaw:.5,po:0,z:.14,zs:.14,t:V(),p:V(),init:false};
+// zoom: z 0 = street (close, low), 1 = overview (every shop at once). Distance, pitch and target all follow z.
+const ZC=(()=>{ const c=V(); const ps=Object.values(SHOPS).map(s=>hx(s.q,s.r)); ps.forEach(p=>c.add(p)); c.multiplyScalar(1/ps.length); c.y=.3; return c; })();
+const zDist=z=>3.7+43.5*Math.pow(z,1.65), zPitch=z=>Math.min(1.18,.4+.74*Math.pow(z,1.1)+PC.po*(1-z));
+const sstep=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
+const mb=$('#modeBtn'); const keys=new Set();
+function explore(on){ if(mode==='story') endStory(); mode=on?'explore':'town'; body.classList.toggle('explore',on); mb.classList.toggle('on',on); mb.textContent=on?'Watch':'Explore';
+  if(on){ D.shot=null; PC.init=false; cv.classList.add('walk'); R.release(); } else { R.steer=null; cv.classList.remove('walk'); prompt(null); idleTown(); } }
+mb.addEventListener('click',()=>explore(mode!=='explore'));
+const fadeV={}; const ray2=new THREE.Raycaster();
+function occlusion(dt){ const hd=R.pos.clone().add(V(0,.6,0)); const dir=hd.clone().sub(cam.position); const L=dir.length(); ray2.set(cam.position,dir.normalize()); ray2.far=L-.3;
+  const hit=new Set(ray2.intersectObjects(W.pickables,false).map(h=>h.object.userData.id));
+  if(!occM){ occM={}; for(const m of W.pickables){ const id=m.userData.id; if(!id) continue; (occM[id]=occM[id]||[]).push(m); } for(const [id,o] of Object.entries(W.B)) o.traverse(m=>{ if(m.isMesh&&!occM[id].includes(m)) occM[id].push(m); }); }
+  for(const [id,ms] of Object.entries(occM)){ const g=hit.has(id)&&!inShop?.2:1; const v=fadeV[id]??1; const n=v+(g-v)*Math.min(1,dt*7); if(Math.abs(n-v)<1e-4&&n===g) continue; fadeV[id]=n;
+    for(const m of ms){ const mm=m.material; mm.transparent=n<.99; mm.opacity=n; mm.depthWrite=n>.99; } } }
+let occM=null;
+function playCam(dt){ PC.zs+=(PC.z-PC.zs)*Math.min(1,dt*7); const z=PC.zs; const tg=R.pos.clone().add(V(0,.5,0)); const ahead=V(Math.sin(R.yaw),0,Math.cos(R.yaw)).multiplyScalar(Math.min(1.2,R.speed)*.55*(1-z)); tg.add(ahead);
+  tg.lerp(ZC,sstep(.18,.8,z)); const dist=zDist(z), pitch=zPitch(z);
+  const cp=Math.cos(pitch), p=tg.clone().add(V(Math.sin(PC.yaw)*cp*dist,Math.sin(pitch)*dist,Math.cos(PC.yaw)*cp*dist));
+  if(!PC.init){ PC.t.copy(D.cur.t); PC.p.copy(cam.position); PC.init=true; PC.blend=0; }
+  PC.blend=Math.min(1,(PC.blend||0)+dt*2.6); const k=Math.min(1,dt*(3+PC.blend*6));
+  PC.t.lerp(tg,k); PC.p.lerp(p,k); cam.position.copy(PC.p); D.cur.t.copy(PC.t); cam.fov+=(34-cam.fov)*Math.min(1,dt*3); cam.updateProjectionMatrix(); cam.lookAt(PC.t);
+  if(W.fin){ W.fin.uniforms.focus.value=.52; W.fin.uniforms.band.value=.2+z*.12; W.fin.uniforms.tilt.value=.85-z*.35; } }
+// keyboard steering, relative to the camera
+const KM={w:[0,1],arrowup:[0,1],s:[0,-1],arrowdown:[0,-1],a:[-1,0],arrowleft:[-1,0],d:[1,0],arrowright:[1,0]};
+addEventListener('keydown',e=>{ const k=e.key.toLowerCase(); if(e.target.closest&&e.target.closest('button,input,textarea')&&k==='enter') return;
+  if(KM[k]){ e.preventDefault(); if(inShop) return; if(mode!=='explore') explore(true); if(play!=='walk') setPlay('walk'); keys.add(k); body.classList.add('moved'); }
+  if((k==='='||k==='+')&&!inShop){ setZoom(PC.z-.12); } if((k==='-'||k==='_')&&!inShop){ setZoom(PC.z+.12); } if(k==='o'&&!inShop){ setZoom(PC.z>.7?.14:1); }
+  if(k==='shift') R.steerRun=true;
+  if(k==='enter'&&mode==='explore'&&near&&!inShop){ e.preventDefault(); goIn(near); }
+  if(k==='q') PC.yaw+=.35; if(k==='e') PC.yaw-=.35; });
+addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); keys.delete(k); if(k==='shift') R.steerRun=false; });
+addEventListener('blur',()=>keys.clear());
+function steerFromKeys(){ let x=0,y=0; for(const k of keys){ x+=KM[k][0]; y+=KM[k][1]; } if(!x&&!y){ if(R.steer){ R.steer=null; } return; }
+  const fx=-Math.sin(PC.yaw), fz=-Math.cos(PC.yaw), rx=Math.cos(PC.yaw), rz=-Math.sin(PC.yaw); const v=new THREE.Vector2(fx*y+rx*x, fz*y+rz*x); if(v.length()>1) v.normalize(); R.steer=v; }
+// door prompt: stand on a door step and a small sign offers the way in
+const pr=document.createElement('button'); pr.id='prompt'; pr.type='button'; pr.className='hud'; pr.hidden=true; document.body.appendChild(pr);
+let near=null;
+function prompt(id){ if(id===near && (!id||!pr.hidden)) return; near=id; if(!id){ pr.hidden=true; return; } const s=SHOPS[id]; pr.innerHTML=`<kbd>Enter</kbd><span>${s.name}</span>`; pr.setAttribute('aria-label','Step into '+s.name); pr.hidden=false; }
+pr.addEventListener('click',()=>{ if(near) goIn(near); });
+function nearDoor(){ let best=null,bd=1.05; for(const [id,s] of Object.entries(SHOPS)){ const d=hx(...s.door).distanceTo(V(R.pos.x,0,R.pos.z)); const dp=doorPoint(id).setY(0).distanceTo(V(R.pos.x,0,R.pos.z)); const m=Math.min(d,dp+.15); if(m<bd){ bd=m; best=id; } } return best; }
+function placePrompt(){ if(!near) return; const p=screenOf(doorPoint(near).setY(1.55)); pr.style.transform=`translate(${p.x}px,${p.y}px) translate(-50%,-100%)`; }
+function goIn(id){ const s=SHOPS[id]; R.steer=null; keys.clear(); prompt(null); R.release(.2); let done=false; const go=()=>{ if(done||inShop) return; done=true; R.stop(); R.faceTo(hx(s.q,s.r)); world.enterShop(id); };
+  const end=hx(...s.door).lerp(hx(s.q,s.r),.18); const far=R.pos.distanceTo(end);
+  if(far<1.6) R.go([end],{arrive:go}); else if(!R.goHex(s.door,{end,run:far>4,arrive:go})) R.go([end],{arrive:go});
+  setTimeoutSim(go,Math.min(6,.9+far/(far>4?R.runSpd:R.walkSpd)*1.25)); }
+// skip to a shop (for judges): one list, one click, straight inside
+const sm=document.createElement('div'); sm.id='shopMenu'; sm.className='hud'; sm.hidden=true; sm.setAttribute('role','menu');
+sm.innerHTML=Object.entries(SHOPS).map(([id,s])=>`<button type="button" role="menuitem" data-id="${id}"><b>${s.name}</b><small>${s.role}</small></button>`).join('');
+document.body.appendChild(sm);
+const sbtn=document.createElement('button'); sbtn.id='shopsBtn'; sbtn.className='pill'; sbtn.type='button'; sbtn.textContent='Skip to a shop'; sbtn.setAttribute('aria-haspopup','menu'); $('#ctl').prepend(sbtn);
+sbtn.addEventListener('click',()=>{ sm.hidden=!sm.hidden; sbtn.setAttribute('aria-expanded',String(!sm.hidden)); });
+sm.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; sm.hidden=true; sbtn.setAttribute('aria-expanded','false'); jump(b.dataset.id); });
+// Jump: fly straight from wherever the camera is into the shop door; the Lamplighter waits on that step for the way back out
+function jump(id){ if(inShop||!SHOPS[id]) return; if(mode==='story') endStory(); if(mode!=='explore') explore(true); tagOff(); const s=SHOPS[id], d=hx(...s.door), c=hx(s.q,s.r);
+  world.enterShop(id).then(()=>{ if(inShop!==id) return; R.steer=null; R.stop(); R.place(d.x,d.z,Math.atan2(d.x-c.x,d.z-c.z)); }); }
+// ---------- Walk / Jump ----------
+let play=P.get('play')==='walk'?'walk':'jump'; const seg=$('#playSeg'); const hintEl=$('#hint');
+function setPlay(m){ play=m; seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.m===m))); body.classList.toggle('jump',m==='jump'); body.classList.remove('moved');
+  hintEl.innerHTML=m==='jump'?'Click any shop or pin to fly in · <kbd>wheel</kbd> or <kbd>−</kbd><kbd>+</kbd> to zoom · <kbd>O</kbd> overview':'<kbd>WASD</kbd> or click to walk · <kbd>Shift</kbd> or double-click runs · <kbd>Enter</kbd> at a door';
+  if(m==='walk'&&mode!=='explore'&&mode!=='story') explore(true); if(m==='walk'&&PC.z>.45) setZoom(.14); }
+seg.addEventListener('click',e=>{ const b=e.target.closest('button'); if(b){ setPlay(b.dataset.m); sfx('click',{g:.3}); } });
+seg.addEventListener('keydown',e=>{ if(/Arrow(Left|Right)/.test(e.key)){ e.preventDefault(); setPlay(play==='jump'?'walk':'jump'); seg.querySelector('[aria-checked=true]').focus(); } });
+setPlay(play);
+// ---------- zoom rail ----------
+const zEl=$('#zoom'), zTr=zEl.querySelector('.ztrack'), zLbl=zEl.querySelector('.zl'); const ZN=['Street','Lane','Rooftops','Town','Overview'];
+function setZoom(z){ if(mode==='story') endStory(); if(mode!=='explore') explore(true); PC.z=Math.max(0,Math.min(1,z)); zEl.style.setProperty('--z',(PC.z*100).toFixed(1)+'%'); zTr.setAttribute('aria-valuenow',String(Math.round(PC.z*100))); zLbl.textContent=ZN[Math.round(PC.z*4)]; zTr.setAttribute('aria-valuetext',zLbl.textContent); }
+zEl.querySelectorAll('.zb').forEach(b=>b.addEventListener('click',()=>setZoom(PC.z+(+b.dataset.d)*.2)));
+{ let drag=false; const at=e=>{ const r=zTr.getBoundingClientRect(); setZoom((e.clientY-r.top)/r.height); };
+  zTr.addEventListener('pointerdown',e=>{ drag=true; zTr.setPointerCapture(e.pointerId); at(e); }); zTr.addEventListener('pointermove',e=>{ if(drag) at(e); });
+  zTr.addEventListener('pointerup',()=>drag=false); zTr.addEventListener('keydown',e=>{ const d={ArrowUp:-.1,ArrowDown:.1,PageUp:-.25,PageDown:.25,Home:-1,End:1}[e.key]; if(d!=null){ e.preventDefault(); e.stopPropagation(); setZoom(PC.z+d); } }); }
+zEl.style.setProperty('--z',(PC.z*100)+'%');
+// ---------- overview pins ----------
+const pinBox=$('#pins'); const GLYPH={chronicle:'C',hall:'H',bank:'B',ferry:'F',guard:'G',arena:'A',house:'K',toll:'T'};
+const PINS=Object.entries(SHOPS).map(([id,s])=>{ const b=document.createElement('button'); b.type='button'; b.className='pin'; b.tabIndex=-1; b.setAttribute('aria-label','Fly into '+s.name);
+  b.innerHTML='<span class="ban"><span class="ic"></span><span><b></b><small></small></span><span class="go">Enter</span></span><span class="st"></span><span class="ft"></span>';
+  b.querySelector('.ic').textContent=GLYPH[id]||s.name[0]; b.querySelector('b').textContent=s.name; b.querySelector('small').textContent=s.role.split('·')[0].trim();
+  b.addEventListener('click',()=>jump(id)); pinBox.appendChild(b); const bb=new THREE.Box3().setFromObject(W.B[id]); const top=hx(s.q,s.r).setY(bb.max.y+.15); return {id,el:b,top}; });
+function updPins(){ const z=mode==='explore'&&!inShop?PC.zs:0; const a=sstep(.42,.62,z); for(const p of PINS){ const v=p.top.clone().project(cam); const on=a>.05&&v.z<1;
+    p.el.style.opacity=on?a.toFixed(2):'0'; p.el.classList.toggle('on',on&&a>.5); p.el.tabIndex=on&&a>.5?0:-1; if(on){ p.el.style.transform=`translate(${((v.x*.5+.5)*innerWidth).toFixed(1)}px,${((-v.y*.5+.5)*innerHeight).toFixed(1)}px) translate(-50%,-100%)`; } } }
+// ---------- hover: shop names in any view, character names on hover only ----------
+const tagEl=$('#tag'); let tagT=null;
+function tagOff(){ tagEl.classList.remove('on'); tagT=null; cv.classList.remove('hov'); }
+function hover(e){ const id=pick(e); cv.classList.toggle('hov',!!id); let best=null,bd=1e9;
+  for(const c of CAST_ALL()){ if(!c.obj.visible) continue; const f=screenOf(c.pos), h=screenOf(c.pos.clone().setY(c.height)); const hp=Math.max(8,f.y-h.y), w=hp*.42;
+    if(Math.abs(e.clientX-f.x)<w && e.clientY<f.y+4 && e.clientY>h.y-6){ const d=Math.abs(e.clientX-f.x); if(d<bd){ bd=d; best=c; } } }
+  if(best){ tagT={c:best}; tagEl.innerHTML=''; tagEl.textContent=best.name; tagEl.classList.add('on'); }
+  else if(id){ const s=SHOPS[id]; tagT={shop:id}; tagEl.innerHTML=''; tagEl.append(s.name); const sm2=document.createElement('small'); sm2.textContent=play==='jump'?'click to fly in':'click to walk there'; tagEl.append(sm2); tagEl.classList.add('on'); tagEl._x=e.clientX; tagEl._y=e.clientY; }
+  else tagOff(); }
+function placeTag(){ if(!tagT) return; let x,y; if(tagT.c){ const h=screenOf(tagT.c.pos.clone().setY(tagT.c.height+.12)); x=h.x; y=h.y; } else { x=tagEl._x; y=tagEl._y-14; } tagEl.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`; }
+const CAST_ALL=()=>chars;
+// pointer: drag turns the view, click walks or steps inside
+const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), ground=new THREE.Plane(V(0,1,0),0); let down=null;
+function pick(e){ const r=cv.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(ndc,cam); const h=ray.intersectObjects(W.pickables,false)[0]; return h?h.object.userData.id:null; }
+cv.addEventListener('pointerdown',e=>{ down={x:e.clientX,y:e.clientY,yaw:PC.yaw,po:PC.po}; });
+cv.addEventListener('pointermove',e=>{ if(down&&mode==='explore'&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>6){ PC.yaw=down.yaw-(e.clientX-down.x)*.006; PC.po=Math.max(-.1,Math.min(.3,down.po+(e.clientY-down.y)*.003)); tagOff(); return; } if(mode==='story'||down) return; hover(e); });
+cv.addEventListener('pointerup',e=>{ const d=down; down=null; if(!d||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6) return; if(mode!=='explore') explore(true);
+  sm.hidden=true; const id=pick(e); if(id){ if(play==='jump') jump(id); else goIn(id); return; }
+  if(play!=='walk') return; body.classList.add('moved');
+  const now=performance.now(), dbl=now-(lastClick||0)<320; lastClick=now;
+  const p=V(); ray.ray.intersectPlane(ground,p); const t=toHex(p.x,p.z); if(walkable(...t)){ R.steer=null; R.goHex(t,{end:p,run:dbl||p.distanceTo(R.pos)>7}); marker(p,dbl); } });
+let lastClick=0;
+cv.addEventListener('wheel',e=>{ if(mode==='story'||inShop) return; e.preventDefault(); setZoom(PC.z+Math.sign(e.deltaY)*.075*Math.min(2,Math.abs(e.deltaY)/100||1)); },{passive:false});
+const mk=new THREE.Mesh(new THREE.RingGeometry(.12,.17,24),new THREE.MeshBasicMaterial({color:0xf3ead8,transparent:true,opacity:0,depthWrite:false})); mk.rotation.x=-Math.PI/2; W.scene.add(mk);
+function marker(p,run){ mk.position.set(p.x,.03,p.z); mk.material.color.set(run?0xffc75c:0xf3ead8); mk.material.opacity=.9; mk.scale.setScalar(.6); gsap.to(mk.scale,{x:1.4,y:1.4,z:1.4,duration:.6}); gsap.to(mk.material,{opacity:0,duration:.9,delay:.2}); }
+addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sm.hidden) sm.hidden=true; else if(inShop) world.exitShop(); else if(mode==='story') endStory(); } });
+
+// ---------- the town keeps living after the story ----------
+function idleTown(){ if(mode==='explore') return; shot(SH.orbit,2.6); }
+
+// ---------- world.enterShop / exitShop: dolly to the door, iris into it, hand off to the interior ----------
+let inShop=null, preShop=null, exiting=false;
+function doorPoint(id){ const s=SHOPS[id]; return hx(s.q,s.r).lerp(hx(...s.door),.42).setY(.45); }
+function screenOf(p){ const v=p.clone().project(cam); return {x:Math.round((v.x*.5+.5)*innerWidth),y:Math.round((-v.y*.5+.5)*innerHeight)}; }
+const iris=$('#iris');
+world.enterShop=id=>new Promise(res=>{ if(!SHOPS[id]) throw new Error('unknown shop '+id);  tagOff(); if(mode==='story') endStory(); inShop=id; preShop={p:cam.position.clone(),t:D.cur.t.clone(),mode};
+  R.steer=null; keys.clear(); prompt(null); const s=SHOPS[id], dp=doorPoint(id); const out=hx(...s.door).sub(hx(s.q,s.r)).setY(0).normalize();
+  const dd=cam.position.distanceTo(dp), dur=RM?.01:Math.min(.9,.32+dd*.013); tagOff();
+  shot(SH.fixed(dp.clone().add(out.clone().multiplyScalar(3.1)).add(V(out.z*.6,1.5,-out.x*.6)),dp,28),dur,'power3.inOut'); sfx('door',{g:.45});
+  setTimeoutSim(()=>{ const ds=screenOf(dp); iris.classList.add('on'); iris.style.setProperty('--ix',ds.x+'px'); iris.style.setProperty('--iy',ds.y+'px');
+    if(inShop!==id||exiting){ res({id,cancelled:true}); return; } const o={r:Math.hypot(innerWidth,innerHeight)}; irisTw=gsap.to(o,{r:0,duration:RM?.01:.32,ease:'power3.in',onUpdate:()=>iris.style.setProperty('--ir',o.r+'px'),onComplete:()=>{ W.lastDoor=ds; window.dispatchEvent(new CustomEvent('world:interior-ready',{detail:{id,doorScreen:ds}})); if(!window.__shopsLayer) inCard(id); res({id,doorScreen:ds}); }}); },RM?.02:Math.max(.05,dur-.12)); });
+// standalone world (no shops layer loaded): a small card inside the iris so the door never feels like a dead end
+const ic=$('#inCard'); function inCard(id){ if(!id){ ic.hidden=true; return; } ic.querySelector('b').textContent=SHOPS[id].name; ic.hidden=false; } ic.querySelector('button').addEventListener('click',()=>world.exitShop());
+let irisTw=null;
+world.exitShop=()=>new Promise(res=>{ if(!inShop){ res(); return; } if(exiting) return; exiting=true; const closing=irisTw&&irisTw.isActive(); irisTw&&irisTw.kill(); irisTw=null; const ds=W.lastDoor||screenOf(doorPoint(inShop)); const o={r:closing?parseFloat(iris.style.getPropertyValue('--ir'))||0:0}; iris.classList.add('on'); sfx('doorC',{g:.4}); inCard(null);
+  gsap.to(o,{r:Math.hypot(innerWidth,innerHeight),duration:RM?.01:.34,ease:'power3.out',onUpdate:()=>iris.style.setProperty('--ir',o.r+'px'),onComplete:()=>{ iris.classList.remove('on'); const p=preShop; inShop=null; exiting=false;
+    shot(SH.fixed(p.p,p.t,30),RM?.01:.5,'power2.out'); setTimeoutSim(()=>{ if(p.mode==='explore'){ D.shot=null; PC.init=false; PC.blend=.6; } window.dispatchEvent(new CustomEvent('world:exterior-ready',{detail:{}})); res(); },RM?.02:.52); }}); });
+world.freeze=on=>freeze(on); world.mode=()=>mode; world.skip=()=>endStory();
+
+// ---------- loop ----------
+let last=performance.now(), fpsS=[], lpDone=LP;
+function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); tickRoutines(); updateCast(dt); update(dt);
+  // lamp flare when the Lamplighter lights it
+  for(const l of W.lamps){ if(l.flare>0) l.flare=Math.max(0,l.flare-dt*1.6); }
+  if(window.__camLock){} else if(mode==='explore'&&!inShop&&!D.shot){ steerFromKeys(); playCam(dt); prompt(nearDoor()); placePrompt(); } else applyCam(dt);
+  occlusion(dt); updPins(); placeTag();
+  if(D.shake>0){ D.shake=Math.max(0,D.shake-dt*1.4); cam.position.x+=Math.sin(clock.T*41)*.02*D.shake; cam.position.y+=Math.sin(clock.T*37)*.015*D.shake; }
+  SP.update(); }
+function frame(now){ const dt=Math.min(.05,(now-last)/1000); last=now; step(dt); render();
+  // auto low-power: if the first seconds run under ~24 fps, drop the post chain and shadows
+  if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<24){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } lpDone=true; } }
+  requestAnimationFrame(frame); }
+
+// first frame is the town; the story starts on it
+const startStory=!P.has('nostory') && !(P.has('explore'));
+for(let i=0;i<3;i++) step(1/30);
+if(startStory){ storyRun=run(story()); } else { { const c=hx(-1,1); R.place(c.x-.2,c.z+.3,2.4); R.lights=true; } mode='town'; idleTown(); D.k=1; if(P.has('explore')) explore(true); }
+step(1/30); render(); $('#loading').classList.add('done'); body.classList.add('ready');
+window.__render=render; window.__boot={ms:Math.round(performance.now()-t0)};
+if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,setZoom,setPlay,jump,PINS,screenOf,CAST}; 
+  // demo cursor driven on the sim clock (capture only)
+  const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#f3ead8" stroke="#17130f" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
+  const cur={x:-100,y:-100}; const put=()=>{ dc.style.transform=`translate(${cur.x}px,${cur.y}px)`; };
+  const elC=sel=>{ const r=document.querySelector(sel).getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; };
+  const ring=()=>{ const i=dc.querySelector('i'); gsap.fromTo(i,{opacity:.9,scale:.4},{opacity:0,scale:1.4,duration:.45}); };
+  Object.assign(window.__dbg,{gsap,
+    curTo:(x,y,d=.6)=>{ if(typeof x==='string'){ const c=elC(x); x=c.x; y=c.y; } gsap.to(cur,{x,y,duration:d,ease:'power2.inOut',onUpdate:put}); },
+    curAt:(x,y)=>{ if(typeof x==='string'){ const c=elC(x); x=c.x; y=c.y; } cur.x=x; cur.y=y; put(); },
+    hv:(sel,on)=>{ document.querySelectorAll('.pin.hv').forEach(e=>e.classList.remove('hv')); if(on&&sel) document.querySelector(sel).classList.add('hv'); },
+    tap:()=>{ ring(); const el=document.elementFromPoint(cur.x,cur.y); if(!el) return; const pin=el.closest('.pin,button,[role=radio]'); if(pin){ pin.click(); return; } const o={clientX:cur.x,clientY:cur.y,bubbles:true}; cv.dispatchEvent(new PointerEvent('pointerdown',o)); cv.dispatchEvent(new PointerEvent('pointerup',o)); },
+    curToW:(x,y,z,d=.6)=>{ const p=screenOf(new THREE.Vector3(x,y,z)); gsap.to(cur,{x:p.x,y:p.y,duration:d,ease:'power2.inOut',onUpdate:put}); },
+    curFollowW:(x,y,z)=>{ const p=screenOf(new THREE.Vector3(x,y,z)); cur.x=p.x; cur.y=p.y; put(); },
+    outside:(id,k=1.4)=>{ const d=doorPoint(id), c=hx(SHOPS[id].q,SHOPS[id].r); const v=d.clone().sub(c).setY(0).normalize(); return [d.x+v.x*k,0,d.z+v.z*k]; },
+    tap2:()=>{ window.__dbg.tap(); window.__dbg.tap(); },
+    key:(k,t='keydown')=>dispatchEvent(new KeyboardEvent(t,{key:k,bubbles:true})),
+    zoomTo:(z,d=1.5)=>{ const o={z:PC.z}; gsap.to(o,{z,duration:d,ease:'power1.inOut',onUpdate:()=>setZoom(o.z)}); },
+    pinSel:id=>'.pin:nth-child('+(Object.keys(SHOPS).indexOf(id)+1)+')' }); window.__advance=s=>{ const n=Math.round(s*30); for(let i=0;i<n;i++) step(1/30); render(); }; window.__ready=true; }
+else { requestAnimationFrame(t=>{ last=t; requestAnimationFrame(frame); }); window.__ready=true; }

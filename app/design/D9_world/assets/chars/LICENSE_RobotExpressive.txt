@@ -1,0 +1,5 @@
+RobotExpressive.glb
+Model by Tomás Laulhé (Quaternius), CC0 1.0 Universal (public domain dedication).
+Modifications (animations/export) by Don McCurdy, as distributed in the three.js examples.
+Source: https://github.com/mrdoob/three.js/tree/r170/examples/models/gltf/RobotExpressive
+Used here with a gold tint on the "Main" material (runtime only; file unchanged).

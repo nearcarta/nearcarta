@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nearcarta</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Ccircle cx=%278%27 cy=%278%27 r=%276%27 fill=%27%23c9a45c%27/%3E%3C/svg%3E">
+<meta name="description" content="Nearcarta: a small charter town where every payment your agent proposes is checked by the oath. Independent, not affiliated with NEAR Foundation.">
+<link rel="preload" href="assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="d7/tokens/tokens.css">
+<link rel="stylesheet" href="world.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/jsm/"}}</script>
+</head>
+<body>
+<canvas id="c" aria-label="Nearcarta, a living town. The Lamplighter walks the streets."></canvas>
+<div id="iris" aria-hidden="true"></div>
+<div id="lb" aria-hidden="true"><i></i><i></i></div>
+<div id="bubbles" aria-live="polite"></div>
+
+<header id="brand" class="hud">
+  <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l11 6v14l-11 6-11-6V9z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 9.5c3 2.4 4.4 4.7 4.4 7a4.4 4.4 0 0 1-8.8 0c0-2.3 1.4-4.6 4.4-7z" fill="currentColor"/></svg>
+  <div><b>Nearcarta</b><small>independent, not affiliated with NEAR Foundation</small></div>
+</header>
+
+<nav id="ctl" class="hud" aria-label="Controls">
+  <div id="playSeg" role="radiogroup" aria-label="How to get around">
+    <button type="button" role="radio" aria-checked="true" data-m="jump" title="Click any shop or pin to fly straight in"><svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M3 14c3-7 8-9 14-9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13 3l4 2-2 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="4" cy="15" r="1.8" fill="currentColor"/></svg>Jump</button>
+    <button type="button" role="radio" aria-checked="false" data-m="walk" title="Steer the Lamplighter with WASD or clicks"><svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M6 17l2-5 3 2 1 3M8 12l1-4 3 1 2 3M9 8l-3 1-1 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="4" r="1.8" fill="currentColor"/></svg>Walk</button>
+  </div>
+  <button id="modeBtn" class="pill" type="button" title="Walk the town yourself">Explore</button>
+  <button id="soundBtn" class="ib" type="button" aria-label="Sound"></button>
+  <button id="curfewBtn" class="pill ice" type="button" title="Hold: only your house key can freeze the agent"><span class="fi"></span><span class="t">Hold for curfew</span></button>
+</nav>
+
+<aside id="chron" class="hud" aria-label="Chronicle (testnet)">
+  <div class="ch"><span class="dot"></span>Chronicle <em>testnet</em></div>
+  <ol id="clist"></ol>
+</aside>
+
+<div id="title" aria-hidden="true"><b>Nearcarta</b><span>the oath decides, the town remembers</span></div>
+<div id="hint" class="hud"></div>
+<div id="pins" aria-label="Shops"></div>
+<div id="tag" aria-hidden="true"></div>
+<div id="zoom" class="hud" role="group" aria-label="Zoom">
+  <button type="button" class="zb" data-d="-1" aria-label="Zoom in to the street">+</button>
+  <div class="ztrack" role="slider" tabindex="0" aria-label="Zoom level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="15" aria-orientation="vertical">
+    <i class="tk" style="--t:0"></i><i class="tk" style="--t:.25"></i><i class="tk" style="--t:.5"></i><i class="tk" style="--t:.75"></i><i class="tk" style="--t:1"></i>
+    <span class="zfill"></span><span class="knob"><span class="kc"></span></span>
+  </div>
+  <button type="button" class="zb" data-d="1" aria-label="Zoom out to the overview">&minus;</button>
+  <span class="zl">Street</span>
+</div>
+<div id="inCard" hidden><b></b><span>The shop opens here.</span><button type="button" class="pill">Step back out <kbd>Esc</kbd></button></div>
+<div id="loading"><i id="lbar"></i></div>
+
+<div id="fb2d" hidden>
+  <img id="fbimg" loading="lazy" src="shots/fallback_1920x1080.jpg" alt="Nearcarta at dusk: the island town, the ward, the ferry.">
+  <div id="fbpins"></div>
+</div>
+
+<script src="vendor/gsap/gsap.min.js"></script>
+<script type="module">import(new URLSearchParams(location.search).has("t")?"./js/test_main.js":"./js/main.js")</script>
+</body>
+</html>
