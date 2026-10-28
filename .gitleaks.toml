@@ -10,3 +10,8 @@ paths = ['''(^|/)target/''', '''^app/dist/''', '''vendor/jsm/libs/chevrotain\.mo
 description = "public NEAR testnet tx hashes (base58, 43-44 chars) in the deployments file"
 regexTarget = "line"
 regexes = ['''^\s*"[a-z0-9_]+": "[1-9A-HJ-NP-Za-km-z]{43,44}",?$''']
+
+[[allowlists]]
+description = "NEP-171 deed token ids are the holder's public testnet account id"
+regexTarget = "line"
+regexes = ['''^\s*"token_id": "([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*\.testnet",?$''']
