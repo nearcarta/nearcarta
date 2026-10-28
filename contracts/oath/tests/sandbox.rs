@@ -78,6 +78,18 @@ async fn propose_async(e: &Env, p: Value) -> anyhow::Result<Value> {
     Ok(Value::Null)
 }
 
+/// R14: an escalation resolves through a yield resume plus a callback receipt, which may land a block or
+/// two after `fast_forward` returns (seen flaky after the box reboot). Poll instead of reading once.
+async fn action_until(e: &Env, id: &Value, want: &str) -> anyhow::Result<Value> {
+    let mut a = Value::Null;
+    for _ in 0..40 {
+        a = e.oath.view("get_action").args_json(json!({"action_id": id})).await?.json()?;
+        if a["status"] == want { break; }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    Ok(a)
+}
+
 fn action_hash(oath: &AccountId, p: &Value) -> String {
     let memo = match p["memo"].as_str() { Some(m) => sha_hex(m.as_bytes()), None => "none".to_string() };
     let s = format!("oath-v2|{}|{}|{}|{}|{}|{}|{}|{}|{}", oath, p["shop"].as_str().unwrap(), p["clause_id"].as_str().unwrap(),
@@ -282,7 +294,7 @@ async fn oath_end_to_end() -> anyhow::Result<()> {
     let r = e.owner.call(e.oath.id(), "resolve_escalation").args_json(json!({"action_id": id, "approve": true})).max_gas().transact().await?;
     println!("T13c owner approve: ok={} gas={}", r.is_success(), r.total_gas_burnt);
     e.w.fast_forward(3).await?;
-    let a: Value = e.oath.view("get_action").args_json(json!({"action_id": id})).await?.json()?;
+    let a = action_until(&e, &id, "confirmed").await?;
     println!("T13c action after approve: {a}");
     assert_eq!(a["status"], "confirmed");
     let d = e.bob.view_account().await?.balance.as_yoctonear() - bob_a; // + late gas refund from T13b
@@ -292,13 +304,13 @@ async fn oath_end_to_end() -> anyhow::Result<()> {
     let out = propose_async(&e, proposal("big", e.bob.id(), 11 * NEAR / 10, n + 1, v)).await?; assert_eq!(out["status"], "escalated");
     e.owner.call(e.oath.id(), "resolve_escalation").args_json(json!({"action_id": id2, "approve": false})).max_gas().transact().await?.into_result()?;
     e.w.fast_forward(3).await?;
-    let a: Value = e.oath.view("get_action").args_json(json!({"action_id": id2})).await?.json()?;
+    let a = action_until(&e, &id2, "denied").await?;
     assert_eq!(a["status"], "denied"); println!("T13d owner rejected -> {a}");
     // timeout: nobody answers within the yield window
     let id3: Value = e.oath.view("get_state").await?.json::<Value>()?["next_action"].clone();
     let out = propose_async(&e, proposal("big", e.bob.id(), 11 * NEAR / 10, n + 2, v)).await?; assert_eq!(out["status"], "escalated");
     e.w.fast_forward(250).await?;
-    let a: Value = e.oath.view("get_action").args_json(json!({"action_id": id3})).await?.json()?;
+    let a = action_until(&e, &id3, "denied").await?;
     println!("T13e after 250 blocks: {a}");
     assert_eq!(a["status"], "denied");
     let u: Value = e.oath.view("get_usage").args_json(json!({"clause_id": "big"})).await?.json()?;
