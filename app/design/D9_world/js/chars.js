@@ -58,6 +58,22 @@ function mergeSkin(root){ const groups=new Map(); root.updateMatrixWorld(true);
     sm.bind(new THREE.Skeleton(bones,inv),new THREE.Matrix4()); p0.parent.add(sm); parts.forEach(m=>m.removeFromParent()); }
 }
 
+// contact shadows of every character: one instanced draw (was one draw per character); per-instance opacity rides in aOp
+let BLOB=null;
+function blobMesh(){ if(BLOB) return BLOB; const N=64, g=new THREE.CircleGeometry(.17*SCL,20); g.rotateX(-Math.PI/2);
+  const op=new THREE.InstancedBufferAttribute(new Float32Array(N),1); op.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aOp',op);
+  const mat=new THREE.MeshBasicMaterial({map:radial('#1a120c',.15),transparent:true,depthWrite:false});
+  mat.onBeforeCompile=sh=>{ sh.vertexShader='attribute float aOp; varying float vOp;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n vOp=aOp;');
+    sh.fragmentShader='varying float vOp;\n'+sh.fragmentShader.replace('#include <alphamap_fragment>','#include <alphamap_fragment>\n diffuseColor.a*=vOp;'); };
+  const m=BLOB=new THREE.InstancedMesh(g,mat,N); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.count=0; m.renderOrder=2; m.frustumCulled=false; m.name='charBlobs'; W.scene.add(m);
+  const M=new THREE.Matrix4(), P=new THREE.Vector3(), S=new THREE.Vector3(), Q=new THREE.Quaternion();
+  const shown=o=>{ for(;o;o=o.parent) if(!o.visible) return false; return true; };
+  W.updBlobs=()=>{ const n=Math.min(N,chars.length); for(let i=0;i<n;i++){ const c=chars[i], o=c.obj, v=shown(o);
+      if(o.parent===W.scene){ P.copy(o.position); S.copy(o.scale); } else { o.updateWorldMatrix(true,false); o.matrixWorld.decompose(P,Q,S); }
+      P.y+=.012*S.y; S.multiply(c.blob.scale); M.compose(P,Q.identity(),S); m.setMatrixAt(i,M); op.array[i]=v?c.blob.material.opacity:0; }
+    m.count=n; m.instanceMatrix.needsUpdate=true; op.needsUpdate=true; };
+  return m; }
+
 export class Char{
   constructor(g,{rig='kay',scale=.22,name='',keep=null,hide=[],tint=null,voice=1,height=.62}={}){
     this.rig=RIG[rig]; this.kind=rig; this.name=name; this.voice=voice;
@@ -80,7 +96,7 @@ export class Char{
     this.look=null; this.lookW=0; this.emote=null; this.busy=0; this.lastFoot=[1,1]; this.footMin=[9,9]; this.stepCD=0; this.idleT=3+rnd()*4; this.bob=0;
     this.surp=0; this.tag=null; chars.push(this);
     // contact shadow (always on; real shadows add on top when enabled)
-    const sh=new THREE.Mesh(new THREE.CircleGeometry(.17*SCL,20),new THREE.MeshBasicMaterial({map:radial('#1a120c',.15),transparent:true,opacity:.55,depthWrite:false})); sh.rotation.x=-Math.PI/2; sh.position.y=.012; sh.renderOrder=2; this.obj.add(sh); this.blob=sh;
+    this.blob={scale:new THREE.Vector3(1,1,1),material:{opacity:.55}}; blobMesh(); // drawn by the one instanced blob mesh below
   }
   place(x,z,yaw=0){ this.pos.set(x,0,z); this.yaw=yaw; this.obj.rotation.y=yaw; return this; }
   placeHex(q,r,yaw=0,dx=0,dz=0){ const p=hx(q,r); return this.place(p.x+dx,p.z+dz,yaw); }
