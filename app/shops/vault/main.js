@@ -261,7 +261,7 @@ function loadFeed() {
   if (!charter || feedBusy) return feedBusy;
   feedBusy = (async () => {
     let j = null;
-    for (let i = 0; i < 3 && !j; i++) { j = await api(`/api/chronicle/${charter}?limit=12`).catch(e => (/not a Nearcarta/.test(e.message) ? 'no' : null)); if (!j) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
+    for (let i = 0; i < 3 && !j; i++) { j = await api(`/api/chronicle/${charter}?limit=12`).catch(e => (/not a Nearcarta/.test(e.message) ? 'no' : null)); if (j?.busy) j = null; if (!j) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
     if (!j || j === 'no') return; // API without the charter feed yet, or busy: keep this tab's story
     if (want && !(j.txs || []).some(t => t.hash === want)) { if (++misses < 5) setTimeout(loadFeed, 3000); return; }
     const rows = (j.txs || []).map(t => ({ t, l: feedLine(t) })).filter(x => x.l);
