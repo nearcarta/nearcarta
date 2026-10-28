@@ -428,7 +428,8 @@ function showTab(id) {
 
 async function main() {
   CFG = await api('/api/vault/config');
-  rpc = rpcClient(CFG.rpc);
+  // Same order as the server runner: the primary RPC, then the fallbacks when one answers 429/5xx or is unreachable.
+  rpc = rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])]);
   ({ connector } = makeConnector(rpc));
   for (const t of document.querySelectorAll('[role=tab]')) {
     t.onclick = () => { showTab(t.dataset.tab); history.replaceState(null, '', '#' + t.id.slice(4)); };

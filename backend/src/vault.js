@@ -39,7 +39,7 @@ export function config() {
   return { network: DEP.network, factory: V.factory, code_hash: V.code_hash, factory_sha256: V.factory_sha256,
     min_deposit: V.min_deposit, policy_delay: V.policy_delay || null,
     arena: { charter: V.arena.charter, merchants: V.arena.merchants, owner: V.arena.owner },
-    attacks: ATTACKS, tasks: TASKS, explorer: DEP.explorer, rpc: cfg.rpc, proof_txs: V.proof_txs, legacy: V.legacy || [],
+    attacks: ATTACKS, tasks: TASKS, explorer: DEP.explorer, rpc: cfg.rpc, rpc_fallbacks: cfg.rpcFallbacks.filter(u => u !== cfg.rpc), proof_txs: V.proof_txs, legacy: V.legacy || [],
     attack_enabled: !!agentSecret(), runner: runnerLimits() };
 }
 
