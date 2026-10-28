@@ -1,0 +1,26 @@
+{
+  "name": "@nearcarta/backend",
+  "private": true,
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/unit/",
+    "test:integration": "node --test --test-concurrency=1 test/integration/"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@defuse-protocol/one-click-sdk-typescript": "^0.1.26",
+    "@hono/node-server": "^2.1.5",
+    "@noble/hashes": "^1.8.0",
+    "@phala/dcap-qvl": "^0.7.0",
+    "@scure/base": "^2.4.0",
+    "bs58": "^6.0.0",
+    "hono": "^4.13.14",
+    "near-api-js": "^7.2.0",
+    "tweetnacl": "^1.0.3"
+  }
+}
