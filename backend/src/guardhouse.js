@@ -1,0 +1,53 @@
+// Guardhouse: the agent's oath contract. Every spend is a propose() that the contract itself checks
+// (clause, receiver allowlist, cap, daily budget, nonce, policy version, expiry, optional TEE receipt).
+// The agent key is a function-call key that can only call propose on the oath account.
+import { readFileSync } from 'node:fs';
+import { Account, JsonRpcProvider, KeyPairSigner } from 'near-api-js';
+import { DEP, cfg } from './config.js';
+import { view, txStatus, eventsFromOutcome, txResult, explorerTx, accessKeys } from './near.js';
+
+const G = DEP.guardhouse;
+export const oathId = G.oath;
+
+export async function snapshot() {
+  const [state, clauses, keys] = await Promise.all([view(oathId, 'get_state'), view(oathId, 'get_clauses'), accessKeys(oathId)]);
+  const usage = {};
+  for (const id of Object.keys(clauses || {})) usage[id] = await view(oathId, 'get_usage', { clause_id: id }).catch(() => null);
+  const fullAccess = keys.keys.filter(k => k.access_key.permission === 'FullAccess').length;
+  const fc = keys.keys.filter(k => k.access_key.permission !== 'FullAccess').map(k => ({
+    public_key: k.public_key, receiver: k.access_key.permission.FunctionCall.receiver_id, methods: k.access_key.permission.FunctionCall.method_names }));
+  return { oath: oathId, state, clauses, usage, keys: { fullAccess, functionCall: fc } };
+}
+
+export const action = id => view(oathId, 'get_action', { action_id: id });
+
+export async function proposal({ clause_id, receiver, amount, memo = null, shop = 'guardhouse', ttlSec = 3600 }) {
+  const s = await view(oathId, 'get_state');
+  return { shop, clause_id, receiver, amount: String(amount), nonce: s.next_nonce, policy_version: s.policy_version,
+    expires_at: String(BigInt(Date.now()) * 1000000n + BigInt(ttlSec) * 1000000000n), memo, receipt: null };
+}
+
+// Signing is for local scripts and integration tests only: the deployed API never holds the agent key.
+export function agentFromFile(path) {
+  const k = JSON.parse(readFileSync(path, 'utf8'));
+  const provider = new JsonRpcProvider({ url: cfg.rpc });
+  return new Account(k.account_id, provider, KeyPairSigner.fromSecretKey(k.private_key));
+}
+
+export async function propose(account, p, { gasTgas = 150 } = {}) {
+  const out = await account.signAndSendTransaction({
+    receiverId: oathId,
+    actions: [(await import('near-api-js')).actions.functionCall('propose', { p }, BigInt(gasTgas) * 10n ** 12n, 0n)],
+    waitUntil: 'FINAL',
+  });
+  return explain(out.transaction.hash);
+}
+
+// Read any oath tx back from chain: verdict, events (phantoms dropped) and link.
+export async function explain(hash, sender = oathId) {
+  const tx = await txStatus(hash, sender);
+  const { events, dropped } = eventsFromOutcome(tx);
+  const verdicts = events.filter(e => e.standard === 'oath' || e.standard?.startsWith('oath'));
+  return { hash, url: explorerTx(hash), result: txResult(tx), events: verdicts.length ? verdicts : events, phantomEventsDropped: dropped,
+    gas_tgas: +([tx.transaction_outcome, ...tx.receipts_outcome].reduce((s, o) => s + o.outcome.gas_burnt, 0) / 1e12).toFixed(2) };
+}
