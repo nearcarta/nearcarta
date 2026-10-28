@@ -43,3 +43,10 @@ test('reputation: RPC overload (429 everywhere) is a 503 with Retry-After, not a
   const r = await makeApp().request('/api/charter/busy.testnet/reputation');
   assert.equal(r.status, 503); assert.equal(r.headers.get('retry-after'), '10');
 });
+
+test('health: RPC 429 on status still answers 200 (Render health check must not restart the box)', async () => {
+  mock(() => new Response('slow down', { status: 429 }));
+  const r = await makeApp().request('/api/health');
+  assert.equal(r.status, 200);
+  const j = await r.json(); assert.equal(j.ok, true); assert.match(j.near.error, /429/);
+});

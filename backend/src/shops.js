@@ -87,7 +87,16 @@ export async function explainAny(hash, sender) {
   return { hash, url: explorerTx(hash), signer: tx.transaction.signer_id, receiver: tx.transaction.receiver_id, result: txResult(tx), events, phantomDropped: dropped };
 }
 
+// Render's health check hits /api/health, so an RPC 429 here must not fail it (that restarted the container
+// in a loop). Serve the last good status marked stale, or an error field, and keep answering 200.
+let lastStatus = null;
 export async function health() {
-  const s = await rpc('status', []);
-  return { chain_id: s.chain_id, height: s.sync_info.latest_block_height, time: s.sync_info.latest_block_time };
+  try {
+    const s = await rpc('status', []);
+    lastStatus = { chain_id: s.chain_id, height: s.sync_info.latest_block_height, time: s.sync_info.latest_block_time };
+    return lastStatus;
+  } catch (e) {
+    const error = String(e.message).slice(0, 120);
+    return lastStatus ? { ...lastStatus, stale: true, error } : { chain_id: null, height: null, error };
+  }
 }
