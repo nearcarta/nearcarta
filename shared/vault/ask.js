@@ -1,5 +1,6 @@
 // "Ask the agent to pay": turns a plain-language request into one `propose` on the owner's charter.
-// The parser is deliberately simple and runs in the browser (no AI model): it finds an amount in
+// This is the plain-words FALLBACK used when the NEAR AI model (backend/src/agent.js) is unavailable or over budget,
+// and it is labelled as such in every reply. It is deliberately simple: it finds an amount in
 // NEAR, a payee (an account id, or a shop named by the first part of an allowlisted account) and
 // an optional "for ..." note. Whether the payment happens is decided by the charter, not by this code:
 // a payee off the allowlist or an amount over the cap is parsed as asked and then refused on chain.

@@ -20,3 +20,5 @@ services:
         sync: false
       - key: NEARAI_CLOUD_API_KEY
         sync: false
+      - key: NEARAI_MODEL
+        value: z-ai/glm-5.3-flash

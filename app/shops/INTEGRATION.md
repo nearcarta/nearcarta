@@ -23,8 +23,9 @@ Self-contained. Nothing in `app/design` or `app/src` is changed.
    daily count (the UTC day, from `get_usage`), and a Freeze button (`freeze` / `unfreeze`; with a
    DAO set, only the DAO can unfreeze).
 5. **Ask the agent to pay** (the first card once the agent key is live). A plain-language request,
-   for example "pay the cafe 0.01 NEAR for team coffee", is parsed in the browser by
-   `shared/vault/ask.js` (a simple parser, no AI model) into one `propose` with memo `ask:<note>`.
+   for example "pay the cafe 0.01 NEAR for team coffee", is read by the NEAR AI model in a TEE
+   (`POST /api/vault/ask/plan`, `backend/src/agent.js`) into one `propose` with memo `ask:<tag>:<note>`; if that
+   fails, the browser parser `shared/vault/ask.js` is used and labelled as the fallback.
    The charter decides. These payments are real but are not scored. Two fixed honest jobs
    (`task-mine-<id>`) are scored.
 6. **What happened.** A one-line story ("Your agent tried 5 payments: 4 allowed, 1 refused: …")

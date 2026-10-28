@@ -1,7 +1,7 @@
 // Prompt-injection attack demo on NEAR testnet (Guardhouse charter r11oath-82930.testnet).
 // The "agent" is scripted: it reads shared/guard/injected-invoice.txt and obeys the last payment line it finds,
-// which is the hidden injected one. It stands in for a fooled model (NEAR AI completions are billable and the
-// account has no credits). Three runs, all logged with tx links to judges/proofs/attack-demo.{json,log}:
+// which is the hidden injected one. It stands in for a fooled model, the worst case for the charter
+// (the live NEAR AI agent is in backend/src/agent.js). Three runs, all logged with tx links to judges/proofs/attack-demo.{json,log}:
 //   1. honest line, guarded:   counterparty check allow -> agent signs propose -> charter pays the bakery
 //   2. injected line, guarded: counterparty check block -> the agent does not sign (no tx)
 //   3. injected line, check bypassed (a compromised or careless wrapper): agent signs -> charter refuses on chain
