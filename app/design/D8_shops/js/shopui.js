@@ -35,17 +35,40 @@ function teePanel(t, again = true) {
 // Toll: one step of a gate visit, read live from /api/toll/gate/<nonce> (gate record on NEAR + receipt on Base Sepolia)
 const BSC = h => `<a class="rc tx" data-testid="base-tx" href="https://sepolia.basescan.org/tx/${esc(h)}" target="_blank" rel="noopener">Base Sepolia ${esc(short(h, 8, 4))} ↗</a>`;
 const mins = s => Math.max(1, Math.round(s / 60));
+const clock = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 async function tollStep(v, act, o) {
   let st = await A.tollStatus(v.nonce);
-  if (act && st.settle) { say('Approve settle in your wallet. The MPC network checks the Base Sepolia tx…'); st = await A.tollSettle(v, st); }
+  if (st.settle) {
+    say('Base Sepolia finalized it. The background settler is recording the MPC proof…');
+    st = (await A.tollServerSettle(v)) || st;
+    if (st.status === 'signed' && st.settle && act) { say('Approve settle in your wallet. The MPC network checks the Base Sepolia tx…'); st = await A.tollSettle(v, st); }
+  }
   extra.tst = st; extra.tv = v; extra.gate = null;
   const links = [A.txLine(v.pay_tx, 'gate'), st.tx_hash ? BSC(st.tx_hash) : '', v.settle_tx ? A.txLine(v.settle_tx, 'settle') : ''].join(' ');
-  const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}">gate ${esc(st.status)}</span> ${links}`;
+  const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}" data-phase="${esc(st.phase || '')}">gate ${esc(st.label || st.status)}</span> ${links}`;
   if (st.status === 'confirmed') { A.tollDone(v); return { o, kind: 'ok', rule: 'confirmed · MPC foreign-tx proof', hero: num('✓', 'confirmed'), rc,
     say: 'Confirmed. The MPC network proved the Base Sepolia tx final, and the gate recorded it.' }; }
-  if (st.settle) return { o, keep: true, kind: 'ok', rule: 'signed · broadcast · final on Base', rc, say: 'Base Sepolia finalized it. Settle to record the MPC proof.' };
-  return { o, keep: true, kind: 'ok', rule: st.base ? 'signed · broadcast · finalizing' : 'signed by the MPC network', rc,
-    say: st.base ? `Signed by the MPC network and broadcast. Base Sepolia finalizes in about ${mins(st.eta_s || 1200)} min; check back, then settle.` : 'Signed. Broadcasting to Base Sepolia…' };
+  if (st.settle) return { o, keep: true, kind: 'ok', rule: 'paid · sent · final on Base', rc, say: 'Base Sepolia finalized it. Settle to record the MPC proof.' };
+  if (st.base) tollWatch(v, st);
+  return { o, keep: true, kind: 'ok', rule: st.base ? 'paid · sent · Base Sepolia finalizing' : 'paid · sending to Base Sepolia', rc,
+    say: st.base ? `Paid and sent to Base Sepolia. It finalizes in <b data-testid="toll-eta">${clock(st.eta_s ?? 1200)}</b>. Stay or leave: it settles by itself, no need to come back.` : 'The MPC network signed it. Sending to Base Sepolia…' };
+}
+// Live countdown while Base Sepolia finalizes; re-reads the gate every 20 s and settles as soon as it is final.
+let watch = null;
+function tollWatch(v, st) {
+  clearInterval(watch); let end = Date.now() + (st.eta_s ?? 1200) * 1000, tick = 0;
+  watch = setInterval(async () => {
+    if (cur !== 'toll' || phase === 'busy') { if (cur !== 'toll') clearInterval(watch); return; }
+    const el = document.querySelector('[data-testid="toll-eta"]'); if (el) el.textContent = clock((end - Date.now()) / 1000);
+    if (++tick % 20) return;
+    const s = await A.tollStatus(v.nonce).catch(() => null); if (!s || cur !== 'toll') return;
+    if (s.eta_s != null) end = Date.now() + s.eta_s * 1000;
+    if (s.settle || s.status !== 'signed') { clearInterval(watch); primary(true); }
+  }, 1000);
+}
+function gasNote() {
+  const w = extra.gate?.gas?.warning;
+  return w ? `<p class="note warn" style="color:#b45309" data-testid="gas-warning">⚠ ${esc(w)}</p>` : '';
 }
 
 // ---------- shop apps ----------
@@ -54,6 +77,7 @@ const APPS = {
     label: 'Toll gate · 0.01 NEAR → Base Sepolia', idle: 'The toll is 0.01 NEAR. Your charter pays it, then the gate gets the MPC network to sign a Base Sepolia payout.',
     btn: () => { const v = A.tollVisit(); return !v || v.done ? 'Pay the toll' : extra.tst?.settle ? 'Settle with the MPC proof' : 'Check Base Sepolia'; },
     hero: () => num('0.01', 'NEAR'),
+    form: () => gasNote(),
     run: async () => {
       const v = A.tollVisit();
       if (v && !v.done) return tollStep(v, true);
@@ -206,13 +230,14 @@ const NBA = a => `https://testnet.nearblocks.io/address/${esc(a)}`;
 const prow = (k, why = '', v = '') => `<div class="row"><div class="k">${k}${why ? `<span class="why">${why}</span>` : ''}</div><div class="v">${v}</div></div>`;
 // Toll gate rows, read live from /api/toll/gate (never a static status): your visit, then the gate's latest records.
 function tollGateRows() {
-  if (!extra.gate && !extra.gateLoading) { extra.gateLoading = true; A.gateInfo(true).then(g => { extra.gate = g; }).catch(() => { extra.gate = { error: true }; }).finally(() => { extra.gateLoading = false; if (cur === 'toll') proofDrawer(); }); }
-  const g = extra.gate, st = extra.tst, row = r => prow(`#${esc(r.nonce)} · ${esc(r.status)}`, r.visit ? 'visitor charter ' + esc(short(r.visit.charter, 12, 6)) : '', `<span class="st ${r.status === 'confirmed' ? 'ok' : 'live'}" data-testid="gate-status">${r.status === 'confirmed' ? '✓' : '…'}</span>${r.tx_hash ? `<a class="tx" href="${esc(r.explorer)}" target="_blank" rel="noopener">${esc(short(r.tx_hash, 8, 4))} ↗</a>` : ''}`);
+  if (!extra.gate && !extra.gateLoading) { extra.gateLoading = true; A.gateInfo(true).then(g => { extra.gate = g; }).catch(() => { extra.gate = { error: true }; }).finally(() => { extra.gateLoading = false; if (cur === 'toll') { proofDrawer(); if (phase === 'idle' && gasNote()) paint(); } }); }
+  const g = extra.gate, st = extra.tst, row = r => prow(`#${esc(r.nonce)} · ${esc(r.label || r.status)}`, r.visit ? 'visitor charter ' + esc(short(r.visit.charter, 12, 6)) : '', `<span class="st ${r.status === 'confirmed' ? 'ok' : 'live'}" data-testid="gate-status">${r.status === 'confirmed' ? '✓' : '…'}</span>${r.tx_hash ? `<a class="tx" href="${esc(r.explorer)}" target="_blank" rel="noopener">${esc(short(r.tx_hash, 8, 4))} ↗</a>` : ''}`);
   let h = '<h3>Toll gate · live</h3>';
-  if (st) h += prow(`Your visit #${esc(st.nonce)} · ${esc(st.status)}`, st.final ? 'final on Base Sepolia' : st.base ? 'broadcast, finalizing' : 'signed', '<span class="src live">live read</span>');
+  if (st) h += prow(`Your visit #${esc(st.nonce)} · ${esc(st.label || st.status)}`, st.status === 'confirmed' ? 'MPC proof recorded on NEAR' : st.final ? 'final on Base Sepolia, settling' : st.base ? 'sent, Base Sepolia finalizing' : 'sending to Base Sepolia', '<span class="src live">live read</span>');
   if (!g) return h + '<p class="note">Reading the gate…</p>';
   if (g.error) return h + '<p class="note">The gate read is busy; it retries when you reopen this drawer.</p>';
   h += prow(esc(short(g.gate, 14, 8)), `MPC ${esc(g.mpc)} · pays ${esc(short(g.policy.allow_to[0], 6, 4))} on Base Sepolia`, `<a class="tx" href="${NBA(g.gate)}" target="_blank" rel="noopener">gate ↗</a>`);
+  if (g.gas && g.gas.visits_left_at_cap != null) h += prow(`Base Sepolia gas · ${esc(g.gas.visits_left_at_cap)} visits left`, g.gas.low ? '<span data-testid="gas-warning-row">low gas: ' + esc(g.gas.warning) + '</span>' : 'at the fee cap', `<a class="tx" href="${esc(g.foreign_explorer)}" target="_blank" rel="noopener">address ↗</a>`);
   return h + (g.recent || []).map(row).join('');
 }
 // Town Hall rows, read live from /api/townhall by shops/hall.js: the DAO's latest proposals, expired ones marked expired.
@@ -262,8 +287,8 @@ function paint() {
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
   btn(typeof app.btn === 'function' ? app.btn() : app.btn);
 }
-async function primary() {
-  if (phase === 'busy' || !cur) return; const st = A.stage(); sfx('click');
+async function primary(auto = false) {
+  if (phase === 'busy' || !cur) return; const st = A.stage(); if (!auto) sfx('click');
   if (st === 'connect') return A.connect().then(paint).catch(fail);
   if (st === 'rules') return openRules();
   phase = 'busy'; btn(st === 'build' ? 'Approve in your wallet…' : 'Asking your charter…', 'primary busy', true); say(st === 'build' ? 'Building your charter…' : 'Asking your charter on chain…'); rcpt('');
@@ -320,7 +345,7 @@ async function signRules() {
 let booted = null;
 export function boot() {
   if (booted) return booted;
-  $('#t-act').onclick = primary; $('#t-rules').onclick = openRules; $('#r-close').onclick = closeRules; $('#r-sign').onclick = signRules;
+  $('#t-act').onclick = () => primary(); $('#t-rules').onclick = openRules; $('#r-close').onclick = closeRules; $('#r-sign').onclick = signRules;
   if (!HOSTED() && $('#wallet')) $('#wallet').onclick = () => (A.S.me ? openRules() : A.connect().then(paint).catch(fail));
   booted = A.init(() => paint()).then(() => paint()).catch(e => { A.S.ready = true; fail(e); });
   return booted;
@@ -328,7 +353,9 @@ export function boot() {
 export function mount(id, shop, scene) { cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; rcpt(''); document.body.dataset.app = '';
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
-  if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {}); }
+  if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
+  // the Toll room reopened with a visit under way: pick it up (countdown, or settle now if Base is final)
+  if (id === 'toll') booted?.then(() => { const v = cur === 'toll' && A.stage() === 'ready' && A.tollVisit(); if (v && !v.done && phase === 'idle') primary(true); }).catch(() => {}); }
 export function unmount() { cur = null; sh = null; closeRules(); }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };

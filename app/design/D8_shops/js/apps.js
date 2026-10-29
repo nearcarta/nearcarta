@@ -191,6 +191,16 @@ export async function tollSettle(v, st) {
   return s;
 }
 export const tollDone = v => { v.done = true; saveVisit(v); };
+// The background settler: the API signs settle with a key that may only call gate.settle, so no wallet prompt.
+// Returns the new status, or null when the API has no settler (then the visitor's wallet settles).
+export async function tollServerSettle(v) {
+  const r = await api(`/api/toll/gate/${encodeURIComponent(v.nonce)}/settle`, { method: 'POST' }).catch(() => null);
+  if (!r || r.result === 'no_settler' || r.result === 'error') return null;
+  if (r.settle_tx) { v.settle_tx = r.settle_tx; saveVisit(v); }
+  let s; for (let i = 0; i < 12; i++) { s = await tollStatus(v.nonce); if (s.status !== 'signed') break; await new Promise(res => setTimeout(res, 2000)); }
+  if (s.status === 'confirmed') { if (v.settle_tx) keep(v.settle_tx, 'toll', 'confirmed', 'settle'); v.done = true; saveVisit(v); }
+  gateMemo = null; return s;
+}
 
 export async function quote(route, amount) {
   const rt = ROUTES.find(r => r.id === route);
