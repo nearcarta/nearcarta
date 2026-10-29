@@ -4,6 +4,7 @@ import { DEP } from './config.js';
 import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, rpc } from './near.js';
 import { snapshot } from './guardhouse.js';
 import { indexPost } from './txindex.js';
+import { proposalState } from '../../shared/townhall/expiry.js';
 
 const yocto = s => (s == null ? null : Number(BigInt(s) * 10000n / 10n ** 24n) / 1e4);
 
@@ -23,10 +24,19 @@ export async function townhall() {
     receivers: reward?.receivers || [],
     bounties: [],
     council: policy.roles.filter(r => r.kind?.Group).map(r => ({ role: r.name, members: r.kind.Group })),
-    proposals: proposals.map(p => ({ id: p.id, proposer: p.proposer, status: p.status, kind: Object.keys(p.kind)[0], description: String(p.description).slice(0, 160) })),
+    // status is Expired once the vote window closed (Sputnik keeps InProgress until act_proposal); chain_status is raw.
+    proposals: proposals.map(p => townhallProposal(p, policy.proposal_period)),
+    proposal_period_h: Number(BigInt(policy.proposal_period) / 10n ** 9n) / 3600,
     lastProposalId: lastId, proof_txs: T.proof_txs,
     r16: await townhallR16(),
   };
+}
+
+export function townhallProposal(p, periodNs, nowMs = Date.now()) {
+  const s = proposalState(p, periodNs, nowMs);
+  return { id: p.id, proposer: p.proposer, status: s.status, chain_status: s.chain_status, expired: s.expired,
+    ends_at: s.ends_at_ms == null ? null : new Date(s.ends_at_ms).toISOString(),
+    kind: typeof p.kind === 'string' ? p.kind : Object.keys(p.kind)[0], description: String(p.description).slice(0, 160) };
 }
 
 // Town Hall on the R16.1 charter (propose_batch): pays a reward round in one all-or-nothing batch.

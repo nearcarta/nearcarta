@@ -8,3 +8,6 @@
 .props .mine{outline:2px solid var(--c-accent-text)}
 .kinds label{display:flex!important;flex-direction:row!important;gap:8px;align-items:center;margin:0!important}
 .kinds input{width:auto!important;margin:0}
+.props li.expired{border-style:dashed}
+.props .st-expired{color:var(--c-brass)}
+.props .st-inprogress{color:var(--c-accent-text)}

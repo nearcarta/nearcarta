@@ -1,7 +1,7 @@
 // Town Hall: a council table with vote stones. Proposal 4 (real, testnet) lowered the reward cap from 0.25 to 0.15 NEAR.
 import { THREE, room, put, makeRobot, sfx, wait, tween, tok, C } from '../js/core.js';
 import { TH } from '../../D6_dashboards/src/data.js';
-import { row, h3, note, proof, acct, paper } from './_ui.js';
+import { row, h3, note, proof, acct, paper, esc } from './_ui.js';
 import { M as PM, brassM, mesh, lantern, banner, candle, rug } from './_props.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
@@ -10,9 +10,24 @@ export const PROOF = proof(
       h3('Oath versions'), ...TH.versions.map(v => row({ k: `v${v.v} · cap ${v.cap} · total ${v.total} NEAR`, why: v.how, tx: v.tx })),
       h3('What the hall refused'), ...TH.log.filter(l => !l.ok).map(l => row({ k: `${l.who} ${l.what}`, why: l.res, st: 'no', stText: 'refused', tx: l.tx })),
       note(`DAO ${acct(TH.dao)}. All rows are real testnet transactions; the stones are a re-enactment.`));
+// The DAO's latest proposals, read live from /api/townhall. A proposal past its vote window shows as expired:
+// Sputnik keeps it InProgress on chain until someone finalizes it, but nobody can vote on it any more.
+const PST = { Approved: ['ok', 'approved'], Rejected: ['no', 'rejected'], Removed: ['no', 'removed'], Failed: ['no', 'failed'], Expired: ['ice', 'expired'], InProgress: ['pend', 'open'] };
+export function proposalRows(ps = []) {
+  return ps.map(p => { const [st, stText] = PST[p.status] || ['pend', String(p.status).toLowerCase()];
+    const why = p.expired ? `vote closed ${p.ends_at ? new Date(p.ends_at).toUTCString().slice(5, 22) + ' UTC' : ''}; on chain still InProgress until finalized` : p.status === 'InProgress' && p.ends_at ? `vote open until ${new Date(p.ends_at).toUTCString().slice(5, 22)} UTC` : String(p.description || '').slice(0, 80);
+    return row({ k: `#${p.id} · ${p.kind}`, why, st, stText, src: 'live' }); });
+}
+export async function liveProposals(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, '')) {
+  try { const c = new AbortController(), t = setTimeout(() => c.abort(), 6000);
+    const r = await fetchFn(base + '/api/townhall', { signal: c.signal }).finally(() => clearTimeout(t)); if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json(); return proof(h3('Latest proposals · live read'), ...proposalRows(d.proposals), note(`Each vote stays open ${esc(d.proposal_period_h ?? '?')} h. An expired proposal can no longer pass.`)); }
+  catch { return proof(note('The latest proposals could not be read just now; see the proposals page.')); }
+}
 // The town's real proposals page (Sputnik DAO on testnet).
 export const MORE = { href: '/shops/hall/', text: 'See proposals' };
 export default async function hall(ctx) {
+  const liveP = liveProposals();
   const { scene, camera } = await room({ cam: [0, 4.4, 8.6], look: [0, .8, 0] });
   const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a33, roughness: .85 }), stone = PM.stone;
   const top = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, .1, 32), wood); top.position.y = .62; const leg = new THREE.Mesh(new THREE.CylinderGeometry(.16, .26, .6, 12), wood); leg.position.y = .3;
@@ -50,7 +65,7 @@ export default async function hall(ctx) {
   return {
     rob, scene, camera, tags: [],
     panel: { title: 'Town Hall', src: 'testnet', label: 'Reward cap · Proposal 4', hero: tok('0.25', 'NEAR'), action: 'Count the votes', more: MORE },
-    proof: PROOF,
+    proof: (await liveP) + PROOF,
   // intro: the robot walks to beside the table, not behind it
     *intro() { setCap(v2.cap); yield rob.walk([new THREE.Vector3(1.95, 0, -.35)]); rob.lookAt(slab.position); },
     *act() {

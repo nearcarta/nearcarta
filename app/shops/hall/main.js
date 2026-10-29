@@ -4,6 +4,7 @@
 // the receivers. It changes the charter only if the DAO council approves it (2 of 2) and the timelock passes.
 import { makeConnector, currentAccount, txHashOf, hasGuest, forgetGuest } from '../vault/wallet.js';
 import { rpcClient, viewFn } from '../../../shared/vault/tx.js';
+import { proposalState, stateText } from '../../../shared/townhall/expiry.js';
 
 export const DAO = 'r7thmvr8maey.sputnikv2.testnet';
 export const CHARTER = 'townhall.r7thmvr8maey-council2.testnet';
@@ -48,8 +49,10 @@ async function list(want = null) {
   // RPC nodes can lag a just-final tx: wait (up to ~10 s) until the new proposal is listed.
   for (let i = 0; want != null && last <= want && i < 5; i++) { await new Promise(r => setTimeout(r, 2000)); last = await view(DAO, 'get_last_proposal_id'); }
   const ps = await view(DAO, 'get_proposals', { from_index: Math.max(0, last - 6), limit: 6 });
-  $('#list').innerHTML = `<ul class="props">${ps.reverse().map(p => `<li class="${mineIds.has(p.id) ? 'mine' : ''}" data-id="${p.id}"><b>#${p.id}</b><span class="st">${esc(p.status)}</span>
-    <span class="muted"> by <code>${esc(p.proposer)}</code> · ${esc(typeof p.kind === 'string' ? p.kind : Object.keys(p.kind)[0])}</span><br>${esc(p.description)}</li>`).join('')}</ul>`;
+  // A proposal past its vote window shows as Expired even though Sputnik keeps InProgress on chain until act_proposal.
+  const now = Date.now(), period = policy?.proposal_period ?? (await view(DAO, 'get_policy')).proposal_period;
+  $('#list').innerHTML = `<ul class="props">${ps.reverse().map(p => { const s = proposalState(p, period, now); return `<li class="${mineIds.has(p.id) ? 'mine' : ''}${s.expired ? ' expired' : ''}" data-id="${p.id}" data-status="${esc(s.status)}"><b>#${p.id}</b><span class="st st-${esc(String(s.status).toLowerCase())}" title="${s.expired ? 'Vote window closed; on chain it stays InProgress until someone finalizes it' : ''}">${esc(stateText(s, now))}</span>
+    <span class="muted"> by <code>${esc(p.proposer)}</code> · ${esc(typeof p.kind === 'string' ? p.kind : Object.keys(p.kind)[0])}</span><br>${esc(p.description)}</li>`; }).join('')}</ul>`;
   return last;
 }
 

@@ -21,6 +21,8 @@ test.describe('town hall proposals', () => {
     await expect(filed).toBeVisible({ timeout: 120_000 });
     expect(await filed.getAttribute('data-tx')).toMatch(/^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
     const id = await filed.getAttribute('data-id');
-    await expect(page.locator(`[data-testid=list] li[data-id="${id}"]`)).toContainText('InProgress');
+    const li = page.locator(`[data-testid=list] li[data-id="${id}"]`);
+    await expect(li).toHaveAttribute('data-status', 'InProgress');
+    await expect(li).toContainText('Open,');
   });
 });
