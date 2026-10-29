@@ -14,6 +14,12 @@ export const SCL=1.24; // everyone reads bigger at street distance
 // rim light: a warm fresnel edge so silhouettes separate from the street
 export function rimify(root,col=0xffd7a0,k=.55){ root.traverse(m=>{ if(!m.isMesh||!m.material) return; const mm=m.material=m.material.clone(); const rc=new THREE.Color(col);
   mm.onBeforeCompile=sh=>{ sh.uniforms.rimC={value:rc}; sh.uniforms.rimK={value:k}; sh.fragmentShader='uniform vec3 rimC; uniform float rimK;\n'+sh.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n{ float fr=1.-clamp(dot(normalize(normal),normalize(vViewPosition)),0.,1.); totalEmissiveRadiance+=rimC*pow(fr,2.6)*rimK; }'); }; mm.customProgramCacheKey=()=>'rim'+k; }); }
+// ink outline (inverted hull, skinned with the same skeleton) so the cast reads against the busy town at every width
+const inkM=new Map();
+export function outline(root,col=0x2a1a10,w=.018){ const add=[]; root.traverse(m=>{ if(!m.isMesh||m.userData.ink||!m.geometry?.attributes.normal||m.visible===false) return; m.geometry.computeBoundingSphere(); const t=m.geometry.boundingSphere.radius*w;
+    const key=col+':'+t.toFixed(4)+(m.isSkinnedMesh?'s':''); let mat=inkM.get(key); if(!mat){ mat=new THREE.MeshBasicMaterial({color:col,side:THREE.BackSide,fog:true}); mat.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>','vec3 transformed = vec3( position ) + normalize( normal ) * '+t.toFixed(5)+';'); }; mat.customProgramCacheKey=()=>'ink'+key; inkM.set(key,mat); }
+    const o=m.isSkinnedMesh?new THREE.SkinnedMesh(m.geometry,mat):new THREE.Mesh(m.geometry,mat); if(m.isSkinnedMesh) o.bind(m.skeleton,m.bindMatrix); o.position.copy(m.position); o.quaternion.copy(m.quaternion); o.scale.copy(m.scale);
+    o.userData.ink=true; o.castShadow=false; o.receiveShadow=false; o.frustumCulled=false; o.raycast=()=>{}; add.push([m.parent,o]); }); for(const [p,o] of add) p.add(o); }
 export let onStep=()=>{}, onEvent=()=>{};
 export function setHooks(h){ if(h.step) onStep=h.step; if(h.event) onEvent=h.event; }
 
@@ -201,7 +207,7 @@ export async function buildCast(){
   const [robot,knight,hooded,barb,mage,rogue]=await Promise.all([P.has('rorig')?'../chars/RobotExpressive':'RobotExpressive','Knight','Rogue_Hooded','Barbarian','Mage','Rogue'].map(n=>load('chars9/'+n+'.glb').catch(()=>null)));
   const R=CAST.robot=new Char(robot,{rig:'robot',scale:.135,name:'Lamplighter',voice:1.25,height:.7}); R.addLantern(); R.lights=true; R.immune=false;
   // the Lamplighter's palette: brass body instead of the stock yellow, so it reads as a lantern-bearer, not a toy
-  R.root.traverse(m=>{ if(m.isMesh&&m.material){ m.material=m.material.clone(); const c=m.material.color; const hsl={}; c.getHSL(hsl); if(hsl.s>.4&&hsl.h>.08&&hsl.h<.2) c.set(0xc9a066); } });
+  R.root.traverse(m=>{ if(m.isMesh&&m.material){ m.material=m.material.clone(); const c=m.material.color; const hsl={}; c.getHSL(hsl); if(hsl.s>.4&&hsl.h>.08&&hsl.h<.2) c.set(0xd9a441); } });
   // knights hold the ward gate, facing out: shield arm toward the road, shields up on a refusal
   const g=W.gatePos; const gd=new THREE.Vector3(1,0,0);
   CAST.knights=[0,1].map(i=>new Char(knight,{scale:.22,name:'Knight',keep:[i?'Round_Shield':'Badge_Shield','1H_Sword'],voice:.8,height:.62}).place(g.x-.3,g.z+(i?.6:-.6),-Math.PI/2));
@@ -232,6 +238,7 @@ export async function buildCast(){
   for(const [id,[gk,o]] of Object.entries(KEEP)){ if(!gk||!SHOPS[id]) continue; const s=SHOPS[id], c0=hx(s.q,s.r), d=hx(...s.door); const out=d.clone().sub(c0).setY(0).normalize(); const side=new THREE.Vector3(-out.z,0,out.x);
     const p=c0.clone().lerp(d,.58).addScaledVector(side,.62); const k=new Char(gk,{...o,height:.6}); k.place(p.x,p.z,Math.atan2(out.x,out.z)); k.noAlt=false; k.keeper=id; k.home=k.yaw; k.waveCD=0; CAST.keepers[id]=k; }
   for(const c of chars) rimify(c.root, c===R?0xffe2b0:0xffd2a0, c===R?.75:.6);
+  for(const c of chars) outline(c.root, c===R?0x1e1208:0x2a1a10, c===R?.03:.02);
   return CAST;
 }
 const TOWN=[[0,1],[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[2,-1],[-2,1],[-2,0],[0,-2],[1,-3],[-1,-1],[2,0],[-3,1],[0,2],[-1,3],[1,1],[2,-2],[-3,2]];
