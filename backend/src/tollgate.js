@@ -123,8 +123,24 @@ export async function settleOne(nonce, { read = visit, send = sendSettle, settle
   const prev = settled.get(v.nonce);
   if (prev && Date.now() - prev.at < 60_000) return { nonce: v.nonce, result: 'sent', settle_tx: prev.tx, explorer: explorerTx(prev.tx) };
   // one settle tx at a time, so two callers never race on the key's nonce
-  const run = sendChain.then(() => send(settler, g.gate, v.settle.args)); sendChain = run.catch(() => {});
-  const tx = await run;
+  // re-read inside the queue: another caller (sweep or room) may have settled it while we waited
+  const run = sendChain.then(async () => {
+    const hit = settled.get(v.nonce);
+    if (hit && Date.now() - hit.at < 60_000) return { dup: hit.tx };
+    const now = await read(nonce).catch(() => v);
+    if (now.status !== 'signed') return { done: now.status };
+    return { tx: await send(settler, g.gate, v.settle.args) };
+  });
+  sendChain = run.catch(() => {});
+  let r;
+  try { r = await run; } catch (e) {
+    const now = await read(nonce).catch(() => null);
+    if (now && now.status !== 'signed') return { nonce: v.nonce, result: 'done', status: now.status };
+    throw err(502, 'settle not accepted yet, retry shortly');
+  }
+  if (r.done) return { nonce: v.nonce, result: 'done', status: r.done };
+  if (r.dup) return { nonce: v.nonce, result: 'sent', settle_tx: r.dup, explorer: explorerTx(r.dup) };
+  const tx = r.tx;
   settled.set(v.nonce, { tx, at: Date.now() });
   return { nonce: v.nonce, result: 'sent', settle_tx: tx, explorer: explorerTx(tx) };
 }

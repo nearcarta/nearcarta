@@ -55,3 +55,17 @@ test('the settler settles only final signed records, once, and needs no wallet',
   tg._resetSettler();
   assert.equal((await tg.settleOne(2, { ...opts, settler: null })).result, 'no_settler');
 });
+test('a room settle racing the sweep sends once and never errors', async () => {
+  tg._resetSettler();
+  const rec = { nonce: 8, status: 'signed', phase: 'settling', settle: { args: { nonce: 8 } } };
+  let sent = 0;
+  const opts = { read: async () => ({ ...rec }), send: async () => { sent++; await new Promise(r => setTimeout(r, 20)); rec.status = 'confirmed'; return 'TX8'; }, settler: { account: 'a.testnet' } };
+  const [a, b] = await Promise.all([tg.settleOne(8, opts), tg.settleOne(8, opts)]);
+  assert.equal(sent, 1);
+  assert.ok(['sent', 'done'].includes(a.result) && ['sent', 'done'].includes(b.result));
+  tg._resetSettler(); rec.status = 'signed';
+  const failing = { ...opts, send: async () => { rec.status = 'confirmed'; throw new Error('already settled'); } };
+  assert.equal((await tg.settleOne(8, failing)).result, 'done', 'a lost race reads as done, not a 500');
+  tg._resetSettler(); rec.status = 'signed';
+  await assert.rejects(tg.settleOne(8, { ...opts, send: async () => { throw new Error('rpc down'); } }), e => e.status === 502);
+});
