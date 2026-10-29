@@ -3,14 +3,15 @@
 //   the charter's agent key proposes 0.01 NEAR, the guest wallet calls gate.pay_for, the MPC network signs the
 //   Base Sepolia payout, and the API relays it. Phase "settle" (after ~20 min of Base finality) reopens the same
 //   guest and settles with the MPC foreign-tx proof. Every console error and every non-2xx response is recorded.
-// BASE_URL=... WIDTH=1440 PHASE=pay|settle STATE_DIR=<outside git> node e2e/toll-visitor-live.mjs
+// Phase "stay" pays like "pay", then stays in the room: the live countdown runs and the background settler confirms
+// the visit with no second click. BASE_URL=... WIDTH=1440 PHASE=pay|settle|stay STATE_DIR=<outside git> node e2e/toll-visitor-live.mjs
 import { chromium } from '@playwright/test';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5173', W = Number(process.env.WIDTH || 1440), PHASE = process.env.PHASE || 'pay';
 const STATE = `${process.env.STATE_DIR}/ui-${W}.json`, OUT = process.env.OUT || 'judges/proofs/toll-visitor-ui.json';
 const H = W < 500 ? 844 : W < 1400 ? 800 : 900;
-const shot = n => `e2e/shots/toll-${W}-${n}.png`;
+const shot = n => `e2e/shots/${process.env.SHOT_PREFIX || 'toll'}-${W}-${n}.png`;
 const rec = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : { base_url: BASE, passes: {} };
 const pass = rec.passes[W] ||= { width: W, height: H };
 const ph = pass[PHASE] = { at: new Date().toISOString(), console_errors: [], non_2xx: [], shots: [] };
@@ -27,7 +28,7 @@ const save = () => writeFileSync(OUT, JSON.stringify(rec, null, 2) + '\n');
 const until = async (re, ms) => { await p.waitForFunction(r => new RegExp(r).test(document.querySelector('#t-act')?.textContent || ''), re.source, { timeout: ms }); };
 try {
   await p.goto(BASE + '/design/D8_shops/?shop=toll');
-  if (PHASE === 'pay') {
+  if (PHASE === 'pay' || PHASE === 'stay') {
     await until(/Connect wallet/, 60e3); await snap('1-enter');
     await act.click(); await p.locator('.connect-item', { hasText: 'Guest' }).first().click();
     await until(/Build my charter/, 90e3); ph.guest = await p.evaluate(() => window.__apps.S.me);
@@ -46,7 +47,20 @@ try {
     await snap('4-signed-broadcast');
     await p.locator('#t-proof').click(); await p.locator('[data-testid=gate-status]').first().waitFor({ timeout: 60e3 }); await p.waitForTimeout(800); await snap('5-drawer-live');
     ph.drawer = (await p.locator('[data-testid=guest-proof]').innerText()).split('\n').filter(l => /visit|#\d|gate/i.test(l)).slice(0, 8);
+    ph.split = await p.locator('[data-testid=toll-split]').innerText().catch(() => null);
+    ph.split_tx = await p.locator('#t-rcpt a.tx').first().getAttribute('href').catch(() => null);
     mkdirSync(process.env.STATE_DIR, { recursive: true }); await ctx.storageState({ path: STATE }); chmodSync(STATE, 0o600);
+    if (PHASE === 'stay') {
+      if (await p.locator('#t-proof').getAttribute('aria-expanded') === 'true') { await p.keyboard.press('Escape'); if (await p.locator('#t-proof').getAttribute('aria-expanded') === 'true') await p.locator('#t-proof').click({ force: true }).catch(() => {}); } // close the drawer
+      const eta = async () => p.locator('[data-testid=toll-eta]').textContent({ timeout: 3000 }).catch(() => null);
+      ph.eta_first = await eta(); await p.waitForTimeout(5000); ph.eta_after_5s = await eta(); await snap('6-countdown');
+      await p.locator('[data-testid=toll-status][data-status=confirmed]').waitFor({ timeout: 35 * 60e3 });
+      ph.say_confirmed = (await p.locator('#t-say').textContent()).trim();
+      ph.visit_done = await p.evaluate(() => window.__apps.A.tollVisit()); ph.status = 'confirmed';
+      await snap('7-confirmed');
+      if (await p.locator('#t-proof').getAttribute('aria-expanded') !== 'true') await p.locator('#t-proof').click(); await p.locator('[data-testid=gate-status]').first().waitFor({ timeout: 60e3 }); await p.waitForTimeout(1500); await snap('8-drawer-confirmed');
+      ph.drawer_confirmed = (await p.locator('[data-testid=guest-proof]').innerText()).split('\n').filter(l => /visit|#\d|gate|gas/i.test(l)).slice(0, 10);
+    }
   } else {
     await until(/Check Base Sepolia|Settle|Pay the toll/, 90e3);
     // "Check Base Sepolia" settles in the same click once Base is final (the wallet approves settle), so stop on confirmed
@@ -60,7 +74,7 @@ try {
     ph.say = (await p.locator('#t-say').textContent()).trim();
     ph.visit = await p.evaluate(() => window.__apps.A.tollVisit()); ph.status = 'confirmed';
     await snap('7-confirmed');
-    await p.locator('#t-proof').click(); await p.locator('[data-testid=gate-status]').first().waitFor({ timeout: 60e3 }); await p.waitForTimeout(1500); await snap('8-drawer-confirmed');
+    if (await p.locator('#t-proof').getAttribute('aria-expanded') !== 'true') await p.locator('#t-proof').click(); await p.locator('[data-testid=gate-status]').first().waitFor({ timeout: 60e3 }); await p.waitForTimeout(1500); await snap('8-drawer-confirmed');
     ph.drawer = (await p.locator('[data-testid=guest-proof]').innerText()).split('\n').filter(l => /visit|#\d|gate/i.test(l)).slice(0, 8);
   }
   ph.ok = true;
