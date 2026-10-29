@@ -136,7 +136,35 @@ export function ruleFor(o, clauseId = 'pay') {
 }
 
 // ---------- per shop ----------
-export const toll = () => ask({ shop: 'toll', receiver: merchants()[0], amountY: toY(0.01), memo: 'toll:gate' });
+export const toll = () => ask({ shop: 'toll', receiver: merchants()[0], amountY: toY(0.01), memo: 'toll:base-sepolia' });
+// Toll gate (contracts/toll v4): your wallet calls pay_for on the gate with your charter's toll action; the gate reads
+// your charter on chain and gets the MPC network to sign a Base Sepolia payout; the API relays the raw tx the gate
+// signed; after Base finality your wallet calls settle, and the MPC foreign-tx proof makes the record confirmed.
+const LS_TOLL = c => 'nearcarta.d8.toll.' + c;
+export const tollVisit = () => (S.charter ? JSON.parse(localStorage.getItem(LS_TOLL(S.charter)) || 'null') : null);
+const saveVisit = v => S.charter && localStorage.setItem(LS_TOLL(S.charter), JSON.stringify(v));
+let gateMemo = null;
+export const gateInfo = (fresh = false) => (!fresh && gateMemo) || (gateMemo = api('/api/toll/gate').catch(e => { gateMemo = null; throw e; }));
+export const tollStatus = n => api('/api/toll/gate/' + encodeURIComponent(n));
+export async function tollGate(action) {
+  const g = await gateInfo();
+  const h = await sign(g.gate, [fc('pay_for', { charter: S.charter, action_id: String(action) }, 300)]);
+  let nonce = null;
+  for (let i = 0; i < 12 && nonce == null; i++) { nonce = await view(g.gate, 'visit_nonce', { charter: S.charter, action_id: String(action) }).catch(() => null); if (nonce == null) await new Promise(r => setTimeout(r, 1500)); }
+  if (nonce == null) throw Object.assign(new Error('the gate did not sign this visit'), { tx: h });
+  const v = { gate: g.gate, nonce, action, pay_tx: h, at: Date.now() }; saveVisit(v); keep(h, 'toll', 'signed', 'pay_for');
+  const b = await api(`/api/toll/gate/${nonce}/broadcast`, { method: 'POST' });
+  v.base_tx = b.tx_hash; saveVisit(v); gateMemo = null;
+  return { v, st: b };
+}
+export async function tollSettle(v, st) {
+  const h = await sign(v.gate, [fc('settle', st.settle.args, st.settle.gas_tgas || 150)]);
+  v.settle_tx = h; saveVisit(v);
+  let s = st; for (let i = 0; i < 10; i++) { s = await tollStatus(v.nonce); if (s.status !== 'signed') break; await new Promise(r => setTimeout(r, 2000)); }
+  keep(h, 'toll', s.status === 'confirmed' ? 'confirmed' : s.status, 'settle'); if (s.status === 'confirmed') { v.done = true; saveVisit(v); } gateMemo = null;
+  return s;
+}
+export const tollDone = v => { v.done = true; saveVisit(v); };
 
 export async function quote(route, amount) {
   const rt = ROUTES.find(r => r.id === route);
