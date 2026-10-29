@@ -76,21 +76,21 @@ export async function visit(nonce) {
 
 const sendErr = e => err(502, 'Base Sepolia said: ' + String(e.message).slice(0, 120));
 /** Send one signed record unless Base Sepolia already has it. Returns true once the RPC holds the tx. */
-async function relay(rec) {
+export async function relay(rec, rpc = evm) {
   if (!rec?.raw_signed || !rec.tx_hash) return false;
-  if (await evm('eth_getTransactionByHash', [rec.tx_hash]).catch(() => null)) return true;
-  try { await evm('eth_sendRawTransaction', [rec.raw_signed]); }
+  if (await rpc('eth_getTransactionByHash', [rec.tx_hash]).catch(() => null)) return true;
+  try { await rpc('eth_sendRawTransaction', [rec.raw_signed]); }
   catch (e) { if (!/already known|nonce too low|known transaction/i.test(e.message)) throw sendErr(e); }
-  return !!(await evm('eth_getTransactionByHash', [rec.tx_hash]).catch(() => null));
+  return !!(await rpc('eth_getTransactionByHash', [rec.tx_hash]).catch(() => null));
 }
 /** Relay every signed record between the address's mined nonce and `upto` (exclusive), oldest first. */
 const policyNext = async () => (await view(G().gate, 'policy')).next_nonce;
-export async function relayGap(upto, { maxGap = 40 } = {}) {
-  const g = G(); if (!g) return { from: null, sent: [] };
-  const head = parseInt(await evm('eth_getTransactionCount', [g.foreign_address, 'latest']), 16), sent = [];
-  for (let n = head; n < upto && n < head + maxGap; n++) {
-    const r = await view(g.gate, 'get_tx', { nonce: n }).catch(() => null);
-    if (r?.status === 'signed' && r.raw_signed) { try { if (await relay(r)) sent.push(n); } catch { /* next sweep retries */ } }
+export async function relayGap(upto, { maxGap = 40, rpc = evm, gate = G(), read = n => view(gate.gate, 'get_tx', { nonce: n }) } = {}) {
+  const g = gate; if (!g) return { from: null, sent: [] };
+  const head = parseInt(await rpc('eth_getTransactionCount', [g.foreign_address, 'latest']), 16), sent = [];
+  for (let n = head; n < upto && n < head + maxGap; n++) { // lowest Base nonce first: a later tx cannot mine before this one
+    const r = await read(n).catch(() => null);
+    if (r?.status === 'signed' && r.raw_signed) { try { if (await relay(r, rpc)) sent.push(n); } catch { /* next sweep retries */ } }
   }
   return { from: head, sent };
 }

@@ -69,3 +69,19 @@ test('a room settle racing the sweep sends once and never errors', async () => {
   tg._resetSettler(); rec.status = 'signed';
   await assert.rejects(tg.settleOne(8, { ...opts, send: async () => { throw new Error('rpc down'); } }), e => e.status === 502);
 });
+
+test('relayGap re-sends an unsent signed record below a sent one, lowest nonce first', async () => {
+  // Base mined up to nonce 5; record 5 was signed but never sent; record 6 is already in the mempool.
+  const pool = new Set(['0x06']), order = [];
+  const rpc = async (m, p) => {
+    if (m === 'eth_getTransactionCount') return '0x5';
+    if (m === 'eth_getTransactionByHash') return pool.has(p[0]) ? { hash: p[0] } : null;
+    if (m === 'eth_sendRawTransaction') { if (pool.has('0x0' + p[0].slice(-1))) throw new Error('nonce too low'); order.push(p[0]); pool.add('0x0' + p[0].slice(-1)); return '0x'; }
+  };
+  const recs = { 5: { status: 'signed', raw_signed: 'raw5', tx_hash: '0x05' }, 6: { status: 'signed', raw_signed: 'raw6', tx_hash: '0x06' } };
+  const r = await tg.relayGap(7, { rpc, gate: { gate: 'g', foreign_address: '0xa' }, read: async n => recs[n] });
+  assert.equal(r.from, 5);
+  assert.deepEqual(r.sent, [5, 6]);
+  assert.deepEqual(order, ['raw5']); // 6 was already held, only the gap was sent
+  assert.equal(await tg.relay(recs[6], rpc), true);
+});
