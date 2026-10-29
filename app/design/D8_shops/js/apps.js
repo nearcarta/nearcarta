@@ -51,9 +51,13 @@ export async function init(onChange) {
   conn.on('wallet:signIn', () => refresh().then(onChange).then(tell)); conn.on('wallet:signOut', () => { S.charter = null; refresh().then(onChange).then(tell); });
   await refresh(); S.ready = true; return S;
 }
+export const factories = () => [CFG.factory, ...(CFG.legacy || []).map(l => l.factory)];
+/** Only charters from the current (R17) factory run propose_batch; R16 and older ones pay one action per tx. */
+export const canBatch = (c = S.charter) => !!c && c.endsWith('.' + CFG.factory);
 export async function refresh() {
   S.me = await W.currentAccount(conn);
-  if (S.me && !S.charter) { const mine = await view(CFG.factory, 'charters_of', { owner: S.me }).catch(() => []); if (mine.length) S.charter = mine[mine.length - 1]; }
+  // Newest factory first, then the legacy ones: a guest who opened a charter before R17 keeps it.
+  if (S.me && !S.charter) for (const f of factories()) { const mine = await view(f, 'charters_of', { owner: S.me }).catch(() => []); if (mine.length) { S.charter = mine[mine.length - 1]; break; } }
   if (S.charter) await readRules();
   return S;
 }

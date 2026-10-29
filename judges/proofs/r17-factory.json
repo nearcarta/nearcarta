@@ -1,0 +1,106 @@
+{
+ "note": "R17 charter factory on testnet: the main-branch oath (R16.1 propose_batch + C5 hidden rules) published once as a NEP-591 global contract by code hash; the factory pins that hash and has 0 access keys (no admin, no upgrade). New guests get R17 charters; R16/R15/R14 factories stay listed under vault.legacy and are still read by the board, Chronicle and reputation.",
+ "script": "backend/scripts/factory-r17.js (fund | publish | factory | smoke)",
+ "source": {
+  "commit": "370980711a0c3cc2af4956d4d7c638aa5dcc0146",
+  "tag": "build-3709807",
+  "main_oath_unchanged_since": true,
+  "reproducible_build": "cargo near build reproducible-wasm (sourcescan/cargo-near:0.22.0-rust-1.99.1@sha256:c9655eaf...b5bb), rebuilt 29 Oct 2026 03:52 UTC+3: byte-identical to the committed artifact",
+  "artifact": "contracts/artifacts/oath.c5.wasm",
+  "sha256": "a6d611463f9d1c10403ee3985b7ed258e7dfc62742e53c148a1d8a79570c5271",
+  "bytes": 401313,
+  "code_hash_bs58": "CEG11eK9iE23uEJXowQ5kBbsk27TX1mhbhoaGmaP5pjr",
+  "embedded_rev": "3709807"
+ },
+ "global_code": {
+  "code_hash": "CEG11eK9iE23uEJXowQ5kBbsk27TX1mhbhoaGmaP5pjr",
+  "rpc": "query view_global_contract_code (finality final) returns bytes equal to the artifact",
+  "equals_artifact": true
+ },
+ "factory": {
+  "account": "nccharters-53836.testnet",
+  "artifact": "contracts/artifacts/charter_factory.r15.wasm",
+  "sha256": "181ed629e9da61bde286e266cde7896287a648490549e6381ff589aed2c00e96",
+  "code_hash_bs58": "2dA4HymactrRrBL5e1iT2SDZbfcCg2gi3pt5ooUfuVSV",
+  "onchain_code_hash": "2dA4HymactrRrBL5e1iT2SDZbfcCg2gi3pt5ooUfuVSV",
+  "matches_artifact": true,
+  "access_keys": 0,
+  "source_rev": "4d4d047 (factory src unchanged since)"
+ },
+ "smoke": {
+  "charter": "smoke.nccharters-53836.testnet",
+  "global_contract_hash": "CEG11eK9iE23uEJXowQ5kBbsk27TX1mhbhoaGmaP5pjr",
+  "matches": true,
+  "keys": 0,
+  "owner": "ncpub-53836.testnet",
+  "setup_open": true,
+  "policy_delay_ns": "86400000000000",
+  "registered": true
+ },
+ "publisher": "ncpub-53836.testnet",
+ "funding": "faucet only: publisher, factory and 4 donors (10 NEAR each), donors consolidated into the publisher; global deploy burns 10 NEAR per 100 KB (401313 B = 40.13 NEAR)",
+ "txs": [
+  {
+   "label": "consolidate ncfund1-53836.testnet -> publisher",
+   "tx": "gtNyw36izUaHTiA6nqMoUyFyfBt6ivegbfGEXs3cJDU",
+   "ok": true,
+   "gas_tgas": 0.669,
+   "url": "https://testnet.nearblocks.io/txns/gtNyw36izUaHTiA6nqMoUyFyfBt6ivegbfGEXs3cJDU"
+  },
+  {
+   "label": "consolidate ncfund2-53836.testnet -> publisher",
+   "tx": "7HvaP6puCQuJ4LgXrbNpHz3PCJvhrFyVdJUpKBPCKQQy",
+   "ok": true,
+   "gas_tgas": 0.669,
+   "url": "https://testnet.nearblocks.io/txns/7HvaP6puCQuJ4LgXrbNpHz3PCJvhrFyVdJUpKBPCKQQy"
+  },
+  {
+   "label": "consolidate ncfund3-53836.testnet -> publisher",
+   "tx": "2M83ycUEVpjNLMKcWZF9TUKzUcewEb5diz8XrcfBeV5M",
+   "ok": true,
+   "gas_tgas": 0.669,
+   "url": "https://testnet.nearblocks.io/txns/2M83ycUEVpjNLMKcWZF9TUKzUcewEb5diz8XrcfBeV5M"
+  },
+  {
+   "label": "consolidate ncfund4-53836.testnet -> publisher",
+   "tx": "Fmf3HjGHe77yBQEFxXDg37tThugzNi4TLZyyiHrCCxXR",
+   "ok": true,
+   "gas_tgas": 0.669,
+   "url": "https://testnet.nearblocks.io/txns/Fmf3HjGHe77yBQEFxXDg37tThugzNi4TLZyyiHrCCxXR"
+  },
+  {
+   "label": "deploy-as-global R17 oath (by hash)",
+   "tx": "EqTuyP3yv3mhrNTbDbu8ckMNQyB2MSY56m6QPDNMfnR8",
+   "ok": true,
+   "gas_tgas": 31.634,
+   "url": "https://testnet.nearblocks.io/txns/EqTuyP3yv3mhrNTbDbu8ckMNQyB2MSY56m6QPDNMfnR8"
+  },
+  {
+   "label": "deploy factory + new(code_hash)",
+   "tx": "9VJ3iRzE5quEz4pn8k2ZPzDqot2idAuj5kVJJ6Xi6iWc",
+   "ok": true,
+   "gas_tgas": 14.701,
+   "url": "https://testnet.nearblocks.io/txns/9VJ3iRzE5quEz4pn8k2ZPzDqot2idAuj5kVJJ6Xi6iWc"
+  },
+  {
+   "label": "delete factory full-access key (factory locked)",
+   "tx": "D4W8yGEx5ZFhXo5m3d6tqQwJ3KomBhsuC3pcTuHeXVhm",
+   "ok": true,
+   "gas_tgas": 0.629,
+   "url": "https://testnet.nearblocks.io/txns/D4W8yGEx5ZFhXo5m3d6tqQwJ3KomBhsuC3pcTuHeXVhm"
+  },
+  {
+   "label": "create smoke charter via factory",
+   "tx": "64eJHL3Gm8xFkMWtDmKmSmdjcjgD1eS5kz2hucrnQcrh",
+   "ok": true,
+   "gas_tgas": 15.846,
+   "url": "https://testnet.nearblocks.io/txns/64eJHL3Gm8xFkMWtDmKmSmdjcjgD1eS5kz2hucrnQcrh"
+  }
+ ],
+ "unit_tests": {
+  "oath": "cargo test --lib: 122 passed",
+  "charter_factory": "cargo test --lib: 23 passed",
+  "backend": "npm test: 182 pass, 1 skipped, 0 fail"
+ },
+ "verify": "curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"smoke.nccharters-53836.testnet\"}}' | jq .result.global_contract_hash  # = CEG11eK9..., = bs58(sha256(contracts/artifacts/oath.c5.wasm))"
+}

@@ -177,12 +177,12 @@
     }
   },
   "vault": {
-    "release": "R16",
-    "factory": "nccharters-53681.testnet",
-    "code_hash": "AWw8zu6mcbkdmTf49wPB2BdXEUjbbWKVHAfjfiQho89r",
-    "code_source": "contracts/artifacts/oath.r16.oz.wasm = binaryen 133 `wasm-opt -Oz` of contracts/artifacts/oath.r16.wasm (reproducible build of commit 5099a7c, sha256 3a65b00c5112d375cc5b492f05570b7e574a7a2d0dfb0506f04116ccb4a84d46); -Oz sha256 8d643d5e48fef54421006ad48b7693f6340be2787928d4f64224b866284ea64d, 367202 bytes",
+    "release": "R17",
+    "factory": "nccharters-53836.testnet",
+    "code_hash": "CEG11eK9iE23uEJXowQ5kBbsk27TX1mhbhoaGmaP5pjr",
+    "code_source": "contracts/artifacts/oath.c5.wasm = cargo near build reproducible-wasm (sourcescan/cargo-near:0.22.0-rust-1.99.1) of commit 3709807 (tag build-3709807; main oath source unchanged since): R16.1 propose_batch + C5 hidden rules, sha256 a6d611463f9d1c10403ee3985b7ed258e7dfc62742e53c148a1d8a79570c5271, 401313 bytes, published as is (no -Oz)",
     "factory_sha256": "181ed629e9da61bde286e266cde7896287a648490549e6381ff589aed2c00e96",
-    "factory_artifact": "contracts/artifacts/charter_factory.r15.wasm (factory source unchanged; only the pinned code_hash differs)",
+    "factory_artifact": "contracts/artifacts/charter_factory.r15.wasm (reproducible build of 4d4d047; factory source unchanged; only the pinned code_hash differs)",
     "factory_full_access_keys": 0,
     "min_deposit": "300000000000000000000000",
     "policy_delay": {
@@ -198,27 +198,62 @@
         "books.ncpub-17102.testnet"
       ]
     },
+    "arena_note": "The shared arena stays on the R16 factory (arena.nccharters-53681.testnet) with the same server agent key; new visitor charters come from the R17 factory.",
     "redteam": {
       "charter": "redteam.nccharters-53681.testnet",
       "owner": "ncarena-53681.testnet",
       "purpose": "H14/H15 exploit replays on a factory-made R16 charter"
     },
-    "proof": "judges/proofs/r16-factory.json",
+    "smoke": {
+      "charter": "smoke.nccharters-53836.testnet",
+      "owner": "ncpub-53836.testnet",
+      "purpose": "factory-made R17 charter: view_account global_contract_hash == code_hash, 0 keys"
+    },
+    "proof": "judges/proofs/r17-factory.json",
     "proof_txs": {
-      "oath_deployed_as_global_by_hash": "HjtqV8X6GZgc7zNp1Me2G6fqN5DBemD1fj7o2mY4ZXaM",
-      "factory_deploy_init": "DSLDca13SWjnquvfJ6aGYCwJBusNCn5xMrgvhZf2tSqx",
-      "factory_full_access_key_deleted": "B8cW1TrFSPjmFQ6dzU2Sd9yetRhKDyQa1ZdiXbF9SA9F",
-      "arena_charter_created_by_factory": "912H2oZ5AL6kiG2eXEyHkCs8eLGRGE4TyCz5ia9kPp4L",
-      "arena_set_clause_in_setup_window": "AT8R9VTtcmgMceBaKsbzsum6GJDVPBnPwkRY4hNB4mPs",
-      "arena_set_agent_key_closes_setup": "E6D8o6CQRfvncTJpSsXmkMCoH5ZJ5bEE9E8wsdvHxUxP",
-      "redteam_charter_created_by_factory": "2bW63Yjb3rZGzdXi62WzYxVnKWmxFDDKKGp9BniPVRLv",
-      "h14_low_gas": "96WKCBh1ST6gAaN6VyCkQFd6VQm2Vt1g49Pif74yN76s",
-      "h14_control": "Rmorj4ZAUeSdbssxNrpMCKau96DkLWSSsFp23iRL1Wr",
-      "h15_below_min": "BjyTxDJNS2oUExBjjYCC5UecqRWwDoGM6yCqu5gnmbfk",
-      "h15_over_daily_action_count": "5WMXzkNfRPGpZkEP5Z5RZq7b1pYxjNmNdHrwybSjpav7",
-      "h15_storage_reserve_low": "7dZSt6iVCViMX92LhxfeyFvZH1koG5HGXkcx68PkMKaW"
+      "oath_deployed_as_global_by_hash": "EqTuyP3yv3mhrNTbDbu8ckMNQyB2MSY56m6QPDNMfnR8",
+      "factory_deploy_init": "9VJ3iRzE5quEz4pn8k2ZPzDqot2idAuj5kVJJ6Xi6iWc",
+      "factory_full_access_key_deleted": "D4W8yGEx5ZFhXo5m3d6tqQwJ3KomBhsuC3pcTuHeXVhm",
+      "smoke_charter_created_by_factory": "64eJHL3Gm8xFkMWtDmKmSmdjcjgD1eS5kz2hucrnQcrh"
     },
     "legacy": [
+      {
+        "release": "R16",
+        "factory": "nccharters-53681.testnet",
+        "code_hash": "AWw8zu6mcbkdmTf49wPB2BdXEUjbbWKVHAfjfiQho89r",
+        "code_source": "contracts/artifacts/oath.r16.oz.wasm = binaryen 133 `wasm-opt -Oz` of contracts/artifacts/oath.r16.wasm (reproducible build of commit 5099a7c, sha256 3a65b00c5112d375cc5b492f05570b7e574a7a2d0dfb0506f04116ccb4a84d46); -Oz sha256 8d643d5e48fef54421006ad48b7693f6340be2787928d4f64224b866284ea64d, 367202 bytes",
+        "factory_sha256": "181ed629e9da61bde286e266cde7896287a648490549e6381ff589aed2c00e96",
+        "factory_artifact": "contracts/artifacts/charter_factory.r15.wasm (factory source unchanged; only the pinned code_hash differs)",
+        "arena": {
+          "charter": "arena.nccharters-53681.testnet",
+          "owner": "ncarena-53681.testnet",
+          "merchants": [
+            "cafe.ncpub-17102.testnet",
+            "books.ncpub-17102.testnet"
+          ]
+        },
+        "redteam": {
+          "charter": "redteam.nccharters-53681.testnet",
+          "owner": "ncarena-53681.testnet",
+          "purpose": "H14/H15 exploit replays on a factory-made R16 charter"
+        },
+        "proof": "judges/proofs/r16-factory.json",
+        "proof_txs": {
+          "oath_deployed_as_global_by_hash": "HjtqV8X6GZgc7zNp1Me2G6fqN5DBemD1fj7o2mY4ZXaM",
+          "factory_deploy_init": "DSLDca13SWjnquvfJ6aGYCwJBusNCn5xMrgvhZf2tSqx",
+          "factory_full_access_key_deleted": "B8cW1TrFSPjmFQ6dzU2Sd9yetRhKDyQa1ZdiXbF9SA9F",
+          "arena_charter_created_by_factory": "912H2oZ5AL6kiG2eXEyHkCs8eLGRGE4TyCz5ia9kPp4L",
+          "arena_set_clause_in_setup_window": "AT8R9VTtcmgMceBaKsbzsum6GJDVPBnPwkRY4hNB4mPs",
+          "arena_set_agent_key_closes_setup": "E6D8o6CQRfvncTJpSsXmkMCoH5ZJ5bEE9E8wsdvHxUxP",
+          "redteam_charter_created_by_factory": "2bW63Yjb3rZGzdXi62WzYxVnKWmxFDDKKGp9BniPVRLv",
+          "h14_low_gas": "96WKCBh1ST6gAaN6VyCkQFd6VQm2Vt1g49Pif74yN76s",
+          "h14_control": "Rmorj4ZAUeSdbssxNrpMCKau96DkLWSSsFp23iRL1Wr",
+          "h15_below_min": "BjyTxDJNS2oUExBjjYCC5UecqRWwDoGM6yCqu5gnmbfk",
+          "h15_over_daily_action_count": "5WMXzkNfRPGpZkEP5Z5RZq7b1pYxjNmNdHrwybSjpav7",
+          "h15_storage_reserve_low": "7dZSt6iVCViMX92LhxfeyFvZH1koG5HGXkcx68PkMKaW"
+        },
+        "note": "R16 factory (no propose_batch). Read-only for new guests: its charters, arena and redteam rows still verify and count on the board, Chronicle and reputation. The shared arena runner still uses arena.nccharters-53681."
+      },
       {
         "release": "R15",
         "factory": "nccharters-85831.testnet",

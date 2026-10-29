@@ -42,8 +42,11 @@ async function refreshWho() {
   $('#connect').hidden = !!me; $('#guest').hidden = !!me; $('#signout').hidden = !me;
   document.body.dataset.step = me ? (charter ? 'charter' : 'wallet') : 'none';
   if (me && !charter) {
-    const mine = await view(CFG.factory, 'charters_of', { owner: me }).catch(() => []);
-    if (mine.length) await useCharter(mine[mine.length - 1]);
+    // Newest factory first, then the legacy ones: a guest who opened a charter before R17 keeps it.
+    for (const f of [CFG.factory, ...(CFG.legacy || []).map(l => l.factory)]) {
+      const mine = await view(f, 'charters_of', { owner: me }).catch(() => []);
+      if (mine.length) { await useCharter(mine[mine.length - 1]); break; }
+    }
   }
   renderCreate();
 }
