@@ -22,10 +22,23 @@ export function say(who,text,{style='say',tone='',dur=null,name=null}={}){
 }
 export function hush(who){ for(const b of live) if(!who||b.who===who) b.end=Math.min(b.end,clock.T); }
 export function clear(){ for(const b of live) b.el.remove(); live.length=0; }
-// keep bubbles under the visible top HUD (brand card, wallet row): on a phone it fills the top ~160 px
+// layout: every visible bubble gets a box that touches no other bubble, no HUD control and no screen edge.
+// Each bubble tries slots near its head (above, then stepped up, then sideways); if no slot is free it waits hidden.
 let hudR=[], hudT=-1;
-function topFloor(x,bw){ if(hudT!==clock.T){ hudT=clock.T; hudR=[]; for(const e of document.querySelectorAll('.hud,.hud .what')){ const r=e.getBoundingClientRect(); if(!r.height||r.top>innerHeight*.3) continue; let o=1; for(let n=e;n&&n.nodeType===1;n=n.parentElement) o*=+getComputedStyle(n).opacity; if(o>.1) hudR.push(r); } }
-  let y=10; for(const r of hudR) if(x<r.right+6&&x+bw+6>r.left) y=Math.max(y,r.bottom+8); return y; }
+const HUDQ='.hud,.pill,#prompt:not([hidden]),.pin,#ctl,#zoom'; // pins too: a line never covers a shop label
+function huds(){ if(hudT===clock.T) return hudR; hudT=clock.T; hudR=[];
+  for(const e of document.querySelectorAll(HUDQ)){ const r=e.getBoundingClientRect(); if(r.width<2||r.height<2||r.bottom<0||r.top>innerHeight) continue; let o=1; for(let n=e;n&&n.nodeType===1;n=n.parentElement){ const cs=getComputedStyle(n); if(cs.display==='none'||cs.visibility==='hidden'){ o=0; break; } o*=+cs.opacity; } if(o>.1) hudR.push({x:r.left,y:r.top,w:r.width,h:r.height}); }
+  return hudR; }
+const GAP=8;
+const hit=(a,b,g=GAP)=>a.x<b.x+b.w+g && a.x+a.w+g>b.x && a.y<b.y+b.h+g && a.y+a.h+g>b.y;
+function slot(b,taken,w,h){ const H=huds(); const bw=b.w, bh=b.h+10; /* +10: the tail under the box */
+  const x0=Math.max(10,Math.min(w-bw-10,b.ax-bw*.3)), y0=b.ay-bh-4;
+  const free=(x,y)=>{ if(x<6||y<6||x+bw>w-6||y+bh>h-6) return false; const c={x,y,w:bw,h:bh}; for(const o of taken) if(hit(c,o)) return false; for(const o of H) if(hit(c,o,6)) return false; return true; };
+  const dxs=[0,-bw*.55,bw*.55,-bw*1.1,bw*1.1];
+  for(let k=0;k<14;k++){ const dy=-k*(bh*.5); for(const dx of dxs){ const x=Math.max(10,Math.min(w-bw-10,x0+dx)), y=y0+dy; if(free(x,y)) return {x,y}; } }
+  // nothing above: try below the anchor (feet side), then give up
+  for(let k=0;k<4;k++) for(const dx of dxs){ const x=Math.max(10,Math.min(w-bw-10,x0+dx)), y=b.ay+40+k*(bh*.5); if(free(x,y)) return {x,y}; }
+  return null; }
 export function update(){
   const T=clock.T, cam=W.camera, w=innerWidth, h=innerHeight;
   for(let i=live.length-1;i>=0;i--){ const b=live[i]; if(T>b.end+.35){ b.el.remove(); live.splice(i,1); } }
@@ -36,23 +49,27 @@ export function update(){
     const p=b.who.top(); tv.copy(p); tv.y+=.12; const dist=cam.position.distanceTo(tv); tv.project(cam);
     const on=tv.z<1 && Math.abs(tv.x)<1.15 && Math.abs(tv.y)<1.15;
     const fade=1-Math.min(1,Math.max(0,(dist-28)/18)); const life=T>b.end?0:Math.min(1,(T-b.t0)*6);
-    const op=on?fade*life:0; b.el.style.opacity=op.toFixed(3);
-    if(op<.02){ continue; }
-    if(!b.w){ const cur=b.tx.textContent; b.tx.textContent=b.text; b.w=b.el.offsetWidth+1||160; b.h=b.el.offsetHeight||40; b.el.style.width=b.w+'px'; b.el.style.minHeight=b.h+'px'; b.tx.textContent=cur; }
+    b.op=on?fade*life:0;
+    if(b.op<.02){ b.el.style.opacity='0'; b.x=null; continue; }
+    if(!b.w){ const cur=b.tx.textContent; b.tx.textContent=b.text; b.w=Math.min(b.el.offsetWidth+1||160,w-24); b.h=b.el.offsetHeight||40; b.el.style.width=b.w+'px'; b.el.style.minHeight=b.h+'px'; b.tx.textContent=cur; b.h=Math.max(b.h,b.el.offsetHeight); }
     b.ax=(tv.x*.5+.5)*w; b.ay=(-tv.y*.5+.5)*h; vis.push(b);
-    const sc=.86+.14*fade; b.sc=sc;
+    b.sc=.86+.14*fade;
   }
-  // de-overlap: place in order of anchor height, push up past already-placed boxes
-  vis.sort((a,b)=>b.ay-a.ay); const placed=[];
-  for(const b of vis){ let x=b.ax-b.w*.3, y=b.ay-b.h-14; x=Math.max(10,Math.min(w-b.w-10,x));
-    for(let it=0;it<8;it++){ const hit=placed.find(o=>x<o.x+o.w+8 && x+b.w+8>o.x && y<o.y+o.h+6 && y+b.h+6>o.y); if(!hit) break; y=hit.y-b.h-8; }
-    y=Math.max(topFloor(x,b.w),y);
-    // ease toward the slot so bubbles never jitter
-    if(b.x==null||RM){ b.x=x; b.y=y; } else { b.x+=(x-b.x)*.35; b.y+=(y-b.y)*.35; }
-    placed.push({x:b.x,y:b.y,w:b.w,h:b.h});
+  // priority: the Lamplighter first, then the newest line; ties by the nearer (lower) head
+  vis.sort((a,b)=>((b.who.kind==="robot"?1:0)-(a.who.kind==="robot"?1:0))||(b.t0-a.t0)||(b.ay-a.ay));
+  const tgt=[];
+  for(const b of vis){ const s=slot(b,tgt.map(t=>t.box),w,h); b.slot=s; if(s) tgt.push({b,box:{x:s.x,y:s.y,w:b.w,h:b.h+10}}); }
+  // ease toward the slot, but only while the eased box stays clear of everyone's slot and of boxes already drawn; otherwise jump
+  const drawn=[];
+  for(const b of vis){ const s=b.slot; if(!s){ b.el.style.opacity='0'; b.x=null; continue; }
+    let x=s.x, y=s.y;
+    if(b.x!=null && !RM){ const ex=b.x+(s.x-b.x)*.35, ey=b.y+(s.y-b.y)*.35, e={x:ex,y:ey,w:b.w,h:b.h+10};
+      const clear=!tgt.some(t=>t.b!==b&&hit(e,t.box,2)) && !drawn.some(o=>hit(e,o,2)); if(clear){ x=ex; y=ey; } }
+    b.x=x; b.y=y; drawn.push({x,y,w:b.w,h:b.h+10});
+    b.el.style.opacity=b.op.toFixed(3);
     const txp=Math.max(14,Math.min(b.w-14,b.ax-b.x)); b.el.style.setProperty('--tx',txp+'px'); b.el.style.setProperty('--ty',(b.h)+'px');
     b.el.style.setProperty('--sx',((b.ax-b.x-txp)/40).toFixed(2));
     b.el.style.transform=`translate(${b.x.toFixed(1)}px,${b.y.toFixed(1)}px) scale(${b.sc.toFixed(3)})`; b.el.style.transformOrigin=`${txp}px 100%`;
-    // when the tail must stretch (pushed up), dim slightly so the stack reads as secondary
   }
+  window.__bubbles=drawn;
 }
