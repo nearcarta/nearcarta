@@ -30,3 +30,9 @@ regexes = ['''(?i)0x036cbd53842c5426634e7929541ec2318f3dcf7e''']
 description = "a NEAR public key named in a log line ('key ed25519:<32-byte key>', <=44 base58 chars); 64-byte private keys (~88 chars) stay flagged"
 regexTarget = "match"
 regexes = ['''(?i)\bkey ed25519:[1-9A-HJ-NP-Za-km-z]{43,44}\s*$''']
+
+[[allowlists]]
+description = "Vault Arena attempt labels in shared/arena/prompts.js (\"key\": \"<CODE>_<words>\"), plain ids, not secrets"
+paths = ['''^shared/arena/prompts\.js$''']
+regexTarget = "line"
+regexes = ['''^\s*"key": "[A-Z][A-Z0-9]*_[a-z_]+",?$''']
