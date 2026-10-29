@@ -155,7 +155,7 @@
       "held_by": "the owner, given to an auditor out of band; never served by the API or committed",
       "contains": "the payee viewing key (UFVK) and the opening (amount in zatoshi and salt)",
       "how": "the auditor imports the UFVK into their own zcash-devtool view-only wallet (init-fvk, sync, enhance, list-tx), reads the amount and the salt from the encrypted memo, then checks the opening against the commitment on chain with POST /api/mistbank/verify or by hashing it locally",
-      "rotated": "the first payout (d0b52067…, payee account mist-payee, wallet payee) had its viewing key in git history until 2026-10-28; that account is retired. This payout goes to a fresh account in the payee-r2 wallet whose key was never committed or served; each later payout gets its own fresh account"
+      "rotated": "an earlier payout had its viewing key in git history until 2026-10-28; its account is retired and no longer shown here. This payout goes to a fresh account in the payee-r2 wallet whose key was never committed or served; each later payout gets its own fresh account"
     }
   },
   "house": {

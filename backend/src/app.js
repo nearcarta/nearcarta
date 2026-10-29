@@ -1,5 +1,6 @@
 // HTTP API (Hono). Read-only on chain; quotes are dry; no route can sign or spend.
 import { Hono } from 'hono';
+import { createHmac, randomBytes } from 'node:crypto';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { bodyLimit } from 'hono/body-limit';
@@ -100,14 +101,18 @@ export function makeApp() {
   // each one's status and time, plus the RPC retry/fallback/stale counters.
   app.get('/api/health', limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: await shops.health(),
     features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: await vault.runnerStatus() }));
-  // Shows the caller only what Render received about the caller's own request: which header decides
-  // the client IP, the IP-related header values, and the names (not values) of every other header.
+  // Shows the caller how Render keys their own request, with no address in the answer: which header decides
+  // the client key, a short keyed tag of that key (the same client gets the same tag until the process
+  // restarts, so two visitors can see they are in different limit buckets), how many hops each IP header
+  // lists, and the names (not values) of every other header.
   const IP_HEADERS = ['cf-connecting-ip', 'true-client-ip', 'x-forwarded-for', 'x-vercel-forwarded-for', 'x-real-ip', 'x-vercel-ip-country'];
+  const TAG_KEY = randomBytes(32);
+  const ipTag = v => v ? createHmac('sha256', TAG_KEY).update(String(v)).digest('hex').slice(0, 12) : null;
   app.get('/api/whoami', limiter(20), c => {
     const [from, ip, egress] = clientIdentity(c);
     const raw = c.req.raw.headers, seen = {};
-    for (const n of IP_HEADERS) if (raw.get(n)) seen[n] = raw.get(n);
-    return c.json({ client_ip_from: from, client_ip: ip, shared_cap: egress, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
+    for (const n of IP_HEADERS) if (raw.get(n)) seen[n] = n === 'x-vercel-ip-country' ? 'set' : `${raw.get(n).split(',').length} hop(s)`;
+    return c.json({ client_ip_from: from, client_tag: ipTag(ip), shared_cap: egress ? 'egress:' + ipTag(egress) : null, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
 
@@ -255,7 +260,7 @@ export function makeApp() {
     catch (e) {
       if (e.status || !/busy|http (429|5\d\d)|timeout|aborted|fetch failed/i.test(e.message)) throw e;
       const hashes = [...known, ...vault.knownTxs(a).slice(-15)];
-      if (hashes.length) { const f = await shops.chronicleFrom(a, hashes, limit); if (f.txs.length) return c.json(f); }
+      if (hashes.length) { const f = await shops.chronicleFrom(a, hashes, limit); if (f.txs.length) return c.json(shops.hideRetired(f)); }
       c.header('Retry-After', '10'); return c.json({ account: a, count: 0, txs: [], busy: true, source: 'tx index busy; try again in 10 s' });
     }
     const have = new Set((j.txs || []).map(t => t.hash)), lag = known.filter(h => !have.has(h));
@@ -264,7 +269,7 @@ export function makeApp() {
       if (f.txs.length) j = { ...j, txs: [...f.txs, ...j.txs].sort((x, y) => String(y.at).localeCompare(String(x.at))).slice(0, limit), source: j.source + ' + known tx hashes' };
       j.count = j.txs.length;
     }
-    return c.json(j);
+    return c.json(shops.hideRetired(j));
   });
   // R16 oath charters: on-chain reputation (refusal buckets) and one clause's user-set rules. Read-only views;
   // older charters (R14/R15) have no such method and answer { supported: false }.

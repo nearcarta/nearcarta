@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 // Read-only live views for Town Hall, Arena and Toll, plus the Chronicle indexer.
 import { DEP } from './config.js';
 import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, rpc } from './near.js';
@@ -99,6 +100,17 @@ export async function fpost(path, body, f = fetch, waitMs = 700) {
 // Pages poll the feed after every tx: concurrent callers for one account+limit share one upstream read (1 s reuse),
 // and the last good feed (marked stale) when the index is still busy after retries.
 const feeds = new Map();
+// Retired txs: the first Mist Bank payout's oath approval (its payee was retired when its viewing key was found in
+// git history). Feeds leave it out so the site never re-links that payee; listed by sha256 so the hash itself is
+// not repeated here. Chain explorers still show it, as they show every testnet tx.
+export const RETIRED_TX_SHA256 = new Set(['ffbfd539498bf406654eb56d5dfb270fbda0f1620c833bc54789898e60cd2e7e']);
+const sha256hex = s => createHash('sha256').update(String(s)).digest('hex');
+export function hideRetired(feed) {
+  if (!feed || !Array.isArray(feed.txs)) return feed;
+  const txs = feed.txs.filter(t => !RETIRED_TX_SHA256.has(sha256hex(t.hash)));
+  if (txs.length === feed.txs.length) return feed;
+  return { ...feed, txs, count: txs.length, retired_hidden: feed.txs.length - txs.length };
+}
 export async function chronicle(account, limit = 8, read = chronicleOnce) {
   const k = account + '|' + limit, hit = feeds.get(k), now = Date.now();
   if (hit?.p) return hit.p;
