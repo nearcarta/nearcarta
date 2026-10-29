@@ -218,6 +218,16 @@ function hallRows() {
   if (extra.hallP == null && !extra.hallLoading) { extra.hallLoading = true; import('../shops/hall.js').then(m => m.liveProposals(undefined, undefined, true)).then(h => { extra.hallP = h; }).catch(() => { extra.hallP = ''; }).finally(() => { extra.hallLoading = false; if (cur === 'hall') proofDrawer(); }); }
   return extra.hallP ?? '<h3>Latest proposals · live read</h3><p class="note">Reading the DAO…</p>';
 }
+// Vault Arena rows, read live from /api/arena/prompts by shops/arenalive.js: past prompts with their decision and reveal txs.
+function arenaRows() {
+  if (extra.arenaP == null && !extra.arenaLoading) { extra.arenaLoading = true; import('../shops/arenalive.js').then(m => m.livePrompts(undefined, undefined, true)).then(h => { extra.arenaP = h; }).catch(() => { extra.arenaP = ''; }).finally(() => { extra.arenaLoading = false; if (cur === 'arena') proofDrawer(); }); }
+  return extra.arenaP ?? '<h3>Past prompts · live read</h3><p class="note">Reading the arena…</p>';
+}
+// Toll records, read live from /api/toll by shops/tollrecords.js: a record stuck in "signed" shows pending or expired.
+function tollRecordRows() {
+  if (extra.tollR == null && !extra.tollRLoading) { extra.tollRLoading = true; import('../shops/tollrecords.js').then(m => m.liveTollRecords(undefined, undefined, true)).then(h => { extra.tollR = h; }).catch(() => { extra.tollR = ''; }).finally(() => { extra.tollRLoading = false; if (cur === 'toll') proofDrawer(); }); }
+  return extra.tollR ?? '<h3>Toll records · live read</h3><p class="note">Reading the tolls…</p>';
+}
 function proofDrawer() {
   const d = $('#d-body'); if (!d || !cur) return; const S = A.S, c = S.clauses?.pay;
   let g = '';
@@ -232,6 +242,8 @@ function proofDrawer() {
   }
   if (cur === 'toll') g += tollGateRows();
   if (cur === 'hall') g += hallRows();
+  if (cur === 'arena') g += arenaRows();
+  if (cur === 'toll') g += tollRecordRows();
   d.innerHTML = `<div class="pf" data-testid="guest-proof" data-guest="1">${g}</div>` + (lab ? `<details class="lab"><summary>Lab record · reference, not your charter</summary>${lab}</details>` : '');
 }
 
