@@ -10,6 +10,7 @@ export const SHOPS = {
   toll:      { q: -1, r: 5,  m: 'buildings/blue/building_tower_base_blue', name: 'Toll',       icon: 'link' },
   chronicle: { q: 0,  r: 0,  m: 'buildings/blue/building_tower_A_blue',    name: 'Chronicle',  icon: 'file-text' },
   house:     { q: -4, r: 0,  m: 'buildings/blue/building_home_A_blue',     name: 'Your House', icon: 'key' },
+  payouts:   { q: -1, r: -3, m: 'buildings/blue/building_tavern_blue',     name: 'Payouts',    icon: 'money-bag' },
 };
 const ISLAND = 7, DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
 const key = (q, r) => q + ',' + r, hdist = (q, r) => (Math.abs(q) + Math.abs(r) + Math.abs(q + r)) / 2;

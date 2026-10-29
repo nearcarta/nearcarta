@@ -220,7 +220,7 @@ export async function buildCast(){
   // shop keepers: one per shop, beside the door, each with its own look and prop. They wave when the Lamplighter comes close.
   const KEEP={ chronicle:[mage,{scale:.18,name:'Archivist',keep:['Spellbook_open'],tint:0xf0d9b0}], bank:[rogue,{scale:.2,name:'Banker',keep:[],tint:0xe8c890}],
     guard:[knight,{scale:.22,name:'Captain',keep:['Badge_Shield']}], arena:[barb,{scale:.21,name:'Arena marshal',keep:['2H_Axe'],hide:['Barbarian_Hat']}],
-    house:[hooded,{scale:.2,name:'Housekeeper',keep:[],tint:0xf2c8a8}], toll:[knight,{scale:.21,name:'Toll warden',keep:['Round_Shield'],hide:['Knight_Helmet'],tint:0xffd0c0}], hall:[mage,{scale:.18,name:'Clerk',keep:[],hide:['Mage_Hat'],tint:0xd8e0c0}] };
+    house:[hooded,{scale:.2,name:'Housekeeper',keep:[],tint:0xf2c8a8}], toll:[knight,{scale:.21,name:'Toll warden',keep:['Round_Shield'],hide:['Knight_Helmet'],tint:0xffd0c0}], hall:[mage,{scale:.18,name:'Clerk',keep:[],hide:['Mage_Hat'],tint:0xd8e0c0}], payouts:[rogue,{scale:.2,name:'Paymaster',keep:[],tint:0xf0d0a0}] };
   const { SHOPS }=await import('./core.js'); CAST.keepers={};
   for(const [id,[gk,o]] of Object.entries(KEEP)){ if(!gk||!SHOPS[id]) continue; const s=SHOPS[id], c0=hx(s.q,s.r), d=hx(...s.door); const out=d.clone().sub(c0).setY(0).normalize(); const side=new THREE.Vector3(-out.z,0,out.x);
     const p=c0.clone().lerp(d,.58).addScaledVector(side,.62); const k=new Char(gk,{...o,height:.6}); k.place(p.x,p.z,Math.atan2(out.x,out.z)); k.noAlt=false; k.keeper=id; k.home=k.yaw; k.waveCD=0; CAST.keepers[id]=k; }

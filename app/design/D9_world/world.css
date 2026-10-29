@@ -345,3 +345,16 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #drawer details.lab{margin-top:14px} #drawer details.lab summary{cursor:pointer;color:var(--muted);font-size:12px;text-decoration:underline dotted;text-underline-offset:3px}
 @media (max-width:720px){ body.in-shop #acct,body.in-shop #brand{display:none!important} }
 #shopUI a.link.more{display:inline-flex;align-items:center} #shopUI a.link.more[hidden]{display:none}
+
+/* Payouts (C3) inside the town tray */
+#shopUI .plist { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; }
+#shopUI .plist li { display: grid; grid-template-columns: minmax(0, 1fr) 104px 28px; gap: 6px; align-items: center; }
+#shopUI .plist select, #shopUI .p-amt { height: 36px; border: 1px solid var(--line); border-radius: var(--r); background: var(--base); color: var(--text); font: 500 13px Inter, system-ui, sans-serif; min-width: 0; }
+#shopUI .plist select { padding: 0 8px; }
+#shopUI .p-amt { display: flex; align-items: center; gap: 4px; padding: 0 8px; }
+#shopUI .p-amt input { flex: 1; min-width: 0; width: 100%; background: none; border: 0; color: var(--text); font: 600 14px Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; outline: none; }
+#shopUI .p-amt span { color: var(--muted); font-size: 11px; }
+#shopUI .p-x { height: 28px; width: 28px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
+#shopUI .p-x:disabled { opacity: .35; cursor: default; }
+#shopUI .p-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+#shopUI .p-sum { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; } #shopUI .p-sum.no { color: var(--no); }

@@ -3,7 +3,7 @@ import { THREE, P, CAPTURE, RM, $, readTokens, clock, run, killAll, tickRoutines
 import { buildTown, SHOPS, B, robot, doorPos, townCamera } from './town.js';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 
-const LOADERS = { guard: () => import('../shops/guard.js'), ferry: () => import('../shops/ferry.js'), hall: () => import('../shops/hall.js'), bank: () => import('../shops/bank.js'), arena: () => import('../shops/arena.js'), toll: () => import('../shops/toll.js'), chronicle: () => import('../shops/chronicle.js'), house: () => import('../shops/house.js') };
+const LOADERS = { guard: () => import('../shops/guard.js'), ferry: () => import('../shops/ferry.js'), hall: () => import('../shops/hall.js'), bank: () => import('../shops/bank.js'), arena: () => import('../shops/arena.js'), toll: () => import('../shops/toll.js'), chronicle: () => import('../shops/chronicle.js'), house: () => import('../shops/house.js'), payouts: () => import('../shops/payouts.js') };
 window.__events = events;
 
 const webgl = (() => { try { const c = document.createElement('canvas'); return !!c.getContext('webgl2'); } catch (e) { return false; } })();

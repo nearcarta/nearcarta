@@ -39,6 +39,7 @@ export const SHOPS = {
   arena:    {q:1,r:3,  m:'buildings/blue/building_archeryrange_blue',name:'Vault Arena', role:'try to break the vault'},
   house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'House', role:'owner key · oath plaque'},
   toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay per call'},
+  payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'counting house · one batch, all or nothing'},
 };
 export const GATE={q:-5,r:1,dir:3};
 export const tiles=new Map();
@@ -47,7 +48,7 @@ for(let q=-ISLAND;q<=ISLAND;q++) for(let r=-ISLAND;r<=ISLAND;r++){ const d=hdist
 export const isTown=(q,r)=>tiles.get(key(q,r))?.kind==='town';
 export const bTile=new Map(); Object.entries(SHOPS).forEach(([id,s])=>bTile.set(key(s.q,s.r),id));
 // extra (non-civic) houses that make it a town; never shops, never stalls
-export const EXTRA=[ ['buildings/blue/building_tavern_blue',-1,-3,3], ['buildings/blue/building_blacksmith_blue',-3,-1,0], ['buildings/blue/building_home_B_blue',0,-4,4],
+export const EXTRA=[ ['buildings/blue/building_blacksmith_blue',-3,-1,0], ['buildings/blue/building_home_B_blue',0,-4,4],
   ['buildings/blue/building_home_A_blue',2,1,2], ['buildings/blue/building_home_B_blue',-2,4,1], ['buildings/blue/building_well_blue',-1,2,0],
   ['buildings/blue/building_windmill_blue',-5,-1,0], ['buildings/blue/building_home_B_blue',3,-5,3], ['buildings/blue/building_tower_B_blue',-3,5,1] ];
 EXTRA.forEach(([,q,r])=>bTile.set(key(q,r),'extra'));

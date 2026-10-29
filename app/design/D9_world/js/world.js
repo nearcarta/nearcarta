@@ -155,7 +155,7 @@ async function buildIsland(){
     ['resource_lumber',-2,-1,.5,.45],['wheelbarrow',-2,-1,-.45,-.4],['resource_stone',-3,0,.4,.5],                                       // smithy
     ['crate_long_A',3,-3,.45,.35],['crate_B_small',3,-3,-.3,.55],['pallet',3,-1,.5,.4],['barrel',3,-1,.2,.62],['sack',3,-1,-.2,.55],    // ferry dock cargo
     ['flag_yellow',1,2,.6,.4],['bucket_arrows',2,3,-.6,-.2],['target',2,2,.4,-.4],                                                     // arena
-    ['ladder',0,-1,.6,-.4],['crate_open',-1,-2,.55,.5],['barrel',-1,-2,.25,.7],                                                         // tavern + tower
+    ['ladder',0,-1,.6,-.4],['crate_open',0,-3,.55,.5],['barrel',0,-3,.25,.7],                                                         // tavern + tower
     ['tent',-7,2,0,0],['crate_open',-7,1,.5,.65],['flag_green',-6,2,.2,.2],                                                              // stranger's camp outside the ward
     ['flag_yellow',-1,4,.4,-.3],['resource_lumber',-5,3,.1,.1],['wheelbarrow',-3,4,.4,.4],
   ];
@@ -220,6 +220,7 @@ const GLYPH={
   guard:x=>{ x.beginPath(); x.moveTo(0,-34); x.lineTo(28,-24); x.quadraticCurveTo(28,18,0,36); x.quadraticCurveTo(-28,18,-28,-24); x.closePath(); x.stroke(); x.beginPath(); x.moveTo(0,-22); x.lineTo(0,24); x.moveTo(-16,-6); x.lineTo(16,-6); x.stroke(); },
   arena:x=>{ for(const r of [30,19,8]){ x.beginPath(); x.arc(0,0,r,0,7); x.stroke(); } x.beginPath(); x.moveTo(-34,-30); x.lineTo(0,0); x.stroke(); },
   house:x=>{ x.beginPath(); x.arc(-14,0,13,0,7); x.stroke(); x.beginPath(); x.moveTo(-1,0); x.lineTo(34,0); x.moveTo(22,0); x.lineTo(22,12); x.moveTo(30,0); x.lineTo(30,9); x.stroke(); },
+  payouts:x=>{ for(let i=0;i<3;i++){ x.beginPath(); x.moveTo(-30,-24+i*20); x.lineTo(4,-24+i*20); x.stroke(); x.beginPath(); x.arc(22,-24+i*20,7,0,7); x.fill(); } x.beginPath(); x.moveTo(-34,34); x.lineTo(34,34); x.stroke(); },
   toll:x=>{ x.beginPath(); x.moveTo(-36,20); x.quadraticCurveTo(0,-26,36,20); x.stroke(); x.beginPath(); x.moveTo(-36,20); x.lineTo(36,20); x.stroke(); for(let i=-2;i<=2;i++){ x.beginPath(); x.moveTo(i*12,20); x.lineTo(i*12,20-(14-Math.abs(i)*5)); x.stroke(); } },
 };
 function signTex(id){ const c=document.createElement('canvas'); c.width=c.height=128; const x=c.getContext('2d');

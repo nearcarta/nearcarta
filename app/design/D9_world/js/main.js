@@ -245,7 +245,7 @@ zEl.querySelectorAll('.zb').forEach(b=>b.addEventListener('click',()=>setZoom(PC
   zTr.addEventListener('pointerup',()=>drag=false); zTr.addEventListener('keydown',e=>{ const d={ArrowUp:-.1,ArrowDown:.1,PageUp:-.25,PageDown:.25,Home:-1,End:1}[e.key]; if(d!=null){ e.preventDefault(); e.stopPropagation(); setZoom(PC.z+d); } }); }
 zEl.style.setProperty('--z',(PC.z*100)+'%');
 // ---------- overview pins ----------
-const pinBox=$('#pins'); const GLYPH={chronicle:'C',hall:'H',bank:'B',ferry:'F',guard:'G',arena:'A',house:'K',toll:'T'};
+const pinBox=$('#pins'); const GLYPH={chronicle:'C',hall:'H',bank:'B',ferry:'F',guard:'G',arena:'A',house:'K',toll:'T',payouts:'P'};
 const PINS=Object.entries(OPEN).map(([id,s])=>{ const b=document.createElement('button'); b.type='button'; b.className='pin'; b.tabIndex=-1; b.setAttribute('aria-label','Fly into '+s.name);
   b.innerHTML='<span class="ban"><span class="ic"></span><span><b></b><small></small></span><span class="go">Enter</span></span><span class="st"></span><span class="ft"></span>';
   b.querySelector('.ic').textContent=GLYPH[id]||s.name[0]; b.querySelector('b').textContent=s.name; b.querySelector('small').textContent=s.role.split('·')[0].trim();

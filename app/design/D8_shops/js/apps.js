@@ -3,6 +3,7 @@
 // the charter answers on chain. The proof is a one-line receipt after the action.
 import * as W from './wallet.bundle.js';
 import { $, sfx } from './core.js';
+import * as P from './payouts.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, ''); // same origin on Vercel (/api is proxied)
 const NBX = 'https://testnet.nearblocks.io';
@@ -25,7 +26,7 @@ const LS_OPEN = c => 'nearcarta.d8.mist.' + c;
 const WHY = {
   receiver_not_allowlisted: 'you never allowed that account', over_per_action_cap: 'more than your max per payment', over_daily_budget: 'more than your daily cap',
   over_daily_action_count: 'too many payments today', below_min_amount: 'smaller than your smallest payment', outside_time_window: 'outside the hours you allowed',
-  unknown_clause: 'you never allowed that route', stale_policy_version: 'your rules changed mid-ask', expired: 'the request expired', storage_reserve_low: 'your charter needs a top-up', frozen: 'your charter is frozen',
+  unknown_clause: 'you never allowed that route', stale_policy_version: 'your rules changed mid-ask', expired: 'the request expired', storage_reserve_low: 'your charter needs a top-up', frozen: 'your charter is frozen', batch_refused: 'another payout broke a rule',
 };
 export const why = r => WHY[r] || r || '';
 
@@ -345,4 +346,19 @@ export async function teeCheck(nonce) {
   return { ok: !!r.ok && r.nonce === nonce && rows.every(x => x[1]), model: r.model, at: r.checkedAt, checks: g.checks || {}, rows, nonce };
 }
 export const teeFresh = () => teeCheck(Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join(''));
+// ---------- Payouts (C3): one list, one all-or-nothing propose_batch, or the whole batch refused ----------
+export const payoutLeft = () => P.leftToday(pay(), S.usage.pay);
+export async function payouts(rows) {
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
+  if (!canBatch()) throw new Error('this charter predates batches: build a new one at Your House');
+  const st = await view(S.charter, 'get_state');
+  const b = P.planBatch(rows, { payees: bankPayees(), nonce: st.next_nonce, policy: st.policy_version, nowMs: Date.now() });
+  const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: S.charter, public_key: key.publicKey });
+  const signed = W.signTx({ key, signerId: S.charter, receiverId: S.charter, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+    actions: [W.functionCall('propose_batch', { ps: b.ps }, BigInt(b.gasTgas) * TG)] });
+  const r = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+  const v = r.ok ? P.readBatch(r.value, b.n) : { decision: 'failed', reason: r.error, paid: 0, bad: null, ids: [] };
+  keep(signed.hash, 'payouts', v.decision, v.reason); readRules().catch(() => {});
+  return { tx: signed.hash, ...v, n: b.n, total: b.total };
+}
 export { fmt, esc, short, toY, fromY };
