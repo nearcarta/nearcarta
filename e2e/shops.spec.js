@@ -88,8 +88,9 @@ test('toll: Chain Signatures oath shows its Base Sepolia address and a signed tx
 
 test('shop interiors get live data through the data interface', async ({ page }) => {
   await page.goto('/design/D8_shops/?2d');
-  const d = await page.evaluate(async () => { const m = await import('/design/D6_dashboards/src/data.js'); return { q: m.QUOTE, oath: m.CORE.oath, n: m.CORE_TXS.length, ag: m.AGENT_NAME }; });
-  expect(d.oath).toBe(dep.guardhouse.oath); expect(d.q.src).toBe('live'); expect(d.q.fee).toContain('signature verified');
+  // QUOTE is no longer fetched here (the Ferry room reads its own quote), so only the chain reads are checked.
+  const d = await page.evaluate(async () => { const m = await import('/design/D6_dashboards/src/data.js'); return { oath: m.CORE.oath, n: m.CORE_TXS.length, ag: m.AGENT_NAME }; });
+  expect(d.oath).toBe(dep.guardhouse.oath);
   expect(d.n).toBeGreaterThan(0); expect(d.ag).toBe('the Lamplighter');
   await page.getByRole('button', { name: 'Ferry' }).click();
   await expect(page.locator('#t-title')).toHaveText('Ferry');
