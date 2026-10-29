@@ -357,7 +357,7 @@ function hover(id){ if(hovered===id) return; if(hovered&&B[hovered]) B[hovered].
 const GUAR={ guard:['Guardhouse','Every spend is checked before it can be signed: payee list, daily cap, weekly cap.','clause · payee_allowlist · daily_cap · weekly_cap'],
   bank:['Mist Bank','Amounts stay hidden. Public: the check passed, and when.','gate G3 · hidden amounts'],
   arena:['Vault Arena','A live vault anyone may try to break. Every failed attack is a Chronicle row.','arena.attack_failed · 0 breaches'],
-  hall:['Town Hall','Opens after the oath ships. Not built yet.','gate G8'], toll:['Toll','Pay 0.01 NEAR from your own charter; the gate then gets the MPC network to sign a Base Sepolia payout, and settles it with a foreign-tx proof.','gate.pay_for · Chain Signatures · Base Sepolia'],
+  hall:['Town Hall','File a real proposal from your own charter and see the open proposals at /shops/hall/.','Sputnik add_proposal · testnet'], toll:['Toll','Pay 0.01 NEAR from your own charter; the gate then gets the MPC network to sign a Base Sepolia payout, and settles it with a foreign-tx proof.','gate.pay_for · Chain Signatures · Base Sepolia'],
   house:['Your House','Only your house key can change the oath or ring the curfew. The agent holds a propose-only key.','function-call key · propose()'],
   chronicle:['Chronicle','Every decision, yes or no, is a public NEP-297 event with an explorer link.','EVENT_JSON · standard: oath'] };
 function clickB(id){ if(id==='ferry'){ openFerry(); return; } const g=GUAR[id]; if(g) toast(id==='guard'?'ref':'ok',g[0],g[1],g[2]); const s=SHOPS[id]; if(s){ setView({t:[hx(s.q,s.r).x,0,hx(s.q,s.r).z],az:-.4,pol:.92,d:20}); } }
