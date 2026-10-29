@@ -4,6 +4,37 @@ A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money
 
 Deployed (testnet): https://nearcarta.vercel.app serves the pages, and its `/api/*` is passed to the API on Render (free plan, testnet, built from the `Dockerfile` image): https://nearcarta-api.onrender.com. Example: `/api/health`, `/api/guardhouse`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped. `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`.
 
+## What it is
+An on-chain charter for AI agents that spend money. A person writes the agent's rules (who it may pay, how much per payment and per day, when it must ask) into a NEAR contract, the charter (`contracts/oath`). The agent holds only a function-call key that can call `propose`. The contract checks each payment the agent proposes: allowed payments are sent, the rest are refused on chain with a reason, or held until the owner approves (NEP-519 yield). Humans only set the constraints; the agent acts inside them.
+
+## The problem
+An agent with a wallet key can be talked into paying anyone: a fake invoice, a prompt-injected recipient, a look-alike account, many small payments under a cap. Checks that live in the agent's own code or prompt fail when the agent is fooled. The charter puts the check in a contract the agent cannot change, so a fooled agent still cannot pay outside the rules.
+
+## Try it in a browser (testnet, no wallet install)
+1. Open https://nearcarta.vercel.app and press *Start free* for a fresh testnet guest account (its key stays in your browser), or *Connect wallet* for a testnet wallet through NEAR Connect.
+2. Walk into a shop and press its button. Each signed step shows its tx as a link to testnet.nearblocks.io. The same rooms open directly at `/design/D8_shops/?shop=<house|toll|ferry|bank|guard|arena|hall>`.
+
+| Shop | Press | See |
+|---|---|---|
+| House | *Build my charter*, then *Write my rules* and *Sign my rules*, then *Check my reputation* | Your own charter from the factory `nccharters-53681.testnet` with a pay clause and a propose-only agent key; the reputation is counted from the charter's on-chain refusals |
+| Toll Bridge | *Pay the toll* | Your agent asks your charter to pay 0.01 NEAR to the café; allowed inside your max |
+| Ferry | *Get quote*, then *Ask my agent to swap* | A live 1Click dry quote with its signature checked (mainnet send locked); your charter then pays a testnet stand-in of 0.01 NEAR per quoted USD back to you |
+| Mist Bank | *Send 0.01 NEAR privately* (fixed note sizes), then *Verify the seal*; *Verify the TEE now* | The charter memo carries a commitment and the seal matches the chain; the send comes with a NEAR AI TEE check that uses the commitment as its nonce (*Verify the TEE now* uses a fresh random one). The ZEC payout is mainnet only |
+| Guardhouse | *Try to trick my agent* (poisoned invoice), then *Let it knock anyway* | The payee check blocks before signing; sent anyway, the charter refuses on chain: "you never allowed that account" |
+| Vault Arena | Write a scam, *Send the scam* | The NEAR AI model (`z-ai/glm-5.3-flash`) reads it and proposes a payment; a payment outside your rules is refused on chain. Six walls, points and a leaderboard |
+| Town Hall room | *Propose a cap change* | Changes your own charter: a lower max is in force now; a higher max or a cooling period waits behind the policy delay |
+| Town Hall proposals | `/shops/hall/`: *File proposal* | A real Sputnik DAO `add_proposal` to `r7thmvr8maey.sputnikv2.testnet`, signed by your wallet with the 0.1 NEAR bond; it appears in the DAO's list. Only the council votes |
+
+On 2026-10-29 a fresh guest pressed every shop row above on the live site with no page errors; each tx is in [judges/proofs/shops-live-pass.json](judges/proofs/shops-live-pass.json). The proposals page filed DAO proposal #10 from a guest account before its deploy ([judges/proofs/townhall-file-proposal.json](judges/proofs/townhall-file-proposal.json)); on the live page the read-only e2e passes.
+
+## Tracks and the hints we use
+- `security`: spending limits and a policy engine in a contract. FUNCTION CALL KEYS: the agent key can only call `propose`; every served account has 0 full-access keys. TEE ATTESTATION: NEAR AI Cloud Intel TDX and NVIDIA quotes checked live. Scam detection: the payee check and the Arena scam set. Reputation counted from on-chain refusals.
+- `business`: humans only set the constraints; the agent pays inside them, and a payment over the cap waits for the owner (NEP-519 yield). Cross-chain: NEAR INTENTS via 1Click quotes in Ferry and Mist Bank; CHAIN SIGNATURES via the Toll contract (`toll.r4csmvr86zk4.testnet`).
+- `agents`: a NEAR AI model turns the visitor's words into a payment proposal; the agent pays only through the charter (AGENT COMMERCE).
+- `privacy`: Mist Bank: a shielded Zcash testnet payout bound to a charter commitment; NEAR AI Cloud TEE check (PRIVATE AI, TEE, NEAR AI CLOUD).
+- `social`: a real Sputnik DAO owns and governs the Town Hall charter, and any visitor can file a proposal to it (SPUTNIK DAO). We do not rebuild the multisig.
+- `games`: the Arena's six walls, points and leaderboard; NEP-245 case tokens on the Arena contract; a one-click guest account, no wallet install.
+
 ## Run it (2 minutes)
 ```
 npm ci
