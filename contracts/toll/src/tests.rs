@@ -211,7 +211,7 @@ fn bad_token_address_refused() {
 
 // ---------------- v4: the visitor gate (pay_for after the guest's own charter paid) ----------------
 fn gate_cfg() -> Gate {
-    Gate { factory: acc("factory.test"), payee: acc("cafe.test"), fee: U128(10), memo: "toll:base-sepolia".into(),
+    Gate { factories: vec![acc("factory.test"), acc("old-factory.test")], payee: acc("cafe.test"), fee: U128(10), memo: "toll:base-sepolia".into(),
            evm_to: TO.to_uppercase().replace("0X", "0x"), evm_value: U128(7), max_fee_per_gas: U128(5), max_priority_fee_per_gas: U128(1) }
 }
 fn gated() -> Oath {
@@ -268,14 +268,14 @@ fn another_action_of_the_same_charter_opens_it_again() {
 fn gate_payouts_count_against_the_oath_budget() { let mut o = gated(); for i in 0..3 { let _ = visit(&mut o, i, paid()); } }
 
 #[test]
-#[should_panic(expected = "REFUSED: not a charter from the gate's factory")]
+#[should_panic(expected = "REFUSED: not a charter from the gate's factories")]
 fn non_factory_account_refused() {
     let mut o = gated(); set("toll.test");
     let _ = o.on_visit_checked(acc("fake.test"), U64(0), acc("guest.test"), Ok(false), Ok(Some(paid())));
 }
 
 #[test]
-#[should_panic(expected = "REFUSED: not a charter from the gate's factory")]
+#[should_panic(expected = "REFUSED: not a charter from the gate's factories")]
 fn failed_factory_read_refused() {
     let mut o = gated(); set("toll.test");
     let _ = o.on_visit_checked(acc("fake.test"), U64(0), acc("guest.test"), Err(PromiseError::Failed), Ok(Some(paid())));
@@ -376,3 +376,48 @@ fn gate_not_for_token_tolls() {
 
 #[test]
 fn policy_shows_the_gate() { let o = gated(); assert_eq!(o.policy()["gate"]["memo"], "toll:base-sepolia"); assert_eq!(o.policy()["gate"]["evm_to"], TO); }
+
+// ---------------- v5: a fixed list of factories ----------------
+#[test]
+fn charter_factory_is_the_parent_account_on_the_list() {
+    let g = gate_cfg();
+    assert_eq!(charter_factory(&g, &acc("guest-1.factory.test")).map(|a| a.to_string()), Some("factory.test".into()));
+    assert_eq!(charter_factory(&g, &acc("guest-2.old-factory.test")).map(|a| a.to_string()), Some("old-factory.test".into()));
+    assert_eq!(charter_factory(&g, &acc("guest.other.test")), None);
+    assert_eq!(charter_factory(&g, &acc("a.guest-1.factory.test")), None); // grandchild: parent is guest-1.factory.test
+    assert_eq!(charter_factory(&g, &acc("factory.test")), None);
+}
+
+#[test]
+fn pay_for_accepts_a_charter_from_any_listed_factory() {
+    for c in ["guest-2.old-factory.test", "guest-1.factory.test"] {
+        let mut o = gated(); set("guest.test"); let _ = o.pay_for(acc(c), U64(0));
+    }
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: not a charter from the gate's factories")]
+fn pay_for_refuses_an_unlisted_factory_before_any_call() { let mut o = gated(); set("guest.test"); let _ = o.pay_for(acc("guest.other.test"), U64(0)); }
+
+#[test]
+fn visit_from_an_older_factory_opens_the_gate() {
+    let mut o = gated(); set("toll.test");
+    let _ = o.on_visit_checked(acc("guest-2.old-factory.test"), U64(4), acc("guest.test"), Ok(true), Ok(Some(paid())));
+    assert_eq!(o.get_visit(0).unwrap().charter.as_str(), "guest-2.old-factory.test");
+}
+
+#[test]
+#[should_panic(expected = "gate needs 1 to 8 factories")]
+fn gate_without_factories_refused() {
+    set("owner.test");
+    let mut g = gate_cfg(); g.factories = vec![];
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "gate-1".into(), 84532,
+        "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
+        U128(10), U128(20), U128(10), None, None, None, Some(g));
+}
+
+#[test]
+fn policy_shows_the_factory_list() {
+    let o = gated();
+    assert_eq!(o.policy()["gate"]["factories"], json!(["factory.test", "old-factory.test"]));
+}

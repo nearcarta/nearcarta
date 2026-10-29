@@ -1,7 +1,7 @@
-// Toll v4 visitor gate: one batch from the owner creates <name>.<owner>, funds it, deploys the reproducible
-// contracts/artifacts/toll.v4.wasm and calls new() with a gate. No access key is added, so the account has
+// Toll v5 visitor gate (v4 + a fixed list of charter factories): one batch from the owner creates <name>.<owner>, funds it, deploys the reproducible
+// contracts/artifacts/toll.v5.wasm and calls new() with a gate. No access key is added, so the account has
 // zero keys and nobody can sign as it. Any wallet may call pay_for(charter, action_id): the gate checks on
-// chain that the charter is from the factory and that its action paid the toll, then MPC-signs a fixed
+// chain that the charter is from one of its factories and that its action paid the toll, then MPC-signs a fixed
 // Base Sepolia payout from its own derived address. settle() records the MPC foreign-tx proof.
 // Usage (testnet only): OWNER_KEY_FILE=... RECIPIENT=0x... NAME=gate node backend/scripts/toll-gate-deploy.js
 import { readFileSync } from 'node:fs';
@@ -23,12 +23,13 @@ const root = await view(MPC, 'public_key', { domain_id: 3 });
 const foreign = '0x' + Buffer.from(keccak_256(base58.decode(derived.replace('secp256k1:', '')))).subarray(12).toString('hex');
 const fxRoot = Buffer.from(base58.decode(root.replace('secp256k1:', ''))).toString('hex');
 const to = E.RECIPIENT.toLowerCase();
-const gate = { factory: E.FACTORY || 'nccharters-53681.testnet', payee: E.PAYEE || 'cafe.ncpub-17102.testnet',
+const FACTORIES = (E.FACTORIES || 'nccharters-53836.testnet,nccharters-53681.testnet,nccharters-85831.testnet,nccharters-17102.testnet').split(',');
+const gate = { factories: FACTORIES, payee: E.PAYEE || 'cafe.ncpub-17102.testnet',
   fee: E.FEE || '10000000000000000000000', memo: 'toll:base-sepolia', evm_to: to, evm_value: E.EVM_VALUE || '100000000000',
   max_fee_per_gas: '100000000', max_priority_fee_per_gas: '1000000' };
 const init = { owner: owner.accountId, mpc: MPC, path: PATH_, chain_id: 84532, foreign_address: foreign, fx_root_key: fxRoot,
   allow_to: [to], max_per_tx: gate.evm_value, budget: E.BUDGET || '30000000000000', max_fee_cap: '100000000', verify_chain: 'Base', gate };
-const wasm = readFileSync(new URL('../../contracts/artifacts/toll.v4.wasm', import.meta.url));
+const wasm = readFileSync(new URL('../../contracts/artifacts/' + (E.WASM || 'toll.v5.wasm'), import.meta.url));
 const r = await owner.signAndSendTransaction({ receiverId: id, waitUntil: 'FINAL', actions: [
   actions.createAccount(), actions.transfer(3n * 10n ** 24n), actions.deployContract(wasm),
   actions.functionCall('new', init, 100n * 10n ** 12n, 0n),

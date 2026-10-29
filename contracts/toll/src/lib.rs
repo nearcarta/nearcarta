@@ -9,6 +9,8 @@
 //! v4: an optional visitor `gate`. `pay_for(charter, action_id)` is open to anyone, but it signs only after
 //! it has read, on chain, that `charter` was made by the gate's charter factory and that this charter's
 //! own action `action_id` paid the toll fee in NEAR to the gate's payee with the gate's memo and settled.
+//! v5: the gate holds a fixed list of charter factories (set once at init, no setter): a charter qualifies when
+//! its parent account is on the list and that factory's is_charter says yes.
 //! Each charter action opens the gate once. The EVM payout is fixed by the gate (recipient, value, fees),
 //! so a visitor can not choose where the oath's coins go; the oath's own caps and budget still apply.
 mod rlp;
@@ -59,7 +61,7 @@ pub struct Oath {
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
 pub struct Gate {
-    pub factory: AccountId,   // charters must come from this factory (is_charter)
+    pub factories: Vec<AccountId>, // v5: charters must come from one of these factories (parent account + is_charter)
     pub payee: AccountId,     // the charter action's receiver
     pub fee: U128,            // minimum NEAR (yocto) the action paid
     pub memo: String,         // the action's memo, e.g. "toll:base-sepolia"
@@ -76,6 +78,14 @@ pub struct Visit { pub charter: AccountId, pub action_id: u64, pub by: AccountId
 /// v4: gas for the visitor callback (it starts the MPC sign: 50 Tgas + on_signed 30 Tgas).
 pub const GATE_CB_GAS: u64 = 110;
 pub const GATE_MIN_GAS: u64 = 150;
+/// v5: at most this many factories on a gate.
+pub const MAX_FACTORIES: usize = 8;
+
+/// v5: the factory a charter claims to come from (its parent account), if that factory is on the gate's list.
+pub fn charter_factory(g: &Gate, charter: &AccountId) -> Option<AccountId> {
+    let parent = charter.as_str().split_once('.')?.1;
+    g.factories.iter().find(|f| f.as_str() == parent).cloned()
+}
 
 /// v3: gas limit cap for an ERC-20 transfer (a USDC transfer uses about 40-60k).
 pub const ERC20_GAS_CAP: u64 = 100_000;
@@ -145,6 +155,7 @@ impl Oath {
             require!(g.evm_value.0 <= max_per_tx.0, "gate evm_value over per-tx cap");
             require!(g.max_fee_per_gas.0 <= max_fee_cap.0 && g.max_priority_fee_per_gas.0 <= g.max_fee_per_gas.0, "gate fees over cap");
             require!(g.fee.0 > 0 && !g.memo.is_empty(), "gate needs a fee and a memo");
+            require!(!g.factories.is_empty() && g.factories.len() <= MAX_FACTORIES, "gate needs 1 to 8 factories");
             g
         });
         Self { owner, mpc, path, chain_id, foreign_address: foreign_address.to_lowercase(), fx_root_key,
@@ -194,7 +205,8 @@ impl Oath {
         require!(!self.frozen, "REFUSED: oath frozen");
         require!(!self.visits.contains_key(&visit_key(&charter, action_id.0)), "REFUSED: this charter action already opened the gate");
         require!(env::prepaid_gas() >= Gas::from_tgas(GATE_MIN_GAS), "attach at least 150 Tgas");
-        let a = Promise::new(g.factory.clone()).function_call("is_charter".to_string(), json!({"account_id": charter}).to_string().into_bytes(), NearToken::from_yoctonear(0), Gas::from_tgas(5));
+        let f = charter_factory(&g, &charter).unwrap_or_else(|| env::panic_str("REFUSED: not a charter from the gate's factories"));
+        let a = Promise::new(f).function_call("is_charter".to_string(), json!({"account_id": charter}).to_string().into_bytes(), NearToken::from_yoctonear(0), Gas::from_tgas(5));
         let b = Promise::new(charter.clone()).function_call("get_action".to_string(), json!({"action_id": action_id}).to_string().into_bytes(), NearToken::from_yoctonear(0), Gas::from_tgas(10));
         a.and(b).then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(GATE_CB_GAS))
             .on_visit_checked(charter, action_id, env::predecessor_account_id()))
@@ -206,7 +218,7 @@ impl Oath {
                             #[callback_result] is_charter: Result<bool, PromiseError>,
                             #[callback_result] action: Result<Option<Value>, PromiseError>) -> Promise {
         let g = self.gate.clone().expect("no gate");
-        require!(matches!(is_charter, Ok(true)), "REFUSED: not a charter from the gate's factory");
+        require!(matches!(is_charter, Ok(true)), "REFUSED: not a charter from the gate's factories");
         let a = action.ok().flatten().unwrap_or_else(|| env::panic_str("REFUSED: the charter has no such action"));
         check_visit(&g, &a);
         let key = visit_key(&charter, action_id.0);
