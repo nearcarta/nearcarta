@@ -1,0 +1,250 @@
+{
+  "base_url": "https://nearcarta.vercel.app",
+  "passes": {
+    "390": {
+      "width": 390,
+      "height": 844,
+      "pay": {
+        "at": "2026-10-29T00:50:14.579Z",
+        "console_errors": [],
+        "non_2xx": [],
+        "shots": [
+          "e2e/shots/toll-390-1-enter.png",
+          "e2e/shots/toll-390-2-rules.png",
+          "e2e/shots/toll-390-3-ready.png",
+          "e2e/shots/toll-390-4-signed-broadcast.png",
+          "e2e/shots/toll-390-5-drawer-live.png"
+        ],
+        "guest": "ncguest-5150473731.testnet",
+        "charter": "ncguest-5150473731-jwnj.nccharters-53681.testnet",
+        "rules_tx": "https://testnet.nearblocks.io/txns/DyysfwjDwauFts9uc6spo6g9QPzhgmxzJ5JWbiS5Udid",
+        "say": "Signed by the MPC network and broadcast. Base Sepolia finalizes in about 19 min; check back, then settle.",
+        "visit": {
+          "gate": "gate.r4csmvr86zk4.testnet",
+          "nonce": 4,
+          "action": "0",
+          "pay_tx": "9GjVuMF6YYSoMgWmjQB2gYJwK3J9Y1SkuSQsBAB7kD2G",
+          "at": 1793235061254,
+          "base_tx": "0x50eec87ee9fe030b976516f8486d3f402e55e38c6a04a1cda1f52d3570f20272"
+        },
+        "status": "signed",
+        "base_tx": "0x50eec87ee9fe030b976516f8486d3f402e55e38c6a04a1cda1f52d3570f20272",
+        "drawer": [
+          "TOLL GATE · LIVE",
+          "Your visit #4 · signed",
+          "gate.r4csmvr86….testnet",
+          "gate ↗",
+          "#4 · signed",
+          "visitor charter ncguest-5150…estnet",
+          "#3 · signed",
+          "visitor charter ncguest-3c64…estnet"
+        ],
+        "ok": true,
+        "no_sideways_scroll": true
+      },
+      "settle": {
+        "at": "2026-10-29T01:16:42.289Z",
+        "console_errors": [],
+        "non_2xx": [],
+        "shots": [
+          "e2e/shots/toll-390-7-confirmed.png",
+          "e2e/shots/toll-390-8-drawer-confirmed.png"
+        ],
+        "say": "Confirmed. The MPC network proved the Base Sepolia tx final, and the gate recorded it.",
+        "visit": {
+          "gate": "gate.r4csmvr86zk4.testnet",
+          "nonce": 4,
+          "action": "0",
+          "pay_tx": "9GjVuMF6YYSoMgWmjQB2gYJwK3J9Y1SkuSQsBAB7kD2G",
+          "at": 1793235061254,
+          "base_tx": "0x50eec87ee9fe030b976516f8486d3f402e55e38c6a04a1cda1f52d3570f20272",
+          "done": true
+        },
+        "status": "confirmed",
+        "drawer": [
+          "TOLL GATE · LIVE",
+          "Your visit #4 · confirmed",
+          "gate.r4csmvr86….testnet",
+          "gate ↗",
+          "#4 · confirmed",
+          "visitor charter ncguest-5150…estnet",
+          "#3 · confirmed",
+          "visitor charter ncguest-3c64…estnet"
+        ],
+        "ok": true,
+        "no_sideways_scroll": true
+      },
+      "on_chain": {
+        "gate_nonce": 4,
+        "pay_for_tx": "9GjVuMF6YYSoMgWmjQB2gYJwK3J9Y1SkuSQsBAB7kD2G",
+        "settle_tx": "CCusSKzotkLDa7L8ffmgvybumLCQfuamt259nQNRVj1m",
+        "status": "confirmed"
+      }
+    },
+    "1280": {
+      "width": 1280,
+      "height": 800,
+      "pay": {
+        "at": "2026-10-29T00:49:12.655Z",
+        "console_errors": [],
+        "non_2xx": [],
+        "shots": [
+          "e2e/shots/toll-1280-1-enter.png",
+          "e2e/shots/toll-1280-2-rules.png",
+          "e2e/shots/toll-1280-3-ready.png",
+          "e2e/shots/toll-1280-4-signed-broadcast.png",
+          "e2e/shots/toll-1280-5-drawer-live.png"
+        ],
+        "guest": "ncguest-3c641f6x1w.testnet",
+        "charter": "ncguest-3c641f6x1w-x6gm.nccharters-53681.testnet",
+        "rules_tx": "https://testnet.nearblocks.io/txns/EZWpdLQZoQLZm8bjCRWmgeSq4NH6a2nFDnu9bo5cF26a",
+        "say": "Signed by the MPC network and broadcast. Base Sepolia finalizes in about 18 min; check back, then settle.",
+        "visit": {
+          "gate": "gate.r4csmvr86zk4.testnet",
+          "nonce": 3,
+          "action": "0",
+          "pay_tx": "5Zfprh4o8Q4ncDMbsYrmf7SnDENKCr7tm3KDjmSD8EmJ",
+          "at": 1793235006057,
+          "base_tx": "0x0e11fdf1216d162b4efd6f9083a44755f5deef2ace667988d72d17858aeff5a3"
+        },
+        "status": "signed",
+        "base_tx": "0x0e11fdf1216d162b4efd6f9083a44755f5deef2ace667988d72d17858aeff5a3",
+        "drawer": [
+          "TOLL GATE · LIVE",
+          "Your visit #3 · signed",
+          "gate.r4csmvr86….testnet",
+          "gate ↗",
+          "#3 · signed",
+          "visitor charter ncguest-3c64…estnet",
+          "#2 · signed",
+          "visitor charter ncguest-3c0y…estnet"
+        ],
+        "ok": true,
+        "no_sideways_scroll": true
+      },
+      "settle": {
+        "at": "2026-10-29T01:21:06.718Z",
+        "console_errors": [],
+        "non_2xx": [],
+        "shots": [
+          "e2e/shots/toll-1280-7-confirmed.png",
+          "e2e/shots/toll-1280-8-drawer-confirmed.png"
+        ],
+        "say": "Confirmed. The MPC network proved the Base Sepolia tx final, and the gate recorded it.",
+        "visit": {
+          "gate": "gate.r4csmvr86zk4.testnet",
+          "nonce": 3,
+          "action": "0",
+          "pay_tx": "5Zfprh4o8Q4ncDMbsYrmf7SnDENKCr7tm3KDjmSD8EmJ",
+          "at": 1793235006057,
+          "base_tx": "0x0e11fdf1216d162b4efd6f9083a44755f5deef2ace667988d72d17858aeff5a3",
+          "done": true
+        },
+        "status": "confirmed",
+        "drawer": [
+          "TOLL GATE · LIVE",
+          "Your visit #3 · confirmed",
+          "gate.r4csmvr86….testnet",
+          "gate ↗",
+          "#4 · confirmed",
+          "visitor charter ncguest-5150…estnet",
+          "#3 · confirmed",
+          "visitor charter ncguest-3c64…estnet"
+        ],
+        "ok": true,
+        "no_sideways_scroll": true
+      },
+      "on_chain": {
+        "gate_nonce": 3,
+        "pay_for_tx": "5Zfprh4o8Q4ncDMbsYrmf7SnDENKCr7tm3KDjmSD8EmJ",
+        "settle_tx": "8WXikoVyKpxZRFmzunuBRhooQhDRkXU5zGN1CUHKoQvi",
+        "status": "confirmed"
+      }
+    },
+    "1440": {
+      "width": 1440,
+      "height": 900,
+      "pay": {
+        "at": "2026-10-29T00:46:55.907Z",
+        "console_errors": [],
+        "non_2xx": [],
+        "shots": [
+          "e2e/shots/toll-1440-1-enter.png",
+          "e2e/shots/toll-1440-2-rules.png",
+          "e2e/shots/toll-1440-3-ready.png",
+          "e2e/shots/toll-1440-4-signed-broadcast.png",
+          "e2e/shots/toll-1440-5-drawer-live.png"
+        ],
+        "guest": "ncguest-3c0y4f1h0m.testnet",
+        "charter": "ncguest-3c0y4f1h0m-ivb3.nccharters-53681.testnet",
+        "rules_tx": "https://testnet.nearblocks.io/txns/64moxwkEHfmBRVzFvGxnR92XTdRjD3dpMud8Jqm8zaHS",
+        "say": "Signed by the MPC network and broadcast. Base Sepolia finalizes in about 16 min; check back, then settle.",
+        "visit": {
+          "gate": "gate.r4csmvr86zk4.testnet",
+          "nonce": 2,
+          "action": "0",
+          "pay_tx": "2CaLZh9CnqnMqjNHWywEF4KqjKBd1TfPcMeupx4ouWqD",
+          "at": 1793234870633,
+          "base_tx": "0x66a588ac4fa829344f4021143946a85eb7bdc33a99b16b8b7a90f1eb99817374"
+        },
+        "status": "signed",
+        "base_tx": "0x66a588ac4fa829344f4021143946a85eb7bdc33a99b16b8b7a90f1eb99817374",
+        "drawer": [
+          "TOLL GATE · LIVE",
+          "Your visit #2 · signed",
+          "gate.r4csmvr86….testnet",
+          "gate ↗",
+          "#2 · signed",
+          "visitor charter ncguest-3c0y…estnet",
+          "#1 · signed",
+          "visitor charter ncguest-1z33…estnet"
+        ],
+        "ok": true,
+        "no_sideways_scroll": true
+      },
+      "settle": {
+        "at": "2026-10-29T01:21:20.178Z",
+        "console_errors": [],
+        "non_2xx": [],
+        "shots": [
+          "e2e/shots/toll-1440-7-confirmed.png",
+          "e2e/shots/toll-1440-8-drawer-confirmed.png"
+        ],
+        "say": "Confirmed. The MPC network proved the Base Sepolia tx final, and the gate recorded it.",
+        "visit": {
+          "gate": "gate.r4csmvr86zk4.testnet",
+          "nonce": 2,
+          "action": "0",
+          "pay_tx": "2CaLZh9CnqnMqjNHWywEF4KqjKBd1TfPcMeupx4ouWqD",
+          "at": 1793234870633,
+          "base_tx": "0x66a588ac4fa829344f4021143946a85eb7bdc33a99b16b8b7a90f1eb99817374",
+          "done": true
+        },
+        "status": "confirmed",
+        "drawer": [
+          "TOLL GATE · LIVE",
+          "Your visit #2 · confirmed",
+          "gate.r4csmvr86….testnet",
+          "gate ↗",
+          "#4 · confirmed",
+          "visitor charter ncguest-5150…estnet",
+          "#3 · confirmed",
+          "visitor charter ncguest-3c64…estnet"
+        ],
+        "ok": true,
+        "no_sideways_scroll": true
+      },
+      "on_chain": {
+        "gate_nonce": 2,
+        "pay_for_tx": "2CaLZh9CnqnMqjNHWywEF4KqjKBd1TfPcMeupx4ouWqD",
+        "settle_tx": "27hUbicC5qQsiNhevfEeKS1Za4t7YagANHPomTTf6D5J",
+        "status": "confirmed"
+      }
+    }
+  },
+  "notes": [
+    "Settle was sent by the guest's own click on 'Check Base Sepolia' once Base was final (that click settles in one step). The first settle runs did it but then timed out waiting for a 'Settle' button that never shows; the script now stops on data-status=confirmed and the rerun records the confirmed state at each width.",
+    "Retries, run once each after a few minutes: 1440 pay hit a testnet RPC send_tx 'Expired' error on the first try; 1440 settle saw 502s from /api/chronicle and /api/guardhouse (other panels) and 1280 settle failed to find the guest's charter on reopen. The recorded passes are the reruns: 0 console errors and 0 non-2xx at all three widths.",
+    "Settle tx signers and methods read from NEAR testnet RPC tx status (SuccessValue)."
+  ]
+}
