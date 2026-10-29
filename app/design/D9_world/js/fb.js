@@ -11,7 +11,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
   if(why) console.warn('[Nearcarta] showing the 2D town:',why);
   const img=$('#fbimg'); const town=img.getAttribute('src');
   try{ const pins=await (await fetch('shots/fallback_pins.json')).json(); const box=$('#fbpins'); const els=[];
-    for(const p of pins){ const d=document.createElement('button'); d.type='button'; d.className='fbpin'; d.dataset.id=p.id; d.title=`Enter ${p.name}`; d.innerHTML=`<b></b><span></span>`; d.querySelector('b').textContent=p.name; d.querySelector('span').textContent=p.role; d.onclick=()=>open(p.id); box.appendChild(d); els.push([d,p]); }
+    for(const p of pins){ const d=document.createElement('button'); d.type='button'; d.className='fbpin'; d.dataset.id=p.id; d.title=p.card?`${p.name}: ${p.card}`:`Enter ${p.name}`; d.innerHTML=`<b></b><span></span>`; d.querySelector('b').textContent=p.name; d.querySelector('span').textContent=p.role; d.onclick=()=>open(p.id); box.appendChild(d); els.push([d,p]); }
     /* Pins stay clear of the HUD (brand, account row, blurb on top; rules CTA and curfew below) and of each other,
        so every shop is tappable at 390 too. Each pin hangs above its anchor (translate -50%,-100%). */
     const vis=e=>{ if(!e) return null; const r=e.getBoundingClientRect(); return r.width&&r.height&&getComputedStyle(e).visibility!=='hidden'?r:null; };

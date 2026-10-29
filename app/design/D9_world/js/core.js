@@ -29,17 +29,26 @@ export function toHex(x,z){ const r=z/SQ3, q=(x-r)/2; let rq=Math.round(q), rr=M
 
 // ---- town layout ----
 export const ISLAND=7;
-// civic buildings. Names are the in-world names; states, never prices.
+// civic buildings. Names are the in-world names; states, never prices. card + tag = the shop card (menu, hover), same words as the old game.js cards.
 export const SHOPS = {
-  chronicle:{q:0,r:0,  m:'buildings/blue/building_tower_A_blue', name:'Chronicle', role:'crier tower · every decision posted'},
-  hall:     {q:-2,r:-2,m:'buildings/blue/building_castle_blue',  name:'Town Hall', role:'bell tower · council'},
-  bank:     {q:2,r:-4, m:'buildings/blue/building_church_blue',  name:'Mist Bank', role:'vault · amounts stay in the mist'},
-  ferry:    {q:3,r:-2, m:'buildings/blue/building_watermill_blue',name:'Ferry', role:'dock · the only way across'},
-  guard:    {q:-4,r:2, m:'buildings/blue/building_barracks_blue', name:'Guardhouse', role:'ward gate · knights'},
-  arena:    {q:1,r:3,  m:'buildings/blue/building_archeryrange_blue',name:'Vault Arena', role:'try to break the vault'},
-  house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'House', role:'owner key · oath plaque'},
-  toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay per call'},
-  payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'counting house · one batch, all or nothing'},
+  chronicle:{q:0,r:0,  m:'buildings/blue/building_tower_A_blue', name:'Chronicle', role:'crier tower · every decision posted',
+            card:'Every decision, yes or no, is a public NEP-297 event with an explorer link.', tag:'EVENT_JSON · standard: oath'},
+  hall:     {q:-2,r:-2,m:'buildings/blue/building_castle_blue',  name:'Town Hall', role:'council · real proposals',
+            card:'File a real proposal from your own charter and see the open proposals at /shops/hall/.', tag:'Sputnik add_proposal · testnet'},
+  bank:     {q:2,r:-4, m:'buildings/blue/building_church_blue',  name:'Mist Bank', role:'vault · amounts stay in the mist',
+            card:'Amounts stay hidden. Public: the check passed, and when.', tag:'hidden amounts'},
+  ferry:    {q:3,r:-2, m:'buildings/blue/building_watermill_blue',name:'Ferry', role:'dock · the only way across',
+            card:'A live 1Click quote with its signature checked; your charter pays a testnet stand-in.', tag:'1Click quote · testnet stand-in'},
+  guard:    {q:-4,r:2, m:'buildings/blue/building_barracks_blue', name:'Guardhouse', role:'ward gate · knights',
+            card:'Every spend is checked before it can be signed: payee list, daily cap, weekly cap.', tag:'payee_allowlist · daily_cap · weekly_cap'},
+  arena:    {q:1,r:3,  m:'buildings/blue/building_archeryrange_blue',name:'Vault Arena', role:'try to break the vault',
+            card:'A live vault anyone may try to break. Every failed attack is a Chronicle row.', tag:'arena.attack_failed'},
+  house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'House', role:'owner key · oath plaque',
+            card:'Only your house key can change the oath or ring the curfew. The agent holds a propose-only key.', tag:'function-call key · propose()'},
+  toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay 0.01 · Base Sepolia payout',
+            card:'Pay 0.01 NEAR from your own charter; the gate then gets the MPC network to sign a Base Sepolia payout, and settles it with a foreign-tx proof.', tag:'gate.pay_for · Chain Signatures · Base Sepolia'},
+  payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'counting house · one batch, all or nothing',
+            card:'List 2 to 5 payouts. Your charter pays them all in one tx, or refuses all of them.', tag:'propose_batch · all or nothing'},
 };
 export const GATE={q:-5,r:1,dir:3};
 export const tiles=new Map();
