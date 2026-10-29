@@ -91,7 +91,7 @@ test('worker sync: hands out the address once, keeps only whitelisted fields, st
 test('worker sync rebuilds status after a restart and drops malformed records', () => {
   const rec = { id: 'e'.repeat(32), charter: CHARTER, approval_tx: TX, queued_at: new Date(T0).toISOString(), state: 'sent', txid: 'nothex', commitment: 'cd'.repeat(32) };
   mq.sync([rec, { id: 'x', state: 'sent' }, { ...rec, id: 'f'.repeat(32), state: 'failed', error: 'Error: /secret/path' }], { now: T0 + 1000 });
-  assert.equal(mq.status('e'.repeat(32)).state, 'sending'); // a sent claim without a real txid is not shown as sent
+  assert.equal(mq.status('e'.repeat(32), T0 + 1000).state, 'sending'); // a sent claim without a real txid is not shown as sent
   assert.equal(mq.status('f'.repeat(32)).error, 'failed');
   assert.throws(() => mq.status('x'), /bad id/);
 });

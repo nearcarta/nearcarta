@@ -5,6 +5,7 @@ import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, r
 import { snapshot } from './guardhouse.js';
 import { indexPost } from './txindex.js';
 import { proposalState } from '../../shared/townhall/expiry.js';
+import { signedState } from '../../shared/stale.js';
 
 const yocto = s => (s == null ? null : Number(BigInt(s) * 10000n / 10n ** 24n) / 1e4);
 
@@ -80,7 +81,7 @@ export async function toll() {
   const recent = [];
   for (let n = Math.max(0, policy.next_nonce - 5); n < policy.next_nonce; n++) recent.push(await view(T.oath, 'get_tx', { nonce: n }).catch(() => null));
   const instances = (await Promise.all(TOLL_INSTANCES.map(tollInstance))).filter(Boolean);
-  return { oath: T.oath, mpc: T.mpc, policy, recent: recent.filter(Boolean), foreign_explorer: `https://sepolia.basescan.org/address/${policy.foreign_address}`, instances };
+  return { oath: T.oath, mpc: T.mpc, policy, recent: await sweepRecent(recent.filter(Boolean), policy), foreign_explorer: `https://sepolia.basescan.org/address/${policy.foreign_address}`, instances };
 }
 
 // Further Toll instances from the deployments file: the Arbitrum Sepolia Toll and the USDC Toll (v3).
@@ -94,8 +95,25 @@ async function tollInstance([label, id]) {
     for (let n = Math.max(0, policy.next_nonce - 3); n < policy.next_nonce; n++) recent.push(await view(id, 'get_tx', { nonce: n }).catch(() => null));
     const ex = EXPLORER[policy.verify_chain] || EXPLORER.Base;
     return { label, oath: id, chain_id: policy.chain_id, verify_chain: policy.verify_chain || 'Base', asset: policy.asset || 'native',
-      policy, recent: recent.filter(Boolean), foreign_explorer: `${ex}/address/${policy.foreign_address}` };
+      policy, recent: await sweepRecent(recent.filter(Boolean), policy), foreign_explorer: `${ex}/address/${policy.foreign_address}` };
   } catch { return null; }
+}
+
+// Stale-record sweep: a record still "signed" on NEAR is checked against its foreign chain and shown as
+// pending, settling or expired (shared/stale.js). chain_status keeps the contract's own word.
+const EVM_RPC = { Base: process.env.BASE_SEPOLIA_RPC || 'https://sepolia.base.org', Arbitrum: process.env.ARB_SEPOLIA_RPC || 'https://sepolia-rollup.arbitrum.io/rpc' };
+export async function evmFacts(chain, rec, from, f = fetch) {
+  const call = async (method, params) => { const r = await f(EVM_RPC[chain] || EVM_RPC.Base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: AbortSignal.timeout(6000) }); const j = await r.json(); if (j.error) throw new Error(j.error.message); return j.result; };
+  const [tx, rcpt, nonce, bal] = await Promise.all([call('eth_getTransactionByHash', [rec.tx_hash]), call('eth_getTransactionReceipt', [rec.tx_hash]),
+    from ? call('eth_getTransactionCount', [from, 'latest']) : null, from ? call('eth_getBalance', [from, 'latest']) : null]);
+  return { known: !!tx, mined: !!rcpt, sender_nonce: nonce == null ? null : Number(BigInt(nonce)), balance_wei: bal == null ? null : BigInt(bal).toString() };
+}
+export async function sweepRecent(recent, policy, facts = evmFacts) {
+  return Promise.all(recent.map(async r => {
+    if (r.status !== 'signed') return r;
+    const st = signedState(r, await facts(policy.verify_chain || 'Base', r, policy.foreign_address).catch(() => null));
+    return { ...r, chain_status: 'signed', status: st.state, stale_reason: st.reason };
+  }));
 }
 
 // Chronicle: recent txs of a shop contract (FastNEAR tx index for the list), each re-read from NEAR RPC

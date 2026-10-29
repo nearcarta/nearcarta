@@ -118,13 +118,21 @@ export async function enqueue(body, { now = Date.now(), verify = verifyApproval 
   return { id, state: 'queued', status_url: `/api/mistbank/send/${id}`, approval: { tx: approval_tx, url: a.url, clause_id: a.clause_id }, limits: { delay: LIMITS.delay } };
 }
 
-export function status(id) {
+export function status(id, now = Date.now()) {
   if (!/^[0-9a-f]{32}$/.test(String(id))) throw err(400, 'bad id');
   const r = recs.get(id);
   if (!r) throw err(404, 'unknown id (records are kept 24 h)');
-  return publicView(r);
+  return publicView(r, now);
 }
-const publicView = r => ({ id: r.id, state: r.state, charter: r.charter, approval: { tx: r.approval_tx, url: explorerTx(r.approval_tx) }, queued_at: r.queued_at,
+// Stale-record rule: a request still queued, waiting or sending 3 h after it was queued (the delay is at
+// most 45 min) shows as expired; stuck_state keeps the last state the worker reported. A later worker sync
+// that reports sent or failed replaces it.
+export const STUCK_MS = 3 * 3600e3;
+export function shownState(r, now = Date.now()) {
+  const open = r.state === 'queued' || r.state === 'waiting' || r.state === 'sending';
+  return open && now - Date.parse(r.queued_at) > STUCK_MS ? { state: 'expired', stuck_state: r.state, reason: 'no worker result 3 h after queueing; nothing was sent from this request as far as the desk knows' } : { state: r.state };
+}
+const publicView = (r, now = Date.now()) => ({ id: r.id, ...shownState(r, now), charter: r.charter, approval: { tx: r.approval_tx, url: explorerTx(r.approval_tx) }, queued_at: r.queued_at,
   ...(r.state === 'sent' ? { sent_at: r.sent_at, zcash: { txid: r.txid, explorer: `https://testnet.cipherscan.app/tx/${r.txid}` },
     commitment: { scheme: 'sha256("mistbank:v1:<amount>:<salt>")', value: r.commitment },
     check: 'the amount and salt sit in the encrypted memo, readable only by the address owner' } : {}),
