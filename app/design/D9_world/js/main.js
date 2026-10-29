@@ -385,7 +385,15 @@ step(1/30); draw();
   if(!lit&&!CAPTURE){ console.error('[Nearcarta] first 3D frame came back black'); await fallback('blank first frame'); throw new Error('blank first frame'); } }
 $('#loading').classList.add('done'); body.classList.add('ready');
 { const q=P.get('shop'); const id=q&&(ALIAS[q]||q); if(id&&OPEN[id]) setTimeoutSim(()=>jump(id),.4); }
-window.__render=draw; window.__shopsLayer='d9'; setTimeout(()=>SL.preload(),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
+// warm every room while the town idles: each shop module and the room props it puts (D8 core caches both), one per idle slot,
+// so the first door at any width opens at warm speed instead of waiting on cold fetches
+const WARM={ chronicle:['tiles/base/hex_grass','decoration/props/crate_A_big'], bank:['decoration/props/crate_B_small','decoration/props/sack'], guard:['buildings/neutral/wall_straight_gate','decoration/props/barrel','decoration/props/bucket_arrows','decoration/props/target','decoration/props/weaponrack'],
+  ferry:['decoration/props/crate_A_small'], arena:['chars/Knight.glb'], hall:['decoration/props/flag_blue'], house:[], payouts:[], toll:['buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A'] };
+function warmRooms(){ if(navigator.connection?.saveData) return; const D8=new URL('../../D8_shops/',import.meta.url).href; const q=Object.entries(WARM).filter(([id])=>OPEN[id]);
+  const idle=f=>setTimeout(f,350);
+  const next=()=>{ if(!q.length) return; if(inShop){ setTimeout(()=>idle(next),1500); return; } const [id,ps]=q.shift(); Promise.all([import(D8+'js/core.js'),import(D8+'shops/'+id+'.js')]).then(([C8])=>Promise.all(ps.map(p=>C8.load(p.endsWith('.glb')?p:'hex/'+p).catch(()=>null)))).catch(()=>null).then(()=>idle(next)); };
+  idle(next); }
+window.__render=draw; window.__shopsLayer='d9'; setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE) warmRooms(); }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
 if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,SP,setSky,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
   // demo cursor driven on the sim clock (capture only)
   const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#f3ead8" stroke="#17130f" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
