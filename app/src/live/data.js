@@ -18,19 +18,17 @@ async function j(path, body) {
 }
 
 // All reads at once (no waterfall): /api/chronicle is the guardhouse oath feed, so it needs no deployments read first.
-const [DEP, q, g, ch, mb] = await Promise.all([
+// No shop room reads QUOTE from here (the Ferry room uses shops-live.js), so the dry 1Click quote is not fetched:
+// it was the slowest read (1-2.5 s) and held every room's entry.
+const [DEP, g, ch, mb] = await Promise.all([
   j('/api/deployments'),
-  j('/api/ferry/quote', { from: { symbol: 'USDC', chain: 'base' }, to: { symbol: 'wNEAR', chain: 'near' }, amount: '30', recipient: '561e8ef0fecb621469da30250dc6cdcd1e47a66e561e8ef0fecb621469da3025' /* placeholder implicit account: dry quote only, no deposit address exists */, refundTo: '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e' }),
   j('/api/guardhouse'),
   j('/api/chronicle?limit=12'),
   j('/api/mistbank'),
 ]);
 const N = y => (y == null ? 0 : Number(BigInt(y) / 10n ** 20n) / 1e4);
 
-export const QUOTE = q?.ok
-  ? { from: { sym: q.from.symbol, chain: 'Base', amt: q.from.amount }, to: { sym: 'NEAR', chain: 'NEAR', amt: Number(q.to.amount).toFixed(3) },
-      eta: `≈ ${q.eta_s} s`, fee: `${q.checks.echo.protocolFeeBps} bps (1Click) · signature ${q.checks.signature ? 'verified' : 'FAILED'}`, src: 'live' }
-  : S.QUOTE;
+export const QUOTE = S.QUOTE;
 
 export const CORE = g
   ? { ...S.CORE, oath: g.oath, owner: g.state.owner, dao: g.state.dao, policyVersion: g.state.policy_version, policyHash: g.state.policy_hash,
