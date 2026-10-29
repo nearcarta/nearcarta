@@ -22,13 +22,13 @@ p.on('pageerror', e => ph.console_errors.push(String(e).slice(0, 300)));
 p.on('console', m => m.type() === 'error' && ph.console_errors.push(m.text().slice(0, 300)));
 p.on('response', r => { if (r.status() >= 300 && r.status() !== 304) ph.non_2xx.push(`${r.status()} ${r.request().method()} ${r.url().slice(0, 160)}`); });
 const act = p.locator('#t-act');
-const snap = async n => { await p.screenshot({ path: shot(n) }); ph.shots.push(shot(n)); };
+const snap = async n => { try { await p.screenshot({ path: shot(n) }); ph.shots.push(shot(n)); } catch (e) { ph.shot_errors = [...(ph.shot_errors || []), n]; } };
 const save = () => writeFileSync(OUT, JSON.stringify(rec, null, 2) + '\n');
 const text = async sel => ((await p.locator(sel).textContent().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
 const until = async (re, ms) => { await p.waitForFunction(r => new RegExp(r).test(document.querySelector('#t-act')?.textContent || ''), re.source, { timeout: ms }); };
 // one press: click, then wait until the button is free again (not busy, enabled)
 const press = async (ms = 240e3) => {
-  const label = (await act.textContent()).trim();
+  const label = (await act.innerText().catch(() => '')).trim();
   await act.click();
   await p.waitForFunction(() => { const b = document.querySelector('#t-act'); return b && !b.classList.contains('busy') && !b.disabled; }, null, { timeout: ms });
   await p.waitForTimeout(600);
