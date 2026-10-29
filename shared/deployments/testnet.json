@@ -525,6 +525,43 @@
     }
   },
   "toll_gate": {
+    "gate": "gate5.r4csmvr86zk4.testnet",
+    "owner": "r4csmvr86zk4.testnet",
+    "mpc": "v1.signer-prod.testnet",
+    "path": "gate-1",
+    "chain_id": 84532,
+    "verify_chain": "Base",
+    "foreign_address": "0xfd4f86716f2e46bb45b4672c07a16d6329ae5ed4",
+    "derived_key": "secp256k1:45Z2Yjdaso1hJwib26YGCdytSGASHZ5UMtyAk7wsR4vyitvZ5mq3vh2tVqC2uDZKrGpU2GmWbF5R9AMQ6HTvk4Hz",
+    "policy": {
+      "factories": [
+        "nccharters-53836.testnet",
+        "nccharters-53681.testnet",
+        "nccharters-85831.testnet",
+        "nccharters-17102.testnet"
+      ],
+      "payee": "cafe.ncpub-17102.testnet",
+      "fee": "10000000000000000000000",
+      "memo": "toll:base-sepolia",
+      "evm_to": "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5",
+      "evm_value": "100000000000",
+      "max_fee_per_gas": "100000000",
+      "max_priority_fee_per_gas": "1000000"
+    },
+    "wasm": "contracts/artifacts/toll.v5.wasm",
+    "wasm_sha256": "ae57ff8dfcc47e0553c0b83a665438a5b81da2ec0d080ca9e430e76b81901e28",
+    "code_hash": "CjZmQCk2F5YAuGDrJnyBH7gtW3D2wztbRws8zrWaJLkf",
+    "source_tag": "build-379af43",
+    "access_keys": 0,
+    "create_deploy_init_tx": "HDwh494seRKgMSDrLi5tCgkcXbYMHubDNkQVX6PHtufC",
+    "gas_funding": {
+      "note": "no faucet: the allowlisted test EOA (it receives every gate payout) forwarded Base Sepolia ETH to the v5 gate's derived address",
+      "forward_base_tx": "0xa95a2e4ea9cac0801edc1557cddf43337b6b78322459cedada36ba09312019e4",
+      "wei": "17000000000000"
+    },
+    "explorer": "https://sepolia.basescan.org/address/0xfd4f86716f2e46bb45b4672c07a16d6329ae5ed4"
+  },
+  "toll_gate_v4": {
     "gate": "gate.r4csmvr86zk4.testnet",
     "owner": "r4csmvr86zk4.testnet",
     "mpc": "v1.signer-prod.testnet",
@@ -555,6 +592,7 @@
       "forward_base_tx": "0xa8b41c1b63759bb7c3025e0eea386afe86190da8e75ca268750fd0959574faa7",
       "wei": "50000000000000"
     },
-    "explorer": "https://sepolia.basescan.org/address/0xeb7d20b8c6af0d63f0331d4e7aa31205c147eb38"
+    "explorer": "https://sepolia.basescan.org/address/0xeb7d20b8c6af0d63f0331d4e7aa31205c147eb38",
+    "retired": "v4 accepted only nccharters-53681; replaced by toll_gate (v5, every factory)"
   }
 }

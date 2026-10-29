@@ -1,6 +1,7 @@
 // Gas for the Toll gate's derived address, with no faucet: the existing Toll (toll.<owner>.testnet) MPC-signs
 // a payout from its funded derived address to the allowlisted test EOA, then that EOA forwards the coins to the
 // gate's derived address. Base Sepolia only; prints tx hashes, never keys.
+// SKIP_TOLL=1 skips step 1 when the EOA already holds the coins (it receives every toll payout).
 // Usage: TOLL=... AGENT_KEY_FILE=... EVM_KEY_FILE=... GATE_EVM=0x... VALUE=<wei> node backend/scripts/toll-gate-fund.js
 import { readFileSync } from 'node:fs';
 import { Account, JsonRpcProvider, KeyPairSigner, actions } from 'near-api-js';
@@ -15,9 +16,10 @@ const receipt = async h => { for (let i = 0; i < 60; i++) { const r = await rpc(
 const value = BigInt(E.VALUE || '50000000000000');
 
 // 1. Existing Toll pays the allowlisted EOA from its derived address.
+const key = JSON.parse(readFileSync(E.EVM_KEY_FILE, 'utf8'));
+if (!E.SKIP_TOLL) {
 const k = JSON.parse(readFileSync(E.AGENT_KEY_FILE, 'utf8'));
 const agent = new Account(k.account_id, new JsonRpcProvider({ url: cfg.rpc }), KeyPairSigner.fromSecretKey(k.private_key));
-const key = JSON.parse(readFileSync(E.EVM_KEY_FILE, 'utf8'));
 const r = await agent.signAndSendTransaction({ receiverId: E.TOLL, waitUntil: 'FINAL', throwOnFailure: false, actions: [actions.functionCall('pay',
   { to: key.address.toLowerCase(), value: value.toString(), max_fee_per_gas: '100000000', max_priority_fee_per_gas: '1000000', gas_limit: 21000 }, 200n * 10n ** 12n, 0n)] });
 const ret = JSON.parse(Buffer.from(r.status.SuccessValue || '', 'base64').toString() || 'null');
@@ -25,6 +27,7 @@ if (!ret?.nonce && ret?.nonce !== 0) { console.error('pay failed', JSON.stringif
 const rec = await view(E.TOLL, 'get_tx', { nonce: ret.nonce });
 const h1 = await rpc('eth_sendRawTransaction', [rec.raw_signed]);
 console.log(JSON.stringify({ toll_pay_near_tx: r.transaction.hash, toll_nonce: ret.nonce, base_tx: h1, block: parseInt((await receipt(h1)).blockNumber) }));
+}
 
 // 2. The EOA forwards the same amount to the gate's derived address (EIP-1559, signed locally).
 const enc = x => { // minimal RLP
