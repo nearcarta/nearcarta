@@ -57,9 +57,9 @@ function makeAtlas(img){ const c=document.createElement('canvas'); c.width=img.w
 // ---------- colour script ----------
 const C = h=>new THREE.Color(h);
 const KEYS = [ // day, dusk, night
-  { top:C('#9fb3bb'), mid:C('#d9d6c4'), hor:C('#efe2c6'), fog:C('#d8cfb8'), sun:C('#fff1d6'), sunI:2.3, hemiS:C('#f1ead8'), hemiG:C('#6b5a40'), hemiI:1.15, sea:C('#6b8873'), deep:C('#3c584b'), elev:.95, lift:C('#000000'), sat:.92, lamp:0, fly:0, expo:1.12 },
-  { top:C('#7d6a6e'), mid:C('#e0a184'), hor:C('#fbd29a'), fog:C('#e8c39c'), sun:C('#ffc884'), sunI:2.45, hemiS:C('#f6dcbc'), hemiG:C('#7a5c40'), hemiI:1.5, sea:C('#647a66'), deep:C('#384d41'), elev:.62, lift:C('#0a0604'), sat:1.02, lamp:.75, fly:.45, expo:1.16 } /* late golden hour: details read, lamps still glow */,
-  { top:C('#2c3a5c'), mid:C('#4a5574'), hor:C('#76768c'), fog:C('#454c63'), sun:C('#c4d3f0'), sunI:1.35, hemiS:C('#a9b5d4'), hemiG:C('#4a3e32'), hemiI:1.3, sea:C('#3a5056'), deep:C('#22343a'), elev:.82, lift:C('#12141c'), sat:.92, lamp:1, fly:1, expo:1.34 } /* moonlit, not dark: every roof, sign and face still reads */,
+  { top:C('#9fb3bb'), mid:C('#d9d6c4'), hor:C('#efe2c6'), fog:C('#d8cfb8'), sun:C('#fff1d6'), sunI:2.3, hemiS:C('#f1ead8'), hemiG:C('#6b5a40'), hemiI:1.15, sea:C('#6b8873'), deep:C('#3c584b'), elev:.95, lift:C('#000000'), sat:.92, lamp:0, fly:0, expo:1.15, sh:.05 },
+  { top:C('#7d6a6e'), mid:C('#e0a184'), hor:C('#fbd29a'), fog:C('#e8c39c'), sun:C('#ffc884'), sunI:2.45, hemiS:C('#f6dcc8'), hemiG:C('#7a5c48'), hemiI:1.55, sea:C('#647a66'), deep:C('#384d41'), elev:.62, lift:C('#050302'), sat:.98, lamp:.75, fly:.45, expo:1.16, sh:.08 } /* late golden hour: details read, lamps still glow */,
+  { top:C('#2c3a5c'), mid:C('#4a5574'), hor:C('#76768c'), fog:C('#3d4560'), sun:C('#c4d3f0'), sunI:1.45, hemiS:C('#a9b5d4'), hemiG:C('#4a3e32'), hemiI:1.42, sea:C('#3a5056'), deep:C('#22343a'), elev:.82, lift:C('#0a0c14'), sat:.97, lamp:1, fly:1, expo:1.3, sh:.1 } /* moonlit, not dark: every roof, sign and face still reads */,
 ];
 const ICE = C('#cfe6f5');
 const mixK=(t)=>{ const i=Math.min(1,Math.floor(t)), f=Math.min(1,t-i), a=KEYS[i], b=KEYS[Math.min(2,i+1)]; const o={}; for(const k in a) o[k]= a[k].isColor? a[k].clone().lerp(b[k],f) : a[k]+(b[k]-a[k])*f; return o; };
@@ -499,20 +499,20 @@ function buildPost(){
   W.sceneRT=rt; W.postRT=post; const comp=W.composer={ passes:[], addPass(p){ this.passes.push(p); }, setSize(w,h){ const pr=W.renderer.getPixelRatio(); rt.setSize(w*pr,h*pr); post.setSize(w*pr,h*pr); this.passes.forEach(p=>p.setSize(w*pr,h*pr)); } };
   const bloom=W.bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth/2,innerHeight/2),.55,.5,.82); comp.addPass(bloom); W.outp=new OutputPass();
   const fin=W.fin=new ShaderPass({ uniforms:{ tDiffuse:{value:null}, tDepth:{value:null}, res:{value:new THREE.Vector2(innerWidth,innerHeight)}, cn:{value:.3}, cf:{value:400}, con:{value:.32}, focus:{value:.55}, band:{value:.22}, tilt:{value:1}, ink:{value:C('#2a1d14')},
-      lift:{value:C('#120806')}, sat:{value:.9}, frz:U.frz, time:U.time, vig:{value:.5}, hit:U.hit },
+      lift:{value:C('#120806')}, sat:{value:.9}, frz:U.frz, time:U.time, vig:{value:.5}, hit:U.hit, pt:{value:0}, sh:{value:.05} },
     vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
-    fragmentShader:`uniform sampler2D tDiffuse,tDepth; uniform vec2 res; uniform float cn,cf,con,focus,band,tilt,sat,frz,time,vig,hit; uniform vec3 ink,lift; varying vec2 vUv;
+    fragmentShader:`uniform sampler2D tDiffuse,tDepth; uniform vec2 res; uniform float cn,cf,con,focus,band,tilt,sat,frz,time,vig,hit,pt,sh; uniform vec3 ink,lift; varying vec2 vUv;
       float ld(vec2 uv){ float z=texture2D(tDepth,uv).x; return cn*cf/((cf-cn)*z-cf)*-1.; }
       float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
       void main(){ vec2 px=1./res;
-        float b=smoothstep(0.,band,abs(vUv.y-focus)-band*.35)*tilt; vec3 c=vec3(0.); float wsum=0.;
+        float bw=band*(1.+pt*.7); float b=smoothstep(0.,bw,abs(vUv.y-focus)-bw*.35)*tilt*(1.-pt*.55); vec3 c=vec3(0.); float wsum=0.;
         for(int i=0;i<9;i++){ float a=float(i)*2.39996; float r=sqrt(float(i)/9.)*b*3.2; vec2 o=vec2(cos(a),sin(a))*r*px*1.6; c+=texture2D(tDiffuse,vUv+o).rgb; wsum+=1.; } c/=wsum;
         float d0=ld(vUv); float dx=ld(vUv+vec2(px.x,0.))-ld(vUv-vec2(px.x,0.)); float dy=ld(vUv+vec2(0.,px.y))-ld(vUv-vec2(0.,px.y));
         float e=sqrt(dx*dx+dy*dy)/max(d0,1.); float edge=smoothstep(.03,.08,e)*(1.-smoothstep(45.,110.,d0))*(1.-b*.7);
         c=mix(c,ink*(.6+.4*c),edge*.55);
         float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,sat*(1.-frz*.45)); c=mix(c,c*vec3(.85,.95,1.08)+vec3(.04,.07,.1),frz*.6);
-        c=clamp(c,0.,1.); c=mix(c,c*c*(3.-2.*c),con); c=c*(1.-lift)+lift; c=mix(c,c*vec3(1.,.82,.8),hit*.18);
-        vec2 q=vUv-.5; c*=mix(1.,smoothstep(.95,.25,length(q*vec2(1.,.8))),vig*.7);
+        c=clamp(c,0.,1.); c=pow(c,vec3(1.-sh-pt*.04)); c=mix(c,c*c*(3.-2.*c),con*(1.-pt*.25)); c=c*(1.-lift)+lift; c=mix(c,c*vec3(1.,.82,.8),hit*.18);
+        vec2 q=vUv-.5; c*=mix(1.,smoothstep(.95,.25,length(q*vec2(1.,.8))),vig*.7*(1.-pt*.55));
         c+=(h(vUv*res+fract(time))-.5)*.018;
         gl_FragColor=vec4(c,1.); }` });
   comp.addPass(fin); comp.addPass(W.outp);
@@ -536,7 +536,7 @@ export function update(dt){ const T=clock.T; U.time.value=T;
   W.scene.fog.color.copy(K.fog).lerp(ICE,W.frz*.6);
   seaMat.uniforms.shallow.value.copy(K.sea); seaMat.uniforms.deep.value.copy(K.deep); seaMat.uniforms.sunC.value.copy(K.sun).multiplyScalar(.6);
   seaMat.uniforms.fogColor.value.copy(W.scene.fog.color); seaMat.uniforms.fogNear.value=W.scene.fog.near; seaMat.uniforms.fogFar.value=W.scene.fog.far;
-  if(W.fin){ W.fin.uniforms.lift.value.copy(K.lift); W.fin.uniforms.sat.value=K.sat; }
+  if(W.fin){ const u=W.fin.uniforms; u.lift.value.copy(K.lift); u.sat.value=K.sat; u.sh.value=K.sh; u.pt.value=W.camera.aspect<.8?1:0; }
   W.lampAmb=K.lamp; { const wi=K.lamp*1.1*(1-W.frz*.7); for(const m of W.winMats) m.emissiveIntensity=wi; }
   // lanterns
   if(W.lampFx){ const {flames,pools,halos}=W.lampFx, hc=halos.geometry.attributes.color, hs=halos.geometry.attributes.size; const tc=new THREE.Color();
