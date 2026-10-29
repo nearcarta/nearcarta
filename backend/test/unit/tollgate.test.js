@@ -21,3 +21,37 @@ test('a bad nonce is refused before any read', async () => {
     await assert.rejects(tg.broadcast(n), e => e.status === 400);
   }
 });
+
+const POL = { next_nonce: 3, budget: '30000000000000', spent: '800000000000', gate: { evm_value: '100000000000', max_fee_per_gas: '100000000', max_priority_fee_per_gas: '1000000' } };
+test('gas info counts visits left at the fee cap and warns when low', () => {
+  const ok = tg.gasInfo(POL, 515190000000000n, 6000000n);
+  assert.equal(ok.per_visit_at_cap_wei, '2200000000000');
+  assert.equal(ok.visits_left_at_cap, 234);
+  assert.ok(ok.visits_left_now > ok.visits_left_at_cap);
+  assert.equal(ok.budget_visits_left, 292);
+  assert.equal(ok.low, false); assert.equal(ok.warning, null);
+  const low = tg.gasInfo(POL, 2200000000000n * 10n, null);
+  assert.equal(low.visits_left_at_cap, 10); assert.equal(low.low, true); assert.match(low.warning, /about 10 more visits/);
+  assert.match(tg.gasInfo(POL, 1n, null).warning, /no Base Sepolia gas/);
+  assert.equal(tg.gasInfo(POL, null, null).low, null);
+});
+test('a signed record is never shown as just "signed"', () => {
+  assert.equal(tg.phaseOf({ status: 'signed' }).phase, 'broadcasting');
+  assert.equal(tg.phaseOf({ status: 'signed', base: { status: 'success' }, final: false }).label, 'Base Sepolia finalizing');
+  assert.equal(tg.phaseOf({ status: 'signed', base: { status: 'success' }, final: true }).phase, 'settling');
+  assert.equal(tg.phaseOf({ status: 'confirmed' }).phase, 'confirmed');
+  for (const s of ['signed']) for (const b of [undefined, { status: 'success' }]) for (const f of [false, true]) assert.doesNotMatch(tg.phaseOf({ status: s, base: b, final: f }).label, /^signed$/);
+});
+test('the settler settles only final signed records, once, and needs no wallet', async () => {
+  tg._resetSettler();
+  const recs = { 0: { nonce: 0, status: 'confirmed' }, 1: { nonce: 1, status: 'signed', phase: 'finalizing', eta_s: 300, settle: null }, 2: { nonce: 2, status: 'signed', phase: 'settling', settle: { args: { nonce: 2, block_hash: '0xab' } } } };
+  const sent = [];
+  const opts = { read: async n => recs[n], send: async (s, gate, args) => { sent.push([gate, args]); return 'TX' + args.nonce; }, settler: { account: 'a.testnet' }, policyRead: async () => POL };
+  const r = await tg.settleDue(opts);
+  assert.deepEqual(r.records.map(x => [x.nonce, x.result]), [[1, 'waiting'], [2, 'sent']]);
+  assert.equal(r.records[0].eta_s, 300);
+  assert.equal(sent.length, 1); assert.deepEqual(sent[0][1], { nonce: 2, block_hash: '0xab' });
+  await tg.settleDue(opts); assert.equal(sent.length, 1, 'no second settle within the cooldown');
+  tg._resetSettler();
+  assert.equal((await tg.settleOne(2, { ...opts, settler: null })).result, 'no_settler');
+});

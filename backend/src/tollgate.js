@@ -1,9 +1,11 @@
 // Toll gate (v5, any listed charter factory): a visitor's own charter pays the toll, the visitor's wallet calls gate.pay_for, and the gate
 // MPC-signs a fixed Base Sepolia payout. This module only reads: the gate record from NEAR, the tx from Base Sepolia.
 // broadcast() relays the raw tx the gate already signed (read from chain, never from the caller), so it cannot
-// sign, change or spend anything; settle is a NEAR tx the visitor signs.
+// sign, change or spend anything. settle is permissionless (the MPC foreign-tx proof, not the caller, confirms a record):
+// the visitor's wallet may sign it, or the background settler below, whose key may only call gate.settle.
 import { DEP } from './config.js';
-import { view } from './near.js';
+import { view, rpc as nearRpc, explorerTx } from './near.js';
+import { keyFrom, signTx, functionCall } from '../../shared/vault/tx.js';
 
 const G = () => DEP.toll_gate;
 const BASE = process.env.BASE_SEPOLIA_RPC || 'https://sepolia.base.org';
@@ -16,13 +18,32 @@ const err = (status, m) => Object.assign(new Error(m), { status });
 // one retry after a short pause: a single slow or dropped RPC read should not fail the whole gate page
 const again = async f => { try { return await f(); } catch { await new Promise(r => setTimeout(r, 700)); return f(); } };
 
+// Gas left on the gate's derived Base Sepolia address. Each visit is a plain transfer: 21000 gas plus the fixed payout.
+export const LOW_VISITS = 25;
+export function gasInfo(policy, balanceWei, gasPriceWei) {
+  const g = policy?.gate || {}, value = BigInt(g.evm_value || 0), cap = BigInt(g.max_fee_per_gas || 0);
+  const perCap = 21000n * cap + value;
+  if (balanceWei == null) return { balance_wei: null, per_visit_at_cap_wei: perCap.toString(), visits_left_at_cap: null, visits_left_now: null, low: null, warning: null };
+  const bal = BigInt(balanceWei);
+  let price = gasPriceWei == null ? cap : BigInt(gasPriceWei) + BigInt(g.max_priority_fee_per_gas || 0); if (price > cap) price = cap;
+  const perNow = 21000n * price + value;
+  const atCap = perCap > 0n ? Number(bal / perCap) : null, now = perNow > 0n ? Number(bal / perNow) : null;
+  const budgetLeft = value > 0n && policy?.budget ? Number((BigInt(policy.budget) - BigInt(policy.spent || 0)) / value) : null;
+  const low = atCap != null && atCap < LOW_VISITS;
+  return { balance_wei: bal.toString(), per_visit_at_cap_wei: perCap.toString(), per_visit_now_wei: perNow.toString(), visits_left_at_cap: atCap, visits_left_now: now,
+    budget_visits_left: budgetLeft, low,
+    warning: atCap === 0 ? 'The gate has no Base Sepolia gas left: a payout it signs now cannot be sent. Please wait until it is topped up.'
+      : low ? `Low gas: the gate's Base Sepolia address has gas for about ${atCap} more visits at the fee cap.` : null };
+}
+
 export async function gate() {
   const g = G(); if (!g) throw err(404, 'no toll gate deployed');
-  const [policy, bal] = await Promise.all([again(() => view(g.gate, 'policy')), evm('eth_getBalance', [g.foreign_address, 'latest']).catch(() => null)]);
+  const [policy, bal, price] = await Promise.all([again(() => view(g.gate, 'policy')), evm('eth_getBalance', [g.foreign_address, 'latest']).catch(() => null), evm('eth_gasPrice', []).catch(() => null)]);
   const ns = []; for (let n = Math.max(0, policy.next_nonce - 4); n < policy.next_nonce; n++) ns.push(n);
   const recent = await Promise.all(ns.map(n => visit(n).catch(() => null)));
   return { gate: g.gate, mpc: g.mpc, wasm_sha256: g.wasm_sha256, source_tag: g.source_tag, policy, foreign_address: g.foreign_address,
     foreign_balance_wei: bal ? BigInt(bal).toString() : null, foreign_explorer: `${SCAN}/address/${g.foreign_address}`, recent: recent.filter(Boolean).reverse(),
+    gas: gasInfo(policy, bal == null ? null : BigInt(bal), price == null ? null : BigInt(price)), settler: settlerInfo(),
     how: 'your agent key proposes the 0.01 NEAR toll on your charter (memo toll:base-sepolia); your wallet calls pay_for {charter, action_id} with 300 Tgas; POST /api/toll/gate/<nonce>/broadcast; after Base finality your wallet calls settle {nonce, block_hash}' };
 }
 
@@ -44,6 +65,7 @@ export async function visit(nonce) {
     out.eta_s = blk ? Math.max(0, parseInt(blk.timestamp) - parseInt(fin.timestamp)) : 0;
     out.settle = out.final && rec.status === 'signed' ? { method: 'settle', args: { nonce, block_hash: rc.blockHash }, gas_tgas: 150 } : null;
   }
+  Object.assign(out, phaseOf(out));
   return out;
 }
 
@@ -60,4 +82,71 @@ export async function broadcast(nonce) {
   }
   for (let i = 0; i < 6; i++) { const v = await visit(nonce); if (v.base) return v; await new Promise(r => setTimeout(r, 1500)); }
   return visit(nonce);
+}
+
+/** What a visitor sees for a record: "signed" alone reads as stuck mid-visit, so name the step it is in. */
+export function phaseOf(v) {
+  if (v.status === 'confirmed') return { phase: 'confirmed', label: 'confirmed' };
+  if (v.status === 'refused_proof') return { phase: 'refused', label: 'proof refused' };
+  if (v.status !== 'signed') return { phase: v.status, label: String(v.status).replace(/_/g, ' ') };
+  if (!v.base) return { phase: 'broadcasting', label: 'sending to Base Sepolia' };
+  if (v.base.status === 'reverted') return { phase: 'reverted', label: 'reverted on Base Sepolia' };
+  if (!v.final) return { phase: 'finalizing', label: 'Base Sepolia finalizing' };
+  return { phase: 'settling', label: 'final, settling' };
+}
+
+// ---------- background settler: anyone may trigger it; its key may only call gate.settle ----------
+const SETTLER = () => {
+  const s = (process.env.TOLL_SETTLER_KEY || '').trim(), a = (process.env.TOLL_SETTLER_ACCOUNT || '').trim();
+  return s && a ? { key: keyFrom(s), account: a } : null;
+};
+const settled = new Map(); // nonce -> { tx, at }
+let sweeping = null, lastSweep = 0, sendChain = Promise.resolve();
+export function settlerInfo() { const s = SETTLER(); return { enabled: !!s, account: s ? s.account : null, last_sweep: lastSweep ? new Date(lastSweep).toISOString() : null }; }
+export function _resetSettler() { settled.clear(); sweeping = null; lastSweep = 0; }
+
+async function sendSettle(s, gateId, args) {
+  const ak = await nearRpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: s.account, public_key: s.key.publicKey });
+  const tx = signTx({ key: s.key, signerId: s.account, receiverId: gateId, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash, actions: [functionCall('settle', args, 150n * 10n ** 12n)] });
+  const r = await nearRpc('send_tx', { signed_tx_base64: tx.base64, wait_until: 'EXECUTED_OPTIMISTIC' });
+  if (r?.status?.Failure) throw err(502, 'settle failed on NEAR: ' + JSON.stringify(r.status.Failure).slice(0, 120));
+  return tx.hash;
+}
+
+/** Settle one record if it is final on Base and still signed. Safe to call any number of times. */
+export async function settleOne(nonce, { read = visit, send = sendSettle, settler = SETTLER() } = {}) {
+  const g = G(); if (!g) throw err(404, 'no toll gate deployed');
+  const v = await read(nonce);
+  if (v.status !== 'signed') return { nonce: v.nonce, result: 'done', status: v.status };
+  if (!v.settle) return { nonce: v.nonce, result: 'waiting', phase: v.phase, eta_s: v.eta_s ?? null };
+  if (!settler) return { nonce: v.nonce, result: 'no_settler', settle: v.settle };
+  const prev = settled.get(v.nonce);
+  if (prev && Date.now() - prev.at < 60_000) return { nonce: v.nonce, result: 'sent', settle_tx: prev.tx, explorer: explorerTx(prev.tx) };
+  // one settle tx at a time, so two callers never race on the key's nonce
+  const run = sendChain.then(() => send(settler, g.gate, v.settle.args)); sendChain = run.catch(() => {});
+  const tx = await run;
+  settled.set(v.nonce, { tx, at: Date.now() });
+  return { nonce: v.nonce, result: 'sent', settle_tx: tx, explorer: explorerTx(tx) };
+}
+
+/** Settle every recent record that is final on Base Sepolia. Runs one sweep at a time. */
+export function settleDue({ read = visit, send = sendSettle, settler = SETTLER(), policyRead = () => view(G().gate, 'policy'), window = 12 } = {}) {
+  if (sweeping) return sweeping;
+  sweeping = (async () => {
+    const g = G(); if (!g) throw err(404, 'no toll gate deployed');
+    const policy = await again(policyRead), out = [];
+    for (let n = Math.max(0, policy.next_nonce - window); n < policy.next_nonce; n++) {
+      const r = await settleOne(n, { read, send, settler }).catch(e => ({ nonce: n, result: 'error', error: String(e.message).slice(0, 120) }));
+      if (r.result !== 'done') out.push(r);
+    }
+    lastSweep = Date.now();
+    return { gate: g.gate, settler: settlerInfo(), records: out };
+  })().finally(() => { sweeping = null; });
+  return sweeping;
+}
+
+/** Sweep in the background every `ms` while a settler key is set (TOLL_SETTLER_AUTO=0 turns it off). */
+export function startSettler(ms = 90_000) {
+  if (!SETTLER() || process.env.TOLL_SETTLER_AUTO === '0' || !G()) return null;
+  const t = setInterval(() => { settleDue().catch(() => {}); }, ms); t.unref?.(); return t;
 }
