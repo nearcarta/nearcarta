@@ -217,6 +217,11 @@ export async function buildCast(){
   const wset=[[rogue,{scale:.2,name:'Courier',keep:[]}],[barb,{scale:.2,name:'Smith',keep:['Mug'],hide:['Barbarian_Hat']}],[mage,{scale:.17,name:'Scribe',keep:['Spellbook']}],[rogue,{scale:.2,name:'Walker',keep:[]}],[knight,{scale:.21,name:'Watch',keep:['1H_Sword'],hide:['Knight_Helmet']}],[barb,{scale:.2,name:'Miller',keep:[]}]];
   const spots=[[1,-1],[2,-2],[0,-2],[1,2],[-2,-1],[0,3],[2,0],[-1,-1]];
   CAST.wander=wset.filter(([g])=>g).map(([g,o],i)=>{ const c=new Char(g,{...o,height:.6}); const [q,r]=spots[i%spots.length]; c.placeHex(q,r,rnd()*6,(rnd()-.5)*.6,(rnd()-.5)*.6); c.wanderer=true; c.wT=1+rnd()*4; return c; });
+  // two townsfolk who sit on the ground and stay put: one on the jetty edge by the ferry, one reading by the tavern barrels. They look up and greet the Lamplighter.
+  const sset=[[barb,{scale:.2,name:'Docker',keep:['Mug'],hide:['Barbarian_Hat']},3,-1,-.05,.3],[mage,{scale:.17,name:'Reader',keep:['Spellbook_open'],hide:['Mage_Hat'],tint:0xe8e0d0},0,-3,-.1,.68]];
+  CAST.sitters=sset.filter(([g])=>g).map(([g,o,q,r,dx,dz],i)=>{ const c=new Char(g,{...o,height:.42}); const p=hx(q,r);
+    if(i===0&&W.jetty?.stand){ const J=W.jetty, dir=J.home.clone().sub(J.stand).setY(0).normalize(), sd=new THREE.Vector3(-dir.z,0,dir.x), q0=J.stand.clone().lerp(J.home,.32).addScaledVector(sd,.24); c.place(q0.x,q0.z,Math.atan2(sd.x,sd.z)); c.pos.y=.06; }
+    else c.place(p.x+dx,p.z+dz,Math.atan2(-(p.x+dx),-(p.z+dz))); c.noAlt=true; c.sitter=true; c.play('sit',{hold:true,fade:0}); return c; });
   // shop keepers: one per shop, beside the door, each with its own look and prop. They wave when the Lamplighter comes close.
   const KEEP={ chronicle:[mage,{scale:.18,name:'Archivist',keep:['Spellbook_open'],tint:0xf0d9b0}], bank:[rogue,{scale:.2,name:'Banker',keep:[],tint:0xe8c890}],
     guard:[knight,{scale:.22,name:'Captain',keep:['Badge_Shield']}], arena:[barb,{scale:.21,name:'Arena marshal',keep:['2H_Axe'],hide:['Barbarian_Hat']}],
