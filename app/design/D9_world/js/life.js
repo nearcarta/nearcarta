@@ -2,7 +2,7 @@
 // and the sky turns day → dusk → night → dawn on a slow loop (or holds the time picked on the sun button).
 import * as THREE from 'three';
 import { clock } from './core.js';
-import { W } from './world.js';
+import { W, zecDrop } from './world.js';
 import { CAST, chars } from './chars.js';
 import * as SP from './speech.js';
 
@@ -41,9 +41,25 @@ function tickSky(dt){ if(fixed!=null){ W.tod+=(fixed-W.tod)*Math.min(1,dt*1.2); 
   const [to,dur]=LOOP[cyc.i]; cyc.t+=dt; const blend=Math.min(1,cyc.t/Math.min(dur,18)); const k=blend*blend*(3-2*blend);
   W.tod=cyc.from+(to-cyc.from)*k; if(cyc.t>=dur){ cyc.from=to; cyc.t=0; cyc.i=(cyc.i+1)%LOOP.length; } }
 
+// Ferry scene: the boat crosses on a loop. The lines say only what the Ferry and Mist Bank code and proofs do:
+// the Ferry reads a dry 1Click quote (USDC on Base to ZEC, Orchard-only UA, no swap run); the Mist Bank's ZEC
+// payout on Zcash testnet went out in Ironwood actions with the amount hidden (judges/proofs/mistbank-payout.json).
+const FV=V(); const boatV={name:'Ferry',voice:.8,top(){ return FV.copy(W.boat.position).setY(W.boat.position.y+1.05); }};
+let fs={ph:0,t:14};
+function tickFerry(dt){ const b=W.boat, J=W.jetty, fm=CAST.ferryman; if(!b||!J.far) return; const u=b.userData; fs.t-=dt;
+  if(fs.ph===0){ if(u.goal!==0) u.goal=0; if(fs.t<=0){ u.goal=2; fs.ph=1; fs.t=30; if(fm) SP.say(fm,'Dry quote only: USDC on Base to ZEC.',{dur:3,name:fm.name}); } return; }
+  if(fs.ph===1){ if(b.position.distanceTo(J.far)<.35||fs.t<=0){ zecDrop(b.position); SP.say(boatV,'Orchard-only address. No transparent fallback.',{dur:3.2}); fs.ph=2; fs.t=4.2; } return; }
+  if(fs.ph===2){ if(fs.t<=0){ if(fm) SP.say(fm,'Mist Bank paid ZEC into Ironwood. Amount hidden.',{dur:3.4,name:fm.name}); fs.ph=3; fs.t=6; } return; }
+  if(fs.ph===3&&fs.t<=0){ u.goal=0; fs.ph=0; fs.t=40; } }
+// Vault Arena Guardian: a small AI pet in the dome. Each scam spark that hits makes it shake its head; every few hits it says why.
+const GL=[['Scam text in. NEAR AI flagged it.','warn'],['Held by rule. The charter decides.','say'],['Five lab attacks. All refused, on chain.','think']];
+let gs={seen:0,n:0,cd:6};
+function tickGuardian(dt){ const g=CAST.guardian; if(!g) return; gs.cd-=dt; const h=W.domeHits||0; if(h===gs.seen) return; gs.seen=h;
+  if(!g.emote) g.play(g.A.no?'no':'idle',{rate:1.3});
+  if(gs.cd<=0&&g.root.visible){ const [t,st]=GL[gs.n++%GL.length]; SP.say(g,t,{style:st,tone:st==='say'?'ok':'',dur:3,name:'Guardian'}); gs.cd=11; } }
 // called every town frame (not in the story, not inside a room)
 export function tickLife(dt,{sky=true}={}){ if(W.frz>.5){ if(chat) endChat(); return; }
   if(sky) tickSky(dt);
   if(chat) tickChat(dt); else { nextChat-=dt; if(nextChat<=0){ nextChat=3; startChat(); } }
-  tickGreet(dt); }
+  tickGreet(dt); tickFerry(dt); tickGuardian(dt); }
 export function hushLife(){ if(chat) endChat(); }
