@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Nearcarta">
+  <circle cx="256" cy="256" r="236" fill="none" stroke="#e3c06a" stroke-width="24"/>
+  <path d="M136 270 L256 150 L376 270" fill="none" stroke="#e3c06a" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="166" y="262" width="180" height="134" rx="14" fill="#e3c06a"/>
+  <path d="M226 396 V330 a30 30 0 0 1 60 0 V396" fill="#14120f"/>
+  <circle cx="256" cy="226" r="20" fill="#7ee0a1"/>
+</svg>
