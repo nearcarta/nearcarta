@@ -224,9 +224,12 @@ export async function explainAny(hash, sender) {
 let lastStatus = null;
 export async function health() {
   try {
-    const s = await rpc('status', []);
-    lastStatus = { chain_id: s.chain_id, height: s.sync_info.latest_block_height, time: s.sync_info.latest_block_time };
-    return lastStatus;
+    // A slow RPC after idle must not make the health check slow: answer the last good status after 1.5 s
+    // and let the call finish in the background.
+    const live = rpc('status', []).then(s => (lastStatus = { chain_id: s.chain_id, height: s.sync_info.latest_block_height, time: s.sync_info.latest_block_time }));
+    if (!lastStatus) return await live;
+    live.catch(() => {});
+    return await Promise.race([live, new Promise(r => setTimeout(() => r({ ...lastStatus, stale: true }), 1500).unref?.())]);
   } catch (e) {
     const error = String(e.message).slice(0, 120);
     return lastStatus ? { ...lastStatus, stale: true, error } : { chain_id: null, height: null, error };
