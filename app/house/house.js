@@ -6,7 +6,8 @@ import { NearConnector } from '@hot-labs/near-connect';
 // Lazy: NEAR Connect only awaits this when a WalletConnect wallet is used, so the client loads on demand.
 const WC_ID = __WC_ID__;
 let wcP; const walletConnect = WC_ID ? { then: (ok, no) => (wcP ||= import('/wc.bundle.js').then(m => m.init(WC_ID))).then(ok, no) } : undefined;
-import { injectGuest, GUEST_ID, balance, fmt, faucet, deeds, nfts, nftSupply, FACTORY, ARENA } from './onboard.js';
+import { injectGuest, GUEST_ID, balance, fmt, faucet, deeds, nfts, nftSupply, ARENA } from './onboard.js';
+import { factoryOfCharter } from './factories.js';
 
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
@@ -171,7 +172,7 @@ async function deedCard(who) {
   if (!who) return '<span class="note">Sign in (or Start free) to build a house of your own.</span>';
   const [d, t, n] = await Promise.all([deeds(who), nfts(who), nftSupply()]);
   const acc = a => `<a href="https://testnet.nearblocks.io/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
-  return (d.length ? `deed${d.length > 1 ? 's' : ''}: ${d.map(acc).join(', ')} <span class="note">(registered in the charter factory ${esc(FACTORY)})</span>`
+  return (d.length ? `deed${d.length > 1 ? 's' : ''}: ${d.map(acc).join(', ')} <span class="note">(registered in the charter factory ${esc([...new Set(d.map(factoryOfCharter))].join(', '))})</span>`
       : `no house yet. <a class="pill go" href="/shops/vault/" data-testid="house-build">Build my house</a> <span class="note">One approval: the factory creates your charter account and writes your deed.</span>`)
     + `<br>Guardian NFTs (NEP-171 on ${acc(ARENA)}): you hold <b data-testid="house-nfts">${t.length}</b>${t.length ? ' · ' + t.map(x => esc(x.metadata?.title || x.token_id)).join(', ') : ''}${n ? ` of ${esc(n)} minted` : ''}.`
     + '<br><span class="note">The house deed is the factory registry entry today, not a NEP-171 token.</span>';

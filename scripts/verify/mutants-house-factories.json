@@ -1,0 +1,22 @@
+{
+  "file": "app/house/factories.js",
+  "test": "backend/test/unit/house-factories.test.js",
+  "mutants": [
+    ["[vault?.factory || fallback, ...", "[fallback || vault?.factory, ..."],
+    ["[vault?.factory || fallback, ...(vault?.legacy || []).map(l => l?.factory)]", "[vault?.factory || fallback]"],
+    ["[vault?.factory || fallback, ...(vault?.legacy || []).map(l => l?.factory)]", "[...(vault?.legacy || []).map(l => l?.factory), vault?.factory || fallback]"],
+    ["return [...new Set(all.filter(", "return [...(all.filter("],
+    ["typeof f === 'string' && f", "typeof f === 'string'"],
+    ["typeof f === 'string' && f", "f"],
+    ["factories.map(f =>", "factories.slice(0, 1).map(f =>"],
+    ["view(f, 'charters_of', { owner })", "view(f, 'charters_of', { owner_id: owner })"],
+    ["view(f, 'charters_of', { owner })", "view(f, 'charter_of', { owner })"],
+    [".catch(() => [])", ""],
+    ["Promise.resolve().then(() => view(f, 'charters_of', { owner }))", "view(f, 'charters_of', { owner })"],
+    ["return [...new Set(lists.flatMap(", "return [...(lists.flatMap("],
+    ["(Array.isArray(l) ? l : [])", "(l || [])"],
+    [".filter(x => typeof x === 'string')", ""],
+    ["split('.').slice(1).join('.')", "split('.').slice(-2).join('.')"],
+    ["split('.').slice(1).join('.')", "split('.')[1]"]
+  ]
+}

@@ -2,11 +2,14 @@
 // Testnet only. Keys made here stay in this browser; nothing is sent to our backend.
 import { keyFrom, signTx, rpcClient, viewFn } from '../../shared/vault/tx.js';
 import { guestWallet, hasGuest } from '../shops/vault/wallet.js';
+import { factoriesOf, deedsOn } from './factories.js';
 import { rpc as RPC, vault, townhall, arena } from '../../shared/deployments/testnet.json'; // named: guardhouse test accounts stay out of the bundle
 const DEP = { rpc: RPC, vault, townhall, arena };
 
 export const rpc = rpcClient(DEP.rpc);
 export const FACTORY = DEP.vault?.factory || DEP.townhall.factory;
+/** The current factory first, then every older one, so a charter built before a factory release still counts. */
+export const FACTORIES = factoriesOf(DEP.vault, DEP.townhall.factory);
 export const ARENA = DEP.arena.contract;
 export const GUEST_ID = 'nearcarta-guest';
 export const guest = guestWallet(rpc);
@@ -46,8 +49,8 @@ export async function faucet(to, note = () => {}) {
   return s.hash;
 }
 
-/** The house deeds: charters this account owns in the charter factory (the factory registry is the deed today). */
-export async function deeds(id) { try { return await viewFn(rpc, FACTORY, 'charters_of', { owner: id }); } catch { return []; } }
+/** The house deeds: charters this account owns in any charter factory, newest first (the factory registry is the deed today). */
+export async function deeds(id) { return deedsOn(FACTORIES, (f, m, a) => viewFn(rpc, f, m, a), id); }
 /** NEP-171 Guardian NFTs this account holds on the arena contract. */
 export async function nfts(id) { try { return await viewFn(rpc, ARENA, 'nft_tokens_for_owner', { account_id: id, limit: 20 }); } catch { return []; } }
 export async function nftSupply() { try { return await viewFn(rpc, ARENA, 'nft_total_supply', {}); } catch { return null; } }
