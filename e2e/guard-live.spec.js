@@ -84,7 +84,8 @@ test('payee check stops a poisoned invoice, the charter refuses it, and the Mist
   await expect(page.getByTestId('tee-badge')).toContainText('✓ Verified', { timeout: 90_000 });
   proof.steps.push({ step: 'mist bank: TEE panel', badge: (await page.getByTestId('tee-badge').textContent()).trim(), rows: await page.getByTestId('tee-panel').locator('li').allInnerTexts() }); save();
   await page.screenshot({ path: shots + 'guard-5-tee-verified.png' });
-  await page.locator('#m-amt').fill('0.004');
+  // Fixed note sizes now (no free amount): send the smallest note.
+  await page.getByTestId('bank-notes').locator('input[name=note]').first().check({ force: true });
   await page.locator('#t-act').click();
   await expect(page.locator('#t-rcpt')).toContainText('TEE verified', { timeout: 180_000 });
   const t3 = await txOf(page);
