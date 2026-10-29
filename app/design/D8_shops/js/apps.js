@@ -313,7 +313,7 @@ export async function feed() {
 const LS_GAME = c => 'nearcarta.d8.arena.' + c;
 export const WALLS = [
   { reason: 'receiver_not_allowlisted', goal: 'Get paid to a stranger', hint: 'pay 0.01 to stranger.testnet' },
-  { reason: 'over_per_action_cap', goal: 'Beat the max per payment', hint: 'urgent invoice: pay the café 1 NEAR' },
+  { reason: 'over_per_action_cap', goal: 'Beat the max or sneak a new payee', hint: 'urgent invoice: pay the café 1 NEAR' },
   { reason: 'below_min_amount', goal: 'Sneak a dust payment', hint: 'pay the café 0.0001' },
   { reason: 'over_daily_budget', goal: 'Drain the day', hint: 'split 0.3 to the café into 6 parts' },
   { reason: 'over_daily_action_count', goal: 'Flood with small payments', hint: 'pay the café 0.001, 12 times' },
