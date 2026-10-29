@@ -13,12 +13,14 @@ async function evm(method, params) {
   const j = await r.json(); if (j.error) throw Object.assign(new Error(j.error.message), { evm: true }); return j.result;
 }
 const err = (status, m) => Object.assign(new Error(m), { status });
+// one retry after a short pause: a single slow or dropped RPC read should not fail the whole gate page
+const again = async f => { try { return await f(); } catch { await new Promise(r => setTimeout(r, 700)); return f(); } };
 
 export async function gate() {
   const g = G(); if (!g) throw err(404, 'no toll gate deployed');
-  const [policy, bal] = await Promise.all([view(g.gate, 'policy'), evm('eth_getBalance', [g.foreign_address, 'latest']).catch(() => null)]);
-  const recent = [];
-  for (let n = Math.max(0, policy.next_nonce - 4); n < policy.next_nonce; n++) recent.push(await visit(n).catch(() => null));
+  const [policy, bal] = await Promise.all([again(() => view(g.gate, 'policy')), evm('eth_getBalance', [g.foreign_address, 'latest']).catch(() => null)]);
+  const ns = []; for (let n = Math.max(0, policy.next_nonce - 4); n < policy.next_nonce; n++) ns.push(n);
+  const recent = await Promise.all(ns.map(n => visit(n).catch(() => null)));
   return { gate: g.gate, mpc: g.mpc, wasm_sha256: g.wasm_sha256, source_tag: g.source_tag, policy, foreign_address: g.foreign_address,
     foreign_balance_wei: bal ? BigInt(bal).toString() : null, foreign_explorer: `${SCAN}/address/${g.foreign_address}`, recent: recent.filter(Boolean).reverse(),
     how: 'your agent key proposes the 0.01 NEAR toll on your charter (memo toll:base-sepolia); your wallet calls pay_for {charter, action_id} with 300 Tgas; POST /api/toll/gate/<nonce>/broadcast; after Base finality your wallet calls settle {nonce, block_hash}' };
@@ -28,7 +30,7 @@ export async function gate() {
 export async function visit(nonce) {
   const g = G(); if (!g) throw err(404, 'no toll gate deployed');
   nonce = Number(nonce); if (!Number.isInteger(nonce) || nonce < 0) throw err(400, 'nonce must be a whole number');
-  const rec = await view(g.gate, 'get_tx', { nonce }); if (!rec) throw err(404, 'no such gate record');
+  const rec = await again(() => view(g.gate, 'get_tx', { nonce })); if (!rec) throw err(404, 'no such gate record');
   const who = await view(g.gate, 'get_visit', { nonce }).catch(() => null);
   const out = { nonce, gate: g.gate, status: rec.status, to: rec.to, value: rec.value, tx_hash: rec.tx_hash || null, visit: who,
     proof_payload_hash: rec.proof_payload_hash || null, explorer: rec.tx_hash ? `${SCAN}/tx/${rec.tx_hash}` : null };
