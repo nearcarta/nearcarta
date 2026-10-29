@@ -63,7 +63,7 @@ const reads = Object.fromEntries(Object.entries({
   guardhouse: swr('guardhouse', () => guard.snapshot()),
   house: houseView,
   mistbank: swr('mistbank', () => mist.mistbank()),
-  townhall: () => shops.townhall(),
+  townhall: swr('townhall', () => shops.townhall(), { ttl: 10_000, stale: 15 * 60_000 }), // cold read 3.5-6 s seen live
   arena: () => shops.arena(),
   arena_attempts: () => shops.arenaAttempts(undefined, '2'),
   toll: () => shops.toll(),
@@ -108,7 +108,7 @@ export function warm({ every = WARM_EVERY_MS, read } = {}) {
   let tick = 0;
   const once = () => Promise.allSettled([
     shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
-    ...(read ? [] : [reads.guardhouse(), reads.mistbank(), ...(tick++ % 5 === 0 ? [arenaPromptsSwr()] : [])]),
+    ...(read ? [] : [reads.guardhouse(), reads.mistbank(), reads.townhall(), ...(tick++ % 5 === 0 ? [arenaPromptsSwr()] : [])]),
   ]);
   const first = once();
   const t = every ? setInterval(once, every) : null; t?.unref?.();
