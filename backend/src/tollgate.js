@@ -1,4 +1,4 @@
-// Toll gate (v4): a visitor's own charter pays the toll, the visitor's wallet calls gate.pay_for, and the gate
+// Toll gate (v5, any listed charter factory): a visitor's own charter pays the toll, the visitor's wallet calls gate.pay_for, and the gate
 // MPC-signs a fixed Base Sepolia payout. This module only reads: the gate record from NEAR, the tx from Base Sepolia.
 // broadcast() relays the raw tx the gate already signed (read from chain, never from the caller), so it cannot
 // sign, change or spend anything; settle is a NEAR tx the visitor signs.
