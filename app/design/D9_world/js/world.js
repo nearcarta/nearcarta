@@ -57,9 +57,9 @@ function makeAtlas(img){ const c=document.createElement('canvas'); c.width=img.w
 // ---------- colour script ----------
 const C = h=>new THREE.Color(h);
 const KEYS = [ // day, dusk, night
-  { top:C('#9fb3bb'), mid:C('#d9d6c4'), hor:C('#efe2c6'), fog:C('#d8cfb8'), sun:C('#fff1d6'), sunI:2.3, hemiS:C('#f1ead8'), hemiG:C('#6b5a40'), hemiI:1.15, sea:C('#6b8873'), deep:C('#3c584b'), elev:.95, lift:C('#000000'), sat:.92, lamp:0, fly:0 },
-  { top:C('#7d6a6e'), mid:C('#e0a184'), hor:C('#fbd29a'), fog:C('#e8c39c'), sun:C('#ffc884'), sunI:2.45, hemiS:C('#f6dcbc'), hemiG:C('#7a5c40'), hemiI:1.5, sea:C('#647a66'), deep:C('#384d41'), elev:.62, lift:C('#0a0604'), sat:1.02, lamp:.75, fly:.45 } /* late golden hour: details read, lamps still glow */,
-  { top:C('#17141a'), mid:C('#2c2329'), hor:C('#3b3036'), fog:C('#2a2328'), sun:C('#c9d4dc'), sunI:.5, hemiS:C('#6c6670'), hemiG:C('#1c1612'), hemiI:.55, sea:C('#24302a'), deep:C('#151c18'), elev:.7, lift:C('#0a0708'), sat:.8, lamp:1, fly:1 },
+  { top:C('#9fb3bb'), mid:C('#d9d6c4'), hor:C('#efe2c6'), fog:C('#d8cfb8'), sun:C('#fff1d6'), sunI:2.3, hemiS:C('#f1ead8'), hemiG:C('#6b5a40'), hemiI:1.15, sea:C('#6b8873'), deep:C('#3c584b'), elev:.95, lift:C('#000000'), sat:.92, lamp:0, fly:0, expo:1.12 },
+  { top:C('#7d6a6e'), mid:C('#e0a184'), hor:C('#fbd29a'), fog:C('#e8c39c'), sun:C('#ffc884'), sunI:2.45, hemiS:C('#f6dcbc'), hemiG:C('#7a5c40'), hemiI:1.5, sea:C('#647a66'), deep:C('#384d41'), elev:.62, lift:C('#0a0604'), sat:1.02, lamp:.75, fly:.45, expo:1.16 } /* late golden hour: details read, lamps still glow */,
+  { top:C('#2c3a5c'), mid:C('#4a5574'), hor:C('#76768c'), fog:C('#454c63'), sun:C('#c4d3f0'), sunI:1.35, hemiS:C('#a9b5d4'), hemiG:C('#4a3e32'), hemiI:1.3, sea:C('#3a5056'), deep:C('#22343a'), elev:.82, lift:C('#12141c'), sat:.92, lamp:1, fly:1, expo:1.34 } /* moonlit, not dark: every roof, sign and face still reads */,
 ];
 const ICE = C('#cfe6f5');
 const mixK=(t)=>{ const i=Math.min(1,Math.floor(t)), f=Math.min(1,t-i), a=KEYS[i], b=KEYS[Math.min(2,i+1)]; const o={}; for(const k in a) o[k]= a[k].isColor? a[k].clone().lerp(b[k],f) : a[k]+(b[k]-a[k])*f; return o; };
@@ -92,7 +92,7 @@ export async function init(canvas){
     `#include <clipping_planes_fragment>
      if(tfade>0.){ float cd=length(vViewPosition); float ign=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715)))); if(smoothstep(1.3,2.9,cd)*tfade+(1.-tfade)<ign) discard; }`); };
   await buildIsland();
-  buildWater(); buildGrass(); buildLamps(); buildWard(); buildFerry(); buildArena(); buildMist(); buildSmoke(); buildBirds(); buildFireflies(); buildBell(); buildPlaque(); buildSigns();
+  buildWater(); buildGrass(); buildLamps(); buildWard(); buildFerry(); buildArena(); buildMist(); buildSmoke(); buildBirds(); buildFireflies(); buildBell(); buildPlaque(); buildSigns(); buildLaundry();
   if(!LP) buildPost();
   addEventListener('resize', resize);
   return W;
@@ -460,6 +460,21 @@ function buildMist(){ const p=hx(SHOPS.bank.q,SHOPS.bank.r);
 let smoke=[];
 function buildSmoke(){ const src=[[-4,0,.05,.55,-.15],[-1,-3,-.2,1.05,.1],[-3,-1,.3,.9,.0],[0,-4,.1,.65,.2],[-2,4,.0,.6,.1],[2,1,-.1,.6,.1]];
   const L=puffs(src.length*7,softT,0xcfc3b0); let n=0; src.forEach(([q,r,dx,y,dz],j)=>{ const c=hx(q,r); for(let i=0;i<7;i++){ const s=L[n++]; s.material.opacity=0; s.userData={o:new THREE.Vector3(c.x+dx,y,c.z+dz),ph:i/7+j*.13}; smoke.push(s); } }); }
+// laundry: a line behind a few houses, shirts and sheets that lift in the wind (one instanced mesh; no random draws, so the rest of the town keeps its layout)
+let wash=null; const washBase=[];
+function buildLaundry(){ const CL=[0xe9e1cf,0x9fb7c9,0xd8a48f,0xc9c08a,0xf3ede2,0xa9c2a0,0xcf8f86,0xe2d6b8], wood=new THREE.MeshLambertMaterial({color:0x5a3d26}), rope=new THREE.LineBasicMaterial({color:0xd9cfb8});
+  const hs=W.houses.filter((h,i)=>i%2===0).slice(0,LP?3:6); if(!hs.length) return; const n=hs.length*4;
+  const cg=new THREE.PlaneGeometry(.2,.24); cg.translate(0,-.12,0); const cm=new THREE.MeshLambertMaterial({color:0xffffff,side:THREE.DoubleSide});
+  wash=new THREE.InstancedMesh(cg,cm,n); wash.castShadow=true; wash.userData.dynCast=true; const col=new THREE.Color(); let k=0; const pg=new THREE.CylinderGeometry(.018,.022,.62,5); pg.translate(0,.31,0);
+  hs.forEach((h,hi)=>{ const [dq,dr]=DIRS[h.dir]; const c=hx(h.q,h.r), f=hx(h.q+dq,h.r+dr).sub(c).setY(0).normalize(); const side=new THREE.Vector3(-f.z,0,f.x);
+    const mid=c.clone().addScaledVector(f,-.72).addScaledVector(side,hi%2?.18:-.18); const a=mid.clone().addScaledVector(side,-.42), b=mid.clone().addScaledVector(side,.42);
+    for(const e of [a,b]){ const p=new THREE.Mesh(pg,wood); p.position.copy(e); p.castShadow=true; W.scene.add(p); }
+    const lg=new THREE.BufferGeometry().setFromPoints([a.clone().setY(.6),mid.clone().setY(.56),b.clone().setY(.6)]); W.scene.add(new THREE.Line(lg,rope));
+    for(let j=0;j<4;j++){ const t=(j+.5)/4, p=a.clone().lerp(b,t); p.y=.6-Math.sin(t*Math.PI)*.04; washBase.push({p,yaw:Math.atan2(side.x,side.z)+Math.PI/2,ph:hi*1.7+j*.9,s:j%2?1:1.25});
+      wash.setColorAt(k++,col.set(CL[(hi*3+j)%CL.length])); } });
+  wash.instanceColor.needsUpdate=true; W.scene.add(wash); }
+const wm=new THREE.Matrix4(), wq=new THREE.Quaternion(), we=new THREE.Euler(), wsv=new THREE.Vector3();
+function tickLaundry(T){ if(!wash) return; washBase.forEach((w,i)=>{ const gust=.25+.2*Math.sin(T*.37+w.ph*.3); we.set(Math.sin(T*1.9+w.ph)*gust+.12,w.yaw,0,'YXZ'); wq.setFromEuler(we); wsv.set(w.s,1,1); wm.compose(w.p,wq,wsv); wash.setMatrixAt(i,wm); }); wash.instanceMatrix.needsUpdate=true; }
 // birds: a loose flock that circles the bell tower and the shore
 let birds=[];
 function buildBirds(){ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute([0,0,.06, -.22,0,-.02, 0,0,-.05,  0,0,.06, .22,0,-.02, 0,0,-.05],3));
@@ -514,7 +529,7 @@ export function update(dt){ const T=clock.T; U.time.value=T;
   const K=mixK(W.tod);
   U.frz.value=W.frz; U.wind.value=1-W.frz*.95;
   // sun direction from elevation; azimuth from the south-west so shadows fall toward the camera's right
-  const el=K.elev, az=-2.25; if(el!==lastElev){ lastElev=el; W.renderer.shadowMap.needsUpdate=true; } const sd=new THREE.Vector3(Math.cos(el)*Math.cos(az),Math.sin(el),Math.cos(el)*Math.sin(az)); sun.position.copy(sd).multiplyScalar(50); sun.target.position.set(0,0,0);
+  W.renderer.toneMappingExposure=K.expo; const el=Math.round(K.elev*80)/80, az=-2.25; /* quantised: a moving sun re-draws the static shadow map in steps, not every frame */ if(el!==lastElev){ lastElev=el; W.renderer.shadowMap.needsUpdate=true; } const sd=new THREE.Vector3(Math.cos(el)*Math.cos(az),Math.sin(el),Math.cos(el)*Math.sin(az)); sun.position.copy(sd).multiplyScalar(50); sun.target.position.set(0,0,0);
   sun.color.copy(K.sun).lerp(ICE,W.frz*.6); sun.intensity=K.sunI*(1-W.frz*.35); hemi.color.copy(K.hemiS).lerp(ICE,W.frz*.5); hemi.groundColor.copy(K.hemiG); hemi.intensity=K.hemiI;
   const su=sky.material.uniforms; su.top.value.copy(K.top).lerp(C('#9fb7c6'),W.frz*.5); su.mid.value.copy(K.mid).lerp(ICE,W.frz*.6); su.hor.value.copy(K.hor).lerp(ICE,W.frz*.7); su.sunDir.value.copy(sd); su.sunC.value.copy(K.sun).multiplyScalar(1-W.frz);
   W.scene.fog.color.copy(K.fog).lerp(ICE,W.frz*.6);
@@ -535,6 +550,7 @@ export function update(dt){ const T=clock.T; U.time.value=T;
   clouds.forEach(o=>{ o.rotation.y=-T*.006; o.material.color.copy(K.hor).lerp(C('#fff4e6'),.55).lerp(ICE,W.frz*.5); });
   // smoke rises unless frozen
   smoke.forEach(s=>{ const u=s.userData; const ph=(T*.12*(1-W.frz*.97)+u.ph)%1; s.position.set(u.o.x+Math.sin(ph*4+u.ph*9)*.12+ph*.5,u.o.y+ph*1.8,u.o.z-ph*.25); s.scale.setScalar(.18+ph*.7); s.material.opacity=Math.sin(ph*Math.PI)*.38; s.material.color.copy(K.fog).lerp(C('#e3d8c6'),.5); });
+  tickLaundry(T*(1-W.frz*.9));
   // birds
   birds.forEach(b=>{ const u=b.userData; const a=u.ph+T*u.sp*(1-W.frz); b.position.set(u.c.x+Math.cos(a)*u.r,u.h+Math.sin(a*2.3)*.4,u.c.z+Math.sin(a)*u.r*.7); b.rotation.set(0,-a,Math.sin(a)*.2); const fl=Math.sin(T*u.fl+u.ph)*(1-W.frz); const p=b.geometry.attributes.position; p.setY(1,fl*.09); p.setY(4,fl*.09); p.needsUpdate=true; });
   // mist
