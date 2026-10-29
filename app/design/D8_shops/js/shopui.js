@@ -213,6 +213,11 @@ function tollGateRows() {
   h += prow(esc(short(g.gate, 14, 8)), `MPC ${esc(g.mpc)} · pays ${esc(short(g.policy.allow_to[0], 6, 4))} on Base Sepolia`, `<a class="tx" href="${NBA(g.gate)}" target="_blank" rel="noopener">gate ↗</a>`);
   return h + (g.recent || []).map(row).join('');
 }
+// Town Hall rows, read live from /api/townhall by shops/hall.js: the DAO's latest proposals, expired ones marked expired.
+function hallRows() {
+  if (extra.hallP == null && !extra.hallLoading) { extra.hallLoading = true; import('../shops/hall.js').then(m => m.liveProposals(undefined, undefined, true)).then(h => { extra.hallP = h; }).catch(() => { extra.hallP = ''; }).finally(() => { extra.hallLoading = false; if (cur === 'hall') proofDrawer(); }); }
+  return extra.hallP ?? '<h3>Latest proposals · live read</h3><p class="note">Reading the DAO…</p>';
+}
 function proofDrawer() {
   const d = $('#d-body'); if (!d || !cur) return; const S = A.S, c = S.clauses?.pay;
   let g = '';
@@ -226,6 +231,7 @@ function proofDrawer() {
       + (mine.length ? mine.map(r => prow(esc(r.shop) + ' · ' + esc(r.decision), r.reason && r.decision !== 'allowed' ? esc(A.why(r.reason)) : '', `<span class="st ${r.decision === 'denied' ? 'no' : 'ok'}">${r.decision === 'denied' ? '✕' : '✓'}</span>${A.txLine(r.h)}`)).join('') : '<p class="note">Nothing signed here yet.</p>');
   }
   if (cur === 'toll') g += tollGateRows();
+  if (cur === 'hall') g += hallRows();
   d.innerHTML = `<div class="pf" data-testid="guest-proof" data-guest="1">${g}</div>` + (lab ? `<details class="lab"><summary>Lab record · reference, not your charter</summary>${lab}</details>` : '');
 }
 

@@ -53,5 +53,8 @@ test('the proposals page and the Town Hall room use the expiry, and the Mist Ban
   assert.match(room, /\/api\/townhall/); assert.match(room, /Expired: \['ice', 'expired'\]/);
   const line = 'One fresh payee per payout; the Zcash send is run by an operator worker.';
   assert.ok(readFileSync(new URL('../../../app/design/D8_shops/shops/bank.js', import.meta.url), 'utf8').includes(line));
-  assert.ok(readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8').includes(line));
+  const ui = readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8');
+  assert.ok(ui.includes(line));
+  // the app drawer (which replaces the room proof) lists the live proposals in the Town Hall
+  assert.match(ui, /if \(cur === 'hall'\) g \+= hallRows\(\);/); assert.match(ui, /m\.liveProposals\(undefined, undefined, true\)/);
 });

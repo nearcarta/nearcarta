@@ -18,11 +18,12 @@ export function proposalRows(ps = []) {
     const why = p.expired ? `vote closed ${p.ends_at ? new Date(p.ends_at).toUTCString().slice(5, 22) + ' UTC' : ''}; on chain still InProgress until finalized` : p.status === 'InProgress' && p.ends_at ? `vote open until ${new Date(p.ends_at).toUTCString().slice(5, 22)} UTC` : String(p.description || '').slice(0, 80);
     return row({ k: `#${p.id} · ${p.kind}`, why, st, stText, src: 'live' }); });
 }
-export async function liveProposals(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, '')) {
+export async function liveProposals(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, ''), bare = false) {
   try { const c = new AbortController(), t = setTimeout(() => c.abort(), 6000);
     const r = await fetchFn(base + '/api/townhall', { signal: c.signal }).finally(() => clearTimeout(t)); if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json(); return proof(h3('Latest proposals · live read'), ...proposalRows(d.proposals), note(`Each vote stays open ${esc(d.proposal_period_h ?? '?')} h. An expired proposal can no longer pass.`)); }
-  catch { return proof(note('The latest proposals could not be read just now; see the proposals page.')); }
+    const d = await r.json(); const parts = [h3('Latest proposals · live read'), ...proposalRows(d.proposals), note(`Each vote stays open ${esc(d.proposal_period_h ?? '?')} h. An expired proposal can no longer pass.`)];
+    return bare ? parts.join('') : proof(...parts); }
+  catch { const n = note('The latest proposals could not be read just now; see the proposals page.'); return bare ? n : proof(n); }
 }
 // The town's real proposals page (Sputnik DAO on testnet).
 export const MORE = { href: '/shops/hall/', text: 'See proposals' };
