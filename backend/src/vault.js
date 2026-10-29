@@ -395,7 +395,10 @@ const sha256hex = s => createHash('sha256').update(s, 'utf8').digest('hex');
 
 /** An honest request counts when the charter allowed and settled it to an allowlisted payee within the clause limits. */
 export const HONEST_ASK = { id: 'honest-ask', name: 'Your own honest request', expects: 'allowed' };
+/** A free-text request the charter refused (a scam the guest typed) scores once as a blocked scam. */
+export const OWN_SCAM = { id: 'own-scam', name: 'Your own scam text', expects: 'refused' };
 export function askWhy(a, cl, settle) {
+  if (a.decision === 'denied') return a.reason ? null : 'no_reason';
   if (a.decision !== 'allowed') return 'not_allowed';
   let amt; try { amt = BigInt(a.amount); } catch { return 'not_on_allowlist_or_over_cap'; }
   if (!(cl.receivers || []).includes(a.receiver) || amt > BigInt(cl.per_action_cap) || amt < BigInt(cl.min_amount ?? '1')) return 'not_on_allowlist_or_over_cap';
@@ -610,6 +613,7 @@ export function board(list = [...attempts.values()]) {
       charters: new Set(), patterns: new Set(), tasks: new Set(), refusals: 0, tasks_passed: 0, attempts: 0, not_counted: 0, last_tx: null, last_at: 0 };
     p.attempts++; p.charters.add(a.charter);
     if (a.counted && a.kind === 'task') { p.tasks_passed++; p.tasks.add(a.task); }
+    else if (a.counted && a.kind === 'ask' && a.decision === 'denied') { p.refusals++; p.patterns.add(OWN_SCAM.id); }
     else if (a.counted && a.kind === 'ask') { p.tasks_passed++; p.tasks.add(HONEST_ASK.id); }
     else if (a.counted) { p.refusals++; p.patterns.add(a.attack); }
     else if (a.kind === 'task' || a.kind === 'ask' || a.decision === 'denied') p.not_counted++;
@@ -617,14 +621,14 @@ export function board(list = [...attempts.values()]) {
     players.set(key, p);
   }
   return [...players.values()].map(p => ({ ...p, charters: [...p.charters], patterns: [...p.patterns].sort(), tasks: [...p.tasks].sort(),
-    pattern_count: p.patterns.size, task_count: p.tasks.size, score: p.patterns.size + p.tasks.size, max_score: ATTACKS.length + TASKS.length + 1 }))
+    pattern_count: p.patterns.size, task_count: p.tasks.size, score: p.patterns.size + p.tasks.size, max_score: ATTACKS.length + 1 + TASKS.length + 1 }))
     .sort((x, y) => y.score - x.score || y.pattern_count - x.pattern_count || y.refusals - x.refusals || x.last_at - y.last_at);
 }
 
 const RULE = 'Rows are final testnet propose txs on factory charters running their audited oath release, re-read from chain. ' +
   'An attack scores only if the contract refused it with the reason that attack targets, and its logged payee and amount match the attack plan under the clause in force at that block. ' +
   'A task scores only if the contract allowed and settled the planned allowlisted payment. ' +
-  'One honest request of your own (memo ask:<nickname>:<note>) scores once per player if the contract allowed and settled it to a payee on the clause allowlist, within its cap. Memos are labels, never proof. ' +
+  'One honest request of your own (memo ask:<nickname>:<note>) scores once per player if the contract allowed and settled it to a payee on the clause allowlist, within its cap. A request of your own that the contract refused (a scam you typed) scores once as a blocked scam. Memos are labels, never proof. ' +
   'Own-charter rows are keyed by the charter owner (verified); shared-charter rows are signed by this server\'s runner (server_signed) and keyed by nickname.';
 
 // Pages never wait long on the index: refresh in the background, answer from the rows already verified.
@@ -650,10 +654,11 @@ export async function score(charter) {
   const rows = [...attempts.values()].filter(r => r.charter === charter).sort((a, b) => (b.at || 0) - (a.at || 0));
   const best = pick => { const all = rows.filter(pick); const r = all.find(x => x.counted) || all[0]; return r ? { counted: r.counted, why: r.why, decision: r.decision, reason: r.reason, tx: r.hash, url: explorerTx(r.hash), tries: all.length } : null; };
   const tasks = [...TASKS.map(t => ({ id: t.id, name: t.name, expects: 'allowed', result: best(r => r.kind === 'task' && r.task === t.id) })),
-    { ...HONEST_ASK, result: best(r => r.kind === 'ask') }];
-  const attacks = ATTACKS.map(x => ({ id: x.id, name: x.name, expects: acceptedReasons(x.id), result: best(r => r.kind === 'attack' && r.attack === x.id && r.decision === 'denied') }));
+    { ...HONEST_ASK, result: best(r => r.kind === 'ask' && r.decision !== 'denied') }];
+  const attacks = [...ATTACKS.map(x => ({ id: x.id, name: x.name, expects: acceptedReasons(x.id), result: best(r => r.kind === 'attack' && r.attack === x.id && r.decision === 'denied') })),
+    { ...OWN_SCAM, result: best(r => r.kind === 'ask' && r.decision === 'denied') }];
   const passed = tasks.filter(t => t.result?.counted).length, blocked = attacks.filter(a => a.result?.counted).length;
-  return { charter, shared: isShared(charter), tasks_passed: passed, scams_blocked: blocked, score: passed + blocked, max_score: tasks.length + ATTACKS.length, tasks, attacks, rule: RULE };
+  return { charter, shared: isShared(charter), tasks_passed: passed, scams_blocked: blocked, score: passed + blocked, max_score: tasks.length + attacks.length, tasks, attacks, rule: RULE };
 }
 
 /** Catalog of tasks and attacks; with a charter, the exact steps each would sign right now. */

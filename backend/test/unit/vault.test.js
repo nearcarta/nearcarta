@@ -197,8 +197,9 @@ test('verifyAttempt scores an honest ask: allowed, settled ok, allowlisted, with
   fresh();
   const ok = await verifyAttempt(H, 'c.f.testnet', { status: async () => k(), facts, blockTime: async () => 1, clause: at });
   assert.equal(ok.kind, 'ask'); assert.equal(ok.ask, 'team-coffee'); assert.equal(ok.tag, 'neo'); assert.equal(ok.counted, true, ok.why);
-  for (const [c, why] of [[{ decision: 'denied', reason: 'receiver_not_allowlisted', receiver: 'c4fe.pub.testnet' }, 'not_allowed'],
-    [{ receiver: 'someone.testnet' }, 'not_on_allowlist_or_over_cap'], [{ amount: String(51n * M) }, 'not_on_allowlist_or_over_cap'],
+  fresh(); const scam = await verifyAttempt(H, 'c.f.testnet', { status: async () => k({ decision: 'denied', reason: 'receiver_not_allowlisted', receiver: 'c4fe.pub.testnet' }), facts, blockTime: async () => 1, clause: at });
+  assert.equal(scam.counted, true, 'a free-text request the charter refused counts as a blocked scam'); assert.equal(scam.why, null);
+  for (const [c, why] of [[{ receiver: 'someone.testnet' }, 'not_on_allowlist_or_over_cap'], [{ amount: String(51n * M) }, 'not_on_allowlist_or_over_cap'],
     [{ settle: 'transfer_failed' }, 'payment_failed'], [{ memoHash: 'ff' }, 'memo_mismatch']]) {
     fresh(); const r = await verifyAttempt(H, 'c.f.testnet', { status: async () => k(c), facts, blockTime: async () => 1, clause: at });
     assert.equal(r.counted, false, JSON.stringify(c)); assert.equal(r.why, why, JSON.stringify(c));
@@ -210,7 +211,13 @@ test('verifyAttempt scores an honest ask: allowed, settled ok, allowlisted, with
 test('board counts one honest ask per player as an honest payment', () => {
   const ask = (h, at) => ({ hash: h, charter: 'x', owner: 'o1', kind: 'ask', ask: 'coffee', tag: 'mine', decision: 'allowed', counted: true, shared: false, at });
   const [p] = board([ask('a', 1), ask('b', 2), { ...ask('c', 3), counted: false, why: 'not_allowed', decision: 'denied' }]);
-  assert.equal(p.score, 1); assert.deepEqual(p.tasks, ['honest-ask']); assert.equal(p.tasks_passed, 2); assert.equal(p.not_counted, 1); assert.equal(p.max_score, 9);
+  assert.equal(p.score, 1); assert.deepEqual(p.tasks, ['honest-ask']); assert.equal(p.tasks_passed, 2); assert.equal(p.not_counted, 1); assert.equal(p.max_score, 10);
+});
+
+test('board counts a refused free-text ask once as the own-scam pattern', () => {
+  const ask = (h, decision, at) => ({ hash: h, charter: 'x', owner: 'o1', kind: 'ask', ask: 'scam', tag: 'mine', decision, reason: decision === 'denied' ? 'receiver_not_allowlisted' : 'ok', counted: true, shared: false, at });
+  const [p] = board([ask('a', 'denied', 1), ask('b', 'denied', 2), ask('c', 'allowed', 3)]);
+  assert.deepEqual(p.patterns, ['own-scam']); assert.deepEqual(p.tasks, ['honest-ask']); assert.equal(p.refusals, 2); assert.equal(p.score, 2);
 });
 
 test('board scores tasks passed plus scams blocked, counting only verified rows', () => {
@@ -221,7 +228,7 @@ test('board scores tasks passed plus scams blocked, counting only verified rows'
     { hash: 'd', charter: 's', owner: 'arena', kind: 'attack', attack: 'impersonation', tag: 'neo', decision: 'denied', counted: false, why: 'wrong_reason', shared: true, server_signed: true, at: 4 },
     { hash: 'e', charter: 's', owner: 'arena', kind: 'attack', attack: 'slow-drain', tag: 'neo', decision: 'allowed', counted: false, shared: true, server_signed: true, at: 5 },
   ]);
-  assert.equal(rows[0].player, 'o1'); assert.equal(rows[0].score, 2); assert.equal(rows[0].max_score, 9); assert.equal(rows[0].verified, true);
+  assert.equal(rows[0].player, 'o1'); assert.equal(rows[0].score, 2); assert.equal(rows[0].max_score, 10); assert.equal(rows[0].verified, true);
   assert.equal(rows[1].player, 'neo'); assert.equal(rows[1].score, 1); assert.equal(rows[1].server_signed, true); assert.equal(rows[1].refusals, 1); assert.equal(rows[1].not_counted, 1);
 });
 
