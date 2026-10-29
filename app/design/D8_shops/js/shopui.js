@@ -260,7 +260,7 @@ async function primary() {
     document.body.dataset.app = kind; ruleChip(); proofDrawer();
   } catch (e) { fail(e); }
 }
-function fail(e) { phase = 'idle'; say(`Stopped: ${esc(String(e.message || e).slice(0, 90))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); const app = APPS[cur]; btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
+function fail(e) { phase = 'idle'; say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); const app = APPS[cur]; btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
 
 // ---------- rules sheet ----------
 function openRules() {
@@ -293,7 +293,7 @@ async function signRules() {
   const b = $('#r-sign'); b.disabled = true; b.textContent = 'Approve in your wallet…'; $('#r-status').innerHTML = '';
   try { const o = await A.signRules(r); $('#r-status').innerHTML = `<span class="rule ok">✓ ${o.queued ? 'signed · loosening queued' : 'signed · in force now'}</span> ${A.txLine(o.tx)}`; b.textContent = 'Signed'; sfx('allowed');
     setTimeout(() => { closeRules(); phase = 'idle'; paint(); rcpt(A.txLine(o.tx, 'rules signed')); }, 900);
-  } catch (e) { $('#r-status').innerHTML = `<span class="rule no">✕ ${esc(String(e.message).slice(0, 90))}</span>`; b.disabled = false; b.textContent = 'Try again'; }
+  } catch (e) { $('#r-status').innerHTML = `<span class="rule no">✕ ${esc(A.plainError(e).slice(0, 140))}</span>`; b.disabled = false; b.textContent = 'Try again'; }
 }
 
 // ---------- wiring ----------

@@ -16,8 +16,11 @@ const short = h => h ? h.slice(0, 6) + '…' + h.slice(-4) : '';
 let lastRules = null;
 let CFG, rpc, connector, me = null, charter = null, ready = false, target = 'shared';
 
-async function api(path, opts) {
-  const r = await fetch(API + path, opts); const j = await r.json().catch(() => ({}));
+async function api(path, opts, retry = !opts) {
+  const r = await fetch(API + path, opts);
+  // a read that hits a brief gateway hiccup (502/503/504) is tried once more before it shows as an error
+  if (retry && r.status >= 502 && r.status <= 504) { await new Promise(ok => setTimeout(ok, 1500)); return api(path, opts, false); }
+  const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'http ' + r.status); return j;
 }
 const view = (c, m, a) => viewFn(rpc, c, m, a);
@@ -222,7 +225,7 @@ function renderRules(cl, keyLive, f = {}) {
     <label>Allowed payee 2<input id="r2" value="${esc(cl?.receivers?.[1] || m[1])}"></label>
     <label>Max per payment<span class="suffix"><input id="rcap" type="number" step="0.01" min="0.002" value="${cl ? Number(BigInt(cl.per_action_cap) / 10n ** 18n) / 1e6 : 0.05}"><span>NEAR</span></span></label>
     <label>Daily budget<span class="suffix"><input id="rbud" type="number" step="0.01" min="0.002" value="${cl ? Number(BigInt(cl.daily_budget) / 10n ** 18n) / 1e6 : 0.1}"><span>NEAR</span></span></label>
-    <label>Payments per day<input id="rmax" type="number" min="1" max="50" value="${cl?.max_actions_per_day || 4}"></label>
+    <label>Payments per day<input id="rmax" type="number" min="1" max="50" value="${cl?.max_actions_per_day || 10}"></label>
     <label>Smallest payment<span class="suffix"><input id="rmin" type="number" step="0.001" min="0.001" value="0.001"><span>NEAR</span></span></label>
     ${f.legacy ? '' : `<label>Rules expire<select id="rexp" data-testid="rexp"><option value="">Keep as is</option><option value="1">In 1 day</option><option value="7"${cl ? '' : ' selected'}>In 7 days</option><option value="30">In 30 days</option></select></label>
     <p class="hint" data-testid="rexp-hint">${expiryHint(f)}</p>`}</div>
@@ -352,11 +355,11 @@ async function ask(e) {
     out.insertAdjacentHTML('beforeend', r.passed
       ? `<p class="verdict good" data-testid="verdict">ALLOWED: the charter paid ${fmt(r.amount)} to <code>${esc(r.receiver)}</code>. ${txl(r.tx, 'see the transaction')}</p>`
       : `<p class="verdict bad" data-testid="verdict">REFUSED: ${esc(plain(r.reason))}. Nothing was paid. ${txl(r.tx, 'see the refusal')}</p>`);
-    out.insertAdjacentHTML('beforeend', '<p class="muted">One allowed request to a shop on your allowlist, within your max per payment, scores a point (once). The charter decides, not this page.</p>');
+    out.insertAdjacentHTML('beforeend', '<p class="muted">One allowed request to a shop on your allowlist, within your max per payment, scores a point (once); one your charter refuses scores once as a blocked scam. The charter decides, not this page.</p>');
     // the verdict is in: free the button now; the scoreboard write and the refresh follow in the background
     busy(btn, false); unlock();
     (r.tx ? post('/api/vault/record', { tx: r.tx, charter }).catch(e => toast('Scoreboard did not take it: ' + esc(e.message), 'bad')) : Promise.resolve())
-      .then(() => { renderFacts().catch(() => {}); loadScore('mine').catch(() => {}); });
+      .then(() => { renderFacts().catch(() => {}); scoreSoon('mine'); });
   } finally { busy(btn, false); unlock(); }
 }
 
@@ -407,7 +410,7 @@ async function taskRun(btn) {
   out.insertAdjacentHTML('beforeend', r.passed
     ? `<p class="verdict good" data-testid="verdict">ALLOWED: the charter allowed the honest payment: ${fmt(r.amount)} to <code>${esc(r.receiver)}</code>. ${txl(r.tx, 'see the transaction')}</p>`
     : `<p class="verdict bad" data-testid="verdict">The honest payment did not go through: ${esc(plain(r.reason || r.decision))}</p>`);
-  loadScore(where).catch(() => {}); loadBoard().catch(() => {});
+  scoreSoon(where); loadBoard().catch(() => {});
 }
 function nick() {
   const v = ($('#nick').value || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20);
@@ -421,8 +424,12 @@ function defaultNick() {
     const r = crypto.getRandomValues(new Uint16Array(3)); n = `${A[r[0] % 8]}-${B[r[1] % 8]}-${r[2] % 100}`; localStorage.setItem('nearcarta.vault.nick', n); }
   return n;
 }
+// The scoreboard re-reads the tx from chain, so a fresh row can take a few seconds: read now, then again shortly.
+function scoreSoon(where) { for (const ms of [0, 3000, 9000]) setTimeout(() => loadScore(where).catch(() => {}), ms); }
 async function loadScore(where) {
   const id = where === 'mine' ? charter : CFG.arena.charter; if (!id) return;
+  const box = where === 'mine' ? $('#score-mine-box') : null;
+  if (box && !box.querySelector('table')) box.innerHTML = '<p class="muted" data-testid="score-loading">Loading score…</p>';
   const s = await api('/api/vault/score/' + id);
   const cell = r => !r ? '<span class="muted">not run</span>' : r.counted ? `<span class="tag ok">counted</span> ${txl(r.tx)}` : `<span class="tag">${esc(r.why || r.reason || r.decision)}</span> ${txl(r.tx)}`;
   const html = `<p><b data-testid="score-${where}">${s.score}/${s.max_score}</b> · <span title="${s.tasks_passed} of ${s.tasks.length} honest payments allowed, ${s.scams_blocked} of ${s.attacks.length} scams refused for the right reason">jobs ${s.tasks_passed}/${s.tasks.length} · scams ${s.scams_blocked}/${s.attacks.length}</span></p>
@@ -461,7 +468,7 @@ async function attackRun(btn) {
     ? `<p class="verdict good" data-testid="verdict">The charter refused it: <b>${esc(plain(r.reason))}</b> <code>${esc(r.reason)}</code> · ${txl(r.steps.at(-1).tx, 'tx')}</p>`
     : `<p class="verdict bad" data-testid="verdict">Not refused${r.steps.length ? '' : ' (no step ran)'}. ${esc(r.reason || '')}</p>`);
   if (r.why && r.why !== 'not_refused') out.insertAdjacentHTML('beforeend', `<p class="muted">Not counted: ${esc(r.why)}</p>`);
-  loadScore(where).catch(() => {}); loadBoard().catch(() => {});
+  scoreSoon(where); loadBoard().catch(() => {});
 }
 
 async function loadBoard() {

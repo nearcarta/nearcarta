@@ -25,10 +25,29 @@ const LS_RCPT = c => 'nearcarta.d8.receipts.' + c;
 const LS_OPEN = c => 'nearcarta.d8.mist.' + c;
 const WHY = {
   receiver_not_allowlisted: 'you never allowed that account', over_per_action_cap: 'more than your max per payment', over_daily_budget: 'more than your daily cap',
-  over_daily_action_count: 'too many payments today', below_min_amount: 'smaller than your smallest payment', outside_time_window: 'outside the hours you allowed',
+  over_daily_action_count: 'too many payments today (your rules cap the count; it resets at midnight UTC)', below_min_amount: 'smaller than your smallest payment', outside_time_window: 'outside the hours you allowed',
   unknown_clause: 'you never allowed that route', stale_policy_version: 'your rules changed mid-ask', expired: 'the request expired', storage_reserve_low: 'your charter needs a top-up', frozen: 'your charter is frozen', batch_refused: 'another payout broke a rule',
 };
 export const why = r => WHY[r] || r || '';
+// Contract panics, in plain words: no "Smart contract panicked", no ERR_ codes.
+const PLAIN = [
+  [/not a charter from the gate's factor/, 'the Toll gate does not accept this charter (it is not from a charter factory the gate lists)'],
+  [/already opened the gate/, 'this toll payment already opened the gate once; pay the toll again for a new crossing'],
+  [/has not paid|action not confirmed/, 'your toll payment has not settled yet; wait a few seconds and try again'],
+  [/no such action/, 'the gate could not find that payment on your charter'],
+  [/budget exhausted/, "the Toll's Base Sepolia budget is used up"],
+  [/oath frozen/, 'the Toll is paused by its owner'],
+  [/attach at least|Exceeded the prepaid gas|ERR_LOW_GAS/, 'the network ran out of gas for this step; try again'],
+  [/expired|Expired/, 'the request expired before the network took it; try again'],
+  [/NotEnoughBalance|not enough balance/i, 'your account does not have enough testnet NEAR for this step'],
+];
+export function plainError(e) {
+  const m = String(e?.message || e || '');
+  for (const [re, t] of PLAIN) if (re.test(m)) return t;
+  const r = m.match(/\b(receiver_not_allowlisted|over_per_action_cap|over_daily_budget|over_daily_action_count|below_min_amount|outside_time_window|unknown_clause|frozen)\b/);
+  if (r) return why(r[1]);
+  return m.replace(/Smart contract panicked:\s*/g, '').replace(/^(Error:\s*)?(REFUSED:\s*)?/, '').replace(/ERR_[A-Z_]+/g, 'a contract check failed').trim() || 'something went wrong';
+}
 
 let CFG = null, rpc = null, conn = null;
 export const S = { me: null, charter: null, clauses: {}, usage: {}, state: null, ready: false };
@@ -96,7 +115,7 @@ export function rulesNow() {
   const routes = ROUTES.filter(r => S.clauses[r.id]).map(r => r.id);
   return {
     receivers: c?.receivers || [m[0], m[1], S.me].filter(Boolean),
-    cap: c ? fromY(c.per_action_cap) : 0.05, budget: c ? fromY(c.daily_budget) : 0.2, count: c?.max_actions_per_day || 8,
+    cap: c ? fromY(c.per_action_cap) : 0.05, budget: c ? fromY(c.daily_budget) : 0.2, count: c?.max_actions_per_day || 10,
     min: c ? fromY(c.min_amount) : 0.001, ws: c?.window_start_min || 0, we: c?.window_end_min || 0,
     routes: c ? routes : ROUTES.slice(0, 2).map(r => r.id), ferryCap: S.clauses[routes[0]] ? fromY(S.clauses[routes[0]].per_action_cap) : 0.1,
   };
