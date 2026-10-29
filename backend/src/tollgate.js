@@ -14,6 +14,7 @@ async function evm(method, params) {
   const r = await fetch(BASE, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: AbortSignal.timeout(8000) });
   const j = await r.json(); if (j.error) throw Object.assign(new Error(j.error.message), { evm: true }); return j.result;
 }
+export const BROADCAST_WAIT_MS = Number(process.env.TOLL_BROADCAST_WAIT_MS || 45000);
 const err = (status, m) => Object.assign(new Error(m), { status });
 // one retry after a short pause: a single slow or dropped RPC read should not fail the whole gate page
 const again = async f => { try { return await f(); } catch { await new Promise(r => setTimeout(r, 700)); return f(); } };
@@ -73,7 +74,14 @@ export async function visit(nonce) {
 export async function broadcast(nonce) {
   const g = G(); if (!g) throw err(404, 'no toll gate deployed');
   nonce = Number(nonce); if (!Number.isInteger(nonce) || nonce < 0) throw err(400, 'nonce must be a whole number');
-  const rec = await view(g.gate, 'get_tx', { nonce });
+  // the visitor sees its visit nonce (optimistic) before the MPC signature lands and before our 'final' read catches up:
+  // wait for the signed raw tx here instead of answering 409 to a caller that is only early
+  let rec = null;
+  for (let t0 = Date.now(); ; ) {
+    rec = await view(g.gate, 'get_tx', { nonce }).catch(() => null);
+    if (rec?.raw_signed || Date.now() - t0 > BROADCAST_WAIT_MS) break;
+    await new Promise(r => setTimeout(r, 1500));
+  }
   if (!rec?.raw_signed) throw err(409, 'the gate has not signed this record');
   const seen = await evm('eth_getTransactionByHash', [rec.tx_hash]).catch(() => null);
   if (!seen) {
