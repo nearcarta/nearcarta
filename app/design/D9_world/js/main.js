@@ -387,8 +387,9 @@ $('#loading').classList.add('done'); body.classList.add('ready');
 { const q=P.get('shop'); const id=q&&(ALIAS[q]||q); if(id&&OPEN[id]) setTimeoutSim(()=>jump(id),.4); }
 // warm every room while the town idles: each shop module and the room props it puts (D8 core caches both), one per idle slot,
 // so the first door at any width opens at warm speed instead of waiting on cold fetches
+// arena's Knight.glb (1.1 MB) is left cold to keep first-load wire under budget
 const WARM={ chronicle:['tiles/base/hex_grass','decoration/props/crate_A_big'], bank:['decoration/props/crate_B_small','decoration/props/sack'], guard:['buildings/neutral/wall_straight_gate','decoration/props/barrel','decoration/props/bucket_arrows','decoration/props/target','decoration/props/weaponrack'],
-  ferry:['decoration/props/crate_A_small'], arena:['chars/Knight.glb'], hall:['decoration/props/flag_blue'], house:[], payouts:[], toll:['buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A'] };
+  ferry:['decoration/props/crate_A_small'], arena:[], hall:['decoration/props/flag_blue'], house:[], payouts:[], toll:['buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A'] };
 function warmRooms(){ if(navigator.connection?.saveData) return; const D8=new URL('../../D8_shops/',import.meta.url).href; const q=Object.entries(WARM).filter(([id])=>OPEN[id]);
   const idle=f=>setTimeout(f,350);
   const next=()=>{ if(!q.length) return; if(inShop){ setTimeout(()=>idle(next),1500); return; } const [id,ps]=q.shift(); Promise.all([import(D8+'js/core.js'),import(D8+'shops/'+id+'.js')]).then(([C8])=>Promise.all(ps.map(p=>C8.load(p.endsWith('.glb')?p:'hex/'+p).catch(()=>null)))).catch(()=>null).then(()=>idle(next)); };
