@@ -159,7 +159,7 @@ export function ruleFor(o, clauseId = 'pay') {
   const c = S.clauses[clauseId];
   if (o.decision === 'denied') return 'refused · ' + why(o.reason);
   if (o.decision === 'failed') return 'failed · ' + String(o.reason).slice(0, 60);
-  return c ? `allowed · within your max ${fmt(c.per_action_cap)}` : 'allowed';
+  return c ? `allowed · within your ${clauseId === 'pay' ? 'max per payment' : 'Ferry route max'} ${fmt(c.per_action_cap)}` : 'allowed';
 }
 
 // ---------- per shop ----------
