@@ -4,6 +4,7 @@ import { P, CAPTURE, RM, clock, run, tickRoutines, wait, hx, toHex, walkable, SH
 import { W, LP, init, update, render, setTod, setProgress, lampState, LAMPC, setShadowMode } from './world.js';
 import { buildCast, updateCast, CAST, setHooks, smooth, chars } from './chars.js';
 import * as SP from './speech.js';
+import { tickLife, setSky, hushLife } from './life.js';
 import * as SL from './shops.js';
 import { icon } from '../d7/js/d7.js';
 const $=s=>document.querySelector(s); const body=document.body; const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
@@ -88,7 +89,7 @@ const gateIn=V(W.gatePos.x+1.65,0,W.gatePos.z+.05);
 // ---------- the story (~45 s). Every beat is driven by sim time, so the capture is frame-exact. ----------
 let storyRun=null, mode='story', storyEnd=-1e9;
 function* story(){
-  storyT0=clock.T; body.classList.add('story'); letterbox(true); mode='story';
+  storyT0=clock.T; hushLife(); body.classList.add('story'); letterbox(true); mode='story';
   const st=CAST.stranger, kn=CAST.knights, fm=CAST.ferryman, nb=CAST.wander[0];
   if(nb){ nb.hold=true; nb.stop(); const p=hx(-3,1); nb.place(p.x+.2,p.z-.75,0); }
   // 0–3 s: hook — the Lamplighter lifts its lantern and a lamp catches
@@ -156,6 +157,14 @@ const fb=$('#curfewBtn'); fb.querySelector('.fi').appendChild(icon('freeze',{siz
 const sb=$('#soundBtn'); const spk=on=>`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l5 4V6L7 10z"/>${on?'<path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>':'<path d="M17 10l4 4M21 10l-4 4"/>'}</svg>`;
 sb.innerHTML=spk(false); sb.setAttribute('aria-pressed','false');
 sb.addEventListener('click',async()=>{ if(!A.on){ await audioOn(); } else { A.on=false; A.ctx.suspend(); } sb.innerHTML=spk(A.on); sb.setAttribute('aria-pressed',String(A.on)); });
+// ---------- sky button: the town turns day → dusk → night on its own; a click holds one time of day ----------
+const SKY=['auto','day','dusk','night'], SKYL={auto:'Time of day: changing (click to hold day)',day:'Time of day: day (click for dusk)',dusk:'Time of day: dusk (click for night)',night:'Time of day: night (click to let it change)'};
+const skyIc=m=>`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${m==='night'?'<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>':m==='dusk'?'<path d="M4 17h16M7 17a5 5 0 0 1 10 0M12 7v2M5.6 10.6l1.4 1.4M18.4 10.6 17 12"/>':m==='day'?'<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>':'<circle cx="9" cy="10" r="3.4"/><path d="M14.5 17.5a4.8 4.8 0 0 1-9-1.5M20 14a6 6 0 0 1-8-8 6 6 0 0 0 8 8z"/>'}</svg>`;
+let skyM='auto'; const kb=document.createElement('button'); kb.id='skyBtn'; kb.className='ib'; kb.type='button'; sb.before(kb);
+const showSky=()=>{ kb.innerHTML=skyIc(skyM); kb.setAttribute('aria-label',SKYL[skyM]); kb.title=SKYL[skyM]; kb.dataset.sky=skyM; };
+kb.addEventListener('click',()=>{ skyM=SKY[(SKY.indexOf(skyM)+1)%SKY.length]; setSky(skyM); showSky(); sfx('click',{g:.3}); }); showSky();
+const LIFE=!CAPTURE||P.has('life'), SKYRUN=!P.has('tod')&&(!CAPTURE||P.has('cycle'));
+if(P.get('sky')&&SKY.includes(P.get('sky'))){ skyM=P.get('sky'); setSky(skyM); showSky(); }
 
 // ---------- explore: you walk the Lamplighter. WASD / arrows or click; drag to turn the view, wheel to zoom ----------
 const PC={yaw:.5,po:0,z:.14,zs:.14,t:V(),p:V(),init:false};
@@ -330,7 +339,7 @@ world.freeze=on=>freeze(on); world.mode=()=>mode; world.skip=()=>endStory();
 // ---------- loop ----------
 let last=performance.now(), fpsS=[], lpDone=LP;
 function draw(){ if(!room){ render(); return; } const r=W.renderer, e=r.toneMappingExposure; r.setRenderTarget(null); r.toneMappingExposure=1.18; r.render(room.scene,room.camera); r.toneMappingExposure=e; SL.placeTags(); }
-function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(dt); if(room){ SP.update(); return; } tickRoutines(); updateCast(dt); update(dt);
+function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(dt); if(room){ SP.update(); return; } tickRoutines(); updateCast(dt); if(mode!=='story'&&LIFE) tickLife(dt,{sky:SKYRUN||skyM!=='auto'}); update(dt);
   // lamp flare when the Lamplighter lights it
   for(const l of W.lamps){ if(l.flare>0) l.flare=Math.max(0,l.flare-dt*1.6); }
   if(window.__camLock){} else if(mode==='explore'&&!inShop&&!D.shot){ steerFromKeys(); playCam(dt); prompt(PC.zs<.44?nearDoor():null); placePrompt(); walkInto(dt); } else { prompt(null); applyCam(dt); }
@@ -377,7 +386,7 @@ step(1/30); draw();
 $('#loading').classList.add('done'); body.classList.add('ready');
 { const q=P.get('shop'); const id=q&&(ALIAS[q]||q); if(id&&OPEN[id]) setTimeoutSim(()=>jump(id),.4); }
 window.__render=draw; window.__shopsLayer='d9'; setTimeout(()=>SL.preload(),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
-if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
+if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,SP,setSky,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
   // demo cursor driven on the sim clock (capture only)
   const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#f3ead8" stroke="#17130f" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
   const cur={x:-100,y:-100}; const put=()=>{ dc.style.transform=`translate(${cur.x}px,${cur.y}px)`; };
