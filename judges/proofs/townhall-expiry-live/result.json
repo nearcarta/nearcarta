@@ -1,0 +1,278 @@
+{
+  "at": "2026-10-29T02:15:37.392Z",
+  "base": "https://nearcarta.vercel.app",
+  "api_expired_ids": [
+    10
+  ],
+  "api": [
+    {
+      "id": 6,
+      "status": "Approved",
+      "chain_status": "Approved",
+      "ends_at": "2026-10-28T05:07:55.882Z"
+    },
+    {
+      "id": 7,
+      "status": "Approved",
+      "chain_status": "Approved",
+      "ends_at": "2026-10-28T05:08:31.314Z"
+    },
+    {
+      "id": 8,
+      "status": "Approved",
+      "chain_status": "Approved",
+      "ends_at": "2026-10-28T05:08:51.757Z"
+    },
+    {
+      "id": 9,
+      "status": "Approved",
+      "chain_status": "Approved",
+      "ends_at": "2026-10-28T20:46:38.459Z"
+    },
+    {
+      "id": 10,
+      "status": "Expired",
+      "chain_status": "InProgress",
+      "ends_at": "2026-10-29T00:20:33.097Z"
+    },
+    {
+      "id": 11,
+      "status": "InProgress",
+      "chain_status": "InProgress",
+      "ends_at": "2026-10-29T02:25:43.715Z"
+    }
+  ],
+  "widths": {
+    "390": {
+      "console_errors": [],
+      "non_2xx": [],
+      "shots": [
+        {
+          "f": "judges/proofs/townhall-expiry-live/390-1-hall-page.jpg",
+          "kb": 40
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/390-2-hall-room.jpg",
+          "kb": 22
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/390-3-hall-drawer.jpg",
+          "kb": 33
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/390-4-bank-room.jpg",
+          "kb": 22
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/390-5-bank-drawer.jpg",
+          "kb": 10
+        }
+      ],
+      "page": [
+        {
+          "id": 11,
+          "status": "InProgress",
+          "text": "Open, 8 min left"
+        },
+        {
+          "id": 10,
+          "status": "Expired",
+          "text": "Expired 2 h ago"
+        },
+        {
+          "id": 9,
+          "status": "Approved",
+          "text": "Approved"
+        },
+        {
+          "id": 8,
+          "status": "Approved",
+          "text": "Approved"
+        },
+        {
+          "id": 7,
+          "status": "Approved",
+          "text": "Approved"
+        },
+        {
+          "id": 6,
+          "status": "Approved",
+          "text": "Approved"
+        }
+      ],
+      "room": [
+        "#6 · FunctionCall",
+        "approved",
+        "#7 · FunctionCall",
+        "approved",
+        "#8 · FunctionCall",
+        "approved",
+        "#9 · FunctionCall",
+        "approved",
+        "#10 · FunctionCall",
+        "vote closed 29 Oct 2026 00:20 UTC; on chain still InProgress until finalized",
+        "expired",
+        "#11 · Vote",
+        "vote open until 29 Oct 2026 02:25 UTC",
+        "open"
+      ],
+      "bank_line_visible": true,
+      "bank_line_in_drawer": true,
+      "ok": true
+    },
+    "1280": {
+      "console_errors": [],
+      "non_2xx": [],
+      "shots": [
+        {
+          "f": "judges/proofs/townhall-expiry-live/1280-1-hall-page.jpg",
+          "kb": 89
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/1280-2-hall-room.jpg",
+          "kb": 47
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/1280-3-hall-drawer.jpg",
+          "kb": 65
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/1280-4-bank-room.jpg",
+          "kb": 52
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/1280-5-bank-drawer.jpg",
+          "kb": 41
+        }
+      ],
+      "page": [
+        {
+          "id": 11,
+          "status": "InProgress",
+          "text": "Open, 9 min left"
+        },
+        {
+          "id": 10,
+          "status": "Expired",
+          "text": "Expired 2 h ago"
+        },
+        {
+          "id": 9,
+          "status": "Approved",
+          "text": "Approved"
+        },
+        {
+          "id": 8,
+          "status": "Approved",
+          "text": "Approved"
+        },
+        {
+          "id": 7,
+          "status": "Approved",
+          "text": "Approved"
+        },
+        {
+          "id": 6,
+          "status": "Approved",
+          "text": "Approved"
+        }
+      ],
+      "room": [
+        "#6 · FunctionCall",
+        "approved",
+        "#7 · FunctionCall",
+        "approved",
+        "#8 · FunctionCall",
+        "approved",
+        "#9 · FunctionCall",
+        "approved",
+        "#10 · FunctionCall",
+        "vote closed 29 Oct 2026 00:20 UTC; on chain still InProgress until finalized",
+        "expired",
+        "#11 · Vote",
+        "vote open until 29 Oct 2026 02:25 UTC",
+        "open"
+      ],
+      "bank_line_visible": true,
+      "bank_line_in_drawer": true,
+      "ok": true
+    },
+    "1440": {
+      "console_errors": [],
+      "non_2xx": [],
+      "shots": [
+        {
+          "f": "judges/proofs/townhall-expiry-live/1440-1-hall-page.jpg",
+          "kb": 107
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/1440-2-hall-room.jpg",
+          "kb": 56
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/1440-3-hall-drawer.jpg",
+          "kb": 75
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/1440-4-bank-room.jpg",
+          "kb": 63
+        },
+        {
+          "f": "judges/proofs/townhall-expiry-live/1440-5-bank-drawer.jpg",
+          "kb": 49
+        }
+      ],
+      "page": [
+        {
+          "id": 11,
+          "status": "InProgress",
+          "text": "Open, 10 min left"
+        },
+        {
+          "id": 10,
+          "status": "Expired",
+          "text": "Expired 2 h ago"
+        },
+        {
+          "id": 9,
+          "status": "Approved",
+          "text": "Approved"
+        },
+        {
+          "id": 8,
+          "status": "Approved",
+          "text": "Approved"
+        },
+        {
+          "id": 7,
+          "status": "Approved",
+          "text": "Approved"
+        },
+        {
+          "id": 6,
+          "status": "Approved",
+          "text": "Approved"
+        }
+      ],
+      "room": [
+        "#6 · FunctionCall",
+        "approved",
+        "#7 · FunctionCall",
+        "approved",
+        "#8 · FunctionCall",
+        "approved",
+        "#9 · FunctionCall",
+        "approved",
+        "#10 · FunctionCall",
+        "vote closed 29 Oct 2026 00:20 UTC; on chain still InProgress until finalized",
+        "expired",
+        "#11 · Vote",
+        "vote open until 29 Oct 2026 02:25 UTC",
+        "open"
+      ],
+      "bank_line_visible": true,
+      "bank_line_in_drawer": true,
+      "ok": true
+    }
+  }
+}
