@@ -82,6 +82,19 @@ async function jsonBody(c) {
 }
 const str = (v, max = 200) => typeof v === 'string' && v.length > 0 && v.length <= max;
 
+// Boot pre-warm and keep-warm: the town feed and the reads a first room entry needs, so the first visitor after a
+// deploy or a quiet spell is not the one who waits on the tx index and RPC. Errors are ignored (the routes retry).
+export const WARM_EVERY_MS = 60_000;
+export function warm({ every = WARM_EVERY_MS, read } = {}) {
+  const once = () => Promise.allSettled([
+    shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
+    ...(read ? [] : [reads.guardhouse(), reads.mistbank()]),
+  ]);
+  const first = once();
+  const t = every ? setInterval(once, every) : null; t?.unref?.();
+  return { first, stop: () => t && clearInterval(t) };
+}
+
 export function makeApp() {
   const app = new Hono();
   // Global caps (all clients together) on routes that spend a paid key: 1Click partner key, NEAR AI key.
@@ -244,6 +257,15 @@ export function makeApp() {
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
   app.get('/api/toll/gate/:nonce', limiter(60), tg(c => tollgate.visit(c.req.param('nonce'))));
   app.post('/api/toll/gate/:nonce/broadcast', limiter(10), tg(c => tollgate.broadcast(c.req.param('nonce'))));
+  // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
+  app.get('/api/chronicle', limiter(20), async c => {
+    const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
+    try { return c.json(shops.hideRetired(await shops.chronicle(DEP.guardhouse.oath, limit))); }
+    catch (e) {
+      if (e.status || !/busy|http (429|5\d\d)|timeout|aborted|fetch failed/i.test(e.message)) throw e;
+      c.header('Retry-After', '10'); return c.json({ account: DEP.guardhouse.oath, count: 0, txs: [], busy: true, source: 'tx index busy; try again in 10 s' });
+    }
+  });
   app.get('/api/chronicle/:account', limiter(20), async c => {
     const a = c.req.param('account');
     // Visitor charters made by the vault factory count too (B13 "What happened" feed): the id must sit under the
@@ -251,7 +273,7 @@ export function makeApp() {
     if (!knownAccounts.has(a) && !(await vault.isFactoryCharter(a))) return c.json({ error: 'not a Nearcarta contract' }, 400);
     // A busy tx index on a charter with no cached feed yet is not an error for the page (it keeps its own story and
     // polls again): answer 200 busy + Retry-After instead of 503, so a fresh visitor's console stays clean.
-    const limit = Math.min(Number(c.req.query('limit') || 8), 15);
+    const limit = Math.min(Number(c.req.query('limit') || 8), shops.FEED_MAX);
     // `known`: tx hashes the page itself sent (each re-read from RPC and kept only if it belongs to this account), so a
     // fresh charter's feed fills even when the index lags or is busy; the server adds the rows it already verified.
     const known = String(c.req.query('known') || '').split(',').filter(h => /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(h)).slice(0, 15);

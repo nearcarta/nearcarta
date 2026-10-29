@@ -107,9 +107,15 @@ export async function fpost(path, body, f = fetch, waitMs = 700) {
   try { return await indexPost('/v0' + path, body, { prio: 'high', f, baseMs: waitMs }); }
   catch (e) { if (e.status) throw Object.assign(new Error(`fastnear ${e.message}`), { status: e.status }); throw new Error(`fastnear ${e.message}`); }
 }
-// Pages poll the feed after every tx: concurrent callers for one account+limit share one upstream read (1 s reuse),
-// and the last good feed (marked stale) when the index is still busy after retries.
-const feeds = new Map();
+// Feed cache (stale-while-revalidate). One read per account at FEED_MAX rows serves every limit (a slice), so the
+// HUD (3), the console (8) and the room (12) share it. Fresh for FEED_TTL_MS; after that, up to FEED_STALE_MS old, the
+// cached feed is answered at once (marked stale) and one background read refreshes it. Older than that, or nothing
+// cached, the caller waits for the read. Concurrent callers share one in-flight read. A failed read keeps the last good
+// feed; with nothing cached the error goes to the route (busy + Retry-After). Pages that just sent a tx pass their own
+// hashes (?known=), which the route merges from RPC, so a cached feed never hides a visitor's newest tx.
+export const FEED_MAX = 15, FEED_TTL_MS = 15_000, FEED_STALE_MS = 10 * 60_000;
+const feeds = new Map(); // account -> { v, at, p }
+export const _resetFeeds = () => feeds.clear();
 // Retired txs: the first Mist Bank payout's oath approval (its payee was retired when its viewing key was found in
 // git history). Feeds leave it out so the site never re-links that payee; listed by sha256 so the hash itself is
 // not repeated here. Chain explorers still show it, as they show every testnet tx.
@@ -121,26 +127,41 @@ export function hideRetired(feed) {
   if (txs.length === feed.txs.length) return feed;
   return { ...feed, txs, count: txs.length, retired_hidden: feed.txs.length - txs.length };
 }
-export async function chronicle(account, limit = 8, read = chronicleOnce) {
-  const k = account + '|' + limit, hit = feeds.get(k), now = Date.now();
+const sliceFeed = (v, limit, extra) => { const txs = (v.txs || []).slice(0, limit); return { ...v, ...extra, count: txs.length, txs }; };
+function refresh(account, read) {
+  const hit = feeds.get(account);
   if (hit?.p) return hit.p;
-  if (hit?.v && now - hit.at < 1_000) return hit.v;
-  const p = read(account, limit).then(v => { feeds.set(k, { v, at: Date.now() }); return v; },
-    e => { if (hit?.v) { feeds.set(k, hit); return { ...hit.v, stale: true }; } feeds.delete(k); throw e; });
-  feeds.set(k, { ...hit, p });
+  const p = read(account, FEED_MAX).then(v => { feeds.set(account, { v, at: Date.now() }); return v; },
+    e => { const h = feeds.get(account); if (h?.v) feeds.set(account, { v: h.v, at: h.at }); else feeds.delete(account); throw e; });
+  feeds.set(account, { ...hit, p });
   if (feeds.size > 500) feeds.delete(feeds.keys().next().value);
   return p;
 }
-async function chronicleOnce(account, limit = 8) {
-  const { account_txs = [] } = await fpost('/account', { account_id: account, max_block_height: null });
-  const list = account_txs.slice(0, limit);
-  const { transactions = [] } = list.length ? await fpost('/transactions', { tx_hashes: list.map(t => t.transaction_hash) }) : {};
-  const signer = Object.fromEntries(transactions.map(t => [t.transaction.hash, t.transaction.signer_id]));
-  const out = [];
-  for (const t of list) {
-    try { out.push(txRow(await txStatus(t.transaction_hash, signer[t.transaction_hash] || account), new Date(Number(BigInt(t.tx_block_timestamp) / 1000000n)).toISOString())); }
-    catch (e) { out.push({ hash: t.transaction_hash, error: e.message.slice(0, 120) }); }
+export async function chronicle(account, limit = 8, read = chronicleOnce, now = Date.now()) {
+  const n = Math.max(1, Math.min(Number(limit) || 8, FEED_MAX)), hit = feeds.get(account);
+  if (hit?.v) {
+    const age = now - hit.at;
+    if (age < FEED_TTL_MS) return sliceFeed(hit.v, n);
+    if (age < FEED_STALE_MS) { refresh(account, read).catch(() => {}); return sliceFeed(hit.v, n, { stale: true, stale_age_s: Math.round(age / 1000) }); }
   }
+  try { return sliceFeed(await refresh(account, read), n); }
+  catch (e) { if (hit?.v) return sliceFeed(hit.v, n, { stale: true, stale_age_s: Math.round((now - hit.at) / 1000) }); throw e; }
+}
+// Re-read each listed tx from RPC in parallel (bounded), keeping the index order.
+async function inParallel(items, conc, fn) {
+  const out = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(conc, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k]); } }));
+  return out;
+}
+export async function chronicleOnce(account, limit = FEED_MAX, { post = fpost, status = txStatus } = {}) {
+  const { account_txs = [] } = await post('/account', { account_id: account, max_block_height: null });
+  const list = account_txs.slice(0, limit);
+  const { transactions = [] } = list.length ? await post('/transactions', { tx_hashes: list.map(t => t.transaction_hash) }) : {};
+  const signer = Object.fromEntries(transactions.map(t => [t.transaction.hash, t.transaction.signer_id]));
+  const out = await inParallel(list, 6, async t => {
+    try { return txRow(await status(t.transaction_hash, signer[t.transaction_hash] || account), new Date(Number(BigInt(t.tx_block_timestamp) / 1000000n)).toISOString()); }
+    catch (e) { return { hash: t.transaction_hash, error: e.message.slice(0, 120) }; }
+  });
   return { account, count: out.length, source: 'tx.test.fastnear.com list + rpc EXPERIMENTAL_tx_status', txs: out };
 }
 function txRow(tx, at) {
