@@ -187,6 +187,7 @@ export const tollVisit = () => (S.charter ? JSON.parse(localStorage.getItem(LS_T
 const saveVisit = v => S.charter && localStorage.setItem(LS_TOLL(S.charter), JSON.stringify(v));
 let gateMemo = null;
 export const gateInfo = (fresh = false) => (!fresh && gateMemo) || (gateMemo = api('/api/toll/gate').catch(e => { gateMemo = null; throw e; }));
+export const tollBroadcast = n => api(`/api/toll/gate/${encodeURIComponent(n)}/broadcast`, { method: 'POST' });
 export const tollStatus = n => api('/api/toll/gate/' + encodeURIComponent(n));
 export async function tollGate(action, o = null) {
   const g = await gateInfo();
@@ -196,7 +197,7 @@ export async function tollGate(action, o = null) {
   if (nonce == null) throw Object.assign(new Error('the gate did not sign this visit'), { tx: h });
   const v = { gate: g.gate, nonce, action, pay_tx: h, at: Date.now(), split: o?.split ? { tx: o.tx, legs: o.split.map(l => [l.role, l.amt, l.to]) } : null }; saveVisit(v); keep(h, 'toll', 'signed', 'pay_for');
   const b = await api(`/api/toll/gate/${nonce}/broadcast`, { method: 'POST' });
-  v.base_tx = b.tx_hash; saveVisit(v); gateMemo = null;
+  if (b.accepted || b.base) v.base_tx = b.tx_hash; saveVisit(v); gateMemo = null;
   return { v, st: b };
 }
 export async function tollSettle(v, st) {
