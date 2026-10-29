@@ -49,9 +49,14 @@ try {
     mkdirSync(process.env.STATE_DIR, { recursive: true }); await ctx.storageState({ path: STATE }); chmodSync(STATE, 0o600);
   } else {
     await until(/Check Base Sepolia|Settle|Pay the toll/, 90e3);
-    for (let i = 0; i < 60 && !/Settle/.test(await act.textContent()); i++) { await act.click(); await until(/Check Base Sepolia|Settle/, 60e3); if (!/Settle/.test(await act.textContent())) await p.waitForTimeout(30e3); }
-    await snap('6-final-on-base');
-    await act.click(); await p.locator('[data-testid=toll-status][data-status=confirmed]').waitFor({ timeout: 180e3 });
+    // "Check Base Sepolia" settles in the same click once Base is final (the wallet approves settle), so stop on confirmed
+    const stat = async () => (await p.locator('[data-testid=toll-status]').getAttribute('data-status', { timeout: 2000 }).catch(() => null));
+    for (let i = 0; i < 60 && (await stat()) !== 'confirmed'; i++) {
+      await act.click();
+      await p.waitForFunction(() => document.querySelector('[data-testid=toll-status]')?.dataset.status === 'confirmed' || /Check Base Sepolia|Settle/.test(document.querySelector('#t-act')?.textContent || ''), null, { timeout: 240e3 });
+      if ((await stat()) !== 'confirmed') { if (i === 0) await snap('6-waiting-on-base'); await p.waitForTimeout(30e3); }
+    }
+    await p.locator('[data-testid=toll-status][data-status=confirmed]').waitFor({ timeout: 180e3 });
     ph.say = (await p.locator('#t-say').textContent()).trim();
     ph.visit = await p.evaluate(() => window.__apps.A.tollVisit()); ph.status = 'confirmed';
     await snap('7-confirmed');
