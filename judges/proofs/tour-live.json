@@ -1,0 +1,530 @@
+{
+  "base_url": "https://nearcarta.vercel.app",
+  "passes": {
+    "390": {
+      "width": 390,
+      "height": 844,
+      "pay": {
+        "at": "2026-10-29T02:26:47.914Z",
+        "console_errors": [],
+        "non_2xx": [],
+        "shots": [
+          "e2e/shots/tour-390-1-enter.png",
+          "e2e/shots/tour-390-shop-chronicle.png",
+          "e2e/shots/tour-390-shop-bank.png",
+          "e2e/shots/tour-390-shop-ferry.png",
+          "e2e/shots/tour-390-shop-guard.png",
+          "e2e/shots/tour-390-shop-arena.png",
+          "e2e/shots/tour-390-shop-hall.png",
+          "e2e/shots/tour-390-shop-payouts.png",
+          "e2e/shots/tour-390-shop-house.png",
+          "e2e/shots/tour-390-toll-ready.png",
+          "e2e/shots/tour-390-toll-signed-broadcast.png"
+        ],
+        "shops": [
+          {
+            "shop": "chronicle",
+            "steps": [
+              {
+                "press": "",
+                "see": "Entry signed. The scribe got 0.001.",
+                "rule": "\u2713 allowed \u00b7 within your max 0.05 NEAR",
+                "txs": [
+                  "3cfKMfigZ64cTVfcxmko9G3r4pQfXbaXEL3yWeLpHQYt"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "bank",
+            "steps": [
+              {
+                "press": "",
+                "see": "Sent one 0.01 NEAR note to you, sealed.",
+                "rule": "\u2713 allowed \u00b7 within your max 0.05 NEAR",
+                "txs": [
+                  "Afr9cUa1vnBvFTYzkKwovyu3N3dXTLyZWQACrhGS2G1a"
+                ]
+              },
+              {
+                "press": "Verify the seal",
+                "see": "Seal matches the chain.",
+                "rule": "",
+                "txs": [
+                  "Afr9cUa1vnBvFTYzkKwovyu3N3dXTLyZWQACrhGS2G1a"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "ferry",
+            "steps": [
+              {
+                "press": "",
+                "see": "Live quote, signed by 1Click. Worth 0.046 test NEAR. Ask?",
+                "rule": "",
+                "txs": []
+              },
+              {
+                "press": "Ask my agent to swap",
+                "see": "Your charter approved the crossing.",
+                "rule": "\u2713 allowed \u00b7 within your max 0.1 NEAR",
+                "txs": [
+                  "2BV2jkojDZu5fEnh7WQQ9vVXYp5BNFyP2LDHeAj9Erwp"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "guard",
+            "steps": [
+              {
+                "press": "",
+                "see": "Stopped before signing: Attack-demo payee. A prompt-injected agent tried to pay it; the Guardhouse charter refused, then the owner removed it from the vendor clause.",
+                "rule": "\u2713 payee check \u00b7 blocked, nothing signed",
+                "txs": []
+              },
+              {
+                "press": "Let it knock anyway",
+                "see": "Second wall: the charter refused. You never allowed that account.",
+                "rule": "\u2715 refused \u00b7 you never allowed that account",
+                "txs": [
+                  "Egak6BuzAfPWMz5NVPPuqn7KzzSJ8mt8KMLjFcTP9aiM"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "arena",
+            "steps": [
+              {
+                "press": "",
+                "see": "NEAR AI read it and flagged it, proposed 0.01 to stranger.testnet. New wall: you never allowed that account. +100",
+                "rule": "\u2713 held by your rule \u00b7 you never allowed that account",
+                "txs": [
+                  "AvRmK59t94C6RzhyXycYNVpQc3Jji7fEP43Gkpc6MYuM"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "hall",
+            "steps": [
+              {
+                "press": "",
+                "see": "Passed: max per payment 0.03 NEAR, in force now.",
+                "rule": "\u2713 applied on chain",
+                "txs": [
+                  "8qXzs3NZ8GQcy42ijPVNBdoxgBypqMurGdVjeUmSonFN"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "payouts",
+            "steps": [
+              {
+                "press": "",
+                "see": "Paid all 3, 0.03 NEAR, in one batch.",
+                "rule": "\u2713 paid \u00b7 3 payouts in one tx",
+                "txs": [
+                  "HU3kgTCG2Yd4vtjV2StFCNDkjSkUp1PUomLJfpqxZmWe"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "house",
+            "steps": [
+              {
+                "press": "",
+                "see": "Max 0.03 NEAR, 0.2 NEAR a day. 6 paid, 2 refused, all on chain.",
+                "rule": "\u2713 reputation \u00b7 25% of asks refused",
+                "txs": []
+              }
+            ]
+          }
+        ],
+        "guest": "ncguest-382j6x3a5n.testnet",
+        "charter": "ncguest-382j6x3a5n-sq7u.nccharters-53836.testnet",
+        "rules_defaults": {
+          "cap": "0.05",
+          "budget": "0.2",
+          "count": "10"
+        },
+        "rules_tx": "HVNmFahoMystVsA8vDL76VzSCsoM6vvJctdaDrtsgsG7",
+        "say": "Signed by the MPC network and broadcast. Base Sepolia finalizes in about 15 min; check back, then settle.",
+        "visit": {
+          "gate": "gate5.r4csmvr86zk4.testnet",
+          "nonce": 4,
+          "action": "6",
+          "pay_tx": "AY34MtaVeqpPSx34wDQdRFXwsZDmrnmvLKhGHKpWkvZ2",
+          "at": 1793241036124,
+          "base_tx": "0x92b7e101e019d4f5caf67ebf974b4b05fa2136e0d98c2a72c06154c934d77b39"
+        },
+        "status": "signed",
+        "base_tx": "0x92b7e101e019d4f5caf67ebf974b4b05fa2136e0d98c2a72c06154c934d77b39",
+        "ok": true,
+        "no_sideways_scroll": true
+      },
+      "settle": {
+        "gate": "gate5.r4csmvr86zk4.testnet",
+        "nonce": 4,
+        "settle_tx": "GNzhNTda3x6tRaZJCJQpy2SY9qyJBpT2dWQxJRrK5vNS",
+        "signer": "ncguest-tv3cwwo2vw.testnet",
+        "via": "backend/scripts/toll-settle.js (settle is permissionless; the 390 browser state was lost in a box restart)",
+        "status": "confirmed"
+      }
+    },
+    "1280": {
+      "width": 1280,
+      "height": 800,
+      "pay": {
+        "at": "2026-10-29T02:22:16.041Z",
+        "console_errors": [],
+        "non_2xx": [],
+        "shots": [
+          "e2e/shots/tour-1280-1-enter.png",
+          "e2e/shots/tour-1280-shop-chronicle.png",
+          "e2e/shots/tour-1280-shop-bank.png",
+          "e2e/shots/tour-1280-shop-ferry.png",
+          "e2e/shots/tour-1280-shop-guard.png",
+          "e2e/shots/tour-1280-shop-arena.png",
+          "e2e/shots/tour-1280-shop-hall.png",
+          "e2e/shots/tour-1280-shop-payouts.png",
+          "e2e/shots/tour-1280-shop-house.png",
+          "e2e/shots/tour-1280-toll-ready.png",
+          "e2e/shots/tour-1280-toll-signed-broadcast.png"
+        ],
+        "shops": [
+          {
+            "shop": "chronicle",
+            "steps": [
+              {
+                "press": "",
+                "see": "Entry signed. The scribe got 0.001.",
+                "rule": "\u2713 allowed \u00b7 within your max 0.05 NEAR",
+                "txs": [
+                  "J2Btgssrb47H6An6PbmM2Jy2wvkTUjfgnV7t2bVVwBXR"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "bank",
+            "steps": [
+              {
+                "press": "",
+                "see": "Sent one 0.01 NEAR note to you, sealed.",
+                "rule": "\u2713 allowed \u00b7 within your max 0.05 NEAR",
+                "txs": [
+                  "4kZnF4JnkiQtXtwNVyMp2R62bsXkB81AdXg1TumFNkBB"
+                ]
+              },
+              {
+                "press": "Verify the seal",
+                "see": "Seal matches the chain.",
+                "rule": "",
+                "txs": [
+                  "4kZnF4JnkiQtXtwNVyMp2R62bsXkB81AdXg1TumFNkBB"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "ferry",
+            "steps": [
+              {
+                "press": "",
+                "see": "Live quote, signed by 1Click. Worth 0.046 test NEAR. Ask?",
+                "rule": "",
+                "txs": []
+              },
+              {
+                "press": "Ask my agent to swap",
+                "see": "Your charter approved the crossing.",
+                "rule": "\u2713 allowed \u00b7 within your max 0.1 NEAR",
+                "txs": [
+                  "93SbCypugwSEixecjyWoL6QcuqmLUf1avGZxs4auQKy9"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "guard",
+            "steps": [
+              {
+                "press": "",
+                "see": "Stopped before signing: Attack-demo payee. A prompt-injected agent tried to pay it; the Guardhouse charter refused, then the owner removed it from the vendor clause.",
+                "rule": "\u2713 payee check \u00b7 blocked, nothing signed",
+                "txs": []
+              },
+              {
+                "press": "Let it knock anyway",
+                "see": "Second wall: the charter refused. You never allowed that account.",
+                "rule": "\u2715 refused \u00b7 you never allowed that account",
+                "txs": [
+                  "AcwZxz2Q4r8nDY8AyjaTuAovEPjUxKVA7jbMgVTta7BV"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "arena",
+            "steps": [
+              {
+                "press": "",
+                "see": "NEAR AI read it and flagged it, proposed 0.01 to stranger.testnet. New wall: you never allowed that account. +100",
+                "rule": "\u2713 held by your rule \u00b7 you never allowed that account",
+                "txs": [
+                  "Fr9kcruh73aP4bLpBaWSfxGEmd8Wcz7JLzDLbay3seXV"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "hall",
+            "steps": [
+              {
+                "press": "",
+                "see": "Passed: max per payment 0.03 NEAR, in force now.",
+                "rule": "\u2713 applied on chain",
+                "txs": [
+                  "H4REpc2tQSDK5f8TMJZhieNhgT5mJtTbVnXu24DtGCXs"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "payouts",
+            "steps": [
+              {
+                "press": "",
+                "see": "Paid all 3, 0.03 NEAR, in one batch.",
+                "rule": "\u2713 paid \u00b7 3 payouts in one tx",
+                "txs": [
+                  "6ymQYvWF9g3oujRfejJQnQkC4SVUdtqFeazR2574aaEr"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "house",
+            "steps": [
+              {
+                "press": "",
+                "see": "Max 0.03 NEAR, 0.2 NEAR a day. 6 paid, 2 refused, all on chain.",
+                "rule": "\u2713 reputation \u00b7 25% of asks refused",
+                "txs": []
+              }
+            ]
+          }
+        ],
+        "guest": "ncguest-3v4v4h6l47.testnet",
+        "charter": "ncguest-3v4v4h6l47-cgkg.nccharters-53836.testnet",
+        "rules_defaults": {
+          "cap": "0.05",
+          "budget": "0.2",
+          "count": "10"
+        },
+        "rules_tx": "DZ1JhabNx6cb6pLmGo8ZCFCTgHmhd9oESZNzPZsXBuUU",
+        "say": "Signed by the MPC network and broadcast. Base Sepolia finalizes in about 19 min; check back, then settle.",
+        "visit": {
+          "gate": "gate5.r4csmvr86zk4.testnet",
+          "nonce": 3,
+          "action": "6",
+          "pay_tx": "6sjoymzF3DCVxKShAixeqo6uB7gECq2qYWjfwY9SfSDD",
+          "at": 1793240801629,
+          "base_tx": "0xe6c387a21a4049b2b77a18f7edee77cfe1e52282e1c43517bdd8a402b1af8983"
+        },
+        "status": "signed",
+        "base_tx": "0xe6c387a21a4049b2b77a18f7edee77cfe1e52282e1c43517bdd8a402b1af8983",
+        "ok": true,
+        "no_sideways_scroll": true
+      },
+      "settle": {
+        "gate": "gate5.r4csmvr86zk4.testnet",
+        "nonce": 3,
+        "settle_tx": "DaAcZkp2hWx7u7ux9UGK9MgbuuJywzBWmyDtSMAWsbMd",
+        "signer": "ncguest-3v4v4h6l47.testnet",
+        "via": "wallet in the UI (Check Base Sepolia); the run log was cut by a box restart after the tx landed",
+        "status": "confirmed"
+      }
+    },
+    "1440": {
+      "width": 1440,
+      "height": 900,
+      "pay": {
+        "at": "2026-10-29T02:17:42.324Z",
+        "console_errors": [],
+        "non_2xx": [],
+        "shots": [
+          "e2e/shots/tour-1440-1-enter.png",
+          "e2e/shots/tour-1440-shop-chronicle.png",
+          "e2e/shots/tour-1440-shop-bank.png",
+          "e2e/shots/tour-1440-shop-ferry.png",
+          "e2e/shots/tour-1440-shop-guard.png",
+          "e2e/shots/tour-1440-shop-arena.png",
+          "e2e/shots/tour-1440-shop-hall.png",
+          "e2e/shots/tour-1440-shop-payouts.png",
+          "e2e/shots/tour-1440-shop-house.png",
+          "e2e/shots/tour-1440-toll-ready.png",
+          "e2e/shots/tour-1440-toll-signed-broadcast.png"
+        ],
+        "shops": [
+          {
+            "shop": "chronicle",
+            "steps": [
+              {
+                "press": "",
+                "see": "Entry signed. The scribe got 0.001.",
+                "rule": "\u2713 allowed \u00b7 within your max 0.05 NEAR",
+                "txs": [
+                  "oKCV3gxTrpD5A6m9wYC1wxkpBLBm9CPcYnLo6ebU2je"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "bank",
+            "steps": [
+              {
+                "press": "",
+                "see": "Sent one 0.01 NEAR note to you, sealed.",
+                "rule": "\u2713 allowed \u00b7 within your max 0.05 NEAR",
+                "txs": [
+                  "5q8ZbbPv7EQDAa3RWk37PbQksibMM85yqwPjRqPYG7ai"
+                ]
+              },
+              {
+                "press": "Verify the seal",
+                "see": "Seal matches the chain.",
+                "rule": "",
+                "txs": [
+                  "5q8ZbbPv7EQDAa3RWk37PbQksibMM85yqwPjRqPYG7ai"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "ferry",
+            "steps": [
+              {
+                "press": "",
+                "see": "Live quote, signed by 1Click. Worth 0.046 test NEAR. Ask?",
+                "rule": "",
+                "txs": []
+              },
+              {
+                "press": "Ask my agent to swap",
+                "see": "Your charter approved the crossing.",
+                "rule": "\u2713 allowed \u00b7 within your max 0.1 NEAR",
+                "txs": [
+                  "ET2kVHpe7hjeMqR7BdMKGWiJq1hARtZhENtztPb7JLaW"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "guard",
+            "steps": [
+              {
+                "press": "",
+                "see": "Stopped before signing: Attack-demo payee. A prompt-injected agent tried to pay it; the Guardhouse charter refused, then the owner removed it from the vendor clause.",
+                "rule": "\u2713 payee check \u00b7 blocked, nothing signed",
+                "txs": []
+              },
+              {
+                "press": "Let it knock anyway",
+                "see": "Second wall: the charter refused. You never allowed that account.",
+                "rule": "\u2715 refused \u00b7 you never allowed that account",
+                "txs": [
+                  "77nysp27362Wx26ZLrz3RZcaV7R8MQz2KjGmPnz9MLPk"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "arena",
+            "steps": [
+              {
+                "press": "",
+                "see": "NEAR AI read it and flagged it, proposed 0.01 to stranger.testnet. New wall: you never allowed that account. +100",
+                "rule": "\u2713 held by your rule \u00b7 you never allowed that account",
+                "txs": [
+                  "HzC9CaqEWLnECcoybLfdzmLEKUB4aDBof5d61wKrNVa1"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "hall",
+            "steps": [
+              {
+                "press": "",
+                "see": "Passed: max per payment 0.03 NEAR, in force now.",
+                "rule": "\u2713 applied on chain",
+                "txs": [
+                  "7Fo5Mybz8Et3bFS5Vwhbv3kvjwK3DWyLcWpnm7diwe22"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "payouts",
+            "steps": [
+              {
+                "press": "",
+                "see": "Paid all 3, 0.03 NEAR, in one batch.",
+                "rule": "\u2713 paid \u00b7 3 payouts in one tx",
+                "txs": [
+                  "2BidLNamtS2oJSrQw67sKVh8Dg7GAp7Ni9aWXS9PmDTs"
+                ]
+              }
+            ]
+          },
+          {
+            "shop": "house",
+            "steps": [
+              {
+                "press": "",
+                "see": "Max 0.03 NEAR, 0.2 NEAR a day. 6 paid, 2 refused, all on chain.",
+                "rule": "\u2713 reputation \u00b7 25% of asks refused",
+                "txs": []
+              }
+            ]
+          }
+        ],
+        "guest": "ncguest-4z0r2v5p22.testnet",
+        "charter": "ncguest-4z0r2v5p22-cwdk.nccharters-53836.testnet",
+        "rules_defaults": {
+          "cap": "0.05",
+          "budget": "0.2",
+          "count": "10"
+        },
+        "rules_tx": "4i6oxwRyTiuL7NhG3Bo9imGHhGgMqy4oY9PtKK9gX6dE",
+        "say": "Signed by the MPC network and broadcast. Base Sepolia finalizes in about 21 min; check back, then settle.",
+        "visit": {
+          "gate": "gate5.r4csmvr86zk4.testnet",
+          "nonce": 2,
+          "action": "6",
+          "pay_tx": "GnDNQCwtMYDtNqiWDZaDwrg3dhUtcRYbLfS4doZJYqQT",
+          "at": 1793240529613,
+          "base_tx": "0x849982663b290363b951ffee347c3375e2a72ccb3692a7c01b6ddeade10e386f"
+        },
+        "status": "signed",
+        "base_tx": "0x849982663b290363b951ffee347c3375e2a72ccb3692a7c01b6ddeade10e386f",
+        "ok": true,
+        "no_sideways_scroll": true
+      },
+      "settle": {
+        "gate": "gate5.r4csmvr86zk4.testnet",
+        "nonce": 2,
+        "settle_tx": "2DAZSKsk1wMbC2ovfVo7yUKbd531aTwFEK83udRS9muM",
+        "signer": "ncguest-4z0r2v5p22.testnet",
+        "via": "wallet in the UI (Check Base Sepolia); run result ok, 0 console errors, 0 non-2xx",
+        "status": "confirmed"
+      }
+    }
+  }
+}
