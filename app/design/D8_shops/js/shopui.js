@@ -1,6 +1,7 @@
 // Tray controller: one robot line, one big button, loading / error / success, a one-line receipt.
 import * as A from './apps.js';
 import { $, sfx } from './core.js';
+import { ruleChip as ruleChipText } from '../../../../shared/rules-default.js';
 const { esc, fmt, short } = A;
 
 let cur = null, sh = null, phase = 'idle', last = null, runScene = null, extra = {};
@@ -16,7 +17,8 @@ const verdict = o => o.decision === 'allowed' ? 'ok' : 'no';
 function react(kind) { const r = sh?.rob; if (!r) return; sfx(kind === 'ok' ? 'allowed' : 'refuse'); r.play(kind === 'ok' ? 'Yes' : 'No', { once: true }); setTimeout(() => r.play('Idle'), 1500); }
 function ruleChip() {
   const c = A.S.clauses.pay; const b = $('#t-rules');
-  b.hidden = !A.S.charter; b.textContent = c ? `Your rules · max ${fmt(c.per_action_cap)}` : 'Your rules';
+  const r = ruleChipText(c ? A.fromY(c.per_action_cap) : null, n => fmt(A.toY(n)));
+  b.hidden = !A.S.charter; b.textContent = r.text; b.title = r.title; b.dataset.changed = r.changed ? '1' : ''; b.dataset.testid = 'rules-chip';
 }
 const HOSTED = () => document.body.dataset.host === 'd9'; // inside the town page the HUD owns #wallet
 const wallet = () => { const w = HOSTED() ? null : $('#wallet'); if (!w) return; w.textContent = A.S.me ? short(A.S.me, 10, 8) : 'Connect wallet'; w.classList.toggle('on', !!A.S.me); };
