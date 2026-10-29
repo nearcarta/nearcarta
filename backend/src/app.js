@@ -18,6 +18,7 @@ import * as vault from './vault.js';
 import * as cp from './counterparty.js';
 import { view, rpcStats } from './near.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
+import { pastPrompts as arenaPrompts } from './arena.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
@@ -265,6 +266,7 @@ export function makeApp() {
   app.get('/api/mistbank/street/:txid', limiter(10), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
   app.get('/api/townhall', limiter(20), async c => c.json(await reads.townhall()));
   app.get('/api/arena', limiter(20), async c => c.json(await reads.arena()));
+  app.get('/api/arena/prompts', limiter(20), async c => c.json(await arenaPrompts()));
   app.get('/api/arena/attempts', limiter(20), async c => c.json(await shops.arenaAttempts(c.req.query('from'), c.req.query('limit'))));
   app.get('/api/toll', limiter(20), async c => c.json(await reads.toll()));
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
