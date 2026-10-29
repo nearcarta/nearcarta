@@ -11,3 +11,5 @@ target/
 *.wasm
 !contracts/artifacts/*.wasm
 .vercel
+__pycache__/
+*.pyc
