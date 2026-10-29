@@ -44,7 +44,8 @@ async function tollStep(v, act, o) {
     if (st.status === 'signed' && st.settle && act) { say('Approve settle in your wallet. The MPC network checks the Base Sepolia tx…'); st = await A.tollSettle(v, st); }
   }
   extra.tst = st; extra.tv = v; extra.gate = null;
-  const links = [A.txLine(v.pay_tx, 'gate'), st.tx_hash ? BSC(st.tx_hash) : '', v.settle_tx ? A.txLine(v.settle_tx, 'settle') : ''].join(' ');
+  const split = v.split ? `<span class="rc" data-testid="toll-split">split in one tx: ${v.split.legs.map(([r, a]) => `${esc(r === 'agent' ? 'agent budget' : r)} ${esc(a)}`).join(' · ')} NEAR</span> ${A.txLine(v.split.tx, 'split')}` : '';
+  const links = [split, A.txLine(v.pay_tx, 'gate'), st.tx_hash ? BSC(st.tx_hash) : '', v.settle_tx ? A.txLine(v.settle_tx, 'settle') : ''].join(' ');
   const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}" data-phase="${esc(st.phase || '')}">gate ${esc(st.label || st.status)}</span> ${links}`;
   if (st.status === 'confirmed') { A.tollDone(v); return { o, kind: 'ok', rule: 'confirmed · MPC foreign-tx proof', hero: num('✓', 'confirmed'), rc,
     say: 'Confirmed. The MPC network proved the Base Sepolia tx final, and the gate recorded it.' }; }
@@ -74,7 +75,7 @@ function gasNote() {
 // ---------- shop apps ----------
 const APPS = {
   toll: {
-    label: 'Toll gate · 0.01 NEAR → Base Sepolia', idle: 'The toll is 0.01 NEAR. Your charter pays it, then the gate gets the MPC network to sign a Base Sepolia payout.',
+    label: 'Toll gate · 0.01 NEAR → Base Sepolia', idle: 'The toll is 0.01 NEAR to the gate, plus 0.002 to the town treasury and 0.001 to my inference budget: one tx your charter checks, all or nothing. Then the gate gets the MPC network to sign a Base Sepolia payout.',
     btn: () => { const v = A.tollVisit(); return !v || v.done ? 'Pay the toll' : extra.tst?.settle ? 'Settle with the MPC proof' : 'Check Base Sepolia'; },
     hero: () => num('0.01', 'NEAR'),
     form: () => gasNote(),
@@ -83,8 +84,8 @@ const APPS = {
       if (v && !v.done) return tollStep(v, true);
       const o = await A.toll();
       if (o.decision !== 'allowed') return { o, hero: num('0.01', 'NEAR'), say: `Refused: ${A.why(o.reason)}. Nothing was signed for Base Sepolia.` };
-      say('Your charter paid 0.01 NEAR. Now approve the gate call in your wallet…'); btn('Approve in your wallet…', 'primary busy', true);
-      const { v: nv } = await A.tollGate(o.action);
+      say(o.split ? 'Your charter paid the split in one tx: 0.01 toll, 0.002 treasury, 0.001 agent budget. Now approve the gate call in your wallet…' : 'Your charter paid 0.01 NEAR. Now approve the gate call in your wallet…'); btn('Approve in your wallet…', 'primary busy', true);
+      const { v: nv } = await A.tollGate(o.action, o);
       return tollStep(nv, false, o);
     },
   },

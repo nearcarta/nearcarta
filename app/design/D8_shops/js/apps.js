@@ -4,6 +4,7 @@
 import * as W from './wallet.bundle.js';
 import { $, sfx } from './core.js';
 import * as P from './payouts.js';
+import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, ''); // same origin on Vercel (/api is proxied)
@@ -116,7 +117,7 @@ export function rulesNow() {
   const c = pay(), m = merchants();
   const routes = ROUTES.filter(r => S.clauses[r.id]).map(r => r.id);
   return {
-    receivers: c?.receivers || [m[0], m[1], S.me].filter(Boolean),
+    receivers: c?.receivers || [m[0], m[1], S.me, TS.SPLIT.treasury, TS.SPLIT.agent].filter(Boolean),
     cap: c ? fromY(c.per_action_cap) : D.cap, budget: c ? fromY(c.daily_budget) : D.budget, count: c?.max_actions_per_day || D.count,
     min: c ? fromY(c.min_amount) : D.min, ws: c?.window_start_min || 0, we: c?.window_end_min || 0,
     routes: c ? routes : ROUTES.slice(0, 2).map(r => r.id), ferryCap: S.clauses[routes[0]] ? fromY(S.clauses[routes[0]].per_action_cap) : D.ferryCap,
@@ -162,7 +163,22 @@ export function ruleFor(o, clauseId = 'pay') {
 }
 
 // ---------- per shop ----------
-export const toll = () => ask({ shop: 'toll', receiver: merchants()[0], amountY: toY(0.01), memo: 'toll:base-sepolia' });
+// The toll with its revenue split: one propose_batch (owner 0.01 + town treasury 0.002 + agent budget 0.001), all or
+// nothing. A charter whose rules do not allow all three payees (or that predates batches) pays the plain 0.01 toll.
+export async function toll() {
+  const payee = merchants()[0];
+  if (!TS.canSplit(pay()?.receivers, payee, canBatch())) return ask({ shop: 'toll', receiver: payee, amountY: toY(0.01), memo: 'toll:base-sepolia' });
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
+  const st = await view(S.charter, 'get_state');
+  const b = TS.planSplit({ payee, nonce: st.next_nonce, policy: st.policy_version, nowMs: Date.now() });
+  const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: S.charter, public_key: key.publicKey });
+  const signed = W.signTx({ key, signerId: S.charter, receiverId: S.charter, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+    actions: [W.functionCall('propose_batch', { ps: b.ps }, BigInt(b.gasTgas) * TG)] });
+  const r = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+  const v = r.ok ? P.readBatch(r.value, b.n) : { decision: 'failed', reason: r.error, ids: [] };
+  keep(signed.hash, 'toll', v.decision, v.reason); readRules().catch(() => {});
+  return { tx: signed.hash, decision: v.decision, reason: v.reason, action: v.ids?.[0] ?? null, amount: b.ps[0].amount, receiver: payee, split: b.legs, split_ids: v.ids };
+}
 // Toll gate (contracts/toll v4): your wallet calls pay_for on the gate with your charter's toll action; the gate reads
 // your charter on chain and gets the MPC network to sign a Base Sepolia payout; the API relays the raw tx the gate
 // signed; after Base finality your wallet calls settle, and the MPC foreign-tx proof makes the record confirmed.
@@ -172,13 +188,13 @@ const saveVisit = v => S.charter && localStorage.setItem(LS_TOLL(S.charter), JSO
 let gateMemo = null;
 export const gateInfo = (fresh = false) => (!fresh && gateMemo) || (gateMemo = api('/api/toll/gate').catch(e => { gateMemo = null; throw e; }));
 export const tollStatus = n => api('/api/toll/gate/' + encodeURIComponent(n));
-export async function tollGate(action) {
+export async function tollGate(action, o = null) {
   const g = await gateInfo();
   const h = await sign(g.gate, [fc('pay_for', { charter: S.charter, action_id: String(action) }, 300)]);
   let nonce = null;
   for (let i = 0; i < 12 && nonce == null; i++) { nonce = await view(g.gate, 'visit_nonce', { charter: S.charter, action_id: String(action) }).catch(() => null); if (nonce == null) await new Promise(r => setTimeout(r, 1500)); }
   if (nonce == null) throw Object.assign(new Error('the gate did not sign this visit'), { tx: h });
-  const v = { gate: g.gate, nonce, action, pay_tx: h, at: Date.now() }; saveVisit(v); keep(h, 'toll', 'signed', 'pay_for');
+  const v = { gate: g.gate, nonce, action, pay_tx: h, at: Date.now(), split: o?.split ? { tx: o.tx, legs: o.split.map(l => [l.role, l.amt, l.to]) } : null }; saveVisit(v); keep(h, 'toll', 'signed', 'pay_for');
   const b = await api(`/api/toll/gate/${nonce}/broadcast`, { method: 'POST' });
   v.base_tx = b.tx_hash; saveVisit(v); gateMemo = null;
   return { v, st: b };
