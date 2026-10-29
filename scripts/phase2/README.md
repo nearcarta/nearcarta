@@ -22,4 +22,4 @@ Run it again:
     python3 scripts/phase2/phase2.py --network testnet
 
 `ONECLICK_PARTNER_KEY` is read from env if set and is never logged. `--network mainnet` does the
-same reads on mainnet. Still dry: the live legs need the spend approval in MAINNET_COST_PLAN.md.
+same reads on mainnet. Still dry: the live legs need the spend approval in docs/MAINNET_COST_PLAN.md.

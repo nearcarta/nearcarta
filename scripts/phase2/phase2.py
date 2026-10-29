@@ -31,7 +31,7 @@ NET = {
 OC = 'https://1click.chaindefuser.com'
 BUSDC = 'nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near'
 ZEC = 'nep141:zec.omft.near'
-LEG_A_MIN_USDC = 1.750123   # measured 1Click minimum for leg A (see MAINNET_COST_PLAN.md)
+LEG_A_MIN_USDC = 1.750123   # measured 1Click minimum for leg A (see docs/MAINNET_COST_PLAN.md)
 LEG_B_MIN_ZATS = 132000     # measured 1Click minimum for leg B
 FEE_ZATS = 10000            # ZIP-317 fee for a 1-output shielded send
 

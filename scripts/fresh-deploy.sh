@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Optional fresh testnet redeploy (see MIGRATE_NOV1.md; not needed for the hackathon window).
+# Optional fresh testnet redeploy (see docs/MIGRATE_NOV1.md; not needed for the hackathon window).
 # Default is a DRY RUN: it checks every reproducible artifact (sha256 + NEAR code hash) and the
 # script each step uses, then prints the plan. It sends no transaction and reads no key.
 #   bash scripts/fresh-deploy.sh            # dry run (default)
@@ -37,7 +37,7 @@ for s in "${STEPS[@]}"; do
   fi
   echo "$line | needs: $envs"
 done
-echo "[charter factory + town hall] owned by the charter-factory worker; not run here (see MIGRATE_NOV1.md)"
+echo "[charter factory + town hall] owned by the charter-factory worker; not run here (see docs/MIGRATE_NOV1.md)"
 echo "[after] cd backend && node scripts/verify-proofs.js && node scripts/txs-table.js && node scripts/readme-numbers.js"
 [ $fail = 0 ] || { echo "plan check FAILED"; exit 1; }
 if [ "$MODE" != "--run" ]; then echo "dry run OK: nothing sent"; exit 0; fi

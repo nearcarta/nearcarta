@@ -71,7 +71,7 @@ const add = (kind, value, where, extra = {}) => cites.push({ kind, value, where,
 const ACC = /(?<![\w.<>/-])((?:[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\.(?:testnet|near))(?![\w-]|\.[a-z])/g;
 const ROOTS = '(?:contracts|judges|backend|app|shared|docs|e2e|scripts|design|\\.github)';
 const PATH = new RegExp(`(?<![\\w/.:@-])(${ROOTS}/[A-Za-z0-9_./-]*[A-Za-z0-9_])(/?\\.?\\{[^}\\s]+\\})?`, 'g');
-const TOP = /(?<![\w/.-])((?:README|SECURITY|AGENTS|MAINNET_COST_PLAN|MIGRATE_NOV1)\.md|LICENSE|package\.json|render\.yaml|vercel\.json|Dockerfile)(?![\w/-])/g;
+const TOP = /(?<![\w/.-])((?:README|SECURITY|AGENTS)\.md|LICENSE|package\.json|render\.yaml|vercel\.json|Dockerfile)(?![\w/-])/g;
 const isRepoPath = p => !/\/api\//.test(p) && !/^(?:app|docs)\.[a-z]/.test(p);
 const cleanPath = p => p.replace(/\/+$/, '').replace(/\.{2,}$/, '');
 
