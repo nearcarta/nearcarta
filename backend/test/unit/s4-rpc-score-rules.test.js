@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { rpcClient } from '../../../shared/vault/tx.js';
-import { ruleChip, DEFAULT_RULES } from '../../../shared/rules-default.js';
+import { ruleChip, DEFAULT_RULES } from '../../../app/design/D8_shops/js/rules-default.js';
 
 const DEP = JSON.parse(readFileSync(new URL('../../../shared/deployments/testnet.json', import.meta.url)));
 const ok = (result) => ({ ok: true, status: 200, json: async () => ({ result }) });

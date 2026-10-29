@@ -4,7 +4,7 @@
 import * as W from './wallet.bundle.js';
 import { $, sfx } from './core.js';
 import * as P from './payouts.js';
-import { DEFAULT_RULES } from '../../../../shared/rules-default.js';
+import { DEFAULT_RULES } from './rules-default.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, ''); // same origin on Vercel (/api is proxied)
 const NBX = 'https://testnet.nearblocks.io';

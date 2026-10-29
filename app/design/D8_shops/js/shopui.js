@@ -1,7 +1,7 @@
 // Tray controller: one robot line, one big button, loading / error / success, a one-line receipt.
 import * as A from './apps.js';
 import { $, sfx } from './core.js';
-import { ruleChip as ruleChipText } from '../../../../shared/rules-default.js';
+import { ruleChip as ruleChipText } from './rules-default.js';
 const { esc, fmt, short } = A;
 
 let cur = null, sh = null, phase = 'idle', last = null, runScene = null, extra = {};
