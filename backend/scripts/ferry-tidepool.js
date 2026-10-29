@@ -3,12 +3,16 @@
 // testnet sandbox: community testnet, not 1Click. Its verifier must run the unmodified near/intents
 // defuse v0.4.2 code (sha256 f67f9559…); this script checks the on-chain code hash before any deposit.
 // Deposits use ft_transfer_call(verifier, msg = depositAddress) from a wallet balance (INTENTS deposit).
+// Every swap gets a fresh refund address: a one-time NEAR implicit account made for that swap only (never the
+// wallet, never the recipient, never reused). Its key is written to REFUND_KEYS_DIR (default .secrets/ferry-refunds,
+// gitignored) and never printed; the proof records only the account id and the checks.
 // Usage (testnet only): WALLET_KEY_FILE=... OUT=judges/proofs/ferry-tidepool.json node backend/scripts/ferry-tidepool.js [success|refund|all]
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { Account, JsonRpcProvider, KeyPairSigner, actions } from 'near-api-js';
 import { cfg } from '../src/config.js';
 import { view } from '../src/near.js';
-import { TIDEPOOL, tidepoolVerifierOk } from '../src/ferry.js';
+import { TIDEPOOL, tidepoolVerifierOk, freshRefund, checkFreshRefund } from '../src/ferry.js';
 
 if (!/testnet|:\/\/test\./.test(String(cfg.rpc))) { console.error('testnet only'); process.exit(2); }
 const E = process.env, CASE = process.argv[2] || 'all';
@@ -16,6 +20,8 @@ const provider = new JsonRpcProvider({ url: cfg.rpc });
 const k = JSON.parse(readFileSync(E.WALLET_KEY_FILE, 'utf8'));
 const me = new Account(k.account_id, provider, KeyPairSigner.fromSecretKey(k.private_key));
 const out = existsSync(E.OUT) ? JSON.parse(readFileSync(E.OUT, 'utf8')) : { label: 'community testnet, not 1Click', api: TIDEPOOL.api, wallet: me.accountId, cases: {} };
+const KEYS = E.REFUND_KEYS_DIR || '.secrets/ferry-refunds';
+const usedRefunds = new Set(Object.values(out.cases).map(c => c.refundTo).filter(Boolean));
 const save = () => writeFileSync(E.OUT, JSON.stringify(out, null, 1) + '\n');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const say = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -41,9 +47,9 @@ if (await bal() < 5_000_000n) {
 }
 say('wallet USDC', String(await bal()));
 
-const quote = (deadlineMs, amount) => api('POST', '/v0/quote', {
+const quote = (deadlineMs, amount, refundTo) => api('POST', '/v0/quote', {
   dry: false, swapType: 'EXACT_INPUT', slippageTolerance: 100, originAsset: USDC.assetId, destinationAsset: WNEAR.assetId,
-  amount, depositType: 'INTENTS', refundTo: me.accountId, refundType: 'INTENTS', recipient: me.accountId, recipientType: 'INTENTS',
+  amount, depositType: 'INTENTS', refundTo, refundType: 'INTENTS', recipient: me.accountId, recipientType: 'INTENTS',
   deadline: new Date(Date.now() + deadlineMs).toISOString() });
 async function deposit(depositAddress, amount) {
   const r = await me.signAndSendTransaction({ receiverId: usdcContract, waitUntil: 'FINAL', throwOnFailure: false, actions: [
@@ -68,14 +74,23 @@ const trim = st => st && ({ status: st.status, updatedAt: st.updatedAt, swapDeta
 
 async function run(name, deadlineMs, part) {
   if (out.cases[name]?.final) return;
-  const q = await quote(deadlineMs, '2000000');
+  const refund = freshRefund(usedRefunds, [me.accountId]);
+  const fresh = checkFreshRefund(refund.accountId, { used: new Set([...usedRefunds].filter(a => a !== refund.accountId)), wallet: me.accountId, recipient: me.accountId });
+  if (!fresh.ok) throw new Error('refund address is not fresh: ' + fresh.why);
+  mkdirSync(KEYS, { recursive: true, mode: 0o700 });
+  writeFileSync(join(KEYS, refund.accountId + '.json'), JSON.stringify({ account_id: refund.accountId, public_key: refund.public_key, private_key: refund.private_key, made_for: name }) + '\n', { mode: 0o600 });
+  const q = await quote(deadlineMs, '2000000', refund.accountId);
+  if (q.quoteRequest && q.quoteRequest.refundTo !== refund.accountId) throw new Error('quote echoed a different refundTo');
   const { depositAddress, amountIn, minAmountIn, amountOut, deadline } = q.quote;
   const amt = part ? (BigInt(amountIn) / 2n).toString() : amountIn;
   say(`[${name}] quote`, depositAddress, 'in', amountIn, 'out', amountOut, 'deadline', deadline);
   const tx = await deposit(depositAddress, amt);
   say(`[${name}] deposit ${amt} https://testnet.nearblocks.io/txns/${tx}`);
   const w = await watch(name, depositAddress);
-  out.cases[name] = { depositAddress, quote: { amountIn, minAmountIn, amountOut, deadline, signature: q.signature ? 'present (Tidepool maker key, not 1Click)' : null },
+  const usdcId = USDC.assetId, inVerifier = a => view(TIDEPOOL.verifier, 'mt_balance_of', { account_id: a, token_id: usdcId }).catch(e => 'error: ' + e.message);
+  const refundBalance = await inVerifier(refund.accountId);
+  out.cases[name] = { depositAddress, refundTo: refund.accountId, refund_fresh: { ...fresh, not_wallet: refund.accountId !== me.accountId, not_recipient: true, distinct_from_other_swaps: !Object.values(out.cases).some(c => c.refundTo === refund.accountId), key_file: 'kept in .secrets/ferry-refunds (not committed)' },
+    refund_account_usdc_in_verifier: refundBalance, quote: { amountIn, minAmountIn, amountOut, deadline, signature: q.signature ? 'present (Tidepool maker key, not 1Click)' : null },
     deposited: amt, deposit_tx: tx, statuses: w.seen, final: trim(w.final), timeout: w.timeout || undefined,
     track: `${TIDEPOOL.api}/v0/status?depositAddress=${depositAddress}` };
   save(); say(`[${name}] final`, JSON.stringify(out.cases[name].final).slice(0, 400));

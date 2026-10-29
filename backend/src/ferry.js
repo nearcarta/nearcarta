@@ -7,6 +7,7 @@
 //  3. for ZEC, the recipient must be an Orchard-only UA (decoded from the address itself);
 //     Orchard+Sapling and Orchard+transparent are refused before 1Click is asked.
 import { verifyQuoteSignature } from '@defuse-protocol/one-click-sdk-typescript';
+import { KeyPair } from 'near-api-js';
 import { cfg, secret, DEP } from './config.js';
 import { zcashRecipient } from './zcash.js';
 import { viewAccount } from './near.js';
@@ -181,4 +182,28 @@ export async function tidepoolStatus(depositAddress, f = fetch, ver = tidepoolVe
     deposited: d.depositedAmountFormatted ?? d.depositedAmount ?? null, received: d.amountOutFormatted ?? d.amountOut ?? null, refund,
     near_txs: (d.nearTxHashes || []).map(h => ({ hash: h.hash || h, explorer: `https://testnet.nearblocks.io/txns/${h.hash || h}` })),
     verifier, source: `${TIDEPOOL.api}/v0/status?depositAddress=${depositAddress}` };
+}
+
+// One refund address per swap. A real swap's refundTo is a fresh NEAR implicit account (64-hex id of a
+// one-time ed25519 key made for that swap only), never the wallet and never the recipient, so a refund
+// cannot be linked to the payer's wallet or to any other swap. The key goes to the caller (kept in
+// .secrets/, never committed); the refund lands in that account's verifier balance and only it can move it.
+export const implicitId = pk => Buffer.from(pk.data).toString('hex');
+export function freshRefund(used = new Set(), avoid = []) {
+  for (let i = 0; i < 3; i++) {
+    const kp = KeyPair.fromRandom('ed25519');
+    const accountId = implicitId(kp.getPublicKey());
+    if (used.has(accountId) || avoid.includes(accountId)) continue;
+    used.add(accountId);
+    return { accountId, public_key: kp.getPublicKey().toString(), private_key: kp.toString() };
+  }
+  throw new Error('could not make a fresh refund account');
+}
+// Refuses a refundTo that was used before, or that equals the payer wallet or the recipient.
+export function checkFreshRefund(refundTo, { used = new Set(), wallet, recipient } = {}) {
+  if (!/^[0-9a-f]{64}$/.test(String(refundTo))) return { ok: false, why: 'refundTo is not a one-time implicit account' };
+  if (refundTo === wallet) return { ok: false, why: 'refundTo is the payer wallet' };
+  if (refundTo === recipient) return { ok: false, why: 'refundTo is the recipient' };
+  if (used.has(refundTo)) return { ok: false, why: 'refundTo was already used by another swap' };
+  return { ok: true };
 }
