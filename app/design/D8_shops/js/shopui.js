@@ -161,13 +161,13 @@ const APPS = {
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => { const ps = A.bankPayees(), rows = APPS.payouts.rows(), left = A.payoutLeft(), tot = APPS.payouts.total();
       if (!A.canBatch()) return '<p class="goal" data-testid="payout-legacy">This charter predates batches.</p>';
-      return `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ps.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(short(a, 12, 6))}</option>`).join('')}</select>`
+      return `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ps.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(a.split('.')[0])}</option>`).join('')}</select>`
         + `<label class="p-amt"><input type="number" data-i="${i}" min="0.001" step="0.001" value="${esc(r.amt)}" aria-label="Amount ${i + 1}"><span>NEAR</span></label>`
         + `<button type="button" class="p-x" data-i="${i}" aria-label="Remove payout ${i + 1}" ${rows.length <= 2 ? 'disabled' : ''}>×</button></li>`).join('')}</ol>`
-        + `<div class="p-foot"><button type="button" class="tee-btn" id="p-add" ${rows.length >= 5 ? 'disabled' : ''}>+ Add payout</button><span class="p-sum ${tot > left ? 'no' : ''}" data-testid="payout-total">${tot} of ${+left.toFixed(4)} NEAR left today</span></div>`; },
+        + `<div class="p-foot"><button type="button" class="tee-btn" id="p-add" ${rows.length >= 5 ? 'disabled' : ''}>+ Add payout</button><span class="p-sum ${tot > left ? 'no' : ''}" data-testid="payout-total">${tot} NEAR · ${+left.toFixed(4)} left today</span></div>`; },
     bind: () => { const rows = APPS.payouts.rows(), re = () => { form(APPS.payouts.form()); APPS.payouts.bind(); btn(APPS.payouts.btn(), 'primary', !A.canBatch()); };
       document.querySelectorAll('.p-to').forEach(e => { e.onchange = () => { rows[+e.dataset.i].to = e.value; }; });
-      document.querySelectorAll('.p-amt input').forEach(e => { e.oninput = () => { rows[+e.dataset.i].amt = e.value; const t = $('[data-testid=payout-total]'), tot = APPS.payouts.total(), left = A.payoutLeft(); if (t) { t.textContent = `${tot} of ${+left.toFixed(4)} NEAR left today`; t.classList.toggle('no', tot > left); } btn(APPS.payouts.btn()); }; });
+      document.querySelectorAll('.p-amt input').forEach(e => { e.oninput = () => { rows[+e.dataset.i].amt = e.value; const t = $('[data-testid=payout-total]'), tot = APPS.payouts.total(), left = A.payoutLeft(); if (t) { t.textContent = `${tot} NEAR · ${+left.toFixed(4)} left today`; t.classList.toggle('no', tot > left); } btn(APPS.payouts.btn()); }; });
       document.querySelectorAll('.p-x').forEach(e => { e.onclick = () => { rows.splice(+e.dataset.i, 1); re(); }; });
       const a = $('#p-add'); if (a) a.onclick = () => { if (rows.length < 5) rows.push({ to: A.bankDefault() || A.bankPayees()[0], amt: '0.01' }); re(); }; },
     btn: () => A.canBatch() ? `Pay ${APPS.payouts.rows().length} as one · ${APPS.payouts.total()} NEAR` : 'Build a new charter first',

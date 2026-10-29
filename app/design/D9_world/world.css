@@ -358,3 +358,4 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #shopUI .p-x:disabled { opacity: .35; cursor: default; }
 #shopUI .p-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 #shopUI .p-sum { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; } #shopUI .p-sum.no { color: var(--no); }
+#shopUI #p-add:disabled { opacity: .4; cursor: default; }

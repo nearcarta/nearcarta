@@ -38,6 +38,10 @@ export default async function payouts() {
   // back wall shelves, banners, a rug and lanterns
   mesh(scene, new THREE.BoxGeometry(3.2, 2.0, .2), PM.plaster, [0, 1.0, -1.5]);
   [.75, 1.3].forEach(y => mesh(scene, new THREE.BoxGeometry(1.6, .05, .26), PM.wood, [-.6, y, -1.33]));
+  const bk = [0x7a3e2c, 0x5e6b4a, 0x8a6a3a, 0x4a4060, 0x9a5a3a];
+  [.75, 1.3].forEach((y, j) => { let x = -1.3; for (let i = 0; i < 6; i++) { const w = .06 + ((i + j) % 3) * .015, h = .2 + ((i * 7 + j) % 4) * .03;
+    mesh(scene, new THREE.BoxGeometry(w, h, .17), new THREE.MeshStandardMaterial({ color: bk[(i + j * 2) % 5], roughness: .9 }), [x, y + .025 + h / 2, -1.33]); x += w + .015; } });
+  mesh(scene, new THREE.CylinderGeometry(.08, .1, .16, 14), brassM(), [.1, 1.405, -1.33]); mesh(scene, new THREE.CylinderGeometry(.07, .07, .12, 14), brassM(), [-.05, .855, -1.33]);
   banner(scene, 1.15, 1.75, -1.38, 0xa8644a, { w: .36, h: .85 });
   rug(scene, 0, 1.3, 2.6, 1.4, 0x5e3427); lantern(scene, -2.0, -.6, { h: 1.4 }); lantern(scene, 2.1, -.9, { h: 1.4, light: false });
   await put(scene, 'decoration/props/sack', { x: -1.75, z: .55, fitW: .4 }).catch(() => null);

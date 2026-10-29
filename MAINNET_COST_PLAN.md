@@ -11,8 +11,8 @@ Kind: **burn** = gone; **lock** = storage stake, recoverable; **move** = working
 | # | Piece | What | NEAR | ETH | ZEC | USDC/USD | Kind | Required? | Source |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Root account | named `<root>.near` via registrar: creation charge + gas | 0.008 |  |  |  | burn | required | G,A |
-| 2 | Charters (global code) | publish lean `oath` -Oz 330,006 B as global contract by hash: 10 NEAR/100 KB, burned | 33.0006 |  |  |  | burn | required | GC |
-| 3 | Charters (global code) | gas to upload 330 KB (0.58+0.13*X Tgas) | 0.00435 |  |  |  | burn | required | G |
+| 2 | Charters (global code) | publish main `oath` (R16.1 propose_batch + C5, reproducible build-3709807) 401,313 B as global contract by hash, as on the testnet R17 factory `nccharters-53836`: 10 NEAR/100 KB, burned | 40.1313 |  |  |  | burn | required | GC |
+| 3 | Charters (global code) | gas to upload 401 KB (0.58+0.13*X Tgas) | 0.00527 |  |  |  | burn | required | G |
 | 4 | Factory | `charter_factory` account: creation + 201,539 B storage (measured) | 2.02239 |  |  |  | lock | required | S,M |
 | 5 | Factory | deploy gas 175 KB + init + delete full-access key | 0.00337 |  |  |  | burn | required | G |
 | 6 | Charters x4 | Guardhouse/Mist Bank, House, Town Hall, shared Vault/Arena charter: each 833 B (measured, >770 so all bytes) + 0.01 registry fee | 0.07332 |  |  |  | lock | required | S,M |
@@ -45,19 +45,19 @@ Kind: **burn** = gone; **lock** = storage stake, recoverable; **move** = working
 
 | Set | NEAR | ETH | ZEC | USDC | USD |
 |---|---|---|---|---|---|
-| Required, all kinds (cash to hold) | 46.2673 | 0.00000553 | 0.0003 | 3.26 | **$222.97** |
-| Required, burned or spent only | 33.2722 | 0.00000358 | 0.0003 | 0.76 | **$158.87** |
+| Required, all kinds (cash to hold) | 53.3989 | 0.00000553 | 0.0003 | 3.26 | **$256.78** |
+| Required, burned or spent only | 40.4038 | 0.00000358 | 0.0003 | 0.76 | **$192.68** |
 | Required, locked (recoverable) | 12.9949 | 0 | 0 | 0 | **$61.60** |
 | Optional items | 3.9904 | 0.00000352 | 0 | 0 | **$18.92** |
-| Everything incl. optional | 50.2577 | 0.00000905 | 0.0003 | 3.26 | **$241.89** |
-| Floor: required, factory deferred, 4 charters deployed as regular contracts (path 2 below) | 26.0353 | 0.00000553 | 0.0003 | 3.26 | **$127.07** |
+| Everything incl. optional | 57.3893 | 0.00000905 | 0.0003 | 3.26 | **$275.70** |
+| Floor: required, factory deferred, 4 charters deployed as regular contracts (path 2 below) | 27.4015 | 0.00000553 | 0.0003 | 3.26 | **$133.55** |
 
-The biggest single item is row 2, publishing the charter code as a global contract (33.00 NEAR, about $156, burned). It is needed only because the public factory lets anyone create a charter with no code of their own.
+The biggest single item is row 2, publishing the charter code as a global contract (40.13 NEAR, about $190, burned). It is needed only because the public factory lets anyone create a charter with no code of their own.
 
 ## Cheapest path
 
-1. **Shrunk wasm.** Publish the lean `oath` build (`wasm-opt -Oz`, 330,006 B) rather than `oath.r16.oz.wasm` (367,202 B). This saves 3.72 NEAR of burn. Each further 10 KB cut saves 1 NEAR. Rebuild it reproducibly and re-verify on testnet first.
-2. **Global code only for the factory.** If the public factory waits, deploy the 4 house charters as regular contracts instead: 4 x 371,620 B = 14.91 NEAR, all locked and recoverable, against 35.14 NEAR for the global path (mostly burned). The global path pays off at 10 or more charters [GC].
+1. **Shrunk wasm.** The testnet R17 factory publishes the reproducible 401,313 B build unchanged (40.13 NEAR of testnet burn). On R16 a `wasm-opt -Oz` pass cut 10.1% (367,202 to 330,006 B); on this build that would save about 4.07 NEAR of burn. Each 10 KB cut saves 1 NEAR. Rebuild it reproducibly and re-verify on testnet first.
+2. **Global code only for the factory.** If the public factory waits, deploy the 4 house charters as regular contracts instead: 4 x ~405,731 B = 16.28 NEAR, all locked and recoverable, against 42.28 NEAR for the global path (mostly burned). The global path pays off at 10 or more charters [GC].
 3. **Charters through the factory.** Each one is 833 B (it holds a reference to the code, not the code), so initialise the mainnet factory with `min_deposit` 0.02 NEAR, not the testnet 0.3 NEAR (the contract only requires more than the 0.01 registry fee).
 4. **One Toll instance for Base** covers both native ETH and USDC rules. Arbitrum is a second instance and is optional.
 5. **DAO.** Guardhouse uses a plain account as its DAO role (182 B on testnet). Only Town Hall needs the Sputnik DAO, and Guardhouse can point at the same one.

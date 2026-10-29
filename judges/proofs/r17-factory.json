@@ -102,5 +102,26 @@
   "charter_factory": "cargo test --lib: 23 passed",
   "backend": "npm test: 182 pass, 1 skipped, 0 fail"
  },
- "verify": "curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"smoke.nccharters-53836.testnet\"}}' | jq .result.global_contract_hash  # = CEG11eK9..., = bs58(sha256(contracts/artifacts/oath.c5.wasm))"
+ "verify": "curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"smoke.nccharters-53836.testnet\"}}' | jq .result.global_contract_hash  # = CEG11eK9..., = bs58(sha256(contracts/artifacts/oath.c5.wasm))",
+ "tests": {
+  "oath_cargo_test_lib": "pass (rerun 29 Oct 2026 for R17)",
+  "cargo_mutants_oath_diff": {
+   "mutants": 114,
+   "caught": 90,
+   "unviable": 24,
+   "missed": 0,
+   "timeout": 0,
+   "cmd": "cargo mutants --in-diff (oath diff since the R16 factory build, --relative)"
+  },
+  "payouts_js_unit": {
+   "file": "backend/test/unit/d8-payouts.test.js",
+   "pass": 10,
+   "fail": 0
+  },
+  "payouts_js_mutants": {
+   "spec": "scripts/verify/mutants-payouts.json",
+   "killed": 23,
+   "total": 23
+  }
+ }
 }

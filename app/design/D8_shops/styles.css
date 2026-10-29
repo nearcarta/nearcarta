@@ -217,3 +217,4 @@ a.link.more[hidden] { display: none; }
 .p-x:disabled { opacity: .35; cursor: default; }
 .p-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 .p-sum { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; } .p-sum.no { color: var(--no); }
+#p-add:disabled { opacity: .4; cursor: default; }

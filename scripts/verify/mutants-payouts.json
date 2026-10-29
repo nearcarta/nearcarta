@@ -1,0 +1,29 @@
+{
+  "file": "app/design/D8_shops/js/payouts.js",
+  "test": "backend/test/unit/d8-payouts.test.js",
+  "mutants": [
+    ["export const MAX_BATCH = 5;", "export const MAX_BATCH = 6;"],
+    ["Math.min(TG_MAX, TG_BASE + TG_PER * n)", "Math.max(TG_MAX, TG_BASE + TG_PER * n)"],
+    ["TG_BASE + TG_PER * n", "TG_BASE + TG_PER"],
+    ["Math.round(Number(n) * 1e6)", "Math.floor(Number(n) * 1e5)"],
+    ["filter(r => r && r.to)", "filter(r => r)"],
+    ["if (list.length < 2)", "if (list.length < 1)"],
+    ["if (list.length > MAX_BATCH)", "if (list.length >= MAX_BATCH)"],
+    ["if (!(Number(r.amt) > 0))", "if (!(Number(r.amt) >= 0))"],
+    ["if (!payees.includes(r.to)) throw", "if (false) throw"],
+    ["String(BigInt(nonce) + BigInt(i))", "String(BigInt(nonce))"],
+    ["memo: `payouts:${i + 1}/${n}`", "memo: `payouts:${i}/${n}`"],
+    ["receipt: null", "receipt: undefined"],
+    ["(BigInt(nowMs + ttlMs) * 1_000_000n)", "(BigInt(nowMs) * 1_000_000n)"],
+    ["clause_id: clauseId", "clause_id: 'pay2'"],
+    ["if (v.length !== n)", "if (false)"],
+    ["v.every(o => o.decision === 'allowed')", "v.some(o => o.decision === 'allowed')"],
+    ["ids: v.map(o => o.action_id)", "ids: []"],
+    ["findIndex(o => o.reason !== 'batch_refused')", "findIndex(o => o.reason === 'batch_refused')"],
+    ["bad >= 0 && v.some(o => o.reason === 'batch_refused') ? bad : null", "bad >= 0 ? bad : null"],
+    ["if (!clause) return 0;", "if (!clause) return 1;"],
+    ["+ BigInt(usage?.reserved || 0)", "+ 0n"],
+    ["left > 0n ? ", "left > -1000000000000000000000000n ? "],
+    ["/ 10n ** 18n) / 1e6", "/ 10n ** 18n) / 1e5"]
+  ]
+}
