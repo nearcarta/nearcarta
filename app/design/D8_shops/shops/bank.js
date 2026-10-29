@@ -8,11 +8,14 @@ import { BANK } from '../data/live.js';
 import { M as PM, brassM, mesh, lantern, candle, rug } from './_props.js';
 
 const B = D.BANK || BANK;
+// The room's one-line summary of how a payout runs (room copy; the README is the charter worker's).
+export const ROOM_LINE = 'One fresh payee per payout; the Zcash send is run by an operator worker.';
 const LEG = { shield: 'Shield ZEC into a confidential balance', transfer: 'Transfer between confidential balances', unshield: 'Unshield to a public Intents balance' };
 const short = c => `${String(c).slice(0, 8)}…${String(c).slice(-6)}`;
 function live(b) {
   const s = b.street;
   return proof(
+    note(ROOM_LINE),
     h3('The street window · public explorer, live read'),
     row({ k: `Zcash testnet payout at height ${s.height}`, why: s.hidden ? `no transparent inputs or outputs; only the ${s.fee} zat fee leaves the ${s.pool} pool` : `amount visible: ${s.reasons.join(', ')}`, st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'amount hidden' : 'amount visible', src: 'live' }),
     note(`<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.txid.slice(0, 12))}… ↗</a> · ${esc(String(s.confirmations))} confirmations${b.at ? ' · read ' + esc(b.at) : ''}`),

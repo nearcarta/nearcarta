@@ -80,7 +80,7 @@ const APPS = {
     },
   },
   bank: {
-    label: 'Mist Bank · private send', idle: 'Pick a note. Fixed sizes keep every send alike.',
+    label: 'Mist Bank · private send', idle: 'Pick a note. Fixed sizes keep every send alike. One fresh payee per payout; the Zcash send is run by an operator worker.',
     form: () => { const ps = A.bankPayees(), to = extra.to || A.bankDefault();
       const note = A.NOTES.includes(+extra.amt) ? +extra.amt : A.NOTES[0];
       return `<div class="seg notes" role="radiogroup" aria-label="Note size" data-testid="bank-notes">${A.NOTES.map(n => `<label><input type="radio" name="note" id="m-note-${String(n).replace('.', '')}" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div>`
