@@ -61,11 +61,11 @@ On 2026-10-29 a fresh guest pressed every shop row above on the live site with n
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 250 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
-npm run verify           # reads every proof tx back from testnet (70/70 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
+npm test                 # 254 unit tests (1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm run verify           # reads every proof tx back from testnet (76/76 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
-npm run build && node app/serve.mjs &   # UI on :5173
-npx playwright install chromium && npm run e2e   # 34 browser tests
+NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
+npx playwright install chromium && npm run e2e   # 34 browser tests: 22 run, 12 skip without wallet keys
 ```
 Optional: `ONECLICK_PARTNER_KEY` enables confidential quotes. `NEARAI_CLOUD_API_KEY` enables the live NEAR AI TEE check (`npm run tee`; non-billable). Without them the public paths still run.
 
