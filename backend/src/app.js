@@ -298,10 +298,20 @@ export function makeApp() {
   // Full TEE preflight (dcap-qvl quote, nonce + signer binding, MRCONFIGID, RTMR3 replay, NVIDIA NRAS).
   // Non-billable. ?nonce= lets the caller supply its own 32-byte hex nonce.
   app.get('/api/ai/tee/models', limiter(6), nearAi, async c => c.json(await tee.attestedModels()));
-  app.get('/api/ai/tee', limiter(4), nearAi, async c => {
-    const model = c.req.query('model');
-    if (model && (model.length > 120 || !(await tee.attestedModels()).attested.some(m => m.id === model))) return bad(c, 'that model has no TEE attestation; see /api/ai/tee/models');
-    return c.json(await tee.proveTee({ nonce: c.req.query('nonce') || undefined, ...(model ? { model } : {}) }));
+  // Answered from a 5-minute cache when the same nonce (or no nonce) was checked recently (tee.cachedProveTee);
+  // only a miss, which fetches a fresh quote, counts against the per-client limit and its own global cap.
+  // A loose guard (60/min per client) still stops anyone hammering cache hits.
+  const teeAny = limiter(60), teeMiss = limiter(Number(process.env.TEE_MISS_PER_MIN || 20)), teeCap = globalCap('nearai-tee', Number(process.env.CAP_NEARAI_TEE_PER_MIN || 60));
+  app.get('/api/ai/tee', teeAny, async c => {
+    const model = c.req.query('model'), nonce = c.req.query('nonce') || undefined;
+    if (nonce !== undefined && !/^[0-9a-f]{64}$/i.test(nonce)) return bad(c, 'nonce must be 32 bytes as 64 hex chars');
+    const opts = { nonce, ...(model ? { model } : {}) };
+    const run = async () => {
+      if (model && (model.length > 120 || !(await tee.attestedModels()).attested.some(m => m.id === model))) return bad(c, 'that model has no TEE attestation; see /api/ai/tee/models');
+      return c.json(await tee.cachedProveTee(opts));
+    };
+    if (tee.teeCached(opts)) return run();
+    return teeMiss(c, () => teeCap(c, run));
   });
   app.post('/api/ai/prove', limiter(3), nearAi, async c => {
     // Completions are billable. This demo route is off unless AI_PROVE_ENABLED=1; the agent (agent.js) has its own budget.

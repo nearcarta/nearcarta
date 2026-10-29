@@ -10,7 +10,7 @@
 // and a daily call cap. When the model is unavailable or over budget, the plain-words parser
 // (shared/vault/ask.js) is used instead and the result says so.
 import { complete, signature, checkSigned, verifyLink } from './ai.js';
-import { proveTee } from './tee.js';
+import { cachedProveTee } from './tee.js';
 import { cfg, secret } from './config.js';
 import { nearToYocto, parseAsk } from '../../shared/vault/ask.js';
 
@@ -46,7 +46,8 @@ export const budgetStatus = () => { roll(); return { ...budget, usd: Number(budg
 
 // ---- TEE preflight, cached (non-billable, but slow) ----
 let pre = null;
-export async function preflight({ ttlMs = 10 * 60e3, run = proveTee } = {}) {
+// Reads through tee.js's 5-minute attestation cache, so it shares fetches with /api/ai/tee.
+export async function preflight({ ttlMs = 10 * 60e3, run = cachedProveTee } = {}) {
   if (pre && pre.ok && Date.now() - pre.at < ttlMs) return pre.r;
   const r = await run({ signingAlgo: 'ed25519' });
   pre = { r, ok: !!r.ok, at: Date.now() };

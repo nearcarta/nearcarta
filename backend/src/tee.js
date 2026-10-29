@@ -158,3 +158,38 @@ export async function attestedModels({ concurrency = 6, ttlMs = 10 * 60e3, fetch
   attestedCache = { at: Date.now(), list };
   return list;
 }
+
+// ---- attestation result cache (5 minutes) ----
+// /api/ai/tee is called by the Mist Bank twice per send (the "verify now" panel, then the send with the
+// seal as nonce) and by the console. A repeated nonce, or a call with no nonce, gets the result already
+// checked within the last 5 minutes, so it neither hits NEAR AI again nor counts against the route's
+// rate limit. A new client nonce always needs a fresh quote (the nonce must be inside it), so that is a
+// miss and stays rate limited. Failures are not cached. Concurrent identical calls share one fetch.
+// The agent's preflight (agent.js) reads through this cache too, so it and the route share fetches.
+export const TEE_TTL_MS = Number(process.env.TEE_CACHE_TTL_MS || 5 * 60e3);
+const teeCache = new Map(); // key -> { at, p }
+const teeKey = ({ model = cfg.nearAiModel, signingAlgo = 'ecdsa', gpu = true, nonce } = {}) =>
+  [model, signingAlgo, gpu ? 'gpu' : 'nogpu', nonce ? String(nonce).toLowerCase() : '*'].join('|');
+function teeGet(key, ttlMs, now) {
+  const e = teeCache.get(key);
+  if (!e) return null;
+  if (now - e.at >= ttlMs) { teeCache.delete(key); return null; }
+  return e;
+}
+// True when this call would be answered from the cache (used to skip the per-client limit).
+export const teeCached = (opts = {}, { ttlMs = TEE_TTL_MS, now = Date.now() } = {}) => !!teeGet(teeKey(opts), ttlMs, now);
+export async function cachedProveTee(opts = {}, { ttlMs = TEE_TTL_MS, run = proveTee, now = Date.now } = {}) {
+  const key = teeKey(opts), t = now();
+  let e = teeGet(key, ttlMs, t);
+  if (!e) {
+    if (teeCache.size > 500) for (const [k, v] of teeCache) if (t - v.at >= ttlMs || teeCache.size > 500) teeCache.delete(k);
+    e = { at: t, p: Promise.resolve().then(() => run(opts)) };
+    teeCache.set(key, e);
+    e.p.then(r => { if (!r?.ok) teeCache.delete(key); }, () => teeCache.delete(key));
+    const r = await e.p;
+    return { ...r, cache: { hit: false, ttl_s: Math.round(ttlMs / 1000) } };
+  }
+  const r = await e.p;
+  return { ...r, cache: { hit: true, age_s: Math.round((t - e.at) / 1000), ttl_s: Math.round(ttlMs / 1000) } };
+}
+export const _clearTeeCache = () => teeCache.clear();
