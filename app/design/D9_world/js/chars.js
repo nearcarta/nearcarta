@@ -222,6 +222,8 @@ export async function buildCast(){
   CAST.sitters=sset.filter(([g])=>g).map(([g,o,q,r,dx,dz],i)=>{ const c=new Char(g,{...o,height:.42}); const p=hx(q,r);
     if(i===0&&W.jetty?.stand){ const J=W.jetty, dir=J.home.clone().sub(J.stand).setY(0).normalize(), sd=new THREE.Vector3(-dir.z,0,dir.x), q0=J.stand.clone().lerp(J.home,.32).addScaledVector(sd,.24); c.place(q0.x,q0.z,Math.atan2(sd.x,sd.z)); c.pos.y=.06; }
     else c.place(p.x+dx,p.z+dz,Math.atan2(-(p.x+dx),-(p.z+dz))); c.noAlt=true; c.sitter=true; c.play('sit',{hold:true,fade:0}); return c; });
+  // the Vault Arena Guardian: a small gold Lamplighter-kin that lives inside the dome and reacts to each scam that hits it (js/life.js)
+  if(robot){ const { SHOPS:S0 }=await import('./core.js'); const ap=hx(S0.arena.q,S0.arena.r); CAST.guardian=new Char(robot,{rig:'robot',scale:.11,name:'Guardian',voice:1.7,height:.6,tint:0xffd98a}).place(ap.x,ap.z+.15,0); CAST.guardian.noAlt=false; CAST.guardian.immune=true; }
   // shop keepers: one per shop, beside the door, each with its own look and prop. They wave when the Lamplighter comes close.
   const KEEP={ chronicle:[mage,{scale:.18,name:'Archivist',keep:['Spellbook_open'],tint:0xf0d9b0}], bank:[rogue,{scale:.2,name:'Banker',keep:[],tint:0xe8c890}],
     guard:[knight,{scale:.22,name:'Captain',keep:['Badge_Shield']}], arena:[barb,{scale:.21,name:'Arena marshal',keep:['2H_Axe'],hide:['Barbarian_Hat']}],
