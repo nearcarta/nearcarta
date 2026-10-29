@@ -1,14 +1,14 @@
 {
   "config": {
     "argv": [
-      "/usr/bin/node",
-      "/workspace/near/tech/nearcarta/node_modules/.bin/playwright",
+      "/usr/local/lib/nodejs/node",
+      "/tmp/nc/node_modules/.bin/playwright",
       "test",
       "-c",
       "e2e/playwright.config.js"
     ],
-    "configFile": "/workspace/near/tech/nearcarta/e2e/playwright.config.js",
-    "rootDir": "/workspace/near/tech/nearcarta/e2e",
+    "configFile": "/tmp/nc/e2e/playwright.config.js",
+    "rootDir": "/tmp/nc/e2e",
     "failOnFlakyTests": false,
     "forbidOnly": false,
     "fullyParallel": false,
@@ -19,20 +19,20 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 1
+      "actualWorkers": 2
     },
     "preserveOutput": "always",
     "projects": [
       {
-        "outputDir": "/workspace/near/tech/nearcarta/test-results",
+        "outputDir": "/tmp/nc/test-results",
         "repeatEach": 1,
         "retries": 1,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 2
         },
         "id": "",
         "name": "",
-        "testDir": "/workspace/near/tech/nearcarta/e2e",
+        "testDir": "/tmp/nc/e2e",
         "testIgnore": [],
         "testMatch": [
           "**/*.@(spec|test).?(c|m)[jt]s?(x)"
@@ -44,20 +44,20 @@
       {
         "grep": {},
         "grepInvert": null,
-        "outputDir": "/workspace/near/tech/nearcarta/test-results",
+        "outputDir": "/tmp/nc/test-results",
         "repeatEach": 1,
         "retries": 1,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 2
         },
         "name": "",
-        "testDir": "/workspace/near/tech/nearcarta/e2e",
-        "snapshotDir": "/workspace/near/tech/nearcarta/e2e",
+        "testDir": "/tmp/nc/e2e",
+        "snapshotDir": "/tmp/nc/e2e",
         "testIgnore": [],
         "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
         "timeout": 90000,
         "use": {
-          "baseURL": "http://127.0.0.1:5173",
+          "baseURL": "http://127.0.0.1:5174",
           "screenshot": "only-on-failure"
         },
         "dependencies": [],
@@ -92,6 +92,487 @@
   },
   "suites": [
     {
+      "title": "connect.spec.js",
+      "file": "connect.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "connect: / opens the NEAR Connect wallet list",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1150,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:02.996Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18dd010e2552a361d8c1-5b114a22359cc3d275f1",
+          "file": "connect.spec.js",
+          "line": 18,
+          "column": 3
+        },
+        {
+          "title": "connect: / drops MyNearWallet after its sunset",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 787,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:04.279Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18dd010e2552a361d8c1-2910c8d5614ed1b688f4",
+          "file": "connect.spec.js",
+          "line": 26,
+          "column": 3
+        },
+        {
+          "title": "connect: /console opens the NEAR Connect wallet list",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 511,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:05.079Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18dd010e2552a361d8c1-386d3970b672e9eafc9b",
+          "file": "connect.spec.js",
+          "line": 18,
+          "column": 3
+        },
+        {
+          "title": "connect: /console drops MyNearWallet after its sunset",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 398,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:05.598Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18dd010e2552a361d8c1-dd1fe18b09a904842199",
+          "file": "connect.spec.js",
+          "line": 26,
+          "column": 3
+        }
+      ]
+    },
+    {
+      "title": "evm-wallet.spec.js",
+      "file": "evm-wallet.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "evm wallet: opens the evm-on-near.dev window",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 857,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:02.983Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2684ecfc8f680c82c5f3-241c021bf932f5d53c28",
+          "file": "evm-wallet.spec.js",
+          "line": 5,
+          "column": 3
+        },
+        {
+          "title": "evm wallet: blocked pop-up shows an error",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 784,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:03.986Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2684ecfc8f680c82c5f3-96cca86a3aff84fcd971",
+          "file": "evm-wallet.spec.js",
+          "line": 5,
+          "column": 3
+        }
+      ]
+    },
+    {
+      "title": "guard-live.spec.js",
+      "file": "guard-live.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "payee check stops a poisoned invoice, the charter refuses it, and the Mist Bank shows a verified TEE",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 900000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/tmp/nc/e2e/guard-live.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set GUARD_E2E=1 (uses the public testnet faucet)",
+                  "location": {
+                    "file": "/tmp/nc/e2e/guard-live.spec.js",
+                    "line": 13,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:07.672Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/tmp/nc/e2e/guard-live.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set GUARD_E2E=1 (uses the public testnet faucet)",
+                      "location": {
+                        "file": "/tmp/nc/e2e/guard-live.spec.js",
+                        "line": 13,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "57fceaa41bb22dcf9ffa-86191a52d74ee28df0e3",
+          "file": "guard-live.spec.js",
+          "line": 19,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "hall.spec.js",
+      "file": "hall.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "town hall proposals",
+          "file": "hall.spec.js",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "shows the DAO, its council and the latest proposals from chain",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1443,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-29T08:37:04.795Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "12efcde6fe54bde8de65-92f8dc872c65e5e69a69",
+              "file": "hall.spec.js",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "a guest files a proposal to join the reward list",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set HALL_FILE=1 to file a real testnet proposal",
+                      "location": {
+                        "file": "/tmp/nc/e2e/hall.spec.js",
+                        "line": 13,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "skipped",
+                      "duration": 112,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-29T08:37:06.255Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "set HALL_FILE=1 to file a real testnet proposal",
+                          "location": {
+                            "file": "/tmp/nc/e2e/hall.spec.js",
+                            "line": 13,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "12efcde6fe54bde8de65-d91fe811e66ef5d0628b",
+              "file": "hall.spec.js",
+              "line": 12,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "house.spec.js",
+      "file": "house.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "owner freezes, unfreezes and approves a held spend through NEAR Connect",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 480000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/tmp/nc/e2e/house.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set HOUSE_OWNER_KEY_FILE and HOUSE_AGENT_KEY_FILE to run against testnet",
+                  "location": {
+                    "file": "/tmp/nc/e2e/house.spec.js",
+                    "line": 17,
+                    "column": 8
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 2,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:06.024Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/tmp/nc/e2e/house.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set HOUSE_OWNER_KEY_FILE and HOUSE_AGENT_KEY_FILE to run against testnet",
+                      "location": {
+                        "file": "/tmp/nc/e2e/house.spec.js",
+                        "line": 17,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "77f510a8e7074d097df7-3665d75f8a51ab3f2d0d",
+          "file": "house.spec.js",
+          "line": 16,
+          "column": 1
+        }
+      ]
+    },
+    {
       "title": "shops.spec.js",
       "file": "shops.spec.js",
       "column": 0,
@@ -113,12 +594,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 261,
+                  "duration": 229,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:33.640Z",
+                  "startTime": "2026-10-29T08:37:06.049Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -147,12 +628,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1238,
+                  "duration": 1147,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:33.963Z",
+                  "startTime": "2026-10-29T08:37:06.294Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -181,12 +662,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1473,
+                  "duration": 1400,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:35.454Z",
+                  "startTime": "2026-10-29T08:37:07.460Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -196,7 +677,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-81111cd24dfd0e822200",
           "file": "shops.spec.js",
-          "line": 20,
+          "line": 22,
           "column": 1
         },
         {
@@ -215,12 +696,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 440,
+                  "duration": 263,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:36.972Z",
+                  "startTime": "2026-10-29T08:37:08.888Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -230,7 +711,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-24a5ca6356b4572da13f",
           "file": "shops.spec.js",
-          "line": 29,
+          "line": 32,
           "column": 1
         },
         {
@@ -249,12 +730,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1045,
+                  "duration": 202,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:37.426Z",
+                  "startTime": "2026-10-29T08:37:09.162Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -264,7 +745,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-40c648e334fb9e4bc6f6",
           "file": "shops.spec.js",
-          "line": 36,
+          "line": 40,
           "column": 1
         },
         {
@@ -283,12 +764,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2614,
+                  "duration": 1907,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:38.489Z",
+                  "startTime": "2026-10-29T08:37:09.391Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -298,7 +779,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-573f8032b41051135587",
           "file": "shops.spec.js",
-          "line": 43,
+          "line": 48,
           "column": 1
         },
         {
@@ -317,12 +798,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2594,
+                  "duration": 194,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:41.117Z",
+                  "startTime": "2026-10-29T08:37:11.310Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -332,11 +813,11 @@
           ],
           "id": "e3b5e6ee814041738c3d-d8038822d04264cd484f",
           "file": "shops.spec.js",
-          "line": 55,
+          "line": 60,
           "column": 1
         },
         {
-          "title": "town hall: oath is frozen by a DAO vote",
+          "title": "town hall: the DAO froze and unfroze the oath by vote, and the page shows the live state",
           "ok": true,
           "tags": [],
           "tests": [
@@ -351,12 +832,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1173,
+                  "duration": 228,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:43.741Z",
+                  "startTime": "2026-10-29T08:37:11.512Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -364,9 +845,9 @@
               "status": "expected"
             }
           ],
-          "id": "e3b5e6ee814041738c3d-8867e905a46a04a2834f",
+          "id": "e3b5e6ee814041738c3d-e342116ed3c15aee626a",
           "file": "shops.spec.js",
-          "line": 62,
+          "line": 67,
           "column": 1
         },
         {
@@ -385,12 +866,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2565,
+                  "duration": 3587,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:44.946Z",
+                  "startTime": "2026-10-29T08:37:11.757Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -400,7 +881,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-375bb67bc8d84b7efb9b",
           "file": "shops.spec.js",
-          "line": 68,
+          "line": 77,
           "column": 1
         },
         {
@@ -419,12 +900,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 601,
+                  "duration": 1521,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:47.536Z",
+                  "startTime": "2026-10-29T08:37:15.350Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -434,7 +915,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-e79a798733b7df2f5e5c",
           "file": "shops.spec.js",
-          "line": 74,
+          "line": 83,
           "column": 1
         },
         {
@@ -453,12 +934,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3236,
+                  "duration": 1239,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:48.174Z",
+                  "startTime": "2026-10-29T08:37:16.883Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -468,11 +949,11 @@
           ],
           "id": "e3b5e6ee814041738c3d-9cabba31baf570716cd0",
           "file": "shops.spec.js",
-          "line": 80,
+          "line": 89,
           "column": 1
         },
         {
-          "title": "mist bank: the street shows a hidden amount and the ledger binds to the oath",
+          "title": "mist bank: the street shows a hidden amount and only the commitment is public",
           "ok": true,
           "tags": [],
           "tests": [
@@ -487,12 +968,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2875,
+                  "duration": 325,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:51.431Z",
+                  "startTime": "2026-10-29T08:37:18.138Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -500,9 +981,9 @@
               "status": "expected"
             }
           ],
-          "id": "e3b5e6ee814041738c3d-7050bec6c91e34c2bf65",
+          "id": "e3b5e6ee814041738c3d-fbb163ced24de17ed809",
           "file": "shops.spec.js",
-          "line": 89,
+          "line": 99,
           "column": 1
         },
         {
@@ -521,12 +1002,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 599,
+                  "duration": 525,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T02:12:54.324Z",
+                  "startTime": "2026-10-29T08:37:18.476Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -536,7 +1017,714 @@
           ],
           "id": "e3b5e6ee814041738c3d-667e3858efcad007d0b0",
           "file": "shops.spec.js",
-          "line": 98,
+          "line": 110,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "vault-ai.spec.js",
+      "file": "vault-ai.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "the NEAR AI model proposes, the charter allows one ask and refuses an injection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 420000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault-ai.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set VAULT_AI_E2E=1 (testnet faucet and two NEAR AI calls)",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault-ai.spec.js",
+                    "line": 10,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:06.383Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-ai.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_AI_E2E=1 (testnet faucet and two NEAR AI calls)",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-ai.spec.js",
+                        "line": 10,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7b7d909e9dd50a69e76-f8379411f4eccf005a28",
+          "file": "vault-ai.spec.js",
+          "line": 16,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "vault-create.spec.js",
+      "file": "vault-create.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "charter office #create at 1280",
+          "file": "vault-create.spec.js",
+          "line": 8,
+          "column": 8,
+          "specs": [
+            {
+              "title": "guest first and focused, no sideways scroll",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 539,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-29T08:37:06.390Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "691584d3a1d95b30af6a-9f66e4444ef45e26a272",
+              "file": "vault-create.spec.js",
+              "line": 11,
+              "column": 5
+            },
+            {
+              "title": "guest sign-in sends nearcarta:signin and focuses Create",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_FAUCET=1 to make a faucet account",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-create.spec.js",
+                        "line": 26,
+                        "column": 12
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "skipped",
+                      "duration": 101,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-29T08:37:06.946Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "set VAULT_FAUCET=1 to make a faucet account",
+                          "location": {
+                            "file": "/tmp/nc/e2e/vault-create.spec.js",
+                            "line": 26,
+                            "column": 12
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "691584d3a1d95b30af6a-23bccd92535479836073",
+              "file": "vault-create.spec.js",
+              "line": 25,
+              "column": 5
+            }
+          ]
+        },
+        {
+          "title": "charter office #create at 390",
+          "file": "vault-create.spec.js",
+          "line": 8,
+          "column": 8,
+          "specs": [
+            {
+              "title": "guest first and focused, no sideways scroll",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 487,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-29T08:37:07.064Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "691584d3a1d95b30af6a-18a423577acdc2faa74a",
+              "file": "vault-create.spec.js",
+              "line": 11,
+              "column": 5
+            },
+            {
+              "title": "guest sign-in sends nearcarta:signin and focuses Create",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_FAUCET=1 to make a faucet account",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-create.spec.js",
+                        "line": 26,
+                        "column": 12
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "skipped",
+                      "duration": 102,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-29T08:37:07.561Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "set VAULT_FAUCET=1 to make a faucet account",
+                          "location": {
+                            "file": "/tmp/nc/e2e/vault-create.spec.js",
+                            "line": 26,
+                            "column": 12
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "691584d3a1d95b30af6a-5af7f0536e975f9589e9",
+              "file": "vault-create.spec.js",
+              "line": 25,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "vault-early-click.spec.js",
+      "file": "vault-early-click.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Start free clicked at DOMContentLoaded signs in",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault-early-click.spec.js",
+                    "line": 5,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:07.672Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-early-click.spec.js",
+                        "line": 5,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "897c726a6a28885d1515-589a2f3926a231114dd6",
+          "file": "vault-early-click.spec.js",
+          "line": 8,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "vault-feed.spec.js",
+      "file": "vault-feed.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "feed fills from chain within 15 s at 1440",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 420000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                    "line": 10,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:07.672Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                        "line": 10,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "b5c735e74348b3bd6442-8e7052ac9d9a5663ee5f",
+          "file": "vault-feed.spec.js",
+          "line": 17,
+          "column": 3
+        },
+        {
+          "title": "feed fills from chain within 15 s at 1280",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 420000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                    "line": 10,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:07.672Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                        "line": 10,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "b5c735e74348b3bd6442-d6bab0abaa44a373b02d",
+          "file": "vault-feed.spec.js",
+          "line": 17,
+          "column": 3
+        },
+        {
+          "title": "feed fills from chain within 15 s at 390",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 420000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                    "line": 10,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:07.672Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault-feed.spec.js",
+                        "line": 10,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "b5c735e74348b3bd6442-b07c6f6822ab93daf28b",
+          "file": "vault-feed.spec.js",
+          "line": 17,
+          "column": 3
+        }
+      ]
+    },
+    {
+      "title": "vault.spec.js",
+      "file": "vault.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "visitor makes a charter and the contract refuses scams on chain",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 420000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault.spec.js",
+                    "line": 11,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:07.672Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault.spec.js",
+                        "line": 11,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "88f3c38d2dbea463e1e4-6febfbb31cd1ff44051d",
+          "file": "vault.spec.js",
+          "line": 17,
+          "column": 1
+        },
+        {
+          "title": "shared arena: attack without a wallet",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 420000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                  "location": {
+                    "file": "/tmp/nc/e2e/vault.spec.js",
+                    "line": 11,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-29T08:37:07.672Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
+                      "location": {
+                        "file": "/tmp/nc/e2e/vault.spec.js",
+                        "line": 11,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "88f3c38d2dbea463e1e4-57d844c9b0831a917042",
+          "file": "vault.spec.js",
+          "line": 95,
           "column": 1
         }
       ]
@@ -544,10 +1732,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-28T02:12:32.579Z",
-    "duration": 22516.289,
-    "expected": 13,
-    "skipped": 0,
+    "startTime": "2026-10-29T08:37:02.351Z",
+    "duration": 16721.144,
+    "expected": 22,
+    "skipped": 12,
     "unexpected": 0,
     "flaky": 0
   }
