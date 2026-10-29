@@ -57,6 +57,10 @@ export async function visit(nonce) {
   const out = { nonce, gate: g.gate, status: rec.status, to: rec.to, value: rec.value, tx_hash: rec.tx_hash || null, visit: who,
     proof_payload_hash: rec.proof_payload_hash || null, explorer: rec.tx_hash ? `${SCAN}/tx/${rec.tx_hash}` : null };
   if (rec.tx_hash) {
+    const [inPool, head] = await Promise.all([evm('eth_getTransactionByHash', [rec.tx_hash]).catch(() => null), evm('eth_getTransactionCount', [g.foreign_address, 'latest']).catch(() => null)]);
+    out.accepted = !!inPool; // show the hash only once a Base Sepolia RPC holds the tx
+    out.evm_nonce_head = head == null ? null : parseInt(head, 16);
+    out.queued_behind = out.evm_nonce_head == null ? null : Math.max(0, nonce - out.evm_nonce_head);
     const [rc, fin] = await Promise.all([evm('eth_getTransactionReceipt', [rec.tx_hash]).catch(() => null), evm('eth_getBlockByNumber', ['finalized', false]).catch(() => null)]);
     out.base = rc ? { status: rc.status === '0x1' ? 'success' : 'reverted', block: parseInt(rc.blockNumber), block_hash: rc.blockHash } : null;
     out.finalized_head = fin ? parseInt(fin.number) : null;
@@ -68,6 +72,27 @@ export async function visit(nonce) {
   }
   Object.assign(out, phaseOf(out));
   return out;
+}
+
+const sendErr = e => err(502, 'Base Sepolia said: ' + String(e.message).slice(0, 120));
+/** Send one signed record unless Base Sepolia already has it. Returns true once the RPC holds the tx. */
+async function relay(rec) {
+  if (!rec?.raw_signed || !rec.tx_hash) return false;
+  if (await evm('eth_getTransactionByHash', [rec.tx_hash]).catch(() => null)) return true;
+  try { await evm('eth_sendRawTransaction', [rec.raw_signed]); }
+  catch (e) { if (!/already known|nonce too low|known transaction/i.test(e.message)) throw sendErr(e); }
+  return !!(await evm('eth_getTransactionByHash', [rec.tx_hash]).catch(() => null));
+}
+/** Relay every signed record between the address's mined nonce and `upto` (exclusive), oldest first. */
+const policyNext = async () => (await view(G().gate, 'policy')).next_nonce;
+export async function relayGap(upto, { maxGap = 40 } = {}) {
+  const g = G(); if (!g) return { from: null, sent: [] };
+  const head = parseInt(await evm('eth_getTransactionCount', [g.foreign_address, 'latest']), 16), sent = [];
+  for (let n = head; n < upto && n < head + maxGap; n++) {
+    const r = await view(g.gate, 'get_tx', { nonce: n }).catch(() => null);
+    if (r?.status === 'signed' && r.raw_signed) { try { if (await relay(r)) sent.push(n); } catch { /* next sweep retries */ } }
+  }
+  return { from: head, sent };
 }
 
 /** Relay the raw tx the gate signed (read from chain) to Base Sepolia. Idempotent. */
@@ -83,11 +108,10 @@ export async function broadcast(nonce) {
     await new Promise(r => setTimeout(r, 1500));
   }
   if (!rec?.raw_signed) throw err(409, 'the gate has not signed this record');
-  const seen = await evm('eth_getTransactionByHash', [rec.tx_hash]).catch(() => null);
-  if (!seen) {
-    try { await evm('eth_sendRawTransaction', [rec.raw_signed]); }
-    catch (e) { if (!/already known|nonce too low/i.test(e.message)) throw err(502, 'Base Sepolia said: ' + String(e.message).slice(0, 120)); }
-  }
+  // The gate signs payouts from one Base Sepolia address with nonce = record nonce. A record nobody relayed (a closed tab,
+  // an aborted visit) leaves a nonce gap, and every later payout then waits in the mempool forever. Relay the gap first.
+  await relayGap(nonce);
+  await relay(rec);
   for (let i = 0; i < 6; i++) { const v = await visit(nonce); if (v.base) return v; await new Promise(r => setTimeout(r, 1500)); }
   return visit(nonce);
 }
@@ -154,11 +178,12 @@ export async function settleOne(nonce, { read = visit, send = sendSettle, settle
 }
 
 /** Settle every recent record that is final on Base Sepolia. Runs one sweep at a time. */
-export function settleDue({ read = visit, send = sendSettle, settler = SETTLER(), policyRead = () => view(G().gate, 'policy'), window = 12 } = {}) {
+export function settleDue({ read = visit, send = sendSettle, settler = SETTLER(), policyRead = () => view(G().gate, 'policy'), window = 12, relayOnSweep = read === visit } = {}) {
   if (sweeping) return sweeping;
   sweeping = (async () => {
     const g = G(); if (!g) throw err(404, 'no toll gate deployed');
     const policy = await again(policyRead), out = [];
+    if (relayOnSweep) await relayGap(policy.next_nonce).catch(() => null);
     for (let n = Math.max(0, policy.next_nonce - window); n < policy.next_nonce; n++) {
       const r = await settleOne(n, { read, send, settler }).catch(e => ({ nonce: n, result: 'error', error: String(e.message).slice(0, 120) }));
       if (r.result !== 'done') out.push(r);
@@ -171,6 +196,8 @@ export function settleDue({ read = visit, send = sendSettle, settler = SETTLER()
 
 /** Sweep in the background every `ms` while a settler key is set (TOLL_SETTLER_AUTO=0 turns it off). */
 export function startSettler(ms = 90_000) {
+  // relay stuck payouts even without a settler key: anyone may relay a raw tx the gate signed
+  if (G() && process.env.TOLL_RELAY_AUTO !== '0') { const r = setInterval(() => { policyNext().then(n => relayGap(n)).catch(() => {}); }, 60_000); r.unref?.(); }
   if (!SETTLER() || process.env.TOLL_SETTLER_AUTO === '0' || !G()) return null;
   const t = setInterval(() => { settleDue().catch(() => {}); }, ms); t.unref?.(); return t;
 }
