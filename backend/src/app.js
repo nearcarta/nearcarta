@@ -101,10 +101,14 @@ const str = (v, max = 200) => typeof v === 'string' && v.length > 0 && v.length 
 // Boot pre-warm and keep-warm: the town feed and the reads a first room entry needs, so the first visitor after a
 // deploy or a quiet spell is not the one who waits on the tx index and RPC. Errors are ignored (the routes retry).
 export const WARM_EVERY_MS = 60_000;
+// Vault Arena past prompts: a cold read is ~50 RPC views (8 s seen live), and the Arena room shows them,
+// so serve them stale-while-revalidate and keep them warm every 5th warm tick (50 views per 5 min).
+const arenaPromptsSwr = swr('arena_prompts', () => arenaPrompts(), { ttl: 30_000, stale: 15 * 60_000 });
 export function warm({ every = WARM_EVERY_MS, read } = {}) {
+  let tick = 0;
   const once = () => Promise.allSettled([
     shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
-    ...(read ? [] : [reads.guardhouse(), reads.mistbank()]),
+    ...(read ? [] : [reads.guardhouse(), reads.mistbank(), ...(tick++ % 5 === 0 ? [arenaPromptsSwr()] : [])]),
   ]);
   const first = once();
   const t = every ? setInterval(once, every) : null; t?.unref?.();
@@ -266,7 +270,7 @@ export function makeApp() {
   app.get('/api/mistbank/street/:txid', limiter(10), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
   app.get('/api/townhall', limiter(20), async c => c.json(await reads.townhall()));
   app.get('/api/arena', limiter(20), async c => c.json(await reads.arena()));
-  app.get('/api/arena/prompts', limiter(20), async c => c.json(await arenaPrompts()));
+  app.get('/api/arena/prompts', limiter(20), async c => c.json(await arenaPromptsSwr()));
   app.get('/api/arena/attempts', limiter(20), async c => c.json(await shops.arenaAttempts(c.req.query('from'), c.req.query('limit'))));
   app.get('/api/toll', limiter(20), async c => c.json(await reads.toll()));
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)

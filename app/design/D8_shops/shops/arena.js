@@ -32,10 +32,13 @@ export default async function arena() {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.9, .006, 4, 96), new THREE.MeshBasicMaterial({ color: C.accent, transparent: true, opacity: .5 })); ring.rotation.x = Math.PI / 2; ring.position.y = .2; scene.add(ring);
   const kg = await load('chars/Knight.glb'); const guards = [[-1.7, .3, .9], [1.7, .3, -.9]].map(([x, z, f]) => { const k = new Char(kg, scene, { h: 1.0 }); k.root.traverse(m => { if (/Offhand|Rectangle|Round_Shield|Spike|2H_Sword/.test(m.name)) m.visible = false; }); k.at(x, z); k.g.rotation.y = f; k.play('Idle'); return k; });
   let t = 0; const rob = await makeRobot(scene); rob.at(.6, 2.2); rob.lookAt(new THREE.Vector3(0, 0, 0), { toViewer: .82 }); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
-  return {
+  const ROOM = {
     rob, scene, camera, tags: [],
     panel: { title: 'Vault Arena', src: 'testnet', label: `${ATTACKS.length} attacks on the lab oath`, hero: `<b class="num">0</b><span class="unit">breaches</span>`, action: null },
-    proof: PROOF + await liveP,
+    // The past prompts arrive after the room is up: the town drawer reads sh.proof when it opens.
+    proof: PROOF + '<div class="pf"><h3>Past prompts · live read</h3><p class="note">Reading the arena…</p></div>',
     update(dt) { t += dt; rings.forEach(r => { const k = ((t * .6 + r.ph) % 1); r.m.scale.setScalar(1 + k * .9); r.m.material.opacity = .85 * (1 - k); }); rob.update(dt); guards.forEach(g => g.update(dt)); },
   };
+  liveP.then(h => { ROOM.proof = PROOF + h; });
+  return ROOM;
 }
