@@ -40,13 +40,28 @@ const lastGood = (name, fn) => async () => {
     throw e;
   }
 };
-export const _resetLastGood = () => good.clear();
+export const _resetLastGood = () => { good.clear(); swrs.clear(); };
+
+// Stale-while-revalidate for slow display reads that rooms wait on (guardhouse, mistbank):
+// fresh for ttl, then served from cache while one shared background read refreshes it.
+export const READ_TTL_MS = 10_000, READ_STALE_MS = 5 * 60_000;
+const swrs = new Map(); // name -> { v, at, p }
+export const swr = (name, fn, { ttl = READ_TTL_MS, stale = READ_STALE_MS, now = Date.now } = {}) => async () => {
+  const e = swrs.get(name) || {}; swrs.set(name, e);
+  const refresh = () => e.p || (e.p = Promise.resolve().then(fn)
+    .then(v => { if (v != null) { e.v = v; e.at = now(); } return v; })
+    .finally(() => { e.p = null; }));
+  const age = e.at == null ? Infinity : now() - e.at;
+  if (age < ttl) return e.v;
+  if (age < stale) { refresh().catch(() => {}); return e.v; }
+  return refresh();
+};
 
 // One handler per public read route, shared by the routes and by /api/health?deep=1.
 const reads = Object.fromEntries(Object.entries({
-  guardhouse: () => guard.snapshot(),
+  guardhouse: swr('guardhouse', () => guard.snapshot()),
   house: houseView,
-  mistbank: () => mist.mistbank(),
+  mistbank: swr('mistbank', () => mist.mistbank()),
   townhall: () => shops.townhall(),
   arena: () => shops.arena(),
   arena_attempts: () => shops.arenaAttempts(undefined, '2'),
