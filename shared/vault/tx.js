@@ -35,7 +35,7 @@ export function signTx({ key, signerId, receiverId, nonce, blockHash, actions })
 // `urls` may be one URL or a list. HTTP 408/429/5xx means the node did not take the request, so the
 // next URL is tried (rounds with backoff). A JSON-RPC error or a network failure is not retried here:
 // a send_tx that may have reached a node must not be sent twice.
-const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 export function rpcClient(urls, fetchImpl = fetch, { rounds = 3, backoffMs = 300, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
   const list = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
   let id = 0;

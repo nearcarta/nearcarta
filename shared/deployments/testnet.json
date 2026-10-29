@@ -1,6 +1,7 @@
 {
   "network": "testnet",
   "rpc": "https://test.rpc.fastnear.com",
+  "rpc_fallbacks": ["https://rpc.testnet.near.org", "https://near-testnet.drpc.org", "https://rpc.testnet.fastnear.com"],
   "explorer": "https://testnet.nearblocks.io",
   "guardhouse": {
     "oath": "r11oath-82930.testnet",

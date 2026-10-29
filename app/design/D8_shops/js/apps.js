@@ -4,6 +4,7 @@
 import * as W from './wallet.bundle.js';
 import { $, sfx } from './core.js';
 import * as P from './payouts.js';
+import { DEFAULT_RULES } from '../../../../shared/rules-default.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, ''); // same origin on Vercel (/api is proxied)
 const NBX = 'https://testnet.nearblocks.io';
@@ -65,7 +66,7 @@ function keep(h, shop, decision, reason) {
 
 // ---------- boot + wallet ----------
 export async function init(onChange) {
-  for (let i = 0; ; i++) { try { CFG = await api('/api/vault/config'); break; } catch (e) { if (i >= 3) throw e; await new Promise(r => setTimeout(r, 2500 * (i + 1))); } } rpc = W.rpcClient(CFG.rpc);
+  for (let i = 0; ; i++) { try { CFG = await api('/api/vault/config'); break; } catch (e) { if (i >= 3) throw e; await new Promise(r => setTimeout(r, 2500 * (i + 1))); } } rpc = W.rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])]);
   ({ connector: conn } = W.makeConnector(rpc));
   const tell = () => dispatchEvent(new CustomEvent('nearcarta:wallet')); // the town HUD has its own connector: let it redraw
   conn.on('wallet:signIn', () => refresh().then(onChange).then(tell)); conn.on('wallet:signOut', () => { S.charter = null; refresh().then(onChange).then(tell); });
@@ -111,13 +112,14 @@ export async function buildCharter() {
 
 // ---------- rules: the visitor writes them, one approval signs them ----------
 export function rulesNow() {
+  const D = DEFAULT_RULES;
   const c = pay(), m = merchants();
   const routes = ROUTES.filter(r => S.clauses[r.id]).map(r => r.id);
   return {
     receivers: c?.receivers || [m[0], m[1], S.me].filter(Boolean),
-    cap: c ? fromY(c.per_action_cap) : 0.05, budget: c ? fromY(c.daily_budget) : 0.2, count: c?.max_actions_per_day || 10,
-    min: c ? fromY(c.min_amount) : 0.001, ws: c?.window_start_min || 0, we: c?.window_end_min || 0,
-    routes: c ? routes : ROUTES.slice(0, 2).map(r => r.id), ferryCap: S.clauses[routes[0]] ? fromY(S.clauses[routes[0]].per_action_cap) : 0.1,
+    cap: c ? fromY(c.per_action_cap) : D.cap, budget: c ? fromY(c.daily_budget) : D.budget, count: c?.max_actions_per_day || D.count,
+    min: c ? fromY(c.min_amount) : D.min, ws: c?.window_start_min || 0, we: c?.window_end_min || 0,
+    routes: c ? routes : ROUTES.slice(0, 2).map(r => r.id), ferryCap: S.clauses[routes[0]] ? fromY(S.clauses[routes[0]].per_action_cap) : D.ferryCap,
   };
 }
 const clause = (r, receivers, cap) => ({ asset: 'Native', receivers, per_action_cap: toY(cap), daily_budget: toY(r.budget), window_start_min: r.ws, window_end_min: r.we,

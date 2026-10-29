@@ -3,10 +3,11 @@
 import { keyFrom, signTx, rpcClient, viewFn } from '../../shared/vault/tx.js';
 import { guestWallet, hasGuest } from '../shops/vault/wallet.js';
 import { factoriesOf, deedsOn } from './factories.js';
-import { rpc as RPC, vault, townhall, arena } from '../../shared/deployments/testnet.json'; // named: guardhouse test accounts stay out of the bundle
+import { rpc as RPC, rpc_fallbacks as RPC_FB, vault, townhall, arena } from '../../shared/deployments/testnet.json'; // named: guardhouse test accounts stay out of the bundle
 const DEP = { rpc: RPC, vault, townhall, arena };
 
-export const rpc = rpcClient(DEP.rpc);
+// fastnear first; 408/429/5xx or a network error rotates to the backups.
+export const rpc = rpcClient([DEP.rpc, ...(RPC_FB || [])]);
 export const FACTORY = DEP.vault?.factory || DEP.townhall.factory;
 /** The current factory first, then every older one, so a charter built before a factory release still counts. */
 export const FACTORIES = factoriesOf(DEP.vault, DEP.townhall.factory);
