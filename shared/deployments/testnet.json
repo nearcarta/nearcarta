@@ -488,5 +488,38 @@
       "reveal_refuses_hidden_rule_cap": "Cy1pFPc6vDbs5CA4tbQcknsLtQoqpSSMUkMJs11pEfVQ",
       "reveal_allows_paid": "GjYQczzVUGXqMeyoxrT9vkWmAsJQWxRiA4Ksh5kwiGkP"
     }
+  },
+  "toll_gate": {
+    "gate": "gate.r4csmvr86zk4.testnet",
+    "owner": "r4csmvr86zk4.testnet",
+    "mpc": "v1.signer-prod.testnet",
+    "path": "gate-1",
+    "chain_id": 84532,
+    "verify_chain": "Base",
+    "foreign_address": "0xeb7d20b8c6af0d63f0331d4e7aa31205c147eb38",
+    "derived_key": "secp256k1:nbPa1MWh9GPqCZtMLuHsywM55wCNR9fRqjxzHUBs6H8UdVZYTh3VFkFF22aETfhCpHFfsbNTpva6YK9u9QS34Wq",
+    "policy": {
+      "factory": "nccharters-53681.testnet",
+      "payee": "cafe.ncpub-17102.testnet",
+      "fee": "10000000000000000000000",
+      "memo": "toll:base-sepolia",
+      "evm_to": "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5",
+      "evm_value": "100000000000",
+      "max_fee_per_gas": "100000000",
+      "max_priority_fee_per_gas": "1000000"
+    },
+    "wasm": "contracts/artifacts/toll.v4.wasm",
+    "wasm_sha256": "950253ae8fe4b4395823e4ac477dfe412353d3be33443a26ce894d75eb171197",
+    "source_tag": "build-e7a8186",
+    "access_keys": 0,
+    "create_deploy_init_tx": "9nPQYF5KpEckXqPRPzW2MpSX4j9zJYFNETEJjfobmq2G",
+    "gas_funding": {
+      "note": "no faucet: the existing Toll MPC-signed a payout from its derived address to the allowlisted EOA, which forwarded it to the gate address",
+      "toll_pay_near_tx": "4ZZD7b5EQSz4DP8Hrs8GuFQewZazS6EsvR6dJ9pTCWmv",
+      "toll_base_tx": "0x28e3740d07862a5aca8b38175ededcc706b2dc0d21393c9da72dc38a7271f267",
+      "forward_base_tx": "0xa8b41c1b63759bb7c3025e0eea386afe86190da8e75ca268750fd0959574faa7",
+      "wei": "50000000000000"
+    },
+    "explorer": "https://sepolia.basescan.org/address/0xeb7d20b8c6af0d63f0331d4e7aa31205c147eb38"
   }
 }

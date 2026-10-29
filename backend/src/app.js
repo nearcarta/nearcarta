@@ -10,6 +10,7 @@ import * as guard from './guardhouse.js';
 import * as mist from './mistbank.js';
 import * as mq from './mistqueue.js';
 import * as shops from './shops.js';
+import * as tollgate from './tollgate.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
@@ -49,6 +50,7 @@ const reads = Object.fromEntries(Object.entries({
   arena: () => shops.arena(),
   arena_attempts: () => shops.arenaAttempts(undefined, '2'),
   toll: () => shops.toll(),
+  toll_gate: () => tollgate.gate(),
   chronicle: () => shops.chronicle(DEP.guardhouse.oath, 2),
   ferry_tokens: () => ferry.tokens(),
 }).map(([k, fn]) => [k, lastGood(k, fn)]));
@@ -72,7 +74,7 @@ export async function deepHealth() {
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 const ACCT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 const knownAccounts = new Set([DEP.guardhouse.oath, DEP.townhall.charter, DEP.townhall.dao, DEP.arena.contract, DEP.toll.oath,
-  DEP.townhall_r16?.charter, DEP.toll_arbitrum?.oath, DEP.toll_usdc?.toll].filter(Boolean));
+  DEP.townhall_r16?.charter, DEP.toll_arbitrum?.oath, DEP.toll_usdc?.toll, DEP.toll_gate?.gate].filter(Boolean));
 const bad = (c, m) => c.json({ error: m }, 400);
 async function jsonBody(c) {
   try { const b = await c.req.json(); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; }
@@ -232,6 +234,11 @@ export function makeApp() {
   app.get('/api/arena', limiter(20), async c => c.json(await reads.arena()));
   app.get('/api/arena/attempts', limiter(20), async c => c.json(await shops.arenaAttempts(c.req.query('from'), c.req.query('limit'))));
   app.get('/api/toll', limiter(20), async c => c.json(await reads.toll()));
+  // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
+  const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
+  app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
+  app.get('/api/toll/gate/:nonce', limiter(60), tg(c => tollgate.visit(c.req.param('nonce'))));
+  app.post('/api/toll/gate/:nonce/broadcast', limiter(10), tg(c => tollgate.broadcast(c.req.param('nonce'))));
   app.get('/api/chronicle/:account', limiter(20), async c => {
     const a = c.req.param('account');
     // Visitor charters made by the vault factory count too (B13 "What happened" feed): the id must sit under the
