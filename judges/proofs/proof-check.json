@@ -1,5 +1,5 @@
 {
- "at": "2026-10-29T09:44:21.046Z",
+ "at": "2026-10-29T10:07:22.408Z",
  "rows": [
   {
    "shop": "guardhouse",
@@ -1293,7 +1293,7 @@
    "hash": "GpdLAhoQZiVieiRUYp2j3jo3c1BXNaKqHFZU9k3C3wr9",
    "url": "https://testnet.nearblocks.io/txns/GpdLAhoQZiVieiRUYp2j3jo3c1BXNaKqHFZU9k3C3wr9",
    "signer": "toll-arb.r4csmvr86zk4.testnet",
-   "source": "rpc",
+   "source": "fastnear",
    "receiver": "toll-arb.r4csmvr86zk4.testnet",
    "method": "pay",
    "result": {

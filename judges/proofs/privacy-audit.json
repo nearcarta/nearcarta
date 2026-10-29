@@ -1,19 +1,19 @@
 {
- "at": "2026-10-29T01:36:43.472Z",
- "finished": "2026-10-29T01:48:55.769Z",
+ "at": "2026-10-29T10:08:48.112Z",
+ "finished": "2026-10-29T10:25:36.476Z",
  "site": {
-  "files": 2180,
-  "text_files": 982,
-  "map_probes": 783,
+  "files": 2192,
+  "text_files": 989,
+  "map_probes": 790,
   "maps_served": [],
   "sourceMappingURL_refs": []
  },
  "api": "https://nearcarta-api.onrender.com",
- "git": "9b25b3a",
+ "git": "ea8778e",
  "live_api_commit": null,
- "requests": 1985,
- "corpus_items": 2057,
- "corpus_bytes": 19794547,
+ "requests": 1999,
+ "corpus_items": 2069,
+ "corpus_bytes": 19929439,
  "browser": {
   "pages": [
    {
@@ -84,7 +84,7 @@
   ],
   "console_lines": 2
  },
- "secret_values_checked": 978,
+ "secret_values_checked": 980,
  "hits": {
   "ufvk_or_viewing_key_value": 0,
   "ufvk_field_with_value": 0,
@@ -104,18 +104,18 @@
   "secret_only_value": 0
  },
  "not_leaks_skipped_by_rule": {
-  "near_private_key": 18,
+  "near_private_key": 20,
   "zats_field": 13,
   "ipv4": 8
  },
  "total_hits": 0,
  "statuses": {
-  "200": 1065,
+  "200": 1072,
   "204": 2,
   "400": 92,
   "401": 6,
   "403": 4,
-  "404": 808,
+  "404": 815,
   "405": 4,
   "409": 4
  },
@@ -124,7 +124,7 @@
    "url": "{api}/api/deployments",
    "method": "GET",
    "status": 200,
-   "bytes": 26225
+   "bytes": 28252
   },
   {
    "url": "{api}/api/health",
@@ -142,7 +142,7 @@
    "url": "{api}/api/ferry/tokens",
    "method": "GET",
    "status": 200,
-   "bytes": 27149
+   "bytes": 27150
   },
   {
    "url": "{api}/api/ferry/tidepool",
@@ -202,7 +202,7 @@
    "url": "{api}/api/guardhouse/check/attacker.r10own-19371.testnet",
    "method": "GET",
    "status": 200,
-   "bytes": 1343
+   "bytes": 1344
   },
   {
    "url": "{api}/api/guardhouse/check/!!bad",
@@ -268,7 +268,7 @@
    "url": "{api}/api/mistbank",
    "method": "GET",
    "status": 200,
-   "bytes": 2640
+   "bytes": 2641
   },
   {
    "url": "{api}/api/mistbank/verify",
@@ -286,7 +286,7 @@
    "url": "{api}/api/mistbank/send",
    "method": "GET",
    "status": 200,
-   "bytes": 830
+   "bytes": 809
   },
   {
    "url": "{api}/api/mistbank/send/does-not-exist",
@@ -304,7 +304,7 @@
    "url": "{api}/api/mistbank/street/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
    "method": "GET",
    "status": 200,
-   "bytes": 309
+   "bytes": 310
   },
   {
    "url": "{api}/api/mistbank/street/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -322,43 +322,43 @@
    "url": "{api}/api/townhall",
    "method": "GET",
    "status": 200,
-   "bytes": 4613
+   "bytes": 5108
   },
   {
    "url": "{api}/api/arena",
    "method": "GET",
    "status": 200,
-   "bytes": 3327
+   "bytes": 3316
   },
   {
    "url": "{api}/api/arena/attempts",
    "method": "GET",
    "status": 200,
-   "bytes": 5385
+   "bytes": 5368
   },
   {
    "url": "{api}/api/arena/attempts?limit=5&deep=1",
    "method": "GET",
    "status": 200,
-   "bytes": 1273
+   "bytes": 1268
   },
   {
    "url": "{api}/api/toll",
    "method": "GET",
    "status": 200,
-   "bytes": 4345
+   "bytes": 4507
   },
   {
    "url": "{api}/api/toll/gate",
    "method": "GET",
    "status": 200,
-   "bytes": 4330
+   "bytes": 5051
   },
   {
-   "url": "{api}/api/toll/gate/4",
+   "url": "{api}/api/toll/gate/33",
    "method": "GET",
    "status": 200,
-   "bytes": 728
+   "bytes": 824
   },
   {
    "url": "{api}/api/toll/gate/999999999",
@@ -424,13 +424,13 @@
    "url": "{api}/api/ai/tee/models",
    "method": "GET",
    "status": 200,
-   "bytes": 622
+   "bytes": 685
   },
   {
    "url": "{api}/api/ai/tee",
    "method": "GET",
    "status": 200,
-   "bytes": 2419
+   "bytes": 2431
   },
   {
    "url": "{api}/api/ai/tee?nonce=zz",
@@ -454,7 +454,7 @@
    "url": "{api}/api/vault/charters",
    "method": "GET",
    "status": 200,
-   "bytes": 1728
+   "bytes": 10007
   },
   {
    "url": "{api}/api/vault/charter/gd-mvst67ib.nccharters-53681.testnet",
@@ -484,13 +484,13 @@
    "url": "{api}/api/agent/budget",
    "method": "GET",
    "status": 200,
-   "bytes": 145
+   "bytes": 156
   },
   {
    "url": "{api}/api/vault/score/gd-mvst67ib.nccharters-53681.testnet",
    "method": "GET",
    "status": 200,
-   "bytes": 1956
+   "bytes": 2135
   },
   {
    "url": "{api}/api/vault/score/!!bad",
@@ -502,7 +502,7 @@
    "url": "{api}/api/vault/leaderboard",
    "method": "GET",
    "status": 200,
-   "bytes": 31498
+   "bytes": 32966
   },
   {
    "url": "{api}/api/vault/runner",
@@ -748,7 +748,7 @@
    "url": "{site}/api/deployments",
    "method": "GET",
    "status": 200,
-   "bytes": 26225
+   "bytes": 28252
   },
   {
    "url": "{site}/api/health",
@@ -766,7 +766,7 @@
    "url": "{site}/api/ferry/tokens",
    "method": "GET",
    "status": 200,
-   "bytes": 27149
+   "bytes": 27153
   },
   {
    "url": "{site}/api/ferry/tidepool",
@@ -826,7 +826,7 @@
    "url": "{site}/api/guardhouse/check/attacker.r10own-19371.testnet",
    "method": "GET",
    "status": 200,
-   "bytes": 1343
+   "bytes": 1344
   },
   {
    "url": "{site}/api/guardhouse/check/!!bad",
@@ -892,7 +892,7 @@
    "url": "{site}/api/mistbank",
    "method": "GET",
    "status": 200,
-   "bytes": 2639
+   "bytes": 2642
   },
   {
    "url": "{site}/api/mistbank/verify",
@@ -910,7 +910,7 @@
    "url": "{site}/api/mistbank/send",
    "method": "GET",
    "status": 200,
-   "bytes": 830
+   "bytes": 809
   },
   {
    "url": "{site}/api/mistbank/send/does-not-exist",
@@ -928,7 +928,7 @@
    "url": "{site}/api/mistbank/street/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
    "method": "GET",
    "status": 200,
-   "bytes": 309
+   "bytes": 310
   },
   {
    "url": "{site}/api/mistbank/street/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -946,43 +946,43 @@
    "url": "{site}/api/townhall",
    "method": "GET",
    "status": 200,
-   "bytes": 4613
+   "bytes": 5108
   },
   {
    "url": "{site}/api/arena",
    "method": "GET",
    "status": 200,
-   "bytes": 3327
+   "bytes": 3316
   },
   {
    "url": "{site}/api/arena/attempts",
    "method": "GET",
    "status": 200,
-   "bytes": 5385
+   "bytes": 5368
   },
   {
    "url": "{site}/api/arena/attempts?limit=5&deep=1",
    "method": "GET",
    "status": 200,
-   "bytes": 1273
+   "bytes": 1268
   },
   {
    "url": "{site}/api/toll",
    "method": "GET",
    "status": 200,
-   "bytes": 4345
+   "bytes": 4507
   },
   {
    "url": "{site}/api/toll/gate",
    "method": "GET",
    "status": 200,
-   "bytes": 4330
+   "bytes": 5051
   },
   {
-   "url": "{site}/api/toll/gate/4",
+   "url": "{site}/api/toll/gate/33",
    "method": "GET",
    "status": 200,
-   "bytes": 728
+   "bytes": 824
   },
   {
    "url": "{site}/api/toll/gate/999999999",
@@ -1000,7 +1000,7 @@
    "url": "{site}/api/chronicle/gd-mvst67ib.nccharters-53681.testnet",
    "method": "GET",
    "status": 200,
-   "bytes": 5500
+   "bytes": 5531
   },
   {
    "url": "{site}/api/chronicle/!!bad",
@@ -1048,13 +1048,13 @@
    "url": "{site}/api/ai/tee/models",
    "method": "GET",
    "status": 200,
-   "bytes": 622
+   "bytes": 685
   },
   {
    "url": "{site}/api/ai/tee",
    "method": "GET",
    "status": 200,
-   "bytes": 2430
+   "bytes": 2420
   },
   {
    "url": "{site}/api/ai/tee?nonce=zz",
@@ -1078,7 +1078,7 @@
    "url": "{site}/api/vault/charters",
    "method": "GET",
    "status": 200,
-   "bytes": 1934
+   "bytes": 10007
   },
   {
    "url": "{site}/api/vault/charter/gd-mvst67ib.nccharters-53681.testnet",
@@ -1108,13 +1108,13 @@
    "url": "{site}/api/agent/budget",
    "method": "GET",
    "status": 200,
-   "bytes": 145
+   "bytes": 156
   },
   {
    "url": "{site}/api/vault/score/gd-mvst67ib.nccharters-53681.testnet",
    "method": "GET",
    "status": 200,
-   "bytes": 1956
+   "bytes": 2135
   },
   {
    "url": "{site}/api/vault/score/!!bad",
@@ -1126,7 +1126,7 @@
    "url": "{site}/api/vault/leaderboard",
    "method": "GET",
    "status": 200,
-   "bytes": 31497
+   "bytes": 32966
   },
   {
    "url": "{site}/api/vault/runner",
@@ -1390,7 +1390,7 @@
    "url": "{site}/shops/vault/",
    "method": "GET",
    "status": 200,
-   "bytes": 4308
+   "bytes": 4329
   },
   {
    "url": "{site}/shops/hall/",
@@ -4210,7 +4210,7 @@
    "url": "{site}/design/D6_dashboards/src/data.js",
    "method": "GET",
    "status": 200,
-   "bytes": 4417
+   "bytes": 4372
   },
   {
    "url": "{site}/design/D6_dashboards/src/styles.css",
@@ -4270,7 +4270,7 @@
    "url": "{site}/design/D8_shops/js/apps.js",
    "method": "GET",
    "status": 200,
-   "bytes": 28447
+   "bytes": 32749
   },
   {
    "url": "{site}/design/D8_shops/js/core.js",
@@ -4291,10 +4291,28 @@
    "bytes": 14477
   },
   {
+   "url": "{site}/design/D8_shops/js/payouts.js",
+   "method": "GET",
+   "status": 200,
+   "bytes": 2703
+  },
+  {
+   "url": "{site}/design/D8_shops/js/rules-default.js",
+   "method": "GET",
+   "status": 200,
+   "bytes": 853
+  },
+  {
    "url": "{site}/design/D8_shops/js/shopui.js",
    "method": "GET",
    "status": 200,
-   "bytes": 32275
+   "bytes": 37998
+  },
+  {
+   "url": "{site}/design/D8_shops/js/tollsplit.js",
+   "method": "GET",
+   "status": 200,
+   "bytes": 1810
   },
   {
    "url": "{site}/design/D8_shops/js/town.js",
@@ -4306,7 +4324,7 @@
    "url": "{site}/design/D8_shops/js/wallet.bundle.js",
    "method": "GET",
    "status": 200,
-   "bytes": 112548
+   "bytes": 112552
   },
   {
    "url": "{site}/design/D8_shops/shops/_props.js",
@@ -4324,13 +4342,19 @@
    "url": "{site}/design/D8_shops/shops/arena.js",
    "method": "GET",
    "status": 200,
-   "bytes": 5213
+   "bytes": 5556
+  },
+  {
+   "url": "{site}/design/D8_shops/shops/arenalive.js",
+   "method": "GET",
+   "status": 200,
+   "bytes": 2253
   },
   {
    "url": "{site}/design/D8_shops/shops/bank.js",
    "method": "GET",
    "status": 200,
-   "bytes": 8506
+   "bytes": 8729
   },
   {
    "url": "{site}/design/D8_shops/shops/chronicle.js",
@@ -4354,7 +4378,7 @@
    "url": "{site}/design/D8_shops/shops/hall.js",
    "method": "GET",
    "status": 200,
-   "bytes": 7187
+   "bytes": 8981
   },
   {
    "url": "{site}/design/D8_shops/shops/house.js",
@@ -4363,16 +4387,28 @@
    "bytes": 6126
   },
   {
+   "url": "{site}/design/D8_shops/shops/payouts.js",
+   "method": "GET",
+   "status": 200,
+   "bytes": 5610
+  },
+  {
    "url": "{site}/design/D8_shops/shops/toll.js",
    "method": "GET",
    "status": 200,
    "bytes": 3931
   },
   {
+   "url": "{site}/design/D8_shops/shops/tollrecords.js",
+   "method": "GET",
+   "status": 200,
+   "bytes": 2473
+  },
+  {
    "url": "{site}/design/D8_shops/styles.css",
    "method": "GET",
    "status": 200,
-   "bytes": 18740
+   "bytes": 20078
   },
   {
    "url": "{site}/design/D8_shops/vendor/three.module.min.js",
@@ -5008,7 +5044,7 @@
    "url": "{site}/design/D9_world/dist/main.js",
    "method": "GET",
    "status": 200,
-   "bytes": 134835
+   "bytes": 144609
   },
   {
    "url": "{site}/design/D9_world/game.css",
@@ -5038,7 +5074,7 @@
    "url": "{site}/design/D9_world/js/chars.js",
    "method": "GET",
    "status": 200,
-   "bytes": 28288
+   "bytes": 30879
   },
   {
    "url": "{site}/design/D9_world/js/core.js",
@@ -5056,13 +5092,19 @@
    "url": "{site}/design/D9_world/js/life.js",
    "method": "GET",
    "status": 200,
-   "bytes": 4852
+   "bytes": 6749
   },
   {
    "url": "{site}/design/D9_world/js/main.js",
    "method": "GET",
    "status": 200,
-   "bytes": 50207
+   "bytes": 53139
+  },
+  {
+   "url": "{site}/design/D9_world/js/roomkit.js",
+   "method": "GET",
+   "status": 200,
+   "bytes": 5304
   },
   {
    "url": "{site}/design/D9_world/js/shops.js",
@@ -5086,7 +5128,7 @@
    "url": "{site}/design/D9_world/js/world.js",
    "method": "GET",
    "status": 200,
-   "bytes": 66008
+   "bytes": 67830
   },
   {
    "url": "{site}/design/D9_world/shots/fallback_pins.json",
@@ -7258,7 +7300,7 @@
    "url": "{site}/house.bundle.js",
    "method": "GET",
    "status": 200,
-   "bytes": 130162
+   "bytes": 130281
   },
   {
    "url": "{site}/index.html",
@@ -7276,7 +7318,7 @@
    "url": "{site}/live/data.js",
    "method": "GET",
    "status": 200,
-   "bytes": 4417
+   "bytes": 4372
   },
   {
    "url": "{site}/live/data.static.js",
@@ -7294,13 +7336,13 @@
    "url": "{site}/shops/hall/hall.bundle.js",
    "method": "GET",
    "status": 200,
-   "bytes": 112256
+   "bytes": 113193
   },
   {
    "url": "{site}/shops/hall/hall.css",
    "method": "GET",
    "status": 200,
-   "bytes": 808
+   "bytes": 938
   },
   {
    "url": "{site}/shops/hall/index.html",
@@ -7312,13 +7354,13 @@
    "url": "{site}/shops/vault/index.html",
    "method": "GET",
    "status": 200,
-   "bytes": 4308
+   "bytes": 4329
   },
   {
    "url": "{site}/shops/vault/vault.bundle.js",
    "method": "GET",
    "status": 200,
-   "bytes": 149921
+   "bytes": 150278
   },
   {
    "url": "{site}/shops/vault/vault.css",
@@ -9601,7 +9643,25 @@
    "bytes": 79
   },
   {
+   "url": "{site}/design/D8_shops/js/payouts.js.map",
+   "method": "GET",
+   "status": 404,
+   "bytes": 79
+  },
+  {
+   "url": "{site}/design/D8_shops/js/rules-default.js.map",
+   "method": "GET",
+   "status": 404,
+   "bytes": 79
+  },
+  {
    "url": "{site}/design/D8_shops/js/shopui.js.map",
+   "method": "GET",
+   "status": 404,
+   "bytes": 79
+  },
+  {
+   "url": "{site}/design/D8_shops/js/tollsplit.js.map",
    "method": "GET",
    "status": 404,
    "bytes": 79
@@ -9632,6 +9692,12 @@
   },
   {
    "url": "{site}/design/D8_shops/shops/arena.js.map",
+   "method": "GET",
+   "status": 404,
+   "bytes": 79
+  },
+  {
+   "url": "{site}/design/D8_shops/shops/arenalive.js.map",
    "method": "GET",
    "status": 404,
    "bytes": 79
@@ -9673,7 +9739,19 @@
    "bytes": 79
   },
   {
+   "url": "{site}/design/D8_shops/shops/payouts.js.map",
+   "method": "GET",
+   "status": 404,
+   "bytes": 79
+  },
+  {
    "url": "{site}/design/D8_shops/shops/toll.js.map",
+   "method": "GET",
+   "status": 404,
+   "bytes": 79
+  },
+  {
+   "url": "{site}/design/D8_shops/shops/tollrecords.js.map",
    "method": "GET",
    "status": 404,
    "bytes": 79
@@ -9800,6 +9878,12 @@
   },
   {
    "url": "{site}/design/D9_world/js/main.js.map",
+   "method": "GET",
+   "status": 404,
+   "bytes": 79
+  },
+  {
+   "url": "{site}/design/D9_world/js/roomkit.js.map",
    "method": "GET",
    "status": 404,
    "bytes": 79
