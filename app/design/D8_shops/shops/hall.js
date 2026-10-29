@@ -10,6 +10,8 @@ export const PROOF = proof(
       h3('Oath versions'), ...TH.versions.map(v => row({ k: `v${v.v} · cap ${v.cap} · total ${v.total} NEAR`, why: v.how, tx: v.tx })),
       h3('What the hall refused'), ...TH.log.filter(l => !l.ok).map(l => row({ k: `${l.who} ${l.what}`, why: l.res, st: 'no', stText: 'refused', tx: l.tx })),
       note(`DAO ${acct(TH.dao)}. All rows are real testnet transactions; the stones are a re-enactment.`));
+// The town's real proposals page (Sputnik DAO on testnet).
+export const MORE = { href: '/shops/hall/', text: 'See proposals' };
 export default async function hall(ctx) {
   const { scene, camera } = await room({ cam: [0, 4.4, 8.6], look: [0, .8, 0] });
   const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a33, roughness: .85 }), stone = PM.stone;
@@ -47,7 +49,7 @@ export default async function hall(ctx) {
   const v2 = TH.versions[1], v3 = TH.versions[2];
   return {
     rob, scene, camera, tags: [],
-    panel: { title: 'Town Hall', src: 'testnet', label: 'Reward cap · Proposal 4', hero: tok('0.25', 'NEAR'), action: 'Count the votes' },
+    panel: { title: 'Town Hall', src: 'testnet', label: 'Reward cap · Proposal 4', hero: tok('0.25', 'NEAR'), action: 'Count the votes', more: MORE },
     proof: PROOF,
   // intro: the robot walks to beside the table, not behind it
     *intro() { setCap(v2.cap); yield rob.walk([new THREE.Vector3(1.95, 0, -.35)]); rob.lookAt(slab.position); },

@@ -40,6 +40,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
       chronicle:['testnet','testnet','Refusals on the record','<b class="num">6</b><span class="unit">of 10 actions</span>'], house:['testnet','testnet','Tip cap · policy v4',tok('0.5','NEAR')] }[id];
     const info=m.FLAT||(F&&{src:F[0],cls:F[1],label:F[2],hero:F[3]})||{src:'testnet',cls:'testnet',label:'',hero:''};
     src.textContent=info.src; src.className='src '+info.cls; $('#t-label').textContent=info.label; $('#t-hero').innerHTML=info.hero;
+    { const mo=$('#t-more'); mo.hidden=!m.MORE; if(m.MORE){ mo.href=m.MORE.href; mo.textContent=m.MORE.text; } }
     const end=END[id]; b.onclick=null; b.hidden=!end; if(end){ b.className='act res '+end[0]; b.disabled=true; b.textContent=end[1]; }
     d.innerHTML=(m.PROOF||'<p class="note">This room has no proof list in the 2D view.</p>')+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>'; $('#d-title').textContent=NAMES[id]+' · proof';
     if(APP){ // same real wallet flows as the 3D rooms (D8 shopui), not the scripted result

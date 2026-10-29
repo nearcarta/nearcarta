@@ -202,3 +202,5 @@ body:not(.in-shop) #wallet { display: none; }
 
 .rc.tx { text-decoration: underline dotted; text-underline-offset: 3px; }
 details.lab { margin-top: 14px; } details.lab summary { cursor: pointer; color: var(--muted); font-size: 12px; text-decoration: underline dotted; text-underline-offset: 3px; }
+a.link.more { display: inline-flex; align-items: center; }
+a.link.more[hidden] { display: none; }

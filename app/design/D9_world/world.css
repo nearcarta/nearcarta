@@ -344,3 +344,4 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #shopUI .rc.tx{text-decoration:underline dotted;text-underline-offset:3px}
 #drawer details.lab{margin-top:14px} #drawer details.lab summary{cursor:pointer;color:var(--muted);font-size:12px;text-decoration:underline dotted;text-underline-offset:3px}
 @media (max-width:720px){ body.in-shop #acct,body.in-shop #brand{display:none!important} }
+#shopUI a.link.more{display:inline-flex;align-items:center} #shopUI a.link.more[hidden]{display:none}

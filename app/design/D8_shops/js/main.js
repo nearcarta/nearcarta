@@ -84,6 +84,7 @@ export function setHero(html) { const h = $('#t-hero'); h.innerHTML = html; h.cl
 const SRC = { testnet: 'testnet', live: 'live read' };
 function fillTray(sh) { const p = sh.panel; $('#t-title').innerHTML = `${i3(SHOPS[sh.id].icon, 28)}<span>${p.title}</span>`; const s = $('#t-src'); s.textContent = SRC[p.src]; s.className = 'src ' + p.src; s.title = p.srcNote || '';
   $('#t-label').textContent = p.label; $('#t-hero').innerHTML = p.hero; const b = $('#t-act'); b.className = 'act primary'; b.disabled = false; b.hidden = !p.action; b.textContent = p.action || '';
+  const m = $('#t-more'); m.hidden = !p.more; if (p.more) { m.href = p.more.href; m.textContent = p.more.text; }
   $('#d-title').textContent = p.title + ' · proof'; $('#d-body').innerHTML = sh.proof + '<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>'; }
 
 // --- enter / leave ---

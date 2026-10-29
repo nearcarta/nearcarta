@@ -42,6 +42,7 @@ const CTA_APP={ house:'Open the charter office →' };
 export function cta(id){ const a=$('#t-cta'); const t=(APP?CTA_APP:CTA)[id]; a.hidden=!t; a.className=APP?'link cta8':'act primary cta'; if(t){ a.textContent=t; a.href=(window.NEARCARTA_CHARTER||'/shops/vault/')+(id==='house'&&!APP?'#create':''); a.dataset.testid='vault-link'; } }
 export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; $('#t-title').textContent=p.title||NAMES[sh.id]; const s=$('#t-src'); s.textContent=SRC[p.src]||p.src; s.className='src '+p.src; s.title=p.srcNote||'';
   $('#t-label').textContent=p.label; $('#t-hero').innerHTML=p.hero; const b=$('#t-act'); b.className='act primary'; b.disabled=false; b.hidden=!p.action; b.textContent=p.action||'';
+  { const m=$('#t-more'); m.hidden=!p.more; if(p.more){ m.href=p.more.href; m.textContent=p.more.text; } }
   $('#d-title').textContent=(p.title||NAMES[sh.id])+' · proof'; $('#d-body').innerHTML=sh.proof+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>';
   sh.tags?.forEach(t=>{ if(t.html){ t.el=document.createElement('div'); t.el.className='stag '+(t.cls||''); t.el.innerHTML=t.html; $('#stags').appendChild(t.el); } }); frame(sh.camera);
   document.body.classList.toggle('apps',APP); $('#t-say').hidden=!APP; if(!APP) return;
