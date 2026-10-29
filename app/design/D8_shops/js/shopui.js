@@ -46,15 +46,16 @@ async function tollStep(v, act, o) {
     if (st.status === 'signed' && st.settle && act) { say('Approve settle in your wallet. The MPC network checks the Base Sepolia tx…'); st = await A.tollSettle(v, st); }
   }
   extra.tst = st; extra.tv = v; extra.gate = null;
+  const late = !st.base && v.at && Date.now() - v.at > 120e3; // over 2 min: say it was re-sent and give the explorer link
   const split = v.split ? `<span class="rc" data-testid="toll-split">split in one tx: ${v.split.legs.map(([r, a]) => `${esc(r === 'agent' ? 'agent budget' : r)} ${esc(a)}`).join(' · ')} NEAR</span> ${A.txLine(v.split.tx, 'split')}` : '';
-  const links = [split, A.txLine(v.pay_tx, 'gate'), st.tx_hash && (st.accepted || st.base) ? BSC(st.tx_hash) : '', v.settle_tx ? A.txLine(v.settle_tx, 'settle') : ''].join(' ');
+  const links = [split, A.txLine(v.pay_tx, 'gate'), st.tx_hash && (st.accepted || st.base || late) ? BSC(st.tx_hash) : '', v.settle_tx ? A.txLine(v.settle_tx, 'settle') : ''].join(' ');
   const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}" data-phase="${esc(st.phase || '')}">gate ${esc(st.label || st.status)}</span> ${links}`;
   if (st.status === 'confirmed') { A.tollDone(v); return { o, kind: 'ok', rule: 'confirmed · MPC foreign-tx proof', hero: num('✓', 'confirmed'), rc,
     say: 'Confirmed. The MPC network proved the Base Sepolia tx final, and the gate recorded it.' }; }
   if (st.settle) return { o, keep: true, kind: 'ok', rule: 'paid · sent · final on Base', rc, say: 'Base Sepolia finalized it. Settle to record the MPC proof.' };
   tollWatch(v, st);
   return { o, keep: true, kind: 'ok', rule: st.base ? 'paid · sent · Base Sepolia finalizing' : 'paid · sending to Base Sepolia', rc,
-    say: st.base ? `Paid and sent to Base Sepolia. It finalizes in <b data-testid="toll-eta">${clock(st.eta_s ?? 1200)}</b>. Stay or leave: it settles by itself, no need to come back.` : (st.queued_behind ? `The MPC network signed it. Sending to Base Sepolia (${esc(st.queued_behind)} earlier payout${st.queued_behind > 1 ? 's' : ''} go first)…` : 'The MPC network signed it. Sending to Base Sepolia…') };
+    say: st.base ? `Paid and sent to Base Sepolia. It finalizes in <b data-testid="toll-eta">${clock(st.eta_s ?? 1200)}</b>. Stay or leave: it settles by itself, no need to come back.` : late ? `Waiting on Base Sepolia. The payout was re-sent${st.queued_behind ? ` (${esc(st.queued_behind)} earlier payout${st.queued_behind > 1 ? 's' : ''} ahead)` : ''}; check it on the explorer below.` : (st.queued_behind ? `The MPC network signed it. Sending to Base Sepolia (${esc(st.queued_behind)} earlier payout${st.queued_behind > 1 ? 's' : ''} go first)…` : 'The MPC network signed it. Sending to Base Sepolia…') };
 }
 // Live countdown while Base Sepolia finalizes; re-reads the gate every 20 s and settles as soon as it is final.
 let watch = null;
@@ -67,7 +68,7 @@ function tollWatch(v, st) {
     const s = await A.tollStatus(v.nonce).catch(() => null); if (!s || cur !== 'toll') return;
     if (s.eta_s != null) end = Date.now() + s.eta_s * 1000;
     if (s.settle || s.status !== 'signed' || (s.base && !st.base)) { clearInterval(watch); primary(true); }
-    else if (!s.base) A.tollBroadcast(v.nonce).catch(() => null);
+    else if (!s.base) { await A.tollBroadcast(v.nonce).catch(() => null); if (v.at && Date.now() - v.at > 120e3 && !st.late) { st.late = 1; clearInterval(watch); primary(true); } }
   }, 1000);
 }
 function gasNote() {
