@@ -123,5 +123,30 @@
    "killed": 23,
    "total": 23
   }
+ },
+ "c3_payouts_live": {
+  "deploy": "main 7979ff6, Vercel nearcarta-5oh5g870z + Render dep-dbh9ruqfngtc73b214o0, 29 Oct 2026 04:16 UTC+3",
+  "method": "propose_batch signed by the guest agent key (house rules: max 0.05, daily 0.2)",
+  "runs": [
+   {
+    "width": 1440,
+    "charter": "ncguest-4s1t2k4p0z-obwz.nccharters-53836.testnet",
+    "paid_3x0.01": "G1wFMXb7P5pzTESTRKm7MaoAWNAAot97ujcptQ68h21e",
+    "refused_5x0.05_over_daily": "35FNyZqrLZFncJN6WqV8TsH9ufJ8B75Dacni4kJo9oz3"
+   },
+   {
+    "width": 1280,
+    "charter": "ncguest-3r5m665v5g-lzaa.nccharters-53836.testnet",
+    "paid_3x0.01": "92AW7zho1t15RmSM7AbdQjwe5kRNNDj8LnFqme8tsLrt",
+    "refused_5x0.05_over_daily": "HBvWhKutGFqcSYaPBzBmUuBirgf5Miaft7V2owv95rT7"
+   },
+   {
+    "width": 390,
+    "charter": "ncguest-3t506l5p46-st2n.nccharters-53836.testnet",
+    "paid_3x0.01": "Cmnjqs6C1NRbcWo2d5tTnmGpQmXKdejuHAgGM23xZZmn",
+    "refused_5x0.05_over_daily": "CsmoUvbS8vpRcGks4M4ZhYLvrW62v8wffpXjYVAiHgRC"
+   }
+  ],
+  "check": "each paid tx: 3 Transfer receipts; each refused tx: succeeds with 0 Transfer receipts (all-or-nothing). 0 console errors, 0 non-2xx at every width."
  }
 }
