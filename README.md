@@ -17,7 +17,7 @@ An agent with a wallet key can be talked into paying anyone: a fake invoice, a p
 | Shop | Press | See |
 |---|---|---|
 | House | *Build my charter*, then *Write my rules* and *Sign my rules*, then *Check my reputation* | Your own charter from the factory `nccharters-53836.testnet` (R17; charters from the older factories keep working) with a pay clause and a propose-only agent key; the reputation is counted from the charter's on-chain refusals |
-| Toll Bridge | *Pay the toll* | Your agent asks your charter to pay 0.01 NEAR to the café; allowed inside your max |
+| Toll Bridge | *Pay the toll* | Your agent asks your charter to pay the 0.01 NEAR toll; your wallet then asks the gate `gate5.r4csmvr86zk4.testnet`, which reads that payment on chain and has Chain Signatures sign a Base Sepolia payout from its own derived address; after Base finality it is settled and shows confirmed. The gate accepts charters from every charter factory (R17 and the older ones) |
 | Ferry | *Get quote*, then *Ask my agent to swap* | A live 1Click dry quote with its signature checked (mainnet send locked); your charter then pays a testnet stand-in of 0.01 NEAR per quoted USD back to you |
 | Mist Bank | *Send 0.01 NEAR privately* (fixed note sizes), then *Verify the seal*; *Verify the TEE now* | The charter memo carries a commitment and the seal matches the chain; the send comes with a NEAR AI TEE check that uses the commitment as its nonce (*Verify the TEE now* uses a fresh random one). The ZEC payout is mainnet only |
 | Guardhouse | *Try to trick my agent* (poisoned invoice), then *Let it knock anyway* | The payee check blocks before signing; sent anyway, the charter refuses on chain: "you never allowed that account" |
@@ -30,16 +30,13 @@ On 2026-10-29 a fresh guest pressed every shop row above on the live site with n
 
 ## Tracks and the hints we use
 - `security`: spending limits and a policy engine in a contract. FUNCTION CALL KEYS: the agent key can only call `propose`; every served account has 0 full-access keys. TEE ATTESTATION: NEAR AI Cloud Intel TDX and NVIDIA quotes checked live. Scam detection: the payee check and the Arena scam set. Reputation counted from on-chain refusals.
-- `business`: humans only set the constraints; the agent pays inside them, and a payment over the cap waits for the owner (NEP-519 yield). Cross-chain: NEAR INTENTS via 1Click quotes in Ferry and Mist Bank; CHAIN SIGNATURES via the Toll contract (`toll.r4csmvr86zk4.testnet`).
-- `agents`: a NEAR AI model turns the visitor's words into a payment proposal; the agent pays only through the charter (AGENT COMMERCE).
+- `business`: humans only set the constraints; the agent pays inside them, and a payment over the cap waits for the owner (NEP-519 yield). Cross-chain: NEAR INTENTS via 1Click quotes in Ferry and Mist Bank; CHAIN SIGNATURES via the Toll contract (`toll.r4csmvr86zk4.testnet`) and the visitor Toll gate (`gate5.r4csmvr86zk4.testnet`).
 - `privacy`: Mist Bank: a shielded Zcash testnet payout bound to a charter commitment; NEAR AI Cloud TEE check (PRIVATE AI, TEE, NEAR AI CLOUD).
-- `social`: a real Sputnik DAO owns and governs the Town Hall charter, and any visitor can file a proposal to it (SPUTNIK DAO). We do not rebuild the multisig.
-- `games`: the Arena's six walls, points and leaderboard; NEP-245 case tokens on the Arena contract; a one-click guest account, no wallet install.
 
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 176 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm test                 # 196 unit tests: ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
 npm run verify           # reads every proof tx back from testnet (70/70 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 npm run build && node app/serve.mjs &   # UI on :5173
