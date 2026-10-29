@@ -230,3 +230,8 @@ a.link.more[hidden] { display: none; }
 .t-links { display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: 100%; min-width: 0; }
 .t-links > * { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
 .wallet { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+/* TEE and check rows: the long detail goes under the label, so the label never shrinks to one letter per line */
+.feed.checks li, .feed.tee li { grid-template-columns: 56px minmax(0, 1fr); }
+.feed.checks li > :nth-child(3), .feed.tee li > :nth-child(3) { grid-column: 2; color: var(--c-text-3, inherit); }
+.feed li > :nth-child(2) { overflow-wrap: normal; word-break: normal; }
+.feed li { grid-template-columns: 72px minmax(6em, 1fr) minmax(0, auto); }
