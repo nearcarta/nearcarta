@@ -1,5 +1,16 @@
 # Nearcarta
 
+Every shop is a real wallet app under your own on-chain charter.
+
+**Judge path (Node 22, no keys, testnet read-only):**
+```
+git clone https://github.com/nearcarta/nearcarta && cd nearcarta
+npm ci
+npm test            # unit tests, about 15 s
+npm run verify      # re-reads all 76 proof txs from chain, about 1-2 min (46-102 s measured); exits 1 if any is missing
+npm run check-cited # every file, tx, account and hash the docs cite exists
+```
+
 A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money, and each move is checked first by the charter (the `oath` contract on NEAR), which holds the agent's rules. Agents ask. The charter answers. Each shop below is real on NEAR testnet, or real on 1Click mainnet as a dry quote (no spend).
 
 Deployed (testnet): https://nearcarta.vercel.app serves the pages, and its `/api/*` is passed to the API on Render (free plan, testnet, built from the `Dockerfile` image): https://nearcarta-api.onrender.com. Example: `/api/health`, `/api/guardhouse`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped. `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`.
