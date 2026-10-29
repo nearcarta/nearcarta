@@ -49,6 +49,7 @@ Run honest jobs first, because scams spend the day's limits.
 | `POST /api/vault/ask` `{text}` | "Ask the agent to pay" on the shared arena (runner-signed, one `propose`, counts against the runner's daily tx cap): `decision`, `reason`, `tx`, `url`. The charter decides; an off-allowlist payee or an amount over the cap comes back `denied` |
 | `POST /api/vault/record` `{tx, charter}` | verifies a tx from chain and records it on the board if it counts |
 | `GET /api/vault/score/:charter` | per job and scam: counted or not, and why; `score`/`max_score` |
+| `GET /api/vault/score?charter=` | alias of the above; with no charter it returns a usage hint (not a 404) |
 | `GET /api/vault/leaderboard` | players with `score`, `tasks`, `patterns`, `not_counted`, `verified` (owner) or nickname rows (`server_signed`), `last_tx` |
 | `GET /api/vault/runner` | runner allowance, gas per tx (30 Tgas), and transactions left today |
 

@@ -720,6 +720,12 @@ export function register(app, { limiter, globalCap }) {
     return c.json({ ...a, url: explorerTx(a.hash) });
   });
   app.get('/api/vault/score/:charter', limiter(20), async c => c.json(await score(c.req.param('charter'))));
+  // Bare path (cited by older notes): ?charter= works as an alias; without it, a usage hint instead of a 404.
+  app.get('/api/vault/score', limiter(20), async c => {
+    const id = c.req.query('charter');
+    if (id) return c.json(await score(id));
+    return c.json({ usage: 'GET /api/vault/score/:charter or /api/vault/score?charter=<account>', example: '/api/vault/score/' + (V.arena?.charter || '<charter>') });
+  });
   app.get('/api/vault/leaderboard', limiter(20), async c => c.json(await leaderboard()));
   app.get('/api/vault/runner', limiter(30), async c => c.json(await runnerStatus()));
 }
