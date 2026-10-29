@@ -384,3 +384,29 @@ test('refreshBoard answers within its wait and keeps the last fill result', asyn
   await new Promise(res => setTimeout(res, 450));
   assert.deepEqual(await refreshBoard(50, async () => { throw new Error('429'); }), { complete: false }); // the slow fill landed
 });
+
+test('a restart with no disk and no snapshot rebuilds the same board from chain at boot', async () => {
+  fresh();
+  const factories = [{ factory: 'f.testnet' }];
+  const charters = async () => [{ charter: 'arena.f.testnet' }, { charter: 'own.f.testnet' }];
+  const chain = { 'arena.f.testnet': [{ hash: 'r1', at: 10 }, { hash: 'r2', at: 20 }], 'own.f.testnet': [{ hash: 'r3', at: 30 }, { hash: 'r4', at: 40 }] };
+  const facts = { r1: { kind: 'attack', attack: 'fake-invoice', decision: 'denied', counted: true, shared: true, tag: 'ana' },
+    r2: { kind: 'task', task: 't1', decision: 'allowed', counted: true, shared: true, tag: 'ana' },
+    r3: { kind: 'attack', attack: 'lookalike', decision: 'denied', counted: true, owner: 'bo.testnet' }, r4: null };
+  const verify = async (h, c) => { if (!facts[h]) return null; const a = { hash: h, charter: c, ...facts[h], at: null }; _attempts.set(h, a); return a; };
+  const fill = o => backfill({ ...o, factories, charters, txs: async c => chain[c], verify, next: async () => null });
+  assert.equal((await fill({})).complete, true);
+  const before = JSON.stringify(board());
+  // restart: memory gone, /tmp board gone (no paid disk), no committed snapshot
+  fresh();
+  const gone = join(mkdtempSync(join(tmpdir(), 'nc-')), 'none.json');
+  rebuild.complete_at = null;
+  boot({ fill, firstMs: 0, snapshotFile: null, boardFile: gone });
+  assert.equal(rebuild.board_file_rows, 0);
+  const t0 = Date.now();
+  while (!rebuild.complete_at && Date.now() - t0 < 5000) await new Promise(r => setTimeout(r, 20));
+  assert.ok(rebuild.complete_at, 'boot rebuild completed');
+  assert.equal(_attempts.size, 3);
+  assert.equal(JSON.stringify(board()), before, 'same players, scores and order as before the restart');
+  fresh();
+});

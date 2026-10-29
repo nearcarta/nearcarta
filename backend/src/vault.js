@@ -574,9 +574,10 @@ export const rebuild = { started_at: null, complete_at: null, reread_at: null, p
  * Load the saved board (this instance) and the committed snapshot (tx hashes and nonces; every one re-read from chain
  * below), then fill until a pass completes (backoff to 60 s) while the snapshot hashes are re-read in parallel.
  */
-export function boot({ fill = backfill, firstMs = 1000, snapshotFile, reread: rr = reread, conc = 6 } = {}) {
+export function boot({ fill = backfill, firstMs = 1000, snapshotFile, boardFile = BOARD_FILE, reread: rr = reread, conc = 6 } = {}) {
   if (!V) return;
-  loadBoard();
+  // On Render free (no disk) the /tmp board is gone after a restart: the fill below rebuilds it from chain.
+  rebuild.board_file_rows = loadBoard(boardFile);
   rebuild.snapshot_rows = snapshotFile === null ? 0 : loadSnapshot(snapshotFile);
   rebuild.started_at = Date.now();
   rebuild.pending = pending.size;
