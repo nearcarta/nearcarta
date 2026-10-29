@@ -273,7 +273,9 @@ export function makeApp() {
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
   app.get('/api/toll/gate/:nonce', limiter(60), tg(c => tollgate.visit(c.req.param('nonce'))));
+  app.post('/api/toll/gate/settle-due', limiter(6), tg(() => tollgate.settleDue()));
   app.post('/api/toll/gate/:nonce/broadcast', limiter(10), tg(c => tollgate.broadcast(c.req.param('nonce'))));
+  app.post('/api/toll/gate/:nonce/settle', limiter(10), tg(c => tollgate.settleOne(c.req.param('nonce'))));
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
   app.get('/api/chronicle', limiter(20), async c => {
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
