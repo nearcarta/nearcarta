@@ -92,7 +92,7 @@ export async function init(canvas){
     `#include <clipping_planes_fragment>
      if(tfade>0.){ float cd=length(vViewPosition); float ign=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715)))); if(smoothstep(1.3,2.9,cd)*tfade+(1.-tfade)<ign) discard; }`); };
   await buildIsland();
-  buildWater(); buildGrass(); buildLamps(); buildWard(); buildFerry(); buildArena(); buildMist(); buildSmoke(); buildBirds(); buildFireflies(); buildBell(); buildPlaque(); buildSigns(); buildLaundry();
+  buildWater(); buildGrass(); buildLamps(); buildWard(); buildFerry(); buildArena(); buildZec(); buildMist(); buildSmoke(); buildBirds(); buildFireflies(); buildBell(); buildPlaque(); buildSigns(); buildLaundry();
   if(!LP) buildPost();
   addEventListener('resize', resize);
   return W;
@@ -433,6 +433,19 @@ function buildFerry(){
   const lpost=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.32,4),dark); lpost.position.set(-.55,.24,0); b.add(lpost);
   b.position.copy(J.home); b.lookAt(far.x,J.home.y,far.z); b.rotateY(-Math.PI/2); W.scene.add(b); b.userData.goal=0; b.userData.dir=b.rotation.y;
 }
+// ZEC drop: a gold coin rises off the boat, then sinks into a shielding mist (the amount stays hidden). Drawn on a canvas, no download.
+const zec={t:-1,p:new THREE.Vector3()};
+function buildZec(){ const cv=document.createElement('canvas'); cv.width=cv.height=96; const x=cv.getContext('2d');
+  x.fillStyle='#f4b728'; x.beginPath(); x.arc(48,48,44,0,7); x.fill(); x.strokeStyle='#8a5a12'; x.lineWidth=5; x.beginPath(); x.arc(48,48,36,0,7); x.stroke();
+  x.fillStyle='#3a2508'; x.font='bold 50px sans-serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('Z',48,51);
+  zec.coin=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false,fog:false})); zec.coin.visible=false; W.scene.add(zec.coin);
+  zec.mist=new THREE.Sprite(new THREE.SpriteMaterial({map:softT,color:0xcfd8e8,transparent:true,depthWrite:false})); zec.mist.visible=false; W.scene.add(zec.mist); }
+export function zecDrop(p){ if(!zec.coin) return; zec.p.copy(p); zec.t=0; }
+function updZec(dt){ if(zec.t<0) return; zec.t+=dt; const t=zec.t, c=zec.coin, m=zec.mist;
+  if(t>3.4){ zec.t=-1; c.visible=m.visible=false; return; }
+  const up=Math.min(1,t/1.1), sink=Math.max(0,(t-1.5)/1.1); c.visible=sink<1; c.position.copy(zec.p).setY(zec.p.y+.25+up*.7-sink*.35); c.scale.setScalar(.5*(1-sink*.9)); c.material.rotation=Math.sin(t*6)*.25;
+  c.material.opacity=1-sink; m.visible=t>1.2; const k=Math.max(0,t-1.2); m.position.copy(zec.p).setY(zec.p.y+.75); m.scale.setScalar(.4+k*.9); m.material.opacity=Math.min(.75,k*1.5)*(1-Math.max(0,(t-2.4)));
+}
 // Vault Arena: a wire dome that takes hits and never breaks
 let dome, sparks=[];
 function buildArena(){ const p=hx(SHOPS.arena.q,SHOPS.arena.r);
@@ -557,6 +570,7 @@ export function update(dt){ const T=clock.T; U.time.value=T;
   // mist
   mist.forEach(s=>{ const u=s.userData; const a=u.a+T*.15*(1-W.frz); s.position.set(u.c.x+Math.cos(a)*u.r*1.2,u.y+Math.sin(T*.6+u.a)*.12,u.c.z+Math.sin(a)*u.r); s.material.opacity=.13+(W.mist||0)*.35; });
   // ward
+  updZec(dt);
   W.hit=Math.max(0,W.hit-dt*.5); U.hit.value=W.hit; W.refuse=Math.max(0,(W.refuse||0)-dt*.3); U.refuse.value=Math.min(1,W.refuse); U.glow.value=.55+W.frz*.4;
   W.gateCaps.forEach(c=>c.material.color.set(W.hit>.08||W.refuse>.15?0xff6b6b:W.frz>.5?0xa8d8ff:0x00ec97));
   // boat
@@ -564,7 +578,7 @@ export function update(dt){ const T=clock.T; U.time.value=T;
   bu.sail.scale.x=1+Math.sin(T*1.7)*.05*(1-W.frz)+Math.min(dl,1)*.12; bu.lan.material.color.copy(LAMPC.warm).lerp(LAMPC.ice,W.frz); bu.lan.material.opacity=.4+K.lamp*.6;
   // arena
   dome.rotation.y=T*.08*(1-W.frz); W.domeHit=Math.max(0,(W.domeHit||0)-dt*1.8); dome.material.opacity=.16+W.domeHit*.45; dome.material.color.set(W.domeHit>.1?0xff8a6b:W.frz>.5?0xa8d8ff:0xd6b46a);
-  sparks.forEach(sp=>{ if(sp.t<0){ sp.s.visible=false; return; } sp.t+=dt*1.3; const k=Math.min(1,sp.t); sp.s.position.lerpVectors(sp.from,sp.to,k); sp.s.position.y+=Math.sin(k*Math.PI)*1.1; sp.s.visible=true; if(k>=1){ sp.t=-1; W.domeHit=1; } });
+  sparks.forEach(sp=>{ if(sp.t<0){ sp.s.visible=false; return; } sp.t+=dt*1.3; const k=Math.min(1,sp.t); sp.s.position.lerpVectors(sp.from,sp.to,k); sp.s.position.y+=Math.sin(k*Math.PI)*1.1; sp.s.visible=true; if(k>=1){ sp.t=-1; W.domeHit=1; W.domeHits=(W.domeHits||0)+1; } });
   if(W.frz<.5 && Math.floor(T*.45)!==Math.floor((T-dt)*.45)) fireSpark();
   // bell + windmill
   if(W.bell){ W.bell.userData.sw=Math.max(0,W.bell.userData.sw-dt*.3); W.bell.rotation.z=Math.sin(T*5)*.45*W.bell.userData.sw; }
