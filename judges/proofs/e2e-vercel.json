@@ -113,12 +113,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1304,
+                  "duration": 1872,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:52.184Z",
+                  "startTime": "2026-10-28T23:59:42.053Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -147,12 +147,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1308,
+                  "duration": 989,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:53.690Z",
+                  "startTime": "2026-10-28T23:59:44.053Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -181,12 +181,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 767,
+                  "duration": 652,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:55.060Z",
+                  "startTime": "2026-10-28T23:59:45.077Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -215,12 +215,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 638,
+                  "duration": 545,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:55.847Z",
+                  "startTime": "2026-10-28T23:59:45.739Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -257,12 +257,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 1,
                   "status": "passed",
-                  "duration": 1296,
+                  "duration": 2185,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:52.217Z",
+                  "startTime": "2026-10-28T23:59:42.048Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -291,12 +291,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 1,
                   "status": "passed",
-                  "duration": 1029,
+                  "duration": 821,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:53.721Z",
+                  "startTime": "2026-10-28T23:59:44.347Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -356,7 +356,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:59.626Z",
+                  "startTime": "2026-10-28T23:59:50.240Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -386,6 +386,111 @@
           "file": "guard-live.spec.js",
           "line": 19,
           "column": 1
+        }
+      ]
+    },
+    {
+      "title": "hall.spec.js",
+      "file": "hall.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "town hall proposals",
+          "file": "hall.spec.js",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "shows the DAO, its council and the latest proposals from chain",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2181,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T23:59:45.202Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "12efcde6fe54bde8de65-92f8dc872c65e5e69a69",
+              "file": "hall.spec.js",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "a guest files a proposal to join the reward list",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "set HALL_FILE=1 to file a real testnet proposal",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-research/e2e/hall.spec.js",
+                        "line": 13,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "skipped",
+                      "duration": 60,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-28T23:59:47.392Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "set HALL_FILE=1 to file a real testnet proposal",
+                          "location": {
+                            "file": "/workspace/near/tech/nearcarta-research/e2e/hall.spec.js",
+                            "line": 13,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "12efcde6fe54bde8de65-d91fe811e66ef5d0628b",
+              "file": "hall.spec.js",
+              "line": 12,
+              "column": 3
+            }
+          ]
         }
       ]
     },
@@ -426,15 +531,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "skipped",
                   "duration": 1,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:54.823Z",
+                  "startTime": "2026-10-28T23:59:46.307Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -486,15 +591,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 438,
+                  "duration": 331,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:54.858Z",
+                  "startTime": "2026-10-28T23:59:46.341Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -520,15 +625,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1815,
+                  "duration": 1622,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:55.314Z",
+                  "startTime": "2026-10-28T23:59:46.681Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -554,15 +659,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2251,
+                  "duration": 2979,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:57.139Z",
+                  "startTime": "2026-10-28T23:59:48.312Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -588,15 +693,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1420,
+                  "duration": 1766,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:59.406Z",
+                  "startTime": "2026-10-28T23:59:51.302Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -622,15 +727,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 12984,
+                  "duration": 11880,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:15:00.840Z",
+                  "startTime": "2026-10-28T23:59:53.077Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -656,15 +761,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 13005,
+                  "duration": 8999,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:15:13.842Z",
+                  "startTime": "2026-10-29T00:00:04.965Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -690,15 +795,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2282,
+                  "duration": 1762,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:15:26.886Z",
+                  "startTime": "2026-10-29T00:00:13.976Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -724,15 +829,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1802,
+                  "duration": 1436,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:15:29.191Z",
+                  "startTime": "2026-10-29T00:00:15.749Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -758,15 +863,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1841,
+                  "duration": 1757,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:15:31.015Z",
+                  "startTime": "2026-10-29T00:00:17.196Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -792,15 +897,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1439,
+                  "duration": 1220,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:15:32.882Z",
+                  "startTime": "2026-10-29T00:00:18.961Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -826,15 +931,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3913,
+                  "duration": 5853,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:15:34.345Z",
+                  "startTime": "2026-10-29T00:00:20.190Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -860,15 +965,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3041,
+                  "duration": 2783,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:15:38.324Z",
+                  "startTime": "2026-10-29T00:00:26.055Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -894,15 +999,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1164,
+                  "duration": 706,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:15:41.411Z",
+                  "startTime": "2026-10-29T00:00:28.847Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -913,6 +1018,84 @@
           "id": "e3b5e6ee814041738c3d-667e3858efcad007d0b0",
           "file": "shops.spec.js",
           "line": 109,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "vault-ai.spec.js",
+      "file": "vault-ai.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "the NEAR AI model proposes, the charter allows one ask and refuses an injection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 420000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-ai.spec.js",
+                    "line": 0,
+                    "column": 0
+                  }
+                },
+                {
+                  "type": "skip",
+                  "description": "set VAULT_AI_E2E=1 (testnet faucet and two NEAR AI calls)",
+                  "location": {
+                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-ai.spec.js",
+                    "line": 10,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-28T23:59:47.461Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-ai.spec.js",
+                        "line": 0,
+                        "column": 0
+                      }
+                    },
+                    {
+                      "type": "skip",
+                      "description": "set VAULT_AI_E2E=1 (testnet faucet and two NEAR AI calls)",
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-ai.spec.js",
+                        "line": 10,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "c7b7d909e9dd50a69e76-f8379411f4eccf005a28",
+          "file": "vault-ai.spec.js",
+          "line": 16,
           "column": 1
         }
       ]
@@ -943,15 +1126,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1510,
+                      "duration": 1454,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:14:56.516Z",
+                      "startTime": "2026-10-28T23:59:47.472Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -987,15 +1170,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "skipped",
-                      "duration": 115,
+                      "duration": 53,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:14:58.051Z",
+                      "startTime": "2026-10-28T23:59:48.935Z",
                       "annotations": [
                         {
                           "type": "skip",
@@ -1039,15 +1222,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1298,
+                      "duration": 1169,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:14:58.189Z",
+                      "startTime": "2026-10-28T23:59:48.996Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1083,15 +1266,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "skipped",
-                      "duration": 106,
+                      "duration": 57,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:14:59.507Z",
+                      "startTime": "2026-10-28T23:59:50.173Z",
                       "annotations": [
                         {
                           "type": "skip",
@@ -1155,7 +1338,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:59.626Z",
+                  "startTime": "2026-10-28T23:59:50.240Z",
                   "annotations": [
                     {
                       "type": "skip",
@@ -1225,7 +1408,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:59.626Z",
+                  "startTime": "2026-10-28T23:59:50.240Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1295,7 +1478,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:59.626Z",
+                  "startTime": "2026-10-28T23:59:50.240Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1365,7 +1548,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:59.626Z",
+                  "startTime": "2026-10-28T23:59:50.240Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1443,7 +1626,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:59.626Z",
+                  "startTime": "2026-10-28T23:59:50.240Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1513,7 +1696,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:14:59.626Z",
+                  "startTime": "2026-10-28T23:59:50.240Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1549,10 +1732,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-28T23:14:51.014Z",
-    "duration": 51687.422999999995,
-    "expected": 21,
-    "skipped": 10,
+    "startTime": "2026-10-28T23:59:41.203Z",
+    "duration": 48418.347,
+    "expected": 22,
+    "skipped": 12,
     "unexpected": 0,
     "flaky": 0
   }
