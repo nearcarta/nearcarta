@@ -19,7 +19,7 @@ export function setHooks(h){ if(h.step) onStep=h.step; if(h.event) onEvent=h.eve
 
 // clip names per rig
 const RIG={
-  robot:{ idle:'Idle', walk:'Walking', run:'Running', yes:'Yes', no:'No', thumbs:'ThumbsUp', jump:'Jump', wave:'Wave', kneel:'Sitting', stand:'Standing', head:'Head', feet:['FootL','FootR'], walkV:.62, runV:1.7, alt:[] },
+  robot:{ idle:'Idle', walk:'Walking', run:'Running', yes:'Yes', no:'No', thumbs:'ThumbsUp', jump:'Jump', wave:'Wave', kneel:'Sitting', stand:'Standing', head:'Head', feet:['FootL','FootR'], walkV:.62, runV:.82, walkS:1.09, runS:1.9, alt:[] }, // walkV/runV: clip speeds where the planted foot stops sliding (swept: stance-foot speed < .07 at the minimum; the old runV 1.7 skated)
   kay:{ idle:'Idle', walk:'Walking_A', walk2:'Walking_B', run:'Running_A', block:'Blocking', blockIn:'Block', cheer:'Cheer', interact:'Interact', hit:'Hit_A', sit:'Sit_Floor_Idle', cast:'Spellcast_Raise', use:'Use_Item', head:'head', feet:['footl','footr'], walkV:.5, runV:1.35, alt:['interact','use'] },
 };
 
@@ -79,7 +79,7 @@ export class Char{
     this.rig=RIG[rig]; this.kind=rig; this.name=name; this.voice=voice;
     const o=this.root=skClone(g.scene); if(rig==='kay') o.traverse(m=>{ if(m.isBone) m.name=m.name.replace(/_\d+$/,''); }); /* the 5 KayKit rigs share one glb: GLTFLoader suffixes their bones (hips_4), the clips target the bare names */ o.scale.setScalar(scale*SCL); height*=SCL; this.height=height;
     // gait: wv/rv are the clip reference speeds (stride x scale); walkSpd/runSpd are the actual brisk speeds
-    this.wv=this.rig.walkV*SCL; this.rv=this.rig.runV*SCL; this.walkSpd=this.wv*1.42; this.runSpd=this.rv*1.2; this.obj=new THREE.Group(); this.obj.add(o); W.scene.add(this.obj);
+    this.wv=this.rig.walkV*SCL; this.rv=this.rig.runV*SCL; this.walkSpd=this.rig.walkS||this.wv*1.42; this.runSpd=this.rig.runS||this.rv*1.2; this.obj=new THREE.Group(); this.obj.add(o); W.scene.add(this.obj);
     o.traverse(m=>{ if(m.isMesh){ m.castShadow=true; m.userData.dynCast=true; m.receiveShadow=false; m.frustumCulled=false;
         if(keep && /Shield|Sword|Axe|Knife|Crossbow|Throwable|Wand|Staff|Spellbook|Mug/.test(m.name) && !keep.includes(m.name)) m.visible=false;
         if(hide.includes(m.name)) m.visible=false;
