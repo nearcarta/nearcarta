@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-10-29T02:07:04.741Z",
+  "ref": "origin/main",
+  "commit": "cfcdb04",
+  "api": "https://nearcarta.vercel.app",
+  "counts": {
+    "files": 67,
+    "proofs": 36,
+    "accounts": 44,
+    "code_hashes": 40,
+    "sha256": 26,
+    "key_counts": 8,
+    "charter_code": 8
+  },
+  "misses": [
+    {
+      "kind": "sha256",
+      "value": "a6d611463f9d",
+      "why": "ending …5c271 is wrong: contracts/artifacts/oath.c5.wasm sha256 ends …c5271",
+      "where": "judges/VERIFY.md:64"
+    }
+  ]
+}
