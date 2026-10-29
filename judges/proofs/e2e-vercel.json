@@ -1,14 +1,14 @@
 {
   "config": {
     "argv": [
-      "/usr/bin/node",
-      "/workspace/near/tech/nearcarta-research/node_modules/.bin/playwright",
+      "/usr/local/lib/nodejs/node",
+      "/workspace/near/tech/nearcarta/node_modules/.bin/playwright",
       "test",
       "-c",
       "e2e/playwright.config.js"
     ],
-    "configFile": "/workspace/near/tech/nearcarta-research/e2e/playwright.config.js",
-    "rootDir": "/workspace/near/tech/nearcarta-research/e2e",
+    "configFile": "/workspace/near/tech/nearcarta/e2e/playwright.config.js",
+    "rootDir": "/workspace/near/tech/nearcarta/e2e",
     "failOnFlakyTests": false,
     "forbidOnly": false,
     "fullyParallel": false,
@@ -24,7 +24,7 @@
     "preserveOutput": "always",
     "projects": [
       {
-        "outputDir": "/workspace/near/tech/nearcarta-research/test-results",
+        "outputDir": "/workspace/near/tech/nearcarta/test-results",
         "repeatEach": 1,
         "retries": 1,
         "metadata": {
@@ -32,7 +32,7 @@
         },
         "id": "",
         "name": "",
-        "testDir": "/workspace/near/tech/nearcarta-research/e2e",
+        "testDir": "/workspace/near/tech/nearcarta/e2e",
         "testIgnore": [],
         "testMatch": [
           "**/*.@(spec|test).?(c|m)[jt]s?(x)"
@@ -44,15 +44,15 @@
       {
         "grep": {},
         "grepInvert": null,
-        "outputDir": "/workspace/near/tech/nearcarta-research/test-results",
+        "outputDir": "/workspace/near/tech/nearcarta/test-results",
         "repeatEach": 1,
         "retries": 1,
         "metadata": {
           "actualWorkers": 2
         },
         "name": "",
-        "testDir": "/workspace/near/tech/nearcarta-research/e2e",
-        "snapshotDir": "/workspace/near/tech/nearcarta-research/e2e",
+        "testDir": "/workspace/near/tech/nearcarta/e2e",
+        "snapshotDir": "/workspace/near/tech/nearcarta/e2e",
         "testIgnore": [],
         "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
         "timeout": 90000,
@@ -113,12 +113,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1872,
+                  "duration": 1278,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:42.053Z",
+                  "startTime": "2026-10-29T10:27:48.562Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -147,12 +147,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 989,
+                  "duration": 1176,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:44.053Z",
+                  "startTime": "2026-10-29T10:27:49.966Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -181,12 +181,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 652,
+                  "duration": 647,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:45.077Z",
+                  "startTime": "2026-10-29T10:27:51.159Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -215,12 +215,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 545,
+                  "duration": 640,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:45.739Z",
+                  "startTime": "2026-10-29T10:27:51.822Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -257,12 +257,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 1,
                   "status": "passed",
-                  "duration": 2185,
+                  "duration": 1691,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:42.048Z",
+                  "startTime": "2026-10-29T10:27:48.621Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -291,12 +291,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 1,
                   "status": "passed",
-                  "duration": 821,
+                  "duration": 1213,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:44.347Z",
+                  "startTime": "2026-10-29T10:27:50.421Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -328,7 +328,7 @@
                 {
                   "type": "serial",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/guard-live.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/guard-live.spec.js",
                     "line": 0,
                     "column": 0
                   }
@@ -337,7 +337,7 @@
                   "type": "skip",
                   "description": "set GUARD_E2E=1 (uses the public testnet faucet)",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/guard-live.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/guard-live.spec.js",
                     "line": 13,
                     "column": 6
                   }
@@ -356,12 +356,12 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:50.240Z",
+                  "startTime": "2026-10-29T10:27:56.612Z",
                   "annotations": [
                     {
                       "type": "serial",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/guard-live.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/guard-live.spec.js",
                         "line": 0,
                         "column": 0
                       }
@@ -370,7 +370,7 @@
                       "type": "skip",
                       "description": "set GUARD_E2E=1 (uses the public testnet faucet)",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/guard-live.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/guard-live.spec.js",
                         "line": 13,
                         "column": 6
                       }
@@ -418,12 +418,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 2181,
+                      "duration": 1814,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:59:45.202Z",
+                      "startTime": "2026-10-29T10:27:51.658Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -448,7 +448,7 @@
                       "type": "skip",
                       "description": "set HALL_FILE=1 to file a real testnet proposal",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/hall.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
                         "line": 13,
                         "column": 10
                       }
@@ -462,18 +462,18 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "skipped",
-                      "duration": 60,
+                      "duration": 90,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:59:47.392Z",
+                      "startTime": "2026-10-29T10:27:53.489Z",
                       "annotations": [
                         {
                           "type": "skip",
                           "description": "set HALL_FILE=1 to file a real testnet proposal",
                           "location": {
-                            "file": "/workspace/near/tech/nearcarta-research/e2e/hall.spec.js",
+                            "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
                             "line": 13,
                             "column": 10
                           }
@@ -511,7 +511,7 @@
                 {
                   "type": "serial",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/house.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/house.spec.js",
                     "line": 0,
                     "column": 0
                   }
@@ -520,7 +520,7 @@
                   "type": "skip",
                   "description": "set HOUSE_OWNER_KEY_FILE and HOUSE_AGENT_KEY_FILE to run against testnet",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/house.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/house.spec.js",
                     "line": 17,
                     "column": 8
                   }
@@ -539,12 +539,12 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:46.307Z",
+                  "startTime": "2026-10-29T10:27:52.481Z",
                   "annotations": [
                     {
                       "type": "serial",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/house.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/house.spec.js",
                         "line": 0,
                         "column": 0
                       }
@@ -553,7 +553,7 @@
                       "type": "skip",
                       "description": "set HOUSE_OWNER_KEY_FILE and HOUSE_AGENT_KEY_FILE to run against testnet",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/house.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/house.spec.js",
                         "line": 17,
                         "column": 8
                       }
@@ -594,12 +594,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 331,
+                  "duration": 610,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:46.341Z",
+                  "startTime": "2026-10-29T10:27:52.502Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -628,12 +628,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1622,
+                  "duration": 1824,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:46.681Z",
+                  "startTime": "2026-10-29T10:27:53.122Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -662,12 +662,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2979,
+                  "duration": 3145,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:48.312Z",
+                  "startTime": "2026-10-29T10:27:54.958Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -696,12 +696,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1766,
+                  "duration": 1406,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:51.302Z",
+                  "startTime": "2026-10-29T10:27:58.122Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -730,12 +730,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 11880,
+                  "duration": 2017,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:53.077Z",
+                  "startTime": "2026-10-29T10:27:59.541Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -764,12 +764,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 8999,
+                  "duration": 16009,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-29T00:00:04.965Z",
+                  "startTime": "2026-10-29T10:28:01.570Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -798,12 +798,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1762,
+                  "duration": 2405,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-29T00:00:13.976Z",
+                  "startTime": "2026-10-29T10:28:17.589Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -832,12 +832,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1436,
+                  "duration": 1782,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-29T00:00:15.749Z",
+                  "startTime": "2026-10-29T10:28:20.009Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -866,12 +866,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1757,
+                  "duration": 8103,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-29T00:00:17.196Z",
+                  "startTime": "2026-10-29T10:28:21.814Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -900,12 +900,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1220,
+                  "duration": 2398,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-29T00:00:18.961Z",
+                  "startTime": "2026-10-29T10:28:29.930Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -934,12 +934,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 5853,
+                  "duration": 1892,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-29T00:00:20.190Z",
+                  "startTime": "2026-10-29T10:28:32.344Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -968,12 +968,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2783,
+                  "duration": 1394,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-29T00:00:26.055Z",
+                  "startTime": "2026-10-29T10:28:34.244Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -983,7 +983,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-fbb163ced24de17ed809",
           "file": "shops.spec.js",
-          "line": 98,
+          "line": 99,
           "column": 1
         },
         {
@@ -1002,12 +1002,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 706,
+                  "duration": 732,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-29T00:00:28.847Z",
+                  "startTime": "2026-10-29T10:28:35.648Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1017,7 +1017,7 @@
           ],
           "id": "e3b5e6ee814041738c3d-667e3858efcad007d0b0",
           "file": "shops.spec.js",
-          "line": 109,
+          "line": 110,
           "column": 1
         }
       ]
@@ -1039,7 +1039,7 @@
                 {
                   "type": "serial",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-ai.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault-ai.spec.js",
                     "line": 0,
                     "column": 0
                   }
@@ -1048,7 +1048,7 @@
                   "type": "skip",
                   "description": "set VAULT_AI_E2E=1 (testnet faucet and two NEAR AI calls)",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-ai.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault-ai.spec.js",
                     "line": 10,
                     "column": 6
                   }
@@ -1067,12 +1067,12 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:47.461Z",
+                  "startTime": "2026-10-29T10:27:53.594Z",
                   "annotations": [
                     {
                       "type": "serial",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-ai.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-ai.spec.js",
                         "line": 0,
                         "column": 0
                       }
@@ -1081,7 +1081,7 @@
                       "type": "skip",
                       "description": "set VAULT_AI_E2E=1 (testnet faucet and two NEAR AI calls)",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-ai.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-ai.spec.js",
                         "line": 10,
                         "column": 6
                       }
@@ -1129,12 +1129,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1454,
+                      "duration": 1431,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:59:47.472Z",
+                      "startTime": "2026-10-29T10:27:53.603Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1159,7 +1159,7 @@
                       "type": "skip",
                       "description": "set VAULT_FAUCET=1 to make a faucet account",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-create.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
                         "line": 26,
                         "column": 12
                       }
@@ -1173,18 +1173,18 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "skipped",
-                      "duration": 53,
+                      "duration": 80,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:59:48.935Z",
+                      "startTime": "2026-10-29T10:27:55.053Z",
                       "annotations": [
                         {
                           "type": "skip",
                           "description": "set VAULT_FAUCET=1 to make a faucet account",
                           "location": {
-                            "file": "/workspace/near/tech/nearcarta-research/e2e/vault-create.spec.js",
+                            "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
                             "line": 26,
                             "column": 12
                           }
@@ -1225,12 +1225,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1169,
+                      "duration": 1332,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:59:48.996Z",
+                      "startTime": "2026-10-29T10:27:55.150Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1255,7 +1255,7 @@
                       "type": "skip",
                       "description": "set VAULT_FAUCET=1 to make a faucet account",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-create.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
                         "line": 26,
                         "column": 12
                       }
@@ -1269,18 +1269,18 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "skipped",
-                      "duration": 57,
+                      "duration": 100,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-10-28T23:59:50.173Z",
+                      "startTime": "2026-10-29T10:27:56.500Z",
                       "annotations": [
                         {
                           "type": "skip",
                           "description": "set VAULT_FAUCET=1 to make a faucet account",
                           "location": {
-                            "file": "/workspace/near/tech/nearcarta-research/e2e/vault-create.spec.js",
+                            "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
                             "line": 26,
                             "column": 12
                           }
@@ -1319,7 +1319,7 @@
                   "type": "skip",
                   "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-early-click.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault-early-click.spec.js",
                     "line": 5,
                     "column": 6
                   }
@@ -1338,13 +1338,13 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:50.240Z",
+                  "startTime": "2026-10-29T10:27:56.612Z",
                   "annotations": [
                     {
                       "type": "skip",
                       "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-early-click.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-early-click.spec.js",
                         "line": 5,
                         "column": 6
                       }
@@ -1380,7 +1380,7 @@
                 {
                   "type": "serial",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                     "line": 0,
                     "column": 0
                   }
@@ -1389,7 +1389,7 @@
                   "type": "skip",
                   "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                     "line": 10,
                     "column": 6
                   }
@@ -1408,12 +1408,12 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:50.240Z",
+                  "startTime": "2026-10-29T10:27:56.612Z",
                   "annotations": [
                     {
                       "type": "serial",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                         "line": 0,
                         "column": 0
                       }
@@ -1422,7 +1422,7 @@
                       "type": "skip",
                       "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                         "line": 10,
                         "column": 6
                       }
@@ -1450,7 +1450,7 @@
                 {
                   "type": "serial",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                     "line": 0,
                     "column": 0
                   }
@@ -1459,7 +1459,7 @@
                   "type": "skip",
                   "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                     "line": 10,
                     "column": 6
                   }
@@ -1478,12 +1478,12 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:50.240Z",
+                  "startTime": "2026-10-29T10:27:56.612Z",
                   "annotations": [
                     {
                       "type": "serial",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                         "line": 0,
                         "column": 0
                       }
@@ -1492,7 +1492,7 @@
                       "type": "skip",
                       "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                         "line": 10,
                         "column": 6
                       }
@@ -1520,7 +1520,7 @@
                 {
                   "type": "serial",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                     "line": 0,
                     "column": 0
                   }
@@ -1529,7 +1529,7 @@
                   "type": "skip",
                   "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                     "line": 10,
                     "column": 6
                   }
@@ -1548,12 +1548,12 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:50.240Z",
+                  "startTime": "2026-10-29T10:27:56.612Z",
                   "annotations": [
                     {
                       "type": "serial",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                         "line": 0,
                         "column": 0
                       }
@@ -1562,7 +1562,7 @@
                       "type": "skip",
                       "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault-feed.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault-feed.spec.js",
                         "line": 10,
                         "column": 6
                       }
@@ -1598,7 +1598,7 @@
                 {
                   "type": "serial",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault.spec.js",
                     "line": 0,
                     "column": 0
                   }
@@ -1607,7 +1607,7 @@
                   "type": "skip",
                   "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault.spec.js",
                     "line": 11,
                     "column": 6
                   }
@@ -1626,12 +1626,12 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:50.240Z",
+                  "startTime": "2026-10-29T10:27:56.612Z",
                   "annotations": [
                     {
                       "type": "serial",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault.spec.js",
                         "line": 0,
                         "column": 0
                       }
@@ -1640,7 +1640,7 @@
                       "type": "skip",
                       "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault.spec.js",
                         "line": 11,
                         "column": 6
                       }
@@ -1668,7 +1668,7 @@
                 {
                   "type": "serial",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault.spec.js",
                     "line": 0,
                     "column": 0
                   }
@@ -1677,7 +1677,7 @@
                   "type": "skip",
                   "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                   "location": {
-                    "file": "/workspace/near/tech/nearcarta-research/e2e/vault.spec.js",
+                    "file": "/workspace/near/tech/nearcarta/e2e/vault.spec.js",
                     "line": 11,
                     "column": 6
                   }
@@ -1696,12 +1696,12 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-28T23:59:50.240Z",
+                  "startTime": "2026-10-29T10:27:56.612Z",
                   "annotations": [
                     {
                       "type": "serial",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault.spec.js",
                         "line": 0,
                         "column": 0
                       }
@@ -1710,7 +1710,7 @@
                       "type": "skip",
                       "description": "set VAULT_E2E=1 (uses the public testnet faucet)",
                       "location": {
-                        "file": "/workspace/near/tech/nearcarta-research/e2e/vault.spec.js",
+                        "file": "/workspace/near/tech/nearcarta/e2e/vault.spec.js",
                         "line": 11,
                         "column": 6
                       }
@@ -1732,8 +1732,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-28T23:59:41.203Z",
-    "duration": 48418.347,
+    "startTime": "2026-10-29T10:27:48.033Z",
+    "duration": 48425.28799999999,
     "expected": 22,
     "skipped": 12,
     "unexpected": 0,
