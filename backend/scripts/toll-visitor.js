@@ -4,12 +4,13 @@
 // the gate reads the charter on chain and MPC-signs a Base Sepolia payout from its own derived address; the raw
 // tx is read from the gate and broadcast; after Base finality the guest calls settle and the MPC foreign-tx proof
 // makes the record confirmed. A second guest whose max per payment is below the toll is refused by its charter,
-// and the gate refuses that action, a replay, and a charter action that was not a toll payment.
+// and the gate refuses that action, a replay, a charter action that was not a toll payment, and an account that is
+// not from one of the gate's factories. FACTORY picks the guest's charter factory (default: the current R17 one).
 // Usage (testnet only): GATE=gate.<owner>.testnet KEYS=.secrets/toll-visitor/guests.json OUT=judges/proofs/toll-visitor.json node backend/scripts/toll-visitor.js
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { rpcClient, viewFn, keyFrom, signTx, functionCall, sendPropose, outcomeOf } from '../../shared/vault/tx.js';
 
-const E = process.env, GATE = E.GATE, FACTORY = 'nccharters-53681.testnet', PAYEE = 'cafe.ncpub-17102.testnet';
+const E = process.env, GATE = E.GATE, FACTORY = E.FACTORY || 'nccharters-53836.testnet', PAYEE = 'cafe.ncpub-17102.testnet';
 const RPC = 'https://rpc.testnet.near.org', BASE = 'https://sepolia.base.org', FAUCET = 'https://helper.nearprotocol.com/account';
 const rpc = rpcClient([RPC, 'https://test.rpc.fastnear.com']);
 const view = (c, m, a = {}) => viewFn(rpc, c, m, a);
@@ -17,7 +18,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const toY = n => (BigInt(Math.round(n * 1e6)) * 10n ** 18n).toString();
 const K = existsSync(E.KEYS) ? JSON.parse(readFileSync(E.KEYS, 'utf8')) : {};
 const saveK = () => writeFileSync(E.KEYS, JSON.stringify(K), { mode: 0o600 });
-const out = existsSync(E.OUT) ? JSON.parse(readFileSync(E.OUT, 'utf8')) : { gate: GATE, steps: {} };
+const out = existsSync(E.OUT) ? JSON.parse(readFileSync(E.OUT, 'utf8')) : { gate: GATE, factory: FACTORY, steps: {} };
 const save = () => writeFileSync(E.OUT, JSON.stringify(out, null, 1) + '\n');
 const evm = async (method, params) => { const j = await (await fetch(BASE, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })).json(); if (j.error) throw new Error(j.error.message); return j.result; };
 const errOf = s => (JSON.stringify(s).match(/REFUSED[^"\\]*|Smart contract panicked: [^"\\]+|ERR_[A-Z_]+/) || [JSON.stringify(s).slice(0, 200)])[0];
@@ -96,6 +97,7 @@ const B = await guest('overcap', 0.005);
 await step('overcap_gate_refuses', async () => ({ ...(await send(B.g.id, B.g.secret, GATE, [functionCall('pay_for', { charter: B.g.charter, action_id: String(B.asked.action_id ?? 0) }, 300n * 10n ** 12n)])), logs: undefined }));
 await step('replay_refused', async () => ({ ...(await send(B.g.id, B.g.secret, GATE, [functionCall('pay_for', { charter: A.g.charter, action_id: String(A.asked.action_id) }, 300n * 10n ** 12n)])), logs: undefined }));
 if (E.NON_TOLL_CHARTER) await step('non_toll_action_refused', async () => ({ charter: E.NON_TOLL_CHARTER, ...(await send(B.g.id, B.g.secret, GATE, [functionCall('pay_for', { charter: E.NON_TOLL_CHARTER, action_id: '0' }, 300n * 10n ** 12n)])), logs: undefined }));
+await step('unlisted_factory_refused', async () => ({ charter: E.NON_FACTORY_ACCOUNT || 'oath.r4csmvr86zk4.testnet', ...(await send(B.g.id, B.g.secret, GATE, [functionCall('pay_for', { charter: E.NON_FACTORY_ACCOUNT || 'oath.r4csmvr86zk4.testnet', action_id: '0' }, 300n * 10n ** 12n)])), logs: undefined }));
 
 // ---- settle after Base finality ----
 await step('settle', async () => {
