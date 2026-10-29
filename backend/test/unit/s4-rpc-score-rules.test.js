@@ -60,7 +60,7 @@ test('rules chip: default cap has no hint', () => {
 });
 test('rules chip: lowered cap says changed in Town Hall', () => {
   const r = ruleChip(0.03);
-  assert.equal(r.changed, true); assert.match(r.text, /max 0\.03 NEAR · changed in Town Hall/); assert.match(r.title, /default cap is 0\.05 NEAR/);
+  assert.equal(r.changed, true); assert.match(r.text, /max per payment 0\.03 NEAR · changed in Town Hall/); assert.match(r.title, /default cap is 0\.05 NEAR/);
 });
 test('rules chip: no clause', () => {
   assert.deepEqual(ruleChip(null), { text: 'Your rules', changed: false, title: '' });
