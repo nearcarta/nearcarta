@@ -400,7 +400,11 @@ function warmRooms(){ if(navigator.connection?.saveData) return; const D8=new UR
   const idle=f=>setTimeout(f,350);
   const next=()=>{ if(!q.length) return; if(inShop){ setTimeout(()=>idle(next),1500); return; } const [id,ps]=q.shift(); Promise.all([import(D8+'js/core.js'),import(D8+'shops/'+id+'.js')]).then(([C8])=>Promise.all(ps.map(p=>C8.load(p.endsWith('.glb')?p:'hex/'+p).catch(()=>null)))).catch(()=>null).then(()=>idle(next)); };
   idle(next); }
-window.__render=draw; window.__shopsLayer='d9'; setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE) warmRooms(); }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
+// first-render warm-up: build one room off screen, compile its shaders and draw one tiny hidden frame (shadow maps, fog, lights),
+// so the first door the visitor opens does not pay the one-off GPU program and upload cost
+let warmed=null; const warmGPU=()=>warmed||(warmed=(async()=>{ if(inShop) return; const r=await SL.load('chronicle'); if(!r.sh||inShop) return; await warmRoom(r);
+  const g=W.renderer, rt=new THREE.WebGLRenderTarget(64,64), au=g.shadowMap.autoUpdate; try{ g.shadowMap.autoUpdate=true; g.setRenderTarget(rt); g.render(r.sh.scene,r.sh.camera); }catch(e){} finally{ g.setRenderTarget(null); g.shadowMap.autoUpdate=au; rt.dispose(); } undressRoom(r.sh); window.__warm=Math.round(performance.now()); })().catch(()=>null));
+window.__render=draw; window.__shopsLayer='d9'; setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE){ setTimeout(()=>warmGPU().then(warmRooms),300); } }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
 if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,SP,setSky,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
   // demo cursor driven on the sim clock (capture only)
   const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#f3ead8" stroke="#17130f" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
