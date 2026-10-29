@@ -10,7 +10,8 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from 'n
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5173', W = Number(process.env.WIDTH || 1440);
 const STATE = `${process.env.STATE_DIR}/ui-${W}.json`, OUT = process.env.OUT || 'judges/proofs/tour-live.json';
 const H = W < 500 ? 844 : W < 1400 ? 800 : 900;
-const shot = n => `e2e/shots/tour-${W}-${n}.png`;
+const SHOTS = process.env.SHOTS_DIR || 'e2e/shots';
+const shot = n => `${SHOTS}/tour-${W}-${n}.png`;
 const rec = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : { base_url: BASE, passes: {} };
 const pass = rec.passes[W] = { width: W, height: H };
 const PUBLIC_RPC_C = /^https:\/\/(test\.rpc\.fastnear\.com|near-testnet\.drpc\.org|rpc\.testnet\.near\.org)\//;
