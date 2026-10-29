@@ -5,11 +5,49 @@
 // deployment entry is tried as the signer straight against NEAR RPC (source: "rpc").
 import { writeFileSync } from 'node:fs';
 import { DEP } from '../src/config.js';
-import { txStatus, txResult, eventsFromOutcome, explorerTx } from '../src/near.js';
+import { txResult, eventsFromOutcome, explorerTx } from '../src/near.js';
+
+// Proof txs are days old, and non-archival nodes forget them (UNKNOWN_TRANSACTION, or a
+// wait_until FINAL that hangs to a timeout). So: 3 testnet RPCs in rotation, archival first,
+// wait_until NONE (a finished tx comes back whole), and 3 rounds with backoff.
+const RPCS = (process.env.VERIFY_RPCS || 'https://archival-rpc.testnet.fastnear.com,https://archival-rpc.testnet.near.org,https://rpc.testnet.near.org').split(',');
+const ROUNDS = Number(process.env.VERIFY_ROUNDS || 3);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function post(url, body, ms = 15000) {
+  const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(ms) });
+  if (!r.ok) throw new Error(`${new URL(url).host} http ${r.status}`);
+  return r.json();
+}
+async function withRetry(fn) {
+  let last;
+  for (let round = 0; round < ROUNDS; round++) {
+    try { return await fn(); } catch (e) { last = e; }
+    if (round + 1 < ROUNDS) await sleep(500 * 2 ** round);
+  }
+  throw last;
+}
+async function txStatus(hash, sender) {
+  let last;
+  for (let round = 0; round < ROUNDS; round++) {
+    for (const url of RPCS) {
+      try {
+        const j = await post(url, { jsonrpc: '2.0', id: 1, method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } });
+        if (j.result?.transaction) return j.result;
+        last = new Error(`${new URL(url).host}: ${j.error?.cause?.name || j.error?.name || 'no result'}`);
+        if (j.error?.cause?.name === 'UNKNOWN_TRANSACTION' && url === RPCS.at(-1) && round === 0 && sender) {
+          // every RPC says unknown: a wrong signer guess, not a flaky node
+          const allUnknown = last; throw Object.assign(allUnknown, { final: true });
+        }
+      } catch (e) { if (e.final) throw e; last = e; }
+    }
+    if (round + 1 < ROUNDS) await sleep(500 * 2 ** round);
+  }
+  throw last;
+}
 
 async function signerOf(hash) {
-  const r = await fetch('https://tx.test.fastnear.com/v0/transactions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tx_hashes: [hash] }) });
-  const j = await r.json(); return j.transactions?.[0]?.transaction?.signer_id ?? null;
+  const j = await withRetry(() => post('https://tx.test.fastnear.com/v0/transactions', { tx_hashes: [hash] }));
+  return j.transactions?.[0]?.transaction?.signer_id ?? null;
 }
 // Account ids named in a shop's deployment entry, the likely signers.
 const candidates = (o) => [...new Set(JSON.stringify(o).match(/[a-z0-9][a-z0-9._-]*\.testnet/g) || [])];
@@ -41,7 +79,7 @@ for (const shop of ['guardhouse', 'townhall', 'arena', 'toll', 'toll_arbitrum', 
 // The Chain Signatures payout on Base Sepolia: sent from the MPC-derived address.
 {
   const h = DEP.toll.foreign_txs.base_sepolia_broadcast;
-  const r = await (await fetch('https://sepolia.base.org', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [h] }) })).json();
+  const r = await withRetry(() => post('https://sepolia.base.org', { jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [h] })).catch(e => ({ error: e.message }));
   const ok = r.result?.status === '0x1' && r.result.from.toLowerCase() === DEP.toll.foreign_address.toLowerCase();
   out.push({ shop: 'toll', label: 'base_sepolia_broadcast', hash: h, url: 'https://sepolia.basescan.org/tx/' + h, found: ok, from: r.result?.from, to: r.result?.to });
   console.log(ok ? 'FOUND ' : 'MISSING', 'toll'.padEnd(10), 'base_sepolia_broadcast'.padEnd(28), 'from MPC-derived address', r.result?.from);
@@ -49,7 +87,7 @@ for (const shop of ['guardhouse', 'townhall', 'arena', 'toll', 'toll_arbitrum', 
 // The USDC Toll payout on Base Sepolia: an ERC-20 transfer sent from its MPC-derived address.
 if (DEP.toll_usdc?.signed?.broadcast) {
   const h = DEP.toll_usdc.signed.evm_tx_hash;
-  const r = await (await fetch('https://sepolia.base.org', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [h] }) })).json();
+  const r = await withRetry(() => post('https://sepolia.base.org', { jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [h] })).catch(e => ({ error: e.message }));
   const ok = r.result?.status === '0x1' && r.result.from.toLowerCase() === DEP.toll_usdc.derived_address.toLowerCase() && r.result.to.toLowerCase() === DEP.toll_usdc.token.toLowerCase();
   out.push({ shop: 'toll_usdc', label: 'base_sepolia_usdc_payout', hash: h, url: 'https://sepolia.basescan.org/tx/' + h, found: ok, from: r.result?.from, to: r.result?.to });
   console.log(ok ? 'FOUND ' : 'MISSING', 'toll_usdc'.padEnd(10), 'base_sepolia_usdc_payout'.padEnd(28), 'from MPC-derived address', r.result?.from);
@@ -64,7 +102,10 @@ if (DEP.toll_usdc?.signed?.broadcast) {
   out.push({ shop: 'mistbank', label: 'zcash_payout_amount_hidden', hash: h, url: 'https://testnet.cipherscan.app/tx/' + h, found: ok, height: st.blockHeight, hidden: c?.amount_hidden, reasons: c?.reasons });
   console.log(ok ? 'FOUND ' : 'MISSING', 'mistbank'.padEnd(10), 'zcash_payout_amount_hidden'.padEnd(28), 'height', st.blockHeight, 'hidden', c?.amount_hidden);
 }
+// VERIFY_FORCE_MISSING=<label> marks one row missing, to test that a gap fails the run.
+if (process.env.VERIFY_FORCE_MISSING) for (const r of out) if (r.label === process.env.VERIFY_FORCE_MISSING) { r.found = false; r.error = 'forced missing (test)'; }
 writeFileSync(new URL('../../judges/proofs/proof-check.json', import.meta.url), JSON.stringify({ at: new Date().toISOString(), rows: out }, null, 1));
 const missing = out.filter(r => !r.found).length;
 console.log(`${out.length - missing}/${out.length} proof txs found on testnet`);
+if (missing) console.error(`verify FAILED: ${missing} row(s) missing: ` + out.filter(r => !r.found).map(r => r.shop + '/' + r.label).join(', '));
 process.exit(missing ? 1 : 0);
