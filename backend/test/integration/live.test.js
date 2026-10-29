@@ -119,7 +119,7 @@ test('mist bank: Zcash testnet payout hides its amount, its NEAR oath carries th
   assert.equal(m.built, true);
   assert.equal(m.street.amount_hidden, true, m.street.reasons.join());
   assert.ok(m.street.confirmations >= 1);
-  assert.equal(m.oath.success, true); assert.equal(m.oath.decision, 'allowed'); assert.equal(m.oath.memo_on_chain, true); assert.equal(m.oath.shop, 'mistbank');
+  assert.equal(m.oath.success, true); assert.equal(m.oath.decision, 'allowed'); assert.equal(m.oath.memo_on_chain, true); assert.equal(m.oath.shop, 'payout'); // the rotated proof (f2b48b2) is a tip2 on the guardhouse charter's payout shop
   assert.equal(m.binding.charter_caps_zec_amount, false); // stated plainly
   assert.doesNotMatch(JSON.stringify(m), /uview(test)?1|salt=|"zats"|payee_address/);
   assert.equal(m.ledger, undefined); assert.equal(m.disclosure, undefined);
