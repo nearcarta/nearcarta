@@ -51,8 +51,13 @@ async function refreshWho() {
 // ---------- step 2: create ----------
 function renderCreate() {
   const box = $('#create');
+  if (!me || charter) delete box.dataset.for;
   if (!me) { box.innerHTML = '<p class="muted" title="A charter is a NEAR account that holds your agent\'s money and its rules.">Start free first.</p>'; focusCreate(); return; }
   if (charter) { box.innerHTML = `<p>Your charter: <b data-testid="charter-id">${esc(charter)}</b></p>`; return; }
+  // refreshWho runs again after a sign-in (the wallet event and the guest flow both call it): keep the
+  // form the visitor is typing in instead of rebuilding it, or the name they typed is lost.
+  if (box.dataset.for === me && $('#cname', box)) { focusCreate(); return; }
+  box.dataset.for = me;
   const base = me.split('.')[0].replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'my';
   box.innerHTML = `<label>Name <span class="suffix"><input id="cname" value="${esc(base)}" maxlength="32" pattern="[a-z0-9-]+" aria-describedby="cname-h"><span>.${esc(CFG.factory)}</span></span></label>
     <label>Deposit <span class="suffix"><input id="cdep" type="number" min="0.3" max="5" step="0.1" value="0.5"><span>NEAR</span></span></label>
