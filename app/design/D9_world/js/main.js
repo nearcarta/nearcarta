@@ -1,4 +1,5 @@
 // Nearcarta — the town is the page. Boot → living town → (first visit) a 45 s story → free explore.
+import { dressRoom, undressRoom } from './roomkit.js';
 import * as THREE from 'three';
 import { P, CAPTURE, RM, clock, run, tickRoutines, wait, hx, toHex, walkable, SHOPS, TX, txUrl } from './core.js';
 import { W, LP, init, update, render, setTod, setProgress, lampState, LAMPC, setShadowMode } from './world.js';
@@ -311,10 +312,10 @@ function fadeTo(a,dur,at){ return new Promise(r=>{ if(at){ fade.style.setPropert
 const shopUI=$('#shopUI');
 let prevAU=true;
 function enterRoom(sh){ if(!body.classList.contains('in-shop')) prevAU=W.renderer.shadowMap.autoUpdate; room=sh; body.classList.add('in-shop'); shopUI.hidden=false; W.renderer.shadowMap.autoUpdate=true; tagOff(); prompt(null);
-  if(sh){ const c=sh.camera; if(!c.userData.home0) c.userData.home0=c.position.clone(); const look=c.userData.look; roomLook=look; const fit=SL.frame(c), home=c.userData.home0.clone().sub(look).multiplyScalar(fit).add(look); const far=home.clone().sub(look).multiplyScalar(1.22).add(look); c.position.copy(far); c.lookAt(look);
+  if(sh){ try{ dressRoom(sh); }catch(e){} const c=sh.camera; if(!c.userData.home0) c.userData.home0=c.position.clone(); const look=c.userData.look; roomLook=look; const fit=SL.frame(c), home=c.userData.home0.clone().sub(look).multiplyScalar(fit).add(look); const far=home.clone().sub(look).multiplyScalar(1.22).add(look); c.position.copy(far); c.lookAt(look);
     const o={k:0}; gsap.to(o,{k:1,duration:RM?.01:.9,ease:'power2.out',onUpdate:()=>{ c.position.lerpVectors(far,home,o.k); c.lookAt(look); }});
     if(sh.intro) setTimeoutSim(()=>{ if(room===sh) SL.L.C8.run(sh.intro()); },RM?.02:.5); } }
-function leaveRoom(){ SL.clear(); room=null; body.classList.remove('in-shop'); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
+function leaveRoom(){ undressRoom(room); SL.clear(); room=null; body.classList.remove('in-shop'); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
 addEventListener('resize',()=>{ if(!room) return; const c=room.camera, look=c.userData.look, fit=SL.frame(c); if(c.userData.home0){ c.position.copy(c.userData.home0).sub(look).multiplyScalar(fit).add(look); c.lookAt(look); } });
 $('#back').addEventListener('click',()=>world.exitShop());
 $('#t-proof').addEventListener('click',()=>{ SL.drawer(true); sfx('page',{g:.3}); }); $('#d-close').addEventListener('click',()=>SL.drawer(false));
@@ -322,7 +323,7 @@ $('#t-act').addEventListener('click',async e=>{ const b=e.currentTarget; if(b.da
 // compile the room's shaders (parallel where the GPU allows) during the fly-in, so its first frame does not stall the fade
 // the entry beats run on the wall clock outside captures: sim time is clamped per frame, so a slow GPU would stretch the walk-in
 const wallT=(f,t)=>CAPTURE?setTimeoutSim(f,t):setTimeout(f,t*1000);
-const warmRoom=async r=>{ if(r.sh&&W.renderer.compileAsync) try{ await W.renderer.compileAsync(r.sh.scene,r.sh.camera); }catch(e){} return r; };
+const warmRoom=async r=>{ if(r.sh) try{ r.sh.id=r.sh.id||''; dressRoom(r.sh); }catch(e){} if(r.sh&&W.renderer.compileAsync) try{ await W.renderer.compileAsync(r.sh.scene,r.sh.camera); }catch(e){} return r; };
 world.enterShop=(id,opt={})=>new Promise(res=>{ if(!OPEN[id]) throw new Error('unknown shop '+id); if(inShop){ res({id,cancelled:true}); return; } tagOff(); if(mode==='story') endStory(); inShop=id; preShop={p:cam.position.clone(),t:D.cur.t.clone(),mode};
   R.steer=null; keys.clear(); prompt(null); sm.hidden=true; body.classList.add('entering'); const pend=SL.load(id).then(warmRoom); const df=placeDoor(id), out=df.out, side=V(out.z,0,-out.x);
   const dd=cam.position.distanceTo(df.c), dur=RM?.01:Math.min(.85,.3+dd*.012);
@@ -342,7 +343,7 @@ world.freeze=on=>freeze(on); world.mode=()=>mode; world.skip=()=>endStory();
 
 // ---------- loop ----------
 let last=performance.now(), fpsS=[], lpDone=LP;
-function draw(){ if(!room){ render(); return; } const r=W.renderer, e=r.toneMappingExposure; r.setRenderTarget(null); r.toneMappingExposure=1.18; r.render(room.scene,room.camera); r.toneMappingExposure=e; SL.placeTags(); }
+function draw(){ if(!room){ render(); return; } const r=W.renderer, e=r.toneMappingExposure; r.setRenderTarget(null); r.toneMappingExposure=1.08; r.render(room.scene,room.camera); r.toneMappingExposure=e; SL.placeTags(); }
 function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(dt); if(room){ SP.update(); return; } tickRoutines(); updateCast(dt); if(mode!=='story'&&LIFE) tickLife(dt,{sky:SKYRUN||skyM!=='auto'}); update(dt);
   // lamp flare when the Lamplighter lights it
   for(const l of W.lamps){ if(l.flare>0) l.flare=Math.max(0,l.flare-dt*1.6); }
