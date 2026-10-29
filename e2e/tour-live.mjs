@@ -13,14 +13,16 @@ const H = W < 500 ? 844 : W < 1400 ? 800 : 900;
 const shot = n => `e2e/shots/tour-${W}-${n}.png`;
 const rec = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : { base_url: BASE, passes: {} };
 const pass = rec.passes[W] = { width: W, height: H };
-const ph = pass.pay = { at: new Date().toISOString(), console_errors: [], non_2xx: [], shots: [], shops: [] };
+const PUBLIC_RPC_C = /^https:\/\/(test\.rpc\.fastnear\.com|near-testnet\.drpc\.org|rpc\.testnet\.near\.org)\//;
+const ph = pass.pay = { at: new Date().toISOString(), console_errors: [], non_2xx: [], rpc_timeouts: [], rpc_timeout_console: [], shots: [], shops: [] };
 
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: W, height: H }, isMobile: W < 500, hasTouch: W < 500 });
 const p = await ctx.newPage();
 p.on('pageerror', e => ph.console_errors.push(String(e).slice(0, 300)));
-p.on('console', m => m.type() === 'error' && ph.console_errors.push(m.text().slice(0, 300)));
-p.on('response', r => { if (r.status() >= 300 && r.status() !== 304) ph.non_2xx.push(`${r.status()} ${r.request().method()} ${r.url().slice(0, 160)}`); });
+p.on('console', m => { if (m.type() !== 'error') return; const u = m.location()?.url || ''; (PUBLIC_RPC_C.test(u) && /status of (408|429|50[234])/.test(m.text()) ? ph.rpc_timeout_console : ph.console_errors).push(m.text().slice(0, 300)); });
+const PUBLIC_RPC = /^https:\/\/(test\.rpc\.fastnear\.com|near-testnet\.drpc\.org|rpc\.testnet\.near\.org)\//;
+p.on('response', r => { if (r.status() >= 300 && r.status() !== 304) (PUBLIC_RPC.test(r.url()) && [408, 429, 502, 503, 504].includes(r.status()) ? ph.rpc_timeouts : ph.non_2xx).push(`${r.status()} ${r.request().method()} ${r.url().slice(0, 160)}`); });
 const act = p.locator('#t-act');
 const snap = async n => { try { await p.screenshot({ path: shot(n) }); ph.shots.push(shot(n)); } catch (e) { ph.shot_errors = [...(ph.shot_errors || []), n]; } };
 const save = () => writeFileSync(OUT, JSON.stringify(rec, null, 2) + '\n');
@@ -65,4 +67,4 @@ try {
 } catch (e) { ph.ok = false; ph.error = String(e.message).slice(0, 400); ph.say = await text('#t-say'); await snap('error').catch(() => {}); }
 ph.no_sideways_scroll = await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth).catch(() => null);
 save(); await b.close();
-console.log(JSON.stringify({ W, ok: ph.ok, error: ph.error, errors: ph.console_errors.length, non_2xx: ph.non_2xx.length, shops: ph.shops.map(s => `${s.shop}:${s.error ? 'ERR' : s.steps.map(x => x.rule || x.see.slice(0, 30)).join('|')}`), base_tx: ph.base_tx, status: ph.status }));
+console.log(JSON.stringify({ W, ok: ph.ok, error: ph.error, errors: ph.console_errors.length, non_2xx: ph.non_2xx.length, rpc_timeouts: ph.rpc_timeouts.length, shops: ph.shops.map(s => `${s.shop}:${s.error ? 'ERR' : s.steps.map(x => x.rule || x.see.slice(0, 30)).join('|')}`), base_tx: ph.base_tx, status: ph.status }));
