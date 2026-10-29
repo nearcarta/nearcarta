@@ -319,17 +319,21 @@ addEventListener('resize',()=>{ if(!room) return; const c=room.camera, look=c.us
 $('#back').addEventListener('click',()=>world.exitShop());
 $('#t-proof').addEventListener('click',()=>{ SL.drawer(true); sfx('page',{g:.3}); }); $('#d-close').addEventListener('click',()=>SL.drawer(false));
 $('#t-act').addEventListener('click',async e=>{ const b=e.currentTarget; if(b.dataset.retry){ const id=b.dataset.retry; delete b.dataset.retry; b.disabled=true; const r=await SL.load(id); if(inShop!==id) return; if(r.err) SL.showError(id,r.err); else { SL.show(r.sh); enterRoom(r.sh); } return; } if(SL.act()) sfx('click',{g:.3}); });
+// compile the room's shaders (parallel where the GPU allows) during the fly-in, so its first frame does not stall the fade
+// the entry beats run on the wall clock outside captures: sim time is clamped per frame, so a slow GPU would stretch the walk-in
+const wallT=(f,t)=>CAPTURE?setTimeoutSim(f,t):setTimeout(f,t*1000);
+const warmRoom=async r=>{ if(r.sh&&W.renderer.compileAsync) try{ await W.renderer.compileAsync(r.sh.scene,r.sh.camera); }catch(e){} return r; };
 world.enterShop=(id,opt={})=>new Promise(res=>{ if(!OPEN[id]) throw new Error('unknown shop '+id); if(inShop){ res({id,cancelled:true}); return; } tagOff(); if(mode==='story') endStory(); inShop=id; preShop={p:cam.position.clone(),t:D.cur.t.clone(),mode};
-  R.steer=null; keys.clear(); prompt(null); sm.hidden=true; body.classList.add('entering'); const pend=SL.load(id); const df=placeDoor(id), out=df.out, side=V(out.z,0,-out.x);
+  R.steer=null; keys.clear(); prompt(null); sm.hidden=true; body.classList.add('entering'); const pend=SL.load(id).then(warmRoom); const df=placeDoor(id), out=df.out, side=V(out.z,0,-out.x);
   const dd=cam.position.distanceTo(df.c), dur=RM?.01:Math.min(.85,.3+dd*.012);
   const pf=innerWidth<innerHeight?1.45:1; shot(SH.fixed(df.c.clone().addScaledVector(out,2.4*pf).addScaledVector(side,.45).setY(df.c.y+.95),df.c,28),dur,'power3.inOut');
-  setTimeoutSim(()=>{ if(inShop!==id) return; sfx('door',{g:.5}); swingDoor(true);
+  wallT(()=>{ if(inShop!==id) return; sfx('door',{g:.5}); swingDoor(true);
     shot(SH.fixed(df.c.clone().addScaledVector(out,.7*pf).setY(df.c.y+.1),df.c.clone().addScaledVector(out,-.6),32),RM?.01:.7,'power2.in');
-    setTimeoutSim(async()=>{ if(inShop!==id) return; const ds=screenOf(df.c); const wt=setTimeout(()=>fade.classList.add('wait'),700); await fadeTo(1,.34,ds);
+    wallT(async()=>{ if(inShop!==id) return; const ds=screenOf(df.c); const wt=setTimeout(()=>fade.classList.add('wait'),700); await fadeTo(1,.34,ds);
       if(opt.to){ clearTimeout(wt); fade.classList.add('wait'); window.dispatchEvent(new CustomEvent('world:navigate',{detail:{id,to:opt.to}})); if(!CAPTURE||!P.has('nonav')) location.assign(opt.to); res({id,to:opt.to}); return; }
       const r=await pend; clearTimeout(wt); if(inShop!==id||exiting){ res({id,cancelled:true}); return; } DF.g.visible=false; W.lastDoor=ds;
       if(r.err) { SL.showError(id,r.err); enterRoom(null); } else { SL.show(r.sh); enterRoom(r.sh); }
-      body.classList.remove('entering'); window.dispatchEvent(new CustomEvent('world:interior-ready',{detail:{id,doorScreen:ds}})); await fadeTo(0,.5); res({id,doorScreen:ds}); },RM?.02:.32); },RM?.02:Math.max(.05,dur-.05)); });
+      body.classList.remove('entering'); window.dispatchEvent(new CustomEvent('world:interior-ready',{detail:{id,doorScreen:ds}})); await fadeTo(0,.36); res({id,doorScreen:ds}); },RM?.02:.32); },RM?.02:Math.max(.05,dur-.05)); });
 world.exitShop=()=>new Promise(res=>{ if(!inShop||exiting){ res(); return; } exiting=true; const id=inShop; SL.drawer(false); sfx('doorC',{g:.4});
   fadeTo(1,.28,{x:innerWidth/2,y:innerHeight/2}).then(()=>{ leaveRoom(); body.classList.remove('entering'); const df=placeDoor(id), out=df.out; DF.hinge.rotation.y=-1.75; DF.glow.material.opacity=1;
     cut(SH.fixed(df.c.clone().addScaledVector(out,1.1).setY(df.c.y+.3),df.c,30)); const p=preShop; shot(SH.fixed(p.p,p.t,30),RM?.01:.8,'power2.inOut'); swingDoor(false,.6);
@@ -346,7 +350,8 @@ function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(
   occlusion(dt); updPins(); placeTag(); if(W.treeFadeU) W.treeFadeU.value=mode==='explore'&&!inShop?1:0;
   if(D.shake>0){ D.shake=Math.max(0,D.shake-dt*1.4); cam.position.x+=Math.sin(clock.T*41)*.02*D.shake; cam.position.y+=Math.sin(clock.T*37)*.015*D.shake; }
   SP.update(); }
-function frame(now){ if(stopped) return; const dt=Math.min(.05,(now-last)/1000); last=now; step(dt); draw();
+// clamp .1 s (not .05): sim time, gsap and the door/fade beats all run on it, so a slow GPU keeps close to real time
+function frame(now){ if(stopped) return; const dt=Math.min(.1,(now-last)/1000); last=now; step(dt); draw();
   // auto low-power: if the first seconds run under ~24 fps, drop the post chain and shadows
   if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<8&&!P.has('full')&&!P.has('3d')){ fallback(`3D too slow here (${(1/avg).toFixed(1)} fps)`); return; } if(1/avg<24&&!P.has('full')){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } else if(1/avg>50&&!SHM) setShadowMode(true); lpDone=true; } }
   requestAnimationFrame(frame); }
