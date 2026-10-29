@@ -1,5 +1,5 @@
 {
- "at": "2026-10-29T00:01:44.358Z",
+ "at": "2026-10-29T07:09:00.149Z",
  "rows": [
   {
    "shop": "guardhouse",
@@ -970,6 +970,264 @@
    "found": true
   },
   {
+   "shop": "toll",
+   "label": "split_charter_pays_1440",
+   "hash": "6HN9GUZ8q5dHdDeacKQpmC84rmpZwP1g4Kbt55nqPYBh",
+   "url": "https://testnet.nearblocks.io/txns/6HN9GUZ8q5dHdDeacKQpmC84rmpZwP1g4Kbt55nqPYBh",
+   "signer": "ncguest-0k4b5k4i5f-g0oj.nccharters-53836.testnet",
+   "source": "fastnear",
+   "receiver": "ncguest-0k4b5k4i5f-g0oj.nccharters-53836.testnet",
+   "method": "propose_batch",
+   "result": {
+    "ok": true,
+    "value": [
+     {
+      "action_id": "0",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "1",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "2",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     }
+    ]
+   },
+   "events": [
+    "action",
+    "action",
+    "action",
+    "batch",
+    "settle",
+    "settle",
+    "settle"
+   ],
+   "found": true
+  },
+  {
+   "shop": "toll",
+   "label": "split_charter_pays_1280",
+   "hash": "2s6fMGiAU8AQRSqkkNg974L5ns8beT35nttqbTmDnbxo",
+   "url": "https://testnet.nearblocks.io/txns/2s6fMGiAU8AQRSqkkNg974L5ns8beT35nttqbTmDnbxo",
+   "signer": "ncguest-2l0y56562r-ta59.nccharters-53836.testnet",
+   "source": "fastnear",
+   "receiver": "ncguest-2l0y56562r-ta59.nccharters-53836.testnet",
+   "method": "propose_batch",
+   "result": {
+    "ok": true,
+    "value": [
+     {
+      "action_id": "0",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "1",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "2",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     }
+    ]
+   },
+   "events": [
+    "action",
+    "action",
+    "action",
+    "batch",
+    "settle",
+    "settle",
+    "settle"
+   ],
+   "found": true
+  },
+  {
+   "shop": "toll",
+   "label": "split_charter_pays_390",
+   "hash": "7m39rfeHNC75E5MvhVqWKKoAxSjuxHPTp9G3qWiDt67U",
+   "url": "https://testnet.nearblocks.io/txns/7m39rfeHNC75E5MvhVqWKKoAxSjuxHPTp9G3qWiDt67U",
+   "signer": "ncguest-0g4y061e0c-cdp8.nccharters-53836.testnet",
+   "source": "fastnear",
+   "receiver": "ncguest-0g4y061e0c-cdp8.nccharters-53836.testnet",
+   "method": "propose_batch",
+   "result": {
+    "ok": true,
+    "value": [
+     {
+      "action_id": "0",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "1",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "2",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     }
+    ]
+   },
+   "events": [
+    "action",
+    "action",
+    "action",
+    "batch",
+    "settle",
+    "settle",
+    "settle"
+   ],
+   "found": true
+  },
+  {
+   "shop": "toll",
+   "label": "split_charter_pays_r5_1440",
+   "hash": "DkDrX5xccpnGkCjwKnM4d5TAfTSNUKFVts89LiHcnCba",
+   "url": "https://testnet.nearblocks.io/txns/DkDrX5xccpnGkCjwKnM4d5TAfTSNUKFVts89LiHcnCba",
+   "signer": "ncguest-371u2w140w-ko3f.nccharters-53836.testnet",
+   "source": "fastnear",
+   "receiver": "ncguest-371u2w140w-ko3f.nccharters-53836.testnet",
+   "method": "propose_batch",
+   "result": {
+    "ok": true,
+    "value": [
+     {
+      "action_id": "6",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "7",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "8",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     }
+    ]
+   },
+   "events": [
+    "action",
+    "action",
+    "action",
+    "batch",
+    "settle",
+    "settle",
+    "settle"
+   ],
+   "found": true
+  },
+  {
+   "shop": "toll",
+   "label": "split_charter_pays_r5_1280",
+   "hash": "7ucupBxh71RTjVUq9fnJQHDmDY4m33a7CtfGLVcHkC2P",
+   "url": "https://testnet.nearblocks.io/txns/7ucupBxh71RTjVUq9fnJQHDmDY4m33a7CtfGLVcHkC2P",
+   "signer": "ncguest-1z4j545k00-w96z.nccharters-53836.testnet",
+   "source": "fastnear",
+   "receiver": "ncguest-1z4j545k00-w96z.nccharters-53836.testnet",
+   "method": "propose_batch",
+   "result": {
+    "ok": true,
+    "value": [
+     {
+      "action_id": "6",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "7",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "8",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     }
+    ]
+   },
+   "events": [
+    "action",
+    "action",
+    "action",
+    "batch",
+    "settle",
+    "settle",
+    "settle"
+   ],
+   "found": true
+  },
+  {
+   "shop": "toll",
+   "label": "split_charter_pays_r5_390",
+   "hash": "3gqmEUVMpQe5wtW8MSk83C6SwaegAT7CxErgCqCbJVVb",
+   "url": "https://testnet.nearblocks.io/txns/3gqmEUVMpQe5wtW8MSk83C6SwaegAT7CxErgCqCbJVVb",
+   "signer": "ncguest-6t026w4q6k-mmvf.nccharters-53836.testnet",
+   "source": "fastnear",
+   "receiver": "ncguest-6t026w4q6k-mmvf.nccharters-53836.testnet",
+   "method": "propose_batch",
+   "result": {
+    "ok": true,
+    "value": [
+     {
+      "action_id": "6",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "7",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     },
+     {
+      "action_id": "8",
+      "decision": "allowed",
+      "status": "submitted",
+      "reason": "ok"
+     }
+    ]
+   },
+   "events": [
+    "action",
+    "action",
+    "action",
+    "batch",
+    "settle",
+    "settle",
+    "settle"
+   ],
+   "found": true
+  },
+  {
    "shop": "toll_arbitrum",
    "label": "deploy",
    "hash": "CH4YEXKN5exV9URpxqwJd6vs8Q2wwDjdUJmsPAssSXk1",
@@ -1035,7 +1293,7 @@
    "hash": "GpdLAhoQZiVieiRUYp2j3jo3c1BXNaKqHFZU9k3C3wr9",
    "url": "https://testnet.nearblocks.io/txns/GpdLAhoQZiVieiRUYp2j3jo3c1BXNaKqHFZU9k3C3wr9",
    "signer": "toll-arb.r4csmvr86zk4.testnet",
-   "source": "fastnear",
+   "source": "rpc",
    "receiver": "toll-arb.r4csmvr86zk4.testnet",
    "method": "pay",
    "result": {
@@ -1051,7 +1309,7 @@
    "hash": "7nAT5QzRMRMcJX8GxL4h8dNFN1gxAkUrzJv3TWYFprzu",
    "url": "https://testnet.nearblocks.io/txns/7nAT5QzRMRMcJX8GxL4h8dNFN1gxAkUrzJv3TWYFprzu",
    "signer": "toll-arb.r4csmvr86zk4.testnet",
-   "source": "fastnear",
+   "source": "rpc",
    "receiver": "toll-arb.r4csmvr86zk4.testnet",
    "method": "pay",
    "result": {
@@ -1067,7 +1325,7 @@
    "hash": "Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
    "url": "https://testnet.nearblocks.io/txns/Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
    "signer": "r11oath-82930.testnet",
-   "source": "fastnear",
+   "source": "rpc",
    "receiver": "r11oath-82930.testnet",
    "method": "propose",
    "result": {
@@ -1091,7 +1349,7 @@
    "hash": "9riHoM2rG8nWsNCW5qtnpwcbKu1GUB7LpZB7CPgBm6Xy",
    "url": "https://testnet.nearblocks.io/txns/9riHoM2rG8nWsNCW5qtnpwcbKu1GUB7LpZB7CPgBm6Xy",
    "signer": "r11oath-82930.testnet",
-   "source": "fastnear",
+   "source": "rpc",
    "receiver": "r11oath-82930.testnet",
    "method": "propose",
    "result": {
@@ -1114,7 +1372,7 @@
    "hash": "Bd3qdM2WaCVCnJQaggLHFKybTv2XXcB3jtSWJfSZyebw",
    "url": "https://testnet.nearblocks.io/txns/Bd3qdM2WaCVCnJQaggLHFKybTv2XXcB3jtSWJfSZyebw",
    "signer": "r11house-31474.testnet",
-   "source": "fastnear",
+   "source": "rpc",
    "receiver": "r11house-31474.testnet",
    "method": "DeployContract,new",
    "result": {
@@ -1132,7 +1390,7 @@
    "hash": "AhZBGPuQtgoX2Rw9ofqX8A7gzmMWbTtbgnzEsthX6nTE",
    "url": "https://testnet.nearblocks.io/txns/AhZBGPuQtgoX2Rw9ofqX8A7gzmMWbTtbgnzEsthX6nTE",
    "signer": "r11hown-31474.testnet",
-   "source": "fastnear",
+   "source": "rpc",
    "receiver": "r11house-31474.testnet",
    "method": "set_clause",
    "result": {

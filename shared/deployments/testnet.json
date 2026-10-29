@@ -1,7 +1,11 @@
 {
   "network": "testnet",
   "rpc": "https://test.rpc.fastnear.com",
-  "rpc_fallbacks": ["https://rpc.testnet.near.org", "https://near-testnet.drpc.org", "https://rpc.testnet.fastnear.com"],
+  "rpc_fallbacks": [
+    "https://rpc.testnet.near.org",
+    "https://near-testnet.drpc.org",
+    "https://rpc.testnet.fastnear.com"
+  ],
   "explorer": "https://testnet.nearblocks.io",
   "guardhouse": {
     "oath": "r11oath-82930.testnet",
@@ -104,7 +108,13 @@
       "owner_freeze": "FmCDKaQ7Qs1kcKfg5gmhiKJFnka9cf1y3VtmLe5WapSy",
       "refused_while_frozen": "L9h2WoiiBPKheddP4bVwVZ2necmHKbp3DzqjERjV2hZ",
       "owner_unfreeze": "BHhoRStQwim3AdAhi2D526aogqgyuyfyrYuayC3nVfMq",
-      "settle_mpc_verified": "2PUvy9row3aSN5vd9tbYYRUhJG6BG4XXydtd6TsBo54F"
+      "settle_mpc_verified": "2PUvy9row3aSN5vd9tbYYRUhJG6BG4XXydtd6TsBo54F",
+      "split_charter_pays_1440": "6HN9GUZ8q5dHdDeacKQpmC84rmpZwP1g4Kbt55nqPYBh",
+      "split_charter_pays_1280": "2s6fMGiAU8AQRSqkkNg974L5ns8beT35nttqbTmDnbxo",
+      "split_charter_pays_390": "7m39rfeHNC75E5MvhVqWKKoAxSjuxHPTp9G3qWiDt67U",
+      "split_charter_pays_r5_1440": "DkDrX5xccpnGkCjwKnM4d5TAfTSNUKFVts89LiHcnCba",
+      "split_charter_pays_r5_1280": "7ucupBxh71RTjVUq9fnJQHDmDY4m33a7CtfGLVcHkC2P",
+      "split_charter_pays_r5_390": "3gqmEUVMpQe5wtW8MSk83C6SwaegAT7CxErgCqCbJVVb"
     },
     "foreign_txs": {
       "base_sepolia_broadcast": "0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
