@@ -244,3 +244,6 @@ a.link.more[hidden] { display: none; }
   #tray .rc, #tray .tx, #tray .kv, #tray .rcpt a { overflow-wrap: anywhere; word-break: break-word; }
   #tray, #tray * { max-width: 100%; }
 }
+/* per-action receipt + counter-offer (arena) */
+.receipt{display:block;margin-top:.35em;font:12px/1.4 ui-monospace,monospace;opacity:.85;border-top:1px dashed currentColor;padding-top:.3em}
+.counter{display:block;margin-top:.25em;font-size:12px;padding:.25em .5em;border-left:3px solid #d9a441;background:rgba(217,164,65,.12)}

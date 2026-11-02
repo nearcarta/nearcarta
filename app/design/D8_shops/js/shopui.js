@@ -2,6 +2,8 @@
 import * as A from './apps.js';
 import { $, sfx } from './core.js';
 import { ruleChip as ruleChipText } from './rules-default.js';
+import { receipt } from './receipt.js';
+const yOf = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const { esc, fmt, short } = A;
 
 let cur = null, sh = null, phase = 'idle', last = null, runScene = null, extra = {};
@@ -172,7 +174,11 @@ const APPS = {
       const who = r.brain?.by === 'model' ? `NEAR AI read it${r.brain.parsed?.suspicious ? ' and flagged it' : ''}, proposed ${+r.parsed.amount.toFixed(4)} to ${esc(short(r.parsed.receiverShown, 12, 6))}. ` : r.brain ? 'Model unavailable; the plain-words parser read it. ' : '';
       let rank = ''; try { const b = await A.board(); const i = b.players.findIndex(p => p.player === A.S.me); if (i >= 0) rank = ` Rank ${i + 1}.`; } catch {}
       const said = r.breach ? 'Breach! The charter paid a stranger.' : r.decision === 'denied' ? (r.fresh ? `New wall: ${A.why(r.reason)}. +100` : `Same wall: ${A.why(r.reason)}. +10`) : `Paid ${+r.paid.toFixed(4)} inside your rules. No wall hit.`;
-      return { o: r, keep: true, kind: r.breach ? 'no' : r.decision === 'denied' ? 'ok' : 'no', hero: APPS.arena.hero(), say: who + said + rank, rule: r.decision === 'denied' ? 'held by your rule · ' + A.why(r.reason) : A.ruleFor(r, r.parsed.clause) };
+      const rc = receipt({ note: r.parsed.cls, receiver: r.parsed.receiverShown, amount: yOf(r.parsed.amount), by: r.brain?.by, model: r.brain?.model,
+        verification: r.brain?.verification, cost: r.brain?.cost, decision: r.decision, reason: r.reason, tx: r.tx, clause_id: r.parsed.clause }, A.S.clauses[r.parsed.clause]);
+      const rcl = `<span class="receipt" data-testid="receipt">Receipt: ${esc(rc.what)} · to ${esc(short(rc.to || '', 12, 6))} · ${esc(rc.price_near)} NEAR · ${esc(rc.decided_by)} · plan ${rc.checks.within_plan ? 'ok' : 'over'} · charter ${esc(rc.checks.charter || '?')}</span>`
+        + (rc.counter_offer ? ` <span class="counter" data-testid="counter-offer">Counter-offer: ${esc(rc.counter_offer.why)}</span>` : '');
+      return { o: r, keep: true, kind: r.breach ? 'no' : r.decision === 'denied' ? 'ok' : 'no', hero: APPS.arena.hero(), say: who + said + rank + ' ' + rcl, rule: r.decision === 'denied' ? 'held by your rule · ' + A.why(r.reason) : A.ruleFor(r, r.parsed.clause) };
     },
   },
   hall: {

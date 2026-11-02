@@ -22,6 +22,7 @@ import { ATTACKS, ATTACK_IDS, MEMO_RE, acceptedReasons, matchesPlan, pickClause,
 import { TASKS, TASK_IDS, TASK_MEMO_RE, matchesTask, planTask } from '../../shared/vault/tasks.js';
 import { keyFrom, sendPropose, rpcClient, viewFn, PROPOSE_TGAS } from '../../shared/vault/tx.js';
 import { runSteps, runTask, runAsk } from '../../shared/vault/run.js';
+import { receipt as buildReceipt } from '../../shared/vault/receipt.js';
 import { ASK_MEMO_RE, parseAsk } from '../../shared/vault/ask.js';
 import * as agent from './agent.js';
 
@@ -270,9 +271,9 @@ export async function sharedAsk(text, { run = runAsk, nickname = 'guest', propos
   if (!V) throw bad('vault not deployed', 503);
   const secret = agentSecret();
   if (!secret) throw bad('shared arena runner is off on this deployment (no agent key set)', 503);
-  let a;
+  let a, clauses;
   try {
-    const clauses = await viewF(V.arena.charter, 'get_clauses').catch(() => ({}));
+    clauses = await viewF(V.arena.charter, 'get_clauses').catch(() => ({}));
     a = await propose(text, { clauses, receivers: V.arena.merchants || [], tag: nickname || 'guest' });
   } catch (e) { throw bad(e.message, e.status && e.status < 500 ? e.status : 400); }
   const q = a.parsed;
@@ -286,7 +287,8 @@ export async function sharedAsk(text, { run = runAsk, nickname = 'guest', propos
       const r = await run({ charter: V.arena.charter, key: keyFrom(secret), receiver: q.receiver, amount: q.amount, memo: q.memo,
         rpcCall, viewF: (a, m, x) => viewFn(rpcCall, a, m, x), send: sendPropose });
       used = r.tx ? 1 : 0;
-      return { ...r, note: q.note, ...brain, url: r.tx ? explorerTx(r.tx) : null, server_signed: true };
+      const out = { ...r, note: q.note, ...brain, url: r.tx ? explorerTx(r.tx) : null, server_signed: true };
+      return { ...out, receipt: buildReceipt(out, (clauses || {})[r.clause_id]) };
     } catch (e) { used = (e.status && e.status < 500) ? 0 : 1; throw e; }
     finally { release(used); }
   });
