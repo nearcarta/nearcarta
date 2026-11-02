@@ -185,6 +185,7 @@ export function makeApp() {
     c.get('quoteDone')?.(v);
     return c.json(v);
   });
+  app.get('/api/ferry/routes', limiter(30), async c => c.json(await ferry.routes()));
   app.get('/api/ferry/zcash/:addr', limiter(30), c => {
     try { return c.json(zcashRecipient(c.req.param('addr'))); } catch { return bad(c, 'not a valid Zcash address'); }
   });
