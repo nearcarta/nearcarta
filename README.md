@@ -153,6 +153,10 @@ The model call is non-streaming (`stream: false`, `backend/src/ai.js`) to a TEE-
 3. **The signature:** fetch `/v1/signature/<id>` with the same `signing_algo` as the report (we use `ed25519`; NEAR AI also offers `ecdsa`). It must be a `provider_tee` signature over `MODEL:sha256(request):sha256(response)`, from a signing key that matches exactly one model report from step 1.
 4. **Check it yourself:** each verified reply links to NEAR AI's Verification Center (`https://cloud.near.ai/verify?model=z-ai%2Fglm-5.3-flash#receipt=…`), which re-fetches fresh evidence in your browser.
 
+## One loop in under two minutes
+
+Open [/loop](https://nearcarta.vercel.app/loop) and press **Run the loop**. A timer runs while the house agent pays a listed shop (allowed on chain, with the Verified reply and its Verification Center link), then tries a fake invoice (refused on chain), and both rows appear in the [public ledger](https://nearcarta.vercel.app/ledger). No wallet needed; the shared runner is rate-limited. NEAR Intents and 1Click have no testnet, so this loop uses testnet-native rails: a NEAR function call and its NEP-297 event.
+
 ## Try it with sample data (no wallet, no real data)
 
 `node scripts/sample-run.mjs` runs a fictional bakery (`shared/samples/`): four invoices and the six Arena attacks against one sample clause, offline. Every name and amount is made up. It prints each verdict, a receipt, and the counter-offer for the over-cap invoice. The preview mirrors the contract's checks; on testnet the contract itself decides. `shared/samples/charter.json` also lists the charter rules under common agent-API policy names (budget, per_tx_limit, destinations_only, max_tx_per_day, owner_approval, frozen).

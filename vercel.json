@@ -5,6 +5,10 @@
   "installCommand": "npm ci --omit=dev",
   "rewrites": [
     {
+      "source": "/loop",
+      "destination": "/loop.html"
+    },
+    {
       "source": "/ledger",
       "destination": "/ledger.html"
     },

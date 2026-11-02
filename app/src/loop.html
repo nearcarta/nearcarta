@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="/config.js"></script>
+<title>NearCarta: one full loop on testnet</title>
+<style>
+body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#f6f1e7;color:#2a2116}main{max-width:760px;margin:auto;padding:20px}
+h1{font-size:1.5rem}#go{font-size:1.1rem;padding:12px 22px;border-radius:12px;border:0;background:#2f5d3a;color:#fff;cursor:pointer}
+#go:disabled{opacity:.5}#clock{font:700 2rem ui-monospace,monospace;margin-left:16px;vertical-align:middle}
+ol{padding-left:1.2em}li{background:#fff;border:1px solid #e2d6c0;border-radius:10px;padding:10px;margin:8px 0}
+li.ok{border-color:#2f5d3a}li.bad{border-color:#a3261b}.s{color:#6b5a44;font-size:.9rem}a{color:#2f5d3a}
+</style></head><body><main>
+<a href="/">← Town</a>
+<h1>One full loop on testnet, timed</h1>
+<p class="s">The house agent (NEAR AI, Confidential model) pays a listed shop, then tries a fake invoice. The charter contract allows the first and refuses the second on chain, and both land in the <a href="/ledger">public ledger</a>. No wallet needed: it uses the shared testnet runner (rate-limited). Goal: under 2 minutes, including a cold API wake-up.</p>
+<p class="s">Why no NEAR Intents in this loop: Intents and 1Click run on mainnet only and have no testnet, so the loop uses testnet-native rails (a NEAR function call and a NEP-297 event).</p>
+<p><button id="go" data-testid="loop-start">Run the loop</button><span id="clock" data-testid="loop-clock">0.0 s</span></p>
+<ol id="steps" data-testid="loop-steps"></ol>
+<script type="module">
+const api = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const $ = id => document.getElementById(id);
+let t0 = 0, tick;
+const step = (txt) => { const li = document.createElement('li'); li.textContent = txt + ' …'; $('steps').append(li); return (cls, html) => { li.className = cls; li.innerHTML = html; }; };
+const txLink = h => h ? ` <a target="_blank" rel="noopener" href="https://testnet.nearblocks.io/txns/${esc(h)}">tx ${esc(String(h).slice(0, 8))}…</a>` : '';
+const call = async (path, body) => { const r = await fetch(api + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'http ' + r.status); return j; };
+const hashOf = j => j.tx || j.tx_hash || j.receipt?.tx || j.steps?.at?.(-1)?.tx || j.results?.at?.(-1)?.tx || null;
+$('go').onclick = async () => {
+  $('go').disabled = true; $('steps').innerHTML = ''; t0 = performance.now();
+  tick = setInterval(() => $('clock').textContent = ((performance.now() - t0) / 1000).toFixed(1) + ' s', 100);
+  try {
+    let d = step('1. Wake the API'); await call('/api/health'); d('ok', '1. API awake');
+    d = step('2. Read the shop list from the charter'); const cfg = await call('/api/vault/config'); const shop = cfg.arena.merchants[0];
+    d('ok', `2. Charter <b>${esc(cfg.arena.charter)}</b>, listed shop ${esc(shop)}`);
+    d = step('3. Agent pays the listed shop (should be ALLOWED)');
+    const a = await call('/api/vault/ask', { text: `pay 0.001 NEAR to ${shop} for coffee`, nickname: 'loop' });
+    const v = a.verification || {};
+    d(a.decision === 'allowed' ? 'ok' : 'bad', `3. Charter: <b>${esc(a.decision || 'no decision')}</b>${txLink(a.tx)}<br><span class="s">Reply by ${esc(a.model || 'rules')}: ${v.verified ? `Verified (${esc(v.signature_kind)} signature, model in TEE)` : 'not verified'}${v.verify_url ? ` · <a target="_blank" rel="noopener" href="${esc(v.verify_url)}">check in NEAR AI Verification Center</a>` : ''}</span>`);
+    d = step('4. Fake invoice to a swapped payee (should be REFUSED)');
+    const b = await call('/api/vault/attack', { attack: 'fake-invoice', nickname: 'loop' });
+    const why = b.refused ? b.reason : '';
+    d(why ? 'ok' : 'bad', `4. Refused on chain: <b>${esc(why || 'no refusal seen')}</b>${txLink(hashOf(b))}`);
+    d = step('5. Both show in the public ledger'); const L = await call('/api/ledger');
+    d('ok', `5. Ledger: ${L.rows.length} rows, ${L.totals.refusals} refusals, ${L.totals.payouts_near} NEAR paid${L.partial ? ' (partial read)' : ''}. <a href="/ledger">Open</a>`);
+  } catch (e) { step('Stopped')('bad', 'Stopped: ' + esc(e.message)); }
+  clearInterval(tick); const s = (performance.now() - t0) / 1000;
+  $('clock').textContent = s.toFixed(1) + ' s ' + (s < 120 ? '✓ under 2 min' : '(over 2 min)'); $('go').disabled = false;
+};
+</script></main></body></html>

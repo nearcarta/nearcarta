@@ -286,8 +286,12 @@ export function makeApp() {
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => {
     const soft = (p, ms = 9000) => Promise.race([p.catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
-    const [chron, toll] = await Promise.all([soft(shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX)), soft(shops.toll())]);
-    return c.json(buildLedger({ chronicle: chron ? shops.hideRetired(chron) : { busy: true }, toll, budget: agentMod.budgetStatus() }));
+    const arena = vault.config()?.arena?.charter;
+    const [chron, arenaChron, toll] = await Promise.all([soft(shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX)),
+      arena ? soft(shops.chronicle(arena, shops.FEED_MAX)) : null, soft(shops.toll())]);
+    const feeds = [chron ? shops.hideRetired(chron) : { busy: true }, ...(arena ? [arenaChron || { busy: true }] : [])];
+    const merged = { busy: feeds.some(f => f.busy), stale: feeds.some(f => f.stale), txs: feeds.flatMap(f => f.txs || []) };
+    return c.json(buildLedger({ chronicle: merged, toll, budget: agentMod.budgetStatus() }));
   });
   app.get('/api/chronicle', limiter(20), async c => {
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
