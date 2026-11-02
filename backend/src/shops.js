@@ -131,7 +131,7 @@ export async function fpost(path, body, f = fetch, waitMs = 700) {
 // cached, the caller waits for the read. Concurrent callers share one in-flight read. A failed read keeps the last good
 // feed; with nothing cached the error goes to the route (busy + Retry-After). Pages that just sent a tx pass their own
 // hashes (?known=), which the route merges from RPC, so a cached feed never hides a visitor's newest tx.
-export const FEED_MAX = 15, FEED_TTL_MS = 15_000, FEED_STALE_MS = 10 * 60_000;
+export const FEED_MAX = 15, FEED_TTL_MS = 15_000, FEED_STALE_MS = 10 * 60_000, FEED_COLD_WAIT_MS = Number(process.env.FEED_COLD_WAIT_MS || 8000);
 const feeds = new Map(); // account -> { v, at, p }
 export const _resetFeeds = () => feeds.clear();
 // Retired txs: the first Mist Bank payout's oath approval (its payee was retired when its viewing key was found in
@@ -155,14 +155,21 @@ function refresh(account, read) {
   if (feeds.size > 500) feeds.delete(feeds.keys().next().value);
   return p;
 }
-export async function chronicle(account, limit = 8, read = chronicleOnce, now = Date.now()) {
+export async function chronicle(account, limit = 8, read = chronicleOnce, now = Date.now(), coldWait = FEED_COLD_WAIT_MS) {
   const n = Math.max(1, Math.min(Number(limit) || 8, FEED_MAX)), hit = feeds.get(account);
   if (hit?.v) {
     const age = now - hit.at;
     if (age < FEED_TTL_MS) return sliceFeed(hit.v, n);
     if (age < FEED_STALE_MS) { refresh(account, read).catch(() => {}); return sliceFeed(hit.v, n, { stale: true, stale_age_s: Math.round(age / 1000) }); }
   }
-  try { return sliceFeed(await refresh(account, read), n); }
+  // A cold read re-checks up to FEED_MAX txs on RPC and took ~58 s after an idle spell. Wait at most FEED_COLD_WAIT_MS;
+  // past that the route answers "busy, retry" (or the old feed, stale) and the read keeps going and fills the cache.
+  try {
+    const p = refresh(account, read); let timer;
+    const late = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('timeout: feed still loading')), coldWait); timer.unref?.(); });
+    p.catch(() => {});
+    try { return sliceFeed(await Promise.race([p, late]), n); } finally { clearTimeout(timer); }
+  }
   catch (e) { if (hit?.v) return sliceFeed(hit.v, n, { stale: true, stale_age_s: Math.round((now - hit.at) / 1000) }); throw e; }
 }
 // Re-read each listed tx from RPC in parallel (bounded), keeping the index order.

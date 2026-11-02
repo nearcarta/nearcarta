@@ -80,3 +80,13 @@ test('warm() pre-reads the town feed at FEED_MAX, so the first request is served
   const res2 = await makeApp().request(`/api/chronicle/${DEP.guardhouse.oath}?limit=12`); const j2 = await res2.json();
   assert.equal(j2.txs.length, 12); assert.equal(r.n, 1);
 });
+
+test('a cold read slower than the cold wait answers timeout at once; the read keeps going and serves the next call', async () => {
+  const slow = async (a, l) => { await new Promise(res => setTimeout(res, 150)); return { account: a, txs: rows(l) }; };
+  const t0 = Date.now();
+  await assert.rejects(chronicle('cold.testnet', 8, slow, Date.now(), 30), /timeout/);
+  assert.ok(Date.now() - t0 < 120);
+  await new Promise(res => setTimeout(res, 200));
+  const z = await chronicle('cold.testnet', 8, async () => { throw new Error('should be cached'); });
+  assert.equal(z.txs.length, 8); assert.equal(z.stale, undefined);
+});
