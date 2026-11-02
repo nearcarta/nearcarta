@@ -277,7 +277,7 @@ impl Contract {
     pub fn get_season(&self) -> Season { self.season.clone() }
     pub fn inventory_account(&self, token_id: TokenId) -> AccountId { self.inv(&token_id) }
 
-    // ---------- NEP-245 (subset: transfer, batch transfer, balances, supply, events) ----------
+    // ---------- NEP-245 core: transfer, batch transfer, transfer_call + resolve, balances, supply, events ----------
     #[payable]
     pub fn mt_transfer(&mut self, receiver_id: AccountId, token_id: String, amount: U128, approval: Option<(AccountId, u64)>, memo: Option<String>) {
         assert_one_yocto();
@@ -301,6 +301,30 @@ impl Contract {
     pub fn mt_batch_supply(&self, token_ids: Vec<String>) -> Vec<Option<U128>> { token_ids.iter().map(|t| self.sup.get(t)).collect() }
     pub fn mt_token(&self, token_ids: Vec<String>) -> Vec<Option<serde_json::Value>> {
         token_ids.iter().map(|t| self.sup.get(t).map(|_| json!({"token_id": t, "owner_id": null}))).collect()
+    }
+    /// NEP-245 transfer_call: move, then ask the receiver; unused amounts come back in mt_resolve_transfer.
+    #[payable]
+    pub fn mt_transfer_call(&mut self, receiver_id: AccountId, token_id: String, amount: U128, approval: Option<(AccountId, u64)>, memo: Option<String>, msg: String) -> PromiseOrValue<Vec<U128>> {
+        assert_one_yocto();
+        require!(approval.is_none(), "ERR_MT_APPROVALS_UNSUPPORTED");
+        self.mt_call(receiver_id, vec![token_id], vec![amount], memo, msg)
+    }
+    #[payable]
+    pub fn mt_batch_transfer_call(&mut self, receiver_id: AccountId, token_ids: Vec<String>, amounts: Vec<U128>, approvals: Option<Vec<Option<(AccountId, u64)>>>, memo: Option<String>, msg: String) -> PromiseOrValue<Vec<U128>> {
+        assert_one_yocto();
+        require!(token_ids.len() == amounts.len(), "ERR_LEN_MISMATCH");
+        require!(approvals.map(|v| v.iter().all(|a| a.is_none())).unwrap_or(true), "ERR_MT_APPROVALS_UNSUPPORTED");
+        self.mt_call(receiver_id, token_ids, amounts, memo, msg)
+    }
+    /// Returns the amounts the receiver kept. Refunds = min(asked back, what the receiver still holds).
+    #[private]
+    pub fn mt_resolve_transfer(&mut self, sender_id: AccountId, receiver_id: AccountId, token_ids: Vec<String>, amounts: Vec<U128>, approvals: Option<Vec<Option<(AccountId, u64)>>>) -> Vec<U128> {
+        let _ = approvals;
+        let unused: Vec<U128> = match env::promise_result_checked(0, 1024) {
+            Ok(v) => serde_json::from_slice::<Vec<U128>>(&v).ok().filter(|u| u.len() == amounts.len()).unwrap_or_else(|| amounts.clone()),
+            Err(_) => amounts.clone(),
+        };
+        self.mt_settle(&sender_id, &receiver_id, &token_ids, &amounts, &unused)
     }
 }
 
@@ -382,6 +406,27 @@ impl Contract {
         self.bal.insert(&key, &U128(self.bal.get(&key).unwrap_or(U128(0)).0 + amt));
         self.sup.insert(&item.to_string(), &U128(self.sup.get(&item.to_string()).unwrap_or(U128(0)).0 + amt));
         ev("nep245", "1.0.0", "mt_mint", json!({"owner_id": to, "token_ids": [item], "amounts": [U128(amt)], "memo": memo}));
+    }
+    fn mt_call(&mut self, receiver_id: AccountId, token_ids: Vec<String>, amounts: Vec<U128>, memo: Option<String>, msg: String) -> PromiseOrValue<Vec<U128>> {
+        require!(!token_ids.is_empty(), "ERR_EMPTY");
+        let s = env::predecessor_account_id();
+        for (t, a) in token_ids.iter().zip(amounts.iter()) { self.mt_move(&s, &receiver_id, t, a.0, memo.as_deref()); }
+        let prev: Vec<AccountId> = token_ids.iter().map(|_| s.clone()).collect();
+        let on = Promise::new(receiver_id.clone()).function_call("mt_on_transfer".to_string(),
+            serde_json::to_vec(&json!({"sender_id": s, "previous_owner_ids": prev, "token_ids": token_ids, "amounts": amounts, "msg": msg})).unwrap(),
+            NearToken::from_yoctonear(0), Gas::from_tgas(35));
+        on.then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(15))
+            .mt_resolve_transfer(s, receiver_id, token_ids, amounts, None)).into()
+    }
+    pub(crate) fn mt_settle(&mut self, sender: &AccountId, receiver: &AccountId, token_ids: &[String], amounts: &[U128], unused: &[U128]) -> Vec<U128> {
+        let mut kept = Vec::with_capacity(token_ids.len());
+        for ((t, a), u) in token_ids.iter().zip(amounts).zip(unused) {
+            let have = self.bal.get(&k(t, receiver)).unwrap_or(U128(0)).0;
+            let back = u.0.min(a.0).min(have);
+            if back > 0 { self.mt_move(receiver, sender, t, back, Some("refund")); }
+            kept.push(U128(a.0 - back));
+        }
+        kept
     }
     fn mt_move(&mut self, from: &AccountId, to: &AccountId, item: &str, amt: u128, memo: Option<&str>) {
         require!(amt > 0, "ERR_ZERO_AMOUNT");

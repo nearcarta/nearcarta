@@ -173,3 +173,43 @@ fn season_commit_reveal() {
     c.season_close(hex::encode(seed));
     assert_eq!(c.tiebreak(a("bob.testnet")).unwrap().len(), 64);
 }
+
+fn give_bob_key(c: &mut Contract) {
+    let i = att(c, "bob.testnet", "key please");
+    assert_eq!(act(c, i, Act::GiveItem { to: a("bob.testnet"), item: "key:brass".into(), amount: U128(1) }), "ALLOW");
+}
+
+#[test]
+fn nep245_transfer_call_moves_then_resolve_refunds_unused() {
+    let mut c = setup();
+    give_bob_key(&mut c);
+    ctx("bob.testnet", 1);
+    let _ = c.mt_transfer_call(a("shop.testnet"), "key:brass".into(), U128(1), None, None, "deposit".into());
+    assert_eq!(c.mt_balance_of(a("shop.testnet"), "key:brass".into()).0, 1);
+    // receiver asks for all of it back
+    let kept = c.mt_settle(&a("bob.testnet"), &a("shop.testnet"), &["key:brass".into()], &[U128(1)], &[U128(1)]);
+    assert_eq!(kept[0].0, 0);
+    assert_eq!(c.mt_balance_of(a("bob.testnet"), "key:brass".into()).0, 1);
+}
+
+#[test]
+fn nep245_resolve_refund_is_capped_by_receiver_balance() {
+    let mut c = setup();
+    give_bob_key(&mut c);
+    ctx("bob.testnet", 1);
+    let _ = c.mt_batch_transfer_call(a("shop.testnet"), vec!["key:brass".into()], vec![U128(1)], None, None, "".into());
+    ctx("shop.testnet", 1); c.mt_transfer(a("erin.testnet"), "key:brass".into(), U128(1), None, None);
+    // receiver spent it, then claims a refund: nothing comes back, nothing is minted
+    let kept = c.mt_settle(&a("bob.testnet"), &a("shop.testnet"), &["key:brass".into()], &[U128(1)], &[U128(1)]);
+    assert_eq!(kept[0].0, 1);
+    assert_eq!(c.mt_balance_of(a("bob.testnet"), "key:brass".into()).0, 0);
+    assert_eq!(c.mt_supply("key:brass".into()).unwrap().0, 3);
+}
+
+#[test]
+#[should_panic(expected = "ERR_MT_BALANCE")]
+fn nep245_transfer_call_needs_balance() {
+    let mut c = setup();
+    ctx("bob.testnet", 1);
+    let _ = c.mt_transfer_call(a("shop.testnet"), "key:brass".into(), U128(1), None, None, "".into());
+}
