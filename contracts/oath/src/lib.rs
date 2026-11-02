@@ -245,7 +245,7 @@ pub struct Outcome {
 pub enum Change {
     SetClause { clause_id: String, clause: Clause },
     SetReceiptSigner { key_id: String, public_key: Base64VecU8 },
-    SetAgentKey { public_key: PublicKey, allowance: U128 },
+    SetAgentKey { public_key: PublicKey, allowance: Option<U128> },
     SetDao { dao: Option<AccountId> },
     SetPolicyDelay { delay_ns: U64 },
     Upgrade { code_hash: String },
@@ -438,7 +438,9 @@ impl Oath {
                     emit("policy", json!({"change": "setup_closed", "by": env::predecessor_account_id()}));
                 }
                 emit("agent_key", json!({"op": "set", "public_key": public_key, "allowance": allowance}));
-                let a = Allowance::limited(NearToken::from_yoctonear(allowance.0)).expect("ERR_ALLOWANCE_ZERO");
+                // R18: no allowance (None) is the default. A capped key that runs out of gas is locked out for good
+                // (its allowance cannot be raised), so the real limit is the receiver + method list, not gas.
+                let a = match allowance { None => Allowance::Unlimited, Some(x) => Allowance::limited(NearToken::from_yoctonear(x.0)).expect("ERR_ALLOWANCE_ZERO") };
                 let mut add = Promise::new(me.clone()).add_access_key_allowance(public_key.clone(), a, me.clone(), AGENT_METHODS.to_string());
                 if let Some(old) = prev.clone().filter(|o| *o != public_key) { add = add.delete_key(old); }
                 env::storage_write(K_ROTATING, &[1]);
@@ -540,9 +542,10 @@ impl Oath {
 
     /// Adds the agent key to THIS account as a function-call key that may only
     /// call `propose` on this contract. A new key is a widening change.
-    pub fn set_agent_key(&mut self, public_key: PublicKey, allowance: U128) -> PromiseOrValue<serde_json::Value> {
+    /// `allowance` is optional: leave it out for a key with no gas cap (recommended); a cap must be > 0.
+    pub fn set_agent_key(&mut self, public_key: PublicKey, allowance: Option<U128>) -> PromiseOrValue<serde_json::Value> {
         self.assert_gov();
-        require!(allowance.0 > 0, "ERR_ALLOWANCE_ZERO");
+        require!(allowance.map_or(true, |a| a.0 > 0), "ERR_ALLOWANCE_ZERO");
         self.queue_or_apply(Change::SetAgentKey { public_key, allowance })
     }
 

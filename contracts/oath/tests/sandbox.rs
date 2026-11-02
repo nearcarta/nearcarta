@@ -35,7 +35,7 @@ async fn setup() -> anyhow::Result<Env> {
     oath.call("new").args_json(json!({"owner": owner.id(), "dao": dao.id()})).transact().await?.into_result()?;
     let agent_sk = SecretKey::from_random(KeyType::ED25519);
     let r = owner.call(oath.id(), "set_agent_key")
-        .args_json(json!({"public_key": agent_sk.public_key(), "allowance": NEAR.to_string()}))
+        .args_json(json!({"public_key": agent_sk.public_key()}))
         .gas(near_workspaces::types::Gas::from_tgas(30)).transact().await?;
     assert!(r.is_success(), "{:?}", r.failures());
     println!("GAS set_agent_key: {}", r.total_gas_burnt);
@@ -381,5 +381,33 @@ async fn r14_set_agent_key_rollback_and_rotation() -> anyhow::Result<()> {
         .args_json(json!({"prev": null, "new": new_sk.public_key()})).transact().await?;
     assert!(r.is_failure());
     println!("R14 on_agent_key by owner: {:?}", r.failures().first().map(|f| format!("{:?}", (*f).clone().into_result().err())).unwrap_or_default().chars().take(160).collect::<String>());
+    Ok(())
+}
+
+#[tokio::test]
+async fn r18_agent_key_has_no_allowance_by_default_and_cap_is_optional() -> anyhow::Result<()> {
+    let e = setup().await?;
+    let pk = e.agent.secret_key().public_key();
+    let keys = e.w.view_access_keys(e.oath.id()).await?;
+    let k = keys.iter().find(|k| k.public_key == pk).expect("agent key");
+    match &k.access_key.permission {
+        near_workspaces::types::AccessKeyPermission::FunctionCall(fc) => {
+            assert_eq!(fc.allowance, None, "default agent key must have no gas allowance");
+            assert!(fc.method_names.iter().all(|m| m.starts_with("propose")), "{:?}", fc.method_names);
+            assert_eq!(&fc.receiver_id, e.oath.id().as_str());
+        }
+        p => panic!("agent key must be a function-call key, got {p:?}"),
+    }
+    // A cap can still be asked for, but never zero.
+    let sk = SecretKey::from_random(KeyType::ED25519);
+    let r = e.owner.call(e.oath.id(), "set_agent_key").args_json(json!({"public_key": sk.public_key(), "allowance": "0"}))
+        .gas(near_workspaces::types::Gas::from_tgas(50)).transact().await?;
+    assert!(r.is_failure());
+    let r = e.owner.call(e.oath.id(), "set_agent_key").args_json(json!({"public_key": sk.public_key(), "allowance": NEAR.to_string()}))
+        .gas(near_workspaces::types::Gas::from_tgas(50)).transact().await?;
+    assert!(r.is_success(), "{:?}", r.failures());
+    let keys = e.w.view_access_keys(e.oath.id()).await?;
+    let k = keys.iter().find(|k| k.public_key == sk.public_key()).expect("capped key");
+    if let near_workspaces::types::AccessKeyPermission::FunctionCall(fc) = &k.access_key.permission { assert_eq!(fc.allowance, Some(NearToken::from_near(1))); }
     Ok(())
 }

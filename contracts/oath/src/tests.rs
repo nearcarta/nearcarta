@@ -609,7 +609,7 @@ fn timelock_signer_dao_delay_agent_key_are_queued() {
     let _ = o.set_receipt_signer("evil".into(), Base64VecU8(vec![9; 32]));
     let _ = o.set_dao(None);
     let _ = o.set_policy_delay(U64(0));
-    let _ = o.set_agent_key("ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847".parse().unwrap(), U128(1));
+    let _ = o.set_agent_key("ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847".parse().unwrap(), Some(U128(1)));
     assert_eq!(o.pending.len(), 4);
     assert!(o.receipt_signers.is_empty()); assert_eq!(o.dao, Some(acc("dao.test")));
     assert_eq!(o.policy_delay_ns, DELAY); assert_eq!(o.agent_key, Some(agent_pk()));
@@ -764,7 +764,7 @@ fn has_log(op: &str) -> bool { get_logs().iter().any(|l| l.contains(&format!("\"
 fn r14_set_agent_key_switches_state_and_returns_promise() {
     let mut o = setup(0);
     set("owner.test", T0);
-    let r = o.set_agent_key(pk2(), U128(NEAR));
+    let r = o.set_agent_key(pk2(), Some(U128(NEAR)));
     assert!(is_promise(&r));
     assert_eq!(o.agent_key, Some(pk2()));
 }
@@ -860,12 +860,12 @@ fn r14_set_agent_key_low_gas_reverts_before_state_or_log() {
     let mut o = setup(0);
     let before = o.agent_key.clone();
     let mut b = ctx("owner.test", T0); b.prepaid_gas(Gas::from_tgas(24)); testing_env!(b.build());
-    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.set_agent_key(pk2(), U128(NEAR)); }));
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.set_agent_key(pk2(), Some(U128(NEAR))); }));
     assert!(r.is_err());
     assert!(get_logs().is_empty());
     assert_eq!(o.agent_key, before);
     let mut b = ctx("owner.test", T0); b.prepaid_gas(Gas::from_tgas(25)); testing_env!(b.build());
-    let _ = o.set_agent_key(pk2(), U128(NEAR));
+    let _ = o.set_agent_key(pk2(), Some(U128(NEAR)));
     assert_eq!(o.agent_key, Some(pk2()));
 }
 
@@ -923,7 +923,7 @@ fn setup_window_applies_first_rules_and_key_at_once_then_closes() {
     let r = o.set_clause("pay".into(), clause(&["bob.test"], NEAR, 2 * NEAR, false, None));
     assert!(!is_promise(&r));
     assert!(o.clauses.contains_key("pay") && o.pending.is_empty());
-    let r = o.set_agent_key(pk2(), U128(NEAR));
+    let r = o.set_agent_key(pk2(), Some(U128(NEAR)));
     assert!(is_promise(&r));
     assert_eq!(o.agent_key, Some(pk2()));
     assert!(!o.setup_open);
@@ -932,7 +932,7 @@ fn setup_window_applies_first_rules_and_key_at_once_then_closes() {
     let _ = o.set_clause("pay".into(), clause(&["bob.test", "eve.test"], NEAR, 2 * NEAR, false, None));
     assert_eq!(o.pending.len(), 1);
     assert_eq!(o.clauses["pay"].receivers.len(), 1);
-    let _ = o.set_agent_key(pk3(), U128(NEAR));
+    let _ = o.set_agent_key(pk3(), Some(U128(NEAR)));
     assert_eq!(o.pending.len(), 2);
     assert_eq!(o.agent_key, Some(pk2()));
     // tightening stays instant
@@ -973,7 +973,7 @@ fn setup_window_off_by_default_and_closable() {
 #[test]
 fn setup_window_reopens_when_the_closing_key_fails_to_land() {
     let mut o = fresh_setup(DELAY);
-    let _ = o.set_agent_key(pk2(), U128(NEAR));
+    let _ = o.set_agent_key(pk2(), Some(U128(NEAR)));
     assert!(!o.setup_open);
     set_results("oath.test", T0, vec![PromiseResult::Failed]);
     let _ = o.on_agent_key(None, pk2());
@@ -985,7 +985,7 @@ fn setup_window_reopens_when_the_closing_key_fails_to_land() {
 #[test]
 fn setup_window_stays_closed_when_the_closing_key_lands() {
     let mut o = fresh_setup(DELAY);
-    let _ = o.set_agent_key(pk2(), U128(NEAR));
+    let _ = o.set_agent_key(pk2(), Some(U128(NEAR)));
     set_results("oath.test", T0, vec![PromiseResult::Successful(vec![])]);
     let _ = o.on_agent_key(None, pk2());
     assert!(!o.setup_open);
@@ -1004,7 +1004,7 @@ fn relayed(ts: u64) {
 }
 fn rotate_to_pk2(o: &mut Oath) {
     set("owner.test", T0);
-    let _ = o.set_agent_key(pk2(), U128(NEAR));
+    let _ = o.set_agent_key(pk2(), Some(U128(NEAR)));
 }
 
 #[test]
