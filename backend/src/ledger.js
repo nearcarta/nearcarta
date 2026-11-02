@@ -28,7 +28,10 @@ export function buildLedger({ chronicle, toll, budget, now = new Date().toISOStr
     totals: { payouts_near: +sum('payout', 'NEAR (testnet)').toFixed(6), sales_near: +sum('sale', 'NEAR (testnet)').toFixed(6),
       payouts_base_eth: +sum('payout', 'ETH (Base Sepolia)').toFixed(8), refusals: rows.filter(r => r.kind === 'refusal').length,
       inference_usd_today: +(budget?.usd ?? 0) },
-    partial: !!(chronicle?.busy || chronicle?.stale || (chronicle?.txs || []).some(t => t.error)),
+    // A cached (stale-while-revalidate) feed is still complete; only a missing feed or a failed tx read is partial.
+    partial: !!(chronicle?.busy || (chronicle?.txs || []).some(t => t.error)),
+    partial_reason: chronicle?.busy ? 'feed busy' : (chronicle?.txs || []).some(t => t.error) ? 'tx read error' : null,
+    cached: !!chronicle?.stale,
     rows,
   };
 }

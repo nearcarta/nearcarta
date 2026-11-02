@@ -23,3 +23,11 @@ test('empty inputs give an empty, honest ledger', () => {
   const L = buildLedger({});
   assert.deepEqual(L.rows, []); assert.equal(L.partial, false); assert.equal(L.totals.payouts_near, 0);
 });
+
+test('ledger: a cached feed is complete, a busy feed is partial', async () => {
+  const b = buildLedger;
+  const ok = b({ chronicle: { stale: true, txs: [] } });
+  if (ok.partial !== false || ok.cached !== true) throw new Error('stale must not be partial');
+  const bad = b({ chronicle: { busy: true, txs: [] } });
+  if (bad.partial !== true || bad.partial_reason !== 'feed busy') throw new Error('busy must be partial');
+});
