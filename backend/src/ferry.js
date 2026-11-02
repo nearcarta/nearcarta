@@ -169,6 +169,17 @@ export async function tidepoolVerifierOk(read = viewAccount) {
 export const validDepositAddress = a => typeof a === 'string' && a.length <= 96 &&
   (/^[0-9a-f]{64}$/.test(a) || /^0x[0-9a-fA-F]{40}$/.test(a) || /^([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/.test(a) || /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a));
 const FINAL = ['SUCCESS', 'REFUNDED', 'FAILED'];
+// What each 1Click status means for the person waiting, in plain words.
+export const STATUS_HELP = {
+  PENDING_DEPOSIT: 'Waiting for your deposit to arrive.',
+  KNOWN_DEPOSIT_TX: 'Your deposit transaction was seen; waiting for it to confirm.',
+  INCOMPLETE_DEPOSIT: 'Less than the quoted amount arrived. Send the rest to the same address before the deadline, or the amount received is refunded.',
+  PROCESSING: 'Deposit received; the swap is running.',
+  SUCCESS: 'Done: the output was delivered.',
+  REFUNDED: 'Refunded to your refund address.',
+  FAILED: 'The swap failed; see the refund line.',
+};
+export const statusHelp = s => STATUS_HELP[s] || `Unknown status ${String(s).slice(0, 40)}; nothing is assumed.`;
 export async function tidepoolStatus(depositAddress, f = fetch, ver = tidepoolVerifierOk) {
   if (!validDepositAddress(depositAddress)) throw Object.assign(new Error('not a deposit address'), { status: 400 });
   const [verifier, r] = await Promise.all([ver().catch(e => ({ ok: false, error: e.message })),
@@ -178,7 +189,7 @@ export async function tidepoolStatus(depositAddress, f = fetch, ver = tidepoolVe
   const j = await r.json();
   const d = j.swapDetails || {};
   const refund = d.refundedAmount && d.refundedAmount !== '0' ? { amount: d.refundedAmount, formatted: d.refundedAmountFormatted, reason: d.refundReason || null } : null;
-  return { env: 'TIDEPOOL', label: TIDEPOOL.label, depositAddress, status: j.status, final: FINAL.includes(j.status), updatedAt: j.updatedAt,
+  return { env: 'TIDEPOOL', label: TIDEPOOL.label, depositAddress, status: j.status, help: statusHelp(j.status), final: FINAL.includes(j.status), updatedAt: j.updatedAt,
     deposited: d.depositedAmountFormatted ?? d.depositedAmount ?? null, received: d.amountOutFormatted ?? d.amountOut ?? null, refund,
     near_txs: (d.nearTxHashes || []).map(h => ({ hash: h.hash || h, explorer: `https://testnet.nearblocks.io/txns/${h.hash || h}` })),
     verifier, source: `${TIDEPOOL.api}/v0/status?depositAddress=${depositAddress}` };
