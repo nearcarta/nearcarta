@@ -34,7 +34,7 @@ const n = {
 
 const edits = {
   'README.md': [
-    [/# \d+ unit tests:/, `# ${n.unit} unit tests:`],
+    [/# \d+ unit tests( \(\d+ skipped\))?:/, `# ${n.unit} unit tests$1:`],
     [/\(\d+\/\d+ expected\)/, `(${n.proofsFound}/${n.proofs} expected)`],
     [/npm run e2e   # \d+ browser tests/, `npm run e2e   # ${n.e2e} browser tests`],
     [/`judges\/proofs\/e2e-vercel.json`: \d+ passed, \d+ skipped/, `\`judges/proofs/e2e-vercel.json\`: ${n.vercelPassed} passed, ${n.vercelSkipped} skipped`],
