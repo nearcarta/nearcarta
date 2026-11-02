@@ -1,12 +1,27 @@
 // Chronicle (static): the crier's scroll. One mark per real decision from the core testnet run; refusals in the refused colour.
 import { THREE, room, put, makeRobot, C, CSS } from '../js/core.js';
 import { M as PM, brassM, mesh, lantern, banner, candle, rug } from './_props.js';
-import { CORE_TXS, CORE } from '../../D6_dashboards/src/data.js';
-import { row, h3, note, proof, paper, acct } from './_ui.js';
+import { CORE_TXS, CORE, CLAUSES } from '../../D6_dashboards/src/data.js';
+import { explain, replayPlan } from '../js/why.js';
+import { row, h3, note, proof, paper, acct, esc } from './_ui.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
 const acts = CORE_TXS.filter(t => t.kind === 'action');
-export const PROOF = proof(h3('Every action the agent tried'), ...acts.map(a => row({ k: a.what, why: (a.reason || a.clause).replaceAll('_', ' '), st: a.decision === 'denied' ? 'no' : a.decision === 'allowed' ? 'ok' : 'pend', stText: a.decision, tx: a.tx })), note(`Oath ${acct(CORE.oath)}. One mark on the scroll per row.`));
+const whyOf = a => { if (!a.reason) return a.clause.replaceAll('_', ' '); const e = explain(a, CLAUSES); return `${e.rule}: ${e.plain}`; };
+const REPLAY = `<div class="replay" data-testid="replay"><h3>Replay the run</h3><p class="note">The same ${acts.length} decisions at their recorded spacing, sped up.</p>
+  <p>${[1, 8, 32].map(x => `<button type="button" class="rc" data-replay="${x}" data-testid="replay-${x}">${x}×</button>`).join(' ')}</p><ol class="feed" data-testid="replay-feed"></ol></div>`;
+export const PROOF = proof(h3('Every action the agent tried'), ...acts.map(a => row({ k: a.what, why: whyOf(a), st: a.decision === 'denied' ? 'no' : a.decision === 'allowed' ? 'ok' : 'pend', stText: a.decision, tx: a.tx })), note(`Oath ${acct(CORE.oath)}. One mark on the scroll per row. Each refusal says which rule the contract applied and the numbers it compared.`), REPLAY);
+// one delegated listener: works in the 3D drawer and the 2D view alike
+let timers = [];
+if (typeof document !== 'undefined') document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-replay]'); if (!b) return;
+  const feed = b.closest('.replay')?.querySelector('[data-testid="replay-feed"]'); if (!feed) return;
+  timers.forEach(clearTimeout); timers = []; feed.innerHTML = '';
+  for (const { at, act } of replayPlan(acts, +b.dataset.replay)) timers.push(setTimeout(() => {
+    const st = act.decision === 'denied' ? 'no' : act.decision === 'allowed' ? 'ok' : 'pend';
+    feed.insertAdjacentHTML('beforeend', `<li class="${st}"><span>${esc(act.time)}</span><span>${esc(act.what)}</span><span>${esc(act.decision)}${act.reason ? ' · ' + esc(explain(act, CLAUSES).rule) : ''}</span></li>`);
+  }, at));
+});
 export default async function chronicle() {
   const { scene, camera } = await room({ cam: [0, 3.6, 7.6], look: [0, 1.1, 0] });
   const acts = CORE_TXS.filter(t => t.kind === 'action'); const denied = acts.filter(t => t.decision === 'denied');
