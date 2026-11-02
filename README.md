@@ -72,7 +72,7 @@ On 2026-10-29 a fresh guest pressed every shop row above on the live site with n
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 266 unit tests (1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm test                 # 283 unit tests (1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
 npm run verify           # reads every proof tx back from testnet (76/76 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
