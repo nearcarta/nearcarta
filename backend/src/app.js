@@ -1,4 +1,6 @@
 // HTTP API (Hono). Read-only on chain; quotes are dry; no route can sign or spend.
+import { buildLedger } from './ledger.js';
+import * as agentMod from './agent.js';
 import { Hono } from 'hono';
 import { createHmac, randomBytes } from 'node:crypto';
 import { cors } from 'hono/cors';
@@ -281,6 +283,12 @@ export function makeApp() {
   app.post('/api/toll/gate/:nonce/broadcast', limiter(10), tg(c => tollgate.broadcast(c.req.param('nonce'))));
   app.post('/api/toll/gate/:nonce/settle', limiter(10), tg(c => tollgate.settleOne(c.req.param('nonce'))));
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
+  // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
+  app.get('/api/ledger', limiter(20), async c => {
+    const soft = (p, ms = 9000) => Promise.race([p.catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
+    const [chron, toll] = await Promise.all([soft(shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX)), soft(shops.toll())]);
+    return c.json(buildLedger({ chronicle: chron ? shops.hideRetired(chron) : { busy: true }, toll, budget: agentMod.budgetStatus() }));
+  });
   app.get('/api/chronicle', limiter(20), async c => {
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
     try { return c.json(shops.hideRetired(await shops.chronicle(DEP.guardhouse.oath, limit))); }
