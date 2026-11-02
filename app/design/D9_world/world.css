@@ -366,3 +366,4 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #shopUI .p-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 #shopUI .p-sum { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; } #shopUI .p-sum.no { color: var(--no); }
 #shopUI #p-add:disabled { opacity: .4; cursor: default; }
+#shopUI .t-links .link{white-space:normal;height:auto;min-height:28px;text-align:left} /* long rule chips wrap inside the panel */
