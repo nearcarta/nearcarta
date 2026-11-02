@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { pickShared, sharedCharters, isShared } from '../../src/vault.js';
+
+const clause = { daily_budget: '100000000000000000000000', max_actions_per_day: 4 };
+const fake = usage => async (c, m) => m === 'get_clauses' ? (usage[c] === 'gone' ? Promise.reject(new Error('x')) : { pay: clause }) : usage[c];
+
+test('pool: every shared charter is on the board and the original stays first', () => {
+  const l = sharedCharters();
+  assert.ok(l.length >= 5); assert.equal(l[0], 'arena.nccharters-53681.testnet');
+  for (const c of l) assert.ok(isShared(c));
+});
+test('pool: an exhausted charter is skipped for the one with the most payments left', async () => {
+  const u = { a: { count: 4, spent: '0' }, b: { count: 1, spent: '0' }, c: { count: 2, spent: '0' } };
+  assert.equal(await pickShared(fake(u), ['a', 'b', 'c']), 'b');
+});
+test('pool: ties go to more budget left; unreadable charters are skipped', async () => {
+  const u = { a: 'gone', b: { count: 1, spent: '50000000000000000000000' }, c: { count: 1, spent: '1' } };
+  assert.equal(await pickShared(fake(u), ['a', 'b', 'c']), 'c');
+});
+test('pool: nothing readable falls back to the first charter', async () => {
+  assert.equal(await pickShared(async () => { throw new Error('down'); }, ['a', 'b']), 'a');
+});

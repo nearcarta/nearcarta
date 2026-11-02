@@ -191,7 +191,14 @@
       "merchants": [
         "cafe.ncpub-17102.testnet",
         "books.ncpub-17102.testnet"
-      ]
+      ],
+      "pool": [
+        "arenapool0-d3nd.nccharters-53836.testnet",
+        "arenapool1-5plv.nccharters-53836.testnet",
+        "arenapool2-rfyw.nccharters-53836.testnet",
+        "arenapool3-neex.nccharters-53836.testnet"
+      ],
+      "pool_note": "Demo pool: same 'pay' clause as the shared charter (allowlist, 0.05 cap, 0.1/day, 4 payments/day) and the same propose-only server agent key, made by the R17 factory with backend/scripts/arena-pool.js. The server sends each run to the charter with the most payments left today, so one visitor's slow drain no longer blocks the next visitor's honest payment; every refusal is unchanged."
     },
     "arena_note": "The shared arena stays on the R16 factory (arena.nccharters-53681.testnet) with the same server agent key; new visitor charters come from the R17 factory.",
     "redteam": {

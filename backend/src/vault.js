@@ -33,7 +33,7 @@ export const isAccount = a => typeof a === 'string' && ACCOUNT_RE.test(a);
 const ARCHIVAL = process.env.ARCHIVAL_RPC || 'https://archival-rpc.testnet.fastnear.com';
 
 /** Factories whose charters count: the live one first, then earlier releases (kept for history). */
-const ARENAS = new Set(V ? [V.arena.charter, ...(V.legacy || []).map(l => l.arena?.charter).filter(Boolean)] : []);
+const ARENAS = new Set(V ? [V.arena.charter, ...(V.arena.pool || []), ...(V.legacy || []).map(l => l.arena?.charter).filter(Boolean)] : []);
 export const isShared = c => ARENAS.has(c);
 export const FACTORIES = V ? [{ factory: V.factory, code_hash: V.code_hash }, ...(V.legacy || []).map(l => ({ factory: l.factory, code_hash: l.code_hash }))] : [];
 
@@ -148,6 +148,26 @@ export async function listCharters(from = 0, limit = 50, factory = V?.factory) {
 
 // ---------- the shared arena runner (30 Tgas, daily tx cap) ----------
 function agentSecret() { return (process.env.ARENA_AGENT_KEY || '').trim() || null; }
+/** Shared demo charters (same clause, same agent key): the original one first, then the pool. */
+export const sharedCharters = () => V ? [V.arena.charter, ...(V.arena.pool || [])] : [];
+/**
+ * The shared charter with the most room left today on its 'pay' clause (payments left, then budget left).
+ * Every candidate carries the identical clause, so refusals do not change; only an exhausted day stops being
+ * shared by every visitor. A charter whose usage cannot be read is skipped; if none can be read, the first.
+ */
+export async function pickShared(viewF = view, list = sharedCharters()) {
+  const rows = await Promise.all(list.map(async c => {
+    try {
+      const cl = (await viewF(c, 'get_clauses'))?.pay; const u = await viewF(c, 'get_usage', { clause_id: 'pay' });
+      if (!cl) return null;
+      const left = Number(cl.max_actions_per_day ?? 0) - Number(u.count ?? 0);
+      const room = BigInt(cl.daily_budget) - BigInt(u.spent ?? 0) - BigInt(u.reserved ?? 0);
+      return { c, left, room };
+    } catch { return null; }
+  }));
+  const ok = rows.filter(Boolean).sort((a, b) => b.left - a.left || (b.room > a.room ? 1 : b.room < a.room ? -1 : 0));
+  return ok[0]?.c || list[0];
+}
 let queue = Promise.resolve();
 const serial = fn => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
 
@@ -214,7 +234,7 @@ export async function sharedAttack(attackId, tag) {
   return serial(async () => {
     const release = reserve(12);
     let used = 0;
-    try { const r = await runAttack({ charter: V.arena.charter, key: keyFrom(secret), attackId, tag }); used = r.steps.filter(s => s.tx).length; return { ...r, server_signed: true }; }
+    try { const r = await runAttack({ charter: await pickShared(viewFn.bind(null, runnerRpc())), key: keyFrom(secret), attackId, tag }); used = r.steps.filter(s => s.tx).length; return { ...r, server_signed: true }; }
     catch (e) { used = (e.status && e.status < 500) ? 0 : 1; throw e; }
     finally { release(used); }
   });
@@ -228,7 +248,7 @@ export async function sharedTask(taskId, tag) {
   return serial(async () => {
     const release = reserve(1);
     let used = 0;
-    try { const r = await doTask({ charter: V.arena.charter, key: keyFrom(secret), taskId, tag }); used = r.tx ? 1 : 0; return { ...r, server_signed: true }; }
+    try { const r = await doTask({ charter: await pickShared(viewFn.bind(null, runnerRpc())), key: keyFrom(secret), taskId, tag }); used = r.tx ? 1 : 0; return { ...r, server_signed: true }; }
     catch (e) { used = (e.status && e.status < 500) ? 0 : 1; throw e; }
     finally { release(used); }
   });
@@ -284,7 +304,7 @@ export async function sharedAsk(text, { run = runAsk, nickname = 'guest', propos
     let used = 0;
     try {
       const rpcCall = runnerRpc();
-      const r = await run({ charter: V.arena.charter, key: keyFrom(secret), receiver: q.receiver, amount: q.amount, memo: q.memo,
+      const r = await run({ charter: await pickShared((a, m, x) => viewFn(rpcCall, a, m, x)), key: keyFrom(secret), receiver: q.receiver, amount: q.amount, memo: q.memo,
         rpcCall, viewF: (a, m, x) => viewFn(rpcCall, a, m, x), send: sendPropose });
       used = r.tx ? 1 : 0;
       const out = { ...r, note: q.note, ...brain, url: r.tx ? explorerTx(r.tx) : null, server_signed: true };

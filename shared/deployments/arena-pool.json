@@ -1,0 +1,33 @@
+{
+ "factory": "nccharters-53836.testnet",
+ "charters": [
+  {
+   "tag": "p0",
+   "charter": "arenapool0-d3nd.nccharters-53836.testnet",
+   "owner": "r2rcv.testnet",
+   "create_tx": "Gn4umNzw4baxorgmJPC2BaEFrGpgsXhghc427f3814L2",
+   "rules_tx": "CdpA2w4iedTxMgZZBQdGFcjPmCfMJWLhC4YCHsEavimW"
+  },
+  {
+   "tag": "p1",
+   "charter": "arenapool1-5plv.nccharters-53836.testnet",
+   "owner": "r2rcv.testnet",
+   "create_tx": "8qyEGE7j3scrdoyvtHFTEEzPtoh2kHFPeqaU2TfyY6DH",
+   "rules_tx": "GkyqW3RiMShXDSatpYefsXabQXkwwqrh7SBHt1whSxQz"
+  },
+  {
+   "tag": "p2",
+   "charter": "arenapool2-rfyw.nccharters-53836.testnet",
+   "owner": "r2rcv.testnet",
+   "create_tx": "C2jY6rYfy9oEEckXDUPaFo182NBiyVSJjTFvYuEjFVSg",
+   "rules_tx": "49qGRVEyzz6dstA1KojTVr6xruuKrPsmN9wUYZVibbj4"
+  },
+  {
+   "tag": "p3",
+   "charter": "arenapool3-neex.nccharters-53836.testnet",
+   "owner": "r2rcv.testnet",
+   "create_tx": "76JR1FaiRm86P9CwuVCmvooicXsMuJmF8tEQCYEtKFAC",
+   "rules_tx": "EAitAKKVv6EdmrstFqzYSqaWCDD6RHkbwdjGZL3RczNj"
+  }
+ ]
+}
