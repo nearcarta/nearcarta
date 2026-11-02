@@ -289,9 +289,10 @@ export function makeApp() {
     const arena = vault.config()?.arena?.charter;
     const [chron, arenaChron, toll] = await Promise.all([soft(shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX)),
       arena ? soft(shops.chronicle(arena, shops.FEED_MAX)) : null, soft(shops.toll())]);
+    const gate = await soft(tollgate.gate(), 6000);
     const feeds = [chron ? shops.hideRetired(chron) : { busy: true }, ...(arena ? [arenaChron || { busy: true }] : [])];
     const merged = { busy: feeds.some(f => f.busy), stale: feeds.some(f => f.stale), txs: feeds.flatMap(f => f.txs || []) };
-    return c.json(buildLedger({ chronicle: merged, toll, budget: agentMod.budgetStatus() }));
+    return c.json(buildLedger({ chronicle: merged, toll, gate, budget: agentMod.budgetStatus() }));
   });
   app.get('/api/chronicle', limiter(20), async c => {
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
