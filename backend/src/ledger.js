@@ -32,6 +32,7 @@ export function buildLedger({ chronicle, toll, budget, now = new Date().toISOStr
     partial: !!(chronicle?.busy || (chronicle?.txs || []).some(t => t.error)),
     partial_reason: chronicle?.busy ? 'feed busy' : (chronicle?.txs || []).some(t => t.error) ? 'tx read error' : null,
     cached: !!chronicle?.stale,
+    unread: (chronicle?.txs || []).filter(t => t.error).map(t => ({ tx: t.hash, error: t.error })),
     rows,
   };
 }

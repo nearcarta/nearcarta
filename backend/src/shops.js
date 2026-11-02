@@ -149,7 +149,8 @@ const sliceFeed = (v, limit, extra) => { const txs = (v.txs || []).slice(0, limi
 function refresh(account, read) {
   const hit = feeds.get(account);
   if (hit?.p) return hit.p;
-  const p = read(account, FEED_MAX).then(v => { feeds.set(account, { v, at: Date.now() }); return v; },
+  // A feed with unread txs is kept but marked old, so the next request re-reads just those (final txs are cached).
+  const p = read(account, FEED_MAX).then(v => { const bad = (v.txs || []).some(t => t.error); feeds.set(account, { v, at: bad ? Date.now() - FEED_TTL_MS : Date.now() }); return v; },
     e => { const h = feeds.get(account); if (h?.v) feeds.set(account, { v: h.v, at: h.at }); else feeds.delete(account); throw e; });
   feeds.set(account, { ...hit, p });
   if (feeds.size > 500) feeds.delete(feeds.keys().next().value);
