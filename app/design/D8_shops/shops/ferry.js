@@ -28,7 +28,7 @@ export const PROOF = proof(
   row({ k: 'Hidden · the swap', why: 'order size, timing and counterparties settle on the private Confidential Intents shard', st: 'ok', stText: 'hidden', src: 'testnet' }),
   row({ k: 'Hidden · recipient, note and later spends', why: "shielded into Zcash's Ironwood pool via an Orchard-only UA; no transparent receiver to fall back to", st: 'ok', stText: 'hidden', src: 'testnet' }),
   note(`Not hidden from the 1Click operator or the private shard's validators. Dry quote: nothing was sent, so no tx exists yet. Read ${esc(utc3(Q.at))}.`));
-export const FLAT = { src: 'live read', cls: 'live', label: LABEL, hero: HERO };
+export const FLAT = { src: 'testnet · live quote', cls: 'live', label: LABEL, hero: HERO };
 
 export default async function ferry(ctx) {
   const T = []; for (let q = -3; q <= 3; q++) for (let r = -1; r <= 1; r++) { const x = 2 * q + r; if (Math.abs(x) > 4) continue; T.push([q, r, Math.abs(x) <= 1 ? 'hex_water' : 'hex_grass']); }

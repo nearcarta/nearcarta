@@ -34,7 +34,7 @@ export function flat() {
 }
 const FLAT = {
   guard: { src: 'testnet', cls: 'testnet', label: 'Forged invoice asks', hero: tok('5', 'NEAR') },
-  ferry: { src: 'live read', cls: 'live', label: 'Shielded quote · Orchard-only UA', hero: `${tok(String(+QUOTE.from.amt), QUOTE.from.sym, { chain: QUOTE.from.chain })}<span class="arrow">→</span>${tok(QUOTE.to.amt, QUOTE.to.sym)}` },
+  ferry: { src: 'testnet · live quote', cls: 'live', label: 'Shielded quote · Orchard-only UA', hero: `${tok(String(+QUOTE.from.amt), QUOTE.from.sym, { chain: QUOTE.from.chain })}<span class="arrow">→</span>${tok(QUOTE.to.amt, QUOTE.to.sym)}` },
   hall: { src: 'testnet', cls: 'testnet', label: 'Reward cap · Proposal 4', hero: tok('0.15', 'NEAR') },
   bank: { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount', hero: '<span class="commit">sha256…</span><span class="unit">amount hidden</span>' },
   arena: { src: 'testnet', cls: 'testnet', label: '5 attacks on the lab oath', hero: '<b class="num">0</b><span class="unit">breaches</span>' },
