@@ -2,7 +2,7 @@
  {
   "id": "chronicle",
   "name": "Chronicle",
-  "role": "crier tower \u00b7 every decision posted",
+  "role": "see every decision your agent made",
   "x": 52.9,
   "y": 44.2,
   "card": "Every decision, yes or no, is a public NEP-297 event with an explorer link."
@@ -10,7 +10,7 @@
  {
   "id": "hall",
   "name": "Town Hall",
-  "role": "council \u00b7 real proposals",
+  "role": "propose a rule and vote on it",
   "x": 43.5,
   "y": 16.2,
   "card": "File a real proposal from your own charter and see the open proposals at /shops/hall/."
@@ -18,7 +18,7 @@
  {
   "id": "bank",
   "name": "Mist Bank",
-  "role": "vault \u00b7 amounts stay in the mist",
+  "role": "send money privately",
   "x": 60.7,
   "y": 23.6,
   "card": "Amounts stay hidden. Public: the check passed, and when."
@@ -26,7 +26,7 @@
  {
   "id": "ferry",
   "name": "Ferry",
-  "role": "dock \u00b7 the only way across",
+  "role": "swap NEAR to Zcash (testnet)",
   "x": 66.1,
   "y": 42.6,
   "card": "A live 1Click quote with its signature checked; your charter pays a testnet stand-in."
@@ -34,7 +34,7 @@
  {
   "id": "guard",
   "name": "Guardhouse",
-  "role": "ward gate \u00b7 knights",
+  "role": "check who you are paying",
   "x": 34.4,
   "y": 46.2,
   "card": "Every spend is checked before it can be signed: payee list, daily cap, weekly cap."
@@ -42,7 +42,7 @@
  {
   "id": "arena",
   "name": "Vault Arena",
-  "role": "try to break the vault",
+  "role": "try to trick the AI into paying",
   "x": 58.9,
   "y": 75.7,
   "card": "A live vault anyone may try to break. Every failed attack is a Chronicle row."
@@ -50,7 +50,7 @@
  {
   "id": "house",
   "name": "House",
-  "role": "owner key \u00b7 oath plaque",
+  "role": "your rules and history",
   "x": 35.4,
   "y": 33.8,
   "card": "Only your house key can change the oath or ring the curfew. The agent holds a propose-only key."
@@ -58,7 +58,7 @@
  {
   "id": "toll",
   "name": "Toll Bridge",
-  "role": "pay 0.01 \u00b7 Base Sepolia payout",
+  "role": "pay 0.01 and cross to Base",
   "x": 48.7,
   "y": 87.1,
   "card": "Pay 0.01 NEAR from your own charter; the gate then gets the MPC network to sign a Base Sepolia payout, and settles it with a foreign-tx proof."
@@ -66,7 +66,7 @@
  {
   "id": "payouts",
   "name": "Payouts",
-  "role": "counting house \u00b7 one batch, all or nothing",
+  "role": "pay 3 people in one go",
   "x": 48.1,
   "y": 21.6,
   "card": "List 2 to 5 payouts. Your charter pays them all in one tx, or refuses all of them."

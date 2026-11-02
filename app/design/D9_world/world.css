@@ -367,3 +367,7 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #shopUI .p-sum { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; } #shopUI .p-sum.no { color: var(--no); }
 #shopUI #p-add:disabled { opacity: .4; cursor: default; }
 #shopUI .t-links .link{white-space:normal;height:auto;min-height:28px;text-align:left} /* long rule chips wrap inside the panel */
+
+/* JB9: the "Enter" hint only on hover/focus, so pins stay compact at laptop widths */
+.fbpin::after{display:none} .fbpin:hover::after,.fbpin:focus-visible::after{display:block}
+.fbpin span{max-width:220px;white-space:normal;line-height:1.3}

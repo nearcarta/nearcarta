@@ -19,8 +19,11 @@ export async function fallback(why){ if(started) return; started=true; body.clas
       let top=48, bot=H-8; for(const e of document.querySelectorAll('#brand,#brand .what,#acct,#acct *')){ const r=vis(e); if(r&&r.top<H/3) top=Math.max(top,r.bottom+8); }
       for(const e of document.querySelectorAll('.hud,#rulesBtn')){ const r=vis(e); if(r&&r.top>H/2&&!e.closest('#fb2d')) bot=Math.min(bot,r.top-8); }
       const placed=[]; for(const [d,p] of els.slice().sort((a,b)=>a[1].y-b[1].y)){ const w=d.offsetWidth, h=d.offsetHeight;
-        const x=Math.max(w/2+6,Math.min(W-w/2-6,ox+p.x/100*1920*s)); let y=Math.max(top+h,Math.min(bot,oy+p.y/100*1080*s));
-        for(let k=0;k<12;k++){ const hit=placed.find(q=>Math.abs(q.x-x)<(q.w+w)/2+4&&Math.abs(q.y-(y-h/2))<(q.h+h)/2+4); if(!hit) break; y=hit.y+(hit.h+h)/2+4+h/2; }
+        let x=Math.max(w/2+6,Math.min(W-w/2-6,ox+p.x/100*1920*s)); let y=Math.max(top+h,Math.min(bot,oy+p.y/100*1080*s));
+        const clash=(x,y)=>placed.find(q=>Math.abs(q.x-x)<(q.w+w)/2+8&&Math.abs(q.y-(y-h/2))<(q.h+h)/2+6);
+        for(let k=0;k<12;k++){ const hit=clash(x,y); if(!hit) break; // first try a small sideways nudge, then step down
+          const dx=(q=>(q.w+w)/2+8-Math.abs(q.x-x))(hit)*(x>=hit.x?1:-1), nx=x+dx;
+          if(Math.abs(dx)<w*0.6&&nx>w/2+6&&nx<W-w/2-6&&!clash(nx,y)){ x=nx; break; } y=hit.y+(hit.h+h)/2+6+h/2; }
         if(y>bot) y=bot; d.style.left=x+'px'; d.style.top=y+'px'; placed.push({x,y:y-h/2,w,h}); } };
     lay(); addEventListener('resize',lay); const acct=$('#acct'); if(acct&&'ResizeObserver' in window) new ResizeObserver(lay).observe(acct); setTimeout(lay,1500);
   }catch(e){ console.error('[Nearcarta] 2D pins failed',e); }
