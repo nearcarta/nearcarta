@@ -53,7 +53,10 @@ async function createGuest(rpc) {
   const accountId = `ncguest-${rnd}.testnet`;
   const key = keyFrom();
   const r = await fetch(FAUCET, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ newAccountId: accountId, newAccountPublicKey: key.publicKey }) });
-  if (!r.ok) throw new Error('testnet faucet said ' + r.status + '. Try again in a minute, or connect a wallet.');
+  if (!r.ok) { // the public faucet rate-limits per network; the town pays for the guest account instead (backend/src/guest.js)
+    const f = await fetch((globalThis.NEARCARTA_API || '') + '/api/guest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: accountId, public_key: key.publicKey }) }).catch(() => null);
+    if (!f?.ok) { const why = await f?.json().then(j => j.error, () => '').catch(() => ''); throw new Error('Could not open a guest account right now' + (why ? ' (' + why + ')' : '') + '. Try again in a minute, or connect a wallet.'); }
+  }
   for (let i = 0; i < 30; i++) {
     try { await rpc('query', { request_type: 'view_account', finality: 'final', account_id: accountId }); localStorage.setItem(LS, JSON.stringify({ accountId, secret: key.secretKey })); return { accountId, secret: key.secretKey }; }
     catch { await new Promise(res => setTimeout(res, 2000)); }
