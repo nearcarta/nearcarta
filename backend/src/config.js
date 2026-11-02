@@ -16,8 +16,9 @@ export const cfg = {
   archivalRpc: process.env.NEAR_ARCHIVAL_RPC || DEP.archival_rpc || 'https://archival-rpc.testnet.fastnear.com',
   // Second archival node, used when the first rate-limits (Render egress IPs are shared and see 429s).
   archivalRpc2: process.env.NEAR_ARCHIVAL_RPC2 || 'https://archival-rpc.testnet.near.org',
-  rpcRetries: Number(process.env.NEAR_RPC_RETRIES || 3),
-  rpcBackoffMs: Number(process.env.NEAR_RPC_BACKOFF_MS || 250),
+  rpcRetries: Number(process.env.NEAR_RPC_RETRIES || 4),
+  rpcBackoffMs: Number(process.env.NEAR_RPC_BACKOFF_MS || 400),
+  rpcBackoffMaxMs: Number(process.env.NEAR_RPC_BACKOFF_MAX_MS || 4000),
   rpcTimeoutMs: Number(process.env.NEAR_RPC_TIMEOUT_MS || 8000),
   rpcCacheMs: Number(process.env.NEAR_RPC_CACHE_MS || 5000),
   rpcStaleMs: Number(process.env.NEAR_RPC_STALE_MS || 10 * 60 * 1000),

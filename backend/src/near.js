@@ -11,7 +11,22 @@ const CACHEABLE = new Set(['query', 'EXPERIMENTAL_protocol_config', 'block']);
 const cache = new Map(); // key -> { at, value }
 export const rpcStats = { calls: 0, retries: 0, fallbacks: 0, cacheHits: 0, staleServed: 0, lastError: null };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-export function _resetRpcCache() { cache.clear(); }
+// Endpoint cooldown: an endpoint that just answered 429/5xx/timeout is tried last until its cooldown ends,
+// so the pool spreads load instead of hammering the busy node first on every call.
+const cool = new Map(); // url -> { until, strikes }
+export function _resetRpcCache() { cache.clear(); cool.clear(); }
+function strike(url, e) {
+  const c = cool.get(url) || { until: 0, strikes: 0 };
+  c.strikes = Math.min(c.strikes + 1, 6);
+  c.until = Date.now() + (e.retryAfterMs || cfg.rpcBackoffMs * 2 ** c.strikes);
+  cool.set(url, c);
+}
+function order(urls) {
+  const now = Date.now();
+  const ready = urls.filter((u) => (cool.get(u)?.until || 0) <= now);
+  const busy = urls.filter((u) => (cool.get(u)?.until || 0) > now).sort((a, b) => cool.get(a).until - cool.get(b).until);
+  return [...ready, ...busy];
+}
 
 async function once(url, method, params) {
   const r = await fetch(url, {
@@ -20,7 +35,11 @@ async function once(url, method, params) {
     body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }),
     signal: AbortSignal.timeout(cfg.rpcTimeoutMs),
   });
-  if (!r.ok) { const e = new Error(`rpc ${method} http ${r.status}`); e.retry = RETRY_HTTP.has(r.status); throw e; }
+  if (!r.ok) {
+    const e = new Error(`rpc ${method} http ${r.status}`); e.retry = RETRY_HTTP.has(r.status);
+    const ra = Number(r.headers.get('retry-after')); if (ra > 0) e.retryAfterMs = Math.min(ra * 1000, 10_000);
+    throw e;
+  }
   const j = await r.json();
   if (j.error) {
     const e = new Error(`rpc ${method}: ${j.error.cause?.name || j.error.name || 'error'} ${JSON.stringify(j.error.data ?? j.error.cause?.info ?? '')}`);
@@ -40,19 +59,24 @@ export async function rpc(method, params, url = cfg.rpc) {
   let last;
   // Each round tries every URL once (primary first); rounds are separated by an exponential backoff.
   for (let round = 0; round < cfg.rpcRetries; round++) {
-    for (let i = 0; i < urls.length; i++) {
+    const pool = order(urls);
+    let waitHint = 0;
+    for (let i = 0; i < pool.length; i++) {
       try {
-        const value = await once(urls[i], method, params);
+        const value = await once(pool[i], method, params);
+        cool.delete(pool[i]);
         if (key) { cache.set(key, { at: Date.now(), value }); if (cache.size > 2000) cache.delete(cache.keys().next().value); }
         return value;
       } catch (e) {
         last = e;
         const retry = e.retry || e.name === 'TimeoutError' || e.name === 'AbortError' || e.cause?.code || /fetch failed/.test(e.message);
         if (!retry) throw e; // a real answer (unknown account, contract panic): no point retrying
-        if (i + 1 < urls.length) rpcStats.fallbacks++; else rpcStats.retries++;
+        strike(pool[i], e);
+        waitHint = Math.max(waitHint, e.retryAfterMs || 0);
+        if (i + 1 < pool.length) rpcStats.fallbacks++; else rpcStats.retries++;
       }
     }
-    if (round + 1 < cfg.rpcRetries) await sleep(cfg.rpcBackoffMs * 2 ** round + Math.floor(Math.random() * 100));
+    if (round + 1 < cfg.rpcRetries) await sleep(Math.min(Math.max(cfg.rpcBackoffMs * 2 ** round, waitHint), cfg.rpcBackoffMaxMs) + Math.floor(Math.random() * 150));
   }
   rpcStats.lastError = { at: new Date().toISOString(), message: String(last?.message).slice(0, 200) };
   if (hit && Date.now() - hit.at < cfg.rpcStaleMs) { rpcStats.staleServed++; return hit.value; }
