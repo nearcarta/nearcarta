@@ -37,14 +37,28 @@ get('/api/health').then(h => { $('#health').innerHTML = `testnet block ${h.near.
 const form = $('#ferry-form');
 const SAMPLE = { zec: 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex',
   near: '561e8ef0fecb621469da30250dc6cdcd1e47a66e561e8ef0fecb621469da3025', refund: '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e' };
-$('#ferry-sample').onclick = () => { form.recipient.value = form.to.value.startsWith('ZEC') ? SAMPLE.zec : SAMPLE.near; form.refundTo.value = SAMPLE.refund; zcheck(); };
+const refundFor = () => (form.from.value.split('|')[1] === 'near' ? SAMPLE.near : SAMPLE.refund);
+$('#ferry-sample').onclick = () => { form.recipient.value = form.to.value.startsWith('ZEC') ? SAMPLE.zec : SAMPLE.near; form.refundTo.value = refundFor(); zcheck(); };
+form.from.addEventListener('change', () => { if ([SAMPLE.near, SAMPLE.refund].includes(form.refundTo.value)) form.refundTo.value = refundFor(); hidePairs(); });
+// Only pairs that quoted OK in the server's last dry probe are offered; a failing pair is hidden.
+let pairs = null;
+const pairKey = (from, to) => from.replace('|', '@') + '>' + to.replace('|', '@');
+function hidePairs() {
+  if (!pairs) return;
+  for (const o of form.to.options) { const r = pairs.find(p => p.from + '>' + p.to === pairKey(form.from.value, o.value)); o.hidden = o.disabled = !!r && !r.ok; }
+  if (form.to.selectedOptions[0]?.disabled) { const ok = [...form.to.options].find(o => !o.disabled); if (ok) form.to.value = ok.value; }
+}
+get('/api/ferry/routes').then(r => { pairs = r.routes; for (const o of form.from.options) { const rs = pairs.filter(p => p.from === o.value.replace('|', '@')); o.hidden = o.disabled = rs.length > 0 && !rs.some(p => p.ok); } hidePairs(); }).catch(() => {});
 form.recipient.addEventListener('change', zcheck);
+let zseq = 0;
 async function zcheck() {
-  const to = form.to.value.split('|')[1], el = $('#ferry-zec');
-  if (to !== 'zec' || !form.recipient.value.trim()) { el.innerHTML = ''; return; }
-  try { const z = await get('/api/ferry/zcash/' + encodeURIComponent(form.recipient.value.trim()));
+  const to = form.to.value.split('|')[1], el = $('#ferry-zec'), addr = form.recipient.value.trim(), my = ++zseq;
+  if (to !== 'zec' || !addr) { el.innerHTML = ''; return; }
+  try { const z = await get('/api/ferry/zcash/' + encodeURIComponent(addr));
+    if (my !== zseq) return; // a newer address was typed while this one was being checked
     el.innerHTML = `<div class="card" data-testid="zec-check">Zcash recipient: <b>${esc(z.kind)}</b> · receivers ${esc(z.receivers.join(', '))} · ${z.shielded ? '<b class="pass">shielded</b>' : '<b class="fail">public on Zcash</b>'}<br><span class="note">${esc(z.note)}</span></div>`;
-  } catch (e) { el.innerHTML = `<div class="card fail">${esc(e.message)}</div>`; }
+  } catch (e) { if (my !== zseq) return; const t = /^t[13]/.test(addr);
+    el.innerHTML = `<div class="card fail" data-testid="zec-check">${t ? '<b class="fail">public on Zcash</b> (transparent t-address) · ' : ''}check unavailable: ${esc(e.message)}</div>`; }
 }
 form.to.onchange = () => { if (Object.values(SAMPLE).includes(form.recipient.value)) form.recipient.value = form.to.value.startsWith('ZEC') ? SAMPLE.zec : SAMPLE.near; zcheck(); };
 form.onsubmit = async ev => {
