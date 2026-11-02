@@ -15,7 +15,7 @@ export async function townhall() {
   // the agent holds a propose-only key, and there is no full-access key.
   const T = DEP.townhall;
   const [snap, policy, lastId] = await Promise.all([snapshot(T.charter), view(T.dao, 'get_policy'), view(T.dao, 'get_last_proposal_id')]);
-  const proposals = await view(T.dao, 'get_proposals', { from_index: Math.max(0, lastId - 6), limit: 6 }).catch(() => []);
+  const proposals = await view(T.dao, 'get_proposals', { from_index: Math.max(0, lastId - 24), limit: 24 }).catch(() => []);
   const reward = snap.clauses?.[T.clause || 'reward'] || null;
   return {
     dao: T.dao, oath: T.charter, charter: T.charter, factory: T.factory, agent_key: snap.state.agent_key, keys: snap.keys,
