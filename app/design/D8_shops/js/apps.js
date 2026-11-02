@@ -385,7 +385,7 @@ export async function teeCheck(nonce) {
   const rows = [
     ['Intel TDX quotes verified', both('quote') && g.tcbStatus === 'UpToDate' && m.tcbStatus === 'UpToDate', `dcap-qvl · TCB ${g.tcbStatus || '?'} / ${m.tcbStatus || '?'}`],
     ['Debug mode off', both('debugOff'), 'gateway and model'],
-    ['Your nonce is in the quote', both('nonceBound') && both('echoedNonce') && r.nonce === nonce, nonce.slice(0, 10) + '…'],
+    ['Your nonce is in the quote', both('nonceBound') && both('echoedNonce') && r.nonce === nonce, `sent ${nonce.slice(0, 8)}…${nonce.slice(-4)} · back ${String(r.nonce || '—').slice(0, 8)}…${String(r.nonce || '').slice(-4)}`],
     ['Signing key bound to the quote', both('signerBound'), String(m.signing_address || '').slice(0, 12) + '…'],
     ['App config measured', both('configBound') && both('composeEvent'), 'compose ' + String(m.composeHash || '').slice(0, 10) + '…'],
     ['Event log replays RTMR3', both('rtmr3'), `${g.rtmr3Events ?? '?'} + ${m.rtmr3Events ?? '?'} events`],
