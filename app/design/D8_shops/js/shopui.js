@@ -207,13 +207,14 @@ const APPS = {
     },
   },
   hall: {
-    label: 'Town Hall · change a rule', idle: 'Which rule should change? Your charter votes.',
-    form: () => `<div class="seg" role="radiogroup">${[['tighter', 'Lower max'], ['looser', 'Raise max'], ['cool', '5 min cooling']].map(([k, t]) => `<label><input type="radio" name="hc" value="${k}" ${k === (extra.hc || 'tighter') ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>`,
+    label: 'Town Hall · change a rule', idle: 'File a real proposal with the Town Hall DAO, or change your own charter (timelocked).',
+    form: () => `<div class="seg" role="radiogroup">${[['dao', 'Ask the DAO'], ['tighter', 'My max lower'], ['looser', 'My max higher'], ['cool', 'My 5 min cooling']].map(([k, t]) => `<label><input type="radio" name="hc" value="${k}" ${k === (extra.hc || 'dao') ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>`,
     bind: () => { for (const i of document.querySelectorAll('input[name=hc]')) i.onchange = () => { extra.hc = i.value; }; },
     btn: 'Propose a cap change',
     hero: () => A.S.clauses.pay ? num(+A.fromY(A.S.clauses.pay.per_action_cap).toFixed(4), 'NEAR max') : null,
     run: async () => {
-      const r = await A.hallChange(extra.hc || 'tighter'); const when = r.eta ? new Date(Number(BigInt(r.eta) / 1_000_000n)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const r = await A.hallChange(extra.hc || 'dao');
+      if (r.dao) return { o: { decision: 'allowed', tx: r.tx }, kind: 'ok', hero: APPS.hall.hero(), say: `Filed with the Town Hall DAO: ${r.what}. The council votes next.`, rule: 'Sputnik proposal, 0.1 NEAR bond' }; const when = r.eta ? new Date(Number(BigInt(r.eta) / 1_000_000n)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       return { o: { decision: 'allowed', tx: r.tx }, kind: 'ok', hero: APPS.hall.hero(), say: r.applied ? `Passed: ${r.what}, in force now.` : `Queued: ${r.what}, from ${when}.`, rule: r.applied ? 'applied on chain' : 'queued behind your cooling period' };
     },
   },

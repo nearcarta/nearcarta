@@ -297,7 +297,21 @@ export const ARENA_ORDER = ['fake-invoice', 'injected-recipient', 'lookalike', '
 export const record = tx => api('/api/vault/record', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tx, charter: S.charter }) });
 export const board = () => api('/api/vault/leaderboard');
 
+// The Town Hall DAO (Sputnik v2) owns the town's charter. Anyone may file a proposal (0.1 NEAR testnet bond, refunded
+// when the council approves it); the 2-of-2 council votes; only an approved proposal changes the town's rule.
+export const HALL = { dao: 'r7thmvr8maey.sputnikv2.testnet', charter: 'townhall.nccharters-17102.testnet', clause: 'reward', bond: '100000000000000000000000' };
+const b64j = o => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o))));
+export async function hallPropose() {
+  const c = (await view(HALL.charter, 'get_clauses'))[HALL.clause]; if (!c) throw new Error('the Town Hall rule could not be read');
+  const cap = (BigInt(c.per_action_cap) * 6n / 10n).toString();
+  const description = `Lower the Town Hall reward cap to ${fromY(cap)} NEAR (filed from the town by ${S.me})`;
+  const kind = { FunctionCall: { receiver_id: HALL.charter, actions: [{ method_name: 'set_clause', args: b64j({ clause_id: HALL.clause, clause: { ...c, per_action_cap: cap } }), deposit: '0', gas: (40n * TG).toString() }] } };
+  const h = await sign(HALL.dao, [fc('add_proposal', { proposal: { description, kind } }, 100, HALL.bond)]);
+  keep(h, 'hall', 'filed', 'add_proposal');
+  return { tx: h, applied: false, dao: true, what: `reward cap ${fromY(cap)} NEAR` };
+}
 export async function hallChange(kind) {
+  if (kind === 'dao') return hallPropose();
   const r = rulesNow();
   if (kind === 'cool') { const h = await sign(S.charter, [fc('set_policy_delay', { delay_ns: String(5n * 60n * 10n ** 9n) })]); keep(h, 'hall', 'applied', 'set_policy_delay'); await readRules(); return { tx: h, applied: true, what: 'cooling period 5 min' }; }
   const cap = kind === 'tighter' ? Math.max(r.min, +(r.cap * 0.6).toFixed(3)) : +(r.cap * 1.6).toFixed(3);
