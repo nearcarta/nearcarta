@@ -183,7 +183,7 @@ export async function chronicleOnce(account, limit = FEED_MAX, { post = fpost, s
   const list = account_txs.slice(0, limit);
   const { transactions = [] } = list.length ? await post('/transactions', { tx_hashes: list.map(t => t.transaction_hash) }) : {};
   const signer = Object.fromEntries(transactions.map(t => [t.transaction.hash, t.transaction.signer_id]));
-  const out = await inParallel(list, 6, async t => {
+  const out = await inParallel(list, 3, async t => {
     try { return txRow(await status(t.transaction_hash, signer[t.transaction_hash] || account), new Date(Number(BigInt(t.tx_block_timestamp) / 1000000n)).toISOString()); }
     catch (e) { return { hash: t.transaction_hash, error: e.message.slice(0, 120) }; }
   });

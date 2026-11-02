@@ -75,8 +75,20 @@ export const viewAccount = (accountId, url = cfg.rpc) =>
 export const accessKeys = (accountId, url = cfg.rpc) =>
   rpc('query', { request_type: 'view_access_key_list', finality: 'final', account_id: accountId }, url);
 
-export const txStatus = (hash, sender) =>
-  rpc('EXPERIMENTAL_tx_status', { tx_hash: hash, sender_account_id: sender, wait_until: 'FINAL' });
+// A FINAL tx never changes, so keep it for the process lifetime (bounded). This is what stops the
+// chronicle from re-reading the same 15 txs every 15 s and tripping the RPC 429 limit.
+const finalTx = new Map();
+export const txCacheSize = () => finalTx.size;
+export async function txStatus(hash, sender, call = rpc) {
+  const k = hash + '|' + sender;
+  if (finalTx.has(k)) { rpcStats.cacheHits++; return finalTx.get(k); }
+  const params = { tx_hash: hash, sender_account_id: sender, wait_until: 'FINAL' };
+  let v;
+  try { v = await call('EXPERIMENTAL_tx_status', params, cfg.archivalRpc); }
+  catch { v = await call('EXPERIMENTAL_tx_status', params); }
+  if (v?.final_execution_status === 'FINAL' || v?.status) { finalTx.set(k, v); if (finalTx.size > 5000) finalTx.delete(finalTx.keys().next().value); }
+  return v;
+}
 
 // NEP-297: logs that start with EVENT_JSON:. A receipt that failed rolls back its state,
 // but RPC still returns its logs. Those are phantom events: we drop them.

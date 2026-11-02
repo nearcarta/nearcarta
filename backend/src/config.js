@@ -12,6 +12,8 @@ export const cfg = {
   rpc: process.env.NEAR_RPC || DEP.rpc,
   // Tried in order when the main testnet RPC answers 429/5xx or is unreachable (free RPCs rate-limit shared host IPs).
   rpcFallbacks: (process.env.NEAR_RPC_FALLBACKS || (DEP.rpc_fallbacks || []).join(',')).split(',').map((s) => s.trim()).filter(Boolean),
+  // Tx status for anything older than ~2.5 days lives only on archival nodes (others answer NOT_OBSERVED/timeout).
+  archivalRpc: process.env.NEAR_ARCHIVAL_RPC || DEP.archival_rpc || 'https://archival-rpc.testnet.fastnear.com',
   rpcRetries: Number(process.env.NEAR_RPC_RETRIES || 3),
   rpcBackoffMs: Number(process.env.NEAR_RPC_BACKOFF_MS || 250),
   rpcTimeoutMs: Number(process.env.NEAR_RPC_TIMEOUT_MS || 8000),
