@@ -120,7 +120,7 @@ async function townhall() {
 async function arena() {
   const a = await get('/api/arena');
   const gd = a.guardian;
-  $('#arena .out').innerHTML = `<div class="card" data-testid="arena-state">Contract ${acct(a.contract)} · season commit <code>${esc(a.season.commit_hex.slice(0, 16))}…</code><br>
+  $('#arena .out').innerHTML = `<div class="card" data-testid="arena-state">Contract ${acct(a.contract)} · ${a.season?.commit_hex ? `season commit <code>${esc(a.season.commit_hex.slice(0, 16))}…</code>` : 'no season open yet'}<br>
     Guardian g1 agent ${acct(gd.agent)} · oath v${esc(gd.oath_version)} · cap ${near(gd.oath.per_action_cap)} · pot ${near(gd.pot)} · may pay ${gd.oath.allow.map(acct).join(', ')}</div>
     <div class="card"><b>Case tokens (NEP-245)</b><table>${a.tokens.map(t => `<tr><td>${esc(t.token_id)}</td><td>supply ${esc(t.supply ?? 0)}</td></tr>`).join('')}</table></div>
     <div class="card"><b>Attempts</b><table>${a.attempts.map(x => `<tr><td>#${x.id}</td><td>${acct(x.player)}</td><td>verdict ${esc(x.verdict)} · block ${esc(x.block)}</td></tr>`).join('') || '<tr><td>none</td></tr>'}</table></div>`;
