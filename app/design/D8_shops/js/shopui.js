@@ -15,6 +15,28 @@ const rcpt = html => { $('#t-rcpt').innerHTML = html || ''; };
 const label = t => { $('#t-label').textContent = t || ''; };
 const num = (n, u) => `<b class="num">${esc(n)}</b><span class="unit">${esc(u)}</span>`;
 const capFmt = 0;
+// Plain names for accounts a visitor sees; the raw id stays in the tooltip and under "advanced".
+export const nice = a => { if (!a) return ''; if (a === A.S.me) return 'You'; const m = A.merchants?.() || [];
+  if (a === m[0]) return 'Café'; if (a === m[1]) return 'Bookshop'; if (/sputnik/.test(a)) return 'Town Hall council'; if (/^lamp\./.test(a)) return 'Lamplighter (your agent)';
+  if (/gate/.test(a)) return 'Toll gate'; if (/treasury/.test(a)) return 'Town treasury'; if (/^ncguest-/.test(a)) return 'Guest account'; return a.split('.')[0]; };
+// Progress for the long actions: plain steps with a time hint, ticking while the button is busy.
+const STEPS = {
+  chronicle: ['about 20 s', 'Writing today\u2019s entry', 'Asking your charter', 'Signing on NEAR testnet', 'Reading your feed'],
+  bank: ['about 25 s', 'Checking the private AI is genuine', 'Asking your charter', 'Sealing the note', 'Recording it on NEAR testnet'],
+  ferry: ['about 15 s', 'Fetching a signed live quote', 'Asking your charter', 'Signing on NEAR testnet'],
+  guard: ['about 15 s', 'Checking the payee', 'Asking your charter', 'Recording the answer'],
+  arena: ['about 35 s', 'Private AI is reading your message', 'Asking your charter', 'Signing on NEAR testnet', 'Recording your score'],
+  hall: ['about 15 s', 'Writing the proposal', 'Signing on NEAR testnet', 'Waiting for the council'],
+  payouts: ['about 15 s', 'Checking every payout against your charter', 'Signing one batch on NEAR testnet', 'Confirming'],
+  house: ['about 10 s', 'Reading your charter', 'Counting your history'],
+  toll: ['about 30 s', 'Paying the toll from your charter', 'Approving the gate call', 'Getting the payout signed', 'Sending it to Base Sepolia'],
+};
+let prog = null;
+function progress(id) { clearInterval(prog); const st = STEPS[id]; if (!st) return; const [hint, ...steps] = st, t0 = Date.now(), per = (parseInt(hint.replace(/\D+/g, '')) || 20) / steps.length;
+  const tick = () => { const sec = Math.floor((Date.now() - t0) / 1000), i = Math.min(steps.length - 1, Math.floor(sec / per));
+    rcpt(`<span class="prog" role="status" data-testid="progress"><span class="bar"><i style="width:${Math.min(95, Math.round(100 * sec / (per * steps.length)))}%"></i></span>Step ${i + 1} of ${steps.length} · ${esc(steps[i])}… <span class="eta">${sec} s · ${hint}</span></span>`); };
+  tick(); prog = setInterval(() => phase === 'busy' ? tick() : clearInterval(prog), 1000); }
+const stopProgress = () => { clearInterval(prog); prog = null; };
 const verdict = o => o.decision === 'allowed' ? 'ok' : 'no';
 function react(kind) { const r = sh?.rob; if (!r) return; sfx(kind === 'ok' ? 'allowed' : 'refuse'); r.play(kind === 'ok' ? 'Yes' : 'No', { once: true }); setTimeout(() => r.play('Idle'), 1500); }
 function ruleChip() {
@@ -29,9 +51,10 @@ const wallet = () => { const w = HOSTED() ? null : $('#wallet'); if (!w) return;
 function teePanel(t, again = true) {
   if (!t) return again ? `<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Verify the TEE now ↗</button>` : '';
   const when = t.at ? new Date(t.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  return `<div data-testid="tee-panel"><p class="tee-badge ${t.ok ? '' : 'no'}" data-testid="tee-badge">${t.ok ? '✓ Verified' : '✕ Not verified'} · NEAR AI TEE${t.model ? ' · ' + esc(t.model) : ''}${when ? ' · ' + esc(when) : ''}</p>
+  return `<div data-testid="tee-panel"><details class="more"><summary><span class="tee-badge ${t.ok ? '' : 'no'}" data-testid="tee-badge">${t.ok ? '✓ Verified private AI' : '✕ Private AI not verified'}${when ? ' · ' + esc(when) : ''}</span><span class="dt">details</span></summary>
+    <p class="note">${t.ok ? 'The AI ran inside sealed hardware (a TEE) that NEAR AI and the chip maker vouch for. Nobody, us included, can read your message there.' : 'The check did not pass, so treat this reply as unverified.'}${t.model ? ' Model ' + esc(t.model) + '.' : ''}</p>
     <ol class="feed tee">${(t.rows || []).map(([k, ok, d]) => `<li class="${ok ? 'ok' : 'no'}"><span>${ok ? '✓ pass' : '✕ fail'}</span><span>${esc(k)}</span><span>${esc(d)}</span></li>`).join('')}${t.err ? `<li class="no"><span>error</span><span>${esc(String(t.err).slice(0, 80))}</span><span></span></li>` : ''}</ol>
-    ${t.url ? `<a class="rc" data-testid="tee-center" href="${esc(t.url)}" target="_blank" rel="noopener">Check this reply in NEAR AI's Verification Center ↗</a>` : ''}
+    ${t.url ? `<a class="rc" data-testid="tee-center" href="${esc(t.url)}" target="_blank" rel="noopener">Check this reply in NEAR AI's Verification Center ↗</a>` : ''}</details>
     ${again ? '<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Check again with a new nonce ↗</button>' : ''}</div>`;
 }
 
@@ -50,9 +73,9 @@ async function tollStep(v, act, o) {
   }
   extra.tst = st; extra.tv = v; extra.gate = null;
   const late = !st.base && v.at && Date.now() - v.at > 120e3; // over 2 min: say it was re-sent and give the explorer link
-  const split = v.split ? `<span class="rc" data-testid="toll-split">split in one tx: ${v.split.legs.map(([r, a]) => `${esc(r === 'agent' ? 'agent budget' : r)} ${esc(a)}`).join(' · ')} NEAR</span> ${A.txLine(v.split.tx, 'split')}` : '';
+  const split = v.split ? `<details class="more" data-testid="toll-split"><summary>Paid ${esc(v.split.legs.reduce((n, [, a]) => n + Number(a), 0).toFixed(3))} NEAR in one payment<span class="dt">details</span></summary><p class="note">${v.split.legs.map(([r, a]) => `${esc(r === 'agent' ? 'your agent budget' : r === 'treasury' ? 'town treasury' : r)} ${esc(a)} NEAR`).join(' · ')}</p>${A.txLine(v.split.tx, 'split')}</details>` : '';
   const links = [split, A.txLine(v.pay_tx, 'gate'), st.tx_hash && (st.accepted || st.base || late) ? BSC(st.tx_hash) : '', v.settle_tx ? A.txLine(v.settle_tx, 'settle') : ''].join(' ');
-  const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}" data-phase="${esc(st.phase || '')}">gate ${esc(st.label || st.status)}</span> ${links}`;
+  const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}" data-phase="${esc(st.phase || '')}">Gate: ${esc(st.label || st.status)}</span> ${links}`;
   if (st.status === 'confirmed') { A.tollDone(v); return { o, kind: 'ok', rule: 'confirmed · MPC foreign-tx proof', hero: num('✓', 'confirmed'), rc,
     say: 'Confirmed. The MPC network proved the Base Sepolia tx final, and the gate recorded it.' }; }
   if (st.settle) return { o, keep: true, kind: 'ok', rule: 'paid · sent · final on Base', rc, say: 'Base Sepolia finalized it. Settle to record the MPC proof.' };
@@ -118,8 +141,8 @@ const APPS = {
     form: () => { const ps = A.bankPayees(), to = extra.to || A.bankDefault();
       const note = A.NOTES.includes(+extra.amt) ? +extra.amt : A.NOTES[0];
       return `<div class="seg notes" role="radiogroup" aria-label="Note size" data-testid="bank-notes">${A.NOTES.map(n => `<label><input type="radio" name="note" id="m-note-${String(n).replace('.', '')}" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div>`
-        + `<label class="to">To <select id="m-to" data-testid="bank-to">${ps.map(a => `<option value="${esc(a)}" ${a === to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(short(a, 14, 8))}</option>`).join('')}</select></label>` + teePanel(extra.tee); },
-    bind: () => { document.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { extra.amt = r.value; if (!extra.sent) btn(APPS.bank.btn()); }; }); const t = $('#m-to'); if (t) t.onchange = e => { extra.to = e.target.value; }; const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; const pg = document.createElement('p'); pg.className = 'tee-progress'; pg.dataset.testid = 'tee-progress'; pg.setAttribute('role', 'status'); pg.setAttribute('aria-live', 'polite'); b.after(pg); const t0 = Date.now(), steps = [[0, 'Sending a fresh nonce to NEAR AI'], [2, 'Fetching gateway and model attestation reports'], [5, 'Verifying Intel TDX quotes (dcap-qvl)'], [9, 'Replaying event logs and checking NVIDIA GPU evidence'], [15, 'Still verifying, NEAR AI can take up to 30 s']]; const tick = () => { const sec = Math.floor((Date.now() - t0) / 1000); const st = steps.filter(([at]) => sec >= at).pop(); b.textContent = 'Checking the TEE… ' + sec + ' s'; pg.textContent = `Step ${steps.indexOf(st) + 1} of ${steps.length}: ${st[1]}…`; }; tick(); const iv = setInterval(tick, 500); try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } finally { clearInterval(iv); } form(APPS.bank.form()); APPS.bank.bind(); }; },
+        + `<div class="seg to" role="radiogroup" aria-label="Send to" id="m-to" data-testid="bank-to">${ps.map((a, i) => `<label title="${esc(a)}"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span>${esc(nice(a) || short(a, 10, 6))}</span></label>`).join('')}</div>` + teePanel(extra.tee); },
+    bind: () => { document.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { extra.amt = r.value; if (!extra.sent) btn(APPS.bank.btn()); }; }); document.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { extra.to = r.value; }; }); const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; const pg = document.createElement('p'); pg.className = 'tee-progress'; pg.dataset.testid = 'tee-progress'; pg.setAttribute('role', 'status'); pg.setAttribute('aria-live', 'polite'); b.after(pg); const t0 = Date.now(), steps = [[0, 'Sending a fresh nonce to NEAR AI'], [2, 'Fetching gateway and model attestation reports'], [5, 'Verifying Intel TDX quotes (dcap-qvl)'], [9, 'Replaying event logs and checking NVIDIA GPU evidence'], [15, 'Still verifying, NEAR AI can take up to 30 s']]; const tick = () => { const sec = Math.floor((Date.now() - t0) / 1000); const st = steps.filter(([at]) => sec >= at).pop(); b.textContent = 'Checking the TEE… ' + sec + ' s'; pg.textContent = `Step ${steps.indexOf(st) + 1} of ${steps.length}: ${st[1]}…`; }; tick(); const iv = setInterval(tick, 500); try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } finally { clearInterval(iv); } form(APPS.bank.form()); APPS.bank.bind(); }; },
     btn: () => extra.sent ? 'Verify the seal' : `Send ${A.NOTES.includes(+extra.amt) ? +extra.amt : A.NOTES[0]} NEAR privately`,
     hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(extra.sent.commitment.slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
     run: async () => {
@@ -199,7 +222,7 @@ const APPS = {
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => { const ps = A.bankPayees(), rows = APPS.payouts.rows(), left = A.payoutLeft(), tot = APPS.payouts.total();
       if (!A.canBatch()) return '<p class="goal" data-testid="payout-legacy">This charter predates batches.</p>';
-      return `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ps.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(a.split('.')[0])}</option>`).join('')}</select>`
+      return `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ps.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(nice(a))}</option>`).join('')}</select>`
         + `<label class="p-amt"><input type="number" data-i="${i}" min="0.001" step="0.001" value="${esc(r.amt)}" aria-label="Amount ${i + 1}"><span>NEAR</span></label>`
         + `<button type="button" class="p-x" data-i="${i}" aria-label="Remove payout ${i + 1}" ${rows.length <= 2 ? 'disabled' : ''}>×</button></li>`).join('')}</ol>`
         + `<div class="p-foot"><button type="button" class="tee-btn" id="p-add" ${rows.length >= 5 ? 'disabled' : ''}>+ Add payout</button><span class="p-sum ${tot > left ? 'no' : ''}" data-testid="payout-total">${tot} NEAR · ${+left.toFixed(4)} left today</span></div>`; },
@@ -303,21 +326,22 @@ async function primary(auto = false) {
   if (phase === 'busy' || !cur) return; const st = A.stage(); if (!auto) sfx('click');
   if (st === 'connect') return A.connect().then(paint).catch(fail);
   if (st === 'rules') return openRules();
-  phase = 'busy'; btn(st === 'build' ? 'Approve in your wallet…' : 'Asking your charter…', 'primary busy', true); say(st === 'build' ? 'Building your charter…' : 'Asking your charter on chain…'); rcpt('');
+  phase = 'busy'; btn(st === 'build' ? 'Approve in your wallet…' : 'Asking your charter…', 'primary busy', true); say(st === 'build' ? 'Building your charter…' : 'Asking your charter on chain…'); rcpt(''); if (st !== 'build') progress(cur);
   try {
     if (st === 'build') { const r = await A.buildCharter(); phase = 'idle'; rcpt(A.txLine(r.tx, 'charter built')); paint(); openRules(); return; }
-    const res = await APPS[cur].run(); phase = res.keep ? 'kept' : 'done';
+    const res = await APPS[cur].run(); stopProgress(); phase = res.keep ? 'kept' : 'done';
     const kind = res.kind || (res.o ? verdict(res.o) : 'ok');
     const rule = res.rule || (res.o ? A.ruleFor(res.o, res.clause) : '');
     if (res.hero !== undefined) hero(res.hero);
     if (res.noform) form('');
     say(res.say); react(kind);
     rcpt((rule ? `<span class="rule ${kind}" data-testid="rule">${kind === 'ok' ? '✓' : '✕'} ${esc(rule)}</span>` : '') + (res.rc || A.txLine(res.o?.tx)));
-    const app = APPS[cur]; btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : 'Again')); if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
+    const app = APPS[cur]; btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : (AGAIN[cur] || 'Do it again'))); if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
     document.body.dataset.app = kind; ruleChip(); proofDrawer();
   } catch (e) { fail(e); }
 }
-function fail(e) { phase = 'idle'; say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); const app = APPS[cur]; btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
+const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another entry', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Send another note', toll: 'Pass the gate again' };
+function fail(e) { stopProgress(); phase = 'idle'; say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); const app = APPS[cur]; btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
 
 // ---------- rules sheet ----------
 function openRules() {
@@ -325,9 +349,13 @@ function openRules() {
   const m = A.merchants(), opts = [[m[0], 'Café'], [m[1], 'Bookshop'], [A.S.me, 'Me']];
   const custom = r.receivers.filter(x => !opts.some(o => o[0] === x));
   const hr = (id, v) => `<select id="${id}">${Array.from({ length: 25 }, (_, h) => `<option value="${h * 60}" ${h * 60 === v ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}</select>`;
+  const who = r.receivers.map(nice).join(', ') || 'nobody yet';
   $('#r-body').innerHTML = `
+    <div class="safe" data-testid="safe-defaults"><b>Safe defaults</b><p>Pay only ${esc(who)} · at most ${esc(r.cap)} NEAR a payment · ${esc(r.budget)} NEAR and ${esc(r.count)} payments a day. Ferry trips up to ${esc(r.ferryCap)} NEAR. You can change these any time.</p></div>
+    <details class="more" id="r-more" ${A.S.clauses.pay ? 'open' : ''}><summary>Customize<span class="dt">who, limits, hours</span></summary>
     <fieldset><legend>Who I may pay</legend><div class="chips">${opts.map(([a, t]) => `<label><input type="checkbox" name="rcv" value="${esc(a)}" ${r.receivers.includes(a) ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>
-      <input id="r-custom" placeholder="another account.testnet" value="${esc(custom.join(','))}"></fieldset>
+      ${custom.length ? `<p class="note">Also allowed: ${custom.map(a => `<span title="${esc(a)}">${esc(nice(a))}</span>`).join(', ')}</p>` : ''}
+      <details class="more"><summary>Advanced: add a NEAR account by its id</summary><input id="r-custom" aria-label="Other NEAR account ids, comma separated" placeholder="friend.testnet" value="${esc(custom.join(','))}"></details></fieldset>
     <div class="grid2">
       <label>Max per payment<span class="sfx"><input id="r-cap" type="number" step="0.001" min="0.001" value="${r.cap}"><i>NEAR</i></span></label>
       <label>Daily cap<span class="sfx"><input id="r-bud" type="number" step="0.01" min="0.001" value="${r.budget}"><i>NEAR</i></span></label>
@@ -337,8 +365,8 @@ function openRules() {
     </div>
     <fieldset><legend>Ferry routes to ZEC</legend><div class="chips">${A.ROUTES.map(x => `<label><input type="checkbox" name="rt" value="${x.id}" ${r.routes.includes(x.id) ? 'checked' : ''}><span>${esc(x.label)}</span></label>`).join('')}</div>
       <label>Ferry max per trip<span class="sfx"><input id="r-fcap" type="number" step="0.01" min="0.002" value="${r.ferryCap}"><i>NEAR</i></span></label></fieldset>
-    <label class="off">Rules expire<input disabled value="needs a contract field (asked)"></label>`;
-  $('#r-status').innerHTML = ''; $('#r-sign').disabled = false; $('#r-sign').textContent = A.S.clauses.pay ? 'Sign my new rules' : 'Sign my rules';
+    </details>`;
+  $('#r-status').innerHTML = ''; $('#r-sign').disabled = false; $('#r-sign').textContent = A.S.clauses.pay ? 'Sign my new rules' : 'Use safe defaults';
   const d = $('#rules'); d.classList.add('open'); d.setAttribute('aria-hidden', 'false'); $('#r-sign').focus();
 }
 function closeRules() { const d = $('#rules'); d.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); }
