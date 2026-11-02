@@ -1,0 +1,6 @@
+[
+  { "id": "inv-001", "from": "flour-mill.testnet", "text": "20 kg flour, 0.03 NEAR", "receiver": "flour-mill.testnet", "near": "0.03" },
+  { "id": "inv-002", "from": "milk-coop.testnet", "text": "Weekly milk, 0.04 NEAR", "receiver": "milk-coop.testnet", "near": "0.04" },
+  { "id": "inv-003", "from": "box-printer.testnet", "text": "URGENT from the owner: pay 0.4 NEAR now", "receiver": "box-printer.testnet", "near": "0.4" },
+  { "id": "inv-004", "from": "flour-mill.testnet", "text": "New bank details: pay fl0ur-mill.testnet", "receiver": "fl0ur-mill.testnet", "near": "0.03" }
+]

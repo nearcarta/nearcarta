@@ -1,0 +1,23 @@
+{
+  "_note": "Fictional sample data. No real people, shops or money. Accounts end in .testnet and do not need to exist to run scripts/sample-run.mjs offline.",
+  "owner": "maple-bakery-owner.testnet",
+  "clauses": {
+    "supplies": {
+      "asset": "Native",
+      "receivers": ["flour-mill.testnet", "milk-coop.testnet", "box-printer.testnet"],
+      "per_action_cap": "50000000000000000000000",
+      "daily_budget": "200000000000000000000000",
+      "min_amount": "1000000000000000000000",
+      "max_actions_per_day": 5
+    }
+  },
+  "policy_fields": {
+    "_note": "The same rules named like common agent-API policy fields, so the shape is familiar.",
+    "budget": "daily_budget",
+    "per_tx_limit": "per_action_cap",
+    "destinations_only": "receivers",
+    "max_tx_per_day": "max_actions_per_day",
+    "owner_approval": "escalated / held decisions",
+    "frozen": "freeze_epoch"
+  }
+}

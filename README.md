@@ -153,6 +153,10 @@ The model call is non-streaming (`stream: false`, `backend/src/ai.js`) to a TEE-
 3. **The signature:** fetch `/v1/signature/<id>` with the same `signing_algo` as the report (we use `ed25519`; NEAR AI also offers `ecdsa`). It must be a `provider_tee` signature over `MODEL:sha256(request):sha256(response)`, from a signing key that matches exactly one model report from step 1.
 4. **Check it yourself:** each verified reply links to NEAR AI's Verification Center (`https://cloud.near.ai/verify?model=z-ai%2Fglm-5.3-flash#receipt=…`), which re-fetches fresh evidence in your browser.
 
+## Try it with sample data (no wallet, no real data)
+
+`node scripts/sample-run.mjs` runs a fictional bakery (`shared/samples/`): four invoices and the six Arena attacks against one sample clause, offline. Every name and amount is made up. It prints each verdict, a receipt, and the counter-offer for the over-cap invoice. The preview mirrors the contract's checks; on testnet the contract itself decides. `shared/samples/charter.json` also lists the charter rules under common agent-API policy names (budget, per_tx_limit, destinations_only, max_tx_per_day, owner_approval, frozen).
+
 ## Limits (stated plainly)
 - 1Click has no testnet. Ferry quotes are mainnet `dry:true`: no deposit address is created and nothing is swapped.
 - "Ask the agent to pay" (Vault page, `/api/vault/ask`, and single-payment scams in the D8 Arena) is read by a real NEAR AI model, `z-ai/glm-5.3-flash`, running in a TEE (`backend/src/agent.js`). It turns the words into one structured proposal (payee, amount, memo) and flags tricks, but it never refuses: the charter decides on chain. Each reply's provider signature is checked on the server: signed text = `model:sha256(request):sha256(reply)`, ed25519, signer equal to a key from a fresh, verified TEE attestation. If the model fails or is over budget, a plain-words parser (`shared/vault/ask.js`) is used and the reply says so. Spend is capped: 160 max tokens, 6 to 8 asks a minute and 40 a day per guest, and a server budget of $0.05 or 300 calls a day (`GET /api/agent/budget`).
