@@ -8,7 +8,7 @@ const SEEN = {
   'nearcarta-guest': () => { try { return !!localStorage.getItem('nearcarta.vault.guest'); } catch { return false; } },
 };
 const CSS = `.connect-item .nc-det{margin-left:auto;font:600 11px/1 Inter,system-ui,sans-serif;padding:5px 8px;border-radius:999px;background:rgba(22,163,74,.16);color:#4ade80;white-space:nowrap}
-.nc-more{margin:10px 4px 2px;font:400 12px/1.45 Inter,system-ui,sans-serif;color:rgba(255,255,255,.62)}`;
+.nc-more{margin:0;padding:10px 20px 16px;font:400 12px/1.45 Inter,system-ui,sans-serif;color:rgba(255,255,255,.62)}`;
 function decorate(root) {
   for (const it of root.querySelectorAll('.connect-item:not([data-nc])')) {
     it.dataset.nc = '1'; const id = it.dataset.type, name = it.querySelector('.connect-item-info span');
