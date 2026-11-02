@@ -83,12 +83,19 @@ export async function txStatus(hash, sender, call = rpc) {
   const k = hash + '|' + sender;
   if (finalTx.has(k)) { rpcStats.cacheHits++; return finalTx.get(k); }
   const params = { tx_hash: hash, sender_account_id: sender, wait_until: 'FINAL' };
-  let v;
-  try { v = await call('EXPERIMENTAL_tx_status', params, cfg.archivalRpc); }
-  catch { v = await call('EXPERIMENTAL_tx_status', params); }
+  // Archival first, then the pool; on a 429 or timeout back off and go round again (3 rounds, ~1 s then ~3 s).
+  let v, err;
+  for (let round = 0; round < 3 && v === undefined; round++) {
+    if (round) await new Promise(r => setTimeout(r, txStatus.backoffMs * (3 ** (round - 1)) * (0.75 + Math.random() / 2)));
+    try { v = await call('EXPERIMENTAL_tx_status', params, cfg.archivalRpc); break; } catch (e) { err = e; }
+    try { v = await call('EXPERIMENTAL_tx_status', params); break; } catch (e) { err = e; if (!/429|timeout|abort/i.test(e.message)) throw e; }
+  }
+  if (v === undefined) throw err;
   if (v?.final_execution_status === 'FINAL' || v?.status) { finalTx.set(k, v); if (finalTx.size > 5000) finalTx.delete(finalTx.keys().next().value); }
   return v;
 }
+
+txStatus.backoffMs = 1000;
 
 // NEP-297: logs that start with EVENT_JSON:. A receipt that failed rolls back its state,
 // but RPC still returns its logs. Those are phantom events: we drop them.
