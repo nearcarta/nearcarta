@@ -151,6 +151,8 @@ The model call is non-streaming (`stream: false`, `backend/src/ai.js`) to a TEE-
 1. **Before the question:** fetch `/v1/attestation/report` with `provider=near`, a fresh 32-byte random nonce and the header `x-no-aliasing: true`. Check that the nonce is bound in the TDX report data and echoed back, and that the NVIDIA GPU payload carries the same nonce and gets a pass from NVIDIA's attestation service. If this fails, the question is not sent.
 2. **The question:** one non-streaming `/v1/chat/completions` call with the full model name `z-ai/glm-5.3-flash`, a Confidential (TEE) model. We keep the exact request and response bytes in memory for the hash.
 3. **The signature:** fetch `/v1/signature/<id>` with the same `signing_algo` as the report (we use `ed25519`; NEAR AI also offers `ecdsa`). It must be a `provider_tee` signature over `MODEL:sha256(request):sha256(response)`, from a signing key that matches exactly one model report from step 1.
+   - **Which algorithm where:** chat receipts (`/api/vault/ask`, `backend/src/ai.js`) use **ed25519** end to end; the live attestation panel (`/api/ai/tee`, `backend/src/tee.js`) uses **ecdsa**. NEAR AI accepts either as long as the report and the signature use the same one, and each path does.
+   - **No reasoning text is kept:** `ai.js` keeps only `choices[0].message.content`, usage and hashes of the request and response; `reasoning_content` is never stored, logged or returned (test: `ai-no-reasoning.test.js`).
 4. **Check it yourself:** each verified reply links to NEAR AI's Verification Center (`https://cloud.near.ai/verify?model=z-ai%2Fglm-5.3-flash#receipt=…`), which re-fetches fresh evidence in your browser.
 
 ## One loop in under two minutes
