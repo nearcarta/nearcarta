@@ -3,6 +3,7 @@
 // code runs in a sandboxed iframe, and every freeze / unfreeze / approve / deny is approved in the wallet, one by one.
 // Sign-in asks for no access key.
 import { NearConnector } from '@hot-labs/near-connect';
+import { decoratePicker } from '../shops/vault/picker.js';
 // Lazy: NEAR Connect only awaits this when a WalletConnect wallet is used, so the client loads on demand.
 const WC_ID = __WC_ID__;
 let wcP; const walletConnect = WC_ID ? { then: (ok, no) => (wcP ||= import('/wc.bundle.js').then(m => m.init(WC_ID))).then(ok, no) } : undefined;
@@ -25,7 +26,7 @@ export function wallet() {
   if (!connector) {
     injectGuest(); // the one-click guest account is one more wallet in the list
     // Pass the page's CSP nonce so the wallet's sandboxed iframe may run its scripts.
-    connector = new NearConnector({ network: 'testnet', features: { testnet: true, signAndSendTransaction: true }, footerBranding: null, walletConnect, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
+    decoratePicker(); connector = new NearConnector({ network: 'testnet', features: { testnet: true, signAndSendTransaction: true }, footerBranding: null, walletConnect, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
     // The picker's "⋯" header button has no text: name it for screen readers and hover.
     const label = r => r.querySelectorAll?.('.settings-button:not([aria-label])').forEach(b => { b.setAttribute('aria-label', 'Wallet list settings'); b.title = 'Wallet list settings'; });
     const fix = r => { label(r); unavailable(r); };
