@@ -14,6 +14,7 @@ import * as mist from './mistbank.js';
 import * as mq from './mistqueue.js';
 import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
+import * as guest from './guest.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
@@ -279,6 +280,12 @@ export function makeApp() {
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
   app.get('/api/toll/gate/:nonce', limiter(60), tg(c => tollgate.visit(c.req.param('nonce'))));
+  // Guest fallback when the public faucet rate-limits a visitor (backend/src/guest.js)
+  app.get('/api/guest', limiter(30), c => c.json(guest.guestInfo()));
+  app.post('/api/guest', limiter(2, 3600e3), async c => {
+    try { return c.json(await guest.createGuest(await c.req.json().catch(() => ({})))); }
+    catch (e) { return c.json({ error: e.message }, e.status || 502); }
+  });
   app.post('/api/toll/gate/settle-due', limiter(6), tg(() => tollgate.settleDue()));
   app.post('/api/toll/gate/:nonce/broadcast', limiter(10), tg(c => tollgate.broadcast(c.req.param('nonce'))));
   app.post('/api/toll/gate/:nonce/settle', limiter(10), tg(c => tollgate.settleOne(c.req.param('nonce'))));
