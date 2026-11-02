@@ -270,3 +270,6 @@ details.more[open] > summary .dt::after { content: ' ▴'; }
   #top { background: var(--raised, #111); padding: 6px; border-radius: 12px; }
   #tray { max-height: calc(100dvh - 84px); overflow-y: auto; overscroll-behavior: contain; }
 }
+/* JB9: 24px minimum tap targets for explorer links and small chips */
+a.tx, a.rc, button.rc, .pf a, .rcpt a { display: inline-flex; align-items: center; min-height: 24px; min-width: 24px; }
+.to-l { margin: 8px 0 0; }

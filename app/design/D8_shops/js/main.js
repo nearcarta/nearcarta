@@ -51,7 +51,7 @@ window.__advance = (sec, fps = 30) => { const n = Math.round(sec * fps); for (le
 // --- town labels: icon + name, nothing else ---
 const v = new THREE.Vector3();
 function makeLabels() { const box = $('#tags');
-  for (const [id, s] of Object.entries(SHOPS)) { const b = document.createElement('button'); b.className = 'lb'; b.dataset.id = id; b.innerHTML = `${i3(s.icon, 24)}<span>${s.name}</span>`; b.onclick = () => enter(id);
+  for (const [id, s] of Object.entries(SHOPS)) { const b = document.createElement('button'); b.className = 'lb'; b.dataset.id = id; b.innerHTML = `${i3(s.icon, 24)}<span>${s.name}</span>`; b.setAttribute("aria-label", s.name); b.onclick = () => enter(id);
     b.onmouseenter = () => { lift(id, true); sfx('hover'); }; b.onmouseleave = () => lift(id, false); b.onfocus = () => lift(id, true); b.onblur = () => lift(id, false); box.appendChild(b); labels[id] = b; } }
 function lift(id, on) { const o = B[id]; if (!o) return; run((function* () { const y0 = o.position.y, y1 = on ? .18 : 0; yield tween(.18, k => o.position.y = y0 + (y1 - y0) * k); })()); o.traverse(m => { if (m.isMesh) { m.material.emissive?.set(on ? 0x3a2a10 : 0); } }); }
 function placeTags() {
