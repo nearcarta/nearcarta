@@ -15,7 +15,7 @@ test('arena scam set: every pattern ends in a refused tx recorded in the deploym
     const ref = steps.filter(s => s.pattern === p && s.verdict !== 'ALLOW');
     assert.equal(ref.length, 1, p);
     assert.equal(ref[0].line, 'the model was fooled; the charter refused');
-    assert.ok(Object.values(dep.arena.proof_txs).includes(ref[0].agent_act_tx), p);
+    assert.ok(Object.values(dep.arena_v1.proof_txs).includes(ref[0].agent_act_tx), p);
   }
   assert.ok(steps.every(s => !s.unexpected), 'every verdict matched the expected clause');
 });

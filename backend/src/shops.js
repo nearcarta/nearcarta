@@ -58,7 +58,7 @@ async function townhallR16() {
 export async function arena() {
   const A = DEP.arena.contract;
   const [season, guardian, acct] = await Promise.all([view(A, 'get_season'), view(A, 'get_guardian', { token_id: 'g1' }), viewAccount(A)]);
-  const cases = ['case:C1_CAP', 'case:C3_ALLOWLIST', 'case:C6_BAD_PROOF', 'case:C7_HANDOFF', 'key:brass'];
+  const cases = ['case:C1_CAP', 'case:C3_ALLOWLIST', 'case:C5_NO_BOUNTY', 'case:C6_BAD_PROOF', 'case:C7_HANDOFF', 'case:C9_STOCK', 'key:brass'];
   const supply = await view(A, 'mt_batch_supply', { token_ids: cases }).catch(() => []);
   const attempts = [];
   for (let i = 0; i < 12; i++) { const a = await view(A, 'get_attempt', { attempt_id: i }).catch(() => null); if (!a) break; attempts.push({ id: i, ...a }); }

@@ -48,7 +48,7 @@ test('corpus: every past prompt has a decision tx; the bounty text is never in i
 });
 
 test('pastPrompts reads chain and caches', async () => {
-  let n = 0; const v = async (_a, _m, { attempt_id }) => { n++; if (attempt_id > 1) throw new Error('none'); return { prompt_hash_hex: sha(PAST[attempt_id].prompt), revealed: true, verdict: PAST[attempt_id].verdict }; };
+  let n = 0; const v = async (_a, _m, { attempt_id }) => { n++; if (_a !== 'arena.r6vamvr9brhx-arena2.testnet' || attempt_id > 1) throw new Error('none'); return { prompt_hash_hex: sha(PAST[attempt_id].prompt), revealed: true, verdict: PAST[attempt_id].verdict }; };
   const d = await pastPrompts(v, 1e12); assert.equal(d.count, 2); assert.equal(d.shown, 2); assert.equal(d.prompts[0].id, 1);
   const calls = n; await pastPrompts(v, 1e12 + 1000); assert.equal(n, calls);
 });

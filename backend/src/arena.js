@@ -4,7 +4,10 @@
 // allowed it, and the reveal tx.
 import { createHash } from 'node:crypto';
 import { view, explorerTx } from './near.js';
-import { PAST, ARENA } from '../../shared/arena/prompts.js';
+import { PAST as PAST_V1, ARENA as ARENA_V1 } from '../../shared/arena/prompts.js';
+import { PAST3, ARENA3 } from '../../shared/arena/prompts3.js';
+// Live arena: the NEP-245 build (arena3). The first season's contract stays readable as history.
+export const ARENA = ARENA3, PAST = PAST3;
 
 const sha = s => createHash('sha256').update(s).digest('hex');
 export const OUTCOME = v => v === 'ALLOW' ? 'allowed' : v === 'C0_FROZEN' ? 'held' : 'refused';
@@ -21,10 +24,14 @@ export function joinPrompts(chain, corpus = PAST) {
 let cache = null;
 export async function pastPrompts(v = view, now = Date.now()) {
   if (cache && now - cache.at < 60e3) return cache.body;
-  const got = await Promise.all(Array.from({ length: 50 }, (_, i) => v(ARENA, 'get_attempt', { attempt_id: i }).catch(() => null)));
-  const chain = []; for (let i = 0; i < got.length && got[i]; i++) chain.push({ id: i, ...got[i] });
-  const prompts = joinPrompts(chain).reverse();
-  const body = { contract: ARENA, count: prompts.length, shown: prompts.filter(p => p.prompt).length, prompts,
+  const read = async (C, corpus) => {
+    const got = await Promise.all(Array.from({ length: 50 }, (_, i) => v(C, 'get_attempt', { attempt_id: i }).catch(() => null)));
+    const chain = []; for (let i = 0; i < got.length && got[i]; i++) chain.push({ id: i, ...got[i] });
+    return joinPrompts(chain, corpus).reverse().map(p => ({ ...p, contract: C }));
+  };
+  const [live, v1] = await Promise.all([read(ARENA, PAST), read(ARENA_V1, PAST_V1)]);
+  const prompts = [...live, ...v1];
+  const body = { contract: ARENA, history_contract: ARENA_V1, standard: 'NEP-245 (mt_transfer, mt_batch_transfer, mt_transfer_call, mt_resolve_transfer)', count: prompts.length, shown: prompts.filter(p => p.prompt).length, prompts,
     rule: 'prompt text shown only when sha256(prompt) equals the on-chain commitment and the attempt is revealed on chain' };
   cache = { at: now, body }; return body;
 }
