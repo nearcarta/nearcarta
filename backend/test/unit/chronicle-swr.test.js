@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { chronicle, chronicleOnce, _resetFeeds, FEED_MAX, FEED_TTL_MS, FEED_STALE_MS } from '../../src/shops.js';
 import { makeApp, warm } from '../../src/app.js';
 import { DEP } from '../../src/config.js';
+import { _setSnapshots } from '../../src/shops.js';
+_setSnapshots(null); // these tests cover the no-snapshot path
 
 const rows = n => Array.from({ length: n }, (_, i) => ({ hash: 'h' + i }));
 const reader = () => { const r = async (a, limit) => { r.n++; r.limits.push(limit); return { account: a, count: limit, source: 'test', txs: rows(limit) }; }; r.n = 0; r.limits = []; return r; };

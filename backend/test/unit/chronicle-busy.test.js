@@ -2,6 +2,8 @@ import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeApp } from '../../src/app.js';
 import { DEP } from '../../src/config.js';
+import { _setSnapshots } from '../../src/shops.js';
+_setSnapshots(null); // these tests cover the no-snapshot path
 
 const real = globalThis.fetch;
 afterEach(() => { globalThis.fetch = real; });

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 // Read-only live views for Town Hall, Arena and Toll, plus the Chronicle indexer.
 import { DEP } from './config.js';
 import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, rpc } from './near.js';
@@ -171,8 +172,23 @@ export async function chronicle(account, limit = 8, read = chronicleOnce, now = 
     p.catch(() => {});
     try { return sliceFeed(await Promise.race([p, late]), n); } finally { clearTimeout(timer); }
   }
-  catch (e) { if (hit?.v) return sliceFeed(hit.v, n, { stale: true, stale_age_s: Math.round((now - hit.at) / 1000) }); throw e; }
+  catch (e) {
+    if (hit?.v) return sliceFeed(hit.v, n, { stale: true, stale_age_s: Math.round((now - hit.at) / 1000) });
+    // Nothing cached yet (fresh boot while the tx index rate-limits this IP): answer the feed snapshot baked into
+    // the image at deploy time, marked stale with its age, while the live read keeps going and fills the cache.
+    const snap = feedSnapshot(account);
+    if (snap) return sliceFeed(snap, n, { stale: true, snapshot: true, stale_age_s: Math.round((now - Date.parse(snap.snapshot_at)) / 1000) });
+    throw e;
+  }
 }
+// Deploy-time feed snapshots (backend/data/feed-snapshots.json, written by scripts/snapshot-feeds.js), final txs only.
+let SNAPS;
+export function feedSnapshot(account, file = new URL('../data/feed-snapshots.json', import.meta.url)) {
+  if (SNAPS === undefined) { try { SNAPS = JSON.parse(readFileSync(file, 'utf8')); } catch { SNAPS = null; } }
+  const v = SNAPS?.feeds?.[account];
+  return v && Array.isArray(v.txs) ? { ...v, snapshot_at: SNAPS.at } : null;
+}
+export const _setSnapshots = v => { SNAPS = v; };
 // Re-read each listed tx from RPC in parallel (bounded), keeping the index order.
 async function inParallel(items, conc, fn) {
   const out = new Array(items.length); let i = 0;
