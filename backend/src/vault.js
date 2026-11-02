@@ -155,17 +155,22 @@ export const sharedCharters = () => V ? [V.arena.charter, ...(V.arena.pool || []
  * Every candidate carries the identical clause, so refusals do not change; only an exhausted day stops being
  * shared by every visitor. A charter whose usage cannot be read is skipped; if none can be read, the first.
  */
-export async function pickShared(viewF = view, list = sharedCharters()) {
-  const rows = await Promise.all(list.map(async c => {
+export async function pickShared(viewF = view, list = sharedCharters(), cache = cached) {
+  // Sequential and cheap: the clause is the same on every charter and rarely changes (cached 10 min); usage is
+  // read one charter at a time and the first one with its whole day left wins, so most runs cost one or two views.
+  const rows = [];
+  for (const c of list) {
     try {
-      const cl = (await viewF(c, 'get_clauses'))?.pay; const u = await viewF(c, 'get_usage', { clause_id: 'pay' });
-      if (!cl) return null;
-      const left = Number(cl.max_actions_per_day ?? 0) - Number(u.count ?? 0);
+      const cl = (await cache('pool-clause:' + c, 600_000, () => viewF(c, 'get_clauses')))?.pay;
+      if (!cl) continue;
+      const u = await viewF(c, 'get_usage', { clause_id: 'pay' });
+      const max = Number(cl.max_actions_per_day ?? 0), left = max - Number(u.count ?? 0);
       const room = BigInt(cl.daily_budget) - BigInt(u.spent ?? 0) - BigInt(u.reserved ?? 0);
-      return { c, left, room };
-    } catch { return null; }
-  }));
-  const ok = rows.filter(Boolean).sort((a, b) => b.left - a.left || (b.room > a.room ? 1 : b.room < a.room ? -1 : 0));
+      rows.push({ c, left, room });
+      if (left >= max && room >= BigInt(cl.daily_budget)) break;
+    } catch { /* unreadable: skip */ }
+  }
+  const ok = rows.sort((a, b) => b.left - a.left || (b.room > a.room ? 1 : b.room < a.room ? -1 : 0));
   return ok[0]?.c || list[0];
 }
 let queue = Promise.resolve();
