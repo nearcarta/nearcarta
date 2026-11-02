@@ -81,6 +81,8 @@ test('payee check stops a poisoned invoice, the charter refuses it, and the Mist
   await openShop(page, 'bank');
   await expect(page.getByTestId('tee-verify')).toBeVisible({ timeout: 90_000 });
   await page.getByTestId('tee-verify').click();
+  // A progress line shows while the check runs (stage text plus elapsed seconds).
+  await expect(page.getByTestId('tee-progress')).toContainText('Step 1 of', { timeout: 5_000 });
   await expect(page.getByTestId('tee-badge')).toContainText('✓ Verified', { timeout: 90_000 });
   proof.steps.push({ step: 'mist bank: TEE panel', badge: (await page.getByTestId('tee-badge').textContent()).trim(), rows: await page.getByTestId('tee-panel').locator('li').allInnerTexts() }); save();
   await page.screenshot({ path: shots + 'guard-5-tee-verified.png' });
