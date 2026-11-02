@@ -132,8 +132,9 @@ const APPS = {
         const q = await A.quote(rt.id, extra.amt || rt.amt); if (!q.ok || !q.checks?.signature) throw new Error(q.error || 'quote not signed');
         extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: `Live quote, signed by 1Click. Worth ${A.ferryNear(q)} test NEAR. Ask?`, rc: `<span class="rc">1Click dry quote · ${esc(q.correlationId.slice(0, 8))} · mainnet send locked</span>` };
       }
+      const amt = A.ferryNear(extra.q), to = A.ferryPayee(rt.id);
       const o = await A.ferry(rt.id, extra.q); extra.q = null;
-      return { o, clause: rt.id, say: o.decision === 'allowed' ? 'Your charter approved the crossing.' : `Refused: ${A.why(o.reason)}.` };
+      return { o, clause: rt.id, say: o.decision === 'allowed' ? `Your charter approved it: ${amt} test NEAR paid to ${nice(to) || to}.` : `Refused: ${A.why(o.reason)}.` };
     },
   },
   bank: {

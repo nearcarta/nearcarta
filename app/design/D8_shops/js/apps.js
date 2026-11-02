@@ -132,7 +132,7 @@ export async function signRules(r) {
   const ferryCap = Math.max(r.ferryCap, r.cap + 0.001);
   const acts = [fc('set_clause', { clause_id: 'pay', clause: clause(r, r.receivers, r.cap) })];
   for (const rt of ROUTES) {
-    if (r.routes.includes(rt.id)) acts.push(fc('set_clause', { clause_id: rt.id, clause: clause({ ...r, budget: Math.max(r.budget, ferryCap) }, [S.me], ferryCap) }, 30));
+    if (r.routes.includes(rt.id)) acts.push(fc('set_clause', { clause_id: rt.id, clause: clause({ ...r, budget: Math.max(r.budget, ferryCap) }, [...new Set([...r.receivers, S.me])], ferryCap) }, 30));
     else if (S.clauses[rt.id]) acts.push(fc('remove_clause', { clause_id: rt.id }, 20));
   }
   let secret = null;
@@ -224,9 +224,17 @@ export async function quote(route, amount) {
   return api('/api/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ from: rt.from, to: 'ZEC@zec', amount: String(amount), recipient: UA, refundTo: REFUND, privacy: 'basic' }) });
 }
-// stand-in on testnet: 1 USD of the mainnet quote = 0.01 testnet NEAR, paid back to you
+// Testnet settlement of a signed mainnet quote: 1 USD = 0.01 testnet NEAR, paid to a recipient your Ferry rule allows
+// (the first allowed payee that is not you; yourself only if the rule names nobody else). The charter checks it on chain.
 export const ferryNear = q => Math.max(0.001, Math.round(Number(q.from.usd) * 0.01 * 1000) / 1000);
-export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receiver: S.me, amountY: toY(ferryNear(q)), memo: 'ferry:' + q.correlationId });
+export const ferryPayee = route => { const r = S.clauses[route]?.receivers || []; return r.find(a => a !== S.me) || r[0] || S.me; };
+export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receiver: ferryPayee(route), amountY: toY(ferryNear(q)), memo: 'ferry:' + q.correlationId });
+// Hide routes whose dry quote failed in the server's last probe (/api/ferry/routes); keep at least one.
+export const routesReady = api('/api/ferry/routes').then(r => {
+  const bad = new Set(r.routes.filter(x => !x.ok && x.to === 'ZEC@zec').map(x => x.from));
+  for (let i = ROUTES.length - 1; i >= 0; i--) if (bad.has(ROUTES[i].from) && ROUTES.length > 1) ROUTES.splice(i, 1);
+  return ROUTES;
+}).catch(() => ROUTES);
 
 const BUCKETS = [0.01, 0.05, 0.1];
 // Mist Bank sends fixed notes only, so every send of a size looks alike. The note picked is exactly what is sent.
