@@ -31,6 +31,7 @@ function teePanel(t, again = true) {
   const when = t.at ? new Date(t.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   return `<div data-testid="tee-panel"><p class="tee-badge ${t.ok ? '' : 'no'}" data-testid="tee-badge">${t.ok ? '✓ Verified' : '✕ Not verified'} · NEAR AI TEE${t.model ? ' · ' + esc(t.model) : ''}${when ? ' · ' + esc(when) : ''}</p>
     <ol class="feed tee">${(t.rows || []).map(([k, ok, d]) => `<li class="${ok ? 'ok' : 'no'}"><span>${ok ? '✓ pass' : '✕ fail'}</span><span>${esc(k)}</span><span>${esc(d)}</span></li>`).join('')}${t.err ? `<li class="no"><span>error</span><span>${esc(String(t.err).slice(0, 80))}</span><span></span></li>` : ''}</ol>
+    ${t.url ? `<a class="rc" data-testid="tee-center" href="${esc(t.url)}" target="_blank" rel="noopener">Check this reply in NEAR AI's Verification Center ↗</a>` : ''}
     ${again ? '<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Check again with a new nonce ↗</button>' : ''}</div>`;
 }
 

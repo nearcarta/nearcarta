@@ -342,11 +342,14 @@ export function parseScam(text) {
 export function brainTee(b) {
   if (!b || b.by !== 'model') return null;
   const v = b.verification || {}, c = v.checks || {};
-  return { ok: !!v.verified, model: b.model, at: Date.now(), rows: [
+  return { ok: !!v.verified, model: b.model, at: Date.now(), url: v.verify_url || null, rows: [
     ['Model attested in a TEE', !!c.teePreflight && !!c.modelInTee, 'fresh attestation, signer ' + String(v.signing_address || '').slice(0, 12) + '…'],
     ['Signed text = model:sha256(request):sha256(reply)', !!c.textMatches, v.signature_kind || ''],
     ['Signer is the attested model key', !!c.signerAttested, v.signing_algo || ''],
     ['ed25519 signature valid', !!c.ed25519, 'checked on our server'],
+    ['Fresh 32-byte nonce, attested before the question', !!(v.attestation?.before_question && v.attestation?.report_nonce_ok), v.attestation?.nonce ? 'nonce ' + String(v.attestation.nonce).slice(0, 10) + '… in the TEE report' : ''],
+    ['Same nonce in the NVIDIA GPU token', !!v.attestation?.gpu_nonce_ok, 'NVIDIA NRAS verdict'],
+    ['Confidential model (not Incognito)', v.attestation?.model_class === 'Confidential (TEE)', 'non-streaming call, full model name'],
     ['Model\'s read', true, b.parsed?.suspicious ? String(b.parsed.why || 'suspicious') : 'looked ordinary'],
   ] };
 }

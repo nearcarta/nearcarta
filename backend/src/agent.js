@@ -10,7 +10,7 @@
 // and a daily call cap. When the model is unavailable or over budget, the plain-words parser
 // (shared/vault/ask.js) is used instead and the result says so.
 import { complete, signature, checkSigned, verifyLink } from './ai.js';
-import { cachedProveTee } from './tee.js';
+import { proveTee } from './tee.js';
 import { cfg, secret } from './config.js';
 import { nearToYocto, parseAsk } from '../../shared/vault/ask.js';
 
@@ -44,11 +44,11 @@ export function budgetLeft(estUsd = 0) {
 }
 export const budgetStatus = () => { roll(); return { ...budget, usd: Number(budget.usd.toFixed(6)), limit_usd: DAILY_USD(), limit_calls: DAILY_CALLS(), model: cfg.nearAiModel }; };
 
-// ---- TEE preflight, cached (non-billable, but slow) ----
+// ---- TEE preflight, fresh for every question ----
+// A new 32-byte nonce per ask (provider=near, x-no-aliasing): the report and the NVIDIA token must both
+// echo it, so the attestation is provably made for this question, before it is sent. About 3 s, not billed.
 let pre = null;
-// Reads through tee.js's 5-minute attestation cache, so it shares fetches with /api/ai/tee.
-export async function preflight({ ttlMs = 10 * 60e3, run = cachedProveTee } = {}) {
-  if (pre && pre.ok && Date.now() - pre.at < ttlMs) return pre.r;
+export async function preflight({ run = proveTee } = {}) {
   const r = await run({ signingAlgo: 'ed25519' });
   pre = { r, ok: !!r.ok, at: Date.now() };
   return r;
@@ -149,7 +149,9 @@ export async function propose(text, { clauses = {}, receivers = [], tag = 'mine'
   if (sig.available) {
     const checks = checkSigned(c, sig, p);
     verification = { verified: checks.verified, checks: { teePreflight: !!p.ok, ...checks.checks }, signature_kind: sig.signature_kind,
-      signing_address: sig.signing_address, signing_algo: sig.signing_algo, verify_url: verifyLink({ id: c.id, model: c.model, sig }) };
+      signing_address: sig.signing_address, signing_algo: sig.signing_algo, verify_url: verifyLink({ id: c.id, model: c.model, sig }),
+      attestation: { nonce: p.nonce || null, checked_at: p.checkedAt || null, before_question: true, gpu_nonce_ok: !!(p.models || []).some(m => m.gpu?.ok),
+        report_nonce_ok: !!(p.models || []).some(m => m.checks?.nonceBound && m.checks?.echoedNonce), model_class: sig.signature_kind === 'provider_tee' && p.ok ? 'Confidential (TEE)' : 'not confirmed' } };
   } else verification = { verified: false, why: `signature unavailable${sig.http ? ' (http ' + sig.http + ')' : ''}` };
 
   return { parsed, by: 'model', model: c.model, completion_id: c.id, verification,
