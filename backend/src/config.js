@@ -14,6 +14,8 @@ export const cfg = {
   rpcFallbacks: (process.env.NEAR_RPC_FALLBACKS || (DEP.rpc_fallbacks || []).join(',')).split(',').map((s) => s.trim()).filter(Boolean),
   // Tx status for anything older than ~2.5 days lives only on archival nodes (others answer NOT_OBSERVED/timeout).
   archivalRpc: process.env.NEAR_ARCHIVAL_RPC || DEP.archival_rpc || 'https://archival-rpc.testnet.fastnear.com',
+  // Second archival node, used when the first rate-limits (Render egress IPs are shared and see 429s).
+  archivalRpc2: process.env.NEAR_ARCHIVAL_RPC2 || 'https://archival-rpc.testnet.near.org',
   rpcRetries: Number(process.env.NEAR_RPC_RETRIES || 3),
   rpcBackoffMs: Number(process.env.NEAR_RPC_BACKOFF_MS || 250),
   rpcTimeoutMs: Number(process.env.NEAR_RPC_TIMEOUT_MS || 8000),

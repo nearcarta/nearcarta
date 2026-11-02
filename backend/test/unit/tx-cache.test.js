@@ -9,7 +9,7 @@ test('a final tx is read from RPC once, then served from memory', async () => {
 test('an error is not cached', async () => {
   txStatus.backoffMs = 0; let n = 0; const call = async () => { n++; throw new Error('rpc http 429'); };
   await assert.rejects(txStatus('H2', 's', call)); await assert.rejects(txStatus('H2', 's', call));
-  assert.equal(n, 12); // 3 rounds of archival then pool, on each call
+  assert.equal(n, 18); // 3 rounds of two archival nodes then pool, on each call
 });
 test('tx status asks the archival node first', async () => {
   const urls = []; const call = async (m, p, u) => { urls.push(u); return { status: {}, final_execution_status: 'FINAL' }; };
@@ -18,6 +18,6 @@ test('tx status asks the archival node first', async () => {
 });
 test('a 429 is retried after a back-off and then succeeds', async () => {
   txStatus.backoffMs = 0; let n = 0;
-  const call = async () => { if (++n <= 2) throw new Error('rpc http 429'); return { status: {}, final_execution_status: 'FINAL' }; };
-  const v = await txStatus('H4', 's', call); assert.ok(v.status); assert.equal(n, 3);
+  const call = async () => { if (++n <= 3) throw new Error('rpc http 429'); return { status: {}, final_execution_status: 'FINAL' }; };
+  const v = await txStatus('H4', 's', call); assert.ok(v.status); assert.equal(n, 4);
 });

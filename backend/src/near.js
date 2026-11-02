@@ -88,6 +88,7 @@ export async function txStatus(hash, sender, call = rpc) {
   for (let round = 0; round < 3 && v === undefined; round++) {
     if (round) await new Promise(r => setTimeout(r, txStatus.backoffMs * (3 ** (round - 1)) * (0.75 + Math.random() / 2)));
     try { v = await call('EXPERIMENTAL_tx_status', params, cfg.archivalRpc); break; } catch (e) { err = e; }
+    if (cfg.archivalRpc2) { try { v = await call('EXPERIMENTAL_tx_status', params, cfg.archivalRpc2); break; } catch (e) { err = e; } }
     try { v = await call('EXPERIMENTAL_tx_status', params); break; } catch (e) { err = e; if (!/429|timeout|abort/i.test(e.message)) throw e; }
   }
   if (v === undefined) throw err;
