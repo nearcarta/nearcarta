@@ -64,7 +64,7 @@ if (!dep.ok) process.exit(1);
 for (const [r, methods] of [['agent', ['agent_act']], ['mallory', ['attempt', 'reveal_prompt']], ['bob', ['attempt', 'reveal_prompt']], ['erin', ['attempt', 'reveal_prompt']]]) {
   const kp = KeyPair.fromRandom('ed25519'); FC[r] = { account_id: id(r), contract: C, methods, public_key: kp.getPublicKey().toString(), private_key: kp.toString() };
   writeFileSync(E.FC_OUT, JSON.stringify(FC), { mode: 0o600 });
-  const t = await acct(r).addFunctionCallAccessKey({ publicKey: kp.getPublicKey(), contractId: C, methodNames: methods, allowance: BigInt(N(0.25)) });
+  const t = await acct(r).addFunctionCallAccessKey({ publicKey: kp.getPublicKey(), contractId: C, methodNames: methods }); // no allowance: a capped key locks out once its gas runs out
   log.push({ step: `fc_key_${r}`, ok: true, tx: t.transaction.hash, methods, public_key: kp.getPublicKey().toString() }); console.log('fckey', r, t.transaction.hash); save();
 }
 const keys = await accessKeys(C);
