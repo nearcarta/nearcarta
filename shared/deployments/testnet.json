@@ -605,5 +605,23 @@
     },
     "explorer": "https://sepolia.basescan.org/address/0xeb7d20b8c6af0d63f0331d4e7aa31205c147eb38",
     "retired": "v4 accepted only nccharters-53681; replaced by toll_gate (v5, every factory)"
+  },
+  "arena_nep245": {
+    "contract": "arena3-370128340.testnet",
+    "owner": "town-lab-38241.testnet",
+    "full_access_keys": 0,
+    "code_hash": "98exRHg8BRXW917eDbn29FoDhfDkdyhgoAYE38HMcfe2",
+    "code_sha256": "78d37a3ccb2dc2a00dc7fb76683261e06d4c2217f12f9f98933c4f89dc41c633",
+    "artifact": "contracts/artifacts/arena.v2.wasm",
+    "note": "Second Arena with the full NEP-245 core incl. mt_transfer_call / mt_batch_transfer_call / mt_resolve_transfer. The first Arena has no keys, so it cannot be upgraded; it keeps the game history. Built with cargo near non-reproducible-wasm (not a reproducible build). Full-access key deleted after deploy.",
+    "txs": {
+      "deploy": "28K49NgRxgKgNH6QA7HKkhJ1v3HQHkezaCf2FCpR7oMc",
+      "mint_guardian": "HTGmQ1nftyJCqLpH9hZqm4VsnLiBc5GsShZfr3yaieaa",
+      "stock": "6HgCfd1ESuzBMnV6xd22u4tqViDbpyqGbTu9QjVYHdy7",
+      "attempt": "8a3EgPDPoa2ZsBTTJfsStEcdqPpJPTmnKaTborJjCZ6y",
+      "agent_give": "5KDhYSv8P8Pt3NRsEqCgFp4PKBx4vc81M4AW7CKouz5g",
+      "mt_transfer_call_refund": "iCGK7Agb9Zzib8pGzWsyvpxrZAgaR8V7HLjmdL5t9vr",
+      "delete_full_key": "8331uzEADU3qma21JQk6XywrBA7oMrteosbm1NxrkqQg"
+    }
   }
 }
