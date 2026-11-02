@@ -12,7 +12,7 @@
 import { complete, signature, checkSigned, verifyLink } from './ai.js';
 import { proveTee } from './tee.js';
 import { cfg, secret } from './config.js';
-import { nearToYocto, parseAsk } from '../../shared/vault/ask.js';
+import { nearToYocto, parseAsk, lookalikeAccount, lookalikeMsg } from '../../shared/vault/ask.js';
 
 /** USD per 1M tokens [input, output], from cloud.near.ai/models (Oct 2026). */
 export const PRICES = {
@@ -115,6 +115,9 @@ export async function propose(text, { clauses = {}, receivers = [], tag = 'mine'
   const t = String(text || '').trim();
   if (!t) throw Object.assign(new Error('Type what the agent should pay, e.g. "pay the cafe 0.01 NEAR for coffee".'), { status: 400 });
   if (t.length > 200) throw Object.assign(new Error('Keep it under 200 characters.'), { status: 400 });
+  // Homoglyph payees (red-team R-1/R-2): refused before the model, so it cannot "correct" one to a real shop.
+  const look = lookalikeAccount(t);
+  if (look) throw Object.assign(new Error(lookalikeMsg(look)), { status: 400, lookalike: true });
   const fallback = why => {
     budget.fallbacks++;
     let parsed; try { parsed = parseAsk(t, receivers, tag); } catch (e) { throw Object.assign(new Error(e.message), { status: 400, fallback_why: why }); }

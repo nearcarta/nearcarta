@@ -20,12 +20,21 @@ export function nearToYocto(s) {
 const label = r => r.split('.')[0].toLowerCase();
 const stems = r => { const l = label(r); return [...new Set([l, l.replace(/s$/, ''), l.replace(/-.*$/, '')])].filter(x => x.length >= 3); };
 
+/** A word that looks like an account id but has non a-z letters (homoglyphs such as Cyrillic "а"), or null. */
+export function lookalikeAccount(text) {
+  for (const m of String(text || '').matchAll(/[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)+/gu)) if (/[^\x00-\x7f]/.test(m[0]) && /\p{L}/u.test(m[0].replace(/[\x00-\x7f]/g, ''))) return m[0];
+  return null;
+}
+export const lookalikeMsg = w => `"${w.slice(0, 64)}" has look-alike (non a-z) letters. Account ids use plain a-z, 0-9, - and _ only.`;
+
 /** Parse a request. Returns { receiver, amount, note, memo } or throws with a plain message. The tag (nickname) labels the memo. */
 export function parseAsk(text, receivers = [], tag = 'mine') {
   if (!TAG_RE.test(tag)) throw new Error('nickname: 1-20 of a-z 0-9 -');
   const t = String(text || '').trim().toLowerCase();
   if (!t) throw new Error('Type what the agent should pay, e.g. "pay the cafe 0.01 NEAR for coffee".');
   if (t.length > 200) throw new Error('Keep it under 200 characters.');
+  const look = lookalikeAccount(t);
+  if (look) throw new Error(lookalikeMsg(look));
   const noteM = t.match(/\bfor\s+(.+)$/);
   const note = noteM ? noteM[1].replace(/[^a-z0-9 -]/g, '').trim().slice(0, 40) : '';
   const head = noteM ? t.slice(0, noteM.index) : t;
