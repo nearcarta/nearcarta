@@ -10,6 +10,7 @@ playwright-report/
 target/
 *.wasm
 !contracts/artifacts/*.wasm
+!outlayer/artifacts/*.wasm
 .vercel
 __pycache__/
 *.pyc

@@ -11,3 +11,4 @@ app/dist
 .env.*
 *.pem
 *.wasm
+!outlayer/artifacts/charter_check.wasm

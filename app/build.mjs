@@ -6,6 +6,8 @@ const dist = here + 'dist';
 rmSync(dist, { recursive: true, force: true }); mkdirSync(dist);
 cpSync(here + 'src', dist, { recursive: true });
 cpSync(here + 'design', dist + '/design', { recursive: true });
+// OutLayer fetches the charter check WASM from here and refuses it unless its sha256 matches the pin.
+mkdirSync(dist + '/outlayer'); cpSync(here + '../outlayer/artifacts/charter_check.wasm', dist + '/outlayer/charter_check.wasm');
 cpSync(here + 'design/D6_dashboards/src/data.js', dist + '/live/data.static.js');
 // Static hosts serve files before rewrites, so put the live adapter at the path the
 // interiors import. Only dist changes; app/design stays as delivered.
