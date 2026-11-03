@@ -20,7 +20,7 @@ npm run verify                # re-reads every proof tx from testnet -> judges/p
 npm run txs                   # rewrites judges/TESTNET_TXS.md from the verify output
 npm run build && npm run e2e  # browser tests (backend on :8787, app on :5173)
 npm run readme-numbers        # writes the counts in README.md and judges/VERIFY.md from the outputs above
-npm run test:contracts        # cargo tests for oath and arena
+npm run test:contracts        # every contract; oath + charter_factory sandbox tests need pkg-config + OpenSSL headers (SKIP_SANDBOX=1 skips them)
 ```
 Run `npm run readme-numbers -- --check` before a commit that touches tests or proofs; it fails if a number in the docs is stale.
 
