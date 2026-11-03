@@ -5,7 +5,7 @@
 import { makeConnector, currentAccount, txHashOf, hasGuest, forgetGuest } from '../vault/wallet.js';
 import { rpcClient, viewFn } from '../../../shared/vault/tx.js';
 import { proposalState, stateText } from '../../../shared/townhall/expiry.js';
-import { reputation, tally, votable } from '../../../shared/townhall/reputation.js';
+import { reputation, tally, votable, canFile } from '../../../shared/townhall/reputation.js';
 
 export const DAO = 'r7thmvr8maey.sputnikv2.testnet';
 export const CHARTER = 'townhall.r7thmvr8maey-council2.testnet';
@@ -59,10 +59,10 @@ async function list(want = null) {
   const row = p => { const s = proposalState(p, period, now), t = tally(p, rep), open = votable(p, period, now), mine = me && p.votes && me in p.votes;
     return `<li class="${mineIds.has(p.id) ? 'mine' : ''}${s.expired ? ' expired' : ''}" data-id="${p.id}" data-status="${esc(s.status)}"><b>#${p.id}</b><span class="st st-${esc(String(s.status).toLowerCase())}" title="${s.expired ? 'Vote window closed; on chain it stays InProgress until someone finalizes it' : ''}">${esc(stateText(s, now))}</span>
     <span class="muted"> by <code>${esc(p.proposer)}</code> (${esc(rep(p.proposer).tier)}) · ${esc(typeof p.kind === 'string' ? p.kind : Object.keys(p.kind)[0])}</span><br>${esc(p.description)}
-    ${p.kind === 'Vote' ? `<div class="tally" data-testid="tally" data-yes="${t.yes}" data-no="${t.no}">Yes ${t.yes} · No ${t.no}${t.voters.length ? ' · ' + t.voters.map(v => `<code>${esc(v.who)}</code> ${v.vote === 'Approve' ? 'yes' : 'no'} (${esc(v.tier)})`).join(', ') : ''}</div>` : ''}
+    ${p.kind === 'Vote' ? `<div class="tally" data-testid="tally" data-yes="${t.yes}" data-no="${t.no}">Yes ${t.yes} · No ${t.no} · weighted ${t.yes_w}–${t.no_w} (<span data-testid="approval">${esc(t.approval)}</span>)${t.voters.length ? ' · ' + t.voters.map(v => `<code>${esc(v.who)}</code> ${v.vote === 'Approve' ? 'yes' : 'no'} (${esc(v.tier)})`).join(', ') : ''}</div>` : ''}
     ${open ? (mine ? `<p class="muted" data-testid="voted">You voted ${p.votes[me] === 'Approve' ? 'yes' : 'no'}.</p>`
       : `<div class="vote"><button type="button" data-vote="VoteApprove" data-id="${p.id}" data-testid="vote-yes" ${me ? '' : 'disabled'}>Vote yes</button> <button type="button" data-vote="VoteReject" data-id="${p.id}" data-testid="vote-no" ${me ? '' : 'disabled'}>Vote no</button>${me ? '' : ' <span class="muted">Start free or connect to vote.</span>'}</div>`) : ''}</li>`; };
-  $('#list').innerHTML = `<p class="muted">Anyone may vote on motions; every vote is on chain and in the tally. Sputnik passes a motion only on the council's 2 votes, and charter changes stay council-only. Tiers come from each account's history in this DAO.</p>
+  $('#list').innerHTML = `<p class="muted">Anyone may vote on motions; every vote is on chain and in the tally. Sputnik passes a motion only on the council's 2 votes, and charter changes stay council-only. Tiers come from each account's history in this DAO: they weight the town tally (newcomer 1, resident 2, elder 3; backed at 4) and cap filing (newcomer 1 a day, resident 3, elder 10).</p>
     ${me ? (r => `<p data-testid="standing">Your standing: <b>${esc(r.tier)}</b> (score ${r.score}: ${r.approved} approved of ${r.filed} filed, ${r.votes} votes${r.listed ? ', on the reward list' : ''}).</p>`)(rep(me)) : ''}
     <ul class="props">${ps.reverse().map(row).join('')}</ul>`;
   return last;
@@ -87,6 +87,10 @@ async function file(e) {
   e.preventDefault();
   const btn = $('#file'); btn.disabled = true; btn.textContent = 'Waiting for your wallet…';
   try {
+    // Anti-spam on top of the 0.1 NEAR bond: a tier may file only so many proposals a day (shared/townhall/reputation.js).
+    const hist = await view(DAO, 'get_proposals', { from_index: Math.max(0, (await view(DAO, 'get_last_proposal_id')) - 100), limit: 100 });
+    const gate = canFile(me, hist, rewardList, Date.now());
+    if (!gate.ok) throw new Error(`Not filed: ${gate.reason} (you: ${gate.today} today, ${gate.open} open).`);
     const clauses = await view(CHARTER, 'get_clauses');
     const kind = document.querySelector('input[name=kind]:checked').value;
     const args = proposalFor(kind, { me, desc: $('#desc').value, clause: clauses.reward });

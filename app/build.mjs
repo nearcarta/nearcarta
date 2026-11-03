@@ -17,6 +17,8 @@ cpSync(here + 'src/live/shops-live.js', shops + '/data/live.js');
 rmSync(dist + '/live/shops-live.js');
 // The Ferry checks quotes with the server's own guard (dependency-free module), so the two cannot drift.
 cpSync(here + '../backend/src/ferry-guard.js', dist + '/live/ferry-guard.js');
+// Town Hall filing caps by reputation tier: the shop room uses the same module as /shops/hall.
+cpSync(here + '../shared/townhall/reputation.js', dist + '/live/townhall-reputation.js');
 // Your House: NEAR Wallet Selector bundled into one ES module (the only part of the console that asks a wallet to sign).
 await (await import('esbuild')).build({ entryPoints: [here + 'house/house.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
   outfile: dist + '/house.bundle.js', define: { 'process.env.NODE_ENV': '"production"', __WC_ID__: JSON.stringify(process.env.VITE_WC_PROJECT_ID || '') }, external: ['/wc.bundle.js'], logLevel: 'warning' });

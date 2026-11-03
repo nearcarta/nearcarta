@@ -74,7 +74,7 @@ export async function init(onChange) {
   await refresh(); S.ready = true; return S;
 }
 export const factories = () => [CFG.factory, ...(CFG.legacy || []).map(l => l.factory)];
-/** Only charters from the current (R17) factory run propose_batch; R16 and older ones pay one action per tx. */
+/** Only charters from the current visitor (R17) factory run propose_batch; R16 and older ones pay one action per tx (the UI says so). */
 export const canBatch = (c = S.charter) => !!c && c.endsWith('.' + CFG.factory);
 export async function refresh() {
   S.me = await W.currentAccount(conn);
@@ -299,10 +299,16 @@ export const board = () => api('/api/vault/leaderboard');
 
 // The Town Hall DAO (Sputnik v2) owns the town's charter. Anyone may file a proposal (0.1 NEAR testnet bond, refunded
 // when the council approves it); the 2-of-2 council votes; only an approved proposal changes the town's rule.
+// Filing is also capped by reputation tier (newcomer 1 a day and 1 open, resident 3, elder 10).
 export const HALL = { dao: 'r7thmvr8maey.sputnikv2.testnet', charter: 'townhall.nccharters-17102.testnet', clause: 'reward', bond: '100000000000000000000000' };
 const b64j = o => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o))));
 export async function hallPropose() {
-  const c = (await view(HALL.charter, 'get_clauses'))[HALL.clause]; if (!c) throw new Error('the Town Hall rule could not be read');
+  const clauses = await view(HALL.charter, 'get_clauses'), c = clauses[HALL.clause]; if (!c) throw new Error('the Town Hall rule could not be read');
+  // Anti-spam on top of the bond: a reputation tier may file only so many proposals a day (shared/townhall/reputation.js).
+  const last = await view(HALL.dao, 'get_last_proposal_id'), hist = await view(HALL.dao, 'get_proposals', { from_index: Math.max(0, last - 100), limit: 100 });
+  const { canFile } = await import('/live/townhall-reputation.js'); // copied from shared/ by app/build.mjs
+  const gate = canFile(S.me, hist, c.receivers || [], Date.now());
+  if (!gate.ok) throw new Error(`not filed: ${gate.reason}`);
   const cap = (BigInt(c.per_action_cap) * 6n / 10n).toString();
   const description = `Lower the Town Hall reward cap to ${fromY(cap)} NEAR (filed from the town by ${S.me})`;
   const kind = { FunctionCall: { receiver_id: HALL.charter, actions: [{ method_name: 'set_clause', args: b64j({ clause_id: HALL.clause, clause: { ...c, per_action_cap: cap } }), deposit: '0', gas: (40n * TG).toString() }] } };
