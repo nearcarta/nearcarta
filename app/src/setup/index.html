@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Set up your agent · Nearcarta</title>
+<meta name="description" content="Sign in, fund, choose your agent and write the rules it cannot break. Seven steps, on chain.">
+<link rel="icon" href="/favicon.ico">
+<link rel="preload" href="/design/D9_world/assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/design/D9_world/d7/tokens/tokens.css">
+<link rel="stylesheet" href="/setup/setup.css">
+<script src="/config.js"></script>
+</head>
+<body>
+<div class="scene" aria-hidden="true"><div class="glow g1"></div><div class="glow g2"></div></div>
+<header class="top">
+  <a class="brand" href="/" aria-label="Back to the town"><span class="seal">N</span><span><b>Nearcarta</b><small>Charter office</small></span></a>
+  <div class="net" id="net"></div>
+  <div class="who" id="who" aria-live="polite"></div>
+</header>
+<main class="shell">
+  <nav class="rail" aria-label="Setup steps"><ol id="rail"></ol></nav>
+  <section class="stage" aria-live="polite">
+    <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+    <article class="card" id="card"><p class="muted">Loading…</p></article>
+  </section>
+</main>
+<footer class="foot">Your rules live in a charter contract on NEAR. This site cannot spend for your agent; the contract decides.</footer>
+<script type="module" src="/setup/setup.bundle.js"></script>
+</body>
+</html>

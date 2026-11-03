@@ -32,13 +32,16 @@ await (await import('esbuild')).build({ entryPoints: [here + 'house/wc.js'], bun
 await (await import('esbuild')).build({ entryPoints: [here + 'design/D8_shops/js/wallet/entry.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
   outfile: shops + '/js/wallet.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis', ...walletDefine }, logLevel: 'warning' });
 rmSync(shops + '/js/wallet', { recursive: true, force: true });
+// /setup: the guided stepper (sign in, fund, privacy, character, rules, sign, try). Its HTML and CSS come from src/setup.
+await (await import('esbuild')).build({ entryPoints: [here + 'house/setup.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
+  outfile: dist + '/setup/setup.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis', __WC_ID__: JSON.stringify(process.env.VITE_WC_PROJECT_ID || ''), __PRIVY_APP_ID__: JSON.stringify(PRIVY_ID || ''), __PRIVY_CLIENT_ID__: JSON.stringify(PRIVY_CLIENT || ''), ...walletDefine }, external: ['/wc.bundle.js'], logLevel: 'warning' });
 // /sign: the Privy login and signing window (React, its own bundle, built when the Privy app id is set; the client id is optional).
 if (PRIVY_ID) {
-  mkdirSync(dist + '/sign');
+  mkdirSync(dist + '/sign', { recursive: true });
   await (await import('esbuild')).build({ entryPoints: [here + 'house/sign.jsx'], bundle: true, format: 'esm', minify: true, target: 'es2022', jsx: 'automatic',
     outfile: dist + '/sign/sign.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis', __PRIVY_APP_ID__: JSON.stringify(PRIVY_ID), __PRIVY_CLIENT_ID__: JSON.stringify(PRIVY_CLIENT) }, logLevel: 'warning' });
   writeFileSync(dist + '/sign/index.html', '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nearcarta sign in</title>'
-    + '<script>try{window.opener&&window.opener.postMessage({source:"privy-near-connect",type:"READY"},"*")}catch(e){}</script><link rel="stylesheet" href="/sign/radix.css"><link rel="stylesheet" href="/sign/theme.css"><style>.box{max-width:360px;margin:40px auto;font:15px/1.4 system-ui;display:flex;flex-direction:column;gap:10px;padding:0 16px}.box h1{font-size:20px;margin:0}.box label{display:flex;flex-direction:column;gap:4px}.box input{font:inherit;padding:8px}.box button{font:inherit;padding:9px;cursor:pointer}.err{color:#b00020}</style></head><body><div id="root"></div><script type="module" src="/sign/sign.bundle.js"></script></body></html>');
+    + '<script>try{window.opener&&window.opener.postMessage({source:"privy-near-connect",type:"READY"},"*")}catch(e){}</script><link rel="stylesheet" href="/sign/radix.css"><link rel="stylesheet" href="/sign/theme.css"><link rel="stylesheet" href="/sign/brand.css"></head><body><div id="root"></div><script type="module" src="/sign/sign.bundle.js"></script></body></html>');
   const nm = p => { for (const b of [here + 'node_modules/', here + '../node_modules/']) try { readFileSync(b + p); return b + p; } catch {} throw new Error(p); };
   cpSync(nm('@radix-ui/themes/styles.css'), dist + '/sign/radix.css');
   cpSync(nm('@peerfolio/privy-near-connect/dist/sign-page-plugin/theme.css'), dist + '/sign/theme.css');
