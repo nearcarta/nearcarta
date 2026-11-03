@@ -10,6 +10,7 @@ import { DEP, cfg, has } from './config.js';
 import * as ferry from './ferry.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
+import { attested } from './outlayer.js';
 import * as mist from './mistbank.js';
 import * as mq from './mistqueue.js';
 import * as shops from './shops.js';
@@ -64,6 +65,7 @@ export const swr = (name, fn, { ttl = READ_TTL_MS, stale = READ_STALE_MS, now = 
 // One handler per public read route, shared by the routes and by /api/health?deep=1.
 const reads = Object.fromEntries(Object.entries({
   guardhouse: swr('guardhouse', () => guard.snapshot()),
+  attested: swr('attested', () => attested()),
   house: houseView,
   mistbank: swr('mistbank', () => mist.mistbank()),
   townhall: swr('townhall', () => shops.townhall(), { ttl: 10_000, stale: 15 * 60_000 }), // cold read 3.5-6 s seen live
@@ -265,6 +267,7 @@ export function makeApp() {
     cpCache.set(k, { at: Date.now(), v }); if (cpCache.size > 500) cpCache.delete(cpCache.keys().next().value);
     return c.json(v);
   });
+  app.get('/api/guardhouse/attested', limiter(30), async c => c.json(await reads.attested()));
   app.get('/api/guardhouse/denylist', limiter(30), c => c.json(cp.DENY));
   app.get('/api/guardhouse/action/:id', limiter(30), async c => {
     const id = c.req.param('id'); if (!/^\d{1,9}$/.test(id)) return bad(c, 'action id must be a number');

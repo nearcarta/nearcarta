@@ -469,7 +469,7 @@
       "near_tx": "Abr2cKQFLk115MWVoG3RMFxQP9ya7S1d76mggdUSafLr",
       "chain": "Arbitrum",
       "foreign_tx": "0xee42361cea2ff228cc1703e91188acc8b39c412bb2bf09335c72169be7139ed7",
-      "note": "Direct verify_foreign_transaction call: the testnet MPC verified a finalized Arbitrum Sepolia tx (block 323769632). Its payload hash 6e6b1eb1… is pinned in contracts/toll/src/tests.rs."
+      "note": "Direct verify_foreign_transaction call: the testnet MPC verified a finalized Arbitrum Sepolia tx (block 323769632). Its payload hash 6e6b1eb1\u2026 is pinned in contracts/toll/src/tests.rs."
     }
   },
   "townhall_r16": {
@@ -754,5 +754,40 @@
       "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
       "note": "R11 guardhouse charter; its capped agent key was revoked (AokHpHPwDJJA3DL2d6NTRVeemuEebh5RBCK5XWHUDnzC) and R11 code cannot hold a key with no allowance. History stays readable; proof_txs ran here."
     }
-  ]
+  ],
+  "outlayer": {
+    "contract": "outlayer.testnet",
+    "proxy": "check-mw06m9jp.r10own-19371.testnet",
+    "charter": "guardhouse-nzjp.nccharters-22195.testnet",
+    "clause_id": "tip2",
+    "checker": {
+      "url": "https://nearcarta.vercel.app/outlayer/charter_check.wasm",
+      "sha256": "17f860e5ef220e22adbd9b0bf2ea69500dc7eda74bb89177da530943838d21a5",
+      "bytes": 114416,
+      "target": "wasm32-wasip1",
+      "source": "outlayer/charter_check"
+    },
+    "attestation_api": "https://testnet-api.outlayer.ai/attestations/by-request/",
+    "proof": "judges/proofs/outlayer.json",
+    "runs": [
+      {
+        "label": "allowed",
+        "tx": "8y1pbAN412ws3tFsXWHs7QqCiNCntrV3476USnQJhfob",
+        "request_id": 6567,
+        "decision": "allow",
+        "attestation": "https://testnet-api.outlayer.ai/attestations/by-request/6567",
+        "charter_tx": "GHC6wGmkqDHwAg4m3jznmNhRfJYMJYpfmiRrC8xGcrJm",
+        "charter_decision": "allowed"
+      },
+      {
+        "label": "over_cap",
+        "tx": "9ShCpzDE6qWktXr5X3YRrsGCC9sJyBXK9ibjf879xLJu",
+        "request_id": 6568,
+        "decision": "deny",
+        "attestation": "https://testnet-api.outlayer.ai/attestations/by-request/6568",
+        "charter_tx": "3cHEbKKWQPTb8yYoxekzowwUHfJ2wNRzLKsTp1SiYdkz",
+        "charter_decision": "denied"
+      }
+    ]
+  }
 }
