@@ -77,6 +77,62 @@
    "ok": true,
    "as_expected": true,
    "gas_burnt_near": 0.00004
+  },
+  {
+   "step": "fund_toll",
+   "signer": "nearcarta.near",
+   "receiver": "toll.nearcarta.near",
+   "tx": "64HuNHJ8jKA4zBJyKNDdQkXasyvmgizbGT5wYBWVb2Fa",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.007114
+  },
+  {
+   "step": "toll_deploy_init_agentkey",
+   "signer": "toll.nearcarta.near",
+   "receiver": "toll.nearcarta.near",
+   "tx": "6KgwM4Q1VmLfvgK8vDBkWg92S65ZLcFsUb6NNXsAEWXc",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.002026
+  },
+  {
+   "step": "toll_sweep_surplus",
+   "signer": "toll.nearcarta.near",
+   "receiver": "nearcarta.near",
+   "tx": "DVFgzmAx2My6cki1q6wXyNsm2VHQ3HzZo1KZHKwQtqEd",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000044
+  },
+  {
+   "step": "owner_toll_pay_allowlisted",
+   "signer": "nearcarta.near",
+   "receiver": "toll.nearcarta.near",
+   "tx": "4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.001289,
+   "ret": "{\"to\":\"0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f\",\"value\":\"1000000000000\",\"nonce\":0,\"status\":\"signed\",\"unsigned_hash\":\"ec99e8608dc36a11c7126faf42af49a05bf9cce9d9fe95cdcbb5e6b56df34f12\",\"raw_signed\":\"0x02f87082210580830f42408405f5e100825208941cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f85e8d4a5100080c001a071d6a2f9eb85a422ce564591271ff13a408c3662b8a91dbc930a79c07b866e21a07b3985170057a3411d007fd71011a999"
+  },
+  {
+   "step": "owner_toll_pay_not_allowlisted",
+   "signer": "nearcarta.near",
+   "receiver": "toll.nearcarta.near",
+   "tx": "B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR",
+   "ok": false,
+   "as_expected": true,
+   "gas_burnt_near": 0.000163,
+   "error": "{\"ActionError\":{\"index\":0,\"kind\":{\"FunctionCallError\":{\"ExecutionError\":\"Smart contract panicked: REFUSED: recipient not in oath allowlist\"}}}}"
+  },
+  {
+   "step": "toll_delete_fak",
+   "signer": "toll.nearcarta.near",
+   "receiver": "toll.nearcarta.near",
+   "tx": "6C1rLPtYKpxQgX5ZYFYSyGsbQEify9AVQ23fdXKAskxY",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.00004
   }
  ],
  "charter": "charter.nearcarta.near",
@@ -89,7 +145,6 @@
   "bytes": 425406
  },
  "final": {
-  "charter_only": true,
   "charter": {
    "id": "charter.nearcarta.near",
    "code_hash": "6fZBa6MbEJeKNHBEB9D7atvXa9ZaVmoWfYu38bjcRni2",
@@ -129,8 +184,66 @@
     "storage_usage": "426432"
    }
   },
-  "root_balance_near": 2.217443,
-  "root_spent_near": 4.382556,
-  "gas_burnt_total_near": 0.012167000000000002
- }
+  "toll": {
+   "id": "toll.nearcarta.near",
+   "code_hash": "9RQw6e1PL81HSQ1x6dr6dyvv9yAMMBdqChRToyHuDwDP",
+   "storage_bytes": 253139,
+   "locked_near": 2.53139,
+   "balance_near": 2.549172,
+   "keys": [
+    {
+     "public_key": "ed25519:GB83bZDdsoWrpBC43LURP1QCGX558V1qgYXMEQdX4ENi",
+     "permission": {
+      "FunctionCall": {
+       "allowance": "250000000000000000000000",
+       "method_names": [
+        "pay",
+        "settle"
+       ],
+       "receiver_id": "toll.nearcarta.near"
+      }
+     }
+    }
+   ],
+   "policy": {
+    "owner": "nearcarta.near",
+    "mpc": "v1.signer",
+    "path": "base-1",
+    "chain_id": 8453,
+    "foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a",
+    "allow_to": [
+     "0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f"
+    ],
+    "max_per_tx": "10000000000000",
+    "budget": "30000000000000",
+    "spent": "1000000000000",
+    "max_fee_cap": "5000000000",
+    "next_nonce": 1,
+    "frozen": false,
+    "verify_chain": "Base",
+    "asset": "native",
+    "dao": null,
+    "gate": null
+   },
+   "tx0": {
+    "to": "0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f",
+    "value": "1000000000000",
+    "nonce": 0,
+    "status": "signed",
+    "unsigned_hash": "ec99e8608dc36a11c7126faf42af49a05bf9cce9d9fe95cdcbb5e6b56df34f12",
+    "raw_signed": "0x02f87082210580830f42408405f5e100825208941cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f85e8d4a5100080c001a071d6a2f9eb85a422ce564591271ff13a408c3662b8a91dbc930a79c07b866e21a07b3985170057a3411d007fd71011a9991f83eedc0c5321310589f8ea74ac95b5",
+    "tx_hash": "0x096571bc0c235605f5c26f2849ba61383dbaa3f8f59fb918999963c30b0d45be",
+    "proof_payload_hash": null
+   }
+  },
+  "root_balance_near": 9.707713,
+  "root_spent_near": -3.107713,
+  "gas_burnt_total_near": 0.022843
+ },
+ "toll_wasm": {
+  "file": "toll.v6p86.wasm",
+  "sha256": "7d1e7ee1a619987c00de5a42c881e006f52dda38ccd423d54540aa51d5e42686",
+  "bytes": 251969
+ },
+ "toll_foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a"
 }
