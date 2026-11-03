@@ -52,3 +52,18 @@ export function tally(p, repOf) {
 /** Motions are Sputnik "Vote" proposals; anyone may vote on them while they are in progress and inside the window. */
 export const votable = (p, periodNs, nowMs) => p.kind === 'Vote' && p.status === 'InProgress'
   && Number(BigInt(p.submission_time) + BigInt(periodNs)) / 1e6 > nowMs;
+
+/** Server-side check of the same limits over the chain history: replays each proposal in id order against the
+ * proposals filed before it (at its own submission time) and returns the ids filed past the proposer's limit.
+ * Sputnik itself cannot refuse them, so the server marks them and the town board does not count them. */
+export function overLimit(proposals = [], rewardList = []) {
+  const sorted = [...proposals].sort((a, b) => a.id - b.id), out = new Set();
+  sorted.forEach((p, i) => {
+    if (p.submission_time == null) return;
+    // Earlier proposals count with their current status (when one closed is not on chain); marked ones do not count.
+    const before = sorted.slice(0, i).filter(q => !out.has(q.id));
+    const g = canFile(p.proposer, before, rewardList, Number(BigInt(p.submission_time) / 10n ** 6n) + 1);
+    if (!g.ok) out.add(p.id);
+  });
+  return out;
+}

@@ -91,6 +91,9 @@ async function file(e) {
     const hist = await view(DAO, 'get_proposals', { from_index: Math.max(0, (await view(DAO, 'get_last_proposal_id')) - 100), limit: 100 });
     const gate = canFile(me, hist, rewardList, Date.now());
     if (!gate.ok) throw new Error(`Not filed: ${gate.reason} (you: ${gate.today} today, ${gate.open} open).`);
+    // The server runs the same check on chain history; over-limit proposals are marked over_limit in /api/townhall.
+    const srv = await fetch(`${API}/api/townhall/can-file/${encodeURIComponent(me)}`).then(r => r.ok ? r.json() : null).catch(() => null);
+    if (srv && !srv.ok) throw new Error(`Not filed: ${srv.reason} (server check: ${srv.today} today, ${srv.open} open).`);
     const clauses = await view(CHARTER, 'get_clauses');
     const kind = document.querySelector('input[name=kind]:checked').value;
     const args = proposalFor(kind, { me, desc: $('#desc').value, clause: clauses.reward });
