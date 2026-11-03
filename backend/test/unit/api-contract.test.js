@@ -1,0 +1,94 @@
+// Offline API contract: every route that takes user input refuses bad input before any RPC or paid call,
+// security headers are set, unknown routes 404 as JSON, and the deployments route serves shared/deployments.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { makeApp } from '../../src/app.js';
+
+const app = makeApp();
+const get = (p, h = {}) => app.request(p, { headers: { 'cf-connecting-ip': '192.0.2.' + Math.floor(Math.random() * 250), ...h } });
+const post = (p, body, h = {}) => app.request(p, { method: 'POST', body, headers: { 'content-type': 'application/json', 'cf-connecting-ip': '192.0.2.' + Math.floor(Math.random() * 250), ...h } });
+
+const badGets = [
+  ['/api/guardhouse/check/NOT..AN..ACCOUNT', 'bad account id'],
+  ['/api/guardhouse/check/' + 'a'.repeat(65), 'account id over 64 chars'],
+  ['/api/guardhouse/action/abc', 'non-numeric action id'],
+  ['/api/guardhouse/action/1234567890', 'action id over 9 digits'],
+  ['/api/charter/x.testnet/rules/BAD%20CLAUSE', 'clause id with a space'],
+  ['/api/tx/nothash?sender=a.testnet', 'malformed tx hash'],
+  ['/api/tx/11111111111111111111111111111111', 'tx hash without sender'],
+  ['/api/ai/tee?nonce=xyz', 'nonce not 64 hex'],
+];
+for (const [path, why] of badGets) {
+  test(`GET ${path.slice(0, 60)} is refused with 4xx (${why})`, async () => {
+    const r = await get(path);
+    assert.ok(r.status >= 400 && r.status < 500, `${path} -> ${r.status}`);
+    assert.ok((await r.json()).error);
+  });
+}
+
+for (const path of ['/api/mistbank/verify', '/api/mistbank/send/prepare', '/api/mistbank/send', '/api/ferry/quote']) {
+  test(`POST ${path} with a non-object body is refused`, async () => {
+    for (const body of ['[]', '"x"', 'not json']) {
+      const r = await post(path, body);
+      assert.ok(r.status >= 400 && r.status < 500, `${path} ${body} -> ${r.status}`);
+    }
+  });
+}
+
+test('the auditor opening is never accepted in a URL', async () => {
+  const r = await get('/api/mistbank/verify?amount=1&salt=' + '0'.repeat(32));
+  assert.equal(r.status, 405);
+});
+
+test('a body over 16 KiB is refused with 413', async () => {
+  const r = await post('/api/mistbank/verify', JSON.stringify({ amount: '1', salt: 'a'.repeat(20_000) }));
+  assert.equal(r.status, 413);
+});
+
+test('unknown API routes return JSON 404', async () => {
+  const r = await get('/api/does-not-exist');
+  assert.equal(r.status, 404);
+  assert.deepEqual(await r.json(), { error: 'not found' });
+});
+
+test('API responses carry strict security headers', async () => {
+  const r = await get('/api/deployments');
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-security-policy') || '', /default-src 'none'/);
+  assert.match(r.headers.get('strict-transport-security') || '', /max-age=31536000/);
+  assert.equal(r.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+});
+
+test('/api/deployments serves the committed testnet deployment file', async () => {
+  const dep = await (await get('/api/deployments')).json();
+  const file = JSON.parse(readFileSync(new URL('../../../shared/deployments/testnet.json', import.meta.url)));
+  assert.equal(dep.network, 'testnet');
+  assert.equal(dep.guardhouse.oath, file.guardhouse.oath);
+});
+
+test('/api/mainnet answers with the mainnet file or not_deployed, never an error', async () => {
+  const r = await get('/api/mainnet');
+  assert.equal(r.status, 200);
+  assert.equal(typeof await r.json(), 'object');
+});
+
+test('/api/whoami never echoes a client IP', async () => {
+  const r = await get('/api/whoami', { 'x-forwarded-for': '198.51.100.77', 'x-real-ip': '198.51.100.78' });
+  const s = await r.text();
+  assert.ok(!s.includes('198.51.100.77') && !s.includes('198.51.100.78'), s);
+});
+
+test('the billable completion route is off unless explicitly enabled', async () => {
+  const prev = process.env.AI_PROVE_ENABLED; delete process.env.AI_PROVE_ENABLED;
+  try {
+    const r = await post('/api/ai/prove', '{}');
+    assert.ok([403, 503].includes(r.status), String(r.status));
+  } finally { if (prev !== undefined) process.env.AI_PROVE_ENABLED = prev; }
+});
+
+test('CORS refuses an unknown origin', async () => {
+  const r = await app.request('/api/deployments', { method: 'OPTIONS', headers: { origin: 'https://evil.example', 'access-control-request-method': 'GET' } });
+  assert.notEqual(r.headers.get('access-control-allow-origin'), 'https://evil.example');
+});
