@@ -284,8 +284,8 @@ function hallRows() {
 }
 // Vault Arena rows, read live from /api/arena/prompts by shops/arenalive.js: past prompts with their decision and reveal txs.
 function arenaRows() {
-  if (extra.arenaP == null && !extra.arenaLoading) { extra.arenaLoading = true; import('../shops/arenalive.js').then(m => m.livePrompts(undefined, undefined, true)).then(h => { extra.arenaP = h; }).catch(() => { extra.arenaP = ''; }).finally(() => { extra.arenaLoading = false; if (cur === 'arena') proofDrawer(); }); }
-  return extra.arenaP ?? '<h3>Past prompts · live read</h3><p class="note">Reading the arena…</p>';
+  if (extra.arenaP == null && !extra.arenaLoading) { extra.arenaLoading = true; import('../shops/arenalive.js').then(m => { extra.arenaM = m; m.bindRedteam(() => { if (cur === 'arena') proofDrawer(); }); return m.livePrompts(undefined, undefined, true); }).then(h => { extra.arenaP = h; }).catch(() => { extra.arenaP = ''; }).finally(() => { extra.arenaLoading = false; if (cur === 'arena') proofDrawer(); }); }
+  return (extra.arenaM ? extra.arenaM.redteamBlock() : '') + (extra.arenaP ?? '<h3>Past prompts · live read</h3><p class="note">Reading the arena…</p>');
 }
 // Toll records, read live from /api/toll by shops/tollrecords.js: a record stuck in "signed" shows pending or expired.
 function tollRecordRows() {

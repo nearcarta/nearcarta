@@ -273,3 +273,4 @@ details.more[open] > summary .dt::after { content: ' ▴'; }
 /* JB9: 24px minimum tap targets for explorer links and small chips */
 a.tx, a.rc, button.rc, .pf a, .rcpt a { display: inline-flex; align-items: center; min-height: 24px; min-width: 24px; }
 .to-l { margin: 8px 0 0; }
+.pf pre.ev,#d-body pre.ev{font-size:11px;white-space:pre-wrap;word-break:break-all;background:rgba(0,0,0,.06);padding:8px;border-radius:6px;margin:6px 0}
