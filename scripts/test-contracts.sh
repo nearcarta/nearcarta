@@ -10,4 +10,6 @@ for c in arena toll townhall house_nft attested_check; do echo "== $c"; (cd "$c"
 [ "${SKIP_SANDBOX:-}" = 1 ] && { echo "SKIP_SANDBOX=1: oath and charter_factory not run"; exit 0; }
 if ! command -v pkg-config >/dev/null || ! pkg-config --exists openssl; then
   echo "oath and charter_factory NOT run: install pkg-config and the OpenSSL headers (see the top of scripts/test-contracts.sh)" >&2; exit 2; fi
+# the factory sandbox test deploys target/near/charter_factory.wasm, so build it first
+(cd charter_factory && cargo near build non-reproducible-wasm >/dev/null)
 for c in oath charter_factory; do echo "== $c"; (cd "$c" && cargo test -q); done

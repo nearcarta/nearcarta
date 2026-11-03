@@ -337,7 +337,7 @@ const Q=[{id:'bank',t:'Pay the rent',s:'120 USDC'},{id:'ferry',t:'Swap',s:'50 US
 const QS={}; function setQ(id,st,txt){ QS[id]=[st,txt]; drawQ(); }
 function drawQ(){ $('#queue').innerHTML=Q.map(q=>{ const [st,txt]=QS[q.id]||['wait','waiting']; return `<div class="qr">${i3(q.id,'d7-3d q3')}<div>${q.t}<small>${tokify(q.s)}</small></div><span class="s ${st}">${txt}</span></div>`; }).join(''); }
 function agentSt(txt,cls=''){ const e=$('#agentSt'); e.textContent=txt; e.className='pill '+cls; }
-let toastT=0; function toast(cls,title,body,k){ const e=$('#toast'); e.className='hud show '+cls; e.innerHTML=`<span class="ti"></span><div><div class="tt1">${title}</div>${tokify(body)}${k?`<div class="tk">${k}</div>`:''}</div>`; const ti=icon({ref:'refused',ok:'allowed',prv:'receipt',frz:'freeze'}[cls]||'allowed',{size:24}); e.firstChild.append(ti); requestAnimationFrame(()=>play(ti)); toastT=T+(STILL?1e9:5.5); }
+let toastT=0; function toast(cls,title,body,k){ const e=$('#toast'); e.className='hud show '+cls; const X=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); e.innerHTML=`<span class="ti"></span><div><div class="tt1">${X(title)}</div>${tokify(X(body))}${k?`<div class="tk">${X(k)}</div>`:''}</div>`; /* text is escaped first; only the token chips are markup */ const ti=icon({ref:'refused',ok:'allowed',prv:'receipt',frz:'freeze'}[cls]||'allowed',{size:24}); e.firstChild.append(ti); requestAnimationFrame(()=>play(ti)); toastT=T+(STILL?1e9:5.5); }
 
 // sound: D7 audio (howler, CC0 samples), see the sfx map above
 
