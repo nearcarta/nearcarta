@@ -1,0 +1,18 @@
+/* /sign in the Nearcarta look: same tokens as /setup. Loaded after radix.css and theme.css. */
+@font-face{font-family:Inter;src:url(/design/D9_world/assets/fonts/inter-latin-wght-normal.woff2) format('woff2');font-weight:100 900;font-display:swap}
+html,body{margin:0;min-height:100%;background:#17130f;color:#f3ead8;font:15px/1.55 Inter,system-ui,sans-serif}
+body{background:radial-gradient(900px 500px at 80% -10%,rgba(214,180,106,.22),transparent 60%),radial-gradient(700px 500px at -10% 110%,rgba(144,133,233,.14),transparent 60%),#17130f}
+.box{max-width:400px;margin:clamp(20px,8vh,72px) auto;padding:28px;display:flex;flex-direction:column;gap:12px;background:rgba(36,29,22,.78);border:1px solid rgba(243,234,216,.18);border-radius:22px;box-shadow:0 30px 80px #0008}
+.box h1{font:700 24px/1.15 'Inter Tight',Inter,sans-serif;margin:0;letter-spacing:-.01em}
+.box h1::before{content:"N";display:inline-grid;place-items:center;width:30px;height:30px;margin-right:10px;border-radius:9px;vertical-align:-5px;font-size:16px;color:#1f1a15;background:linear-gradient(145deg,#f3e3c0,#d6b46a 55%,#a9853f)}
+.box p{color:#cdbfa5;margin:0 0 6px}
+.box label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#cdbfa5}
+.box input{font:inherit;background:#0000002e;border:1px solid rgba(243,234,216,.18);color:#f3ead8;border-radius:12px;padding:12px 14px}
+.box button{font:600 15px Inter,sans-serif;padding:12px 16px;border-radius:12px;cursor:pointer;border:1px solid rgba(243,234,216,.18);background:#ffffff0a;color:#f3ead8}
+.box button:first-of-type{background:linear-gradient(180deg,#f3e3c0,#d6b46a);color:#1f1a15;border-color:#f3e3c0}
+.box button[data-testid=privy-google]{background:#fff;color:#1f1f1f;border-color:#fff}
+.box button:focus-visible,.box input:focus-visible{outline:2px solid #f0c987;outline-offset:2px}
+.err{color:#ff8a80}
+.pnc-root{--accent-9:#d6b46a;--accent-10:#e8c77f;--accent-contrast:#1f1a15;--color-background:#17130f;--color-panel-solid:#2a241d;--gray-12:#f3ead8;--gray-11:#cdbfa5;--default-font-family:Inter,system-ui,sans-serif;background:transparent!important}
+.pnc-card{background:rgba(36,29,22,.86)!important;border:1px solid rgba(243,234,216,.18)!important;border-radius:22px!important;box-shadow:0 30px 80px #0008!important;color:#f3ead8}
+.radix-themes{--accent-9:#d6b46a;--accent-10:#e8c77f;--accent-contrast:#1f1a15;--color-background:transparent}
