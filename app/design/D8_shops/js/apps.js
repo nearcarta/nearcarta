@@ -45,6 +45,8 @@ const PLAIN = [
 ];
 export function plainError(e) {
   const m = String(e?.message || e || '');
+  if (/http (429|502|503|504)|Failed to fetch|NetworkError|Load failed/i.test(m)) return 'the town is busy right now; try again in a moment';
+  if (/Cannot read prop|is not a function|is not defined|undefined|null/.test(m) && !/ERR_/.test(m)) return 'something did not load; try again in a moment';
   for (const [re, t] of PLAIN) if (re.test(m)) return t;
   const r = m.match(/\b(receiver_not_allowlisted|over_per_action_cap|over_daily_budget|over_daily_action_count|below_min_amount|outside_time_window|unknown_clause|frozen)\b/);
   if (r) return why(r[1]);
@@ -66,8 +68,22 @@ function keep(h, shop, decision, reason, x = {}) {
 }
 
 // ---------- boot + wallet ----------
-export async function init(onChange) {
-  for (let i = 0; ; i++) { try { CFG = await api('/api/vault/config'); break; } catch (e) { if (i >= 3) throw e; await new Promise(r => setTimeout(r, 2500 * (i + 1))); } } rpc = W.rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])]);
+// Config: retry with backoff (429/503 from a busy room), keep the last good copy, never fail on a busy API.
+const LS_CFG = 'nearcarta.d8.config';
+async function loadConfig() {
+  let saved = null; try { saved = JSON.parse(localStorage.getItem(LS_CFG) || 'null'); } catch {}
+  for (let i = 0; i < 6; i++) {
+    try { const c = await api('/api/vault/config'); try { localStorage.setItem(LS_CFG, JSON.stringify(c)); } catch {} return c; }
+    catch (e) { if (saved && i >= 1) return saved; await new Promise(r => setTimeout(r, Math.min(8000, 800 * 2 ** i) + Math.random() * 400)); }
+  }
+  if (saved) return saved; throw new Error('the town is busy right now; try again in a moment');
+}
+let booting = null;
+let onCh = () => {};
+const ready = () => conn ? Promise.resolve() : init(onCh).then(() => {});
+export function init(onChange) { onCh = onChange || onCh; return booting || (booting = boot0(onChange).catch(e => { booting = null; throw e; })); }
+async function boot0(onChange) {
+  CFG = await loadConfig(); rpc = W.rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])]);
   ({ connector: conn } = W.makeConnector(rpc));
   const tell = () => dispatchEvent(new CustomEvent('nearcarta:wallet')); // the town HUD has its own connector: let it redraw
   conn.on('wallet:signIn', () => refresh().then(onChange).then(tell)); conn.on('wallet:signOut', () => { S.charter = null; refresh().then(onChange).then(tell); });
@@ -86,6 +102,7 @@ export async function refresh() {
 export async function readRules() {
   const [cl, st] = await Promise.all([view(S.charter, 'get_clauses'), view(S.charter, 'get_state')]);
   S.clauses = cl || {}; S.state = st;
+  S.pending = st?.pending_changes ? await view(S.charter, 'get_pending').catch(() => ({})) : {};
   S.usage = {}; for (const id of Object.keys(S.clauses)) S.usage[id] = await view(S.charter, 'get_usage', { clause_id: id }).catch(() => null);
   // Judge A10: a key saved as pending before signing is promoted once the chain shows it (redirect wallets, closed tabs)
   const pk = S.charter && localStorage.getItem(LS_AGENT(S.charter) + '.pending');
@@ -93,10 +110,23 @@ export async function readRules() {
   const k = agent(); S.agentLive = !!(k && st?.agent_key === k.publicKey);
   return S;
 }
-export const connect = async () => { await conn.connect(); await refresh(); };
-export const connectGuest = async () => { await conn.connect({ walletId: 'nearcarta-guest' }); await refresh(); };
+export const connect = async () => { await ready(); await conn.connect(); await refresh(); };
+export const connectGuest = async () => { await ready(); await conn.connect({ walletId: 'nearcarta-guest' }); await refresh(); };
 export const merchants = () => CFG?.arena?.merchants || [];
-export const stage = () => !S.me ? 'connect' : !S.charter ? 'build' : !(pay() && S.agentLive) ? 'rules' : 'ready';
+// Any existing charter is a charter: a queued change is a status, never a reason to send the visitor back to the rules.
+const pend = () => Object.entries(S.pending || {}).map(([id, p]) => ({ id, eta: Number(BigInt(p.eta) / 1_000_000n), kind: Object.keys(p.change || {})[0], body: Object.values(p.change || {})[0] || {} }));
+export const pendingKey = () => { const pk = S.charter && localStorage.getItem(LS_AGENT(S.charter) + '.pending'); if (!pk) return null; const pub = W.keyFrom(pk).publicKey; return pend().find(c => c.kind === 'SetAgentKey' && c.body.public_key === pub) || null; };
+export const pendingNote = () => { const l = pend(); if (!l.length) return ''; const t = Math.min(...l.map(c => c.eta)); return `${l.length} change${l.length > 1 ? 's' : ''} queued · from ${new Date(t).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`; };
+export const stage = () => !S.me ? 'connect' : !S.charter ? 'build' : !pay() ? (pend().some(c => c.kind === 'SetClause' && c.body.clause_id === 'pay') ? 'wait' : 'rules') : S.agentLive ? 'ready' : 'key';
+/** A helper key for this browser: queued behind the charter's delay (it only adds a propose-only key). Or turn on a queued one whose time came. */
+export async function helperKey() {
+  const q = pendingKey();
+  if (q && Date.now() >= q.eta) { const h = await sign(S.charter, [fc('execute_change', { change_id: q.id }, 120)]); keep(h, 'house', 'signed', 'execute_change'); await readRules(); return { tx: h, live: S.agentLive }; }
+  if (q) return { live: false, eta: q.eta };
+  const secret = W.keyFrom().secretKey; localStorage.setItem(LS_AGENT(S.charter) + '.pending', secret);
+  const h = await sign(S.charter, [fc('set_agent_key', { public_key: W.keyFrom(secret).publicKey, allowance: null }, 60)]);
+  keep(h, 'house', 'signed', 'set_agent_key'); await readRules(); return { tx: h, live: S.agentLive, eta: pendingKey()?.eta };
+}
 async function sign(receiverId, actions) { const w = await conn.wallet(); const r = await w.signAndSendTransaction({ receiverId, actions }); return W.txHashOf(r); }
 const fc = (methodName, args, tg = 40, deposit = '0') => ({ type: 'FunctionCall', params: { methodName, args, gas: (BigInt(tg) * TG).toString(), deposit } });
 
@@ -136,10 +166,9 @@ export async function signRules(r) {
     else if (S.clauses[rt.id]) acts.push(fc('remove_clause', { clause_id: rt.id }, 20));
   }
   let secret = null;
-  if (!S.agentLive) { secret = W.keyFrom().secretKey; acts.push(fc('set_agent_key', { public_key: W.keyFrom(secret).publicKey, allowance: (YN / 2n).toString() }, 60)); }
+  if (!S.agentLive && !pendingKey()) { secret = W.keyFrom().secretKey; acts.push(fc('set_agent_key', { public_key: W.keyFrom(secret).publicKey, allowance: (YN / 2n).toString() }, 60)); }
   if (secret) localStorage.setItem(LS_AGENT(S.charter) + '.pending', secret);
   const h = await sign(S.charter, acts);
-  if (secret) { localStorage.setItem(LS_AGENT(S.charter), secret); localStorage.removeItem(LS_AGENT(S.charter) + '.pending'); }
   keep(h, 'rules', 'signed', 'set_clause'); await readRules(); return { tx: h, queued: S.state?.pending_changes || 0 };
 }
 
