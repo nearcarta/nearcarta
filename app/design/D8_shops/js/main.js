@@ -26,8 +26,9 @@ async function boot() {
   resize(); addEventListener('resize', resize); addEventListener('pointerdown', onPointer);
   await buildTown(town); robot.quiet = true;
   makeLabels(); ui();
-  const start = P.get('shop'); if (start && LOADERS[start]) await enter(start, { instant: true }); 
+  // cold open on ?shop=: drop the spinner now and let the shop panel show its own skeleton while the API wakes
   $('#load').remove(); document.body.classList.add('ready');
+  const start = P.get('shop'); if (start && LOADERS[start]) await enter(start, { instant: true });
   window.__ready = true;
   if (!CAPTURE) { let last = performance.now(); const loop = now => { const dt = Math.min(.05, (now - last) / 1000); last = now; frame(dt); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
 }
