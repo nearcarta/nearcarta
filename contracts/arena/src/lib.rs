@@ -99,7 +99,7 @@ impl Contract {
     #[init]
     pub fn new(owner: AccountId) -> Self {
         let meta = NFTContractMetadata {
-            spec: NFT_METADATA_SPEC.to_string(), name: "Vault Arena Guardians (testnet)".into(),
+            spec: NFT_METADATA_SPEC.to_string(), name: if env::current_account_id().as_str().ends_with(".testnet") { "Vault Arena Guardians (testnet)".into() } else { "Vault Arena Guardians".into() },
             symbol: "GUARD".into(), icon: None, base_uri: None, reference: None, reference_hash: None,
         };
         Self {
@@ -126,6 +126,15 @@ impl Contract {
             spent: U128(0), reserved: U128(0), in_flight: 0, refusals: 0, allows: 0, holder_epoch: 0 });
         self.emit_oath(&token_id, "oath_set");
         t
+    }
+
+    /// Teardown: the owner (1 yocto, so a full-access key signs) deletes this account; every yocto, the
+    /// dev-funded pots and the storage stake, goes back to the owner. Players never deposit into a pot.
+    #[payable]
+    pub fn close(&mut self) -> Promise {
+        assert_one_yocto();
+        require!(env::predecessor_account_id() == self.owner, "ERR_OWNER_ONLY");
+        Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
 
     /// Anyone may add NEAR to a Guardian's pot (dev-funded on testnet; no player money is ever taken).
