@@ -110,6 +110,7 @@ const arenaPromptsSwr = swr('arena_prompts', () => arenaPrompts(), { ttl: 30_000
 export function warm({ every = WARM_EVERY_MS, read } = {}) {
   let tick = 0;
   const once = () => Promise.allSettled([
+    shops.refreshHealth(), vault.refreshRunnerStatus(),
     shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
     ...(read ? [] : [reads.guardhouse(), reads.mistbank(), reads.townhall(), ...(tick++ % 5 === 0 ? [arenaPromptsSwr()] : [])]),
   ]);
@@ -135,8 +136,8 @@ export function makeApp() {
 
   // ?deep=1 runs every read route's handler (not the AI or quote routes, which spend credits) and reports
   // each one's status and time, plus the RPC retry/fallback/stale counters.
-  app.get('/api/health', limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: await shops.health(),
-    features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: await vault.runnerStatus() }));
+  app.get('/api/health', limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: c.req.query('deep') ? await shops.health() : shops.healthCached(),
+    features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: c.req.query('deep') ? await vault.runnerStatus() : vault.runnerStatusCached() }));
   // Shows the caller how Render keys their own request, with no address in the answer: which header decides
   // the client key, a short keyed tag of that key (the same client gets the same tag until the process
   // restarts, so two visitors can see they are in different limit buckets), how many hops each IP header

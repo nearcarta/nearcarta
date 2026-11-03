@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { cfg } from '../../src/config.js';
 import { _resetRpcCache } from '../../src/near.js';
 import { makeApp } from '../../src/app.js';
+import * as shops from '../../src/shops.js';
 
 const real = globalThis.fetch;
 const saved = { ...cfg };
@@ -46,9 +47,11 @@ test('reputation: RPC overload (429 everywhere) is a 503 with Retry-After, not a
 
 test('health: RPC 429 on status still answers 200 (Render health check must not restart the box)', async () => {
   mock(() => new Response('slow down', { status: 429 }));
-  const r = await makeApp().request('/api/health');
+  const r = await makeApp().request('/api/health?deep=1');
   assert.equal(r.status, 200);
   const j = await r.json(); assert.equal(j.ok, true); assert.match(j.near.error, /429/);
+  await shops.refreshHealth();
+  const k = await (await makeApp().request('/api/health')).json(); assert.equal(k.ok, true); assert.match(k.near.error, /429/);
 });
 
 test('rules: valid_until mirrors the on-chain clause expiry (ns) with an ISO copy', async () => {

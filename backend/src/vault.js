@@ -194,6 +194,10 @@ function reserve(n) {
 }
 
 /** Runner status for /api/health: limits plus the arena key's remaining gas allowance on chain. */
+let lastRunner = null;
+/** Cached runner status for /api/health (no RPC on the request path); refreshed by the warm loop. */
+export const runnerStatusCached = () => lastRunner ?? (V ? { enabled: !!agentSecret(), charter: V.arena.charter, ...runnerLimits(), warming: true } : { enabled: false });
+export async function refreshRunnerStatus() { lastRunner = await runnerStatus(); }
 export async function runnerStatus() {
   if (!V) return { enabled: false };
   const secret = agentSecret();

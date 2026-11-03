@@ -245,7 +245,16 @@ export async function explainAny(hash, sender) {
 
 // Render's health check hits /api/health, so an RPC 429 here must not fail it (that restarted the container
 // in a loop). Serve the last good status marked stale, or an error field, and keep answering 200.
-let lastStatus = null;
+let lastStatus = null, lastError = null;
+// /api/health answers from this cache (no RPC on the request path); the warm loop refreshes it.
+export function healthCached() {
+  if (lastStatus) return lastError ? { ...lastStatus, stale: true, error: lastError } : lastStatus;
+  return { chain_id: null, height: null, ...(lastError ? { error: lastError } : { warming: true }) };
+}
+export async function refreshHealth() {
+  try { await rpc('status', []).then(s => (lastStatus = { chain_id: s.chain_id, height: s.sync_info.latest_block_height, time: s.sync_info.latest_block_time })); lastError = null; }
+  catch (e) { lastError = String(e.message).slice(0, 120); }
+}
 export async function health() {
   try {
     // A slow RPC after idle must not make the health check slow: answer the last good status after 1.5 s
