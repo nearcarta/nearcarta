@@ -2,6 +2,7 @@
 // The guest wallet is a fresh testnet account from the public faucet. Its key is made in this
 // browser and stays in this browser's localStorage; the backend never sees it. Testnet only.
 import { NearConnector } from '@hot-labs/near-connect';
+import { addPrivy, NEAR_NET } from '../../house/privy.js';
 import { decoratePicker } from './picker.js';
 import { keyFrom, functionCall, signTx, outcomeOf } from '../../../shared/vault/tx.js';
 
@@ -68,8 +69,9 @@ async function createGuest(rpc) {
 export function makeConnector(rpc) {
   const guest = guestWallet(rpc); decoratePicker();
   window.addEventListener('near-selector-ready', () => window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: guest })));
-  const connector = new NearConnector({ network: 'testnet', footerBranding: null, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
+  const connector = new NearConnector({ network: NEAR_NET, footerBranding: null, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
   window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: guest }));
+  addPrivy(connector).catch(() => {});
   return { connector, GUEST_ID };
 }
 

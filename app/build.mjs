@@ -1,6 +1,7 @@
 // Builds app/dist. "/" is the town (design/D9_world, its 2D fallback included); each shop door opens the
 // shop interiors (design/D8_shops). The plain console moved to /console.html; /judges.html stays.
 import { cpSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { walletDefine, PRIVY_ID, PRIVY_CLIENT } from './build-defines.mjs';
 const here = new URL('.', import.meta.url).pathname;
 const dist = here + 'dist';
 rmSync(dist, { recursive: true, force: true }); mkdirSync(dist);
@@ -23,14 +24,25 @@ cpSync(here + '../backend/src/ferry-guard.js', dist + '/live/ferry-guard.js');
 cpSync(here + '../shared/townhall/reputation.js', dist + '/live/townhall-reputation.js');
 // Your House: NEAR Wallet Selector bundled into one ES module (the only part of the console that asks a wallet to sign).
 await (await import('esbuild')).build({ entryPoints: [here + 'house/house.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
-  outfile: dist + '/house.bundle.js', define: { 'process.env.NODE_ENV': '"production"', __WC_ID__: JSON.stringify(process.env.VITE_WC_PROJECT_ID || '') }, external: ['/wc.bundle.js'], logLevel: 'warning' });
+  outfile: dist + '/house.bundle.js', define: { 'process.env.NODE_ENV': '"production"', __WC_ID__: JSON.stringify(process.env.VITE_WC_PROJECT_ID || ''), ...walletDefine }, external: ['/wc.bundle.js'], logLevel: 'warning' });
 // WalletConnect client, fetched only when someone picks a WalletConnect wallet. The project id is a public client id.
 await (await import('esbuild')).build({ entryPoints: [here + 'house/wc.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
   outfile: dist + '/wc.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' }, logLevel: 'warning' });
 // Shop apps (design/D8_shops/js/apps.js): the site wallet layer and signer, bundled from source so they never drift.
 await (await import('esbuild')).build({ entryPoints: [here + 'design/D8_shops/js/wallet/entry.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
-  outfile: shops + '/js/wallet.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' }, logLevel: 'warning' });
+  outfile: shops + '/js/wallet.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis', ...walletDefine }, logLevel: 'warning' });
 rmSync(shops + '/js/wallet', { recursive: true, force: true });
+// /sign: the Privy login and signing window (React, its own bundle, built when the Privy app id is set; the client id is optional).
+if (PRIVY_ID) {
+  mkdirSync(dist + '/sign');
+  await (await import('esbuild')).build({ entryPoints: [here + 'house/sign.jsx'], bundle: true, format: 'esm', minify: true, target: 'es2022', jsx: 'automatic',
+    outfile: dist + '/sign/sign.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis', __PRIVY_APP_ID__: JSON.stringify(PRIVY_ID), __PRIVY_CLIENT_ID__: JSON.stringify(PRIVY_CLIENT) }, logLevel: 'warning' });
+  writeFileSync(dist + '/sign/index.html', '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nearcarta sign in</title>'
+    + '<link rel="stylesheet" href="/sign/radix.css"><link rel="stylesheet" href="/sign/theme.css"><style>.box{max-width:360px;margin:40px auto;font:15px/1.4 system-ui;display:flex;flex-direction:column;gap:10px;padding:0 16px}.box h1{font-size:20px;margin:0}.box label{display:flex;flex-direction:column;gap:4px}.box input{font:inherit;padding:8px}.box button{font:inherit;padding:9px;cursor:pointer}.err{color:#b00020}</style></head><body><div id="root"></div><script type="module" src="/sign/sign.bundle.js"></script></body></html>');
+  const nm = p => { for (const b of [here + 'node_modules/', here + '../node_modules/']) try { readFileSync(b + p); return b + p; } catch {} throw new Error(p); };
+  cpSync(nm('@radix-ui/themes/styles.css'), dist + '/sign/radix.css');
+  cpSync(nm('@peerfolio/privy-near-connect/dist/sign-page-plugin/theme.css'), dist + '/sign/theme.css');
+}
 // Shop modules (charter office + Vault Arena): app/shops, see app/shops/INTEGRATION.md
 await (await import('./shops/build.mjs')).buildShops(dist, await import('esbuild'));
 // On Vercel the API is same origin (/api is proxied to Render in vercel.json), so no CORS and one origin in the CSP story.
