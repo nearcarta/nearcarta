@@ -150,6 +150,9 @@ export async function listCharters(from = 0, limit = 50, factory = V?.factory) {
 function agentSecret() { return (process.env.ARENA_AGENT_KEY || '').trim() || null; }
 /** Shared demo charters (same clause, same agent key): the original one first, then the pool. */
 export const sharedCharters = () => V ? [V.arena.charter, ...(V.arena.pool || [])] : [];
+// Retired shared arena charters (R16 shared, R17 pool, legacy): no live agent key, kept so their history still shows.
+export const historyCharters = () => V ? [...new Set([...(V.arena_history ? [V.arena_history.charter, ...(V.arena_history.pool || [])] : []),
+  ...(V.legacy || []).map(l => l.arena?.charter)].filter(c => c && !sharedCharters().includes(c)))] : [];
 /**
  * The shared charter with the most room left today on its 'pay' clause (payments left, then budget left).
  * Every candidate carries the identical clause, so refusals do not change; only an exhausted day stops being

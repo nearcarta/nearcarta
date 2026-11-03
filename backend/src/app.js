@@ -109,17 +109,26 @@ export const WARM_EVERY_MS = 60_000;
 const arenaPromptsSwr = swr('arena_prompts', () => arenaPrompts(), { ttl: 30_000, stale: 60 * 60_000 });
 // Public ledger: a cold read is the guardhouse + arena chronicles + toll + gate (4.8 s seen live), so it is served
 // stale-while-revalidate (fresh 15 s, stale up to 30 min) and kept warm on alternate warm ticks (the free instance has 0.1 CPU, so the two heavy reads never share a tick).
-async function ledgerRead() {
+// Live feeds: the guardhouse oath and the shared arena pool. History feeds: the retired guardhouse (R11) and arena
+// charters (R16/R17), which no longer have an agent key, so the deploy-time snapshot is used first and RPC only without one.
+export const ledgerAccounts = () => ({ live: [DEP.guardhouse.oath, ...vault.sharedCharters()],
+  history: [...(DEP.guardhouse_history || []).map(h => h.oath), ...vault.historyCharters()] });
+export async function ledgerRead() {
     const soft = (p, ms = 9000) => Promise.race([p.catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
-    const arena = vault.config()?.arena?.charter;
-    const [chron, arenaChron, toll] = await Promise.all([soft(shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX)),
-      arena ? soft(shops.chronicle(arena, shops.FEED_MAX)) : null, soft(shops.toll())]);
+    const { live, history } = ledgerAccounts();
+    const [feedsLive, feedsOld, toll] = await Promise.all([Promise.all(live.map(a => soft(shops.chronicle(a, shops.FEED_MAX)))),
+      Promise.all(history.map(a => shops.feedSnapshot(a) || soft(shops.chronicle(a, shops.FEED_MAX)))), soft(shops.toll())]);
     const gate = await soft(tollgate.gate(), 6000);
-    const feeds = [chron ? shops.hideRetired(chron) : { busy: true }, ...(arena ? [arenaChron || { busy: true }] : [])];
-    const merged = { busy: feeds.some(f => f.busy), stale: feeds.some(f => f.stale), txs: feeds.flatMap(f => f.txs || []) };
-    return (buildLedger({ chronicle: merged, toll, gate, budget: agentMod.budgetStatus() }));
+    const feeds = [...feedsLive.map((f, i) => f ? (i === 0 ? shops.hideRetired(f) : f) : { busy: true }), ...feedsOld.filter(Boolean)];
+    const seen = new Set(), txs = feeds.flatMap(f => f.txs || []).filter(t => !seen.has(t.hash) && seen.add(t.hash));
+    const merged = { busy: feeds.some(f => f.busy), stale: feeds.some(f => f.stale), txs };
+    return { ...buildLedger({ chronicle: merged, toll, gate, budget: agentMod.budgetStatus() }), charters: { live, history } };
 }
 const ledgerSwr = swr('ledger', ledgerRead, { ttl: 15_000, stale: 30 * 60_000 });
+// First call after a restart: the ledger computed at deploy time (backend/data/feed-snapshots.json) is served at once,
+// marked with its snapshot time, while the first live read runs in the background.
+export const seedSwr = (name, v, at = Date.now()) => { if (v != null && !swrs.get(name)?.v) swrs.set(name, { v, at }); };
+{ const snap = shops.ledgerSnapshot(); if (snap) seedSwr('ledger', { ...snap.ledger, stale: true, snapshot_at: snap.at }, Date.now() - 15_001); }
 
 export function warm({ every = WARM_EVERY_MS, read } = {}) {
   let tick = 0;
@@ -290,6 +299,11 @@ export function makeApp() {
   });
   app.get('/api/mistbank/street/:txid', limiter(10), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
   app.get('/api/townhall', limiter(20), async c => c.json(await reads.townhall()));
+  app.get('/api/townhall/can-file/:account', limiter(20), async c => {
+    const a = c.req.param('account');
+    if (!/^[a-z0-9._-]{2,64}$/.test(a)) return bad(c, 'not a NEAR account id');
+    return c.json(await shops.townhallCanFile(a));
+  });
   app.get('/api/arena', limiter(20), async c => c.json(await reads.arena()));
   app.get('/api/arena/prompts', limiter(20), async c => c.json(await arenaPromptsSwr()));
   app.get('/api/arena/attempts', limiter(20), async c => c.json(await shops.arenaAttempts(c.req.query('from'), c.req.query('limit'))));

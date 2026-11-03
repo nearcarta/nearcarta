@@ -16,7 +16,7 @@ export function _reset() { gate.until = 0; gate.strikes = 0; gate.high = 0; for 
  * POST one index request. `prio` 'high' retries through cooldowns until `deadlineMs`; 'low' tries at most
  * `tries` times and never while a high request is waiting. Throws `tx index busy` (retryable) or `tx index http N`.
  */
-export async function indexPost(path, body, { prio = 'low', deadlineMs = prio === 'high' ? 6_000 : 20_000, tries = prio === 'high' ? 6 : 3, f = fetch, now = Date.now, baseMs = 1000 } = {}) {
+export async function indexPost(path, body, { prio = 'low', deadlineMs = prio === 'high' ? Number(process.env.TX_INDEX_HIGH_DEADLINE_MS || 6_000) : 20_000, tries = prio === 'high' ? 6 : 3, f = fetch, now = Date.now, baseMs = 1000 } = {}) {
   const end = now() + deadlineMs;
   let last = 'cooldown';
   if (prio === 'high') gate.high++;

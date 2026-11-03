@@ -6,6 +6,7 @@ import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, r
 import { snapshot } from './guardhouse.js';
 import { indexPost } from './txindex.js';
 import { proposalState } from '../../shared/townhall/expiry.js';
+import { canFile, overLimit } from '../../shared/townhall/reputation.js';
 import { signedState } from '../../shared/stale.js';
 
 const yocto = s => (s == null ? null : Number(BigInt(s) * 10000n / 10n ** 24n) / 1e4);
@@ -17,6 +18,7 @@ export async function townhall() {
   const [snap, policy, lastId] = await Promise.all([snapshot(T.charter), view(T.dao, 'get_policy'), view(T.dao, 'get_last_proposal_id')]);
   const proposals = await view(T.dao, 'get_proposals', { from_index: Math.max(0, lastId - 24), limit: 24 }).catch(() => []);
   const reward = snap.clauses?.[T.clause || 'reward'] || null;
+  const over = overLimit(proposals, reward?.receivers || []);
   return {
     dao: T.dao, oath: T.charter, charter: T.charter, factory: T.factory, agent_key: snap.state.agent_key, keys: snap.keys,
     // oathState keeps the field names the console reads (version, frozen, policy.deny).
@@ -27,11 +29,19 @@ export async function townhall() {
     bounties: [],
     council: policy.roles.filter(r => r.kind?.Group).map(r => ({ role: r.name, members: r.kind.Group })),
     // status is Expired once the vote window closed (Sputnik keeps InProgress until act_proposal); chain_status is raw.
-    proposals: proposals.map(p => townhallProposal(p, policy.proposal_period)),
+    proposals: proposals.map(p => ({ ...townhallProposal(p, policy.proposal_period), over_limit: over.has(p.id) })),
     proposal_period_h: Number(BigInt(policy.proposal_period) / 10n ** 9n) / 3600,
     lastProposalId: lastId, proof_txs: T.proof_txs,
     r16: await townhallR16(),
   };
+}
+
+/** May `account` file a Town Hall proposal now? Same tier limits as the hall page, read from the DAO's last 100 proposals. */
+export async function townhallCanFile(account) {
+  const T = DEP.townhall;
+  const [lastId, clauses] = await Promise.all([view(T.dao, 'get_last_proposal_id'), view(T.charter, 'get_clauses')]);
+  const hist = await view(T.dao, 'get_proposals', { from_index: Math.max(0, lastId - 100), limit: 100 });
+  return { account, ...canFile(account, hist, clauses?.[T.clause || 'reward']?.receivers || [], Date.now()) };
 }
 
 export function townhallProposal(p, periodNs, nowMs = Date.now()) {
@@ -189,6 +199,7 @@ export function feedSnapshot(account, file = new URL('../data/feed-snapshots.jso
   return v && Array.isArray(v.txs) ? { ...v, snapshot_at: SNAPS.at } : null;
 }
 export const _setSnapshots = v => { SNAPS = v; };
+export function ledgerSnapshot() { feedSnapshot(''); return SNAPS?.ledger ? { ledger: SNAPS.ledger, at: SNAPS.at } : null; }
 // Re-read each listed tx from RPC in parallel (bounded), keeping the index order.
 async function inParallel(items, conc, fn) {
   const out = new Array(items.length); let i = 0;
