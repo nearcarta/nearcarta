@@ -56,5 +56,5 @@ test('the proposals page and the Town Hall room use the expiry, and the Mist Ban
   const ui = readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8');
   assert.ok(ui.includes(line));
   // the app drawer (which replaces the room proof) lists the live proposals in the Town Hall
-  assert.match(ui, /if \(cur === 'hall'\) g \+= hallRows\(\);/); assert.match(ui, /m\.liveProposals\(undefined, undefined, true\)/);
+  assert.match(ui, /hall: \['Latest proposals', hallRows\]/); assert.match(ui, /lazyList\('hallP', '\.\.\/shops\/hall\.js', 'liveProposals', 'hall'\)/);
 });
