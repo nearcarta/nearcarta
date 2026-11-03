@@ -3,7 +3,7 @@
 import { keyFrom, signTx, rpcClient, viewFn } from '../../shared/vault/tx.js';
 import { guestWallet, hasGuest } from '../shops/vault/wallet.js';
 import { factoriesOf, deedsOn } from './factories.js';
-import { rpc as RPC, rpc_fallbacks as RPC_FB, vault, townhall, arena } from '../../shared/deployments/testnet.json'; // named: guardhouse test accounts stay out of the bundle
+import { rpc as RPC, rpc_fallbacks as RPC_FB, vault, townhall, arena, house_deed } from '../../shared/deployments/testnet.json'; // named: guardhouse test accounts stay out of the bundle
 const DEP = { rpc: RPC, vault, townhall, arena };
 
 // fastnear first; 408/429/5xx or a network error rotates to the backups.
@@ -55,3 +55,14 @@ export async function deeds(id) { return deedsOn(FACTORIES, (f, m, a) => viewFn(
 /** NEP-171 Guardian NFTs this account holds on the arena contract. */
 export async function nfts(id) { try { return await viewFn(rpc, ARENA, 'nft_tokens_for_owner', { account_id: id, limit: 20 }); } catch { return []; } }
 export async function nftSupply() { try { return await viewFn(rpc, ARENA, 'nft_total_supply', {}); } catch { return null; } }
+
+/** House deed v2 (NEP-171): the deed is the house. Deeds this account holds now, each with its purse and cap. */
+export const DEED = house_deed?.contract;
+export async function deedHouses(id) {
+  if (!DEED) return [];
+  try {
+    const held = await viewFn(rpc, DEED, 'nft_tokens_for_owner', { account_id: id, limit: 10 });
+    return await Promise.all(held.map(async t => ({ ...t, purse: await viewFn(rpc, DEED, 'house_purse', { token_id: t.token_id }) })));
+  } catch { return []; }
+}
+export async function deedMinted(id) { try { return !!(await viewFn(rpc, DEED, 'nft_token', { token_id: id })); } catch { return false; } }

@@ -7,7 +7,7 @@ import { decoratePicker } from '../shops/vault/picker.js';
 // Lazy: NEAR Connect only awaits this when a WalletConnect wallet is used, so the client loads on demand.
 const WC_ID = __WC_ID__;
 let wcP; const walletConnect = WC_ID ? { then: (ok, no) => (wcP ||= import('/wc.bundle.js').then(m => m.init(WC_ID))).then(ok, no) } : undefined;
-import { injectGuest, GUEST_ID, balance, fmt, faucet, deeds, nfts, nftSupply, ARENA } from './onboard.js';
+import { injectGuest, GUEST_ID, balance, fmt, faucet, deeds, nfts, nftSupply, ARENA, DEED, deedHouses, deedMinted } from './onboard.js';
 import { factoryOfCharter } from './factories.js';
 
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
@@ -165,18 +165,50 @@ async function render() {
     ${pend.length ? `<table><tr><th>#</th><th>rule</th><th>to</th><th>amount</th><th></th></tr>${pend.map(([id, a]) => `<tr data-action="${esc(id)}"><td>${esc(id)}</td><td>${esc(a.p?.clause_id ?? a.clause_id)}</td><td title="${esc(a.p?.receiver ?? a.receiver)}">${esc(short(a.p?.receiver ?? a.receiver))}</td><td>${near(a.p?.amount ?? a.amount)}</td>
       <td>${btn('approve', 'Approve', `data-id="${esc(id)}"`)} ${btn('deny', 'Deny', `data-id="${esc(id)}"`)}</td></tr>`).join('')}</table>` : '<p class="note" data-testid="house-none">Nothing waiting.</p>'}</div>
   <div id="house-log" class="card" aria-live="polite"></div>`;
-  for (const b of out.querySelectorAll('button[data-act]')) b.onclick = () => act(b).catch(e => log(`<span class="fail" data-testid="house-error">${esc(e.message)}</span>`));
+  for (const b of out.querySelectorAll('button[data-act]')) b.onclick = () => act(b).catch(e => log(`<span class="fail" data-testid="house-error">${esc(e.message)}</span>${e.html || ''}`));
 }
 
-// The deed (factory registry entry) and NEP-171 Guardian NFTs for the signed-in account.
+// The house deed (NEP-171 v2: the deed holds the house purse), the charter registry entry and Guardian NFTs.
 async function deedCard(who) {
   if (!who) return '<span class="note">Sign in (or Start free) to build a house of your own.</span>';
-  const [d, t, n] = await Promise.all([deeds(who), nfts(who), nftSupply()]);
+  const [d, t, n, held, minted] = await Promise.all([deeds(who), nfts(who), nftSupply(), deedHouses(who), deedMinted(who)]);
   const acc = a => `<a href="https://testnet.nearblocks.io/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
-  return (d.length ? `deed${d.length > 1 ? 's' : ''}: ${d.map(acc).join(', ')} <span class="note">(registered in the charter factory ${esc([...new Set(d.map(factoryOfCharter))].join(', '))})</span>`
-      : `no house yet. <a class="pill go" href="/shops/vault/" data-testid="house-build">Build my house</a> <span class="note">One approval: the factory creates your charter account and writes your deed.</span>`)
-    + `<br>Guardian NFTs (NEP-171 on ${acc(ARENA)}): you hold <b data-testid="house-nfts">${t.length}</b>${t.length ? ' · ' + t.map(x => esc(x.metadata?.title || x.token_id)).join(', ') : ''}${n ? ` of ${esc(n)} minted` : ''}.`
-    + '<br><span class="note">The house deed is the factory registry entry today, not a NEP-171 token.</span>';
+  const houses = held.map(h => `<div class="deed" data-testid="deed-house" data-token="${esc(h.token_id)}">
+      <b>${esc(h.metadata?.title || h.token_id)}</b> · purse <b data-testid="deed-purse">${near(h.purse?.balance)}</b> · rule: at most <b>${near(h.purse?.cap)}</b> per payment · paid ${near(h.purse?.paid)} in ${esc(h.purse?.pays ?? 0)}
+      <br><label>Pay to <input data-f="to" placeholder="account.testnet" maxlength="64" aria-label="Pay to account"></label>
+      <label>NEAR <input data-f="amt" type="number" min="0.001" step="0.001" value="0.01" aria-label="Amount in NEAR"></label>
+      <button data-act="deed-pay" data-token="${esc(h.token_id)}" data-testid="deed-pay">Pay from the house</button>
+      <button data-act="deed-fund" data-token="${esc(h.token_id)}" data-testid="deed-fund">Add 0.05 NEAR</button>
+      <br><label>Give the house to <input data-f="give" placeholder="account.testnet" maxlength="64" aria-label="Give the deed to account"></label>
+      <button data-act="deed-give" data-token="${esc(h.token_id)}" data-testid="deed-give">Give deed</button>
+      <span class="note">Whoever holds this deed controls the purse. Give it away and your wallet is refused from then on.</span></div>`).join('');
+  return `<div data-testid="deed-v2">House deed (NEP-171 on ${acc(DEED)}): ${held.length ? houses
+      : minted ? '<span class="note">you gave your deed away, so its purse is no longer yours.</span>'
+      : `none yet. <button data-act="deed-mint" data-testid="deed-mint">Mint my deed with 0.1 NEAR in its purse</button> <span class="note">One approval. 0.02 NEAR pays storage; the rest is the house purse, spendable only by the deed holder, 0.05 NEAR per payment at most.</span>`}</div>`
+    + (d.length ? `Charter${d.length > 1 ? 's' : ''}: ${d.map(acc).join(', ')} <span class="note">(registered in the charter factory ${esc([...new Set(d.map(factoryOfCharter))].join(', '))})</span>`
+      : `No charter yet. <a class="pill go" href="/shops/vault/" data-testid="house-build">Build my house</a> <span class="note">One approval: the factory creates your charter account.</span>`)
+    + `<br>Guardian NFTs (NEP-171 on ${acc(ARENA)}): you hold <b data-testid="house-nfts">${t.length}</b>${t.length ? ' · ' + t.map(x => esc(x.metadata?.title || x.token_id)).join(', ') : ''}${n ? ` of ${esc(n)} minted` : ''}.`;
+}
+
+const ACC = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
+const yocto = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
+async function deedCall(methodName, args, deposit) {
+  const w = await wallet().wallet();
+  const res = await w.signAndSendTransaction({ receiverId: DEED, actions: [{ type: 'FunctionCall', params: { methodName, args, gas: GAS, deposit } }] });
+  const hash = res?.transaction?.hash || res?.transaction_outcome?.id || (Array.isArray(res) ? res[0]?.transaction?.hash : null);
+  const fail = res?.status?.Failure || res?.receipts_outcome?.find(o => o.outcome?.status?.Failure)?.outcome.status.Failure;
+  if (fail) { const m = JSON.stringify(fail).match(/Smart contract panicked: ([^"\\]+)/); const e = new Error('refused on chain: ' + (m ? m[1] : 'failed')); e.hash = hash; throw e; }
+  return hash;
+}
+async function deedAct(b) {
+  const a = b.dataset.act, box = b.closest('.deed'), f = k => box?.querySelector(`[data-f="${k}"]`)?.value.trim();
+  if (a === 'deed-mint') return deedCall('mint_deed', { house: null, cap: yocto(0.05) }, yocto(0.12));
+  if (a === 'deed-fund') return deedCall('house_fund', { token_id: b.dataset.token }, yocto(0.05));
+  if (a === 'deed-pay') { const to = f('to'), amt = Number(f('amt')); if (!ACC.test(to || '')) throw new Error('enter the account to pay'); if (!(amt > 0)) throw new Error('enter an amount');
+    return deedCall('house_pay', { token_id: b.dataset.token, receiver_id: to, amount: yocto(amt) }, '1'); }
+  if (a === 'deed-give') { const to = f('give'); if (!ACC.test(to || '')) throw new Error('enter the account to give the deed to');
+    if (!confirm(`Give this house and its purse to ${to}? You cannot take it back.`)) throw new Error('cancelled');
+    return deedCall('nft_transfer', { receiver_id: to, token_id: b.dataset.token }, '1'); }
 }
 
 function log(html) { const l = $('#house-log'); if (l) l.innerHTML = html + (l.innerHTML ? '<br>' + l.innerHTML : ''); }
@@ -194,6 +226,11 @@ async function act(b) {
   if (a === 'signout') { await disconnect(); return render(); }
   if (a === 'guest') { await startGuest(t => t && log(esc(t))); return render(); }
   b.disabled = true; log(`${esc(a)}: waiting for your wallet…`);
+  if (a.startsWith('deed-')) {
+    try { const h = await deedAct(b); log(`<span data-testid="deed-done" data-act="${esc(a)}">${esc(a.slice(5))} done on chain: ${h ? txl(h) : '(no hash returned)'}</span>`); }
+    catch (e) { b.disabled = false; throw Object.assign(new Error(e.message), { html: e.hash ? ' ' + txl(e.hash) : '' }); }
+    await new Promise(r => setTimeout(r, 2500)); return render();
+  }
   const hash = a === 'freeze' ? await call('freeze', {}) : a === 'unfreeze' ? await call('unfreeze', {})
     : await call('resolve_escalation', { action_id: b.dataset.id, approve: a === 'approve' });
   log(`<span data-testid="house-done" data-act="${esc(a)}">${esc(a)} signed by your wallet: ${hash ? txl(hash) : '(no hash returned)'}</span>`);
