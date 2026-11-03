@@ -8,7 +8,7 @@ repository = "https://github.com/nearcarta/nearcarta"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-near-sdk = "5.29"
+near-sdk = "=5.27.0"
 
 [profile.release]
 codegen-units = 1
@@ -17,3 +17,4 @@ lto = true
 debug = false
 panic = "abort"
 overflow-checks = true
+
