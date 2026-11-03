@@ -103,5 +103,6 @@ else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpr
   script('vendor/gsap/gsap.min.js').then(()=>import(q.has('t')?'./js/test_main.js':q.has('dev')?'./js/main.js':'./dist/main.js')).catch(e=>{ console.error('[Nearcarta] 3D failed to load',e); go2d('3D failed to load'); });
   if(!force) setTimeout(()=>{ if(!document.body.classList.contains('ready')&&!document.body.classList.contains('fb')){ window.__3dStop='slow start'; go2d('3D did not start within 25 s'); } },25000); }
 </script>
+<script type="module" src="../D8_shops/js/townplain.js"></script>
 </body>
 </html>
