@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 
 for (const [w, h] of [[1280, 800], [390, 844]]) {
   test.describe(`charter office #create at ${w}`, () => {
-    // The first visit can land on a cold API (free plan); one retry keeps a cold start from failing the suite.
+    // The first visit can land on a cold API (right after a deploy); one retry keeps a cold start from failing the suite.
     test.describe.configure({ retries: 1 });
     test.use({ viewport: { width: w, height: h }, isMobile: w < 500, hasTouch: w < 500 });
 

@@ -373,7 +373,7 @@ function paint() {
   const app = APPS[cur]; if (!app) return; const st = A.S.ready ? A.stage() : 'load';
   wallet(); ruleChip(); label(app.label); proofDrawer();
   if (phase === 'busy') return;
-  if (st === 'load') { say(`${esc(app.idle || '')} <span class="note" data-testid="cold-note">Waking the town server (can take up to 30 s on a cold start). You can connect your wallet as soon as it answers.</span>`); form('<div class="skel" data-testid="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>'); hero(null); btn('Connect wallet', 'primary', true); return; }
+  if (st === 'load') { say(`${esc(app.idle || '')} <span class="note" data-testid="cold-note">Loading the shop from the town server. You can connect your wallet as soon as it answers.</span>`); form('<div class="skel" data-testid="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>'); hero(null); btn('Connect wallet', 'primary', true); return; }
   if (st === 'connect') { say('Connect to begin.'); form(''); hero(null); btn('Connect wallet'); return; }
   if (st === 'build') { say('First I need a charter you own.'); form(''); hero(null); btn('Build my charter'); return; }
   if (st === 'rules') { say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return; }

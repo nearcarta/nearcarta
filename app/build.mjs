@@ -40,8 +40,8 @@ writeFileSync(dist + '/config.js', `window.NEARCARTA_API=${JSON.stringify(api)};
 const addHead = (file, html) => writeFileSync(file, readFileSync(file, 'utf8').replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + html));
 addHead(shops + '/index.html', '<script src="/config.js"></script>');
 // "/" opens straight into the town. <base> keeps every relative path of the delivered page working.
-// Old console links (/#ferry …) still land on the console. The free API host sleeps when idle, so the
-// town wakes it on load; by the time a shop door opens, its live reads are quick.
+// Old console links (/#ferry …) still land on the console. The town pings the API on load
+// so its caches are fresh by the time a shop door opens.
 const world = readFileSync(here + 'design/D9_world/index.html', 'utf8');
 const tabs = ['ferry', 'guardhouse', 'townhall', 'arena', 'toll', 'chronicle', 'house'];
 writeFileSync(dist + '/index.html', world.replace('<meta charset="utf-8">', `<meta charset="utf-8">

@@ -110,7 +110,7 @@ export const WARM_EVERY_MS = Number(process.env.WARM_EVERY_MS) || 60_000;
 // so serve them stale-while-revalidate (stale up to 1 h) and keep them warm every 2nd warm tick.
 const arenaPromptsSwr = swr('arena_prompts', () => arenaPrompts(), { ttl: 30_000, stale: 60 * 60_000 });
 // Public ledger: a cold read is the guardhouse + arena chronicles + toll + gate (4.8 s seen live), so it is served
-// stale-while-revalidate (fresh 15 s, stale up to 30 min) and kept warm on alternate warm ticks (the free instance has 0.1 CPU, so the two heavy reads never share a tick).
+// stale-while-revalidate (fresh 15 s, stale up to 30 min) and kept warm on alternate warm ticks (the two heavy reads never share a tick).
 // Live feeds: the guardhouse oath and the shared arena pool. History feeds: the retired guardhouse (R11) and arena
 // charters (R16/R17), which no longer have an agent key, so the deploy-time snapshot is used first and RPC only without one.
 export const ledgerAccounts = () => ({ live: [DEP.guardhouse.oath, ...vault.sharedCharters()],
@@ -132,9 +132,8 @@ const ledgerSwr = swr('ledger', ledgerRead, { ttl: 15_000, stale: 30 * 60_000 })
 export const seedSwr = (name, v, at = Date.now()) => { if (v != null && !swrs.get(name)?.v) swrs.set(name, { v, at }); };
 { const snap = shops.ledgerSnapshot(); if (snap) seedSwr('ledger', { ...snap.ledger, stale: true, snapshot_at: snap.at }, Date.now() - 15_001); }
 
-export const WARM_DELAY_MS = Number(process.env.WARM_DELAY_MS ?? 45_000);
-// The free instance has 0.1 CPU: reads run one at a time, and the first tick waits WARM_DELAY_MS after boot so the
-// health check is answered while the process starts (a parallel boot warm starved it and Render restarted the process).
+export const WARM_DELAY_MS = Number(process.env.WARM_DELAY_MS ?? 3_000);
+// Reads run one at a time; the first tick waits WARM_DELAY_MS after boot so the health check is answered first.
 export function warm({ every = WARM_EVERY_MS, read, delay = read ? 0 : WARM_DELAY_MS } = {}) {
   let tick = 0, stopped = false, t = null;
   const jobs = () => [() => shops.refreshHealth(), () => vault.refreshRunnerStatus(),
