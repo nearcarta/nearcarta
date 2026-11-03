@@ -295,6 +295,17 @@ export async function askPlan(text, charter = null, { viewF = view, nowMs = Date
     fallback_why: a.fallback_why || null, verification: a.verification || null, tee: a.tee || null, cost: a.cost || null };
 }
 
+/** The oath "action" event a propose tx logged (non-phantom), or null. */
+export async function askEvent(rpcCall, tx, sender) {
+  for (let i = 0; i < 3; i++) {
+    const t = await rpcCall('tx', { tx_hash: tx, sender_account_id: sender, wait_until: 'FINAL' }).catch(() => null);
+    const ev = t && eventsFromOutcome(t).events.find(e => e.standard === 'oath' && e.event === 'action');
+    if (ev) return { standard: ev.standard, version: ev.version, event: ev.event, data: ev.data, executor: ev.executor };
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  return null;
+}
+
 /** "Ask the agent to pay" on the SHARED arena charter: one server-signed `propose`, decided on chain. */
 export async function sharedAsk(text, { run = runAsk, nickname = 'guest', propose = agent.propose, viewF = view } = {}) {
   if (!V) throw bad('vault not deployed', 503);
@@ -316,7 +327,9 @@ export async function sharedAsk(text, { run = runAsk, nickname = 'guest', propos
       const r = await run({ charter: await pickShared((a, m, x) => viewFn(rpcCall, a, m, x)), key: keyFrom(secret), receiver: q.receiver, amount: q.amount, memo: q.memo,
         rpcCall, viewF: (a, m, x) => viewFn(rpcCall, a, m, x), send: sendPropose });
       used = r.tx ? 1 : 0;
-      const out = { ...r, note: q.note, ...brain, url: r.tx ? explorerTx(r.tx) : null, server_signed: true };
+      // The charter's own NEP-297 event for this propose, read back from the chain (the red-team view shows it as is).
+      const event = r.tx ? await askEvent(rpcCall, r.tx, r.charter).catch(() => null) : null;
+      const out = { ...r, note: q.note, ...brain, url: r.tx ? explorerTx(r.tx) : null, server_signed: true, event };
       return { ...out, receipt: buildReceipt(out, (clauses || {})[r.clause_id]) };
     } catch (e) { used = (e.status && e.status < 500) ? 0 : 1; throw e; }
     finally { release(used); }
