@@ -1,0 +1,20 @@
+{
+ "wasm": "contracts/artifacts/reaper.p86.wasm",
+ "sha256": "afe81ba2a0f07af4de3b849aac4f62db9e22d777ef445077a215209eea0ac199",
+ "bytes": 24864,
+ "account": "linkcheck.nearcarta.near",
+ "create_deploy": {
+  "tx": "6mdu5icACvP7F5zRE38Dfe7GyqBKtYfYZzehUMhQC2RR",
+  "ok": true
+ },
+ "view": {
+  "method": "owner",
+  "link_error": false,
+  "result": "\"wasm execution failed with error: WasmTrap(Unreachable)\""
+ },
+ "delete": {
+  "tx": "GpNHE4Dq3kfNd6AmfNhgD6nVqi4Q1cEVoG2P1ztYQ5S",
+  "ok": false,
+  "error": "{\"ActionError\":{\"index\":0,\"kind\":{\"AccountDoesNotExist\":{\"account_id\":\"linkcheck.nearcarta.near\"}}}}"
+ }
+}

@@ -1,0 +1,59 @@
+{
+ "network": "testnet",
+ "root": "nearcarta-core.testnet",
+ "charter": "charter.nearcarta-core.testnet",
+ "toll": "toll.nearcarta-core.testnet",
+ "steps": [
+  {
+   "step": "toll_close",
+   "tx": "LMJvj5vEB58vvKf7PWghfgVF2oEyVR1WZH4NLExfn9d",
+   "ok": true,
+   "gas_burnt_near": 0.000232
+  },
+  {
+   "step": "charter_queue_upgrade_reaper",
+   "tx": "8sfps1qobGXNtzn6ZHmRQG1mx8G8Hu4BtSZr5EX2ZysR",
+   "ok": true,
+   "gas_burnt_near": 0.000218,
+   "ret": "{\"queued\":\"0\",\"eta\":\"1793744171305745674\"}"
+  },
+  {
+   "step": "charter_execute_change",
+   "tx": "HD78vGcyTKee9zxp3JW7PSrEnHCauTbkt28eFCyU6DSU",
+   "ok": true,
+   "gas_burnt_near": 0.000225,
+   "ret": "{\"applied\":true,\"policy_version\":2}"
+  },
+  {
+   "step": "charter_upgrade_to_reaper",
+   "tx": "MxZGx3JszieANt6v8EQTAjv3u5A1Nf2DkKH2YdF4kXV",
+   "ok": true,
+   "gas_burnt_near": 0.000661
+  },
+  {
+   "step": "charter_reap",
+   "tx": "HZcQ4gLm6xyQnyEdYBBTMAxgUATQuEYTARhLoERELbfJ",
+   "ok": true,
+   "gas_burnt_near": 0.00019
+  }
+ ],
+ "root_before_near": 0.73202,
+ "before": {
+  "charter_near": 4.359682,
+  "toll_near": 2.549354
+ },
+ "reaper_sha256": "afe81ba2a0f07af4de3b849aac4f62db9e22d777ef445077a215209eea0ac199",
+ "timelock_wait_s": 92,
+ "reaper_owner_view": "nearcarta-core.testnet",
+ "after": {
+  "charter": {
+   "gone": "{\"name\":\"HANDLER_ERROR\",\"cause\":{\"info\":{\"block_hash\":\"353ArZEBoJSPGrVdXXQR66HM6cAQFEw1P4BQDpZZvs7o\",\"block_height\":2761"
+  },
+  "toll": {
+   "gone": "{\"name\":\"HANDLER_ERROR\",\"cause\":{\"info\":{\"block_hash\":\"353ArZEBoJSPGrVdXXQR66HM6cAQFEw1P4BQDpZZvs7o\",\"block_height\":2761"
+  },
+  "root_after_near": 7.639529
+ },
+ "root_gain_near": 6.907508,
+ "recovered_vs_contract_balances_near": 6.909036
+}
