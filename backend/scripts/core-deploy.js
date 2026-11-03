@@ -11,7 +11,7 @@
 //   4 toll self-batch: deploy toll.v6 + new(owner = root, mpc, derived address) + agent FC key (pay, settle)
 //   5 tests: agent propose allowed + over-cap; agent toll pay (MPC sign) allowlisted
 //   6 lock:  each contract account deletes its own full-access key (recovery stays with root, see TEARDOWN)
-// Usage: NET=testnet|mainnet ROOT_KEY=<json> AGENT_OUT=<json 0600> OUT=<json> [FUND_CHARTER=4.2] [FUND_TOLL=2.4] [KEEP_CHARTER=0.1] [KEEP_TOLL=0.02] [STORAGE_RESERVE=0.02] [TOLL_PAY_BY=root|agent] node backend/scripts/core-deploy.js
+// Usage: NET=testnet|mainnet ROOT_KEY=<json> AGENT_OUT=<json 0600> OUT=<json> [FUND_CHARTER=4.2] [FUND_TOLL=2.4] [KEEP_CHARTER=0.1] [KEEP_TOLL=0.02] [STORAGE_RESERVE=0.02] [TOLL_PAY_BY=root|agent] [AGENT_ALLOWANCE=0.25 finite gas allowance per agent key] node backend/scripts/core-deploy.js
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import crypto from 'node:crypto';
@@ -108,7 +108,7 @@ await sweep('charter_sweep_surplus', charter, C, Number(E.KEEP_CHARTER || 0.1));
 // 3 clause + agent key (from root, the owner)
 const clause = { asset: 'Native', receivers: [ROOT], per_action_cap: N(0.002).toString(), daily_budget: N(0.005).toString(), window_start_min: 0, window_end_min: 0, requires_receipt: false, escalation_max: null, min_amount: N(0.001).toString(), max_actions_per_day: 3, min_receiver_age_days: 0, code_hash_pins: {} };
 await send('set_clause_pay', root, C, [A.functionCall('set_clause', { clause_id: 'pay', clause }, TG(100), 0n)]);
-await send('set_agent_key', root, C, [A.functionCall('set_agent_key', { public_key: agent.public_key, allowance: null }, TG(100), 0n)]);
+await send('set_agent_key', root, C, [A.functionCall('set_agent_key', { public_key: agent.public_key, allowance: N(Number(E.AGENT_ALLOWANCE || 0.25)).toString() }, TG(100), 0n)]);
 // 4 toll
 await fund('fund_toll', tk, Number(E.FUND_TOLL || 2.4));
 const tw = art('toll.v6.wasm'); S.toll_wasm = { file: 'toll.v6.wasm', sha256: sha(tw), bytes: tw.length };
@@ -121,7 +121,7 @@ const init = { owner: ROOT, mpc: MPC, path: PATH_, chain_id: N_.chain_id, foreig
   fx_root_key: Buffer.from(base58.decode(rootPk.replace('secp256k1:', ''))).toString('hex'),
   allow_to: [RECIPIENT], max_per_tx: '10000000000000', budget: '30000000000000', max_fee_cap: '5000000000', verify_chain: 'Base' };
 await send('toll_deploy_init_agentkey', toll, T, [A.deployContract(tw), A.functionCall('new', init, TG(100), 0n),
-  A.addFunctionCallAccessKey(agentPk, T, ['pay', 'settle'], null)]);
+  A.addFunctionCallAccessKey(agentPk, T, ['pay', 'settle'], N(Number(E.AGENT_ALLOWANCE || 0.25)))]);
 await sweep('toll_sweep_surplus', toll, T, Number(E.KEEP_TOLL || 0.02));
 // 5 tests with the agent keys
 const agC = new Account(C, provider, KeyPairSigner.fromSecretKey(agent.private_key));
