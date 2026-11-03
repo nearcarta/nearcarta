@@ -105,14 +105,28 @@ const str = (v, max = 200) => typeof v === 'string' && v.length > 0 && v.length 
 // deploy or a quiet spell is not the one who waits on the tx index and RPC. Errors are ignored (the routes retry).
 export const WARM_EVERY_MS = 60_000;
 // Vault Arena past prompts: a cold read is ~50 RPC views (8 s seen live), and the Arena room shows them,
-// so serve them stale-while-revalidate and keep them warm every 5th warm tick (50 views per 5 min).
-const arenaPromptsSwr = swr('arena_prompts', () => arenaPrompts(), { ttl: 30_000, stale: 15 * 60_000 });
+// so serve them stale-while-revalidate (stale up to 1 h) and keep them warm every 2nd warm tick.
+const arenaPromptsSwr = swr('arena_prompts', () => arenaPrompts(), { ttl: 30_000, stale: 60 * 60_000 });
+// Public ledger: a cold read is the guardhouse + arena chronicles + toll + gate (4.8 s seen live), so it is served
+// stale-while-revalidate (fresh 15 s, stale up to 30 min) and kept warm on every warm tick.
+async function ledgerRead() {
+    const soft = (p, ms = 9000) => Promise.race([p.catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
+    const arena = vault.config()?.arena?.charter;
+    const [chron, arenaChron, toll] = await Promise.all([soft(shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX)),
+      arena ? soft(shops.chronicle(arena, shops.FEED_MAX)) : null, soft(shops.toll())]);
+    const gate = await soft(tollgate.gate(), 6000);
+    const feeds = [chron ? shops.hideRetired(chron) : { busy: true }, ...(arena ? [arenaChron || { busy: true }] : [])];
+    const merged = { busy: feeds.some(f => f.busy), stale: feeds.some(f => f.stale), txs: feeds.flatMap(f => f.txs || []) };
+    return (buildLedger({ chronicle: merged, toll, gate, budget: agentMod.budgetStatus() }));
+}
+const ledgerSwr = swr('ledger', ledgerRead, { ttl: 15_000, stale: 30 * 60_000 });
+
 export function warm({ every = WARM_EVERY_MS, read } = {}) {
   let tick = 0;
   const once = () => Promise.allSettled([
     shops.refreshHealth(), vault.refreshRunnerStatus(),
     shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
-    ...(read ? [] : [reads.guardhouse(), reads.mistbank(), reads.townhall(), ...(tick++ % 5 === 0 ? [arenaPromptsSwr()] : [])]),
+    ...(read ? [] : [reads.guardhouse(), reads.mistbank(), reads.townhall(), ledgerSwr(), ...(tick++ % 2 === 0 ? [arenaPromptsSwr()] : [])]),
   ]);
   const first = once();
   const t = every ? setInterval(once, every) : null; t?.unref?.();
@@ -295,16 +309,7 @@ export function makeApp() {
   app.post('/api/toll/gate/:nonce/settle', limiter(10), tg(c => tollgate.settleOne(c.req.param('nonce'))));
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
-  app.get('/api/ledger', limiter(20), async c => {
-    const soft = (p, ms = 9000) => Promise.race([p.catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
-    const arena = vault.config()?.arena?.charter;
-    const [chron, arenaChron, toll] = await Promise.all([soft(shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX)),
-      arena ? soft(shops.chronicle(arena, shops.FEED_MAX)) : null, soft(shops.toll())]);
-    const gate = await soft(tollgate.gate(), 6000);
-    const feeds = [chron ? shops.hideRetired(chron) : { busy: true }, ...(arena ? [arenaChron || { busy: true }] : [])];
-    const merged = { busy: feeds.some(f => f.busy), stale: feeds.some(f => f.stale), txs: feeds.flatMap(f => f.txs || []) };
-    return c.json(buildLedger({ chronicle: merged, toll, gate, budget: agentMod.budgetStatus() }));
-  });
+  app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
   app.get('/api/chronicle', limiter(20), async c => {
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
     try { return c.json(shops.hideRetired(await shops.chronicle(DEP.guardhouse.oath, limit))); }
