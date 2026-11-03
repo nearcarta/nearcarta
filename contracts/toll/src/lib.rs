@@ -11,6 +11,7 @@
 //! own action `action_id` paid the toll fee in NEAR to the gate's payee with the gate's memo and settled.
 //! v5: the gate holds a fixed list of charter factories (set once at init, no setter): a charter qualifies when
 //! its parent account is on the list and that factory's is_charter says yes.
+//! v6: `close()` lets the owner delete the account and take back all its NEAR (storage stake included).
 //! Each charter action opens the gate once. The EVM payout is fixed by the gate (recipient, value, fees),
 //! so a visitor can not choose where the oath's coins go; the oath's own caps and budget still apply.
 mod rlp;
@@ -176,6 +177,16 @@ impl Oath {
         self.frozen = false;
     }
     pub fn set_nonce(&mut self, nonce: u64) { self.assert_owner(); self.next_nonce = nonce; }
+    /// v6: teardown. The owner (1 yocto, so a full-access key must sign) deletes this account and every
+    /// yocto on it, including the storage stake, goes back to the owner. The account holds no full-access
+    /// key, so this is the only way its locked NEAR comes back.
+    #[payable]
+    pub fn close(&mut self) -> Promise {
+        near_sdk::assert_one_yocto();
+        self.assert_owner();
+        log!("close: deleting {} to {}", env::current_account_id(), self.owner);
+        Promise::new(env::current_account_id()).delete_account(self.owner.clone())
+    }
 
     pub fn policy(&self) -> Value {
         json!({"owner": self.owner, "mpc": self.mpc, "path": self.path, "chain_id": self.chain_id,

@@ -421,3 +421,24 @@ fn policy_shows_the_factory_list() {
     let o = gated();
     assert_eq!(o.policy()["gate"]["factories"], json!(["factory.test", "old-factory.test"]));
 }
+
+#[test]
+fn close_is_owner_only_and_needs_one_yocto() {
+    let mut o = toll();
+    let mut b = ctx("owner.test"); b.attached_deposit(NearToken::from_yoctonear(1)); testing_env!(b.build());
+    let _ = o.close();
+}
+#[test]
+#[should_panic(expected = "only owner")]
+fn close_by_stranger_panics() {
+    let mut o = toll();
+    let mut b = ctx("evil.test"); b.attached_deposit(NearToken::from_yoctonear(1)); testing_env!(b.build());
+    let _ = o.close();
+}
+#[test]
+#[should_panic]
+fn close_without_yocto_panics() {
+    let mut o = toll();
+    set("owner.test");
+    let _ = o.close();
+}
