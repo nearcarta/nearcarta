@@ -197,7 +197,7 @@ body:not(.in-shop) #wallet { display: none; }
 .feed.checks li, .feed.tee li { grid-template-columns: 56px 1fr auto; }
 .tee-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ok); letter-spacing: .04em; text-transform: uppercase; }
 .tee-badge.no { color: var(--no); }
-.tee-btn { background: none; border: 0; padding: 4px 0; cursor: pointer; color: var(--accent); font: 600 12px Inter, system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; }
+.tee-btn { background: none; border: 0; padding: 4px 0; min-height: 24px; cursor: pointer; color: var(--accent); font: 600 12px Inter, system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; }
 .tee-btn:disabled { color: var(--muted); cursor: progress; }
 
 .rc.tx { text-decoration: underline dotted; text-underline-offset: 3px; }

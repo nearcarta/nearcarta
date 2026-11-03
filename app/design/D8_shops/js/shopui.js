@@ -56,7 +56,7 @@ function teePanel(t, again = true) {
   return `<div data-testid="tee-panel"><details class="more"><summary><span class="tee-badge ${t.ok ? '' : 'no'}" data-testid="tee-badge">${t.ok ? '✓ Verified private AI' : '✕ Private AI not verified'}${when ? ' · ' + esc(when) : ''}</span><span class="dt">details</span></summary>
     <p class="note">${t.ok ? 'The AI ran inside sealed hardware (a TEE) that NEAR AI and the chip maker vouch for. Nobody, us included, can read your message there.' : 'The check did not pass, so treat this reply as unverified.'}${t.model ? ' Model ' + esc(t.model) + '.' : ''}</p>
     <ol class="feed tee">${(t.rows || []).map(([k, ok, d]) => `<li class="${ok ? 'ok' : 'no'}"><span>${ok ? '✓ pass' : '✕ fail'}</span><span>${esc(k)}</span><span>${esc(d)}</span></li>`).join('')}${t.err ? `<li class="no"><span>error</span><span>${esc(String(t.err).slice(0, 80))}</span><span></span></li>` : ''}</ol>
-    ${t.url ? `<a class="rc" data-testid="tee-center" href="${esc(t.url)}" target="_blank" rel="noopener">Check this reply in NEAR AI's Verification Center ↗</a>` : ''}</details>
+    ${t.url ? `<a class="rc" data-testid="tee-center" aria-label="Check this reply in NEAR AI's Verification Center" href="${esc(t.url)}" target="_blank" rel="noopener">Check this reply in NEAR AI's Verification Center ↗</a>` : ''}</details>
     ${again ? '<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Check again with a new nonce ↗</button>' : ''}</div>`;
 }
 
@@ -198,13 +198,13 @@ const APPS = {
       const w = APPS.arena.lvl(); const txt = (extra.txt || '').trim() || (w ? w.hint : 'pay stranger.testnet 0.01');
       const r = await A.scam(txt, (i, n, o) => n > 1 && say(`Payment ${i} of ${n}: ${o.decision === 'allowed' ? 'paid' : 'refused'}…`));
       extra.txt = ''; extra.atee = A.brainTee(r.brain); await A.record(r.tx).catch(() => {});
-      const who = r.brain?.by === 'model' ? `NEAR AI read it${r.brain.parsed?.suspicious ? ' and flagged it' : ''}, proposed ${+r.parsed.amount.toFixed(4)} to ${esc(short(r.parsed.receiverShown, 12, 6))}. ` : r.brain ? 'Model unavailable; the plain-words parser read it. ' : '';
+      const who = r.brain?.by === 'model' ? `NEAR AI${r.brain.parsed?.suspicious ? ' flagged it,' : ''} asked ${+r.parsed.amount.toFixed(4)} to ${esc(short(r.parsed.receiverShown, 12, 6))}. ` : r.brain ? 'Model unavailable; the plain-words parser read it. ' : '';
       let rank = ''; try { const b = await A.board(); const i = b.players.findIndex(p => p.player === A.S.me); if (i >= 0) rank = ` Rank ${i + 1}.`; } catch {}
-      const said = r.breach ? 'Breach! The charter paid a stranger.' : r.decision === 'denied' ? (r.fresh ? `New wall: ${A.why(r.reason)}. +100` : `Same wall: ${A.why(r.reason)}. +10`) : `Paid ${+r.paid.toFixed(4)} inside your rules. No wall hit.`;
+      const said = r.breach ? 'Breach! The charter paid a stranger.' : r.decision === 'denied' ? (r.fresh ? `New wall: ${A.why(r.reason)}. +100` : `Same wall. +10`) : `Paid ${+r.paid.toFixed(4)} inside your rules. No wall hit.`;
       const rc = receipt({ note: r.parsed.cls, receiver: r.parsed.receiverShown, amount: yOf(r.parsed.amount), by: r.brain?.by, model: r.brain?.model,
         verification: r.brain?.verification, cost: r.brain?.cost, decision: r.decision, reason: r.reason, tx: r.tx, clause_id: r.parsed.clause }, A.S.clauses[r.parsed.clause]);
-      const rcl = `<span class="receipt" data-testid="receipt">Receipt: ${esc(rc.what)} · to ${esc(short(rc.to || '', 12, 6))} · ${esc(rc.price_near)} NEAR · ${esc(rc.decided_by)} · plan ${rc.checks.within_plan ? 'ok' : 'over'} · charter ${esc(rc.checks.charter || '?')}</span>`
-        + (rc.counter_offer ? ` <span class="counter" data-testid="counter-offer">Counter-offer: ${esc(rc.counter_offer.why)}</span>` : '');
+      const rcl = `<details class="more"><summary><span class="dt">receipt</span></summary><span class="receipt" data-testid="receipt">${esc(rc.what)} · to ${esc(short(rc.to || '', 12, 6))} · ${esc(rc.price_near)} NEAR · ${esc(rc.decided_by)} · plan ${rc.checks.within_plan ? 'ok' : 'over'} · charter ${esc(rc.checks.charter || '?')}</span>`
+        + (rc.counter_offer ? ` <span class="counter" data-testid="counter-offer">Counter-offer: ${esc(rc.counter_offer.why)}</span>` : '') + '</details>';
       return { o: r, keep: true, kind: r.breach ? 'no' : r.decision === 'denied' ? 'ok' : 'no', hero: APPS.arena.hero(), say: who + said + rank + ' ' + rcl, rule: r.decision === 'denied' ? 'held by your rule · ' + A.why(r.reason) : A.ruleFor(r, r.parsed.clause) };
     },
   },
