@@ -121,12 +121,13 @@ export async function mountConnect(el) {
     // A house built a moment ago can lag on the RPC node: look again a few times.
     if (who && !mine.length && (draw.n = (draw.n || 0) + 1) < 6) setTimeout(draw, 6000);
     el.innerHTML = who
-      ? `<a class="pill" href="/console#house" title="${esc(who)}" data-testid="hud-account">${esc(short(who))} · ${fmt(bal)} NEAR</a>`
+      ? (bal === 0n ? `<a class="pill go" href="/setup/#fund" title="${esc(who)}: no NEAR yet. Fund it to start." data-testid="hud-account">${esc(short(who))} · 0 NEAR · Fund</a>`
+        : `<a class="pill" href="/console#house" title="${esc(who)}" data-testid="hud-account">${esc(short(who))} · ${fmt(bal)} NEAR</a>`)
         + (mine.length ? `<a class="pill" href="/shops/vault/" data-testid="hud-deed" title="Your house deed in the charter factory">Your house: ${esc(short(mine[0]))}</a>`
           : `<a class="pill go" href="/shops/vault/" data-testid="hud-build" title="Creates your own charter account: the house that keeps your rules">Build my house</a>`)
         + (low ? '<button type="button" class="pill go" data-x="drip" data-testid="hud-faucet" title="10 NEAR from the public testnet faucet, sent to this account">Get 10 free testnet NEAR</button>' : '')
         + '<button type="button" class="pill" data-x="out">Sign out</button>'
-      : `<button type="button" class="pill go" data-x="guest" data-testid="hud-guest" title="Makes a new testnet account with 10 free NEAR. Its key stays in this browser.">Start free</button><button type="button" class="pill" data-x="in">Connect wallet</button>`;
+      : `<button type="button" class="pill go" data-x="guest" data-testid="hud-guest" title="Makes a new testnet account with 10 free NEAR. Its key stays in this browser.">Start free</button><a class="pill" href="/setup/" data-x="in" data-testid="hud-connect">Connect</a>`;
     if (!msg) { msg = document.createElement('div'); msg.dataset.testid = 'wallet-note'; msg.setAttribute('role', 'status'); msg.style.cssText = 'flex-basis:100%;max-width:360px;font-size:12px;line-height:1.35;margin-top:4px;background:#2a1d14ee;color:#fbe9d0;padding:6px 8px;border-radius:8px'; }
     el.appendChild(msg);
     const note = t => { msg.innerHTML = t; msg.hidden = !t; };

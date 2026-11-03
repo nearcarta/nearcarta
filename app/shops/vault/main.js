@@ -488,7 +488,8 @@ function showTab(id) {
 
 // Bound before the config fetch so a click during page start waits for the connector instead of being lost.
 let booted; const boot = new Promise((ok, no) => { booted = { ok, no }; }); boot.catch(() => {});
-$('#connect').onclick = () => boot.then(() => connector.connect()).catch(fail);
+// Connect opens the branded setup flow; NEAR Connect keeps the session in this browser, so it is live here on return.
+$('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
 $('#guest').onclick = async () => { busy($('#guest'), true, 'Asking the testnet faucet…'); try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { fail(e); } finally { busy($('#guest'), false); } };
 
 async function main() {

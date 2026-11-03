@@ -121,7 +121,7 @@ const boot = (async () => {
 })();
 boot.catch(e => log(`<b>Could not load:</b> ${esc(e.message)}`, 'bad err'));
 $('#file-form').onsubmit = e => boot.then(() => file(e));
-$('#connect').onclick = () => boot.then(() => connector.connect()).catch(e => log(esc(e.message), 'bad err'));
+$('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
 $('#guest').onclick = async () => { const b = $('#guest'); b.disabled = true; b.textContent = 'Asking the testnet faucet…';
   try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { b.disabled = false; b.textContent = 'Start free'; } };
 $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); await refreshWho(); };
