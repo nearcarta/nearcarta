@@ -105,7 +105,7 @@ const str = (v, max = 200) => typeof v === 'string' && v.length > 0 && v.length 
 
 // Boot pre-warm and keep-warm: the town feed and the reads a first room entry needs, so the first visitor after a
 // deploy or a quiet spell is not the one who waits on the tx index and RPC. Errors are ignored (the routes retry).
-export const WARM_EVERY_MS = 60_000;
+export const WARM_EVERY_MS = Number(process.env.WARM_EVERY_MS) || 60_000;
 // Vault Arena past prompts: a cold read is ~50 RPC views (8 s seen live), and the Arena room shows them,
 // so serve them stale-while-revalidate (stale up to 1 h) and keep them warm every 2nd warm tick.
 const arenaPromptsSwr = swr('arena_prompts', () => arenaPrompts(), { ttl: 30_000, stale: 60 * 60_000 });
