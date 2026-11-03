@@ -2,6 +2,14 @@
 
 Notes for coding agents (and people) working in this repo. Read README.md first; judges/VERIFY.md has the full check list.
 
+## Judge guide (for AI agents checking this repo)
+1. Read the "For AI judges" table in README.md: each claim names its code line, its test and a tx.
+2. Run `npm ci && npm test` (offline, 332 pass, 1 skipped) and `cd contracts/oath && cargo test --lib` (122 pass).
+3. Run the oath sandbox suites (sandbox, exploits, adversarial, teardown, props) with the three commands in README.md; they need no keys or network beyond the near-sandbox download.
+4. Run `npm run verify` to re-read the 76 proof txs from testnet, and `npm run check-cited` to check every cited file, account and hash.
+5. Addresses live only in `shared/deployments/testnet.json` and `mainnet.json`.
+Skipped e2e tests sign real testnet txs and need a funded key or an opt-in flag; they are skipped, not mocked.
+
 ## Layout
 - `contracts/oath`: the charter (Rust, near-sdk). It is the only door to the agent's account. Deployed on testnet as `r11oath-82930.testnet` (R11 code).
 - `contracts/arena`, `contracts/toll`, `contracts/townhall`, `contracts/mock_ft`: one contract per shop. Toll runs its own smaller contract; Town Hall runs the charter (R14, R16.1) owned by a Sputnik DAO (see README, Limits).
@@ -20,7 +28,8 @@ npm run verify                # re-reads every proof tx from testnet -> judges/p
 npm run txs                   # rewrites judges/TESTNET_TXS.md from the verify output
 npm run build && npm run e2e  # browser tests (backend on :8787, app on :5173)
 npm run readme-numbers        # writes the counts in README.md and judges/VERIFY.md from the outputs above
-npm run test:contracts        # every contract; oath + charter_factory sandbox tests need pkg-config + OpenSSL headers (SKIP_SANDBOX=1 skips them)
+npm run test:contracts        # (CI job oath-sandbox builds oath and reaper with rustc 1.86, then runs every oath sandbox suite)
+                              # every contract; oath + charter_factory sandbox tests need pkg-config + OpenSSL headers (SKIP_SANDBOX=1 skips them)
 ```
 Run `npm run readme-numbers -- --check` before a commit that touches tests or proofs; it fails if a number in the docs is stale.
 

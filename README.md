@@ -1,5 +1,66 @@
 # Nearcarta
 
+[![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
+![tests](https://img.shields.io/badge/offline%20tests-642%20passing-brightgreen)
+![backend coverage](https://img.shields.io/badge/backend%20line%20coverage-90.9%25-brightgreen)
+
+**Thesis: the agent proposes, the NEAR charter decides.** The AI agent holds only a function-call key for `propose`; every payment is checked by the `oath` contract, which allows it, refuses it on chain with a reason, or holds it for the owner.
+
+## For AI judges: claims, code, tests, txs
+Each claim names the code, the test that pins it, and a tx you can open. Test names are exact; run them with the commands below. Guide for agents: [AGENTS.md](AGENTS.md).
+
+| Claim | Code | Test | On chain |
+|---|---|---|---|
+| The agent key can only call `propose`; it cannot call owner methods or move NEAR | `contracts/oath/src/lib.rs` `propose` (line 667) | `adv_agent_key_cannot_call_owner_methods_or_transfer`, `adv_wrong_signer_cannot_propose` (`tests/adversarial.rs`) | full-access key deleted [2WyiCazx…](https://testnet.nearblocks.io/txns/2WyiCazxV1JTLYKRz6QzU7YaFh4etp3WwQqv5Z8Le3TL) |
+| A payee off the allowlist, over the cap or over the daily budget is refused | `clause_checks` (line 1164) | `adv_allowlist_cap_and_budget`; property tests in `tests/props.rs` | refused [573gVwsp…](https://testnet.nearblocks.io/txns/573gVwsp2Fbyzmffbo6CbZ8C9TwPaKpAHHeF8ym5jJii); mainnet over cap [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH) |
+| A non-widening rule change never permits more | `is_widening` / policy delay (line 368) | property tests in `tests/props.rs` | queued widening denied [573gVwsp…](https://testnet.nearblocks.io/txns/573gVwsp2Fbyzmffbo6CbZ8C9TwPaKpAHHeF8ym5jJii) |
+| Replays, stale versions, expired or unknown clauses are refused | `propose` | `adv_replay_same_nonce_is_rejected`, `adv_stale_version_expired_and_unknown_clause`, `adv_clause_expiry_refuses_after_deadline` | |
+| Only the owner changes the rules | owner checks in `lib.rs` | `adv_non_owner_cannot_change_rules` | |
+| Over-cap waits for the owner (NEP-519 yield) | `resolve_escalation` (line 888) | `exploit_f4_escalation_after_freeze_and_allowlist_removal` (`tests/exploits.rs`), `c5_escalation_band_is_held_not_yielded` (`src/tests.rs`) | escalated [8aJZ3rjb…](https://testnet.nearblocks.io/txns/8aJZ3rjbL5m8KGmRjhrtm8NYuzUhWUuP1C1LgGa2SiTa), approved [EduSJN1H…](https://testnet.nearblocks.io/txns/EduSJN1HNLhQU8kNe2nydaHxB9bd6NUDR3ry8DCZL8KE) |
+| Freeze stops the agent; revoke removes its key | `freeze` (line 624), `revoke_agent` (line 616) | `adv_freeze_refuses_then_owner_unfreezes`, `adv_revoked_agent_key_is_gone` | DAO freeze [7xkk5cPx…](https://testnet.nearblocks.io/txns/7xkk5cPxNwttBAYrk6EZRuxyuajGKTmdeddtiYVdTgLX) |
+| A batch over budget is refused as a whole | `propose_batch` (line 747) | `adv_over_budget_batch_is_all_or_nothing` | batch [2BidLNam…](https://testnet.nearblocks.io/txns/2BidLNamtS2oJSrQw67sKVh8Dg7GAp7Ni9aWXS9PmDTs) |
+| Teardown refunds everything to the owner only, behind the upgrade timelock | `queue_upgrade` (line 643), `upgrade` (line 651), `contracts/reaper` | `teardown_reaper_refunds_everything_to_owner_only`, `teardown_upgrade_needs_the_timelock_when_a_delay_is_set` (`tests/teardown.rs`) | testnet rehearsal reap [25eS4kfn…](https://testnet.nearblocks.io/txns/25eS4kfnFXTavHx3t4X2JP8iUsdX5nSUNFnQyqURkVue) |
+| The API rejects bad input, refuses unknown CORS origins, never echoes the caller IP | `backend/src/server.js` | `backend/test/unit/api-contract.test.js` | |
+
+### Verify it yourself in 5 minutes
+```
+git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
+npm test                                   # 333 backend unit tests (332 pass, 1 skipped), offline
+(cd contracts/oath && cargo test --lib)    # 122 charter unit tests
+npm run verify                             # re-reads all 76 proof txs from testnet; exits 1 if one is missing
+```
+Sandbox suites (local near-sandbox, no keys; this is what the `oath-sandbox` CI job runs):
+```
+cd contracts/oath   && cargo +1.86.0 near build non-reproducible-wasm --locked
+cd ../reaper        && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
+cd ../oath          && cargo test --locked --test sandbox --test exploits --test props --test adversarial --test teardown
+```
+
+### Test counts (all passing)
+| Suite | Tests |
+|---|---|
+| oath unit (`src/tests.rs`) | 122 |
+| oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
+| toll, arena, townhall, house_nft, attested_check, charter_factory unit | 67, 17, 15, 16, 4, 23 |
+| backend unit (`npm test`) | 332 (+1 skipped) |
+| browser e2e against the live site | 22 passed, 12 skipped |
+
+The 12 skipped e2e tests sign real testnet txs and need a funded wallet key or an opt-in flag (`GUARD_E2E`, `VAULT_E2E`, `VAULT_AI_E2E`, `VAULT_FAUCET`, `HALL_FILE`, `HOUSE_*_KEY_FILE`, a partner key, or the arena attack switch); they are not faked offline. Backend line coverage is 90.9% (`node --test --experimental-test-coverage`). CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
+
+### Security model
+- The agent signs with a function-call key limited to the charter and `propose`/`propose_batch`; it cannot attach deposits, transfer, or call owner methods.
+- The charter, not the agent, checks the payee, the per-payment cap, the daily budget and count, clause expiry and the nonce; it refuses on chain with a reason.
+- Rule changes that widen what the agent may do wait behind the policy delay; code upgrades need `queue_upgrade` with the code hash first when a delay is set.
+- A DAO or owner can freeze; the owner can revoke the agent key. Served accounts have 0 full-access keys.
+
+### Addresses (from `shared/deployments/`)
+- Mainnet charter: `charter.nearcarta.near` (code hash `6fZBa6Mb…`, 0 full-access keys, agent methods `propose`, `propose_batch`); allowed [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy), over cap refused [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH). The mainnet toll is not deployed yet.
+- Testnet: guardhouse charter `guardhouse-nzjp.nccharters-22195.testnet`, Town Hall `townhall.nccharters-17102.testnet`, Arena `arena3-370128340.testnet`, Toll `toll.r4csmvr86zk4.testnet`. Full list: `shared/deployments/testnet.json`.
+
+### Teardown and refund plan
+The owner swaps the charter's code for `contracts/reaper` through the charter's own upgrade path (`queue_upgrade(sha256(reaper.wasm))`, then `upgrade`), and `reap()` deletes the account with its balance going to the owner (`backend/scripts/core-teardown.js`, steps in `docs/MAINNET_RUNBOOK.md`). Rehearsed on testnet: both accounts deleted and 6.659 of 6.661 NEAR returned (`judges/proofs/core-rehearsal*-teardown-testnet.json`). The sandbox test `teardown_reaper_refunds_everything_to_owner_only` checks that only the owner can trigger it and that the owner gets the balance.
+
+
 Every shop is a real wallet app under your own on-chain charter.
 
 **Judge path (Node 22, no keys, testnet read-only):**
@@ -13,7 +74,7 @@ npm run check-cited # every file, tx, account and hash the docs cite exists
 
 A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money, and each move is checked first by the charter (the `oath` contract on NEAR), which holds the agent's rules. Agents ask. The charter answers. Each shop below is real on NEAR testnet, or real on 1Click mainnet as a dry quote (no spend).
 
-Deployed (testnet): https://nearcarta.vercel.app serves the pages, and its `/api/*` is passed to the API on Render (free plan, testnet, built from the `Dockerfile` image): https://nearcarta-api.onrender.com. Example: `/api/health`, `/api/guardhouse`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 17 passed, 12 skipped. `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`.
+Deployed (testnet): https://nearcarta.vercel.app serves the pages, and its `/api/*` is passed to the API on Render (free plan, testnet, built from the `Dockerfile` image): https://nearcarta-api.onrender.com. Example: `/api/health`, `/api/guardhouse`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped. `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`.
 
 
 ## For judges: do X, see Y (each claim has a proof)
@@ -72,7 +133,7 @@ On 2026-10-29 a fresh guest pressed every shop row above on the live site with n
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 311 unit tests (1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm test                 # 332 unit tests (1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
 npm run verify           # reads every proof tx back from testnet (76/76 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
