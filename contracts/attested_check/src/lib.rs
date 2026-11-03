@@ -48,6 +48,15 @@ impl AttestedCheck {
         Self { owner, outlayer, wasm_url, wasm_hash, checks: Vector::new(b"c") }
     }
 
+    /// Teardown: the owner (1 yocto, so a full-access key signs) deletes this account; every yocto,
+    /// storage stake included, goes back to the owner. The contract holds no user funds.
+    #[payable]
+    pub fn close(&mut self) -> Promise {
+        near_sdk::assert_one_yocto();
+        require!(env::predecessor_account_id() == self.owner, "owner only");
+        Promise::new(env::current_account_id()).delete_account(self.owner.clone())
+    }
+
     /// Pins a new checker build. Owner only.
     pub fn set_wasm(&mut self, wasm_url: String, wasm_hash: String) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
