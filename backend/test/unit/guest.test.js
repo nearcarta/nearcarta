@@ -20,3 +20,8 @@ test('daily cap', async () => { _reset(); process.env.GUEST_DAY_CAP = '1';
   await createGuest({ account_id: 'ncguest-aaaaaa.testnet', public_key: pk }, { rpc: rpc(), sponsor, network: 'testnet' });
   await assert.rejects(createGuest({ account_id: 'ncguest-bbbbbb.testnet', public_key: pk }, { rpc: rpc(), sponsor, network: 'testnet' }), { status: 429 });
   delete process.env.GUEST_DAY_CAP; });
+test('two parallel requests for one id: only one create_account', async () => { _reset(); let sends = 0;
+  const r0 = rpc(); const r = async (m, p) => { if (m === 'send_tx') sends++; return r0(m, p); };
+  const a = { account_id: 'ncguest-race01.testnet', public_key: pk };
+  const out = await Promise.allSettled([createGuest(a, { rpc: r, sponsor, network: 'testnet' }), createGuest(a, { rpc: r, sponsor, network: 'testnet' })]);
+  assert.equal(sends, 1); assert.equal(out.filter(o => o.status === 'rejected' && o.reason.status === 409).length, 1); });

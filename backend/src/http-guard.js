@@ -47,17 +47,27 @@ export function clientIdentity(c, env = process.env) {
 export const clientIpSource = (c, env = process.env) => clientIdentity(c, env).slice(0, 2);
 export const clientIp = (c, env = process.env) => clientIdentity(c, env)[1];
 
-const MAX_KEYS = 20000;
+import { persist } from './persist.js';
+export const MAX_KEYS = 20000;
+// Bounded memory with least-recently-used eviction: a flood of new keys pushes out the oldest idle clients,
+// it never wipes everyone's counters (Map keeps insertion order; a hit re-inserts the key at the end).
 function bucket(store, key, max, windowMs, now) {
-  if (store.size > MAX_KEYS) store.clear(); // bounded memory; a flood resets counts, not the process
   const arr = (store.get(key) || []).filter(t => now - t < windowMs);
+  store.delete(key);
   if (arr.length >= max) { store.set(key, arr); return Math.ceil((windowMs - (now - arr[0])) / 1000); }
-  arr.push(now); store.set(key, arr); return 0;
+  arr.push(now); store.set(key, arr);
+  while (store.size > MAX_KEYS) store.delete(store.keys().next().value);
+  return 0;
 }
+const persistStore = (name, store, windowMs) => persist('rl:' + name, () => {
+  const t = Date.now(), o = {}; for (const [k, a] of store) { const f = a.filter(x => t - x < windowMs); if (f.length) o[k] = f; } return o;
+}, v => { for (const [k, a] of Object.entries(v)) if (Array.isArray(a)) store.set(k, a.filter(Number.isFinite)); });
 
 // Per-route, per-client quota. One instance per route, so each route has its own counter.
-export function limiter(max, windowMs = 60e3, { ip, identity = clientIdentity, now = Date.now } = {}) {
+// `persist: 'name'` keeps the counter across a process restart (use it for hour/day windows).
+export function limiter(max, windowMs = 60e3, { ip, identity = clientIdentity, now = Date.now, persist: pname } = {}) {
   const hits = new Map();
+  if (pname) persistStore(pname, hits, windowMs);
   return async (c, next) => {
     const [, key, egress] = ip ? [null, ip(c), null] : identity(c);
     const t = now();
@@ -81,7 +91,7 @@ export const edgeCache = (s = 15) => async (c, next) => {
 // Global cap shared by every client: protects the paid 1Click partner key and NEAR AI key.
 const globals = new Map();
 export function globalCap(name, max, windowMs = 60e3, { now = Date.now } = {}) {
-  if (!globals.has(name)) globals.set(name, new Map());
+  if (!globals.has(name)) { globals.set(name, new Map()); if (windowMs >= 3600e3) persistStore('g:' + name, globals.get(name), windowMs); }
   const store = globals.get(name);
   return async (c, next) => {
     const wait = bucket(store, name, max, windowMs, now());

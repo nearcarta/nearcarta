@@ -2,6 +2,7 @@
 // sharing one network hits it fast), the backend creates the same kind of ncguest-*.testnet account itself,
 // paid from a small testnet-only sponsor account. Testnet only; one per IP per hour; a daily cap for the town.
 import { DEP } from './config.js';
+import { persist } from './persist.js';
 import { rpc as nearRpc } from './near.js';
 import { keyFrom, signTx, functionCall } from '../../shared/vault/tx.js';
 
@@ -15,6 +16,8 @@ export const FUND = () => Number(process.env.GUEST_FUND_NEAR || 1.25);
 const DAY_CAP = () => Number(process.env.GUEST_DAY_CAP || 40);
 let day = '', made = 0, chain = Promise.resolve();
 export function _reset() { day = ''; made = 0; }
+persist('guest-day', () => ({ day, made }), v => { if (typeof v.day === 'string' && Number.isFinite(v.made)) { day = v.day; made = v.made; } });
+const pending = new Set(); // ids being created right now: a second parallel request for the same id gets 409
 export function guestInfo() { const s = SPONSOR(); return { enabled: !!s && DEP.network === 'testnet', sponsor: s?.account || null, fund_near: FUND(), today: made, day_cap: DAY_CAP() }; }
 
 export async function createGuest(body, { rpc = nearRpc, sponsor = SPONSOR(), network = DEP.network, today = new Date().toISOString().slice(0, 10) } = {}) {
@@ -25,17 +28,22 @@ export async function createGuest(body, { rpc = nearRpc, sponsor = SPONSOR(), ne
   if (!NAME.test(id) || !PK.test(pk)) throw e(400, 'account_id must be ncguest-<6-12 a-z0-9>.testnet and public_key ed25519:<base58>');
   if (day !== today) { day = today; made = 0; }
   if (made >= DAY_CAP()) throw e(429, 'the town made its guest accounts for today; connect a wallet instead');
-  const exists = await rpc('query', { request_type: 'view_account', finality: 'final', account_id: id }).then(() => true, () => false);
-  if (exists) throw e(409, 'that account already exists');
+  if (pending.has(id)) throw e(409, 'that account is being created');
+  pending.add(id);
+  // The existence check runs inside the serial chain, so two requests for one id cannot both reach create_account.
   const run = chain.then(async () => {
+    if (made >= DAY_CAP()) throw e(429, 'the town made its guest accounts for today; connect a wallet instead');
+    const exists = await rpc('query', { request_type: 'view_account', finality: 'final', account_id: id }).then(() => true, () => false);
+    if (exists) throw e(409, 'that account already exists');
     const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: sponsor.account, public_key: sponsor.key.publicKey });
     const tx = signTx({ key: sponsor.key, signerId: sponsor.account, receiverId: 'testnet', nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
       actions: [functionCall('create_account', { new_account_id: id, new_public_key: pk }, 50n * 10n ** 12n, yocto(FUND()))] });
     const r = await rpc('send_tx', { signed_tx_base64: tx.base64, wait_until: 'EXECUTED_OPTIMISTIC' });
     if (r?.status?.Failure) throw e(502, 'create_account failed on NEAR');
+    made++;
     return tx.hash;
   });
   chain = run.catch(() => {});
-  const tx = await run; made++;
+  const tx = await run.finally(() => pending.delete(id));
   return { account_id: id, tx, funded_near: FUND() };
 }

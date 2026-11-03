@@ -160,9 +160,12 @@ export function makeApp() {
   app.onError(onError);
   app.notFound(c => c.json({ error: 'not found' }, 404));
 
+  // ?deep=1 costs ~20 RPC reads: 3/min per client and 20/min for everyone (results are shared for 30 s anyway).
+  const deepPer = limiter(3), deepGlobal = globalCap('health-deep', 20);
+  const deepLimit = (c, next) => deepPer(c, () => deepGlobal(c, next));
   // ?deep=1 runs every read route's handler (not the AI or quote routes, which spend credits) and reports
   // each one's status and time, plus the RPC retry/fallback/stale counters.
-  app.get('/api/health', limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: c.req.query('deep') ? await shops.health() : shops.healthCached(),
+  app.get('/api/health', (c, next) => c.req.query('deep') ? deepLimit(c, next) : next(), limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: c.req.query('deep') ? await shops.health() : shops.healthCached(),
     features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: c.req.query('deep') ? await vault.runnerStatus() : vault.runnerStatusCached() }));
   // Shows the caller how Render keys their own request, with no address in the answer: which header decides
   // the client key, a short keyed tag of that key (the same client gets the same tag until the process
@@ -318,13 +321,15 @@ export function makeApp() {
   app.get('/api/toll/gate/:nonce', limiter(60), tg(c => tollgate.visit(c.req.param('nonce'))));
   // Guest fallback when the public faucet rate-limits a visitor (backend/src/guest.js)
   app.get('/api/guest', limiter(30), c => c.json(guest.guestInfo()));
-  app.post('/api/guest', limiter(2, 3600e3), async c => {
+  app.post('/api/guest', limiter(2, 3600e3, { persist: 'guest-ip' }), async c => {
     try { return c.json(await guest.createGuest(await c.req.json().catch(() => ({})))); }
     catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
-  app.post('/api/toll/gate/settle-due', limiter(6), tg(() => tollgate.settleDue()));
-  app.post('/api/toll/gate/:nonce/broadcast', limiter(10), tg(c => tollgate.broadcast(c.req.param('nonce'))));
-  app.post('/api/toll/gate/:nonce/settle', limiter(10), tg(c => tollgate.settleOne(c.req.param('nonce'))));
+  // Public relays spend the settler's testnet gas: per-client limits plus a town-wide cap per minute and per day.
+  const relayMin = globalCap('toll-relay', Number(process.env.CAP_TOLL_RELAY_PER_MIN || 20)), relayDay = globalCap('toll-relay-day', Number(process.env.CAP_TOLL_RELAY_PER_DAY || 400), 24 * 3600e3);
+  app.post('/api/toll/gate/settle-due', limiter(6), relayMin, relayDay, tg(() => tollgate.settleDue()));
+  app.post('/api/toll/gate/:nonce/broadcast', limiter(10), relayMin, relayDay, tg(c => tollgate.broadcast(c.req.param('nonce'))));
+  app.post('/api/toll/gate/:nonce/settle', limiter(10), relayMin, relayDay, tg(c => tollgate.settleOne(c.req.param('nonce'))));
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));

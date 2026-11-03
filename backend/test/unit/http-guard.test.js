@@ -80,3 +80,14 @@ test('CORS: production, local and this project\'s Vercel previews only', () => {
     'https://nearcarta-abc-jol5.vercel.app.evil.com', 'https://xnearcarta-abc-jol5.vercel.app', undefined, ''])
     assert.equal(ok(o), null, String(o));
 });
+
+import { MAX_KEYS } from '../../src/http-guard.js';
+test('a flood of new keys evicts the oldest, it does not reset a limited client', async () => {
+  const { limiter: L } = await import('../../src/http-guard.js');
+  let ip = 'victim', t = 1e6; const lim = L(2, 60e3, { ip: () => ip, now: () => t });
+  const call = async () => { let s = 200; const c = { header() {}, json: (_b, st) => { s = st; return st; } }; await lim(c, async () => {}); return s; };
+  await call(); await call(); assert.equal(await call(), 429);
+  for (let i = 0; i < 50; i++) { ip = 'f' + i; await call(); }
+  ip = 'victim'; assert.equal(await call(), 429);
+  assert.ok(MAX_KEYS >= 1000);
+});

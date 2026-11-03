@@ -750,7 +750,7 @@ export function register(app, { limiter, globalCap }) {
     return c.json(await sharedTask(String(b.task || ''), String(b.nickname || '').toLowerCase()));
   });
   // The NEAR AI model proposes (backend/src/agent.js); spend is capped per guest (8/min, 40/day) and globally.
-  const askPerDay = limiter(Number(process.env.AGENT_PER_GUEST_DAY || 40), 24 * 3600e3);
+  const askPerDay = limiter(Number(process.env.AGENT_PER_GUEST_DAY || 40), 24 * 3600e3, { persist: 'ask-day' });
   const agentCap = globalCap('nearai-agent', Number(process.env.CAP_AGENT_PER_MIN || 20));
   app.get('/api/agent/budget', limiter(30), c => c.json(agent.budgetStatus()));
   app.post('/api/vault/ask/plan', limiter(8), askPerDay, agentCap, async c => {
