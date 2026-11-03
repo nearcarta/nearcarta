@@ -4,21 +4,32 @@ Status: **not deployed**. Every step below was rehearsed end to end on testnet (
 
 ## Layout
 
-A 64-hex implicit root can't hold sub-accounts (`charter.<64hex>` is over 64 chars). Each contract gets a fresh **implicit account**, created for free by a plain transfer. Its key lives in `~/.near-credentials/<net>/<id>.json` (mode 0600).
+A 64-hex implicit account can't hold sub-accounts, so the funds move once into a named root made by the `near` registrar. The name itself only locks about 182 B.
 
 | Account | Code | Keys after deploy |
 |---|---|---|
-| root (implicit, owner) | none | full access (owner) |
-| charter (implicit) | `contracts/artifacts/oath.r18.wasm` | agent function-call key only (`propose`, `propose_batch`) |
-| toll (implicit) | `contracts/artifacts/toll.v6.wasm` | agent function-call key only (`pay`, `settle`) |
+| `nearcarta.near` (root, owner) | none | full access (owner) |
+| `charter.nearcarta.near` | `contracts/artifacts/oath.r18.wasm` | agent function-call key only (`propose`, `propose_batch`), allowance 0.25 NEAR |
+| `toll.nearcarta.near` | `contracts/artifacts/toll.v6.wasm` | agent function-call key only (`pay`, `settle`), allowance 0.25 NEAR |
 
-Arena, house deed and Town Hall **stay on testnet**. On mainnet they would lock about 3.45, 2.09 and 5.48 NEAR, which is over budget.
+The agent keys have a **finite** allowance (`AGENT_ALLOWANCE`, default 0.25). When it runs out, the owner rotates the key with `set_agent_key`; r18 adds the new key and deletes the old one in one batch.
+
+Arena, house deed and Town Hall are covered in `docs/MAINNET_CONSOLIDATION.md`.
+
+### Step 0: create the named root
+
+```
+NET=mainnet FROM_ID=<64hex> FROM_KEY=~/.near-credentials/mainnet/<64hex>.json NAME=nearcarta.near DEPOSIT=6.6 \
+  node backend/scripts/create-named-root.js     # DRY_RUN=1 first: checks the name is free and sends nothing
+```
+
+The new root's key is saved with mode 0600 in `~/.near-credentials/mainnet/nearcarta.near.json`.
 
 ## Exact init args
 
 - **charter `new`:** `owner=<root>`, `dao=null`, `policy_delay_ns=90000000000`, `storage_reserve=0.02 NEAR`, `setup_window=true`.
 - **charter `set_clause` (pay):** `receiver=<root>`, cap 0.002, daily 0.005, min 0.001, 3 per day.
-- **charter `set_agent_key`:** agent public key with allowance `null`.
+- **charter `set_agent_key`:** agent public key with allowance 0.25 NEAR (finite).
 - **toll `new`:**
   - `mpc=v1.signer`, domain 3, path `base-1`, `chain_id=8453` (testnet uses `v1.signer-prod.testnet` and 84532).
   - `foreign_address = keccak(derived key)[12..]`.
@@ -28,7 +39,7 @@ Arena, house deed and Town Hall **stay on testnet**. On mainnet they would lock 
 ## Run
 
 ```
-NET=mainnet ROOT_KEY=~/.near-credentials/mainnet/<root>.json \
+NET=mainnet LAYOUT=named ROOT_ID=nearcarta.near ROOT_KEY=~/.near-credentials/mainnet/nearcarta.near.json \
 AGENT_OUT=<0600 file> OUT=<deploy.json> node backend/scripts/core-deploy.js
 ```
 
@@ -52,7 +63,21 @@ Both sweeps matter. A deploy tx reserves its prepaid gas from the contract accou
 
 On mainnet the derived Base address is unfunded, so the MPC-signed payout is real but is **not broadcast**.
 
-## Cost (from rehearsal 2, final defaults)
+## Cost (from rehearsal 3, named layout, final defaults)
+
+The read-only mainnet dry run (`DRY_RUN=1`) resolved every id, the MPC keys and the derived Base address. It found `nearcarta.near`, `charter.` and `toll.` free.
+
+| | NEAR |
+|---|---|
+| charter locked (402,392 B) | 4.024 |
+| toll locked (227,811 B) | 2.278 |
+| root spent in the deploy (locks + float + gas) | 6.437 |
+| left on the root after deploy | 0.263 (of 6.7) |
+| full deploy + teardown cycle, net | ~0.024 |
+
+Exact mainnet budget: 6.7 on the implicit account. Suggested split: `DEPOSIT=6.6` to `nearcarta.near`, with the rest left on the implicit account for the registrar tx gas. About 6.44 is locked while live, and all of it except about 0.025 comes back through teardown.
+
+### Older figures (rehearsal 2, implicit layout)
 
 | | NEAR |
 |---|---|
@@ -85,6 +110,13 @@ NET=mainnet ROOT_KEY=... DEPLOY=<deploy.json> OUT=<teardown.json> node backend/s
 
 ### Proven on testnet
 
+**Rehearsal 3 (named layout, `nearcarta-core.testnet`, finite allowance)**
+- **Deploy:** fund `Ch6z1nMKQcnreHnJPxqMJWN52ihSNm77pa5T3tuKoTSi`, charter `D1CP9Jfie8j6jN8XEU7tmLUAMmus2eJ3akP6YNddToaG`, sweep `Hi8qcXky8wuRy4HcS6aqhT41GAL2ELYT6TmXX4AjLLzq`, agent key `7WA6iT98gRGgQc7rVBWDtaJbdDmjRpQW6e12Sg1pLF1e`, toll fund `2vAzzTryDbnDro2DfWU6NJ2sf2p7gRinVLHS8aZ5Kd5M`, toll `FFsvE2UXSYwahjaxJnWMfDxthAEisQM9F32Kdnk6TM33`, toll sweep `Fb8LbX799rF7GvCWd4geC5Lt8V8UzrWnFmrxCDhdQ9PW`.
+- **Tests:** allowed propose `CbdezdftGQXMAC9dFgC6R8uJooqHDa4wAXJ3CTZuPcVk`; over-cap refused `8iaFJmBxXkD6Ywxp6eRKRsmd5gy5WbL4Rncc9jMZ972Z`; allowlisted toll pay `3LQyZThHD3GnnDDg5fjFznS33dLZV4Vf5NSYaAreTfPh`; non-allowlisted refused `EfaAQY4dBXeb4Me4UmLaa2e9jbJhqL4iRePZkZXVPhZZ`. Full-access keys deleted: `AKVHcbmEH2SFouZZLVVtrdWNiChRiu4Evm9s5uhicBku` and `FETTVx7f7GoF7DG1dqZz9cyVX5LeU8Gy8s95BSXA52md`.
+- **Teardown:** close `2EreUTbe9AHzKp6Md1aR4sMFgVmCawFnGKjP34GfGavr`, queue `BXFJAaAhHA3XMpo3AER8qxhHb6kAJwQR9bdinCCdatrJ`, execute `3o6Lzt8wB9VqzzpJxH3bdK6FDRkS83ypUzFj6bipUvQ2`, upgrade `7JhtCfUqk516zv7aPjeUiTkVu3j6Uf8pyFzTB7SrVAqZ`, reap `25eS4kfnFXTavHx3t4X2JP8iUsdX5nSUNFnQyqURkVue`.
+- **Result:** both accounts deleted; root gained 6.413.
+
+
 **Rehearsal 1**
 - **Txs:** toll_close `5L1mwLFobYRT8bzd2wxMdGC4BTmJ34FvDS6Pn1mhovB2`, queue `FqXAk3KuYaE5tJCiW5jXsrC2cnVbSyTZM74tnFwMbBh5`, execute `dac1wVkRk9iFUYW9ux2SKkpXY3kofwrzBqqH2KXLwUD`, upgrade `GBQ2Duz6vdHWfjPpVtzjD3uzbCcDRdqAAd2LRmDfhmTK`, reap `A3sM6jiu7dxJQMeMJz687UPQd3hDAtF2pwHWdEZJWCZh`.
 - **Result:** both accounts deleted; 6.659 of 6.661 NEAR returned.
@@ -93,6 +125,10 @@ NET=mainnet ROOT_KEY=... DEPLOY=<deploy.json> OUT=<teardown.json> node backend/s
 - **Deploy txs:** fund `GGWumuJ8shTCFuv5HjPYnfVQh38ay1wUQofjaxpY6EfG`, charter deploy `6wqzv5Bm8ZkxR5sGjLHGo7DstR1t3wB33mbS4ckqcS4j`, sweep `FmKFRMWBHEPYCtPzUPQG4fy8k4r9qYQmcEPcsBfi9rAe`, toll deploy `8BkygECnztHNvpJQCSm2rQmZuHdSWBAYfrY9xFKodaz6`, MPC pay `4d5YsK1Hmso6ke6K8bcGtD4U4vo1WWLhZJrZW2T4PcTF`, refused pay `8kdHfrcok4oUuxLCiVqogpbLsbjKffRan4jPDYry4fk3`, full-access key deletes `H6XDMHNEVnNAsnw2ftvBJM8NzpVkQ7kyi9exdYAc56oz` and `6MZbVBFMMsYHuxcfPN8wBxWZ94XvvA6rxuCLn1eigMrQ`.
 - **Teardown txs:** close `5QUcCBa1gYhjxm8XE2W9dgWD1v5KByvGD4TEnuiAjd3M`, queue `37o4wuJTWe2NkmctH1sEQ8PBqWJKJDRTvni5K21Nip98`, execute `EC7wjKScixkoC8emvPcdqS5NDtr4v2EWba1Dzmwq2Qae`, upgrade `HfFdJEBjgUe1a5fDU1vxnsikPTQVceeVHw6LuRAVRNqh`, reap `8fAaYjgHkBJ2cWC175yTKtS6xQJSQ5M6MMZ7Hs4xLB9c`.
 - **Result:** both accounts deleted; root gained 6.414.
+
+## Reproducible builds
+
+Not yet reproducible. `cargo near build reproducible-wasm` fails on this box because Docker's bridge network has no DNS. The pinned artifacts are the hashes in `shared/deployments/mainnet.json`.
 
 ## Config switch
 

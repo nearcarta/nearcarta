@@ -2,12 +2,28 @@
  "network": "mainnet",
  "status": "not_deployed",
  "rpc": "https://free.rpc.fastnear.com",
- "root": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+ "root": "nearcarta.near",
  "mpc": "v1.signer",
  "chain_id": 8453,
  "path": "base-1",
  "charter": null,
  "toll": null,
  "runbook": "docs/MAINNET_RUNBOOK.md",
- "note": "charter and toll ids are filled in by backend/scripts/core-deploy.js output after the mainnet run; arena, house and Town Hall stay on testnet"
+ "note": "read from mainnet v1.signer read-only (domain 0 path base-1; fx root from domain 3). charter and toll are filled in from core-deploy.js output after the mainnet run. Arena, house and Town Hall: see docs/MAINNET_CONSOLIDATION.md",
+ "layout": "named",
+ "root_funder": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+ "registrar": "near",
+ "planned": {
+  "charter": "charter.nearcarta.near",
+  "toll": "toll.nearcarta.near"
+ },
+ "derived_public_key": "secp256k1:26swhQicqiPZBJamrbHX2icEjv8FbcPGw9Cox4c3fu36S2f8MB2d1ZvrocJp3mTcqVH9BQ6of3UXX2WRj2WFv59V",
+ "foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a",
+ "fx_root_key": "secp256k1:29UZSakxpCKVJaJYUmR5UtqdP16xcSemPudWXGEZCxs5HemWkXb331X3o8fqLCZtSj9sdes33YQJNa9D1wEBd9ac",
+ "wasm_sha256": {
+  "oath.r18": "04377fc33eb9f0f1bdf384055e8baac7828d2d0e7f259dfe3dcc2305487c0a14",
+  "toll.v6": "8829a9c7de1d8da512615382a7a8923253fc9f13b136fe1b876ce1dd9e9ed88e",
+  "reaper": "ab253074710342bea61df34b775d71c957519edc4924dfddcc665994f41ee8ba"
+ },
+ "agent_allowance_near": 0.25
 }
