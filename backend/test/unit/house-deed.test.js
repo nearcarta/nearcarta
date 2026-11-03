@@ -15,15 +15,18 @@ test('deed mint: returns an unsigned mint_deed call for the wallet; no signing o
   const { transaction: t } = await r.json();
   assert.equal(t.receiverId, DEP.house_deed.contract);
   assert.equal(t.actions[0].params.methodName, 'mint_deed');
-  assert.deepEqual(t.actions[0].params.args, { house: 'r11house-31474.testnet' });
-  assert.equal(t.actions[0].params.deposit, '20000000000000000000000');
+  assert.deepEqual(t.actions[0].params.args, { house: 'r11house-31474.testnet', cap: '50000000000000000000000' });
+  assert.equal(t.actions[0].params.deposit, '120000000000000000000000');
   assert.equal((await makeApp().request('/api/house/deed/mint?house=' + encodeURIComponent('Bad..x'))).status, 400);
 });
 
 test('deed lookup: token by account, 404 with the mint call when there is none', async () => {
-  let ask; globalThis.fetch = async (u, init) => { ask = JSON.parse(Buffer.from(JSON.parse(init.body).params.args_base64, 'base64')); return viewResult(ask.token_id === 'a.testnet' ? { token_id: 'a.testnet', owner_id: 'a.testnet' } : null); };
+  let ask; globalThis.fetch = async (u, init) => { ask = JSON.parse(Buffer.from(JSON.parse(init.body).params.args_base64, 'base64')); const m = JSON.parse(init.body).params.method_name;
+    if (m === 'nft_tokens_for_owner') return viewResult(ask.account_id === 'a.testnet' ? [{ token_id: 'a.testnet', owner_id: 'a.testnet' }] : []);
+    if (m === 'house_purse') return viewResult({ balance: '1', cap: '1', paid: '0', pays: 0 });
+    return viewResult(ask.token_id === 'a.testnet' ? { token_id: 'a.testnet', owner_id: 'a.testnet' } : null); };
   const ok = await makeApp().request('/api/house/deed/a.testnet');
-  assert.equal(ok.status, 200); assert.equal((await ok.json()).token.owner_id, 'a.testnet');
+  assert.equal(ok.status, 200); const j = await ok.json(); assert.equal(j.token.owner_id, 'a.testnet'); assert.equal(j.purses['a.testnet'].cap, '1');
   const none = await makeApp().request('/api/house/deed/b.testnet');
   assert.equal(none.status, 404); assert.equal((await none.json()).mint.actions[0].params.methodName, 'mint_deed');
 });

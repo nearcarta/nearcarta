@@ -205,11 +205,12 @@ export function makeApp() {
   app.get('/api/guardhouse', limiter(30), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
-  // House deed (NEP-171). The server never signs: /mint returns the unsigned call for the visitor's wallet
-  // (NEAR Connect signAndSendTransaction); the deed's token_id is the signer's own account id.
+  // House deed v2 (NEP-171): the deed is the house. Its purse and cap live in the deed contract and only the
+  // current holder may spend (1 yocto, full wallet approval). The server never signs: /mint returns the unsigned
+  // call for the visitor's wallet (NEAR Connect signAndSendTransaction); token_id is the minter's account id.
   const D = DEP.house_deed;
   const deedTx = (house) => ({ receiverId: D.contract, actions: [{ type: 'FunctionCall', params: { methodName: 'mint_deed',
-    args: { house: house || null }, gas: D.mint.gas, deposit: D.mint.deposit_yocto } }] });
+    args: { house: house || null, cap: '50000000000000000000000' }, gas: D.mint.gas, deposit: D.mint.deposit_yocto } }] });
   app.get('/api/house/deed', limiter(20), async c => {
     if (!D) return c.json({ error: 'no deed contract' }, 404);
     const [metadata, total] = await Promise.all([view(D.contract, 'nft_metadata'), view(D.contract, 'nft_total_supply')]);
@@ -219,13 +220,14 @@ export function makeApp() {
     if (!D) return c.json({ error: 'no deed contract' }, 404);
     const house = c.req.query('house');
     if (house && !ACCT.test(house)) return c.json({ error: 'house must be an account id' }, 400);
-    return c.json({ signer: 'the visitor (one deed per account; token_id = signer)', transaction: deedTx(house), note: 'unsigned; sign with your wallet. Excess deposit is refunded.' });
+    return c.json({ signer: 'the visitor (one deed per account; token_id = signer)', transaction: deedTx(house), note: 'unsigned; sign with your wallet. 0.02 NEAR pays storage, the rest fills the house purse (cap 0.05 NEAR per payment).' });
   });
   app.get('/api/house/deed/:account', limiter(20), async c => {
     if (!D) return c.json({ error: 'no deed contract' }, 404);
     const a = c.req.param('account'); if (!ACCT.test(a)) return c.json({ error: 'not an account id' }, 400);
-    const token = await view(D.contract, 'nft_token', { token_id: a });
-    return token ? c.json({ contract: D.contract, token }) : c.json({ contract: D.contract, token: null, mint: deedTx(null) }, 404);
+    const [token, held] = await Promise.all([view(D.contract, 'nft_token', { token_id: a }), view(D.contract, 'nft_tokens_for_owner', { account_id: a, limit: 10 })]);
+    const purses = Object.fromEntries(await Promise.all((held || []).map(async t => [t.token_id, await view(D.contract, 'house_purse', { token_id: t.token_id })])));
+    return token || held?.length ? c.json({ contract: D.contract, token, held, purses }) : c.json({ contract: D.contract, token: null, held: [], mint: deedTx(null) }, 404);
   });
   // Counterparty check before a payment: allow / warn / block with reasons (backend/src/counterparty.js).
   // ?charter= must be a Nearcarta charter (served or made by the factory), so this never views arbitrary contracts.
