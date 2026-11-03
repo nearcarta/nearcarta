@@ -108,7 +108,7 @@ export const WARM_EVERY_MS = 60_000;
 // so serve them stale-while-revalidate (stale up to 1 h) and keep them warm every 2nd warm tick.
 const arenaPromptsSwr = swr('arena_prompts', () => arenaPrompts(), { ttl: 30_000, stale: 60 * 60_000 });
 // Public ledger: a cold read is the guardhouse + arena chronicles + toll + gate (4.8 s seen live), so it is served
-// stale-while-revalidate (fresh 15 s, stale up to 30 min) and kept warm on every warm tick.
+// stale-while-revalidate (fresh 15 s, stale up to 30 min) and kept warm on alternate warm ticks (the free instance has 0.1 CPU, so the two heavy reads never share a tick).
 async function ledgerRead() {
     const soft = (p, ms = 9000) => Promise.race([p.catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
     const arena = vault.config()?.arena?.charter;
@@ -126,7 +126,7 @@ export function warm({ every = WARM_EVERY_MS, read } = {}) {
   const once = () => Promise.allSettled([
     shops.refreshHealth(), vault.refreshRunnerStatus(),
     shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
-    ...(read ? [] : [reads.guardhouse(), reads.mistbank(), reads.townhall(), ledgerSwr(), ...(tick++ % 2 === 0 ? [arenaPromptsSwr()] : [])]),
+    ...(read ? [] : [reads.guardhouse(), reads.mistbank(), reads.townhall(), ...(tick++ % 2 === 0 ? [arenaPromptsSwr()] : [ledgerSwr()])]),
   ]);
   const first = once();
   const t = every ? setInterval(once, every) : null; t?.unref?.();
