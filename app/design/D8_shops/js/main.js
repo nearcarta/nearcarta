@@ -24,10 +24,11 @@ async function boot() {
     fragmentShader: 'uniform sampler2D tex; uniform vec2 c; uniform float r, asp; uniform vec3 ac; varying vec2 vUv; void main(){ vec2 d=(vUv-c)*vec2(asp,1.); float L=length(d); float a=1.-smoothstep(r-.004,r+.004,L); vec4 t=texture2D(tex,vUv); float edge=smoothstep(r-.02,r,L)*a; gl_FragColor=vec4(mix(t.rgb, ac, edge*.6), a);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}' });
   quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), qmat); quad.frustumCulled = false; const qs = new THREE.Scene(); qs.add(quad); qcam = new THREE.Camera(); quad.userData.scene = qs;
   resize(); addEventListener('resize', resize); addEventListener('pointerdown', onPointer);
+  { const s0 = P.get('shop'); if (s0 && LOADERS[s0]) { coldTray(s0); $('#load')?.remove(); } }
   await buildTown(town); robot.quiet = true;
   makeLabels(); ui();
   // cold open on ?shop=: drop the spinner now and let the shop panel show its own skeleton while the API wakes
-  $('#load').remove(); document.body.classList.add('ready');
+  $('#load')?.remove(); document.body.classList.add('ready');
   const start = P.get('shop'); if (start && LOADERS[start]) await enter(start, { instant: true });
   window.__ready = true;
   if (!CAPTURE) { let last = performance.now(); const loop = now => { const dt = Math.min(.05, (now - last) / 1000); last = now; frame(dt); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
@@ -92,8 +93,12 @@ function fillTray(sh) { const p = sh.panel; $('#t-title').innerHTML = `${i3(SHOP
 // shift the room right so the tray (bottom-left) never covers the subject
 function frameShop(c) { c.aspect = innerWidth / innerHeight; const ox = innerWidth > 900 ? -196 : 0; c.setViewOffset(innerWidth, innerHeight, ox, 0, innerWidth, innerHeight); c.updateProjectionMatrix(); }
 let busy = false;
+function coldTray(id) { $('#t-title').innerHTML = `${i3(SHOPS[id].icon, 28)}<span>${SHOPS[id].name || id}</span>`; $('#t-label').textContent = 'Opening the shop…'; $('#t-hero').innerHTML = '<div class="skel" data-testid="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>';
+    const b0 = $('#t-act'); b0.hidden = false; b0.disabled = true; b0.className = 'act primary'; b0.textContent = 'Connect wallet'; document.body.classList.add('in-shop'); tray().hidden = false; $('#brand').hidden = true; }
 export async function enter(id, { instant = false } = {}) {
   if (busy || shop) return; busy = true; sfx('click');
+  // direct link (?shop=): show the panel straight away while the room's 3D and the API load
+  if (instant) coldTray(id);
   const mod = await LOADERS[id](); const tk = {}; const live = () => shop && shop.tk === tk; const sh = await mod.default({ setResult: (...a) => live() && setResult(...a), setHero: (...a) => live() && setHero(...a), live }); sh.id = id; sh.tk = tk; shop = sh; frameShop(sh.camera);
   sh.tags?.forEach(t => { if (t.html) { t.el = document.createElement('div'); t.el.className = 'stag ' + (t.cls || ''); t.el.innerHTML = t.html; $('#stags').appendChild(t.el); } });
   fillTray(sh); if (APP) loadApps().then(m => live() && m.mount(id, sh, run)); controls.enabled = false; Object.values(labels).forEach(l => l.classList.add('gone'));
