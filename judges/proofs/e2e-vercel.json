@@ -5,7 +5,8 @@
       "/workspace/near/tech/nearcarta/node_modules/.bin/playwright",
       "test",
       "-c",
-      "e2e/playwright.config.js"
+      "e2e/playwright.config.js",
+      "--workers=1"
     ],
     "configFile": "/workspace/near/tech/nearcarta/e2e/playwright.config.js",
     "rootDir": "/workspace/near/tech/nearcarta/e2e",
@@ -19,7 +20,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 2
+      "actualWorkers": 1
     },
     "preserveOutput": "always",
     "projects": [
@@ -28,7 +29,7 @@
         "repeatEach": 1,
         "retries": 1,
         "metadata": {
-          "actualWorkers": 2
+          "actualWorkers": 1
         },
         "id": "",
         "name": "",
@@ -48,7 +49,7 @@
         "repeatEach": 1,
         "retries": 1,
         "metadata": {
-          "actualWorkers": 2
+          "actualWorkers": 1
         },
         "name": "",
         "testDir": "/workspace/near/tech/nearcarta/e2e",
@@ -87,7 +88,7 @@
     "updateSnapshots": "default",
     "updateSourceMethod": "patch",
     "version": "1.64.1",
-    "workers": 2,
+    "workers": 1,
     "webServer": null
   },
   "suites": [
@@ -113,12 +114,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2139,
+                  "duration": 2148,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:18.097Z",
+                  "startTime": "2026-11-03T07:40:43.982Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -147,12 +148,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2232,
+                  "duration": 1885,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:20.321Z",
+                  "startTime": "2026-11-03T07:40:46.233Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -181,12 +182,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2170,
+                  "duration": 2059,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:22.562Z",
+                  "startTime": "2026-11-03T07:40:48.126Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -215,12 +216,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1873,
+                  "duration": 1941,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:24.740Z",
+                  "startTime": "2026-11-03T07:40:50.193Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -254,15 +255,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2261,
+                  "duration": 2424,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:18.098Z",
+                  "startTime": "2026-11-03T07:40:52.158Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -288,15 +289,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2272,
+                  "duration": 2321,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:20.442Z",
+                  "startTime": "2026-11-03T07:40:54.594Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -356,7 +357,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:22.133Z",
+                  "startTime": "2026-11-03T07:41:50.085Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -404,7 +405,7 @@
           "specs": [
             {
               "title": "shows the DAO, its council and the latest proposals from chain",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -415,103 +416,20 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
-                      "status": "failed",
-                      "duration": 61670,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/hall.spec.js:7:42",
-                        "location": {
-                          "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
-                          "column": 42,
-                          "line": 7
-                        },
-                        "snippet": "   5 |   test('shows the DAO, its council and the latest proposals from chain', async ({ page }) => {\n   6 |     await page.goto('/shops/hall/');\n>  7 |     await expect(page.locator('#facts')).toContainText('r7thmvr8maey.sputnikv2.testnet', { timeout: 60_000 });\n     |                                          ^\n   8 |     await expect(page.locator('#facts')).toContainText('Anyone may file a proposal');\n   9 |     await expect(page.locator('[data-testid=list] li').first()).toBeVisible({ timeout: 60_000 });\n  10 |     await expect(page.getByTestId('file')).toBeDisabled();"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
-                            "column": 42,
-                            "line": 7
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n\n\n   5 |   test('shows the DAO, its council and the latest proposals from chain', async ({ page }) => {\n   6 |     await page.goto('/shops/hall/');\n>  7 |     await expect(page.locator('#facts')).toContainText('r7thmvr8maey.sputnikv2.testnet', { timeout: 60_000 });\n     |                                          ^\n   8 |     await expect(page.locator('#facts')).toContainText('Anyone may file a proposal');\n   9 |     await expect(page.locator('[data-testid=list] li').first()).toBeVisible({ timeout: 60_000 });\n  10 |     await expect(page.getByTestId('file')).toBeDisabled();\n    at /workspace/near/tech/nearcarta/e2e/hall.spec.js:7:42"
-                        }
-                      ],
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3609,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T04:43:22.730Z",
+                      "startTime": "2026-11-03T07:40:56.928Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "/workspace/near/tech/nearcarta/test-results/hall-town-hall-proposals-s-a87ff-latest-proposals-from-chain/test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/workspace/near/tech/nearcarta/test-results/hall-town-hall-proposals-s-a87ff-latest-proposals-from-chain/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
-                        "column": 42,
-                        "line": 7
-                      }
-                    },
-                    {
-                      "workerIndex": 7,
-                      "parallelIndex": 1,
-                      "status": "failed",
-                      "duration": 61573,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/hall.spec.js:7:42",
-                        "location": {
-                          "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
-                          "column": 42,
-                          "line": 7
-                        },
-                        "snippet": "   5 |   test('shows the DAO, its council and the latest proposals from chain', async ({ page }) => {\n   6 |     await page.goto('/shops/hall/');\n>  7 |     await expect(page.locator('#facts')).toContainText('r7thmvr8maey.sputnikv2.testnet', { timeout: 60_000 });\n     |                                          ^\n   8 |     await expect(page.locator('#facts')).toContainText('Anyone may file a proposal');\n   9 |     await expect(page.locator('[data-testid=list] li').first()).toBeVisible({ timeout: 60_000 });\n  10 |     await expect(page.getByTestId('file')).toBeDisabled();"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
-                            "column": 42,
-                            "line": 7
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n\n\n   5 |   test('shows the DAO, its council and the latest proposals from chain', async ({ page }) => {\n   6 |     await page.goto('/shops/hall/');\n>  7 |     await expect(page.locator('#facts')).toContainText('r7thmvr8maey.sputnikv2.testnet', { timeout: 60_000 });\n     |                                          ^\n   8 |     await expect(page.locator('#facts')).toContainText('Anyone may file a proposal');\n   9 |     await expect(page.locator('[data-testid=list] li').first()).toBeVisible({ timeout: 60_000 });\n  10 |     await expect(page.getByTestId('file')).toBeDisabled();\n    at /workspace/near/tech/nearcarta/e2e/hall.spec.js:7:42"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 1,
-                      "startTime": "2026-11-03T04:44:24.846Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "/workspace/near/tech/nearcarta/test-results/hall-town-hall-proposals-s-a87ff-latest-proposals-from-chain-retry1/test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/workspace/near/tech/nearcarta/test-results/hall-town-hall-proposals-s-a87ff-latest-proposals-from-chain-retry1/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
-                        "column": 42,
-                        "line": 7
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "12efcde6fe54bde8de65-92f8dc872c65e5e69a69",
@@ -542,15 +460,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 8,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 75,
+                      "duration": 72,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T04:45:26.545Z",
+                      "startTime": "2026-11-03T07:41:00.547Z",
                       "annotations": [
                         {
                           "type": "skip",
@@ -622,7 +540,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:26.635Z",
+                  "startTime": "2026-11-03T07:41:00.638Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -676,61 +594,18 @@
                 {
                   "workerIndex": 0,
                   "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 1034,
-                  "error": {
-                    "message": "SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON",
-                    "stack": "SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:5:13",
-                    "location": {
-                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                      "column": 13,
-                      "line": 5
-                    },
-                    "snippet": "  3 |\n  4 | test('health: the API reads NEAR testnet and cannot sign', async ({ request }) => {\n> 5 |   const h = await (await request.get('/api/health')).json();\n    |             ^\n  6 |   expect(h.network).toBe('testnet'); expect(h.near.height).toBeGreaterThan(200_000_000); expect(h.features.signing).toBe(false);\n  7 | });\n  8 |"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                        "column": 13,
-                        "line": 5
-                      },
-                      "message": "SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON\n\n  3 |\n  4 | test('health: the API reads NEAR testnet and cannot sign', async ({ request }) => {\n> 5 |   const h = await (await request.get('/api/health')).json();\n    |             ^\n  6 |   expect(h.network).toBe('testnet'); expect(h.near.height).toBeGreaterThan(200_000_000); expect(h.features.signing).toBe(false);\n  7 | });\n  8 |\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:5:13"
-                    }
-                  ],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-11-03T04:43:26.655Z",
-                  "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-health-the-API-reads-NEAR-testnet-and-cannot-sign/error-context.md"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                    "column": 13,
-                    "line": 5
-                  }
-                },
-                {
-                  "workerIndex": 2,
-                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 10757,
+                  "duration": 721,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
-                  "retry": 1,
-                  "startTime": "2026-11-03T04:43:28.151Z",
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:41:00.658Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "flaky"
+              "status": "expected"
             }
           ],
           "id": "e3b5e6ee814041738c3d-ecd22ed00dce83a58248",
@@ -740,7 +615,7 @@
         },
         {
           "title": "ferry: dry 1Click quote USDC (Base) -> ZEC to a shielded address passes all checks",
-          "ok": false,
+          "ok": true,
           "tags": [],
           "tests": [
             {
@@ -751,103 +626,20 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 6649,
-                  "error": {
-                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n",
-                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47",
-                    "location": {
-                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                      "column": 47,
-                      "line": 13
-                    },
-                    "snippet": "  11 |   await expect(page.locator('input[name=recipient]')).toHaveValue(''); await expect(page.locator('input[name=amount]')).toHaveValue('30');\n  12 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n> 13 |   await expect(page.getByTestId('zec-check')).toContainText('shielded');\n     |                                               ^\n  14 |   await page.getByRole('button', { name: 'Get dry quote' }).click();\n  15 |   const q = page.getByTestId('quote');\n  16 |   await expect(q).toBeVisible({ timeout: 30_000 });"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                        "column": 47,
-                        "line": 13
-                      },
-                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n\n\n  11 |   await expect(page.locator('input[name=recipient]')).toHaveValue(''); await expect(page.locator('input[name=amount]')).toHaveValue('30');\n  12 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n> 13 |   await expect(page.getByTestId('zec-check')).toContainText('shielded');\n     |                                               ^\n  14 |   await page.getByRole('button', { name: 'Get dry quote' }).click();\n  15 |   const q = page.getByTestId('quote');\n  16 |   await expect(q).toBeVisible({ timeout: 30_000 });\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47"
-                    }
-                  ],
+                  "status": "passed",
+                  "duration": 2940,
+                  "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:38.938Z",
+                  "startTime": "2026-11-03T07:41:01.391Z",
                   "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-ferry-dry-1Click-quo-736e0-d-address-passes-all-checks/test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-ferry-dry-1Click-quo-736e0-d-address-passes-all-checks/error-context.md"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                    "column": 47,
-                    "line": 13
-                  }
-                },
-                {
-                  "workerIndex": 3,
-                  "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 6602,
-                  "error": {
-                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n",
-                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47",
-                    "location": {
-                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                      "column": 47,
-                      "line": 13
-                    },
-                    "snippet": "  11 |   await expect(page.locator('input[name=recipient]')).toHaveValue(''); await expect(page.locator('input[name=amount]')).toHaveValue('30');\n  12 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n> 13 |   await expect(page.getByTestId('zec-check')).toContainText('shielded');\n     |                                               ^\n  14 |   await page.getByRole('button', { name: 'Get dry quote' }).click();\n  15 |   const q = page.getByTestId('quote');\n  16 |   await expect(q).toBeVisible({ timeout: 30_000 });"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                        "column": 47,
-                        "line": 13
-                      },
-                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n\n\n  11 |   await expect(page.locator('input[name=recipient]')).toHaveValue(''); await expect(page.locator('input[name=amount]')).toHaveValue('30');\n  12 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n> 13 |   await expect(page.getByTestId('zec-check')).toContainText('shielded');\n     |                                               ^\n  14 |   await page.getByRole('button', { name: 'Get dry quote' }).click();\n  15 |   const q = page.getByTestId('quote');\n  16 |   await expect(q).toBeVisible({ timeout: 30_000 });\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47"
-                    }
-                  ],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 1,
-                  "startTime": "2026-11-03T04:43:46.049Z",
-                  "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-ferry-dry-1Click-quo-736e0-d-address-passes-all-checks-retry1/test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-ferry-dry-1Click-quo-736e0-d-address-passes-all-checks-retry1/error-context.md"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                    "column": 47,
-                    "line": 13
-                  }
+                  "attachments": []
                 }
               ],
-              "status": "unexpected"
+              "status": "expected"
             }
           ],
           "id": "e3b5e6ee814041738c3d-a069f1c05d460722fbfc",
@@ -857,7 +649,7 @@
         },
         {
           "title": "ferry: confidential (basic) quote echoes the privacy level",
-          "ok": false,
+          "ok": true,
           "tags": [],
           "tests": [
             {
@@ -868,103 +660,20 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 988,
-                  "error": {
-                    "message": "SyntaxError: Unexpected end of JSON input",
-                    "stack": "SyntaxError: Unexpected end of JSON input\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:23:15",
-                    "location": {
-                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                      "column": 15,
-                      "line": 23
-                    },
-                    "snippet": "  21 |\n  22 | test('ferry: confidential (basic) quote echoes the privacy level', async ({ page }) => {\n> 23 |   test.skip(!(await (await page.request.get('/api/health')).json()).features.confidentialQuotes, 'no partner key on this deploy');\n     |               ^\n  24 |   await page.goto('/#ferry');\n  25 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n  26 |   await page.locator('select[name=privacy]').selectOption('basic');"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                        "column": 15,
-                        "line": 23
-                      },
-                      "message": "SyntaxError: Unexpected end of JSON input\n\n  21 |\n  22 | test('ferry: confidential (basic) quote echoes the privacy level', async ({ page }) => {\n> 23 |   test.skip(!(await (await page.request.get('/api/health')).json()).features.confidentialQuotes, 'no partner key on this deploy');\n     |               ^\n  24 |   await page.goto('/#ferry');\n  25 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n  26 |   await page.locator('select[name=privacy]').selectOption('basic');\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:23:15"
-                    }
-                  ],
+                  "status": "passed",
+                  "duration": 4038,
+                  "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:53.110Z",
+                  "startTime": "2026-11-03T07:41:04.340Z",
                   "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-ferry-confidential-b-dba44-te-echoes-the-privacy-level/test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-ferry-confidential-b-dba44-te-echoes-the-privacy-level/error-context.md"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                    "column": 15,
-                    "line": 23
-                  }
-                },
-                {
-                  "workerIndex": 5,
-                  "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 845,
-                  "error": {
-                    "message": "SyntaxError: Unexpected end of JSON input",
-                    "stack": "SyntaxError: Unexpected end of JSON input\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:23:15",
-                    "location": {
-                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                      "column": 15,
-                      "line": 23
-                    },
-                    "snippet": "  21 |\n  22 | test('ferry: confidential (basic) quote echoes the privacy level', async ({ page }) => {\n> 23 |   test.skip(!(await (await page.request.get('/api/health')).json()).features.confidentialQuotes, 'no partner key on this deploy');\n     |               ^\n  24 |   await page.goto('/#ferry');\n  25 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n  26 |   await page.locator('select[name=privacy]').selectOption('basic');"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                        "column": 15,
-                        "line": 23
-                      },
-                      "message": "SyntaxError: Unexpected end of JSON input\n\n  21 |\n  22 | test('ferry: confidential (basic) quote echoes the privacy level', async ({ page }) => {\n> 23 |   test.skip(!(await (await page.request.get('/api/health')).json()).features.confidentialQuotes, 'no partner key on this deploy');\n     |               ^\n  24 |   await page.goto('/#ferry');\n  25 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n  26 |   await page.locator('select[name=privacy]').selectOption('basic');\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:23:15"
-                    }
-                  ],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 1,
-                  "startTime": "2026-11-03T04:43:54.577Z",
-                  "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-ferry-confidential-b-dba44-te-echoes-the-privacy-level-retry1/test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-ferry-confidential-b-dba44-te-echoes-the-privacy-level-retry1/error-context.md"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                    "column": 15,
-                    "line": 23
-                  }
+                  "attachments": []
                 }
               ],
-              "status": "unexpected"
+              "status": "expected"
             }
           ],
           "id": "e3b5e6ee814041738c3d-81111cd24dfd0e822200",
@@ -985,15 +694,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 6,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2842,
+                  "duration": 2676,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:43:55.888Z",
+                  "startTime": "2026-11-03T07:41:08.386Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1019,68 +728,20 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 6,
-                  "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 31518,
-                  "error": {
-                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\nExpected: visible\nTimeout: 30000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first() with timeout 30000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\u001b[22m\n",
-                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\nExpected: visible\nTimeout: 30000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first() with timeout 30000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:43:101",
-                    "location": {
-                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                      "column": 101,
-                      "line": 43
-                    },
-                    "snippet": "  41 |   await page.goto('/#guardhouse');\n  42 |   // Accounts show a readable name; the full id is the link title and target.\n> 43 |   await expect(page.getByTestId('oath-state').locator(`a[title=\"${dep.guardhouse.oath}\"]`).first()).toBeVisible({ timeout: 30_000 });\n     |                                                                                                     ^\n  44 |   await expect(page.getByTestId('fak')).toHaveText('0');\n  45 |   await expect(page.getByTestId('oath-state')).toContainText('propose');\n  46 | });"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                        "column": 101,
-                        "line": 43
-                      },
-                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\nExpected: visible\nTimeout: 30000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first() with timeout 30000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\u001b[22m\n\n\n  41 |   await page.goto('/#guardhouse');\n  42 |   // Accounts show a readable name; the full id is the link title and target.\n> 43 |   await expect(page.getByTestId('oath-state').locator(`a[title=\"${dep.guardhouse.oath}\"]`).first()).toBeVisible({ timeout: 30_000 });\n     |                                                                                                     ^\n  44 |   await expect(page.getByTestId('fak')).toHaveText('0');\n  45 |   await expect(page.getByTestId('oath-state')).toContainText('propose');\n  46 | });\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:43:101"
-                    }
-                  ],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-11-03T04:43:58.820Z",
-                  "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-guardhouse-oath-acco-2a88c-nd-a-propose-only-agent-key/test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-guardhouse-oath-acco-2a88c-nd-a-propose-only-agent-key/error-context.md"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                    "column": 101,
-                    "line": 43
-                  }
-                },
-                {
-                  "workerIndex": 8,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2397,
+                  "duration": 2528,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
-                  "retry": 1,
-                  "startTime": "2026-11-03T04:44:30.792Z",
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:41:11.069Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "flaky"
+              "status": "expected"
             }
           ],
           "id": "e3b5e6ee814041738c3d-40c648e334fb9e4bc6f6",
@@ -1101,15 +762,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 8,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 11915,
+                  "duration": 8521,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:44:33.278Z",
+                  "startTime": "2026-11-03T07:41:13.606Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1135,15 +796,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 8,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 10400,
+                  "duration": 2431,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:44:45.205Z",
+                  "startTime": "2026-11-03T07:41:22.135Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1169,15 +830,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 8,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3287,
+                  "duration": 3355,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:44:55.615Z",
+                  "startTime": "2026-11-03T07:41:24.575Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1203,15 +864,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 8,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2570,
+                  "duration": 2648,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:44:58.911Z",
+                  "startTime": "2026-11-03T07:41:27.939Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1237,15 +898,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 8,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2275,
+                  "duration": 2899,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:01.490Z",
+                  "startTime": "2026-11-03T07:41:30.598Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1271,15 +932,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 8,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 5951,
+                  "duration": 5887,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:03.776Z",
+                  "startTime": "2026-11-03T07:41:33.505Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1305,15 +966,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 8,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 5911,
+                  "duration": 3918,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:09.750Z",
+                  "startTime": "2026-11-03T07:41:39.400Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1339,15 +1000,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 8,
+                  "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2213,
+                  "duration": 2437,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:15.673Z",
+                  "startTime": "2026-11-03T07:41:43.326Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1407,7 +1068,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:17.895Z",
+                  "startTime": "2026-11-03T07:41:45.771Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1466,15 +1127,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 8,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1929,
+                      "duration": 2383,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T04:45:17.900Z",
+                      "startTime": "2026-11-03T07:41:45.776Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1510,15 +1171,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 8,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 82,
+                      "duration": 52,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T04:45:19.839Z",
+                      "startTime": "2026-11-03T07:41:48.167Z",
                       "annotations": [
                         {
                           "type": "skip",
@@ -1562,15 +1223,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 8,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2147,
+                      "duration": 1784,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T04:45:19.930Z",
+                      "startTime": "2026-11-03T07:41:48.227Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1606,15 +1267,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 8,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 41,
+                      "duration": 60,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T04:45:22.084Z",
+                      "startTime": "2026-11-03T07:41:50.017Z",
                       "annotations": [
                         {
                           "type": "skip",
@@ -1678,7 +1339,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:22.133Z",
+                  "startTime": "2026-11-03T07:41:50.084Z",
                   "annotations": [
                     {
                       "type": "skip",
@@ -1748,7 +1409,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:22.133Z",
+                  "startTime": "2026-11-03T07:41:50.084Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1818,7 +1479,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:22.133Z",
+                  "startTime": "2026-11-03T07:41:50.085Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1888,7 +1549,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:22.133Z",
+                  "startTime": "2026-11-03T07:41:50.085Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1966,7 +1627,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:22.133Z",
+                  "startTime": "2026-11-03T07:41:50.085Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -2036,7 +1697,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T04:45:22.133Z",
+                  "startTime": "2026-11-03T07:41:50.085Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -2072,11 +1733,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-03T04:43:17.707Z",
-    "duration": 128985.376,
-    "expected": 17,
+    "startTime": "2026-11-03T07:40:43.596Z",
+    "duration": 66567.58,
+    "expected": 22,
     "skipped": 12,
-    "unexpected": 3,
-    "flaky": 2
+    "unexpected": 0,
+    "flaky": 0
   }
 }
