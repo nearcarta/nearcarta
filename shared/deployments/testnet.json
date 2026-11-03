@@ -353,26 +353,39 @@
     }
   },
   "house_deed": {
-    "contract": "deed-mvronpbm.nc-vault-mvrojr9w.testnet",
-    "standard": "NEP-171 + NEP-177 metadata + NEP-178 approvals + NEP-181 enumeration",
-    "code_hash": "9xqVzKnPgToCggnkStuEgM2ZgdyfbCcejTKf1jehED4m",
-    "wasm": "contracts/artifacts/house_nft.wasm",
-    "wasm_sha256": "852b475fedbe00c4e42773050ee1cf35fa898c50042bdeeb9879b55d107d05b2",
-    "repro_commit": "59896befe6c565e111c8eab9758208df88397be6",
+    "contract": "deedv2-mw024ca6.nc-vault-mvrojr9w.testnet",
+    "version": "v2: the deed is the house (purse + cap, holder-only spend)",
+    "standard": "NEP-171 + NEP-177 metadata + NEP-178 approvals + NEP-181 enumeration + NEP-297 events",
+    "code_hash": "8dU7knznYM875Jakyj9C4C1kMQVWHddZ4X3SrUNHBxwE",
+    "wasm": "contracts/artifacts/house_nft.v2.wasm",
+    "wasm_sha256": "715960d81ad5fa4ce996fb158536cf88ad485bc06e6b5971f161094c2acd63f5",
     "access_keys": 0,
     "mint": {
       "method": "mint_deed",
       "args": {
-        "house": "optional charter account"
+        "house": "optional charter account",
+        "cap": "yocto per payment, max 5 NEAR"
       },
-      "deposit_yocto": "20000000000000000000000",
+      "deposit_yocto": "120000000000000000000000",
       "gas": "30000000000000"
     },
-    "proof": "judges/proofs/house-deed.json",
+    "methods": {
+      "fund": "house_fund",
+      "pay": "house_pay (1 yocto, holder only, <= cap)",
+      "lower_cap": "house_lower_cap (1 yocto)",
+      "purse": "house_purse"
+    },
+    "proof": "judges/proofs/house-deed-v2.json",
     "proof_txs": {
-      "deploy_batch": "GvqA8LTfZk1KWCMk5cLgXuTumLT6hktpZUjUnfgSdXxu",
-      "mint_deed": "7RxQxK5WnzsaVdQGxxikNVPsWV2zy6MLpKGvJAKzqw6H",
-      "mint_again_refused": "7bwM6hTAThLSpymxqvkQCJXrK4WivKZyiGm58PQaZJGL"
+      "deploy_batch": "DW6x2VpGH4td8yyPNsUJPfUikw7huUNyGjs8YRR9DWNC",
+      "mint_deed_with_purse": "ENtQbXU7WnU7edYYXfuYapC9LDSMFiC5KMcREhhZbrWh",
+      "stranger_funds_house": "8xsikqU6p8ZWYQwjeM8isr1qjk3XSJfi9up4K815wz8k",
+      "holder_pays_under_cap": "CoWb3MZcfAQ3774LZbvMwZaXokJ7JboEhEm5zbQFPRCy",
+      "over_cap_refused": "FXr4yKTGMWWQm8WDYy6S8fStPH9RRxT6UugZjf7Ko3cM",
+      "no_yocto_refused": "ABVFQocmAkRZxiVNKX7qJ1sx99mqyd4AS6hwv3Ecng4h",
+      "deed_transferred": "HN4Da25Gj6FBrn3gektEvsmBR8ibysr4RGFDWKpV4HUc",
+      "old_holder_refused": "CcNw5jtgMRxQQoasHMUvnbE3CCVqt3LhdJpMohfnY8Ms",
+      "new_holder_pays": "A3zYSoRTK7xeGPXiK4WmeCW2QCjqqbawBAXRcAEobKSS"
     }
   },
   "toll_arbitrum": {
@@ -631,6 +644,29 @@
       "scam_lookalike_refused": "95PgMqSuM1pG7CrnmFMSQfB8kPvQnvaNRvEJ4Dn2TYym",
       "scam_split_under_cap_refused": "9UWjcJZoXjK6QsMRQ7YokmQM3okwdVhGwXx9pSdjnkT6",
       "scam_repeat_drain_refused": "DZ5Xs5pjRVw1HC6SaPj86UzpGqHF39YvDamPXs1dYY9w"
+    }
+  },
+  "house_deed_v1": {
+    "contract": "deed-mvronpbm.nc-vault-mvrojr9w.testnet",
+    "standard": "NEP-171 + NEP-177 metadata + NEP-178 approvals + NEP-181 enumeration",
+    "code_hash": "9xqVzKnPgToCggnkStuEgM2ZgdyfbCcejTKf1jehED4m",
+    "wasm": "contracts/artifacts/house_nft.wasm",
+    "wasm_sha256": "852b475fedbe00c4e42773050ee1cf35fa898c50042bdeeb9879b55d107d05b2",
+    "repro_commit": "59896befe6c565e111c8eab9758208df88397be6",
+    "access_keys": 0,
+    "mint": {
+      "method": "mint_deed",
+      "args": {
+        "house": "optional charter account"
+      },
+      "deposit_yocto": "20000000000000000000000",
+      "gas": "30000000000000"
+    },
+    "proof": "judges/proofs/house-deed.json",
+    "proof_txs": {
+      "deploy_batch": "GvqA8LTfZk1KWCMk5cLgXuTumLT6hktpZUjUnfgSdXxu",
+      "mint_deed": "7RxQxK5WnzsaVdQGxxikNVPsWV2zy6MLpKGvJAKzqw6H",
+      "mint_again_refused": "7bwM6hTAThLSpymxqvkQCJXrK4WivKZyiGm58PQaZJGL"
     }
   }
 }

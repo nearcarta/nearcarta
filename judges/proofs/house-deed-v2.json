@@ -1,0 +1,106 @@
+{
+ "contract": "deedv2-mw024ca6.nc-vault-mvrojr9w.testnet",
+ "holder1": "nc-vault-mvrojr9w.testnet",
+ "holder2": "r10own-19371.testnet",
+ "wasm_sha256": "715960d81ad5fa4ce996fb158536cf88ad485bc06e6b5971f161094c2acd63f5",
+ "wasm_bytes": 226414,
+ "steps": [
+  {
+   "step": "deploy_batch",
+   "tx": "DW6x2VpGH4td8yyPNsUJPfUikw7huUNyGjs8YRR9DWNC",
+   "ok": true,
+   "as_expected": true
+  },
+  {
+   "step": "mint_deed_with_purse",
+   "tx": "ENtQbXU7WnU7edYYXfuYapC9LDSMFiC5KMcREhhZbrWh",
+   "ok": true,
+   "as_expected": true
+  },
+  {
+   "step": "stranger_funds_house",
+   "tx": "8xsikqU6p8ZWYQwjeM8isr1qjk3XSJfi9up4K815wz8k",
+   "ok": true,
+   "as_expected": true
+  },
+  {
+   "step": "holder_pays_under_cap",
+   "tx": "CoWb3MZcfAQ3774LZbvMwZaXokJ7JboEhEm5zbQFPRCy",
+   "ok": true,
+   "as_expected": true
+  },
+  {
+   "step": "over_cap_refused",
+   "tx": "FXr4yKTGMWWQm8WDYy6S8fStPH9RRxT6UugZjf7Ko3cM",
+   "ok": false,
+   "error": "\"ActionError\":{\"index\":0,\"kind\":{\"FunctionCallError\":{\"ExecutionError\":\"Smart contract panicked: over the deed's cap per payment\"",
+   "as_expected": true
+  },
+  {
+   "step": "no_yocto_refused",
+   "tx": "ABVFQocmAkRZxiVNKX7qJ1sx99mqyd4AS6hwv3Ecng4h",
+   "ok": false,
+   "error": "\"ActionError\":{\"index\":0,\"kind\":{\"FunctionCallError\":{\"ExecutionError\":\"Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR\"",
+   "as_expected": true
+  },
+  {
+   "step": "deed_transferred",
+   "tx": "HN4Da25Gj6FBrn3gektEvsmBR8ibysr4RGFDWKpV4HUc",
+   "ok": true,
+   "as_expected": true
+  },
+  {
+   "step": "old_holder_refused",
+   "tx": "CcNw5jtgMRxQQoasHMUvnbE3CCVqt3LhdJpMohfnY8Ms",
+   "ok": false,
+   "error": "\"ActionError\":{\"index\":0,\"kind\":{\"FunctionCallError\":{\"ExecutionError\":\"Smart contract panicked: only the deed holder may spend from this house\"",
+   "as_expected": true
+  },
+  {
+   "step": "new_holder_pays",
+   "tx": "A3zYSoRTK7xeGPXiK4WmeCW2QCjqqbawBAXRcAEobKSS",
+   "ok": true,
+   "as_expected": true
+  },
+  {
+   "step": "reads",
+   "nft_metadata": {
+    "spec": "nft-1.0.0",
+    "name": "Nearcarta House deeds v2",
+    "symbol": "DEED",
+    "icon": null,
+    "base_uri": null,
+    "reference": null,
+    "reference_hash": null
+   },
+   "nft_token": {
+    "token_id": "nc-vault-mvrojr9w.testnet",
+    "owner_id": "r10own-19371.testnet",
+    "metadata": {
+     "title": "House of nc-vault-mvrojr9w.testnet",
+     "description": "Holder of this deed controls the house purse.",
+     "media": null,
+     "media_hash": null,
+     "copies": 1,
+     "issued_at": "1793672212130",
+     "expires_at": null,
+     "starts_at": null,
+     "updated_at": null,
+     "extra": null,
+     "reference": null,
+     "reference_hash": null
+    },
+    "approved_account_ids": {}
+   },
+   "house_purse": {
+    "balance": "100000000000000000000000",
+    "cap": "50000000000000000000000",
+    "paid": "50000000000000000000000",
+    "pays": 2,
+    "refused_note": null
+   },
+   "code_hash": "8dU7knznYM875Jakyj9C4C1kMQVWHddZ4X3SrUNHBxwE",
+   "access_keys": 0
+  }
+ ]
+}
