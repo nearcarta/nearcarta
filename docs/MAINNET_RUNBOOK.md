@@ -146,7 +146,12 @@ Mainnet runs protocol 86 and testnet 88. Builds with near-sdk 5.28 or newer impo
    - agent propose 0.001 allowed: `JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy`; 0.003 denied `over_per_action_cap`: `BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH`
    - full-access key deleted: `71Zio28gV3yubD5DecGtkguWzWdfix8brcKFy13d3zzt`
    - final: 426,432 bytes (4.264 NEAR locked), balance 4.360, one key (function call, `propose`/`propose_batch`).
-4. Toll: waiting. The root holds 2.217 NEAR; the toll needs about 2.67 (2.537 locked for 253,678 bytes, plus the deploy gas reserve and fees). About 0.5 NEAR more on `nearcarta.near` lets the same command run without `CHARTER_ONLY` (it skips every step already done).
+4. Toll (same command without `CHARTER_ONLY`, after the 10 NEAR were moved to `nearcarta.near` in `6afg8RZ5b1hdqZQ5CHdsg46dgBT8zrcvnioAckFse3Xi`):
+   - fund `64HuNHJ8jKA4zBJyKNDdQkXasyvmgizbGT5wYBWVb2Fa`; deploy + init + agent key `6KgwM4Q1VmLfvgK8vDBkWg92S65ZLcFsUb6NNXsAEWXc`; sweep `DVFgzmAx2My6cki1q6wXyNsm2VHQ3HzZo1KZHKwQtqEd`
+   - allowlisted pay, MPC-signed (signed only, not broadcast on Base): `4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz`; non-allowlisted refused: `B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR`
+   - full-access key deleted: `6C1rLPtYKpxQgX5ZYFYSyGsbQEify9AVQ23fdXKAskxY`
+   - final: 253,139 bytes, code hash `9RQw6e1PL81HSQ1x6dr6dyvv9yAMMBdqChRToyHuDwDP`.
+5. Arena, house deed and Town Hall: see Part C in `docs/MAINNET_CONSOLIDATION.md`.
 
 ## Reproducible builds
 
@@ -154,7 +159,7 @@ Not yet reproducible. `cargo near build reproducible-wasm` fails on this box bec
 
 ## Config switch
 
-- `shared/deployments/mainnet.json` holds the mainnet record (`status: not_deployed` until the run).
+- `shared/deployments/mainnet.json` holds the mainnet record (`status: deployed`).
 - `/api/mainnet` serves it read-only.
 - `NEAR_NET=mainnet` overlays the deployed mainnet ids on the testnet set, and only once the status is `deployed`.
 - The default stays testnet.
