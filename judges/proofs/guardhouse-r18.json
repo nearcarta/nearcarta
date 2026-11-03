@@ -1,0 +1,88 @@
+{
+ "charter": "guardhouse-nzjp.nccharters-22195.testnet",
+ "owner": "r14own-53673.testnet",
+ "factory": "nccharters-22195.testnet",
+ "replaces": "r11oath-82930.testnet",
+ "steps": [
+  {
+   "step": "create_charter",
+   "tx": "BpbdtFedGEYwVmMCJ6zn3q5DfvCqxTFoZcgABKTsybGP",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.007802,
+   "ret": "true"
+  },
+  {
+   "step": "set_clauses_and_agent_key_no_allowance",
+   "tx": "937e2rveJmnrmZUbP3VmNc7qieJvRckDjX4QYt1g9DZA",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.001107,
+   "ret": "true"
+  },
+  {
+   "step": "close_setup",
+   "tx": "4fuEa1ZkbZDw8nt5kkHsnuH4a2ZvHYK4qtG8qjnFUZWh",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000193
+  },
+  {
+   "step": "agent_tip_allowed_0.01",
+   "tx": "HqJYNkPL6bp8PB5iaoZu9AQ7o1YUaCR8VywuD7X6qJd7",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000636,
+   "ret": "{\"action_id\":\"0\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}"
+  },
+  {
+   "step": "agent_tip2_over_cap_0.02",
+   "tx": "5WakJ1miifvzHFfSAkn67o7P8n5q5ER89dHfnH7Vbf1m",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000275,
+   "ret": "{\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_per_action_cap\"}"
+  }
+ ],
+ "keys": [
+  {
+   "public_key": "ed25519:8kFAosEoiA794JtZHjA32RgE2HrSmSkHH5GAvg3rB3VE",
+   "permission": {
+    "FunctionCall": {
+     "allowance": null,
+     "method_names": [
+      "propose",
+      "propose_batch"
+     ],
+     "receiver_id": "guardhouse-nzjp.nccharters-22195.testnet"
+    }
+   }
+  }
+ ],
+ "state": {
+  "owner": "r14own-53673.testnet",
+  "dao": "dao.r11own-82930.testnet",
+  "agent_key": "ed25519:8kFAosEoiA794JtZHjA32RgE2HrSmSkHH5GAvg3rB3VE",
+  "frozen": false,
+  "freeze_epoch": 0,
+  "policy_version": 4,
+  "policy_hash": "e9e31566056576e01c49015c060f80b05dd6a4ba0817278a2e19dd89d3d112c5",
+  "next_nonce": "2",
+  "next_action": "1",
+  "prune_cursor": "0",
+  "policy_delay_ns": "600000000000",
+  "storage_reserve": "100000000000000000000000",
+  "pending_changes": 0,
+  "setup_open": false,
+  "storage_usage": "1351"
+ },
+ "cost": {
+  "owner_spent_near": 1.009102,
+  "charter_balance_after_near": 0.979087,
+  "charter_storage_bytes": 1351,
+  "gas_per_propose_near": [
+   0.000636,
+   0.000275
+  ]
+ }
+}

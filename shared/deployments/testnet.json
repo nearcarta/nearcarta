@@ -8,10 +8,10 @@
   ],
   "explorer": "https://testnet.nearblocks.io",
   "guardhouse": {
-    "oath": "r11oath-82930.testnet",
-    "owner": "r11own-82930.testnet",
+    "oath": "guardhouse-nzjp.nccharters-22195.testnet",
+    "owner": "r14own-53673.testnet",
     "dao": "dao.r11own-82930.testnet",
-    "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
+    "code_hash": "HTiSRFyV2ksRfVzZzEjmZZb5Vf6GMPk6i418mCxbZij",
     "allowed_receiver": "bakery.r10own-19371.testnet",
     "attacker": "attacker.r10own-19371.testnet",
     "proof_txs": {
@@ -26,7 +26,25 @@
       "owner_unfreeze_refused": "9a2AqaPVuFcPegRue67ycdfEuwz4k6RaWJaogDpQiak7",
       "escalated_owner_approved": "AxYjEL2XxpDFLA1Fpkw5EiqGJK7j2sFZymNBbkiVwWkD",
       "owner_resolve_approve": "EduSJN1HNLhQU8kNe2nydaHxB9bd6NUDR3ry8DCZL8KE"
-    }
+    },
+    "factory": "nccharters-22195.testnet",
+    "agent_key": {
+      "public_key": "ed25519:8kFAosEoiA794JtZHjA32RgE2HrSmSkHH5GAvg3rB3VE",
+      "allowance": null,
+      "methods": [
+        "propose",
+        "propose_batch"
+      ]
+    },
+    "proof_txs_charter": "r11oath-82930.testnet",
+    "r18_txs": {
+      "create_charter": "BpbdtFedGEYwVmMCJ6zn3q5DfvCqxTFoZcgABKTsybGP",
+      "clauses_and_agent_key_no_allowance": "937e2rveJmnrmZUbP3VmNc7qieJvRckDjX4QYt1g9DZA",
+      "close_setup": "4fuEa1ZkbZDw8nt5kkHsnuH4a2ZvHYK4qtG8qjnFUZWh",
+      "agent_tip_allowed": "HqJYNkPL6bp8PB5iaoZu9AQ7o1YUaCR8VywuD7X6qJd7",
+      "agent_tip2_over_cap_denied": "5WakJ1miifvzHFfSAkn67o7P8n5q5ER89dHfnH7Vbf1m"
+    },
+    "r18_proof": "judges/proofs/guardhouse-r18.json"
   },
   "townhall": {
     "charter": "townhall.nccharters-17102.testnet",
@@ -451,7 +469,7 @@
       "near_tx": "Abr2cKQFLk115MWVoG3RMFxQP9ya7S1d76mggdUSafLr",
       "chain": "Arbitrum",
       "foreign_tx": "0xee42361cea2ff228cc1703e91188acc8b39c412bb2bf09335c72169be7139ed7",
-      "note": "Direct verify_foreign_transaction call: the testnet MPC verified a finalized Arbitrum Sepolia tx (block 323769632). Its payload hash 6e6b1eb1\u2026 is pinned in contracts/toll/src/tests.rs."
+      "note": "Direct verify_foreign_transaction call: the testnet MPC verified a finalized Arbitrum Sepolia tx (block 323769632). Its payload hash 6e6b1eb1… is pinned in contracts/toll/src/tests.rs."
     }
   },
   "townhall_r16": {
@@ -727,5 +745,14 @@
       "agent_gas_two_proposes_near": 0.000885
     },
     "proof": "judges/proofs/oath-r18.json"
-  }
+  },
+  "guardhouse_history": [
+    {
+      "oath": "r11oath-82930.testnet",
+      "owner": "r11own-82930.testnet",
+      "dao": "dao.r11own-82930.testnet",
+      "code_hash": "EpfJkY8tgedM1T6iZH6kFAUBy4iuEihvmQFvPU3Co9Zq",
+      "note": "R11 guardhouse charter; its capped agent key was revoked (AokHpHPwDJJA3DL2d6NTRVeemuEebh5RBCK5XWHUDnzC) and R11 code cannot hold a key with no allowance. History stays readable; proof_txs ran here."
+    }
+  ]
 }
