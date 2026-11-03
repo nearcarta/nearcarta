@@ -184,7 +184,7 @@ body.apps #t-act.busy::before { content: ''; width: 14px; height: 14px; border-r
 .pts { font-size: 14px; color: var(--muted); margin-left: var(--s1); }
 #r-body fieldset { padding: 0; margin: 0; min-width: 0; }
 body.apps:has(#rules.open) #tray { opacity: .35; pointer-events: none; }
-body.apps:has(#rules.open) #t-act { visibility: hidden; }
+body.apps:has(#rules.open) #t-act { display: none; }
 details.rc { display: inline-block; }
 details.rc summary { cursor: pointer; list-style: none; color: var(--muted); font-family: var(--sans, inherit); font-size: 12px; text-decoration: underline dotted; text-underline-offset: 3px; }
 details.rc summary::-webkit-details-marker { display: none; }
