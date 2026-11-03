@@ -60,9 +60,9 @@ const pay = () => S.clauses.pay;
 // every signed result shows its tx as one visible link (round-2 judges: a collapsed "details" read as no link at all)
 export const txLine = (h, label = 'receipt') => h ? `<a class="rc tx" data-testid="receipt" href="${NBX}/txns/${esc(h)}" target="_blank" rel="noopener" title="${esc(label)} on chain">${label === '↗' ? '↗' : `tx ${esc(short(h))} ↗`}</a>` : '';
 export const receipts = () => (S.charter ? JSON.parse(localStorage.getItem(LS_RCPT(S.charter)) || '[]') : []);
-function keep(h, shop, decision, reason) {
+function keep(h, shop, decision, reason, x = {}) {
   if (!S.charter || !h) return; const k = LS_RCPT(S.charter); const l = JSON.parse(localStorage.getItem(k) || '[]');
-  l.unshift({ h, shop, decision, reason, at: Date.now() }); localStorage.setItem(k, JSON.stringify(l.slice(0, 40)));
+  l.unshift({ h, shop, decision, reason, ...x, at: Date.now() }); localStorage.setItem(k, JSON.stringify(l.slice(0, 40)));
 }
 
 // ---------- boot + wallet ----------
@@ -152,7 +152,7 @@ export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = nu
   const r = await W.sendPropose(rpc, { key, charter: S.charter, p });
   const v = r.value || {};
   const out = { tx: r.hash, decision: r.ok ? v.decision : 'failed', reason: r.ok ? v.reason : r.error, action: v.action_id ?? null, amount: p.amount, receiver };
-  keep(out.tx, shop, out.decision, out.reason); readRules().catch(() => {});
+  keep(out.tx, shop, out.decision, out.reason, { amt: p.amount, to: receiver }); readRules().catch(() => {});
   return out;
 }
 export function ruleFor(o, clauseId = 'pay') {
