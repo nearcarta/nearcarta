@@ -54,7 +54,8 @@ let zseq = 0;
 async function zcheck() {
   const to = form.to.value.split('|')[1], el = $('#ferry-zec'), addr = form.recipient.value.trim(), my = ++zseq;
   if (to !== 'zec' || !addr) { el.innerHTML = ''; return; }
-  try { const z = await get('/api/ferry/zcash/' + encodeURIComponent(addr));
+  // The address check is local to the server; a 503 means the API was restarting, so it retries twice.
+  try { const z = await get('/api/ferry/zcash/' + encodeURIComponent(addr)).catch(async e => { for (let i = 0; i < 2 && /503|502|504|fetch/i.test(e.message); i++) { await new Promise(r => setTimeout(r, 4000)); try { return await get('/api/ferry/zcash/' + encodeURIComponent(addr)); } catch (e2) { e = e2; } } throw e; });
     if (my !== zseq) return; // a newer address was typed while this one was being checked
     el.innerHTML = `<div class="card" data-testid="zec-check">Zcash recipient: <b>${esc(z.kind)}</b> · receivers ${esc(z.receivers.join(', '))} · ${z.shielded ? '<b class="pass">shielded</b>' : '<b class="fail">public on Zcash</b>'}<br><span class="note">${esc(z.note)}</span></div>`;
   } catch (e) { if (my !== zseq) return; const t = /^t[13]/.test(addr);
