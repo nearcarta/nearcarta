@@ -1,0 +1,82 @@
+{
+ "charter": "r18demo.r14own-53673.testnet",
+ "owner": "r14own-53673.testnet",
+ "wasm": "contracts/artifacts/oath.r18.wasm",
+ "wasm_sha256": "04377fc33eb9f0f1bdf384055e8baac7828d2d0e7f259dfe3dcc2305487c0a14",
+ "wasm_bytes": 401334,
+ "steps": [
+  {
+   "step": "deploy_batch",
+   "signer": "r14own-53673.testnet",
+   "tx": "36SHri1xuvUgHHEGXLnoC1hqABv5FJywU4zKeFTRW5A9",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.011831
+  },
+  {
+   "step": "set_clause",
+   "signer": "r14own-53673.testnet",
+   "tx": "Gsoiv23Jaeosf2ErA39GMPBjBdRuKMuxK67eSTo4db78",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000217,
+   "ret": "{\"applied\":true,\"policy_version\":2}"
+  },
+  {
+   "step": "set_agent_key_no_allowance",
+   "signer": "r14own-53673.testnet",
+   "tx": "CJ3Mb9Vo9eiJXN49nxFJjmdn4CZuzP6YSvDQ1wPq4Wtb",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000502,
+   "ret": "true"
+  },
+  {
+   "step": "agent_propose_allowed_0.01",
+   "signer": "r18demo.r14own-53673.testnet",
+   "tx": "Hs1yKoJeX7h2HYx5zUeipKwgfepypS4T6LAmqqJ5mLvY",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000617,
+   "ret": "{\"action_id\":\"0\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}"
+  },
+  {
+   "step": "agent_propose_over_cap_0.03",
+   "signer": "r18demo.r14own-53673.testnet",
+   "tx": "CdccnWeet3gDa9P1hNYoT8ktrgyPAEohewRpZv9r3jiC",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000268,
+   "ret": "{\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_per_action_cap\"}"
+  }
+ ],
+ "keys": [
+  {
+   "public_key": "ed25519:9GN9CL8BEMRxUz2jMpWzbWamPCE9F1R1pgr1KU46MNVN",
+   "permission": {
+    "FunctionCall": {
+     "allowance": null,
+     "method_names": [
+      "propose",
+      "propose_batch"
+     ],
+     "receiver_id": "r18demo.r14own-53673.testnet"
+    }
+   }
+  }
+ ],
+ "cost": {
+  "owner_spent_near": 4.312551,
+  "funded_to_charter_near": 4.3,
+  "charter_storage_bytes": 402361,
+  "charter_locked_storage_near": 4.02361,
+  "charter_balance_after_near": 4.289114,
+  "charter_spent_on_two_proposes_near": 0.010885,
+  "of_which_payment_near": 0.01,
+  "gas_per_propose_near": [
+   0.000617,
+   0.000268
+  ],
+  "owner_setup_gas_near": 0.01255
+ }
+}

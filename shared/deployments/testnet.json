@@ -668,5 +668,34 @@
       "mint_deed": "7RxQxK5WnzsaVdQGxxikNVPsWV2zy6MLpKGvJAKzqw6H",
       "mint_again_refused": "7bwM6hTAThLSpymxqvkQCJXrK4WivKZyiGm58PQaZJGL"
     }
+  },
+  "oath_r18_demo": {
+    "charter": "r18demo.r14own-53673.testnet",
+    "owner": "r14own-53673.testnet",
+    "wasm": "contracts/artifacts/oath.r18.wasm",
+    "full_access_keys": 0,
+    "agent_key": {
+      "public_key": "ed25519:9GN9CL8BEMRxUz2jMpWzbWamPCE9F1R1pgr1KU46MNVN",
+      "allowance": null,
+      "methods": [
+        "propose",
+        "propose_batch"
+      ]
+    },
+    "txs": {
+      "deploy": "36SHri1xuvUgHHEGXLnoC1hqABv5FJywU4zKeFTRW5A9",
+      "set_clause": "Gsoiv23Jaeosf2ErA39GMPBjBdRuKMuxK67eSTo4db78",
+      "set_agent_key_no_allowance": "CJ3Mb9Vo9eiJXN49nxFJjmdn4CZuzP6YSvDQ1wPq4Wtb",
+      "propose_allowed": "Hs1yKoJeX7h2HYx5zUeipKwgfepypS4T6LAmqqJ5mLvY",
+      "propose_over_cap_denied": "CdccnWeet3gDa9P1hNYoT8ktrgyPAEohewRpZv9r3jiC"
+    },
+    "true_cost_testnet": {
+      "owner_spent_near": 4.312551,
+      "locked_storage_near": 4.02361,
+      "storage_bytes": 402361,
+      "setup_gas_near": 0.01255,
+      "agent_gas_two_proposes_near": 0.000885
+    },
+    "proof": "judges/proofs/oath-r18.json"
   }
 }
