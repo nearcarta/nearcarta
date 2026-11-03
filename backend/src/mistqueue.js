@@ -38,7 +38,7 @@ const sha256hex = s => createHash('sha256').update(s).digest('hex');
 
 // The published oath builds a charter may run (R11 guardhouse/house, R15 factory pin, legacy factory, R16).
 export const OATH_HASHES = [...new Set([DEP.guardhouse?.code_hash, DEP.house?.code_hash, DEP.vault?.code_hash,
-  ...(DEP.vault?.legacy || []).map(l => l.code_hash), DEP.oath_r16?.code_hash].filter(Boolean))];
+  ...(DEP.vault?.legacy || []).map(l => l.code_hash), DEP.vault?.runner_factory?.code_hash, DEP.oath_r16?.code_hash].filter(Boolean))];
 
 export function checkUa(ua) {
   if (typeof ua !== 'string' || ua.length > 1000 || !/^utest1[0-9a-z]+$/.test(ua)) throw err(400, 'ua must be a Zcash testnet unified address (utest1...)');

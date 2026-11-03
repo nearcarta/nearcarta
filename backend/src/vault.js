@@ -9,7 +9,7 @@
 //
 // Exception to "no route can sign": POST /api/vault/attack, /api/vault/task and /api/vault/ask sign `propose` on
 // the SHARED arena charter with ARENA_AGENT_KEY. That key is a function-call key that can only call
-// `propose` on that one charter, with a gas allowance; the charter's clause (allowlist, small caps,
+// `propose` on those charters, with no gas allowance (R18: a capped key locks out for good once its gas runs out); the charter's clause (allowlist, small caps,
 // daily budget) bounds what an allowed step can move. The runner signs at 30 Tgas and stops at a
 // daily tx cap. The key is read lazily and never logged or returned. Rows it signs are labelled
 // server_signed.
@@ -33,9 +33,9 @@ export const isAccount = a => typeof a === 'string' && ACCOUNT_RE.test(a);
 const ARCHIVAL = process.env.ARCHIVAL_RPC || 'https://archival-rpc.testnet.fastnear.com';
 
 /** Factories whose charters count: the live one first, then earlier releases (kept for history). */
-const ARENAS = new Set(V ? [V.arena.charter, ...(V.arena.pool || []), ...(V.legacy || []).map(l => l.arena?.charter).filter(Boolean)] : []);
+const ARENAS = new Set(V ? [V.arena.charter, ...(V.arena.pool || []), ...(V.arena_history ? [V.arena_history.charter, ...(V.arena_history.pool || [])] : []), ...(V.legacy || []).map(l => l.arena?.charter).filter(Boolean)] : []);
 export const isShared = c => ARENAS.has(c);
-export const FACTORIES = V ? [{ factory: V.factory, code_hash: V.code_hash }, ...(V.legacy || []).map(l => ({ factory: l.factory, code_hash: l.code_hash }))] : [];
+export const FACTORIES = V ? [{ factory: V.factory, code_hash: V.code_hash }, ...(V.runner_factory ? [{ factory: V.runner_factory.factory, code_hash: V.runner_factory.code_hash }] : []), ...(V.legacy || []).map(l => ({ factory: l.factory, code_hash: l.code_hash }))] : [];
 
 export function config() {
   if (!V) throw bad('vault not deployed on this network', 503);

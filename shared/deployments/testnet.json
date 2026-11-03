@@ -188,21 +188,21 @@
       "max_ns": "2592000000000000"
     },
     "arena": {
-      "charter": "arena.nccharters-53681.testnet",
-      "owner": "ncarena-53681.testnet",
+      "charter": "arenapool0-19es.nccharters-22195.testnet",
+      "owner": "ncpub-22195.testnet",
       "merchants": [
         "cafe.ncpub-17102.testnet",
         "books.ncpub-17102.testnet"
       ],
       "pool": [
-        "arenapool0-d3nd.nccharters-53836.testnet",
-        "arenapool1-5plv.nccharters-53836.testnet",
-        "arenapool2-rfyw.nccharters-53836.testnet",
-        "arenapool3-neex.nccharters-53836.testnet"
+        "arenapool1-ue1s.nccharters-22195.testnet",
+        "arenapool2-qdjg.nccharters-22195.testnet",
+        "arenapool3-l2vs.nccharters-22195.testnet"
       ],
-      "pool_note": "Demo pool: same 'pay' clause as the shared charter (allowlist, 0.05 cap, 0.1/day, 4 payments/day) and the same propose-only server agent key, made by the R17 factory with backend/scripts/arena-pool.js. The server sends each run to the charter with the most payments left today, so one visitor's slow drain no longer blocks the next visitor's honest payment; every refusal is unchanged."
+      "agent_key_allowance": null,
+      "pool_note": "Shared runner on R18: the same 'pay' clause (allowlist, 0.05 cap, 0.1/day, 4 payments/day) on 4 factory charters, and the same server public key added with allowance null: a function-call key limited to this charter and propose/propose_batch, with no gas cap that could lock it out. Made with backend/scripts/arena-pool.js (FACTORY=nccharters-22195.testnet). The server sends each run to the charter with the most payments left today."
     },
-    "arena_note": "The shared arena stays on the R16 factory (arena.nccharters-53681.testnet) with the same server agent key; new visitor charters come from the R17 factory.",
+    "arena_note": "The shared arena runner moved to the R18 factory (runner_factory): its agent key has no gas allowance. Visitor charters still come from the R17 factory, because the Toll gate's factory list is fixed at init. The R16 shared charter and the R17 pool are history; their capped keys were revoked (judges/proofs/revoke-capped-keys.json).",
     "redteam": {
       "charter": "redteam.nccharters-53681.testnet",
       "owner": "ncarena-53681.testnet",
@@ -316,7 +316,37 @@
         },
         "note": "Earlier release, kept so its charters and arena history stay verifiable. Its charters had no default timelock."
       }
-    ]
+    ],
+    "runner_factory": {
+      "release": "R18",
+      "factory": "nccharters-22195.testnet",
+      "code_hash": "HTiSRFyV2ksRfVzZzEjmZZb5Vf6GMPk6i418mCxbZij",
+      "code_source": "contracts/artifacts/oath.r18.wasm (main after 0cbc168: agent key allowance optional), sha256 04377fc33eb9f0f1bdf384055e8baac7828d2d0e7f259dfe3dcc2305487c0a14, 401334 bytes; deployed as a global contract by hash",
+      "factory_artifact": "contracts/artifacts/charter_factory.r15.wasm (factory source unchanged; only the pinned code_hash differs)",
+      "factory_full_access_keys": "0",
+      "proof": "judges/proofs/r18-factory.json",
+      "proof_txs": {
+        "oath_deployed_as_global_by_hash": "9r426TA9rNzYoRLwwyW6V7fKdGeHRdhe2hYCM7HFczD",
+        "factory_deploy_init": "5FBF21tgDU6AwnrUYLy1qz1WjdBdtPKrf6dAZynDumbj",
+        "factory_full_access_key_deleted": "C1TXqLX7hzfHDdM61JtFnZjQwdDAwBFqv2wH2KSFyypF",
+        "smoke_charter_created_by_factory": "94LBfRo4mBiZ1LJVaq1xy1rWguNeRXgBWk34B8LywduV"
+      },
+      "smoke": {
+        "charter": "smoke.nccharters-22195.testnet",
+        "owner": "ncpub-22195.testnet",
+        "purpose": "factory-made R18 charter: global code hash in use, 0 keys"
+      }
+    },
+    "arena_history": {
+      "charter": "arena.nccharters-53681.testnet",
+      "pool": [
+        "arenapool0-d3nd.nccharters-53836.testnet",
+        "arenapool1-5plv.nccharters-53836.testnet",
+        "arenapool2-rfyw.nccharters-53836.testnet",
+        "arenapool3-neex.nccharters-53836.testnet"
+      ],
+      "note": "R16 shared charter and R17 pool (capped agent keys, now revoked). Kept so their attempts still verify and count."
+    }
   },
   "oath_r16": {
     "charter": "r16oath.r14own-46135.testnet",

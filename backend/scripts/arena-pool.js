@@ -3,6 +3,7 @@
 // (same allowlist, caps, budget and 4-a-day count, so every attack is refused exactly as before) and the SAME
 // propose-only server agent public key. The server sends each visitor to the pool charter with the most room left.
 // Each charter has its own fresh owner from the testnet helper; owner keys stay in .secrets (mode 600), never printed.
+// R18 (FACTORY=nccharters-22195.testnet): the agent key has no allowance (needs oath R18; older charters refuse null).
 // Usage: N=8 OUT=shared/deployments/arena-pool.json KEYS=.secrets/arena-pool/owners.json node backend/scripts/arena-pool.js
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { rpcClient, viewFn, keyFrom, signTx, functionCall } from '../../shared/vault/tx.js';
@@ -17,7 +18,7 @@ const K = existsSync(KEYS) ? JSON.parse(readFileSync(KEYS, 'utf8')) : {};
 const saveK = () => writeFileSync(KEYS, JSON.stringify(Object.fromEntries(Object.entries(K).map(([t, v]) => [t, v.from_credentials ? { ...v, secret: undefined } : v]))), { mode: 0o600 });
 const out = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : { factory: FACTORY, charters: [] };
 const save = () => writeFileSync(OUT, JSON.stringify(out, null, 1) + '\n');
-const SHARED = 'arena.nccharters-53681.testnet';
+const SHARED = E.SHARED || 'arena.nccharters-53681.testnet'; // source of the clause and the agent public key
 
 async function send(signerId, secret, receiverId, actions) {
   const key = keyFrom(secret);
@@ -34,6 +35,7 @@ const agentPk = st.agent_key; // public key only
 for (let i = 0; i < N; i++) {
   const tag = 'p' + i;
   if (out.charters.find(c => c.tag === tag)) continue;
+  if (!K[tag] && E.OWNER_KEY) { const c = JSON.parse(readFileSync(E.OWNER_KEY, 'utf8')); K[tag] = { id: c.account_id, secret: c.private_key, from_credentials: true }; }
   if (!K[tag] && E.OWNER) { // fallback when the helper rate-limits: an existing testnet account owns several pool charters
     const c = JSON.parse(readFileSync(`${process.env.HOME}/.near-credentials/testnet/${E.OWNER}.json`, 'utf8'));
     K[tag] = { id: E.OWNER, secret: c.private_key, from_credentials: true };
@@ -53,7 +55,7 @@ for (let i = 0; i < N; i++) {
     for (let j = 0; j < 20 && !(await view(FACTORY, 'is_charter', { account_id: g.charter })); j++) await sleep(1500);
   }
   const rules_tx = await send(g.id, g.secret, g.charter, [functionCall('set_clause', { clause_id: 'pay', clause }, 40n * 10n ** 12n),
-    functionCall('set_agent_key', { public_key: agentPk, allowance: toY(1) }, 60n * 10n ** 12n)]);
+    functionCall('set_agent_key', { public_key: agentPk, allowance: null }, 60n * 10n ** 12n)]); // no gas cap: R18 key limited to propose/propose_batch on this charter
   out.charters.push({ tag, charter: g.charter, owner: g.id, create_tx: g.create_tx, rules_tx }); save();
   console.log(tag, g.charter, 'ok');
 }

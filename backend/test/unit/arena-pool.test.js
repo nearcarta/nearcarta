@@ -5,9 +5,10 @@ import { pickShared, sharedCharters, isShared } from '../../src/vault.js';
 const clause = { daily_budget: '100000000000000000000000', max_actions_per_day: 4 };
 const fake = usage => async (c, m) => m === 'get_clauses' ? (usage[c] === 'gone' ? Promise.reject(new Error('x')) : { pay: clause }) : usage[c];
 
-test('pool: every shared charter is on the board and the original stays first', () => {
+test('pool: every shared charter is on the board, the R18 runner first; revoked R16/R17 runners still count as shared', () => {
   const l = sharedCharters();
-  assert.ok(l.length >= 5); assert.equal(l[0], 'arena.nccharters-53681.testnet');
+  assert.ok(l.length >= 4); assert.equal(l[0], 'arenapool0-19es.nccharters-22195.testnet');
+  assert.ok(!l.includes('arena.nccharters-53681.testnet')); assert.ok(isShared('arena.nccharters-53681.testnet'));
   for (const c of l) assert.ok(isShared(c));
 });
 test('pool: an exhausted charter is skipped for the one with the most payments left', async () => {
