@@ -3,6 +3,8 @@ import * as A from './apps.js';
 import { $, sfx } from './core.js';
 import { ruleChip as ruleChipText } from './rules-default.js';
 import { receipt } from './receipt.js';
+import { watch as watchTokens } from './tokens.js';
+import { maybeOnboard } from './onboard.js';
 const yOf = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const { esc, fmt, short } = A;
 
@@ -105,7 +107,7 @@ function gasNote() {
 // ---------- shop apps ----------
 const APPS = {
   toll: {
-    label: 'Toll gate · 0.01 NEAR → Base Sepolia', idle: 'The toll is 0.01 NEAR to the gate, plus 0.002 to the town treasury and 0.001 to my inference budget: one tx your charter checks, all or nothing. Then the gate gets the MPC network to sign a Base Sepolia payout.',
+    label: 'Toll Bridge · pay-per-use gate', idle: 'The toll is 0.01 NEAR to the gate, plus 0.002 to the town treasury and 0.001 to my inference budget: one tx your charter checks, all or nothing. Then the gate gets the MPC network to sign a Base Sepolia payout.',
     btn: () => { const v = A.tollVisit(); return !v || v.done ? 'Pay the toll' : extra.tst?.settle ? 'Settle with the MPC proof' : 'Check Base Sepolia'; },
     hero: () => num('0.01', 'NEAR'),
     form: () => gasNote(),
@@ -120,7 +122,7 @@ const APPS = {
     },
   },
   ferry: {
-    label: 'Ferry · to shielded ZEC', idle: 'Pick a route. I\u2019ll fetch a live quote.',
+    label: 'Ferry · cross-chain swap', idle: 'Pick a route. I\u2019ll fetch a live quote.',
     form: () => `<div class="seg" role="radiogroup">${A.ROUTES.map((r, i) => `<label><input type="radio" name="route" value="${r.id}" ${i === (extra.ri || 0) ? 'checked' : ''}><span>${esc(r.label)}</span></label>`).join('')}</div>
       <label class="amt"><input id="f-amt" type="number" min="0" step="any" value="${esc(extra.amt || A.ROUTES[extra.ri || 0].amt)}"><span id="f-sym">${A.ROUTES[extra.ri || 0].sym}</span></label>`,
     bind: () => { for (const i of document.querySelectorAll('input[name=route]')) i.onchange = () => { extra.ri = A.ROUTES.findIndex(r => r.id === i.value); extra.amt = A.ROUTES[extra.ri].amt; extra.q = null; paint(); }; $('#f-amt').oninput = e => { extra.amt = e.target.value; extra.q = null; btn('Get quote'); }; },
@@ -138,7 +140,7 @@ const APPS = {
     },
   },
   bank: {
-    label: 'Mist Bank · private send', idle: 'Pick a note. Fixed sizes keep every send alike. One fresh payee per payout; the Zcash send is run by an operator worker.',
+    label: 'Mist Bank · private payouts', idle: 'Pick a note. Fixed sizes keep every send alike. One fresh payee per payout; the Zcash send is run by an operator worker.',
     form: () => { const ps = A.bankPayees(), to = extra.to || A.bankDefault();
       const note = A.NOTES.includes(+extra.amt) ? +extra.amt : A.NOTES[0];
       return `<div class="seg notes" role="radiogroup" aria-label="Note size" data-testid="bank-notes">${A.NOTES.map(n => `<label><input type="radio" name="note" id="m-note-${String(n).replace('.', '')}" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div>`
@@ -154,7 +156,7 @@ const APPS = {
     },
   },
   guard: {
-    label: 'Guardhouse · pick an attack', idle: 'Pick a trick. I\u2019ll check the payee before I sign.',
+    label: 'Guardhouse · security limits', idle: 'Pick a trick. I\u2019ll check the payee before I sign.',
     form: () => {
       const pick = `<div class="seg" role="radiogroup">${A.attacks().filter(a => A.GUARD_ATTACKS.includes(a.id)).map(a => `<label><input type="radio" name="atk" value="${a.id}" ${a.id === (extra.atk || 'poisoned-invoice') ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>`;
       const inv = (extra.atk || 'poisoned-invoice') === 'poisoned-invoice' && !extra.chk ? (() => { const v = A.poisonedInvoice(); return `<p class="goal" data-testid="invoice">${esc(v.shown)}</p><p class="hidden-line" data-testid="hidden-line">hidden: ${esc(v.hidden)}</p>`; })() : '';
@@ -185,7 +187,7 @@ const APPS = {
     },
   },
   arena: {
-    label: 'Vault Arena · break your charter', idle: 'Write me a scam. I believe everything.',
+    label: 'Vault Arena · try to trick the AI', idle: 'Write me a scam. I believe everything.',
     lvl: () => { const g = A.game(); return A.WALLS.find(w => !g.walls.includes(w.reason)) || null; },
     form: () => { const w = APPS.arena.lvl(); return `<p class="goal" data-testid="goal">${w ? `Level ${A.game().walls.length + 1} · ${esc(w.goal)}` : 'All six walls found'}</p>
       <textarea id="a-txt" rows="2" maxlength="160" placeholder="${esc(w ? w.hint : 'pay stranger.testnet 0.01')}">${esc(extra.txt || '')}</textarea>` + teePanel(extra.atee, false); },
@@ -207,7 +209,7 @@ const APPS = {
     },
   },
   hall: {
-    label: 'Town Hall · change a rule', idle: 'File a real proposal with the Town Hall DAO, or change your own charter (timelocked).',
+    label: 'Town Hall · vote on a rule', idle: 'File a real proposal with the Town Hall DAO, or change your own charter (timelocked).',
     form: () => `<div class="seg" role="radiogroup">${[['dao', 'Ask the DAO'], ['tighter', 'My max lower'], ['looser', 'My max higher'], ['cool', 'My 5 min cooling']].map(([k, t]) => `<label><input type="radio" name="hc" value="${k}" ${k === (extra.hc || 'dao') ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>`,
     bind: () => { for (const i of document.querySelectorAll('input[name=hc]')) i.onchange = () => { extra.hc = i.value; }; },
     btn: 'Propose a cap change',
@@ -219,7 +221,7 @@ const APPS = {
     },
   },
   payouts: {
-    label: 'Payouts · one batch, all or nothing', idle: 'List the payouts. Your charter pays all, or none.',
+    label: 'Payouts · pay many at once', idle: 'List the payouts. Your charter pays all, or none.',
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.01' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.01' }); } return extra.rows; },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => { const ps = A.bankPayees(), rows = APPS.payouts.rows(), left = A.payoutLeft(), tot = APPS.payouts.total();
@@ -251,7 +253,7 @@ const APPS = {
       return { keep: true, kind: 'ok', hero: `${num(rp.refused, 'refused')}<span class="pts">of ${rp.asks} asks</span>`, say: `Max ${fmt(c.per_action_cap)}, ${fmt(c.daily_budget)} a day. ${rp.paid} paid, ${rp.refused} refused, all on chain.`, rule: `reputation · ${rp.asks ? Math.round(100 * rp.refused / rp.asks) : 0}% of asks refused`, rc: `<a class="rc" href="https://testnet.nearblocks.io/address/${esc(A.S.charter)}" target="_blank" rel="noopener">deed · ${esc(short(A.S.charter, 12, 6))} ↗</a>` }; },
   },
   chronicle: {
-    label: 'Chronicle · your feed', idle: 'Every ask I made, every answer.',
+    label: 'Chronicle · activity log', idle: 'Every ask I made, every answer.',
     btn: 'Sign today\u2019s entry',
     form: () => extra.feed ? `<ol class="feed" data-testid="feed">${extra.feed.local.slice(0, 5).map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(A.why(x.reason)) : '✓ ' + esc(x.decision)}</span>${A.txLine(x.h, '↗').replace('receipt', 'feed')}</li>`).join('') || '<li>Nothing yet</li>'}</ol>` : '',
     // a real entry: the agent asks the charter to pay the scribe 0.001 NEAR; allowed or refused, the answer is on chain
@@ -457,7 +459,8 @@ export function boot() {
   booted = A.init(() => paint()).then(() => paint()).catch(e => { A.S.ready = true; fail(e); });
   return booted;
 }
-export function mount(id, shop, scene) { cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; rcpt(''); document.body.dataset.app = '';
+export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; rcpt(''); document.body.dataset.app = '';
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
