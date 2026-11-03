@@ -1,0 +1,291 @@
+{
+ "network": "mainnet",
+ "root": "nearcarta.near",
+ "steps": [
+  {
+   "step": "arena_create_fund",
+   "signer": "nearcarta.near",
+   "receiver": "arena.nearcarta.near",
+   "tx": "68A7yYMYA8HecYS1kfDzPwBWTHv3iyN8fapggRRmy3ga",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.007114
+  },
+  {
+   "step": "arena_deploy_init",
+   "signer": "arena.nearcarta.near",
+   "receiver": "arena.nearcarta.near",
+   "tx": "EVbtt3wKS5QUfRWbkPYWNAftwoGV13RXL2h9nKGnXuUg",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.003068
+  },
+  {
+   "step": "arena_mint_guardian",
+   "signer": "nearcarta.near",
+   "receiver": "arena.nearcarta.near",
+   "tx": "8NqFTf8beQf4KQQSotT1pgsbacCAsQghM76rSCFLDayP",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000413,
+   "ret": "{\"token_id\":\"g1\",\"owner_id\":\"nearcarta.near\",\"metadata\":{\"title\":\"Mainnet guardian\",\"description\":\"Transfer the NFT = transfer the oath.\",\"media\":null,\"media_hash\":null,\"copies\":1,\"issued_at\":null,\"expires_at\":null,\"starts_at\":null,\"updated_at\":null,\"extra\":null,\"reference\":null,\"reference_hash\":nul"
+  },
+  {
+   "step": "arena_fund_pot_0.002",
+   "signer": "nearcarta.near",
+   "receiver": "arena.nearcarta.near",
+   "tx": "H6ScgfHkXfgpw1CDoae3C7SP7DSG55UpQpm4yV7aVcNq",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.00021,
+   "ret": "\"2000000000000000000000\""
+  },
+  {
+   "step": "arena_attempt_1",
+   "signer": "nearcarta.near",
+   "receiver": "arena.nearcarta.near",
+   "tx": "HtDJtYxJ6UGYy3VP7n3GgFyh4Zr97WvQRcRxEyzZSiNm",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000243,
+   "ret": "0"
+  },
+  {
+   "step": "arena_agent_pay_allowed_0.001",
+   "signer": "nearcarta.near",
+   "receiver": "arena.nearcarta.near",
+   "tx": "AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000571,
+   "ret": "\"ALLOW\""
+  },
+  {
+   "step": "arena_attempt_2",
+   "signer": "nearcarta.near",
+   "receiver": "arena.nearcarta.near",
+   "tx": "AuXzxGVjHmrBszQm55WobbpLzSenD9qW8SUaw4KANka6",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000243,
+   "ret": "1"
+  },
+  {
+   "step": "arena_agent_pay_refused_0.002",
+   "signer": "nearcarta.near",
+   "receiver": "arena.nearcarta.near",
+   "tx": "25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000355,
+   "ret": "\"C1_CAP\""
+  },
+  {
+   "step": "arena_sweep_surplus",
+   "signer": "arena.nearcarta.near",
+   "receiver": "nearcarta.near",
+   "tx": "891qnrvY62ctc9NpZ7RwK37QJTNAeCEKyXo98yfyFdJG",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000044
+  },
+  {
+   "step": "arena_delete_fak",
+   "signer": "arena.nearcarta.near",
+   "receiver": "arena.nearcarta.near",
+   "tx": "FJLLSMqA7P3MwWowDbp1hnspomkpcEmfGcKjM9PrjJ8y",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.00004
+  },
+  {
+   "step": "house_create_fund",
+   "signer": "nearcarta.near",
+   "receiver": "house.nearcarta.near",
+   "tx": "FeuBqYhuDY2S2EZW4C9u6o7cftyLFTQohvgrpXVZ1ycj",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.007114
+  },
+  {
+   "step": "house_deploy_init",
+   "signer": "house.nearcarta.near",
+   "receiver": "house.nearcarta.near",
+   "tx": "6j1ot7BtC52FhLysYDkVNoc7KKWAQgy9VELGmSU8LzVj",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.002177
+  },
+  {
+   "step": "house_mint_deed_cap_0.001",
+   "signer": "nearcarta.near",
+   "receiver": "house.nearcarta.near",
+   "tx": "FqYcLtmLb7WM9vo83iMNyfSMiMnifSMLQJPJHwBzLtnu",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000342,
+   "ret": "{\"token_id\":\"nearcarta.near\",\"owner_id\":\"nearcarta.near\",\"metadata\":{\"title\":\"House of nearcarta.near\",\"description\":\"Charter: charter.nearcarta.near. Holder of this deed controls the house purse.\",\"media\":null,\"media_hash\":null,\"copies\":1,\"issued_at\":\"1793749173784\",\"expires_at\":null,\"starts_at\":nu"
+  },
+  {
+   "step": "house_pay_allowed_0.001",
+   "signer": "nearcarta.near",
+   "receiver": "house.nearcarta.near",
+   "tx": "83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.00046,
+   "ret": "true"
+  },
+  {
+   "step": "house_pay_refused_0.002",
+   "signer": "nearcarta.near",
+   "receiver": "house.nearcarta.near",
+   "tx": "3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1",
+   "ok": false,
+   "as_expected": true,
+   "gas_burnt_near": 0.000175,
+   "error": "{\"ActionError\":{\"index\":0,\"kind\":{\"FunctionCallError\":{\"ExecutionError\":\"Smart contract panicked: over the deed's cap per payment\"}}}}"
+  },
+  {
+   "step": "house_sweep_surplus",
+   "signer": "house.nearcarta.near",
+   "receiver": "nearcarta.near",
+   "tx": "FPv1CzUVGBerogRdZ58FK924e4L33Nn57frKS4WcwPRD",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000044
+  },
+  {
+   "step": "house_delete_fak",
+   "signer": "house.nearcarta.near",
+   "receiver": "house.nearcarta.near",
+   "tx": "DxZXKNx3SvcGQSVooJwwNrgVMhp5CRdPHEsfxnWny8jB",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.00004
+  },
+  {
+   "step": "townhall_create_fund",
+   "signer": "nearcarta.near",
+   "receiver": "townhall.nearcarta.near",
+   "tx": "AtFX4uhXWDxzk8XpP2he1FxSSxFSDQfn2p1uCB78EZH2",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.007114
+  },
+  {
+   "step": "townhall_deploy_init",
+   "signer": "townhall.nearcarta.near",
+   "receiver": "townhall.nearcarta.near",
+   "tx": "4vieiD25eUpGCS8ttRTx7X8ZyjzVcXpWLbn6NKrpuJzK",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.001576
+  },
+  {
+   "step": "townhall_post_bounty_0.001",
+   "signer": "nearcarta.near",
+   "receiver": "townhall.nearcarta.near",
+   "tx": "HAVTU7zjgHnmnV3bhRXfcAxrcTKREdHTVnho9hjfDshM",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.00021
+  },
+  {
+   "step": "townhall_reward_allowed_0.001",
+   "signer": "nearcarta.near",
+   "receiver": "townhall.nearcarta.near",
+   "tx": "6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000272
+  },
+  {
+   "step": "townhall_post_bounty_0.002",
+   "signer": "nearcarta.near",
+   "receiver": "townhall.nearcarta.near",
+   "tx": "Cq9ffD4ayWASwt3MJK4Y7XdmZkWthXsNfw7eCCqcUXS2",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000211
+  },
+  {
+   "step": "townhall_reward_refused_0.002",
+   "signer": "nearcarta.near",
+   "receiver": "townhall.nearcarta.near",
+   "tx": "Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6",
+   "ok": false,
+   "as_expected": true,
+   "gas_burnt_near": 0.000166,
+   "error": "{\"ActionError\":{\"index\":0,\"kind\":{\"FunctionCallError\":{\"ExecutionError\":\"Smart contract panicked: ERR_OATH_PER_REWARD_CAP\"}}}}"
+  },
+  {
+   "step": "townhall_sweep_surplus",
+   "signer": "townhall.nearcarta.near",
+   "receiver": "nearcarta.near",
+   "tx": "F9A8pLz9LsTWE9fjSecAe4bxPcXibd9RTWJCt61gTq9E",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000044
+  }
+ ],
+ "contracts": {
+  "arena": {
+   "id": "arena.nearcarta.near",
+   "wasm": "arena.p86.wasm",
+   "sha256": "3b44499233443610e268b21ad89613ee1f98cb0b7cfc5b2428ced7b145154a69",
+   "bytes": 368180,
+   "storage_after_init": 368641,
+   "init_state_bytes": 279,
+   "final": {
+    "code_hash": "4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma",
+    "storage_bytes": 369926,
+    "locked_near": 3.69926,
+    "balance_near": 3.729994,
+    "keys": [],
+    "full_access_key_kept": false,
+    "teardown": "owner close() with 1 yocto"
+   }
+  },
+  "house": {
+   "id": "house.nearcarta.near",
+   "wasm": "house_nft.p86.wasm",
+   "sha256": "70a8923bbd187b2b0dd89c66c9ba37902a656640919b16ad4861470fc1ea8806",
+   "bytes": 245996,
+   "storage_after_init": 246446,
+   "init_state_bytes": 268,
+   "final": {
+    "code_hash": "8amkMEcCFxQHbHkgZqP72LXJnoJ1iecGq6B71gPiNMXK",
+    "storage_bytes": 247204,
+    "locked_near": 2.47204,
+    "balance_near": 2.502774,
+    "keys": [],
+    "full_access_key_kept": false,
+    "teardown": "owner close() with 1 yocto"
+   }
+  },
+  "townhall": {
+   "id": "townhall.nearcarta.near",
+   "wasm": "townhall.p86.wasm",
+   "sha256": "9f5480d7e61c01566b081737b91a1a27b02cac84d377e40fb2fcfa09cc101b5f",
+   "bytes": 191351,
+   "storage_after_init": 191728,
+   "init_state_bytes": 195,
+   "final": {
+    "code_hash": "BixZRmNsFTtHBBtDEqtz7tKfiDeU7eJodfEPpZMpxC2J",
+    "storage_bytes": 192231,
+    "locked_near": 1.92231,
+    "balance_near": 1.952265,
+    "keys": [
+     {
+      "public_key": "ed25519:5jTusThDyrUes54AS18G83BsehtjoJ1ftJhfAxyR6icx",
+      "permission": "FullAccess"
+     }
+    ],
+    "full_access_key_kept": true,
+    "teardown": "delete_account with the key in ~/.near-credentials/mainnet/townhall.nearcarta.near.json"
+   }
+  }
+ },
+ "root_balance_near": 1.491207
+}
