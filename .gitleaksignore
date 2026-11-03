@@ -5,3 +5,6 @@
 1e012c1cc00958340562ae4957c08e79783009bf:docs/MAINNET_RUNBOOK.md:generic-api-key:115
 # public MPC root key (hex of the secp256k1 public key fx_root_key_b58)
 65a8635de7c076e3facdd40008153b1d568b8c12:judges/proofs/core-mainnet-dryrun.json:generic-api-key:18
+# token field: testnet USDC contract account id (64-hex implicit account with deployed code), public
+47371f1dcbe0b9492d6b5d88f4d335e3ecd53591:judges/proofs/payroll-usdc.json:generic-api-key:5
+47371f1dcbe0b9492d6b5d88f4d335e3ecd53591:judges/proofs/payroll-usdc.json:generic-api-key:86
