@@ -1,0 +1,234 @@
+{
+ "network": "testnet",
+ "steps": [
+  {
+   "step": "fund_charter",
+   "signer": "guestfund.r2own.testnet",
+   "receiver": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "tx": "4w2PpHrorqLHFTgkq9XmUsAbBxpMndytuae6BT6Qb9zb",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.007114
+  },
+  {
+   "step": "fund_toll",
+   "signer": "guestfund.r2own.testnet",
+   "receiver": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44",
+   "tx": "Ds5P8YST5C57ga9G5NqNBko3jvzwLBHx3c8KhnYmybS7",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.007114
+  },
+  {
+   "step": "charter_deploy_init",
+   "signer": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "receiver": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "tx": "8aNrYgJoUxF5yJJNRwtn9XcZToCLfXouT415ZQSn1BVD",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.00312
+  },
+  {
+   "step": "set_clause_pay",
+   "signer": "guestfund.r2own.testnet",
+   "receiver": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "tx": "EbuEDKAUeuz7FQLbobHs23JLXbZk5t4gEfmviqV8oHVv",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000217,
+   "ret": "{\"applied\":true,\"policy_version\":2}"
+  },
+  {
+   "step": "set_agent_key",
+   "signer": "guestfund.r2own.testnet",
+   "receiver": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "tx": "2Xz6r9u3frhjni1trnYPtKooS8DAHNe4We7GMgoyfYMK",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000508,
+   "ret": "true"
+  },
+  {
+   "step": "toll_deploy_init_agentkey",
+   "signer": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44",
+   "receiver": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44",
+   "tx": "2TYC1uci7idSuTVywSBkEy5eKnZCVcVsBEufS8CN4zqg",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.001842
+  },
+  {
+   "step": "agent_propose_over_cap_0.003",
+   "signer": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "receiver": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "tx": "2psnb3t15zPLeTNbstNahUTkYNvcHzUX2tVonP79B74c",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000271,
+   "ret": "{\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_per_action_cap\"}"
+  },
+  {
+   "step": "agent_propose_allowed_0.001",
+   "signer": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "receiver": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "tx": "65DzDwjaxS7UxqdUpxhSnj8A2RqoNSY6pAVryWrNVXcu",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000626,
+   "ret": "{\"action_id\":\"0\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}"
+  },
+  {
+   "step": "owner_toll_pay_allowlisted",
+   "signer": "guestfund.r2own.testnet",
+   "receiver": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44",
+   "tx": "5EavaP7p3WKWsu7kqCYfMv9W9qSRoqfrSsXcRkEMKc8e",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.001291,
+   "ret": "{\"to\":\"0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f\",\"value\":\"1000000000000\",\"nonce\":0,\"status\":\"signed\",\"unsigned_hash\":\"f9733c85967d26d9402343a3a7d25faa7a2fe226c7ec7d78872fcda662b6e845\",\"raw_signed\":\"0x02f87183014a3480830f42408405f5e100825208941cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f85e8d4a5100080c001a0929b156af8f119d2d8878e04e596697778d96e96449aa9cc4f34e72bcd6d3b14a038a9e2b698620eecb39263b76dab25"
+  },
+  {
+   "step": "owner_toll_pay_not_allowlisted",
+   "signer": "guestfund.r2own.testnet",
+   "receiver": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44",
+   "tx": "Buy9CFZ1A8rbqdru2HBSoDvFaAnTjXsRru8wbFvfSNTg",
+   "ok": false,
+   "as_expected": true,
+   "gas_burnt_near": 0.00016,
+   "error": "{\"ActionError\":{\"index\":0,\"kind\":{\"FunctionCallError\":{\"ExecutionError\":\"Smart contract panicked: REFUSED: recipient not in oath allowlist\"}}}}"
+  },
+  {
+   "step": "charter_delete_fak",
+   "signer": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "receiver": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "tx": "GckhFJXckN5MPeyhVJ7xCdyLYpJiM8WXFrHs8RhmyoJ7",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 4e-05
+  },
+  {
+   "step": "toll_delete_fak",
+   "signer": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44",
+   "receiver": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44",
+   "tx": "EzpCEJXMWc5w3NSV6uvkRsbp6i3Tw3ViiTbNXJPmft8n",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 4e-05
+  }
+ ],
+ "charter": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+ "toll": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44",
+ "agent_public_key": "ed25519:V5ipXpe4HtYbymYudiL38uoDmtZQFscyhMAt9jaJaK3",
+ "root_before": "15930946404081702300000000",
+ "charter_wasm": {
+  "file": "oath.r18.wasm",
+  "sha256": "04377fc33eb9f0f1bdf384055e8baac7828d2d0e7f259dfe3dcc2305487c0a14",
+  "bytes": 401334
+ },
+ "toll_wasm": {
+  "file": "toll.v6.wasm",
+  "sha256": "8829a9c7de1d8da512615382a7a8923253fc9f13b136fe1b876ce1dd9e9ed88e",
+  "bytes": 226610
+ },
+ "toll_foreign_address": "0x4700c61aabdbd1a1141d55469e6e3efcd905a423",
+ "topups": [
+  "9nLwpNxm2FgngZqJ6RYEufSauNXVseF88AbsfAwCajWf (toll +0.12, first fund too low)",
+  "charter +0.1 (storage_reserve_low on first propose)"
+ ],
+ "final": {
+  "charter": {
+   "id": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174",
+   "code_hash": "HTiSRFyV2ksRfVzZzEjmZZb5Vf6GMPk6i418mCxbZij",
+   "storage_bytes": 402413,
+   "locked_near": 4.02413,
+   "balance_near": 4.244663,
+   "keys": [
+    {
+     "public_key": "ed25519:V5ipXpe4HtYbymYudiL38uoDmtZQFscyhMAt9jaJaK3",
+     "permission": {
+      "FunctionCall": {
+       "allowance": null,
+       "method_names": [
+        "propose",
+        "propose_batch"
+       ],
+       "receiver_id": "0070cf3c6591f2d7d297021a9905f40d1f5761eb32834124602432df9db73174"
+      }
+     }
+    }
+   ],
+   "state": {
+    "owner": "guestfund.r2own.testnet",
+    "dao": null,
+    "agent_key": "ed25519:V5ipXpe4HtYbymYudiL38uoDmtZQFscyhMAt9jaJaK3",
+    "frozen": false,
+    "freeze_epoch": 0,
+    "policy_version": 2,
+    "policy_hash": "67c3b4ceff961d312859d8f286d69c17b00e5ea7f9be659627f25d5f2ef08a23",
+    "next_nonce": "3",
+    "next_action": "1",
+    "prune_cursor": "0",
+    "policy_delay_ns": "90000000000",
+    "storage_reserve": "100000000000000000000000",
+    "pending_changes": 0,
+    "setup_open": false,
+    "storage_usage": "402413"
+   }
+  },
+  "toll": {
+   "id": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44",
+   "code_hash": "AAXJ4AveuL3zRGntbP9QYhhCreMMkNusNTxEu8aUSJ1s",
+   "storage_bytes": 227833,
+   "locked_near": 2.27833,
+   "balance_near": 2.416274,
+   "keys": [
+    {
+     "public_key": "ed25519:V5ipXpe4HtYbymYudiL38uoDmtZQFscyhMAt9jaJaK3",
+     "permission": {
+      "FunctionCall": {
+       "allowance": null,
+       "method_names": [
+        "pay",
+        "settle"
+       ],
+       "receiver_id": "cfafde9e15f09d47aae61c20a90ff259fd72c28ccd31a7dd092b21258fd3eb44"
+      }
+     }
+    }
+   ],
+   "policy": {
+    "owner": "guestfund.r2own.testnet",
+    "mpc": "v1.signer-prod.testnet",
+    "path": "base-1",
+    "chain_id": 84532,
+    "foreign_address": "0x4700c61aabdbd1a1141d55469e6e3efcd905a423",
+    "allow_to": [
+     "0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f"
+    ],
+    "max_per_tx": "10000000000000",
+    "budget": "30000000000000",
+    "spent": "1000000000000",
+    "max_fee_cap": "5000000000",
+    "next_nonce": 1,
+    "frozen": false,
+    "verify_chain": "Base",
+    "asset": "native",
+    "dao": null,
+    "gate": null
+   },
+   "tx0": {
+    "to": "0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f",
+    "value": "1000000000000",
+    "nonce": 0,
+    "status": "signed",
+    "unsigned_hash": "f9733c85967d26d9402343a3a7d25faa7a2fe226c7ec7d78872fcda662b6e845",
+    "raw_signed": "0x02f87183014a3480830f42408405f5e100825208941cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f85e8d4a5100080c001a0929b156af8f119d2d8878e04e596697778d96e96449aa9cc4f34e72bcd6d3b14a038a9e2b698620eecb39263b76dab25aa751edefe8a2669e2fa0df6c9a85a2bb8",
+    "tx_hash": "0xd43aad37d15e39d9d1601f16d9e9d128de75da3bb0bca055fc2837d32ba64a45",
+    "proof_payload_hash": null
+   }
+  },
+  "root_balance_near": 9.243868,
+  "root_spent_near": 6.687078,
+  "gas_burnt_total_near": 0.022343
+ }
+}
