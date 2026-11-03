@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [oath, arena, toll, townhall, charter_factory, house_nft]
+        crate: [oath, arena, toll, townhall, charter_factory, house_nft, attested_check]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -33,6 +33,20 @@ jobs:
       - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh | sh
       - run: cd contracts/charter_factory && cargo near build non-reproducible-wasm --locked
       - run: cd contracts/charter_factory && cargo test --test sandbox --locked
+  oath-sandbox:
+    # Local near-sandbox: build the charter and the reaper from source, then run every
+    # integration suite (rules, attacks, properties, refusals, teardown). No testnet, no keys.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.86.0
+        with: { targets: wasm32-unknown-unknown }
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh | sh
+      # near-sdk 5.x targets protocol < 84, so cargo-near requires rustc <= 1.86 for the wasm.
+      - run: cd contracts/oath && cargo +1.86.0 near build non-reproducible-wasm --locked
+      - run: cd contracts/reaper && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
+      - run: cd contracts/oath && cargo test --locked --test sandbox --test exploits --test props --test adversarial --test teardown
   secrets:
     runs-on: ubuntu-latest
     steps:
