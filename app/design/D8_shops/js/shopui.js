@@ -273,6 +273,18 @@ function tollGate() {
     more: kv('Gate', idChip(g.gate)) + kv('Signer', esc(g.mpc)) + kv('Pays on Base Sepolia', idChip(g.policy.allow_to[0], `${esc(g.foreign_explorer)}`))
       + (g.gas && g.gas.visits_left_at_cap != null ? kv('Gas left', `${esc(g.gas.visits_left_at_cap)} visits`) : '') };
 }
+// Guardhouse, under Details: the same pay clause re-checked by OutLayer in a TEE, with its attestation. The charter stays the final gate.
+function attestedLine() {
+  if (!extra.att && !extra.attL) { extra.attL = true; A.attestedCheck().then(a => { extra.att = a; }).catch(() => { extra.att = { error: true }; }).finally(() => { extra.attL = false; if (cur === 'guard') proofDrawer(); }); }
+  const a = extra.att;
+  if (!a) return kv('Attested check', '<span class="note">Reading…</span>');
+  if (a.error || !a.enabled) return kv('Attested check', '<span class="note">Unavailable. The charter still checks every payment itself.</span>');
+  const c = a.checks?.[0], ok = c?.decision === 'allow';
+  const tag = c ? `<span class="st ${ok ? 'ok' : 'no'}" data-testid="attested-decision">${ok ? '✓ allow' : '✕ ' + esc(c.decision)}</span>${!ok && c.reasons?.[0] ? ` <span class="why">${esc(c.reasons[0])}</span>` : ''}` : '<span class="note">No checks yet</span>';
+  const proofs = (a.runs || []).map(r => `<a class="tx" href="${esc(r.attestation)}" target="_blank" rel="noopener" aria-label="TEE attestation for the ${esc(r.label)} check">${r.decision === 'allow' ? '✓' : '✕'} ${esc(r.label.replace('_', ' '))} proof ↗</a> <a class="tx" href="https://testnet.nearblocks.io/txns/${esc(r.tx)}" target="_blank" rel="noopener" aria-label="Open the ${esc(r.label)} check tx in the explorer">${esc(short(r.tx, 6, 4))} ↗</a>`).join('<br>');
+  return `<div data-testid="attested-check">` + kv('Attested check', tag) + kv('Checker', `OutLayer TEE · wasm <code title="${esc(a.wasm_sha256)}">${esc(a.wasm_sha256.slice(0, 12))}…</code>`)
+    + kv('Proof', proofs) + kv('Proxy', idChip(a.proxy)) + `<p class="note">The charter still decides on chain. This is an extra, independent check.</p></div>`;
+}
 // Live lists from the shop modules (Town Hall proposals, Arena past prompts, Toll records): rows only, their notes go to Details.
 function lazyList(key, mod, fn, id) {
   if (extra[key] == null && !extra[key + 'L']) { extra[key + 'L'] = true; import(mod).then(m => { if (id === 'arena') { extra.arenaM = m; m.bindRedteam(() => { if (cur === 'arena') proofDrawer(); }); } return m[fn](undefined, undefined, true); }).then(h => { extra[key] = h; }).catch(() => { extra[key] = ''; }).finally(() => { extra[key + 'L'] = false; if (cur === id) proofDrawer(); }); }
@@ -341,6 +353,7 @@ function proofDrawer() {
   h += latest;
   // 4. history
   if (S.charter) h += list(cur === 'house' ? 'Your history' : 'Your history here', mine.slice(latest && !(cur === 'toll' && extra.tst) ? 1 : 0, 12).map(r => prow(esc(r.shop) + ' · ' + esc(r.decision), r.reason && r.decision !== 'allowed' ? esc(A.why(r.reason)) : '', `<span class="st ${r.decision === 'denied' ? 'no' : 'ok'}" aria-label="${esc(r.decision)}">${r.decision === 'denied' ? '✕' : '✓'}</span>${A.txLine(r.h, '↗')}`)), 'Nothing signed yet.');
+  if (cur === 'guard') details.push(attestedLine());
   if (cur === 'toll') { const t = tollGate(); h += `<section class="dz hist"><h3>Toll gate</h3>${t.list}</section>`; if (t.more) details.push(t.more); }
   const live = { hall: ['Latest proposals', hallRows], arena: ['Past attacks', arenaRows], toll: ['Toll records', tollRecordRows] }[cur];
   if (live) { const p = split(live[1]()); h += p.wait ? `<section class="dz hist"><h3>${live[0]}</h3><p class="note">Reading…</p></section>` : list(live[0], p.rows, p.notes[0] ? p.notes[0].replace(/<\/?p[^>]*>/g, '') : 'Nothing yet.'); if (!p.wait && p.rows.length) details.push(...p.notes); }

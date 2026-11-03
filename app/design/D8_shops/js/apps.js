@@ -185,6 +185,8 @@ export async function toll() {
 const LS_TOLL = c => 'nearcarta.d8.toll.' + c;
 export const tollVisit = () => (S.charter ? JSON.parse(localStorage.getItem(LS_TOLL(S.charter)) || 'null') : null);
 const saveVisit = v => S.charter && localStorage.setItem(LS_TOLL(S.charter), JSON.stringify(v));
+// Guardhouse attested check (OutLayer TEE run of the pay clause); read-only.
+export const attestedCheck = () => api('/api/guardhouse/attested');
 let gateMemo = null;
 export const gateInfo = (fresh = false) => (!fresh && gateMemo) || (gateMemo = api('/api/toll/gate').catch(e => { gateMemo = null; throw e; }));
 export const tollBroadcast = n => api(`/api/toll/gate/${encodeURIComponent(n)}/broadcast`, { method: 'POST' });
