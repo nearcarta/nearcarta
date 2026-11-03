@@ -222,7 +222,8 @@ export const tollBroadcast = n => api(`/api/toll/gate/${encodeURIComponent(n)}/b
 export const tollStatus = n => api('/api/toll/gate/' + encodeURIComponent(n));
 export async function tollGate(action, o = null) {
   const g = await gateInfo();
-  const h = await sign(g.gate, [fc('pay_for', { charter: S.charter, action_id: String(action) }, 300)]);
+  // 200 Tgas, not 300: NEAR reserves prepaid gas at a pessimistic price (300 Tgas = 0.30 NEAR up front), more than a fresh guest has left after its charter (0.26).
+  const h = await sign(g.gate, [fc('pay_for', { charter: S.charter, action_id: String(action) }, 200)]);
   let nonce = null;
   for (let i = 0; i < 12 && nonce == null; i++) { nonce = await view(g.gate, 'visit_nonce', { charter: S.charter, action_id: String(action) }).catch(() => null); if (nonce == null) await new Promise(r => setTimeout(r, 1500)); }
   if (nonce == null) throw Object.assign(new Error('the gate did not sign this visit'), { tx: h });
