@@ -67,6 +67,9 @@ export function limiter(max, windowMs = 60e3, { ip, identity = clientIdentity, n
   };
 }
 
+// Read-only answers the Vercel edge may keep for a few seconds: a judging room behind one IP then shares one copy.
+export const edgeCache = (s = 15) => async (c, next) => { await next(); if (c.res?.status === 200 && !c.res.headers.get('Cache-Control')) c.res.headers.set('Cache-Control', `public, max-age=5, s-maxage=${s}, stale-while-revalidate=${s * 4}`); };
+
 // Global cap shared by every client: protects the paid 1Click partner key and NEAR AI key.
 const globals = new Map();
 export function globalCap(name, max, windowMs = 60e3, { now = Date.now } = {}) {

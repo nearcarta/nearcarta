@@ -21,7 +21,7 @@ import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
 import { view, rpcStats } from './near.js';
-import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
+import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 import { pastPrompts as arenaPrompts } from './arena.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
@@ -227,7 +227,7 @@ export function makeApp() {
   app.get('/api/ferry/tidepool', limiter(20), c => c.json(DEP.ferry_tidepool ? { ...DEP.ferry_tidepool, label: ferry.TIDEPOOL.label } : { error: 'none' }, DEP.ferry_tidepool ? 200 : 404));
 
   // Guardhouse
-  app.get('/api/guardhouse', limiter(30), async c => c.json(await reads.guardhouse()));
+  app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
   // House deed v2 (NEP-171): the deed is the house. Its purse and cap live in the deed contract and only the
@@ -276,7 +276,7 @@ export function makeApp() {
 
   // Other shops
   // The desk's 1Click calls are cached 60 s inside mist.mistbank(), so this route cannot drain the key.
-  app.get('/api/mistbank', limiter(20), async c => c.json(await reads.mistbank()));
+  app.get('/api/mistbank', limiter(120), edgeCache(15), async c => c.json(await reads.mistbank()));
   // Auditor flow: the opening is POSTed (not in a URL, so not in access logs) and never echoed back.
   app.post('/api/mistbank/verify', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
@@ -327,7 +327,7 @@ export function makeApp() {
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
-  app.get('/api/chronicle', limiter(20), async c => {
+  app.get('/api/chronicle', limiter(120), edgeCache(15), async c => {
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
     try { return c.json(shops.hideRetired(await shops.chronicle(DEP.guardhouse.oath, limit))); }
     catch (e) {
@@ -335,7 +335,7 @@ export function makeApp() {
       c.header('Retry-After', '10'); return c.json({ account: DEP.guardhouse.oath, count: 0, txs: [], busy: true, source: 'tx index busy; try again in 10 s' });
     }
   });
-  app.get('/api/chronicle/:account', limiter(20), async c => {
+  app.get('/api/chronicle/:account', limiter(120), edgeCache(15), async c => {
     const a = c.req.param('account');
     // Visitor charters made by the vault factory count too (B13 "What happened" feed): the id must sit under the
     // factory and the factory registry must list it, so this never becomes an open tx-index proxy.

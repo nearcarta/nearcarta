@@ -23,6 +23,7 @@ import { TASKS, TASK_IDS, TASK_MEMO_RE, matchesTask, planTask } from '../../shar
 import { keyFrom, sendPropose, rpcClient, viewFn, PROPOSE_TGAS } from '../../shared/vault/tx.js';
 import { runSteps, runTask, runAsk } from '../../shared/vault/run.js';
 import { receipt as buildReceipt } from '../../shared/vault/receipt.js';
+import { edgeCache } from './http-guard.js';
 import { ASK_MEMO_RE, parseAsk } from '../../shared/vault/ask.js';
 import * as agent from './agent.js';
 
@@ -729,7 +730,7 @@ export async function catalog(charter) {
 
 export function register(app, { limiter, globalCap }) {
   if (process.env.NODE_ENV !== 'test') boot();
-  app.get('/api/vault/config', limiter(30), c => c.json(config()));
+  app.get('/api/vault/config', limiter(240), edgeCache(60), c => c.json(config()));
   app.get('/api/vault/charters', limiter(30), async c => c.json(await listCharters(c.req.query('from'), c.req.query('limit'))));
   app.get('/api/vault/charter/:id', limiter(30), async c => {
     const fresh = c.req.query('fresh') === '1';
