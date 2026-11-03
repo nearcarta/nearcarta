@@ -113,12 +113,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3086,
+                  "duration": 2139,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:04.124Z",
+                  "startTime": "2026-11-03T04:43:18.097Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -147,12 +147,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2473,
+                  "duration": 2232,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:07.354Z",
+                  "startTime": "2026-11-03T04:43:20.321Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -181,12 +181,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2168,
+                  "duration": 2170,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:09.842Z",
+                  "startTime": "2026-11-03T04:43:22.562Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -215,12 +215,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1966,
+                  "duration": 1873,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:12.023Z",
+                  "startTime": "2026-11-03T04:43:24.740Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -257,12 +257,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 1,
                   "status": "passed",
-                  "duration": 2726,
+                  "duration": 2261,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:04.151Z",
+                  "startTime": "2026-11-03T04:43:18.098Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -291,12 +291,12 @@
                   "workerIndex": 1,
                   "parallelIndex": 1,
                   "status": "passed",
-                  "duration": 2753,
+                  "duration": 2272,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:06.989Z",
+                  "startTime": "2026-11-03T04:43:20.442Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -356,7 +356,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:52.721Z",
+                  "startTime": "2026-11-03T04:45:22.133Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -404,7 +404,7 @@
           "specs": [
             {
               "title": "shows the DAO, its council and the latest proposals from chain",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -417,18 +417,101 @@
                     {
                       "workerIndex": 1,
                       "parallelIndex": 1,
-                      "status": "passed",
-                      "duration": 34023,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 61670,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/hall.spec.js:7:42",
+                        "location": {
+                          "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
+                          "column": 42,
+                          "line": 7
+                        },
+                        "snippet": "   5 |   test('shows the DAO, its council and the latest proposals from chain', async ({ page }) => {\n   6 |     await page.goto('/shops/hall/');\n>  7 |     await expect(page.locator('#facts')).toContainText('r7thmvr8maey.sputnikv2.testnet', { timeout: 60_000 });\n     |                                          ^\n   8 |     await expect(page.locator('#facts')).toContainText('Anyone may file a proposal');\n   9 |     await expect(page.locator('[data-testid=list] li').first()).toBeVisible({ timeout: 60_000 });\n  10 |     await expect(page.getByTestId('file')).toBeDisabled();"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
+                            "column": 42,
+                            "line": 7
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n\n\n   5 |   test('shows the DAO, its council and the latest proposals from chain', async ({ page }) => {\n   6 |     await page.goto('/shops/hall/');\n>  7 |     await expect(page.locator('#facts')).toContainText('r7thmvr8maey.sputnikv2.testnet', { timeout: 60_000 });\n     |                                          ^\n   8 |     await expect(page.locator('#facts')).toContainText('Anyone may file a proposal');\n   9 |     await expect(page.locator('[data-testid=list] li').first()).toBeVisible({ timeout: 60_000 });\n  10 |     await expect(page.getByTestId('file')).toBeDisabled();\n    at /workspace/near/tech/nearcarta/e2e/hall.spec.js:7:42"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T03:39:09.763Z",
+                      "startTime": "2026-11-03T04:43:22.730Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/workspace/near/tech/nearcarta/test-results/hall-town-hall-proposals-s-a87ff-latest-proposals-from-chain/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/workspace/near/tech/nearcarta/test-results/hall-town-hall-proposals-s-a87ff-latest-proposals-from-chain/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
+                        "column": 42,
+                        "line": 7
+                      }
+                    },
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 61573,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/hall.spec.js:7:42",
+                        "location": {
+                          "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
+                          "column": 42,
+                          "line": 7
+                        },
+                        "snippet": "   5 |   test('shows the DAO, its council and the latest proposals from chain', async ({ page }) => {\n   6 |     await page.goto('/shops/hall/');\n>  7 |     await expect(page.locator('#facts')).toContainText('r7thmvr8maey.sputnikv2.testnet', { timeout: 60_000 });\n     |                                          ^\n   8 |     await expect(page.locator('#facts')).toContainText('Anyone may file a proposal');\n   9 |     await expect(page.locator('[data-testid=list] li').first()).toBeVisible({ timeout: 60_000 });\n  10 |     await expect(page.getByTestId('file')).toBeDisabled();"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
+                            "column": 42,
+                            "line": 7
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#facts')\nExpected substring: \u001b[32m\"r7thmvr8maey.sputnikv2.testnet\"\u001b[39m\nReceived string:    \u001b[31m\"Loading…\"\u001b[39m\nTimeout: 60000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" locator('#facts') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for locator('#facts')\u001b[22m\n\u001b[2m    123 × locator resolved to <div id=\"facts\">Loading…</div>\u001b[22m\n\u001b[2m        - unexpected value \"Loading…\"\u001b[22m\n\n\n   5 |   test('shows the DAO, its council and the latest proposals from chain', async ({ page }) => {\n   6 |     await page.goto('/shops/hall/');\n>  7 |     await expect(page.locator('#facts')).toContainText('r7thmvr8maey.sputnikv2.testnet', { timeout: 60_000 });\n     |                                          ^\n   8 |     await expect(page.locator('#facts')).toContainText('Anyone may file a proposal');\n   9 |     await expect(page.locator('[data-testid=list] li').first()).toBeVisible({ timeout: 60_000 });\n  10 |     await expect(page.getByTestId('file')).toBeDisabled();\n    at /workspace/near/tech/nearcarta/e2e/hall.spec.js:7:42"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-11-03T04:44:24.846Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/workspace/near/tech/nearcarta/test-results/hall-town-hall-proposals-s-a87ff-latest-proposals-from-chain-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/workspace/near/tech/nearcarta/test-results/hall-town-hall-proposals-s-a87ff-latest-proposals-from-chain-retry1/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/workspace/near/tech/nearcarta/e2e/hall.spec.js",
+                        "column": 42,
+                        "line": 7
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "12efcde6fe54bde8de65-92f8dc872c65e5e69a69",
@@ -459,15 +542,15 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 8,
+                      "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 55,
+                      "duration": 75,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T03:39:43.796Z",
+                      "startTime": "2026-11-03T04:45:26.545Z",
                       "annotations": [
                         {
                           "type": "skip",
@@ -539,7 +622,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:14.005Z",
+                  "startTime": "2026-11-03T04:43:26.635Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -593,18 +676,61 @@
                 {
                   "workerIndex": 0,
                   "parallelIndex": 0,
-                  "status": "passed",
-                  "duration": 1388,
-                  "errors": [],
+                  "status": "failed",
+                  "duration": 1034,
+                  "error": {
+                    "message": "SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON",
+                    "stack": "SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:5:13",
+                    "location": {
+                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
+                      "column": 13,
+                      "line": 5
+                    },
+                    "snippet": "  3 |\n  4 | test('health: the API reads NEAR testnet and cannot sign', async ({ request }) => {\n> 5 |   const h = await (await request.get('/api/health')).json();\n    |             ^\n  6 |   expect(h.network).toBe('testnet'); expect(h.near.height).toBeGreaterThan(200_000_000); expect(h.features.signing).toBe(false);\n  7 | });\n  8 |"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
+                        "column": 13,
+                        "line": 5
+                      },
+                      "message": "SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON\n\n  3 |\n  4 | test('health: the API reads NEAR testnet and cannot sign', async ({ request }) => {\n> 5 |   const h = await (await request.get('/api/health')).json();\n    |             ^\n  6 |   expect(h.network).toBe('testnet'); expect(h.near.height).toBeGreaterThan(200_000_000); expect(h.features.signing).toBe(false);\n  7 | });\n  8 |\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:5:13"
+                    }
+                  ],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:14.034Z",
+                  "startTime": "2026-11-03T04:43:26.655Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/workspace/near/tech/nearcarta/test-results/shops-health-the-API-reads-NEAR-testnet-and-cannot-sign/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
+                    "column": 13,
+                    "line": 5
+                  }
+                },
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10757,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 1,
+                  "startTime": "2026-11-03T04:43:28.151Z",
                   "annotations": [],
                   "attachments": []
                 }
               ],
-              "status": "expected"
+              "status": "flaky"
             }
           ],
           "id": "e3b5e6ee814041738c3d-ecd22ed00dce83a58248",
@@ -625,13 +751,13 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 0,
+                  "workerIndex": 2,
                   "parallelIndex": 0,
                   "status": "failed",
-                  "duration": 6449,
+                  "duration": 6649,
                   "error": {
-                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n",
-                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47",
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47",
                     "location": {
                       "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
                       "column": 47,
@@ -646,13 +772,13 @@
                         "column": 47,
                         "line": 13
                       },
-                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\n\n  11 |   await expect(page.locator('input[name=recipient]')).toHaveValue(''); await expect(page.locator('input[name=amount]')).toHaveValue('30');\n  12 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n> 13 |   await expect(page.getByTestId('zec-check')).toContainText('shielded');\n     |                                               ^\n  14 |   await page.getByRole('button', { name: 'Get dry quote' }).click();\n  15 |   const q = page.getByTestId('quote');\n  16 |   await expect(q).toBeVisible({ timeout: 30_000 });\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47"
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n\n\n  11 |   await expect(page.locator('input[name=recipient]')).toHaveValue(''); await expect(page.locator('input[name=amount]')).toHaveValue('30');\n  12 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n> 13 |   await expect(page.getByTestId('zec-check')).toContainText('shielded');\n     |                                               ^\n  14 |   await page.getByRole('button', { name: 'Get dry quote' }).click();\n  15 |   const q = page.getByTestId('quote');\n  16 |   await expect(q).toBeVisible({ timeout: 30_000 });\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47"
                     }
                   ],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:15.431Z",
+                  "startTime": "2026-11-03T04:43:38.938Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -673,13 +799,13 @@
                   }
                 },
                 {
-                  "workerIndex": 2,
+                  "workerIndex": 3,
                   "parallelIndex": 0,
                   "status": "failed",
-                  "duration": 6781,
+                  "duration": 6602,
                   "error": {
-                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 503\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 503</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 503\"\u001b[22m\n",
-                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 503\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 503</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 503\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47",
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47",
                     "location": {
                       "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
                       "column": 47,
@@ -694,13 +820,13 @@
                         "column": 47,
                         "line": 13
                       },
-                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 503\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 503</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 503\"\u001b[22m\n\n\n  11 |   await expect(page.locator('input[name=recipient]')).toHaveValue(''); await expect(page.locator('input[name=amount]')).toHaveValue('30');\n  12 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n> 13 |   await expect(page.getByTestId('zec-check')).toContainText('shielded');\n     |                                               ^\n  14 |   await page.getByRole('button', { name: 'Get dry quote' }).click();\n  15 |   const q = page.getByTestId('quote');\n  16 |   await expect(q).toBeVisible({ timeout: 30_000 });\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47"
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('zec-check')\nExpected substring: \u001b[32m\"shielded\"\u001b[39m\nReceived string:    \u001b[31m\"check unavailable: http 429\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByTestId('zec-check') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('zec-check')\u001b[22m\n\u001b[2m    10 × locator resolved to <div class=\"card fail\" data-testid=\"zec-check\">check unavailable: http 429</div>\u001b[22m\n\u001b[2m       - unexpected value \"check unavailable: http 429\"\u001b[22m\n\n\n  11 |   await expect(page.locator('input[name=recipient]')).toHaveValue(''); await expect(page.locator('input[name=amount]')).toHaveValue('30');\n  12 |   await page.getByRole('button', { name: 'Fill sample addresses' }).click();\n> 13 |   await expect(page.getByTestId('zec-check')).toContainText('shielded');\n     |                                               ^\n  14 |   await page.getByRole('button', { name: 'Get dry quote' }).click();\n  15 |   const q = page.getByTestId('quote');\n  16 |   await expect(q).toBeVisible({ timeout: 30_000 });\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:13:47"
                     }
                   ],
                   "stdout": [],
                   "stderr": [],
                   "retry": 1,
-                  "startTime": "2026-11-03T03:39:22.270Z",
+                  "startTime": "2026-11-03T04:43:46.049Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -742,10 +868,10 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 3,
+                  "workerIndex": 4,
                   "parallelIndex": 0,
                   "status": "failed",
-                  "duration": 968,
+                  "duration": 988,
                   "error": {
                     "message": "SyntaxError: Unexpected end of JSON input",
                     "stack": "SyntaxError: Unexpected end of JSON input\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:23:15",
@@ -769,7 +895,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:29.489Z",
+                  "startTime": "2026-11-03T04:43:53.110Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -790,10 +916,10 @@
                   }
                 },
                 {
-                  "workerIndex": 4,
+                  "workerIndex": 5,
                   "parallelIndex": 0,
                   "status": "failed",
-                  "duration": 858,
+                  "duration": 845,
                   "error": {
                     "message": "SyntaxError: Unexpected end of JSON input",
                     "stack": "SyntaxError: Unexpected end of JSON input\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:23:15",
@@ -817,7 +943,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 1,
-                  "startTime": "2026-11-03T03:39:30.971Z",
+                  "startTime": "2026-11-03T04:43:54.577Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -859,15 +985,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 5,
+                  "workerIndex": 6,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1998,
+                  "duration": 2842,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:32.360Z",
+                  "startTime": "2026-11-03T04:43:55.888Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -882,7 +1008,7 @@
         },
         {
           "title": "guardhouse: oath account has no full-access key and a propose-only agent key",
-          "ok": false,
+          "ok": true,
           "tags": [],
           "tests": [
             {
@@ -893,10 +1019,10 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 5,
+                  "workerIndex": 6,
                   "parallelIndex": 0,
                   "status": "failed",
-                  "duration": 31711,
+                  "duration": 31518,
                   "error": {
                     "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\nExpected: visible\nTimeout: 30000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first() with timeout 30000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\u001b[22m\n",
                     "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\nExpected: visible\nTimeout: 30000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first() with timeout 30000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:43:101",
@@ -920,7 +1046,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:34.441Z",
+                  "startTime": "2026-11-03T04:43:58.820Z",
                   "annotations": [],
                   "attachments": [
                     {
@@ -941,55 +1067,20 @@
                   }
                 },
                 {
-                  "workerIndex": 6,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 31867,
-                  "error": {
-                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\nExpected: visible\nTimeout: 30000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first() with timeout 30000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\u001b[22m\n",
-                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\nExpected: visible\nTimeout: 30000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first() with timeout 30000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:43:101",
-                    "location": {
-                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                      "column": 101,
-                      "line": 43
-                    },
-                    "snippet": "  41 |   await page.goto('/#guardhouse');\n  42 |   // Accounts show a readable name; the full id is the link title and target.\n> 43 |   await expect(page.getByTestId('oath-state').locator(`a[title=\"${dep.guardhouse.oath}\"]`).first()).toBeVisible({ timeout: 30_000 });\n     |                                                                                                     ^\n  44 |   await expect(page.getByTestId('fak')).toHaveText('0');\n  45 |   await expect(page.getByTestId('oath-state')).toContainText('propose');\n  46 | });"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                        "column": 101,
-                        "line": 43
-                      },
-                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\nExpected: visible\nTimeout: 30000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first() with timeout 30000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('oath-state').locator('a[title=\"guardhouse-nzjp.nccharters-22195.testnet\"]').first()\u001b[22m\n\n\n  41 |   await page.goto('/#guardhouse');\n  42 |   // Accounts show a readable name; the full id is the link title and target.\n> 43 |   await expect(page.getByTestId('oath-state').locator(`a[title=\"${dep.guardhouse.oath}\"]`).first()).toBeVisible({ timeout: 30_000 });\n     |                                                                                                     ^\n  44 |   await expect(page.getByTestId('fak')).toHaveText('0');\n  45 |   await expect(page.getByTestId('oath-state')).toContainText('propose');\n  46 | });\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:43:101"
-                    }
-                  ],
+                  "status": "passed",
+                  "duration": 2397,
+                  "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 1,
-                  "startTime": "2026-11-03T03:40:06.519Z",
+                  "startTime": "2026-11-03T04:44:30.792Z",
                   "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-guardhouse-oath-acco-2a88c-nd-a-propose-only-agent-key-retry1/test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-guardhouse-oath-acco-2a88c-nd-a-propose-only-agent-key-retry1/error-context.md"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                    "column": 101,
-                    "line": 43
-                  }
+                  "attachments": []
                 }
               ],
-              "status": "unexpected"
+              "status": "flaky"
             }
           ],
           "id": "e3b5e6ee814041738c3d-40c648e334fb9e4bc6f6",
@@ -1010,15 +1101,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 7,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 14289,
+                  "duration": 11915,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:38.852Z",
+                  "startTime": "2026-11-03T04:44:33.278Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1044,15 +1135,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 7,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2803,
+                  "duration": 10400,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:53.231Z",
+                  "startTime": "2026-11-03T04:44:45.205Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1078,15 +1169,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 7,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4163,
+                  "duration": 3287,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:56.043Z",
+                  "startTime": "2026-11-03T04:44:55.615Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1112,15 +1203,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 7,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3245,
+                  "duration": 2570,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:41:00.221Z",
+                  "startTime": "2026-11-03T04:44:58.911Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1146,15 +1237,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 7,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4414,
+                  "duration": 2275,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:41:03.493Z",
+                  "startTime": "2026-11-03T04:45:01.490Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1169,7 +1260,7 @@
         },
         {
           "title": "shop interiors get live data through the data interface",
-          "ok": false,
+          "ok": true,
           "tags": [],
           "tests": [
             {
@@ -1180,103 +1271,20 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 7,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
-                  "status": "failed",
-                  "duration": 3433,
-                  "error": {
-                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mguardhouse-nzjp.nccharters-22195\u001b[27m.testnet\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mr11oath-82930\u001b[27m.testnet\"\u001b[39m",
-                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mguardhouse-nzjp.nccharters-22195\u001b[27m.testnet\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mr11oath-82930\u001b[27m.testnet\"\u001b[39m\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:93:18",
-                    "location": {
-                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                      "column": 18,
-                      "line": 93
-                    },
-                    "snippet": "  91 |   // QUOTE is no longer fetched here (the Ferry room reads its own quote), so only the chain reads are checked.\n  92 |   const d = await page.evaluate(async () => { const m = await import('/design/D6_dashboards/src/data.js'); return { oath: m.CORE.oath, n: m.CORE_TXS.length, ag: m.AGENT_NAME }; });\n> 93 |   expect(d.oath).toBe(dep.guardhouse.oath);\n     |                  ^\n  94 |   expect(d.n).toBeGreaterThan(0); expect(d.ag).toBe('the Lamplighter');\n  95 |   await page.getByRole('button', { name: 'Ferry' }).click();\n  96 |   await expect(page.locator('#t-title')).toHaveText('Ferry');"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                        "column": 18,
-                        "line": 93
-                      },
-                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mguardhouse-nzjp.nccharters-22195\u001b[27m.testnet\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mr11oath-82930\u001b[27m.testnet\"\u001b[39m\n\n  91 |   // QUOTE is no longer fetched here (the Ferry room reads its own quote), so only the chain reads are checked.\n  92 |   const d = await page.evaluate(async () => { const m = await import('/design/D6_dashboards/src/data.js'); return { oath: m.CORE.oath, n: m.CORE_TXS.length, ag: m.AGENT_NAME }; });\n> 93 |   expect(d.oath).toBe(dep.guardhouse.oath);\n     |                  ^\n  94 |   expect(d.n).toBeGreaterThan(0); expect(d.ag).toBe('the Lamplighter');\n  95 |   await page.getByRole('button', { name: 'Ferry' }).click();\n  96 |   await expect(page.locator('#t-title')).toHaveText('Ferry');\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:93:18"
-                    }
-                  ],
+                  "status": "passed",
+                  "duration": 5951,
+                  "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:41:07.916Z",
+                  "startTime": "2026-11-03T04:45:03.776Z",
                   "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-shop-interiors-get-l-522ab--through-the-data-interface/test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-shop-interiors-get-l-522ab--through-the-data-interface/error-context.md"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                    "column": 18,
-                    "line": 93
-                  }
-                },
-                {
-                  "workerIndex": 8,
-                  "parallelIndex": 1,
-                  "status": "failed",
-                  "duration": 3022,
-                  "error": {
-                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mguardhouse-nzjp.nccharters-22195\u001b[27m.testnet\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mr11oath-82930\u001b[27m.testnet\"\u001b[39m",
-                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mguardhouse-nzjp.nccharters-22195\u001b[27m.testnet\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mr11oath-82930\u001b[27m.testnet\"\u001b[39m\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:93:18",
-                    "location": {
-                      "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                      "column": 18,
-                      "line": 93
-                    },
-                    "snippet": "  91 |   // QUOTE is no longer fetched here (the Ferry room reads its own quote), so only the chain reads are checked.\n  92 |   const d = await page.evaluate(async () => { const m = await import('/design/D6_dashboards/src/data.js'); return { oath: m.CORE.oath, n: m.CORE_TXS.length, ag: m.AGENT_NAME }; });\n> 93 |   expect(d.oath).toBe(dep.guardhouse.oath);\n     |                  ^\n  94 |   expect(d.n).toBeGreaterThan(0); expect(d.ag).toBe('the Lamplighter');\n  95 |   await page.getByRole('button', { name: 'Ferry' }).click();\n  96 |   await expect(page.locator('#t-title')).toHaveText('Ferry');"
-                  },
-                  "errors": [
-                    {
-                      "location": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                        "column": 18,
-                        "line": 93
-                      },
-                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"\u001b[7mguardhouse-nzjp.nccharters-22195\u001b[27m.testnet\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mr11oath-82930\u001b[27m.testnet\"\u001b[39m\n\n  91 |   // QUOTE is no longer fetched here (the Ferry room reads its own quote), so only the chain reads are checked.\n  92 |   const d = await page.evaluate(async () => { const m = await import('/design/D6_dashboards/src/data.js'); return { oath: m.CORE.oath, n: m.CORE_TXS.length, ag: m.AGENT_NAME }; });\n> 93 |   expect(d.oath).toBe(dep.guardhouse.oath);\n     |                  ^\n  94 |   expect(d.n).toBeGreaterThan(0); expect(d.ag).toBe('the Lamplighter');\n  95 |   await page.getByRole('button', { name: 'Ferry' }).click();\n  96 |   await expect(page.locator('#t-title')).toHaveText('Ferry');\n    at /workspace/near/tech/nearcarta/e2e/shops.spec.js:93:18"
-                    }
-                  ],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 1,
-                  "startTime": "2026-11-03T03:41:11.407Z",
-                  "annotations": [],
-                  "attachments": [
-                    {
-                      "name": "screenshot",
-                      "contentType": "image/png",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-shop-interiors-get-l-522ab--through-the-data-interface-retry1/test-failed-1.png"
-                    },
-                    {
-                      "name": "error-context",
-                      "contentType": "text/markdown",
-                      "path": "/workspace/near/tech/nearcarta/test-results/shops-shop-interiors-get-l-522ab--through-the-data-interface-retry1/error-context.md"
-                    }
-                  ],
-                  "errorLocation": {
-                    "file": "/workspace/near/tech/nearcarta/e2e/shops.spec.js",
-                    "column": 18,
-                    "line": 93
-                  }
+                  "attachments": []
                 }
               ],
-              "status": "unexpected"
+              "status": "expected"
             }
           ],
           "id": "e3b5e6ee814041738c3d-9cabba31baf570716cd0",
@@ -1297,15 +1305,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 9,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3832,
+                  "duration": 5911,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:41:14.783Z",
+                  "startTime": "2026-11-03T04:45:09.750Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1331,15 +1339,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 9,
+                  "workerIndex": 8,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1836,
+                  "duration": 2213,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:41:18.699Z",
+                  "startTime": "2026-11-03T04:45:15.673Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1399,7 +1407,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:39:43.867Z",
+                  "startTime": "2026-11-03T04:45:17.895Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1458,73 +1466,25 @@
                   "projectName": "",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
-                      "status": "failed",
-                      "duration": 61645,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeFocused\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByTestId('guest')\nExpected: focused\nReceived: inactive\nTimeout:  60000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeFocused\" getByTestId('guest') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('guest')\u001b[22m\n\u001b[2m    123 × locator resolved to <button id=\"guest\" class=\"primary\" data-testid=\"guest\" title=\"Creates a new testnet account from the public faucet. Its key stays in this browser.\">Start free</button>\u001b[22m\n\u001b[2m        - unexpected value \"inactive\"\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeFocused\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByTestId('guest')\nExpected: focused\nReceived: inactive\nTimeout:  60000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeFocused\" getByTestId('guest') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('guest')\u001b[22m\n\u001b[2m    123 × locator resolved to <button id=\"guest\" class=\"primary\" data-testid=\"guest\" title=\"Creates a new testnet account from the public faucet. Its key stays in this browser.\">Start free</button>\u001b[22m\n\u001b[2m        - unexpected value \"inactive\"\u001b[22m\n\n    at /workspace/near/tech/nearcarta/e2e/vault-create.spec.js:16:27",
-                        "location": {
-                          "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
-                          "column": 27,
-                          "line": 16
-                        },
-                        "snippet": "  14 |       await page.goto('/shops/vault/#create');\n  15 |       const guest = page.getByTestId('guest');\n> 16 |       await expect(guest).toBeFocused({ timeout: 60_000 });\n     |                           ^\n  17 |       await expect(guest).toBeInViewport();\n  18 |       expect(await page.$$eval('.who button:not([hidden])', bs => bs.map(b => b.id))).toEqual(['guest', 'connect']);\n  19 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
-                            "column": 27,
-                            "line": 16
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeFocused\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByTestId('guest')\nExpected: focused\nReceived: inactive\nTimeout:  60000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeFocused\" getByTestId('guest') with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('guest')\u001b[22m\n\u001b[2m    123 × locator resolved to <button id=\"guest\" class=\"primary\" data-testid=\"guest\" title=\"Creates a new testnet account from the public faucet. Its key stays in this browser.\">Start free</button>\u001b[22m\n\u001b[2m        - unexpected value \"inactive\"\u001b[22m\n\n\n  14 |       await page.goto('/shops/vault/#create');\n  15 |       const guest = page.getByTestId('guest');\n> 16 |       await expect(guest).toBeFocused({ timeout: 60_000 });\n     |                           ^\n  17 |       await expect(guest).toBeInViewport();\n  18 |       expect(await page.$$eval('.who button:not([hidden])', bs => bs.map(b => b.id))).toEqual(['guest', 'connect']);\n  19 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);\n    at /workspace/near/tech/nearcarta/e2e/vault-create.spec.js:16:27"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-03T03:39:43.873Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "/workspace/near/tech/nearcarta/test-results/vault-create-charter-offic-2e54f--focused-no-sideways-scroll/test-failed-1.png"
-                        },
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/workspace/near/tech/nearcarta/test-results/vault-create-charter-offic-2e54f--focused-no-sideways-scroll/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
-                        "column": 27,
-                        "line": 16
-                      }
-                    },
-                    {
                       "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4288,
+                      "duration": 1929,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
-                      "retry": 1,
-                      "startTime": "2026-11-03T03:40:45.884Z",
+                      "retry": 0,
+                      "startTime": "2026-11-03T04:45:17.900Z",
                       "annotations": [],
                       "attachments": []
                     }
                   ],
-                  "status": "flaky"
+                  "status": "expected"
                 }
               ],
               "id": "691584d3a1d95b30af6a-9f66e4444ef45e26a272",
               "file": "vault-create.spec.js",
-              "line": 11,
+              "line": 13,
               "column": 5
             },
             {
@@ -1540,7 +1500,7 @@
                       "description": "set VAULT_FAUCET=1 to make a faucet account",
                       "location": {
                         "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
-                        "line": 26,
+                        "line": 28,
                         "column": 12
                       }
                     }
@@ -1551,21 +1511,21 @@
                   "results": [
                     {
                       "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 69,
+                      "duration": 82,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T03:40:50.253Z",
+                      "startTime": "2026-11-03T04:45:19.839Z",
                       "annotations": [
                         {
                           "type": "skip",
                           "description": "set VAULT_FAUCET=1 to make a faucet account",
                           "location": {
                             "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
-                            "line": 26,
+                            "line": 28,
                             "column": 12
                           }
                         }
@@ -1578,7 +1538,7 @@
               ],
               "id": "691584d3a1d95b30af6a-23bccd92535479836073",
               "file": "vault-create.spec.js",
-              "line": 25,
+              "line": 27,
               "column": 5
             }
           ]
@@ -1603,14 +1563,14 @@
                   "results": [
                     {
                       "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2315,
+                      "duration": 2147,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T03:40:50.331Z",
+                      "startTime": "2026-11-03T04:45:19.930Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1620,7 +1580,7 @@
               ],
               "id": "691584d3a1d95b30af6a-18a423577acdc2faa74a",
               "file": "vault-create.spec.js",
-              "line": 11,
+              "line": 13,
               "column": 5
             },
             {
@@ -1636,7 +1596,7 @@
                       "description": "set VAULT_FAUCET=1 to make a faucet account",
                       "location": {
                         "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
-                        "line": 26,
+                        "line": 28,
                         "column": 12
                       }
                     }
@@ -1647,21 +1607,21 @@
                   "results": [
                     {
                       "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 59,
+                      "duration": 41,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-03T03:40:52.654Z",
+                      "startTime": "2026-11-03T04:45:22.084Z",
                       "annotations": [
                         {
                           "type": "skip",
                           "description": "set VAULT_FAUCET=1 to make a faucet account",
                           "location": {
                             "file": "/workspace/near/tech/nearcarta/e2e/vault-create.spec.js",
-                            "line": 26,
+                            "line": 28,
                             "column": 12
                           }
                         }
@@ -1674,7 +1634,7 @@
               ],
               "id": "691584d3a1d95b30af6a-5af7f0536e975f9589e9",
               "file": "vault-create.spec.js",
-              "line": 25,
+              "line": 27,
               "column": 5
             }
           ]
@@ -1718,7 +1678,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:52.721Z",
+                  "startTime": "2026-11-03T04:45:22.133Z",
                   "annotations": [
                     {
                       "type": "skip",
@@ -1788,7 +1748,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:52.721Z",
+                  "startTime": "2026-11-03T04:45:22.133Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1858,7 +1818,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:52.721Z",
+                  "startTime": "2026-11-03T04:45:22.133Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -1928,7 +1888,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:52.721Z",
+                  "startTime": "2026-11-03T04:45:22.133Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -2006,7 +1966,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:52.721Z",
+                  "startTime": "2026-11-03T04:45:22.133Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -2076,7 +2036,7 @@
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-03T03:40:52.721Z",
+                  "startTime": "2026-11-03T04:45:22.133Z",
                   "annotations": [
                     {
                       "type": "serial",
@@ -2112,11 +2072,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-03T03:39:03.711Z",
-    "duration": 136885.50699999998,
+    "startTime": "2026-11-03T04:43:17.707Z",
+    "duration": 128985.376,
     "expected": 17,
     "skipped": 12,
-    "unexpected": 4,
-    "flaky": 1
+    "unexpected": 3,
+    "flaky": 2
   }
 }

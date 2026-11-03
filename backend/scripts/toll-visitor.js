@@ -101,6 +101,7 @@ await step('replay_refused', async () => ({ ...(await send(B.g.id, B.g.secret, G
 if (E.NON_TOLL_CHARTER) await step('non_toll_action_refused', async () => ({ charter: E.NON_TOLL_CHARTER, ...(await send(B.g.id, B.g.secret, GATE, [functionCall('pay_for', { charter: E.NON_TOLL_CHARTER, action_id: '0' }, 300n * 10n ** 12n)])), logs: undefined }));
 await step('unlisted_factory_refused', async () => ({ charter: E.NON_FACTORY_ACCOUNT || 'oath.r4csmvr86zk4.testnet', ...(await send(B.g.id, B.g.secret, GATE, [functionCall('pay_for', { charter: E.NON_FACTORY_ACCOUNT || 'oath.r4csmvr86zk4.testnet', action_id: '0' }, 300n * 10n ** 12n)])), logs: undefined }));
 
+if (E.STOP_BEFORE_SETTLE) { console.log(JSON.stringify({ stop_before_settle: true, nonce })); process.exit(0); } // leave settle to the server settler
 // ---- settle after Base finality ----
 await step('settle', async () => {
   for (;;) { const f = await evm('eth_getBlockByNumber', ['finalized', false]); if (parseInt(f.number) >= bc.block) { out.base_finalized_head_at_settle = parseInt(f.number); break; } console.log('waiting finality', bc.block - parseInt(f.number)); await sleep(30000); }

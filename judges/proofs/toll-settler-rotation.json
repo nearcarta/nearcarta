@@ -1,0 +1,151 @@
+{
+ "gate": "gate5.r4csmvr86zk4.testnet",
+ "factory": "nccharters-53836.testnet",
+ "steps": {
+  "allowed_account": {
+   "account": "ncguest-tv3cwwo2vw.testnet",
+   "note": "fresh testnet account from the helper; its key never left this script",
+   "ms": 0,
+   "at": "2026-11-03T04:17:10.892Z"
+  },
+  "allowed_create_charter": {
+   "tx": "5QJpWUpAZB6uh4FNFk42zTn6nVhBPhBgmSLUdueMnZsU",
+   "ok": true,
+   "ret": true,
+   "charter": "ncguest-tv3cwwo2vw-mn5g.nccharters-53836.testnet",
+   "ms": 13357,
+   "at": "2026-11-03T04:17:24.253Z"
+  },
+  "allowed_sign_rules": {
+   "tx": "GU44ESj1MUuLUhYCPVNdSt5FK6Pwqow2U97ZvM5NrJno",
+   "ok": true,
+   "ret": true,
+   "rules": {
+    "per_action_cap": "50000000000000000000000",
+    "daily_budget": "200000000000000000000000",
+    "receivers": [
+     "cafe.ncpub-17102.testnet",
+     "books.ncpub-17102.testnet",
+     "ncguest-tv3cwwo2vw.testnet"
+    ]
+   },
+   "ms": 17567,
+   "at": "2026-11-03T04:17:46.052Z"
+  },
+  "allowed_agent_asks_toll": {
+   "tx": "C47tG3NV3YRK5DZKQYu7SkeKvNX2AMEvc8S9RkXDkjmF",
+   "signer": "ncguest-tv3cwwo2vw-mn5g.nccharters-53836.testnet (agent function-call key, propose only)",
+   "decision": "allowed",
+   "reason": "ok",
+   "action_id": "0",
+   "ms": 57031,
+   "at": "2026-11-03T04:18:43.084Z",
+   "action_onchain": {
+    "shop": "toll",
+    "clause_id": "pay",
+    "receiver": "cafe.ncpub-17102.testnet",
+    "amount": "10000000000000000000000",
+    "day": 20760,
+    "status": "confirmed",
+    "receipt_hash": null,
+    "yield_id": null,
+    "policy_version": 2,
+    "freeze_epoch": 0,
+    "asset": "Native",
+    "memo": "toll:base-sepolia"
+   }
+  },
+  "allowed_pay_for": {
+   "tx": "8d9EhUuYDbMFWN8tKYkNRfbVekyvGMPCxKMusY5uNTMW",
+   "ok": true,
+   "ret": {
+    "nonce": 61,
+    "status": "signed",
+    "to": "0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5",
+    "value": "100000000000",
+    "tx_hash": "0xcc9b2efb471134cfe533bf1eb8e3c83d8461074d58a2c14ee41df12903b8d9e5"
+   },
+   "logs": [
+    "EVENT_JSON:{\"standard\":\"town-chronicle\",\"event\":\"visit_paid\",\"data\":{\"nonce\":61,\"charter\":\"ncguest-tv3cwwo2vw-mn5g.nccharters-53836.testnet\",\"action_id\":\"0\"}}",
+    "EVENT_JSON:{\"standard\":\"town-chronicle\",\"event\":\"sign_requested\",\"data\":{\"nonce\":61,\"to\":\"0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5\",\"value\":\"100000000000\",\"payload\":\"4e7ead44030e9d46b1897f1262be043197f1f011e867edd28ac3e66f3285c1ce\"}}",
+    "sign: predecessor=AccountId(\"gate5.r4csmvr86zk4.testnet\"), request=SignRequestArgs { path: \"gate-1\", payload: Ecdsa(BoundedVec { inner: [78, 126, 173, 68, 3, 14, 157, 70, 177, 137, 127, 18, 98, 190, 4, 49, 151, 241, 240, 17, 232, 103, 237, 210, 138, 195, 230, 111, 50, 133, 193, 206], witness: NonEmpty(()) }), domain_id: DomainId(0) }",
+    "EVENT_JSON:{\"standard\":\"town-chronicle\",\"event\":\"signed\",\"data\":{\"nonce\":61,\"tx_hash\":\"0xcc9b2efb471134cfe533bf1eb8e3c83d8461074d58a2c14ee41df12903b8d9e5\"}}"
+   ],
+   "signer": "ncguest-tv3cwwo2vw.testnet",
+   "ms": 24260,
+   "at": "2026-11-03T04:19:12.662Z"
+  },
+  "broadcast": {
+   "base_sepolia_tx": "0xcc9b2efb471134cfe533bf1eb8e3c83d8461074d58a2c14ee41df12903b8d9e5",
+   "from": "0xfd4f86716f2e46bb45b4672c07a16d6329ae5ed4",
+   "status": "0x1",
+   "block": 53788444,
+   "block_hash": "0x8922b3ce25744c3fc6a0071582d93f33db8639c9f37ae07624aeaa7ce911268f",
+   "raw_read_from": "gate5.r4csmvr86zk4.testnet.get_tx(61)",
+   "ms": 6837,
+   "at": "2026-11-03T04:19:19.505Z"
+  },
+  "overcap_account": {
+   "account": "ncguest-tvzrfm077n.testnet",
+   "note": "fresh testnet account from the helper; its key never left this script",
+   "ms": 0,
+   "at": "2026-11-03T04:19:19.505Z"
+  },
+  "overcap_create_charter": {
+   "tx": "CuzQby6kqTLQNHy9oKuhrbFwdRus2fKcrovsJ1J67FiJ",
+   "ok": true,
+   "ret": true,
+   "charter": "ncguest-tvzrfm077n-9z0p.nccharters-53836.testnet",
+   "ms": 14182,
+   "at": "2026-11-03T04:19:33.687Z"
+  },
+  "overcap_sign_rules": {
+   "tx": "64DFNs6gXPociF7vbEBZtp1zNMbhKZnXutW1uF991cwP",
+   "ok": true,
+   "ret": true,
+   "rules": {
+    "per_action_cap": "5000000000000000000000",
+    "daily_budget": "200000000000000000000000",
+    "receivers": [
+     "cafe.ncpub-17102.testnet",
+     "books.ncpub-17102.testnet",
+     "ncguest-tvzrfm077n.testnet"
+    ]
+   },
+   "ms": 15978,
+   "at": "2026-11-03T04:19:53.344Z"
+  },
+  "overcap_agent_asks_toll": {
+   "tx": "DZvPHUL4sfLQBLnnSNXU2uxeuq1SFYBGxopvNReUhS4s",
+   "signer": "ncguest-tvzrfm077n-9z0p.nccharters-53836.testnet (agent function-call key, propose only)",
+   "decision": "denied",
+   "reason": "over_per_action_cap",
+   "action_id": null,
+   "ms": 14970,
+   "at": "2026-11-03T04:20:08.316Z",
+   "action_onchain": null
+  },
+  "overcap_gate_refuses": {
+   "tx": "EENh7EQNcmR1Qo9hJQFm6fpzua2z4xu5AhdpQi753Syf",
+   "ok": false,
+   "error": "Smart contract panicked: REFUSED: the charter has no such action",
+   "ms": 14989,
+   "at": "2026-11-03T04:20:23.305Z"
+  },
+  "replay_refused": {
+   "tx": "7Lqmt1k2ubiBAAtdoMP3D4EnsGoyDfrSaYGMCffJJX6Y",
+   "ok": false,
+   "error": "Smart contract panicked: REFUSED: this charter action already opened the gate",
+   "ms": 12936,
+   "at": "2026-11-03T04:20:36.241Z"
+  },
+  "unlisted_factory_refused": {
+   "charter": "oath.r4csmvr86zk4.testnet",
+   "tx": "AguXRW4CRTASCVZGV1EbDiFi3Ar2CMtH7ASW4rhsLz74",
+   "ok": false,
+   "error": "Smart contract panicked: REFUSED: not a charter from the gate's factories",
+   "ms": 11272,
+   "at": "2026-11-03T04:20:47.513Z"
+  }
+ }
+}
