@@ -26,7 +26,9 @@ export function injectGuest() {
 }
 
 export async function balance(id) {
-  try { const a = await rpc('query', { request_type: 'view_account', finality: 'optimistic', account_id: id }); return BigInt(a.amount); } catch { return null; }
+  // A new implicit account (an email or Google login) is not on chain until its first NEAR arrives: that is 0, not unknown.
+  try { const a = await rpc('query', { request_type: 'view_account', finality: 'optimistic', account_id: id }); return BigInt(a.amount); }
+  catch (e) { return /UNKNOWN_ACCOUNT|does not exist/i.test(e?.message || '') ? 0n : null; }
 }
 export const fmt = y => y == null ? '?' : (Number(y / 10n ** 21n) / 1000).toLocaleString('en', { maximumFractionDigits: 2 });
 
