@@ -14,3 +14,7 @@ target/
 .vercel
 __pycache__/
 *.pyc
+# working notes and local screenshots, not part of the project
+HISTORY.md
+app/design/D8_shops/js/HISTORY.md
+e2e/shots/
