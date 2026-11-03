@@ -68,7 +68,15 @@ export function limiter(max, windowMs = 60e3, { ip, identity = clientIdentity, n
 }
 
 // Read-only answers the Vercel edge may keep for a few seconds: a judging room behind one IP then shares one copy.
-export const edgeCache = (s = 15) => async (c, next) => { await next(); if (c.res?.status === 200 && !c.res.headers.get('Cache-Control')) c.res.headers.set('Cache-Control', `public, max-age=5, s-maxage=${s}, stale-while-revalidate=${s * 4}`); };
+// Edge-cache good read-only answers only: a partial answer (any upstream "error"/timeout inside) is never cached.
+export const edgeCache = (s = 15) => async (c, next) => {
+  await next();
+  if (c.res?.status !== 200 || c.res.headers.get('Cache-Control')) return;
+  let body = '';
+  try { body = await c.res.clone().text(); } catch { return; }
+  if (/"error"\s*:/.test(body)) { c.res.headers.set('Cache-Control', 'no-store'); return; }
+  c.res.headers.set('Cache-Control', `public, max-age=5, s-maxage=${s}, stale-while-revalidate=${s * 4}`);
+};
 
 // Global cap shared by every client: protects the paid 1Click partner key and NEAR AI key.
 const globals = new Map();
