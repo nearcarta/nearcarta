@@ -15,7 +15,8 @@ export function reputation(account, proposals = [], rewardList = []) {
 }
 
 /** What each tier may do: its vote weight in the town tally, and how many proposals it may file (anti-spam,
- * on top of Sputnik's 0.1 NEAR proposal bond). Newcomers (every fresh guest) get one proposal a day and one open. */
+ * on top of Sputnik's 0.1 NEAR proposal bond). Enforced by this site and the API only, not on chain: Sputnik's
+ * add_proposal takes anyone's bond, so a direct DAO call skips the tier cap; the bond and the council vote still apply. Newcomers (every fresh guest) get one proposal a day and one open. */
 export const TIERS = {
   newcomer: { weight: 1, per_day: 1, open: 1 },
   resident: { weight: 2, per_day: 3, open: 3 },
