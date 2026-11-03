@@ -1,0 +1,136 @@
+{
+ "network": "mainnet",
+ "root": "nearcarta.near",
+ "steps": [
+  {
+   "step": "fund_charter",
+   "signer": "nearcarta.near",
+   "receiver": "charter.nearcarta.near",
+   "tx": "3fTm5K9DW8ccACNA34CXLF8J1pirzbuAYqDYefsr5ZMd",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.007114
+  },
+  {
+   "step": "charter_deploy_init",
+   "signer": "charter.nearcarta.near",
+   "receiver": "charter.nearcarta.near",
+   "tx": "DNDNMtRXRiPP1bHoSUtttdYgnwYSfXARpPWJwaedzvma",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.003297
+  },
+  {
+   "step": "charter_sweep_surplus",
+   "signer": "charter.nearcarta.near",
+   "receiver": "nearcarta.near",
+   "tx": "7hvd6krDjboxz8CxnNNWMBeWvAWhCYpYeddGo2uEHjbM",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000044
+  },
+  {
+   "step": "set_clause_pay",
+   "signer": "nearcarta.near",
+   "receiver": "charter.nearcarta.near",
+   "tx": "7s3X1DuBWu1XN3oTWYnyNiduuAjTrPoyT1ETCJesyHpP",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000224,
+   "ret": "{\"applied\":true,\"policy_version\":2}"
+  },
+  {
+   "step": "set_agent_key",
+   "signer": "nearcarta.near",
+   "receiver": "charter.nearcarta.near",
+   "tx": "Frp44yFGSAh9vi2w4dmV4wnDH5MBktvX7N2xyAcPRJDP",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000522,
+   "ret": "true"
+  },
+  {
+   "step": "agent_propose_allowed_0.001",
+   "signer": "charter.nearcarta.near",
+   "receiver": "charter.nearcarta.near",
+   "tx": "JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.000646,
+   "ret": "{\"action_id\":\"0\",\"decision\":\"allowed\",\"status\":\"confirmed\",\"reason\":\"ok\"}"
+  },
+  {
+   "step": "agent_propose_over_cap_0.003",
+   "signer": "charter.nearcarta.near",
+   "receiver": "charter.nearcarta.near",
+   "tx": "BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.00028,
+   "ret": "{\"action_id\":null,\"decision\":\"denied\",\"status\":\"denied\",\"reason\":\"over_per_action_cap\"}"
+  },
+  {
+   "step": "charter_delete_fak",
+   "signer": "charter.nearcarta.near",
+   "receiver": "charter.nearcarta.near",
+   "tx": "71Zio28gV3yubD5DecGtkguWzWdfix8brcKFy13d3zzt",
+   "ok": true,
+   "as_expected": true,
+   "gas_burnt_near": 0.00004
+  }
+ ],
+ "charter": "charter.nearcarta.near",
+ "toll": "toll.nearcarta.near",
+ "agent_public_key": "ed25519:GB83bZDdsoWrpBC43LURP1QCGX558V1qgYXMEQdX4ENi",
+ "root_before": "6600000000000000000000000",
+ "charter_wasm": {
+  "file": "oath.r18p86.wasm",
+  "sha256": "542ae4dad007edae2ded336ec3b9321ada00af208b4c82814ff06b80f29665cf",
+  "bytes": 425406
+ },
+ "final": {
+  "charter_only": true,
+  "charter": {
+   "id": "charter.nearcarta.near",
+   "code_hash": "6fZBa6MbEJeKNHBEB9D7atvXa9ZaVmoWfYu38bjcRni2",
+   "storage_bytes": 426432,
+   "locked_near": 4.26432,
+   "balance_near": 4.359899,
+   "keys": [
+    {
+     "public_key": "ed25519:GB83bZDdsoWrpBC43LURP1QCGX558V1qgYXMEQdX4ENi",
+     "permission": {
+      "FunctionCall": {
+       "allowance": "249073159645283400000000",
+       "method_names": [
+        "propose",
+        "propose_batch"
+       ],
+       "receiver_id": "charter.nearcarta.near"
+      }
+     }
+    }
+   ],
+   "state": {
+    "owner": "nearcarta.near",
+    "dao": null,
+    "agent_key": "ed25519:GB83bZDdsoWrpBC43LURP1QCGX558V1qgYXMEQdX4ENi",
+    "frozen": false,
+    "freeze_epoch": 0,
+    "policy_version": 2,
+    "policy_hash": "ffc4ae2ea3d5bd5e405daa7e39395822a6daeb682862b5968669250dbad50b82",
+    "next_nonce": "2",
+    "next_action": "1",
+    "prune_cursor": "0",
+    "policy_delay_ns": "90000000000",
+    "storage_reserve": "20000000000000000000000",
+    "pending_changes": 0,
+    "setup_open": false,
+    "storage_usage": "426432"
+   }
+  },
+  "root_balance_near": 2.217443,
+  "root_spent_near": 4.382556,
+  "gas_burnt_total_near": 0.012167000000000002
+ }
+}
