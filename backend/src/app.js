@@ -132,16 +132,17 @@ const ledgerSwr = swr('ledger', ledgerRead, { ttl: 15_000, stale: 30 * 60_000 })
 export const seedSwr = (name, v, at = Date.now()) => { if (v != null && !swrs.get(name)?.v) swrs.set(name, { v, at }); };
 { const snap = shops.ledgerSnapshot(); if (snap) seedSwr('ledger', { ...snap.ledger, stale: true, snapshot_at: snap.at }, Date.now() - 15_001); }
 
-export function warm({ every = WARM_EVERY_MS, read } = {}) {
-  let tick = 0;
-  const once = () => Promise.allSettled([
-    shops.refreshHealth(), vault.refreshRunnerStatus(),
-    shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
-    ...(read ? [] : [reads.guardhouse(), reads.mistbank(), reads.townhall(), ...(tick++ % 2 === 0 ? [arenaPromptsSwr()] : [ledgerSwr()])]),
-  ]);
-  const first = once();
-  const t = every ? setInterval(once, every) : null; t?.unref?.();
-  return { first, stop: () => t && clearInterval(t) };
+export const WARM_DELAY_MS = Number(process.env.WARM_DELAY_MS ?? 45_000);
+// The free instance has 0.1 CPU: reads run one at a time, and the first tick waits WARM_DELAY_MS after boot so the
+// health check is answered while the process starts (a parallel boot warm starved it and Render restarted the process).
+export function warm({ every = WARM_EVERY_MS, read, delay = read ? 0 : WARM_DELAY_MS } = {}) {
+  let tick = 0, stopped = false, t = null;
+  const jobs = () => [() => shops.refreshHealth(), () => vault.refreshRunnerStatus(),
+    () => shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
+    ...(read ? [] : [() => reads.guardhouse(), () => reads.mistbank(), () => reads.townhall(), tick++ % 2 === 0 ? () => arenaPromptsSwr() : () => ledgerSwr()])];
+  const once = async () => { const out = []; for (const j of jobs()) { if (stopped) break; try { out.push({ status: 'fulfilled', value: await j() }); } catch (e) { out.push({ status: 'rejected', reason: e }); } } return out; };
+  const first = new Promise(r => { const d = setTimeout(() => r(once().then(v => { if (every && !stopped) { t = setInterval(once, every); t.unref?.(); } return v; })), delay); if (delay) d.unref?.(); });
+  return { first, stop: () => { stopped = true; t && clearInterval(t); } };
 }
 
 export function makeApp() {
