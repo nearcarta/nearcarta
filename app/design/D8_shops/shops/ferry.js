@@ -27,6 +27,7 @@ export const PROOF = proof(
   row({ k: 'Visible · Zcash payout tx', why: 'that a tx entered the pool; the amount too if the bridge pays from transparent funds (not checkable on a dry quote)', st: 'pend', stText: 'depends', src: 'testnet' }),
   row({ k: 'Hidden · the swap', why: 'order size, timing and counterparties settle on the private Confidential Intents shard', st: 'ok', stText: 'hidden', src: 'testnet' }),
   row({ k: 'Hidden · recipient, note and later spends', why: "shielded into Zcash's Ironwood pool via an Orchard-only UA; no transparent receiver to fall back to", st: 'ok', stText: 'hidden', src: 'testnet' }),
+  note('1Click has no testnet. So the swap here is a real signed 1Click quote plus a testnet NEAR payment that your charter checks against your Ferry rule; no cross-chain swap runs.'),
   note(`Not hidden from the 1Click operator or the private shard's validators. Dry quote: nothing was sent, so no tx exists yet. Read ${esc(utc3(Q.at))}.`));
 export const FLAT = { src: 'testnet · live quote', cls: 'live', label: LABEL, hero: HERO };
 
@@ -60,7 +61,7 @@ export default async function ferry(ctx) {
   let t = 0;
   return {
     rob, scene, camera, tags,
-    panel: { title: 'Ferry', src: 'live', srcNote: `Dry 1Click quote read through ${Q.api}. No swap was executed.`, label: LABEL, hero: HERO, action: 'Load the cargo' },
+    panel: { title: 'Ferry', src: 'live', srcNote: `1Click has no testnet: this is a dry 1Click quote read through ${Q.api}, then a testnet payment your charter checks. No swap was executed.`, label: LABEL, hero: HERO, action: 'Load the cargo' },
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },
     *act() {

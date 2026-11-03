@@ -114,7 +114,7 @@ const APPS = {
       if (v && !v.done) return tollStep(v, true);
       const o = await A.toll();
       if (o.decision !== 'allowed') return { o, hero: num('0.01', 'NEAR'), say: `Refused: ${A.why(o.reason)}. Nothing was signed for Base Sepolia.` };
-      say(o.split ? 'Your charter paid the split in one tx: 0.01 toll, 0.002 treasury, 0.001 agent budget. Now approve the gate call in your wallet…' : 'Your charter paid 0.01 NEAR. Now approve the gate call in your wallet…'); btn('Approve in your wallet…', 'primary busy', true);
+      say(o.split ? 'Your charter paid the split in one tx: 0.01 toll, 0.002 treasury, 0.001 agent budget. Now approve the gate call in your wallet…' : !A.canBatch() ? 'Your charter is older and predates batches, so it paid one payment per tx: the plain 0.01 NEAR toll, no split. Now approve the gate call in your wallet…' : 'Your charter paid 0.01 NEAR. Now approve the gate call in your wallet…'); btn('Approve in your wallet…', 'primary busy', true);
       const { v: nv } = await A.tollGate(o.action, o);
       return tollStep(nv, false, o);
     },
@@ -130,7 +130,7 @@ const APPS = {
       const rt = A.ROUTES[extra.ri || 0];
       if (!extra.q) {
         const q = await A.quote(rt.id, extra.amt || rt.amt); if (!q.ok || !q.checks?.signature) throw new Error(q.error || 'quote not signed');
-        extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: `Live quote, signed by 1Click. Worth ${A.ferryNear(q)} test NEAR. Ask?`, rc: `<span class="rc">1Click dry quote · ${esc(q.correlationId.slice(0, 8))} · mainnet send locked</span>` };
+        extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: `Live quote, signed by 1Click (1Click has no testnet, so no swap runs; your charter checks a testnet payment instead). Worth ${A.ferryNear(q)} test NEAR. Ask?`, rc: `<span class="rc">1Click dry quote · ${esc(q.correlationId.slice(0, 8))} · mainnet send locked</span>` };
       }
       const amt = A.ferryNear(extra.q), to = A.ferryPayee(rt.id);
       const o = await A.ferry(rt.id, extra.q); extra.q = null;
@@ -223,7 +223,7 @@ const APPS = {
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.01' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.01' }); } return extra.rows; },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => { const ps = A.bankPayees(), rows = APPS.payouts.rows(), left = A.payoutLeft(), tot = APPS.payouts.total();
-      if (!A.canBatch()) return '<p class="goal" data-testid="payout-legacy">This charter predates batches.</p>';
+      if (!A.canBatch()) return '<p class="goal" data-testid="payout-legacy">This charter is older and predates batches: it pays one payment per transaction, so a list cannot go as one all-or-nothing batch. Build a new charter at Your House to batch.</p>';
       return `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ps.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(nice(a))}</option>`).join('')}</select>`
         + `<label class="p-amt"><input type="number" data-i="${i}" min="0.001" step="0.001" value="${esc(r.amt)}" aria-label="Amount ${i + 1}"><span>NEAR</span></label>`
         + `<button type="button" class="p-x" data-i="${i}" aria-label="Remove payout ${i + 1}" ${rows.length <= 2 ? 'disabled' : ''}>×</button></li>`).join('')}</ol>`

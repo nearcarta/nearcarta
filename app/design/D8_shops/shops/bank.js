@@ -33,7 +33,7 @@ function live(b) {
 }
 const HERO = `<span class="commit" title="sha256 commitment on NEAR testnet">${esc(String(B.commitment?.value || '').slice(0, 8))}…</span><span class="unit">amount hidden</span>`;
 // For the 2D fallback (js/flat.js)
-export const FLAT = { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount', hero: HERO };
+export const FLAT = { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount · operator-run worker', hero: HERO };
 export const PROOF = live(B);
 
 export default async function bank() {
@@ -77,7 +77,7 @@ export default async function bank() {
   let t = 0;
   return {
     rob, scene, camera, tags: [],
-    panel: { title: 'Mist Bank', src: 'testnet', label: FLAT.label, hero: HERO, action: null },
+    panel: { title: 'Mist Bank', src: 'testnet', srcNote: 'Operator-run worker: the Zcash testnet send is made by a worker Nearcarta runs, not by your charter or a contract.', label: FLAT.label, hero: HERO, action: null },
     proof: PROOF,
     update(dt) { t += dt; rob.update(dt); mist.forEach((m, i) => { m.position.x = wx - .42 + ((t * .08 + i * .3) % .84); m.material.opacity = .25 + .12 * Math.sin(t + i); }); shape.material.opacity = .6 + .15 * Math.sin(t * .8); wheel.rotation.z = Math.sin(t * .3) * .08; },
   };
