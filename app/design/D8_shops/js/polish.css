@@ -25,4 +25,4 @@ img.tok{width:1.05em;height:1.05em;vertical-align:-.16em;border-radius:50%;flex:
 #onboard button:focus-visible{outline:3px solid #c58b2b;outline-offset:2px}
 @media (prefers-reduced-motion:reduce){#onboard,#onboard .ob-card{animation:none}}
 
-.skel{display:grid;gap:8px;margin:6px 0}.skel i{display:block;height:14px;border-radius:7px;background:linear-gradient(90deg,#ffffff2e,#ffffff5c,#ffffff2e);background-size:200% 100%;animation:skel 1.2s linear infinite}.skel i:nth-child(2){width:80%}.skel i:nth-child(3){width:55%}@keyframes skel{to{background-position:-200% 0}}
+.skel{display:grid;gap:8px;margin:6px 0;width:100%;flex:1 1 100%}.skel i{display:block;height:14px;border-radius:7px;background:linear-gradient(90deg,#ffffff2e,#ffffff5c,#ffffff2e);background-size:200% 100%;animation:skel 1.2s linear infinite}.skel i:nth-child(2){width:80%}.skel i:nth-child(3){width:55%}@keyframes skel{to{background-position:-200% 0}}
