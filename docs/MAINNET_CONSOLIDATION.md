@@ -28,3 +28,16 @@ Arena, house deed and Town Hall stay on testnet, along with the shops UI state a
 ## Still open
 - Contract-enforced tier limits and the Mist amount: **not started**. Today they are enforced by the UI and backend only. They are needed before option 1 counts as complete.
 - Reproducible builds: blocked by Docker DNS on the box.
+
+## Part B: extra NEAR per contract after size optimization
+
+Built with near-sdk 5.27.0 (standards 5.27.0), rustc 1.86, cargo near, then `wasm-opt -Oz` with debug and producer sections stripped. Every host import is also imported by the live p86 charter or toll, except `block_index`, an old basic function. Storage costs 0.00001 NEAR per byte, and each account adds 100 bytes.
+
+| Contract | File | Bytes | Code + account lock (NEAR) |
+|---|---|---|---|
+| Arena | `arena.p86.wasm` | 368,180 | 3.6828 |
+| House deed | `house_nft.p86.wasm` | 245,996 | 2.4610 |
+| Town Hall | `townhall.p86.wasm` | 191,351 | 1.9145 |
+| All three | | 805,527 | 8.0563 |
+
+The initial state of each contract and about 0.01 NEAR of gas per deploy come on top of this. The state has not been measured on chain yet. These builds have not been deployed to mainnet.
