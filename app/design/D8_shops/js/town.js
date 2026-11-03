@@ -7,7 +7,7 @@ export const SHOPS = {
   hall:      { q: -2, r: -2, m: 'buildings/blue/building_castle_blue',     name: 'Town Hall',  icon: 'flag' },
   bank:      { q: 2,  r: -4, m: 'buildings/blue/building_church_blue',     name: 'Mist Bank',  icon: 'locker' },
   arena:     { q: 1,  r: 3,  m: 'buildings/blue/building_archeryrange_blue', name: 'Vault Arena', icon: 'trophy' },
-  toll:      { q: -1, r: 5,  m: 'buildings/blue/building_tower_base_blue', name: 'Toll',       icon: 'link' },
+  toll:      { q: -1, r: 5,  m: 'buildings/blue/building_tower_base_blue', name: 'Toll Bridge', icon: 'link' },
   chronicle: { q: 0,  r: 0,  m: 'buildings/blue/building_tower_A_blue',    name: 'Chronicle',  icon: 'file-text' },
   house:     { q: -4, r: 0,  m: 'buildings/blue/building_home_A_blue',     name: 'Your House', icon: 'key' },
   payouts:   { q: -1, r: -3, m: 'buildings/blue/building_tavern_blue',     name: 'Payouts',    icon: 'money-bag' },

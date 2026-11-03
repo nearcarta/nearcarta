@@ -51,7 +51,7 @@ body.frozen #freezeBtn{--bg:var(--p-freeze-tint);--fg:var(--p-freeze-text)}
 .cr .m b{font-weight:600}.cr.no .m b{color:var(--p-check-failed-text)}
 .cr .k,.cr .t{font:500 10px var(--f-mono);color:var(--c-text-3)}.cr .tx{color:var(--c-accent-text);text-decoration:none;border-bottom:1px dotted rgba(198,225,255,.4)}
 .cr .d7-token--bare img{width:15px;height:15px}
-.cfoot{font:500 11px var(--f-ui);color:var(--c-text-3);border-top:1px solid var(--c-line)}
+.cfoot{font:500 11px var(--f-ui);color:var(--c-text-2);border-top:1px solid var(--c-line)}
 #ticker{height:30px;background:rgba(7,10,26,.86);border-top:1px solid var(--c-line);font:500 11.5px var(--f-mono)}
 .tl{color:var(--c-text-3);border-right:1px solid var(--c-line);letter-spacing:.12em}
 #tickerIn .ok{color:var(--p-verified-text)}#tickerIn .no{color:var(--p-check-failed-text)}#tickerIn .pv{color:var(--c-accent-text)}#tickerIn .fz{color:var(--p-freeze-text)}#tickerIn .pd{color:var(--p-pending-text)}

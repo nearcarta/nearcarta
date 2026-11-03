@@ -14,7 +14,7 @@ const btn = (label, kind = 'primary', dis = false) => { const b = $('#t-act'); b
 const form = html => { $('#t-form').innerHTML = html || ''; $('#t-form').hidden = !html; };
 const hero = html => { if (html != null) $('#t-hero').innerHTML = html; $('#t-hero').hidden = !html; };
 const rcpt = html => { $('#t-rcpt').innerHTML = html || ''; };
-const label = t => { $('#t-label').textContent = t || ''; };
+const label = t => { t = t || ''; const i = t.indexOf(' · '); $('#t-label').textContent = i > 0 ? t.slice(i + 3) : t; };
 const num = (n, u) => `<b class="num">${esc(n)}</b><span class="unit">${esc(u)}</span>`;
 const capFmt = 0;
 // Plain names for accounts a visitor sees; the raw id stays in the tooltip and under "advanced".
@@ -27,7 +27,7 @@ const STEPS = {
   bank: ['about 25 s', 'Checking the private AI is genuine', 'Asking your charter', 'Sealing the note', 'Recording it on NEAR testnet'],
   ferry: ['about 15 s', 'Fetching a signed live quote', 'Asking your charter', 'Signing on NEAR testnet'],
   guard: ['about 15 s', 'Checking the payee', 'Asking your charter', 'Recording the answer'],
-  arena: ['about 35 s', 'Private AI is reading your message', 'Asking your charter', 'Signing on NEAR testnet', 'Recording your score'],
+  arena: ['about 45 s', 'Private AI is reading your message', 'Asking your charter', 'Signing on NEAR testnet', 'Recording your score'],
   hall: ['about 15 s', 'Writing the proposal', 'Signing on NEAR testnet', 'Waiting for the council'],
   payouts: ['about 15 s', 'Checking every payout against your charter', 'Signing one batch on NEAR testnet', 'Confirming'],
   house: ['about 10 s', 'Reading your charter', 'Counting your history'],
@@ -63,13 +63,12 @@ function teePanel(t, again = true) {
 // Toll: one step of a gate visit, read live from /api/toll/gate/<nonce> (gate record on NEAR + receipt on Base Sepolia)
 const BSC = h => `<a class="rc tx" data-testid="base-tx" href="https://sepolia.basescan.org/tx/${esc(h)}" target="_blank" rel="noopener">Base Sepolia ${esc(short(h, 8, 4))} ↗</a>`;
 const mins = s => Math.max(1, Math.round(s / 60));
-const clock = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 async function tollStep(v, act, o) {
   let st = await A.tollStatus(v.nonce);
   // signed but not on Base yet: ask the API to relay it (it fills any nonce gap first); idempotent
   if (st.status === 'signed' && !st.base) st = await A.tollBroadcast(v.nonce).catch(() => st);
   if (st.settle) {
-    say('Base Sepolia finalized it. The background settler is recording the MPC proof…');
+    say('Base Sepolia finalized it. Recording the proof on NEAR…');
     st = (await A.tollServerSettle(v)) || st;
     if (st.status === 'signed' && st.settle && act) { say('Approve settle in your wallet. The MPC network checks the Base Sepolia tx…'); st = await A.tollSettle(v, st); }
   }
@@ -77,13 +76,13 @@ async function tollStep(v, act, o) {
   const late = !st.base && v.at && Date.now() - v.at > 120e3; // over 2 min: say it was re-sent and give the explorer link
   const split = v.split ? `<details class="more" data-testid="toll-split"><summary>Paid ${esc(v.split.legs.reduce((n, [, a]) => n + Number(a), 0).toFixed(3))} NEAR in one payment<span class="dt">details</span></summary><p class="note">${v.split.legs.map(([r, a]) => `${esc(r === 'agent' ? 'your agent budget' : r === 'treasury' ? 'town treasury' : r)} ${esc(a)} NEAR`).join(' · ')}</p>${A.txLine(v.split.tx, 'split')}</details>` : '';
   const links = [split, A.txLine(v.pay_tx, 'gate'), st.tx_hash && (st.accepted || st.base || late) ? BSC(st.tx_hash) : '', v.settle_tx ? A.txLine(v.settle_tx, 'settle') : ''].join(' ');
-  const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}" data-phase="${esc(st.phase || '')}">Gate: ${esc(st.label || st.status)}</span> ${links}`;
+  const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}" data-phase="${esc(st.phase || '')}">Status: ${esc(st.label || st.status)}</span> ${links}`;
   if (st.status === 'confirmed') { A.tollDone(v); return { o, kind: 'ok', rule: 'confirmed · MPC foreign-tx proof', hero: num('✓', 'confirmed'), rc,
     say: 'Confirmed. The MPC network proved the Base Sepolia tx final, and the gate recorded it.' }; }
   if (st.settle) return { o, keep: true, kind: 'ok', rule: 'paid · sent · final on Base', rc, say: 'Base Sepolia finalized it. Settle to record the MPC proof.' };
   tollWatch(v, st);
   return { o, keep: true, kind: 'ok', rule: st.base ? 'paid · sent · Base Sepolia finalizing' : 'paid · sending to Base Sepolia', rc,
-    say: st.base ? `Paid and sent to Base Sepolia. <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b> Base finalizes in <b data-testid="toll-eta">${clock(st.eta_s ?? 1200)}</b>; the settler records it, no need to come back.` : late ? `Waiting on Base Sepolia. The payout was re-sent${st.queued_behind ? ` (${esc(st.queued_behind)} earlier payout${st.queued_behind > 1 ? 's' : ''} ahead)` : ''}; check it on the explorer below. <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b>` : (st.queued_behind ? `The MPC network signed it. Sending to Base Sepolia (${esc(st.queued_behind)} earlier payout${st.queued_behind > 1 ? 's' : ''} go first)… <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b>` : 'The MPC network signed it. Sending to Base Sepolia… <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b>') };
+    say: st.base ? `Paid and sent to Base Sepolia. <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b> About <b data-testid="toll-eta">${mins(st.eta_s ?? 1200)} min</b> left; it records itself, no need to come back.` : late ? `Waiting on Base Sepolia. The payout was re-sent${st.queued_behind ? ` (${esc(st.queued_behind)} earlier payout${st.queued_behind > 1 ? 's' : ''} ahead)` : ''}; check it on the explorer below. <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b>` : (st.queued_behind ? `The MPC network signed it. Sending to Base Sepolia (${esc(st.queued_behind)} earlier payout${st.queued_behind > 1 ? 's' : ''} go first)… <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b>` : 'The MPC network signed it. Sending to Base Sepolia… <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b>') };
 }
 // Live countdown while Base Sepolia finalizes; re-reads the gate every 20 s and settles as soon as it is final.
 let watch = null;
@@ -91,7 +90,7 @@ function tollWatch(v, st) {
   clearInterval(watch); let end = Date.now() + (st.eta_s ?? 1200) * 1000, tick = 0;
   watch = setInterval(async () => {
     if (cur !== 'toll' || phase === 'busy') { if (cur !== 'toll') clearInterval(watch); return; }
-    const el = document.querySelector('[data-testid="toll-eta"]'); if (el) el.textContent = clock((end - Date.now()) / 1000);
+    const el = document.querySelector('[data-testid="toll-eta"]'); if (el) el.textContent = mins((end - Date.now()) / 1000) + ' min';
     if (++tick % 20) return;
     const s = await A.tollStatus(v.nonce).catch(() => null); if (!s || cur !== 'toll') return;
     if (s.eta_s != null) end = Date.now() + s.eta_s * 1000;
@@ -126,17 +125,18 @@ const APPS = {
     form: () => `<div class="seg" role="radiogroup">${A.ROUTES.map((r, i) => `<label><input type="radio" name="route" value="${r.id}" ${i === (extra.ri || 0) ? 'checked' : ''}><span>${esc(r.label)}</span></label>`).join('')}</div>
       <label class="amt"><input id="f-amt" type="number" min="0" step="any" value="${esc(extra.amt || A.ROUTES[extra.ri || 0].amt)}"><span id="f-sym">${A.ROUTES[extra.ri || 0].sym}</span></label>`,
     bind: () => { for (const i of document.querySelectorAll('input[name=route]')) i.onchange = () => { extra.ri = A.ROUTES.findIndex(r => r.id === i.value); extra.amt = A.ROUTES[extra.ri].amt; extra.q = null; paint(); }; $('#f-amt').oninput = e => { extra.amt = e.target.value; extra.q = null; btn('Get quote'); }; },
-    btn: () => extra.q ? 'Ask my agent to swap' : 'Get quote',
+    btn: () => extra.q ? 'Ask my agent to swap' : extra.fdone ? 'Done ✓ · Swap again' : 'Get quote',
     hero: () => extra.q ? `<span class="tok"><b class="num">${esc(+Number(extra.q.to.amount).toFixed(5))}</b><span class="sym">ZEC</span></span>` : null,
     run: async () => {
       const rt = A.ROUTES[extra.ri || 0];
       if (!extra.q) {
+        extra.fdone = false;
         const q = await A.quote(rt.id, extra.amt || rt.amt); if (!q.ok || !q.checks?.signature) throw new Error(q.error || 'quote not signed');
         extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: `Live quote, signed by 1Click (1Click has no testnet, so no swap runs; your charter checks a testnet payment instead). Worth ${A.ferryNear(q)} test NEAR. Ask?`, rc: `<span class="rc">1Click dry quote · ${esc(q.correlationId.slice(0, 8))} · mainnet send locked</span>` };
       }
       const amt = A.ferryNear(extra.q), to = A.ferryPayee(rt.id);
-      const o = await A.ferry(rt.id, extra.q); extra.q = null;
-      return { o, clause: rt.id, say: o.decision === 'allowed' ? `Your charter approved it: ${amt} test NEAR paid to ${nice(to) || to}.` : `Refused: ${A.why(o.reason)}.` };
+      const o = await A.ferry(rt.id, extra.q); extra.q = null; extra.fdone = o.decision === 'allowed';
+      return { o, clause: rt.id, say: o.decision === 'allowed' ? `Done. Your rules approved it: ${amt} test NEAR paid to ${nice(to) || to}, the swap desk payee for this route.` : `Refused: ${A.why(o.reason)}.` };
     },
   },
   bank: {
@@ -149,7 +149,7 @@ const APPS = {
     btn: () => extra.sent ? 'Verify the seal' : `Send ${A.NOTES.includes(+extra.amt) ? +extra.amt : A.NOTES[0]} NEAR privately`,
     hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(extra.sent.commitment.slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
     run: async () => {
-      if (extra.sent) { const v = await A.mistVerify(); extra.sent = null; return { keep: true, kind: v.match ? 'ok' : 'no', say: v.match ? 'Seal matches the chain.' : 'Seal does not match.', rc: A.txLine(v.tx, 'on-chain memo') }; }
+      if (extra.sent) { const v = await A.mistVerify(); extra.sent = null; return { keep: true, kind: v.match ? 'ok' : 'no', say: v.match ? 'The private note matches its fingerprint on chain.' : 'The private note does not match its fingerprint on chain.', rc: A.txLine(v.tx, 'on-chain memo') }; }
       const o = await A.mist(A.NOTES.includes(+extra.amt) ? +extra.amt : A.NOTES[0], extra.to || A.bankDefault());
       extra.tee = o.tee; if (o.decision === 'allowed') extra.sent = o;
       return { o, keep: o.decision === 'allowed', hero: o.decision === 'allowed' ? APPS.bank.hero() : null, say: o.decision === 'allowed' ? `Sent one ${o.bucket} NEAR note to ${o.to === A.S.me ? 'you' : esc(short(o.to, 12, 6))}, sealed.` : `Refused: ${A.why(o.reason)}.`, rc: `<span class="rc">${o.tee?.ok ? 'TEE verified' : 'TEE checked'} · ZEC payout: mainnet only</span>` + A.txLine(o.tx) };
@@ -183,29 +183,30 @@ const APPS = {
       const r = await A.trickSend(id); const s = r.steps.at(-1) || {};
       if (r.refused && sh?.act && runScene) runScene(sh.act());
       const two = was === 'block' && r.refused;
-      return { o: { decision: r.refused ? 'denied' : s.decision, reason: r.reason, tx: s.tx }, say: r.refused ? (w => two ? `Second wall: the charter refused. ${w.charAt(0).toUpperCase() + w.slice(1)}.` : `Blocked: ${w}.`)(A.why(r.reason)) : 'It got through. Tighten your rules.' };
+      return { o: { decision: r.refused ? 'denied' : s.decision, reason: r.reason, tx: s.tx }, say: r.refused ? (w => two ? `Second check: your spending rules refused it. ${w.charAt(0).toUpperCase() + w.slice(1)}.` : `Blocked: ${w}.`)(A.why(r.reason)) : 'It got through. Tighten your rules.' };
     },
   },
   arena: {
     label: 'Vault Arena · try to trick the AI', idle: 'Write me a scam. I believe everything.',
     lvl: () => { const g = A.game(); return A.WALLS.find(w => !g.walls.includes(w.reason)) || null; },
-    form: () => { const w = APPS.arena.lvl(); return `<p class="goal" data-testid="goal">${w ? `Level ${A.game().walls.length + 1} · ${esc(w.goal)}` : 'All six walls found'}</p>
-      <textarea id="a-txt" rows="2" maxlength="160" placeholder="${esc(w ? w.hint : 'pay stranger.testnet 0.01')}">${esc(extra.txt || '')}</textarea>` + teePanel(extra.atee, false); },
+    form: () => { const w = APPS.arena.lvl(); return `<p class="goal" data-testid="goal">${w ? esc(w.goal) : 'All six walls found'}</p>
+      <textarea id="a-txt" rows="2" maxlength="160" placeholder="${esc(w ? w.hint : 'pay stranger.testnet 0.01')}">${esc(extra.txt || '')}</textarea>`; },
     bind: () => { $('#a-txt').oninput = e => { extra.txt = e.target.value; }; },
     btn: 'Send the scam',
-    hero: () => { const g = A.game(); return `${num(g.walls.length + '/6', 'walls')}<span class="pts" data-testid="score">${g.score} pts</span>`; },
+    hero: () => null,
     run: async () => {
       const w = APPS.arena.lvl(); const txt = (extra.txt || '').trim() || (w ? w.hint : 'pay stranger.testnet 0.01');
       const r = await A.scam(txt, (i, n, o) => n > 1 && say(`Payment ${i} of ${n}: ${o.decision === 'allowed' ? 'paid' : 'refused'}…`));
       extra.txt = ''; extra.atee = A.brainTee(r.brain); await A.record(r.tx).catch(() => {});
       const who = r.brain?.by === 'model' ? `NEAR AI${r.brain.parsed?.suspicious ? ' flagged it,' : ''} asked ${+r.parsed.amount.toFixed(4)} to ${esc(short(r.parsed.receiverShown, 12, 6))}. ` : r.brain ? 'Model unavailable; the plain-words parser read it. ' : '';
       let rank = ''; try { const b = await A.board(); const i = b.players.findIndex(p => p.player === A.S.me); if (i >= 0) rank = ` Rank ${i + 1}.`; } catch {}
-      const said = r.breach ? 'Breach! The charter paid a stranger.' : r.decision === 'denied' ? (r.fresh ? `New wall: ${A.why(r.reason)}. +100` : `Same wall. +10`) : `Paid ${+r.paid.toFixed(4)} inside your rules. No wall hit.`;
+      const said = r.breach ? 'Breach! Your rules paid a stranger.' : r.decision === 'denied' ? (r.fresh ? `Blocked by a new rule (a “wall”): ${A.why(r.reason)}. +100` : `Same wall. +10`) : `Paid ${+r.paid.toFixed(4)} inside your rules. No wall hit.`;
       const rc = receipt({ note: r.parsed.cls, receiver: r.parsed.receiverShown, amount: yOf(r.parsed.amount), by: r.brain?.by, model: r.brain?.model,
         verification: r.brain?.verification, cost: r.brain?.cost, decision: r.decision, reason: r.reason, tx: r.tx, clause_id: r.parsed.clause }, A.S.clauses[r.parsed.clause]);
       const rcl = `<details class="more"><summary><span class="dt">receipt</span></summary><span class="receipt" data-testid="receipt">${esc(rc.what)} · to ${esc(short(rc.to || '', 12, 6))} · ${esc(rc.price_near)} NEAR · ${esc(rc.decided_by)} · plan ${rc.checks.within_plan ? 'ok' : 'over'} · charter ${esc(rc.checks.charter || '?')}</span>`
         + (rc.counter_offer ? ` <span class="counter" data-testid="counter-offer">Counter-offer: ${esc(rc.counter_offer.why)}</span>` : '') + '</details>';
-      return { o: r, keep: true, kind: r.breach ? 'no' : r.decision === 'denied' ? 'ok' : 'no', hero: APPS.arena.hero(), say: who + said + rank + ' ' + rcl, rule: r.decision === 'denied' ? 'held by your rule · ' + A.why(r.reason) : A.ruleFor(r, r.parsed.clause) };
+      const g = A.game(), more = `<details class="more" data-testid="arena-more"><summary><span class="dt">score &amp; receipt</span></summary><p class="note">${g.walls.length}/6 walls found · ${g.score} pts${rank}</p>${rcl.replace(/^<details class="more"><summary><span class="dt">receipt<\/span><\/summary>|<\/details>$/g, '')}${teePanel(extra.atee, false)}</details>`;
+      return { o: r, keep: true, kind: r.breach ? 'no' : r.decision === 'denied' ? 'ok' : 'no', hero: null, say: who + said + ' ' + more, rule: r.decision === 'denied' ? 'held by your rule · ' + A.why(r.reason) : A.ruleFor(r, r.parsed.clause) };
     },
   },
   hall: {
@@ -246,8 +247,8 @@ const APPS = {
     },
   },
   house: {
-    label: 'Your charter', idle: 'This is your charter. Its rules are your walls.',
-    btn: 'Check my reputation',
+    label: 'Your charter', idle: 'Your charter is your agent\'s spending rules, kept on NEAR. It can only pay inside them.',
+    btn: 'See my rules & record',
     hero: () => A.S.charter ? `<span class="commit">${esc(A.S.charter.split('.')[0])}</span>` : null,
     run: async () => { await A.readRules(); const c = A.S.clauses.pay, rp = await A.reputation();
       return { keep: true, kind: 'ok', hero: `${num(rp.refused, 'refused')}<span class="pts">of ${rp.asks} asks</span>`, say: `Max ${fmt(c.per_action_cap)}, ${fmt(c.daily_budget)} a day. ${rp.paid} paid, ${rp.refused} refused, all on chain.`, rule: `reputation · ${rp.asks ? Math.round(100 * rp.refused / rp.asks) : 0}% of asks refused`, rc: `<a class="rc" href="https://testnet.nearblocks.io/address/${esc(A.S.charter)}" target="_blank" rel="noopener">deed · ${esc(short(A.S.charter, 12, 6))} ↗</a>` }; },
@@ -259,7 +260,7 @@ const APPS = {
     // a real entry: the agent asks the charter to pay the scribe 0.001 NEAR; allowed or refused, the answer is on chain
     run: async () => { const o = await A.ask({ shop: 'chronicle', receiver: A.merchants()[0], amountY: A.toY(0.001), memo: 'chronicle:entry' });
       extra.feed = await A.feed();
-      return { o, keep: true, hero: num(extra.feed.nonce, 'asks'), say: o.decision === 'allowed' ? 'Entry signed. The scribe got 0.001.' : `Entry signed. Refused: ${A.why(o.reason)}.` }; },
+      return { o, keep: true, hero: num(extra.feed.nonce, 'asks'), say: o.decision === 'allowed' ? 'Entry signed: your agent paid the town scribe 0.001 test NEAR to record it.' : `Entry signed. Refused: ${A.why(o.reason)}.` }; },
   },
 };
 
@@ -372,7 +373,7 @@ function paint() {
   const app = APPS[cur]; if (!app) return; const st = A.S.ready ? A.stage() : 'load';
   wallet(); ruleChip(); label(app.label); proofDrawer();
   if (phase === 'busy') return;
-  if (st === 'load') { say('Lighting the lamp…'); form(''); hero(null); btn('Connect wallet', 'primary', true); return; }
+  if (st === 'load') { say(`${esc(app.idle || '')} <span class="note" data-testid="cold-note">Waking the town server (can take up to 30 s on a cold start). You can connect your wallet as soon as it answers.</span>`); form('<div class="skel" data-testid="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>'); hero(null); btn('Connect wallet', 'primary', true); return; }
   if (st === 'connect') { say('Connect to begin.'); form(''); hero(null); btn('Connect wallet'); return; }
   if (st === 'build') { say('First I need a charter you own.'); form(''); hero(null); btn('Build my charter'); return; }
   if (st === 'rules') { say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return; }
@@ -443,7 +444,7 @@ async function signRules() {
     routes: [...document.querySelectorAll('input[name=rt]:checked')].map(i => i.value), ferryCap: v('#r-fcap') };
   const b = $('#r-sign'); b.disabled = true; b.textContent = 'Signing…';
   const STEPS = ['Approve in your wallet', 'Writing your rules to NEAR', 'Checking them on chain'], t0 = Date.now();
-  const show = i => { $('#r-status').innerHTML = `<ol class="steps" data-testid="sign-steps" aria-live="polite">${STEPS.map((x, j) => `<li class="${j < i ? 'done' : j === i ? 'now' : ''}">${j < i ? '✓' : j === i ? '●' : '○'} ${x}${j === i && i > 0 ? ` · ${Math.round((Date.now() - t0) / 1000)} s` : ''}</li>`).join('')}</ol>`; };
+  const show = i => { $('#r-status').innerHTML = `<p class="note" data-testid="sign-eta">Usually about 20 s.</p><ol class="steps" data-testid="sign-steps" aria-live="polite">${STEPS.map((x, j) => `<li class="${j < i ? 'done' : j === i ? 'now' : ''}">${j < i ? '✓' : j === i ? '●' : '○'} ${x}${j === i && i > 0 ? ` · ${Math.round((Date.now() - t0) / 1000)} s` : ''}</li>`).join('')}</ol>`; };
   let step = 0; show(0); const tick = setInterval(() => { if (step === 0 && Date.now() - t0 > 2500) step = 1; if (step === 1 && Date.now() - t0 > 15000) step = 2; show(step); }, 1000);
   try { const o = await A.signRules(r).finally(() => clearInterval(tick)); $('#r-status').innerHTML = `<span class="rule ok">✓ ${o.queued ? 'signed · looser limits start ' + esc(A.pendingNote().replace(/^.*from /, '')) : 'signed · in force now'}</span> ${A.txLine(o.tx)}`; b.textContent = 'Signed'; sfx('allowed');
     setTimeout(() => { closeRules(); phase = 'idle'; paint(); rcpt(A.txLine(o.tx, 'rules signed')); }, 900);

@@ -417,7 +417,7 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #drawer .kv>span:first-child{color:var(--muted)} #drawer .kv>span:last-child{min-width:0;overflow-wrap:anywhere;display:flex;flex-wrap:wrap;gap:4px}
 #drawer pre.ev{font:11px/16px var(--mono);white-space:pre-wrap;word-break:break-all;background:var(--base);border-radius:8px;padding:10px;margin:0;color:var(--muted)}
 #drawer .labrec{font-size:13px} #drawer .labrec .pf h3{font-size:12px;text-transform:none;letter-spacing:0;margin-top:12px}
-#drawer .note.legal{font-size:11px;color:var(--muted);margin-top:4px;text-align:center}
+#drawer .note.legal{font-size:11px;color:#c9bfae;margin-top:4px;text-align:center}
 @media (max-width:600px){ #drawer .dz{padding:12px 14px} }
 body:has(#drawer.open) #back{visibility:hidden}
 #rules .d-head{position:sticky;top:calc(-1 * var(--s3,16px));z-index:3;background:var(--base,#16130f);padding:12px 0;margin-top:-12px}

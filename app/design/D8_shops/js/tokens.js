@@ -17,7 +17,8 @@ export function decorate(root) {
   for (const n of hits) {
     const span = document.createElement('span'); span.className = 'tok-done';
     RX.lastIndex = 0; span.innerHTML = n.data.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
-      .replace(RX, (m, pre, sym) => `${pre}<span class="tokw">${tokenIcon(sym)}${sym}</span>`);
+      .replace(RX, (m, pre, sym) => `${pre}<span class="tokw">${tokenIcon(sym)}${sym}</span>`)
+      .replace(/(\d[\d.,]*)\s+<span class="tokw">/g, '<span class="tokw">$1 ').replace(/ {2,}/g, ' ');
     n.replaceWith(span);
   }
 }

@@ -2,7 +2,7 @@
 import { $, tok } from './core.js';
 import { QUOTE } from '../data/live.js';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const SH = { guard: 'Guardhouse', ferry: 'Ferry', hall: 'Town Hall', bank: 'Mist Bank', arena: 'Vault Arena', toll: 'Toll', chronicle: 'Chronicle', house: 'Your House', payouts: 'Payouts' };
+const SH = { guard: 'Guardhouse', ferry: 'Ferry', hall: 'Town Hall', bank: 'Mist Bank', arena: 'Vault Arena', toll: 'Toll Bridge', chronicle: 'Chronicle', house: 'Your House', payouts: 'Payouts' };
 export function flat() {
   document.body.classList.add('flat', 'ready'); $('#load')?.remove(); const bg = document.createElement('div'); bg.id = 'flatbg'; document.body.prepend(bg); bg.style.backgroundImage = 'url(shots/fallback_town.jpg)';
   const nav = $('#tags'); for (const [id, n] of Object.entries(SH)) { const b = document.createElement('button'); b.className = 'lb'; b.textContent = n; b.onclick = () => open(id); nav.appendChild(b); }
