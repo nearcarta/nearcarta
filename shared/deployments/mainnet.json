@@ -1,15 +1,48 @@
 {
  "network": "mainnet",
- "status": "not_deployed",
+ "status": "charter_live_toll_pending",
  "rpc": "https://free.rpc.fastnear.com",
  "root": "nearcarta.near",
  "mpc": "v1.signer",
  "chain_id": 8453,
  "path": "base-1",
- "charter": null,
+ "charter": {
+  "contract": "charter.nearcarta.near",
+  "owner": "nearcarta.near",
+  "code_hash": "6fZBa6MbEJeKNHBEB9D7atvXa9ZaVmoWfYu38bjcRni2",
+  "wasm": "oath.r18p86.wasm",
+  "storage_bytes": 426432,
+  "locked_near": 4.26432,
+  "agent_key": "ed25519:GB83bZDdsoWrpBC43LURP1QCGX558V1qgYXMEQdX4ENi",
+  "agent_methods": [
+   "propose",
+   "propose_batch"
+  ],
+  "full_access_keys": 0,
+  "policy_delay_s": 90,
+  "clause_pay": {
+   "receivers": [
+    "nearcarta.near"
+   ],
+   "per_action_cap_near": 0.002,
+   "daily_budget_near": 0.005
+  },
+  "txs": {
+   "create_root": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",
+   "top_up": "6KByv67b6F1NhHyqk7m87KnSzdN4vdDjiXj2XvD6hbcd",
+   "fund_charter": "3fTm5K9DW8ccACNA34CXLF8J1pirzbuAYqDYefsr5ZMd",
+   "charter_deploy_init": "DNDNMtRXRiPP1bHoSUtttdYgnwYSfXARpPWJwaedzvma",
+   "charter_sweep_surplus": "7hvd6krDjboxz8CxnNNWMBeWvAWhCYpYeddGo2uEHjbM",
+   "set_clause_pay": "7s3X1DuBWu1XN3oTWYnyNiduuAjTrPoyT1ETCJesyHpP",
+   "set_agent_key": "Frp44yFGSAh9vi2w4dmV4wnDH5MBktvX7N2xyAcPRJDP",
+   "agent_propose_allowed_0.001": "JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy",
+   "agent_propose_over_cap_0.003": "BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH",
+   "charter_delete_fak": "71Zio28gV3yubD5DecGtkguWzWdfix8brcKFy13d3zzt"
+  }
+ },
  "toll": null,
  "runbook": "docs/MAINNET_RUNBOOK.md",
- "note": "read from mainnet v1.signer read-only (domain 0 path base-1; fx root from domain 3). charter and toll are filled in from core-deploy.js output after the mainnet run. Arena, house and Town Hall: see docs/MAINNET_CONSOLIDATION.md",
+ "note": "Mainnet runs protocol 86: contracts are built with near-sdk 5.27 (rustc 1.86). charter.nearcarta.near is live with no full-access key. toll.nearcarta.near waits for about 0.5 NEAR more on nearcarta.near. Arena, house and Town Hall: see docs/MAINNET_CONSOLIDATION.md",
  "layout": "named",
  "root_funder": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
  "registrar": "near",
@@ -23,7 +56,15 @@
  "wasm_sha256": {
   "oath.r18": "04377fc33eb9f0f1bdf384055e8baac7828d2d0e7f259dfe3dcc2305487c0a14",
   "toll.v6": "8829a9c7de1d8da512615382a7a8923253fc9f13b136fe1b876ce1dd9e9ed88e",
-  "reaper": "ab253074710342bea61df34b775d71c957519edc4924dfddcc665994f41ee8ba"
+  "reaper": "ab253074710342bea61df34b775d71c957519edc4924dfddcc665994f41ee8ba",
+  "oath.r18p86": "542ae4dad007edae2ded336ec3b9321ada00af208b4c82814ff06b80f29665cf",
+  "toll.v6p86": "7d1e7ee1a619987c00de5a42c881e006f52dda38ccd423d54540aa51d5e42686",
+  "reaper.p86": "afe81ba2a0f07af4de3b849aac4f62db9e22d777ef445077a215209eea0ac199"
  },
- "agent_allowance_near": 0.25
+ "agent_allowance_near": 0.25,
+ "toll_pending": {
+  "reason": "root balance after the charter is 2.217 NEAR; the toll needs about 2.67 (2.537 locked storage for 253,678 bytes + deploy gas reserve + fees)",
+  "extra_near_needed": 0.5
+ },
+ "reaper_link_check_tx": "6mdu5icACvP7F5zRE38Dfe7GyqBKtYfYZzehUMhQC2RR"
 }

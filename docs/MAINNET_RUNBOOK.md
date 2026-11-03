@@ -126,6 +126,28 @@ NET=mainnet ROOT_KEY=... DEPLOY=<deploy.json> OUT=<teardown.json> node backend/s
 - **Teardown txs:** close `5QUcCBa1gYhjxm8XE2W9dgWD1v5KByvGD4TEnuiAjd3M`, queue `37o4wuJTWe2NkmctH1sEQ8PBqWJKJDRTvni5K21Nip98`, execute `EC7wjKScixkoC8emvPcdqS5NDtr4v2EWba1Dzmwq2Qae`, upgrade `HfFdJEBjgUe1a5fDU1vxnsikPTQVceeVHw6LuRAVRNqh`, reap `8fAaYjgHkBJ2cWC175yTKtS6xQJSQ5M6MMZ7Hs4xLB9c`.
 - **Result:** both accounts deleted; root gained 6.414.
 
+## Mainnet run (live)
+
+Mainnet runs protocol 86 and testnet 88. Builds with near-sdk 5.28 or newer import host functions protocol 86 does not have (gas keys, `universal_state_init`), and the first charter deploy failed at `new` with a link error (tx `Eeq1XVYxsW3ieZNakdxC87rZfKGpLSxvHRq7Gx2vomam`, about 0.003 NEAR gas). All three contracts are now built with near-sdk 5.27.0 and rustc 1.86:
+
+| artifact | bytes | sha256 |
+|---|---|---|
+| `oath.r18p86.wasm` | 425,406 | `542ae4dad007edae2ded336ec3b9321ada00af208b4c82814ff06b80f29665cf` |
+| `toll.v6p86.wasm` | 251,969 | `7d1e7ee1a619987c00de5a42c881e006f52dda38ccd423d54540aa51d5e42686` |
+| `reaper.p86.wasm` | 24,864 | `afe81ba2a0f07af4de3b849aac4f62db9e22d777ef445077a215209eea0ac199` |
+
+1. Reaper link check on mainnet (`wasm-link-check.js`): `6mdu5icACvP7F5zRE38Dfe7GyqBKtYfYZzehUMhQC2RR`. The view call reached the code (WasmTrap, no link error).
+2. Testnet rehearsal 4 with the same three files: deploy, both agent checks, both toll checks, key lock and teardown all as expected (`judges/proofs/core-rehearsal4-p86-*.json`).
+3. Mainnet charter (`CHARTER_ONLY=1`, proof `judges/proofs/core-mainnet-deploy.json`):
+   - create `nearcarta.near`: `AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF`
+   - fund charter: `3fTm5K9DW8ccACNA34CXLF8J1pirzbuAYqDYefsr5ZMd`, top up 0.25: `6KByv67b6F1NhHyqk7m87KnSzdN4vdDjiXj2XvD6hbcd`
+   - deploy + init: `DNDNMtRXRiPP1bHoSUtttdYgnwYSfXARpPWJwaedzvma`, sweep: `7hvd6krDjboxz8CxnNNWMBeWvAWhCYpYeddGo2uEHjbM`
+   - clause `pay`: `7s3X1DuBWu1XN3oTWYnyNiduuAjTrPoyT1ETCJesyHpP`, agent key (0.25 NEAR allowance): `Frp44yFGSAh9vi2w4dmV4wnDH5MBktvX7N2xyAcPRJDP`
+   - agent propose 0.001 allowed: `JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy`; 0.003 denied `over_per_action_cap`: `BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH`
+   - full-access key deleted: `71Zio28gV3yubD5DecGtkguWzWdfix8brcKFy13d3zzt`
+   - final: 426,432 bytes (4.264 NEAR locked), balance 4.360, one key (function call, `propose`/`propose_batch`).
+4. Toll: waiting. The root holds 2.217 NEAR; the toll needs about 2.67 (2.537 locked for 253,678 bytes, plus the deploy gas reserve and fees). About 0.5 NEAR more on `nearcarta.near` lets the same command run without `CHARTER_ONLY` (it skips every step already done).
+
 ## Reproducible builds
 
 Not yet reproducible. `cargo near build reproducible-wasm` fails on this box because Docker's bridge network has no DNS. The pinned artifacts are the hashes in `shared/deployments/mainnet.json`.
