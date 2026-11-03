@@ -124,7 +124,7 @@ export async function helperKey() {
   if (q && Date.now() >= q.eta) { const h = await sign(S.charter, [fc('execute_change', { change_id: q.id }, 120)]); keep(h, 'house', 'signed', 'execute_change'); await readRules(); return { tx: h, live: S.agentLive }; }
   if (q) return { live: false, eta: q.eta };
   const secret = W.keyFrom().secretKey; localStorage.setItem(LS_AGENT(S.charter) + '.pending', secret);
-  const h = await sign(S.charter, [fc('set_agent_key', { public_key: W.keyFrom(secret).publicKey, allowance: null }, 60)]);
+  const h = await sign(S.charter, [fc('set_agent_key', { public_key: W.keyFrom(secret).publicKey, allowance: (YN / 2n).toString() }, 60)]);
   keep(h, 'house', 'signed', 'set_agent_key'); await readRules(); return { tx: h, live: S.agentLive, eta: pendingKey()?.eta };
 }
 async function sign(receiverId, actions) { const w = await conn.wallet(); const r = await w.signAndSendTransaction({ receiverId, actions }); return W.txHashOf(r); }
