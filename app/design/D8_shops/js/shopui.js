@@ -359,7 +359,7 @@ function proofDrawer() {
   if (cur === 'guard') details.push(attestedLine());
   if (cur === 'toll') { const t = tollGate(); h += `<section class="dz hist"><h3>Toll gate</h3>${t.list}</section>`; if (t.more) details.push(t.more); }
   const live = { hall: ['Latest proposals', hallRows], arena: ['Past attacks', arenaRows], toll: ['Toll records', tollRecordRows] }[cur];
-  if (live) { const p = split(live[1]()); h += p.wait ? `<section class="dz hist"><h3>${live[0]}</h3><p class="note">Reading…</p></section>` : list(live[0], p.rows, p.notes[0] ? p.notes[0].replace(/<\/?p[^>]*>/g, '') : 'Nothing yet.'); if (!p.wait && p.rows.length) details.push(...p.notes); }
+  if (live) { const p = split(live[1]()); h += p.wait ? `<section class="dz hist"><h3>${live[0]}</h3><p class="note">Reading…</p></section>` : list(live[0], cur === 'arena' ? p.rows.slice(0, 3) : p.rows, p.notes[0] ? p.notes[0].replace(/<\/?p[^>]*>/g, '') : 'Nothing yet.'); if (!p.wait && p.rows.length) details.push(...p.notes); }
   // Details: ids, notes, the lab record
   if (lab) details.push(`<div class="labrec">${lab}</div>`);
   if (details.length) h += `<details class="dz more"><summary>Details</summary>${details.join('')}</details>`;
