@@ -1,2 +1,7 @@
 # Public NEAR key (ed25519, public half only) quoted in an RPC "access key does not exist" error in a proof.
 0ea987fb35212e77c2cb629546912463e42a750b:judges/proofs/oath-r16.json:generic-api-key:422
+# public mainnet tx hashes in the runbook
+61472dc90fd8154d9525f04f593cb46de3f880a5:docs/MAINNET_RUNBOOK.md:generic-api-key:147
+1e012c1cc00958340562ae4957c08e79783009bf:docs/MAINNET_RUNBOOK.md:generic-api-key:115
+# public MPC root key (hex of the secp256k1 public key fx_root_key_b58)
+65a8635de7c076e3facdd40008153b1d568b8c12:judges/proofs/core-mainnet-dryrun.json:generic-api-key:18
