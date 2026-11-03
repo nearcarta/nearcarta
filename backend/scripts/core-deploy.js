@@ -1,6 +1,9 @@
-// Core launch (charter + toll) on testnet or mainnet, from one root account, with no subaccounts.
-// A 64-hex implicit root cannot have subaccounts (an id like charter.<64 hex> is over the 64-char limit), so each
-// contract gets its own implicit account: free to create (a plain transfer), keys kept in ~/.near-credentials/<net>.
+// Core launch (charter + toll) on testnet or mainnet from one root account.
+// LAYOUT=named (default): the root is a named account (create it with create-named-root.js) and the contracts are
+//   its subaccounts charter.<root> and toll.<root>, created with CreateAccount + Transfer + AddKey in one tx.
+// LAYOUT=implicit: each contract gets its own fresh implicit account (for a 64-hex root, which cannot have subaccounts).
+// DRY_RUN=1: reads everything (ids, MPC keys, derived Base address, wasm hashes, balance check) and sends nothing.
+// Keys of new accounts are kept in ~/.near-credentials/<net>/<id>.json (0600).
 // Steps (resumable; state in OUT):
 //   1 fund   root -> charter id, root -> toll id
 //   2 charter self-batch: deploy oath.r18 + new(owner = root, policy_delay 90 s, setup_window)
@@ -24,21 +27,24 @@ const RECIPIENT = (E.RECIPIENT || '0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f').
 const RPCURL = E.RPC || N_.rpc;
 const rq = async params => { const r = await (await fetch(RPCURL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'query', params }) })).json(); if (r.error || r.result?.error) throw new Error(JSON.stringify(r.error || r.result.error)); return r.result; };
 const provider = new JsonRpcProvider({ url: RPCURL });
-const RK = JSON.parse(readFileSync(E.ROOT_KEY, 'utf8'));
+const DRY = E.DRY_RUN === '1', NAMED = (E.LAYOUT || 'named') === 'named';
+const RK = E.ROOT_KEY ? JSON.parse(readFileSync(E.ROOT_KEY, 'utf8')) : {};
 const ROOT = E.ROOT_ID || RK.account_id;
-const root = new Account(ROOT, provider, KeyPairSigner.fromSecretKey(RK.private_key));
+if (NAMED && /^[0-9a-f]{64}$/.test(ROOT)) { console.error('LAYOUT=named needs a named root; a 64-hex root cannot have subaccounts'); process.exit(2); }
+const root = DRY ? null : new Account(ROOT, provider, KeyPairSigner.fromSecretKey(RK.private_key));
 const N = x => BigInt(Math.round(x * 1e6)) * 10n ** 18n;
 const TG = t => BigInt(t) * 10n ** 12n;
 const near = y => Number(BigInt(y) / 10n ** 18n) / 1e6;
 const art = f => readFileSync(new URL(`../../contracts/artifacts/${f}`, import.meta.url));
 const sha = b => crypto.createHash('sha256').update(b).digest('hex');
 const credDir = `${homedir()}/.near-credentials/${NET}`; mkdirSync(credDir, { recursive: true });
-const S = existsSync(E.OUT) ? JSON.parse(readFileSync(E.OUT, 'utf8')) : { network: NET, root: ROOT, steps: [] };
-const save = () => writeFileSync(E.OUT, JSON.stringify(S, null, 1));
+const S = !DRY && existsSync(E.OUT) ? JSON.parse(readFileSync(E.OUT, 'utf8')) : { network: NET, root: ROOT, steps: [] };
+const save = () => { if (!DRY) writeFileSync(E.OUT, JSON.stringify(S, null, 1)); };
 function implicitKey(tag) {
   if (S[tag]) return JSON.parse(readFileSync(`${credDir}/${S[tag]}.json`, 'utf8'));
   const kp = KeyPair.fromRandom('ed25519'); const pk = kp.getPublicKey();
-  const id = Buffer.from(pk.data).toString('hex');
+  const id = NAMED ? `${tag}.${ROOT}` : Buffer.from(pk.data).toString('hex');
+  if (DRY) return { account_id: id, public_key: pk.toString(), private_key: kp.toString(), dry: true };
   const k = { account_id: id, public_key: pk.toString(), private_key: kp.toString() };
   writeFileSync(`${credDir}/${id}.json`, JSON.stringify(k), { mode: 0o600 });
   S[tag] = id; save(); return k;
@@ -59,13 +65,32 @@ async function send(step, signer, receiverId, actions, want = true) {
 }
 const ck = implicitKey('charter'), tk = implicitKey('toll');
 const C = ck.account_id, T = tk.account_id;
+// fund: a named layout creates the subaccount in the same tx; an implicit one is created by the transfer itself
+const fund = (step, k, amt) => send(step, root, k.account_id, NAMED
+  ? [A.createAccount(), A.transfer(N(amt)), A.addFullAccessKey(KeyPair.fromString(k.private_key).getPublicKey())]
+  : [A.transfer(N(amt))]);
 const charter = new Account(C, provider, KeyPairSigner.fromSecretKey(ck.private_key));
 const toll = new Account(T, provider, KeyPairSigner.fromSecretKey(tk.private_key));
 let agent;
-if (existsSync(E.AGENT_OUT)) agent = JSON.parse(readFileSync(E.AGENT_OUT, 'utf8'));
+if (DRY) agent = { public_key: KeyPair.fromRandom('ed25519').getPublicKey().toString() };
+else if (existsSync(E.AGENT_OUT)) agent = JSON.parse(readFileSync(E.AGENT_OUT, 'utf8'));
 else { const kp = KeyPair.fromRandom('ed25519'); agent = { public_key: kp.getPublicKey().toString(), private_key: kp.toString() }; writeFileSync(E.AGENT_OUT, JSON.stringify(agent), { mode: 0o600 }); }
-const agentPk = KeyPair.fromString(agent.private_key).getPublicKey();
+const agentPk = DRY ? null : KeyPair.fromString(agent.private_key).getPublicKey();
 S.agent_public_key = agent.public_key;
+if (DRY) {
+  const MPC = N_.mpc, oath = art('oath.r18.wasm'), tw = art('toll.v6.wasm');
+  const derived = await view(MPC, 'derived_public_key', { path: 'base-1', predecessor: T, domain_id: 0 });
+  const rootPk = await view(MPC, 'public_key', { domain_id: 3 });
+  const foreign = '0x' + Buffer.from(keccak_256(base58.decode(derived.replace('secp256k1:', '')))).subarray(12).toString('hex');
+  const r = await acct(ROOT).catch(e => ({ missing: String(e.message).slice(0, 80) }));
+  const ex = async id => acct(id).then(() => 'EXISTS').catch(() => 'free');
+  const need = Number(E.FUND_CHARTER || 4.2) + 0.05;
+  const out = { dry_run: true, network: NET, layout: NAMED ? 'named' : 'implicit', root: ROOT, root_balance_near: r.amount ? near(r.amount) : null, root_state: r.missing || 'exists',
+    charter: C, charter_free: await ex(C), toll: T, toll_free: await ex(T), mpc: MPC, chain_id: N_.chain_id, path: 'base-1',
+    derived_public_key: derived, foreign_address: foreign, fx_root_key_b58: rootPk, fx_root_key_hex: Buffer.from(base58.decode(rootPk.replace('secp256k1:', ''))).toString('hex'),
+    charter_wasm_sha256: sha(oath), toll_wasm_sha256: sha(tw), peak_root_balance_needed_near: need, named_root_total_needed_near: 6.46, final_locked_estimate_near: 4.024 + 2.283 + 0.1 + 0.02 };
+  console.log(JSON.stringify(out, null, 1)); if (E.OUT) writeFileSync(E.OUT, JSON.stringify(out, null, 1)); process.exit(0);
+}
 if (S.root_before == null) { S.root_before = (await acct(ROOT)).amount; save(); }
 
 // 1 fund the charter (the toll is funded after the charter returns its surplus, so the root never needs both at once).
@@ -74,7 +99,7 @@ if (S.root_before == null) { S.root_before = (await acct(ROOT)).amount; save(); 
 const sweep = async (step, signer, id, keep) => {
   const a = await acct(id); const out = BigInt(a.amount) - BigInt(a.storage_usage) * 10n ** 19n - N(keep) - N(0.002);
   if (out > 0n) await send(step, signer, ROOT, [A.transfer(out)]); };
-await send('fund_charter', root, C, [A.transfer(N(Number(E.FUND_CHARTER || 4.2)))]);
+await fund('fund_charter', ck, Number(E.FUND_CHARTER || 4.2));
 // 2 charter
 const oath = art('oath.r18.wasm'); S.charter_wasm = { file: 'oath.r18.wasm', sha256: sha(oath), bytes: oath.length };
 await send('charter_deploy_init', charter, C, [A.deployContract(oath),
@@ -85,7 +110,7 @@ const clause = { asset: 'Native', receivers: [ROOT], per_action_cap: N(0.002).to
 await send('set_clause_pay', root, C, [A.functionCall('set_clause', { clause_id: 'pay', clause }, TG(100), 0n)]);
 await send('set_agent_key', root, C, [A.functionCall('set_agent_key', { public_key: agent.public_key, allowance: null }, TG(100), 0n)]);
 // 4 toll
-await send('fund_toll', root, T, [A.transfer(N(Number(E.FUND_TOLL || 2.4)))]);
+await fund('fund_toll', tk, Number(E.FUND_TOLL || 2.4));
 const tw = art('toll.v6.wasm'); S.toll_wasm = { file: 'toll.v6.wasm', sha256: sha(tw), bytes: tw.length };
 const MPC = N_.mpc, PATH_ = 'base-1';
 const derived = await view(MPC, 'derived_public_key', { path: PATH_, predecessor: T, domain_id: 0 });
