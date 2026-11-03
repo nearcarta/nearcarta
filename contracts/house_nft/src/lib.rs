@@ -290,4 +290,53 @@ mod tests {
         ctx(1, 2 * 10u128.pow(22)); c.mint_deed(None, None);
         ctx(3, 1); c.nft_transfer(accounts(3), accounts(1).to_string(), None, None);
     }
+    // The deed is sold while a payout is in flight (house_pay sent the transfer; on_house_pay has not run yet).
+    fn callback(ok: bool) {
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.testnet".parse().unwrap())
+            .predecessor_account_id("deeds.testnet".parse().unwrap()).build(),
+            near_sdk::test_vm_config(), near_sdk::RuntimeFeesConfig::test(), Default::default(),
+            vec![if ok { PromiseResult::Successful(vec![]) } else { PromiseResult::Failed }]);
+    }
+    const PAY: u128 = 5 * 10u128.pow(22);
+
+    #[test]
+    fn deed_sold_mid_payout_settles_once_and_the_new_holder_keeps_the_purse() {
+        ctx(0, 0); let mut c = Contract::new();
+        let id = accounts(1).to_string();
+        ctx(1, 10u128.pow(24)); c.mint_deed(None, Some(U128(10u128.pow(23))));
+        let start = c.house_purse(id.clone()).unwrap().balance.0;
+        yocto(1, 1); let _ = c.house_pay(id.clone(), accounts(4), U128(PAY));
+        yocto(1, 1); c.nft_transfer(accounts(2), id.clone(), None, None); // sold before the callback lands
+        callback(true); assert!(c.on_house_pay(id.clone(), accounts(4), U128(PAY)));
+        let p = c.house_purse(id.clone()).unwrap();
+        assert_eq!(p.balance.0, start - PAY); assert_eq!(p.paid.0, PAY); assert_eq!(p.pays, 1);
+        assert_eq!(c.nft_token(id.clone()).unwrap().owner_id, accounts(2));
+        // the buyer spends the rest of the purse under the same cap
+        yocto(2, 1); let _ = c.house_pay(id.clone(), accounts(4), U128(PAY));
+        assert_eq!(c.house_purse(id).unwrap().balance.0, start - 2 * PAY);
+    }
+
+    #[test]
+    fn deed_sold_mid_payout_bounce_refunds_the_purse_not_the_seller() {
+        ctx(0, 0); let mut c = Contract::new();
+        let id = accounts(1).to_string();
+        ctx(1, 10u128.pow(24)); c.mint_deed(None, Some(U128(10u128.pow(23))));
+        let start = c.house_purse(id.clone()).unwrap().balance.0;
+        yocto(1, 1); let _ = c.house_pay(id.clone(), accounts(4), U128(PAY));
+        yocto(1, 1); c.nft_transfer(accounts(2), id.clone(), None, None);
+        callback(false); assert!(!c.on_house_pay(id.clone(), accounts(4), U128(PAY)));
+        let p = c.house_purse(id.clone()).unwrap();
+        assert_eq!(p.balance.0, start); assert_eq!(p.paid.0, 0); assert_eq!(p.pays, 0); // back in the deed's purse, which the buyer now holds
+    }
+
+    #[test]
+    #[should_panic(expected = "only the deed holder")]
+    fn seller_cannot_pay_again_while_the_first_payout_is_in_flight() {
+        ctx(0, 0); let mut c = Contract::new();
+        let id = accounts(1).to_string();
+        ctx(1, 10u128.pow(24)); c.mint_deed(None, Some(U128(10u128.pow(23))));
+        yocto(1, 1); let _ = c.house_pay(id.clone(), accounts(4), U128(PAY));
+        yocto(1, 1); c.nft_transfer(accounts(2), id.clone(), None, None);
+        yocto(1, 1); let _ = c.house_pay(id, accounts(4), U128(PAY));
+    }
 }
