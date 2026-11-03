@@ -34,9 +34,11 @@ const dur = ns => { const s = Number(BigInt(ns || 0) / NS); if (!s) return 'none
   if (s % 3600 === 0) return s / 3600 + (s === 3600 ? ' hour' : ' hours'); return Math.round(s / 60) + ' min'; };
 const when = ns => new Date(Number(BigInt(ns) / 1_000_000n)).toLocaleString();
 const post = (path, body) => api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-function toast(html, kind = 'info') { const t = $('#log'); const li = document.createElement('li'); li.className = kind; li.innerHTML = html; t.prepend(li); }
+// toast() takes plain text (textContent); toastHtml() is only for markup we built from esc()'d parts.
+function toastHtml(html, kind = 'info') { const t = $('#log'); const li = document.createElement('li'); li.className = kind; li.innerHTML = html; t.prepend(li); }
+function toast(text, kind = 'info') { const t = $('#log'); const li = document.createElement('li'); li.className = kind; li.textContent = text; t.prepend(li); }
 function busy(btn, on, label) { if (!btn) return; btn.disabled = on; if (on) { btn.dataset.l = btn.textContent; btn.textContent = label || 'Waiting for chain…'; } else if (btn.dataset.l) btn.textContent = btn.dataset.l; }
-const fail = e => toast(`<b>Stopped:</b> ${esc(e.message)}${e.tx ? ' · ' + txl(e.tx) : ''}`, 'bad err');
+const fail = e => toastHtml(`<b>Stopped:</b> ${esc(e.message)}${e.tx ? ' · ' + txl(e.tx) : ''}`, 'bad err');
 
 // ---------- step 1: wallet ----------
 async function refreshWho() {
@@ -102,7 +104,7 @@ async function createCharter() {
   const h = txHashOf(res); const id = `${name}.${CFG.factory}`; noteSent(h, id);
   const f = await facts(id, f => f.registered && f.exists && !f.pending);
   if (!f.registered) throw Object.assign(new Error('charter not created (name taken? the deposit was refunded minus gas)'), { tx: h });
-  toast(`Charter created · ${txl(h)}`, 'good'); await useCharter(id);
+  toastHtml(`Charter created · ${txl(h)}`, 'good'); await useCharter(id);
 }
 
 // ---------- step 3: rules + agent key ----------
@@ -207,7 +209,7 @@ async function ownerCall(methodName, args, btn, done) {
   try {
     const w = await connector.wallet();
     const res = await w.signAndSendTransaction({ receiverId: charter, actions: [{ type: 'FunctionCall', params: { methodName, args, gas: (60n * TG).toString(), deposit: '0' } }] });
-    noteSent(txHashOf(res)); toast(`${esc(done)} · ${txl(txHashOf(res))}`, 'good');
+    noteSent(txHashOf(res)); toastHtml(`${esc(done)} · ${txl(txHashOf(res))}`, 'good');
   } finally { busy(btn, false); }
   await renderFacts();
 }
@@ -247,7 +249,7 @@ async function saveRules(keyLive) {
   busy($('#rules-btn'), true, 'Approve in your wallet…');
   const w = await connector.wallet();
   const res = await w.signAndSendTransaction({ receiverId: charter, actions });
-  noteSent(txHashOf(res)); toast(`Rules sent${keyLive ? '' : ' with a new agent key'} · ${txl(txHashOf(res))}`, 'good');
+  noteSent(txHashOf(res)); toastHtml(`Rules sent${keyLive ? '' : ' with a new agent key'} · ${txl(txHashOf(res))}`, 'good');
   await renderFacts();
   const f = await facts(charter);
   if (Object.keys(f.pending_changes || {}).length) toast('Some changes loosen the rules, so they wait in the timelock. Apply or cancel them in step 2.', 'info');
@@ -305,7 +307,7 @@ function loadFeed() {
   return feedBusy;
 }
 const tries = [];
-function tell(html, kind) { toast(html, kind); }
+function tell(html, kind) { toastHtml(html, kind); }
 function record(s, who) {
   if (!s || !s.decision) return;
   tries.push({ ...s, who });
@@ -315,7 +317,7 @@ function record(s, who) {
   const reasons = Object.entries(no.reduce((m, t) => (m[plain(t.reason)] = (m[plain(t.reason)] || 0) + 1, m), {})).map(([r, n]) => `${n} ${r}`).join(', ');
   if ($('#story').dataset.src !== 'chain') $('#story').innerHTML = `Your agent tried <b>${tries.length}</b> payment${tries.length > 1 ? 's' : ''}: <b>${ok.length} allowed</b>${ok.length ? ` (${fmt(total)} paid)` : ''}, <b>${no.length} refused</b>${no.length ? ': ' + esc(reasons) : ''}.`;
   setTimeout(loadFeed, 2500);
-  toast(`${esc(who)}: ${fmt(s.amount)} to <code>${esc(s.receiver)}</code> · <b>${s.decision === 'allowed' ? 'allowed' : 'refused: ' + esc(plain(s.reason))}</b> · ${txl(s.tx)}`, s.decision === 'allowed' ? 'good' : 'bad');
+  toastHtml(`${esc(who)}: ${fmt(s.amount)} to <code>${esc(s.receiver)}</code> · <b>${s.decision === 'allowed' ? 'allowed' : 'refused: ' + esc(plain(s.reason))}</b> · ${txl(s.tx)}`, s.decision === 'allowed' ? 'good' : 'bad');
 }
 
 // ---------- ask the agent to pay ----------
@@ -358,7 +360,7 @@ async function ask(e) {
     out.insertAdjacentHTML('beforeend', '<p class="muted">One allowed request to a shop on your allowlist, within your max per payment, scores a point (once); one your charter refuses scores once as a blocked scam. The charter decides, not this page.</p>');
     // the verdict is in: free the button now; the scoreboard write and the refresh follow in the background
     busy(btn, false); unlock();
-    (r.tx ? post('/api/vault/record', { tx: r.tx, charter }).catch(e => toast('Scoreboard did not take it: ' + esc(e.message), 'bad')) : Promise.resolve())
+    (r.tx ? post('/api/vault/record', { tx: r.tx, charter }).catch(e => toast('Scoreboard did not take it: ' + e.message, 'bad')) : Promise.resolve())
       .then(() => { renderFacts().catch(() => {}); scoreSoon('mine'); });
   } finally { busy(btn, false); unlock(); }
 }
@@ -403,7 +405,7 @@ async function taskRun(btn) {
   let r;
   if (where === 'mine') {
     r = await runTask({ charter, key: keyFrom(localStorage.getItem(agentLS(charter))), taskId: id, tag: 'mine', rpcCall: rpc, viewF: view, send: sendPropose });
-    if (r.tx) await post('/api/vault/record', { tx: r.tx, charter }).catch(e => toast('Scoreboard did not take it: ' + esc(e.message), 'bad'));
+    if (r.tx) await post('/api/vault/record', { tx: r.tx, charter }).catch(e => toast('Scoreboard did not take it: ' + e.message, 'bad'));
     renderFacts().catch(() => {});
   } else r = await post('/api/vault/task', { task: id, nickname: nick() });
   out.querySelector('.steps').innerHTML = stepRow(r, 1, 1); record(r, where === 'mine' ? 'Job ' + id : 'Shared job ' + id);
@@ -457,7 +459,7 @@ async function attackRun(btn) {
     const key = keyFrom(localStorage.getItem(agentLS(charter)));
     r = await runSteps({ charter, key, attackId: id, tag: 'mine', rpcCall: rpc, viewF: view, send: sendPropose,
       onStep: (s, i, n) => { out.querySelector('.steps').insertAdjacentHTML('beforeend', stepRow(s, i, n)); record(s, 'Scam ' + id); } });
-    if (r.refused) await post('/api/vault/record', { tx: r.steps.at(-1).tx, charter }).catch(e => toast('Leaderboard did not take it: ' + esc(e.message), 'bad'));
+    if (r.refused) await post('/api/vault/record', { tx: r.steps.at(-1).tx, charter }).catch(e => toast('Leaderboard did not take it: ' + e.message, 'bad'));
     renderFacts().catch(() => {});
   } else {
     r = await post('/api/vault/attack', { attack: id, nickname: nick() });

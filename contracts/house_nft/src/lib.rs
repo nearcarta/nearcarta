@@ -108,7 +108,7 @@ impl Contract {
     #[private]
     pub fn on_house_pay(&mut self, token_id: TokenId, receiver_id: AccountId, amount: U128) -> bool {
         let mut p = self.purses.get(&token_id).unwrap();
-        let ok = matches!(env::promise_result(0), PromiseResult::Successful(_));
+        let ok = matches!(env::promise_result_checked(0, 0), Ok(_));
         if ok {
             p.paid = U128(p.paid.0 + amount.0); p.pays += 1;
             log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_pay\",\"data\":[{{\"token_id\":\"{}\",\"to\":\"{}\",\"amount\":\"{}\"}}]}}", token_id, receiver_id, amount.0);
