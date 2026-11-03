@@ -8,7 +8,7 @@ const { esc, fmt, short } = A;
 
 let cur = null, sh = null, phase = 'idle', last = null, runScene = null, extra = {};
 const say = t => { const e = $('#t-say'); e.innerHTML = `<span class="lamp" aria-hidden="true"></span><span>${t}</span>`; e.classList.remove('bump'); void e.offsetWidth; e.classList.add('bump'); };
-const btn = (label, kind = 'primary', dis = false) => { const b = $('#t-act'); b.hidden = !label; b.className = 'act ' + kind; b.disabled = dis; b.textContent = label || ''; b.classList.toggle('busy', phase === 'busy'); };
+const btn = (label, kind = 'primary', dis = false) => { const b = $('#t-act'); b.hidden = !label; b.className = 'act ' + kind; b.disabled = dis; b.textContent = label || ''; b.classList.toggle('busy', phase === 'busy'); queueMicrotask(syncGo); };
 const form = html => { $('#t-form').innerHTML = html || ''; $('#t-form').hidden = !html; };
 const hero = html => { if (html != null) $('#t-hero').innerHTML = html; $('#t-hero').hidden = !html; };
 const rcpt = html => { $('#t-rcpt').innerHTML = html || ''; };
@@ -261,54 +261,94 @@ const APPS = {
   },
 };
 
-// ---------- proof drawer: the visitor's own charter first; the lab record stays below as reference ----------
+// Toll gate, read live from /api/toll/gate (never a static status): the gate's latest records as a list, the gate itself under Details.
+function tollGate() {
+  if (!extra.gate && !extra.gateLoading) { extra.gateLoading = true; A.gateInfo(true).then(g => { extra.gate = g; }).catch(() => { extra.gate = { error: true }; }).finally(() => { extra.gateLoading = false; if (cur === 'toll') { proofDrawer(); if (phase === 'idle' && gasNote()) paint(); } }); }
+  const g = extra.gate;
+  const row = r => prow(`#${esc(r.nonce)} · ${esc(r.label || r.status)}`, r.visit ? 'charter ' + esc(short(r.visit.charter, 10, 7)) : '', `<span class="st ${r.status === 'confirmed' ? 'ok' : 'live'}" data-testid="gate-status">${r.status === 'confirmed' ? '✓' : '…'}</span>${r.tx_hash ? `<a class="tx" href="${esc(r.explorer)}" target="_blank" rel="noopener" aria-label="Open record ${esc(r.nonce)} in the explorer">${esc(short(r.tx_hash, 6, 4))} ↗</a>` : ''}`);
+  if (!g) return { list: '<p class="note">Reading the gate…</p>', more: '' };
+  if (g.error) return { list: '<p class="note">Gate busy. Reopen to retry.</p>', more: '' };
+  const low = g.gas?.low ? `<p class="warn" data-testid="gas-warning-row">Low gas: ${esc(g.gas.warning)}</p>` : '';
+  return { list: low + (g.recent || []).map(row).join(''),
+    more: kv('Gate', idChip(g.gate)) + kv('Signer', esc(g.mpc)) + kv('Pays on Base Sepolia', idChip(g.policy.allow_to[0], `${esc(g.foreign_explorer)}`))
+      + (g.gas && g.gas.visits_left_at_cap != null ? kv('Gas left', `${esc(g.gas.visits_left_at_cap)} visits`) : '') };
+}
+// Live lists from the shop modules (Town Hall proposals, Arena past prompts, Toll records): rows only, their notes go to Details.
+function lazyList(key, mod, fn, id) {
+  if (extra[key] == null && !extra[key + 'L']) { extra[key + 'L'] = true; import(mod).then(m => { if (id === 'arena') { extra.arenaM = m; m.bindRedteam(() => { if (cur === 'arena') proofDrawer(); }); } return m[fn](undefined, undefined, true); }).then(h => { extra[key] = h; }).catch(() => { extra[key] = ''; }).finally(() => { extra[key + 'L'] = false; if (cur === id) proofDrawer(); }); }
+  return extra[key];
+}
+// Town Hall: m.liveProposals(undefined, undefined, true) via lazyList
+const hallRows = () => lazyList('hallP', '../shops/hall.js', 'liveProposals', 'hall');
+const arenaRows = () => lazyList('arenaP', '../shops/arenalive.js', 'livePrompts', 'arena');
+const tollRecordRows = () => lazyList('tollR', '../shops/tollrecords.js', 'liveTollRecords', 'toll');
+// split a module's html into its rows and its notes
+function split(html) {
+  if (html == null) return { rows: [], notes: [], wait: true };
+  const t = document.createElement('template'); t.innerHTML = html;
+  t.content.querySelectorAll('h3').forEach(h => h.remove());
+  const notes = [...t.content.querySelectorAll('p.note')].map(n => { n.remove(); return n.outerHTML; });
+  return { rows: [...t.content.querySelectorAll('.row')].map(r => r.outerHTML), notes };
+}
+// a list shows 5 rows; the rest fold under "Show all"
+function list(title, rows, empty = 'Nothing yet.') {
+  if (!rows.length) return `<section class="dz hist"><h3>${title}</h3><p class="note">${empty}</p></section>`;
+  const more = rows.length > 5 ? `<details class="all"><summary>Show all ${rows.length}</summary>${rows.slice(5).join('')}</details>` : '';
+  return `<section class="dz hist"><h3>${title} <span class="n">${rows.length}</span></h3>${rows.slice(0, 5).join('')}${more}</section>`;
+}
+
+// ---------- side panel: 1 your status, 2 one action, 3 the latest result, 4 history; everything technical under Details ----------
 let lab = '';
 const NBA = a => `https://testnet.nearblocks.io/address/${esc(a)}`;
 const prow = (k, why = '', v = '') => `<div class="row"><div class="k">${k}${why ? `<span class="why">${why}</span>` : ''}</div><div class="v">${v}</div></div>`;
-// Toll gate rows, read live from /api/toll/gate (never a static status): your visit, then the gate's latest records.
-function tollGateRows() {
-  if (!extra.gate && !extra.gateLoading) { extra.gateLoading = true; A.gateInfo(true).then(g => { extra.gate = g; }).catch(() => { extra.gate = { error: true }; }).finally(() => { extra.gateLoading = false; if (cur === 'toll') { proofDrawer(); if (phase === 'idle' && gasNote()) paint(); } }); }
-  const g = extra.gate, st = extra.tst, row = r => prow(`#${esc(r.nonce)} · ${esc(r.label || r.status)}`, r.visit ? 'visitor charter ' + esc(short(r.visit.charter, 12, 6)) : '', `<span class="st ${r.status === 'confirmed' ? 'ok' : 'live'}" data-testid="gate-status">${r.status === 'confirmed' ? '✓' : '…'}</span>${r.tx_hash ? `<a class="tx" href="${esc(r.explorer)}" target="_blank" rel="noopener">${esc(short(r.tx_hash, 8, 4))} ↗</a>` : ''}`);
-  let h = '<h3>Toll gate · live</h3>';
-  if (st) h += prow(`Your visit #${esc(st.nonce)} · ${esc(st.label || st.status)}`, st.status === 'confirmed' ? 'MPC proof recorded on NEAR' : st.final ? 'final on Base Sepolia, settling' : st.base ? 'sent, Base Sepolia finalizing' : 'sending to Base Sepolia', '<span class="src live">live read</span>');
-  if (!g) return h + '<p class="note">Reading the gate…</p>';
-  if (g.error) return h + '<p class="note">The gate read is busy; it retries when you reopen this drawer.</p>';
-  h += prow(esc(short(g.gate, 14, 8)), `MPC ${esc(g.mpc)} · pays ${esc(short(g.policy.allow_to[0], 6, 4))} on Base Sepolia`, `<a class="tx" href="${NBA(g.gate)}" target="_blank" rel="noopener">gate ↗</a>`);
-  if (g.gas && g.gas.visits_left_at_cap != null) h += prow(`Base Sepolia gas · ${esc(g.gas.visits_left_at_cap)} visits left`, g.gas.low ? '<span data-testid="gas-warning-row">low gas: ' + esc(g.gas.warning) + '</span>' : 'at the fee cap', `<a class="tx" href="${esc(g.foreign_explorer)}" target="_blank" rel="noopener">address ↗</a>`);
-  return h + (g.recent || []).map(row).join('');
+const kv = (k, v) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+// a long account id, cut in the middle, with copy and explorer buttons (24 px targets)
+export const idChip = (a, href = NBA(a)) => a ? `<span class="idc"><code title="${esc(a)}">${esc(short(a, 10, 7))}</code><button type="button" class="ib2" data-copy="${esc(a)}" aria-label="Copy ${esc(a)}">⧉</button><a class="ib2" href="${href}" target="_blank" rel="noopener" aria-label="Open ${esc(a)} in the explorer">↗</a></span>` : '';
+const BADGE = { allowed: ['ok', 'Allowed'], denied: ['no', 'Denied'], failed: ['no', 'Failed'], refused: ['no', 'Refused'] };
+const badge = d => { const [c, t] = BADGE[d] || ['pend', String(d || '?').replace(/^./, x => x.toUpperCase())]; return `<span class="badge ${c}">${c === 'ok' ? '✓' : c === 'no' ? '✕' : '○'} ${esc(t)}</span>`; };
+function card({ d, amt = '', to = '', why = '', link = '', title = 'Latest result' }) {
+  return `<section class="dz"><h3>${title}</h3><article class="card ${(BADGE[d] || ['pend'])[0]}" data-testid="latest"><div class="ch">${badge(d)}${amt ? `<b class="amt">${esc(amt)}</b>` : ''}</div>`
+    + (to ? `<p class="to">to <b title="${esc(to)}">${esc(nice(to) || short(to, 10, 7))}</b></p>` : '') + (why ? `<p class="why">${why}</p>` : '') + (link ? `<div class="lk">${link}</div>` : '') + '</article></section>';
 }
-// Town Hall rows, read live from /api/townhall by shops/hall.js: the DAO's latest proposals, expired ones marked expired.
-function hallRows() {
-  if (extra.hallP == null && !extra.hallLoading) { extra.hallLoading = true; import('../shops/hall.js').then(m => m.liveProposals(undefined, undefined, true)).then(h => { extra.hallP = h; }).catch(() => { extra.hallP = ''; }).finally(() => { extra.hallLoading = false; if (cur === 'hall') proofDrawer(); }); }
-  return extra.hallP ?? '<h3>Latest proposals · live read</h3><p class="note">Reading the DAO…</p>';
-}
-// Vault Arena rows, read live from /api/arena/prompts by shops/arenalive.js: past prompts with their decision and reveal txs.
-function arenaRows() {
-  if (extra.arenaP == null && !extra.arenaLoading) { extra.arenaLoading = true; import('../shops/arenalive.js').then(m => { extra.arenaM = m; m.bindRedteam(() => { if (cur === 'arena') proofDrawer(); }); return m.livePrompts(undefined, undefined, true); }).then(h => { extra.arenaP = h; }).catch(() => { extra.arenaP = ''; }).finally(() => { extra.arenaLoading = false; if (cur === 'arena') proofDrawer(); }); }
-  return (extra.arenaM ? extra.arenaM.redteamBlock() : '') + (extra.arenaP ?? '<h3>Past prompts · live read</h3><p class="note">Reading the arena…</p>');
-}
-// Toll records, read live from /api/toll by shops/tollrecords.js: a record stuck in "signed" shows pending or expired.
-function tollRecordRows() {
-  if (extra.tollR == null && !extra.tollRLoading) { extra.tollRLoading = true; import('../shops/tollrecords.js').then(m => m.liveTollRecords(undefined, undefined, true)).then(h => { extra.tollR = h; }).catch(() => { extra.tollR = ''; }).finally(() => { extra.tollRLoading = false; if (cur === 'toll') proofDrawer(); }); }
-  return extra.tollR ?? '<h3>Toll records · live read</h3><p class="note">Reading the tolls…</p>';
-}
+// copy buttons and the panel's own action button (it presses the tray's main button)
+if (!globalThis.__dzBound && globalThis.document) { globalThis.__dzBound = true;
+  document.addEventListener('click', e => {
+    const c = e.target.closest?.('[data-copy]'); if (c) { navigator.clipboard?.writeText(c.dataset.copy).then(() => { c.textContent = '✓'; setTimeout(() => { c.textContent = '⧉'; }, 1200); }).catch(() => {}); return; }
+    if (e.target.closest?.('[data-drawer-go]')) { const t = $('#t-act'); $('#d-close')?.click(); if (t && !t.disabled && !t.hidden) t.click(); }
+  }); }
+function syncGo() { const g = $('[data-drawer-go]'), t = $('#t-act'); if (!g || !t) return; const on = !t.hidden && !t.disabled && t.textContent.trim(); g.hidden = !on; if (on) g.textContent = t.textContent.trim(); }
 function proofDrawer() {
   const d = $('#d-body'); if (!d || !cur) return; const S = A.S, c = S.clauses?.pay;
-  let g = '';
-  if (!S.charter) g = `<h3>Your charter</h3><p class="note">${S.me ? 'Build your charter here; its proof shows in this drawer.' : 'Connect to see your own charter here.'}</p>`;
+  const details = []; { const t = $('#d-title'); if (t) t.textContent = t.textContent.replace(/ · proof$/, ''); }
+  // 1. your status
+  let h = '<section class="dz me"><h3>You</h3>';
+  if (!S.charter) h += `<p class="lead">${S.me ? 'No charter yet' : 'Not connected'}</p><p class="sub">${S.me ? 'Build one to start.' : 'Connect to see your charter.'}</p>`;
   else {
-    const mine = A.receipts().filter(r => (cur === 'house' ? true : r.shop === cur)).slice(0, 6);
-    g = '<h3>Your charter</h3>' + prow(esc(short(S.charter, 14, 8)), S.me ? 'owner ' + esc(short(S.me, 14, 6)) : '', `<a class="tx" href="${NBA(S.charter)}" target="_blank" rel="noopener">account ↗</a>`)
-      + (S.state ? prow('Policy v' + esc(S.state.policy_version), S.state.frozen ? 'frozen' : 'live, read just now', '<span class="src live">live read</span>') : '')
-      + (c ? prow(`Max ${fmt(c.per_action_cap)} · ${fmt(c.daily_budget)} a day`, 'payees ' + esc((c.receivers || []).map(r => short(r, 10, 6)).join(', '))) : '')
-      + `<h3>${cur === 'house' ? 'Signed by you' : 'Signed here'}</h3>`
-      + (mine.length ? mine.map(r => prow(esc(r.shop) + ' · ' + esc(r.decision), r.reason && r.decision !== 'allowed' ? esc(A.why(r.reason)) : '', `<span class="st ${r.decision === 'denied' ? 'no' : 'ok'}">${r.decision === 'denied' ? '✕' : '✓'}</span>${A.txLine(r.h)}`)).join('') : '<p class="note">Nothing signed here yet.</p>');
+    h += `<div class="lead">${idChip(S.charter)}</div><div class="chips">`
+      + (S.state ? `<span class="chip ${S.state.frozen ? 'ice' : 'ok'}">${S.state.frozen ? 'Frozen' : 'Live'} · v${esc(S.state.policy_version)}</span>` : '')
+      + (c ? `<span class="chip">Max ${fmt(c.per_action_cap)}</span><span class="chip">${fmt(c.daily_budget)} / day</span>` : '') + '</div>';
+    details.push(kv('Charter', idChip(S.charter)) + (S.me ? kv('Owner', idChip(S.me)) : '') + (c?.receivers?.length ? kv('Payees', c.receivers.map(r => idChip(r)).join(' ')) : ''));
   }
-  if (cur === 'toll') g += tollGateRows();
-  if (cur === 'hall') g += hallRows();
-  if (cur === 'arena') g += arenaRows();
-  if (cur === 'toll') g += tollRecordRows();
-  d.innerHTML = `<div class="pf" data-testid="guest-proof" data-guest="1">${g}</div>` + (lab ? `<details class="lab"><summary>Lab record · reference, not your charter</summary>${lab}</details>` : '');
+  h += '</section>';
+  // 2. one action
+  let latest = '';
+  if (cur === 'arena' && extra.arenaM) { const r = extra.arenaM.redteamParts(); h += r.action; latest = r.card; if (r.more) details.push(r.more); }
+  else h += '<section class="dz act1"><button type="button" class="go" data-drawer-go data-testid="drawer-action" hidden></button></section>';
+  // 3. latest result
+  const mine = S.charter ? A.receipts().filter(r => (cur === 'house' ? true : r.shop === cur)) : [];
+  if (!latest && cur === 'toll' && extra.tst) { const st = extra.tst; latest = card({ d: st.status === 'confirmed' ? 'allowed' : st.status, title: 'Your visit', why: esc(st.status === 'confirmed' ? 'Proof recorded on NEAR.' : st.final ? 'Final on Base. Settling.' : st.base ? 'Sent. Base finalizing.' : 'Sending to Base.'), link: `<span class="note">#${esc(st.nonce)}</span>` }); }
+  if (!latest && mine[0]) { const r = mine[0]; latest = card({ d: r.decision, amt: r.amt ? fmt(r.amt) : '', to: r.to || '', why: r.decision === 'allowed' ? '' : esc(A.why(r.reason)), link: A.txLine(r.h) }); }
+  h += latest;
+  // 4. history
+  if (S.charter) h += list(cur === 'house' ? 'Your history' : 'Your history here', mine.slice(latest && !(cur === 'toll' && extra.tst) ? 1 : 0, 12).map(r => prow(esc(r.shop) + ' · ' + esc(r.decision), r.reason && r.decision !== 'allowed' ? esc(A.why(r.reason)) : '', `<span class="st ${r.decision === 'denied' ? 'no' : 'ok'}" aria-label="${esc(r.decision)}">${r.decision === 'denied' ? '✕' : '✓'}</span>${A.txLine(r.h, '↗')}`)), 'Nothing signed yet.');
+  if (cur === 'toll') { const t = tollGate(); h += `<section class="dz hist"><h3>Toll gate</h3>${t.list}</section>`; if (t.more) details.push(t.more); }
+  const live = { hall: ['Latest proposals', hallRows], arena: ['Past attacks', arenaRows], toll: ['Toll records', tollRecordRows] }[cur];
+  if (live) { const p = split(live[1]()); h += p.wait ? `<section class="dz hist"><h3>${live[0]}</h3><p class="note">Reading…</p></section>` : list(live[0], p.rows, p.notes[0] ? p.notes[0].replace(/<\/?p[^>]*>/g, '') : 'Nothing yet.'); if (!p.wait && p.rows.length) details.push(...p.notes); }
+  // Details: ids, notes, the lab record
+  if (lab) details.push(`<div class="labrec">${lab}</div>`);
+  if (details.length) h += `<details class="dz more"><summary>Details</summary>${details.join('')}</details>`;
+  d.innerHTML = `<div class="pf dz-wrap" data-testid="guest-proof" data-guest="1">${h}</div>`;
+  queueMicrotask(syncGo);
 }
 
 // ---------- gate: wallet → charter → rules → shop ----------
