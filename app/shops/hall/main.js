@@ -5,6 +5,7 @@
 import { makeConnector, currentAccount, txHashOf, hasGuest, forgetGuest } from '../vault/wallet.js';
 import { rpcClient, viewFn } from '../../../shared/vault/tx.js';
 import { proposalState, stateText } from '../../../shared/townhall/expiry.js';
+import { reputation, tally, votable } from '../../../shared/townhall/reputation.js';
 
 export const DAO = 'r7thmvr8maey.sputnikv2.testnet';
 export const CHARTER = 'townhall.r7thmvr8maey-council2.testnet';
@@ -13,6 +14,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = y => (Number(BigInt(y) / 10n ** 18n) / 1e6) + ' NEAR';
 const b64 = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+let all = [], rewardList = [];
 let CFG, rpc, connector, me = null, policy = null, mineIds = new Set(JSON.parse(sessionStorage.getItem('nearcarta.hall.mine') || '[]'));
 const view = (c, m, a) => viewFn(rpc, c, m, a);
 const explorer = () => CFG?.explorer || 'https://testnet.nearblocks.io';
@@ -32,7 +34,7 @@ export function proposalFor(kind, { me, desc, clause }) {
 
 async function facts() {
   const [p, clauses, st] = await Promise.all([view(DAO, 'get_policy'), view(CHARTER, 'get_clauses'), view(CHARTER, 'get_state')]);
-  policy = p;
+  policy = p; rewardList = clauses.reward?.receivers || [];
   const council = p.roles.find(r => r.name === 'council')?.kind?.Group || [];
   const anyone = p.roles.some(r => r.kind === 'Everyone' && r.permissions.some(x => x === '*:AddProposal'));
   const hours = Number(BigInt(p.proposal_period) / 10n ** 9n) / 3600;
@@ -48,16 +50,28 @@ async function list(want = null) {
   let last = await view(DAO, 'get_last_proposal_id');
   // RPC nodes can lag a just-final tx: wait (up to ~10 s) until the new proposal is listed.
   for (let i = 0; want != null && last <= want && i < 5; i++) { await new Promise(r => setTimeout(r, 2000)); last = await view(DAO, 'get_last_proposal_id'); }
-  const ps = await view(DAO, 'get_proposals', { from_index: Math.max(0, last - 6), limit: 6 });
+  // The whole history (small) feeds the reputation; the list shows the latest 6.
+  all = await view(DAO, 'get_proposals', { from_index: Math.max(0, last - 100), limit: 100 });
+  const ps = all.slice(-6);
   // A proposal past its vote window shows as Expired even though Sputnik keeps InProgress on chain until act_proposal.
   const now = Date.now(), period = policy?.proposal_period ?? (await view(DAO, 'get_policy')).proposal_period;
-  $('#list').innerHTML = `<ul class="props">${ps.reverse().map(p => { const s = proposalState(p, period, now); return `<li class="${mineIds.has(p.id) ? 'mine' : ''}${s.expired ? ' expired' : ''}" data-id="${p.id}" data-status="${esc(s.status)}"><b>#${p.id}</b><span class="st st-${esc(String(s.status).toLowerCase())}" title="${s.expired ? 'Vote window closed; on chain it stays InProgress until someone finalizes it' : ''}">${esc(stateText(s, now))}</span>
-    <span class="muted"> by <code>${esc(p.proposer)}</code> · ${esc(typeof p.kind === 'string' ? p.kind : Object.keys(p.kind)[0])}</span><br>${esc(p.description)}</li>`; }).join('')}</ul>`;
+  const rep = a => reputation(a, all, rewardList);
+  const row = p => { const s = proposalState(p, period, now), t = tally(p, rep), open = votable(p, period, now), mine = me && p.votes && me in p.votes;
+    return `<li class="${mineIds.has(p.id) ? 'mine' : ''}${s.expired ? ' expired' : ''}" data-id="${p.id}" data-status="${esc(s.status)}"><b>#${p.id}</b><span class="st st-${esc(String(s.status).toLowerCase())}" title="${s.expired ? 'Vote window closed; on chain it stays InProgress until someone finalizes it' : ''}">${esc(stateText(s, now))}</span>
+    <span class="muted"> by <code>${esc(p.proposer)}</code> (${esc(rep(p.proposer).tier)}) · ${esc(typeof p.kind === 'string' ? p.kind : Object.keys(p.kind)[0])}</span><br>${esc(p.description)}
+    ${p.kind === 'Vote' ? `<div class="tally" data-testid="tally" data-yes="${t.yes}" data-no="${t.no}">Yes ${t.yes} · No ${t.no}${t.voters.length ? ' · ' + t.voters.map(v => `<code>${esc(v.who)}</code> ${v.vote === 'Approve' ? 'yes' : 'no'} (${esc(v.tier)})`).join(', ') : ''}</div>` : ''}
+    ${open ? (mine ? `<p class="muted" data-testid="voted">You voted ${p.votes[me] === 'Approve' ? 'yes' : 'no'}.</p>`
+      : `<div class="vote"><button type="button" data-vote="VoteApprove" data-id="${p.id}" data-testid="vote-yes" ${me ? '' : 'disabled'}>Vote yes</button> <button type="button" data-vote="VoteReject" data-id="${p.id}" data-testid="vote-no" ${me ? '' : 'disabled'}>Vote no</button>${me ? '' : ' <span class="muted">Start free or connect to vote.</span>'}</div>`) : ''}</li>`; };
+  $('#list').innerHTML = `<p class="muted">Anyone may vote on motions; every vote is on chain and in the tally. Sputnik passes a motion only on the council's 2 votes, and charter changes stay council-only. Tiers come from each account's history in this DAO.</p>
+    ${me ? (r => `<p data-testid="standing">Your standing: <b>${esc(r.tier)}</b> (score ${r.score}: ${r.approved} approved of ${r.filed} filed, ${r.votes} votes${r.listed ? ', on the reward list' : ''}).</p>`)(rep(me)) : ''}
+    <ul class="props">${ps.reverse().map(row).join('')}</ul>`;
   return last;
 }
 
 async function refreshWho() {
+  const was = me;
   me = await currentAccount(connector);
+  if (was !== me && rpc) list().catch(() => {});
   $('#who').innerHTML = me ? `<b data-testid="who">${esc(me)}</b>` : '';
   $('#connect').hidden = !!me; $('#guest').hidden = !!me; $('#signout').hidden = !me;
   $('#file').disabled = !me; $('#file').textContent = me ? 'File proposal' : 'Start free or connect first';
@@ -104,3 +118,20 @@ $('#connect').onclick = () => boot.then(() => connector.connect()).catch(e => lo
 $('#guest').onclick = async () => { const b = $('#guest'); b.disabled = true; b.textContent = 'Asking the testnet faucet…';
   try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { b.disabled = false; b.textContent = 'Start free'; } };
 $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); await refreshWho(); };
+
+async function vote(btn) {
+  const id = Number(btn.dataset.id), action = btn.dataset.vote;
+  const p = all.find(x => x.id === id); if (!p || !me) return;
+  document.querySelectorAll(`[data-vote][data-id="${id}"]`).forEach(b => { b.disabled = true; }); btn.textContent = 'Waiting for your wallet…';
+  try {
+    const w = await connector.wallet();
+    const res = await w.signAndSendTransaction({ receiverId: DAO, actions: [{ type: 'FunctionCall', params: { methodName: 'act_proposal', args: { id, action, proposal: p.kind }, gas: '100000000000000', deposit: '0' } }] });
+    const h = txHashOf(res);
+    const bad = (Array.isArray(res) ? res : [res]).flatMap(r => [r?.status?.Failure, ...(r?.receipts_outcome || []).map(o => o.outcome.status.Failure)]).find(Boolean);
+    if (bad) { const e = new Error(JSON.stringify(bad).match(/panicked: [^"\\]+/)?.[0] || 'the DAO refused the vote'); e.tx = h; throw e; }
+    log(`Voted ${action === 'VoteApprove' ? 'yes' : 'no'} on <b>#${id}</b> on <code>${esc(DAO)}</code>${h ? ' · ' + txl(h) : ''}`, 'ok');
+    $('#result').innerHTML = `<p class="ok" data-testid="voted-tx" data-id="${id}" data-tx="${esc(h || '')}">Your vote on #${id} is on chain${h ? ' · ' + txl(h) : ''}.</p>`;
+  } catch (err) { log(`<b>Vote stopped:</b> ${esc(err.message)}${err.tx ? ' · ' + txl(err.tx) : ''}`, 'bad err'); }
+  finally { await new Promise(r => setTimeout(r, 1500)); await list(); }
+}
+$('#list').addEventListener('click', e => { const b = e.target.closest('button[data-vote]'); if (b) boot.then(() => vote(b)); });

@@ -11,3 +11,4 @@
 .props li.expired{border-style:dashed}
 .props .st-expired{color:var(--c-brass)}
 .props .st-inprogress{color:var(--c-accent-text)}
+.tally{font-size:13px;margin-top:6px}.vote{margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
