@@ -15,3 +15,4 @@ code{font-size:12px;word-break:break-all;color:var(--mute)}
 .warn{color:#e0a84a}
 form button.ghost{background:transparent;color:var(--amber);border:1px solid var(--amber)}
 #wallet{display:inline-flex;gap:6px;align-items:center;vertical-align:middle}#wallet .pill{background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:3px 10px;border-radius:999px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none}#wallet .pill.go{background:var(--amber);color:#2b1a0c;border-color:var(--amber);font-weight:600}
+.links a{display:inline-block;min-height:24px;line-height:24px}
