@@ -1,0 +1,102 @@
+{
+ "checked_at": "2026-11-03T02:58:12.180Z",
+ "rows": [
+  {
+   "charter": "arenapool0-d3nd.nccharters-53836.testnet",
+   "owner": "r2rcv.testnet",
+   "capped_before": 1,
+   "tx": "78az6bJLNmXjiv6Z2GAYHtNYfvr2ze9bsxZDMPJ4A9FK",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "arenapool1-5plv.nccharters-53836.testnet",
+   "owner": "r2rcv.testnet",
+   "capped_before": 1,
+   "tx": "99gBB2dyjFtsokdGhZ7nsHhriHYxUKm7ghHBFzamKeEu",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "arenapool2-rfyw.nccharters-53836.testnet",
+   "owner": "r2rcv.testnet",
+   "capped_before": 1,
+   "tx": "Gpr5mxDx9Yin57NLeFCAGpKJQqmgM8ZEeamFdQUPodVJ",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "arenapool3-neex.nccharters-53836.testnet",
+   "owner": "r2rcv.testnet",
+   "capped_before": 1,
+   "tx": "DTXLehZKgNfF2o1fCDmzKDQDFCRQrWjCBpG2XivqFLFa",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "arena.nccharters-53681.testnet",
+   "owner": "ncarena-53681.testnet",
+   "capped_before": 1,
+   "tx": "3pR3X2XrrWGszYRNQW2yUSV67k5tEmnDWGuP5cuLMAxm",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "redteam.nccharters-53681.testnet",
+   "owner": "ncarena-53681.testnet",
+   "capped_before": 1,
+   "tx": "9mcd1xdhPyPwr37HFuW27KQXYkka562wDoxQ7SUVzXUi",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "arena.nccharters-17102.testnet",
+   "owner": "ncarena-17102.testnet",
+   "capped_before": 1,
+   "tx": "4AnVwMUHtReVW2MXvhx735Z3V2AsmRBBP443TwPo1xRb",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "arena.nccharters-85831.testnet",
+   "owner": "ncarena-85831.testnet",
+   "capped_before": 1,
+   "tx": "CF9oq257Aeo3GKqtcgj3MNsQG68uVsiTJmVW3kXzzmZF",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "r11oath-82930.testnet",
+   "owner": "r11own-82930.testnet",
+   "capped_before": 1,
+   "tx": "AokHpHPwDJJA3DL2d6NTRVeemuEebh5RBCK5XWHUDnzC",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "c5oath.r14own-46135.testnet",
+   "owner": "r14own-46135.testnet",
+   "capped_before": 1,
+   "tx": "5CXfhCod5Fs3eSFy8RU5B8r4HEEFhqGwn5kM4KfSEKbP",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "r16oath.r14own-46135.testnet",
+   "owner": "r14own-46135.testnet",
+   "capped_before": 1,
+   "tx": "DyGe27bnYAaqR3RWp7Zx343DJBSm2ivkwxr8ffGAz3mw",
+   "ok": true,
+   "capped_after": 0
+  },
+  {
+   "charter": "r11house-31474.testnet",
+   "owner": "r11hown-31474.testnet",
+   "capped_before": 1,
+   "tx": "4LkqgSBqCYP1167BtNbp3SQS1qtQE1BgzdDeV9sUUwtL",
+   "ok": true,
+   "capped_after": 0
+  }
+ ],
+ "rows_note": "Every capped agent key on a charter we own was revoked with the owner-only revoke_agent. The live shared runner uses R18 keys with allowance null (shared/deployments/testnet.json vault.arena)."
+}

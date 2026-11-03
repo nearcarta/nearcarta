@@ -5,7 +5,9 @@
 // tx is read from the gate and broadcast; after Base finality the guest calls settle and the MPC foreign-tx proof
 // makes the record confirmed. A second guest whose max per payment is below the toll is refused by its charter,
 // and the gate refuses that action, a replay, a charter action that was not a toll payment, and an account that is
-// not from one of the gate's factories. FACTORY picks the guest's charter factory (default: the current R17 one).
+// not from one of the gate's factories. Agent key allowance: ALLOWANCE (NEAR, default 0.5, which the R17 factory's code needs);
+// ALLOWANCE=null gives an uncapped key on an R18 charter (only once a gate lists an R18 factory; gate lists are fixed at init).
+// FACTORY picks the guest's charter factory (default: the current R17 one).
 // Usage (testnet only): GATE=gate.<owner>.testnet KEYS=.secrets/toll-visitor/guests.json OUT=judges/proofs/toll-visitor.json node backend/scripts/toll-visitor.js
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { rpcClient, viewFn, keyFrom, signTx, functionCall, sendPropose, outcomeOf } from '../../shared/vault/tx.js';
@@ -61,7 +63,7 @@ async function guest(tag, cap) {
     const clause = { asset: 'Native', receivers: [PAYEE, 'books.ncpub-17102.testnet', g.id], per_action_cap: toY(cap), daily_budget: toY(0.2), window_start_min: 0, window_end_min: 0,
       requires_receipt: false, escalation_max: null, min_amount: toY(0.001), max_actions_per_day: 8 };
     const r = await send(g.id, g.secret, g.charter, [functionCall('set_clause', { clause_id: 'pay', clause }, 40n * 10n ** 12n),
-      functionCall('set_agent_key', { public_key: keyFrom(g.agent).publicKey, allowance: (5n * 10n ** 23n).toString() }, 60n * 10n ** 12n)]);
+      functionCall('set_agent_key', { public_key: keyFrom(g.agent).publicKey, allowance: E.ALLOWANCE === 'null' ? null : (BigInt(Math.round(+(E.ALLOWANCE || 0.5) * 1e6)) * 10n ** 18n).toString() }, 60n * 10n ** 12n)]);
     return { ...r, rules: { per_action_cap: clause.per_action_cap, daily_budget: clause.daily_budget, receivers: clause.receivers }, logs: undefined };
   });
   const asked = await step(`${tag}_agent_asks_toll`, async () => {

@@ -1,3 +1,5 @@
+// R18: the agent key gets no gas allowance by default (a capped key locks out for good once its gas runs out).
+// Needs oath.r18.wasm (or newer); older builds panic ERR_ALLOWANCE_ZERO on null, so set ALLOWANCE=<NEAR> for them.
 // Town Hall on the R16.1 charter (R16 oath + propose_batch). One batch from a council member
 // creates the account, funds it, deploys contracts/artifacts/oath.r16_1.wasm and calls
 // new{owner: DAO, dao: DAO}: the account never has a full-access key. The DAO then votes the
@@ -75,7 +77,7 @@ const clause = { asset: 'Native', receivers: RECV, per_action_cap: NEAR(0.05), d
   max_actions_per_day: 10, min_receiver_age_days: 0, code_hash_pins: {} };
 await voted('p1_dao_votes_round', [
   ['set_clause', { clause_id: 'reward', clause }],
-  ['set_agent_key', { public_key: agentPub, allowance: NEAR(0.25) }, '0', TG(60)],
+  ['set_agent_key', { public_key: agentPub, allowance: (process.env.ALLOWANCE ? NEAR(+process.env.ALLOWANCE) : null) }, '0', TG(60)],
   ['set_policy_delay', { delay_ns: String(600n * 10n ** 9n) }],
 ], CH, 'Town Hall R16.1: reward round up to 0.05 NEAR each to 3 listed contributors, 0.1 NEAR a day in total; agent key may only propose or propose_batch');
 

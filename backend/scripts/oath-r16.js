@@ -1,3 +1,5 @@
+// R18: the agent key gets no gas allowance by default (a capped key locks out for good once its gas runs out).
+// Needs oath.r18.wasm (or newer); older builds panic ERR_ALLOWANCE_ZERO on null, so set ALLOWANCE=<NEAR> for them.
 // Fresh R16 oath charter on testnet: one batch from the owner creates <name>.<owner>, funds it, deploys the
 // reproducible contracts/artifacts/oath.r16.wasm and calls new(..., setup_window: true). The charter account
 // never gets a full-access key. Then live proofs of the R16 changes:
@@ -53,7 +55,7 @@ async function propose(step, name, receiver, amount, expect, { clause = 'pay', t
 }
 
 // ---- deploy: one batch, no full-access key on the charter account ----
-const wasm = readFileSync(new URL('../../contracts/artifacts/oath.r16.wasm', import.meta.url));
+const wasm = readFileSync(new URL('../../' + (process.env.WASM || 'contracts/artifacts/oath.r16.wasm'), import.meta.url));
 if (!E.SKIP_DEPLOY) {
   const dep = { step: 'deploy_batch', signer: OWNER, wasm_sha256: sha(wasm), wasm_bytes: wasm.length, init: { owner: OWNER, dao: null, policy_delay_ns: String(DELAY_S * 1e9), storage_reserve: null, setup_window: true } };
   outcome(dep, await owner.signAndSendTransaction({ receiverId: C, waitUntil: 'FINAL', throwOnFailure: false, actions: [
@@ -71,7 +73,7 @@ const exp1 = String((BigInt(Date.now()) + 3600n * 1000n) * 1_000_000n);
 await gov('rule_set_expiry_1h', 'set_clause_expiry', { clause_id: 'pay', expires_at: exp1 }, 'applied (narrowing)');
 for (const k of ['k1', 'k2']) if (!AK[k]) { const kp = KeyPair.fromRandom('ed25519'); AK[k] = { public_key: kp.getPublicKey().toString(), private_key: kp.toString() }; }
 saveKeys();
-await gov('agent_key_k1', 'set_agent_key', { public_key: AK.k1.public_key, allowance: N(0.25) }, 'applied; closes setup');
+await gov('agent_key_k1', 'set_agent_key', { public_key: AK.k1.public_key, allowance: (process.env.ALLOWANCE ? N(+process.env.ALLOWANCE) : null) }, 'applied; closes setup');
 await keysLog('charter_keys_with_k1');
 await vlog('rules_pay', 'get_rules', { clause_id: 'pay' });
 
@@ -84,7 +86,7 @@ await propose('p_unknown_clause', 'k1', RCV, N(0.01), 'denied unknown_clause', {
 await vlog('reputation_after_5', 'get_reputation');
 
 // ---- atomic rotation: k1 -> k2 after the timelock; the old key is deleted in the AddKey batch ----
-const q = await gov('rotate_queue_k2', 'set_agent_key', { public_key: AK.k2.public_key, allowance: N(0.25) }, 'queued (timelock)');
+const q = await gov('rotate_queue_k2', 'set_agent_key', { public_key: AK.k2.public_key, allowance: (process.env.ALLOWANCE ? N(+process.env.ALLOWANCE) : null) }, 'queued (timelock)');
 const pend = await vlog('pending_rotation', 'get_pending');
 const cid = Object.keys(pend)[0];
 await gov('rotate_execute_too_early', 'execute_change', { change_id: cid }, 'ERR_TIMELOCK_NOT_READY');

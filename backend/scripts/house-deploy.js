@@ -1,3 +1,5 @@
+// R18: the agent key gets no gas allowance by default (a capped key locks out for good once its gas runs out).
+// Needs oath.r18.wasm (or newer); older builds panic ERR_ALLOWANCE_ZERO on null, so set ALLOWANCE=<NEAR> for them.
 // Deploys a second charter on the same R11 wasm for Your House, so the owner's wallet can freeze
 // and approve without touching the main Guardhouse charter (whose freeze only the DAO can undo).
 // No DAO is set here, so the owner can also unfreeze. Ends with 0 full-access keys, like R11.
@@ -37,7 +39,7 @@ tx.set_clause = await send(owner, house.accountId, [call('set_clause', { clause_
   asset: 'Native', receivers: [DEP.guardhouse.allowed_receiver], per_action_cap: NEAR(0.01), daily_budget: NEAR(0.2),
   window_start_min: 0, window_end_min: 0, requires_receipt: false, escalation_max: NEAR(0.05), min_amount: NEAR(0.001),
   max_actions_per_day: 20, min_receiver_age_days: 0, code_hash_pins: {} } })]);
-tx.set_agent_key = await send(owner, house.accountId, [call('set_agent_key', { public_key: agentPub, allowance: NEAR(0.25) })]);
+tx.set_agent_key = await send(owner, house.accountId, [call('set_agent_key', { public_key: agentPub, allowance: (process.env.ALLOWANCE ? NEAR(+process.env.ALLOWANCE) : null) })]);
 tx.policy_delay_90s = await send(owner, house.accountId, [call('set_policy_delay', { delay_ns: String(90n * 10n ** 9n) })]);
 tx.full_access_key_deleted = await send(house, house.accountId, [actions.deleteKey(KeyPair.fromString(houseKey.private_key).getPublicKey())]);
 const dep = JSON.parse(readFileSync(new URL('../../shared/deployments/testnet.json', import.meta.url), 'utf8'));

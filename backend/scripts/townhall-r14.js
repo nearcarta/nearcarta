@@ -1,3 +1,5 @@
+// R18: the agent key gets no gas allowance by default (a capped key locks out for good once its gas runs out).
+// Needs oath.r18.wasm (or newer); older builds panic ERR_ALLOWANCE_ZERO on null, so set ALLOWANCE=<NEAR> for them.
 // Town Hall on the R14 charter. The Sputnik DAO itself creates the charter through the factory
 // (one voted proposal), then votes the clause, the agent key and the DAO lock (a second proposal).
 // The charter account is created by the factory with the global R14 code, so it never has a
@@ -65,7 +67,7 @@ const clause = { asset: 'Native', receivers: [E.ALICE_ID], per_action_cap: NEAR(
   max_actions_per_day: 10, min_receiver_age_days: 0, code_hash_pins: {} };
 await voted('p2_dao_votes_rule', [
   ['set_clause', { clause_id: 'reward', clause }],
-  ['set_agent_key', { public_key: agentPub, allowance: NEAR(0.25) }, '0', TG(60)],
+  ['set_agent_key', { public_key: agentPub, allowance: (process.env.ALLOWANCE ? NEAR(+process.env.ALLOWANCE) : null) }, '0', TG(60)],
   ['set_dao', { dao: DAO }],
   ['set_policy_delay', { delay_ns: String(600n * 10n ** 9n) }],
 ], CH, 'Town Hall rule: rewards up to 0.05 NEAR to listed contributors, 0.2 NEAR a day; agent key may only propose');

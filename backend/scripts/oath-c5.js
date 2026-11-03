@@ -1,3 +1,5 @@
+// R18: the agent key gets no gas allowance by default (a capped key locks out for good once its gas runs out).
+// Needs oath.r18.wasm (or newer); older builds panic ERR_ALLOWANCE_ZERO on null, so set ALLOWANCE=<NEAR> for them.
 // C5 hidden rules on testnet: one batch from the owner creates <name>.<owner>, funds it, deploys the
 // reproducible contracts/artifacts/oath.c5.wasm and calls new(..., setup_window: true). No full-access key.
 // Then: a visible clause, a sealed hidden rule (only its sha256 commitment goes on chain), two proposals that
@@ -20,7 +22,7 @@ const owner = new Account(OWNER, provider, KeyPairSigner.fromSecretKey(OWN.priva
 const N = x => (BigInt(Math.round(x * 1e6)) * 10n ** 18n).toString();
 const TG = t => BigInt(t) * 10n ** 12n;
 const sha = b => crypto.createHash('sha256').update(b).digest('hex');
-const WASM = 'contracts/artifacts/oath.c5.wasm';
+const WASM = process.env.WASM || 'contracts/artifacts/oath.c5.wasm';
 const AK = existsSync(E.AGENT_OUT) ? JSON.parse(readFileSync(E.AGENT_OUT, 'utf8')) : {};
 const saveKeys = () => writeFileSync(E.AGENT_OUT, JSON.stringify(AK), { mode: 0o600 });
 const log = []; const save = () => writeFileSync(E.OUT, JSON.stringify({ charter: C, owner: OWNER, wasm: WASM, steps: log }, null, 1));
@@ -75,7 +77,7 @@ await gov('seal_rule', 'seal_rule', { clause_id: 'tip', commitment }, 'applied (
 await vlog('get_seal', 'get_seal', { clause_id: 'tip' });
 if (!AK.k1) { const kp = KeyPair.fromRandom('ed25519'); AK.k1 = { public_key: kp.getPublicKey().toString(), private_key: kp.toString() }; }
 saveKeys();
-await gov('agent_key_k1', 'set_agent_key', { public_key: AK.k1.public_key, allowance: N(0.25) }, 'applied; closes setup');
+await gov('agent_key_k1', 'set_agent_key', { public_key: AK.k1.public_key, allowance: (process.env.ALLOWANCE ? N(+process.env.ALLOWANCE) : null) }, 'applied; closes setup');
 await keysLog('charter_keys_with_k1');
 await vlog('rules_tip', 'get_rules', { clause_id: 'tip' });
 
