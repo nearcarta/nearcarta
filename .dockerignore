@@ -6,4 +6,5 @@
 !backend/src/**
 !shared/**
 !judges/proofs/mistbank-payout.json
+!judges/proofs/payroll-usdc.json
 !backend/data/**
