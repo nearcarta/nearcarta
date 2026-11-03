@@ -338,6 +338,7 @@ function proofDrawer() {
   else {
     h += `<div class="lead">${idChip(S.charter)}</div><div class="chips">`
       + (S.state ? `<span class="chip ${S.state.frozen ? 'ice' : 'ok'}">${S.state.frozen ? 'Frozen' : 'Live'} · v${esc(S.state.policy_version)}</span>` : '')
+      + (A.pendingNote() ? `<span class="chip" data-testid="pending-chip">${esc(A.pendingNote())}</span>` : '')
       + (c ? `<span class="chip">Max ${fmt(c.per_action_cap)}</span><span class="chip">${fmt(c.daily_budget)} / day</span>` : '') + '</div>';
     details.push(kv('Charter', idChip(S.charter)) + (S.me ? kv('Owner', idChip(S.me)) : '') + (c?.receivers?.length ? kv('Payees', c.receivers.map(r => idChip(r)).join(' ')) : ''));
   }
@@ -373,6 +374,12 @@ function paint() {
   if (st === 'connect') { say('Connect to begin.'); form(''); hero(null); btn('Connect wallet'); return; }
   if (st === 'build') { say('First I need a charter you own.'); form(''); hero(null); btn('Build my charter'); return; }
   if (st === 'rules') { say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return; }
+  if (st === 'wait') { say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(''); hero(null); btn('Check again'); return; }
+  if (st === 'key') { const q = A.pendingKey(); form(''); hero(null);
+    if (q && Date.now() >= q.eta) { say('Your helper key is ready to turn on.'); btn('Turn on helper key'); }
+    else if (q) { say(`Your charter is fine. This browser's helper key starts ${esc(new Date(q.eta).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}.`); btn('Check again'); }
+    else { say('Your charter is fine. This browser has no helper key yet.'); btn('Add a helper key'); }
+    return; }
   if (phase === 'idle') say(app.idle);
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
   btn(typeof app.btn === 'function' ? app.btn() : app.btn);
@@ -381,6 +388,8 @@ async function primary(auto = false) {
   if (phase === 'busy' || !cur) return; const st = A.stage(); if (!auto) sfx('click');
   if (st === 'connect') return A.connect().then(paint).catch(fail);
   if (st === 'rules') return openRules();
+  if (st === 'wait' || st === 'key') { phase = 'busy'; btn(st === 'key' && !A.pendingKey() ? 'Approve in your wallet…' : 'Checking…', 'primary busy', true);
+    try { if (st === 'key' && !(A.pendingKey() && Date.now() < A.pendingKey().eta)) { const r = await A.helperKey(); rcpt(A.txLine(r.tx, 'helper key')); } else await A.readRules(); phase = 'idle'; paint(); } catch (e) { fail(e); } return; }
   phase = 'busy'; btn(st === 'build' ? 'Approve in your wallet…' : 'Asking your charter…', 'primary busy', true); say(st === 'build' ? 'Building your charter…' : 'Asking your charter on chain…'); rcpt(''); if (st !== 'build') progress(cur);
   try {
     if (st === 'build') { const r = await A.buildCharter(); phase = 'idle'; rcpt(A.txLine(r.tx, 'charter built')); paint(); openRules(); return; }
@@ -430,10 +439,13 @@ async function signRules() {
   const rec = [...document.querySelectorAll('input[name=rcv]:checked')].map(i => i.value).concat($('#r-custom').value.split(',').map(s => s.trim()).filter(Boolean));
   const r = { receivers: [...new Set(rec)], cap: v('#r-cap'), budget: v('#r-bud'), count: v('#r-cnt'), min: v('#r-min'), ws: v('#r-ws'), we: v('#r-we') === 1440 && v('#r-ws') === 0 ? 0 : v('#r-we'),
     routes: [...document.querySelectorAll('input[name=rt]:checked')].map(i => i.value), ferryCap: v('#r-fcap') };
-  const b = $('#r-sign'); b.disabled = true; b.textContent = 'Approve in your wallet…'; $('#r-status').innerHTML = '';
-  try { const o = await A.signRules(r); $('#r-status').innerHTML = `<span class="rule ok">✓ ${o.queued ? 'signed · loosening queued' : 'signed · in force now'}</span> ${A.txLine(o.tx)}`; b.textContent = 'Signed'; sfx('allowed');
+  const b = $('#r-sign'); b.disabled = true; b.textContent = 'Signing…';
+  const STEPS = ['Approve in your wallet', 'Writing your rules to NEAR', 'Checking them on chain'], t0 = Date.now();
+  const show = i => { $('#r-status').innerHTML = `<ol class="steps" data-testid="sign-steps" aria-live="polite">${STEPS.map((x, j) => `<li class="${j < i ? 'done' : j === i ? 'now' : ''}">${j < i ? '✓' : j === i ? '●' : '○'} ${x}${j === i && i > 0 ? ` · ${Math.round((Date.now() - t0) / 1000)} s` : ''}</li>`).join('')}</ol>`; };
+  let step = 0; show(0); const tick = setInterval(() => { if (step === 0 && Date.now() - t0 > 2500) step = 1; if (step === 1 && Date.now() - t0 > 15000) step = 2; show(step); }, 1000);
+  try { const o = await A.signRules(r).finally(() => clearInterval(tick)); $('#r-status').innerHTML = `<span class="rule ok">✓ ${o.queued ? 'signed · looser limits start ' + esc(A.pendingNote().replace(/^.*from /, '')) : 'signed · in force now'}</span> ${A.txLine(o.tx)}`; b.textContent = 'Signed'; sfx('allowed');
     setTimeout(() => { closeRules(); phase = 'idle'; paint(); rcpt(A.txLine(o.tx, 'rules signed')); }, 900);
-  } catch (e) { $('#r-status').innerHTML = `<span class="rule no">✕ ${esc(A.plainError(e).slice(0, 140))}</span>`; b.disabled = false; b.textContent = 'Try again'; }
+  } catch (e) { clearInterval(tick); $('#r-status').innerHTML = `<span class="rule no">✕ ${esc(A.plainError(e).slice(0, 140))}</span>`; b.disabled = false; b.textContent = 'Try again'; }
 }
 
 // ---------- wiring ----------
