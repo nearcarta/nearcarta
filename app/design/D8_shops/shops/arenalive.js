@@ -9,7 +9,7 @@ const ST = { refused: ['no', '✕'], held: ['ice', '❄'], allowed: ['ok', '✓'
 export function promptRows(ps = [], max = 31) {
   return ps.slice(0, max).map(p => { const [c, ic] = ST[p.outcome] || ST.refused;
     const k = p.prompt ? `“${p.prompt}”` : `#${p.id} · sealed (${p.sealed})`;
-    const why = `#${p.id} · ${p.pattern || 'attempt'} · ${p.verdict}${p.settled ? ' · ' + p.settled : ''}`;
+    const why = `#${p.id} · ${p.source === 'seeded' ? 'seeded (scripted, no model)' : 'player'} · ${p.pattern || 'attempt'} · ${p.verdict}${p.settled ? ' · ' + p.settled : ''}`;
     return `<div class="row" data-testid="arena-prompt"><div class="k">${esc(k)}<span class="why">${esc(why)}</span></div><div class="v"><span class="st ${c}"><span aria-hidden="true">${ic}</span>${esc(p.outcome)}</span>${TX(p.decision)}${p.reveal ? ' <span class="why">reveal</span> ' + TX(p.reveal) : ''}</div></div>`; }).join('');
 }
 export async function livePrompts(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, ''), bare = false) {
@@ -17,7 +17,7 @@ export async function livePrompts(fetchFn = globalThis.fetch, base = (globalThis
     const r = await fetchFn(base + '/api/arena/prompts', { signal: c.signal }).finally(() => clearTimeout(t)); if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     const parts = [h3(`Past prompts · live read · ${d.shown} of ${d.count} shown`), promptRows(d.prompts),
-      note('Each prompt is shown only when its sha256 matches the commitment on chain. The first link is the decision tx; the second is the reveal.')];
+      note('Seeded rows were written by our own scripts with a scripted agent, not a model. Live model runs are the “Run it live” attacks above. Each prompt is shown only when its sha256 matches the commitment on chain. The first link is the decision tx; the second is the reveal.')];
     return bare ? parts.join('') : proof(...parts); }
   catch { const n = note('The past prompts could not be read just now.'); return bare ? n : proof(n); }
 }
@@ -43,7 +43,7 @@ export function redteamParts() {
   const ev = r.event?.data?.[0] || {}, dec = ev.decision || r.decision, ok = dec === 'allowed';
   const reason = ev.reason ? ev.reason.replace(/_/g, ' ') : r.suspicious ? 'flagged as an attack' : '';
   const card = `<section class="dz"><h3>Latest result</h3><article class="card ${ok ? 'ok' : 'no'}" data-testid="redteam-result" data-decision="${esc(dec || '')}" data-tx="${esc(r.tx || '')}">
-    <div class="ch"><span class="badge ${ok ? 'ok' : 'no'}">${ok ? '✓ Allowed' : '✕ Denied'}</span><b class="amt">${esc(r.receipt?.price_near ?? '?')} NEAR</b></div>
+    <div class="ch"><span class="badge ${ok ? 'ok' : 'no'}">${ok ? '✓ Allowed' : '✕ Denied'}</span><span class="why" data-testid="redteam-live">live model run</span><b class="amt">${esc(r.receipt?.price_near ?? '?')} NEAR</b></div>
     <p class="to">to <b title="${esc(r.receiver || '')}">${esc(sh(r.receiver || ''))}</b></p>${reason ? `<p class="why">${esc(reason[0].toUpperCase() + reason.slice(1))}</p>` : ''}
     <div class="lk">${r.tx ? TX({ tx: r.tx, url: r.url }) : '<span class="note">Event finalizing</span>'}</div></article></section>`;
   const more = `<div class="kv"><span>Model</span><span>${esc(r.model || r.by || '')}</span></div><div class="kv"><span>TEE reply</span><span>${r.verification?.verified ? 'verified' : 'not verified'}</span></div>`

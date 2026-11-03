@@ -13,13 +13,15 @@ const sha = s => createHash('sha256').update(s).digest('hex');
 export const OUTCOME = v => v === 'ALLOW' ? 'allowed' : v === 'C0_FROZEN' ? 'held' : 'refused';
 export function joinPrompts(chain, corpus = PAST) {
   const by = new Map(corpus.map(p => [p.id, p]));
-  return chain.map(a => { const p = by.get(a.id) || {};
+  return chain.map(a => { const seeded = by.has(a.id), p = by.get(a.id) || {};
     const match = !!p.prompt && sha(p.prompt) === a.prompt_hash_hex;
     const tx = h => h ? { tx: h, url: explorerTx(h) } : null;
     return { id: a.id, player: a.player, token_id: a.token_id, prompt_hash_hex: a.prompt_hash_hex, revealed_on_chain: !!a.revealed,
       prompt: match && a.revealed ? p.prompt : null, sealed: !match || !a.revealed ? (p.key === 'B1_bounty' ? 'bounty secret, kept sealed' : 'not revealed') : null,
       pattern: p.pattern || null, verdict: a.verdict ?? p.verdict ?? null, outcome: OUTCOME(a.verdict ?? p.verdict), settled: p.settled || null,
-      decision: tx(p.decision_tx), attempt: tx(p.attempt_tx), reveal: tx(p.reveal_tx) }; });
+      decision: tx(p.decision_tx), attempt: tx(p.attempt_tx), reveal: tx(p.reveal_tx),
+      // seeded: written by our scripts (backend/scripts/arena-*.js) with a scripted agent, no model call; player: anyone else
+      source: seeded ? 'seeded' : 'player' }; });
 }
 let cache = null;
 export async function pastPrompts(v = view, now = Date.now()) {
@@ -31,7 +33,8 @@ export async function pastPrompts(v = view, now = Date.now()) {
   };
   const [live, v1] = await Promise.all([read(ARENA, PAST), read(ARENA_V1, PAST_V1)]);
   const prompts = [...live, ...v1];
-  const body = { contract: ARENA, history_contract: ARENA_V1, standard: 'NEP-245 (mt_transfer, mt_batch_transfer, mt_transfer_call, mt_resolve_transfer)', count: prompts.length, shown: prompts.filter(p => p.prompt).length, prompts,
+  const body = { contract: ARENA, history_contract: ARENA_V1, standard: 'NEP-245 (mt_transfer, mt_batch_transfer, mt_transfer_call, mt_resolve_transfer)', count: prompts.length, seeded: prompts.filter(p => p.source === 'seeded').length,
+    source_note: 'seeded = attempts our scripts wrote with a scripted agent (no model call). Live model runs are the red-team and Ask runs on the shared charter (POST /api/vault/ask), not listed here.', shown: prompts.filter(p => p.prompt).length, prompts,
     rule: 'prompt text shown only when sha256(prompt) equals the on-chain commitment and the attempt is revealed on chain' };
   cache = { at: now, body }; return body;
 }
