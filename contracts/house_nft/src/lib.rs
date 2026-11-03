@@ -31,6 +31,10 @@ pub struct Contract {
     tokens: NonFungibleToken,
     metadata: LazyOption<NFTContractMetadata>,
     purses: LookupMap<TokenId, Purse>,
+    /// The deployer: may only close the contract, and only while no purse holds NEAR.
+    owner: AccountId,
+    /// Sum of every purse balance (user money); close() refuses while it is above 0.
+    held: u128,
 }
 
 /// Storage the minter pays for: the token, its metadata and the purse (about 1 KB; 0.02 NEAR covers it).
@@ -40,7 +44,8 @@ const MAX_CAP: u128 = 10u128.pow(24) * 5; // 5 NEAR per payment at most
 #[near]
 impl Contract {
     #[init]
-    pub fn new() -> Self {
+    /// `owner`: who may close the contract (all its NEAR goes there); defaults to the caller.
+    pub fn new(owner: Option<AccountId>) -> Self {
         let metadata = NFTContractMetadata {
             spec: NFT_METADATA_SPEC.to_string(),
             name: "Nearcarta House deeds v2".to_string(),
@@ -51,6 +56,8 @@ impl Contract {
             tokens: NonFungibleToken::new(Key::Owner, env::current_account_id(), Some(Key::Meta), Some(Key::Enum), Some(Key::Approval)),
             metadata: LazyOption::new(Key::ContractMeta, Some(&metadata)),
             purses: LookupMap::new(Key::Purse),
+            owner: owner.unwrap_or_else(env::predecessor_account_id),
+            held: 0,
         }
     }
 
@@ -72,6 +79,7 @@ impl Contract {
             updated_at: None, extra: None, reference: None, reference_hash: None,
         };
         let id = who.to_string();
+        self.held += dep - MINT_STORAGE.as_yoctonear();
         self.purses.insert(&id, &Purse { balance: U128(dep - MINT_STORAGE.as_yoctonear()), cap: U128(cap), paid: U128(0), pays: 0, refused_note: None });
         self.tokens.internal_mint(id, who, Some(meta))
     }
@@ -83,6 +91,7 @@ impl Contract {
         let dep = env::attached_deposit().as_yoctonear();
         require!(dep > 0, "attach NEAR to fund the house");
         p.balance = U128(p.balance.0 + dep);
+        self.held += dep;
         self.purses.insert(&token_id, &p);
         log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_fund\",\"data\":[{{\"token_id\":\"{}\",\"from\":\"{}\",\"amount\":\"{}\"}}]}}", token_id, env::predecessor_account_id(), dep);
         p.balance
@@ -100,6 +109,7 @@ impl Contract {
         require!(amount.0 <= p.cap.0, "over the deed's cap per payment");
         require!(amount.0 <= p.balance.0, "the house purse is too small");
         p.balance = U128(p.balance.0 - amount.0);
+        self.held -= amount.0;
         self.purses.insert(&token_id, &p);
         Promise::new(receiver_id.clone()).transfer(NearToken::from_yoctonear(amount.0)).then(
             Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(5)).on_house_pay(token_id, receiver_id, amount))
@@ -114,6 +124,7 @@ impl Contract {
             log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_pay\",\"data\":[{{\"token_id\":\"{}\",\"to\":\"{}\",\"amount\":\"{}\"}}]}}", token_id, receiver_id, amount.0);
         } else {
             p.balance = U128(p.balance.0 + amount.0); // the transfer bounced: the purse gets it back
+            self.held += amount.0;
         }
         self.purses.insert(&token_id, &p);
         ok
@@ -128,6 +139,19 @@ impl Contract {
         let mut p = self.purses.get(&token_id).unwrap();
         require!(cap.0 > 0 && cap.0 <= p.cap.0, "the cap can only go down");
         p.cap = cap; self.purses.insert(&token_id, &p);
+    }
+
+    /// NEAR held for deed holders across all purses (user money).
+    pub fn house_held(&self) -> U128 { U128(self.held) }
+
+    /// Teardown: the deployer (1 yocto, full-access key) deletes this account and takes back the storage
+    /// stake, but only once every purse is empty, so no holder's NEAR can ever be taken.
+    #[payable]
+    pub fn close(&mut self) -> Promise {
+        assert_one_yocto();
+        require!(env::predecessor_account_id() == self.owner, "only the deployer may close");
+        require!(self.held == 0, "purses still hold NEAR: holders must spend it first");
+        Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
 
     pub fn house_purse(&self, token_id: TokenId) -> Option<Purse> { self.purses.get(&token_id) }
@@ -197,7 +221,7 @@ mod tests {
 
     #[test]
     fn mint_own_deed_sets_owner_and_metadata() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         ctx(1, 2 * 10u128.pow(22));
         let t = c.mint_deed(Some("r11house-31474.testnet".parse().unwrap()), None);
         assert_eq!(t.token_id, accounts(1).to_string());
@@ -212,7 +236,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "this account already has a deed")]
     fn second_deed_for_same_account_is_refused() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         ctx(1, 2 * 10u128.pow(22)); c.mint_deed(None, None);
         ctx(1, 2 * 10u128.pow(22)); c.mint_deed(None, None);
     }
@@ -221,7 +245,7 @@ mod tests {
 
     #[test]
     fn holder_pays_under_cap_and_purse_moves_with_the_deed() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         let id = accounts(1).to_string();
         ctx(1, 10u128.pow(24)); c.mint_deed(None, Some(U128(10u128.pow(23))));
         assert_eq!(c.house_purse(id.clone()).unwrap().balance.0, 10u128.pow(24) - 2 * 10u128.pow(22));
@@ -234,7 +258,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "only the deed holder")]
     fn old_owner_refused_after_transfer() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         let id = accounts(1).to_string();
         ctx(1, 10u128.pow(24)); c.mint_deed(None, None);
         yocto(1, 1); c.nft_transfer(accounts(2), id.clone(), None, None);
@@ -244,7 +268,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "over the deed's cap")]
     fn over_cap_refused() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         ctx(1, 10u128.pow(24)); c.mint_deed(None, Some(U128(10u128.pow(22))));
         yocto(1, 1); let _ = c.house_pay(accounts(1).to_string(), accounts(4), U128(2 * 10u128.pow(22)));
     }
@@ -252,14 +276,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
     fn pay_without_one_yocto_refused() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         ctx(1, 10u128.pow(24)); c.mint_deed(None, None);
         ctx(1, 0); let _ = c.house_pay(accounts(1).to_string(), accounts(4), U128(10u128.pow(22)));
     }
 
     #[test]
     fn anyone_funds_and_cap_only_goes_down() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         let id = accounts(1).to_string();
         ctx(1, 2 * 10u128.pow(22)); c.mint_deed(None, None);
         ctx(3, 10u128.pow(23)); assert_eq!(c.house_fund(id.clone()).0, 10u128.pow(23));
@@ -270,13 +294,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "attach at least 0.02 NEAR")]
     fn mint_without_deposit_is_refused() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         ctx(1, 0); c.mint_deed(None, None);
     }
 
     #[test]
     fn deed_transfers_by_owner_only_with_one_yocto() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         ctx(1, 2 * 10u128.pow(22)); c.mint_deed(None, None);
         ctx(1, 1); c.nft_transfer(accounts(2), accounts(1).to_string(), None, None);
         assert_eq!(c.nft_token(accounts(1).to_string()).unwrap().owner_id, accounts(2));
@@ -286,7 +310,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn stranger_cannot_transfer_a_deed() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         ctx(1, 2 * 10u128.pow(22)); c.mint_deed(None, None);
         ctx(3, 1); c.nft_transfer(accounts(3), accounts(1).to_string(), None, None);
     }
@@ -301,7 +325,7 @@ mod tests {
 
     #[test]
     fn deed_sold_mid_payout_settles_once_and_the_new_holder_keeps_the_purse() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         let id = accounts(1).to_string();
         ctx(1, 10u128.pow(24)); c.mint_deed(None, Some(U128(10u128.pow(23))));
         let start = c.house_purse(id.clone()).unwrap().balance.0;
@@ -318,7 +342,7 @@ mod tests {
 
     #[test]
     fn deed_sold_mid_payout_bounce_refunds_the_purse_not_the_seller() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         let id = accounts(1).to_string();
         ctx(1, 10u128.pow(24)); c.mint_deed(None, Some(U128(10u128.pow(23))));
         let start = c.house_purse(id.clone()).unwrap().balance.0;
@@ -332,11 +356,35 @@ mod tests {
     #[test]
     #[should_panic(expected = "only the deed holder")]
     fn seller_cannot_pay_again_while_the_first_payout_is_in_flight() {
-        ctx(0, 0); let mut c = Contract::new();
+        ctx(0, 0); let mut c = Contract::new(None);
         let id = accounts(1).to_string();
         ctx(1, 10u128.pow(24)); c.mint_deed(None, Some(U128(10u128.pow(23))));
         yocto(1, 1); let _ = c.house_pay(id.clone(), accounts(4), U128(PAY));
         yocto(1, 1); c.nft_transfer(accounts(2), id.clone(), None, None);
         yocto(1, 1); let _ = c.house_pay(id, accounts(4), U128(PAY));
+    }
+
+    #[test]
+    #[should_panic(expected = "purses still hold NEAR")]
+    fn close_refused_while_a_purse_holds_user_near() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        ctx(1, 3 * 10u128.pow(22)); c.mint_deed(None, None);
+        assert_eq!(c.house_held().0, 10u128.pow(22));
+        ctx(0, 1); let _ = c.close();
+    }
+
+    #[test]
+    #[should_panic(expected = "only the deployer may close")]
+    fn stranger_cannot_close() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        ctx(2, 1); let _ = c.close();
+    }
+
+    #[test]
+    fn deployer_closes_when_every_purse_is_empty() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        ctx(1, 2 * 10u128.pow(22)); c.mint_deed(None, None);
+        assert_eq!(c.house_held().0, 0);
+        ctx(0, 1); let _ = c.close();
     }
 }
