@@ -36,6 +36,7 @@ const N = x => BigInt(Math.round(x * 1e6)) * 10n ** 18n;
 const TG = t => BigInt(t) * 10n ** 12n;
 const near = y => Number(BigInt(y) / 10n ** 18n) / 1e6;
 const art = f => readFileSync(new URL(`../../contracts/artifacts/${f}`, import.meta.url));
+const CW = E.CHARTER_WASM || 'oath.r18.wasm', TW = E.TOLL_WASM || 'toll.v6.wasm';
 const sha = b => crypto.createHash('sha256').update(b).digest('hex');
 const credDir = `${homedir()}/.near-credentials/${NET}`; mkdirSync(credDir, { recursive: true });
 const S = !DRY && existsSync(E.OUT) ? JSON.parse(readFileSync(E.OUT, 'utf8')) : { network: NET, root: ROOT, steps: [] };
@@ -78,7 +79,7 @@ else { const kp = KeyPair.fromRandom('ed25519'); agent = { public_key: kp.getPub
 const agentPk = DRY ? null : KeyPair.fromString(agent.private_key).getPublicKey();
 S.agent_public_key = agent.public_key;
 if (DRY) {
-  const MPC = N_.mpc, oath = art('oath.r18.wasm'), tw = art('toll.v6.wasm');
+  const MPC = N_.mpc, oath = art(CW), tw = art(TW);
   const derived = await view(MPC, 'derived_public_key', { path: 'base-1', predecessor: T, domain_id: 0 });
   const rootPk = await view(MPC, 'public_key', { domain_id: 3 });
   const foreign = '0x' + Buffer.from(keccak_256(base58.decode(derived.replace('secp256k1:', '')))).subarray(12).toString('hex');
@@ -101,7 +102,7 @@ const sweep = async (step, signer, id, keep) => {
   if (out > 0n) await send(step, signer, ROOT, [A.transfer(out)]); };
 await fund('fund_charter', ck, Number(E.FUND_CHARTER || 4.2));
 // 2 charter
-const oath = art('oath.r18.wasm'); S.charter_wasm = { file: 'oath.r18.wasm', sha256: sha(oath), bytes: oath.length };
+const oath = art(CW); S.charter_wasm = { file: CW, sha256: sha(oath), bytes: oath.length };
 await send('charter_deploy_init', charter, C, [A.deployContract(oath),
   A.functionCall('new', { owner: ROOT, dao: null, policy_delay_ns: String(90e9), storage_reserve: N(Number(E.STORAGE_RESERVE || 0.02)).toString(), setup_window: true }, TG(100), 0n)]);
 await sweep('charter_sweep_surplus', charter, C, Number(E.KEEP_CHARTER || 0.1));
@@ -109,9 +110,12 @@ await sweep('charter_sweep_surplus', charter, C, Number(E.KEEP_CHARTER || 0.1));
 const clause = { asset: 'Native', receivers: [ROOT], per_action_cap: N(0.002).toString(), daily_budget: N(0.005).toString(), window_start_min: 0, window_end_min: 0, requires_receipt: false, escalation_max: null, min_amount: N(0.001).toString(), max_actions_per_day: 3, min_receiver_age_days: 0, code_hash_pins: {} };
 await send('set_clause_pay', root, C, [A.functionCall('set_clause', { clause_id: 'pay', clause }, TG(100), 0n)]);
 await send('set_agent_key', root, C, [A.functionCall('set_agent_key', { public_key: agent.public_key, allowance: N(Number(E.AGENT_ALLOWANCE || 0.25)).toString() }, TG(100), 0n)]);
+// CHARTER_ONLY=1: charter, its rules, its agent tests and its key lock; the toll is left for a later run.
+const CO = E.CHARTER_ONLY === '1';
 // 4 toll
+if (!CO) {
 await fund('fund_toll', tk, Number(E.FUND_TOLL || 2.4));
-const tw = art('toll.v6.wasm'); S.toll_wasm = { file: 'toll.v6.wasm', sha256: sha(tw), bytes: tw.length };
+const tw = art(TW); S.toll_wasm = { file: TW, sha256: sha(tw), bytes: tw.length };
 const MPC = N_.mpc, PATH_ = 'base-1';
 const derived = await view(MPC, 'derived_public_key', { path: PATH_, predecessor: T, domain_id: 0 });
 const rootPk = await view(MPC, 'public_key', { domain_id: 3 });
@@ -123,6 +127,7 @@ const init = { owner: ROOT, mpc: MPC, path: PATH_, chain_id: N_.chain_id, foreig
 await send('toll_deploy_init_agentkey', toll, T, [A.deployContract(tw), A.functionCall('new', init, TG(100), 0n),
   A.addFunctionCallAccessKey(agentPk, T, ['pay', 'settle'], N(Number(E.AGENT_ALLOWANCE || 0.25)))]);
 await sweep('toll_sweep_surplus', toll, T, Number(E.KEEP_TOLL || 0.02));
+}
 // 5 tests with the agent keys
 const agC = new Account(C, provider, KeyPairSigner.fromSecretKey(agent.private_key));
 // TOLL_PAY_BY=root (default) lets the owner pay the gas of the toll test, so the toll needs no gas float of its own.
@@ -131,11 +136,17 @@ const prop = async (step, amount) => { const st = await view(C, 'get_state');
   return send(step, agC, C, [A.functionCall('propose', { p: { shop: 'mainnet-core', clause_id: 'pay', receiver: ROOT, amount: N(amount).toString(), nonce: String(st.next_nonce), policy_version: st.policy_version, expires_at: String((BigInt(Date.now()) + 600000n) * 1_000_000n), memo: step, receipt: null } }, TG(60), 0n)]); };
 await prop('agent_propose_allowed_0.001', 0.001);
 await prop('agent_propose_over_cap_0.003', 0.003);
+if (!CO) {
 await send(`${E.TOLL_PAY_BY === 'agent' ? 'agent' : 'owner'}_toll_pay_allowlisted`, agT, T, [A.functionCall('pay', { to: RECIPIENT, value: '1000000000000', max_fee_per_gas: '100000000', max_priority_fee_per_gas: '1000000', gas_limit: 21000 }, TG(120), 0n)]);
 await send(`${E.TOLL_PAY_BY === 'agent' ? 'agent' : 'owner'}_toll_pay_not_allowlisted`, agT, T, [A.functionCall('pay', { to: '0x000000000000000000000000000000000000dead', value: '1', max_fee_per_gas: '100000000', max_priority_fee_per_gas: '1000000', gas_limit: 21000 }, TG(120), 0n)], false);
+}
 // 6 lock: delete each account's own full-access key
 await send('charter_delete_fak', charter, C, [A.deleteKey(KeyPair.fromString(ck.private_key).getPublicKey())]);
-await send('toll_delete_fak', toll, T, [A.deleteKey(KeyPair.fromString(tk.private_key).getPublicKey())]);
+if (!CO) await send('toll_delete_fak', toll, T, [A.deleteKey(KeyPair.fromString(tk.private_key).getPublicKey())]);
+if (CO) { const [ca, ra] = await Promise.all([acct(C), acct(ROOT)]);
+  S.final = { charter_only: true, charter: { id: C, code_hash: ca.code_hash, storage_bytes: ca.storage_usage, locked_near: near(BigInt(ca.storage_usage) * 10n ** 19n), balance_near: near(ca.amount), keys: await keysOf(C), state: await view(C, 'get_state') },
+    root_balance_near: near(ra.amount), root_spent_near: near(BigInt(S.root_before) - BigInt(ra.amount)), gas_burnt_total_near: S.steps.reduce((s, x) => s + x.gas_burnt_near, 0) };
+  save(); console.log(JSON.stringify(S.final, null, 1)); process.exit(0); }
 const [ca, ta, ra] = await Promise.all([acct(C), acct(T), acct(ROOT)]);
 S.final = { charter: { id: C, code_hash: ca.code_hash, storage_bytes: ca.storage_usage, locked_near: near(BigInt(ca.storage_usage) * 10n ** 19n), balance_near: near(ca.amount), keys: await keysOf(C), state: await view(C, 'get_state') },
   toll: { id: T, code_hash: ta.code_hash, storage_bytes: ta.storage_usage, locked_near: near(BigInt(ta.storage_usage) * 10n ** 19n), balance_near: near(ta.amount), keys: await keysOf(T), policy: await view(T, 'policy'), tx0: await view(T, 'get_tx', { nonce: 0 }) },

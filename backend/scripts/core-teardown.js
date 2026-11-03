@@ -30,7 +30,7 @@ const c0 = await acct(C), t0 = await acct(T);
 S.before = { charter_near: c0.amount ? near(c0.amount) : null, toll_near: t0.amount ? near(t0.amount) : null };
 if (t0.amount) await send('toll_close', T, [A.functionCall('close', {}, TG(50), 1n)]);
 if (c0.amount) {
-  const reaper = readFileSync(new URL('../../contracts/artifacts/reaper.wasm', import.meta.url));
+  const reaper = readFileSync(new URL('../../contracts/artifacts/' + (process.env.REAPER_WASM || 'reaper.wasm'), import.meta.url));
   const h = crypto.createHash('sha256').update(reaper).digest('hex'); S.reaper_sha256 = h;
   const q = await send('charter_queue_upgrade_reaper', C, [A.functionCall('queue_upgrade', { code_hash: h }, TG(50), 0n)]);
   const pend = await view(C, 'get_pending'); const id = Object.keys(pend).find(k => JSON.stringify(pend[k]).includes(h));
