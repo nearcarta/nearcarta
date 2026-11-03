@@ -1,5 +1,5 @@
-// Wallet connect through NEAR Connect, without signing: the town and the console show "Connect wallet",
-// clicking it opens the NEAR Connect wallet list. MyNearWallet is listed (testnet, "ends 31 Oct") until its
+// Wallet connect through NEAR Connect, without signing: the town and the console show "Connect",
+// which opens /setup; its NEAR wallet tile opens the NEAR Connect wallet list. MyNearWallet is listed (testnet, "ends 31 Oct") until its
 // sunset on 31 Oct 2026, 00:00 Cairo; from then on it is only in the greyed list with that reason.
 import { test, expect } from '@playwright/test';
 
@@ -9,7 +9,10 @@ async function openList(page, path, errors) {
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(path);
   await expect(page.locator('#wallet').getByRole('button', { name: 'Start free' })).toBeVisible({ timeout: 30_000 });
-  await page.locator('#wallet').getByRole('button', { name: 'Connect wallet' }).click();
+  // Connect opens the /setup stepper; its NEAR wallet tile opens the NEAR Connect list.
+  await page.locator('#wallet').getByTestId('hud-connect').click();
+  await expect(page).toHaveURL(/\/setup\//);
+  await page.getByTestId('setup-wallet').click();
   await expect(page.locator('.connect-item').first()).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.connect-item', { hasText: 'Meteor Wallet' })).toBeVisible();
 }

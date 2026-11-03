@@ -20,6 +20,8 @@ for (const [w, h] of [[1280, 800], [390, 844]]) {
       expect(await page.$$eval('.who button:not([hidden])', bs => bs.map(b => b.id))).toEqual(['guest', 'connect']);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.getByTestId('connect').click();
+      await expect(page).toHaveURL(/\/setup\/\?next=%2Fshops%2Fvault%2F/);
+      await page.getByTestId('setup-wallet').click();
       await expect(page.locator('.connect-item').first()).toContainText('Guest testnet account', { timeout: 30_000 });
       expect(errors).toEqual([]);
     });
