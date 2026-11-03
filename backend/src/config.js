@@ -4,8 +4,18 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const depPath = process.env.DEPLOYMENTS_FILE || join(here, '..', '..', 'shared', 'deployments', 'testnet.json');
-export const DEP = JSON.parse(readFileSync(depPath, 'utf8'));
+// NEAR_NET picks the deployments file (testnet by default). DEPLOYMENTS_FILE still overrides both.
+export const NET = process.env.NEAR_NET === 'mainnet' ? 'mainnet' : 'testnet';
+const depDir = join(here, '..', '..', 'shared', 'deployments');
+// The mainnet core (charter + toll) record, read-only; always served at /api/mainnet.
+let mainnetDep = null;
+try { mainnetDep = JSON.parse(readFileSync(join(depDir, 'mainnet.json'), 'utf8')); } catch { mainnetDep = null; }
+export const MAINNET_DEP = mainnetDep;
+const base = JSON.parse(readFileSync(process.env.DEPLOYMENTS_FILE || join(depDir, 'testnet.json'), 'utf8'));
+// With NEAR_NET=mainnet the deployed mainnet ids overlay the testnet set; testnet-only parts (arena, house, Town Hall) keep their ids.
+const overlay = NET === 'mainnet' && mainnetDep && mainnetDep.status === 'deployed'
+  ? Object.fromEntries(Object.entries(mainnetDep).filter(([, v]) => v !== null)) : {};
+export const DEP = { ...base, ...overlay };
 
 export const cfg = {
   port: Number(process.env.PORT || 8787),

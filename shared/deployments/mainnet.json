@@ -1,0 +1,13 @@
+{
+ "network": "mainnet",
+ "status": "not_deployed",
+ "rpc": "https://free.rpc.fastnear.com",
+ "root": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+ "mpc": "v1.signer",
+ "chain_id": 8453,
+ "path": "base-1",
+ "charter": null,
+ "toll": null,
+ "runbook": "docs/MAINNET_RUNBOOK.md",
+ "note": "charter and toll ids are filled in by backend/scripts/core-deploy.js output after the mainnet run; arena, house and Town Hall stay on testnet"
+}

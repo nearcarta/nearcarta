@@ -6,7 +6,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { bodyLimit } from 'hono/body-limit';
-import { DEP, cfg, has } from './config.js';
+import { DEP, MAINNET_DEP, cfg, has } from './config.js';
 import * as ferry from './ferry.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
@@ -180,6 +180,7 @@ export function makeApp() {
     return c.json({ client_ip_from: from, client_tag: ipTag(ip), shared_cap: egress ? 'egress:' + ipTag(egress) : null, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
+  app.get('/api/mainnet', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
 
   // Ferry
   app.get('/api/ferry/tokens', limiter(30), async c => {
