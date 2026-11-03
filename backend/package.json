@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test test/unit/*.test.js",
+    "test": "node --test --test-force-exit test/unit/*.test.js",
     "test:integration": "NEAR_RPC=${NEAR_RPC:-https://archival-rpc.testnet.fastnear.com} NEAR_RPC_FALLBACKS=${NEAR_RPC_FALLBACKS:-https://archival-rpc.testnet.near.org,https://rpc.testnet.near.org} NEAR_RPC_TIMEOUT_MS=${NEAR_RPC_TIMEOUT_MS:-20000} node --test --test-concurrency=1 test/integration/*.test.js"
   },
   "engines": {
