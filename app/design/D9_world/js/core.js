@@ -43,7 +43,7 @@ export const SHOPS = {
             card:'Every spend is checked before it can be signed: payee list, daily cap, weekly cap.', tag:'payee_allowlist · daily_cap · weekly_cap'},
   arena:    {q:1,r:3,  m:'buildings/blue/building_archeryrange_blue',name:'Vault Arena', role:'try to trick the AI',
             card:'A live vault anyone may try to break. Every failed attack is a Chronicle row.', tag:'arena.attack_failed'},
-  house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'House', role:'your rules and history',
+  house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'Your House', role:'your rules and history',
             card:'Only your house key can change the oath or ring the curfew. The agent holds a propose-only key.', tag:'function-call key · propose()'},
   toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay-per-use gate',
             card:'Pay 0.01 NEAR from your own charter; the gate then gets the MPC network to sign a Base Sepolia payout, and settles it with a foreign-tx proof.', tag:'gate.pay_for · Chain Signatures · Base Sepolia'},

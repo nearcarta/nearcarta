@@ -249,9 +249,9 @@ const APPS = {
     },
   },
   house: {
-    label: 'Your charter', idle: 'Your charter is the rule book your agent cannot break. It can only pay inside those rules.',
+    label: 'Your House · your charter', idle: 'Your charter is the rule book your agent cannot break. It can only pay inside those rules.',
     btn: 'See my rules & record',
-    hero: () => A.S.charter ? `<span class="commit">${esc(A.S.charter.split('.')[0])}</span>` : null,
+    hero: () => A.S.charter ? `<span class="commit" title="${esc(A.S.charter)}">${esc(short(A.S.charter.split('.')[0], 8, 6))}</span>` : null,
     run: async () => { await A.readRules(); const c = A.S.clauses.pay, rp = await A.reputation();
       return { keep: true, kind: 'ok', hero: `${num(rp.refused, 'refused')}<span class="pts">of ${rp.asks} asks</span>`, say: `Max ${fmt(c.per_action_cap)}, ${fmt(c.daily_budget)} a day. ${rp.paid} paid, ${rp.refused} refused, all on chain.`, rule: `reputation · ${rp.asks ? Math.round(100 * rp.refused / rp.asks) : 0}% of asks refused`, rc: `<a class="rc" href="${NBA(A.S.charter)}" target="_blank" rel="noopener" title="${esc(A.S.charter)}">deed · ${esc(short(A.S.charter, 12, 6))} ↗</a>` }; },
   },

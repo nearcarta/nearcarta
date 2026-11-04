@@ -347,3 +347,6 @@ body:has(#drawer.open) #back{visibility:hidden}
 
 .net{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 8px;border-radius:999px;font:600 11px/20px Inter,system-ui,sans-serif;letter-spacing:.02em;text-transform:none;margin-right:6px}
 .net.mainnet{background:color-mix(in srgb,#00ec97 16%,transparent);color:#00ec97;border:1px solid color-mix(in srgb,#00ec97 45%,transparent)}
+
+/* long account ids (64-char implicit accounts) wrap instead of overflowing the panel */
+.card, .card .to b, #t-say, .row .k, .row .why, .goal, .commit, .kv span { overflow-wrap: anywhere; min-width: 0; }
