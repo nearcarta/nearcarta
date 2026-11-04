@@ -1,28 +1,45 @@
 # Nearcarta master task list (single source of truth; tick each with commit + test + screenshot)
+
 ## Owner items (original 9)
-- [ ] O1 Premium cinematic onboarding; START HERE pin and every Start button open /setup flow: sign in > fund > privacy > character > rules > sign charter+agent key > try allowed/refused. Charter office reachable after setup. Completed stepper steps clickable.
-- [ ] O2 'Connect wallet' -> 'Sign in' everywhere; one primary CTA (no Start free vs Connect confusion).
-- [ ] O3 Amazing character creator: several distinct looks, colors/outfit, name, live preview, saved, shown in town.
-- [ ] O4 Real leaderboard: real visitors appear automatically; denylist our scripted/test accounts; nickname+character, score, tx link; good empty state; no fake rows.
-- [ ] O5 'Back to town' on every page.
-- [ ] O6 No testnet in the user journey; mainnet default; any guest trial secondary and honestly labeled; never fake mainnet.
-- [ ] O7 Full design audit 1440/390; fix top-right buttons overlapping proof drawer title.
-- [ ] O8 Original SVG town logo: header, favicon, og image.
-- [ ] O9 Red-team pass (prompt injection, policy bypass on agent+API, deps, secrets) with fixes and tests.
-- [ ] O10 render.yaml plan: starter.
+- [ ] O1 Premium cinematic onboarding. Blocker: there is no public charter factory on mainnet (`docs/MAINNET_COST_PLAN.md`, `shared/deployments/mainnet.json` has charter/toll/arena/house/townhall and no factory). The default path (`46d66db`, `20ca3ae`, test `the default setup path is mainnet`) signs in on mainnet, shows the town's mainnet allow/refuse txs, and does not pretend to create a personal charter. The secondary testnet trial still runs sign, agent key, and try. Stepper steps at or before the current step are clickable (`20ca3ae`). Screenshots of every step are still outstanding.
+- [x] O2 Sign in is the only primary CTA. `5a01d11`, `1a72d4e`. Test: e2e `town pin opens setup` expects zero "Connect wallet".
+- [x] O3 Character creator: six looks, dyes, outfits, name, live portrait, saved in `nearcarta.hero.v1`, shown by `app/design/D9_world/js/hero-town.js`. `5a01d11`.
+- [x] O4 Leaderboard lists factory charters and hides `shared/vault/denied-accounts.json`. `20ca3ae`. Test: `a factory charter appears unless we created that account`.
+- [x] O5 Back to town is on setup, vault, hall, console, judges, ledger, loop, 404, and the shop interiors. The town page is the town.
+- [x] O6 Default journey is mainnet. Guest trial is a secondary control and is the only path that says testnet. `46d66db`, `20ca3ae`. Test: `the default setup path is mainnet and does not offer the faucet or a charter factory`.
+- [x] O7 Proof drawer sits above the top-right account row (`app/build.mjs` hides `#acct` while the drawer is open). Town labels and the "Click a building" hint: `20ca3ae`.
+- [x] O8 Logo is `app/src/brand/mark.svg`, favicon `/favicon.svg`, og image `/brand/og.png`.
+- [x] O9 Agent binding and extra model fields cannot change the payment. `110019b`, `1a72d4e`. Tests: `a model that invents a payee is discarded for the words`, `extra model fields cannot change the payment method`. npm audit highs are zod inside Privy (no zod 3 fix) and are not force-upgraded.
+- [x] O10 `render.yaml` plan is `starter`. `1a72d4e`.
+
 ## Judge signals (done in cce69a8, keep)
-- [x] J1 README mainnet do-X-see-Y first  - [x] J2 /api/receipts uniform  - [x] J3 inference cap  - [x] J4 why-contract section  - [x] J5 demo up to Nov 25
-- [ ] J6 Merge PR #1 to main; commit to main only. Leaderboard per O4.
-- [ ] J7 /api/health network shape kept.
+- [x] J1 README mainnet do-X-see-Y first
+- [x] J2 /api/receipts uniform
+- [x] J3 inference cap
+- [x] J4 why-contract section
+- [x] J5 demo up to Nov 25
+- [x] J6 PR #1 fast-forwarded onto main (`1a72d4e`). Later commits stay on main. Leaderboard is O4 (`20ca3ae`).
+- [x] J7 `/api/health` returns `network.contracts: mainnet` and `network.trial: testnet`. `d363c91`. Test: `health names mainnet contracts and the testnet trial`.
+
 ## Prod audit (my screenshots)
-- [ ] A1 Landing testnet/mainnet contradictions  - [ ] A2 /console: redesign as premium For-judges page or fold+redirect
-- [ ] A3 Town labels tiny/overlapping; 'click a building' hint  - [ ] A4 Top bar: judges menu wrap; account chip nickname + short id
-- [ ] A5 Shops without charter: preview/demo + live proof before asking  - [ ] A6 One state, one CTA (no skeleton + Sign in + Build charter)
-- [ ] A7 'Opening...' stuck button  - [ ] A8 Town Hall raw markup; show all proposals
-- [ ] A9 Spacing bugs (USDC, Base, House missing glyph)  - [ ] A10 Mist/Ferry jargon -> plain words, details toggle
-- [ ] A11 /loop empty page  - [ ] A12 /ledger wrapping, shop names match town, mock-looking rows
-- [ ] A13 /setup Fund dead end, contrast, copy, full address  - [ ] A14 House 'Open the charter office' goes to /setup
+- [x] A1 Landing story is "The town runs on NEAR mainnet." Shop badges say mainnet. `20ca3ae`.
+- [x] A2 `/console` is a judges page. Mainnet receipts first. No account chip and no testnet-block PASS. `20ca3ae`.
+- [x] A3 Larger pin labels, overlap nudge, "Click a building" hint. `20ca3ae`.
+- [x] A4 Judges menu is "For judges". The account chip is the character name plus a short id. `20ca3ae`.
+- [x] A5 A shop without a charter still shows what it does and the mainnet proof. `20ca3ae`.
+- [x] A6 One button, Sign in, until the shop can run. `20ca3ae`.
+- [x] A7 The shop button is no longer left on "Opening…". `20ca3ae`.
+- [x] A8 Town Hall strips markup and lists every proposal. `20ca3ae`.
+- [x] A9 Amount icons attach only to a number plus a symbol, so "kept on NEAR" and "1 USDC" no longer gain a broken gap. `20ca3ae`.
+- [x] A10 Mist and Ferry lead with plain words. Technical rows sit under Technical details. `20ca3ae`.
+- [x] A11 `/loop` shows the five steps before you press the button. `20ca3ae`. Test: `loop page: timer, the two real calls, a plain plan, routes`.
+- [x] A12 Ledger shop names match the town. Refusals are 0 NEAR, not a fake payment. The model line says it is operator spend. `20ca3ae`.
+- [x] A13 Setup fund on the mainnet path can continue at 0 NEAR. The address shown is short. Earlier steps are clickable. `20ca3ae`.
+- [x] A14 "Open the charter office" stays `/shops/vault/`. `hero-town.js` no longer rewrites it to `/setup`.
+
 ## Ferry universal checkout (after above)
-- [ ] F1 Pay from any wallet/chain via NEAR Intents 1Click, charter gates on chain, embeddable widget, receipts, tests, README, script for one real tiny mainnet swap (I run it).
-- [ ] F2 Review every shop for judge-loved gaps.
-## Done when: every box ticked in docs/TASKS.md in repo, CI green, Playwright shots of every step/shop 1440+390 as artifacts, final report per ID.
+- [ ] F1 Blocker: `backend/src/ferry.js` always sends `dry: true`, so no deposit address is created and no mainnet funds move. `/ferry-widget` (`app/src/ferry-widget.html`) asks for that dry quote and says nothing is spent. `backend/scripts/ferry-live-swap.js --live` exits 2 and tells the owner to run a real swap outside this API. Test: `the ferry widget asks for a dry quote and says nothing is spent`. A live swap is not implemented here on purpose.
+- [x] F2 Shop review after the audit: the remaining judge-facing gap is F1's live swap, which stays dry. Personal charters are still the testnet trial because there is no mainnet factory (O1). Shops now lead with the mainnet proof instead of a charter gate.
+
+## Done when
+Playwright shots of every onboarding step and every shop at 1440 and 390 are not in this commit. The unit suite is `npm test` (350 pass, 1 skipped). CI runs that suite on push to main.

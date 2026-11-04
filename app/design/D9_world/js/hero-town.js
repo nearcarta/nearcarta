@@ -31,17 +31,10 @@ function tint(h) {
   if (h.name) R.name = h.name;
   R.userData = { ...(R.userData || {}), dyed: h.dye };
 }
-function flow() {
-  try { if (JSON.parse(localStorage.getItem('nearcarta.setup.v1') || '{}').charter) return '/shops/vault/'; } catch { /* empty */ }
-  return '/setup/';
-}
 function fixCta() {
   const a = document.getElementById('t-cta');
   if (!a || a.hidden) return;
-  const href = a.getAttribute('href') || '';
-  if (!/\/shops\/vault\/|\/setup\//.test(href)) return;
-  const want = flow();
-  if (href !== want) a.setAttribute('href', want);
+  if (/charter office/i.test(a.textContent || '')) a.setAttribute('href', '/shops/vault/');
 }
 export function applyTownHero() { const h = read(); chip(h); tint(h); fixCta(); }
 applyTownHero();
