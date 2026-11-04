@@ -2,6 +2,83 @@
   "ok": true,
   "rows": [
     {
+      "shop": "board",
+      "label": "deploy",
+      "hash": "CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "board",
+      "label": "open_charter",
+      "hash": "BUqfZMBTnqU5f223FSDyufCzaVemvMCaWZ2iYXs4MJ4u",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "board",
+      "label": "set_agent",
+      "hash": "DqMrsEJjd2wyiRh8tW25ZqK8MnG8Tk4rYW3XGuKTfiW7",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "board",
+      "label": "allowed_0.001",
+      "hash": "8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "board",
+      "label": "refused_over_per_action_cap",
+      "hash": "CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": false,
+      "failure": true,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "board",
+      "label": "refused_receiver_not_allowlisted",
+      "hash": "E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": false,
+      "failure": true,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "board",
+      "label": "close_charter",
+      "hash": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
       "shop": "charter",
       "label": "create_root",
       "hash": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",
