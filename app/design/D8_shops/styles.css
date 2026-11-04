@@ -350,3 +350,8 @@ body:has(#drawer.open) #back{visibility:hidden}
 
 /* long account ids (64-char implicit accounts) wrap instead of overflowing the panel */
 .card, .card .to b, #t-say, .row .k, .row .why, .goal, .commit, .kv span { overflow-wrap: anywhere; min-width: 0; }
+
+/* readable one-line explanations (payouts, gas): 14px, light text on the dark panel (>= 7:1) */
+.plain-line { font-size: 14px; line-height: 20px; color: #f3ead8; font-weight: 500; margin: 0; }
+.plain-line.warn { color: #ffd88a; }
+.plain-line a { color: #f3d78f; text-decoration: underline; }

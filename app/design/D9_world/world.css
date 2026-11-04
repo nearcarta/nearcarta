@@ -453,3 +453,13 @@ body:has(#drawer.open) #back{visibility:hidden}
 /* long account ids (64-char implicit accounts) wrap instead of overflowing the panel */
 #shopUI .card, #shopUI .card .to b, #shopUI #t-say, #shopUI .row .k, #shopUI .row .why, #shopUI .goal, #shopUI .commit, #shopUI .kv span { overflow-wrap: anywhere; min-width: 0; }
 #drawer .card, #drawer .card .to b, #drawer .row .k, #drawer .row .why, #drawer .kv span, #drawer .goal { overflow-wrap: anywhere; min-width: 0; }
+
+/* readable one-line explanations (payouts, gas): 14px, light text on the dark panel (>= 7:1) */
+#shopUI .plain-line { font-size: 14px; line-height: 20px; color: #f3ead8; font-weight: 500; margin: 0; }
+#shopUI .plain-line.warn { color: #ffd88a; }
+#shopUI .plain-line a { color: #f3d78f; text-decoration: underline; }
+
+/* readable one-line explanations (payouts, gas): 14px, light text on the dark panel (>= 7:1) */
+#drawer .plain-line { font-size: 14px; line-height: 20px; color: #f3ead8; font-weight: 500; margin: 0; }
+#drawer .plain-line.warn { color: #ffd88a; }
+#drawer .plain-line a { color: #f3d78f; text-decoration: underline; }

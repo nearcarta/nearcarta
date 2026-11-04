@@ -526,7 +526,7 @@ export const teeFresh = () => teeCheck(Array.from(crypto.getRandomValues(new Uin
 export const payoutLeft = () => P.leftToday(pay(), S.usage.pay);
 export async function payouts(rows) {
   const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
-  if (!canBatch()) throw new Error('this charter predates batches: build a new one at Your House');
+  if (!canBatch()) throw new Error(S.board ? 'batches run on testnet only; your mainnet charter pays one at a time' : 'your charter pays one at a time: make a new one at /setup/ to batch');
   const st = await view(S.charter, 'get_state');
   const b = P.planBatch(rows, { payees: bankPayees(), nonce: st.next_nonce, policy: st.policy_version, nowMs: Date.now() });
   const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: S.charter, public_key: key.publicKey });

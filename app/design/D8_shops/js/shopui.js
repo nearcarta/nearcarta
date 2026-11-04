@@ -101,7 +101,7 @@ function tollWatch(v, st) {
 }
 function gasNote() {
   const w = extra.gate?.gas?.warning;
-  return w ? `<p class="note warn" style="color:#b45309" data-testid="gas-warning">⚠ ${esc(w)}</p>` : '';
+  return w ? `<p class="plain-line warn" data-testid="gas-warning">⚠ ${esc(w)}</p>` : '';
 }
 
 // ---------- shop apps ----------
@@ -228,7 +228,9 @@ const APPS = {
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.01' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.01' }); } return extra.rows; },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => { const ps = A.bankPayees(), rows = APPS.payouts.rows(), left = A.payoutLeft(), tot = APPS.payouts.total();
-      if (!A.canBatch()) return '<p class="goal" data-testid="payout-legacy">This charter is older and predates batches: it pays one payment per transaction, so a list cannot go as one all-or-nothing batch. Build a new charter at Your House to batch.</p>';
+      if (!A.canBatch()) return A.S.board
+        ? `<p class="plain-line" data-testid="payout-legacy">Batches are a testnet demo: your mainnet charter pays one payment per transaction, so a list cannot go as one all-or-nothing batch. Mainnet proof of one payment: ${A.mainProof()}</p>`
+        : '<p class="plain-line" data-testid="payout-legacy">Your charter was made before batches existed, so it pays one payment per transaction. <a class="go-link" href="/setup/">Make a new charter that can batch →</a></p>';
       return `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ps.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(nice(a))}</option>`).join('')}</select>`
         + `<label class="p-amt"><input type="number" data-i="${i}" min="0.001" step="0.001" value="${esc(r.amt)}" aria-label="Amount ${i + 1}"><span>NEAR</span></label>`
         + `<button type="button" class="p-x" data-i="${i}" aria-label="Remove payout ${i + 1}" ${rows.length <= 2 ? 'disabled' : ''}>×</button></li>`).join('')}</ol>`
@@ -238,10 +240,10 @@ const APPS = {
       document.querySelectorAll('.p-amt input').forEach(e => { e.oninput = () => { rows[+e.dataset.i].amt = e.value; const t = $('[data-testid=payout-total]'), tot = APPS.payouts.total(), left = A.payoutLeft(); if (t) { t.textContent = `${tot} NEAR · ${+left.toFixed(4)} left today`; t.classList.toggle('no', tot > left); } btn(APPS.payouts.btn()); }; });
       document.querySelectorAll('.p-x').forEach(e => { e.onclick = () => { rows.splice(+e.dataset.i, 1); re(); }; });
       const a = $('#p-add'); if (a) a.onclick = () => { if (rows.length < 5) rows.push({ to: A.bankDefault() || A.bankPayees()[0], amt: '0.01' }); re(); }; },
-    btn: () => A.canBatch() ? `Pay ${APPS.payouts.rows().length} as one · ${APPS.payouts.total()} NEAR` : 'Build a new charter first',
+    btn: () => A.canBatch() ? `Pay ${APPS.payouts.rows().length} as one · ${APPS.payouts.total()} NEAR` : A.S.board ? 'Batches run on testnet only' : 'Make a new charter first',
     hero: () => extra.pay ? num(`${extra.pay.paid}/${extra.pay.n}`, 'paid') : num(APPS.payouts.rows().length, 'payouts'),
     run: async () => {
-      if (!A.canBatch()) throw new Error('this charter predates batches: build a new one at Your House');
+      if (!A.canBatch()) throw new Error(A.S.board ? 'batches run on testnet only; your mainnet charter pays one at a time' : 'your charter pays one at a time: make a new one at /setup/ to batch');
       const o = await A.payouts(APPS.payouts.rows()); extra.pay = o;
       const ok = o.decision === 'allowed', who = o.bad != null ? ` Payout ${o.bad + 1}: ${A.why(o.reason)}.` : '';
       return { o, keep: true, kind: ok ? 'ok' : 'no', hero: APPS.payouts.hero(), rule: ok ? `paid · ${o.n} payouts in one tx` : o.decision === 'failed' ? 'failed · ' + String(o.reason).slice(0, 60) : `refused whole · ${A.why(o.reason)}`,
