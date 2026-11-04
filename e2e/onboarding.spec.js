@@ -23,11 +23,17 @@ for (const width of [1440, 390]) {
       await expect(page.getByRole('heading', { name: 'Start here.' })).toBeVisible();
       await expect(page.getByTestId('back-town')).toBeVisible();
       await expect(page.getByText('Connect wallet')).toHaveCount(0);
+      await expect(page.getByTestId('setup-net')).toHaveText('mainnet');
+      await expect(page.getByTestId('setup-choices')).not.toContainText(/testnet/i);
+      await expect(page.getByTestId('setup-guest')).toBeVisible();
 
       for (const step of steps) {
         await page.goto(`/setup/?preview=1#${step}`);
         await expect(page.getByTestId('preview-banner')).toBeVisible({ timeout: 30_000 });
         await expect(page.getByTestId('back-town')).toBeVisible();
+        await expect(page.getByTestId('setup-net')).toHaveText('mainnet');
+        if (step === 'fund') await expect(page.getByTestId('setup-faucet')).toHaveCount(0);
+        if (step === 'signin') await expect(page.getByTestId('setup-choices')).not.toContainText(/testnet/i);
         if (step === 'character') {
           await expect(page.getByTestId('setup-portrait')).toBeVisible();
           await page.getByTestId('dye-sea').click();

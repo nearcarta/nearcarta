@@ -4,10 +4,12 @@ import { keyFrom, signTx, rpcClient, viewFn } from '../../shared/vault/tx.js';
 import { guestWallet, hasGuest } from '../shops/vault/wallet.js';
 import { factoriesOf, deedsOn } from './factories.js';
 import { rpc as RPC, rpc_fallbacks as RPC_FB, vault, townhall, arena, house_deed } from '../../shared/deployments/testnet.json'; // named: guardhouse test accounts stay out of the bundle
+import mainnetDep from '../../shared/deployments/mainnet.json' with { type: 'json' };
 const DEP = { rpc: RPC, vault, townhall, arena };
 
 // fastnear first; 408/429/5xx or a network error rotates to the backups.
 export const rpc = rpcClient([DEP.rpc, ...(RPC_FB || [])]);
+const mainRpc = rpcClient([mainnetDep.rpc]);
 export const FACTORY = DEP.vault?.factory || DEP.townhall.factory;
 /** The current factory first, then every older one, so a charter built before a factory release still counts. */
 export const FACTORIES = factoriesOf(DEP.vault, DEP.townhall.factory);
@@ -25,11 +27,14 @@ export function injectGuest() {
   window.addEventListener('near-selector-ready', fire); fire();
 }
 
-export async function balance(id) {
+async function balanceFrom(client, id) {
   // A new implicit account (an email or Google login) is not on chain until its first NEAR arrives: that is 0, not unknown.
-  try { const a = await rpc('query', { request_type: 'view_account', finality: 'optimistic', account_id: id }); return BigInt(a.amount); }
+  try { const a = await client('query', { request_type: 'view_account', finality: 'optimistic', account_id: id }); return BigInt(a.amount); }
   catch (e) { return /UNKNOWN_ACCOUNT|does not exist/i.test(e?.message || '') ? 0n : null; }
 }
+export async function balance(id) { return balanceFrom(rpc, id); }
+/** `mainnet` reads mainnet RPC. Anything else stays on the testnet trial RPC. */
+export async function balanceOn(id, network) { return balanceFrom(network === 'mainnet' ? mainRpc : rpc, id); }
 export const fmt = y => y == null ? '?' : (Number(y / 10n ** 21n) / 1000).toLocaleString('en', { maximumFractionDigits: 2 });
 
 // DeleteAccount action (borsh enum 7 + beneficiary): the helper account's whole balance moves to `to`.

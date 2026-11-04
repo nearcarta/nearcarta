@@ -23,32 +23,43 @@ const GAS = '50000000000000';
 let connector, house;
 const listeners = new Set();
 
-export function wallet() {
-  if (!connector) {
-    injectGuest(); // the one-click guest account is one more wallet in the list
-    // Pass the page's CSP nonce so the wallet's sandboxed iframe may run its scripts.
-    decoratePicker(); connector = new NearConnector({ network: NEAR_NET, features: { [NEAR_NET]: true, signAndSendTransaction: true }, footerBranding: null, walletConnect, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
-    // The picker's "⋯" header button has no text: name it for screen readers and hover.
-    const label = r => r.querySelectorAll?.('.settings-button:not([aria-label])').forEach(b => { b.setAttribute('aria-label', 'Wallet list settings'); b.title = 'Wallet list settings'; });
-    const fix = r => { label(r); unavailable(r); };
+const connectors = new Map();
+let watched = false;
+function connectorFor(network) {
+  if (connectors.has(network)) return connectors.get(network);
+  // The guest faucet account is testnet-only. It is not offered on the mainnet connector.
+  if (network !== 'mainnet') injectGuest();
+  decoratePicker();
+  const c = new NearConnector({ network, features: { [network]: true, signAndSendTransaction: true }, footerBranding: null, walletConnect, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
+  connectors.set(network, c);
+  if (!connector && network === NEAR_NET) connector = c;
+  // The picker's "⋯" header button has no text: name it for screen readers and hover.
+  const label = r => r.querySelectorAll?.('.settings-button:not([aria-label])').forEach(b => { b.setAttribute('aria-label', 'Wallet list settings'); b.title = 'Wallet list settings'; });
+  const fix = r => { label(r); if (network !== 'mainnet') unavailable(r); };
+  if (!watched) {
+    watched = true;
     new MutationObserver(() => { fix(document); document.querySelectorAll('body > *').forEach(e => e.shadowRoot && fix(e.shadowRoot)); }).observe(document.body, { childList: true, subtree: true });
-    addPrivy(connector).catch(() => {});
-    const ping = () => listeners.forEach(f => f());
-    connector.on('wallet:signIn', ping); connector.on('wallet:signOut', ping);
-    // Clear EVM label; wallets this browser already has go first.
-    connector.whenManifestLoaded.then(() => {
-      const evm = connector.wallets.find(w => w.manifest.id === 'ethereum-wallets');
-      if (evm) evm.manifest.name = window.ethereum ? 'MetaMask & EVM wallets (detected)' : 'MetaMask & EVM wallets';
-      if (evm && window.ethereum) connector.wallets = [evm, ...connector.wallets.filter(w => w !== evm)];
-      // MyNearWallet's NEAR Connect script has a testnet path (testnet.mynearwallet.com), but the manifest has no testnet flag.
-      // Its own site says it is deprecated on 31 Oct 2026: from then on it leaves the list and shows greyed with that reason.
-      const mnw = connector.wallets.find(w => w.manifest.id === 'mynearwallet');
-      if (mnw && mnwSunset()) connector.wallets = connector.wallets.filter(w => w !== mnw);
-      else if (mnw) { mnw.manifest.features.testnet = true; (mnw.manifest.permissions.allowsOpen ||= []).push('https://testnet.mynearwallet.com'); mnw.manifest.name = 'MyNearWallet (testnet, ends 31 Oct)'; mnw.manifest.website = 'https://testnet.mynearwallet.com'; }
-    }).catch(() => {});
   }
-  return connector;
+  addPrivy(c).catch(() => {});
+  const ping = () => listeners.forEach(f => f());
+  c.on('wallet:signIn', ping); c.on('wallet:signOut', ping);
+  // Clear EVM label; wallets this browser already has go first.
+  c.whenManifestLoaded.then(() => {
+    const evm = c.wallets.find(w => w.manifest.id === 'ethereum-wallets');
+    if (evm) evm.manifest.name = window.ethereum ? 'MetaMask & EVM wallets (detected)' : 'MetaMask & EVM wallets';
+    if (evm && window.ethereum) c.wallets = [evm, ...c.wallets.filter(w => w !== evm)];
+    if (network === 'mainnet') return;
+    // MyNearWallet's NEAR Connect script has a testnet path (testnet.mynearwallet.com), but the manifest has no testnet flag.
+    // Its own site says it is deprecated on 31 Oct 2026: from then on it leaves the list and shows greyed with that reason.
+    const mnw = c.wallets.find(w => w.manifest.id === 'mynearwallet');
+    if (mnw && mnwSunset()) c.wallets = c.wallets.filter(w => w !== mnw);
+    else if (mnw) { mnw.manifest.features.testnet = true; (mnw.manifest.permissions.allowsOpen ||= []).push('https://testnet.mynearwallet.com'); mnw.manifest.name = 'MyNearWallet (testnet, ends 31 Oct)'; mnw.manifest.website = 'https://testnet.mynearwallet.com'; }
+  }).catch(() => {});
+  return c;
 }
+export function wallet() { return connectorFor(NEAR_NET); }
+/** Mainnet wallets for the default setup path. No guest faucet is injected here. */
+export function mainnetWallet() { return connectorFor('mainnet'); }
 // Wallets people ask for that NEAR Connect does not offer on testnet. Each reason was checked in the NEAR Connect
 // manifest (hot-dao/near-selector repository/manifest.json) and the wallet's own NEAR Connect script.
 const UNAVAILABLE = [
@@ -84,23 +95,30 @@ function unavailable(r) {
   });
 }
 export function onWallet(f) { listeners.add(f); }
-export async function account() {
+async function accountOf(c) {
   // A wallet picked earlier but never finished (e.g. a WalletConnect QR left open) must not hold the HUD forever.
   const slow = new Promise(r => setTimeout(() => r(null), 12000));
-  try { const { accounts } = await Promise.race([wallet().getConnectedWallet(), slow.then(() => ({}))]); return accounts?.[0]?.accountId || null; } catch { return null; }
+  try { const { accounts } = await Promise.race([c.getConnectedWallet(), slow.then(() => ({}))]); return accounts?.[0]?.accountId || null; } catch { return null; }
 }
+export async function account() { return accountOf(wallet()); }
+export async function mainnetAccount() { return accountOf(mainnetWallet()); }
 // Opens the wallet list, then signs in. `note` gets plain-text progress and errors (never swallowed).
-export async function connect(note = () => {}) {
-  const c = wallet();
+export async function connect(note = () => {}, network = NEAR_NET) {
+  const c = network === 'mainnet' ? mainnetWallet() : wallet();
+  const main = network === 'mainnet';
   let id;
-  try { id = await c.selectWallet(); } catch { note(''); return account(); }
-  if (id === 'ethereum-wallets') note('In the evm-on-near.dev window that opens, press Connect Wallet, then MetaMask, and approve in MetaMask (it adds NEAR Protocol Testnet, chain 398). If no window opened, allow pop-ups for this site.');
+  try { id = await c.selectWallet(); } catch { note(''); return accountOf(c); }
+  if (id === 'ethereum-wallets') note(main
+    ? 'In the evm-on-near.dev window that opens, press Connect Wallet, then MetaMask, and approve in MetaMask (it adds NEAR on mainnet). If no window opened, allow pop-ups for this site.'
+    : 'In the evm-on-near.dev window that opens, press Connect Wallet, then MetaMask, and approve in MetaMask (it adds NEAR Protocol Testnet, chain 398). If no window opened, allow pop-ups for this site.');
   else if (id === 'nightly-wallet' && !window.nightly) note('Nightly is not installed in this browser. Install it from the Chrome Web Store (chromewebstore.google.com/detail/nightly/fiikommddbeccaoicoejoniammnalkfa), reload this page and press Sign in again.');
-  else if (id === 'near-cli') note('NEAR CLI: type your testnet account id in the window, then run the near command it shows in your terminal (needs near-cli-rs installed).');
+  else if (id === 'near-cli') note(main
+    ? 'NEAR CLI: type your mainnet account id in the window, then run the near command it shows in your terminal (needs near-cli-rs installed).'
+    : 'NEAR CLI: type your testnet account id in the window, then run the near command it shows in your terminal (needs near-cli-rs installed).');
   else note('Waiting for your wallet…');
   try { await c.connect({ walletId: id }); note(''); }
   catch (e) { note(`Could not connect: ${e?.message || e}`); throw e; }
-  return account();
+  return accountOf(c);
 }
 /** One click: a new testnet account with 10 NEAR from the public faucet; its key stays in this browser. */
 export async function startGuest(note = () => {}) {

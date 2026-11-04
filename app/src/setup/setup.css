@@ -57,6 +57,8 @@ input,select{width:100%;background:#0000002e;border:1px solid var(--line2);color
 input:hover,select:hover{border-color:#ffffff38}input::placeholder{color:#9c8f7999}
 .field{margin-bottom:16px}.suffix{display:flex;align-items:stretch}.suffix input{border-radius:12px 0 0 12px}.suffix span{display:grid;place-items:center;padding:0 12px;border:1px solid var(--line2);border-left:0;border-radius:0 12px 12px 0;color:var(--t3);font:13px var(--mono);background:#00000033}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.trial-note{margin:18px 0 0;padding-top:14px;border-top:1px solid var(--line);color:var(--t3);font-size:13px}
+.trial-note .btn.link{font-size:13px;padding:0}
 .assure{display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border-radius:12px;background:#d6b46a12;border:1px solid #d6b46a33;color:var(--t2);font-size:13px}
 .assure::before{content:"🔒";font-size:14px}
 .err{color:var(--bad);font-size:14px;margin:10px 0 0}.okc{color:var(--ok)}
