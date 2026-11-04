@@ -38,11 +38,14 @@ const press = async (ms = 240e3) => {
   return { press: label, see: await text('#t-say'), rule: await text('#t-rcpt [data-testid=rule]'),
     txs: await p.locator('#t-rcpt a[href*="/txns/"]').evaluateAll(as => as.map(a => a.href.split('/').pop())) };
 };
-const open = async shop => { await p.goto(BASE + '/design/D8_shops/?shop=' + shop); await p.waitForFunction(() => { const b = document.querySelector('#t-act'); return b && !b.disabled && !/Connect wallet|Lighting/.test(b.textContent); }, null, { timeout: 90e3 }); };
+const open = async shop => { await p.goto(BASE + '/design/D8_shops/?shop=' + shop); await p.waitForFunction(() => { const b = document.querySelector('#t-act'); return b && !b.disabled && !/Sign in|Lighting/.test(b.textContent); }, null, { timeout: 90e3 }); };
 try {
   await p.goto(BASE + '/design/D8_shops/?shop=house');
-  await until(/Connect wallet/, 60e3); await snap('1-enter');
-  await act.click(); await p.locator('.connect-item', { hasText: 'Guest' }).first().click();
+  await until(/Sign in/, 60e3); await snap('1-enter');
+  await act.click(); await p.waitForURL(/\/setup\//);
+  await p.getByTestId('setup-guest').click();
+  await p.getByTestId('setup-who').waitFor({ timeout: 120_000 });
+  await p.goto(BASE + '/design/D8_shops/?shop=house');
   await until(/Build my charter/, 90e3); ph.guest = await p.evaluate(() => window.__apps.S.me);
   await act.click(); await p.locator('#rules.open').waitFor({ timeout: 120e3 }); ph.charter = await p.evaluate(() => window.__apps.S.charter);
   ph.rules_defaults = { cap: await p.locator('#r-cap').inputValue().catch(() => null), budget: await p.locator('#r-bud').inputValue().catch(() => null), count: await p.locator('#r-cnt').inputValue().catch(() => null) };

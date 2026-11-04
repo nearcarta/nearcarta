@@ -95,7 +95,7 @@ export async function connect(note = () => {}) {
   let id;
   try { id = await c.selectWallet(); } catch { note(''); return account(); }
   if (id === 'ethereum-wallets') note('In the evm-on-near.dev window that opens, press Connect Wallet, then MetaMask, and approve in MetaMask (it adds NEAR Protocol Testnet, chain 398). If no window opened, allow pop-ups for this site.');
-  else if (id === 'nightly-wallet' && !window.nightly) note('Nightly is not installed in this browser. Install it from the Chrome Web Store (chromewebstore.google.com/detail/nightly/fiikommddbeccaoicoejoniammnalkfa), reload this page and press Connect again. No extension? Press Start free.');
+  else if (id === 'nightly-wallet' && !window.nightly) note('Nightly is not installed in this browser. Install it from the Chrome Web Store (chromewebstore.google.com/detail/nightly/fiikommddbeccaoicoejoniammnalkfa), reload this page and press Sign in again.');
   else if (id === 'near-cli') note('NEAR CLI: type your testnet account id in the window, then run the near command it shows in your terminal (needs near-cli-rs installed).');
   else note('Waiting for your wallet…');
   try { await c.connect({ walletId: id }); note(''); }
@@ -127,7 +127,7 @@ export async function mountConnect(el) {
           : `<a class="pill go" href="/shops/vault/" data-testid="hud-build" title="Creates your own charter account: the house that keeps your rules">Build my house</a>`)
         + (low ? '<button type="button" class="pill go" data-x="drip" data-testid="hud-faucet" title="10 NEAR from the public testnet faucet, sent to this account">Get 10 free testnet NEAR</button>' : '')
         + '<button type="button" class="pill" data-x="out">Sign out</button>'
-      : `<button type="button" class="pill go" data-x="guest" data-testid="hud-guest" title="Makes a new testnet account with 10 free NEAR. Its key stays in this browser.">Start free</button><a class="pill" href="/setup/" data-x="in" data-testid="hud-connect">Connect</a>`;
+      : `<a class="pill go" href="/setup/" data-testid="hud-connect" title="Sign in, then fund your account and sign your agent's rules">Sign in</a>`;
     if (!msg) { msg = document.createElement('div'); msg.dataset.testid = 'wallet-note'; msg.setAttribute('role', 'status'); msg.style.cssText = 'flex-basis:100%;max-width:360px;font-size:12px;line-height:1.35;margin-top:4px;background:#2a1d14ee;color:#fbe9d0;padding:6px 8px;border-radius:8px'; }
     el.appendChild(msg);
     const note = t => { msg.innerHTML = t; msg.hidden = !t; };
@@ -160,7 +160,7 @@ async function render() {
     Status: <b data-testid="house-frozen" class="${s.frozen ? 'fail' : 'pass'}">${s.frozen ? 'frozen' : 'active'}</b>${s.frozen ? ' <span class="note">(frozen on purpose: the agent cannot spend until the owner unfreezes)</span>' : ''} · next action #${esc(s.next_action)}<br>
     Full-access keys: <b data-testid="house-fak">${h.keys.fullAccess}</b> · the agent's key may only call: <b>${esc(h.keys.functionCall.map(k => k.methods.join(',')).join(' | '))}</b></div>
   <div class="card"><b>Wallet</b> · <span data-testid="house-who">${who ? 'signed in as ' + esc(who) + (isOwner ? ' (owner)' : ' (not the owner: buttons are off)') : 'not signed in'}</span><br>
-    ${who ? '<button data-act="signout">Sign out</button>' : `<button data-act="signin">Connect wallet</button> <button data-act="guest">Start free (guest account, 10 testnet NEAR)</button>`}</div>
+    ${who ? '<button data-act="signout">Sign out</button>' : `<a class="pill go" href="/setup/" data-testid="house-signin">Sign in</a>`}</div>
   <div class="card" data-testid="house-deed"><b>Your own house</b> · ${await deedCard(who)}</div>
   <div class="card"><b>Emergency</b> · ${btn('freeze', 'Freeze the House')} ${btn('unfreeze', 'Unfreeze')}
     <p class="note">Freeze stops every agent spend at once. It is signed by your wallet, never by this page.</p></div>
@@ -173,7 +173,7 @@ async function render() {
 
 // The house deed (NEP-171 v2: the deed holds the house purse), the charter registry entry and Guardian NFTs.
 async function deedCard(who) {
-  if (!who) return '<span class="note">Sign in (or Start free) to build a house of your own.</span>';
+  if (!who) return '<span class="note">Sign in to build a house of your own.</span>';
   const [d, t, n, held, minted] = await Promise.all([deeds(who), nfts(who), nftSupply(), deedHouses(who), deedMinted(who)]);
   const acc = a => `<a href="https://testnet.nearblocks.io/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
   const houses = held.map(h => `<div class="deed" data-testid="deed-house" data-token="${esc(h.token_id)}">

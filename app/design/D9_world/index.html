@@ -4,8 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nearcarta</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Ccircle cx=%278%27 cy=%278%27 r=%276%27 fill=%27%23c9a45c%27/%3E%3C/svg%3E">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta name="description" content="Nearcarta: a small charter town where every payment your agent proposes is checked by the oath. Independent, not affiliated with NEAR Foundation.">
+<meta property="og:title" content="Nearcarta">
+<meta property="og:description" content="The agent proposes. The charter decides.">
+<meta property="og:image" content="/brand/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preload" href="assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="d7/tokens/tokens.css">
 <link rel="stylesheet" href="world.css">
@@ -18,10 +22,10 @@
 <div id="bubbles" aria-live="polite"></div>
 
 <header id="brand" class="hud">
-  <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l11 6v14l-11 6-11-6V9z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 9.5c3 2.4 4.4 4.7 4.4 7a4.4 4.4 0 0 1-8.8 0c0-2.3 1.4-4.6 4.4-7z" fill="currentColor"/></svg>
+  <img class="mark" src="/brand/mark.svg" alt="" width="26" height="26">
   <div><b>Nearcarta</b><small>independent, not affiliated with NEAR Foundation</small></div>
 </header>
-<a id="rulesBtn" class="hud pill go" href="/shops/vault/" data-testid="rules-cta" title="Your House is the Charter office: write what your agent may spend, and on what"><span class="k" aria-hidden="true">&#9873;</span>Set your agent&rsquo;s rules<span class="cue" aria-hidden="true">Start here</span></a>
+<a id="rulesBtn" class="hud pill go" href="/setup/" data-testid="rules-cta" title="Sign in, fund, and sign the rules your agent cannot break"><span class="k" aria-hidden="true">&#9873;</span><span class="lab">Set your agent&rsquo;s rules</span><span class="cue" aria-hidden="true">Start here</span></a>
 
 <nav id="ctl" class="hud" aria-label="Controls">
   <div id="playSeg" role="radiogroup" aria-label="How to get around">
@@ -103,6 +107,7 @@ else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpr
   script('vendor/gsap/gsap.min.js').then(()=>import(q.has('t')?'./js/test_main.js':q.has('dev')?'./js/main.js':'./dist/main.js')).catch(e=>{ console.error('[Nearcarta] 3D failed to load',e); go2d('3D failed to load'); });
   if(!force) setTimeout(()=>{ if(!document.body.classList.contains('ready')&&!document.body.classList.contains('fb')){ window.__3dStop='slow start'; go2d('3D did not start within 25 s'); } },25000); }
 </script>
+<script type="module" src="js/hero-town.js"></script>
 <script type="module" src="../D8_shops/js/townplain.js"></script>
 </body>
 </html>

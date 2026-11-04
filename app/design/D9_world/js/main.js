@@ -361,13 +361,17 @@ function frame(now){ if(stopped) return; const dt=Math.min(.1,(now-last)/1000); 
 // ---------- landing: after the intro the camera frames the plaza, the Lamplighter in front, two or three shop fronts behind ----------
 function land(){ explore(true); const z=.16; PC.z=PC.zs=z; setZoom(z); PC.po=.04; PC.yaw=Math.atan2(R.pos.x-ZC.x,R.pos.z-ZC.z); }
 // ---------- "Set your agent's rules": the Charter office is Your House. Fly to its door, open it, and go in under the fade ----------
-const rb=$('#rulesBtn'); rb.href=CHARTER;
+const SETUP='/setup/';
+const ready=()=>{ try{ return !!JSON.parse(localStorage.getItem('nearcarta.setup.v1')||'{}').charter; }catch{ return false; } };
+const startTo=()=> ready()?CHARTER:SETUP;
+function paintStart(){ const on=ready(); rb.href=startTo(); const lab=rb.querySelector('.lab'); if(lab) lab.textContent=on?'Your charter':"Set your agent's rules"; const cue=rb.querySelector('.cue'); if(cue) cue.textContent=on?'Charter office':'Start here'; rb.title=on?'Open the charter office':'Sign in, fund, and sign the rules your agent cannot break'; }
+const rb=$('#rulesBtn'); paintStart();
 const goTo=to=>{ window.dispatchEvent(new CustomEvent('world:navigate',{detail:{id:'house',to}})); if(!CAPTURE||!P.has('nonav')) location.assign(to); };
 const toCharter=(hash='')=>{ if(inShop||exiting){ goTo(CHARTER+hash); return; } jump('house',{to:CHARTER+hash}); };
-rb.addEventListener('click',e=>{ if(e.metaKey||e.ctrlKey||e.shiftKey||e.button) return; e.preventDefault(); body.classList.remove('cta'); sfx('click',{g:.3}); toCharter(); });
+rb.addEventListener('click',e=>{ if(e.metaKey||e.ctrlKey||e.shiftKey||e.button) return; e.preventDefault(); body.classList.remove('cta'); sfx('click',{g:.3}); paintStart(); if(!ready()){ location.assign(SETUP); return; } toCharter(); });
 function pointRules(){ body.classList.add('cta'); setTimeoutSim(()=>body.classList.remove('cta'),12); }
 // a wallet that connects during this visit: straight to Your House and "Create my charter"
-{ let out=false, done=false; const chk=()=>{ if(done) return; if(document.querySelector('[data-testid=hud-guest],[data-x=in]')) out=true; else if(out&&document.querySelector('[data-testid=hud-account]')){ done=true; if(!body.classList.contains('in-shop')) onWallet(); } }; /* signed in inside a room: the room shows the next step */
+{ let out=false, done=false; const chk=()=>{ if(done) return; if(document.querySelector('[data-testid=hud-connect],[data-x=in]')) out=true; else if(out&&document.querySelector('[data-testid=hud-account]')){ done=true; if(!body.classList.contains('in-shop')) onWallet(); } }; /* signed in inside a room: the room shows the next step */
   new MutationObserver(chk).observe(body,{childList:true,subtree:true}); addEventListener('nearcarta:signin',()=>{ if(!done){ done=true; onWallet(); } }); }
 function onWallet(){ if(mode==='story') endStory(); toCharter('#create'); }
 world.toCharter=toCharter;

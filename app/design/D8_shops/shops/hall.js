@@ -65,7 +65,7 @@ export default async function hall(ctx) {
   const v2 = TH.versions[1], v3 = TH.versions[2];
   return {
     rob, scene, camera, tags: [],
-    panel: { title: 'Town Hall', src: 'testnet', label: 'Reward cap · Proposal 4', hero: tok('0.25', 'NEAR'), action: 'Count the votes', more: MORE },
+    panel: { title: 'Town Hall', src: 'split', srcNote: 'townhall.nearcarta.near is on mainnet. Counting votes here replays the testnet DAO.', label: 'Reward cap · Proposal 4', hero: tok('0.25', 'NEAR'), action: 'Count the votes', more: MORE },
     proof: (await liveP) + PROOF,
   // intro: the robot walks to beside the table, not behind it
     *intro() { setCap(v2.cap); yield rob.walk([new THREE.Vector3(1.95, 0, -.35)]); rob.lookAt(slab.position); },

@@ -16,3 +16,5 @@ code{font-size:12px;word-break:break-all;color:var(--mute)}
 form button.ghost{background:transparent;color:var(--amber);border:1px solid var(--amber)}
 #wallet{display:inline-flex;gap:6px;align-items:center;vertical-align:middle}#wallet .pill{background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:3px 10px;border-radius:999px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none}#wallet .pill.go{background:var(--amber);color:#2b1a0c;border-color:var(--amber);font-weight:600}
 .links a{display:inline-block;min-height:24px;line-height:24px}
+header .back-town{margin-bottom:10px}
+@media(max-width:720px){form{grid-template-columns:1fr}form .wide,form button{grid-column:auto}header,main{padding:12px 14px}nav button{min-height:40px}}

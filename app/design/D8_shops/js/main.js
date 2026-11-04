@@ -83,7 +83,7 @@ function ui() {
 function drawer(on) { const d = $('#drawer'); d.classList.toggle('open', on); d.setAttribute('aria-hidden', on ? 'false' : 'true'); $('#t-proof').setAttribute('aria-expanded', on); if (on) { sfx('click'); $('#d-close').focus(); } }
 export function setResult(kind, text) { if (APP) return; const b = $('#t-act'); b.classList.remove('busy'); b.className = 'act res ' + kind; b.disabled = true; b.innerHTML = `<span class="glyph" aria-hidden="true">${kind === 'no' ? '✕' : kind === 'ok' ? '✓' : '○'}</span>${text}`; b.setAttribute('aria-live', 'polite'); }
 export function setHero(html) { const h = $('#t-hero'); h.innerHTML = html; h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); }
-const SRC = { testnet: 'testnet', live: 'live read' };
+const SRC = { testnet: 'testnet', live: 'live read', split: 'mainnet · testnet trial', quote: 'mainnet quote' };
 function fillTray(sh) { const p = sh.panel; $('#t-title').innerHTML = `${i3(SHOPS[sh.id].icon, 28)}<span>${p.title}</span>`; const s = $('#t-src'); s.textContent = SRC[p.src]; s.className = 'src ' + p.src; s.title = p.srcNote || '';
   $('#t-label').textContent = p.label; $('#t-hero').innerHTML = p.hero; const b = $('#t-act'); b.className = 'act primary'; b.disabled = false; b.hidden = !p.action; b.textContent = p.action || '';
   const m = $('#t-more'); m.hidden = !p.more; if (p.more) { m.href = p.more.href; m.textContent = p.more.text; }
@@ -94,7 +94,7 @@ function fillTray(sh) { const p = sh.panel; $('#t-title').innerHTML = `${i3(SHOP
 function frameShop(c) { c.aspect = innerWidth / innerHeight; const ox = innerWidth > 900 ? -196 : 0; c.setViewOffset(innerWidth, innerHeight, ox, 0, innerWidth, innerHeight); c.updateProjectionMatrix(); }
 let busy = false;
 function coldTray(id) { $('#t-title').innerHTML = `${i3(SHOPS[id].icon, 28)}<span>${SHOPS[id].name || id}</span>`; $('#t-label').textContent = 'Opening the shop…'; $('#t-hero').innerHTML = '<div class="skel" data-testid="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>';
-    const b0 = $('#t-act'); b0.hidden = false; b0.disabled = true; b0.className = 'act primary'; b0.textContent = 'Connect wallet'; document.body.classList.add('in-shop'); tray().hidden = false; $('#brand').hidden = true; }
+    const b0 = $('#t-act'); b0.hidden = false; b0.disabled = true; b0.className = 'act primary'; b0.textContent = 'Sign in'; document.body.classList.add('in-shop'); tray().hidden = false; $('#brand').hidden = true; }
 export async function enter(id, { instant = false } = {}) {
   if (busy || shop) return; busy = true; sfx('click');
   // direct link (?shop=): show the panel straight away while the room's 3D and the API load

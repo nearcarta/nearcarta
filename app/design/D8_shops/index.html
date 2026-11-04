@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nearcarta</title>
 <link rel="preload" href="fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="icon" href="data:,">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link id="tokens" rel="stylesheet" href="../D7_system/tokens/tokens.css">
 <link rel="stylesheet" href="styles.css">
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","three/addons/":"../D2_game/vendor/jsm/","../D2_game/vendor/three.module.js":"./vendor/three.module.min.js"}}</script>
@@ -13,9 +13,10 @@
 <body>
 <canvas id="gl" aria-label="The town. Pick a building to enter it."></canvas>
 <header id="top">
-  <span id="brand"><b>Nearcarta</b><span class="src testnet">testnet</span></span>
-  <button id="back" class="ghost" hidden><span aria-hidden="true">←</span> Town</button>
-  <button id="wallet" class="ghost wallet" hidden>Connect wallet</button>
+  <span id="brand"><img src="/brand/mark.svg" alt="" width="26" height="26"><b>Nearcarta</b></span>
+  <a class="ghost" href="/" data-testid="back-town">Back to town</a>
+  <button id="back" class="ghost" hidden><span aria-hidden="true">←</span> Street</button>
+  <button id="wallet" class="ghost wallet" hidden>Sign in</button>
   <button id="snd" class="icon" aria-label="Sound on or off" title="Sound"></button>
 </header>
 <nav id="tags" aria-label="Buildings"></nav>

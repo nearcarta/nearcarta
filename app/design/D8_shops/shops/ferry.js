@@ -29,7 +29,7 @@ export const PROOF = proof(
   row({ k: 'Hidden · recipient, note and later spends', why: "shielded into Zcash's Ironwood pool via an Orchard-only UA; no transparent receiver to fall back to", st: 'ok', stText: 'hidden', src: 'testnet' }),
   note('1Click has no testnet. So the swap here is a real signed 1Click quote plus a testnet NEAR payment that your charter checks against your Ferry rule; no cross-chain swap runs.'),
   note(`Not hidden from the 1Click operator or the private shard's validators. Dry quote: nothing was sent, so no tx exists yet. Read ${esc(utc3(Q.at))}.`));
-export const FLAT = { src: 'testnet · live quote', cls: 'live', label: LABEL, hero: HERO };
+export const FLAT = { src: 'mainnet quote', cls: 'quote', label: LABEL, hero: HERO };
 
 export default async function ferry(ctx) {
   const T = []; for (let q = -3; q <= 3; q++) for (let r = -1; r <= 1; r++) { const x = 2 * q + r; if (Math.abs(x) > 4) continue; T.push([q, r, Math.abs(x) <= 1 ? 'hex_water' : 'hex_grass']); }
@@ -61,7 +61,7 @@ export default async function ferry(ctx) {
   let t = 0;
   return {
     rob, scene, camera, tags,
-    panel: { title: 'Ferry', src: 'live', srcNote: `1Click has no testnet: this is a dry 1Click quote read through ${Q.api}, then a testnet payment your charter checks. No swap was executed.`, label: LABEL, hero: HERO, action: 'Load the cargo' },
+    panel: { title: 'Ferry', src: 'quote', srcNote: `1Click has no testnet: this is a dry mainnet quote read through ${Q.api}, then a testnet payment your charter checks. No swap was executed.`, label: LABEL, hero: HERO, action: 'Load the cargo' },
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },
     *act() {

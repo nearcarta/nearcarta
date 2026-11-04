@@ -12,6 +12,7 @@ import { NEAR_NET } from './privy.js';
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, sendPropose } from '../../shared/vault/tx.js';
 import { runAsk } from '../../shared/vault/run.js';
+import { LOOKS, DYES, OUTFITS, portraitHTML, writeHero, displayOk } from './hero.js';
 
 const PRIVY_ON = typeof __PRIVY_ON__ !== 'undefined' && __PRIVY_ON__;
 const privy = PRIVY_ON ? new Privy({ appId: __PRIVY_APP_ID__, ...(__PRIVY_CLIENT_ID__ ? { clientId: __PRIVY_CLIENT_ID__ } : {}), storage: new LocalStorage() }) : null;
@@ -26,6 +27,7 @@ const short = a => { const s = String(a || ''); return s.length > 26 ? s.slice(0
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const agentLS = c => 'nearcarta.vault.agent.' + c, pendLS = c => 'nearcarta.vault.agent.pending.' + c;
 const SAVE = 'nearcarta.setup.v1';
+const PREVIEW = new URLSearchParams(location.search).has('preview');
 
 const STEPS = [
   ['signin', 'Sign in', 'Google, email or wallet'],
@@ -36,23 +38,16 @@ const STEPS = [
   ['sign', 'Sign', 'Charter and agent key'],
   ['try', 'Try it', 'One yes, one no'],
 ];
-const PERSONAS = [
-  { id: 'knight', name: 'Warden', img: 'knight', blurb: 'Careful. Small caps, few shops.', cap: 0.02, daily: 0.06, per: 3 },
-  { id: 'mage', name: 'Scholar', img: 'mage', blurb: 'Buys books and data, mid caps.', cap: 0.05, daily: 0.2, per: 6 },
-  { id: 'rogue', name: 'Courier', img: 'rogue_hooded', blurb: 'Many tiny errands a day.', cap: 0.01, daily: 0.1, per: 12 },
-  { id: 'robot', name: 'Clerk', img: 'robotexpressive', blurb: 'Steady, invoice-style payments.', cap: 0.03, daily: 0.12, per: 5 },
-  { id: 'barbarian', name: 'Buyer', img: 'barbarian', blurb: 'Bigger single buys, few per day.', cap: 0.1, daily: 0.2, per: 2 },
-  { id: 'scout', name: 'Scout', img: 'rogue', blurb: 'Tries new shops, low daily budget.', cap: 0.02, daily: 0.05, per: 4 },
-];
-
-const st = Object.assign({ step: 0, done: [], persona: 'mage', agentName: '', mist: false, cap: null, daily: null, per: null, days: 30, receivers: null, charter: null, deposit: 0.5 }, JSON.parse(localStorage.getItem(SAVE) || '{}'));
+const st = Object.assign({ step: 0, done: [], persona: 'mage', dye: 'brass', outfit: 'lantern', displayName: '', agentName: '', mist: false, cap: null, daily: null, per: null, days: 30, receivers: null, charter: null, deposit: 0.5 }, JSON.parse(localStorage.getItem(SAVE) || '{}'));
 const save = () => localStorage.setItem(SAVE, JSON.stringify(st));
 let CFG = null, rpc = null, me = null, bal = undefined, balTimer = 0, busy = false, msg = '';
 const view = (c, m, a) => viewFn(rpc, c, m, a);
 const explorer = () => (CFG?.explorer || (NEAR_NET === 'mainnet' ? 'https://nearblocks.io' : 'https://testnet.nearblocks.io')).replace(/\/$/, '');
 const txA = h => h ? `<a href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" data-testid="setup-tx">${esc(h.slice(0, 8))}…</a>` : '';
 const acA = a => `<a href="${explorer()}/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
-const persona = () => PERSONAS.find(p => p.id === st.persona) || PERSONAS[1];
+const persona = () => LOOKS.find(p => p.id === st.persona) || LOOKS[1];
+const dyeOf = () => DYES.find(d => d.id === st.dye) || DYES[0];
+const remember = () => writeHero({ look: persona(), dye: dyeOf(), outfit: st.outfit, name: st.displayName || persona().name });
 
 function go(i) { st.step = Math.max(0, Math.min(STEPS.length - 1, i)); msg = ''; save(); history.replaceState(null, '', location.pathname + location.search + '#' + STEPS[st.step][0]); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function done(i) { if (!st.done.includes(i)) st.done.push(i); save(); }
@@ -64,7 +59,8 @@ function rail() {
   $('#bar').style.width = ((st.step + 1) / STEPS.length * 100) + '%';
 }
 function top() {
-  $('#net').textContent = NEAR_NET;
+  const net = CFG?.network || NEAR_NET;
+  $('#net').textContent = net === 'mainnet' ? 'mainnet' : net + ' trial';
   $('#who').innerHTML = me ? `<span data-testid="setup-who">${esc(short(me))}</span> · <span data-testid="setup-bal">${bal === undefined ? '…' : bal == null ? '? NEAR' : fmtN(nearOf(bal)) + ' NEAR'}</span><button class="btn link sm" id="out">Sign out</button>` : '';
   const o = $('#out'); if (o) o.onclick = async () => { await disconnect(); await privy?.auth.logout().catch(() => {}); me = null; bal = undefined; st.done = []; save(); go(0); };
 }
@@ -72,15 +68,17 @@ const head = (eye, h, lede) => `<p class="eyebrow">Step ${st.step + 1} of ${STEP
 const nav = (next, { back = true, nextOk = true, label = 'Continue' } = {}) => `<div class="actions">${back && st.step > 0 ? '<button class="btn" id="back">Back</button>' : '<span></span>'}${next ? `<button class="btn gold" id="next" data-testid="setup-next" ${nextOk ? '' : 'disabled'}>${esc(label)} →</button>` : ''}</div>`;
 const errP = () => msg ? `<p class="err" role="alert" data-testid="setup-err">${esc(msg)}</p>` : '';
 function wire(nextFn) { const b = $('#back'); if (b) b.onclick = () => go(st.step - 1); const n = $('#next'); if (n) n.onclick = nextFn || (() => { done(st.step); go(st.step + 1); }); }
-async function act(btn, f) { if (busy) return; busy = true; const t = btn?.innerHTML; if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + t; } msg = '';
+async function act(btn, f) {
+  if (PREVIEW) { msg = ''; done(st.step); go(Math.min(STEPS.length - 1, st.step + 1)); return; }
+  if (busy) return; busy = true; const t = btn?.innerHTML; if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + t; } msg = '';
   try { await f(); } catch (e) { msg = e?.message || String(e); } finally { busy = false; if (btn && document.contains(btn)) { btn.disabled = false; btn.innerHTML = t; } render(); } }
 
 // ---------- 1. Sign in ----------
 let emailStage = 'email', email = '';
 function sSignin() {
-  const signed = !!me;
-  return head('Sign in', signed ? 'You are in.' : 'Make your account in seconds.',
-    signed ? `Signed in as <b>${esc(me)}</b>.` : 'Pick one way in. You can change wallets later.')
+  const signed = !!me && !PREVIEW;
+  return head('Sign in', signed ? 'You are in.' : 'Start here.',
+    signed ? `Signed in as <b>${esc(me)}</b>.` : 'One path: sign in, fund, pick a character, write the rules, sign them, then try one payment the charter allows and one it refuses.')
     + (signed ? `<div class="addr"><div><small class="muted">Your NEAR account</small><br><code>${esc(me)}</code></div></div>` :
     (PRIVY_ON ? `<button class="btn google big" id="google" data-testid="setup-google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.9l-8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Continue with Google</button>
       <form id="emailf" style="margin-top:12px">${emailStage === 'email'
@@ -89,7 +87,7 @@ function sSignin() {
       <div class="or">or</div>` : '')
     + `<div class="tiles"><button class="tile" id="wallet" data-testid="setup-wallet"><i>◈</i><b>NEAR wallet</b><span>Meteor, Intear, HOT, Ledger…</span></button>
       <button class="tile" id="mm" data-testid="setup-metamask"><i>🦊</i><b>MetaMask</b><span>Your EVM wallet signs NEAR txs</span></button>
-      ${NEAR_NET === 'testnet' ? '<button class="tile" id="guest" data-testid="setup-guest"><i>✦</i><b>Guest</b><span>Free testnet account, key in this browser</span></button>' : ''}</div>
+      ${NEAR_NET === 'testnet' ? '<button class="tile" id="guest" data-testid="setup-guest"><i>✦</i><b>Free testnet trial</b><span>A faucet account. Its key stays in this browser. No real NEAR.</span></button>' : ''}</div>
       <p class="assure">Google or email makes a NEAR account for you; nothing is sent until you approve.</p>`)
     + errP() + nav(signed, { back: false });
 }
@@ -163,16 +161,28 @@ const nameOk = n => /^[a-z0-9](?:[a-z0-9-]{0,22}[a-z0-9])?$/.test(n) && !n.inclu
 function defName() { const b = (me || 'agent').split('.')[0].replace(/[^a-z0-9]/g, '').slice(0, 10) || 'agent'; return `${persona().id}-${b}`.slice(0, 24); }
 function sCharacter() {
   if (!st.agentName) st.agentName = defName();
-  return head('Character', 'Choose who acts for you.', 'The look is yours. The name becomes your charter: <code>' + esc(st.agentName || 'name') + '.' + esc(CFG?.factory || '…') + '</code>')
-    + `<div class="picks" role="group" aria-label="Characters">${PERSONAS.map(p => `<button class="pick" data-p="${p.id}" aria-pressed="${p.id === st.persona}" data-testid="persona-${p.id}"><img src="/setup/chars/${p.img}.webp" alt="" width="160" height="160" loading="lazy"><b>${esc(p.name)}</b><span>${esc(p.blurb)}</span></button>`).join('')}</div>
-     <div class="field" style="margin-top:20px"><label for="an">Charter name</label><div class="suffix"><input id="an" value="${esc(st.agentName)}" maxlength="24" autocomplete="off" spellcheck="false" data-testid="setup-name"><span>.${esc(short(CFG?.factory || ''))}</span></div>
-     <p class="small muted" id="nhint">Lowercase letters, digits and dashes.</p></div>` + nav(true, { nextOk: nameOk(st.agentName) });
+  if (!st.displayName) st.displayName = persona().name;
+  const shown = st.displayName || persona().name;
+  return head('Character', 'Choose who walks the town.', 'The look, colour and name stay in this browser and appear in the town. The account name is the charter on chain.')
+    + `<div class="cast"><div class="picks" role="group" aria-label="Looks">${LOOKS.map(p => `<button class="pick" data-p="${p.id}" aria-pressed="${p.id === st.persona}" data-testid="persona-${p.id}"><img src="/setup/chars/${p.img}.webp" alt="" width="160" height="160"><b>${esc(p.name)}</b><span>${esc(p.blurb)}</span></button>`).join('')}</div>
+     <aside class="liveprev">${portraitHTML(persona(), dyeOf(), st.outfit, shown)}
+       <p class="small muted">Colour</p><div class="swatches" role="group" aria-label="Colours">${DYES.map(d => `<button type="button" class="swatch" data-dye="${d.id}" aria-pressed="${d.id === st.dye}" title="${esc(d.name)}" style="--dye:${d.hex}" data-testid="dye-${d.id}"></button>`).join('')}</div>
+       <p class="small muted">Outfit</p><div class="swatches" role="group" aria-label="Outfits">${OUTFITS.map(o => `<button type="button" class="fit" data-fit="${o.id}" aria-pressed="${o.id === st.outfit}" data-testid="outfit-${o.id}">${esc(o.name)}</button>`).join('')}</div>
+       <div class="field"><label for="dn">Name in town</label><input id="dn" value="${esc(st.displayName)}" maxlength="24" autocomplete="off" data-testid="setup-display"></div>
+       <div class="field"><label for="an">Charter account</label><div class="suffix"><input id="an" value="${esc(st.agentName)}" maxlength="24" autocomplete="off" spellcheck="false" data-testid="setup-name"><span>.${esc(short(CFG?.factory || ''))}</span></div>
+       <p class="small muted" id="nhint">Lowercase letters, digits and single dashes.</p></div></aside></div>` + nav(true, { nextOk: nameOk(st.agentName) && displayOk(st.displayName) });
 }
 function wireCharacter() {
-  document.querySelectorAll('.pick').forEach(b => b.onclick = () => { const old = defName(); st.persona = b.dataset.p; const p = persona(); if (st.agentName === old || !st.agentName) st.agentName = defName(); st.cap = p.cap; st.daily = p.daily; st.per = p.per; save(); render(); });
-  $('#an').oninput = e => { st.agentName = e.target.value.toLowerCase(); save(); const ok = nameOk(st.agentName); $('#next').disabled = !ok; $('#nhint').textContent = ok ? 'Lowercase letters, digits and dashes.' : 'Use 2–24 lowercase letters, digits or single dashes.'; $('#nhint').className = 'small ' + (ok ? 'muted' : 'err'); };
-  wire(async () => { const id = `${st.agentName}.${CFG.factory}`; const b = $('#next');
-    await act(b, async () => { const r = await fetch(API + '/api/vault/charter/' + encodeURIComponent(id)).then(r => r.json()).catch(() => ({}));
+  const paint = () => { remember(); const ok = nameOk(st.agentName) && displayOk(st.displayName); const n = $('#next'); if (n) n.disabled = !ok; const h = $('#nhint'); if (h) { h.textContent = nameOk(st.agentName) ? 'Lowercase letters, digits and single dashes.' : 'Use 2–24 lowercase letters, digits or single dashes.'; h.className = 'small ' + (nameOk(st.agentName) ? 'muted' : 'err'); } };
+  document.querySelectorAll('.pick').forEach(b => b.onclick = () => { const old = defName(), oldShow = persona().name; st.persona = b.dataset.p; const p = persona(); if (st.agentName === old || !st.agentName) st.agentName = defName(); if (!st.displayName || st.displayName === oldShow) st.displayName = p.name; st.cap = p.cap; st.daily = p.daily; st.per = p.per; save(); render(); });
+  document.querySelectorAll('[data-dye]').forEach(b => b.onclick = () => { st.dye = b.dataset.dye; save(); render(); });
+  document.querySelectorAll('[data-fit]').forEach(b => b.onclick = () => { st.outfit = b.dataset.fit; save(); render(); });
+  $('#dn').oninput = e => { st.displayName = e.target.value.replace(/\s+/g, ' ').trimStart(); save(); paint(); const port = document.querySelector('.portrait b'); if (port) port.textContent = st.displayName || persona().name; };
+  $('#an').oninput = e => { st.agentName = e.target.value.toLowerCase(); save(); paint(); };
+  paint();
+  wire(async () => { if (!displayOk(st.displayName)) { msg = 'Give your agent a name, 2–24 letters.'; return render(); }
+    remember(); const id = `${st.agentName}.${CFG.factory}`; const b = $('#next');
+    await act(b, async () => { if (PREVIEW) return; const r = await fetch(API + '/api/vault/charter/' + encodeURIComponent(id)).then(r => r.json()).catch(() => ({}));
       if (r?.exists && r?.owner && r.owner !== me) throw new Error(`${id} is taken. Pick another name.`); done(st.step); go(st.step + 1); }); });
 }
 
@@ -207,7 +217,7 @@ function sSign() {
   const r = rules(), id = st.charter || `${st.agentName}.${CFG.factory}`, live = st.charter && localStorage.getItem(agentLS(st.charter));
   const L = [['Create your charter', 'create'], ['Write the rule and add the agent key', 'rules']];
   return head('Sign', live ? 'Your agent is live.' : 'Two approvals in your wallet.', live ? 'These limits are read back from the chain, not from this page.' : `First the charter is made (${fmtN(st.deposit)} NEAR goes into it). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`)
-    + `<div class="agent"><img src="/setup/chars/${persona().img}.webp" alt=""><div><b>${esc(persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
+    + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
     + (live ? `<div class="facts" id="facts" data-testid="setup-facts"><div class="fact"><small>Loading</small><b>…</b></div></div>` : `<div class="preview">${preview(r)}</div>`)
     + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
     + (live ? '' : `<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`) + errP() + nav(live, { label: 'Try your agent' });
@@ -259,7 +269,7 @@ function sTry() {
     + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button class="tile" id="t-ok" data-testid="try-allowed"><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span>Inside your rule: should pass</span></button>
        <button class="tile" id="t-no" data-testid="try-refused"><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span>Twice your cap: should be refused</span></button></div>
      ${tries.map(t => `<div class="verdict ${t.passed ? 'good' : 'bad'}" data-testid="try-verdict"><span class="tag">${t.passed ? 'ALLOWED' : 'REFUSED'}</span><div><b>${fmtN(nearOf(t.amount))} NEAR → ${esc(short(t.receiver))}</b><br><span class="muted small">${esc(t.passed ? 'inside your rule · the charter paid' : (WHY[t.reason] || t.reason || t.decision))}</span> ${txA(t.tx)}</div></div>`).join('')}
-     ${errP()}<div class="actions"><button class="btn" id="back">Back</button><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.length >= 2 ? 'Enter the town →' : 'Skip to the town →'}</a></div>`;
+     ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Charter office</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.length >= 2 ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
 }
 function next() { const n = new URLSearchParams(location.search).get('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/'; }
 function wireTry() {
@@ -272,14 +282,23 @@ function wireTry() {
 
 const VIEWS = { signin: [sSignin, wireSignin], fund: [sFund, wireFund], privacy: [sPrivacy, wirePrivacy], character: [sCharacter, wireCharacter], rules: [sRules, wireRules], sign: [sSign, wireSign], try: [sTry, wireTry] };
 function render() {
-  if (!me && st.step > 0) st.step = 0;
-  if (st.step === 6 && !(st.charter && localStorage.getItem(agentLS(st.charter)))) st.step = 5;
-  rail(); top(); const [v, w] = VIEWS[STEPS[st.step][0]]; const c = $('#card'); c.innerHTML = v(); c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; w();
+  if (!PREVIEW && !me && st.step > 0) st.step = 0;
+  if (!PREVIEW && st.step === 6 && !(st.charter && localStorage.getItem(agentLS(st.charter)))) st.step = 5;
+  document.body.classList.toggle('previewing', PREVIEW);
+  rail(); top(); const [v, w] = VIEWS[STEPS[st.step][0]]; const c = $('#card');
+  c.innerHTML = (PREVIEW ? '<p class="preview-banner" data-testid="preview-banner">Preview. Nothing is signed.</p>' : '') + v();
+  c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; w();
+  if (['character', 'sign', 'try'].includes(STEPS[st.step][0])) remember();
 }
 
 async function boot() {
   // The API host from config.js, else this origin's /api rewrite.
-  CFG = await fetch(API + '/api/vault/config').then(r => r.json()).catch(() => { API = ''; return fetch('/api/vault/config').then(r => r.json()); });
+  try {
+    CFG = await fetch(API + '/api/vault/config').then(r => r.json()).catch(() => { API = ''; return fetch('/api/vault/config').then(r => r.json()); });
+  } catch (e) {
+    if (!PREVIEW) throw e;
+    CFG = { factory: 'preview.testnet', network: 'testnet', arena: { merchants: ['cafe.preview.testnet'] }, rpc: 'https://rpc.testnet.fastnear.com', rpc_fallbacks: [] };
+  }
   rpc = rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])].filter(Boolean).length ? [CFG.rpc, ...(CFG.rpc_fallbacks || [])].filter(Boolean) : ['https://rpc.testnet.fastnear.com']);
   if (CFG.min_deposit) st.deposit = Math.max(st.deposit, nearOf(CFG.min_deposit));
   onWallet(async () => { const a = await account(); if (a !== me) { me = a; bal = undefined; if (me) await refreshBal(); render(); } });
@@ -292,6 +311,14 @@ async function boot() {
   }
   me = await account(); if (me) await refreshBal();
   const want = STEPS.findIndex(s => s[0] === location.hash.slice(1));
+  if (PREVIEW) {
+    if (!CFG) CFG = { factory: 'preview.testnet', network: 'testnet', arena: { merchants: ['cafe.preview.testnet'] } };
+    if (want > 0) { me = me || 'preview.near'; bal = bal ?? 2n * YN; }
+    st.step = want >= 0 ? want : 0;
+    if (!st.displayName) st.displayName = persona().name;
+    if (!st.agentName) st.agentName = 'preview-agent';
+    render(); return;
+  }
   if (me && (bal === 0n || bal == null)) st.step = 1; else if (want >= 0 && canOpen(want)) st.step = want; else if (!me) st.step = 0;
   render();
 }

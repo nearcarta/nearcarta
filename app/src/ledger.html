@@ -2,21 +2,21 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="/config.js"></script>
 <title>NearCarta ledger: every payout and refusal</title>
-<style>
-body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#f6f1e7;color:#2a2116}
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/brand/chrome.css"><style>
+body{font:15px/1.5 Inter,system-ui,sans-serif;margin:0;background:#17130f;color:#f3ead8}
 main{max-width:980px;margin:auto;padding:20px}
-h1{font-size:1.5rem;margin:.2em 0}.sub{color:#6b5a44}
+h1{font-size:1.5rem;margin:.4em 0}.sub{color:#cdbfa5}
 .tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
-.tot div{background:#fff;border:1px solid #e2d6c0;border-radius:10px;padding:10px}.tot b{display:block;font-size:1.3rem}
-table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden}
-th,td{padding:8px;border-bottom:1px solid #eee3cf;text-align:left;font-size:.9rem;word-break:break-all}
-a,button,select,input{min-height:24px}td a,p a,button{display:inline-flex;align-items:center;min-height:28px;padding:2px 4px}button,select{min-width:28px}
-th{background:#efe4cf}.refusal{color:#a3261b}.payout{color:#1d6b3a}.warn{background:#fff3cd;padding:8px;border-radius:8px}
-@media(max-width:600px){td:nth-child(4),th:nth-child(4){display:none}}
+.tot div{background:#241c16;border:1px solid rgba(243,234,216,.12);border-radius:10px;padding:10px}.tot b{display:block;font-size:1.3rem}
+table{width:100%;border-collapse:collapse;background:#241c16;border-radius:10px;overflow:hidden}
+th,td{padding:8px;border-bottom:1px solid rgba(243,234,216,.1);text-align:left;font-size:.9rem;word-break:break-all}
+a{color:#e6c98a}button,select,input{min-height:24px}td a,p a,button{display:inline-flex;align-items:center;min-height:28px;padding:2px 4px}button,select{min-width:28px}
+th{background:#2c241c}.refusal{color:#ff8a80}.payout{color:#7dcea0}.warn{background:#3a2e1c;color:#e6c98a;padding:8px;border-radius:8px}
+@media(max-width:600px){td:nth-child(4),th:nth-child(4){display:none}main{padding:14px}}
 a{display:inline-block;min-height:24px;line-height:24px}</style></head><body><main>
-<a href="/">← Town</a>
+<a class="back-town" href="/" data-testid="back-town">Back to town</a>
 <h1>Public ledger</h1>
-<p class="sub">Every agent payout, refusal, Base Sepolia send and today's inference cost, read live from testnet. Each row links its transaction. Sample/test money only.</p>
+<p class="sub">Payouts and refusals read live. Each row links its transaction. The rows below are the testnet trial.</p>
 <p id="state" class="warn" hidden></p>
 <p id="sum" class="sub" data-testid="ledger-summary"></p>
 <div class="tot" id="tot" data-testid="ledger-totals"></div>

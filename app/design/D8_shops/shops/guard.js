@@ -51,7 +51,7 @@ export default async function guard(ctx) {
   let t = 0;
   return {
     rob, scene, camera, tags,
-    panel: { title: 'Guardhouse', src: 'testnet', label: 'Forged invoice asks', hero: tok('5', 'NEAR'), action: 'Let it knock' },
+    panel: { title: 'Guardhouse', src: 'split', srcNote: 'charter.nearcarta.near is on mainnet. Letting it knock here is the free testnet trial.', label: 'Forged invoice asks', hero: tok('5', 'NEAR'), action: 'Let it knock' },
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(1.15, 0, 1.75)]); rob.lookAt(pane.position); },
     *act() {

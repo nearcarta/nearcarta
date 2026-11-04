@@ -14,7 +14,10 @@ body.nohud .hud,body.nohud #title{display:none!important}
 
 /* brand */
 #brand{top:18px;left:20px;display:flex;align-items:center;gap:10px;color:var(--parch);text-shadow:0 1px 8px rgba(23,19,15,.6)}
-#brand .mark{width:26px;height:26px;color:var(--brass);filter:drop-shadow(0 1px 4px rgba(23,19,15,.5))}
+#brand .mark{width:26px;height:26px;display:block;border-radius:8px;color:var(--brass);filter:drop-shadow(0 1px 4px rgba(23,19,15,.5))}
+.hero-chip{display:flex;align-items:center;gap:8px;margin-top:8px;color:inherit;text-decoration:none}
+.hero-chip img{width:36px;height:36px;border-radius:50%;object-fit:cover;background:#120e0b;box-shadow:0 0 0 2px var(--dye,#d6b46a)}
+.hero-chip span{font-weight:600;font-size:13px;max-width:18ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #brand b{display:block;font:600 19px/1 var(--serif);letter-spacing:.01em;font-variation-settings:'SOFT' 60,'WONK' 0,'opsz' 48}
 #brand small{display:block;font-size:10.5px;color:var(--parch2);opacity:.85;margin-top:3px;letter-spacing:.01em}
 
@@ -169,6 +172,10 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #shopUI .src { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 var(--s1); border-radius: 999px; font-size: 12px; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
 #shopUI .src::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
 #shopUI .src.live::before { background: none; border: 1.5px solid var(--muted); width: 5px; height: 5px; }
+#shopUI .src.split { color: #e6c98a; border-color: #d6b46a66; }
+#shopUI .src.split::before { background: #7dcea0; }
+#shopUI .src.quote { color: #b7e0ea; border-color: #7eb8c966; }
+#shopUI .src.quote::before { background: #7eb8c9; }
 /* town labels: icon + name only */
 #shopUI .coin { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--muted); color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1; }
 #shopUI .hero .coin { width: 32px; height: 32px; font-size: 16px; }
@@ -256,6 +263,9 @@ body.cta #rulesBtn .cue{opacity:1}
 body.cta #rulesBtn{animation:ctaPulse 1.6s ease-in-out 4}
 @keyframes ctaPulse{0%,100%{box-shadow:0 6px 20px rgba(23,19,15,.35),0 0 0 0 rgba(224,189,114,.55)}50%{box-shadow:0 6px 20px rgba(23,19,15,.35),0 0 0 10px rgba(224,189,114,0)}}
 body.in-shop #rulesBtn,body.entering #rulesBtn{opacity:0;pointer-events:none}
+body.in-shop #acct,body:has(#drawer.open) #acct{display:none!important}
+#shopUI #drawer.open{z-index:24}
+#shopUI .d-head{position:sticky;top:0;background:var(--base);z-index:2;padding-bottom:8px}
 #chron[hidden]{display:none}
 #shopUI .act.cta{display:flex;justify-content:center;width:100%;box-sizing:border-box;margin:0 0 10px;text-decoration:none}
 @media (max-width:900px){ #brand small{display:block;font-size:10px} }

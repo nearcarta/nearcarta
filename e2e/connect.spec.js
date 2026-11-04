@@ -8,9 +8,9 @@ const SUNSET = new Date('2026-10-31T00:00:00+03:00');
 async function openList(page, path, errors) {
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(path);
-  await expect(page.locator('#wallet').getByRole('button', { name: 'Start free' })).toBeVisible({ timeout: 30_000 });
-  // Connect opens the /setup stepper; its NEAR wallet tile opens the NEAR Connect list.
-  await page.locator('#wallet').getByTestId('hud-connect').click();
+  await expect(page.getByTestId('hud-connect')).toHaveText('Sign in', { timeout: 30_000 });
+  // Sign in opens the /setup stepper; its NEAR wallet tile opens the NEAR Connect list.
+  await page.getByTestId('hud-connect').click();
   await expect(page).toHaveURL(/\/setup\//);
   await page.getByTestId('setup-wallet').click();
   await expect(page.locator('.connect-item').first()).toBeVisible({ timeout: 30_000 });

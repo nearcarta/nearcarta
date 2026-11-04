@@ -61,7 +61,7 @@ async function list(want = null) {
     <span class="muted"> by <code>${esc(p.proposer)}</code> (${esc(rep(p.proposer).tier)}) · ${esc(typeof p.kind === 'string' ? p.kind : Object.keys(p.kind)[0])}</span><br>${esc(p.description)}
     ${p.kind === 'Vote' ? `<div class="tally" data-testid="tally" data-yes="${t.yes}" data-no="${t.no}">Yes ${t.yes} · No ${t.no} · weighted ${t.yes_w}–${t.no_w} (<span data-testid="approval">${esc(t.approval)}</span>)${t.voters.length ? ' · ' + t.voters.map(v => `<code>${esc(v.who)}</code> ${v.vote === 'Approve' ? 'yes' : 'no'} (${esc(v.tier)})`).join(', ') : ''}</div>` : ''}
     ${open ? (mine ? `<p class="muted" data-testid="voted">You voted ${p.votes[me] === 'Approve' ? 'yes' : 'no'}.</p>`
-      : `<div class="vote"><button type="button" data-vote="VoteApprove" data-id="${p.id}" data-testid="vote-yes" ${me ? '' : 'disabled'}>Vote yes</button> <button type="button" data-vote="VoteReject" data-id="${p.id}" data-testid="vote-no" ${me ? '' : 'disabled'}>Vote no</button>${me ? '' : ' <span class="muted">Start free or connect to vote.</span>'}</div>`) : ''}</li>`; };
+      : `<div class="vote"><button type="button" data-vote="VoteApprove" data-id="${p.id}" data-testid="vote-yes" ${me ? '' : 'disabled'}>Vote yes</button> <button type="button" data-vote="VoteReject" data-id="${p.id}" data-testid="vote-no" ${me ? '' : 'disabled'}>Vote no</button>${me ? '' : ' <span class="muted">Sign in to vote.</span>'}</div>`) : ''}</li>`; };
   $('#list').innerHTML = `<p class="muted">Anyone may vote on motions; every vote is on chain and in the tally. Sputnik passes a motion only on the council's 2 votes, and charter changes stay council-only. Tiers come from each account's history in this DAO: they weight the town tally (newcomer 1, resident 2, elder 3; backed at 4) and cap filing (newcomer 1 a day, resident 3, elder 10).</p>
     ${me ? (r => `<p data-testid="standing">Your standing: <b>${esc(r.tier)}</b> (score ${r.score}: ${r.approved} approved of ${r.filed} filed, ${r.votes} votes${r.listed ? ', on the reward list' : ''}).</p>`)(rep(me)) : ''}
     <ul class="props">${ps.reverse().map(row).join('')}</ul>`;
@@ -74,7 +74,7 @@ async function refreshWho() {
   if (was !== me && rpc) list().catch(() => {});
   $('#who').innerHTML = me ? `<b data-testid="who">${esc(me)}</b>` : '';
   $('#connect').hidden = !!me; $('#guest').hidden = !!me; $('#signout').hidden = !me;
-  $('#file').disabled = !me; $('#file').textContent = me ? 'File proposal' : 'Start free or connect first';
+  $('#file').disabled = !me; $('#file').textContent = me ? 'File proposal' : 'Sign in first';
 }
 
 function idFrom(res) {
@@ -120,10 +120,14 @@ const boot = (async () => {
   await Promise.all([facts(), list()]);
 })();
 boot.catch(e => log(`<b>Could not load:</b> ${esc(e.message)}`, 'bad err'));
+fetch(API + '/api/mainnet').then(r => r.json()).then(m => {
+  const id = m?.extras?.townhall?.contract; const n = $('#netnote');
+  if (n && id) n.textContent = `${id} is the mainnet hall. This page is the testnet vote.`;
+}).catch(() => {});
 $('#file-form').onsubmit = e => boot.then(() => file(e));
 $('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
 $('#guest').onclick = async () => { const b = $('#guest'); b.disabled = true; b.textContent = 'Asking the testnet faucet…';
-  try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { b.disabled = false; b.textContent = 'Start free'; } };
+  try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { b.disabled = false; b.textContent = 'Free testnet trial'; } };
 $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); await refreshWho(); };
 
 async function vote(btn) {

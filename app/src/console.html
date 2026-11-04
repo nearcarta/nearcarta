@@ -3,19 +3,22 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nearcarta · console (testnet)</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="/console.css">
 <script src="/config.js"></script>
 </head>
 <body>
 <header>
-  <h1>Nearcarta <small>console · NEAR testnet</small></h1>
-  <p class="hero">Nearcarta is a town where an AI agent can only spend what its owner's on-chain charter allows: it can ask, the contract decides. Everything here runs on NEAR testnet; nothing spends real money.</p>
+  <p><a class="back-town" href="/" data-testid="back-town">Back to town</a></p>
+  <h1><img src="/brand/mark.svg" alt="" width="28" height="28" style="vertical-align:-6px;border-radius:8px"> Nearcarta <small>console</small></h1>
+  <p class="hero">The agent can ask. The charter decides. Shops you try here use the free testnet trial. The town contracts are on mainnet.</p>
   <nav id="tabs">
     <button data-tab="ferry" class="on">Ferry</button><button data-tab="guardhouse">Guardhouse</button>
     <button data-tab="townhall">Town Hall</button><button data-tab="arena">Arena</button>
     <button data-tab="toll">Toll</button><button data-tab="chronicle">Chronicle</button><button data-tab="house">Your House</button>
   </nav>
-  <p class="links"><a href="/">Walk the town</a> · <a href="/design/D8_shops/">Shop interiors</a> · <a href="/judges.html">For judges</a> · <span id="wallet"></span> · <span id="health">checking chain…</span></p>
+  <p class="links"><a href="/design/D8_shops/">Shop interiors</a> · <a href="/judges.html">For judges</a> · <span id="wallet"></span> · <span id="health">checking chain…</span></p>
 </header>
 <main>
 <section id="ferry" class="tab on">

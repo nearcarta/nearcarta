@@ -42,10 +42,16 @@ test('payee check stops a poisoned invoice, the charter refuses it, and the Mist
   await openShop(page, 'guard');
   const act = page.locator('#t-act');
   await expect(act).toBeVisible({ timeout: 90_000 });
-  await expect(act).not.toHaveText(/Lighting|Connect wallet/, { timeout: 30_000 }).catch(async () => {
+  await expect(act).not.toHaveText(/Lighting|Sign in/, { timeout: 30_000 }).catch(async () => {
     await act.click();
-    const item = page.locator('.connect-item').filter({ hasText: 'Guest testnet account' });
-    await item.waitFor({ timeout: 60_000 }); await item.click();
+    if (/\/setup\//.test(page.url())) {
+      await page.getByTestId('setup-guest').click();
+      await page.getByTestId('setup-who').waitFor({ timeout: 90_000 });
+      await openShop(page, 'guard');
+    } else {
+      const item = page.locator('.connect-item').filter({ hasText: 'Guest testnet account' });
+      await item.waitFor({ timeout: 60_000 }); await item.click();
+    }
   });
   await expect(act).toHaveText('Try to trick my agent', { timeout: 90_000 });
   await expect(page.getByTestId('hidden-line')).toContainText('attacker.r10own-19371.testnet');

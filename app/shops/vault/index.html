@@ -2,17 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nearcarta · Charter office and Vault Arena (testnet)</title>
+<title>Nearcarta · Charter office</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../../design/D7_system/tokens/tokens.css">
+<link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="vault.css">
 <script src="../../config.js"></script>
 </head>
 <body data-step="none">
 <header class="top">
-  <div><h1>Charter office</h1><p class="sub">Your agent's wallet. Your rules, on chain. <span class="net">testnet</span></p></div>
+  <div><a class="back-town" href="/" data-testid="back-town">Back to town</a><h1>Charter office</h1><p class="sub">Your agent's wallet. Your rules, on chain. <span class="net trial" id="net" data-testid="net-badge">testnet trial</span></p><p class="muted" id="netnote">A charter you create here is a free testnet trial. The town's own contracts are on mainnet.</p></div>
   <div class="who"><span id="who"></span>
-    <button id="guest" class="primary" data-testid="guest" title="Creates a new testnet account from the public faucet. Its key stays in this browser.">Start free</button>
-    <button id="connect" data-testid="connect">Connect wallet</button>
+    <button id="connect" class="primary" data-testid="connect">Sign in</button>
+    <button id="guest" class="quiet" data-testid="guest" title="Creates a new testnet account from the public faucet. Its key stays in this browser.">Free testnet trial</button>
     <button id="signout" hidden>Sign out</button></div>
 </header>
 <nav class="tabs" role="tablist" aria-label="Charter office">
@@ -27,6 +29,7 @@
     <section class="card wide arena" id="mine" hidden>
       <div id="ask"><h2><span class="num">★</span>Ask the agent to pay</h2>
         <form id="ask-form" class="askrow"><input id="ask-text" data-testid="ask-text" maxlength="200" placeholder="pay the cafe 0.01 NEAR for team coffee" aria-label="What should the agent pay?"><button class="primary" id="ask-btn" data-testid="ask">Ask the agent</button></form>
+        <p class="muted" id="infer" data-testid="infer-budget">Each model job is capped before it is sent. The NEAR it can move is still the charter's cap.</p>
         <p class="muted">Or tap:</p>
         <div class="atks tsks"></div><div class="result" aria-live="polite"></div></div>
       <p><button class="mini" id="go-arena" data-testid="go-arena">Try to trick it →</button></p>

@@ -13,7 +13,7 @@ export const APP=!/[?&]scripted\b/.test(location.search);
 document.body.dataset.host='d9'; // D8's shop app leaves the town HUD wallet (#wallet) alone
 let ui=null; const ui8=()=>ui||(ui=import(D8+'js/shopui.js').then(m=>{ m.boot(); return m; }).catch(e=>{ ui=null; throw e; }));
 export const L={ sh:null, C8:null };
-const SRC={ testnet:'testnet', live:'live read' };
+const SRC={ testnet:'testnet', live:'live read', split:'mainnet · testnet trial', quote:'mainnet quote' };
 const NAMES={ guard:'Guardhouse', ferry:'Ferry', hall:'Town Hall', bank:'Mist Bank', arena:'Vault Arena', toll:'Toll Bridge', chronicle:'Chronicle', house:'Your House', payouts:'Payouts' };
 export function setResult(kind,text){ const b=$('#t-act'); b.classList.remove('busy'); b.className='act res '+kind; b.disabled=true; b.innerHTML=`<span class="glyph" aria-hidden="true">${kind==='no'?'✕':kind==='ok'?'✓':'○'}</span>`; b.append(text); b.setAttribute('aria-live','polite'); }
 export function setHero(html){ const h=$('#t-hero'); h.innerHTML=html; h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); }

@@ -33,12 +33,12 @@ export function flat() {
   const start = new URLSearchParams(location.search).get('shop'); if (start && SH[start]) open(start);
 }
 const FLAT = {
-  guard: { src: 'testnet', cls: 'testnet', label: 'Forged invoice asks', hero: tok('5', 'NEAR') },
-  ferry: { src: 'testnet · live quote', cls: 'live', label: 'Shielded quote · Orchard-only UA', hero: `${tok(String(+QUOTE.from.amt), QUOTE.from.sym, { chain: QUOTE.from.chain })}<span class="arrow">→</span>${tok(QUOTE.to.amt, QUOTE.to.sym)}` },
-  hall: { src: 'testnet', cls: 'testnet', label: 'Reward cap · Proposal 4', hero: tok('0.15', 'NEAR') },
+  guard: { src: 'mainnet · testnet trial', cls: 'split', label: 'Forged invoice asks', hero: tok('5', 'NEAR') },
+  ferry: { src: 'mainnet quote', cls: 'quote', label: 'Shielded quote · Orchard-only UA', hero: `${tok(String(+QUOTE.from.amt), QUOTE.from.sym, { chain: QUOTE.from.chain })}<span class="arrow">→</span>${tok(QUOTE.to.amt, QUOTE.to.sym)}` },
+  hall: { src: 'mainnet · testnet trial', cls: 'split', label: 'Reward cap · Proposal 4', hero: tok('0.15', 'NEAR') },
   bank: { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount', hero: '<span class="commit">sha256…</span><span class="unit">amount hidden</span>' },
-  arena: { src: 'testnet', cls: 'testnet', label: '5 attacks on the lab oath', hero: '<b class="num">0</b><span class="unit">breaches</span>' },
-  toll: { src: 'testnet', cls: 'testnet', label: 'MPC signature for Base Sepolia', hero: '<b class="num">11</b><span class="unit">of 16 nodes</span>' },
+  arena: { src: 'mainnet · testnet trial', cls: 'split', label: '5 attacks on the lab oath', hero: '<b class="num">0</b><span class="unit">breaches</span>' },
+  toll: { src: 'mainnet · testnet trial', cls: 'split', label: 'MPC signature for Base Sepolia', hero: '<b class="num">11</b><span class="unit">of 16 nodes</span>' },
   chronicle: { src: 'testnet', cls: 'testnet', label: 'Refusals on the record', hero: '<b class="num">6</b><span class="unit">of 10 actions</span>' },
-  house: { src: 'testnet', cls: 'testnet', label: 'Tip cap · policy v4', hero: tok('0.5', 'NEAR') },
+  house: { src: 'mainnet · testnet trial', cls: 'split', label: 'Tip cap · policy v4', hero: tok('0.5', 'NEAR') },
 };

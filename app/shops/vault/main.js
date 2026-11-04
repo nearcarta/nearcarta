@@ -60,7 +60,7 @@ async function refreshWho() {
 function renderCreate() {
   const box = $('#create');
   if (!me || charter) delete box.dataset.for;
-  if (!me) { box.innerHTML = '<p class="muted" title="A charter is a NEAR account that holds your agent\'s money and its rules.">Start free first.</p>'; focusCreate(); return; }
+  if (!me) { box.innerHTML = '<p class="muted" title="A charter is a NEAR account that holds your agent\'s money and its rules.">Sign in first. A new charter here is a free testnet trial.</p>'; focusCreate(); return; }
   if (charter) { box.innerHTML = `<p>Your charter: <b data-testid="charter-id">${esc(charter)}</b></p>`; return; }
   // refreshWho runs again after a sign-in (the wallet event and the guest flow both call it): keep the
   // form the visitor is typing in instead of rebuilding it, or the name they typed is lost.
@@ -80,7 +80,7 @@ function renderCreate() {
 // The town sends new owners to /shops/vault/#create: bring the next step into view and focus it.
 function focusCreate() {
   if (location.hash !== '#create') return;
-  const el = $('#create-btn') || (!me && $('#guest'));
+  const el = $('#create-btn') || (!me && $('#connect'));
   if (!el || el.hidden) return;
   el.scrollIntoView({ block: 'center' }); el.focus({ preventScroll: true });
 }
@@ -422,6 +422,10 @@ function nick() {
 // A friendly default name, kept in this browser; anyone can change it.
 function defaultNick() {
   let n = localStorage.getItem('nearcarta.vault.nick');
+  if (!n) {
+    try { const slug = String(JSON.parse(localStorage.getItem('nearcarta.hero.v1') || 'null')?.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 20);
+      if (slug && !/^(live|loop|guest|mine|judge|e2e|test|seed|demo)(-|$)/.test(slug)) n = slug; } catch { /* keep going */ }
+  }
   if (!n) { const A = ['brave', 'calm', 'quick', 'sly', 'keen', 'bold', 'wise', 'lucky'], B = ['otter', 'heron', 'lynx', 'fox', 'owl', 'badger', 'gecko', 'crane'];
     const r = crypto.getRandomValues(new Uint16Array(3)); n = `${A[r[0] % 8]}-${B[r[1] % 8]}-${r[2] % 100}`; localStorage.setItem('nearcarta.vault.nick', n); }
   return n;
@@ -473,12 +477,17 @@ async function attackRun(btn) {
   scoreSoon(where); loadBoard().catch(() => {});
 }
 
+const whoName = a => { const s = String(a || ''); return s.length > 28 ? s.slice(0, 14) + '…' + s.slice(-10) : s; };
 async function loadBoard() {
   const b = await api('/api/vault/leaderboard');
-  $('#board').innerHTML = `<table data-testid="board"><thead><tr><th>#</th><th>Player</th><th>Score</th><th>Jobs</th><th>Scams</th><th>Last tx</th></tr></thead><tbody>
-    ${b.players.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.player)} ${p.verified ? '<span class="tag ok" title="owner of the charter, checked on chain">owner</span>' : '<span class="tag" title="nickname on the shared charter; the txs are signed by this server\'s runner">nick · server-signed</span>'}</td>
-    <td><b>${p.score}/${p.max_score}</b></td><td title="${esc(p.tasks.join(', '))}">${p.tasks.length}</td>
-    <td title="${esc(p.patterns.join(', '))}">${p.patterns.length}</td><td>${txl(p.last_tx)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Nothing counted yet.</td></tr>'}</tbody></table>`;
+  const net = `<p class="board-net" data-testid="board-net">NEAR ${esc(b.network || 'testnet')}. Every score is a real propose transaction.${b.seed_hidden ? ' ' + esc(b.seed_hidden) + ' guest or scripted runs are hidden.' : ''}</p>`;
+  const rows = b.players || [];
+  $('#board').innerHTML = rows.length ? net + `<div class="board-scroll"><table data-testid="board"><thead><tr><th>#</th><th>Player</th><th>Network</th><th>Score</th><th>Jobs</th><th>Scams</th><th>Last tx</th></tr></thead><tbody>
+    ${rows.map((p, i) => `<tr><td>${i + 1}</td><td>${p.verified ? `<code title="${esc(p.player)}">${esc(whoName(p.player))}</code> <span class="tag ok">charter</span>` : `<b>${esc(p.player)}</b> <span class="tag">arena</span>`}</td>
+    <td><span class="tag">${esc(p.network || b.network || 'testnet')}</span></td>
+    <td><b>${p.score}/${p.max_score}</b></td><td title="${esc((p.tasks || []).join(', '))}">${(p.tasks || []).length}</td>
+    <td title="${esc((p.patterns || []).join(', '))}">${(p.patterns || []).length}</td><td>${txl(p.last_tx)}</td></tr>`).join('')}</tbody></table></div>`
+    : net + `<div class="empty" data-testid="board-empty"><b>No public scores yet</b><p>${esc(b.empty || 'Finish setup, then run one allowed job and one refused scam. Your nickname is the name on this board.')}</p><a class="primary" href="/setup/">Sign in</a></div>`;
   $('#s-board h2').title = (b.rule || '') + (b.complete ? '' : ' (still indexing)');
 }
 function showTab(id) {
@@ -507,6 +516,9 @@ async function main() {
   for (const r of document.querySelectorAll('input[name=target]')) r.onchange = () => setTarget(r.value);
   $('#nick').value = defaultNick();
   $('#ask-form').onsubmit = e => ask(e).catch(fail);
+  const badge = $('#net'); if (badge) badge.textContent = (CFG.network === 'mainnet' ? 'mainnet' : (CFG.network || 'testnet') + ' trial');
+  api('/api/agent/budget').then(b => { const el = $('#infer'); if (!el || !b?.limit_usd) return; el.textContent = `Model jobs today: ${b.calls} of ${b.limit_calls}, $${b.usd} of $${b.limit_usd}. Each job is at most ${b.max_tokens} tokens and is not sent past the cap. The NEAR it can move is the charter's cap.`; }).catch(() => {});
+  fetch((API) + '/api/mainnet').then(r => r.json()).then(m => { const c = m?.charter?.contract; const note = $('#netnote'); if (note && c) note.textContent = `A charter you create here is a free testnet trial. ${c}, the toll, the arena, the house and the town hall are on mainnet.`; }).catch(() => {});
   $('#factory').innerHTML = `Factory <code>${esc(CFG.factory)}</code> · code hash <code title="${esc(CFG.code_hash)}">${esc(short(CFG.code_hash))}</code> · ${txl(CFG.proof_txs?.factory_full_access_key_deleted, 'factory keys deleted')}`;
   $('#arena-id').textContent = CFG.arena.charter;
   $('#ex-look').textContent = lookalike(CFG.arena.merchants[0]);

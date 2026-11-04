@@ -2,14 +2,15 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="/config.js"></script>
 <title>NearCarta: one full loop on testnet</title>
-<style>
-body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#f6f1e7;color:#2a2116}main{max-width:760px;margin:auto;padding:20px}
-h1{font-size:1.5rem}#go{font-size:1.1rem;padding:12px 22px;border-radius:12px;border:0;background:#2f5d3a;color:#fff;cursor:pointer}
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/brand/chrome.css"><style>
+body{font:15px/1.5 Inter,system-ui,sans-serif;margin:0;background:#17130f;color:#f3ead8}main{max-width:760px;margin:auto;padding:20px}
+h1{font-size:1.5rem}#go{font-size:1.1rem;padding:12px 22px;border-radius:12px;border:0;background:#d6b46a;color:#17130f;cursor:pointer;font-weight:700}
 #go:disabled{opacity:.5}#clock{font:700 2rem ui-monospace,monospace;margin-left:16px;vertical-align:middle}
-ol{padding-left:1.2em}li{background:#fff;border:1px solid #e2d6c0;border-radius:10px;padding:10px;margin:8px 0}
-li.ok{border-color:#2f5d3a}li.bad{border-color:#a3261b}.s{color:#6b5a44;font-size:.9rem}a{color:#2f5d3a}
-a{display:inline-block;min-height:24px;line-height:24px}</style></head><body><main>
-<a href="/">← Town</a>
+ol{padding-left:1.2em}li{background:#241c16;border:1px solid rgba(243,234,216,.12);border-radius:10px;padding:10px;margin:8px 0}
+li.ok{border-color:#7dcea0}li.bad{border-color:#ff8a80}.s{color:#cdbfa5;font-size:.9rem}a{color:#e6c98a}
+a{display:inline-block;min-height:24px;line-height:24px}
+@media(max-width:600px){main{padding:14px}#clock{display:block;margin:8px 0 0}}</style></head><body><main>
+<a class="back-town" href="/" data-testid="back-town">Back to town</a>
 <h1>One full loop on testnet, timed</h1>
 <p class="s">The house agent (NEAR AI, Confidential model) pays a listed shop, then tries a fake invoice. The charter contract allows the first and refuses the second on chain, and both land in the <a href="/ledger">public ledger</a>. No wallet needed: it uses the shared testnet runner (rate-limited). Goal: under 2 minutes, including a cold API wake-up.</p>
 <p class="s">Why no NEAR Intents in this loop: Intents and 1Click run on mainnet only and have no testnet, so the loop uses testnet-native rails (a NEAR function call and a NEP-297 event).</p>

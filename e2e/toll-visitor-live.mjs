@@ -29,8 +29,11 @@ const until = async (re, ms) => { await p.waitForFunction(r => new RegExp(r).tes
 try {
   await p.goto(BASE + '/design/D8_shops/?shop=toll');
   if (PHASE === 'pay' || PHASE === 'stay') {
-    await until(/Connect wallet/, 60e3); await snap('1-enter');
-    await act.click(); await p.locator('.connect-item', { hasText: 'Guest' }).first().click();
+    await until(/Sign in/, 60e3); await snap('1-enter');
+    await act.click(); await p.waitForURL(/\/setup\//);
+    await p.getByTestId('setup-guest').click();
+    await p.getByTestId('setup-who').waitFor({ timeout: 120_000 });
+    await p.goto(BASE + '/design/D8_shops/?shop=toll');
     await until(/Build my charter/, 90e3); ph.guest = await p.evaluate(() => window.__apps.S.me);
     await act.click(); await p.locator('#rules.open').waitFor({ timeout: 120e3 }); ph.charter = await p.evaluate(() => window.__apps.S.charter);
     await snap('2-rules');
