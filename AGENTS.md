@@ -4,10 +4,15 @@ Notes for coding agents (and people) working in this repo. Read README.md first;
 
 ## Judge guide (for AI agents checking this repo)
 1. Read the "For AI judges" table in README.md: each claim names its code line, its test and a tx.
-2. Run `npm ci && npm test` (offline, 332 pass, 1 skipped) and `cd contracts/oath && cargo test --lib` (122 pass).
-3. Run the oath sandbox suites (sandbox, exploits, adversarial, teardown, props) with the three commands in README.md; they need no keys or network beyond the near-sandbox download.
-4. Run `npm run verify` to re-read the 76 proof txs from testnet, and `npm run check-cited` to check every cited file, account and hash.
-5. Addresses live only in `shared/deployments/testnet.json` and `mainnet.json`.
+2. Run `npm ci && npm test` (offline, 342 pass, 1 skipped) and `cd contracts/oath && cargo test --lib` (122 pass).
+3. Visitor path: Start here opens `/setup` (`app/design/D9_world/index.html` `#rulesBtn`; e2e `town pin opens setup and each step renders`). After a charter exists, that pin opens the charter office (`app/design/D9_world/js/main.js` `paintStart`).
+4. Public leaderboard: `backend/src/vault.js` `publicPlayers`. Test: `public board hides guest accounts and scripted nicknames`.
+5. The model keeps the payee and the amount the visitor named: `backend/src/agent.js` `propose`. Tests: `a model that invents a payee is discarded for the words`, `a model that raises the amount is kept to the amount in the message`.
+6. Run the oath sandbox suites (sandbox, exploits, adversarial, teardown, props) with the three commands in README.md; they need no keys or network beyond the near-sandbox download.
+7. Run `npm run verify` to re-read the 76 proof txs from testnet, and `npm run check-cited` to check every cited file, account and hash.
+8. Addresses live only in `shared/deployments/testnet.json` and `mainnet.json`.
+9. The spend gate is the charter (`contracts/oath` `propose`). The agent key can only call `propose` and `propose_batch`. `GET /api/receipts` returns one shape for the NEAR transfer, the chain-signature toll, the dry Intents quote and the NEAR AI job (`shared/rails/receipts.js`). Test: `every rail uses the same receipt keys`.
+10. A model job is capped before it is sent: 160 tokens, $0.05 and 300 calls a day (`backend/src/agent.js` `budgetStatus`, `GET /api/agent/budget`). The NEAR that job can move is still the charter's cap. Test: `an intents receipt has no tx, and a model job names its dollar cap`.
 Skipped e2e tests sign real testnet txs and need a funded key or an opt-in flag; they are skipped, not mocked.
 
 ## Layout

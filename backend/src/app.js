@@ -24,6 +24,7 @@ import * as cp from './counterparty.js';
 import { view, rpcStats } from './near.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 import { pastPrompts as arenaPrompts } from './arena.js';
+import { receiptsBody } from '../../shared/rails/receipts.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
@@ -182,6 +183,7 @@ export function makeApp() {
   });
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
   app.get('/api/mainnet', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
+  app.get('/api/receipts', limiter(30), c => c.json(receiptsBody(MAINNET_DEP || {}, agentMod.budgetStatus(), { jobTokens: agentMod.MAX_TOKENS })));
 
   // Ferry
   app.get('/api/ferry/tokens', limiter(30), async c => {

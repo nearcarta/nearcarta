@@ -1,7 +1,7 @@
 # Nearcarta
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/offline%20tests-642%20passing-brightgreen)
+![tests](https://img.shields.io/badge/offline%20tests-652%20passing-brightgreen)
 ![backend coverage](https://img.shields.io/badge/backend%20line%20coverage-90.9%25-brightgreen)
 
 **Thesis: the agent proposes, the NEAR charter decides.** The AI agent holds only a function-call key for `propose`; every payment is checked by the `oath` contract, which allows it, refuses it on chain with a reason, or holds it for the owner.
@@ -20,12 +20,17 @@ Each claim names the code, the test that pins it, and a tx you can open. Test na
 | Freeze stops the agent; revoke removes its key | `freeze` (line 624), `revoke_agent` (line 616) | `adv_freeze_refuses_then_owner_unfreezes`, `adv_revoked_agent_key_is_gone` | DAO freeze [7xkk5cPx…](https://testnet.nearblocks.io/txns/7xkk5cPxNwttBAYrk6EZRuxyuajGKTmdeddtiYVdTgLX) |
 | A batch over budget is refused as a whole | `propose_batch` (line 747) | `adv_over_budget_batch_is_all_or_nothing` | batch [2BidLNam…](https://testnet.nearblocks.io/txns/2BidLNamtS2oJSrQw67sKVh8Dg7GAp7Ni9aWXS9PmDTs) |
 | Teardown refunds everything to the owner only, behind the upgrade timelock | `queue_upgrade` (line 643), `upgrade` (line 651), `contracts/reaper` | `teardown_reaper_refunds_everything_to_owner_only`, `teardown_upgrade_needs_the_timelock_when_a_delay_is_set` (`tests/teardown.rs`) | testnet rehearsal reap [25eS4kfn…](https://testnet.nearblocks.io/txns/25eS4kfnFXTavHx3t4X2JP8iUsdX5nSUNFnQyqURkVue) |
-| The API rejects bad input, refuses unknown CORS origins, never echoes the caller IP | `backend/src/server.js` | `backend/test/unit/api-contract.test.js` | |
+| The API rejects bad input, refuses unknown CORS origins, never echoes the caller IP, and refuses a body over 16 KB | `backend/src/server.js`, `backend/src/app.js` `bodyLimit` | `backend/test/unit/api-contract.test.js` (`an oversized JSON body is refused before it is read`) | |
+| Start here opens setup. After a charter exists, the same pin opens the charter office | `app/design/D9_world/index.html` `#rulesBtn`, `app/design/D9_world/js/main.js` `paintStart` | e2e `town pin opens setup and each step renders` | |
+| Sign in is the primary action. A free account is a testnet trial inside that page | `app/house/house.js` `mountConnect`, `app/src/setup/index.html` | e2e `connect: / opens the NEAR Connect wallet list` | |
+| The public leaderboard hides guest accounts and scripted nicknames and links each row to its tx | `backend/src/vault.js` `publicPlayers` | `public board hides guest accounts and scripted nicknames` | |
+| The model cannot switch the payee or the amount the visitor named. The charter still refuses an off-list payee | `backend/src/agent.js` `propose` | `a model that invents a payee is discarded for the words`, `a model that raises the amount is kept to the amount in the message` | off-list refusal [BESexM6S…](https://testnet.nearblocks.io/txns/BESexM6SCG8sRPn9XmpZVYE1caTdMexL6EQabyfkrXh5) |
+| One receipt shape covers a NEAR payment, a chain-signature toll, a dry Intents quote and a capped model job | `shared/rails/receipts.js` `receiptsBody`, `GET /api/receipts` | `every rail uses the same receipt keys` | allowed [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy), refused [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH) |
 
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 333 backend unit tests (332 pass, 1 skipped), offline
+npm test                                   # 343 backend unit tests (342 pass, 1 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify                             # re-reads all 76 proof txs from testnet; exits 1 if one is missing
 ```
@@ -42,7 +47,7 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
 | toll, arena, townhall, house_nft, attested_check, charter_factory unit | 67, 17, 15, 16, 4, 23 |
-| backend unit (`npm test`) | 332 (+1 skipped) |
+| backend unit (`npm test`) | 342 (+1 skipped) |
 | browser e2e against the live site | 22 passed, 12 skipped |
 
 The 12 skipped e2e tests sign real testnet txs and need a funded wallet key or an opt-in flag (`GUARD_E2E`, `VAULT_E2E`, `VAULT_AI_E2E`, `VAULT_FAUCET`, `HALL_FILE`, `HOUSE_*_KEY_FILE`, a partner key, or the arena attack switch); they are not faked offline. Backend line coverage is 90.9% (`node --test --experimental-test-coverage`). CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
@@ -54,7 +59,7 @@ The 12 skipped e2e tests sign real testnet txs and need a funded wallet key or a
 - A DAO or owner can freeze; the owner can revoke the agent key. Served accounts have 0 full-access keys.
 
 ### Addresses (from `shared/deployments/`)
-- Mainnet charter: `charter.nearcarta.near` (code hash `6fZBa6Mb…`, 0 full-access keys, agent methods `propose`, `propose_batch`); allowed [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy), over cap refused [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH). The mainnet toll is not deployed yet.
+- Mainnet: `charter.nearcarta.near`, `toll.nearcarta.near`, `arena.nearcarta.near`, `house.nearcarta.near`, `townhall.nearcarta.near`. Allowed payment [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy), over cap refused [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH). Full list: `shared/deployments/mainnet.json`.
 - Testnet: guardhouse charter `guardhouse-nzjp.nccharters-22195.testnet`, Town Hall `townhall.nccharters-17102.testnet`, Arena `arena3-370128340.testnet`, Toll `toll.r4csmvr86zk4.testnet`. Full list: `shared/deployments/testnet.json`.
 
 ### Teardown and refund plan
@@ -72,16 +77,39 @@ npm run verify      # re-reads all 76 proof txs from chain, about 1-2 min (46-10
 npm run check-cited # every file, tx, account and hash the docs cite exists
 ```
 
-A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money, and each move is checked first by the charter (the `oath` contract on NEAR), which holds the agent's rules. Agents ask. The charter answers. Each shop below is real on NEAR testnet, or real on 1Click mainnet as a dry quote (no spend).
+A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money, and each move is checked first by the charter (the `oath` contract on NEAR), which holds the agent's rules. Agents ask. The charter answers.
 
-Deployed (testnet): https://nearcarta.vercel.app serves the pages, and its `/api/*` is passed to the API on Render (free plan, testnet, built from the `Dockerfile` image): https://nearcarta-api.onrender.com. Example: `/api/health`, `/api/guardhouse`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped. `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`.
+Deployed: https://nearcarta.vercel.app serves the pages, and `/api/*` is passed to the API on Render: https://nearcarta-api.onrender.com. The hosted demo stays up through 2026-11-25. Example: `/api/health`, `/api/receipts`, `/api/mainnet`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped. `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`. A new charter a visitor creates in the browser is a free testnet trial. The town's own charter, toll, arena, house and town hall are on mainnet.
 
+## For judges: do X, see Y
 
-## For judges: do X, see Y (each claim has a proof)
-Each line says what to do and what you should see. Every tx opens on testnet.nearblocks.io and is re-read from chain by `npm run verify`; the proof files are in `judges/proofs/`.
+### Mainnet
+Open the tx. You should see the charter allow or refuse it. Links are https://nearblocks.io. Records: `shared/deployments/mainnet.json`, `judges/proofs/core-mainnet-deploy.json`, `judges/proofs/extras-mainnet-deploy.json`.
+
+- Open the allowed payment [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy). The agent paid 0.001 NEAR to `nearcarta.near`.
+- Open the over-cap ask [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH). The charter refused 0.003 NEAR: `over_per_action_cap`.
+- Open the toll's allowlisted signature [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) and the unlisted refusal [B9FFjcSA…](https://nearblocks.io/txns/B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR). The derived Base address was unfunded, so the foreign tx was not broadcast.
+- Open the arena payment [AZWxqZns…](https://nearblocks.io/txns/AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht) and the over-cap refusal [25LpJRFF…](https://nearblocks.io/txns/25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V).
+- Open the house payment [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26) and the refusal [3Z4UAb6N…](https://nearblocks.io/txns/3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1).
+- Open the town hall reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h) and the refusal [Cp2rWatn…](https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6).
+- `curl https://nearcarta-api.onrender.com/api/receipts`. You should see one object shape for `near`, `chain-signatures`, `intents` and `near-ai`. The intents row has `"decision":"dry"` and `"tx":null`. Code: `shared/rails/receipts.js`. Test: `every rail uses the same receipt keys`.
+
+### Where the spend gate is, and what a receipt is
+The gate is the charter contract (`contracts/oath`, `propose` at line 667). The agent holds only a function-call key for `propose` and `propose_batch`. It cannot transfer and it cannot change the rules. `GET /api/receipts` returns every rail in one shape: `rail`, `network`, `what`, `to`, `amount`, `asset`, `decision`, `reason`, `decided_by`, `tx`, `url`, `checks`.
+
+- NEAR transfer. The receipt is the `propose` tx. Allowed or refused, with the reason. Mainnet: [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy), [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH).
+- Chain signatures. The receipt is the NEAR tx that asked the MPC signer. An address off the list is refused before a signature. Mainnet: [B9FFjcSA…](https://nearblocks.io/txns/B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR).
+- Intents. The receipt is a dry 1Click quote. No deposit address and no tx. `decision` is `dry`.
+- NEAR AI. The receipt is the model job. Each job is at most 160 tokens. The day stops at $0.05 or 300 calls (`GET /api/agent/budget`). The call is not sent past that cap. The NEAR the job can move is still the charter's cap. TEE check: [tee-check.json](judges/proofs/tee-check.json).
+
+### Why the charter is a contract
+A key with a gas allowance can still be told to pay the wrong account, or to pay an allowed account too often. The charter checks the payee, the per-payment cap, the daily budget and the daily count, and writes the refusal on chain. The agent cannot edit those rules. Evidence: the over-cap refusal [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH) and the TEE check [tee-check.json](judges/proofs/tee-check.json). The model call does not move the NEAR.
+
+### Testnet
+Each line below was exercised on testnet. Every tx opens on testnet.nearblocks.io and is re-read from chain by `npm run verify`. A visitor's free trial still uses testnet. The proof files are in `judges/proofs/`.
 
 Security
-- Open https://nearcarta.vercel.app, press *Start free*, build a charter, then open the Guardhouse and the Vault Arena. You should see every scam refused on chain, with its clause. Proof: [tour-live.json](judges/proofs/tour-live.json).
+- Open https://nearcarta.vercel.app, press *Sign in*, build a charter, then open the Guardhouse and the Vault Arena. You should see every scam refused on chain, with its clause. Proof: [tour-live.json](judges/proofs/tour-live.json).
 - Run `near account list-keys` on a served account. You should see 0 full-access keys and one function-call key that can only call `propose`. Proof: [access-keys.json](judges/proofs/access-keys.json); the guardhouse full-access key was deleted in [2WyiCazx…](https://testnet.nearblocks.io/txns/2WyiCazxV1JTLYKRz6QzU7YaFh4etp3WwQqv5Z8Le3TL).
 - Open the tx where the agent asks for more than the cap. It waits for the owner (NEP-519 yield): [8aJZ3rjb…](https://testnet.nearblocks.io/txns/8aJZ3rjbL5m8KGmRjhrtm8NYuzUhWUuP1C1LgGa2SiTa). A payee not on the allowlist is denied ([573gVwsp…](https://testnet.nearblocks.io/txns/573gVwsp2Fbyzmffbo6CbZ8C9TwPaKpAHHeF8ym5jJii)), and a DAO freeze holds the agent ([7xkk5cPx…](https://testnet.nearblocks.io/txns/7xkk5cPxNwttBAYrk6EZRuxyuajGKTmdeddtiYVdTgLX)). All are rows in [TESTNET_TXS.md](judges/TESTNET_TXS.md).
 - Send one of the 6 common scams in the Vault Arena. You should see it refused on chain, with the clause it broke, for example a fake invoice ([2kRG9QE4…](https://testnet.nearblocks.io/txns/2kRG9QE4LKF4nDsDD44dpkVWEoHvEWVwM3fcc7WFfWdb)) or a look-alike payee ([95PgMqSu…](https://testnet.nearblocks.io/txns/95PgMqSuM1pG7CrnmFMSQfB8kPvQnvaNRvEJ4Dn2TYym)). Proof: [arena-scams.json](judges/proofs/arena-scams.json). Past prompts and their refusal txs are at `/api/arena/prompts`: [arena-prompts-live/result.json](judges/proofs/arena-prompts-live/result.json).
@@ -108,7 +136,7 @@ An on-chain charter for AI agents that spend money. A person writes the agent's 
 An agent with a wallet key can be talked into paying anyone: a fake invoice, a prompt-injected recipient, a look-alike account, many small payments under a cap. Checks that live in the agent's own code or prompt fail when the agent is fooled. The charter puts the check in a contract the agent cannot change, so a fooled agent still cannot pay outside the rules.
 
 ## Try it in a browser (testnet, no wallet install)
-1. Open https://nearcarta.vercel.app and press *Start free* for a fresh testnet guest account (its key stays in your browser), or *Connect wallet* for a testnet wallet through NEAR Connect.
+1. Open https://nearcarta.vercel.app and press *Sign in*. The setup page is the only way in: a wallet, or a free testnet trial whose key stays in your browser.
 2. Walk into a shop and press its button. Each signed step shows its tx as a link to testnet.nearblocks.io. The same rooms open directly at `/design/D8_shops/?shop=<house|toll|ferry|bank|guard|arena|hall|payouts>`.
 
 | Shop | Press | See |
@@ -133,7 +161,7 @@ On 2026-10-29 a fresh guest pressed every shop row above on the live site with n
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 332 unit tests (1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm test                 # 342 unit tests (1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
 npm run verify           # reads every proof tx back from testnet (76/76 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
