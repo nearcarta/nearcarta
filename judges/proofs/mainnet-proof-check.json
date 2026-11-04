@@ -440,6 +440,39 @@
       "failure": false,
       "signer": "townhall.nearcarta.near",
       "sender": "nearcarta.near"
+    },
+    {
+      "shop": "ferry_intents",
+      "label": "wrap_near",
+      "hash": "HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw",
+      "contract": null,
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "ferry_intents",
+      "label": "origin_ft_transfer",
+      "hash": "A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz",
+      "contract": null,
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "ferry_intents",
+      "label": "destination_usdc_withdraw",
+      "hash": "Be1ttdbmiKhqwxpstP33HefWUp3o1A8RwKosdcK2mquk",
+      "contract": null,
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "intents.near",
+      "sender": "nearcarta.near"
     }
   ]
 }

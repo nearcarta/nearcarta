@@ -158,5 +158,26 @@
    }
   }
  },
- "root_balance_near": 1.491207
+ "root_balance_near": 1.491207,
+ "ferry_intents": {
+  "rail": "NEAR Intents 1Click",
+  "from": "nearcarta.near",
+  "to": "nearcarta.near",
+  "amount_in": "0.045 wNEAR",
+  "amount_in_usd": "0.1809",
+  "amount_out": "0.177937 USDC",
+  "withdraw_fee_usdc": "0.005027",
+  "deposit_address": "524111ff3f37d4edbd09f1bb35c6c517c5c8b3a7ac4f5d268ca6f0612600f2bf",
+  "intent_hashes": [
+   "aybjMQLNbHajyPerDhE65udeMLCRcsUCouGPsgjEvmJ",
+   "DaD8b4EyxbyQstKszWXRWFLB5FHzAUw52n7bqVgXMSTe"
+  ],
+  "status": "SUCCESS",
+  "updated_at": "2026-11-04T21:06:50Z",
+  "txs": {
+   "wrap_near": "HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw",
+   "origin_ft_transfer": "A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz",
+   "destination_usdc_withdraw": "Be1ttdbmiKhqwxpstP33HefWUp3o1A8RwKosdcK2mquk"
+  }
+ }
 }
