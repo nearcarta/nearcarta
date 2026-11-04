@@ -1,12 +1,12 @@
 // Your House (static): the oath hangs on the wall as a charter. Real policy v4 of the core oath. No action here: freezing is the owner's key, not a demo button.
 import { THREE, room, put, makeRobot, tok, C } from '../js/core.js';
 import { CORE, CLAUSES } from '../../D6_dashboards/src/data.js';
-import { row, h3, note, proof, paper, acct } from './_ui.js';
+import { row, h3, note, proof, paper, acct, mainnet } from './_ui.js';
 import { M as PM, brassM, mesh, lantern, candle, rug } from './_props.js';
 import { radial } from '../js/core.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
-export const PROOF = proof(h3('The oath'), row({ k: 'Policy version ' + CORE.policyVersion, why: CORE.policyHash.slice(0, 16) + '…' }), row({ k: 'Contract code', why: CORE.codeHash }), row({ k: 'Freeze epoch ' + CORE.freezeEpoch, why: 'owner or DAO can freeze' }),
+export const PROOF = mainnet('house') + proof(h3('The oath'), row({ k: 'Policy version ' + CORE.policyVersion, why: CORE.policyHash.slice(0, 16) + '…' }), row({ k: 'Contract code', why: CORE.codeHash }), row({ k: 'Freeze epoch ' + CORE.freezeEpoch, why: 'owner or DAO can freeze' }),
       h3('Clauses'), ...CLAUSES.map(c => row({ k: `${c.id} · cap ${c.cap} · budget ${c.budget} NEAR`, why: `spent ${c.spent} · payee ${c.payees.join(', ')}`, tx: c.tx })),
       note(`Oath ${acct(CORE.oath)}, owner ${acct(CORE.owner)}. Snapshot ${CORE.snapshot}.`));
 export default async function house() {

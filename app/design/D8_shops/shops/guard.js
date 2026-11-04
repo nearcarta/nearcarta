@@ -1,12 +1,12 @@
 // Guardhouse: the oath is a pane across the gate. A forged invoice (real lab attack S2) knocks and bounces off.
 import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, tok, C } from '../js/core.js';
 import { ATTACKS, LAB } from '../../D6_dashboards/src/data.js';
-import { row, h3, note, proof, esc, acct, paper } from './_ui.js';
+import { row, h3, note, proof, esc, acct, paper, mainnet } from './_ui.js';
 import { M as PM, brassM, mesh, lantern, banner } from './_props.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
 const S2 = ATTACKS.find(a => a.id === 'S2');
-export const PROOF = proof(
+export const PROOF = mainnet('guard') + proof(
       h3('This knock · lab attack S2'), row({ k: S2.name, why: S2.reason + ' · ' + S2.secs + ' s', st: 'no', stText: 'refused', tx: S2.tx }),
       `<pre class="kv">${esc(S2.tool.split('\n')[1])}</pre>`, note(`The agent read the hidden line and proposed it. The oath ${acct(LAB.oath)} refused before any money moved.`),
       h3('Other knocks on the same gate'), ...ATTACKS.filter(a => a.id !== 'S2').map(a => row({ k: a.name, why: a.reason, st: 'no', stText: 'refused', tx: a.tx })),

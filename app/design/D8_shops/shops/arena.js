@@ -2,11 +2,11 @@
 import { THREE, room, put, makeRobot, load, Char, C, CSS, radial } from '../js/core.js';
 import { M as PM, brassM, mesh, lantern, banner } from './_props.js';
 import { ATTACKS, LAB } from '../../D6_dashboards/src/data.js';
-import { row, h3, note, proof, acct } from './_ui.js';
+import { row, h3, note, proof, acct, mainnet } from './_ui.js';
 import { livePrompts } from './arenalive.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
-export const PROOF = proof(h3('Attacks on ' + LAB.oath), ...ATTACKS.map(a => row({ k: a.name, why: a.cls + ' · ' + a.reason, st: 'no', stText: 'refused', tx: a.tx })), note(`Lab oath ${acct(LAB.oath)}. The Guardians are a picture of the checks, not separate code.`));
+export const PROOF = mainnet('arena') + proof(h3('Attacks on ' + LAB.oath), ...ATTACKS.map(a => row({ k: a.name, why: a.cls + ' · ' + a.reason, st: 'no', stText: 'refused', tx: a.tx })), note(`Lab oath ${acct(LAB.oath)}. The Guardians are a picture of the checks, not separate code.`));
 export default async function arena() {
   const liveP = livePrompts();
   const { scene, camera } = await room({ cam: [0, 5, 9], look: [0, .8, 0] });

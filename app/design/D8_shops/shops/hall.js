@@ -1,11 +1,11 @@
 // Town Hall: a council table with vote stones. Proposal 4 (real, testnet) lowered the reward cap from 0.25 to 0.15 NEAR.
 import { THREE, room, put, makeRobot, sfx, wait, tween, tok, C } from '../js/core.js';
 import { TH } from '../../D6_dashboards/src/data.js';
-import { row, h3, note, proof, acct, paper, esc } from './_ui.js';
+import { row, h3, note, proof, acct, paper, esc, mainnet } from './_ui.js';
 import { M as PM, brassM, mesh, lantern, banner, candle, rug } from './_props.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
-export const PROOF = proof(
+export const PROOF = mainnet('hall') + proof(
       h3('Proposal 4'), row({ k: 'Filed', why: TH.proposal.tag, tx: TH.proposal.filed }), ...TH.proposal.votes.map((v, i) => row({ k: `Vote ${i + 1}`, why: 'council · approve', st: 'ok', stText: 'counted', tx: v })),
       h3('Oath versions'), ...TH.versions.map(v => row({ k: `v${v.v} · cap ${v.cap} · total ${v.total} NEAR`, why: v.how, tx: v.tx })),
       h3('What the hall refused'), ...TH.log.filter(l => !l.ok).map(l => row({ k: `${l.who} ${l.what}`, why: l.res, st: 'no', stText: 'refused', tx: l.tx })),
