@@ -44,7 +44,7 @@ const fail = e => toastHtml(`<b>Stopped:</b> ${esc(e.message)}${e.tx ? ' · ' + 
 async function refreshWho() {
   me = await currentAccount(connector);
   $('#who').innerHTML = me ? `<b data-testid="who">${esc(me)}</b>` : '';
-  $('#connect').hidden = !!me; $('#guest').hidden = !!me; $('#signout').hidden = !me;
+  $('#connect').hidden = !!me; const guest = $('#guest'); if (guest) guest.hidden = !!me; $('#signout').hidden = !me;
   document.body.dataset.step = me ? (charter ? 'charter' : 'wallet') : 'none';
   if (me && !charter) {
     // Newest factory first, then the legacy ones: a guest who opened a charter before R17 keeps it.
@@ -480,7 +480,7 @@ async function attackRun(btn) {
 const whoName = a => { const s = String(a || ''); return s.length > 28 ? s.slice(0, 14) + '…' + s.slice(-10) : s; };
 async function loadBoard() {
   const b = await api('/api/vault/leaderboard');
-  const net = `<p class="board-net" data-testid="board-net">NEAR ${esc(b.network || 'testnet')}. Every score is a real propose transaction.${b.seed_hidden ? ' ' + esc(b.seed_hidden) + ' guest or scripted runs are hidden.' : ''}</p>`;
+  const net = `<p class="board-net" data-testid="board-net">NEAR testnet trial. Only listed visitor charters.${b.seed_hidden ? ' ' + esc(b.seed_hidden) + ' other rows stay off this board.' : ''}</p>`;
   const rows = b.players || [];
   $('#board').innerHTML = rows.length ? net + `<div class="board-scroll"><table data-testid="board"><thead><tr><th>#</th><th>Player</th><th>Network</th><th>Score</th><th>Jobs</th><th>Scams</th><th>Last tx</th></tr></thead><tbody>
     ${rows.map((p, i) => `<tr><td>${i + 1}</td><td>${p.verified ? `<code title="${esc(p.player)}">${esc(whoName(p.player))}</code> <span class="tag ok">charter</span>` : `<b>${esc(p.player)}</b> <span class="tag">arena</span>`}</td>
@@ -499,7 +499,7 @@ function showTab(id) {
 let booted; const boot = new Promise((ok, no) => { booted = { ok, no }; }); boot.catch(() => {});
 // Connect opens the branded setup flow; NEAR Connect keeps the session in this browser, so it is live here on return.
 $('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
-$('#guest').onclick = async () => { busy($('#guest'), true, 'Asking the testnet faucet…'); try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { fail(e); } finally { busy($('#guest'), false); } };
+const guestBtn = $('#guest'); if (guestBtn) guestBtn.onclick = async () => { busy(guestBtn, true, 'Asking the testnet faucet…'); try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { fail(e); } finally { busy(guestBtn, false); } };
 
 async function main() {
   CFG = await api('/api/vault/config').catch(e => { booted.no(e); throw e; });

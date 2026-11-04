@@ -166,7 +166,7 @@ export function makeApp() {
   const deepLimit = (c, next) => deepPer(c, () => deepGlobal(c, next));
   // ?deep=1 runs every read route's handler (not the AI or quote routes, which spend credits) and reports
   // each one's status and time, plus the RPC retry/fallback/stale counters.
-  app.get('/api/health', (c, next) => c.req.query('deep') ? deepLimit(c, next) : next(), limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: DEP.network, near: c.req.query('deep') ? await shops.health() : shops.healthCached(),
+  app.get('/api/health', (c, next) => c.req.query('deep') ? deepLimit(c, next) : next(), limiter(60), async c => c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: { contracts: MAINNET_DEP?.status === 'deployed' ? 'mainnet' : null, trial: 'testnet' }, near: c.req.query('deep') ? await shops.health() : shops.healthCached(),
     features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: c.req.query('deep') ? await vault.runnerStatus() : vault.runnerStatusCached() }));
   // Shows the caller how Render keys their own request, with no address in the answer: which header decides
   // the client key, a short keyed tag of that key (the same client gets the same tag until the process

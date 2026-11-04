@@ -50,6 +50,14 @@ test('a model that invents a payee is discarded for the words', async () => with
   assert.equal(r.parsed.receiver, 'evil.testnet');
 }));
 
+test('extra model fields cannot change the payment method', () => {
+  const p = agent.toProposal({ receiver: 'cafe.x.testnet', amount_near: '0.01', method: 'transfer', deposit: '100', note: 'coffee' }, 'mine');
+  assert.equal(p.receiver, 'cafe.x.testnet');
+  assert.equal(p.amount, '10000000000000000000000');
+  assert.equal(p.method, undefined);
+  assert.equal(p.deposit, undefined);
+});
+
 test('a model that raises the amount is kept to the amount in the message', async () => withKey(async () => {
   const r = await agent.propose('pay the cafe 0.01 NEAR for coffee', { receivers: ['cafe.x.testnet'], pf: okPre, log: () => {},
     ...fakeModel('{"receiver":"cafe.x.testnet","amount_near":"5","suspicious":false,"why":"max it"}') });

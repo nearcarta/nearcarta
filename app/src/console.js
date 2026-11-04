@@ -30,7 +30,10 @@ function show(t) {
   if (loaders[t] && !loaded[t]) { loaded[t] = 1; loaders[t]().catch(e => { $(`#${t} .out`).innerHTML = `<p class="fail">${esc(e.message)}</p>`; loaded[t] = 0; }); }
 }
 
-get('/api/health').then(h => { $('#health').innerHTML = `testnet block ${h.near.height.toLocaleString()} ${mark(true)}`; })
+get('/api/health').then(h => {
+  const contracts = h.network?.contracts, trial = h.network?.trial || 'testnet';
+  $('#health').innerHTML = `${contracts ? `contracts ${esc(contracts)} · ` : ''}trial ${esc(trial)} block ${h.near.height.toLocaleString()} ${mark(true)}`;
+})
   .catch(e => { $('#health').innerHTML = `<span class="fail">API unreachable: ${esc(e.message)}</span>`; });
 
 // Ferry

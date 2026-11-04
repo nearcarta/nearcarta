@@ -3,7 +3,7 @@ import dep from '../shared/deployments/testnet.json' with { type: 'json' };
 
 test('health: the API reads NEAR testnet and cannot sign', async ({ request }) => {
   const h = await (await request.get('/api/health')).json();
-  expect(h.network).toBe('testnet'); expect(h.near.height).toBeGreaterThan(200_000_000); expect(h.features.signing).toBe(false);
+  expect(h.network).toEqual({ contracts: 'mainnet', trial: 'testnet' }); expect(h.near.height).toBeGreaterThan(200_000_000); expect(h.features.signing).toBe(false);
 });
 
 test('ferry: dry 1Click quote USDC (Base) -> ZEC to a shielded address passes all checks', async ({ page }) => {

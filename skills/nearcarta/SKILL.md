@@ -13,7 +13,7 @@ Account ids come from `/api/deployments`; do not hardcode them.
 
 | Do | See |
 | --- | --- |
-| `curl -s $BASE/api/health` | `ok: true` and the network |
+| `curl -s $BASE/api/health` | `ok: true`, `network.contracts` `mainnet`, `network.trial` `testnet` |
 | `curl -s $BASE/api/deployments` | every testnet account and contract the town uses |
 | `curl -s $BASE/api/guardhouse/check/<account>` | `verdict` = allow, warn or block, with `reasons` and the `signals` behind them |
 | `curl -s $BASE/api/guardhouse/denylist` | the shared deny list; each entry carries testnet tx evidence |

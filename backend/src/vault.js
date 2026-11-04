@@ -26,6 +26,7 @@ import { receipt as buildReceipt } from '../../shared/vault/receipt.js';
 import { edgeCache } from './http-guard.js';
 import { ASK_MEMO_RE, parseAsk } from '../../shared/vault/ask.js';
 import * as agent from './agent.js';
+import publicCharters from '../../shared/vault/public-charters.json' with { type: 'json' };
 
 export const V = DEP.vault || null;
 const ACCOUNT_RE = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -653,16 +654,15 @@ export function boot({ fill = backfill, firstMs = 1000, snapshotFile, boardFile 
   else rebuild.reread_at = Date.now();
 }
 
-const SEED_PLAYER = /^(?:live|loop|guest|mine|judge|e2e|test|seed|demo)(?:-[a-z0-9]+)*$/i;
-/** Guest faucet accounts and scripted nicknames are real rows, and they are not a public score. */
-export function isSeedPlayer(player) {
-  const id = String(player || '').toLowerCase();
-  return !id || SEED_PLAYER.test(id) || id.startsWith('ncguest-') || id.startsWith('e2e-');
+/** Visitor charters allowed on the public board. Shared-arena nicknames are not on this list. */
+export const PUBLIC_CHARTERS = new Set((publicCharters.charters || []).map(id => String(id).toLowerCase()));
+export function isPublicPlayer(p, allow = PUBLIC_CHARTERS) {
+  return (p?.charters || []).some(id => allow.has(String(id).toLowerCase()));
 }
-export function publicPlayers(list) {
+export function publicPlayers(list, allow = PUBLIC_CHARTERS) {
   const rows = board(list);
-  const hidden = rows.filter(p => isSeedPlayer(p.player));
-  return { players: rows.filter(p => !isSeedPlayer(p.player)).map(p => ({ ...p, network: 'testnet' })), hidden: hidden.length };
+  const players = rows.filter(p => isPublicPlayer(p, allow)).map(p => ({ ...p, network: 'testnet' }));
+  return { players, hidden: rows.length - players.length };
 }
 
 export function board(list = [...attempts.values()]) {
@@ -686,7 +686,8 @@ export function board(list = [...attempts.values()]) {
     .sort((x, y) => y.score - x.score || y.pattern_count - x.pattern_count || y.refusals - x.refusals || x.last_at - y.last_at);
 }
 
-const RULE = 'Rows are final testnet propose txs on factory charters running their audited oath release, re-read from chain. ' +
+const RULE = 'The public board lists only the visitor charters named in shared/vault/public-charters.json. Every other row stays off it. ' +
+  'Rows are final testnet propose txs on factory charters running their audited oath release, re-read from chain. ' +
   'An attack scores only if the contract refused it with the reason that attack targets, and its logged payee and amount match the attack plan under the clause in force at that block. ' +
   'A task scores only if the contract allowed and settled the planned allowlisted payment. ' +
   'One honest request of your own (memo ask:<nickname>:<note>) scores once per player if the contract allowed and settled it to a payee on the clause allowlist, within its cap. A request of your own that the contract refused (a scam you typed) scores once as a blocked scam. Memos are labels, never proof. ' +
@@ -706,8 +707,8 @@ export async function leaderboard() {
   const pub = publicPlayers(rows);
   return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild, pending: pending.size },
     network: 'testnet', seed_hidden: pub.hidden, players: pub.players.slice(0, 50),
-    empty: 'No public scores yet. Finish setup, then run one allowed job and one refused scam. Your nickname is the name on this board. Guest accounts and scripted nicknames stay off it.',
-    recent: rows.sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
+    empty: 'No visitor charters on the public board yet. A row appears only when its charter is listed. Test runs stay off it.',
+    recent: rows.filter(a => isPublicPlayer({ charters: [a.charter] })).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
 }
 
 /** One charter's scorecard: each task (should be allowed) and each attack (should be refused). */

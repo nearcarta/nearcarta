@@ -1,7 +1,7 @@
 # Nearcarta
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/offline%20tests-652%20passing-brightgreen)
+![tests](https://img.shields.io/badge/offline%20tests-655%20passing-brightgreen)
 ![backend coverage](https://img.shields.io/badge/backend%20line%20coverage-90.9%25-brightgreen)
 
 **Thesis: the agent proposes, the NEAR charter decides.** The AI agent holds only a function-call key for `propose`; every payment is checked by the `oath` contract, which allows it, refuses it on chain with a reason, or holds it for the owner.
@@ -23,14 +23,14 @@ Each claim names the code, the test that pins it, and a tx you can open. Test na
 | The API rejects bad input, refuses unknown CORS origins, never echoes the caller IP, and refuses a body over 16 KB | `backend/src/server.js`, `backend/src/app.js` `bodyLimit` | `backend/test/unit/api-contract.test.js` (`an oversized JSON body is refused before it is read`) | |
 | Start here opens setup. After a charter exists, the same pin opens the charter office | `app/design/D9_world/index.html` `#rulesBtn`, `app/design/D9_world/js/main.js` `paintStart` | e2e `town pin opens setup and each step renders` | |
 | Sign in is the primary action. A free account is a testnet trial inside that page | `app/house/house.js` `mountConnect`, `app/src/setup/index.html` | e2e `connect: / opens the NEAR Connect wallet list` | |
-| The public leaderboard hides guest accounts and scripted nicknames and links each row to its tx | `backend/src/vault.js` `publicPlayers` | `public board hides guest accounts and scripted nicknames` | |
+| The public leaderboard lists only charters in `shared/vault/public-charters.json` | `backend/src/vault.js` `publicPlayers` | `scripted players stay off the board unless their charter is listed` | |
 | The model cannot switch the payee or the amount the visitor named. The charter still refuses an off-list payee | `backend/src/agent.js` `propose` | `a model that invents a payee is discarded for the words`, `a model that raises the amount is kept to the amount in the message` | off-list refusal [BESexM6S…](https://testnet.nearblocks.io/txns/BESexM6SCG8sRPn9XmpZVYE1caTdMexL6EQabyfkrXh5) |
 | One receipt shape covers a NEAR payment, a chain-signature toll, a dry Intents quote and a capped model job | `shared/rails/receipts.js` `receiptsBody`, `GET /api/receipts` | `every rail uses the same receipt keys` | allowed [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy), refused [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH) |
 
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 343 backend unit tests (342 pass, 1 skipped), offline
+npm test                                   # 346 backend unit tests (345 pass, 1 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify                             # re-reads all 76 proof txs from testnet; exits 1 if one is missing
 ```
@@ -47,7 +47,7 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
 | toll, arena, townhall, house_nft, attested_check, charter_factory unit | 67, 17, 15, 16, 4, 23 |
-| backend unit (`npm test`) | 342 (+1 skipped) |
+| backend unit (`npm test`) | 345 (+1 skipped) |
 | browser e2e against the live site | 22 passed, 12 skipped |
 
 The 12 skipped e2e tests sign real testnet txs and need a funded wallet key or an opt-in flag (`GUARD_E2E`, `VAULT_E2E`, `VAULT_AI_E2E`, `VAULT_FAUCET`, `HALL_FILE`, `HOUSE_*_KEY_FILE`, a partner key, or the arena attack switch); they are not faked offline. Backend line coverage is 90.9% (`node --test --experimental-test-coverage`). CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
@@ -79,7 +79,7 @@ npm run check-cited # every file, tx, account and hash the docs cite exists
 
 A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money, and each move is checked first by the charter (the `oath` contract on NEAR), which holds the agent's rules. Agents ask. The charter answers.
 
-Deployed: https://nearcarta.vercel.app serves the pages, and `/api/*` is passed to the API on Render: https://nearcarta-api.onrender.com. The hosted demo stays up through 2026-11-25. Example: `/api/health`, `/api/receipts`, `/api/mainnet`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped. `/api/health` reports `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`. A new charter a visitor creates in the browser is a free testnet trial. The town's own charter, toll, arena, house and town hall are on mainnet.
+Deployed: https://nearcarta.vercel.app serves the pages, and `/api/*` is passed to the API on Render: https://nearcarta-api.onrender.com. The hosted demo stays up through 2026-11-25. Example: `/api/health`, `/api/receipts`, `/api/mainnet`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped. `/api/health` reports `network.contracts` `mainnet` and `network.trial` `testnet`, plus `nearAi: true` and `confidentialQuotes: true`, and `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`); the only server signer is the Vault runner's function-call key for `propose` on the shared arena charter, shown under `vault_runner`. A new charter a visitor creates in the browser is a free testnet trial. The town's own charter, toll, arena, house and town hall are on mainnet.
 
 ## For judges: do X, see Y
 
@@ -161,7 +161,7 @@ On 2026-10-29 a fresh guest pressed every shop row above on the live site with n
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 342 unit tests (1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm test                 # 345 unit tests (1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
 npm run verify           # reads every proof tx back from testnet (76/76 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
