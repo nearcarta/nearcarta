@@ -8,3 +8,5 @@
 # token field: testnet USDC contract account id (64-hex implicit account with deployed code), public
 47371f1dcbe0b9492d6b5d88f4d335e3ecd53591:judges/proofs/payroll-usdc.json:generic-api-key:5
 47371f1dcbe0b9492d6b5d88f4d335e3ecd53591:judges/proofs/payroll-usdc.json:generic-api-key:86
+# public mainnet tx hash (key-deletion tx) in the runbook
+af4ef3e1367c0936f9e259079c5ac7b510418361:docs/MAINNET_RUNBOOK.md:generic-api-key:152
