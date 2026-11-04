@@ -21,8 +21,11 @@ test('visitor makes a charter and the contract refuses scams on chain', async ({
   await expect(page.locator('#factory code').first()).toBeVisible();
   await page.screenshot({ path: shots + 'vault-1-start.png', fullPage: true });
 
-  await page.getByTestId('guest').click();
-  await expect(page.getByTestId('who')).toHaveText(/^ncguest-[a-z0-9]+\.testnet$/, { timeout: 90_000 });
+  await page.goto('/setup/');
+  await page.getByTestId('setup-guest').click();
+  await expect(page.getByTestId('setup-who')).toHaveText(/^ncguest-[a-z0-9]+\.testnet$/, { timeout: 90_000 });
+  await page.goto('/shops/vault/');
+  await expect(page.getByTestId('who')).toHaveText(/^ncguest-[a-z0-9]+\.testnet$/, { timeout: 30_000 });
   proof.account = await page.getByTestId('who').textContent();
 
   const name = 'e2e-' + Date.now().toString(36);

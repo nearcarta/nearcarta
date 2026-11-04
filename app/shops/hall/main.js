@@ -73,7 +73,7 @@ async function refreshWho() {
   me = await currentAccount(connector);
   if (was !== me && rpc) list().catch(() => {});
   $('#who').innerHTML = me ? `<b data-testid="who">${esc(me)}</b>` : '';
-  $('#connect').hidden = !!me; $('#guest').hidden = !!me; $('#signout').hidden = !me;
+  $('#connect').hidden = !!me; const guest = $('#guest'); if (guest) guest.hidden = !!me; $('#signout').hidden = !me;
   $('#file').disabled = !me; $('#file').textContent = me ? 'File proposal' : 'Sign in first';
 }
 
@@ -126,8 +126,8 @@ fetch(API + '/api/mainnet').then(r => r.json()).then(m => {
 }).catch(() => {});
 $('#file-form').onsubmit = e => boot.then(() => file(e));
 $('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
-$('#guest').onclick = async () => { const b = $('#guest'); b.disabled = true; b.textContent = 'Asking the testnet faucet…';
-  try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { b.disabled = false; b.textContent = 'Free testnet trial'; } };
+const guestBtn = $('#guest'); if (guestBtn) guestBtn.onclick = async () => { guestBtn.disabled = true; guestBtn.textContent = 'Asking the testnet faucet…';
+  try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { guestBtn.disabled = false; guestBtn.textContent = 'Free testnet trial'; } };
 $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); await refreshWho(); };
 
 async function vote(btn) {

@@ -19,10 +19,11 @@ for (const [w, h] of [[1440, 900], [1280, 800], [390, 844]]) {
     const errors = [], chron = [];
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
     page.on('response', async r => { if (r.url().includes('/api/chronicle/')) chron.push({ status: r.status(), busy: !!(await r.json().catch(() => ({}))).busy, source: (await r.json().catch(() => ({}))).source || null }); });
+    await page.goto('/setup/');
+    await page.getByTestId('setup-guest').click();
+    await expect(page.getByTestId('setup-who')).toHaveText(/^ncguest-[a-z0-9]+\.testnet$/, { timeout: 90_000 });
     await page.goto('/shops/vault/');
-    await expect(page.locator('#board')).not.toHaveText(/Loading/, { timeout: 60_000 }); // page set up (wallet selector ready)
-    await page.getByTestId('guest').click();
-    await expect(page.getByTestId('who')).toHaveText(/^ncguest-[a-z0-9]+\.testnet$/, { timeout: 90_000 });
+    await expect(page.getByTestId('who')).toHaveText(/^ncguest-[a-z0-9]+\.testnet$/, { timeout: 30_000 });
     const name = 'feed-' + Date.now().toString(36);
     await page.locator('#cname').fill(name);
     await page.getByTestId('create').click();

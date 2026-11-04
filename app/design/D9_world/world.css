@@ -257,7 +257,7 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 .pill.go:hover{background:#ebc983}
 #rulesBtn{top:18px;left:50%;transform:translateX(-50%);height:38px;border-radius:19px;padding:0 16px;font-size:14px;box-shadow:0 6px 20px rgba(23,19,15,.35)}
 #rulesBtn .k{font-size:13px}
-#rulesBtn .cue{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:#1f1a15;background:#f3ead8;border-radius:8px;padding:3px 8px;opacity:0;transition:opacity .4s;pointer-events:none}
+#rulesBtn .cue{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:#1f1a15;background:#f3ead8;border-radius:8px;padding:3px 8px;opacity:1;pointer-events:none}
 #rulesBtn .cue::before{content:'';position:absolute;bottom:100%;left:50%;margin-left:-5px;border:5px solid transparent;border-bottom-color:#f3ead8}
 body.cta #rulesBtn .cue{opacity:1}
 body.cta #rulesBtn{animation:ctaPulse 1.6s ease-in-out 4}

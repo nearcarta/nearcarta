@@ -19,9 +19,11 @@ test('the NEAR AI model proposes, the charter allows one ask and refuses an inje
   page.on('console', m => { if (m.type() === 'error') errs[width].push(m.text().slice(0, 200)); });
   page.on('pageerror', e => errs[width].push('pageerror: ' + String(e.message).slice(0, 200)));
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/setup/');
+  await page.getByTestId('setup-guest').click();
+  await expect(page.getByTestId('setup-who')).toHaveText(/^ncguest-[a-z0-9]+\.testnet$/, { timeout: 90_000 });
   await page.goto('/shops/vault/');
-  await page.getByTestId('guest').click();
-  await expect(page.getByTestId('who')).toHaveText(/^ncguest-[a-z0-9]+\.testnet$/, { timeout: 90_000 });
+  await expect(page.getByTestId('who')).toHaveText(/^ncguest-[a-z0-9]+\.testnet$/, { timeout: 30_000 });
   proof.account = await page.getByTestId('who').textContent();
   const name = 'ai-' + Date.now().toString(36);
   await page.locator('#cname').fill(name);

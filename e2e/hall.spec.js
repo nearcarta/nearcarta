@@ -13,8 +13,11 @@ test.describe('town hall proposals', () => {
     test.skip(!process.env.HALL_FILE, 'set HALL_FILE=1 to file a real testnet proposal');
     page.on('dialog', d => d.accept());
     await page.goto('/shops/hall/');
-    await page.getByTestId('guest').click();
-    await expect(page.getByTestId('who')).toContainText('ncguest-', { timeout: 120_000 });
+    await page.goto('/setup/');
+    await page.getByTestId('setup-guest').click();
+    await expect(page.getByTestId('setup-who')).toContainText('ncguest-', { timeout: 120_000 });
+    await page.goto('/shops/hall/');
+    await expect(page.getByTestId('who')).toContainText('ncguest-', { timeout: 30_000 });
     await page.getByTestId('desc').fill('e2e: add this guest account to the Town Hall reward list');
     await page.getByTestId('file').click();
     const filed = page.getByTestId('filed');

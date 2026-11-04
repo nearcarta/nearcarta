@@ -55,6 +55,17 @@ for (const width of [1440, 390]) {
       await page.screenshot({ path: `${shots}/office-${width}.png`, fullPage: true });
     });
 
+    test('proof drawer title is not under the header buttons', async ({ page }) => {
+      await page.goto('/?mode=2d&shop=house');
+      await page.waitForFunction(() => document.body.classList.contains('fb') || document.body.classList.contains('ready'), null, { timeout: 30_000 });
+      await expect(page.locator('#t-title')).toBeVisible({ timeout: 30_000 });
+      await page.locator('#t-proof').click();
+      await expect(page.locator('#d-title')).toBeVisible();
+      const acct = page.locator('#acct');
+      if (await acct.count()) await expect(acct).toBeHidden();
+      await page.screenshot({ path: `${shots}/drawer-${width}.png` });
+    });
+
     test('every shop', async ({ page }) => {
       for (const shop of shops) {
         await page.goto(`/design/D8_shops/?2d&shop=${shop}`);

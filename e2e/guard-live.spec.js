@@ -25,8 +25,11 @@ test('payee check stops a poisoned invoice, the charter refuses it, and the Mist
   await page.goto('/shops/vault/');
   await expect(page.locator('#factory code').first()).toBeVisible({ timeout: 60_000 });
   await page.waitForTimeout(2000);
-  await page.getByTestId('guest').click();
-  await expect(page.getByTestId('who')).toHaveText(/ncguest-[a-z0-9]+\.testnet/, { timeout: 180_000 });
+  await page.goto('/setup/');
+  await page.getByTestId('setup-guest').click();
+  await expect(page.getByTestId('setup-who')).toHaveText(/ncguest-[a-z0-9]+\.testnet/, { timeout: 180_000 });
+  await page.goto('/shops/vault/');
+  await expect(page.getByTestId('who')).toHaveText(/ncguest-[a-z0-9]+\.testnet/, { timeout: 30_000 });
   proof.account = (await page.getByTestId('who').textContent()).trim();
   const name = 'gd-' + Date.now().toString(36);
   await page.locator('#cname').fill(name);

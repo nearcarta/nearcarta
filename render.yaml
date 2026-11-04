@@ -1,11 +1,11 @@
-# Render Blueprint: the read-only API as a free web service (testnet config).
+# Render Blueprint: the read-only API. The live service is a paid Starter instance so it does not sleep.
 # It runs the image built from ./Dockerfile (pushed to a private GHCR package), so Render
 # needs no access to the repo. Server keys are set on the service, never in the image.
 services:
   - type: web
     name: nearcarta-api
     runtime: image
-    plan: free
+    plan: starter
     region: frankfurt
     image:
       url: ghcr.io/nearcarta/nearcarta-api:latest
