@@ -84,9 +84,12 @@ function sSignin() {
     signed ? `Signed in as <b>${esc(me)}</b>.` : 'One path: sign in, fund, pick a character, write the rules, sign them, then try one payment the charter allows and one it refuses.')
     + (signed ? `<div class="addr"><div><small class="muted">Your NEAR account</small><br><code>${esc(me)}</code></div></div>` :
     (PRIVY_ON ? `<button class="btn google big" id="google" data-testid="setup-google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.9l-8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Continue with Google</button>
-      <form id="emailf" style="margin-top:12px">${emailStage === 'email'
+      <form id="emailf" style="margin-top:12px">${emailStage === 'finish'
+        ? `<p class="lede">You are logged in${email ? ` as <b>${esc(email)}</b>` : ''}. One click opens the Nearcarta sign-in window and links your NEAR account.</p><button type="button" class="btn gold big" id="finish" data-testid="setup-finish">Finish sign in →</button>`
+        : emailStage === 'email'
         ? `<label for="em">Email</label><div class="row" style="flex-wrap:nowrap"><input id="em" type="email" required autocomplete="email" placeholder="you@example.com" value="${esc(email)}" data-testid="setup-email"><button class="btn" data-testid="setup-send">Send code</button></div>`
-        : `<label for="code">6-digit code sent to ${esc(email)}</label><div class="row" style="flex-wrap:nowrap"><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" required data-testid="setup-code" style="font:600 20px var(--mono);letter-spacing:.3em"><button class="btn gold" data-testid="setup-verify">Verify</button></div><button type="button" class="btn link sm" id="reemail">Use another email</button>`}</form>
+        : `<label for="code">6-digit code sent to ${esc(email)}</label><div class="row" style="flex-wrap:nowrap"><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" required data-testid="setup-code" style="font:600 20px var(--mono);letter-spacing:.3em"><button class="btn gold" data-testid="setup-verify">Verify</button></div><button type="button" class="btn link sm" id="reemail" data-testid="setup-reemail">Use another email</button>`}</form>
+      <p id="status" class="small muted" role="status" aria-live="polite" data-testid="setup-status"></p>
       <div class="or">or</div>` : '')
     + `<div class="tiles" data-testid="setup-choices"><button class="tile" id="wallet" data-testid="setup-wallet"><i>◈</i><b>NEAR wallet</b><span>Meteor, Intear, HOT, Ledger… on mainnet</span></button>
       <button class="tile" id="mm" data-testid="setup-metamask"><i>🦊</i><b>MetaMask</b><span>Your EVM wallet signs NEAR mainnet</span></button></div>
@@ -94,11 +97,16 @@ function sSignin() {
       <p class="trial-note"><button class="btn link" id="guest" data-testid="setup-guest">Use a free testnet account instead</button><span class="small"> A separate trial. No real NEAR. Its key stays in this browser.</span></p>`)
     + errP() + nav(signed, { back: false });
 }
-async function afterPrivy() {
-  // Logged in to Privy on this origin: make sure a NEAR wallet exists, then let NEAR Connect pick it up (its /sign window reuses the session).
+const say = t => { const el = $('#status'); if (el) el.textContent = t; };
+async function ensureWallet() {
   const { user } = await privy.user.get();
   const hasNear = u => (u?.linked_accounts || []).some(a => a.type === 'wallet' && a.chain_type === 'near');
   if (!hasNear(user)) await createWallet({ fetchPrivyRoute: privy.fetchPrivyRoute.bind(privy), getCompiledPath: privy.getCompiledPath.bind(privy), app: { appId: privy.app.appId } }, { request: { chain_type: 'near' } });
+}
+async function afterPrivy() {
+  // Logged in to Privy on this origin: make sure a NEAR wallet exists, then let NEAR Connect pick it up (its /sign window reuses the session).
+  // Called from a click, so the browser opens that window in front instead of as a background tab.
+  await ensureWallet();
   const c = mainnetWallet(); await c.whenManifestLoaded;
   await c.connect({ walletId: 'nearcarta-privy' });
   st.trial = false; save();
@@ -109,8 +117,10 @@ function wireSignin() {
   const g = $('#google'); if (g) g.onclick = () => act(g, async () => { const { url } = await privy.auth.oauth.generateURL('google', location.origin + '/setup/'); sessionStorage.setItem('nc_setup_google', '1'); location.assign(url); });
   const f = $('#emailf'); if (f) f.onsubmit = e => { e.preventDefault(); const b = f.querySelector('button:not([type])');
     if (emailStage === 'email') act(b, async () => { email = $('#em').value.trim(); await privy.auth.email.sendCode(email); emailStage = 'code'; });
-    else act(b, async () => { await privy.auth.email.loginWithCode(email, $('#code').value.trim()); emailStage = 'email'; await afterPrivy(); }); };
-  const re = $('#reemail'); if (re) re.onclick = () => { emailStage = 'email'; render(); };
+    else act(b, async () => { say('Checking your code…'); await privy.auth.email.loginWithCode(email, $('#code').value.trim());
+      say('Code accepted. Making your NEAR wallet…'); await ensureWallet(); emailStage = 'finish'; say(''); }); };
+  const fin = $('#finish'); if (fin) fin.onclick = () => act(fin, async () => { say('Opening the Nearcarta sign-in window…'); await afterPrivy(); emailStage = 'email'; say(''); });
+  const re = $('#reemail'); if (re) re.onclick = e => { e.preventDefault(); e.stopPropagation(); emailStage = 'email'; msg = ''; render(); };
   $('#wallet').onclick = e => act(e.currentTarget, async () => { st.trial = false; save(); signedIn(await connect(t => { msg = t; }, 'mainnet')); });
   $('#mm').onclick = e => act(e.currentTarget, async () => { msg = ''; st.trial = false; save(); await mainnetWallet().connect({ walletId: 'ethereum-wallets' }); await signedIn(await mainnetAccount()); });
   const gu = $('#guest'); if (gu) gu.onclick = e => act(e.currentTarget, async () => { st.trial = true; save(); signedIn(await startGuest()); });
@@ -345,13 +355,15 @@ async function boot() {
   }
   rpc = rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])].filter(Boolean).length ? [CFG.rpc, ...(CFG.rpc_fallbacks || [])].filter(Boolean) : ['https://rpc.testnet.fastnear.com']);
   if (CFG.min_deposit) st.deposit = Math.max(st.deposit, nearOf(CFG.min_deposit));
-  const who = () => st.trial ? account() : mainnetAccount();
+  // One session for the whole site: if the preferred network has nobody, use whichever wallet the HUD and /console see.
+  const who = async () => { const a = await (st.trial ? account() : mainnetAccount()); if (a) return a;
+    const b = await (st.trial ? mainnetAccount() : account()); if (b) { st.trial = !st.trial; save(); } return b; };
   if (!PREVIEW) onWallet(async () => { const a = await who(); if (a !== me) { me = a; bal = undefined; if (me) await refreshBal(); render(); } });
   // Back from Google: finish the Privy login, then connect.
   const q = new URLSearchParams(location.search);
   if (privy && sessionStorage.getItem('nc_setup_google') && q.get('privy_oauth_code')) {
     sessionStorage.removeItem('nc_setup_google');
-    try { await privy.auth.oauth.loginWithCode(q.get('privy_oauth_code'), q.get('privy_oauth_state'), 'google'); history.replaceState(null, '', '/setup/'); render(); await afterPrivy(); return; }
+    try { await privy.auth.oauth.loginWithCode(q.get('privy_oauth_code'), q.get('privy_oauth_state'), 'google'); history.replaceState(null, '', '/setup/'); await ensureWallet(); emailStage = 'finish'; }
     catch (e) { msg = 'Google sign-in did not finish: ' + (e?.message || e); }
   }
   if (!PREVIEW) { me = await who(); if (me) await refreshBal(); }
