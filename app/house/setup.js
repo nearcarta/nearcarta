@@ -322,7 +322,7 @@ function sSign() {
     + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
     + (live ? '' : (onBoard && bal != null && nearOf(bal) < SIGN_MIN
         ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
-        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 locked + gas). The 0.02 comes back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`)
+        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 locked + gas). Of the 0.02, 0.01 becomes your charter's spending balance and about 0.004 pays row storage; the rest is refunded at once. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`)
       + `<div id="signhelp" class="tabhelp" hidden data-testid="sign-tabhelp"><p class="small">The approval opened in another browser tab. Switch to it and approve. This page moves on by itself.</p><button type="button" class="btn" id="resign" data-testid="sign-reopen">Switch to approval tab</button></div>`) + errP() + nav(live, { label: 'Try your agent' });
 }
 async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
@@ -336,13 +336,16 @@ function boardArgs(r, agent) {
   const exp = BigInt(Date.now() + r.days * 864e5) * 1_000_000n;
   return {
     rules: { receivers: r.receivers, per_action_cap: toY(r.cap), daily_budget: toY(r.daily), max_actions_per_day: r.per, window_start_min: 0, window_end_min: 0, min_amount: toY(0.0001), expires_at: exp.toString() },
-    agent, fund: (YN / 1000n).toString(),
+    agent, fund: ROW_FUND.toString(),
   };
 }
 // The agent key is also added to the visitor's own account as a function-call access key that may only call
 // `propose` on the board, with a small gas allowance. Then Try needs no wallet: the key signs the board message and
 // the transaction itself. It cannot move NEAR from the account; the board still decides every payment.
 const AGENT_ALLOW = YN / 20n; // 0.05 NEAR of gas allowance, never spendable as NEAR
+// open_charter keeps ROW_FUND as the row's own spendable balance (enough for a full day at the default 0.01 budget);
+// the rest of the 0.02 deposit after storage (~0.004) is refunded in the same call.
+const ROW_FUND = YN / 100n, TOPUP = YN / 200n;
 const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: ['propose'], allowance: AGENT_ALLOW.toString() } } } });
 async function agentAccessKey(sec) {
   if (!sec || !me) return null;
@@ -438,8 +441,8 @@ function wireSign() {
 }
 
 // ---------- 7. Try ----------
-let tries = [], keyReady = null;
-const WHY = { over_per_action_cap: 'over your per-payment cap', over_daily_budget: 'over your daily budget', over_daily_action_count: 'over your payments-per-day limit', receiver_not_allowlisted: 'that shop is not on your list', below_min_amount: 'below the smallest payment', clause_expired: 'your rule has expired', frozen: 'the charter is frozen' };
+let tries = [], keyReady = null, secTimer = null;
+const WHY = { over_per_action_cap: 'over your per-payment cap', over_daily_budget: 'over your daily budget', over_daily_action_count: 'over your payments-per-day limit', receiver_not_allowlisted: 'that shop is not on your list', below_min_amount: 'below the smallest payment', clause_expired: 'your rule has expired', frozen: 'the charter is frozen', ERR_BALANCE: 'your charter\'s own balance is too low' };
 let pendingTry = null; // { amount, hash } while a try is on its way, so the link shows before the result
 const reasonOf = t => Object.keys(WHY).find(k => String(t || '').includes(k)) || refusalOf(t) || '';
 async function boardAsk(amt) {
@@ -454,7 +457,7 @@ async function boardAsk(amt) {
   if (ak) {
     // No wallet: the agent key signs the transaction itself.
     const signed = signTx({ key, signerId: me, receiverId: contract, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash, actions: [functionCall('propose', args, GAS.propose * TG)] });
-    pendingTry = { amount, hash: signed.hash }; render();
+    pendingTry = { amount, hash: signed.hash, t0: Date.now() }; render();
     let r;
     try { r = await rpcCall('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }); }
     catch (e) {
@@ -464,7 +467,7 @@ async function boardAsk(amt) {
     } finally { pendingTry = null; }
     const o = outcomeOf(r);
     return o.ok ? { passed: true, reason: 'ok', tx: signed.hash, amount, receiver, decision: 'allowed', signer: 'agent' }
-      : { passed: false, reason: reasonOf(o.error) || plainErr(o.error), tx: signed.hash, amount, receiver, decision: 'refused', signer: 'agent' };
+      : { passed: false, reason: reasonOf(o.error) || plainErr(o.error), tx: signed.hash, amount, receiver, decision: 'refused', signer: 'agent', holds: row.balance };
   }
   const w = await mainnetWallet().wallet();
   try {
@@ -472,9 +475,20 @@ async function boardAsk(amt) {
     return { passed: true, reason: 'ok', tx: txHashOf(res), amount, receiver, decision: 'allowed', signer: 'wallet' };
   } catch (e) {
     const tx = e.tx || txHashOf(e) || null;
-    return { passed: false, before: !tx, reason: reasonOf(e) || plainErr(e), tx, amount, receiver, decision: 'refused', signer: 'wallet' };
+    return { passed: false, before: !tx, reason: reasonOf(e) || plainErr(e), tx, amount, receiver, decision: 'refused', signer: 'wallet', holds: row.balance };
   }
 }
+const whyText = t => t.reason === 'ERR_BALANCE'
+  ? `Your charter's own balance is too low for this payment (holds ${fmtN(nearOf(t.holds))}, needs ${fmtN(nearOf(t.amount))} NEAR). Your account balance is not used.`
+  : (WHY[t.reason] || t.reason || t.decision);
+let rowBal = null;
+async function topUp() {
+  const w = await mainnetWallet().wallet();
+  const res = await w.signAndSendTransaction({ receiverId: MAIN.board.contract, actions: [{ type: 'FunctionCall', params: { methodName: 'fund', args: {}, gas: (GAS.agent * TG).toString(), deposit: TOPUP.toString() } }] });
+  const tx = txHashOf(res); const s = signLog.find(x => x.k === 'topup'); if (s) Object.assign(s, { state: 'ok', tx }); else signLog.push({ k: 'topup', state: 'ok', tx });
+  await readRowBal();
+}
+async function readRowBal() { const row = await viewFn(rpcClient([MAIN.rpc]), MAIN.board.contract, 'get_charter', { owner: me }).catch(() => null); rowBal = row ? BigInt(row.balance) : null; }
 function sTry() {
   if (!st.trial && !(boardLive() && st.charter)) {
     const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
@@ -489,9 +503,11 @@ function sTry() {
     + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button class="tile" id="t-ok" data-testid="try-allowed"><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span>Inside your rule: should pass</span></button>
        <button class="tile" id="t-no" data-testid="try-refused"><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span>Twice your cap: should be refused</span></button></div>
      ${boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it (it can only call <code>propose</code> on ${esc(MAIN.board.contract)} and cannot move your NEAR).</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
-     ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR…</span> ${txA(pendingTry.hash)}</div></div>` : ''}
-     ${tries.map(t => `<div class="verdict ${t.passed ? 'good' : 'bad'}" data-testid="try-verdict"><span class="tag">${t.passed ? 'ALLOWED' : 'REFUSED'}</span><div><b>${fmtN(nearOf(t.amount))} NEAR → ${esc(short(t.receiver))}</b><br><span class="muted small">${esc(t.passed ? 'inside your rule · the charter paid' : (WHY[t.reason] || t.reason || t.decision))}${t.passed ? '' : t.tx ? ' · refused on chain by the contract' : ' · refused before sending, nothing on chain'}${t.signer === 'agent' ? ' · signed by your agent key, no wallet' : ''}</span> ${txA(t.tx)}</div></div>`).join('')}
-     ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Charter office</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.length >= 2 ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
+     ${boardLive() && !st.trial && rowBal !== null && rowBal < toY(Math.min(+rules().cap, 0.001)) ? `<div class="tabhelp" data-testid="try-lowbal"><p class="small">Your charter holds ${fmtN(nearOf(rowBal.toString()))} NEAR. Payments come from the charter's own balance, not your account. Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to it with one approval.</p><button type="button" class="btn" id="t-topup" data-testid="try-topup">Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to the charter</button></div>` : ''}
+     ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
+     ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR… <span id="try-secs" data-testid="try-secs">${Math.floor((Date.now() - pendingTry.t0) / 1000)}s</span></span> ${txA(pendingTry.hash)}</div></div>` : ''}
+     ${tries.map(t => `<div class="verdict ${t.passed ? 'good' : 'bad'}" data-testid="try-verdict"><span class="tag">${t.passed ? 'ALLOWED' : 'REFUSED'}</span><div><b>${fmtN(nearOf(t.amount))} NEAR → ${esc(short(t.receiver))}</b><br><span class="muted small">${esc(t.passed ? 'inside your rule · the charter paid' : whyText(t))}${t.passed ? '' : t.tx ? ' · refused on chain by the contract' : ' · refused before sending, nothing on chain'}${t.signer === 'agent' ? ' · signed by your agent key, no wallet' : ''}</span> ${txA(t.tx)}</div></div>`).join('')}
+     ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Charter office</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.some(t => t.passed) && tries.length >= 2 ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
 }
 function next() { const n = new URLSearchParams(location.search).get('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/'; }
 function wireTry() {
@@ -503,7 +519,10 @@ function wireTry() {
     : (amt, memo) => runAsk({ charter: st.charter, key: keyFrom(localStorage.getItem(agentLS(st.charter))), receiver: to, amount: toY(amt), memo, viewF: (c, m, a) => viewFn(rpcCall, c, m, a), send: sendPropose, rpcCall });
   const k = $('#t-key'); if (k) k.onclick = e => act(e.currentTarget, async () => { await signBoard(); keyReady = !!(await agentAccessKey(localStorage.getItem(agentLS(me)))); });
   if (boardLive() && !st.trial && keyReady === null) agentAccessKey(localStorage.getItem(agentLS(me))).then(a => { keyReady = !!a; if (STEPS[st.step][0] === 'try') render(); });
-  $('#t-ok').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(Math.min(+r.cap, 0.001), 'setup: allowed')); });
+  const tu = $('#t-topup'); if (tu) tu.onclick = e => act(e.currentTarget, topUp);
+  if (boardLive() && !st.trial && rowBal === null) readRowBal().then(() => { if (STEPS[st.step][0] === 'try' && rowBal !== null) render(); });
+  clearInterval(secTimer); secTimer = setInterval(() => { const el = $('#try-secs'); if (el && pendingTry) el.textContent = Math.floor((Date.now() - pendingTry.t0) / 1000) + 's'; }, 1000);
+  $('#t-ok').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(Math.min(+r.cap, 0.001), 'setup: allowed')); if (boardLive() && !st.trial) await readRowBal(); });
   $('#t-no').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(+(+r.cap * 2).toFixed(4), 'setup: over cap')); });
   wire();
 }
