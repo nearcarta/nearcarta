@@ -112,6 +112,28 @@
       "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
     },
     {
+      "shop": "board.visitor_run",
+      "label": "fund_topup_0.005",
+      "hash": "34QArpijENRcPPYhWPpvVhmbhxXr1jPaBpE6xGNAZ4Lj",
+      "contract": "board.nearcarta.near",
+      "signer": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "propose_allowed_0.001_agent_key_no_wallet",
+      "hash": "BecizuUP6eN4eQnRtYajq6wTudY8pX4gRSVMZMticz1s",
+      "contract": "board.nearcarta.near",
+      "signer": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
       "shop": "charter",
       "label": "create_root",
       "hash": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",
