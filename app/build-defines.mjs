@@ -10,6 +10,6 @@ if (envClient && !envClient.startsWith('client-')) console.warn('Privy client id
 export const PRIVY_CLIENT = rawClient.startsWith('client-') ? rawClient : '';
 const NEAR_NET = process.env.NEAR_NET === 'mainnet' ? 'mainnet' : 'testnet';
 // NEXT_PUBLIC_MAINNET=1 (or NEXT_PUBLIC_NEAR_NET=mainnet) hides the guest trial on /setup
-// and lets a visitor create a charter once mainnet.json factory.status is "deployed".
+// and opens a charter row once mainnet.json board.status is "deployed".
 export const PUBLIC_MAINNET = process.env.NEXT_PUBLIC_MAINNET === '1' || process.env.NEXT_PUBLIC_NEAR_NET === 'mainnet';
 export const walletDefine = { __PRIVY_ON__: String(!!PRIVY_ID), __NEAR_NET__: JSON.stringify(NEAR_NET), __PUBLIC_MAINNET__: JSON.stringify(PUBLIC_MAINNET ? '1' : '0') };

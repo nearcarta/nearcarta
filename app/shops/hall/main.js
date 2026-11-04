@@ -111,7 +111,27 @@ async function file(e) {
   finally { await refreshWho(); }
 }
 
-const boot = (async () => {
+const PUBLIC = window.NEARCARTA_PUBLIC_MAINNET === true;
+if (!PUBLIC) {
+  const sub = document.querySelector('header .sub');
+  if (sub) sub.innerHTML = 'Proposals on this page are the free testnet vote. <span class="net trial" data-testid="net-badge">testnet</span>';
+} else {
+  const fileCard = $('#s-file'); if (fileCard) fileCard.hidden = true;
+  const factsEl = $('#facts'); if (factsEl) factsEl.textContent = 'Loading the mainnet hall…';
+}
+function paintMainnetHall(m) {
+  const hall = m?.extras?.townhall;
+  const id = hall?.contract;
+  const n = $('#netnote');
+  if (n) n.textContent = id ? `${id} is on mainnet. The allow and the refusal are the transactions in the proof drawer.` : 'The mainnet hall record is not loaded.';
+  const txs = hall?.txs || {};
+  $('#facts').innerHTML = id
+    ? `<p>Contract <code>${esc(id)}</code>, owned by <code>${esc(hall.owner || '')}</code>.</p><p class="muted">A visitor's own charter is a row on the mainnet board. Open it from setup.</p>`
+    : '<p class="muted">The mainnet hall record is not loaded.</p>';
+  const links = Object.entries(txs).map(([k, h]) => `<li><a class="tx" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(k).replaceAll('_', ' '))}</a></li>`).join('');
+  $('#list').innerHTML = links ? `<ul class="props">${links}</ul>` : '<p class="muted">No hall transactions in the record.</p>';
+}
+const boot = PUBLIC ? Promise.resolve() : (async () => {
   CFG = await fetch(API + '/api/vault/config').then(r => r.json());
   rpc = rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])]);
   ({ connector } = makeConnector(rpc));
@@ -121,12 +141,13 @@ const boot = (async () => {
 })();
 boot.catch(e => log(`<b>Could not load:</b> ${esc(e.message)}`, 'bad err'));
 fetch(API + '/api/mainnet').then(r => r.json()).then(m => {
+  if (PUBLIC) { paintMainnetHall(m); return; }
   const id = m?.extras?.townhall?.contract; const n = $('#netnote');
   if (n && id) n.textContent = `${id} is the mainnet hall. This page is the testnet vote.`;
-}).catch(() => {});
+}).catch(() => { if (PUBLIC) { const f = $('#facts'); if (f) f.textContent = 'The mainnet hall record could not be loaded.'; } });
 $('#file-form').onsubmit = e => boot.then(() => file(e));
 $('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
-const guestBtn = $('#guest'); if (guestBtn) guestBtn.onclick = async () => { guestBtn.disabled = true; guestBtn.textContent = 'Asking the testnet faucet…';
+const guestBtn = $('#guest'); if (guestBtn && window.NEARCARTA_PUBLIC_MAINNET) guestBtn.hidden = true; else if (guestBtn) guestBtn.onclick = async () => { guestBtn.disabled = true; guestBtn.textContent = 'Asking the testnet faucet…';
   try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { guestBtn.disabled = false; guestBtn.textContent = 'Free testnet trial'; } };
 $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); await refreshWho(); };
 

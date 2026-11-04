@@ -65,12 +65,17 @@ async function createGuest(rpc) {
   throw new Error('faucet account did not appear on chain');
 }
 
-/** NEAR Connect on testnet with the guest wallet injected as one more choice. */
+const PUBLIC_MAINNET = typeof __PUBLIC_MAINNET__ !== 'undefined' && __PUBLIC_MAINNET__ === '1';
+
+/** NEAR Connect. The public mainnet build uses mainnet and does not offer the guest trial. */
 export function makeConnector(rpc) {
-  const guest = guestWallet(rpc); decoratePicker();
-  window.addEventListener('near-selector-ready', () => window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: guest })));
-  const connector = new NearConnector({ network: NEAR_NET, footerBranding: null, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
-  window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: guest }));
+  const network = PUBLIC_MAINNET ? 'mainnet' : NEAR_NET;
+  const connector = new NearConnector({ network, footerBranding: null, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
+  if (!PUBLIC_MAINNET) {
+    const guest = guestWallet(rpc); decoratePicker();
+    window.addEventListener('near-selector-ready', () => window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: guest })));
+    window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: guest }));
+  }
   addPrivy(connector).catch(() => {});
   return { connector, GUEST_ID };
 }

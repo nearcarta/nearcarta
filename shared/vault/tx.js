@@ -18,6 +18,14 @@ export function keyFrom(secret) {
   return { publicKey: 'ed25519:' + bs58.encode(kp.publicKey), secretKey: 'ed25519:' + bs58.encode(kp.secretKey), _pk: kp.publicKey, _sk: kp.secretKey };
 }
 
+const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+
+/** 64 hex chars. The board stores this, without the ed25519: prefix. */
+export function pubkeyHex(key) { return hex(key._pk); }
+
+/** 128 hex chars. Detached ed25519 signature of the raw message bytes. */
+export function signMessage(key, message) { return hex(nacl.sign.detached(enc.encode(message), key._sk)); }
+
 export function functionCall(method, args, gas, deposit = 0n) {
   const a = enc.encode(JSON.stringify(args));
   return cat(new Uint8Array([2]), str(method), u32(a.length), a, u64(gas), u128(deposit));

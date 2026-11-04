@@ -6,9 +6,12 @@ import { $, sfx } from './core.js';
 import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
+import { proposalMessage, refusalOf } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, ''); // same origin on Vercel (/api is proxied)
 const NBX = 'https://testnet.nearblocks.io';
+const onMain = () => globalThis.NEARCARTA_PUBLIC_MAINNET === true;
+const explorer = () => onMain() ? 'https://nearblocks.io' : NBX;
 const YN = 10n ** 24n, TG = 10n ** 12n;
 const toY = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const fromY = y => Number(BigInt(y || 0) / 10n ** 18n) / 1e6;
@@ -60,7 +63,7 @@ const view = (c, m, a) => W.viewFn(rpc, c, m, a);
 const agent = () => { const k = S.charter && localStorage.getItem(LS_AGENT(S.charter)); return k ? W.keyFrom(k) : null; };
 const pay = () => S.clauses.pay;
 // every signed result shows its tx as one visible link (round-2 judges: a collapsed "details" read as no link at all)
-export const txLine = (h, label = 'receipt') => h ? `<a class="rc tx" data-testid="receipt" href="${NBX}/txns/${esc(h)}" target="_blank" rel="noopener" title="${esc(label)} on chain">${label === '↗' ? '↗' : `tx ${esc(short(h))} ↗`}</a>` : '';
+export const txLine = (h, label = 'receipt') => h ? `<a class="rc tx" data-testid="receipt" href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" title="${esc(label)} on chain">${label === '↗' ? '↗' : `tx ${esc(short(h))} ↗`}</a>` : '';
 export const receipts = () => (S.charter ? JSON.parse(localStorage.getItem(LS_RCPT(S.charter)) || '[]') : []);
 function keep(h, shop, decision, reason, x = {}) {
   if (!S.charter || !h) return; const k = LS_RCPT(S.charter); const l = JSON.parse(localStorage.getItem(k) || '[]');
@@ -83,7 +86,13 @@ let onCh = () => {};
 const ready = () => conn ? Promise.resolve() : init(onCh).then(() => {});
 export function init(onChange) { onCh = onChange || onCh; return booting || (booting = boot0(onChange).catch(e => { booting = null; throw e; })); }
 async function boot0(onChange) {
-  CFG = await loadConfig(); rpc = W.rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])]);
+  CFG = await loadConfig();
+  let urls = [CFG.rpc, ...(CFG.rpc_fallbacks || [])];
+  if (onMain()) {
+    S.mainnet = await api('/api/mainnet').catch(() => null);
+    if (S.mainnet?.rpc) urls = [S.mainnet.rpc];
+  }
+  rpc = W.rpcClient(urls);
   ({ connector: conn } = W.makeConnector(rpc));
   const tell = () => dispatchEvent(new CustomEvent('nearcarta:wallet')); // the town HUD has its own connector: let it redraw
   conn.on('wallet:signIn', () => refresh().then(onChange).then(tell)); conn.on('wallet:signOut', () => { S.charter = null; refresh().then(onChange).then(tell); });
@@ -94,12 +103,35 @@ export const factories = () => [CFG.factory, ...(CFG.legacy || []).map(l => l.fa
 export const canBatch = (c = S.charter) => !!c && c.endsWith('.' + CFG.factory);
 export async function refresh() {
   S.me = await W.currentAccount(conn);
+  if (onMain()) {
+    const board = S.mainnet?.board;
+    S.board = board?.status === 'deployed' ? board.contract : null;
+    S.charter = null;
+    if (S.board && S.me) {
+      const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+      if (row) { S.charter = S.me; S.boardRow = row; }
+    }
+    if (S.charter) await readRules();
+    return S;
+  }
   // Newest factory first, then the legacy ones: a guest who opened a charter before R17 keeps it.
   if (S.me && !S.charter) for (const f of factories()) { const mine = await view(f, 'charters_of', { owner: S.me }).catch(() => []); if (mine.length) { S.charter = mine[mine.length - 1]; break; } }
   if (S.charter) await readRules();
   return S;
 }
 export async function readRules() {
+  if (S.board && S.me) {
+    const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+    S.boardRow = row;
+    if (!row) { S.charter = null; S.clauses = {}; S.state = null; S.agentLive = false; return S; }
+    S.charter = S.me;
+    S.clauses = { pay: { receivers: row.receivers, per_action_cap: row.per_action_cap, daily_budget: row.daily_budget, max_actions_per_day: row.max_actions_per_day, min_amount: row.min_amount, window_start_min: row.window_start_min, window_end_min: row.window_end_min } };
+    S.state = { frozen: row.frozen, next_nonce: row.nonce, policy_version: 1 };
+    S.pending = {}; S.usage = { pay: { spent: row.spent_today, count: row.actions_today } };
+    const k = agent();
+    S.agentLive = !!(k && W.pubkeyHex(k) === row.agent);
+    return S;
+  }
   const [cl, st] = await Promise.all([view(S.charter, 'get_clauses'), view(S.charter, 'get_state')]);
   S.clauses = cl || {}; S.state = st;
   S.pending = st?.pending_changes ? await view(S.charter, 'get_pending').catch(() => ({})) : {};
@@ -132,6 +164,7 @@ const fc = (methodName, args, tg = 40, deposit = '0') => ({ type: 'FunctionCall'
 
 // ---------- house: create the charter ----------
 export async function buildCharter() {
+  if (onMain()) throw new Error('Open your charter on the setup page. It is a row on the mainnet board.');
   const base = S.me.split('.')[0].replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '').slice(0, 18) || 'home';
   const name = base + '-' + Math.random().toString(36).slice(2, 6);
   const h = await sign(CFG.factory, [fc('create_charter', { name }, 150, toY(1))]);
@@ -173,7 +206,25 @@ export async function signRules(r) {
 }
 
 // ---------- the Lamplighter asks ----------
+async function boardPay({ shop, receiver, amountY }) {
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
+  const row = S.boardRow || await view(S.board, 'get_charter', { owner: S.me });
+  if (!row) throw new Error('no charter row yet: finish setup first');
+  const amount = String(amountY);
+  const msg = proposalMessage({ contract: S.board, owner: S.me, receiver, amount, nonce: String(row.nonce) });
+  const signature = W.signMessage(key, msg);
+  try {
+    const h = await sign(S.board, [fc('propose', { owner: S.me, receiver, amount, signature, reveal: null }, 80)]);
+    const out = { tx: h, decision: 'allowed', reason: 'ok', action: null, amount, receiver };
+    keep(out.tx, shop, out.decision, out.reason, { amt: amount, to: receiver }); readRules().catch(() => {});
+    return out;
+  } catch (e) {
+    const reason = refusalOf(e) || String(e.message || e).slice(0, 160);
+    return { tx: e.tx || null, decision: 'denied', reason, action: null, amount, receiver };
+  }
+}
 export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null }) {
+  if (S.board) return boardPay({ shop, receiver, amountY });
   const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
   const st = await view(S.charter, 'get_state');
   const p = { shop, clause_id: clauseId, receiver, amount: String(amountY), nonce: String(st.next_nonce), policy_version: st.policy_version,
@@ -195,6 +246,7 @@ export function ruleFor(o, clauseId = 'pay') {
 // The toll with its revenue split: one propose_batch (owner 0.01 + town treasury 0.002 + agent budget 0.001), all or
 // nothing. A charter whose rules do not allow all three payees (or that predates batches) pays the plain 0.01 toll.
 export async function toll() {
+  if (S.board) return boardPay({ shop: 'toll', receiver: merchants()[0], amountY: toY(0.01) });
   const payee = merchants()[0];
   if (!TS.canSplit(pay()?.receivers, payee, canBatch())) return ask({ shop: 'toll', receiver: payee, amountY: toY(0.01), memo: 'toll:base-sepolia' });
   const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');

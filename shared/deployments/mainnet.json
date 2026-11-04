@@ -11,7 +11,16 @@
   "oath_wasm": "contracts/artifacts/oath.r18p86.wasm",
   "reaper_wasm": "contracts/artifacts/reaper.wasm",
   "state_slack_bytes": 8192,
-  "note": "Not on chain. The owner runs backend/scripts/deploy-mainnet-factory.js. Storage stake comes back through reap. See docs/MAINNET_FACTORY.md."
+  "note": "Not on chain. Abandoned: a copy of the oath wasm per visitor does not fit this account. The visitor path is board. See docs/MAINNET_BOARD.md."
+ },
+ "board": {
+  "contract": "board.nearcarta.near",
+  "owner": "nearcarta.near",
+  "status": "not_deployed",
+  "crate": "contracts/charter_board",
+  "wasm": "contracts/artifacts/charter_board.wasm",
+  "max_row_yocto": "20000000000000000000000",
+  "note": "Not on chain. The owner runs backend/scripts/deploy-mainnet-board.js. One contract, one row per visitor. close_charter returns that row. reap deletes the account once no row is open. See docs/MAINNET_BOARD.md."
  },
  "mpc": "v1.signer",
  "chain_id": 8453,
