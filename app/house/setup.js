@@ -175,7 +175,7 @@ function sFund() {
   return head('Fund', bal === 0n ? 'Your account is ready. It has 0 NEAR.' : (st.trial ? 'Add testnet NEAR to the trial account.' : 'Add real NEAR when you want to.'), lead)
     + `<div class="addr"><figure class="qrfig"><div class="qr" role="img" aria-label="QR code: scan to send NEAR to this account">${qr}</div><figcaption>Scan to send NEAR to this account</figcaption></figure><div style="flex:1;min-width:200px">
        <label for="acct" class="small">${st.trial ? 'Your testnet account id' : 'Your NEAR account id'}</label><code id="acct" class="acct" data-testid="setup-address" tabindex="0">${esc(me)}</code>
-       <div class="row" style="margin-top:10px"><button class="btn sm" id="copy" data-testid="setup-copy">Copy account id</button>${acA(me)}</div>
+       <div class="row" style="margin-top:10px"><button class="btn sm" id="copy" data-testid="setup-copy">Copy account id</button><a href="${explorer()}/address/${esc(me)}" target="_blank" rel="noopener">View on explorer ↗</a></div>
        <div style="margin-top:14px"><span class="live">live balance</span><div class="bal" id="bigbal" data-testid="setup-balance">${balHtml()}</div></div></div></div>
      <p class="small gasline">Gas is the tiny fee NEAR charges for each transaction, usually less than 0.001 NEAR.</p>
      <h2>Ways to add NEAR</h2><div class="tiles">
