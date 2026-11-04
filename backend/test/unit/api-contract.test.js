@@ -36,6 +36,12 @@ for (const path of ['/api/mistbank/verify', '/api/mistbank/send/prepare', '/api/
   });
 }
 
+test('an oversized JSON body is refused before it is read', async () => {
+  const r = await post('/api/vault/ask', JSON.stringify({ text: 'pay the cafe 0.01 NEAR', pad: 'x'.repeat(20_000) }));
+  assert.equal(r.status, 413);
+  assert.match((await r.json()).error, /too large/);
+});
+
 test('the auditor opening is never accepted in a URL', async () => {
   const r = await get('/api/mistbank/verify?amount=1&salt=' + '0'.repeat(32));
   assert.equal(r.status, 405);

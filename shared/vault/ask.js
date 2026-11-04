@@ -20,6 +20,37 @@ export function nearToYocto(s) {
 const label = r => r.split('.')[0].toLowerCase();
 const stems = r => { const l = label(r); return [...new Set([l, l.replace(/s$/, ''), l.replace(/-.*$/, '')])].filter(x => x.length >= 3); };
 
+/** Drop controls that hide or reorder text: nulls, bidi overrides, zero-width characters. */
+export function scrubAsk(text) {
+  return String(text ?? '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '');
+}
+
+/** The NEAR amount the words name, as yocto, or null. Same split parseAsk uses. */
+export function askedAmount(text) {
+  const t = scrubAsk(text).trim().toLowerCase();
+  if (!t) return null;
+  const noteM = t.match(/\bfor\s+(.+)$/);
+  const head = noteM ? t.slice(0, noteM.index) : t;
+  const acct = [...head.matchAll(ACCOUNT_RE)].map(m => m[0]).find(a => /[a-z]/.test(a.split('.').pop()));
+  const rest = acct ? head.replace(acct, ' ') : head;
+  const am = rest.match(AMOUNT_RE);
+  if (!am) return null;
+  try {
+    const amount = nearToYocto(am[1].startsWith('.') ? '0' + am[1] : am[1]);
+    return BigInt(amount) === 0n ? null : amount;
+  } catch { return null; }
+}
+
+/** True when the words name this payee, as an account id or as a shop stem. */
+export function payeeNamed(text, receiver) {
+  const t = scrubAsk(text).toLowerCase();
+  const id = String(receiver || '').toLowerCase();
+  if (!id) return false;
+  if (t.includes(id)) return true;
+  const words = t.split(/[^a-z0-9-]+/).filter(Boolean);
+  return stems(id).some(s => words.some(w => w === s || w.replace(/s$/, '') === s || (s.length >= 4 && w.startsWith(s))));
+}
+
 /** A word that looks like an account id but has non a-z letters (homoglyphs such as Cyrillic "а"), or null. */
 export function lookalikeAccount(text) {
   for (const m of String(text || '').matchAll(/[\p{L}\p{N}_-]+(?:\.[\p{L}\p{N}_-]+)+/gu)) if (/[^\x00-\x7f]/.test(m[0]) && /\p{L}/u.test(m[0].replace(/[\x00-\x7f]/g, ''))) return m[0];
@@ -30,7 +61,7 @@ export const lookalikeMsg = w => `"${w.slice(0, 64)}" has look-alike (non a-z) l
 /** Parse a request. Returns { receiver, amount, note, memo } or throws with a plain message. The tag (nickname) labels the memo. */
 export function parseAsk(text, receivers = [], tag = 'mine') {
   if (!TAG_RE.test(tag)) throw new Error('nickname: 1-20 of a-z 0-9 -');
-  const t = String(text || '').trim().toLowerCase();
+  const t = scrubAsk(text).trim().toLowerCase();
   if (!t) throw new Error('Type what the agent should pay, e.g. "pay the cafe 0.01 NEAR for coffee".');
   if (t.length > 200) throw new Error('Keep it under 200 characters.');
   const look = lookalikeAccount(t);

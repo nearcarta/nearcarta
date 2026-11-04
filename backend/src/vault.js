@@ -653,6 +653,18 @@ export function boot({ fill = backfill, firstMs = 1000, snapshotFile, boardFile 
   else rebuild.reread_at = Date.now();
 }
 
+const SEED_PLAYER = /^(?:live|loop|guest|mine|judge|e2e|test|seed|demo)(?:-[a-z0-9]+)*$/i;
+/** Guest faucet accounts and scripted nicknames are real rows, and they are not a public score. */
+export function isSeedPlayer(player) {
+  const id = String(player || '').toLowerCase();
+  return !id || SEED_PLAYER.test(id) || id.startsWith('ncguest-') || id.startsWith('e2e-');
+}
+export function publicPlayers(list) {
+  const rows = board(list);
+  const hidden = rows.filter(p => isSeedPlayer(p.player));
+  return { players: rows.filter(p => !isSeedPlayer(p.player)).map(p => ({ ...p, network: 'testnet' })), hidden: hidden.length };
+}
+
 export function board(list = [...attempts.values()]) {
   const players = new Map();
   for (const a of list) {
@@ -691,7 +703,10 @@ export async function leaderboard() {
   if (!V) throw bad('vault not deployed', 503);
   const fill = await refreshBoard();
   const rows = [...attempts.values()];
-  return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild, pending: pending.size }, players: board(rows).slice(0, 50),
+  const pub = publicPlayers(rows);
+  return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild, pending: pending.size },
+    network: 'testnet', seed_hidden: pub.hidden, players: pub.players.slice(0, 50),
+    empty: 'No public scores yet. Finish setup, then run one allowed job and one refused scam. Your nickname is the name on this board. Guest accounts and scripted nicknames stay off it.',
     recent: rows.sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
 }
 
