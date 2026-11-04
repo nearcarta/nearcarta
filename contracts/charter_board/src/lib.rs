@@ -6,6 +6,8 @@
 //! state, and only those bytes, up to 0.02 NEAR. `close_charter` deletes the row
 //! and sends that storage stake plus the unspent balance back to the visitor.
 //!
+//! `force_close(visitor)` is the owner path: it deletes that visitor's row and
+//! sends the same refund to the visitor, so a row left open cannot block `reap`.
 //! `reap` (1 yoctoNEAR, contract owner, and only when no row is open) deletes
 //! the account. The wasm stake returns to the owner. Gas is the only burn.
 //!
@@ -183,15 +185,25 @@ impl Board {
     }
 
     pub fn close_charter(&mut self) -> Promise {
-        let me = env::predecessor_account_id();
+        self.release(env::predecessor_account_id())
+    }
+
+    /// Owner closes one visitor's row. The stake and the unspent balance go to
+    /// that visitor, the same as `close_charter`. After the last row, `reap` can run.
+    pub fn force_close(&mut self, visitor: AccountId) -> Promise {
+        require!(env::predecessor_account_id() == self.owner, "ERR_NOT_OWNER");
+        self.release(visitor)
+    }
+
+    fn release(&mut self, who: AccountId) -> Promise {
         let before = self.bytes();
-        let row = self.rows.remove(&me).expect("ERR_NO_CHARTER");
+        let row = self.rows.remove(&who).expect("ERR_NO_CHARTER");
         self.keys.remove(&row.agent);
         self.count -= 1;
         let freed = self.shrank(before);
         let back = freed + row.balance + env::attached_deposit().as_yoctonear();
         require!(back > 0, "ERR_REFUND");
-        Promise::new(me).transfer(NearToken::from_yoctonear(back))
+        Promise::new(who).transfer(NearToken::from_yoctonear(back))
     }
 
     pub fn propose(&mut self, owner: AccountId, receiver: AccountId, amount: U128, signature: String, reveal: Option<Reveal>) -> Promise {
@@ -557,6 +569,13 @@ pub extern "C" fn set_agent() { let v = parse(&input_str()); let mut b = load();
 pub extern "C" fn fund() { let mut b = load(); b.fund(); save(&b); }
 #[no_mangle]
 pub extern "C" fn close_charter() { let mut b = load(); let _ = b.close_charter(); save(&b); }
+#[no_mangle]
+pub extern "C" fn force_close() {
+    let v = parse(&input_str());
+    let mut b = load();
+    let _ = b.force_close(v.need("visitor").account());
+    save(&b);
+}
 #[no_mangle]
 pub extern "C" fn propose() {
     let v = parse(&input_str());
@@ -1025,6 +1044,44 @@ mod tests {
         c.close_charter();
         assert_eq!(c.count, 0);
         assert_eq!(c.state_bytes(), after_new, "state bytes after close");
+    }
+
+    #[test]
+    fn force_close_refunds_that_visitor_and_then_the_owner_can_reap() {
+        go("nearcarta.near", 0, 0);
+        let mut c = Board::new();
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.open_charter(rules((0, 0), 4), keypair(7).1, U128(NEAR / 1000));
+        let locked = c.get_charter(acc(ALICE)).unwrap().storage_locked.0;
+        go(BOB, MAX_ROW_YOCTO, 0);
+        c.open_charter(rules((0, 0), 4), keypair(9).1, U128(NEAR / 500));
+        let bob_locked = c.get_charter(acc(BOB)).unwrap().storage_locked.0;
+        let before = encode(&c);
+        assert_eq!(decode(&before).get_charter(acc(ALICE)).unwrap().balance.0, NEAR / 1000);
+        go(ALICE, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.force_close(acc(BOB)); })).unwrap_err();
+        let msg = refuse(err);
+        assert!(msg.contains("ERR_NOT_OWNER"), "{msg}");
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, NEAR / 1000);
+        assert_eq!(c.get_charter(acc(BOB)).unwrap().storage_locked.0, bob_locked);
+        go("nearcarta.near", 0, 0);
+        c.force_close(acc(ALICE));
+        assert!(c.get_charter(acc(ALICE)).is_none());
+        assert_eq!(transfers_to(ALICE).last().copied(), Some(locked + NEAR / 1000));
+        let bob = c.get_charter(acc(BOB)).unwrap();
+        assert_eq!(bob.balance.0, NEAR / 500);
+        assert_eq!(bob.storage_locked.0, bob_locked);
+        go("nearcarta.near", 1, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.reap(); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_NONEMPTY"));
+        go("nearcarta.near", 0, 0);
+        c.force_close(acc(BOB));
+        assert_eq!(transfers_to(BOB).last().copied(), Some(bob_locked + NEAR / 500));
+        assert_eq!(c.count, 0);
+        go("nearcarta.near", 1, 0);
+        c.reap();
+        let receipts = get_created_receipts();
+        assert!(receipts.iter().any(|r| r.actions.iter().any(|a| matches!(a, MockAction::DeleteAccount { beneficiary_id, .. } if beneficiary_id == &acc("nearcarta.near")))));
     }
 
     #[test]

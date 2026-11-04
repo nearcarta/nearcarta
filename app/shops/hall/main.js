@@ -38,7 +38,7 @@ async function facts() {
   const council = p.roles.find(r => r.name === 'council')?.kind?.Group || [];
   const anyone = p.roles.some(r => r.kind === 'Everyone' && r.permissions.some(x => x === '*:AddProposal'));
   const hours = Number(BigInt(p.proposal_period) / 10n ** 9n) / 3600;
-  $('#bond').textContent = `Bond ${fmt(p.proposal_bond)} (testnet), signed by your wallet. The vote stays open ${hours} h.`;
+  $('#bond').textContent = `Bond ${fmt(p.proposal_bond)}, signed by your wallet. The vote stays open ${hours} h.`;
   $('#facts').innerHTML = `<p>DAO <code>${esc(DAO)}</code> owns the charter <code>${esc(CHARTER)}</code> (owner: <code>${esc(st.owner)}</code>).</p>
     <p>${anyone ? 'Anyone may file a proposal.' : 'Only members may file.'} Council of ${council.length} votes: ${council.map(c => `<code>${esc(c)}</code>`).join(', ')}.</p>
     <p>Reward list today: ${(clauses.reward?.receivers || []).map(r => `<code>${esc(r)}</code>`).join(', ') || 'none'}, up to ${clauses.reward ? fmt(clauses.reward.per_action_cap) : '–'} each.</p>

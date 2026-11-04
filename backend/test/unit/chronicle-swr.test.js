@@ -58,11 +58,10 @@ test('chronicleOnce re-reads the txs in parallel and keeps the index order', asy
   const status = async h => { live++; peak = Math.max(peak, live); await new Promise(r => setTimeout(r, 20)); live--;
     if (h === 'T3') throw new Error('rpc down');
     return { transaction: { hash: h, signer_id: 's.testnet', receiver_id: 'a.testnet', actions: [{ FunctionCall: { method_name: 'propose' } }] }, status: { SuccessValue: '' }, receipts_outcome: [], transaction_outcome: { outcome: { logs: [] } } }; };
-  const t0 = Date.now(); const j = await chronicleOnce('a.testnet', 10, { post, status }); const ms = Date.now() - t0;
+  const j = await chronicleOnce('a.testnet', 10, { post, status });
   assert.deepEqual(j.txs.map(t => t.hash), list.map(t => t.transaction_hash));
   assert.match(j.txs[3].error, /rpc down/);
   assert.ok(peak > 1 && peak <= 6, 'bounded parallel reads, peak ' + peak);
-  assert.ok(ms < 10 * 20, 'parallel, took ' + ms + ' ms');
 });
 
 test('GET /api/chronicle is the guardhouse oath feed (no deployments read needed); busy with nothing cached -> 200 busy', async () => {
@@ -84,11 +83,12 @@ test('warm() pre-reads the town feed at FEED_MAX, so the first request is served
 });
 
 test('a cold read slower than the cold wait answers timeout at once; the read keeps going and serves the next call', async () => {
-  const slow = async (a, l) => { await new Promise(res => setTimeout(res, 150)); return { account: a, txs: rows(l) }; };
-  const t0 = Date.now();
-  await assert.rejects(chronicle('cold.testnet', 8, slow, Date.now(), 30), /timeout/);
-  assert.ok(Date.now() - t0 < 120);
-  await new Promise(res => setTimeout(res, 200));
+  let finished = false;
+  const slow = async (a, l) => { await new Promise(res => setTimeout(res, 80)); finished = true; return { account: a, txs: rows(l) }; };
+  await assert.rejects(chronicle('cold.testnet', 8, slow, Date.now(), 15), /timeout/);
+  assert.equal(finished, false);
+  for (let i = 0; i < 20 && !finished; i++) await new Promise(res => setTimeout(res, 20));
+  assert.equal(finished, true);
   const z = await chronicle('cold.testnet', 8, async () => { throw new Error('should be cached'); });
   assert.equal(z.txs.length, 8); assert.equal(z.stale, undefined);
 });

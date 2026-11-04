@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 // Read-only live views for Town Hall, Arena and Toll, plus the Chronicle indexer.
-import { DEP } from './config.js';
+import { cfg, DEP } from './config.js';
 import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, rpc } from './near.js';
 import { snapshot } from './guardhouse.js';
 import { indexPost } from './txindex.js';
@@ -256,26 +256,36 @@ export async function explainAny(hash, sender) {
 
 // Render's health check hits /api/health, so an RPC 429 here must not fail it (that restarted the container
 // in a loop). Serve the last good status marked stale, or an error field, and keep answering 200.
-let lastStatus = null, lastError = null;
+// The visitor journey is mainnet. The trial RPC is a separate cache and is not the journey chain.
+let journeyStatus = null, journeyError = null, trialStatus = null, trialError = null;
+const statusOf = s => ({ chain_id: s.chain_id, height: s.sync_info.latest_block_height, time: s.sync_info.latest_block_time });
+function cached(status, error, chain) {
+  if (status) return error ? { ...status, stale: true, error } : status;
+  return { chain_id: chain, height: null, ...(error ? { error } : { warming: true }) };
+}
 // /api/health answers from this cache (no RPC on the request path); the warm loop refreshes it.
-export function healthCached() {
-  if (lastStatus) return lastError ? { ...lastStatus, stale: true, error: lastError } : lastStatus;
-  return { chain_id: null, height: null, ...(lastError ? { error: lastError } : { warming: true }) };
+export function healthCached() { return cached(journeyStatus, journeyError, 'mainnet'); }
+export function trialHealthCached() { return cached(trialStatus, trialError, 'testnet'); }
+async function pullStatus(url, setStatus, setError) {
+  try { setStatus(statusOf(await rpc('status', [], url))); setError(null); }
+  catch (e) { setError(String(e.message).slice(0, 120)); }
 }
 export async function refreshHealth() {
-  try { await rpc('status', []).then(s => (lastStatus = { chain_id: s.chain_id, height: s.sync_info.latest_block_height, time: s.sync_info.latest_block_time })); lastError = null; }
-  catch (e) { lastError = String(e.message).slice(0, 120); }
+  await Promise.all([
+    pullStatus(cfg.mainnetRpc, s => { journeyStatus = s; }, e => { journeyError = e; }),
+    pullStatus(cfg.rpc, s => { trialStatus = s; }, e => { trialError = e; }),
+  ]);
 }
 export async function health() {
   try {
     // A slow RPC after idle must not make the health check slow: answer the last good status after 1.5 s
     // and let the call finish in the background.
-    const live = rpc('status', []).then(s => (lastStatus = { chain_id: s.chain_id, height: s.sync_info.latest_block_height, time: s.sync_info.latest_block_time }));
-    if (!lastStatus) return await live;
+    const live = pullStatus(cfg.mainnetRpc, s => { journeyStatus = s; }, e => { journeyError = e; }).then(() => healthCached());
+    if (!journeyStatus && !journeyError) return await live;
     live.catch(() => {});
-    return await Promise.race([live, new Promise(r => setTimeout(() => r({ ...lastStatus, stale: true }), 1500).unref?.())]);
+    return await Promise.race([live, new Promise(r => setTimeout(() => r(healthCached()), 1500).unref?.())]);
   } catch (e) {
-    const error = String(e.message).slice(0, 120);
-    return lastStatus ? { ...lastStatus, stale: true, error } : { chain_id: null, height: null, error };
+    journeyError = String(e.message).slice(0, 120);
+    return healthCached();
   }
 }

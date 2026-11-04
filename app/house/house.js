@@ -1,4 +1,4 @@
-// Your House: the owner governs their own charter from their own NEAR wallet (testnet).
+// Your House: the owner governs their own charter from their own NEAR wallet.
 // The page never holds a key. Wallets connect through NEAR Connect (@hot-labs/near-connect): each wallet's
 // code runs in a sandboxed iframe, and every freeze / unfreeze / approve / deny is approved in the wallet, one by one.
 // Sign-in asks for no access key.
@@ -27,7 +27,7 @@ const connectors = new Map();
 let watched = false;
 function connectorFor(network) {
   if (connectors.has(network)) return connectors.get(network);
-  // The guest faucet account is testnet-only. It is not offered on the mainnet connector.
+  // The guest faucet account is the trial build only. It is not offered on the mainnet connector.
   if (network !== 'mainnet') injectGuest();
   decoratePicker();
   const c = new NearConnector({ network, features: { [network]: true, signAndSendTransaction: true }, footerBranding: null, walletConnect, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
@@ -49,7 +49,7 @@ function connectorFor(network) {
     if (evm) evm.manifest.name = window.ethereum ? 'MetaMask & EVM wallets (detected)' : 'MetaMask & EVM wallets';
     if (evm && window.ethereum) c.wallets = [evm, ...c.wallets.filter(w => w !== evm)];
     if (network === 'mainnet') return;
-    // MyNearWallet's NEAR Connect script has a testnet path (testnet.mynearwallet.com), but the manifest has no testnet flag.
+    // MyNearWallet's NEAR Connect script has a trial host, but the manifest has no trial flag.
     // Its own site says it is deprecated on 31 Oct 2026: from then on it leaves the list and shows greyed with that reason.
     const mnw = c.wallets.find(w => w.manifest.id === 'mynearwallet');
     if (mnw && mnwSunset()) c.wallets = c.wallets.filter(w => w !== mnw);
@@ -60,7 +60,7 @@ function connectorFor(network) {
 export function wallet() { return connectorFor(NEAR_NET); }
 /** Mainnet wallets for the default setup path. No guest faucet is injected here. */
 export function mainnetWallet() { return connectorFor('mainnet'); }
-// Wallets people ask for that NEAR Connect does not offer on testnet. Each reason was checked in the NEAR Connect
+// Wallets people ask for that NEAR Connect does not offer on the trial network. Each reason was checked in the NEAR Connect
 // manifest (hot-dao/near-selector repository/manifest.json) and the wallet's own NEAR Connect script.
 const UNAVAILABLE = [
   ['HOT Wallet', 'Mainnet only: its NEAR Connect script refuses testnet.'],
@@ -120,7 +120,7 @@ export async function connect(note = () => {}, network = NEAR_NET) {
   catch (e) { note(`Could not connect: ${e?.message || e}`); throw e; }
   return accountOf(c);
 }
-/** One click: a new testnet account with 10 NEAR from the public faucet; its key stays in this browser. */
+/** One click: a new trial account with 10 NEAR from the public faucet; its key stays in this browser. */
 export async function startGuest(note = () => {}) {
   note('Making your free testnet account with 10 NEAR (up to a minute)…');
   try { await wallet().connect({ walletId: GUEST_ID }); note(''); }

@@ -1,4 +1,4 @@
-// Toll revenue split (testnet): one visit is one all-or-nothing propose_batch the visitor's own charter checks.
+// Toll revenue split: one visit is one all-or-nothing propose_batch the visitor's own charter checks.
 // Leg 1 pays the gate's toll (0.01 NEAR to its payee, memo toll:base-sepolia) and opens the gate; legs 2 and 3
 // pay the town treasury (the Town Hall DAO) and the Lamplighter's inference budget. Pure helpers, no wallet or DOM,
 // so backend/test/unit/d8-tollsplit.test.js can test them in node.
