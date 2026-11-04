@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="/config.js"></script>
-<title>NearCarta: one full loop on testnet</title>
+<title>Nearcarta: check the charter</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/brand/chrome.css"><style>
 body{font:15px/1.5 Inter,system-ui,sans-serif;margin:0;background:#17130f;color:#f3ead8}main{max-width:760px;margin:auto;padding:20px}
 h1{font-size:1.5rem}#go{font-size:1.1rem;padding:12px 22px;border-radius:12px;border:0;background:#d6b46a;color:#17130f;cursor:pointer;font-weight:700}
@@ -11,10 +11,16 @@ li.ok{border-color:#7dcea0}li.bad{border-color:#ff8a80}.s{color:#cdbfa5;font-siz
 a{display:inline-block;min-height:24px;line-height:24px}
 @media(max-width:600px){main{padding:14px}#clock{display:block;margin:8px 0 0}}</style></head><body><main>
 <a class="back-town" href="/" data-testid="back-town">Back to town</a>
-<h1>One full loop on testnet, timed</h1>
-<p class="s">The house agent (NEAR AI, Confidential model) pays a listed shop, then tries a fake invoice. The charter contract allows the first and refuses the second on chain, and both land in the <a href="/ledger">public ledger</a>. No wallet needed: it uses the shared testnet runner (rate-limited). Goal: under 2 minutes, including a cold API wake-up.</p>
-<p class="s">Why no NEAR Intents in this loop: Intents and 1Click run on mainnet only and have no testnet, so the loop uses testnet-native rails (a NEAR function call and a NEP-297 event).</p>
-<p><button id="go" data-testid="loop-start">Run the loop</button><span id="clock" data-testid="loop-clock">0.0 s</span></p>
+<h1>Check that the charter decides</h1>
+<p class="s">Press the button. The charter should allow one small payment to a listed shop, then refuse a fake invoice. Both results land in the <a href="/ledger">public ledger</a>. You do not need a wallet. This check uses the shared runner, so it does not spend your NEAR.</p>
+<ol class="plan">
+<li>Wake the API.</li>
+<li>Read a shop the charter already allows.</li>
+<li>Ask for a small payment. It should be allowed.</li>
+<li>Ask to pay a swapped address. It should be refused.</li>
+<li>Both show up in the ledger.</li>
+</ol>
+<p><button id="go" data-testid="loop-start">Run the check</button><span id="clock" data-testid="loop-clock">0.0 s</span></p>
 <ol id="steps" data-testid="loop-steps"></ol>
 <script type="module">
 const api = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');

@@ -36,7 +36,7 @@ test('ledger: toll gate visits are sale rows and count toward sales', () => {
   const gate = { gate: 'g.testnet', policy: { next_nonce: 3, gate: { fee: '10000000000000000000000', payee: 'cafe.testnet' } },
     recent: [{ nonce: 2, status: 'signed', tx_hash: '0xab', explorer: 'https://x', visit: { by: 'v.testnet' } }] };
   const L = buildLedger({ chronicle: { txs: [] }, gate });
-  const r = L.rows.find(x => x.shop === 'toll gate');
+  const r = L.rows.find(x => x.shop === 'Toll Bridge');
   assert.equal(r.kind, 'sale'); assert.equal(r.amount, '0.01');
   assert.equal(L.totals.sales_near, 0.01); assert.equal(L.totals.gate_visits_total, 3); assert.equal(L.totals.gate_sales_near_total, 0.03);
 });

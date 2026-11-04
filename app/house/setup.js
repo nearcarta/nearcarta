@@ -56,8 +56,8 @@ function done(i) { if (!st.done.includes(i)) st.done.push(i); save(); }
 const canOpen = i => i === 0 || (me && (i <= Math.max(-1, ...st.done) + 1));
 
 function rail() {
-  $('#rail').innerHTML = STEPS.map(([id, t, s], i) => `<li class="${i === st.step ? 'now' : st.done.includes(i) ? 'done' : ''}" data-i="${i}" ${i === st.step ? 'aria-current="step"' : ''}><span>${esc(t)}<small>${esc(s)}</small></span></li>`).join('');
-  $('#rail').querySelectorAll('li.done').forEach(li => li.onclick = () => canOpen(+li.dataset.i) && go(+li.dataset.i));
+  $('#rail').innerHTML = STEPS.map(([id, t, s], i) => `<li class="${i === st.step ? 'now' : (i < st.step || st.done.includes(i)) ? 'done' : ''}" data-i="${i}" ${i === st.step ? 'aria-current="step"' : ''}><span>${esc(t)}<small>${esc(s)}</small></span></li>`).join('');
+  $('#rail').querySelectorAll('li.done, li.now').forEach(li => { const i = +li.dataset.i; if (i <= st.step || st.done.includes(i)) li.onclick = () => go(i); });
   $('#bar').style.width = ((st.step + 1) / STEPS.length * 100) + '%';
 }
 function top() {
@@ -130,20 +130,21 @@ function sFund() {
   let qr = ''; try { const q = qrcode(0, 'M'); q.addData(me); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch {}
   const enough = bal != null && nearOf(bal) >= need();
   const j = journey();
+  const shown = short(me);
   const lead = st.trial
-    ? `Creating your charter on this trial costs about <b>${fmtN(need())} testnet NEAR</b>: ${fmtN(st.deposit)} goes into the charter and a little pays for gas. This is not real NEAR.`
-    : `Keep at least <b>${fmtN(need())} NEAR</b> in this mainnet account for gas. This is real NEAR. This path does not create a charter and does not move it for you.`;
-  return head('Fund', bal === 0n ? 'Your account is ready. It has 0 NEAR.' : (st.trial ? 'Put testnet NEAR in the trial account.' : 'Add real NEAR.'), lead)
+    ? `This trial charter needs about <b>${fmtN(need())} testnet NEAR</b>. That is not real NEAR.`
+    : `You can continue now. Add real NEAR on mainnet when you want to pay gas. This page does not hold you here, and it does not move your NEAR.`;
+  return head('Fund', bal === 0n ? 'Your account is ready. It has 0 NEAR.' : (st.trial ? 'Add testnet NEAR to the trial account.' : 'Add real NEAR when you want to.'), lead)
     + `<div class="addr"><div class="qr" aria-label="QR code of your account id">${qr}</div><div style="flex:1;min-width:200px">
-       <small class="muted">${st.trial ? 'Send testnet NEAR to' : 'Send NEAR on mainnet to'}</small><br><code data-testid="setup-address">${esc(me)}</code>
+       <small class="muted">${st.trial ? 'Send testnet NEAR to' : 'Send NEAR on mainnet to'}</small><br><code data-testid="setup-address" title="${esc(me)}">${esc(shown)}</code>
        <div class="row" style="margin-top:10px"><button class="btn sm" id="copy" data-testid="setup-copy">Copy address</button>${acA(me)}</div>
        <div style="margin-top:14px"><span class="live">live balance</span><div class="bal" id="bigbal" data-testid="setup-balance">${balHtml()}</div></div></div></div>
-     <p class="small muted">${esc(j.fundLead)}</p>
+     <p class="small">${esc(j.fundLead)}</p>
      <h2>Ways to add NEAR</h2><div class="tiles">
        ${j.showFaucet ? `<button class="tile" id="drip" data-testid="setup-faucet"><i>✦</i><b>Free testnet NEAR</b><span>10 testnet NEAR from the public faucet. Not real NEAR.</span></button>` : ''}
-       <a class="tile" href="https://app.near-intents.org/" target="_blank" rel="noopener" data-testid="setup-intents"><i>⇄</i><b>Ferry via NEAR Intents</b><span>${esc(j.intentsNote)}</span></a>
-       <button class="tile" id="copy2"><i>⎘</i><b>From an exchange</b><span>${st.trial ? 'This trial is not an exchange withdrawal. Use the faucet.' : 'Withdraw NEAR on NEAR mainnet to the address above.'}</span></button></div>
-     ${errP()}` + nav(true, { nextOk: enough, label: enough ? 'Continue' : `Waiting for ${fmtN(need())} NEAR` });
+       <a class="tile" href="https://app.near-intents.org/" target="_blank" rel="noopener" data-testid="setup-intents"><i>⇄</i><b>Swap into NEAR</b><span>${esc(j.intentsNote)}</span></a>
+       <button class="tile" id="copy2"><i>⎘</i><b>From an exchange</b><span>${st.trial ? 'This trial is not an exchange withdrawal. Use the faucet above.' : 'Withdraw NEAR on NEAR mainnet to this address.'}</span></button></div>
+     ${errP()}` + nav(true, { nextOk: st.trial ? enough : true, label: st.trial && !enough ? `Waiting for ${fmtN(need())} testnet NEAR` : 'Continue' });
 }
 function wireFund() {
   const cp = () => navigator.clipboard?.writeText(me).then(() => { const b = $('#copy'); if (b) { b.textContent = 'Copied ✓'; setTimeout(() => b && (b.textContent = 'Copy address'), 1600); } });

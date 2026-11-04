@@ -480,14 +480,13 @@ async function attackRun(btn) {
 const whoName = a => { const s = String(a || ''); return s.length > 28 ? s.slice(0, 14) + '…' + s.slice(-10) : s; };
 async function loadBoard() {
   const b = await api('/api/vault/leaderboard');
-  const net = `<p class="board-net" data-testid="board-net">NEAR testnet trial. Only listed visitor charters.${b.seed_hidden ? ' ' + esc(b.seed_hidden) + ' other rows stay off this board.' : ''}</p>`;
+  const net = `<p class="board-net" data-testid="board-net">Visitor charters. Our test accounts stay off this board.</p>`;
   const rows = b.players || [];
-  $('#board').innerHTML = rows.length ? net + `<div class="board-scroll"><table data-testid="board"><thead><tr><th>#</th><th>Player</th><th>Network</th><th>Score</th><th>Jobs</th><th>Scams</th><th>Last tx</th></tr></thead><tbody>
-    ${rows.map((p, i) => `<tr><td>${i + 1}</td><td>${p.verified ? `<code title="${esc(p.player)}">${esc(whoName(p.player))}</code> <span class="tag ok">charter</span>` : `<b>${esc(p.player)}</b> <span class="tag">arena</span>`}</td>
-    <td><span class="tag">${esc(p.network || b.network || 'testnet')}</span></td>
-    <td><b>${p.score}/${p.max_score}</b></td><td title="${esc((p.tasks || []).join(', '))}">${(p.tasks || []).length}</td>
-    <td title="${esc((p.patterns || []).join(', '))}">${(p.patterns || []).length}</td><td>${txl(p.last_tx)}</td></tr>`).join('')}</tbody></table></div>`
-    : net + `<div class="empty" data-testid="board-empty"><b>No public scores yet</b><p>${esc(b.empty || 'Finish setup, then run one allowed job and one refused scam. Your nickname is the name on this board.')}</p><a class="primary" href="/setup/">Sign in</a></div>`;
+  const proof = p => p.last_tx ? txl(p.last_tx) : (p.charters?.[0] ? `<a href="https://testnet.nearblocks.io/address/${esc(p.charters[0])}" target="_blank" rel="noopener">charter</a>` : '');
+  $('#board').innerHTML = rows.length ? net + `<div class="board-scroll"><table data-testid="board"><thead><tr><th>#</th><th>Nickname</th><th>Character</th><th>Score</th><th>Tx</th></tr></thead><tbody>
+    ${rows.map((p, i) => `<tr><td>${i + 1}</td><td><b>${esc(p.nickname || whoName(p.player))}</b></td><td>${esc(p.character || p.nickname || '')}</td>
+    <td><b>${p.score}/${p.max_score}</b></td><td>${proof(p)}</td></tr>`).join('')}</tbody></table></div>`
+    : net + `<div class="empty" data-testid="board-empty"><b>No visitor charters yet</b><p>${esc(b.empty || 'When someone signs in and creates a charter, it appears here.')}</p><a class="primary" href="/setup/">Sign in</a></div>`;
   $('#s-board h2').title = (b.rule || '') + (b.complete ? '' : ' (still indexing)');
 }
 function showTab(id) {

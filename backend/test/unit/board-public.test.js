@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { publicPlayers, PUBLIC_CHARTERS } from '../../src/vault.js';
+import { publicPlayers, DENIED, isDenied } from '../../src/vault.js';
 import { makeApp } from '../../src/app.js';
 
 const row = (player, charter, shared = false) => ({
@@ -8,27 +8,34 @@ const row = (player, charter, shared = false) => ({
   kind: 'attack', attack: 'lookalike', tag: player, decision: 'denied', counted: true, shared, server_signed: shared, at: 1,
 });
 
-const LIVE = [
-  row('nc-audit-158353.testnet', 'nc-audit-158353-x3oh.nccharters-17102.testnet'),
-  row('aiprobe', 'arena.nccharters-53681.testnet', true),
-  row('fallback-test', 'arena.nccharters-85831.testnet', true),
-  row('pooltest', 'arenapool1-5plv.nccharters-53836.testnet', true),
-  row('redteam', 'arena.nccharters-53681.testnet', true),
-];
-
-test('the public board starts with an empty visitor allowlist', () => {
-  assert.equal(PUBLIC_CHARTERS.size, 0);
+test('the denylist names the scripted accounts from the repo', () => {
+  for (const id of ['nc-audit-158353.testnet', 'aiprobe', 'fallback-test', 'pooltest', 'redteam']) assert.equal(isDenied(id), true);
+  assert.ok(DENIED.size > 20);
 });
 
-test('scripted players stay off the board unless their charter is listed', () => {
-  const none = publicPlayers(LIVE);
-  assert.equal(none.players.length, 0);
-  assert.equal(none.hidden, 5);
-  const visitor = 'owl.nccharters-1.testnet';
-  const pub = publicPlayers([...LIVE, row('lucky-owl', visitor)], new Set([visitor]));
-  assert.deepEqual(pub.players.map(p => p.player), ['lucky-owl']);
-  assert.equal(pub.hidden, 5);
-  assert.equal(pub.players[0].network, 'testnet');
+test('a factory charter appears unless we created that account', () => {
+  const visitor = { charter: 'owl.nccharters-1.testnet', owner: 'alice.near' };
+  const audit = { charter: 'nc-audit-158353-x3oh.nccharters-17102.testnet', owner: 'nc-audit-158353.testnet' };
+  const arena = { charter: 'arena.nccharters-53681.testnet', owner: 'ncarena.testnet', shared: true };
+  const attempts = [
+    row('nc-audit-158353.testnet', audit.charter),
+    row('aiprobe', arena.charter, true),
+    row('fallback-test', 'arena.nccharters-85831.testnet', true),
+    row('pooltest', 'arenapool1-5plv.nccharters-53836.testnet', true),
+    row('redteam', arena.charter, true),
+    { ...row('alice.near', visitor.charter), owner: 'alice.near' },
+  ];
+  const pub = publicPlayers(attempts, [visitor, audit, arena]);
+  assert.deepEqual(pub.players.map(p => p.nickname), ['owl']);
+  assert.equal(pub.players[0].character, 'owl');
+  assert.equal(pub.players[0].score > 0, true);
+  assert.ok(pub.players[0].last_tx);
+  assert.equal(pub.players.some(p => /aiprobe|pooltest|redteam|audit|fallback/.test(p.nickname)), false);
+});
+
+test('an empty factory list is an empty board, not a invented one', () => {
+  const pub = publicPlayers([row('redteam', 'arena.nccharters-53681.testnet', true)], []);
+  assert.equal(pub.players.length, 0);
 });
 
 test('health names mainnet contracts and the testnet trial', async () => {

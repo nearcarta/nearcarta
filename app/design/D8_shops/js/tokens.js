@@ -7,7 +7,7 @@ export function tokenIcon(sym, size = 16) {
   return `<img class="tok" src="/tokens/${FILE[k] || k}.svg" alt="${KNOWN[k]}" width="${size}" height="${size}" loading="lazy" decoding="async">`;
 }
 // Decorate plain text already in the page: "0.01 NEAR", "ZEC", "Base Sepolia" get an icon before the symbol.
-const RX = /(^|[\s(·→>])(NEAR|USDC|USDT|ZEC|TAZ|ETH|BTC|SOL|Base)(?=$|[\s),.·:→<])/g;
+const RX = /(\d[\d.,]*)\s+(NEAR|USDC|USDT|ZEC|TAZ|ETH|BTC|SOL)\b/g;
 export function decorate(root) {
   if (!root) return;
   const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => {
@@ -17,8 +17,7 @@ export function decorate(root) {
   for (const n of hits) {
     const span = document.createElement('span'); span.className = 'tok-done';
     RX.lastIndex = 0; span.innerHTML = n.data.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
-      .replace(RX, (m, pre, sym) => `${pre}<span class="tokw">${tokenIcon(sym)}${sym}</span>`)
-      .replace(/(\d[\d.,]*)\s+<span class="tokw">/g, '<span class="tokw">$1 ').replace(/ {2,}/g, ' ');
+      .replace(RX, (m, num, sym) => `<span class="tokw">${num}${tokenIcon(sym)} ${sym}</span>`);
     n.replaceWith(span);
   }
 }

@@ -38,9 +38,9 @@ export async function fallback(why){ if(started) return; started=true; body.clas
     const b=$('#t-act'), d=$('#d-body'), src=$('#t-src');
     if(err){ src.textContent='error'; src.className='src error'; $('#t-label').textContent='This room could not load'; $('#t-hero').innerHTML=''; b.hidden=false; b.disabled=false; b.className='act primary'; b.textContent='Try again'; b.onclick=()=>open(id);
       d.innerHTML=`<p class="note">The ${esc(NAMES[id])} room failed to load. ${esc(err.message||err)}</p>`; return; }
-    const tok=core.tok; const F={ guard:['mainnet · testnet trial','split','Forged invoice asks',tok('5','NEAR')], hall:['mainnet · testnet trial','split','Reward cap · Proposal 4',tok('0.15','NEAR')],
-      arena:['mainnet · testnet trial','split','5 attacks on the lab oath','<b class="num">0</b><span class="unit">breaches</span>'], toll:['mainnet · testnet trial','split','MPC signature for Base Sepolia','<b class="num">11</b><span class="unit">of 16 nodes</span>'],
-      chronicle:['testnet','testnet','Refusals on the record','<b class="num">6</b><span class="unit">of 10 actions</span>'], house:['mainnet · testnet trial','split','Tip cap · policy v4',tok('0.5','NEAR')] }[id];
+    const tok=core.tok;     const F={ guard:['mainnet','split','Forged invoice asks',tok('5','NEAR')], hall:['mainnet','split','Reward cap · Proposal 4',tok('0.15','NEAR')],
+      arena:['mainnet','split','5 attacks on the lab oath','<b class="num">0</b><span class="unit">breaches</span>'], toll:['mainnet','split','MPC signature for Base Sepolia','<b class="num">11</b><span class="unit">of 16 nodes</span>'],
+      chronicle:['record','testnet','Refusals on the record','<b class="num">6</b><span class="unit">of 10 actions</span>'], house:['mainnet','split','Tip cap · policy v4',tok('0.5','NEAR')] }[id];
     const info=m.FLAT||(F&&{src:F[0],cls:F[1],label:F[2],hero:F[3]})||{src:'testnet',cls:'testnet',label:'',hero:''};
     src.textContent=info.src; src.className='src '+info.cls; $('#t-label').textContent=info.label; $('#t-hero').innerHTML=info.hero;
     { const mo=$('#t-more'); mo.hidden=!m.MORE; if(m.MORE){ mo.href=m.MORE.href; mo.textContent=m.MORE.text; } }
@@ -48,7 +48,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
     d.innerHTML=(m.PROOF||'<p class="note">This room has no proof list in the 2D view.</p>')+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>'; $('#d-title').textContent=NAMES[id]+' · proof';
     if(APP){ // same real wallet flows as the 3D rooms (D8 shopui), not the scripted result
       body.dataset.host='d9'; body.classList.add('apps'); $('#t-say').hidden=false; $('#t-hero').innerHTML=''; b.className='act primary'; b.hidden=false; b.disabled=true; b.textContent='Opening…';
-      const c=$('#t-cta'); c.hidden=id!=='house'; c.className='link cta8'; if(id==='house'){ c.textContent='Open the charter office →'; c.href=window.NEARCARTA_CHARTER||'/shops/vault/'; }
+      const c=$('#t-cta'); c.hidden=id!=='house'; c.className='link cta8'; if(id==='house'){ c.textContent='Open the charter office →'; c.href='/shops/vault/'; }
       import(D8+'js/shopui.js').then(u=>{ ui8m=u; if(ui.hidden||fbCur!==id) return; u.mount(id,{id},()=>{}); /* mount boots the wallet and paints its own state: no waiting on "Opening…" */ b.onclick=()=>window.__apps?.primary(); })
         .catch(e=>{ console.warn('[Nearcarta 2D] shop app failed to load',e); b.disabled=false; b.textContent='Try again'; b.onclick=()=>open(id); }); } }
   const A={chron:'chronicle',townhall:'hall',mistbank:'bank',guardhouse:'guard',vault:'house'}; const q=new URLSearchParams(location.search).get('shop'); const start=q&&(A[q]||q); if(start&&NAMES[start]) open(start);

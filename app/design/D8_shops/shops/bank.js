@@ -17,7 +17,9 @@ function live(b) {
   return proof(
     note(ROOM_LINE),
     h3('The street window · public explorer, live read'),
-    row({ k: `Zcash testnet payout at height ${s.height}`, why: s.hidden ? `no transparent inputs or outputs; only the ${s.fee} zat fee leaves the ${s.pool} pool` : `amount visible: ${s.reasons.join(', ')}`, st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'amount hidden' : 'amount visible', src: 'live' }),
+    row({ k: 'A payout happened. The amount is hidden.', why: 'The public record shows a shielded payment and a small fee. This page never shows the amount.', st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'amount hidden' : 'amount visible', src: 'live' }),
+    `<details class="more"><summary>Technical details</summary>`,
+    row({ k: `Recorded at block ${s.height}`, why: s.hidden ? `The amount stays inside a shielded pool. The fee is ${s.fee} of the smallest Zcash unit.` : `Amount visible: ${s.reasons.join(', ')}`, st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'hidden' : 'visible', src: 'live' }),
     note(`<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.txid.slice(0, 12))}… ↗</a> · ${esc(String(s.confirmations))} confirmations${b.at ? ' · read ' + esc(b.at) : ''}`),
     h3('The oath · NEAR testnet'),
     row({ k: `Payout approved by clause ${b.oath.clause}`, why: 'the memo on chain holds only a commitment to the amount', st: b.oath.ok ? 'ok' : 'no', stText: b.oath.ok ? 'allowed' : 'not verified', tx: b.oath.tx }),
@@ -29,7 +31,8 @@ function live(b) {
     h3('The desk · NEAR Intents Confidential, dry quotes'),
     ...(b.desk?.length ? b.desk.map(l => row({ k: LEG[l.leg] || l.leg, why: `privacy ${l.privacy} · signature ${l.sig ? 'verified' : 'FAILED'} · echo ${l.echo ? 'ok' : 'differs'}`, st: l.ok ? 'ok' : 'no', stText: l.ok ? 'quoted' : 'rejected', src: 'live' }))
       : [row({ k: 'Confidential quotes', why: 'not available on this server', st: 'no', stText: 'off', src: 'live' })]),
-    note('Dry quotes only: no deposit address exists and nothing was spent.'));
+    note('Practice quotes only: nothing was spent.'),
+    `</details>`);
 }
 const HERO = `<span class="commit" title="sha256 commitment on NEAR testnet">${esc(String(B.commitment?.value || '').slice(0, 8))}…</span><span class="unit">amount hidden</span>`;
 // For the 2D fallback (js/flat.js)

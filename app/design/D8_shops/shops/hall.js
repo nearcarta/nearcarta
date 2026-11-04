@@ -13,10 +13,12 @@ export const PROOF = mainnet('hall') + proof(
 // The DAO's latest proposals, read live from /api/townhall. A proposal past its vote window shows as expired:
 // Sputnik keeps it InProgress on chain until someone finalizes it, but nobody can vote on it any more.
 const PST = { Approved: ['ok', 'approved'], Rejected: ['no', 'rejected'], Removed: ['no', 'removed'], Failed: ['no', 'failed'], Expired: ['ice', 'expired'], InProgress: ['pend', 'open'] };
+const plain = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+const KIND = { FunctionCall: 'Contract call', AddMemberToRole: 'Add a member', RemoveMemberFromRole: 'Remove a member', Transfer: 'Send NEAR', Vote: 'Vote' };
 export function proposalRows(ps = []) {
   return ps.map(p => { const [st, stText] = PST[p.status] || ['pend', String(p.status).toLowerCase()];
-    const why = p.expired ? `vote closed ${p.ends_at ? new Date(p.ends_at).toUTCString().slice(5, 22) + ' UTC' : ''}; on chain still InProgress until finalized` : p.status === 'InProgress' && p.ends_at ? `vote open until ${new Date(p.ends_at).toUTCString().slice(5, 22)} UTC` : String(p.description || '').slice(0, 80);
-    return row({ k: `#${p.id} · ${p.kind}`, why, st, stText, src: 'live' }); });
+    const why = p.expired ? 'Voting has closed.' : p.status === 'InProgress' ? 'Voting is open.' : plain(p.description).slice(0, 90);
+    return row({ k: `#${p.id} · ${KIND[p.kind] || plain(p.kind)}`, why, st, stText, src: 'live' }); });
 }
 export async function liveProposals(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, ''), bare = false) {
   try { const c = new AbortController(), t = setTimeout(() => c.abort(), 6000);
@@ -65,7 +67,7 @@ export default async function hall(ctx) {
   const v2 = TH.versions[1], v3 = TH.versions[2];
   return {
     rob, scene, camera, tags: [],
-    panel: { title: 'Town Hall', src: 'split', srcNote: 'townhall.nearcarta.near is on mainnet. Counting votes here replays the testnet DAO.', label: 'Reward cap · Proposal 4', hero: tok('0.25', 'NEAR'), action: 'Count the votes', more: MORE },
+    panel: { title: 'Town Hall', src: 'split', srcNote: 'townhall.nearcarta.near is on mainnet. The two payments below are real mainnet transactions.', label: 'Reward cap · Proposal 4', hero: tok('0.15', 'NEAR'), action: 'Count the votes', more: MORE },
     proof: (await liveP) + PROOF,
   // intro: the robot walks to beside the table, not behind it
     *intro() { setCap(v2.cap); yield rob.walk([new THREE.Vector3(1.95, 0, -.35)]); rob.lookAt(slab.position); },

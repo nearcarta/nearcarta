@@ -9,14 +9,16 @@ h1{font-size:1.5rem;margin:.4em 0}.sub{color:#cdbfa5}
 .tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
 .tot div{background:#241c16;border:1px solid rgba(243,234,216,.12);border-radius:10px;padding:10px}.tot b{display:block;font-size:1.3rem}
 table{width:100%;border-collapse:collapse;background:#241c16;border-radius:10px;overflow:hidden}
-th,td{padding:8px;border-bottom:1px solid rgba(243,234,216,.1);text-align:left;font-size:.9rem;word-break:break-all}
+th,td{padding:8px;border-bottom:1px solid rgba(243,234,216,.1);text-align:left;font-size:.9rem;vertical-align:top}
+td:nth-child(2),td:nth-child(3),th:nth-child(2),th:nth-child(3){white-space:nowrap}
+td:nth-child(4),td:nth-child(6){overflow-wrap:anywhere;word-break:normal}
 a{color:#e6c98a}button,select,input{min-height:24px}td a,p a,button{display:inline-flex;align-items:center;min-height:28px;padding:2px 4px}button,select{min-width:28px}
 th{background:#2c241c}.refusal{color:#ff8a80}.payout{color:#7dcea0}.warn{background:#3a2e1c;color:#e6c98a;padding:8px;border-radius:8px}
 @media(max-width:600px){td:nth-child(4),th:nth-child(4){display:none}main{padding:14px}}
 a{display:inline-block;min-height:24px;line-height:24px}</style></head><body><main>
 <a class="back-town" href="/" data-testid="back-town">Back to town</a>
 <h1>Public ledger</h1>
-<p class="sub">Payouts and refusals read live. Each row links its transaction. The rows below are the testnet trial.</p>
+<p class="sub">Payouts and refusals. Shop names match the town. Each row that moved money links its transaction. A zero amount is a refusal, not a payment.</p>
 <p id="state" class="warn" hidden></p>
 <p id="sum" class="sub" data-testid="ledger-summary"></p>
 <div class="tot" id="tot" data-testid="ledger-totals"></div>
@@ -32,7 +34,7 @@ async function load() {
     document.getElementById('tot').innerHTML = [['Payouts', t.payouts_near + ' NEAR'], ['Base payouts', t.payouts_base_eth + ' ETH'], ['Refusals', t.refusals], ['Inference today', '$' + t.inference_usd_today]]
       .map(([k, v]) => `<div>${k}<b>${esc(v)}</b></div>`).join('');
     const np = L.rows.filter(r => r.kind === 'payout').length, nr = L.rows.filter(r => r.kind === 'refusal').length;
-    document.getElementById('sum').textContent = `In short: ${np} payouts and ${nr} refusals listed below, ${t.payouts_near} test NEAR paid in total. Every row links to its testnet transaction.`;
+    document.getElementById('sum').textContent = `In short: ${np} payouts and ${nr} refusals. ${t.payouts_near} NEAR paid in the rows below. The model line is operator spend, not a charter payment.`;
     const st = document.getElementById('state');
     st.hidden = !L.partial; st.textContent = 'Some transactions could not be read right now (RPC rate limit). The list may be short; reload in a minute.';
     document.getElementById('rows').innerHTML = L.rows.length ? L.rows.map(r => `<tr><td>${esc(r.at || '')}</td><td>${esc(r.shop)}</td><td class="${esc(r.kind)}">${esc(r.kind)}</td><td>${esc(r.to || '')}</td><td>${esc(r.amount)} ${esc(r.asset)}</td><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(String(r.tx).slice(0, 10))}…</a>` : ''} ${esc(r.note || '')}</td></tr>`).join('')

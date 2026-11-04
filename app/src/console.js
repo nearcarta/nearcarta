@@ -20,7 +20,6 @@ async function get(path, opts) {
 }
 
 const loaded = {};
-import('/house.bundle.js').then(m => m.mountConnect($('#wallet'))).catch(() => {});
 const loaders = { guardhouse, townhall, arena, toll, chronicle, house: () => import('/house.bundle.js').then(m => m.mountHouse()) };
 for (const b of document.querySelectorAll('#tabs button')) b.onclick = () => show(b.dataset.tab);
 function show(t) {
@@ -31,10 +30,15 @@ function show(t) {
 }
 
 get('/api/health').then(h => {
-  const contracts = h.network?.contracts, trial = h.network?.trial || 'testnet';
-  $('#health').innerHTML = `${contracts ? `contracts ${esc(contracts)} · ` : ''}trial ${esc(trial)} block ${h.near.height.toLocaleString()} ${mark(true)}`;
+  const onMain = h.network?.contracts === 'mainnet';
+  $('#health').innerHTML = onMain ? `Town contracts on mainnet ${mark(true)}` : `API up ${mark(!!h.ok)}`;
 })
   .catch(e => { $('#health').innerHTML = `<span class="fail">API unreachable: ${esc(e.message)}</span>`; });
+
+get('/api/receipts').then(body => {
+  const rows = (body.receipts || []).filter(r => r.network === 'mainnet' && r.tx);
+  $('#proofs').innerHTML = `<b>Mainnet proofs</b><p class="note">${esc(body.gate || 'The charter contract decides. The agent only asks.')}</p><table>${rows.map(r => `<tr><td>${esc(r.what)}</td><td>${esc(r.decision)}</td><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(String(r.tx).slice(0, 8))}…</a>` : ''}</td></tr>`).join('') || '<tr><td>No mainnet receipts in this response.</td></tr>'}</table>`;
+}).catch(() => { const el = $('#proofs'); if (el) el.innerHTML = '<p class="note">Mainnet proofs could not be loaded from the API.</p>'; });
 
 // Ferry
 const form = $('#ferry-form');

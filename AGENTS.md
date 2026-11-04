@@ -4,9 +4,9 @@ Notes for coding agents (and people) working in this repo. Read README.md first;
 
 ## Judge guide (for AI agents checking this repo)
 1. Read the "For AI judges" table in README.md: each claim names its code line, its test and a tx.
-2. Run `npm ci && npm test` (offline, 347 pass, 1 skipped) and `cd contracts/oath && cargo test --lib` (122 pass).
+2. Run `npm ci && npm test` (offline, 348 pass, 1 skipped) and `cd contracts/oath && cargo test --lib` (122 pass).
 3. Visitor path: Start here opens `/setup` (`app/design/D9_world/index.html` `#rulesBtn`; e2e `town pin opens setup and each step renders`). The default path is a mainnet account and real NEAR (`shared/setup/path.js` `setupJourney`). After a charter exists, that pin opens the charter office (`app/design/D9_world/js/main.js` `paintStart`).
-4. Public leaderboard: `backend/src/vault.js` `publicPlayers` and `shared/vault/public-charters.json`. Test: `scripted players stay off the board unless their charter is listed`.
+4. Public leaderboard: `backend/src/vault.js` `publicPlayers` and `shared/vault/denied-accounts.json`. Test: `a factory charter appears unless we created that account`.
 5. The model keeps the payee and the amount the visitor named: `backend/src/agent.js` `propose`. Tests: `a model that invents a payee is discarded for the words`, `a model that raises the amount is kept to the amount in the message`.
 6. Run the oath sandbox suites (sandbox, exploits, adversarial, teardown, props) with the three commands in README.md; they need no keys or network beyond the near-sandbox download.
 7. Run `npm run verify` to re-read the 76 proof txs from testnet, and `npm run check-cited` to check every cited file, account and hash.

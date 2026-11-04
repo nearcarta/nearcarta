@@ -43,7 +43,7 @@
 </aside>
 
 <div id="title" aria-hidden="true"><b>Nearcarta</b><span>the oath decides, the town remembers</span></div>
-<div id="hint" class="hud"></div>
+<div id="hint" class="hud">Click a building to step inside</div>
 <div id="pins" aria-label="Shops"></div>
 <div id="tag" aria-hidden="true"></div>
 <div id="zoom" class="hud" role="group" aria-label="Zoom">
@@ -106,6 +106,19 @@ if(q.get('mode')==='2d'||!cap.ok){ if(!q.has('t')) go2d(q.get('mode')==='2d'?'':
 else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpressive.glb'].forEach(pre);
   script('vendor/gsap/gsap.min.js').then(()=>import(q.has('t')?'./js/test_main.js':q.has('dev')?'./js/main.js':'./dist/main.js')).catch(e=>{ console.error('[Nearcarta] 3D failed to load',e); go2d('3D failed to load'); });
   if(!force) setTimeout(()=>{ if(!document.body.classList.contains('ready')&&!document.body.classList.contains('fb')){ window.__3dStop='slow start'; go2d('3D did not start within 25 s'); } },25000); }
+</script>
+<script>
+// Pins are placed on the buildings. Nudge any two that overlap so the names stay readable.
+setInterval(() => {
+  const pins = [...document.querySelectorAll('#pins .pin')].filter(p => parseFloat(p.style.opacity || '0') > 0.4);
+  pins.forEach(p => { p.style.marginTop = '0px'; });
+  const box = pins.map(p => ({ p, r: p.getBoundingClientRect() })).sort((a, b) => a.r.top - b.r.top || a.r.left - b.r.left);
+  for (let i = 1; i < box.length; i++) {
+    const prev = box[i - 1].r, cur = box[i].p.getBoundingClientRect();
+    const hit = cur.left < prev.right - 6 && cur.right > prev.left + 6 && cur.top < prev.bottom - 4;
+    if (hit) { const dy = Math.min(48, prev.bottom - cur.top + 6); box[i].p.style.marginTop = dy + 'px'; box[i].r = box[i].p.getBoundingClientRect(); }
+  }
+}, 400);
 </script>
 <script type="module" src="js/hero-town.js"></script>
 <script type="module" src="../D8_shops/js/townplain.js"></script>

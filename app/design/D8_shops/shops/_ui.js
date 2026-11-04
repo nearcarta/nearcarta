@@ -24,4 +24,4 @@ const MN = {
 const mtx = h => `<a class="tx" href="https://nearblocks.io/txns/${h}" target="_blank" rel="noopener">${h.slice(0, 6)}…${h.slice(-4)} ↗</a>`;
 const mrow = (k, st, txt, h) => `<div class="row"><div class="k">${esc(k)}</div><div class="v"><span class="st ${st}"><span aria-hidden="true">${st === 'ok' ? '✓' : '✕'}</span>${txt}</span>${mtx(h)}</div></div>`;
 export const mainnet = id => { const m = MN[id]; if (!m) return '';
-  return `<div class="pf mn"><h3><span class="net mainnet">● mainnet</span> Live with real NEAR</h3>${mrow(m[1], 'ok', 'allowed', m[2])}${mrow(m[3], 'no', 'refused', m[4])}<p class="note">Contract <a class="tx" href="https://nearblocks.io/address/${m[0]}" target="_blank" rel="noopener">${m[0]} ↗</a>. The buttons in this shop use testnet, so trying it is free.</p></div>`; };
+  return `<div class="pf mn"><h3><span class="net mainnet">● mainnet</span> Live with real NEAR</h3>${mrow(m[1], 'ok', 'allowed', m[2])}${mrow(m[3], 'no', 'refused', m[4])}<p class="note">Contract <a class="tx" href="https://nearblocks.io/address/${m[0]}" target="_blank" rel="noopener">${m[0]} ↗</a>. Both payments are on mainnet.</p></div>`; };

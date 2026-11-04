@@ -26,7 +26,7 @@ import { receipt as buildReceipt } from '../../shared/vault/receipt.js';
 import { edgeCache } from './http-guard.js';
 import { ASK_MEMO_RE, parseAsk } from '../../shared/vault/ask.js';
 import * as agent from './agent.js';
-import publicCharters from '../../shared/vault/public-charters.json' with { type: 'json' };
+import deniedAccounts from '../../shared/vault/denied-accounts.json' with { type: 'json' };
 
 export const V = DEP.vault || null;
 const ACCOUNT_RE = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -654,15 +654,34 @@ export function boot({ fill = backfill, firstMs = 1000, snapshotFile, boardFile 
   else rebuild.reread_at = Date.now();
 }
 
-/** Visitor charters allowed on the public board. Shared-arena nicknames are not on this list. */
-export const PUBLIC_CHARTERS = new Set((publicCharters.charters || []).map(id => String(id).toLowerCase()));
-export function isPublicPlayer(p, allow = PUBLIC_CHARTERS) {
-  return (p?.charters || []).some(id => allow.has(String(id).toLowerCase()));
+/** Accounts and script nicknames we created. A visitor charter is public unless its id or owner is in this set. */
+export const DENIED = new Set((deniedAccounts.accounts || []).map(id => String(id).toLowerCase()));
+export function isDenied(id, deny = DENIED) {
+  const s = String(id || '').toLowerCase();
+  if (!s) return true;
+  if (deny.has(s)) return true;
+  return deny.has(s.split('.')[0]);
 }
-export function publicPlayers(list, allow = PUBLIC_CHARTERS) {
-  const rows = board(list);
-  const players = rows.filter(p => isPublicPlayer(p, allow)).map(p => ({ ...p, network: 'testnet' }));
-  return { players, hidden: rows.length - players.length };
+export function publicPlayers(list, charters = [], deny = DENIED) {
+  const scored = board(list);
+  const byCharter = new Map();
+  for (const p of scored) for (const c of p.charters || []) byCharter.set(String(c).toLowerCase(), p);
+  const max = ATTACKS.length + 1 + TASKS.length + 1;
+  const players = [];
+  for (const c of charters) {
+    if (!c?.charter || c.shared || isDenied(c.charter, deny) || isDenied(c.owner, deny)) continue;
+    const hit = byCharter.get(String(c.charter).toLowerCase());
+    const nickname = String(c.charter).split('.')[0];
+    players.push({
+      player: nickname, nickname, character: nickname, owner: c.owner, verified: true, server_signed: false,
+      charters: [c.charter], patterns: hit?.patterns || [], tasks: hit?.tasks || [],
+      score: hit?.score || 0, max_score: hit?.max_score || max, last_tx: hit?.last_tx || null, network: 'testnet',
+    });
+  }
+  players.sort((a, b) => b.score - a.score || a.nickname.localeCompare(b.nickname));
+  const shown = new Set(players.flatMap(p => p.charters.map(id => id.toLowerCase())));
+  const hidden = scored.filter(p => !(p.charters || []).some(id => shown.has(String(id).toLowerCase()))).length;
+  return { players, hidden };
 }
 
 export function board(list = [...attempts.values()]) {
@@ -686,7 +705,7 @@ export function board(list = [...attempts.values()]) {
     .sort((x, y) => y.score - x.score || y.pattern_count - x.pattern_count || y.refusals - x.refusals || x.last_at - y.last_at);
 }
 
-const RULE = 'The public board lists only the visitor charters named in shared/vault/public-charters.json. Every other row stays off it. ' +
+const RULE = 'The public board lists every charter the public factory created, except the accounts in shared/vault/denied-accounts.json. ' +
   'Rows are final testnet propose txs on factory charters running their audited oath release, re-read from chain. ' +
   'An attack scores only if the contract refused it with the reason that attack targets, and its logged payee and amount match the attack plan under the clause in force at that block. ' +
   'A task scores only if the contract allowed and settled the planned allowlisted payment. ' +
@@ -700,15 +719,24 @@ export async function refreshBoard(waitMs = 2500, fill = () => cached('backfill'
   let t; const timeout = new Promise(r => { t = setTimeout(() => r(lastFill), waitMs); t.unref?.(); });
   try { return await Promise.race([p, timeout]); } finally { clearTimeout(t); }
 }
+async function listedCharters() {
+  const out = [];
+  for (const fa of FACTORIES) {
+    try { out.push(...await allCharters(fa.factory)); } catch { /* a factory that does not answer is skipped */ }
+  }
+  return out;
+}
 export async function leaderboard() {
   if (!V) throw bad('vault not deployed', 503);
   const fill = await refreshBoard();
   const rows = [...attempts.values()];
-  const pub = publicPlayers(rows);
+  const charters = await cached('visitor-charters', 20_000, listedCharters).catch(() => []);
+  const pub = publicPlayers(rows, charters);
+  const shown = new Set(pub.players.flatMap(p => p.charters));
   return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild, pending: pending.size },
     network: 'testnet', seed_hidden: pub.hidden, players: pub.players.slice(0, 50),
-    empty: 'No visitor charters on the public board yet. A row appears only when its charter is listed. Test runs stay off it.',
-    recent: rows.filter(a => isPublicPlayer({ charters: [a.charter] })).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
+    empty: 'No visitor charters yet. When someone signs in and creates one, it appears here. Our test accounts stay off this board.',
+    recent: rows.filter(a => shown.has(a.charter)).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
 }
 
 /** One charter's scorecard: each task (should be allowed) and each attack (should be refused). */

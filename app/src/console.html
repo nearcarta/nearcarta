@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nearcarta · console (testnet)</title>
+<title>Nearcarta · for judges</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="/console.css">
@@ -11,19 +11,20 @@
 <body>
 <header>
   <p><a class="back-town" href="/" data-testid="back-town">Back to town</a></p>
-  <h1><img src="/brand/mark.svg" alt="" width="28" height="28" style="vertical-align:-6px;border-radius:8px"> Nearcarta <small>console</small></h1>
-  <p class="hero">The agent can ask. The charter decides. Shops you try here use the free testnet trial. The town contracts are on mainnet.</p>
+  <h1><img src="/brand/mark.svg" alt="" width="28" height="28" style="vertical-align:-6px;border-radius:8px"> Nearcarta <small>for judges</small></h1>
+  <p class="hero">The agent can ask. The charter decides. The town contracts run on NEAR mainnet. The proofs below are those transactions.</p>
+  <div id="proofs" class="card" data-testid="judge-proofs"><p class="note">Loading mainnet proofs…</p></div>
   <nav id="tabs">
     <button data-tab="ferry" class="on">Ferry</button><button data-tab="guardhouse">Guardhouse</button>
     <button data-tab="townhall">Town Hall</button><button data-tab="arena">Arena</button>
     <button data-tab="toll">Toll</button><button data-tab="chronicle">Chronicle</button><button data-tab="house">Your House</button>
   </nav>
-  <p class="links"><a href="/design/D8_shops/">Shop interiors</a> · <a href="/judges.html">For judges</a> · <span id="wallet"></span> · <span id="health">checking chain…</span></p>
+  <p class="links"><a href="/">Town</a> · <a href="/ledger">Ledger</a> · <span id="health">checking the API…</span></p>
 </header>
 <main>
 <section id="ferry" class="tab on">
-  <h2>Ferry · private cross-chain swap quote</h2>
-  <p class="note">Dry quotes from NEAR Intents 1Click: no deposit address is created, nothing can be spent. Each quote is checked before it is shown.</p>
+  <h2>Ferry · a price quote, nothing sent</h2>
+  <p class="note">This asks for a real mainnet price. No deposit address is created and nothing can be spent.</p>
   <form id="ferry-form">
     <label>From <select name="from"><option value="USDC|base">USDC on Base</option><option value="ETH|base">ETH on Base</option><option value="USDC|near">USDC on NEAR</option></select></label>
     <label>Amount <input name="amount" value="30" inputmode="decimal"></label>
@@ -45,7 +46,7 @@
 <section id="chronicle" class="tab"><h2>Chronicle · what happened on chain</h2>
   <label>Contract <select id="chron-acct"></select></label><div class="out"></div></section>
 <section id="house" class="tab"><h2>Your House · you hold the off switch</h2>
-  <p class="note">Your own charter on testnet. Freeze, unfreeze and answer held spends from your NEAR wallet (NEAR Connect on testnet: Meteor, Intear, Ledger, Nightly and more). This page never holds a key.</p><div class="out"></div></section>
+  <p class="note">The town house is on mainnet. This page reads it. It does not hold a key.</p><div class="out"></div></section>
 </main>
 <script type="module" src="/console.js"></script>
 </body>

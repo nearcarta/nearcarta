@@ -133,19 +133,19 @@ export async function disconnect() { await wallet().disconnect().catch(() => {})
 export async function mountConnect(el) {
   let msg;
   const draw = async () => {
-    const who = await account();
+    const who = (await mainnetAccount()) || null;
     const [bal, mine] = who ? await Promise.all([balance(who), deeds(who)]) : [null, []];
     const low = who && bal != null && bal < 10n ** 24n;
     // A house built a moment ago can lag on the RPC node: look again a few times.
     if (who && !mine.length && (draw.n = (draw.n || 0) + 1) < 6) setTimeout(draw, 6000);
+    let hero = '';
+    try { hero = JSON.parse(localStorage.getItem('nearcarta.hero.v1') || 'null')?.name || ''; } catch { /* keep the short id */ }
+    const id = short(who);
+    const label = hero ? `${hero} · ${id}` : id;
     el.innerHTML = who
-      ? (bal === 0n ? `<a class="pill go" href="/setup/#fund" title="${esc(who)}: no NEAR yet. Fund it to start." data-testid="hud-account">${esc(short(who))} · 0 NEAR · Fund</a>`
-        : `<a class="pill" href="/console#house" title="${esc(who)}" data-testid="hud-account">${esc(short(who))} · ${fmt(bal)} NEAR</a>`)
-        + (mine.length ? `<a class="pill" href="/shops/vault/" data-testid="hud-deed" title="Your house deed in the charter factory">Your house: ${esc(short(mine[0]))}</a>`
-          : `<a class="pill go" href="/shops/vault/" data-testid="hud-build" title="Creates your own charter account: the house that keeps your rules">Build my house</a>`)
-        + (low ? '<button type="button" class="pill go" data-x="drip" data-testid="hud-faucet" title="10 NEAR from the public testnet faucet, sent to this account">Get 10 free testnet NEAR</button>' : '')
+      ? `<a class="pill${bal === 0n ? ' go' : ''}" href="/setup/#fund" title="${esc(who)}" data-testid="hud-account">${esc(label)}${bal === 0n ? ' · Fund' : ` · ${fmt(bal)} NEAR`}</a>`
         + '<button type="button" class="pill" data-x="out">Sign out</button>'
-      : `<a class="pill go" href="/setup/" data-testid="hud-connect" title="Sign in, then fund your account and sign your agent's rules">Sign in</a>`;
+      : `<a class="pill go" href="/setup/" data-testid="hud-connect" title="Sign in, then fund your account">Sign in</a>`;
     if (!msg) { msg = document.createElement('div'); msg.dataset.testid = 'wallet-note'; msg.setAttribute('role', 'status'); msg.style.cssText = 'flex-basis:100%;max-width:360px;font-size:12px;line-height:1.35;margin-top:4px;background:#2a1d14ee;color:#fbe9d0;padding:6px 8px;border-radius:8px'; }
     el.appendChild(msg);
     const note = t => { msg.innerHTML = t; msg.hidden = !t; };

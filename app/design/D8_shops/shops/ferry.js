@@ -9,16 +9,20 @@ import { QUOTE } from '../data/live.js';
 import { M as PM, brassM, mesh, lantern } from './_props.js';
 
 const Q = QUOTE, short = a => a.slice(0, 8) + '…' + a.slice(-5);
-export const LABEL = 'Shielded quote · Orchard-only UA';
+export const LABEL = 'A shielded quote. Nothing is sent.';
 export const HERO = `${tok(String(+Q.from.amt), Q.from.sym, { chain: Q.from.chain })}<span class="arrow" aria-hidden="true">→</span>${tok(Q.to.amt, Q.to.sym)}`;
 export const RESULT = 'Crossed shielded';
 const diffTxt = r => r.diffs ? r.diffs.map(d => `${d.field}: sent ${d.sent}, echo ${d.got}`).join('; ') : `receivers ${r.receivers.join(' + ')}`;
 const utc3 = s => { const d = new Date(s.replace(' UTC', 'Z').replace(' ', 'T')); if (isNaN(d)) return s; d.setUTCHours(d.getUTCHours() + 3); return d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC+3'; };
 export const PROOF = proof(
+  h3('What this quote is'),
+  row({ k: `${Q.from.amt} ${Q.from.sym} on ${Q.from.chain} would become about ${Q.to.exact} ZEC`, why: 'A practice quote. Nothing was sent and nothing was spent.', st: Q.sig ? 'ok' : 'no', stText: Q.sig ? 'signed' : 'not signed', src: 'live' }),
+  row({ k: 'The Zcash address hides the amount', why: 'The recipient and the amount stay hidden. A weaker address is refused.', st: Q.ua.orchardOnly ? 'ok' : 'no', stText: Q.ua.orchardOnly ? 'hidden' : 'not hidden', src: 'live' }),
+  `<details class="more"><summary>Technical details</summary>`,
   h3(`The quote · live read, ${Q.api}`),
-  row({ k: `${Q.from.amt} ${Q.from.sym} on ${Q.from.chain} → ${Q.to.exact} ${Q.to.sym}`, why: `confidentiality ${Q.privacy} · ETA ${Q.eta} · ${Q.fee} · signed cost ${(Q.costBps / 100).toFixed(1)}% on this small amount`, st: Q.sig ? 'ok' : 'no', stText: Q.sig ? 'signed' : 'bad signature', src: 'live' }),
-  h3('The recipient · Orchard-only UA check'),
-  row({ k: `${short(Q.ua.addr)} · receivers: ${Q.ua.receivers.join(', ')}`, why: "shielded into Zcash's Ironwood pool via an Orchard-only UA", st: Q.ua.orchardOnly ? 'ok' : 'no', stText: Q.ua.orchardOnly ? 'Orchard-only' : 'refused', src: 'live' }),
+  row({ k: `${Q.from.amt} ${Q.from.sym} on ${Q.from.chain} → ${Q.to.exact} ${Q.to.sym}`, why: `privacy ${Q.privacy} · about ${Q.eta} · fee ${Q.fee}`, st: Q.sig ? 'ok' : 'no', stText: Q.sig ? 'signed' : 'bad signature', src: 'live' }),
+  h3('Address check'),
+  row({ k: `${short(Q.ua.addr)}`, why: 'Shielded Zcash address. A mixed or public address is refused.', st: Q.ua.orchardOnly ? 'ok' : 'no', stText: Q.ua.orchardOnly ? 'shielded' : 'refused', src: 'live' }),
   h3('Refused · anything that weakens the shielding'),
   ...Q.refused.map(r => row({ k: r.case, why: `${r.why} · ${diffTxt(r)}`, st: 'no', stText: 'refused', src: r.diffs ? 'replay' : 'live' })),
   note(`The signature does not cover confidentiality, so the guard compares every echoed field with the request (${SIGNED.length} signed, ${UNSIGNED.length} not). Echo edits are re-runs of that rule on this live quote.`),
@@ -28,7 +32,8 @@ export const PROOF = proof(
   row({ k: 'Hidden · the swap', why: 'order size, timing and counterparties settle on the private Confidential Intents shard', st: 'ok', stText: 'hidden', src: 'testnet' }),
   row({ k: 'Hidden · recipient, note and later spends', why: "shielded into Zcash's Ironwood pool via an Orchard-only UA; no transparent receiver to fall back to", st: 'ok', stText: 'hidden', src: 'testnet' }),
   note('1Click has no testnet. So the swap here is a real signed 1Click quote plus a testnet NEAR payment that your charter checks against your Ferry rule; no cross-chain swap runs.'),
-  note(`Not hidden from the 1Click operator or the private shard's validators. Dry quote: nothing was sent, so no tx exists yet. Read ${esc(utc3(Q.at))}.`));
+  note(`Nothing was sent, so there is no transaction yet. Read ${esc(utc3(Q.at))}.`),
+  `</details>`);
 export const FLAT = { src: 'mainnet quote', cls: 'quote', label: LABEL, hero: HERO };
 
 export default async function ferry(ctx) {
@@ -61,7 +66,7 @@ export default async function ferry(ctx) {
   let t = 0;
   return {
     rob, scene, camera, tags,
-    panel: { title: 'Ferry', src: 'quote', srcNote: `1Click has no testnet: this is a dry mainnet quote read through ${Q.api}, then a testnet payment your charter checks. No swap was executed.`, label: LABEL, hero: HERO, action: 'Load the cargo' },
+    panel: { title: 'Ferry', src: 'quote', srcNote: 'A real mainnet price quote. Nothing is sent and nothing is spent.', label: LABEL, hero: HERO, action: 'Load the cargo' },
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },
     *act() {
