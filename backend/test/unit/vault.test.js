@@ -376,13 +376,14 @@ test('boot keeps filling after index errors until a pass completes', async () =>
 test('refreshBoard answers within its wait and keeps the last fill result', async () => {
   const { refreshBoard } = await import('../../src/vault.js');
   assert.deepEqual(await refreshBoard(50, async () => ({ complete: true })), { complete: true });
-  const t0 = Date.now();
-  const r = await refreshBoard(50, () => new Promise(res => setTimeout(() => res({ complete: false }), 400)));
-  assert.ok(Date.now() - t0 < 300);
-  assert.deepEqual(r, { complete: true }); // slow fill: last known result
-  assert.deepEqual(await refreshBoard(50, async () => { throw new Error('429'); }), { complete: true });
-  await new Promise(res => setTimeout(res, 450));
-  assert.deepEqual(await refreshBoard(50, async () => { throw new Error('429'); }), { complete: false }); // the slow fill landed
+  let finished = false;
+  const r = await refreshBoard(20, () => new Promise(res => setTimeout(() => { finished = true; res({ complete: false }); }, 2000)));
+  assert.equal(finished, false); // the wait returns the last result; the fill is still running
+  assert.deepEqual(r, { complete: true });
+  assert.deepEqual(await refreshBoard(20, async () => { throw new Error('429'); }), { complete: true });
+  for (let i = 0; i < 80 && !finished; i++) await new Promise(res => setTimeout(res, 50));
+  assert.equal(finished, true);
+  assert.deepEqual(await refreshBoard(20, async () => { throw new Error('429'); }), { complete: false }); // the slow fill landed
 });
 
 test('a restart with no disk and no snapshot rebuilds the same board from chain at boot', async () => {
