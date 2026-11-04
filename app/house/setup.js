@@ -16,6 +16,7 @@ import { runAsk } from '../../shared/vault/run.js';
 import { LOOKS, DYES, OUTFITS, portraitHTML, writeHero, displayOk } from './hero.js';
 
 const PRIVY_ON = typeof __PRIVY_ON__ !== 'undefined' && __PRIVY_ON__;
+const PUBLIC_MAINNET = __PUBLIC_MAINNET__ === '1';
 const privy = PRIVY_ON ? new Privy({ appId: __PRIVY_APP_ID__, ...(__PRIVY_CLIENT_ID__ ? { clientId: __PRIVY_CLIENT_ID__ } : {}), storage: new LocalStorage() }) : null;
 let API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
@@ -43,7 +44,8 @@ const st = Object.assign({ step: 0, done: [], trial: false, persona: 'mage', dye
 const save = () => localStorage.setItem(SAVE, JSON.stringify(st));
 let CFG = null, rpc = null, me = null, bal = undefined, balTimer = 0, busy = false, msg = '';
 const view = (c, m, a) => viewFn(rpc, c, m, a);
-const journey = () => setupJourney(st.trial);
+const factoryLive = () => PUBLIC_MAINNET && MAIN.factory?.status === 'deployed' && !!MAIN.factory.contract;
+const journey = () => setupJourney(st.trial, { publicMainnet: PUBLIC_MAINNET, factoryDeployed: factoryLive() });
 const explorer = () => journey().explorer;
 const txA = h => h ? `<a href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" data-testid="setup-tx">${esc(h.slice(0, 8))}…</a>` : '';
 const acA = a => `<a href="${explorer()}/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
@@ -93,8 +95,8 @@ function sSignin() {
       <div class="or">or</div>` : '')
     + `<div class="tiles" data-testid="setup-choices"><button class="tile" id="wallet" data-testid="setup-wallet"><i>◈</i><b>NEAR wallet</b><span>Meteor, Intear, HOT, Ledger… on mainnet</span></button>
       <button class="tile" id="mm" data-testid="setup-metamask"><i>🦊</i><b>MetaMask</b><span>Your EVM wallet signs NEAR mainnet</span></button></div>
-      <p class="assure">Google or email makes a NEAR mainnet account for you. Nothing is sent until you approve. Funding is real NEAR.</p>
-      <p class="trial-note"><button class="btn link" id="guest" data-testid="setup-guest">Use a free testnet account instead</button><span class="small"> A separate trial. No real NEAR. Its key stays in this browser.</span></p>`)
+      <p class="assure">Google or email makes a NEAR mainnet account for you. Nothing is sent until you approve. Funding is real NEAR.</p>`
+    + (journey().showGuest ? `<p class="trial-note"><button class="btn link" id="guest" data-testid="setup-guest">Use a free testnet account instead</button><span class="small"> A separate trial. No real NEAR. Its key stays in this browser.</span></p>` : ''))
     + errP() + nav(signed, { back: false });
 }
 const say = t => { const el = $('#status'); if (el) el.textContent = t; };
@@ -135,7 +137,12 @@ async function signedIn(id) {
 // ---------- 2. Fund ----------
 async function refreshBal() { if (!me) return; bal = await balanceOn(me, st.trial ? 'testnet' : 'mainnet'); top(); const el = $('#bigbal'); if (el) el.innerHTML = balHtml(); }
 const balHtml = () => `${bal === undefined ? '…' : bal == null ? '?' : fmtN(nearOf(bal))} <small>NEAR</small>`;
-const need = () => st.trial ? Number(st.deposit) + 0.05 : 0.05;
+const need = () => {
+  if (st.trial && !PUBLIC_MAINNET) return Number(st.deposit) + 0.05;
+  if (factoryLive() && MAIN.factory.min_deposit_yocto) return Number(BigInt(MAIN.factory.min_deposit_yocto) / 10n ** 18n) / 1e6 + 0.1;
+  return 0.05;
+};
+const holdsForCharter = () => (st.trial && !PUBLIC_MAINNET) || factoryLive();
 function sFund() {
   let qr = ''; try { const q = qrcode(0, 'M'); q.addData(me); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch {}
   const enough = bal != null && nearOf(bal) >= need();
@@ -154,7 +161,7 @@ function sFund() {
        ${j.showFaucet ? `<button class="tile" id="drip" data-testid="setup-faucet"><i>✦</i><b>Free testnet NEAR</b><span>10 testnet NEAR from the public faucet. Not real NEAR.</span></button>` : ''}
        <a class="tile" href="https://app.near-intents.org/" target="_blank" rel="noopener" data-testid="setup-intents"><i>⇄</i><b>Swap into NEAR</b><span>${esc(j.intentsNote)}</span></a>
        <button class="tile" id="copy2"><i>⎘</i><b>From an exchange</b><span>${st.trial ? 'This trial is not an exchange withdrawal. Use the faucet above.' : 'Withdraw NEAR on NEAR mainnet to this address.'}</span></button></div>
-     ${errP()}` + nav(true, { nextOk: st.trial ? enough : true, label: st.trial && !enough ? `Waiting for ${fmtN(need())} testnet NEAR` : 'Continue' });
+     ${errP()}` + nav(true, { nextOk: holdsForCharter() ? enough : true, label: holdsForCharter() && !enough ? `Waiting for ${fmtN(need())} NEAR` : 'Continue' });
 }
 function wireFund() {
   const cp = () => navigator.clipboard?.writeText(me).then(() => { const b = $('#copy'); if (b) { b.textContent = 'Copied ✓'; setTimeout(() => b && (b.textContent = 'Copy address'), 1600); } });
@@ -182,20 +189,20 @@ function sCharacter() {
   if (!st.agentName) st.agentName = defName();
   if (!st.displayName) st.displayName = persona().name;
   const shown = st.displayName || persona().name;
-  const accountField = st.trial
-    ? `<div class="field"><label for="an">Charter account</label><div class="suffix"><input id="an" value="${esc(st.agentName)}" maxlength="24" autocomplete="off" spellcheck="false" data-testid="setup-name"><span>.${esc(short(CFG?.factory || ''))}</span></div>
-       <p class="small muted" id="nhint">Lowercase letters, digits and single dashes. This trial charter is on testnet.</p></div>`
-    : `<p class="small muted">This name stays in this browser and in the town. This path does not create a charter account.</p>`;
+  const accountField = holdsForCharter()
+    ? `<div class="field"><label for="an">Charter account</label><div class="suffix"><input id="an" value="${esc(st.agentName)}" maxlength="24" autocomplete="off" spellcheck="false" data-testid="setup-name"><span>.${esc(short((st.trial ? CFG?.factory : MAIN.factory?.contract) || ''))}</span></div>
+       <p class="small muted" id="nhint">${st.trial ? 'Lowercase letters, digits and single dashes. This trial charter is on testnet.' : 'Lowercase letters, digits and single dashes.'}</p></div>`
+    : `<p class="small muted">This name stays in this browser and in the town. A personal charter is created here once ${esc(MAIN.factory?.contract || 'the factory')} is deployed. It is not on chain yet.</p>`;
   return head('Character', 'Choose who walks the town.', 'The look, colour and name stay in this browser and appear in the town.')
     + `<div class="cast"><div class="picks" role="group" aria-label="Looks">${LOOKS.map(p => `<button class="pick" data-p="${p.id}" aria-pressed="${p.id === st.persona}" data-testid="persona-${p.id}"><img src="/setup/chars/${p.img}.webp" alt="" width="160" height="160"><b>${esc(p.name)}</b><span>${esc(p.blurb)}</span></button>`).join('')}</div>
      <aside class="liveprev">${portraitHTML(persona(), dyeOf(), st.outfit, shown)}
        <p class="small muted">Colour</p><div class="swatches" role="group" aria-label="Colours">${DYES.map(d => `<button type="button" class="swatch" data-dye="${d.id}" aria-pressed="${d.id === st.dye}" title="${esc(d.name)}" style="--dye:${d.hex}" data-testid="dye-${d.id}"></button>`).join('')}</div>
        <p class="small muted">Outfit</p><div class="swatches" role="group" aria-label="Outfits">${OUTFITS.map(o => `<button type="button" class="fit" data-fit="${o.id}" aria-pressed="${o.id === st.outfit}" data-testid="outfit-${o.id}">${esc(o.name)}</button>`).join('')}</div>
        <div class="field"><label for="dn">Name in town</label><input id="dn" value="${esc(st.displayName)}" maxlength="24" autocomplete="off" data-testid="setup-display"></div>
-       ${accountField}</aside></div>` + nav(true, { nextOk: (st.trial ? nameOk(st.agentName) : true) && displayOk(st.displayName) });
+       ${accountField}</aside></div>` + nav(true, { nextOk: (holdsForCharter() ? nameOk(st.agentName) : true) && displayOk(st.displayName) });
 }
 function wireCharacter() {
-  const paint = () => { remember(); const ok = (st.trial ? nameOk(st.agentName) : true) && displayOk(st.displayName); const n = $('#next'); if (n) n.disabled = !ok; const h = $('#nhint'); if (h) { h.textContent = nameOk(st.agentName) ? 'Lowercase letters, digits and single dashes. This trial charter is on testnet.' : 'Use 2–24 lowercase letters, digits or single dashes.'; h.className = 'small ' + (nameOk(st.agentName) ? 'muted' : 'err'); } };
+  const paint = () => { remember(); const ok = (holdsForCharter() ? nameOk(st.agentName) : true) && displayOk(st.displayName); const n = $('#next'); if (n) n.disabled = !ok; const h = $('#nhint'); if (h) { h.textContent = nameOk(st.agentName) ? (st.trial ? 'Lowercase letters, digits and single dashes. This trial charter is on testnet.' : 'Lowercase letters, digits and single dashes.') : 'Use 2–24 lowercase letters, digits or single dashes.'; h.className = 'small ' + (nameOk(st.agentName) ? 'muted' : 'err'); } };
   document.querySelectorAll('.pick').forEach(b => b.onclick = () => { const old = defName(), oldShow = persona().name; st.persona = b.dataset.p; const p = persona(); if (st.agentName === old || !st.agentName) st.agentName = defName(); if (!st.displayName || st.displayName === oldShow) st.displayName = p.name; st.cap = p.cap; st.daily = p.daily; st.per = p.per; save(); render(); });
   document.querySelectorAll('[data-dye]').forEach(b => b.onclick = () => { st.dye = b.dataset.dye; save(); render(); });
   document.querySelectorAll('[data-fit]').forEach(b => b.onclick = () => { st.outfit = b.dataset.fit; save(); render(); });
@@ -203,8 +210,8 @@ function wireCharacter() {
   const an = $('#an'); if (an) an.oninput = e => { st.agentName = e.target.value.toLowerCase(); save(); paint(); };
   paint();
   wire(async () => { if (!displayOk(st.displayName)) { msg = 'Give your agent a name, 2–24 letters.'; return render(); }
-    remember(); if (!st.trial) { done(st.step); go(st.step + 1); return; }
-    const id = `${st.agentName}.${CFG.factory}`; const b = $('#next');
+    remember(); if (!holdsForCharter()) { done(st.step); go(st.step + 1); return; }
+    const id = `${st.agentName}.${st.trial ? CFG.factory : MAIN.factory.contract}`; const b = $('#next');
     await act(b, async () => { if (PREVIEW) return; const r = await fetch(API + '/api/vault/charter/' + encodeURIComponent(id)).then(r => r.json()).catch(() => ({}));
       if (r?.exists && r?.owner && r.owner !== me) throw new Error(`${id} is taken. Pick another name.`); done(st.step); go(st.step + 1); }); });
 }
@@ -246,35 +253,43 @@ function wireRules() {
 // ---------- 6. Sign ----------
 let signLog = [];
 function sSign() {
-  if (!st.trial) {
+  if (!st.trial && !factoryLive()) {
     const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
     const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
-    return head('Sign', 'Your account is on mainnet.', 'A personal charter is not part of this path. The town charter, toll, arena, house and town hall already run on mainnet. This page will not send a transaction that pretends to create one.')
+    return head('Sign', 'Your account is on mainnet.', `A personal charter is created on ${esc(MAIN.factory?.contract || 'the factory')} after that factory is deployed. It is not on chain yet, so this page will not send a transaction that pretends to create one. The town charter, toll, arena, house and town hall already run on mainnet.`)
       + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><span class="small muted">Saved in this browser</span></div></div>`
       + `<div class="facts"><div class="fact"><small>Town charter</small><b>${acA(MAIN.charter.contract)}</b></div>
          <div class="fact"><small>Allowed 0.001 NEAR</small><b>${txA(allowed)}</b></div>
          <div class="fact"><small>Refused 0.003 NEAR</small><b>${txA(refused)}</b></div></div>`
       + errP() + nav(true, { label: 'Continue' });
   }
-  const r = rules(), id = st.charter || `${st.agentName}.${CFG.factory}`, live = st.charter && localStorage.getItem(agentLS(st.charter));
+  const r = rules(), id = st.charter || `${st.agentName}.${st.trial ? CFG.factory : MAIN.factory.contract}`, live = st.charter && localStorage.getItem(agentLS(st.charter));
+  const stake = !st.trial && MAIN.factory?.min_deposit_yocto ? fmtN(Number(BigInt(MAIN.factory.min_deposit_yocto) / 10n ** 18n) / 1e6) : fmtN(st.deposit);
   const L = [['Create your charter', 'create'], ['Write the rule and add the agent key', 'rules']];
-  return head('Sign', live ? 'Your agent is live.' : 'Two approvals in your wallet.', live ? 'These limits are read back from the chain, not from this page.' : `First the charter is made (${fmtN(st.deposit)} NEAR goes into it). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`)
+  return head('Sign', live ? 'Your agent is live.' : 'Two approvals in your wallet.', live ? 'These limits are read back from the chain, not from this page.' : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`)
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
     + (live ? `<div class="facts" id="facts" data-testid="setup-facts"><div class="fact"><small>Loading</small><b>…</b></div></div>` : `<div class="preview">${preview(r)}</div>`)
     + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
     + (live ? '' : `<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`) + errP() + nav(live, { label: 'Try your agent' });
 }
 async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
+async function accountOn(id, network) {
+  if (network !== 'mainnet') return (await charterState(id)).exists;
+  const r = await fetch(MAIN.rpc, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'query', params: { request_type: 'view_account', finality: 'final', account_id: id } }) });
+  const j = await r.json();
+  return !j.error && !!j.result;
+}
 async function sign() {
-  const r = rules(), w = await wallet().wallet(), id = `${st.agentName}.${CFG.factory}`;
+  const onMain = factoryLive() && !st.trial;
+  const r = rules(), w = await (onMain ? mainnetWallet() : wallet()).wallet(), id = `${st.agentName}.${onMain ? MAIN.factory.contract : CFG.factory}`;
   const mark = (k, state, tx) => { const s = signLog.find(x => x.k === k); if (s) Object.assign(s, { state, tx: tx || s.tx }); else signLog.push({ k, state, tx }); render(); };
-  let cs = await charterState(id);
-  if (!cs.exists) {
+  let exists = await accountOn(id, onMain ? 'mainnet' : 'testnet');
+  if (!exists) {
     mark('create', 'run');
-    const res = await w.signAndSendTransaction({ receiverId: CFG.factory, actions: [{ type: 'FunctionCall', params: { methodName: 'create_charter', args: { name: st.agentName, policy_delay_ns: String(CFG.policy_delay?.default_ns || '86400000000000') }, gas: (150n * TG).toString(), deposit: toY(st.deposit) } }] });
+    const res = await w.signAndSendTransaction({ receiverId: onMain ? MAIN.factory.contract : CFG.factory, actions: [{ type: 'FunctionCall', params: { methodName: 'create_charter', args: { name: st.agentName, policy_delay_ns: String((onMain ? MAIN.factory.policy_delay_ns : CFG.policy_delay?.default_ns) || '86400000000000') }, gas: ((onMain ? 300n : 150n) * TG).toString(), deposit: onMain ? String(MAIN.factory.min_deposit_yocto) : toY(st.deposit) } }] });
     mark('create', 'run', txHashOf(res));
-    for (let i = 0; i < 20 && !cs.exists; i++) { await wait(1500); cs = await charterState(id); }
-    if (!cs.exists) throw new Error('The charter did not appear yet. Wait a few seconds and press Approve again.');
+    for (let i = 0; i < 20 && !exists; i++) { await wait(1500); exists = await accountOn(id, onMain ? 'mainnet' : 'testnet'); }
+    if (!exists) throw new Error('The charter did not appear yet. Wait a few seconds and press Approve again.');
   }
   mark('create', 'ok'); st.charter = id; save();
   mark('rules', 'run');
@@ -289,11 +304,13 @@ async function sign() {
 async function facts() {
   const el = $('#facts'); if (!el || !st.charter) return;
   try {
-    const cl = await view(st.charter, 'get_clauses'); const c = (Array.isArray(cl) ? cl.find(x => (x.id || x[0]) === 'pay') : cl?.pay) || cl?.[0]; const k = c?.clause || c?.[1] || c;
-    const acct = await rpc('query', { request_type: 'view_account', finality: 'final', account_id: st.charter });
+    const readRpc = st.trial ? rpc : rpcClient([MAIN.rpc]);
+    const read = (m, a) => viewFn(readRpc, st.charter, m, a);
+    const cl = await read('get_clauses'); const c = (Array.isArray(cl) ? cl.find(x => (x.id || x[0]) === 'pay') : cl?.pay) || cl?.[0]; const k = c?.clause || c?.[1] || c;
+    const acct = await readRpc('query', { request_type: 'view_account', finality: 'final', account_id: st.charter });
     const pk = keyFrom(localStorage.getItem(agentLS(st.charter))).publicKey;
-    const ak = await rpc('query', { request_type: 'view_access_key', finality: 'final', account_id: st.charter, public_key: pk }).catch(() => null);
-    const fp = ak?.permission?.FunctionCall; const ex = await view(st.charter, 'get_clause_expiry', { clause_id: 'pay' }).catch(() => null);
+    const ak = await readRpc('query', { request_type: 'view_access_key', finality: 'final', account_id: st.charter, public_key: pk }).catch(() => null);
+    const fp = ak?.permission?.FunctionCall; const ex = await read('get_clause_expiry', { clause_id: 'pay' }).catch(() => null);
     el.innerHTML = [['Charter', acA(st.charter)], ['Holds', fmtN(nearOf(acct.amount)) + ' NEAR'], ['Max per payment', fmtN(nearOf(k?.per_action_cap)) + ' NEAR'], ['Daily budget', fmtN(nearOf(k?.daily_budget)) + ' NEAR'],
       ['Allowed shops', esc((k?.receivers || []).join(', '))], ['Expires', ex ? new Date(Number(BigInt(ex) / 1_000_000n)).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' }) : 'none'],
       ['Agent key may call', fp ? esc(fp.method_names.join(', ') || 'any method') + ' on ' + esc(short(fp.receiver_id)) : 'not found yet'], ['Agent gas allowance', fp?.allowance ? fmtN(nearOf(fp.allowance)) + ' NEAR' : '—']]
@@ -301,7 +318,7 @@ async function facts() {
   } catch (e) { el.innerHTML = `<div class="fact"><small>Read</small><b>${esc(e?.message || e)}</b></div>`; }
 }
 function wireSign() {
-  if (!st.trial) { wire(() => { done(5); go(6); }); return; }
+  if (!st.trial && !factoryLive()) { wire(() => { done(5); go(6); }); return; }
   const b = $('#sign'); if (b) b.onclick = () => act(b, sign); wire(() => { done(5); go(6); }); facts();
 }
 
@@ -309,7 +326,7 @@ function wireSign() {
 let tries = [];
 const WHY = { over_per_action_cap: 'over your per-payment cap', over_daily_budget: 'over your daily budget', over_daily_action_count: 'over your payments-per-day limit', receiver_not_allowlisted: 'that shop is not on your list', below_min_amount: 'below the smallest payment', clause_expired: 'your rule has expired', frozen: 'the charter is frozen' };
 function sTry() {
-  if (!st.trial) {
+  if (!st.trial && !(factoryLive() && st.charter)) {
     const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
     const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
     return head('Try it', 'The town charter already decides on mainnet.', 'These two transactions are on mainnet. One payment inside the cap was allowed. One over the cap was refused. Your NEAR is not spent here.')
@@ -326,9 +343,10 @@ function sTry() {
 }
 function next() { const n = new URLSearchParams(location.search).get('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/'; }
 function wireTry() {
-  if (!st.trial) { wire(); return; }
+  if (!st.trial && !(factoryLive() && st.charter)) { wire(); return; }
   const r = rules(), to = r.receivers[0];
-  const ask = (amt, memo) => runAsk({ charter: st.charter, key: keyFrom(localStorage.getItem(agentLS(st.charter))), receiver: to, amount: toY(amt), memo, viewF: view, send: sendPropose, rpcCall: rpc });
+  const rpcCall = st.trial ? rpc : rpcClient([MAIN.rpc]);
+  const ask = (amt, memo) => runAsk({ charter: st.charter, key: keyFrom(localStorage.getItem(agentLS(st.charter))), receiver: to, amount: toY(amt), memo, viewF: (c, m, a) => viewFn(rpcCall, c, m, a), send: sendPropose, rpcCall });
   $('#t-ok').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(Math.min(+r.cap, 0.001), 'setup: allowed')); });
   $('#t-no').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(+(+r.cap * 2).toFixed(4), 'setup: over cap')); });
   wire();
@@ -337,7 +355,7 @@ function wireTry() {
 const VIEWS = { signin: [sSignin, wireSignin], fund: [sFund, wireFund], privacy: [sPrivacy, wirePrivacy], character: [sCharacter, wireCharacter], rules: [sRules, wireRules], sign: [sSign, wireSign], try: [sTry, wireTry] };
 function render() {
   if (!PREVIEW && !me && st.step > 0) st.step = 0;
-  if (!PREVIEW && st.trial && st.step === 6 && !(st.charter && localStorage.getItem(agentLS(st.charter)))) st.step = 5;
+  if (!PREVIEW && (st.trial || factoryLive()) && st.step === 6 && !(st.charter && localStorage.getItem(agentLS(st.charter)))) st.step = 5;
   document.body.classList.toggle('previewing', PREVIEW);
   rail(); top(); const [v, w] = VIEWS[STEPS[st.step][0]]; const c = $('#card');
   c.innerHTML = (PREVIEW ? '<p class="preview-banner" data-testid="preview-banner">Preview. Nothing is signed.</p>' : '') + v();
@@ -356,7 +374,10 @@ async function boot() {
   rpc = rpcClient([CFG.rpc, ...(CFG.rpc_fallbacks || [])].filter(Boolean).length ? [CFG.rpc, ...(CFG.rpc_fallbacks || [])].filter(Boolean) : ['https://rpc.testnet.fastnear.com']);
   if (CFG.min_deposit) st.deposit = Math.max(st.deposit, nearOf(CFG.min_deposit));
   // One session for the whole site: if the preferred network has nobody, use whichever wallet the HUD and /console see.
-  const who = async () => { const a = await (st.trial ? account() : mainnetAccount()); if (a) return a;
+  if (PUBLIC_MAINNET && st.trial) { st.trial = false; save(); }
+  const who = async () => {
+    if (PUBLIC_MAINNET) return mainnetAccount();
+    const a = await (st.trial ? account() : mainnetAccount()); if (a) return a;
     const b = await (st.trial ? mainnetAccount() : account()); if (b) { st.trial = !st.trial; save(); } return b; };
   if (!PREVIEW) onWallet(async () => { const a = await who(); if (a !== me) { me = a; bal = undefined; if (me) await refreshBal(); render(); } });
   // Back from Google: finish the Privy login, then connect.

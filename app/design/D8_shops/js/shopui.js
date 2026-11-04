@@ -23,12 +23,12 @@ export const nice = a => { if (!a) return ''; if (a === A.S.me) return 'You'; co
   if (/gate/.test(a)) return 'Toll gate'; if (/treasury/.test(a)) return 'Town treasury'; if (/^ncguest-/.test(a)) return 'Guest account'; return a.split('.')[0]; };
 // Progress for the long actions: plain steps with a time hint, ticking while the button is busy.
 const STEPS = {
-  chronicle: ['about 20 s', 'Writing today\u2019s entry', 'Asking your charter', 'Signing on NEAR testnet', 'Reading your feed'],
+  chronicle: ['about 20 s', 'Writing today\u2019s entry', 'Asking your charter', 'Signing on NEAR', 'Reading your feed'],
   bank: ['about 25 s', 'Checking the private AI is genuine', 'Asking your charter', 'Sealing the note', 'Recording it on NEAR testnet'],
-  ferry: ['about 15 s', 'Fetching a signed live quote', 'Asking your charter', 'Signing on NEAR testnet'],
+  ferry: ['about 15 s', 'Fetching a signed live quote', 'Asking your charter', 'Signing on NEAR'],
   guard: ['about 15 s', 'Checking the payee', 'Asking your charter', 'Recording the answer'],
-  arena: ['about 45 s', 'Private AI is reading your message', 'Asking your charter', 'Signing on NEAR testnet', 'Recording your score'],
-  hall: ['about 15 s', 'Writing the proposal', 'Signing on NEAR testnet', 'Waiting for the council'],
+  arena: ['about 45 s', 'Private AI is reading your message', 'Asking your charter', 'Signing on NEAR', 'Recording your score'],
+  hall: ['about 15 s', 'Writing the proposal', 'Signing on NEAR', 'Waiting for the council'],
   payouts: ['about 15 s', 'Checking every payout against your charter', 'Signing one batch on NEAR testnet', 'Confirming'],
   house: ['about 10 s', 'Reading your charter', 'Counting your history'],
   toll: ['about 30 s', 'Paying the toll from your charter', 'Approving the gate call', 'Getting the payout signed', 'Sending it to Base Sepolia'],

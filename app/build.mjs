@@ -1,7 +1,7 @@
 // Builds app/dist. "/" is the town (design/D9_world, its 2D fallback included); each shop door opens the
 // shop interiors (design/D8_shops). The plain console moved to /console.html; /judges.html stays.
 import { cpSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
-import { walletDefine, PRIVY_ID, PRIVY_CLIENT } from './build-defines.mjs';
+import { walletDefine, PRIVY_ID, PRIVY_CLIENT, PUBLIC_MAINNET } from './build-defines.mjs';
 const here = new URL('.', import.meta.url).pathname;
 const dist = here + 'dist';
 rmSync(dist, { recursive: true, force: true }); mkdirSync(dist);
@@ -50,7 +50,7 @@ if (PRIVY_ID) {
 await (await import('./shops/build.mjs')).buildShops(dist, await import('esbuild'));
 // On Vercel the API is same origin (/api is proxied to Render in vercel.json), so no CORS and one origin in the CSP story.
 const api = process.env.NEARCARTA_API ?? (process.env.VERCEL ? '' : 'https://nearcarta-api.onrender.com');
-writeFileSync(dist + '/config.js', `window.NEARCARTA_API=${JSON.stringify(api)};globalThis.NEARCARTA_API=window.NEARCARTA_API;\n`);
+writeFileSync(dist + '/config.js', `window.NEARCARTA_API=${JSON.stringify(api)};globalThis.NEARCARTA_API=window.NEARCARTA_API;window.NEARCARTA_PUBLIC_MAINNET=${PUBLIC_MAINNET ? 'true' : 'false'};\n`);
 // config.js before the first module, in the interiors and the town.
 const addHead = (file, html) => writeFileSync(file, readFileSync(file, 'utf8').replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + html));
 addHead(shops + '/index.html', '<script src="/config.js"></script>');
