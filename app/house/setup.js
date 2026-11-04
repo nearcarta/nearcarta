@@ -77,7 +77,7 @@ const errP = () => msg ? `<p class="err" role="alert" data-testid="setup-err">${
 function wire(nextFn) { const b = $('#back'); if (b) b.onclick = () => go(st.step - 1); const n = $('#next'); if (n) n.onclick = nextFn || (() => { done(st.step); go(st.step + 1); }); }
 async function act(btn, f) {
   if (PREVIEW) { msg = ''; done(st.step); go(Math.min(STEPS.length - 1, st.step + 1)); return; }
-  if (busy) return; busy = true; const t = btn?.innerHTML; if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + t; } msg = '';
+  if (busy) return; busy = true; const t = btn?.innerHTML; if (btn) { btn.style.minWidth = btn.offsetWidth + 'px'; btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + t; } msg = '';
   try { await f(); } catch (e) { msg = e?.message || String(e); } finally { busy = false; if (btn && document.contains(btn)) { btn.disabled = false; btn.innerHTML = t; } render(); } }
 
 // ---------- 1. Sign in ----------
@@ -85,11 +85,11 @@ let emailStage = 'email', email = '';
 function sSignin() {
   const signed = !!me && !PREVIEW;
   return head('Sign in', signed ? 'You are in.' : 'Start here.',
-    signed ? `Signed in as <b>${esc(me)}</b>.` : 'One path: sign in, fund, pick a character, write the rules, sign them, then try one payment the charter allows and one it refuses.')
+    signed ? `Signed in as <b>${esc(me)}</b>.` : 'Sign in to get your own NEAR account. Next you pick a character and set spending limits your agent can never go past.')
     + (signed ? `<div class="addr"><div><small class="muted">Your NEAR account</small><br><code>${esc(me)}</code></div></div>` :
     (PRIVY_ON ? `<button class="btn google big" id="google" data-testid="setup-google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.9l-8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Continue with Google</button>
-      <form id="emailf" style="margin-top:12px">${emailStage === 'finish'
-        ? `<p class="lede">You are logged in${email ? ` as <b>${esc(email)}</b>` : ''}. One click opens the Nearcarta sign-in window and links your NEAR account.</p><button type="button" class="btn gold big" id="finish" data-testid="setup-finish">Finish sign in →</button>`
+      <form id="emailf" class="signbox" style="margin-top:12px">${emailStage === 'finish'
+        ? `<p class="lede">You are logged in${email ? ` as <b>${esc(email)}</b>` : ''}. One click opens the Nearcarta sign-in tab and links your NEAR account.</p><button type="button" class="btn gold big" id="finish" data-testid="setup-finish">Finish sign in →</button><div id="tabhelp" class="tabhelp" hidden data-testid="setup-tabhelp"><p class="small">The sign-in opened in another browser tab. Switch to it and press <b>Connect</b>. This page moves on by itself.</p><button type="button" class="btn" id="reopen" data-testid="setup-reopen">Switch to the sign-in tab</button></div>`
         : emailStage === 'email'
         ? `<label for="em">Email</label><div class="row" style="flex-wrap:nowrap"><input id="em" type="email" required autocomplete="email" placeholder="you@example.com" value="${esc(email)}" data-testid="setup-email"><button class="btn" data-testid="setup-send">Send code</button></div>`
         : `<label for="code">6-digit code sent to ${esc(email)}</label><div class="row" style="flex-wrap:nowrap"><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" required data-testid="setup-code" style="font:600 20px var(--mono);letter-spacing:.3em"><button class="btn gold" data-testid="setup-verify">Verify</button></div><button type="button" class="btn link sm" id="reemail" data-testid="setup-reemail">Use another email</button>`}</form>
@@ -97,7 +97,7 @@ function sSignin() {
       <div class="or">or</div>` : '')
     + `<div class="tiles" data-testid="setup-choices"><button class="tile" id="wallet" data-testid="setup-wallet"><i>◈</i><b>NEAR wallet</b><span>Meteor, Intear, HOT, Ledger… on mainnet</span></button>
       <button class="tile" id="mm" data-testid="setup-metamask"><i>🦊</i><b>MetaMask</b><span>Your EVM wallet signs NEAR mainnet</span></button></div>
-      <p class="assure">Google or email makes a NEAR mainnet account for you. Nothing is sent until you approve. Funding is real NEAR.</p>`
+      <p class="assure">Google or email makes a NEAR account for you. Nothing is sent until you approve it.</p>`
     + (journey().showGuest ? `<p class="trial-note"><button class="btn link" id="guest" data-testid="setup-guest">Use a free testnet account instead</button><span class="small"> A separate trial. No real NEAR. Its key stays in this browser.</span></p>` : ''))
     + errP() + nav(signed, { back: false });
 }
@@ -119,16 +119,34 @@ async function afterPrivy() {
 function wireSignin() {
   if (me) return wire();
   const g = $('#google'); if (g) g.onclick = () => act(g, async () => { const { url } = await privy.auth.oauth.generateURL('google', location.origin + '/setup/'); sessionStorage.setItem('nc_setup_google', '1'); location.assign(url); });
-  const f = $('#emailf'); if (f) f.onsubmit = e => { e.preventDefault(); const b = f.querySelector('button:not([type])');
+  const f = $('#emailf'); if (f) f.onsubmit = e => { e.preventDefault(); const b = f.querySelector('button:not([type])'); msg = ''; const oe = $('[data-testid=setup-err]'); if (oe) oe.remove();
     if (emailStage === 'email') act(b, async () => { email = $('#em').value.trim(); await privy.auth.email.sendCode(email); emailStage = 'code'; });
     else act(b, async () => { say('Checking your code…'); await privy.auth.email.loginWithCode(email, $('#code').value.trim());
-      say('Code accepted. Making your NEAR wallet…'); await ensureWallet(); emailStage = 'finish'; say(''); }); };
-  const fin = $('#finish'); if (fin) fin.onclick = () => act(fin, async () => { say('Opening the Nearcarta sign-in window…'); await afterPrivy(); emailStage = 'email'; say(''); });
+      say('Code accepted. Making your NEAR wallet…'); await ensureWallet(); emailStage = 'finish'; msg = ''; say(''); }); };
+  const fin = $('#finish'); if (fin) fin.onclick = () => finishSignin(fin);
+  const ro = $('#reopen'); if (ro) ro.onclick = () => { finishTry++; busy = false; finishSignin(fin, true); };
   const re = $('#reemail'); if (re) re.onclick = e => { e.preventDefault(); e.stopPropagation(); emailStage = 'email'; msg = ''; render(); };
   $('#wallet').onclick = e => act(e.currentTarget, async () => { st.trial = false; save(); signedIn(await connect(t => { msg = t; }, 'mainnet')); });
   $('#mm').onclick = e => act(e.currentTarget, async () => { msg = ''; st.trial = false; save(); await mainnetWallet().connect({ walletId: 'ethereum-wallets' }); await signedIn(await mainnetAccount()); });
   const gu = $('#guest'); if (gu) gu.onclick = e => act(e.currentTarget, async () => { st.trial = true; save(); signedIn(await startGuest()); });
 }
+// The sign-in tab can open behind this one. Watch for it to connect (storage event from the same origin, or the
+// wallet callback), move on by itself, and after 3 s offer a button that opens it again in front.
+let finishTry = 0, helpTimer = 0;
+async function finishSignin(btn, again) {
+  const my = ++finishTry; msg = ''; const oe = $('[data-testid=setup-err]'); if (oe) oe.remove();
+  const help = $('#tabhelp'); if (help) help.hidden = true; clearTimeout(helpTimer);
+  say(again ? 'Opening the sign-in tab again…' : 'Opening the Nearcarta sign-in tab…');
+  helpTimer = setTimeout(() => { if (my !== finishTry || me) return; if (document.hasFocus()) { const h = $('#tabhelp'); if (h) h.hidden = false; say('Waiting for you to press Connect in the sign-in tab…'); } }, 3000);
+  if (btn) { btn.disabled = true; btn.dataset.label = btn.dataset.label || btn.innerHTML; btn.style.minWidth = btn.offsetWidth + 'px'; btn.innerHTML = '<span class="spin"></span> Waiting for the sign-in tab'; }
+  try { await afterPrivy(); if (my !== finishTry) return; emailStage = 'email'; say(''); }
+  catch (e) { if (my !== finishTry || me) return; msg = e?.message || String(e); say(''); render(); }
+  finally { clearTimeout(helpTimer); if (btn && document.contains(btn) && my === finishTry) { btn.disabled = false; btn.innerHTML = btn.dataset.label; } }
+}
+window.addEventListener('storage', async () => {
+  if (me || emailStage !== 'finish') return;
+  const a = await mainnetAccount().catch(() => null); if (a && !me) { finishTry++; clearTimeout(helpTimer); emailStage = 'email'; msg = ''; await signedIn(a); }
+});
 async function signedIn(id) {
   if (!id) return;
   me = id; done(0); await refreshBal();
@@ -149,24 +167,25 @@ function sFund() {
   let qr = ''; try { const q = qrcode(0, 'M'); q.addData(me); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch {}
   const enough = bal != null && nearOf(bal) >= need();
   const j = journey();
-  const shown = short(me);
   const lead = st.trial
     ? `This trial charter needs about <b>${fmtN(need())} testnet NEAR</b>. That is not real NEAR.`
-    : `You can continue now. Add real NEAR on mainnet when you want to pay gas. This page does not hold you here, and it does not move your NEAR.`;
+    : (bal === 0n
+      ? `With 0 NEAR you can still pick a character, write your rules and walk the town. To save your rules on chain and let your agent pay, add about <b>${fmtN(need())} NEAR</b>.`
+      : `You can continue now. This page never moves your NEAR.`);
   return head('Fund', bal === 0n ? 'Your account is ready. It has 0 NEAR.' : (st.trial ? 'Add testnet NEAR to the trial account.' : 'Add real NEAR when you want to.'), lead)
-    + `<div class="addr"><div class="qr" aria-label="QR code of your account id">${qr}</div><div style="flex:1;min-width:200px">
-       <small class="muted">${st.trial ? 'Send testnet NEAR to' : 'Send NEAR on mainnet to'}</small><br><code data-testid="setup-address" title="${esc(me)}">${esc(shown)}</code>
-       <div class="row" style="margin-top:10px"><button class="btn sm" id="copy" data-testid="setup-copy">Copy address</button>${acA(me)}</div>
+    + `<div class="addr"><figure class="qrfig"><div class="qr" role="img" aria-label="QR code: scan to send NEAR to this account">${qr}</div><figcaption>Scan to send NEAR to this account</figcaption></figure><div style="flex:1;min-width:200px">
+       <label for="acct" class="small">${st.trial ? 'Your testnet account id' : 'Your NEAR account id'}</label><code id="acct" class="acct" data-testid="setup-address" tabindex="0">${esc(me)}</code>
+       <div class="row" style="margin-top:10px"><button class="btn sm" id="copy" data-testid="setup-copy">Copy account id</button>${acA(me)}</div>
        <div style="margin-top:14px"><span class="live">live balance</span><div class="bal" id="bigbal" data-testid="setup-balance">${balHtml()}</div></div></div></div>
-     <p class="small">${esc(j.fundLead)}</p>
+     <p class="small gasline">Gas is the tiny fee NEAR charges for each transaction, usually less than 0.001 NEAR.</p>
      <h2>Ways to add NEAR</h2><div class="tiles">
        ${j.showFaucet ? `<button class="tile" id="drip" data-testid="setup-faucet"><i>✦</i><b>Free testnet NEAR</b><span>10 testnet NEAR from the public faucet. Not real NEAR.</span></button>` : ''}
        <a class="tile" href="https://app.near-intents.org/" target="_blank" rel="noopener" data-testid="setup-intents"><i>⇄</i><b>Swap into NEAR</b><span>${esc(j.intentsNote)}</span></a>
-       <button class="tile" id="copy2"><i>⎘</i><b>From an exchange</b><span>${st.trial ? 'This trial is not an exchange withdrawal. Use the faucet above.' : 'Withdraw NEAR on NEAR mainnet to this address.'}</span></button></div>
+       <button class="tile" id="copy2"><i>⎘</i><b>From an exchange</b><span>${st.trial ? 'This trial is not an exchange withdrawal. Use the faucet above.' : 'Withdraw NEAR on the NEAR network to the account id above. Tap to copy it.'}</span></button></div>
      ${errP()}` + nav(true, { nextOk: holdsForCharter() ? enough : true, label: holdsForCharter() && !enough ? `Waiting for ${fmtN(need())} NEAR` : 'Continue' });
 }
 function wireFund() {
-  const cp = () => navigator.clipboard?.writeText(me).then(() => { const b = $('#copy'); if (b) { b.textContent = 'Copied ✓'; setTimeout(() => b && (b.textContent = 'Copy address'), 1600); } });
+  const cp = () => navigator.clipboard?.writeText(me).then(() => { const b = $('#copy'); if (b) { b.textContent = 'Copied ✓'; setTimeout(() => b && (b.textContent = 'Copy account id'), 1600); } });
   $('#copy').onclick = cp; $('#copy2').onclick = cp;
   const d = $('#drip'); if (d) d.onclick = () => act(d, async () => { const h = await faucet(me, t => { const s = d.querySelector('span'); if (s) s.textContent = t; }); await refreshBal(); msg = ''; lastFaucet = h; });
   wire();
