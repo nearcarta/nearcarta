@@ -25,7 +25,7 @@ function Login({ onUser }) {
   const verify = run(async () => { const r = await privy.auth.email.loginWithCode(email.trim(), code.trim()); onUser(await ensureNear(r.user)); });
   const google = run(async () => { const { url } = await privy.auth.oauth.generateURL('google', GOOGLE_BACK); sessionStorage.setItem('nc_google', '1'); location.assign(url); });
   return <form className="box" onSubmit={step === 'email' ? send : verify}>
-    <h1>Log in to Nearcarta</h1>
+    <h1>Sign in to Nearcarta</h1>
     <p>Use your email or Google. A NEAR wallet is made for you; nothing is sent until you approve it here.</p>
     {step === 'email'
       ? <><label>Email<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} data-testid="privy-email" /></label>
@@ -56,7 +56,11 @@ function App() {
   return <>
     {user === undefined && <p className="box">Loading…</p>}
     {user === null && <Login onUser={setUser} />}
-    <div hidden={!user}><SignPagePlugin privy={privy} options={{ allowedOrigins: [location.origin] }} /></div>
+    <div hidden={!user}><SignPagePlugin privy={privy} options={{ allowedOrigins: [location.origin] }} theme={{ appearance: 'dark', accentColor: 'amber', grayColor: 'sand', radius: 'large', className: 'nc-sign' }} /></div>
   </>;
 }
+// Plain words on the connect screen, and bring this window to the front when it opens.
+const retitle = () => document.querySelectorAll('.pnc-approval__title').forEach(t => { if (t.textContent.trim() === 'Connect to') t.textContent = 'Sign in to Nearcarta'; });
+new MutationObserver(retitle).observe(document.getElementById('root'), { childList: true, subtree: true });
+try { window.focus(); } catch {}
 createRoot(document.getElementById('root')).render(<App />);

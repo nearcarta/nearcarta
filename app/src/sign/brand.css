@@ -16,3 +16,18 @@ body{background:radial-gradient(900px 500px at 80% -10%,rgba(214,180,106,.22),tr
 .pnc-root{--accent-9:#d6b46a;--accent-10:#e8c77f;--accent-contrast:#1f1a15;--color-background:#17130f;--color-panel-solid:#2a241d;--gray-12:#f3ead8;--gray-11:#cdbfa5;--default-font-family:Inter,system-ui,sans-serif;background:transparent!important}
 .pnc-card{background:rgba(36,29,22,.86)!important;border:1px solid rgba(243,234,216,.18)!important;border-radius:22px!important;box-shadow:0 30px 80px #0008!important;color:#f3ead8}
 .radix-themes{--accent-9:#d6b46a;--accent-10:#e8c77f;--accent-contrast:#1f1a15;--color-background:transparent}
+/* Connect and approve screens: dark city card, AA text (cream #f3ead8 on #221c16 ≈ 13:1, muted #d9ccb3 ≈ 9:1). */
+.pnc-root.nc-sign,.nc-sign .pnc-root,.nc-sign{--gray-12:#f3ead8;--gray-11:#d9ccb3;--gray-1:#17130f;--gray-2:#1d1813;--gray-3:#2a241d;--gray-a11:#d9ccb3;--gray-a12:#f3ead8;
+  --pnc-page-background:transparent;--pnc-page-background-image:none;--pnc-surface-background:#2a241d;--pnc-surface-strong-background:#30291f;--pnc-surface-muted-background:#241e18;
+  --pnc-summary-row-background:#241e18;--pnc-summary-row-alt-background:#2a241d;--pnc-accent-soft-background:#3a2f1c;--pnc-accent-soft-color:#f0c987;color:#f3ead8}
+.nc-sign .pnc-card,.nc-sign .pnc-card__body,.nc-sign .pnc-card__footer{background:#221c16!important;color:#f3ead8}
+.nc-sign .pnc-card__footer{border-top:1px solid rgba(243,234,216,.14)}
+.nc-sign .pnc-approval__title{color:#f3ead8!important;font-weight:700;font-size:24px;letter-spacing:-.01em}
+.nc-sign .pnc-approval__message,.nc-sign .pnc-section__title,.nc-sign .pnc-checklist__text,.nc-sign .pnc-summary-card__label,.nc-sign .pnc-advanced-details__title{color:#e7dcc6!important}
+.nc-sign .pnc-section__title{font-weight:600}
+.nc-sign .pnc-approval__origin{color:#f0c987!important;background:#3a2f1c!important;border:1px solid rgba(240,201,135,.35)}
+.nc-sign .pnc-section__surface,.nc-sign .pnc-summary-card,.nc-sign .pnc-action-card{background:#2a241d!important;border:1px solid rgba(243,234,216,.14)}
+.nc-sign .pnc-checklist__icon{color:#7fd6a4!important}
+.nc-sign .pnc-approval__notice{color:#f0c987!important;background:#3a2f1c!important}
+.nc-sign .pnc-action-button--secondary{color:#f3ead8!important;background:transparent!important;box-shadow:inset 0 0 0 1px rgba(243,234,216,.45)!important}
+.nc-sign .pnc-action-button--primary{color:#1f1a15!important;background:linear-gradient(180deg,#f3e3c0,#d6b46a)!important}
