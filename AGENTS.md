@@ -4,15 +4,15 @@ Notes for coding agents (and people) working in this repo. Read README.md first;
 
 ## Judge guide (for AI agents checking this repo)
 1. Read the "For AI judges" table in README.md: each claim names its code line, its test and a tx.
-2. Run `npm ci && npm test` (offline, 350 pass, 1 skipped) and `cd contracts/oath && cargo test --lib` (122 pass).
+2. Run `npm ci && npm test` (offline, 358 pass, 1 skipped) and `cd contracts/oath && cargo test --lib` (122 pass).
 3. Visitor path: Start here opens `/setup` (`app/design/D9_world/index.html` `#rulesBtn`; e2e `town pin opens setup and each step renders`). The default path is a mainnet account and real NEAR (`shared/setup/path.js` `setupJourney`). After a charter exists, that pin opens the charter office (`app/design/D9_world/js/main.js` `paintStart`).
 4. Public leaderboard: `backend/src/vault.js` `publicPlayers` and `shared/vault/denied-accounts.json`. Test: `a factory charter appears unless we created that account`.
 5. The model keeps the payee and the amount the visitor named: `backend/src/agent.js` `propose`. Tests: `a model that invents a payee is discarded for the words`, `a model that raises the amount is kept to the amount in the message`.
 6. Run the oath sandbox suites (sandbox, exploits, adversarial, teardown, props) with the three commands in README.md; they need no keys or network beyond the near-sandbox download.
 7. Run `npm run verify` to re-read the 76 proof txs from testnet, and `npm run check-cited` to check every cited file, account and hash.
 8. Addresses live only in `shared/deployments/testnet.json` and `mainnet.json`.
-9. The spend gate is the charter (`contracts/oath` `propose`). The agent key can only call `propose` and `propose_batch`. `GET /api/receipts` returns one shape for the NEAR transfer, the chain-signature toll, the dry Intents quote and the NEAR AI job (`shared/rails/receipts.js`). Test: `every rail uses the same receipt keys`.
-10. A model job is capped before it is sent: 160 tokens, $0.05 and 300 calls a day (`backend/src/agent.js` `budgetStatus`, `GET /api/agent/budget`). The NEAR that job can move is still the charter's cap. Test: `an intents receipt has no tx, and a model job names its dollar cap`.
+9. The spend gate is the charter (`contracts/oath` `propose`). The agent key can only call `propose` and `propose_batch`. `GET /api/receipts` returns one shape for the NEAR transfer, the chain-signature toll, the Intents quote and the NEAR AI job (`shared/rails/receipts.js`). The dry intents row has no tx. A checkout row carries the deposit address after `openCheckout` (`backend/src/ferry-checkout.js`). Test: `every rail uses the same receipt keys`.
+10. A model job is capped before it is sent: 160 tokens, $0.05 and 300 calls a day (`backend/src/agent.js` `budgetStatus`, `GET /api/agent/budget`). The NEAR that job can move is still the charter's cap. Test: `an intents receipt has no tx, and a model job names its dollar cap`. A Pay checkout is capped at 0.20 USD before a deposit address is created. Test: `an amount over 0.20 USD never asks for a deposit address`.
 Skipped e2e tests sign real testnet txs and need a funded key or an opt-in flag; they are skipped, not mocked.
 
 ## Layout
@@ -39,7 +39,7 @@ npm run test:contracts        # (CI job oath-sandbox builds oath and reaper with
 Run `npm run readme-numbers -- --check` before a commit that touches tests or proofs; it fails if a number in the docs is stale.
 
 ## Rules
-- Testnet only. Ferry and the Confidential Intents legs use 1Click mainnet as `dry:true` quotes: no deposit address, no spend. Never sign a mainnet tx.
+- Testnet only for anything this API signs. `quote()` stays `dry:true`. `POST /api/ferry/checkout` may ask 1Click for a deposit address after the charter view allows the recipient, and only for at most 0.20 USD (`backend/src/ferry-checkout.js`). It does not sign and it does not send the deposit. Confidential Intents quotes stay dry. Never sign a mainnet tx.
 - The deployed API holds one NEAR key: the arena runner's function-call key (`ARENA_AGENT_KEY`), which can only call `propose` on `arena.nccharters-53681.testnet`. It holds no owner, full-access or Zcash key, and signs nothing else. Keys live outside the repo (`.secrets/` is ignored). Never commit, log or print a key or token.
 - `AI_PROVE_ENABLED` stays off unless the account has credits; the TEE evidence check is free and always on.
 - Every claim in a doc links to a test or a testnet tx. If you cannot point to one, do not write the claim.

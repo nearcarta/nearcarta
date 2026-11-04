@@ -7,6 +7,7 @@ import { M as PM, brassM, mesh, lantern, banner } from './_props.js';
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
 const S2 = ATTACKS.find(a => a.id === 'S2');
 export const PROOF = mainnet('guard') + proof(
+      note('The model runs in a TEE. In Mist Bank, press Verify the TEE now. That check uses a fresh nonce against NEAR AI.'),
       h3('This knock · lab attack S2'), row({ k: S2.name, why: S2.reason + ' · ' + S2.secs + ' s', st: 'no', stText: 'refused', tx: S2.tx }),
       `<pre class="kv">${esc(S2.tool.split('\n')[1])}</pre>`, note(`The agent read the hidden line and proposed it. The oath ${acct(LAB.oath)} refused before any money moved.`),
       h3('Other knocks on the same gate'), ...ATTACKS.filter(a => a.id !== 'S2').map(a => row({ k: a.name, why: a.reason, st: 'no', stText: 'refused', tx: a.tx })),

@@ -1,5 +1,6 @@
-// Ferry: cross-chain swap quotes through NEAR Intents 1Click. Always dry:true here, so no deposit
-// address is created and nothing can be spent. Every quote is checked before it is shown:
+// Ferry: cross-chain swap quotes through NEAR Intents 1Click. quote() is always dry:true, so that
+// path creates no deposit address and spends nothing. A checkout that may ask for a deposit address
+// lives in ferry-checkout.js and runs only after the charter view allows it. Every quote is checked:
 //  1. the 1Click manager signature (ed25519 over base58(sha256(stable JSON)))
 //  2. the echo guard: every field we asked for must come back unchanged in quoteRequest.
 //     confidentiality, appFees and rebates are NOT covered by the signature, so a quote whose echo
@@ -61,10 +62,10 @@ export function toUnits(amount, decimals) {
 
 export const PRIVACY = ['public', 'basic', 'advanced'];
 
-export function buildQuoteRequest({ from, to, amount, recipient, refundTo, privacy = 'public', slippageBps = 100, deadlineMin = 60 }) {
+export function buildQuoteRequest({ from, to, amount, recipient, refundTo, privacy = 'public', slippageBps = 100, deadlineMin = 60, live = false }) {
   if (!PRIVACY.includes(privacy)) throw Object.assign(new Error('privacy must be public|basic|advanced'), { status: 400 });
   const body = {
-    dry: true,
+    dry: live !== true,
     swapType: 'EXACT_INPUT',
     slippageTolerance: slippageBps,
     originAsset: from.assetId,

@@ -132,7 +132,7 @@ const APPS = {
       if (!extra.q) {
         extra.fdone = false;
         const q = await A.quote(rt.id, extra.amt || rt.amt); if (!q.ok || !q.checks?.signature) throw new Error(q.error || 'quote not signed');
-        extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: `Live quote, signed by 1Click (1Click has no testnet, so no swap runs; your charter checks a testnet payment instead). Worth ${A.ferryNear(q)} test NEAR. Ask?`, rc: `<span class="rc">1Click dry quote · ${esc(q.correlationId.slice(0, 8))} · mainnet send locked</span>` };
+        extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: `This is a price. Nothing is sent from here. Pay from another chain only after the charter allows the recipient, at most 0.20 USD. Or ask your charter to approve a ${A.ferryNear(q)} NEAR stand-in.`, rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click price · ${esc(q.correlationId.slice(0, 8))}</span>` };
       }
       const amt = A.ferryNear(extra.q), to = A.ferryPayee(rt.id);
       const o = await A.ferry(rt.id, extra.q); extra.q = null; extra.fdone = o.decision === 'allowed';

@@ -8,6 +8,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { bodyLimit } from 'hono/body-limit';
 import { DEP, MAINNET_DEP, cfg, has } from './config.js';
 import * as ferry from './ferry.js';
+import * as checkout from './ferry-checkout.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
 import { attested } from './outlayer.js';
@@ -148,6 +149,10 @@ export function warm({ every = WARM_EVERY_MS, read, delay = read ? 0 : WARM_DELA
 
 export function makeApp() {
   const app = new Hono();
+  // Pay is embedded on other sites. These routes carry no cookie, so any origin may call them.
+  // The charter view and the 0.20 USD cap still run before a deposit address is created.
+  const payCors = cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['content-type'], maxAge: 600 });
+  for (const p of ['/api/ferry/checkout', '/api/ferry/rules', '/api/ferry/status', '/api/mainnet']) app.use(p, payCors);
   // Global caps (all clients together) on routes that spend a paid key: 1Click partner key, NEAR AI key.
   const oneClick = globalCap('1click', Number(process.env.CAP_1CLICK_PER_MIN || 60));
   const nearAi = globalCap('nearai', Number(process.env.CAP_NEARAI_PER_MIN || 12));
@@ -183,7 +188,7 @@ export function makeApp() {
   });
   app.get('/api/deployments', limiter(30), c => c.json(DEP));
   app.get('/api/mainnet', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
-  app.get('/api/receipts', limiter(30), c => c.json(receiptsBody(MAINNET_DEP || {}, agentMod.budgetStatus(), { jobTokens: agentMod.MAX_TOKENS })));
+  app.get('/api/receipts', limiter(30), c => c.json(receiptsBody(MAINNET_DEP || {}, agentMod.budgetStatus(), { jobTokens: agentMod.MAX_TOKENS, checkouts: checkout.listCheckoutReceipts() })));
 
   // Ferry
   app.get('/api/ferry/tokens', limiter(30), async c => {
@@ -218,6 +223,20 @@ export function makeApp() {
     c.get('quoteDone')?.(v);
     return c.json(v);
   });
+  // Checkout: a deposit address only after the charter view allows the recipient and the quote is at most 0.20 USD.
+  // The route does not sign and does not send the deposit. The payer sends it from their own wallet.
+  app.get('/api/ferry/rules', limiter(30), async c => {
+    const out = await checkout.rulesFor(c.req.query('charter') || '', c.req.query('clause') || 'pay');
+    const { httpStatus, ...body } = out;
+    return c.json(body, httpStatus || 200);
+  });
+  app.post('/api/ferry/checkout', limiter(6), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const out = await checkout.startCheckout(b);
+    const { httpStatus, ...body } = out;
+    if (httpStatus === 400) return bad(c, out.error);
+    return c.json(body);
+  });
   app.get('/api/ferry/routes', limiter(30), async c => c.json(await ferry.routes()));
   app.get('/api/ferry/zcash/:addr', limiter(30), c => {
     try { return c.json(zcashRecipient(c.req.param('addr'))); } catch { return bad(c, 'not a valid Zcash address'); }
@@ -227,9 +246,11 @@ export function makeApp() {
   // Tidepool quote; the answer carries the status, refund amount and reason, and the verifier code-hash check.
   app.get('/api/ferry/status', limiter(30), async c => {
     const env = (c.req.query('env') || 'TIDEPOOL').toUpperCase();
-    if (env !== 'TIDEPOOL') return bad(c, 'only env=TIDEPOOL deposits are tracked (live 1Click quotes are dry, no deposits)');
-    try { return c.json(await ferry.tidepoolStatus(c.req.query('depositAddress'))); }
-    catch (e) { return c.json({ error: e.message }, e.status || 502); }
+    try {
+      if (env === 'ONECLICK') return c.json(await checkout.oneClickStatus(c.req.query('depositAddress')));
+      if (env !== 'TIDEPOOL') return bad(c, 'env must be TIDEPOOL or ONECLICK');
+      return c.json(await ferry.tidepoolStatus(c.req.query('depositAddress')));
+    } catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
   app.get('/api/ferry/tidepool', limiter(20), c => c.json(DEP.ferry_tidepool ? { ...DEP.ferry_tidepool, label: ferry.TIDEPOOL.label } : { error: 'none' }, DEP.ferry_tidepool ? 200 : 404));
 

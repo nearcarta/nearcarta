@@ -4,7 +4,7 @@
 import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, tok, C } from '../js/core.js';
 import { SIGNED, UNSIGNED } from '../../D6_dashboards/src/data.js';
 import { boat } from '../js/town.js';
-import { row, h3, note, proof, paper, esc } from './_ui.js';
+import { row, h3, note, proof, paper, esc, mainnet } from './_ui.js';
 import { QUOTE } from '../data/live.js';
 import { M as PM, brassM, mesh, lantern } from './_props.js';
 
@@ -14,7 +14,8 @@ export const HERO = `${tok(String(+Q.from.amt), Q.from.sym, { chain: Q.from.chai
 export const RESULT = 'Crossed shielded';
 const diffTxt = r => r.diffs ? r.diffs.map(d => `${d.field}: sent ${d.sent}, echo ${d.got}`).join('; ') : `receivers ${r.receivers.join(' + ')}`;
 const utc3 = s => { const d = new Date(s.replace(' UTC', 'Z').replace(' ', 'T')); if (isNaN(d)) return s; d.setUTCHours(d.getUTCHours() + 3); return d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC+3'; };
-export const PROOF = proof(
+export const PROOF = mainnet('ferry') + proof(
+  note('Pay from another chain on <a href="/ferry-widget">Pay</a>. The charter checks the recipient, the cap and the daily budget before a deposit address is created. At most 0.20 USD. You send the tokens yourself.'),
   h3('What this quote is'),
   row({ k: `${Q.from.amt} ${Q.from.sym} on ${Q.from.chain} would become about ${Q.to.exact} ZEC`, why: 'A practice quote. Nothing was sent and nothing was spent.', st: Q.sig ? 'ok' : 'no', stText: Q.sig ? 'signed' : 'not signed', src: 'live' }),
   row({ k: 'The Zcash address hides the amount', why: 'The recipient and the amount stay hidden. A weaker address is refused.', st: Q.ua.orchardOnly ? 'ok' : 'no', stText: Q.ua.orchardOnly ? 'hidden' : 'not hidden', src: 'live' }),

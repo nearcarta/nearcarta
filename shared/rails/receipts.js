@@ -34,8 +34,25 @@ function near(what, to, amount, decision, reason, tx, within) {
   });
 }
 
-/** Recorded mainnet receipts plus the model-job cap. `m` is shared/deployments/mainnet.json. */
-export function mainnetReceipts(m, { budget = {}, jobTokens = 160 } = {}) {
+/** A checkout receipt. `tx` is the deposit address, or the chain tx once status reports one. */
+export function intentsCheckout(row) {
+  const tx = row.tx ?? null;
+  const nearTx = typeof tx === 'string' && !tx.startsWith('0x') && tx.length >= 32 && tx.length <= 50;
+  return receipt({
+    rail: 'intents', network: 'mainnet',
+    what: row.what || (row.decision === 'allowed' ? 'checkout deposit address' : 'checkout refused'),
+    to: row.to ?? null,
+    amount: row.amount == null ? null : String(row.amount),
+    asset: row.asset || 'USD',
+    decision: row.decision,
+    reason: row.reason ?? null,
+    decided_by: 'charter',
+    tx, url: row.url ?? (nearTx ? nb(tx) : null),
+    checks: { charter: true, within_allowance: row.decision === 'allowed', tee: null },
+  });
+}
+
+export function mainnetReceipts(m, { budget = {}, jobTokens = 160, checkouts = [] } = {}) {
   if (!m?.charter) return [];
   const payee = m.charter.clause_pay?.receivers?.[0] || null;
   const rows = [
@@ -75,6 +92,7 @@ export function mainnetReceipts(m, { budget = {}, jobTokens = 160 } = {}) {
     decided_by: 'quote guard', tx: null, url: null,
     checks: { charter: null, within_allowance: null, tee: null },
   }));
+  for (const c of checkouts) rows.push(intentsCheckout(c));
   const limit = budget.limit_usd ?? null;
   rows.push(receipt({
     rail: 'near-ai', network: 'mainnet', what: 'model job', to: budget.model || null,
@@ -86,15 +104,15 @@ export function mainnetReceipts(m, { budget = {}, jobTokens = 160 } = {}) {
   return rows;
 }
 
-export function receiptsBody(mainnet, budget = {}, { jobTokens = 160 } = {}) {
-  const receipts = mainnetReceipts(mainnet, { budget, jobTokens });
+export function receiptsBody(mainnet, budget = {}, { jobTokens = 160, checkouts = [] } = {}) {
+  const receipts = mainnetReceipts(mainnet, { budget, jobTokens, checkouts });
   return {
     gate: 'The spend gate is the charter contract. The agent holds a function-call key for propose and propose_batch only. It cannot transfer, and it cannot change the rules.',
     shape: RECEIPT_KEYS,
     rails: {
       near: 'A propose on the charter. The receipt is the NEAR tx: allowed, or refused with a reason.',
       'chain-signatures': 'The toll contract asks the MPC signer. The receipt is the NEAR tx that requested the signature. An address off the list is refused before a signature.',
-      intents: 'A dry 1Click quote. No deposit address and no tx.',
+      intents: 'A dry 1Click quote has no deposit address and no tx. A checkout adds another intents receipt only after the charter allows the recipient: its tx is the deposit address, then the chain tx once the status says the swap settled. The amount is at most 0.20 USD.',
       'near-ai': 'A TEE model call. The call is capped per job and per day before it is sent. Any NEAR it asks to move is still judged by the charter.',
     },
     inference: {

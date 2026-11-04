@@ -1,0 +1,192 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { makeApp } from '../../src/app.js';
+import { receiptsBody, RECEIPT_KEYS } from '../../../shared/rails/receipts.js';
+import { readFileSync } from 'node:fs';
+import {
+  charterGate, checkoutUsdOk, settlementYocto, openCheckout, checkLiveQuote, resetCheckouts,
+  rememberCheckout, startCheckout, checkoutDeps, oneClickStatus, listCheckoutReceipts, MAX_CHECKOUT_USD,
+} from '../../src/ferry-checkout.js';
+
+const clause = {
+  receivers: ['payee.near'], per_action_cap: '2000000000000000000000', daily_budget: '5000000000000000000000',
+  min_amount: '1', max_actions_per_day: 50, window_start_min: 0, window_end_min: 0,
+};
+const usage = { spent: '0', reserved: '0', count: 0 };
+const state = { frozen: false };
+const yocto = '1000000000000000000000';
+const input = {
+  from: { symbol: 'USDC', chain: 'base' }, to: { symbol: 'USDC', chain: 'near' }, amount: '0.2',
+  recipient: 'payee.near', refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
+  charter: 'charter.nearcarta.near', clauseId: 'pay', amountYocto: yocto, privacy: 'public',
+};
+const tokens = [
+  { assetId: 'nep141:base-usdc', symbol: 'USDC', blockchain: 'base', decimals: 6, price: 1 },
+  { assetId: 'nep141:usdc.near', symbol: 'USDC', blockchain: 'near', decimals: 6, price: 1 },
+];
+const allow = () => ({ state, clause, usage, sealed: false });
+
+function liveDeps(extra = {}) {
+  const calls = [];
+  const deps = {
+    readCharter: async () => allow(),
+    tokens: async () => tokens,
+    quote: async () => ({ ok: true, from: { usd: '0.2' } }),
+    postQuote: async body => {
+      calls.push(body);
+      return { http: 201, body: { quoteRequest: body, correlationId: 'cid', quote: { depositAddress: 'ab'.repeat(32), amountInUsd: '0.2', depositMemo: null, deadline: body.deadline } } };
+    },
+    verify: () => true,
+    calls,
+  };
+  return Object.assign(deps, extra);
+}
+
+test('the charter gate matches the oath rules', () => {
+  assert.equal(charterGate({ state, clause, usage, receiver: 'payee.near', amount: yocto, nowMin: 0 }).ok, true);
+  assert.equal(charterGate({ state, clause, usage, receiver: 'other.near', amount: yocto, nowMin: 0 }).reason, 'receiver_not_allowlisted');
+  assert.equal(charterGate({ state, clause, usage, receiver: 'payee.near', amount: '3000000000000000000000', nowMin: 0 }).reason, 'over_per_action_cap');
+  assert.equal(charterGate({ state, clause, usage: { spent: '4500000000000000000000', reserved: '0', count: 0 }, receiver: 'payee.near', amount: yocto, nowMin: 0 }).reason, 'over_daily_budget');
+  assert.equal(charterGate({ state, clause, usage: { ...usage, count: 50 }, receiver: 'payee.near', amount: yocto, nowMin: 0 }).reason, 'over_daily_action_count');
+  assert.equal(charterGate({ state: { frozen: true }, clause, usage, receiver: 'payee.near', amount: yocto, nowMin: 0 }).reason, 'frozen');
+  assert.equal(charterGate({ state, clause: { ...clause, window_start_min: 0, window_end_min: 60 }, usage, receiver: 'payee.near', amount: yocto, nowMin: 120 }).reason, 'outside_time_window');
+  assert.equal(charterGate({ state, clause, usage, receiver: 'payee.near', amount: yocto, nowMin: 0, sealed: true }).reason, 'hidden_rule');
+  assert.equal(checkoutUsdOk('0.2').ok, true);
+  assert.equal(checkoutUsdOk('0.21').reason, 'over_checkout_cap');
+  assert.equal(MAX_CHECKOUT_USD, 0.2);
+  assert.equal(settlementYocto(clause, usage), yocto);
+});
+
+test('a refused recipient never asks 1Click, and an allowed one returns a deposit address', async () => {
+  resetCheckouts();
+  const blocked = liveDeps({ readCharter: async () => allow() });
+  const no = await openCheckout({ ...input, recipient: 'other.near' }, blocked);
+  assert.equal(no.ok, false);
+  assert.equal(no.reason, 'receiver_not_allowlisted');
+  assert.equal(no.depositAddress, null);
+  assert.equal(blocked.calls.length, 0);
+  assert.equal(no.receipt.rail, 'intents');
+  assert.equal(no.receipt.decision, 'refused');
+  assert.equal(no.receipt.tx, null);
+
+  const okd = liveDeps();
+  const yes = await openCheckout(input, okd);
+  assert.equal(yes.ok, true);
+  assert.equal(yes.depositAddress, 'ab'.repeat(32));
+  assert.equal(okd.calls.length, 1);
+  assert.equal(okd.calls[0].dry, false);
+  assert.equal(okd.calls[0].recipient, 'payee.near');
+  assert.equal(yes.receipt.rail, 'intents');
+  assert.equal(yes.receipt.decision, 'allowed');
+  assert.equal(yes.receipt.tx, yes.depositAddress);
+  assert.deepEqual(Object.keys(yes.receipt), RECEIPT_KEYS);
+  const listed = listCheckoutReceipts();
+  assert.equal(listed[0].tx, yes.depositAddress);
+  resetCheckouts();
+});
+
+test('an amount over 0.20 USD never asks for a deposit address', async () => {
+  const deps = liveDeps({ tokens: async () => tokens.map(t => ({ ...t, price: 1 })) });
+  const over = await openCheckout({ ...input, amount: '1' }, deps);
+  assert.equal(over.reason, 'over_checkout_cap');
+  assert.equal(over.depositAddress, null);
+  assert.equal(deps.calls.length, 0);
+
+  const priced = liveDeps({ quote: async () => ({ ok: true, from: { usd: '0.5' } }) });
+  const soft = await openCheckout({ ...input, amount: '0.2' }, { ...priced, tokens: async () => tokens.map(t => ({ ...t, price: 0 })) });
+  assert.equal(soft.reason, 'over_checkout_cap');
+  assert.equal(priced.calls.length, 0);
+});
+
+test('an unsigned live quote does not hand out its deposit address', () => {
+  const sent = { dry: false, recipient: 'payee.near' };
+  const resp = { quoteRequest: { ...sent }, quote: { depositAddress: 'ab'.repeat(32), amountInUsd: '0.2' } };
+  const bad = checkLiveQuote(sent, resp, () => false);
+  assert.equal(bad.accepted, false);
+  assert.equal(bad.depositAddress, null);
+  const good = checkLiveQuote(sent, resp, () => true);
+  assert.equal(good.depositAddress, 'ab'.repeat(32));
+});
+
+test('POST /api/ferry/checkout refuses a bad body and a payee the charter does not list', async () => {
+  resetCheckouts();
+  const saved = { ...checkoutDeps };
+  const calls = [];
+  checkoutDeps.readCharter = async () => allow();
+  checkoutDeps.tokens = async () => tokens;
+  checkoutDeps.quote = async () => ({ ok: true, from: { usd: '0.2' } });
+  checkoutDeps.postQuote = async body => {
+    calls.push(body);
+    return { http: 201, body: { quoteRequest: body, correlationId: 'cid', quote: { depositAddress: 'ab'.repeat(32), amountInUsd: '0.2', deadline: body.deadline } } };
+  };
+  checkoutDeps.verify = () => true;
+  try {
+    const app = makeApp();
+    const post = body => app.request('/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json', 'cf-connecting-ip': '192.0.2.77' }, body: JSON.stringify(body) });
+    const bad = await post({ from: 'nope' });
+    assert.equal(bad.status, 400);
+    const refused = await post({
+      from: 'USDC@base', to: 'USDC@near', amount: '0.2', recipient: 'other.near', refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
+      charter: 'charter.nearcarta.near', clause_id: 'pay', amount_yocto: yocto,
+    });
+    const j = await refused.json();
+    assert.equal(refused.status, 200);
+    assert.equal(j.ok, false);
+    assert.equal(j.reason, 'receiver_not_allowlisted');
+    assert.equal(j.depositAddress, null);
+    assert.equal(calls.length, 0);
+    const allowed = await post({
+      from: 'USDC@base', to: 'USDC@near', amount: '0.2', recipient: 'payee.near', refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
+      charter: 'charter.nearcarta.near', clause_id: 'pay', amount_yocto: yocto,
+    });
+    const a = await allowed.json();
+    assert.equal(a.depositAddress, 'ab'.repeat(32));
+    assert.equal(calls[0].dry, false);
+    assert.equal(a.receipt.decision, 'allowed');
+  } finally {
+    Object.assign(checkoutDeps, saved);
+    resetCheckouts();
+  }
+});
+
+test('ONECLICK status is only for a checkout this process issued', async () => {
+  resetCheckouts();
+  const app = makeApp();
+  const missing = await app.request('/api/ferry/status?env=ONECLICK&depositAddress=' + 'cd'.repeat(32), { headers: { 'cf-connecting-ip': '192.0.2.78' } });
+  assert.equal(missing.status, 404);
+  rememberCheckout({ depositAddress: 'ab'.repeat(32), recipient: 'payee.near', usd: '0.2', status: 'PENDING_DEPOSIT', tx: null });
+  const real = globalThis.fetch;
+  globalThis.fetch = async url => {
+    assert.match(String(url), /\/v0\/status\?depositAddress=ab/);
+    return new Response(JSON.stringify({ status: 'SUCCESS', swapDetails: { destinationChainTxHashes: ['5'.repeat(44)] } }), { status: 200 });
+  };
+  try {
+    const r = await app.request('/api/ferry/status?env=ONECLICK&depositAddress=' + 'ab'.repeat(32), { headers: { 'cf-connecting-ip': '192.0.2.79' } });
+    const j = await r.json();
+    assert.equal(j.status, 'SUCCESS');
+    assert.equal(j.tx, '5'.repeat(44));
+    assert.match(j.help, /Done/);
+    const body = receiptsBody(JSON.parse(readFileSync(new URL('../../../shared/deployments/mainnet.json', import.meta.url), 'utf8')), {}, { checkouts: listCheckoutReceipts() });
+    const row = body.receipts.find(x => x.tx === '5'.repeat(44));
+    assert.equal(row.rail, 'intents');
+    assert.equal(row.decision, 'allowed');
+    assert.equal(row.url, 'https://nearblocks.io/txns/' + '5'.repeat(44));
+    const dry = body.receipts.find(x => x.decision === 'dry');
+    assert.equal(dry.tx, null);
+  } finally {
+    globalThis.fetch = real;
+    resetCheckouts();
+  }
+});
+
+test('a shop on another site can call Pay', async () => {
+  const app = makeApp();
+  const r = await app.request('/api/ferry/rules?charter=nope', { method: 'OPTIONS', headers: { origin: 'https://shop.example', 'access-control-request-method': 'GET' } });
+  assert.equal(r.status, 204);
+  assert.equal(r.headers.get('access-control-allow-origin'), '*');
+});
+
+test('startCheckout does not call the network when the body is empty', async () => {
+  const out = await startCheckout(null);
+  assert.equal(out.httpStatus, 400);
+});

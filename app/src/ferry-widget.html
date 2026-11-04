@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nearcarta · ferry quote</title>
+<title>Nearcarta · Pay</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/brand/chrome.css">
 <style>
@@ -12,43 +12,23 @@ main{max-width:640px;margin:auto;padding:20px}
 label{display:block;margin:10px 0;color:#e7d7bc}
 input,select{width:100%;background:#241c16;color:#f3ead8;border:1px solid rgba(243,234,216,.2);border-radius:10px;padding:10px}
 button{margin-top:12px;background:#d6b46a;color:#17130f;border:0;border-radius:12px;padding:12px 18px;font-weight:700;cursor:pointer}
-#out{margin-top:16px;white-space:pre-wrap}
+#nc-out,#nc-status{margin-top:16px;white-space:pre-wrap}
 a{color:#e6c98a}
+pre{background:#241c16;border-radius:12px;padding:12px;overflow:auto;font-size:13px}
+code{word-break:break-all}
 </style>
 </head>
 <body>
 <main>
 <a class="back-town" href="/" data-testid="back-town">Back to town</a>
-<h1>Ferry quote</h1>
-<p>Ask what a swap would cost. This is a dry quote: nothing is sent and nothing is spent. A real swap is not started from this page.</p>
-<form id="q">
-  <label>Pay with <select name="from"><option value="USDC|base">USDC on Base</option><option value="ETH|base">ETH on Base</option></select></label>
-  <label>Amount <input name="amount" value="5" inputmode="decimal"></label>
-  <label>Receive <select name="to"><option value="ZEC|zec">ZEC</option></select></label>
-  <label>Shielded Zcash address <input name="recipient" required placeholder="u1…" data-testid="widget-recipient"></label>
-  <label>Refund address on the origin chain <input name="refundTo" required placeholder="0x…"></label>
-  <button type="submit" data-testid="widget-quote">Get a dry quote</button>
-</form>
-<p id="out" data-testid="widget-out"></p>
+<h1>Pay</h1>
+<p>Pay from the chain you already use. The charter checks the recipient, the cap and the daily budget before a deposit address is created. The amount is at most 0.20 USD. You send the tokens yourself. This page does not send them.</p>
+<div id="nearcarta-pay"></div>
+<h2>Embed</h2>
+<p>Other apps load this script. <code>data-charter</code> is the merchant’s charter account.</p>
+<pre data-testid="widget-embed"><code>&lt;div id="nearcarta-pay"&gt;&lt;/div&gt;
+&lt;script src="https://nearcarta.vercel.app/ferry-pay.js" data-charter="YOUR_CHARTER" data-clause="pay"&gt;&lt;/script&gt;</code></pre>
 </main>
-<script type="module">
-const api = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-document.getElementById('q').onsubmit = async e => {
-  e.preventDefault();
-  const f = new FormData(e.target);
-  const [symbol, chain] = String(f.get('from')).split('|');
-  const [toSym, toChain] = String(f.get('to')).split('|');
-  const out = document.getElementById('out');
-  out.textContent = 'Asking for a dry quote…';
-  const r = await fetch(api + '/api/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-    from: { symbol, chain }, to: { symbol: toSym, chain: toChain }, amount: String(f.get('amount')),
-    recipient: String(f.get('recipient')), refundTo: String(f.get('refundTo')), privacy: 'public',
-  }) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) { out.textContent = j.error || 'The quote was refused.'; return; }
-  out.innerHTML = `Dry quote. Nothing was spent.<br>You would receive about <b>${esc(j.to?.amount || j.quote?.amountOut || '')}</b>.<br>${j.correlationId ? 'Quote id ' + esc(String(j.correlationId).slice(0, 8)) : ''}`;
-};
-</script>
+<script src="/ferry-pay.js"></script>
 </body>
 </html>

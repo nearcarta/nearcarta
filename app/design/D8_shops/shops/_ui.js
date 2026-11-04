@@ -20,6 +20,7 @@ const MN = {
   house: ['house.nearcarta.near', 'House paid 0.001 NEAR', '83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26', 'House asked 0.002, over the cap', '3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1'],
   hall: ['townhall.nearcarta.near', 'Reward of 0.001 NEAR paid', '6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h', 'Reward of 0.002, over the cap', 'Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6'],
   guard: ['charter.nearcarta.near', 'Agent spent 0.001 NEAR', 'JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy', 'Agent asked 0.003, over the cap', 'BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH'],
+  ferry: ['charter.nearcarta.near', 'Charter allowed 0.001 NEAR', 'JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy', 'Charter refused 0.003, over the cap', 'BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH'],
 };
 const mtx = h => `<a class="tx" href="https://nearblocks.io/txns/${h}" target="_blank" rel="noopener">${h.slice(0, 6)}…${h.slice(-4)} ↗</a>`;
 const mrow = (k, st, txt, h) => `<div class="row"><div class="k">${esc(k)}</div><div class="v"><span class="st ${st}"><span aria-hidden="true">${st === 'ok' ? '✓' : '✕'}</span>${txt}</span>${mtx(h)}</div></div>`;
