@@ -51,6 +51,7 @@ const journey = () => setupJourney(st.trial, { publicMainnet: PUBLIC_MAINNET, bo
 const explorer = () => journey().explorer;
 const txA = h => h ? `<a href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" data-testid="setup-tx">${esc(h.slice(0, 8))}…</a>` : '';
 const acA = a => `<a href="${explorer()}/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
+for (const p of LOOKS) { const i = new Image(); i.src = `/setup/chars/${p.img}.webp`; (window.__chars ||= []).push(i); }
 const persona = () => LOOKS.find(p => p.id === st.persona) || LOOKS[1];
 const dyeOf = () => DYES.find(d => d.id === st.dye) || DYES[0];
 const remember = () => writeHero({ look: persona(), dye: dyeOf(), outfit: st.outfit, name: st.displayName || persona().name });
@@ -159,9 +160,30 @@ async function refreshBal() { if (!me) return; bal = await balanceOn(me, st.tria
 const balHtml = () => `${bal === undefined ? '…' : bal == null ? '?' : fmtN(nearOf(bal))} <small>NEAR</small>`;
 const need = () => {
   if (st.trial && !PUBLIC_MAINNET) return Number(st.deposit) + 0.05;
-  if (boardLive()) return 0.03;
+  if (boardLive()) return SIGN_MIN;
   return 0.05;
 };
+// Gas measured on mainnet (board.nearcarta.near): open_charter 2.59 TGas (BUqfZMBT…), set_agent 2.54 TGas (DqMrsEJj…),
+// propose with its payout 4.67 TGas (8WDqBeaN…). We attach about 4x / 4x / 3x. A wallet reserves attached gas at the
+// highest gas price (1 NEAR per 1000 TGas) before it sends, so the worst-case cost of opening a row is
+// 0.02 NEAR deposit + 10 TGas x 0.001 = 0.03 NEAR. Unused gas comes back.
+const GAS = { open: 10n, agent: 10n, propose: 15n };
+const GAS_NEAR = t => Number(t) * 0.001;
+const SIGN_MIN = Math.round((0.02 + GAS_NEAR(GAS.open) + 0.002) * 1000) / 1000; // + small reserve for account storage
+const yToN = y => { try { return Number(BigInt(y) / 10n ** 18n) / 1e6; } catch { return NaN; } };
+// Wallet errors in plain words: yocto numbers become NEAR and a shortfall.
+function plainErr(e) {
+  const t = String(e?.message || e || '');
+  if (/window closed|popup closed|user (closed|rejected|cancel)|cancel+ed by user|rejected/i.test(t)) return 'You closed the approval tab. Nothing was sent.';
+  if (/not enough balance|NotEnoughBalance|LackBalanceForState|insufficient/i.test(t)) {
+    const nums = (t.match(/\d{19,}/g) || []).map(yToN).filter(n => n > 0);
+    const have = bal != null ? nearOf(bal) : (nums.length > 1 ? Math.min(...nums) : NaN);
+    const cost = nums.length ? Math.max(...nums) : SIGN_MIN;
+    const short = Math.max(0, cost - (isNaN(have) ? 0 : have));
+    return `Not enough NEAR. This approval can cost up to ${fmtN(cost)} NEAR (deposit plus gas held back for a moment)${isNaN(have) ? '' : `, and the account has ${fmtN(have)} NEAR`}. Add ${fmtN(Math.max(short, 0.001))} NEAR on the Fund step, then try again.`;
+  }
+  return t.replace(/\d{19,}/g, d => fmtN(yToN(d)) + ' NEAR');
+}
 const holdsForCharter = () => st.trial && !PUBLIC_MAINNET;
 function sFund() {
   let qr = ''; try { const q = qrcode(0, 'M'); q.addData(me); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch {}
@@ -171,7 +193,8 @@ function sFund() {
     ? `This trial charter needs about <b>${fmtN(need())} testnet NEAR</b>. That is not real NEAR.`
     : (bal === 0n
       ? `With 0 NEAR you can still pick a character, write your rules and walk the town. To save your rules on chain and let your agent pay, add about <b>${fmtN(need())} NEAR</b>.`
-      : `You can continue now. This page never moves your NEAR.`);
+      : `You can continue now. This page never moves your NEAR.`)
+    + (!st.trial && boardLive() ? ` <span data-testid="fund-min">To open your charter later you need at least <b>${fmtN(SIGN_MIN)} NEAR</b>: 0.02 NEAR deposit that comes back when you close it, plus up to ${fmtN(GAS_NEAR(GAS.open))} NEAR of gas the wallet holds back for a moment (unused gas is returned).</span>` : '');
   return head('Fund', bal === 0n ? 'Your account is ready. It has 0 NEAR.' : (st.trial ? 'Add testnet NEAR to the trial account.' : 'Add real NEAR when you want to.'), lead)
     + `<div class="addr"><figure class="qrfig"><div class="qr" role="img" aria-label="QR code: scan to send NEAR to this account">${qr}</div><figcaption>Scan to send NEAR to this account</figcaption></figure><div style="flex:1;min-width:200px">
        <label for="acct" class="small">${st.trial ? 'Your testnet account id' : 'Your NEAR account id'}</label><code id="acct" class="acct" data-testid="setup-address" tabindex="0">${esc(me)}</code>
@@ -215,7 +238,7 @@ function sCharacter() {
        <p class="small muted" id="nhint">Lowercase letters, digits and single dashes. This trial charter is on testnet.</p></div>`
     : `<p class="small muted">This name stays in this browser and in the town. ${boardLive() ? 'Your charter is a row on the mainnet board, under the account you signed in with.' : 'A personal charter is a row on the mainnet board. That contract is not deployed yet, so this page will not create one.'}</p>`;
   return head('Character', 'Choose who walks the town.', 'The look, colour and name stay in this browser and appear in the town.')
-    + `<div class="cast"><div class="picks" role="group" aria-label="Looks">${LOOKS.map(p => `<button class="pick" data-p="${p.id}" aria-pressed="${p.id === st.persona}" data-testid="persona-${p.id}"><img src="/setup/chars/${p.img}.webp" alt="" width="160" height="160"><b>${esc(p.name)}</b><span>${esc(p.blurb)}</span></button>`).join('')}</div>
+    + `<div class="cast"><div class="picks" role="group" aria-label="Looks">${LOOKS.map(p => `<button class="pick" data-p="${p.id}" aria-pressed="${p.id === st.persona}" data-testid="persona-${p.id}"><img src="/setup/chars/${p.img}.webp" alt="${esc(p.name)}" width="160" height="160" loading="eager" decoding="sync" fetchpriority="high"><b>${esc(p.name)}</b><span>${esc(p.blurb)}</span></button>`).join('')}</div>
      <aside class="liveprev">${portraitHTML(persona(), dyeOf(), st.outfit, shown)}
        <p class="small muted">Colour</p><div class="swatches" role="group" aria-label="Colours">${DYES.map(d => `<button type="button" class="swatch" data-dye="${d.id}" aria-pressed="${d.id === st.dye}" title="${esc(d.name)}" style="--dye:${d.hex}" data-testid="dye-${d.id}"></button>`).join('')}</div>
        <p class="small muted">Outfit</p><div class="swatches" role="group" aria-label="Outfits">${OUTFITS.map(o => `<button type="button" class="fit" data-fit="${o.id}" aria-pressed="${o.id === st.outfit}" data-testid="outfit-${o.id}">${esc(o.name)}</button>`).join('')}</div>
@@ -248,7 +271,7 @@ function rules() {
 }
 function preview(r) {
   const until = new Date(Date.now() + r.days * 864e5).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' });
-  return `<b>${esc(persona().name)}</b> may pay only <b>${r.receivers.map(esc).join('</b> or <b>') || 'nobody yet'}</b>, at most <b>${fmtN(+r.cap)} NEAR</b> per payment, <b>${fmtN(+r.daily)} NEAR</b> and <b>${r.per}</b> payments per day, until <b>${until}</b>. Anything else is refused by the contract, even if the agent is tricked.`;
+  return `<b>${esc(persona().name)}</b> may pay only <b>${r.receivers.map(esc).join('</b> or <b>') || 'nobody yet'}</b>, at most <b>${fmtN(+r.cap)} NEAR</b> per payment, <b>${fmtN(+r.daily)} NEAR</b> and <b>${r.per}</b> payments per day, until <b>${until}</b>. Anything else is refused by ${boardLive() && !st.trial ? `your charter on <b>${esc(MAIN.board.contract)}</b>` : 'the contract'}, even if the agent is tricked.`;
 }
 function sRules() {
   const r = rules();
@@ -257,11 +280,11 @@ function sRules() {
     : (boardLive()
       ? 'These become your row on the mainnet board. Closing the row sends its storage and whatever is left unspent back to you.'
       : 'These stay in this browser with your character. The mainnet board is not deployed yet, so this page does not write them into a contract.'))
-    + `<div class="grid2"><div class="field"><label for="cap">Max per payment</label><div class="suffix"><input id="cap" type="number" step="0.001" min="0.001" value="${r.cap}" data-testid="rule-cap"><span>NEAR</span></div></div>
-       <div class="field"><label for="daily">Daily budget</label><div class="suffix"><input id="daily" type="number" step="0.001" min="0.001" value="${r.daily}" data-testid="rule-daily"><span>NEAR</span></div></div>
-       <div class="field"><label for="per">Payments per day</label><input id="per" type="number" min="1" max="100" value="${r.per}" data-testid="rule-per"></div>
-       <div class="field"><label for="days">Rule expires after</label><select id="days" data-testid="rule-days">${[7, 30, 90, 365].map(d => `<option value="${d}" ${d == r.days ? 'selected' : ''}>${d} days</option>`).join('')}</select></div></div>
-     <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"></div>
+    + `<div class="grid2"><div class="field"><label for="cap">Max per payment</label><div class="suffix"><input id="cap" type="number" step="0.001" min="0.001" value="${r.cap}" data-testid="rule-cap"><span>NEAR</span></div><p class="small muted">The most one payment can be. Bigger ones are refused.</p></div>
+       <div class="field"><label for="daily">Daily budget</label><div class="suffix"><input id="daily" type="number" step="0.001" min="0.001" value="${r.daily}" data-testid="rule-daily"><span>NEAR</span></div><p class="small muted">All payments in one day added up.</p></div>
+       <div class="field"><label for="per">Payments per day</label><div class="suffix"><input id="per" type="number" min="1" max="100" value="${r.per}" data-testid="rule-per"><span>per day</span></div><p class="small muted">How many payments the agent may make each day.</p></div>
+       <div class="field"><label for="days">Rule expires after</label><select id="days" data-testid="rule-days">${[7, 30, 90, 365].map(d => `<option value="${d}" ${d == r.days ? 'selected' : ''}>${d} days</option>`).join('')}</select><p class="small muted">After this date every payment is refused.</p></div></div>
+     <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"><p class="small muted">The only accounts your agent may pay.</p></div>
      <div class="preview" id="prev" data-testid="rule-preview">${preview(r)}</div>${errP()}` + nav(true);
 }
 function wireRules() {
@@ -294,7 +317,10 @@ function sSign() {
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
     + (live ? `<div class="facts" id="facts" data-testid="setup-facts"><div class="fact"><small>Loading</small><b>…</b></div></div>` : `<div class="preview">${preview(r)}</div>`)
     + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
-    + (live ? '' : `<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`) + errP() + nav(live, { label: 'Try your agent' });
+    + (live ? '' : (onBoard && bal != null && nearOf(bal) < SIGN_MIN
+        ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
+        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Worst case ${fmtN(SIGN_MIN)} NEAR: 0.02 deposit (returned when you close the row) and up to ${fmtN(GAS_NEAR(GAS.open))} NEAR gas held back for a moment.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`)
+      + `<div id="signhelp" class="tabhelp" hidden data-testid="sign-tabhelp"><p class="small">The approval opened in another browser tab. Switch to it and approve. This page moves on by itself.</p><button type="button" class="btn" id="resign" data-testid="sign-reopen">Switch to approval tab</button></div>`) + errP() + nav(live, { label: 'Try your agent' });
 }
 async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
 async function accountOn(id, network) {
@@ -319,14 +345,14 @@ async function signBoard() {
   localStorage.setItem(agentLS(me), sec);
   if (!row) {
     mark('create', 'run');
-    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'open_charter', args: boardArgs(r, keyFrom(sec).publicKey), gas: (80n * TG).toString(), deposit: String(MAIN.board.max_row_yocto) } }] });
+    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'open_charter', args: boardArgs(r, keyFrom(sec).publicKey), gas: (GAS.open * TG).toString(), deposit: String(MAIN.board.max_row_yocto) } }] });
     mark('create', 'run', txHashOf(res));
     for (let i = 0; i < 20 && !row; i++) { await wait(1500); row = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null); }
     if (!row) throw new Error('The row did not appear yet. Wait a few seconds and press Approve again.');
   }
   mark('create', 'ok'); st.charter = me; save();
   if (row.agent !== pubkeyHex(keyFrom(sec))) {
-    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: keyFrom(sec).publicKey }, gas: (40n * TG).toString(), deposit: '1' } }] });
+    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: keyFrom(sec).publicKey }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] });
     mark('create', 'ok', txHashOf(res));
   }
   done(5); await refreshBal();
@@ -383,7 +409,13 @@ async function facts() {
 }
 function wireSign() {
   if (!st.trial && !boardLive()) { wire(() => { done(5); go(6); }); return; }
-  const b = $('#sign'); if (b) b.onclick = () => act(b, sign); wire(() => { done(5); go(6); }); facts();
+  const tf = $('#tofund'); if (tf) tf.onclick = e => { e.preventDefault(); go(1); };
+  const run = () => act(b, async () => {
+    const t = setTimeout(() => { if (busy && document.hasFocus()) { const h = $('#signhelp'); if (h) h.hidden = false; } }, 3000);
+    try { await sign(); } catch (e) { throw new Error(plainErr(e)); } finally { clearTimeout(t); }
+  });
+  const b = $('#sign'); if (b) b.onclick = run;
+  const rs = $('#resign'); if (rs) rs.onclick = () => { busy = false; const h = $('#signhelp'); if (h) h.hidden = true; run(); }; wire(() => { done(5); go(6); }); facts();
 }
 
 // ---------- 7. Try ----------
@@ -397,10 +429,10 @@ async function boardAsk(amt) {
   const signature = signMessage(keyFrom(localStorage.getItem(agentLS(me))), msg);
   const w = await mainnetWallet().wallet();
   try {
-    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'propose', args: { owner: me, receiver, amount, signature, reveal: null }, gas: (80n * TG).toString(), deposit: '0' } }] });
+    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'propose', args: { owner: me, receiver, amount, signature, reveal: null }, gas: (GAS.propose * TG).toString(), deposit: '0' } }] });
     return { passed: true, reason: 'ok', tx: txHashOf(res), amount, receiver, decision: 'allowed' };
   } catch (e) {
-    const reason = refusalOf(e) || String(e.message || e);
+    const reason = refusalOf(e) || plainErr(e);
     return { passed: false, reason, tx: e.tx || null, amount, receiver, decision: 'refused' };
   }
 }
