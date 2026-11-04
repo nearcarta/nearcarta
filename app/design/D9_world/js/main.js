@@ -79,7 +79,7 @@ const ALIAS={chron:'chronicle',townhall:'hall',mistbank:'bank',guardhouse:'guard
 
 // ---------- Chronicle (real testnet ids only; anything else would be marked SAMPLE) ----------
 function chron(k,label){ const tx=TX[k]; const li=document.createElement('li'); li.className=tx.cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
-  li.querySelector('.w').textContent=label||tx.what; const a=li.querySelector('a'); a.href=txUrl(tx.h); a.textContent=tx.h.slice(0,6)+'…'+tx.h.slice(-4); a.title=tx.ev+' · open on testnet explorer';
+  li.querySelector('.w').textContent=(label||tx.what)+(window.NEARCARTA_PUBLIC_MAINNET===true?' · testnet demo':''); const a=li.querySelector('a'); a.href=txUrl(tx.h); a.textContent=tx.h.slice(0,6)+'…'+tx.h.slice(-4); a.title=tx.ev+' · open on testnet explorer';
   const l=$('#clist'); $('#chron').hidden=false; l.prepend(li); while(l.children.length>3) l.lastChild.remove(); sfx('page',{g:.25}); }
 
 // ---------- initial town state ----------
@@ -377,6 +377,12 @@ function onWallet(){ if(mode==='story') endStory(); toCharter('#create'); }
 world.toCharter=toCharter;
 // ---------- Chronicle HUD: the last three real transactions on the guardhouse oath, hidden until they arrive ----------
 (async()=>{ if(CAPTURE&&!P.has('live')) return; const API=window.NEARCARTA_API||'';
+  if(window.NEARCARTA_PUBLIC_MAINNET===true){ try{ // mainnet town: the real visitor run on board.nearcarta.near, mainnet explorer links
+    const mn=await (await fetch(API+'/api/mainnet')).json(), t=mn?.board?.visitor_run?.txs||{}; const rows=[['propose_allowed_0.001_agent_key_no_wallet','ok','agent paid 0.001 · allowed'],['propose_refused_0.01_over_per_action_cap','no','asked 0.01 over the cap · refused'],['open_charter','pd','visitor opened a charter']].filter(r=>t[r[0]]);
+    if(!rows.length) return; const l=$('#clist'); l.innerHTML='';
+    for(const [k,cls,w] of rows){ const h=t[k], li=document.createElement('li'); li.className=cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>'; li.querySelector('.w').textContent=w+' · mainnet';
+      const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+h; a.textContent=h.slice(0,6)+'…'+h.slice(-4); a.title='Open on the NEAR mainnet explorer'; l.append(li); }
+    $('#chron').hidden=false; $('#chron').dataset.live='1'; }catch(e){ console.warn('[Nearcarta] Chronicle feed unavailable',e?.message||e); } return; }
   try{ const dep=await (await fetch(API+'/api/deployments')).json(); const acct=dep?.guardhouse?.oath; if(!acct) return;
     const r=await (await fetch(API+'/api/chronicle/'+encodeURIComponent(acct)+'?limit=3')).json(); const txs=(r?.txs||[]).slice(0,3); if(!txs.length) return;
     const l=$('#clist'); l.innerHTML=''; const ago=t=>{ const m=Math.max(0,(Date.now()-Date.parse(t))/6e4); return m<60?`${m|0} min ago`:m<2880?`${(m/60)|0} h ago`:`${(m/1440)|0} d ago`; };
@@ -384,7 +390,7 @@ world.toCharter=toCharter;
       const cls=/allow|paid|ok|executed|true/.test(dec)?'ok':/refus|den|block|fail|reject/.test(dec)?'no':/froz|freeze/.test(tx.method+dec)?'fz':'pd';
       const li=document.createElement('li'); li.className=cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
       li.querySelector('.w').textContent=`${String(tx.method||'call').replace(/_/g,' ')} · ${String(dec).replace(/_/g,' ')} · ${ago(tx.at)}`;
-      const a=li.querySelector('a'); a.href=tx.url||txUrl(tx.hash); a.textContent=tx.hash.slice(0,6)+'…'+tx.hash.slice(-4); a.title='Open on the testnet explorer'; l.append(li); }
+      const a=li.querySelector('a'); a.href=tx.url||txUrl(tx.hash); a.textContent=tx.hash.slice(0,6)+'…'+tx.hash.slice(-4); a.title=/\/\/testnet\./.test(a.href)?'Open on the testnet explorer':'Open on the NEAR mainnet explorer'; l.append(li); }
     $('#chron').hidden=false; $('#chron').dataset.live='1'; }catch(e){ console.warn('[Nearcarta] Chronicle feed unavailable',e?.message||e); } })();
 const startStory=!P.has('nostory') && !(P.has('explore')) && !P.has('shop');
 for(let i=0;i<3;i++) step(1/30);

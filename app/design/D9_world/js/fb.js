@@ -42,7 +42,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
       arena:['mainnet','split','5 attacks on the lab oath','<b class="num">0</b><span class="unit">breaches</span>'], toll:['mainnet','split','MPC signature for Base Sepolia','<b class="num">11</b><span class="unit">of 16 nodes</span>'],
       chronicle:['record','testnet','Refusals on the record','<b class="num">6</b><span class="unit">of 10 actions</span>'], house:['mainnet','split','Tip cap · policy v4',tok('0.5','NEAR')] }[id];
     const info=m.FLAT||(F&&{src:F[0],cls:F[1],label:F[2],hero:F[3]})||{src:'testnet',cls:'testnet',label:'',hero:''};
-    src.textContent=info.src; src.className='src '+info.cls; $('#t-label').textContent=info.label; $('#t-hero').innerHTML=info.hero;
+    src.textContent=(window.NEARCARTA_PUBLIC_MAINNET===true&&{bank:'mainnet · Zcash testnet',payouts:'testnet demo',chronicle:'mainnet'}[id])||(info.src==='testnet'?'testnet demo':info.src); src.className='src '+info.cls; $('#t-label').textContent=info.label; $('#t-hero').innerHTML=info.hero;
     { const mo=$('#t-more'); mo.hidden=!m.MORE; if(m.MORE){ mo.href=m.MORE.href; mo.textContent=m.MORE.text; } }
     const end=END[id]; b.onclick=null; b.hidden=!end; if(end){ b.className='act res '+end[0]; b.disabled=true; b.textContent=end[1]; }
     d.innerHTML=(m.PROOF||'<p class="note">This room has no proof list in the 2D view.</p>')+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>'; $('#d-title').textContent=NAMES[id]+' · proof';

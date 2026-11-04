@@ -6,7 +6,9 @@ const seen = () => { try { return !!localStorage.getItem(KEY); } catch { return 
 const done = () => { try { localStorage.setItem(KEY, String(Date.now())); } catch {} };
 const SHOPS = ['toll', 'ferry', 'bank', 'guard', 'arena'];
 const STEPS = [
-  { t: 'Connect', b: `Use your NEAR testnet wallet, or start as a guest with free test funds ${tokenIcon('NEAR')}. No real money.` },
+  { t: 'Connect', b: globalThis.NEARCARTA_PUBLIC_MAINNET === true
+    ? `Sign in with your NEAR wallet or email. The town runs on NEAR mainnet ${tokenIcon('NEAR')}: tries cost about 0.001 NEAR each, and your charter caps every payment.`
+    : `Use your NEAR testnet wallet, or start as a guest with free test funds ${tokenIcon('NEAR')}. No real money.` },
   { t: 'Set your rules', b: 'Your charter sets who your AI helper may pay and how much a day. The chain checks every payment against it.' },
   { t: 'Try a shop', b: '<ul class="ob-shops">' + SHOPS.map(k => `<li><b>${NAME[k]}</b><span>${SUB[k]}</span></li>`).join('') + '</ul>' },
 ];

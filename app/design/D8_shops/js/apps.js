@@ -44,7 +44,7 @@ const PLAIN = [
   [/oath frozen/, 'the Toll is paused by its owner'],
   [/attach at least|Exceeded the prepaid gas|ERR_LOW_GAS/, 'the network ran out of gas for this step; try again'],
   [/expired|Expired/, 'the request expired before the network took it; try again'],
-  [/NotEnoughBalance|not enough balance/i, 'your account does not have enough testnet NEAR for this step'],
+  [/NotEnoughBalance|not enough balance/i, (globalThis.NEARCARTA_PUBLIC_MAINNET === true ? 'your account does not have enough NEAR for this step' : 'your account does not have enough testnet NEAR for this step')],
 ];
 export function plainError(e) {
   const m = String(e?.message || e || '');
@@ -63,6 +63,9 @@ const view = (c, m, a) => W.viewFn(rpc, c, m, a);
 const agent = () => { const k = S.charter && localStorage.getItem(LS_AGENT(S.charter)); return k ? W.keyFrom(k) : null; };
 const pay = () => S.clauses.pay;
 // every signed result shows its tx as one visible link (round-2 judges: a collapsed "details" read as no link at all)
+// One real mainnet payment by a visitor's agent on board.nearcarta.near (shared/deployments/mainnet.json visitor_run).
+export const MAIN_PROOF_TX = '4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia';
+export const mainProof = (h = MAIN_PROOF_TX, what = 'a 0.001 NEAR payment on board.nearcarta.near') => `<a class="tx" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener" title="Open on the NEAR mainnet explorer">${what} ↗</a>`;
 export const txLine = (h, label = 'receipt') => h ? `<a class="rc tx" data-testid="receipt" href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" title="${esc(label)} on chain">${label === '↗' ? '↗' : `tx ${esc(short(h))} ↗`}</a>` : '';
 export const receipts = () => (S.charter ? JSON.parse(localStorage.getItem(LS_RCPT(S.charter)) || '[]') : []);
 function keep(h, shop, decision, reason, x = {}) {
@@ -323,6 +326,9 @@ export const routesReady = api('/api/ferry/routes').then(r => {
 const BUCKETS = [0.01, 0.05, 0.1];
 // Mist Bank sends fixed notes only, so every send of a size looks alike. The note picked is exactly what is sent.
 export const NOTES = BUCKETS;
+// On mainnet a visitor's board row caps each payment (0.005 NEAR at most), so the notes are smaller; never one above the row's cap.
+const MAIN_NOTES = [0.001, 0.002, 0.005];
+export const notes = () => { if (!S.board) return NOTES; const c = pay()?.per_action_cap, cap = c ? fromY(c) : 0.005; const n = MAIN_NOTES.filter(x => x <= cap + 1e-12); return n.length ? n : [MAIN_NOTES[0]]; };
 export const bucketOf = a => BUCKETS.find(b => a <= b) ?? Math.ceil(a * 10) / 10;
 // Mist Bank pays one of YOUR allowed payees (the pay clause's receivers), never an account the rules do not name.
 // Default: yourself if you listed yourself, else the first payee you added.
@@ -330,7 +336,7 @@ export const bankPayees = () => (pay()?.receivers || []);
 export const bankDefault = () => { const r = bankPayees(); return r.includes(S.me) ? S.me : r[0] || null; };
 export async function mist(amount, to = bankDefault()) {
   if (!to) throw new Error('add a payee to your rules first');
-  if (!NOTES.includes(amount)) throw new Error('pick one of the fixed notes: ' + NOTES.join(', ') + ' NEAR');
+  if (!notes().includes(amount)) throw new Error('pick one of the set amounts: ' + notes().join(', ') + ' NEAR');
   const yocto = toY(amount), salt = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
   const commitment = W.sha256hex(`mistbank:v1:${yocto}:${salt}`);
   const tee = await teeCheck(commitment).catch(e => ({ ok: false, why: e.message }));
