@@ -1,6 +1,6 @@
-// Wallet layer for the charter shop: NEAR Connect (testnet) plus an optional guest wallet.
-// The guest wallet is a fresh testnet account from the public faucet. Its key is made in this
-// browser and stays in this browser's localStorage; the backend never sees it. Testnet only.
+// Wallet layer for the charter shop: NEAR Connect, plus an optional guest wallet on the trial build.
+// The guest wallet is a fresh trial account from the public faucet. Its key is made in this
+// browser and stays in this browser's localStorage; the backend never sees it. The trial build only.
 import { NearConnector } from '@hot-labs/near-connect';
 import { addPrivy, NEAR_NET } from '../../house/privy.js';
 import { decoratePicker } from './picker.js';

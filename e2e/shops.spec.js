@@ -1,9 +1,13 @@
 import { test, expect } from '@playwright/test';
 import dep from '../shared/deployments/testnet.json' with { type: 'json' };
 
-test('health: the API reads NEAR testnet and cannot sign', async ({ request }) => {
+test('health: the journey chain is mainnet and the API cannot sign', async ({ request }) => {
   const h = await (await request.get('/api/health')).json();
-  expect(h.network).toEqual({ contracts: 'mainnet', trial: 'testnet' }); expect(h.near.height).toBeGreaterThan(200_000_000); expect(h.features.signing).toBe(false);
+  expect(h.network).toEqual({ contracts: 'mainnet', journey: 'mainnet' });
+  expect(h.near.chain_id).toBe('mainnet');
+  expect(h.near.height).toBeGreaterThan(200_000_000);
+  expect(h.features.signing).toBe(false);
+  if (h.trial) expect(h.trial.chain_id).toBe('testnet');
 });
 
 test('ferry: dry 1Click quote USDC (Base) -> ZEC to a shielded address passes all checks', async ({ page }) => {
