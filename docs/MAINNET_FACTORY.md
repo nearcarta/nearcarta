@@ -1,5 +1,9 @@
 # Mainnet visitor factory
 
+This factory is not the visitor path. Copying the oath wasm onto each charter costs more than `nearcarta.near` can fund, and the stake does not fit a 1 NEAR deploy. The visitor path is the one board in `docs/MAINNET_BOARD.md`. The code below stays so the old cost math can still be read.
+
+# Mainnet visitor factory (retired)
+
 The testnet factory publishes the oath wasm as a NEAR global contract. That burns about one NEAR per 100 KB and that NEAR does not come back. The mainnet factory does not do that.
 
 `contracts/charter_factory_lock` stores one copy of the oath wasm on the factory account named in `shared/deployments/mainnet.json` (`factory.contract`) and copies it onto each charter with `deploy_contract`. Storage is staked, not burned. Gas is the only NEAR that does not come back.

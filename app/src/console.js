@@ -35,6 +35,17 @@ get('/api/health').then(h => {
 })
   .catch(e => { $('#health').innerHTML = `<span class="fail">API unreachable: ${esc(e.message)}</span>`; });
 
+get('/api/mainnet').then(m => {
+  if (!window.NEARCARTA_PUBLIC_MAINNET) return;
+  const el = document.createElement('p');
+  el.className = 'note';
+  el.dataset.testid = 'board-note';
+  el.textContent = m?.board?.status === 'deployed'
+    ? 'Your charter is a row on the mainnet board, under the account you sign in with.'
+    : 'A personal charter is a row on the mainnet board. That contract is not deployed yet, so this page does not create one.';
+  const host = $('#proofs'); if (host) host.after(el);
+}).catch(() => {});
+
 get('/api/receipts').then(body => {
   const rows = (body.receipts || []).filter(r => r.network === 'mainnet' && r.tx);
   $('#proofs').innerHTML = `<b>Mainnet proofs</b><p class="note">${esc(body.gate || 'The charter contract decides. The agent only asks.')}</p><table>${rows.map(r => `<tr><td>${esc(r.what)}</td><td>${esc(r.decision)}</td><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(String(r.tx).slice(0, 8))}…</a>` : ''}</td></tr>`).join('') || '<tr><td>No mainnet receipts in this response.</td></tr>'}</table>`;

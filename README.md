@@ -1,7 +1,7 @@
 # Nearcarta
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/backend%20unit%20tests-364%20pass%2C%201%20skipped-brightgreen)
+![tests](https://img.shields.io/badge/backend%20unit%20tests-368%20pass%2C%201%20skipped-brightgreen)
 
 **Thesis: the agent proposes, the NEAR charter decides.** The AI agent holds only a function-call key for `propose`; every payment is checked by the `oath` contract, which allows it, refuses it on chain with a reason, or holds it for the owner.
 
@@ -21,7 +21,7 @@ Each claim names the code, the test that pins it, and a tx you can open. Test na
 | Teardown refunds everything to the owner only, behind the upgrade timelock | `queue_upgrade` (line 643), `upgrade` (line 651), `contracts/reaper` | `teardown_reaper_refunds_everything_to_owner_only`, `teardown_upgrade_needs_the_timelock_when_a_delay_is_set` (`tests/teardown.rs`) | testnet rehearsal reap [25eS4kfn…](https://testnet.nearblocks.io/txns/25eS4kfnFXTavHx3t4X2JP8iUsdX5nSUNFnQyqURkVue) |
 | The API rejects bad input, refuses unknown CORS origins, never echoes the caller IP, and refuses a body over 16 KB | `backend/src/server.js`, `backend/src/app.js` `bodyLimit` | `backend/test/unit/api-contract.test.js` (`an oversized JSON body is refused before it is read`) | |
 | Start here opens setup. After a charter exists, the same pin opens the charter office | `app/design/D9_world/index.html` `#rulesBtn`, `app/design/D9_world/js/main.js` `paintStart` | e2e `town pin opens setup and each step renders` | |
-| Sign in on /setup uses a mainnet account and real NEAR. A personal charter is sent only after `factory.status` in `shared/deployments/mainnet.json` is `deployed` and the build has `NEXT_PUBLIC_MAINNET=1`. Until then the page shows the town's mainnet txs and does not send a create. With the flag off, the guest trial is a secondary control and is labeled testnet | `shared/setup/path.js` `setupJourney`, `contracts/charter_factory_lock`, `docs/MAINNET_FACTORY.md` | `the default setup path is mainnet and does not offer the faucet or a charter factory`, `the public mainnet flag hides the guest and creates a charter only after the factory is deployed` | the owner runs `node backend/scripts/deploy-mainnet-factory.js`; this repo does not sign it |
+| Sign in on /setup uses a mainnet account and real NEAR. A personal charter row is sent only after `board.status` in `shared/deployments/mainnet.json` is `deployed` and the build has `NEXT_PUBLIC_MAINNET=1`. Until then the page shows the town's mainnet txs and does not send a create. With the flag off, the guest trial is a secondary control and is labeled testnet | `shared/setup/path.js` `setupJourney`, `contracts/charter_board`, `docs/MAINNET_BOARD.md` | `the default setup path is mainnet and does not offer the faucet or a charter factory`, `the public mainnet flag hides the guest and opens a charter row only after the board is deployed` | the owner runs `node backend/scripts/deploy-mainnet-board.js`; this repo does not sign it |
 | The public leaderboard lists factory charters except `shared/vault/denied-accounts.json` | `backend/src/vault.js` `publicPlayers` | `a factory charter appears unless we created that account` | |
 | Pay reads the charter, then asks 1Click for a deposit address of at most 0.20 USD. The page does not send the deposit | `backend/src/ferry-checkout.js` `openCheckout`, `app/src/ferry-pay.js` | `a refused recipient never asks 1Click, and an allowed one returns a deposit address` | the owner runs `node backend/scripts/ferry-live-swap.js --live` for one swap; this repo does not send it |
 | The model cannot switch the payee or the amount the visitor named. The charter still refuses an off-list payee | `backend/src/agent.js` `propose` | `a model that invents a payee is discarded for the words`, `a model that raises the amount is kept to the amount in the message` | off-list refusal [BESexM6S…](https://testnet.nearblocks.io/txns/BESexM6SCG8sRPn9XmpZVYE1caTdMexL6EQabyfkrXh5) |
@@ -30,7 +30,7 @@ Each claim names the code, the test that pins it, and a tx you can open. Test na
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 365 backend unit tests (364 pass, 1 skipped), offline
+npm test                                   # 369 backend unit tests (368 pass, 1 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify                             # re-reads all 76 proof txs from testnet; exits 1 if one is missing
 ```
@@ -46,8 +46,8 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 |---|---|
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
-| toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock unit | 67, 17, 15, 16, 4, 23, 13 |
-| backend unit (`npm test`) | 365 (364 pass, 1 skipped) |
+| toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 11 |
+| backend unit (`npm test`) | 369 (368 pass, 1 skipped) |
 | browser e2e against the live site | 22 passed, 12 skipped, testnet wallets only. There is no mainnet browser e2e |
 
 The 12 skipped e2e tests sign real testnet txs and need a funded wallet key or an opt-in flag (`GUARD_E2E`, `VAULT_E2E`, `VAULT_AI_E2E`, `VAULT_FAUCET`, `HALL_FILE`, `HOUSE_*_KEY_FILE`, a partner key, or the arena attack switch); they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
@@ -63,7 +63,7 @@ The 12 skipped e2e tests sign real testnet txs and need a funded wallet key or a
 - Testnet: guardhouse charter `guardhouse-nzjp.nccharters-22195.testnet`, Town Hall `townhall.nccharters-17102.testnet`, Arena `arena3-370128340.testnet`, Toll `toll.r4csmvr86zk4.testnet`. Full list: `shared/deployments/testnet.json`.
 
 ### Teardown and refund plan
-The owner swaps the charter's code for `contracts/reaper` through the charter's own upgrade path (`queue_upgrade(sha256(reaper.wasm))`, then `upgrade`), and `reap()` deletes the account with its balance going to the owner (`backend/scripts/core-teardown.js`, steps in `docs/MAINNET_RUNBOOK.md`). The testnet rehearsal file `judges/proofs/core-rehearsal-teardown-testnet.json` records a later re-read of 6.659473 NEAR returned against 6.660937 on the two accounts. That figure is the file's note, not a number `npm run verify` recomputes. The reap tx is [25eS4kfn…](https://testnet.nearblocks.io/txns/25eS4kfnFXTavHx3t4X2JP8iUsdX5nSUNFnQyqURkVue). The sandbox test `teardown_reaper_refunds_everything_to_owner_only` checks that only the owner can trigger it and that the owner gets the balance. The mainnet visitor factory returns its storage the same way: `docs/MAINNET_FACTORY.md`.
+The owner swaps the charter's code for `contracts/reaper` through the charter's own upgrade path (`queue_upgrade(sha256(reaper.wasm))`, then `upgrade`), and `reap()` deletes the account with its balance going to the owner (`backend/scripts/core-teardown.js`, steps in `docs/MAINNET_RUNBOOK.md`). The testnet rehearsal file `judges/proofs/core-rehearsal-teardown-testnet.json` records a later re-read of 6.659473 NEAR returned against 6.660937 on the two accounts. That figure is the file's note, not a number `npm run verify` recomputes. The reap tx is [25eS4kfn…](https://testnet.nearblocks.io/txns/25eS4kfnFXTavHx3t4X2JP8iUsdX5nSUNFnQyqURkVue). The sandbox test `teardown_reaper_refunds_everything_to_owner_only` checks that only the owner can trigger it and that the owner gets the balance. The mainnet visitor board returns a row through `close_charter` and the wasm stake through `reap` once no row is open: `docs/MAINNET_BOARD.md`. The unit test `a_failed_transfer_returns_the_balance_and_the_owner_cannot_reap_early` checks that `reap`.
 
 
 Every shop is a real wallet app under your own on-chain charter.
@@ -82,7 +82,7 @@ npm run check-cited # every file, tx, account and hash the docs cite exists
 
 A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money, and each move is checked first by the charter (the `oath` contract on NEAR), which holds the agent's rules. Agents ask. The charter answers.
 
-Deployed: https://nearcarta.vercel.app serves the pages, and `/api/*` is passed to the API on Render: https://nearcarta-api.onrender.com. The hackathon demo window runs through 2026-11-25. This page does not prove uptime. Example: `/api/health`, `/api/receipts`, `/api/mainnet`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped. That run uses testnet wallets. There is no mainnet browser e2e. A live read of `/api/health` returns `network.contracts` `mainnet` and `network.trial` `testnet`, plus `nearAi: true` and `confidentialQuotes: true`. `near.chain_id` is `testnet` because that block height is the API's testnet RPC, not a mainnet block. `vault_runner.charter` is a testnet arena charter; that key calls `propose` there and does not sign mainnet. `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`). A visitor charter on mainnet waits on the factory in `docs/MAINNET_FACTORY.md`. With `NEXT_PUBLIC_MAINNET` unset, the guest trial on `/setup` is still the testnet path and it is labeled as one. The town's own charter, toll, arena, house and town hall are on mainnet. `/ferry-widget` is the Pay page.
+Deployed: https://nearcarta.vercel.app serves the pages, and `/api/*` is passed to the API on Render: https://nearcarta-api.onrender.com. The hackathon demo window runs through 2026-11-25. This page does not prove uptime. Example: `/api/health`, `/api/receipts`, `/api/mainnet`. The latest full e2e run against Vercel (`BASE_URL=https://nearcarta.vercel.app npm run e2e`; the skipped tests need keys or opt-in flags) is in `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped. That run uses testnet wallets. There is no mainnet browser e2e. A live read of `/api/health` returns `network.contracts` `mainnet` and `network.trial` `testnet`, plus `nearAi: true` and `confidentialQuotes: true`. `near.chain_id` is `testnet` because that block height is the API's testnet RPC, not a mainnet block. `vault_runner.charter` is a testnet arena charter; that key calls `propose` there and does not sign mainnet. `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`). A visitor charter on mainnet is a row on the board in `docs/MAINNET_BOARD.md`. That contract is not deployed yet, so `/setup` does not send `open_charter`. With `NEXT_PUBLIC_MAINNET` unset, the guest trial on `/setup` is still the testnet path and it is labeled as one. The town's own charter, toll, arena, house and town hall are on mainnet. `/ferry-widget` is the Pay page.
 
 ## For judges: do X, see Y
 
@@ -140,7 +140,7 @@ An on-chain charter for AI agents that spend money. A person writes the agent's 
 An agent with a wallet key can be talked into paying anyone: a fake invoice, a prompt-injected recipient, a look-alike account, many small payments under a cap. Checks that live in the agent's own code or prompt fail when the agent is fooled. The charter puts the check in a contract the agent cannot change, so a fooled agent still cannot pay outside the rules.
 
 ## Try it in a browser (testnet, no wallet install)
-1. Open https://nearcarta.vercel.app and press *Sign in*. The setup page is the only way in: Google, email, a NEAR wallet or MetaMask, on mainnet, funded with real NEAR. A personal charter is created only after the owner deploys the factory in `docs/MAINNET_FACTORY.md` and the site is built with `NEXT_PUBLIC_MAINNET=1`. Until then this page does not send a create. With that flag unset, a free testnet account stays a secondary option, and its key stays in the browser.
+1. Open https://nearcarta.vercel.app and press *Sign in*. The setup page is the only way in: Google, email, a NEAR wallet or MetaMask, on mainnet, funded with real NEAR. A personal charter row is opened only after the owner deploys the board in `docs/MAINNET_BOARD.md` and the site is built with `NEXT_PUBLIC_MAINNET=1`. Until then this page does not send a create. With that flag unset, a free testnet account stays a secondary option, and its key stays in the browser.
 2. Walk into a shop and press its button. Each signed step shows its tx as a link to testnet.nearblocks.io. The same rooms open directly at `/design/D8_shops/?shop=<house|toll|ferry|bank|guard|arena|hall|payouts>`.
 
 | Shop | Press | See |
@@ -165,7 +165,7 @@ On 2026-10-29 a fresh guest pressed every shop row above on the live site with n
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 365 unit tests (364 pass, 1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm test                 # 369 unit tests (368 pass, 1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
 npm run verify           # reads every proof tx back from testnet (76/76 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -213,7 +213,7 @@ Every tx below is a row in [judges/TESTNET_TXS.md](judges/TESTNET_TXS.md), re-re
 ## Layout
 - `contracts/oath`: the agent charter (Rust, near-sdk). 122 unit tests, plus near-workspaces sandbox and 10 exploit reproductions in `tests/`.
 - `contracts/artifacts`: the deployed charter wasm. `npm run wasm-hash` prints its hash, which equals the on-chain code_hash.
-- `contracts/charter_factory_lock`: the mainnet visitor factory. It stores the oath wasm and deploys it onto each charter. Storage stake comes back through `reap`. See `docs/MAINNET_FACTORY.md`. The testnet factory stays `contracts/charter_factory` and still uses a global contract.
+- `contracts/charter_board`: the mainnet visitor board. One contract, one row per visitor. The visitor pays for that row (at most 0.02 NEAR) and `close_charter` returns it. `reap` deletes the account once no row is open. See `docs/MAINNET_BOARD.md`. `contracts/charter_factory_lock` is the retired per-charter copy. The testnet factory stays `contracts/charter_factory` and still uses a global contract.
 - `contracts/townhall`, `contracts/arena`, `contracts/toll`, `contracts/mock_ft`: the shop contracts.
 - `backend/`: Hono API that reads chain, 1Click and NEAR AI. `scripts/` holds the testnet demo and the proof checker.
 - `app/`: the console UI, the live data interface for the design views, and the design views themselves (`app/design`).

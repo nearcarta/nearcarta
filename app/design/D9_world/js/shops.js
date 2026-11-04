@@ -40,7 +40,8 @@ export function frame(c){ const a=innerWidth/innerHeight; c.aspect=a; const ox=i
 const CTA={ house:"Set your agent's rules →", guard:'Write a rule like this for your agent →', arena:'Put your own charter in the arena →' };
 const CTA_APP={ house:'Open the charter office →' };
 export function cta(id){ const a=$('#t-cta'); const t=(APP?CTA_APP:CTA)[id]; a.hidden=!t; a.className=APP?'link cta8':'act primary cta'; if(t){ a.textContent=t; a.href='/shops/vault/'; a.dataset.testid='vault-link'; } }
-export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; $('#t-title').textContent=p.title||NAMES[sh.id]; const s=$('#t-src'); s.textContent=SRC[p.src]||p.src; s.className='src '+p.src; s.title=p.srcNote||'';
+const visitorNote=note=>window.NEARCARTA_PUBLIC_MAINNET===true?String(note||'').replace(/ ?[^.]*testnet trial[^.]*/gi,'').replace(/\s{2,}/g,' ').trim():(note||'');
+export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; $('#t-title').textContent=p.title||NAMES[sh.id]; const s=$('#t-src'); s.textContent=SRC[p.src]||p.src; s.className='src '+p.src; s.title=visitorNote(p.srcNote);
   $('#t-label').textContent=p.label; $('#t-hero').innerHTML=p.hero; const b=$('#t-act'); b.className='act primary'; b.disabled=false; b.hidden=!p.action; b.textContent=p.action||'';
   { const m=$('#t-more'); m.hidden=!p.more; if(p.more){ m.href=p.more.href; m.textContent=p.more.text; } }
   $('#d-title').textContent=(p.title||NAMES[sh.id]); $('#d-body').innerHTML=sh.proof+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>';

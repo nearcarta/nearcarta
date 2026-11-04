@@ -60,7 +60,15 @@ async function refreshWho() {
 function renderCreate() {
   const box = $('#create');
   if (!me || charter) delete box.dataset.for;
-  if (!me) { box.innerHTML = '<p class="muted" title="A charter is a NEAR account that holds your agent\'s money and its rules.">Sign in first. A new charter here is a free testnet trial.</p>'; focusCreate(); return; }
+  if (!me) { box.innerHTML = window.NEARCARTA_PUBLIC_MAINNET ? '<p class="muted">Sign in with your mainnet account. Your charter is a row on the mainnet board.</p>' : '<p class="muted" title="A charter is a NEAR account that holds your agent\'s money and its rules.">Sign in first. A new charter here is a free testnet trial.</p>'; focusCreate(); return; }
+  if (window.NEARCARTA_PUBLIC_MAINNET) {
+    const board = window.__ncBoard;
+    const live = board?.status === 'deployed' && board.contract;
+    box.innerHTML = live
+      ? `<p>Your charter is the row for <b data-testid="charter-id">${esc(me)}</b> on <b>${esc(board.contract)}</b>.</p><p class="muted">Open it from <a href="/setup/?next=${encodeURIComponent(location.pathname)}">setup</a> if it is not open yet. Closing it returns the row storage and the unspent balance.</p>`
+      : '<p class="muted">The mainnet board is not deployed yet, so this page will not create a charter.</p>';
+    return;
+  }
   if (charter) { box.innerHTML = `<p>Your charter: <b data-testid="charter-id">${esc(charter)}</b></p>`; return; }
   // refreshWho runs again after a sign-in (the wallet event and the guest flow both call it): keep the
   // form the visitor is typing in instead of rebuilding it, or the name they typed is lost.
@@ -515,10 +523,25 @@ async function main() {
   for (const r of document.querySelectorAll('input[name=target]')) r.onchange = () => setTarget(r.value);
   $('#nick').value = defaultNick();
   $('#ask-form').onsubmit = e => ask(e).catch(fail);
-  const badge = $('#net'); if (badge) badge.textContent = (CFG.network === 'mainnet' ? 'mainnet' : (CFG.network || 'testnet') + ' trial');
+  const badge = $('#net'); if (badge) { badge.textContent = window.NEARCARTA_PUBLIC_MAINNET ? 'mainnet' : ((CFG.network === 'mainnet' ? 'mainnet' : (CFG.network || 'testnet') + ' trial')); badge.classList.toggle('trial', !window.NEARCARTA_PUBLIC_MAINNET && CFG.network !== 'mainnet'); }
   api('/api/agent/budget').then(b => { const el = $('#infer'); if (!el || !b?.limit_usd) return; el.textContent = `Model jobs today: ${b.calls} of ${b.limit_calls}, $${b.usd} of $${b.limit_usd}. Each job is at most ${b.max_tokens} tokens and is not sent past the cap. The NEAR it can move is the charter's cap.`; }).catch(() => {});
-  fetch((API) + '/api/mainnet').then(r => r.json()).then(m => { const c = m?.charter?.contract; const note = $('#netnote'); if (note && c) note.textContent = `A charter you create here is a free testnet trial. ${c}, the toll, the arena, the house and the town hall are on mainnet.`; }).catch(() => {});
-  $('#factory').innerHTML = `Factory <code>${esc(CFG.factory)}</code> · code hash <code title="${esc(CFG.code_hash)}">${esc(short(CFG.code_hash))}</code> · ${txl(CFG.proof_txs?.factory_full_access_key_deleted, 'factory keys deleted')}`;
+  fetch((API) + '/api/mainnet').then(r => r.json()).then(m => {
+    window.__ncBoard = m?.board || null;
+    const c = m?.charter?.contract; const note = $('#netnote'); if (!note || !c) return;
+    if (window.NEARCARTA_PUBLIC_MAINNET) {
+      note.textContent = m?.board?.status === 'deployed'
+        ? `Your charter is a row on the mainnet board. ${c}, the toll, the arena, the house and the town hall are on mainnet.`
+        : `The mainnet board is not deployed yet. ${c}, the toll, the arena, the house and the town hall are on mainnet.`;
+      const guest = $('#guest'); if (guest) guest.hidden = true;
+      if (badge) { badge.textContent = 'mainnet'; badge.classList.remove('trial'); }
+    } else note.textContent = `A charter you create here is a free testnet trial. ${c}, the toll, the arena, the house and the town hall are on mainnet.`;
+    renderCreate();
+  }).catch(() => {});
+  const factoryLine = $('#factory');
+  if (factoryLine) {
+    if (window.NEARCARTA_PUBLIC_MAINNET) factoryLine.hidden = true;
+    else factoryLine.innerHTML = `Factory <code>${esc(CFG.factory)}</code> · code hash <code title="${esc(CFG.code_hash)}">${esc(short(CFG.code_hash))}</code> · ${txl(CFG.proof_txs?.factory_full_access_key_deleted, 'factory keys deleted')}`;
+  }
   $('#arena-id').textContent = CFG.arena.charter;
   $('#ex-look').textContent = lookalike(CFG.arena.merchants[0]);
   quickCards(); setTarget('shared');

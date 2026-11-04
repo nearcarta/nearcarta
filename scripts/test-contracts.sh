@@ -8,7 +8,13 @@ set -euo pipefail
 cd "$(dirname "$0")/../contracts"
 for c in arena toll townhall house_nft attested_check; do echo "== $c"; (cd "$c" && cargo test --lib -q); done
 # The lock factory uses near-sdk 5.30, which needs rustc 1.95 (the CI toolchain).
-if command -v rustup >/dev/null && rustup toolchain list | grep -q '^1.95'; then echo "== charter_factory_lock"; (cd charter_factory_lock && cargo +1.95.0 test --lib -q); else echo "== charter_factory_lock"; (cd charter_factory_lock && cargo test --lib -q); fi
+if command -v rustup >/dev/null && rustup toolchain list | grep -q '^1.95'; then
+  echo "== charter_factory_lock"; (cd charter_factory_lock && cargo +1.95.0 test --lib -q)
+  echo "== charter_board"; (cd charter_board && cargo +1.95.0 test --lib -q)
+else
+  echo "== charter_factory_lock"; (cd charter_factory_lock && cargo test --lib -q)
+  echo "== charter_board"; (cd charter_board && cargo test --lib -q)
+fi
 [ "${SKIP_SANDBOX:-}" = 1 ] && { echo "SKIP_SANDBOX=1: oath and charter_factory not run"; exit 0; }
 if ! command -v pkg-config >/dev/null || ! pkg-config --exists openssl; then
   echo "oath and charter_factory NOT run: install pkg-config and the OpenSSL headers (see the top of scripts/test-contracts.sh)" >&2; exit 2; fi

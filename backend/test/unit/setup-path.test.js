@@ -14,17 +14,18 @@ test('the default setup path is mainnet and does not offer the faucet or a chart
   assert.doesNotMatch(j.intentsNote, /faucet/);
 });
 
-test('the public mainnet flag hides the guest and creates a charter only after the factory is deployed', () => {
-  const off = setupJourney(true, { publicMainnet: true, factoryDeployed: false });
+test('the public mainnet flag hides the guest and opens a charter row only after the board is deployed', () => {
+  const off = setupJourney(true, { publicMainnet: true, boardDeployed: false });
   assert.equal(off.badge, 'mainnet');
   assert.equal(off.showGuest, false);
   assert.equal(off.showFaucet, false);
   assert.equal(off.createCharter, false);
   assert.doesNotMatch(off.fundLead, /testnet/i);
-  const on = setupJourney(false, { publicMainnet: true, factoryDeployed: true });
+  const on = setupJourney(false, { publicMainnet: true, boardDeployed: true });
   assert.equal(on.createCharter, true);
   assert.equal(on.showGuest, false);
   assert.equal(on.badge, 'mainnet');
+  assert.equal(setupJourney(false, { publicMainnet: true, factoryDeployed: true }).createCharter, false);
 });
 
 test('the guest trial is labeled testnet and is the only path that creates a charter', () => {

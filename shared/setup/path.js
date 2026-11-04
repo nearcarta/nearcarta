@@ -1,7 +1,7 @@
 // What the setup page may say, and what it may do, on each path.
 // The default path is a mainnet NEAR account and real NEAR. The free guest is a separate testnet trial.
-// publicMainnet (NEXT_PUBLIC_MAINNET=1) hides that guest. A personal charter is created only when
-// the mainnet factory in shared/deployments/mainnet.json has status "deployed".
+// publicMainnet (NEXT_PUBLIC_MAINNET=1) hides that guest. A personal charter row is opened only when
+// the mainnet board in shared/deployments/mainnet.json has status "deployed".
 export function setupJourney(trial, opts = {}) {
   const publicMainnet = !!opts.publicMainnet;
   const onTrial = !!trial && !publicMainnet;
@@ -10,7 +10,7 @@ export function setupJourney(trial, opts = {}) {
     guestInTiles: false,
     showGuest: !publicMainnet,
     showFaucet: onTrial,
-    createCharter: onTrial || !!(publicMainnet && opts.factoryDeployed),
+    createCharter: onTrial || !!(publicMainnet && opts.boardDeployed),
     explorer: onTrial ? 'https://testnet.nearblocks.io' : 'https://nearblocks.io',
     intentsNote: onTrial
       ? 'NEAR Intents swaps on mainnet. This trial is funded by the testnet faucet below.'

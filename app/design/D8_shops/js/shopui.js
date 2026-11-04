@@ -34,7 +34,8 @@ const STEPS = {
   toll: ['about 30 s', 'Paying the toll from your charter', 'Approving the gate call', 'Getting the payout signed', 'Sending it to Base Sepolia'],
 };
 let prog = null;
-function progress(id) { clearInterval(prog); const st = STEPS[id]; if (!st) return; const [hint, ...steps] = st, t0 = Date.now(), per = (parseInt(hint.replace(/\D+/g, '')) || 20) / steps.length;
+const stepLine = s => (globalThis.NEARCARTA_PUBLIC_MAINNET === true ? s.replace(/ on NEAR testnet/g, ' on NEAR') : s);
+function progress(id) { clearInterval(prog); const st = STEPS[id]; if (!st) return; const [hint, ...raw] = st, steps = raw.map(stepLine), t0 = Date.now(), per = (parseInt(hint.replace(/\D+/g, '')) || 20) / steps.length;
   const tick = () => { const sec = Math.floor((Date.now() - t0) / 1000), i = Math.min(steps.length - 1, Math.floor(sec / per));
     rcpt(`<span class="prog" role="status" data-testid="progress"><span class="bar"><i style="width:${Math.min(95, Math.round(100 * sec / (per * steps.length)))}%"></i></span>Step ${i + 1} of ${steps.length} · ${esc(steps[i])}… <span class="eta">${sec} s · ${hint}</span></span>`); };
   tick(); prog = setInterval(() => phase === 'busy' ? tick() : clearInterval(prog), 1000); }
@@ -376,7 +377,7 @@ function paint() {
     say(app.idle || 'This is what the shop does. The proof is already on mainnet.');
     hero(app.hero ? app.hero() : null);
     form('');
-    btn('Sign in');
+    btn(st === 'build' && A.S.me ? 'Open your charter' : 'Sign in');
     return;
   }
   if (st === 'rules') { say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return; }
