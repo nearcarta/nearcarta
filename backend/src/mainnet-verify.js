@@ -7,7 +7,7 @@ export function collectMainnetTxs(dep) {
     if (!node || typeof node !== 'object' || Array.isArray(node)) return;
     if (node.txs && typeof node.txs === 'object' && !Array.isArray(node.txs)) {
       for (const [label, hash] of Object.entries(node.txs)) {
-        if (typeof hash === 'string' && hash.length >= 32) rows.push({ shop, label, hash, contract: typeof node.contract === 'string' ? node.contract : null });
+        if (typeof hash === 'string' && hash.length >= 32) rows.push({ shop, label, hash, contract: typeof node.contract === 'string' ? node.contract : null, ...(typeof node.signer === 'string' ? { signer: node.signer } : {}) });
       }
     }
     for (const [k, v] of Object.entries(node)) {
@@ -20,7 +20,8 @@ export function collectMainnetTxs(dep) {
 }
 
 export function sendersFor(dep, row) {
-  return [...new Set([dep.root, row.contract, dep.charter?.contract, dep.factory?.contract].filter(s => typeof s === 'string' && s.endsWith('.near')))];
+  // A visitor's implicit account (64 hex) signs its own txs, so it is a sender too.
+  return [...new Set([row.signer, dep.root, row.contract, dep.charter?.contract, dep.factory?.contract].filter(s => typeof s === 'string' && (s.endsWith('.near') || /^[0-9a-f]{64}$/.test(s))))];
 }
 
 export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
