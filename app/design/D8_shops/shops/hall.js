@@ -15,10 +15,13 @@ export const PROOF = mainnet('hall') + proof(
 const PST = { Approved: ['ok', 'approved'], Rejected: ['no', 'rejected'], Removed: ['no', 'removed'], Failed: ['no', 'failed'], Expired: ['ice', 'expired'], InProgress: ['pend', 'open'] };
 const plain = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 const KIND = { FunctionCall: 'Contract call', AddMemberToRole: 'Add a member', RemoveMemberFromRole: 'Remove a member', Transfer: 'Send NEAR', Vote: 'Vote' };
+// Expired votes and leftovers from test runs (template ids, round labels, throwaway accounts) go under "Show history".
+export const isOld = p => !!p.expired || p.status === 'Expired' || /alice\.testnet|trezu-tmpl|\bR16\.|\.testnet char/i.test(plain(p.description));
 export function proposalRows(ps = []) {
   return ps.map(p => { const [st, stText] = PST[p.status] || ['pend', String(p.status).toLowerCase()];
     const why = p.expired ? 'Voting has closed.' : p.status === 'InProgress' ? 'Voting is open.' : plain(p.description).slice(0, 90);
-    return row({ k: `#${p.id} · ${KIND[p.kind] || plain(p.kind)}`, why, st, stText, src: 'live' }); });
+    const r = row({ k: `#${p.id} · ${KIND[p.kind] || plain(p.kind)}`, why, st, stText, src: 'live' });
+    return isOld(p) ? r.replace('<div class="row">', '<div class="row" data-old="1">') : r; });
 }
 export async function liveProposals(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, ''), bare = false) {
   try { const c = new AbortController(), t = setTimeout(() => c.abort(), 6000);

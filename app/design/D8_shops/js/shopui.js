@@ -212,7 +212,7 @@ const APPS = {
     },
   },
   hall: {
-    label: 'Town Hall · vote on a rule', idle: 'File a real proposal with the Town Hall DAO, or change your own charter (timelocked).',
+    label: 'Town Hall · vote on a rule', idle: 'Costs: “Ask the DAO” locks a 0.1 NEAR bond on the testnet Town Hall DAO (returned when the vote ends) plus a network fee. Changing your own max or cooling costs only the network fee, well under 0.01 NEAR, and waits out your cooling period.',
     form: () => `<div class="seg" role="radiogroup">${[['dao', 'Ask the DAO'], ['tighter', 'My max lower'], ['looser', 'My max higher'], ['cool', 'My 5 min cooling']].map(([k, t]) => `<label><input type="radio" name="hc" value="${k}" ${k === (extra.hc || 'dao') ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>`,
     bind: () => { for (const i of document.querySelectorAll('input[name=hc]')) i.onchange = () => { extra.hc = i.value; }; },
     btn: 'Propose a cap change',
@@ -360,8 +360,9 @@ function proofDrawer() {
   if (S.charter) h += list(cur === 'house' ? 'Your history' : 'Your history here', mine.slice(latest && !(cur === 'toll' && extra.tst) ? 1 : 0, 12).map(r => prow(esc(r.shop) + ' · ' + esc(r.decision), r.reason && r.decision !== 'allowed' ? esc(A.why(r.reason)) : '', `<span class="st ${r.decision === 'denied' ? 'no' : 'ok'}" aria-label="${esc(r.decision)}">${r.decision === 'denied' ? '✕' : '✓'}</span>${A.txLine(r.h, '↗')}`)), 'Nothing signed yet.');
   if (cur === 'guard') details.push(attestedLine());
   if (cur === 'toll') { const t = tollGate(); h += `<section class="dz hist"><h3>Toll gate</h3>${t.list}</section>`; if (t.more) details.push(t.more); }
-  const live = { hall: ['Latest proposals', hallRows], arena: ['Past attacks', arenaRows], toll: ['Toll records', tollRecordRows] }[cur];
-  if (live) { const p = split(live[1]()); h += p.wait ? `<section class="dz hist"><h3>${live[0]}</h3><p class="note">Reading…</p></section>` : list(live[0], cur === 'arena' ? p.rows.slice(0, 3) : p.rows, p.notes[0] ? p.notes[0].replace(/<\/?p[^>]*>/g, '') : 'Nothing yet.'); if (!p.wait && p.rows.length) details.push(...p.notes); }
+  const live = { hall: ['Latest proposals · testnet DAO', hallRows], arena: ['Past attacks', arenaRows], toll: ['Toll records', tollRecordRows] }[cur];
+  if (live) { const p = split(live[1]()); if (cur === 'hall' && !p.wait) { const old = p.rows.filter(r => r.includes('data-old="1"')); p.rows = p.rows.filter(r => !r.includes('data-old="1"')); if (old.length) p.hist = `<details class="more" data-testid="hall-history"><summary><span class="dt">Show history (${old.length} expired or test entries)</span></summary>${old.join('')}</details>`; }
+    h += p.wait ? `<section class="dz hist"><h3>${live[0]}</h3><p class="note">Reading…</p></section>` : list(live[0], cur === 'arena' ? p.rows.slice(0, 3) : p.rows, p.notes[0] ? p.notes[0].replace(/<\/?p[^>]*>/g, '') : 'Nothing yet.'); if (p.hist) h = h.replace(/<\/section>$/, p.hist + '</section>'); if (!p.wait && p.rows.length) details.push(...p.notes); }
   // Details: ids, notes, the lab record
   if (lab) details.push(`<div class="labrec">${lab}</div>`);
   if (details.length) h += `<details class="dz more"><summary>Details</summary>${details.join('')}</details>`;
