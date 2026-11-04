@@ -99,6 +99,8 @@ async function getJson(path) {
 function walkJson(o, where, parent = null) {
   if (Array.isArray(o)) { o.forEach((v, i) => walkJson(v, `${where}[${i}]`, parent)); return; }
   if (!o || typeof o !== 'object') return;
+  // A planned account (the mainnet factory, until the owner deploys it) is not on chain yet.
+  if (o.status === 'not_deployed') return;
   const target = o.contract || o.oath || o.charter || null;
   if (o.factory && o.code_hash) RELEASES.push({ factory: o.factory, code_hash: o.code_hash, where });
   for (const [k, v] of Object.entries(o)) {
