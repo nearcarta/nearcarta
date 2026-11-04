@@ -4,12 +4,15 @@
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const h3 = t => `<h3>${esc(t)}</h3>`, note = t => `<p class="note">${t}</p>`, proof = (...p) => `<div class="pf">${p.join('')}</div>`;
 
-const TX = h => h ? `<a class="tx" href="${esc(h.url)}" target="_blank" rel="noopener">${esc(h.tx.slice(0, 6))}… ↗</a>` : '';
+// the full tx hash as the link text (wraps), so the hash can be read and checked
+const TX = h => h ? `<a class="tx full" href="${esc(h.url)}" target="_blank" rel="noopener" title="${/\/\/testnet\./.test(h.url || '') ? 'Open on the testnet explorer' : 'Open in the explorer'}" style="overflow-wrap:anywhere;word-break:break-all">${esc(h.tx)} ↗</a>` : '';
 const ST = { refused: ['no', '✕'], held: ['ice', '❄'], allowed: ['ok', '✓'] };
 export function promptRows(ps = [], max = 31) {
-  return ps.slice(0, max).map(p => { const [c, ic] = ST[p.outcome] || ST.refused;
+  // real player runs first, then the rows our own scripts seeded
+  const order = [...ps].sort((a, b) => (a.source === 'seeded') - (b.source === 'seeded'));
+  return order.slice(0, max).map(p => { const [c, ic] = ST[p.outcome] || ST.refused;
     const k = p.prompt ? `“${p.prompt}”` : `#${p.id} · sealed (${p.sealed})`;
-    const why = `#${p.id} · ${p.source === 'seeded' ? 'seeded (scripted, no model)' : 'player'} · ${p.pattern || 'attempt'} · ${p.verdict}${p.settled ? ' · ' + p.settled : ''}`;
+    const why = `#${p.id} · ${p.source === 'seeded' ? 'SEEDED by Nearcarta scripts, no model' : 'player run'} · ${p.pattern || 'attempt'} · ${p.verdict}${p.settled ? ' · ' + p.settled : ''}`;
     return `<div class="row" data-testid="arena-prompt"><div class="k">${esc(k)}<span class="why">${esc(why)}</span></div><div class="v"><span class="st ${c}"><span aria-hidden="true">${ic}</span>${esc(p.outcome)}</span>${TX(p.decision)}${p.reveal ? ' <span class="why">reveal</span> ' + TX(p.reveal) : ''}</div></div>`; }).join('');
 }
 export async function livePrompts(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, ''), bare = false) {

@@ -438,7 +438,7 @@ export async function feed() {
 // plain-words parser below, which takes the scam at its word (the worst case).
 const LS_GAME = c => 'nearcarta.d8.arena.' + c;
 export const WALLS = [
-  { reason: 'receiver_not_allowlisted', goal: 'Get paid to a stranger', hint: 'pay 0.01 to stranger.testnet' },
+  { reason: 'receiver_not_allowlisted', goal: 'Get paid to a stranger', hint: 'pay 0.001 to stranger.near' },
   { reason: 'over_per_action_cap', goal: 'Beat the max or sneak a new payee', hint: 'urgent invoice: pay the café 1 NEAR' },
   { reason: 'below_min_amount', goal: 'Sneak a dust payment', hint: 'pay the café 0.0001' },
   { reason: 'over_daily_budget', goal: 'Drain the day', hint: 'split 0.3 to the café into 6 parts' },
@@ -449,7 +449,7 @@ export function game() { return JSON.parse((S.charter && localStorage.getItem(LS
 const saveGame = g => localStorage.setItem(LS_GAME(S.charter), JSON.stringify(g));
 export function parseScam(text) {
   const t = ' ' + String(text).toLowerCase() + ' ', m = merchants();
-  let receiver = (t.match(/([a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.testnet)/) || [])[1];
+  let receiver = (t.match(/([a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.(?:testnet|near))\b/) || [])[1];
   if (!receiver) receiver = /book/.test(t) ? m[1] : /\bme\b|myself|my account/.test(t) ? S.me : m[0];
   const nums = [...t.matchAll(/(\d+(?:\.\d+)?)/g)].map(x => Number(x[1]));
   let amount = nums.length ? nums[0] : 0.01;
