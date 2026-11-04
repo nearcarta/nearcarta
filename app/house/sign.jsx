@@ -60,7 +60,10 @@ function App() {
   </>;
 }
 // Plain words on the connect screen, and bring this window to the front when it opens.
-const retitle = () => document.querySelectorAll('.pnc-approval__title').forEach(t => { if (t.textContent.trim() === 'Connect to') t.textContent = 'Sign in to Nearcarta'; });
+const retitle = () => {
+  document.querySelectorAll('.pnc-approval__title').forEach(t => { if (t.textContent.trim() === 'Connect to') t.textContent = 'Sign in to Nearcarta'; });
+  document.querySelectorAll('#root p, #root span, #root div').forEach(n => { if (n.childElementCount === 0 && /only connect to apps you trust/i.test(n.textContent)) n.textContent = "This is Nearcarta's own sign-in."; });
+};
 new MutationObserver(retitle).observe(document.getElementById('root'), { childList: true, subtree: true });
 try { window.focus(); } catch {}
 createRoot(document.getElementById('root')).render(<App />);
