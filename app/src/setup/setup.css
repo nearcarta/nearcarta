@@ -120,3 +120,21 @@ input:hover,select:hover{border-color:#ffffff38}input::placeholder{color:#9c8f79
 .shell{padding:6px 12px 24px}.card{padding:22px 18px;border-radius:18px}.grid2,.two,.tiles{grid-template-columns:1fr}.picks{grid-template-columns:repeat(2,1fr);gap:10px}
 .facts{grid-template-columns:1fr}.qr{width:112px;height:112px}.actions{flex-direction:column-reverse;align-items:stretch}.actions .btn{width:100%}.who{display:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* AA contrast pass (all >= 4.5:1 on the dark card) and stable sign-in layout */
+:root{--t3:#bcae95}
+.rail li small{color:#e7d7bc}.rail li{color:#c9bca3}
+.eyebrow{color:#e2c47f}
+.foot{color:#c9bca3}
+.muted,.small.muted,.tile span,.fact small,.pick span,.trial-note,.or{color:#c3b59c}
+input::placeholder{color:#a99c85}
+.err{color:#ffa49b}
+label{color:#ddd0b8}
+.signbox{min-height:150px}
+.tabhelp{margin-top:12px;padding:12px 14px;border-radius:12px;background:#d6b46a14;border:1px solid #d6b46a44}
+.tabhelp p{margin:0 0 10px;color:#e7dcc6}
+#status{min-height:1.6em}
+.acct{display:block;margin-top:6px;padding:10px 12px;border-radius:10px;background:#00000044;border:1px solid var(--line2);font:14px/1.5 var(--mono);color:#f3ead8;word-break:break-all;user-select:all;-webkit-user-select:all}
+.qrfig{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.qrfig figcaption{font-size:12px;color:#ddd0b8;max-width:132px;text-align:center}
+.gasline{color:#ddd0b8}
