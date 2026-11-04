@@ -143,7 +143,7 @@ label{color:#ddd0b8}
 .tile span{font-size:14px;color:#d6c9b0}.foot{font-size:13px;color:#d6c9b0}
 .actions .btn:not(.gold){background:#ffffff1a;border-color:#f3ead880;color:#f3ead8}.actions .btn:not(.gold):hover{background:#ffffff29;border-color:#f3ead8}
 /* try cards: look clickable */
-.tile[data-testid^=try-]{border:1.5px solid #d6b46a88;background:#d6b46a0f;position:relative}
-.tile[data-testid^=try-]:not(:disabled):hover{border-color:#e2c47f;background:#d6b46a1f;transform:translateY(-2px);box-shadow:0 8px 24px #0006}
+.tile[data-testid^=try-]{border:2px solid #e2c47f;background:#d6b46a0f;position:relative}
+.tile[data-testid^=try-]:not(:disabled):hover{border-color:#f3d78f;background:#d6b46a1f;transform:translateY(-2px);box-shadow:0 8px 24px #0006}
 .tile[data-testid^=try-]:focus-visible{outline:2px solid #e2c47f;outline-offset:2px}
 .tile .go{margin-top:4px;font-size:13px;font-weight:600;color:#e2c47f}.tile:disabled .go{display:none}

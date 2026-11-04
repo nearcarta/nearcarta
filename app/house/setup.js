@@ -50,6 +50,9 @@ const boardLive = () => PUBLIC_MAINNET && MAIN.board?.status === 'deployed' && !
 const journey = () => setupJourney(st.trial, { publicMainnet: PUBLIC_MAINNET, boardDeployed: boardLive() });
 const explorer = () => journey().explorer;
 const txA = h => h ? `<a href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" data-testid="setup-tx" aria-label="View transaction ${esc(h)} on nearblocks">View on nearblocks (${esc(h.slice(0, 4))}…)</a> <button type="button" class="btn link sm" data-copy="${esc(h)}" data-testid="setup-copy-tx" aria-label="Copy transaction hash">Copy</button>` : '';
+// The town links are re-rendered by balance and key polls; navigate on pointerdown/click so a re-render cannot swallow the tap.
+const toTown = e => { const a = e.target.closest?.('a[data-testid=setup-finish],a[data-testid=setup-office]'); if (!a || e.button > 0 || e.metaKey || e.ctrlKey) return; e.preventDefault(); location.assign(a.getAttribute('href')); };
+document.addEventListener('click', toTown, true);
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-copy]'); if (!b) return; e.preventDefault(); navigator.clipboard?.writeText(b.dataset.copy).then(() => { b.textContent = 'Copied'; setTimeout(() => { if (document.contains(b)) b.textContent = 'Copy'; }, 1500); }).catch(() => {}); });
 const acA = a => `<a href="${explorer()}/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
 for (const p of LOOKS) { const i = new Image(); i.src = `/setup/chars/${p.img}.webp`; (window.__chars ||= []).push(i); }
@@ -517,7 +520,7 @@ function sTry() {
      ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
      ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR… <span id="try-secs" data-testid="try-secs">${Math.floor((Date.now() - pendingTry.t0) / 1000)}s</span></span> ${txA(pendingTry.hash)}</div></div>` : ''}
      ${tries.map(t => `<div class="verdict ${t.passed ? 'good' : 'bad'}" data-testid="try-verdict"><span class="tag">${t.passed ? 'ALLOWED' : 'REFUSED'}</span><div><b>${fmtN(nearOf(t.amount))} NEAR → ${esc(short(t.receiver))}</b><br><span class="muted small">${esc(t.passed ? 'inside your rule · the charter paid' : whyText(t))}${t.passed ? '' : t.tx ? ' · refused on chain by the contract' : ' · refused before sending, nothing on chain'}${t.signer === 'agent' ? ' · signed by your agent key, no wallet' : ''}</span> ${txA(t.tx)}</div></div>`).join('')}
-     ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Charter office</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.some(t => t.passed) && tries.length >= 2 ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
+     ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Charter office</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.some(t => t.passed) || st.allowedTx ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
 }
 function next() { const n = new URLSearchParams(location.search).get('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/'; }
 function wireTry() {
@@ -532,7 +535,7 @@ function wireTry() {
   const tu = $('#t-topup'); if (tu) tu.onclick = e => act(e.currentTarget, topUp);
   if (boardLive() && !st.trial && rowBal === null) readRowBal().then(() => { if (STEPS[st.step][0] === 'try' && rowBal !== null) render(); });
   clearInterval(secTimer); secTimer = setInterval(() => { const el = $('#try-secs'); if (el && pendingTry) el.textContent = Math.floor((Date.now() - pendingTry.t0) / 1000) + 's'; }, 1000);
-  $('#t-ok').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(Math.min(+r.cap, 0.001), 'setup: allowed')); if (boardLive() && !st.trial) await readRowBal(); refreshBal(); });
+  $('#t-ok').onclick = e => act(e.currentTarget, async () => { const t = await ask(Math.min(+r.cap, 0.001), 'setup: allowed'); tries.push(t); if (t.passed) { st.allowedTx = t.tx || true; save(); } if (boardLive() && !st.trial) await readRowBal(); refreshBal(); });
   $('#t-no').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(+(+r.cap * 2).toFixed(4), 'setup: over cap')); refreshBal(); });
   wire();
 }
