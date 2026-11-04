@@ -496,7 +496,7 @@ async function topUpRun() {
   mark('run');
   // Re-read the row until the new balance shows (the fund call confirms in a block or two).
   for (let i = 0; i < 15; i++) { await readRowBal(); if (rowBal !== null && rowBal > before) break; await wait(1500); }
-  mark(rowBal !== null && rowBal > before ? 'ok' : 'run');
+  mark(rowBal !== null && rowBal > before ? 'ok' : 'run'); refreshBal();
 }
 async function readRowBal() { const row = await viewFn(rpcClient([MAIN.rpc]), MAIN.board.contract, 'get_charter', { owner: me }).catch(() => null); rowBal = row ? BigInt(row.balance) : null; }
 function sTry() {
@@ -510,8 +510,8 @@ function sTry() {
   }
   const r = rules(), to = r.receivers[0], ok = Math.min(+r.cap, 0.001 > +r.cap ? +r.cap : 0.001), over = +(+r.cap * 2).toFixed(4);
   return head('Try it', 'Watch the charter decide.', `Your agent signs two real requests with its own key. The contract checks each against your rule.`)
-    + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button class="tile" id="t-ok" data-testid="try-allowed" ${lowBal() || topUpBusy ? 'disabled' : ''}><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span>${lowBal() || topUpBusy ? 'Needs charter balance: add NEAR below first' : 'Inside your rule: should pass'}</span></button>
-       <button class="tile" id="t-no" data-testid="try-refused" ${lowBal() || topUpBusy ? 'disabled' : ''}><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span>${lowBal() || topUpBusy ? 'Needs charter balance: add NEAR below first' : 'Twice your cap: should be refused'}</span></button></div>
+    + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button class="tile" id="t-ok" data-testid="try-allowed" ${lowBal() || topUpBusy ? 'disabled' : ''}><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span>${lowBal() || topUpBusy ? 'Needs charter balance: add NEAR below first' : 'Inside your rule: should pass'}</span><em class="go" style="font-style:normal">Tap to run →</em></button>
+       <button class="tile" id="t-no" data-testid="try-refused" ${lowBal() || topUpBusy ? 'disabled' : ''}><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span>${lowBal() || topUpBusy ? 'Needs charter balance: add NEAR below first' : 'Twice your cap: should be refused'}</span><em class="go" style="font-style:normal">Tap to run →</em></button></div>
      ${boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it (it can only call <code>propose</code> on ${esc(MAIN.board.contract)} and cannot move your NEAR).</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
      ${lowBal() || topUpBusy ? `<div class="tabhelp" data-testid="try-lowbal"><p class="small">Your charter holds ${fmtN(nearOf(rowBal.toString()))} NEAR. Payments come from the charter's own balance, not your account. Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to it with one approval.</p><button type="button" class="btn" id="t-topup" data-testid="try-topup" ${topUpBusy ? 'disabled aria-busy="true"' : ''}>${topUpBusy ? 'Adding… waiting for confirmation' : `Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to the charter`}</button></div>` : ''}
      ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
@@ -532,8 +532,8 @@ function wireTry() {
   const tu = $('#t-topup'); if (tu) tu.onclick = e => act(e.currentTarget, topUp);
   if (boardLive() && !st.trial && rowBal === null) readRowBal().then(() => { if (STEPS[st.step][0] === 'try' && rowBal !== null) render(); });
   clearInterval(secTimer); secTimer = setInterval(() => { const el = $('#try-secs'); if (el && pendingTry) el.textContent = Math.floor((Date.now() - pendingTry.t0) / 1000) + 's'; }, 1000);
-  $('#t-ok').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(Math.min(+r.cap, 0.001), 'setup: allowed')); if (boardLive() && !st.trial) await readRowBal(); });
-  $('#t-no').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(+(+r.cap * 2).toFixed(4), 'setup: over cap')); });
+  $('#t-ok').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(Math.min(+r.cap, 0.001), 'setup: allowed')); if (boardLive() && !st.trial) await readRowBal(); refreshBal(); });
+  $('#t-no').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(+(+r.cap * 2).toFixed(4), 'setup: over cap')); refreshBal(); });
   wire();
 }
 
