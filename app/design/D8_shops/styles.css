@@ -329,3 +329,17 @@ body:has(#drawer.open) #back{visibility:hidden}
 #r-status .steps{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px;font-size:13px;color:var(--muted,#b9ad95)}
 #r-status .steps li.now{color:var(--ink,#f3ead8);font-weight:600}#r-status .steps li.done{color:#5bd69a}
 .skel{display:grid;gap:8px;margin:6px 0;width:100%;flex:1 1 100%}.skel i{display:block;height:14px;border-radius:7px;background:linear-gradient(90deg,#ffffff2e,#ffffff5c,#ffffff2e);background-size:200% 100%;animation:skel 1.2s linear infinite}.skel i:nth-child(2){width:80%}.skel i:nth-child(3){width:55%}@keyframes skel{to{background-position:-200% 0}}
+
+/* proof panels: self-contained city card, never white, readable on any host page */
+.pf{background:var(--c-pane,#1f1a15);color:var(--c-text,#f3ead8);border:1px solid var(--c-line-strong,#3a3128);border-radius:12px;padding:4px 16px 14px;margin:0 0 12px}
+.pf h3{color:var(--c-brass,#d6b46a)!important;font:600 12px/18px Inter,system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;margin:12px 0 4px}
+.pf .row{border-top:1px solid var(--c-line-strong,#3a3128)}
+.pf .row .k{color:var(--c-text,#f3ead8)!important;font:500 14px/20px Inter,system-ui,sans-serif}
+.pf .row .k .why{color:#c9bda8!important;font:400 12px/18px Inter,system-ui,sans-serif}
+.pf .note{color:#c9bda8;font-size:13px;line-height:19px}
+.pf a.tx,.pf .note a{color:var(--c-brass,#d6b46a)}
+.pf .st.ok{color:var(--p-verified-mark,#00ec97)} .pf .st.no{color:var(--p-check-failed-mark,#ff6b6b)}
+#drawer .dz .pf{border:0;padding:0;margin:0;background:transparent}
+
+.net{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 8px;border-radius:999px;font:600 11px/20px Inter,system-ui,sans-serif;letter-spacing:.02em;text-transform:none;margin-right:6px}
+.net.mainnet{background:color-mix(in srgb,#00ec97 16%,transparent);color:#00ec97;border:1px solid color-mix(in srgb,#00ec97 45%,transparent)}

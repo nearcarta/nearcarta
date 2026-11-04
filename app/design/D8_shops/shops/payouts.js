@@ -7,16 +7,16 @@ import { M as PM, brassM, mesh, lantern, candle, rug, banner } from './_props.js
 // The R17 charter factory these batches run on (shared/deployments/testnet.json vault, judges/proofs/r17-factory.json).
 const F = 'nccharters-53836.testnet';
 const BATCH_PROOF = proof(
-  h3('Batches run on the R17 charters'),
-  row({ k: 'Oath published by hash', why: 'reproducible build-3709807 · propose_batch', st: 'ok', stText: 'byte-equal', tx: 'EqTuyP3yv3mhrNTbDbu8ckMNQyB2MSY56m6QPDNMfnR8' }),
-  row({ k: 'Factory deployed on that hash', why: 'every new charter runs this code', st: 'ok', stText: 'live', tx: '9VJ3iRzE5quEz4pn8k2ZPzDqot2idAuj5kVJJ6Xi6iWc' }),
-  row({ k: 'Factory full-access key deleted', why: 'nobody can change the factory', st: 'ok', stText: '0 keys', tx: 'D4W8yGEx5ZFhXo5m3d6tqQwJ3KomBhsuC3pcTuHeXVhm' }),
+  h3('Batch payouts on testnet'),
+  row({ k: 'Rule code published', why: 'anyone can rebuild it and get the same file', st: 'ok', stText: 'matches', tx: 'EqTuyP3yv3mhrNTbDbu8ckMNQyB2MSY56m6QPDNMfnR8' }),
+  row({ k: 'Charter maker uses that code', why: 'every new charter runs it', st: 'ok', stText: 'live', tx: '9VJ3iRzE5quEz4pn8k2ZPzDqot2idAuj5kVJJ6Xi6iWc' }),
+  row({ k: 'Charter maker locked', why: 'nobody can change it now', st: 'ok', stText: '0 keys', tx: 'D4W8yGEx5ZFhXo5m3d6tqQwJ3KomBhsuC3pcTuHeXVhm' }),
   note(`Factory ${acct(F)}. Up to 5 payouts per batch; one over budget refuses them all.`));
 // Testnet USDC payroll (judges/proofs/payroll-usdc.json; live at /api/payouts/usdc).
 export const USDC_PROOF = proof(
   h3('USDC payroll on testnet'),
   row({ k: 'You set the rule', why: '2 staff · 1 USDC per payment · 2 USDC a day', st: 'ok', stText: 'on chain', tx: 'EegQrPE6mPxZ6qiB1hgQvptFB2MFN3FCd6FwQh7y6jpA' }),
-  row({ k: 'Staff registered on USDC', why: 'storage_deposit, so a payment can land', st: 'ok', stText: 'done', tx: 'FZP13pFCrQgJUadCHcLoHHbF64UcwPbeJL7UK7wC2hk5' }),
+  row({ k: 'Staff registered on USDC', why: 'each wallet opened so it can receive USDC', st: 'ok', stText: 'done', tx: 'FZP13pFCrQgJUadCHcLoHHbF64UcwPbeJL7UK7wC2hk5' }),
   row({ k: 'Agent paid 0.5 USDC', why: 'inside the cap', st: 'ok', stText: 'paid', tx: '9mj13hmpnQV11FSy6tNZ4yoJbQeaJVMWhwAbPdSx6DDi' }),
   row({ k: 'Agent asked for 1.5 USDC', why: 'over the 1 USDC cap', st: 'no', stText: 'refused', tx: '6yMgMiRLfCtyum7aYJuL5Qkyy5hr74WPgQJmVrx7L6bv' }),
   note(`Charter ${acct('payroll-rveu.nccharters-22195.testnet')}. Token: Circle testnet USDC.`));
