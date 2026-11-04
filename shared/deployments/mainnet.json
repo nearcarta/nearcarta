@@ -47,6 +47,30 @@
    "refused_over_per_action_cap": "CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF",
    "refused_receiver_not_allowlisted": "E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ",
    "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
+  },
+  "visitor_run": {
+   "note": "A real visitor, start to finish, in the browser at nearcarta.vercel.app/setup: email sign-in made this implicit account, nearcarta.near funded it, the visitor opened a row and the agent's request inside the cap was paid; the one over the cap was refused by the contract.",
+   "contract": "board.nearcarta.near",
+   "signer": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8",
+   "funded_by": {
+    "nearcarta.near_0.08": "A3SqsmD6CcDvD4qdRAxJrDn1gUUFzcVC3ErVdQZVveeu",
+    "nearcarta.near_0.03": "9Hz9yVarJAow2cU1SAap6EEdyJfuCM5QwGDHfAZdABV8"
+   },
+   "rules": {
+    "receivers": [
+     "charter.nearcarta.near",
+     "toll.nearcarta.near"
+    ],
+    "per_action_cap_near": 0.005,
+    "daily_budget_near": 0.01,
+    "max_actions_per_day": 3,
+    "row_deposit_near": 0.02
+   },
+   "txs": {
+    "open_charter": "6xMQyXcczLjxymmrYfBhFDuRy9MpFV62CviqdYHrnTdQ",
+    "propose_allowed_0.001": "4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia",
+    "propose_refused_0.01_over_per_action_cap": "AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx"
+   }
   }
  },
  "mpc": "v1.signer",
