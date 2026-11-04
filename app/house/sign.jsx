@@ -64,6 +64,23 @@ const retitle = () => {
   document.querySelectorAll('.pnc-approval__title').forEach(t => { if (t.textContent.trim() === 'Connect to') t.textContent = 'Sign in to Nearcarta'; });
   document.querySelectorAll('#root p, #root span, #root div').forEach(n => { if (n.childElementCount === 0 && /only connect to apps you trust/i.test(n.textContent)) n.textContent = "This is Nearcarta's own sign-in."; });
 };
+// Show what each action does (method, deposit, contract) above the fold, without opening Advanced Details.
+const whatLine = card => {
+  const f = {}; card.querySelectorAll('.pnc-action-card__field').forEach(x => { f[x.querySelector('.pnc-action-card__field-label')?.textContent.trim()] = x.querySelector('.pnc-action-card__field-value')?.textContent.trim(); });
+  const kind = card.querySelector('.pnc-action-card__badge')?.textContent.trim(), dep = (card.querySelector('.pnc-action-card__footer')?.textContent.match(/Deposit:\s*([\d.]+)\s*NEAR/) || [])[1];
+  if (f.Method) return `${f.Method} · ${dep ? dep + ' NEAR' : 'no deposit'} to ${f.To}`;
+  if (f.Amount) return `send ${f.Amount} to ${f.To}`;
+  return `${(kind || 'action').toLowerCase()} on ${f.To}`;
+};
+const summarize = () => {
+  const adv = document.querySelector('.pnc-advanced-details'); if (!adv) return;
+  const lines = [...adv.querySelectorAll('.pnc-action-card')].map(whatLine); if (!lines.length) return;
+  const key = lines.join('\n'); let box = document.querySelector('.nc-what');
+  if (box?.dataset.k === key) return;
+  if (!box) { box = document.createElement('section'); box.className = 'pnc-section nc-what'; box.setAttribute('data-testid', 'sign-what'); adv.parentNode.insertBefore(box, adv); }
+  box.dataset.k = key; box.innerHTML = '<p class="nc-what__title">You are approving</p>' + lines.map(l => `<p class="nc-what__line">${l.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</p>`).join('');
+};
+new MutationObserver(summarize).observe(document.getElementById('root'), { childList: true, subtree: true });
 new MutationObserver(retitle).observe(document.getElementById('root'), { childList: true, subtree: true });
 document.title = 'Nearcarta · approve';
 try { window.focus(); } catch {}

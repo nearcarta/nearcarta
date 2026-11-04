@@ -35,3 +35,4 @@ body{background:radial-gradient(900px 500px at 80% -10%,rgba(214,180,106,.22),tr
 /* No tall empty card: size to the content. */
 @media (min-width:600px){.nc-sign .pnc-card,.pnc-card{min-height:0!important}}
 .nc-sign .pnc-card__body{flex:0 1 auto!important}
+.nc-what{border:1px solid #d6b46a55;border-radius:12px;padding:10px 14px;background:#d6b46a12}.nc-what__title{margin:0 0 4px;font-size:13px;color:#e2c47f;font-weight:600}.nc-what__line{margin:2px 0;font:14px/1.4 ui-monospace,Menlo,monospace;color:#f3ead8;word-break:break-all}
