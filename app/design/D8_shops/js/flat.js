@@ -33,7 +33,7 @@ export function flat() {
   const start = new URLSearchParams(location.search).get('shop'); if (start && SH[start]) open(start);
 }
 const FLAT = {
-  guard: { src: 'mainnet', cls: 'split', label: 'Forged invoice asks', hero: tok('5', 'NEAR') },
+  guard: { src: 'mainnet', cls: 'split', label: 'Invoice with a hidden instruction', hero: tok('0.001', 'NEAR') },
   ferry: { src: 'mainnet quote', cls: 'quote', label: 'Shielded quote · Orchard-only UA', hero: `${tok(String(+QUOTE.from.amt), QUOTE.from.sym, { chain: QUOTE.from.chain })}<span class="arrow">→</span>${tok(QUOTE.to.amt, QUOTE.to.sym)}` },
   hall: { src: 'mainnet', cls: 'split', label: 'Reward cap · Proposal 4', hero: tok('0.15', 'NEAR') },
   bank: { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount', hero: '<span class="commit">sha256…</span><span class="unit">amount hidden</span>' },

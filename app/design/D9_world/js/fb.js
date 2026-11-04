@@ -38,7 +38,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
     const b=$('#t-act'), d=$('#d-body'), src=$('#t-src');
     if(err){ src.textContent='error'; src.className='src error'; $('#t-label').textContent='This room could not load'; $('#t-hero').innerHTML=''; b.hidden=false; b.disabled=false; b.className='act primary'; b.textContent='Try again'; b.onclick=()=>open(id);
       d.innerHTML=`<p class="note">The ${esc(NAMES[id])} room failed to load. ${esc(err.message||err)}</p>`; return; }
-    const tok=core.tok;     const F={ guard:['mainnet','split','Forged invoice asks',tok('5','NEAR')], hall:['mainnet','split','Reward cap · Proposal 4',tok('0.15','NEAR')],
+    const tok=core.tok;     const F={ guard:['mainnet','split','Invoice with a hidden instruction',tok('0.001','NEAR')], hall:['mainnet','split','Reward cap · Proposal 4',tok('0.15','NEAR')],
       arena:['mainnet','split','5 attacks on the lab oath','<b class="num">0</b><span class="unit">breaches</span>'], toll:['mainnet','split','MPC signature for Base Sepolia','<b class="num">11</b><span class="unit">of 16 nodes</span>'],
       chronicle:['record','testnet','Refusals on the record','<b class="num">6</b><span class="unit">of 10 actions</span>'], house:['mainnet','split','Tip cap · policy v4',tok('0.5','NEAR')] }[id];
     const info=m.FLAT||(F&&{src:F[0],cls:F[1],label:F[2],hero:F[3]})||{src:'testnet',cls:'testnet',label:'',hero:''};

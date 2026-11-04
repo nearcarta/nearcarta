@@ -39,7 +39,7 @@ export const SHOPS = {
             card:'Amounts stay hidden. Public: the check passed, and when.', tag:'hidden amounts'},
   ferry:    {q:3,r:-2, m:'buildings/blue/building_watermill_blue',name:'Ferry', role:'cross-chain swap',
             card:'A live 1Click quote with its signature checked; your charter pays a testnet stand-in.', tag:'1Click quote · testnet stand-in'},
-  guard:    {q:-4,r:2, m:'buildings/blue/building_barracks_blue', name:'Guardhouse', role:'security limits',
+  guard:    {q:-4,r:2, m:'buildings/blue/building_barracks_blue', name:'Guardhouse', role:'prompt-injection test',
             card:'Every spend is checked before it can be signed: payee list, daily cap, weekly cap.', tag:'payee_allowlist · daily_cap · weekly_cap'},
   arena:    {q:1,r:3,  m:'buildings/blue/building_archeryrange_blue',name:'Vault Arena', role:'try to trick the AI',
             card:'A live vault anyone may try to break. Every failed attack is a Chronicle row.', tag:'arena.attack_failed'},

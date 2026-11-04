@@ -158,7 +158,7 @@ const APPS = {
     },
   },
   guard: {
-    label: 'Guardhouse · security limits', idle: 'Pick a trick. I\u2019ll check the payee before I sign.',
+    label: 'Guardhouse · prompt-injection test', idle: 'Pick a trick, such as an invoice with a hidden line telling AI helpers to pay someone else. I\u2019ll check the payee before I sign. A try costs at most 0.001 NEAR, and only if your rules allow it.',
     form: () => {
       const pick = `<div class="seg" role="radiogroup">${A.attacks().filter(a => A.GUARD_ATTACKS.includes(a.id)).map(a => `<label><input type="radio" name="atk" value="${a.id}" ${a.id === (extra.atk || 'poisoned-invoice') ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>`;
       const inv = (extra.atk || 'poisoned-invoice') === 'poisoned-invoice' && !extra.chk ? (() => { const v = A.poisonedInvoice(); return `<p class="goal" data-testid="invoice">${esc(v.shown)}</p><p class="hidden-line" data-testid="hidden-line">hidden: ${esc(v.hidden)}</p>`; })() : '';
