@@ -3,12 +3,13 @@
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const tx = h => `<a href="https://testnet.nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(h).slice(0, 10))}…</a>`;
+const NB = window.NEARCARTA_PUBLIC_MAINNET ? 'https://nearblocks.io' : 'https://testnet.nearblocks.io';
+const tx = h => `<a href="${NB}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(h).slice(0, 10))}…</a>`;
 // Readable names for our testnet accounts; the full id stays in the link and the tooltip.
 const ROLE = [[/^attacker\./, 'test merchant (red-team)'], [/mallory/, 'red-team account'], [/^bakery\./, 'Bakery (payee)'], [/^dao\.|sputnik/, 'Town Hall DAO'],
   [/house/, 'Your House charter'], [/hown/, 'House owner'], [/oath/, 'charter contract'], [/arena/, 'Arena contract'], [/agent/, 'agent'], [/own-/, 'owner'], [/signer/, 'NEAR MPC signer']];
 const nameOf = a => { const s = String(a ?? ''); for (const [re, n] of ROLE) if (re.test(s)) return n; return s.length > 26 ? s.slice(0, 10) + '…' + s.slice(-8) : s; };
-const acct = a => `<a href="https://testnet.nearblocks.io/address/${esc(a)}" target="_blank" rel="noopener" title="${esc(a)}">${esc(nameOf(a))}</a>`;
+const acct = a => `<a href="${NB}/address/${esc(a)}" target="_blank" rel="noopener" title="${esc(a)}">${esc(nameOf(a))}</a>`;
 const near = y => (y == null ? '–' : (Number(BigInt(y) / 10n ** 18n) / 1e6).toString() + ' NEAR');
 const mark = ok => `<b class="${ok ? 'pass' : 'fail'}" data-check="${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'}</b>`;
 
