@@ -3,12 +3,12 @@
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const HERO_KEY = 'nearcarta.hero.v1';
 export const LOOKS = [
-  { id: 'knight', name: 'Warden', img: 'knight', blurb: 'Small caps. Few shops.', cap: 0.02, daily: 0.06, per: 3 },
-  { id: 'mage', name: 'Scholar', img: 'mage', blurb: 'Books and data. Mid caps.', cap: 0.05, daily: 0.2, per: 6 },
-  { id: 'rogue', name: 'Courier', img: 'rogue_hooded', blurb: 'Many tiny errands.', cap: 0.01, daily: 0.1, per: 12 },
-  { id: 'robot', name: 'Clerk', img: 'robotexpressive', blurb: 'Steady invoice payments.', cap: 0.03, daily: 0.12, per: 5 },
-  { id: 'barbarian', name: 'Buyer', img: 'barbarian', blurb: 'Bigger buys, few a day.', cap: 0.1, daily: 0.2, per: 2 },
-  { id: 'scout', name: 'Scout', img: 'rogue', blurb: 'New shops, low budget.', cap: 0.02, daily: 0.05, per: 4 },
+  { id: 'knight', name: 'Warden', img: 'knight', blurb: 'Small caps. Few shops.', cap: 0.005, daily: 0.01, per: 3 },
+  { id: 'mage', name: 'Scholar', img: 'mage', blurb: 'Books and data. Mid caps.', cap: 0.005, daily: 0.01, per: 3 },
+  { id: 'rogue', name: 'Courier', img: 'rogue_hooded', blurb: 'Many tiny errands.', cap: 0.005, daily: 0.01, per: 3 },
+  { id: 'robot', name: 'Clerk', img: 'robotexpressive', blurb: 'Steady invoice payments.', cap: 0.005, daily: 0.01, per: 3 },
+  { id: 'barbarian', name: 'Buyer', img: 'barbarian', blurb: 'Bigger buys, few a day.', cap: 0.005, daily: 0.01, per: 3 },
+  { id: 'scout', name: 'Scout', img: 'rogue', blurb: 'New shops, low budget.', cap: 0.005, daily: 0.01, per: 3 },
 ];
 export const DYES = [
   { id: 'brass', name: 'Brass', hex: '#d6b46a' },
