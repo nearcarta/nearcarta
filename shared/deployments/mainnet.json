@@ -16,11 +16,38 @@
  "board": {
   "contract": "board.nearcarta.near",
   "owner": "nearcarta.near",
-  "status": "not_deployed",
+  "status": "deployed",
   "crate": "contracts/charter_board",
   "wasm": "contracts/artifacts/charter_board.wasm",
   "max_row_yocto": "20000000000000000000000",
-  "note": "Not on chain. The owner runs backend/scripts/deploy-mainnet-board.js. One contract, one row per visitor. close_charter returns that row. reap deletes the account once no row is open. See docs/MAINNET_BOARD.md."
+  "note": "Live. One contract, one row per visitor, no access key. close_charter returns the row stake and unspent balance; reap (owner, 1 yocto, only at rows=0) deletes the account and returns the wasm stake to nearcarta.near. See docs/MAINNET_BOARD.md.",
+  "code_hash": "6aBm6TugZzge9uHDpSsr6pG7XPfZm22JoZ8XZxknRGsa",
+  "wasm_sha256": "52cac49a44fe0881fe1f35ee06e6711e7c215e0845136fbd3d4d9e7049ce0dc1",
+  "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --no-abi (wasm-opt -O)",
+  "storage_bytes": 86762,
+  "locked_near": 0.86762,
+  "full_access_keys": 0,
+  "deploy_tx": "CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt",
+  "failed_deploy_tx": "4mq8P3jugnatzbbc9VzDbufCBpyj27TxwK4w3L7nTPCX",
+  "proof": {
+   "visitor": "nearcarta.near",
+   "receiver": "townhall.nearcarta.near",
+   "fund_near": 0.01,
+   "row_storage_locked_near": 0.00265,
+   "per_action_cap_near": 0.002,
+   "daily_budget_near": 0.005,
+   "allowed_near": 0.001,
+   "script": "backend/scripts/board-proof-mainnet.js"
+  },
+  "txs": {
+   "deploy": "CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt",
+   "open_charter": "BUqfZMBTnqU5f223FSDyufCzaVemvMCaWZ2iYXs4MJ4u",
+   "set_agent": "DqMrsEJjd2wyiRh8tW25ZqK8MnG8Tk4rYW3XGuKTfiW7",
+   "allowed_0.001": "8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR",
+   "refused_over_per_action_cap": "CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF",
+   "refused_receiver_not_allowlisted": "E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ",
+   "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
+  }
  },
  "mpc": "v1.signer",
  "chain_id": 8453,
@@ -167,7 +194,7 @@
    }
   }
  },
- "root_balance_near": 1.491207,
+ "root_balance_near": 0.561379,
  "ferry_intents": {
   "rail": "NEAR Intents 1Click",
   "from": "nearcarta.near",

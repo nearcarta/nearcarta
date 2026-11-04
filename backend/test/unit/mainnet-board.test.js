@@ -20,7 +20,9 @@ test('the board wasm deploys for at most 1 NEAR and the state size matches the c
   assert.ok(cost.totalYocto <= MAX_DEPLOY_YOCTO, cost.totalYocto.toString());
   assert.ok(cost.peakYocto <= MAX_DEPLOY_YOCTO, cost.peakYocto.toString());
   assert.equal(cost.totalYocto, cost.stakeYocto + cost.burnedGasYocto + cost.accountCreationYocto);
-  assert.equal(MAIN.board.status, 'not_deployed');
+  assert.equal(MAIN.board.status, 'deployed');
+  assert.equal(MAIN.board.full_access_keys, 0);
+  assert.equal(MAIN.board.txs.close_charter.length > 40, true);
   assert.equal(MAIN.board.owner, MAIN.root);
   assert.equal(MAIN.board.max_row_yocto, '20000000000000000000000');
   assert.match(readFileSync(new URL('../../../contracts/charter_board/src/lib.rs', import.meta.url), 'utf8'), /fn reap/);

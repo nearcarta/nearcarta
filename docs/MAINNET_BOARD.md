@@ -2,7 +2,7 @@
 
 One contract holds every visitor's charter. The row key is the visitor's NEAR account. The lock factory in `docs/MAINNET_FACTORY.md` is not this path: copying the oath wasm onto each charter costs more than `nearcarta.near` can fund, and a global contract burns storage that `reap` cannot return.
 
-The account id is `board.contract` in `shared/deployments/mainnet.json`. It stays `not_deployed` until the owner runs the script below. This repo does not sign that transaction.
+The account id is `board.contract` in `shared/deployments/mainnet.json`. It is live on mainnet: deploy tx `CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt`, 86,762 bytes, no access key. The proof run is `backend/scripts/board-proof-mainnet.js`.
 
 ## What a row stores
 
