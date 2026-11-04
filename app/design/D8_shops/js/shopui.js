@@ -107,16 +107,17 @@ function gasNote() {
 // ---------- shop apps ----------
 const APPS = {
   toll: {
-    label: 'Toll Bridge · pay-per-use gate', idle: 'The toll is 0.01 NEAR to the gate, plus 0.002 to the town treasury and 0.001 to my inference budget: one tx your charter checks, all or nothing. Then the gate gets the MPC network to sign a Base Sepolia payout.',
+    label: 'Toll Bridge · pay-per-use gate', get idle() { return A.S.board ? 'Total cost: 0.001 NEAR on mainnet, one payment your charter checks (your cap is at most 0.005, so the 0.013 testnet split cannot run here). The Base Sepolia gate step runs only in the testnet demo.' : 'Total cost: about 0.013 NEAR in one tx your charter checks, all or nothing: 0.01 toll to the gate, 0.002 to the town treasury, 0.001 to my inference budget. Then the gate gets the MPC network to sign a Base Sepolia payout.'; },
     btn: () => { const v = A.tollVisit(); return !v || v.done ? 'Pay the toll' : extra.tst?.settle ? 'Settle with the MPC proof' : 'Check Base Sepolia'; },
-    hero: () => num('0.01', 'NEAR'),
+    hero: () => num(A.S.board ? String(A.TOLL_MAIN) : '0.013', 'NEAR'),
     form: () => gasNote(),
     run: async () => {
       const v = A.tollVisit();
       if (v && !v.done) return tollStep(v, true);
       const o = await A.toll();
-      if (o.decision !== 'allowed') return { o, hero: num('0.01', 'NEAR'), say: `Refused: ${A.why(o.reason)}. Nothing was signed for Base Sepolia.` };
-      say(o.split ? 'Your charter paid the split in one tx: 0.01 toll, 0.002 treasury, 0.001 agent budget. Now approve the gate call in your wallet…' : !A.canBatch() ? 'Your charter is older and predates batches, so it paid one payment per tx: the plain 0.01 NEAR toll, no split. Now approve the gate call in your wallet…' : 'Your charter paid 0.01 NEAR. Now approve the gate call in your wallet…'); btn('Approve in your wallet…', 'primary busy', true);
+      if (o.decision !== 'allowed') return { o, hero: APPS.toll.hero(), say: `Refused: ${A.why(o.reason)}. Nothing was signed for Base Sepolia.` };
+      if (A.S.board) return { o, keep: true, kind: 'ok', hero: APPS.toll.hero(), say: `Paid the ${A.TOLL_MAIN} NEAR toll on mainnet, inside your cap. The Base Sepolia gate step is testnet only, so it stops here.` };
+      say(o.split ? 'Your charter paid the split in one tx: 0.01 toll, 0.002 treasury, 0.001 agent budget. Now approve the gate call in your wallet…' : !A.canBatch() ? 'Your charter pays one payment per tx, so it paid the plain 0.01 NEAR toll, no split. Now approve the gate call in your wallet…' : 'Your charter paid 0.01 NEAR. Now approve the gate call in your wallet…'); btn('Approve in your wallet…', 'primary busy', true);
       const { v: nv } = await A.tollGate(o.action, o);
       return tollStep(nv, false, o);
     },

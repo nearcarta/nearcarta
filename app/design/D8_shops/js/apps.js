@@ -248,8 +248,11 @@ export function ruleFor(o, clauseId = 'pay') {
 // ---------- per shop ----------
 // The toll with its revenue split: one propose_batch (owner 0.01 + town treasury 0.002 + agent budget 0.001), all or
 // nothing. A charter whose rules do not allow all three payees (or that predates batches) pays the plain 0.01 toll.
+export const TOLL_MAIN = 0.001;
 export async function toll() {
-  if (S.board) return boardPay({ shop: 'toll', receiver: merchants()[0], amountY: toY(0.01) });
+  // mainnet board row: one 0.001 NEAR toll, inside the row's 0.005 cap (0.01 would be refused). The Base Sepolia gate is testnet only.
+  if (S.board) { const rc = pay()?.receivers || [], to = rc.includes('toll.nearcarta.near') ? 'toll.nearcarta.near' : merchants()[0];
+    return boardPay({ shop: 'toll', receiver: to, amountY: toY(TOLL_MAIN) }); }
   const payee = merchants()[0];
   if (!TS.canSplit(pay()?.receivers, payee, canBatch())) return ask({ shop: 'toll', receiver: payee, amountY: toY(0.01), memo: 'toll:base-sepolia' });
   const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
