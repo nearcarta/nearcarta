@@ -54,7 +54,7 @@ function App() {
   // The plugin mounts at once: NEAR Connect waits only 30 s for it to say READY. Its approval stays hidden
   // until the visitor is logged in, so nothing can be signed before that.
   return <>
-    {user === undefined && <p className="box">Loading…</p>}
+    {user === undefined && <p className="box" role="status">Preparing your approval…</p>}
     {user === null && <Login onUser={setUser} />}
     <div hidden={!user}><SignPagePlugin privy={privy} options={{ allowedOrigins: [location.origin] }} theme={{ appearance: 'dark', accentColor: 'amber', grayColor: 'sand', radius: 'large', className: 'nc-sign' }} /></div>
   </>;
@@ -65,5 +65,6 @@ const retitle = () => {
   document.querySelectorAll('#root p, #root span, #root div').forEach(n => { if (n.childElementCount === 0 && /only connect to apps you trust/i.test(n.textContent)) n.textContent = "This is Nearcarta's own sign-in."; });
 };
 new MutationObserver(retitle).observe(document.getElementById('root'), { childList: true, subtree: true });
+document.title = 'Nearcarta · approve';
 try { window.focus(); } catch {}
 createRoot(document.getElementById('root')).render(<App />);
