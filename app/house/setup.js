@@ -11,7 +11,7 @@ import { balanceOn, faucet } from './onboard.js';
 import { setupJourney } from '../../shared/setup/path.js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
-import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose } from '../../shared/vault/tx.js';
+import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
 import { runAsk } from '../../shared/vault/run.js';
@@ -44,12 +44,13 @@ const STEPS = [
 ];
 const st = Object.assign({ step: 0, done: [], trial: false, persona: 'mage', dye: 'brass', outfit: 'lantern', displayName: '', agentName: '', mist: false, cap: null, daily: null, per: null, days: 30, receivers: null, charter: null, deposit: 0.5 }, JSON.parse(localStorage.getItem(SAVE) || '{}'));
 const save = () => localStorage.setItem(SAVE, JSON.stringify(st));
-let CFG = null, rpc = null, me = null, bal = undefined, balTimer = 0, busy = false, msg = '';
+let CFG = null, rpc = null, me = null, bal = undefined, balTimer = 0, busy = false, busySince = 0, msg = '';
 const view = (c, m, a) => viewFn(rpc, c, m, a);
 const boardLive = () => PUBLIC_MAINNET && MAIN.board?.status === 'deployed' && !!MAIN.board.contract;
 const journey = () => setupJourney(st.trial, { publicMainnet: PUBLIC_MAINNET, boardDeployed: boardLive() });
 const explorer = () => journey().explorer;
-const txA = h => h ? `<a href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" data-testid="setup-tx">${esc(h.slice(0, 8))}…</a>` : '';
+const txA = h => h ? `<a href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" data-testid="setup-tx">${esc(h.slice(0, 8))}…</a> <button type="button" class="btn link sm" data-copy="${esc(h)}" data-testid="setup-copy-tx" aria-label="Copy transaction hash">Copy</button>` : '';
+document.addEventListener('click', e => { const b = e.target.closest?.('[data-copy]'); if (!b) return; e.preventDefault(); navigator.clipboard?.writeText(b.dataset.copy).then(() => { b.textContent = 'Copied'; setTimeout(() => { if (document.contains(b)) b.textContent = 'Copy'; }, 1500); }).catch(() => {}); });
 const acA = a => `<a href="${explorer()}/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
 for (const p of LOOKS) { const i = new Image(); i.src = `/setup/chars/${p.img}.webp`; (window.__chars ||= []).push(i); }
 const persona = () => LOOKS.find(p => p.id === st.persona) || LOOKS[1];
@@ -62,7 +63,7 @@ const canOpen = i => i === 0 || (me && (i <= Math.max(-1, ...st.done) + 1));
 
 function rail() {
   $('#rail').innerHTML = STEPS.map(([id, t, s], i) => `<li class="${i === st.step ? 'now' : (i < st.step || st.done.includes(i)) ? 'done' : ''}" data-i="${i}" ${i === st.step ? 'aria-current="step"' : ''}><span>${esc(t)}<small>${esc(s)}</small></span></li>`).join('');
-  $('#rail').querySelectorAll('li.done, li.now').forEach(li => { const i = +li.dataset.i; if (i <= st.step || st.done.includes(i)) li.onclick = () => go(i); });
+  $('#rail').querySelectorAll('li.done, li.now').forEach(li => { const i = +li.dataset.i; if (i <= st.step || st.done.includes(i)) { li.tabIndex = 0; li.setAttribute('role', 'button'); li.onclick = () => go(i); li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(i); } }; } });
   $('#bar').style.width = ((st.step + 1) / STEPS.length * 100) + '%';
 }
 function top() {
@@ -78,8 +79,10 @@ const errP = () => msg ? `<p class="err" role="alert" data-testid="setup-err">${
 function wire(nextFn) { const b = $('#back'); if (b) b.onclick = () => go(st.step - 1); const n = $('#next'); if (n) n.onclick = nextFn || (() => { done(st.step); go(st.step + 1); }); }
 async function act(btn, f) {
   if (PREVIEW) { msg = ''; done(st.step); go(Math.min(STEPS.length - 1, st.step + 1)); return; }
-  if (busy) return; busy = true; const t = btn?.innerHTML; if (btn) { btn.style.minWidth = btn.offsetWidth + 'px'; btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + t; } msg = '';
-  try { await f(); } catch (e) { msg = e?.message || String(e); } finally { busy = false; if (btn && document.contains(btn)) { btn.disabled = false; btn.innerHTML = t; } render(); } }
+  // A click while an approval is open says so instead of doing nothing; after 45 s a new attempt is allowed.
+  if (busy && Date.now() - busySince < 45000) { msg = 'Still waiting for the approval you opened. Finish or close it, then try again.'; const oe = $('[data-testid=setup-err]'); if (oe) oe.textContent = msg; else btn?.insertAdjacentHTML('afterend', errP()); return; }
+  busy = true; busySince = Date.now(); const t = btn?.innerHTML; if (btn) { btn.style.minWidth = btn.offsetWidth + 'px'; btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + t; } msg = '';
+  try { await f(); } catch (e) { msg = plainErr(e); } finally { busy = false; if (btn && document.contains(btn)) { btn.disabled = false; btn.innerHTML = t; } render(); } }
 
 // ---------- 1. Sign in ----------
 let emailStage = 'email', email = '';
@@ -312,14 +315,14 @@ function sSign() {
   const onBoard = boardLive() && !st.trial;
   const r = rules(), id = st.charter || (onBoard ? me : `${st.agentName}.${CFG.factory}`), live = st.charter && localStorage.getItem(agentLS(st.charter));
   const stake = onBoard ? '0.02' : fmtN(st.deposit);
-  const L = onBoard ? [['Open your row', 'create']] : [['Create your charter', 'create'], ['Write the rule and add the agent key', 'rules']];
-  return head('Sign', live ? 'Your agent is live.' : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), live ? 'These limits are read back from the chain, not from this page.' : (onBoard ? `This opens your row. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`))
+  const L = onBoard ? [['Open your row', 'create'], ['Let your agent sign by itself', 'key']] : [['Create your charter', 'create'], ['Write the rule and add the agent key', 'rules']];
+  return head('Sign', live ? 'Your agent is live.' : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), live ? 'These limits are read back from the chain, not from this page.' : (onBoard ? `This opens your row and adds your agent key to your account, limited to <code>propose</code> on the board, so your agent can sign later tries without your wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`))
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
-    + (live ? `<div class="facts" id="facts" data-testid="setup-facts"><div class="fact"><small>Loading</small><b>…</b></div></div>` : `<div class="preview">${preview(r)}</div>`)
+    + (live ? `<div class="facts" id="facts" data-testid="setup-facts"><div class="fact"><small>Reading your charter from the chain</small><b>…</b></div></div>` : `<div class="preview">${preview(r)}</div>`)
     + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
     + (live ? '' : (onBoard && bal != null && nearOf(bal) < SIGN_MIN
         ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
-        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Worst case ${fmtN(SIGN_MIN)} NEAR: 0.02 deposit (returned when you close the row) and up to ${fmtN(GAS_NEAR(GAS.open))} NEAR gas held back for a moment.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`)
+        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 locked + gas). The 0.02 comes back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`)
       + `<div id="signhelp" class="tabhelp" hidden data-testid="sign-tabhelp"><p class="small">The approval opened in another browser tab. Switch to it and approve. This page moves on by itself.</p><button type="button" class="btn" id="resign" data-testid="sign-reopen">Switch to approval tab</button></div>`) + errP() + nav(live, { label: 'Try your agent' });
 }
 async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
@@ -336,6 +339,17 @@ function boardArgs(r, agent) {
     agent, fund: (YN / 1000n).toString(),
   };
 }
+// The agent key is also added to the visitor's own account as a function-call access key that may only call
+// `propose` on the board, with a small gas allowance. Then Try needs no wallet: the key signs the board message and
+// the transaction itself. It cannot move NEAR from the account; the board still decides every payment.
+const AGENT_ALLOW = YN / 20n; // 0.05 NEAR of gas allowance, never spendable as NEAR
+const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: ['propose'], allowance: AGENT_ALLOW.toString() } } } });
+async function agentAccessKey(sec) {
+  if (!sec || !me) return null;
+  const ak = await rpcClient([MAIN.rpc])('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: me, public_key: keyFrom(sec).publicKey }).catch(() => null);
+  const fc = ak?.permission?.FunctionCall;
+  return fc && fc.receiver_id === MAIN.board.contract && fc.method_names.includes('propose') ? ak : null;
+}
 async function signBoard() {
   const r = rules(), w = await mainnetWallet().wallet(), contract = MAIN.board.contract;
   const mark = (k, state, tx) => { const s = signLog.find(x => x.k === k); if (s) Object.assign(s, { state, tx: tx || s.tx }); else signLog.push({ k, state, tx }); render(); };
@@ -343,18 +357,23 @@ async function signBoard() {
   let row = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null);
   const sec = localStorage.getItem(agentLS(me)) || keyFrom().secretKey;
   localStorage.setItem(agentLS(me), sec);
-  if (!row) {
-    mark('create', 'run');
-    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'open_charter', args: boardArgs(r, keyFrom(sec).publicKey), gas: (GAS.open * TG).toString(), deposit: String(MAIN.board.max_row_yocto) } }] });
-    mark('create', 'run', txHashOf(res));
-    for (let i = 0; i < 20 && !row; i++) { await wait(1500); row = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null); }
-    if (!row) throw new Error('The row did not appear yet. Wait a few seconds and press Approve again.');
+  const pk = keyFrom(sec).publicKey;
+  const txs = [];
+  if (!row) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'open_charter', args: boardArgs(r, pk), gas: (GAS.open * TG).toString(), deposit: String(MAIN.board.max_row_yocto) } }] }]);
+  else if (row.agent !== pubkeyHex(keyFrom(sec))) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: pk }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
+  if (!(await agentAccessKey(sec))) txs.push(['key', { receiverId: me, actions: [addKeyAction(pk)] }]);
+  for (const [k] of txs) mark(k, 'run');
+  if (txs.length) {
+    // One approval for both transactions when the wallet can batch them.
+    const out = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: txs.map(t => t[1]) }) : [];
+    let res = out; if (!w.signAndSendTransactions) for (const t of txs) res.push(await w.signAndSendTransaction(t[1]));
+    txs.forEach(([k], i) => mark(k, 'run', txHashOf(res?.[i])));
   }
+  for (let i = 0; i < 20 && !row; i++) { await wait(1500); row = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null); }
+  if (!row) throw new Error('The row did not appear yet. Wait a few seconds and press Approve again.');
   mark('create', 'ok'); st.charter = me; save();
-  if (row.agent !== pubkeyHex(keyFrom(sec))) {
-    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: keyFrom(sec).publicKey }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] });
-    mark('create', 'ok', txHashOf(res));
-  }
+  let ak = null; for (let i = 0; i < 10 && !(ak = await agentAccessKey(sec)); i++) await wait(1200);
+  mark('key', ak ? 'ok' : 'run');
   done(5); await refreshBal();
 }
 async function sign() {
@@ -419,21 +438,41 @@ function wireSign() {
 }
 
 // ---------- 7. Try ----------
-let tries = [];
+let tries = [], keyReady = null;
 const WHY = { over_per_action_cap: 'over your per-payment cap', over_daily_budget: 'over your daily budget', over_daily_action_count: 'over your payments-per-day limit', receiver_not_allowlisted: 'that shop is not on your list', below_min_amount: 'below the smallest payment', clause_expired: 'your rule has expired', frozen: 'the charter is frozen' };
+let pendingTry = null; // { amount, hash } while a try is on its way, so the link shows before the result
+const reasonOf = t => Object.keys(WHY).find(k => String(t || '').includes(k)) || refusalOf(t) || '';
 async function boardAsk(amt) {
   const contract = MAIN.board.contract, amount = toY(amt), receiver = rules().receivers[0];
   const rpcCall = rpcClient([MAIN.rpc]);
+  const sec = localStorage.getItem(agentLS(me));
+  const key = keyFrom(sec);
   const row = await viewFn(rpcCall, contract, 'get_charter', { owner: me });
-  const msg = proposalMessage({ contract, owner: me, receiver, amount, nonce: String(row.nonce) });
-  const signature = signMessage(keyFrom(localStorage.getItem(agentLS(me))), msg);
+  const signature = signMessage(key, proposalMessage({ contract, owner: me, receiver, amount, nonce: String(row.nonce) }));
+  const args = { owner: me, receiver, amount, signature, reveal: null };
+  const ak = await agentAccessKey(sec);
+  if (ak) {
+    // No wallet: the agent key signs the transaction itself.
+    const signed = signTx({ key, signerId: me, receiverId: contract, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash, actions: [functionCall('propose', args, GAS.propose * TG)] });
+    pendingTry = { amount, hash: signed.hash }; render();
+    let r;
+    try { r = await rpcCall('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }); }
+    catch (e) {
+      // InvalidTxError means the network did not accept it: nothing is on chain.
+      if (e.rpc && /InvalidTx|INVALID_TRANSACTION|NotEnough|Expired|Nonce/i.test(JSON.stringify(e.rpc))) return { passed: false, before: true, reason: 'the network did not accept the transaction (' + (e.rpc.cause?.name || 'invalid') + ')', amount, receiver };
+      return { passed: false, reason: 'no answer from the RPC yet; open the link to see the result', tx: signed.hash, amount, receiver };
+    } finally { pendingTry = null; }
+    const o = outcomeOf(r);
+    return o.ok ? { passed: true, reason: 'ok', tx: signed.hash, amount, receiver, decision: 'allowed', signer: 'agent' }
+      : { passed: false, reason: reasonOf(o.error) || plainErr(o.error), tx: signed.hash, amount, receiver, decision: 'refused', signer: 'agent' };
+  }
   const w = await mainnetWallet().wallet();
   try {
-    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'propose', args: { owner: me, receiver, amount, signature, reveal: null }, gas: (GAS.propose * TG).toString(), deposit: '0' } }] });
-    return { passed: true, reason: 'ok', tx: txHashOf(res), amount, receiver, decision: 'allowed' };
+    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'propose', args, gas: (GAS.propose * TG).toString(), deposit: '0' } }] });
+    return { passed: true, reason: 'ok', tx: txHashOf(res), amount, receiver, decision: 'allowed', signer: 'wallet' };
   } catch (e) {
-    const reason = refusalOf(e) || plainErr(e);
-    return { passed: false, reason, tx: e.tx || null, amount, receiver, decision: 'refused' };
+    const tx = e.tx || txHashOf(e) || null;
+    return { passed: false, before: !tx, reason: reasonOf(e) || plainErr(e), tx, amount, receiver, decision: 'refused', signer: 'wallet' };
   }
 }
 function sTry() {
@@ -449,7 +488,9 @@ function sTry() {
   return head('Try it', 'Watch the charter decide.', `Your agent signs two real requests with its own key. The contract checks each against your rule.`)
     + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button class="tile" id="t-ok" data-testid="try-allowed"><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span>Inside your rule: should pass</span></button>
        <button class="tile" id="t-no" data-testid="try-refused"><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span>Twice your cap: should be refused</span></button></div>
-     ${tries.map(t => `<div class="verdict ${t.passed ? 'good' : 'bad'}" data-testid="try-verdict"><span class="tag">${t.passed ? 'ALLOWED' : 'REFUSED'}</span><div><b>${fmtN(nearOf(t.amount))} NEAR → ${esc(short(t.receiver))}</b><br><span class="muted small">${esc(t.passed ? 'inside your rule · the charter paid' : (WHY[t.reason] || t.reason || t.decision))}</span> ${txA(t.tx)}</div></div>`).join('')}
+     ${boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it (it can only call <code>propose</code> on ${esc(MAIN.board.contract)} and cannot move your NEAR).</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
+     ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR…</span> ${txA(pendingTry.hash)}</div></div>` : ''}
+     ${tries.map(t => `<div class="verdict ${t.passed ? 'good' : 'bad'}" data-testid="try-verdict"><span class="tag">${t.passed ? 'ALLOWED' : 'REFUSED'}</span><div><b>${fmtN(nearOf(t.amount))} NEAR → ${esc(short(t.receiver))}</b><br><span class="muted small">${esc(t.passed ? 'inside your rule · the charter paid' : (WHY[t.reason] || t.reason || t.decision))}${t.passed ? '' : t.tx ? ' · refused on chain by the contract' : ' · refused before sending, nothing on chain'}${t.signer === 'agent' ? ' · signed by your agent key, no wallet' : ''}</span> ${txA(t.tx)}</div></div>`).join('')}
      ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Charter office</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.length >= 2 ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
 }
 function next() { const n = new URLSearchParams(location.search).get('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/'; }
@@ -460,6 +501,8 @@ function wireTry() {
   const ask = boardLive() && !st.trial
     ? amt => boardAsk(amt)
     : (amt, memo) => runAsk({ charter: st.charter, key: keyFrom(localStorage.getItem(agentLS(st.charter))), receiver: to, amount: toY(amt), memo, viewF: (c, m, a) => viewFn(rpcCall, c, m, a), send: sendPropose, rpcCall });
+  const k = $('#t-key'); if (k) k.onclick = e => act(e.currentTarget, async () => { await signBoard(); keyReady = !!(await agentAccessKey(localStorage.getItem(agentLS(me)))); });
+  if (boardLive() && !st.trial && keyReady === null) agentAccessKey(localStorage.getItem(agentLS(me))).then(a => { keyReady = !!a; if (STEPS[st.step][0] === 'try') render(); });
   $('#t-ok').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(Math.min(+r.cap, 0.001), 'setup: allowed')); });
   $('#t-no').onclick = e => act(e.currentTarget, async () => { tries.push(await ask(+(+r.cap * 2).toFixed(4), 'setup: over cap')); });
   wire();
