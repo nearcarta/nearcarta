@@ -1,7 +1,7 @@
 # The read-only API (backend/src/server.js) as a container. No keys are baked in:
 # ONECLICK_PARTNER_KEY and NEARAI_CLOUD_API_KEY come from the host's env at runtime.
 FROM node:22-slim
-ENV NODE_ENV=production PORT=10000 NEAR_RPC=https://test.rpc.fastnear.com
+ENV NODE_ENV=production PORT=10000 NEAR_RPC=https://free.rpc.fastnear.com
 WORKDIR /srv
 COPY package.json package-lock.json ./
 COPY backend/package.json backend/
