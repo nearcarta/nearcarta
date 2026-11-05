@@ -1,5 +1,5 @@
 // Shop apps: every shop is one real flow on the visitor's own charter.
-// The visitor writes the rules and signs them; the Lamplighter (a propose-only agent key made in this browser) asks;
+// The visitor writes the rules and signs them; the Lamplighter (an agent key made in this browser) asks;
 // the charter answers on chain. The proof is a one-line receipt after the action.
 import * as W from './wallet.bundle.js';
 import { readSessionAccount } from './session.js';
@@ -153,7 +153,7 @@ const pend = () => Object.entries(S.pending || {}).map(([id, p]) => ({ id, eta: 
 export const pendingKey = () => { const pk = S.charter && localStorage.getItem(LS_AGENT(S.charter) + '.pending'); if (!pk) return null; const pub = W.keyFrom(pk).publicKey; return pend().find(c => c.kind === 'SetAgentKey' && c.body.public_key === pub) || null; };
 export const pendingNote = () => { const l = pend(); if (!l.length) return ''; const t = Math.min(...l.map(c => c.eta)); return `${l.length} change${l.length > 1 ? 's' : ''} queued · from ${new Date(t).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`; };
 export const stage = () => !S.me ? 'connect' : !S.charter ? 'build' : !pay() ? (pend().some(c => c.kind === 'SetClause' && c.body.clause_id === 'pay') ? 'wait' : 'rules') : S.agentLive ? 'ready' : 'key';
-/** A helper key for this browser: queued behind the charter's delay (it only adds a propose-only key). Or turn on a queued one whose time came. */
+/** A helper key for this browser: queued behind the charter's delay (it adds a key that calls propose). Or turn on a queued one whose time came. */
 export async function helperKey() {
   const q = pendingKey();
   if (q && Date.now() >= q.eta) { const h = await sign(S.charter, [fc('execute_change', { change_id: q.id }, 120)]); keep(h, 'house', 'signed', 'execute_change'); await readRules(); return { tx: h, live: S.agentLive }; }

@@ -2,7 +2,10 @@
 Do not link this file from the public README, site, or llms.txt.
 Cursor: read these **before** any GitHub/X hunt (TASKS §I). Then merge old+new into `docs/internal/competitors.md`.
 
-## On this machine (copied from owner D:\route\near → /workspace/near)
+## On this machine
+Checked 2026-11-05: `/workspace/near` and the pack files listed below are **not on this machine**. I0 used the in-repo baseline in `docs/internal/competitors.md`. Do not invent quotes from the missing pack.
+
+## Pack paths (not present here; kept so the next machine can open them)
 | Path | What it is |
 |---|---|
 | `/workspace/near/START_HERE.md` | Index of the pack |

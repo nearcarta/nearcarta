@@ -99,7 +99,7 @@ body.fb #c{display:none}
 #shopMenu[hidden]{display:none}
 #shopMenu button{appearance:none;text-align:left;border:0;background:transparent;color:var(--parch);padding:7px 10px;border-radius:8px;cursor:pointer}
 #shopMenu button:hover,#shopMenu button:focus-visible{background:rgba(214,180,106,.14);outline:none}
-#shopMenu b{display:block;font:600 13px var(--sans)} #shopMenu small{display:block;font-size:11px;color:var(--parch3)}
+#shopMenu b{display:block;font:600 14px var(--sans)} #shopMenu small{display:block;font-size:12px;color:var(--parch3)}
 body.story #shopsBtn{opacity:.85}
 
 /* ---------- Walk / Jump: one small segmented switch ---------- */
@@ -126,7 +126,7 @@ body.story #zoom{opacity:0;pointer-events:none}
 #pins{position:fixed;inset:0;pointer-events:none;z-index:9}
 .pin{position:absolute;left:0;top:0;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;opacity:0;transition:opacity .25s;pointer-events:none;cursor:pointer;appearance:none;border:0;background:none;padding:0;color:inherit;font:inherit}
 .pin.on{pointer-events:auto}
-.pin .ban{position:relative;background:#1a140fe6;border:1px solid #f0c987;border-radius:9px;padding:7px 12px 8px 9px;display:flex;align-items:center;gap:8px;white-space:nowrap;box-shadow:0 8px 18px rgba(0,0,0,.55);transition:transform .15s,background .15s}
+.pin .ban{position:relative;background:#1a140fe6;border:1px solid #f0c987;border-radius:9px;padding:7px 12px 8px 9px;display:flex;align-items:center;gap:8px;white-space:nowrap;box-shadow:0 8px 18px rgba(0,0,0,.55);transition:transform .15s,background .15s;min-height:44px;min-width:44px}
 .pin .ic{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#f2dba6,#c99c52 60%,#8d6630);color:#2a1d14;font:700 11px var(--serif)}
 .pin b{display:block;font:650 16px/1.15 var(--serif);color:#fff8ea;letter-spacing:.01em;text-shadow:0 1px 2px #000}
 .pin small{display:block;font:600 12px/1.2 var(--sans);color:#f3ead8;margin-top:2px}
@@ -159,7 +159,8 @@ body:not(.explore) #modeBtn{display:none!important}
   --s1:8px; --s2:16px; --s3:24px; --r:8px; --R:16px; --ease:cubic-bezier(.16,1,.3,1); --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:var(--text); font:400 14px/20px Inter,system-ui,sans-serif }
 #shopUI[hidden]{display:none} #shopUI *{box-sizing:border-box} #shopUI h1,#shopUI h2,#shopUI h3,#shopUI p{margin:0} #shopUI button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 #shopUI .icon{width:40px;height:40px;display:grid;place-items:center;border-radius:var(--r);background:var(--raised);border:1px solid var(--line);color:var(--muted)}
-#back{position:fixed;top:16px;right:16px;z-index:7;height:40px;padding:0 16px;border-radius:999px!important;background:color-mix(in srgb,var(--raised) 92%,transparent)!important;border:1px solid var(--line)!important;display:flex;align-items:center;gap:8px;font-weight:600}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#curfewBtn:hover + #curfewHint, #curfewBtn:focus + #curfewHint, #curfewBtn:focus-visible + #curfewHint{position:fixed;width:auto;height:auto;margin:0;clip:auto;overflow:visible;left:16px;bottom:72px;z-index:40;max-width:36ch;padding:8px 10px;border-radius:8px;background:#1a140fe6;color:#f3ead8;border:1px solid #d6b46a;font:14px/1.35 system-ui,sans-serif}
 #back:hover{border-color:var(--accent)!important} #back kbd{font:600 10px/1 var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:2px 4px}
 #shopUI .note.legal{margin-top:24px}
 body.in-shop #ctl,body.in-shop #chron,body.in-shop #zoom,body.in-shop #pins,body.in-shop #hint,body.in-shop #tag,body.in-shop #bubbles,body.in-shop #prompt,body.in-shop #title,body.in-shop #lb{display:none!important}
@@ -373,8 +374,17 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #shopUI .p-amt span { color: var(--muted); font-size: 11px; }
 #shopUI .p-x { height: 28px; width: 28px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
 #shopUI .p-x:disabled { opacity: .35; cursor: default; }
+#town-intro{position:fixed;left:50%;bottom:18vh;z-index:16;pointer-events:none;transform:translate(calc(-50% + var(--pan, 0px)), 0)}
+#town-intro .bub{position:relative;opacity:1;background:#1a140fe6;color:#f3ead8;border:1px solid #d6b46a;border-radius:12px;padding:10px 14px;font:600 16px/1.35 ui-serif,Georgia,serif;max-width:36ch}
+#town-intro .walkers{display:flex;justify-content:center;gap:10px;margin-bottom:8px}
+#town-intro .walkers i{display:block;width:14px;height:26px;border-radius:7px 7px 3px 3px;background:#d6b46a;animation:introWalk 1s steps(2) infinite}
+@keyframes introWalk{50%{transform:translateY(-4px)}}
+body.intro-on #fbimg{animation:introCam 22s linear both}
+@keyframes introCam{from{transform:scale(1.12) translate3d(3%,1%,0)}to{transform:scale(1.02) translate3d(-2%,-1%,0)}}
+#shopUI .skel{display:block;height:28px;width:46%;border-radius:8px;background:linear-gradient(90deg,#3a3128,#d6b46a55,#3a3128);background-size:200% 100%;animation:skel 1.2s linear infinite}
+@keyframes skel{to{background-position:-200% 0}}
 #shopUI .p-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
-#shopUI .p-sum { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; } #shopUI .p-sum.no { color: var(--no); }
+#shopUI .p-sum { font-size: 14px; color: #f3ead8; font-variant-numeric: tabular-nums; } #shopUI .p-sum.no { color: #ffb4a8; }
 #shopUI #p-add:disabled { opacity: .4; cursor: default; }
 #shopUI .t-links .link{white-space:normal;height:auto;min-height:28px;text-align:left} /* long rule chips wrap inside the panel */
 

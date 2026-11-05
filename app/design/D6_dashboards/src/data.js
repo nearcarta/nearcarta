@@ -28,7 +28,7 @@ export const CORE_TXS = [
   { id: 'P1', t: 0, time: 'mainnet', what: '0.001 NEAR to nearcarta.near', kind: 'action', decision: 'allowed', amount: 0.001, clause: 'pay', tx: 'JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy' },
   { id: 'P2', t: 12, time: 'mainnet', what: '0.003 NEAR over the cap', kind: 'action', decision: 'denied', reason: 'over_per_action_cap', amount: 0.003, clause: 'pay', tx: 'BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH' },
   { id: 'P5', t: 24, time: 'mainnet', what: 'payee not on the list', kind: 'action', decision: 'denied', reason: 'receiver_not_allowlisted', amount: 0.001, clause: 'pay', tx: 'E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ' },
-  { id: 'S1', time: 'mainnet', what: 'Agent key added (propose only)', kind: 'agent_key', tx: 'Frp44yFGSAh9vi2w4dmV4wnDH5MBktvX7N2xyAcPRJDP' },
+  { id: 'S1', time: 'mainnet', what: 'Agent key added (propose and propose_batch)', kind: 'agent_key', tx: 'Frp44yFGSAh9vi2w4dmV4wnDH5MBktvX7N2xyAcPRJDP' },
   { id: 'S3', time: 'mainnet', what: 'Full-access key deleted', kind: 'agent_key', tx: '71Zio28gV3yubD5DecGtkguWzWdfix8brcKFy13d3zzt' },
   { id: 'B1', time: 'mainnet', what: 'Visitor opened a board row', kind: 'policy', tx: '6xMQyXcczLjxymmrYfBhFDuRy9MpFV62CviqdYHrnTdQ' },
   { id: 'B2', time: 'mainnet', what: 'Board paid 0.001 NEAR', kind: 'action', decision: 'allowed', amount: 0.001, clause: 'pay', tx: '8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR' },

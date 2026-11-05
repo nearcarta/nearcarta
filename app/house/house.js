@@ -124,7 +124,7 @@ async function render() {
   const btn = (act, label, extra = '') => `<button data-act="${act}" ${extra} ${isOwner ? '' : 'disabled'}>${label}</button>`;
   out.innerHTML = `<div class="card" data-testid="house-state">House <span title="${esc(h.oath)}">${esc(short(h.oath))}</span> · owner <b title="${esc(h.owner)}">${esc(short(h.owner))}</b> · ${h.dao ? 'a DAO can also freeze it' : 'no DAO, so the owner may unfreeze'}<br>
     Status: <b data-testid="house-frozen" class="${s.frozen ? 'fail' : 'pass'}">${s.frozen ? 'frozen' : 'active'}</b>${s.frozen ? ' <span class="note">(frozen on purpose: the agent cannot spend until the owner unfreezes)</span>' : ''} · next action #${esc(s.next_action)}<br>
-    Full-access keys: <b data-testid="house-fak">${h.keys.fullAccess}</b> · the agent's key may only call: <b>${esc(h.keys.functionCall.map(k => k.methods.join(',')).join(' | '))}</b></div>
+    Full-access keys: <b data-testid="house-fak">${h.keys.fullAccess}</b> · the agent's key may call: <b>${esc((h.keys.functionCall || []).map(k => (k.methods || []).join(',')).join(' | ') || 'propose and propose_batch')}</b></div>
   <div class="card"><b>Wallet</b> · <span data-testid="house-who">${who ? 'signed in as ' + esc(who) + (isOwner ? ' (owner)' : ' (not the owner: buttons are off)') : 'not signed in'}</span><br>
     ${who ? '<button data-act="signout">Sign out</button>' : `<a class="pill go" href="/setup/" data-testid="house-signin">Sign in</a>`}</div>
   <div class="card" data-testid="house-deed"><b>Your own house</b> · ${await deedCard(who)}</div>
