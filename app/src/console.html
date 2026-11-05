@@ -6,8 +6,13 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="/console.css">
+<link rel="stylesheet" href="/panels/panels.css">
 <link rel="stylesheet" href="/brand/brown.css">
 <script src="/config.js"></script>
+<script>
+try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }); } catch (e) {}
+try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }); } catch (e) {}
+</script>
 </head>
 <body>
 <header>
@@ -24,6 +29,7 @@
 <main>
 <section id="ferry" class="tab on">
   <h2>Ferry · a price quote, nothing sent</h2>
+  <div id="ferry-deep" class="deep"></div>
   <p class="note">This form asks for a real mainnet price. No deposit address is created here and nothing can be spent. A payment from another chain is <a href="/ferry-widget">Pay</a>: the charter checks the recipient first, and the amount is at most 0.20 USD.</p>
   <form id="ferry-form">
     <label>From <select name="from"><option value="USDC|base">USDC on Base</option><option value="ETH|base">ETH on Base</option><option value="USDC|near">USDC on NEAR</option></select></label>
@@ -39,11 +45,12 @@
   <div id="ferry-zec"></div>
   <div id="ferry-out" aria-live="polite"></div>
 </section>
-<section id="guardhouse" class="tab"><h2>Guardhouse · the agent's oath</h2><div class="out"></div></section>
-<section id="townhall" class="tab"><h2>Town Hall · your own row</h2><div class="out"></div></section>
-<section id="arena" class="tab"><h2>Arena · guardian vs jailbreakers</h2><div class="out"></div></section>
-<section id="toll" class="tab"><h2>Toll · Chain Signatures with an oath</h2><div class="out"></div></section>
+<section id="guardhouse" class="tab"><h2>Guardhouse · the agent's oath</h2><div class="deep"></div><div class="out"></div></section>
+<section id="townhall" class="tab"><h2>Town Hall · your own row</h2><div class="deep"></div><div class="out"></div></section>
+<section id="arena" class="tab"><h2>Arena · guardian vs jailbreakers</h2><div class="deep"></div><div class="out"></div></section>
+<section id="toll" class="tab"><h2>Toll · Chain Signatures with an oath</h2><div class="deep"></div><div class="out"></div></section>
 <section id="chronicle" class="tab"><h2>Chronicle · what happened on chain</h2>
+  <div class="deep"></div>
   <label>Contract <select id="chron-acct"></select></label><div class="out"></div></section>
 <section id="house" class="tab"><h2>Your House · you hold the off switch</h2>
   <p class="note">The town house is on mainnet. This page reads it. It does not hold a key.</p><div class="out"></div></section>

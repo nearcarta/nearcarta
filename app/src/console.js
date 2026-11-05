@@ -1,5 +1,8 @@
 import { policyView } from './policy-view.js';
 import { FERRY_BUTTON, FERRY_PASS, PRIVACY, chronicleRowsFromMainnet, chronicleSummary } from './judges-data.js';
+import { mountShop } from './panels/deep.js';
+import { roomError } from './room-error.js';
+import { installBoundary } from './panels/boundary.js';
 // Live console: every value below is fetched from the Nearcarta API, which reads NEAR RPC,
 // 1Click (dry) and NEAR AI Cloud. Nothing here signs or spends; only the Your House tab asks your own wallet to sign.
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
@@ -14,12 +17,8 @@ const nameOf = a => { const s = String(a ?? ''); for (const [re, n] of ROLE) if 
 const acct = a => `<a href="${NB}/address/${esc(a)}" target="_blank" rel="noopener" title="${esc(a)}">${esc(nameOf(a))}</a>`;
 const near = y => (y == null ? '–' : (Number(BigInt(y) / 10n ** 18n) / 1e6).toString() + ' NEAR');
 const mark = ok => `<b class="${ok ? 'pass' : 'fail'}" data-check="${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'}</b>`;
-function plainErr(e) {
-  const m = String(e?.message || e || '');
-  if (/failed to fetch|networkerror|load failed|aborted/i.test(m)) return 'The town API is not reachable just now.';
-  if (/^http 5\d\d/.test(m)) return 'The town API is busy. Try again in a moment.';
-  return m;
-}
+function plainErr(e) { return roomError(e); }
+installBoundary(document.querySelector('main'));
 
 async function get(path, opts) {
   const r = await fetch(API + path, opts);
@@ -36,7 +35,13 @@ function show(t) {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('on', s.id === t));
   history.replaceState(null, '', '#' + t);
-  if (loaders[t] && !loaded[t]) { loaded[t] = 1; loaders[t]().catch(e => { const host = $(`#${t} .out`); host.innerHTML = `<p class="fail" data-testid="load-error">${esc(plainErr(e))}</p><button type="button" data-testid="retry">Try again</button>`; loaded[t] = 0; host.querySelector('button').onclick = () => show(t); }); }
+  const deepHost = document.querySelector(`#${CSS.escape(t)} .deep`);
+  if (deepHost && !deepHost.dataset.ready) {
+    deepHost.dataset.ready = '1';
+    const shop = { ferry: 'ferry', guardhouse: 'guard', townhall: 'hall', arena: 'arena', toll: 'toll', chronicle: 'chronicle' }[t];
+    if (shop) Promise.resolve().then(() => mountShop(shop, deepHost, { auto: shop === 'ferry' })).catch(e => { deepHost.innerHTML = `<p data-testid="room-boundary" role="alert">${esc(plainErr(e))}</p>`; deepHost.dataset.ready = ''; });
+  }
+  if (loaders[t] && !loaded[t]) { loaded[t] = 1; loaders[t]().catch(e => { const host = $(`#${t} .out`); if (!host) return; host.innerHTML = `<p class="fail" data-testid="load-error">${esc(plainErr(e))}</p><button type="button" data-testid="retry">Try again</button>`; loaded[t] = 0; host.querySelector('button').onclick = () => show(t); }); }
 }
 
 get('/api/health').then(h => {
@@ -114,7 +119,8 @@ form.onsubmit = async ev => {
 
 async function guardhouse() {
   const [d, gh] = await Promise.all([get('/api/mainnet'), get('/api/guardhouse').catch(() => null)]);
-  const b = d.board, c = d.charter;
+  const b = d?.board, c = d?.charter;
+  if (!b?.txs || !c?.txs) throw new Error('The guard record is not in this response.');
   // Prefer live access-key methods from Guardhouse; fall back to the on-chain truth for charter.nearcarta.near.
   const live = gh?.keys?.functionCall?.[0]?.methods;
   const view = policyView({ state: gh?.state, clauses: gh?.clauses, methods: Array.isArray(live) && live.length ? live : ['propose', 'propose_batch'] });
@@ -159,21 +165,24 @@ async function teeCheck(btn) {
 
 async function townhall() {
   const d = await get('/api/mainnet');
-  const t = d.extras.townhall;
+  const t = d?.extras?.townhall;
+  if (!t?.txs) throw new Error('The town hall record is not in this response.');
   $('#townhall .out').innerHTML = `<div class="card" data-testid="hall-state">Town Hall ${acct(t.contract)}. A shared DAO is not built. A rule change is set_rules on your own row.<br>
     Reward allowed ${tx(t.txs['townhall_reward_allowed_0.001'])} · reward refused ${tx(t.txs['townhall_reward_refused_0.002'])}</div>`;
 }
 
 async function arena() {
   const d = await get('/api/mainnet');
-  const a = d.extras.arena;
+  const a = d?.extras?.arena;
+  if (!a?.txs) throw new Error('The arena record is not in this response.');
   $('#arena .out').innerHTML = `<div class="card" data-testid="arena-state">Vault Arena ${acct(a.contract)}<br>
     Allowed ${tx(a.txs['arena_agent_pay_allowed_0.001'])} · refused ${tx(a.txs['arena_agent_pay_refused_0.002'])}</div>`;
 }
 
 async function toll() {
   const d = await get('/api/mainnet');
-  const t = d.toll;
+  const t = d?.toll;
+  if (!t?.txs) throw new Error('The toll record is not in this response.');
   $('#toll .out').innerHTML = `<div class="card" data-testid="toll-state">Toll ${acct(t.contract)} · 0.001 NEAR pass on mainnet · recorded chain-signature proof · chain id ${esc(d.chain_id)} · the foreign chain was not paid from this gate<br>
     Allowed ${tx(t.txs.owner_toll_pay_allowlisted)} · refused ${tx(t.txs.owner_toll_pay_not_allowlisted)}</div>`;
 }

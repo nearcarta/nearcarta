@@ -4,34 +4,24 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nearcarta · Town Hall</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="../../design/D7_system/tokens/tokens.css">
 <link rel="stylesheet" href="/brand/chrome.css">
-<link rel="stylesheet" href="../vault/vault.css">
-<link rel="stylesheet" href="hall.css">
 <link rel="stylesheet" href="/brand/brown.css">
-<script src="../../config.js"></script>
+<link rel="stylesheet" href="/console.css">
+<link rel="stylesheet" href="/panels/panels.css">
+<link rel="stylesheet" href="hall.css">
+<script src="/config.js"></script>
+<script>
+try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }); } catch (e) {}
+try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }); } catch (e) {}
+</script>
 </head>
-<body data-step="none">
+<body data-shop="hall">
 <header class="top">
-  <div><a class="back-town" href="/" data-testid="back-town" aria-label="Back to town">Back to town</a><h1>Town Hall</h1><p class="sub">Your row on the board. <span class="net" data-testid="net-badge">mainnet</span></p><p class="muted" id="netnote">set_rules, set_frozen and set_seal. Gas only. A shared council is not built.</p></div>
+  <div><a class="back-town" href="/" data-testid="back-town" aria-label="Back to town">Back to town</a><h1>Town Hall</h1><p class="sub">Your row on the board. <span class="net" data-testid="net-badge">mainnet</span></p><p class="muted">set_rules, set_frozen and set_seal. Gas only. A shared council is not built.</p></div>
   <div class="who"><span id="who"></span>
     <a id="connect" class="primary" data-testid="connect" href="/setup/?next=%2Fshops%2Fhall%2F">Sign in</a></div>
 </header>
-<main>
-  <section class="card" id="s-row"><h2><span class="num">1</span>Your row</h2>
-    <p class="muted" id="preview-note" hidden data-testid="hall-preview">Preview. Nothing is signed. Reload reads the same row back.</p>
-    <form id="row-form">
-      <label>Max per payment (NEAR) <input id="cap" data-testid="hall-cap" inputmode="decimal" value="0.002"></label>
-      <label><input id="frozen" data-testid="hall-frozen" type="checkbox"> Freeze the row. The agent key cannot undo this.</label>
-      <label><input id="sealed" data-testid="hall-seal" type="checkbox"> Store a seal. The rule text stays off the row.</label>
-      <p class="muted" id="bond">Deposit 0. The calls are set_rules, set_frozen and set_seal on your own row.</p>
-      <button class="primary" id="apply" data-testid="hall-apply" type="submit">Read the change back</button>
-    </form>
-    <div class="result" id="result" aria-live="polite" data-testid="result"></div>
-  </section>
-  <section class="card" id="s-who"><h2>On the row now</h2><div id="facts" data-testid="hall-facts">Loading…</div></section>
-  <section class="card wide" id="s-list"><h2>Difference</h2><div id="list" data-testid="hall-diff">No change yet.</div></section>
-</main>
-<script type="module" src="hall.bundle.js"></script>
+<main id="room" class="shop-page" data-testid="shop-room"></main>
+<script type="module" src="/panels/boot.js"></script>
 </body>
 </html>

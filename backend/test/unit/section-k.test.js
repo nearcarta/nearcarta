@@ -26,7 +26,7 @@ test('one session pill and a return path that drops the preview flag', () => {
   assert.equal(nextPath('?next=https://evil.example'), null);
   assert.equal(hallRowHref('visitor.near'), '/shops/hall/?owner=visitor.near');
   assert.equal(hallRowHref(''), '/setup/?next=%2Fshops%2Fhall%2F');
-  assert.equal(rowOwner({ preview: true }).owner, 'preview.near');
+  assert.equal(rowOwner({ preview: true }).owner, null);
   assert.equal(rowOwner({ owner: 'visitor.near', session: 'other.near' }).owner, 'visitor.near');
   assert.equal(rowOwner({ session: 'preview.near' }).owner, null);
 });
@@ -72,7 +72,10 @@ test('a ferry line names both tokens, the dollars, the fee and the wait', () => 
   assert.match(line.text, /90s/);
   const src = readFileSync(new URL('../../../app/design/D8_shops/js/apps.js', import.meta.url), 'utf8');
   assert.match(src, /ROUTES\.length > 3/);
-  assert.match(readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8'), /data-testid="ferry-route"/);
+  const shopui = readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8');
+  const deep = readFileSync(new URL('../../../app/src/panels/deep.js', import.meta.url), 'utf8');
+  assert.match(shopui, /mountShop\('ferry'/);
+  assert.match(deep, /data-testid="ferry-route"/);
 });
 
 test('the judges page and the console share one script', () => {

@@ -28,6 +28,9 @@ h2{position:relative;z-index:1;margin:0 0 10px}
 /* Sticky header keeps only the title and tabs; proofs live in main. */
 header{position:sticky;top:0;z-index:20;background:var(--bg)}
 header .hero{max-width:62ch}
+.corridors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}
+.corridor{min-width:0;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel);overflow-wrap:anywhere}
+.corridor b{display:block} .corridor p{margin:4px 0 0;font-size:12px}
 
 a.tx, #proofs a, table a{color:#e8c76a;font-weight:700;font-size:1.05em;text-decoration:underline;text-underline-offset:2px}
 a.tx:hover, #proofs a:hover, table a:hover{color:#ffe08a}

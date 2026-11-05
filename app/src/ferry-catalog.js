@@ -44,7 +44,7 @@ export function quoteView(q) {
   return {
     amountOut: to.amount ?? q.amountOut ?? null,
     symbolOut: to.symbol || '',
-    usd: q.usd ?? from.amountUsd ?? to.amountUsd ?? null,
+    usd: q.usd ?? q.amountInUsd ?? from.usd ?? from.amountUsd ?? to.usd ?? to.amountUsd ?? null,
     eta: q.eta_s ?? q.eta ?? null,
     fee: q.cost_bps_signed ?? q.fee ?? q.checks?.echo?.protocolFeeBps ?? null,
     privacy: q.privacy || 'public',
@@ -60,7 +60,8 @@ export function quoteLine(q) {
   const to = q.to || {};
   const inn = [from.amount ?? view.amountIn, from.symbol || view.symbolIn, (from.chain || view.chainIn) ? `on ${from.chain || view.chainIn}` : ''].filter(Boolean).join(' ');
   const out = [to.amount ?? view.amountOut, to.symbol || view.symbolOut, (to.chain || view.chainOut) ? `on ${to.chain || view.chainOut}` : ''].filter(Boolean).join(' ');
-  const usd = view.usd != null && view.usd !== '' ? `about $${view.usd}` : 'USD not quoted';
+  const usdNum = Number(view.usd);
+  const usd = view.usd != null && view.usd !== '' ? `about $${Number.isFinite(usdNum) ? usdNum.toFixed(2) : view.usd}` : 'USD not quoted';
   const fee = view.fee != null && view.fee !== '' ? `fee ${view.fee} bps` : 'fee not quoted';
   const eta = view.eta != null && view.eta !== '' ? `about ${view.eta}s` : 'ETA not quoted';
   return {
