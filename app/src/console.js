@@ -50,12 +50,12 @@ get('/api/mainnet').then(m => {
   el.textContent = m?.board?.status === 'deployed'
     ? 'Your charter is a row on the mainnet board, under the account you sign in with.'
     : 'A personal charter is a row on the mainnet board. That contract is not deployed yet, so this page does not create one.';
-  const host = $('#proofs'); if (host) host.after(el);
+  const host = $('#tabs'); if (host) host.after(el);
 }).catch(() => {});
 
 get('/api/receipts').then(body => {
   const rows = (body.receipts || []).filter(r => r.network === 'mainnet' && r.tx);
-  $('#proofs').innerHTML = `<b>Mainnet proofs</b><p class="note">${esc(body.gate || 'The charter contract decides. The agent only asks.')}</p><table>${rows.map(r => `<tr><td>${esc(r.what)}</td><td>${esc(r.decision)}</td><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(String(r.tx).slice(0, 8))}…</a>` : ''}</td></tr>`).join('') || '<tr><td>No mainnet receipts in this response.</td></tr>'}</table>`;
+  $('#proofs').innerHTML = `<p class="note">${esc(body.gate || 'The charter contract decides. The agent only asks.')}</p><table>${rows.map(r => `<tr><td>${esc(r.what)}</td><td>${esc(r.decision)}</td><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" class="tx">${esc(String(r.tx).slice(0, 8))}…</a>` : ''}</td></tr>`).join('') || '<tr><td>No mainnet receipts in this response.</td></tr>'}</table>`;
 }).catch(() => { const el = $('#proofs'); if (el) el.innerHTML = '<p class="note">Mainnet proofs could not be loaded from the API.</p>'; });
 
 // Ferry

@@ -13,8 +13,7 @@
 <header>
   <p><a class="back-town" href="/" data-testid="back-town" aria-label="Back to town">Back to town</a></p>
   <h1><img src="/brand/mark.svg" alt="" width="28" height="28" style="vertical-align:-6px;border-radius:8px"> Nearcarta <small>for judges</small></h1>
-  <p class="hero">The agent can ask. The charter decides. The town contracts run on NEAR mainnet. The proofs below are those transactions.</p>
-  <div id="proofs" class="card" data-testid="judge-proofs"><p class="note">Loading mainnet proofs…</p></div>
+  <p class="hero">The agent can ask. The charter decides. The town contracts run on NEAR mainnet.</p>
   <nav id="tabs">
     <button data-tab="ferry" class="on">Ferry</button><button data-tab="guardhouse">Guardhouse</button>
     <button data-tab="townhall">Town Hall</button><button data-tab="arena">Arena</button>
@@ -48,6 +47,10 @@
   <label>Contract <select id="chron-acct"></select></label><div class="out"></div></section>
 <section id="house" class="tab"><h2>Your House · you hold the off switch</h2>
   <p class="note">The town house is on mainnet. This page reads it. It does not hold a key.</p><div class="out"></div></section>
+<details id="proofs-wrap" class="proofs-wrap">
+  <summary>Mainnet proofs</summary>
+  <div id="proofs" class="card" data-testid="judge-proofs"><p class="note">Loading mainnet proofs…</p></div>
+</details>
 </main>
 <script type="module" src="/console.js"></script>
 </body>

@@ -18,3 +18,13 @@ form button.ghost{background:transparent;color:var(--amber);border:1px solid var
 .links a{display:inline-block;min-height:24px;line-height:24px}
 header .back-town{margin-bottom:10px}
 @media(max-width:720px){form{grid-template-columns:1fr}form .wide,form button{grid-column:auto}header,main{padding:12px 14px}nav button{min-height:40px}}
+
+/* Proofs sit under the active shop so they never push Ferry or Guardhouse down. */
+.proofs-wrap{margin:18px 0 8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px}
+.proofs-wrap>summary{cursor:pointer;font-weight:700;color:var(--amber);list-style:none;padding:6px 0}
+.proofs-wrap>summary::-webkit-details-marker{display:none}
+.proofs-wrap[open]>summary{margin-bottom:6px;border-bottom:1px solid var(--line)}
+.proofs-wrap #proofs{margin:0;border:0;padding:8px 0 4px;background:transparent}
+/* Sticky header keeps only the title and tabs; proofs live in main. */
+header{position:sticky;top:0;z-index:20;background:var(--bg)}
+header .hero{max-width:62ch}
