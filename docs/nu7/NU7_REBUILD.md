@@ -22,10 +22,10 @@ The live bank wallet was not opened with the new binary. Its sqlite DB would be 
 
 ## Switching the Mist Bank worker (later, no code change)
 
-The worker reads `ZCASH_DEVTOOL` (see `backend/scripts/mist-worker.js`). To switch:
+The worker script is not in this repo. The Zcash leg is not run from this API. To switch a worker that still exists outside the repo:
 
 1. Copy the bank wallet dir and run `sync` and `balance` on the copy with the new binary.
-2. Stop the worker with `backend/scripts/mist-worker.sh stop`.
+2. Stop the worker if it is still running outside this repo.
 3. Set `ZCASH_DEVTOOL=<nu7 build>` in the worker env file, then `start`.
 
 Do this before mainnet height 3,543,405. Rollback: restore the wallet dir copy and unset `ZCASH_DEVTOOL`.

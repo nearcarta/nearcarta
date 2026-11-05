@@ -18,10 +18,7 @@ Arena, house deed and Town Hall are covered in `docs/MAINNET_CONSOLIDATION.md`.
 
 ### Step 0: create the named root
 
-```
-NET=mainnet FROM_ID=<64hex> FROM_KEY=~/.near-credentials/mainnet/<64hex>.json NAME=nearcarta.near DEPOSIT=6.6 \
-  node backend/scripts/create-named-root.js     # DRY_RUN=1 first: checks the name is free and sends nothing
-```
+The named-root helper is not in this repo. The live root is already `nearcarta.near` in `shared/deployments/mainnet.json`. Do not recreate it.
 
 The new root's key is saved with mode 0600 in `~/.near-credentials/mainnet/nearcarta.near.json`.
 
@@ -38,10 +35,7 @@ The new root's key is saved with mode 0600 in `~/.near-credentials/mainnet/nearc
 
 ## Run
 
-```
-NET=mainnet LAYOUT=named ROOT_ID=nearcarta.near ROOT_KEY=~/.near-credentials/mainnet/nearcarta.near.json \
-AGENT_OUT=<0600 file> OUT=<deploy.json> node backend/scripts/core-deploy.js
-```
+The deploy helper is not in this repo. The live charter and toll are already recorded in `shared/deployments/mainnet.json`. This API does not sign.
 
 The script is resumable: it skips any step already recorded in `OUT`. It runs these steps in order:
 
@@ -96,9 +90,7 @@ Net cost of the full deploy plus teardown cycle was about 0.03 NEAR. Everything 
 
 ## TEARDOWN
 
-```
-NET=mainnet ROOT_KEY=... DEPLOY=<deploy.json> OUT=<teardown.json> node backend/scripts/core-teardown.js
-```
+The teardown helper is not in this repo. Do not delete the live accounts from this API.
 
 1. On the toll, call `close()` with 1 yocto.
 2. On the charter, call `queue_upgrade(sha256(reaper.wasm))`.

@@ -9,13 +9,24 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = p => readFileSync(join(root, p), 'utf8');
-const json = p => JSON.parse(read(p));
-const count = (dir, re) => readdirSync(join(root, dir)).filter(f => /\.(rs|js)$/.test(f))
-  .reduce((n, f) => n + (read(join(dir, f)).match(re) || []).length, 0);
+const json = p => { try { return JSON.parse(read(p)); } catch (e) { throw new Error(`cannot read ${p}: ${e.message}`); } };
+const statsOf = (p) => {
+  const body = json(p);
+  const s = body && body.stats;
+  if (!s || [s.expected, s.unexpected, s.flaky, s.skipped].some(n => typeof n !== 'number')) throw new Error(`${p} has no stats block`);
+  return s;
+};
+const count = (dir, re) => {
+  let names = [];
+  try { names = readdirSync(join(root, dir)); } catch (e) { throw new Error(`cannot read ${dir}: ${e.message}`); }
+  return names.filter(f => /\.(rs|js)$/.test(f)).reduce((n, f) => n + (read(join(dir, f)).match(re) || []).length, 0);
+};
 
-const rows = json('judges/proofs/mainnet-proof-check.json').rows;
-const e2e = json('judges/proofs/e2e-results.json').stats;
-const vercel = json('judges/proofs/e2e-vercel.json').stats;
+const proof = json('judges/proofs/mainnet-proof-check.json');
+const rows = Array.isArray(proof?.rows) ? proof.rows : null;
+if (!rows) throw new Error('judges/proofs/mainnet-proof-check.json has no rows array');
+const e2e = statsOf('judges/proofs/e2e-results.json');
+const vercel = statsOf('judges/proofs/e2e-vercel.json');
 const unitFiles = readdirSync(join(root, 'backend/test/unit')).filter(f => f.endsWith('.test.js')).map(f => join('test/unit', f));
 const tapRun = spawnSync(process.execPath, ['--test', '--test-reporter=tap', '--test-timeout=120000', ...unitFiles],
   { cwd: join(root, 'backend'), encoding: 'utf8', maxBuffer: 64 << 20 });
@@ -37,6 +48,8 @@ const n = {
 
 const edits = {
   'README.md': [
+    [/# \d+ backend unit tests \(\d+ pass, \d+ skipped\)/, `# ${n.unit + unitSkip} backend unit tests (${n.unit} pass, ${unitSkip} skipped)`],
+    [/npm test\s+# \d+ unit tests \(\d+ pass, \d+ skipped\)/, `npm test                 # ${n.unit + unitSkip} unit tests (${n.unit} pass, ${unitSkip} skipped)`],
     [/# \d+ unit tests \(\d+ pass, \d+ skipped\):/, `# ${n.unit + unitSkip} unit tests (${n.unit} pass, ${unitSkip} skipped):`],
     [/\(\d+\/\d+ expected\)/, `(${n.proofsFound}/${n.proofs} expected)`],
     [/npm run e2e   # \d+ browser tests/, `npm run e2e   # ${n.e2e} browser tests`],

@@ -6,7 +6,7 @@
 // phrases, IPs, emails, retired proof values) and, if .secrets/ is present, for any secret-only value
 // (a string under .secrets/ that appears in no tracked file). Secret values are never printed or written.
 //   node scripts/verify/privacy-audit.mjs   -> judges/proofs/privacy-audit.json
-import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { join, relative } from 'node:path';
@@ -203,5 +203,7 @@ const out = { at: t0.toISOString(), finished: new Date().toISOString(), site: SI
   live_api_commit: dep.commit || dep.git || null, requests: reqLog.length, corpus_items: corpus.length, corpus_bytes: corpus.reduce((a, c) => a + c.text.length, 0),
   site, browser, secret_values_checked, hits: counts, not_leaks_skipped_by_rule: skipped, total_hits: Object.values(counts).reduce((a, b) => a + b, 0),
   statuses: reqLog.reduce((a, r) => (a[r.status] = (a[r.status] || 0) + 1, a), {}), requests_list: reqLog };
-writeFileSync(process.env.OUT || join(ROOT, 'judges/proofs/privacy-audit.json'), JSON.stringify(out, null, 1) + '\n');
+const outPath = process.env.OUT || join(ROOT, 'judges/proofs/privacy-audit.json');
+mkdirSync(join(outPath, '..'), { recursive: true });
+writeFileSync(outPath, JSON.stringify(out, null, 1) + '\n');
 console.log(JSON.stringify({ total_hits: out.total_hits, hits: counts, requests: out.requests, secret_values_checked, maps: site.maps_served, refs: site.sourceMappingURL_refs }));

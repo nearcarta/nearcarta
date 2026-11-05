@@ -60,7 +60,7 @@ The factory (`charter_factory.r15.wasm`, unchanged source) pins the charter code
 - **Hosting:** unchanged.
 
 ## Before any spend (owner approval each)
-1. Run `bash scripts/fresh-deploy.sh` (dry run) green on the mainnet config, with r18 added to its artifact list.
+1. The fresh-deploy helper is not in this repo. Read `shared/deployments/mainnet.json` before any further deploy.
 2. Review security on the no-allowance propose-only key and the caps.
 3. Confirm the MPC mainnet fee and the Base payout address.
 4. Deploy steps 2 → 8, verify, then delete the FAKs.
