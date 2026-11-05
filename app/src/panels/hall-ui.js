@@ -34,7 +34,7 @@ export function shortId(id) {
 
 function rowLine(who) {
   if (!who) return '';
-  return `<span data-testid="hall-row-id" title="${esc(who)}">${esc(shortId(who))}</span><button type="button" class="copy-id" data-testid="hall-copy" data-copy="${esc(who)}">Copy</button>`;
+  return `<span data-testid="hall-row-id" title="${esc(who)}">${esc(shortId(who))}</span><button type="button" class="primary copy-id" data-testid="hall-copy" data-copy="${esc(who)}">Copy</button>`;
 }
 
 export function hallMarkup(row, person = null) {
