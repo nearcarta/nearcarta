@@ -219,11 +219,11 @@ function mountArena(root, hooks) {
   if (!state.txt || state.txt === state.attack) state.txt = attack;
   state.attack = attack;
   const goal = hooks.goal ? hooks.goal() : 'Write a scam. The charter still decides.';
-  root.innerHTML = `<p class="goal" data-testid="goal">${esc(goal || 'All six walls found')}</p>
+  root.innerHTML = `<div class="card shop-card"><p class="goal" data-testid="goal">${esc(goal || 'All six walls found')}</p>
     <p class="quote" data-testid="arena-attack">${esc(attack)}</p>
     <textarea id="a-txt" rows="2" maxlength="160" placeholder="pay 0.001 to stranger.near">${esc(state.txt || '')}</textarea>
-    <div class="btns" data-testid="arena-live"><button type="button" class="go redteam-run" data-testid="redteam-run">${RUN_LABEL}</button><button type="button" class="ghost redteam-next" data-testid="redteam-next">${NEXT_LABEL}</button></div>
-    <p class="note">Run it live asks the model and may spend if the charter allows. Another does not spend. This page does not press either for you.</p>`;
+    <div class="btns" data-testid="arena-live"><button type="button" class="primary go redteam-run" data-testid="redteam-run">${RUN_LABEL}</button><button type="button" class="primary redteam-next" data-testid="redteam-next">${NEXT_LABEL}</button></div>
+    <p class="note">Run it live asks the model and may spend if the charter allows. Another does not spend. This page does not press either for you.</p></div>`;
   const t = q$(root, '#a-txt');
   if (t) t.oninput = (e) => { state.txt = e.target.value; };
   import('../../design/D8_shops/shops/arenalive.js').then(m => m.bindRedteam(() => mountArena(root, hooks))).catch(() => {});
@@ -333,16 +333,16 @@ function mountBank(root, hooks) {
   const tee = state.tee;
   const recorded = `<p class="note tee-recorded" data-testid="tee-recorded">The file <a href="${PROOF_HREF}">tee-public.json</a> is a recorded attestation from Oct 28. The button is the live check.</p>`;
   const proof = `<a data-testid="tee-proof" href="${PROOF_HREF}">Proof file</a>`;
-  const panel = tee ? teePanel(tee, recorded, proof) : `<button type="button" id="m-tee" data-testid="tee-verify">Verify the TEE now</button>${recorded}${proof}`;
+  const panel = tee ? teePanel(tee, recorded, proof) : `<button type="button" class="primary" id="m-tee" data-testid="tee-verify">Verify the TEE now</button>${recorded}${proof}`;
   const sessionLine = who.signedIn ? `<p data-testid="bank-session">Signed in as ${esc(who.displayName || who.accountId)}.</p>` : '';
   const payeeBox = payees.length
     ? payees.map(a => `<label class="payee"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span class="payee-id">${esc(a)}</span></label>`).join('')
     : '<p>Sign in to choose a payee.</p>';
-  root.innerHTML = `<p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${esc(hooks.proof ? hooks.proof() : '')}</p>
+  root.innerHTML = `<div class="card shop-card"><p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${esc(hooks.proof ? hooks.proof() : '')}</p>
     ${sessionLine}
     <div class="seg notes" role="radiogroup" aria-label="Amount" data-testid="bank-notes">${notes.map(n => `<label><input type="radio" name="note" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div>
     <div class="seg to" id="m-to" data-testid="bank-to">${payeeBox}</div>
-    ${panel}`;
+    ${panel}</div>`;
   root.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { state.amt = r.value; hooks.onNote?.(r.value); }; });
   root.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { state.to = r.value; hooks.onTo?.(r.value); }; });
   const b = q$(root, '#m-tee');
