@@ -4,11 +4,11 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nearcarta · Your House</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="../../design/D7_system/tokens/tokens.css">
+<link rel="stylesheet" href="/design/D7_system/tokens/tokens.css">
 <link rel="stylesheet" href="/brand/chrome.css">
-<link rel="stylesheet" href="vault.css">
+<link rel="stylesheet" href="/shops/vault/vault.css">
 <link rel="stylesheet" href="/brand/brown.css">
-<script src="../../config.js"></script>
+<script src="/config.js"></script>
 <script>
 try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }); } catch (e) {}
 try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }); } catch (e) {}
@@ -60,6 +60,6 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
     <section class="card wide" id="s-board"><h2>Leaderboard</h2><div id="board">Loading…</div></section>
   </div>
 </main>
-<script type="module" src="vault.bundle.js"></script>
+<script type="module" src="/shops/vault/vault.bundle.js"></script>
 </body>
 </html>

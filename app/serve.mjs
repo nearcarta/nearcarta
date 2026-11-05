@@ -16,6 +16,10 @@ createServer(async (req, res) => {
       res.writeHead(r.status, { 'content-type': r.headers.get('content-type') || 'application/json' }); return res.end(Buffer.from(await r.arrayBuffer()));
     } catch { res.writeHead(502, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'api down' })); }
   }
+  if (/^\/shops\/[a-z0-9-]+$/.test(u.pathname)) {
+    res.writeHead(308, { location: u.pathname + '/' + u.search });
+    return res.end();
+  }
   let p = decodeURIComponent(REWRITES[u.pathname] || u.pathname);
   let f = normalize(join(root, p)); if (!f.startsWith(root)) { res.writeHead(403); return res.end(); }
   try { if ((await stat(f)).isDirectory()) f = join(f, 'index.html'); const b = await readFile(f);
