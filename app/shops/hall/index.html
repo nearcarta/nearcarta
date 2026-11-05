@@ -13,26 +13,24 @@
 </head>
 <body data-step="none">
 <header class="top">
-  <div><a class="back-town" href="/" data-testid="back-town" aria-label="Back to town">Back to town</a><h1>Town Hall</h1><p class="sub">The town hall. <span class="net" data-testid="net-badge">mainnet</span></p><p class="muted" id="netnote"></p></div>
+  <div><a class="back-town" href="/" data-testid="back-town" aria-label="Back to town">Back to town</a><h1>Town Hall</h1><p class="sub">Your row on the board. <span class="net" data-testid="net-badge">mainnet</span></p><p class="muted" id="netnote">set_rules, set_frozen and set_seal. Gas only. A shared council is not built.</p></div>
   <div class="who"><span id="who"></span>
-    <button id="connect" class="primary" data-testid="connect">Sign in</button>
-    <button id="signout" hidden>Sign out</button></div>
+    <a id="connect" class="primary" data-testid="connect" href="/setup/?next=%2Fshops%2Fhall%2F">Sign in</a></div>
 </header>
 <main>
-  <section class="card" id="s-file"><h2><span class="num">1</span>File a proposal</h2>
-    <form id="file-form">
-      <fieldset class="kinds"><legend>What should change on this row?</legend>
-        <label><input type="radio" name="kind" value="join" checked data-testid="kind-join"> Add my account to the charter's reward list</label>
-        <label><input type="radio" name="kind" value="motion" data-testid="kind-motion"> A motion (text only, no charter change)</label></fieldset>
-      <label>Why <textarea id="desc" data-testid="desc" maxlength="280" rows="3" placeholder="I fixed the town map, please add me to the reward round"></textarea></label>
-      <p class="muted" id="bond"></p>
-      <button class="primary" id="file" data-testid="file" disabled>File proposal</button>
+  <section class="card" id="s-row"><h2><span class="num">1</span>Your row</h2>
+    <p class="muted" id="preview-note" hidden data-testid="hall-preview">Preview. Nothing is signed. Reload reads the same row back.</p>
+    <form id="row-form">
+      <label>Max per payment (NEAR) <input id="cap" data-testid="hall-cap" inputmode="decimal" value="0.002"></label>
+      <label><input id="frozen" data-testid="hall-frozen" type="checkbox"> Freeze the row. The agent key cannot undo this.</label>
+      <label><input id="sealed" data-testid="hall-seal" type="checkbox"> Store a seal. The rule text stays off the row.</label>
+      <p class="muted" id="bond">Deposit 0. The calls are set_rules, set_frozen and set_seal on your own row.</p>
+      <button class="primary" id="apply" data-testid="hall-apply" type="submit">Read the change back</button>
     </form>
     <div class="result" id="result" aria-live="polite" data-testid="result"></div>
-    <ul id="log" aria-live="polite"></ul>
   </section>
-  <section class="card" id="s-who"><h2>Who decides</h2><div id="facts">Loading…</div></section>
-  <section class="card wide" id="s-list"><h2>Latest proposals and motions</h2><div id="list" data-testid="list">Loading…</div></section>
+  <section class="card" id="s-who"><h2>On the row now</h2><div id="facts" data-testid="hall-facts">Loading…</div></section>
+  <section class="card wide" id="s-list"><h2>Difference</h2><div id="list" data-testid="hall-diff">No change yet.</div></section>
 </main>
 <script type="module" src="hall.bundle.js"></script>
 </body>
