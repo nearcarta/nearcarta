@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 484 backend unit tests (481 pass, 3 skipped), offline
+npm test                                   # 487 backend unit tests (484 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -141,7 +141,7 @@ An on-chain charter for AI agents that spend money. A person writes the agent's 
 An agent with a wallet key can be talked into paying anyone: a fake invoice, a prompt-injected recipient, a look-alike account, many small payments under a cap. Checks that live in the agent's own code or prompt fail when the agent is fooled. The charter puts the check in a contract the agent cannot change, so a fooled agent still cannot pay outside the rules.
 
 ## Try it in a browser
-1. Open https://nearcarta.vercel.app and press *Sign in*. The setup page uses a mainnet account and real NEAR. A personal charter is a row on `board.nearcarta.near`.
+1. Open https://nearcarta.vercel.app and press *Sign in*. The setup page uses a mainnet account and real NEAR. A personal charter is a row on `board.nearcarta.near`. On Try it, Add NEAR to the charter puts that amount on the row in one approval; `close_charter` returns it.
 2. Walk into a shop and press its button. Each signed step shows its tx as a link to nearblocks.io. The same rooms open directly at `/design/D8_shops/?shop=<house|toll|ferry|bank|guard|arena|hall|payouts>`.
 
 | Shop | Press | See |
@@ -182,7 +182,7 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 484 unit tests (481 pass, 3 skipped)
+npm test                 # 487 unit tests (484 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -205,7 +205,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 484 unit tests (481 pass, 3 skipped):
+# 487 unit tests (484 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).
