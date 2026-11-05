@@ -13,6 +13,7 @@ let started=false;
 export async function fallback(why){ if(started) return; started=true; body.classList.add('fb','ready'); $('#fb2d').hidden=false; $('#loading').classList.add('done'); $('#c').style.display='none';
   if(why) console.warn('[Nearcarta] showing the 2D town:',why);
   const introCtl=mountIntro(document, location.search);
+  window.__skipTownIntro = () => introCtl?.skip();
   addEventListener('keydown',e=>{ if(e.key==='Escape') introCtl?.skip(); });
   const img=$('#fbimg'); const town=img.getAttribute('src');
   try{ const pins=await (await fetch('shots/fallback_pins.json')).json(); const box=$('#fbpins'); const els=[];

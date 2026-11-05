@@ -396,6 +396,7 @@ world.toCharter=toCharter;
     $('#chron').hidden=false; $('#chron').dataset.live='1'; }catch(e){ console.warn('[Nearcarta] Chronicle feed unavailable',e?.message||e); } })();
 const startStory=!P.has('nostory') && !(P.has('explore')) && !P.has('shop');
 let introCtl=null;
+window.__skipTownIntro = () => { introCtl?.skip(); if (mode === 'story') endStory(); };
 for(let i=0;i<12;i++) step(1/30);
 if(startStory){ try{ storyRun=run(story()); body.dataset.intro='camera'; }catch(e){ console.warn('[Nearcarta] story', e); introCtl=mountIntro(document, location.search); body.dataset.intro='flat'; } } else { { const c=hx(-1,1); R.place(c.x-.2,c.z+.3,2.4); R.lights=true; } mode='town'; idleTown(); D.k=1; if(P.has('explore')) explore(true); }
 step(1/30); draw();

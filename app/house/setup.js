@@ -604,7 +604,11 @@ async function boot() {
     if (!st.agentName) st.agentName = 'preview-agent';
     render(); return;
   }
-  if (me && (bal === 0n || bal == null)) st.step = 1; else if (want >= 0 && canOpen(want)) st.step = want; else if (!me) st.step = 0;
+  const asked = want >= 0 && (location.hash === '#rules' || location.hash === '#sign');
+  if (me && asked) st.step = want;
+  else if (me && (bal === 0n || bal == null)) st.step = 1;
+  else if (want >= 0 && canOpen(want)) st.step = want;
+  else if (!me) st.step = 0;
   render();
 }
 addEventListener('hashchange', () => {

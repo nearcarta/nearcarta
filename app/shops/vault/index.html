@@ -2,31 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nearcarta · Your House</title>
+<title>Nearcarta · Charter office</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/design/D7_system/tokens/tokens.css">
 <link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="/shops/vault/vault.css">
 <link rel="stylesheet" href="/brand/brown.css">
+<link rel="stylesheet" href="/panels/panels.css">
 <script src="/config.js"></script>
 <script>
 try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }); } catch (e) {}
 try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }); } catch (e) {}
 </script>
 </head>
-<body data-step="none">
-<header class="top">
-  <div><a class="back-town" href="/" data-testid="back-town">Back to town</a><h1>Your House</h1><p class="sub">Your rules, on chain. <span class="net" id="net" data-testid="net-badge">mainnet</span></p><p class="muted" id="netnote">The town's own contracts are on mainnet.</p></div>
-  <div class="who"><span id="who"></span>
-    <button id="connect" class="primary" data-testid="connect">Sign in</button>
-    <button id="signout" hidden>Sign out</button></div>
+<body data-shop="vault" data-step="none">
+<header class="shop-page">
+  <p><a class="back-town" href="/" data-testid="back-town">Back to town</a></p>
+  <div class="vault-head">
+    <div><h1>Charter office</h1><p class="sub">Your rules, on chain. <span class="net" id="net" data-testid="net-badge">mainnet</span></p><p class="muted" id="netnote">The town's own contracts are on mainnet.</p></div>
+    <div class="who"><span id="who"></span>
+      <button id="connect" class="primary" data-testid="connect">Sign in</button>
+      <button id="signout" hidden>Sign out</button></div>
+  </div>
 </header>
 <nav class="tabs" role="tablist" aria-label="Charter office">
   <button role="tab" id="tab-mine" data-tab="p-mine" aria-selected="true" data-testid="tab-mine">My charter</button>
   <button role="tab" id="tab-arena" data-tab="p-arena" aria-selected="false" data-testid="tab-arena">Shared arena</button>
   <button role="tab" id="tab-board" data-tab="p-board" aria-selected="false" data-testid="tab-board">Leaderboard</button>
 </nav>
-<main>
+<main class="shop-page">
   <div class="panel" id="p-mine" role="tabpanel" aria-labelledby="tab-mine">
     <section class="card wide" id="dash" hidden><h2>Dashboard <span id="dash-id" class="muted"></span></h2><div id="gauges"></div></section>
     <section class="card wide" id="s-what"><h2>What happened</h2><p id="story" class="story" data-testid="story"></p><ul id="feed" data-testid="feed" hidden></ul><ul id="log" aria-live="polite"></ul></section>

@@ -2,6 +2,28 @@
 // This module builds the calls and the diff. It does not sign.
 
 export const BOARD = 'board.nearcarta.near';
+export const ROW_WAIT_MS = 5000;
+
+export function rowWaitWhy(ms = ROW_WAIT_MS) {
+  const sec = Math.max(1, Math.round(Number(ms) / 1000));
+  return `The row read did not answer in ${sec} ${sec === 1 ? 'second' : 'seconds'}.`;
+}
+
+/** The row read has to settle, or the caller shows rowWaitWhy. A late answer is still the caller's to paint. */
+export function withRowWait(work, ms = ROW_WAIT_MS) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(rowWaitWhy(ms));
+      err.code = 'row-wait';
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([
+    Promise.resolve().then(() => (typeof work === 'function' ? work() : work)),
+    timeout,
+  ]).finally(() => clearTimeout(timer));
+}
 
 export const PREVIEW_ROW = {
   owner: 'preview.near',

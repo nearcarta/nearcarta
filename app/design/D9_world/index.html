@@ -154,6 +154,18 @@ setInterval(() => {
   }
 }, 400);
 </script>
+<script>
+document.addEventListener('click', function (e) {
+  var t = e.target;
+  if (!t || !t.closest || !t.closest('[data-testid=all-shops]')) return;
+  document.body.classList.remove('intro-on', 'story', 'letterbox');
+  var intro = document.getElementById('town-intro');
+  if (intro) intro.remove();
+  var title = document.getElementById('title');
+  if (title) title.style.opacity = '0';
+  if (window.__skipTownIntro) window.__skipTownIntro();
+}, true);
+</script>
 <script type="module" src="js/hero-town.js"></script>
 <script type="module" src="../D8_shops/js/townplain.js"></script>
 </body>

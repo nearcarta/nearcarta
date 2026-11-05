@@ -5,7 +5,7 @@
 import { readSession, readSessionAccount, sessionPill, visitor } from '../../design/D8_shops/js/session.js';
 import { roomError } from '../room-error.js';
 import {
-  BOARD, diffCharter, draftFrom, matchNote, nearOf, normalizeRow, readBack, readUntilChange, rowOwner, waitForFinal,
+  BOARD, ROW_WAIT_MS, diffCharter, draftFrom, matchNote, nearOf, normalizeRow, readBack, readUntilChange, rowOwner, waitForFinal, withRowWait,
 } from './hall.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -37,7 +37,17 @@ function rowLine(who) {
   return `<span data-testid="hall-row-id" title="${esc(who)}">${esc(shortId(who))}</span><span class="hall-id-full" data-testid="hall-row-full">${esc(who)}</span><button type="button" class="primary copy-id" data-testid="hall-copy" data-copy="${esc(who)}">Copy</button>`;
 }
 
+export function charterSetupCta({ accountId = '', displayName = '', note = 'This account has no charter row.' } = {}) {
+  const named = displayName || accountId;
+  const facts = named ? `<p data-testid="hall-facts">Signed in as ${esc(named)}.</p>` : '';
+  const id = accountId
+    ? `<dl class="hall-meta" data-testid="hall-read"><div><dt>Row</dt><dd class="row-id">${rowLine(accountId)}</dd></div></dl>`
+    : '';
+  return `<div class="card charter-cta" data-testid="charter-cta" role="status">${facts}<p>${esc(note)}</p>${id}<p><a class="primary" data-testid="charter-setup" href="/setup/#rules">Rules and Sign</a></p></div>`;
+}
+
 export function hallMarkup(row, person = null) {
+  if (!row && person?.accountId) return charterSetupCta({ accountId: person.accountId, displayName: person.displayName || '' });
   const cap = row ? String(nearOf(row.per_action_cap)) : '';
   const who = row?.owner || person?.accountId || '';
   const named = person?.displayName || who;
@@ -83,7 +93,7 @@ export async function mountHall(root, hooks = {}) {
     const connect = document.getElementById('connect');
     if (connect) connect.hidden = !!(row?.owner || choice.owner || person.signedIn);
     const form = root.querySelector('#row-form');
-    form.onsubmit = (e) => { e.preventDefault(); onSign(); };
+    if (form) form.onsubmit = (e) => { e.preventDefault(); onSign(); };
     const capEl = root.querySelector('#cap');
     if (capEl && row?.per_action_cap != null) capEl.value = String(nearOf(row.per_action_cap));
     const copy = root.querySelector('[data-testid=hall-copy]');
@@ -163,23 +173,39 @@ export async function mountHall(root, hooks = {}) {
     }
   }
 
-  if (!choice.owner) { paint(null); return; }
-  root.innerHTML = hallSkeleton();
-  try {
-    before = await readRow(choice.owner);
-    if (!before) before = await readRow(choice.owner, { fresh: true });
-    paint(before);
-    if (!before) {
-      const person = visitor();
-      const named = person.displayName || choice.owner;
-      root.querySelector('[data-testid=hall-facts]').innerHTML = `Signed in as ${esc(named)}. <span data-testid="hall-missing">No row for <code class="hall-id-full">${esc(choice.owner)}</code> on <code>${esc(BOARD)}</code>.</span>`;
+  let gen = 0;
+  async function start() {
+    if (!choice.owner) { paint(null); return; }
+    const mine = ++gen;
+    root.innerHTML = hallSkeleton();
+    let gaveUp = false;
+    const loadRow = async () => {
+      const row = await readRow(choice.owner);
+      if (row || gaveUp) return row;
+      return readRow(choice.owner, { fresh: true });
+    };
+    const job = loadRow();
+    try {
+      const row = await withRowWait(() => job, ROW_WAIT_MS);
+      if (mine !== gen) return;
+      before = row;
+      paint(row);
+    } catch (e) {
+      if (mine !== gen) return;
+      gaveUp = true;
+      const why = e?.code === 'row-wait'
+        ? e.message
+        : `The row could not be read. ${roomError(e)} Nothing was signed.`;
+      root.innerHTML = `<div class="card charter-cta" data-testid="hall-row-reason" role="alert"><p>${esc(why)}</p><p><button type="button" class="primary" data-testid="hall-retry">Try again</button></p></div>`;
+      const retry = root.querySelector('[data-testid=hall-retry]');
+      if (retry) retry.onclick = () => start();
+      job.then(row => {
+        if (mine !== gen) return;
+        if (!root.querySelector('[data-testid=hall-row-reason]')) return;
+        before = row;
+        paint(row);
+      }).catch(() => {});
     }
-  } catch {
-    paint(null);
-    const facts2 = root.querySelector('[data-testid=hall-facts]');
-    const person = visitor();
-    if (facts2) facts2.textContent = person.signedIn
-      ? `Signed in as ${person.displayName || person.accountId}. The row could not be read. Nothing was signed.`
-      : 'The row could not be read. Nothing was signed.';
   }
+  start();
 }

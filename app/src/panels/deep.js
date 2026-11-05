@@ -12,9 +12,9 @@ import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
 import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
-import { nearOf, normalizeRow } from './hall.js';
+import { ROW_WAIT_MS, nearOf, normalizeRow, withRowWait } from './hall.js';
 import { boundaryHtml } from './boundary.js';
-import { shortId } from './hall-ui.js';
+import { charterSetupCta, shortId } from './hall-ui.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -197,14 +197,14 @@ function mountChronicle(root, hooks) {
     const q = queryFeed(rows(), { q: state.cq || '', decision: state.cd || '', page: state.cp || 1 });
     const ol = q$(root, '[data-testid=chronicle-page]');
     if (ol) {
-      ol.innerHTML = q.rows.map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(x.label || x.reason || '') : '✓ ' + esc(x.decision)}</span><button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button></li>`).join('') || '<li>Nothing yet</li>';
+      ol.innerHTML = q.rows.map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(x.label || x.reason || '') : '✓ ' + esc(x.decision)}</span><button type="button" class="primary c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button></li>`).join('') || '<li>Nothing yet</li>';
       ol.dataset.total = String(q.total);
     }
     const pages = q$(root, '[data-testid=chronicle-pages]');
     if (pages) pages.textContent = `${q.page} / ${q.pages}`;
   };
   const verifyHtml = () => `${esc(state.verify || '')}${state.verifyUrl ? ` <a data-testid="chronicle-link" href="${esc(state.verifyUrl)}">explorer</a>` : ''}`;
-  root.innerHTML = `<div class="shop-stack"><label class="field">Search <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}"></label><label class="field">Decision <select id="c-d" data-testid="chronicle-filter"><option value="">All</option><option value="allowed">Allowed</option><option value="denied">Refused</option></select></label><ol class="feed" data-testid="chronicle-page"></ol><p data-testid="chronicle-pages"></p><div class="btns"><button type="button" id="c-prev">Previous</button><button type="button" id="c-next">Next</button><button type="button" id="c-csv" data-testid="chronicle-export">Export</button></div><p id="c-out" data-testid="chronicle-verify">${verifyHtml()}</p></div>`;
+  root.innerHTML = `<div class="shop-stack"><label class="field">Search <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}"></label><label class="field">Decision <select id="c-d" data-testid="chronicle-filter"><option value="">All</option><option value="allowed">Allowed</option><option value="denied">Refused</option></select></label><ol class="feed" data-testid="chronicle-page"></ol><p data-testid="chronicle-pages"></p><div class="btns"><button type="button" class="primary" id="c-prev">Previous</button><button type="button" class="primary" id="c-next">Next</button><button type="button" class="primary" id="c-csv" data-testid="chronicle-export">Export</button></div><p id="c-out" data-testid="chronicle-verify">${verifyHtml()}</p></div>`;
   const filter = q$(root, '#c-d');
   if (state.cd) filter.value = state.cd;
   draw();
@@ -461,7 +461,7 @@ export function houseCharterMarkup({ accountId = '', row = null, failed = false 
     return `<div class="house-empty" data-testid="house-empty" role="status"><p>The charter read did not answer.</p><p>Try again in a moment. The buttons above are the public deed record. Nothing was signed.</p></div>`;
   }
   if (accountId) {
-    return `<div class="house-empty" data-testid="house-empty" role="status"><p>No charter row for this account yet.</p><p>Open a row in setup. This page reads it with get_charter. The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Open a row</a></p></div>`;
+    return charterSetupCta({ accountId, note: 'This account has no charter row. Nothing was signed.' });
   }
   return `<div class="house-empty" data-testid="house-empty" role="status"><p>Sign in to read your charter row.</p><p>The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Sign in</a></p></div>`;
 }
@@ -479,9 +479,9 @@ function mountHouse(root, hooks = {}) {
   slot.innerHTML = `<div class="house-state" data-testid="house-state" role="status"><p>Reading the charter row…</p></div>`;
   const load = hooks.row
     ? Promise.resolve(hooks.row)
-    : fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
+    : withRowWait(() => fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
       .then(r => r.json())
-      .then(body => normalizeRow(body));
+      .then(body => normalizeRow(body)), ROW_WAIT_MS);
   load.then(row => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, row }); })
     .catch(() => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, failed: true }); });
 }
