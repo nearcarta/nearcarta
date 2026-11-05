@@ -1,4 +1,4 @@
-// Town Hall room. The recorded mainnet payments are a 0.001 NEAR reward and a 0.002 NEAR refusal. A shared DAO is not built.
+// Town Hall room. The recorded mainnet payments are a 0.001 NEAR reward and a 0.002 NEAR refusal.
 import { THREE, room, put, makeRobot, sfx, wait, tween, tok, C } from '../js/core.js';
 import { TH } from '../../D6_dashboards/src/data.js';
 import { row, h3, note, proof, acct, paper, esc, mainnet } from './_ui.js';
@@ -8,7 +8,7 @@ import { M as PM, brassM, mesh, lantern, banner, candle, rug } from './_props.js
 export const PROOF = mainnet('hall') + proof(
       h3('Recorded payments'), row({ k: 'Reward paid', why: '0.001 NEAR allowed', st: 'ok', stText: 'allowed', tx: '6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h' }),
       row({ k: 'Reward over the cap', why: '0.002 NEAR refused', st: 'no', stText: 'refused', tx: 'Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6' }),
-      note(`Contract ${acct(TH.oath)}. A shared DAO is not built. These two rows are mainnet transactions.`));
+      note(`Contract ${acct(TH.oath)}. These two rows are mainnet transactions.`));
 // Old vote rows, kept so a recorded list can still mark a closed vote. This room does not fetch them.
 const PST = { Approved: ['ok', 'approved'], Rejected: ['no', 'rejected'], Removed: ['no', 'removed'], Failed: ['no', 'failed'], Expired: ['ice', 'expired'], InProgress: ['pend', 'open'] };
 const plain = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();

@@ -1,6 +1,7 @@
 // 2D fallback (?2d or no WebGL2): still pictures of each room plus the same tray and proof drawer.
 import { $, tok } from './core.js';
 import { QUOTE } from '../data/live.js';
+import { paintTrack } from './names.js';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const SH = { guard: 'Guardhouse', ferry: 'Ferry', hall: 'Town Hall', bank: 'Mist Bank', arena: 'Vault Arena', toll: 'Toll Bridge', chronicle: 'Chronicle', house: 'Your House', payouts: 'Payouts' };
 export function flat() {
@@ -22,7 +23,7 @@ export function flat() {
     } else {
       // the 2D tray shows the end state (no scene to animate)
       const end = { guard: ['no', 'Refused · not on the list'], ferry: ['ok', 'Downgrade refused · crossed shielded'], hall: ['ok', 'Allowed · 0.001 NEAR'] }[id];
-      const info = m.FLAT || FLAT[id]; $('#t-src').textContent = (globalThis.NEARCARTA_PUBLIC_MAINNET === true && { bank: 'mainnet · mainnet', payouts: 'mainnet', chronicle: 'mainnet' }[id]) || (info.src === 'mainnet' ? 'mainnet' : info.src); $('#t-src').className = 'src ' + info.cls; $('#t-label').textContent = info.label; $('#t-hero').innerHTML = info.hero;
+      const info = m.FLAT || FLAT[id]; $('#t-src').textContent = (globalThis.NEARCARTA_PUBLIC_MAINNET === true && { bank: 'mainnet · mainnet', payouts: 'mainnet', chronicle: 'mainnet' }[id]) || (info.src === 'mainnet' ? 'mainnet' : info.src); $('#t-src').className = 'src ' + info.cls; $('#t-label').textContent = info.label; paintTrack(id); $('#t-hero').innerHTML = info.hero;
       { const mo = $('#t-more'); mo.hidden = !m.MORE; if (m.MORE) { mo.href = m.MORE.href; mo.textContent = m.MORE.text; } }
       b.onclick = null; b.hidden = !end; if (end) { b.className = 'act res ' + end[0]; b.disabled = true; b.textContent = end[1]; }
       if (m.PROOF) body.innerHTML = m.PROOF;

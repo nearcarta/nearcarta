@@ -141,8 +141,8 @@ function renderCreate() {
   box.innerHTML = `<label>Name <span class="suffix"><input id="cname" value="${esc(base)}" maxlength="32" pattern="[a-z0-9-]+" aria-describedby="cname-h"><span>.${esc(CFG.factory)}</span></span></label>
     <label>Deposit <span class="suffix"><input id="cdep" type="number" min="0.3" max="5" step="0.1" value="0.5"><span>NEAR</span></span></label>
     <label>Timelock <select id="cdelay" data-testid="delay">${delayOptions()}</select></label>
-    <label>DAO (optional) <input id="cdao" placeholder="e.g. mydao.sputnik-dao.near" maxlength="64" data-testid="dao"></label>
-    <details class="how"><summary>How this works</summary><p class="muted">After setup, a wider allowlist, a bigger cap or a new agent key waits this long before it applies, and the owner (or the DAO) can cancel it meanwhile. Tightening is always instant. The DAO can also freeze the charter or cancel changes.</p>
+    <label>Guardian (optional) <input id="cdao" placeholder="e.g. guardian.near" maxlength="64" data-testid="dao"></label>
+    <details class="how"><summary>How this works</summary><p class="muted">After setup, a wider allowlist, a bigger cap or a new agent key waits this long before it applies, and the owner (or the guardian) can cancel it meanwhile. Tightening is always instant. The guardian can also freeze the charter or cancel changes.</p>
     <p id="cname-h" class="muted">The factory creates the account, points it at the audited oath code (by hash, nothing is uploaded), and makes you the owner. It keeps 0.01 NEAR as a fee.</p></details>
     <button id="create-btn" class="primary" data-testid="create">Create my charter</button>`;
   $('#create-btn').onclick = () => createCharter().catch(fail).finally(() => busy($('#create-btn'), false));
@@ -167,7 +167,7 @@ async function createCharter() {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) throw new Error('name: a-z, 0-9 and single dashes');
   if (!(dep >= 0.3 && dep <= 5)) throw new Error('deposit must be 0.3 to 5 NEAR');
   const dao = $('#cdao').value.trim().toLowerCase();
-  if (dao && !/^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(dao)) throw new Error('DAO: a NEAR account id');
+  if (dao && !/^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(dao)) throw new Error('Guardian: a NEAR account id');
   const args = { name, policy_delay_ns: $('#cdelay').value, ...(dao ? { dao } : {}) };
   busy($('#create-btn'), true, 'Approve in your wallet…');
   const w = await connector.wallet();
@@ -208,7 +208,7 @@ async function renderFacts() {
     <li class="${f.full_access_keys === 0 ? 'ok' : 'no'}">${f.full_access_keys} full-access keys (nobody can bypass the rules)</li>
     <li class="${f.owner === me ? 'ok' : 'no'}">Owner: ${esc(f.owner)}</li>
     <li class="${BigInt(f.policy_delay_ns || 0) > 0n ? 'ok' : 'no'}" data-testid="timelock">Timelock: loosening the rules waits ${esc(dur(f.policy_delay_ns))}</li>
-    <li class="${f.dao ? 'ok' : ''}">Co-guardian DAO: ${f.dao ? `<code>${esc(f.dao)}</code>` : 'none'}</li>
+    <li class="${f.dao ? 'ok' : ''}">Guardian: ${f.dao ? `<code>${esc(f.dao)}</code>` : 'none'}</li>
     <li class="${f.setup_open ? 'todo' : 'ok'}" data-testid="setup">${f.setup_open ? 'Setup window open: the first rules and agent key apply at once. Adding the agent key closes it.' : 'Setup closed: loosening rules or a new agent key now waits the timelock'}</li>
     <li>Balance: ${fmt(f.balance)}</li>
     <li class="${cl ? 'ok' : 'todo'}">${cl ? `Rules: pays only ${(cl.receivers || []).map(esc).join(', ')} · max ${fmt(cl.per_action_cap)} each · ${fmt(cl.daily_budget)} a day · ${cl.max_actions_per_day || '∞'} payments a day` : 'No rules yet'}</li>
@@ -269,9 +269,9 @@ function renderDash(f, cl, u) {
     <div class="gauge" data-testid="gauge-expiry"><div class="gl"><span>Rules expire</span><b id="exp-left">${expiryText()}</b></div>${expiryBar()}</div>
     <div class="gauge"><div class="gl"><span>Max per payment</span><b>${fmt(cl.per_action_cap)}</b></div><div class="gl"><span>Balance</span><b>${fmt(f.balance)}</b></div></div>
     <div class="gauge freeze ${frozen ? 'on' : ''}"><div class="gl"><span>Status</span><b data-testid="frozen">${frozen ? 'FROZEN · all refused' : 'Active'}</b></div>
-      ${frozen ? `<button id="unfreeze" data-testid="unfreeze" ${canUnfreeze ? '' : 'disabled title="Only the DAO can unfreeze this charter"'}>Unfreeze</button>`
+      ${frozen ? `<button id="unfreeze" data-testid="unfreeze" ${canUnfreeze ? '' : 'disabled title="Only the guardian can unfreeze this charter"'}>Unfreeze</button>`
         : `<button id="freeze" class="danger" data-testid="freeze" title="Stops the agent at once. Instant, one wallet approval.">Freeze the agent</button>`}</div></div>
-    ${f.dao ? '<p class="muted">Only the DAO can undo a freeze.</p>' : ''}`;
+    ${f.dao ? '<p class="muted">Only the guardian can undo a freeze.</p>' : ''}`;
   if ($('#freeze')) $('#freeze').onclick = () => ownerCall('freeze', {}, $('#freeze'), 'Charter frozen').then(() => tell('Frozen. Every payment is now refused on chain.', 'info')).catch(fail);
   if ($('#unfreeze')) $('#unfreeze').onclick = () => ownerCall('unfreeze', {}, $('#unfreeze'), 'Charter unfrozen').catch(fail);
 }

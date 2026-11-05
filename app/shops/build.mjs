@@ -6,7 +6,7 @@ export async function buildShops(dist, esbuild) {
   for (const f of ['index.html', 'vault.css']) cpSync(here + 'vault/' + f, dist + '/shops/vault/' + f);
   await esbuild.build({ entryPoints: [here + 'vault/main.js'], bundle: true, format: 'esm', minify: true, target: 'es2022', outfile: dist + '/shops/vault/vault.bundle.js',
     define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', ...(await import('../build-defines.mjs')).walletDefine }, logLevel: 'warning' });
-  // Town Hall proposals page: the visitor files a Sputnik DAO proposal; reuses the vault wallet layer and CSS.
+  // Town Hall page: the visitor changes their own row; reuses the vault wallet layer and CSS.
   mkdirSync(dist + '/shops/hall', { recursive: true });
   for (const f of ['index.html', 'hall.css']) cpSync(here + 'hall/' + f, dist + '/shops/hall/' + f);
   await esbuild.build({ entryPoints: [here + 'hall/main.js'], bundle: true, format: 'esm', minify: true, target: 'es2022', outfile: dist + '/shops/hall/hall.bundle.js',

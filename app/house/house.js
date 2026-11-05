@@ -165,7 +165,7 @@ async function render() {
   const pend = Object.entries(h?.actions || {}).filter(([, a]) => a?.status === 'escalated');
   const isOwner = who && who === h?.owner;
   const btn = (act, label, extra = '') => `<button data-act="${act}" ${extra} ${isOwner ? '' : 'disabled'}>${label}</button>`;
-  out.innerHTML = `${deedMarkup()}<div class="card" data-testid="house-state">House <span title="${esc(h?.oath)}">${esc(short(h?.oath))}</span> · owner <b title="${esc(h?.owner)}">${esc(short(h?.owner))}</b> · No shared DAO. The owner may freeze and unfreeze this house.<br>
+  out.innerHTML = `${deedMarkup()}<div class="card" data-testid="house-state">House <span title="${esc(h?.oath)}">${esc(short(h?.oath))}</span> · owner <b title="${esc(h?.owner)}">${esc(short(h?.owner))}</b> · The owner may freeze and unfreeze this house.<br>
     Status: <b data-testid="house-frozen" class="${s.frozen ? 'fail' : 'pass'}">${s.frozen ? 'frozen' : 'active'}</b>${s.frozen ? ' <span class="note">(frozen on purpose: the agent cannot spend until the owner unfreezes)</span>' : ''} · next action #${esc(s.next_action)}<br>
     Full-access keys: <b data-testid="house-fak">${keys.fullAccess ?? 0}</b> · the agent's key may call: <b>${esc((keys.functionCall || []).map(k => (k.methods || []).join(',')).join(' | ') || 'propose and propose_batch')}</b></div>
   <div class="card"><b>Wallet</b> · <span data-testid="house-who">${who ? 'signed in as ' + esc(who) + (isOwner ? ' (owner)' : ' (not the owner: buttons are off)') : 'not signed in'}</span><br>

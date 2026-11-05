@@ -1,7 +1,7 @@
 # Nearcarta
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/backend%20unit%20tests-394%20pass%2C%203%20skipped-brightgreen)
+![tests](https://img.shields.io/badge/backend%20unit%20tests-439%20pass%2C%203%20skipped-brightgreen)
 
 **Thesis: the agent proposes, the NEAR charter decides.** The town charter's agent key calls `propose` and `propose_batch`. Every payment is checked by the charter, which allows it, refuses it on chain with a reason, or holds it for the owner.
 
@@ -31,18 +31,21 @@ Each claim names the code, the test that pins it, and a tx you can open. Test na
 - Sign-in: email or a wallet on the setup page. The account id is saved in this browser and read by every shop panel.
 
 ## Tracks
-| Track | Where it shows | Proof |
-|---|---|---|
-| Security | The charter refuses a payment over the cap | [CcPMX1Dt…](https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF) |
-| Business | The payout page prepares a batch and does not send it. The live row signs one payment at a time, each at most 0.005 NEAR | [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia) |
-| Privacy | The model call does not move NEAR. The TEE check is `judges/proofs/tee-check.json` | [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy) |
-| Agents | One recorded Intents swap | [HzgUr618…](https://nearblocks.io/txns/HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw) |
-| Games | The town opens with the camera story when 3D starts, then a shop, a button and a result | [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR) |
-| NFTs | The house deed | [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26) |
-| Social | Town Hall writes a rule on the visitor's own row. A shared DAO is not built | [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h) |
+Eight tracks. Each one is a building. The pin labels and the brown town are unchanged; the track name is on the shop card and under the shop title.
+
+| Track | Building | What runs | Contract | Proof |
+|---|---|---|---|---|
+| DeFi | Ferry | One recorded NEAR Intents swap: 0.045 wNEAR became 0.177937 USDC. New quotes stay dry | `intents.near` | [HzgUr618…](https://nearblocks.io/txns/HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw) |
+| Privacy | Mist Bank | The model call does not move NEAR. The TEE check is `judges/proofs/tee-check.json` | `board.nearcarta.near` | [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy) |
+| Autonomous Business | Chronicle, Toll Bridge | Chronicle lists what the charter allowed and refused. Toll asks the MPC signer | `board.nearcarta.near`, `toll.nearcarta.near` | chronicle [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR), toll allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) |
+| AI Security | Guardhouse | The charter refuses a payment over the cap and a payee off the list | `board.nearcarta.near` | over cap [CcPMX1Dt…](https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF), off list [E7KMexjS…](https://nearblocks.io/txns/E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ) |
+| Agent Economy | Town Hall | `set_rules`, `set_frozen` and `set_seal` on the visitor's own row. Deposit 0. The recorded rows are a reward and a refusal | `board.nearcarta.near` | reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h), refusal [Cp2rWatn…](https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6) |
+| Real-World Money | Payouts | The page prepares a batch and does not send it. The live row signs one payment at a time, each at most 0.005 NEAR | `board.nearcarta.near` | [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia) |
+| Games | Vault Arena | A recorded arena payment and an over-cap refusal | `arena.nearcarta.near` | [AZWxqZns…](https://nearblocks.io/txns/AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht), [25LpJRFF…](https://nearblocks.io/txns/25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V) |
+| Open | Your House | A house deed payment of 0.001 NEAR was allowed and 0.002 NEAR was refused | `house.nearcarta.near` | [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26), [3Z4UAb6N…](https://nearblocks.io/txns/3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1) |
 
 ## Limits
-The live board wasm has no access key, no `propose_batch` and no upgrade method. A row is closed with `close_charter`. A shared DAO is not built. The API does not sign mainnet. A Pay checkout asks for a deposit address of at most 0.20 USD and does not send the deposit. The payout page prepares one `propose_batch` and does not send it. The recorded payouts are single `propose` calls, each at most 0.005 NEAR. A USDC row is kept and not sent. Owner costs, not signed: a ferry deposit of 0.20 USD (`node backend/scripts/ferry-live-swap.js` without `--live` prints the steps); three board proposes of 0.001 NEAR move 0.003 NEAR (`3000000000000000000000` yoctoNEAR) from the row; one USDC payout of at most 0.20 USD. `set_rules`, `set_frozen` and `set_seal` attach a deposit of 0. The list is `node backend/scripts/spend-plan.js`.
+The live board wasm has no access key, no `propose_batch` and no upgrade method. A row is closed with `close_charter`. The API does not sign mainnet. A Pay checkout asks for a deposit address of at most 0.20 USD and does not send the deposit. The payout page prepares one `propose_batch` and does not send it. The recorded payouts are single `propose` calls, each at most 0.005 NEAR. A USDC row is kept and not sent. Owner costs, not signed: a ferry deposit of 0.20 USD (`node backend/scripts/ferry-live-swap.js` without `--live` prints the steps); three board proposes of 0.001 NEAR move 0.003 NEAR (`3000000000000000000000` yoctoNEAR) from the row; one USDC payout of at most 0.20 USD. `set_rules`, `set_frozen` and `set_seal` attach a deposit of 0. The list is `node backend/scripts/spend-plan.js`.
 
 ## The town loop
 Open the town, walk to a shop, and press the button. The Lamplighter asks. The charter allows or refuses. The chronicle lists the result with a nearblocks.io link. The chain stays in the proof drawer.
@@ -50,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 440 backend unit tests (437 pass, 3 skipped), offline
+npm test                                   # 442 backend unit tests (439 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -67,7 +70,7 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
 | toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 15 |
-| backend unit (`npm test`) | 405 (402 pass, 3 skipped) |
+| backend unit (`npm test`) | 442 (439 pass, 3 skipped) |
 | browser e2e | 124 passed, 2 skipped, 1 flaky on retry. The skips need a partner key or a NEAR AI key |
 
 The 2 skipped e2e tests need a 1Click partner key or a NEAR AI key; they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
@@ -76,7 +79,7 @@ The 2 skipped e2e tests need a 1Click partner key or a NEAR AI key; they are not
 - The agent signs with a function-call key limited to the charter and `propose`/`propose_batch`; it cannot attach deposits, transfer, or call owner methods.
 - The charter, not the agent, checks the payee, the per-payment cap, the daily budget and count, clause expiry and the nonce; it refuses on chain with a reason.
 - Rule changes that widen what the agent may do wait behind the policy delay; code upgrades need `queue_upgrade` with the code hash first when a delay is set.
-- A DAO or owner can freeze; the owner can revoke the agent key. Served accounts have 0 full-access keys.
+- The owner can freeze and can revoke the agent key. Served accounts have 0 full-access keys.
 
 ### Addresses (from `shared/deployments/`)
 - Mainnet: `charter.nearcarta.near`, `toll.nearcarta.near`, `arena.nearcarta.near`, `house.nearcarta.near`, `townhall.nearcarta.near`. Allowed payment [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy), over cap refused [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH). Full list: `shared/deployments/mainnet.json`.
@@ -150,9 +153,9 @@ An agent with a wallet key can be talked into paying anyone: a fake invoice, a p
 | Guardhouse | Type an account and press *Check this account* | Age, code hash, lookalike, denylist and any recorded refusal, each with a sentence. A recorded refusal links the mainnet tx |
 | Vault Arena | Write a scam, *Send the scam* | The NEAR AI model (`z-ai/glm-5.3-flash`) reads it and proposes a payment; a payment outside your rules is refused on chain. Six walls, points and a leaderboard |
 | Payouts | *Prepare the batch*, or paste a CSV | One receipt per row. Nothing is sent. A USDC row stays under 0.20 USD and is not sent. The live board signs `propose` only |
-| Town Hall | *Change my row* | `set_rules`, `set_frozen` and `set_seal` on your own row. Deposit 0. A preview reads the new cap back. A shared DAO is not built |
+| Town Hall | *Change my row* | `set_rules`, `set_frozen` and `set_seal` on your own row. Deposit 0. A preview reads the new cap back |
 
-The live path is a visitor's own row on `board.nearcarta.near`. A shared DAO is not built. Town Hall writes `set_rules` on that row.
+The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes `set_rules` on that row.
 
 | Shop | Code | Test | Mainnet |
 |---|---|---|---|
@@ -167,14 +170,19 @@ The live path is a visitor's own row on `board.nearcarta.near`. A shared DAO is 
 | Town intro | `app/design/D9_world/js/main.js` `story` | `the 3D story starts without the flat overlay` | no new spend |
 
 ## Tracks and the hints we use
-- `security`: spending limits and a policy engine in a contract. FUNCTION CALL KEYS: the town charter agent key calls `propose` and `propose_batch`; every served account has 0 full-access keys. The agent key cannot unfreeze the charter. TEE ATTESTATION: NEAR AI Cloud Intel TDX and NVIDIA quotes checked live. Scam detection: the payee check and the recorded mainnet refusal. Reputation counted from on-chain refusals.
-- `business`: humans only set the constraints; the agent pays inside them. Cross-chain: NEAR Intents via the recorded swap, and Chain Signatures via `toll.nearcarta.near`.
-- `privacy`: NEAR AI Cloud TEE check (PRIVATE AI, TEE, NEAR AI CLOUD). The model call does not move the NEAR.
+- DeFi (Ferry): one recorded NEAR Intents swap. New quotes stay dry.
+- Privacy (Mist Bank): NEAR AI Cloud TEE check. The model call does not move NEAR.
+- Autonomous Business (Chronicle, Toll Bridge): Chronicle lists what the charter allowed and refused. Toll asks the MPC signer at `toll.nearcarta.near`.
+- AI Security (Guardhouse): spending limits and a policy engine in the charter. The town charter agent key calls `propose` and `propose_batch`. Every served account has 0 full-access keys. The agent key cannot unfreeze the charter.
+- Agent Economy (Town Hall): `set_rules` on the visitor's own row. Deposit 0.
+- Real-World Money (Payouts): the page prepares a batch and does not send it. A live payment is one `propose`, at most 0.005 NEAR.
+- Games (Vault Arena): a recorded payment and an over-cap refusal.
+- Open (Your House): the house deed, and the visitor's rules on their row.
 
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 440 unit tests (437 pass, 3 skipped)
+npm test                 # 442 unit tests (439 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -196,7 +204,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Pay | Open `/ferry-widget`, leave the amount at 0.2, press Pay | The charter is read first. A deposit address appears only when that recipient is allowlisted and the signed quote is at most 0.20 USD. The receipt uses the same keys, rail `intents`, and `tx` is the deposit address. Code: `backend/src/ferry-checkout.js`, `app/src/ferry-pay.js` | e2e "ferry checkout: mocked 1Click returns a deposit address only after the charter allows it"; unit `a refused recipient never asks 1Click, and an allowed one returns a deposit address` |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 440 unit tests (437 pass, 3 skipped):
+# 442 unit tests (439 pass, 3 skipped):
 Proof rows (56/56 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).

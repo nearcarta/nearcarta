@@ -13,9 +13,9 @@ const DIFF = [
 export default function TownHallView() {
   return (
     <>
-      <PageHead icon={Vote} kicker="Town Hall · SputnikDAO v2 proposal" title="The oath changes only by vote"
-        sub="The agent cannot edit its own oath. A council proposal on the DAO is the only path to set_policy, and every attempt to skip it is refused on chain.">
-        <a className="btn ghost" href={NBA(TH.dao)} target="_blank" rel="noreferrer">Open the DAO<ArrowRight size={14} /></a>
+      <PageHead icon={Vote} kicker="Town Hall · Agent Economy" title="Rules change on your row"
+        sub="The agent cannot edit its own rules. A change is set_rules on your row.">
+        <a className="btn ghost" href={NBA(TH.dao)} target="_blank" rel="noreferrer">Open the row<ArrowRight size={14} /></a>
       </PageHead>
       <div className="grid">
         <Card className="s7" title={`Proposal ${TH.proposal.id} · tighten the oath to v3`} icon={FileDiff} right={<><Dot tone="pos">Executed</Dot><Ev label="Mainnet" tx={TH.proposal.filed} /></>}>

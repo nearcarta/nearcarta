@@ -155,7 +155,8 @@ test('M10 the console does not say a DAO governs the oath', async ({ page }) => 
   await page.goto('/console');
   await expect(page.locator('h1, .top, body').first()).toBeVisible();
   await page.getByRole('button', { name: 'Town Hall' }).click();
-  await expect(page.getByTestId('hall-state')).toContainText('A shared DAO is not built', { timeout: 30_000 });
+  await expect(page.getByTestId('hall-state')).toContainText('set_rules on your own row', { timeout: 30_000 });
+  await expect(page.getByTestId('hall-state')).not.toContainText('shared DAO');
   const text = await page.locator('body').innerText();
   expect(text).not.toMatch(/DAO-governed oath/);
   expect(text).not.toMatch(/Town Hall DAO/);

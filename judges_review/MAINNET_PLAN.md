@@ -4,7 +4,7 @@ Revised 2026-11-03 01:00 Cairo (UTC+2). Changes from the last draft:
 - the charter is now **oath.r18** (agent key allowance optional);
 - sizes are the shipped artifact bytes;
 - the r18 factory path is costed;
-- the Town Hall DAO line is corrected. `dao.globals.primitives.near` does not exist on mainnet (RPC UNKNOWN_ACCOUNT, checked 2026-11-03), so a DAO is a full Sputnik v2 instance.
+- the Town Hall line is the visitor's own row. `dao.globals.primitives.near` does not exist on mainnet (RPC UNKNOWN_ACCOUNT, checked 2026-11-03). No separate council contract is deployed.
 
 ## Rules the numbers rest on
 - **Regular deploy:** locks 1 NEAR per 100 kB (1e19 yocto/byte) of code and state. The stake is refundable when the code or state is removed (docs.near.org storage staking).
@@ -47,7 +47,7 @@ The factory (`charter_factory.r15.wasm`, unchanged source) pins the charter code
 |---|---|---|
 | Arena v2 (345,020 B) regular | 3.450 | 0.005 |
 | House deed NFT (208,519 B) regular | 2.085 | 0.005 |
-| Town Hall: own Sputnik v2 DAO (546,780 B measured on earlier network) | 5.475 | 0.003 |
+| Town Hall: the visitor row on the board. No separate council contract | 0 | 0 |
 | Town Hall proposal bond (refunded on approval) | 0.1 | 0.006 |
 
 - **Core + all optional, no factory:** 17.45 NEAR locked, ≈0.05 burned.

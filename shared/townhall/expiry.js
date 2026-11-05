@@ -1,4 +1,4 @@
-// Sputnik DAO keeps a proposal "InProgress" on chain until someone calls act_proposal, even after its vote window
+// A proposal stays "InProgress" on chain until someone calls act_proposal, even after its vote window
 // closed. A proposal whose submission_time + proposal_period has passed can no longer be voted on, so every view
 // shows it as Expired. Pure (no I/O), shared by the API, /shops/hall/ and the Town Hall room.
 

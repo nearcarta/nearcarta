@@ -56,6 +56,6 @@ export function renderJudges(rows) {
     <p>The full-access key was deleted in <a href="https://nearblocks.io/txns/${FAK}" title="${FAK}">${FAK.slice(0, 10)}…</a>.</p></div></article>
     <article class="card judge-step"><span class="n">4</span><div><h2>Chronicle shows allowed and refused</h2>
     <p data-testid="chronicle-script">Open <a href="/console#chronicle">Chronicle</a>. You should see ${summary}, each linked on nearblocks.io.</p></div></article>
-    <article class="card judge-step"><span class="n">5</span><div><h2>Town Hall payments, no shared DAO</h2>
-    <p>Open <a href="/shops/hall/">Town Hall</a>. You should see the recorded 0.001 NEAR reward marked allowed, and the 0.002 NEAR reward marked refused. A shared DAO is not built. A rule change is <code>set_rules</code> on your own row.</p></div></article>`;
+    <article class="card judge-step"><span class="n">5</span><div><h2>Town Hall payments</h2>
+    <p>Open <a href="/shops/hall/">Town Hall</a>. You should see the recorded 0.001 NEAR reward marked allowed, and the 0.002 NEAR reward marked refused. A rule change is <code>set_rules</code> on your own row.</p></div></article>`;
 }

@@ -4,6 +4,7 @@ import { buildTown, SHOPS, B, robot, doorPos, townCamera } from './town.js';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { srcBadge } from './badge.js';
 import { readSessionAccount } from './session.js';
+import { paintTrack } from './names.js';
 
 const LOADERS = { guard: () => import('../shops/guard.js'), ferry: () => import('../shops/ferry.js'), hall: () => import('../shops/hall.js'), bank: () => import('../shops/bank.js'), arena: () => import('../shops/arena.js'), toll: () => import('../shops/toll.js'), chronicle: () => import('../shops/chronicle.js'), house: () => import('../shops/house.js'), payouts: () => import('../shops/payouts.js') };
 window.__events = events;
@@ -87,7 +88,7 @@ export function setResult(kind, text) { if (APP) return; const b = $('#t-act'); 
 export function setHero(html) { const h = $('#t-hero'); h.innerHTML = html; h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); }
 const visitorNote = note => (globalThis.NEARCARTA_PUBLIC_MAINNET === true ? String(note || '').replace(/ ?[^.]*charter row[^.]*/gi, '').replace(/\s{2,}/g, ' ').trim() : (note || ''));
 function fillTray(sh) { const p = sh.panel; $('#t-title').innerHTML = `${i3(SHOPS[sh.id].icon, 28)}<span>${p.title}</span>`; const s = $('#t-src'); const badge = srcBadge(p); s.textContent = badge; s.className = 'src ' + (badge || 'live'); s.title = visitorNote(p.srcNote);
-  $('#t-label').textContent = p.label; $('#t-hero').innerHTML = p.hero; const b = $('#t-act'); b.className = 'act primary'; b.disabled = false; b.hidden = !p.action; b.textContent = p.action || '';
+  $('#t-label').textContent = p.label; paintTrack(sh.id); $('#t-hero').innerHTML = p.hero; const b = $('#t-act'); b.className = 'act primary'; b.disabled = false; b.hidden = !p.action; b.textContent = p.action || '';
   const m = $('#t-more'); m.hidden = !p.more; if (p.more) { m.href = p.more.href; m.textContent = p.more.text; }
   $('#d-title').textContent = p.title + ' · proof'; $('#d-body').innerHTML = sh.proof + '<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>'; }
 
@@ -95,7 +96,7 @@ function fillTray(sh) { const p = sh.panel; $('#t-title').innerHTML = `${i3(SHOP
 // shift the room right so the tray (bottom-left) never covers the subject
 function frameShop(c) { c.aspect = innerWidth / innerHeight; const ox = innerWidth > 900 ? -196 : 0; c.setViewOffset(innerWidth, innerHeight, ox, 0, innerWidth, innerHeight); c.updateProjectionMatrix(); }
 let busy = false;
-function coldTray(id) { $('#t-title').innerHTML = `${i3(SHOPS[id].icon, 28)}<span>${SHOPS[id].name || id}</span>`; $('#t-label').textContent = 'Opening the shop…'; $('#t-hero').innerHTML = '<div class="skel" data-testid="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>';
+function coldTray(id) { $('#t-title').innerHTML = `${i3(SHOPS[id].icon, 28)}<span>${SHOPS[id].name || id}</span>`; $('#t-label').textContent = 'Opening the shop…'; paintTrack(id); $('#t-hero').innerHTML = '<div class="skel" data-testid="skeleton" aria-hidden="true"><i></i><i></i><i></i></div>';
     const b0 = $('#t-act'); b0.hidden = false; b0.disabled = true; b0.className = 'act primary'; b0.textContent = readSessionAccount() ? 'Opening…' : 'Sign in'; document.body.classList.add('in-shop'); tray().hidden = false; $('#brand').hidden = true; }
 export async function enter(id, { instant = false } = {}) {
   if (busy || shop) return; busy = true; sfx('click');

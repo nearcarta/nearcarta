@@ -31,23 +31,23 @@ export function toHex(x,z){ const r=z/SQ3, q=(x-r)/2; let rq=Math.round(q), rr=M
 export const ISLAND=7;
 // civic buildings. Names are the in-world names; states, never prices. card + tag = the shop card (menu, hover), same words as the old game.js cards.
 export const SHOPS = {
-  chronicle:{q:0,r:0,  m:'buildings/blue/building_tower_A_blue', name:'Chronicle', role:'see every decision your agent made',
+  chronicle:{q:0,r:0,  m:'buildings/blue/building_tower_A_blue', name:'Chronicle', role:'see every decision your agent made', track:'Autonomous Business',
             card:'Every decision, yes or no, is a public NEP-297 event with an explorer link.', tag:'EVENT_JSON · standard: oath'},
-  hall:     {q:-2,r:-2,m:'buildings/blue/building_castle_blue',  name:'Town Hall', role:'vote on a rule',
+  hall:     {q:-2,r:-2,m:'buildings/blue/building_castle_blue',  name:'Town Hall', role:'vote on a rule', track:'Agent Economy',
             card:'Change the rules on your own charter row. Gas only.', tag:'set_rules · your row'},
-  bank:     {q:2,r:-4, m:'buildings/blue/building_church_blue',  name:'Mist Bank', role:'private payouts',
+  bank:     {q:2,r:-4, m:'buildings/blue/building_church_blue',  name:'Mist Bank', role:'private payouts', track:'Privacy',
             card:'Amounts stay hidden. Public: the check passed, and when.', tag:'hidden amounts'},
-  ferry:    {q:3,r:-2, m:'buildings/blue/building_watermill_blue',name:'Ferry', role:'cross-chain swap',
+  ferry:    {q:3,r:-2, m:'buildings/blue/building_watermill_blue',name:'Ferry', role:'cross-chain swap', track:'DeFi',
             card:'A recorded mainnet swap: 0.045 wNEAR became 0.177937 USDC. New quotes stay dry.', tag:'1Click · mainnet record'},
-  guard:    {q:-4,r:2, m:'buildings/blue/building_barracks_blue', name:'Guardhouse', role:'prompt-injection test',
+  guard:    {q:-4,r:2, m:'buildings/blue/building_barracks_blue', name:'Guardhouse', role:'prompt-injection test', track:'AI Security',
             card:'Every spend is checked before it can be signed: payee list, daily cap, weekly cap.', tag:'payee_allowlist · daily_cap · weekly_cap'},
-  arena:    {q:1,r:3,  m:'buildings/blue/building_archeryrange_blue',name:'Vault Arena', role:'try to trick the AI',
+  arena:    {q:1,r:3,  m:'buildings/blue/building_archeryrange_blue',name:'Vault Arena', role:'try to trick the AI', track:'Games',
             card:'A live vault anyone may try to break. Every failed attack is a Chronicle row.', tag:'arena.attack_failed'},
-  house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'Your House', role:'your rules and history',
+  house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'Your House', role:'your rules and history', track:'Open',
             card:'Only your house key can change the oath or ring the curfew. The agent key calls propose and propose_batch.', tag:'function-call key · propose and propose_batch'},
-  toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay-per-use gate',
+  toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay-per-use gate', track:'Autonomous Business',
             card:'Pay 0.001 NEAR to toll.nearcarta.near. A refusal pays nothing.', tag:'propose · 0.001 NEAR'},
-  payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'prepare a batch',
+  payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'prepare a batch', track:'Real-World Money',
             card:'Prepare a batch. The live row signs one payment at a time, each at most 0.005 NEAR.', tag:'prepared, not sent'},
 };
 export const GATE={q:-5,r:1,dir:3};

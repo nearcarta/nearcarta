@@ -42,7 +42,7 @@ export function shapeClauses(guard, sample) {
     spent: N(usage[id]?.spent),
     reserved: N(usage[id]?.reserved),
     window: 'Any time',
-    escalate: c?.escalation_max ? { max: N(c.escalation_max), by: 'Owner or DAO', timeout: 'timelock' } : null,
+    escalate: c?.escalation_max ? { max: N(c.escalation_max), by: 'Owner', timeout: 'timelock' } : null,
     receipt: !!c?.requires_receipt,
     src: 'mainnet',
     tx: null,

@@ -69,9 +69,10 @@ test('chronicle: the guardhouse shows one allowed and one denied proposal from c
   await expect(c).toContainText('allowed'); await expect(c).toContainText('denied');
 });
 
-test('town hall: the page names the mainnet contract and says a shared DAO is not built', async ({ page }) => {
+test('town hall: the page names the mainnet contract and the row change', async ({ page }) => {
   await page.goto('/console#townhall');
-  await expect(page.getByTestId('hall-state')).toContainText('shared DAO is not built', { timeout: 30_000 });
+  await expect(page.getByTestId('hall-state')).toContainText('set_rules on your own row', { timeout: 30_000 });
+  await expect(page.getByTestId('hall-state')).not.toContainText('shared DAO');
   await expect(page.getByTestId('hall-state').locator(`a[title="${dep.extras.townhall.contract}"]`).first()).toBeVisible();
 });
 

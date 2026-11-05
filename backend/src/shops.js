@@ -29,7 +29,7 @@ export async function townhall() {
     receivers: reward?.receivers || [],
     bounties: [],
     council: policy.roles.filter(r => r.kind?.Group).map(r => ({ role: r.name, members: r.kind.Group })),
-    // status is Expired once the vote window closed (Sputnik keeps InProgress until act_proposal); chain_status is raw.
+    // status is Expired once the vote window closed (the chain keeps InProgress until act_proposal); chain_status is raw.
     proposals: proposals.map(p => ({ ...townhallProposal(p, policy.proposal_period), over_limit: over.has(p.id) })),
     proposal_period_h: Number(BigInt(policy.proposal_period) / 10n ** 9n) / 3600,
     lastProposalId: lastId, proof_txs: T.proof_txs,

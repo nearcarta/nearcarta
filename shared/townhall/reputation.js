@@ -1,7 +1,7 @@
 // Town Hall reputation: a small score read only from the DAO's own on-chain history.
 // +2 for each proposal the account filed that the DAO approved, +1 for each vote it cast,
 // +2 if the charter's reward list names it. Tiers weight the town tally and cap how often an account may file;
-// they do not change Sputnik's own count (the council's 2 votes still decide on chain).
+// they do not change the proposal contract's own count (the council's 2 votes still decide on chain).
 export function reputation(account, proposals = [], rewardList = []) {
   let filed = 0, approved = 0, votes = 0;
   for (const p of proposals) {
@@ -15,7 +15,7 @@ export function reputation(account, proposals = [], rewardList = []) {
 }
 
 /** What each tier may do: its vote weight in the town tally, and how many proposals it may file (anti-spam,
- * on top of Sputnik's 0.1 NEAR proposal bond). Enforced by this site and the API only, not on chain: Sputnik's
+ * on top of the 0.1 NEAR proposal bond). Enforced by this site and the API only, not on chain: the proposal contract's
  * add_proposal takes anyone's bond, so a direct DAO call skips the tier cap; the bond and the council vote still apply. Newcomers (every fresh guest) get one proposal a day and one open. */
 export const TIERS = {
   newcomer: { weight: 1, per_day: 1, open: 1 },
@@ -50,13 +50,13 @@ export function tally(p, repOf) {
   return out;
 }
 
-/** Motions are Sputnik "Vote" proposals; anyone may vote on them while they are in progress and inside the window. */
+/** Motions are "Vote" proposals; anyone may vote on them while they are in progress and inside the window. */
 export const votable = (p, periodNs, nowMs) => p.kind === 'Vote' && p.status === 'InProgress'
   && Number(BigInt(p.submission_time) + BigInt(periodNs)) / 1e6 > nowMs;
 
 /** Server-side check of the same limits over the chain history: replays each proposal in id order against the
  * proposals filed before it (at its own submission time) and returns the ids filed past the proposer's limit.
- * Sputnik itself cannot refuse them, so the server marks them and the town board does not count them. */
+ * The proposal contract cannot refuse them, so the server marks them and the town board does not count them. */
 export function overLimit(proposals = [], rewardList = []) {
   const sorted = [...proposals].sort((a, b) => a.id - b.id), out = new Set();
   sorted.forEach((p, i) => {

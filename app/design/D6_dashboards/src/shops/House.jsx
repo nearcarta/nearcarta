@@ -50,7 +50,7 @@ export default function HouseView() {
           <div style={{ padding: '10px 16px 6px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {['Typed clauses', 'Daily budget with reserve / release', 'NEP-519 yield / resume escalation', 'ed25519 receipt check', 'NEP-297 refusal events'].map((t) => <span key={t} className="chip" style={{ height: 24 }}>{t}</span>)}
           </div>
-          {dirty && <div style={{ padding: '6px 16px 8px' }}><Note icon={Pencil}>Draft only. A rule change is set_rules on your own row. A shared DAO is not built. A pending proposal signed for an older policy version is refused with <span className="reason">stale policy_version</span>.</Note></div>}
+          {dirty && <div style={{ padding: '6px 16px 8px' }}><Note icon={Pencil}>Draft only. A rule change is set_rules on your own row. A pending proposal signed for an older policy version is refused with <span className="reason">stale policy_version</span>.</Note></div>}
         </Card>
 
         <Card className="s5" title="Today’s budget" icon={Gauge} right={<Ev label="Mainnet" />}>
@@ -97,11 +97,11 @@ export default function HouseView() {
               <span className="tag pos"><Lock size={11} />0 keys</span>
             </div>
             <div className="row" style={{ gridTemplateColumns: '1fr auto' }}>
-              <div><div style={{ fontWeight: 550 }}>Guardians</div><div className="mono t3"><a href={NBA(CORE.owner)} target="_blank" rel="noreferrer">{CORE.owner}</a> · <a href={NBA(CORE.dao)} target="_blank" rel="noreferrer">r2guard.sputnikv2</a></div></div>
+              <div><div style={{ fontWeight: 550 }}>Guardians</div><div className="mono t3"><a href={NBA(CORE.owner)} target="_blank" rel="noreferrer">{CORE.owner}</a> · <a href={NBA(CORE.dao)} target="_blank" rel="noreferrer">{CORE.dao}</a></div></div>
               <span className="chip" style={{ height: 24 }}><Users size={12} />2 can freeze</span>
             </div>
             <div className="row" style={{ gridTemplateColumns: '1fr auto' }}>
-              <div><div style={{ fontWeight: 550 }}>Freeze epoch</div><div className="sub">A freeze is an owner action on a row. A shared DAO is not built</div></div>
+              <div><div style={{ fontWeight: 550 }}>Freeze epoch</div><div className="sub">A freeze is an owner action on a row</div></div>
               <span className="mono" style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Snowflake size={13} className="t3" />{CORE.freezeEpoch}<Dot tone="pos">Open</Dot></span>
             </div>
           </div>

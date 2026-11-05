@@ -10,6 +10,28 @@ export const NAME = {
   house: 'Your House',
   payouts: 'Payouts',
 };
+export const TRACK = {
+  ferry: 'DeFi',
+  bank: 'Privacy',
+  chronicle: 'Autonomous Business',
+  toll: 'Autonomous Business',
+  guard: 'AI Security',
+  hall: 'Agent Economy',
+  payouts: 'Real-World Money',
+  arena: 'Games',
+  house: 'Open',
+};
+export function paintTrack(id) {
+  let el = document.getElementById('t-track');
+  if (!el) {
+    el = document.createElement('p');
+    el.id = 't-track';
+    el.dataset.testid = 'shop-track';
+    el.className = 'note';
+    (document.getElementById('t-label') || document.getElementById('t-title'))?.after(el);
+  }
+  el.textContent = TRACK[id] || '';
+}
 export const PURPOSE = {
   guard: 'Check a payee before anything is signed',
   ferry: 'A recorded cross-chain swap',
