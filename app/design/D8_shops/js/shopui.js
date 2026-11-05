@@ -15,7 +15,7 @@ import { teeResult, PROOF_HREF } from '/tee-view.js';
 import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
 import { mountShop } from '/panels/deep.js';
 import { deedMarkup } from '/panels/deed.js';
-import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues } from './payouts.js';
+import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues, prepareRows } from './payouts.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
 const yOf = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const { esc, fmt, short } = A;
@@ -252,11 +252,12 @@ const APPS = {
     hero: () => extra.pay ? num(`${extra.pay.paid}/${extra.pay.n}`, 'paid') : num(APPS.payouts.rows().length, 'payouts'),
     run: async () => {
       const prepared = APPS.payouts.rows();
-      if (!prepared.length) throw new Error('Nothing to prepare');
-      if (payoutIssues(prepared, extra.exists).length) throw new Error('Check the account name and the 0.005 NEAR cap. Nothing was sent.');
-      if (A.S.board) { const parts = splitAssets(prepared); extra.usdc = parts.usdc; extra.receipts = receiptsFor(prepared); return { keep: true, kind: 'ok', hero: APPS.payouts.hero(), say: `Prepared ${parts.near.length} NEAR payments as one propose_batch. The live board signs propose only, so this page did not send it.`, rc: extra.receipts.map(r => `<span class="rc" data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)} · not sent</span>`).join(' ') }; }
+      const prep = prepareRows(prepared);
+      if (prep.blocked) throw new Error(prep.note);
+      if (payoutIssues(prep.rows, extra.exists).length) throw new Error('Check the account name and the 0.005 NEAR cap. Nothing was sent.');
+      if (A.S.board) { const parts = splitAssets(prep.rows); extra.usdc = parts.usdc; extra.receipts = receiptsFor(prep.rows); return { keep: true, kind: 'ok', hero: APPS.payouts.hero(), say: `${prep.note ? prep.note + ' ' : ''}Prepared ${parts.near.length} NEAR payments as one propose_batch. The live board signs propose only, so this page did not send it.`, rc: extra.receipts.map(r => `<span class="rc" data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)} · not sent</span>`).join(' ') }; }
       if (!A.canBatch()) throw new Error('your charter pays one at a time');
-      const o = await A.payouts(APPS.payouts.rows()); extra.pay = o;
+      const o = await A.payouts(prep.rows); extra.pay = o;
       const ok = o.decision === 'allowed', who = o.bad != null ? ` Payout ${o.bad + 1}: ${A.why(o.reason)}.` : '';
       return { o, keep: true, kind: ok ? 'ok' : 'no', hero: APPS.payouts.hero(), rule: ok ? `paid · ${o.n} payouts in one tx` : o.decision === 'failed' ? 'failed · ' + String(o.reason).slice(0, 60) : `refused whole · ${A.why(o.reason)}`,
         say: ok ? `Paid all ${o.n}, ${o.total} NEAR, in one batch.` : o.decision === 'failed' ? 'Nothing moved.' : `Refused all ${o.n}. Nothing moved.${who}` };

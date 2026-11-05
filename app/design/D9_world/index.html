@@ -16,6 +16,15 @@
 <link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="/brand/brown.css">
 <link rel="stylesheet" href="/panels/panels.css">
+<style>
+html,body{margin:0;background:#17130f;color:#f3ead8}
+#c{position:fixed;inset:0;width:100%;height:100%;opacity:0}
+body.ready #c{opacity:1}
+body.fb #c{display:none}
+#loading{position:fixed;inset:0;z-index:50;background:#17130f;color:#f3ead8}
+#loading .lc{position:absolute;left:50%;bottom:14vh;transform:translateX(-50%);background:#1a140fe6;border:1px solid #d6b46a;border-radius:14px;padding:16px 22px;text-align:center;color:#f3ead8}
+#loading.done{opacity:0;visibility:hidden;pointer-events:none}
+</style>
 <script>
 try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }); } catch (e) {}
 try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }); } catch (e) {}
@@ -98,14 +107,6 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
   <div id="fbpins"></div>
 </div>
 
-<script>
-(function () {
-  var gone = false;
-  function hide() { if (gone) return; gone = true; var n = document.getElementById('loading'); if (n) n.classList.add('done'); }
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
-  setTimeout(hide, 1200);
-})();
-</script>
 <script type="module">
 // Boot: decide 2D vs 3D first, so the 2D path never downloads three.js, GSAP or the models.
 // 3D needs a WebGL2 context. Software rasterisers (SwiftShader, llvmpipe) still run the town so the camera and walkers are visible.

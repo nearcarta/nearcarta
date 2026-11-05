@@ -113,6 +113,10 @@ input:hover,select:hover{border-color:#ffffff38}input::placeholder{color:#9c8f79
 .swatch[aria-pressed=true],.fit[aria-pressed=true]{box-shadow:0 0 0 2px #17130f, 0 0 0 4px var(--dye, #d6b46a)}
 .fit{border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;background:#241d16;color:#f3ead8;border:1px solid #d6b46a66;cursor:pointer}.fit:hover{border-color:#d6b46a}.fit[aria-pressed=true]{background:#d6b46a;color:#1f1a15;border-color:#d6b46a}
 .preview-banner{margin:0 0 12px;padding:8px 12px;border-radius:10px;background:#d6b46a22;border:1px solid #d6b46a55;color:#f3e6c8;font-size:13px}
+.stepnav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.stepnav button{min-height:44px;padding:8px 12px;border-radius:999px;border:1px solid #d6b46a66;background:#241d16;color:#f3ead8;font:600 13px/1.2 Inter,system-ui,sans-serif;cursor:pointer}
+.stepnav button[aria-current=step]{background:#d6b46a;color:#1f1a15;border-color:#d6b46a}
+.stepnav button:disabled{opacity:.55;cursor:default}
 .foot{text-align:center;color:var(--t3);font-size:12px;padding:0 20px 30px}
 .spin{width:16px;height:16px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:spin .8s linear infinite;display:inline-block}
 @media (max-width:900px){.shell{grid-template-columns:1fr;gap:0}.rail{display:none}.progress{display:block}.who{max-width:44vw}.cast{grid-template-columns:1fr}.liveprev{position:static;order:-1}}

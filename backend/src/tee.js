@@ -116,6 +116,17 @@ export async function checkGpu(report, nonceHex) {
   return { present: true, ok: claims['x-nvidia-overall-att-result'] === true, gpus: (payload.evidence_list || []).length || undefined };
 }
 
+// The first failed check, in words. A passing report returns an empty string.
+export function teeFailure(part) {
+  if (!part) return 'missing';
+  const gpuBad = part.gpu?.present && part.gpu.ok === false;
+  if (part.ok && !gpuBad) return '';
+  if (part.error) return part.error;
+  const bad = Object.entries(part.checks || {}).filter(([, v]) => !v).map(([k]) => k);
+  if (gpuBad) bad.push(part.gpu.why || 'gpu');
+  return bad.join(', ') || 'did not pass';
+}
+
 // Full preflight: fresh nonce, gateway + every model candidate, optional GPU verdicts.
 export async function proveTee({ model = cfg.nearAiModel, signingAlgo = 'ecdsa', gpu = true, nonce } = {}) {
   if (nonce !== undefined && !/^[0-9a-f]{64}$/i.test(nonce)) throw Object.assign(new Error('nonce must be 32 bytes as 64 hex chars'), { status: 400 });
@@ -131,8 +142,16 @@ export async function proveTee({ model = cfg.nearAiModel, signingAlgo = 'ecdsa',
     models.push(r);
   }
   const ok = gateway.ok && models.length > 0 && models.every(m => m.ok && (!gpu || !m.gpu?.present || m.gpu.ok));
+  const bits = [];
+  if (!gateway.ok) bits.push(`gateway: ${teeFailure(gateway)}`);
+  if (!models.length) bits.push('model: NEAR AI returned no model report');
+  for (const m of models) {
+    const why = teeFailure(m);
+    if (why) bits.push(`${m.model_name || 'model'}: ${why}`);
+  }
+  const failure = ok ? '' : (bits.join('; ') || 'did not pass');
   return { model, nonce: rep.nonce, signingAlgo, checkedAt: new Date(rep.fetchedAt * 1000).toISOString(), policy: { acceptedTcb: ACCEPTED_TCB, gpuRequired: gpu },
-    gateway, models, ok };
+    gateway, models, ok, failure };
 }
 
 // Models that serve a TEE attestation report. The NEAR AI catalog (/v1/models) also lists models routed

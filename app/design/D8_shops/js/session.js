@@ -21,6 +21,22 @@ export function readSessionAccount(storage = globalThis.localStorage) {
   return sessionAccount(readSession(storage));
 }
 
+const HERO_KEY = 'nearcarta.hero.v1';
+
+export function readHero(storage = globalThis.localStorage) {
+  try { return JSON.parse(storage?.getItem(HERO_KEY) || 'null') || null; }
+  catch { return null; }
+}
+
+/** The town chip, Town Hall and Mist Bank all read this. A look name is not a sign-in. */
+export function visitor(storage = globalThis.localStorage) {
+  const saved = readSession(storage);
+  const hero = readHero(storage);
+  const accountId = sessionAccount(saved) || sessionAccount({ accountId: saved.charter }) || '';
+  const displayName = String(saved.displayName || hero?.name || '').trim();
+  return { accountId, displayName, balanceNear: saved.balanceNear ?? null, signedIn: !!accountId };
+}
+
 /** Merge into the saved setup object. accountId null removes the account. */
 export function writeSession(patch, storage = globalThis.localStorage) {
   const cur = readSession(storage);

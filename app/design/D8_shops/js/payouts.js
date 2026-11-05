@@ -74,6 +74,22 @@ export function readBatch(value, n) {
   return { decision: 'denied', reason: bad >= 0 ? v[bad].reason : 'batch_refused', paid: 0, bad: bad >= 0 && v.some(o => o.reason === 'batch_refused') ? bad : null, ids: [] };
 }
 
+/** Drop rows with no payee. A list of only blank rows prepares nothing. */
+export function prepareRows(rows) {
+  const kept = [];
+  let dropped = 0;
+  for (const r of rows || []) {
+    if (!String(r?.to || '').trim()) { dropped += 1; continue; }
+    kept.push(r);
+  }
+  const note = !dropped
+    ? ''
+    : kept.length
+      ? `Dropped ${dropped} ${dropped === 1 ? 'row' : 'rows'} with no payee.`
+      : 'A row needs a payee. Nothing was prepared.';
+  return { rows: kept, dropped, note, blocked: kept.length === 0 };
+}
+
 /** One receipt per payout. A shared tx means one propose_batch. An empty tx means prepared, not sent. */
 export function receiptsFor(rows, tx = '') {
   return (rows || []).map((r, i) => ({

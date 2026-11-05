@@ -74,8 +74,9 @@ test('each shop route and the console use the one shop module', () => {
   assert.match(build, /\['ferry', 'ferry', 'Ferry'\]/);
   assert.match(consoleJs, /mountShop/);
   assert.match(read('../../../app/src/console.html'), /serviceWorker/);
-  assert.match(read('../../../app/design/D9_world/index.html'), /Escape/);
-  assert.match(read('../../../app/design/D9_world/index.html'), /1200/);
+  assert.match(read('../../../app/design/D9_world/index.html'), /#loading\{position:fixed/);
+  assert.match(read('../../../app/design/D9_world/index.html'), /Opening the town/);
+  assert.doesNotMatch(read('../../../app/design/D9_world/index.html'), /setTimeout\(hide, 1200\)/);
   assert.match(read('../../../app/design/D9_world/js/main.js'), /exitShop\(\)/);
   assert.doesNotMatch(read('../../../app/house/house.js'), /a DAO can also freeze/);
   assert.match(read('../../../app/house/house.js'), /No shared DAO/);

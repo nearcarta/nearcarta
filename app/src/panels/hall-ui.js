@@ -2,7 +2,7 @@
 // Sign sends set_rules / set_frozen / set_seal with deposit 0, then reads get_charter back.
 // This file does not sign until the visitor presses Sign.
 
-import { readSession, readSessionAccount, sessionPill } from '../../design/D8_shops/js/session.js';
+import { readSession, readSessionAccount, sessionPill, visitor } from '../../design/D8_shops/js/session.js';
 import { roomError } from '../room-error.js';
 import {
   BOARD, diffCharter, draftFrom, matchNote, nearOf, normalizeRow, readBack, rowOwner,
@@ -21,11 +21,15 @@ function ownerNow() {
   return rowOwner({ owner: params.get('owner') || '', session: readSessionAccount() || '' });
 }
 
-export function hallMarkup(row) {
+export function hallMarkup(row, person = null) {
   const cap = row ? String(nearOf(row.per_action_cap)) : '';
-  const who = row?.owner || '';
+  const who = row?.owner || person?.accountId || '';
+  const named = person?.displayName || who;
+  const facts = who
+    ? `Signed in as ${esc(named)}. Row for <code>${esc(who)}</code> on <code>${esc(BOARD)}</code>.${cap ? ` Cap ${esc(cap)} NEAR.` : ''}`
+    : 'Sign in, then open your row. This page does not open a preview account.';
   return `<form id="row-form" data-testid="hall-form">
-    <p data-testid="hall-facts">${who ? `Row for <code>${esc(who)}</code> on <code>${esc(BOARD)}</code>. Cap ${esc(cap)} NEAR.` : 'Sign in, then open your row. This page does not open a preview account.'}</p>
+    <p data-testid="hall-facts">${facts}</p>
     <p data-testid="hall-read">${who ? `Row for <code>${esc(who)}</code> on <code>${esc(BOARD)}</code>. Cap ${esc(cap)} NEAR.` : ''}</p>
     <label>Max per payment (NEAR) <input id="cap" data-testid="hall-cap" inputmode="decimal" value="${esc(cap)}"></label>
     <label><input id="frozen" data-testid="hall-frozen" type="checkbox" ${row?.frozen ? 'checked' : ''}> Freeze the row. The agent key cannot undo this.</label>
@@ -42,7 +46,8 @@ export async function mountHall(root, hooks = {}) {
   const choice = ownerNow();
   let before = null;
   const paint = (row) => {
-    root.innerHTML = hallMarkup(row);
+    const person = visitor();
+    root.innerHTML = hallMarkup(row, person);
     const who = root.querySelector('#who') || document.getElementById('who');
     if (who) {
       const saved = readSession();
@@ -51,7 +56,7 @@ export async function mountHall(root, hooks = {}) {
       who.innerHTML = id ? `<b data-testid="who" data-account="${esc(id)}">${esc(pill)}</b>` : '';
     }
     const connect = document.getElementById('connect');
-    if (connect) connect.hidden = !!(row?.owner || choice.owner);
+    if (connect) connect.hidden = !!(row?.owner || choice.owner || person.signedIn);
     const form = root.querySelector('#row-form');
     form.onsubmit = (e) => { e.preventDefault(); onSign(); };
   };
@@ -111,11 +116,16 @@ export async function mountHall(root, hooks = {}) {
     before = await readRow(choice.owner);
     paint(before);
     if (!before) {
-      root.querySelector('[data-testid=hall-facts]').innerHTML = `<p data-testid="hall-missing">No row for <code>${esc(choice.owner)}</code> on <code>${esc(BOARD)}</code>.</p>`;
+      const person = visitor();
+      const named = person.displayName || choice.owner;
+      root.querySelector('[data-testid=hall-facts]').innerHTML = `Signed in as ${esc(named)}. <span data-testid="hall-missing">No row for <code>${esc(choice.owner)}</code> on <code>${esc(BOARD)}</code>.</span>`;
     }
   } catch {
     paint(null);
     const facts2 = root.querySelector('[data-testid=hall-facts]');
-    if (facts2) facts2.textContent = 'The row could not be read. Nothing was signed.';
+    const person = visitor();
+    if (facts2) facts2.textContent = person.signedIn
+      ? `Signed in as ${person.displayName || person.accountId}. The row could not be read. Nothing was signed.`
+      : 'The row could not be read. Nothing was signed.';
   }
 }

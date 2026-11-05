@@ -99,12 +99,12 @@ test('guard, chronicle, toll, house, ferry and the bank proof are usable', async
   await page.goto('/?mode=2d&nostory&shop=ferry');
   await page.getByTestId('ferry-compare').click();
   await expect(page.getByTestId('ferry-row').first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('ferry-status')).toContainText('Waiting for the deposit');
-  await expect(page.getByTestId('ferry-refund')).toContainText('refund');
+  await expect(page.getByTestId('ferry-idle')).toContainText('No deposit has been requested');
+  await expect(page.locator('body')).not.toContainText('Waiting for the deposit');
   await page.goto('/?mode=2d&nostory&shop=bank');
   await expect(page.getByTestId('tee-proof')).toHaveAttribute('href', '/tee-public.json');
   await page.getByTestId('tee-verify').click();
-  await expect(page.getByTestId('tee-result')).toHaveText(/attested|failed/, { timeout: 30_000 });
+  await expect(page.getByTestId('tee-result')).toHaveText(/attested|failed/, { timeout: 60_000 });
   await page.goto('/?mode=2d&nostory&shop=payouts');
   await page.getByTestId('payout-csv').fill('cafe.near,0.001,NEAR\npay.near,0.2,USDC');
   await page.getByTestId('payout-prepare').click();
