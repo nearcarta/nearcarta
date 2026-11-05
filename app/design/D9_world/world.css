@@ -73,7 +73,7 @@ body.letterbox #lb i{height:7.5vh}
 #iris.on{opacity:1}
 
 /* loading: a hairline only; the first frame is the town */
-#loading{position:fixed;inset:0;z-index:40;background:#17130f;transition:opacity .6s,visibility 0s .6s} #loading>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.62) saturate(.9);animation:lpz 30s linear both}
+#loading{position:fixed;inset:0;z-index:40;background:#17130f;transition:opacity .6s,visibility 0s .6s;pointer-events:none} #loading>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.62) saturate(.9);animation:lpz 30s linear both;pointer-events:none} #loading .lc{pointer-events:auto}
 #loading .lc{position:absolute;left:50%;bottom:14vh;transform:translateX(-50%);display:grid;justify-items:center;gap:10px;text-align:center;color:#f3ead8;text-shadow:0 1px 10px rgba(23,19,15,.8);background:#1a140fe6;border:1px solid #d6b46a;border-radius:14px;padding:16px 22px}
 #loading .lc b{font-size:34px;letter-spacing:.01em} #loading .lc span{font-size:16px;color:#f3ead8} #loading .lc small{font-size:13px;color:#f3ead8}
 #loading .lt{display:block;width:min(260px,60vw);height:3px;border-radius:3px;background:rgba(243,234,216,.18);overflow:hidden} #lbar{display:block;height:100%;width:4%;background:#d6b46a;transition:width .3s}
@@ -483,8 +483,8 @@ body:has(#drawer.open) #back{visibility:hidden}
 #drawer .plain-line a { color: #f3d78f; text-decoration: underline; }
 
 /* A plain shop list for a visitor who cannot use the city. It does not restyle the canvas. */
-nav.all-shops{position:fixed;z-index:80;top:120px;left:12px;max-width:min(280px,calc(100vw - 24px));background:#1a140f;color:#fff8ee;border:1px solid #c98f4e;border-radius:12px;padding:8px 12px;font:600 16px/1.35 system-ui,sans-serif;pointer-events:auto}
-body.story nav.all-shops,body.intro-on nav.all-shops,body:not(.ready) nav.all-shops{opacity:1;visibility:visible;pointer-events:auto;z-index:80}
+nav.all-shops{position:fixed;z-index:200;top:120px;left:12px;max-width:min(280px,calc(100vw - 24px));background:#1a140f;color:#fff8ee;border:1px solid #c98f4e;border-radius:12px;padding:8px 12px;font:600 16px/1.35 system-ui,sans-serif;pointer-events:auto}
+body.story nav.all-shops,body.intro-on nav.all-shops,body:not(.ready) nav.all-shops{opacity:1;visibility:visible;pointer-events:auto;z-index:200}
 nav.all-shops summary{list-style:none;cursor:pointer;color:#f5d08a}
 nav.all-shops summary::-webkit-details-marker{display:none}
 nav.all-shops summary:focus-visible{outline:2px solid #f5d08a;outline-offset:2px}

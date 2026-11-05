@@ -6,7 +6,7 @@ import { runSteps, runTask, runAsk } from '../../../shared/vault/run.js';
 import { parseAsk } from '../../../shared/vault/ask.js';
 import { lookalike } from '../../../shared/vault/attacks.js';
 import { roomError } from '../../src/room-error.js';
-import { visitor } from '../../design/D8_shops/js/session.js';
+import { clearSessionAccount, sessionPill, visitor } from '../../design/D8_shops/js/session.js';
 import { installBoundary } from '../../src/panels/boundary.js';
 
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
@@ -54,13 +54,31 @@ function showLoadError(e) {
 }
 
 // ---------- step 1: wallet ----------
-async function refreshWho() {
-  me = await currentAccount(connector);
-  $('#who').innerHTML = me ? `<b data-testid="who">${esc(me)}</b>` : '';
-  $('#connect').hidden = !!me; const guest = $('#guest'); if (guest) guest.hidden = !!me; $('#signout').hidden = !me;
-  document.body.dataset.step = me ? (charter ? 'charter' : 'wallet') : 'none';
+function paintWho() {
+  const saved = visitor();
+  const sessionId = saved.signedIn ? saved.accountId : '';
+  const id = me || sessionId;
+  const who = $('#who');
+  if (who) {
+    who.innerHTML = id
+      ? `<b data-testid="who" data-account="${esc(id)}">${esc(sessionPill({ accountId: id, displayName: saved.displayName, balanceNear: saved.balanceNear }))}</b>`
+      : '';
+  }
+  const connect = $('#connect');
+  if (connect) connect.hidden = !!id;
+  const guest = $('#guest');
+  if (guest) guest.hidden = !!id;
+  const out = $('#signout');
+  if (out) out.hidden = !id;
+  document.body.dataset.step = me ? (charter ? 'charter' : 'wallet') : (id ? 'session' : 'none');
   explainLock();
-  if (me && !charter) {
+}
+
+async function refreshWho() {
+  const pending = connector ? currentAccount(connector).catch(() => null) : Promise.resolve(null);
+  me = await Promise.race([pending, new Promise(resolve => setTimeout(() => resolve(null), 1500))]);
+  paintWho();
+  if (me && !charter && CFG) {
     // Newest factory first, then the legacy ones: a guest who opened a charter before R17 keeps it.
     for (const f of [CFG.factory, ...(CFG.legacy || []).map(l => l.factory)]) {
       const mine = await view(f, 'charters_of', { owner: me }).catch(() => null);
@@ -69,6 +87,12 @@ async function refreshWho() {
     }
   }
   renderCreate();
+  pending.then(id => {
+    if (!id || id === me) return;
+    me = id;
+    paintWho();
+    renderCreate();
+  }).catch(() => {});
 }
 
 function explainLock() {
@@ -78,16 +102,27 @@ function explainLock() {
   const saved = visitor();
   if (step === 'charter') { el.hidden = true; return; }
   el.hidden = false;
-  el.textContent = (step === 'wallet' || saved.signedIn)
+  el.textContent = (step === 'wallet' || step === 'session' || saved.signedIn)
     ? 'Locked because this browser has no factory charter. A board row is changed in Town Hall. This card does not issue an agent key before that.'
     : 'Locked until you sign in. This step writes rules and an agent key, and it does not run before that.';
 }
-explainLock();
+paintWho();
+renderCreate();
 
 // ---------- step 2: create ----------
 function renderCreate() {
   const box = $('#create');
+  if (!box) return;
+  const saved = visitor();
+  const sessionId = saved.signedIn ? saved.accountId : '';
   if (!me || charter) delete box.dataset.for;
+  if (!me && sessionId) {
+    const label = saved.displayName || sessionId;
+    box.innerHTML = `<p data-testid="factory-signin">Signed in as <b>${esc(label)}</b>. This office does not treat that site session as a factory wallet. Connecting the factory wallet in this tab is a separate step, and nothing is signed until you approve it.</p><p><button type="button" class="primary" data-testid="factory-connect">Connect factory wallet</button></p><p>A board row is changed in Town Hall.</p>`;
+    const go = box.querySelector('[data-testid=factory-connect]');
+    if (go) go.onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
+    return;
+  }
   if (!me) { box.innerHTML = window.NEARCARTA_PUBLIC_MAINNET ? '<p class="muted">Sign in with your mainnet account. Your charter is a row on the mainnet board.</p>' : '<p class="muted" title="A charter is a NEAR account that holds your agent\'s money and its rules.">Sign in first. A new charter here is a mainnet charter.</p>'; focusCreate(); return; }
   if (window.NEARCARTA_PUBLIC_MAINNET) {
     const board = window.__ncBoard;
@@ -590,7 +625,7 @@ async function main() {
   connector.on('wallet:signIn', () => refreshWho().then(signedIn).catch(fail));
   booted.ok();
   connector.on('wallet:signOut', () => { charter = null; ready = false; refreshWho().catch(fail); });
-  $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); charter = null; ready = false; await refreshWho(); };
+  $('#signout').onclick = async () => { clearSessionAccount(); me = null; if (connector) await connector.disconnect().catch(() => {}); charter = null; ready = false; await refreshWho(); };
   await refreshWho(); await loadBoard().catch(e => {
     const b = $('#board');
     b.innerHTML = `<p data-testid="load-error">${esc(plainErr(e))}</p><button type="button" data-testid="retry-board">Try again</button>`;

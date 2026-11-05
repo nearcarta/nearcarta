@@ -561,7 +561,16 @@ function render() {
   if (['character', 'sign', 'try'].includes(STEPS[st.step][0])) remember();
 }
 
+function paintShell() {
+  if (!me) me = st.accountId || readSessionAccount() || null;
+  const want = STEPS.findIndex(s => s[0] === location.hash.slice(1));
+  if (!PREVIEW && me && (location.hash === '#rules' || location.hash === '#sign') && want >= 0) st.step = want;
+  else if (!PREVIEW && !me) st.step = 0;
+  try { render(); } catch { /* the HTML shell stays until boot finishes */ }
+}
+
 async function boot() {
+  paintShell();
   // The API host from config.js, else this origin's /api rewrite.
   try {
     CFG = await fetch(API + '/api/vault/config').then(r => r.json()).catch(() => { API = ''; return fetch('/api/vault/config').then(r => r.json()); });
