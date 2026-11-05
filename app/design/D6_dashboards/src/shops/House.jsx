@@ -53,7 +53,7 @@ export default function HouseView() {
           {dirty && <div style={{ padding: '6px 16px 8px' }}><Note icon={Pencil}>Draft only. Changing a clause needs the owner or a DAO vote, bumps the policy version, and every pending proposal signed for v4 is refused with <span className="reason">stale policy_version</span>.</Note></div>}
         </Card>
 
-        <Card className="s5" title="Today’s budget" icon={Gauge} right={<Ev label="Testnet state" />}>
+        <Card className="s5" title="Today’s budget" icon={Gauge} right={<Ev label="Mainnet" />}>
           {CLAUSES.map((c) => {
             const left = +(c.budget - c.spent).toFixed(2);
             return (

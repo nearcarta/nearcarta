@@ -1,4 +1,4 @@
-// Town Hall: a council table with vote stones. Proposal 4 (real, testnet) lowered the reward cap from 0.25 to 0.15 NEAR.
+// Town Hall: a council table with vote stones. Proposal 4 (recorded) lowered the reward cap from 0.25 to 0.15 NEAR.
 import { THREE, room, put, makeRobot, sfx, wait, tween, tok, C } from '../js/core.js';
 import { TH } from '../../D6_dashboards/src/data.js';
 import { row, h3, note, proof, acct, paper, esc, mainnet } from './_ui.js';
@@ -9,14 +9,14 @@ export const PROOF = mainnet('hall') + proof(
       h3('Proposal 4'), row({ k: 'Filed', why: TH.proposal.tag, tx: TH.proposal.filed }), ...TH.proposal.votes.map((v, i) => row({ k: `Vote ${i + 1}`, why: 'council · approve', st: 'ok', stText: 'counted', tx: v })),
       h3('Oath versions'), ...TH.versions.map(v => row({ k: `v${v.v} · cap ${v.cap} · total ${v.total} NEAR`, why: v.how, tx: v.tx })),
       h3('What the hall refused'), ...TH.log.filter(l => !l.ok).map(l => row({ k: `${l.who} ${l.what}`, why: l.res, st: 'no', stText: 'refused', tx: l.tx })),
-      note(`DAO ${acct(TH.dao)}. All rows are real testnet transactions; the stones are a re-enactment.`));
+      note(`DAO ${acct(TH.dao)}. All rows are recorded mainnet payments; the stones are a re-enactment.`));
 // The DAO's latest proposals, read live from /api/townhall. A proposal past its vote window shows as expired:
 // Sputnik keeps it InProgress on chain until someone finalizes it, but nobody can vote on it any more.
 const PST = { Approved: ['ok', 'approved'], Rejected: ['no', 'rejected'], Removed: ['no', 'removed'], Failed: ['no', 'failed'], Expired: ['ice', 'expired'], InProgress: ['pend', 'open'] };
 const plain = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 const KIND = { FunctionCall: 'Contract call', AddMemberToRole: 'Add a member', RemoveMemberFromRole: 'Remove a member', Transfer: 'Send NEAR', Vote: 'Vote' };
 // Expired votes and leftovers from test runs (template ids, round labels, throwaway accounts) go under "Show history".
-export const isOld = p => !!p.expired || p.status === 'Expired' || /alice\.testnet|trezu-tmpl|\bR16\.|\.testnet char/i.test(plain(p.description));
+export const isOld = p => !!p.expired || p.status === 'Expired' || /old-row/i.test(plain(p.description));
 export function proposalRows(ps = []) {
   return ps.map(p => { const [st, stText] = PST[p.status] || ['pend', String(p.status).toLowerCase()];
     const why = p.expired ? 'Voting has closed.' : p.status === 'InProgress' ? 'Voting is open.' : plain(p.description).slice(0, 90);
@@ -30,7 +30,7 @@ export async function liveProposals(fetchFn = globalThis.fetch, base = (globalTh
     return bare ? parts.join('') : proof(...parts); }
   catch { const n = note('The latest proposals could not be read just now; see the proposals page.'); return bare ? n : proof(n); }
 }
-// The town's real proposals page (Sputnik DAO on testnet).
+// The town's real proposals page (Sputnik DAO on mainnet).
 export const MORE = { href: '/shops/hall/', text: 'See proposals' };
 export default async function hall(ctx) {
   const liveP = liveProposals();

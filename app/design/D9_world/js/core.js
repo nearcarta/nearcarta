@@ -34,11 +34,11 @@ export const SHOPS = {
   chronicle:{q:0,r:0,  m:'buildings/blue/building_tower_A_blue', name:'Chronicle', role:'see every decision your agent made',
             card:'Every decision, yes or no, is a public NEP-297 event with an explorer link.', tag:'EVENT_JSON · standard: oath'},
   hall:     {q:-2,r:-2,m:'buildings/blue/building_castle_blue',  name:'Town Hall', role:'vote on a rule',
-            card:'File a real proposal from your own charter and see the open proposals at /shops/hall/.', tag:'Sputnik add_proposal · testnet'},
+            card:'Change the rules on your own charter row. Gas only.', tag:'set_rules · your row'},
   bank:     {q:2,r:-4, m:'buildings/blue/building_church_blue',  name:'Mist Bank', role:'private payouts',
             card:'Amounts stay hidden. Public: the check passed, and when.', tag:'hidden amounts'},
   ferry:    {q:3,r:-2, m:'buildings/blue/building_watermill_blue',name:'Ferry', role:'cross-chain swap',
-            card:'A live 1Click quote with its signature checked; your charter pays a testnet stand-in.', tag:'1Click quote · testnet stand-in'},
+            card:'A recorded mainnet swap: 0.045 wNEAR became 0.177937 USDC. New quotes stay dry.', tag:'1Click · mainnet record'},
   guard:    {q:-4,r:2, m:'buildings/blue/building_barracks_blue', name:'Guardhouse', role:'prompt-injection test',
             card:'Every spend is checked before it can be signed: payee list, daily cap, weekly cap.', tag:'payee_allowlist · daily_cap · weekly_cap'},
   arena:    {q:1,r:3,  m:'buildings/blue/building_archeryrange_blue',name:'Vault Arena', role:'try to trick the AI',
@@ -46,9 +46,9 @@ export const SHOPS = {
   house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'Your House', role:'your rules and history',
             card:'Only your house key can change the oath or ring the curfew. The agent holds a propose-only key.', tag:'function-call key · propose()'},
   toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay-per-use gate',
-            card:'Pay 0.01 NEAR from your own charter; the gate then gets the MPC network to sign a Base Sepolia payout, and settles it with a foreign-tx proof.', tag:'gate.pay_for · Chain Signatures · Base Sepolia'},
+            card:'Pay 0.001 NEAR to toll.nearcarta.near. A refusal pays nothing.', tag:'propose · 0.001 NEAR'},
   payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'pay many at once',
-            card:'List 2 to 5 payouts. Your charter pays them all in one tx, or refuses all of them.', tag:'propose_batch · all or nothing'},
+            card:'Up to three payments, one at a time, each at most 0.005 NEAR.', tag:'one at a time, not all-or-nothing'},
 };
 export const GATE={q:-5,r:1,dir:3};
 export const tiles=new Map();
@@ -82,13 +82,13 @@ export const walkable=(q,r)=>free(q,r)||road.has(key(q,r));
 export function roadPath(from,to){ return astar(from,to,(q,r)=>road.has(key(q,r)),null); }
 export function walkPath(from,to){ return astar(from,to,walkable,(q,r)=>road.has(key(q,r))?.6:1); }
 
-// ---- real testnet facts (contract r2oath.testnet) ----
+// Recorded mainnet payments. Hashes are in shared/deployments/mainnet.json.
 export const TX={
-  P1:{h:'HVWQjVpgZoZP454ratPiL84hgyaCAiMkZwvx8XrH1u3w', what:'0.3 NEAR → r2rcv.testnet', ev:'confirmed', cls:'ok'},
-  P2:{h:'4EKcDsMJWp1u7h7wfNNmHQ7dmH7ELuZw5KGtUnBXF7Mn', what:'0.6 NEAR', ev:'over_per_action_cap', cls:'no'},
-  P4:{h:'41K2cC48GAbftXT9mFqd5Rmyrn18TuYmpWY5qs6yZDtK', what:'over budget', ev:'over_daily_budget', cls:'no'},
-  P5:{h:'J3CFNbM2qdh6uVrLdcT7sqzs7YfnnhYqLL16uXNwHw4e', what:'0.3 NEAR → r2own.testnet', ev:'receiver_not_allowlisted', cls:'no'},
-  F1:{h:'AsdG2RUrvU8vGys3WeVMZYTXZAMhsHqfCRtTNT8u1tRq', what:'owner froze the agent', ev:'frozen', cls:'fz'},
-  F2:{h:'EpprWNwq89QRKR3N2aLpWbJsAzwK2FqPSru7DTiq7Mxp', what:'spend while frozen', ev:'denied · frozen', cls:'fz'},
+  P1:{h:'8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR', what:'0.001 NEAR allowed', ev:'allowed', cls:'ok'},
+  P2:{h:'CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF', what:'0.003 NEAR over the cap', ev:'over_per_action_cap', cls:'no'},
+  P4:{h:'AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx', what:'0.01 NEAR over the cap', ev:'over_per_action_cap', cls:'no'},
+  P5:{h:'E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ', what:'payee not on the list', ev:'receiver_not_allowlisted', cls:'no'},
+  F1:{h:'6xMQyXcczLjxymmrYfBhFDuRy9MpFV62CviqdYHrnTdQ', what:'row opened', ev:'open', cls:'ok'},
+  F2:{h:'7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf', what:'row closed', ev:'closed', cls:'ok'},
 };
-export const txUrl=h=>'https://testnet.nearblocks.io/txns/'+h;
+export const txUrl=h=>'https://nearblocks.io/txns/'+h;

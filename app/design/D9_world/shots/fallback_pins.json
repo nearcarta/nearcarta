@@ -29,7 +29,7 @@
   "role": "pay from any chain via NEAR Intents",
   "x": 66.1,
   "y": 42.6,
-  "card": "A live 1Click quote with its signature checked; your charter pays a testnet stand-in."
+  "card": "A live 1Click quote with its signature checked; your charter pays a mainnet stand-in."
  },
  {
   "id": "guard",
@@ -61,7 +61,7 @@
   "role": "pay 0.01 and cross to Base",
   "x": 48.7,
   "y": 87.1,
-  "card": "Pay 0.01 NEAR from your own charter; the gate then gets the MPC network to sign a Base Sepolia payout, and settles it with a foreign-tx proof."
+  "card": "Pay 0.01 NEAR from your own charter; the gate then gets the MPC network to sign a Base payout, and settles it with a foreign-tx proof."
  },
  {
   "id": "payouts",

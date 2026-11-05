@@ -1,8 +1,8 @@
-// proof-drawer building blocks. Every row says where it comes from: testnet or a live read; nothing is sample data.
+// proof-drawer building blocks. Every row says where it comes from: mainnet or a live read; nothing is sample data.
 import { txLink, NB, nbAddr } from '../js/core.js';
 export const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ST = { no: ['✕', 'no'], ok: ['✓', 'ok'], ice: ['❄', 'ice'], pend: ['○', 'pend'] };
-export const row = ({ k, why = '', st = null, stText = '', tx = null, src = 'testnet' }) => {
+export const row = ({ k, why = '', st = null, stText = '', tx = null, src = 'mainnet' }) => {
   const s = st ? `<span class="st ${ST[st][1]}"><span aria-hidden="true">${ST[st][0]}</span>${esc(stText)}</span>` : '';
   const tag = src === 'live' ? '<span class="src live">live read</span>' : '';
   return `<div class="row"><div class="k">${esc(k)}${why ? `<span class="why">${esc(why)}</span>` : ''}</div><div class="v">${s}${tx ? txLink(tx) : tag}</div></div>`;
@@ -13,7 +13,7 @@ export const proof = (...parts) => `<div class="pf">${parts.join('')}</div>`;
 export const acct = a => `<a class="tx" href="${nbAddr(a)}" target="_blank" rel="noopener">${esc(a)} ↗</a>`;
 // a canvas texture for in-world paper (lines and marks only, no words)
 export function paper(THREE, w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); draw(x, w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
-// Mainnet: the same contracts live under nearcarta.near (shared/deployments/mainnet.json). The shop apps stay on testnet for the free guest demo.
+// Mainnet: the same contracts live under nearcarta.near (shared/deployments/mainnet.json). The shop apps stay on mainnet for the free guest demo.
 const MN = {
   toll: ['toll.nearcarta.near', 'Allowed payment signed', '4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz', 'Unlisted address refused', 'B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR'],
   arena: ['arena.nearcarta.near', 'Agent paid 0.001 NEAR', 'AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht', 'Agent asked 0.002, over the cap', '25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V'],

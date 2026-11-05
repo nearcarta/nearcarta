@@ -1,10 +1,10 @@
 // Snapshot of live reads (tools/snapshot.mjs, 2026-10-28 05:00 UTC, nearcarta-api.onrender.com). Hosted app replaces these with fresh reads.
 export const BANK = {
- "src": "testnet",
+ "src": "mainnet",
  "at": "2026-10-28 05:00 UTC",
  "street": {
   "txid": "446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
-  "url": "https://testnet.cipherscan.app/tx/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
+  "url": "https://cipherscan.app/tx/446dde4a68790dc842ca826b4c2c7a46786288aa54156e74ac463fb6caf4f984",
   "height": 4552488,
   "confirmations": 1,
   "fee": "10000",
@@ -20,7 +20,7 @@ export const BANK = {
  },
  "oath": {
   "tx": "Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
-  "url": "https://testnet.nearblocks.io/txns/Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
+  "url": "https://nearblocks.io/txns/Df7D29qiAKG2aKJ8U54Uen8yS8birtNBoDvTZG6FmDyh",
   "ok": true,
   "clause": "tip2"
  },

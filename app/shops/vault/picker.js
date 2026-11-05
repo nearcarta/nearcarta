@@ -1,6 +1,6 @@
 // Wallet picker labels: NEAR Connect lists "Ethereum Wallets"; name MetaMask there, mark wallets this browser has
 // installed as "Detected", and say plainly which popular NEAR wallets only work on mainnet in this picker.
-const NAMES = { 'ethereum-wallets': 'MetaMask & EVM wallets (Rabby, Coinbase, Trust…)', 'meteor-wallet': 'Meteor Wallet', 'intear-wallet': 'Intear Wallet', 'nightly-wallet': 'Nightly Wallet', 'near-cli': 'NEAR CLI (developers)', 'nearcarta-guest': 'Guest testnet account · instant, no install' };
+const NAMES = { 'ethereum-wallets': 'MetaMask & EVM wallets (Rabby, Coinbase, Trust…)', 'meteor-wallet': 'Meteor Wallet', 'intear-wallet': 'Intear Wallet', 'nightly-wallet': 'Nightly Wallet', 'near-cli': 'NEAR CLI (developers)', 'nearcarta-guest': 'NEAR account · instant, no install' };
 // EIP-6963: installed EVM wallets announce their own names; show them on the MetaMask row.
 const EVM = new Set();
 if (typeof window !== 'undefined') {
@@ -26,7 +26,7 @@ function decorate(root) {
     if (SEEN[id]?.()) { const b = document.createElement('span'); b.className = 'nc-det'; b.textContent = id === 'nearcarta-guest' ? 'Saved here' : id === 'ethereum-wallets' ? 'Detected: ' + evmSeen() : 'Detected'; it.append(b); }
   }
   const list = root.querySelector('.connect-item')?.parentElement;
-  if (list && !root.querySelector('.nc-more')) { const p = document.createElement('p'); p.className = 'nc-more'; p.textContent = 'New here? Pick Guest account. HERE (HOT) and MyNearWallet are mainnet-only here, and Bitte is not in this picker; Nearcarta runs on testnet.'; list.after(p); }
+  if (list && !root.querySelector('.nc-more')) { const p = document.createElement('p'); p.className = 'nc-more'; p.textContent = 'New here? Pick Guest account. HERE (HOT) and MyNearWallet are mainnet-only here, and Bitte is not in this picker; Nearcarta runs on mainnet.'; list.after(p); }
 }
 let on = false;
 export function decoratePicker() {

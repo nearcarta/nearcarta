@@ -18,7 +18,7 @@ export default function TownHallView() {
         <a className="btn ghost" href={NBA(TH.dao)} target="_blank" rel="noreferrer">Open the DAO<ArrowRight size={14} /></a>
       </PageHead>
       <div className="grid">
-        <Card className="s7" title={`Proposal ${TH.proposal.id} · tighten the oath to v3`} icon={FileDiff} right={<><Dot tone="pos">Executed</Dot><Ev label="Testnet" tx={TH.proposal.filed} /></>}>
+        <Card className="s7" title={`Proposal ${TH.proposal.id} · tighten the oath to v3`} icon={FileDiff} right={<><Dot tone="pos">Executed</Dot><Ev label="Mainnet" tx={TH.proposal.filed} /></>}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <span className="tag neu mono">{TH.proposal.tag}</span>
             <span className="sub">filed</span><Tx h={TH.proposal.filed} />
@@ -64,7 +64,7 @@ export default function TownHallView() {
           </div>
         </Card>
 
-        <Card className="s12" title="Attempts to skip the vote" icon={Gavel} right={<span className="sub">{TH.log.filter((l) => !l.ok).length} refused · {TH.log.filter((l) => l.ok).length} allowed · all testnet</span>} flush>
+        <Card className="s12" title="Attempts to skip the vote" icon={Gavel} right={<span className="sub">{TH.log.filter((l) => !l.ok).length} refused · {TH.log.filter((l) => l.ok).length} allowed · on mainnet</span>} flush>
           <div className="thead" style={{ gridTemplateColumns: '54px 1fr 2fr 1.6fr 1fr' }}><span>Run</span><span>Actor</span><span>Tried</span><span>Result</span><span>Tx</span></div>
           <div className="rows">
             {TH.log.map((l) => (

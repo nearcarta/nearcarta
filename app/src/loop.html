@@ -28,7 +28,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const $ = id => document.getElementById(id);
 let t0 = 0, tick;
 const step = (txt) => { const li = document.createElement('li'); li.textContent = txt + ' …'; $('steps').append(li); return (cls, html) => { li.className = cls; li.innerHTML = html; }; };
-const txLink = h => h ? ` <a target="_blank" rel="noopener" href="https://testnet.nearblocks.io/txns/${esc(h)}">tx ${esc(String(h).slice(0, 8))}…</a>` : '';
+const txLink = h => h ? ` <a target="_blank" rel="noopener" href="https://nearblocks.io/txns/${esc(h)}">tx ${esc(String(h).slice(0, 8))}…</a>` : '';
 const call = async (path, body) => { const r = await fetch(api + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'http ' + r.status); return j; };
 const hashOf = j => j.tx || j.tx_hash || j.receipt?.tx || j.steps?.at?.(-1)?.tx || j.results?.at?.(-1)?.tx || null;
 $('go').onclick = async () => {

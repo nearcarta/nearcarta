@@ -3,24 +3,24 @@ import { Coins, Network, ShieldX, Snowflake, Bitcoin, Send, X } from 'lucide-rea
 import { MPC, NBA } from '../data.js';
 import { Card, PageHead, Token, Dot, Ev, Tx, Steps, Proof, short } from '../ui.jsx';
 
-const EXP = (h) => `https://sepolia.basescan.org/address/${h}`;
+const EXP = (h) => `https://basescan.org/address/${h}`;
 
 export default function TollView() {
   const p = MPC.oathPay;
   return (
     <>
       <PageHead icon={Coins} kicker="Toll · NEAR Chain Signatures" title="Pay on another chain, still under the oath"
-        sub={<>The oath checks the payment first, then asks the MPC network to sign a Base Sepolia transaction. No single node holds the key: {MPC.threshold} of {MPC.nodes} must sign.</>}>
+        sub={<>The oath checks the payment first, then asks the MPC network to sign a Base transaction. No single node holds the key: {MPC.threshold} of {MPC.nodes} must sign.</>}>
         <a className="btn ghost" href={NBA(MPC.oath)} target="_blank" rel="noreferrer">{MPC.oath}</a>
       </PageHead>
       <div className="grid">
-        <Card className="s7" title="Payment" icon={Send} right={<Ev label="Testnet" tx={p.tx} />}>
+        <Card className="s7" title="Payment" icon={Send} right={<Ev label="Mainnet" tx={p.tx} />}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '4px 0 16px' }}>
             <Token sym="ETH" net="base" size={44} />
             <div>
               <div className="sub">Amount</div>
               <div style={{ fontSize: 26, fontWeight: 650, letterSpacing: '-0.02em' }} className="num">0.00001 <span className="t3" style={{ fontSize: 16 }}>ETH</span></div>
-              <div className="sub mono">{p.wei} wei · Base Sepolia</div>
+              <div className="sub mono">{p.wei} wei · Base</div>
             </div>
             <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
               <div className="sub">To</div>
@@ -30,12 +30,12 @@ export default function TollView() {
           <Steps items={[
             { s: 'done', t: 'Oath allows it', d: 'Recipient on the allowlist, value and gas fee under their caps', r: <Tx h={p.tx} /> },
             { s: 'done', t: `MPC network signs · ${p.secs} s`, d: `${MPC.signer} · ECDSA domain 0`, r: <Proof kind="verified" label="Signature returned" /> },
-            { s: '', t: 'Broadcast to Base Sepolia', d: 'The signed transaction was not sent in this run', r: <Proof kind="notrec" /> },
+            { s: '', t: 'Broadcast to Base', d: 'The signed transaction was not sent in this run', r: <Proof kind="notrec" /> },
             { s: 'done', t: 'Foreign-chain check', d: `Separate run: MPC verified a ${MPC.foreignVerify.chain} tx in ${MPC.foreignVerify.secs} s`, r: <Tx h={MPC.foreignVerify.tx} /> },
           ]} />
         </Card>
 
-        <Card className="s5" title="Signer network" icon={Network} right={<Dot tone="pos">Testnet · read 28 Oct</Dot>}>
+        <Card className="s5" title="Signer network" icon={Network} right={<Dot tone="pos">Mainnet</Dot>}>
           <div className="stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div><div className="sub">Nodes</div><div className="big">{MPC.nodes}</div></div>
             <div><div className="sub">Threshold</div><div className="big">{MPC.threshold}</div></div>
@@ -66,11 +66,11 @@ export default function TollView() {
           </div>
         </Card>
 
-        <Card className="s6" title="Read Bitcoin from NEAR" icon={Bitcoin} right={<Ev label="Testnet" tx={MPC.btcVerify.tx} />}>
+        <Card className="s6" title="Read Bitcoin from NEAR" icon={Bitcoin} right={<Ev label="Mainnet" tx={MPC.btcVerify.tx} />}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <Token sym="BTC" size={36} />
             <div style={{ minWidth: 0 }}>
-              <div className="sub">Bitcoin testnet tx checked by the MPC network</div>
+              <div className="sub">Bitcoin tx checked by the MPC network</div>
               <div className="mono" style={{ fontSize: 12.5 }}>{short(MPC.btcVerify.btc, 14, 10)}</div>
             </div>
           </div>

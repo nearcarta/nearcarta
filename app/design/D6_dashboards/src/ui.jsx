@@ -57,8 +57,8 @@ export function Ev({ src, tx, label }) {
   if (src === 'live') return <span className="ev" title="Live keyless read during research">{label || 'Live read'}</span>;
   if (src === 'preview') return <span className="ev sample">Design preview</span>;
   return tx
-    ? <a className="ev" href={NB(tx)} target="_blank" rel="noreferrer">{label || 'Testnet tx'}<ArrowUpRight size={11} /></a>
-    : <span className="ev">{label || 'Testnet'}</span>;
+    ? <a className="ev" href={NB(tx)} target="_blank" rel="noreferrer">{label || 'Mainnet tx'}<ArrowUpRight size={11} /></a>
+    : <span className="ev">{label || 'Mainnet'}</span>;
 }
 
 export function Tx({ h, a = 6, b = 4 }) {

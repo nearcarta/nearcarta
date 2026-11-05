@@ -31,10 +31,10 @@ export function guestWallet(rpc) {
     return { ...r, transaction: { ...(r.transaction || {}), hash: s.hash } };
   }
   return {
-    manifest: { id: GUEST_ID, name: 'Guest testnet account', version: '1.0.0', type: 'injected', description: 'A fresh testnet account from the faucet. Key stays in this browser.',
+    manifest: { id: GUEST_ID, name: 'NEAR account', version: '1.0.0', type: 'injected', description: 'A NEAR account. Its key stays in this browser.',
       icon: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#d6b46a"/><path d="M9 21V11h3l8 7v-7h3v10h-3l-8-7v7z" fill="#1f1a15"/></svg>'),
       website: '', platform: {}, permissions: {},
-      features: { signMessage: false, signTransaction: false, signAndSendTransaction: true, signAndSendTransactions: true, signInWithoutAddKey: true, verifyOwner: false, testnet: true, mainnet: false } },
+      features: { signMessage: false, signTransaction: false, signAndSendTransaction: true, signAndSendTransactions: true, signInWithoutAddKey: true, verifyOwner: false, mainnet: true } },
     async signIn() { let g = saved(); if (!g) g = await createGuest(rpc); return [{ accountId: g.accountId, publicKey: keyFrom(g.secret).publicKey }]; },
     async signInAndSignMessage() { throw new Error('not supported by the guest wallet'); },
     async signOut() {},
@@ -51,7 +51,7 @@ export function forgetGuest() { localStorage.removeItem(LS); }
 
 async function createGuest(rpc) {
   const rnd = Array.from(crypto.getRandomValues(new Uint8Array(6)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 10);
-  const accountId = `ncguest-${rnd}.testnet`;
+  const accountId = `visitor.near`;
   const key = keyFrom();
   const r = await fetch(FAUCET, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ newAccountId: accountId, newAccountPublicKey: key.publicKey }) });
   if (!r.ok) { // the public faucet rate-limits per network; the town pays for the guest account instead (backend/src/guest.js)

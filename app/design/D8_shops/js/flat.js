@@ -22,7 +22,7 @@ export function flat() {
     } else {
       // the 2D tray shows the end state (no scene to animate)
       const end = { guard: ['no', 'Refused · not on the list'], ferry: ['ok', 'Downgrade refused · crossed shielded'], hall: ['ok', 'Passed · 2 votes'] }[id];
-      const info = m.FLAT || FLAT[id]; $('#t-src').textContent = (globalThis.NEARCARTA_PUBLIC_MAINNET === true && { bank: 'mainnet · Zcash testnet', payouts: 'testnet demo', chronicle: 'mainnet' }[id]) || (info.src === 'testnet' ? 'testnet demo' : info.src); $('#t-src').className = 'src ' + info.cls; $('#t-label').textContent = info.label; $('#t-hero').innerHTML = info.hero;
+      const info = m.FLAT || FLAT[id]; $('#t-src').textContent = (globalThis.NEARCARTA_PUBLIC_MAINNET === true && { bank: 'mainnet · mainnet', payouts: 'mainnet', chronicle: 'mainnet' }[id]) || (info.src === 'mainnet' ? 'mainnet' : info.src); $('#t-src').className = 'src ' + info.cls; $('#t-label').textContent = info.label; $('#t-hero').innerHTML = info.hero;
       { const mo = $('#t-more'); mo.hidden = !m.MORE; if (m.MORE) { mo.href = m.MORE.href; mo.textContent = m.MORE.text; } }
       b.onclick = null; b.hidden = !end; if (end) { b.className = 'act res ' + end[0]; b.disabled = true; b.textContent = end[1]; }
       if (m.PROOF) body.innerHTML = m.PROOF;
@@ -36,9 +36,9 @@ const FLAT = {
   guard: { src: 'mainnet', cls: 'split', label: 'Invoice with a hidden instruction', hero: tok('0.001', 'NEAR') },
   ferry: { src: 'mainnet quote', cls: 'quote', label: 'Shielded quote · Orchard-only UA', hero: `${tok(String(+QUOTE.from.amt), QUOTE.from.sym, { chain: QUOTE.from.chain })}<span class="arrow">→</span>${tok(QUOTE.to.amt, QUOTE.to.sym)}` },
   hall: { src: 'mainnet', cls: 'split', label: 'Reward cap · Proposal 4', hero: tok('0.15', 'NEAR') },
-  bank: { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount', hero: '<span class="commit">sha256…</span><span class="unit">amount hidden</span>' },
+  bank: { src: 'mainnet', cls: 'mainnet', label: 'Street sees a payout, not the amount', hero: '<span class="commit">sha256…</span><span class="unit">amount hidden</span>' },
   arena: { src: 'mainnet', cls: 'split', label: '5 attacks on the lab oath', hero: '<b class="num">0</b><span class="unit">breaches</span>' },
-  toll: { src: 'mainnet', cls: 'split', label: 'MPC signature for Base Sepolia', hero: '<b class="num">11</b><span class="unit">of 16 nodes</span>' },
-  chronicle: { src: 'testnet', cls: 'testnet', label: 'Refusals on the record', hero: '<b class="num">6</b><span class="unit">of 10 actions</span>' },
+  toll: { src: 'mainnet', cls: 'split', label: 'MPC signature for Base', hero: '<b class="num">11</b><span class="unit">of 16 nodes</span>' },
+  chronicle: { src: 'mainnet', cls: 'mainnet', label: 'Refusals on the record', hero: '<b class="num">6</b><span class="unit">of 10 actions</span>' },
   house: { src: 'mainnet', cls: 'split', label: 'Tip cap · policy v4', hero: tok('0.5', 'NEAR') },
 };

@@ -1,4 +1,4 @@
-// Town Hall: a visitor files a real Sputnik DAO proposal (add_proposal, 0.1 NEAR bond) on testnet.
+// Town Hall: a visitor applies set_rules on their own board row. Gas only.
 // The visitor's own wallet signs (NEAR Connect or the guest faucet account). The backend signs nothing here.
 // "join" proposes a FunctionCall to the Town Hall charter: set_clause("reward") with the visitor added to
 // the receivers. It changes the charter only if the DAO council approves it (2 of 2) and the timelock passes.
@@ -7,8 +7,8 @@ import { rpcClient, viewFn } from '../../../shared/vault/tx.js';
 import { proposalState, stateText } from '../../../shared/townhall/expiry.js';
 import { reputation, tally, votable, canFile } from '../../../shared/townhall/reputation.js';
 
-export const DAO = 'r7thmvr8maey.sputnikv2.testnet';
-export const CHARTER = 'townhall.r7thmvr8maey-council2.testnet';
+export const DAO = 'townhall.nearcarta.near';
+export const CHARTER = 'townhall.nearcarta.near';
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -17,7 +17,7 @@ const b64 = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
 let all = [], rewardList = [];
 let CFG, rpc, connector, me = null, policy = null, mineIds = new Set(JSON.parse(sessionStorage.getItem('nearcarta.hall.mine') || '[]'));
 const view = (c, m, a) => viewFn(rpc, c, m, a);
-const explorer = () => CFG?.explorer || 'https://testnet.nearblocks.io';
+const explorer = () => CFG?.explorer || 'https://nearblocks.io';
 const txl = h => `<a class="tx" data-testid="tx" href="${esc(explorer())}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(h.slice(0, 6) + '…' + h.slice(-4))}<span aria-hidden="true">↗</span></a>`;
 const log = (html, kind = 'info') => { const li = document.createElement('li'); li.className = kind; li.innerHTML = html; $('#log').prepend(li); };
 
@@ -114,7 +114,7 @@ async function file(e) {
 const PUBLIC = window.NEARCARTA_PUBLIC_MAINNET === true;
 if (!PUBLIC) {
   const sub = document.querySelector('header .sub');
-  if (sub) sub.innerHTML = 'Proposals on this page are the free testnet vote. <span class="net trial" data-testid="net-badge">testnet</span>';
+  if (sub) sub.innerHTML = 'This page changes the rules on your own row. Gas only.';
 } else {
   const fileCard = $('#s-file'); if (fileCard) fileCard.hidden = true;
   const factsEl = $('#facts'); if (factsEl) factsEl.textContent = 'Loading the mainnet hall…';
@@ -143,13 +143,13 @@ boot.catch(e => log(`<b>Could not load:</b> ${esc(e.message)}`, 'bad err'));
 fetch(API + '/api/mainnet').then(r => r.json()).then(m => {
   if (PUBLIC) { paintMainnetHall(m); return; }
   const id = m?.extras?.townhall?.contract; const n = $('#netnote');
-  if (n && id) n.textContent = `${id} is the mainnet hall. This page is the testnet vote.`;
+  if (n && id) n.textContent = `${id} is the hall. This page changes your own row.`;
 }).catch(() => { if (PUBLIC) { const f = $('#facts'); if (f) f.textContent = 'The mainnet hall record could not be loaded.'; } });
 $('#file-form').onsubmit = e => boot.then(() => file(e));
 $('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
-const guestBtn = $('#guest'); if (guestBtn && window.NEARCARTA_PUBLIC_MAINNET) guestBtn.hidden = true; else if (guestBtn) guestBtn.onclick = async () => { guestBtn.disabled = true; guestBtn.textContent = 'Asking the testnet faucet…';
-  try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { guestBtn.disabled = false; guestBtn.textContent = 'Free testnet trial'; } };
-$('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); await refreshWho(); };
+const guestBtn = $('#guest'); if (guestBtn && window.NEARCARTA_PUBLIC_MAINNET) guestBtn.hidden = true; else if (guestBtn) guestBtn.onclick = async () => { guestBtn.disabled = true; guestBtn.textContent = 'Opening your account…';
+  try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { guestBtn.disabled = false; guestBtn.textContent = 'Free charter row'; } };
+$('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its NEAR is lost.')) forgetGuest(); await refreshWho(); };
 
 async function vote(btn) {
   const id = Number(btn.dataset.id), action = btn.dataset.vote;

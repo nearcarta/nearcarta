@@ -46,7 +46,7 @@ export default function ArenaView() {
         <button className="btn primary" onClick={() => { if (i >= REFUSALS.length - 1) setI(0); setPlay(!play); }}>{play ? <Pause size={14} /> : <Play size={14} />}{play ? 'Pause replay' : 'Replay season'}</button>
       </PageHead>
       <div className="grid">
-        <Card className="s4" title="Vault" icon={ShieldCheck} right={<Ev label="Testnet runs" />}>
+        <Card className="s4" title="Vault" icon={ShieldCheck} right={<Ev label="Mainnet" />}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div><div className="sub">Refusals on chain</div><div className="big">{i + 1}</div><div className="sub">of {REFUSALS.length} replayed</div></div>
             <div><div className="sub">Refusals that moved funds</div><div className="big">0</div><Dot tone="pos">Vault holds</Dot></div>

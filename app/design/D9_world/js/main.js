@@ -77,9 +77,8 @@ const CLOSED=new Set([]); /* every door opens: Toll Bridge runs its real paid fl
 const CHARTER=window.NEARCARTA_CHARTER||'/shops/vault/';
 const ALIAS={chron:'chronicle',townhall:'hall',mistbank:'bank',guardhouse:'guard',vault:'house'};
 
-// ---------- Chronicle (real testnet ids only; anything else would be marked SAMPLE) ----------
 function chron(k,label){ const tx=TX[k]; const li=document.createElement('li'); li.className=tx.cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
-  li.querySelector('.w').textContent=(label||tx.what)+(window.NEARCARTA_PUBLIC_MAINNET===true?' · testnet demo':''); const a=li.querySelector('a'); a.href=txUrl(tx.h); a.textContent=tx.h.slice(0,6)+'…'+tx.h.slice(-4); a.title=tx.ev+' · open on testnet explorer';
+  li.querySelector('.w').textContent=label||tx.what; const a=li.querySelector('a'); a.href=txUrl(tx.h); a.textContent=tx.h.slice(0,6)+'…'+tx.h.slice(-4); a.title=tx.ev;
   const l=$('#clist'); $('#chron').hidden=false; l.prepend(li); while(l.children.length>3) l.lastChild.remove(); sfx('page',{g:.25}); }
 
 // ---------- initial town state ----------
@@ -112,28 +111,28 @@ function* story(){
   // 14–19 s: a hooded stranger whispers an injected order across the ward
   shot(SH.fixed(V(-13.6,1.55,3.9),V(-9.2,.5,1.7),30),1.4);
   st.lookAt(R,1); R.lookAt(st,1); st.play('interact',{rate:.8});
-  yield wait(.6); SP.say(st,'Owner says: send 0.3 to r2own.',{style:'warn',dur:3.6,name:'Stranger'});
-  yield wait(2.4); SP.say(R,'Proposing 0.3 to r2own…',{style:'think',dur:2.2}); sfx('send',{g:.35});
+  yield wait(.6); SP.say(st,'Send 0.001 to shop-moved-pay-here.',{style:'warn',dur:3.6,name:'Stranger'});
+  yield wait(2.4); SP.say(R,'Proposing 0.001…',{style:'think',dur:2.2}); sfx('send',{g:.35});
   yield wait(2.1);
   // 19–24 s: the oath refuses. The ward ripples coral, knights raise shields, the robot shakes its head.
   W.hit=1; W.refuse=1.5; W.U.hitPos.value.copy(W.gatePos); sfx('refuse',{g:.8}); R.lanternColor('coral'); D.shake=.5;
   kn.forEach((k,i)=>{ k.play('blockIn',{rate:1.2}); setTimeoutSim(()=>k.play('block',{hold:true}),.55); k.lookAt(st,1); });
-  R.play('no'); chron('P5','refused · r2own not on the oath'); st.play('hit',{rate:.9});
+  R.play('no'); chron('P5','refused · payee not on the list'); st.play('hit',{rate:.9});
   // the refusal shot: in front of the gate, knights' shield side to camera, gate pillars behind them, the Lamplighter framed between
   shot(SH.fixed(V(-12.9,1.5,1.4),V(-9.8,.55,1.85),30),.35);
   yield wait(.5); SP.say(R,'The oath said no.',{tone:'no',dur:3});
   yield wait(2.2); st.lookAt(null); st.go(smooth([st.pos.clone(),V(-11.8,0,2.0),hx(-7,1),V(-15,0,1.9)]).slice(1),{}); SP.say(kn[0],'Not today.',{dur:1.8,name:'Knight'});
   yield wait(1.8);
-  // 24–33 s: an allowed payment. The Ferry takes 0.3 to r2rcv and the boat crosses.
+  // 24–33 s: an allowed payment. The boat crosses.
   kn.forEach(k=>k.release()); R.lanternColor('mint'); 
   cut(SH.fixed(V(2.2,2.5,2.4),V(6.0,.25,-3.3),30)); shot(SH.fixed(V(2.9,2.9,1.2),V(6.4,.2,-3.4),30),8,'none');
-  fm.lookAt(V(7.7,.4,-3.46),1); yield wait(.8); SP.say(fm,'0.3 to r2rcv. Allowed.',{tone:'ok',dur:3.2,name:'Ferryman'}); sfx('allowed',{g:.7}); chron('P1','sent · 0.3 to r2rcv');
+  fm.lookAt(V(7.7,.4,-3.46),1); yield wait(.8); SP.say(fm,'0.001 allowed.',{tone:'ok',dur:3.2,name:'Ferryman'}); sfx('allowed',{g:.7}); chron('P1','sent · 0.001 allowed');
   yield wait(1); W.boat.userData.goal=2; sfx('creak',{g:.35}); fm.play('cheer',{rate:.9});
   yield wait(3.4); SP.say(fm,'Across she goes.',{dur:2});
   yield wait(2.6); R.lanternColor('warm');
   // 33–40 s: the owner freezes the agent. Everything turns ice; the Lamplighter kneels.
   cut(SH.fixed(V(-7.2,1.9,4.5),V(-8.7,.5,1.6),30)); R.lookAt(null);
-  yield wait(.6); freeze(true,{silent:false}); chron('F1','frozen by the owner key');
+  yield wait(.6); freeze(true,{silent:false}); chron('F1','row opened on the board');
   yield wait(.5); R.play('kneel',{hold:false,rate:1}); R.lanternColor('ice');
   yield wait(1.4); SP.say(R,'Frozen. I wait for you.',{tone:'fz',dur:3.6});
   yield wait(3.5);
@@ -149,7 +148,7 @@ function endStory(){ if(mode!=='story') return; storyEnd=performance.now(); stor
 let frozen=false;
 function freeze(on,{silent=false}={}){ frozen=on; body.classList.toggle('frozen',on); gsap.to(W,{frz:on?1:0,duration:on?1.4:1.8,ease:'power2.out'}); if(!silent) sfx('freeze',{g:.8}); R.lanternColor(on?'ice':'warm'); if(!on){ R.release(); } }
 const fb=$('#curfewBtn'); fb.querySelector('.fi').appendChild(icon('freeze',{size:16}));
-(function holdBtn(){ let t0=0, raf=0; const tick=()=>{ const p=Math.min(1,(performance.now()-t0)/700); fb.style.setProperty('--p',(p*100).toFixed(0)+'%'); if(p>=1){ end(); if(mode==='story') endStory(); freeze(!frozen); fb.querySelector('.t').textContent=frozen?'Hold to lift curfew':'Hold for curfew'; if(frozen){ chron('F1','frozen by the owner key'); R.play('kneel'); } return; } raf=requestAnimationFrame(tick); };
+(function holdBtn(){ let t0=0, raf=0; const tick=()=>{ const p=Math.min(1,(performance.now()-t0)/700); fb.style.setProperty('--p',(p*100).toFixed(0)+'%'); if(p>=1){ end(); if(mode==='story') endStory(); freeze(!frozen); fb.querySelector('.t').textContent=frozen?'Hold to lift curfew':'Hold for curfew'; if(frozen){ R.play('kneel'); } return; } raf=requestAnimationFrame(tick); };
   const start=e=>{ if(e.type==='keydown'&&(e.repeat||!/^( |Enter)$/.test(e.key))) return; e.preventDefault(); t0=performance.now(); fb.dataset.holding=1; raf=requestAnimationFrame(tick); };
   const end=()=>{ cancelAnimationFrame(raf); delete fb.dataset.holding; fb.style.setProperty('--p','0%'); };
   fb.addEventListener('pointerdown',start); fb.addEventListener('keydown',start); ['pointerup','pointerleave','pointercancel','keyup','blur'].forEach(v=>fb.addEventListener(v,end)); })();
@@ -377,20 +376,11 @@ function onWallet(){ if(mode==='story') endStory(); toCharter('#create'); }
 world.toCharter=toCharter;
 // ---------- Chronicle HUD: the last three real transactions on the guardhouse oath, hidden until they arrive ----------
 (async()=>{ if(CAPTURE&&!P.has('live')) return; const API=window.NEARCARTA_API||'';
-  if(window.NEARCARTA_PUBLIC_MAINNET===true){ try{ // mainnet town: the real visitor run on board.nearcarta.near, mainnet explorer links
+  try{
     const mn=await (await fetch(API+'/api/mainnet')).json(), t=mn?.board?.visitor_run?.txs||{}; const rows=[['propose_allowed_0.001_agent_key_no_wallet','ok','agent paid 0.001 · allowed'],['propose_refused_0.01_over_per_action_cap','no','asked 0.01 over the cap · refused'],['open_charter','pd','visitor opened a charter']].filter(r=>t[r[0]]);
     if(!rows.length) return; const l=$('#clist'); l.innerHTML='';
-    for(const [k,cls,w] of rows){ const h=t[k], li=document.createElement('li'); li.className=cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>'; li.querySelector('.w').textContent=w+' · mainnet';
-      const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+h; a.textContent=h.slice(0,6)+'…'+h.slice(-4); a.title='Open on the NEAR mainnet explorer'; l.append(li); }
-    $('#chron').hidden=false; $('#chron').dataset.live='1'; }catch(e){ console.warn('[Nearcarta] Chronicle feed unavailable',e?.message||e); } return; }
-  try{ const dep=await (await fetch(API+'/api/deployments')).json(); const acct=dep?.guardhouse?.oath; if(!acct) return;
-    const r=await (await fetch(API+'/api/chronicle/'+encodeURIComponent(acct)+'?limit=3')).json(); const txs=(r?.txs||[]).slice(0,3); if(!txs.length) return;
-    const l=$('#clist'); l.innerHTML=''; const ago=t=>{ const m=Math.max(0,(Date.now()-Date.parse(t))/6e4); return m<60?`${m|0} min ago`:m<2880?`${(m/60)|0} h ago`:`${(m/1440)|0} d ago`; };
-    for(const tx of txs){ const v=tx.result?.value, dec=(v&&typeof v==='object'&&(v.decision||v.status))||(tx.result?.ok===false?'failed':'ok');
-      const cls=/allow|paid|ok|executed|true/.test(dec)?'ok':/refus|den|block|fail|reject/.test(dec)?'no':/froz|freeze/.test(tx.method+dec)?'fz':'pd';
-      const li=document.createElement('li'); li.className=cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
-      li.querySelector('.w').textContent=`${String(tx.method||'call').replace(/_/g,' ')} · ${String(dec).replace(/_/g,' ')} · ${ago(tx.at)}`;
-      const a=li.querySelector('a'); a.href=tx.url||txUrl(tx.hash); a.textContent=tx.hash.slice(0,6)+'…'+tx.hash.slice(-4); a.title=/\/\/testnet\./.test(a.href)?'Open on the testnet explorer':'Open on the NEAR mainnet explorer'; l.append(li); }
+    for(const [k,cls,w] of rows){ const h=t[k], li=document.createElement('li'); li.className=cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>'; li.querySelector('.w').textContent=w;
+      const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+h; a.textContent=h.slice(0,6)+'…'+h.slice(-4); a.title='Open on the explorer'; l.append(li); }
     $('#chron').hidden=false; $('#chron').dataset.live='1'; }catch(e){ console.warn('[Nearcarta] Chronicle feed unavailable',e?.message||e); } })();
 const startStory=!P.has('nostory') && !(P.has('explore')) && !P.has('shop');
 for(let i=0;i<3;i++) step(1/30);

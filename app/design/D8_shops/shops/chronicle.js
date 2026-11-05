@@ -1,4 +1,4 @@
-// Chronicle (static): the crier's scroll. One mark per real decision from the core testnet run; refusals in the refused colour.
+// Chronicle (static): the crier's scroll. One mark per real decision from the core mainnet run; refusals in the refused colour.
 import { THREE, room, put, makeRobot, C, CSS } from '../js/core.js';
 import { M as PM, brassM, mesh, lantern, banner, candle, rug } from './_props.js';
 import { CORE_TXS, CORE, CLAUSES } from '../../D6_dashboards/src/data.js';
@@ -46,7 +46,7 @@ export default async function chronicle() {
   const rob = await makeRobot(scene); rob.at(.6, 1.25); rob.lookAt(new THREE.Vector3(.2, 0, 3));
   return {
     rob, scene, camera, tags: [],
-    panel: { title: 'Chronicle', src: 'testnet', label: 'Refusals on the record', hero: `<b class="num">${denied.length}</b><span class="unit">of ${acts.length} actions</span>`, action: null },
+    panel: { title: 'Chronicle', src: 'mainnet', label: 'Refusals on the record', hero: `<b class="num">${denied.length}</b><span class="unit">of ${acts.length} actions</span>`, action: null },
     proof: PROOF,
     update(dt) { rob.update(dt); },
   };

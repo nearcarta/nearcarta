@@ -20,7 +20,7 @@ function Mark({ t }) {
   return <span className="cmark"><I size={12} /></span>;
 }
 
-const CURL_TX = `curl -s https://rpc.testnet.near.org \\
+const CURL_TX = `curl -s https://rpc.mainnet.near.org \\
   -H 'content-type: application/json' \\
   -d '{"jsonrpc":"2.0","id":1,"method":"tx",
        "params":{"tx_hash":"${CORE_TXS.find((t) => t.id === 'P2').tx}",
@@ -28,7 +28,7 @@ const CURL_TX = `curl -s https://rpc.testnet.near.org \\
                  "wait_until":"FINAL"}}' \\
 | jq -r '.result.receipts_outcome[].outcome.logs[]'`;
 
-const CURL_CODE = `curl -s https://rpc.testnet.near.org \\
+const CURL_CODE = `curl -s https://rpc.mainnet.near.org \\
   -H 'content-type: application/json' \\
   -d '{"jsonrpc":"2.0","id":1,"method":"query",
        "params":{"request_type":"view_account",
@@ -45,13 +45,13 @@ export default function ChronicleView() {
   return (
     <>
       <PageHead icon={ScrollText} kicker={`Chronicle · ${CORE.oath}`} title="Check every claim without our site"
-        sub="Each line is a testnet transaction. The oath logs a NEP-297 event for every decision, so anyone can rebuild this page from a public RPC.">
+        sub="Each line is a mainnet transaction. The oath logs a NEP-297 event for every decision, so anyone can rebuild this page from a public RPC.">
         <div className="seg" role="tablist">
           {FILTERS.map(([k, l]) => <button key={k} className={f === k ? 'on' : ''} onClick={() => setF(k)}>{l}<span className="t3 num" style={{ marginLeft: 4 }}>{CORE_TXS.filter((t) => match(t, k)).length}</span></button>)}
         </div>
       </PageHead>
       <div className="grid">
-        <Card className="s7" title="Timeline · 28 Oct 2026, EEST" icon={Filter} right={<Ev label="Testnet" />} flush>
+        <Card className="s7" title="Timeline · 28 Oct 2026, EEST" icon={Filter} right={<Ev label="Mainnet" />} flush>
           <div className="ctl">
             {rows.map((t, i) => (
               <button key={t.id} className={`crow ${sel === t.id ? 'on' : ''}`} onClick={() => setSel(t.id)} style={{ animation: `enter .3s var(--ease) both ${Math.min(i, 12) * 0.025}s` }}>

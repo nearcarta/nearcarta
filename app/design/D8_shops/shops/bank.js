@@ -9,7 +9,7 @@ import { M as PM, brassM, mesh, lantern, candle, rug } from './_props.js';
 
 const B = D.BANK || BANK;
 // The room's one-line summary of how a payout runs (room copy; the README is the charter worker's).
-export const ROOM_LINE = 'One fresh payee per payout; the Zcash send is run by an operator worker.';
+export const ROOM_LINE = 'This payment is a charter check on mainnet.';
 const LEG = { shield: 'Shield ZEC into a confidential balance', transfer: 'Transfer between confidential balances', unshield: 'Unshield to a public Intents balance' };
 const short = c => `${String(c).slice(0, 8)}…${String(c).slice(-6)}`;
 function live(b) {
@@ -21,10 +21,10 @@ function live(b) {
     `<details class="more"><summary>Technical details</summary>`,
     row({ k: `Recorded at block ${s.height}`, why: s.hidden ? `The amount stays inside a shielded pool. The fee is ${s.fee} of the smallest Zcash unit.` : `Amount visible: ${s.reasons.join(', ')}`, st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'hidden' : 'visible', src: 'live' }),
     note(`<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.txid.slice(0, 12))}… ↗</a> · ${esc(String(s.confirmations))} confirmations${b.at ? ' · read ' + esc(b.at) : ''}`),
-    h3('The oath · NEAR testnet'),
+    h3('The oath · NEAR'),
     row({ k: `Payout approved by clause ${b.oath.clause}`, why: 'the memo on chain holds only a commitment to the amount', st: b.oath.ok ? 'ok' : 'no', stText: b.oath.ok ? 'allowed' : 'not verified', tx: b.oath.tx }),
-    h3('The commitment · NEAR testnet memo'),
-    row({ k: `sha256 ${short(b.commitment.value)}`, why: 'binds the paid amount without showing it; this app never receives the amount, salt or viewing key', st: 'ok', stText: 'amount hidden', src: 'testnet' }),
+    h3('The commitment · NEAR memo'),
+    row({ k: `sha256 ${short(b.commitment.value)}`, why: 'binds the paid amount without showing it; this app never receives the amount, salt or viewing key', st: 'ok', stText: 'amount hidden', src: 'mainnet' }),
     `<p class="kv">${esc(b.commitment.value)}</p>`,
     note(`Auditor check: with the payee viewing key, read the amount and salt from the encrypted memo and hash them, or ${esc(b.auditor?.verify || 'POST /api/mistbank/verify')}. A match proves the paid amount is the committed one.`),
     ...(b.binding && !b.binding.capsAmount ? [note('The charter approves the payout and stores the commitment; it does not cap the Zcash amount.')] : []),
@@ -34,9 +34,9 @@ function live(b) {
     note('Practice quotes only: nothing was spent.'),
     `</details>`);
 }
-const HERO = `<span class="commit" title="sha256 commitment on NEAR testnet">${esc(String(B.commitment?.value || '').slice(0, 8))}…</span><span class="unit">amount hidden</span>`;
+const HERO = `<span class="commit" title="sha256 commitment on NEAR">${esc(String(B.commitment?.value || '').slice(0, 8))}…</span><span class="unit">amount hidden</span>`;
 // For the 2D fallback (js/flat.js)
-export const FLAT = { src: 'testnet', cls: 'testnet', label: 'Street sees a payout, not the amount · operator-run worker', hero: HERO };
+export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'Street sees a payout, not the amount · operator-run worker', hero: HERO };
 export const PROOF = live(B);
 
 export default async function bank() {
@@ -80,7 +80,7 @@ export default async function bank() {
   let t = 0;
   return {
     rob, scene, camera, tags: [],
-    panel: { title: 'Mist Bank', src: 'testnet', srcNote: 'Operator-run worker: the Zcash testnet send is made by a worker Nearcarta runs, not by your charter or a contract.', label: FLAT.label, hero: HERO, action: null },
+    panel: { title: 'Mist Bank', src: 'mainnet', srcNote: 'Operator-run worker: the mainnet send is made by a worker Nearcarta runs, not by your charter or a contract.', label: FLAT.label, hero: HERO, action: null },
     proof: PROOF,
     update(dt) { t += dt; rob.update(dt); mist.forEach((m, i) => { m.position.x = wx - .42 + ((t * .08 + i * .3) % .84); m.material.opacity = .25 + .12 * Math.sin(t + i); }); shape.material.opacity = .6 + .15 * Math.sin(t * .8); wheel.rotation.z = Math.sin(t * .3) * .08; },
   };

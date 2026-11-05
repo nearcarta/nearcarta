@@ -32,7 +32,7 @@ body.nohud .hud,body.nohud #title{display:none!important}
 .pill.ice[data-holding]{background:linear-gradient(90deg,rgba(168,216,255,.35) var(--p,0%),var(--glass) var(--p,0%))}
 body.frozen .pill.ice{background:rgba(168,216,255,.2);border-color:rgba(168,216,255,.5)}
 
-/* chronicle strip: one line per decision, real testnet ids */
+/* chronicle strip: one line per decision, recorded mainnet payments */
 #chron{left:18px;bottom:18px;width:min(380px,calc(100vw - 36px));background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:12px;padding:10px 12px 8px}
 #chron .ch{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--parch2);display:flex;align-items:center;gap:7px;margin-bottom:6px}
 #chron .ch em{font-style:normal;font-weight:500;letter-spacing:.02em;text-transform:none;color:var(--parch3);margin-left:auto;font-family:var(--mono);font-size:10.5px}

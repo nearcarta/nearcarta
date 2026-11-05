@@ -4,26 +4,18 @@ import { THREE, room, put, makeRobot, C } from '../js/core.js';
 import { row, h3, note, proof, paper, acct } from './_ui.js';
 import { M as PM, brassM, mesh, lantern, candle, rug, banner } from './_props.js';
 
-// The R17 charter factory these batches run on (shared/deployments/testnet.json vault, judges/proofs/r17-factory.json).
-const F = 'nccharters-53836.testnet';
 const BATCH_PROOF = proof(
-  h3('Batch payouts on testnet'),
-  row({ k: 'Rule code published', why: 'anyone can rebuild it and get the same file', st: 'ok', stText: 'matches', tx: 'EqTuyP3yv3mhrNTbDbu8ckMNQyB2MSY56m6QPDNMfnR8' }),
-  row({ k: 'Charter maker uses that code', why: 'every new charter runs it', st: 'ok', stText: 'live', tx: '9VJ3iRzE5quEz4pn8k2ZPzDqot2idAuj5kVJJ6Xi6iWc' }),
-  row({ k: 'Charter maker locked', why: 'nobody can change it now', st: 'ok', stText: '0 keys', tx: 'D4W8yGEx5ZFhXo5m3d6tqQwJ3KomBhsuC3pcTuHeXVhm' }),
-  note(`Factory ${acct(F)}. Up to 5 payouts per batch; one over budget refuses them all.`));
-// Testnet USDC payroll (judges/proofs/payroll-usdc.json; live at /api/payouts/usdc).
+  h3('One at a time'),
+  row({ k: '0.001 NEAR allowed', why: 'inside the cap, on board.nearcarta.near', st: 'ok', stText: 'paid', tx: '4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia' }),
+  row({ k: '0.01 NEAR refused', why: 'over the per-payment cap. Nothing was paid.', st: 'no', stText: 'refused', tx: 'AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx' }),
+  note('Up to three payments, each at most 0.005 NEAR. One at a time, not all-or-nothing.'));
 export const USDC_PROOF = proof(
-  h3('USDC payroll on testnet'),
-  row({ k: 'You set the rule', why: '2 staff · 1 USDC per payment · 2 USDC a day', st: 'ok', stText: 'on chain', tx: 'EegQrPE6mPxZ6qiB1hgQvptFB2MFN3FCd6FwQh7y6jpA' }),
-  row({ k: 'Staff registered on USDC', why: 'each wallet opened so it can receive USDC', st: 'ok', stText: 'done', tx: 'FZP13pFCrQgJUadCHcLoHHbF64UcwPbeJL7UK7wC2hk5' }),
-  row({ k: 'Agent paid 0.5 USDC', why: 'inside the cap', st: 'ok', stText: 'paid', tx: '9mj13hmpnQV11FSy6tNZ4yoJbQeaJVMWhwAbPdSx6DDi' }),
-  row({ k: 'Agent asked for 1.5 USDC', why: 'over the 1 USDC cap', st: 'no', stText: 'refused', tx: '6yMgMiRLfCtyum7aYJuL5Qkyy5hr74WPgQJmVrx7L6bv' }),
-  note(`Charter ${acct('payroll-rveu.nccharters-22195.testnet')}. Token: Circle testnet USDC.`));
-export const PROOF = USDC_PROOF + BATCH_PROOF;
+  h3('USDC'),
+  note('No USDC payroll has been paid from this town. A NEAR payment above is the record.'));
+export const PROOF = BATCH_PROOF + USDC_PROOF;
 export const MORE = null;
 // For the 2D fallback (js/flat.js and the town's fb.js)
-export const FLAT = { src: 'testnet', cls: 'testnet', label: 'One batch · all or nothing', hero: '<b class="num">5</b><span class="unit">max per batch</span>' };
+export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'One at a time, not all-or-nothing', hero: '<b class="num">3</b><span class="unit">max, 0.005 each</span>' };
 export default async function payouts() {
   const { scene, camera } = await room({ cam: [.4, 3.9, 8.0], look: [0, .85, 0] });
   // the counting desk
@@ -59,7 +51,7 @@ export default async function payouts() {
   let t = 0;
   return {
     rob, scene, camera, tags: [],
-    panel: { title: 'Payouts', src: 'testnet', label: 'One batch · all or nothing', hero: '<b class="num">5</b><span class="unit">max per batch</span>', action: null },
+    panel: { title: 'Payouts', src: 'mainnet', label: 'One at a time, not all-or-nothing', hero: '<b class="num">3</b><span class="unit">max, 0.005 each</span>', action: null },
     proof: PROOF,
     update(dt) { t += dt; rob.update(dt); stamp.position.y = .86 + Math.max(0, Math.sin(t * 1.1)) * .03; stacks.forEach((s, i) => { s.rotation.y = Math.sin(t * .5 + i) * .08; }); },
   };

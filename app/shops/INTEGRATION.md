@@ -6,8 +6,8 @@ Self-contained. Nothing in `app/design` or `app/src` is changed.
 `/shops/vault/` has three tabs: **My charter**, **Shared arena** and **Leaderboard**.
 
 **My charter**
-1. **Connect** through NEAR Connect (`@hot-labs/near-connect`, testnet). There is also an optional
-   guest wallet: a new account from the public testnet faucet. Its key is made in the browser and
+1. **Connect** through NEAR Connect (`@hot-labs/near-connect`, mainnet). There is also an optional
+   guest wallet: a new account from the public mainnet faucet. Its key is made in the browser and
    stays in that browser's localStorage. The backend never sees it.
 2. **Create a charter.** The wallet signs `create_charter(name, policy_delay_ns, dao?)` on the
    factory with a 0.3–5 NEAR deposit. The timelock defaults to 24 hours (10 minutes to 30 days);
@@ -59,15 +59,15 @@ that charter's rules, and the reason is one the scam targets. Otherwise, `why` s
 
 ## Mist Bank private send queue (backend/src/mistqueue.js)
 Render only queues a request. A separate worker on the operator's machine (backend/scripts/mist-worker.js)
-holds the Zcash testnet wallet, re-checks every request on chain, and sends after a random delay.
+holds the mainnet wallet, re-checks every request on chain, and sends after a random delay.
 No response ever contains the amount, the salt, the address or a viewing key.
 
 | Route | What it does |
 |---|---|
 | `GET /api/mistbank/send` | `open` (worker seen in the last 5 minutes), the limits, and the charter code hashes accepted |
-| `POST /api/mistbank/send/prepare` `{ua}` | checks the address (testnet, Orchard-only Unified Address) and returns the `memo` (`mbq1:…`, a hash of the address) which goes into one `propose` your agent key sends to your own charter (shop `mistbank`, any clause that allows it) |
+| `POST /api/mistbank/send/prepare` `{ua}` | checks the address (mainnet, Orchard-only Unified Address) and returns the `memo` (`mbq1:…`, a hash of the address) which goes into one `propose` your agent key sends to your own charter (shop `mistbank`, any clause that allows it) |
 | `POST /api/mistbank/send` `{ua, charter, approval_tx}` | 202 `{id, state:'queued', status_url}`. `approval_tx` must be a final `propose` signed by the charter's own agent key and allowed by it: shop `mistbank`, memo = the prepared memo, at most 24 h old, on a charter with an accepted code hash and 0 full-access keys. 503 if the worker is offline; 409 if the approval was already used; 429 for the per-charter, per-IP or daily limit |
-| `GET /api/mistbank/send/:id` | `state` queued, waiting, sending, sent or failed (with `error`); when sent, the Zcash testnet `txid`, explorer link and amount `commitment` |
+| `GET /api/mistbank/send/:id` | `state` queued, waiting, sending, sent or failed (with `error`); when sent, the mainnet `txid`, explorer link and amount `commitment` |
 
 The address is dropped from Render as soon as the worker takes the request.
 
@@ -82,7 +82,7 @@ The address is dropped from Render as soon as the worker takes the request.
   `board`). Deep links: `#mine`, `#arena`, `#board`.
 - **Backend.** `backend/src/app.js` has one line, `vault.register(app, { limiter, globalCap })`.
   The routes live in `backend/src/vault.js`. The deployment is the `vault` section of
-  `shared/deployments/testnet.json`.
+  `shared/deployments/mainnet.json`.
 - **Env.** `ARENA_AGENT_KEY` turns on the shared runner. It is the propose-only key of the shared
   arena charter. Without it, `/api/vault/attack` returns 503 and the page says the shared runner
   is off. The rest still works.

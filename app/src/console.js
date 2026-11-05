@@ -1,11 +1,11 @@
-// Live console: every value below is fetched from the Nearcarta API, which reads NEAR testnet RPC,
+// Live console: every value below is fetched from the Nearcarta API, which reads NEAR RPC,
 // 1Click (dry) and NEAR AI Cloud. Nothing here signs or spends; only the Your House tab asks your own wallet to sign.
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const NB = window.NEARCARTA_PUBLIC_MAINNET ? 'https://nearblocks.io' : 'https://testnet.nearblocks.io';
+const NB = window.NEARCARTA_PUBLIC_MAINNET ? 'https://nearblocks.io' : 'https://nearblocks.io';
 const tx = h => `<a href="${NB}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(h).slice(0, 10))}…</a>`;
-// Readable names for our testnet accounts; the full id stays in the link and the tooltip.
+// Readable names for our mainnet accounts; the full id stays in the link and the tooltip.
 const ROLE = [[/^attacker\./, 'test merchant (red-team)'], [/mallory/, 'red-team account'], [/^bakery\./, 'Bakery (payee)'], [/^dao\.|sputnik/, 'Town Hall DAO'],
   [/house/, 'Your House charter'], [/hown/, 'House owner'], [/oath/, 'charter contract'], [/arena/, 'Arena contract'], [/agent/, 'agent'], [/own-/, 'owner'], [/signer/, 'NEAR MPC signer']];
 const nameOf = a => { const s = String(a ?? ''); for (const [re, n] of ROLE) if (re.test(s)) return n; return s.length > 26 ? s.slice(0, 10) + '…' + s.slice(-8) : s; };
@@ -162,7 +162,7 @@ async function arena() {
 
 async function toll() {
   const t = await get('/api/toll'), p = t.policy;
-  $('#toll .out').innerHTML = `<div class="card" data-testid="toll-state">Oath ${acct(t.oath)} signs through ${acct(t.mpc)} for chain ${esc(p.chain_id)} (Base Sepolia)<br>
+  $('#toll .out').innerHTML = `<div class="card" data-testid="toll-state">Oath ${acct(t.oath)} signs through ${acct(t.mpc)} for chain ${esc(p.chain_id)} (Base)<br>
     Derived address <a href="${esc(t.foreign_explorer)}" target="_blank" rel="noopener">${esc(p.foreign_address)}</a> · may pay ${p.allow_to.map(a => `<code title="${esc(a)}">${esc(String(a).slice(0, 8))}…${esc(String(a).slice(-4))}</code>`).join(', ')} · max/tx ${Number(p.max_per_tx) / 1e18} ETH · spent ${Number(p.spent) / 1e18} / ${Number(p.budget) / 1e18} ETH</div>
     <div class="card"><b>Signed so far</b><table>${t.recent.map(r => `<tr><td><code title="${esc(r.to)}">${esc(String(r.to).slice(0, 8))}…${esc(String(r.to).slice(-4))}</code></td><td>${Number(r.value) / 1e18} ETH</td><td><code>${esc(JSON.stringify(r).slice(0, 120))}</code></td></tr>`).join('')}</table></div>`;
 }

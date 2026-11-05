@@ -32,7 +32,7 @@ export default function GuardView() {
   return (
     <>
       <PageHead icon={Shield} kicker={<>Guardhouse · attack lab account <a className="mono" href={NBA(LAB.oath)} target="_blank" rel="noreferrer">{LAB.oath}</a></>} title="Refused by the contract, not by the model"
-        sub="Real prompt-injection runs against the agent on testnet. In each run the agent followed the injected instruction. The oath refused it anyway, and every refusal is a public event anyone can read.">
+        sub="Real prompt-injection runs against the agent on mainnet. In each run the agent followed the injected instruction. The oath refused it anyway, and every refusal is a public event anyone can read.">
         <button className="btn primary" onClick={() => { setTick(0); }}><Play size={14} />Replay attack</button>
       </PageHead>
       <div className="grid">
@@ -87,7 +87,7 @@ export default function GuardView() {
           </div>
         </Card>
 
-        <Card className="s6" title="Counterparty verdicts" icon={UserCheck} right={<Ev label="Testnet" />} flush>
+        <Card className="s6" title="Counterparty verdicts" icon={UserCheck} right={<Ev label="Mainnet" />} flush>
           <div className="rows">
             {COUNTERPARTIES.map((c) => (
               <div key={c.acct} className="row" style={{ gridTemplateColumns: '84px 1fr auto' }}>

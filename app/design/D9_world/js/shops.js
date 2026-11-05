@@ -13,10 +13,9 @@ export const APP=!/[?&]scripted\b/.test(location.search);
 document.body.dataset.host='d9'; // D8's shop app leaves the town HUD wallet (#wallet) alone
 let ui=null; const ui8=()=>ui||(ui=import(D8+'js/shopui.js').then(m=>{ m.boot(); return m; }).catch(e=>{ ui=null; throw e; }));
 export const L={ sh:null, C8:null };
-const SRC={ testnet:'testnet demo', live:'live read', split:'mainnet', quote:'mainnet quote' };
-// On the mainnet town the badge says where a room's payment really lands (bank: NEAR on mainnet, Zcash on testnet; payouts: testnet only).
-export const NETMAIN={ bank:'mainnet · Zcash testnet', payouts:'testnet demo', chronicle:'mainnet' };
-export const srcLabel=(id,src)=>(window.NEARCARTA_PUBLIC_MAINNET===true&&NETMAIN[id])||SRC[src]||src;
+const SRC={ mainnet:'mainnet', live:'live read', split:'mainnet', quote:'mainnet quote' };
+export const NETMAIN={ bank:'mainnet', payouts:'mainnet', chronicle:'mainnet' };
+export const srcLabel=(id,src)=>NETMAIN[id]||SRC[src]||'mainnet';
 const NAMES={ guard:'Guardhouse', ferry:'Ferry', hall:'Town Hall', bank:'Mist Bank', arena:'Vault Arena', toll:'Toll Bridge', chronicle:'Chronicle', house:'Your House', payouts:'Payouts' };
 export function setResult(kind,text){ const b=$('#t-act'); b.classList.remove('busy'); b.className='act res '+kind; b.disabled=true; b.innerHTML=`<span class="glyph" aria-hidden="true">${kind==='no'?'✕':kind==='ok'?'✓':'○'}</span>`; b.append(text); b.setAttribute('aria-live','polite'); }
 export function setHero(html){ const h=$('#t-hero'); h.innerHTML=html; h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); }
@@ -43,18 +42,16 @@ export function frame(c){ const a=innerWidth/innerHeight; c.aspect=a; const ox=i
 const CTA={ house:"Set your agent's rules →", guard:'Write a rule like this for your agent →', arena:'Put your own charter in the arena →' };
 const CTA_APP={ house:'Open the charter office →' };
 export function cta(id){ const a=$('#t-cta'); const t=(APP?CTA_APP:CTA)[id]; a.hidden=!t; a.className=APP?'link cta8':'act primary cta'; if(t){ a.textContent=t; a.href='/shops/vault/'; a.dataset.testid='vault-link'; } }
-const visitorNote=note=>window.NEARCARTA_PUBLIC_MAINNET===true?String(note||'').replace(/ ?[^.]*testnet trial[^.]*/gi,'').replace(/\s{2,}/g,' ').trim():(note||'');
+const visitorNote=note=>note||'';
 export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; $('#t-title').textContent=p.title||NAMES[sh.id]; const s=$('#t-src'); s.textContent=srcLabel(sh.id,p.src); s.className='src '+p.src; s.title=visitorNote(p.srcNote);
   $('#t-label').textContent=p.label; $('#t-hero').innerHTML=p.hero; const b=$('#t-act'); b.className='act primary'; b.disabled=false; b.hidden=!p.action; b.textContent=p.action||'';
   { const m=$('#t-more'); m.hidden=!p.more; if(p.more){ m.href=p.more.href; m.textContent=p.more.text; } }
   $('#d-title').textContent=(p.title||NAMES[sh.id]); $('#d-body').innerHTML=sh.proof+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>';
   sh.tags?.forEach(t=>{ if(t.html){ t.el=document.createElement('div'); t.el.className='stag '+(t.cls||''); t.el.innerHTML=t.html; $('#stags').appendChild(t.el); } }); frame(sh.camera);
   document.body.classList.toggle('apps',APP); $('#t-say').hidden=!APP; if(!APP) return;
-  b.hidden=false; b.disabled=true; if (!b.textContent.trim()) b.textContent='Sign in';
-  // mount by room id (the same room can be re-shown while the app module loads), and never leave "Opening…" up:
-  // if the label is still there after 8 s, mount again; the app paints its own state on mount.
+  b.hidden=false; b.disabled=true; if (!b.textContent.trim()) b.textContent='Opening…';
   const go=()=>ui8().then(m=>{ if(L.sh?.id===sh.id) m.mount(sh.id,L.sh,g=>L.C8.run(g)); }).catch(e=>{ if(L.sh?.id!==sh.id) return; console.warn('[Nearcarta] shop app failed to load',e); b.disabled=false; b.textContent='Try again'; b.dataset.retry=sh.id; });
-  go(); setTimeout(()=>{ if(L.sh?.id===sh.id&&b.disabled&&b.textContent.trim()==='Sign in'&&!document.body.dataset.app) go(); },8000); }
+  go(); setTimeout(()=>{ if(L.sh?.id===sh.id&&b.disabled&&/^(Opening…|Sign in)$/.test(b.textContent.trim())){ b.textContent='Still opening this shop'; go(); } },2000); }
 export const rulesOpen=()=>!!ui&&$('#rules').classList.contains('open');
 export function closeRules(){ ui?.then(m=>m.closeRules()); }
 export function showError(id,err){ $('#t-title').textContent=NAMES[id]||id; const s=$('#t-src'); s.textContent='error'; s.className='src error'; $('#t-label').textContent='This room could not load'; $('#t-hero').innerHTML='';

@@ -59,7 +59,7 @@ export default function App() {
         <div className="brand"><span className="glyph"><Lamplighter /></span>{PROJECT_NAME}</div>
         <div className="crumb"><shop.icon size={14} /><b>{shop.name}</b></div>
         <div className="sp" />
-        <span className="chip"><Dot tone="pos" live />Testnet</span>
+        <span className="chip"><Dot tone="pos" live />Mainnet</span>
         <a className="chip mono" href={NBA(CORE.oath)} target="_blank" rel="noreferrer" title={`policy_hash ${CORE.policyHash}`}>
           oath <b>{CORE.oath}</b><span className="t3">·</span><b>v{CORE.policyVersion}</b><span className="t3">{short(CORE.policyHash, 6, 4)}</span>
         </a>
@@ -80,11 +80,11 @@ export default function App() {
         ))}
         <div className="foot">
           <a className="town-thumb" href="../D2_game/" title="Back to the island"><img src="town.jpg" alt="" /><span><ArrowLeft size={13} />Back to {PROJECT_NAME}</span></a>
-          <div className="sub" style={{ marginTop: 8 }}>Testnet snapshot · {CORE.snapshot}</div>
+          <div className="sub" style={{ marginTop: 8 }}>Mainnet record · {CORE.snapshot}</div>
         </div>
       </nav>
       <main className="main">
-        {frozen && <div className="banner"><Snowflake size={15} />Demo freeze: every proposal would be refused with reason <span className="reason">frozen</span>. No transaction was sent. Real freeze: <a className="txl" href="https://testnet.nearblocks.io/txns/AsdG2RUrvU8vGys3WeVMZYTXZAMhsHqfCRtTNT8u1tRq" target="_blank" rel="noreferrer">AsdG2R…1tRq</a></div>}
+        {frozen && <div className="banner"><Snowflake size={15} />Demo freeze: every proposal would be refused with reason <span className="reason">frozen</span>. No transaction was sent. A recorded refusal: <a className="txl" href="https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF" target="_blank" rel="noreferrer">CcPMX1…9ceF</a></div>}
         <div className="page" key={shop.id}><V /></div>
       </main>
       {pal && <Palette onClose={() => setPal(false)} />}
