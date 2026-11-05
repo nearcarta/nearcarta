@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { makeApp } from '../../src/app.js';
 import { judgePropose, toYocto, _setFetch, MAX_YOCTO, TOLL_YOCTO, BOARD } from '../../src/board-tx.js';
 import { refusalFor, _setRead } from '../../src/board-guard.js';
-import { issuePass, readPass, signPass, _setSecret } from '../../src/toll-pass.js';
+import { issuePass, readPass, signPass, _setSecret, _clearUsed } from '../../src/toll-pass.js';
 import { mainnetChronicle, _setFetch as setFeed, _clear } from '../../src/board-chronicle.js';
 import { nextCap, boardPayoutPlan, sealText } from '../../../app/design/D8_shops/js/board-plan.js';
 import { sealText as sharedSeal } from '../../../shared/board/seal.js';
@@ -106,11 +106,36 @@ test('a toll pass is 0.001 NEAR to toll.nearcarta.near and expires', async () =>
     assert.equal(pass.amount, '0.001');
     assert.equal(readPass(pass.pass, 1_000).tx, HASH);
     assert.throws(() => readPass(pass.pass, 1_000 + 11 * 60_000), /expired/);
+    _clearUsed();
     const res = await makeApp().request('/api/toll/mainnet', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ visitor: VISITOR, tx: HASH }) });
     assert.equal(res.status, 200);
     assert.equal((await res.json()).amount, '0.001');
     assert.throws(() => readPass(signPass({ exp: 1 }), 5), /expired/);
-  } finally { _setFetch(null); }
+  } finally { _setFetch(null); _clearUsed(); }
+});
+
+test('one toll tx buys one pass: the same near tx is refused the second time', async () => {
+  _setSecret('test-secret-test-secret-test-secret'); _clearUsed();
+  _setFetch(async () => ({ json: async () => ({ result: txFor({ payee: TOLL, amount: y001 }) }) }));
+  try {
+    await issuePass({ visitor: VISITOR, tx: HASH, now: 1_000 });
+    await assert.rejects(issuePass({ visitor: VISITOR, tx: HASH, now: 2_000 }), e => e.status === 409 && /already issued a pass/.test(e.message));
+    const res = await makeApp().request('/api/toll/mainnet', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ visitor: VISITOR, tx: HASH }) });
+    assert.equal(res.status, 409);
+    assert.match((await res.json()).error, /already issued a pass/);
+  } finally { _setFetch(null); _clearUsed(); }
+});
+
+test('no TOLL_PASS_SECRET: the mainnet gate fails closed with 503 and issues nothing', async () => {
+  _setSecret(''); _clearUsed();
+  _setFetch(async () => ({ json: async () => ({ result: txFor({ payee: TOLL, amount: y001 }) }) }));
+  try {
+    await assert.rejects(issuePass({ visitor: VISITOR, tx: HASH }), e => e.status === 503 && /not configured/.test(e.message));
+    const res = await makeApp().request('/api/toll/mainnet', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ visitor: VISITOR, tx: HASH }) });
+    assert.equal(res.status, 503);
+    assert.match((await res.json()).error, /not configured/);
+    assert.throws(() => signPass({ exp: 1 }), /not configured/);
+  } finally { _setFetch(null); _setSecret('test-secret-test-secret-test-secret'); _clearUsed(); }
 });
 
 test('GET /api/chronicle?net=mainnet lists propose rows and falls back to known hashes', async () => {

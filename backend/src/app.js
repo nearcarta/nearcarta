@@ -364,7 +364,8 @@ export function makeApp() {
   // Mainnet gate: one 0.001 board propose to toll.nearcarta.near, then a short-lived signed pass. No testnet gate contract.
   app.post('/api/toll/mainnet', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    return c.json(await issuePass({ visitor: b.visitor, tx: b.tx }));
+    try { return c.json(await issuePass({ visitor: b.visitor, tx: b.tx })); }
+    catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; }
   });
   app.get('/api/toll/gate/:nonce', limiter(60), tg(c => tollgate.visit(c.req.param('nonce'))));
   // Guest fallback when the public faucet rate-limits a visitor (backend/src/guest.js)
