@@ -4,6 +4,7 @@
 // Read-only: dry quotes only (no deposit address exists), no keys, no viewing key is copied into the page.
 import * as SNAP from './live.snapshot.js';
 import { echoGuard, orchardOnly } from '/live/ferry-guard.js';
+import { shapeBank } from '/live/shape.js';
 
 const UA = 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex';
 // ZIP 316 test vectors (backend/test/fixtures/zip316_vectors.json): what the Orchard-only check refuses.
@@ -32,18 +33,13 @@ const at = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 const host = R ? (R.b || location.origin).replace(/^https?:\/\//, '') : null;
 const mb = R?.mb, q = R?.q;
 
-export const BANK = mb?.built ? { src: 'mainnet', at, live: true,
-  street: { txid: mb.payout.txid, url: mb.payout.explorer, height: mb.street.height, confirmations: mb.street.confirmations, fee: mb.street.fee_zat,
-    hidden: mb.street.amount_hidden === true, reasons: mb.street.reasons || [], pool: Object.entries(mb.street.value_balance_zat || {}).find(([, v]) => v !== '0')?.[0] || 'shielded', actions: mb.street.actions },
-  oath: { tx: mb.oath.tx, ok: mb.oath.success && mb.oath.decision === 'allowed' && mb.oath.memo_on_chain, clause: mb.oath.clause_id },
-  // Never the amount, the salt or the viewing key: only the commitment on chain.
-  commitment: { value: mb.commitment?.value, scheme: mb.commitment?.scheme },
-  binding: { capsAmount: mb.binding?.charter_caps_zec_amount === true, timing: mb.binding?.timing }, auditor: { verify: mb.auditor?.verify },
-  desk: mb.desk?.available ? Object.entries(mb.desk.legs).map(([k, l]) => ({ leg: k, ok: l.ok, privacy: l.privacy, sig: l.signature, echo: l.echo?.ok, out: l.amountOut })) : [] }
+const shaped = shapeBank(mb);
+export const BANK = shaped
+  ? { ...shaped, at, live: true, street: { ...shaped.street, actions: mb.street?.actions } }
   : { ...SNAP.BANK, live: false };
 
 function quote() {
-  if (!(q?.ok && q.checks?.accepted && R.mine && orchardOnly(R.mine.receivers || []).ok)) return null;
+  if (!(q?.ok && q.checks?.accepted && q.from && q.to && R?.mine && orchardOnly(R.mine.receivers || []).ok)) return null;
   if (echoGuard(q.sent, q.echoed).diffs.length) return null; // the page's guard must agree with the server's
   const down = echoGuard(q.sent, { ...q.echoed, confidentiality: undefined }).diffs;
   const swap = echoGuard(q.sent, { ...q.echoed, recipient: UA_OPEN }).diffs;
