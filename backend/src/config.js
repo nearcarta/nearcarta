@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-// NEAR_NET picks the deployments file (testnet by default). DEPLOYMENTS_FILE still overrides both.
-export const NET = process.env.NEAR_NET === 'mainnet' ? 'mainnet' : 'testnet';
+// NEAR_NET=testnet is the only way off mainnet. Unset means mainnet.
+export const NET = process.env.NEAR_NET === 'testnet' ? 'testnet' : 'mainnet';
 const depDir = join(here, '..', '..', 'shared', 'deployments');
 // The mainnet core (charter + toll) record, read-only; always served at /api/mainnet.
 let mainnetDep = null;
@@ -13,19 +13,18 @@ try { mainnetDep = JSON.parse(readFileSync(join(depDir, 'mainnet.json'), 'utf8')
 export const MAINNET_DEP = mainnetDep;
 const base = JSON.parse(readFileSync(process.env.DEPLOYMENTS_FILE || join(depDir, 'testnet.json'), 'utf8'));
 // With NEAR_NET=mainnet the deployed mainnet ids overlay the testnet set; testnet-only parts (arena, house, Town Hall) keep their ids.
+// Keep the internal shop records. Public routes serve MAINNET_DEP. The toll object
+// stays the internal one so a reader that expects .oath does not crash; /api/toll does not return it.
 const overlay = NET === 'mainnet' && mainnetDep && mainnetDep.status === 'deployed'
-  ? Object.fromEntries(Object.entries(mainnetDep).filter(([, v]) => v !== null)) : {};
-export const DEP = { ...base, ...overlay };
+  ? Object.fromEntries(Object.entries(mainnetDep).filter(([k, v]) => v !== null && k !== 'toll' && k !== 'rpc')) : {};
+export const DEP = { ...base, ...overlay, network: NET };
 
 export const cfg = {
   port: Number(process.env.PORT || 8787),
-  rpc: process.env.NEAR_RPC || DEP.rpc,
-  // Tried in order when the main testnet RPC answers 429/5xx or is unreachable (free RPCs rate-limit shared host IPs).
-  rpcFallbacks: (process.env.NEAR_RPC_FALLBACKS || (DEP.rpc_fallbacks || []).join(',')).split(',').map((s) => s.trim()).filter(Boolean),
-  // Tx status for anything older than ~2.5 days lives only on archival nodes (others answer NOT_OBSERVED/timeout).
-  archivalRpc: process.env.NEAR_ARCHIVAL_RPC || DEP.archival_rpc || 'https://archival-rpc.testnet.fastnear.com',
-  // Second archival node, used when the first rate-limits (Render egress IPs are shared and see 429s).
-  archivalRpc2: process.env.NEAR_ARCHIVAL_RPC2 || 'https://archival-rpc.testnet.near.org',
+  rpc: process.env.NEAR_RPC || (NET === 'mainnet' ? (mainnetDep?.rpc || 'https://free.rpc.fastnear.com') : DEP.rpc),
+  rpcFallbacks: (process.env.NEAR_RPC_FALLBACKS || (NET === 'mainnet' ? 'https://rpc.mainnet.near.org' : (DEP.rpc_fallbacks || []).join(','))).split(',').map((s) => s.trim()).filter(u => u && (NET !== 'mainnet' || !/testnet/i.test(u))),
+  archivalRpc: process.env.NEAR_ARCHIVAL_RPC || (NET === 'mainnet' ? 'https://archival-rpc.mainnet.fastnear.com' : (DEP.archival_rpc || '')),
+  archivalRpc2: process.env.NEAR_ARCHIVAL_RPC2 || (NET === 'mainnet' ? 'https://archival-rpc.mainnet.near.org' : ''),
   rpcRetries: Number(process.env.NEAR_RPC_RETRIES || 4),
   rpcBackoffMs: Number(process.env.NEAR_RPC_BACKOFF_MS || 400),
   rpcBackoffMaxMs: Number(process.env.NEAR_RPC_BACKOFF_MAX_MS || 4000),

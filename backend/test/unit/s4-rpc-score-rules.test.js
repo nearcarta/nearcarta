@@ -36,10 +36,12 @@ test('frontend rpcClient rotates on a network error', async () => {
   assert.equal(await rpcClient(['A', 'B'], f, noSleep)('block', {}), 7);
 });
 
-test('backend cfg.rpcFallbacks defaults to testnet.json backups', async () => {
+test('backend cfg.rpcFallbacks default to a mainnet RPC', async () => {
   if (process.env.NEAR_RPC_FALLBACKS) return;
-  const { cfg } = await import('../../src/config.js');
-  assert.deepEqual(cfg.rpcFallbacks, DEP.rpc_fallbacks);
+  const { cfg, NET } = await import('../../src/config.js');
+  assert.equal(NET, 'mainnet');
+  assert.deepEqual(cfg.rpcFallbacks, ['https://rpc.mainnet.near.org']);
+  assert.equal(cfg.rpcFallbacks.some(u => /testnet/i.test(u)), false);
 });
 
 test('backend rpc() falls back from a 408 primary', async () => {

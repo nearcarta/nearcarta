@@ -32,7 +32,7 @@ export const V = DEP.vault || null;
 const ACCOUNT_RE = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 const bad = (msg, status = 400) => Object.assign(new Error(msg), { status });
 export const isAccount = a => typeof a === 'string' && ACCOUNT_RE.test(a);
-const ARCHIVAL = process.env.ARCHIVAL_RPC || 'https://archival-rpc.testnet.fastnear.com';
+const ARCHIVAL = process.env.ARCHIVAL_RPC || 'https://archival-rpc.mainnet.fastnear.com';
 
 /** Factories whose charters count: the live one first, then earlier releases (kept for history). */
 const ARENAS = new Set(V ? [V.arena.charter, ...(V.arena.pool || []), ...(V.arena_history ? [V.arena_history.charter, ...(V.arena_history.pool || [])] : []), ...(V.legacy || []).map(l => l.arena?.charter).filter(Boolean)] : []);
@@ -831,5 +831,5 @@ export function register(app, { limiter, globalCap }) {
     return c.json({ usage: 'GET /api/vault/score/:charter or /api/vault/score?charter=<account>', example: '/api/vault/score/' + (V.arena?.charter || '<charter>') });
   });
   app.get('/api/vault/leaderboard', limiter(20), async c => c.json(await leaderboard()));
-  app.get('/api/vault/runner', limiter(30), async c => c.json(await runnerStatus()));
+  app.get('/api/vault/runner', limiter(30), c => c.json({ enabled: false, network: 'mainnet', charter: MAINNET_DEP?.extras?.arena?.contract || null }));
 }

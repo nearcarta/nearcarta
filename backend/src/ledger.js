@@ -5,7 +5,7 @@ const Y = 10n ** 24n;
 const nearOf = y => { try { const b = BigInt(y); const f = (b % Y).toString().padStart(24, '0').slice(0, 6).replace(/0+$/, ''); return `${b / Y}${f ? '.' + f : ''}`; } catch { return null; } };
 const ethOf = w => { try { const b = BigInt(w); const f = (b % 10n ** 18n).toString().padStart(18, '0').slice(0, 8).replace(/0+$/, ''); return `${b / 10n ** 18n}${f ? '.' + f : ''}`; } catch { return null; } };
 const KIND = { pay: 'payout', tip: 'payout', ask: 'payout', arena: 'payout', toll: 'sale', house: 'payout', ferry: 'sale' };
-const SHOP = { pay: 'Guardhouse', tip: 'Your House', ask: 'Charter office', arena: 'Vault Arena', toll: 'Toll Bridge', house: 'Your House', ferry: 'Ferry', guardhouse: 'Guardhouse' };
+const SHOP = { pay: 'Guardhouse', tip: 'Your House', ask: 'Your House', arena: 'Vault Arena', toll: 'Toll Bridge', house: 'Your House', ferry: 'Ferry', guardhouse: 'Guardhouse' };
 
 export function buildLedger({ chronicle, toll, gate, budget, now = new Date().toISOString() } = {}) {
   const rows = [];
@@ -13,7 +13,7 @@ export function buildLedger({ chronicle, toll, gate, budget, now = new Date().to
     if (e.standard !== 'oath' || e.event !== 'action') continue;
     for (const d of e.data || []) {
       const ok = d.decision === 'allowed';
-      rows.push({ at: t.at || null, shop: SHOP[d.shop] || 'Charter office', kind: ok ? (KIND[d.shop] || 'payout') : 'refusal', to: d.receiver || null,
+      rows.push({ at: t.at || null, shop: SHOP[d.shop] || 'Your House', kind: ok ? (KIND[d.shop] || 'payout') : 'refusal', to: d.receiver || null,
         amount: ok ? nearOf(d.amount) : '0', asset: 'NEAR', note: ok ? null : reasonLabel(d.reason || d.decision), tx: t.hash, url: t.hash ? `https://nearblocks.io/txns/${t.hash}` : null });
     }
   }

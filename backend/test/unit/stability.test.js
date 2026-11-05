@@ -37,7 +37,7 @@ test('read routes: an RPC 429 serves the last good value marked stale, or 503 + 
     : new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { result: [...Buffer.from(JSON.stringify({ ok: 1 }))], logs: [] } }), { status: 200 });
   const app = makeApp();
   busy = true;
-  const cold = await app.request('/api/toll');
+  const cold = await app.request('/api/guardhouse');
   assert.equal(cold.status, 503); assert.equal(cold.headers.get('retry-after'), '3');
   assert.equal((await cold.json()).retry, true);
 });

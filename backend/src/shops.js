@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 // Read-only live views for Town Hall, Arena and Toll, plus the Chronicle indexer.
-import { cfg, DEP } from './config.js';
+import { cfg, DEP, MAINNET_DEP } from './config.js';
 import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, rpc } from './near.js';
 import { snapshot } from './guardhouse.js';
 import { indexPost } from './txindex.js';
@@ -87,17 +87,18 @@ export async function arenaAttempts(from = 0, limit = 25) {
 }
 
 export async function toll() {
-  const T = DEP.toll;
-  const policy = await view(T.oath, 'policy');
-  const recent = [];
-  for (let n = Math.max(0, policy.next_nonce - 5); n < policy.next_nonce; n++) recent.push(await view(T.oath, 'get_tx', { nonce: n }).catch(() => null));
-  const instances = (await Promise.all(TOLL_INSTANCES.map(tollInstance))).filter(Boolean);
-  return { oath: T.oath, mpc: T.mpc, policy, recent: await sweepRecent(recent.filter(Boolean), policy), foreign_explorer: `https://sepolia.basescan.org/address/${policy.foreign_address}`, instances };
+  const T = MAINNET_DEP?.toll;
+  if (!T) return { network: 'mainnet', contract: null };
+  return {
+    network: 'mainnet', contract: T.contract, amount_near: '0.001', chain_id: MAINNET_DEP.chain_id,
+    foreign_address: T.foreign_address, txs: T.txs,
+    note: 'One payment of 0.001 NEAR to toll.nearcarta.near. A refusal pays nothing.',
+  };
 }
 
 // Further Toll instances from the deployments file: the Arbitrum Sepolia Toll and the USDC Toll (v3).
 // Each is read from chain; one that cannot be read is left out rather than failing the route.
-const EXPLORER = { Base: 'https://sepolia.basescan.org', Arbitrum: 'https://sepolia.arbiscan.io' };
+const EXPLORER = { Base: 'https://basescan.org', Arbitrum: 'https://arbiscan.io' };
 const TOLL_INSTANCES = [['arbitrum', DEP.toll_arbitrum?.oath], ['usdc', DEP.toll_usdc?.toll]].filter(([, id]) => id);
 async function tollInstance([label, id]) {
   try {
@@ -112,7 +113,7 @@ async function tollInstance([label, id]) {
 
 // Stale-record sweep: a record still "signed" on NEAR is checked against its foreign chain and shown as
 // pending, settling or expired (shared/stale.js). chain_status keeps the contract's own word.
-const EVM_RPC = { Base: process.env.BASE_SEPOLIA_RPC || 'https://sepolia.base.org', Arbitrum: process.env.ARB_SEPOLIA_RPC || 'https://sepolia-rollup.arbitrum.io/rpc' };
+const EVM_RPC = { Base: process.env.BASE_RPC || 'https://mainnet.base.org', Arbitrum: process.env.ARB_RPC || 'https://arb1.arbitrum.io/rpc' };
 export async function evmFacts(chain, rec, from, f = fetch) {
   const call = async (method, params) => { const r = await f(EVM_RPC[chain] || EVM_RPC.Base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: AbortSignal.timeout(6000) }); const j = await r.json(); if (j.error) throw new Error(j.error.message); return j.result; };
   const [tx, rcpt, nonce, bal] = await Promise.all([call('eth_getTransactionByHash', [rec.tx_hash]), call('eth_getTransactionReceipt', [rec.tx_hash]),

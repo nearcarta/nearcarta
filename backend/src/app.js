@@ -13,10 +13,12 @@ import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
 import { attested } from './outlayer.js';
 import * as mist from './mistbank.js';
-import * as mq from './mistqueue.js';
 import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
-import * as guest from './guest.js';
+import { issuePass } from './toll-pass.js';
+import { verifyPropose } from './board-tx.js';
+import { mainnetChronicle } from './board-chronicle.js';
+import { previewOwner } from './board-guard.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
@@ -138,7 +140,7 @@ export const WARM_DELAY_MS = Number(process.env.WARM_DELAY_MS ?? 3_000);
 // Reads run one at a time; the first tick waits WARM_DELAY_MS after boot so the health check is answered first.
 export function warm({ every = WARM_EVERY_MS, read, delay = read ? 0 : WARM_DELAY_MS } = {}) {
   let tick = 0, stopped = false, t = null;
-  const jobs = () => [() => shops.refreshHealth(), () => vault.refreshRunnerStatus(),
+  const jobs = () => [() => shops.refreshHealth(),
     () => shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
     ...(read ? [] : [() => reads.guardhouse(), () => reads.mistbank(), () => reads.townhall(), tick++ % 2 === 0 ? () => arenaPromptsSwr() : () => ledgerSwr()])];
   const once = async () => { const out = []; for (const j of jobs()) { if (stopped) break; try { out.push({ status: 'fulfilled', value: await j() }); } catch (e) { out.push({ status: 'rejected', reason: e }); } } return out; };
@@ -244,17 +246,10 @@ export function makeApp() {
     try { return c.json(zcashRecipient(c.req.param('addr'))); } catch { return bad(c, 'not a valid Zcash address'); }
   });
 
-  // Ferry deposit and status tracker (ENV=TIDEPOOL: community testnet, not 1Click). Any deposit address from a
-  // Tidepool quote; the answer carries the status, refund amount and reason, and the verifier code-hash check.
   app.get('/api/ferry/status', limiter(30), async c => {
-    const env = (c.req.query('env') || 'TIDEPOOL').toUpperCase();
-    try {
-      if (env === 'ONECLICK') return c.json(await checkout.oneClickStatus(c.req.query('depositAddress')));
-      if (env !== 'TIDEPOOL') return bad(c, 'env must be TIDEPOOL or ONECLICK');
-      return c.json(await ferry.tidepoolStatus(c.req.query('depositAddress')));
-    } catch (e) { return c.json({ error: e.message }, e.status || 502); }
+    try { return c.json(await checkout.oneClickStatus(c.req.query('depositAddress'))); }
+    catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
-  app.get('/api/ferry/tidepool', limiter(20), c => c.json(DEP.ferry_tidepool ? { ...DEP.ferry_tidepool, label: ferry.TIDEPOOL.label } : { error: 'none' }, DEP.ferry_tidepool ? 200 : 404));
 
   // Guardhouse
   app.get('/api/payouts/usdc', limiter(30), edgeCache(15), c => c.json({
@@ -317,22 +312,15 @@ export function makeApp() {
     return c.json(mist.verifyOpening(b.amount, b.salt));
   });
   app.get('/api/mistbank/verify', c => c.json({ error: 'POST {"amount":"<zatoshi>","salt":"<32 hex>"}; the opening is auditor-only and never goes in a URL' }, 405));
-  // Per-visitor private send: verify the charter approval and queue it. The box worker holds the Zcash
-  // key, sends after a random delay and reports back the txid + commitment only (src/mistqueue.js).
-  app.get('/api/mistbank/send', limiter(20), c => c.json(mq.info()));
-  app.post('/api/mistbank/send/prepare', limiter(20), async c => {
+  app.post('/api/mistbank/mainnet', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    return c.json(mq.prepare(b.ua));
-  });
-  app.post('/api/mistbank/send', limiter(mq.LIMITS.per_ip_per_hour, 3600e3), async c => {
-    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    return c.json(await mq.enqueue(b), 202);
-  });
-  app.get('/api/mistbank/send/:id', limiter(30), c => c.json(mq.status(c.req.param('id'))));
-  app.post('/api/mistbank/worker/sync', limiter(10), async c => {
-    if (!mq.workerAuth(c.req.header('authorization'))) return c.json({ error: 'unauthorized' }, 401);
-    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    return c.json(mq.sync(b.records));
+    if (!HASH.test(b.tx || '')) return bad(c, 'tx must be a hash');
+    if (!ACCT.test(b.signer || '')) return bad(c, 'signer must be an account');
+    try {
+      const j = await verifyPropose(b.tx, b.signer, b.payee ? { expectReceiver: b.payee } : {});
+      if (!j.ok) return c.json({ error: j.error }, j.status || 400);
+      return c.json({ network: 'mainnet', ...j });
+    } catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
   app.get('/api/mistbank/street/:txid', limiter(10), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
   app.get('/api/townhall', limiter(20), async c => c.json(await reads.townhall()));
@@ -348,22 +336,25 @@ export function makeApp() {
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
-  app.get('/api/toll/gate/:nonce', limiter(60), tg(c => tollgate.visit(c.req.param('nonce'))));
-  // Guest fallback when the public faucet rate-limits a visitor (backend/src/guest.js)
-  app.get('/api/guest', limiter(30), c => c.json(guest.guestInfo()));
-  app.post('/api/guest', limiter(2, 3600e3, { persist: 'guest-ip' }), async c => {
-    try { return c.json(await guest.createGuest(await c.req.json().catch(() => ({})))); }
+  app.post('/api/toll/mainnet', limiter(10), async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    if (!HASH.test(b.tx || '')) return bad(c, 'tx must be a hash');
+    if (!ACCT.test(b.signer || '')) return bad(c, 'signer must be an account');
+    try { return c.json(await issuePass({ hash: b.tx, signer: b.signer })); }
     catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
-  // Public relays spend the settler's testnet gas: per-client limits plus a town-wide cap per minute and per day.
-  const relayMin = globalCap('toll-relay', Number(process.env.CAP_TOLL_RELAY_PER_MIN || 20)), relayDay = globalCap('toll-relay-day', Number(process.env.CAP_TOLL_RELAY_PER_DAY || 400), 24 * 3600e3);
-  app.post('/api/toll/gate/settle-due', limiter(6), relayMin, relayDay, tg(() => tollgate.settleDue()));
-  app.post('/api/toll/gate/:nonce/broadcast', limiter(10), relayMin, relayDay, tg(c => tollgate.broadcast(c.req.param('nonce'))));
-  app.post('/api/toll/gate/:nonce/settle', limiter(10), relayMin, relayDay, tg(c => tollgate.settleOne(c.req.param('nonce'))));
+  app.get('/api/guardhouse/board', limiter(20), async c => {
+    const owner = c.req.query('owner') || '';
+    const payee = c.req.query('payee') || '';
+    if (!ACCT.test(owner) || !ACCT.test(payee)) return bad(c, 'owner and payee must be account ids');
+    try { return c.json(await previewOwner(owner, payee)); }
+    catch (e) { return c.json({ error: e.message }, e.status || 502); }
+  });
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
   app.get('/api/chronicle', limiter(120), edgeCache(15), async c => {
+    if (c.req.query('net') === 'mainnet') return c.json(mainnetChronicle(c.req.query('owner') || ''));
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
     try { return c.json(shops.hideRetired(await shops.chronicle(DEP.guardhouse.oath, limit))); }
     catch (e) {
