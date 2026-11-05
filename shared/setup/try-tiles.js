@@ -16,5 +16,7 @@ export function tryTiles({ actionsToday = 0, maxPerDay = 3, lowBalance = false }
     allowReason: reason,
     refuseDisabled: lowBalance,
     refuseReason: lowBalance ? 'Needs charter balance: add NEAR below first' : 'Twice your cap: should be refused',
+    allowAction: noneLeft || lowBalance ? reason : 'Tap to run →',
+    refuseAction: lowBalance ? 'Needs charter balance: add NEAR below first' : 'Tap to run →',
   };
 }

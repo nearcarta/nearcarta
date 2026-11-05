@@ -10,6 +10,7 @@ const WC_ID = __WC_ID__;
 let wcP; const walletConnect = WC_ID ? { then: (ok, no) => (wcP ||= import('/wc.bundle.js').then(m => m.init(WC_ID))).then(ok, no) } : undefined;
 import { balance, fmt, deeds, nfts, nftSupply, ARENA, DEED, deedHouses, deedMinted } from './onboard.js';
 import { factoryOfCharter } from './factories.js';
+import { clearSessionAccount, readSession, sessionAccount, sessionPill, writeSession } from '../design/D8_shops/js/session.js';
 
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
@@ -89,10 +90,12 @@ export async function mountConnect(el) {
     if (who && !mine.length && (draw.n = (draw.n || 0) + 1) < 6) setTimeout(draw, 6000);
     let hero = '';
     try { hero = JSON.parse(localStorage.getItem('nearcarta.hero.v1') || 'null')?.name || ''; } catch { /* keep the short id */ }
-    const id = short(who);
-    const label = hero ? `${hero} · ${id}` : id;
-    el.innerHTML = who
-      ? `<a class="pill${bal === 0n ? ' go' : ''}" href="/setup/#fund" title="${esc(who)}" data-testid="hud-account">${esc(label)}${bal === 0n ? ' · Fund' : ` · ${fmt(bal)} NEAR`}</a>`
+    const stored = readSession();
+    const id = who || sessionAccount(stored);
+    if (who) writeSession({ accountId: who, displayName: hero || stored.displayName || '', balanceNear: bal == null ? stored.balanceNear : (bal === 0n ? 0 : fmt(bal)) });
+    const label = sessionPill({ accountId: id, displayName: hero || stored.displayName || '', balanceNear: bal == null ? stored.balanceNear : (bal === 0n ? 0 : fmt(bal)) });
+    el.innerHTML = id
+      ? `<a class="pill${bal === 0n ? ' go' : ''}" href="/setup/#fund" title="${esc(id)}" data-testid="hud-account">${esc(label)}</a>`
         + '<button type="button" class="pill" data-x="out">Sign out</button>'
       : `<a class="pill go" href="/setup/" data-testid="hud-connect" title="Sign in, then fund your account">Sign in</a>`;
     if (!msg) { msg = document.createElement('div'); msg.dataset.testid = 'wallet-note'; msg.setAttribute('role', 'status'); msg.style.cssText = 'flex-basis:100%;max-width:360px;font-size:12px;line-height:1.35;margin-top:4px;background:#2a1d14ee;color:#fbe9d0;padding:6px 8px;border-radius:8px'; }
@@ -104,7 +107,7 @@ export async function mountConnect(el) {
     const told = a => { if (a) dispatchEvent(new CustomEvent('nearcarta:signin', { detail: { accountId: a } })); return a; };
     on('in', () => connect(t => note(esc(t))).then(told));
     on('guest', () => Promise.resolve(null));
-    on('out', () => disconnect());
+    on('out', () => { clearSessionAccount(); return disconnect(); });
   };
   onWallet(draw); await draw();
 }

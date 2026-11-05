@@ -17,6 +17,7 @@ import { proposalMessage } from '../../shared/board/message.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
 import { runAsk } from '../../shared/vault/run.js';
 import { LOOKS, DYES, OUTFITS, portraitHTML, writeHero, displayOk } from './hero.js';
+import { nextPath, readSessionAccount, writeSession } from '../design/D8_shops/js/session.js';
 
 const PRIVY_ON = typeof __PRIVY_ON__ !== 'undefined' && __PRIVY_ON__;
 const PUBLIC_MAINNET = __PUBLIC_MAINNET__ === '1';
@@ -32,7 +33,8 @@ const short = a => { const s = String(a || ''); return s.length > 26 ? s.slice(0
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const agentLS = c => 'nearcarta.vault.agent.' + c, pendLS = c => 'nearcarta.vault.agent.pending.' + c;
 const SAVE = 'nearcarta.setup.v1';
-const PREVIEW = new URLSearchParams(location.search).has('preview');
+const RETURN_TO = nextPath(location.search);
+const PREVIEW = new URLSearchParams(location.search).has('preview') && !RETURN_TO;
 
 const STEPS = [
   ['signin', 'Sign in', 'Google, email or wallet'],
@@ -75,7 +77,7 @@ function top() {
   net.textContent = journey().badge;
   net.dataset.testid = 'setup-net';
   $('#who').innerHTML = me ? `<span data-testid="setup-who">${esc(short(me))}</span> · <span data-testid="setup-bal">${bal === undefined ? '…' : bal == null ? '? NEAR' : fmtN(nearOf(bal)) + ' NEAR'}</span><button class="btn link sm" id="out">Sign out</button>` : '';
-  const o = $('#out'); if (o) o.onclick = async () => { await disconnect(); await mainnetWallet().disconnect().catch(() => {}); await privy?.auth.logout().catch(() => {}); me = null; bal = undefined; st.done = []; st.trial = false; save(); go(0); };
+  const o = $('#out'); if (o) o.onclick = async () => { await disconnect(); await mainnetWallet().disconnect().catch(() => {}); await privy?.auth.logout().catch(() => {}); me = null; bal = undefined; st.done = []; st.trial = false; delete st.accountId; save(); go(0); };
 }
 const head = (eye, h, lede) => `<p class="eyebrow">Step ${st.step + 1} of ${STEPS.length} · ${esc(eye)}</p><h1>${h}</h1>${lede ? `<p class="lede">${lede}</p>` : ''}`;
 const nav = (next, { back = true, nextOk = true, label = 'Continue' } = {}) => `<div class="actions">${back && st.step > 0 ? '<button class="btn" id="back">Back</button>' : '<span></span>'}${next ? `<button class="btn gold" id="next" data-testid="setup-next" ${nextOk ? '' : 'disabled'}>${esc(label)} →</button>` : ''}</div>`;
@@ -156,7 +158,11 @@ window.addEventListener('storage', async () => {
 });
 async function signedIn(id) {
   if (!id) return;
-  me = id; st.accountId = id; save(); done(0); await refreshBal();
+  me = id; st.accountId = id; save();
+  writeSession({ accountId: id, displayName: st.displayName || '' });
+  const dest = nextPath(location.search);
+  if (dest) { location.replace(dest); return; }
+  done(0); await refreshBal();
   // A brand-new account has nothing yet: the next stop is always Fund.
   go(bal === 0n || bal == null || bal < YN / 2n ? 1 : Math.max(1, st.step));
 }
@@ -485,8 +491,8 @@ function sTry() {
     const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
     const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
     return head('Try it', 'Watch the charter decide.', 'These buttons use your rules. This preview does not sign. The two transactions below are already on mainnet.')
-      + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button type="button" class="tile" id="t-ok" data-testid="try-allowed" aria-describedby="try-allow-hint"><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span id="try-allow-hint">${esc(tiles.allowReason)}</span><em class="go" style="font-style:normal">Tap to run →</em></button>
-       <button type="button" class="tile" id="t-no" data-testid="try-refused" aria-describedby="try-refuse-hint"><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span id="try-refuse-hint">${esc(tiles.refuseReason)}</span><em class="go" style="font-style:normal">Tap to run →</em></button></div>`
+      + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button type="button" class="tile" id="t-ok" data-testid="try-allowed" aria-describedby="try-allow-hint"><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span id="try-allow-hint">${esc(tiles.allowReason)}</span><em class="go" style="font-style:normal">${esc(tiles.allowAction)}</em></button>
+       <button type="button" class="tile" id="t-no" data-testid="try-refused" aria-describedby="try-refuse-hint"><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span id="try-refuse-hint">${esc(tiles.refuseReason)}</span><em class="go" style="font-style:normal">${esc(tiles.refuseAction)}</em></button></div>`
       + (st.previewNote ? `<p data-testid="try-preview-note">${esc(st.previewNote)}</p>` : '')
       + `<div class="verdict good" data-testid="try-verdict"><span class="tag">ALLOWED</span><div><b>0.001 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">inside the cap</span> ${txA(allowed)}</div></div>`
       + `<div class="verdict bad" data-testid="try-verdict"><span class="tag">REFUSED</span><div><b>0.003 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">over the per-payment cap</span> ${txA(refused)}</div></div>`
@@ -503,8 +509,8 @@ function sTry() {
   const r = rules(), to = r.receivers[0], ok = Math.min(+r.cap, 0.001 > +r.cap ? +r.cap : 0.001), over = +(+r.cap * 2).toFixed(4);
   const tiles = tryTiles({ actionsToday: rowView?.actions_today || 0, maxPerDay: rowView?.max_actions_per_day || r.per, lowBalance: !!(lowBal() || topUpBusy) });
   return head('Try it', 'Watch the charter decide.', `Your agent signs two real requests with its own key. The contract checks each against your rule.`)
-    + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button type="button" class="tile" id="t-ok" data-testid="try-allowed" aria-describedby="try-allow-hint" ${tiles.allowDisabled ? 'disabled' : ''}><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span id="try-allow-hint">${esc(tiles.allowReason)}</span><em class="go" style="font-style:normal">Tap to run →</em></button>
-       <button type="button" class="tile" id="t-no" data-testid="try-refused" aria-describedby="try-refuse-hint" ${tiles.refuseDisabled ? 'disabled' : ''}><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span id="try-refuse-hint">${esc(tiles.refuseReason)}</span><em class="go" style="font-style:normal">Tap to run →</em></button></div>
+    + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button type="button" class="tile" id="t-ok" data-testid="try-allowed" aria-describedby="try-allow-hint" ${tiles.allowDisabled ? 'disabled' : ''}><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span id="try-allow-hint">${esc(tiles.allowReason)}</span><em class="go" style="font-style:normal">${esc(tiles.allowAction)}</em></button>
+       <button type="button" class="tile" id="t-no" data-testid="try-refused" aria-describedby="try-refuse-hint" ${tiles.refuseDisabled ? 'disabled' : ''}><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span id="try-refuse-hint">${esc(tiles.refuseReason)}</span><em class="go" style="font-style:normal">${esc(tiles.refuseAction)}</em></button></div>
      ${boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
      ${lowBal() || topUpBusy ? `<div class="tabhelp" data-testid="try-lowbal"><p class="small">Your charter holds ${fmtN(nearOf(rowBal.toString()))} NEAR. Payments come from the charter's own balance, not your account. Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to it with one approval.</p><button type="button" class="btn" id="t-topup" data-testid="try-topup" ${topUpBusy ? 'disabled aria-busy="true"' : ''}>${topUpBusy ? 'Adding… waiting for confirmation' : `Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to the charter`}</button></div>` : ''}
      ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
@@ -512,7 +518,7 @@ function sTry() {
      ${tries.map(t => `<div class="verdict ${t.passed ? 'good' : 'bad'}" data-testid="try-verdict"><span class="tag">${t.passed ? 'ALLOWED' : 'REFUSED'}</span><div><b>${fmtN(nearOf(t.amount))} NEAR → ${esc(short(t.receiver))}</b><br><span class="muted small">${esc(t.passed ? 'inside your rule · the charter paid' : whyText(t))}${t.passed ? '' : t.tx ? ' · refused on chain by the contract' : ' · refused before sending, nothing on chain'}${t.signer === 'agent' ? ' · signed by your agent key, no wallet' : ''}</span> ${txA(t.tx)}</div></div>`).join('')}
      ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Your House</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.some(t => t.passed) || st.allowedTx ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
 }
-function next() { const n = new URLSearchParams(location.search).get('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/'; }
+function next() { return nextPath(location.search) || '/'; }
 function wireTry() {
   if (PREVIEW && !(boardLive() && st.charter)) {
     const okBtn = $('#t-ok'); if (okBtn) okBtn.onclick = () => { st.previewNote = 'Preview. The pass was not sent.'; render(); };
@@ -562,15 +568,24 @@ async function boot() {
     if (PUBLIC_MAINNET) return mainnetAccount();
     const a = await (st.trial ? account() : mainnetAccount()); if (a) return a;
     const b = await (st.trial ? mainnetAccount() : account()); if (b) { st.trial = !st.trial; save(); } return b; };
-  if (!PREVIEW) onWallet(async () => { const a = await who(); if (a !== me) { me = a; bal = undefined; if (me) await refreshBal(); render(); } });
+  if (!PREVIEW) onWallet(async () => {
+    const a = await who();
+    if (!a && (me || st.accountId)) return;
+    if (a && a !== me) { me = a; st.accountId = a; save(); writeSession({ accountId: a, displayName: st.displayName || '' }); bal = undefined; await refreshBal(); render(); }
+  });
   // Back from Google: finish the Privy login, then connect.
   const q = new URLSearchParams(location.search);
   if (privy && sessionStorage.getItem('nc_setup_google') && q.get('privy_oauth_code')) {
     sessionStorage.removeItem('nc_setup_google');
-    try { await privy.auth.oauth.loginWithCode(q.get('privy_oauth_code'), q.get('privy_oauth_state'), 'google'); history.replaceState(null, '', '/setup/'); await ensureWallet(); emailStage = 'finish'; }
+    try { await privy.auth.oauth.loginWithCode(q.get('privy_oauth_code'), q.get('privy_oauth_state'), 'google'); const back = nextPath(location.search); history.replaceState(null, '', back ? '/setup/?next=' + encodeURIComponent(back) : '/setup/'); await ensureWallet(); emailStage = 'finish'; }
     catch (e) { msg = 'Google sign-in did not finish: ' + (e?.message || e); }
   }
-  if (!PREVIEW) { me = await who(); if (me) await refreshBal(); }
+  if (!PREVIEW) {
+    me = (await who()) || st.accountId || readSessionAccount() || null;
+    if (me) { st.accountId = me; save(); writeSession({ accountId: me, displayName: st.displayName || '' }); await refreshBal(); }
+    const dest = nextPath(location.search);
+    if (me && dest) { location.replace(dest); return; }
+  }
   const want = STEPS.findIndex(s => s[0] === location.hash.slice(1));
   if (PREVIEW) {
     if (!CFG) CFG = { factory: 'preview.near', network: 'mainnet', arena: { merchants: ['cafe.preview.near'] } };
