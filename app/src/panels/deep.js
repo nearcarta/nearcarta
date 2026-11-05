@@ -200,6 +200,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
         <button type="button" class="primary ferry-cta" id="f-cargo" data-testid="ferry-load-cargo">Load cargo</button>
         <button type="button" class="primary ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}>Ask charter · load cargo</button>
       </div>
+      ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}</p>` : ''}
     </div>`;
   const routesPane = `<div class="ferry-pane" data-pane="routes" ${tab === 'routes' ? '' : 'hidden'}>
       <p class="ferry-picker-note" data-testid="ferry-token-count" ${nTok ? '' : 'hidden'}>${nTok ? `${nTok} live tokens` : ''}</p>
@@ -277,6 +278,7 @@ function mountFerry(root, hooks) {
         state.toId = 'ZEC|zec';
         state.q = null;
         state.quoteError = '';
+        state.charterNote = '';
         state.sample = false;
         state.tab = 'swap';
         paint();
@@ -313,12 +315,12 @@ function mountFerry(root, hooks) {
     if (from) from.onchange = (e) => {
       state.fromId = e.target.value;
       if (!state.amtEdited) state.amt = defaultAmtFor((e.target.value || '').split('|')[0]);
-      state.q = null; state.quoteError = ''; state.sample = false; refill(); localPaint();
+      state.q = null; state.quoteError = ''; state.charterNote = ''; state.sample = false; refill(); localPaint();
     };
     const to = q$(root, '#f-to');
-    if (to) to.onchange = (e) => { state.toId = e.target.value; state.q = null; state.quoteError = ''; state.sample = false; };
+    if (to) to.onchange = (e) => { state.toId = e.target.value; state.q = null; state.quoteError = ''; state.charterNote = ''; state.sample = false; };
     const amt = q$(root, '#f-amt');
-    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.sample = false; };
+    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.sample = false; };
     const compare = q$(root, '#f-compare');
     if (compare) compare.onclick = () => runQuotes(compare);
     const one = q$(root, '#f-quote');
@@ -352,6 +354,7 @@ function mountFerry(root, hooks) {
     if (parsed.amt) { state.amt = parsed.amt; state.amtEdited = true; }
     state.q = null;
     state.quoteError = '';
+    state.charterNote = '';
     state.sample = false;
     state.tab = 'swap';
     state.agentHint = `Filled ${parsed.from} → ${parsed.to}. Stamping a live quote…`;
@@ -410,6 +413,7 @@ function mountFerry(root, hooks) {
     state.sample = !failed && !state.quotes.some(v => v.amountOut != null);
     state.fstatus = null;
     state.quoted = true;
+    state.charterNote = '';
     state.q = failed ? null : q;
     state.tab = 'swap';
     if (!failed && hooks.onPair) {

@@ -377,6 +377,7 @@ body.ferry-tray #shopUI .btns .ghost{
 }
 .ferry-rate{margin:4px 0 0;color:#f5d08a;font:650 14px/1.35 system-ui,sans-serif;text-align:center}
 .ferry-quote-err{margin:0;color:#ff8f8f;font:600 13px/1.35 system-ui,sans-serif}
+.ferry-charter-note{margin:0;color:#ff8f8f;font:600 13px/1.4 system-ui,sans-serif;text-align:center}
 .ferry-compare-more{border:1px solid #4a3a28;border-radius:12px;padding:12px 14px;background:#17130f;color:#e8d7b8}
 .ferry-compare-more summary{cursor:pointer;font:650 13px/1.3 system-ui,sans-serif;color:#f5d08a}
 .ferry-picker{gap:16px;padding:0;border:0;background:transparent;border-radius:0}

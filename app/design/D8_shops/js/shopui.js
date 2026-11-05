@@ -62,6 +62,11 @@ function wireFerryDock() {
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
 }
+function setCharterNote(o) {
+  if (!o || o.decision === 'allowed') { extra.charterNote = ''; return; }
+  const text = A.why(o.reason) || o.reason || 'refused';
+  extra.charterNote = `Charter refused the trip: ${text}. The boat stays at the jetty.`;
+}
 async function loadFerryCargo(wantCharter) {
   if (phase === 'busy' || cur !== 'ferry') return;
   if (!extra.q) { say('Get a quote first.'); return; }
@@ -89,6 +94,7 @@ async function loadFerryCargo(wantCharter) {
     return;
   }
   const refused = o && o.decision !== 'allowed';
+  setCharterNote(o);
   if (sh?.act && runScene) runScene(sh.act({ refused, reason: o ? A.why(o.reason) || o.reason : '' }));
   stopProgress();
   phase = 'kept';
@@ -277,7 +283,7 @@ const APPS = {
       return { from, to, amt, fromSym: from.split('@')[0], fromChain: from.split('@')[1], toSym: to.split('@')[0], toChain: to.split('@')[1] };
     },
     run: async () => {
-      if (extra.acted) { extra.q = null; extra.acted = false; extra.fdone = true; extra.ferryTx = null; sh?.setOrder?.('jetty'); }
+      if (extra.acted) { extra.q = null; extra.acted = false; extra.fdone = true; extra.ferryTx = null; extra.charterNote = ''; sh?.setOrder?.('jetty'); }
       if (!extra.q) {
         extra.fdone = false;
         const pair = APPS.ferry.pairFromState();
@@ -311,6 +317,7 @@ const APPS = {
         extra.ferryTx = o?.tx || null;
       }
       const refused = o && o.decision !== 'allowed';
+      setCharterNote(o);
       if (sh?.act && runScene) runScene(sh.act({ refused, reason: o ? A.why(o.reason) || o.reason : '' }));
       if (refused) {
         return {

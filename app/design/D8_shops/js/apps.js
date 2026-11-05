@@ -7,7 +7,7 @@ import { $, sfx } from './core.js';
 import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
-import { pairClauseId, isFerryClauseId, parsePairClauseId } from '/panels/ferry-pair.js';
+import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -426,11 +426,21 @@ export async function quotePair(from, to, amount) {
 // Board rows only store a `pay` clause (apps.js readRules), so a route id alone must not fall through to S.me —
 // that is off the allowlist and the board refuses (live: Ask charter → denied, boat frozen).
 // Prefer a listed shop that is not you; yourself only if the rule names nobody else.
+// The fee is about 1% of the quote in NEAR, at least 0.001. On a board session that fee is
+// clamped to the open row's per_action_cap (and not under min_amount when the floor fits).
+// A ~$3 USDC quote is 0.03 NEAR, which is over a 0.005 cap, so localRefusal would return
+// over_per_action_cap before any propose. The cap stays the visitor's; the stamp shrinks.
 export const ferryNear = q => Math.max(0.001, Math.round(Number(q.from.usd) * 0.01 * 1000) / 1000);
 export const ferryPayee = route => {
   const r = S.clauses[route]?.receivers || S.clauses.pay?.receivers || S.boardRow?.receivers || [];
   return r.find(a => a !== S.me) || r[0] || S.me;
 };
+function ferryAmountY(q) {
+  const raw = ferryNear(q);
+  if (!S.board) return toY(raw);
+  const c = pay() || {};
+  return ferryStampYocto(raw, { capYocto: c.per_action_cap || null, minYocto: c.min_amount || null });
+}
 export function ferryClauseForPair(from, to) {
   const id = pairClauseId(from, to);
   // Prefer an exact clause; fall back to a matching preset corridor; else the first ferry clause.
@@ -439,7 +449,7 @@ export function ferryClauseForPair(from, to) {
   if (preset && S.clauses[preset.id]) return preset.id;
   return Object.keys(S.clauses || {}).find(isFerryClauseId) || id;
 }
-export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receiver: ferryPayee(route), amountY: toY(ferryNear(q)), memo: 'ferry:' + q.correlationId });
+export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receiver: ferryPayee(route), amountY: ferryAmountY(q), memo: 'ferry:' + q.correlationId });
 // Hide routes whose dry quote failed in the server's last probe (/api/ferry/routes); keep at least one.
 export const routesReady = api('/api/ferry/routes').then(r => {
   const bad = new Set(r.routes.filter(x => !x.ok && x.to === 'ZEC@zec').map(x => x.from));
