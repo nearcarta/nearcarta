@@ -45,7 +45,7 @@ function tickTimers(){ for(let i=timers.length-1;i>=0;i--) if(clock.T>=timers[i]
 function flare(l){ l.flare=1; }
 
 // ---------- boot ----------
-setProgress(f=>{ $('#lbar').style.width=(f*100).toFixed(0)+'%'; const t=$('#ltxt'); if(t) t.textContent=f<.9?`Building the town · ${(f*100)|0}%`:'The town is open'; if(f>=.9) document.getElementById('loading')?.classList.add('done'); });
+setProgress(f=>{ $('#lbar').style.width=(f*100).toFixed(0)+'%'; const t=$('#ltxt'); if(t) t.textContent=f<.9?`Building the town · ${(f*100)|0}%`:'The town is open'; });
 const cv=$('#c'); const t0=performance.now();
 cv.addEventListener('webglcontextlost',e=>{ e.preventDefault(); console.error('[Nearcarta] WebGL context lost'); fallback('WebGL context lost'); });
 try{ await init(cv); await buildCast(); }catch(e){ console.error(e); fallback('3D start failed: '+(e&&e.message||e)); throw e; }
