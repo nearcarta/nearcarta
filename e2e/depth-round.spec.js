@@ -79,7 +79,7 @@ test('guard, chronicle, toll, house, ferry and the bank proof are usable', async
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/?mode=2d&nostory&shop=guard');
   await page.getByTestId('guard-check').click();
-  await expect(page.getByTestId('guard-verdict')).toHaveText('block', { timeout: 20_000 });
+  await expect(page.getByTestId('guard-verdict')).toContainText('Block because: on the deny list', { timeout: 20_000 });
   await expect(page.getByTestId('guard-score')).toContainText('Lookalike');
   await expect(page.getByTestId('guard-score')).toContainText('Recorded refusals');
   await page.goto('/?mode=2d&nostory&shop=chronicle');

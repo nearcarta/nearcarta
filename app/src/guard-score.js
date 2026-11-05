@@ -56,5 +56,37 @@ export function explainCheck(check) {
     if (!r?.code || covered.has(r.code)) continue;
     lines.push({ id: r.code, title: 'Check', level: r.level || 'warn', text: r.text || r.code });
   }
-  return { account: check?.account || s.account || '', verdict: check?.verdict || 'warn', lines };
+  const named = verdictLine(check);
+  return { account: check?.account || s.account || '', verdict: named.verdict, summary: named.summary, causes: named.causes, lines };
+}
+
+const CAUSE_ORDER = [
+  ['no contract (code hash empty)', codes => codes.has('unconfirmed') || codes.has('code_unknown')],
+  ['first-seen unknown', codes => codes.has('age_unknown') || codes.has('unconfirmed')],
+  ['first-seen recent', codes => codes.has('new_account')],
+  ['code changed', codes => codes.has('code_changed')],
+  ['on the deny list', codes => codes.has('denylisted')],
+  ['lookalike name', codes => codes.has('lookalike')],
+  ['no prior payment', codes => codes.has('no_history')],
+  ['account missing', codes => codes.has('account_missing')],
+  ['index did not answer', codes => codes.has('index_unknown')],
+];
+
+/** The verdict line names the checks that produced it. Allow stays one word. */
+export function verdictLine(check) {
+  const verdict = check?.verdict || 'warn';
+  const word = verdict === 'block' ? 'Block' : verdict === 'allow' ? 'Allow' : 'Warn';
+  const reasons = (Array.isArray(check?.reasons) ? check.reasons : []).filter(r => r && r.level === verdict);
+  const codes = new Set(reasons.map(r => r.code));
+  const causes = [];
+  if (verdict !== 'allow') {
+    for (const [label, hit] of CAUSE_ORDER) if (hit(codes) && !causes.includes(label)) causes.push(label);
+    for (const r of reasons) {
+      if (!r.code || CAUSE_ORDER.some(([, hit]) => hit(new Set([r.code])))) continue;
+      const extra = r.text || r.code;
+      if (extra && !causes.includes(extra)) causes.push(extra);
+    }
+  }
+  const summary = causes.length ? `${word} because: ${causes.join('; ')}` : word;
+  return { verdict, summary, causes };
 }

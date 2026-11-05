@@ -115,7 +115,7 @@ function mountGuard(root, hooks) {
   const state = hooks.state || (hooks.state = {});
   const attacks = hooks.attacks ? hooks.attacks() : [];
   const score = state.score;
-  const scoreHtml = score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.verdict)}</p><ul>${(score.lines || []).map(l => `<li data-signal="${esc(l.id)}"${l.level === 'warn' || l.level === 'block' || l.level === 'unknown' ? ' data-testid="guard-reason"' : ''}><b>${esc(l.title)}</b> ${esc(l.text)}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
+  const scoreHtml = score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.summary || score.verdict)}</p><ul>${(score.lines || []).map(l => `<li data-signal="${esc(l.id)}"${l.level === 'warn' || l.level === 'block' || l.level === 'unknown' ? ' data-testid="guard-reason"' : ''}><b>${esc(l.title)}</b> ${esc(l.text)}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
   const pick = attacks.length ? `<div class="seg" role="radiogroup">${attacks.map(a => `<label><input type="radio" name="atk" value="${esc(a.id)}" ${a.id === (state.atk || attacks[0].id) ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>` : '';
   root.innerHTML = `<label>Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || 'shop-moved-pay-here.near')}"></label><button type="button" id="g-check" data-testid="guard-check">Check this account</button>${scoreHtml}${pick}`;
   root.querySelectorAll('input[name=atk]').forEach(i => { i.onchange = () => { state.atk = i.value; if (hooks.repaint) hooks.repaint(); }; });
