@@ -16,7 +16,7 @@ const count = (dir, re) => readdirSync(join(root, dir)).filter(f => /\.(rs|js)$/
 const rows = json('judges/proofs/proof-check.json').rows;
 const e2e = json('judges/proofs/e2e-results.json').stats;
 const vercel = json('judges/proofs/e2e-vercel.json').stats;
-const tap = execFileSync(process.execPath, ['--test', '--test-force-exit', '--test-timeout=60000', '--test-reporter=tap', 'test/unit/*.test.js'],
+const tap = execFileSync('npm', ['test', '--', '--test-reporter=tap', '--test-timeout=60000'],
   { cwd: join(root, 'backend'), encoding: 'utf8', maxBuffer: 32 << 20 });
 const unitPass = +tap.match(/^# pass (\d+)/m)[1], unitFail = +tap.match(/^# fail (\d+)/m)[1], unitSkip = +tap.match(/^# skipped (\d+)/m)[1];
 if (unitFail) throw new Error(`${unitFail} unit tests fail; fix them before writing numbers`);
