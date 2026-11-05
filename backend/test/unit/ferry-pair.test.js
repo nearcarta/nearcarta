@@ -36,6 +36,10 @@ test('parseAgentFerry fills from/to/amt from plain words', () => {
   const b = parseAgentFerry('ETH@eth → NEAR@near');
   assert.equal(b.from, 'ETH@eth');
   assert.equal(b.to, 'NEAR@near');
+  const session = parseAgentFerry('get a quote for 0.05 wNEAR on near to USDC');
+  assert.equal(session.from, 'wNEAR@near');
+  assert.equal(session.to, 'USDC@near');
+  assert.equal(session.amt, '0.05');
   assert.equal(parseAgentFerry('hello'), null);
 });
 

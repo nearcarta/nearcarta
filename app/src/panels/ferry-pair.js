@@ -61,31 +61,50 @@ export function chainLabel(chain) {
   return map[k] || (chain ? String(chain) : '');
 }
 
+const SYMBOL_CASE = { WNEAR: 'wNEAR', USDC: 'USDC', USDT: 'USDT', NEAR: 'NEAR', ZEC: 'ZEC', ETH: 'ETH', WETH: 'WETH' };
+
+/** Keep 1Click's symbol case. wNEAR is not WNEAR. */
+export function canonSymbol(raw) {
+  const u = String(raw || '').toUpperCase();
+  return SYMBOL_CASE[u] || u;
+}
+
+// USDC typed without a chain stays Base, except a NEAR-origin swap whose destination USDC is the session corridor (USDC@near).
+function chainFor(sym, given, role, fromChain) {
+  if (given) return String(given).toLowerCase();
+  const u = String(sym || '').toUpperCase();
+  if (u === 'WNEAR' || u === 'NEAR') return 'near';
+  if (u === 'ZEC') return 'zec';
+  if (u === 'ETH' || u === 'WETH') return 'eth';
+  if ((u === 'USDC' || u === 'USDT' || u === 'DAI') && role === 'to' && fromChain === 'near') return 'near';
+  if ((u === 'USDC' || u === 'USDT' || u === 'DAI') && role === 'from') return 'base';
+  return '';
+}
+
+function pairOf(amt, fromRaw, fromGiven, toRaw, toGiven) {
+  const fromSym = canonSymbol(fromRaw);
+  const fromChain = chainFor(fromSym, fromGiven, 'from', '');
+  const toSym = canonSymbol(toRaw);
+  const toChain = chainFor(toSym, toGiven, 'to', fromChain);
+  const from = fromChain ? `${fromSym}@${fromChain}` : `${fromSym}@`;
+  const to = toChain ? `${toSym}@${toChain}` : `${toSym}@`;
+  return { amt: amt || '', from, to, fromId: from.replace('@', '|'), toId: to.replace('@', '|') };
+}
+
 /** Parse a natural-language Ferry ask into from/to/amount. Returns null if not a swap ask. */
 export function parseAgentFerry(text) {
   const t = String(text || '').trim();
   if (!t) return null;
-  // "swap 3 USDC on Base to ZEC", "get a quote for 3 USDC on base to ZEC", Arabic "حوّل 2 USDC لـ ZEC"
+  // "swap 0.05 wNEAR on NEAR to USDC", "get a quote for 3 USDC on base to ZEC", Arabic "حوّل 2 USDC لـ ZEC"
   const re = /(?:get\s+a\s+quote\s+for|quote|swap|convert|change|trade|exchange|حو[ّل]*|بدل)\s+(?:up\s+to\s+)?(\d+(?:\.\d+)?)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?\s+(?:to|into|for|→|->|ل(?:ـ)?|إلى)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?/i;
   const m = t.match(re);
   if (!m) {
-    // "USDC@base → ZEC@zec" without verb
+    // "wNEAR@near → USDC" without a verb. A missing destination chain follows chainFor.
     const bare = t.match(/^(\d+(?:\.\d+)?)?\s*([A-Za-z0-9.]+)\s*(?:@|on)\s*([A-Za-z0-9_-]+)\s*(?:→|->|to|into|ل(?:ـ)?|إلى)\s*([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?/i);
     if (!bare) return null;
-    const amt = bare[1] || '';
-    const from = `${bare[2].toUpperCase()}@${bare[3].toLowerCase()}`;
-    const toChain = (bare[5] || (bare[4].toUpperCase() === 'ZEC' ? 'zec' : '')).toLowerCase();
-    const to = toChain ? `${bare[4].toUpperCase()}@${toChain}` : `${bare[4].toUpperCase()}@`;
-    return { amt, from, to, fromId: from.replace('@', '|'), toId: to.replace('@', '|') };
+    return pairOf(bare[1] || '', bare[2], bare[3], bare[4], bare[5] || '');
   }
-  const amt = m[1];
-  const fromSym = m[2].toUpperCase();
-  const fromChain = (m[3] || (fromSym === 'ETH' ? 'eth' : fromSym === 'USDC' ? 'base' : '')).toLowerCase();
-  const toSym = m[4].toUpperCase();
-  const toChain = (m[5] || (toSym === 'ZEC' ? 'zec' : toSym === 'NEAR' ? 'near' : '')).toLowerCase();
-  const from = fromChain ? `${fromSym}@${fromChain}` : `${fromSym}@`;
-  const to = toChain ? `${toSym}@${toChain}` : `${toSym}@`;
-  return { amt, from, to, fromId: from.replace('@', '|'), toId: to.replace('@', '|') };
+  return pairOf(m[1], m[2], m[3] || '', m[4], m[5] || '');
 }
 
 /**
@@ -100,7 +119,7 @@ export function agentCargoPlan(text, { charterReady = false } = {}) {
   const loadCargo = /\bload\s+cargo\b/i.test(raw);
   const quoteOnly = /\b(?:get\s+a\s+quote|quote)\b/i.test(raw) && !askCharter && !loadCargo && !/\b(?:swap|convert|change|trade|exchange)\b/i.test(raw);
   const parsed = parseAgentFerry(raw);
-  if (!parsed && !askCharter && !loadCargo) return { ok: false, hint: 'Try: Swap 3 USDC on Base to ZEC, or get a quote for 3 USDC on Base to ZEC' };
+  if (!parsed && !askCharter && !loadCargo) return { ok: false, hint: 'Try: Swap 0.05 wNEAR on NEAR to USDC, or get a quote for 0.05 wNEAR on NEAR to USDC' };
   if (parsed && (String(parsed.from).endsWith('@') || String(parsed.to).endsWith('@'))) {
     return { ok: false, hint: 'Name the chain too, e.g. USDC@base or USDC on Base.' };
   }
@@ -117,7 +136,7 @@ export const ORDER_STATES = {
   jetty: { id: 'jetty', label: 'at the jetty', cls: 'order' },
   quoted: { id: 'quoted', label: 'quote stamped · waiting', cls: 'order gold' },
   loading: { id: 'loading', label: 'loading cargo', cls: 'order gold' },
-  deposit: { id: 'deposit', label: 'waiting for your send', cls: 'order gold' },
+  deposit: { id: 'deposit', label: 'waiting on 1Click', cls: 'order gold' },
   transit: { id: 'transit', label: 'in transit · mid-river', cls: 'order gold' },
   delivered: { id: 'delivered', label: 'far bank · delivered', cls: 'order ok' },
   refunded: { id: 'refunded', label: 'boat returns · refunded', cls: 'order no' },

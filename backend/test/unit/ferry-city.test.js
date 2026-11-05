@@ -7,8 +7,9 @@ import { agentCargoPlan, parseAgentFerry } from '../../../app/src/panels/ferry-p
 import { ferryMarkup } from '../../../app/src/panels/deep.js';
 import { runFerryAgent } from '../../../app/src/panels/deep.js';
 import {
-  boardCallText, cityCheckoutBody, depositPlan, mayCheckout, nextFerryBeat, WRAP,
+  boardCallText, cityCheckoutBody, depositPlan, explainQuoteMiss, mayCheckout, nextFerryBeat, SESSION_SWAP, WRAP,
 } from '../../../app/src/panels/ferry-settle.js';
+import { armFerryDock, dispatchFerryDock, installFerryDock, lastFerryDockSend } from '../../../app/src/panels/ferry-dock.js';
 
 const read = p => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
@@ -93,18 +94,93 @@ test('load cargo with a session is the deposit path, not a demo', async () => {
   assert.doesNotMatch(out.hint, /Demo crossing/);
 });
 
-test('the city send button is wired to runAgent, and a quote clears the box', () => {
+function fakeDock() {
+  const listeners = [];
+  const mk = (id) => ({
+    id,
+    value: '',
+    hidden: true,
+    textContent: '',
+    closest(sel) { return sel === '#' + id ? this : null; },
+  });
+  const input = mk('f-agent');
+  const go = mk('f-agent-go');
+  const log = mk('f-agent-log');
+  const doc = {
+    getElementById(id) { return { 'f-agent': input, 'f-agent-go': go, 'f-agent-log': log }[id] || null; },
+    addEventListener(type, fn) { listeners.push({ type, fn }); },
+  };
+  const fire = (type, target, extra = {}) => {
+    const e = { type, target, key: extra.key || '', preventDefault() {} };
+    for (const l of listeners) if (l.type === type) l.fn(e);
+  };
+  installFerryDock(doc);
+  return { doc, input, go, log, fire };
+}
+
+test('dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not', async () => {
+  const phrase = 'get a quote for 0.05 wNEAR on near to USDC';
+  const parsed = parseAgentFerry(phrase);
+  assert.equal(parsed.from, 'wNEAR@near');
+  assert.equal(parsed.to, 'USDC@near');
+  assert.equal(parsed.amt, '0.05');
+  assert.equal(agentCargoPlan(phrase, { charterReady: true }).mode, 'quote');
+  const { doc, input, go, log, fire } = fakeDock();
+  const calls = [];
+  armFerryDock((text) => runFerryAgent({
+    text,
+    state: {},
+    charterReady: true,
+    quotePair: async (from, to, amt) => {
+      calls.push({ from, to, amt });
+      return { ok: true, dry: true, from: { symbol: 'wNEAR', amount: amt, usd: '0.185' }, to: { symbol: 'USDC', amount: '0.18' } };
+    },
+  }));
+  input.value = phrase;
+  fire('input', input);
+  fire('click', input);
+  assert.equal(calls.length, 0);
+  fire('click', go);
+  const out = await lastFerryDockSend();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].from, SESSION_SWAP.from);
+  assert.equal(calls[0].to, SESSION_SWAP.to);
+  assert.equal(calls[0].amt, SESSION_SWAP.amt);
+  assert.equal(out.loaded, false);
+  assert.equal(input.value, '');
+  assert.match(log.textContent, /Quote ready/);
+  input.value = phrase;
+  fire('keydown', input, { key: 'Enter' });
+  await lastFerryDockSend();
+  assert.equal(calls.length, 2);
+  armFerryDock(async () => ({ ok: false, hint: explainQuoteMiss('1Click answered HTTP 400: Amount is too low for bridge, try at least 1671417') }));
+  input.value = 'swap 0.2 USDC on base to ZEC';
+  fire('click', go);
+  await dispatchFerryDock(doc);
+  assert.equal(input.value, 'swap 0.2 USDC on base to ZEC');
+  assert.match(log.textContent, /bridge minimum/);
+  assert.match(log.textContent, /1671417/);
+  assert.match(log.textContent, /has not delivered/);
+});
+
+test('the city send button is re-armed after every bind and cannot no-op', () => {
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /id="f-agent-go"/);
   assert.match(ui, /id="f-agent-log"/);
   assert.match(ui, /wireFerryDock\(hooks\)/);
+  assert.match(ui, /installFerryDock\(document\)/);
+  assert.match(ui, /armFerryDock/);
   assert.match(ui, /go\.onclick = send/);
   assert.match(ui, /e\.key === 'Enter'/);
-  assert.match(ui, /hooks\?\.runAgent/);
+  assert.match(ui, /dispatchFerryDock\(document\)/);
   const deep = read('app/src/panels/deep.js');
-  assert.match(deep, /hooks\.runAgent = \(btn\) => runAgent\(btn\)/);
-  assert.match(deep, /if \(result\.ok && input\) \{ input\.value = ''; state\.agentText = ''; \}/);
-  assert.match(deep, /agentLog\(result\.hint \|\| ''\)/);
+  assert.match(deep, /armFerryDock\(\(text\) => runAgent\(text\)\)/);
+  assert.match(deep, /installFerryDock\(dockDoc\)/);
+  assert.match(deep, /hooks\.runAgent = \(text\) => runAgent\(text\)/);
+  assert.match(deep, /agentLog\(result\?\.hint/);
+  const dock = read('app/src/panels/ferry-dock.js');
+  assert.match(dock, /if \(result\?\.ok && input\) input\.value = ''/);
+  assert.match(dock, /addEventListener\('click', onEvent, true\)/);
 });
 
 test('typing ZEC or USDC filters both lists and keeps the chain filter', () => {
@@ -124,7 +200,9 @@ test('a successful seal hides Downgrade refused, and a new quote hides it again'
   const src = read('app/design/D8_shops/shops/ferry.js');
   const ok = src.indexOf('seal.material = sealOk');
   assert.ok(ok > 0);
-  assert.match(src.slice(ok, ok + 120), /classList\.add\('hide'\)/);
+  assert.match(src.slice(ok, ok + 160), /hideRefuseTag\(\)/);
+  assert.match(src, /el\.classList\.add\('hide'\)/);
+  assert.match(src, /setAttribute\('hidden'/);
   assert.match(src, /const hideRefuse = \(\)/);
   const apply = src.indexOf('const applyPair');
   assert.match(src.slice(apply, apply + 80), /hideRefuse\(\)/);
@@ -143,7 +221,10 @@ test('a session load plans a deposit and a guest load stays a demo', () => {
   assert.match(fn, /setOrder\?\.\('deposit'\)/);
   assert.match(fn, /hideRefuse/);
   assert.doesNotMatch(fn, /paintOrder\('delivered'\)/);
-  assert.match(fn, /0\.20/);
+  assert.match(fn, /The boat does not say delivered/);
+  assert.match(fn, /You are not asked to send USDC on Base/);
+  assert.match(fn, /explainQuoteMiss/);
+  assert.doesNotMatch(fn, /sh\.act\(\{ refused: false \}\)/);
   assert.match(ui, /sh\.act\(\{ refused: false \}\)/);
   const watch = ui.slice(ui.indexOf('function watchFerryDeposit'), ui.indexOf('async function settleFerry'));
   assert.match(watch, /beat\.play && sh\?\.act/);
@@ -176,6 +257,44 @@ test('USDC on Base is you-send, and NEAR under the cap is propose_call with no w
   assert.equal(locked.wallet, false);
   assert.equal(mayCheckout({ from: { usd: '0.21' } }).ok, false);
   assert.equal(mayCheckout({ from: { usd: '0.2' } }).ok, true);
+  const session = depositPlan({
+    from: SESSION_SWAP.from, amount: SESSION_SWAP.amt, depositAddress: 'intents.near',
+    capYocto: '60000000000000000000000', balanceYocto: '200000000000000000000000',
+    keyMethods: ['propose', 'propose_call'],
+  });
+  assert.equal(session.kind, 'propose_call');
+  assert.equal(session.wallet, false);
+  assert.equal(session.steps[0].receiver, WRAP);
+  assert.equal(session.steps[0].deposit, '50000000000000000000000');
+  const tight = depositPlan({
+    from: SESSION_SWAP.from, amount: SESSION_SWAP.amt, depositAddress: 'intents.near',
+    capYocto: '5000000000000000000000', balanceYocto: '200000000000000000000000',
+  });
+  assert.equal(tight.kind, 'you-send');
+  const bridge = explainQuoteMiss('1Click answered HTTP 400: Amount is too low for bridge, try at least 1671417 (correlation abc)');
+  assert.match(bridge, /bridge minimum/);
+  assert.match(bridge, /1671417/);
+  assert.match(bridge, /No deposit address/);
+  assert.match(bridge, /has not delivered/);
+  assert.match(explainQuoteMiss('over_checkout_cap'), /0\.20/);
+});
+
+test('a failed quote and Get another quote both hide the refuse seal', () => {
+  const deep = read('app/src/panels/deep.js');
+  const runOne = deep.slice(deep.indexOf('async function runOne'), deep.indexOf('async function runQuotes'));
+  assert.match(runOne, /hideRefuse/);
+  assert.match(runOne, /explainQuoteMiss/);
+  const ui = read('app/design/D8_shops/js/shopui.js');
+  const ferryRun = ui.slice(ui.indexOf('ferry: {'), ui.indexOf('bank: {'));
+  assert.match(ferryRun, /hideRefuse/);
+  assert.match(ferryRun, /explainQuoteMiss/);
+  assert.match(ferryRun, /onAgain: \(\) => \{ sh\?\.hideRefuse/);
+  const fail = ui.slice(ui.indexOf('function fail'), ui.indexOf('function openRules'));
+  assert.match(fail, /hideRefuse/);
+  const idle = ferryMarkup({});
+  assert.match(idle, /wNEAR on near/);
+  assert.match(idle, /value="0.05"/);
+  assert.match(idle, /USDC on near/);
 });
 
 test('status SUCCESS sails once, and a refund does not', () => {

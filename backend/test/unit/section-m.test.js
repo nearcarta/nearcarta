@@ -89,7 +89,7 @@ test('ferry idle copy does not claim a quote or a deposit', () => {
   assert.doesNotMatch(idle, /Waiting for the deposit/);
   assert.doesNotMatch(idle, /No deposit has been requested/);
   assert.match(idle, /You pay/);
-  assert.match(idle, /value="3"/); // city default USDC corridor
+  assert.match(idle, /value="0.05"/); // session corridor: 0.05 wNEAR on NEAR
   const quoted = ferryMarkup({ quoted: true, lines: [{ id: DEFAULT_ROUTES[0].id, usdText: '', text: 'ETH' }] }, DEFAULT_ROUTES);
   assert.match(quoted, /USD not quoted/);
   assert.doesNotMatch(quoted, /Waiting for the deposit/);
