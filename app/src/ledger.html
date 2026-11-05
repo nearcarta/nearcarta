@@ -37,7 +37,7 @@ async function load() {
     document.getElementById('sum').textContent = `In short: ${np} payouts and ${nr} refusals. ${t.payouts_near} NEAR paid in the rows below. The model line is operator spend, not a charter payment.`;
     const st = document.getElementById('state');
     st.hidden = !L.partial; st.textContent = 'Some transactions could not be read right now (RPC rate limit). The list may be short; reload in a minute.';
-    document.getElementById('rows').innerHTML = L.rows.length ? L.rows.map(r => `<tr><td>${esc(r.at || '')}</td><td>${esc(r.shop)}</td><td class="${esc(r.kind)}">${esc(r.kind)}</td><td>${esc(r.to || '')}</td><td>${esc(r.amount)} ${esc(r.asset)}</td><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(String(r.tx).slice(0, 10))}…</a>` : ''}</td><td>${esc(r.note || (r.kind === 'payout' ? 'Paid' : 'Refused'))}</td></tr>`).join('')
+    document.getElementById('rows').innerHTML = L.rows.length ? L.rows.map(r => `<tr><td>${esc(r.at || '')}</td><td>${esc(r.shop)}</td><td class="${esc(r.kind)}">${esc(r.kind)}</td><td>${esc(r.to || '')}</td><td>${esc(r.amount)} ${esc(r.asset)}</td><td>${r.url ? `<a class="tx" href="${esc(r.url)}" title="${esc(r.tx || '')}" target="_blank" rel="noopener">${esc(String(r.tx).slice(0, 10))}…</a>` : ''}</td><td>${esc(r.note || (r.kind === 'payout' ? 'Paid' : 'Refused'))}</td></tr>`).join('')
       : '<tr><td colspan="7">No rows yet.</td></tr>';
   } catch (e) { document.getElementById('rows').innerHTML = `<tr><td colspan="7">Ledger unavailable: ${esc(e.message)}. Retrying…</td></tr>`; setTimeout(load, 8000); }
 }

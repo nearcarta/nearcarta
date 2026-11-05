@@ -164,7 +164,7 @@ async function renderFacts() {
     <li>Balance: ${fmt(f.balance)}</li>
     <li class="${cl ? 'ok' : 'todo'}">${cl ? `Rules: pays only ${(cl.receivers || []).map(esc).join(', ')} · max ${fmt(cl.per_action_cap)} each · ${fmt(cl.daily_budget)} a day · ${cl.max_actions_per_day || '∞'} payments a day` : 'No rules yet'}</li>
     ${u ? `<li>Today: spent ${fmt(u.spent)} in ${u.count} payments</li>` : ''}
-    <li class="${keyLive ? 'ok' : 'todo'}" data-testid="agent-key">${keyLive ? `Agent key in this browser, can only call <code>propose</code>` : pendWaiting ? 'New agent key made in this browser, waiting for its timelock' : 'No agent key in this browser yet'}</li></ul></details>
+    <li class="${keyLive ? 'ok' : 'todo'}" data-testid="agent-key">${keyLive ? `Agent key in this browser. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Your row key calls <code>propose</code>. Neither key can change the rules.` : pendWaiting ? 'New agent key made in this browser, waiting for its timelock' : 'No agent key in this browser yet'}</li></ul></details>
     ${queued.length ? `<h3>Waiting in the timelock</h3><ul class="facts" data-testid="pending">${queued.map(([id, p]) => {
       const ready = Date.now() * 1e6 >= Number(p.eta); const kind = Object.keys(p.change || {})[0] || 'change';
       return `<li class="todo"><b>${esc(kind)}</b> #${esc(id)} · by ${esc(p.by)} · ${ready ? 'ready now' : 'ready ' + esc(when(p.eta))}
@@ -243,7 +243,7 @@ function expiryHint(f) {
   return `Extending waits for your timelock (${own === def ? 'default ' + hrs(def) : hrs(own)}); renew at least a day early.`;
 }
 function renderRules(cl, keyLive, f = {}) {
-  const m = CFG.arena.merchants;
+  const m = CFG.arena?.merchants || [];
   $('#rules').innerHTML = `<div class="grid2">
     <label>Allowed payee 1<input id="r1" value="${esc(cl?.receivers?.[0] || m[0])}"></label>
     <label>Allowed payee 2<input id="r2" value="${esc(cl?.receivers?.[1] || m[1])}"></label>
@@ -253,7 +253,7 @@ function renderRules(cl, keyLive, f = {}) {
     <label>Smallest payment<span class="suffix"><input id="rmin" type="number" step="0.001" min="0.001" value="0.001"><span>NEAR</span></span></label>
     ${f.legacy ? '' : `<label>Rules expire<select id="rexp" data-testid="rexp"><option value="">Keep as is</option><option value="1">In 1 day</option><option value="7"${cl ? '' : ' selected'}>In 7 days</option><option value="30">In 30 days</option></select></label>
     <p class="hint" data-testid="rexp-hint">${expiryHint(f)}</p>`}</div>
-    <details class="how"><summary>How this works</summary><p class="muted">One wallet approval does two things: saves these rules on chain and adds a fresh agent key made in this browser. That key can only call <code>propose</code> on this charter; it cannot move money around the rules.${f.setup_open === false ? ' Setup is closed, so a looser rule or a new key waits the timelock; a tighter rule applies at once.' : ''}</p></details>
+    <details class="how"><summary>How this works</summary><p class="muted">One wallet approval does two things: saves these rules on chain and adds a fresh agent key made in this browser. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Your row key calls <code>propose</code>. Neither key can move money around the rules.${f.setup_open === false ? ' Setup is closed, so a looser rule or a new key waits the timelock; a tighter rule applies at once.' : ''}</p></details>
     <button id="rules-btn" class="primary" data-testid="rules">${cl && keyLive ? 'Update rules' : 'Save rules and issue agent key'}</button>`;
   $('#rules-btn').onclick = () => saveRules(keyLive).catch(fail).finally(() => busy($('#rules-btn'), false));
 }
@@ -458,14 +458,22 @@ function defaultNick() {
 // The scoreboard re-reads the tx from chain, so a fresh row can take a few seconds: read now, then again shortly.
 function scoreSoon(where) { for (const ms of [0, 3000, 9000]) setTimeout(() => loadScore(where).catch(() => {}), ms); }
 async function loadScore(where) {
-  const id = where === 'mine' ? charter : CFG.arena.charter; if (!id) return;
+  const id = where === 'mine' ? charter : CFG.arena?.charter; if (!id) return;
   const box = where === 'mine' ? $('#score-mine-box') : null;
   if (box && !box.querySelector('table')) box.innerHTML = '<p class="muted" data-testid="score-loading">Loading score…</p>';
   const s = await api('/api/vault/score/' + id);
+  const tasks = Array.isArray(s?.tasks) ? s.tasks : [];
+  const attacks = Array.isArray(s?.attacks) ? s.attacks : [];
+  if (!s || typeof s.score !== 'number') {
+    const empty = '<p class="muted" data-testid="score-empty">No score yet.</p>';
+    if (where === 'mine' && $('#score-mine-box')) $('#score-mine-box').innerHTML = empty;
+    if (where === target && $('#arena .score')) $('#arena .score').innerHTML = empty;
+    return;
+  }
   const cell = r => !r ? '<span class="muted">not run</span>' : r.counted ? `<span class="tag ok">counted</span> ${txl(r.tx)}` : `<span class="tag">${esc(r.why || r.reason || r.decision)}</span> ${txl(r.tx)}`;
-  const html = `<p><b data-testid="score-${where}">${s.score}/${s.max_score}</b> · <span title="${s.tasks_passed} of ${s.tasks.length} honest payments allowed, ${s.scams_blocked} of ${s.attacks.length} scams refused for the right reason">jobs ${s.tasks_passed}/${s.tasks.length} · scams ${s.scams_blocked}/${s.attacks.length}</span></p>
+  const html = `<p><b data-testid="score-${where}">${s.score}/${s.max_score}</b> · <span title="${s.tasks_passed} of ${tasks.length} honest payments allowed, ${s.scams_blocked} of ${attacks.length} scams refused for the right reason">jobs ${s.tasks_passed}/${tasks.length} · scams ${s.scams_blocked}/${attacks.length}</span></p>
     <table><thead><tr><th>Job</th><th>Should be</th><th>Result</th></tr></thead><tbody>
-    ${[...s.tasks, ...s.attacks].map(x => `<tr><td>${esc(x.name)}</td><td${Array.isArray(x.expects) ? ` title="${esc(x.expects.map(plain).join(' or '))}">refused` : '>allowed'}</td><td>${cell(x.result)}</td></tr>`).join('')}</tbody></table>`;
+    ${[...tasks, ...attacks].map(x => `<tr><td>${esc(x.name)}</td><td${Array.isArray(x.expects) ? ` title="${esc(x.expects.map(plain).join(' or '))}">refused` : '>allowed'}</td><td>${cell(x.result)}</td></tr>`).join('')}</tbody></table>`;
   if (where === 'mine') $('#score-mine-box').innerHTML = html.replace('data-testid="score-mine"', 'data-testid="score-mine-top"');
   if (where === target) $('#arena .score').innerHTML = html;
 }
@@ -492,7 +500,7 @@ async function attackRun(btn) {
     renderFacts().catch(() => {});
   } else {
     r = await post('/api/vault/attack', { attack: id, nickname: nick() });
-    out.querySelector('.steps').innerHTML = r.steps.map((s, i) => stepRow(s, i + 1, r.steps.length)).join('');
+    out.querySelector('.steps').innerHTML = (Array.isArray(r.steps) ? r.steps : []).map((s, i) => stepRow(s, i + 1, r.steps.length)).join('');
     for (const s of r.steps) record(s, 'Shared scam ' + id);
   }
   out.insertAdjacentHTML('beforeend', r.refused
@@ -559,7 +567,7 @@ async function main() {
     if (window.NEARCARTA_PUBLIC_MAINNET) factoryLine.hidden = true;
     else factoryLine.innerHTML = `Factory <code>${esc(CFG.factory)}</code> · code hash <code title="${esc(CFG.code_hash)}">${esc(short(CFG.code_hash))}</code> · ${txl(CFG.proof_txs?.factory_full_access_key_deleted, 'factory keys deleted')}`;
   }
-  $('#arena-id').textContent = CFG.arena.charter;
+  $('#arena-id').textContent = CFG.arena?.charter || '';
   $('#ex-look').textContent = lookalike((CFG.arena?.merchants || [])[0] || '');
   quickCards(); setTarget('shared');
   const rl = CFG.runner; if (rl) $('#runner').title = `Shared runner: ${rl.left_today} of ${rl.daily_tx_cap} transactions left today (UTC), ${rl.gas_tgas} Tgas each.`;

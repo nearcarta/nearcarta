@@ -63,7 +63,7 @@ export default function App() {
         <a className="chip mono" href={NBA(CORE.oath)} target="_blank" rel="noreferrer" title={`policy_hash ${CORE.policyHash}`}>
           oath <b>{CORE.oath}</b><span className="t3">·</span><b>v{CORE.policyVersion}</b><span className="t3">{short(CORE.policyHash, 6, 4)}</span>
         </a>
-        <span className="chip" title={CORE.agentKey}><Lamplighter size={14} />{AGENT_NAME}<span className="t3">·</span>{frozen ? <Dot tone="crit">frozen</Dot> : <Dot tone="pos">propose-only key</Dot>}</span>
+        <span className="chip" title={CORE.agentKey}><Lamplighter size={14} />{AGENT_NAME}<span className="t3">·</span>{frozen ? <Dot tone="crit">frozen</Dot> : <Dot tone="pos">propose and propose_batch</Dot>}</span>
         <button className="search" onClick={() => setPal(true)}><Search size={14} /><span>Jump to…</span><span className="kbd">⌘K</span></button>
         <button className="iconbtn" aria-label="Toggle theme" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}</button>
         <button className={`btn sm ${frozen ? 'ghost' : 'danger'}`} onClick={() => setFrozen(!frozen)} title="Demo toggle. Sends no transaction.">

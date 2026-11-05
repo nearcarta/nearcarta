@@ -4,7 +4,7 @@ import { ATTACKS, HIJACK, COUNTERPARTIES, LAB, NBA } from '../data.js';
 import { Card, PageHead, Dot, Ev, Tx, Note, short } from '../ui.jsx';
 
 const CHECKS = [
-  ['scope', 'Signed by the agent key (propose only)'],
+  ['scope', 'Signed by the agent key (propose and propose_batch)'],
   ['frozen', 'Oath not frozen'],
   ['version', 'Policy version is current'],
   ['nonce', 'Nonce unused, not expired'],

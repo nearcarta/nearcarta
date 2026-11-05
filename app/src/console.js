@@ -1,10 +1,11 @@
+import { policyView } from './policy-view.js';
 // Live console: every value below is fetched from the Nearcarta API, which reads NEAR RPC,
 // 1Click (dry) and NEAR AI Cloud. Nothing here signs or spends; only the Your House tab asks your own wallet to sign.
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const NB = window.NEARCARTA_PUBLIC_MAINNET ? 'https://nearblocks.io' : 'https://nearblocks.io';
-const tx = h => `<a href="${NB}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(h).slice(0, 10))}…</a>`;
+const tx = h => `<a class="tx" href="${NB}/txns/${esc(h)}" target="_blank" rel="noopener" title="${esc(h)}">${esc(String(h).slice(0, 10))}…</a>`;
 // Readable names for our mainnet accounts; the full id stays in the link and the tooltip.
 const ROLE = [[/^attacker\./, 'test merchant (red-team)'], [/mallory/, 'red-team account'], [/^bakery\./, 'Bakery (payee)'], [/^dao\.|sputnik/, 'Town Hall DAO'],
   [/house/, 'Your House charter'], [/hown/, 'House owner'], [/oath/, 'charter contract'], [/arena/, 'Arena contract'], [/agent/, 'agent'], [/own-/, 'owner'], [/signer/, 'NEAR MPC signer']];
@@ -114,9 +115,15 @@ async function guardhouse() {
   const b = d.board, c = d.charter;
   // Prefer live access-key methods from Guardhouse; fall back to the on-chain truth for charter.nearcarta.near.
   const live = gh?.keys?.functionCall?.[0]?.methods;
-  const methods = (Array.isArray(live) && live.length ? live : ['propose', 'propose_batch']).join(' and ');
+  const view = policyView({ state: gh?.state, clauses: gh?.clauses, methods: Array.isArray(live) && live.length ? live : ['propose', 'propose_batch'] });
+  const win = view.windowStart == null ? 'any time' : `${view.windowStart}–${view.windowEnd} min`;
   $('#guardhouse .out').innerHTML = `<div class="card" data-testid="oath-state">Board ${acct(b.contract)} · charter ${acct(c.contract)}<br>
-    Full-access keys on the charter: <b data-testid="fak">${c.full_access_keys}</b> · agent key methods: <b data-testid="agent-methods">${esc(methods)}</b></div>
+    Full-access keys on the charter: <b data-testid="fak">${c.full_access_keys}</b> · agent key methods: <b data-testid="agent-methods">${esc(view.agentMethods.join(' and '))}</b></div>
+    <div class="card" data-testid="policy-card"><b>Policy on chain</b>
+    <p>Allowlist: ${view.allowlist.length ? view.allowlist.map(esc).join(', ') : 'read from the charter when the API answers'}</p>
+    <p>Per payment ${view.perActionNear ?? '—'} NEAR · daily budget ${view.dailyBudgetNear ?? '—'} NEAR · ${view.dailyCount ?? '—'} payments a day · window ${esc(win)}</p>
+    <p>Frozen: ${view.frozen ? 'yes' : 'no'}. Sealed rule: ${view.sealed ? 'yes' : 'no'}.</p>
+    <p data-testid="agent-cannot-unfreeze">The agent key calls ${esc(view.agentMethods.join(' and '))}. It cannot unfreeze the charter. Only the owner key can.</p></div>
     <div class="card"><b>Proof on chain</b><table>
     <tr><td>Allowed 0.001 NEAR</td><td>${tx(b.txs['allowed_0.001'])}</td></tr>
     <tr><td>Refused over the per-payment cap</td><td>${tx(b.txs.refused_over_per_action_cap)}</td></tr>
@@ -165,7 +172,7 @@ async function arena() {
 async function toll() {
   const d = await get('/api/mainnet');
   const t = d.toll;
-  $('#toll .out').innerHTML = `<div class="card" data-testid="toll-state">Toll ${acct(t.contract)} · Base chain ${esc(d.chain_id)} · address <code>${esc(t.foreign_address)}</code><br>
+  $('#toll .out').innerHTML = `<div class="card" data-testid="toll-state">Toll ${acct(t.contract)} · 0.001 NEAR pass on mainnet · recorded chain-signature proof · chain id ${esc(d.chain_id)} · the foreign chain was not paid from this gate<br>
     Allowed ${tx(t.txs.owner_toll_pay_allowlisted)} · refused ${tx(t.txs.owner_toll_pay_not_allowlisted)}</div>`;
 }
 
