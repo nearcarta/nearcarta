@@ -1,14 +1,29 @@
 // Session length and the function-call key the visitor adds for the board.
 // A function-call key names one receiver, optional method names, and a gas allowance.
 // It cannot attach a deposit. https://docs.near.org/protocol/accounts-contracts/access-keys
+// The allowance is charged at the gas buy price (0.001 NEAR/Tgas on mainnet), then
+// credited back for unused gas. An existing key's allowance cannot be raised.
+// https://docs.near.org/protocol/transactions/gas#buying-vs-burning-gas
 // The login plugin requests that key. https://docs.near.org/web3-apps/tutorials/wallet-login
 // set_calls JSON is the contract's own parser: contracts/charter_board/src/lib.rs `set_calls`.
 // ft_transfer is NEP-141: https://github.com/near/NEPs/blob/master/neps/nep-0141.md
+import { functionCallAllowanceCost } from './cost.js';
 
 export const AGENT_METHODS = ['propose', 'propose_call'];
 export const SESSION_HOURS = [1, 2, 24];
 // 0.05 NEAR of gas. The key cannot spend it as a transfer.
 export const GAS_ALLOWANCE_YOCTO = (10n ** 24n / 20n).toString();
+// Prepaid gas for a silent board propose. 30 Tgas covers propose plus the 8 Tgas
+// on_paid callback (measured use is about 4.67 Tgas). 80 Tgas is bought for ~0.081
+// NEAR and exceeds this allowance. The 0.005 stamp is a contract argument, not a deposit.
+export const BOARD_PROPOSE_TGAS = 30;
+// Method name + JSON of the live Ferry propose that returned NotEnoughAllowance.
+export const FERRY_PROPOSE_BYTES = 310;
+
+/** Yocto the session key must have free for one board propose at this gas. */
+export function boardProposeAllowanceYocto(tgas = BOARD_PROPOSE_TGAS, numBytes = FERRY_PROPOSE_BYTES) {
+  return functionCallAllowanceCost({ tgas, numBytes });
+}
 // Storage for the call allowlist. Unused yocto is refunded by charge_len.
 export const CALLS_DEPOSIT_YOCTO = (10n ** 24n / 200n).toString();
 

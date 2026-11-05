@@ -14,7 +14,7 @@ import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
-import { AGENT_METHODS, CALLS_DEPOSIT_YOCTO, SESSION_HOURS, callPolicy, sessionExpiresAt, sessionLabel } from '../../shared/board/session.js';
+import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_ALLOWANCE_YOCTO, SESSION_HOURS, callPolicy, sessionExpiresAt, sessionLabel } from '../../shared/board/session.js';
 import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
 import { runAsk } from '../../shared/vault/run.js';
@@ -187,10 +187,11 @@ const need = () => {
   return 0.05;
 };
 // Gas measured on mainnet (board.nearcarta.near): open_charter 2.59 TGas (BUqfZMBT…), set_agent 2.54 TGas (DqMrsEJj…),
-// propose with its payout 4.67 TGas (8WDqBeaN…). We attach about 4x / 4x / 3x. A wallet reserves attached gas at the
-// highest gas price (1 NEAR per 1000 TGas) before it sends, so the worst-case cost of opening a row is
+// propose with its payout 4.67 TGas (8WDqBeaN…). The board reserves 8 TGas for the on_paid callback.
+// A wallet buys attached gas at 0.001 NEAR per TGas before it sends, so opening a row holds
 // 0.02 NEAR deposit + 10 TGas x 0.001 = 0.03 NEAR. Unused gas comes back.
-const GAS = { open: 10n, agent: 10n, propose: 15n };
+// propose uses BOARD_PROPOSE_TGAS (30). 80 TGas is bought for ~0.081 NEAR, over the 0.05 key allowance.
+const GAS = { open: 10n, agent: 10n, propose: BigInt(BOARD_PROPOSE_TGAS) };
 const GAS_NEAR = t => Number(t) * 0.001;
 const SIGN_MIN = Math.round((0.02 + GAS_NEAR(GAS.open) + 0.005 + 0.002) * 1000) / 1000; // row + call allowlist + a little reserve
 const yToN = y => { try { return Number(BigInt(y) / 10n ** 18n) / 1e6; } catch { return NaN; } };
@@ -355,7 +356,7 @@ function boardArgs(r, agent) {
 // The agent key is also added to the visitor's own account as a function-call access key. It may call
 // propose and propose_call on the board, with a gas allowance only. It cannot attach NEAR.
 // https://docs.near.org/protocol/accounts-contracts/access-keys
-const AGENT_ALLOW = YN / 20n; // 0.05 NEAR of gas allowance, never spendable as NEAR
+const AGENT_ALLOW = BigInt(GAS_ALLOWANCE_YOCTO); // 0.05 NEAR of gas allowance, never spendable as NEAR
 // open_charter keeps ROW_FUND as the row's own spendable balance (enough for a full day at the default 0.01 budget);
 // the rest of the 0.02 deposit after storage (~0.004) is refunded in the same call.
 const ROW_FUND = YN / 100n, TOPUP = YN / 200n;

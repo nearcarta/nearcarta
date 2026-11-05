@@ -75,3 +75,20 @@ export function deployCost(wasmLen, owner) {
   const peakYocto = stakeYocto + prepaidYocto;
   return { storageBytes: bytes, stakeYocto, gas, burnedGasYocto, prepaidYocto, accountCreationYocto, totalYocto, peakYocto };
 }
+
+/** Yocto a function-call key's allowance is charged for one zero-deposit call.
+ *  Same split as nearcore `calculate_tx_cost`: send fees burn at the block gas
+ *  price; attached gas and exec fees are bought at max(that price, GAS_PURCHASE_YOCTO),
+ *  which on mainnet is 0.001 NEAR/Tgas. `numBytes` is the method name plus the args.
+ *  The sender is not the receiver. Deposit is not included: a function-call key cannot
+ *  attach NEAR. https://docs.near.org/protocol/transactions/gas#buying-vs-burning-gas
+ *  Live Ferry propose (80 Tgas, 310 bytes) charged 80921036784705000000000. */
+export function functionCallAllowanceCost({ tgas, numBytes, gasPrice = GAS_PRICE_YOCTO }) {
+  const bytes = BigInt(numBytes);
+  const price = BigInt(gasPrice);
+  const attached = BigInt(tgas) * 10n ** 12n;
+  const burnt = RECEIPT_SEND + CALL_SEND + CALL_SEND_PER_BYTE * bytes;
+  const remaining = attached + RECEIPT_EXEC + CALL_EXEC + CALL_EXEC_PER_BYTE * bytes;
+  const buy = price > GAS_PURCHASE_YOCTO ? price : GAS_PURCHASE_YOCTO;
+  return burnt * price + remaining * buy;
+}

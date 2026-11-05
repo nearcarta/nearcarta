@@ -62,6 +62,7 @@ const PLAIN = [
   [/attach at least|Exceeded the prepaid gas|ERR_LOW_GAS/, 'the network ran out of gas for this step; try again'],
   [/expired|Expired/, 'the request expired before the network took it; try again'],
   [/NotEnoughBalance|not enough balance/i, 'your account does not have enough NEAR for this step'],
+  [/NotEnoughAllowance/, 'the session key does not have enough gas allowance for this ask. Nothing was paid.'],
 ];
 export function plainError(e) {
   const m = String(e?.message || e || '');
@@ -310,8 +311,11 @@ async function boardPay({ shop, receiver, amountY }) {
   try {
     if (ak) {
       // The key installed at setup may only call propose. It signs here. The wallet tab stays closed.
+      // 30 Tgas (shared/board/session.js BOARD_PROPOSE_TGAS). Gas is bought at 0.001 NEAR/Tgas,
+      // so 80 Tgas costs ~0.081 NEAR and the 0.05 session allowance refuses NotEnoughAllowance.
+      // Deposit stays 0. The stamp moves from the row inside propose, not as an attached deposit.
       const signed = W.signTx({ key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
-        actions: [W.functionCall('propose', args, 80n * TG)] });
+        actions: [W.functionCall('propose', args, 30n * TG)] });
       const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
       if (!sent.ok) {
         const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
@@ -319,7 +323,7 @@ async function boardPay({ shop, receiver, amountY }) {
       }
       return settled(shop, { tx: signed.hash, decision: 'allowed', reason: 'ok', action: null, amount, receiver, signer: 'agent' });
     }
-    const h = await sign(S.board, [fc('propose', args, 80)]);
+    const h = await sign(S.board, [fc('propose', args, 30)]);
     return settled(shop, { tx: h, decision: 'allowed', reason: 'ok', action: null, amount, receiver, signer: 'wallet' });
   } catch (e) {
     if (userCancelled(e)) {
