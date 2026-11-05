@@ -50,6 +50,9 @@ export function hallMarkup(row, person = null) {
 
 export async function mountHall(root, hooks = {}) {
   if (!root) return;
+  if (hooks.accountP && !readSessionAccount()) {
+    try { await hooks.accountP; } catch { /* a saved session is not required to paint */ }
+  }
   const choice = ownerNow();
   let before = null;
   const paint = (row) => {

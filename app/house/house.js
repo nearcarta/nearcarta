@@ -75,7 +75,30 @@ export async function connect(note = () => {}, network = NEAR_NET) {
   else note('Waiting for your wallet…');
   try { await c.connect({ walletId: id }); note(''); }
   catch (e) { note(`Could not connect: ${e?.message || e}`); throw e; }
-  return accountOf(c);
+  const account = await accountOf(c);
+  if (account) writeSession({ accountId: account, walletId: id, displayName: readSession().displayName || '' });
+  return account;
+}
+/** A short look at the wallet. A full reload starts a new connector, so this is the silent restore. */
+export async function peekAccount(timeoutMs = 1500) {
+  const c = mainnetWallet();
+  const slow = new Promise(r => setTimeout(() => r(null), timeoutMs));
+  try {
+    const got = await Promise.race([c.getConnectedWallet(), slow.then(() => ({}))]);
+    return got?.accounts?.[0]?.accountId || null;
+  } catch { return null; }
+}
+/** One click reconnects the wallet id saved with the session. */
+export async function restoreWallet() {
+  const saved = readSession();
+  const walletId = typeof saved.walletId === 'string' ? saved.walletId : '';
+  const live = await peekAccount(1500);
+  if (live) { writeSession({ accountId: live, walletId, displayName: saved.displayName || '' }); return live; }
+  if (!walletId) return null;
+  await mainnetWallet().connect({ walletId });
+  const id = await peekAccount(4000);
+  if (id) writeSession({ accountId: id, walletId, displayName: saved.displayName || '' });
+  return id;
 }
 export async function startGuest() { return null; }
 export async function disconnect() { await wallet().disconnect().catch(() => {}); }
@@ -95,8 +118,12 @@ export async function mountConnect(el) {
     const id = who || sessionAccount(stored);
     if (who) writeSession({ accountId: who, displayName: hero || stored.displayName || '', balanceNear: bal == null ? stored.balanceNear : (bal === 0n ? 0 : fmt(bal)) });
     const label = sessionPill({ accountId: id, displayName: hero || stored.displayName || '', balanceNear: bal == null ? stored.balanceNear : (bal === 0n ? 0 : fmt(bal)) });
+    const restore = !who && id
+      ? '<button type="button" class="pill go" data-x="restore" data-testid="restore-session">Restore session</button>'
+      : '';
     el.innerHTML = id
       ? `<a class="pill${bal === 0n ? ' go' : ''}" href="/setup/#fund" title="${esc(id)}" data-testid="hud-account">${esc(label)}</a>`
+        + restore
         + '<button type="button" class="pill" data-x="out">Sign out</button>'
       : `<a class="pill go" href="/setup/" data-testid="hud-connect" title="Sign in, then fund your account">Sign in</a>`;
     if (!msg) { msg = document.createElement('div'); msg.dataset.testid = 'wallet-note'; msg.setAttribute('role', 'status'); msg.style.cssText = 'flex-basis:100%;max-width:360px;font-size:12px;line-height:1.35;margin-top:4px;background:#2a1d14ee;color:#fbe9d0;padding:6px 8px;border-radius:8px'; }
@@ -107,6 +134,7 @@ export async function mountConnect(el) {
     // After a sign-in, tell the town (it flies to the House and opens /shops/vault/#create).
     const told = a => { if (a) dispatchEvent(new CustomEvent('nearcarta:signin', { detail: { accountId: a } })); return a; };
     on('in', () => connect(t => note(esc(t))).then(told));
+    on('restore', () => restoreWallet().then(told));
     on('guest', () => Promise.resolve(null));
     on('out', () => { clearSessionAccount(); return disconnect(); });
   };
