@@ -9,7 +9,7 @@ import { TOLL_ADDRESS, TOLL_KEY, checkDerived } from '../toll-derive.js';
 import { PROOF_HREF, liveTee, teeView } from '../tee-view.js';
 import { NEXT_LABEL, RUN_LABEL } from '../../design/D8_shops/shops/arena-labels.js';
 import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
-import { formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
+import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
 import { boundaryHtml } from './boundary.js';
@@ -254,7 +254,7 @@ function mountArena(root, hooks) {
 
 function mountPayouts(root, hooks) {
   const state = hooks.state || (hooks.state = {});
-  if (!state.rows) state.rows = hooks.rows ? hooks.rows() : [{ to: '', amt: '0.001' }, { to: '', amt: '0.001' }];
+  if (!state.rows) state.rows = (hooks.rows ? hooks.rows() : []).filter(r => r && (String(r.to || '').trim() || String(r.amt || '').trim()));
   const drawMsg = () => {
     const issues = payoutIssues(state.rows, state.exists);
     const box = q$(root, '[data-testid=payout-issues]');
@@ -274,14 +274,23 @@ function mountPayouts(root, hooks) {
   };
   const render = () => {
     const issues = payoutIssues(state.rows, state.exists);
+    const full = state.rows.length >= 3;
     root.innerHTML = `<p data-testid="payout-issues" class="${issues.length ? 'bad' : ''}">${issues.length ? esc(issueText(issues)) : 'Each NEAR row needs a real account and at most 0.005 NEAR.'}</p>
       <ol class="plist" data-testid="payout-list">${rowList()}</ol>
+      <button type="button" class="primary" id="p-add" data-testid="payout-add"${full ? ' disabled data-reason="Three rows is the daily count on this charter."' : ''}>Add a row</button>
+      <p data-testid="payout-add-note">${full ? 'Three rows is the daily count on this charter.' : ''}</p>
       <label>CSV <textarea id="p-csv" data-testid="payout-csv" rows="3" placeholder="account,amount,asset">${esc(state.csv || '')}</textarea></label>
-      <button type="button" id="p-prep" data-testid="payout-prepare">Prepare the batch</button>
+      <button type="button" class="primary" id="p-prep" data-testid="payout-prepare">Prepare the batch</button>
       <p data-testid="payout-drop"${state.dropNote ? '' : ' hidden'}>${esc(state.dropNote || '')}</p>
       <ul data-testid="payout-receipts">${(state.receipts || []).map(r => `<li data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)} · not sent</li>`).join('')}</ul>
       <p data-testid="payout-usdc"${state.usdcNote ? '' : ' hidden'}>${esc(state.usdcNote || '')}</p>`;
     bindRows();
+    const add = q$(root, '#p-add');
+    if (add) add.onclick = () => {
+      const next = addPayoutRow(state.rows);
+      state.rows = next.rows;
+      render();
+    };
     const csv = q$(root, '#p-csv');
     csv.oninput = (e) => { state.csv = e.target.value; };
     csv.onchange = () => {
