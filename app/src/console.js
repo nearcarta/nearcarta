@@ -110,10 +110,13 @@ form.onsubmit = async ev => {
 };
 
 async function guardhouse() {
-  const d = await get('/api/mainnet');
+  const [d, gh] = await Promise.all([get('/api/mainnet'), get('/api/guardhouse').catch(() => null)]);
   const b = d.board, c = d.charter;
+  // Prefer live access-key methods from Guardhouse; fall back to the on-chain truth for charter.nearcarta.near.
+  const live = gh?.keys?.functionCall?.[0]?.methods;
+  const methods = (Array.isArray(live) && live.length ? live : ['propose', 'propose_batch']).join(' and ');
   $('#guardhouse .out').innerHTML = `<div class="card" data-testid="oath-state">Board ${acct(b.contract)} · charter ${acct(c.contract)}<br>
-    Full-access keys on the charter: <b data-testid="fak">${c.full_access_keys}</b> · agent key methods: <b>propose</b></div>
+    Full-access keys on the charter: <b data-testid="fak">${c.full_access_keys}</b> · agent key methods: <b data-testid="agent-methods">${esc(methods)}</b></div>
     <div class="card"><b>Proof on chain</b><table>
     <tr><td>Allowed 0.001 NEAR</td><td>${tx(b.txs['allowed_0.001'])}</td></tr>
     <tr><td>Refused over the per-payment cap</td><td>${tx(b.txs.refused_over_per_action_cap)}</td></tr>
