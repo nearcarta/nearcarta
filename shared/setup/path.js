@@ -1,22 +1,17 @@
-// What the setup page may say, and what it may do, on each path.
-// The default path is a mainnet NEAR account and real NEAR. The free guest is a separate testnet trial.
-// publicMainnet (NEXT_PUBLIC_MAINNET=1) hides that guest. A personal charter row is opened only when
-// the mainnet board in shared/deployments/mainnet.json has status "deployed".
-export function setupJourney(trial, opts = {}) {
-  const publicMainnet = !!opts.publicMainnet;
-  const onTrial = !!trial && !publicMainnet;
+// What the setup page may say, and what it may do.
+// The only path is a mainnet NEAR account and real NEAR.
+// A personal charter row is opened only when the mainnet board is deployed.
+export function setupJourney(_trial, opts = {}) {
+  const boardDeployed = !!(opts.boardDeployed || opts.publicMainnet && opts.boardDeployed);
   return {
-    badge: onTrial ? 'testnet trial' : 'mainnet',
+    badge: 'mainnet',
     guestInTiles: false,
-    showGuest: !publicMainnet,
-    showFaucet: onTrial,
-    createCharter: onTrial || !!(publicMainnet && opts.boardDeployed),
-    explorer: onTrial ? 'https://testnet.nearblocks.io' : 'https://nearblocks.io',
-    intentsNote: onTrial
-      ? 'NEAR Intents swaps on mainnet. This trial is funded by the testnet faucet below.'
-      : 'Swap from BTC, ETH, SOL or USDC into NEAR, sent to the address above.',
-    fundLead: onTrial
-      ? 'This trial account spends testnet NEAR, not real NEAR.'
-      : 'Send real NEAR on NEAR mainnet. This path has no faucet.',
+    showGuest: false,
+    showFaucet: false,
+    createCharter: !!(opts.publicMainnet && opts.boardDeployed),
+    explorer: 'https://nearblocks.io',
+    intentsNote: 'Swap from BTC, ETH, SOL or USDC into NEAR, sent to the address above.',
+    fundLead: 'Send real NEAR on NEAR mainnet. This path has no faucet.',
+    boardDeployed,
   };
 }

@@ -28,12 +28,12 @@ test('the public mainnet flag hides the guest and opens a charter row only after
   assert.equal(setupJourney(false, { publicMainnet: true, factoryDeployed: true }).createCharter, false);
 });
 
-test('the guest trial is labeled testnet and is the only path that creates a charter', () => {
+test('a trial flag does not open a guest path', () => {
   const j = setupJourney(true);
-  assert.equal(j.badge, 'testnet trial');
-  assert.equal(j.guestInTiles, false);
-  assert.equal(j.showFaucet, true);
-  assert.equal(j.createCharter, true);
-  assert.equal(j.explorer, 'https://testnet.nearblocks.io');
-  assert.match(j.fundLead, /testnet NEAR/);
+  assert.equal(j.badge, 'mainnet');
+  assert.equal(j.showGuest, false);
+  assert.equal(j.showFaucet, false);
+  assert.equal(j.createCharter, false);
+  assert.equal(j.explorer, 'https://nearblocks.io');
+  assert.doesNotMatch(JSON.stringify(j), /testnet/i);
 });

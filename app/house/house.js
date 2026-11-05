@@ -8,13 +8,13 @@ import { decoratePicker } from '../shops/vault/picker.js';
 // Lazy: NEAR Connect only awaits this when a WalletConnect wallet is used, so the client loads on demand.
 const WC_ID = __WC_ID__;
 let wcP; const walletConnect = WC_ID ? { then: (ok, no) => (wcP ||= import('/wc.bundle.js').then(m => m.init(WC_ID))).then(ok, no) } : undefined;
-import { injectGuest, GUEST_ID, balance, fmt, faucet, deeds, nfts, nftSupply, ARENA, DEED, deedHouses, deedMinted } from './onboard.js';
+import { balance, fmt, deeds, nfts, nftSupply, ARENA, DEED, deedHouses, deedMinted } from './onboard.js';
 import { factoryOfCharter } from './factories.js';
 
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const txl = h => `<a data-testid="house-tx" href="https://testnet.nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(h).slice(0, 10))}…</a>`;
+const txl = h => `<a data-testid="house-tx" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(h).slice(0, 10))}…</a>`;
 const near = y => (y == null ? '–' : (Number(BigInt(y) / 10n ** 18n) / 1e6).toString() + ' NEAR');
 const short = a => { const s = String(a ?? ''); return s.length > 28 ? s.slice(0, 12) + '…' + s.slice(-10) : s; };
 export const FAUCET = 'https://docs.near.org/getting-started/faucet';
@@ -27,15 +27,13 @@ const connectors = new Map();
 let watched = false;
 function connectorFor(network) {
   if (connectors.has(network)) return connectors.get(network);
-  // The guest faucet account is the trial build only. It is not offered on the mainnet connector.
-  if (network !== 'mainnet') injectGuest();
   decoratePicker();
   const c = new NearConnector({ network, features: { [network]: true, signAndSendTransaction: true }, footerBranding: null, walletConnect, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
   connectors.set(network, c);
   if (!connector && network === NEAR_NET) connector = c;
   // The picker's "⋯" header button has no text: name it for screen readers and hover.
   const label = r => r.querySelectorAll?.('.settings-button:not([aria-label])').forEach(b => { b.setAttribute('aria-label', 'Wallet list settings'); b.title = 'Wallet list settings'; });
-  const fix = r => { label(r); if (network !== 'mainnet') unavailable(r); };
+  const fix = r => { label(r); };
   if (!watched) {
     watched = true;
     new MutationObserver(() => { fix(document); document.querySelectorAll('body > *').forEach(e => e.shadowRoot && fix(e.shadowRoot)); }).observe(document.body, { childList: true, subtree: true });
@@ -48,52 +46,13 @@ function connectorFor(network) {
     const evm = c.wallets.find(w => w.manifest.id === 'ethereum-wallets');
     if (evm) evm.manifest.name = window.ethereum ? 'MetaMask & EVM wallets (detected)' : 'MetaMask & EVM wallets';
     if (evm && window.ethereum) c.wallets = [evm, ...c.wallets.filter(w => w !== evm)];
-    if (network === 'mainnet') return;
-    // MyNearWallet's NEAR Connect script has a trial host, but the manifest has no trial flag.
-    // Its own site says it is deprecated on 31 Oct 2026: from then on it leaves the list and shows greyed with that reason.
-    const mnw = c.wallets.find(w => w.manifest.id === 'mynearwallet');
-    if (mnw && mnwSunset()) c.wallets = c.wallets.filter(w => w !== mnw);
-    else if (mnw) { mnw.manifest.features.testnet = true; (mnw.manifest.permissions.allowsOpen ||= []).push('https://testnet.mynearwallet.com'); mnw.manifest.name = 'MyNearWallet (testnet, ends 31 Oct)'; mnw.manifest.website = 'https://testnet.mynearwallet.com'; }
   }).catch(() => {});
   return c;
 }
 export function wallet() { return connectorFor(NEAR_NET); }
 /** Mainnet wallets for the default setup path. No guest faucet is injected here. */
 export function mainnetWallet() { return connectorFor('mainnet'); }
-// Wallets people ask for that NEAR Connect does not offer on the trial network. Each reason was checked in the NEAR Connect
-// manifest (hot-dao/near-selector repository/manifest.json) and the wallet's own NEAR Connect script.
-const UNAVAILABLE = [
-  ['HOT Wallet', 'Mainnet only: its NEAR Connect script refuses testnet.'],
-  ['HERE Wallet', 'Now HOT Wallet (same app), so mainnet only.'],
-  ['OKX Wallet', 'Mainnet only in NEAR Connect (no testnet support listed).'],
-  ['NEAR Mobile', 'Mainnet only: its NEAR Connect script refuses testnet.'],
-  ['Hana Wallet', 'Mainnet only in NEAR Connect (no testnet support listed).'],
-  ['Sender', 'Not in NEAR Connect.'],
-  ['Bitte Wallet', 'Not in NEAR Connect.'],
-];
-// MyNearWallet sunset: 31 Oct 2026, 00:00 Cairo (UTC+3). Nothing else in the house flow uses it.
 export const MNW_SUNSET = Date.UTC(2026, 9, 30, 21, 0, 0);
-const mnwSunset = () => Date.now() >= MNW_SUNSET;
-function unavailable(r) {
-  r.querySelectorAll?.('.modal-body').forEach(body => {
-    if (!body.querySelector('.connect-item') || body.querySelector('.nc-unavailable')) return;
-    const box = document.createElement('div');
-    box.className = 'nc-unavailable'; box.setAttribute('data-testid', 'wallets-unavailable');
-    box.style.cssText = 'margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,.12)';
-    const h = document.createElement('p'); h.textContent = 'Not available on testnet';
-    h.style.cssText = 'margin:4px 8px;font-size:12px;opacity:.7;color:#fff';
-    box.append(h);
-    for (const [name, why] of mnwSunset() ? [['MyNearWallet', 'Sunset: its own site set 31 Oct 2026 as the end date.'], ...UNAVAILABLE] : UNAVAILABLE) {
-      const row = document.createElement('div');
-      row.setAttribute('aria-disabled', 'true'); row.title = why; row.dataset.wallet = name;
-      row.style.cssText = 'display:flex;flex-direction:column;padding:6px 8px;opacity:.45;cursor:not-allowed;color:#fff';
-      const a = document.createElement('span'); a.textContent = name; a.style.fontSize = '14px';
-      const b = document.createElement('span'); b.textContent = why; b.style.fontSize = '12px';
-      row.append(a, b); box.append(row);
-    }
-    body.append(box);
-  });
-}
 export function onWallet(f) { listeners.add(f); }
 async function accountOf(c) {
   // A wallet picked earlier but never finished (e.g. a WalletConnect QR left open) must not hold the HUD forever.
@@ -108,25 +67,15 @@ export async function connect(note = () => {}, network = NEAR_NET) {
   const main = network === 'mainnet';
   let id;
   try { id = await c.selectWallet(); } catch { note(''); return accountOf(c); }
-  if (id === 'ethereum-wallets') note(main
-    ? 'In the evm-on-near.dev window that opens, press Connect Wallet, then MetaMask, and approve in MetaMask (it adds NEAR on mainnet). If no window opened, allow pop-ups for this site.'
-    : 'In the evm-on-near.dev window that opens, press Connect Wallet, then MetaMask, and approve in MetaMask (it adds NEAR Protocol Testnet, chain 398). If no window opened, allow pop-ups for this site.');
+  if (id === 'ethereum-wallets') note('In the evm-on-near.dev window that opens, press Connect Wallet, then MetaMask, and approve in MetaMask (it adds NEAR on mainnet). If no window opened, allow pop-ups for this site.');
   else if (id === 'nightly-wallet' && !window.nightly) note('Nightly is not installed in this browser. Install it from the Chrome Web Store (chromewebstore.google.com/detail/nightly/fiikommddbeccaoicoejoniammnalkfa), reload this page and press Sign in again.');
-  else if (id === 'near-cli') note(main
-    ? 'NEAR CLI: type your mainnet account id in the window, then run the near command it shows in your terminal (needs near-cli-rs installed).'
-    : 'NEAR CLI: type your testnet account id in the window, then run the near command it shows in your terminal (needs near-cli-rs installed).');
+  else if (id === 'near-cli') note('NEAR CLI: type your mainnet account id in the window, then run the near command it shows in your terminal (needs near-cli-rs installed).');
   else note('Waiting for your wallet…');
   try { await c.connect({ walletId: id }); note(''); }
   catch (e) { note(`Could not connect: ${e?.message || e}`); throw e; }
   return accountOf(c);
 }
-/** One click: a new trial account with 10 NEAR from the public faucet; its key stays in this browser. */
-export async function startGuest(note = () => {}) {
-  note('Making your free testnet account with 10 NEAR (up to a minute)…');
-  try { await wallet().connect({ walletId: GUEST_ID }); note(''); }
-  catch (e) { note(`Could not make the guest account: ${e?.message || e}`); throw e; }
-  return account();
-}
+export async function startGuest() { return null; }
 export async function disconnect() { await wallet().disconnect().catch(() => {}); }
 
 // A small "Connect wallet" control for any page (the town uses it).
@@ -154,8 +103,7 @@ export async function mountConnect(el) {
     // After a sign-in, tell the town (it flies to the House and opens /shops/vault/#create).
     const told = a => { if (a) dispatchEvent(new CustomEvent('nearcarta:signin', { detail: { accountId: a } })); return a; };
     on('in', () => connect(t => note(esc(t))).then(told));
-    on('guest', () => startGuest(t => note(esc(t))).then(told));
-    on('drip', async () => { try { const h = await faucet(who, t => note(esc(t))); note(`10 testnet NEAR sent: ${txl(h)}`); } catch (e) { note(esc('Faucet: ' + e.message)); } });
+    on('guest', () => Promise.resolve(null));
     on('out', () => disconnect());
   };
   onWallet(draw); await draw();
@@ -193,14 +141,14 @@ async function render() {
 async function deedCard(who) {
   if (!who) return '<span class="note">Sign in to build a house of your own.</span>';
   const [d, t, n, held, minted] = await Promise.all([deeds(who), nfts(who), nftSupply(), deedHouses(who), deedMinted(who)]);
-  const acc = a => `<a href="https://testnet.nearblocks.io/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
+  const acc = a => `<a href="https://nearblocks.io/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
   const houses = held.map(h => `<div class="deed" data-testid="deed-house" data-token="${esc(h.token_id)}">
       <b>${esc(h.metadata?.title || h.token_id)}</b> · purse <b data-testid="deed-purse">${near(h.purse?.balance)}</b> · rule: at most <b>${near(h.purse?.cap)}</b> per payment · paid ${near(h.purse?.paid)} in ${esc(h.purse?.pays ?? 0)}
-      <br><label>Pay to <input data-f="to" placeholder="account.testnet" maxlength="64" aria-label="Pay to account"></label>
+      <br><label>Pay to <input data-f="to" placeholder="account.near" maxlength="64" aria-label="Pay to account"></label>
       <label>NEAR <input data-f="amt" type="number" min="0.001" step="0.001" value="0.01" aria-label="Amount in NEAR"></label>
       <button data-act="deed-pay" data-token="${esc(h.token_id)}" data-testid="deed-pay">Pay from the house</button>
       <button data-act="deed-fund" data-token="${esc(h.token_id)}" data-testid="deed-fund">Add 0.05 NEAR</button>
-      <br><label>Give the house to <input data-f="give" placeholder="account.testnet" maxlength="64" aria-label="Give the deed to account"></label>
+      <br><label>Give the house to <input data-f="give" placeholder="account.near" maxlength="64" aria-label="Give the deed to account"></label>
       <button data-act="deed-give" data-token="${esc(h.token_id)}" data-testid="deed-give">Give deed</button>
       <span class="note">Whoever holds this deed controls the purse. Give it away and your wallet is refused from then on.</span></div>`).join('');
   return `<div data-testid="deed-v2">House deed (NEP-171 on ${acc(DEED)}): ${held.length ? houses
@@ -260,4 +208,4 @@ async function act(b) {
 
 export async function mountHouse() { wallet(); onWallet(() => render().catch(() => {})); await render(); }
 window.mountHouse = mountHouse;
-export { faucet, balance } from './onboard.js';
+export { balance } from './onboard.js';
