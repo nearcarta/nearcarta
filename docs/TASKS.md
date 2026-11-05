@@ -433,3 +433,8 @@ Brown town unchanged. No spend. `npm test` is unchanged: 440 tests, 437 pass, 0 
 - [x] T10 **The ferry quote says nothing is sent.** The button and the panel use the same sentence. The quote click does not call propose. Quotes stay dry. Accept: the T10 browser test at 1440 and 390. Done: `8b85502`, browser `d53b9c4`.
 - [x] T11 **Payouts says it prepares a batch.** The pin, the shop label, and the page no longer say "pay many at once". The page still does not send. Accept: the T11 browser test at 1440 and 390. Done: `8b85502`, browser `d53b9c4`.
 - [x] T12 **A click opens the building under the cursor.** Pin labels separate sideways. The banner takes the click; the stem does not. In the flat town, the nearest shop anchor wins when another label covers it. Accept: the T12 browser test at 1440 and 390. Done: `8b85502`, browser `d53b9c4`.
+
+## V. Eight tracks
+Section V supersedes the open parts of U. The owner redeploys the board. This repo does not deploy a contract. No spend. `npm test`: 442 tests, 439 pass, 3 skipped. Town Hall browser checks passed locally. Pin labels are unchanged.
+
+- [x] V1 **Eight tracks, eight buildings.** Ferry is DeFi, Mist Bank is Privacy, Chronicle and Toll are Autonomous Business, Guardhouse is AI Security, Town Hall is Agent Economy, Payouts is Real-World Money, Arena is Games, House is Open. Public files do not name the retired track. Accept: `public files do not name a retired track` and `the eight tracks are the eight buildings`. Done: `babf78a`.
