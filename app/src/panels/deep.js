@@ -62,6 +62,16 @@ export function refundForChain(chain) {
   return c === 'near' || c === 'near protocol' ? SAMPLE.near : SAMPLE.refund;
 }
 
+/** Smart tray default: stables ~3, tiny for high-value, else 1. */
+export function defaultAmtFor(sym) {
+  const s = String(sym || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (s.startsWith('USDC') || s === 'USDT' || s === 'DAI' || s === 'USDCE') return '3';
+  if (s === 'ETH' || s === 'WETH') return '0.002';
+  if (s === 'BTC' || s === 'WBTC') return '0.00005';
+  if (s === 'NEAR' || s === 'WNEAR') return '1';
+  return '1';
+}
+
 function routeMeta(r) {
   const parsed = parseRouteFrom(r.from);
   const sym = r.sym || parsed.sym;
@@ -105,8 +115,18 @@ function pickerOptions(choices, { q = '', chain = '', selected = '' } = {}) {
 }
 
 export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
-  const ri = state.ri || 0;
-  const rt = routes[ri] || routes[0];
+  const resolveRi = () => {
+    if (state.ri != null && state.ri !== '') return Number(state.ri) || 0;
+    if (state.fromId) {
+      const [sym, chain] = String(state.fromId).split('|');
+      const i = routes.findIndex(r => (r.sym || '').toUpperCase() === String(sym || '').toUpperCase() && (r.chain || '') === (chain || ''));
+      return i >= 0 ? i : -1; // custom pair: no corridor chip pressed
+    }
+    const usdc = routes.findIndex(r => r.id === 'route.usdc-base.zec' || ((r.sym || '').toUpperCase() === 'USDC' && r.chain === 'base'));
+    return usdc >= 0 ? usdc : 0;
+  };
+  const ri = resolveRi();
+  const rt = (ri >= 0 && routes[ri]) || routes.find(r => r.id === 'route.usdc-base.zec') || routes[0];
   const meta = routeMeta(rt);
   const choices = state.choices || [];
   const nTok = choices.length;
@@ -114,9 +134,10 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const chainOpts = ['<option value="">All</option>']
     .concat(chainsOf(choices).map(c => `<option value="${esc(c)}"${c === (state.chainFilter || '') ? ' selected' : ''}>${esc(c)}</option>`))
     .join('');
-  const fromOpts = pickerOptions(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: state.fromId || '' });
+  const defaultFromId = state.fromId || `${meta.sym}|${meta.chain}`;
+  const fromOpts = pickerOptions(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId });
   const toOpts = pickerOptions(choices, { q: state.tqTo || '', chain: state.chainFilterTo || '', selected: state.toId || 'ZEC|zec' });
-  const pickFrom = (state.fromId || '').split('|');
+  const pickFrom = String(defaultFromId).split('|');
   const pickSym = pickFrom[0] || meta.sym;
   const pickChain = pickFrom[1] || meta.chain;
   const pickTo = (state.toId || 'ZEC|zec').split('|');
@@ -158,19 +179,19 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       <button type="button" role="tab" class="ferry-tab${tab === 'routes' ? ' on' : ''}" data-tab="routes" aria-selected="${tab === 'routes' ? 'true' : 'false'}" data-testid="ferry-tab-routes">Routes</button>
       <button type="button" role="tab" class="ferry-tab${tab === 'rules' ? ' on' : ''}" data-tab="rules" aria-selected="${tab === 'rules' ? 'true' : 'false'}" data-testid="ferry-tab-rules">Rules</button>
     </div>`;
+  const amtVal = (state.amt != null && state.amt !== '') ? state.amt : defaultAmtFor(pickSym);
   const flow = `<div class="ferry-flow" data-testid="ferry-flow" aria-hidden="true"><span class="ferry-dest" data-testid="ferry-dest" hidden></span>
-      ${tokenStack(pickSym, pickChain, { size: 36, chainSize: 14 })}
+      ${tokenStack(pickSym, pickChain, { size: 48, chainSize: 16 })}
       <span class="ferry-flow-arrow">→</span>
-      ${tokenStack(toSym, toChain, { size: 36, chainSize: 14 })}
+      ${tokenStack(toSym, toChain, { size: 48, chainSize: 16 })}
     </div>`;
   const swap = `<div class="ferry-pane ferry-picker" data-pane="swap" data-testid="ferry-picker" ${tab === 'swap' ? '' : 'hidden'}>
       ${flow}
-      <p class="ferry-picker-note" data-testid="ferry-token-count" ${nTok ? '' : 'hidden'}>${nTok ? `${nTok} live` : ''}</p>
       <label class="field ferry-field"><span>Chain</span><select id="f-chain" data-testid="ferry-chain-filter">${chainOpts}</select></label>
-      <label class="field ferry-field"><span>Get</span><select id="f-from" data-testid="ferry-from">${fromOpts || `<option value="${esc(rt.from.replace('@', '|'))}">${esc(meta.label)}</option>`}</select></label>
-      <label class="field ferry-field"><span>Can</span><select id="f-to" data-testid="ferry-to">${toOpts || '<option value="ZEC|zec">ZEC on zec</option>'}</select></label>
+      <label class="field ferry-field"><span>You pay</span><select id="f-from" data-testid="ferry-from">${fromOpts || `<option value="${esc(rt.from.replace('@', '|'))}">${esc(meta.label)}</option>`}</select></label>
+      <label class="field ferry-field"><span>You get</span><select id="f-to" data-testid="ferry-to">${toOpts || '<option value="ZEC|zec">ZEC on zec</option>'}</select></label>
       <label class="field ferry-field amt-field"><span>Amount</span>
-        <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(state.amt || rt.amt)}" aria-label="Amount"><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
+        <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(amtVal)}" aria-label="Amount"><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
       </label>
       <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote">Get quote</button>
       ${rateLine}
@@ -179,9 +200,9 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
         <button type="button" class="primary ferry-cta" id="f-cargo" data-testid="ferry-load-cargo">Load cargo</button>
         <button type="button" class="primary ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}>Ask charter · load cargo</button>
       </div>
-      <p class="ferry-idle" data-testid="ferry-idle" ${showCargo ? 'hidden' : ''}>${state.quoted ? 'No deposit has been requested.' : 'No quote yet. No deposit has been requested.'}</p>
     </div>`;
   const routesPane = `<div class="ferry-pane" data-pane="routes" ${tab === 'routes' ? '' : 'hidden'}>
+      <p class="ferry-picker-note" data-testid="ferry-token-count" ${nTok ? '' : 'hidden'}>${nTok ? `${nTok} live tokens` : ''}</p>
       <p class="ferry-shortcuts-label">Quick ZEC corridors</p>
       <div class="route-row" role="group" aria-label="Quick ZEC corridors" data-testid="ferry-routes">${routes.map((r, i) => {
         const m = routeMeta(r);
@@ -224,6 +245,13 @@ function mountFerry(root, hooks) {
   const state = hooks.state || (hooks.state = {});
   if (!state.toId) state.toId = 'ZEC|zec';
   if (!state.tab) state.tab = 'swap';
+  // City default corridor: USDC@base → ZEC with amt 3 (first Get quote succeeds).
+  if (!state.fromId) state.fromId = 'USDC|base';
+  if (state.amt == null || state.amt === '') state.amt = defaultAmtFor((state.fromId || '').split('|')[0] || 'USDC');
+  if (state.ri == null) {
+    const i = routes.findIndex(r => (r.sym || '').toUpperCase() === 'USDC' && (r.chain || '') === 'base');
+    state.ri = i >= 0 ? i : 1;
+  }
   const syncReady = () => { state.charterReady = !!(hooks.charterReady && hooks.charterReady()); };
   const localPaint = () => {
     syncReady();
@@ -282,7 +310,11 @@ function mountFerry(root, hooks) {
     const chain = q$(root, '#f-chain');
     if (chain) chain.onchange = (e) => { state.chainFilter = e.target.value; refill(); };
     const from = q$(root, '#f-from');
-    if (from) from.onchange = (e) => { state.fromId = e.target.value; state.q = null; state.quoteError = ''; state.sample = false; refill(); localPaint(); };
+    if (from) from.onchange = (e) => {
+      state.fromId = e.target.value;
+      if (!state.amtEdited) state.amt = defaultAmtFor((e.target.value || '').split('|')[0]);
+      state.q = null; state.quoteError = ''; state.sample = false; refill(); localPaint();
+    };
     const to = q$(root, '#f-to');
     if (to) to.onchange = (e) => { state.toId = e.target.value; state.q = null; state.quoteError = ''; state.sample = false; };
     const amt = q$(root, '#f-amt');
@@ -332,9 +364,14 @@ function mountFerry(root, hooks) {
     try {
       const rows = hooks.tokens ? await hooks.tokens() : await fetch(api() + '/api/ferry/tokens').then(r => r.json());
       state.choices = tokenChoices(Array.isArray(rows) ? rows : rows?.tokens || []);
-      if (!state.fromId) {
+      if (!state.fromId || state.fromId === 'USDC|base') {
         const pref = state.choices.find(t => t.id === 'USDC|base') || state.choices.find(t => t.symbol === 'USDC') || state.choices[0];
-        if (pref) state.fromId = pref.id;
+        if (pref) {
+          state.fromId = pref.id;
+          if (!state.amtEdited) state.amt = defaultAmtFor(pref.symbol);
+        }
+      } else if (!state.amtEdited && (state.amt == null || state.amt === '')) {
+        state.amt = defaultAmtFor((state.fromId || '').split('|')[0]);
       }
       if (!state.choices.some(t => t.id === state.toId)) {
         const z = state.choices.find(t => t.symbol === 'ZEC') || { id: 'ZEC|zec' };
@@ -354,12 +391,12 @@ function mountFerry(root, hooks) {
     const originChain = from.split('@')[1] || '';
     let q;
     try {
-      if (hooks.quotePair) q = await hooks.quotePair(from, to, state.amt || '1');
+      if (hooks.quotePair) q = await hooks.quotePair(from, to, state.amt || defaultAmtFor(from.split('@')[0]));
       else if (hooks.quote && from === routes[state.ri || 0]?.from) q = await hooks.quote(routes[state.ri || 0].id, state.amt || routes[state.ri || 0].amt);
       else {
         const res = await fetch(api() + '/api/ferry/quote', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ from, to, amount: String(state.amt || '1'), recipient: SAMPLE.zec, refundTo: refundForChain(originChain), privacy: 'basic' }),
+          body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient: SAMPLE.zec, refundTo: refundForChain(originChain), privacy: 'basic' }),
         });
         q = await res.json();
       }
@@ -379,7 +416,7 @@ function mountFerry(root, hooks) {
       const [fs, fc] = String(state.fromId || from.replace('@', '|')).split('|');
       const [ts, tc] = String(state.toId || to.replace('@', '|')).split('|');
       hooks.onPair({
-        from, to, amt: state.amt || '1',
+        from, to, amt: state.amt || defaultAmtFor(from.split('@')[0]),
         fromSym: fs || from.split('@')[0], fromChain: fc || from.split('@')[1],
         toSym: ts || to.split('@')[0], toChain: tc || to.split('@')[1],
         outAmt: q.to?.amount || q.amountOut || '',

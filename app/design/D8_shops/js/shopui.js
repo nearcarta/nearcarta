@@ -43,7 +43,7 @@ function ensureFerryDock() {
     </div>
     <button type="button" class="ferry-agent-char" data-testid="ferry-agent-toggle" aria-expanded="false" aria-controls="ferry-agent-pop" title="AI Agent">
       <span class="ferry-agent-badge" aria-hidden="true">⋯</span>
-      <img class="ferry-agent-avatar" src="/setup/chars/robotexpressive.webp" width="92" height="92" alt="" decoding="async">
+      <img class="ferry-agent-avatar" src="/setup/chars/robotexpressive.webp" width="72" height="72" alt="" decoding="async">
       <span class="ferry-agent-name">AI Agent</span>
     </button>`;
   (document.getElementById('shopUI') || document.body).appendChild(d);
@@ -231,7 +231,7 @@ const APPS = {
     },
   },
   ferry: {
-    label: 'Ferry · cross-chain swap', idle: 'Pick any live 1Click token, or tell the ferryman. I\u2019ll stamp a quote, then load the cargo in the room.',
+    label: 'Ferry · cross-chain swap', idle: 'Pick a pair. Get a quote. Load cargo.',
     guest: true,
     form: () => '<div data-deep="ferry"></div>',
     bind: () => {

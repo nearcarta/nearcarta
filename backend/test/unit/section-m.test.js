@@ -84,12 +84,14 @@ test('ferry idle copy does not claim a quote or a deposit', () => {
   const cards = corridorCards(DEFAULT_ROUTES, []);
   assert.match(cards, /No quote yet/);
   assert.doesNotMatch(cards, /USD not quoted/);
+  // Swap pane drops idle microcopy (airy sketch); corridors still say no quote yet.
   const idle = ferryMarkup({}, DEFAULT_ROUTES);
-  assert.match(idle, /No quote yet\. No deposit has been requested/);
   assert.doesNotMatch(idle, /Waiting for the deposit/);
+  assert.doesNotMatch(idle, /No deposit has been requested/);
+  assert.match(idle, /You pay/);
+  assert.match(idle, /value="3"/); // city default USDC corridor
   const quoted = ferryMarkup({ quoted: true, lines: [{ id: DEFAULT_ROUTES[0].id, usdText: '', text: 'ETH' }] }, DEFAULT_ROUTES);
   assert.match(quoted, /USD not quoted/);
-  assert.match(quoted, /No deposit has been requested/);
   assert.doesNotMatch(quoted, /Waiting for the deposit/);
 });
 

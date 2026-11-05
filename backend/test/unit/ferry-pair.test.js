@@ -49,7 +49,7 @@ test('order chip states match TOWN_PLAN ferry labels', () => {
   assert.match(orderChipHtml('delivered'), /far bank/);
 });
 
-test('city Ferry markup exposes Swap tabs + Get/Can picker (agent dock is separate)', () => {
+test('city Ferry markup exposes Swap tabs + You pay/You get picker (agent dock is separate)', () => {
   const html = ferryMarkup({
     choices: [{ symbol: 'USDC', chain: 'base', id: 'USDC|base', label: 'USDC' }, { symbol: 'NEAR', chain: 'near', id: 'NEAR|near', label: 'NEAR' }],
     fromId: 'USDC|base',
@@ -60,6 +60,8 @@ test('city Ferry markup exposes Swap tabs + Get/Can picker (agent dock is separa
   assert.match(html, /data-testid="ferry-tab-swap"/);
   assert.match(html, /data-testid="ferry-from"/);
   assert.match(html, /data-testid="ferry-to"/);
+  assert.match(html, /You pay/);
+  assert.match(html, /You get/);
   assert.match(html, /data-testid="ferry-quote"/);
   assert.match(html, /NEAR\|near/);
   assert.match(html, /data-testid="ferry-card"/);

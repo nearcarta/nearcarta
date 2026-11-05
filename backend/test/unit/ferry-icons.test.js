@@ -105,18 +105,41 @@ test('token badges never use inline onerror (CSP)', () => {
   assert.match(tokenStack('ETH', 'eth'), /data-ti-fallback/);
 });
 
-test('Ferry tray sketch match: wide ~400px tray + AI Agent character (not emoji dock)', () => {
+test('Ferry tray sketch match: wide ~400px airy tray + AI Agent character (not emoji dock)', () => {
   const world = read('app/design/D9_world/world.css');
   assert.match(world, /max-width:\s*400px/);
   assert.doesNotMatch(world, /max-width:\s*268px/);
+  assert.match(world, /max-height:\s*calc\(100dvh - 132px\)/);
+  assert.match(world, /#t-who/);
+  assert.match(world, /#t-track/);
   assert.match(world, /\.ferry-agent-char/);
   assert.match(world, /\.ferry-agent-avatar/);
+  assert.match(world, /width:\s*72px/);
   assert.match(world, /\.ferry-agent-send/);
+  const panels = read('app/src/panels/panels.css');
+  assert.match(panels, /\.ferry-card\{display:grid;gap:18px\}/);
+  assert.match(panels, /\.ferry-pane\{display:grid;gap:16px\}/);
+  assert.match(panels, /width:48px!important/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /AI Agent/);
   assert.match(ui, /ferry-agent-char/);
   assert.match(ui, /robotexpressive\.webp/);
+  assert.match(ui, /width="72"/);
   assert.match(ui, /ferry-agent-send/);
   assert.doesNotMatch(ui, /💬/);
   assert.doesNotMatch(ui, /ferry-dock-toggle/);
+  const html = ferryMarkup({ fromId: 'USDC|base', toId: 'ZEC|zec' }, DEFAULT_ROUTES);
+  assert.match(html, /You pay/);
+  assert.match(html, /You get/);
+  assert.doesNotMatch(html, /<span>Get<\/span>/);
+  assert.doesNotMatch(html, /<span>Can<\/span>/);
+  assert.match(html, /value="3"/);
+});
+
+test('defaultAmtFor prefers 3 for USDC and tiny for ETH', async () => {
+  const { defaultAmtFor } = await import('../../../app/src/panels/deep.js');
+  assert.equal(defaultAmtFor('USDC'), '3');
+  assert.equal(defaultAmtFor('usdc.e'), '3');
+  assert.equal(defaultAmtFor('ETH'), '0.002');
+  assert.equal(defaultAmtFor('NEAR'), '1');
 });
