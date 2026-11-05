@@ -26,3 +26,8 @@ export function planSplit({ payee, nonce, policy, nowMs, ttlMs = 10 * 60_000, cl
     policy_version: policy, expires_at: expires, memo: l.memo, receipt: null }));
   return { ps, n: ps.length, total: SPLIT_TOTAL, gasTgas: batchGasTgas(ps.length), legs: LEGS.map(l => ({ ...l, to: to[l.role] })) };
 }
+
+// Mainnet toll: the payee is always this account. Not on the allowlist means refuse before signing; never pay another shop.
+export const TOLL_ACCT = 'toll.nearcarta.near';
+export const TOLL_NOT_LISTED = 'Add toll.nearcarta.near to your allowlist first';
+export const tollAllowed = rc => Array.isArray(rc) && rc.includes(TOLL_ACCT);

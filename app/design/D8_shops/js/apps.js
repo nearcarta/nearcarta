@@ -257,8 +257,9 @@ export function ruleFor(o, clauseId = 'pay') {
 export const TOLL_MAIN = 0.001;
 export async function toll() {
   // mainnet board row: one 0.001 NEAR toll, inside the row's 0.005 cap (0.01 would be refused). The Base Sepolia gate is testnet only.
-  if (S.board) { const rc = pay()?.receivers || [], to = rc.includes('toll.nearcarta.near') ? 'toll.nearcarta.near' : merchants()[0];
-    return boardPay({ shop: 'toll', receiver: to, amountY: toY(TOLL_MAIN) }); }
+  // Only ever pay the toll account itself. If it is not on the allowlist, refuse before any signing (never pay another shop).
+  if (S.board) { if (!TS.tollAllowed(pay()?.receivers)) throw new Error(TS.TOLL_NOT_LISTED);
+    return boardPay({ shop: 'toll', receiver: TS.TOLL_ACCT, amountY: toY(TOLL_MAIN) }); }
   const payee = merchants()[0];
   if (!TS.canSplit(pay()?.receivers, payee, canBatch())) return ask({ shop: 'toll', receiver: payee, amountY: toY(0.01), memo: 'toll:base-sepolia' });
   const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
