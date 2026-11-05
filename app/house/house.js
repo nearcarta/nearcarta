@@ -149,7 +149,12 @@ async function load() {
 
 async function render() {
   const out = $('#house .out');
-  const h = await load(); const who = await account();
+  const h = await load();
+  if (h?.kind === 'deed') {
+    out.innerHTML = `${deedMarkup()}<div class="house-empty" data-testid="house-empty" role="status"><p>This record is the public deed. It is not your charter row.</p><p>Your row is read with get_charter on the house shop. Nothing was signed.</p></div>`;
+    return;
+  }
+  const who = await account();
   const s = h?.state || {};
   const keys = h?.keys || {};
   const pend = Object.entries(h?.actions || {}).filter(([, a]) => a?.status === 'escalated');

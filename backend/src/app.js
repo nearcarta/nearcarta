@@ -32,8 +32,9 @@ import { receiptsBody } from '../../shared/rails/receipts.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
-  const H = DEP.house;
-  if (!H || typeof H !== 'object') return null;
+  const recorded = DEP.house && typeof DEP.house === 'object' ? DEP.house : DEP.extras?.house;
+  const H = recorded && typeof recorded === 'object' ? recorded : null;
+  if (!H) return null;
   // The mainnet house record is the deed contract. It has no oath account, so this must not call view() on an empty id.
   if (!H.oath) {
     return {

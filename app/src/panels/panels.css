@@ -186,7 +186,7 @@ body[data-shop=bank] .payee-id{
 #row-form [data-testid=hall-cap]{color:#fff8ee;font-size:16px;min-height:44px}
 #row-form button.copy-id{grid-column:auto;align-self:flex-start;margin:0}
 .deed-mint{margin:0;padding-top:18px}
-a.deed-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;min-height:44px;box-sizing:border-box}
+a.deed-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none !important;min-height:44px;box-sizing:border-box;color:#2A1608 !important}
 .deed-actions{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 0}
 .house-empty,.house-state{margin-top:16px;padding:14px 16px;border:1px solid #4a3a28;border-radius:12px;background:#1a140f;color:#fff8ee;font-weight:500;font-size:16px;line-height:1.45}
 .house-empty p,.house-state p{margin:0 0 8px}
