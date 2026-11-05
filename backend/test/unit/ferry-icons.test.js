@@ -145,5 +145,6 @@ test('defaultAmtFor prefers 3 for USDC and tiny for ETH', async () => {
   assert.equal(defaultAmtFor('USDC'), '3');
   assert.equal(defaultAmtFor('usdc.e'), '3');
   assert.equal(defaultAmtFor('ETH'), '0.002');
-  assert.equal(defaultAmtFor('NEAR'), '1');
+  assert.equal(defaultAmtFor('NEAR'), '0.05');
+  assert.equal(defaultAmtFor('wNEAR'), '0.05');
 });

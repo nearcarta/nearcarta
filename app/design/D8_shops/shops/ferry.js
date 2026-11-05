@@ -17,7 +17,7 @@ export const RESULT = 'Crossed';
 const diffTxt = r => r.diffs ? r.diffs.map(d => `${d.field}: sent ${d.sent}, echo ${d.got}`).join('; ') : `receivers ${r.receivers.join(' + ')}`;
 const utc3 = s => { const d = new Date(s.replace(' UTC', 'Z').replace(' ', 'T')); if (isNaN(d)) return s; d.setUTCHours(d.getUTCHours() + 3); return d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC+3'; };
 export const PROOF = mainnet('ferry') + proof(
-  note('In the city tray pick any live 1Click pair, then Load the cargo. Pay from another chain on <a href="/ferry-widget">Pay</a>. The charter checks the recipient, the cap and the daily budget before a deposit address is created. At most 0.20 USD. You send the tokens yourself.'),
+  note('Fund NEAR once in /setup. The session swap is about 0.05 wNEAR on NEAR to USDC on NEAR: the charter calls wrap.near with propose_call and no wallet opens. Guest Load cargo is a demo and does not say delivered. <a href="/ferry-widget">Pay</a> is optional: you send that deposit yourself, at most 0.20 USD. A 1Click bridge minimum can refuse a quote with no deposit address.'),
   h3('What this quote is'),
   row({ k: `${Q.from.amt} ${Q.from.sym} on ${Q.from.chain} would become about ${Q.to.exact} ZEC`, why: 'A practice quote. Nothing was sent and nothing was spent.', st: Q.sig ? 'ok' : 'no', stText: Q.sig ? 'signed' : 'not signed', src: 'live' }),
   row({ k: 'The Zcash address hides the amount', why: 'The recipient and the amount stay hidden. A weaker address is refused.', st: Q.ua.orchardOnly ? 'ok' : 'no', stText: Q.ua.orchardOnly ? 'hidden' : 'not hidden', src: 'live' }),
@@ -93,8 +93,20 @@ export default async function ferry(ctx) {
     else tags[2].html = orderChipHtml(id);
   };
   const swapsTo = () => { if (tags[0].el) tags[0].el.innerHTML = icon(cargo.toSym, cargo.toChain); };
+  const hideRefuseTag = () => {
+    const el = tags[1].el;
+    if (!el) return;
+    el.classList.add('hide');
+    el.setAttribute('hidden', '');
+  };
+  const showRefuseTag = () => {
+    const el = tags[1].el;
+    if (!el) return;
+    el.classList.remove('hide');
+    el.removeAttribute('hidden');
+  };
   const hideRefuse = () => {
-    tags[1].el?.classList.add('hide');
+    hideRefuseTag();
     seal.material = sealIdle;
   };
   const applyPair = (p = {}) => {
@@ -136,7 +148,7 @@ export default async function ferry(ctx) {
       speak('Stale quote? Checking the seal…', 'speech');
       slip.visible = true; const s0 = slip.position.clone(), s1 = new THREE.Vector3(-2.6, .8, -.84); rob.lookAt(seal.position);
       yield tween(1.1, k => { slip.position.lerpVectors(s0, s1, k); slip.position.y += Math.sin(k * Math.PI) * .6; slip.rotation.z = Math.sin(k * 8) * .2; }, easeInOut);
-      seal.material = sealNo; tags[1].el?.classList.remove('hide'); sfx('refuse'); rob.play('No', { once: true }); yield wait(.5);
+      seal.material = sealNo; showRefuseTag(); sfx('refuse'); rob.play('No', { once: true }); yield wait(.5);
       const d0 = slip.position.clone(), d1 = new THREE.Vector3(-1.3, -.25, -.7);
       yield tween(.9, k => { slip.position.lerpVectors(d0, d1, k); slip.position.y = d0.y + (d1.y - d0.y) * k * k; slip.rotation.x = -k * 1.4; slip.material.opacity = 1 - k * .9; });
       slip.visible = false; yield wait(.3);
@@ -150,7 +162,7 @@ export default async function ferry(ctx) {
       // the signed quote matches the request: the seal goes mint and the boat crosses with the visitor's pair
       speak('Seal matches. Casting off.', 'speech');
       seal.material = sealOk;
-      tags[1].el?.classList.add('hide');
+      hideRefuseTag();
       sfx('allowed'); sfx('water'); rob.play('Idle'); paintOrder('transit');
       yield tween(2.2, k => { b.position.x = -.85 + 1.7 * k; b.rotation.z = Math.sin(k * 12) * .03; }, easeInOut);
       swapsTo(); speak(`Far bank · ${cargo.toSym}`, 'speech');

@@ -9,6 +9,40 @@
 
 export const MAX_CHECKOUT_USD = 0.2;
 export const WRAP = 'wrap.near';
+// Primary session settle. A dry 1Click quote of 0.05 wNEAR@near → USDC@near is about $0.185,
+// under MAX_CHECKOUT_USD, and the origin chain is NEAR so depositPlan returns propose_call.
+// 1Click can still reject a different corridor under that USD cap when the amount is below the
+// bridge minimum ("Amount is too low for bridge, try at least N" raw units).
+// https://docs.near-intents.org/integration/distribution-channels/1click-api
+// wrap.near near_deposit / storage_deposit / ft_transfer:
+// https://docs.near.org/tutorials/tokens/creating-a-ft
+// The board signs call_text (contracts/charter_board/src/lib.rs) and the session key calls
+// propose_call. A function-call key cannot attach NEAR:
+// https://docs.near.org/protocol/accounts-contracts/access-keys
+export const SESSION_SWAP = {
+  from: 'wNEAR@near',
+  to: 'USDC@near',
+  amt: '0.05',
+  fromId: 'wNEAR|near',
+  toId: 'USDC|near',
+};
+
+/** Plain reason for a 1Click quote or checkout miss. Never says the boat delivered. */
+export function explainQuoteMiss(error) {
+  const raw = String(error || '').replace(/\s+/g, ' ').trim();
+  const low = raw.match(/too low for bridge[^\d]*(\d+)/i);
+  if (low) {
+    return `Below this corridor's bridge minimum. 1Click asked for at least ${low[1]} raw units. No deposit address. Nothing was sent. The boat has not delivered.`;
+  }
+  if (/over_checkout_cap|over 0\.20/i.test(raw)) {
+    return 'Over the 0.20 USD checkout cap. No deposit address. Nothing was sent. The boat has not delivered.';
+  }
+  if (raw === 'no_usd' || /no usd|has no USD/i.test(raw)) {
+    return 'No deposit address. This quote has no USD amount. Nothing was sent. The boat has not delivered.';
+  }
+  if (!raw) return 'Live quote did not return. No deposit address. Nothing was sent. The boat has not delivered.';
+  return `${raw.slice(0, 180)} No deposit address. Nothing was sent. The boat has not delivered.`;
+}
 // wrap.near storage_balance_bounds.min — 0.00125 NEAR.
 export const WRAP_STORAGE_YOCTO = '1250000000000000000000';
 // Board forwards 30 Tgas plus an 8 Tgas callback. 42 Tgas leaves a little for propose_call

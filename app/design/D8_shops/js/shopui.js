@@ -15,7 +15,8 @@ import { teeResult, PROOF_HREF } from '/tee-view.js';
 import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
 import { mountShop } from '/panels/deep.js';
 import { pairClauseId, chainLabel } from '/panels/ferry-pair.js';
-import { depositPlan, mayCheckout, nextFerryBeat } from '/panels/ferry-settle.js';
+import { depositPlan, explainQuoteMiss, mayCheckout, nearNative, nextFerryBeat, SESSION_SWAP } from '/panels/ferry-settle.js';
+import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
 import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues, prepareRows } from './payouts.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
@@ -46,7 +47,7 @@ function ensureFerryDock() {
   d.innerHTML = `<div id="ferry-agent-pop" class="ferry-agent-pop" data-testid="ferry-agent" hidden>
       <p id="f-agent-log" class="ferry-agent-log" data-testid="ferry-agent-log" hidden></p>
       <div class="ferry-agent-row">
-        <input id="f-agent" data-testid="ferry-agent-input" placeholder="Swap 3 USDC to ZEC" autocomplete="off" aria-label="Ask the AI Agent">
+        <input id="f-agent" data-testid="ferry-agent-input" placeholder="Swap 0.05 wNEAR on NEAR to USDC" autocomplete="off" aria-label="Ask the AI Agent">
         <button type="button" class="ferry-agent-send" id="f-agent-go" data-testid="ferry-agent-go" aria-label="Send">➤</button>
       </div>
     </div>
@@ -62,6 +63,7 @@ function ensureFerryDock() {
 function wireFerryDock(hooks) {
   const d = ensureFerryDock();
   if (!d) return;
+  installFerryDock(document);
   if (!d.dataset.wired) {
     d.dataset.wired = '1';
     const toggle = d.querySelector('[data-testid=ferry-agent-toggle]');
@@ -72,11 +74,16 @@ function wireFerryDock(hooks) {
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
   }
+  // Re-arm after every ferry paint/bind. The document listener still fires if onclick is dropped.
+  armFerryDock((text) => {
+    if (typeof hooks?.runAgent === 'function') return hooks.runAgent(text);
+    return { ok: false, hint: 'The agent is not ready. Open Ferry and press Send again.' };
+  });
   const go = d.querySelector('#f-agent-go');
   const input = d.querySelector('#f-agent');
-  const send = () => { if (hooks?.runAgent) hooks.runAgent(go); };
+  const send = (e) => { e?.preventDefault?.(); return dispatchFerryDock(document); };
   if (go) go.onclick = send;
-  if (input) input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } };
+  if (input) input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); send(e); } };
 }
 function ferryPlainReason(reason) {
   const raw = String(reason || '');
@@ -133,7 +140,7 @@ function watchFerryDeposit(address) {
   tick();
   ferryWatch = setInterval(tick, 4000);
 }
-/** Guest cinema, or a session stamp plus a ≤ $0.20 deposit. Delivered only after SUCCESS on the session path. */
+/** Guest is a labeled demo. A session stamp plus a ≤ $0.20 checkout may propose_call. Delivered only after SUCCESS. */
 async function settleFerry(wantCharter) {
   const pair = APPS.ferry.pairFromState();
   const outAmt = extra.q.to?.amount || extra.q.amountOut || '';
@@ -146,12 +153,12 @@ async function settleFerry(wantCharter) {
         rc: '<a class="rc" href="/setup">Open /setup</a>',
       };
     }
-    sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
-    if (sh?.act && runScene) runScene(sh.act({ refused: false }));
+    sh?.hideRefuse?.();
+    sh?.applyPair?.({ ...pair, outAmt, order: 'jetty' });
     return {
       kind: 'ok', hero: APPS.ferry.hero(),
-      say: `Demo crossing only — ${esc(pair.fromSym)} to ${esc(pair.toSym)} is not a settled swap. Pay from any chain, or Ask charter for a stamp under the cap.`,
-      rc: '<span class="rc" data-testid="ferry-order-state">order · demo</span><a class="rc" href="/ferry-widget">Pay from any chain</a>',
+      say: `Demo crossing only — ${esc(pair.fromSym)} to ${esc(pair.toSym)} is not a settled swap. The boat does not say delivered.`,
+      rc: '<span class="rc" data-testid="ferry-order-state">order · demo</span><a class="rc" href="/ferry-widget">Optional Pay</a>',
     };
   }
   sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
@@ -186,13 +193,11 @@ async function settleFerry(wantCharter) {
   if (!cap.ok) {
     sh?.hideRefuse?.();
     sh?.setOrder?.('quoted');
-    extra.charterNote = cap.reason === 'over_checkout_cap'
-      ? 'No deposit address. This quote is over 0.20 USD.'
-      : 'No deposit address. This quote has no USD amount.';
+    extra.charterNote = explainQuoteMiss(cap.reason || 'no_usd');
     return {
       kind: 'ok', o, hero: APPS.ferry.hero(),
       say: `${stamp} ${extra.charterNote}`,
-      rc: (o?.tx ? A.txLine(o.tx) : '') + '<a class="rc" href="/ferry-widget">Pay from any chain</a>',
+      rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · quoted</span>',
       rule: o ? A.ruleFor(o, clause) : '',
     };
   }
@@ -202,18 +207,14 @@ async function settleFerry(wantCharter) {
   if (!checkout?.ok || !checkout.depositAddress) {
     sh?.hideRefuse?.();
     sh?.setOrder?.('quoted');
-    const why = ferryPlainReason(checkout?.reason || checkout?.error);
-    extra.charterNote = `No deposit address: ${why}. Nothing was sent.`;
+    extra.charterNote = explainQuoteMiss(checkout?.error || checkout?.reason || 'checkout failed');
     return {
       kind: 'ok', o, hero: APPS.ferry.hero(),
       say: `${stamp} ${extra.charterNote}`,
-      rc: (o?.tx ? A.txLine(o.tx) : '') + '<a class="rc" href="/ferry-widget">Pay from any chain</a>',
+      rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · quoted</span>',
       rule: o ? A.ruleFor(o, clause) : '',
     };
   }
-  extra.depositAddress = checkout.depositAddress;
-  extra.depositUsd = checkout.usd || String(cap.usd);
-  extra.depositHelp = checkout.help || 'Waiting for the deposit. The boat has not delivered.';
   const plan = depositPlan({
     from: pair.from,
     amount: pair.amt,
@@ -222,22 +223,62 @@ async function settleFerry(wantCharter) {
     capYocto: A.S.boardRow?.per_action_cap || null,
     balanceYocto: A.S.boardRow?.balance || null,
   });
-  let sent = null;
-  if (plan.kind === 'propose_call') sent = await A.ferryProposeCalls(plan.steps);
-  const sentOk = !!(sent && sent.ok && sent.wallet === false);
-  extra.depositMode = sentOk ? 'propose_call' : 'you-send';
-  if (!sentOk) extra.depositHelp = plan.why || extra.depositHelp;
   sh?.hideRefuse?.();
+  const waiting = '<span class="rc" data-testid="ferry-order-state">order · waiting</span>';
+  if (plan.kind === 'propose_call') {
+    let sent = null;
+    try { sent = await A.ferryProposeCalls(plan.steps); }
+    catch (e) { sent = { ok: false, wallet: false, reason: e?.message || 'propose_call failed' }; }
+    const sentOk = !!(sent && sent.ok && sent.wallet === false);
+    if (!sentOk) {
+      sh?.setOrder?.('quoted');
+      extra.depositAddress = '';
+      extra.depositMode = '';
+      const why = ferryPlainReason(sent?.reason) || plan.why || 'the charter did not send the wrap';
+      extra.charterNote = `No wrap was sent: ${why}. No wallet opened. You are not asked to send USDC on Base. The boat has not delivered.`;
+      return {
+        kind: 'ok', o, hero: APPS.ferry.hero(),
+        say: `${stamp} ${extra.charterNote}`,
+        rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · quoted</span>',
+        rule: o ? A.ruleFor(o, clause) : '',
+      };
+    }
+    extra.depositAddress = checkout.depositAddress;
+    extra.depositUsd = checkout.usd || String(cap.usd);
+    extra.depositMode = 'propose_call';
+    extra.depositHelp = 'Charter sent the NEAR deposit. Waiting until 1Click says SUCCESS. The boat has not delivered.';
+    sh?.setOrder?.('deposit');
+    watchFerryDeposit(checkout.depositAddress);
+    return {
+      kind: 'ok', o, hero: APPS.ferry.hero(),
+      say: `${stamp} The charter sent the NEAR deposit with propose_call (no wallet). The boat waits until 1Click says SUCCESS.`,
+      rc: (o?.tx ? A.txLine(o.tx) : '') + (sent.tx ? A.txLine(sent.tx, 'deposit') : '') + waiting,
+      rule: o ? A.ruleFor(o, clause) : '',
+    };
+  }
+  if (nearNative(pair.from)) {
+    sh?.setOrder?.('quoted');
+    extra.depositAddress = '';
+    extra.depositMode = '';
+    extra.charterNote = `The charter did not send this wrap (${plan.why || 'the row cap cannot hold it'}). No wallet opened. You are not asked to send USDC on Base. The boat has not delivered.`;
+    return {
+      kind: 'ok', o, hero: APPS.ferry.hero(),
+      say: `${stamp} ${extra.charterNote}`,
+      rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · quoted</span>',
+      rule: o ? A.ruleFor(o, clause) : '',
+    };
+  }
+  extra.depositAddress = checkout.depositAddress;
+  extra.depositUsd = checkout.usd || String(cap.usd);
+  extra.depositMode = 'you-send';
+  extra.depositHelp = `${plan.why || 'Send the tokens yourself.'} The boat has not delivered.`;
   sh?.setOrder?.('deposit');
   watchFerryDeposit(checkout.depositAddress);
   const where = `<code>${esc(checkout.depositAddress)}</code>`;
-  const sayText = sentOk
-    ? `${stamp} The charter sent the NEAR deposit (no wallet). The boat waits until 1Click says SUCCESS.`
-    : `${stamp} Send at most ${esc(extra.depositUsd)} USD yourself to ${where}. ${esc(plan.why || 'The boat waits until 1Click says SUCCESS.')}`;
   return {
     kind: 'ok', o, hero: APPS.ferry.hero(),
-    say: sayText,
-    rc: (o?.tx ? A.txLine(o.tx) : '') + (sentOk && sent.tx ? A.txLine(sent.tx, 'deposit') : '') + `<span class="rc" data-testid="ferry-order-state">order · waiting</span>`,
+    say: `${stamp} This corridor is not wrap.near. Send at most ${esc(extra.depositUsd)} USD yourself to ${where}. The boat waits until 1Click says SUCCESS.`,
+    rc: (o?.tx ? A.txLine(o.tx) : '') + '<a class="rc" href="/ferry-widget">Optional Pay</a>' + waiting,
     rule: o ? A.ruleFor(o, clause) : '',
   };
 }
@@ -375,7 +416,7 @@ const APPS = {
     },
   },
   ferry: {
-    label: 'Ferry · cross-chain swap', idle: 'Pick a pair. Get a quote. Load cargo.',
+    label: 'Ferry · cross-chain swap', idle: 'Fund NEAR once in /setup. Swap about 0.05 wNEAR on NEAR. Guest Load cargo is a demo.',
     guest: true,
     form: () => '<div data-deep="ferry"></div>',
     bind: () => {
@@ -389,9 +430,11 @@ const APPS = {
         charterReady: () => APPS.ferry.charterReady(),
         openRules: () => openRules(),
         onLoadCargo: (opts) => loadFerryCargo(!!opts?.charter),
-        onAgain: () => primary(),
+        onAgain: () => { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); return primary(); },
+        hideRefuse: () => sh?.hideRefuse?.(),
+        setOrder: (id) => sh?.setOrder?.(id),
         repaint: () => paint(),
-        onPair: (pair) => { if (sh?.applyPair) sh.applyPair(pair); },
+        onPair: (pair) => { sh?.hideRefuse?.(); if (sh?.applyPair) sh.applyPair(pair); },
       };
       mountShop('ferry', document.getElementById('t-form'), hooks);
       wireFerryDock(hooks);
@@ -413,13 +456,13 @@ const APPS = {
       return `<span class="tok"><b class="num">${esc(inn || extra.amt || '')}</b><span class="sym">${esc(fromSym)}</span></span><span class="arrow" aria-hidden="true">→</span><span class="tok"><b class="num">${esc(out ? out.toFixed(5) : '')}</b><span class="sym">${esc(toSym)}</span></span>`;
     },
     pairFromState: () => {
-      const fromId = extra.fromId || '';
-      const toId = extra.toId || 'ZEC|zec';
+      const fromId = extra.fromId || SESSION_SWAP.fromId;
+      const toId = extra.toId || SESSION_SWAP.toId;
       const [fs, fc] = fromId.split('|');
       const [ts, tc] = toId.split('|');
-      const from = (fs && fc) ? `${fs}@${fc}` : (A.ROUTES[extra.ri || 0]?.from || 'USDC@base');
-      const to = (ts && tc) ? `${ts}@${tc}` : 'ZEC@zec';
-      const amt = extra.amt || A.ROUTES[extra.ri || 0]?.amt || '1';
+      const from = (fs && fc) ? `${fs}@${fc}` : (A.ROUTES[extra.ri || 0]?.from || SESSION_SWAP.from);
+      const to = (ts && tc) ? `${ts}@${tc}` : SESSION_SWAP.to;
+      const amt = extra.amt || A.ROUTES[extra.ri || 0]?.amt || SESSION_SWAP.amt;
       return { from, to, amt, fromSym: from.split('@')[0], fromChain: from.split('@')[1], toSym: to.split('@')[0], toChain: to.split('@')[1] };
     },
     run: async () => {
@@ -431,9 +474,14 @@ const APPS = {
       }
       if (!extra.q) {
         extra.fdone = false;
+        sh?.hideRefuse?.();
+        sh?.setOrder?.('jetty');
         const pair = APPS.ferry.pairFromState();
         const q = await A.quotePair(pair.from, pair.to, pair.amt);
-        if (!q.ok || !q.checks?.signature) throw new Error(q.error || 'quote not signed');
+        if (!q.ok || !q.checks?.signature) {
+          sh?.hideRefuse?.();
+          throw new Error(explainQuoteMiss(q.error || 'quote not signed'));
+        }
         extra.q = q;
         const outAmt = q.to?.amount || q.amountOut || '';
         sh?.applyPair?.({ ...pair, outAmt, order: 'quoted' });
@@ -441,9 +489,9 @@ const APPS = {
         return {
           keep: true, hero: APPS.ferry.hero(),
           say: ready
-            ? `Quote ready for ${esc(pair.from)} → ${esc(pair.to)}. Ask charter is a stamp under the cap, then a deposit address if this quote is at most 0.20 USD. No wallet popup.`
+            ? `Quote ready for ${esc(pair.from)} → ${esc(pair.to)}. Ask charter is a stamp under the cap, then propose_call on wrap.near if this quote is at most 0.20 USD. No wallet popup.`
             : `Quote ready for ${esc(pair.from)} → ${esc(pair.to)}. Load cargo here is a demo crossing, not a settled swap.`,
-          rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click · ${esc((q.correlationId || '').slice(0, 8))}</span><span class="rc" data-testid="ferry-clause">clause ${esc(A.ferryClauseForPair?.(pair.from, pair.to) || pairClauseId(pair.from, pair.to))}</span>`,
+          rc: `<a class="rc" href="/ferry-widget">Optional Pay</a><span class="rc">1Click · ${esc((q.correlationId || '').slice(0, 8))}</span><span class="rc" data-testid="ferry-clause">clause ${esc(A.ferryClauseForPair?.(pair.from, pair.to) || pairClauseId(pair.from, pair.to))}</span>`,
         };
       }
       // Quote is up. Same path as the card: session settles, guest is a demo crossing.
@@ -792,7 +840,7 @@ async function primary(auto = false) {
   }
 }
 const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another entry', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Send another note', toll: 'Pass the gate again' };
-function fail(e) { stopProgress(); phase = 'idle'; say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry') hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
+function fail(e) { stopProgress(); phase = 'idle'; if (cur === 'ferry') { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); } say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry') hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
 
 // ---------- rules sheet ----------
 function openRules() {

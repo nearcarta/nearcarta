@@ -51,7 +51,7 @@ body:not(.ready) .lb { opacity: 0; }
 .stag { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: color-mix(in srgb, var(--base) 86%, transparent); border: 1px solid var(--line); font-size: 12px; white-space: nowrap; transition: opacity .2s var(--ease); }
 .stag.bare { padding: 4px; }
 .stag.no { border-color: var(--no); color: var(--no); }
-.stag.hide { opacity: 0; }
+.stag.hide { opacity: 0; visibility: hidden; pointer-events: none; }
 .stag .tok .sym { display: none; }
 
 /* the tray: bottom-left counter slip, one primary action */
