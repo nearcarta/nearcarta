@@ -5,6 +5,8 @@ import { keyPlan, keyToAdd } from '../../../shared/vault/agentkeys.js';
 import { runSteps, runTask, runAsk } from '../../../shared/vault/run.js';
 import { parseAsk } from '../../../shared/vault/ask.js';
 import { lookalike } from '../../../shared/vault/attacks.js';
+import { roomError } from '../../src/room-error.js';
+import { installBoundary } from '../../src/panels/boundary.js';
 
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
@@ -38,12 +40,8 @@ const post = (path, body) => api(path, { method: 'POST', headers: { 'content-typ
 function toastHtml(html, kind = 'info') { const t = $('#log'); const li = document.createElement('li'); li.className = kind; li.innerHTML = html; t.prepend(li); }
 function toast(text, kind = 'info') { const t = $('#log'); const li = document.createElement('li'); li.className = kind; li.textContent = text; t.prepend(li); }
 function busy(btn, on, label) { if (!btn) return; btn.disabled = on; if (on) { btn.dataset.l = btn.textContent; btn.textContent = label || 'Waiting for chain…'; } else if (btn.dataset.l) btn.textContent = btn.dataset.l; }
-function plainErr(e) {
-  const m = String(e?.message || e || '');
-  if (/failed to fetch|networkerror|load failed|aborted/i.test(m)) return 'The town API is not reachable just now.';
-  if (/^http 5\d\d/.test(m)) return 'The town API is busy. Try again in a moment.';
-  return m;
-}
+function plainErr(e) { return roomError(e); }
+installBoundary(document.querySelector('main') || document.body);
 const fail = e => toastHtml(`<b>Stopped:</b> ${esc(plainErr(e))}${e.tx ? ' · ' + txl(e.tx) : ''}`, 'bad err');
 function showLoadError(e) {
   const story = $('#story');
@@ -63,8 +61,9 @@ async function refreshWho() {
   if (me && !charter) {
     // Newest factory first, then the legacy ones: a guest who opened a charter before R17 keeps it.
     for (const f of [CFG.factory, ...(CFG.legacy || []).map(l => l.factory)]) {
-      const mine = await view(f, 'charters_of', { owner: me }).catch(() => []);
-      if (mine.length) { await useCharter(mine[mine.length - 1]); break; }
+      const mine = await view(f, 'charters_of', { owner: me }).catch(() => null);
+      const list = Array.isArray(mine) ? mine : [];
+      if (list.length) { await useCharter(list[list.length - 1]); break; }
     }
   }
   renderCreate();
@@ -496,16 +495,18 @@ async function attackRun(btn) {
     const key = keyFrom(localStorage.getItem(agentLS(charter)));
     r = await runSteps({ charter, key, attackId: id, tag: 'mine', rpcCall: rpc, viewF: view, send: sendPropose,
       onStep: (s, i, n) => { out.querySelector('.steps').insertAdjacentHTML('beforeend', stepRow(s, i, n)); record(s, 'Scam ' + id); } });
-    if (r.refused) await post('/api/vault/record', { tx: r.steps.at(-1).tx, charter }).catch(e => toast('Leaderboard did not take it: ' + e.message, 'bad'));
+    if (r.refused) await post('/api/vault/record', { tx: (Array.isArray(r.steps) ? r.steps : []).at(-1)?.tx, charter }).catch(e => toast('Leaderboard did not take it: ' + roomError(e), 'bad'));
     renderFacts().catch(() => {});
   } else {
     r = await post('/api/vault/attack', { attack: id, nickname: nick() });
-    out.querySelector('.steps').innerHTML = (Array.isArray(r.steps) ? r.steps : []).map((s, i) => stepRow(s, i + 1, r.steps.length)).join('');
-    for (const s of r.steps) record(s, 'Shared scam ' + id);
+    const steps = Array.isArray(r?.steps) ? r.steps : [];
+    out.querySelector('.steps').innerHTML = steps.map((s, i) => stepRow(s, i + 1, steps.length)).join('');
+    for (const s of steps) record(s, 'Shared scam ' + id);
   }
+  const steps = Array.isArray(r?.steps) ? r.steps : [];
   out.insertAdjacentHTML('beforeend', r.refused
-    ? `<p class="verdict good" data-testid="verdict">The charter refused it: <b>${esc(plain(r.reason))}</b> <code>${esc(r.reason)}</code> · ${txl(r.steps.at(-1).tx, 'tx')}</p>`
-    : `<p class="verdict bad" data-testid="verdict">Not refused${r.steps.length ? '' : ' (no step ran)'}. ${esc(r.reason || '')}</p>`);
+    ? `<p class="verdict good" data-testid="verdict">The charter refused it: <b>${esc(plain(r.reason))}</b> <code>${esc(r.reason)}</code> · ${txl(steps.at(-1)?.tx, 'tx')}</p>`
+    : `<p class="verdict bad" data-testid="verdict">Not refused${steps.length ? '' : ' (no step ran)'}. ${esc(r.reason || '')}</p>`);
   if (r.why && r.why !== 'not_refused') out.insertAdjacentHTML('beforeend', `<p class="muted">Not counted: ${esc(r.why)}</p>`);
   scoreSoon(where); loadBoard().catch(() => {});
 }
@@ -568,7 +569,7 @@ async function main() {
     else factoryLine.innerHTML = `Factory <code>${esc(CFG.factory)}</code> · code hash <code title="${esc(CFG.code_hash)}">${esc(short(CFG.code_hash))}</code> · ${txl(CFG.proof_txs?.factory_full_access_key_deleted, 'factory keys deleted')}`;
   }
   $('#arena-id').textContent = CFG.arena?.charter || '';
-  $('#ex-look').textContent = lookalike((CFG.arena?.merchants || [])[0] || '');
+  $('#ex-look').textContent = lookalike((CFG.arena?.merchants || []).find(Boolean) || '');
   quickCards(); setTarget('shared');
   const rl = CFG.runner; if (rl) $('#runner').title = `Shared runner: ${rl.left_today} of ${rl.daily_tx_cap} transactions left today (UTC), ${rl.gas_tgas} Tgas each.`;
   connector.on('wallet:signIn', () => refreshWho().then(signedIn).catch(fail));
