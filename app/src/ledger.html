@@ -3,19 +3,19 @@
 <script src="/config.js"></script>
 <title>NearCarta ledger: every payout and refusal</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/brand/chrome.css"><style>
-body{font:15px/1.5 Inter,system-ui,sans-serif;margin:0;background:#0b1020;color:#eef2ff}
+body{font:15px/1.5 Inter,system-ui,sans-serif;margin:0;background:#0c0e11;color:#f4f6f8}
 main{max-width:980px;margin:auto;padding:20px}
-h1{font-size:1.5rem;margin:.4em 0}.sub{color:#cdbfa5}
+h1{font-size:1.5rem;margin:.4em 0}.sub{color:#c5ccd6}
 .tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
-.tot div{background:#241c16;border:1px solid rgba(243,234,216,.12);border-radius:10px;padding:10px}.tot b{display:block;font-size:1.3rem}
-table{width:100%;border-collapse:collapse;background:#241c16;border-radius:10px;overflow:hidden}
-th,td{padding:8px;border-bottom:1px solid rgba(243,234,216,.1);text-align:left;font-size:.9rem;vertical-align:top}
+.tot div{background:#0c0e11;border:1px solid rgba(244, 246, 248, .12);border-radius:10px;padding:10px}.tot b{display:block;font-size:1.3rem}
+table{width:100%;border-collapse:collapse;background:#0c0e11;border-radius:10px;overflow:hidden}
+th,td{padding:8px;border-bottom:1px solid rgba(244, 246, 248, .1);text-align:left;font-size:.9rem;vertical-align:top}
 td:nth-child(2),td:nth-child(3),th:nth-child(2),th:nth-child(3){white-space:nowrap}
 td:nth-child(4),td:nth-child(6){overflow-wrap:anywhere;word-break:normal}
-a{color:#e6c98a}button,select,input{min-height:24px}td a,p a,button{display:inline-flex;align-items:center;min-height:28px;padding:2px 4px}button,select{min-width:28px}
-th{background:#2c241c}.refusal{color:#ff8a80}.payout{color:#7dcea0}.warn{background:#3a2e1c;color:#e6c98a;padding:8px;border-radius:8px}
+a{color:#c5ccd6}button,select,input{min-height:24px}td a,p a,button{display:inline-flex;align-items:center;min-height:28px;padding:2px 4px}button,select{min-width:28px}
+th{background:#0c0e11}.refusal{color:#ff8a80}.payout{color:#7dcea0}.warn{background:#0c0e11;color:#c5ccd6;padding:8px;border-radius:8px}
 @media(max-width:600px){td:nth-child(4),th:nth-child(4){display:none}main{padding:14px}}
-a{display:inline-block;min-height:24px;line-height:24px}</style></head><body><main>
+a{display:inline-block;min-height:24px;line-height:24px}</style><link rel="stylesheet" href="/brand/graphite.css"><script src="/brand/motion.js" defer></script></head><body><main>
 <a class="back-town" href="/" data-testid="back-town" aria-label="Return to the city">Return to the city</a>
 <h1>Public ledger</h1>
 <p class="sub">Payouts and refusals. Shop names match the town. Each row that moved money links its transaction. A zero amount is a refusal, not a payment.</p>

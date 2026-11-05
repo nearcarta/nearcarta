@@ -14,27 +14,27 @@
   --c-ink-text: #0a0b0d;
   --c-focus: #8ab4ff;
   --c-pos: #3ecf8e; --c-pos-bg: rgba(62,207,142,.10); --c-pos-line: rgba(62,207,142,.28);
-  --c-cau: #f1b14c; --c-cau-bg: rgba(241,177,76,.10); --c-cau-line: rgba(241,177,76,.30);
+  --c-cau: #c4b5fd; --c-cau-bg: rgba(196, 181, 253, .10); --c-cau-line: rgba(196, 181, 253, .30);
   --c-crit: #ff6a5f; --c-crit-bg: rgba(255,106,95,.10); --c-crit-line: rgba(255,106,95,.36);
   --c-neu: #9a9ca5; --c-neu-bg: rgba(154,156,165,.10); --c-neu-line: rgba(154,156,165,.25);
-  --c-brass: #c8a46a;       /* the Lamplighter glyph only */
+  --c-brass: #8b7cff;       /* the Lamplighter glyph only */
   --c-chart-line: #e9e9ec;
   --c-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 12px 32px -16px rgba(0,0,0,.6);
-  --c-stripe: rgba(241,177,76,.16);
+  --c-stripe: rgba(196, 181, 253, .16);
   color-scheme: dark;
 }
 [data-theme='light'] {
   --c-bg: #f6f6f4; --c-bg-2: #fbfbfa; --c-pane: #ffffff; --c-pane-2: #f7f7f5; --c-pane-3: #efefec;
   --c-line: #e6e6e2; --c-line-2: #d9d9d4;
   --c-text: #18191b; --c-text-2: #5d6068; --c-text-3: #8d9098;
-  --c-ink: #18191b; --c-ink-text: #ffffff; --c-focus: #2f6fdb;
+  --c-ink: #18191b; --c-ink-text: #ffffff; --c-focus: #1e222a;
   --c-pos: #13814f; --c-pos-bg: rgba(19,129,79,.08); --c-pos-line: rgba(19,129,79,.28);
-  --c-cau: #a2620a; --c-cau-bg: rgba(162,98,10,.08); --c-cau-line: rgba(162,98,10,.28);
+  --c-cau: #8b7cff; --c-cau-bg: rgba(139, 124, 255, .08); --c-cau-line: rgba(139, 124, 255, .28);
   --c-crit: #c8352b; --c-crit-bg: rgba(200,53,43,.07); --c-crit-line: rgba(200,53,43,.32);
   --c-neu: #6b6e76; --c-neu-bg: rgba(107,110,118,.08); --c-neu-line: rgba(107,110,118,.22);
-  --c-brass: #9a7339; --c-chart-line: #18191b;
+  --c-brass: #8b7cff; --c-chart-line: #18191b;
   --c-shadow: 0 1px 2px rgba(20,20,20,.04), 0 8px 24px -14px rgba(20,20,20,.14);
-  --c-stripe: rgba(162,98,10,.10);
+  --c-stripe: rgba(139, 124, 255, .10);
   color-scheme: light;
 }
 :root {

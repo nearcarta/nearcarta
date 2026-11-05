@@ -407,7 +407,7 @@ let warmed=null; const warmGPU=()=>warmed||(warmed=(async()=>{ if(inShop) return
 window.__render=draw; window.__shopsLayer='d9'; setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE){ setTimeout(()=>warmGPU().then(warmRooms),300); } }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
 if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,SP,setSky,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
   // demo cursor driven on the sim clock (capture only)
-  const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#eef2ff" stroke="#0b1020" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
+  const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#f4f6f8" stroke="#0c0e11" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
   const cur={x:-100,y:-100}; const put=()=>{ dc.style.transform=`translate(${cur.x}px,${cur.y}px)`; };
   const elC=sel=>{ const r=document.querySelector(sel).getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; };
   const ring=()=>{ const i=dc.querySelector('i'); gsap.fromTo(i,{opacity:.9,scale:.4},{opacity:0,scale:1.4,duration:.45}); };

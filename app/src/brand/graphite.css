@@ -1,0 +1,221 @@
+/* Graphite surface, NEAR green, electric violet.
+   Motion is transform, opacity, and one rotating border angle. Reduced motion stops it. */
+@property --nc-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes nc-spin { to { --nc-angle: 360deg; } }
+@keyframes nc-aurora { to { transform: translate3d(-6%, 4%, 0) scale(1.12); } }
+@keyframes nc-sweep { 0%, 55% { transform: translateX(-130%); } 75%, 100% { transform: translateX(130%); } }
+@keyframes nc-spark { to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.2); opacity: 0; } }
+
+:root {
+  --bg: #0c0e11;
+  --surface: #16191f;
+  --surface-2: #1e222a;
+  --ink: #f4f6f8;
+  --muted: #a8b0bd;
+  --brand: #00ec97;
+  --violet: #8b7cff;
+  --on-brand: #04140e;
+}
+
+html, body {
+  background-color: #0c0e11;
+  color: #f4f6f8;
+}
+
+body {
+  background-image:
+    radial-gradient(900px 520px at 88% -10%, rgba(139,124,255,.22), transparent 58%),
+    radial-gradient(720px 480px at -8% 108%, rgba(0,236,151,.12), transparent 56%);
+  background-attachment: fixed;
+}
+
+/* Silk / aurora field behind pages that are not the 3D town. */
+.scene {
+  background: #0c0e11 !important;
+  filter: none !important;
+  overflow: hidden;
+}
+.scene::before {
+  content: "";
+  position: absolute;
+  inset: -22%;
+  background:
+    radial-gradient(closest-side at 18% 24%, rgba(0,236,151,.22), transparent 70%),
+    radial-gradient(closest-side at 82% 6%, rgba(139,124,255,.34), transparent 68%),
+    radial-gradient(closest-side at 68% 86%, rgba(110,220,255,.16), transparent 70%);
+  animation: nc-aurora 16s ease-in-out infinite alternate;
+  transform: translate3d(0,0,0);
+}
+.scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: linear-gradient(180deg, rgba(12,14,17,.15), rgba(12,14,17,.55)) !important;
+}
+
+/* Town photo is a texture, not a brown wash. */
+#fb2d { background: #0c0e11; }
+#fb2d img, #loading > img {
+  filter: grayscale(.42) brightness(.78) contrast(1.08) saturate(.7) !important;
+}
+#fb2d::after, #loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(820px 460px at 76% 8%, rgba(139,124,255,.28), transparent 56%),
+    radial-gradient(640px 400px at 10% 92%, rgba(0,236,151,.16), transparent 52%),
+    linear-gradient(180deg, rgba(12,14,17,.12), rgba(12,14,17,.38));
+}
+#loading { background: #0c0e11 !important; }
+#flatbg { filter: grayscale(.4) brightness(.74) contrast(1.06) saturate(.62); }
+#flatbg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(820px 460px at 76% 8%, rgba(139,124,255,.22), transparent 56%),
+    radial-gradient(640px 400px at 10% 92%, rgba(0,236,151,.12), transparent 52%),
+    linear-gradient(180deg, rgba(12,14,17,.18), rgba(12,14,17,.42));
+}
+html, body, #c, #iris, #lb i { background-color: #0c0e11; }
+#c { background-color: transparent; }
+
+/* Rotating conic border + pointer spotlight on the main cards and shop cards. */
+.card, .pick, .tile, .panel, .box, .tot > div, #tray, #chron, .pin .ban, #shopMenu,
+.ob-card, .fbpin, .pnc-card, main > form, .nc-sign .pnc-card, .plan > li, #steps > li {
+  --sx: 50%;
+  --sy: 18%;
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(115deg, transparent 36%, rgba(255,255,255,.07) 47%, transparent 56%) padding-box,
+    radial-gradient(440px circle at var(--sx) var(--sy), rgba(196,181,253,.16), transparent 42%) padding-box,
+    linear-gradient(#16191ef2, #16191ef2) padding-box,
+    conic-gradient(from var(--nc-angle), #00ec97, #8b7cff, rgba(0,236,151,.08) 42%, #8b7cff, #00ec97) border-box !important;
+  animation: nc-spin 8s linear infinite;
+  box-shadow: 0 18px 50px rgba(0,0,0,.38);
+  color: #f4f6f8;
+}
+.card:hover, .pick:hover, .tile:hover, .panel:hover, .pin .ban:hover, .fbpin:hover, #tray:hover {
+  box-shadow: 0 0 0 1px rgba(0,236,151,.35), 0 18px 48px rgba(0,0,0,.45), 0 0 36px rgba(139,124,255,.16);
+}
+
+/* Ledger and loop rows are the cards. The rule above uses element names that exist. */
+table { background: #16191f !important; color: #f4f6f8; }
+th { background: #1e222a !important; color: #c5ccd6; }
+input, select, textarea {
+  background: #101216 !important;
+  color: #f4f6f8 !important;
+  border-color: rgba(244,246,248,.22) !important;
+}
+input::placeholder { color: #a8b0bd !important; }
+a { color: #c4b5fd; }
+a:hover { color: #00ec97; }
+
+/* Premium 3D controls. Magnetic offset is --mx/--my. Press adds --press. */
+.back-town, .btn, .ghost, #back, .pill, .ib, button, .act {
+  --mx: 0px;
+  --my: 0px;
+  --press: 0px;
+  position: relative;
+  transform: translate3d(var(--mx), calc(var(--my) + var(--press)), 0);
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 3px 0 #090b0e, 0 8px 16px rgba(0,0,0,.32);
+}
+.back-town:active, .btn:active, .ghost:active, #back:active, .pill:active, button:active, .act:active {
+  --press: 3px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 #090b0e, 0 4px 10px rgba(0,0,0,.28);
+}
+.back-town, #back {
+  background: #1e222a !important;
+  color: #f4f6f8 !important;
+  border: 1px solid rgba(244,246,248,.2) !important;
+}
+.back-town:hover, #back:hover { border-color: #00ec97 !important; color: #f4f6f8 !important; }
+
+.btn.gold, .act.primary, button.primary, a.primary, #rulesBtn, #go, #onboard .ob-next,
+a.go, .pill.go, #playSeg button[aria-checked=true], nav button.on,
+.nc-sign .pnc-action-button--primary, .fit[aria-pressed=true] {
+  background: linear-gradient(180deg, #5dffc0 0%, #00ec97 46%, #00b978 100%) !important;
+  color: #04140e !important;
+  border-color: transparent !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -2px 0 #067a52,
+    0 6px 0 #067a52,
+    0 12px 24px rgba(0,236,151,.28) !important;
+  text-shadow: none;
+}
+.btn.gold:active, .act.primary:active, #rulesBtn:active, #go:active, a.primary:active, .pill.go:active {
+  --press: 6px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 0 #067a52, 0 4px 12px rgba(0,236,151,.2) !important;
+}
+.btn.gold::after, .act.primary::after, #go::after, a.primary::after, .pill.go::after,
+#onboard .ob-next::after, #playSeg button[aria-checked=true]::after, nav button.on::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(110deg, transparent 32%, rgba(255,255,255,.62) 48%, transparent 64%);
+  transform: translateX(-130%);
+  animation: nc-sweep 3.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.btn.google, .btn.google:hover {
+  background: #fff !important;
+  color: #1f1f1f !important;
+  border-color: #fff !important;
+  box-shadow: inset 0 1px 0 #fff, 0 3px 0 #c5ccd4, 0 8px 16px rgba(0,0,0,.25) !important;
+}
+.btn.google::after { content: none !important; }
+
+/* The street is the town. */
+body:has(#c) > a.back-town { display: none !important; }
+
+#onboard .ob-card { color: #f4f6f8 !important; }
+#onboard .ob-b, #onboard .ob-back, #onboard h2 { color: #f4f6f8 !important; }
+#onboard .ob-shops li { background: #1e222a !important; color: #f4f6f8 !important; }
+#onboard .ob-shops span, #onboard .ob-n, #onboard .ob-skip { color: #a8b0bd !important; }
+#onboard .ob-dots i { background: #454b54 !important; }
+#onboard .ob-dots i.on, #onboard button:focus-visible { background: #8b7cff !important; outline-color: #b7a6ff; }
+
+.bub, .bub.think {
+  background: #1e222a !important;
+  color: #f4f6f8 !important;
+}
+.bub .who { color: #c4b5fd !important; }
+#hint, .pin .ban, #brand, #shopMenu, #prompt, #zoom, #playSeg, .pill, .ib {
+  background-color: rgba(22,25,31,.88);
+  color: #f4f6f8;
+  border-color: rgba(244,246,248,.18);
+}
+.pin b, .pin small, #brand small, #loading .lc span, #loading .lc small { color: #c5ccd6 !important; }
+#fade {
+  background: radial-gradient(circle at var(--fx,50%) var(--fy,50%), rgba(196,181,253,.35) 0, rgba(22,25,31,.2) 28%, #0c0e11 72%) !important;
+}
+
+.nc-spark {
+  position: fixed;
+  width: 5px;
+  height: 5px;
+  margin: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 90;
+  transform: translate(-50%, -50%);
+  animation: nc-spark .45s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene::before, .card, .pick, .tile, .panel, .box, .tot > div, #tray, #chron, .pin .ban,
+  #shopMenu, .ob-card, .fbpin, .pnc-card, main > form, .plan > li, #steps > li,
+  .btn.gold::after, .act.primary::after, #go::after, .pill.go::after,
+  #onboard .ob-next::after, nav button.on::after, a.primary::after {
+    animation: none !important;
+  }
+  .nc-spark { display: none !important; }
+}

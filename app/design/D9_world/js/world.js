@@ -50,16 +50,16 @@ function makeAtlas(img){ const c=document.createElement('canvas'); c.width=img.w
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.flipY=false; t.generateMipmaps=false; t.minFilter=t.magFilter=THREE.LinearFilter;
   // window glow: only the dark glazing swatch emits; everything else stays black
   const e=document.createElement('canvas'); e.width=img.width; e.height=img.height; const ex=e.getContext('2d'); ex.fillStyle='#000'; ex.fillRect(0,0,e.width,e.height);
-  const gg=ex.createLinearGradient(0,0,0,sh); gg.addColorStop(0,'#ffcf7a'); gg.addColorStop(1,'#e88a3a'); ex.fillStyle=gg; ex.fillRect(0,0,sw,sh);
+  const gg=ex.createLinearGradient(0,0,0,sh); gg.addColorStop(0,'#d8fff2'); gg.addColorStop(1,'#1f8f6e'); ex.fillStyle=gg; ex.fillRect(0,0,sw,sh);
   const et=new THREE.CanvasTexture(e); et.colorSpace=THREE.SRGBColorSpace; et.flipY=false; et.generateMipmaps=false; et.minFilter=et.magFilter=THREE.LinearFilter; W.winTex=et;
   return t; }
 
 // ---------- colour script ----------
 const C = h=>new THREE.Color(h);
-const KEYS = [ // day, dusk, night
-  { top:C('#9fb3bb'), mid:C('#d9d6c4'), hor:C('#efe2c6'), fog:C('#d8cfb8'), sun:C('#fff1d6'), sunI:2.3, hemiS:C('#f1ead8'), hemiG:C('#6b5a40'), hemiI:1.15, sea:C('#6b8873'), deep:C('#3c584b'), elev:.95, lift:C('#000000'), sat:.92, lamp:0, fly:0, expo:1.15, sh:.05 },
-  { top:C('#121a2e'), mid:C('#1a2440'), hor:C('#2a3a62'), fog:C('#0b1020'), sun:C('#ffd166'), sunI:1.6, hemiS:C('#9aa6c8'), hemiG:C('#1a2440'), hemiI:1.2, sea:C('#16324a'), deep:C('#0b1020'), elev:.7, lift:C('#050814'), sat:.9, lamp:1, fly:.6, expo:1.2, sh:.08 },
-  { top:C('#0b1020'), mid:C('#121a2e'), hor:C('#1a2440'), fog:C('#0b1020'), sun:C('#7aa7ff'), sunI:1.35, hemiS:C('#c3cbe6'), hemiG:C('#121a2e'), hemiI:1.3, sea:C('#10283c'), deep:C('#070c18'), elev:.8, lift:C('#050814'), sat:.95, lamp:1, fly:1, expo:1.25, sh:.1 },
+const KEYS = [ // day, dusk, night. Graphite sky, violet horizon, green sun. Buildings stay, the grade does not.
+  { top:C('#12161c'), mid:C('#1a2128'), hor:C('#243038'), fog:C('#101418'), sun:C('#e7fff6'), sunI:1.9, hemiS:C('#d5dbe4'), hemiG:C('#1a2422'), hemiI:1.05, sea:C('#1a2c30'), deep:C('#0e181c'), elev:.9, lift:C('#000000'), sat:.62, lamp:.15, fly:.1, expo:1.08, sh:.05 },
+  { top:C('#10141a'), mid:C('#181c24'), hor:C('#2a2440'), fog:C('#0c0e11'), sun:C('#c4b5fd'), sunI:1.35, hemiS:C('#c5ccd6'), hemiG:C('#16191f'), hemiI:1.15, sea:C('#152226'), deep:C('#0c0e11'), elev:.72, lift:C('#050608'), sat:.58, lamp:1, fly:.6, expo:1.12, sh:.08 },
+  { top:C('#0c0e11'), mid:C('#141820'), hor:C('#221c36'), fog:C('#0c0e11'), sun:C('#8b7cff'), sunI:1.2, hemiS:C('#c5ccd6'), hemiG:C('#121418'), hemiI:1.2, sea:C('#121c22'), deep:C('#090b0e'), elev:.8, lift:C('#050608'), sat:.55, lamp:1, fly:1, expo:1.16, sh:.1 },
 ];
 const ICE = C('#cfe6f5');
 const mixK=(t)=>{ const i=Math.min(1,Math.floor(t)), f=Math.min(1,t-i), a=KEYS[i], b=KEYS[Math.min(2,i+1)]; const o={}; for(const k in a) o[k]= a[k].isColor? a[k].clone().lerp(b[k],f) : a[k]+(b[k]-a[k])*f; return o; };
@@ -72,7 +72,7 @@ export async function init(canvas){
   const r = W.renderer = new THREE.WebGLRenderer({canvas, antialias:LP, powerPreference:'high-performance', preserveDrawingBuffer:CAPTURE});
   r.setPixelRatio(Math.min(devicePixelRatio, LP?1:CAPTURE?1:1.5)); r.setSize(innerWidth,innerHeight);
   r.shadowMap.enabled=!LP; r.shadowMap.type=THREE.PCFSoftShadowMap; r.toneMapping=THREE.ACESFilmicToneMapping; r.toneMappingExposure=1.16; r.outputColorSpace=THREE.SRGBColorSpace;
-  const s = W.scene = new THREE.Scene(); s.fog=new THREE.Fog(0x0b1020,42,150);
+  const s = W.scene = new THREE.Scene(); s.fog=new THREE.Fog(0x0c0e11,42,150);
   W.camera = new THREE.PerspectiveCamera(30, innerWidth/innerHeight, .3, 400);
   hemi=new THREE.HemisphereLight(0xffffff,0x444444,1); s.add(hemi);
   sun=new THREE.DirectionalLight(0xffffff,2); sun.castShadow=!LP; const SM=+(P.get('shadow')||2048); sun.shadow.mapSize.set(SM,SM); W.sunShadowSize=SM;
@@ -351,7 +351,7 @@ export function radial(c,soft=.35){ const cv=document.createElement('canvas'); c
 const softT=radial('#ffffff',.25);
 
 // ---------- lanterns (unlit at dusk until the Lamplighter passes) ----------
-export const LAMPC={ warm:C('#ffc27a'), coral:C('#ff6b6b'), ice:C('#a8d8ff'), mint:C('#7cf0c4') };
+export const LAMPC={ warm:C('#b8ffe4'), coral:C('#ff6b6b'), ice:C('#a8d8ff'), mint:C('#7cf0c4') };
 function buildLamps(){
   const spots=[[-4,1,.55,-.55],[-3,1,.6,.55],[-2,1,-.1,-.7],[-1,1,.62,.4],[0,1,-.55,.5],[1,0,.6,-.45],[1,-1,-.6,-.35],[2,-2,.55,.5],[2,-3,-.5,.5],[-1,0,-.6,.3],[-2,-1,.5,-.5],[-3,2,.65,.45],[-2,3,.6,.5],[0,2,.55,-.5],[-5,1,.6,.8],[-1,3,-.5,.5],[3,-2,-.3,.85]];
   const postG=new THREE.CylinderGeometry(.03,.045,1.05,6), armG=new THREE.BoxGeometry(.22,.025,.025), capG=new THREE.ConeGeometry(.09,.09,4), cageG=new THREE.CylinderGeometry(.065,.05,.13,4,1,true);
@@ -561,9 +561,9 @@ export function update(dt){ const T=clock.T; U.time.value=T;
   // fireflies
   const fa=flies.geometry.attributes.position.array,fb=flies.userData.base; for(let i=0;i<fa.length;i+=3){ fa[i]=fb[i]+Math.sin(T*.5+i)*.35; fa[i+1]=fb[i+1]+Math.sin(T*.9+i*.7)*.22; fa[i+2]=fb[i+2]+Math.cos(T*.43+i)*.35; } flies.geometry.attributes.position.needsUpdate=true; fireflyMat.opacity=K.fly*(1-W.frz)*(.65+.35*Math.sin(T*3));
   // clouds drift
-  clouds.forEach(o=>{ o.rotation.y=-T*.006; o.material.color.copy(K.hor).lerp(C('#fff4e6'),.55).lerp(ICE,W.frz*.5); });
+  clouds.forEach(o=>{ o.rotation.y=-T*.006; o.material.color.copy(K.hor).lerp(C('#e8eef6'),.55).lerp(ICE,W.frz*.5); });
   // smoke rises unless frozen
-  smoke.forEach(s=>{ const u=s.userData; const ph=(T*.12*(1-W.frz*.97)+u.ph)%1; s.position.set(u.o.x+Math.sin(ph*4+u.ph*9)*.12+ph*.5,u.o.y+ph*1.8,u.o.z-ph*.25); s.scale.setScalar(.18+ph*.7); s.material.opacity=Math.sin(ph*Math.PI)*.38; s.material.color.copy(K.fog).lerp(C('#e3d8c6'),.5); });
+  smoke.forEach(s=>{ const u=s.userData; const ph=(T*.12*(1-W.frz*.97)+u.ph)%1; s.position.set(u.o.x+Math.sin(ph*4+u.ph*9)*.12+ph*.5,u.o.y+ph*1.8,u.o.z-ph*.25); s.scale.setScalar(.18+ph*.7); s.material.opacity=Math.sin(ph*Math.PI)*.38; s.material.color.copy(K.fog).lerp(C('#d5dbe4'),.5); });
   tickLaundry(T*(1-W.frz*.9));
   // birds
   birds.forEach(b=>{ const u=b.userData; const a=u.ph+T*u.sp*(1-W.frz); b.position.set(u.c.x+Math.cos(a)*u.r,u.h+Math.sin(a*2.3)*.4,u.c.z+Math.sin(a)*u.r*.7); b.rotation.set(0,-a,Math.sin(a)*.2); const fl=Math.sin(T*u.fl+u.ph)*(1-W.frz); const p=b.geometry.attributes.position; p.setY(1,fl*.09); p.setY(4,fl*.09); p.needsUpdate=true; });

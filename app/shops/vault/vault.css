@@ -6,7 +6,7 @@ a{color:var(--c-accent-text)}
 .top{display:flex;gap:var(--s-5);justify-content:space-between;align-items:flex-end;flex-wrap:wrap;padding:var(--s-6) var(--s-6) var(--s-4);max-width:1180px;margin:auto}
 h1{font:700 34px/1.1 var(--f-display);margin:0 0 6px;letter-spacing:-.02em}
 .sub{margin:0;color:var(--c-text-2);max-width:620px}
-.net{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:var(--r-pill);background:var(--p-pending-tint);color:var(--p-pending-text);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.net{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:var(--r-pill);background:var(--c-brass-tint);color:var(--c-brass);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
 .who{display:flex;gap:var(--s-2);align-items:center;flex-wrap:wrap;color:var(--c-text-2)}
 main{max-width:1180px;margin:auto;padding:0 var(--s-6) var(--s-6);display:grid;grid-template-columns:1fr 1fr;gap:var(--s-4)}
 .card{background:var(--c-glass);border:1px solid var(--c-line);border-radius:var(--r-lg);padding:var(--s-5);backdrop-filter:blur(8px)}
@@ -26,7 +26,7 @@ button.quiet,a.quiet{background:transparent;border-color:transparent;color:var(-
 .empty{padding:28px 8px;display:grid;gap:8px;max-width:46ch}
 .empty b{font-size:18px}
 .empty .primary{justify-self:start;padding:10px 16px;border-radius:999px}
-.net.trial{background:#3a2e1c;color:#e6c98a}
+.net.trial{background:#0c0e11;color:#c5ccd6}
 .primary:hover:not(:disabled){background:var(--c-accent-press)}
 label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--c-text-2);margin-bottom:var(--s-3)}
 input{font:500 14px var(--f-ui);background:var(--c-scene);color:var(--c-text);border:1px solid var(--c-line-strong);border-radius:var(--r-sm);padding:8px 10px;min-width:0;width:100%}
@@ -106,7 +106,7 @@ details.how{margin:var(--s-2) 0 var(--s-3)}details.how summary{cursor:pointer;co
 #feed li{animation:none}#feed:not([hidden])~#log li:not(.err){display:none}
 .gl b{text-align:right}
 label select{display:block;width:100%;margin-top:6px}
-.grid2 .hint{grid-column:1/-1;margin:-4px 0 0;color:var(--c-text-2,#cbbfa8);font-size:14px}
+.grid2 .hint{grid-column:1/-1;margin:-4px 0 0;color:var(--c-text-2,#c5ccd6);font-size:14px}
 #s-what:has(#story:empty):has(#feed[hidden]):has(#log:empty){display:none}
 .atk em{margin-top:6px}
 .facts-box summary{margin-bottom:6px}

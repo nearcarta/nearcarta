@@ -1,13 +1,15 @@
-// Night-harbour pairs. Body text is at least 4.5:1. Large text and UI chrome are at least 3:1.
+// Graphite pairs. Body text is at least 4.5:1. Large text and UI chrome are at least 3:1.
 const pairs = [
-  ['text on bg', '#eef2ff', '#0b1020', 4.5],
-  ['text-2 on bg', '#c3cbe6', '#0b1020', 4.5],
-  ['muted on bg', '#9aa6c8', '#0b1020', 4.5],
-  ['muted on surface-2', '#9aa6c8', '#1a2440', 4.5],
-  ['brand text on brand', '#04140d', '#00ec97', 4.5],
-  ['line on bg', '#7f93c4', '#0b1020', 3],
-  ['focus on bg', '#ffd166', '#0b1020', 3],
-  ['disabled on surface', '#8b98b8', '#121a2e', 3],
+  ['text on bg', '#f4f6f8', '#0c0e11', 4.5],
+  ['text-2 on bg', '#c5ccd6', '#0c0e11', 4.5],
+  ['muted on bg', '#a8b0bd', '#0c0e11', 4.5],
+  ['muted on surface', '#a8b0bd', '#16191f', 4.5],
+  ['muted on surface-2', '#a8b0bd', '#1e222a', 4.5],
+  ['violet text on surface', '#c4b5fd', '#16191f', 4.5],
+  ['brand text on brand', '#04140e', '#00ec97', 4.5],
+  ['line on bg', '#8b93a3', '#0c0e11', 3],
+  ['focus on bg', '#b7a6ff', '#0c0e11', 3],
+  ['disabled on surface', '#8b93a3', '#16191f', 3],
 ];
 const lin = c => {
   const n = parseInt(c.slice(1), 16);
