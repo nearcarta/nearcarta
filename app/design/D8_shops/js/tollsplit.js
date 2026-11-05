@@ -1,11 +1,11 @@
 // Toll revenue split: one visit is one all-or-nothing propose_batch the visitor's own charter checks.
 // Leg 1 pays the gate's toll (0.01 NEAR to its payee, memo toll) and opens the gate; legs 2 and 3
-// pay the town treasury (the Town Hall DAO) and the Lamplighter's inference budget. Pure helpers, no wallet or DOM,
+// pay the town treasury (townhall.nearcarta.near) and the Lamplighter's inference budget. Pure helpers, no wallet or DOM,
 // so backend/test/unit/d8-tollsplit.test.js can test them in node.
 import { toYocto, batchGasTgas } from './payouts.js';
 
 export const SPLIT = {
-  treasury: 'townhall.nearcarta.near', // Town Hall DAO (sputnik v2)
+  treasury: 'townhall.nearcarta.near', // Town Hall account
   agent: 'toll.nearcarta.near',          // the Lamplighter's inference budget
 };
 export const LEGS = [

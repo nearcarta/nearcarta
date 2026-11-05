@@ -19,11 +19,11 @@ Kind: **burn** = gone; **lock** = storage stake, recoverable; **move** = working
 | 7 | Charters x4 | creation charge + create/init gas (~30 Tgas each) | 0.04 |  |  |  | burn | required | G |
 | 8 | Charters x4 | set clause + add agent FC key + delete FAK (3 calls x ~10 Tgas each) | 0.012 |  |  |  | burn | required | G |
 | 9 | Shops / merchants | 6 plain receiver accounts (cafe, books, bakery, ...): creation only, <770 B | 0.045 |  |  |  | burn | required | A |
-| 10 | Guardhouse | DAO role = plain account (earlier network one is 182 B): creation only | 0.0075 |  |  |  | burn | required | A,M |
+| 10 | Guardhouse | guardian account = plain account (earlier network one is 182 B): creation only | 0.0075 |  |  |  | burn | required | A,M |
 | 11 | Guardhouse | demo txs: paid, denied, escalated (yield/resume), approve, freeze: 6 calls x <=60 Tgas | 0.036 |  |  |  | burn | required | G |
 | 12 | Guardhouse | smallest payout amounts: cap 0.0001 NEAR, 2 paid moves (go to own accounts, recoverable) | 0.0002 |  |  |  | move | required | - |
-| 13 | Town Hall DAO | Sputnik v2 DAO: 546,780 B storage (measured) + creation | 5.4748 |  |  |  | lock | required | S,M |
-| 14 | Town Hall DAO | proposal bond (refunded) + 3 proposal/vote calls | 0.106 |  |  |  | lock | required | M |
+| 13 | Town Hall | visitor row on the board; no separate council contract |  |  |  |  | burn | not used | - |
+| 14 | Town Hall | no proposal bond; a row change is set_rules with deposit 0 |  |  |  |  | burn | not used | - |
 | 15 | Arena | `arena` contract: 340,244 B storage (measured, incl. 32 attempts) + creation | 3.40944 |  |  |  | lock | required | S,M |
 | 16 | Arena | deploy gas 329 KB + init + 32 commits + 13 reveals (~10 Tgas each) | 0.04934 |  |  |  | burn | required | G |
 | 17 | Vault | shared charter is row 6; runner `propose` calls x 20 at ~25 Tgas | 0.05 |  |  |  | burn | required | G |
@@ -45,12 +45,12 @@ Kind: **burn** = gone; **lock** = storage stake, recoverable; **move** = working
 
 | Set | NEAR | ETH | ZEC | USDC | USD |
 |---|---|---|---|---|---|
-| Required, all kinds (cash to hold) | 53.3989 | 0.00000553 | 0.0003 | 3.26 | **$256.78** |
+| Required, all kinds (cash to hold) | 47.8181 | 0.00000553 | 0.0003 | 3.26 | **$230.32** |
 | Required, burned or spent only | 40.4038 | 0.00000358 | 0.0003 | 0.76 | **$192.68** |
-| Required, locked (recoverable) | 12.9949 | 0 | 0 | 0 | **$61.60** |
+| Required, locked (recoverable) | 7.4141 | 0 | 0 | 0 | **$35.14** |
 | Optional items | 3.9904 | 0.00000352 | 0 | 0 | **$18.92** |
-| Everything incl. optional | 57.3893 | 0.00000905 | 0.0003 | 3.26 | **$275.70** |
-| Floor: required, factory deferred, 4 charters deployed as regular contracts (path 2 below) | 27.4015 | 0.00000553 | 0.0003 | 3.26 | **$133.55** |
+| Everything incl. optional | 51.8085 | 0.00000905 | 0.0003 | 3.26 | **$249.25** |
+| Floor: required, factory deferred, 4 charters deployed as regular contracts (path 2 below) | 21.8207 | 0.00000553 | 0.0003 | 3.26 | **$107.10** |
 
 The biggest single item is row 2, publishing the charter code as a global contract (40.13 NEAR, about $190, burned). It is needed only because the public factory lets anyone create a charter with no code of their own.
 
@@ -60,14 +60,14 @@ The biggest single item is row 2, publishing the charter code as a global contra
 2. **Global code only for the factory.** If the public factory waits, deploy the 4 house charters as regular contracts instead: 4 x ~405,731 B = 16.28 NEAR, all locked and recoverable, against 42.28 NEAR for the global path (mostly burned). The global path pays off at 10 or more charters [GC].
 3. **Charters through the factory.** Each one is 833 B (it holds a reference to the code, not the code), so initialise the mainnet factory with `min_deposit` 0.02 NEAR, not the earlier network 0.3 NEAR (the contract only requires more than the 0.01 registry fee).
 4. **One Toll instance for Base** covers both native ETH and USDC rules. Arbitrum is a second instance and is optional.
-5. **DAO.** Guardhouse uses a plain account as its DAO role (182 B on earlier network). Only Town Hall needs the Sputnik DAO, and Guardhouse can point at the same one.
+5. **Town Hall.** Guardhouse uses a plain account as its guardian (182 B on earlier network). Town Hall is the visitor row on the board. No separate council contract is deployed.
 6. **Smallest amounts.** Use a 0.0001 NEAR cap, a 1e12 wei EVM test value and 0.01 USDC. Leg A needs 1.750123 USDC at minimum and leg B 132,000 zats, so ZEC comes from leg A and none is bought.
 7. **No full-access keys** after deploy (as on earlier network). Deleting each key costs 0.41 Tgas (0.000041 NEAR).
 8. **Skip:** the NEAR AI 50 NEAR agent stake (API-key inference is enough), `mock_ft` (mainnet uses real USDC), Chronicle (read-only, free), and Vercel/Render (free plans).
 
 ## Order (each step only after its earlier network check passes)
 
-1. Root account and factory, with the global code published (rows 1-5). 2. Charters (6-8). 3. Shops and Guardhouse (9-12). 4. Town Hall DAO (13-14). 5. Arena and Vault (15-17). 6. Toll Base (19-20, 30). 7. Ferry, 1Click and Mist Bank, using the phase-2 scripts with `--live` only after the owner approves (32-33, 40-41). 8. Optional: House deed, Toll Arbitrum (18, 21, 31).
+1. Root account and factory, with the global code published (rows 1-5). 2. Charters (6-8). 3. Shops and Guardhouse (9-12). 4. Town Hall uses the visitor row (13-14 are not deployed). 5. Arena and Vault (15-17). 6. Toll Base (19-20, 30). 7. Ferry, 1Click and Mist Bank, using the phase-2 scripts with `--live` only after the owner approves (32-33, 40-41). 8. Optional: House deed, Toll Arbitrum (18, 21, 31).
 
 ## Sources
 

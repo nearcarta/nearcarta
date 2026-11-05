@@ -79,7 +79,8 @@ test('each shop route and the console use the one shop module', () => {
   assert.doesNotMatch(read('../../../app/design/D9_world/index.html'), /setTimeout\(hide, 1200\)/);
   assert.match(read('../../../app/design/D9_world/js/main.js'), /exitShop\(\)/);
   assert.doesNotMatch(read('../../../app/house/house.js'), /a DAO can also freeze/);
-  assert.match(read('../../../app/house/house.js'), /No shared DAO/);
+  assert.doesNotMatch(read('../../../app/house/house.js'), /shared DAO/);
+  assert.match(read('../../../app/house/house.js'), /The owner may freeze and unfreeze this house/);
 });
 
 test('loading and shop pages do not name a rehearsal network', () => {

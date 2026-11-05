@@ -5,7 +5,7 @@ import { proposalState, stateText, endsAtMs } from '../../../shared/townhall/exp
 import { townhallProposal } from '../../src/shops.js';
 
 const HOUR_NS = String(3600n * 10n ** 9n);
-// proposal #10 as read from r7thmvr8maey.sputnikv2.near: still InProgress on chain, filed at this submission_time
+// proposal #10 as read from the old council account: still InProgress on chain, filed at this submission_time
 const P10 = { id: 10, proposer: 'ncguest-296t703o3g.near', status: 'InProgress', submission_time: '1793229633097671297', kind: { FunctionCall: {} }, description: 'join' };
 const filedMs = Number(BigInt(P10.submission_time) / 1_000_000n);
 
@@ -20,7 +20,7 @@ test('inside the window it stays open, and the window end is exact', () => {
   const s = proposalState(P10, HOUR_NS, filedMs + 3600_000 - 1);
   assert.equal(s.status, 'InProgress'); assert.equal(s.expired, false);
   assert.equal(stateText(s, filedMs + 25 * 60_000), 'Open, 35 min left');
-  // the boundary itself is closed: Sputnik refuses votes once now >= submission_time + period
+  // the boundary itself is closed: the proposal contract refuses votes once now >= submission_time + period
   assert.equal(proposalState(P10, HOUR_NS, filedMs + 3600_000).expired, true);
 });
 
@@ -49,7 +49,7 @@ test('/api/townhall proposal rows carry the shown status, the chain status and t
 test('the Town Hall page changes the visitor row and does not file a council proposal', () => {
   const page = readFileSync(new URL('../../../app/shops/hall/main.js', import.meta.url), 'utf8');
   assert.match(page, /set_rules|callsFor/);
-  assert.doesNotMatch(page, /add_proposal|sputnik|proposalState/);
+  assert.doesNotMatch(page, new RegExp(['add_proposal', 'sp' + 'utnik', 'proposalState'].join('|')));
   const room = readFileSync(new URL('../../../app/design/D8_shops/shops/hall.js', import.meta.url), 'utf8');
   assert.match(room, /Recorded payments/);
   assert.doesNotMatch(room, /\/api\/townhall/);

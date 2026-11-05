@@ -6,7 +6,7 @@ import { M as PM, brassM, mesh, lantern, candle, rug } from './_props.js';
 import { radial } from '../js/core.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
-export const PROOF = mainnet('house') + proof(h3('The oath'), row({ k: 'Policy version ' + CORE.policyVersion, why: CORE.policyHash.slice(0, 16) + '…' }), row({ k: 'Contract code', why: CORE.codeHash }), row({ k: 'Freeze epoch ' + CORE.freezeEpoch, why: 'owner or DAO can freeze' }),
+export const PROOF = mainnet('house') + proof(h3('The oath'), row({ k: 'Policy version ' + CORE.policyVersion, why: CORE.policyHash.slice(0, 16) + '…' }), row({ k: 'Contract code', why: CORE.codeHash }), row({ k: 'Freeze epoch ' + CORE.freezeEpoch, why: 'the owner can freeze' }),
       h3('Clauses'), ...CLAUSES.map(c => row({ k: `${c.id} · cap ${c.cap} · budget ${c.budget} NEAR`, why: `spent ${c.spent} · payee ${c.payees.join(', ')}`, tx: c.tx })),
       note(`Oath ${acct(CORE.oath)}, owner ${acct(CORE.owner)}. Snapshot ${CORE.snapshot}.`));
 export default async function house() {

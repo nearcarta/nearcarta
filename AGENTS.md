@@ -17,7 +17,7 @@ Skipped e2e tests would sign real transactions and need a funded key or an opt-i
 
 ## Layout
 - `contracts/oath`: the charter (Rust, near-sdk). It is the only door to the agent's account. Deployed on mainnet as `charter.nearcarta.near`.
-- `contracts/arena`, `contracts/toll`, `contracts/townhall`, `contracts/mock_ft`: one contract per shop. Toll runs its own smaller contract; Town Hall runs the charter (R14, R16.1) owned by a Sputnik DAO (see README, Limits).
+- `contracts/arena`, `contracts/toll`, `contracts/townhall`, `contracts/mock_ft`: one contract per shop. Toll runs its own smaller contract. Town Hall writes `set_rules` on the visitor's own row (see README, Tracks).
 - `backend/src`: the API (`server.js`, one module per shop). `backend/scripts`: proof recorders and checkers; apart from the arena runner's `propose` (`backend/src/vault.js`), only these sign txs.
 - `app/src`: the console UI. `app/design`: the 3D town and shop interiors. They get live data only through `app/src/live/data.js` (and `app/design/D6_dashboards/src/data.js`); keep data wiring in those interfaces.
 - `shared/deployments/mainnet.json`: every mainnet account, contract and proof tx. Code and docs read ids from here; do not hardcode them.

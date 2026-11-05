@@ -11,7 +11,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const NB = window.NEARCARTA_PUBLIC_MAINNET ? 'https://nearblocks.io' : 'https://nearblocks.io';
 const tx = h => `<a class="tx" href="${NB}/txns/${esc(h)}" target="_blank" rel="noopener" title="${esc(h)}">${esc(String(h).slice(0, 10))}…</a>`;
 // Readable names for our mainnet accounts; the full id stays in the link and the tooltip.
-const ROLE = [[/^attacker\./, 'test merchant (red-team)'], [/mallory/, 'red-team account'], [/^bakery\./, 'Bakery (payee)'], [/^dao\.|sputnik/, 'Town Hall'],
+const ROLE = [[/^attacker\./, 'test merchant (red-team)'], [/mallory/, 'red-team account'], [/^bakery\./, 'Bakery (payee)'], [/^dao\.|townhall\.nearcarta\.near$/, 'Town Hall'],
   [/house/, 'Your House charter'], [/hown/, 'House owner'], [/oath/, 'charter contract'], [/arena/, 'Arena contract'], [/agent/, 'agent'], [/own-/, 'owner'], [/signer/, 'NEAR MPC signer']];
 const nameOf = a => { const s = String(a ?? ''); for (const [re, n] of ROLE) if (re.test(s)) return n; return s.length > 26 ? s.slice(0, 10) + '…' + s.slice(-8) : s; };
 const acct = a => `<a href="${NB}/address/${esc(a)}" target="_blank" rel="noopener" title="${esc(a)}">${esc(nameOf(a))}</a>`;
@@ -167,7 +167,7 @@ async function townhall() {
   const d = await get('/api/mainnet');
   const t = d?.extras?.townhall;
   if (!t?.txs) throw new Error('The town hall record is not in this response.');
-  $('#townhall .out').innerHTML = `<div class="card" data-testid="hall-state">Town Hall ${acct(t.contract)}. A shared DAO is not built. A rule change is set_rules on your own row.<br>
+  $('#townhall .out').innerHTML = `<div class="card" data-testid="hall-state">Town Hall ${acct(t.contract)}. A rule change is set_rules on your own row.<br>
     Reward allowed ${tx(t.txs['townhall_reward_allowed_0.001'])} · reward refused ${tx(t.txs['townhall_reward_refused_0.002'])}</div>`;
 }
 

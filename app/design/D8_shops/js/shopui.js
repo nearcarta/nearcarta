@@ -31,7 +31,7 @@ const num = (n, u) => `<b class="num">${esc(n)}</b><span class="unit">${esc(u)}<
 const capFmt = 0;
 // Plain names for accounts a visitor sees; the raw id stays in the tooltip and under "advanced".
 export const nice = a => { if (!a) return ''; if (a === A.S.me) return 'You'; const m = A.merchants?.() || [];
-  if (a === m[0]) return 'Café'; if (a === m[1]) return 'Bookshop'; if (/sputnik/.test(a)) return 'Town Hall council'; if (/^lamp\./.test(a)) return 'Lamplighter (your agent)';
+  if (a === m[0]) return 'Café'; if (a === m[1]) return 'Bookshop'; if (a === 'townhall.nearcarta.near') return 'Town Hall'; if (/^lamp\./.test(a)) return 'Lamplighter (your agent)';
   if (/gate/.test(a)) return 'Toll gate'; if (/treasury/.test(a)) return 'Town treasury'; return a.split('.')[0]; };
 // Progress for the long actions: plain steps with a time hint, ticking while the button is busy.
 const STEPS = {

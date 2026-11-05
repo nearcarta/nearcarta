@@ -15,6 +15,8 @@ One recorded swap: 0.045 wNEAR became 0.177937 USDC. https://nearblocks.io/txns/
 
 The API does not sign mainnet. New quotes stay dry. A Pay checkout is at most 0.20 USD and does not send the deposit.
 
-The board wasm has no access key. A shared DAO is not part of this town.
+The board wasm has no access key.
+
+Tracks: Ferry is DeFi, Mist Bank is Privacy, Chronicle and Toll Bridge are Autonomous Business, Guardhouse is AI Security, Town Hall is Agent Economy, Payouts is Real-World Money, Vault Arena is Games, Your House is Open.
 
 Payouts run one at a time. Each payment is at most 0.005 NEAR. The daily budget on a visitor row is 0.01 NEAR.

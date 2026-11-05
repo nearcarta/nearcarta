@@ -121,7 +121,8 @@ test('the loading card is in the first paint and the console does not claim a DA
   assert.doesNotMatch(consoleJs, /DAO-governed oath/);
   assert.doesNotMatch(consoleHtml, /DAO-governed oath/);
   assert.doesNotMatch(consoleJs, /Town Hall DAO/);
-  assert.match(consoleJs, /A shared DAO is not built/);
+  assert.doesNotMatch(consoleJs, /shared DAO/);
+  assert.match(consoleJs, /A rule change is set_rules on your own row/);
 });
 
 test('live scripts, the ignore file and the vercel report do not name deleted files', () => {
