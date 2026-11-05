@@ -194,3 +194,8 @@ button[data-testid="setup-send"]:active, button[data-testid="privy-send"]:active
     animation: none !important;
   }
 }
+
+/* Readability: secondary copy and explorer links — same brass family, heavier weight. */
+.note, .muted, .hint, .faint, .step-meta, .try-meta{color:#c9b896 !important;font-weight:500}
+a.tx, a.explorer, a[href*="nearblocks"], a[href*="explorer.near"], .tx-link{color:#e8c76a !important;font-weight:700;font-size:1.05em}
+a.tx:hover, a.explorer:hover, a[href*="nearblocks"]:hover, a[href*="explorer.near"]:hover, .tx-link:hover{color:#ffe08a !important}

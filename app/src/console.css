@@ -3,7 +3,7 @@
 header{padding:16px 24px;border-bottom:1px solid var(--line)}h1{margin:0;font-size:22px;color:var(--amber)}h1 small{color:var(--mute);font-weight:400;font-size:14px}
 nav{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}nav button{background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:6px 12px;border-radius:6px;cursor:pointer}
 nav button.on{background:var(--amber);color:#2b1a0c;border-color:var(--amber)}a{color:var(--amber)}.links{margin:0;color:var(--mute)}
-main{padding:16px 24px;max-width:1100px}.tab{display:none}.tab.on{display:block}.note{color:var(--mute)}
+main{padding:16px 24px;max-width:1100px}.tab{display:none}.tab.on{display:block}.note{color:#c9b896;font-weight:500;font-size:.95rem;line-height:1.45}
 form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;background:var(--panel);padding:14px;border-radius:8px}
 form .wide{grid-column:span 2}label{display:flex;flex-direction:column;font-size:13px;color:var(--mute);gap:4px}
 input,select{background:#170f0b;color:var(--ink);border:1px solid var(--line);padding:6px;border-radius:4px;font:inherit}
@@ -12,7 +12,7 @@ form button{grid-column:span 4;background:var(--amber);border:0;padding:9px;bord
 .pass{color:var(--ok)}.fail{color:var(--bad)}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;font-size:13px;vertical-align:top}
 code{font-size:12px;word-break:break-all;color:var(--mute)}
 .hero{max-width:62ch;margin:6px 0 10px;font-size:15px;line-height:1.45}
-.warn{color:#e0a84a}
+.warn{color:#e8c08a;font-weight:600;font-size:.95rem}
 form button.ghost{background:transparent;color:var(--amber);border:1px solid var(--amber)}
 #wallet{display:inline-flex;gap:6px;align-items:center;vertical-align:middle}#wallet .pill{background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:3px 10px;border-radius:999px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none}#wallet .pill.go{background:var(--amber);color:#2b1a0c;border-color:var(--amber);font-weight:600}
 .links a{display:inline-block;min-height:24px;line-height:24px}
@@ -28,3 +28,7 @@ header .back-town{margin-bottom:10px}
 /* Sticky header keeps only the title and tabs; proofs live in main. */
 header{position:sticky;top:0;z-index:20;background:var(--bg)}
 header .hero{max-width:62ch}
+
+a.tx, #proofs a, table a{color:#e8c76a;font-weight:700;font-size:1.05em;text-decoration:underline;text-underline-offset:2px}
+a.tx:hover, #proofs a:hover, table a:hover{color:#ffe08a}
+#tabs button{font-weight:600}

@@ -126,7 +126,7 @@ input:hover,select:hover{border-color:#ffffff38}input::placeholder{color:#9c8f79
 .rail li small{color:#e7d7bc}.rail li{color:#c9bca3}
 .eyebrow{color:#e2c47f}
 .foot{color:#c9bca3}
-.muted,.small.muted,.tile span,.fact small,.pick span,.trial-note,.or,.small{color:#d6c9b0}
+.muted,.small.muted,.tile span,.fact small,.pick span,.trial-note,.or,.small{color:#e2d4b4;font-weight:500}
 input::placeholder{color:#a99c85}
 .err{color:#ffa49b}
 label{color:#ddd0b8}
@@ -140,10 +140,19 @@ label{color:#ddd0b8}
 .gasline{color:#ddd0b8}
 .tile:disabled{opacity:.55;cursor:not-allowed;transform:none}.tile:disabled:hover{border-color:inherit;background:inherit}.btn:disabled{opacity:.6;cursor:progress}
 /* readability: helper + footer >=13px, >=4.5:1 on #17130f */
-.tile span{font-size:14px;color:#d6c9b0}.foot{font-size:13px;color:#d6c9b0}
+.tile span{font-size:14px;color:#e2d4b4;font-weight:600}.foot{font-size:13px;color:#d6c9b0}
 .actions .btn:not(.gold){background:#ffffff1a;border-color:#f3ead880;color:#f3ead8}.actions .btn:not(.gold):hover{background:#ffffff29;border-color:#f3ead8}
 /* try cards: look clickable */
 .tile[data-testid^=try-]{border:2px solid #e2c47f;background:#d6b46a0f;position:relative}
 .tile[data-testid^=try-]:not(:disabled):hover{border-color:#f3d78f;background:#d6b46a1f;transform:translateY(-2px);box-shadow:0 8px 24px #0006}
 .tile[data-testid^=try-]:focus-visible{outline:2px solid #e2c47f;outline-offset:2px}
-.tile .go{margin-top:4px;font-size:13px;font-weight:600;color:#e2c47f}.tile:disabled .go{display:none}
+.tile .go{margin-top:4px;font-size:14px;font-weight:700;color:#f0d78a}.tile:disabled .go{display:none}
+
+/* Step 7 readability — remaining quota and "Tap to run" were too faint on brown. */
+.tiles .tile span, .tiles .tile #try-allow-hint, .tiles .tile #try-refuse-hint,
+.tile span, [id^="try-"][id$="-hint"]{
+  color:#c9b896 !important; font-weight:600; font-size:.95rem;
+}
+.tiles .tile em.go, .tile em.go, .tile .go{
+  color:#e8c76a !important; font-weight:700; font-style:normal; font-size:1rem;
+}
