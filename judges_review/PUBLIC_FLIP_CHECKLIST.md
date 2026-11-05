@@ -8,7 +8,7 @@ Deadline: dev window closes Nov 14 23:59 UTC (Nov 15 02:59 Cairo). Keep the repo
 - [ ] Known, documented history item: retired testnet view-only UFVK in `ae15658` (removed in `f19e12f`), see `docs/HISTORY_REWRITE.md`. No rewrite, no force push.
 - [ ] `git status` clean; no `*.tmp.mjs`, `__pycache__`, `.secrets/`, `.env*` tracked.
 - [ ] `npm ci && npm test && npm run verify && npm run build` pass on a fresh clone.
-- [ ] Every link in README / judges/VERIFY.md / judges/TESTNET_TXS.md / docs resolves; no box paths.
+- [ ] Every link in README / judges/VERIFY.md / docs resolves; no box paths.
 
 ## 1. Tag (OWNER OK, then agent)
 - [ ] Pick the exact submitted commit on `main`.

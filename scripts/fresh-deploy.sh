@@ -38,7 +38,7 @@ for s in "${STEPS[@]}"; do
   echo "$line | needs: $envs"
 done
 echo "[charter factory + town hall] owned by the charter-factory worker; not run here (see docs/MIGRATE_NOV1.md)"
-echo "[after] cd backend && node scripts/verify-proofs.js && node scripts/txs-table.js && node scripts/readme-numbers.js"
+echo "[after] cd backend && node scripts/verify-proofs.js && node scripts/readme-numbers.js"
 [ $fail = 0 ] || { echo "plan check FAILED"; exit 1; }
 if [ "$MODE" != "--run" ]; then echo "dry run OK: nothing sent"; exit 0; fi
 [ "$(date -u +%Y%m%d)" -ge 20261101 ] || { echo "refused: --run is for 1 Nov 2026 UTC or later"; exit 2; }

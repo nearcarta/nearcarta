@@ -46,7 +46,7 @@ The initial state of each contract and about 0.01 NEAR of gas per deploy come on
 
 ## Part C: mainnet deploy (live)
 
-Script `backend/scripts/extras-deploy.js`. Testnet run first (`judges/proofs/extras-testnet.json`: deploy, both checks, teardown, all as expected), then mainnet (`judges/proofs/extras-mainnet-deploy.json`). Root `nearcarta.near` after: 1.491207 NEAR.
+Script `backend/scripts/extras-deploy.js`. Testnet run first, then mainnet (`judges/proofs/extras-mainnet-deploy.json`). Root `nearcarta.near` after: 1.491207 NEAR.
 
 | Contract | Init state bytes | Locked | Balance | Full-access key |
 |---|---|---|---|---|

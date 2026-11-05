@@ -21,7 +21,7 @@ Skipped e2e tests sign real testnet txs and need a funded key or an opt-in flag;
 - `backend/src`: the API (`server.js`, one module per shop). `backend/scripts`: proof recorders and checkers; apart from the arena runner's `propose` (`backend/src/vault.js`), only these sign txs.
 - `app/src`: the console UI. `app/design`: the 3D town and shop interiors. They get live data only through `app/src/live/data.js` (and `app/design/D6_dashboards/src/data.js`); keep data wiring in those interfaces.
 - `shared/deployments/testnet.json`: every testnet account, contract and proof tx. Code and docs read ids from here; do not hardcode them.
-- `judges/`: VERIFY.md, TESTNET_TXS.md (generated) and `proofs/*.json` (generated).
+- `judges/`: VERIFY.md and `proofs/*.json` (generated).
 - `vercel.json` and `middleware.js`: Vercel serves the pages and passes `/api/*` to the Render API (`render.yaml`, `Dockerfile`).
 
 ## Commands
@@ -30,7 +30,6 @@ npm ci
 npm test                      # unit tests (offline)
 npm run test:integration      # live: NEAR testnet, 1Click dry quotes, NEAR AI TEE check
 npm run verify                # re-reads every proof tx from testnet -> judges/proofs/proof-check.json
-npm run txs                   # rewrites judges/TESTNET_TXS.md from the verify output
 npm run build && npm run e2e  # browser tests (backend on :8787, app on :5173)
 npm run readme-numbers        # writes the counts in README.md and judges/VERIFY.md from the outputs above
 npm run test:contracts        # (CI job oath-sandbox builds oath and reaper with rustc 1.86, then runs every oath sandbox suite)

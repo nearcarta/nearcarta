@@ -39,7 +39,7 @@ reproducible builds in `judges/VERIFY.md`. It exits non-zero if an artifact or s
 | 5 | Your House charter | `scripts/house-deploy.js` | `oath.r11.wasm` |
 | 6 | House deed (NEP-171) | `scripts/house-nft-fresh.js` (`HOUSE` = the new house charter) | `house_nft.wasm` |
 | 7 | Mist Bank payout | `scripts/mistbank-record.js` with a payee whose viewing key was never public | — |
-| 8 | Proof check + tables | `scripts/verify-proofs.js`, `scripts/txs-table.js`, `scripts/readme-numbers.js` | — |
+| 8 | Proof check + tables | `scripts/verify-proofs.js`, `scripts/readme-numbers.js` | — |
 
 Each script writes new account names and tx hashes into its proof file; copy them into
 `shared/deployments/testnet.json` before the next step. Keys are made per step and stay outside
