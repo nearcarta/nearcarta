@@ -41,6 +41,7 @@
     },
     "txs": {
       "deploy": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4",
+      "reap_prior": "3H6ZypLBdvFfSqtr5wjDPEN462p12Y43FopXcdQUgD2A",
       "smoke_open_charter": "AmYExaBSM5rC3q68AV8ESL1teEJcDMxcRb3rNdhNCDZB",
       "smoke_close_charter": "H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf"
     },
@@ -83,6 +84,16 @@
       "smoke_close": "H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf",
       "wasm_bytes": 108955,
       "tests": "cargo +1.86.0 test --lib 15/15"
+    },
+    "txs_prior_wasm": {
+      "note": "Proof txs against the previous wasm (code_hash 6aBm6TugZzge9uHDpSsr6pG7XPfZm22JoZ8XZxknRGsa, deploy CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt).",
+      "deploy": "CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt",
+      "open_charter": "BUqfZMBTnqU5f223FSDyufCzaVemvMCaWZ2iYXs4MJ4u",
+      "set_agent": "DqMrsEJjd2wyiRh8tW25ZqK8MnG8Tk4rYW3XGuKTfiW7",
+      "allowed_0.001": "8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR",
+      "refused_over_per_action_cap": "CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF",
+      "refused_receiver_not_allowlisted": "E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ",
+      "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
     }
   },
   "mpc": "v1.signer",
