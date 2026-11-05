@@ -5,7 +5,7 @@
 import { readSession, readSessionAccount, sessionPill, visitor } from '../../design/D8_shops/js/session.js';
 import { roomError } from '../room-error.js';
 import {
-  BOARD, diffCharter, draftFrom, matchNote, nearOf, normalizeRow, readBack, rowOwner,
+  BOARD, diffCharter, draftFrom, matchNote, nearOf, normalizeRow, readBack, readUntilChange, rowOwner, waitForFinal,
 } from './hall.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,16 +21,23 @@ function ownerNow() {
   return rowOwner({ owner: params.get('owner') || '', session: readSessionAccount() || '' });
 }
 
+export function hallSkeleton() {
+  return `<div class="hall-skel" data-testid="hall-skel" aria-busy="true" aria-label="Reading your row"><span></span><span></span><span></span></div>`;
+}
+
 export function hallMarkup(row, person = null) {
   const cap = row ? String(nearOf(row.per_action_cap)) : '';
   const who = row?.owner || person?.accountId || '';
   const named = person?.displayName || who;
   const facts = who
-    ? `Signed in as ${esc(named)}. Row for <code>${esc(who)}</code> on <code>${esc(BOARD)}</code>.${cap ? ` Cap ${esc(cap)} NEAR.` : ''}`
+    ? `Signed in as ${esc(named)}.`
     : 'Sign in, then open your row. This page does not open a preview account.';
+  const meta = row
+    ? `<dl class="hall-meta" data-testid="hall-read"><div><dt>Row</dt><dd>${esc(who)}</dd></div><div><dt>Board</dt><dd>${esc(BOARD)}</dd></div><div><dt>Cap</dt><dd>${esc(cap)} NEAR</dd></div></dl>`
+    : '<p data-testid="hall-read"></p>';
   return `<form id="row-form" data-testid="hall-form">
     <p data-testid="hall-facts">${facts}</p>
-    <p data-testid="hall-read">${who ? `Row for <code>${esc(who)}</code> on <code>${esc(BOARD)}</code>. Cap ${esc(cap)} NEAR.` : ''}</p>
+    ${meta}
     <label>Max per payment (NEAR) <input id="cap" data-testid="hall-cap" inputmode="decimal" value="${esc(cap)}"></label>
     <label><input id="frozen" data-testid="hall-frozen" type="checkbox" ${row?.frozen ? 'checked' : ''}> Freeze the row. The agent key cannot undo this.</label>
     <label><input id="sealed" data-testid="hall-seal" type="checkbox" ${row?.sealed ? 'checked' : ''}> Store a seal. The rule text stays off the row.</label>
@@ -61,8 +68,9 @@ export async function mountHall(root, hooks = {}) {
     form.onsubmit = (e) => { e.preventDefault(); onSign(); };
   };
 
-  async function readRow(id) {
-    const body = await fetch(apiBase() + '/api/board/row/' + encodeURIComponent(id)).then(r => r.json());
+  async function readRow(id, { fresh = false } = {}) {
+    const q = fresh ? `?fresh=1&t=${Date.now()}` : '';
+    const body = await fetch(apiBase() + '/api/board/row/' + encodeURIComponent(id) + q, { cache: 'no-store' }).then(r => r.json());
     return normalizeRow(body) || (body?.row ? normalizeRow(body.row) : null);
   }
 
@@ -90,28 +98,42 @@ export async function mountHall(root, hooks = {}) {
       result.innerHTML = `<p data-testid="hall-match">${esc(note.text)}</p>`;
       return;
     }
-    result.innerHTML = '<p>Waiting for your wallet… Deposit 0.</p>';
+    result.innerHTML = '<p data-testid="hall-pending">Waiting for your wallet… Deposit 0.</p>';
     try {
       const sign = hooks.sign || (async (calls) => {
         const m = await import('/shops/hall/hall.bundle.js');
         return m.signCalls(calls);
       });
       const sent = await sign(note.calls);
-      const again = await readRow(before.owner);
-      const shown = again || readBack(draft);
+      const box = () => root.querySelector('#result');
+      if (sent?.hash) {
+        if (box()) box().innerHTML = '<p data-testid="hall-pending">Waiting until the transaction is final…</p>';
+        await waitForFinal(() => fetch(apiBase() + '/api/tx-status/' + encodeURIComponent(sent.hash) + '?sender=' + encodeURIComponent(sent.signer || before.owner), { cache: 'no-store' }).then(r => r.json()).catch(() => ({ final: false, pass: false })));
+      }
+      if (box()) box().innerHTML = '<p data-testid="hall-pending">Reading the row again…</p>';
+      const outcome = await readUntilChange({
+        before,
+        draft,
+        read: () => readRow(before.owner, { fresh: true }),
+      });
+      const shown = outcome.changed && outcome.row ? outcome.row : before;
       before = shown;
       paint(shown);
-      root.querySelector('#result').innerHTML = `<p class="ok" data-testid="hall-readback">Read back. Cap is ${esc(nearOf(shown.per_action_cap))} NEAR.${sent?.hash ? ` Tx ${esc(String(sent.hash).slice(0, 10))}.` : ''}</p>`;
+      const line = root.querySelector('#result');
+      if (!line) return;
+      if (outcome.changed && outcome.row) {
+        line.innerHTML = `<p class="ok" data-testid="hall-readback">Read back. Cap is ${esc(nearOf(shown.per_action_cap))} NEAR.${sent?.hash ? ` Tx ${esc(String(sent.hash).slice(0, 10))}.` : ''}</p>`;
+      } else {
+        line.innerHTML = `<p data-testid="hall-readback">The chain still shows the previous cap. Nothing else was sent.</p>`;
+      }
     } catch (e) {
       const box = root.querySelector('#result');
       if (box) box.innerHTML = `<p data-testid="room-boundary" role="alert">${esc(roomError(e))}</p>`;
     }
   }
 
-  paint(null);
-  if (!choice.owner) return;
-  const facts = root.querySelector('[data-testid=hall-facts]');
-  if (facts) facts.textContent = 'Reading your row…';
+  if (!choice.owner) { paint(null); return; }
+  root.innerHTML = hallSkeleton();
   try {
     before = await readRow(choice.owner);
     paint(before);
