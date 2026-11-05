@@ -130,6 +130,10 @@ function renderCreate() {
     box.innerHTML = live
       ? `<p>Your charter is the row for <b data-testid="charter-id">${esc(me)}</b> on <b>${esc(board.contract)}</b>.</p><p class="muted">Open it from <a href="/setup/?next=${encodeURIComponent(location.pathname)}">setup</a> if it is not open yet. Closing it returns the row storage and the unspent balance.</p>`
       : '<p class="muted">The mainnet board is not deployed yet, so this page will not create a charter.</p>';
+    if (live) {
+      box.insertAdjacentHTML('beforeend', '<p><button type="button" id="close-charter" data-testid="close-charter">Close my charter</button></p>');
+      $('#close-charter').onclick = () => closeCharter(board.contract, $('#close-charter')).catch(fail);
+    }
     return;
   }
   if (charter) { box.innerHTML = `<p>Your charter: <b data-testid="charter-id">${esc(charter)}</b></p>`; return; }
@@ -274,6 +278,15 @@ function renderDash(f, cl, u) {
     ${f.dao ? '<p class="muted">Only the DAO can undo a freeze.</p>' : ''}`;
   if ($('#freeze')) $('#freeze').onclick = () => ownerCall('freeze', {}, $('#freeze'), 'Charter frozen').then(() => tell('Frozen. Every payment is now refused on chain.', 'info')).catch(fail);
   if ($('#unfreeze')) $('#unfreeze').onclick = () => ownerCall('unfreeze', {}, $('#unfreeze'), 'Charter unfrozen').catch(fail);
+}
+async function closeCharter(contract, btn) {
+  if (!confirm('Close your charter row on ' + contract + '? The row storage and the unspent balance go back to your wallet.')) return;
+  busy(btn, true, 'Approve in your wallet…');
+  try {
+    const w = await connector.wallet();
+    const res = await w.signAndSendTransaction({ receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'close_charter', args: {}, gas: (30n * TG).toString(), deposit: '0' } }] });
+    noteSent(txHashOf(res)); toastHtml(`Charter closed · ${txl(txHashOf(res))}`, 'good');
+  } finally { busy(btn, false); }
 }
 async function ownerCall(methodName, args, btn, done) {
   busy(btn, true, 'Approve in your wallet…');
