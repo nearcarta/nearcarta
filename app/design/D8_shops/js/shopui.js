@@ -231,8 +231,8 @@ const APPS = {
     form: () => { const opts = A.S.board ? [['tighter', 'Lower my cap'], ['looser', 'Raise my cap'], ['freeze', 'Freeze'], ['unfreeze', 'Unfreeze'], ['seal', 'Seal the hidden rule']] : [['dao', 'Ask the DAO'], ['tighter', 'My max lower'], ['looser', 'My max higher'], ['cool', 'My 5 min cooling']];
       const lead = A.S.board ? '<p class="plain-line" data-testid="hall-mainnet">Your own row on board.nearcarta.near. A cap change or a freeze attaches 0 NEAR. A seal locks under 0.001 NEAR of storage. Read back with get_charter.</p>' : '';
       return lead + `<div class="seg" role="radiogroup">${opts.map(([k, t]) => `<label><input type="radio" name="hc" value="${k}" ${k === (extra.hc || opts[0][0]) ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>`; },
-    bind: () => { for (const i of document.querySelectorAll('input[name=hc]')) i.onchange = () => { extra.hc = i.value; }; },
-    btn: 'Propose a cap change',
+    bind: () => { for (const i of document.querySelectorAll('input[name=hc]')) i.onchange = () => { extra.hc = i.value; btn(APPS.hall.btn); }; },
+    get btn() { const k = extra.hc || (A.S.board ? 'tighter' : 'dao'); return { dao: 'Ask the DAO', tighter: 'Lower my cap', looser: 'Raise my cap', cool: 'Set my cooling period', freeze: 'Freeze my row', unfreeze: 'Unfreeze my row', seal: 'Seal the hidden rule' }[k] || 'Change my rule'; },
     hero: () => A.S.clauses.pay ? num(+A.fromY(A.S.clauses.pay.per_action_cap).toFixed(4), 'NEAR max') : null,
     run: async () => {
       const r = await A.hallChange(extra.hc || (A.S.board ? 'tighter' : 'dao'));
