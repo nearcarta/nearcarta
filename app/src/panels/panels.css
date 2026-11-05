@@ -328,9 +328,14 @@ label.amt input{width:9rem;flex:0 0 9rem;min-width:0;box-sizing:border-box}
 .ferry-field select option{background:#17130f;color:#fff8ee}
 .ferry-field .amt-row{display:flex;align-items:center;gap:10px}
 .ferry-field .amt-row input{flex:1;min-width:0;border:0;background:transparent;color:#fff8ee;font:650 17px/1.2 system-ui,sans-serif;outline:none}
-.ferry-cta{width:100%;min-height:50px;justify-content:center;border:0;border-radius:12px;background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1.2 system-ui,sans-serif;cursor:pointer}
+.ferry-cta{width:100%;min-height:50px;justify-content:center;border:0;border-radius:12px;background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1.2 system-ui,sans-serif;cursor:pointer;margin:0}
 .ferry-cta[disabled]{opacity:.55;cursor:progress}
-.ferry-cargo-actions{display:grid;gap:12px;margin-top:4px}
+/* Owner: gold CTAs must not stack flush — ≥12px between Get quote / Load cargo / Ask charter */
+.ferry-pane > .ferry-cta,.ferry-cargo-actions > .ferry-cta{margin:0}
+.ferry-cargo-actions{display:grid;gap:12px;margin-top:12px}
+.ferry-pane{row-gap:16px}
+body.ferry-tray #shopUI .btns{gap:12px;flex-direction:column;align-items:stretch}
+body.ferry-tray #shopUI .btns .go,body.ferry-tray #shopUI .btns .ghost{width:100%;margin:0}
 .ferry-rate{margin:4px 0 0;color:#f5d08a;font:650 14px/1.35 system-ui,sans-serif;text-align:center}
 .ferry-quote-err{margin:0;color:#ff8f8f;font:600 13px/1.35 system-ui,sans-serif}
 .ferry-compare-more{border:1px solid #4a3a28;border-radius:12px;padding:12px 14px;background:#17130f;color:#e8d7b8}

@@ -219,8 +219,8 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       </details>
     </div>`;
   const rulesPane = `<div class="ferry-pane" data-pane="rules" ${tab === 'rules' ? '' : 'hidden'}>
-      <p class="ferry-kicker">Your charter caps every trip. Add any 1Click pair under Your rules.</p>
-      <button type="button" class="primary ferry-cta" id="f-open-rules" data-testid="ferry-open-rules">Open rules</button>
+      <p class="ferry-kicker">Ask charter stamps your first allowed shop under the session cap. Open /setup to edit shops or wrap.near call allowlist — set_rules updates an open row without close_charter.</p>
+      <button type="button" class="primary ferry-cta" id="f-open-rules" data-testid="ferry-open-rules">Open /setup rules</button>
       <p class="ferry-agent-hint">Cap still binds. Session key signs with no wallet popup when ready.</p>
     </div>`;
   return `<div class="shop-stack ferry-card" data-testid="ferry-card">${tabs}${swap}${routesPane}${rulesPane}</div>`;

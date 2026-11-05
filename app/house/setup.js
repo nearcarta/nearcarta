@@ -301,7 +301,7 @@ function sRules() {
        <div class="field"><label for="daily">Daily budget</label><div class="suffix"><input id="daily" type="number" step="0.001" min="0.001" value="${r.daily}" data-testid="rule-daily"><span>NEAR</span></div><p class="small muted">All payments in one day added up.</p></div>
        <div class="field"><label for="per">Payments per day</label><div class="suffix"><input id="per" type="number" min="1" max="100" value="${r.per}" data-testid="rule-per"><span>per day</span></div><p class="small muted">How many payments the agent may make each day.</p></div>
        <div class="field"><label for="hours">Session</label><select id="hours" data-testid="rule-hours">${SESSION_HOURS.map(h => `<option value="${h}" ${h == r.hours ? 'selected' : ''}>${sessionLabel(h)}</option>`).join('')}</select><p class="small muted">After this the contract refuses every payment. You can write a new session later.</p></div></div>
-     <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"><p class="small muted">The only accounts your agent may pay.</p></div>
+     <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"><p class="small muted">The only accounts your agent may pay. Ferry Ask charter stamps the first listed shop (not you). Session also allowlists wrap.near for 1Click deposit calls.</p></div>
      <div class="preview" id="prev" data-testid="rule-preview">${preview(r)}</div>${errP()}` + nav(true));
 }
 function wireRules() {
@@ -386,7 +386,10 @@ async function signBoard() {
   const txs = [];
   if (!row) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'open_charter', args: boardArgs(r, pk), gas: (GAS.open * TG).toString(), deposit: String(MAIN.board.max_row_yocto) } }, calls] }]);
   else {
+    // Update receivers/caps without close_charter (storage charge only; unused deposit refunded).
+    // Source: contracts/charter_board/src/lib.rs set_rules + charge.
     if (row.agent !== pubkeyHex(keyFrom(sec))) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: pk }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
+    txs.push(['rules', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_rules', args: { rules: ruleArgs(r) }, gas: (GAS.agent * TG).toString(), deposit: toY(0.001) } }] }]);
     txs.push(['calls', { receiverId: contract, actions: [calls] }]);
   }
   if (!(await agentAccessKey(sec))) txs.push(['key', { receiverId: me, actions: [addKeyAction(pk)] }]);

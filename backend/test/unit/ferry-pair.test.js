@@ -111,3 +111,17 @@ test('rules sheet allows dynamic ferry pairs beyond 3 corridors (source)', () =>
   assert.match(apps, /ferryClauseForPair/);
   assert.match(apps, /wanted/);
 });
+
+test('ferryPayee falls back to pay/board receivers on board sessions (source)', () => {
+  const apps = read('app/design/D8_shops/js/apps.js');
+  assert.match(apps, /S\.clauses\.pay\?\.receivers/);
+  assert.match(apps, /S\.boardRow\?\.receivers/);
+  assert.match(apps, /ferryPayee = route =>/);
+  // Must not only look at S.clauses[route] — board rows have no ferry route clauses.
+  assert.match(apps, /clauses\[route\]\?\.receivers \|\| S\.clauses\.pay/);
+  const session = read('shared/board/session.js');
+  assert.match(session, /wrap\.near/);
+  assert.match(session, /FERRY_CALL_TARGETS/);
+  const css = read('app/src/panels/panels.css');
+  assert.match(css, /ferry-cargo-actions\{display:grid;gap:12px/);
+});

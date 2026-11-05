@@ -27,10 +27,14 @@ test('propose_call signs the same message the board builds', () => {
 });
 
 test('set_calls names each shop, the method and the caps', () => {
-  assert.deepEqual(callPolicy(['toll.nearcarta.near'], '2', '5'), {
+  assert.deepEqual(callPolicy(['toll.nearcarta.near'], '2', '5', 'ft_transfer', []), {
     calls: [{ receiver: 'toll.nearcarta.near', method: 'ft_transfer', cap: '2' }],
     session_cap: '5',
   });
+  const withFerry = callPolicy(['charter.nearcarta.near'], '2', '5');
+  assert.equal(withFerry.calls[0].receiver, 'charter.nearcarta.near');
+  assert.ok(withFerry.calls.some(c => c.receiver === 'wrap.near' && c.method === 'ft_transfer'));
+  assert.ok(withFerry.calls.some(c => c.receiver === 'wrap.near' && c.method === 'near_deposit'));
   assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call']);
 });
 

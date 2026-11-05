@@ -22,9 +22,19 @@ export function sessionLabel(hours) {
   return h === 1 ? '1 hour' : `${h} hours`;
 }
 
-export function callPolicy(receivers, capYocto, sessionCapYocto, method = 'ft_transfer') {
+// wrap.near is the NEP-141 wNEAR used for NEAR→1Click deposit legs (brief-V V4; ferry_intents wrap_near tx).
+// https://docs.near.org/tutorials/tokens/creating-a-ft ; near_deposit / ft_transfer / storage_deposit on wrap.near.
+export const FERRY_CALL_TARGETS = [
+  { receiver: 'wrap.near', method: 'near_deposit' },
+  { receiver: 'wrap.near', method: 'ft_transfer' },
+  { receiver: 'wrap.near', method: 'storage_deposit' },
+];
+
+export function callPolicy(receivers, capYocto, sessionCapYocto, method = 'ft_transfer', extra = FERRY_CALL_TARGETS) {
+  const shop = receivers.map(receiver => ({ receiver, method, cap: String(capYocto) }));
+  const ferry = (extra || []).map(c => ({ receiver: c.receiver, method: c.method, cap: String(c.cap || capYocto) }));
   return {
-    calls: receivers.map(receiver => ({ receiver, method, cap: String(capYocto) })),
+    calls: [...shop, ...ferry],
     session_cap: String(sessionCapYocto),
   };
 }

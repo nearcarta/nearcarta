@@ -422,9 +422,15 @@ export async function quotePair(from, to, amount) {
     body: JSON.stringify({ from, to: to || 'ZEC@zec', amount: String(amount), recipient: UA, refundTo: refundFor(from), privacy: 'basic' }) });
 }
 // A dry quote. Paying it is a board propose, inside the visitor's cap.
-// (the first allowed payee that is not you; yourself only if the rule names nobody else). The charter checks it on chain.
+// Payee: ferry-route clause receivers if present; else the board/pay allowlist (open_charter receivers).
+// Board rows only store a `pay` clause (apps.js readRules), so a route id alone must not fall through to S.me —
+// that is off the allowlist and the board refuses (live: Ask charter → denied, boat frozen).
+// Prefer a listed shop that is not you; yourself only if the rule names nobody else.
 export const ferryNear = q => Math.max(0.001, Math.round(Number(q.from.usd) * 0.01 * 1000) / 1000);
-export const ferryPayee = route => { const r = S.clauses[route]?.receivers || []; return r.find(a => a !== S.me) || r[0] || S.me; };
+export const ferryPayee = route => {
+  const r = S.clauses[route]?.receivers || S.clauses.pay?.receivers || S.boardRow?.receivers || [];
+  return r.find(a => a !== S.me) || r[0] || S.me;
+};
 export function ferryClauseForPair(from, to) {
   const id = pairClauseId(from, to);
   // Prefer an exact clause; fall back to a matching preset corridor; else the first ferry clause.
