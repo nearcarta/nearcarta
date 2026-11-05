@@ -15,13 +15,13 @@ try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) n
 try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }); } catch (e) {}
 </script>
 </head>
-<body>
-<header>
+<body data-shop="payouts">
+<header class="shop-page">
   <p><a class="back-town" href="/" data-testid="back-town">Back to town</a></p>
   <h1>Payouts</h1>
   <p>Prepare several NEAR payments. Each row is at most 0.005 NEAR. This page does not send them.</p>
 </header>
-<main>
+<main class="shop-page">
   <p class="skel" data-testid="payout-skel">Opening the list…</p>
   <div id="app"></div>
 </main>
