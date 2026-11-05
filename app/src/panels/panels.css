@@ -18,3 +18,8 @@
 .hall-skel span:nth-child(3){width:54%}
 @keyframes hallShimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
 @media (prefers-reduced-motion:reduce){.hall-skel span{animation:none}}
+/* Payee radios sit with their labels. Long account ids wrap inside the column. */
+.seg.to{display:grid;gap:8px;justify-items:start}
+.seg.to label.payee,#shopUI .seg.to label.payee{position:relative;display:flex;flex-direction:row;align-items:flex-start;justify-content:flex-start;gap:8px;width:100%;max-width:100%;margin:0}
+.seg.to label.payee input,#shopUI .seg.to input[type=radio]{position:static;opacity:1;inset:auto;width:18px;height:18px;margin:2px 0 0;flex:none}
+.seg.to .payee-id,#shopUI .seg.to .payee-id{display:inline;height:auto;padding:0;border:0;border-radius:0;background:none;white-space:normal;overflow-wrap:anywhere;color:#f3ead8;line-height:1.35}

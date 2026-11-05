@@ -336,7 +336,7 @@ function mountBank(root, hooks) {
   const panel = tee ? teePanel(tee, recorded, proof) : `<button type="button" id="m-tee" data-testid="tee-verify">Verify the TEE now</button>${recorded}${proof}`;
   const sessionLine = who.signedIn ? `<p data-testid="bank-session">Signed in as ${esc(who.displayName || who.accountId)}.</p>` : '';
   const payeeBox = payees.length
-    ? payees.map(a => `<label><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span>${esc(a)}</span></label>`).join('')
+    ? payees.map(a => `<label class="payee"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span class="payee-id">${esc(a)}</span></label>`).join('')
     : '<p>Sign in to choose a payee.</p>';
   root.innerHTML = `<p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${esc(hooks.proof ? hooks.proof() : '')}</p>
     ${sessionLine}
