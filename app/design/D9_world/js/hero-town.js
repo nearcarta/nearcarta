@@ -6,7 +6,7 @@ function chip(h) {
   let el = document.getElementById('heroChip');
   if (!brand || !h?.img || !h?.name) { el?.remove(); return; }
   if (!el) { el = document.createElement('a'); el.id = 'heroChip'; el.className = 'hero-chip'; el.href = '/setup/#character'; brand.append(el); }
-  el.style.setProperty('--dye', /^#[0-9a-fA-F]{6}$/.test(h.dye || '') ? h.dye : '#00ec97');
+  el.style.setProperty('--dye', /^#[0-9a-fA-F]{6}$/.test(h.dye || '') ? h.dye : '#d6b46a');
   if (el.dataset.img !== h.img) { el.dataset.img = h.img; el.innerHTML = '<img alt=""><span></span>'; el.querySelector('img').src = '/setup/chars/' + h.img + '.webp'; }
   el.querySelector('span').textContent = h.name;
   el.title = h.name + '. Change look';

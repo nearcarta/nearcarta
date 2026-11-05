@@ -58,8 +58,8 @@ function makeAtlas(img){ const c=document.createElement('canvas'); c.width=img.w
 const C = h=>new THREE.Color(h);
 const KEYS = [ // day, dusk, night
   { top:C('#9fb3bb'), mid:C('#d9d6c4'), hor:C('#efe2c6'), fog:C('#d8cfb8'), sun:C('#fff1d6'), sunI:2.3, hemiS:C('#f1ead8'), hemiG:C('#6b5a40'), hemiI:1.15, sea:C('#6b8873'), deep:C('#3c584b'), elev:.95, lift:C('#000000'), sat:.92, lamp:0, fly:0, expo:1.15, sh:.05 },
-  { top:C('#121a2e'), mid:C('#1a2440'), hor:C('#2a3a62'), fog:C('#0b1020'), sun:C('#ffd166'), sunI:1.6, hemiS:C('#9aa6c8'), hemiG:C('#1a2440'), hemiI:1.2, sea:C('#16324a'), deep:C('#0b1020'), elev:.7, lift:C('#050814'), sat:.9, lamp:1, fly:.6, expo:1.2, sh:.08 },
-  { top:C('#0b1020'), mid:C('#121a2e'), hor:C('#1a2440'), fog:C('#0b1020'), sun:C('#7aa7ff'), sunI:1.35, hemiS:C('#c3cbe6'), hemiG:C('#121a2e'), hemiI:1.3, sea:C('#10283c'), deep:C('#070c18'), elev:.8, lift:C('#050814'), sat:.95, lamp:1, fly:1, expo:1.25, sh:.1 },
+  { top:C('#7d6a6e'), mid:C('#e0a184'), hor:C('#fbd29a'), fog:C('#e8c39c'), sun:C('#ffc884'), sunI:2.45, hemiS:C('#f6dcc8'), hemiG:C('#7a5c48'), hemiI:1.55, sea:C('#647a66'), deep:C('#384d41'), elev:.62, lift:C('#050302'), sat:.98, lamp:.75, fly:.45, expo:1.16, sh:.08 } /* late golden hour: details read, lamps still glow */,
+  { top:C('#2c3a5c'), mid:C('#4a5574'), hor:C('#76768c'), fog:C('#3d4560'), sun:C('#c4d3f0'), sunI:1.45, hemiS:C('#a9b5d4'), hemiG:C('#4a3e32'), hemiI:1.42, sea:C('#3a5056'), deep:C('#22343a'), elev:.82, lift:C('#0a0c14'), sat:.97, lamp:1, fly:1, expo:1.3, sh:.1 } /* moonlit, not dark: every roof, sign and face still reads */,
 ];
 const ICE = C('#cfe6f5');
 const mixK=(t)=>{ const i=Math.min(1,Math.floor(t)), f=Math.min(1,t-i), a=KEYS[i], b=KEYS[Math.min(2,i+1)]; const o={}; for(const k in a) o[k]= a[k].isColor? a[k].clone().lerp(b[k],f) : a[k]+(b[k]-a[k])*f; return o; };
@@ -72,7 +72,7 @@ export async function init(canvas){
   const r = W.renderer = new THREE.WebGLRenderer({canvas, antialias:LP, powerPreference:'high-performance', preserveDrawingBuffer:CAPTURE});
   r.setPixelRatio(Math.min(devicePixelRatio, LP?1:CAPTURE?1:1.5)); r.setSize(innerWidth,innerHeight);
   r.shadowMap.enabled=!LP; r.shadowMap.type=THREE.PCFSoftShadowMap; r.toneMapping=THREE.ACESFilmicToneMapping; r.toneMappingExposure=1.16; r.outputColorSpace=THREE.SRGBColorSpace;
-  const s = W.scene = new THREE.Scene(); s.fog=new THREE.Fog(0x0b1020,42,150);
+  const s = W.scene = new THREE.Scene(); s.fog=new THREE.Fog(0xe8c39c,42,150);
   W.camera = new THREE.PerspectiveCamera(30, innerWidth/innerHeight, .3, 400);
   hemi=new THREE.HemisphereLight(0xffffff,0x444444,1); s.add(hemi);
   sun=new THREE.DirectionalLight(0xffffff,2); sun.castShadow=!LP; const SM=+(P.get('shadow')||2048); sun.shadow.mapSize.set(SM,SM); W.sunShadowSize=SM;
@@ -215,7 +215,7 @@ function buildSkyline(){ const R=['mountain_A_grass_trees','mountain_B_grass','m
 const GLYPH={
   chronicle:x=>{ x.beginPath(); x.moveTo(-26,-30); x.lineTo(22,-30); x.quadraticCurveTo(30,-30,30,-22); x.lineTo(30,30); x.lineTo(-22,30); x.quadraticCurveTo(-30,30,-30,22); x.lineTo(-30,-26); x.stroke(); for(let i=0;i<4;i++){ x.beginPath(); x.moveTo(-18,-14+i*12); x.lineTo(18-(i==3?14:0),-14+i*12); x.stroke(); } },
   hall:x=>{ x.beginPath(); x.moveTo(-24,22); x.quadraticCurveTo(-22,-30,0,-30); x.quadraticCurveTo(22,-30,24,22); x.closePath(); x.stroke(); x.beginPath(); x.arc(0,30,6,0,7); x.fill(); x.beginPath(); x.moveTo(0,-30); x.lineTo(0,-40); x.stroke(); },
-  bank:x=>{ for(let i=0;i<3;i++){ x.beginPath(); x.ellipse(0,20-i*16,24,8,0,0,7); x.fill(); x.stroke(); } x.save(); x.fillStyle='#eef2ff'; x.font='bold 22px serif'; x.textAlign='center'; x.restore(); },
+  bank:x=>{ for(let i=0;i<3;i++){ x.beginPath(); x.ellipse(0,20-i*16,24,8,0,0,7); x.fill(); x.stroke(); } x.save(); x.fillStyle='#f3ead8'; x.font='bold 22px serif'; x.textAlign='center'; x.restore(); },
   ferry:x=>{ x.beginPath(); x.moveTo(-32,6); x.lineTo(32,6); x.lineTo(22,22); x.lineTo(-22,22); x.closePath(); x.fill(); x.beginPath(); x.moveTo(0,6); x.lineTo(0,-34); x.lineTo(22,0); x.closePath(); x.stroke(); x.beginPath(); x.moveTo(-36,32); x.quadraticCurveTo(-18,24,0,32); x.quadraticCurveTo(18,40,36,32); x.stroke(); },
   guard:x=>{ x.beginPath(); x.moveTo(0,-34); x.lineTo(28,-24); x.quadraticCurveTo(28,18,0,36); x.quadraticCurveTo(-28,18,-28,-24); x.closePath(); x.stroke(); x.beginPath(); x.moveTo(0,-22); x.lineTo(0,24); x.moveTo(-16,-6); x.lineTo(16,-6); x.stroke(); },
   arena:x=>{ for(const r of [30,19,8]){ x.beginPath(); x.arc(0,0,r,0,7); x.stroke(); } x.beginPath(); x.moveTo(-34,-30); x.lineTo(0,0); x.stroke(); },
@@ -269,7 +269,7 @@ function buildWater(){
   const land=[...tiles.values()];
   [[28,.25],[14,.45],[6,.7],[2,1]].forEach(([b,a])=>{ x.filter=`blur(${b}px)`; x.globalAlpha=a; x.fillStyle='#fff'; land.forEach(t=>hexPoly(t.q,t.r,1.18)); }); x.filter='none'; x.globalAlpha=1;
   const df=new THREE.CanvasTexture(cv); df.flipY=false;
-  seaMat=new THREE.ShaderMaterial({ fog:true, transparent:false, uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{ df:{value:df}, S:{value:S}, time:U.time, shallow:{value:C('#577160')}, deep:{value:C('#2d4136')}, foam:{value:C('#eef2ff')}, sunC:{value:C('#ffb070')}, frz:U.frz }]),
+  seaMat=new THREE.ShaderMaterial({ fog:true, transparent:false, uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{ df:{value:df}, S:{value:S}, time:U.time, shallow:{value:C('#577160')}, deep:{value:C('#2d4136')}, foam:{value:C('#f3ead8')}, sunC:{value:C('#ffb070')}, frz:U.frz }]),
     vertexShader:`varying vec3 vW;
 #include <fog_pars_vertex>
 void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vec4 mvPosition=viewMatrix*w; gl_Position=projectionMatrix*mvPosition;
@@ -449,7 +449,7 @@ function updZec(dt){ if(zec.t<0) return; zec.t+=dt; const t=zec.t, c=zec.coin, m
 // Vault Arena: a wire dome that takes hits and never breaks
 let dome, sparks=[];
 function buildArena(){ const p=hx(SHOPS.arena.q,SHOPS.arena.r);
-  dome=new THREE.Mesh(new THREE.IcosahedronGeometry(1.25,2),new THREE.MeshBasicMaterial({color:0x00ec97,wireframe:true,transparent:true,opacity:.2,depthWrite:false,blending:THREE.AdditiveBlending,fog:false}));
+  dome=new THREE.Mesh(new THREE.IcosahedronGeometry(1.25,2),new THREE.MeshBasicMaterial({color:0xd6b46a,wireframe:true,transparent:true,opacity:.2,depthWrite:false,blending:THREE.AdditiveBlending,fog:false}));
   dome.position.set(p.x,.1,p.z); dome.scale.y=.78; W.scene.add(dome);
   for(let i=0;i<5;i++){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:softT,color:0xff8a6b,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false})); s.scale.setScalar(.35); s.visible=false; W.scene.add(s); sparks.push({s,t:-1,from:new THREE.Vector3(),to:new THREE.Vector3()}); } }
 // soft puffs (smoke, mist) as one Points draw per system instead of one Sprite each. Each puff is a light proxy with the
@@ -577,7 +577,7 @@ export function update(dt){ const T=clock.T; U.time.value=T;
   const b=W.boat, bu=b.userData; const goal=[W.jetty.home,W.jetty.mid,W.jetty.far][bu.goal]; tmp.copy(goal).sub(b.position); const dl=tmp.length(); b.position.addScaledVector(tmp,Math.min(1,dt*.55)*(1-W.frz)); b.position.y=-.06+Math.sin(T*2)*.025*(1-W.frz); b.rotation.z=Math.sin(T*1.5)*.04*(1-W.frz);
   bu.sail.scale.x=1+Math.sin(T*1.7)*.05*(1-W.frz)+Math.min(dl,1)*.12; bu.lan.material.color.copy(LAMPC.warm).lerp(LAMPC.ice,W.frz); bu.lan.material.opacity=.4+K.lamp*.6;
   // arena
-  dome.rotation.y=T*.08*(1-W.frz); W.domeHit=Math.max(0,(W.domeHit||0)-dt*1.8); dome.material.opacity=.16+W.domeHit*.45; dome.material.color.set(W.domeHit>.1?0xff8a6b:W.frz>.5?0xa8d8ff:0x00ec97);
+  dome.rotation.y=T*.08*(1-W.frz); W.domeHit=Math.max(0,(W.domeHit||0)-dt*1.8); dome.material.opacity=.16+W.domeHit*.45; dome.material.color.set(W.domeHit>.1?0xff8a6b:W.frz>.5?0xa8d8ff:0xd6b46a);
   sparks.forEach(sp=>{ if(sp.t<0){ sp.s.visible=false; return; } sp.t+=dt*1.3; const k=Math.min(1,sp.t); sp.s.position.lerpVectors(sp.from,sp.to,k); sp.s.position.y+=Math.sin(k*Math.PI)*1.1; sp.s.visible=true; if(k>=1){ sp.t=-1; W.domeHit=1; W.domeHits=(W.domeHits||0)+1; } });
   if(W.frz<.5 && Math.floor(T*.45)!==Math.floor((T-dt)*.45)) fireSpark();
   // bell + windmill
