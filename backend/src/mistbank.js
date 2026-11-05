@@ -1,9 +1,9 @@
 // Mist Bank: a private payout desk. Everything shown comes from a real source, nothing is sample data.
-//  Street (public): a real Zcash TESTNET shielded payout read live from a public explorer API.
+//  Street (public): a shielded Zcash payout read live from a public explorer API (mainnet by default).
 //    streetCheck() proves the amount is not visible: no transparent inputs or outputs, and the only
 //    value leaving the shielded pools is the fee. A payout that crosses pools (for example Ironwood to
 //    Sapling) shows the crossing amount on chain, so it fails this check, as faucet payouts do.
-//  Oath (public): NEAR testnet approval of the payout. Its memo carries only a commitment
+//  Oath (public): NEAR approval of the payout. Its memo carries only a commitment
 //    sha256("mistbank:v1:<amount>:<salt>") (as "mb1:<base64url>"), never the amount.
 //  Ledger (auditor only): the amount and salt sit in the encrypted Zcash memo. Only an auditor
 //    given the payee viewing key out of band can read them; the API never serves the key, the
@@ -17,7 +17,10 @@ import { DEP, has } from './config.js';
 import { postQuote, checkQuote } from './ferry.js';
 import { txStatus, txResult, eventsFromOutcome, explorerTx } from './near.js';
 
-export const ZEC_TESTNET_API = process.env.ZEC_TESTNET_API || 'https://api.testnet.cipherscan.app';
+// Mainnet Zcash explorer. ZEC_TESTNET_API is accepted only as an explicit override (no testnet default).
+export const ZEC_API = process.env.ZEC_API || process.env.ZEC_TESTNET_API || 'https://api.mainnet.cipherscan.app';
+/** @deprecated use ZEC_API */
+export const ZEC_TESTNET_API = ZEC_API;
 const UA = { 'User-Agent': 'nearcarta-mistbank/0.1' };
 
 export const commitment = (zats, salt) => createHash('sha256').update(`mistbank:v1:${zats}:${salt}`).digest('hex');
@@ -26,9 +29,9 @@ export const oathMemo = c => `mb1:${Buffer.from(c, 'hex').toString('base64url')}
 
 export async function fetchStreet(txid) {
   if (!/^[0-9a-f]{64}$/.test(txid)) throw Object.assign(new Error('bad txid'), { status: 400 });
-  const r = await fetch(`${ZEC_TESTNET_API}/api/tx/${txid}`, { headers: UA });
-  // A just-broadcast tx is not on the explorer until it is mined (about 75 s on testnet): say so instead of 'internal'.
-  if (r.status === 404) throw Object.assign(new Error('tx not found on the Zcash testnet explorer (not mined yet, or unknown)'), { status: 404 });
+  const r = await fetch(`${ZEC_API}/api/tx/${txid}`, { headers: UA });
+  // A just-broadcast tx is not on the explorer until it is mined: say so instead of 'internal'.
+  if (r.status === 404) throw Object.assign(new Error('tx not found on the Zcash explorer (not mined yet, or unknown)'), { status: 404 });
   if (!r.ok) throw Object.assign(new Error(`zcash explorer http ${r.status}`), { status: 502 });
   return r.json();
 }

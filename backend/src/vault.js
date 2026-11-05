@@ -1,5 +1,5 @@
 // Charters and Vault Arena. Charters come from the factory on chain; every arena result is a
-// final testnet tx, and the leaderboard is rebuilt from chain (factory list + each charter's
+// final tx, and the leaderboard is rebuilt from chain (factory list + each charter's
 // propose txs, each one re-verified through RPC).
 //
 // Scoring never trusts the memo. The memo only says which attack or task a tx claims to be; the
@@ -7,12 +7,8 @@
 // attack or task under the clause in force at that block, and the expected decision:
 //   attack -> denied, with the reason the attack targets;   task -> allowed and settled ok.
 //
-// Exception to "no route can sign": POST /api/vault/attack, /api/vault/task and /api/vault/ask sign `propose` on
-// the SHARED arena charter with ARENA_AGENT_KEY. That key is a function-call key that can only call
-// `propose` on those charters, with no gas allowance (R18: a capped key locks out for good once its gas runs out); the charter's clause (allowlist, small caps,
-// daily budget) bounds what an allowed step can move. The runner signs at 30 Tgas and stops at a
-// daily tx cap. The key is read lazily and never logged or returned. Rows it signs are labelled
-// server_signed.
+// No route signs. The former ARENA_AGENT_KEY shared-runner path is removed on mainnet; attack/task/ask
+// HTTP handlers return 503 unless a caller injects a key in tests.
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { indexPost } from './txindex.js';
 import { createHash } from 'node:crypto';
@@ -149,7 +145,8 @@ export async function listCharters(from = 0, limit = 50, factory = V?.factory) {
 }
 
 // ---------- the shared arena runner (30 Tgas, daily tx cap) ----------
-function agentSecret() { return (process.env.ARENA_AGENT_KEY || '').trim() || null; }
+// Mainnet: never load a testnet arena agent key from the environment.
+function agentSecret() { return null; }
 /** Shared demo charters (same clause, same agent key): the original one first, then the pool. */
 export const sharedCharters = () => V ? [V.arena.charter, ...(V.arena.pool || [])] : [];
 // Retired shared arena charters (R16 shared, R17 pool, legacy): no live agent key, kept so their history still shows.
@@ -281,8 +278,8 @@ export async function askReceivers(charter, viewF = view) {
 
 /** "Ask the agent to pay" without signing: the parsed request and the proposal the owner's agent key would sign. */
 export async function askPlan(text, charter = null, { viewF = view, nowMs = Date.now(), propose = agent.propose, tag = 'mine' } = {}) {
-  if (!V) throw bad('vault not deployed', 503);
-  if (charter !== null && !isAccount(charter)) throw bad('charter: a testnet account id');
+  if (!charter && !V) throw bad('vault not deployed', 503);
+  if (charter !== null && !isAccount(charter)) throw bad('charter: a NEAR account id');
   const id = charter || V.arena.charter;
   const clauses = await viewF(id, 'get_clauses');
   const receivers = await askReceivers(id, async () => clauses);
@@ -624,7 +621,8 @@ export const rebuild = { started_at: null, complete_at: null, reread_at: null, p
  * below), then fill until a pass completes (backoff to 60 s) while the snapshot hashes are re-read in parallel.
  */
 export function boot({ fill = backfill, firstMs = 1000, snapshotFile, boardFile = BOARD_FILE, reread: rr = reread, conc = 6 } = {}) {
-  if (!V) return;
+  // On mainnet V is null (no vault factory). Injected fills still run so unit tests can exercise boot.
+  if (!V && fill === backfill) return;
   // On Render free (no disk) the /tmp board is gone after a restart: the fill below rebuilds it from chain.
   rebuild.board_file_rows = loadBoard(boardFile);
   rebuild.snapshot_rows = snapshotFile === null ? 0 : loadSnapshot(snapshotFile);
