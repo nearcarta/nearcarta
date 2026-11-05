@@ -22,7 +22,9 @@ export function flat() {
     } else {
       // the 2D tray shows the end state (no scene to animate)
       const end = { guard: ['no', 'Refused · not on the list'], ferry: ['ok', 'Downgrade refused · crossed shielded'], hall: ['ok', 'Passed · 2 votes'] }[id];
-      const info = m.FLAT || FLAT[id]; $('#t-src').textContent = (globalThis.NEARCARTA_PUBLIC_MAINNET === true && { bank: 'mainnet · Zcash testnet', payouts: 'testnet demo', chronicle: 'mainnet' }[id]) || (info.src === 'testnet' ? 'testnet demo' : info.src); $('#t-src').className = 'src ' + info.cls; $('#t-label').textContent = info.label; $('#t-hero').innerHTML = info.hero;
+      const info = m.FLAT || FLAT[id];
+      const mainSrc = { bank: 'mainnet · Zcash testnet', payouts: 'mainnet · one at a time', chronicle: 'mainnet', toll: 'mainnet · Base Sepolia is testnet', hall: 'mainnet · your row', guard: 'mainnet · view' };
+      $('#t-src').textContent = (globalThis.NEARCARTA_PUBLIC_MAINNET === true && mainSrc[id]) || (info.src === 'testnet' ? 'testnet demo' : info.src); $('#t-src').className = 'src ' + info.cls; $('#t-label').textContent = info.label; $('#t-hero').innerHTML = info.hero;
       { const mo = $('#t-more'); mo.hidden = !m.MORE; if (m.MORE) { mo.href = m.MORE.href; mo.textContent = m.MORE.text; } }
       b.onclick = null; b.hidden = !end; if (end) { b.className = 'act res ' + end[0]; b.disabled = true; b.textContent = end[1]; }
       if (m.PROOF) body.innerHTML = m.PROOF;
