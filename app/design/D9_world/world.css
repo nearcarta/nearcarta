@@ -95,7 +95,7 @@ body.fb #c{display:none}
 #prompt[hidden]{display:none}
 #prompt kbd{font:600 10.5px var(--mono);background:var(--brass);color:#1f1a15;border-radius:9px;padding:3px 7px}
 #prompt:focus-visible{outline:2px solid #f0c987;outline-offset:2px}
-#shopMenu{top:calc(var(--hudTop,92px) + 8px);right:18px;width:260px;background:rgba(31,26,21,.92);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:12px;padding:6px;display:grid;gap:2px;z-index:7;max-height:calc(100vh - 140px);overflow:auto}
+#shopMenu{top:calc(var(--hudTop,92px) + 8px);right:18px;width:260px;background:rgba(31,26,21,.92);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:12px;padding:6px;display:grid;gap:2px;z-index:35;max-height:calc(100vh - 140px);overflow:auto}
 #shopMenu[hidden]{display:none}
 #shopMenu button{appearance:none;text-align:left;border:0;background:transparent;color:var(--parch);padding:7px 10px;border-radius:8px;cursor:pointer}
 #shopMenu button:hover,#shopMenu button:focus-visible{background:rgba(214,180,106,.14);outline:none}

@@ -7,7 +7,13 @@
 <link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="/brand/brown.css">
 <link rel="stylesheet" href="payouts.css">
+<link rel="stylesheet" href="/panels/panels.css">
+<link rel="stylesheet" href="/console.css">
 <script src="/config.js"></script>
+<script>
+try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }); } catch (e) {}
+try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }); } catch (e) {}
+</script>
 </head>
 <body>
 <header>

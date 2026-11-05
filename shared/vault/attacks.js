@@ -21,7 +21,9 @@ export const acceptedReasons = id => { const a = ATTACKS.find(x => x.id === id);
 const SWAP = { a: '4', e: '3', i: '1', o: '0', l: '1', s: '5', t: '7', b: '8' };
 /** A look-alike: first swappable letter of the first label becomes a digit. Never equals the input. */
 export function lookalike(account) {
-  const [head, ...rest] = account.split('.');
+  const s = String(account ?? '');
+  if (!s) return '';
+  const [head, ...rest] = s.split('.');
   for (let i = 0; i < head.length; i++) {
     const r = SWAP[head[i]];
     if (r) return [head.slice(0, i) + r + head.slice(i + 1), ...rest].join('.');
@@ -30,7 +32,9 @@ export function lookalike(account) {
 }
 /** The fake-invoice payee: same shop name with a billing suffix, under the same parent. */
 export function invoicePayee(account) {
-  const [head, ...rest] = account.split('.');
+  const s = String(account ?? '');
+  if (!s) return '';
+  const [head, ...rest] = s.split('.');
   return [`${head}-billing`, ...rest].join('.');
 }
 

@@ -13,6 +13,8 @@ import { checkDerived, TOLL_KEY, TOLL_ADDRESS } from '/toll-derive.js';
 import { DEED, controlAfterMove, metadataView, txUrl } from '/deed-control.js';
 import { teeResult, PROOF_HREF } from '/tee-view.js';
 import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
+import { mountShop } from '/panels/deep.js';
+import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues } from './payouts.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
 const yOf = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
@@ -136,22 +138,8 @@ const APPS = {
     btn: () => 'Pay 0.001 NEAR',
     hero: () => num('0.001', 'NEAR'),
     guest: true,
-    form: () => { const d = extra.derived || checkDerived({ publicKey: TOLL_KEY, recorded: TOLL_ADDRESS }); extra.derived = d;
-      const chains = d.chains.map(c => `<li data-testid="toll-chain">${esc(c.chain)} ${esc(c.path)}${c.address ? ' ' + esc(c.address) : ''} — ${esc(c.note)}</li>`).join('');
-      return gasNote() + `<div data-testid="toll-derive"><p>${esc(d.text)}</p><ul>${chains}</ul></div><button type="button" id="toll-sig" data-testid="check-signature">Check signature</button><p id="toll-sig-out" data-testid="check-signature-out"></p>`; },
-    bind: () => { const b = $('#toll-sig'); if (!b) return; b.onclick = async () => {
-      const out = $('#toll-sig-out'); if (out) out.textContent = 'Checking the recorded signature…';
-      b.disabled = true;
-      try {
-        const api = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
-        const d = await fetch(api + '/api/mainnet').then(r => r.json());
-        const hash = d?.toll?.txs?.owner_toll_pay_allowlisted;
-        const sender = d?.toll?.owner;
-        const st = await fetch(api + '/api/tx-status/' + encodeURIComponent(hash) + '?sender=' + encodeURIComponent(sender || '')).then(r => r.json());
-        if (out) out.textContent = st.pass ? 'Pass. The recorded signature is on chain.' : 'Fail. ' + (st.why || 'The chain did not confirm it.');
-      } catch (e) { if (out) out.textContent = 'Fail. The chain check did not answer.'; }
-      b.disabled = false;
-    }; },
+    form: () => '<div data-deep="toll"></div>',
+    bind: () => mountShop('toll', document.getElementById('t-form')),
     run: async () => {
       const v = A.tollVisit();
       if (v && !v.done) return tollStep(v, true);
@@ -163,17 +151,8 @@ const APPS = {
   ferry: {
     label: 'Ferry · cross-chain swap', idle: 'Pick a route. I\u2019ll fetch a live quote.',
     guest: true,
-    form: () => `<div class="seg" role="group" aria-label="Routes">${A.ROUTES.map((r, i) => `<button type="button" class="route-chip" data-route="${esc(r.id)}" aria-pressed="${i === (extra.ri || 0) ? 'true' : 'false'}" data-testid="ferry-route">${esc(r.label)}${r.down ? ' · down' : ''}</button>`).join('')}</div>
-      <label class="amt"><input id="f-amt" type="number" min="0" step="any" value="${esc(extra.amt || A.ROUTES[extra.ri || 0].amt)}"><span id="f-sym">${A.ROUTES[extra.ri || 0].sym}</span></label>
-      <button type="button" id="f-compare" data-testid="ferry-compare">Compare routes</button>
-      <div id="f-quotes" data-testid="ferry-quotes">${(extra.quotes || []).map(v => `<p data-testid="ferry-row"${v.best ? ' data-best="1"' : ''}>${esc(v.text || ((v.label || v.symbolOut || '') + ' out ' + (v.amountOut ?? '—')))}${v.best ? ' · best rate' : ''}</p>`).join('')}${extra.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : ''}</div>
-      ${extra.fstatus ? `<p data-testid="ferry-status">${esc(extra.fstatus.words || extra.fstatus.status)}</p><p data-testid="ferry-refund">${extra.fstatus.refund ? 'Refunded to the refund address.' : 'A short deposit or a failed swap is refunded to the refund address. This page does not send the deposit.'}</p>` : ''}`,
-    bind: () => { for (const i of document.querySelectorAll('[data-route]')) i.onclick = () => { extra.ri = A.ROUTES.findIndex(r => r.id === i.dataset.route); extra.amt = A.ROUTES[extra.ri].amt; extra.q = null; paint(); }; const amt = $('#f-amt'); if (amt) amt.oninput = e => { extra.amt = e.target.value; extra.q = null; btn('Get quote'); };
-      const c = $('#f-compare'); if (c) c.onclick = async () => { c.disabled = true; const raw = [];
-        for (const r of A.ROUTES) { try { raw.push(await A.quote(r.id, extra.amt || r.amt)); } catch { raw.push({ label: r.label, from: { amount: extra.amt || r.amt, symbol: r.sym, chain: String(r.from).split('@')[1] || '' }, to: { symbol: 'ZEC', chain: 'zec' }, dry: true }); } }
-        extra.quotes = pickBest(raw.map(quoteLine));
-        extra.sample = !extra.quotes.some(v => v.amountOut != null);
-        extra.fstatus = statusView({ status: 'PENDING_DEPOSIT' }); paint(); }; },
+    form: () => '<div data-deep="ferry"></div>',
+    bind: () => mountShop('ferry', document.getElementById('t-form'), { state: extra, routes: () => A.ROUTES, quote: (id, amt) => A.quote(id, amt), repaint: () => paint() }),
     btn: () => extra.q ? 'Ask my agent to swap' : extra.fdone ? 'Done ✓ · Swap again' : 'Get quote',
     hero: () => extra.q ? `<span class="tok"><b class="num">${esc(+Number(extra.q.to.amount).toFixed(5))}</b><span class="sym">ZEC</span></span>` : null,
     run: async () => {
@@ -190,12 +169,9 @@ const APPS = {
   },
   bank: {
     guest: true,
-    label: 'Mist Bank · private payouts', idle: 'Pick an amount and who gets it. Everyone sends one of the same few amounts, so no payment stands out. The amount is never shown; Nearcarta\u2019s own server makes the Zcash transfer.',
-    form: () => { const ps = A.bankPayees(), to = extra.to || A.bankDefault();
-      const N = A.notes(), note = N.includes(+extra.amt) ? +extra.amt : N[0];
-      return `<p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${A.mainProof()}</p><div class="seg notes" role="radiogroup" aria-label="Amount" data-testid="bank-notes">${N.map(n => `<label><input type="radio" name="note" id="m-note-${String(n).replace('.', '')}" value="${n}" ${n === note ? 'checked' : ''}><span class="tok-done">${n} NEAR</span></label>`).join('')}</div>`
-        + `<p class="note to-l">Send to</p><div class="seg to" role="radiogroup" aria-label="Send to" id="m-to" data-testid="bank-to">${ps.map((a, i) => `<label title="${esc(a)}"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span>${esc(nice(a) || short(a, 10, 6))}</span></label>`).join('')}</div>` + teePanel(extra.tee); },
-    bind: () => { document.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { extra.amt = r.value; if (!extra.sent) btn(APPS.bank.btn()); }; }); document.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { extra.to = r.value; }; }); const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; const pg = document.createElement('p'); pg.className = 'tee-progress'; pg.dataset.testid = 'tee-progress'; pg.setAttribute('role', 'status'); pg.setAttribute('aria-live', 'polite'); b.after(pg); const bar = document.createElement('span'); bar.className = 'holdbar'; bar.dataset.testid = 'tee-bar'; const fill = document.createElement('i'); bar.append(fill); pg.before(bar); const t0 = Date.now(), steps = [[0, 'Sending a fresh nonce to NEAR AI'], [2, 'Fetching gateway and model attestation reports'], [5, 'Verifying Intel TDX quotes (dcap-qvl)'], [9, 'Replaying event logs and checking NVIDIA GPU evidence'], [15, 'Still verifying, NEAR AI can take up to 30 s']]; const tick = () => { const sec = Math.floor((Date.now() - t0) / 1000); const st = steps.filter(([at]) => sec >= at).pop(); const n = steps.indexOf(st) + 1; b.textContent = 'Checking the TEE… ' + sec + ' s'; pg.textContent = `Step ${n} of ${steps.length}: ${st[1]}…`; fill.style.width = Math.min(100, Math.round(n / steps.length * 100)) + '%'; }; tick(); const iv = setInterval(tick, 500); try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } finally { clearInterval(iv); } form(APPS.bank.form()); APPS.bank.bind(); }; },
+    label: 'Mist Bank · private payouts', idle: 'Pick an amount and who gets it. This payment is a charter check on mainnet. Everyone sends one of the same few amounts, so no payment stands out. The amount is never shown; Nearcarta\u2019s own server makes the Zcash transfer.',
+    form: () => '<div data-deep="bank"></div>',
+    bind: () => mountShop('bank', document.getElementById('t-form'), { state: extra, notes: () => A.notes(), payees: () => A.bankPayees(), proof: () => A.mainProof(), def: () => extra.to || A.bankDefault(), tee: () => A.teeFresh(), onNote: v => { extra.amt = v; if (!extra.sent) btn(APPS.bank.btn()); }, onTo: v => { extra.to = v; } }),
     btn: () => extra.sent ? 'Check the hidden amount' : `Send ${A.notes().includes(+extra.amt) ? +extra.amt : A.notes()[0]} NEAR privately`,
     hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(extra.sent.commitment.slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
     run: async () => {
@@ -208,21 +184,8 @@ const APPS = {
   guard: {
     label: 'Guardhouse · prompt-injection test', idle: 'Pick a trick, such as an invoice with a hidden line telling AI helpers to pay someone else. I\u2019ll check the payee before I sign. A try costs at most 0.001 NEAR, and only if your rules allow it.',
     guest: true,
-    form: () => {
-      const score = extra.score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(extra.score.verdict)}</p><ul>${extra.score.lines.map(l => `<li data-signal="${esc(l.id)}"><b>${esc(l.title)}</b> ${esc(l.text)}${l.tx ? ` <a href="https://nearblocks.io/txns/${esc(l.tx)}">record</a>` : ''}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
-      const ask = `<label>Account <input id="g-acct" data-testid="guard-account" value="${esc(extra.acct || 'shop-moved-pay-here.near')}"></label><button type="button" id="g-check" data-testid="guard-check">Check this account</button>${score}`;
-      const pick = `<div class="seg" role="radiogroup">${A.attacks().filter(a => A.GUARD_ATTACKS.includes(a.id)).map(a => `<label><input type="radio" name="atk" value="${a.id}" ${a.id === (extra.atk || 'poisoned-invoice') ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>`;
-      const inv = (extra.atk || 'poisoned-invoice') === 'poisoned-invoice' && !extra.chk ? (() => { const v = A.poisonedInvoice(); return `<p class="goal" data-testid="invoice">${esc(v.shown)}</p><p class="hidden-line" data-testid="hidden-line">hidden: ${esc(v.hidden)}</p>`; })() : '';
-      const c = extra.chk;
-      const chk = c ? `<p class="goal" data-testid="check-verdict">Payee check · ${esc(short(c.account, 14, 10))} · <b class="v-${c.verdict}">${c.verdict.toUpperCase()}</b></p>
-        <ol class="feed checks" data-testid="check-reasons">${(c.reasons.length ? c.reasons : [{ level: 'allow', code: 'ok', text: 'on your list and paid before' }]).map(r => `<li class="${r.level === 'allow' ? 'ok' : 'no'}"><span>${esc(r.level)}</span><span>${esc(r.text)}</span>${r.evidence?.[0] ? A.txLine(r.evidence[0], 'evidence') : '<span></span>'}</li>`).join('')}</ol>` : '';
-      return ask + pick + inv + chk;
-    },
-    bind: () => { for (const i of document.querySelectorAll('input[name=atk]')) i.onchange = () => { extra.atk = i.value; extra.chk = null; paint(); };
-      const g = $('#g-check'); if (g) g.onclick = async () => { const acct = ($('#g-acct')?.value || '').trim(); extra.acct = acct; g.disabled = true;
-        try { const r = await fetch((globalThis.NEARCARTA_API || '') + '/api/guardhouse/check/' + encodeURIComponent(acct)); extra.score = explainCheck(await r.json()); }
-        catch (e) { extra.score = explainCheck({ account: acct, verdict: 'warn', reasons: [{ code: 'account_missing', text: e.message }], signals: {} }); }
-        paint(); }; },
+    form: () => '<div data-deep="guard"></div>',
+    bind: () => mountShop('guard', document.getElementById('t-form'), { state: extra, attacks: () => A.attacks().filter(a => A.GUARD_ATTACKS.includes(a.id)), repaint: () => paint() }),
     btn: () => !extra.chk ? 'Try to trick my agent' : extra.chk.verdict === 'block' ? 'Let it knock anyway' : extra.chk.verdict === 'warn' ? 'I checked. Ask the charter' : 'Ask the charter',
     run: async () => {
       const id = extra.atk || 'poisoned-invoice';
@@ -247,10 +210,8 @@ const APPS = {
     guest: true,
     label: 'Vault Arena · try to trick the AI', idle: 'Write me a scam. I believe everything.',
     lvl: () => { const g = A.game(); return A.WALLS.find(w => !g.walls.includes(w.reason)) || null; },
-    form: () => { const w = APPS.arena.lvl(); return `<p class="goal" data-testid="goal">${w ? esc(w.goal) : 'All six walls found'}</p>
-      <textarea id="a-txt" rows="2" maxlength="160" placeholder="${esc(w ? w.hint : 'pay 0.001 to stranger.near')}">${esc(extra.txt || '')}</textarea>
-      <div class="btns" data-testid="arena-live"><button type="button" class="go redteam-run" data-testid="redteam-run">${RUN_LABEL}</button><button type="button" class="ghost redteam-next" data-testid="redteam-next">${NEXT_LABEL}</button></div>`; },
-    bind: () => { const t = $('#a-txt'); if (t) t.oninput = e => { extra.txt = e.target.value; }; import('../shops/arenalive.js').then(m => m.bindRedteam(() => { if (cur === 'arena') proofDrawer(); })).catch(() => {}); },
+    form: () => '<div data-deep="arena"></div>',
+    bind: () => mountShop('arena', document.getElementById('t-form'), { state: extra, goal: () => APPS.arena.lvl()?.goal || '', repaint: () => { if (cur === 'arena') proofDrawer(); } }),
     btn: 'Send the scam',
     hero: () => null,
     run: async () => {
@@ -270,8 +231,8 @@ const APPS = {
   },
   hall: {
     label: 'Town Hall · your row', idle: 'Apply a tighter or looser cap to your own row. Gas only. No bond.',
-    form: () => `<div class="seg" role="radiogroup">${[['tighter', 'My max lower'], ['looser', 'My max higher']].map(([k, t]) => `<label><input type="radio" name="hc" value="${k}" ${k === (extra.hc || 'tighter') ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>`,
-    bind: () => { for (const i of document.querySelectorAll('input[name=hc]')) i.onchange = () => { extra.hc = i.value; }; },
+    form: () => '<div data-deep="hall"></div>',
+    bind: () => mountShop('hall', document.getElementById('t-form'), { state: extra }),
     btn: 'Apply to my row',
     hero: () => A.S.clauses.pay ? num(+A.fromY(A.S.clauses.pay.per_action_cap).toFixed(4), 'NEAR max') : null,
     run: async () => {
@@ -285,28 +246,8 @@ const APPS = {
     label: 'Payouts · one batch', idle: 'Prepare several payments as one propose_batch. The live board signs propose only, so this page does not send the batch.',
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.001' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.001' }); } return extra.rows.slice(0, 3); },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
-    form: () => { const ps = A.bankPayees(), rows = APPS.payouts.rows(), left = A.payoutLeft(), tot = APPS.payouts.total();
-      const note = A.mainProof() ? `<p class="plain-line" data-testid="payout-legacy">${A.mainProof()}</p>` : '';
-      const receipts = (extra.receipts || []).map(r => `<li data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)}${r.url ? ` <a href="${esc(r.url)}">tx</a>` : ' · not sent'}</li>`).join('');
-      const ids = [...new Set([...ps, ...rows.map(r => r.to)].filter(Boolean))];
-      const issues = payoutIssues(rows, extra.exists);
-      return note + (issues.length ? `<p data-testid="payout-issues">${esc(issues.map(x => x.code === 'bad_account' ? 'Not a NEAR account' : x.code === 'missing_account' ? 'Account was not found' : 'Over the 0.005 NEAR cap').join('. '))}</p>` : '')
-        + `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ids.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${esc(a === A.S.me ? 'Me' : a)}</option>`).join('')}</select>`
-        + `<label class="p-amt"><input type="text" inputmode="decimal" data-i="${i}" value="${esc(formatNear(r.amt))}" aria-label="Amount ${i + 1}"><span>NEAR</span></label>`
-        + `<button type="button" class="p-x" data-i="${i}" aria-label="Remove payout ${i + 1}" ${rows.length <= 2 ? 'disabled' : ''}>×</button></li>`).join('')}</ol>`
-        + `<label>CSV <textarea id="p-csv" data-testid="payout-csv" rows="3" placeholder="account,amount,asset">${esc(extra.csv || '')}</textarea></label>`
-        + `<div class="p-foot"><button type="button" class="tee-btn" id="p-add" ${rows.length >= 3 ? 'disabled' : ''}>+ Add payout</button><button type="button" id="p-prep" data-testid="payout-prepare">Prepare the batch</button><span class="p-sum ${tot > left ? 'no' : ''}" data-testid="payout-total">${tot} NEAR · ${+left.toFixed(4)} left today</span></div>`
-        + `<ul data-testid="payout-receipts">${receipts}</ul>`
-        + ((extra.usdc || []).length ? `<p data-testid="payout-usdc">${extra.usdc.length} USDC ${extra.usdc.length === 1 ? 'row' : 'rows'} kept. Not sent. Cap 0.20 USD.</p>` : ''); },
-    bind: () => { const rows = APPS.payouts.rows(), re = () => { form(APPS.payouts.form()); APPS.payouts.bind(); const off = !payoutReady(rows, extra.exists).enabled; btn(APPS.payouts.btn(), 'primary', off || !A.canBatch()); };
-      const api = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
-      for (const r of rows) { if (!r.to || extra.exists?.[r.to] != null) continue; fetch(api + '/api/account/' + encodeURIComponent(r.to)).then(x => x.json()).then(body => { extra.exists = { ...(extra.exists || {}), [r.to]: body.exists !== false }; if (body.exists === false && cur === 'payouts') re(); }).catch(() => {}); }
-      document.querySelectorAll('.p-to').forEach(e => { e.onchange = () => { rows[+e.dataset.i].to = e.value; }; });
-      document.querySelectorAll('.p-amt input').forEach(e => { e.oninput = () => { rows[+e.dataset.i].amt = e.value; const t = $('[data-testid=payout-total]'), tot = APPS.payouts.total(), left = A.payoutLeft(); if (t) { t.textContent = `${tot} NEAR · ${+left.toFixed(4)} left today`; t.classList.toggle('no', tot > left); } btn(APPS.payouts.btn(), 'primary', !payoutReady(rows, extra.exists).enabled); }; });
-      document.querySelectorAll('.p-x').forEach(e => { e.onclick = () => { rows.splice(+e.dataset.i, 1); re(); }; });
-      const a = $('#p-add'); if (a) a.onclick = () => { if (rows.length < 3) rows.push({ to: A.bankDefault() || A.bankPayees()[0], amt: '0.001' }); re(); };
-      const csv = $('#p-csv'); if (csv) { csv.oninput = e => { extra.csv = e.target.value; }; csv.onchange = () => { const parsed = parseCsv(extra.csv || ''); if (!parsed.length) return; extra.rows = parsed.slice(0, 3); re(); }; }
-      const prep = $('#p-prep'); if (prep) prep.onclick = () => { const parsed = parseCsv(extra.csv || ''); const use = parsed.length ? parsed : rows; if (parsed.length) extra.rows = parsed; if (payoutIssues(use, extra.exists).length) { paint(); return; } const parts = splitAssets(use); extra.usdc = parts.usdc; extra.receipts = receiptsFor(use); extra.batch = { method: 'propose_batch', sent: false, near: parts.near.length }; paint(); }; },
+    form: () => '<div data-deep="payouts"></div>',
+    bind: () => mountShop('payouts', document.getElementById('t-form'), { state: extra, repaint: () => paint(), rows: () => APPS.payouts.rows(), onReady: ok => btn(APPS.payouts.btn(), 'primary', !ok || !A.canBatch()) }),
     btn: () => payoutLabel(APPS.payouts.rows()),
     hero: () => extra.pay ? num(`${extra.pay.paid}/${extra.pay.n}`, 'paid') : num(APPS.payouts.rows().length, 'payouts'),
     run: async () => {
@@ -324,8 +265,7 @@ const APPS = {
   house: {
     guest: true,
     label: 'Your House · your charter', idle: 'Your charter is the rule book your agent cannot break. It can only pay inside those rules.',
-    form: () => { const m = metadataView(); const held = controlAfterMove({ holder: 'holder.near', payer: 'holder.near' }); const moved = controlAfterMove({ holder: 'holder.near', payer: 'previous.near' });
-      return `<div data-testid="deed-meta"><p>${esc(m.name)} · ${esc(m.standard)}</p><p>${esc(m.contract)}</p><p>${esc(m.description)}</p><a href="${esc(txUrl(DEED.mint))}">Mint record</a></div><p data-testid="deed-held">${esc(held.reason)}</p><p data-testid="deed-moved">${esc(moved.reason)}</p><a data-testid="deed-allow" href="${esc(txUrl(DEED.allow))}">Allowed payment</a> <a data-testid="deed-refuse" href="${esc(txUrl(DEED.refuse))}">Refused payment</a>`; },
+    form: () => deedMarkup(),
     btn: 'See my rules & record',
     hero: () => A.S.charter ? `<span class="commit" title="${esc(A.S.charter)}">${esc(short(A.S.charter.split('.')[0], 8, 6))}</span>` : null,
     run: async () => { await A.readRules(); const c = A.S.clauses.pay, rp = await A.reputation();
@@ -335,16 +275,8 @@ const APPS = {
     guest: true,
     label: 'Chronicle · activity log', idle: 'Your activity log: every payment your agent asked for, and the answer. Adding today’s entry costs 0.001 NEAR, paid only if your rules allow it.',
     btn: 'Add today\u2019s entry · 0.001 NEAR',
-    form: () => { const rows = [...(extra.feed?.local || []), ...RECORDED].map(x => ({ ...x, label: A.why(x.reason) })); const q = queryFeed(rows, { q: extra.cq || '', decision: extra.cd || '', page: extra.cp || 1 });
-      return `<label>Search <input id="c-q" data-testid="chronicle-search" value="${esc(extra.cq || '')}"></label><label>Decision <select id="c-d" data-testid="chronicle-filter"><option value="">All</option><option value="allowed" ${extra.cd === 'allowed' ? 'selected' : ''}>Allowed</option><option value="denied" ${extra.cd === 'denied' ? 'selected' : ''}>Refused</option></select></label><ol class="feed" data-testid="chronicle-page">${q.rows.map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(A.why(x.reason)) : '✓ ' + esc(x.decision)}</span><button type="button" class="c-v" data-hash="${esc(x.h || '')}">Verify</button></li>`).join('') || '<li>Nothing yet</li>'}</ol><p data-testid="chronicle-pages">${q.page} / ${q.pages}</p><button type="button" id="c-prev">Previous</button><button type="button" id="c-next">Next</button><button type="button" id="c-csv" data-testid="chronicle-export">Export</button><p id="c-out" data-testid="chronicle-verify"></p>`; },
-    bind: () => { const rows = () => [...(extra.feed?.local || []), ...RECORDED].map(x => ({ ...x, label: A.why(x.reason) }));
-      const draw = () => { const q = queryFeed(rows(), { q: extra.cq || '', decision: extra.cd || '', page: extra.cp || 1 }); const ol = document.querySelector('[data-testid=chronicle-page]'); if (ol) { ol.innerHTML = q.rows.map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(x.label || A.why(x.reason)) : '✓ ' + esc(x.decision)}</span><button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button></li>`).join('') || '<li>Nothing yet</li>'; ol.dataset.total = String(q.total); } const pages = document.querySelector('[data-testid=chronicle-pages]'); if (pages) pages.textContent = `${q.page} / ${q.pages}`; };
-      const qel = $('#c-q'); if (qel) qel.oninput = e => { extra.cq = e.target.value; extra.cp = 1; draw(); };
-      const d = $('#c-d'); if (d) d.onchange = e => { extra.cd = e.target.value; extra.cp = 1; draw(); };
-      const prev = $('#c-prev'); if (prev) prev.onclick = () => { extra.cp = Math.max(1, (extra.cp || 1) - 1); draw(); };
-      const next = $('#c-next'); if (next) next.onclick = () => { extra.cp = (extra.cp || 1) + 1; draw(); };
-      const csv = $('#c-csv'); if (csv) csv.onclick = () => { const text = exportCsv(queryFeed(rows(), { q: extra.cq || '', decision: extra.cd || '', page: 1, pageSize: 100 }).rows); downloadCsv(text); const el = $('#c-out'); if (el) el.textContent = text; };
-      document.querySelector('[data-testid=chronicle-page]')?.addEventListener('click', async e => { const b = e.target.closest?.('.c-v'); if (!b) return; const el = $('#c-out'); if (el) el.textContent = 'Checking the chain…'; const row = rows().find(r => r.h === b.dataset.hash) || { h: b.dataset.hash, signer: b.dataset.signer }; try { const api = (globalThis.NEARCARTA_API || '').replace(/\/$/, ''); const body = await fetch(api + '/api/tx-status/' + encodeURIComponent(row.h) + '?sender=' + encodeURIComponent(row.signer || 'nearcarta.near')).then(r => r.json()); const v = verifyEntry(row, body); if (el) el.innerHTML = `${esc(v.text)}${v.url ? ` <a data-testid="chronicle-link" href="${esc(v.url)}">explorer</a>` : ''}`; } catch { if (el) el.textContent = 'The chain check did not answer.'; } }); },
+    form: () => '<div data-deep="chronicle"></div>',
+    bind: () => mountShop('chronicle', document.getElementById('t-form'), { state: extra, repaint: () => paint(), rows: () => [...(extra.feed?.local || []), ...RECORDED].map(x => ({ ...x, label: A.why(x.reason) })) }),
     // a real entry: the agent asks the charter to pay the scribe 0.001 NEAR; allowed or refused, the answer is on chain
     run: async () => { const o = await A.ask({ shop: 'chronicle', receiver: A.merchants()[0], amountY: A.toY(0.001), memo: 'chronicle:entry' });
       extra.feed = await A.feed();

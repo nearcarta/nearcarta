@@ -1,0 +1,8 @@
+.corridors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}
+.corridor{min-width:0;border:1px solid rgba(214,180,106,.45);border-radius:8px;padding:8px;background:rgba(31,26,21,.55);overflow-wrap:anywhere}
+.corridor b{display:block;font-size:13px}
+.corridor p{margin:4px 0 0;font-size:12px}
+.deep{margin:8px 0 12px}
+[data-testid=room-boundary]{color:#e8c08a;font-weight:600}
+.shop-page{max-width:880px;margin:0 auto;padding:16px}
+.shop-page h1{font-size:28px;margin:8px 0}

@@ -22,6 +22,6 @@ step "build $REV + sha256 == pinned" bash -c "git clone -q '$ROOT' '$BDIR/r' && 
 if command -v cargo-mutants >/dev/null; then step "cargo mutants (policy fns; 0 missed, timeouts=caught)" bash -c "cd '$OATH' && cargo mutants -f src/lib.rs --re '$MRE' --no-shuffle -j4 --timeout 60 -o '$MOUT' -- --lib; rc=\$?; m='$MOUT/mutants.out/missed.txt'; [ ! -s \$m ] || { echo MISSED:; cat \$m; false; } && { [ \$rc = 0 ] || [ \$rc = 3 ]; }"; else echo "SKIP cargo-mutants not installed (cargo install cargo-mutants)"; fi
 # 4 secrets scan: the contract dir with this folder's config, the repo with the repo config, EXTRA_SCAN with its own config if it has one
 if command -v gitleaks >/dev/null; then step "gitleaks (contract + repo + EXTRA_SCAN)" bash -c "gitleaks dir '$OATH' -c '$HERE/gitleaks.toml' --redact && cd '$ROOT' && gitleaks dir . -c .gitleaks.toml --redact && { [ -z \"\${EXTRA_SCAN:-}\" ] || { cd \"\$EXTRA_SCAN\" && c='$HERE/gitleaks.toml' && { [ ! -f .gitleaks.toml ] || c=.gitleaks.toml; } && echo \"EXTRA_SCAN config: \$c\" && gitleaks dir . -c \"\$c\" --redact; }; }"; else echo "SKIP gitleaks not installed"; fi
-# 5 on-chain re-derivation of judges/proofs/r16-factory.json: code hashes, keys, every proof tx
+# 5 on-chain re-read of the mainnet proof list (npm run verify:mainnet)
 [ "${1:-}" = "--offline" ] || step "recheck mainnet proofs" bash -c "cd '$ROOT' && npm run verify:mainnet"
 rm -f "$LOG"; exit $fail

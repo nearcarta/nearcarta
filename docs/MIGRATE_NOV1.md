@@ -24,7 +24,7 @@ Tags are annotated, never moved and never force-pushed.
 Only needed if a key or viewing key is exposed or an account has to be retired. The dry run
 checks every artifact and sends nothing:
 
-    bash scripts/fresh-deploy.sh
+    The fresh-deploy helper is not in this repo. The live contracts are already on mainnet.
 
 For each step it prints the script, the artifact's sha256 and its NEAR code hash (base58 of the
 sha256). Those must equal the `code_hash` values in `shared/deployments/earlier network.json` and the
@@ -33,13 +33,13 @@ reproducible builds in `judges/VERIFY.md`. It exits non-zero if an artifact or s
 | # | Part | Script | Artifact |
 |---|------|--------|----------|
 | 1 | Charter factory + Town Hall | the factory worker's scripts | `charter_factory*.wasm`, global oath code |
-| 2 | Vault Arena | `scripts/arena-fresh.js` | `arena.wasm` |
-| 3 | Toll (MPC → Base EVM) | `scripts/toll-deploy.js`, then `scripts/toll-proofs.js` | `toll.wasm` |
-| 4 | Oath R16 (rule expiry) | `scripts/oath-r16.js` | `oath.r16.wasm` |
-| 5 | Your House charter | `scripts/house-deploy.js` | `oath.r11.wasm` |
-| 6 | House deed (NEP-171) | `scripts/house-nft-fresh.js` (`HOUSE` = the new house charter) | `house_nft.wasm` |
-| 7 | Mist Bank payout | `scripts/mistbank-record.js` with a payee whose viewing key was never public | — |
-| 8 | Proof check + tables | `scripts/verify-proofs.js`, `scripts/readme-numbers.js` | — |
+| 2 | Vault Arena | removed from this repo | `arena.wasm` |
+| 3 | Toll (MPC → Base EVM) | removed from this repo | `toll.wasm` |
+| 4 | Oath R16 (rule expiry) | removed from this repo | `oath.r16.wasm` |
+| 5 | Your House charter | removed from this repo | `oath.r11.wasm` |
+| 6 | House deed (NEP-171) | removed from this repo | `house_nft.wasm` |
+| 7 | Mist Bank payout | removed from this repo | — |
+| 8 | Proof check + tables | `backend/scripts/verify-proofs.js`, `backend/scripts/readme-numbers.js` | — |
 
 Each script writes new account names and tx hashes into its proof file; copy them into
 `shared/deployments/earlier network.json` before the next step. Keys are made per step and stay outside
