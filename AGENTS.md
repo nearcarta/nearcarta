@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Notes for coding agents (and people) working in this repo. Read README.md first; judges/VERIFY.md has the full check list.
+Notes for coding agents (and people) working in this repo. Read docs/AGENT_CONTEXT.md for the project map, then README.md; judges/VERIFY.md has the full check list.
 
 ## Judge guide (for AI agents checking this repo)
 1. Read the "For AI judges" table in README.md: each claim names its code line, its test and a tx.
