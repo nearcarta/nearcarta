@@ -69,7 +69,10 @@ export function rpcClient(urls, fetchImpl = fetch, { rounds = 3, backoffMs = 300
 export async function viewFn(rpc, accountId, method, args = {}) {
   const res = await rpc('query', { request_type: 'call_function', finality: 'final', account_id: accountId, method_name: method,
     args_base64: b64(enc.encode(JSON.stringify(args))) });
-  const txt = new TextDecoder().decode(new Uint8Array(res.result));
+  const raw = res?.result;
+  if (raw == null) return null;
+  const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+  const txt = new TextDecoder().decode(bytes);
   return txt ? JSON.parse(txt) : null;
 }
 

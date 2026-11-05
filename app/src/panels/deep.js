@@ -143,10 +143,11 @@ function mountGuard(root, hooks) {
   const scoreHtml = score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.summary || score.verdict)}</p><ul>${(score.lines || []).map(l => `<li data-signal="${esc(l.id)}"${l.level === 'warn' || l.level === 'block' || l.level === 'unknown' ? ' data-testid="guard-reason"' : ''}><b>${esc(l.title)}</b> ${esc(l.text)}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
   const pick = attacks.length ? `<div class="seg beside" role="radiogroup" aria-label="Tricks">${attacks.map(a => `<label class="beside"><input type="radio" name="atk" value="${esc(a.id)}" ${a.id === (state.atk || attacks[0].id) ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>` : '';
   root.innerHTML = `<div class="shop-stack"><label class="field">Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || '')}" autocomplete="off"></label><p class="example-row"><button type="button" class="example" data-testid="guard-example">Example: shop-moved-pay-here.near</button></p><button type="button" class="primary" id="g-check" data-testid="guard-check">Check this account</button>${scoreHtml}${pick}</div>`;
+  const input = q$(root, '#g-acct');
+  if (input) input.addEventListener('input', () => { state.acct = input.value; });
   const example = q$(root, '[data-testid=guard-example]');
   if (example) example.onclick = () => {
     state.acct = 'shop-moved-pay-here.near';
-    const input = q$(root, '#g-acct');
     if (input) input.value = state.acct;
   };
   root.querySelectorAll('input[name=atk]').forEach(i => { i.onchange = () => { state.atk = i.value; if (hooks.repaint) hooks.repaint(); }; });
@@ -408,7 +409,8 @@ function mountBank(root, hooks) {
   const payeeBox = payees.length
     ? payees.map(a => `<label class="payee"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span class="payee-id" title="${esc(a)}">${esc(shortId(a))}</span></label>`).join('')
     : '<p>Sign in to choose a payee.</p>';
-  root.innerHTML = `<div class="card shop-card shop-stack"><p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${esc(hooks.proof ? hooks.proof() : '')}</p>
+  const proofHtml = hooks.proof ? hooks.proof() : '';
+  root.innerHTML = `<div class="card shop-card shop-stack"><p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${proofHtml}</p>
     ${sessionLine}
     <div class="choice" data-testid="bank-amount"><p class="choice-label">Amount</p><div class="seg notes" role="radiogroup" aria-label="Amount" data-testid="bank-notes">${notes.map(n => `<label class="beside"><input type="radio" name="note" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div></div>
     <div class="choice" data-testid="bank-payee"><p class="choice-label">Payee</p><div class="seg to" id="m-to" data-testid="bank-to">${payeeBox}</div></div>

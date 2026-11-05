@@ -10,6 +10,11 @@ import { beginEnter, finishEnter } from './room-lock.js';
 const END={ guard:['no','Refused · not on the list'], ferry:['ok','Downgrade refused · crossed shielded'], hall:['ok','Allowed · 0.001 NEAR'] };
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let started=false;
+function pushChron(d){ if(!d?.hash) return; const l=$('#clist'); if(!l||[...l.querySelectorAll('a')].some(a=>a.href.includes(d.hash))) return;
+  const li=document.createElement('li'); li.className=d.decision==='denied'?'no':'ok'; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
+  li.querySelector('.w').textContent=d.decision==='denied'?'refused · new entry':'new entry'; const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+d.hash; a.textContent=d.hash.slice(0,6)+'…'+d.hash.slice(-4); a.title='Open on the explorer';
+  l.prepend(li); while(l.children.length>3) l.lastChild.remove(); const box=$('#chron'); if(box) box.hidden=false; }
+addEventListener('nearcarta:chronicle',e=>pushChron(e.detail));
 export async function fallback(why){ if(started) return; started=true; body.classList.add('fb','ready'); $('#fb2d').hidden=false; $('#loading').classList.add('done'); $('#c').style.display='none';
   if(why) console.warn('[Nearcarta] showing the 2D town:',why);
   const introCtl=mountIntro(document, location.search);
@@ -17,7 +22,9 @@ export async function fallback(why){ if(started) return; started=true; body.clas
   addEventListener('keydown',e=>{ if(e.key==='Escape') introCtl?.skip(); });
   const img=$('#fbimg'); const town=img.getAttribute('src');
   try{ const pins=await (await fetch('shots/fallback_pins.json')).json(); const box=$('#fbpins'); const els=[];
-    for(const p of pins){ const d=document.createElement('button'); d.type='button'; d.className='fbpin'; d.dataset.id=p.id; d.title=p.card?`${p.name}: ${p.card}`:`Enter ${p.name}`; d.innerHTML=`<b></b><span></span>`; d.querySelector('b').textContent=p.name; d.querySelector('span').textContent=p.role; d.onclick=()=>open(p.id); box.appendChild(d); els.push([d,p]); }
+    for(const p of pins){ const d=document.createElement('button'); d.type='button'; d.className='fbpin'; d.dataset.id=p.id; d.title=p.card?`${p.name}: ${p.card}`:`Enter ${p.name}`; d.innerHTML=`<b></b><span></span>`; d.querySelector('b').textContent=p.name; d.querySelector('span').textContent=p.role; box.appendChild(d); els.push([d,p]); }
+    const nearest=ev=>{ let best=null,bd=1e9; for(const [el,p] of els){ const ax=parseFloat(el.style.left), ay=parseFloat(el.style.top); if(!Number.isFinite(ax)) continue; const d=Math.hypot(ev.clientX-ax,ev.clientY-ay); const r=el.getBoundingClientRect(); const inside=ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom; if((inside||d<48)&&d<bd){ bd=d; best=p; } } return best; };
+    box.addEventListener('click',ev=>{ const pin=ev.target.closest?.('.fbpin'); if(!pin) return; ev.preventDefault(); const hit=nearest(ev); if(hit) open(hit.id); });
     /* Pins stay clear of the HUD (brand, account row, blurb on top; rules CTA and curfew below) and of each other,
        so every shop is tappable at 390 too. Each pin hangs above its anchor (translate -50%,-100%). */
     const vis=e=>{ if(!e) return null; const r=e.getBoundingClientRect(); return r.width&&r.height&&getComputedStyle(e).visibility!=='hidden'?r:null; };

@@ -144,17 +144,8 @@ else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpr
   if(!force && !cap.soft) setTimeout(()=>{ if(!document.body.classList.contains('ready')&&!document.body.classList.contains('fb')){ window.__3dStop='slow start'; go2d('3D did not start within 25 s'); } },25000); }
 </script>
 <script>
-// Pins are placed on the buildings. Nudge any two that overlap so the names stay readable.
-setInterval(() => {
-  const pins = [...document.querySelectorAll('#pins .pin')].filter(p => parseFloat(p.style.opacity || '0') > 0.4);
-  pins.forEach(p => { p.style.marginTop = '0px'; });
-  const box = pins.map(p => ({ p, r: p.getBoundingClientRect() })).sort((a, b) => a.r.top - b.r.top || a.r.left - b.r.left);
-  for (let i = 1; i < box.length; i++) {
-    const prev = box[i - 1].r, cur = box[i].p.getBoundingClientRect();
-    const hit = cur.left < prev.right - 6 && cur.right > prev.left + 6 && cur.top < prev.bottom - 4;
-    if (hit) { const dy = Math.min(48, prev.bottom - cur.top + 6); box[i].p.style.marginTop = dy + 'px'; box[i].r = box[i].p.getBoundingClientRect(); }
-  }
-}, 400);
+// Overlapping pin labels are separated sideways in the town script. A downward margin used to
+// drop a label onto the next building, so a click on Payouts opened Town Hall.
 </script>
 <script>
 // The list opens on the first pointer, including while the 3D scene and the intro are up.

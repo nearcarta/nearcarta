@@ -66,7 +66,7 @@
  {
   "id": "payouts",
   "name": "Payouts",
-  "role": "pay 3 people in one go",
+  "role": "prepare a batch",
   "x": 48.1,
   "y": 21.6,
   "card": "List 2 to 5 payouts. Your charter pays them all in one tx, or refuses all of them."
