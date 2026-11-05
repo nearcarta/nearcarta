@@ -64,19 +64,31 @@ const retitle = () => {
   document.querySelectorAll('.pnc-approval__title').forEach(t => { if (t.textContent.trim() === 'Connect to') t.textContent = 'Sign in to Nearcarta'; });
   document.querySelectorAll('#root p, #root span, #root div').forEach(n => { if (n.childElementCount === 0 && /only connect to apps you trust/i.test(n.textContent)) n.textContent = "This is Nearcarta's own sign-in."; });
 };
-// Show what each action does (method, deposit, contract) above the fold, without opening Advanced Details.
-const whatLine = card => {
+// Show what each action does (method, receiver, deposit, key scope) above the fold, without opening Advanced Details.
+// A deposit plus the first account inside the arguments is not a payment. open_charter's rules name
+// charter.nearcarta.near; the transaction receiver is the board.
+export function whatLine(card, flow) {
   const f = {}; card.querySelectorAll('.pnc-action-card__field').forEach(x => { f[x.querySelector('.pnc-action-card__field-label')?.textContent.trim()] = x.querySelector('.pnc-action-card__field-value')?.textContent.trim(); });
-  const kind = card.querySelector('.pnc-action-card__badge')?.textContent.trim(), dep = (card.querySelector('.pnc-action-card__footer')?.textContent.match(/Deposit:\s*([\d.]+)\s*NEAR/) || [])[1];
+  const kind = card.querySelector('.pnc-action-card__badge')?.textContent.trim() || '';
+  const dep = (card.querySelector('.pnc-action-card__footer')?.textContent.match(/Deposit:\s*([\d.]+)\s*NEAR/) || [])[1] || '0';
   const blob = card.textContent || '';
-  const recv = f.Receiver || (blob.match(/([a-z0-9][a-z0-9._-]{1,62}\.near)\b/) || [])[1] || f.To;
-  const yocto = (blob.match(/"amount"\s*:\s*"(\d+)"/) || [])[1];
-  const near = yocto ? (Number(yocto) / 1e24).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') : (f.Amount || dep);
-  if (recv && near) return `Pay ${near} NEAR to ${recv}`;
-  if (f.Method) return `${f.Method} · ${dep ? dep + ' NEAR' : 'no deposit'} to ${f.To}`;
-  if (f.Amount) return `Pay ${f.Amount} NEAR to ${f.To}`;
-  return `${(kind || 'action').toLowerCase()} on ${f.To}`;
-};
+  const method = f.Method || (blob.match(/"method_name"\s*:\s*"([a-z_]+)"/) || [])[1] || '';
+  const to = f.To || f.Contract || (blob.match(/\b(board\.nearcarta\.near)\b/) || [])[1] || '';
+  const mark = flow || (() => { try { return localStorage.getItem('nearcarta.sign.flow') || ''; } catch { return ''; } })();
+  if (mark === 'private' || /mistbank:v1/.test(blob)) return `Private flow. ${method || 'propose'} on ${to || 'the board'}. Deposit ${dep} NEAR. The chain stores a fingerprint, not the note.`;
+  if (method === 'open_charter' || (/open_charter/.test(blob) && method !== 'propose')) return `open_charter on ${to || 'board.nearcarta.near'}. Deposit ${dep} NEAR. This opens your row. It is not a payment to another account.`;
+  if (method === 'set_agent') return `set_agent on ${to || 'the board'}. Deposit ${dep} NEAR.`;
+  if (/add\s*key/i.test(kind) || /AddKey/.test(blob) || /method_names|methodNames/.test(blob)) {
+    const methods = ((blob.match(/method_names"\s*:\s*\[([^\]]*)\]/) || blob.match(/methodNames"\s*:\s*\[([^\]]*)\]/) || [])[1] || '"propose"').replace(/"/g, '');
+    const scope = (blob.match(/receiver_id"\s*:\s*"([^"]+)"/) || blob.match(/receiverId"\s*:\s*"([^"]+)"/) || [])[1] || 'board.nearcarta.near';
+    return `AddKey on ${to || 'your account'}. The key may only call ${methods} on ${scope}. It cannot transfer NEAR. Deposit ${dep} NEAR.`;
+  }
+  if (method === 'propose') return `propose on ${to || 'the board'}. Deposit ${dep} NEAR. The charter decides the payment.`;
+  if (method) return `${method} on ${to || 'the contract'}. Deposit ${dep} NEAR.`;
+  if (f.Amount && f.To) return `Pay ${f.Amount} NEAR to ${f.To}`;
+  return `${(kind || 'action').toLowerCase()} on ${to || 'the contract'}. Deposit ${dep} NEAR.`;
+}
+globalThis.__signWhat = whatLine;
 const summarize = () => {
   const adv = document.querySelector('.pnc-advanced-details'); if (!adv) return;
   const lines = [...adv.querySelectorAll('.pnc-action-card')].map(whatLine); if (!lines.length) return;

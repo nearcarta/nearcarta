@@ -47,7 +47,7 @@ export const SHOPS = {
             card:'Only your house key can change the oath or ring the curfew. The agent key calls propose and propose_batch.', tag:'function-call key · propose and propose_batch'},
   toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay-per-use gate',
             card:'Pay 0.001 NEAR to toll.nearcarta.near. A refusal pays nothing.', tag:'propose · 0.001 NEAR'},
-  payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'pay many at once',
+  payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'prepare a batch',
             card:'Prepare a batch. The live row signs one payment at a time, each at most 0.005 NEAR.', tag:'prepared, not sent'},
 };
 export const GATE={q:-5,r:1,dir:3};
