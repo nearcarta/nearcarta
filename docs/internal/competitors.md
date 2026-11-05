@@ -1,9 +1,9 @@
 # Internal competitors register (Nearcarta)
 **Not public.** Do not link from README, site, or llms.txt. Never paste rival names into UI copy.
 
-Status: **baseline from existing `/workspace/near` research only** (I0). Cursor must append **NEW** finds from GitHub/X (I1–I3) below, then re-rank and set "raise H?" (I4–I5).
+Status: **I0 baseline plus I1–I3 on 2026-11-05.** The `/workspace/near` pack was not on this machine (those paths do not exist here). The I0 table below is the in-repo baseline. New rows are from public GitHub READMEs and `gh repo view` (stars, updated). Their transactions were not re-read on an explorer. X search for `#NEARHackathon` returned no posts.
 
-Sources read for this baseline: see `docs/internal/RESEARCH_SOURCES.md`.
+Sources: `docs/internal/RESEARCH_SOURCES.md`.
 
 ## Per-track bar (known — I0)
 
@@ -27,12 +27,30 @@ Sources read for this baseline: see `docs/internal/RESEARCH_SOURCES.md`.
 - **Emet / Gleipnir** — non-NEAR or analysis-only; see TOWN_PLAN §1 (do not cite in public).
 - Past NEAR winners patterns: `/workspace/near/pack/files/near-competitors-winners.md`.
 
-## NEW finds (I1–I3) — Cursor fills
-| Project | Repo / X | Tracks | Depth metrics | Real txs | Raise H? |
-|---|---|---|---|---|---|
-| _none yet_ | | | | | |
+## NEW finds (I1–I3), 2026-11-05
+GitHub search: public repos whose description or README says NEAR HACKATHON 2026, updated since 2026-10-19, excluding the I0 names. All of the ones opened below had **0 stars**. X: no posts returned for `#NEARHackathon`.
 
-## Decisions log
-| Date | Change |
+| Project | Repo | Tracks they claim | What the README actually shows | Real txs I checked | Raise H? |
+|---|---|---|---|---|---|
+| Countersign | https://github.com/Thiago-spart/countersign | security, agents | SDK score plus a vault the agent can only `pay` through, and a report registry. README says sandbox 7/7, read-only mainnet scoring, and a testnet attack run with 2 failures | Not re-read. README says no registry is configured on mainnet | H2 shows our on-chain caps and both methods. We do not claim a shared registry |
+| Halter | https://github.com/Arashrahmaniii/halter | security, agents | On-chain policy, scam registry, scout, published agent key, red-team page. Badge says testnet | Not re-read | Same as Countersign. Our refusals stay the recorded mainnet txs |
+| Settle | https://github.com/MFrancis-dev/settle | realworld | Invoices paid in any token, delivered as exact dollars via Intents | Not opened | H1 lists the 1Click catalog and a dry quote. We do not claim exact-dollar settlement |
+| Hearthmarket | https://github.com/nguyenkhangph/hearthmarket | games, agents | Six NPC accounts on testnet, NEP-141/171/245, 126 tests claimed, red-team refusal txs on testnet | Not re-read | G2 intro is the games-loop gap we can close without claiming six agents. Swarms stay omitted (H11c) |
+| near-policy-vault | https://github.com/Alan021011/near-policy-vault | nfts | NFT that would own a cross-chain account. README: signing path and NFT base on testnet; spending policy not built | Not re-read | No raise. House deed allow/refuse txs stay the proof |
+| Laurel | https://github.com/agadape/laurel | privacy, agents | TEE / private decision models (description) | README not fully read | H5 stays an attestation check. No custody claim |
+| IntentWatch | https://github.com/surs51/IntentWatch | agents, defi | Intents detector, policy, guard wallet (description) | Not opened | H1 status words cover the quote. No new spend |
+| capgrate, AgentGuard, Aegis, Hermes, Stashway | several repos in the search | security | Spend policy, function-call keys, panic button. Several say testnet | Not opened | H2 policy card. No shared scam registry |
+
+Other names seen in the same search and not read past the description: skyll-private-grading, veilprocure, ghosterdex-near, midge, darkroom, waybill, intents-desk, stack, werracle, market-town, openteller, invoicerail, release-passport, judge-near, polaris. None of those descriptions showed a mainnet tx I verified.
+
+## Raise H? decisions (I5)
+| Gap | Decision |
 |---|---|
-| 2026-11-05 | Baseline I0 table seeded from pack; awaiting Cursor I1–I6 |
+| Four hard-coded Pay pairs vs a full 1Click list | Implemented: Pay loads `/api/ferry/tokens`, filters, and shows amount out, USD, ETA, fee, plus refund words. A live deposit is still S1 and was not sent |
+| Shared scam registry (Countersign, Halter) | Not built. A recorded mainnet refusal (`shop-moved-pay-here.near`, tx `E7KMexjS…`) is a block reason before signing. No shared on-chain registry |
+| Six-agent game loop (Hearthmarket, testnet) | Intro plays on the 3D town and the 2D fallback. Swarms track stays omitted |
+| Exact-dollar invoices (Settle) | Not claimed |
+| NFT that signs on another chain (near-policy-vault, unfinished) | Not claimed |
+| Confidential swap as a settled private payment | The confidential button is labeled quote only |
+| USDC payroll | S3, not run |
+| Shared mainnet DAO | A21 / S4, still blocked |
