@@ -105,11 +105,12 @@ test('token badges never use inline onerror (CSP)', () => {
   assert.match(tokenStack('ETH', 'eth'), /data-ti-fallback/);
 });
 
-test('Ferry tray sketch match: wide ~400px airy tray + AI Agent character (not emoji dock)', () => {
+test('Ferry tray sketch match: wide ~440px airy tray + AI Agent character (not emoji dock)', () => {
   const world = read('app/design/D9_world/world.css');
-  assert.match(world, /max-width:\s*400px/);
+  assert.match(world, /max-width:\s*440px/);
+  assert.match(world, /440px/);
   assert.doesNotMatch(world, /max-width:\s*268px/);
-  assert.match(world, /max-height:\s*calc\(100dvh - 132px\)/);
+  assert.match(world, /max-height:\s*calc\(100dvh - 112px\)/);
   assert.match(world, /#t-who/);
   assert.match(world, /#t-track/);
   assert.match(world, /\.ferry-agent-char/);
@@ -120,6 +121,9 @@ test('Ferry tray sketch match: wide ~400px airy tray + AI Agent character (not e
   assert.match(panels, /\.ferry-card\{display:grid;gap:18px\}/);
   assert.match(panels, /\.ferry-pane\{display:grid;gap:16px\}/);
   assert.match(panels, /width:48px!important/);
+  assert.match(panels, /0 4px 0 #9a6f2e/);
+  assert.match(panels, /width:auto/);
+  assert.match(panels, /gap:14px/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /AI Agent/);
   assert.match(ui, /ferry-agent-char/);

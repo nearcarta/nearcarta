@@ -123,5 +123,9 @@ test('ferryPayee falls back to pay/board receivers on board sessions (source)', 
   assert.match(session, /wrap\.near/);
   assert.match(session, /FERRY_CALL_TARGETS/);
   const css = read('app/src/panels/panels.css');
-  assert.match(css, /ferry-cargo-actions\{display:grid;gap:12px/);
+  assert.match(css, /ferry-cargo-actions\{display:grid;justify-items:center;gap:14px/);
+  assert.match(css, /0 4px 0 #9a6f2e/); /* raised 3D CTA shelf */
+  assert.match(css, /min-width:min\(220px/);
+  assert.match(css, /\.ferry-cta\{[\s\S]*?\bwidth:auto/);
+  assert.match(css, /justify-self:center/);
 });

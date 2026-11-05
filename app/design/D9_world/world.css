@@ -495,14 +495,14 @@ nav.all-shops a{color:#fff8ee;text-decoration:none}
 nav.all-shops a:hover,nav.all-shops a:focus-visible{color:#f5d08a}
 
 
-/* Ferry mix sketch (owner-approved): wide ~400px airy tray; room stays the hero */
+/* Ferry mix sketch (owner-approved): ~420–440px airy tray; room stays the hero */
 body.ferry-tray #shopUI #tray{
-  width:min(400px,calc(100vw - 28px));
-  max-width:400px;
+  width:min(440px,calc(100vw - 28px));
+  max-width:440px;
   left:16px; bottom:18px;
-  /* stay clear of top badges / brand / HUD */
-  max-height:calc(100dvh - 132px);
-  padding:22px 20px 20px;
+  /* stay clear of top badges / brand / HUD; taller for CTA breathing room */
+  max-height:calc(100dvh - 112px);
+  padding:24px 22px 22px;
   background:#1f1a15;
   border:1px solid #3a3128;
   box-shadow:0 16px 40px rgba(0,0,0,.45);
@@ -576,9 +576,9 @@ body.ferry-tray #shopUI .rcpt:empty{display:none}
 }
 @media (max-width:720px){
   body.ferry-tray #shopUI #tray{
-    width:min(100vw - 16px,380px); max-width:none;
+    width:min(100vw - 16px,420px); max-width:none;
     left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    max-height:min(52dvh,calc(100dvh - 120px)); padding:18px 16px;
+    max-height:min(58dvh,calc(100dvh - 108px)); padding:20px 18px;
   }
   #ferry-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
   .ferry-agent-avatar{width:72px;height:72px}
