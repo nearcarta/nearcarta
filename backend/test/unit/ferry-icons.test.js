@@ -16,7 +16,8 @@ test('ferry routes carry ETH/USDC icons and chain badges from /tokens', () => {
   assert.match(html, /src="\/tokens\/chains\/arb\.svg"/);
   assert.match(html, /src="\/tokens\/chains\/zec\.svg"/);
   assert.match(html, /data-testid="ferry-dest"/);
-  assert.match(html, /Shielded ZEC/);
+  assert.match(html, /data-testid="ferry-flow"/);
+  assert.match(html, /data-testid="ferry-tabs"/);
   assert.equal((html.match(/data-testid="ferry-route"/g) || []).length, 3);
   assert.match(html, /class="route-chip"[^>]*aria-pressed="true"/);
 });
@@ -62,7 +63,8 @@ test('token badge helper resolves chain keys and ZEC assets are valid SVG', () =
   assert.match(tokenBadge('USDC', 'base'), /\/tokens\/chains\/base\.svg/);
   assert.match(tokenStack('ZEC', 'zec'), /\/tokens\/zec\.svg/);
   assert.match(tokenStack('ZEC', 'zec'), /\/tokens\/chains\/zec\.svg/);
-  for (const f of ['eth.svg', 'usdc.svg', 'zec.svg', 'chains/eth.svg', 'chains/base.svg', 'chains/arb.svg', 'chains/zec.svg']) {
+  assert.match(tokenStack('NEAR', 'near'), /\/tokens\/chains\/near\.svg/);
+  for (const f of ['eth.svg', 'usdc.svg', 'zec.svg', 'chains/eth.svg', 'chains/base.svg', 'chains/arb.svg', 'chains/zec.svg', 'chains/near.svg']) {
     assert.match(read('app/src/tokens/' + f), /<svg\b/);
   }
   // ZEC marks must carry an explicit viewBox so they paint at CSS sizes on the brown UI.
@@ -88,11 +90,17 @@ test('city Ferry markup exposes live token picker + quick corridors', () => {
     toId: 'ZEC|zec',
   }, DEFAULT_ROUTES);
   assert.match(html, /data-testid="ferry-picker"/);
-  assert.match(html, /data-testid="ferry-search"/);
   assert.match(html, /data-testid="ferry-chain-filter"/);
   assert.match(html, /data-testid="ferry-from"/);
   assert.match(html, /data-testid="ferry-to"/);
-  assert.match(html, /60 live 1Click tokens/);
+  assert.match(html, /60 live tokens/);
   assert.match(html, /Quick ZEC corridors/);
   assert.equal((html.match(/data-testid="ferry-route"/g) || []).length, 3);
+});
+
+test('token badges never use inline onerror (CSP)', () => {
+  const src = read('app/src/panels/token-badge.js');
+  assert.doesNotMatch(src, /\bonerror=/);
+  assert.match(src, /bindTokenFallbacks/);
+  assert.match(tokenStack('ETH', 'eth'), /data-ti-fallback/);
 });

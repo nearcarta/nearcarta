@@ -49,19 +49,32 @@ test('order chip states match TOWN_PLAN ferry labels', () => {
   assert.match(orderChipHtml('delivered'), /far bank/);
 });
 
-test('city Ferry markup exposes agent chat + live dest from picker', () => {
+test('city Ferry markup exposes Swap tabs + Get/Can picker (agent dock is separate)', () => {
   const html = ferryMarkup({
     choices: [{ symbol: 'USDC', chain: 'base', id: 'USDC|base', label: 'USDC' }, { symbol: 'NEAR', chain: 'near', id: 'NEAR|near', label: 'NEAR' }],
     fromId: 'USDC|base',
     toId: 'NEAR|near',
     amt: '2',
   }, DEFAULT_ROUTES);
-  assert.match(html, /data-testid="ferry-agent"/);
-  assert.match(html, /data-testid="ferry-agent-input"/);
-  assert.match(html, /data-testid="ferry-agent-go"/);
-  assert.match(html, /Tell the ferryman/);
-  assert.match(html, /NEAR on near/);
-  assert.match(html, /data-testid="ferry-picker"/);
+  assert.match(html, /data-testid="ferry-tabs"/);
+  assert.match(html, /data-testid="ferry-tab-swap"/);
+  assert.match(html, /data-testid="ferry-from"/);
+  assert.match(html, /data-testid="ferry-to"/);
+  assert.match(html, /data-testid="ferry-quote"/);
+  assert.match(html, /NEAR\|near/);
+  assert.match(html, /data-testid="ferry-card"/);
+});
+
+test('quoted Ferry markup shows Load cargo and Ask charter CTAs', () => {
+  const html = ferryMarkup({
+    fromId: 'USDC|base', toId: 'ZEC|zec', amt: '3',
+    q: { from: { symbol: 'USDC', amount: '3' }, to: { symbol: 'ZEC', amount: '0.002' } },
+    charterReady: true,
+  }, DEFAULT_ROUTES);
+  assert.match(html, /data-testid="ferry-load-cargo"/);
+  assert.match(html, /data-testid="ferry-ask-charter"/);
+  assert.match(html, /data-testid="ferry-cargo-actions"/);
+  assert.doesNotMatch(html, /ferry-cargo-actions"[^>]*hidden/);
 });
 
 test('city ferry room wires applyPair + order chip + speech beats (source)', () => {
@@ -82,8 +95,13 @@ test('rules sheet allows dynamic ferry pairs beyond 3 corridors (source)', () =>
   assert.match(ui, /data-testid="ferry-rules"/);
   assert.match(ui, /data-testid="ferry-rule-add"/);
   assert.match(ui, /pairClauseId/);
-  assert.match(ui, /Load the cargo/);
+  assert.match(ui, /Load the cargo|Load cargo/);
   assert.match(ui, /Ask charter · load cargo/);
+  assert.match(ui, /onLoadCargo|loadFerryCargo/);
+  const deep = read('app/src/panels/deep.js');
+  assert.match(deep, /ferry-load-cargo/);
+  assert.match(deep, /ferry-ask-charter/);
+  assert.match(deep, /refundForChain/);
   assert.match(ui, /applyPair/);
   assert.match(ui, /A\.ferry\(/);
   const apps = read('app/design/D8_shops/js/apps.js');

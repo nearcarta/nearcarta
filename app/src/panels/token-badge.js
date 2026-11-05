@@ -33,10 +33,28 @@ function letterFallback(sym) {
   return s ? s.slice(0, 1) : '·';
 }
 
-/** img that falls back to a brass letter coin if the SVG fails to paint. */
+/** img that falls back to a brass letter coin if the SVG fails to paint. No inline handlers (CSP). */
 function tokenImg(file, sym, size) {
   const letter = esc(letterFallback(sym));
-  return `<img class="ti" src="/tokens/${file}.svg" alt="${esc(sym || '')}" width="${size}" height="${size}" loading="lazy" decoding="async" data-letter="${letter}" onerror="this.onerror=null;var s=document.createElement('span');s.className='ti coin';s.setAttribute('aria-hidden','true');s.textContent=this.getAttribute('data-letter')||'·';this.replaceWith(s);">`;
+  return `<img class="ti" src="/tokens/${file}.svg" alt="${esc(sym || '')}" width="${size}" height="${size}" loading="lazy" decoding="async" data-letter="${letter}" data-ti-fallback="1">`;
+}
+
+/** Wire image→letter fallbacks without inline onerror (CSP script-src blocks inline handlers). */
+export function bindTokenFallbacks(root = document) {
+  if (!root?.querySelectorAll) return;
+  root.querySelectorAll('img.ti[data-ti-fallback]').forEach(img => {
+    if (img.dataset.tiBound) return;
+    img.dataset.tiBound = '1';
+    const fail = () => {
+      const s = document.createElement('span');
+      s.className = 'ti coin';
+      s.setAttribute('aria-hidden', 'true');
+      s.textContent = img.getAttribute('data-letter') || '·';
+      img.replaceWith(s);
+    };
+    img.addEventListener('error', fail, { once: true });
+    if (img.complete && img.naturalWidth === 0) fail();
+  });
 }
 
 function chainImg(ck, chain, size) {

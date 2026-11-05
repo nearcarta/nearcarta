@@ -28,6 +28,84 @@ const form = html => { $('#t-form').innerHTML = html || ''; $('#t-form').hidden 
 const hero = html => { if (html != null) $('#t-hero').innerHTML = html; $('#t-hero').hidden = !html; };
 const rcpt = html => { $('#t-rcpt').innerHTML = html || ''; };
 const label = t => { t = t || ''; const i = t.indexOf(' · '); $('#t-label').textContent = i > 0 ? t.slice(i + 3) : t; };
+function ensureFerryDock() {
+  let d = document.getElementById('ferry-agent-dock');
+  if (d) { d.hidden = cur !== 'ferry'; return d; }
+  d = document.createElement('div');
+  d.id = 'ferry-agent-dock';
+  d.setAttribute('data-testid', 'ferry-agent-dock');
+  d.innerHTML = `<button type="button" class="ferry-dock-toggle" data-testid="ferry-agent-toggle" aria-expanded="false" aria-controls="ferry-agent-pop" title="Ask the ferryman">💬</button>
+    <div id="ferry-agent-pop" class="ferry-agent-pop" data-testid="ferry-agent" hidden>
+      <p class="ferry-dock-label">Ferryman</p>
+      <div class="ferry-agent-row">
+        <input id="f-agent" data-testid="ferry-agent-input" placeholder="Swap 3 USDC to ZEC" autocomplete="off" aria-label="Ask the ferryman in plain words">
+        <button type="button" class="primary" id="f-agent-go" data-testid="ferry-agent-go" aria-label="Send">➤</button>
+      </div>
+      <p class="ferry-agent-hint" data-testid="ferry-agent-hint">Plain words → quote → Load cargo under your caps.</p>
+    </div>`;
+  (document.getElementById('shopUI') || document.body).appendChild(d);
+  d.hidden = cur !== 'ferry';
+  return d;
+}
+function wireFerryDock() {
+  const d = ensureFerryDock();
+  if (!d || d.dataset.wired) return;
+  d.dataset.wired = '1';
+  const toggle = d.querySelector('[data-testid=ferry-agent-toggle]');
+  const pop = d.querySelector('#ferry-agent-pop');
+  toggle?.addEventListener('click', () => {
+    const open = pop.hasAttribute('hidden');
+    pop.toggleAttribute('hidden', !open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+}
+async function loadFerryCargo(wantCharter) {
+  if (phase === 'busy' || cur !== 'ferry') return;
+  if (!extra.q) { say('Get a quote first.'); return; }
+  phase = 'busy';
+  sfx('click');
+  const pair = APPS.ferry.pairFromState();
+  const outAmt = extra.q.to?.amount || extra.q.amountOut || '';
+  sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
+  let o = null;
+  const ready = APPS.ferry.charterReady();
+  if (wantCharter && ready) {
+    btn('Asking your charter…', 'primary busy', true);
+    say('Asking your charter on chain…');
+    const clause = A.ferryClauseForPair(pair.from, pair.to);
+    try { o = await A.ferry(clause, extra.q); }
+    catch (e) {
+      if (e.cancelled) { phase = 'idle'; fail(e); return; }
+      o = { decision: 'denied', reason: A.plainError(e), tx: e.tx || null };
+    }
+    extra.ferryTx = o?.tx || null;
+  } else if (wantCharter && !ready) {
+    phase = 'idle';
+    say('Open your charter and helper key in /setup to Ask charter. You can still Load cargo as a guest.');
+    btn('Open your charter');
+    return;
+  }
+  const refused = o && o.decision !== 'allowed';
+  if (sh?.act && runScene) runScene(sh.act({ refused, reason: o ? A.why(o.reason) || o.reason : '' }));
+  stopProgress();
+  phase = 'kept';
+  extra.acted = true;
+  if (refused) {
+    say(`Charter refused the trip: ${esc(A.why(o.reason) || o.reason || 'refused')}. The boat stays at the jetty.`);
+    rcpt((o?.tx ? A.txLine(o.tx) : '') + `<span class="rc" data-testid="ferry-order-state">order · refused</span>`);
+    document.body.dataset.app = 'no';
+  } else {
+    say(o
+      ? `Charter allowed a tiny stamp for ${esc(pair.fromSym)} → ${esc(pair.toSym)}. Watching the crossing.`
+      : `The ferryman loads ${esc(pair.fromSym)} and sails for ${esc(pair.toSym)}.`);
+    rcpt((o?.tx ? A.txLine(o.tx) : '') + `<span class="rc" data-testid="ferry-order-state">order · in room</span><a class="rc" href="/ferry-widget">Pay from any chain</a>`);
+    document.body.dataset.app = 'ok';
+  }
+  hero(APPS.ferry.hero());
+  btn(APPS.ferry.btn());
+  form(APPS.ferry.form()); APPS.ferry.bind?.();
+  ruleChip(); proofDrawer();
+}
 const num = (n, u) => `<b class="num">${esc(n)}</b><span class="unit">${esc(u)}</span>`;
 const capFmt = 0;
 // Plain names for accounts a visitor sees; the raw id stays in the tooltip and under "advanced".
@@ -153,15 +231,22 @@ const APPS = {
     label: 'Ferry · cross-chain swap', idle: 'Pick any live 1Click token, or tell the ferryman. I\u2019ll stamp a quote, then load the cargo in the room.',
     guest: true,
     form: () => '<div data-deep="ferry"></div>',
-    bind: () => mountShop('ferry', document.getElementById('t-form'), {
-      state: extra,
-      routes: () => A.ROUTES,
-      tokens: () => A.loadFerryTokens(),
-      quote: (id, amt) => A.quote(id, amt),
-      quotePair: (from, to, amt) => A.quotePair(from, to, amt),
-      repaint: () => paint(),
-      onPair: (pair) => { if (sh?.applyPair) sh.applyPair(pair); },
-    }),
+    bind: () => {
+      ensureFerryDock();
+      mountShop('ferry', document.getElementById('t-form'), {
+        state: extra,
+        routes: () => A.ROUTES,
+        tokens: () => A.loadFerryTokens(),
+        quote: (id, amt) => A.quote(id, amt),
+        quotePair: (from, to, amt) => A.quotePair(from, to, amt),
+        charterReady: () => APPS.ferry.charterReady(),
+        openRules: () => openRules(),
+        onLoadCargo: (opts) => loadFerryCargo(!!opts?.charter),
+        repaint: () => paint(),
+        onPair: (pair) => { if (sh?.applyPair) sh.applyPair(pair); },
+      });
+      wireFerryDock();
+    },
     charterReady: () => A.S.ready && A.stage() === 'ready',
     btn: () => {
       if (extra.acted) return 'Get another quote';
@@ -498,26 +583,50 @@ function paint() {
   wallet(); ruleChip(); label(app.label); proofDrawer();
   if (cur === 'hall') { const m = $('#t-more'); if (m) { m.href = hallRowHref(who()); m.classList.add('row-btn'); m.dataset.testid = 'change-my-row'; } }
   if (phase === 'busy') return;
+  // Ferry: after a quote, keep the card + cargo CTAs even if charter stage is incomplete (guest cinema).
+  const ferryQuoted = cur === 'ferry' && extra.q;
   if (st === 'load' || st === 'connect' || st === 'build') {
-    say(app.idle || 'This is what the shop does. The proof is already on mainnet.');
+    say(ferryQuoted ? (APPS.ferry.charterReady() ? 'Quote ready. Ask charter or Load cargo.' : 'Quote ready. Load cargo as guest, or open your charter.') : (app.idle || 'This is what the shop does. The proof is already on mainnet.'));
     hero(app.hero ? app.hero() : null);
     if (app.guest && app.form) { form(app.form()); app.bind?.(); } else form('');
     const id = who();
-    if (!A.S.ready) btn(id ? 'Opening…' : 'Sign in', 'primary', !!id);
+    if (ferryQuoted) { btn(null); document.body.classList.add('ferry-tray'); }
+    else if (!A.S.ready) btn(id ? 'Opening…' : 'Sign in', 'primary', !!id);
     else if (st === 'build' && id) btn('Open your charter');
     else btn('Sign in');
     return;
   }
-  if (st === 'rules') { say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return; }
+  if (st === 'rules') {
+    if (ferryQuoted && app.guest && app.form) {
+      say('Quote ready. Load cargo as guest, or write your rules to Ask charter.');
+      hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.(); btn('Write my rules'); return;
+    }
+    say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return;
+  }
   if (st === 'wait') { say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(''); hero(null); btn('Check again'); return; }
-  if (st === 'key') { const q = A.pendingKey(); form(''); hero(null);
-    if (q && Date.now() >= q.eta) { say('Your helper key is ready to turn on.'); btn('Turn on helper key'); }
-    else if (q) { say(`Your charter is fine. This browser's helper key starts ${esc(new Date(q.eta).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}.`); btn('Check again'); }
-    else { say('Your charter is fine. This browser has no helper key yet.'); btn('Add a helper key'); }
-    return; }
+  if (st === 'key') {
+    if (ferryQuoted && app.guest && app.form) {
+      say('Quote ready. Load cargo as guest, or finish the helper key to Ask charter.');
+      hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.();
+    } else { form(''); hero(null); }
+    const q = A.pendingKey();
+    if (q && Date.now() >= q.eta) { if (!ferryQuoted) say('Your helper key is ready to turn on.'); btn('Turn on helper key'); }
+    else if (q) { if (!ferryQuoted) say(`Your charter is fine. This browser's helper key starts ${esc(new Date(q.eta).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}.`); btn('Check again'); }
+    else { if (!ferryQuoted) say('Your charter is fine. This browser has no helper key yet.'); btn('Add a helper key'); }
+    return;
+  }
   if (phase === 'idle') say(app.idle);
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
-  btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
+  if (cur === 'ferry') {
+    document.body.classList.add('ferry-tray');
+    // Cargo CTAs live in the card after quote; keep tray primary only before quote / for stage gates.
+    if (extra.q && !extra.acted) btn(null);
+    else btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', false);
+  } else {
+    document.body.classList.remove('ferry-tray');
+    const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true;
+    btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
+  }
 }
 async function primary(auto = false) {
   if (phase === 'busy' || !cur) return; const st = A.stage(); if (!auto) sfx('click');
@@ -631,14 +740,15 @@ export function boot() {
   return booted;
 }
 export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
-  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = '';
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry');
+  const dock0 = document.getElementById('ferry-agent-dock'); if (dock0) dock0.hidden = id !== 'ferry';
   const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = '';
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
   // the Toll room reopened with a visit under way: pick it up (countdown, or settle now if Base is final)
   if (id === 'toll') booted?.then(() => { const v = cur === 'toll' && A.stage() === 'ready' && A.tollVisit(); if (v && !v.done && phase === 'idle') primary(true); }).catch(() => {}); }
-export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; closeRules(); const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; closeRules(); document.body.classList.remove('ferry-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };

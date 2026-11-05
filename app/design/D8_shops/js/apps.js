@@ -21,6 +21,11 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const short = (h, a = 6, b = 4) => h ? (h.length > a + b + 1 ? h.slice(0, a) + '…' + h.slice(-b) : h) : '';
 const UA = 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex';
 const REFUND = '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e';
+const REFUND_NEAR = 'nearcarta.near';
+const refundFor = (from) => {
+  const chain = String(from || '').split('@')[1] || '';
+  return chain.toLowerCase() === 'near' ? REFUND_NEAR : REFUND;
+};
 // Shortcut corridors for the city Ferry room (quick ZEC picks). The live picker
 // loads the full 1Click list via /api/ferry/tokens (~215 tokens / 38 chains).
 export const ROUTES = [
@@ -414,7 +419,7 @@ export async function quote(route, amount, to = 'ZEC@zec') {
 /** Dry quote for any 1Click pair (symbol@chain). Used by the city Ferry live picker. */
 export async function quotePair(from, to, amount) {
   return api('/api/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ from, to: to || 'ZEC@zec', amount: String(amount), recipient: UA, refundTo: REFUND, privacy: 'basic' }) });
+    body: JSON.stringify({ from, to: to || 'ZEC@zec', amount: String(amount), recipient: UA, refundTo: refundFor(from), privacy: 'basic' }) });
 }
 // A dry quote. Paying it is a board propose, inside the visitor's cap.
 // (the first allowed payee that is not you; yourself only if the rule names nobody else). The charter checks it on chain.
