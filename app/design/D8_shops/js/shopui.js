@@ -34,15 +34,18 @@ function ensureFerryDock() {
   d = document.createElement('div');
   d.id = 'ferry-agent-dock';
   d.setAttribute('data-testid', 'ferry-agent-dock');
-  d.innerHTML = `<button type="button" class="ferry-dock-toggle" data-testid="ferry-agent-toggle" aria-expanded="false" aria-controls="ferry-agent-pop" title="Ask the ferryman">💬</button>
-    <div id="ferry-agent-pop" class="ferry-agent-pop" data-testid="ferry-agent" hidden>
-      <p class="ferry-dock-label">Ferryman</p>
+  // Mix sketch: character on the right; chat popup (input + send INSIDE) opens beside it.
+  d.innerHTML = `<div id="ferry-agent-pop" class="ferry-agent-pop" data-testid="ferry-agent" hidden>
       <div class="ferry-agent-row">
-        <input id="f-agent" data-testid="ferry-agent-input" placeholder="Swap 3 USDC to ZEC" autocomplete="off" aria-label="Ask the ferryman in plain words">
-        <button type="button" class="primary" id="f-agent-go" data-testid="ferry-agent-go" aria-label="Send">➤</button>
+        <input id="f-agent" data-testid="ferry-agent-input" placeholder="Swap 3 USDC to ZEC" autocomplete="off" aria-label="Ask the AI Agent">
+        <button type="button" class="ferry-agent-send" id="f-agent-go" data-testid="ferry-agent-go" aria-label="Send">➤</button>
       </div>
-      <p class="ferry-agent-hint" data-testid="ferry-agent-hint">Plain words → quote → Load cargo under your caps.</p>
-    </div>`;
+    </div>
+    <button type="button" class="ferry-agent-char" data-testid="ferry-agent-toggle" aria-expanded="false" aria-controls="ferry-agent-pop" title="AI Agent">
+      <span class="ferry-agent-badge" aria-hidden="true">⋯</span>
+      <img class="ferry-agent-avatar" src="/setup/chars/robotexpressive.webp" width="92" height="92" alt="" decoding="async">
+      <span class="ferry-agent-name">AI Agent</span>
+    </button>`;
   (document.getElementById('shopUI') || document.body).appendChild(d);
   d.hidden = cur !== 'ferry';
   return d;

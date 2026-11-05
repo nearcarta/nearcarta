@@ -308,34 +308,40 @@ label.amt input{width:9rem;flex:0 0 9rem;min-width:0;box-sizing:border-box}
 .ferry-add-pair input{min-height:40px;min-width:9rem;flex:1;padding:0 10px;border-radius:10px;border:1px solid #4a3a28;background:rgba(23,15,11,.72);color:#fff8ee}
 
 
-/* ---- Ferry mix sketch card (city tray): narrow, opaque, tabs Swap|Routes|Rules ---- */
-.ferry-card{display:grid;gap:10px}
-.ferry-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:3px;border-radius:12px;background:rgba(23,15,11,.85);border:1px solid #4a3a28}
-.ferry-tab{min-height:36px;border:0;border-radius:10px;background:transparent;color:#d4c4a8;font:650 13px/1 system-ui,sans-serif;cursor:pointer}
+/* ---- Ferry mix sketch card (city tray): ~400px comfort, opaque, tabs Swap|Routes|Rules ---- */
+.ferry-card{display:grid;gap:14px}
+.ferry-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:4px;border-radius:14px;background:#17130f;border:1px solid #4a3a28}
+.ferry-tab{min-height:44px;border:0;border-radius:11px;background:transparent;color:#d4c4a8;font:700 15px/1 system-ui,sans-serif;cursor:pointer}
 .ferry-tab.on,.ferry-tab[aria-selected=true]{background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608}
-.ferry-pane{display:grid;gap:8px}
-.ferry-flow{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px;border-radius:12px;background:rgba(23,15,11,.72);border:1px solid rgba(214,180,106,.35)}
-.ferry-flow-arrow{color:#c98f4e;font-weight:700}
-.ferry-field{display:flex;flex-direction:column;gap:4px;margin:0;color:#e8d7b8;font:650 12px/1.2 system-ui,sans-serif}
+.ferry-pane{display:grid;gap:12px}
+.ferry-flow{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 12px;border-radius:14px;background:#17130f;border:1px solid rgba(214,180,106,.35)}
+.ferry-flow .tic .ti{width:36px!important;height:36px!important}
+.ferry-flow .tic .ci{width:14px!important;height:14px!important}
+.ferry-flow-arrow{color:#c98f4e;font:700 18px/1 system-ui,sans-serif}
+.ferry-field{display:flex;flex-direction:column;gap:6px;margin:0;color:#e8d7b8;font:650 13px/1.2 system-ui,sans-serif}
 .ferry-field select,.ferry-field .amt-row{
-  width:100%;min-height:42px;box-sizing:border-box;padding:0 10px;border-radius:10px;
-  border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:600 14px/1.2 system-ui,sans-serif;
+  width:100%;min-height:48px;box-sizing:border-box;padding:0 12px;border-radius:12px;
+  border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:600 15px/1.2 system-ui,sans-serif;
   -webkit-appearance:none;appearance:none;
 }
-.ferry-field select{background-color:#17130f;background-image:linear-gradient(45deg,transparent 50%,#d6b46a 50%),linear-gradient(135deg,#d6b46a 50%,transparent 50%);background-position:calc(100% - 14px) calc(50% - 3px),calc(100% - 9px) calc(50% - 3px);background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:28px}
+.ferry-field select{background-color:#17130f;background-image:linear-gradient(45deg,transparent 50%,#d6b46a 50%),linear-gradient(135deg,#d6b46a 50%,transparent 50%);background-position:calc(100% - 16px) calc(50% - 3px),calc(100% - 11px) calc(50% - 3px);background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px}
 .ferry-field select option{background:#17130f;color:#fff8ee}
-.ferry-field .amt-row{display:flex;align-items:center;gap:8px}
-.ferry-field .amt-row input{flex:1;min-width:0;border:0;background:transparent;color:#fff8ee;font:650 16px/1.2 system-ui,sans-serif;outline:none}
-.ferry-cta{width:100%;min-height:46px;justify-content:center;border:0;border-radius:12px;background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 15px/1.2 system-ui,sans-serif;cursor:pointer}
+.ferry-field .amt-row{display:flex;align-items:center;gap:10px}
+.ferry-field .amt-row input{flex:1;min-width:0;border:0;background:transparent;color:#fff8ee;font:650 17px/1.2 system-ui,sans-serif;outline:none}
+.ferry-cta{width:100%;min-height:50px;justify-content:center;border:0;border-radius:12px;background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1.2 system-ui,sans-serif;cursor:pointer}
 .ferry-cta[disabled]{opacity:.55;cursor:progress}
-.ferry-cargo-actions{display:grid;gap:8px}
-.ferry-rate{margin:0;color:#f5d08a;font:650 13px/1.35 system-ui,sans-serif;text-align:center}
-.ferry-quote-err{margin:0;color:#ff8f8f;font:600 12px/1.35 system-ui,sans-serif}
-.ferry-compare-more{border:1px solid #4a3a28;border-radius:12px;padding:8px 10px;background:rgba(23,15,11,.55);color:#e8d7b8}
+.ferry-cargo-actions{display:grid;gap:10px}
+.ferry-rate{margin:2px 0 0;color:#f5d08a;font:650 14px/1.35 system-ui,sans-serif;text-align:center}
+.ferry-quote-err{margin:0;color:#ff8f8f;font:600 13px/1.35 system-ui,sans-serif}
+.ferry-compare-more{border:1px solid #4a3a28;border-radius:12px;padding:10px 12px;background:#17130f;color:#e8d7b8}
 .ferry-compare-more summary{cursor:pointer;font:650 13px/1.3 system-ui,sans-serif;color:#f5d08a}
+.ferry-picker{gap:12px;padding:0;border:0;background:transparent;border-radius:0}
+.ferry-picker-note{margin:0;color:#d6b46a;font:600 12px/1.35 system-ui,sans-serif}
 .route-row{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .route-chip{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px;border-radius:12px;border:1px solid #4a3a28;background:#1a1410;color:#fff8ee;text-align:left;cursor:pointer}
 .route-chip[aria-pressed=true]{border-color:#f5d08a;box-shadow:inset 0 0 0 1px #f5d08a}
 .route-copy{min-width:0}
 .route-copy b{display:block;white-space:nowrap}
 .route-copy small{display:block;color:#d6b46a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.ferry-idle{margin:0;color:#9a8b74;font:500 12px/1.35 system-ui,sans-serif}

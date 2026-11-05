@@ -159,18 +159,18 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       <button type="button" role="tab" class="ferry-tab${tab === 'rules' ? ' on' : ''}" data-tab="rules" aria-selected="${tab === 'rules' ? 'true' : 'false'}" data-testid="ferry-tab-rules">Rules</button>
     </div>`;
   const flow = `<div class="ferry-flow" data-testid="ferry-flow" aria-hidden="true"><span class="ferry-dest" data-testid="ferry-dest" hidden></span>
-      ${tokenStack(pickSym, pickChain, { size: 22, chainSize: 11 })}
+      ${tokenStack(pickSym, pickChain, { size: 36, chainSize: 14 })}
       <span class="ferry-flow-arrow">→</span>
-      ${tokenStack(toSym, toChain, { size: 22, chainSize: 11 })}
+      ${tokenStack(toSym, toChain, { size: 36, chainSize: 14 })}
     </div>`;
   const swap = `<div class="ferry-pane ferry-picker" data-pane="swap" data-testid="ferry-picker" ${tab === 'swap' ? '' : 'hidden'}>
       ${flow}
-      <p class="ferry-picker-note" data-testid="ferry-token-count">${nTok ? `${nTok} live tokens` : (state.tokensError ? 'List offline · corridors still work' : 'Loading tokens…')}</p>
+      <p class="ferry-picker-note" data-testid="ferry-token-count" ${nTok ? '' : 'hidden'}>${nTok ? `${nTok} live` : ''}</p>
       <label class="field ferry-field"><span>Chain</span><select id="f-chain" data-testid="ferry-chain-filter">${chainOpts}</select></label>
       <label class="field ferry-field"><span>Get</span><select id="f-from" data-testid="ferry-from">${fromOpts || `<option value="${esc(rt.from.replace('@', '|'))}">${esc(meta.label)}</option>`}</select></label>
       <label class="field ferry-field"><span>Can</span><select id="f-to" data-testid="ferry-to">${toOpts || '<option value="ZEC|zec">ZEC on zec</option>'}</select></label>
       <label class="field ferry-field amt-field"><span>Amount</span>
-        <span class="amt-row">${tokenStack(pickSym, pickChain, { size: 18, chainSize: 9 })}<input id="f-amt" type="number" min="0" step="any" value="${esc(state.amt || rt.amt)}" aria-label="Amount"><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
+        <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(state.amt || rt.amt)}" aria-label="Amount"><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
       </label>
       <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote">Get quote</button>
       ${rateLine}
@@ -179,7 +179,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
         <button type="button" class="primary ferry-cta" id="f-cargo" data-testid="ferry-load-cargo">Load cargo</button>
         <button type="button" class="primary ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}>Ask charter · load cargo</button>
       </div>
-      ${showCargo ? '<p data-testid="ferry-idle">No deposit has been requested.</p>' : `<p data-testid="ferry-idle">${state.quoted ? 'No deposit has been requested.' : 'No quote yet. No deposit has been requested.'}</p>`}
+      <p class="ferry-idle" data-testid="ferry-idle" ${showCargo ? 'hidden' : ''}>${state.quoted ? 'No deposit has been requested.' : 'No quote yet. No deposit has been requested.'}</p>
     </div>`;
   const routesPane = `<div class="ferry-pane" data-pane="routes" ${tab === 'routes' ? '' : 'hidden'}>
       <p class="ferry-shortcuts-label">Quick ZEC corridors</p>
@@ -274,7 +274,7 @@ function mountFerry(root, hooks) {
         }
         state.toId = to.value;
       }
-      if (note && state.choices?.length) note.textContent = `${state.choices.length} live tokens`;
+      if (note && state.choices?.length) { note.hidden = false; note.textContent = `${state.choices.length} live`; }
       const sym = q$(root, '#f-sym');
       if (sym && state.fromId) sym.textContent = state.fromId.split('|')[0] || '';
       bindTokenFallbacks(root);

@@ -93,7 +93,7 @@ test('city Ferry markup exposes live token picker + quick corridors', () => {
   assert.match(html, /data-testid="ferry-chain-filter"/);
   assert.match(html, /data-testid="ferry-from"/);
   assert.match(html, /data-testid="ferry-to"/);
-  assert.match(html, /60 live tokens/);
+  assert.match(html, /60 live/);
   assert.match(html, /Quick ZEC corridors/);
   assert.equal((html.match(/data-testid="ferry-route"/g) || []).length, 3);
 });
@@ -103,4 +103,20 @@ test('token badges never use inline onerror (CSP)', () => {
   assert.doesNotMatch(src, /\bonerror=/);
   assert.match(src, /bindTokenFallbacks/);
   assert.match(tokenStack('ETH', 'eth'), /data-ti-fallback/);
+});
+
+test('Ferry tray sketch match: wide ~400px tray + AI Agent character (not emoji dock)', () => {
+  const world = read('app/design/D9_world/world.css');
+  assert.match(world, /max-width:\s*400px/);
+  assert.doesNotMatch(world, /max-width:\s*268px/);
+  assert.match(world, /\.ferry-agent-char/);
+  assert.match(world, /\.ferry-agent-avatar/);
+  assert.match(world, /\.ferry-agent-send/);
+  const ui = read('app/design/D8_shops/js/shopui.js');
+  assert.match(ui, /AI Agent/);
+  assert.match(ui, /ferry-agent-char/);
+  assert.match(ui, /robotexpressive\.webp/);
+  assert.match(ui, /ferry-agent-send/);
+  assert.doesNotMatch(ui, /💬/);
+  assert.doesNotMatch(ui, /ferry-dock-toggle/);
 });

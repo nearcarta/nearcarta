@@ -495,28 +495,87 @@ nav.all-shops a{color:#fff8ee;text-decoration:none}
 nav.all-shops a:hover,nav.all-shops a:focus-visible{color:#f5d08a}
 
 
-/* Ferry mix sketch: narrow opaque tray; room stays the hero */
+/* Ferry mix sketch (owner-approved): wide opaque tray ~400px; room stays the hero */
 body.ferry-tray #shopUI #tray{
-  width:min(268px,calc(100vw - 24px));
-  max-width:268px;
-  left:12px; bottom:12px;
+  width:min(400px,calc(100vw - 28px));
+  max-width:400px;
+  left:16px; bottom:16px;
+  padding:20px 18px 18px;
   background:#1f1a15;
   border:1px solid #3a3128;
   box-shadow:0 16px 40px rgba(0,0,0,.45);
   backdrop-filter:none; -webkit-backdrop-filter:none;
 }
-body.ferry-tray #shopUI .hero{font-size:22px;line-height:28px;margin:2px 0 8px}
-body.ferry-tray #shopUI .say{font-size:13px;line-height:18px}
+/* Drop stacked title/hero clutter so Swap card matches the sketch */
+body.ferry-tray #shopUI .t-head,
+body.ferry-tray #shopUI .label,
+body.ferry-tray #shopUI .hero{display:none!important}
+body.ferry-tray #shopUI .say{font-size:13px;line-height:18px;margin:0 0 12px;color:#d4c4a8}
+body.ferry-tray #shopUI #t-form{margin:0}
+body.ferry-tray #shopUI .t-links{margin-top:12px}
 body.ferry-tray #shopUI #t-act[hidden]{display:none!important}
-#ferry-agent-dock{position:fixed;right:16px;bottom:18px;z-index:5;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+body.ferry-tray #shopUI .rcpt:empty{display:none}
+
+/* AI Agent character (right) + chat popup; send stays INSIDE the card */
+#ferry-agent-dock{
+  position:fixed; right:20px; bottom:22px; z-index:5;
+  display:flex; flex-direction:row; align-items:flex-end; gap:12px;
+  pointer-events:none;
+}
+#ferry-agent-dock > *{pointer-events:auto}
 #ferry-agent-dock[hidden]{display:none!important}
-.ferry-dock-toggle{width:48px;height:48px;border-radius:50%;border:1px solid #d6b46a;background:#1f1a15;color:#f5d08a;font-size:20px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35)}
-.ferry-agent-pop{width:min(280px,calc(100vw - 32px));padding:10px;border-radius:14px;border:1px solid #d6b46a66;background:#1f1a15;box-shadow:0 12px 28px rgba(0,0,0,.4);display:grid;gap:8px}
-.ferry-dock-label{margin:0;color:#f5d08a;font:700 11px/1.2 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase}
-.ferry-agent-pop .ferry-agent-row{display:flex;gap:6px}
-.ferry-agent-pop input{flex:1;min-width:0;min-height:40px;padding:0 10px;border-radius:10px;border:1px solid #4a3a28;background:#17130f;color:#fff8ee}
-.ferry-agent-pop button.primary{min-width:42px;border:0;border-radius:10px;background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font-weight:700;cursor:pointer}
+.ferry-agent-char{
+  position:relative; display:flex; flex-direction:column; align-items:center; gap:4px;
+  width:108px; padding:0; border:0; background:transparent; cursor:pointer; color:#fff8ee;
+}
+.ferry-agent-char:focus-visible{outline:2px solid #f5d08a; outline-offset:4px; border-radius:12px}
+.ferry-agent-avatar{
+  width:92px; height:92px; object-fit:contain; display:block;
+  filter:hue-rotate(195deg) saturate(1.35) brightness(1.05) drop-shadow(0 10px 18px rgba(0,0,0,.45));
+}
+.ferry-agent-badge{
+  position:absolute; top:2px; right:10px; z-index:1;
+  width:28px; height:28px; border-radius:999px;
+  background:#fff; color:#2a1608; font:800 16px/28px system-ui,sans-serif;
+  text-align:center; box-shadow:0 4px 12px rgba(0,0,0,.35);
+  letter-spacing:.02em;
+}
+.ferry-agent-char[aria-expanded="true"] .ferry-agent-badge{opacity:.35}
+.ferry-agent-name{
+  margin:0; color:#f5d08a; font:700 12px/1.2 system-ui,sans-serif;
+  letter-spacing:.05em; text-transform:uppercase; text-shadow:0 2px 8px rgba(0,0,0,.55);
+}
+.ferry-agent-pop{
+  width:min(300px,calc(100vw - 160px));
+  box-sizing:border-box; padding:10px; border-radius:14px;
+  border:1px solid #d6b46a66; background:#1f1a15;
+  box-shadow:0 12px 28px rgba(0,0,0,.4);
+  display:grid; gap:0; overflow:hidden;
+}
+.ferry-agent-pop .ferry-agent-row{
+  display:grid; grid-template-columns:minmax(0,1fr) 44px; gap:8px; align-items:stretch; min-width:0;
+}
+.ferry-agent-pop input{
+  width:100%; min-width:0; box-sizing:border-box; min-height:44px;
+  padding:0 12px; border-radius:10px; border:1px solid #4a3a28;
+  background:#17130f; color:#fff8ee; font:500 14px/1.2 system-ui,sans-serif;
+}
+.ferry-agent-pop .ferry-agent-send,
+.ferry-agent-pop button.ferry-agent-send{
+  width:44px; min-width:44px; height:44px; margin:0; padding:0;
+  border:0; border-radius:10px;
+  background:linear-gradient(180deg,#f5d08a,#e2b35b); color:#2a1608;
+  font:700 16px/1 system-ui,sans-serif; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+}
 @media (max-width:720px){
-  body.ferry-tray #shopUI #tray{width:min(100vw - 16px,300px);left:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));max-height:42dvh}
-  #ferry-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  body.ferry-tray #shopUI #tray{
+    width:min(100vw - 16px,380px); max-width:none;
+    left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    max-height:48dvh; padding:16px 14px;
+  }
+  #ferry-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
+  .ferry-agent-avatar{width:72px;height:72px}
+  .ferry-agent-char{width:88px}
+  .ferry-agent-pop{width:min(240px,calc(100vw - 120px))}
 }
