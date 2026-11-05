@@ -1,13 +1,12 @@
-// Night-harbour pairs. Body text is at least 4.5:1. Large text and UI chrome are at least 3:1.
+// Espresso and brass. Body text is at least 4.5:1. Large text and UI chrome are at least 3:1.
 const pairs = [
-  ['text on bg', '#eef2ff', '#0b1020', 4.5],
-  ['text-2 on bg', '#c3cbe6', '#0b1020', 4.5],
-  ['muted on bg', '#9aa6c8', '#0b1020', 4.5],
-  ['muted on surface-2', '#9aa6c8', '#1a2440', 4.5],
-  ['brand text on brand', '#04140d', '#00ec97', 4.5],
-  ['line on bg', '#7f93c4', '#0b1020', 3],
-  ['focus on bg', '#ffd166', '#0b1020', 3],
-  ['disabled on surface', '#8b98b8', '#121a2e', 3],
+  ['ink on panel', '#FFF8EE', '#1A1410', 4.5],
+  ['title on panel', '#FFFFFF', '#1A1410', 4.5],
+  ['muted on panel', '#D4C4A8', '#1A1410', 4.5],
+  ['brass on panel', '#E2B35B', '#1A1410', 3],
+  ['label on brass', '#2A1608', '#E2B35B', 4.5],
+  ['refusal on no-bg', '#F0D0C8', '#2A1210', 4.5],
+  ['dim on panel', '#A89272', '#1A1410', 3],
 ];
 const lin = c => {
   const n = parseInt(c.slice(1), 16);

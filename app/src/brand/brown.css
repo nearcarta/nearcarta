@@ -1,0 +1,170 @@
+/* Espresso cards and brass controls. The 3D town colors stay in world.js and the D7 tokens. */
+:root {
+  --panel: #1A1410;
+  --panel-2: #221A14;
+  --panel-3: #2A2118;
+  --ink: #FFF8EE;
+  --ink-strong: #FFFFFF;
+  --muted: #D4C4A8;
+  --dim: #A89272;
+  --line: #4A3A28;
+  --brass: #E2B35B;
+  --brass-hi: #F5D08A;
+  --brass-lo: #C98F4E;
+  --brass-deep: #8B5E2B;
+  --ok: #3DDC97;
+  --no: #FF6B5A;
+  --no-bg: #2A1210;
+}
+
+body:not(:has(#c)) { background: #120e0b; color: #FFF8EE; }
+
+/* The control sits on its own row, under a sticky header, so it never covers the title. */
+header.top, header:has(.back-town) {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: linear-gradient(180deg, rgba(18,14,11,.96), rgba(18,14,11,.78));
+}
+header.top > div:has(> .back-town) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+a.back-town, button#back {
+  position: relative !important;
+  top: auto !important;
+  margin: 0 0 12px !important;
+  width: max-content;
+  max-width: 100%;
+  color: #FFF8EE !important;
+  background: linear-gradient(180deg, #2A2118, #1A1410) !important;
+  border: 1px solid #4A3A28 !important;
+  box-shadow: 0 4px 0 #0E0A08 !important;
+}
+body:has(#c) > a.back-town { display: none !important; }
+
+.card, #tray, #shopUI #tray, .panel, .box, main > form, .pnc-card, .ob-card, .tot > div, .pin .ban {
+  background: linear-gradient(165deg, rgba(42,33,24,.96), rgba(26,20,16,.98)) !important;
+  color: #FFF8EE !important;
+  border: 1px solid #4A3A28 !important;
+  box-shadow:
+    0 18px 40px rgba(0,0,0,.55),
+    0 0 28px rgba(226,179,91,.18),
+    inset 0 1px 0 rgba(245,208,138,.18) !important;
+}
+.card, .panel, .box, main > form, .pnc-card, .ob-card, .tot > div, .pin .ban { position: relative; }
+.card::before, #tray::before, #shopUI #tray::before, .panel::before, main > form::before, .pnc-card::before, .ob-card::before, .tot > div::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(120deg, transparent 0%, transparent 35%, #F5D08A 48%, #E2B35B 52%, #F5D08A 56%, transparent 70%, transparent 100%);
+  background-size: 220% 220%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: borderShine 3.7s linear infinite;
+  pointer-events: none;
+}
+@keyframes borderShine {
+  0% { background-position: 120% 0%; }
+  100% { background-position: -120% 100%; }
+}
+
+h1, h2, .amt, #t-title { color: #FFFFFF; }
+.muted, .sub, .note, .lede span { color: #D4C4A8; }
+
+.btn.gold, .act.primary, button.primary, a.primary, #rulesBtn, #go, a.go, .pill.go,
+nav button.on, #onboard .ob-next, .nc-sign .pnc-action-button--primary {
+  position: relative;
+  overflow: hidden;
+  color: #2A1608 !important;
+  background-image:
+    linear-gradient(105deg, transparent 38%, rgba(255,255,255,.55) 50%, transparent 62%),
+    linear-gradient(180deg, #F5D08A 0%, #E2B35B 42%, #C98F4E 100%) !important;
+  background-size: 220% 100%, 100% 100%;
+  background-repeat: no-repeat;
+  animation: brassSweep 2.8s ease-in-out infinite;
+  border: 0 !important;
+  box-shadow:
+    0 7px 0 #8B5E2B,
+    0 14px 28px rgba(139,94,43,.45),
+    0 0 24px rgba(226,179,91,.45),
+    inset 0 1px 0 rgba(255,255,255,.45) !important;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+#rulesBtn { overflow: visible; }
+@keyframes brassSweep {
+  0%, 55% { background-position: -130% 0, 0 0; }
+  75%, 100% { background-position: 130% 0, 0 0; }
+}
+.btn.gold:hover, .act.primary:hover, button.primary:hover, a.primary:hover, #rulesBtn:hover, #go:hover, .pill.go:hover, nav button.on:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.06);
+  box-shadow: 0 10px 0 #8B5E2B, 0 18px 34px rgba(139,94,43,.55), 0 0 36px rgba(226,179,91,.45), inset 0 1px 0 rgba(255,255,255,.5) !important;
+}
+.btn.gold:active, .act.primary:active, button.primary:active, a.primary:active, #rulesBtn:active, #go:active, .pill.go:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #8B5E2B, 0 6px 14px rgba(139,94,43,.35), inset 0 2px 6px rgba(80,40,10,.35) !important;
+}
+.btn.google, .btn.google:hover {
+  color: #1A1410 !important;
+  background: linear-gradient(180deg, #FFFFFF, #F0E8DC) !important;
+  animation: none;
+  box-shadow: 0 7px 0 #8B7355, 0 14px 28px rgba(0,0,0,.35), inset 0 1px 0 #fff !important;
+}
+
+/* Setup glows stay warm. A cool blob reads as a grey smudge on the espresso page. */
+.scene .g1, .scene .g2 { background: #c98f4e33 !important; }
+
+/* Setup uses the width. The step rail and the card share the viewport. */
+.shell {
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) !important;
+  width: min(1240px, calc(100% - 32px));
+  max-width: none;
+  margin-inline: auto;
+  align-items: stretch;
+}
+.stage, article.card { min-height: calc(100vh - 168px); }
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr !important; width: auto; }
+  .stage, article.card { min-height: 0; }
+}
+
+/* Shop panels are wide enough to read the amount, the payee and the last transactions. */
+#tray, #shopUI #tray {
+  width: min(460px, calc(100vw - 32px)) !important;
+  padding: 22px !important;
+}
+#t-title, #shopUI #t-title { font-size: 30px !important; line-height: 1.1 !important; color: #FFFFFF !important; }
+#tray .label, #shopUI .label, #t-label { color: #FFF8EE !important; font-size: 15px !important; }
+
+.hall-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+}
+.badge { display: inline-block; padding: 4px 8px; border-radius: 7px; font: 800 11px/1 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.badge.ok { color: #3DDC97; background: rgba(61,220,151,.1); border: 1px solid rgba(61,220,151,.4); }
+.badge.no { color: #FF6B5A; background: rgba(255,107,90,.1); border: 1px solid rgba(255,107,90,.4); }
+.badge.rec { color: #D4C4A8; background: rgba(212,196,168,.08); border: 1px solid #4A3A28; }
+
+.judge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.judge-step { display: grid; grid-template-columns: 42px 1fr; gap: 12px; align-items: start; }
+.judge-step .n { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #2A1608; background: linear-gradient(145deg, #F5D08A, #C98F4E); }
+.judge-step h2 { margin: 0 0 6px; font-size: 18px; }
+.judge-step p { margin: 0 0 8px; color: #D4C4A8; }
+@media (max-width: 800px) { .judge-grid { grid-template-columns: 1fr; } .hall-row { grid-template-columns: 1fr; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .card::before, #tray::before, #shopUI #tray::before, .panel::before, main > form::before, .pnc-card::before, .ob-card::before, .tot > div::before,
+  .btn.gold, .act.primary, button.primary, a.primary, #rulesBtn, #go, .pill.go, nav button.on {
+    animation: none !important;
+  }
+}
