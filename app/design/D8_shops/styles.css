@@ -355,3 +355,13 @@ body:has(#drawer.open) #back{visibility:hidden}
 .plain-line { font-size: 14px; line-height: 20px; color: #f3ead8; font-weight: 500; margin: 0; }
 .plain-line.warn { color: #ffd88a; }
 .plain-line a { color: #f3d78f; text-decoration: underline; }
+
+/* Ferry standing-order chip on the boat (TOWN_PLAN live-oath-state) */
+.stag.order { padding: 4px 10px; color: #e8d7b8; border-color: rgba(214,180,106,.45); }
+.stag.order.gold { color: #f5d08a; border-color: #d6b46a; }
+.stag.order.ok { color: #00ec97; border-color: color-mix(in srgb, #00ec97 45%, transparent); }
+.stag.order.no { color: var(--no); border-color: color-mix(in srgb, var(--no) 45%, transparent); }
+.ferry-order-chip { font: 650 11px/1.2 Inter, system-ui, sans-serif; letter-spacing: .02em; }
+.ferry-add-pair { display: grid; gap: 8px; margin-top: 8px; }
+.ferry-add-pair label { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ferry-add-pair input { min-height: 36px; min-width: 8rem; flex: 1; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--base); color: var(--text); }

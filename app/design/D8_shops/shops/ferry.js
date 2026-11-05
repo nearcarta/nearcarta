@@ -1,21 +1,23 @@
-// Ferry: USDC on Base crosses to ZEC, shielded into Zcash's Ironwood pool via an Orchard-only UA.
-// The quote is a real dry 1Click read through the Nearcarta API (snapshot in data/live.js); the crossing re-enacts it, nothing is sent.
+// Ferry: any live 1Click pair crosses the strait. Default demo is USDC@Base → ZEC (shielded).
+// The quote is a real dry 1Click read through the Nearcarta API (snapshot in data/live.js); the crossing re-enacts the visitor's picker choice, nothing is sent.
 // Before the boat leaves, a downgraded echo of the same quote is refused, with the same echo-guard rule as tech backend/src/ferry.js.
+// Sources: depth-plan-v2 §1; TOWN_PLAN Ferry live-oath-state (order chip); STRENGTHEN §4 standing order; brief-V V4; 1Click /v0/tokens.
 import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, tok, C } from '../js/core.js';
 import { SIGNED, UNSIGNED } from '../../D6_dashboards/src/data.js';
 import { boat } from '../js/town.js';
 import { row, h3, note, proof, paper, esc, mainnet } from './_ui.js';
 import { QUOTE } from '../data/live.js';
 import { M as PM, brassM, mesh, lantern } from './_props.js';
+import { chainLabel, orderChipHtml, ORDER_STATES } from '/panels/ferry-pair.js';
 
 const Q = QUOTE, short = a => a.slice(0, 8) + '…' + a.slice(-5);
-export const LABEL = 'A shielded quote. Nothing is sent.';
+export const LABEL = 'A live quote. Nothing is sent.';
 export const HERO = `${tok(String(+Q.from.amt), Q.from.sym, { chain: Q.from.chain })}<span class="arrow" aria-hidden="true">→</span>${tok(Q.to.amt, Q.to.sym)}`;
-export const RESULT = 'Crossed shielded';
+export const RESULT = 'Crossed';
 const diffTxt = r => r.diffs ? r.diffs.map(d => `${d.field}: sent ${d.sent}, echo ${d.got}`).join('; ') : `receivers ${r.receivers.join(' + ')}`;
 const utc3 = s => { const d = new Date(s.replace(' UTC', 'Z').replace(' ', 'T')); if (isNaN(d)) return s; d.setUTCHours(d.getUTCHours() + 3); return d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC+3'; };
 export const PROOF = mainnet('ferry') + proof(
-  note('Pay from another chain on <a href="/ferry-widget">Pay</a>. The charter checks the recipient, the cap and the daily budget before a deposit address is created. At most 0.20 USD. You send the tokens yourself.'),
+  note('In the city tray pick any live 1Click pair, then Load the cargo. Pay from another chain on <a href="/ferry-widget">Pay</a>. The charter checks the recipient, the cap and the daily budget before a deposit address is created. At most 0.20 USD. You send the tokens yourself.'),
   h3('What this quote is'),
   row({ k: `${Q.from.amt} ${Q.from.sym} on ${Q.from.chain} would become about ${Q.to.exact} ZEC`, why: 'A practice quote. Nothing was sent and nothing was spent.', st: Q.sig ? 'ok' : 'no', stText: Q.sig ? 'signed' : 'not signed', src: 'live' }),
   row({ k: 'The Zcash address hides the amount', why: 'The recipient and the amount stay hidden. A weaker address is refused.', st: Q.ua.orchardOnly ? 'ok' : 'no', stText: Q.ua.orchardOnly ? 'hidden' : 'not hidden', src: 'live' }),
@@ -61,16 +63,55 @@ export default async function ferry(ctx) {
   const b = boat(new THREE.Vector3(-.85, -.02, .2)); b.scale.setScalar(1.25); scene.add(b);
   const crate = await put(scene, 'decoration/props/crate_A_small', { x: -2.0, y: .15, z: .25, fitW: .42 });
   const rob = await makeRobot(scene); rob.at(-3.6, 1.6);
-  const icon = (sym, chain) => `<span class="tok">${tok(null, sym, { chain }).replace('<span class="sym">' + sym + '</span>', '')}</span>`;
-  const tags = [{ obj: crate, pos: new THREE.Vector3(0, .9, 0), html: icon('USDC', 'Base'), cls: 'bare' }, { obj: seal, pos: new THREE.Vector3(-.15, .55, 0), html: 'Downgrade refused', cls: 'no hide' }];
-  const swapsTo = () => { tags[0].el.innerHTML = icon('ZEC', 'Zcash'); };
+  // Live cargo follows the city tray picker (extra.fromId/toId/q). Default remains the snapshot USDC→ZEC.
+  const cargo = {
+    fromSym: Q.from.sym, fromChain: Q.from.chain, toSym: Q.to.sym, toChain: Q.to.chain || 'Zcash',
+    amt: String(+Q.from.amt), outAmt: Q.to.amt, result: RESULT,
+  };
+  const icon = (sym, chain) => {
+    const ch = chainLabel(chain) || chain;
+    const html = tok(null, sym, { chain: ch });
+    return `<span class="tok">${html.replace('<span class="sym">' + sym + '</span>', '')}</span>`;
+  };
+  const heroOf = () => `${tok(cargo.amt, cargo.fromSym, { chain: chainLabel(cargo.fromChain) || cargo.fromChain })}<span class="arrow" aria-hidden="true">→</span>${tok(cargo.outAmt, cargo.toSym, { chain: chainLabel(cargo.toChain) || cargo.toChain })}`;
+  const tags = [
+    { obj: crate, pos: new THREE.Vector3(0, .9, 0), html: icon(cargo.fromSym, cargo.fromChain), cls: 'bare' },
+    { obj: seal, pos: new THREE.Vector3(-.15, .55, 0), html: 'Downgrade refused', cls: 'no hide' },
+    { obj: b, pos: new THREE.Vector3(0, 1.15, 0), html: orderChipHtml('jetty'), cls: 'order' },
+  ];
+  const paintOrder = (id) => {
+    const s = ORDER_STATES[id] || ORDER_STATES.jetty;
+    const el = tags[2].el;
+    if (el) { el.className = 'stag ' + (s.cls || 'order'); el.innerHTML = orderChipHtml(id); }
+    else tags[2].html = orderChipHtml(id);
+  };
+  const swapsTo = () => { if (tags[0].el) tags[0].el.innerHTML = icon(cargo.toSym, cargo.toChain); };
+  const applyPair = (p = {}) => {
+    const fromSym = p.fromSym || (p.from || '').split('@')[0] || cargo.fromSym;
+    const fromChain = p.fromChain || (p.from || '').split('@')[1] || cargo.fromChain;
+    const toSym = p.toSym || (p.to || '').split('@')[0] || cargo.toSym;
+    const toChain = p.toChain || (p.to || '').split('@')[1] || cargo.toChain;
+    cargo.fromSym = fromSym; cargo.fromChain = fromChain; cargo.toSym = toSym; cargo.toChain = toChain;
+    if (p.amt != null && p.amt !== '') cargo.amt = String(p.amt);
+    if (p.outAmt != null && p.outAmt !== '') cargo.outAmt = String(p.outAmt);
+    cargo.result = `Crossed · ${fromSym} → ${toSym}`;
+    if (tags[0].el) tags[0].el.innerHTML = icon(fromSym, fromChain);
+    else tags[0].html = icon(fromSym, fromChain);
+    const h = heroOf();
+    panel.hero = h;
+    ctx.setHero?.(h);
+    paintOrder(p.order || 'quoted');
+    return cargo;
+  };
   let t = 0;
+  const panel = { title: 'Ferry', src: 'quote', srcNote: 'A real mainnet price quote. Nothing is sent and nothing is spent.', label: LABEL, hero: heroOf(), action: 'Load the cargo' };
   return {
-    rob, scene, camera, tags,
-    panel: { title: 'Ferry', src: 'quote', srcNote: 'A real mainnet price quote. Nothing is sent and nothing is spent.', label: LABEL, hero: HERO, action: 'Load the cargo' },
+    rob, scene, camera, tags, applyPair, setOrder: paintOrder, cargo,
+    panel,
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },
     *act() {
+      paintOrder('loading');
       yield rob.walk([new THREE.Vector3(-2.45, 0, .55)]); rob.lookAt(crate.position); rob.play('Yes', { once: true }); yield wait(.4);
       sfx('send'); const c0 = crate.position.clone(), c1 = new THREE.Vector3(-.85, .36, .2);
       yield tween(.55, k => { crate.position.lerpVectors(c0, c1, k); crate.position.y += Math.sin(k * Math.PI) * .5; });
@@ -82,11 +123,12 @@ export default async function ferry(ctx) {
       const d0 = slip.position.clone(), d1 = new THREE.Vector3(-1.3, -.25, -.7);
       yield tween(.9, k => { slip.position.lerpVectors(d0, d1, k); slip.position.y = d0.y + (d1.y - d0.y) * k * k; slip.rotation.x = -k * 1.4; slip.material.opacity = 1 - k * .9; });
       slip.visible = false; yield wait(.3);
-      // the signed, shielded quote matches the request: the seal goes mint and the boat crosses
-      seal.material = sealOk; sfx('allowed'); sfx('water'); rob.play('Idle');
+      // the signed quote matches the request: the seal goes mint and the boat crosses with the visitor's pair
+      seal.material = sealOk; sfx('allowed'); sfx('water'); rob.play('Idle'); paintOrder('transit');
       yield tween(2.2, k => { b.position.x = -.85 + 1.7 * k; b.rotation.z = Math.sin(k * 12) * .03; }, easeInOut);
       swapsTo(); yield tween(.9, k => pool.forEach((m, i) => { m.material.opacity = .55 * Math.min(1, Math.max(0, k * 1.4 - i * .2)); }));
-      ctx.setResult('ok', RESULT); rob.play('ThumbsUp', { once: true }); yield wait(1.4); rob.play('Idle');
+      paintOrder('delivered');
+      ctx.setResult('ok', cargo.result); rob.play('ThumbsUp', { once: true }); yield wait(1.4); rob.play('Idle');
     },
     update(dt) { t += dt; rob.update(dt); b.position.y = -.02 + Math.sin(t * 1.6) * .015; pool.forEach((m, i) => { m.position.y += Math.sin(t * .9 + i) * .0008; }); },
   };

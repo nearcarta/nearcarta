@@ -16,6 +16,7 @@ import { ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './ha
 import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
 import { parseRouteFrom, tokenStack, tokenBadge } from './token-badge.js';
+import { parseAgentFerry, chainLabel } from './ferry-pair.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -134,7 +135,12 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const pickFrom = (state.fromId || '').split('|');
   const pickSym = pickFrom[0] || meta.sym;
   const pickChain = pickFrom[1] || meta.chain;
-  const dest = `<div class="ferry-dest" data-testid="ferry-dest">${tokenStack('ZEC', 'zec', { size: 24, chainSize: 12 })}<div><b>Shielded ZEC</b><small>Orchard-only UA · Ironwood pool · default destination</small></div></div>`;
+  const pickTo = (state.toId || 'ZEC|zec').split('|');
+  const toSym = pickTo[0] || 'ZEC';
+  const toChain = pickTo[1] || 'zec';
+  const destTitle = toSym === 'ZEC' ? 'Shielded ZEC' : `${toSym} on ${toChain}`;
+  const destNote = toSym === 'ZEC' ? 'Orchard-only UA · Ironwood pool · default destination' : 'Destination from the live 1Click list';
+  const dest = `<div class="ferry-dest" data-testid="ferry-dest">${tokenStack(toSym, toChain, { size: 24, chainSize: 12 })}<div><b>${esc(destTitle)}</b><small>${esc(destNote)}</small></div></div>`;
   const picker = `<div class="ferry-picker" data-testid="ferry-picker">
       <p class="ferry-picker-note" data-testid="ferry-token-count">${nTok ? `${nTok} live 1Click tokens · search any chain` : (state.tokensError ? 'Token list did not load. Shortcut corridors still work.' : 'Loading the live token list…')}</p>
       <label class="field">Find a token <input id="f-search" data-testid="ferry-search" value="${esc(state.tq || '')}" placeholder="USDC, ETH, near, base" autocomplete="off"></label>
@@ -142,8 +148,17 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       <label class="field">Pay with <select id="f-from" data-testid="ferry-from">${fromOpts || `<option value="${esc(rt.from.replace('@', '|'))}">${esc(meta.label)}</option>`}</select></label>
       <label class="field">Receive <select id="f-to" data-testid="ferry-to">${toOpts || '<option value="ZEC|zec">ZEC on zec</option>'}</select></label>
     </div>`;
+  const agent = `<div class="ferry-agent" data-testid="ferry-agent">
+      <p class="ferry-agent-label">Tell the ferryman</p>
+      <div class="ferry-agent-row">
+        <input id="f-agent" data-testid="ferry-agent-input" value="${esc(state.agentText || '')}" placeholder="Swap 3 USDC on Base to ZEC" autocomplete="off" aria-label="Ask the ferryman in plain words">
+        <button type="button" class="primary" id="f-agent-go" data-testid="ferry-agent-go">Ask</button>
+      </div>
+      <p class="ferry-agent-hint" data-testid="ferry-agent-hint">${esc(state.agentHint || 'Same caps as /setup. No wallet popup from this box — it only fills the pair and stamps a quote.')}</p>
+    </div>`;
   return `<div class="shop-stack">
-    <p class="ferry-kicker">In the city room the ferryman loads your cargo. Pick any live 1Click token below, or use a quick ZEC corridor. The charter checks the recipient, the cap and the daily budget before a deposit address is created.</p>
+    <p class="ferry-kicker">In the city room the ferryman loads your cargo. Pick any live 1Click token, use a quick corridor, or tell him in plain words. The charter checks the recipient, the cap and the daily budget before a deposit address is created.</p>
+    ${agent}
     ${picker}
     ${dest}
     <p class="ferry-shortcuts-label">Quick ZEC corridors</p>
@@ -157,6 +172,8 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
     <div id="f-quotes" class="ferry-quotes" data-testid="ferry-quotes">${quotes}${state.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : ''}</div>
     ${state.fstatus ? `<p data-testid="ferry-status">${esc(state.fstatus.words || state.fstatus.status)}</p><p data-testid="ferry-refund">${state.fstatus.refund ? 'Refunded to the refund address.' : 'A short deposit or a failed swap is refunded to the refund address. This page does not send the deposit.'}</p>` : `<p data-testid="ferry-idle">${state.quoted ? 'No deposit has been requested.' : 'No quote yet. No deposit has been requested.'}</p>`}</div>`;
 }
+
+
 
 async function quoteOne(route, amount, hooks) {
   if (hooks.quote) return hooks.quote(route.id, amount || route.amt);
@@ -227,7 +244,31 @@ function mountFerry(root, hooks) {
     if (compare) compare.onclick = () => runQuotes(compare);
     const one = q$(root, '#f-quote');
     if (one) one.onclick = () => runOne(one);
+    const agentIn = q$(root, '#f-agent');
+    if (agentIn) agentIn.oninput = (e) => { state.agentText = e.target.value; };
+    const agentGo = q$(root, '#f-agent-go');
+    if (agentGo) agentGo.onclick = () => runAgent(agentGo);
   };
+  async function runAgent(btn) {
+    const parsed = parseAgentFerry(state.agentText || q$(root, '#f-agent')?.value || '');
+    if (!parsed) {
+      state.agentHint = 'Try: Swap 3 USDC on Base to ZEC — or ETH@eth → NEAR@near';
+      paint();
+      return;
+    }
+    if (parsed.from.endsWith('@') || parsed.to.endsWith('@')) {
+      state.agentHint = 'Name the chain too, e.g. USDC@base or USDC on Base.';
+      paint();
+      return;
+    }
+    state.fromId = parsed.fromId;
+    state.toId = parsed.toId;
+    if (parsed.amt) { state.amt = parsed.amt; state.amtEdited = true; }
+    state.q = null;
+    state.agentHint = `Filled ${parsed.from} → ${parsed.to}. Stamping a live quote…`;
+    paint();
+    await runOne(q$(root, '#f-quote') || btn);
+  }
   async function ensureTokens() {
     if (state.choices?.length || state.tokensTried) return;
     state.tokensTried = true;
@@ -273,6 +314,18 @@ function mountFerry(root, hooks) {
     state.fstatus = null;
     state.quoted = true;
     state.q = q;
+    if (hooks.onPair) {
+      const [fs, fc] = String(state.fromId || from.replace('@', '|')).split('|');
+      const [ts, tc] = String(state.toId || to.replace('@', '|')).split('|');
+      hooks.onPair({
+        from, to, amt: state.amt || '1',
+        fromSym: fs || from.split('@')[0], fromChain: fc || from.split('@')[1],
+        toSym: ts || to.split('@')[0], toChain: tc || to.split('@')[1],
+        outAmt: q.to?.amount || q.amountOut || '',
+        order: 'quoted',
+      });
+    }
+    if (state.agentText) state.agentHint = 'Quote stamped. In the city room press Load the cargo.';
     paint();
   }
   async function runQuotes(btn) {

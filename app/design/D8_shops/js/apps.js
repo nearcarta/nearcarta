@@ -7,6 +7,7 @@ import { $, sfx } from './core.js';
 import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
+import { pairClauseId, isFerryClauseId, parsePairClauseId } from '/panels/ferry-pair.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -221,14 +222,19 @@ export async function buildCharter() {
 export function rulesNow() {
   const D = DEFAULT_RULES;
   const c = pay(), m = merchants();
-  const routes = ROUTES.filter(r => S.clauses[r.id]).map(r => r.id);
+  // Ferry clauses: preset corridors and any dynamic pair the visitor allowed (route.*).
+  const routes = Object.keys(S.clauses || {}).filter(isFerryClauseId);
+  const presets = ROUTES.filter(r => S.clauses[r.id]).map(r => r.id);
+  const list = routes.length ? routes : (c ? presets : ROUTES.slice(0, 2).map(r => r.id));
+  const first = list[0];
   return {
     receivers: c?.receivers || [m[0], m[1], S.me, TS.SPLIT.treasury, TS.SPLIT.agent].filter(Boolean),
     cap: c ? fromY(c.per_action_cap) : D.cap, budget: c ? fromY(c.daily_budget) : D.budget, count: c?.max_actions_per_day || D.count,
     min: c ? fromY(c.min_amount) : D.min, ws: c?.window_start_min || 0, we: c?.window_end_min || 0,
-    routes: c ? routes : ROUTES.slice(0, 2).map(r => r.id), ferryCap: S.clauses[routes[0]] ? fromY(S.clauses[routes[0]].per_action_cap) : D.ferryCap,
+    routes: list, ferryCap: first && S.clauses[first] ? fromY(S.clauses[first].per_action_cap) : D.ferryCap,
   };
 }
+export { pairClauseId, isFerryClauseId, parsePairClauseId };
 const clause = (r, receivers, cap) => ({ asset: 'Native', receivers, per_action_cap: toY(cap), daily_budget: toY(r.budget), window_start_min: r.ws, window_end_min: r.we,
   requires_receipt: false, escalation_max: null, min_amount: toY(r.min), max_actions_per_day: r.count });
 export async function signRules(r) {
@@ -237,9 +243,13 @@ export async function signRules(r) {
   if (!r.receivers.length) throw new Error('add at least one allowed recipient');
   const ferryCap = Math.max(r.ferryCap, r.cap + 0.001);
   const acts = [fc('set_clause', { clause_id: 'pay', clause: clause(r, r.receivers, r.cap) })];
-  for (const rt of ROUTES) {
-    if (r.routes.includes(rt.id)) acts.push(fc('set_clause', { clause_id: rt.id, clause: clause({ ...r, budget: Math.max(r.budget, ferryCap) }, [...new Set([...r.receivers, S.me])], ferryCap) }, 30));
-    else if (S.clauses[rt.id]) acts.push(fc('remove_clause', { clause_id: rt.id }, 20));
+  const wanted = new Set((r.routes || []).filter(Boolean));
+  // Allow any pair id (preset corridor or route.SYM-chain.SYM-chain), not only the 3 ZEC shortcuts.
+  for (const id of wanted) {
+    acts.push(fc('set_clause', { clause_id: id, clause: clause({ ...r, budget: Math.max(r.budget, ferryCap) }, [...new Set([...r.receivers, S.me])], ferryCap) }, 30));
+  }
+  for (const id of Object.keys(S.clauses || {})) {
+    if (isFerryClauseId(id) && !wanted.has(id)) acts.push(fc('remove_clause', { clause_id: id }, 20));
   }
   let secret = null;
   if (!S.agentLive && !pendingKey()) { secret = W.keyFrom().secretKey; acts.push(fc('set_agent_key', { public_key: W.keyFrom(secret).publicKey, allowance: (YN / 2n).toString() }, 60)); }
@@ -410,6 +420,14 @@ export async function quotePair(from, to, amount) {
 // (the first allowed payee that is not you; yourself only if the rule names nobody else). The charter checks it on chain.
 export const ferryNear = q => Math.max(0.001, Math.round(Number(q.from.usd) * 0.01 * 1000) / 1000);
 export const ferryPayee = route => { const r = S.clauses[route]?.receivers || []; return r.find(a => a !== S.me) || r[0] || S.me; };
+export function ferryClauseForPair(from, to) {
+  const id = pairClauseId(from, to);
+  // Prefer an exact clause; fall back to a matching preset corridor; else the first ferry clause.
+  if (S.clauses[id]) return id;
+  const preset = ROUTES.find(r => r.from === from);
+  if (preset && S.clauses[preset.id]) return preset.id;
+  return Object.keys(S.clauses || {}).find(isFerryClauseId) || id;
+}
 export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receiver: ferryPayee(route), amountY: toY(ferryNear(q)), memo: 'ferry:' + q.correlationId });
 // Hide routes whose dry quote failed in the server's last probe (/api/ferry/routes); keep at least one.
 export const routesReady = api('/api/ferry/routes').then(r => {

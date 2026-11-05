@@ -103,7 +103,7 @@ export async function makeRobot(scene) {
 
 // tokens and icons (D7 files; every amount gets its icon)
 const TOK = { NEAR: 'near', USDC: 'usdc', ETH: 'eth', BTC: 'btc', ZEC: 'zec' };
-const CHAIN = { Base: 'base', NEAR: 'near', 'Base': 'base', Zcash: 'zec' };
+const CHAIN = { Base: 'base', base: 'base', NEAR: 'near', near: 'near', Zcash: 'zec', zec: 'zec', Ethereum: 'eth', eth: 'eth', ethereum: 'eth', Arbitrum: 'arb', arb: 'arb', arbitrum: 'arb', Solana: 'sol', sol: 'sol', Polygon: 'polygon', polygon: 'polygon', Avalanche: 'avax', avax: 'avax', Optimism: 'optimism', optimism: 'optimism', BSC: 'bsc', bsc: 'bsc' };
 export function tok(amount, sym, { chain = null, cls = '' } = {}) {
   const f = sym === 'NEAR' ? null : TOK[sym]; const ic = sym === 'NEAR' ? `<span class="ti coin" aria-hidden="true">N</span>` : f ? `<img class="ti" src="${D7}assets/tokens/tokens/${f}.svg" alt="" width="20" height="20">` : `<span class="ti coin" aria-hidden="true">${sym.slice(0, 1)}</span>`;
   const ch = chain && chain !== 'NEAR' && CHAIN[chain] ? `<img class="ci" src="${D7}assets/tokens/chains/${CHAIN[chain]}.svg" alt="${chain}" title="on ${chain}" width="12" height="12">` : '';

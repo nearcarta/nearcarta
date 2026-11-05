@@ -14,6 +14,7 @@ import { DEED, controlAfterMove, metadataView, txUrl } from '/deed-control.js';
 import { teeResult, PROOF_HREF } from '/tee-view.js';
 import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
 import { mountShop } from '/panels/deep.js';
+import { pairClauseId, parseAgentFerry, chainLabel } from '/panels/ferry-pair.js';
 import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues, prepareRows } from './payouts.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
@@ -149,7 +150,7 @@ const APPS = {
     },
   },
   ferry: {
-    label: 'Ferry · cross-chain swap', idle: 'Pick a route. I\u2019ll fetch a live quote.',
+    label: 'Ferry · cross-chain swap', idle: 'Pick any live 1Click token, or tell the ferryman. I\u2019ll stamp a quote, then load the cargo in the room.',
     guest: true,
     form: () => '<div data-deep="ferry"></div>',
     bind: () => mountShop('ferry', document.getElementById('t-form'), {
@@ -159,24 +160,57 @@ const APPS = {
       quote: (id, amt) => A.quote(id, amt),
       quotePair: (from, to, amt) => A.quotePair(from, to, amt),
       repaint: () => paint(),
+      onPair: (pair) => { if (sh?.applyPair) sh.applyPair(pair); },
     }),
-    btn: () => extra.q ? 'Nothing is sent from here' : extra.fdone ? 'Get another quote' : 'Get quote',
-    hero: () => extra.q ? `<span class="tok"><b class="num">${esc(+Number(extra.q.to?.amount || extra.q.amountOut || 0).toFixed(5))}</b><span class="sym">${esc(extra.q.to?.symbol || 'ZEC')}</span></span>` : null,
+    btn: () => extra.acted ? 'Get another quote' : extra.q ? 'Load the cargo' : extra.fdone ? 'Get another quote' : 'Get quote',
+    hero: () => {
+      if (!extra.q) return null;
+      const q = extra.q;
+      const fromSym = q.from?.symbol || (extra.fromId || '').split('|')[0] || 'USDC';
+      const fromChain = chainLabel(q.from?.blockchain || q.from?.chain || (extra.fromId || '').split('|')[1] || 'base');
+      const toSym = q.to?.symbol || (extra.toId || 'ZEC|zec').split('|')[0] || 'ZEC';
+      const toChain = chainLabel(q.to?.blockchain || q.to?.chain || (extra.toId || 'ZEC|zec').split('|')[1] || 'zec');
+      const out = +Number(q.to?.amount || q.amountOut || 0);
+      const inn = +Number(q.from?.amount || extra.amt || 0);
+      return `<span class="tok"><b class="num">${esc(inn || extra.amt || '')}</b><span class="sym">${esc(fromSym)}</span></span><span class="arrow" aria-hidden="true">→</span><span class="tok"><b class="num">${esc(out ? out.toFixed(5) : '')}</b><span class="sym">${esc(toSym)}</span></span>`;
+    },
+    pairFromState: () => {
+      const fromId = extra.fromId || '';
+      const toId = extra.toId || 'ZEC|zec';
+      const [fs, fc] = fromId.split('|');
+      const [ts, tc] = toId.split('|');
+      const from = (fs && fc) ? `${fs}@${fc}` : (A.ROUTES[extra.ri || 0]?.from || 'USDC@base');
+      const to = (ts && tc) ? `${ts}@${tc}` : 'ZEC@zec';
+      const amt = extra.amt || A.ROUTES[extra.ri || 0]?.amt || '1';
+      return { from, to, amt, fromSym: from.split('@')[0], fromChain: from.split('@')[1], toSym: to.split('@')[0], toChain: to.split('@')[1] };
+    },
     run: async () => {
+      if (extra.acted) { extra.q = null; extra.acted = false; extra.fdone = true; sh?.setOrder?.('jetty'); }
       if (!extra.q) {
         extra.fdone = false;
-        const fromId = extra.fromId || '';
-        const toId = extra.toId || 'ZEC|zec';
-        const [fs, fc] = fromId.split('|');
-        const [ts, tc] = toId.split('|');
-        const from = (fs && fc) ? `${fs}@${fc}` : (A.ROUTES[extra.ri || 0]?.from);
-        const to = (ts && tc) ? `${ts}@${tc}` : 'ZEC@zec';
-        const amt = extra.amt || A.ROUTES[extra.ri || 0]?.amt || '1';
-        const q = await A.quotePair(from, to, amt);
+        const pair = APPS.ferry.pairFromState();
+        const q = await A.quotePair(pair.from, pair.to, pair.amt);
         if (!q.ok || !q.checks?.signature) throw new Error(q.error || 'quote not signed');
-        extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: 'This is a price. Nothing is sent from here. Load the cargo in the room to watch the crossing.', rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click price · ${esc(q.correlationId.slice(0, 8))}</span>` };
+        extra.q = q;
+        const outAmt = q.to?.amount || q.amountOut || '';
+        sh?.applyPair?.({ ...pair, outAmt, order: 'quoted' });
+        return {
+          keep: true, hero: APPS.ferry.hero(),
+          say: `Quote stamped for ${esc(pair.from)} → ${esc(pair.to)}. Nothing left your wallet. Press Load the cargo to watch the crossing in the room.`,
+          rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click · ${esc((q.correlationId || '').slice(0, 8))}</span><span class="rc" data-testid="ferry-clause">clause ${esc(A.ferryClauseForPair?.(pair.from, pair.to) || pairClauseId(pair.from, pair.to))}</span>`,
+        };
       }
-      return { keep: true, hero: APPS.ferry.hero(), say: 'This is a price. Nothing is sent from here. Load the cargo in the room to watch the crossing.', rc: '<a class="rc" href="/ferry-widget">Pay from any chain</a>' };
+      // Second beat: play the in-room cargo act with the live pair (not a hard-coded USDC→ZEC).
+      extra.acted = true;
+      const pair = APPS.ferry.pairFromState();
+      const outAmt = extra.q.to?.amount || extra.q.amountOut || '';
+      sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
+      if (sh?.act && runScene) runScene(sh.act());
+      return {
+        keep: true, hero: APPS.ferry.hero(),
+        say: `The ferryman loads ${esc(pair.fromSym)} and sails for ${esc(pair.toSym)}. Downgrade refused; signed quote crosses.`,
+        rc: `<span class="rc" data-testid="ferry-order-state">order · in room</span><a class="rc" href="/ferry-widget">Pay from any chain</a>`,
+      };
     },
   },
   bank: {
@@ -509,10 +543,38 @@ function openRules() {
       <label>Smallest payment<span class="sfx"><input id="r-min" type="number" step="0.001" min="0.001" value="${r.min}"><i>NEAR</i></span></label>
       <label>Open from (UTC)${hr('r-ws', r.ws)}</label><label>Until (UTC)${hr('r-we', r.we)}</label>
     </div>
-    <fieldset><legend>Ferry routes to ZEC</legend><div class="chips">${A.ROUTES.map(x => `<label><input type="checkbox" name="rt" value="${x.id}" ${r.routes.includes(x.id) ? 'checked' : ''}><span>${esc(x.label)}</span></label>`).join('')}</div>
+    <fieldset data-testid="ferry-rules"><legend>Ferry pairs (any live 1Click corridor)</legend>
+      <p class="note">Quick ZEC corridors, plus any other pair you allow. Cap still binds every trip under /setup.</p>
+      <div class="chips" data-testid="ferry-preset-routes">${A.ROUTES.map(x => `<label><input type="checkbox" name="rt" value="${x.id}" ${r.routes.includes(x.id) ? 'checked' : ''}><span>${esc(x.label)}</span></label>`).join('')}</div>
+      <div class="chips" id="r-extra-routes" data-testid="ferry-extra-routes">${r.routes.filter(id => !A.ROUTES.some(x => x.id === id)).map(id => `<label><input type="checkbox" name="rt" value="${esc(id)}" checked><span>${esc(id.replace(/^route\./, ''))}</span></label>`).join('')}</div>
+      <div class="ferry-add-pair" data-testid="ferry-add-pair">
+        <label>Allow another pair
+          <input id="r-from-pair" data-testid="ferry-rule-from" placeholder="USDC@base" autocomplete="off">
+          <span aria-hidden="true">→</span>
+          <input id="r-to-pair" data-testid="ferry-rule-to" placeholder="ZEC@zec" autocomplete="off">
+        </label>
+        <button type="button" class="link" id="r-add-pair" data-testid="ferry-rule-add">Allow pair</button>
+      </div>
       <label>Ferry max per trip<span class="sfx"><input id="r-fcap" type="number" step="0.01" min="0.002" value="${r.ferryCap}"><i>NEAR</i></span></label></fieldset>
     </details>`;
   $('#r-status').innerHTML = ''; $('#r-sign').disabled = false; $('#r-sign').textContent = A.S.clauses.pay ? 'Sign my new rules' : 'Use safe defaults';
+  const addPair = $('#r-add-pair');
+  if (addPair) addPair.onclick = () => {
+    const from = ($('#r-from-pair')?.value || '').trim();
+    const to = ($('#r-to-pair')?.value || '').trim() || 'ZEC@zec';
+    if (!from.includes('@')) { $('#r-status').innerHTML = '<span class="rule no">✕ Use symbol@chain, e.g. USDC@base</span>'; return; }
+    const id = pairClauseId(from, to);
+    const box = $('#r-extra-routes');
+    if (!box) return;
+    if ([...box.querySelectorAll('input[name=rt]')].some(i => i.value === id) || [...document.querySelectorAll('input[name=rt]')].some(i => i.value === id && i.checked)) {
+      $('#r-status').innerHTML = '<span class="rule ok">✓ Pair already allowed</span>'; return;
+    }
+    const lab = document.createElement('label');
+    lab.innerHTML = `<input type="checkbox" name="rt" value="${esc(id)}" checked><span>${esc(from)} → ${esc(to)}</span>`;
+    box.appendChild(lab);
+    $('#r-from-pair').value = ''; $('#r-to-pair').value = '';
+    $('#r-status').innerHTML = `<span class="rule ok">✓ Allowed ${esc(from)} → ${esc(to)}. Sign to write it on chain.</span>`;
+  };
   const d = $('#rules'); d.classList.add('open'); d.setAttribute('aria-hidden', 'false'); $('#r-sign').focus();
 }
 function closeRules() { const d = $('#rules'); d.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); }

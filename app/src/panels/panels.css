@@ -292,3 +292,16 @@ label.amt input{width:9rem;flex:0 0 9rem;min-width:0;box-sizing:border-box}
 .ferry-picker-note{margin:0;color:#d6b46a;font:600 12px/1.35 system-ui,sans-serif}
 .ferry-shortcuts-label{margin:2px 0 0;color:#e8d7b8;font:650 12px/1.2 system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase}
 .ferry-actions{gap:10px}
+
+/* Ferry agent chat (plain-words ask → fills picker + quote). Caps still from /setup. */
+.ferry-agent{display:grid;gap:8px;padding:12px;border:1px solid rgba(214,180,106,.45);border-radius:14px;background:linear-gradient(165deg,rgba(42,33,24,.92),rgba(26,20,16,.88))}
+.ferry-agent-label{margin:0;color:#f5d08a;font:700 13px/1.2 system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase}
+.ferry-agent-row{display:flex;gap:8px;align-items:stretch}
+.ferry-agent-row input{flex:1;min-width:0;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid #4a3a28;background:rgba(23,15,11,.72);color:#fff8ee;font:500 15px/1.2 system-ui,sans-serif}
+.ferry-agent-row button{flex:none}
+.ferry-agent-hint{margin:0;color:#d4c4a8;font:500 12px/1.4 system-ui,sans-serif}
+
+/* Rules sheet: add any 1Click pair beyond the 3 ZEC corridors */
+.ferry-add-pair{display:grid;gap:8px;margin-top:8px}
+.ferry-add-pair label{display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:#e8d7b8;font-weight:600}
+.ferry-add-pair input{min-height:40px;min-width:9rem;flex:1;padding:0 10px;border-radius:10px;border:1px solid #4a3a28;background:rgba(23,15,11,.72);color:#fff8ee}
