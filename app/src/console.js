@@ -1,4 +1,5 @@
 import { policyView } from './policy-view.js';
+import { FERRY_BUTTON, FERRY_PASS, PRIVACY, chronicleRowsFromMainnet, chronicleSummary } from './judges-data.js';
 // Live console: every value below is fetched from the Nearcarta API, which reads NEAR RPC,
 // 1Click (dry) and NEAR AI Cloud. Nothing here signs or spends; only the Your House tab asks your own wallet to sign.
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
@@ -31,6 +32,7 @@ const loaded = {};
 const loaders = { guardhouse, townhall, arena, toll, chronicle, house: () => import('/house.bundle.js').then(m => m.mountHouse()) };
 for (const b of document.querySelectorAll('#tabs button')) b.onclick = () => show(b.dataset.tab);
 function show(t) {
+  document.title = 'Nearcarta · for judges';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('on', s.id === t));
   history.replaceState(null, '', '#' + t);
@@ -100,9 +102,9 @@ form.onsubmit = async ev => {
     out.innerHTML = `<div class="card" data-testid="quote">
       <p><b>${esc(q.from.amount)} ${esc(q.from.symbol)}</b> on ${esc(q.from.chain)} → <b>${esc(q.to.amount)} ${esc(q.to.symbol)}</b> (min ${esc(q.to.min)} base units) · ETA ${esc(q.eta_s)} s · privacy <b>${esc(q.privacy)}</b></p>
       <table>
-      <tr><td>1Click signature (ed25519, manager key)</td><td>${mark(c.signature)}</td></tr>
-      <tr><td>Echo guard: every field we asked for came back unchanged (privacy level and fees are not signed)</td><td>${mark(c.echo.ok)} ${c.echo.diffs.map(d => esc(d.field)).join(', ')}</td></tr>
-      <tr><td>Dry: no deposit address, nothing can be sent</td><td>${mark(c.dry)}</td></tr>
+      <tr><td>${esc(FERRY_PASS[0].label)}</td><td>${mark(c.signature)}</td></tr>
+      <tr><td>${esc(FERRY_PASS[1].label)}</td><td>${mark(c.echo.ok)} ${c.echo.diffs.map(d => esc(d.field)).join(', ')}</td></tr>
+      <tr><td>${esc(FERRY_PASS[2].label)}</td><td>${mark(c.dry)}</td></tr>
       <tr><td>Protocol fee added by 1Click</td><td>${esc(c.echo.protocolFeeBps)} bps</td></tr>
       <tr><td>All-in cost from signed USD amounts</td><td>${esc(q.cost_bps_signed)} bps = ${(q.cost_bps_signed / 100).toFixed(2)}% (includes the destination withdrawal fee)${q.cost_bps_signed > 200 ? ' <b class="fail">fees eat ' + (q.cost_bps_signed / 100).toFixed(1) + '% of this amount; try about 30 USDC</b>' : ''}</td></tr>
       <tr><td>Verdict</td><td>${q.ok ? '<b class="pass" data-testid="verdict">ACCEPTED</b>' : '<b class="fail" data-testid="verdict">REJECTED</b>'}</td></tr>
@@ -178,15 +180,14 @@ async function toll() {
 
 async function chronicle() {
   const d = await get('/api/mainnet');
-  const rows = [
-    ['Board allowed', d.board.txs['allowed_0.001']],
-    ['Board refused, over cap', d.board.txs.refused_over_per_action_cap],
-    ['Board refused, off list', d.board.txs.refused_receiver_not_allowlisted],
-    ['Visitor allowed', d.board.visitor_run.txs['propose_allowed_0.001']],
-    ['Visitor refused, over cap', d.board.visitor_run.txs['propose_refused_0.01_over_per_action_cap']],
-  ];
-  $('#chronicle .out').innerHTML = `<div class="card" data-testid="chronicle"><table><tr><th>what</th><th>tx</th><th>result</th></tr>${rows.map(([w, h]) => `<tr><td>${esc(w)}</td><td>${tx(h)}</td><td>${/refused/.test(w) ? 'denied' : 'allowed'}</td></tr>`).join('')}</table>
-    <p class="note">Recorded mainnet propose results. Each link opens on nearblocks.io.</p></div>`;
+  const rows = chronicleRowsFromMainnet(d);
+  $('#chronicle .out').innerHTML = `<div class="card" data-testid="chronicle"><table><tr><th>what</th><th>tx</th><th>result</th></tr>${rows.map(r => `<tr><td>${esc(r.what)}</td><td>${tx(r.h)}</td><td>${esc(r.result)}</td></tr>`).join('')}</table>
+    <p class="note" data-testid="chronicle-summary">${esc(chronicleSummary(rows))}. Recorded mainnet propose results. Each link opens on nearblocks.io.</p></div>`;
 }
+
+const ferrySubmit = document.querySelector('#ferry-form button[type=submit]');
+if (ferrySubmit) ferrySubmit.textContent = FERRY_BUTTON;
+const privacy = document.querySelector('#ferry-form select[name=privacy]');
+if (privacy) privacy.innerHTML = PRIVACY.map(p => `<option value="${esc(p.value)}">${esc(p.label)}</option>`).join('');
 
 show((location.hash || '#ferry').slice(1));

@@ -44,9 +44,13 @@ test('chronicle search, filter, export and verify', () => {
   const page = queryFeed(RECORDED, { page: 2, pageSize: 2 });
   assert.equal(page.page, 2);
   assert.equal(page.rows.length, 2);
-  const v = verifyEntry(RECORDED[0]);
+  const pending = verifyEntry(RECORDED[0]);
+  assert.equal(pending.ok, false);
+  assert.equal(pending.pending, true);
+  const v = verifyEntry(RECORDED[0], { status: { SuccessValue: '' } });
   assert.equal(v.ok, true);
   assert.match(v.url, /8WDqBeaN/);
+  assert.equal(verifyEntry(RECORDED[0], { status: { Failure: {} } }).ok, false);
 });
 
 test('the toll key hashes to the recorded Base address', () => {

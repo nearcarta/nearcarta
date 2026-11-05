@@ -50,7 +50,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 397 backend unit tests (394 pass, 3 skipped), offline
+npm test                                   # 407 backend unit tests (404 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -67,7 +67,7 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
 | toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 12 |
-| backend unit (`npm test`) | 397 (394 pass, 3 skipped) |
+| backend unit (`npm test`) | 407 (404 pass, 3 skipped) |
 | browser e2e against the live site | 22 passed, 12 skipped. The skipped tests need a funded key |
 
 The 12 skipped e2e tests sign real transactions and need a funded wallet key or an opt-in flag (`GUARD_E2E`, `VAULT_E2E`, `VAULT_AI_E2E`, `HALL_FILE`, `HOUSE_*_KEY_FILE`, a partner key, or the arena attack switch); they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
@@ -174,7 +174,7 @@ The live path is a visitor's own row on `board.nearcarta.near`. A shared DAO is 
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 397 unit tests (394 pass, 3 skipped)
+npm test                 # 407 unit tests (404 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -197,7 +197,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 Earlier rehearsal notes are in [docs/archive/TESTNET_REHEARSAL.md](docs/archive/TESTNET_REHEARSAL.md). They are history. The town above is mainnet.
 
-# 397 unit tests (394 pass, 3 skipped):
+# 407 unit tests (404 pass, 3 skipped):
 Proof rows (76/76 expected).
 `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (12 tests, rustc 1.86).

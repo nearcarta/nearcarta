@@ -58,10 +58,10 @@
  {
   "id": "toll",
   "name": "Toll Bridge",
-  "role": "pay 0.01 and cross to Base",
+  "role": "pay 0.001 NEAR to pass",
   "x": 48.7,
   "y": 87.1,
-  "card": "Pay 0.01 NEAR from your own charter; the gate then gets the MPC network to sign a Base payout, and settles it with a foreign-tx proof."
+  "card": "Pay 0.001 NEAR from your own charter. The recorded chain-signature proof is a separate check. This pass does not send a foreign-chain payout."
  },
  {
   "id": "payouts",

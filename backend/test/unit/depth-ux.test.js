@@ -77,14 +77,15 @@ test('back to town sits above the title card', () => {
   assert.match(css, /min-width:\s*44px/);
   assert.match(read('app/design/D9_world/js/shops.js'), /roomError/);
   const town = read('app/design/D9_world/index.html');
-  assert.match(town, /aria-label="Sound on or off"/);
+  assert.match(town, /aria-label="Sound off"/);
+  assert.match(town, /aria-pressed="false"/);
   assert.match(town, /id="curfewHint"/);
   assert.match(read('app/shops/vault/main.js'), /Array\.isArray/);
-  assert.match(read('app/src/judges.html'), /title="71Zio28g/);
+  assert.match(read('app/src/judges-data.js'), /71Zio28g/);
 });
 
 test('the charter agent key is named as propose and propose_batch', () => {
-  for (const file of ['app/src/console.js', 'app/src/judges.html', 'app/design/D6_dashboards/src/shops/Guardhouse.jsx', 'README.md']) {
+  for (const file of ['app/src/console.js', 'app/src/judges-data.js', 'app/design/D6_dashboards/src/shops/Guardhouse.jsx', 'README.md']) {
     const text = read(file);
     assert.match(text, /propose/);
     assert.match(text, /propose_batch/);

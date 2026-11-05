@@ -12,6 +12,7 @@ import { beginEnter } from './room-lock.js';
 import { icon } from '../d7/js/d7.js';
 const $=s=>document.querySelector(s); const body=document.body; const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 window.__alog=[]; // audio event log (t in story seconds) for the offline video mix
+let storyT0=0; // set before boot: a character cue during the cast build must not touch this before it exists
 
 // ---------- fallback: no WebGL, or ?mode=2d ----------
 // index.html picks the 2D path before this module loads (so 2D never downloads three.js); this covers a failed WebGL init.
@@ -52,7 +53,6 @@ const R=CAST.robot; window.world={}; window.W=W; window.CAST=CAST;
 // shadows: captures and ?shadows=dynamic keep every caster live; the live page starts static (town shadows baked once) and upgrades once it holds ~50 fps
 const SHM=P.get('shadows'); setShadowMode(CAPTURE?SHM!=='static':SHM==='dynamic');
 gsap.ticker.remove(gsap.updateRoot); gsap.ticker.lagSmoothing(0);
-let storyT0=0;
 
 // ---------- camera director (GSAP-driven blends between shot functions) ----------
 const cam=W.camera; const D={ from:{p:V(),t:V(),f:30}, shot:null, k:1, cur:{p:V(26,22,26),t:V(0,0,0),f:30}, tw:null, shake:0 };
@@ -95,11 +95,12 @@ function* story(){
   const st=CAST.stranger, kn=CAST.knights, fm=CAST.ferryman, nb=CAST.wander[0];
   if(nb){ nb.hold=true; nb.stop(); const p=hx(-3,1); nb.place(p.x+.2,p.z-.75,0); }
   // 0–3 s: hook — the Lamplighter lifts its lantern and a lamp catches
-  R.place(-1.05,1.45,.9); R.lights=false; R.lanternColor('warm'); const L0=W.lamps.length?W.lamps.reduce((a,b)=>a.pos.distanceTo(R.pos)<b.pos.distanceTo(R.pos)?a:b, W.lamps[0]):null; if(!L0){ endStory(); return; }
-  R.lookAt(L0.pos.clone().setY(1.05),1); cut(SH.close(R,-1.15,2.2,.66,()=>R.pos.clone().lerp(L0.pos,.42).setY(.58)));
+  R.place(-1.05,1.45,.9); R.lights=false; R.lanternColor('warm'); const L0=W.lamps.length?W.lamps.reduce((a,b)=>a.pos.distanceTo(R.pos)<b.pos.distanceTo(R.pos)?a:b, W.lamps[0]):null;
+  if(!L0){ shot(SH.establish,2,'power2.inOut'); yield wait(1.5); }
+  else { R.lookAt(L0.pos.clone().setY(1.05),1); cut(SH.close(R,-1.15,2.2,.66,()=>R.pos.clone().lerp(L0.pos,.42).setY(.58)));
   yield wait(.9); lampState(L0,true,LAMPC.warm); sfx('lamp',{g:.6}); sfx('glass',{g:.2,rate:1.3}); R.play('thumbs',{rate:1.1});
   yield wait(1.4); SP.say(R,'Sundown. Lamps first.',{style:'think',dur:2.2});
-  yield wait(.7);
+  yield wait(.7); }
   // 3–7 s: pull back to the whole town at dusk
   R.lookAt(null); shot(SH.establish,3.6,'power2.inOut');
   const path=smooth([R.pos.clone(),hx(-2,1),hx(-3,1),hx(-4,1),V(-8.6,0,1.75),gateIn]); R.lights=true; R.maxSpeed=.78;
@@ -150,15 +151,17 @@ function endStory(){ if(mode!=='story') return; storyEnd=performance.now(); stor
 let frozen=false;
 function freeze(on,{silent=false}={}){ frozen=on; body.classList.toggle('frozen',on); gsap.to(W,{frz:on?1:0,duration:on?1.4:1.8,ease:'power2.out'}); if(!silent) sfx('freeze',{g:.8}); R.lanternColor(on?'ice':'warm'); if(!on){ R.release(); } }
 const fb=$('#curfewBtn'); fb.querySelector('.fi').appendChild(icon('freeze',{size:16}));
-(function holdBtn(){ let t0=0, raf=0; const tick=()=>{ const p=Math.min(1,(performance.now()-t0)/700); fb.style.setProperty('--p',(p*100).toFixed(0)+'%'); if(p>=1){ end(); if(mode==='story') endStory(); freeze(!frozen); fb.querySelector('.t').textContent=frozen?'Hold to lift curfew':'Hold for curfew'; if(frozen){ R.play('kneel'); } return; } raf=requestAnimationFrame(tick); };
+(function holdBtn(){ let t0=0, raf=0; const tick=()=>{ const p=Math.min(1,(performance.now()-t0)/700); const pct=(p*100).toFixed(0)+'%'; fb.style.setProperty('--p',pct); const fill=$('#curfewFill'); if(fill) fill.style.width=pct; if(p>=1){ end(); if(mode==='story') endStory(); freeze(!frozen); fb.querySelector('.t').textContent=frozen?'Hold to lift curfew':'Hold for curfew'; done(); if(frozen){ R.play('kneel'); } return; } raf=requestAnimationFrame(tick); };
+  const result=$('#curfewResult');
   const start=e=>{ if(e.type==='keydown'&&(e.repeat||!/^( |Enter)$/.test(e.key))) return; e.preventDefault(); t0=performance.now(); fb.dataset.holding=1; raf=requestAnimationFrame(tick); };
-  const end=()=>{ cancelAnimationFrame(raf); delete fb.dataset.holding; fb.style.setProperty('--p','0%'); };
+  const end=()=>{ cancelAnimationFrame(raf); delete fb.dataset.holding; if(fb.style.getPropertyValue('--p')!=='100%') fb.style.setProperty('--p','0%'); };
+  const done=()=>{ if(!result) return; result.hidden=false; result.textContent=frozen?'The agent is frozen':'The freeze is lifted'; };
   fb.addEventListener('pointerdown',start); fb.addEventListener('keydown',start); ['pointerup','pointerleave','pointercancel','keyup','blur'].forEach(v=>fb.addEventListener(v,end)); })();
 
 // ---------- sound button ----------
 const sb=$('#soundBtn'); const spk=on=>`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l5 4V6L7 10z"/>${on?'<path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>':'<path d="M17 10l4 4M21 10l-4 4"/>'}</svg>`;
-sb.innerHTML=spk(false); sb.setAttribute('aria-pressed','false');
-sb.addEventListener('click',async()=>{ if(!A.on){ await audioOn(); } else { A.on=false; A.ctx.suspend(); } sb.innerHTML=spk(A.on); sb.setAttribute('aria-pressed',String(A.on)); });
+sb.innerHTML=spk(false); sb.setAttribute('aria-pressed','false'); sb.setAttribute('aria-label','Sound off'); sb.title='Sound off';
+sb.addEventListener('click',async()=>{ if(!A.on){ await audioOn(); } else { A.on=false; A.ctx.suspend(); } sb.innerHTML=spk(A.on); sb.setAttribute('aria-pressed',String(A.on)); sb.setAttribute('aria-label',A.on?'Sound on':'Sound off'); sb.title=A.on?'Sound on':'Sound off'; });
 // ---------- sky button: the town turns day → dusk → night on its own; a click holds one time of day ----------
 const SKY=['auto','day','dusk','night'], SKYL={auto:'Time of day: changing (click to hold day)',day:'Time of day: day (click for dusk)',dusk:'Time of day: dusk (click for night)',night:'Time of day: night (click to let it change)'};
 const skyIc=m=>`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${m==='night'?'<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>':m==='dusk'?'<path d="M4 17h16M7 17a5 5 0 0 1 10 0M12 7v2M5.6 10.6l1.4 1.4M18.4 10.6 17 12"/>':m==='day'?'<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>':'<circle cx="9" cy="10" r="3.4"/><path d="M14.5 17.5a4.8 4.8 0 0 1-9-1.5M20 14a6 6 0 0 1-8-8 6 6 0 0 0 8 8z"/>'}</svg>`;
@@ -357,7 +360,7 @@ function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(
 // clamp .1 s (not .05): sim time, gsap and the door/fade beats all run on it, so a slow GPU keeps close to real time
 function frame(now){ if(stopped) return; const dt=Math.min(.1,(now-last)/1000); last=now; step(dt); draw();
   // auto low-power: if the first seconds run under ~24 fps, drop the post chain and shadows
-  if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<8&&!P.has('full')&&!P.has('3d')){ fallback(`3D too slow here (${(1/avg).toFixed(1)} fps)`); return; } if(1/avg<24&&!P.has('full')){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } else if(1/avg>50&&!SHM) setShadowMode(true); lpDone=true; } }
+  if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<8&&!P.has('full')&&!P.has('3d')&&!window.__gl?.soft){ fallback(`3D too slow here (${(1/avg).toFixed(1)} fps)`); return; } if(1/avg<24&&!P.has('full')){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } else if(1/avg>50&&!SHM) setShadowMode(true); lpDone=true; } }
   requestAnimationFrame(frame); }
 
 // first frame is the town; the story starts on it
@@ -388,12 +391,12 @@ world.toCharter=toCharter;
     $('#chron').hidden=false; $('#chron').dataset.live='1'; }catch(e){ console.warn('[Nearcarta] Chronicle feed unavailable',e?.message||e); } })();
 const startStory=!P.has('nostory') && !(P.has('explore')) && !P.has('shop');
 let introCtl=null;
-for(let i=0;i<3;i++) step(1/30);
+for(let i=0;i<12;i++) step(1/30);
 if(startStory){ try{ storyRun=run(story()); body.dataset.intro='camera'; }catch(e){ console.warn('[Nearcarta] story', e); introCtl=mountIntro(document, location.search); body.dataset.intro='flat'; } } else { { const c=hx(-1,1); R.place(c.x-.2,c.z+.3,2.4); R.lights=true; } mode='town'; idleTown(); D.k=1; if(P.has('explore')) explore(true); }
 step(1/30); draw();
 // never reveal a black canvas: sample the first frame; if the GPU gave us nothing, go 2D instead
 { const g=W.renderer.getContext(), px=new Uint8Array(4); let lit=0; for(const [fx,fy] of [[.5,.5],[.25,.4],[.75,.4],[.5,.2],[.3,.75],[.7,.75]]){ g.readPixels((g.drawingBufferWidth*fx)|0,(g.drawingBufferHeight*fy)|0,1,1,g.RGBA,g.UNSIGNED_BYTE,px); if(px[0]+px[1]+px[2]>24) lit++; }
-  if(!lit&&!CAPTURE){ console.error('[Nearcarta] first 3D frame came back black'); await fallback('blank first frame'); throw new Error('blank first frame'); } }
+  if(!lit&&!window.__gl?.soft&&!CAPTURE){ console.error('[Nearcarta] first 3D frame came back black'); await fallback('blank first frame'); throw new Error('blank first frame'); } }
 $('#loading').classList.add('done'); body.classList.add('ready');
 { const q=P.get('shop'); const id=q&&(ALIAS[q]||q); if(id&&OPEN[id]) setTimeoutSim(()=>jump(id),.4); }
 // warm every room while the town idles: each shop module and the room props it puts (D8 core caches both), one per idle slot,

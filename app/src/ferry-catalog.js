@@ -52,8 +52,29 @@ export function quoteView(q) {
   };
 }
 
+/** One comparable line: input token and amount, output token and amount, USD, fee, ETA. */
+export function quoteLine(q) {
+  const view = quoteView(q);
+  if (!view) return null;
+  const from = q.from || {};
+  const to = q.to || {};
+  const inn = [from.amount ?? view.amountIn, from.symbol || view.symbolIn, (from.chain || view.chainIn) ? `on ${from.chain || view.chainIn}` : ''].filter(Boolean).join(' ');
+  const out = [to.amount ?? view.amountOut, to.symbol || view.symbolOut, (to.chain || view.chainOut) ? `on ${to.chain || view.chainOut}` : ''].filter(Boolean).join(' ');
+  const usd = view.usd != null && view.usd !== '' ? `about $${view.usd}` : 'USD not quoted';
+  const fee = view.fee != null && view.fee !== '' ? `fee ${view.fee} bps` : 'fee not quoted';
+  const eta = view.eta != null && view.eta !== '' ? `about ${view.eta}s` : 'ETA not quoted';
+  return {
+    ...view,
+    amountIn: from.amount ?? view.amountIn ?? null,
+    symbolIn: from.symbol || view.symbolIn || '',
+    chainIn: from.chain || view.chainIn || '',
+    chainOut: to.chain || view.chainOut || '',
+    text: `${inn} → ${out} · ${usd} · ${fee} · ${eta}`,
+  };
+}
+
 export function compareRows(quotes) {
-  return (Array.isArray(quotes) ? quotes : []).map(quoteView).filter(Boolean);
+  return (Array.isArray(quotes) ? quotes : []).map(quoteLine).filter(Boolean);
 }
 
 /** The quote with the largest amount out is the best rate. Ties keep the first. */

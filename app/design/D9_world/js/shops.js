@@ -37,7 +37,7 @@ function dress(scene){ const k=skyCols(); const c=document.createElement('canvas
   const sea=new THREE.Mesh(new THREE.CircleGeometry(80,48),new THREE.MeshLambertMaterial({color:k.sea.clone().lerp(k.deep,.35)})); sea.rotation.x=-Math.PI/2; sea.position.y=y; sea.receiveShadow=true; scene.add(sea); scene.userData.dressed=true; }
 // shift the room right so the tray (bottom-left) never covers the subject on wide screens
 // desktop: room shifted right of the tray. Portrait: pulled back (fit) and lifted above the bottom tray.
-export function frame(c){ const a=innerWidth/innerHeight; c.aspect=a; const ox=innerWidth>900?-196:0, oy=a<1?Math.round(innerHeight*.13):0; c.setViewOffset(innerWidth,innerHeight,ox,oy,innerWidth,innerHeight); c.updateProjectionMatrix();
+export function frame(c){ const a=innerWidth/innerHeight; c.aspect=a; const ox=innerWidth>900?-260:0, oy=a<1?Math.round(innerHeight*.13):0; c.setViewOffset(innerWidth,innerHeight,ox,oy,innerWidth,innerHeight); c.updateProjectionMatrix();
   return a<1?Math.min(1.8,1+(1-a)*1.3):a<1.3?1.12:1; }
 // every room that is about rules offers the way to write your own: Your House is the Charter office
 const CTA={ house:"Set your agent's rules →", guard:'Write a rule like this for your agent →', arena:'Put your own charter in the arena →' };
@@ -51,7 +51,8 @@ export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; $('#t-title').t
   $('#d-title').textContent=(p.title||NAMES[sh.id]); $('#d-body').innerHTML=sh.proof+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>';
   sh.tags?.forEach(t=>{ if(t.html){ t.el=document.createElement('div'); t.el.className='stag '+(t.cls||''); t.el.innerHTML=t.html; $('#stags').appendChild(t.el); } }); frame(sh.camera);
   document.body.classList.toggle('apps',APP); $('#t-say').hidden=!APP; if(!APP) return;
-  b.hidden=false; b.disabled=true; if (!b.textContent.trim()) b.textContent='Opening…';
+  b.hidden=false; b.disabled=true; if (sh.id === 'payouts') { skeleton(sh.id); b.textContent = 'Prepare the batch'; }
+  else if (!b.textContent.trim()) b.textContent='Opening…';
   const go=()=>ui8().then(m=>{ if(L.sh?.id===sh.id) m.mount(sh.id,L.sh,g=>L.C8.run(g)); }).catch(e=>{ if(L.sh?.id!==sh.id) return; console.warn('[Nearcarta] shop app failed to load',e); b.disabled=false; b.textContent='Try again'; b.dataset.retry=sh.id; });
   go(); setTimeout(()=>{ if(L.sh?.id===sh.id&&b.disabled&&/^(Opening…|Sign in)$/.test(b.textContent.trim())){ b.textContent='Still opening this shop'; go(); } },2000); }
 export const rulesOpen=()=>!!ui&&$('#rules').classList.contains('open');

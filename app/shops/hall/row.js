@@ -79,6 +79,14 @@ export function callsFor(before, draft) {
   return calls;
 }
 
+/** preview opens the demo row. A real owner or the saved session never falls back to it. */
+export function rowOwner({ preview = false, owner = '', session = '' } = {}) {
+  if (preview) return { owner: PREVIEW_ROW.owner, demo: true };
+  const id = String(owner || session || '').trim();
+  if (!id || id === PREVIEW_ROW.owner) return { owner: null, demo: false };
+  return { owner: id, demo: false };
+}
+
 /** Apply a draft the way a later get_charter read would look. Nothing is sent. */
 export function readBack(draft) {
   return { ...draft, receivers: [...(draft.receivers || [])] };

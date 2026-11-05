@@ -187,7 +187,7 @@ export class Char{
     const pool=new THREE.Mesh(new THREE.CircleGeometry(.9,24),new THREE.MeshBasicMaterial({map:radial('#ffffff',.1),color:0xffc27a,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending})); pool.rotation.x=-Math.PI/2; pool.renderOrder=3; W.scene.add(pool);
     g.add(top,base,glass,ring,halo); W.scene.add(g); this.lantern={g,glass,halo,pool,pl,col:LAMPC.warm.clone(),goal:LAMPC.warm.clone(),vel:V(),off:V(),on:1}; return this; }
   lanternColor(name){ this.lantern.goal.copy(LAMPC[name]||LAMPC.warm); }
-  updLantern(dt){ const L=this.lantern; const hand=this.handL||this.head; hand.getWorldPosition(tv); tv.y-=.07;
+  updLantern(dt){ const L=this.lantern; const hand=this.handL||this.head||this.obj; hand.getWorldPosition(tv); tv.y-=.07;
     // spring pendulum: lags behind hand motion
     tv2.copy(tv).sub(L.g.position); L.vel.addScaledVector(tv2,dt*120).multiplyScalar(Math.max(0,1-dt*14)); L.g.position.addScaledVector(L.vel,dt); if(L.g.position.distanceTo(tv)>.12||!L.init){ L.g.position.copy(tv); L.init=1; }
     L.g.rotation.z=Math.max(-.5,Math.min(.5,-L.vel.x*.8)); L.g.rotation.x=Math.max(-.5,Math.min(.5,L.vel.z*.8));
@@ -203,8 +203,10 @@ export function smooth(pts){ let p=pts; for(let n=0;n<2;n++){ if(p.length<3) bre
 
 // ---------- cast ----------
 export const CAST={};
+function bodyOf(gltf){ if(gltf?.scene) return gltf; const g=new THREE.Group(); const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(.22,.55,4,8), new THREE.MeshStandardMaterial({color:0xd6b46a})); mesh.name='stand-in'; g.add(mesh); return {scene:g, animations:[]}; }
 export async function buildCast(){
-  const [robot,knight,hooded,barb,mage,rogue]=await Promise.all([P.has('rorig')?'../chars/RobotExpressive':'RobotExpressive','Knight','Rogue_Hooded','Barbarian','Mage','Rogue'].map(n=>load('chars9/'+n+'.glb').catch(()=>null)));
+  const loaded=await Promise.all([P.has('rorig')?'../chars/RobotExpressive':'RobotExpressive','Knight','Rogue_Hooded','Barbarian','Mage','Rogue'].map(n=>load('chars9/'+n+'.glb').catch(()=>null)));
+  const [robot,knight,hooded,barb,mage,rogue]=loaded.map(bodyOf);
   const R=CAST.robot=new Char(robot,{rig:'robot',scale:.135,name:'Lamplighter',voice:1.25,height:.7}); R.addLantern(); R.lights=true; R.immune=false;
   // the Lamplighter's palette: brass body instead of the stock yellow, so it reads as a lantern-bearer, not a toy
   R.root.traverse(m=>{ if(m.isMesh&&m.material){ m.material=m.material.clone(); const c=m.material.color; const hsl={}; c.getHSL(hsl); if(hsl.s>.4&&hsl.h>.08&&hsl.h<.2) c.set(0xd9a441); } });

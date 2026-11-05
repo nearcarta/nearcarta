@@ -10,7 +10,7 @@ export function teeResult(body, proofHref = PROOF_HREF) {
     proof: proofHref,
     model: body?.model || '',
     text: ok
-      ? 'Attested. The private AI check passed. The proof file is the recorded result.'
-      : 'Failed. The private AI check did not pass. The proof file is the last recorded result.',
+      ? 'Live check passed. The button asks NEAR AI now. The file tee-public.json is the recorded Oct 28 result.'
+      : 'Live check did not pass. The button asks NEAR AI now. The file tee-public.json is the recorded Oct 28 result.',
   };
 }
