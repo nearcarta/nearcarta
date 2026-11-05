@@ -32,7 +32,7 @@ export function guestWallet(rpc) {
   }
   return {
     manifest: { id: GUEST_ID, name: 'NEAR account', version: '1.0.0', type: 'injected', description: 'A NEAR account. Its key stays in this browser.',
-      icon: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#d6b46a"/><path d="M9 21V11h3l8 7v-7h3v10h-3l-8-7v7z" fill="#1f1a15"/></svg>'),
+      icon: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#00ec97"/><path d="M9 21V11h3l8 7v-7h3v10h-3l-8-7v7z" fill="#121a2e"/></svg>'),
       website: '', platform: {}, permissions: {},
       features: { signMessage: false, signTransaction: false, signAndSendTransaction: true, signAndSendTransactions: true, signInWithoutAddKey: true, verifyOwner: false, mainnet: true } },
     async signIn() { let g = saved(); if (!g) g = await createGuest(rpc); return [{ accountId: g.accountId, publicKey: keyFrom(g.secret).publicKey }]; },

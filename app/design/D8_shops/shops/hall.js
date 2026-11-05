@@ -45,11 +45,11 @@ export default async function hall(ctx) {
   // the cap dial: a brass-rimmed half dial, 0 to 0.30 NEAR; mint below the new cap, brass up to the old one, coral beyond
   const RNG = .30, face = paper(THREE, 512, 300, (x, w, h) => {
     const cx = w / 2, cy = h - 34, R = 210, ang = c => Math.PI + (c / RNG) * Math.PI;
-    x.fillStyle = '#1f1a15'; x.beginPath(); x.arc(cx, cy, R + 26, Math.PI, 0); x.lineTo(cx + R + 26, h); x.lineTo(cx - R - 26, h); x.fill();
-    x.strokeStyle = '#d6b46a'; x.lineWidth = 10; x.beginPath(); x.arc(cx, cy, R + 20, Math.PI, 0); x.stroke();
-    [[0, .15, '#00ec97'], [.15, .25, '#d6b46a'], [.25, .30, '#ff6b6b']].forEach(([a0, a1, c]) => { x.strokeStyle = c; x.lineWidth = 22; x.beginPath(); x.arc(cx, cy, R - 14, ang(a0) + .01, ang(a1) - .01); x.stroke(); });
-    for (let i = 0; i <= 30; i++) { const a = ang(i / 100), maj = i % 5 === 0, r0 = R - (maj ? 58 : 40); x.strokeStyle = maj ? '#f3ead8' : '#9c9182'; x.lineWidth = maj ? 5 : 2; x.beginPath(); x.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); x.lineTo(cx + Math.cos(a) * (R - 30), cy + Math.sin(a) * (R - 30)); x.stroke(); }
-    x.fillStyle = '#f3ead8'; x.font = '700 34px Inter, sans-serif'; x.textAlign = 'center'; [[.15, '0.15', -.38], [.25, '0.25', .2]].forEach(([c, t, off]) => { const a = ang(c) + off; x.fillText(t, cx + Math.cos(a) * (R - 96), cy + Math.sin(a) * (R - 96) + 12); }); // labels sit beside their tick, so the needle never covers them
+    x.fillStyle = '#121a2e'; x.beginPath(); x.arc(cx, cy, R + 26, Math.PI, 0); x.lineTo(cx + R + 26, h); x.lineTo(cx - R - 26, h); x.fill();
+    x.strokeStyle = '#00ec97'; x.lineWidth = 10; x.beginPath(); x.arc(cx, cy, R + 20, Math.PI, 0); x.stroke();
+    [[0, .15, '#00ec97'], [.15, .25, '#00ec97'], [.25, .30, '#ff6b6b']].forEach(([a0, a1, c]) => { x.strokeStyle = c; x.lineWidth = 22; x.beginPath(); x.arc(cx, cy, R - 14, ang(a0) + .01, ang(a1) - .01); x.stroke(); });
+    for (let i = 0; i <= 30; i++) { const a = ang(i / 100), maj = i % 5 === 0, r0 = R - (maj ? 58 : 40); x.strokeStyle = maj ? '#eef2ff' : '#9c9182'; x.lineWidth = maj ? 5 : 2; x.beginPath(); x.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); x.lineTo(cx + Math.cos(a) * (R - 30), cy + Math.sin(a) * (R - 30)); x.stroke(); }
+    x.fillStyle = '#eef2ff'; x.font = '700 34px Inter, sans-serif'; x.textAlign = 'center'; [[.15, '0.15', -.38], [.25, '0.25', .2]].forEach(([c, t, off]) => { const a = ang(c) + off; x.fillText(t, cx + Math.cos(a) * (R - 96), cy + Math.sin(a) * (R - 96) + 12); }); // labels sit beside their tick, so the needle never covers them
   });
   const dial = mesh(scene, new THREE.PlaneGeometry(1.1, 1.1 * 300 / 512), new THREE.MeshStandardMaterial({ map: face, roughness: .6 }), [0, 1.18, -1.615], { cast: false });
   const piv = new THREE.Group(); piv.position.set(0, 1.18 - (1.1 * 300 / 512) / 2 + 1.1 * 34 / 512, -1.6); scene.add(piv);

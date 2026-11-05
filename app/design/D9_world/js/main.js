@@ -281,8 +281,8 @@ cv.addEventListener('wheel',e=>{ if(mode==='story'||inShop) return; e.preventDef
   cv.addEventListener('touchstart',e=>{ if(e.touches.length===2&&mode!=='story'&&!inShop){ pz={d:dd(e.touches),z:PC.z}; down=null; } },{passive:true});
   cv.addEventListener('touchmove',e=>{ if(pz&&e.touches.length===2){ e.preventDefault(); setZoom(pz.z-Math.log(dd(e.touches)/pz.d)*.9); } },{passive:false});
   cv.addEventListener('touchend',e=>{ if(e.touches.length<2&&pz){ pz=null; down=null; } },{passive:true}); }
-const mk=new THREE.Mesh(new THREE.RingGeometry(.12,.17,24),new THREE.MeshBasicMaterial({color:0xf3ead8,transparent:true,opacity:0,depthWrite:false})); mk.rotation.x=-Math.PI/2; W.scene.add(mk);
-function marker(p,run){ mk.position.set(p.x,.03,p.z); mk.material.color.set(run?0xffc75c:0xf3ead8); mk.material.opacity=.9; mk.scale.setScalar(.6); gsap.to(mk.scale,{x:1.4,y:1.4,z:1.4,duration:.6}); gsap.to(mk.material,{opacity:0,duration:.9,delay:.2}); }
+const mk=new THREE.Mesh(new THREE.RingGeometry(.12,.17,24),new THREE.MeshBasicMaterial({color:0xeef2ff,transparent:true,opacity:0,depthWrite:false})); mk.rotation.x=-Math.PI/2; W.scene.add(mk);
+function marker(p,run){ mk.position.set(p.x,.03,p.z); mk.material.color.set(run?0xffc75c:0xeef2ff); mk.material.opacity=.9; mk.scale.setScalar(.6); gsap.to(mk.scale,{x:1.4,y:1.4,z:1.4,duration:.6}); gsap.to(mk.material,{opacity:0,duration:.9,delay:.2}); }
 addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sm.hidden) sm.hidden=true; else if(inShop&&SL.rulesOpen()) SL.closeRules(); else if(inShop&&SL.drawerOpen()) SL.drawer(false); else if(inShop) world.exitShop(); else if(mode==='story') endStory(); } });
 
 // ---------- the town keeps living after the story ----------
@@ -298,7 +298,7 @@ const DF=(()=>{ const g=new THREE.Group(); const glow=new THREE.Mesh(new THREE.P
   glow.position.set(0,.5,.045); glow.renderOrder=2; // in front of the frame box (front face z=-.005), behind the open leaf
   const doorFrame=new THREE.Mesh(new THREE.BoxGeometry(1.16,1.1,.05),new THREE.MeshLambertMaterial({color:0x3a2618})); doorFrame.position.set(0,.55,-.03);
   const hinge=new THREE.Group(); hinge.position.set(-.5,0,.03); const leaf=new THREE.Mesh(new THREE.BoxGeometry(1,1,.07),new THREE.MeshLambertMaterial({color:0x7a4a2a})); leaf.position.set(.5,.5,.035);
-  const knob=new THREE.Mesh(new THREE.SphereGeometry(.05,8,6),new THREE.MeshLambertMaterial({color:0xd6b46a,emissive:0x3a2a10})); knob.position.set(.86,.48,.09); hinge.add(leaf,knob); g.add(doorFrame,glow,hinge); g.visible=false; W.scene.add(g); return {g,glow,hinge}; })();
+  const knob=new THREE.Mesh(new THREE.SphereGeometry(.05,8,6),new THREE.MeshLambertMaterial({color:0x00ec97,emissive:0x3a2a10})); knob.position.set(.86,.48,.09); hinge.add(leaf,knob); g.add(doorFrame,glow,hinge); g.visible=false; W.scene.add(g); return {g,glow,hinge}; })();
 const dray=new THREE.Raycaster();
 function placeDoor(id){ const s=SHOPS[id], c=hx(s.q,s.r), st=hx(...s.door); const out=st.clone().sub(c).setY(0).normalize(); const h=(CAST.robot?.height||.6)*1.08, w=h*.62;
   const o=st.clone().setY(h*.45); dray.set(o,out.clone().negate()); dray.far=3; const hit=W.B[id]?dray.intersectObject(W.B[id],true)[0]:null;
@@ -407,7 +407,7 @@ let warmed=null; const warmGPU=()=>warmed||(warmed=(async()=>{ if(inShop) return
 window.__render=draw; window.__shopsLayer='d9'; setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE){ setTimeout(()=>warmGPU().then(warmRooms),300); } }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
 if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,SP,setSky,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
   // demo cursor driven on the sim clock (capture only)
-  const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#f3ead8" stroke="#17130f" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
+  const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#eef2ff" stroke="#0b1020" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);
   const cur={x:-100,y:-100}; const put=()=>{ dc.style.transform=`translate(${cur.x}px,${cur.y}px)`; };
   const elC=sel=>{ const r=document.querySelector(sel).getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; };
   const ring=()=>{ const i=dc.querySelector('i'); gsap.fromTo(i,{opacity:.9,scale:.4},{opacity:0,scale:1.4,duration:.45}); };

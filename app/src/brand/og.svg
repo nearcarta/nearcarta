@@ -1,18 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Nearcarta">
-  <rect width="1200" height="630" fill="#17130f"/>
-  <circle cx="980" cy="80" r="220" fill="#d6b46a" opacity=".08"/>
+  <rect width="1200" height="630" fill="#0b1020"/>
+  <circle cx="980" cy="80" r="220" fill="#00ec97" opacity=".08"/>
   <circle cx="140" cy="560" r="260" fill="#9085e9" opacity=".08"/>
   <g transform="translate(96 150) scale(5)">
     <rect width="64" height="64" rx="16" fill="#241c16"/>
     <path d="M8 48c7 6 15 9 24 9s17-3 24-9c-3 2-9 4-24 4S11 50 8 48z" fill="#3a2c22"/>
     <path d="M12 47 22 34l8 13H12z" fill="#a9853f"/>
     <path d="M24 47 34 26l10 21H24z" fill="#f3e6c8"/>
-    <path d="M40 47 50 33l8 14H40z" fill="#d6b46a"/>
-    <path d="M30 47h8v-6h-8v6z" fill="#17130f"/>
-    <path d="M34 26v-7" stroke="#f3ead8" stroke-width="2" stroke-linecap="round"/>
+    <path d="M40 47 50 33l8 14H40z" fill="#00ec97"/>
+    <path d="M30 47h8v-6h-8v6z" fill="#0b1020"/>
+    <path d="M34 26v-7" stroke="#eef2ff" stroke-width="2" stroke-linecap="round"/>
     <circle cx="34" cy="15" r="2.6" fill="#ffc56e"/>
     <circle cx="34" cy="15" r="6.5" fill="#ffc56e" opacity=".28"/>
   </g>
-  <text x="460" y="280" fill="#f3ead8" font-family="Georgia, serif" font-size="92">Nearcarta</text>
-  <text x="464" y="360" fill="#d6b46a" font-family="Georgia, serif" font-size="36">The agent proposes. The charter decides.</text>
+  <text x="460" y="280" fill="#eef2ff" font-family="Georgia, serif" font-size="92">Nearcarta</text>
+  <text x="464" y="360" fill="#00ec97" font-family="Georgia, serif" font-size="36">The agent proposes. The charter decides.</text>
 </svg>

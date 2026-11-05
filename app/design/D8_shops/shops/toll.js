@@ -20,7 +20,7 @@ export default async function toll() {
   const bx = 1.2, bz = .3;
   mesh(scene, new THREE.BoxGeometry(.14, .7, .14), PM.dark, [bx, .35, bz - .62]); mesh(scene, new THREE.BoxGeometry(.18, .06, .18), brassM(), [bx, .72, bz - .62]);
   const boom = new THREE.Group(); boom.position.set(bx, .62, bz - .62); scene.add(boom);
-  for (let i = 0; i < 6; i++) { const seg = new THREE.Mesh(new THREE.BoxGeometry(.06, .06, .22), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xf3ead8 : 0xa8644a, roughness: .8 })); seg.position.z = .14 + i * .22; seg.castShadow = true; boom.add(seg); }
+  for (let i = 0; i < 6; i++) { const seg = new THREE.Mesh(new THREE.BoxGeometry(.06, .06, .22), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xeef2ff : 0xa8644a, roughness: .8 })); seg.position.z = .14 + i * .22; seg.castShadow = true; boom.add(seg); }
   const lit = new THREE.MeshStandardMaterial({ color: C.ok, emissive: C.ok, emissiveIntensity: .9, roughness: .4 });
   const stones = 6;
   for (let i = 0; i < stones; i++) { const a = Math.PI * .55 + (i / (stones - 1)) * Math.PI * .9, r = .95; mesh(scene, new THREE.CylinderGeometry(.06, .075, .16, 6), lit, [bx - .15 + Math.cos(a) * r, .08, bz + Math.sin(a) * r]); }

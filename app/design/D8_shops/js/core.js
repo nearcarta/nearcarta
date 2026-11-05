@@ -57,7 +57,7 @@ export function radial(c) { const cv = document.createElement('canvas'); cv.widt
 
 // colour roles (PRINCIPLES.md §2). The scene uses these too.
 // Values are read at boot from the D8 role variables in styles.css, which point at the D7 tokens (design/D7_system/tokens/tokens.css).
-export const C = { base: 0x17130f, raised: 0x1f1a15, line: 0x3a3128, text: 0xf3ead8, muted: 0x9c9182, accent: 0xd6b46a, ok: 0x00ec97, no: 0xff6b6b, ice: 0xa8d8ff };
+export const C = { base: 0x0b1020, raised: 0x121a2e, line: 0x7f93c4, text: 0xeef2ff, muted: 0x9c9182, accent: 0x00ec97, ok: 0x00ec97, no: 0xff6b6b, ice: 0xa8d8ff };
 export const CSS = {};
 export function readTokens() { const cs = getComputedStyle(document.documentElement); const probe = document.createElement('i'); document.body.appendChild(probe);
   for (const k of Object.keys(C)) { const raw = cs.getPropertyValue('--' + k).trim(); if (!raw) continue; probe.style.color = raw; const m = getComputedStyle(probe).color.match(/[\d.]+/g); if (!m) continue; const [r, g, b] = m.map(Number); C[k] = (r << 16) | (g << 8) | b; CSS[k] = '#' + C[k].toString(16).padStart(6, '0'); }
