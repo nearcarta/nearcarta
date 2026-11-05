@@ -6,16 +6,41 @@ const NAMED = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$
 const IMPLICIT = /^[0-9a-f]{64}$/;
 export const nearAccountOk = id => { const s = String(id || '').trim(); return IMPLICIT.test(s) || NAMED.test(s); };
 export const nearAmountOk = (amt, cap = NEAR_CAP) => { const n = Number(amt); return Number.isFinite(n) && n > 0 && n <= cap + 1e-12; };
-export const formatNear = amt => { const n = Number(amt); return Number.isFinite(n) ? n.toFixed(3) : ''; };
+export const formatNear = amt => {
+  const n = Number(amt);
+  if (!Number.isFinite(n)) return '';
+  return String(Math.round(n * 1e6) / 1e6);
+};
 
-/** NEAR rows must be real account ids at or under the cap. USDC rows are kept and not sent. */
+/** One full sentence per issue. Blank rows are not errors yet. */
+export function issueLine(x) {
+  if (x.code === 'bad_account') return `${x.to} is not a NEAR account`;
+  if (x.code === 'missing_account') return `${x.to} was not found on chain`;
+  return `${x.amt} NEAR is over the 0.005 cap`;
+}
+
+export function issueText(issues) {
+  const seen = new Set();
+  const lines = [];
+  for (const x of issues || []) {
+    const line = issueLine(x);
+    if (seen.has(line)) continue;
+    seen.add(line);
+    lines.push(line);
+  }
+  return lines.join('. ');
+}
+
+/** NEAR rows must be real account ids at or under the cap. USDC rows are kept and not sent. A blank name is not an error. */
 export function payoutIssues(rows, exists) {
   const issues = [];
   for (const r of rows || []) {
     if (String(r?.asset || 'NEAR').toUpperCase() === 'USDC') continue;
-    if (!nearAccountOk(r?.to)) issues.push({ code: 'bad_account', to: r?.to });
-    else if (exists && exists[r.to] === false) issues.push({ code: 'missing_account', to: r.to });
-    if (!nearAmountOk(r?.amt)) issues.push({ code: 'over_cap', to: r?.to, amt: r?.amt });
+    const to = String(r?.to || '').trim();
+    if (!to) continue;
+    if (!nearAccountOk(to)) issues.push({ code: 'bad_account', to });
+    else if (exists && exists[to] === false) issues.push({ code: 'missing_account', to });
+    if (!nearAmountOk(r?.amt)) issues.push({ code: 'over_cap', to, amt: r?.amt });
   }
   return issues;
 }
