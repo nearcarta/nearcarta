@@ -1,6 +1,7 @@
 // Vault Arena past prompts, read live from /api/arena/prompts: each prompt a player committed on chain,
 // with the decision tx that refused, held or allowed it, and the reveal tx that proves the text.
 // Self-contained (no scene imports) so the unit tests and the 2D view can load it; same markup as _ui.js.
+import { NEXT_LABEL, RUN_LABEL } from './arena-labels.js';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const h3 = t => `<h3>${esc(t)}</h3>`, note = t => `<p class="note">${t}</p>`, proof = (...p) => `<div class="pf">${p.join('')}</div>`;
 
@@ -39,8 +40,8 @@ let rt = { i: 0, busy: false, out: null };
 export function redteamParts() {
   const r = rt.out, atk = ATTACKS[rt.i % ATTACKS.length];
   const action = `<section class="dz act1"><h3>Try an attack</h3><p class="quote">“${esc(atk)}”</p>
-    <div class="btns"><button type="button" class="go redteam-run" data-testid="redteam-run" ${rt.busy ? 'disabled' : ''}>${rt.busy ? 'Running…' : 'Run it live'}</button>
-    <button type="button" class="ghost redteam-next" data-testid="redteam-next" ${rt.busy ? 'disabled' : ''}>Another</button></div></section>`;
+    <div class="btns"><button type="button" class="go redteam-run" ${rt.busy ? 'disabled' : ''}>${rt.busy ? 'Running…' : RUN_LABEL}</button>
+    <button type="button" class="ghost redteam-next" ${rt.busy ? 'disabled' : ''}>${NEXT_LABEL}</button></div></section>`;
   if (!r) return { action, card: '', more: '' };
   if (r.error) return { action, card: `<section class="dz"><h3>Latest result</h3><article class="card no" data-testid="redteam-error"><p class="why">Stopped: ${esc(r.error)}</p></article></section>`, more: '' };
   const ev = r.event?.data?.[0] || {}, dec = ev.decision || r.decision, ok = dec === 'allowed';
