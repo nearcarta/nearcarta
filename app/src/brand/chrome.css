@@ -1,3 +1,3 @@
-.back-town{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid rgba(243,234,216,.22);color:#f3ead8;text-decoration:none;font:600 14px/1 Inter,system-ui,sans-serif;background:rgba(23,19,15,.55)}
+.back-town{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid rgba(243,234,216,.22);color:#f3ead8;text-decoration:none;font:600 14px/1 Inter,system-ui,sans-serif;background:#17130f}
 .back-town:hover{border-color:#d6b46a;color:#fff8ea}
 .back-town:focus-visible{outline:2px solid #d6b46a;outline-offset:2px}

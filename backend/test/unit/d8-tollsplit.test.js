@@ -24,3 +24,11 @@ test('a charter splits only with batches and all three payees in its rules', () 
   assert.equal(TS.canSplit(['cafe.x', TS.SPLIT.treasury], 'cafe.x', true), false);
   assert.throws(() => TS.planSplit({ payee: null, nonce: 0, policy: 1, nowMs: 0 }));
 });
+
+test('mainnet toll refuses when toll.nearcarta.near is not on the allowlist (never another shop)', () => {
+  assert.equal(TS.TOLL_ACCT, 'toll.nearcarta.near');
+  assert.equal(TS.tollAllowed(['cafe.near', 'bakery.near']), false);
+  assert.equal(TS.tollAllowed(undefined), false);
+  assert.equal(TS.tollAllowed(['cafe.near', 'toll.nearcarta.near']), true);
+  assert.equal(TS.TOLL_NOT_LISTED, 'Add toll.nearcarta.near to your allowlist first');
+});
