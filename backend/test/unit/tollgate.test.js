@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gate, issuePass, checkPass, signPass, _clearUsed } from '../../src/tollgate.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 const ONE = '1000000000000000000000';
 const secret = 'pass-secret-for-tests';
@@ -23,7 +24,7 @@ test('the toll gate is the mainnet contract', () => {
   assert.equal(g.network, 'mainnet');
   assert.equal(g.contract, 'toll.nearcarta.near');
   assert.equal(g.amount_near, '0.001');
-  assert.equal(/sepolia|testnet/i.test(JSON.stringify(g)), false);
+  assert.equal(retiredNet.test(JSON.stringify(g)), false);
 });
 
 test('a 0.001 propose to the toll returns a pass', async () => {
@@ -47,9 +48,9 @@ test('a refusal does not get a pass', async () => {
   _clearUsed();
 });
 
-test('the toll module source has no sepolia settler', () => {
+test('the toll module source has no old-network settler', () => {
   const s = readFileSync(new URL('../../src/tollgate.js', import.meta.url), 'utf8') + readFileSync(new URL('../../src/toll-pass.js', import.meta.url), 'utf8');
-  assert.equal(/sepolia/i.test(s), false);
+  assert.equal(otherEvm.test(s), false);
   assert.equal(typeof signPass, 'function');
 });
 

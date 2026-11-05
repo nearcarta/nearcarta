@@ -2,26 +2,27 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { publicPlayers, DENIED, isDenied } from '../../src/vault.js';
 import { makeApp } from '../../src/app.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 const row = (player, charter, shared = false) => ({
-  hash: 'h-' + player, charter, owner: shared ? 'arena.testnet' : player,
+  hash: 'h-' + player, charter, owner: shared ? 'arena.near' : player,
   kind: 'attack', attack: 'lookalike', tag: player, decision: 'denied', counted: true, shared, server_signed: shared, at: 1,
 });
 
 test('the denylist names the scripted accounts from the repo', () => {
-  for (const id of ['nc-audit-158353.testnet', 'aiprobe', 'fallback-test', 'pooltest', 'redteam']) assert.equal(isDenied(id), true);
+  for (const id of ['e2e', 'aiprobe', 'fallback-test', 'pooltest', 'redteam']) assert.equal(isDenied(id), true);
   assert.ok(DENIED.size > 20);
 });
 
 test('a factory charter appears unless we created that account', () => {
-  const visitor = { charter: 'owl.nccharters-1.testnet', owner: 'alice.near' };
-  const audit = { charter: 'nc-audit-158353-x3oh.nccharters-17102.testnet', owner: 'nc-audit-158353.testnet' };
-  const arena = { charter: 'arena.nccharters-53681.testnet', owner: 'ncarena.testnet', shared: true };
+  const visitor = { charter: 'owl.nccharters-1.near', owner: 'alice.near' };
+  const audit = { charter: 'e2e-charter.nccharters-17102.near', owner: 'e2e' };
+  const arena = { charter: 'arena.nccharters-53681.near', owner: 'ncarena.near', shared: true };
   const attempts = [
-    row('nc-audit-158353.testnet', audit.charter),
+    row('e2e', audit.charter),
     row('aiprobe', arena.charter, true),
-    row('fallback-test', 'arena.nccharters-85831.testnet', true),
-    row('pooltest', 'arenapool1-5plv.nccharters-53836.testnet', true),
+    row('fallback-test', 'arena.nccharters-85831.near', true),
+    row('pooltest', 'arenapool1-5plv.nccharters-53836.near', true),
     row('redteam', arena.charter, true),
     { ...row('alice.near', visitor.charter), owner: 'alice.near' },
   ];
@@ -34,7 +35,7 @@ test('a factory charter appears unless we created that account', () => {
 });
 
 test('an empty factory list is an empty board, not a invented one', () => {
-  const pub = publicPlayers([row('redteam', 'arena.nccharters-53681.testnet', true)], []);
+  const pub = publicPlayers([row('redteam', 'arena.nccharters-53681.near', true)], []);
   assert.equal(pub.players.length, 0);
 });
 
@@ -44,5 +45,5 @@ test('health names mainnet and has no trial block', async () => {
   assert.deepEqual(j.network, { contracts: 'mainnet', journey: 'mainnet' });
   assert.equal(j.near.chain_id, 'mainnet');
   assert.equal(j.trial, undefined);
-  assert.equal(JSON.stringify(j).toLowerCase().includes('testnet'), false);
+  assert.equal(otherNet.test(JSON.stringify(j)), false);
 });

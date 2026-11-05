@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { b58hex, validDepositAddress } from '../../src/ferry.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 test('b58hex decodes a 32-byte hash', () => {
   assert.equal(b58hex('11111111111111111111111111111111'), '0'.repeat(64));
@@ -13,5 +14,5 @@ test('deposit address validation', () => {
 });
 test('ferry source does not describe a sandbox', () => {
   const s = readFileSync(new URL('../../src/ferry.js', import.meta.url), 'utf8');
-  assert.equal(/testnet|stand-in|tidepool/i.test(s), false);
+  assert.equal(new RegExp(otherNet.source + '|stand-in|tidepool', 'i').test(s), false);
 });

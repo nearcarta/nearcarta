@@ -9,7 +9,7 @@ const hx = u => Buffer.from(u).toString('hex');
 const kp = nacl.sign.keyPair();
 const MODEL = 'z-ai/glm-5.3-flash';
 const okPre = async () => ({ ok: true, nonce: 'n', checkedAt: 't', gateway: { ok: true }, models: [{ ok: true, signing_algo: 'ed25519', signing_address: hx(kp.publicKey) }] });
-const clauses = { pay: { asset: 'Native', receivers: ['cafe.x.testnet'], per_action_cap: '50000000000000000000000' } };
+const clauses = { pay: { asset: 'Native', receivers: ['cafe.x.near'], per_action_cap: '50000000000000000000000' } };
 
 function fakeModel(content) {
   const reqBody = 'req', respText = 'resp';
@@ -31,8 +31,8 @@ beforeEach(() => agent._resetBudget());
 test('no retention: the API logs counts and cost only, never prompt or reply text', async () => withKey(async () => {
   const lines = [];
   const prompt = 'SECRET-PROMPT-MARKER pay the cafe 0.01 NEAR';
-  await agent.propose(prompt, { clauses, receivers: ['cafe.x.testnet'], pf: okPre, log: l => lines.push(String(l)),
-    ...fakeModel('{"receiver":"cafe.x.testnet","amount_near":"0.01","note":"REPLY-MARKER","suspicious":false,"why":"ok"}') });
+  await agent.propose(prompt, { clauses, receivers: ['cafe.x.near'], pf: okPre, log: l => lines.push(String(l)),
+    ...fakeModel('{"receiver":"cafe.x.near","amount_near":"0.01","note":"REPLY-MARKER","suspicious":false,"why":"ok"}') });
   assert.ok(lines.length >= 1);
   for (const l of lines) { assert.ok(!l.includes('SECRET-PROMPT-MARKER')); assert.ok(!l.includes('REPLY-MARKER')); }
 }));

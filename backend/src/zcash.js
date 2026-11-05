@@ -51,7 +51,7 @@ export function decodeUnifiedAddress(ua) {
     receivers.push(TYPES[t] || `unknown_${t}`); i += n;
     if (i > body.length) throw new Error('truncated UA');
   }
-  return { network: prefix === 'u' ? 'mainnet' : 'testnet', receivers };
+  return { network: prefix === 'u' ? 'mainnet' : 'other', receivers };
 }
 
 // Classify a Zcash recipient for the privacy check shown in the Ferry.

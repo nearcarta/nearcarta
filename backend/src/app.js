@@ -94,7 +94,7 @@ export async function deepHealth() {
       routes[name] = { ok: v != null, ms: Date.now() - t0 };
     } catch (e) { routes[name] = { ok: false, ms: Date.now() - t0, error: String(e.message).slice(0, 160) }; }
   }));
-  const value = { routes_ok: Object.values(routes).every(r => r.ok), routes, rpc: { ...rpcStats, primary: cfg.mainnetRpc, fallback_urls: cfg.rpcFallbacks.filter(u => !/testnet/i.test(u)) } };
+  const value = { routes_ok: Object.values(routes).every(r => r.ok), routes, rpc: { ...rpcStats, primary: cfg.mainnetRpc, fallback_urls: cfg.rpcFallbacks } };
   deepCache = { at: Date.now(), value };
   return value;
 }
@@ -138,7 +138,7 @@ export async function ledgerRead() {
     return { ...buildLedger({ chronicle: merged, toll, board: mainnetChronicle(), budget: agentMod.budgetStatus() }), charters: { live, history } };
 }
 const ledgerSwr = swr('ledger', ledgerRead, { ttl: 15_000, stale: 30 * 60_000 });
-// Seed only a mainnet ledger snapshot. A testnet feed-snapshots.json ledger is ignored.
+// Seed the ledger cache only from a mainnet snapshot.
 export const seedSwr = (name, v, at = Date.now()) => { if (v != null && !swrs.get(name)?.v) swrs.set(name, { v, at }); };
 { const snap = shops.ledgerSnapshot(); if (snap?.ledger?.network === 'mainnet') seedSwr('ledger', { ...snap.ledger, stale: true, snapshot_at: snap.at }, Date.now() - 15_001); }
 
@@ -396,17 +396,7 @@ export function makeApp() {
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
-  app.get('/api/chronicle', limiter(120), edgeCache(15), async c => {
-    if (c.req.query('net') !== 'testnet') return c.json(mainnetChronicle(c.req.query('owner') || ''));
-    const oath = DEP.guardhouse?.oath;
-    if (!oath) return c.json(mainnetChronicle(c.req.query('owner') || ''));
-    const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
-    try { return c.json(shops.hideRetired(await shops.chronicle(oath, limit))); }
-    catch (e) {
-      if (e.status || !/busy|http (429|5\d\d)|timeout|aborted|fetch failed/i.test(e.message)) throw e;
-      c.header('Retry-After', '10'); return c.json({ account: oath, count: 0, txs: [], busy: true, source: 'tx index busy; try again in 10 s' });
-    }
-  });
+  app.get('/api/chronicle', limiter(120), edgeCache(15), async c => c.json(mainnetChronicle(c.req.query('owner') || '')));
   app.get('/api/chronicle/:account', limiter(120), edgeCache(15), async c => {
     const a = c.req.param('account');
     // Visitor charters made by the vault factory count too (B13 "What happened" feed): the id must sit under the

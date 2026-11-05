@@ -17,10 +17,8 @@ import { DEP, has } from './config.js';
 import { postQuote, checkQuote } from './ferry.js';
 import { txStatus, txResult, eventsFromOutcome, explorerTx } from './near.js';
 
-// Mainnet Zcash explorer. ZEC_TESTNET_API is accepted only as an explicit override (no testnet default).
-export const ZEC_API = process.env.ZEC_API || process.env.ZEC_TESTNET_API || 'https://api.mainnet.cipherscan.app';
-/** @deprecated use ZEC_API */
-export const ZEC_TESTNET_API = ZEC_API;
+// Mainnet Zcash explorer.
+export const ZEC_API = process.env.ZEC_API || 'https://api.mainnet.cipherscan.app';
 const UA = { 'User-Agent': 'nearcarta-mistbank/0.1' };
 
 export const commitment = (zats, salt) => createHash('sha256').update(`mistbank:v1:${zats}:${salt}`).digest('hex');
@@ -132,11 +130,17 @@ export async function oathCheck(p) {
     memo_on_chain: args.includes(memo) || blob.includes(memo) };
 }
 
+function mistbankMainnet(p) {
+  const n = p.network;
+  if (n === 'mainnet') return true;
+  return !!n && typeof n === 'object' && n.near === 'mainnet' && n.zcash === 'mainnet';
+}
+
 let cache = { at: 0, v: null };
 export async function mistbank({ fresh = false } = {}) {
   if (!fresh && cache.v && Date.now() - cache.at < 60e3) return cache.v;
   const p = proof();
-  if (!p || /testnet/i.test(JSON.stringify(p.network || ''))) return { built: false, network: 'mainnet', note: 'A Mist Bank payment is a board propose of at most 0.005 NEAR. POST /api/mistbank/mainnet with the tx hash. The TEE check is GET /api/ai/tee.' };
+  if (!p || !mistbankMainnet(p)) return { built: false, network: 'mainnet', note: 'A Mist Bank payment is a board propose of at most 0.005 NEAR. POST /api/mistbank/mainnet with the tx hash. The TEE check is GET /api/ai/tee.' };
   const [street, oath, deskBasic] = await Promise.all([
     fetchStreet(p.payout.txid).then(streetCheck).catch(e => ({ error: e.message })),
     oathCheck(p).catch(e => ({ error: e.message })),

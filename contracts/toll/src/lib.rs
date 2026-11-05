@@ -1,9 +1,9 @@
-//! oath-lab: a policy ("oath") contract that owns an EVM wallet (Base Sepolia, Arbitrum Sepolia, ...) via NEAR Chain Signatures.
+//! oath-lab: a policy ("oath") contract that owns an EVM wallet (Base, Arbitrum, ...) via NEAR Chain Signatures.
 //! One chain per instance: `chain_id` for the tx it signs, `verify_chain` for the MPC foreign-tx proof that settles it.
 //! The agent can only *propose*; this contract checks the clauses, builds the EIP-1559 tx itself,
 //! asks the MPC network to sign it (predecessor = this contract, so the key belongs to the oath),
 //! and later settles it only on an MPC foreign-tx proof (verify_foreign_transaction).
-//! v3: an optional ERC-20 `token` (e.g. Circle USDC on Base Sepolia). With a token set, `pay` builds
+//! v3: an optional ERC-20 `token` (e.g. Circle USDC). With a token set, `pay` builds
 //! `token.transfer(to, value)` itself (EVM value 0), and the caps and budget count token units.
 //! v3: an optional `dao`. With a DAO set, only the DAO can unfreeze (the owner can still freeze).
 //! v4: an optional visitor `gate`. `pay_for(charter, action_id)` is open to anyone, but it signs only after
@@ -65,7 +65,7 @@ pub struct Gate {
     pub factories: Vec<AccountId>, // v5: charters must come from one of these factories (parent account + is_charter)
     pub payee: AccountId,     // the charter action's receiver
     pub fee: U128,            // minimum NEAR (yocto) the action paid
-    pub memo: String,         // the action's memo, e.g. "toll:base-sepolia"
+    pub memo: String,         // the action's memo, e.g. "toll:base"
     pub evm_to: String,       // fixed EVM recipient (must be in allow_to)
     pub evm_value: U128,      // fixed EVM value (wei)
     pub max_fee_per_gas: U128,
@@ -114,8 +114,8 @@ pub fn check_visit(g: &Gate, a: &Value) {
 }
 fn unhex(s: &str) -> Vec<u8> { hex::decode(s.trim_start_matches("0x")).expect("bad hex") }
 
-/// EVM chains the MPC network verifies (v1.signer-prod.testnet get_available_foreign_chains), with the
-/// borsh index of each in ForeignChainRpcRequest and the chain ids (mainnet, testnet) that belong to it.
+/// EVM chains the MPC network verifies (`v1.signer` get_available_foreign_chains), with the
+/// borsh index of each in ForeignChainRpcRequest and the chain ids that belong to it.
 pub fn evm_chain(name: &str) -> Option<(u8, [u64; 2])> {
     match name {
         "Bnb" => Some((5, [56, 97])),

@@ -1,4 +1,4 @@
-//! Town Hall oath (R7 testnet spike). The DAO owns the rule; the agent acts inside it.
+//! Town Hall oath. The DAO owns the rule; the agent acts inside it.
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde_json::json;
 use near_sdk::store::{IterableMap, LookupMap};

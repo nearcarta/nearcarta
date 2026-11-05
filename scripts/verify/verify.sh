@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# One-command verify (no `make` needed). Each step prints PASS/FAIL/SKIP; exit != 0 on any FAIL. Testnet reads only, no keys.
-# Usage: scripts/verify/verify.sh [--offline]   (--offline skips the testnet RPC recheck)
+# One-command verify (no `make` needed). Each step prints PASS/FAIL/SKIP; exit != 0 on any FAIL. Mainnet reads only, no keys.
+# Usage: scripts/verify/verify.sh [--offline]   (--offline skips the mainnet proof recheck)
 # Overrides: OATH_SRC (contract dir), PINNED_WASM (expected build), PIN_REV (commit it was built from), MUTANT_RE (fns to mutate), MUTANTS_OUT,
 #            EXTRA_SCAN (another dir to secret-scan; its own .gitleaks.toml wins if present), RECHECK_DIR / RECHECK_CMD.
 set -uo pipefail
@@ -23,5 +23,5 @@ if command -v cargo-mutants >/dev/null; then step "cargo mutants (policy fns; 0 
 # 4 secrets scan: the contract dir with this folder's config, the repo with the repo config, EXTRA_SCAN with its own config if it has one
 if command -v gitleaks >/dev/null; then step "gitleaks (contract + repo + EXTRA_SCAN)" bash -c "gitleaks dir '$OATH' -c '$HERE/gitleaks.toml' --redact && cd '$ROOT' && gitleaks dir . -c .gitleaks.toml --redact && { [ -z \"\${EXTRA_SCAN:-}\" ] || { cd \"\$EXTRA_SCAN\" && c='$HERE/gitleaks.toml' && { [ ! -f .gitleaks.toml ] || c=.gitleaks.toml; } && echo \"EXTRA_SCAN config: \$c\" && gitleaks dir . -c \"\$c\" --redact; }; }"; else echo "SKIP gitleaks not installed"; fi
 # 5 on-chain re-derivation of judges/proofs/r16-factory.json: code hashes, keys, every proof tx
-[ "${1:-}" = "--offline" ] || step "recheck vs testnet RPC" bash -c "cd '$RECHECK_DIR' && $RECHECK_CMD"
+[ "${1:-}" = "--offline" ] || step "recheck mainnet proofs" bash -c "cd '$ROOT' && npm run verify:mainnet"
 rm -f "$LOG"; exit $fail

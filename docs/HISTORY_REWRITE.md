@@ -7,11 +7,11 @@ The first Mist Bank payout's viewing key (UFVK) was committed in `ae15658` and r
 ## Why it is not needed now
 
 The key is a view-only key for one payee account (`mist-payee` in the retired `payee` wallet). It
-cannot spend. It shows one old testnet payout (the amount, the memo and the salt of that payout)
+cannot spend. It shows one old earlier network payout (the amount, the memo and the salt of that payout)
 and nothing else, because ZIP 32 account keys are hardened: one account's UFVK says nothing about
 another account's.
 
-The live proof has been rotated. `judges/proofs/mistbank-payout.json`, `shared/deployments/testnet.json`
+The live proof has been rotated. `judges/proofs/mistbank-payout.json`, `shared/deployments/earlier network.json`
 and `/api/mistbank` now point to a new payout to a fresh payee account in the `payee-r2` wallet. That
 account's viewing key has never been in git, in an API response or in a log. It is held only in
 `.secrets/` (outside the repo) for an auditor. The old key opens nothing that is served.
@@ -22,7 +22,7 @@ account's viewing key has never been in git, in an API response or in a log. It 
    force push to `main`.
 2. **The tool.** `git filter-repo --replace-text expressions.txt` with one line,
    `<old UFVK>==>REDACTED`, run on a fresh mirror clone (`git clone --mirror`). The two files
-   touched are `judges/proofs/mistbank-payout.json` and `shared/deployments/testnet.json`.
+   touched are `judges/proofs/mistbank-payout.json` and `shared/deployments/earlier network.json`.
 3. **Tags.** `build-1b8fd86`, `build-864d0f5` and `build-e7a8186` would move to new hashes. They are
    annotated and are meant never to move.
 4. **On-chain build links break.** The contracts were built reproducibly and their NEP-330

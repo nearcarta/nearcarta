@@ -7,7 +7,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::BTreeMap;
 
 const CASES: usize = 2_000;
-fn acc(i: u32) -> AccountId { format!("r{i}.testnet").parse().unwrap() }
+fn acc(i: u32) -> AccountId { format!("r{i}.near").parse().unwrap() }
 fn rng(seed: u64) -> StdRng { StdRng::seed_from_u64(seed) }
 
 fn clause(r: &mut StdRng) -> Clause {
@@ -47,7 +47,7 @@ fn prop_receiver_outside_allowlist_is_always_refused() {
     let mut r = rng(1);
     for i in 0..CASES {
         let c = clause(&mut r);
-        let out: AccountId = format!("x{i}.evil.testnet").parse().unwrap();
+        let out: AccountId = format!("x{i}.evil.near").parse().unwrap();
         assert_eq!(clause_checks(&c, &out, r.gen_range(0..u128::MAX)), Err("receiver_not_allowlisted".into()));
     }
 }
@@ -128,13 +128,13 @@ fn prop_each_loosening_field_is_widening() {
     let mut r = rng(9);
     for _ in 0..500 {
         let o = clause(&mut r);
-        let mut n = o.clone(); n.receivers.push("new-receiver.testnet".parse().unwrap()); assert!(is_widening(Some(&o), &n));
+        let mut n = o.clone(); n.receivers.push("new-receiver.near".parse().unwrap()); assert!(is_widening(Some(&o), &n));
         let mut n = o.clone(); n.per_action_cap = U128(o.per_action_cap.0 + 1); assert!(is_widening(Some(&o), &n));
         let mut n = o.clone(); n.daily_budget = U128(o.daily_budget.0 + 1); assert!(is_widening(Some(&o), &n));
         let mut n = o.clone(); n.escalation_max = Some(U128(o.escalation_max.map(|m| m.0 + 1).unwrap_or(1))); assert!(is_widening(Some(&o), &n));
         let mut n = o.clone(); n.window_start_min = 60; n.window_end_min = 120; assert!(is_widening(Some(&o), &n));
         let mut n = o.clone(); n.max_actions_per_day = o.max_actions_per_day + 1; assert!(is_widening(Some(&o), &n));
-        let mut n = o.clone(); n.asset = Asset::Ft { token: "usdc.testnet".parse().unwrap() }; assert!(is_widening(Some(&o), &n));
+        let mut n = o.clone(); n.asset = Asset::Ft { token: "usdc.near".parse().unwrap() }; assert!(is_widening(Some(&o), &n));
         if o.min_amount.0 > 1 { let mut n = o.clone(); n.min_amount = U128(o.min_amount.0 - 1); assert!(is_widening(Some(&o), &n)); }
         if o.min_receiver_age_days > 0 { let mut n = o.clone(); n.min_receiver_age_days -= 1; assert!(is_widening(Some(&o), &n)); }
         if o.requires_receipt { let mut n = o.clone(); n.requires_receipt = false; assert!(is_widening(Some(&o), &n)); }
@@ -158,7 +158,7 @@ fn prop_hidden_rule_checks() {
         let max = r.gen_range(1..1_000_000u128);
         let h = HiddenRule { max_amount: Some(U128(max)), deny: vec![deny.clone()] };
         assert_eq!(hidden_checks(&h, &deny, 1), Err("hidden_rule_receiver".into()));
-        let other: AccountId = "ok.testnet".parse().unwrap();
+        let other: AccountId = "ok.near".parse().unwrap();
         assert_eq!(hidden_checks(&h, &other, max + r.gen_range(1..100)), Err("hidden_rule_cap".into()));
         assert_eq!(hidden_checks(&h, &other, r.gen_range(0..=max)), Ok(()));
     }
@@ -201,7 +201,7 @@ fn prop_valid_job_id_bounds() {
 
 fn body(ah: &str, amount: &str, job: &str, verdict: &str, age: u64, code: &str) -> String {
     serde_json::json!({"action_hash": ah, "age_days": age, "amount": amount, "code_hash": code, "job_id": job,
-        "receiver": "r1.testnet", "v": RECEIPT_V, "verdict": verdict}).to_string()
+        "receiver": "r1.near", "v": RECEIPT_V, "verdict": verdict}).to_string()
 }
 fn plain() -> Clause { let mut r = rng(14); let mut c = clause(&mut r); c.code_hash_pins.clear(); c.min_receiver_age_days = 0; c }
 const JOB: &str = "job-0123456789abcdef";

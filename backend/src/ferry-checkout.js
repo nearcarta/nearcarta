@@ -81,8 +81,8 @@ export function settlementYocto(clause, usage) {
   } catch { return null; }
 }
 
-export function rpcFor(account) {
-  return String(account).endsWith('.testnet') ? cfg.rpc : cfg.mainnetRpc;
+export function rpcFor() {
+  return cfg.mainnetRpc;
 }
 
 export async function readCharterRules(account, clauseId, viewFn = view) {

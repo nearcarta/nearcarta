@@ -1,10 +1,10 @@
 {
-  "_note": "Fictional sample data. No real people, shops or money. Accounts end in .testnet and do not need to exist to run scripts/sample-run.mjs offline.",
-  "owner": "maple-bakery-owner.testnet",
+  "_note": "Fictional sample data. No real people, shops or money. Accounts end in .near and do not need to exist to run scripts/sample-run.mjs offline.",
+  "owner": "maple-bakery-owner.near",
   "clauses": {
     "supplies": {
       "asset": "Native",
-      "receivers": ["flour-mill.testnet", "milk-coop.testnet", "box-printer.testnet"],
+      "receivers": ["flour-mill.near", "milk-coop.near", "box-printer.near"],
       "per_action_cap": "50000000000000000000000",
       "daily_budget": "200000000000000000000000",
       "min_amount": "1000000000000000000000",

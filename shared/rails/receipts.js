@@ -88,7 +88,7 @@ export function mainnetReceipts(m, { budget = {}, jobTokens = 160, checkouts = [
   }
   rows.push(receipt({
     rail: 'intents', network: 'mainnet', what: '1Click quote', to: null, amount: null, asset: null,
-    decision: 'dry', reason: '1Click has no testnet. A quote is dry: no deposit address is created and nothing is spent.',
+    decision: 'dry', reason: 'A quote is dry: no deposit address is created and nothing is spent.',
     decided_by: 'quote guard', tx: null, url: null,
     checks: { charter: null, within_allowance: null, tee: null },
   }));

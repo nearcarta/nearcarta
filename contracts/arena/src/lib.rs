@@ -1,4 +1,4 @@
-//! Vault Arena — R6 prototype (testnet only).
+//! Vault Arena.
 //! One contract = Guardian NFTs (NEP-171/177/178/181) + oath per Guardian + NEP-245 items + attempts log.
 //! The agent may only PROPOSE through `agent_act`; the contract decides. A refusal is a successful
 //! transaction that emits a `decision` event and scores the Guardian — refusals are the gameplay.
@@ -99,7 +99,7 @@ impl Contract {
     #[init]
     pub fn new(owner: AccountId) -> Self {
         let meta = NFTContractMetadata {
-            spec: NFT_METADATA_SPEC.to_string(), name: if env::current_account_id().as_str().ends_with(".testnet") { "Vault Arena Guardians (testnet)".into() } else { "Vault Arena Guardians".into() },
+            spec: NFT_METADATA_SPEC.to_string(), name: "Vault Arena Guardians".into(),
             symbol: "GUARD".into(), icon: None, base_uri: None, reference: None, reference_hash: None,
         };
         Self {
@@ -137,7 +137,7 @@ impl Contract {
         Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
 
-    /// Anyone may add NEAR to a Guardian's pot (dev-funded on testnet; no player money is ever taken).
+    /// Anyone may add NEAR to a Guardian's pot. Player deposits are not taken.
     #[payable]
     pub fn fund(&mut self, token_id: TokenId) -> U128 {
         let mut g = self.g(&token_id);

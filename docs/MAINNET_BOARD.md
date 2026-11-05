@@ -43,4 +43,4 @@ Because the live account cannot take new code, the owner does this by hand:
 
 ## The site
 
-`/setup` sends `open_charter` only when the build has `NEXT_PUBLIC_MAINNET=1` and `board.status` is `deployed`. Until then the page shows the town's mainnet transactions and does not send a create. With the flag unset, the guest trial on testnet stays available and is labeled testnet. Shops on the flagged build read the visitor's row and ask the board with the agent signature. They do not open the guest trial.
+`/setup` sends `open_charter` only when the build has `NEXT_PUBLIC_MAINNET=1` and `board.status` is `deployed`. Until then the page shows the town's mainnet transactions and does not send a create. With the flag unset, the guest trial on earlier network stays available and is labeled earlier network. Shops on the flagged build read the visitor's row and ask the board with the agent signature. They do not open the guest trial.

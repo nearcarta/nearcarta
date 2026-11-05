@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { signedState } from '../../../shared/stale.js';
-import { joinPrompts, pastPrompts } from '../../src/arena.js';
+import { joinPrompts, pastPrompts, PAST as LIVE } from '../../src/arena.js';
 import { sweepRecent } from '../../src/shops.js';
 import { PAST } from '../../../shared/arena/prompts.js';
 import { promptRows } from '../../../app/design/D8_shops/shops/arenalive.js';
@@ -47,10 +47,20 @@ test('corpus: every past prompt has a decision tx; the bounty text is never in i
   assert.equal(PAST.filter(p => p.reveal_tx).length, 30);
 });
 
-test('pastPrompts reads chain and caches', async () => {
-  let n = 0; const v = async (_a, _m, { attempt_id }) => { n++; if (_a !== 'arena.r6vamvr9brhx-arena2.testnet' || attempt_id > 1) throw new Error('none'); return { prompt_hash_hex: sha(PAST[attempt_id].prompt), revealed: true, verdict: PAST[attempt_id].verdict }; };
-  const d = await pastPrompts(v, 1e12); assert.equal(d.count, 2); assert.equal(d.shown, 2); assert.equal(d.prompts[0].id, 1);
-  const calls = n; await pastPrompts(v, 1e12 + 1000); assert.equal(n, calls);
+test('pastPrompts reads the mainnet arena once and caches', async () => {
+  let n = 0; const v = async (_a, _m, { attempt_id }) => {
+    n++;
+    const p = LIVE[attempt_id];
+    if (_a !== 'arena.nearcarta.near' || !p) throw new Error('none');
+    return { prompt_hash_hex: p.prompt ? sha(p.prompt) : 'x', revealed: !!p.prompt, verdict: p.verdict };
+  };
+  const d = await pastPrompts(v, 3e12);
+  assert.equal(d.contract, 'arena.nearcarta.near');
+  assert.equal(d.history_contract, null);
+  assert.equal(d.count, LIVE.length);
+  assert.equal(d.shown, LIVE.filter(p => p.prompt).length);
+  assert.equal(d.prompts[0].id, LIVE.length - 1);
+  const calls = n; await pastPrompts(v, 3e12 + 1000); assert.equal(n, calls);
 });
 
 test('room rows escape text and mark expired', () => {

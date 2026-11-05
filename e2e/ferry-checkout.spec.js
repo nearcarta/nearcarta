@@ -35,7 +35,7 @@ test('ferry checkout: mocked 1Click returns a deposit address only after the cha
   await page.getByTestId('widget-pay').click();
   await expect(page.getByTestId('widget-deposit')).toHaveText(deposit);
   await expect(page.getByTestId('widget-status')).toContainText('Done', { timeout: 15_000 });
-  await expect(page.getByTestId('widget-status')).toContainText(chainTx);
+  await expect(page.getByTestId('widget-status').locator('a.tx')).toHaveAttribute('href', new RegExp(chainTx));
   expect(body.recipient).toBe('payee.near');
   expect(body.to).toEqual({ symbol: 'USDC', chain: 'near' });
   expect(Number(body.amount)).toBeLessThanOrEqual(0.2);

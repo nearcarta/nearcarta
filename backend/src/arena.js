@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { view, explorerTx } from './near.js';
 import { PAST as PAST_V1, ARENA as ARENA_V1 } from '../../shared/arena/prompts.js';
 import { PAST3, ARENA3 } from '../../shared/arena/prompts3.js';
-// Live arena: the NEP-245 build (arena3). The first season's contract stays readable as history.
+// Live arena: arena.nearcarta.near. One contract, read once.
 export const ARENA = ARENA3, PAST = PAST3;
 
 const sha = s => createHash('sha256').update(s).digest('hex');
@@ -31,9 +31,10 @@ export async function pastPrompts(v = view, now = Date.now()) {
     const chain = []; for (let i = 0; i < got.length && got[i]; i++) chain.push({ id: i, ...got[i] });
     return joinPrompts(chain, corpus).reverse().map(p => ({ ...p, contract: C }));
   };
-  const [live, v1] = await Promise.all([read(ARENA, PAST), read(ARENA_V1, PAST_V1)]);
-  const prompts = [...live, ...v1];
-  const body = { contract: ARENA, history_contract: ARENA_V1, standard: 'NEP-245 (mt_transfer, mt_batch_transfer, mt_transfer_call, mt_resolve_transfer)', count: prompts.length, seeded: prompts.filter(p => p.source === 'seeded').length,
+  const same = ARENA === ARENA_V1;
+  const parts = same ? [await read(ARENA, PAST)] : await Promise.all([read(ARENA, PAST), read(ARENA_V1, PAST_V1)]);
+  const prompts = parts.flat();
+  const body = { contract: ARENA, history_contract: same ? null : ARENA_V1, standard: 'NEP-245 (mt_transfer, mt_batch_transfer, mt_transfer_call, mt_resolve_transfer)', count: prompts.length, seeded: prompts.filter(p => p.source === 'seeded').length,
     source_note: 'seeded = attempts our scripts wrote with a scripted agent (no model call). Live model runs are the red-team and Ask runs on the shared charter (POST /api/vault/ask), not listed here.', shown: prompts.filter(p => p.prompt).length, prompts,
     rule: 'prompt text shown only when sha256(prompt) equals the on-chain commitment and the attempt is revealed on chain' };
   cache = { at: now, body }; return body;

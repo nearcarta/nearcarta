@@ -17,7 +17,7 @@ fn ctx(pred: &str) -> VMContextBuilder {
 fn set(pred: &str) { testing_env!(ctx(pred).build()); }
 fn toll() -> Oath {
     set("owner.test");
-    Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "toll".into(), 84532,
+    Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "toll".into(), 84532,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.to_uppercase().replace("0X", "0x")],
         U128(100), U128(150), U128(10), None, None, None, None)
 }
@@ -104,7 +104,7 @@ fn unsigned_tx_cannot_settle() { let mut o = toll(); let _ = pay(&mut o, TO, 1);
 
 fn arb(chain_id: u64, chain: &str) -> Oath {
     set("owner.test");
-    Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "arb-1".into(), chain_id,
+    Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "arb-1".into(), chain_id,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
         U128(100), U128(150), U128(10), Some(chain.into()), None, None, None)
 }
@@ -113,7 +113,7 @@ fn arb(chain_id: u64, chain: &str) -> Oath {
 fn default_verify_chain_is_base() { assert_eq!(toll().policy()["verify_chain"], "Base"); }
 
 #[test]
-fn arbitrum_sepolia_instance() { let o = arb(421614, "Arbitrum"); assert_eq!(o.policy()["verify_chain"], "Arbitrum"); assert_eq!(o.policy()["chain_id"], 421614); }
+fn arbitrum_chain_instance() { let o = arb(421614, "Arbitrum"); assert_eq!(o.policy()["verify_chain"], "Arbitrum"); assert_eq!(o.policy()["chain_id"], 421614); }
 
 #[test]
 #[should_panic(expected = "chain_id does not belong to verify_chain")]
@@ -123,17 +123,17 @@ fn chain_id_must_match_verify_chain() { let _ = arb(84532, "Arbitrum"); }
 #[should_panic(expected = "verify_chain not supported")]
 fn non_evm_or_unknown_verify_chain_refused() { let _ = arb(421614, "Solana"); }
 
-// Real MPC proofs from v1.signer-prod.testnet (domain 3): the payload this contract rebuilds must hash
+// Real MPC proofs from v1.signer-prod.near (domain 3): the payload this contract rebuilds must hash
 // to the payload_hash the network signed.
 #[test]
-fn payload_matches_real_base_sepolia_proof() {
+fn payload_matches_real_base_proof() {
     let b = crate::proof_payload(6, "0x86bab7a98f872cec2e60ac2a549d1154f7cb330b9aeb073ff191b57a42ef9054",
         "0xa800c2bbcf63fc22ef17020b725efd17b681682b7fa913c2d7603055c03b44e3");
     assert_eq!(hex::encode(near_sdk::env::sha256(&b)), "d8c7513c35354b6184108ad58a63430bf88934460f30fc1420ffa3d595506025");
 }
 
 #[test]
-fn payload_matches_real_arbitrum_sepolia_proof() {
+fn payload_matches_real_arbitrum_proof() {
     let b = crate::proof_payload(7, "ee42361cea2ff228cc1703e91188acc8b39c412bb2bf09335c72169be7139ed7",
         "0x64ee2745f7637d236ceaa471fbebb4fd98621184acba8360f1595d49df73455c");
     assert_eq!(hex::encode(near_sdk::env::sha256(&b)), "6e6b1eb1dd56ee291e591de942f006b4ce40eb2476ba2456f1132ba77b9d1f48");
@@ -144,7 +144,7 @@ const USDC: &str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 /// USDC toll: cap 1 USDC per tx, budget 3 USDC (6 decimals), DAO set.
 fn usdc() -> Oath {
     set("owner.test");
-    Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "usdc-1".into(), 84532,
+    Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "usdc-1".into(), 84532,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
         U128(1_000_000), U128(3_000_000), U128(10), None, Some(USDC.into()), Some(acc("dao.test")), None)
 }
@@ -205,22 +205,22 @@ fn dao_can_freeze_and_unfreeze() {
 #[should_panic(expected = "token must be a 0x address")]
 fn bad_token_address_refused() {
     set("owner.test");
-    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "x".into(), 84532, "0x01".into(), "00".into(), vec![],
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "x".into(), 84532, "0x01".into(), "00".into(), vec![],
         U128(1), U128(1), U128(1), None, Some("0x1234".into()), None, None);
 }
 
 // ---------------- v4: the visitor gate (pay_for after the guest's own charter paid) ----------------
 fn gate_cfg() -> Gate {
-    Gate { factories: vec![acc("factory.test"), acc("old-factory.test")], payee: acc("cafe.test"), fee: U128(10), memo: "toll:base-sepolia".into(),
+    Gate { factories: vec![acc("factory.test"), acc("old-factory.test")], payee: acc("cafe.test"), fee: U128(10), memo: "toll:base".into(),
            evm_to: TO.to_uppercase().replace("0X", "0x"), evm_value: U128(7), max_fee_per_gas: U128(5), max_priority_fee_per_gas: U128(1) }
 }
 fn gated() -> Oath {
     set("owner.test");
-    Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "gate-1".into(), 84532,
+    Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "gate-1".into(), 84532,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
         U128(10), U128(20), U128(10), None, None, None, Some(gate_cfg()))
 }
-fn paid() -> Value { json!({"shop":"toll","clause_id":"pay","receiver":"cafe.test","amount":"10","status":"confirmed","asset":"Native","memo":"toll:base-sepolia"}) }
+fn paid() -> Value { json!({"shop":"toll","clause_id":"pay","receiver":"cafe.test","amount":"10","status":"confirmed","asset":"Native","memo":"toll:base"}) }
 fn visit(o: &mut Oath, id: u64, a: Value) -> Promise {
     set("toll.test");
     o.on_visit_checked(acc("guest-1.factory.test"), U64(id), acc("guest.test"), Ok(true), Ok(Some(a)))
@@ -346,7 +346,7 @@ fn anyone_may_call_pay_for() { let mut o = gated(); set("guest.test"); let _ = o
 #[should_panic(expected = "gate evm_to must be in allow_to")]
 fn gate_recipient_must_be_allowlisted() {
     set("owner.test"); let mut g = gate_cfg(); g.evm_to = OTHER.into();
-    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
         U128(10), U128(20), U128(10), None, None, None, Some(g));
 }
 
@@ -354,7 +354,7 @@ fn gate_recipient_must_be_allowlisted() {
 #[should_panic(expected = "gate evm_value over per-tx cap")]
 fn gate_value_within_cap() {
     set("owner.test"); let mut g = gate_cfg(); g.evm_value = U128(11);
-    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
         U128(10), U128(20), U128(10), None, None, None, Some(g));
 }
 
@@ -362,7 +362,7 @@ fn gate_value_within_cap() {
 #[should_panic(expected = "gate fees over cap")]
 fn gate_fees_within_cap() {
     set("owner.test"); let mut g = gate_cfg(); g.max_fee_per_gas = U128(11);
-    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
         U128(10), U128(20), U128(10), None, None, None, Some(g));
 }
 
@@ -370,12 +370,12 @@ fn gate_fees_within_cap() {
 #[should_panic(expected = "gate is for native-coin tolls")]
 fn gate_not_for_token_tolls() {
     set("owner.test");
-    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "g".into(), 84532, "0x01".into(), "00".into(), vec![TO.into()],
         U128(10), U128(20), U128(10), None, Some(USDC.into()), None, Some(gate_cfg()));
 }
 
 #[test]
-fn policy_shows_the_gate() { let o = gated(); assert_eq!(o.policy()["gate"]["memo"], "toll:base-sepolia"); assert_eq!(o.policy()["gate"]["evm_to"], TO); }
+fn policy_shows_the_gate() { let o = gated(); assert_eq!(o.policy()["gate"]["memo"], "toll:base"); assert_eq!(o.policy()["gate"]["evm_to"], TO); }
 
 // ---------------- v5: a fixed list of factories ----------------
 #[test]
@@ -411,7 +411,7 @@ fn visit_from_an_older_factory_opens_the_gate() {
 fn gate_without_factories_refused() {
     set("owner.test");
     let mut g = gate_cfg(); g.factories = vec![];
-    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.testnet"), "gate-1".into(), 84532,
+    let _ = Oath::new(acc("owner.test"), acc("v1.signer-prod.near"), "gate-1".into(), 84532,
         "0xABCDEF0000000000000000000000000000000001".into(), "00".into(), vec![TO.into()],
         U128(10), U128(20), U128(10), None, None, None, Some(g));
 }

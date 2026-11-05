@@ -9,6 +9,7 @@ import { NAME as shopNames } from '../../../app/design/D8_shops/js/names.js';
 import { NAME as plainNames } from '../../../app/design/D8_shops/js/plain.js';
 import { sessionAccount, tollRefusal } from '../../../app/design/D8_shops/js/session.js';
 import { makeApp } from '../../src/app.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 const y = n => (BigInt(n) * 10n ** 21n).toString();
 
@@ -50,7 +51,7 @@ test('chronicle rows link nearblocks and take the shop from the payee', () => {
   assert.equal(c.txs.some(t => t.shop === 'chronicle'), false);
   const one = mainnetChronicle('8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8');
   assert.ok(one.txs.every(t => t.signer.startsWith('8e20273e')));
-  assert.equal(/testnet/i.test(JSON.stringify(c)), false);
+  assert.equal(otherNet.test(JSON.stringify(c)), false);
 });
 
 test('a payee off the list is a preview refusal', () => {
@@ -84,7 +85,7 @@ test('shop name maps match, a refusal fits 140 characters, and the session store
 });
 
 test('a row that names the old network does not wear a mainnet badge', () => {
-  assert.equal(srcBadge({ src: 'mainnet', srcNote: 'paid on testnet' }), '');
+  assert.equal(srcBadge({ src: 'mainnet', srcNote: 'paid on ' + otherNet.source }), '');
   assert.equal(srcBadge({ src: 'split', url: 'https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR' }), 'mainnet');
 });
 

@@ -44,11 +44,11 @@ async function apiPass(base, tag) {
   if (tp?.deposit_address || tp?.depositAddress) await g('/api/ferry/status?depositAddress=' + encodeURIComponent(tp.deposit_address || tp.depositAddress));
   await g('/api/ferry/zcash/not-an-address'); await g('/api/ferry/zcash/utest1' + 'q'.repeat(60));
   await g('/api/guardhouse'); await g('/api/guardhouse/denylist');
-  await g('/api/guardhouse/check/attacker.r10own-19371.testnet'); await g('/api/guardhouse/check/!!bad');
+  await g('/api/guardhouse/check/attacker.r10own-19371.near'); await g('/api/guardhouse/check/!!bad');
   await g('/api/guardhouse/action/1'); await g('/api/guardhouse/action/999999999'); await g('/api/guardhouse/action/x');
   const house = await g('/api/house');
   await g('/api/house/deed'); await g('/api/house/deed/mint'); await g('/api/house/deed/mint?house=!!');
-  await g('/api/house/deed/' + (house?.owner || 'nobody.testnet')); await g('/api/house/deed/!!bad');
+  await g('/api/house/deed/' + (house?.owner || 'nobody.near')); await g('/api/house/deed/!!bad');
   const mb = await g('/api/mistbank') || {};
   await g('/api/mistbank/verify'); await g('/api/mistbank/verify?commitment=00');
   await g('/api/mistbank/send'); await g('/api/mistbank/send/does-not-exist'); await g('/api/mistbank/send/' + '0'.repeat(64));
@@ -60,7 +60,7 @@ async function apiPass(base, tag) {
   const nonce = JSON.stringify(gate || {}).match(/"nonce"\s*:\s*"?(\d+)/)?.[1];
   if (nonce) await g('/api/toll/gate/' + nonce);
   await g('/api/toll/gate/999999999'); await g('/api/toll/gate/bad');
-  const charter = process.env.AUDIT_CHARTER || 'gd-mvst67ib.nccharters-53681.testnet';
+  const charter = process.env.AUDIT_CHARTER || 'gd-mvst67ib.nccharters-53681.near';
   await g('/api/chronicle/' + charter); await g('/api/chronicle/!!bad');
   await g(`/api/charter/${charter}/reputation`); await g(`/api/charter/${charter}/rules/0`); await g('/api/charter/!!/rules/x');
   await g('/api/tx/' + (process.env.AUDIT_TX || '4Y2P7YGDVVhcgkusbbbL5JdkdnSKAPthn4xuwHMgtzvU')); await g('/api/tx/bad');
@@ -165,7 +165,7 @@ function secretValues() {
   } } };
   walk(SECRETS);
   for (const [k, v] of Object.entries(process.env)) if (/KEY|TOKEN|SECRET|PASS|SEED|MNEMONIC|UFVK/i.test(k) && v) vals.add(v.trim());
-  const cand = [...vals].filter(v => v.length >= 16 && v.length <= 4096 && /^[\x20-\x7e]+$/.test(v) && !/^(https?:\/\/|\/)/.test(v) && !/^[a-z0-9._-]+\.(testnet|near)$/.test(v));
+  const cand = [...vals].filter(v => v.length >= 16 && v.length <= 4096 && /^[\x20-\x7e]+$/.test(v) && !/^(https?:\/\/|\/)/.test(v) && !/^[a-z0-9._-]+\.near$/.test(v));
   // Values that also appear in a tracked file are public (account ids, public keys): drop them. The pattern file
   // lives in a private temp dir and is removed at once.
   let tracked = ''; const tmp = mkdtempSync(join(tmpdir(), 'pa-')), pf = join(tmp, 'p');

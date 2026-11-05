@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Phase 2 (Base USDC -> shielded ZEC -> Base USDC through 1Click), dry run.
 
-This file never signs and never broadcasts. It has no --live switch; the live legs stay out of
-the repo until each step below has passed on testnet and the spend is approved.
+This file never signs and never broadcasts. It has no --live switch.
 
-  --network testnet (default)  Base Sepolia + Zcash testnet + 1Click dry quotes
-  --network mainnet            Base + Zcash mainnet reads + 1Click dry quotes (still read-only)
+  --network mainnet            Base + Zcash mainnet reads + 1Click dry quotes (read-only)
 
 Steps (each prints one JSON line to the log):
   1. quote_legA   1Click dry quote, Base USDC -> ZEC (dry=true: no deposit address is issued)
@@ -23,8 +21,6 @@ Secrets come from env only and are never printed or logged.
 import argparse, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
 NET = {
-    'testnet': dict(rpcs=['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'], chain_id=84532,
-                    usdc='0x036CbD53842c5426634e7929541eC2318f3dCF7e', zserver='zecrocks', explorer='https://sepolia.basescan.org'),
     'mainnet': dict(rpcs=['https://mainnet.base.org', 'https://base-rpc.publicnode.com'], chain_id=8453,
                     usdc='0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', zserver='zecrocks', explorer='https://basescan.org'),
 }
@@ -36,7 +32,7 @@ LEG_B_MIN_ZATS = 132000     # measured 1Click minimum for leg B
 FEE_ZATS = 10000            # ZIP-317 fee for a 1-output shielded send
 
 ap = argparse.ArgumentParser()
-ap.add_argument('--network', choices=NET, default='testnet')
+ap.add_argument('--network', choices=NET, default='mainnet')
 ap.add_argument('--usdc', default='2.5')
 ap.add_argument('--zats', type=int, default=50000)
 ap.add_argument('--log', default='phase2-dryrun.jsonl')
@@ -86,7 +82,7 @@ def quote(tag, **kw):
         note='dry quote: no deposit address, nothing to send')
     return q
 
-# 1Click has no testnet: quotes are always mainnet prices with dry=true. A dry quote still checks
+# Quotes are mainnet prices with dry=true. A dry quote still checks
 # that the addresses are valid mainnet ones: QUOTE_EVM_ADDR (default: the example address from the
 # 1Click docs) and QUOTE_ZEC_ADDR (a mainnet Zcash address). Neither is logged.
 EVM_PLACEHOLDER = os.environ.get('QUOTE_EVM_ADDR', '0x2527D02599Ba641c19FEa793cD0F167589a0f10D')

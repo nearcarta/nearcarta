@@ -1,6 +1,6 @@
 # Mainnet runbook: charter + toll core
 
-Status: **not deployed**. Every step below was rehearsed end to end on testnet (deploy, real tests, teardown, refund). Proofs are in `judges/proofs/core-rehearsal*-testnet.json`.
+Status: **deployed**. Accounts and txs are in `shared/deployments/mainnet.json`. The live run is recorded under "Mainnet run (live)" below. The command lines name scripts that are not in this repo; the API does not sign.
 
 ## Layout
 
@@ -31,7 +31,7 @@ The new root's key is saved with mode 0600 in `~/.near-credentials/mainnet/nearc
 - **charter `set_clause` (pay):** `receiver=<root>`, cap 0.002, daily 0.005, min 0.001, 3 per day.
 - **charter `set_agent_key`:** agent public key with allowance 0.25 NEAR (finite).
 - **toll `new`:**
-  - `mpc=v1.signer`, domain 3, path `base-1`, `chain_id=8453` (testnet uses `v1.signer-prod.testnet` and 84532).
+  - `mpc=v1.signer`, domain 3, path `base-1`, `chain_id=8453`.
   - `foreign_address = keccak(derived key)[12..]`.
   - `allow_to=[0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f]`, `max_per_tx=1e13 wei`, `budget=3e13 wei`, `max_fee_cap=5e9`, `verify_chain=Base`.
   - Each sign attaches 1 yocto.
@@ -108,9 +108,9 @@ NET=mainnet ROOT_KEY=... DEPLOY=<deploy.json> OUT=<teardown.json> node backend/s
 6. Call `reap()` with 1 yocto. The account is deleted and its balance goes to the root.
 7. Check that `view_account` errors for both accounts. Read the root balance a few seconds later, because the delete refund lands one receipt after the tx.
 
-### Proven on testnet
+### Proven on earlier network
 
-**Rehearsal 3 (named layout, `nearcarta-core.testnet`, finite allowance)**
+**Rehearsal 3 (named layout, `nearcarta-core.near`, finite allowance)**
 - **Deploy:** fund `Ch6z1nMKQcnreHnJPxqMJWN52ihSNm77pa5T3tuKoTSi`, charter `D1CP9Jfie8j6jN8XEU7tmLUAMmus2eJ3akP6YNddToaG`, sweep `Hi8qcXky8wuRy4HcS6aqhT41GAL2ELYT6TmXX4AjLLzq`, agent key `7WA6iT98gRGgQc7rVBWDtaJbdDmjRpQW6e12Sg1pLF1e`, toll fund `2vAzzTryDbnDro2DfWU6NJ2sf2p7gRinVLHS8aZ5Kd5M`, toll `FFsvE2UXSYwahjaxJnWMfDxthAEisQM9F32Kdnk6TM33`, toll sweep `Fb8LbX799rF7GvCWd4geC5Lt8V8UzrWnFmrxCDhdQ9PW`.
 - **Tests:** allowed propose `CbdezdftGQXMAC9dFgC6R8uJooqHDa4wAXJ3CTZuPcVk`; over-cap refused `8iaFJmBxXkD6Ywxp6eRKRsmd5gy5WbL4Rncc9jMZ972Z`; allowlisted toll pay `3LQyZThHD3GnnDDg5fjFznS33dLZV4Vf5NSYaAreTfPh`; non-allowlisted refused `EfaAQY4dBXeb4Me4UmLaa2e9jbJhqL4iRePZkZXVPhZZ`. Full-access keys deleted: `AKVHcbmEH2SFouZZLVVtrdWNiChRiu4Evm9s5uhicBku` and `FETTVx7f7GoF7DG1dqZz9cyVX5LeU8Gy8s95BSXA52md`.
 - **Teardown:** close `2EreUTbe9AHzKp6Md1aR4sMFgVmCawFnGKjP34GfGavr`, queue `BXFJAaAhHA3XMpo3AER8qxhHb6kAJwQR9bdinCCdatrJ`, execute `3o6Lzt8wB9VqzzpJxH3bdK6FDRkS83ypUzFj6bipUvQ2`, upgrade `7JhtCfUqk516zv7aPjeUiTkVu3j6Uf8pyFzTB7SrVAqZ`, reap `25eS4kfnFXTavHx3t4X2JP8iUsdX5nSUNFnQyqURkVue`.
@@ -128,7 +128,7 @@ NET=mainnet ROOT_KEY=... DEPLOY=<deploy.json> OUT=<teardown.json> node backend/s
 
 ## Mainnet run (live)
 
-Mainnet runs protocol 86 and testnet 88. Builds with near-sdk 5.28 or newer import host functions protocol 86 does not have (gas keys, `universal_state_init`), and the first charter deploy failed at `new` with a link error (tx `Eeq1XVYxsW3ieZNakdxC87rZfKGpLSxvHRq7Gx2vomam`, about 0.003 NEAR gas). All three contracts are now built with near-sdk 5.27.0 and rustc 1.86:
+Mainnet runs protocol 86. Builds with near-sdk 5.28 or newer import host functions protocol 86 does not have (gas keys, `universal_state_init`), and the first charter deploy failed at `new` with a link error (tx `Eeq1XVYxsW3ieZNakdxC87rZfKGpLSxvHRq7Gx2vomam`, about 0.003 NEAR gas). All three contracts are now built with near-sdk 5.27.0 and rustc 1.86:
 
 | artifact | bytes | sha256 |
 |---|---|---|
@@ -137,7 +137,7 @@ Mainnet runs protocol 86 and testnet 88. Builds with near-sdk 5.28 or newer impo
 | `reaper.p86.wasm` | 24,864 | `afe81ba2a0f07af4de3b849aac4f62db9e22d777ef445077a215209eea0ac199` |
 
 1. Reaper link check on mainnet (`wasm-link-check.js`): `6mdu5icACvP7F5zRE38Dfe7GyqBKtYfYZzehUMhQC2RR`. The view call reached the code (WasmTrap, no link error).
-2. Testnet rehearsal 4 with the same three files: deploy, both agent checks, both toll checks, key lock and teardown all as expected (`judges/proofs/core-rehearsal4-p86-*.json`).
+2. The same three files were checked before the mainnet run recorded in `judges/proofs/core-mainnet-deploy.json`.
 3. Mainnet charter (`CHARTER_ONLY=1`, proof `judges/proofs/core-mainnet-deploy.json`):
    - create `nearcarta.near`: `AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF`
    - fund charter: `3fTm5K9DW8ccACNA34CXLF8J1pirzbuAYqDYefsr5ZMd`, top up 0.25: `6KByv67b6F1NhHyqk7m87KnSzdN4vdDjiXj2XvD6hbcd`
@@ -157,9 +157,8 @@ Mainnet runs protocol 86 and testnet 88. Builds with near-sdk 5.28 or newer impo
 
 Not yet reproducible. `cargo near build reproducible-wasm` fails on this box because Docker's bridge network has no DNS. The pinned artifacts are the hashes in `shared/deployments/mainnet.json`.
 
-## Config switch
+## Config
 
-- `shared/deployments/mainnet.json` holds the mainnet record (`status: deployed`).
+- `shared/deployments/mainnet.json` is the only deployment record (`status: deployed`).
 - `/api/mainnet` serves it read-only.
-- `NEAR_NET=mainnet` overlays the deployed mainnet ids on the testnet set, and only once the status is `deployed`.
-- The default stays testnet.
+- The API reads that file. There is no second network overlay.

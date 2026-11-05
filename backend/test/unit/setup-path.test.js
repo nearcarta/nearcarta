@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupJourney } from '../../../shared/setup/path.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 test('the default setup path is mainnet and does not offer the faucet or a charter factory', () => {
   const j = setupJourney(false);
@@ -10,7 +11,7 @@ test('the default setup path is mainnet and does not offer the faucet or a chart
   assert.equal(j.createCharter, false);
   assert.equal(j.explorer, 'https://nearblocks.io');
   assert.match(j.fundLead, /real NEAR/);
-  assert.doesNotMatch(j.fundLead, /testnet/i);
+  assert.doesNotMatch(j.fundLead, otherNet);
   assert.doesNotMatch(j.intentsNote, /faucet/);
 });
 
@@ -20,7 +21,7 @@ test('the public mainnet flag hides the guest and opens a charter row only after
   assert.equal(off.showGuest, false);
   assert.equal(off.showFaucet, false);
   assert.equal(off.createCharter, false);
-  assert.doesNotMatch(off.fundLead, /testnet/i);
+  assert.doesNotMatch(off.fundLead, otherNet);
   const on = setupJourney(false, { publicMainnet: true, boardDeployed: true });
   assert.equal(on.createCharter, true);
   assert.equal(on.showGuest, false);
@@ -35,5 +36,5 @@ test('a trial flag does not open a guest path', () => {
   assert.equal(j.showFaucet, false);
   assert.equal(j.createCharter, false);
   assert.equal(j.explorer, 'https://nearblocks.io');
-  assert.doesNotMatch(JSON.stringify(j), /testnet/i);
+  assert.doesNotMatch(JSON.stringify(j), otherNet);
 });

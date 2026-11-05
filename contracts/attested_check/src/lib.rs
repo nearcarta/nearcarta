@@ -175,7 +175,7 @@ mod tests {
 
     fn setup() -> AttestedCheck {
         testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(0)).current_account_id(accounts(1)).build());
-        AttestedCheck::new(accounts(0), "outlayer.testnet".parse().unwrap(), "https://x/y.wasm".into(), "a".repeat(64))
+        AttestedCheck::new(accounts(0), "outlayer.near".parse().unwrap(), "https://x/y.wasm".into(), "a".repeat(64))
     }
     #[test]
     fn failure_is_unavailable_not_allow() {

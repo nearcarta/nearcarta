@@ -2,7 +2,7 @@
 import { cfg } from './config.js';
 
 let rpcId = 0;
-// Testnet RPCs rate-limit (HTTP 429) under load. Each call retries with backoff, falls through to fallback
+// RPCs rate-limit (HTTP 429) under load. Each call retries with backoff, falls through to fallback
 // URLs, and read-only queries are cached briefly; if every endpoint fails, a recent cached answer is served
 // (marked stale in /api/health) instead of a 500.
 const RETRY_HTTP = new Set([408, 425, 429, 500, 502, 503, 504]);

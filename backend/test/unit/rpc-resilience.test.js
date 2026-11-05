@@ -8,7 +8,7 @@ const saved = { ...cfg };
 let calls;
 const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const ok = (result) => reply(200, { jsonrpc: '2.0', id: 1, result });
-const params = (n) => ({ request_type: 'view_account', finality: 'final', account_id: `a${n}.testnet` });
+const params = (n) => ({ request_type: 'view_account', finality: 'final', account_id: `a${n}.near` });
 
 beforeEach(() => {
   calls = []; _resetRpcCache();
@@ -54,7 +54,7 @@ test('nothing cached and every URL down: the error is thrown', async () => {
 });
 
 test('status is never cached', async () => {
-  globalThis.fetch = async (url) => { calls.push(url); return ok({ chain_id: 'testnet' }); };
+  globalThis.fetch = async (url) => { calls.push(url); return ok({ chain_id: 'mainnet' }); };
   await rpc('status', []); await rpc('status', []);
   assert.equal(calls.length, 2);
 });

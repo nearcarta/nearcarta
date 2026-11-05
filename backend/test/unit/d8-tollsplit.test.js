@@ -4,9 +4,9 @@ import * as TS from '../../../app/design/D8_shops/js/tollsplit.js';
 
 const Y = n => BigInt(Math.round(n * 1e6)) * 10n ** 18n;
 test('the toll split is one batch: the toll leg opens the gate, then treasury and agent budget', () => {
-  const b = TS.planSplit({ payee: 'cafe.ncpub-17102.testnet', nonce: 7, policy: 2, nowMs: 1e12 });
+  const b = TS.planSplit({ payee: 'cafe.ncpub-17102.near', nonce: 7, policy: 2, nowMs: 1e12 });
   assert.equal(b.n, 3);
-  assert.deepEqual(b.ps.map(p => p.receiver), ['cafe.ncpub-17102.testnet', TS.SPLIT.treasury, TS.SPLIT.agent]);
+  assert.deepEqual(b.ps.map(p => p.receiver), ['cafe.ncpub-17102.near', TS.SPLIT.treasury, TS.SPLIT.agent]);
   assert.deepEqual(b.ps.map(p => p.nonce), ['7', '8', '9']);
   assert.equal(b.ps[0].memo, 'toll', 'the toll leg names the toll');
   assert.ok(BigInt(b.ps[0].amount) >= Y(0.01), 'the toll leg pays at least the gate fee');

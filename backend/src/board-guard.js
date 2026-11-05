@@ -1,13 +1,14 @@
 // Preview only: would this payee pass the visitor's row. Nothing is signed.
 import { reasonLabel } from '../../shared/net/reasons.js';
+import { mainnetReceiverOk } from '../../shared/net/accounts.js';
 import { MAINNET_DEP } from './config.js';
 import { view } from './near.js';
 
 export const BOARD = MAINNET_DEP?.board?.contract || 'board.nearcarta.near';
 
 export function previewPayee(charter, payee) {
-  if (!payee || String(payee).includes('.testnet')) {
-    return { preview: true, found: false, payee, decision: 'would refuse', reason: 'receiver must be a mainnet account', label: 'Refused' };
+  if (!mainnetReceiverOk(payee)) {
+    return { preview: true, found: false, payee, decision: 'would refuse', reason: 'receiver must be a valid mainnet .near or implicit account', label: 'Refused' };
   }
   if (!charter) return { preview: true, found: false, payee, decision: 'would refuse', reason: 'no row', label: 'No row on the board' };
   const list = charter.receivers || [];

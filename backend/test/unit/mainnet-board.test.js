@@ -9,6 +9,7 @@ import { proposalMessage } from '../../../shared/board/message.js';
 import { proposalMessage as shopMessage } from '../../../app/design/D8_shops/js/board.js';
 import { setupJourney } from '../../../shared/setup/path.js';
 import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 const wasm = readFileSync(new URL('../../../contracts/artifacts/charter_board.wasm', import.meta.url));
 
@@ -56,7 +57,7 @@ test('the public mainnet flag opens a row only after the board is deployed', () 
   const off = setupJourney(true, { publicMainnet: true, boardDeployed: false });
   assert.equal(off.createCharter, false);
   assert.equal(off.showGuest, false);
-  assert.doesNotMatch(off.fundLead, /testnet/i);
+  assert.doesNotMatch(off.fundLead, otherNet);
   const on = setupJourney(false, { publicMainnet: true, boardDeployed: true });
   assert.equal(on.createCharter, true);
   assert.equal(on.badge, 'mainnet');

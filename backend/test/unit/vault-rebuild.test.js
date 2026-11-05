@@ -70,9 +70,9 @@ test('backfill: RPC trouble while verifying is an error, never a "not arena" ver
 
 test('verifyAttempt strict: an unreadable clause throws instead of returning null', async () => {
   fresh();
-  const charter = 'arena.nccharters-53681.testnet';
+  const charter = 'arena.nccharters-53681.near';
   const memo = 'arena:bob:impersonation';
-  const ev = { standard: 'oath', version: '1', event: 'action', data: [{ decision: 'denied', reason: 'over_per_action_cap', clause_id: 'c1', receiver: 'x.testnet', amount: '1' }] };
+  const ev = { standard: 'oath', version: '1', event: 'action', data: [{ decision: 'denied', reason: 'over_per_action_cap', clause_id: 'c1', receiver: 'x.near', amount: '1' }] };
   const t = tx(charter, 'propose', { p: { nonce: '0', memo } }, { hash: '11111111111111111111111111111111111111111111' });
   t.receipts_outcome[0].outcome.logs = ['EVENT_JSON:' + JSON.stringify(ev)];
   t.receipts_outcome[0].outcome.executor_id = charter;
@@ -113,14 +113,14 @@ test('pool runs everything with bounded concurrency', async () => {
 
 test('chronicle without the index: known hashes are re-read and kept only if they belong to the account', async () => {
   const mk = (h, signer, receiver, method = 'set_clause', args = {}) => { const t = tx(signer, method, args, { signer, receiver, hash: h }); return t; };
-  const chain = { h1: mk('h1', 'owner.testnet', 'me.f.testnet'), h2: mk('h2', 'owner.testnet', 'f.testnet', 'create_charter', { name: 'me' }),
-    h3: mk('h3', 'owner.testnet', 'someone.testnet'), h4: mk('h4', 'owner.testnet', 'f.testnet', 'create_charter', { name: 'other' }) };
-  assert.equal(txOf(chain.h1, 'me.f.testnet'), true);
-  assert.equal(txOf(chain.h2, 'me.f.testnet'), true);
-  assert.equal(txOf(chain.h3, 'me.f.testnet'), false);
-  assert.equal(txOf(chain.h4, 'me.f.testnet'), false);
-  assert.equal(txOf(mk('h6', 'owner.testnet', 'f.testnet', 'set_owner', { name: 'me' }), 'me.f.testnet'), false, 'only create_charter names a new charter');
-  const j = await chronicleFrom('me.f.testnet', ['h1', 'h2', 'h3', 'h4', 'h5', 'h1'], 8, {
+  const chain = { h1: mk('h1', 'owner.near', 'me.f.near'), h2: mk('h2', 'owner.near', 'f.near', 'create_charter', { name: 'me' }),
+    h3: mk('h3', 'owner.near', 'someone.near'), h4: mk('h4', 'owner.near', 'f.near', 'create_charter', { name: 'other' }) };
+  assert.equal(txOf(chain.h1, 'me.f.near'), true);
+  assert.equal(txOf(chain.h2, 'me.f.near'), true);
+  assert.equal(txOf(chain.h3, 'me.f.near'), false);
+  assert.equal(txOf(chain.h4, 'me.f.near'), false);
+  assert.equal(txOf(mk('h6', 'owner.near', 'f.near', 'set_owner', { name: 'me' }), 'me.f.near'), false, 'only create_charter names a new charter');
+  const j = await chronicleFrom('me.f.near', ['h1', 'h2', 'h3', 'h4', 'h5', 'h1'], 8, {
     status: async h => { if (!chain[h]) throw new Error('unknown tx'); return chain[h]; }, blockAt: async () => null });
   assert.deepEqual(j.txs.map(t => [t.hash, t.method]), [['h1', 'set_clause'], ['h2', 'create_charter']]);
   assert.equal(j.partial, true); assert.match(j.source, /busy/);

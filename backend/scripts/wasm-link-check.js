@@ -3,7 +3,9 @@
 import { readFileSync } from 'node:fs';
 import crypto from 'node:crypto';
 import { Account, JsonRpcProvider, KeyPair, KeyPairSigner, actions as A } from 'near-api-js';
-const E = process.env, rpc = { mainnet: 'https://free.rpc.fastnear.com', testnet: 'https://rpc.testnet.fastnear.com' }[E.NET];
+const E = process.env;
+if (E.NET && E.NET !== 'mainnet') throw new Error('only mainnet is supported');
+const rpc = 'https://free.rpc.fastnear.com';
 const provider = new JsonRpcProvider({ url: rpc });
 const rk = JSON.parse(readFileSync(E.ROOT_KEY, 'utf8'));
 const root = new Account(E.ROOT_ID, provider, KeyPairSigner.fromSecretKey(rk.private_key || rk.secret_key));

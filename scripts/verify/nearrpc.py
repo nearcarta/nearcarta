@@ -1,11 +1,11 @@
-"""Tiny read-only NEAR testnet JSON-RPC helper for the verify scripts. No keys, no signing.
+"""Tiny read-only NEAR mainnet JSON-RPC helper for the verify scripts. No keys, no signing.
 NEAR_RPC sets the primary URL; NEAR_RPC_FALLBACKS (comma list) is tried when one answers 429/5xx or is unreachable."""
 import os, json, time, base64, urllib.request, urllib.error
 
-PRIMARY = os.environ.get("NEAR_RPC", "https://test.rpc.fastnear.com")
-FALLBACKS = [u.strip() for u in os.environ.get("NEAR_RPC_FALLBACKS", "https://rpc.testnet.fastnear.com,https://rpc.testnet.near.org,https://near-testnet.drpc.org").split(",") if u.strip()]
+PRIMARY = os.environ.get("NEAR_RPC", "https://free.rpc.fastnear.com")
+FALLBACKS = [u.strip() for u in os.environ.get("NEAR_RPC_FALLBACKS", "https://rpc.mainnet.near.org,https://rpc.mainnet.fastnear.com").split(",") if u.strip()]
 URLS = [PRIMARY] + [u for u in FALLBACKS if u != PRIMARY]
-TX_INDEX = os.environ.get("FASTNEAR_TX_API", "https://tx.test.fastnear.com")
+TX_INDEX = os.environ.get("FASTNEAR_TX_API", "https://api.fastnear.com")
 B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 

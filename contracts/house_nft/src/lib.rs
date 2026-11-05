@@ -215,7 +215,7 @@ mod tests {
     use near_sdk::testing_env;
 
     fn ctx(who: usize, deposit: u128) {
-        testing_env!(VMContextBuilder::new().current_account_id("deeds.testnet".parse().unwrap())
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
             .predecessor_account_id(accounts(who)).attached_deposit(NearToken::from_yoctonear(deposit)).build());
     }
 
@@ -223,12 +223,12 @@ mod tests {
     fn mint_own_deed_sets_owner_and_metadata() {
         ctx(0, 0); let mut c = Contract::new(None);
         ctx(1, 2 * 10u128.pow(22));
-        let t = c.mint_deed(Some("r11house-31474.testnet".parse().unwrap()), None);
+        let t = c.mint_deed(Some("r11house-31474.near".parse().unwrap()), None);
         assert_eq!(t.token_id, accounts(1).to_string());
         assert_eq!(t.owner_id, accounts(1));
         let m = t.metadata.unwrap();
         assert_eq!(m.title.unwrap(), format!("House of {}", accounts(1)));
-        assert!(m.description.unwrap().starts_with("Charter: r11house-31474.testnet"));
+        assert!(m.description.unwrap().starts_with("Charter: r11house-31474.near"));
         assert_eq!(c.nft_total_supply().0, 1);
         assert_eq!(c.nft_metadata().spec, NFT_METADATA_SPEC);
     }
@@ -316,8 +316,8 @@ mod tests {
     }
     // The deed is sold while a payout is in flight (house_pay sent the transfer; on_house_pay has not run yet).
     fn callback(ok: bool) {
-        testing_env!(VMContextBuilder::new().current_account_id("deeds.testnet".parse().unwrap())
-            .predecessor_account_id("deeds.testnet".parse().unwrap()).build(),
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id("deeds.near".parse().unwrap()).build(),
             near_sdk::test_vm_config(), near_sdk::RuntimeFeesConfig::test(), Default::default(),
             vec![if ok { PromiseResult::Successful(vec![]) } else { PromiseResult::Failed }]);
     }

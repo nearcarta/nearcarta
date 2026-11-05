@@ -50,7 +50,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 407 backend unit tests (404 pass, 3 skipped), offline
+npm test                                   # 405 backend unit tests (402 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -67,10 +67,10 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
 | toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 12 |
-| backend unit (`npm test`) | 407 (404 pass, 3 skipped) |
-| browser e2e against the live site | 22 passed, 12 skipped. The skipped tests need a funded key |
+| backend unit (`npm test`) | 405 (402 pass, 3 skipped) |
+| browser e2e | 124 passed, 2 skipped, 1 flaky on retry. The skips need a partner key or a NEAR AI key |
 
-The 12 skipped e2e tests sign real transactions and need a funded wallet key or an opt-in flag (`GUARD_E2E`, `VAULT_E2E`, `VAULT_AI_E2E`, `HALL_FILE`, `HOUSE_*_KEY_FILE`, a partner key, or the arena attack switch); they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
+The 2 skipped e2e tests need a 1Click partner key or a NEAR AI key; they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
 
 ### Security model
 - The agent signs with a function-call key limited to the charter and `propose`/`propose_batch`; it cannot attach deposits, transfer, or call owner methods.
@@ -174,11 +174,11 @@ The live path is a visitor's own row on `board.nearcarta.near`. A shared DAO is 
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 407 unit tests (404 pass, 3 skipped)
+npm test                 # 405 unit tests (402 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
-npx playwright install chromium && npm run e2e   # 34 browser tests: 22 run, 12 skip without wallet keys
+npx playwright install chromium && npm run e2e   # 127 browser tests: 124 passed, 2 skipped, 1 flaky
 ```
 Optional: `ONECLICK_PARTNER_KEY` enables confidential quotes. `NEARAI_CLOUD_API_KEY` enables the live NEAR AI TEE check (`npm run tee`; non-billable). Without them the public paths still run.
 
@@ -196,7 +196,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Pay | Open `/ferry-widget`, leave the amount at 0.2, press Pay | The charter is read first. A deposit address appears only when that recipient is allowlisted and the signed quote is at most 0.20 USD. The receipt uses the same keys, rail `intents`, and `tx` is the deposit address. Code: `backend/src/ferry-checkout.js`, `app/src/ferry-pay.js` | e2e "ferry checkout: mocked 1Click returns a deposit address only after the charter allows it"; unit `a refused recipient never asks 1Click, and an allowed one returns a deposit address` |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 407 unit tests (404 pass, 3 skipped):
-Proof rows (76/76 expected).
+# 405 unit tests (402 pass, 3 skipped):
+Proof rows (56/56 expected).
 `judges/proofs/e2e-vercel.json`: 22 passed, 12 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (12 tests, rustc 1.86).

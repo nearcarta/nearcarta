@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Repo-vs-live check: every file, proof, account and code hash cited by the live
 // /api/deployments, the live /api/vault/config, judges/VERIFY.md and README.md must
-// exist on origin/main and (for accounts and code hashes) on the NEAR testnet RPC.
+// exist on origin/main and (for accounts and code hashes) on the NEAR mainnet RPC.
 // Read-only: git reads, HTTP GETs and RPC view calls. Prints every miss, exits 1 on any miss.
 // Tx hashes are not checked here; `npm run verify` checks those.
 // Usage: node scripts/check-cited.mjs [--ref origin/main] [--api https://nearcarta.vercel.app]
@@ -15,11 +15,11 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 const REF = arg('--ref', 'origin/main');
 const API = arg('--api', 'https://nearcarta.vercel.app').replace(/\/$/, '');
 const JSON_OUT = arg('--json', null);
-const RPCS = ['https://rpc.testnet.fastnear.com', 'https://test.rpc.fastnear.com', 'https://rpc.testnet.near.org'];
+const RPCS = ['https://rpc.mainnet.fastnear.com', 'https://free.rpc.fastnear.com', 'https://rpc.mainnet.near.org'];
 const RPCS_MAIN = ['https://rpc.mainnet.fastnear.com', 'https://rpc.mainnet.near.org'];
 const DOCS = ['judges/VERIFY.md', 'README.md'];
 // accounts the docs cite on purpose as never created (attack payees); a miss if they ever exist
-const MUST_NOT_EXIST = new Map([['r6vamvr9brhx-b0b.testnet', 'allowlist look-alike payee in the Arena scam set']]);
+const MUST_NOT_EXIST = new Map([['r6vamvr9brhx-b0b.near', 'allowlist look-alike payee in the Arena scam set']]);
 
 const git = (...a) => execFileSync('git', a, { maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] });
 if (!process.argv.includes('--no-fetch')) { try { git('fetch', '-q', 'origin'); } catch { console.error('warn: git fetch failed, using the local ' + REF); } }
@@ -68,7 +68,7 @@ function account(id) {
 // citation collection
 const cites = []; // {kind, value, where, ...extra}
 const add = (kind, value, where, extra = {}) => cites.push({ kind, value, where, ...extra });
-const ACC = /(?<![\w.<>/-])((?:[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\.(?:testnet|near))(?![\w-]|\.[a-z])/g;
+const ACC = /(?<![\w.<>/-])((?:[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\.near)(?![\w-]|\.[a-z])/g;
 const ROOTS = '(?:contracts|judges|backend|app|shared|docs|e2e|scripts|design|\\.github)';
 const PATH = new RegExp(`(?<![\\w/.:@-])(${ROOTS}/[A-Za-z0-9_./-]*[A-Za-z0-9_])(/?\\.?\\{[^}\\s]+\\})?`, 'g');
 const TOP = /(?<![\w/.-])((?:README|SECURITY|AGENTS)\.md|LICENSE|package\.json|render\.yaml|vercel\.json|Dockerfile)(?![\w/-])/g;
@@ -113,7 +113,7 @@ function walkJson(o, where, parent = null) {
       else if (/sha256$/.test(k) && /^[0-9a-f]{64}$/.test(v)) add('sha256', v, w, { file: o[k.replace(/_?sha256$/, '_artifact')] || (k === 'wasm_sha256' ? o.wasm : null) || (k === 'code_sha256' ? null : null) });
       if (/^(url|explorer|explorer_api|zcash_explorer_api|rpc|oneclick)$/.test(k) || /^https?:/.test(v)) continue;
       pathsIn(v, w);
-      if (!/^(scheme|memo|note|story|purpose|how|contains|held_by|rotated|standard|name)$/.test(k) || /\.testnet\b/.test(v)) accountsIn(v, w);
+      if (!/^(scheme|memo|note|story|purpose|how|contains|held_by|rotated|standard|name)$/.test(k) || /\.near\b/.test(v)) accountsIn(v, w);
     } else if (typeof v === 'number' && /full_access_keys$/.test(k)) {
       const acc = k === 'factory_full_access_keys' ? o.factory : target;
       if (acc) add('fa_keys', acc, w, { expect: v });
@@ -172,7 +172,7 @@ for (const c of cites) {
   if (c.kind === 'account') {
     if (dup) continue; const a = accInfo.get(c.value);
     if (MUST_NOT_EXIST.has(c.value)) { a ? miss(c, `should not exist (${MUST_NOT_EXIST.get(c.value)}) but does`) : ok(c); continue; }
-    if (a?.error) miss(c, `RPC error: ${a.error}`); else if (!a) miss(c, `account does not exist on ${c.value.endsWith('.near') ? 'mainnet' : 'testnet'}`); else ok(c);
+    if (a?.error) miss(c, `RPC error: ${a.error}`); else if (!a) miss(c, 'account does not exist on mainnet'); else ok(c);
     continue;
   }
   if (c.kind === 'fa_keys') {
