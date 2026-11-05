@@ -355,11 +355,13 @@ export function makeApp() {
     if (!nearAccountOk(owner)) return bad(c, 'not a NEAR account');
     const board = MAINNET_DEP?.board?.contract;
     if (!board) return c.json({ error: 'no board' }, 404);
+    const fresh = c.req.query('fresh') === '1';
     try {
-      const row = await view(board, 'get_charter', { owner });
-      return c.json({ owner, board, row: row || null });
+      const row = await view(board, 'get_charter', { owner }, cfg.rpc, { fresh });
+      if (fresh) c.header('Cache-Control', 'no-store');
+      return c.json({ owner, board, row: row || null, fresh });
     } catch (e) {
-      if (/does not exist|UNKNOWN|MethodNotFound|not found|no charter/i.test(String(e.message))) return c.json({ owner, board, row: null });
+      if (/does not exist|UNKNOWN|MethodNotFound|not found|no charter/i.test(String(e.message))) return c.json({ owner, board, row: null, fresh });
       throw e;
     }
   });
@@ -381,9 +383,10 @@ export function makeApp() {
     try {
       const body = await txStatus(hash, sender);
       const v = txVerdict(body);
-      return c.json({ hash, sender, pass: v.pass, why: v.why });
+      const final = body?.final_execution_status === 'FINAL' || !!body?.status;
+      return c.json({ hash, sender, pass: v.pass, why: v.why, final });
     } catch (e) {
-      return c.json({ hash, sender, pass: false, why: String(e.message || 'no status').slice(0, 160) });
+      return c.json({ hash, sender, pass: false, why: String(e.message || 'no status').slice(0, 160), final: false });
     }
   });
   app.get('/api/guardhouse/board', limiter(20), async c => {

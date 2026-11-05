@@ -48,10 +48,11 @@ async function once(url, method, params) {
   return j.result;
 }
 
-export async function rpc(method, params, url = cfg.rpc) {
+export async function rpc(method, params, url = cfg.rpc, opts = {}) {
   rpcStats.calls++;
+  const fresh = opts?.fresh === true;
   const finalityOk = !params || params.finality !== 'optimistic';
-  const key = CACHEABLE.has(method) && finalityOk ? method + JSON.stringify(params) : null;
+  const key = !fresh && CACHEABLE.has(method) && finalityOk ? method + JSON.stringify(params) : null;
   const hit = key && cache.get(key);
   if (hit && Date.now() - hit.at < cfg.rpcCacheMs) { rpcStats.cacheHits++; return hit.value; }
   // A caller that passes its own URL (e.g. mainnet views) gets retries on that URL only.
@@ -79,15 +80,15 @@ export async function rpc(method, params, url = cfg.rpc) {
     if (round + 1 < cfg.rpcRetries) await sleep(Math.min(Math.max(cfg.rpcBackoffMs * 2 ** round, waitHint), cfg.rpcBackoffMaxMs) + Math.floor(Math.random() * 150));
   }
   rpcStats.lastError = { at: new Date().toISOString(), message: String(last?.message).slice(0, 200) };
-  if (hit && Date.now() - hit.at < cfg.rpcStaleMs) { rpcStats.staleServed++; return hit.value; }
+  if (!fresh && hit && Date.now() - hit.at < cfg.rpcStaleMs) { rpcStats.staleServed++; return hit.value; }
   throw last ?? new Error(`rpc ${method}: no attempt made (rpcRetries < 1)`);
 }
 
-export async function view(accountId, method, args = {}, url = cfg.rpc) {
+export async function view(accountId, method, args = {}, url = cfg.rpc, opts = {}) {
   const res = await rpc('query', {
     request_type: 'call_function', finality: 'final', account_id: accountId, method_name: method,
     args_base64: Buffer.from(JSON.stringify(args)).toString('base64'),
-  }, url);
+  }, url, opts);
   if (res.error) throw new Error(`view ${accountId}.${method}: ${res.error}`);
   const txt = Buffer.from(res.result).toString('utf8');
   return txt ? JSON.parse(txt) : null;
