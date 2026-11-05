@@ -178,6 +178,13 @@ body[data-shop=bank] .payee-id{
 .tee-steps li{min-height:1.45em}
 .tee-steps [data-step=request]{min-height:2.9em}
 .tee-line{margin:0;min-height:1.45em;color:#fff8ee;font-size:16px;line-height:1.45}
+.hall-meta div:has(> dd.row-id){display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.hall-meta dd.row-id{display:flex;flex-direction:column;align-items:flex-start;gap:10px;flex-wrap:nowrap;width:100%;overflow-wrap:anywhere}
+.hall-facts code,.hall-meta [data-testid=hall-row-id],.hall-meta [data-testid=hall-row-full]{color:#fff8ee;font-size:16px;font-weight:650;line-height:1.4}
+.hall-meta [data-testid=hall-row-id]{white-space:nowrap}
+.hall-meta [data-testid=hall-row-full]{display:block;max-width:100%;overflow-wrap:anywhere}
+#row-form [data-testid=hall-cap]{color:#fff8ee;font-size:16px;min-height:44px}
+#row-form button.copy-id{grid-column:auto;align-self:flex-start;margin:0}
 .deed-mint{margin:0;padding-top:18px}
 button.copy-id{flex:none}
 
