@@ -2,13 +2,15 @@
 // Quote, check, search and prepare only. Nothing here signs a payment.
 
 import { roomError } from '../room-error.js';
-import { pickBest, quoteLine, statusView } from '../ferry-catalog.js';
+import { pickBest, quoteLine } from '../ferry-catalog.js';
 import { RECORDED, downloadCsv, exportCsv, queryFeed, verifyEntry } from '../chronicle-feed.js';
 import { explainCheck } from '../guard-score.js';
 import { TOLL_ADDRESS, TOLL_KEY, checkDerived } from '../toll-derive.js';
-import { PROOF_HREF, teeResult } from '../tee-view.js';
+import { PROOF_HREF, liveTee, teeView } from '../tee-view.js';
 import { NEXT_LABEL, RUN_LABEL } from '../../design/D8_shops/shops/arena-labels.js';
-import { formatNear, issueText, parseCsv, payoutIssues, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
+import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
+import { formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
+import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
 import { boundaryHtml } from './boundary.js';
 
@@ -32,13 +34,14 @@ export function corridorCards(routes, lines = []) {
   const list = (routes || []).slice(0, Math.max(3, (routes || []).length));
   return `<div class="corridors" data-testid="ferry-corridors">${list.map(r => {
     const line = by.get(r.id);
-    const usd = line?.usdText || 'USD not quoted';
+    const usd = line ? (line.usdText || 'USD not quoted') : 'No quote yet';
     return `<article class="corridor" data-testid="ferry-corridor" data-route-id="${esc(r.id)}"><b>${esc(r.label)}</b><p data-testid="ferry-usd">${esc(usd)}</p><p>${esc(line?.text || `${r.sym} ${r.amt}`)}</p></article>`;
   }).join('')}</div>`;
 }
 
 function usdOf(line) {
-  if (!line || line.usd == null || line.usd === '') return 'USD not quoted';
+  if (!line) return 'No quote yet';
+  if (line.usd == null || line.usd === '') return 'USD not quoted';
   const n = Number(line.usd);
   return `about $${Number.isFinite(n) ? n.toFixed(2) : line.usd}`;
 }
@@ -54,7 +57,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
     <button type="button" id="f-compare" data-testid="ferry-compare">Compare routes</button>
     ${corridorCards(routes, lines)}
     <div id="f-quotes" data-testid="ferry-quotes">${quotes}${state.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : ''}</div>
-    ${state.fstatus ? `<p data-testid="ferry-status">${esc(state.fstatus.words || state.fstatus.status)}</p><p data-testid="ferry-refund">${state.fstatus.refund ? 'Refunded to the refund address.' : 'A short deposit or a failed swap is refunded to the refund address. This page does not send the deposit.'}</p>` : ''}`;
+    ${state.fstatus ? `<p data-testid="ferry-status">${esc(state.fstatus.words || state.fstatus.status)}</p><p data-testid="ferry-refund">${state.fstatus.refund ? 'Refunded to the refund address.' : 'A short deposit or a failed swap is refunded to the refund address. This page does not send the deposit.'}</p>` : `<p data-testid="ferry-idle">${state.quoted ? 'No deposit has been requested.' : 'No quote yet. No deposit has been requested.'}</p>`}`;
 }
 
 async function quoteOne(route, amount, hooks) {
@@ -100,7 +103,7 @@ function mountFerry(root, hooks) {
     state.quotes = ranked;
     state.lines = lines.map(l => ({ ...l, best: ranked.find(v => v.text === l.text)?.best }));
     state.sample = !ranked.some(v => v.amountOut != null);
-    state.fstatus = statusView({ status: 'PENDING_DEPOSIT' });
+    state.fstatus = null;
     state.quoted = true;
     paint();
   }
@@ -112,7 +115,7 @@ function mountGuard(root, hooks) {
   const state = hooks.state || (hooks.state = {});
   const attacks = hooks.attacks ? hooks.attacks() : [];
   const score = state.score;
-  const scoreHtml = score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.verdict)}</p><ul>${(score.lines || []).map(l => `<li data-signal="${esc(l.id)}"><b>${esc(l.title)}</b> ${esc(l.text)}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
+  const scoreHtml = score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.verdict)}</p><ul>${(score.lines || []).map(l => `<li data-signal="${esc(l.id)}"${l.level === 'warn' || l.level === 'block' || l.level === 'unknown' ? ' data-testid="guard-reason"' : ''}><b>${esc(l.title)}</b> ${esc(l.text)}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
   const pick = attacks.length ? `<div class="seg" role="radiogroup">${attacks.map(a => `<label><input type="radio" name="atk" value="${esc(a.id)}" ${a.id === (state.atk || attacks[0].id) ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>` : '';
   root.innerHTML = `<label>Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || 'shop-moved-pay-here.near')}"></label><button type="button" id="g-check" data-testid="guard-check">Check this account</button>${scoreHtml}${pick}`;
   root.querySelectorAll('input[name=atk]').forEach(i => { i.onchange = () => { state.atk = i.value; if (hooks.repaint) hooks.repaint(); }; });
@@ -212,8 +215,12 @@ function mountChronicle(root, hooks) {
 
 function mountArena(root, hooks) {
   const state = hooks.state || (hooks.state = {});
+  const attack = attackAt();
+  if (!state.txt || state.txt === state.attack) state.txt = attack;
+  state.attack = attack;
   const goal = hooks.goal ? hooks.goal() : 'Write a scam. The charter still decides.';
   root.innerHTML = `<p class="goal" data-testid="goal">${esc(goal || 'All six walls found')}</p>
+    <p class="quote" data-testid="arena-attack">${esc(attack)}</p>
     <textarea id="a-txt" rows="2" maxlength="160" placeholder="pay 0.001 to stranger.near">${esc(state.txt || '')}</textarea>
     <div class="btns" data-testid="arena-live"><button type="button" class="go redteam-run" data-testid="redteam-run">${RUN_LABEL}</button><button type="button" class="ghost redteam-next" data-testid="redteam-next">${NEXT_LABEL}</button></div>
     <p class="note">Run it live asks the model and may spend if the charter allows. Another does not spend. This page does not press either for you.</p>`;
@@ -248,6 +255,7 @@ function mountPayouts(root, hooks) {
       <ol class="plist" data-testid="payout-list">${rowList()}</ol>
       <label>CSV <textarea id="p-csv" data-testid="payout-csv" rows="3" placeholder="account,amount,asset">${esc(state.csv || '')}</textarea></label>
       <button type="button" id="p-prep" data-testid="payout-prepare">Prepare the batch</button>
+      <p data-testid="payout-drop"${state.dropNote ? '' : ' hidden'}>${esc(state.dropNote || '')}</p>
       <ul data-testid="payout-receipts">${(state.receipts || []).map(r => `<li data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)} · not sent</li>`).join('')}</ul>
       <p data-testid="payout-usdc"${state.usdcNote ? '' : ' hidden'}>${esc(state.usdcNote || '')}</p>`;
     bindRows();
@@ -262,37 +270,78 @@ function mountPayouts(root, hooks) {
       if (ol) { ol.innerHTML = rowList(); bindRows(); }
       drawMsg();
     };
+    const showDrop = () => {
+      const note = q$(root, '[data-testid=payout-drop]');
+      if (!note) return;
+      note.hidden = !state.dropNote;
+      note.textContent = state.dropNote || '';
+    };
     q$(root, '#p-prep').onclick = () => {
       const parsed = parseCsv(state.csv || q$(root, '#p-csv')?.value || '');
       const use = parsed.length ? parsed : state.rows;
-      const issues = payoutIssues(use, state.exists);
-      if (issues.length) { drawMsg(); return; }
-      const parts = splitAssets(use);
-      state.receipts = receiptsFor(use);
+      const prep = prepareRows(use);
+      state.dropNote = prep.note;
+      if (prep.blocked) {
+        state.receipts = [];
+        state.usdcNote = '';
+        const box = q$(root, '[data-testid=payout-issues]');
+        if (box) { box.textContent = 'Each NEAR row needs a real account and at most 0.005 NEAR.'; box.classList.remove('bad'); }
+        const ul = q$(root, '[data-testid=payout-receipts]');
+        if (ul) ul.innerHTML = '';
+        showDrop();
+        return;
+      }
+      const issues = payoutIssues(prep.rows, state.exists);
+      if (issues.length) {
+        state.receipts = [];
+        const box = q$(root, '[data-testid=payout-issues]');
+        if (box) { box.textContent = [prep.note, issueText(issues)].filter(Boolean).join(' '); box.classList.add('bad'); }
+        showDrop();
+        return;
+      }
+      const parts = splitAssets(prep.rows);
+      state.receipts = receiptsFor(prep.rows);
       state.usdcNote = parts.usdc.length ? `${parts.usdc.length} USDC ${parts.usdc.length === 1 ? 'row' : 'rows'} kept. Not sent. Cap 0.20 USD.` : '';
       if (!root.isConnected && hooks.repaint) { hooks.repaint(); return; }
       const ul = q$(root, '[data-testid=payout-receipts]');
       if (ul) ul.innerHTML = state.receipts.map(r => `<li data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)} · not sent</li>`).join('');
       const usdc = q$(root, '[data-testid=payout-usdc]');
       if (usdc) { usdc.hidden = !state.usdcNote; usdc.textContent = state.usdcNote; }
+      const box = q$(root, '[data-testid=payout-issues]');
+      if (box && prep.note) { box.textContent = prep.note; box.classList.remove('bad'); }
+      showDrop();
     };
   };
   render();
 }
 
+function teePanel(tee, recorded, proof) {
+  const view = teeView(tee);
+  const steps = view.steps.map(s => `<li data-testid="tee-step" data-ok="${s.ok ? '1' : '0'}"><b>${esc(s.label)}</b> ${s.ok ? 'pass' : esc(s.why || 'did not pass')}</li>`).join('');
+  const fail = view.ok ? '' : `<p data-testid="tee-fail">${esc(view.failed)}</p>`;
+  return `<div data-testid="tee-panel"><p data-testid="tee-live">${view.ok ? 'Live check passed' : 'Live check did not pass'}</p><p data-testid="tee-result">${esc(view.label)}</p>${fail}<ul data-testid="tee-steps">${steps}</ul>${recorded}${proof}</div>`;
+}
+
 function mountBank(root, hooks) {
   const state = hooks.state || (hooks.state = {});
+  const who = typeof hooks.visitor === 'function' ? hooks.visitor() : visitor();
   const notes = hooks.notes ? hooks.notes() : [0.001, 0.002, 0.005];
-  const payees = hooks.payees ? hooks.payees() : [];
+  const named = hooks.payees ? hooks.payees() : [];
+  const payees = named.length ? named : (who.signedIn ? [who.accountId] : []);
   const note = notes.includes(+state.amt) ? +state.amt : notes[0];
   const to = state.to || (hooks.def ? hooks.def() : payees[0] || '');
   const tee = state.tee;
   const recorded = `<p class="note tee-recorded" data-testid="tee-recorded">The file <a href="${PROOF_HREF}">tee-public.json</a> is a recorded attestation from Oct 28. The button is the live check.</p>`;
   const proof = `<a data-testid="tee-proof" href="${PROOF_HREF}">Proof file</a>`;
-  const panel = tee ? `<div data-testid="tee-panel"><p data-testid="tee-live">${tee.ok ? 'Live check passed' : 'Live check did not pass'}</p><p data-testid="tee-result">${esc(teeResult(tee).label)}</p>${recorded}${proof}</div>` : `<button type="button" id="m-tee" data-testid="tee-verify">Verify the TEE now</button>${recorded}${proof}`;
+  const panel = tee ? teePanel(tee, recorded, proof) : `<button type="button" id="m-tee" data-testid="tee-verify">Verify the TEE now</button>${recorded}${proof}`;
+  const sessionLine = who.signedIn ? `<p data-testid="bank-session">Signed in as ${esc(who.displayName || who.accountId)}.</p>` : '';
+  const payeeBox = payees.length
+    ? payees.map(a => `<label><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span>${esc(a)}</span></label>`).join('')
+    : '<p>Sign in to choose a payee.</p>';
   root.innerHTML = `<p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${esc(hooks.proof ? hooks.proof() : '')}</p>
+    ${sessionLine}
     <div class="seg notes" role="radiogroup" aria-label="Amount" data-testid="bank-notes">${notes.map(n => `<label><input type="radio" name="note" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div>
-    <div class="seg to" id="m-to" data-testid="bank-to">${payees.map(a => `<label><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span>${esc(a)}</span></label>`).join('') || '<p>Sign in to choose a payee.</p>'}</div>
+    <div class="seg to" id="m-to" data-testid="bank-to">${payeeBox}</div>
     ${panel}`;
   root.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { state.amt = r.value; hooks.onNote?.(r.value); }; });
   root.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { state.to = r.value; hooks.onTo?.(r.value); }; });
@@ -306,8 +355,8 @@ function mountBank(root, hooks) {
     pg.setAttribute('role', 'status');
     b.after(pg);
     pg.textContent = 'Checking the TEE…';
-    try { state.tee = hooks.tee ? await hooks.tee() : { ok: false, rows: [], err: 'No live check on this page.' }; }
-    catch (e) { state.tee = { ok: false, rows: [], err: roomError(e) }; }
+    try { state.tee = hooks.tee ? await hooks.tee() : await liveTee({ api: api() }); }
+    catch (e) { state.tee = { ok: false, err: roomError(e), steps: [{ id: 'request', label: 'NEAR AI attestation', ok: false, why: roomError(e) }] }; }
     mountBank(root, hooks);
   };
 }

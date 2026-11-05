@@ -1,24 +1,33 @@
 // Plain words for one counterparty check. The API returns the signals. This only labels them.
 
+const EMPTY_CODE = '11111111111111111111111111111111';
+
 export function explainCheck(check) {
   const s = check?.signals || {};
   const reasons = Array.isArray(check?.reasons) ? check.reasons : [];
   const code = id => reasons.find(r => r.code === id);
+  const codes = new Set(reasons.map(r => r.code));
   const hours = s.age_ms == null ? null : Math.max(1, Math.round(Number(s.age_ms) / 3600_000));
+  const fetchFailed = codes.has('account_missing');
+  const emptyHash = !s.code_hash || s.code_hash === EMPTY_CODE;
+  const noContract = !fetchFailed && (emptyHash || codes.has('code_unknown') || (codes.has('unconfirmed') && emptyHash));
+  const noFirst = !fetchFailed && (s.age_ms == null || codes.has('age_unknown'));
   const lines = [
     {
       id: 'age',
-      title: 'Account age',
-      level: hours == null ? 'unknown' : (code('new_account') ? 'warn' : 'info'),
-      text: hours == null ? 'The index did not return a first-seen time.' : `First seen ${hours} h ago.`,
+      title: 'First seen',
+      level: noFirst || code('new_account') ? 'warn' : (hours == null ? 'unknown' : 'info'),
+      text: noFirst || hours == null ? 'A first-seen time is not available.' : `First seen ${hours} h ago.`,
     },
     {
       id: 'code',
       title: 'Code hash',
-      level: code('code_changed') ? 'warn' : 'info',
+      level: code('code_changed') || noContract ? 'warn' : 'info',
       text: s.code_changed_ms != null
         ? `Contract code changed ${Math.max(1, Math.round(s.code_changed_ms / 3600_000))} h ago.`
-        : (s.code_hash ? `Code hash ${s.code_hash}. No recent change in the window.` : 'This account has no contract code hash.'),
+        : (noContract
+          ? 'The code hash is empty, so this account has no contract.'
+          : (s.code_hash ? `Code hash ${s.code_hash}. No recent change in the window.` : 'This account has no contract code hash.')),
     },
     {
       id: 'lookalike',
@@ -42,5 +51,10 @@ export function explainCheck(check) {
       tx: s.deny?.evidence?.[0] || '',
     },
   ];
+  const covered = new Set(['age_unknown', 'code_unknown', 'unconfirmed', 'new_account', 'code_changed', 'denylisted']);
+  for (const r of reasons) {
+    if (!r?.code || covered.has(r.code)) continue;
+    lines.push({ id: r.code, title: 'Check', level: r.level || 'warn', text: r.text || r.code });
+  }
   return { account: check?.account || s.account || '', verdict: check?.verdict || 'warn', lines };
 }

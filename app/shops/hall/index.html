@@ -19,7 +19,7 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
 <header class="top">
   <div><a class="back-town" href="/" data-testid="back-town" aria-label="Back to town">Back to town</a><h1>Town Hall</h1><p class="sub">Your row on the board. <span class="net" data-testid="net-badge">mainnet</span></p><p class="muted">set_rules, set_frozen and set_seal. Gas only. A shared council is not built.</p></div>
   <div class="who"><span id="who"></span>
-    <a id="connect" class="primary" data-testid="connect" href="/setup/?next=%2Fshops%2Fhall%2F">Sign in</a></div>
+    <a id="connect" class="primary" data-testid="connect" href="/setup/?next=%2Fshops%2Fhall%2F" hidden>Sign in</a></div>
 </header>
 <main id="room" class="shop-page" data-testid="shop-room"></main>
 <script type="module" src="/panels/boot.js"></script>
