@@ -103,3 +103,33 @@ export function orderChipHtml(stateId) {
   const s = ORDER_STATES[stateId] || ORDER_STATES.jetty;
   return `<span class="ferry-order-chip" data-testid="ferry-order-chip" data-state="${s.id}">${s.label}</span>`;
 }
+
+/** YoctoNEAR rounded to 1e-6 NEAR. Same rounding as apps.js `toY`. */
+function yoctoOfNear(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) throw new Error('ferry stamp is not a number');
+  return BigInt(Math.round(x * 1e6)) * 10n ** 18n;
+}
+
+function yoctoOrNull(v) {
+  if (v == null || v === '') return null;
+  return BigInt(v);
+}
+
+/**
+ * Ask-charter stamp in yoctoNEAR.
+ * The USD-scaled fee can sit above a board row's per_action_cap (a ~$3 quote is
+ * 0.03 NEAR; a setup row often caps one payment at 0.005). Clamp down to that cap.
+ * If the result is under min_amount and that floor still fits in the cap, lift to it.
+ * The stamp is never above a positive cap. No cap leaves the fee unchanged.
+ */
+export function ferryStampYocto(near, { capYocto = null, minYocto = null } = {}) {
+  let amt = yoctoOfNear(near);
+  const cap = yoctoOrNull(capYocto);
+  const min = yoctoOrNull(minYocto);
+  const hasCap = cap != null && cap > 0n;
+  if (hasCap && amt > cap) amt = cap;
+  if (min != null && min > 0n && amt < min && (!hasCap || min <= cap)) amt = min;
+  if (hasCap && amt > cap) amt = cap;
+  return amt.toString();
+}

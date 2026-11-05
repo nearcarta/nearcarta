@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   toAsset, pairClauseId, isFerryClauseId, parsePairClauseId,
-  parseAgentFerry, orderChipHtml, ORDER_STATES, chainLabel,
+  parseAgentFerry, orderChipHtml, ORDER_STATES, chainLabel, ferryStampYocto,
 } from '../../../app/src/panels/ferry-pair.js';
 import { ferryMarkup, DEFAULT_ROUTES } from '../../../app/src/panels/deep.js';
 
@@ -110,6 +110,69 @@ test('rules sheet allows dynamic ferry pairs beyond 3 corridors (source)', () =>
   assert.match(apps, /isFerryClauseId/);
   assert.match(apps, /ferryClauseForPair/);
   assert.match(apps, /wanted/);
+});
+
+const yocto = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
+// Same fee as apps.js ferryNear: max(0.001, round(usd * 0.01 * 1000) / 1000).
+const ferryNearOf = usd => Math.max(0.001, Math.round(Number(usd) * 0.01 * 1000) / 1000);
+
+test('a board-path Ask charter stamp cannot exceed per_action_cap', () => {
+  // Live row (Scholar, board.nearcarta.near): cap 0.005 NEAR, min 0.0001. A $3 quote is 0.03 NEAR.
+  const cap = yocto(0.005);
+  const min = yocto(0.0001);
+  const raw = ferryNearOf(3);
+  assert.equal(raw, 0.03);
+  const stamp = ferryStampYocto(raw, { capYocto: cap, minYocto: min });
+  assert.equal(stamp, cap);
+  assert.ok(BigInt(stamp) <= BigInt(cap));
+  assert.ok(BigInt(stamp) >= BigInt(min));
+  // Under the cap, the fee stays (still at least the floor).
+  assert.equal(ferryStampYocto(0.001, { capYocto: cap, minYocto: min }), yocto(0.001));
+  // Floor lifts when it still fits inside the cap.
+  assert.equal(ferryStampYocto(0.001, { capYocto: cap, minYocto: yocto(0.002) }), yocto(0.002));
+  // A floor above the cap does not push the stamp over the cap.
+  assert.equal(ferryStampYocto(0.03, { capYocto: yocto(0.001), minYocto: yocto(0.002) }), yocto(0.001));
+  // No cap: the USD-scaled fee is unchanged (non-board path).
+  assert.equal(ferryStampYocto(0.03, {}), yocto(0.03));
+  for (const usd of [0.5, 1, 3, 10, 50]) {
+    const fee = ferryNearOf(usd);
+    const got = ferryStampYocto(fee, { capYocto: cap, minYocto: min });
+    assert.ok(BigInt(got) <= BigInt(cap), `usd ${usd} stamp ${got} over cap`);
+    assert.ok(BigInt(got) >= BigInt(min), `usd ${usd} stamp ${got} under min`);
+  }
+});
+
+test('board Ask charter uses the clamped stamp and the payee allowlist (source)', () => {
+  const apps = read('app/design/D8_shops/js/apps.js');
+  assert.match(apps, /function ferryAmountY\(q\)/);
+  assert.match(apps, /if \(!S\.board\) return toY\(raw\)/);
+  assert.match(apps, /ferryStampYocto\(raw, \{ capYocto: c\.per_action_cap \|\| null, minYocto: c\.min_amount \|\| null \}\)/);
+  assert.match(apps, /amountY: ferryAmountY\(q\)/);
+  // Payee fallback from d328b04 stays: route receivers, else pay, else the board row.
+  assert.match(apps, /clauses\[route\]\?\.receivers \|\| S\.clauses\.pay\?\.receivers \|\| S\.boardRow\?\.receivers/);
+  const ui = read('app/design/D8_shops/js/shopui.js');
+  assert.match(ui, /extra\.charterNote = `Charter refused the trip:/);
+  const deep = read('app/src/panels/deep.js');
+  assert.match(deep, /data-testid="ferry-charter-note"/);
+  assert.match(deep, /state\.charterNote/);
+});
+
+test('ferry tray shows the charter refusal inside the card', () => {
+  const html = ferryMarkup({
+    fromId: 'USDC|base', toId: 'ZEC|zec', amt: '3',
+    q: { from: { symbol: 'USDC', amount: '3' }, to: { symbol: 'ZEC', amount: '0.002' } },
+    charterReady: true,
+    charterNote: 'Charter refused the trip: more than your max per payment. The boat stays at the jetty.',
+  }, DEFAULT_ROUTES);
+  assert.match(html, /data-testid="ferry-charter-note"/);
+  assert.match(html, /more than your max per payment/);
+  assert.match(html, /data-testid="ferry-ask-charter"/);
+  const quiet = ferryMarkup({
+    fromId: 'USDC|base', toId: 'ZEC|zec', amt: '3',
+    q: { from: { symbol: 'USDC', amount: '3' }, to: { symbol: 'ZEC', amount: '0.002' } },
+    charterReady: true,
+  }, DEFAULT_ROUTES);
+  assert.doesNotMatch(quiet, /ferry-charter-note/);
 });
 
 test('ferryPayee falls back to pay/board receivers on board sessions (source)', () => {
