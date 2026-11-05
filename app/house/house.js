@@ -1,8 +1,12 @@
 // Your House: the owner governs their own charter from their own NEAR wallet.
 // The page never holds a key. Wallets connect through NEAR Connect (@hot-labs/near-connect): each wallet's
 // code runs in a sandboxed iframe, and every freeze / unfreeze / approve / deny is approved in the wallet, one by one.
-// Sign-in asks for no access key.
+// On mainnet, sign-in asks for a function-call key on the board (propose and propose_call, gas only).
+// https://docs.near.org/web3-apps/tutorials/wallet-login
 import { NearConnector } from '@hot-labs/near-connect';
+import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
+import { AGENT_METHODS, GAS_ALLOWANCE_YOCTO } from '../../shared/board/session.js';
+import { createBoardKeyPlugin } from './board-key.js';
 import { addPrivy, NEAR_NET } from './privy.js';
 import { decoratePicker } from '../shops/vault/picker.js';
 // Lazy: NEAR Connect only awaits this when a WalletConnect wallet is used, so the client loads on demand.
@@ -31,6 +35,11 @@ function connectorFor(network) {
   if (connectors.has(network)) return connectors.get(network);
   decoratePicker();
   const c = new NearConnector({ network, features: { [network]: true, signAndSendTransaction: true }, footerBranding: null, walletConnect, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
+  if (network === 'mainnet') {
+    c.__boardKey = c.use(createBoardKeyPlugin({
+      contractId: MAIN.board.contract, methodNames: AGENT_METHODS, allowance: GAS_ALLOWANCE_YOCTO,
+    })).catch(() => {});
+  }
   connectors.set(network, c);
   if (!connector && network === NEAR_NET) connector = c;
   // The picker's "⋯" header button has no text: name it for screen readers and hover.
@@ -64,8 +73,10 @@ async function accountOf(c) {
 export async function account() { return accountOf(wallet()); }
 export async function mainnetAccount() { return accountOf(mainnetWallet()); }
 // Opens the wallet list, then signs in. `note` gets plain-text progress and errors (never swallowed).
+export function readyBoardKey() { return mainnetWallet().__boardKey || Promise.resolve(); }
 export async function connect(note = () => {}, network = NEAR_NET) {
   const c = network === 'mainnet' ? mainnetWallet() : wallet();
+  if (network === 'mainnet') await readyBoardKey();
   const main = network === 'mainnet';
   let id;
   try { id = await c.selectWallet(); } catch { note(''); return accountOf(c); }
@@ -95,6 +106,7 @@ export async function restoreWallet() {
   const live = await peekAccount(1500);
   if (live) { writeSession({ accountId: live, walletId, displayName: saved.displayName || '' }); return live; }
   if (!walletId) return null;
+  await readyBoardKey();
   await mainnetWallet().connect({ walletId });
   const id = await peekAccount(4000);
   if (id) writeSession({ accountId: id, walletId, displayName: saved.displayName || '' });

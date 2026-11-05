@@ -6,7 +6,7 @@ import { Buffer } from 'buffer';
 globalThis.Buffer = globalThis.Buffer || Buffer;
 import Privy, { LocalStorage, create as createWallet } from '@privy-io/js-sdk-core';
 import qrcode from 'qrcode-generator';
-import { wallet, mainnetWallet, account, mainnetAccount, connect, disconnect, onWallet } from './house.js';
+import { wallet, mainnetWallet, account, mainnetAccount, connect, disconnect, onWallet, readyBoardKey } from './house.js';
 import { balanceOn } from './onboard.js';
 import { setupJourney } from '../../shared/setup/path.js';
 import { tryTiles } from '../../shared/setup/try-tiles.js';
@@ -14,6 +14,8 @@ import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
+import { AGENT_METHODS, CALLS_DEPOSIT_YOCTO, SESSION_HOURS, callPolicy, sessionExpiresAt, sessionLabel } from '../../shared/board/session.js';
+import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
 import { runAsk } from '../../shared/vault/run.js';
 import { LOOKS, DYES, OUTFITS, portraitHTML, writeHero, displayOk } from './hero.js';
@@ -45,7 +47,7 @@ const STEPS = [
   ['sign', 'Sign', 'Charter and agent key'],
   ['try', 'Try it', 'One yes, one no'],
 ];
-const st = Object.assign({ step: 0, done: [], trial: false, persona: 'mage', dye: 'brass', outfit: 'lantern', displayName: '', agentName: '', mist: false, cap: null, daily: null, per: null, days: 30, receivers: null, charter: null, deposit: 0.5 }, JSON.parse(localStorage.getItem(SAVE) || '{}'));
+const st = Object.assign({ step: 0, done: [], trial: false, persona: 'mage', dye: 'brass', outfit: 'lantern', displayName: '', agentName: '', mist: false, cap: null, daily: null, per: null, hours: 1, receivers: null, charter: null, deposit: 0.5 }, JSON.parse(localStorage.getItem(SAVE) || '{}'));
 const save = () => localStorage.setItem(SAVE, JSON.stringify(st));
 let CFG = null, rpc = null, me = null, bal = undefined, balTimer = 0, busy = false, busySince = 0, msg = '';
 const view = (c, m, a) => viewFn(rpc, c, m, a);
@@ -128,6 +130,7 @@ async function afterPrivy() {
   // Called from a click, so the browser opens that window in front instead of as a background tab.
   await ensureWallet();
   const c = mainnetWallet(); await c.whenManifestLoaded;
+  await readyBoardKey();
   await c.connect({ walletId: 'nearcarta-privy' });
   st.trial = false; save();
   await signedIn(await mainnetAccount(), 'nearcarta-privy');
@@ -189,7 +192,7 @@ const need = () => {
 // 0.02 NEAR deposit + 10 TGas x 0.001 = 0.03 NEAR. Unused gas comes back.
 const GAS = { open: 10n, agent: 10n, propose: 15n };
 const GAS_NEAR = t => Number(t) * 0.001;
-const SIGN_MIN = Math.round((0.02 + GAS_NEAR(GAS.open) + 0.002) * 1000) / 1000; // + small reserve for account storage
+const SIGN_MIN = Math.round((0.02 + GAS_NEAR(GAS.open) + 0.005 + 0.002) * 1000) / 1000; // row + call allowlist + a little reserve
 const yToN = y => { try { return Number(BigInt(y) / 10n ** 18n) / 1e6; } catch { return NaN; } };
 // Wallet errors in plain words: yocto numbers become NEAR and a shortfall.
 function plainErr(e) {
@@ -283,11 +286,11 @@ function rules() {
   const fallback = st.trial ? (CFG?.arena?.merchants || []).slice(0, 2) : mainShops;
   const saved = st.receivers;
   const useSaved = saved && saved.length > 0;
-  return { cap: st.cap ?? p.cap, daily: st.daily ?? p.daily, per: st.per ?? p.per, days: st.days, receivers: useSaved ? saved : fallback };
+  return { cap: st.cap ?? p.cap, daily: st.daily ?? p.daily, per: st.per ?? p.per, hours: SESSION_HOURS.includes(+st.hours) ? +st.hours : 1, receivers: useSaved ? saved : fallback };
 }
 function preview(r) {
-  const until = new Date(Date.now() + r.days * 864e5).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' });
-  return `<b>${esc(persona().name)}</b> may pay only <b>${r.receivers.map(esc).join('</b> or <b>') || 'nobody yet'}</b>, at most <b>${fmtN(+r.cap)} NEAR</b> per payment, <b>${fmtN(+r.daily)} NEAR</b> and <b>${r.per}</b> payments per day, until <b>${until}</b>. Anything else is refused by ${boardLive() && !st.trial ? `your charter on <b>${esc(MAIN.board.contract)}</b>` : 'the contract'}, even if the agent is tricked.`;
+  const until = sessionLabel(r.hours);
+  return `<b>${esc(persona().name)}</b> may pay only <b>${r.receivers.map(esc).join('</b> or <b>') || 'nobody yet'}</b>, at most <b>${fmtN(+r.cap)} NEAR</b> per payment, <b>${fmtN(+r.daily)} NEAR</b> and <b>${r.per}</b> payments per day, for <b>${until}</b>. Anything else is refused by ${boardLive() && !st.trial ? `your charter on <b>${esc(MAIN.board.contract)}</b>` : 'the contract'}, even if the agent is tricked.`;
 }
 function sRules() {
   const r = rules();
@@ -297,13 +300,13 @@ function sRules() {
     + `<div class="grid2"><div class="field"><label for="cap">Max per payment</label><div class="suffix"><input id="cap" type="number" step="0.001" min="0.001" value="${r.cap}" data-testid="rule-cap"><span>NEAR</span></div><p class="small muted">The most one payment can be. Bigger ones are refused.</p></div>
        <div class="field"><label for="daily">Daily budget</label><div class="suffix"><input id="daily" type="number" step="0.001" min="0.001" value="${r.daily}" data-testid="rule-daily"><span>NEAR</span></div><p class="small muted">All payments in one day added up.</p></div>
        <div class="field"><label for="per">Payments per day</label><div class="suffix"><input id="per" type="number" min="1" max="100" value="${r.per}" data-testid="rule-per"><span>per day</span></div><p class="small muted">How many payments the agent may make each day.</p></div>
-       <div class="field"><label for="days">Rule expires after</label><select id="days" data-testid="rule-days">${[7, 30, 90, 365].map(d => `<option value="${d}" ${d == r.days ? 'selected' : ''}>${d} days</option>`).join('')}</select><p class="small muted">After this date every payment is refused.</p></div></div>
+       <div class="field"><label for="hours">Session</label><select id="hours" data-testid="rule-hours">${SESSION_HOURS.map(h => `<option value="${h}" ${h == r.hours ? 'selected' : ''}>${sessionLabel(h)}</option>`).join('')}</select><p class="small muted">After this the contract refuses every payment. You can write a new session later.</p></div></div>
      <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"><p class="small muted">The only accounts your agent may pay.</p></div>
      <div class="preview" id="prev" data-testid="rule-preview">${preview(r)}</div>${errP()}` + nav(true));
 }
 function wireRules() {
-  const upd = () => { st.cap = +$('#cap').value; st.daily = +$('#daily').value; st.per = +$('#per').value; st.days = +$('#days').value; st.receivers = $('#rcv').value.split(/[\s,]+/).map(s => s.trim().toLowerCase()).filter(Boolean); save(); $('#prev').innerHTML = preview(rules()); };
-  ['cap', 'daily', 'per', 'days', 'rcv'].forEach(id => $('#' + id).oninput = upd);
+  const upd = () => { st.cap = +$('#cap').value; st.daily = +$('#daily').value; st.per = +$('#per').value; st.hours = +$('#hours').value; st.receivers = $('#rcv').value.split(/[\s,]+/).map(s => s.trim().toLowerCase()).filter(Boolean); save(); $('#prev').innerHTML = preview(rules()); };
+  ['cap', 'daily', 'per', 'hours', 'rcv'].forEach(id => $('#' + id).oninput = upd);
   wire(() => { const r = rules();
     if (!(r.cap > 0) || !(r.daily >= r.cap)) { msg = 'The daily budget must be at least the per-payment cap.'; return render(); }
     if (!r.receivers.length || r.receivers.some(a => !/^[a-z0-9._-]{2,64}$/.test(a))) { msg = 'Add at least one valid account id.'; return render(); }
@@ -327,13 +330,13 @@ function sSign() {
   const r = rules(), id = st.charter || (onBoard ? me : `${st.agentName}.${CFG.factory}`), live = st.charter && localStorage.getItem(agentLS(st.charter));
   const stake = onBoard ? '0.02' : fmtN(st.deposit);
   const L = onBoard ? [['Open your row', 'create'], ['Let your agent sign by itself', 'key']] : [['Create your charter', 'create'], ['Write the rule and add the agent key', 'rules']];
-  return head('Sign', live ? 'Your agent is live.' : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), live ? 'These limits are read back from the chain, not from this page.' : (onBoard ? `This opens your row and adds your agent key to your account, limited to <code>propose</code> on the board, so your agent can sign later tries without your wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`))
+  return head('Sign', live ? 'Your agent is live.' : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), live ? 'These limits are read back from the chain, not from this page.' : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code> and <code>propose_call</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`))
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
     + (live ? `<div class="facts" id="facts" data-testid="setup-facts"><div class="fact"><small>Reading your charter from the chain</small><b>…</b></div></div>` : `<div class="preview">${preview(r)}</div>`)
     + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
     + (live ? '' : (onBoard && bal != null && nearOf(bal) < SIGN_MIN
         ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
-        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 locked + gas). Of the 0.02, 0.01 becomes your charter's spending balance and about 0.004 pays row storage; the rest is refunded at once. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`)
+        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.005 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your charter's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`)
       + `<div id="signhelp" class="tabhelp" hidden data-testid="sign-tabhelp"><p class="small">The approval opened in another browser tab. Switch to it and approve. This page moves on by itself.</p><button type="button" class="btn" id="resign" data-testid="sign-reopen">Switch to approval tab</button></div>`) + errP() + nav(live, { label: 'Try your agent' });
 }
 async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
@@ -343,21 +346,27 @@ async function accountOn(id, network) {
   const j = await r.json();
   return !j.error && !!j.result;
 }
-function boardArgs(r, agent) {
-  const exp = BigInt(Date.now() + r.days * 864e5) * 1_000_000n;
-  return {
-    rules: { receivers: r.receivers, per_action_cap: toY(r.cap), daily_budget: toY(r.daily), max_actions_per_day: r.per, window_start_min: 0, window_end_min: 0, min_amount: toY(0.0001), expires_at: exp.toString() },
-    agent, fund: ROW_FUND.toString(),
-  };
+function ruleArgs(r, expiresAt = sessionExpiresAt(r.hours)) {
+  return { receivers: r.receivers, per_action_cap: toY(r.cap), daily_budget: toY(r.daily), max_actions_per_day: r.per, window_start_min: 0, window_end_min: 0, min_amount: toY(0.0001), expires_at: String(expiresAt) };
 }
-// The agent key is also added to the visitor's own account as a function-call access key that may only call
-// `propose` on the board, with a small gas allowance. Then Try needs no wallet: the key signs the board message and
-// the transaction itself. It cannot move NEAR from the account; the board still decides every payment.
+function boardArgs(r, agent) {
+  return { rules: ruleArgs(r), agent, fund: ROW_FUND.toString() };
+}
+// The agent key is also added to the visitor's own account as a function-call access key. It may call
+// propose and propose_call on the board, with a gas allowance only. It cannot attach NEAR.
+// https://docs.near.org/protocol/accounts-contracts/access-keys
 const AGENT_ALLOW = YN / 20n; // 0.05 NEAR of gas allowance, never spendable as NEAR
 // open_charter keeps ROW_FUND as the row's own spendable balance (enough for a full day at the default 0.01 budget);
 // the rest of the 0.02 deposit after storage (~0.004) is refunded in the same call.
 const ROW_FUND = YN / 100n, TOPUP = YN / 200n;
-const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: ['propose'], allowance: AGENT_ALLOW.toString() } } } });
+const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: [...AGENT_METHODS], allowance: AGENT_ALLOW.toString() } } } });
+// The login plugin stores its key here. Use it as the row agent when this browser has not made one yet.
+function adoptPluginKey(id) {
+  if (!id || localStorage.getItem(agentLS(id))) return;
+  let parsed;
+  try { parsed = JSON.parse(localStorage.getItem(pluginKeyName(id)) || ''); } catch { return; }
+  if (parsed?.privateKey?.startsWith('ed25519:')) localStorage.setItem(agentLS(id), parsed.privateKey);
+}
 async function agentAccessKey(sec) {
   if (!sec || !me) return null;
   const ak = await rpcClient([MAIN.rpc])('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: me, public_key: keyFrom(sec).publicKey }).catch(() => null);
@@ -369,12 +378,17 @@ async function signBoard() {
   const mark = (k, state, tx) => { const s = signLog.find(x => x.k === k); if (s) Object.assign(s, { state, tx: tx || s.tx }); else signLog.push({ k, state, tx }); render(); };
   const readRpc = rpcClient([MAIN.rpc]);
   let row = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null);
+  adoptPluginKey(me);
   const sec = localStorage.getItem(agentLS(me)) || keyFrom().secretKey;
   localStorage.setItem(agentLS(me), sec);
   const pk = keyFrom(sec).publicKey;
+  const calls = { type: 'FunctionCall', params: { methodName: 'set_calls', args: callPolicy(r.receivers, toY(r.cap), toY(r.daily)), gas: (GAS.agent * TG).toString(), deposit: CALLS_DEPOSIT_YOCTO } };
   const txs = [];
-  if (!row) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'open_charter', args: boardArgs(r, pk), gas: (GAS.open * TG).toString(), deposit: String(MAIN.board.max_row_yocto) } }] }]);
-  else if (row.agent !== pubkeyHex(keyFrom(sec))) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: pk }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
+  if (!row) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'open_charter', args: boardArgs(r, pk), gas: (GAS.open * TG).toString(), deposit: String(MAIN.board.max_row_yocto) } }, calls] }]);
+  else {
+    if (row.agent !== pubkeyHex(keyFrom(sec))) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: pk }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
+    txs.push(['calls', { receiverId: contract, actions: [calls] }]);
+  }
   if (!(await agentAccessKey(sec))) txs.push(['key', { receiverId: me, actions: [addKeyAction(pk)] }]);
   for (const [k] of txs) mark(k, 'run');
   if (txs.length) {
@@ -516,10 +530,12 @@ function sTry() {
   }
   const r = rules(), to = r.receivers[0], ok = Math.min(+r.cap, 0.001 > +r.cap ? +r.cap : 0.001), over = +(+r.cap * 2).toFixed(4);
   const tiles = tryTiles({ actionsToday: rowView?.actions_today || 0, maxPerDay: rowView?.max_actions_per_day || r.per, lowBalance: !!(lowBal() || topUpBusy) });
-  return head('Try it', 'Watch the charter decide.', `Your agent signs two real requests with its own key. The contract checks each against your rule.`)
+  return head('Try it', 'Watch the charter decide.', `Your agent signs each request with its own key. No further wallet for the ask. Freeze and expiry are owner approvals; the ask after them is still the agent key.`)
     + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button type="button" class="tile" id="t-ok" data-testid="try-allowed" aria-describedby="try-allow-hint" ${tiles.allowDisabled ? 'disabled' : ''}><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span id="try-allow-hint">${esc(tiles.allowReason)}</span><em class="go" style="font-style:normal">${esc(tiles.allowAction)}</em></button>
        <button type="button" class="tile" id="t-no" data-testid="try-refused" aria-describedby="try-refuse-hint" ${tiles.refuseDisabled ? 'disabled' : ''}><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span id="try-refuse-hint">${esc(tiles.refuseReason)}</span><em class="go" style="font-style:normal">${esc(tiles.refuseAction)}</em></button></div>
-     ${boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
+     ${boardLive() && !st.trial ? `<div class="tiles" style="grid-template-columns:1fr 1fr;margin-top:12px"><button type="button" class="tile" id="t-freeze" data-testid="try-frozen"><i>❄</i><b>Freeze, then ask</b><span>One approval freezes the row. The ask is your agent key and should be refused. A second approval unfreezes it.</span></button>
+       <button type="button" class="tile" id="t-expire" data-testid="try-expired"><i>⌛</i><b>Expire, then ask</b><span>One approval sets the session in the past. The ask is your agent key and should be refused. A second approval writes the session again.</span></button></div>` : ''}
+     ${boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code> and <code>propose_call</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
      ${lowBal() || topUpBusy ? `<div class="tabhelp" data-testid="try-lowbal"><p class="small">Your charter holds ${fmtN(nearOf(rowBal.toString()))} NEAR. Payments come from the charter's own balance, not your account. Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to it with one approval.</p><button type="button" class="btn" id="t-topup" data-testid="try-topup" ${topUpBusy ? 'disabled aria-busy="true"' : ''}>${topUpBusy ? 'Adding… waiting for confirmation' : `Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to the charter`}</button></div>` : ''}
      ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
      ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR… <span id="try-secs" data-testid="try-secs">${Math.floor((Date.now() - pendingTry.t0) / 1000)}s</span></span> ${txA(pendingTry.hash)}</div></div>` : ''}
@@ -527,6 +543,24 @@ function sTry() {
      ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Your House</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.some(t => t.passed) || st.allowedTx ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
 }
 function next() { return nextPath(location.search) || '/'; }
+async function ownerBoard(method, args, deposit = '0') {
+  const w = await mainnetWallet().wallet();
+  const res = await w.signAndSendTransaction({ receiverId: MAIN.board.contract, actions: [{ type: 'FunctionCall', params: { methodName: method, args, gas: (GAS.agent * TG).toString(), deposit } }] });
+  return txHashOf(res);
+}
+async function ownerBeat(kind) {
+  const r = rules(), amt = Math.min(+r.cap, 0.001);
+  if (kind === 'frozen') {
+    await ownerBoard('set_frozen', { frozen: true });
+    try { tries.push(await boardAsk(amt)); }
+    finally { await ownerBoard('set_frozen', { frozen: false }); }
+  } else {
+    await ownerBoard('set_rules', { rules: ruleArgs(r, '1') }, toY(0.001));
+    try { tries.push(await boardAsk(amt)); }
+    finally { await ownerBoard('set_rules', { rules: ruleArgs(r) }, toY(0.001)); }
+  }
+  await readRowBal();
+}
 function wireTry() {
   if (PREVIEW && !(boardLive() && st.charter)) {
     const okBtn = $('#t-ok'); if (okBtn) okBtn.onclick = () => { st.previewNote = 'Preview. The pass was not sent.'; render(); };
@@ -546,6 +580,8 @@ function wireTry() {
   clearInterval(secTimer); secTimer = setInterval(() => { const el = $('#try-secs'); if (el && pendingTry) el.textContent = Math.floor((Date.now() - pendingTry.t0) / 1000) + 's'; }, 1000);
   const okBtn = $('#t-ok'); if (okBtn && !okBtn.disabled) okBtn.onclick = e => act(e.currentTarget, async () => { const t = await ask(Math.min(+r.cap, 0.001), 'setup: allowed'); tries.push(t); if (t.passed) { st.allowedTx = t.tx || true; save(); } if (boardLive()) await readRowBal(); refreshBal(); });
   const noBtn = $('#t-no'); if (noBtn && !noBtn.disabled) noBtn.onclick = e => act(e.currentTarget, async () => { tries.push(await ask(+(+r.cap * 2).toFixed(4), 'setup: over cap')); refreshBal(); });
+  const fr = $('#t-freeze'); if (fr) fr.onclick = e => act(e.currentTarget, () => ownerBeat('frozen'));
+  const ex = $('#t-expire'); if (ex) ex.onclick = e => act(e.currentTarget, () => ownerBeat('expired'));
   wire();
 }
 
