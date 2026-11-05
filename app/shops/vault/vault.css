@@ -62,6 +62,7 @@ td{padding:8px;border-bottom:1px solid var(--c-line)}
 body[data-step=none] #s-rules,body[data-step=wallet] #s-rules{opacity:1}
 #s-rules h2,#rules-lock{color:#fff8ee;opacity:1}
 #rules-lock{font-size:16px;font-weight:650;line-height:1.45;margin:8px 0 0}
+[data-testid=factory-signin]{color:#fff8ee;font-size:16px;font-weight:500;line-height:1.45}
 @keyframes in{from{opacity:0;transform:translateY(4px)}}
 @media (max-width:820px){main{grid-template-columns:1fr}.vault-head{flex-direction:column;align-items:stretch}.who{width:100%}.who .primary{flex:1}.grid2{grid-template-columns:1fr}.steps li{grid-template-columns:36px 80px 1fr;}.steps .r,.steps .tx{grid-column:2/-1}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
