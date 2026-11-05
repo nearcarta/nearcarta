@@ -11,4 +11,8 @@ export async function buildShops(dist, esbuild) {
   for (const f of ['index.html', 'hall.css']) cpSync(here + 'hall/' + f, dist + '/shops/hall/' + f);
   await esbuild.build({ entryPoints: [here + 'hall/main.js'], bundle: true, format: 'esm', minify: true, target: 'es2022', outfile: dist + '/shops/hall/hall.bundle.js',
     define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', ...(await import('../build-defines.mjs')).walletDefine }, logLevel: 'warning' });
+  mkdirSync(dist + '/shops/payouts', { recursive: true });
+  cpSync(here + 'payouts/index.html', dist + '/shops/payouts/index.html');
+  cpSync(here + 'payouts/payouts.css', dist + '/shops/payouts/payouts.css');
+  await esbuild.build({ entryPoints: [here + 'payouts/main.js'], bundle: true, format: 'esm', minify: true, target: 'es2022', outfile: dist + '/shops/payouts/payouts.bundle.js', logLevel: 'warning' });
 }

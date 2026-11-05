@@ -317,7 +317,7 @@ export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receive
 // Hide routes whose dry quote failed in the server's last probe (/api/ferry/routes); keep at least one.
 export const routesReady = api('/api/ferry/routes').then(r => {
   const bad = new Set(r.routes.filter(x => !x.ok && x.to === 'ZEC@zec').map(x => x.from));
-  for (let i = ROUTES.length - 1; i >= 0; i--) if (bad.has(ROUTES[i].from) && ROUTES.length > 1) ROUTES.splice(i, 1);
+  for (let i = ROUTES.length - 1; i >= 0; i--) if (bad.has(ROUTES[i].from)) { ROUTES[i].down = true; if (ROUTES.length > 3) ROUTES.splice(i, 1); }
   return ROUTES;
 }).catch(() => ROUTES);
 
@@ -510,9 +510,10 @@ export async function payouts(rows) {
   const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
   if (S.board) {
     const plan = rows.slice(0, 3);
+    if (P.payoutIssues(plan).length) throw new Error('Check the account name and the 0.005 NEAR cap. Nothing was sent.');
     const out = [];
     for (const row of plan) {
-      const amt = Math.min(0.005, Number(row.amt) || 0);
+      const amt = Number(row.amt) || 0;
       if (!(amt > 0)) continue;
       out.push(await boardPay({ shop: 'payouts', receiver: row.to, amountY: toY(amt) }));
     }

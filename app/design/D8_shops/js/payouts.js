@@ -1,6 +1,24 @@
 // Payouts (C3): a payout list the charter pays as one all-or-nothing propose_batch (oath R16.1), or refuses whole.
 // Pure helpers, no wallet or DOM, so backend/test/unit/d8-payouts.test.js can test them in node.
 export const MAX_BATCH = 5; // contracts/oath MAX_BATCH
+export const NEAR_CAP = 0.005;
+const NAMED = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
+const IMPLICIT = /^[0-9a-f]{64}$/;
+export const nearAccountOk = id => { const s = String(id || '').trim(); return IMPLICIT.test(s) || NAMED.test(s); };
+export const nearAmountOk = (amt, cap = NEAR_CAP) => { const n = Number(amt); return Number.isFinite(n) && n > 0 && n <= cap + 1e-12; };
+export const formatNear = amt => { const n = Number(amt); return Number.isFinite(n) ? n.toFixed(3) : ''; };
+
+/** NEAR rows must be real account ids at or under the cap. USDC rows are kept and not sent. */
+export function payoutIssues(rows, exists) {
+  const issues = [];
+  for (const r of rows || []) {
+    if (String(r?.asset || 'NEAR').toUpperCase() === 'USDC') continue;
+    if (!nearAccountOk(r?.to)) issues.push({ code: 'bad_account', to: r?.to });
+    else if (exists && exists[r.to] === false) issues.push({ code: 'missing_account', to: r.to });
+    if (!nearAmountOk(r?.amt)) issues.push({ code: 'over_cap', to: r?.to, amt: r?.amt });
+  }
+  return issues;
+}
 const TG_PER = 30, TG_BASE = 30, TG_MAX = 300; // oath needs >= 25 Tgas per native item (MIN_GAS_NATIVE)
 export const batchGasTgas = n => Math.min(TG_MAX, TG_BASE + TG_PER * n);
 const Y18 = 10n ** 18n;
