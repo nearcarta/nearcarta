@@ -1,252 +1,261 @@
 {
- "network": "mainnet",
- "status": "deployed",
- "rpc": "https://free.rpc.fastnear.com",
- "root": "nearcarta.near",
- "factory": {
-  "contract": "factory.nearcarta.near",
-  "owner": "nearcarta.near",
-  "status": "not_deployed",
-  "crate": "contracts/charter_factory_lock",
-  "oath_wasm": "contracts/artifacts/oath.r18p86.wasm",
-  "reaper_wasm": "contracts/artifacts/reaper.wasm",
-  "state_slack_bytes": 8192,
-  "note": "Not on chain. Abandoned: a copy of the oath wasm per visitor does not fit this account. The visitor path is board. See docs/MAINNET_BOARD.md."
- },
- "board": {
-  "contract": "board.nearcarta.near",
-  "owner": "nearcarta.near",
+  "network": "mainnet",
   "status": "deployed",
-  "crate": "contracts/charter_board",
-  "wasm": "contracts/artifacts/charter_board.wasm",
-  "max_row_yocto": "20000000000000000000000",
-  "note": "Live. One contract, one row per visitor, no access key. close_charter returns the row stake and unspent balance; reap (owner, 1 yocto, only at rows=0) deletes the account and returns the wasm stake to nearcarta.near. See docs/MAINNET_BOARD.md.",
-  "code_hash": "6aBm6TugZzge9uHDpSsr6pG7XPfZm22JoZ8XZxknRGsa",
-  "wasm_sha256": "52cac49a44fe0881fe1f35ee06e6711e7c215e0845136fbd3d4d9e7049ce0dc1",
-  "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --no-abi (wasm-opt -O)",
-  "storage_bytes": 86762,
-  "locked_near": 0.86762,
-  "full_access_keys": 0,
-  "deploy_tx": "CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt",
-  "failed_deploy_tx": "4mq8P3jugnatzbbc9VzDbufCBpyj27TxwK4w3L7nTPCX",
-  "proof": {
-   "visitor": "nearcarta.near",
-   "receiver": "townhall.nearcarta.near",
-   "fund_near": 0.01,
-   "row_storage_locked_near": 0.00265,
-   "per_action_cap_near": 0.002,
-   "daily_budget_near": 0.005,
-   "allowed_near": 0.001,
-   "script": "backend/scripts/board-proof-mainnet.js"
+  "rpc": "https://free.rpc.fastnear.com",
+  "root": "nearcarta.near",
+  "factory": {
+    "contract": "factory.nearcarta.near",
+    "owner": "nearcarta.near",
+    "status": "not_deployed",
+    "crate": "contracts/charter_factory_lock",
+    "oath_wasm": "contracts/artifacts/oath.r18p86.wasm",
+    "reaper_wasm": "contracts/artifacts/reaper.wasm",
+    "state_slack_bytes": 8192,
+    "note": "Not on chain. Abandoned: a copy of the oath wasm per visitor does not fit this account. The visitor path is board. See docs/MAINNET_BOARD.md."
   },
-  "txs": {
-   "deploy": "CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt",
-   "open_charter": "BUqfZMBTnqU5f223FSDyufCzaVemvMCaWZ2iYXs4MJ4u",
-   "set_agent": "DqMrsEJjd2wyiRh8tW25ZqK8MnG8Tk4rYW3XGuKTfiW7",
-   "allowed_0.001": "8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR",
-   "refused_over_per_action_cap": "CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF",
-   "refused_receiver_not_allowlisted": "E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ",
-   "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
+  "board": {
+    "contract": "board.nearcarta.near",
+    "owner": "nearcarta.near",
+    "status": "deployed",
+    "crate": "contracts/charter_board",
+    "wasm": "contracts/artifacts/charter_board.wasm",
+    "max_row_yocto": "20000000000000000000000",
+    "note": "Live (redeployed 2026-11-05). One contract, one row per visitor, no access key. close_charter / force_close refund visitor; reap (owner, 1 yocto, rows=0) deletes account. propose_call + CALLS allowlist on this wasm. See docs/MAINNET_BOARD.md.",
+    "code_hash": "Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C",
+    "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
+    "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --no-abi (wasm-opt -O); source includes PR#22 propose_call + force_close (5126bdb lineage)",
+    "storage_bytes": 109130,
+    "locked_near": 1.0913,
+    "full_access_keys": 0,
+    "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4",
+    "failed_deploy_tx": "4mq8P3jugnatzbbc9VzDbufCBpyj27TxwK4w3L7nTPCX",
+    "proof": {
+      "visitor": "nearcarta.near",
+      "receiver": "townhall.nearcarta.near",
+      "fund_near": 0.01,
+      "row_storage_locked_near": 0.00265,
+      "per_action_cap_near": 0.002,
+      "daily_budget_near": 0.005,
+      "allowed_near": 0.001,
+      "script": "backend/scripts/board-proof-mainnet.js"
+    },
+    "txs": {
+      "deploy": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4",
+      "smoke_open_charter": "AmYExaBSM5rC3q68AV8ESL1teEJcDMxcRb3rNdhNCDZB",
+      "smoke_close_charter": "H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf"
+    },
+    "visitor_run": {
+      "note": "A real visitor, start to finish, in the browser at nearcarta.vercel.app/setup: email sign-in made this implicit account, nearcarta.near funded it, the visitor opened a row and the agent's request inside the cap was paid; the one over the cap was refused by the contract.",
+      "contract": "board.nearcarta.near",
+      "signer": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8",
+      "funded_by": {
+        "nearcarta.near_0.08": "A3SqsmD6CcDvD4qdRAxJrDn1gUUFzcVC3ErVdQZVveeu",
+        "nearcarta.near_0.03": "9Hz9yVarJAow2cU1SAap6EEdyJfuCM5QwGDHfAZdABV8"
+      },
+      "rules": {
+        "receivers": [
+          "charter.nearcarta.near",
+          "toll.nearcarta.near"
+        ],
+        "per_action_cap_near": 0.005,
+        "daily_budget_near": 0.01,
+        "max_actions_per_day": 3,
+        "row_deposit_near": 0.02
+      },
+      "txs": {
+        "open_charter": "6xMQyXcczLjxymmrYfBhFDuRy9MpFV62CviqdYHrnTdQ",
+        "propose_allowed_0.001": "4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia",
+        "propose_refused_0.01_over_per_action_cap": "AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx",
+        "fund_topup_0.005": "34QArpijENRcPPYhWPpvVhmbhxXr1jPaBpE6xGNAZ4Lj",
+        "propose_allowed_0.001_agent_key_no_wallet": "BecizuUP6eN4eQnRtYajq6wTudY8pX4gRSVMZMticz1s",
+        "propose_allowed_0.001_agent_key_no_wallet_2": "5A3QBy7Tp3q3tiJa9BQFP7Caniw54uBo5HVVr5MsWMe4"
+      }
+    },
+    "redeploy": {
+      "when_cairo": "2026-11-05 20:03 Africa/Cairo",
+      "prev_code_hash": "6aBm6TugZzge9uHDpSsr6pG7XPfZm22JoZ8XZxknRGsa",
+      "prev_deploy_tx": "CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt",
+      "close_1de390": "3RpDG2XoYes8m2uiNyG4TdMYRqymJvPB8wD6VgdwQTrL",
+      "close_8e20273e": "Hynuz7GoY651GLrbhWLq9hUcQ8pwPLWRvaeqgWYGXgTy",
+      "reap_tx": "3H6ZypLBdvFfSqtr5wjDPEN462p12Y43FopXcdQUgD2A",
+      "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4",
+      "smoke_open": "AmYExaBSM5rC3q68AV8ESL1teEJcDMxcRb3rNdhNCDZB",
+      "smoke_close": "H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf",
+      "wasm_bytes": 108955,
+      "tests": "cargo +1.86.0 test --lib 15/15"
+    }
   },
-  "visitor_run": {
-   "note": "A real visitor, start to finish, in the browser at nearcarta.vercel.app/setup: email sign-in made this implicit account, nearcarta.near funded it, the visitor opened a row and the agent's request inside the cap was paid; the one over the cap was refused by the contract.",
-   "contract": "board.nearcarta.near",
-   "signer": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8",
-   "funded_by": {
-    "nearcarta.near_0.08": "A3SqsmD6CcDvD4qdRAxJrDn1gUUFzcVC3ErVdQZVveeu",
-    "nearcarta.near_0.03": "9Hz9yVarJAow2cU1SAap6EEdyJfuCM5QwGDHfAZdABV8"
-   },
-   "rules": {
-    "receivers": [
-     "charter.nearcarta.near",
-     "toll.nearcarta.near"
+  "mpc": "v1.signer",
+  "chain_id": 8453,
+  "path": "base-1",
+  "charter": {
+    "contract": "charter.nearcarta.near",
+    "owner": "nearcarta.near",
+    "code_hash": "6fZBa6MbEJeKNHBEB9D7atvXa9ZaVmoWfYu38bjcRni2",
+    "wasm": "oath.r18p86.wasm",
+    "storage_bytes": 426432,
+    "locked_near": 4.26432,
+    "agent_key": "ed25519:GB83bZDdsoWrpBC43LURP1QCGX558V1qgYXMEQdX4ENi",
+    "agent_methods": [
+      "propose",
+      "propose_batch"
     ],
-    "per_action_cap_near": 0.005,
-    "daily_budget_near": 0.01,
-    "max_actions_per_day": 3,
-    "row_deposit_near": 0.02
-   },
-   "txs": {
-    "open_charter": "6xMQyXcczLjxymmrYfBhFDuRy9MpFV62CviqdYHrnTdQ",
-    "propose_allowed_0.001": "4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia",
-    "propose_refused_0.01_over_per_action_cap": "AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx",
-    "fund_topup_0.005": "34QArpijENRcPPYhWPpvVhmbhxXr1jPaBpE6xGNAZ4Lj",
-    "propose_allowed_0.001_agent_key_no_wallet": "BecizuUP6eN4eQnRtYajq6wTudY8pX4gRSVMZMticz1s",
-    "propose_allowed_0.001_agent_key_no_wallet_2": "5A3QBy7Tp3q3tiJa9BQFP7Caniw54uBo5HVVr5MsWMe4"
-   }
-  }
- },
- "mpc": "v1.signer",
- "chain_id": 8453,
- "path": "base-1",
- "charter": {
-  "contract": "charter.nearcarta.near",
-  "owner": "nearcarta.near",
-  "code_hash": "6fZBa6MbEJeKNHBEB9D7atvXa9ZaVmoWfYu38bjcRni2",
-  "wasm": "oath.r18p86.wasm",
-  "storage_bytes": 426432,
-  "locked_near": 4.26432,
-  "agent_key": "ed25519:GB83bZDdsoWrpBC43LURP1QCGX558V1qgYXMEQdX4ENi",
-  "agent_methods": [
-   "propose",
-   "propose_batch"
-  ],
-  "full_access_keys": 0,
-  "policy_delay_s": 90,
-  "clause_pay": {
-   "receivers": [
-    "nearcarta.near"
-   ],
-   "per_action_cap_near": 0.002,
-   "daily_budget_near": 0.005
+    "full_access_keys": 0,
+    "policy_delay_s": 90,
+    "clause_pay": {
+      "receivers": [
+        "nearcarta.near"
+      ],
+      "per_action_cap_near": 0.002,
+      "daily_budget_near": 0.005
+    },
+    "txs": {
+      "create_root": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",
+      "top_up": "6KByv67b6F1NhHyqk7m87KnSzdN4vdDjiXj2XvD6hbcd",
+      "fund_charter": "3fTm5K9DW8ccACNA34CXLF8J1pirzbuAYqDYefsr5ZMd",
+      "charter_deploy_init": "DNDNMtRXRiPP1bHoSUtttdYgnwYSfXARpPWJwaedzvma",
+      "charter_sweep_surplus": "7hvd6krDjboxz8CxnNNWMBeWvAWhCYpYeddGo2uEHjbM",
+      "set_clause_pay": "7s3X1DuBWu1XN3oTWYnyNiduuAjTrPoyT1ETCJesyHpP",
+      "set_agent_key": "Frp44yFGSAh9vi2w4dmV4wnDH5MBktvX7N2xyAcPRJDP",
+      "agent_propose_allowed_0.001": "JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy",
+      "agent_propose_over_cap_0.003": "BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH",
+      "charter_delete_fak": "71Zio28gV3yubD5DecGtkguWzWdfix8brcKFy13d3zzt"
+    }
   },
-  "txs": {
-   "create_root": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",
-   "top_up": "6KByv67b6F1NhHyqk7m87KnSzdN4vdDjiXj2XvD6hbcd",
-   "fund_charter": "3fTm5K9DW8ccACNA34CXLF8J1pirzbuAYqDYefsr5ZMd",
-   "charter_deploy_init": "DNDNMtRXRiPP1bHoSUtttdYgnwYSfXARpPWJwaedzvma",
-   "charter_sweep_surplus": "7hvd6krDjboxz8CxnNNWMBeWvAWhCYpYeddGo2uEHjbM",
-   "set_clause_pay": "7s3X1DuBWu1XN3oTWYnyNiduuAjTrPoyT1ETCJesyHpP",
-   "set_agent_key": "Frp44yFGSAh9vi2w4dmV4wnDH5MBktvX7N2xyAcPRJDP",
-   "agent_propose_allowed_0.001": "JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy",
-   "agent_propose_over_cap_0.003": "BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH",
-   "charter_delete_fak": "71Zio28gV3yubD5DecGtkguWzWdfix8brcKFy13d3zzt"
-  }
- },
- "toll": {
-  "contract": "toll.nearcarta.near",
-  "owner": "nearcarta.near",
-  "code_hash": "9RQw6e1PL81HSQ1x6dr6dyvv9yAMMBdqChRToyHuDwDP",
-  "wasm": "toll.v6p86.wasm",
-  "storage_bytes": 253139,
-  "locked_near": 2.53139,
-  "full_access_keys": 0,
+  "toll": {
+    "contract": "toll.nearcarta.near",
+    "owner": "nearcarta.near",
+    "code_hash": "9RQw6e1PL81HSQ1x6dr6dyvv9yAMMBdqChRToyHuDwDP",
+    "wasm": "toll.v6p86.wasm",
+    "storage_bytes": 253139,
+    "locked_near": 2.53139,
+    "full_access_keys": 0,
+    "foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a",
+    "txs": {
+      "fund_toll": "64HuNHJ8jKA4zBJyKNDdQkXasyvmgizbGT5wYBWVb2Fa",
+      "toll_deploy_init_agentkey": "6KgwM4Q1VmLfvgK8vDBkWg92S65ZLcFsUb6NNXsAEWXc",
+      "toll_sweep_surplus": "DVFgzmAx2My6cki1q6wXyNsm2VHQ3HzZo1KZHKwQtqEd",
+      "owner_toll_pay_allowlisted": "4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz",
+      "owner_toll_pay_not_allowlisted": "B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR",
+      "toll_delete_fak": "6C1rLPtYKpxQgX5ZYFYSyGsbQEify9AVQ23fdXKAskxY"
+    }
+  },
+  "runbook": "docs/MAINNET_RUNBOOK.md",
+  "note": "Mainnet runs protocol 86 (near-sdk 5.27, rustc 1.86). Live: charter, toll, arena, house deed, Town Hall, all subaccounts of nearcarta.near. Charter, toll, arena and house have no full-access key; Town Hall keeps one for teardown (it has no owner close).",
+  "layout": "named",
+  "root_funder": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+  "registrar": "near",
+  "planned": {
+    "charter": "charter.nearcarta.near",
+    "toll": "toll.nearcarta.near",
+    "arena": "arena.nearcarta.near",
+    "house": "house.nearcarta.near",
+    "townhall": "townhall.nearcarta.near"
+  },
+  "derived_public_key": "secp256k1:26swhQicqiPZBJamrbHX2icEjv8FbcPGw9Cox4c3fu36S2f8MB2d1ZvrocJp3mTcqVH9BQ6of3UXX2WRj2WFv59V",
   "foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a",
-  "txs": {
-   "fund_toll": "64HuNHJ8jKA4zBJyKNDdQkXasyvmgizbGT5wYBWVb2Fa",
-   "toll_deploy_init_agentkey": "6KgwM4Q1VmLfvgK8vDBkWg92S65ZLcFsUb6NNXsAEWXc",
-   "toll_sweep_surplus": "DVFgzmAx2My6cki1q6wXyNsm2VHQ3HzZo1KZHKwQtqEd",
-   "owner_toll_pay_allowlisted": "4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz",
-   "owner_toll_pay_not_allowlisted": "B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR",
-   "toll_delete_fak": "6C1rLPtYKpxQgX5ZYFYSyGsbQEify9AVQ23fdXKAskxY"
-  }
- },
- "runbook": "docs/MAINNET_RUNBOOK.md",
- "note": "Mainnet runs protocol 86 (near-sdk 5.27, rustc 1.86). Live: charter, toll, arena, house deed, Town Hall, all subaccounts of nearcarta.near. Charter, toll, arena and house have no full-access key; Town Hall keeps one for teardown (it has no owner close).",
- "layout": "named",
- "root_funder": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
- "registrar": "near",
- "planned": {
-  "charter": "charter.nearcarta.near",
-  "toll": "toll.nearcarta.near",
-  "arena": "arena.nearcarta.near",
-  "house": "house.nearcarta.near",
-  "townhall": "townhall.nearcarta.near"
- },
- "derived_public_key": "secp256k1:26swhQicqiPZBJamrbHX2icEjv8FbcPGw9Cox4c3fu36S2f8MB2d1ZvrocJp3mTcqVH9BQ6of3UXX2WRj2WFv59V",
- "foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a",
- "fx_root_key": "secp256k1:29UZSakxpCKVJaJYUmR5UtqdP16xcSemPudWXGEZCxs5HemWkXb331X3o8fqLCZtSj9sdes33YQJNa9D1wEBd9ac",
- "wasm_sha256": {
-  "oath.r18": "04377fc33eb9f0f1bdf384055e8baac7828d2d0e7f259dfe3dcc2305487c0a14",
-  "toll.v6": "8829a9c7de1d8da512615382a7a8923253fc9f13b136fe1b876ce1dd9e9ed88e",
-  "reaper": "ab253074710342bea61df34b775d71c957519edc4924dfddcc665994f41ee8ba",
-  "oath.r18p86": "542ae4dad007edae2ded336ec3b9321ada00af208b4c82814ff06b80f29665cf",
-  "toll.v6p86": "7d1e7ee1a619987c00de5a42c881e006f52dda38ccd423d54540aa51d5e42686",
-  "reaper.p86": "afe81ba2a0f07af4de3b849aac4f62db9e22d777ef445077a215209eea0ac199"
- },
- "agent_allowance_near": 0.25,
- "reaper_link_check_tx": "6mdu5icACvP7F5zRE38Dfe7GyqBKtYfYZzehUMhQC2RR",
- "extras": {
-  "arena": {
-   "contract": "arena.nearcarta.near",
-   "owner": "nearcarta.near",
-   "wasm": "arena.p86.wasm",
-   "sha256": "3b44499233443610e268b21ad89613ee1f98cb0b7cfc5b2428ced7b145154a69",
-   "code_hash": "4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma",
-   "storage_bytes": 369926,
-   "locked_near": 3.69926,
-   "full_access_keys": 0,
-   "teardown": "owner close() with 1 yocto",
-   "txs": {
-    "arena_create_fund": "68A7yYMYA8HecYS1kfDzPwBWTHv3iyN8fapggRRmy3ga",
-    "arena_deploy_init": "EVbtt3wKS5QUfRWbkPYWNAftwoGV13RXL2h9nKGnXuUg",
-    "arena_mint_guardian": "8NqFTf8beQf4KQQSotT1pgsbacCAsQghM76rSCFLDayP",
-    "arena_fund_pot_0.002": "H6ScgfHkXfgpw1CDoae3C7SP7DSG55UpQpm4yV7aVcNq",
-    "arena_attempt_1": "HtDJtYxJ6UGYy3VP7n3GgFyh4Zr97WvQRcRxEyzZSiNm",
-    "arena_agent_pay_allowed_0.001": "AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht",
-    "arena_attempt_2": "AuXzxGVjHmrBszQm55WobbpLzSenD9qW8SUaw4KANka6",
-    "arena_agent_pay_refused_0.002": "25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V",
-    "arena_sweep_surplus": "891qnrvY62ctc9NpZ7RwK37QJTNAeCEKyXo98yfyFdJG",
-    "arena_delete_fak": "FJLLSMqA7P3MwWowDbp1hnspomkpcEmfGcKjM9PrjJ8y"
-   }
+  "fx_root_key": "secp256k1:29UZSakxpCKVJaJYUmR5UtqdP16xcSemPudWXGEZCxs5HemWkXb331X3o8fqLCZtSj9sdes33YQJNa9D1wEBd9ac",
+  "wasm_sha256": {
+    "oath.r18": "04377fc33eb9f0f1bdf384055e8baac7828d2d0e7f259dfe3dcc2305487c0a14",
+    "toll.v6": "8829a9c7de1d8da512615382a7a8923253fc9f13b136fe1b876ce1dd9e9ed88e",
+    "reaper": "ab253074710342bea61df34b775d71c957519edc4924dfddcc665994f41ee8ba",
+    "oath.r18p86": "542ae4dad007edae2ded336ec3b9321ada00af208b4c82814ff06b80f29665cf",
+    "toll.v6p86": "7d1e7ee1a619987c00de5a42c881e006f52dda38ccd423d54540aa51d5e42686",
+    "reaper.p86": "afe81ba2a0f07af4de3b849aac4f62db9e22d777ef445077a215209eea0ac199"
   },
-  "house": {
-   "contract": "house.nearcarta.near",
-   "owner": "nearcarta.near",
-   "wasm": "house_nft.p86.wasm",
-   "sha256": "70a8923bbd187b2b0dd89c66c9ba37902a656640919b16ad4861470fc1ea8806",
-   "code_hash": "8amkMEcCFxQHbHkgZqP72LXJnoJ1iecGq6B71gPiNMXK",
-   "storage_bytes": 247204,
-   "locked_near": 2.47204,
-   "full_access_keys": 0,
-   "teardown": "owner close() with 1 yocto",
-   "txs": {
-    "house_create_fund": "FeuBqYhuDY2S2EZW4C9u6o7cftyLFTQohvgrpXVZ1ycj",
-    "house_deploy_init": "6j1ot7BtC52FhLysYDkVNoc7KKWAQgy9VELGmSU8LzVj",
-    "house_mint_deed_cap_0.001": "FqYcLtmLb7WM9vo83iMNyfSMiMnifSMLQJPJHwBzLtnu",
-    "house_pay_allowed_0.001": "83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26",
-    "house_pay_refused_0.002": "3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1",
-    "house_sweep_surplus": "FPv1CzUVGBerogRdZ58FK924e4L33Nn57frKS4WcwPRD",
-    "house_delete_fak": "DxZXKNx3SvcGQSVooJwwNrgVMhp5CRdPHEsfxnWny8jB"
-   }
+  "agent_allowance_near": 0.25,
+  "reaper_link_check_tx": "6mdu5icACvP7F5zRE38Dfe7GyqBKtYfYZzehUMhQC2RR",
+  "extras": {
+    "arena": {
+      "contract": "arena.nearcarta.near",
+      "owner": "nearcarta.near",
+      "wasm": "arena.p86.wasm",
+      "sha256": "3b44499233443610e268b21ad89613ee1f98cb0b7cfc5b2428ced7b145154a69",
+      "code_hash": "4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma",
+      "storage_bytes": 369926,
+      "locked_near": 3.69926,
+      "full_access_keys": 0,
+      "teardown": "owner close() with 1 yocto",
+      "txs": {
+        "arena_create_fund": "68A7yYMYA8HecYS1kfDzPwBWTHv3iyN8fapggRRmy3ga",
+        "arena_deploy_init": "EVbtt3wKS5QUfRWbkPYWNAftwoGV13RXL2h9nKGnXuUg",
+        "arena_mint_guardian": "8NqFTf8beQf4KQQSotT1pgsbacCAsQghM76rSCFLDayP",
+        "arena_fund_pot_0.002": "H6ScgfHkXfgpw1CDoae3C7SP7DSG55UpQpm4yV7aVcNq",
+        "arena_attempt_1": "HtDJtYxJ6UGYy3VP7n3GgFyh4Zr97WvQRcRxEyzZSiNm",
+        "arena_agent_pay_allowed_0.001": "AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht",
+        "arena_attempt_2": "AuXzxGVjHmrBszQm55WobbpLzSenD9qW8SUaw4KANka6",
+        "arena_agent_pay_refused_0.002": "25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V",
+        "arena_sweep_surplus": "891qnrvY62ctc9NpZ7RwK37QJTNAeCEKyXo98yfyFdJG",
+        "arena_delete_fak": "FJLLSMqA7P3MwWowDbp1hnspomkpcEmfGcKjM9PrjJ8y"
+      }
+    },
+    "house": {
+      "contract": "house.nearcarta.near",
+      "owner": "nearcarta.near",
+      "wasm": "house_nft.p86.wasm",
+      "sha256": "70a8923bbd187b2b0dd89c66c9ba37902a656640919b16ad4861470fc1ea8806",
+      "code_hash": "8amkMEcCFxQHbHkgZqP72LXJnoJ1iecGq6B71gPiNMXK",
+      "storage_bytes": 247204,
+      "locked_near": 2.47204,
+      "full_access_keys": 0,
+      "teardown": "owner close() with 1 yocto",
+      "txs": {
+        "house_create_fund": "FeuBqYhuDY2S2EZW4C9u6o7cftyLFTQohvgrpXVZ1ycj",
+        "house_deploy_init": "6j1ot7BtC52FhLysYDkVNoc7KKWAQgy9VELGmSU8LzVj",
+        "house_mint_deed_cap_0.001": "FqYcLtmLb7WM9vo83iMNyfSMiMnifSMLQJPJHwBzLtnu",
+        "house_pay_allowed_0.001": "83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26",
+        "house_pay_refused_0.002": "3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1",
+        "house_sweep_surplus": "FPv1CzUVGBerogRdZ58FK924e4L33Nn57frKS4WcwPRD",
+        "house_delete_fak": "DxZXKNx3SvcGQSVooJwwNrgVMhp5CRdPHEsfxnWny8jB"
+      }
+    },
+    "townhall": {
+      "contract": "townhall.nearcarta.near",
+      "owner": "nearcarta.near",
+      "wasm": "townhall.p86.wasm",
+      "sha256": "9f5480d7e61c01566b081737b91a1a27b02cac84d377e40fb2fcfa09cc101b5f",
+      "code_hash": "BixZRmNsFTtHBBtDEqtz7tKfiDeU7eJodfEPpZMpxC2J",
+      "storage_bytes": 192231,
+      "locked_near": 1.92231,
+      "full_access_keys": 1,
+      "teardown": "delete_account with the key in ~/.near-credentials/mainnet/townhall.nearcarta.near.json",
+      "txs": {
+        "townhall_create_fund": "AtFX4uhXWDxzk8XpP2he1FxSSxFSDQfn2p1uCB78EZH2",
+        "townhall_deploy_init": "4vieiD25eUpGCS8ttRTx7X8ZyjzVcXpWLbn6NKrpuJzK",
+        "townhall_post_bounty_0.001": "HAVTU7zjgHnmnV3bhRXfcAxrcTKREdHTVnho9hjfDshM",
+        "townhall_reward_allowed_0.001": "6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h",
+        "townhall_post_bounty_0.002": "Cq9ffD4ayWASwt3MJK4Y7XdmZkWthXsNfw7eCCqcUXS2",
+        "townhall_reward_refused_0.002": "Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6",
+        "townhall_sweep_surplus": "F9A8pLz9LsTWE9fjSecAe4bxPcXibd9RTWJCt61gTq9E"
+      }
+    }
   },
-  "townhall": {
-   "contract": "townhall.nearcarta.near",
-   "owner": "nearcarta.near",
-   "wasm": "townhall.p86.wasm",
-   "sha256": "9f5480d7e61c01566b081737b91a1a27b02cac84d377e40fb2fcfa09cc101b5f",
-   "code_hash": "BixZRmNsFTtHBBtDEqtz7tKfiDeU7eJodfEPpZMpxC2J",
-   "storage_bytes": 192231,
-   "locked_near": 1.92231,
-   "full_access_keys": 1,
-   "teardown": "delete_account with the key in ~/.near-credentials/mainnet/townhall.nearcarta.near.json",
-   "txs": {
-    "townhall_create_fund": "AtFX4uhXWDxzk8XpP2he1FxSSxFSDQfn2p1uCB78EZH2",
-    "townhall_deploy_init": "4vieiD25eUpGCS8ttRTx7X8ZyjzVcXpWLbn6NKrpuJzK",
-    "townhall_post_bounty_0.001": "HAVTU7zjgHnmnV3bhRXfcAxrcTKREdHTVnho9hjfDshM",
-    "townhall_reward_allowed_0.001": "6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h",
-    "townhall_post_bounty_0.002": "Cq9ffD4ayWASwt3MJK4Y7XdmZkWthXsNfw7eCCqcUXS2",
-    "townhall_reward_refused_0.002": "Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6",
-    "townhall_sweep_surplus": "F9A8pLz9LsTWE9fjSecAe4bxPcXibd9RTWJCt61gTq9E"
-   }
+  "root_balance_near": 0.561379,
+  "ferry_intents": {
+    "rail": "NEAR Intents 1Click",
+    "from": "nearcarta.near",
+    "to": "nearcarta.near",
+    "amount_in": "0.045 wNEAR",
+    "amount_in_usd": "0.1809",
+    "amount_out": "0.177937 USDC",
+    "withdraw_fee_usdc": "0.005027",
+    "deposit_address": "524111ff3f37d4edbd09f1bb35c6c517c5c8b3a7ac4f5d268ca6f0612600f2bf",
+    "intent_hashes": [
+      "aybjMQLNbHajyPerDhE65udeMLCRcsUCouGPsgjEvmJ",
+      "DaD8b4EyxbyQstKszWXRWFLB5FHzAUw52n7bqVgXMSTe"
+    ],
+    "status": "SUCCESS",
+    "updated_at": "2026-11-04T21:06:50Z",
+    "txs": {
+      "wrap_near": "HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw",
+      "origin_ft_transfer": "A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz",
+      "destination_usdc_withdraw": "Be1ttdbmiKhqwxpstP33HefWUp3o1A8RwKosdcK2mquk"
+    }
+  },
+  "ferry": {
+    "oneclick": "https://1click.chaindefuser.com",
+    "verifier_mainnet": "intents.near",
+    "quote_signer": "ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc",
+    "note": "1Click quotes are dry:true (no deposit address, nothing spent)."
   }
- },
- "root_balance_near": 0.561379,
- "ferry_intents": {
-  "rail": "NEAR Intents 1Click",
-  "from": "nearcarta.near",
-  "to": "nearcarta.near",
-  "amount_in": "0.045 wNEAR",
-  "amount_in_usd": "0.1809",
-  "amount_out": "0.177937 USDC",
-  "withdraw_fee_usdc": "0.005027",
-  "deposit_address": "524111ff3f37d4edbd09f1bb35c6c517c5c8b3a7ac4f5d268ca6f0612600f2bf",
-  "intent_hashes": [
-   "aybjMQLNbHajyPerDhE65udeMLCRcsUCouGPsgjEvmJ",
-   "DaD8b4EyxbyQstKszWXRWFLB5FHzAUw52n7bqVgXMSTe"
-  ],
-  "status": "SUCCESS",
-  "updated_at": "2026-11-04T21:06:50Z",
-  "txs": {
-   "wrap_near": "HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw",
-   "origin_ft_transfer": "A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz",
-   "destination_usdc_withdraw": "Be1ttdbmiKhqwxpstP33HefWUp3o1A8RwKosdcK2mquk"
-  }
- },
- "ferry": {
-  "oneclick": "https://1click.chaindefuser.com",
-  "verifier_mainnet": "intents.near",
-  "quote_signer": "ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc",
-  "note": "1Click quotes are dry:true (no deposit address, nothing spent)."
- }
 }
