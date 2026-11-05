@@ -107,8 +107,9 @@ export async function disconnect() { await wallet().disconnect().catch(() => {})
 export async function mountConnect(el) {
   let msg;
   const draw = async () => {
-    const who = (await mainnetAccount()) || null;
-    const [bal, mine] = who ? await Promise.all([balance(who), deeds(who)]) : [null, []];
+    const storedNow = readSession();
+    const who = (await Promise.race([mainnetAccount(), new Promise(r => setTimeout(() => r(null), 1500))])) || sessionAccount(storedNow) || null;
+    const [bal, mine] = who ? await Promise.all([balance(who), deeds(who).catch(() => [])]) : [null, []];
     const low = who && bal != null && bal < 10n ** 24n;
     // A house built a moment ago can lag on the RPC node: look again a few times.
     if (who && !mine.length && (draw.n = (draw.n || 0) + 1) < 6) setTimeout(draw, 6000);
@@ -116,8 +117,10 @@ export async function mountConnect(el) {
     try { hero = JSON.parse(localStorage.getItem('nearcarta.hero.v1') || 'null')?.name || ''; } catch { /* keep the short id */ }
     const stored = readSession();
     const id = who || sessionAccount(stored);
-    if (who) writeSession({ accountId: who, displayName: hero || stored.displayName || '', balanceNear: bal == null ? stored.balanceNear : (bal === 0n ? 0 : fmt(bal)) });
-    const label = sessionPill({ accountId: id, displayName: hero || stored.displayName || '', balanceNear: bal == null ? stored.balanceNear : (bal === 0n ? 0 : fmt(bal)) });
+    const balanceNear = bal == null ? stored.balanceNear : (bal === 0n ? 0 : fmt(bal));
+    if (who) writeSession({ accountId: who, displayName: hero || stored.displayName || '', balanceNear });
+    dispatchEvent(new CustomEvent('nearcarta:balance', { detail: { balanceNear } }));
+    const label = sessionPill({ accountId: id, displayName: hero || stored.displayName || '', balanceNear });
     const restore = !who && id
       ? '<button type="button" class="pill go" data-x="restore" data-testid="restore-session">Restore session</button>'
       : '';
@@ -138,7 +141,9 @@ export async function mountConnect(el) {
     on('guest', () => Promise.resolve(null));
     on('out', () => { clearSessionAccount(); return disconnect(); });
   };
-  onWallet(draw); await draw();
+  onWallet(draw);
+  addEventListener('nearcarta:tx', () => { draw().catch(() => {}); });
+  await draw();
 }
 
 async function load() {

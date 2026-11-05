@@ -53,9 +53,9 @@ function progress(id) { clearInterval(prog); const st = STEPS[id]; if (!st) retu
   tick(); prog = setInterval(() => phase === 'busy' ? tick() : clearInterval(prog), 1000); }
 const stopProgress = () => { clearInterval(prog); prog = null; };
 const verdict = o => o.decision === 'allowed' ? 'ok' : 'no';
-function react(kind) { const r = sh?.rob; if (!r) return; sfx(kind === 'ok' ? 'allowed' : 'refuse'); r.play(kind === 'ok' ? 'Yes' : 'No', { once: true }); setTimeout(() => r.play('Idle'), 1500); }
+function react(kind) { const r = sh?.rob; if (!r || typeof r.play !== 'function') return; sfx(kind === 'ok' ? 'allowed' : 'refuse'); try { r.play(kind === 'ok' ? 'Yes' : 'No', { once: true }); setTimeout(() => r.play('Idle'), 1500); } catch { /* the receipt still shows if the pose is missing */ } }
 function ruleChip() {
-  const c = A.S.clauses.pay; const b = $('#t-rules');
+  const c = A.S.clauses.pay; const b = $('#t-rules'); if (!b) return;
   const r = ruleChipText(c ? A.fromY(c.per_action_cap) : null, n => fmt(A.toY(n)));
   b.hidden = !A.S.charter; b.textContent = r.text; b.title = r.title; b.dataset.changed = r.changed ? '1' : ''; b.dataset.testid = 'rules-chip';
 }
@@ -144,8 +144,8 @@ const APPS = {
       const v = A.tollVisit();
       if (v && !v.done) return tollStep(v, true);
       const o = await A.toll();
-      if (o.decision !== 'allowed') return { o, hero: APPS.toll.hero(), say: tollRefusal(A.why(o.reason)) };
-      return { o, keep: true, kind: 'ok', hero: APPS.toll.hero(), say: `Paid the ${A.TOLL_MAIN} NEAR toll. Nothing else was charged.` };
+      if (o.decision !== 'allowed') return { o, hero: APPS.toll.hero(), rc: A.txLine(o.tx), say: tollRefusal(A.why(o.reason)) };
+      return { o, keep: true, kind: 'ok', hero: APPS.toll.hero(), rc: A.txLine(o.tx), say: `Paid the ${A.TOLL_MAIN} NEAR toll. Nothing else was charged.` };
     },
   },
   ferry: {
@@ -153,18 +153,16 @@ const APPS = {
     guest: true,
     form: () => '<div data-deep="ferry"></div>',
     bind: () => mountShop('ferry', document.getElementById('t-form'), { state: extra, routes: () => A.ROUTES, quote: (id, amt) => A.quote(id, amt), repaint: () => paint() }),
-    btn: () => extra.q ? 'Ask my agent to swap' : extra.fdone ? 'Done ✓ · Swap again' : 'Get quote',
+    btn: () => extra.q ? 'Nothing is sent from here' : extra.fdone ? 'Get another quote' : 'Get quote',
     hero: () => extra.q ? `<span class="tok"><b class="num">${esc(+Number(extra.q.to.amount).toFixed(5))}</b><span class="sym">ZEC</span></span>` : null,
     run: async () => {
       const rt = A.ROUTES[extra.ri || 0];
       if (!extra.q) {
         extra.fdone = false;
         const q = await A.quote(rt.id, extra.amt || rt.amt); if (!q.ok || !q.checks?.signature) throw new Error(q.error || 'quote not signed');
-        extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: `This is a price. Nothing is sent from here. Pay from another chain only after the charter allows the recipient, at most 0.20 USD. Or ask your charter to approve a ${A.ferryNear(q)} NEAR stand-in.`, rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click price · ${esc(q.correlationId.slice(0, 8))}</span>` };
+        extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: 'This is a price. Nothing is sent from here.', rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click price · ${esc(q.correlationId.slice(0, 8))}</span>` };
       }
-      const amt = A.ferryNear(extra.q), to = A.ferryPayee(rt.id);
-      const o = await A.ferry(rt.id, extra.q); extra.q = null; extra.fdone = o.decision === 'allowed';
-      return { o, clause: rt.id, say: o.decision === 'allowed' ? `Done. Your rules approved it: ${amt} NEAR paid to ${nice(to) || to}.` : `Refused: ${A.why(o.reason)}. Nothing was paid.` };
+      return { keep: true, hero: APPS.ferry.hero(), say: 'This is a price. Nothing is sent from here.', rc: '<a class="rc" href="/ferry-widget">Pay from any chain</a>' };
     },
   },
   bank: {
@@ -220,13 +218,19 @@ const APPS = {
       extra.txt = ''; extra.atee = A.brainTee(r.brain); await A.record(r.tx).catch(() => {});
       const who = r.brain?.by === 'model' ? `NEAR AI${r.brain.parsed?.suspicious ? ' flagged it,' : ''} asked ${+r.parsed.amount.toFixed(4)} to ${esc(short(r.parsed.receiverShown, 12, 6))}. ` : r.brain ? 'Model unavailable; the plain-words parser read it. ' : '';
       let rank = ''; try { const b = await A.board(); const i = b.players.findIndex(p => p.player === A.S.me); if (i >= 0) rank = ` Rank ${i + 1}.`; } catch {}
-      const said = r.breach ? 'Breach! Your rules paid a stranger.' : r.decision === 'denied' ? (r.fresh ? `Blocked by a new rule (a “wall”): ${A.why(r.reason)}. +100` : `Same wall. +10`) : `Paid ${+r.paid.toFixed(4)} inside your rules. No wall hit.`;
+      const cap = r.cap ? A.fmt(r.cap) : '';
+      const said = r.cancelled ? 'Cancelled in the wallet. Nothing was signed. That is not a defence.'
+        : r.breach ? 'Breach! Your rules paid a stranger.'
+        : r.decision === 'denied' && r.fromRule ? `Refused by your rule before anything was signed: ${A.why(r.reason)}${cap ? ` (max ${cap})` : ''}. You can read this cap on your row.`
+        : r.decision === 'denied' && r.tx ? `Refused on chain: ${A.why(r.reason)}. The receipt is the refusal.`
+        : r.decision === 'denied' ? `Not a defence. ${A.why(r.reason) || 'Nothing was signed.'}`
+        : `Paid ${+r.paid.toFixed(4)} inside your rules. No wall hit.`;
       const rc = receipt({ note: r.parsed.cls, receiver: r.parsed.receiverShown, amount: yOf(r.parsed.amount), by: r.brain?.by, model: r.brain?.model,
         verification: r.brain?.verification, cost: r.brain?.cost, decision: r.decision, reason: r.reason, tx: r.tx, clause_id: r.parsed.clause }, A.S.clauses[r.parsed.clause]);
       const rcl = `<details class="more"><summary><span class="dt">receipt</span></summary><span class="receipt" data-testid="receipt">${esc(rc.what)} · to ${esc(short(rc.to || '', 12, 6))} · ${esc(rc.price_near)} NEAR · ${esc(rc.decided_by)} · plan ${rc.checks.within_plan ? 'ok' : 'over'} · charter ${esc(rc.checks.charter || '?')}</span>`
         + (rc.counter_offer ? ` <span class="counter" data-testid="counter-offer">Counter-offer: ${esc(rc.counter_offer.why)}</span>` : '') + '</details>';
       const g = A.game(), more = `<details class="more" data-testid="arena-more"><summary><span class="dt">score &amp; receipt</span></summary><p class="note">${g.walls.length}/6 walls found · ${g.score} pts${rank}</p>${rcl.replace(/^<details class="more"><summary><span class="dt">receipt<\/span><\/summary>|<\/details>$/g, '')}${teePanel(extra.atee, false)}</details>`;
-      return { o: r, keep: true, kind: r.breach ? 'no' : r.decision === 'denied' ? 'ok' : 'no', hero: null, say: who + said + ' ' + more, rule: r.decision === 'denied' ? 'held by your rule · ' + A.why(r.reason) : A.ruleFor(r, r.parsed.clause) };
+      return { o: r, keep: true, kind: r.cancelled ? 'no' : r.breach ? 'no' : r.decision === 'denied' ? 'ok' : 'no', hero: null, say: who + said + ' ' + more, rc: r.tx ? A.txLine(r.tx) : '', rule: r.cancelled ? '' : r.decision === 'denied' ? 'held by your rule · ' + A.why(r.reason) : A.ruleFor(r, r.parsed.clause) };
     },
   },
   hall: {
@@ -243,7 +247,7 @@ const APPS = {
   },
   payouts: {
     guest: true,
-    label: 'Payouts · one batch', idle: 'Prepare several payments as one propose_batch. The live board signs propose only, so this page does not send the batch.',
+    label: 'Payouts · prepare a batch', idle: 'Prepare several payments. Each one stays within your cap. This page does not send them.',
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.001' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.001' }); } return extra.rows.slice(0, 3); },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => '<div data-deep="payouts"></div>',
@@ -269,8 +273,13 @@ const APPS = {
     form: () => deedMarkup(),
     btn: 'See my rules & record',
     hero: () => A.S.charter ? `<span class="commit" title="${esc(A.S.charter)}">${esc(short(A.S.charter.split('.')[0], 8, 6))}</span>` : null,
-    run: async () => { await A.readRules(); const c = A.S.clauses.pay, rp = await A.reputation();
-      return { keep: true, kind: 'ok', hero: `${num(rp.refused, 'refused')}<span class="pts">of ${rp.asks} asks</span>`, say: `Max ${fmt(c.per_action_cap)}, ${fmt(c.daily_budget)} a day. ${rp.paid} paid, ${rp.refused} refused, all on chain.`, rule: `reputation · ${rp.asks ? Math.round(100 * rp.refused / rp.asks) : 0}% of asks refused`, rc: `<a class="rc" href="${NBA(A.S.charter)}" target="_blank" rel="noopener" title="${esc(A.S.charter)}">deed · ${esc(short(A.S.charter, 12, 6))} ↗</a>` }; },
+    run: async () => {
+      await A.readRules();
+      const c = A.S.clauses.pay;
+      const rp = await A.reputation();
+      if (!c?.per_action_cap) return { keep: true, kind: 'ok', say: 'No pay rule is on this row yet. Open Town Hall to read it. Nothing was signed.', rule: 'no pay rule on this row' };
+      return { keep: true, kind: 'ok', hero: `${num(rp.refused, 'refused')}<span class="pts">of ${rp.asks} asks</span>`, say: `Max ${fmt(c.per_action_cap)}, ${fmt(c.daily_budget)} a day. ${rp.paid} paid, ${rp.refused} refused, all on chain.`, rule: `reputation · ${rp.asks ? Math.round(100 * rp.refused / rp.asks) : 0}% of asks refused`, rc: `<a class="rc" href="${NBA(A.S.charter)}" target="_blank" rel="noopener" title="${esc(A.S.charter)}">deed · ${esc(short(A.S.charter, 12, 6))} ↗</a>` };
+    },
   },
   chronicle: {
     guest: true,
@@ -279,9 +288,14 @@ const APPS = {
     form: () => '<div data-deep="chronicle"></div>',
     bind: () => mountShop('chronicle', document.getElementById('t-form'), { state: extra, repaint: () => paint(), rows: () => [...(extra.feed?.local || []), ...RECORDED].map(x => ({ ...x, label: A.why(x.reason) })) }),
     // a real entry: the agent asks the charter to pay the scribe 0.001 NEAR; allowed or refused, the answer is on chain
-    run: async () => { const o = await A.ask({ shop: 'chronicle', receiver: A.merchants()[0], amountY: A.toY(0.001), memo: 'chronicle:entry' });
-      extra.feed = await A.feed();
-      return { o, keep: true, hero: num(extra.feed.nonce, 'asks'), say: o.decision === 'allowed' ? 'Entry signed: your agent paid 0.001 NEAR to record it.' : `Entry signed. Refused: ${A.why(o.reason)}. Nothing was paid.` }; },
+    run: async () => {
+      const payee = A.merchants()[0] || (A.S.clauses.pay?.receivers || []).find(Boolean);
+      if (!payee) throw new Error('add a payee to your rules first');
+      const o = await A.ask({ shop: 'chronicle', receiver: payee, amountY: A.toY(0.001), memo: 'chronicle:entry' });
+      extra.feed = await A.feed().catch(() => ({ local: A.receipts(), onchain: [], nonce: A.receipts().length }));
+      if (o.tx) dispatchEvent(new CustomEvent('nearcarta:chronicle', { detail: { hash: o.tx, shop: 'chronicle', decision: o.decision } }));
+      return { o, keep: true, hero: num(extra.feed.nonce ?? 0, 'asks'), rc: A.txLine(o.tx), say: o.decision === 'allowed' ? 'Entry signed: your agent paid 0.001 NEAR to record it.' : `Entry signed. Refused: ${A.why(o.reason)}. Nothing was paid.` };
+    },
   },
 };
 
@@ -435,9 +449,14 @@ async function primary(auto = false) {
   if (st === 'wait' || st === 'key') { phase = 'busy'; btn(st === 'key' && !A.pendingKey() ? 'Approve in your wallet…' : 'Checking…', 'primary busy', true);
     try { if (st === 'key' && !(A.pendingKey() && Date.now() < A.pendingKey().eta)) { const r = await A.helperKey(); rcpt(A.txLine(r.tx, 'helper key')); } else await A.readRules(); phase = 'idle'; paint(); } catch (e) { fail(e); } return; }
   phase = 'busy'; btn(st === 'build' ? 'Approve in your wallet…' : 'Asking your charter…', 'primary busy', true); say(st === 'build' ? 'Building your charter…' : 'Asking your charter on chain…'); rcpt(''); if (st !== 'build') progress(cur);
+  let res = null;
   try {
     if (st === 'build') { const r = await A.buildCharter(); phase = 'idle'; rcpt(A.txLine(r.tx, 'charter built')); paint(); openRules(); return; }
-    const res = await APPS[cur].run(); stopProgress(); phase = res.keep ? 'kept' : 'done';
+    res = await APPS[cur].run();
+  } catch (e) { fail(e); return; }
+  // The tx already landed. A later paint must not replace the receipt with "Stopped".
+  try {
+    stopProgress(); phase = res.keep ? 'kept' : 'done';
     const kind = res.kind || (res.o ? verdict(res.o) : 'ok');
     const rule = res.rule || (res.o ? A.ruleFor(res.o, res.clause) : '');
     if (res.hero !== undefined) hero(res.hero);
@@ -446,7 +465,12 @@ async function primary(auto = false) {
     rcpt((rule ? `<span class="rule ${kind}" data-testid="rule">${kind === 'ok' ? '✓' : '✕'} ${esc(rule)}</span>` : '') + (res.rc || A.txLine(res.o?.tx)));
     const app = APPS[cur]; btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : (AGAIN[cur] || 'Do it again'))); if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
     document.body.dataset.app = kind; ruleChip(); proofDrawer();
-  } catch (e) { fail(e); }
+  } catch (e) {
+    phase = 'kept';
+    say(res.say || 'Done.');
+    rcpt(res.rc || A.txLine(res.o?.tx) || (e.tx ? A.txLine(e.tx) : ''));
+    document.body.dataset.app = 'ok';
+  }
 }
 const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another entry', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Send another note', toll: 'Pass the gate again' };
 function fail(e) { stopProgress(); phase = 'idle'; say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); const app = APPS[cur]; btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
@@ -513,6 +537,7 @@ export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase =
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };
+addEventListener('nearcarta:balance', () => { try { if (cur) wallet(); } catch { /* the header redraws on its own */ } });
 
 // Accessible names for explorer links and replay buttons, wherever a drawer renders them (they can sit in a
 // collapsed drawer where their text has no layout, so screen readers and audits need an explicit name).

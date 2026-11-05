@@ -59,14 +59,21 @@ export function decide(signals) {
 }
 
 /** Read every signal. deps are injectable for tests. */
-export async function check(account, { charter = null, now = Date.now(), view = nearView, viewAccount = nearViewAccount, fpost = fastPost } = {}) {
+export async function check(account, { charter = null, row = null, now = Date.now(), view = nearView, viewAccount = nearViewAccount, fpost = fastPost } = {}) {
   const s = { account, charter, exists: true, is_contract: false, allowlisted: false, prior_payments: 0, age_ms: null, first_seen: null, code_changed_ms: null, code_change_tx: null, lookalike_of: null, deny: null, index: 'ok' };
   s.deny = DENY.entries.find(e => e.account === account) || recordedRefusal(account);
   let acct = null;
   try { acct = await viewAccount(account); } catch (e) { if (/UNKNOWN_ACCOUNT|does not exist/.test(e.message)) s.exists = false; else throw e; }
   if (acct) { s.is_contract = acct.code_hash !== EMPTY_CODE || !!(acct.global_contract_hash || acct.global_contract_account_id); s.code_hash = acct.global_contract_hash || acct.code_hash; }
   // The charter's own allowlist and its confirmed payments.
-  if (charter) {
+  // A board row is the visitor's account. Its rules are on the board, not get_clauses on that account.
+  if (row) {
+    const allowed = [...new Set(row.receivers || [])];
+    s.allowlisted = allowed.includes(account);
+    s.lookalike_of = lookalikeOf(account, allowed);
+    s.actions_scanned = 0;
+    s.board_row = true;
+  } else if (charter) {
     const [clauses, st] = await Promise.all([view(charter, 'get_clauses'), view(charter, 'get_state')]);
     const allowed = [...new Set(Object.values(clauses || {}).flatMap(c => c.receivers || []))];
     s.allowlisted = allowed.includes(account);

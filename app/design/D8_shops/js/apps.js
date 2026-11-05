@@ -7,7 +7,7 @@ import { $, sfx } from './core.js';
 import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
-import { proposalMessage, refusalOf } from './board.js';
+import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 const onMain = () => true;
@@ -49,7 +49,7 @@ const PLAIN = [
 export function plainError(e) {
   const m = String(e?.message || e || '');
   if (/http (429|502|503|504)|Failed to fetch|NetworkError|Load failed/i.test(m)) return 'the town is busy right now; try again in a moment';
-  if (/Cannot read prop|is not a function|is not defined|undefined|null/.test(m) && !/ERR_/.test(m)) return 'something did not load; try again in a moment';
+  if (/Cannot read prop|is not a function|is not defined|Cannot convert undefined or null/.test(m) && !/ERR_/.test(m)) return 'something did not load; try again in a moment';
   for (const [re, t] of PLAIN) if (re.test(m)) return t;
   const r = m.match(/\b(receiver_not_allowlisted|over_per_action_cap|over_daily_budget|over_daily_action_count|below_min_amount|outside_time_window|unknown_clause|frozen)\b/);
   if (r) return why(r[1]);
@@ -125,8 +125,12 @@ export async function refresh() {
 export async function readRules() {
   if (S.board && S.me) {
     const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+    if (!row) {
+      // A failed re-read after a tx must not wipe a row we already have.
+      if (!S.boardRow) { S.charter = null; S.clauses = {}; S.state = null; S.agentLive = false; }
+      return S;
+    }
     S.boardRow = row;
-    if (!row) { S.charter = null; S.clauses = {}; S.state = null; S.agentLive = false; return S; }
     S.charter = S.me;
     S.clauses = { pay: { receivers: row.receivers, per_action_cap: row.per_action_cap, daily_budget: row.daily_budget, max_actions_per_day: row.max_actions_per_day, min_amount: row.min_amount, window_start_min: row.window_start_min, window_end_min: row.window_end_min } };
     S.state = { frozen: row.frozen, next_nonce: row.nonce, policy_version: 1 };
@@ -162,7 +166,32 @@ export async function helperKey() {
   const h = await sign(S.charter, [fc('set_agent_key', { public_key: W.keyFrom(secret).publicKey, allowance: (YN / 2n).toString() }, 60)]);
   keep(h, 'house', 'signed', 'set_agent_key'); await readRules(); return { tx: h, live: S.agentLive, eta: pendingKey()?.eta };
 }
-async function sign(receiverId, actions) { const w = await conn.wallet(); const r = await w.signAndSendTransaction({ receiverId, actions }); return W.txHashOf(r); }
+function noteFinal(hash, shop, decision) {
+  if (typeof dispatchEvent !== 'function' || !hash) return;
+  const detail = { hash, shop: shop || '', decision: decision || '' };
+  dispatchEvent(new CustomEvent('nearcarta:tx', { detail }));
+  if (shop === 'chronicle') dispatchEvent(new CustomEvent('nearcarta:chronicle', { detail }));
+}
+/** A wallet close is not a charter refusal. Contract reasons and a broadcast tx are. */
+export function userCancelled(e) {
+  if (!e || e.tx || refusalOf(e)) return false;
+  if (e.name === 'AbortError' || e.cancelled) return true;
+  const s = String(e.message || e);
+  return /user rejected|user cancelled|user canceled|rejected the transaction|rejected the request|approval.*closed|dismissed the|closed the prompt/i.test(s);
+}
+async function sign(receiverId, actions) {
+  const hook = globalThis.__NC_WALLET_SIGN;
+  if (typeof hook === 'function') {
+    const h = await hook(receiverId, actions);
+    noteFinal(h);
+    return h;
+  }
+  const w = await conn.wallet();
+  const r = await w.signAndSendTransaction({ receiverId, actions });
+  const h = W.txHashOf(r);
+  noteFinal(h);
+  return h;
+}
 const fc = (methodName, args, tg = 40, deposit = '0') => ({ type: 'FunctionCall', params: { methodName, args, gas: (BigInt(tg) * TG).toString(), deposit } });
 
 // ---------- house: create the charter ----------
@@ -209,21 +238,72 @@ export async function signRules(r) {
 }
 
 // ---------- the Lamplighter asks ----------
+/** A rule the loaded row already breaks. Returned before any wallet or agent signature. */
+function localRefusal(receiver, amountY) {
+  const c = pay();
+  if (!c) return null;
+  let amt;
+  try { amt = BigInt(amountY); } catch { return null; }
+  if (Array.isArray(c.receivers) && c.receivers.length && receiver && !c.receivers.includes(receiver)) return 'receiver_not_allowlisted';
+  if (c.per_action_cap && amt > BigInt(c.per_action_cap)) return 'over_per_action_cap';
+  if (c.min_amount && amt < BigInt(c.min_amount)) return 'below_min_amount';
+  const u = S.usage?.pay;
+  if (u && c.daily_budget && BigInt(u.spent || 0) + amt > BigInt(c.daily_budget)) return 'over_daily_budget';
+  if (u && c.max_actions_per_day && Number(u.count || 0) + 1 > Number(c.max_actions_per_day)) return 'over_daily_action_count';
+  return null;
+}
+/** The propose-only key on the visitor's account. Present only when it may call propose on the board. */
+async function proposeAccessKey(key) {
+  if (!rpc || !key || !S.me || !S.board) return null;
+  const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: S.me, public_key: key.publicKey }).catch(() => null);
+  const perm = ak?.permission?.FunctionCall;
+  if (!perm || perm.receiver_id !== S.board) return null;
+  const names = perm.method_names || [];
+  if (names.length && !names.includes('propose')) return null;
+  return ak;
+}
+function settled(shop, out) {
+  keep(out.tx, shop, out.decision, out.reason, { amt: out.amount, to: out.receiver });
+  // The wallet path already refreshed the header inside sign(). The agent path never opens a wallet.
+  if (out.signer === 'agent' && out.tx) noteFinal(out.tx, shop, out.decision);
+  readRules().catch(() => {});
+  return out;
+}
 async function boardPay({ shop, receiver, amountY }) {
-  const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
   const row = S.boardRow || await view(S.board, 'get_charter', { owner: S.me });
   if (!row) throw new Error('no charter row yet: finish setup first');
+  S.boardRow = row;
   const amount = String(amountY);
+  const local = localRefusal(receiver, amount);
+  if (local) return { tx: null, decision: 'denied', reason: local, action: null, amount, receiver, fromRule: true, cap: pay()?.per_action_cap || null };
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
   const msg = proposalMessage({ contract: S.board, owner: S.me, receiver, amount, nonce: String(row.nonce) });
   const signature = W.signMessage(key, msg);
+  const args = { owner: S.me, receiver, amount, signature, reveal: null };
+  const ak = await proposeAccessKey(key);
   try {
-    const h = await sign(S.board, [fc('propose', { owner: S.me, receiver, amount, signature, reveal: null }, 80)]);
-    const out = { tx: h, decision: 'allowed', reason: 'ok', action: null, amount, receiver };
-    keep(out.tx, shop, out.decision, out.reason, { amt: amount, to: receiver }); readRules().catch(() => {});
-    return out;
+    if (ak) {
+      // The key installed at setup may only call propose. It signs here. The wallet tab stays closed.
+      const signed = W.signTx({ key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+        actions: [W.functionCall('propose', args, 80n * TG)] });
+      const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+      if (!sent.ok) {
+        const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+        return settled(shop, { tx: signed.hash, decision: 'denied', reason, action: null, amount, receiver, fromChain: true, signer: 'agent' });
+      }
+      return settled(shop, { tx: signed.hash, decision: 'allowed', reason: 'ok', action: null, amount, receiver, signer: 'agent' });
+    }
+    const h = await sign(S.board, [fc('propose', args, 80)]);
+    return settled(shop, { tx: h, decision: 'allowed', reason: 'ok', action: null, amount, receiver, signer: 'wallet' });
   } catch (e) {
-    const reason = refusalOf(e) || String(e.message || e).slice(0, 160);
-    return { tx: e.tx || null, decision: 'denied', reason, action: null, amount, receiver };
+    if (userCancelled(e)) {
+      const err = new Error('Cancelled in the wallet. Nothing was signed.');
+      err.cancelled = true;
+      throw err;
+    }
+    const code = refusalOf(e);
+    if (code || e.tx) return settled(shop, { tx: e.tx || null, decision: 'denied', reason: code || String(e.message || e).slice(0, 160), action: null, amount, receiver, fromChain: !!e.tx });
+    throw e;
   }
 }
 export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null }) {
@@ -234,8 +314,8 @@ export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = nu
     expires_at: String(BigInt(Date.now() + 10 * 60_000) * 1_000_000n), memo, receipt: null };
   const r = await W.sendPropose(rpc, { key, charter: S.charter, p });
   const v = r.value || {};
-  const out = { tx: r.hash, decision: r.ok ? v.decision : 'failed', reason: r.ok ? v.reason : r.error, action: v.action_id ?? null, amount: p.amount, receiver };
-  keep(out.tx, shop, out.decision, out.reason, { amt: p.amount, to: receiver }); readRules().catch(() => {});
+  const out = { tx: r.hash, decision: r.ok ? v.decision : 'failed', reason: r.ok ? v.reason : r.error, action: v.action_id ?? null, amount: p.amount, receiver, signer: 'agent' };
+  keep(out.tx, shop, out.decision, out.reason, { amt: p.amount, to: receiver }); noteFinal(out.tx, shop, out.decision); readRules().catch(() => {});
   return out;
 }
 export function ruleFor(o, clauseId = 'pay') {
@@ -339,7 +419,10 @@ export async function mist(amount, to = bankDefault()) {
   const commitment = W.sha256hex(`mistbank:v1:${yocto}:${salt}`);
   const tee = await teeCheck(commitment).catch(e => ({ ok: false, why: e.message }));
   if (!tee.ok) throw new Error('TEE check failed, nothing sent');
-  const o = await ask({ shop: 'mistbank', receiver: to, amountY: yocto, memo: commitment });
+  try { localStorage.setItem('nearcarta.sign.flow', 'private'); } catch { /* the prompt falls back to the method line */ }
+  let o;
+  try { o = await ask({ shop: 'mistbank', receiver: to, amountY: yocto, memo: commitment }); }
+  finally { try { localStorage.removeItem('nearcarta.sign.flow'); } catch { /* leave the flag if storage is blocked */ } }
   localStorage.setItem(LS_OPEN(S.charter), JSON.stringify({ yocto, salt, commitment, action: o.action, tx: o.tx }));
   return { ...o, commitment, bucket: amount, tee, to };
 }
@@ -409,10 +492,19 @@ export async function hallChange(kind) {
 }
 
 export async function feed() {
-  const l = JSON.parse(localStorage.getItem(LS_RCPT(S.charter)) || '[]');
-  const st = await view(S.charter, 'get_state'); const n = Number(st.next_action || 0);
+  const local = receipts().slice(0, 10);
+  // A board row lives on board.nearcarta.near. The visitor's account has no get_state.
+  if (S.board && S.me) {
+    const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => S.boardRow || null);
+    if (row) S.boardRow = row;
+    return { local, onchain: [], nonce: Number(row?.nonce ?? local.length), policy: 1 };
+  }
+  if (!S.charter) return { local, onchain: [], nonce: local.length, policy: 1 };
+  const st = await view(S.charter, 'get_state').catch(() => null);
+  if (!st) return { local, onchain: [], nonce: local.length, policy: 1 };
+  const n = Number(st.next_action || 0);
   const acts = []; for (let i = n - 1; i >= Math.max(0, n - 6); i--) { const a = await view(S.charter, 'get_action', { action_id: String(i) }).catch(() => null); if (a) acts.push({ id: i, ...a }); }
-  return { local: l.slice(0, 10), onchain: acts, nonce: st.next_nonce, policy: st.policy_version };
+  return { local, onchain: acts, nonce: st.next_nonce, policy: st.policy_version };
 }
 
 // ---------- Arena: the player writes the scam, the Lamplighter obeys, the charter judges ----------
@@ -470,12 +562,26 @@ export async function scam(text, onStep) {
     if (brain.by === 'model' && brain.parsed?.receiver && brain.parsed?.amount) { p.receiverShown = brain.parsed.receiver; p.amount = fromY(brain.parsed.amount); }
   }
   let last = null, paid = 0;
-  for (let i = 0; i < p.times; i++) {
-    const o = await ask({ shop: 'arena', clauseId: p.clause, receiver: p.receiverShown, amountY: toY(p.amount), memo: `arena:mine:${p.cls}` });
-    last = o; onStep?.(i + 1, p.times, o); if (o.decision !== 'allowed') break; paid += p.amount;
+  try {
+    for (let i = 0; i < p.times; i++) {
+      const o = await ask({ shop: 'arena', clauseId: p.clause, receiver: p.receiverShown, amountY: toY(p.amount), memo: `arena:mine:${p.cls}` });
+      last = o; onStep?.(i + 1, p.times, o); if (o.decision !== 'allowed') break; paid += p.amount;
+    }
+  } catch (e) {
+    if (e.cancelled || userCancelled(e)) {
+      saveGame(g);
+      return { decision: 'cancelled', cancelled: true, reason: 'cancelled', tx: null, parsed: p, paid, fresh: false, breach: false, game: g, brain };
+    }
+    throw e;
   }
+  if (!last) throw new Error('no payment was asked');
   g.tries++; let fresh = false;
-  if (last.decision === 'denied') { if (!g.walls.includes(last.reason)) { g.walls.push(last.reason); g.score += 100; fresh = true; } else g.score += 10; }
+  const known = REFUSALS.includes(last.reason) || Object.prototype.hasOwnProperty.call(WHY, last.reason);
+  // A cancel, or a denied result with no rule and no tx, is not a defence.
+  if (!last.cancelled && last.decision === 'denied' && known && (last.fromRule || last.fromChain || last.tx)) {
+    if (!g.walls.includes(last.reason)) { g.walls.push(last.reason); g.score += 100; fresh = true; }
+    else g.score += 10;
+  }
   const breach = last.decision === 'allowed' && p.clause === 'pay' && !(pay()?.receivers || []).includes(p.receiverShown);
   if (breach) { g.breaches++; g.score += 1000; }
   saveGame(g); return { ...last, parsed: p, paid, fresh, breach, game: g, brain };
@@ -483,7 +589,16 @@ export async function scam(text, onStep) {
 
 // ---------- reputation, straight from the charter's counters ----------
 export async function reputation(charter = S.charter) {
-  const st = await view(charter, 'get_state'); const asks = Number(st.next_nonce || 0), paid = Number(st.next_action || 0);
+  if (S.board && S.me && (!charter || charter === S.me || charter === S.charter)) {
+    const row = S.boardRow || await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+    if (row) {
+      const mine = receipts();
+      return { asks: Number(row.nonce || 0), paid: mine.filter(r => r.decision === 'allowed').length, refused: mine.filter(r => r.decision === 'denied').length, policy: 1, frozen: !!row.frozen, keys: row.agent ? 1 : 0 };
+    }
+  }
+  const st = charter ? await view(charter, 'get_state').catch(() => null) : null;
+  if (!st) return { asks: 0, paid: 0, refused: 0, policy: 1, frozen: false, keys: 0 };
+  const asks = Number(st.next_nonce || 0), paid = Number(st.next_action || 0);
   const refused = Math.max(0, asks - paid);
   return { asks, paid, refused, policy: st.policy_version, frozen: st.frozen, keys: st.agent_key ? 1 : 0 };
 }

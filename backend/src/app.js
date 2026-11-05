@@ -304,15 +304,29 @@ export function makeApp() {
     return token || held?.length ? c.json({ contract: D.contract, token, held, purses }) : c.json({ contract: D.contract, token: null, held: [], mint: deedTx(null) }, 404);
   });
   // Counterparty check before a payment: allow / warn / block with reasons (backend/src/counterparty.js).
-  // ?charter= must be a Nearcarta charter (served or made by the factory), so this never views arbitrary contracts.
+  // ?charter= must be a Nearcarta charter: a known contract, a factory charter, or a row opened on the board.
+  // A board row's owner account is the charter. It has no get_clauses of its own.
   const cpCache = new Map();
+  async function nearcartaCharter(charter) {
+    if (!ACCT.test(charter)) return null;
+    if (knownAccounts.has(charter)) return { kind: 'known' };
+    if (await vault.isFactoryCharter(charter)) return { kind: 'factory' };
+    const board = MAINNET_DEP?.board?.contract;
+    if (!board) return null;
+    try {
+      const row = await view(board, 'get_charter', { owner: charter });
+      if (row && (row.owner === charter || row.per_action_cap != null)) return { kind: 'board', row };
+    } catch { /* the account has no row */ }
+    return null;
+  }
   app.get('/api/guardhouse/check/:account', limiter(12), async c => {
     const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
     const charter = c.req.query('charter') || MAINNET_DEP?.charter?.contract || DEP.guardhouse?.oath;
-    if (!ACCT.test(charter) || (!knownAccounts.has(charter) && !(await vault.isFactoryCharter(charter)))) return bad(c, 'charter must be a Nearcarta charter');
+    const found = await nearcartaCharter(charter);
+    if (!found) return bad(c, 'charter must be a Nearcarta charter');
     const k = a + '|' + charter, hit = cpCache.get(k);
     if (hit && Date.now() - hit.at < 20_000) return c.json(hit.v);
-    const v = await cp.check(a, { charter });
+    const v = await cp.check(a, { charter, row: found.row || null });
     cpCache.set(k, { at: Date.now(), v }); if (cpCache.size > 500) cpCache.delete(cpCache.keys().next().value);
     return c.json(v);
   });

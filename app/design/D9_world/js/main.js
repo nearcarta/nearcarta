@@ -1,7 +1,7 @@
 // Nearcarta — the town is the page. Boot → living town → (first visit) a 45 s story → free explore.
 import { dressRoom, undressRoom } from './roomkit.js';
 import * as THREE from 'three';
-import { P, CAPTURE, RM, clock, run, tickRoutines, wait, hx, toHex, walkable, SHOPS, TX, txUrl } from './core.js';
+import { P, CAPTURE, RM, clock, run, tickRoutines, wait, hx, toHex, key, bTile, walkable, SHOPS, TX, txUrl } from './core.js';
 import { W, LP, init, update, render, setTod, setProgress, lampState, LAMPC, setShadowMode } from './world.js';
 import { buildCast, updateCast, CAST, setHooks, smooth, chars } from './chars.js';
 import * as SP from './speech.js';
@@ -197,7 +197,8 @@ function playCam(dt){ PC.zs+=(PC.z-PC.zs)*Math.min(1,dt*7); const z=PC.zs; const
   if(W.fin){ W.fin.uniforms.focus.value=.52; W.fin.uniforms.band.value=.2+z*.12; W.fin.uniforms.tilt.value=.85-z*.35; } }
 // keyboard steering, relative to the camera
 const KM={w:[0,1],arrowup:[0,1],s:[0,-1],arrowdown:[0,-1],a:[-1,0],arrowleft:[-1,0],d:[1,0],arrowright:[1,0]};
-addEventListener('keydown',e=>{ const k=e.key.toLowerCase(); if(e.target.closest&&e.target.closest('button,input,textarea')&&k==='enter') return;
+const typing=e=>e.target.closest&&e.target.closest('input,textarea,select,[contenteditable="true"]');
+addEventListener('keydown',e=>{ if(typing(e)) return; const k=e.key.toLowerCase(); if(e.target.closest&&e.target.closest('button,input,textarea')&&k==='enter') return;
   if(KM[k]){ e.preventDefault(); if(inShop) return; if(mode!=='explore') explore(true); if(play!=='walk') setPlay('walk'); keys.add(k); body.classList.add('moved'); }
   if((k==='='||k==='+')&&!inShop){ setZoom(PC.z-.12); } if((k==='-'||k==='_')&&!inShop){ setZoom(PC.z+.12); } if(k==='o'&&!inShop){ setZoom(PC.z>.7?.14:1); }
   if(k==='shift') R.steerRun=true;
@@ -259,9 +260,22 @@ const pinBox=$('#pins'); const GLYPH={chronicle:'C',hall:'H',bank:'B',ferry:'F',
 const PINS=Object.entries(OPEN).map(([id,s])=>{ const b=document.createElement('button'); b.type='button'; b.className='pin'; b.tabIndex=-1; b.setAttribute('aria-label','Fly into '+s.name);
   b.innerHTML='<span class="ban"><span class="ic"></span><span><b></b><small></small></span><span class="go">Enter</span></span><span class="st"></span><span class="ft"></span>';
   b.querySelector('.ic').textContent=GLYPH[id]||s.name[0]; b.querySelector('b').textContent=s.name; b.querySelector('small').textContent=s.role.split('·')[0].trim();
-  b.addEventListener('click',()=>jump(id)); pinBox.appendChild(b); const bb=new THREE.Box3().setFromObject(W.B[id]); const top=hx(s.q,s.r).setY(bb.max.y+.15); return {id,el:b,top}; });
+  b.addEventListener('click',ev=>{ const hit=shopAt(ev.clientX,ev.clientY); jump(hit||id); }); pinBox.appendChild(b); const bb=new THREE.Box3().setFromObject(W.B[id]); const top=hx(s.q,s.r).setY(bb.max.y+.15); return {id,el:b,top}; });
+function shopScreen(id){ const s=SHOPS[id]; if(!s) return null; const v=hx(s.q,s.r).setY(1.2).project(cam); if(v.z>1) return null; return {id,x:(v.x*.5+.5)*innerWidth,y:(-v.y*.5+.5)*innerHeight}; }
+function shopAt(x,y){ let best=null,bd=1e9; for(const id of Object.keys(SHOPS)){ const s=shopScreen(id); if(!s) continue; const d=Math.hypot(x-s.x,y-s.y); if(d<bd){ bd=d; best=id; } } return bd<120?best:null; }
+function separatePins(){ const live=PINS.filter(p=>p.el.classList.contains('on')&&p.el.offsetWidth>2); if(live.length<2) return;
+  const box=p=>{ const r=p.el.getBoundingClientRect(); return {p,l:r.left,t:r.top,w:r.width,h:r.height}; };
+  const boxes=live.map(box);
+  for(let n=0;n<8;n++){ let moved=false;
+    for(let i=0;i<boxes.length;i++) for(let j=i+1;j<boxes.length;j++){ const a=boxes[i],b=boxes[j];
+      if(a.l+a.w<b.l||b.l+b.w<a.l||a.t+a.h<b.t||b.t+b.h<a.t) continue;
+      const shift=12+(a.w+b.w)/2-Math.abs((a.l+a.w/2)-(b.l+b.w/2)); if(shift<=0) continue;
+      if(a.l<=b.l){ a.l-=shift/2; b.l+=shift/2; } else { b.l-=shift/2; a.l+=shift/2; } moved=true; }
+    if(!moved) break; }
+  for(const b of boxes){ const x=b.l+b.w/2, y=b.t+b.h; b.p.el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; } }
 function updPins(){ const z=mode==='explore'&&!inShop?PC.zs:0; const a=sstep(.42,.62,z); body.classList.toggle('ov',a>.5); for(const p of PINS){ const v=p.top.clone().project(cam); const on=a>.05&&v.z<1;
-    p.el.style.opacity=on?a.toFixed(2):'0'; p.el.classList.toggle('on',on&&a>.5); p.el.tabIndex=on&&a>.5?0:-1; if(on){ const hw=Math.min(90,p.el.offsetWidth/2||70)+8, x=Math.max(hw,Math.min(innerWidth-hw-(innerWidth<720?44:64),(v.x*.5+.5)*innerWidth)), y=Math.max(innerWidth<720?150:110,Math.min(innerHeight-(innerWidth<720?150:120),(-v.y*.5+.5)*innerHeight)); p.el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; } } }
+    p.el.style.opacity=on?a.toFixed(2):'0'; p.el.classList.toggle('on',on&&a>.5); p.el.tabIndex=on&&a>.5?0:-1; if(on){ const hw=Math.min(90,p.el.offsetWidth/2||70)+8, x=Math.max(hw,Math.min(innerWidth-hw-(innerWidth<720?44:64),(v.x*.5+.5)*innerWidth)), y=Math.max(innerWidth<720?150:110,Math.min(innerHeight-(innerWidth<720?150:120),(-v.y*.5+.5)*innerHeight)); p.el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; } }
+  if(a>.5) separatePins(); }
 // ---------- hover: shop names in any view, character names on hover only ----------
 const tagEl=$('#tag'); let tagT=null;
 function tagOff(){ tagEl.classList.remove('on'); tagT=null; cv.classList.remove('hov'); }
@@ -276,7 +290,13 @@ const CAST_ALL=()=>chars;
 // pointer: drag turns the view, click walks or steps inside
 const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), ground=new THREE.Plane(V(0,1,0),0); let down=null;
 function pickOpen(e){ const id=pick(e); return id&&!CLOSED.has(id)?id:null; }
-function pick(e){ const r=cv.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(ndc,cam); const h=ray.intersectObjects(W.pickables,false)[0]; return h?h.object.userData.id:null; }
+function pick(e){ const r=cv.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(ndc,cam);
+  const groundPt=V();
+  if(ray.ray.intersectPlane(ground,groundPt)){ const [q,rr]=toHex(groundPt.x,groundPt.z); const tile=bTile.get(key(q,rr)); if(tile&&SHOPS[tile]) return tile; }
+  const hits=ray.intersectObjects(W.pickables,false); if(!hits.length) return null;
+  let best=null,bd=2.56; const seen=new Set();
+  for(const h of hits){ const id=h.object.userData.id; if(!id||!SHOPS[id]||seen.has(id)) continue; seen.add(id); const c=hx(SHOPS[id].q,SHOPS[id].r); const d=(c.x-groundPt.x)**2+(c.z-groundPt.z)**2; if(d<bd){ bd=d; best=id; } }
+  return best||hits[0].object.userData.id; }
 cv.addEventListener('pointerdown',e=>{ down={x:e.clientX,y:e.clientY,yaw:PC.yaw,po:PC.po,t:performance.now()}; });
 cv.addEventListener('pointermove',e=>{ if(down&&mode==='explore'&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>6){ PC.yaw=down.yaw-(e.clientX-down.x)*.006; PC.po=Math.max(-.1,Math.min(.3,down.po+(e.clientY-down.y)*.003)); tagOff(); return; } if(mode==='story'||down||inShop) return; hover(e); });
 cv.addEventListener('pointerup',e=>{ const d=down; down=null; if(inShop) return; if(!d||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6) return; if(storyEnd>d.t-80) return; if(mode!=='explore') explore(true);
@@ -394,6 +414,10 @@ world.toCharter=toCharter;
     for(const [k,cls,w] of rows){ const h=t[k], li=document.createElement('li'); li.className=cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>'; li.querySelector('.w').textContent=w;
       const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+h; a.textContent=h.slice(0,6)+'…'+h.slice(-4); a.title='Open on the explorer'; l.append(li); }
     $('#chron').hidden=false; $('#chron').dataset.live='1'; }catch(e){ console.warn('[Nearcarta] Chronicle feed unavailable',e?.message||e); } })();
+addEventListener('nearcarta:chronicle',e=>{ const d=e.detail||{}; if(!d.hash) return; const l=$('#clist'); if(!l||[...l.querySelectorAll('a')].some(a=>a.href.includes(d.hash))) return;
+  const li=document.createElement('li'); li.className=d.decision==='denied'?'no':'ok'; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
+  li.querySelector('.w').textContent=d.decision==='denied'?'refused · new entry':'new entry'; const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+d.hash; a.textContent=d.hash.slice(0,6)+'…'+d.hash.slice(-4); a.title='Open on the explorer';
+  l.prepend(li); while(l.children.length>3) l.lastChild.remove(); $('#chron').hidden=false; });
 const startStory=!P.has('nostory') && !(P.has('explore')) && !P.has('shop');
 let introCtl=null;
 window.__skipTownIntro = () => { introCtl?.skip(); if (mode === 'story') endStory(); };
