@@ -20,11 +20,22 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const short = (h, a = 6, b = 4) => h ? (h.length > a + b + 1 ? h.slice(0, a) + '…' + h.slice(-b) : h) : '';
 const UA = 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex';
 const REFUND = '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e';
+// Shortcut corridors for the city Ferry room (quick ZEC picks). The live picker
+// loads the full 1Click list via /api/ferry/tokens (~215 tokens / 38 chains).
 export const ROUTES = [
-  { id: 'route.eth-eth.zec', from: 'ETH@eth', sym: 'ETH', label: 'ETH · Ethereum', amt: '0.002' },
-  { id: 'route.usdc-base.zec', from: 'USDC@base', sym: 'USDC', label: 'USDC · Base', amt: '3' },
-  { id: 'route.usdc-arb.zec', from: 'USDC@arb', sym: 'USDC', label: 'USDC · Arbitrum', amt: '3' },
+  { id: 'route.eth-eth.zec', from: 'ETH@eth', sym: 'ETH', chain: 'eth', chainLabel: 'Ethereum', label: 'ETH · Ethereum', amt: '0.002' },
+  { id: 'route.usdc-base.zec', from: 'USDC@base', sym: 'USDC', chain: 'base', chainLabel: 'Base', label: 'USDC · Base', amt: '3' },
+  { id: 'route.usdc-arb.zec', from: 'USDC@arb', sym: 'USDC', chain: 'arb', chainLabel: 'Arbitrum', label: 'USDC · Arbitrum', amt: '3' },
 ];
+let _ferryTokens = null;
+export async function loadFerryTokens() {
+  if (_ferryTokens) return _ferryTokens;
+  try {
+    const rows = await api('/api/ferry/tokens');
+    _ferryTokens = Array.isArray(rows) ? rows : (rows?.tokens || []);
+  } catch { _ferryTokens = []; }
+  return _ferryTokens;
+}
 const LS_AGENT = c => 'nearcarta.vault.agent.' + c;
 const LS_RCPT = c => 'nearcarta.d8.receipts.' + c;
 const LS_OPEN = c => 'nearcarta.d8.mist.' + c;
@@ -384,10 +395,16 @@ export async function tollServerSettle(v) {
   gateMemo = null; return s;
 }
 
-export async function quote(route, amount) {
+export async function quote(route, amount, to = 'ZEC@zec') {
   const rt = ROUTES.find(r => r.id === route);
+  const from = rt?.from || (typeof route === 'string' && route.includes('@') ? route : null);
+  if (!from) throw new Error('Unknown ferry route');
+  return quotePair(from, to, amount);
+}
+/** Dry quote for any 1Click pair (symbol@chain). Used by the city Ferry live picker. */
+export async function quotePair(from, to, amount) {
   return api('/api/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ from: rt.from, to: 'ZEC@zec', amount: String(amount), recipient: UA, refundTo: REFUND, privacy: 'basic' }) });
+    body: JSON.stringify({ from, to: to || 'ZEC@zec', amount: String(amount), recipient: UA, refundTo: REFUND, privacy: 'basic' }) });
 }
 // A dry quote. Paying it is a board propose, inside the visitor's cap.
 // (the first allowed payee that is not you; yourself only if the rule names nobody else). The charter checks it on chain.

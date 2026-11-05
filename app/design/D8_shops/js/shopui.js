@@ -152,17 +152,31 @@ const APPS = {
     label: 'Ferry · cross-chain swap', idle: 'Pick a route. I\u2019ll fetch a live quote.',
     guest: true,
     form: () => '<div data-deep="ferry"></div>',
-    bind: () => mountShop('ferry', document.getElementById('t-form'), { state: extra, routes: () => A.ROUTES, quote: (id, amt) => A.quote(id, amt), repaint: () => paint() }),
+    bind: () => mountShop('ferry', document.getElementById('t-form'), {
+      state: extra,
+      routes: () => A.ROUTES,
+      tokens: () => A.loadFerryTokens(),
+      quote: (id, amt) => A.quote(id, amt),
+      quotePair: (from, to, amt) => A.quotePair(from, to, amt),
+      repaint: () => paint(),
+    }),
     btn: () => extra.q ? 'Nothing is sent from here' : extra.fdone ? 'Get another quote' : 'Get quote',
-    hero: () => extra.q ? `<span class="tok"><b class="num">${esc(+Number(extra.q.to.amount).toFixed(5))}</b><span class="sym">ZEC</span></span>` : null,
+    hero: () => extra.q ? `<span class="tok"><b class="num">${esc(+Number(extra.q.to?.amount || extra.q.amountOut || 0).toFixed(5))}</b><span class="sym">${esc(extra.q.to?.symbol || 'ZEC')}</span></span>` : null,
     run: async () => {
-      const rt = A.ROUTES[extra.ri || 0];
       if (!extra.q) {
         extra.fdone = false;
-        const q = await A.quote(rt.id, extra.amt || rt.amt); if (!q.ok || !q.checks?.signature) throw new Error(q.error || 'quote not signed');
-        extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: 'This is a price. Nothing is sent from here.', rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click price · ${esc(q.correlationId.slice(0, 8))}</span>` };
+        const fromId = extra.fromId || '';
+        const toId = extra.toId || 'ZEC|zec';
+        const [fs, fc] = fromId.split('|');
+        const [ts, tc] = toId.split('|');
+        const from = (fs && fc) ? `${fs}@${fc}` : (A.ROUTES[extra.ri || 0]?.from);
+        const to = (ts && tc) ? `${ts}@${tc}` : 'ZEC@zec';
+        const amt = extra.amt || A.ROUTES[extra.ri || 0]?.amt || '1';
+        const q = await A.quotePair(from, to, amt);
+        if (!q.ok || !q.checks?.signature) throw new Error(q.error || 'quote not signed');
+        extra.q = q; return { keep: true, hero: APPS.ferry.hero(), say: 'This is a price. Nothing is sent from here. Load the cargo in the room to watch the crossing.', rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click price · ${esc(q.correlationId.slice(0, 8))}</span>` };
       }
-      return { keep: true, hero: APPS.ferry.hero(), say: 'This is a price. Nothing is sent from here.', rc: '<a class="rc" href="/ferry-widget">Pay from any chain</a>' };
+      return { keep: true, hero: APPS.ferry.hero(), say: 'This is a price. Nothing is sent from here. Load the cargo in the room to watch the crossing.', rc: '<a class="rc" href="/ferry-widget">Pay from any chain</a>' };
     },
   },
   bank: {

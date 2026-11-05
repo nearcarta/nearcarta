@@ -286,3 +286,9 @@ label.amt input{width:9rem;flex:0 0 9rem;min-width:0;box-sizing:border-box}
 .row-arrow{color:#c98f4e;font-weight:700}
 .row-meta{color:#d4c4a8;font-size:12px}
 .row-best{color:#2a1608;background:#f5d08a;border-radius:999px;padding:2px 8px;font:700 11px/1.2 system-ui,sans-serif}
+
+/* City Ferry live 1Click picker (tray). Shortcuts stay below. */
+.ferry-picker{display:grid;gap:8px;padding:10px 12px;border:1px solid rgba(214,180,106,.35);border-radius:14px;background:rgba(31,26,21,.55)}
+.ferry-picker-note{margin:0;color:#d6b46a;font:600 12px/1.35 system-ui,sans-serif}
+.ferry-shortcuts-label{margin:2px 0 0;color:#e8d7b8;font:650 12px/1.2 system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase}
+.ferry-actions{gap:10px}

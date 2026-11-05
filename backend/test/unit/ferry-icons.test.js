@@ -80,3 +80,19 @@ test('token badge helper resolves chain keys and ZEC assets are valid SVG', () =
   assert.match(read('app/src/tokens/LICENSES.md'), /chains\/zec\.svg/);
   assert.match(read('app/src/tokens/LICENSES.md'), /CC0/);
 });
+
+test('city Ferry markup exposes live token picker + quick corridors', () => {
+  const html = ferryMarkup({
+    choices: Array.from({ length: 60 }, (_, i) => ({ symbol: 'T' + i, chain: i % 2 ? 'near' : 'base', id: 'T' + i + '|' + (i % 2 ? 'near' : 'base'), label: 'T' + i })),
+    fromId: 'T0|base',
+    toId: 'ZEC|zec',
+  }, DEFAULT_ROUTES);
+  assert.match(html, /data-testid="ferry-picker"/);
+  assert.match(html, /data-testid="ferry-search"/);
+  assert.match(html, /data-testid="ferry-chain-filter"/);
+  assert.match(html, /data-testid="ferry-from"/);
+  assert.match(html, /data-testid="ferry-to"/);
+  assert.match(html, /60 live 1Click tokens/);
+  assert.match(html, /Quick ZEC corridors/);
+  assert.equal((html.match(/data-testid="ferry-route"/g) || []).length, 3);
+});
