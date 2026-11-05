@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchStreet } from '../../src/mistbank.js';
+import { fetchStreet, ZEC_API } from '../../src/mistbank.js';
 
 const TX = 'a'.repeat(64);
 async function withFetch(status, fn) {
@@ -19,4 +19,9 @@ test('street check: an explorer outage is a 502', async () => {
 
 test('street check: a bad txid is a 400 before any fetch', async () => {
   await assert.rejects(fetchStreet('nope'), e => e.status === 400);
+});
+
+test('ZEC explorer defaults to mainnet cipherscan', () => {
+  assert.match(ZEC_API, /mainnet\.cipherscan\.app/);
+  assert.equal(/testnet/i.test(ZEC_API), false);
 });

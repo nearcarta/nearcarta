@@ -1,16 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pickShared, sharedCharters, isShared } from '../../src/vault.js';
+import { TESTNET_DEP } from '../../src/config.js';
 
 const clause = { daily_budget: '100000000000000000000000', max_actions_per_day: 4 };
 const fake = usage => async (c, m) => m === 'get_clauses' ? (usage[c] === 'gone' ? Promise.reject(new Error('x')) : { pay: clause }) : usage[c];
 
-test('pool: every shared charter is on the board, the R18 runner first; revoked R16/R17 runners still count as shared', () => {
-  const l = sharedCharters();
-  assert.ok(l.length >= 4); assert.equal(l[0], 'arenapool0-19es.nccharters-22195.testnet');
-  assert.ok(!l.includes('arena.nccharters-53681.testnet')); assert.ok(isShared('arena.nccharters-53681.testnet'));
-  for (const c of l) assert.ok(isShared(c));
+test('pool: mainnet has no shared vault charters', () => {
+  assert.deepEqual(sharedCharters(), []);
+  assert.equal(isShared('arenapool0-19es.nccharters-22195.testnet'), false);
 });
+
+test('pool: testnet vault record keeps the R18 runner first; revoked R16/R17 runners still count as shared history', () => {
+  const V = TESTNET_DEP.vault;
+  const l = [V.arena.charter, ...(V.arena.pool || [])];
+  assert.ok(l.length >= 4); assert.equal(l[0], 'arenapool0-19es.nccharters-22195.testnet');
+  assert.ok(!l.includes('arena.nccharters-53681.testnet'));
+  const hist = [V.arena_history?.charter, ...(V.arena_history?.pool || []), ...(V.legacy || []).map(x => x.arena?.charter)].filter(Boolean);
+  assert.ok(hist.includes('arena.nccharters-53681.testnet'));
+});
+
 test('pool: an exhausted charter is skipped for the one with the most payments left', async () => {
   const u = { a: { count: 4, spent: '0' }, b: { count: 1, spent: '0' }, c: { count: 2, spent: '0' } };
   assert.equal(await pickShared(fake(u), ['a', 'b', 'c'], (k, ms, f) => f()), 'b');

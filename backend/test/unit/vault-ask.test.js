@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { askPlan, askReceivers, sharedAsk, V } from '../../src/vault.js';
+import { askPlan, askReceivers, sharedAsk } from '../../src/vault.js';
+import { TESTNET_DEP } from '../../src/config.js';
 // Hermetic: the model path is covered in agent.test.js with a fake model; never bill a live call here.
 delete process.env.NEARAI_CLOUD_API_KEY;
 
-const merchant = V.arena.merchants[0];
+const merchant = TESTNET_DEP.vault.arena.merchants[0];
 const clauses = { pay: { asset: 'Native', receivers: [merchant, 'cafe-1.testnet'], per_action_cap: '20000000000000000000000' } };
 const viewF = async (_a, m) => (m === 'get_clauses' ? clauses : { next_nonce: '7', policy_version: 3 });
 
@@ -28,9 +29,10 @@ test('askPlan: an off-allowlist payee is parsed as asked (the charter refuses it
 });
 
 test('askPlan: bad input is a 400 with a plain message', async () => {
-  await assert.rejects(askPlan('', null, { viewF }), e => e.status === 400);
-  await assert.rejects(askPlan('pay the cafe', null, { viewF }), e => e.status === 400 && /how much/.test(e.message));
+  await assert.rejects(askPlan('', 'x.testnet', { viewF }), e => e.status === 400);
+  await assert.rejects(askPlan('pay the cafe', 'x.testnet', { viewF }), e => e.status === 400 && /how much/.test(e.message));
   await assert.rejects(askPlan('pay 1 NEAR', 'Not An Account', { viewF }), e => e.status === 400);
+  await assert.rejects(askPlan('pay 0.01 NEAR', null, { viewF }), e => e.status === 503);
 });
 
 test('sharedAsk: 503 when no agent key is set; never signs', async () => {
@@ -39,4 +41,13 @@ test('sharedAsk: 503 when no agent key is set; never signs', async () => {
   await assert.rejects(sharedAsk('pay 0.01 NEAR', { run: async () => { ran = true; } }), e => e.status === 503);
   assert.equal(ran, false);
   if (saved !== undefined) process.env.ARENA_AGENT_KEY = saved;
+});
+
+test('sharedAsk: ARENA_AGENT_KEY is ignored on mainnet; never signs', async () => {
+  const saved = process.env.ARENA_AGENT_KEY;
+  process.env.ARENA_AGENT_KEY = 'ed25519:' + 'A'.repeat(80);
+  let ran = false;
+  await assert.rejects(sharedAsk('pay 0.01 NEAR', { run: async () => { ran = true; } }), e => e.status === 503);
+  assert.equal(ran, false);
+  if (saved !== undefined) process.env.ARENA_AGENT_KEY = saved; else delete process.env.ARENA_AGENT_KEY;
 });

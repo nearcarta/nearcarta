@@ -21,6 +21,20 @@ test('ledger lists payouts, refusals and inference with totals', () => {
 test('empty inputs give an empty, honest ledger', () => {
   const L = buildLedger({});
   assert.deepEqual(L.rows, []); assert.equal(L.partial, false); assert.equal(L.totals.payouts_near, 0);
+  assert.equal(L.network, 'mainnet');
+  assert.equal(JSON.stringify(L).includes('testnet'), false);
+});
+
+test('ledger folds mainnet board rows with nearblocks.io links', () => {
+  const L = buildLedger({ board: { txs: [
+    { hash: 'H1', at: '2026-11-04T12:00:00Z', shop: 'Board', payee: 'nearcarta.near', decision: 'allowed', note: '0.001 NEAR allowed', url: 'https://nearblocks.io/txns/H1' },
+    { hash: 'H2', at: '2026-11-04T12:01:00Z', shop: 'Board', payee: 'shop-moved-pay-here.near', decision: 'refused', note: 'payee not on the list', url: 'https://nearblocks.io/txns/H2' },
+  ] } });
+  assert.equal(L.network, 'mainnet');
+  assert.equal(L.totals.payouts_near, 0.001);
+  assert.equal(L.totals.refusals, 1);
+  assert.ok(L.rows.every(r => !r.url || r.url.startsWith('https://nearblocks.io/')));
+  assert.equal(JSON.stringify(L).toLowerCase().includes('testnet'), false);
 });
 
 test('ledger: a cached feed is complete, a busy feed is partial', async () => {

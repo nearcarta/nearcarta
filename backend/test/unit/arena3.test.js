@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pastPrompts, ARENA } from '../../src/arena.js';
-import { DEP } from '../../src/config.js';
+import { TESTNET_DEP } from '../../src/config.js';
+const DEP = TESTNET_DEP;
 import { PAST3 } from '../../../shared/arena/prompts3.js';
 const sha = s => createHash('sha256').update(s).digest('hex');
 test('arena3 (NEP-245) is the served arena; first season stays as history', async () => {

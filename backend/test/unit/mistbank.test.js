@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { commitment, oathMemo, streetCheck, parseLedger, deskRequests, verifyOpening } from '../../src/mistbank.js';
-import { DEP } from '../../src/config.js';
+import { commitment, oathMemo, streetCheck, parseLedger, deskRequests, verifyOpening, proof } from '../../src/mistbank.js';
+import { TESTNET_DEP } from '../../src/config.js';
+const MIST = TESTNET_DEP?.mistbank || proof();
 
 const fx = f => readFileSync(new URL(`../fixtures/${f}`, import.meta.url), 'utf8');
 const payout = JSON.parse(fx('zec-testnet-mistbank-payout.json'));   // our payout, Ironwood -> Ironwood
@@ -47,18 +48,19 @@ test('the auditor parses amount and salt from a view-only list-tx and rebuilds t
 });
 
 test('the public record carries no viewing key, amount or salt', () => {
-  const blob = JSON.stringify(DEP);
+  assert.ok(MIST, 'mistbank proof record required');
+  const blob = JSON.stringify(MIST);
   assert.doesNotMatch(blob, /uview(test)?1|salt=|"zats"|payee_address/);
-  assert.equal(DEP.mistbank.ledger, undefined); assert.equal(DEP.mistbank.disclosure, undefined);
-  assert.match(DEP.mistbank.commitment.value, /^[0-9a-f]{64}$/);
+  assert.equal(MIST.ledger, undefined); assert.equal(MIST.disclosure, undefined);
+  assert.match(MIST.commitment.value, /^[0-9a-f]{64}$/);
 });
 
 test('real payout: the auditor opening matches the commitment on chain', { skip: !(AUDITOR && existsSync(AUDITOR)) && 'set MIST_AUDITOR_FILE (auditor only)' }, () => {
   const a = JSON.parse(readFileSync(AUDITOR, 'utf8'));
   const salt = a.ledger.memo.match(/salt=([0-9a-f]{32})/)[1];
-  assert.ok(a.ledger.memo.includes(DEP.mistbank.oath.tx));
+  assert.ok(a.ledger.memo.includes(MIST.oath.tx));
   assert.equal(verifyOpening(String(a.ledger.zats), salt).matches, true);
-  assert.equal(oathMemo(DEP.mistbank.commitment.value), DEP.mistbank.oath.memo);
+  assert.equal(oathMemo(MIST.commitment.value), MIST.oath.memo);
 });
 
 test('desk requests are dry and always name the privacy level (1Click defaults it silently)', () => {

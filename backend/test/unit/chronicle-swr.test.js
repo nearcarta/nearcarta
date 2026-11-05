@@ -2,7 +2,7 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { chronicle, chronicleOnce, _resetFeeds, FEED_MAX, FEED_TTL_MS, FEED_STALE_MS } from '../../src/shops.js';
 import { makeApp, warm } from '../../src/app.js';
-import { DEP } from '../../src/config.js';
+import { MAINNET_DEP } from '../../src/config.js';
 import { _setSnapshots } from '../../src/shops.js';
 _setSnapshots(null); // these tests cover the no-snapshot path
 
@@ -64,21 +64,26 @@ test('chronicleOnce re-reads the txs in parallel and keeps the index order', asy
   assert.ok(peak > 1 && peak <= 6, 'bounded parallel reads, peak ' + peak);
 });
 
-test('GET /api/chronicle is the guardhouse oath feed (no deployments read needed); busy with nothing cached -> 200 busy', async () => {
+test('GET /api/chronicle serves the recorded mainnet board (no live index)', async () => {
   const real = globalThis.fetch; globalThis.fetch = async () => new Response('{}', { status: 429 });
   try {
     const r = await makeApp().request('/api/chronicle?limit=3');
-    assert.equal(r.status, 200); assert.equal(r.headers.get('retry-after'), '10');
-    const j = await r.json(); assert.equal(j.account, DEP.guardhouse.oath); assert.equal(j.busy, true);
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.equal(j.network, 'mainnet');
+    assert.equal(j.board, MAINNET_DEP.board.contract);
+    assert.ok(j.txs.length >= 1);
+    assert.equal(JSON.stringify(j).toLowerCase().includes('testnet'), false);
   } finally { globalThis.fetch = real; }
 });
 
-test('warm() pre-reads the town feed at FEED_MAX, so the first request is served from the cache', async () => {
+test('warm() pre-reads the mainnet charter feed at FEED_MAX, so the first account request is served from the cache', async () => {
+  const a = MAINNET_DEP.charter.contract;
   const r = reader(); const w = warm({ every: 0, read: r }); await w.first; w.stop();
   assert.equal(r.n, 1);
-  const res = await makeApp().request('/api/chronicle?limit=3'); const j = await res.json();
-  assert.equal(res.status, 200); assert.equal(j.account, DEP.guardhouse.oath); assert.equal(j.txs.length, 3); assert.equal(r.n, 1);
-  const res2 = await makeApp().request(`/api/chronicle/${DEP.guardhouse.oath}?limit=12`); const j2 = await res2.json();
+  const res = await makeApp().request('/api/chronicle'); const j = await res.json();
+  assert.equal(res.status, 200); assert.equal(j.network, 'mainnet'); assert.ok(j.txs.length >= 1);
+  const res2 = await makeApp().request(`/api/chronicle/${a}?limit=12`); const j2 = await res2.json();
   assert.equal(j2.txs.length, 12); assert.equal(r.n, 1);
 });
 
