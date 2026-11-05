@@ -45,12 +45,39 @@ a.back-town, button#back {
   border: 1px solid #4A3A28 !important;
   box-shadow: 0 4px 0 #0E0A08 !important;
 }
+#shopUI #back, body.in-shop #back, body.fb #back {
+  position: fixed !important;
+  top: 16px !important;
+  right: 16px !important;
+  left: auto !important;
+  bottom: auto !important;
+  z-index: 60 !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 44px;
+}
+#shopUI #back kbd, body.in-shop #back kbd, body.fb #back kbd {
+  display: inline-flex !important;
+  font-size: 12px !important;
+}
 body:has(#c) > a.back-town { display: none !important; }
 header#top #back { display: none !important; }
 @media (max-width: 640px) {
   header.top { flex-wrap: wrap; }
 }
 
+.pin .ban { min-height: 44px; min-width: 44px; }
+#shopMenu { z-index: 30; }
+#shopMenu b { font-size: 14px; }
+#shopUI .p-sum, .p-sum { color: #f3ead8 !important; font-size: 14px !important; }
+html, body { overflow-x: clip; }
+@media (max-width: 420px) {
+  #shopUI #tray, #tray, main, .shell { max-width: 100%; }
+  #shopUI #back, body.in-shop #back { top: 8px !important; right: 8px !important; }
+}
 .card, #tray, #shopUI #tray, .panel, .box, main > form, .pnc-card, .ob-card, .tot > div, .pin .ban {
   background: linear-gradient(165deg, rgba(42,33,24,.96), rgba(26,20,16,.98)) !important;
   color: #FFF8EE !important;
