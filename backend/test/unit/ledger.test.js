@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildLedger } from '../../src/ledger.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 const ev = d => ({ standard: 'oath', event: 'action', data: [d] });
 test('ledger lists payouts, refusals and inference with totals', () => {
@@ -16,13 +17,13 @@ test('ledger lists payouts, refusals and inference with totals', () => {
   assert.equal(L.partial, true);
   assert.equal(L.rows[0].tx, 'B');
   assert.equal(L.rows.find(r => r.tx === 'B').note, 'Refused: payee not on your list');
-  assert.equal(JSON.stringify(L).includes('testnet'), false);
+  assert.equal(otherNet.test(JSON.stringify(L)), false);
 });
 test('empty inputs give an empty, honest ledger', () => {
   const L = buildLedger({});
   assert.deepEqual(L.rows, []); assert.equal(L.partial, false); assert.equal(L.totals.payouts_near, 0);
   assert.equal(L.network, 'mainnet');
-  assert.equal(JSON.stringify(L).includes('testnet'), false);
+  assert.equal(otherNet.test(JSON.stringify(L)), false);
 });
 
 test('ledger folds mainnet board rows with nearblocks.io links', () => {
@@ -34,7 +35,7 @@ test('ledger folds mainnet board rows with nearblocks.io links', () => {
   assert.equal(L.totals.payouts_near, 0.001);
   assert.equal(L.totals.refusals, 1);
   assert.ok(L.rows.every(r => !r.url || r.url.startsWith('https://nearblocks.io/')));
-  assert.equal(JSON.stringify(L).toLowerCase().includes('testnet'), false);
+  assert.equal(otherNet.test(JSON.stringify(L)), false);
 });
 
 test('ledger: a cached feed is complete, a busy feed is partial', async () => {
@@ -46,8 +47,8 @@ test('ledger: a cached feed is complete, a busy feed is partial', async () => {
 });
 
 test('ledger: toll gate visits are sale rows and count toward sales', () => {
-  const gate = { gate: 'g.testnet', policy: { next_nonce: 3, gate: { fee: '10000000000000000000000', payee: 'cafe.testnet' } },
-    recent: [{ nonce: 2, status: 'signed', tx_hash: '0xab', explorer: 'https://x', visit: { by: 'v.testnet' } }] };
+  const gate = { gate: 'g.near', policy: { next_nonce: 3, gate: { fee: '10000000000000000000000', payee: 'cafe.near' } },
+    recent: [{ nonce: 2, status: 'signed', tx_hash: '0xab', explorer: 'https://x', visit: { by: 'v.near' } }] };
   const L = buildLedger({ chronicle: { txs: [] }, gate });
   const r = L.rows.find(x => x.shop === 'Toll Bridge');
   assert.equal(r.kind, 'sale'); assert.equal(r.amount, '0.01');

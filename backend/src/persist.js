@@ -1,7 +1,7 @@
 // Small counters that must survive a process restart (rate limits over hours, daily caps).
 // Saved as one JSON file in STATE_DIR (default: the OS temp dir) every 15 s and on SIGTERM, read at start.
 // A restart of the process keeps them; a brand-new instance (redeploy, free-plan spin-down) starts from an
-// empty file, so the sponsor account's own testnet balance stays the hard cap behind the guest day cap.
+// empty file, so the charter cap stays the hard limit behind the guest day cap.
 import { readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

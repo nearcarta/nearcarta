@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planBatch, readBatch, leftToday, batchGasTgas, toYocto, MAX_BATCH } from '../../../app/design/D8_shops/js/payouts.js';
 
-const payees = ['cafe.testnet', 'books.testnet', 'me.testnet'];
+const payees = ['cafe.near', 'books.near', 'me.near'];
 const base = { payees, nonce: '7', policy: 3, nowMs: 1_000 };
-const rows = [{ to: 'cafe.testnet', amt: 0.01 }, { to: 'books.testnet', amt: '0.02' }, { to: 'me.testnet', amt: 0.005 }];
+const rows = [{ to: 'cafe.near', amt: 0.01 }, { to: 'books.near', amt: '0.02' }, { to: 'me.near', amt: 0.005 }];
 
 test('plan: sequential nonces from the charter, one clause, exact amounts, memo i/n', () => {
   const p = planBatch(rows, base);
@@ -24,10 +24,10 @@ test('plan: rows without a payee are dropped, sizes 2..5 only', () => {
   assert.throws(() => planBatch(Array(MAX_BATCH + 1).fill(rows[0]), base), /at most 5/);
 });
 test('plan: refuses zero, negative or missing amounts and accounts the rules do not allow', () => {
-  assert.throws(() => planBatch([rows[0], { to: 'cafe.testnet', amt: 0 }], base), /above 0/);
-  assert.throws(() => planBatch([rows[0], { to: 'cafe.testnet', amt: -1 }], base), /above 0/);
-  assert.throws(() => planBatch([rows[0], { to: 'cafe.testnet' }], base), /above 0/);
-  assert.throws(() => planBatch([rows[0], { to: 'stranger.testnet', amt: 0.01 }], base), /rules allow/);
+  assert.throws(() => planBatch([rows[0], { to: 'cafe.near', amt: 0 }], base), /above 0/);
+  assert.throws(() => planBatch([rows[0], { to: 'cafe.near', amt: -1 }], base), /above 0/);
+  assert.throws(() => planBatch([rows[0], { to: 'cafe.near' }], base), /above 0/);
+  assert.throws(() => planBatch([rows[0], { to: 'stranger.near', amt: 0.01 }], base), /rules allow/);
 });
 test('gas: 30 Tgas per item plus 30, capped at 300; always >= 25 per item', () => {
   assert.equal(batchGasTgas(2), 90); assert.equal(batchGasTgas(5), 180); assert.equal(batchGasTgas(20), 300);

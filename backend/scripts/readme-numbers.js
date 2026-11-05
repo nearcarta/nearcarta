@@ -1,9 +1,9 @@
 // Writes the counts in README.md and judges/VERIFY.md from real outputs, so no number is typed by hand.
-// Sources: judges/proofs/proof-check.json (npm run verify), judges/proofs/e2e-results.json and
+// Sources: judges/proofs/mainnet-proof-check.json (npm run verify:mainnet), judges/proofs/e2e-results.json and
 // e2e-vercel.json (Playwright JSON reporter), a run of the unit tests, and the #[test] / test( counts in the sources.
 // Usage: node backend/scripts/readme-numbers.js [--check]   (--check exits 1 if a file would change)
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -13,12 +13,15 @@ const json = p => JSON.parse(read(p));
 const count = (dir, re) => readdirSync(join(root, dir)).filter(f => /\.(rs|js)$/.test(f))
   .reduce((n, f) => n + (read(join(dir, f)).match(re) || []).length, 0);
 
-const rows = json('judges/proofs/proof-check.json').rows;
+const rows = json('judges/proofs/mainnet-proof-check.json').rows;
 const e2e = json('judges/proofs/e2e-results.json').stats;
 const vercel = json('judges/proofs/e2e-vercel.json').stats;
-const tap = execFileSync('npm', ['test', '--', '--test-reporter=tap', '--test-timeout=60000'],
-  { cwd: join(root, 'backend'), encoding: 'utf8', maxBuffer: 32 << 20 });
-const unitPass = +tap.match(/^# pass (\d+)/m)[1], unitFail = +tap.match(/^# fail (\d+)/m)[1], unitSkip = +tap.match(/^# skipped (\d+)/m)[1];
+const unitFiles = readdirSync(join(root, 'backend/test/unit')).filter(f => f.endsWith('.test.js')).map(f => join('test/unit', f));
+const tapRun = spawnSync(process.execPath, ['--test', '--test-reporter=tap', '--test-timeout=120000', ...unitFiles],
+  { cwd: join(root, 'backend'), encoding: 'utf8', maxBuffer: 64 << 20 });
+const tap = `${tapRun.stdout || ''}\n${tapRun.stderr || ''}`;
+const grab = (re) => { const m = tap.match(re); if (!m) throw new Error('unit summary missing\n' + tap.slice(-800)); return +m[1]; };
+const unitPass = grab(/^# pass (\d+)/m), unitFail = grab(/^# fail (\d+)/m), unitSkip = grab(/^# skipped (\d+)/m);
 if (unitFail) throw new Error(`${unitFail} unit tests fail; fix them before writing numbers`);
 
 const n = {
@@ -41,10 +44,7 @@ const edits = {
     [/the agent charter \(Rust, near-sdk\)\. \d+ unit tests/, `the agent charter (Rust, near-sdk). ${n.oath} unit tests`],
   ],
   'judges/VERIFY.md': [
-    [/`\d+\/\d+ proof txs found on testnet`/, `\`${n.proofsFound}/${n.proofs} proof txs found on testnet\``],
-    [/It runs \d+ tests against testnet/, `It runs ${n.integration} tests against testnet`],
-    [/cargo test --lib` \(\d+\) and `cd contracts\/arena && cargo test --lib` \(\d+\)/, `cargo test --lib\` (${n.oath}) and \`cd contracts/arena && cargo test --lib\` (${n.arena})`],
-    [/`npm run e2e` \(\d+ tests;/, `\`npm run e2e\` (${n.e2e} tests;`],
+    [/\d+\/\d+ mainnet txs found/, `${n.proofsFound}/${n.proofs} mainnet txs found`],
   ],
 };
 

@@ -77,24 +77,24 @@ pub fn decide(raw: &str) -> Result<Decision, String> {
 mod tests {
     use super::*;
     fn inp(recv: &str, amt: &str, spent: &str) -> String {
-        format!(r#"{{"charter":"c.testnet","clause":{{"cap":"100","daily_limit":"150","allowlist":["bob.testnet"]}},"spent_today":"{spent}","action":{{"receiver":"{recv}","amount":"{amt}"}}}}"#)
+        format!(r#"{{"charter":"c.near","clause":{{"cap":"100","daily_limit":"150","allowlist":["bob.near"]}},"spent_today":"{spent}","action":{{"receiver":"{recv}","amount":"{amt}"}}}}"#)
     }
     #[test]
-    fn allows_inside_clause() { assert!(decide(&inp("bob.testnet", "100", "50")).unwrap().allow); }
+    fn allows_inside_clause() { assert!(decide(&inp("bob.near", "100", "50")).unwrap().allow); }
     #[test]
-    fn denies_over_cap() { let d = decide(&inp("bob.testnet", "101", "0")).unwrap(); assert!(!d.allow); assert_eq!(d.reasons, vec!["over the per-payment cap"]); }
+    fn denies_over_cap() { let d = decide(&inp("bob.near", "101", "0")).unwrap(); assert!(!d.allow); assert_eq!(d.reasons, vec!["over the per-payment cap"]); }
     #[test]
-    fn denies_over_daily() { let d = decide(&inp("bob.testnet", "60", "100")).unwrap(); assert_eq!(d.reasons, vec!["over the daily limit"]); }
+    fn denies_over_daily() { let d = decide(&inp("bob.near", "60", "100")).unwrap(); assert_eq!(d.reasons, vec!["over the daily limit"]); }
     #[test]
-    fn denies_lookalike() { assert!(!decide(&inp("b\u{043e}b.testnet", "1", "0")).unwrap().allow); }
+    fn denies_lookalike() { assert!(!decide(&inp("b\u{043e}b.near", "1", "0")).unwrap().allow); }
     #[test]
-    fn denies_case() { assert!(!decide(&inp("Bob.testnet", "1", "0")).unwrap().allow); }
+    fn denies_case() { assert!(!decide(&inp("Bob.near", "1", "0")).unwrap().allow); }
     #[test]
-    fn denies_zero() { assert!(!decide(&inp("bob.testnet", "0", "0")).unwrap().allow); }
+    fn denies_zero() { assert!(!decide(&inp("bob.near", "0", "0")).unwrap().allow); }
     #[test]
-    fn overflow_denies() { assert!(!decide(&inp("bob.testnet", "1", "340282366920938463463374607431768211455")).unwrap().allow); }
+    fn overflow_denies() { assert!(!decide(&inp("bob.near", "1", "340282366920938463463374607431768211455")).unwrap().allow); }
     #[test]
-    fn rejects_bad_numbers() { assert!(decide(&inp("bob.testnet", "-1", "0")).is_err()); assert!(decide(&inp("bob.testnet", "1e3", "0")).is_err()); assert!(decide("{}").is_err()); }
+    fn rejects_bad_numbers() { assert!(decide(&inp("bob.near", "-1", "0")).is_err()); assert!(decide(&inp("bob.near", "1e3", "0")).is_err()); assert!(decide("{}").is_err()); }
     #[test]
-    fn hash_is_of_raw_input() { let s = inp("bob.testnet", "1", "0"); assert_eq!(decide(&s).unwrap().input_sha256.len(), 64); }
+    fn hash_is_of_raw_input() { let s = inp("bob.near", "1", "0"); assert_eq!(decide(&s).unwrap().input_sha256.len(), 64); }
 }

@@ -18,9 +18,9 @@ test('freshRefund makes a new implicit account per swap, owned by its own key', 
 test('checkFreshRefund refuses reuse, the wallet, the recipient and named accounts', () => {
   const used = new Set();
   const a = freshRefund(used).accountId, b = freshRefund().accountId;
-  assert.equal(checkFreshRefund(b, { used, wallet: 'w.testnet', recipient: 'w.testnet' }).ok, true);
+  assert.equal(checkFreshRefund(b, { used, wallet: 'w.near', recipient: 'w.near' }).ok, true);
   assert.match(checkFreshRefund(a, { used }).why, /already used/);
   assert.match(checkFreshRefund(b, { wallet: b }).why, /payer wallet/);
   assert.match(checkFreshRefund(b, { recipient: b }).why, /recipient/);
-  assert.match(checkFreshRefund('r14rcv-46135.testnet').why, /one-time/);
+  assert.match(checkFreshRefund('r14rcv-46135.near').why, /one-time/);
 });

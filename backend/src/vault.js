@@ -22,6 +22,7 @@ import { receipt as buildReceipt } from '../../shared/vault/receipt.js';
 import { edgeCache } from './http-guard.js';
 import { ASK_MEMO_RE, parseAsk } from '../../shared/vault/ask.js';
 import * as agent from './agent.js';
+import { mainnetReceiverOk } from '../../shared/net/accounts.js';
 import deniedAccounts from '../../shared/vault/denied-accounts.json' with { type: 'json' };
 
 export const V = DEP.vault || null;
@@ -145,7 +146,7 @@ export async function listCharters(from = 0, limit = 50, factory = V?.factory) {
 }
 
 // ---------- the shared arena runner (30 Tgas, daily tx cap) ----------
-// Mainnet: never load a testnet arena agent key from the environment.
+// Mainnet: the arena agent key is not loaded from the environment.
 function agentSecret() { return null; }
 /** Shared demo charters (same clause, same agent key): the original one first, then the pool. */
 export const sharedCharters = () => V ? [V.arena.charter, ...(V.arena.pool || [])] : [];
@@ -731,7 +732,8 @@ export async function leaderboard() {
   const charters = await cached('visitor-charters', 20_000, listedCharters).catch(() => []);
   const pub = publicPlayers(rows, charters);
   const shown = new Set(pub.players.flatMap(p => p.charters));
-  const visible = p => !JSON.stringify(p).toLowerCase().includes('testnet');
+  const idsOf = p => [p.charter, p.owner, p.player, p.receiver].filter(x => typeof x === 'string' && (x.includes('.') || /^[0-9a-f]{64}$/.test(x)));
+  const visible = p => idsOf(p).every(mainnetReceiverOk);
   return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild, pending: pending.size },
     network: 'mainnet', seed_hidden: pub.hidden, players: pub.players.filter(visible).slice(0, 50),
     empty: 'No visitor charters yet. When someone signs in and creates one, it appears here.',

@@ -22,7 +22,7 @@ Revised 2026-11-03 01:00 Cairo (UTC+2). Changes from the last draft:
 | 5 | Deploy toll.v5 (226,463 B) regular on the gate + init | 2.265 | 0.003 |
 | 6 | Toll state: policy, path | 0.010 | 0.002 |
 | 7 | Agent propose-only FC key, **no allowance** (r18) | 0.001 | 0.00004 |
-| 8 | Delete the full-access keys (0 FAK, as on testnet) | 0 | 0.0001 |
+| 8 | Delete the full-access keys (0 FAK, as on earlier network) | 0 | 0.0001 |
 | | **Core total** | **6.341 NEAR** | **≈0.028 NEAR** |
 | 9 | Agent gas float, ~1,000 proposals × ~0.0003 | stays in the account | ≈0.3 over time |
 
@@ -40,14 +40,14 @@ The factory (`charter_factory.r15.wasm`, unchanged source) pins the charter code
 | | **Factory setup** | **2.022** | **≈40.14** |
 
 - **Break-even:** a regular r18 per user is 4.013 locked, against 0.028 through the factory. The factory wins after about 10 users.
-- **Testnet:** the same path costs the same in testnet NEAR, about 42.2. This is why r18 is built (sha256 04377fc3…) but not yet deployed on testnet.
+- **Earlier network:** the same path costs the same in earlier network NEAR, about 42.2. This is why r18 is built (sha256 04377fc3…) but not yet deployed on earlier network.
 
 ## Optional shops (add later, each independent)
 | Step | Locked | Burned |
 |---|---|---|
 | Arena v2 (345,020 B) regular | 3.450 | 0.005 |
 | House deed NFT (208,519 B) regular | 2.085 | 0.005 |
-| Town Hall: own Sputnik v2 DAO (546,780 B measured on testnet) | 5.475 | 0.003 |
+| Town Hall: own Sputnik v2 DAO (546,780 B measured on earlier network) | 5.475 | 0.003 |
 | Town Hall proposal bond (refunded on approval) | 0.1 | 0.006 |
 
 - **Core + all optional, no factory:** 17.45 NEAR locked, ≈0.05 burned.

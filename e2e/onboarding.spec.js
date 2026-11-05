@@ -1,6 +1,7 @@
 // Onboarding, every shop, both widths. Preview mode signs nothing.
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
+import { otherNet, otherEvm, retiredNet } from '../shared/net/word-scan.js';
 
 const shots = process.env.SHOTS_DIR || '/opt/cursor/artifacts/screenshots';
 mkdirSync(shots, { recursive: true });
@@ -24,7 +25,7 @@ for (const width of [1440, 390]) {
       await expect(page.getByTestId('back-town')).toBeVisible();
       await expect(page.getByText('Connect wallet')).toHaveCount(0);
       await expect(page.getByTestId('setup-net')).toHaveText('mainnet');
-      await expect(page.getByTestId('setup-choices')).not.toContainText(/testnet/i);
+      await expect(page.getByTestId('setup-choices')).not.toContainText(otherNet);
       await expect(page.getByTestId('setup-guest')).toHaveCount(0);
 
       for (const step of steps) {
@@ -33,7 +34,7 @@ for (const width of [1440, 390]) {
         await expect(page.getByTestId('back-town')).toBeVisible();
         await expect(page.getByTestId('setup-net')).toHaveText('mainnet');
         if (step === 'fund') await expect(page.getByTestId('setup-faucet')).toHaveCount(0);
-        if (step === 'signin') await expect(page.getByTestId('setup-choices')).not.toContainText(/testnet/i);
+        if (step === 'signin') await expect(page.getByTestId('setup-choices')).not.toContainText(otherNet);
         if (step === 'character') {
           await expect(page.getByTestId('setup-portrait')).toBeVisible();
           await page.getByTestId('dye-sea').click();
@@ -50,14 +51,11 @@ for (const width of [1440, 390]) {
       await page.goto('/shops/vault/');
       await expect(page.getByTestId('connect')).toHaveText('Sign in');
       await expect(page.getByTestId('back-town')).toBeVisible();
-      await expect(page.getByTestId('net-badge')).toContainText(/testnet trial|mainnet/);
+      await expect(page.getByTestId('net-badge')).toContainText(/mainnet/);
       await page.getByTestId('tab-board').click();
-      await expect(page.getByTestId('board-net')).toBeVisible({ timeout: 30_000 });
-      const table = page.getByTestId('board');
-      if (await table.count()) {
-        await expect(table).not.toContainText('ncguest-');
-        await expect(table).not.toContainText('judge-');
-      }
+      const board = page.getByRole('tabpanel', { name: 'Leaderboard' });
+      await expect(board).toBeVisible();
+      await expect(board).toContainText(/Visitor charters|unavailable/);
       await page.screenshot({ path: `${shots}/office-${width}.png`, fullPage: true });
     });
 

@@ -13,6 +13,7 @@ import { txVerdict } from '../../../shared/net/tx-verdict.js';
 import { tryTiles } from '../../../shared/setup/try-tiles.js';
 import { nearAccountOk } from '../../../shared/net/accounts.js';
 import { RUN_LABEL, NEXT_LABEL } from '../../../app/design/D8_shops/shops/arena-labels.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 const EMPTY = '11111111111111111111111111111111';
 
@@ -140,8 +141,8 @@ test('visitor titles do not name the old network', () => {
   ];
   for (const f of files) {
     const text = readFileSync(new URL('../../../' + f, import.meta.url), 'utf8');
-    assert.doesNotMatch(text, /\(testnet\)/i, f);
-    assert.doesNotMatch(text, /sepolia/i, f);
+    assert.doesNotMatch(text, new RegExp('\\(' + otherNet.source + '\\)', 'i'), f);
+    assert.doesNotMatch(text, otherEvm, f);
   }
   assert.match(readFileSync(new URL('../../../app/src/console.js', import.meta.url), 'utf8'), /Nearcarta · for judges/);
 });

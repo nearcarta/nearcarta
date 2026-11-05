@@ -1,33 +1,25 @@
-// Runtime config. Addresses come from shared/deployments/<NET>.json (mainnet by default).
+// Runtime config. Addresses come from shared/deployments/mainnet.json.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-// NEAR_NET=testnet is the only way off mainnet. Unset means mainnet.
-export const NET = process.env.NEAR_NET === 'testnet' ? 'testnet' : 'mainnet';
+export const NET = 'mainnet';
 const depDir = join(here, '..', '..', 'shared', 'deployments');
-// The mainnet core (charter + toll) record, read-only; always served at /api/mainnet.
 let mainnetDep = null;
 try { mainnetDep = JSON.parse(readFileSync(join(depDir, 'mainnet.json'), 'utf8')); } catch { mainnetDep = null; }
 export const MAINNET_DEP = mainnetDep;
-let testnetDep = null;
-try { testnetDep = JSON.parse(readFileSync(join(depDir, 'testnet.json'), 'utf8')); } catch { testnetDep = null; }
-export const TESTNET_DEP = testnetDep;
-// Default file follows NET. DEPLOYMENTS_FILE overrides for local trials only.
-const depFile = process.env.DEPLOYMENTS_FILE || join(depDir, `${NET}.json`);
+// DEPLOYMENTS_FILE overrides the record for a local read of the same mainnet shape.
+const depFile = process.env.DEPLOYMENTS_FILE || join(depDir, 'mainnet.json');
 const base = JSON.parse(readFileSync(depFile, 'utf8'));
-// When a trial file is loaded under NET=mainnet, overlay the committed mainnet ids.
-const overlay = NET === 'mainnet' && mainnetDep && mainnetDep.status === 'deployed' && base.network !== 'mainnet'
-  ? Object.fromEntries(Object.entries(mainnetDep).filter(([k, v]) => v !== null && k !== 'toll' && k !== 'rpc')) : {};
-export const DEP = { ...base, ...overlay, network: NET };
+export const DEP = { ...base, network: 'mainnet' };
 
 export const cfg = {
   port: Number(process.env.PORT || 8787),
-  rpc: process.env.NEAR_RPC || (NET === 'mainnet' ? (mainnetDep?.rpc || 'https://free.rpc.fastnear.com') : DEP.rpc),
-  rpcFallbacks: (process.env.NEAR_RPC_FALLBACKS || (NET === 'mainnet' ? 'https://rpc.mainnet.near.org' : (DEP.rpc_fallbacks || []).join(','))).split(',').map((s) => s.trim()).filter(u => u && (NET !== 'mainnet' || !/testnet/i.test(u))),
-  archivalRpc: process.env.NEAR_ARCHIVAL_RPC || (NET === 'mainnet' ? 'https://archival-rpc.mainnet.fastnear.com' : (DEP.archival_rpc || '')),
-  archivalRpc2: process.env.NEAR_ARCHIVAL_RPC2 || (NET === 'mainnet' ? 'https://archival-rpc.mainnet.near.org' : ''),
+  rpc: process.env.NEAR_RPC || mainnetDep?.rpc || 'https://free.rpc.fastnear.com',
+  rpcFallbacks: (process.env.NEAR_RPC_FALLBACKS || 'https://rpc.mainnet.near.org').split(',').map((s) => s.trim()).filter(Boolean),
+  archivalRpc: process.env.NEAR_ARCHIVAL_RPC || 'https://archival-rpc.mainnet.fastnear.com',
+  archivalRpc2: process.env.NEAR_ARCHIVAL_RPC2 || 'https://archival-rpc.mainnet.near.org',
   rpcRetries: Number(process.env.NEAR_RPC_RETRIES || 4),
   rpcBackoffMs: Number(process.env.NEAR_RPC_BACKOFF_MS || 400),
   rpcBackoffMaxMs: Number(process.env.NEAR_RPC_BACKOFF_MAX_MS || 4000),

@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeApp } from '../../src/app.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 const app = makeApp();
 const get = (p, h = {}) => app.request(p, { headers: { 'cf-connecting-ip': '192.0.2.' + Math.floor(Math.random() * 250), ...h } });
@@ -14,8 +15,8 @@ const badGets = [
   ['/api/guardhouse/check/' + 'a'.repeat(65), 'account id over 64 chars'],
   ['/api/guardhouse/action/abc', 'non-numeric action id'],
   ['/api/guardhouse/action/1234567890', 'action id over 9 digits'],
-  ['/api/charter/x.testnet/rules/BAD%20CLAUSE', 'clause id with a space'],
-  ['/api/tx/nothash?sender=a.testnet', 'malformed tx hash'],
+  ['/api/charter/x.near/rules/BAD%20CLAUSE', 'clause id with a space'],
+  ['/api/tx/nothash?sender=a.near', 'malformed tx hash'],
   ['/api/tx/11111111111111111111111111111111', 'tx hash without sender'],
   ['/api/ai/tee?nonce=xyz', 'nonce not 64 hex'],
 ];
@@ -72,7 +73,7 @@ test('/api/deployments serves the committed mainnet deployment file', async () =
   const file = JSON.parse(readFileSync(new URL('../../../shared/deployments/mainnet.json', import.meta.url)));
   assert.equal(dep.network, 'mainnet');
   assert.equal(dep.board.contract, file.board.contract);
-  assert.equal(JSON.stringify(dep).toLowerCase().includes('testnet'), false);
+  assert.equal(otherNet.test(JSON.stringify(dep)), false);
 });
 
 test('/api/mainnet answers with the mainnet file or not_deployed, never an error', async () => {

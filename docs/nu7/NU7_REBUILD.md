@@ -1,6 +1,6 @@
 # zcash-devtool rebuilt for NU7
 
-NU7 (ZIP 259) activates on Zcash mainnet at height **3,543,405** (around Nov 6, 2026). On testnet it activated at 4,465,026. After NU7, a wallet tool built on the old consensus parameters stops following the chain. NU7 also lowers block spacing to 25 s (ZIP 318: `NU7_POW_TARGET_SPACING_RATIO = 3`).
+NU7 (ZIP 259) activates on Zcash mainnet at height **3,543,405** (around Nov 6, 2026). On earlier network it activated at 4,465,026. After NU7, a wallet tool built on the old consensus parameters stops following the chain. NU7 also lowers block spacing to 25 s (ZIP 318: `NU7_POW_TARGET_SPACING_RATIO = 3`).
 
 ## What was built
 
@@ -11,12 +11,12 @@ NU7 (ZIP 259) activates on Zcash mainnet at height **3,543,405** (around Nov 6, 
   - `pczt/inspect.rs`: `PrecomputedSighashData::new_zip244`; accepts tx versions V5 and V6.
   - `pczt/update_with_signature.rs`: transparent signing via `PrecomputedSighashData<EffectsOnly>`.
   - `pczt/pay_manual.rs` and `migration/advance.rs`: `zip318::BlockSpacing::for_network`.
-- Checked in the pinned source (`zcash_protocol/src/consensus.rs`): mainnet `Nu7 => 3_543_405`, testnet `4_465_026`, spacing ratio 3.
+- Checked in the pinned source (`zcash_protocol/src/consensus.rs`): mainnet `Nu7 => 3_543_405`, earlier network `4_465_026`, spacing ratio 3.
 - `cargo build --release`: OK. The binary is 103,942,752 B, sha256 `62a6364ac1f0207801d423a4f37af608d09c88b3e2b8fc2b9ce99a08f770a910`.
 
-## Verification (testnet, on a copy)
+## Verification (earlier network, on a copy)
 
-A copy of a testnet payee wallet, never the bank wallet, was synced with the new binary: `ChainTip(4549566..4552389)`, 77/77 ranges. That range is past testnet NU7, so the new tool follows the NU7 chain.
+A copy of a earlier network payee wallet, never the bank wallet, was synced with the new binary: `ChainTip(4549566..4552389)`, 77/77 ranges. That range is past earlier network NU7, so the new tool follows the NU7 chain.
 
 The live bank wallet was not opened with the new binary. Its sqlite DB would be migrated forward and the old binary could no longer read it.
 

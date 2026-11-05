@@ -1,4 +1,5 @@
 // Read a board propose back from a mainnet tx status. No signing.
+import { mainnetReceiverOk } from '../../shared/net/accounts.js';
 import { MAINNET_DEP } from './config.js';
 import { txStatus } from './near.js';
 
@@ -58,7 +59,7 @@ export function judgePropose(tx, { signer, board = BOARD, expectReceiver, maxYoc
   let amount;
   try { amount = BigInt(call.args.amount); } catch { return { ok: false, status: 400, error: 'amount is outside the cap' }; }
   const receiver = String(call.args.receiver || '');
-  if (!receiver || receiver.includes('.testnet')) return { ok: false, status: 400, error: 'receiver must be a mainnet account' };
+  if (!mainnetReceiverOk(receiver)) return { ok: false, status: 400, error: 'receiver must be a valid mainnet .near or implicit account' };
   if (expectReceiver && receiver !== expectReceiver) return { ok: false, status: 400, error: 'payee does not match' };
   if (amount <= 0n || amount > maxYocto) return { ok: false, status: 400, error: 'amount is outside the cap' };
   const reason = failureReason(tx);

@@ -5,8 +5,8 @@ import { proposalState, stateText, endsAtMs } from '../../../shared/townhall/exp
 import { townhallProposal } from '../../src/shops.js';
 
 const HOUR_NS = String(3600n * 10n ** 9n);
-// proposal #10 as read from r7thmvr8maey.sputnikv2.testnet: still InProgress on chain, filed at this submission_time
-const P10 = { id: 10, proposer: 'ncguest-296t703o3g.testnet', status: 'InProgress', submission_time: '1793229633097671297', kind: { FunctionCall: {} }, description: 'join' };
+// proposal #10 as read from r7thmvr8maey.sputnikv2.near: still InProgress on chain, filed at this submission_time
+const P10 = { id: 10, proposer: 'ncguest-296t703o3g.near', status: 'InProgress', submission_time: '1793229633097671297', kind: { FunctionCall: {} }, description: 'join' };
 const filedMs = Number(BigInt(P10.submission_time) / 1_000_000n);
 
 test('an InProgress proposal past its 1 h window is Expired', () => {

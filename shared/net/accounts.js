@@ -21,10 +21,18 @@ export function formatNear(amt) {
   return n.toFixed(3);
 }
 
-export function rejectTestnetReceiver(id) {
-  const s = String(id || '');
-  if (!s || /\.testnet$/i.test(s) || s.toLowerCase().includes('.testnet')) {
-    const err = new Error('receiver must be a mainnet account');
+const MAINNET_NAMED = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+\.near$/;
+
+/** A mainnet payee: a named .near account, or a 64-hex implicit account. */
+export function mainnetReceiverOk(id) {
+  const s = String(id || '').trim();
+  return IMPLICIT.test(s) || MAINNET_NAMED.test(s);
+}
+
+export function requireMainnetReceiver(id) {
+  const s = String(id || '').trim();
+  if (!mainnetReceiverOk(s)) {
+    const err = new Error('receiver must be a valid mainnet .near or implicit account');
     err.status = 400;
     throw err;
   }

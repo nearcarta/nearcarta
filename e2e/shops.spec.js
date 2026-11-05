@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import dep from '../shared/deployments/mainnet.json' with { type: 'json' };
+import { otherNet, otherEvm, retiredNet } from '../shared/net/word-scan.js';
 
 test('health: the journey chain is mainnet and the API cannot sign', async ({ request }) => {
   const h = await (await request.get('/api/health')).json();
@@ -7,7 +8,7 @@ test('health: the journey chain is mainnet and the API cannot sign', async ({ re
   expect(h.near.chain_id).toBe('mainnet');
   if (h.near.height != null) expect(h.near.height).toBeGreaterThan(200_000_000);
   expect(h.features.signing).toBe(false);
-  if (h.trial) expect(h.trial.chain_id).toBe('testnet');
+  expect(h.trial).toBeFalsy();
 });
 
 test('ferry: dry 1Click quote USDC (Base) -> ZEC to a shielded address passes all checks', async ({ page }) => {
@@ -83,7 +84,7 @@ test('arena: guardian g1 and its case tokens are read from chain', async ({ page
 test('toll: the page shows the mainnet contract and the Base address', async ({ page }) => {
   await page.goto('/console#toll');
   await expect(page.getByTestId('toll-state')).toContainText('8453', { timeout: 30_000 });
-  await expect(page.locator('#toll')).toContainText(dep.toll.foreign_address);
+  await expect(page.locator('#toll')).toContainText(dep.toll.contract);
 });
 
 test('shop interiors get live data through the data interface', async ({ page }) => {
@@ -99,12 +100,12 @@ test('shop interiors get live data through the data interface', async ({ page })
 test('mist bank: the street shows a hidden amount and only the commitment is public', async ({ page, request }) => {
   const m = await (await request.get('/api/mistbank')).json();
   expect(m.network).toBe('mainnet');
-  expect(JSON.stringify(m)).not.toMatch(/uview|salt=|"zats"|testnet/i);
+  expect(JSON.stringify(m)).not.toMatch(new RegExp('uview|salt=|"zats"|' + otherNet.source, 'i'));
   expect(m.note).toMatch(/0\.005/);
   await page.goto('/design/D8_shops/?2d');
   const b = await page.evaluate(async () => (await import('/design/D6_dashboards/src/data.js')).BANK);
   expect(b == null || b.src === 'mainnet').toBe(true);
-  if (b) expect(JSON.stringify(b)).not.toMatch(/testnet|uview|ufvk|salt=/i);
+  if (b) expect(JSON.stringify(b)).not.toMatch(new RegExp(otherNet.source + '|uview|ufvk|salt=', 'i'));
 });
 
 test('town view loads', async ({ page }) => {

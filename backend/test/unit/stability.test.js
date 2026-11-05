@@ -51,7 +51,7 @@ test('vault fresh read: waits and retries through RPC 429s instead of failing', 
     return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { result: [...Buffer.from('null')], logs: [] } }), { status: 200 });
   };
   try {
-    const f = await charterFacts('x-1.nccharters-85831.testnet', { fresh: true, retryMs: 1 });
+    const f = await charterFacts('x-1.nccharters-85831.near', { fresh: true, retryMs: 1 });
     assert.equal(f.exists, false); assert.ok(n >= 3);
   } catch (e) { if (/vault not deployed/.test(e.message)) return; throw e; }
 });

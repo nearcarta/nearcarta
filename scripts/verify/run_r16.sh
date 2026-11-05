@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Full R16 verify: verify.sh, then the oath sandbox + exploit suites against the deployed bytes (oath.r16.oz.wasm),
-# the factory unit + sandbox tests, and factory mutants. Testnet reads only. Usage: scripts/verify/run_r16.sh [--offline]
+# the factory unit + sandbox tests, and factory mutants. Earlier network reads only. Usage: scripts/verify/run_r16.sh [--offline]
 set -uo pipefail
 export PATH="$HOME/.cargo/bin:$PATH"
 HERE="$(cd "$(dirname "$0")" && pwd)"; ROOT="$(cd "$HERE/../.." && pwd)"

@@ -1,89 +1,29 @@
-// Live tests against NEAR testnet, 1Click (dry quotes, mainnet routing, nothing spent) and NEAR AI Cloud.
+// Live reads of the deployed mainnet contracts, 1Click dry quotes, and NEAR AI Cloud. Nothing is signed.
 import { proveTee } from '../../src/tee.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
-import { DEP, has } from '../../src/config.js';
+import { MAINNET_DEP, has } from '../../src/config.js';
 import * as ferry from '../../src/ferry.js';
-import * as guard from '../../src/guardhouse.js';
-import * as shops from '../../src/shops.js';
 import * as ai from '../../src/ai.js';
 import { accessKeys, viewAccount } from '../../src/near.js';
 
 const UA = 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex';
 const REFUND = '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e';
-const proof = JSON.parse(readFileSync(new URL('../../../judges/proofs/guardhouse-demo.json', import.meta.url)));
+const M = MAINNET_DEP;
+const accounts = [M.charter?.contract, M.toll?.contract, M.board?.contract, M.extras?.arena?.contract, M.extras?.house?.contract, M.extras?.townhall?.contract].filter(Boolean);
 
-test('every deployed contract account exists on testnet', async () => {
-  for (const a of [DEP.guardhouse.oath, DEP.townhall.charter, DEP.townhall.dao, DEP.arena.contract, DEP.toll.oath]) {
+test('every deployed contract account exists on mainnet', async () => {
+  for (const a of accounts) {
     const v = await viewAccount(a);
-    // A factory charter runs global code: code_hash is all ones and global_contract_hash is set.
-    const hasCode = v.code_hash !== '11111111111111111111111111111111' || !!(v.global_contract_hash || v.global_contract_account_id);
-    assert.ok(hasCode, `${a} has code`);
+    assert.ok(v.code_hash && v.code_hash !== '11111111111111111111111111111111', `${a} has code`);
   }
 });
 
-test('no shown contract account holds a full-access key', async () => {
-  for (const a of [DEP.guardhouse.oath, DEP.townhall.charter, DEP.arena.contract, DEP.toll.oath, DEP.house?.oath].filter(Boolean)) {
+test('charter, toll, arena and house hold no full-access key', async () => {
+  for (const a of [M.charter.contract, M.toll.contract, M.extras.arena.contract, M.extras.house.contract]) {
     const ks = (await accessKeys(a)).keys;
     assert.equal(ks.filter(k => k.access_key.permission === 'FullAccess').length, 0, `${a} has no full-access key`);
   }
-});
-
-test('guardhouse oath: pinned code hash, no full-access key, agent key is propose-only', async () => {
-  const v = await viewAccount(DEP.guardhouse.oath);
-  assert.equal(v.code_hash, DEP.guardhouse.code_hash);
-  const s = await guard.snapshot();
-  assert.equal(s.keys.fullAccess, 0);
-  assert.deepEqual(s.keys.functionCall.map(k => k.methods), [['propose']]);
-  assert.equal(s.state.agent_key, s.keys.functionCall[0].public_key);
-});
-
-test('guardhouse demo txs read back from chain with the recorded verdicts', async () => {
-  for (const r of proof.runs) {
-    const e = await guard.explain(r.hash);
-    assert.equal(e.result.value.decision, r.decision);
-    assert.equal(e.result.value.reason, r.reason);
-  }
-  assert.deepEqual(proof.runs.map(r => r.decision), ['allowed', 'denied']);
-});
-
-test('recorded proof txs in deployments resolve on chain', async () => {
-  const g = DEP.guardhouse.proof_txs;
-  const paid = await guard.explain(g.valid_receipt_paid);
-  assert.equal(paid.result.value.decision, 'allowed');
-  const T = DEP.townhall;
-  const allowed = await shops.explainAny(T.proof_txs.agent_reward_allowed, T.charter);
-  assert.equal(allowed.result.value.decision, 'allowed');
-  const over = await shops.explainAny(T.proof_txs.over_cap_denied, T.charter);
-  assert.equal(over.result.value.reason, 'over_per_action_cap');
-  const frozen = await shops.explainAny(T.proof_txs.agent_after_freeze_denied, T.charter);
-  assert.equal(frozen.result.value.reason, 'frozen');
-});
-
-test('town hall: R14 charter owned by the DAO, propose-only agent key, live caps', async () => {
-  const t = await shops.townhall();
-  assert.equal(t.charter, DEP.townhall.charter);
-  assert.equal(t.oathState.owner, DEP.townhall.dao);
-  assert.equal(t.keys.fullAccess, 0);
-  assert.deepEqual(t.keys.functionCall.map(k => k.methods), [['propose']]);
-  assert.equal(t.caps_near.per_reward, 0.05);
-  assert.ok(t.council[0].members.length >= 2);
-});
-
-test('arena and toll views', async () => {
-  const a = await shops.arena();
-  assert.match(a.season.commit_hex, /^[0-9a-f]{64}$/);
-  assert.ok(a.guardian?.agent);
-  const t = await shops.toll();
-  assert.equal(t.policy.mpc, 'v1.signer-prod.testnet');
-  assert.equal(t.policy.foreign_address, DEP.toll.foreign_address);
-});
-
-test('chronicle lists oath txs and decodes events from chain', async () => {
-  const c = await shops.chronicle(DEP.guardhouse.oath, 4);
-  assert.ok(c.count > 0);
-  assert.ok(c.txs.some(t => t.events?.length));
 });
 
 test('ferry: public dry quote USDC(Base) -> ZEC to an Orchard-only UA is signed and echoes', async () => {
@@ -113,31 +53,10 @@ test('NEAR AI TEE preflight: gateway + model quotes verify (dcap-qvl, nonce, sig
   assert.equal(r.ok, true);
 });
 
-test('mist bank: Zcash testnet payout hides its amount, its NEAR oath carries the commitment, nothing secret is served', async () => {
+test('mist bank public view is a mainnet note until a mainnet payout is recorded', async () => {
   const { mistbank } = await import('../../src/mistbank.js');
   const m = await mistbank({ fresh: true });
-  assert.equal(m.built, true);
-  assert.equal(m.street.amount_hidden, true, m.street.reasons.join());
-  assert.ok(m.street.confirmations >= 1);
-  assert.equal(m.oath.success, true); assert.equal(m.oath.decision, 'allowed'); assert.equal(m.oath.memo_on_chain, true); assert.equal(m.oath.shop, 'payout'); // the rotated proof (f2b48b2) is a tip2 on the guardhouse charter's payout shop
-  assert.equal(m.binding.charter_caps_zec_amount, false); // stated plainly
-  assert.doesNotMatch(JSON.stringify(m), /uview(test)?1|salt=|"zats"|payee_address/);
-  assert.equal(m.ledger, undefined); assert.equal(m.disclosure, undefined);
-  if (has.oneClick()) for (const [k, l] of Object.entries(m.desk.legs)) { assert.equal(l.ok, true, k); assert.equal(l.privacy, 'basic'); assert.equal(l.dry, true); }
-});
-
-test('arena corpus: every attempt is on chain with a prompt hash, refusals outnumber allows', async () => {
-  const d = await shops.arenaAttempts(0, 25);
-  assert.ok(d.attempts.length >= 20);
-  for (const a of d.attempts) assert.match(a.prompt_hash_hex, /^[0-9a-f]{64}$/);
-  const allows = d.attempts.filter(a => a.verdict === 'ALLOW').length;
-  assert.ok(d.attempts.length - allows > allows);
-  const page2 = await shops.arenaAttempts(10, 5);
-  assert.equal(page2.attempts[0].id, 10);
-});
-
-test('guardhouse: the owner-approved escalation settled on chain', async () => {
-  const a = await guard.action('4');
-  assert.equal(a.status, 'confirmed');
-  assert.equal(a.clause_id, 'tip');
+  assert.equal(m.network, 'mainnet');
+  assert.equal(m.built, false);
+  assert.match(m.note, /0\.005 NEAR/);
 });

@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { retiredNet } from '../../../shared/net/word-scan.js';
 
 const root = new URL('../../../', import.meta.url).pathname;
-const bad = /testnet|r2own|ncguest|sepolia|utest1/i;
+const bad = new RegExp(`${retiredNet.source}|r2own|ncguest|utest1`, 'i');
 
 function walk(dir, hits) {
   for (const name of readdirSync(dir)) {

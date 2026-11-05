@@ -7,7 +7,7 @@ def r(id,piece,what,near=0,eth=0,zec=0,usdc=0,kind='burn',opt='required',src='')
     rows.append(dict(id=id,piece=piece,what=what,near=near,eth=eth,zec=zec,usdc=usdc,kind=kind,opt=opt,src=src))
 # --- NEAR side, recommended path (global code for charters because the public factory needs it)
 r(1,'Root account','named `<root>.near` via registrar: creation charge + gas',ACC+0.001,kind='burn',src='G,A')
-r(2,'Charters (global code)','publish main `oath` (R16.1 propose_batch + C5, reproducible build-3709807) 401,313 B as global contract by hash, as on the testnet R17 factory `nccharters-53836`: 10 NEAR/100 KB, burned',401313*1e-4,kind='burn',src='GC')
+r(2,'Charters (global code)','publish main `oath` (R16.1 propose_batch + C5, reproducible build-3709807) 401,313 B as global contract by hash, as on the earlier network R17 factory `nccharters-53836`: 10 NEAR/100 KB, burned',401313*1e-4,kind='burn',src='GC')
 r(3,'Charters (global code)','gas to upload 401 KB (0.58+0.13*X Tgas)',(0.58+0.13*401)*TG,src='G')
 r(4,'Factory','`charter_factory` account: creation + 201,539 B storage (measured)',ACC+201539*B,kind='lock',src='S,M')
 r(5,'Factory','deploy gas 175 KB + init + delete full-access key',(0.58+0.13*175+10+0.41)*TG,src='G')
@@ -15,7 +15,7 @@ r(6,'Charters x4','Guardhouse/Mist Bank, House, Town Hall, shared Vault/Arena ch
 r(7,'Charters x4','creation charge + create/init gas (~30 Tgas each)',4*(ACC+30*TG),src='G')
 r(8,'Charters x4','set clause + add agent FC key + delete FAK (3 calls x ~10 Tgas each)',4*3*10*TG,src='G')
 r(9,'Shops / merchants','6 plain receiver accounts (cafe, books, bakery, ...): creation only, <770 B',6*(ACC+0.0005),src='A')
-r(10,'Guardhouse','DAO role = plain account (testnet one is 182 B): creation only',ACC+0.0005,src='A,M')
+r(10,'Guardhouse','DAO role = plain account (earlier network one is 182 B): creation only',ACC+0.0005,src='A,M')
 r(11,'Guardhouse','demo txs: paid, denied, escalated (yield/resume), approve, freeze: 6 calls x <=60 Tgas',6*60*TG,src='G')
 r(12,'Guardhouse','smallest payout amounts: cap 0.0001 NEAR, 2 paid moves (go to own accounts, recoverable)',0.0002,kind='move',src='-')
 r(13,'Town Hall DAO','Sputnik v2 DAO: 546,780 B storage (measured) + creation',ACC+546780*B,kind='lock',src='S,M')
@@ -63,13 +63,13 @@ SRC={'S':'https://docs.near.org/protocol/storage/storage-staking (1e19 yocto/byt
 '1C':'1Click API dry quotes 2026-10-28 (https://1click.chaindefuser.com/v0/quote, dry:true): leg A error "try at least 1750123" (1.750123 USDC); leg B min 132,000 zats; withdraw fee 32,000 zats / 0.0024 USDC',
 'Z':'https://zips.z.cash/zip-0317 (marginal fee 5,000 zats x 2 grace actions = 10,000 zats minimum)',
 'AI':'https://cloud-api.near.ai/v1/model/list (z-ai/glm-5.3-flash: input 80e-9, output 500e-9 USD per token)',
-'M':'measured testnet `storage_bytes` via https://test.api.fastnear.com/v1/account/<id>/full on 2026-10-29; mainnet uses the same wasm and the same price',
+'M':'measured earlier network `storage_bytes` via https://test.api.fastnear.com/v1/account/<id>/full on 2026-10-29; mainnet uses the same wasm and the same price',
 'PX':'https://api.coingecko.com/api/v3/simple/price?ids=near,ethereum,zcash,usd-coin&vs_currencies=usd (2026-10-29)'}
 def f(v,n=6):
     return '' if not v else ('%.*f'%(n,v)).rstrip('0').rstrip('.')
 L=[]
 L.append('# Mainnet cost plan: the absolute minimum to move every piece\n')
-L.append('Status: plan only. Nothing here has been spent or signed on mainnet. Each piece moves only after it is verified working on testnet (see `judges/VERIFY.md`). Prices are from today, 2026-10-29: NEAR $%.2f, ETH $%.2f, ZEC $%.2f, USDC $%.6f [PX].\n'%(P['NEAR'],P['ETH'],P['ZEC'],P['USDC']))
+L.append('Status: plan only. Nothing here has been spent or signed on mainnet. Each piece moves only after it is verified working on earlier network (see `judges/VERIFY.md`). Prices are from today, 2026-10-29: NEAR $%.2f, ETH $%.2f, ZEC $%.2f, USDC $%.6f [PX].\n'%(P['NEAR'],P['ETH'],P['ZEC'],P['USDC']))
 L.append('Rules used: storage is locked, not spent (it comes back when state or the account is deleted). Gas, the account creation charge, global contract publishing, fees and swap spread are burned. Gas is priced at the protocol floor (1 Tgas = 0.0001 NEAR) and attached gas is an upper bound; unused gas is refunded.\n')
 L.append('Kind: **burn** = gone; **lock** = storage stake, recoverable; **move** = working capital that returns to our own accounts; **spend** = paid to another chain as gas.\n')
 L.append('## Items\n')
@@ -91,15 +91,15 @@ fl=tot(lambda x:x['opt']=='required' and x['id'] not in (2,3,4,5,6,7)); fl['NEAR
 L.append(line('Floor: required, factory deferred, 4 charters deployed as regular contracts (path 2 below)',fl))
 L.append('\nThe biggest single item is row 2, publishing the charter code as a global contract (%.2f NEAR, about $%.0f, burned). It is needed only because the public factory lets anyone create a charter with no code of their own.\n'%(rows[1]['near'],rows[1]['near']*P['NEAR']))
 L.append('## Cheapest path\n')
-L.append('1. **Shrunk wasm.** The testnet R17 factory publishes the reproducible 401,313 B build unchanged (40.13 NEAR of testnet burn). On R16 a `wasm-opt -Oz` pass cut 10.1%% (367,202 to 330,006 B); on this build that would save about %.2f NEAR of burn. Each 10 KB cut saves 1 NEAR. Rebuild it reproducibly and re-verify on testnet first.'%(401313*(1-330006/367202)*1e-4))
+L.append('1. **Shrunk wasm.** The earlier network R17 factory publishes the reproducible 401,313 B build unchanged (40.13 NEAR of earlier network burn). On R16 a `wasm-opt -Oz` pass cut 10.1%% (367,202 to 330,006 B); on this build that would save about %.2f NEAR of burn. Each 10 KB cut saves 1 NEAR. Rebuild it reproducibly and re-verify on earlier network first.'%(401313*(1-330006/367202)*1e-4))
 L.append('2. **Global code only for the factory.** If the public factory waits, deploy the 4 house charters as regular contracts instead: 4 x ~405,731 B = %.2f NEAR, all locked and recoverable, against %.2f NEAR for the global path (mostly burned). The global path pays off at 10 or more charters [GC].'%(A,rows[1]['near']+rows[2]['near']+rows[3]['near']+rows[4]['near']+rows[5]['near']+rows[6]['near']))
-L.append('3. **Charters through the factory.** Each one is 833 B (it holds a reference to the code, not the code), so initialise the mainnet factory with `min_deposit` 0.02 NEAR, not the testnet 0.3 NEAR (the contract only requires more than the 0.01 registry fee).')
+L.append('3. **Charters through the factory.** Each one is 833 B (it holds a reference to the code, not the code), so initialise the mainnet factory with `min_deposit` 0.02 NEAR, not the earlier network 0.3 NEAR (the contract only requires more than the 0.01 registry fee).')
 L.append('4. **One Toll instance for Base** covers both native ETH and USDC rules. Arbitrum is a second instance and is optional.')
-L.append('5. **DAO.** Guardhouse uses a plain account as its DAO role (182 B on testnet). Only Town Hall needs the Sputnik DAO, and Guardhouse can point at the same one.')
+L.append('5. **DAO.** Guardhouse uses a plain account as its DAO role (182 B on earlier network). Only Town Hall needs the Sputnik DAO, and Guardhouse can point at the same one.')
 L.append('6. **Smallest amounts.** Use a 0.0001 NEAR cap, a 1e12 wei EVM test value and 0.01 USDC. Leg A needs 1.750123 USDC at minimum and leg B 132,000 zats, so ZEC comes from leg A and none is bought.')
-L.append('7. **No full-access keys** after deploy (as on testnet). Deleting each key costs 0.41 Tgas (0.000041 NEAR).')
+L.append('7. **No full-access keys** after deploy (as on earlier network). Deleting each key costs 0.41 Tgas (0.000041 NEAR).')
 L.append('8. **Skip:** the NEAR AI 50 NEAR agent stake (API-key inference is enough), `mock_ft` (mainnet uses real USDC), Chronicle (read-only, free), and Vercel/Render (free plans).\n')
-L.append('## Order (each step only after its testnet check passes)\n')
+L.append('## Order (each step only after its earlier network check passes)\n')
 L.append('1. Root account and factory, with the global code published (rows 1-5). 2. Charters (6-8). 3. Shops and Guardhouse (9-12). 4. Town Hall DAO (13-14). 5. Arena and Vault (15-17). 6. Toll Base (19-20, 30). 7. Ferry, 1Click and Mist Bank, using the phase-2 scripts with `--live` only after the owner approves (32-33, 40-41). 8. Optional: House deed, Toll Arbitrum (18, 21, 31).\n')
 L.append('## Sources\n')
 for k,v in SRC.items(): L.append('- [%s] %s'%(k,v))

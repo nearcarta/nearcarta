@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fetchStreet, ZEC_API } from '../../src/mistbank.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
 const TX = 'a'.repeat(64);
 async function withFetch(status, fn) {
@@ -23,5 +24,5 @@ test('street check: a bad txid is a 400 before any fetch', async () => {
 
 test('ZEC explorer defaults to mainnet cipherscan', () => {
   assert.match(ZEC_API, /mainnet\.cipherscan\.app/);
-  assert.equal(/testnet/i.test(ZEC_API), false);
+  assert.equal(otherNet.test(ZEC_API), false);
 });

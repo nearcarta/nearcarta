@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { otherNet } from '../shared/net/word-scan.js';
 
 test('town intro plays once', async ({ page }) => {
   test.setTimeout(40_000);
@@ -34,7 +35,7 @@ test('console title has no rehearsal-network word and the ferry heading is visib
   await page.goto('/console');
   await expect(page).toHaveTitle(/Nearcarta/);
   const title = await page.title();
-  expect(title.toLowerCase()).not.toContain('testnet');
+  expect(otherNet.test(title)).toBe(false);
   const h2 = page.locator('#ferry h2');
   await expect(h2).toBeVisible();
   const box = await h2.boundingBox();

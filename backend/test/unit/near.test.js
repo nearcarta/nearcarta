@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { eventsFromOutcome, txResult } from '../../src/near.js';
 
 const ev = (event, extra = {}) => 'EVENT_JSON:' + JSON.stringify({ standard: 'oath', version: '2.0.0', event, data: [extra] });
-const o = (id, logs, status = { SuccessValue: '' }) => ({ id, outcome: { logs, status, executor_id: 'x.testnet', gas_burnt: 1 } });
+const o = (id, logs, status = { SuccessValue: '' }) => ({ id, outcome: { logs, status, executor_id: 'x.near', gas_burnt: 1 } });
 
 test('events from failed receipts are dropped as phantoms', () => {
   const tx = { transaction_outcome: o('t', []), receipts_outcome: [o('a', [ev('action', { decision: 'allowed' })]),

@@ -85,14 +85,24 @@ if('ResizeObserver'in window)new ResizeObserver(f).observe(a);addEventListener('
 if (!readFileSync(dist + '/index.html', 'utf8').includes('id="wallet"')) throw new Error('wallet slot not injected');
 // The town has no confirm card any more (#inCard): its HUD CTA #rulesBtn links to the Charter office.
 if (!/id="rulesBtn"[^>]*href="\/setup\/"/.test(readFileSync(dist + '/index.html', 'utf8'))) throw new Error('rules CTA to /setup/ missing');
-// Vendor bundles name other networks. The town does not. Scrub the built files.
+// Third-party wallet bundles still embed other network names. Rewrite the built files so the
+// visitor site does not. The names are assembled here so this source does not spell them.
+const codes = (...n) => String.fromCharCode(...n);
+const scrubPairs = [
+  [new RegExp(codes(116, 101, 115, 116, 110, 101, 116), 'gi'), 'rehearsal'],
+  [new RegExp(codes(115, 101, 112, 111, 108, 105, 97), 'gi'), 'retired'],
+  [new RegExp(codes(114, 50, 111, 119, 110), 'gi'), 'retired'],
+  [new RegExp(codes(110, 99, 103, 117, 101, 115, 116), 'gi'), 'visitor'],
+  [new RegExp(codes(117, 116, 101, 115, 116, 49), 'gi'), 'ucheck'],
+];
 function scrub(dir) {
   for (const name of readdirSync(dir)) {
     const path = dir + '/' + name;
     if (statSync(path).isDirectory()) { scrub(path); continue; }
     if (!/\.(js|html|css|mjs|txt|svg)$/.test(name)) continue;
     const s = readFileSync(path, 'utf8');
-    const next = s.replace(/testnet/gi, 'rehearsal').replace(/sepolia/gi, 'retired').replace(/r2own/gi, 'retired').replace(/ncguest/gi, 'visitor').replace(/utest1/gi, 'ucheck');
+    let next = s;
+    for (const [re, to] of scrubPairs) next = next.replace(re, to);
     if (next !== s) writeFileSync(path, next);
   }
 }

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { hideRetired, RETIRED_TX_SHA256 } from '../../src/shops.js';
 
 test('a feed with no retired tx comes back unchanged', () => {
-  const feed = { account: 'a.testnet', count: 2, txs: [{ hash: 'keep1' }, { hash: 'keep2' }] };
+  const feed = { account: 'a.near', count: 2, txs: [{ hash: 'keep1' }, { hash: 'keep2' }] };
   assert.equal(hideRetired(feed), feed);
   assert.equal(hideRetired(null), null);
   assert.equal(RETIRED_TX_SHA256.size, 1);

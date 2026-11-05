@@ -5,7 +5,7 @@ Deadline: dev window closes Nov 14 23:59 UTC (Nov 15 02:59 Cairo). Keep the repo
 
 ## 0. Before the flip (agent, private repo)
 - [ ] `gitleaks git --config .gitleaks.toml --redact --no-banner .` on full history: 0 findings (dry run Oct 29: 498 commits, 0 with repo config, 0 with default config).
-- [ ] Known, documented history item: retired testnet view-only UFVK in `ae15658` (removed in `f19e12f`), see `docs/HISTORY_REWRITE.md`. No rewrite, no force push.
+- [ ] Known, documented history item: retired earlier network view-only UFVK in `ae15658` (removed in `f19e12f`), see `docs/HISTORY_REWRITE.md`. No rewrite, no force push.
 - [ ] `git status` clean; no `*.tmp.mjs`, `__pycache__`, `.secrets/`, `.env*` tracked.
 - [ ] `npm ci && npm test && npm run verify && npm run build` pass on a fresh clone.
 - [ ] Every link in README / judges/VERIFY.md / docs resolves; no box paths.

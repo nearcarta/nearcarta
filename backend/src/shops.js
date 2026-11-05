@@ -100,7 +100,7 @@ export async function toll() {
   };
 }
 
-// Further Toll instances from the deployments file: the Arbitrum Sepolia Toll and the USDC Toll (v3).
+// Further Toll instances from the deployments file: an Arbitrum toll and a USDC toll (v3).
 // Each is read from chain; one that cannot be read is left out rather than failing the route.
 const EXPLORER = { Base: 'https://basescan.org', Arbitrum: 'https://arbiscan.io' };
 const TOLL_INSTANCES = [['arbitrum', DEP.toll_arbitrum?.oath], ['usdc', DEP.toll_usdc?.toll]].filter(([, id]) => id);
@@ -152,7 +152,7 @@ const feeds = new Map(); // account -> { v, at, p }
 export const _resetFeeds = () => feeds.clear();
 // Retired txs: the first Mist Bank payout's oath approval (its payee was retired when its viewing key was found in
 // git history). Feeds leave it out so the site never re-links that payee; listed by sha256 so the hash itself is
-// not repeated here. Chain explorers still show it, as they show every testnet tx.
+// not repeated here. Chain explorers still show it, as they show every public tx.
 export const RETIRED_TX_SHA256 = new Set(['ffbfd539498bf406654eb56d5dfb270fbda0f1620c833bc54789898e60cd2e7e']);
 const sha256hex = s => createHash('sha256').update(String(s)).digest('hex');
 export function hideRetired(feed) {
@@ -206,7 +206,7 @@ export function feedSnapshot(account, file = new URL('../data/feed-snapshots.jso
 export const _setSnapshots = v => { SNAPS = v; };
 export function ledgerSnapshot() {
   feedSnapshot('');
-  // Never seed a testnet ledger into the public /api/ledger SWR cache.
+  // Seed the public /api/ledger cache only from a mainnet snapshot.
   if (!SNAPS?.ledger || SNAPS.ledger.network !== 'mainnet') return null;
   return { ledger: SNAPS.ledger, at: SNAPS.at };
 }
@@ -266,8 +266,8 @@ export async function explainAny(hash, sender) {
 
 // Render's health check hits /api/health, so an RPC 429 here must not fail it (that restarted the container
 // in a loop). Serve the last good status marked stale, or an error field, and keep answering 200.
-// The visitor journey is mainnet. The trial RPC is a separate cache and is not the journey chain.
-let journeyStatus = null, journeyError = null, trialStatus = null, trialError = null;
+// The visitor journey is mainnet.
+let journeyStatus = null, journeyError = null;
 const statusOf = s => ({ chain_id: s.chain_id, height: s.sync_info.latest_block_height, time: s.sync_info.latest_block_time });
 function cached(status, error, chain) {
   if (status) return error ? { ...status, stale: true, error } : status;
@@ -275,7 +275,6 @@ function cached(status, error, chain) {
 }
 // /api/health answers from this cache (no RPC on the request path); the warm loop refreshes it.
 export function healthCached() { return cached(journeyStatus, journeyError, 'mainnet'); }
-export function trialHealthCached() { return cached(trialStatus, trialError, 'testnet'); }
 async function pullStatus(url, setStatus, setError) {
   try { setStatus(statusOf(await rpc('status', [], url))); setError(null); }
   catch (e) { setError(String(e.message).slice(0, 120)); }

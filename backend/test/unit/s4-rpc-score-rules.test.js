@@ -1,19 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { rpcClient } from '../../../shared/vault/tx.js';
 import { ruleChip, DEFAULT_RULES } from '../../../app/design/D8_shops/js/rules-default.js';
+import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
-const DEP = JSON.parse(readFileSync(new URL('../../../shared/deployments/testnet.json', import.meta.url)));
 const ok = (result) => ({ ok: true, status: 200, json: async () => ({ result }) });
 const http = (status) => ({ ok: false, status, json: async () => ({}) });
 const noSleep = { sleep: async () => {} };
-
-test('testnet.json lists backup RPCs other than the primary', () => {
-  assert.ok(DEP.rpc_fallbacks.length >= 2);
-  assert.ok(!DEP.rpc_fallbacks.includes(DEP.rpc));
-  assert.ok(DEP.rpc_fallbacks.some(u => !/fastnear/.test(u)), 'at least one non-fastnear backup');
-});
 
 for (const code of [408, 425, 429, 500, 502, 503, 504]) {
   test(`frontend rpcClient rotates to the backup on ${code}`, async () => {
@@ -41,7 +34,7 @@ test('backend cfg.rpcFallbacks default to a mainnet RPC', async () => {
   const { cfg, NET } = await import('../../src/config.js');
   assert.equal(NET, 'mainnet');
   assert.deepEqual(cfg.rpcFallbacks, ['https://rpc.mainnet.near.org']);
-  assert.equal(cfg.rpcFallbacks.some(u => /testnet/i.test(u)), false);
+  assert.equal(cfg.rpcFallbacks.some(u => otherNet.test(u)), false);
 });
 
 test('backend rpc() falls back from a 408 primary', async () => {

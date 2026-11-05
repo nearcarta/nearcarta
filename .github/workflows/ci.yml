@@ -30,7 +30,7 @@ jobs:
       - run: cd contracts/${{ matrix.crate }} && cargo test --lib --locked
   factory-sandbox:
     # Local near-sandbox: publish the committed charter as a global contract, deploy the factory,
-    # create a charter through it and drive it (no testnet, no keys).
+    # create a charter through it and drive it (local sandbox only, no keys).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
       - run: cd contracts/charter_factory && cargo test --test sandbox --locked
   oath-sandbox:
     # Local near-sandbox: build the charter and the reaper from source, then run every
-    # integration suite (rules, attacks, properties, refusals, teardown). No testnet, no keys.
+    # integration suite (rules, attacks, properties, refusals, teardown). Local sandbox only, no keys.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -24,8 +24,8 @@ test('fpost: a 4xx other than 429 is not retried', async () => {
 
 test('chronicle: concurrent and repeat calls share one read; a later failure serves the last good feed as stale', async () => {
   let n = 0; const ok = async a => { n++; return { account: a, txs: [n] }; };
-  const [x, y] = await Promise.all([chronicle('c1.testnet', 8, ok), chronicle('c1.testnet', 8, ok)]);
+  const [x, y] = await Promise.all([chronicle('c1.near', 8, ok), chronicle('c1.near', 8, ok)]);
   assert.equal(n, 1); assert.deepEqual(x, y);
-  assert.deepEqual(await chronicle('c1.testnet', 8, ok), x); assert.equal(n, 1);
-  await assert.rejects(chronicle('c2.testnet', 8, async () => { throw new Error('fastnear tx http 429'); }), /429/);
+  assert.deepEqual(await chronicle('c1.near', 8, ok), x); assert.equal(n, 1);
+  await assert.rejects(chronicle('c2.near', 8, async () => { throw new Error('fastnear tx http 429'); }), /429/);
 });
