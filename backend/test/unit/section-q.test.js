@@ -59,9 +59,12 @@ test('the house deed links are brass and a missing oath is not a missing row', a
   assert.match(row, /Town Hall/);
   assert.doesNotMatch(row, /did not return a row/);
   const empty = houseCharterMarkup({ accountId: ROW });
-  assert.match(empty, /data-testid="house-empty"/);
-  assert.match(empty, /Open a row in setup/);
+  assert.match(empty, /data-testid="charter-cta"/);
+  assert.match(empty, /data-testid="charter-setup" href="\/setup\/#rules"/);
+  assert.match(empty, /Rules and Sign/);
+  assert.match(empty, /no charter row/);
   assert.match(empty, /Nothing was signed/);
+  assert.doesNotMatch(empty, /data-testid="hall-cap"|id="cap"/);
   assert.equal(DEP.extras?.house?.contract, 'house.nearcarta.near');
   assert.equal(DEP.extras?.house?.oath, undefined);
   let called = false;

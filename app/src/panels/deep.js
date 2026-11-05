@@ -12,9 +12,9 @@ import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
 import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
-import { nearOf, normalizeRow } from './hall.js';
+import { ROW_WAIT_MS, nearOf, normalizeRow, withRowWait } from './hall.js';
 import { boundaryHtml } from './boundary.js';
-import { shortId } from './hall-ui.js';
+import { charterSetupCta, shortId } from './hall-ui.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -461,7 +461,7 @@ export function houseCharterMarkup({ accountId = '', row = null, failed = false 
     return `<div class="house-empty" data-testid="house-empty" role="status"><p>The charter read did not answer.</p><p>Try again in a moment. The buttons above are the public deed record. Nothing was signed.</p></div>`;
   }
   if (accountId) {
-    return `<div class="house-empty" data-testid="house-empty" role="status"><p>No charter row for this account yet.</p><p>Open a row in setup. This page reads it with get_charter. The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Open a row</a></p></div>`;
+    return charterSetupCta({ accountId, note: 'This account has no charter row. Nothing was signed.' });
   }
   return `<div class="house-empty" data-testid="house-empty" role="status"><p>Sign in to read your charter row.</p><p>The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Sign in</a></p></div>`;
 }
@@ -479,9 +479,9 @@ function mountHouse(root, hooks = {}) {
   slot.innerHTML = `<div class="house-state" data-testid="house-state" role="status"><p>Reading the charter row…</p></div>`;
   const load = hooks.row
     ? Promise.resolve(hooks.row)
-    : fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
+    : withRowWait(() => fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
       .then(r => r.json())
-      .then(body => normalizeRow(body));
+      .then(body => normalizeRow(body)), ROW_WAIT_MS);
   load.then(row => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, row }); })
     .catch(() => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, failed: true }); });
 }
