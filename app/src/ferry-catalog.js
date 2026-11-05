@@ -42,8 +42,12 @@ export function quoteView(q) {
   const to = q.to || {};
   const from = q.from || {};
   return {
+    amountIn: from.amount ?? q.amountIn ?? null,
     amountOut: to.amount ?? q.amountOut ?? null,
-    symbolOut: to.symbol || '',
+    symbolIn: from.symbol || q.symbolIn || '',
+    symbolOut: to.symbol || q.symbolOut || '',
+    chainIn: from.chain || q.chainIn || '',
+    chainOut: to.chain || q.chainOut || '',
     usd: q.usd ?? q.amountInUsd ?? from.usd ?? from.amountUsd ?? to.usd ?? to.amountUsd ?? null,
     eta: q.eta_s ?? q.eta ?? null,
     fee: q.cost_bps_signed ?? q.fee ?? q.checks?.echo?.protocolFeeBps ?? null,

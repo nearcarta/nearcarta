@@ -104,14 +104,18 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
     </button>`;
   }).join('');
   const quotes = (state.quotes || []).map(v => {
-    const inn = v.symbolIn ? tokenBadge(v.symbolIn, v.chainIn, { size: 18, chainSize: 10, cls: 'row-tok' }) : '';
-    const out = v.symbolOut ? tokenBadge(v.symbolOut, v.chainOut || 'zec', { size: 18, chainSize: 10, cls: 'row-tok' }) : '';
+    const symIn = v.symbolIn || parseRouteFrom(v.from || '').sym || '';
+    const chainIn = v.chainIn || parseRouteFrom(v.from || '').chain || '';
+    const symOut = v.symbolOut || 'ZEC';
+    const chainOut = v.chainOut || 'zec';
+    const inn = tokenBadge(symIn, chainIn, { size: 18, chainSize: 10, cls: 'row-tok' });
+    const out = tokenBadge(symOut, chainOut, { size: 18, chainSize: 10, cls: 'row-tok' });
+    const amtIn = v.amountIn != null && v.amountIn !== '' ? `<span class="row-amt">${esc(v.amountIn)}</span>` : '';
+    const amtOut = v.amountOut != null && v.amountOut !== '' ? `<span class="row-amt">${esc(v.amountOut)}</span>` : '';
     const usdNum = Number(v.usd);
     const usdTxt = v.usd != null && v.usd !== '' ? `about $${Number.isFinite(usdNum) ? usdNum.toFixed(2) : v.usd}` : '';
     const metaBits = [usdTxt, v.fee != null && v.fee !== '' ? `fee ${v.fee} bps` : '', v.eta != null && v.eta !== '' ? `about ${v.eta}s` : ''].filter(Boolean).join(' · ');
-    const body = inn && out
-      ? `${inn}<span class="row-arrow" aria-hidden="true">→</span>${out}${metaBits ? `<span class="row-meta">${esc(metaBits)}</span>` : ''}`
-      : esc(v.text || '');
+    const body = `${amtIn}${inn}<span class="row-arrow" aria-hidden="true">→</span>${amtOut}${out}${metaBits ? `<span class="row-meta">${esc(metaBits)}</span>` : ''}`;
     return `<p class="ferry-row" data-testid="ferry-row"${v.best ? ' data-best="1"' : ''}>${body}${v.best ? ' <span class="row-best">best rate</span>' : ''}</p>`;
   }).join('');
   const lines = state.lines || [];
@@ -160,13 +164,27 @@ function mountFerry(root, hooks) {
     const raw = [];
     for (const r of routes) {
       try { raw.push(await quoteOne(r, state.amtEdited ? state.amt : r.amt, hooks)); }
-      catch { raw.push({ label: r.label, from: { amount: state.amt || r.amt, symbol: r.sym }, to: { symbol: 'ZEC', chain: 'zec' }, dry: true }); }
+      catch { raw.push({ label: r.label, from: { amount: state.amt || r.amt, symbol: r.sym, chain: r.chain }, to: { symbol: 'ZEC', chain: 'zec' }, dry: true }); }
     }
     const lines = raw.map((q, i) => {
       const line = quoteLine(q) || { text: routes[i].label, usd: null };
       return { id: routes[i].id, text: line.text, usdText: usdOf(line), usd: line.usd, best: false };
     });
-    const ranked = pickBest(raw.map(quoteLine).filter(Boolean));
+    const enriched = raw.map((q, i) => {
+      const line = quoteLine(q);
+      if (!line) return null;
+      const r = routes[i] || {};
+      const meta = routeMeta(r);
+      return {
+        ...line,
+        symbolIn: line.symbolIn || meta.sym || r.sym || '',
+        chainIn: line.chainIn || meta.chain || r.chain || '',
+        symbolOut: line.symbolOut || 'ZEC',
+        chainOut: line.chainOut || 'zec',
+        amountIn: line.amountIn ?? (state.amtEdited ? state.amt : r.amt),
+      };
+    }).filter(Boolean);
+    const ranked = pickBest(enriched);
     state.quotes = ranked;
     state.lines = lines.map(l => ({ ...l, best: ranked.find(v => v.text === l.text)?.best }));
     state.sample = !ranked.some(v => v.amountOut != null);
