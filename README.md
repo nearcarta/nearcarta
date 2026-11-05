@@ -1,7 +1,7 @@
 # Nearcarta
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/backend%20unit%20tests-368%20pass%2C%201%20skipped-brightgreen)
+![tests](https://img.shields.io/badge/backend%20unit%20tests-376%20pass%2C%201%20skipped-brightgreen)
 
 **Thesis: the agent proposes, the NEAR charter decides.** The AI agent holds only a function-call key for `propose`; every payment is checked by the `oath` contract, which allows it, refuses it on chain with a reason, or holds it for the owner.
 
@@ -30,7 +30,7 @@ Each claim names the code, the test that pins it, and a tx you can open. Test na
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 369 backend unit tests (368 pass, 1 skipped), offline
+npm test                                   # 377 backend unit tests (376 pass, 1 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify                             # re-reads all 76 proof txs from testnet; exits 1 if one is missing
 ```
@@ -47,7 +47,7 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
 | toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 12 |
-| backend unit (`npm test`) | 369 (368 pass, 1 skipped) |
+| backend unit (`npm test`) | 377 (376 pass, 1 skipped) |
 | browser e2e against the live site | 22 passed, 12 skipped, testnet wallets only. There is no mainnet browser e2e |
 
 The 12 skipped e2e tests sign real testnet txs and need a funded wallet key or an opt-in flag (`GUARD_E2E`, `VAULT_E2E`, `VAULT_AI_E2E`, `VAULT_FAUCET`, `HALL_FILE`, `HOUSE_*_KEY_FILE`, a partner key, or the arena attack switch); they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
@@ -167,7 +167,7 @@ On 2026-10-29 a fresh guest pressed every shop row above on the live site with n
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 369 unit tests (368 pass, 1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
+npm test                 # 377 unit tests (376 pass, 1 skipped): ZIP-316 vectors, quote echo guard, event parsing, TEE quote checks, Mist Bank street/ledger
 npm run verify           # reads every proof tx back from testnet (76/76 expected); `npm run txs` rewrites judges/TESTNET_TXS.md from it
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)

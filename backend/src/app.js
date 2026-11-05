@@ -23,6 +23,10 @@ import * as vault from './vault.js';
 import { payroll } from './payroll.js';
 import * as cp from './counterparty.js';
 import { view, rpcStats } from './near.js';
+import { verifyBoardPayment } from './board-tx.js';
+import { checkPayee as boardPayee } from './board-guard.js';
+import { issuePass } from './toll-pass.js';
+import { mainnetChronicle } from './board-chronicle.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 import { pastPrompts as arenaPrompts } from './arena.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
@@ -291,6 +295,8 @@ export function makeApp() {
   // Counterparty check before a payment: allow / warn / block with reasons (backend/src/counterparty.js).
   // ?charter= must be a Nearcarta charter (served or made by the factory), so this never views arbitrary contracts.
   const cpCache = new Map();
+  // A visitor's own board row: a view of the allowlist, plus the sealed deny list they hold off chain.
+  app.get('/api/guardhouse/board', limiter(20), async c => c.json(await boardPayee({ visitor: c.req.query('visitor'), payee: c.req.query('payee'), deny: c.req.query('deny') })));
   app.get('/api/guardhouse/check/:account', limiter(12), async c => {
     const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
     const charter = c.req.query('charter') || DEP.guardhouse.oath;
@@ -315,6 +321,13 @@ export function makeApp() {
   app.post('/api/mistbank/verify', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
     return c.json(mist.verifyOpening(b.amount, b.salt));
+  });
+  // Mainnet NEAR leg (a board propose of at most 0.005) plus the Zcash testnet leg, checked the same way as the street.
+  app.post('/api/mistbank/mainnet', limiter(10), async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const near = await verifyBoardPayment({ hash: b.tx, visitor: b.visitor, payee: b.payee, amount: b.amount });
+    const zcash = mist.streetCheck(await mist.fetchStreet(b.zcash_txid));
+    return c.json({ network: { near: 'mainnet', zcash: 'testnet' }, near, zcash });
   });
   app.get('/api/mistbank/verify', c => c.json({ error: 'POST {"amount":"<zatoshi>","salt":"<32 hex>"}; the opening is auditor-only and never goes in a URL' }, 405));
   // Per-visitor private send: verify the charter approval and queue it. The box worker holds the Zcash
@@ -348,6 +361,11 @@ export function makeApp() {
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
+  // Mainnet gate: one 0.001 board propose to toll.nearcarta.near, then a short-lived signed pass. No testnet gate contract.
+  app.post('/api/toll/mainnet', limiter(10), async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    return c.json(await issuePass({ visitor: b.visitor, tx: b.tx }));
+  });
   app.get('/api/toll/gate/:nonce', limiter(60), tg(c => tollgate.visit(c.req.param('nonce'))));
   // Guest fallback when the public faucet rate-limits a visitor (backend/src/guest.js)
   app.get('/api/guest', limiter(30), c => c.json(guest.guestInfo()));
@@ -364,6 +382,12 @@ export function makeApp() {
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
   app.get('/api/chronicle', limiter(120), edgeCache(15), async c => {
+    if (c.req.query('net') === 'mainnet') {
+      const owner = c.req.query('owner') || '';
+      if (!ACCT.test(owner) || owner.length > 64) return bad(c, 'owner must be an account id');
+      const known = String(c.req.query('known') || '').split(',').filter(h => HASH.test(h)).slice(0, 15);
+      return c.json(await mainnetChronicle({ owner, known, limit: Math.min(Number(c.req.query('limit') || 12), 25) }));
+    }
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
     try { return c.json(shops.hideRetired(await shops.chronicle(DEP.guardhouse.oath, limit))); }
     catch (e) {
