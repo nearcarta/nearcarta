@@ -8,8 +8,7 @@ const rawClient = envClient.startsWith('client-') ? envClient : WEB_CLIENT;
 // A Privy client id starts with "client-". Anything else (an app secret pasted in the wrong field) must never reach a browser bundle.
 if (envClient && !envClient.startsWith('client-')) console.warn('Privy client id ignored: it is not a client id (does not start with "client-"). the public web client id is used.');
 export const PRIVY_CLIENT = rawClient.startsWith('client-') ? rawClient : '';
-const NEAR_NET = process.env.NEAR_NET === 'mainnet' ? 'mainnet' : 'testnet';
-// NEXT_PUBLIC_MAINNET=1 (or NEXT_PUBLIC_NEAR_NET=mainnet) hides the guest trial on /setup
-// and opens a charter row once mainnet.json board.status is "deployed".
-export const PUBLIC_MAINNET = process.env.NEXT_PUBLIC_MAINNET === '1' || process.env.NEXT_PUBLIC_NEAR_NET === 'mainnet';
+const NEAR_NET = 'mainnet';
+// The public build is mainnet. A charter row opens once mainnet.json board.status is "deployed".
+export const PUBLIC_MAINNET = true;
 export const walletDefine = { __PRIVY_ON__: String(!!PRIVY_ID), __NEAR_NET__: JSON.stringify(NEAR_NET), __PUBLIC_MAINNET__: JSON.stringify(PUBLIC_MAINNET ? '1' : '0') };

@@ -158,5 +158,5 @@ function failureText(f) {
   return e || JSON.stringify(f).slice(0, 300);
 }
 
-export const explorerTx = h => `https://testnet.nearblocks.io/txns/${h}`;
-export const explorerAcct = a => `https://testnet.nearblocks.io/address/${a}`;
+export const explorerTx = h => `https://nearblocks.io/txns/${h}`;
+export const explorerAcct = a => `https://nearblocks.io/address/${a}`;

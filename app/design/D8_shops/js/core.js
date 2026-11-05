@@ -57,7 +57,7 @@ export function radial(c) { const cv = document.createElement('canvas'); cv.widt
 
 // colour roles (PRINCIPLES.md §2). The scene uses these too.
 // Values are read at boot from the D8 role variables in styles.css, which point at the D7 tokens (design/D7_system/tokens/tokens.css).
-export const C = { base: 0x17130f, raised: 0x1f1a15, line: 0x3a3128, text: 0xf3ead8, muted: 0x9c9182, accent: 0xd6b46a, ok: 0x00ec97, no: 0xff6b6b, ice: 0xa8d8ff };
+export const C = { base: 0x0b1020, raised: 0x121a2e, line: 0x7f93c4, text: 0xeef2ff, muted: 0x9c9182, accent: 0x00ec97, ok: 0x00ec97, no: 0xff6b6b, ice: 0xa8d8ff };
 export const CSS = {};
 export function readTokens() { const cs = getComputedStyle(document.documentElement); const probe = document.createElement('i'); document.body.appendChild(probe);
   for (const k of Object.keys(C)) { const raw = cs.getPropertyValue('--' + k).trim(); if (!raw) continue; probe.style.color = raw; const m = getComputedStyle(probe).color.match(/[\d.]+/g); if (!m) continue; const [r, g, b] = m.map(Number); C[k] = (r << 16) | (g << 8) | b; CSS[k] = '#' + C[k].toString(16).padStart(6, '0'); }
@@ -103,20 +103,19 @@ export async function makeRobot(scene) {
 
 // tokens and icons (D7 files; every amount gets its icon)
 const TOK = { NEAR: 'near', USDC: 'usdc', ETH: 'eth', BTC: 'btc', ZEC: 'zec' };
-const CHAIN = { Base: 'base', NEAR: 'near', 'Base Sepolia': 'base', Zcash: 'zec' };
+const CHAIN = { Base: 'base', NEAR: 'near', 'Base': 'base', Zcash: 'zec' };
 export function tok(amount, sym, { chain = null, cls = '' } = {}) {
   const f = sym === 'NEAR' ? null : TOK[sym]; const ic = sym === 'NEAR' ? `<span class="ti coin" aria-hidden="true">N</span>` : f ? `<img class="ti" src="${D7}assets/tokens/tokens/${f}.svg" alt="" width="20" height="20">` : `<span class="ti coin" aria-hidden="true">${sym.slice(0, 1)}</span>`;
   const ch = chain && chain !== 'NEAR' && CHAIN[chain] ? `<img class="ci" src="${D7}assets/tokens/chains/${CHAIN[chain]}.svg" alt="${chain}" title="on ${chain}" width="12" height="12">` : '';
   return `<span class="tok ${cls}"><span class="tic">${ic}${ch}</span>${amount != null ? `<b class="num">${amount}</b>` : ''}<span class="sym">${sym}</span></span>`;
 }
 export const i3 = (n, size = 32) => `<img class="i3" src="${D7}assets/3dicons/192/${n}-premium.webp" alt="" width="${size}" height="${size}" decoding="async">`;
-// Explorer links say which network they open. Static proof rows are testnet records; an account id tells its own network.
-export const onMainnet = () => globalThis.NEARCARTA_PUBLIC_MAINNET === true;
-export const NB = h => `https://testnet.nearblocks.io/txns/${h}`;
+export const onMainnet = () => true;
+export const NB = h => `https://nearblocks.io/txns/${h}`;
 export const NBM = h => `https://nearblocks.io/txns/${h}`;
-export const nbAddr = a => (/\.testnet$/.test(String(a)) ? 'https://testnet.nearblocks.io' : 'https://nearblocks.io') + '/address/' + a;
+export const nbAddr = a => 'https://nearblocks.io/address/' + a;
 export const short = h => h.length > 14 ? h.slice(0, 6) + '…' + h.slice(-4) : h;
-export const txLink = h => `<a class="tx" href="${NB(h)}" target="_blank" rel="noopener" title="Open on the testnet explorer">${short(h)}${onMainnet() ? ' · testnet' : ''} ↗</a>`;
+export const txLink = h => `<a class="tx" href="${NB(h)}" target="_blank" rel="noopener">${short(h)} ↗</a>`;
 
 export function desat(mat, k = .55) { mat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
  diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(.299,.587,.114))), diffuseColor.rgb, ${k.toFixed(2)});`); }; mat.customProgramCacheKey = () => 'desat' + k; return mat; }

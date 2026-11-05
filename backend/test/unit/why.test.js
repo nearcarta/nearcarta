@@ -5,7 +5,7 @@ import { CORE_TXS, CLAUSES } from '../../../app/design/D6_dashboards/src/data.js
 
 test('every refusal code in the real run has a plain explanation', () => {
   const codes = [...new Set(CORE_TXS.filter(t => t.reason).map(t => t.reason))];
-  assert.ok(codes.length >= 5);
+  assert.deepEqual(codes.sort(), ['over_per_action_cap', 'receiver_not_allowlisted']);
   for (const c of codes) assert.ok(KNOWN.includes(c), `no explanation for ${c}`);
 });
 
@@ -13,8 +13,8 @@ test('explanations carry the numbers the contract compared', () => {
   const p2 = CORE_TXS.find(t => t.id === 'P2');
   const e = explain(p2, CLAUSES);
   assert.equal(e.rule, 'Per-action cap');
-  assert.match(e.plain, /0\.6 NEAR/); assert.match(e.plain, /0\.5 NEAR/);
-  assert.match(explain(CORE_TXS.find(t => t.id === 'P5'), CLAUSES).plain, /r2rcv\.testnet/);
+  assert.match(e.plain, /0\.003 NEAR/); assert.match(e.plain, /0\.002 NEAR/);
+  assert.match(explain(CORE_TXS.find(t => t.id === 'P5'), CLAUSES).plain, /nearcarta\.near/);
   assert.equal(explain({ reason: 'made_up' }, CLAUSES).known, false);
 });
 

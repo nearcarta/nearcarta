@@ -31,7 +31,7 @@ test('look-alike and invoice payees are never the real payee', () => {
 
 test('plans aim at the right limit', () => {
   assert.equal(plan('impersonation', clause)[0].amount, String(400n * M));
-  assert.equal(plan('injected-recipient', clause)[0].receiver, 'refund-desk.testnet');
+  assert.equal(plan('injected-recipient', clause)[0].receiver, 'shop-moved-pay-here.near');
   // 100 budget / 50 cap -> 2 allowed + 1 refused
   assert.equal(plan('split-under-cap', clause).length, 3);
   assert.equal(plan('split-under-cap', clause, { spent: String(100n * M), count: 2 }).length, 1);

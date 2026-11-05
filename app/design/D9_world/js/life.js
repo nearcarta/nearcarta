@@ -41,15 +41,13 @@ function tickSky(dt){ if(fixed!=null){ W.tod+=(fixed-W.tod)*Math.min(1,dt*1.2); 
   const [to,dur]=LOOP[cyc.i]; cyc.t+=dt; const blend=Math.min(1,cyc.t/Math.min(dur,18)); const k=blend*blend*(3-2*blend);
   W.tod=cyc.from+(to-cyc.from)*k; if(cyc.t>=dur){ cyc.from=to; cyc.t=0; cyc.i=(cyc.i+1)%LOOP.length; } }
 
-// Ferry scene: the boat crosses on a loop. The lines say only what the Ferry and Mist Bank code and proofs do:
-// the Ferry reads a dry 1Click quote (USDC on Base to ZEC, Orchard-only UA, no swap run); the Mist Bank's ZEC
-// payout on Zcash testnet went out in Ironwood actions with the amount hidden (judges/proofs/mistbank-payout.json).
+// Ferry scene: the boat crosses on a loop. The lines name the recorded mainnet swap.
 const FV=V(); const boatV={name:'Ferry',voice:.8,top(){ return FV.copy(W.boat.position).setY(W.boat.position.y+1.05); }};
 let fs={ph:0,t:14};
 function tickFerry(dt){ const b=W.boat, J=W.jetty, fm=CAST.ferryman; if(!b||!J.far) return; const u=b.userData; fs.t-=dt;
-  if(fs.ph===0){ if(u.goal!==0) u.goal=0; if(fs.t<=0){ u.goal=2; fs.ph=1; fs.t=30; if(fm) SP.say(fm,'Dry quote only: USDC on Base to ZEC.',{dur:3,name:fm.name}); } return; }
-  if(fs.ph===1){ if(b.position.distanceTo(J.far)<.35||fs.t<=0){ zecDrop(b.position); SP.say(boatV,'Orchard-only address. No transparent fallback.',{dur:3.2}); fs.ph=2; fs.t=4.2; } return; }
-  if(fs.ph===2){ if(fs.t<=0){ if(fm) SP.say(fm,'Mist Bank paid ZEC into Ironwood. Amount hidden.',{dur:3.4,name:fm.name}); fs.ph=3; fs.t=6; } return; }
+  if(fs.ph===0){ if(u.goal!==0) u.goal=0; if(fs.t<=0){ u.goal=2; fs.ph=1; fs.t=30; if(fm) SP.say(fm,'0.045 wNEAR became 0.177937 USDC.',{dur:3,name:fm.name}); } return; }
+  if(fs.ph===1){ if(b.position.distanceTo(J.far)<.35||fs.t<=0){ zecDrop(b.position); SP.say(boatV,'That swap settled on mainnet.',{dur:3.2}); fs.ph=2; fs.t=4.2; } return; }
+  if(fs.ph===2){ if(fs.t<=0){ if(fm) SP.say(fm,'A new quote stays dry until you pay.',{dur:3.4,name:fm.name}); fs.ph=3; fs.t=6; } return; }
   if(fs.ph===3&&fs.t<=0){ u.goal=0; fs.ph=0; fs.t=40; } }
 // Vault Arena Guardian: a small AI pet in the dome. Each scam spark that hits makes it shake its head; every few hits it says why.
 const GL=[['Scam text in. NEAR AI flagged it.','warn'],['Held by rule. The charter decides.','say'],['Five lab attacks. All refused, on chain.','think']];

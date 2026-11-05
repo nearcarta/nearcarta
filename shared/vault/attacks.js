@@ -59,7 +59,7 @@ export function plan(attackId, clause, usage = { spent: '0', count: 0 }) {
   const small = max(floor, min(cap, cap / 2n || 1n));
   switch (attackId) {
     case 'fake-invoice': return [{ receiver: invoicePayee(allow[0]), amount: small.toString() }];
-    case 'injected-recipient': return [{ receiver: 'refund-desk.testnet', amount: small.toString() }];
+    case 'injected-recipient': return [{ receiver: 'shop-moved-pay-here.near', amount: small.toString() }];
     case 'lookalike': return [{ receiver: lookalike(allow[0]), amount: small.toString() }];
     case 'impersonation': return [{ receiver: allow[0], amount: (cap * 8n).toString() }];
     case 'split-under-cap': {
@@ -95,7 +95,7 @@ export function matchesPlan(attackId, { receiver, amount }, clause) {
   try { amt = big(amount); } catch { return false; }
   switch (attackId) {
     case 'fake-invoice': return amt === small && allow.some(r => invoicePayee(r) === receiver) && !allow.includes(receiver);
-    case 'injected-recipient': return amt === small && receiver === 'refund-desk.testnet' && !allow.includes(receiver);
+    case 'injected-recipient': return amt === small && receiver === 'shop-moved-pay-here.near' && !allow.includes(receiver);
     case 'lookalike': return amt === small && allow.some(r => lookalike(r) === receiver) && !allow.includes(receiver);
     case 'impersonation': return allow.includes(receiver) && amt === cap * 8n;
     case 'split-under-cap': return allow.includes(receiver) && amt === cap;

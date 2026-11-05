@@ -1,24 +1,24 @@
 /* generated from tokens.json — Nearcarta */
 :root{
   color-scheme:dark;
-  --c-scene:#17130f;
+  --c-scene:#0b1020;
   --c-scene-warm:#241d16;
-  --c-pane:#1f1a15;
+  --c-pane:#121a2e;
   --c-glass:rgba(31,26,21,0.78);
-  --c-card:#2a241d;
+  --c-card:#1a2440;
   --c-card-quiet:#251f19;
   --c-line:rgba(243,234,216,0.09);
   --c-line-strong:rgba(243,234,216,0.18);
-  --c-text:#f3ead8;
+  --c-text:#eef2ff;
   --c-text-2:#cdbfa5;
-  --c-text-3:#9c8f79;
+  --c-text-3:#9aa6c8;
   --c-accent:#e8d5ae;
   --c-accent-press:#d8c193;
-  --c-on-accent:#1f1a15;
+  --c-on-accent:#121a2e;
   --c-accent-text:#f3e3c0;
   --c-brand-blue:#c98f4e;
   --c-accent-tint:rgba(232,213,174,0.16);
-  --c-brass:#d6b46a;
+  --c-brass:#00ec97;
   --c-brass-tint:rgba(214,180,106,0.14);
   --c-focus:#f0c987;
   --p-verified-mark:#00ec97;

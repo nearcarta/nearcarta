@@ -1,5 +1,7 @@
 # Verify with commands
 
+The live town is mainnet. The older rehearsal records named in this file are history. They are collected in [docs/archive/TESTNET_REHEARSAL.md](../docs/archive/TESTNET_REHEARSAL.md). They are not the product.
+
 All commands are read-only unless marked.
 
 1. Proof txs exist and have the stated outcome:

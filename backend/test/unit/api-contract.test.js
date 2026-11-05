@@ -67,11 +67,12 @@ test('API responses carry strict security headers', async () => {
   assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
 });
 
-test('/api/deployments serves the committed testnet deployment file', async () => {
+test('/api/deployments serves the committed mainnet deployment file', async () => {
   const dep = await (await get('/api/deployments')).json();
-  const file = JSON.parse(readFileSync(new URL('../../../shared/deployments/testnet.json', import.meta.url)));
-  assert.equal(dep.network, 'testnet');
-  assert.equal(dep.guardhouse.oath, file.guardhouse.oath);
+  const file = JSON.parse(readFileSync(new URL('../../../shared/deployments/mainnet.json', import.meta.url)));
+  assert.equal(dep.network, 'mainnet');
+  assert.equal(dep.board.contract, file.board.contract);
+  assert.equal(JSON.stringify(dep).toLowerCase().includes('testnet'), false);
 });
 
 test('/api/mainnet answers with the mainnet file or not_deployed, never an error', async () => {

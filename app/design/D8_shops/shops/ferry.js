@@ -28,11 +28,11 @@ export const PROOF = mainnet('ferry') + proof(
   ...Q.refused.map(r => row({ k: r.case, why: `${r.why} · ${diffTxt(r)}`, st: 'no', stText: 'refused', src: r.diffs ? 'replay' : 'live' })),
   note(`The signature does not cover confidentiality, so the guard compares every echoed field with the request (${SIGNED.length} signed, ${UNSIGNED.length} not). Echo edits are re-runs of that rule on this live quote.`),
   h3('What a real crossing leaves on chain'),
-  row({ k: 'Visible · Base deposit', why: `sender, ${+Q.from.amt} ${Q.from.sym} and time, to a 1Click deposit address`, st: 'no', stText: 'public', src: 'testnet' }),
-  row({ k: 'Visible · Zcash payout tx', why: 'that a tx entered the pool; the amount too if the bridge pays from transparent funds (not checkable on a dry quote)', st: 'pend', stText: 'depends', src: 'testnet' }),
-  row({ k: 'Hidden · the swap', why: 'order size, timing and counterparties settle on the private Confidential Intents shard', st: 'ok', stText: 'hidden', src: 'testnet' }),
-  row({ k: 'Hidden · recipient, note and later spends', why: "shielded into Zcash's Ironwood pool via an Orchard-only UA; no transparent receiver to fall back to", st: 'ok', stText: 'hidden', src: 'testnet' }),
-  note('1Click has no testnet. So the swap here is a real signed 1Click quote plus a testnet NEAR payment that your charter checks against your Ferry rule; no cross-chain swap runs.'),
+  row({ k: 'Visible · Base deposit', why: `sender, ${+Q.from.amt} ${Q.from.sym} and time, to a 1Click deposit address`, st: 'no', stText: 'public', src: 'mainnet' }),
+  row({ k: 'Visible · Zcash payout tx', why: 'that a tx entered the pool; the amount too if the bridge pays from transparent funds (not checkable on a dry quote)', st: 'pend', stText: 'depends', src: 'mainnet' }),
+  row({ k: 'Hidden · the swap', why: 'order size, timing and counterparties settle on the private Confidential Intents shard', st: 'ok', stText: 'hidden', src: 'mainnet' }),
+  row({ k: 'Hidden · recipient, note and later spends', why: "shielded into Zcash's Ironwood pool via an Orchard-only UA; no transparent receiver to fall back to", st: 'ok', stText: 'hidden', src: 'mainnet' }),
+  note('1Click has no mainnet. So the swap here is a real signed 1Click quote plus a NEAR payment that your charter checks against your Ferry rule; no cross-chain swap runs.'),
   note(`Nothing was sent, so there is no transaction yet. Read ${esc(utc3(Q.at))}.`),
   `</details>`);
 export const FLAT = { src: 'mainnet quote', cls: 'quote', label: LABEL, hero: HERO };

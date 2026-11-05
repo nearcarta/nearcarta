@@ -11,7 +11,6 @@ import { verifyQuoteSignature } from '@defuse-protocol/one-click-sdk-typescript'
 import { KeyPair } from 'near-api-js';
 import { cfg, secret, DEP } from './config.js';
 import { zcashRecipient } from './zcash.js';
-import { viewAccount } from './near.js';
 import { echoGuard, orchardOnly } from './ferry-guard.js';
 
 const UA = { 'User-Agent': 'nearcarta-ferry/0.1 (+curl/8.5.0)', 'content-type': 'application/json' };
@@ -147,29 +146,11 @@ export async function quote(input) {
 
 const redact = b => ({ ...b });
 
-// ENV=TIDEPOOL: the Ferry's deposit and status tracker on Tidepool, a community-run 1Click-compatible
-// testnet sandbox (community testnet, not 1Click). Live Ferry quotes stay on real 1Click in dry mode.
-// The verifier must run the unmodified near/intents defuse v0.4.2 code; it has a full-access key, so the
-// code hash is rechecked (at most every 10 minutes) and reported with every status answer.
-export const TIDEPOOL = {
-  api: 'https://www.usetidepool.tech', verifier: 'verifier.tidepool-sandbox.testnet', label: 'community testnet, not 1Click',
-  verifierSha256: 'f67f9559b3b512c52dfa11723a28b9119bcf773ac01780370d6409e5f1fb20e5', release: 'https://github.com/near/intents/releases/tag/defuse/v0.4.2',
-};
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 export const b58hex = s => { let n = 0n; for (const ch of s) { const i = B58.indexOf(ch); if (i < 0) throw new Error('bad base58'); n = n * 58n + BigInt(i); } return n.toString(16).padStart(64, '0'); };
-let vCache = null;
-export async function tidepoolVerifierOk(read = viewAccount) {
-  if (vCache && Date.now() - vCache.at < 600_000) return vCache.v;
-  const a = await read(TIDEPOOL.verifier);
-  const hex = b58hex(a.code_hash);
-  const v = { verifier: TIDEPOOL.verifier, code_hash_hex: hex, expected: TIDEPOOL.verifierSha256, ok: hex === TIDEPOOL.verifierSha256, release: TIDEPOOL.release };
-  vCache = { at: Date.now(), v };
-  return v;
-}
 // Deposit addresses: 64-hex NEAR implicit, 0x EVM, a NEAR account id, or base58 (Solana).
 export const validDepositAddress = a => typeof a === 'string' && a.length <= 96 &&
   (/^[0-9a-f]{64}$/.test(a) || /^0x[0-9a-fA-F]{40}$/.test(a) || /^([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/.test(a) || /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a));
-const FINAL = ['SUCCESS', 'REFUNDED', 'FAILED'];
 // What each 1Click status means for the person waiting, in plain words.
 export const STATUS_HELP = {
   PENDING_DEPOSIT: 'Waiting for your deposit to arrive.',
@@ -181,21 +162,6 @@ export const STATUS_HELP = {
   FAILED: 'The swap failed; see the refund line.',
 };
 export const statusHelp = s => STATUS_HELP[s] || `Unknown status ${String(s).slice(0, 40)}; nothing is assumed.`;
-export async function tidepoolStatus(depositAddress, f = fetch, ver = tidepoolVerifierOk) {
-  if (!validDepositAddress(depositAddress)) throw Object.assign(new Error('not a deposit address'), { status: 400 });
-  const [verifier, r] = await Promise.all([ver().catch(e => ({ ok: false, error: e.message })),
-    f(`${TIDEPOOL.api}/v0/status?depositAddress=${encodeURIComponent(depositAddress)}`, { headers: UA })]);
-  if (r.status === 404) throw Object.assign(new Error('unknown deposit address on Tidepool'), { status: 404 });
-  if (!r.ok) throw Object.assign(new Error(`tidepool status http ${r.status}`), { status: 502 });
-  const j = await r.json();
-  const d = j.swapDetails || {};
-  const refund = d.refundedAmount && d.refundedAmount !== '0' ? { amount: d.refundedAmount, formatted: d.refundedAmountFormatted, reason: d.refundReason || null } : null;
-  return { env: 'TIDEPOOL', label: TIDEPOOL.label, depositAddress, status: j.status, help: statusHelp(j.status), final: FINAL.includes(j.status), updatedAt: j.updatedAt,
-    deposited: d.depositedAmountFormatted ?? d.depositedAmount ?? null, received: d.amountOutFormatted ?? d.amountOut ?? null, refund,
-    near_txs: (d.nearTxHashes || []).map(h => ({ hash: h.hash || h, explorer: `https://testnet.nearblocks.io/txns/${h.hash || h}` })),
-    verifier, source: `${TIDEPOOL.api}/v0/status?depositAddress=${depositAddress}` };
-}
-
 // One refund address per swap. A real swap's refundTo is a fresh NEAR implicit account (64-hex id of a
 // one-time ed25519 key made for that swap only), never the wallet and never the recipient, so a refund
 // cannot be linked to the payer's wallet or to any other swap. The key goes to the caller (kept in

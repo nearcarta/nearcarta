@@ -3,7 +3,7 @@
 <script src="/config.js"></script>
 <title>NearCarta ledger: every payout and refusal</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/brand/chrome.css"><style>
-body{font:15px/1.5 Inter,system-ui,sans-serif;margin:0;background:#17130f;color:#f3ead8}
+body{font:15px/1.5 Inter,system-ui,sans-serif;margin:0;background:#0b1020;color:#eef2ff}
 main{max-width:980px;margin:auto;padding:20px}
 h1{font-size:1.5rem;margin:.4em 0}.sub{color:#cdbfa5}
 .tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
@@ -22,7 +22,7 @@ a{display:inline-block;min-height:24px;line-height:24px}</style></head><body><ma
 <p id="state" class="warn" hidden></p>
 <p id="sum" class="sub" data-testid="ledger-summary"></p>
 <div class="tot" id="tot" data-testid="ledger-totals"></div>
-<table data-testid="ledger"><thead><tr><th>When (UTC)</th><th>Shop</th><th>Kind</th><th>To</th><th>Amount</th><th>Tx / note</th></tr></thead><tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody></table>
+<table data-testid="ledger"><thead><tr><th>When (UTC)</th><th>Shop</th><th>Kind</th><th>To</th><th>Amount</th><th>Proof</th><th>Result</th></tr></thead><tbody id="rows"><tr><td colspan="7">Loading…</td></tr></tbody></table>
 </main>
 <script type="module">
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -31,15 +31,15 @@ async function load() {
   try {
     const L = await (await fetch(base + '/api/ledger')).json();
     const t = L.totals;
-    document.getElementById('tot').innerHTML = [['Payouts', t.payouts_near + ' NEAR'], ['Base payouts', t.payouts_base_eth + ' ETH'], ['Refusals', t.refusals], ['Inference today', '$' + t.inference_usd_today]]
+    document.getElementById('tot').innerHTML = [['Payouts', t.payouts_near + ' NEAR'], ['Refusals', t.refusals], ['Inference today', '$' + t.inference_usd_today]]
       .map(([k, v]) => `<div>${k}<b>${esc(v)}</b></div>`).join('');
     const np = L.rows.filter(r => r.kind === 'payout').length, nr = L.rows.filter(r => r.kind === 'refusal').length;
     document.getElementById('sum').textContent = `In short: ${np} payouts and ${nr} refusals. ${t.payouts_near} NEAR paid in the rows below. The model line is operator spend, not a charter payment.`;
     const st = document.getElementById('state');
     st.hidden = !L.partial; st.textContent = 'Some transactions could not be read right now (RPC rate limit). The list may be short; reload in a minute.';
-    document.getElementById('rows').innerHTML = L.rows.length ? L.rows.map(r => `<tr><td>${esc(r.at || '')}</td><td>${esc(r.shop)}</td><td class="${esc(r.kind)}">${esc(r.kind)}</td><td>${esc(r.to || '')}</td><td>${esc(r.amount)} ${esc(r.asset)}</td><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(String(r.tx).slice(0, 10))}…</a>` : ''} ${esc(r.note || '')}</td></tr>`).join('')
-      : '<tr><td colspan="6">No rows yet.</td></tr>';
-  } catch (e) { document.getElementById('rows').innerHTML = `<tr><td colspan="6">Ledger unavailable: ${esc(e.message)}. Retrying…</td></tr>`; setTimeout(load, 8000); }
+    document.getElementById('rows').innerHTML = L.rows.length ? L.rows.map(r => `<tr><td>${esc(r.at || '')}</td><td>${esc(r.shop)}</td><td class="${esc(r.kind)}">${esc(r.kind)}</td><td>${esc(r.to || '')}</td><td>${esc(r.amount)} ${esc(r.asset)}</td><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(String(r.tx).slice(0, 10))}…</a>` : ''}</td><td>${esc(r.note || (r.kind === 'payout' ? 'Paid' : 'Refused'))}</td></tr>`).join('')
+      : '<tr><td colspan="7">No rows yet.</td></tr>';
+  } catch (e) { document.getElementById('rows').innerHTML = `<tr><td colspan="7">Ledger unavailable: ${esc(e.message)}. Retrying…</td></tr>`; setTimeout(load, 8000); }
 }
 load();
 </script></body></html>

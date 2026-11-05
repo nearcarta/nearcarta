@@ -132,7 +132,7 @@
   }
  },
  "runbook": "docs/MAINNET_RUNBOOK.md",
- "note": "Mainnet runs protocol 86 (near-sdk 5.27, rustc 1.86). Live: charter, toll, arena, house deed, Town Hall, all subaccounts of nearcarta.near. Charter, toll, arena and house have no full-access key; Town Hall keeps one for teardown (it has no owner close). Guest sponsor demo stays on testnet.",
+ "note": "Mainnet runs protocol 86 (near-sdk 5.27, rustc 1.86). Live: charter, toll, arena, house deed, Town Hall, all subaccounts of nearcarta.near. Charter, toll, arena and house have no full-access key; Town Hall keeps one for teardown (it has no owner close).",
  "layout": "named",
  "root_funder": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
  "registrar": "near",

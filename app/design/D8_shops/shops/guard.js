@@ -11,7 +11,7 @@ export const PROOF = mainnet('guard') + proof(
       h3('This knock · lab attack S2'), row({ k: S2.name, why: S2.reason + ' · ' + S2.secs + ' s', st: 'no', stText: 'refused', tx: S2.tx }),
       `<pre class="kv">${esc(S2.tool.split('\n')[1])}</pre>`, note(`The agent read the hidden line and proposed it. The oath ${acct(LAB.oath)} refused before any money moved.`),
       h3('Other knocks on the same gate'), ...ATTACKS.filter(a => a.id !== 'S2').map(a => row({ k: a.name, why: a.reason, st: 'no', stText: 'refused', tx: a.tx })),
-      note('Every row is a real testnet transaction. The flight of the letter is a re-enactment.'));
+      note('Every row is a real mainnet transaction. The flight of the letter is a re-enactment.'));
 export default async function guard(ctx) {
   const { scene, camera } = await room({ cam: [2.2, 3.4, 8.2], look: [0, .9, 0] });
   const gate = await put(scene, 'buildings/neutral/wall_straight_gate', { z: -.4, fitW: 2.3 });
@@ -52,7 +52,7 @@ export default async function guard(ctx) {
   let t = 0;
   return {
     rob, scene, camera, tags,
-    panel: { title: 'Guardhouse', src: 'split', srcNote: 'charter.nearcarta.near is on mainnet. Letting it knock here is the free testnet trial.', label: 'Invoice with a hidden instruction', hero: tok('0.001', 'NEAR'), action: 'Let it knock' },
+    panel: { title: 'Guardhouse', src: 'split', srcNote: 'charter.nearcarta.near is on mainnet. Letting it knock here is the mainnet charter.', label: 'Invoice with a hidden instruction', hero: tok('0.001', 'NEAR'), action: 'Let it knock' },
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(1.15, 0, 1.75)]); rob.lookAt(pane.position); },
     *act() {

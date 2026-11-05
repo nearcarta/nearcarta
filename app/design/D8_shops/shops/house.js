@@ -35,13 +35,13 @@ export default async function house() {
   const kb = new THREE.Mesh(new THREE.TorusGeometry(.045, .014, 8, 20), brassM()); kb.rotation.x = Math.PI / 2; key.add(kb); const ks = new THREE.Mesh(new THREE.BoxGeometry(.16, .018, .018), brassM()); ks.position.x = .11; key.add(ks);
   const dome = new THREE.Mesh(new THREE.SphereGeometry(.17, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: C.ice, transparent: true, opacity: .28, roughness: .1, metalness: .1, depthWrite: false })); dome.position.set(tx, .645, tz); scene.add(dome);
   // books on a shelf
-  mesh(scene, new THREE.BoxGeometry(.9, .04, .22), PM.wood, [1.15, .78, -.7]); ['#7a3e2c', '#3f6f6d', '#a8644a', '#6b4a33', '#52653b', '#d6b46a'].forEach((c, i) => mesh(scene, new THREE.BoxGeometry(.07, .2 + (i % 3) * .03, .16), new THREE.MeshStandardMaterial({ color: c, roughness: .9 }), [.8 + i * .09, .9 + (i % 3) * .015, -.7]));
+  mesh(scene, new THREE.BoxGeometry(.9, .04, .22), PM.wood, [1.15, .78, -.7]); ['#7a3e2c', '#3f6f6d', '#a8644a', '#6b4a33', '#52653b', '#00ec97'].forEach((c, i) => mesh(scene, new THREE.BoxGeometry(.07, .2 + (i % 3) * .03, .16), new THREE.MeshStandardMaterial({ color: c, roughness: .9 }), [.8 + i * .09, .9 + (i % 3) * .015, -.7]));
   rug(scene, -.2, .8, 2.4, 1.5, 0x7a3e2c); lantern(scene, -2.0, .9, { h: 1.3, light: false });
   const rob = await makeRobot(scene); rob.at(.25, 1.05); rob.lookAt(sheet.position);
   const tip = CLAUSES[0]; let tt = 0;
   return {
     rob, scene, camera, tags: [],
-    panel: { title: 'Your House', src: 'split', srcNote: 'house.nearcarta.near is on mainnet. A charter you create is the free testnet trial.', label: `Tip cap · policy v${CORE.policyVersion}`, hero: tok(String(tip.cap), 'NEAR'), action: null },
+    panel: { title: 'Your House', src: 'split', srcNote: 'house.nearcarta.near is on mainnet. A charter you create is the mainnet charter.', label: `Tip cap · policy v${CORE.policyVersion}`, hero: tok(String(tip.cap), 'NEAR'), action: null },
     proof: PROOF,
     update(dt) { tt += dt; rob.update(dt); fire.material.opacity = .75 + .2 * Math.sin(tt * 9) * Math.sin(tt * 3.7); flames.forEach((f, i) => f.scale.y = 1 + .18 * Math.sin(tt * (7 + i * 2.3) + i)); fl.intensity = 1.4 + .3 * Math.sin(tt * 7); },
   };

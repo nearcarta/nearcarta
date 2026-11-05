@@ -13,9 +13,11 @@
 <link rel="preload" href="assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="d7/tokens/tokens.css">
 <link rel="stylesheet" href="world.css">
+<link rel="stylesheet" href="/brand/chrome.css">
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","three/addons/":"./vendor/jsm/"}}</script>
 </head>
 <body>
+<a class="back-town" href="/" data-testid="back-town">Back to town</a>
 <canvas id="c" aria-label="Nearcarta, a living town. The Lamplighter walks the streets."></canvas>
 <div id="iris" aria-hidden="true"></div>
 <div id="lb" aria-hidden="true"><i></i><i></i></div>
@@ -37,9 +39,8 @@
   <button id="curfewBtn" class="pill ice" type="button" title="Press and hold: freezes your agent so it cannot pay anyone (only your house key can)"><span class="fi"></span><span class="t">Hold to freeze agent</span></button>
 </nav>
 
-<aside id="chron" class="hud" aria-label="Chronicle (testnet)" hidden>
-  <div class="ch"><span class="dot"></span>Chronicle <em>testnet</em></div>
-  <script>if(window.NEARCARTA_PUBLIC_MAINNET){var c=document.getElementById('chron');if(c){c.setAttribute('aria-label','Chronicle (mainnet)');var e=c.querySelector('em');if(e)e.textContent='mainnet';}}</script>
+<aside id="chron" class="hud" aria-label="Chronicle" hidden>
+  <div class="ch"><span class="dot"></span>Chronicle <em>mainnet</em></div>
   <ol id="clist"></ol>
 </aside>
 
@@ -105,7 +106,7 @@ const script=src=>new Promise((res,rej)=>{ const s=document.createElement('scrip
 const pre=h=>{ const l=document.createElement('link'); l.rel='preload'; l.as='fetch'; l.crossOrigin='anonymous'; l.href=h; document.head.appendChild(l); };
 if(q.get('mode')==='2d'||!cap.ok){ if(!q.has('t')) go2d(q.get('mode')==='2d'?'':cap.why); }
 else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpressive.glb'].forEach(pre);
-  script('vendor/gsap/gsap.min.js').then(()=>import(q.has('t')?'./js/test_main.js':q.has('dev')?'./js/main.js':'./dist/main.js')).catch(e=>{ console.error('[Nearcarta] 3D failed to load',e); go2d('3D failed to load'); });
+  script('vendor/gsap/gsap.min.js').then(()=>import(q.has('t')?'./js/test_main.js':'./js/main.js')).catch(e=>{ console.error('[Nearcarta] 3D failed to load',e); go2d('3D failed to load'); });
   if(!force) setTimeout(()=>{ if(!document.body.classList.contains('ready')&&!document.body.classList.contains('fb')){ window.__3dStop='slow start'; go2d('3D did not start within 25 s'); } },25000); }
 </script>
 <script>

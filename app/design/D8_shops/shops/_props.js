@@ -9,7 +9,7 @@ export const M = {
   terra: new THREE.MeshStandardMaterial({ color: 0xa8644a, roughness: .9 }),
 };
 let brass; export const brassM = () => brass ||= new THREE.MeshStandardMaterial({ color: C.accent, metalness: .75, roughness: .32 });
-let glowT; const glow = () => glowT ||= radial(CSS.accent || '#d6b46a');
+let glowT; const glow = () => glowT ||= radial(CSS.accent || '#00ec97');
 export function mesh(scene, geo, mat, [x, y, z] = [0, 0, 0], { rx = 0, ry = 0, rz = 0, cast = true } = {}) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = cast; m.receiveShadow = true; scene.add(m); return m; }
 // a standing or hanging brass lantern; light=false keeps the draw cost down
 export function lantern(scene, x, z, { h = 1.25, light = true, post = true, s = 1 } = {}) {
@@ -23,7 +23,7 @@ export function lantern(scene, x, z, { h = 1.25, light = true, post = true, s = 
   scene.add(g); return g;
 }
 export function candle(scene, x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z);
-  const c = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, .12, 8), new THREE.MeshStandardMaterial({ color: 0xf3ead8, roughness: .9 })); c.position.y = .06; g.add(c);
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, .12, 8), new THREE.MeshStandardMaterial({ color: 0xeef2ff, roughness: .9 })); c.position.y = .06; g.add(c);
   const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .7 })); f.scale.setScalar(.16); f.position.y = .15; g.add(f); scene.add(g); return g; }
 export function rug(scene, x, z, w, d, col = 0x7a3e2c) { const r = mesh(scene, new THREE.BoxGeometry(w, .015, d), new THREE.MeshStandardMaterial({ color: col, roughness: 1 }), [x, .008, z], { cast: false });
   const b = mesh(scene, new THREE.BoxGeometry(w * .86, .018, d * .8), new THREE.MeshStandardMaterial({ color: 0xc89a5a, roughness: 1 }), [x, .01, z], { cast: false }); b.scale.set(1, 1, 1); const in2 = mesh(scene, new THREE.BoxGeometry(w * .8, .02, d * .7), new THREE.MeshStandardMaterial({ color: col, roughness: 1 }), [x, .012, z], { cast: false }); return r; }

@@ -8,13 +8,14 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link id="tokens" rel="stylesheet" href="../D7_system/tokens/tokens.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="/brand/chrome.css">
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","three/addons/":"../D2_game/vendor/jsm/","../D2_game/vendor/three.module.js":"./vendor/three.module.min.js"}}</script>
 </head>
 <body>
 <canvas id="gl" aria-label="The town. Pick a building to enter it."></canvas>
 <header id="top">
   <span id="brand"><img src="/brand/mark.svg" alt="" width="26" height="26"><b>Nearcarta</b></span>
-  <a class="ghost" href="/" data-testid="back-town" aria-label="Return to the city">Return to the city</a>
+  <a class="ghost back-town" href="/" data-testid="back-town">Back to town</a>
   <button id="back" class="ghost" hidden><span aria-hidden="true">←</span> Street</button>
   <button id="wallet" class="ghost wallet" hidden>Sign in</button>
   <button id="snd" class="icon" aria-label="Sound on or off" title="Sound"></button>

@@ -6,7 +6,7 @@ export function tokenIcon(sym, size = 16) {
   const k = tokenKey(sym); if (!k) return '';
   return `<img class="tok" src="/tokens/${FILE[k] || k}.svg" alt="${KNOWN[k]}" width="${size}" height="${size}" loading="lazy" decoding="async">`;
 }
-// Decorate plain text already in the page: "0.01 NEAR", "ZEC", "Base Sepolia" get an icon before the symbol.
+// Decorate plain text already in the page: "0.01 NEAR", "ZEC", "Base" get an icon before the symbol.
 const RX = /(\d[\d.,]*)\s+(NEAR|USDC|USDT|ZEC|TAZ|ETH|BTC|SOL)\b/g;
 export function decorate(root) {
   if (!root) return;

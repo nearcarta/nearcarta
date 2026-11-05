@@ -11,7 +11,7 @@ export const LOOKS = [
   { id: 'scout', name: 'Scout', img: 'rogue', blurb: 'New shops, low budget.', cap: 0.005, daily: 0.01, per: 3 },
 ];
 export const DYES = [
-  { id: 'brass', name: 'Brass', hex: '#d6b46a' },
+  { id: 'brass', name: 'Brass', hex: '#00ec97' },
   { id: 'sea', name: 'Sea', hex: '#7eb8c9' },
   { id: 'wine', name: 'Wine', hex: '#c47b84' },
   { id: 'pine', name: 'Pine', hex: '#7daa78' },
@@ -27,14 +27,14 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 export const displayOk = n => /^[A-Za-z][A-Za-z0-9][A-Za-z0-9 '.-]{0,22}$/.test(String(n || ''));
 
 export function portraitHTML(look, dye, outfit, name) {
-  const hex = HEX.test(dye?.hex || '') ? dye.hex : '#d6b46a';
+  const hex = HEX.test(dye?.hex || '') ? dye.hex : '#00ec97';
   const fit = OUTFITS.some(o => o.id === outfit) ? outfit : 'lantern';
-  const lamp = fit === 'lantern' ? '<svg class="lamp" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 6v6" stroke="#f3ead8" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="16" r="4" fill="#ffc56e"/><circle cx="16" cy="16" r="8" fill="#ffc56e" opacity=".35"/></svg>' : '';
+  const lamp = fit === 'lantern' ? '<svg class="lamp" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 6v6" stroke="#eef2ff" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="16" r="4" fill="#ffc56e"/><circle cx="16" cy="16" r="8" fill="#ffc56e" opacity=".35"/></svg>' : '';
   return `<div class="portrait" data-outfit="${esc(fit)}" style="--dye:${hex}" data-testid="setup-portrait"><span class="glow"></span><img src="/setup/chars/${esc(look?.img || 'mage')}.webp" alt=""><span class="wash"></span>${lamp}<b>${esc(name || look?.name || 'Agent')}</b></div>`;
 }
 
 export function writeHero({ look, dye, outfit, name }) {
-  const hero = { look: look?.id || 'mage', img: look?.img || 'mage', name: String(name || look?.name || 'Agent').slice(0, 24), dye: HEX.test(dye?.hex || '') ? dye.hex : '#d6b46a', outfit: outfit || 'lantern' };
+  const hero = { look: look?.id || 'mage', img: look?.img || 'mage', name: String(name || look?.name || 'Agent').slice(0, 24), dye: HEX.test(dye?.hex || '') ? dye.hex : '#00ec97', outfit: outfit || 'lantern' };
   try { localStorage.setItem(HERO_KEY, JSON.stringify(hero)); } catch { /* private mode */ }
   return hero;
 }

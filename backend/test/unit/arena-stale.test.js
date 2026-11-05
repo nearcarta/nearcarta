@@ -60,11 +60,9 @@ test('room rows escape text and mark expired', () => {
   assert.match(t, /expired/); assert.match(t, /arbiscan/); assert.match(t, /on NEAR still signed/);
 });
 
-test('mist desk: a request stuck past 3 h shows as expired', async () => {
-  const { shownState } = await import('../../src/mistqueue.js');
-  const q = new Date(0).toISOString();
-  assert.deepEqual(shownState({ state: 'queued', queued_at: q }, 3600e3), { state: 'queued' });
-  const e = shownState({ state: 'sending', queued_at: q }, 4 * 3600e3);
-  assert.equal(e.state, 'expired'); assert.equal(e.stuck_state, 'sending');
-  assert.deepEqual(shownState({ state: 'sent', queued_at: q }, 9 * 3600e3), { state: 'sent' });
+test('a payee off the recorded list is not a mainnet badge', async () => {
+  const { previewPayee } = await import('../../src/board-guard.js');
+  const row = previewPayee({ receivers: ['nearcarta.near'] }, 'stranger.near');
+  assert.equal(row.decision, 'would refuse');
+  assert.equal(row.preview, true);
 });

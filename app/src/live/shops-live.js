@@ -1,5 +1,5 @@
 // Live reads for the shop interiors (design/D8_shops imports ../data/live.js; the build puts this file there).
-// Same field mapping as design/D8_shops/tools/snapshot.mjs. Reads the testnet API (window.NEARCARTA_API, then the
+// Same field mapping as design/D8_shops/tools/snapshot.mjs. Reads the mainnet API (window.NEARCARTA_API, then the
 // same origin); if both are down or slow, the last snapshot stays, labelled with the time it was read.
 // Read-only: dry quotes only (no deposit address exists), no keys, no viewing key is copied into the page.
 import * as SNAP from './live.snapshot.js';
@@ -32,7 +32,7 @@ const at = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 const host = R ? (R.b || location.origin).replace(/^https?:\/\//, '') : null;
 const mb = R?.mb, q = R?.q;
 
-export const BANK = mb?.built ? { src: 'testnet', at, live: true,
+export const BANK = mb?.built ? { src: 'mainnet', at, live: true,
   street: { txid: mb.payout.txid, url: mb.payout.explorer, height: mb.street.height, confirmations: mb.street.confirmations, fee: mb.street.fee_zat,
     hidden: mb.street.amount_hidden === true, reasons: mb.street.reasons || [], pool: Object.entries(mb.street.value_balance_zat || {}).find(([, v]) => v !== '0')?.[0] || 'shielded', actions: mb.street.actions },
   oath: { tx: mb.oath.tx, ok: mb.oath.success && mb.oath.decision === 'allowed' && mb.oath.memo_on_chain, clause: mb.oath.clause_id },

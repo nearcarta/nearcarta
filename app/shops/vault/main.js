@@ -24,7 +24,7 @@ async function api(path, opts, retry = !opts) {
   if (!r.ok) throw new Error(j.error || 'http ' + r.status); return j;
 }
 const view = (c, m, a) => viewFn(rpc, c, m, a);
-const txl = (h, label) => h ? `<a class="tx" data-testid="tx" href="${esc(CFG.explorer || 'https://testnet.nearblocks.io')}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(label || short(h))}<span aria-hidden="true">↗</span></a>` : '';
+const txl = (h, label) => h ? `<a class="tx" data-testid="tx" href="${esc(CFG.explorer || 'https://nearblocks.io')}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(label || short(h))}<span aria-hidden="true">↗</span></a>` : '';
 const agentLS = c => 'nearcarta.vault.agent.' + c;
 // A key made for a wallet approval that has not shown up on chain yet. Saved BEFORE signing so a
 // redirect wallet or a closed tab never leaves a live key on chain that nobody holds.
@@ -60,7 +60,7 @@ async function refreshWho() {
 function renderCreate() {
   const box = $('#create');
   if (!me || charter) delete box.dataset.for;
-  if (!me) { box.innerHTML = window.NEARCARTA_PUBLIC_MAINNET ? '<p class="muted">Sign in with your mainnet account. Your charter is a row on the mainnet board.</p>' : '<p class="muted" title="A charter is a NEAR account that holds your agent\'s money and its rules.">Sign in first. A new charter here is a free testnet trial.</p>'; focusCreate(); return; }
+  if (!me) { box.innerHTML = window.NEARCARTA_PUBLIC_MAINNET ? '<p class="muted">Sign in with your mainnet account. Your charter is a row on the mainnet board.</p>' : '<p class="muted" title="A charter is a NEAR account that holds your agent\'s money and its rules.">Sign in first. A new charter here is a mainnet charter.</p>'; focusCreate(); return; }
   if (window.NEARCARTA_PUBLIC_MAINNET) {
     const board = window.__ncBoard;
     const live = board?.status === 'deployed' && board.contract;
@@ -490,7 +490,7 @@ async function loadBoard() {
   const b = await api('/api/vault/leaderboard');
   const net = `<p class="board-net" data-testid="board-net">Visitor charters. Our test accounts stay off this board.</p>`;
   const rows = b.players || [];
-  const proof = p => p.last_tx ? txl(p.last_tx) : (p.charters?.[0] ? `<a href="https://testnet.nearblocks.io/address/${esc(p.charters[0])}" target="_blank" rel="noopener">charter</a>` : '');
+  const proof = p => p.last_tx ? txl(p.last_tx) : (p.charters?.[0] ? `<a href="https://nearblocks.io/address/${esc(p.charters[0])}" target="_blank" rel="noopener">charter</a>` : '');
   $('#board').innerHTML = rows.length ? net + `<div class="board-scroll"><table data-testid="board"><thead><tr><th>#</th><th>Nickname</th><th>Character</th><th>Score</th><th>Tx</th></tr></thead><tbody>
     ${rows.map((p, i) => `<tr><td>${i + 1}</td><td><b>${esc(p.nickname || whoName(p.player))}</b></td><td>${esc(p.character || p.nickname || '')}</td>
     <td><b>${p.score}/${p.max_score}</b></td><td>${proof(p)}</td></tr>`).join('')}</tbody></table></div>`
@@ -506,7 +506,7 @@ function showTab(id) {
 let booted; const boot = new Promise((ok, no) => { booted = { ok, no }; }); boot.catch(() => {});
 // Connect opens the branded setup flow; NEAR Connect keeps the session in this browser, so it is live here on return.
 $('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
-const guestBtn = $('#guest'); if (guestBtn) guestBtn.onclick = async () => { busy(guestBtn, true, 'Asking the testnet faucet…'); try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { fail(e); } finally { busy(guestBtn, false); } };
+const guestBtn = $('#guest'); if (guestBtn) guestBtn.hidden = true;
 
 async function main() {
   CFG = await api('/api/vault/config').catch(e => { booted.no(e); throw e; });
@@ -523,7 +523,7 @@ async function main() {
   for (const r of document.querySelectorAll('input[name=target]')) r.onchange = () => setTarget(r.value);
   $('#nick').value = defaultNick();
   $('#ask-form').onsubmit = e => ask(e).catch(fail);
-  const badge = $('#net'); if (badge) { badge.textContent = window.NEARCARTA_PUBLIC_MAINNET ? 'mainnet' : ((CFG.network === 'mainnet' ? 'mainnet' : (CFG.network || 'testnet') + ' trial')); badge.classList.toggle('trial', !window.NEARCARTA_PUBLIC_MAINNET && CFG.network !== 'mainnet'); }
+  const badge = $('#net'); if (badge) { badge.textContent = window.NEARCARTA_PUBLIC_MAINNET ? 'mainnet' : ((CFG.network === 'mainnet' ? 'mainnet' : (CFG.network || 'mainnet') + ' trial')); badge.classList.toggle('trial', !window.NEARCARTA_PUBLIC_MAINNET && CFG.network !== 'mainnet'); }
   api('/api/agent/budget').then(b => { const el = $('#infer'); if (!el || !b?.limit_usd) return; el.textContent = `Model jobs today: ${b.calls} of ${b.limit_calls}, $${b.usd} of $${b.limit_usd}. Each job is at most ${b.max_tokens} tokens and is not sent past the cap. The NEAR it can move is the charter's cap.`; }).catch(() => {});
   fetch((API) + '/api/mainnet').then(r => r.json()).then(m => {
     window.__ncBoard = m?.board || null;
@@ -534,7 +534,7 @@ async function main() {
         : `The mainnet board is not deployed yet. ${c}, the toll, the arena, the house and the town hall are on mainnet.`;
       const guest = $('#guest'); if (guest) guest.hidden = true;
       if (badge) { badge.textContent = 'mainnet'; badge.classList.remove('trial'); }
-    } else note.textContent = `A charter you create here is a free testnet trial. ${c}, the toll, the arena, the house and the town hall are on mainnet.`;
+    } else note.textContent = `A charter you create here is a mainnet charter. ${c}, the toll, the arena, the house and the town hall are on mainnet.`;
     renderCreate();
   }).catch(() => {});
   const factoryLine = $('#factory');
@@ -549,7 +549,7 @@ async function main() {
   connector.on('wallet:signIn', () => refreshWho().then(signedIn).catch(fail));
   booted.ok();
   connector.on('wallet:signOut', () => { charter = null; ready = false; refreshWho().catch(fail); });
-  $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its testnet NEAR is lost.')) forgetGuest(); charter = null; ready = false; await refreshWho(); };
+  $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); charter = null; ready = false; await refreshWho(); };
   await refreshWho(); await loadBoard().catch(e => { $('#board').textContent = e.message; });
 }
 main().catch(fail);

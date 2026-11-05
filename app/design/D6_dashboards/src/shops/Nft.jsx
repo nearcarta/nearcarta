@@ -31,14 +31,14 @@ export default function NftView() {
             <div style={{ animation: 'enter .6s var(--ease) both', boxShadow: '0 20px 40px -20px rgba(0,0,0,.6)', borderRadius: 16, border: '1px solid var(--c-line-2)' }}><Deed size={190} /></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
               <div><div className="sub">Token</div><div style={{ fontWeight: 650, fontSize: 16 }}>Workshop deed #07</div></div>
-              <div><div className="sub">Contract</div><div className="mono">deeds.sample.testnet</div></div>
+              <div><div className="sub">Contract</div><div className="mono">house.nearcarta.near</div></div>
               <div><div className="sub">Standard</div><div className="mono">NEP-171</div></div>
               <div><div className="sub">Price asked</div><Amt v="2.0" size={16} net="near" /></div>
             </div>
           </div>
           <div className="divider" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="chip"><Lamplighter size={14} />House</span><ArrowRight size={14} className="t3" /><span className="chip mono">buyer.sample.testnet</span>
+            <span className="chip"><Lamplighter size={14} />House</span><ArrowRight size={14} className="t3" /><span className="chip mono">nearcarta.near</span>
             <span style={{ marginLeft: 'auto' }}><Dot tone="neu">Not started</Dot></span>
           </div>
         </Card>
@@ -50,13 +50,13 @@ export default function NftView() {
             { s: 'plan', n: 3, t: 'Oath checks and emits an event', d: 'Same NEP-297 action / settle events as every other shop', r: <Dot tone="neu">Not run</Dot> },
             { s: 'plan', n: 4, t: 'Buyer owns the token', d: 'nft_token view shows the new owner; the Chronicle links both txs', r: <Dot tone="neu">Not run</Dot> },
           ]} />
-          <Note icon={Hammer}>To build: an <span className="mono">nft_transfer</span> payload kind in the oath, a clause type that binds receiver to the payer, and a testnet run. Until then this page stays a preview.</Note>
+          <Note icon={Hammer}>To build: an <span className="mono">nft_transfer</span> payload kind in the oath, a clause type that binds receiver to the payer, and a mainnet run. Until then this page stays a preview.</Note>
         </Card>
 
         <Card className="s12" title="Clause draft" icon={ScrollText} right={<Ev src="preview" />}>
           <pre className="code">{`clause "nft" {
   kind              = nft_transfer        // NEP-171, not supported by the deployed oath yet
-  token_contracts   = ["deeds.sample.testnet"]
+  token_contracts   = ["house.nearcarta.near"]
   receiver          = payer_of(settled_payment)
   per_action        = 1 token
   per_day           = 3 tokens

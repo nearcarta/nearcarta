@@ -7,7 +7,13 @@ description = "build output and a minified third-party parser (token class names
 paths = ['''(^|/)target/''', '''^app/dist/''', '''vendor/jsm/libs/chevrotain\.module\.min\.js$''']
 
 [[allowlists]]
-description = "public NEAR testnet tx hashes (base58, 43-44 chars) in the deployments file"
+description = "public NEAR tx hashes (base58, 43-44 chars) in the readme, docs, deployments and judges notes. A 64-byte key is about 88 chars and stays flagged."
+paths = ['''^README\.md$''', '''^docs/.*\.md$''', '''^shared/deployments/.*\.json$''', '''^judges/''']
+regexTarget = "match"
+regexes = ['''\b[1-9A-HJ-NP-Za-km-z]{43,44}\b''']
+
+[[allowlists]]
+description = "public NEAR tx hashes (base58, 43-44 chars) in the deployments file"
 regexTarget = "line"
 regexes = ['''^\s*"[a-z0-9_]+": "[1-9A-HJ-NP-Za-km-z]{43,44}",?$''']
 

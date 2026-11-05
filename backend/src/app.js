@@ -13,20 +13,17 @@ import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
 import { attested } from './outlayer.js';
 import * as mist from './mistbank.js';
-import * as mq from './mistqueue.js';
 import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
-import * as guest from './guest.js';
+import { issuePass } from './toll-pass.js';
+import { verifyPropose } from './board-tx.js';
+import { mainnetChronicle } from './board-chronicle.js';
+import { previewOwner } from './board-guard.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
-import { payroll } from './payroll.js';
 import * as cp from './counterparty.js';
 import { view, rpcStats } from './near.js';
-import { verifyBoardPayment } from './board-tx.js';
-import { checkPayee as boardPayee } from './board-guard.js';
-import { issuePass } from './toll-pass.js';
-import { mainnetChronicle } from './board-chronicle.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 import { pastPrompts as arenaPrompts } from './arena.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
@@ -95,7 +92,7 @@ export async function deepHealth() {
       routes[name] = { ok: v != null, ms: Date.now() - t0 };
     } catch (e) { routes[name] = { ok: false, ms: Date.now() - t0, error: String(e.message).slice(0, 160) }; }
   }));
-  const value = { routes_ok: Object.values(routes).every(r => r.ok), routes, rpc: { ...rpcStats, primary: cfg.rpc, fallback_urls: cfg.rpcFallbacks } };
+  const value = { routes_ok: Object.values(routes).every(r => r.ok), routes, rpc: { ...rpcStats, primary: cfg.mainnetRpc, fallback_urls: cfg.rpcFallbacks.filter(u => !/testnet/i.test(u)) } };
   deepCache = { at: Date.now(), value };
   return value;
 }
@@ -143,7 +140,7 @@ export const WARM_DELAY_MS = Number(process.env.WARM_DELAY_MS ?? 3_000);
 // Reads run one at a time; the first tick waits WARM_DELAY_MS after boot so the health check is answered first.
 export function warm({ every = WARM_EVERY_MS, read, delay = read ? 0 : WARM_DELAY_MS } = {}) {
   let tick = 0, stopped = false, t = null;
-  const jobs = () => [() => shops.refreshHealth(), () => vault.refreshRunnerStatus(),
+  const jobs = () => [() => shops.refreshHealth(),
     () => shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
     ...(read ? [] : [() => reads.guardhouse(), () => reads.mistbank(), () => reads.townhall(), tick++ % 2 === 0 ? () => arenaPromptsSwr() : () => ledgerSwr()])];
   const once = async () => { const out = []; for (const j of jobs()) { if (stopped) break; try { out.push({ status: 'fulfilled', value: await j() }); } catch (e) { out.push({ status: 'rejected', reason: e }); } } return out; };
@@ -176,11 +173,9 @@ export function makeApp() {
   // ?deep=1 runs every read route's handler (not the AI or quote routes, which spend credits) and reports
   // each one's status and time, plus the RPC retry/fallback/stale counters.
   app.get('/api/health', (c, next) => c.req.query('deep') ? deepLimit(c, next) : next(), limiter(60), async c => {
-    const publicMainnet = process.env.NEXT_PUBLIC_MAINNET === '1' || process.env.NEXT_PUBLIC_NEAR_NET === 'mainnet';
     const near = c.req.query('deep') ? await shops.health() : shops.healthCached();
     return c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: { contracts: MAINNET_DEP?.status === 'deployed' ? 'mainnet' : null, journey: 'mainnet' }, near,
-      ...(publicMainnet ? {} : { trial: shops.trialHealthCached() }),
-      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: c.req.query('deep') ? await vault.runnerStatus() : vault.runnerStatusCached() });
+      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: { enabled: false, charter: MAINNET_DEP?.extras?.arena?.contract || null } });
   });
   // Shows the caller how Render keys their own request, with no address in the answer: which header decides
   // the client key, a short keyed tag of that key (the same client gets the same tag until the process
@@ -195,7 +190,7 @@ export function makeApp() {
     for (const n of IP_HEADERS) if (raw.get(n)) seen[n] = n === 'x-vercel-ip-country' ? 'set' : `${raw.get(n).split(',').length} hop(s)`;
     return c.json({ client_ip_from: from, client_tag: ipTag(ip), shared_cap: egress ? 'egress:' + ipTag(egress) : null, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
-  app.get('/api/deployments', limiter(30), c => c.json(DEP));
+  app.get('/api/deployments', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
   app.get('/api/mainnet', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
   app.get('/api/receipts', limiter(30), c => c.json(receiptsBody(MAINNET_DEP || {}, agentMod.budgetStatus(), { jobTokens: agentMod.MAX_TOKENS, checkouts: checkout.listCheckoutReceipts() })));
 
@@ -251,20 +246,16 @@ export function makeApp() {
     try { return c.json(zcashRecipient(c.req.param('addr'))); } catch { return bad(c, 'not a valid Zcash address'); }
   });
 
-  // Ferry deposit and status tracker (ENV=TIDEPOOL: community testnet, not 1Click). Any deposit address from a
-  // Tidepool quote; the answer carries the status, refund amount and reason, and the verifier code-hash check.
   app.get('/api/ferry/status', limiter(30), async c => {
-    const env = (c.req.query('env') || 'TIDEPOOL').toUpperCase();
-    try {
-      if (env === 'ONECLICK') return c.json(await checkout.oneClickStatus(c.req.query('depositAddress')));
-      if (env !== 'TIDEPOOL') return bad(c, 'env must be TIDEPOOL or ONECLICK');
-      return c.json(await ferry.tidepoolStatus(c.req.query('depositAddress')));
-    } catch (e) { return c.json({ error: e.message }, e.status || 502); }
+    try { return c.json(await checkout.oneClickStatus(c.req.query('depositAddress'))); }
+    catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
-  app.get('/api/ferry/tidepool', limiter(20), c => c.json(DEP.ferry_tidepool ? { ...DEP.ferry_tidepool, label: ferry.TIDEPOOL.label } : { error: 'none' }, DEP.ferry_tidepool ? 200 : 404));
 
   // Guardhouse
-  app.get('/api/payouts/usdc', limiter(30), edgeCache(15), async c => c.json(await payroll()));
+  app.get('/api/payouts/usdc', limiter(30), edgeCache(15), c => c.json({
+    network: 'mainnet', mode: 'one at a time, not all-or-nothing', max_steps: 3, per_payment_near: '0.005', daily_near: '0.01', usdc: null,
+    note: 'No USDC payroll has been paid. Each payment is a board propose inside the row cap.',
+  }));
   app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
@@ -295,8 +286,6 @@ export function makeApp() {
   // Counterparty check before a payment: allow / warn / block with reasons (backend/src/counterparty.js).
   // ?charter= must be a Nearcarta charter (served or made by the factory), so this never views arbitrary contracts.
   const cpCache = new Map();
-  // A visitor's own board row: a view of the allowlist, plus the sealed deny list they hold off chain.
-  app.get('/api/guardhouse/board', limiter(20), async c => c.json(await boardPayee({ visitor: c.req.query('visitor'), payee: c.req.query('payee'), deny: c.req.query('deny') })));
   app.get('/api/guardhouse/check/:account', limiter(12), async c => {
     const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
     const charter = c.req.query('charter') || DEP.guardhouse.oath;
@@ -322,30 +311,16 @@ export function makeApp() {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
     return c.json(mist.verifyOpening(b.amount, b.salt));
   });
-  // Mainnet NEAR leg (a board propose of at most 0.005) plus the Zcash testnet leg, checked the same way as the street.
+  app.get('/api/mistbank/verify', c => c.json({ error: 'POST {"amount":"<zatoshi>","salt":"<32 hex>"}; the opening is auditor-only and never goes in a URL' }, 405));
   app.post('/api/mistbank/mainnet', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    const near = await verifyBoardPayment({ hash: b.tx, visitor: b.visitor, payee: b.payee, amount: b.amount });
-    const zcash = mist.streetCheck(await mist.fetchStreet(b.zcash_txid));
-    return c.json({ network: { near: 'mainnet', zcash: 'testnet' }, near, zcash });
-  });
-  app.get('/api/mistbank/verify', c => c.json({ error: 'POST {"amount":"<zatoshi>","salt":"<32 hex>"}; the opening is auditor-only and never goes in a URL' }, 405));
-  // Per-visitor private send: verify the charter approval and queue it. The box worker holds the Zcash
-  // key, sends after a random delay and reports back the txid + commitment only (src/mistqueue.js).
-  app.get('/api/mistbank/send', limiter(20), c => c.json(mq.info()));
-  app.post('/api/mistbank/send/prepare', limiter(20), async c => {
-    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    return c.json(mq.prepare(b.ua));
-  });
-  app.post('/api/mistbank/send', limiter(mq.LIMITS.per_ip_per_hour, 3600e3), async c => {
-    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    return c.json(await mq.enqueue(b), 202);
-  });
-  app.get('/api/mistbank/send/:id', limiter(30), c => c.json(mq.status(c.req.param('id'))));
-  app.post('/api/mistbank/worker/sync', limiter(10), async c => {
-    if (!mq.workerAuth(c.req.header('authorization'))) return c.json({ error: 'unauthorized' }, 401);
-    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    return c.json(mq.sync(b.records));
+    if (!HASH.test(b.tx || '')) return bad(c, 'tx must be a hash');
+    if (!ACCT.test(b.signer || '')) return bad(c, 'signer must be an account');
+    try {
+      const j = await verifyPropose(b.tx, b.signer, b.payee ? { expectReceiver: b.payee } : {});
+      if (!j.ok) return c.json({ error: j.error }, j.status || 400);
+      return c.json({ network: 'mainnet', ...j });
+    } catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
   app.get('/api/mistbank/street/:txid', limiter(10), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
   app.get('/api/townhall', limiter(20), async c => c.json(await reads.townhall()));
@@ -361,34 +336,25 @@ export function makeApp() {
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
-  // Mainnet gate: one 0.001 board propose to toll.nearcarta.near, then a short-lived signed pass. No testnet gate contract.
   app.post('/api/toll/mainnet', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    try { return c.json(await issuePass({ visitor: b.visitor, tx: b.tx })); }
-    catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; }
-  });
-  app.get('/api/toll/gate/:nonce', limiter(60), tg(c => tollgate.visit(c.req.param('nonce'))));
-  // Guest fallback when the public faucet rate-limits a visitor (backend/src/guest.js)
-  app.get('/api/guest', limiter(30), c => c.json(guest.guestInfo()));
-  app.post('/api/guest', limiter(2, 3600e3, { persist: 'guest-ip' }), async c => {
-    try { return c.json(await guest.createGuest(await c.req.json().catch(() => ({})))); }
+    if (!HASH.test(b.tx || '')) return bad(c, 'tx must be a hash');
+    if (!ACCT.test(b.signer || '')) return bad(c, 'signer must be an account');
+    try { return c.json(await issuePass({ hash: b.tx, signer: b.signer })); }
     catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
-  // Public relays spend the settler's testnet gas: per-client limits plus a town-wide cap per minute and per day.
-  const relayMin = globalCap('toll-relay', Number(process.env.CAP_TOLL_RELAY_PER_MIN || 20)), relayDay = globalCap('toll-relay-day', Number(process.env.CAP_TOLL_RELAY_PER_DAY || 400), 24 * 3600e3);
-  app.post('/api/toll/gate/settle-due', limiter(6), relayMin, relayDay, tg(() => tollgate.settleDue()));
-  app.post('/api/toll/gate/:nonce/broadcast', limiter(10), relayMin, relayDay, tg(c => tollgate.broadcast(c.req.param('nonce'))));
-  app.post('/api/toll/gate/:nonce/settle', limiter(10), relayMin, relayDay, tg(c => tollgate.settleOne(c.req.param('nonce'))));
+  app.get('/api/guardhouse/board', limiter(20), async c => {
+    const owner = c.req.query('owner') || '';
+    const payee = c.req.query('payee') || '';
+    if (!ACCT.test(owner) || !ACCT.test(payee)) return bad(c, 'owner and payee must be account ids');
+    try { return c.json(await previewOwner(owner, payee)); }
+    catch (e) { return c.json({ error: e.message }, e.status || 502); }
+  });
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
   app.get('/api/chronicle', limiter(120), edgeCache(15), async c => {
-    if (c.req.query('net') === 'mainnet') {
-      const owner = c.req.query('owner') || '';
-      if (!ACCT.test(owner) || owner.length > 64) return bad(c, 'owner must be an account id');
-      const known = String(c.req.query('known') || '').split(',').filter(h => HASH.test(h)).slice(0, 15);
-      return c.json(await mainnetChronicle({ owner, known, limit: Math.min(Number(c.req.query('limit') || 12), 25) }));
-    }
+    if (c.req.query('net') === 'mainnet') return c.json(mainnetChronicle(c.req.query('owner') || ''));
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
     try { return c.json(shops.hideRetired(await shops.chronicle(DEP.guardhouse.oath, limit))); }
     catch (e) {

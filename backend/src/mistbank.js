@@ -133,7 +133,7 @@ let cache = { at: 0, v: null };
 export async function mistbank({ fresh = false } = {}) {
   if (!fresh && cache.v && Date.now() - cache.at < 60e3) return cache.v;
   const p = proof();
-  if (!p) return { built: false, reason: 'no payout recorded yet (run backend/scripts/mistbank-record.js)' };
+  if (!p || /testnet/i.test(JSON.stringify(p.network || ''))) return { built: false, network: 'mainnet', note: 'A Mist Bank payment is a board propose of at most 0.005 NEAR. POST /api/mistbank/mainnet with the tx hash. The TEE check is GET /api/ai/tee.' };
   const [street, oath, deskBasic] = await Promise.all([
     fetchStreet(p.payout.txid).then(streetCheck).catch(e => ({ error: e.message })),
     oathCheck(p).catch(e => ({ error: e.message })),

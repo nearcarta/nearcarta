@@ -1,34 +1,27 @@
-// Off-chain payee check for a visitor's board row. A view only: get_charter, then the
-// same two refusals the wasm would raise. Nothing is signed and nothing is spent.
-import { cfg } from './config.js';
+// Preview only: would this payee pass the visitor's row. Nothing is signed.
+import { reasonLabel } from '../../shared/net/reasons.js';
+import { MAINNET_DEP } from './config.js';
 import { view } from './near.js';
-import { BOARD } from './board-tx.js';
 
-const ACCOUNT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
-const err = (status, message) => Object.assign(new Error(message), { status });
-let readImpl = view;
-export const _setRead = fn => { readImpl = fn || view; };
+export const BOARD = MAINNET_DEP?.board?.contract || 'board.nearcarta.near';
 
-export function refusalFor(charter, payee, deny = []) {
-  if (!charter) return { ok: false, reason: 'no_charter', sealed: false, network: 'mainnet' };
-  const allow = charter.receivers || [];
-  const sealed = !!charter.sealed;
-  if (!allow.includes(payee)) return { ok: false, reason: 'receiver_not_allowlisted', sealed, network: 'mainnet' };
-  if (sealed && deny.includes(payee)) return { ok: false, reason: 'hidden_rule_receiver', sealed: true, network: 'mainnet' };
-  return { ok: true, reason: null, sealed, network: 'mainnet' };
+export function previewPayee(charter, payee) {
+  if (!payee || String(payee).includes('.testnet')) {
+    return { preview: true, found: false, payee, decision: 'would refuse', reason: 'receiver must be a mainnet account', label: 'Refused' };
+  }
+  if (!charter) return { preview: true, found: false, payee, decision: 'would refuse', reason: 'no row', label: 'No row on the board' };
+  const list = charter.receivers || [];
+  const on = list.includes(payee);
+  const reason = on ? null : 'receiver_not_allowlisted';
+  return {
+    preview: true, found: true, payee, receivers: list, sealed: !!charter.sealed,
+    decision: on ? 'would allow' : 'would refuse', reason,
+    label: on ? 'On your list' : reasonLabel(reason),
+    seal_note: charter.sealed ? 'A sealed rule is checked when the payment is proposed. This line is a preview of the list only.' : null,
+  };
 }
 
-export function parseDeny(raw) {
-  if (raw == null || raw === '') return [];
-  const list = Array.isArray(raw) ? raw : String(raw).split(',');
-  return list.map(s => String(s).trim()).filter(Boolean);
-}
-
-export async function checkPayee({ visitor, payee, deny = [], board = BOARD, rpc = cfg.mainnetRpc, read = view } = {}) {
-  if (!ACCOUNT.test(String(visitor)) || String(visitor).length > 64) throw err(400, 'visitor must be an account id');
-  if (!ACCOUNT.test(String(payee)) || String(payee).length > 64) throw err(400, 'payee must be an account id');
-  const hidden = parseDeny(deny);
-  if (hidden.length > 8 || hidden.some(a => !ACCOUNT.test(a))) throw err(400, 'deny must be up to 8 account ids');
-  const charter = await (read === view ? readImpl : read)(board, 'get_charter', { owner: visitor }, rpc);
-  return { visitor, payee, board, ...refusalFor(charter, payee, hidden) };
+export async function previewOwner(owner, payee, read = view) {
+  const charter = await read(BOARD, 'get_charter', { owner });
+  return { owner, board: BOARD, ...previewPayee(charter, payee) };
 }
