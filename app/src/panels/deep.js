@@ -12,6 +12,7 @@ import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
 import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
+import { nearOf, normalizeRow } from './hall.js';
 import { boundaryHtml } from './boundary.js';
 import { shortId } from './hall-ui.js';
 
@@ -450,19 +451,39 @@ function mountBank(root, hooks) {
   };
 }
 
-function mountHouse(root) {
-  root.innerHTML = `<div id="house"><p class="note">The town house is on mainnet. This page reads it. It does not hold a key.</p><div class="out">${deedMarkup()}</div></div>`;
-  import('/house.bundle.js').then(m => m.mountHouse()).catch((e) => {
-    const out = root.querySelector('.out');
-    if (!out || out.querySelector('[data-testid=house-state]')) return;
-    const note = document.createElement('p');
-    note.dataset.testid = 'room-boundary';
-    note.setAttribute('role', 'alert');
-    note.textContent = /no house/i.test(String(e?.message || e))
-      ? 'The house read did not return a row. The deed above is the public record. Nothing was signed.'
-      : roomError(e);
-    out.appendChild(note);
-  });
+export function houseCharterMarkup({ accountId = '', row = null, failed = false } = {}) {
+  if (row && row.per_action_cap != null && row.per_action_cap !== '') {
+    const cap = nearOf(row.per_action_cap);
+    const owner = accountId || row.owner || '';
+    return `<div class="house-state" data-testid="house-state" role="status"><p>This account has a charter row on the board.</p><p>Max per payment <b data-testid="house-cap">${esc(cap)}</b> NEAR.</p><p>The next step is Town Hall, where that cap can be changed. Nothing was signed here.</p><p><a class="primary" href="/shops/hall/?owner=${encodeURIComponent(owner)}">Open Town Hall</a></p></div>`;
+  }
+  if (failed) {
+    return `<div class="house-empty" data-testid="house-empty" role="status"><p>The charter read did not answer.</p><p>Try again in a moment. The buttons above are the public deed record. Nothing was signed.</p></div>`;
+  }
+  if (accountId) {
+    return `<div class="house-empty" data-testid="house-empty" role="status"><p>No charter row for this account yet.</p><p>Open a row in setup. This page reads it with get_charter. The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Open a row</a></p></div>`;
+  }
+  return `<div class="house-empty" data-testid="house-empty" role="status"><p>Sign in to read your charter row.</p><p>The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Sign in</a></p></div>`;
+}
+
+function mountHouse(root, hooks = {}) {
+  const who = typeof hooks.visitor === 'function' ? hooks.visitor() : visitor();
+  const params = new URLSearchParams(globalThis.location?.search || '');
+  const id = params.get('owner') || who.accountId || '';
+  root.innerHTML = `<div id="house"><p class="note">The town house is on mainnet. This page reads your charter row. It does not hold a key.</p><div class="out">${deedMarkup()}<div data-testid="house-read"></div></div></div>`;
+  const slot = root.querySelector('[data-testid=house-read]');
+  if (!id) {
+    slot.innerHTML = houseCharterMarkup({});
+    return;
+  }
+  slot.innerHTML = `<div class="house-state" data-testid="house-state" role="status"><p>Reading the charter row…</p></div>`;
+  const load = hooks.row
+    ? Promise.resolve(hooks.row)
+    : fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
+      .then(r => r.json())
+      .then(body => normalizeRow(body));
+  load.then(row => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, row }); })
+    .catch(() => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, failed: true }); });
 }
 
 const ALIAS = { guardhouse: 'guard', townhall: 'hall', mist: 'bank', mistbank: 'bank' };
