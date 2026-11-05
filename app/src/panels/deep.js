@@ -197,14 +197,14 @@ function mountChronicle(root, hooks) {
     const q = queryFeed(rows(), { q: state.cq || '', decision: state.cd || '', page: state.cp || 1 });
     const ol = q$(root, '[data-testid=chronicle-page]');
     if (ol) {
-      ol.innerHTML = q.rows.map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(x.label || x.reason || '') : '✓ ' + esc(x.decision)}</span><button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button></li>`).join('') || '<li>Nothing yet</li>';
+      ol.innerHTML = q.rows.map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(x.label || x.reason || '') : '✓ ' + esc(x.decision)}</span><button type="button" class="primary c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button></li>`).join('') || '<li>Nothing yet</li>';
       ol.dataset.total = String(q.total);
     }
     const pages = q$(root, '[data-testid=chronicle-pages]');
     if (pages) pages.textContent = `${q.page} / ${q.pages}`;
   };
   const verifyHtml = () => `${esc(state.verify || '')}${state.verifyUrl ? ` <a data-testid="chronicle-link" href="${esc(state.verifyUrl)}">explorer</a>` : ''}`;
-  root.innerHTML = `<div class="shop-stack"><label class="field">Search <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}"></label><label class="field">Decision <select id="c-d" data-testid="chronicle-filter"><option value="">All</option><option value="allowed">Allowed</option><option value="denied">Refused</option></select></label><ol class="feed" data-testid="chronicle-page"></ol><p data-testid="chronicle-pages"></p><div class="btns"><button type="button" id="c-prev">Previous</button><button type="button" id="c-next">Next</button><button type="button" id="c-csv" data-testid="chronicle-export">Export</button></div><p id="c-out" data-testid="chronicle-verify">${verifyHtml()}</p></div>`;
+  root.innerHTML = `<div class="shop-stack"><label class="field">Search <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}"></label><label class="field">Decision <select id="c-d" data-testid="chronicle-filter"><option value="">All</option><option value="allowed">Allowed</option><option value="denied">Refused</option></select></label><ol class="feed" data-testid="chronicle-page"></ol><p data-testid="chronicle-pages"></p><div class="btns"><button type="button" class="primary" id="c-prev">Previous</button><button type="button" class="primary" id="c-next">Next</button><button type="button" class="primary" id="c-csv" data-testid="chronicle-export">Export</button></div><p id="c-out" data-testid="chronicle-verify">${verifyHtml()}</p></div>`;
   const filter = q$(root, '#c-d');
   if (state.cd) filter.value = state.cd;
   draw();
