@@ -492,17 +492,27 @@ export async function reputation(charter = S.charter) {
 export async function teeCheck(nonce) {
   const r = await api('/api/ai/tee?nonce=' + nonce);
   const g = r.gateway || {}, m = (r.models || [])[0] || {}, both = k => !!g.checks?.[k] && !!m.checks?.[k];
+  const quoteOk = both('quote') && g.tcbStatus === 'UpToDate' && m.tcbStatus === 'UpToDate';
+  const configOk = both('configBound') && both('composeEvent');
+  const rtmrOk = both('rtmr3');
+  const gpuOk = !!m.gpu?.ok;
+  const quoteWhy = quoteOk ? `dcap-qvl · TCB ${g.tcbStatus || '?'} / ${m.tcbStatus || '?'}` : (g.error || m.error || r.failure || `TCB ${g.tcbStatus || 'missing'} / ${m.tcbStatus || 'missing'}`);
   // One row per check, true only when both the gateway and the model report pass it (backend/src/tee.js does the verifying).
-  const rows = [
-    ['Intel TDX quotes verified', both('quote') && g.tcbStatus === 'UpToDate' && m.tcbStatus === 'UpToDate', `dcap-qvl · TCB ${g.tcbStatus || '?'} / ${m.tcbStatus || '?'}`],
-    ['Debug mode off', both('debugOff'), 'gateway and model'],
-    ['Your nonce is in the quote', both('nonceBound') && both('echoedNonce') && r.nonce === nonce, `sent ${nonce.slice(0, 8)}…${nonce.slice(-4)} · back ${String(r.nonce || '—').slice(0, 8)}…${String(r.nonce || '').slice(-4)}`],
-    ['Signing key bound to the quote', both('signerBound'), String(m.signing_address || '').slice(0, 12) + '…'],
-    ['App config measured', both('configBound') && both('composeEvent'), 'compose ' + String(m.composeHash || '').slice(0, 10) + '…'],
-    ['Event log replays RTMR3', both('rtmr3'), `${g.rtmr3Events ?? '?'} + ${m.rtmr3Events ?? '?'} events`],
-    ['NVIDIA GPUs attested', !!m.gpu?.ok, `${m.gpu?.gpus ?? 0} GPUs`],
-  ];
-  return { ok: !!r.ok && r.nonce === nonce && rows.every(x => x[1]), model: r.model, at: r.checkedAt, checks: g.checks || {}, rows, nonce };
+  const rows = !r.models?.length
+    ? [['Model attestation', false, r.failure || r.error || 'NEAR AI returned no model report']]
+    : !quoteOk
+      ? [['Intel TDX quote', false, quoteWhy]]
+      : [
+        ['Intel TDX quote', true, quoteWhy],
+        ['Debug mode off', both('debugOff'), both('debugOff') ? 'gateway and model' : 'TDX debug mode is on'],
+        ['Your nonce is in the quote', both('nonceBound') && both('echoedNonce') && r.nonce === nonce, `sent ${nonce.slice(0, 8)}…${nonce.slice(-4)} · back ${String(r.nonce || '—').slice(0, 8)}…${String(r.nonce || '').slice(-4)}${r.nonce === nonce ? '' : ' · does not match'}`],
+        ['Signing key bound', both('signerBound'), both('signerBound') ? String(m.signing_address || '').slice(0, 12) + '…' : 'The signing address is not bound to the quote'],
+        ['App config measured', configOk, configOk ? 'compose ' + String(m.composeHash || '').slice(0, 10) + '…' : (String(g.error || '').startsWith('config') ? g.error : 'MRCONFIGID does not match the measured config')],
+        ['Event log replays RTMR3', rtmrOk, rtmrOk ? `${g.rtmr3Events ?? '?'} + ${m.rtmr3Events ?? '?'} events` : (String(g.error || '').startsWith('rtmr3') ? g.error : 'The event log does not match RTMR3')],
+        ['NVIDIA GPU attestation', gpuOk, gpuOk ? `${m.gpu?.gpus ?? 0} GPUs` : (m.gpu?.why || 'The GPU verdict did not pass')],
+      ];
+  const failed = rows.find(x => !x[1]);
+  return { ok: !!r.ok && r.nonce === nonce && rows.every(x => x[1]), model: r.model, at: r.checkedAt, checks: g.checks || {}, rows, nonce, failure: failed ? `${failed[0]}: ${failed[2]}` : '' };
 }
 export const teeFresh = () => teeCheck(Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join(''));
 export const payoutLeft = () => P.leftToday(pay(), S.usage.pay);
