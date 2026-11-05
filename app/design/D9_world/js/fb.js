@@ -3,7 +3,7 @@
 // proof drawer as in 3D (#shopUI). Nothing leaves this page. Pins are % of the 1920x1080 still (object-fit:cover crop).
 const $=s=>document.querySelector(s); const body=document.body;
 const D8=new URL('../../D8_shops/',import.meta.url).href;
-const NAMES={ guard:'Guardhouse', ferry:'Ferry', hall:'Town Hall', bank:'Mist Bank', arena:'Vault Arena', toll:'Toll Bridge', chronicle:'Chronicle', house:'Your House', payouts:'Payouts' };
+import { NAME as NAMES } from '../../D8_shops/js/names.js';
 const END={ guard:['no','Refused · not on the list'], ferry:['ok','Downgrade refused · crossed shielded'], hall:['ok','Passed · 2 votes'] };
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let started=false;

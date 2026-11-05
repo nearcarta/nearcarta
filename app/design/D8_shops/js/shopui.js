@@ -5,6 +5,7 @@ import { ruleChip as ruleChipText } from './rules-default.js';
 import { receipt } from './receipt.js';
 import { watch as watchTokens } from './tokens.js';
 import { maybeOnboard } from './onboard.js';
+import { readSessionAccount, tollRefusal } from './session.js';
 const yOf = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const { esc, fmt, short } = A;
 
@@ -48,7 +49,8 @@ function ruleChip() {
   b.hidden = !A.S.charter; b.textContent = r.text; b.title = r.title; b.dataset.changed = r.changed ? '1' : ''; b.dataset.testid = 'rules-chip';
 }
 const HOSTED = () => document.body.dataset.host === 'd9'; // inside the town page the HUD owns #wallet
-const wallet = () => { const w = HOSTED() ? null : $('#wallet'); if (!w) return; w.textContent = A.S.me ? short(A.S.me, 10, 8) : 'Sign in'; w.classList.toggle('on', !!A.S.me); };
+const who = () => A.S.me || readSessionAccount();
+const wallet = () => { const w = HOSTED() ? null : $('#wallet'); if (!w) return; const id = who(); w.textContent = id ? short(id, 10, 8) : 'Sign in'; w.classList.toggle('on', !!id); };
 
 // Mist Bank: the NEAR AI TEE attestation behind the seal, one row per check (A.teeCheck → /api/ai/tee → backend/src/tee.js).
 function teePanel(t, again = true) {
@@ -115,7 +117,7 @@ const APPS = {
       const v = A.tollVisit();
       if (v && !v.done) return tollStep(v, true);
       const o = await A.toll();
-      if (o.decision !== 'allowed') return { o, hero: APPS.toll.hero(), say: `Refused: ${A.why(o.reason)}. Nothing was paid.` };
+      if (o.decision !== 'allowed') return { o, hero: APPS.toll.hero(), say: tollRefusal(A.why(o.reason)) };
       return { o, keep: true, kind: 'ok', hero: APPS.toll.hero(), say: `Paid the ${A.TOLL_MAIN} NEAR toll. Nothing else was charged.` };
       say(o.split ? 'Your charter paid the split in one tx: 0.01 toll, 0.002 treasury, 0.001 agent budget. Now approve the gate call in your wallet…' : !A.canBatch() ? 'Your charter pays one payment per tx, so it paid the plain 0.01 NEAR toll, no split. Now approve the gate call in your wallet…' : 'Your charter paid 0.01 NEAR. Now approve the gate call in your wallet…'); btn('Approve in your wallet…', 'primary busy', true);
       const { v: nv } = await A.tollGate(o.action, o);

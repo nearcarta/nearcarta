@@ -16,7 +16,7 @@ export const L={ sh:null, C8:null };
 const SRC={ mainnet:'mainnet', live:'live read', split:'mainnet', quote:'mainnet quote' };
 export const NETMAIN={ bank:'mainnet', payouts:'mainnet', chronicle:'mainnet' };
 export const srcLabel=(id,src)=>NETMAIN[id]||SRC[src]||'mainnet';
-const NAMES={ guard:'Guardhouse', ferry:'Ferry', hall:'Town Hall', bank:'Mist Bank', arena:'Vault Arena', toll:'Toll Bridge', chronicle:'Chronicle', house:'Your House', payouts:'Payouts' };
+import { NAME as NAMES } from '../../D8_shops/js/names.js';
 export function setResult(kind,text){ const b=$('#t-act'); b.classList.remove('busy'); b.className='act res '+kind; b.disabled=true; b.innerHTML=`<span class="glyph" aria-hidden="true">${kind==='no'?'✕':kind==='ok'?'✓':'○'}</span>`; b.append(text); b.setAttribute('aria-live','polite'); }
 export function setHero(html){ const h=$('#t-hero'); h.innerHTML=html; h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); }
 export function drawer(on){ const d=$('#drawer'); d.classList.toggle('open',on); d.setAttribute('aria-hidden',on?'false':'true'); $('#t-proof').setAttribute('aria-expanded',String(on)); if(on) $('#d-close').focus(); }

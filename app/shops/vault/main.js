@@ -506,7 +506,7 @@ function showTab(id) {
 let booted; const boot = new Promise((ok, no) => { booted = { ok, no }; }); boot.catch(() => {});
 // Connect opens the branded setup flow; NEAR Connect keeps the session in this browser, so it is live here on return.
 $('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
-const guestBtn = $('#guest'); if (guestBtn) guestBtn.onclick = async () => { busy(guestBtn, true, 'Opening your account…'); try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { fail(e); } finally { busy(guestBtn, false); } };
+const guestBtn = $('#guest'); if (guestBtn) guestBtn.hidden = true;
 
 async function main() {
   CFG = await api('/api/vault/config').catch(e => { booted.no(e); throw e; });
@@ -549,7 +549,7 @@ async function main() {
   connector.on('wallet:signIn', () => refreshWho().then(signedIn).catch(fail));
   booted.ok();
   connector.on('wallet:signOut', () => { charter = null; ready = false; refreshWho().catch(fail); });
-  $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its NEAR is lost.')) forgetGuest(); charter = null; ready = false; await refreshWho(); };
+  $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); charter = null; ready = false; await refreshWho(); };
   await refreshWho(); await loadBoard().catch(e => { $('#board').textContent = e.message; });
 }
 main().catch(fail);

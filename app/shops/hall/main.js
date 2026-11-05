@@ -147,9 +147,8 @@ fetch(API + '/api/mainnet').then(r => r.json()).then(m => {
 }).catch(() => { if (PUBLIC) { const f = $('#facts'); if (f) f.textContent = 'The mainnet hall record could not be loaded.'; } });
 $('#file-form').onsubmit = e => boot.then(() => file(e));
 $('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
-const guestBtn = $('#guest'); if (guestBtn && window.NEARCARTA_PUBLIC_MAINNET) guestBtn.hidden = true; else if (guestBtn) guestBtn.onclick = async () => { guestBtn.disabled = true; guestBtn.textContent = 'Opening your account…';
-  try { await boot; await connector.connect({ walletId: 'nearcarta-guest' }); await refreshWho(); } catch (e) { log(esc(e.message), 'bad err'); } finally { guestBtn.disabled = false; guestBtn.textContent = 'Free charter row'; } };
-$('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); if (hasGuest() && confirm('Forget the guest account key in this browser? Its NEAR is lost.')) forgetGuest(); await refreshWho(); };
+const guestBtn = $('#guest'); if (guestBtn) guestBtn.hidden = true;
+$('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); await refreshWho(); };
 
 async function vote(btn) {
   const id = Number(btn.dataset.id), action = btn.dataset.vote;

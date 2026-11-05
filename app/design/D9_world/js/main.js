@@ -363,7 +363,7 @@ function land(){ explore(true); const z=.16; PC.z=PC.zs=z; setZoom(z); PC.po=.04
 const SETUP='/setup/';
 const ready=()=>{ try{ return !!JSON.parse(localStorage.getItem('nearcarta.setup.v1')||'{}').charter; }catch{ return false; } };
 const startTo=()=> ready()?CHARTER:SETUP;
-function paintStart(){ const on=ready(); rb.href=startTo(); const lab=rb.querySelector('.lab'); if(lab) lab.textContent=on?'Your charter':"Set your agent's rules"; const cue=rb.querySelector('.cue'); if(cue) cue.textContent=on?'Charter office':'Start here'; rb.title=on?'Open the charter office':'Sign in, fund, and sign the rules your agent cannot break'; }
+function paintStart(){ const on=ready(); rb.href=startTo(); const lab=rb.querySelector('.lab'); if(lab) lab.textContent=on?'Your charter':"Set your agent's rules"; const cue=rb.querySelector('.cue'); if(cue) cue.textContent=on?'Your House':'Start here'; rb.title=on?'Open Your House':'Sign in, fund, and sign the rules your agent cannot break'; }
 const rb=$('#rulesBtn'); paintStart();
 const goTo=to=>{ window.dispatchEvent(new CustomEvent('world:navigate',{detail:{id:'house',to}})); if(!CAPTURE||!P.has('nonav')) location.assign(to); };
 const toCharter=(hash='')=>{ if(inShop||exiting){ goTo(CHARTER+hash); return; } jump('house',{to:CHARTER+hash}); };

@@ -68,8 +68,13 @@ const retitle = () => {
 const whatLine = card => {
   const f = {}; card.querySelectorAll('.pnc-action-card__field').forEach(x => { f[x.querySelector('.pnc-action-card__field-label')?.textContent.trim()] = x.querySelector('.pnc-action-card__field-value')?.textContent.trim(); });
   const kind = card.querySelector('.pnc-action-card__badge')?.textContent.trim(), dep = (card.querySelector('.pnc-action-card__footer')?.textContent.match(/Deposit:\s*([\d.]+)\s*NEAR/) || [])[1];
+  const blob = card.textContent || '';
+  const recv = f.Receiver || (blob.match(/([a-z0-9][a-z0-9._-]{1,62}\.near)\b/) || [])[1] || f.To;
+  const yocto = (blob.match(/"amount"\s*:\s*"(\d+)"/) || [])[1];
+  const near = yocto ? (Number(yocto) / 1e24).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') : (f.Amount || dep);
+  if (recv && near) return `Pay ${near} NEAR to ${recv}`;
   if (f.Method) return `${f.Method} · ${dep ? dep + ' NEAR' : 'no deposit'} to ${f.To}`;
-  if (f.Amount) return `send ${f.Amount} to ${f.To}`;
+  if (f.Amount) return `Pay ${f.Amount} NEAR to ${f.To}`;
   return `${(kind || 'action').toLowerCase()} on ${f.To}`;
 };
 const summarize = () => {

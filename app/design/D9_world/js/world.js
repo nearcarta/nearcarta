@@ -58,8 +58,8 @@ function makeAtlas(img){ const c=document.createElement('canvas'); c.width=img.w
 const C = h=>new THREE.Color(h);
 const KEYS = [ // day, dusk, night
   { top:C('#9fb3bb'), mid:C('#d9d6c4'), hor:C('#efe2c6'), fog:C('#d8cfb8'), sun:C('#fff1d6'), sunI:2.3, hemiS:C('#f1ead8'), hemiG:C('#6b5a40'), hemiI:1.15, sea:C('#6b8873'), deep:C('#3c584b'), elev:.95, lift:C('#000000'), sat:.92, lamp:0, fly:0, expo:1.15, sh:.05 },
-  { top:C('#7d6a6e'), mid:C('#e0a184'), hor:C('#fbd29a'), fog:C('#e8c39c'), sun:C('#ffc884'), sunI:2.45, hemiS:C('#f6dcc8'), hemiG:C('#7a5c48'), hemiI:1.55, sea:C('#647a66'), deep:C('#384d41'), elev:.62, lift:C('#050302'), sat:.98, lamp:.75, fly:.45, expo:1.16, sh:.08 } /* late golden hour: details read, lamps still glow */,
-  { top:C('#2c3a5c'), mid:C('#4a5574'), hor:C('#76768c'), fog:C('#3d4560'), sun:C('#c4d3f0'), sunI:1.45, hemiS:C('#a9b5d4'), hemiG:C('#4a3e32'), hemiI:1.42, sea:C('#3a5056'), deep:C('#22343a'), elev:.82, lift:C('#0a0c14'), sat:.97, lamp:1, fly:1, expo:1.3, sh:.1 } /* moonlit, not dark: every roof, sign and face still reads */,
+  { top:C('#121a2e'), mid:C('#1a2440'), hor:C('#2a3a62'), fog:C('#0b1020'), sun:C('#ffd166'), sunI:1.6, hemiS:C('#9aa6c8'), hemiG:C('#1a2440'), hemiI:1.2, sea:C('#16324a'), deep:C('#0b1020'), elev:.7, lift:C('#050814'), sat:.9, lamp:1, fly:.6, expo:1.2, sh:.08 },
+  { top:C('#0b1020'), mid:C('#121a2e'), hor:C('#1a2440'), fog:C('#0b1020'), sun:C('#7aa7ff'), sunI:1.35, hemiS:C('#c3cbe6'), hemiG:C('#121a2e'), hemiI:1.3, sea:C('#10283c'), deep:C('#070c18'), elev:.8, lift:C('#050814'), sat:.95, lamp:1, fly:1, expo:1.25, sh:.1 },
 ];
 const ICE = C('#cfe6f5');
 const mixK=(t)=>{ const i=Math.min(1,Math.floor(t)), f=Math.min(1,t-i), a=KEYS[i], b=KEYS[Math.min(2,i+1)]; const o={}; for(const k in a) o[k]= a[k].isColor? a[k].clone().lerp(b[k],f) : a[k]+(b[k]-a[k])*f; return o; };
@@ -72,7 +72,7 @@ export async function init(canvas){
   const r = W.renderer = new THREE.WebGLRenderer({canvas, antialias:LP, powerPreference:'high-performance', preserveDrawingBuffer:CAPTURE});
   r.setPixelRatio(Math.min(devicePixelRatio, LP?1:CAPTURE?1:1.5)); r.setSize(innerWidth,innerHeight);
   r.shadowMap.enabled=!LP; r.shadowMap.type=THREE.PCFSoftShadowMap; r.toneMapping=THREE.ACESFilmicToneMapping; r.toneMappingExposure=1.16; r.outputColorSpace=THREE.SRGBColorSpace;
-  const s = W.scene = new THREE.Scene(); s.fog=new THREE.Fog(0xe8c39c,42,150);
+  const s = W.scene = new THREE.Scene(); s.fog=new THREE.Fog(0x0b1020,42,150);
   W.camera = new THREE.PerspectiveCamera(30, innerWidth/innerHeight, .3, 400);
   hemi=new THREE.HemisphereLight(0xffffff,0x444444,1); s.add(hemi);
   sun=new THREE.DirectionalLight(0xffffff,2); sun.castShadow=!LP; const SM=+(P.get('shadow')||2048); sun.shadow.mapSize.set(SM,SM); W.sunShadowSize=SM;

@@ -52,7 +52,7 @@ for (const width of [1440, 390]) {
       await expect(page.getByTestId('back-town')).toBeVisible();
       await expect(page.getByTestId('net-badge')).toContainText(/testnet trial|mainnet/);
       await page.getByTestId('tab-board').click();
-      await expect(page.getByTestId('board-net').or(page.getByTestId('board-empty'))).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('board-net')).toBeVisible({ timeout: 30_000 });
       const table = page.getByTestId('board');
       if (await table.count()) {
         await expect(table).not.toContainText('ncguest-');

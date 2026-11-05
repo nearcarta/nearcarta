@@ -67,7 +67,7 @@ const canOpen = i => i === 0 || (me && (i <= Math.max(-1, ...st.done) + 1));
 
 function rail() {
   $('#rail').innerHTML = STEPS.map(([id, t, s], i) => `<li class="${i === st.step ? 'now' : (i < st.step || st.done.includes(i)) ? 'done' : ''}" data-i="${i}" ${i === st.step ? 'aria-current="step"' : ''}><span>${esc(t)}<small>${esc(s)}</small></span></li>`).join('');
-  $('#rail').querySelectorAll('li.done, li.now').forEach(li => { const i = +li.dataset.i; if (i <= st.step || st.done.includes(i)) { li.tabIndex = 0; li.setAttribute('role', 'button'); li.onclick = () => go(i); li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(i); } }; } });
+  $('#rail').querySelectorAll('li.done, li.now').forEach(li => { const i = +li.dataset.i; if (i <= st.step || st.done.includes(i)) { li.tabIndex = 0; li.onclick = () => go(i); li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(i); } }; } });
   $('#bar').style.width = ((st.step + 1) / STEPS.length * 100) + '%';
 }
 function top() {
@@ -156,7 +156,7 @@ window.addEventListener('storage', async () => {
 });
 async function signedIn(id) {
   if (!id) return;
-  me = id; done(0); await refreshBal();
+  me = id; st.accountId = id; save(); done(0); await refreshBal();
   // A brand-new account has nothing yet: the next stop is always Fund.
   go(bal === 0n || bal == null || bal < YN / 2n ? 1 : Math.max(1, st.step));
 }
@@ -485,7 +485,7 @@ function sTry() {
     return head('Try it', 'The town charter already decides on mainnet.', 'These two transactions are on mainnet. One payment inside the cap was allowed. One over the cap was refused. Your NEAR is not spent here.')
       + `<div class="verdict good" data-testid="try-verdict"><span class="tag">ALLOWED</span><div><b>0.001 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">inside the cap</span> ${txA(allowed)}</div></div>`
       + `<div class="verdict bad" data-testid="try-verdict"><span class="tag">REFUSED</span><div><b>0.003 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">over the per-payment cap</span> ${txA(refused)}</div></div>`
-      + `<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Charter office</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">Enter the town</a></span></div>`;
+      + `<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Your House</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">Enter the town</a></span></div>`;
   }
   const r = rules(), to = r.receivers[0], ok = Math.min(+r.cap, 0.001 > +r.cap ? +r.cap : 0.001), over = +(+r.cap * 2).toFixed(4);
   const tiles = tryTiles({ actionsToday: rowView?.actions_today || 0, maxPerDay: rowView?.max_actions_per_day || r.per, lowBalance: !!(lowBal() || topUpBusy) });
@@ -497,7 +497,7 @@ function sTry() {
      ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
      ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR… <span id="try-secs" data-testid="try-secs">${Math.floor((Date.now() - pendingTry.t0) / 1000)}s</span></span> ${txA(pendingTry.hash)}</div></div>` : ''}
      ${tries.map(t => `<div class="verdict ${t.passed ? 'good' : 'bad'}" data-testid="try-verdict"><span class="tag">${t.passed ? 'ALLOWED' : 'REFUSED'}</span><div><b>${fmtN(nearOf(t.amount))} NEAR → ${esc(short(t.receiver))}</b><br><span class="muted small">${esc(t.passed ? 'inside your rule · the charter paid' : whyText(t))}${t.passed ? '' : t.tx ? ' · refused on chain by the contract' : ' · refused before sending, nothing on chain'}${t.signer === 'agent' ? ' · signed by your agent key, no wallet' : ''}</span> ${txA(t.tx)}</div></div>`).join('')}
-     ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Charter office</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.some(t => t.passed) || st.allowedTx ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
+     ${errP()}<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Your House</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">${tries.some(t => t.passed) || st.allowedTx ? 'Enter the town' : 'Skip to the town'}</a></span></div>`;
 }
 function next() { const n = new URLSearchParams(location.search).get('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/'; }
 function wireTry() {
@@ -565,4 +565,11 @@ async function boot() {
   if (me && (bal === 0n || bal == null)) st.step = 1; else if (want >= 0 && canOpen(want)) st.step = want; else if (!me) st.step = 0;
   render();
 }
+addEventListener('hashchange', () => {
+  if (!PREVIEW) return;
+  const want = STEPS.findIndex(s => s[0] === location.hash.slice(1));
+  if (want < 0) return;
+  if (want > 0) { me = me || 'preview.near'; bal = bal ?? 2n * YN; }
+  st.step = want; render();
+});
 boot().catch(e => { $('#card').innerHTML = `<h1>Could not load</h1><p class="err">${esc(e?.message || e)}</p>`; });

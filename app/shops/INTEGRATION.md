@@ -57,10 +57,9 @@ A refusal **counts** only when the tx is final on chain, the proposal matches th
 that charter's rules, and the reason is one the scam targets. Otherwise, `why` says why not
 (`not_verified_yet`, `not_refused`, `wrong_reason`, …).
 
-## Mist Bank private send queue (backend/src/mistqueue.js)
-Render only queues a request. A separate worker on the operator's machine (backend/scripts/mist-worker.js)
-holds the mainnet wallet, re-checks every request on chain, and sends after a random delay.
-No response ever contains the amount, the salt, the address or a viewing key.
+## Mist Bank
+A payment is a board propose of at most 0.005 NEAR. `POST /api/mistbank/mainnet` reads that tx back. The TEE check is `GET /api/ai/tee`.
+No response contains an amount, a salt, an address or a viewing key.
 
 | Route | What it does |
 |---|---|

@@ -2,6 +2,7 @@
 // The visitor writes the rules and signs them; the Lamplighter (a propose-only agent key made in this browser) asks;
 // the charter answers on chain. The proof is a one-line receipt after the action.
 import * as W from './wallet.bundle.js';
+import { readSessionAccount } from './session.js';
 import { $, sfx } from './core.js';
 import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
@@ -104,7 +105,7 @@ export const factories = () => [CFG.factory, ...(CFG.legacy || []).map(l => l.fa
 /** Only charters from the current visitor (R17) factory run propose_batch; R16 and older ones pay one action per tx (the UI says so). */
 export const canBatch = (c = S.charter) => !!c && c.endsWith('.' + CFG.factory);
 export async function refresh() {
-  S.me = await W.currentAccount(conn);
+  S.me = (await W.currentAccount(conn).catch(() => null)) || readSessionAccount();
   if (onMain()) {
     const board = S.mainnet?.board;
     S.board = board?.status === 'deployed' ? board.contract : null;
@@ -145,7 +146,7 @@ export async function readRules() {
   return S;
 }
 export const connect = async () => { await ready(); await conn.connect(); await refresh(); };
-export const connectGuest = async () => { await ready(); await conn.connect({ walletId: 'nearcarta-guest' }); await refresh(); };
+export const connectGuest = async () => { throw new Error('Sign in with your wallet'); };
 export const merchants = () => CFG?.arena?.merchants || [];
 // Any existing charter is a charter: a queued change is a status, never a reason to send the visitor back to the rules.
 const pend = () => Object.entries(S.pending || {}).map(([id, p]) => ({ id, eta: Number(BigInt(p.eta) / 1_000_000n), kind: Object.keys(p.change || {})[0], body: Object.values(p.change || {})[0] || {} }));

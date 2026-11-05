@@ -4,5 +4,4 @@ export const SUB = {
   arena: 'try to trick the AI', hall: 'vote on a rule', payouts: 'pay many at once', house: 'your rules',
   chronicle: 'activity log',
 };
-export const NAME = { toll: 'Toll Bridge', ferry: 'Ferry', bank: 'Mist Bank', guard: 'Guardhouse', arena: 'Vault Arena',
-  hall: 'Town Hall', payouts: 'Payouts', house: 'Your House', chronicle: 'Chronicle' };
+export { NAME, PURPOSE } from './names.js';

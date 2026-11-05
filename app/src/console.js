@@ -104,20 +104,16 @@ form.onsubmit = async ev => {
 };
 
 async function guardhouse() {
-  const [g, d] = await Promise.all([get('/api/guardhouse'), get('/api/deployments')]);
-  const s = g.state;
-  const rows = Object.entries(g.clauses).map(([id, c]) => `<tr><td>${esc(id)}</td><td>${c.receivers.map(acct).join('<br>')}</td><td>${near(c.per_action_cap)}</td><td>${near(c.daily_budget)}</td><td>${near(g.usage[id]?.spent)} (${esc(g.usage[id]?.count)})</td><td>${c.requires_receipt ? 'TEE receipt' : '–'}</td></tr>`).join('');
-  const p = d.guardhouse.proof_txs;
-  $('#guardhouse .out').innerHTML = `<div class="card" data-testid="oath-state">Oath ${acct(g.oath)} · policy v${esc(s.policy_version)} · next nonce ${esc(s.next_nonce)} · ${s.frozen ? '<b class="fail">frozen</b> <span class="note">(stopped on purpose: no agent spend goes through until it is unfrozen)</span>' : '<b class="pass">active</b>'} · timelock ${Number(s.policy_delay_ns) / 1e9} s<br>
-    Full-access keys: <b data-testid="fak">${g.keys.fullAccess}</b> · agent key methods: <b>${esc(g.keys.functionCall.map(k => k.methods.join(',')).join(' | '))}</b></div>
-    <div class="card"><table><tr><th>clause</th><th>may pay</th><th>cap</th><th>daily</th><th>spent today</th><th>needs</th></tr>${rows}</table></div>
+  const d = await get('/api/mainnet');
+  const b = d.board, c = d.charter;
+  $('#guardhouse .out').innerHTML = `<div class="card" data-testid="oath-state">Board ${acct(b.contract)} · charter ${acct(c.contract)}<br>
+    Full-access keys on the charter: <b data-testid="fak">${c.full_access_keys}</b> · agent key methods: <b>propose</b></div>
     <div class="card"><b>Proof on chain</b><table>
-    <tr><td>Paid with a valid NEAR AI TEE receipt</td><td>${tx(p.valid_receipt_paid)}</td></tr>
-    <tr><td>Receipt saying BLOCK is refused</td><td>${tx(p.block_receipt_denied)}</td></tr>
-    <tr><td>Full-access key deleted</td><td>${tx(p.full_access_key_deleted)}</td></tr>
-    <tr><td>Spend refused while a policy widening waits in the timelock</td><td>${tx(p.queued_widening_denied)}</td></tr>
-    <tr><td>DAO freezes the oath / owner cannot unfreeze</td><td>${tx(p.dao_freeze)} · ${tx(p.owner_unfreeze_refused)}</td></tr></table></div>
-    <div class="card"><b>Who signs the receipts: NEAR AI Cloud TEE</b><p class="note">Fresh nonce from this browser → gateway and model TDX quotes checked as in docs.near.ai/cloud/verification.</p>
+    <tr><td>Allowed 0.001 NEAR</td><td>${tx(b.txs['allowed_0.001'])}</td></tr>
+    <tr><td>Refused over the per-payment cap</td><td>${tx(b.txs.refused_over_per_action_cap)}</td></tr>
+    <tr><td>Refused, payee not on the list</td><td>${tx(b.txs.refused_receiver_not_allowlisted)}</td></tr>
+    <tr><td>Charter agent key deleted its full-access key</td><td>${tx(c.txs.charter_delete_fak)}</td></tr></table></div>
+    <div class="card"><b>Who signs the receipts: NEAR AI Cloud TEE</b><p class="note">Fresh nonce from this browser. The check does not move NEAR.</p>
     <button id="tee-btn" data-testid="tee-btn">Verify NEAR AI TEE now</button><div id="tee-out"></div></div>`;
   $('#tee-btn').onclick = e => teeCheck(e.currentTarget);
 }
@@ -144,39 +140,37 @@ async function teeCheck(btn) {
 }
 
 async function townhall() {
-  const t = await get('/api/townhall');
-  $('#townhall .out').innerHTML = `<div class="card" data-testid="hall-state">DAO ${acct(t.dao)} · oath v${esc(t.oathState.version)} · per reward ${t.caps_near.per_reward} NEAR · total ${t.caps_near.total} NEAR · ${t.oathState.frozen ? '<b class="warn">frozen by a DAO vote</b> <span class="note">(on purpose: this shows the council can stop the agent, and the agent\'s owner alone cannot undo it)</span>' : '<b class="pass">active</b>'}<br>
-    Council: ${t.council.flatMap(c => c.members).map(acct).join(', ')} · denied: ${t.oathState.policy.deny.map(acct).join(', ')}</div>
-    <div class="card"><b>Bounties</b><table>${t.bounties.map(b => `<tr><td><code>${esc(b.hash.slice(0, 16))}…</code></td><td>${b.amount_near} NEAR</td><td>${b.claimed_by ? 'claimed by ' + acct(b.claimed_by) : 'open'}</td></tr>`).join('')}</table></div>
-    <div class="card"><b>Recent proposals</b><table>${t.proposals.map(p => `<tr><td>#${esc(p.id)}</td><td>${esc(p.kind)}</td><td>${esc(p.status)}</td><td>${esc(p.description)}</td></tr>`).join('')}</table></div>`;
+  const d = await get('/api/mainnet');
+  const t = d.extras.townhall;
+  $('#townhall .out').innerHTML = `<div class="card" data-testid="hall-state">Town Hall ${acct(t.contract)}. A shared DAO is not built. A rule change is set_rules on your own row.<br>
+    Reward allowed ${tx(t.txs['townhall_reward_allowed_0.001'])} · reward refused ${tx(t.txs['townhall_reward_refused_0.002'])}</div>`;
 }
 
 async function arena() {
-  const a = await get('/api/arena');
-  const gd = a.guardian;
-  $('#arena .out').innerHTML = `<div class="card" data-testid="arena-state">Contract ${acct(a.contract)} · ${a.season?.commit_hex ? `season commit <code>${esc(a.season.commit_hex.slice(0, 16))}…</code>` : 'no season open yet'}<br>
-    Guardian g1 agent ${acct(gd.agent)} · oath v${esc(gd.oath_version)} · cap ${near(gd.oath.per_action_cap)} · pot ${near(gd.pot)} · may pay ${gd.oath.allow.map(acct).join(', ')}</div>
-    <div class="card"><b>Case tokens (NEP-245)</b><table>${a.tokens.map(t => `<tr><td>${esc(t.token_id)}</td><td>supply ${esc(t.supply ?? 0)}</td></tr>`).join('')}</table></div>
-    <div class="card"><b>Attempts</b><table>${a.attempts.map(x => `<tr><td>#${x.id}</td><td>${acct(x.player)}</td><td>verdict ${esc(x.verdict)} · block ${esc(x.block)}</td></tr>`).join('') || '<tr><td>none</td></tr>'}</table></div>`;
+  const d = await get('/api/mainnet');
+  const a = d.extras.arena;
+  $('#arena .out').innerHTML = `<div class="card" data-testid="arena-state">Vault Arena ${acct(a.contract)}<br>
+    Allowed ${tx(a.txs['arena_agent_pay_allowed_0.001'])} · refused ${tx(a.txs['arena_agent_pay_refused_0.002'])}</div>`;
 }
 
 async function toll() {
-  const t = await get('/api/toll'), p = t.policy;
-  $('#toll .out').innerHTML = `<div class="card" data-testid="toll-state">Oath ${acct(t.oath)} signs through ${acct(t.mpc)} for chain ${esc(p.chain_id)} (Base)<br>
-    Derived address <a href="${esc(t.foreign_explorer)}" target="_blank" rel="noopener">${esc(p.foreign_address)}</a> · may pay ${p.allow_to.map(a => `<code title="${esc(a)}">${esc(String(a).slice(0, 8))}…${esc(String(a).slice(-4))}</code>`).join(', ')} · max/tx ${Number(p.max_per_tx) / 1e18} ETH · spent ${Number(p.spent) / 1e18} / ${Number(p.budget) / 1e18} ETH</div>
-    <div class="card"><b>Signed so far</b><table>${t.recent.map(r => `<tr><td><code title="${esc(r.to)}">${esc(String(r.to).slice(0, 8))}…${esc(String(r.to).slice(-4))}</code></td><td>${Number(r.value) / 1e18} ETH</td><td><code>${esc(JSON.stringify(r).slice(0, 120))}</code></td></tr>`).join('')}</table></div>`;
+  const d = await get('/api/mainnet');
+  const t = d.toll;
+  $('#toll .out').innerHTML = `<div class="card" data-testid="toll-state">Toll ${acct(t.contract)} · Base chain ${esc(d.chain_id)} · address <code>${esc(t.foreign_address)}</code><br>
+    Allowed ${tx(t.txs.owner_toll_pay_allowlisted)} · refused ${tx(t.txs.owner_toll_pay_not_allowlisted)}</div>`;
 }
 
 async function chronicle() {
-  const d = await get('/api/deployments'), sel = $('#chron-acct');
-  if (!sel.options.length) {
-    for (const a of [d.guardhouse.oath, d.townhall.oath, d.townhall.dao, d.arena.contract, d.toll.oath]) sel.add(new Option(nameOf(a) + ' · ' + a, a));
-    sel.onchange = () => chronicle();
-  }
-  $('#chronicle .out').innerHTML = '<p class="note">reading chain…</p>';
-  const c = await get(`/api/chronicle/${sel.value}?limit=8`);
-  $('#chronicle .out').innerHTML = `<div class="card" data-testid="chronicle"><table><tr><th>when (UTC)</th><th>tx</th><th>method</th><th>result</th><th>events</th></tr>${c.txs.map(t => `<tr><td>${esc((t.at || '').replace('T', ' ').slice(0, 19))}</td><td>${tx(t.hash)}</td><td>${esc(t.method)}</td><td>${t.result ? (t.result.ok ? esc(t.result.value?.decision || 'ok') : `<span class="fail">${esc(String(t.result.error).slice(0, 60))}</span>`) : esc(t.error)}</td><td>${(t.events || []).map(e => esc(e.event)).join(', ')}${t.phantomDropped ? ` <span class="fail">(${t.phantomDropped} phantom dropped)</span>` : ''}</td></tr>`).join('')}</table>
-    <p class="note">${esc(c.source)}</p></div>`;
+  const d = await get('/api/mainnet');
+  const rows = [
+    ['Board allowed', d.board.txs['allowed_0.001']],
+    ['Board refused, over cap', d.board.txs.refused_over_per_action_cap],
+    ['Board refused, off list', d.board.txs.refused_receiver_not_allowlisted],
+    ['Visitor allowed', d.board.visitor_run.txs['propose_allowed_0.001']],
+    ['Visitor refused, over cap', d.board.visitor_run.txs['propose_refused_0.01_over_per_action_cap']],
+  ];
+  $('#chronicle .out').innerHTML = `<div class="card" data-testid="chronicle"><table><tr><th>what</th><th>tx</th><th>result</th></tr>${rows.map(([w, h]) => `<tr><td>${esc(w)}</td><td>${tx(h)}</td><td>${/refused/.test(w) ? 'denied' : 'allowed'}</td></tr>`).join('')}</table>
+    <p class="note">Recorded mainnet propose results. Each link opens on nearblocks.io.</p></div>`;
 }
 
 show((location.hash || '#ferry').slice(1));

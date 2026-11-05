@@ -50,7 +50,7 @@ body.explore #hint{opacity:1} body.explore.moved #hint{opacity:0}
 /* speech bubbles: anchored, non-overlapping, ≤10 words */
 #bubbles{position:fixed;inset:0;pointer-events:none;z-index:15}
 .bub{position:absolute;left:0;top:0;max-width:240px;padding:8px 12px 9px;border-radius:14px;background:#f6eedc;color:#2a1d14;font:500 14.5px/1.3 var(--sans);box-shadow:0 6px 18px rgba(23,19,15,.28),0 1px 0 rgba(255,255,255,.6) inset;white-space:normal;opacity:0;transition:opacity .25s ease}
-.bub .who{display:block;font:600 10px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#9aa6c8;margin-bottom:4px}
+.bub .who{display:block;font:600 12px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#9aa6c8;margin-bottom:4px}
 .bub::after{content:"";position:absolute;width:12px;height:12px;background:inherit;left:var(--tx,20px);top:var(--ty,100%);transform:translate(-50%,-50%) rotate(45deg);border-radius:2px}
 .bub.think{background:rgba(246,238,220,.9);font-style:italic;font-weight:450;border-radius:18px}
 .bub.think::after{width:8px;height:8px;border-radius:50%;box-shadow:calc(var(--sx,0)*9px) calc(var(--sy,1)*9px) 0 -1px rgba(246,238,220,.85)}

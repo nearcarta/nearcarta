@@ -1,5 +1,7 @@
 # Testnet transactions
 
+This file is the rehearsal record. It is not the live town. The live payments are in `shared/deployments/mainnet.json` and open on https://nearblocks.io. The same note is in [docs/archive/TESTNET_REHEARSAL.md](../docs/archive/TESTNET_REHEARSAL.md).
+
 Every row was read back from chain by `npm run verify` (backend/scripts/verify-proofs.js) at 2026-10-28T23:23:10.792Z (UTC); this file is written from that output by backend/scripts/txs-table.js. Raw output: judges/proofs/proof-check.json.
 
 **70/70 found.**
