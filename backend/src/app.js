@@ -23,7 +23,9 @@ import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
-import { view, rpcStats } from './near.js';
+import { view, viewAccount, txStatus, rpcStats } from './near.js';
+import { nearAccountOk } from '../../shared/net/accounts.js';
+import { txVerdict } from '../../shared/net/tx-verdict.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 import { pastPrompts as arenaPrompts } from './arena.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
@@ -347,6 +349,42 @@ export function makeApp() {
     if (!ACCT.test(b.signer || '')) return bad(c, 'signer must be an account');
     try { return c.json(await issuePass({ hash: b.tx, signer: b.signer })); }
     catch (e) { return c.json({ error: e.message }, e.status || 502); }
+  });
+  app.get('/api/board/row/:owner', limiter(20), async c => {
+    const owner = c.req.param('owner');
+    if (!nearAccountOk(owner)) return bad(c, 'not a NEAR account');
+    const board = MAINNET_DEP?.board?.contract;
+    if (!board) return c.json({ error: 'no board' }, 404);
+    try {
+      const row = await view(board, 'get_charter', { owner });
+      return c.json({ owner, board, row: row || null });
+    } catch (e) {
+      if (/does not exist|UNKNOWN|MethodNotFound|not found|no charter/i.test(String(e.message))) return c.json({ owner, board, row: null });
+      throw e;
+    }
+  });
+  app.get('/api/account/:id', limiter(20), async c => {
+    const id = c.req.param('id');
+    if (!nearAccountOk(id)) return bad(c, 'not a NEAR account');
+    try {
+      const v = await viewAccount(id);
+      return c.json({ id, exists: true, code_hash: v?.code_hash || null });
+    } catch (e) {
+      if (/UNKNOWN_ACCOUNT|does not exist/i.test(String(e.message))) return c.json({ id, exists: false, code_hash: null });
+      return c.json({ error: 'the account check did not answer' }, 502);
+    }
+  });
+  app.get('/api/tx-status/:hash', limiter(20), async c => {
+    const hash = c.req.param('hash');
+    const sender = c.req.query('sender') || '';
+    if (!HASH.test(hash) || !nearAccountOk(sender)) return bad(c, 'need a tx hash and ?sender=');
+    try {
+      const body = await txStatus(hash, sender);
+      const v = txVerdict(body);
+      return c.json({ hash, sender, pass: v.pass, why: v.why });
+    } catch (e) {
+      return c.json({ hash, sender, pass: false, why: String(e.message || 'no status').slice(0, 160) });
+    }
   });
   app.get('/api/guardhouse/board', limiter(20), async c => {
     const owner = c.req.query('owner') || '';
