@@ -11,8 +11,10 @@ createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname.startsWith('/api/')) {
     const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await new Promise(r => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => r(b)); });
-    const r = await fetch(api + u.pathname + u.search, { method: req.method, headers: { 'content-type': req.headers['content-type'] || 'application/json' }, body });
-    res.writeHead(r.status, { 'content-type': r.headers.get('content-type') || 'application/json' }); return res.end(Buffer.from(await r.arrayBuffer()));
+    try {
+      const r = await fetch(api + u.pathname + u.search, { method: req.method, headers: { 'content-type': req.headers['content-type'] || 'application/json' }, body });
+      res.writeHead(r.status, { 'content-type': r.headers.get('content-type') || 'application/json' }); return res.end(Buffer.from(await r.arrayBuffer()));
+    } catch { res.writeHead(502, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'api down' })); }
   }
   let p = decodeURIComponent(REWRITES[u.pathname] || u.pathname);
   let f = normalize(join(root, p)); if (!f.startsWith(root)) { res.writeHead(403); return res.end(); }
