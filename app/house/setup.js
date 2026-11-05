@@ -393,7 +393,13 @@ async function signBoard() {
     txs.push(['rules', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_rules', args: { rules: ruleArgs(r) }, gas: (GAS.agent * TG).toString(), deposit: toY(0.001) } }] }]);
     txs.push(['calls', { receiverId: contract, actions: [calls] }]);
   }
-  if (!(await agentAccessKey(sec))) txs.push(['key', { receiverId: me, actions: [addKeyAction(pk)] }]);
+  // Allowance cannot be raised on a key that is already on the account. Sign replaces it
+  // (delete, then add the same key) so one approval refreshes the 0.05 gas budget.
+  const existingKey = await agentAccessKey(sec);
+  const keyActions = existingKey
+    ? [{ type: 'DeleteKey', params: { publicKey: pk } }, addKeyAction(pk)]
+    : [addKeyAction(pk)];
+  txs.push(['key', { receiverId: me, actions: keyActions }]);
   for (const [k] of txs) mark(k, 'run');
   if (txs.length) {
     // One approval for both transactions when the wallet can batch them.

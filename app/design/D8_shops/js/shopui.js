@@ -24,6 +24,13 @@ const { esc, fmt, short } = A;
 let cur = null, sh = null, phase = 'idle', last = null, runScene = null, extra = {};
 const say = t => { const e = $('#t-say'); e.innerHTML = `<span class="lamp" aria-hidden="true"></span><span>${t}</span>`; e.classList.remove('bump'); void e.offsetWidth; e.classList.add('bump'); };
 const btn = (label, kind = 'primary', dis = false) => { const b = $('#t-act'); b.hidden = !label; b.className = 'act ' + kind; b.disabled = dis; b.textContent = label || ''; b.classList.toggle('busy', phase === 'busy'); queueMicrotask(syncGo); };
+// Ferry quote, cargo, Ask charter and Get another quote live in the card. #t-act is a second copy of the same label.
+function hideFerryPrimary() {
+  const b = $('#t-act');
+  if (!b) return;
+  b.hidden = true;
+  b.classList.remove('busy');
+}
 const form = html => { $('#t-form').innerHTML = html || ''; $('#t-form').hidden = !html; };
 const hero = html => { if (html != null) $('#t-hero').innerHTML = html; $('#t-hero').hidden = !html; };
 const rcpt = html => { $('#t-rcpt').innerHTML = html || ''; };
@@ -62,10 +69,16 @@ function wireFerryDock() {
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
 }
+function ferryPlainReason(reason) {
+  const raw = String(reason || '');
+  if (/NotEnoughAllowance/i.test(raw)) return 'the session key does not have enough gas allowance for this ask';
+  const plain = String(A.plainError(raw) || '').replace(/\s+/g, ' ').trim();
+  if (!plain || /[{"]|account_id|send_tx|InvalidTx|public_key|yocto/i.test(plain)) return 'the charter did not accept this ask';
+  return plain.slice(0, 140);
+}
 function setCharterNote(o) {
   if (!o || o.decision === 'allowed') { extra.charterNote = ''; return; }
-  const text = A.why(o.reason) || o.reason || 'refused';
-  extra.charterNote = `Charter refused the trip: ${text}. The boat stays at the jetty.`;
+  extra.charterNote = `Charter refused the trip: ${ferryPlainReason(o.reason)}. The boat stays at the jetty.`;
 }
 async function loadFerryCargo(wantCharter) {
   if (phase === 'busy' || cur !== 'ferry') return;
@@ -78,7 +91,9 @@ async function loadFerryCargo(wantCharter) {
   let o = null;
   const ready = APPS.ferry.charterReady();
   if (wantCharter && ready) {
-    btn('Asking your charter…', 'primary busy', true);
+    hideFerryPrimary();
+    const asking = document.getElementById('f-charter');
+    if (asking) { asking.disabled = true; asking.textContent = 'Asking your charter…'; }
     say('Asking your charter on chain…');
     const clause = A.ferryClauseForPair(pair.from, pair.to);
     try { o = await A.ferry(clause, extra.q); }
@@ -111,7 +126,7 @@ async function loadFerryCargo(wantCharter) {
     document.body.dataset.app = 'ok';
   }
   hero(APPS.ferry.hero());
-  btn(APPS.ferry.btn());
+  hideFerryPrimary();
   form(APPS.ferry.form()); APPS.ferry.bind?.();
   ruleChip(); proofDrawer();
 }
@@ -251,6 +266,7 @@ const APPS = {
         charterReady: () => APPS.ferry.charterReady(),
         openRules: () => openRules(),
         onLoadCargo: (opts) => loadFerryCargo(!!opts?.charter),
+        onAgain: () => primary(),
         repaint: () => paint(),
         onPair: (pair) => { if (sh?.applyPair) sh.applyPair(pair); },
       });
@@ -629,9 +645,8 @@ function paint() {
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
   if (cur === 'ferry') {
     document.body.classList.add('ferry-tray');
-    // Cargo CTAs live in the card after quote; keep tray primary only before quote / for stage gates.
-    if (extra.q && !extra.acted) btn(null);
-    else btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', false);
+    // The card owns Get quote, Load cargo, Ask charter and Get another quote. One of each.
+    hideFerryPrimary();
   } else {
     document.body.classList.remove('ferry-tray');
     const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true;
@@ -644,7 +659,13 @@ async function primary(auto = false) {
   if (st === 'rules') return openRules();
   if (st === 'wait' || st === 'key') { phase = 'busy'; btn(st === 'key' && !A.pendingKey() ? 'Approve in your wallet…' : 'Checking…', 'primary busy', true);
     try { if (st === 'key' && !(A.pendingKey() && Date.now() < A.pendingKey().eta)) { const r = await A.helperKey(); rcpt(A.txLine(r.tx, 'helper key')); } else await A.readRules(); phase = 'idle'; paint(); } catch (e) { fail(e); } return; }
-  phase = 'busy'; btn(st === 'build' ? 'Approve in your wallet…' : 'Asking your charter…', 'primary busy', true); say(st === 'build' ? 'Building your charter…' : 'Asking your charter on chain…'); rcpt(''); if (st !== 'build') progress(cur);
+  phase = 'busy';
+  if (cur === 'ferry') {
+    hideFerryPrimary();
+    const again = document.getElementById('f-again');
+    if (again) { again.disabled = true; again.textContent = 'Getting a quote…'; }
+  } else btn(st === 'build' ? 'Approve in your wallet…' : 'Asking your charter…', 'primary busy', true);
+  say(st === 'build' ? 'Building your charter…' : 'Asking your charter on chain…'); rcpt(''); if (st !== 'build') progress(cur);
   let res = null;
   try {
     if (st === 'build') { const r = await A.buildCharter(); phase = 'idle'; rcpt(A.txLine(r.tx, 'charter built')); paint(); openRules(); return; }
@@ -659,7 +680,10 @@ async function primary(auto = false) {
     if (res.noform) form('');
     say(res.say); react(kind);
     rcpt((rule ? `<span class="rule ${kind}" data-testid="rule">${kind === 'ok' ? '✓' : '✕'} ${esc(rule)}</span>` : '') + (res.rc || A.txLine(res.o?.tx)));
-    const app = APPS[cur]; btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : (AGAIN[cur] || 'Do it again'))); if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
+    const app = APPS[cur];
+    if (cur === 'ferry') hideFerryPrimary();
+    else btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : (AGAIN[cur] || 'Do it again')));
+    if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
     document.body.dataset.app = kind; ruleChip(); proofDrawer();
   } catch (e) {
     phase = 'kept';
@@ -669,7 +693,7 @@ async function primary(auto = false) {
   }
 }
 const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another entry', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Send another note', toll: 'Pass the gate again' };
-function fail(e) { stopProgress(); phase = 'idle'; say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); const app = APPS[cur]; btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
+function fail(e) { stopProgress(); phase = 'idle'; say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry') hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
 
 // ---------- rules sheet ----------
 function openRules() {

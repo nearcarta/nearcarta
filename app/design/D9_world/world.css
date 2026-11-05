@@ -503,6 +503,9 @@ body.ferry-tray #shopUI #tray{
   /* stay clear of top badges / brand / HUD; taller for CTA breathing room */
   max-height:calc(100dvh - 112px);
   padding:24px 22px 22px;
+  box-sizing:border-box;
+  overflow-x:hidden;
+  overflow-y:auto;
   background:#1f1a15;
   border:1px solid #3a3128;
   box-shadow:0 16px 40px rgba(0,0,0,.45);
@@ -518,8 +521,18 @@ body.ferry-tray #shopUI .shop-track,
 body.ferry-tray #shopUI .say,
 body.ferry-tray #shopUI .t-links,
 body.ferry-tray #shopUI .rcpt{display:none!important}
-body.ferry-tray #shopUI #t-form{margin:0}
+body.ferry-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
 body.ferry-tray #shopUI #t-act[hidden]{display:none!important}
+/* Stage gates stay a chip. The card owns quote and cargo, so this must not be a full-width bar. */
+body.apps.ferry-tray #shopUI #t-act{
+  width:auto!important;
+  max-width:min(220px,100%);
+  min-width:0;
+  box-sizing:border-box;
+}
+body.ferry-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
+body.ferry-tray #shopUI select,
+body.ferry-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
 body.ferry-tray #shopUI .rcpt:empty{display:none}
 
 /* AI Agent character (~72px) + chat popup; send stays INSIDE the card */
