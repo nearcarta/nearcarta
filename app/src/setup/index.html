@@ -28,10 +28,31 @@
   <div class="who" id="who" aria-live="polite"></div>
 </header>
 <main class="shell">
-  <nav class="rail" aria-label="Setup steps"><ol id="rail"></ol></nav>
+  <nav class="rail" aria-label="Setup steps"><ol id="rail">
+    <li class="now" aria-current="step"><span>Sign in<small>Google, email or wallet</small></span></li>
+    <li><span>Fund<small>Put NEAR in the account</small></span></li>
+    <li><span>Privacy<small>What the world sees</small></span></li>
+    <li><span>Character<small>Your agent and its name</small></span></li>
+    <li><span>Rules<small>Cap, shops, expiry</small></span></li>
+    <li><span>Sign<small>Charter and agent key</small></span></li>
+    <li><span>Try it<small>One yes, one no</small></span></li>
+  </ol></nav>
   <section class="stage" aria-live="polite">
-    <div class="progress" aria-hidden="true"><span id="bar"></span></div>
-    <article class="card" id="card"><p class="muted" role="status">Preparing your setup…</p></article>
+    <div class="progress" aria-hidden="true"><span id="bar" style="width:14.2857%"></span></div>
+    <article class="card" id="card" data-testid="setup-shell">
+      <nav class="stepnav" data-testid="setup-steps" aria-label="Steps">
+        <button type="button" data-testid="setup-step" data-step="0" data-id="signin" aria-current="step">1. Sign in</button>
+        <button type="button" data-testid="setup-step" data-step="1" data-id="fund" disabled>2. Fund</button>
+        <button type="button" data-testid="setup-step" data-step="2" data-id="privacy" disabled>3. Privacy</button>
+        <button type="button" data-testid="setup-step" data-step="3" data-id="character" disabled>4. Character</button>
+        <button type="button" data-testid="setup-step" data-step="4" data-id="rules" disabled>5. Rules</button>
+        <button type="button" data-testid="setup-step" data-step="5" data-id="sign" disabled>6. Sign</button>
+        <button type="button" data-testid="setup-step" data-step="6" data-id="try" disabled>7. Try it</button>
+      </nav>
+      <p class="eyebrow">Step 1 of 7 · Sign in</p>
+      <h1>Start here.</h1>
+      <p class="lede">Sign in to get your own NEAR account. Next you pick a character and set spending limits your agent can never go past.</p>
+    </article>
   </section>
 </main>
 <footer class="foot">Your spending limits are kept on NEAR. This site cannot spend for your agent; the limits on NEAR decide.</footer>
