@@ -15,6 +15,7 @@ import { deedMarkup } from './deed.js';
 import { ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './hall.js';
 import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
+import { parseRouteFrom, tokenStack, tokenBadge } from './token-badge.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -44,9 +45,9 @@ function holdButton(btn, reason) {
 }
 
 export const DEFAULT_ROUTES = [
-  { id: 'route.eth-eth.zec', from: 'ETH@eth', sym: 'ETH', label: 'ETH · Ethereum', amt: '0.002' },
-  { id: 'route.usdc-base.zec', from: 'USDC@base', sym: 'USDC', label: 'USDC · Base', amt: '3' },
-  { id: 'route.usdc-arb.zec', from: 'USDC@arb', sym: 'USDC', label: 'USDC · Arbitrum', amt: '3' },
+  { id: 'route.eth-eth.zec', from: 'ETH@eth', sym: 'ETH', chain: 'eth', chainLabel: 'Ethereum', label: 'ETH · Ethereum', amt: '0.002' },
+  { id: 'route.usdc-base.zec', from: 'USDC@base', sym: 'USDC', chain: 'base', chainLabel: 'Base', label: 'USDC · Base', amt: '3' },
+  { id: 'route.usdc-arb.zec', from: 'USDC@arb', sym: 'USDC', chain: 'arb', chainLabel: 'Arbitrum', label: 'USDC · Arbitrum', amt: '3' },
 ];
 
 const SAMPLE = {
@@ -54,13 +55,33 @@ const SAMPLE = {
   refund: '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e',
 };
 
+function routeMeta(r) {
+  const parsed = parseRouteFrom(r.from);
+  const sym = r.sym || parsed.sym;
+  const chain = r.chain || parsed.chain;
+  const chainLabel = r.chainLabel || ({ eth: 'Ethereum', base: 'Base', arb: 'Arbitrum', zec: 'Zcash' }[chain] || chain || '');
+  return { sym, chain, chainLabel, label: r.label || `${sym} · ${chainLabel}` };
+}
+
 export function corridorCards(routes, lines = []) {
   const by = new Map(lines.map(l => [l.id, l]));
   const list = (routes || []).slice(0, Math.max(3, (routes || []).length));
   return `<div class="corridors" data-testid="ferry-corridors">${list.map(r => {
+    const meta = routeMeta(r);
     const line = by.get(r.id);
     const usd = line ? (line.usdText || 'USD not quoted') : 'No quote yet';
-    return `<article class="corridor" data-testid="ferry-corridor" data-route-id="${esc(r.id)}"><b>${esc(r.label)}</b><p data-testid="ferry-usd">${esc(usd)}</p><p>${esc(line?.text || `${r.sym} ${r.amt}`)}</p></article>`;
+    const best = line?.best ? ' data-best="1"' : '';
+    const detail = line?.text || `${meta.sym} ${r.amt}`;
+    return `<article class="corridor${line?.best ? ' best' : ''}" data-testid="ferry-corridor" data-route-id="${esc(r.id)}"${best}>
+      <header class="corridor-head">${tokenStack(meta.sym, meta.chain, { size: 26, chainSize: 13 })}
+        <div class="corridor-titles"><b>${esc(meta.sym)}</b><span class="corridor-chain">on ${esc(meta.chainLabel)}</span></div>
+        <span class="corridor-arrow" aria-hidden="true">→</span>
+        ${tokenStack('ZEC', 'zec', { size: 22, chainSize: 11 })}
+      </header>
+      <p class="corridor-usd" data-testid="ferry-usd">${esc(usd)}</p>
+      <p class="corridor-line">${esc(detail)}</p>
+      ${line?.best ? '<p class="corridor-best">Best rate</p>' : ''}
+    </article>`;
   }).join('')}</div>`;
 }
 
@@ -74,14 +95,35 @@ function usdOf(line) {
 export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const ri = state.ri || 0;
   const rt = routes[ri] || routes[0];
-  const chips = routes.map((r, i) => `<button type="button" class="route-chip" data-route="${esc(r.id)}" aria-pressed="${i === ri ? 'true' : 'false'}" data-testid="ferry-route">${esc(r.label)}${r.down ? ' · down' : ''}</button>`).join('');
-  const quotes = (state.quotes || []).map(v => `<p data-testid="ferry-row"${v.best ? ' data-best="1"' : ''}>${esc(v.text || '')}${v.best ? ' · best rate' : ''}</p>`).join('');
+  const meta = routeMeta(rt);
+  const chips = routes.map((r, i) => {
+    const m = routeMeta(r);
+    return `<button type="button" class="route-chip" data-route="${esc(r.id)}" aria-pressed="${i === ri ? 'true' : 'false'}" data-testid="ferry-route">
+      ${tokenStack(m.sym, m.chain, { size: 28, chainSize: 14 })}
+      <span class="route-copy"><b>${esc(m.sym)}</b><small>on ${esc(m.chainLabel)}${r.down ? ' · down' : ''}</small></span>
+    </button>`;
+  }).join('');
+  const quotes = (state.quotes || []).map(v => {
+    const inn = v.symbolIn ? tokenBadge(v.symbolIn, v.chainIn, { size: 18, chainSize: 10, cls: 'row-tok' }) : '';
+    const out = v.symbolOut ? tokenBadge(v.symbolOut, v.chainOut || 'zec', { size: 18, chainSize: 10, cls: 'row-tok' }) : '';
+    const usdNum = Number(v.usd);
+    const usdTxt = v.usd != null && v.usd !== '' ? `about $${Number.isFinite(usdNum) ? usdNum.toFixed(2) : v.usd}` : '';
+    const metaBits = [usdTxt, v.fee != null && v.fee !== '' ? `fee ${v.fee} bps` : '', v.eta != null && v.eta !== '' ? `about ${v.eta}s` : ''].filter(Boolean).join(' · ');
+    const body = inn && out
+      ? `${inn}<span class="row-arrow" aria-hidden="true">→</span>${out}${metaBits ? `<span class="row-meta">${esc(metaBits)}</span>` : ''}`
+      : esc(v.text || '');
+    return `<p class="ferry-row" data-testid="ferry-row"${v.best ? ' data-best="1"' : ''}>${body}${v.best ? ' <span class="row-best">best rate</span>' : ''}</p>`;
+  }).join('');
   const lines = state.lines || [];
-  return `<div class="shop-stack"><div class="route-row" role="group" aria-label="Routes" data-testid="ferry-routes">${chips}</div>
-    <label class="amt">Amount <input id="f-amt" type="number" min="0" step="any" value="${esc(state.amt || rt.amt)}"><span id="f-sym">${esc(rt.sym)}</span></label>
+  const dest = `<div class="ferry-dest" data-testid="ferry-dest">${tokenStack('ZEC', 'zec', { size: 24, chainSize: 12 })}<div><b>Shielded ZEC</b><small>Orchard-only UA · Ironwood pool</small></div></div>`;
+  return `<div class="shop-stack">
+    <p class="ferry-kicker">Pay from any chain. The charter checks the recipient, the cap and the daily budget before a deposit address is created.</p>
+    <div class="route-row" role="group" aria-label="Routes" data-testid="ferry-routes">${chips}</div>
+    ${dest}
+    <label class="amt">${tokenStack(meta.sym, meta.chain, { size: 22, chainSize: 11 })}<span class="amt-label">Amount</span><input id="f-amt" type="number" min="0" step="any" value="${esc(state.amt || rt.amt)}" aria-label="Amount in ${esc(meta.sym)}"><span id="f-sym" class="amt-sym">${esc(meta.sym)}</span></label>
     <button type="button" class="primary" id="f-compare" data-testid="ferry-compare">Compare routes</button>
     ${corridorCards(routes, lines)}
-    <div id="f-quotes" data-testid="ferry-quotes">${quotes}${state.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : ''}</div>
+    <div id="f-quotes" class="ferry-quotes" data-testid="ferry-quotes">${quotes}${state.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : ''}</div>
     ${state.fstatus ? `<p data-testid="ferry-status">${esc(state.fstatus.words || state.fstatus.status)}</p><p data-testid="ferry-refund">${state.fstatus.refund ? 'Refunded to the refund address.' : 'A short deposit or a failed swap is refunded to the refund address. This page does not send the deposit.'}</p>` : `<p data-testid="ferry-idle">${state.quoted ? 'No deposit has been requested.' : 'No quote yet. No deposit has been requested.'}</p>`}</div>`;
 }
 
