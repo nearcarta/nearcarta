@@ -74,8 +74,8 @@ body.letterbox #lb i{height:7.5vh}
 
 /* loading: a hairline only; the first frame is the town */
 #loading{position:fixed;inset:0;z-index:40;background:#17130f;transition:opacity .6s,visibility 0s .6s} #loading>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.62) saturate(.9);animation:lpz 30s linear both}
-#loading .lc{position:absolute;left:50%;bottom:14vh;transform:translateX(-50%);display:grid;justify-items:center;gap:10px;text-align:center;color:#f3ead8;text-shadow:0 1px 10px rgba(23,19,15,.8)}
-#loading .lc b{font-size:28px;letter-spacing:.01em} #loading .lc span{font-size:14px;color:#e9dcc2} #loading .lc small{font-size:11px;color:#bfb29c}
+#loading .lc{position:absolute;left:50%;bottom:14vh;transform:translateX(-50%);display:grid;justify-items:center;gap:10px;text-align:center;color:#f3ead8;text-shadow:0 1px 10px rgba(23,19,15,.8);background:#1a140fe6;border:1px solid #d6b46a;border-radius:14px;padding:16px 22px}
+#loading .lc b{font-size:34px;letter-spacing:.01em} #loading .lc span{font-size:16px;color:#f3ead8} #loading .lc small{font-size:13px;color:#f3ead8}
 #loading .lt{display:block;width:min(260px,60vw);height:3px;border-radius:3px;background:rgba(243,234,216,.18);overflow:hidden} #lbar{display:block;height:100%;width:4%;background:#d6b46a;transition:width .3s}
 #loading.done{opacity:0;visibility:hidden;pointer-events:none} @keyframes lpz{to{transform:scale(1.04)}}
 body:not(.ready) #c{opacity:0} body:not(.ready) .hud,body:not(.ready) #pins{visibility:hidden} body.fb .hud#brand{visibility:visible}
@@ -188,7 +188,7 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #shopUI .stag.hide { opacity: 0; }
 #shopUI .stag .tok .sym { display: none; }
 /* the tray: bottom-left counter slip, one primary action */
-#shopUI #tray { position: fixed; left: var(--s3); bottom: var(--s3); width: 360px; padding: var(--s3); background: var(--raised); border: 1px solid var(--line); border-radius: var(--R); z-index: 4; animation: shup .24s var(--ease); }
+#shopUI #tray { position: fixed; left: var(--s3); bottom: var(--s3); width: 300px; max-height: calc(100dvh - 96px); overflow-y: auto; padding: var(--s3); background: var(--raised); border: 1px solid var(--line); border-radius: var(--R); z-index: 4; animation: shup .24s var(--ease); }
 @keyframes shup { from { transform: translateY(8px); opacity: 0; } }
 #shopUI .t-head { display: flex; align-items: center; gap: var(--s1); margin-bottom: var(--s2); }
 #shopUI #t-title { display: flex; align-items: center; gap: var(--s1); font-size: 20px; line-height: 28px; flex: 1; }
@@ -214,7 +214,7 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #shopUI .act.res.no { color: var(--no); border-color: color-mix(in srgb, var(--no) 45%, transparent); }
 #shopUI .act.res.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 #shopUI .act.res .glyph { font-size: 14px; }
-#shopUI .link { color: var(--muted); height: 40px; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line); }
+#shopUI .link { color: #f3ead8; min-height: 40px; font-size: 15px; font-weight: 650; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: #d6b46a; }
 #shopUI .link:hover { color: var(--text); }
 #shopUI .act[hidden] + .link { margin-left: 0; }
 /* proof drawer */
@@ -232,7 +232,13 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #shopUI .st.no { color: var(--no); } #shopUI .st.ok { color: var(--ok); } #shopUI .st.ice { color: var(--ice); } #shopUI .st.pend { color: var(--muted); }
 #shopUI .tx { font-family: var(--mono); font-size: 12px; color: var(--muted); text-decoration: none; }
 #shopUI .tx:hover { color: var(--text); }
-#shopUI .note { color: var(--muted); font-size: 12px; line-height: 18px; margin-top: var(--s2); }
+#shopUI .note, #shopUI .note.to-l { color: #f3ead8; font-size: 14px; line-height: 20px; margin-top: var(--s2); }
+#shopUI .tee-pass{border:2px solid #7dcea0;background:#1e2a22;padding:10px;border-radius:12px}
+#shopUI .tee-live{font-size:18px;font-weight:700;color:#f3ead8}
+#shopUI .holdbar, .pill.ice .holdbar{display:inline-block;width:72px;height:8px;border-radius:4px;background:rgba(243,234,216,.35);overflow:hidden;vertical-align:middle}
+#shopUI .holdbar i, .pill.ice .holdbar i{display:block;height:100%;width:0;background:#f3ead8}
+#curfewResult{position:fixed;top:58px;right:18px;z-index:21;background:#1a140fe6;color:#f3ead8;border:1px solid #d6b46a;border-radius:10px;padding:8px 12px;font-weight:700}
+#shopUI a.row-btn{display:inline-flex;align-items:center;min-height:40px;padding:8px 14px;border-radius:10px;background:#3a2a1c;color:#f3ead8;border:1px solid #d6b46a;font-size:15px;font-weight:700;text-decoration:none}
 #shopUI .kv { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; }
 #shopUI .blurnum { letter-spacing: .12em; color: var(--muted); filter: blur(1.5px); }
 /* two-token heroes (Ferry quote) stay on one line */
@@ -326,7 +332,9 @@ body.apps #shopUI #t-act.busy::before{content:'';width:14px;height:14px;border-r
 #shopUI .rc{font-family:var(--mono);font-size:12px;color:var(--muted);text-decoration:none} #shopUI .rc:hover{color:var(--text)}
 #shopUI details.rc{display:inline-block} #shopUI details.rc summary{cursor:pointer;list-style:none;color:var(--muted);font-family:Inter,system-ui,sans-serif;font-size:12px;text-decoration:underline dotted;text-underline-offset:3px}
 #shopUI details.rc summary::-webkit-details-marker{display:none} #shopUI details.rc[open] summary{display:none}
-#shopUI .t-links{display:flex;flex-wrap:wrap;gap:0 var(--s2)} #shopUI .t-links .link{height:28px;font-size:12px}
+#shopUI .t-links{display:flex;flex-wrap:wrap;gap:8px var(--s2)} #shopUI .t-links .link{height:auto;min-height:36px;font-size:15px;color:#f3ead8}
+#shopUI .btns{position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:8px;padding-top:8px;background:var(--raised);z-index:1}
+#shopUI .btns .go,#shopUI .btns .ghost{min-height:40px;padding:8px 12px}
 #shopUI a.cta8{display:inline-flex;align-items:center;height:28px;font-size:12px;margin:0 0 var(--s1)}
 #shopUI .commit{font-family:var(--mono);font-size:22px;color:var(--ice)}
 #shopUI .goal{font-size:12px;color:var(--accent);font-weight:600;letter-spacing:.02em}
@@ -377,7 +385,7 @@ body.apps:has(#rules.open) #back{visibility:hidden}
 #town-intro{position:fixed;left:50%;bottom:18vh;z-index:16;pointer-events:none;transform:translate(calc(-50% + var(--pan, 0px)), 0)}
 #town-intro .bub{position:relative;opacity:1;background:#1a140fe6;color:#f3ead8;border:1px solid #d6b46a;border-radius:12px;padding:10px 14px;font:600 16px/1.35 ui-serif,Georgia,serif;max-width:36ch}
 #town-intro .walkers{display:flex;justify-content:center;gap:10px;margin-bottom:8px}
-#town-intro .walkers i{display:block;width:14px;height:26px;border-radius:7px 7px 3px 3px;background:#d6b46a;animation:introWalk 1s steps(2) infinite}
+#town-intro .walkers i{display:block;width:22px;height:44px;border-radius:11px 11px 4px 4px;background:#d6b46a;animation:introWalk 1s steps(2) infinite}
 @keyframes introWalk{50%{transform:translateY(-4px)}}
 body.intro-on #fbimg{animation:introCam 22s linear both}
 @keyframes introCam{from{transform:scale(1.12) translate3d(3%,1%,0)}to{transform:scale(1.02) translate3d(-2%,-1%,0)}}
@@ -386,7 +394,7 @@ body.intro-on #fbimg{animation:introCam 22s linear both}
 #shopUI .p-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 #shopUI .p-sum { font-size: 14px; color: #f3ead8; font-variant-numeric: tabular-nums; } #shopUI .p-sum.no { color: #ffb4a8; }
 #shopUI #p-add:disabled { opacity: .4; cursor: default; }
-#shopUI .t-links .link{white-space:normal;height:auto;min-height:28px;text-align:left} /* long rule chips wrap inside the panel */
+#shopUI .t-links .link{white-space:normal;height:auto;min-height:36px;font-size:15px;color:#f3ead8;text-align:left} /* long rule chips wrap inside the panel */
 
 /* JB9: the "Enter" hint only on hover/focus, so pins stay compact at laptop widths */
 .fbpin::after{display:none} .fbpin:hover::after,.fbpin:focus-visible::after{display:block}

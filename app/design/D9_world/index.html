@@ -35,8 +35,9 @@
     <button type="button" role="radio" aria-checked="false" data-m="walk" title="Steer the Lamplighter with WASD or clicks"><svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M6 17l2-5 3 2 1 3M8 12l1-4 3 1 2 3M9 8l-3 1-1 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="4" r="1.8" fill="currentColor"/></svg>Walk</button>
   </div>
   <button id="modeBtn" class="pill" type="button" title="Walk the town yourself">Explore</button>
-  <button id="soundBtn" class="ib" type="button" aria-label="Sound on or off" title="Sound on or off. Click to toggle."><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg></button>
-  <button id="curfewBtn" class="pill ice" type="button" aria-describedby="curfewHint" title="Press and hold until the bar fills. That freezes the agent so it cannot pay. Only your house key can lift it."><span class="fi"></span><span class="t">Hold to freeze agent</span></button>
+  <button id="soundBtn" class="ib" type="button" aria-pressed="false" aria-label="Sound off" title="Sound off"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg></button>
+  <button id="curfewBtn" class="pill ice" type="button" aria-describedby="curfewHint" title="Press and hold until the bar fills. That freezes the agent so it cannot pay. Only your house key can lift it."><span class="fi"></span><span class="t">Hold to freeze agent</span><span class="holdbar" data-testid="curfew-bar" aria-hidden="true"><i id="curfewFill"></i></span></button>
+  <p id="curfewResult" data-testid="curfew-result" hidden></p>
   <span id="curfewHint" class="sr">Press and hold until the bar fills. Only your house key can lift the freeze.</span>
 </nav>
 
@@ -94,21 +95,20 @@
 
 <script type="module">
 // Boot: decide 2D vs 3D first, so the 2D path never downloads three.js, GSAP or the models.
-// 3D needs WebGL2 on real hardware: no context, a "major performance caveat" or a software rasteriser (SwiftShader,
-// llvmpipe) means the 2D town, unless ?3d / ?full / ?capture forces 3D (captures and perf runs use SwiftShader on purpose).
+// 3D needs a WebGL2 context. Software rasterisers (SwiftShader, llvmpipe) still run the town so the camera and walkers are visible.
 // Until the first lit frame the poster + progress bar stay up and the canvas stays hidden, so no black frame is ever shown;
-// if 3D has not drawn within 25 s, or a script fails, the 2D town takes over.
+// if 3D has not drawn within 25 s on a hardware GPU, or a script fails, the 2D town takes over. A software context is given longer.
 const q=new URLSearchParams(location.search); const force=q.has('3d')||q.has('full')||q.has('capture');
-const cap=(()=>{ try{ const c=document.createElement('canvas'); const x=c.getContext('webgl2',{failIfMajorPerformanceCaveat:!force,powerPreference:'high-performance'}); if(!x) return {ok:false,why:'WebGL2 unavailable or software-only'};
+const cap=(()=>{ try{ const c=document.createElement('canvas'); const x=c.getContext('webgl2',{powerPreference:'high-performance'}); if(!x) return {ok:false,soft:false,why:'WebGL2 unavailable'};
   const d=x.getExtension('WEBGL_debug_renderer_info'); const r=d?String(x.getParameter(d.UNMASKED_RENDERER_WEBGL)):''; x.getExtension('WEBGL_lose_context')?.loseContext();
-  const soft=/swiftshader|llvmpipe|softpipe|software|basic render/i.test(r); return {ok:force||!soft,why:soft?'software WebGL: '+r:'',r}; }catch(e){ return {ok:false,why:String(e)}; } })();
+  const soft=/swiftshader|llvmpipe|softpipe|software|basic render/i.test(r); return {ok:true,soft,why:soft?'software WebGL: '+r:'',r}; }catch(e){ return {ok:false,soft:false,why:String(e)}; } })();
 window.__gl=cap; const go2d=why=>import('./js/fb.js').then(m=>m.fallback(why));
 const script=src=>new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
 const pre=h=>{ const l=document.createElement('link'); l.rel='preload'; l.as='fetch'; l.crossOrigin='anonymous'; l.href=h; document.head.appendChild(l); };
 if(q.get('mode')==='2d'||!cap.ok){ if(!q.has('t')) go2d(q.get('mode')==='2d'?'':cap.why); }
 else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpressive.glb'].forEach(pre);
   script('vendor/gsap/gsap.min.js').then(()=>import(q.has('t')?'./js/test_main.js':'./js/main.js')).catch(e=>{ console.error('[Nearcarta] 3D failed to load',e); go2d('3D failed to load'); });
-  if(!force) setTimeout(()=>{ if(!document.body.classList.contains('ready')&&!document.body.classList.contains('fb')){ window.__3dStop='slow start'; go2d('3D did not start within 25 s'); } },25000); }
+  if(!force && !cap.soft) setTimeout(()=>{ if(!document.body.classList.contains('ready')&&!document.body.classList.contains('fb')){ window.__3dStop='slow start'; go2d('3D did not start within 25 s'); } },25000); }
 </script>
 <script>
 // Pins are placed on the buildings. Nudge any two that overlap so the names stay readable.

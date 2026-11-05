@@ -6,14 +6,15 @@ import { ruleChip as ruleChipText } from './rules-default.js';
 import { receipt } from './receipt.js';
 import { watch as watchTokens } from './tokens.js';
 import { maybeOnboard } from './onboard.js';
-import { readSessionAccount, tollRefusal } from './session.js';
+import { hallRowHref, readSession, readSessionAccount, sessionPill, signedCopy, tollRefusal } from './session.js';
 import { explainCheck } from '/guard-score.js';
-import { queryFeed, exportCsv, verifyEntry, RECORDED } from '/chronicle-feed.js';
+import { queryFeed, exportCsv, downloadCsv, verifyEntry, RECORDED } from '/chronicle-feed.js';
 import { checkDerived, TOLL_KEY, TOLL_ADDRESS } from '/toll-derive.js';
 import { DEED, controlAfterMove, metadataView, txUrl } from '/deed-control.js';
 import { teeResult, PROOF_HREF } from '/tee-view.js';
-import { pickBest, statusView } from '/ferry-catalog.js';
-import { receiptsFor, parseCsv, splitAssets } from './payouts.js';
+import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
+import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues } from './payouts.js';
+import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
 const yOf = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const { esc, fmt, short } = A;
 
@@ -58,15 +59,26 @@ function ruleChip() {
 }
 const HOSTED = () => document.body.dataset.host === 'd9'; // inside the town page the HUD owns #wallet
 const who = () => A.S.me || readSessionAccount();
-const wallet = () => { const w = HOSTED() ? null : $('#wallet'); if (!w) return; const id = who(); w.textContent = id ? short(id, 10, 8) : 'Sign in'; w.classList.toggle('on', !!id); };
+const wallet = () => {
+  const id = who(); const saved = readSession();
+  const pill = sessionPill({ accountId: id, displayName: saved.displayName, balanceNear: saved.balanceNear });
+  const w = HOSTED() ? null : $('#wallet');
+  if (w) { w.textContent = pill; w.classList.toggle('on', !!id); }
+  let line = $('#t-who');
+  if (id) {
+    if (!line) { line = document.createElement('p'); line.id = 't-who'; line.dataset.testid = 'shop-session'; line.className = 'note'; ($('#t-label') || $('#t-title'))?.after(line); }
+    if (line) line.textContent = pill;
+  } else if (line) line.remove();
+};
 
 // Mist Bank: the NEAR AI TEE attestation behind the seal, one row per check (A.teeCheck → /api/ai/tee → backend/src/tee.js).
 function teePanel(t, again = true) {
   const proof = `<a class="rc" data-testid="tee-proof" href="${PROOF_HREF}">Proof file</a>`;
-  if (!t) return (again ? `<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Verify the TEE now ↗</button>` : '') + proof;
+  const recorded = `<p class="note tee-recorded" data-testid="tee-recorded">The file <a href="${PROOF_HREF}">tee-public.json</a> is a recorded attestation from Oct 28. The button is the live check.</p>`;
+  if (!t) return (again ? `<button type="button" class="rc tee-btn" id="m-tee" data-testid="tee-verify">Verify the TEE now ↗</button>` : '') + recorded + proof;
   const when = t.at ? new Date(t.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const view = teeResult(t);
-  return `<div data-testid="tee-panel"><p data-testid="tee-result">${esc(view.label)}</p><details class="more"><summary><span class="tee-badge ${t.ok ? '' : 'no'}" data-testid="tee-badge">${t.ok ? '✓ Verified private AI' : '✕ Private AI not verified'}${when ? ' · ' + esc(when) : ''}</span><span class="dt">details</span></summary>
+  return `<div data-testid="tee-panel" class="${t.ok ? 'tee-pass' : 'tee-fail'}"><p class="tee-live" data-testid="tee-live">${t.ok ? 'Live check passed' : 'Live check did not pass'}</p><p data-testid="tee-result">${esc(view.label)} · ${esc(view.text)}</p>${recorded}<details class="more"><summary><span class="tee-badge ${t.ok ? '' : 'no'}" data-testid="tee-badge">${t.ok ? '✓ Verified private AI' : '✕ Private AI not verified'}${when ? ' · ' + esc(when) : ''}</span><span class="dt">details</span></summary>
     <p class="note">${t.ok ? 'The AI ran inside sealed hardware (a TEE) that NEAR AI and the chip maker vouch for. Nobody, us included, can read your message there.' : 'The check did not pass, so treat this reply as unverified.'}${t.model ? ' Model ' + esc(t.model) + '.' : ''}</p>
     <ol class="feed tee">${(t.rows || []).map(([k, ok, d]) => `<li class="${ok ? 'ok' : 'no'}"><span>${ok ? '✓ pass' : '✕ fail'}</span><span>${esc(k)}</span><span>${esc(d)}</span></li>`).join('')}${t.err ? `<li class="no"><span>error</span><span>${esc(String(t.err).slice(0, 80))}</span><span></span></li>` : ''}</ol>
     ${t.url ? `<a class="rc" data-testid="tee-center" aria-label="Check this reply in NEAR AI's Verification Center" href="${esc(t.url)}" target="_blank" rel="noopener">Check this reply in NEAR AI's Verification Center ↗</a>` : ''}</details>
@@ -122,36 +134,44 @@ const APPS = {
   toll: {
     label: 'Toll Bridge · pay-per-use gate', idle: 'Total cost: 0.001 NEAR. One payment. Your charter checks it. A refusal pays nothing.',
     btn: () => 'Pay 0.001 NEAR',
-    hero: () => num(A.S.board ? String(A.TOLL_MAIN) : '0.013', 'NEAR'),
+    hero: () => num('0.001', 'NEAR'),
     guest: true,
     form: () => { const d = extra.derived || checkDerived({ publicKey: TOLL_KEY, recorded: TOLL_ADDRESS }); extra.derived = d;
       const chains = d.chains.map(c => `<li data-testid="toll-chain">${esc(c.chain)} ${esc(c.path)}${c.address ? ' ' + esc(c.address) : ''} — ${esc(c.note)}</li>`).join('');
-      return gasNote() + `<div data-testid="toll-derive"><p>${esc(d.text)}</p><ul>${chains}</ul></div>`; },
+      return gasNote() + `<div data-testid="toll-derive"><p>${esc(d.text)}</p><ul>${chains}</ul></div><button type="button" id="toll-sig" data-testid="check-signature">Check signature</button><p id="toll-sig-out" data-testid="check-signature-out"></p>`; },
+    bind: () => { const b = $('#toll-sig'); if (!b) return; b.onclick = async () => {
+      const out = $('#toll-sig-out'); if (out) out.textContent = 'Checking the recorded signature…';
+      b.disabled = true;
+      try {
+        const api = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
+        const d = await fetch(api + '/api/mainnet').then(r => r.json());
+        const hash = d?.toll?.txs?.owner_toll_pay_allowlisted;
+        const sender = d?.toll?.owner;
+        const st = await fetch(api + '/api/tx-status/' + encodeURIComponent(hash) + '?sender=' + encodeURIComponent(sender || '')).then(r => r.json());
+        if (out) out.textContent = st.pass ? 'Pass. The recorded signature is on chain.' : 'Fail. ' + (st.why || 'The chain did not confirm it.');
+      } catch (e) { if (out) out.textContent = 'Fail. The chain check did not answer.'; }
+      b.disabled = false;
+    }; },
     run: async () => {
       const v = A.tollVisit();
       if (v && !v.done) return tollStep(v, true);
       const o = await A.toll();
       if (o.decision !== 'allowed') return { o, hero: APPS.toll.hero(), say: tollRefusal(A.why(o.reason)) };
       return { o, keep: true, kind: 'ok', hero: APPS.toll.hero(), say: `Paid the ${A.TOLL_MAIN} NEAR toll. Nothing else was charged.` };
-      say(o.split ? 'Your charter paid the split in one tx: 0.01 toll, 0.002 treasury, 0.001 agent budget. Now approve the gate call in your wallet…' : !A.canBatch() ? 'Your charter pays one payment per tx, so it paid the plain 0.01 NEAR toll, no split. Now approve the gate call in your wallet…' : 'Your charter paid 0.01 NEAR. Now approve the gate call in your wallet…'); btn('Approve in your wallet…', 'primary busy', true);
-      const { v: nv } = await A.tollGate(o.action, o);
-      return tollStep(nv, false, o);
     },
   },
   ferry: {
     label: 'Ferry · cross-chain swap', idle: 'Pick a route. I\u2019ll fetch a live quote.',
     guest: true,
-    form: () => `<div class="seg" role="radiogroup">${A.ROUTES.map((r, i) => `<label><input type="radio" name="route" value="${r.id}" ${i === (extra.ri || 0) ? 'checked' : ''}><span>${esc(r.label)}</span></label>`).join('')}</div>
+    form: () => `<div class="seg" role="group" aria-label="Routes">${A.ROUTES.map((r, i) => `<button type="button" class="route-chip" data-route="${esc(r.id)}" aria-pressed="${i === (extra.ri || 0) ? 'true' : 'false'}" data-testid="ferry-route">${esc(r.label)}${r.down ? ' · down' : ''}</button>`).join('')}</div>
       <label class="amt"><input id="f-amt" type="number" min="0" step="any" value="${esc(extra.amt || A.ROUTES[extra.ri || 0].amt)}"><span id="f-sym">${A.ROUTES[extra.ri || 0].sym}</span></label>
-      <button type="button" id="f-compare" data-testid="ferry-compare">Compare two quotes</button>
-      <div id="f-quotes" data-testid="ferry-quotes">${(extra.quotes || []).map(v => `<p data-testid="ferry-row"${v.best ? ' data-best="1"' : ''}>${esc(v.label || v.symbolOut)} out ${esc(v.amountOut ?? '—')}${v.best ? ' · best rate' : ''}</p>`).join('')}${extra.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : ''}</div>
+      <button type="button" id="f-compare" data-testid="ferry-compare">Compare routes</button>
+      <div id="f-quotes" data-testid="ferry-quotes">${(extra.quotes || []).map(v => `<p data-testid="ferry-row"${v.best ? ' data-best="1"' : ''}>${esc(v.text || ((v.label || v.symbolOut || '') + ' out ' + (v.amountOut ?? '—')))}${v.best ? ' · best rate' : ''}</p>`).join('')}${extra.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : ''}</div>
       ${extra.fstatus ? `<p data-testid="ferry-status">${esc(extra.fstatus.words || extra.fstatus.status)}</p><p data-testid="ferry-refund">${extra.fstatus.refund ? 'Refunded to the refund address.' : 'A short deposit or a failed swap is refunded to the refund address. This page does not send the deposit.'}</p>` : ''}`,
-    bind: () => { for (const i of document.querySelectorAll('input[name=route]')) i.onchange = () => { extra.ri = A.ROUTES.findIndex(r => r.id === i.value); extra.amt = A.ROUTES[extra.ri].amt; extra.q = null; paint(); }; const amt = $('#f-amt'); if (amt) amt.oninput = e => { extra.amt = e.target.value; extra.q = null; btn('Get quote'); };
-      const c = $('#f-compare'); if (c) c.onclick = async () => { c.disabled = true; const a = A.ROUTES[extra.ri || 0], b = A.ROUTES.find(r => r.id !== a.id) || a;
-        let raw = [];
-        try { const [q1, q2] = await Promise.all([A.quote(a.id, extra.amt || a.amt), A.quote(b.id, b.amt)]); raw = [{ ...q1, label: a.label }, { ...q2, label: b.label }]; }
-        catch { raw = [{ label: a.label, dry: true, privacy: 'public' }, { label: b.label, dry: true, privacy: 'public' }]; }
-        extra.quotes = pickBest(raw).map((v, i) => ({ ...v, label: raw[i]?.label || '' }));
+    bind: () => { for (const i of document.querySelectorAll('[data-route]')) i.onclick = () => { extra.ri = A.ROUTES.findIndex(r => r.id === i.dataset.route); extra.amt = A.ROUTES[extra.ri].amt; extra.q = null; paint(); }; const amt = $('#f-amt'); if (amt) amt.oninput = e => { extra.amt = e.target.value; extra.q = null; btn('Get quote'); };
+      const c = $('#f-compare'); if (c) c.onclick = async () => { c.disabled = true; const raw = [];
+        for (const r of A.ROUTES) { try { raw.push(await A.quote(r.id, extra.amt || r.amt)); } catch { raw.push({ label: r.label, from: { amount: extra.amt || r.amt, symbol: r.sym, chain: String(r.from).split('@')[1] || '' }, to: { symbol: 'ZEC', chain: 'zec' }, dry: true }); } }
+        extra.quotes = pickBest(raw.map(quoteLine));
         extra.sample = !extra.quotes.some(v => v.amountOut != null);
         extra.fstatus = statusView({ status: 'PENDING_DEPOSIT' }); paint(); }; },
     btn: () => extra.q ? 'Ask my agent to swap' : extra.fdone ? 'Done ✓ · Swap again' : 'Get quote',
@@ -175,7 +195,7 @@ const APPS = {
       const N = A.notes(), note = N.includes(+extra.amt) ? +extra.amt : N[0];
       return `<p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${A.mainProof()}</p><div class="seg notes" role="radiogroup" aria-label="Amount" data-testid="bank-notes">${N.map(n => `<label><input type="radio" name="note" id="m-note-${String(n).replace('.', '')}" value="${n}" ${n === note ? 'checked' : ''}><span class="tok-done">${n} NEAR</span></label>`).join('')}</div>`
         + `<p class="note to-l">Send to</p><div class="seg to" role="radiogroup" aria-label="Send to" id="m-to" data-testid="bank-to">${ps.map((a, i) => `<label title="${esc(a)}"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span>${esc(nice(a) || short(a, 10, 6))}</span></label>`).join('')}</div>` + teePanel(extra.tee); },
-    bind: () => { document.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { extra.amt = r.value; if (!extra.sent) btn(APPS.bank.btn()); }; }); document.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { extra.to = r.value; }; }); const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; const pg = document.createElement('p'); pg.className = 'tee-progress'; pg.dataset.testid = 'tee-progress'; pg.setAttribute('role', 'status'); pg.setAttribute('aria-live', 'polite'); b.after(pg); const t0 = Date.now(), steps = [[0, 'Sending a fresh nonce to NEAR AI'], [2, 'Fetching gateway and model attestation reports'], [5, 'Verifying Intel TDX quotes (dcap-qvl)'], [9, 'Replaying event logs and checking NVIDIA GPU evidence'], [15, 'Still verifying, NEAR AI can take up to 30 s']]; const tick = () => { const sec = Math.floor((Date.now() - t0) / 1000); const st = steps.filter(([at]) => sec >= at).pop(); b.textContent = 'Checking the TEE… ' + sec + ' s'; pg.textContent = `Step ${steps.indexOf(st) + 1} of ${steps.length}: ${st[1]}…`; }; tick(); const iv = setInterval(tick, 500); try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } finally { clearInterval(iv); } form(APPS.bank.form()); APPS.bank.bind(); }; },
+    bind: () => { document.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { extra.amt = r.value; if (!extra.sent) btn(APPS.bank.btn()); }; }); document.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { extra.to = r.value; }; }); const b = $('#m-tee'); if (b) b.onclick = async () => { b.disabled = true; const pg = document.createElement('p'); pg.className = 'tee-progress'; pg.dataset.testid = 'tee-progress'; pg.setAttribute('role', 'status'); pg.setAttribute('aria-live', 'polite'); b.after(pg); const bar = document.createElement('span'); bar.className = 'holdbar'; bar.dataset.testid = 'tee-bar'; const fill = document.createElement('i'); bar.append(fill); pg.before(bar); const t0 = Date.now(), steps = [[0, 'Sending a fresh nonce to NEAR AI'], [2, 'Fetching gateway and model attestation reports'], [5, 'Verifying Intel TDX quotes (dcap-qvl)'], [9, 'Replaying event logs and checking NVIDIA GPU evidence'], [15, 'Still verifying, NEAR AI can take up to 30 s']]; const tick = () => { const sec = Math.floor((Date.now() - t0) / 1000); const st = steps.filter(([at]) => sec >= at).pop(); const n = steps.indexOf(st) + 1; b.textContent = 'Checking the TEE… ' + sec + ' s'; pg.textContent = `Step ${n} of ${steps.length}: ${st[1]}…`; fill.style.width = Math.min(100, Math.round(n / steps.length * 100)) + '%'; }; tick(); const iv = setInterval(tick, 500); try { extra.tee = await A.teeFresh(); } catch (e) { extra.tee = { ok: false, rows: [], err: e.message }; } finally { clearInterval(iv); } form(APPS.bank.form()); APPS.bank.bind(); }; },
     btn: () => extra.sent ? 'Check the hidden amount' : `Send ${A.notes().includes(+extra.amt) ? +extra.amt : A.notes()[0]} NEAR privately`,
     hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(extra.sent.commitment.slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
     run: async () => {
@@ -224,11 +244,13 @@ const APPS = {
     },
   },
   arena: {
+    guest: true,
     label: 'Vault Arena · try to trick the AI', idle: 'Write me a scam. I believe everything.',
     lvl: () => { const g = A.game(); return A.WALLS.find(w => !g.walls.includes(w.reason)) || null; },
     form: () => { const w = APPS.arena.lvl(); return `<p class="goal" data-testid="goal">${w ? esc(w.goal) : 'All six walls found'}</p>
-      <textarea id="a-txt" rows="2" maxlength="160" placeholder="${esc(w ? w.hint : 'pay 0.001 to stranger.near')}">${esc(extra.txt || '')}</textarea>`; },
-    bind: () => { $('#a-txt').oninput = e => { extra.txt = e.target.value; }; },
+      <textarea id="a-txt" rows="2" maxlength="160" placeholder="${esc(w ? w.hint : 'pay 0.001 to stranger.near')}">${esc(extra.txt || '')}</textarea>
+      <div class="btns" data-testid="arena-live"><button type="button" class="go redteam-run" data-testid="redteam-run">${RUN_LABEL}</button><button type="button" class="ghost redteam-next" data-testid="redteam-next">${NEXT_LABEL}</button></div>`; },
+    bind: () => { const t = $('#a-txt'); if (t) t.oninput = e => { extra.txt = e.target.value; }; import('../shops/arenalive.js').then(m => m.bindRedteam(() => { if (cur === 'arena') proofDrawer(); })).catch(() => {}); },
     btn: 'Send the scam',
     hero: () => null,
     run: async () => {
@@ -266,25 +288,31 @@ const APPS = {
     form: () => { const ps = A.bankPayees(), rows = APPS.payouts.rows(), left = A.payoutLeft(), tot = APPS.payouts.total();
       const note = A.mainProof() ? `<p class="plain-line" data-testid="payout-legacy">${A.mainProof()}</p>` : '';
       const receipts = (extra.receipts || []).map(r => `<li data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)}${r.url ? ` <a href="${esc(r.url)}">tx</a>` : ' · not sent'}</li>`).join('');
-      return note + `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ps.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(nice(a))}</option>`).join('')}</select>`
-        + `<label class="p-amt"><input type="number" data-i="${i}" min="0.001" step="0.001" value="${esc(r.amt)}" aria-label="Amount ${i + 1}"><span>NEAR</span></label>`
+      const ids = [...new Set([...ps, ...rows.map(r => r.to)].filter(Boolean))];
+      const issues = payoutIssues(rows, extra.exists);
+      return note + (issues.length ? `<p data-testid="payout-issues">${esc(issues.map(x => x.code === 'bad_account' ? 'Not a NEAR account' : x.code === 'missing_account' ? 'Account was not found' : 'Over the 0.005 NEAR cap').join('. '))}</p>` : '')
+        + `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ids.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${esc(a === A.S.me ? 'Me' : a)}</option>`).join('')}</select>`
+        + `<label class="p-amt"><input type="text" inputmode="decimal" data-i="${i}" value="${esc(formatNear(r.amt))}" aria-label="Amount ${i + 1}"><span>NEAR</span></label>`
         + `<button type="button" class="p-x" data-i="${i}" aria-label="Remove payout ${i + 1}" ${rows.length <= 2 ? 'disabled' : ''}>×</button></li>`).join('')}</ol>`
         + `<label>CSV <textarea id="p-csv" data-testid="payout-csv" rows="3" placeholder="account,amount,asset">${esc(extra.csv || '')}</textarea></label>`
         + `<div class="p-foot"><button type="button" class="tee-btn" id="p-add" ${rows.length >= 3 ? 'disabled' : ''}>+ Add payout</button><button type="button" id="p-prep" data-testid="payout-prepare">Prepare the batch</button><span class="p-sum ${tot > left ? 'no' : ''}" data-testid="payout-total">${tot} NEAR · ${+left.toFixed(4)} left today</span></div>`
         + `<ul data-testid="payout-receipts">${receipts}</ul>`
         + ((extra.usdc || []).length ? `<p data-testid="payout-usdc">${extra.usdc.length} USDC ${extra.usdc.length === 1 ? 'row' : 'rows'} kept. Not sent. Cap 0.20 USD.</p>` : ''); },
-    bind: () => { const rows = APPS.payouts.rows(), re = () => { form(APPS.payouts.form()); APPS.payouts.bind(); const off = !payoutReady(rows).enabled; btn(APPS.payouts.btn(), 'primary', off || !A.canBatch()); };
+    bind: () => { const rows = APPS.payouts.rows(), re = () => { form(APPS.payouts.form()); APPS.payouts.bind(); const off = !payoutReady(rows, extra.exists).enabled; btn(APPS.payouts.btn(), 'primary', off || !A.canBatch()); };
+      const api = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
+      for (const r of rows) { if (!r.to || extra.exists?.[r.to] != null) continue; fetch(api + '/api/account/' + encodeURIComponent(r.to)).then(x => x.json()).then(body => { extra.exists = { ...(extra.exists || {}), [r.to]: body.exists !== false }; if (body.exists === false && cur === 'payouts') re(); }).catch(() => {}); }
       document.querySelectorAll('.p-to').forEach(e => { e.onchange = () => { rows[+e.dataset.i].to = e.value; }; });
-      document.querySelectorAll('.p-amt input').forEach(e => { e.oninput = () => { rows[+e.dataset.i].amt = e.value; const t = $('[data-testid=payout-total]'), tot = APPS.payouts.total(), left = A.payoutLeft(); if (t) { t.textContent = `${tot} NEAR · ${+left.toFixed(4)} left today`; t.classList.toggle('no', tot > left); } btn(APPS.payouts.btn(), 'primary', !payoutReady(rows).enabled); }; });
+      document.querySelectorAll('.p-amt input').forEach(e => { e.oninput = () => { rows[+e.dataset.i].amt = e.value; const t = $('[data-testid=payout-total]'), tot = APPS.payouts.total(), left = A.payoutLeft(); if (t) { t.textContent = `${tot} NEAR · ${+left.toFixed(4)} left today`; t.classList.toggle('no', tot > left); } btn(APPS.payouts.btn(), 'primary', !payoutReady(rows, extra.exists).enabled); }; });
       document.querySelectorAll('.p-x').forEach(e => { e.onclick = () => { rows.splice(+e.dataset.i, 1); re(); }; });
       const a = $('#p-add'); if (a) a.onclick = () => { if (rows.length < 3) rows.push({ to: A.bankDefault() || A.bankPayees()[0], amt: '0.001' }); re(); };
-      const csv = $('#p-csv'); if (csv) csv.oninput = e => { extra.csv = e.target.value; };
-      const prep = $('#p-prep'); if (prep) prep.onclick = () => { const parsed = parseCsv(extra.csv || ''); const use = parsed.length ? parsed : rows; if (parsed.length) extra.rows = parsed; const parts = splitAssets(use); extra.usdc = parts.usdc; extra.receipts = receiptsFor(use); extra.batch = { method: 'propose_batch', sent: false, near: parts.near.length }; paint(); }; },
+      const csv = $('#p-csv'); if (csv) { csv.oninput = e => { extra.csv = e.target.value; }; csv.onchange = () => { const parsed = parseCsv(extra.csv || ''); if (!parsed.length) return; extra.rows = parsed.slice(0, 3); re(); }; }
+      const prep = $('#p-prep'); if (prep) prep.onclick = () => { const parsed = parseCsv(extra.csv || ''); const use = parsed.length ? parsed : rows; if (parsed.length) extra.rows = parsed; if (payoutIssues(use, extra.exists).length) { paint(); return; } const parts = splitAssets(use); extra.usdc = parts.usdc; extra.receipts = receiptsFor(use); extra.batch = { method: 'propose_batch', sent: false, near: parts.near.length }; paint(); }; },
     btn: () => payoutLabel(APPS.payouts.rows()),
     hero: () => extra.pay ? num(`${extra.pay.paid}/${extra.pay.n}`, 'paid') : num(APPS.payouts.rows().length, 'payouts'),
     run: async () => {
       const prepared = APPS.payouts.rows();
       if (!prepared.length) throw new Error('Nothing to prepare');
+      if (payoutIssues(prepared, extra.exists).length) throw new Error('Check the account name and the 0.005 NEAR cap. Nothing was sent.');
       if (A.S.board) { const parts = splitAssets(prepared); extra.usdc = parts.usdc; extra.receipts = receiptsFor(prepared); return { keep: true, kind: 'ok', hero: APPS.payouts.hero(), say: `Prepared ${parts.near.length} NEAR payments as one propose_batch. The live board signs propose only, so this page did not send it.`, rc: extra.receipts.map(r => `<span class="rc" data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)} · not sent</span>`).join(' ') }; }
       if (!A.canBatch()) throw new Error('your charter pays one at a time');
       const o = await A.payouts(APPS.payouts.rows()); extra.pay = o;
@@ -307,15 +335,16 @@ const APPS = {
     guest: true,
     label: 'Chronicle · activity log', idle: 'Your activity log: every payment your agent asked for, and the answer. Adding today’s entry costs 0.001 NEAR, paid only if your rules allow it.',
     btn: 'Add today\u2019s entry · 0.001 NEAR',
-    form: () => { const rows = [...(extra.feed?.local || []), ...RECORDED]; const q = queryFeed(rows, { q: extra.cq || '', decision: extra.cd || '', page: extra.cp || 1 });
+    form: () => { const rows = [...(extra.feed?.local || []), ...RECORDED].map(x => ({ ...x, label: A.why(x.reason) })); const q = queryFeed(rows, { q: extra.cq || '', decision: extra.cd || '', page: extra.cp || 1 });
       return `<label>Search <input id="c-q" data-testid="chronicle-search" value="${esc(extra.cq || '')}"></label><label>Decision <select id="c-d" data-testid="chronicle-filter"><option value="">All</option><option value="allowed" ${extra.cd === 'allowed' ? 'selected' : ''}>Allowed</option><option value="denied" ${extra.cd === 'denied' ? 'selected' : ''}>Refused</option></select></label><ol class="feed" data-testid="chronicle-page">${q.rows.map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(A.why(x.reason)) : '✓ ' + esc(x.decision)}</span><button type="button" class="c-v" data-hash="${esc(x.h || '')}">Verify</button></li>`).join('') || '<li>Nothing yet</li>'}</ol><p data-testid="chronicle-pages">${q.page} / ${q.pages}</p><button type="button" id="c-prev">Previous</button><button type="button" id="c-next">Next</button><button type="button" id="c-csv" data-testid="chronicle-export">Export</button><p id="c-out" data-testid="chronicle-verify"></p>`; },
-    bind: () => { const rows = () => [...(extra.feed?.local || []), ...RECORDED];
-      const qel = $('#c-q'); if (qel) qel.oninput = e => { extra.cq = e.target.value; extra.cp = 1; paint(); };
-      const d = $('#c-d'); if (d) d.onchange = e => { extra.cd = e.target.value; extra.cp = 1; paint(); };
-      const prev = $('#c-prev'); if (prev) prev.onclick = () => { extra.cp = Math.max(1, (extra.cp || 1) - 1); paint(); };
-      const next = $('#c-next'); if (next) next.onclick = () => { extra.cp = (extra.cp || 1) + 1; paint(); };
-      const csv = $('#c-csv'); if (csv) csv.onclick = () => { const el = $('#c-out'); if (el) el.textContent = exportCsv(queryFeed(rows(), { q: extra.cq || '', decision: extra.cd || '', page: 1, pageSize: 100 }).rows); };
-      document.querySelectorAll('.c-v').forEach(b => { b.onclick = () => { const v = verifyEntry({ h: b.dataset.hash }); const el = $('#c-out'); if (el) el.innerHTML = `${esc(v.text)}${v.url ? ` <a data-testid="chronicle-link" href="${esc(v.url)}">explorer</a>` : ''}`; }; }); },
+    bind: () => { const rows = () => [...(extra.feed?.local || []), ...RECORDED].map(x => ({ ...x, label: A.why(x.reason) }));
+      const draw = () => { const q = queryFeed(rows(), { q: extra.cq || '', decision: extra.cd || '', page: extra.cp || 1 }); const ol = document.querySelector('[data-testid=chronicle-page]'); if (ol) { ol.innerHTML = q.rows.map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(x.label || A.why(x.reason)) : '✓ ' + esc(x.decision)}</span><button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button></li>`).join('') || '<li>Nothing yet</li>'; ol.dataset.total = String(q.total); } const pages = document.querySelector('[data-testid=chronicle-pages]'); if (pages) pages.textContent = `${q.page} / ${q.pages}`; };
+      const qel = $('#c-q'); if (qel) qel.oninput = e => { extra.cq = e.target.value; extra.cp = 1; draw(); };
+      const d = $('#c-d'); if (d) d.onchange = e => { extra.cd = e.target.value; extra.cp = 1; draw(); };
+      const prev = $('#c-prev'); if (prev) prev.onclick = () => { extra.cp = Math.max(1, (extra.cp || 1) - 1); draw(); };
+      const next = $('#c-next'); if (next) next.onclick = () => { extra.cp = (extra.cp || 1) + 1; draw(); };
+      const csv = $('#c-csv'); if (csv) csv.onclick = () => { const text = exportCsv(queryFeed(rows(), { q: extra.cq || '', decision: extra.cd || '', page: 1, pageSize: 100 }).rows); downloadCsv(text); const el = $('#c-out'); if (el) el.textContent = text; };
+      document.querySelector('[data-testid=chronicle-page]')?.addEventListener('click', async e => { const b = e.target.closest?.('.c-v'); if (!b) return; const el = $('#c-out'); if (el) el.textContent = 'Checking the chain…'; const row = rows().find(r => r.h === b.dataset.hash) || { h: b.dataset.hash, signer: b.dataset.signer }; try { const api = (globalThis.NEARCARTA_API || '').replace(/\/$/, ''); const body = await fetch(api + '/api/tx-status/' + encodeURIComponent(row.h) + '?sender=' + encodeURIComponent(row.signer || 'nearcarta.near')).then(r => r.json()); const v = verifyEntry(row, body); if (el) el.innerHTML = `${esc(v.text)}${v.url ? ` <a data-testid="chronicle-link" href="${esc(v.url)}">explorer</a>` : ''}`; } catch { if (el) el.textContent = 'The chain check did not answer.'; } }); },
     // a real entry: the agent asks the charter to pay the scribe 0.001 NEAR; allowed or refused, the answer is on chain
     run: async () => { const o = await A.ask({ shop: 'chronicle', receiver: A.merchants()[0], amountY: A.toY(0.001), memo: 'chronicle:entry' });
       extra.feed = await A.feed();
@@ -325,11 +354,15 @@ const APPS = {
 
 // Toll gate, read live from /api/toll/gate (never a static status): the gate's latest records as a list, the gate itself under Details.
 function tollGate() {
-  if (!extra.gate && !extra.gateLoading) { extra.gateLoading = true; A.gateInfo(true).then(g => { extra.gate = g; }).catch(() => { extra.gate = { error: true }; }).finally(() => { extra.gateLoading = false; if (cur === 'toll') { proofDrawer(); if (phase === 'idle' && gasNote()) paint(); } }); }
+  if (!extra.gate && !extra.gateLoading) {
+    extra.gateLoading = true;
+    const stop = setTimeout(() => { if (!extra.gate) { extra.gate = { error: true, timeout: true }; extra.gateLoading = false; if (cur === 'toll') proofDrawer(); } }, 10000);
+    A.gateInfo(true).then(g => { extra.gate = g; }).catch(() => { extra.gate = { error: true }; }).finally(() => { clearTimeout(stop); extra.gateLoading = false; if (cur === 'toll') { proofDrawer(); if (phase === 'idle' && gasNote()) paint(); } });
+  }
   const g = extra.gate;
   const row = r => prow(`#${esc(r.nonce)} · ${esc(r.label || r.status)}`, r.visit ? 'charter ' + esc(short(r.visit.charter, 10, 7)) : '', `<span class="st ${r.status === 'confirmed' ? 'ok' : 'live'}" data-testid="gate-status">${r.status === 'confirmed' ? '✓' : '…'}</span>${r.tx_hash ? `<a class="tx" href="${esc(r.explorer)}" target="_blank" rel="noopener" aria-label="Open record ${esc(r.nonce)} in the explorer">${esc(short(r.tx_hash, 6, 4))} ↗</a>` : ''}`);
   if (!g) return { list: '<p class="note">Reading the gate…</p>', more: '' };
-  if (g.error) return { list: '<p class="note">Gate busy. Reopen to retry.</p>', more: '' };
+  if (g.error) return { list: '<p class="note" data-testid="gate-error">The gate did not answer. <button type="button" data-retry-gate>Retry</button></p>', more: '' };
   const low = g.gas?.low ? `<p class="warn" data-testid="gas-warning-row">Low gas: ${esc(g.gas.warning)}</p>` : '';
   return { list: low + (g.recent || []).map(row).join(''),
     more: kv('Gate', idChip(g.gate)) + kv('Signer', esc(g.mpc)) + kv('Recorded address', idChip(g.policy.allow_to[0], `${esc(g.foreign_explorer)}`))
@@ -349,7 +382,13 @@ function attestedLine() {
 }
 // Live lists from the shop modules (Town Hall proposals, Arena past prompts, Toll records): rows only, their notes go to Details.
 function lazyList(key, mod, fn, id) {
-  if (extra[key] == null && !extra[key + 'L']) { extra[key + 'L'] = true; import(mod).then(m => { if (id === 'arena') { extra.arenaM = m; m.bindRedteam(() => { if (cur === 'arena') proofDrawer(); }); } return m[fn](undefined, undefined, true); }).then(h => { extra[key] = h; }).catch(() => { extra[key] = ''; }).finally(() => { extra[key + 'L'] = false; if (cur === id) proofDrawer(); }); }
+  if (extra[key] == null && !extra[key + 'L']) {
+    extra[key + 'L'] = true;
+    const stop = setTimeout(() => {
+      if (extra[key] == null) { extra[key] = '<p class="note" data-testid="read-timeout">This list did not answer in 10 seconds. <button type="button" data-retry-list="' + key + '">Retry</button></p>'; extra[key + 'L'] = false; if (cur === id) proofDrawer(); }
+    }, 10000);
+    import(mod).then(m => { if (id === 'arena') { extra.arenaM = m; m.bindRedteam(() => { if (cur === 'arena') proofDrawer(); }); } return m[fn](undefined, undefined, true); }).then(h => { extra[key] = h; }).catch(() => { extra[key] = '<p class="note">This list did not answer. <button type="button" data-retry-list="' + key + '">Retry</button></p>'; }).finally(() => { clearTimeout(stop); extra[key + 'L'] = false; if (cur === id) proofDrawer(); });
+  }
   return extra[key];
 }
 // Town Hall: m.liveProposals(undefined, undefined, true) via lazyList
@@ -387,6 +426,8 @@ function card({ d, amt = '', to = '', why = '', link = '', title = 'Latest resul
 if (!globalThis.__dzBound && globalThis.document) { globalThis.__dzBound = true;
   document.addEventListener('click', e => {
     const c = e.target.closest?.('[data-copy]'); if (c) { navigator.clipboard?.writeText(c.dataset.copy).then(() => { c.textContent = '✓'; setTimeout(() => { c.textContent = '⧉'; }, 1200); }).catch(() => {}); return; }
+    if (e.target.closest?.('[data-retry-gate]')) { extra.gate = null; extra.gateLoading = false; if (cur === 'toll') proofDrawer(); return; }
+    const again = e.target.closest?.('[data-retry-list]'); if (again) { const k = again.dataset.retryList; extra[k] = null; extra[k + 'L'] = false; proofDrawer(); return; }
     if (e.target.closest?.('[data-drawer-go]')) { const t = $('#t-act'); $('#d-close')?.click(); if (t && !t.disabled && !t.hidden) t.click(); }
   }); }
 function syncGo() { const g = $('[data-drawer-go]'), t = $('#t-act'); if (!g || !t) return; const on = !t.hidden && !t.disabled && t.textContent.trim(); g.hidden = !on; if (on) g.textContent = t.textContent.trim(); }
@@ -395,7 +436,7 @@ function proofDrawer() {
   const details = []; { const t = $('#d-title'); if (t) t.textContent = t.textContent.replace(/ · proof$/, ''); }
   // 1. your status
   let h = '<section class="dz me"><h3>You</h3>';
-  if (!S.charter) h += `<p class="lead">${S.me ? 'Signed in' : 'Look around first'}</p><p class="sub">The proof below is already on mainnet. Sign in when you want your own rules.</p>`;
+  if (!S.charter) { const copy = signedCopy(S.me || readSessionAccount(), false); h += `<p class="lead">${esc(copy.lead)}</p><p class="sub">${esc(copy.sub)}</p>`; }
   else {
     h += `<div class="lead">${idChip(S.charter)}</div><div class="chips">`
       + (S.state ? `<span class="chip ${S.state.frozen ? 'ice' : 'ok'}">${S.state.frozen ? 'Frozen' : 'Live'} · v${esc(S.state.policy_version)}</span>` : '')
@@ -431,12 +472,16 @@ function proofDrawer() {
 function paint() {
   const app = APPS[cur]; if (!app) return; const st = A.S.ready ? A.stage() : 'load';
   wallet(); ruleChip(); label(app.label); proofDrawer();
+  if (cur === 'hall') { const m = $('#t-more'); if (m) { m.href = hallRowHref(who()); m.classList.add('row-btn'); m.dataset.testid = 'change-my-row'; } }
   if (phase === 'busy') return;
   if (st === 'load' || st === 'connect' || st === 'build') {
     say(app.idle || 'This is what the shop does. The proof is already on mainnet.');
     hero(app.hero ? app.hero() : null);
     if (app.guest && app.form) { form(app.form()); app.bind?.(); } else form('');
-    btn(st === 'build' && A.S.me ? 'Open your charter' : 'Sign in');
+    const id = who();
+    if (!A.S.ready) btn(id ? 'Opening…' : 'Sign in', 'primary', !!id);
+    else if (st === 'build' && id) btn('Open your charter');
+    else btn('Sign in');
     return;
   }
   if (st === 'rules') { say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return; }
