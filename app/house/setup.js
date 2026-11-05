@@ -130,7 +130,7 @@ async function afterPrivy() {
   const c = mainnetWallet(); await c.whenManifestLoaded;
   await c.connect({ walletId: 'nearcarta-privy' });
   st.trial = false; save();
-  await signedIn(await mainnetAccount());
+  await signedIn(await mainnetAccount(), 'nearcarta-privy');
 }
 function wireSignin() {
   if (me) return wire();
@@ -143,7 +143,7 @@ function wireSignin() {
   const ro = $('#reopen'); if (ro) ro.onclick = () => { finishTry++; busy = false; finishSignin(fin, true); };
   const re = $('#reemail'); if (re) re.onclick = e => { e.preventDefault(); e.stopPropagation(); emailStage = 'email'; msg = ''; render(); };
   $('#wallet').onclick = e => act(e.currentTarget, async () => { st.trial = false; save(); signedIn(await connect(t => { msg = t; }, 'mainnet')); });
-  $('#mm').onclick = e => act(e.currentTarget, async () => { msg = ''; st.trial = false; save(); await mainnetWallet().connect({ walletId: 'ethereum-wallets' }); await signedIn(await mainnetAccount()); });
+  $('#mm').onclick = e => act(e.currentTarget, async () => { msg = ''; st.trial = false; save(); await mainnetWallet().connect({ walletId: 'ethereum-wallets' }); await signedIn(await mainnetAccount(), 'ethereum-wallets'); });
 }
 // The sign-in tab can open behind this one. Watch for it to connect (storage event from the same origin, or the
 // wallet callback), move on by itself, and after 3 s offer a button that opens it again in front.
@@ -162,10 +162,12 @@ window.addEventListener('storage', async () => {
   if (me || emailStage !== 'finish') return;
   const a = await mainnetAccount().catch(() => null); if (a && !me) { finishTry++; clearTimeout(helpTimer); emailStage = 'email'; msg = ''; await signedIn(a); }
 });
-async function signedIn(id) {
+async function signedIn(id, walletId) {
   if (!id) return;
   me = id; st.accountId = id; save();
-  writeSession({ accountId: id, displayName: st.displayName || '' });
+  const patch = { accountId: id, displayName: st.displayName || '' };
+  if (walletId) patch.walletId = walletId;
+  writeSession(patch);
   const dest = nextPath(location.search);
   if (dest) { location.replace(dest); return; }
   done(0); await refreshBal();

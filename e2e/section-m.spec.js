@@ -53,6 +53,9 @@ test('M2 another attack changes the prompt and does not ask the vault', async ({
 test('M3 a blank payee prepares nothing', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/shops/payouts/');
+  await expect(page.getByTestId('payout-to')).toHaveCount(0);
+  await page.getByTestId('payout-add').click();
+  await page.getByTestId('payout-add').click();
   await expect(page.getByTestId('payout-to')).toHaveCount(2);
   await page.getByTestId('payout-prepare').click();
   await expect(page.getByTestId('payout-receipt')).toHaveCount(0);
@@ -136,7 +139,9 @@ test('M8 guardhouse names the empty hash and the missing first-seen', async ({ p
   await page.goto('/shops/guard/');
   await page.getByTestId('guard-account').fill('nearcarta.near');
   await page.getByTestId('guard-check').click();
-  await expect(page.getByTestId('guard-verdict')).toHaveText('warn', { timeout: 30_000 });
+  await expect(page.getByTestId('guard-verdict')).toContainText('Warn because:', { timeout: 30_000 });
+  await expect(page.getByTestId('guard-verdict')).toContainText('no contract (code hash empty)');
+  await expect(page.getByTestId('guard-verdict')).toContainText('first-seen unknown');
   const reasons = page.getByTestId('guard-reason');
   await expect(reasons.filter({ hasText: 'no contract' })).toHaveCount(1);
   await expect(reasons.filter({ hasText: 'first-seen' })).toHaveCount(1);

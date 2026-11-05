@@ -6,3 +6,22 @@
 [data-testid=room-boundary]{color:#e8c08a;font-weight:600}
 .shop-page{max-width:880px;margin:0 auto;padding:16px}
 .shop-page h1{font-size:28px;margin:8px 0}
+.hall-facts,.hall-meta dd{overflow-wrap:anywhere}
+.hall-meta{display:grid;gap:8px;margin:8px 0 12px}
+.hall-meta div{display:grid;grid-template-columns:4.5rem minmax(0,1fr);gap:8px;align-items:start}
+.hall-meta dt{margin:0;color:#d4c4a8;font-weight:600}
+.hall-meta dd{margin:0}
+@media (max-width:480px){.hall-meta div{grid-template-columns:minmax(0,1fr);gap:2px}}
+.hall-skel{display:grid;gap:10px;padding:8px 0 16px}
+.hall-skel span{display:block;height:14px;border-radius:7px;background:linear-gradient(90deg,#3a3128 0%,#6b5a3a 50%,#3a3128 100%);background-size:200% 100%;animation:hallShimmer 1.2s ease-in-out infinite}
+.hall-skel span:nth-child(2){width:82%}
+.hall-skel span:nth-child(3){width:54%}
+@keyframes hallShimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){.hall-skel span{animation:none}}
+/* Payee radios sit with their labels. Long account ids wrap inside the column. */
+.seg.to{display:grid;gap:8px;justify-items:start}
+.seg.to label.payee,#shopUI .seg.to label.payee{position:relative;display:flex;flex-direction:row;align-items:flex-start;justify-content:flex-start;gap:8px;width:100%;max-width:100%;margin:0}
+.seg.to label.payee input,#shopUI .seg.to input[type=radio]{position:static;opacity:1;inset:auto;width:18px;height:18px;margin:2px 0 0;flex:none}
+.seg.to .payee-id,#shopUI .seg.to .payee-id{display:inline;height:auto;padding:0;border:0;border-radius:0;background:none;white-space:normal;overflow-wrap:anywhere;color:#f3ead8;line-height:1.35}
+button:disabled,button.primary:disabled{opacity:1 !important;color:#2A1608 !important;background-image:none !important;background-color:#e6d3a8 !important;border:1px solid #8b5e2b !important;box-shadow:none !important;animation:none !important;cursor:not-allowed}
+.control-reason{color:#f3ead8;font-weight:650;font-size:14px;line-height:1.4;margin:6px 0 0}

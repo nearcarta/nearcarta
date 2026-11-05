@@ -50,6 +50,29 @@ export function clearSessionAccount(storage = globalThis.localStorage) {
   return writeSession({ accountId: null, balanceNear: null }, storage);
 }
 
+/** The wallet id saved with the session, if it is a short connector id. */
+export function savedWalletId(saved) {
+  const id = typeof saved?.walletId === 'string' ? saved.walletId.trim() : '';
+  if (!id || id.length > 64 || /[\s/]/.test(id)) return '';
+  return id;
+}
+
+/**
+ * What to do on load. A live wallet account is the session.
+ * A saved account with no live wallet needs one click.
+ */
+export function restorePlan(storage = globalThis.localStorage, liveAccount = '') {
+  const saved = visitor(storage);
+  const live = sessionAccount({ accountId: liveAccount }) || '';
+  if (live && (!saved.signedIn || saved.accountId === live)) {
+    return { accountId: live, needsClick: false, walletId: savedWalletId(readSession(storage)) };
+  }
+  if (saved.signedIn) {
+    return { accountId: saved.accountId, needsClick: !live, walletId: savedWalletId(readSession(storage)), note: 'The wallet is not connected in this tab.' };
+  }
+  return { accountId: '', needsClick: false, walletId: '', note: '' };
+}
+
 /** Same-origin path from ?next=. Drops a preview flag so a return never opens the demo row. */
 export function nextPath(search = '') {
   const q = new URLSearchParams(String(search || '').replace(/^\?/, ''));

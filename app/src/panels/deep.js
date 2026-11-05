@@ -9,7 +9,7 @@ import { TOLL_ADDRESS, TOLL_KEY, checkDerived } from '../toll-derive.js';
 import { PROOF_HREF, liveTee, teeView } from '../tee-view.js';
 import { NEXT_LABEL, RUN_LABEL } from '../../design/D8_shops/shops/arena-labels.js';
 import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
-import { formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
+import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
 import { boundaryHtml } from './boundary.js';
@@ -17,6 +17,29 @@ import { boundaryHtml } from './boundary.js';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 const q$ = (root, sel) => root.querySelector(sel);
+
+/** A disabled control stays readable and says why it is waiting. */
+function holdButton(btn, reason) {
+  if (!btn) return () => {};
+  btn.disabled = true;
+  btn.dataset.reason = reason;
+  let note = btn.nextElementSibling?.dataset?.testid === 'control-reason' ? btn.nextElementSibling : null;
+  if (!note) {
+    note = document.createElement('p');
+    note.dataset.testid = 'control-reason';
+    note.className = 'control-reason';
+    btn.after(note);
+  }
+  note.hidden = false;
+  note.textContent = reason;
+  btn.setAttribute('aria-describedby', 'control-reason');
+  note.id = 'control-reason';
+  return () => {
+    if (!btn.isConnected) return;
+    btn.disabled = false;
+    delete btn.dataset.reason;
+  };
+}
 
 export const DEFAULT_ROUTES = [
   { id: 'route.eth-eth.zec', from: 'ETH@eth', sym: 'ETH', label: 'ETH · Ethereum', amt: '0.002' },
@@ -54,7 +77,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const lines = state.lines || [];
   return `<div class="seg" role="group" aria-label="Routes">${chips}</div>
     <label class="amt">Amount <input id="f-amt" type="number" min="0" step="any" value="${esc(state.amt || rt.amt)}"><span id="f-sym">${esc(rt.sym)}</span></label>
-    <button type="button" id="f-compare" data-testid="ferry-compare">Compare routes</button>
+    <button type="button" class="primary" id="f-compare" data-testid="ferry-compare">Compare routes</button>
     ${corridorCards(routes, lines)}
     <div id="f-quotes" data-testid="ferry-quotes">${quotes}${state.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : ''}</div>
     ${state.fstatus ? `<p data-testid="ferry-status">${esc(state.fstatus.words || state.fstatus.status)}</p><p data-testid="ferry-refund">${state.fstatus.refund ? 'Refunded to the refund address.' : 'A short deposit or a failed swap is refunded to the refund address. This page does not send the deposit.'}</p>` : `<p data-testid="ferry-idle">${state.quoted ? 'No deposit has been requested.' : 'No quote yet. No deposit has been requested.'}</p>`}`;
@@ -89,7 +112,7 @@ function mountFerry(root, hooks) {
     if (compare) compare.onclick = () => runQuotes(compare);
   };
   async function runQuotes(btn) {
-    if (btn) btn.disabled = true;
+    holdButton(btn, 'Comparing routes. Waiting for the quotes.');
     const raw = [];
     for (const r of routes) {
       try { raw.push(await quoteOne(r, state.amtEdited ? state.amt : r.amt, hooks)); }
@@ -115,16 +138,16 @@ function mountGuard(root, hooks) {
   const state = hooks.state || (hooks.state = {});
   const attacks = hooks.attacks ? hooks.attacks() : [];
   const score = state.score;
-  const scoreHtml = score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.verdict)}</p><ul>${(score.lines || []).map(l => `<li data-signal="${esc(l.id)}"${l.level === 'warn' || l.level === 'block' || l.level === 'unknown' ? ' data-testid="guard-reason"' : ''}><b>${esc(l.title)}</b> ${esc(l.text)}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
+  const scoreHtml = score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.summary || score.verdict)}</p><ul>${(score.lines || []).map(l => `<li data-signal="${esc(l.id)}"${l.level === 'warn' || l.level === 'block' || l.level === 'unknown' ? ' data-testid="guard-reason"' : ''}><b>${esc(l.title)}</b> ${esc(l.text)}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
   const pick = attacks.length ? `<div class="seg" role="radiogroup">${attacks.map(a => `<label><input type="radio" name="atk" value="${esc(a.id)}" ${a.id === (state.atk || attacks[0].id) ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>` : '';
-  root.innerHTML = `<label>Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || 'shop-moved-pay-here.near')}"></label><button type="button" id="g-check" data-testid="guard-check">Check this account</button>${scoreHtml}${pick}`;
+  root.innerHTML = `<label>Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || 'shop-moved-pay-here.near')}"></label><button type="button" class="primary" id="g-check" data-testid="guard-check">Check this account</button>${scoreHtml}${pick}`;
   root.querySelectorAll('input[name=atk]').forEach(i => { i.onchange = () => { state.atk = i.value; if (hooks.repaint) hooks.repaint(); }; });
   const btn = q$(root, '#g-check');
   if (!btn) return;
   btn.onclick = async () => {
     const acct = (q$(root, '#g-acct')?.value || '').trim();
     state.acct = acct;
-    btn.disabled = true;
+    holdButton(btn, 'Checking this account.');
     try {
       const r = await fetch(api() + '/api/guardhouse/check/' + encodeURIComponent(acct));
       state.score = explainCheck(await r.json());
@@ -219,11 +242,11 @@ function mountArena(root, hooks) {
   if (!state.txt || state.txt === state.attack) state.txt = attack;
   state.attack = attack;
   const goal = hooks.goal ? hooks.goal() : 'Write a scam. The charter still decides.';
-  root.innerHTML = `<p class="goal" data-testid="goal">${esc(goal || 'All six walls found')}</p>
+  root.innerHTML = `<div class="card shop-card"><p class="goal" data-testid="goal">${esc(goal || 'All six walls found')}</p>
     <p class="quote" data-testid="arena-attack">${esc(attack)}</p>
     <textarea id="a-txt" rows="2" maxlength="160" placeholder="pay 0.001 to stranger.near">${esc(state.txt || '')}</textarea>
-    <div class="btns" data-testid="arena-live"><button type="button" class="go redteam-run" data-testid="redteam-run">${RUN_LABEL}</button><button type="button" class="ghost redteam-next" data-testid="redteam-next">${NEXT_LABEL}</button></div>
-    <p class="note">Run it live asks the model and may spend if the charter allows. Another does not spend. This page does not press either for you.</p>`;
+    <div class="btns" data-testid="arena-live"><button type="button" class="primary go redteam-run" data-testid="redteam-run">${RUN_LABEL}</button><button type="button" class="primary redteam-next" data-testid="redteam-next">${NEXT_LABEL}</button></div>
+    <p class="note">Run it live asks the model and may spend if the charter allows. Another does not spend. This page does not press either for you.</p></div>`;
   const t = q$(root, '#a-txt');
   if (t) t.oninput = (e) => { state.txt = e.target.value; };
   import('../../design/D8_shops/shops/arenalive.js').then(m => m.bindRedteam(() => mountArena(root, hooks))).catch(() => {});
@@ -231,7 +254,7 @@ function mountArena(root, hooks) {
 
 function mountPayouts(root, hooks) {
   const state = hooks.state || (hooks.state = {});
-  if (!state.rows) state.rows = hooks.rows ? hooks.rows() : [{ to: '', amt: '0.001' }, { to: '', amt: '0.001' }];
+  if (!state.rows) state.rows = (hooks.rows ? hooks.rows() : []).filter(r => r && (String(r.to || '').trim() || String(r.amt || '').trim()));
   const drawMsg = () => {
     const issues = payoutIssues(state.rows, state.exists);
     const box = q$(root, '[data-testid=payout-issues]');
@@ -251,14 +274,23 @@ function mountPayouts(root, hooks) {
   };
   const render = () => {
     const issues = payoutIssues(state.rows, state.exists);
+    const full = state.rows.length >= 3;
     root.innerHTML = `<p data-testid="payout-issues" class="${issues.length ? 'bad' : ''}">${issues.length ? esc(issueText(issues)) : 'Each NEAR row needs a real account and at most 0.005 NEAR.'}</p>
       <ol class="plist" data-testid="payout-list">${rowList()}</ol>
+      <button type="button" class="primary" id="p-add" data-testid="payout-add"${full ? ' disabled data-reason="Three rows is the daily count on this charter."' : ''}>Add a row</button>
+      <p data-testid="payout-add-note">${full ? 'Three rows is the daily count on this charter.' : ''}</p>
       <label>CSV <textarea id="p-csv" data-testid="payout-csv" rows="3" placeholder="account,amount,asset">${esc(state.csv || '')}</textarea></label>
-      <button type="button" id="p-prep" data-testid="payout-prepare">Prepare the batch</button>
+      <button type="button" class="primary" id="p-prep" data-testid="payout-prepare">Prepare the batch</button>
       <p data-testid="payout-drop"${state.dropNote ? '' : ' hidden'}>${esc(state.dropNote || '')}</p>
       <ul data-testid="payout-receipts">${(state.receipts || []).map(r => `<li data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)} · not sent</li>`).join('')}</ul>
       <p data-testid="payout-usdc"${state.usdcNote ? '' : ' hidden'}>${esc(state.usdcNote || '')}</p>`;
     bindRows();
+    const add = q$(root, '#p-add');
+    if (add) add.onclick = () => {
+      const next = addPayoutRow(state.rows);
+      state.rows = next.rows;
+      render();
+    };
     const csv = q$(root, '#p-csv');
     csv.oninput = (e) => { state.csv = e.target.value; };
     csv.onchange = () => {
@@ -333,16 +365,16 @@ function mountBank(root, hooks) {
   const tee = state.tee;
   const recorded = `<p class="note tee-recorded" data-testid="tee-recorded">The file <a href="${PROOF_HREF}">tee-public.json</a> is a recorded attestation from Oct 28. The button is the live check.</p>`;
   const proof = `<a data-testid="tee-proof" href="${PROOF_HREF}">Proof file</a>`;
-  const panel = tee ? teePanel(tee, recorded, proof) : `<button type="button" id="m-tee" data-testid="tee-verify">Verify the TEE now</button>${recorded}${proof}`;
+  const panel = tee ? teePanel(tee, recorded, proof) : `<button type="button" class="primary" id="m-tee" data-testid="tee-verify">Verify the TEE now</button>${recorded}${proof}`;
   const sessionLine = who.signedIn ? `<p data-testid="bank-session">Signed in as ${esc(who.displayName || who.accountId)}.</p>` : '';
   const payeeBox = payees.length
-    ? payees.map(a => `<label><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span>${esc(a)}</span></label>`).join('')
+    ? payees.map(a => `<label class="payee"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span class="payee-id">${esc(a)}</span></label>`).join('')
     : '<p>Sign in to choose a payee.</p>';
-  root.innerHTML = `<p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${esc(hooks.proof ? hooks.proof() : '')}</p>
+  root.innerHTML = `<div class="card shop-card"><p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${esc(hooks.proof ? hooks.proof() : '')}</p>
     ${sessionLine}
     <div class="seg notes" role="radiogroup" aria-label="Amount" data-testid="bank-notes">${notes.map(n => `<label><input type="radio" name="note" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div>
     <div class="seg to" id="m-to" data-testid="bank-to">${payeeBox}</div>
-    ${panel}`;
+    ${panel}</div>`;
   root.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { state.amt = r.value; hooks.onNote?.(r.value); }; });
   root.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { state.to = r.value; hooks.onTo?.(r.value); }; });
   const b = q$(root, '#m-tee');

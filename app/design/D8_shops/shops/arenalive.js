@@ -41,9 +41,10 @@ export function advanceAttack() { rt.i += 1; rt.out = null; return attackAt(); }
 // The side panel's parts: one action (run the attack), the result as a card, the raw event under Details.
 export function redteamParts() {
   const r = rt.out, atk = ATTACKS[rt.i % ATTACKS.length];
-  const action = `<section class="dz act1"><h3>Try an attack</h3><p class="quote">“${esc(atk)}”</p>
-    <div class="btns"><button type="button" class="go redteam-run" ${rt.busy ? 'disabled' : ''}>${rt.busy ? 'Running…' : RUN_LABEL}</button>
-    <button type="button" class="ghost redteam-next" ${rt.busy ? 'disabled' : ''}>${NEXT_LABEL}</button></div></section>`;
+  const action = `<section class="dz act1 card"><h3>Try an attack</h3><p class="quote">“${esc(atk)}”</p>
+    <div class="btns"><button type="button" class="primary go redteam-run" ${rt.busy ? 'disabled data-reason="Running the attack."' : ''}>${rt.busy ? 'Running…' : RUN_LABEL}</button>
+    <button type="button" class="primary redteam-next" ${rt.busy ? 'disabled data-reason="Wait for this attack to finish."' : ''}>${NEXT_LABEL}</button></div>
+    ${rt.busy ? '<p class="control-reason" data-testid="control-reason">Running the attack.</p>' : ''}</section>`;
   if (!r) return { action, card: '', more: '' };
   if (r.error) return { action, card: `<section class="dz"><h3>Latest result</h3><article class="card no" data-testid="redteam-error"><p class="why">Stopped: ${esc(r.error)}</p></article></section>`, more: '' };
   const ev = r.event?.data?.[0] || {}, dec = ev.decision || r.decision, ok = dec === 'allowed';

@@ -116,6 +116,38 @@ export function readBack(draft) {
   return { ...draft, receivers: [...(draft.receivers || [])] };
 }
 
+/** True when every field the draft changed is already on the chain read. */
+export function rowCaughtUp(before, draft, read) {
+  if (!read) return false;
+  const want = diffCharter(before, draft);
+  if (!want.length) return true;
+  return want.every(d => JSON.stringify(read[d.field]) === JSON.stringify(d.to));
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/** Poll until the status says the transaction is final, or the attempts run out. */
+export async function waitForFinal(poll, { attempts = 6, pauseMs = 200, wait = sleep } = {}) {
+  let last = null;
+  for (let i = 0; i < attempts; i++) {
+    last = await poll();
+    if (last?.final === true || last?.pass === true) return { ready: true, ok: !!last?.pass, status: last, attempts: i + 1 };
+    if (i + 1 < attempts) await wait(pauseMs);
+  }
+  return { ready: false, ok: false, status: last, attempts };
+}
+
+/** Re-read get_charter until the changed fields match the draft. A stale first read is not the answer. */
+export async function readUntilChange({ before, draft, read, attempts = 6, pauseMs = 250, wait = sleep } = {}) {
+  let last = null;
+  for (let i = 0; i < attempts; i++) {
+    last = await read();
+    if (rowCaughtUp(before, draft, last)) return { row: last, changed: true, attempts: i + 1 };
+    if (i + 1 < attempts) await wait(pauseMs);
+  }
+  return { row: last, changed: false, attempts };
+}
+
 /** No call when the form already matches the row. Names the cap instead of "0 calls". */
 export function matchNote(before, draft) {
   const calls = callsFor(before, draft);

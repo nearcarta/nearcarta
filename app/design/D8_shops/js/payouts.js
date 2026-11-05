@@ -7,10 +7,21 @@ const IMPLICIT = /^[0-9a-f]{64}$/;
 export const nearAccountOk = id => { const s = String(id || '').trim(); return IMPLICIT.test(s) || NAMED.test(s); };
 export const nearAmountOk = (amt, cap = NEAR_CAP) => { const n = Number(amt); return Number.isFinite(n) && n > 0 && n <= cap + 1e-12; };
 export const formatNear = amt => {
+  if (amt == null || String(amt).trim() === '') return '';
   const n = Number(amt);
   if (!Number.isFinite(n)) return '';
   return String(Math.round(n * 1e6) / 1e6);
 };
+
+export const MAX_ROWS = 3;
+
+/** A new row is blank. Three rows is the daily count. */
+export function addPayoutRow(rows) {
+  const list = (rows || []).map(r => ({ to: r?.to || '', amt: r?.amt ?? '' }));
+  if (list.length >= MAX_ROWS) return { rows: list, added: false, reason: 'Three rows is the daily count on this charter.' };
+  list.push({ to: '', amt: '' });
+  return { rows: list, added: true, reason: '' };
+}
 
 /** One full sentence per issue. Blank rows are not errors yet. */
 export function issueLine(x) {
