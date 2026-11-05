@@ -29,7 +29,7 @@ export const displayOk = n => /^[A-Za-z][A-Za-z0-9][A-Za-z0-9 '.-]{0,22}$/.test(
 export function portraitHTML(look, dye, outfit, name) {
   const hex = HEX.test(dye?.hex || '') ? dye.hex : '#00ec97';
   const fit = OUTFITS.some(o => o.id === outfit) ? outfit : 'lantern';
-  const lamp = fit === 'lantern' ? '<svg class="lamp" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 6v6" stroke="#eef2ff" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="16" r="4" fill="#ffc56e"/><circle cx="16" cy="16" r="8" fill="#ffc56e" opacity=".35"/></svg>' : '';
+  const lamp = fit === 'lantern' ? '<svg class="lamp" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 6v6" stroke="#eef2ff" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="16" r="4" fill="#00ec97"/><circle cx="16" cy="16" r="8" fill="#00ec97" opacity=".35"/></svg>' : '';
   return `<div class="portrait" data-outfit="${esc(fit)}" style="--dye:${hex}" data-testid="setup-portrait"><span class="glow"></span><img src="/setup/chars/${esc(look?.img || 'mage')}.webp" alt=""><span class="wash"></span>${lamp}<b>${esc(name || look?.name || 'Agent')}</b></div>`;
 }
 
