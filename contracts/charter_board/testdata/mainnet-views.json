@@ -1,0 +1,33 @@
+{
+  "account": "board.nearcarta.near",
+  "block_height": 223191542,
+  "state_bytes": 804,
+  "config": {
+    "owner": "nearcarta.near",
+    "rows": 2,
+    "max_row_yocto": "20000000000000000000000",
+    "byte_yocto": "10000000000000000000"
+  },
+  "charter": {
+    "owner": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8",
+    "receivers": [
+      "charter.nearcarta.near",
+      "toll.nearcarta.near"
+    ],
+    "per_action_cap": "4000000000000000000000",
+    "daily_budget": "10000000000000000000000",
+    "max_actions_per_day": 3,
+    "window_start_min": 0,
+    "window_end_min": 0,
+    "min_amount": "100000000000000000000",
+    "expires_at": "1796425757348000000",
+    "frozen": false,
+    "sealed": false,
+    "agent": "9cecd259f3873c451010e8b7949114dcfd7c7229316f50146f39d872b5b50b94",
+    "nonce": "3",
+    "balance": "3000000000000000000000",
+    "storage_locked": "3870000000000000000000",
+    "spent_today": "3000000000000000000000",
+    "actions_today": 3
+  }
+}

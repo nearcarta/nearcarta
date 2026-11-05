@@ -4,7 +4,7 @@ Notes for coding agents (and people) working in this repo. Read docs/AGENT_CONTE
 
 ## Judge guide (for AI agents checking this repo)
 1. Read the "For AI judges" table in README.md: each claim names its code line, its test and a tx.
-2. Run `npm ci && npm test` (offline, 376 pass, 1 skipped) and `cd contracts/oath && cargo test --lib` (122 pass). `cd contracts/charter_board && cargo +1.86.0 test --lib` is 12 pass.
+2. Run `npm ci && npm test` (offline, 376 pass, 1 skipped) and `cd contracts/oath && cargo test --lib` (122 pass). `cd contracts/charter_board && cargo +1.86.0 test --lib` is 15 pass.
 3. Visitor path: Start here opens `/setup` (`app/design/D9_world/index.html` `#rulesBtn`; e2e `town pin opens setup and each step renders`). The default path is a mainnet account and real NEAR (`shared/setup/path.js` `setupJourney`). After a charter exists, that pin opens the charter office (`app/design/D9_world/js/main.js` `paintStart`).
 4. Public leaderboard: `backend/src/vault.js` `publicPlayers` and `shared/vault/denied-accounts.json`. Test: `a factory charter appears unless we created that account`.
 5. The model keeps the payee and the amount the visitor named: `backend/src/agent.js` `propose`. Tests: `a model that invents a payee is discarded for the words`, `a model that raises the amount is kept to the amount in the message`.

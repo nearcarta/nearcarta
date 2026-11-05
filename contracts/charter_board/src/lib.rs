@@ -13,6 +13,9 @@
 //!
 //! There is no access key on this account. The agent key is checked as a
 //! signature, so one visitor's key cannot spend another visitor's row.
+//! `propose` is unchanged. `propose_call` is a second method: the visitor
+//! allowlists (receiver, method) pairs with `set_calls`, and that policy
+//! lives under the `CALLS` storage key, not inside `STATE`.
 //! The refusal strings, the window rule and the sealed-rule commitment match
 //! the oath charter (`oath-hidden-v1`, clause id `pay`).
 
@@ -72,6 +75,23 @@ pub struct Reveal {
     pub salt: String,
 }
 
+/// One allowed function call. `cap` is the most NEAR that call may attach.
+#[derive(Clone)]
+struct CallRule {
+    receiver: AccountId,
+    method: String,
+    cap: u128,
+}
+
+/// Call rules sit beside the row. They are not part of the v1 STATE blob,
+/// so a row opened by the current wasm still loads.
+#[derive(Clone)]
+struct CallPolicy {
+    rules: Vec<CallRule>,
+    session_cap: u128,
+    session_spent: u128,
+}
+
 pub struct CharterView {
     pub owner: AccountId,
     pub receivers: Vec<AccountId>,
@@ -104,11 +124,12 @@ pub struct Board {
     rows: BTreeMap<AccountId, Row>,
     keys: BTreeMap<[u8; 32], AccountId>,
     count: u32,
+    calls: BTreeMap<AccountId, CallPolicy>,
 }
 
 impl Board {
     pub fn new() -> Self {
-        Self { owner: env::predecessor_account_id(), rows: BTreeMap::new(), keys: BTreeMap::new(), count: 0 }
+        Self { owner: env::predecessor_account_id(), rows: BTreeMap::new(), keys: BTreeMap::new(), count: 0, calls: BTreeMap::new() }
     }
 
     /// Open this visitor's row. `fund` stays as spendable balance.
@@ -197,11 +218,15 @@ impl Board {
 
     fn release(&mut self, who: AccountId) -> Promise {
         let before = self.bytes();
+        let calls_before = encode_calls(&self.calls).len() as u64;
         let row = self.rows.remove(&who).expect("ERR_NO_CHARTER");
         self.keys.remove(&row.agent);
+        self.calls.remove(&who);
         self.count -= 1;
         let freed = self.shrank(before);
-        let back = freed + row.balance + env::attached_deposit().as_yoctonear();
+        let calls_after = encode_calls(&self.calls).len() as u64;
+        let calls_freed = (calls_before - calls_after) as u128 * price();
+        let back = freed + calls_freed + row.balance + env::attached_deposit().as_yoctonear();
         require!(back > 0, "ERR_REFUND");
         Promise::new(who).transfer(NearToken::from_yoctonear(back))
     }
@@ -261,6 +286,98 @@ impl Board {
             row.spent = row.spent.saturating_sub(amount.0);
             row.count = row.count.saturating_sub(1);
         }
+    }
+
+    /// The visitor names which (receiver, method) pairs the agent may call, and the session ceiling.
+    /// `propose` is unchanged. An empty list clears the policy.
+    pub fn set_calls(&mut self, rules: Vec<(AccountId, String, u128)>, session_cap: u128) {
+        let me = env::predecessor_account_id();
+        require!(self.rows.contains_key(&me), "ERR_NO_CHARTER");
+        require!(rules.len() <= MAX_RECEIVERS, "ERR_RECEIVERS");
+        let mut seen = BTreeSet::new();
+        let mut parsed = Vec::new();
+        for (receiver, method, cap) in rules {
+            require!((1..=64).contains(&method.len()), "ERR_METHOD");
+            require!(method.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_'), "ERR_METHOD");
+            require!(cap > 0, "ERR_CAP");
+            require!(seen.insert((receiver.clone(), method.clone())), "ERR_RECEIVERS");
+            parsed.push(CallRule { receiver, method, cap });
+        }
+        let spent = self.calls.get(&me).map(|p| p.session_spent).unwrap_or(0);
+        require!(spent <= session_cap, "ERR_CAP");
+        let before = encode_calls(&self.calls).len() as u64;
+        if parsed.is_empty() {
+            self.calls.remove(&me);
+        } else {
+            self.calls.insert(me.clone(), CallPolicy { rules: parsed, session_cap, session_spent: spent });
+        }
+        self.charge_len(&me, before, encode_calls(&self.calls).len() as u64);
+    }
+
+    /// A signed function call. The message covers the method and sha256(args). The deposit
+    /// comes from the row. A failed call is returned by `on_called`.
+    pub fn propose_call(&mut self, owner: AccountId, receiver: AccountId, method: String, args: Vec<u8>, deposit: U128, signature: String) -> Promise {
+        let mut row = self.rows.get(&owner).cloned().expect("ERR_NO_CHARTER");
+        let deposit = deposit.0;
+        require!(signature.len() == 128, "ERR_BAD_SIG");
+        let sig = parse_hex_n::<64>(&signature);
+        let msg = call_text(&owner, &receiver, &method, &args, deposit, row.nonce);
+        require!(env::ed25519_verify(&sig, msg.as_bytes(), &row.agent), "ERR_BAD_SIG");
+        require!(!row.frozen, "frozen");
+        if row.rules.expires_at != 0 {
+            require!(env::block_timestamp() <= row.rules.expires_at, "clause_expired");
+        }
+        require!(args.len() <= 2048, "ERR_ARGS");
+        require!((1..=64).contains(&method.len()), "ERR_METHOD");
+        let Some(policy) = self.calls.get(&owner) else { env::panic_str("method_not_allowlisted"); };
+        let Some(rule) = policy.rules.iter().find(|r| r.receiver == receiver && r.method == method) else { env::panic_str("method_not_allowlisted"); };
+        require!(deposit <= rule.cap, "over_shop_cap");
+        let next_session = policy.session_spent.checked_add(deposit).expect("ERR_AMOUNT");
+        require!(next_session <= policy.session_cap, "over_session_cap");
+        require!(deposit <= row.rules.per_action_cap, "over_per_action_cap");
+        let day = today();
+        if row.day != day { row.day = day; row.spent = 0; row.count = 0; }
+        let next = row.spent.checked_add(deposit).expect("ERR_AMOUNT");
+        require!(next <= row.rules.daily_budget, "over_daily_budget");
+        require!(row.count < row.rules.max_actions_per_day, "over_daily_action_count");
+        require!(row.balance >= deposit, "ERR_BALANCE");
+        row.balance -= deposit;
+        row.spent = next;
+        row.count += 1;
+        row.nonce += 1;
+        self.rows.insert(owner.clone(), row);
+        let mut policy = self.calls.get(&owner).unwrap().clone();
+        policy.session_spent = next_session;
+        self.calls.insert(owner.clone(), policy);
+        let mut cb = String::from("{\"owner\":\"");
+        cb.push_str(owner.as_str());
+        cb.push_str("\",\"amount\":\"");
+        push_u128(&mut cb, deposit);
+        cb.push_str("\",\"day\":\"");
+        push_u128(&mut cb, day as u128);
+        cb.push_str("\"}");
+        Promise::new(receiver).function_call(
+            method, args, NearToken::from_yoctonear(deposit), Gas::from_tgas(30),
+        ).then(Promise::new(env::current_account_id()).function_call(
+            "on_called", cb.into_bytes(), NearToken::from_yoctonear(0), GAS_CALLBACK,
+        ))
+    }
+
+    pub fn on_called(&mut self, owner: AccountId, amount: U128, day: U64) {
+        if near_sdk::is_promise_success() { return; }
+        let Some(row) = self.rows.get_mut(&owner) else { return; };
+        row.balance += amount.0;
+        if row.day == day.0 {
+            row.spent = row.spent.saturating_sub(amount.0);
+            row.count = row.count.saturating_sub(1);
+        }
+        if let Some(policy) = self.calls.get_mut(&owner) {
+            policy.session_spent = policy.session_spent.saturating_sub(amount.0);
+        }
+    }
+
+    pub fn call_message(&self, owner: AccountId, receiver: AccountId, method: String, args: Vec<u8>, deposit: U128, nonce: U64) -> String {
+        call_text(&owner, &receiver, &method, &args, deposit.0, nonce.0)
     }
 
     pub fn reap(&mut self) -> Promise {
@@ -323,6 +440,24 @@ impl Board {
         (before - after) as u128 * price()
     }
 
+    fn charge_len(&mut self, me: &AccountId, before: u64, after: u64) {
+        let attached = env::attached_deposit().as_yoctonear();
+        if after > before {
+            let cost = (after - before) as u128 * price();
+            require!(attached >= cost, "ERR_DEPOSIT");
+            let row = self.rows.get_mut(me).unwrap();
+            require!(row.storage_locked + cost <= MAX_ROW_YOCTO, "ERR_ROW_TOO_BIG");
+            row.storage_locked += cost;
+            refund(me, attached - cost);
+        } else {
+            let freed = (before - after) as u128 * price();
+            if let Some(row) = self.rows.get_mut(me) {
+                row.storage_locked = row.storage_locked.saturating_sub(freed);
+            }
+            refund(me, freed + attached);
+        }
+    }
+
     fn charge(&mut self, me: &AccountId, before: u64) {
         let attached = env::attached_deposit().as_yoctonear();
         let after = self.bytes();
@@ -349,6 +484,18 @@ fn push_u128(s: &mut String, mut n: u128) {
     let mut i = 40;
     while n > 0 { i -= 1; buf[i] = b'0' + (n % 10) as u8; n /= 10; }
     s.push_str(core::str::from_utf8(&buf[i..]).unwrap());
+}
+
+fn call_text(owner: &AccountId, receiver: &AccountId, method: &str, args: &[u8], deposit: u128, nonce: u64) -> String {
+    let mut s = String::from("board-call-v1|");
+    s.push_str(env::current_account_id().as_str());
+    s.push('|'); s.push_str(owner.as_str());
+    s.push('|'); s.push_str(receiver.as_str());
+    s.push('|'); s.push_str(method);
+    s.push('|'); s.push_str(&hex32(&env::sha256_array(args)));
+    s.push('|'); push_u128(&mut s, deposit);
+    s.push('|'); push_u128(&mut s, nonce as u128);
+    s
 }
 
 fn proposal_text(owner: &AccountId, receiver: &AccountId, amount: u128, nonce: u64) -> String {
@@ -534,13 +681,55 @@ fn decode(raw: &[u8]) -> Board {
     for _ in 0..m { let k = r.bytes32(); keys.insert(k, r.acc()); }
     let count = r.u32();
     require!(r.i == raw.len(), "ERR_STATE");
-    Board { owner, rows, keys, count }
+    Board { owner, rows, keys, count, calls: BTreeMap::new() }
 }
 
-fn save(b: &Board) { env::storage_write(b"STATE", &encode(b)); }
+fn encode_calls(m: &BTreeMap<AccountId, CallPolicy>) -> Vec<u8> {
+    let mut o = Vec::new();
+    put_u32(&mut o, m.len() as u32);
+    for (owner, p) in m {
+        put_acc(&mut o, owner);
+        put_u32(&mut o, p.rules.len() as u32);
+        for rule in &p.rules {
+            put_acc(&mut o, &rule.receiver);
+            put_str(&mut o, &rule.method);
+            put_u128(&mut o, rule.cap);
+        }
+        put_u128(&mut o, p.session_cap);
+        put_u128(&mut o, p.session_spent);
+    }
+    o
+}
+fn decode_calls(raw: &[u8]) -> BTreeMap<AccountId, CallPolicy> {
+    let mut r = Rd { s: raw, i: 0 };
+    let n = r.u32() as usize;
+    require!(n <= 10_000, "ERR_STATE");
+    let mut out = BTreeMap::new();
+    for _ in 0..n {
+        let owner = r.acc();
+        let k = r.u32() as usize;
+        require!(k <= MAX_RECEIVERS, "ERR_STATE");
+        let mut rules = Vec::with_capacity(k);
+        for _ in 0..k {
+            rules.push(CallRule { receiver: r.acc(), method: r.string(), cap: r.u128() });
+        }
+        out.insert(owner, CallPolicy { rules, session_cap: r.u128(), session_spent: r.u128() });
+    }
+    require!(r.i == raw.len(), "ERR_STATE");
+    out
+}
+
+fn save(b: &Board) {
+    env::storage_write(b"STATE", &encode(b));
+    let calls = encode_calls(&b.calls);
+    if b.calls.is_empty() { env::storage_remove(b"CALLS"); }
+    else { env::storage_write(b"CALLS", &calls); }
+}
 fn load() -> Board {
     let raw = env::storage_read(b"STATE").unwrap_or_else(|| env::panic_str("ERR_NO_STATE"));
-    decode(&raw)
+    let mut b = decode(&raw);
+    if let Some(raw) = env::storage_read(b"CALLS") { b.calls = decode_calls(&raw); }
+    b
 }
 fn input_str() -> String {
     String::from_utf8(env::input().unwrap_or_default()).unwrap_or_else(|_| env::panic_str("ERR_ARGS"))
@@ -582,6 +771,45 @@ pub extern "C" fn propose() {
     let mut b = load();
     let _ = b.propose(v.need("owner").account(), v.need("receiver").account(), U128(v.need("amount").u128()), v.need("signature").string(), reveal_json(v.get("reveal")));
     save(&b);
+}
+#[no_mangle]
+pub extern "C" fn set_calls() {
+    let v = parse(&input_str());
+    let mut rules = Vec::new();
+    for item in v.need("calls").arr() {
+        let o = item.obj();
+        rules.push((o.need("receiver").account(), o.need("method").string(), o.need("cap").u128()));
+    }
+    let mut b = load();
+    b.set_calls(rules, v.need("session_cap").u128());
+    save(&b);
+}
+#[no_mangle]
+pub extern "C" fn propose_call() {
+    let v = parse(&input_str());
+    let mut b = load();
+    let _ = b.propose_call(
+        v.need("owner").account(), v.need("receiver").account(), v.need("method").string(),
+        v.need("args").string().into_bytes(), U128(v.need("deposit").u128()), v.need("signature").string(),
+    );
+    save(&b);
+}
+#[no_mangle]
+pub extern "C" fn on_called() {
+    require!(env::predecessor_account_id() == env::current_account_id(), "ERR_PRIVATE");
+    let v = parse(&input_str());
+    let mut b = load();
+    b.on_called(v.need("owner").account(), U128(v.need("amount").u128()), U64(v.need("day").u128() as u64));
+    save(&b);
+}
+#[no_mangle]
+pub extern "C" fn call_message() {
+    let v = parse(&input_str());
+    let b = load();
+    ret(&b.call_message(
+        v.need("owner").account(), v.need("receiver").account(), v.need("method").string(),
+        v.need("args").string().into_bytes(), U128(v.need("deposit").u128()), U64(v.need("nonce").u128() as u64),
+    ));
 }
 #[no_mangle]
 pub extern "C" fn on_paid() {
@@ -1152,6 +1380,191 @@ mod tests {
         assert_eq!(rules.per_action_cap.0, 2_000_000_000_000_000_000_000);
         assert_eq!(v.need("fund").u128(), 1000);
         assert!(v.get("missing").is_none());
+    }
+
+    fn allow(c: &mut Board, shop_cap: u128, session_cap: u128) {
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "near_deposit".into(), shop_cap)], session_cap);
+    }
+
+    fn sign_call(sk: &SigningKey, c: &Board, method: &str, args: &[u8], deposit: u128) -> String {
+        let nonce = c.get_charter(acc(ALICE)).unwrap().nonce.0;
+        let msg = c.call_message(acc(ALICE), acc(SHOP), method.into(), args.to_vec(), U128(deposit), U64(nonce));
+        hex32_n(&sk.sign(msg.as_bytes()).to_bytes())
+    }
+
+    fn call(c: &mut Board, sk: &SigningKey, method: &str, args: &[u8], deposit: u128) -> String {
+        go(ALICE, 0, 0);
+        let sig = sign_call(sk, c, method, args, deposit);
+        c.propose_call(acc(ALICE), acc(SHOP), method.into(), args.to_vec(), U128(deposit), sig.clone());
+        sig
+    }
+
+    #[test]
+    fn a_v1_row_still_pays_and_a_call_is_not_allowlisted_until_set() {
+        let (c, sk, _) = boot();
+        let raw = encode(&c);
+        let mut old = decode(&raw);
+        assert!(old.calls.is_empty());
+        let amount = NEAR / 2000;
+        go(ALICE, 0, 0);
+        let (_, sig) = sign(&sk, &old, ALICE, SHOP, amount);
+        old.propose(acc(ALICE), acc(SHOP), U128(amount), sig, None);
+        assert_eq!(old.get_charter(acc(ALICE)).unwrap().balance.0, NEAR / 1000 - amount);
+        assert_eq!(old.proposal_message(acc(ALICE), acc(SHOP), U128(1), U64(0)), "board-v1|charters.nearcarta.near|alice.near|shop.nearcarta.near|1|0");
+        go(ALICE, 0, 0);
+        let sig = sign_call(&sk, &old, "near_deposit", b"{}", NEAR / 2000);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            old.propose_call(acc(ALICE), acc(SHOP), "near_deposit".into(), b"{}".to_vec(), U128(NEAR / 2000), sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("method_not_allowlisted"));
+        assert_eq!(encode(&c).len(), raw.len());
+        let _ = c;
+    }
+
+    #[test]
+    fn the_live_state_dump_still_decodes_and_propose_is_unchanged() {
+        let raw = include_bytes!("../testdata/mainnet-state.bin");
+        let mut live = decode(raw);
+        assert_eq!(encode(&live), raw.as_slice());
+        assert!(live.calls.is_empty());
+        assert_eq!(live.get_config().rows, 2);
+        assert_eq!(live.get_config().owner, acc("nearcarta.near"));
+        let owner = "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8";
+        let row = live.get_charter(acc(owner)).unwrap();
+        assert_eq!(row.receivers, vec![acc("charter.nearcarta.near"), acc("toll.nearcarta.near")]);
+        assert_eq!(row.per_action_cap.0, 4_000_000_000_000_000_000_000);
+        assert_eq!(row.nonce.0, 3);
+        assert_eq!(row.balance.0, 3_000_000_000_000_000_000_000);
+        assert!(!row.frozen);
+        assert_eq!(row.agent, "9cecd259f3873c451010e8b7949114dcfd7c7229316f50146f39d872b5b50b94");
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(acc("board.nearcarta.near"))
+            .predecessor_account_id(acc(owner))
+            .prepaid_gas(Gas::from_tgas(30))
+            .account_balance(NearToken::from_near(30));
+        testing_env!(b.build());
+        assert_eq!(
+            live.proposal_message(acc(owner), acc("toll.nearcarta.near"), U128(1), U64(3)),
+            "board-v1|board.nearcarta.near|8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8|toll.nearcarta.near|1|3"
+        );
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            live.propose(acc(owner), acc("toll.nearcarta.near"), U128(1), "00".repeat(64), None);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_BAD_SIG"));
+        assert_eq!(live.get_charter(acc(owner)).unwrap().balance.0, row.balance.0);
+        assert_eq!(live.get_charter(acc(owner)).unwrap().nonce.0, 3);
+        assert_eq!(encode(&live), raw.as_slice());
+
+        let sk = SigningKey::from_bytes(&[9u8; 32]);
+        live.rows.get_mut(&acc(owner)).unwrap().agent = sk.verifying_key().to_bytes();
+        let stored_day = live.rows.get(&acc(owner)).unwrap().day;
+        let when = if stored_day == 0 { NS_PER_DAY } else { 1 };
+        assert!(when <= row.expires_at.0);
+        let amount = row.min_amount.0;
+        b.block_timestamp(when);
+        testing_env!(b.build());
+        let call_msg = live.call_message(acc(owner), acc("wrap.near"), "near_deposit".into(), b"{}".to_vec(), U128(amount), U64(3));
+        let call_sig = hex32_n(&sk.sign(call_msg.as_bytes()).to_bytes());
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            live.propose_call(acc(owner), acc("wrap.near"), "near_deposit".into(), b"{}".to_vec(), U128(amount), call_sig);
+        })).unwrap_err();
+        let msg = refuse(err);
+        assert!(msg.contains("method_not_allowlisted"), "{msg}");
+        assert_eq!(live.get_charter(acc(owner)).unwrap().balance.0, row.balance.0);
+        let (_, sig) = sign(&sk, &live, owner, "toll.nearcarta.near", amount);
+        live.propose(acc(owner), acc("toll.nearcarta.near"), U128(amount), sig, None);
+        assert_eq!(live.get_charter(acc(owner)).unwrap().balance.0, row.balance.0 - amount);
+        assert_eq!(live.get_charter(acc(owner)).unwrap().nonce.0, 4);
+    }
+
+    #[test]
+    fn propose_call_covers_allow_wrong_key_replay_allowlist_caps_expiry_freeze_and_refund() {
+        let (mut c, sk, _) = boot();
+        let args = b"{}";
+        let deposit = NEAR / 2000;
+        allow(&mut c, deposit, NEAR / 1000);
+        let before = c.get_charter(acc(ALICE)).unwrap().balance.0;
+        let used = call(&mut c, &sk, "near_deposit", args, deposit);
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, before - deposit);
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().nonce.0, 1);
+        let receipts = get_created_receipts();
+        assert!(receipts.iter().any(|r| r.receiver_id == acc(SHOP) && r.actions.iter().any(|a| matches!(a, MockAction::FunctionCallWeight { method_name, attached_deposit, .. } if method_name == b"near_deposit" && attached_deposit.as_yoctonear() == deposit))));
+
+        go(ALICE, 0, 0);
+        let bad = SigningKey::from_bytes(&[8u8; 32]);
+        let sig = sign_call(&bad, &c, "near_deposit", args, deposit);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call(acc(ALICE), acc(SHOP), "near_deposit".into(), args.to_vec(), U128(deposit), sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_BAD_SIG"));
+        go(ALICE, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call(acc(ALICE), acc(SHOP), "near_deposit".into(), args.to_vec(), U128(deposit), used);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_BAD_SIG"), "replayed nonce");
+
+        go(ALICE, 0, 0);
+        let sig = sign_call(&sk, &c, "ft_transfer", args, deposit);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.to_vec(), U128(deposit), sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("method_not_allowlisted"));
+
+        go(ALICE, 0, 0);
+        let sig = sign_call(&sk, &c, "near_deposit", args, deposit * 2);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call(acc(ALICE), acc(SHOP), "near_deposit".into(), args.to_vec(), U128(deposit * 2), sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("over_shop_cap"));
+
+        allow(&mut c, NEAR / 500, deposit);
+        go(ALICE, 0, 0);
+        let sig = sign_call(&sk, &c, "near_deposit", args, deposit * 2);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call(acc(ALICE), acc(SHOP), "near_deposit".into(), args.to_vec(), U128(deposit * 2), sig);
+        })).unwrap_err();
+        let msg = refuse(err);
+        assert!(msg.contains("over_session_cap"), "{msg}");
+
+        go(ALICE, 0, 0);
+        c.set_rules(RulesIn { expires_at: U64(1), ..rules((0, 0), 4) });
+        go(ALICE, 0, 50);
+        allow(&mut c, NEAR / 500, NEAR / 100);
+        go(ALICE, 0, 50);
+        let sig = sign_call(&sk, &c, "near_deposit", args, deposit);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call(acc(ALICE), acc(SHOP), "near_deposit".into(), args.to_vec(), U128(deposit), sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("clause_expired"));
+
+        go(ALICE, 0, 0);
+        c.set_rules(rules((0, 0), 4));
+        go(ALICE, 0, 0);
+        c.set_frozen(true);
+        go(ALICE, 0, 0);
+        let sig = sign_call(&sk, &c, "near_deposit", args, deposit);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call(acc(ALICE), acc(SHOP), "near_deposit".into(), args.to_vec(), U128(deposit), sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("frozen"));
+        go(ALICE, 0, 0);
+        c.set_frozen(false);
+
+        allow(&mut c, NEAR / 500, NEAR / 100);
+        let bal = c.get_charter(acc(ALICE)).unwrap().balance.0;
+        let spent = c.calls.get(&acc(ALICE)).unwrap().session_spent;
+        call(&mut c, &sk, "near_deposit", args, deposit);
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, bal - deposit);
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(acc("charters.nearcarta.near"))
+            .predecessor_account_id(acc("charters.nearcarta.near"))
+            .prepaid_gas(Gas::from_tgas(30))
+            .account_balance(NearToken::from_near(30));
+        testing_env!(b.build(), test_vm_config(), RuntimeFeesConfig::test(), Default::default(), vec![PromiseResult::Failed]);
+        c.on_called(acc(ALICE), U128(deposit), U64(0));
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, bal);
+        assert_eq!(c.calls.get(&acc(ALICE)).unwrap().session_spent, spent);
     }
 
     fn b58encode(data: &[u8]) -> String {

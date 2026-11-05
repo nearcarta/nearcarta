@@ -66,7 +66,7 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 |---|---|
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
-| toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 12 |
+| toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 15 |
 | backend unit (`npm test`) | 405 (402 pass, 3 skipped) |
 | browser e2e | 124 passed, 2 skipped, 1 flaky on retry. The skips need a partner key or a NEAR AI key |
 
@@ -199,4 +199,4 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 # 440 unit tests (437 pass, 3 skipped):
 Proof rows (56/56 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
-`contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (12 tests, rustc 1.86).
+`contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).
