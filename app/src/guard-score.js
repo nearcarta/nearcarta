@@ -9,7 +9,7 @@ export function explainCheck(check) {
     {
       id: 'age',
       title: 'Account age',
-      level: code('new_account') ? 'warn' : 'info',
+      level: hours == null ? 'unknown' : (code('new_account') ? 'warn' : 'info'),
       text: hours == null ? 'The index did not return a first-seen time.' : `First seen ${hours} h ago.`,
     },
     {

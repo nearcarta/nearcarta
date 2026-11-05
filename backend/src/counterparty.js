@@ -48,6 +48,10 @@ export function decide(signals) {
   if (s.lookalike_of) r.push({ level: 'block', code: 'lookalike', text: `looks like ${s.lookalike_of}, which you allow` });
   const trusted = s.allowlisted && s.prior_payments > 0;
   if (s.exists && !trusted && s.age_ms != null && s.age_ms < NEW_ACCOUNT_MS) r.push({ level: 'warn', code: 'new_account', text: `first seen ${Math.max(1, Math.round(s.age_ms / 3600_000))} h ago` });
+  if (s.exists && s.age_ms == null) r.push({ level: 'warn', code: 'age_unknown', text: 'account age was not returned' });
+  if (s.exists && (s.code_hash == null || s.code_hash === '')) r.push({ level: 'warn', code: 'code_unknown', text: 'code hash was not returned' });
+  if (s.exists && s.code_hash === EMPTY_CODE && s.age_ms == null) r.push({ level: 'warn', code: 'unconfirmed', text: 'empty code hash and no account age' });
+  if (s.index && s.index !== 'ok') r.push({ level: 'warn', code: 'index_unknown', text: 'the index did not answer' });
   if (s.code_changed_ms != null && s.code_changed_ms < CODE_CHANGE_MS) r.push({ level: 'warn', code: 'code_changed', text: `contract code changed ${Math.max(1, Math.round(s.code_changed_ms / 3600_000))} h ago`, evidence: [s.code_change_tx] });
   if (s.exists && !s.allowlisted && !s.prior_payments) r.push({ level: 'warn', code: 'no_history', text: 'not on your list and never paid before' });
   const verdict = r.some(x => x.level === 'block') ? 'block' : r.some(x => x.level === 'warn') ? 'warn' : 'allow';
@@ -74,7 +78,9 @@ export async function check(account, { charter = null, now = Date.now(), view = 
   }
   if (s.exists) {
     try {
-      const { account_txs: txs = [], txs_count } = await fpost('/account', { account_id: account, max_block_height: null });
+      const page = await fpost('/account', { account_id: account, max_block_height: null });
+      const txs = page.account_txs || page.txs || [];
+      const txs_count = page.txs_count;
       if (txs.length) {
         const first = Number(BigInt(txs.at(-1).tx_block_timestamp) / 1_000_000n);
         s.first_seen = new Date(first).toISOString(); s.age_ms = now - first;
