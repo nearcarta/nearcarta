@@ -67,6 +67,12 @@ function go(i) { st.step = Math.max(0, Math.min(STEPS.length - 1, i)); msg = '';
 function done(i) { if (!st.done.includes(i)) st.done.push(i); save(); }
 const canOpen = i => i === 0 || (me && (i <= Math.max(-1, ...st.done) + 1));
 
+function stepNav() {
+  return `<nav class="stepnav" data-testid="setup-steps" aria-label="Steps">${STEPS.map(([id, t], i) => {
+    const open = i === 0 || i <= st.step || st.done.includes(i);
+    return `<button type="button" data-testid="setup-step" data-step="${i}" data-id="${id}"${i === st.step ? ' aria-current="step"' : ''}${open ? '' : ' disabled'}>${i + 1}. ${esc(t)}</button>`;
+  }).join('')}</nav>`;
+}
 function rail() {
   $('#rail').innerHTML = STEPS.map(([id, t, s], i) => `<li class="${i === st.step ? 'now' : (i < st.step || st.done.includes(i)) ? 'done' : ''}" data-i="${i}" ${i === st.step ? 'aria-current="step"' : ''}><span>${esc(t)}<small>${esc(s)}</small></span></li>`).join('');
   $('#rail').querySelectorAll('li.done, li.now').forEach(li => { const i = +li.dataset.i; if (i <= st.step || st.done.includes(i)) { li.tabIndex = 0; li.onclick = () => go(i); li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(i); } }; } });
@@ -79,7 +85,7 @@ function top() {
   $('#who').innerHTML = me ? `<span data-testid="setup-who">${esc(short(me))}</span> · <span data-testid="setup-bal">${bal === undefined ? '…' : bal == null ? '? NEAR' : fmtN(nearOf(bal)) + ' NEAR'}</span><button class="btn link sm" id="out">Sign out</button>` : '';
   const o = $('#out'); if (o) o.onclick = async () => { await disconnect(); await mainnetWallet().disconnect().catch(() => {}); await privy?.auth.logout().catch(() => {}); me = null; bal = undefined; st.done = []; st.trial = false; delete st.accountId; save(); go(0); };
 }
-const head = (eye, h, lede) => `<p class="eyebrow">Step ${st.step + 1} of ${STEPS.length} · ${esc(eye)}</p><h1>${h}</h1>${lede ? `<p class="lede">${lede}</p>` : ''}`;
+const head = (eye, h, lede) => `${stepNav()}<p class="eyebrow">Step ${st.step + 1} of ${STEPS.length} · ${esc(eye)}</p><h1>${h}</h1>${lede ? `<p class="lede">${lede}</p>` : ''}`;
 const nav = (next, { back = true, nextOk = true, label = 'Continue' } = {}) => `<div class="actions">${back && st.step > 0 ? '<button class="btn" id="back">Back</button>' : '<span></span>'}${next ? `<button class="btn gold" id="next" data-testid="setup-next" ${nextOk ? '' : 'disabled'}>${esc(label)} →</button>` : ''}</div>`;
 const errP = () => msg ? `<p class="err" role="alert" data-testid="setup-err">${esc(msg)}</p>` : '';
 function wire(nextFn) { const b = $('#back'); if (b) b.onclick = () => go(st.step - 1); const n = $('#next'); if (n) n.onclick = nextFn || (() => { done(st.step); go(st.step + 1); }); }
@@ -549,6 +555,7 @@ function render() {
   rail(); top(); const [v, w] = VIEWS[STEPS[st.step][0]]; const c = $('#card');
   c.innerHTML = (PREVIEW ? '<p class="preview-banner" data-testid="preview-banner">Preview. Nothing is signed.</p>' : '') + v();
   c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; w();
+  c.querySelectorAll('[data-testid=setup-step]').forEach(b => { if (!b.disabled) b.onclick = () => go(+b.dataset.step); });
   if (['character', 'sign', 'try'].includes(STEPS[st.step][0])) remember();
 }
 
