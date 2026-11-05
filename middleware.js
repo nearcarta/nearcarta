@@ -26,6 +26,12 @@ export default async function middleware(req) {
   if (req.headers.get('x-nc-inner') || !['GET', 'HEAD'].includes(req.method)) return pass();
   const u = new URL(req.url);
   const p = u.pathname;
+  // /shops/payouts (no slash) is the folder index. A relative bundle then loads from /shops/ and never runs.
+  if (/^\/shops\/[a-z0-9-]+$/.test(p)) {
+    const dest = new URL(req.url);
+    dest.pathname = p + '/';
+    return Response.redirect(dest, 308);
+  }
   const tries = p.endsWith('/') ? [p + 'index.html'] : p.endsWith('.html') ? [p] : [p + '.html', p + '/index.html'];
   for (const t of tries) {
     const r = await fetch(new URL(t + u.search, u), { headers: { 'x-nc-inner': '1' } });

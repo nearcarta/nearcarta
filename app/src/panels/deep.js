@@ -13,6 +13,7 @@ import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRow
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
 import { boundaryHtml } from './boundary.js';
+import { shortId } from './hall-ui.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -374,12 +375,12 @@ function mountBank(root, hooks) {
   const panel = tee ? teePanel(tee, recorded, proof) : `<button type="button" class="primary" id="m-tee" data-testid="tee-verify">Verify the TEE now</button>${recorded}${proof}`;
   const sessionLine = who.signedIn ? `<p data-testid="bank-session">Signed in as ${esc(who.displayName || who.accountId)}.</p>` : '';
   const payeeBox = payees.length
-    ? payees.map(a => `<label class="payee"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span class="payee-id">${esc(a)}</span></label>`).join('')
+    ? payees.map(a => `<label class="payee"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span class="payee-id" title="${esc(a)}">${esc(shortId(a))}</span></label>`).join('')
     : '<p>Sign in to choose a payee.</p>';
   root.innerHTML = `<div class="card shop-card shop-stack"><p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${esc(hooks.proof ? hooks.proof() : '')}</p>
     ${sessionLine}
-    <div class="seg notes" role="radiogroup" aria-label="Amount" data-testid="bank-notes">${notes.map(n => `<label class="beside"><input type="radio" name="note" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div>
-    <div class="seg to" id="m-to" data-testid="bank-to">${payeeBox}</div>
+    <div class="choice" data-testid="bank-amount"><p class="choice-label">Amount</p><div class="seg notes" role="radiogroup" aria-label="Amount" data-testid="bank-notes">${notes.map(n => `<label class="beside"><input type="radio" name="note" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div></div>
+    <div class="choice" data-testid="bank-payee"><p class="choice-label">Payee</p><div class="seg to" id="m-to" data-testid="bank-to">${payeeBox}</div></div>
     ${panel}</div>`;
   root.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { state.amt = r.value; hooks.onNote?.(r.value); }; });
   root.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { state.to = r.value; hooks.onTo?.(r.value); }; });

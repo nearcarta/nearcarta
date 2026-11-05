@@ -34,7 +34,7 @@ export function shortId(id) {
 
 function rowLine(who) {
   if (!who) return '';
-  return `<span data-testid="hall-row-id" title="${esc(who)}">${esc(shortId(who))}</span><button type="button" class="copy-id" data-testid="hall-copy" data-copy="${esc(who)}">Copy</button>`;
+  return `<span data-testid="hall-row-id" title="${esc(who)}">${esc(shortId(who))}</span><button type="button" class="primary copy-id" data-testid="hall-copy" data-copy="${esc(who)}">Copy</button>`;
 }
 
 export function hallMarkup(row, person = null) {
@@ -44,8 +44,11 @@ export function hallMarkup(row, person = null) {
   const facts = who
     ? `Signed in as ${esc(named)}.`
     : 'Sign in, then open your row. This page does not open a preview account.';
-  const meta = row
-    ? `<dl class="hall-meta" data-testid="hall-read"><div><dt>Row</dt><dd class="row-id">${rowLine(who)}</dd></div><div><dt>Board</dt><dd>${esc(BOARD)}</dd></div><div><dt>Cap</dt><dd>${esc(cap)} NEAR</dd></div></dl>`
+  const details = row
+    ? `<div><dt>Board</dt><dd>${esc(BOARD)}</dd></div><div><dt>Cap</dt><dd>${esc(cap)} NEAR</dd></div>`
+    : '';
+  const meta = who
+    ? `<dl class="hall-meta" data-testid="hall-read"><div><dt>Row</dt><dd class="row-id">${rowLine(who)}</dd></div>${details}</dl>`
     : '<p data-testid="hall-read"></p>';
   return `<form id="row-form" data-testid="hall-form">
     <p data-testid="hall-facts">${facts}</p>
