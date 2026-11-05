@@ -25,6 +25,18 @@ export function hallSkeleton() {
   return `<div class="hall-skel" data-testid="hall-skel" aria-busy="true" aria-label="Reading your row"><span></span><span></span><span></span></div>`;
 }
 
+/** A long row id reads as 8e2027…61c8. Shorter account names stay whole. */
+export function shortId(id) {
+  const s = String(id || '');
+  if (s.length <= 32) return s;
+  return `${s.slice(0, 6)}…${s.slice(-4)}`;
+}
+
+function rowLine(who) {
+  if (!who) return '';
+  return `<span data-testid="hall-row-id" title="${esc(who)}">${esc(shortId(who))}</span><button type="button" class="copy-id" data-testid="hall-copy" data-copy="${esc(who)}">Copy</button>`;
+}
+
 export function hallMarkup(row, person = null) {
   const cap = row ? String(nearOf(row.per_action_cap)) : '';
   const who = row?.owner || person?.accountId || '';
@@ -33,14 +45,14 @@ export function hallMarkup(row, person = null) {
     ? `Signed in as ${esc(named)}.`
     : 'Sign in, then open your row. This page does not open a preview account.';
   const meta = row
-    ? `<dl class="hall-meta" data-testid="hall-read"><div><dt>Row</dt><dd>${esc(who)}</dd></div><div><dt>Board</dt><dd>${esc(BOARD)}</dd></div><div><dt>Cap</dt><dd>${esc(cap)} NEAR</dd></div></dl>`
+    ? `<dl class="hall-meta" data-testid="hall-read"><div><dt>Row</dt><dd class="row-id">${rowLine(who)}</dd></div><div><dt>Board</dt><dd>${esc(BOARD)}</dd></div><div><dt>Cap</dt><dd>${esc(cap)} NEAR</dd></div></dl>`
     : '<p data-testid="hall-read"></p>';
   return `<form id="row-form" data-testid="hall-form">
     <p data-testid="hall-facts">${facts}</p>
     ${meta}
-    <label>Max per payment (NEAR) <input id="cap" data-testid="hall-cap" inputmode="decimal" value="${esc(cap)}"></label>
-    <label><input id="frozen" data-testid="hall-frozen" type="checkbox" ${row?.frozen ? 'checked' : ''}> Freeze the row. The agent key cannot undo this.</label>
-    <label><input id="sealed" data-testid="hall-seal" type="checkbox" ${row?.sealed ? 'checked' : ''}> Store a seal. The rule text stays off the row.</label>
+    <label class="field">Max per payment (NEAR) <input id="cap" data-testid="hall-cap" inputmode="decimal" value="${esc(cap)}"></label>
+    <label class="check"><input id="frozen" data-testid="hall-frozen" type="checkbox" ${row?.frozen ? 'checked' : ''}> <span>Freeze the row. The agent key cannot undo this.</span></label>
+    <label class="check"><input id="sealed" data-testid="hall-seal" type="checkbox" ${row?.sealed ? 'checked' : ''}> <span>Store a seal. The rule text stays off the row.</span></label>
     <p class="muted" id="bond">Deposit 0. The calls are set_rules, set_frozen and set_seal on your own row.</p>
     <button class="primary" id="apply" data-testid="hall-apply" type="submit">Sign</button>
     <div id="result" data-testid="result" aria-live="polite"></div>
@@ -69,6 +81,17 @@ export async function mountHall(root, hooks = {}) {
     if (connect) connect.hidden = !!(row?.owner || choice.owner || person.signedIn);
     const form = root.querySelector('#row-form');
     form.onsubmit = (e) => { e.preventDefault(); onSign(); };
+    const copy = root.querySelector('[data-testid=hall-copy]');
+    if (copy) copy.onclick = async () => {
+      const full = copy.dataset.copy || '';
+      try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(full);
+        else throw new Error('copy');
+        copy.textContent = 'Copied';
+      } catch {
+        copy.textContent = 'Copy failed';
+      }
+    };
   };
 
   async function readRow(id, { fresh = false } = {}) {
