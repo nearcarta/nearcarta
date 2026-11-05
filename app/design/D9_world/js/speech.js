@@ -11,7 +11,7 @@ export function say(who,text,{style='say',tone='',dur=null,name=null}={}){
   if(words(text)>12) console.warn('bubble over 10 words:',text);
   // one bubble per speaker
   for(const b of live) if(b.who===who) b.end=Math.min(b.end,clock.T);
-  const el=document.createElement('div'); el.className='bub '+style+(tone?' '+tone:''); el.setAttribute('role','status');
+  const el=document.createElement('div'); el.className='bub '+style+(tone?' '+tone:''); el.dataset.testid='speech-line'; el.setAttribute('role','status');
   const nm=name??who.name; if(nm){ const w=document.createElement('span'); w.className='who'; w.textContent=nm; el.appendChild(w); }
   const tx=document.createElement('span'); tx.className='tx'; el.appendChild(tx); layer().appendChild(el);
   const speed=style==='think'?24:30; // chars / s

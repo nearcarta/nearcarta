@@ -321,7 +321,7 @@ function leaveRoom(){ undressRoom(room); SL.clear(); room=null; body.classList.r
 addEventListener('resize',()=>{ if(!room) return; const c=room.camera, look=c.userData.look, fit=SL.frame(c); if(c.userData.home0){ c.position.copy(c.userData.home0).sub(look).multiplyScalar(fit).add(look); c.lookAt(look); } });
 $('#back').addEventListener('click',()=>world.exitShop());
 $('#t-proof').addEventListener('click',()=>{ SL.drawer(true); sfx('page',{g:.3}); }); $('#d-close').addEventListener('click',()=>SL.drawer(false));
-$('#t-act').addEventListener('click',async e=>{ const b=e.currentTarget; if(b.dataset.retry){ const id=b.dataset.retry; delete b.dataset.retry; b.disabled=true; const r=await SL.load(id); if(inShop!==id) return; if(r.err) SL.showError(id,r.err); else { SL.show(r.sh); enterRoom(r.sh); } return; } if(SL.act()) sfx('click',{g:.3}); });
+$('#t-act').addEventListener('click',async e=>{ const b=e.currentTarget; if(b.dataset.retry){ const id=b.dataset.retry; delete b.dataset.retry; b.disabled=true; const r=await SL.load(id, Date.now()); if(inShop!==id) return; if(r.err) SL.showError(id,r.err); else { SL.show(r.sh); enterRoom(r.sh); } return; } if(SL.act()) sfx('click',{g:.3}); });
 // compile the room's shaders (parallel where the GPU allows) during the fly-in, so its first frame does not stall the fade
 // the entry beats run on the wall clock outside captures: sim time is clamped per frame, so a slow GPU would stretch the walk-in
 const wallT=(f,t)=>CAPTURE?setTimeoutSim(f,t):setTimeout(f,t*1000);
@@ -350,6 +350,7 @@ function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(
   // lamp flare when the Lamplighter lights it
   for(const l of W.lamps){ if(l.flare>0) l.flare=Math.max(0,l.flare-dt*1.6); }
   if(window.__camLock){} else if(mode==='explore'&&!inShop&&!D.shot){ steerFromKeys(); playCam(dt); prompt(PC.zs<.44?nearDoor():null); placePrompt(); walkInto(dt); } else { prompt(null); applyCam(dt); }
+  if(mode==='story'){ const p=cam.position; const bag=window.__introMotion||(window.__introMotion=[]); const last=bag.at(-1); if(!last||Math.hypot(p.x-last.x,p.y-last.y,p.z-last.z)>0.04) bag.push({x:+p.x.toFixed(3),y:+p.y.toFixed(3),z:+p.z.toFixed(3),t:+clock.T.toFixed(2)}); }
   occlusion(dt); updPins(); placeTag(); if(W.treeFadeU) W.treeFadeU.value=mode==='explore'&&!inShop?1:0;
   if(D.shake>0){ D.shake=Math.max(0,D.shake-dt*1.4); cam.position.x+=Math.sin(clock.T*41)*.02*D.shake; cam.position.y+=Math.sin(clock.T*37)*.015*D.shake; }
   SP.update(); }
@@ -388,7 +389,7 @@ world.toCharter=toCharter;
 const startStory=!P.has('nostory') && !(P.has('explore')) && !P.has('shop');
 let introCtl=null;
 for(let i=0;i<3;i++) step(1/30);
-if(startStory){ try{ storyRun=run(story()); }catch(e){ console.warn('[Nearcarta] story', e); } introCtl=mountIntro(document, location.search); } else { { const c=hx(-1,1); R.place(c.x-.2,c.z+.3,2.4); R.lights=true; } mode='town'; idleTown(); D.k=1; if(P.has('explore')) explore(true); }
+if(startStory){ try{ storyRun=run(story()); body.dataset.intro='camera'; }catch(e){ console.warn('[Nearcarta] story', e); introCtl=mountIntro(document, location.search); body.dataset.intro='flat'; } } else { { const c=hx(-1,1); R.place(c.x-.2,c.z+.3,2.4); R.lights=true; } mode='town'; idleTown(); D.k=1; if(P.has('explore')) explore(true); }
 step(1/30); draw();
 // never reveal a black canvas: sample the first frame; if the GPU gave us nothing, go 2D instead
 { const g=W.renderer.getContext(), px=new Uint8Array(4); let lit=0; for(const [fx,fy] of [[.5,.5],[.25,.4],[.75,.4],[.5,.2],[.3,.75],[.7,.75]]){ g.readPixels((g.drawingBufferWidth*fx)|0,(g.drawingBufferHeight*fy)|0,1,1,g.RGBA,g.UNSIGNED_BYTE,px); if(px[0]+px[1]+px[2]>24) lit++; }
