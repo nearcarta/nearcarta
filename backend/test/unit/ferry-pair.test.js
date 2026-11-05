@@ -77,6 +77,25 @@ test('quoted Ferry markup shows Load cargo and Ask charter CTAs', () => {
   assert.match(html, /data-testid="ferry-ask-charter"/);
   assert.match(html, /data-testid="ferry-cargo-actions"/);
   assert.doesNotMatch(html, /ferry-cargo-actions"[^>]*hidden/);
+  assert.equal(html.split('Ask charter · load cargo').length - 1, 1);
+  assert.match(html, /data-testid="ferry-again"[^>]*hidden/);
+});
+
+test('after a ferry ask the card has one Get another quote and no second Ask charter', () => {
+  const html = ferryMarkup({
+    fromId: 'USDC|base', toId: 'ZEC|zec', amt: '3',
+    q: { from: { symbol: 'USDC', amount: '3' }, to: { symbol: 'ZEC', amount: '0.002' } },
+    charterReady: true,
+    acted: true,
+    charterNote: 'Charter refused the trip: the session key does not have enough gas allowance for this ask. The boat stays at the jetty.',
+  }, DEFAULT_ROUTES);
+  assert.match(html, /ferry-cargo-actions"[^>]*hidden/);
+  assert.match(html, /data-testid="ferry-again"/);
+  assert.doesNotMatch(html, /data-testid="ferry-again"[^>]*hidden/);
+  assert.match(html, /Get another quote/);
+  assert.match(html, /class="primary ferry-cta"/);
+  assert.match(html, /data-testid="ferry-charter-note"/);
+  assert.doesNotMatch(html, /account_id|NotEnoughAllowance/);
 });
 
 test('city ferry room wires applyPair + order chip + speech beats (source)', () => {
@@ -152,6 +171,17 @@ test('board Ask charter uses the clamped stamp and the payee allowlist (source)'
   assert.match(apps, /clauses\[route\]\?\.receivers \|\| S\.clauses\.pay\?\.receivers \|\| S\.boardRow\?\.receivers/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /extra\.charterNote = `Charter refused the trip:/);
+  assert.match(ui, /function hideFerryPrimary/);
+  assert.match(ui, /function ferryPlainReason/);
+  assert.match(ui, /NotEnoughAllowance/);
+  assert.doesNotMatch(ui, /btn\(APPS\.ferry\.btn\(\)\)/);
+  const world = read('app/design/D9_world/world.css');
+  assert.match(world, /body\.ferry-tray #shopUI #tray\{[\s\S]*overflow-x:hidden/);
+  const css = read('app/src/panels/panels.css');
+  assert.match(css, /overflow-wrap:anywhere/);
+  const setup = read('app/house/setup.js');
+  assert.match(setup, /DeleteKey/);
+  assert.match(setup, /addKeyAction\(pk\)/);
   const deep = read('app/src/panels/deep.js');
   assert.match(deep, /data-testid="ferry-charter-note"/);
   assert.match(deep, /state\.charterNote/);

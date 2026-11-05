@@ -172,7 +172,9 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const errLine = state.quoteError
     ? `<p class="ferry-quote-err" data-testid="ferry-quote-error">${esc(state.quoteError)}</p>`
     : (state.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : '');
-  const showCargo = !!(state.q && !state.sample && !state.quoteError);
+  const acted = !!state.acted;
+  const showCargo = !!(state.q && !acted && !state.sample && !state.quoteError);
+  const showAgain = acted && !state.sample;
   const charterReady = !!state.charterReady;
   const tabs = `<div class="ferry-tabs" role="tablist" data-testid="ferry-tabs">
       <button type="button" role="tab" class="ferry-tab${tab === 'swap' ? ' on' : ''}" data-tab="swap" aria-selected="${tab === 'swap' ? 'true' : 'false'}" data-testid="ferry-tab-swap">Swap</button>
@@ -193,13 +195,14 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       <label class="field ferry-field amt-field"><span>Amount</span>
         <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(amtVal)}" aria-label="Amount"><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
       </label>
-      <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote">Get quote</button>
+      <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote" ${acted ? 'hidden' : ''}>Get quote</button>
       ${rateLine}
       ${errLine}
       <div class="ferry-cargo-actions" data-testid="ferry-cargo-actions" ${showCargo ? '' : 'hidden'}>
         <button type="button" class="primary ferry-cta" id="f-cargo" data-testid="ferry-load-cargo">Load cargo</button>
         <button type="button" class="primary ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}>Ask charter · load cargo</button>
       </div>
+      <button type="button" class="primary ferry-cta" id="f-again" data-testid="ferry-again" ${showAgain ? '' : 'hidden'}>Get another quote</button>
       ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}</p>` : ''}
     </div>`;
   const routesPane = `<div class="ferry-pane" data-pane="routes" ${tab === 'routes' ? '' : 'hidden'}>
@@ -279,6 +282,7 @@ function mountFerry(root, hooks) {
         state.q = null;
         state.quoteError = '';
         state.charterNote = '';
+        state.acted = false;
         state.sample = false;
         state.tab = 'swap';
         paint();
@@ -315,12 +319,12 @@ function mountFerry(root, hooks) {
     if (from) from.onchange = (e) => {
       state.fromId = e.target.value;
       if (!state.amtEdited) state.amt = defaultAmtFor((e.target.value || '').split('|')[0]);
-      state.q = null; state.quoteError = ''; state.charterNote = ''; state.sample = false; refill(); localPaint();
+      state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; refill(); localPaint();
     };
     const to = q$(root, '#f-to');
-    if (to) to.onchange = (e) => { state.toId = e.target.value; state.q = null; state.quoteError = ''; state.charterNote = ''; state.sample = false; };
+    if (to) to.onchange = (e) => { state.toId = e.target.value; state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; };
     const amt = q$(root, '#f-amt');
-    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.sample = false; };
+    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; };
     const compare = q$(root, '#f-compare');
     if (compare) compare.onclick = () => runQuotes(compare);
     const one = q$(root, '#f-quote');
@@ -329,6 +333,8 @@ function mountFerry(root, hooks) {
     if (cargo) cargo.onclick = () => hooks.onLoadCargo && hooks.onLoadCargo({ charter: false });
     const charter = q$(root, '#f-charter');
     if (charter) charter.onclick = () => hooks.onLoadCargo && hooks.onLoadCargo({ charter: true });
+    const again = q$(root, '#f-again');
+    if (again) again.onclick = () => hooks.onAgain && hooks.onAgain();
     const openRules = q$(root, '#f-open-rules');
     if (openRules) openRules.onclick = () => hooks.openRules && hooks.openRules();
     // Agent dock lives outside the tray; still bind if present in this root.
@@ -414,6 +420,7 @@ function mountFerry(root, hooks) {
     state.fstatus = null;
     state.quoted = true;
     state.charterNote = '';
+    state.acted = false;
     state.q = failed ? null : q;
     state.tab = 'swap';
     if (!failed && hooks.onPair) {

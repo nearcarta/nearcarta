@@ -8,7 +8,7 @@
 import { Account, JsonRpcProvider, KeyPairSigner } from 'near-api-js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { proposalMessage } from '../../shared/board/message.js';
-import { AGENT_METHODS, GAS_ALLOWANCE_YOCTO, SESSION_BEATS, SESSION_HOURS, callPolicy, sessionExpiresAt } from '../../shared/board/session.js';
+import { AGENT_METHODS, BOARD_PROPOSE_TGAS, GAS_ALLOWANCE_YOCTO, SESSION_BEATS, SESSION_HOURS, callPolicy, sessionExpiresAt } from '../../shared/board/session.js';
 import { functionCall, keyFrom, outcomeOf, rpcClient, signMessage, signTx, viewFn } from '../../shared/vault/tx.js';
 
 const live = process.argv.includes('--live');
@@ -53,7 +53,7 @@ async function propose(label, amount, expect) {
   const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: OWNER, public_key: agent.publicKey });
   const signed = signTx({
     key: agent, signerId: OWNER, receiverId: BOARD, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
-    actions: [functionCall('propose', args, 30n * TG)],
+    actions: [functionCall('propose', args, BigInt(BOARD_PROPOSE_TGAS) * TG)],
   });
   const r = await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' });
   const o = outcomeOf(r);
