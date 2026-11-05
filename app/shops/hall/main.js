@@ -128,7 +128,20 @@ function paintMainnetHall(m) {
   $('#facts').innerHTML = id
     ? `<p>Contract <code>${esc(id)}</code>, owned by <code>${esc(hall.owner || '')}</code>.</p><p class="muted">A visitor's own charter is a row on the mainnet board. Open it from setup.</p>`
     : '<p class="muted">The mainnet hall record is not loaded.</p>';
-  const links = Object.entries(txs).map(([k, h]) => `<li><a class="tx" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(k).replaceAll('_', ' '))}</a></li>`).join('');
+  const HALL_ROWS = {
+    townhall_create_fund: ['Town Hall account funded', '', 'recorded'],
+    townhall_deploy_init: ['Town Hall contract deployed', '', 'recorded'],
+    'townhall_post_bounty_0.001': ['Bounty posted', '0.001 NEAR', 'allowed'],
+    'townhall_reward_allowed_0.001': ['Reward paid', '0.001 NEAR', 'allowed'],
+    'townhall_post_bounty_0.002': ['Bounty posted', '0.002 NEAR', 'allowed'],
+    'townhall_reward_refused_0.002': ['Reward over the cap', '0.002 NEAR', 'refused'],
+    townhall_sweep_surplus: ['Surplus returned to the owner', '', 'recorded'],
+  };
+  const links = Object.entries(txs).map(([k, h]) => {
+    const [title, amt, st] = HALL_ROWS[k] || [String(k).replaceAll('_', ' '), '', 'recorded'];
+    const badge = st === 'allowed' ? 'ok' : st === 'refused' ? 'no' : 'rec';
+    return `<li class="hall-row"><div><b>${esc(title)}</b>${amt ? `<div class="muted">${esc(amt)}</div>` : ''}</div><span class="badge ${badge}">${esc(st)}</span><a class="tx" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">View</a></li>`;
+  }).join('');
   $('#list').innerHTML = links ? `<ul class="props">${links}</ul>` : '<p class="muted">No hall transactions in the record.</p>';
 }
 const boot = PUBLIC ? Promise.resolve() : (async () => {
@@ -139,12 +152,28 @@ const boot = PUBLIC ? Promise.resolve() : (async () => {
   await refreshWho();
   await Promise.all([facts(), list()]);
 })();
-boot.catch(e => log(`<b>Could not load:</b> ${esc(e.message)}`, 'bad err'));
+boot.catch(e => {
+  const m = String(e?.message || '');
+  const said = /failed to fetch|networkerror|load failed|aborted/i.test(m) ? 'The town API is not reachable just now.' : m;
+  const host = $('#list');
+  if (host) {
+    host.innerHTML = `<p class="muted" data-testid="load-error">${esc(said)}</p><button type="button" data-testid="retry">Try again</button>`;
+    host.querySelector('button').onclick = () => location.reload();
+  }
+});
 fetch(API + '/api/mainnet').then(r => r.json()).then(m => {
   if (PUBLIC) { paintMainnetHall(m); return; }
   const id = m?.extras?.townhall?.contract; const n = $('#netnote');
   if (n && id) n.textContent = `${id} is the hall. This page changes your own row.`;
-}).catch(() => { if (PUBLIC) { const f = $('#facts'); if (f) f.textContent = 'The mainnet hall record could not be loaded.'; } });
+}).catch(() => {
+  if (!PUBLIC) return;
+  const f = $('#facts'); if (f) f.textContent = 'The town API is not reachable just now.';
+  const host = $('#list');
+  if (host && host.textContent.trim() === 'Loading…') {
+    host.innerHTML = `<p class="muted" data-testid="load-error">The town API is not reachable just now.</p><button type="button" data-testid="retry">Try again</button>`;
+    host.querySelector('button').onclick = () => location.reload();
+  }
+});
 $('#file-form').onsubmit = e => boot.then(() => file(e));
 $('#connect').onclick = () => location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.hash));
 const guestBtn = $('#guest'); if (guestBtn) guestBtn.hidden = true;

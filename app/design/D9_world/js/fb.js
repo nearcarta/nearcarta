@@ -4,7 +4,7 @@
 const $=s=>document.querySelector(s); const body=document.body;
 const D8=new URL('../../D8_shops/',import.meta.url).href;
 import { NAME as NAMES } from '../../D8_shops/js/names.js';
-const END={ guard:['no','Refused · not on the list'], ferry:['ok','Downgrade refused · crossed shielded'], hall:['ok','Passed · 2 votes'] };
+const END={ guard:['no','Refused · not on the list'], ferry:['ok','Downgrade refused · crossed shielded'], hall:['ok','Allowed · 0.001 NEAR'] };
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let started=false;
 export async function fallback(why){ if(started) return; started=true; body.classList.add('fb','ready'); $('#fb2d').hidden=false; $('#loading').classList.add('done'); $('#c').style.display='none';
@@ -38,7 +38,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
     const b=$('#t-act'), d=$('#d-body'), src=$('#t-src');
     if(err){ src.textContent='error'; src.className='src error'; $('#t-label').textContent='This room could not load'; $('#t-hero').innerHTML=''; b.hidden=false; b.disabled=false; b.className='act primary'; b.textContent='Try again'; b.onclick=()=>open(id);
       d.innerHTML=`<p class="note">The ${esc(NAMES[id])} room failed to load. ${esc(err.message||err)}</p>`; return; }
-    const tok=core.tok;     const F={ guard:['mainnet','split','Invoice with a hidden instruction',tok('0.001','NEAR')], hall:['mainnet','split','Reward cap · Proposal 4',tok('0.15','NEAR')],
+    const tok=core.tok;     const F={ guard:['mainnet','split','Invoice with a hidden instruction',tok('0.001','NEAR')], hall:['mainnet','split','Reward paid',tok('0.001','NEAR')],
       arena:['mainnet','split','5 attacks on the lab oath','<b class="num">0</b><span class="unit">breaches</span>'], toll:['mainnet','split','MPC signature for Base','<b class="num">11</b><span class="unit">of 16 nodes</span>'],
       chronicle:['record','mainnet','Refusals on the record','<b class="num">2</b><span class="unit">recorded refusals</span>'], house:['mainnet','split','Tip cap',tok('0.002','NEAR')] }[id];
     const info=m.FLAT||(F&&{src:F[0],cls:F[1],label:F[2],hero:F[3]})||{src:'mainnet',cls:'mainnet',label:'',hero:''};

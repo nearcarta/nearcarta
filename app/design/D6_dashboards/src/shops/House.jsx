@@ -50,7 +50,7 @@ export default function HouseView() {
           <div style={{ padding: '10px 16px 6px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {['Typed clauses', 'Daily budget with reserve / release', 'NEP-519 yield / resume escalation', 'ed25519 receipt check', 'NEP-297 refusal events'].map((t) => <span key={t} className="chip" style={{ height: 24 }}>{t}</span>)}
           </div>
-          {dirty && <div style={{ padding: '6px 16px 8px' }}><Note icon={Pencil}>Draft only. Changing a clause needs the owner or a DAO vote, bumps the policy version, and every pending proposal signed for v4 is refused with <span className="reason">stale policy_version</span>.</Note></div>}
+          {dirty && <div style={{ padding: '6px 16px 8px' }}><Note icon={Pencil}>Draft only. A rule change is set_rules on your own row. A shared DAO is not built. A pending proposal signed for an older policy version is refused with <span className="reason">stale policy_version</span>.</Note></div>}
         </Card>
 
         <Card className="s5" title="Today’s budget" icon={Gauge} right={<Ev label="Mainnet" />}>
@@ -93,7 +93,7 @@ export default function HouseView() {
               <div><div style={{ textAlign: 'right', marginBottom: 6 }}><Amt v={CORE.allowanceNow} size={14} /></div><Meter value={CORE.allowanceNow} max={1} /></div>
             </div>
             <div className="row" style={{ gridTemplateColumns: '1fr auto' }}>
-              <div><div style={{ fontWeight: 550 }}>Full-access keys</div><div className="sub">Deleted. Code changes only by DAO vote</div></div>
+              <div><div style={{ fontWeight: 550 }}>Full-access keys</div><div className="sub">The agent key can only call propose</div></div>
               <span className="tag pos"><Lock size={11} />0 keys</span>
             </div>
             <div className="row" style={{ gridTemplateColumns: '1fr auto' }}>
@@ -101,7 +101,7 @@ export default function HouseView() {
               <span className="chip" style={{ height: 24 }}><Users size={12} />2 can freeze</span>
             </div>
             <div className="row" style={{ gridTemplateColumns: '1fr auto' }}>
-              <div><div style={{ fontWeight: 550 }}>Freeze epoch</div><div className="sub">Owner froze at F1, DAO vote froze at D4</div></div>
+              <div><div style={{ fontWeight: 550 }}>Freeze epoch</div><div className="sub">A freeze is an owner action on a row. A shared DAO is not built</div></div>
               <span className="mono" style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Snowflake size={13} className="t3" />{CORE.freezeEpoch}<Dot tone="pos">Open</Dot></span>
             </div>
           </div>

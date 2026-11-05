@@ -124,7 +124,7 @@ app/design/D8_shops/shops/ferry.js:56:  // the far shore: the cargo goes into th
 app/design/D8_shops/shops/ferry.js:57:  const mistT = new THREE.CanvasTexture((() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('
 app/design/D8_shops/shops/ferry.js:58:  const pool = [0, 1, 2].map(i => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistT, transparent: true, opacity: 0, depthWrit
 app/design/D8_shops/shops/ferry.js:66:  const swapsTo = () => { tags[0].el.innerHTML = icon('ZEC', 'Zcash'); };
-app/design/D8_shops/shops/hall.js:1:// Town Hall: a council table with vote stones. Proposal 4 (real, testnet) lowered the reward cap from 0.25 to 0.15 NEAR.
+app/design/D8_shops/shops/hall.js:1:// Town Hall room. The recorded mainnet payments are a 0.001 NEAR reward and a 0.002 NEAR refusal. A shared DAO is not built.
 app/design/D8_shops/shops/hall.js:12:      note(`DAO ${acct(TH.dao)}. All rows are real testnet transactions; the stones are a re-enactment.`));
 app/design/D8_shops/shops/hall.js:19:export const isOld = p => !!p.expired || p.status === 'Expired' || /alice\.testnet|trezu-tmpl|\bR16\.|\.testnet char/i.test(plain(p.description
 app/design/D8_shops/shops/hall.js:33:// The town's real proposals page (Sputnik DAO on testnet).

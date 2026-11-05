@@ -6,7 +6,7 @@ const SH = { guard: 'Guardhouse', ferry: 'Ferry', hall: 'Town Hall', bank: 'Mist
 export function flat() {
   document.body.classList.add('flat', 'ready'); $('#load')?.remove(); const bg = document.createElement('div'); bg.id = 'flatbg'; document.body.prepend(bg); bg.style.backgroundImage = 'url(shots/fallback_town.jpg)';
   const nav = $('#tags'); for (const [id, n] of Object.entries(SH)) { const b = document.createElement('button'); b.className = 'lb'; b.textContent = n; b.onclick = () => open(id); nav.appendChild(b); }
-  $('#back').onclick = () => { bg.style.backgroundImage = 'url(shots/fallback_town.jpg)'; $('#tray').hidden = true; $('#back').hidden = true; $('#brand').hidden = false; nav.hidden = false; document.body.classList.remove('in-shop'); };
+  $('#back').onclick = () => { location.assign('/'); };
   $('#t-proof').onclick = () => $('#drawer').classList.add('open'); $('#d-close').onclick = () => $('#drawer').classList.remove('open');
   // A shop module that fails to import is shown as a failure, never as an empty room: console error, a coral tray
   // with one Reload action, and the error in the drawer. A module without a PROOF list is also logged and flagged.
@@ -21,7 +21,7 @@ export function flat() {
       body.innerHTML = `<p class="note proof-error">The ${esc(SH[id])} module failed to load, so there is no proof to show. ${esc(err.message || err)}</p>`;
     } else {
       // the 2D tray shows the end state (no scene to animate)
-      const end = { guard: ['no', 'Refused · not on the list'], ferry: ['ok', 'Downgrade refused · crossed shielded'], hall: ['ok', 'Passed · 2 votes'] }[id];
+      const end = { guard: ['no', 'Refused · not on the list'], ferry: ['ok', 'Downgrade refused · crossed shielded'], hall: ['ok', 'Allowed · 0.001 NEAR'] }[id];
       const info = m.FLAT || FLAT[id]; $('#t-src').textContent = (globalThis.NEARCARTA_PUBLIC_MAINNET === true && { bank: 'mainnet · mainnet', payouts: 'mainnet', chronicle: 'mainnet' }[id]) || (info.src === 'mainnet' ? 'mainnet' : info.src); $('#t-src').className = 'src ' + info.cls; $('#t-label').textContent = info.label; $('#t-hero').innerHTML = info.hero;
       { const mo = $('#t-more'); mo.hidden = !m.MORE; if (m.MORE) { mo.href = m.MORE.href; mo.textContent = m.MORE.text; } }
       b.onclick = null; b.hidden = !end; if (end) { b.className = 'act res ' + end[0]; b.disabled = true; b.textContent = end[1]; }
@@ -35,7 +35,7 @@ export function flat() {
 const FLAT = {
   guard: { src: 'mainnet', cls: 'split', label: 'Invoice with a hidden instruction', hero: tok('0.001', 'NEAR') },
   ferry: { src: 'mainnet quote', cls: 'quote', label: 'Shielded quote · Orchard-only UA', hero: `${tok(String(+QUOTE.from.amt), QUOTE.from.sym, { chain: QUOTE.from.chain })}<span class="arrow">→</span>${tok(QUOTE.to.amt, QUOTE.to.sym)}` },
-  hall: { src: 'mainnet', cls: 'split', label: 'Reward cap · Proposal 4', hero: tok('0.15', 'NEAR') },
+  hall: { src: 'mainnet', cls: 'split', label: 'Reward paid', hero: tok('0.001', 'NEAR') },
   bank: { src: 'mainnet', cls: 'mainnet', label: 'Street sees a payout, not the amount', hero: '<span class="commit">sha256…</span><span class="unit">amount hidden</span>' },
   arena: { src: 'mainnet', cls: 'split', label: '5 attacks on the lab oath', hero: '<b class="num">0</b><span class="unit">breaches</span>' },
   toll: { src: 'mainnet', cls: 'split', label: 'MPC signature for Base', hero: '<b class="num">11</b><span class="unit">of 16 nodes</span>' },

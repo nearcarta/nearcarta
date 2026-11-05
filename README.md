@@ -103,7 +103,7 @@ A town of shops on NEAR. In every shop an AI agent (the Lamplighter) moves money
 
 Deployed: https://nearcarta.vercel.app serves the pages, and `/api/*` is passed to the API on Render: https://nearcarta-api.onrender.com. The hackathon demo window runs through 2026-11-25. This page does not prove uptime. Example: `/api/health`, `/api/receipts`, `/api/mainnet`. `/api/health` returns `network.contracts` `mainnet`, `network.journey` `mainnet`, and `near.chain_id` `mainnet` (test `health names mainnet and has no trial block`). `/api/ai/tee` returns `ok: true`. General signing stays off (`signing: false`). A visitor charter is a row on `board.nearcarta.near` (`docs/MAINNET_BOARD.md`, deploy [CaZr8GmM…](https://nearblocks.io/txns/CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt)). `/ferry-widget` is the Pay page.
 
-## For judges: do X, see Y
+## For judges: open the transaction, see the charter's answer
 
 ### Mainnet
 Open the tx. You should see the charter allow or refuse it. Links are https://nearblocks.io. Records: `shared/deployments/mainnet.json`, `judges/proofs/core-mainnet-deploy.json`, `judges/proofs/extras-mainnet-deploy.json`.
@@ -169,7 +169,7 @@ npx playwright install chromium && npm run e2e   # 34 browser tests: 22 run, 12 
 ```
 Optional: `ONECLICK_PARTNER_KEY` enables confidential quotes. `NEARAI_CLOUD_API_KEY` enables the live NEAR AI TEE check (`npm run tee`; non-billable). Without them the public paths still run.
 
-## Check each shop: do X, see Y
+## Check each shop
 The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run verify:mainnet`.
 
 | Shop | Do | See | Proof |
