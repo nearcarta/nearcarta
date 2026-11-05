@@ -2,6 +2,22 @@
 // A failed check always names the step and the reason. The pass rule is unchanged.
 
 export const PROOF_HREF = '/tee-public.json';
+export const TEE_TIMEOUT_MS = 8000;
+export const TEE_PLAN = [
+  ['request', 'NEAR AI attestation'],
+  ['quote', 'Intel TDX quote'],
+  ['debug', 'Debug mode off'],
+  ['nonce', 'Nonce in the quote'],
+  ['signer', 'Signing key bound'],
+  ['config', 'App config measured'],
+  ['rtmr3', 'Event log replays RTMR3'],
+  ['gpu', 'NVIDIA GPU attestation'],
+];
+
+export function teeTimeoutWhy(timeoutMs = TEE_TIMEOUT_MS) {
+  const waited = timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)} seconds` : `${timeoutMs} milliseconds`;
+  return `The live check did not answer within ${waited}. A direct read of this route usually answers in about 2 seconds. Nothing was signed.`;
+}
 
 const hasDetail = body => !!(body?.steps?.length || body?.rows?.length || body?.gateway || body?.models?.length || body?.error || body?.err || body?.failure);
 
@@ -74,21 +90,39 @@ export function teeResult(body, proofHref = PROOF_HREF) {
   };
 }
 
-export async function liveTee({ fetchImpl = globalThis.fetch, api = '', nonce } = {}) {
+export async function liveTee({ fetchImpl = globalThis.fetch, api = '', nonce, timeoutMs = TEE_TIMEOUT_MS, onTick } = {}) {
   const bytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
   const n = nonce || [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
   const base = String(api || '').replace(/\/$/, '');
+  const ctrl = new AbortController();
+  const started = Date.now();
+  if (onTick) onTick(0);
+  const tick = onTick ? setInterval(() => onTick(Math.round((Date.now() - started) / 1000)), 1000) : null;
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const fail = (why) => ({ ok: false, nonce: n, error: why, failure: `NEAR AI attestation: ${why}`, steps: [step('request', 'NEAR AI attestation', false, why)] });
   try {
-    const res = await fetchImpl(`${base}/api/ai/tee?nonce=${encodeURIComponent(n)}`);
+    const res = await Promise.race([
+      Promise.resolve(fetchImpl(`${base}/api/ai/tee?nonce=${encodeURIComponent(n)}`, { signal: ctrl.signal })),
+      new Promise((_, reject) => {
+        ctrl.signal.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      }),
+    ]);
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       const why = body.error || body.failure || `attestation http ${res.status}`;
-      return { ok: false, nonce: n, error: why, failure: `NEAR AI attestation: ${why}`, steps: [step('request', 'NEAR AI attestation', false, why)] };
+      return fail(why);
     }
     const view = teeView(body, n);
     return { ...body, ok: view.ok, nonce: body.nonce || n, steps: view.steps, failure: view.ok ? '' : view.failed };
   } catch (e) {
-    const why = e?.message || 'The attestation request failed';
-    return { ok: false, nonce: n, error: why, failure: `NEAR AI attestation: ${why}`, steps: [step('request', 'NEAR AI attestation', false, why)] };
+    const why = ctrl.signal.aborted ? teeTimeoutWhy(timeoutMs) : (e?.message || 'The attestation request failed');
+    return fail(why);
+  } finally {
+    clearTimeout(timer);
+    if (tick) clearInterval(tick);
   }
 }
