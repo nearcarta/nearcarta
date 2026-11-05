@@ -78,7 +78,13 @@ export default async function ferry(ctx) {
     { obj: crate, pos: new THREE.Vector3(0, .9, 0), html: icon(cargo.fromSym, cargo.fromChain), cls: 'bare' },
     { obj: seal, pos: new THREE.Vector3(-.15, .55, 0), html: 'Downgrade refused', cls: 'no hide' },
     { obj: b, pos: new THREE.Vector3(0, 1.15, 0), html: orderChipHtml('jetty'), cls: 'order' },
+    { obj: rob.g, pos: new THREE.Vector3(0, 1.55, 0), html: '', cls: 'speech hide' },
   ];
+  const speak = (html, cls = 'speech') => {
+    const el = tags[3].el;
+    if (el) { el.className = 'stag ' + cls; el.innerHTML = html; el.classList.toggle('hide', !html); }
+    else { tags[3].html = html; tags[3].cls = html ? cls : 'speech hide'; }
+  };
   const paintOrder = (id) => {
     const s = ORDER_STATES[id] || ORDER_STATES.jetty;
     const el = tags[2].el;
@@ -110,25 +116,39 @@ export default async function ferry(ctx) {
     panel,
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },
-    *act() {
+    *act(opts = {}) {
+      // Character beats (depth-plan-v2 §1): read board → refuse downgrade → sail → hand over far-chain coin.
+      const refused = !!opts.refused;
       paintOrder('loading');
+      speak(`Weighing ${cargo.fromSym} → ${cargo.toSym}`, 'speech');
       yield rob.walk([new THREE.Vector3(-2.45, 0, .55)]); rob.lookAt(crate.position); rob.play('Yes', { once: true }); yield wait(.4);
+      speak('Handing over the coin', 'speech');
       sfx('send'); const c0 = crate.position.clone(), c1 = new THREE.Vector3(-.85, .36, .2);
       yield tween(.55, k => { crate.position.lerpVectors(c0, c1, k); crate.position.y += Math.sin(k * Math.PI) * .5; });
       crate.removeFromParent(); b.add(crate); crate.position.set(0, .3 / 1.25, 0); crate.scale.multiplyScalar(1 / 1.25); rob.play('Idle');
       // a downgraded echo of the quote drifts in from the far shore; the board refuses it
+      speak('Stale quote? Checking the seal…', 'speech');
       slip.visible = true; const s0 = slip.position.clone(), s1 = new THREE.Vector3(-2.6, .8, -.84); rob.lookAt(seal.position);
       yield tween(1.1, k => { slip.position.lerpVectors(s0, s1, k); slip.position.y += Math.sin(k * Math.PI) * .6; slip.rotation.z = Math.sin(k * 8) * .2; }, easeInOut);
       seal.material = sealNo; tags[1].el?.classList.remove('hide'); sfx('refuse'); rob.play('No', { once: true }); yield wait(.5);
       const d0 = slip.position.clone(), d1 = new THREE.Vector3(-1.3, -.25, -.7);
       yield tween(.9, k => { slip.position.lerpVectors(d0, d1, k); slip.position.y = d0.y + (d1.y - d0.y) * k * k; slip.rotation.x = -k * 1.4; slip.material.opacity = 1 - k * .9; });
       slip.visible = false; yield wait(.3);
+      if (refused) {
+        speak('Charter said no. Boat stays.', 'speech no');
+        paintOrder('frozen');
+        ctx.setResult('no', opts.reason || 'Refused by your rules');
+        rob.play('No', { once: true }); yield wait(1.4); rob.play('Idle'); speak('');
+        return;
+      }
       // the signed quote matches the request: the seal goes mint and the boat crosses with the visitor's pair
+      speak('Seal matches. Casting off.', 'speech');
       seal.material = sealOk; sfx('allowed'); sfx('water'); rob.play('Idle'); paintOrder('transit');
       yield tween(2.2, k => { b.position.x = -.85 + 1.7 * k; b.rotation.z = Math.sin(k * 12) * .03; }, easeInOut);
-      swapsTo(); yield tween(.9, k => pool.forEach((m, i) => { m.material.opacity = .55 * Math.min(1, Math.max(0, k * 1.4 - i * .2)); }));
+      swapsTo(); speak(`Far bank · ${cargo.toSym}`, 'speech');
+      yield tween(.9, k => pool.forEach((m, i) => { m.material.opacity = .55 * Math.min(1, Math.max(0, k * 1.4 - i * .2)); }));
       paintOrder('delivered');
-      ctx.setResult('ok', cargo.result); rob.play('ThumbsUp', { once: true }); yield wait(1.4); rob.play('Idle');
+      ctx.setResult('ok', cargo.result); rob.play('ThumbsUp', { once: true }); yield wait(1.4); rob.play('Idle'); speak('');
     },
     update(dt) { t += dt; rob.update(dt); b.position.y = -.02 + Math.sin(t * 1.6) * .015; pool.forEach((m, i) => { m.position.y += Math.sin(t * .9 + i) * .0008; }); },
   };

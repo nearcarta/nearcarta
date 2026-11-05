@@ -365,3 +365,6 @@ body:has(#drawer.open) #back{visibility:hidden}
 .ferry-add-pair { display: grid; gap: 8px; margin-top: 8px; }
 .ferry-add-pair label { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ferry-add-pair input { min-height: 36px; min-width: 8rem; flex: 1; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--base); color: var(--text); }
+
+.stag.speech { max-width: 220px; white-space: normal; padding: 6px 10px; color: #fff8ee; background: color-mix(in srgb, var(--base) 92%, transparent); border-color: rgba(214,180,106,.55); font: 600 12px/1.35 Inter, system-ui, sans-serif; }
+.stag.speech.no { color: var(--no); border-color: color-mix(in srgb, var(--no) 45%, transparent); }

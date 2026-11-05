@@ -154,7 +154,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
         <input id="f-agent" data-testid="ferry-agent-input" value="${esc(state.agentText || '')}" placeholder="Swap 3 USDC on Base to ZEC" autocomplete="off" aria-label="Ask the ferryman in plain words">
         <button type="button" class="primary" id="f-agent-go" data-testid="ferry-agent-go">Ask</button>
       </div>
-      <p class="ferry-agent-hint" data-testid="ferry-agent-hint">${esc(state.agentHint || 'Same caps as /setup. No wallet popup from this box — it only fills the pair and stamps a quote.')}</p>
+      <p class="ferry-agent-hint" data-testid="ferry-agent-hint">${esc(state.agentHint || 'Fills the pair and stamps a quote. With a live /setup session, Ask charter · load cargo runs under your caps with no wallet popup.')}</p>
     </div>`;
   return `<div class="shop-stack">
     <p class="ferry-kicker">In the city room the ferryman loads your cargo. Pick any live 1Click token, use a quick corridor, or tell him in plain words. The charter checks the recipient, the cap and the daily budget before a deposit address is created.</p>
@@ -325,7 +325,7 @@ function mountFerry(root, hooks) {
         order: 'quoted',
       });
     }
-    if (state.agentText) state.agentHint = 'Quote stamped. In the city room press Load the cargo.';
+    if (state.agentText) state.agentHint = 'Quote stamped. In the city room press Ask charter · load cargo (or Load the cargo as guest).';
     paint();
   }
   async function runQuotes(btn) {

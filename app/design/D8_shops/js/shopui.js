@@ -162,14 +162,18 @@ const APPS = {
       repaint: () => paint(),
       onPair: (pair) => { if (sh?.applyPair) sh.applyPair(pair); },
     }),
-    btn: () => extra.acted ? 'Get another quote' : extra.q ? 'Load the cargo' : extra.fdone ? 'Get another quote' : 'Get quote',
+    charterReady: () => A.S.ready && A.stage() === 'ready',
+    btn: () => {
+      if (extra.acted) return 'Get another quote';
+      if (extra.q) return APPS.ferry.charterReady() ? 'Ask charter · load cargo' : 'Load the cargo';
+      return extra.fdone ? 'Get another quote' : 'Get quote';
+    },
     hero: () => {
       if (!extra.q) return null;
       const q = extra.q;
       const fromSym = q.from?.symbol || (extra.fromId || '').split('|')[0] || 'USDC';
       const fromChain = chainLabel(q.from?.blockchain || q.from?.chain || (extra.fromId || '').split('|')[1] || 'base');
       const toSym = q.to?.symbol || (extra.toId || 'ZEC|zec').split('|')[0] || 'ZEC';
-      const toChain = chainLabel(q.to?.blockchain || q.to?.chain || (extra.toId || 'ZEC|zec').split('|')[1] || 'zec');
       const out = +Number(q.to?.amount || q.amountOut || 0);
       const inn = +Number(q.from?.amount || extra.amt || 0);
       return `<span class="tok"><b class="num">${esc(inn || extra.amt || '')}</b><span class="sym">${esc(fromSym)}</span></span><span class="arrow" aria-hidden="true">→</span><span class="tok"><b class="num">${esc(out ? out.toFixed(5) : '')}</b><span class="sym">${esc(toSym)}</span></span>`;
@@ -185,7 +189,7 @@ const APPS = {
       return { from, to, amt, fromSym: from.split('@')[0], fromChain: from.split('@')[1], toSym: to.split('@')[0], toChain: to.split('@')[1] };
     },
     run: async () => {
-      if (extra.acted) { extra.q = null; extra.acted = false; extra.fdone = true; sh?.setOrder?.('jetty'); }
+      if (extra.acted) { extra.q = null; extra.acted = false; extra.fdone = true; extra.ferryTx = null; sh?.setOrder?.('jetty'); }
       if (!extra.q) {
         extra.fdone = false;
         const pair = APPS.ferry.pairFromState();
@@ -194,22 +198,47 @@ const APPS = {
         extra.q = q;
         const outAmt = q.to?.amount || q.amountOut || '';
         sh?.applyPair?.({ ...pair, outAmt, order: 'quoted' });
+        const ready = APPS.ferry.charterReady();
         return {
           keep: true, hero: APPS.ferry.hero(),
-          say: `Quote stamped for ${esc(pair.from)} → ${esc(pair.to)}. Nothing left your wallet. Press Load the cargo to watch the crossing in the room.`,
+          say: ready
+            ? `Quote stamped for ${esc(pair.from)} → ${esc(pair.to)}. Ask your charter (no popup if the session key is on), then watch the crossing.`
+            : `Quote stamped for ${esc(pair.from)} → ${esc(pair.to)}. Nothing left your wallet. Press Load the cargo to watch the crossing in the room.`,
           rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click · ${esc((q.correlationId || '').slice(0, 8))}</span><span class="rc" data-testid="ferry-clause">clause ${esc(A.ferryClauseForPair?.(pair.from, pair.to) || pairClauseId(pair.from, pair.to))}</span>`,
         };
       }
-      // Second beat: play the in-room cargo act with the live pair (not a hard-coded USDC→ZEC).
+      // Second beat: optional charter ask under /setup caps, then in-room cargo cinema.
       extra.acted = true;
       const pair = APPS.ferry.pairFromState();
       const outAmt = extra.q.to?.amount || extra.q.amountOut || '';
       sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
-      if (sh?.act && runScene) runScene(sh.act());
+      let o = null;
+      if (APPS.ferry.charterReady()) {
+        const clause = A.ferryClauseForPair(pair.from, pair.to);
+        try { o = await A.ferry(clause, extra.q); }
+        catch (e) {
+          if (e.cancelled) throw e;
+          o = { decision: 'denied', reason: A.plainError(e), tx: e.tx || null };
+        }
+        extra.ferryTx = o?.tx || null;
+      }
+      const refused = o && o.decision !== 'allowed';
+      if (sh?.act && runScene) runScene(sh.act({ refused, reason: o ? A.why(o.reason) || o.reason : '' }));
+      if (refused) {
+        return {
+          o, keep: true, kind: 'no', hero: APPS.ferry.hero(),
+          say: `Charter refused the trip: ${esc(A.why(o.reason) || o.reason || 'refused')}. The boat stays at the jetty.`,
+          rc: (o?.tx ? A.txLine(o.tx) : '') + `<span class="rc" data-testid="ferry-order-state">order · refused</span>`,
+          rule: A.ruleFor(o, A.ferryClauseForPair(pair.from, pair.to)),
+        };
+      }
       return {
-        keep: true, hero: APPS.ferry.hero(),
-        say: `The ferryman loads ${esc(pair.fromSym)} and sails for ${esc(pair.toSym)}. Downgrade refused; signed quote crosses.`,
-        rc: `<span class="rc" data-testid="ferry-order-state">order · in room</span><a class="rc" href="/ferry-widget">Pay from any chain</a>`,
+        o: o || undefined, keep: true, kind: 'ok', hero: APPS.ferry.hero(),
+        say: o
+          ? `Charter allowed a tiny stamp for ${esc(pair.fromSym)} → ${esc(pair.toSym)}. Watching the crossing.`
+          : `The ferryman loads ${esc(pair.fromSym)} and sails for ${esc(pair.toSym)}. Downgrade refused; signed quote crosses.`,
+        rc: (o?.tx ? A.txLine(o.tx) : '') + `<span class="rc" data-testid="ferry-order-state">order · in room</span><a class="rc" href="/ferry-widget">Pay from any chain</a>`,
+        rule: o ? A.ruleFor(o, A.ferryClauseForPair(pair.from, pair.to)) : '',
       };
     },
   },

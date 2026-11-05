@@ -64,13 +64,16 @@ test('city Ferry markup exposes agent chat + live dest from picker', () => {
   assert.match(html, /data-testid="ferry-picker"/);
 });
 
-test('city ferry room wires applyPair + order chip (source)', () => {
+test('city ferry room wires applyPair + order chip + speech beats (source)', () => {
   const src = read('app/design/D8_shops/shops/ferry.js');
   assert.match(src, /applyPair/);
   assert.match(src, /orderChipHtml/);
   assert.match(src, /paintOrder\('transit'\)/);
   assert.match(src, /paintOrder\('delivered'\)/);
   assert.match(src, /cargo\.fromSym/);
+  assert.match(src, /speak\(/);
+  assert.match(src, /refused/);
+  assert.match(src, /Casting off/);
   assert.doesNotMatch(src, /swapsTo = \(\) => \{ tags\[0\]\.el\.innerHTML = icon\('ZEC'/);
 });
 
@@ -80,7 +83,9 @@ test('rules sheet allows dynamic ferry pairs beyond 3 corridors (source)', () =>
   assert.match(ui, /data-testid="ferry-rule-add"/);
   assert.match(ui, /pairClauseId/);
   assert.match(ui, /Load the cargo/);
+  assert.match(ui, /Ask charter · load cargo/);
   assert.match(ui, /applyPair/);
+  assert.match(ui, /A\.ferry\(/);
   const apps = read('app/design/D8_shops/js/apps.js');
   assert.match(apps, /isFerryClauseId/);
   assert.match(apps, /ferryClauseForPair/);
