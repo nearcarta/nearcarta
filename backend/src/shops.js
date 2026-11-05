@@ -15,6 +15,7 @@ export async function townhall() {
   // Town Hall is the R14 charter the DAO created through the charter factory: the DAO is owner and governor,
   // the agent holds a propose-only key, and there is no full-access key.
   const T = DEP.townhall;
+  if (!T?.charter || !T?.dao) return { network: 'mainnet', dao: null, oath: null, note: 'Town Hall proposals are board rows on mainnet.' };
   const [snap, policy, lastId] = await Promise.all([snapshot(T.charter), view(T.dao, 'get_policy'), view(T.dao, 'get_last_proposal_id')]);
   const proposals = await view(T.dao, 'get_proposals', { from_index: Math.max(0, lastId - 24), limit: 24 }).catch(() => []);
   const reward = snap.clauses?.[T.clause || 'reward'] || null;
@@ -39,6 +40,7 @@ export async function townhall() {
 /** May `account` file a Town Hall proposal now? Same tier limits as the hall page, read from the DAO's last 100 proposals. */
 export async function townhallCanFile(account) {
   const T = DEP.townhall;
+  if (!T?.charter || !T?.dao) return { account, ok: false, reason: 'Town Hall is a board row on mainnet.' };
   const [lastId, clauses] = await Promise.all([view(T.dao, 'get_last_proposal_id'), view(T.charter, 'get_clauses')]);
   const hist = await view(T.dao, 'get_proposals', { from_index: Math.max(0, lastId - 100), limit: 100 });
   return { account, ...canFile(account, hist, clauses?.[T.clause || 'reward']?.receivers || [], Date.now()) };
@@ -66,7 +68,8 @@ async function townhallR16() {
 }
 
 export async function arena() {
-  const A = DEP.arena.contract;
+  const A = DEP.arena?.contract || MAINNET_DEP?.extras?.arena?.contract;
+  if (!A) return { network: 'mainnet', contract: null };
   const [season, guardian, acct] = await Promise.all([view(A, 'get_season'), view(A, 'get_guardian', { token_id: 'g1' }), viewAccount(A)]);
   const cases = ['case:C1_CAP', 'case:C3_ALLOWLIST', 'case:C5_NO_BOUNTY', 'case:C6_BAD_PROOF', 'case:C7_HANDOFF', 'case:C9_STOCK', 'key:brass'];
   const supply = await view(A, 'mt_batch_supply', { token_ids: cases }).catch(() => []);
@@ -77,7 +80,8 @@ export async function arena() {
 
 // The attack corpus, paged: every attempt is committed on chain by prompt hash, and anyone may reveal the prompt.
 export async function arenaAttempts(from = 0, limit = 25) {
-  const A = DEP.arena.contract;
+  const A = DEP.arena?.contract || MAINNET_DEP?.extras?.arena?.contract;
+  if (!A) return { network: 'mainnet', contract: null, from: 0, attempts: [], next: null };
   from = Math.max(0, Math.floor(Number(from) || 0)); limit = Math.min(25, Math.max(1, Math.floor(Number(limit) || 25)));
   const got = await Promise.all(Array.from({ length: limit }, (_, k) => view(A, 'get_attempt', { attempt_id: from + k }).catch(() => null)));
   const attempts = [];
@@ -200,7 +204,12 @@ export function feedSnapshot(account, file = new URL('../data/feed-snapshots.jso
   return v && Array.isArray(v.txs) ? { ...v, snapshot_at: SNAPS.at } : null;
 }
 export const _setSnapshots = v => { SNAPS = v; };
-export function ledgerSnapshot() { feedSnapshot(''); return SNAPS?.ledger ? { ledger: SNAPS.ledger, at: SNAPS.at } : null; }
+export function ledgerSnapshot() {
+  feedSnapshot('');
+  // Never seed a testnet ledger into the public /api/ledger SWR cache.
+  if (!SNAPS?.ledger || SNAPS.ledger.network !== 'mainnet') return null;
+  return { ledger: SNAPS.ledger, at: SNAPS.at };
+}
 // Re-read each listed tx from RPC in parallel (bounded), keeping the index order.
 async function inParallel(items, conc, fn) {
   const out = new Array(items.length); let i = 0;
@@ -216,7 +225,7 @@ export async function chronicleOnce(account, limit = FEED_MAX, { post = fpost, s
     try { return txRow(await status(t.transaction_hash, signer[t.transaction_hash] || account), new Date(Number(BigInt(t.tx_block_timestamp) / 1000000n)).toISOString()); }
     catch (e) { return { hash: t.transaction_hash, error: e.message.slice(0, 120) }; }
   });
-  return { account, count: out.length, source: 'tx.test.fastnear.com list + rpc EXPERIMENTAL_tx_status', txs: out };
+  return { account, count: out.length, source: 'tx index list + rpc EXPERIMENTAL_tx_status', txs: out };
 }
 function txRow(tx, at) {
   const h = tx.transaction.hash;

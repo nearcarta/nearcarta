@@ -7,7 +7,7 @@ const ethOf = w => { try { const b = BigInt(w); const f = (b % 10n ** 18n).toStr
 const KIND = { pay: 'payout', tip: 'payout', ask: 'payout', arena: 'payout', toll: 'sale', house: 'payout', ferry: 'sale' };
 const SHOP = { pay: 'Guardhouse', tip: 'Your House', ask: 'Your House', arena: 'Vault Arena', toll: 'Toll Bridge', house: 'Your House', ferry: 'Ferry', guardhouse: 'Guardhouse' };
 
-export function buildLedger({ chronicle, toll, gate, budget, now = new Date().toISOString() } = {}) {
+export function buildLedger({ chronicle, toll, gate, budget, board, now = new Date().toISOString() } = {}) {
   const rows = [];
   for (const t of chronicle?.txs || []) for (const e of t.events || []) {
     if (e.standard !== 'oath' || e.event !== 'action') continue;
@@ -16,6 +16,14 @@ export function buildLedger({ chronicle, toll, gate, budget, now = new Date().to
       rows.push({ at: t.at || null, shop: SHOP[d.shop] || 'Your House', kind: ok ? (KIND[d.shop] || 'payout') : 'refusal', to: d.receiver || null,
         amount: ok ? nearOf(d.amount) : '0', asset: 'NEAR', note: ok ? null : reasonLabel(d.reason || d.decision), tx: t.hash, url: t.hash ? `https://nearblocks.io/txns/${t.hash}` : null });
     }
+  }
+  // Recorded mainnet board proposes (from shared/deployments/mainnet.json).
+  for (const t of board?.txs || []) {
+    const ok = t.decision === 'allowed';
+    const opened = t.decision === 'opened';
+    rows.push({ at: t.at || null, shop: t.shop || 'Board', kind: opened ? 'note' : ok ? 'payout' : 'refusal', to: t.payee || null,
+      amount: ok ? '0.001' : '0', asset: 'NEAR', note: t.note || null, tx: t.hash || null,
+      url: t.url || (t.hash ? `https://nearblocks.io/txns/${t.hash}` : null) });
   }
   // Toll gate: each visit is a sale. The visitor's charter pays the gate fee in NEAR.
   const fee = gate?.policy?.gate?.fee;
@@ -28,7 +36,7 @@ export function buildLedger({ chronicle, toll, gate, budget, now = new Date().to
   rows.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
   const sum = (k, asset) => rows.filter(r => r.kind === k && r.asset === asset).reduce((s, r) => s + Number(r.amount || 0), 0);
   return {
-    generated_at: now, network: 'recorded',
+    generated_at: now, network: 'mainnet',
     totals: { payouts_near: +sum('payout', 'NEAR').toFixed(6), sales_near: +sum('sale', 'NEAR').toFixed(6),
       refusals: rows.filter(r => r.kind === 'refusal').length,
       gate_visits_total: gate?.policy?.next_nonce ?? null,

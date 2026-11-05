@@ -77,7 +77,7 @@ const reads = Object.fromEntries(Object.entries({
   arena_attempts: () => shops.arenaAttempts(undefined, '2'),
   toll: () => shops.toll(),
   toll_gate: () => tollgate.gate(),
-  chronicle: () => shops.chronicle(DEP.guardhouse.oath, 2),
+  chronicle: () => MAINNET_DEP?.charter?.contract ? shops.chronicle(MAINNET_DEP.charter.contract, 2) : Promise.resolve(mainnetChronicle()),
   ferry_tokens: () => ferry.tokens(),
 }).map(([k, fn]) => [k, lastGood(k, fn)]));
 
@@ -99,8 +99,12 @@ export async function deepHealth() {
 
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 const ACCT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
-const knownAccounts = new Set([DEP.guardhouse.oath, DEP.townhall.charter, DEP.townhall.dao, DEP.arena.contract, DEP.toll.oath,
-  DEP.townhall_r16?.charter, DEP.toll_arbitrum?.oath, DEP.toll_usdc?.toll, DEP.toll_gate?.gate].filter(Boolean));
+const knownAccounts = new Set([
+  MAINNET_DEP?.charter?.contract, MAINNET_DEP?.board?.contract, MAINNET_DEP?.toll?.contract,
+  MAINNET_DEP?.extras?.arena?.contract, MAINNET_DEP?.extras?.house?.contract,
+  DEP.guardhouse?.oath, DEP.townhall?.charter, DEP.townhall?.dao, DEP.arena?.contract, DEP.toll?.oath,
+  DEP.townhall_r16?.charter, DEP.toll_arbitrum?.oath, DEP.toll_usdc?.toll, DEP.toll_gate?.gate,
+].filter(Boolean));
 const bad = (c, m) => c.json({ error: m }, 400);
 async function jsonBody(c) {
   try { const b = await c.req.json(); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; }
@@ -113,36 +117,37 @@ export const WARM_EVERY_MS = Number(process.env.WARM_EVERY_MS) || 60_000;
 // Vault Arena past prompts: a cold read is ~50 RPC views (8 s seen live), and the Arena room shows them,
 // so serve them stale-while-revalidate (stale up to 1 h) and keep them warm every 2nd warm tick.
 const arenaPromptsSwr = swr('arena_prompts', () => arenaPrompts(), { ttl: 30_000, stale: 60 * 60_000 });
-// Public ledger: a cold read is the guardhouse + arena chronicles + toll + gate (4.8 s seen live), so it is served
-// stale-while-revalidate (fresh 15 s, stale up to 30 min) and kept warm on alternate warm ticks (the two heavy reads never share a tick).
-// Live feeds: the guardhouse oath and the shared arena pool. History feeds: the retired guardhouse (R11) and arena
-// charters (R16/R17), which no longer have an agent key, so the deploy-time snapshot is used first and RPC only without one.
-export const ledgerAccounts = () => ({ live: [DEP.guardhouse.oath, ...vault.sharedCharters()],
-  history: [...(DEP.guardhouse_history || []).map(h => h.oath), ...vault.historyCharters()] });
+// Public ledger: mainnet accounts from shared/deployments/mainnet.json only. Served stale-while-revalidate
+// (fresh 15 s, stale up to 30 min) and kept warm on alternate warm ticks.
+export const ledgerAccounts = () => {
+  const m = MAINNET_DEP || {};
+  return { live: [m.charter?.contract, m.extras?.arena?.contract].filter(Boolean), history: [] };
+};
 export async function ledgerRead() {
     const soft = (p, ms = 9000) => Promise.race([p.catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
     const { live, history } = ledgerAccounts();
-    const [feedsLive, feedsOld, toll] = await Promise.all([Promise.all(live.map(a => soft(shops.chronicle(a, shops.FEED_MAX)))),
-      Promise.all(history.map(a => shops.feedSnapshot(a) || soft(shops.chronicle(a, shops.FEED_MAX)))), soft(shops.toll())]);
-    const gate = await soft(tollgate.gate(), 6000);
-    const feeds = [...feedsLive.map((f, i) => f ? (i === 0 ? shops.hideRetired(f) : f) : { busy: true }), ...feedsOld.filter(Boolean)];
+    const [feedsLive, toll] = await Promise.all([
+      Promise.all(live.map(a => soft(shops.chronicle(a, shops.FEED_MAX)))),
+      soft(shops.toll()),
+    ]);
+    const feeds = feedsLive.map(f => f || { busy: true });
     const seen = new Set(), txs = feeds.flatMap(f => f.txs || []).filter(t => !seen.has(t.hash) && seen.add(t.hash));
     const merged = { busy: feeds.some(f => f.busy), stale: feeds.some(f => f.stale), txs };
-    return { ...buildLedger({ chronicle: merged, toll, gate, budget: agentMod.budgetStatus() }), charters: { live, history } };
+    return { ...buildLedger({ chronicle: merged, toll, board: mainnetChronicle(), budget: agentMod.budgetStatus() }), charters: { live, history } };
 }
 const ledgerSwr = swr('ledger', ledgerRead, { ttl: 15_000, stale: 30 * 60_000 });
-// First call after a restart: the ledger computed at deploy time (backend/data/feed-snapshots.json) is served at once,
-// marked with its snapshot time, while the first live read runs in the background.
+// Seed only a mainnet ledger snapshot. A testnet feed-snapshots.json ledger is ignored.
 export const seedSwr = (name, v, at = Date.now()) => { if (v != null && !swrs.get(name)?.v) swrs.set(name, { v, at }); };
-{ const snap = shops.ledgerSnapshot(); if (snap) seedSwr('ledger', { ...snap.ledger, stale: true, snapshot_at: snap.at }, Date.now() - 15_001); }
+{ const snap = shops.ledgerSnapshot(); if (snap?.ledger?.network === 'mainnet') seedSwr('ledger', { ...snap.ledger, stale: true, snapshot_at: snap.at }, Date.now() - 15_001); }
 
 export const WARM_DELAY_MS = Number(process.env.WARM_DELAY_MS ?? 3_000);
 // Reads run one at a time; the first tick waits WARM_DELAY_MS after boot so the health check is answered first.
 export function warm({ every = WARM_EVERY_MS, read, delay = read ? 0 : WARM_DELAY_MS } = {}) {
   let tick = 0, stopped = false, t = null;
+  const warmOath = () => MAINNET_DEP?.charter?.contract || DEP.guardhouse?.oath || null;
   const jobs = () => [() => shops.refreshHealth(),
-    () => shops.chronicle(DEP.guardhouse.oath, shops.FEED_MAX, ...(read ? [read] : [])),
-    ...(read ? [] : [() => reads.guardhouse(), () => reads.mistbank(), () => reads.townhall(), tick++ % 2 === 0 ? () => arenaPromptsSwr() : () => ledgerSwr()])];
+    () => { const a = warmOath(); return a ? shops.chronicle(a, shops.FEED_MAX, ...(read ? [read] : [])) : null; },
+    ...(read ? [] : [() => reads.mistbank(), tick++ % 2 === 0 ? () => arenaPromptsSwr() : () => ledgerSwr()])];
   const once = async () => { const out = []; for (const j of jobs()) { if (stopped) break; try { out.push({ status: 'fulfilled', value: await j() }); } catch (e) { out.push({ status: 'rejected', reason: e }); } } return out; };
   const first = new Promise(r => { const d = setTimeout(() => r(once().then(v => { if (every && !stopped) { t = setInterval(once, every); t.unref?.(); } return v; })), delay); if (delay) d.unref?.(); });
   return { first, stop: () => { stopped = true; t && clearInterval(t); } };
@@ -288,7 +293,7 @@ export function makeApp() {
   const cpCache = new Map();
   app.get('/api/guardhouse/check/:account', limiter(12), async c => {
     const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
-    const charter = c.req.query('charter') || DEP.guardhouse.oath;
+    const charter = c.req.query('charter') || MAINNET_DEP?.charter?.contract || DEP.guardhouse?.oath;
     if (!ACCT.test(charter) || (!knownAccounts.has(charter) && !(await vault.isFactoryCharter(charter)))) return bad(c, 'charter must be a Nearcarta charter');
     const k = a + '|' + charter, hit = cpCache.get(k);
     if (hit && Date.now() - hit.at < 20_000) return c.json(hit.v);
@@ -354,12 +359,14 @@ export function makeApp() {
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
   app.get('/api/chronicle', limiter(120), edgeCache(15), async c => {
-    if (c.req.query('net') === 'mainnet') return c.json(mainnetChronicle(c.req.query('owner') || ''));
+    if (c.req.query('net') !== 'testnet') return c.json(mainnetChronicle(c.req.query('owner') || ''));
+    const oath = DEP.guardhouse?.oath;
+    if (!oath) return c.json(mainnetChronicle(c.req.query('owner') || ''));
     const limit = Math.min(Number(c.req.query('limit') || 12), shops.FEED_MAX);
-    try { return c.json(shops.hideRetired(await shops.chronicle(DEP.guardhouse.oath, limit))); }
+    try { return c.json(shops.hideRetired(await shops.chronicle(oath, limit))); }
     catch (e) {
       if (e.status || !/busy|http (429|5\d\d)|timeout|aborted|fetch failed/i.test(e.message)) throw e;
-      c.header('Retry-After', '10'); return c.json({ account: DEP.guardhouse.oath, count: 0, txs: [], busy: true, source: 'tx index busy; try again in 10 s' });
+      c.header('Retry-After', '10'); return c.json({ account: oath, count: 0, txs: [], busy: true, source: 'tx index busy; try again in 10 s' });
     }
   });
   app.get('/api/chronicle/:account', limiter(120), edgeCache(15), async c => {
