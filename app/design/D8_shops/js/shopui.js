@@ -1,5 +1,6 @@
 // Tray controller: one robot line, one big button, loading / error / success, a one-line receipt.
 import * as A from './apps.js';
+import { payoutReady, payoutLabel } from './payout-ready.js';
 import { $, sfx } from './core.js';
 import { ruleChip as ruleChipText } from './rules-default.js';
 import { receipt } from './receipt.js';
@@ -32,7 +33,7 @@ const STEPS = {
   hall: ['about 15 s', 'Writing the proposal', 'Signing on NEAR', 'Waiting for the council'],
   payouts: ['about 15 s', 'Checking every payout against your charter', 'Sending one payment on NEAR', 'Confirming'],
   house: ['about 10 s', 'Reading your charter', 'Counting your history'],
-  toll: ['about 30 s', 'Paying the toll from your charter', 'Approving the gate call', 'Getting the payout signed', 'Sending it to Base'],
+  toll: ['about 30 s', 'Paying the 0.001 NEAR pass from your charter', 'Recording the pass', 'Recording the chain-signature proof'],
 };
 let prog = null;
 const stepLine = s => s;
@@ -71,21 +72,21 @@ async function tollStep(v, act, o) {
   // signed but not on Base yet: ask the API to relay it (it fills any nonce gap first); idempotent
   if (st.status === 'signed' && !st.base) st = await A.tollBroadcast(v.nonce).catch(() => st);
   if (st.settle) {
-    say('Base finalized it. Recording the proof on NEAR…');
+    say('The chain-signature proof is ready. Recording it on NEAR…');
     st = (await A.tollServerSettle(v)) || st;
-    if (st.status === 'signed' && st.settle && act) { say('Approve settle in your wallet. The MPC network checks the Base tx…'); st = await A.tollSettle(v, st); }
+    if (st.status === 'signed' && st.settle && act) { say('Approve settle in your wallet. The charter records the proof…'); st = await A.tollSettle(v, st); }
   }
   extra.tst = st; extra.tv = v; extra.gate = null;
   const late = !st.base && v.at && Date.now() - v.at > 120e3; // over 2 min: say it was re-sent and give the explorer link
   const split = v.split ? `<details class="more" data-testid="toll-split"><summary>Paid ${esc(v.split.legs.reduce((n, [, a]) => n + Number(a), 0).toFixed(3))} NEAR in one payment<span class="dt">details</span></summary><p class="note">${v.split.legs.map(([r, a]) => `${esc(r === 'agent' ? 'your agent budget' : r === 'treasury' ? 'town treasury' : r)} ${esc(a)} NEAR`).join(' · ')}</p>${A.txLine(v.split.tx, 'split')}</details>` : '';
   const links = [split, A.txLine(v.pay_tx, 'gate'), st.tx_hash && (st.accepted || st.base || late) ? BSC(st.tx_hash) : '', v.settle_tx ? A.txLine(v.settle_tx, 'settle') : ''].join(' ');
   const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}" data-phase="${esc(st.phase || '')}">Status: ${esc(st.label || st.status)}</span> ${links}`;
-  if (st.status === 'confirmed') { A.tollDone(v); return { o, kind: 'ok', rule: 'confirmed · MPC foreign-tx proof', hero: num('✓', 'confirmed'), rc,
-    say: 'Confirmed. The MPC network proved the Base tx final, and the gate recorded it.' }; }
-  if (st.settle) return { o, keep: true, kind: 'ok', rule: 'paid · sent · final on Base', rc, say: 'Base finalized it. Settle to record the MPC proof.' };
+  if (st.status === 'confirmed') { A.tollDone(v); return { o, kind: 'ok', rule: 'confirmed · recorded chain-signature proof', hero: num('✓', 'confirmed'), rc,
+    say: 'Confirmed. The 0.001 NEAR pass is on mainnet, and the chain-signature proof is recorded.' }; }
+  if (st.settle) return { o, keep: true, kind: 'ok', rule: 'paid · proof recorded', rc, say: 'The proof is ready to record on NEAR.' };
   tollWatch(v, st);
-  return { o, keep: true, kind: 'ok', rule: st.base ? 'paid · sent · Base finalizing' : 'paid · sending to Base', rc,
-    say: st.base ? `Paid and sent to Base. <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b> About <b data-testid="toll-eta">${mins(st.eta_s ?? 1200)} min</b> left; it records itself, no need to come back.` : late ? `Waiting on Base. The payout was re-sent${st.queued_behind ? ` (${esc(st.queued_behind)} earlier payout${st.queued_behind > 1 ? 's' : ''} ahead)` : ''}; check it on the explorer below. <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b>` : (st.queued_behind ? `The MPC network signed it. Sending to Base (${esc(st.queued_behind)} earlier payout${st.queued_behind > 1 ? 's' : ''} go first)… <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b>` : 'The MPC network signed it. Sending to Base… <b data-testid="toll-leave">You can leave; it settles in about 20 min.</b>') };
+  return { o, keep: true, kind: 'ok', rule: 'paid · 0.001 NEAR pass', rc,
+    say: `The 0.001 NEAR pass is on mainnet. A recorded chain-signature proof sits beside it. This gate does not send your NEAR to another chain. <b data-testid="toll-leave">You can leave.</b>` };
 }
 // Live countdown while Base finalizes; re-reads the gate every 20 s and settles as soon as it is final.
 let watch = null;
@@ -230,19 +231,20 @@ const APPS = {
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.001' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.001' }); } return extra.rows.slice(0, 3); },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => { const ps = A.bankPayees(), rows = APPS.payouts.rows(), left = A.payoutLeft(), tot = APPS.payouts.total();
-      const note = `<p class="plain-line" data-testid="payout-legacy">One at a time, not all-or-nothing. Each payment is at most 0.005 NEAR. ${A.mainProof()}</p>`;
+      const note = A.mainProof() ? `<p class="plain-line" data-testid="payout-legacy">${A.mainProof()}</p>` : '';
       return note + `<ol class="plist" data-testid="payout-list">${rows.map((r, i) => `<li><select class="p-to" data-i="${i}" aria-label="Payee ${i + 1}">${ps.map(a => `<option value="${esc(a)}" ${a === r.to ? 'selected' : ''}>${a === A.S.me ? 'Me' : esc(nice(a))}</option>`).join('')}</select>`
         + `<label class="p-amt"><input type="number" data-i="${i}" min="0.001" step="0.001" value="${esc(r.amt)}" aria-label="Amount ${i + 1}"><span>NEAR</span></label>`
         + `<button type="button" class="p-x" data-i="${i}" aria-label="Remove payout ${i + 1}" ${rows.length <= 2 ? 'disabled' : ''}>×</button></li>`).join('')}</ol>`
         + `<div class="p-foot"><button type="button" class="tee-btn" id="p-add" ${rows.length >= 3 ? 'disabled' : ''}>+ Add payout</button><span class="p-sum ${tot > left ? 'no' : ''}" data-testid="payout-total">${tot} NEAR · ${+left.toFixed(4)} left today</span></div>`; },
-    bind: () => { const rows = APPS.payouts.rows(), re = () => { form(APPS.payouts.form()); APPS.payouts.bind(); btn(APPS.payouts.btn(), 'primary', !A.canBatch()); };
+    bind: () => { const rows = APPS.payouts.rows(), re = () => { form(APPS.payouts.form()); APPS.payouts.bind(); const off = !payoutReady(rows).enabled; btn(APPS.payouts.btn(), 'primary', off || !A.canBatch()); };
       document.querySelectorAll('.p-to').forEach(e => { e.onchange = () => { rows[+e.dataset.i].to = e.value; }; });
-      document.querySelectorAll('.p-amt input').forEach(e => { e.oninput = () => { rows[+e.dataset.i].amt = e.value; const t = $('[data-testid=payout-total]'), tot = APPS.payouts.total(), left = A.payoutLeft(); if (t) { t.textContent = `${tot} NEAR · ${+left.toFixed(4)} left today`; t.classList.toggle('no', tot > left); } btn(APPS.payouts.btn()); }; });
+      document.querySelectorAll('.p-amt input').forEach(e => { e.oninput = () => { rows[+e.dataset.i].amt = e.value; const t = $('[data-testid=payout-total]'), tot = APPS.payouts.total(), left = A.payoutLeft(); if (t) { t.textContent = `${tot} NEAR · ${+left.toFixed(4)} left today`; t.classList.toggle('no', tot > left); } btn(APPS.payouts.btn(), 'primary', !payoutReady(rows).enabled); }; });
       document.querySelectorAll('.p-x').forEach(e => { e.onclick = () => { rows.splice(+e.dataset.i, 1); re(); }; });
       const a = $('#p-add'); if (a) a.onclick = () => { if (rows.length < 3) rows.push({ to: A.bankDefault() || A.bankPayees()[0], amt: '0.001' }); re(); }; },
-    btn: () => `Pay ${Math.min(3, APPS.payouts.rows().length)} one at a time`,
+    btn: () => payoutLabel(APPS.payouts.rows()),
     hero: () => extra.pay ? num(`${extra.pay.paid}/${extra.pay.n}`, 'paid') : num(APPS.payouts.rows().length, 'payouts'),
     run: async () => {
+      if (!payoutReady(APPS.payouts.rows()).enabled) throw new Error('Nothing to pay');
       if (A.S.board) { const o = await A.payouts(APPS.payouts.rows().slice(0, 3)); const ok = o.decision === 'allowed'; return { o, keep: true, kind: ok ? 'ok' : 'no', hero: APPS.payouts.hero(), say: ok ? `Paid ${o.paid} of ${o.n}, one at a time.` : `Refused: ${A.why(o.reason)}. Nothing further was paid.` }; }
       if (!A.canBatch()) throw new Error('your charter pays one at a time');
       const o = await A.payouts(APPS.payouts.rows()); extra.pay = o;
@@ -278,7 +280,7 @@ function tollGate() {
   if (g.error) return { list: '<p class="note">Gate busy. Reopen to retry.</p>', more: '' };
   const low = g.gas?.low ? `<p class="warn" data-testid="gas-warning-row">Low gas: ${esc(g.gas.warning)}</p>` : '';
   return { list: low + (g.recent || []).map(row).join(''),
-    more: kv('Gate', idChip(g.gate)) + kv('Signer', esc(g.mpc)) + kv('Pays on Base', idChip(g.policy.allow_to[0], `${esc(g.foreign_explorer)}`))
+    more: kv('Gate', idChip(g.gate)) + kv('Signer', esc(g.mpc)) + kv('Recorded address', idChip(g.policy.allow_to[0], `${esc(g.foreign_explorer)}`))
       + (g.gas && g.gas.visits_left_at_cap != null ? kv('Gas left', `${esc(g.gas.visits_left_at_cap)} visits`) : '') };
 }
 // Guardhouse, under Details: the same pay clause re-checked by OutLayer in a TEE, with its attestation. The charter stays the final gate.
@@ -356,7 +358,7 @@ function proofDrawer() {
   else h += '<section class="dz act1"><button type="button" class="go" data-drawer-go data-testid="drawer-action" hidden></button></section>';
   // 3. latest result
   const mine = S.charter ? A.receipts().filter(r => (cur === 'house' ? true : r.shop === cur)) : [];
-  if (!latest && cur === 'toll' && extra.tst) { const st = extra.tst; latest = card({ d: st.status === 'confirmed' ? 'allowed' : st.status, title: 'Your visit', why: esc(st.status === 'confirmed' ? 'Proof recorded on NEAR.' : st.final ? 'Final on Base. Settling.' : st.base ? 'Sent. Base finalizing.' : 'Sending to Base.'), link: `<span class="note">#${esc(st.nonce)}</span>` }); }
+  if (!latest && cur === 'toll' && extra.tst) { const st = extra.tst; latest = card({ d: st.status === 'confirmed' ? 'allowed' : st.status, title: 'Your visit', why: esc(st.status === 'confirmed' ? 'Proof recorded on NEAR.' : '0.001 NEAR pass on mainnet. The chain-signature proof is recorded separately.'), link: `<span class="note">#${esc(st.nonce)}</span>` }); }
   if (!latest && mine[0]) { const r = mine[0]; latest = card({ d: r.decision, amt: r.amt ? fmt(r.amt) : '', to: r.to || '', why: r.decision === 'allowed' ? '' : esc(A.why(r.reason)), link: A.txLine(r.h) }); }
   h += latest;
   // 4. history
@@ -394,7 +396,7 @@ function paint() {
     return; }
   if (phase === 'idle') say(app.idle);
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
-  btn(typeof app.btn === 'function' ? app.btn() : app.btn);
+  btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
 }
 async function primary(auto = false) {
   if (phase === 'busy' || !cur) return; const st = A.stage(); if (!auto) sfx('click');
@@ -470,13 +472,14 @@ export function boot() {
   return booted;
 }
 export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
-  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; rcpt(''); document.body.dataset.app = '';
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = '';
+  const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = '';
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
   // the Toll room reopened with a visit under way: pick it up (countdown, or settle now if Base is final)
   if (id === 'toll') booted?.then(() => { const v = cur === 'toll' && A.stage() === 'ready' && A.tollVisit(); if (v && !v.done && phase === 'idle') primary(true); }).catch(() => {}); }
-export function unmount() { cur = null; sh = null; closeRules(); }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; closeRules(); const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };
