@@ -56,6 +56,28 @@ export function compareRows(quotes) {
   return (Array.isArray(quotes) ? quotes : []).map(quoteView).filter(Boolean);
 }
 
+/** The quote with the largest amount out is the best rate. Ties keep the first. */
+export function pickBest(quotes) {
+  const views = compareRows(quotes);
+  let best = -1;
+  let top = -Infinity;
+  views.forEach((v, i) => {
+    const n = Number(v.amountOut);
+    if (Number.isFinite(n) && n > top) { top = n; best = i; }
+  });
+  return views.map((v, i) => ({ ...v, best: i === best && best >= 0 }));
+}
+
+export const STATUS_WORDS = {
+  PENDING_DEPOSIT: 'Waiting for the deposit.',
+  KNOWN_DEPOSIT_TX: 'The deposit transaction is seen.',
+  PROCESSING: 'The swap is in progress.',
+  SUCCESS: 'The swap finished.',
+  REFUNDED: 'Refunded to the refund address.',
+  FAILED: 'The swap failed. Nothing else is sent from this page.',
+  INCOMPLETE_DEPOSIT: 'The deposit was short. Send the rest to the same address, or wait for the refund.',
+};
+
 const REFUND = new Set(['REFUNDED', 'INCOMPLETE_DEPOSIT']);
 const DONE = new Set(['SUCCESS', 'REFUNDED', 'FAILED']);
 
@@ -63,7 +85,8 @@ export function statusView(body) {
   const status = String(body?.status || '');
   return {
     status,
-    help: body?.help || '',
+    help: body?.help || STATUS_WORDS[status] || '',
+    words: STATUS_WORDS[status] || '',
     terminal: DONE.has(status),
     refund: REFUND.has(status),
     tx: body?.tx || '',

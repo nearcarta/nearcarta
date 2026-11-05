@@ -1,7 +1,7 @@
 // Embeddable Pay button. A host page includes this script; it renders into #nearcarta-pay
 // (or the element named by data-root) and talks to this origin's /api. The charter is read
 // before a deposit address is asked for. This file never sends the deposit.
-import { tokenChoices, chainsOf, filterTokens, quoteView, compareRows, statusView } from './ferry-catalog.js';
+import { tokenChoices, chainsOf, filterTokens, quoteView, pickBest, statusView } from './ferry-catalog.js';
 
 const me = document.currentScript || document.querySelector('script[src*="ferry-pay.js"]');
 const origin = me ? new URL(me.src, location.href).origin : '';
@@ -26,6 +26,7 @@ if (root) {
       <label>Your refund address, on the chain you pay from <input name="refundTo" required placeholder="0x…" data-testid="widget-refund"></label>
       <button type="button" data-testid="widget-quote">See the quote</button>
       <button type="button" data-testid="widget-compare">Compare a confidential quote</button>
+      <button type="button" data-testid="widget-routes">Compare two routes</button>
       <div data-testid="widget-quotes"></div>
       <button type="submit" data-testid="widget-pay">Pay</button>
     </form>
@@ -84,8 +85,10 @@ if (root) {
     return { from: { symbol, chain: chainName }, to: { symbol: toSymbol || 'USDC', chain: toChain || 'near' } };
   }
   function paintQuotes(rows) {
-    const views = compareRows(rows);
-    quotesEl.innerHTML = views.map((v, i) => `<p data-testid="quote-row">Quote ${i + 1}: out ${esc(v.amountOut)} ${esc(v.symbolOut)} · USD ${esc(v.usd ?? '—')} · ETA ${esc(v.eta ?? '—')} s · fee ${esc(v.fee ?? '—')} · ${esc(v.privacy)}${v.dry ? ' · quote only' : ''}</p>`).join('');
+    const views = pickBest(rows);
+    quotesEl.innerHTML = views.map((v, i) => `<p data-testid="quote-row"${v.best ? ' data-best="1"' : ''}>Quote ${i + 1}: out ${esc(v.amountOut)} ${esc(v.symbolOut)} · USD ${esc(v.usd ?? '—')} · ETA ${esc(v.eta ?? '—')} s · fee ${esc(v.fee ?? '—')} · ${esc(v.privacy)}${v.dry ? ' · quote only' : ''}${v.best ? ' · best rate' : ''}</p>`).join('');
+    const best = views.find(v => v.best);
+    if (best) out.textContent = `Best rate: ${best.amountOut} ${best.symbolOut}. Quotes only. Nothing is sent.`;
   }
   async function dryQuote(privacy) {
     const body = { ...pair(), amount: String(amount.value), recipient: recipient.value, refundTo: String(new FormData(form).get('refundTo') || '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e'), privacy };
@@ -101,7 +104,17 @@ if (root) {
     quotesEl.textContent = 'Comparing two dry quotes…';
     const rows = await Promise.all([dryQuote('public'), dryQuote('basic')]);
     paintQuotes(rows);
-    out.textContent = 'The confidential line is a quote only. It is not a settled private swap.';
+    out.textContent = 'The confidential line is a quote only. It is not a settled private swap. The higher amount out is marked best rate.';
+  };
+  form.querySelector('[data-testid=widget-routes]').onclick = async () => {
+    quotesEl.textContent = 'Comparing two routes…';
+    const first = await dryQuote('public');
+    const alt = choices.find(t => t.id !== chain.value && t.chain !== String(chain.value).split('|')[1]) || choices[1];
+    const saved = chain.value;
+    if (alt) chain.value = alt.id;
+    const second = await dryQuote('public');
+    chain.value = saved;
+    paintQuotes([first, second]);
   };
   (async () => {
     await loadTokens();
