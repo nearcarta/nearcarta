@@ -18,6 +18,29 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 const q$ = (root, sel) => root.querySelector(sel);
 
+/** A disabled control stays readable and says why it is waiting. */
+function holdButton(btn, reason) {
+  if (!btn) return () => {};
+  btn.disabled = true;
+  btn.dataset.reason = reason;
+  let note = btn.nextElementSibling?.dataset?.testid === 'control-reason' ? btn.nextElementSibling : null;
+  if (!note) {
+    note = document.createElement('p');
+    note.dataset.testid = 'control-reason';
+    note.className = 'control-reason';
+    btn.after(note);
+  }
+  note.hidden = false;
+  note.textContent = reason;
+  btn.setAttribute('aria-describedby', 'control-reason');
+  note.id = 'control-reason';
+  return () => {
+    if (!btn.isConnected) return;
+    btn.disabled = false;
+    delete btn.dataset.reason;
+  };
+}
+
 export const DEFAULT_ROUTES = [
   { id: 'route.eth-eth.zec', from: 'ETH@eth', sym: 'ETH', label: 'ETH · Ethereum', amt: '0.002' },
   { id: 'route.usdc-base.zec', from: 'USDC@base', sym: 'USDC', label: 'USDC · Base', amt: '3' },
@@ -54,7 +77,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const lines = state.lines || [];
   return `<div class="seg" role="group" aria-label="Routes">${chips}</div>
     <label class="amt">Amount <input id="f-amt" type="number" min="0" step="any" value="${esc(state.amt || rt.amt)}"><span id="f-sym">${esc(rt.sym)}</span></label>
-    <button type="button" id="f-compare" data-testid="ferry-compare">Compare routes</button>
+    <button type="button" class="primary" id="f-compare" data-testid="ferry-compare">Compare routes</button>
     ${corridorCards(routes, lines)}
     <div id="f-quotes" data-testid="ferry-quotes">${quotes}${state.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : ''}</div>
     ${state.fstatus ? `<p data-testid="ferry-status">${esc(state.fstatus.words || state.fstatus.status)}</p><p data-testid="ferry-refund">${state.fstatus.refund ? 'Refunded to the refund address.' : 'A short deposit or a failed swap is refunded to the refund address. This page does not send the deposit.'}</p>` : `<p data-testid="ferry-idle">${state.quoted ? 'No deposit has been requested.' : 'No quote yet. No deposit has been requested.'}</p>`}`;
@@ -89,7 +112,7 @@ function mountFerry(root, hooks) {
     if (compare) compare.onclick = () => runQuotes(compare);
   };
   async function runQuotes(btn) {
-    if (btn) btn.disabled = true;
+    holdButton(btn, 'Comparing routes. Waiting for the quotes.');
     const raw = [];
     for (const r of routes) {
       try { raw.push(await quoteOne(r, state.amtEdited ? state.amt : r.amt, hooks)); }
@@ -117,14 +140,14 @@ function mountGuard(root, hooks) {
   const score = state.score;
   const scoreHtml = score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.summary || score.verdict)}</p><ul>${(score.lines || []).map(l => `<li data-signal="${esc(l.id)}"${l.level === 'warn' || l.level === 'block' || l.level === 'unknown' ? ' data-testid="guard-reason"' : ''}><b>${esc(l.title)}</b> ${esc(l.text)}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
   const pick = attacks.length ? `<div class="seg" role="radiogroup">${attacks.map(a => `<label><input type="radio" name="atk" value="${esc(a.id)}" ${a.id === (state.atk || attacks[0].id) ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>` : '';
-  root.innerHTML = `<label>Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || 'shop-moved-pay-here.near')}"></label><button type="button" id="g-check" data-testid="guard-check">Check this account</button>${scoreHtml}${pick}`;
+  root.innerHTML = `<label>Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || 'shop-moved-pay-here.near')}"></label><button type="button" class="primary" id="g-check" data-testid="guard-check">Check this account</button>${scoreHtml}${pick}`;
   root.querySelectorAll('input[name=atk]').forEach(i => { i.onchange = () => { state.atk = i.value; if (hooks.repaint) hooks.repaint(); }; });
   const btn = q$(root, '#g-check');
   if (!btn) return;
   btn.onclick = async () => {
     const acct = (q$(root, '#g-acct')?.value || '').trim();
     state.acct = acct;
-    btn.disabled = true;
+    holdButton(btn, 'Checking this account.');
     try {
       const r = await fetch(api() + '/api/guardhouse/check/' + encodeURIComponent(acct));
       state.score = explainCheck(await r.json());
