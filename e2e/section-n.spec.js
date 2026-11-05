@@ -147,8 +147,8 @@ test('N4 a reload restores the wallet or offers one click', async ({ page, brows
     window.__NC_CONNECT = async () => 'visitor.near';
   });
   await at(other, 1440);
-  await other.goto(base + '/shops/bank/');
-  await expect(other.getByTestId('bank-session')).toContainText('Signed in as Scholar');
+  await other.goto(base + '/shops/hall/');
+  await expect(other.getByTestId('hall-facts')).toContainText('Signed in as Scholar', { timeout: 20_000 });
   await expect(other.getByTestId('restore-session')).toBeVisible();
   await shot(other, 'n4-restore-1440');
   await other.reload();
@@ -159,7 +159,7 @@ test('N4 a reload restores the wallet or offers one click', async ({ page, brows
   await shot(other, 'n4-restore-390');
   await other.getByTestId('restore-session').click();
   await expect(other.getByTestId('restore-note')).toContainText('Wallet restored.');
-  await expect(other.getByTestId('bank-session')).toContainText('Signed in as Scholar');
+  await expect(other.getByTestId('hall-facts')).toContainText('Signed in as Scholar');
   await expect(other.getByTestId('restore-session')).toBeHidden();
   await ctx.close();
 });

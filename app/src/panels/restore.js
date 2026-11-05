@@ -32,6 +32,13 @@ export async function resolveAccount() {
   return plan;
 }
 
+/** Pages whose control asks the visitor wallet to sign. A check or a quote does not. */
+const SIGNING_PAGES = new Set(['hall', 'townhall', 'house', 'vault']);
+
+export function pageSigns(shop) {
+  return SIGNING_PAGES.has(String(shop || ''));
+}
+
 export function restoreBar(plan) {
   if (!plan?.needsClick) return '';
   return `<p data-testid="session-restore"><button type="button" class="primary" data-testid="restore-session">Restore session</button> <span data-testid="restore-note">${plan.note || 'The wallet is not connected in this tab.'}</span></p>`;
