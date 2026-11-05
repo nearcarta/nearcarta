@@ -44,7 +44,8 @@ test('the town intro plays for a fresh visit and skips when asked', () => {
   assert.equal(introEnabled('?explore'), false);
   assert.equal(introEnabled('?shop=ferry'), false);
   assert.equal(introLine(0).length > 0, true);
-  assert.match(read('app/design/D9_world/js/main.js'), /mountIntro/);
+  assert.match(read('app/design/D9_world/js/main.js'), /dataset\.intro='camera'/);
+  assert.match(read('app/design/D9_world/js/main.js'), /run\(story\(\)\)/);
   assert.match(read('app/design/D9_world/js/fb.js'), /mountIntro/);
 });
 

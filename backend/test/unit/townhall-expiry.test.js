@@ -46,15 +46,16 @@ test('/api/townhall proposal rows carry the shown status, the chain status and t
   assert.equal(townhallProposal({ ...P10, kind: 'Vote' }, HOUR_NS, filedMs).kind, 'Vote');
 });
 
-test('the proposals page and the Town Hall room use the expiry, and the Mist Bank room says how payouts run', () => {
+test('the Town Hall page changes the visitor row and does not file a council proposal', () => {
   const page = readFileSync(new URL('../../../app/shops/hall/main.js', import.meta.url), 'utf8');
-  assert.match(page, /proposalState\(p, period, now\)/); assert.match(page, /data-status=/);
+  assert.match(page, /set_rules|callsFor/);
+  assert.doesNotMatch(page, /add_proposal|sputnik|proposalState/);
   const room = readFileSync(new URL('../../../app/design/D8_shops/shops/hall.js', import.meta.url), 'utf8');
-  assert.match(room, /\/api\/townhall/); assert.match(room, /Expired: \['ice', 'expired'\]/);
+  assert.match(room, /Recorded payments/);
+  assert.doesNotMatch(room, /\/api\/townhall/);
   const line = 'This payment is a charter check on mainnet.';
   assert.ok(readFileSync(new URL('../../../app/design/D8_shops/shops/bank.js', import.meta.url), 'utf8').includes(line));
   const ui = readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8');
   assert.ok(ui.includes(line));
-  // the app drawer (which replaces the room proof) lists the live proposals in the Town Hall
-  assert.match(ui, /hall: \['Latest proposals', hallRows\]/); assert.match(ui, /lazyList\('hallP', '\.\.\/shops\/hall\.js', 'liveProposals', 'hall'\)/);
+  assert.match(ui, /hall: \['Recorded payments', hallRows\]/);
 });
