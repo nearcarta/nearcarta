@@ -84,7 +84,7 @@ header#top #back { display: none !important; }
 h1, h2, .amt, #t-title { color: #FFFFFF; }
 .muted, .sub, .note, .lede span { color: #D4C4A8; }
 
-.btn.gold, .act.primary, button.primary, a.primary, #rulesBtn, #go, a.go, .pill.go,
+.btn.gold, .act.primary, button.primary, a.primary, #go, a.go,
 nav button.on, #onboard .ob-next, .nc-sign .pnc-action-button--primary,
 button[data-testid="setup-send"], button[data-testid="privy-send"] {
   position: relative;
@@ -104,18 +104,35 @@ button[data-testid="setup-send"], button[data-testid="privy-send"] {
     inset 0 1px 0 rgba(255,255,255,.45) !important;
   transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
 }
-#rulesBtn { overflow: visible; }
+#rulesBtn {
+  position: fixed;
+  overflow: visible;
+  color: #2A1608 !important;
+  background-image:
+    linear-gradient(105deg, transparent 38%, rgba(255,255,255,.55) 50%, transparent 62%),
+    linear-gradient(180deg, #F5D08A 0%, #E2B35B 42%, #C98F4E 100%) !important;
+  background-size: 220% 100%, 100% 100%;
+  background-repeat: no-repeat;
+  animation: brassSweep 2.8s ease-in-out infinite;
+  border: 0 !important;
+  box-shadow:
+    0 7px 0 #8B5E2B,
+    0 14px 28px rgba(139,94,43,.45),
+    inset 0 1px 0 rgba(255,255,255,.45) !important;
+}
+#rulesBtn:hover { filter: brightness(1.06); }
+#rulesBtn:active { filter: brightness(.96); }
 @keyframes brassSweep {
   0%, 55% { background-position: -130% 0, 0 0; }
   75%, 100% { background-position: 130% 0, 0 0; }
 }
-.btn.gold:hover, .act.primary:hover, button.primary:hover, a.primary:hover, #rulesBtn:hover, #go:hover, .pill.go:hover, nav button.on:hover,
+.btn.gold:hover, .act.primary:hover, button.primary:hover, a.primary:hover, #go:hover, .pill.go:hover, nav button.on:hover,
 button[data-testid="setup-send"]:hover, button[data-testid="privy-send"]:hover {
   transform: translateY(-3px);
   filter: brightness(1.06);
   box-shadow: 0 10px 0 #8B5E2B, 0 18px 34px rgba(139,94,43,.55), 0 0 36px rgba(226,179,91,.45), inset 0 1px 0 rgba(255,255,255,.5) !important;
 }
-.btn.gold:active, .act.primary:active, button.primary:active, a.primary:active, #rulesBtn:active, #go:active, .pill.go:active,
+.btn.gold:active, .act.primary:active, button.primary:active, a.primary:active, #go:active, .pill.go:active,
 button[data-testid="setup-send"]:active, button[data-testid="privy-send"]:active {
   transform: translateY(4px);
   box-shadow: 0 2px 0 #8B5E2B, 0 6px 14px rgba(139,94,43,.35), inset 0 2px 6px rgba(80,40,10,.35) !important;
@@ -172,7 +189,7 @@ button[data-testid="setup-send"]:active, button[data-testid="privy-send"]:active
 
 @media (prefers-reduced-motion: reduce) {
   .card::before, #tray::before, #shopUI #tray::before, .panel::before, main > form::before, .pnc-card::before, .ob-card::before, .tot > div::before,
-  .btn.gold, .act.primary, button.primary, a.primary, #rulesBtn, #go, .pill.go, nav button.on,
+  .btn.gold, .act.primary, button.primary, a.primary, #go, .pill.go, nav button.on, #rulesBtn,
   button[data-testid="setup-send"], button[data-testid="privy-send"] {
     animation: none !important;
   }
