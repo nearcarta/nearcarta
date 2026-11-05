@@ -1,22 +1,28 @@
-// Live proof that the Vault leaderboard comes back after a Render restart (no disk): BEFORE is the board read
-// before the restart, then this waits for the new boot to rebuild it from chain and loads the rooms at 3 widths.
-// Signs nothing. BEFORE=judges/proofs/board-restart-live/before.json node e2e/board-restart-live.mjs
+// Live proof that the Vault leaderboard comes back after a Render restart (no disk).
+// Pass BEFORE as a path to a board read taken before the restart. With no BEFORE, this reads the live board only.
+// Signs nothing.
 import { chromium } from 'playwright';
-import { readFileSync, writeFileSync, statSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, statSync, mkdirSync } from 'node:fs';
 const BASE = process.env.BASE || 'https://nearcarta.vercel.app', OUT = 'judges/proofs/board-restart-live';
 mkdirSync(OUT, { recursive: true });
-const before = JSON.parse(readFileSync(process.env.BEFORE || OUT + '/before.json', 'utf8'));
+const beforePath = process.env.BEFORE || '';
+const before = beforePath && existsSync(beforePath) ? JSON.parse(readFileSync(beforePath, 'utf8')) : null;
 const lb = async () => (await fetch(BASE + '/api/vault/leaderboard?t=' + Date.now())).json();
 let after, t0 = Date.now();
-for (;;) {
-  try { after = await lb(); } catch { after = null; }
-  if (after?.rebuilt?.started_at > before.rebuilt.started_at && after.rebuilt.complete_at && after.indexed >= before.indexed) break;
-  if (Date.now() - t0 > 15 * 60e3) throw new Error('board not rebuilt in 15 min: ' + JSON.stringify(after?.rebuilt));
-  await new Promise(r => setTimeout(r, 10e3));
+if (before?.rebuilt?.started_at) {
+  for (;;) {
+    try { after = await lb(); } catch { after = null; }
+    if (after?.rebuilt?.started_at > before.rebuilt.started_at && after.rebuilt.complete_at && after.indexed >= before.indexed) break;
+    if (Date.now() - t0 > 15 * 60e3) throw new Error('board not rebuilt in 15 min: ' + JSON.stringify(after?.rebuilt));
+    await new Promise(r => setTimeout(r, 10e3));
+  }
+} else {
+  after = await lb();
 }
 const pick = x => ({ indexed: x.indexed, counted: x.counted, complete: x.complete, players: x.players.length, top: x.players.slice(0, 3), rebuilt: x.rebuilt });
-const res = { at: new Date().toISOString(), base: BASE, before: pick(before), after: pick(after),
-  restored: after.indexed >= before.indexed && after.counted >= before.counted, rebuild_s: Math.round((after.rebuilt.complete_at - after.rebuilt.started_at) / 1000), widths: {} };
+const res = { at: new Date().toISOString(), base: BASE, before: before ? pick(before) : null, after: pick(after),
+  restored: before ? after.indexed >= before.indexed && after.counted >= before.counted : null,
+  rebuild_s: before && after?.rebuilt?.complete_at ? Math.round((after.rebuilt.complete_at - after.rebuilt.started_at) / 1000) : null, widths: {} };
 const b = await chromium.launch();
 for (const [W, H] of [[1440, 900], [1280, 800], [390, 844]]) {
   const r = res.widths[W] = { console_errors: [], shots: [] };
