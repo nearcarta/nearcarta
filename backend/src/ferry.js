@@ -9,7 +9,8 @@
 //     Orchard+Sapling and Orchard+transparent are refused before 1Click is asked.
 import { verifyQuoteSignature } from '@defuse-protocol/one-click-sdk-typescript';
 import { KeyPair } from 'near-api-js';
-import { cfg, secret, DEP } from './config.js';
+import { cfg, secret, DEP, MAINNET_DEP } from './config.js';
+const QUOTE_SIGNER = DEP.ferry?.quote_signer || MAINNET_DEP?.ferry?.quote_signer || 'ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc';
 import { zcashRecipient } from './zcash.js';
 import { echoGuard, orchardOnly } from './ferry-guard.js';
 
@@ -91,7 +92,7 @@ export function signedCostBps(q) {
 }
 
 export function checkQuote(sent, resp) {
-  const signature = verifyQuoteSignature(resp, DEP.ferry.quote_signer);
+  const signature = verifyQuoteSignature(resp, QUOTE_SIGNER);
   const echo = echoGuard(sent, resp.quoteRequest);
   const noDeposit = !resp.quote?.depositAddress;
   return { signature, echo, dry: resp.quoteRequest?.dry === true && noDeposit, accepted: signature && echo.ok && noDeposit };

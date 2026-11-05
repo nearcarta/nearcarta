@@ -242,5 +242,11 @@
    "origin_ft_transfer": "A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz",
    "destination_usdc_withdraw": "Be1ttdbmiKhqwxpstP33HefWUp3o1A8RwKosdcK2mquk"
   }
+ },
+ "ferry": {
+  "oneclick": "https://1click.chaindefuser.com",
+  "verifier_mainnet": "intents.near",
+  "quote_signer": "ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc",
+  "note": "1Click quotes are dry:true (no deposit address, nothing spent)."
  }
 }

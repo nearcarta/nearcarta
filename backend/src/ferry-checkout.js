@@ -229,7 +229,7 @@ export async function oneClickStatus(depositAddress, f = fetch) {
 
 // The route uses these. Tests replace them and restore them.
 export function defaultVerify(resp) {
-  try { return verifyQuoteSignature(resp, DEP.ferry.quote_signer); } catch { return false; }
+  try { return verifyQuoteSignature(resp, DEP.ferry?.quote_signer); } catch { return false; }
 }
 
 export const checkoutDeps = {

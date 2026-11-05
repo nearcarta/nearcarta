@@ -3,13 +3,14 @@
 // The agent key is a function-call key that can only call propose on the oath account.
 import { readFileSync } from 'node:fs';
 import { Account, JsonRpcProvider, KeyPairSigner } from 'near-api-js';
-import { DEP, cfg } from './config.js';
+import { DEP, MAINNET_DEP, cfg } from './config.js';
 import { view, txStatus, eventsFromOutcome, txResult, explorerTx, accessKeys } from './near.js';
 
-const G = DEP.guardhouse;
-export const oathId = G.oath;
+const G = DEP.guardhouse || null;
+export const oathId = G?.oath || MAINNET_DEP?.charter?.contract || null;
 
 export async function snapshot(oath = oathId) {
+  if (!oath) throw Object.assign(new Error('no oath on this network'), { status: 503 });
   const oathId = oath;
   const [state, clauses, keys] = await Promise.all([view(oathId, 'get_state'), view(oathId, 'get_clauses'), accessKeys(oathId)]);
   const usage = {};
