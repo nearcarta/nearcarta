@@ -168,3 +168,14 @@ Found by walking every page of nearcarta.vercel.app signed in on mainnet. Where 
 - [x] W16 **No README / GitHub link on the site.** Fix: footer/menu link to `https://github.com/nearcarta/nearcarta#readme` on town, `/judges`, `/setup`. Overlaps R1. Accept: e2e finds the link on those pages. Done: `cfc5612`.
 - [x] W17 **Hidden text addressed to AI agents on the town page.** Review it: every sentence must be true, and it must be visible/legit (e.g. `/llms.txt` + a visible "For judges" note linking README) rather than hidden prompt-injection-like text that judges may penalise. Where: locate in rendered DOM of `/` (not in `D9_world/index.html` source; check `app/build.mjs` injections). Accept: no hidden (`display:none`/off-screen/aria-hidden) text addressed to AI; `/llms.txt` served and every claim in it is in R2. Done: `cfc5612`.
 - [x] W18 **Small grey labels in shop panels look faint.** Covered by C3 (contrast + 12px minimum). Accept: C3 axe run. Done: `cfc5612`.
+
+### F. Warm town, brass cards, review fixes
+The navy night-harbour colors are gone. Town sky, fog, meadow, lights, robot and props match the tree before merge `b42f001` (`450078a`). UI cards are espresso with a brass border. A shared DAO is not built.
+- [x] F1 **Town Hall “Back to town” covered the title.** The control is its own row in a sticky header, on every page. Done: `97ca9c0`.
+- [x] F2 **One label: Back to town.** “Return to the city” and the shop “Street” control are gone. Done: `00d9aea`.
+- [x] F3 **Judges page.** Five numbered cards. Each card names the page to open, the result to expect, and a mainnet transaction where one exists. Done: `dbe45bc`.
+- [x] F4 **No freeze-by-DAO claim.** The judges step, the Town Hall room, and the house notes no longer say a DAO vote froze the oath or that Proposal 4 passed. README already pointed at the recorded payments. Done: `dbe45bc`.
+- [x] F5 **Town Hall rows.** No orphan “2”. Each recorded transaction has a title, an amount when it moved NEAR, an allowed / refused / recorded badge, and a nearblocks link. Done: `dbe45bc`.
+- [x] F6 **Load errors.** The console and the charter office say the API is not reachable and offer Try again. The raw “Failed to fetch” string is not shown. Done: `dbe45bc`.
+- [x] F7 **No Back to town on the town page.** The street link is gone. The in-shop control still says Back to town. Done: `00d9aea`.
+- [x] F8 **Screenshots and contrast.** `e2e/brown-pass.spec.js` shoots every page at 1440 and 390 and checks axe color-contrast. The town start button stays fixed. Done: `adf8a9f`, `5c27a49`.

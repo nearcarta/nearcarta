@@ -1,4 +1,4 @@
-// Town Hall: a council table with vote stones. Proposal 4 (recorded) lowered the reward cap from 0.25 to 0.15 NEAR.
+// Town Hall room. The recorded mainnet payments are a 0.001 NEAR reward and a 0.002 NEAR refusal. A shared DAO is not built.
 import { THREE, room, put, makeRobot, sfx, wait, tween, tok, C } from '../js/core.js';
 import { TH } from '../../D6_dashboards/src/data.js';
 import { row, h3, note, proof, acct, paper, esc, mainnet } from './_ui.js';
@@ -6,10 +6,9 @@ import { M as PM, brassM, mesh, lantern, banner, candle, rug } from './_props.js
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
 export const PROOF = mainnet('hall') + proof(
-      h3('Proposal 4'), row({ k: 'Filed', why: TH.proposal.tag, tx: TH.proposal.filed }), ...TH.proposal.votes.map((v, i) => row({ k: `Vote ${i + 1}`, why: 'council · approve', st: 'ok', stText: 'counted', tx: v })),
-      h3('Oath versions'), ...TH.versions.map(v => row({ k: `v${v.v} · cap ${v.cap} · total ${v.total} NEAR`, why: v.how, tx: v.tx })),
-      h3('What the hall refused'), ...TH.log.filter(l => !l.ok).map(l => row({ k: `${l.who} ${l.what}`, why: l.res, st: 'no', stText: 'refused', tx: l.tx })),
-      note(`DAO ${acct(TH.dao)}. All rows are recorded mainnet payments; the stones are a re-enactment.`));
+      h3('Recorded payments'), row({ k: 'Reward paid', why: '0.001 NEAR allowed', st: 'ok', stText: 'allowed', tx: '6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h' }),
+      row({ k: 'Reward over the cap', why: '0.002 NEAR refused', st: 'no', stText: 'refused', tx: 'Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6' }),
+      note(`Contract ${acct(TH.oath)}. A shared DAO is not built. These two rows are mainnet transactions.`));
 // The DAO's latest proposals, read live from /api/townhall. A proposal past its vote window shows as expired:
 // Sputnik keeps it InProgress on chain until someone finalizes it, but nobody can vote on it any more.
 const PST = { Approved: ['ok', 'approved'], Rejected: ['no', 'rejected'], Removed: ['no', 'removed'], Failed: ['no', 'failed'], Expired: ['ice', 'expired'], InProgress: ['pend', 'open'] };
@@ -45,11 +44,11 @@ export default async function hall(ctx) {
   // the cap dial: a brass-rimmed half dial, 0 to 0.30 NEAR; mint below the new cap, brass up to the old one, coral beyond
   const RNG = .30, face = paper(THREE, 512, 300, (x, w, h) => {
     const cx = w / 2, cy = h - 34, R = 210, ang = c => Math.PI + (c / RNG) * Math.PI;
-    x.fillStyle = '#121a2e'; x.beginPath(); x.arc(cx, cy, R + 26, Math.PI, 0); x.lineTo(cx + R + 26, h); x.lineTo(cx - R - 26, h); x.fill();
-    x.strokeStyle = '#00ec97'; x.lineWidth = 10; x.beginPath(); x.arc(cx, cy, R + 20, Math.PI, 0); x.stroke();
-    [[0, .15, '#00ec97'], [.15, .25, '#00ec97'], [.25, .30, '#ff6b6b']].forEach(([a0, a1, c]) => { x.strokeStyle = c; x.lineWidth = 22; x.beginPath(); x.arc(cx, cy, R - 14, ang(a0) + .01, ang(a1) - .01); x.stroke(); });
-    for (let i = 0; i <= 30; i++) { const a = ang(i / 100), maj = i % 5 === 0, r0 = R - (maj ? 58 : 40); x.strokeStyle = maj ? '#eef2ff' : '#9c9182'; x.lineWidth = maj ? 5 : 2; x.beginPath(); x.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); x.lineTo(cx + Math.cos(a) * (R - 30), cy + Math.sin(a) * (R - 30)); x.stroke(); }
-    x.fillStyle = '#eef2ff'; x.font = '700 34px Inter, sans-serif'; x.textAlign = 'center'; [[.15, '0.15', -.38], [.25, '0.25', .2]].forEach(([c, t, off]) => { const a = ang(c) + off; x.fillText(t, cx + Math.cos(a) * (R - 96), cy + Math.sin(a) * (R - 96) + 12); }); // labels sit beside their tick, so the needle never covers them
+    x.fillStyle = '#1f1a15'; x.beginPath(); x.arc(cx, cy, R + 26, Math.PI, 0); x.lineTo(cx + R + 26, h); x.lineTo(cx - R - 26, h); x.fill();
+    x.strokeStyle = '#d6b46a'; x.lineWidth = 10; x.beginPath(); x.arc(cx, cy, R + 20, Math.PI, 0); x.stroke();
+    [[0, .15, '#00ec97'], [.15, .25, '#d6b46a'], [.25, .30, '#ff6b6b']].forEach(([a0, a1, c]) => { x.strokeStyle = c; x.lineWidth = 22; x.beginPath(); x.arc(cx, cy, R - 14, ang(a0) + .01, ang(a1) - .01); x.stroke(); });
+    for (let i = 0; i <= 30; i++) { const a = ang(i / 100), maj = i % 5 === 0, r0 = R - (maj ? 58 : 40); x.strokeStyle = maj ? '#f3ead8' : '#9c9182'; x.lineWidth = maj ? 5 : 2; x.beginPath(); x.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); x.lineTo(cx + Math.cos(a) * (R - 30), cy + Math.sin(a) * (R - 30)); x.stroke(); }
+    x.fillStyle = '#f3ead8'; x.font = '700 34px Inter, sans-serif'; x.textAlign = 'center'; [[.15, '0.15', -.38], [.25, '0.25', .2]].forEach(([c, t, off]) => { const a = ang(c) + off; x.fillText(t, cx + Math.cos(a) * (R - 96), cy + Math.sin(a) * (R - 96) + 12); }); // labels sit beside their tick, so the needle never covers them
   });
   const dial = mesh(scene, new THREE.PlaneGeometry(1.1, 1.1 * 300 / 512), new THREE.MeshStandardMaterial({ map: face, roughness: .6 }), [0, 1.18, -1.615], { cast: false });
   const piv = new THREE.Group(); piv.position.set(0, 1.18 - (1.1 * 300 / 512) / 2 + 1.1 * 34 / 512, -1.6); scene.add(piv);
@@ -70,7 +69,7 @@ export default async function hall(ctx) {
   const v2 = TH.versions[1], v3 = TH.versions[2];
   return {
     rob, scene, camera, tags: [],
-    panel: { title: 'Town Hall', src: 'split', srcNote: 'townhall.nearcarta.near is on mainnet. The two payments below are real mainnet transactions.', label: 'Reward cap · Proposal 4', hero: tok('0.15', 'NEAR'), action: 'Count the votes', more: MORE },
+    panel: { title: 'Town Hall', src: 'split', srcNote: 'townhall.nearcarta.near is on mainnet. The two payments below are real mainnet transactions.', label: 'Reward paid', hero: tok('0.001', 'NEAR'), action: 'Show the payments', more: MORE },
     proof: (await liveP) + PROOF,
   // intro: the robot walks to beside the table, not behind it
     *intro() { setCap(v2.cap); yield rob.walk([new THREE.Vector3(1.95, 0, -.35)]); rob.lookAt(slab.position); },
@@ -79,7 +78,7 @@ export default async function hall(ctx) {
       yield wait(.2); sfx('swap');
       ghost.rotation.z = capAng(v2.cap); ghost.visible = true;
       yield tween(.9, k => setCap(v2.cap + (v3.cap - v2.cap) * k), k => 1 - Math.pow(1 - k, 3) + Math.sin(k * Math.PI) * .06);
-      ctx.setHero(tok('0.15', 'NEAR')); ctx.setResult('ok', 'Passed · 2 votes'); sfx('allowed'); rob.lookAt(camera.position); rob.play('Yes', { once: true }); yield wait(1.4); rob.play('Idle');
+      ctx.setHero(tok('0.001', 'NEAR')); ctx.setResult('ok', 'Allowed · 0.001 NEAR'); sfx('allowed'); rob.lookAt(camera.position); rob.play('Yes', { once: true }); yield wait(1.4); rob.play('Idle');
     },
     update(dt) { rob.update(dt); },
   };

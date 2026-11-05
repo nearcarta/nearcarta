@@ -41,7 +41,7 @@ if (PRIVY_ID) {
   await (await import('esbuild')).build({ entryPoints: [here + 'house/sign.jsx'], bundle: true, format: 'esm', minify: true, target: 'es2022', jsx: 'automatic',
     outfile: dist + '/sign/sign.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis', __PRIVY_APP_ID__: JSON.stringify(PRIVY_ID), __PRIVY_CLIENT_ID__: JSON.stringify(PRIVY_CLIENT) }, logLevel: 'warning' });
   writeFileSync(dist + '/sign/index.html', '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nearcarta · approve</title><link rel="stylesheet" href="/brand/chrome.css">'
-    + '<script>try{window.opener&&window.opener.postMessage({source:"privy-near-connect",type:"READY"},"*")}catch(e){}</script><link rel="stylesheet" href="/sign/radix.css"><link rel="stylesheet" href="/sign/theme.css"><link rel="stylesheet" href="/sign/brand.css"></head><body>'
+    + '<script>try{window.opener&&window.opener.postMessage({source:"privy-near-connect",type:"READY"},"*")}catch(e){}</script><link rel="stylesheet" href="/sign/radix.css"><link rel="stylesheet" href="/sign/theme.css"><link rel="stylesheet" href="/sign/brand.css"><link rel="stylesheet" href="/brand/brown.css"></head><body>'
     + '<a class="back-town" href="/" data-testid="back-town">Back to town</a><p><a href="https://github.com/nearcarta/nearcarta#readme">README</a></p>'
     + '<div id="root"></div><script type="module" src="/sign/sign.bundle.js"></script></body></html>');
   const nm = p => { for (const b of [here + 'node_modules/', here + '../node_modules/']) try { readFileSync(b + p); return b + p; } catch {} throw new Error(p); };

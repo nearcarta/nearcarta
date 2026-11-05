@@ -38,7 +38,21 @@ const post = (path, body) => api(path, { method: 'POST', headers: { 'content-typ
 function toastHtml(html, kind = 'info') { const t = $('#log'); const li = document.createElement('li'); li.className = kind; li.innerHTML = html; t.prepend(li); }
 function toast(text, kind = 'info') { const t = $('#log'); const li = document.createElement('li'); li.className = kind; li.textContent = text; t.prepend(li); }
 function busy(btn, on, label) { if (!btn) return; btn.disabled = on; if (on) { btn.dataset.l = btn.textContent; btn.textContent = label || 'Waiting for chain…'; } else if (btn.dataset.l) btn.textContent = btn.dataset.l; }
-const fail = e => toastHtml(`<b>Stopped:</b> ${esc(e.message)}${e.tx ? ' · ' + txl(e.tx) : ''}`, 'bad err');
+function plainErr(e) {
+  const m = String(e?.message || e || '');
+  if (/failed to fetch|networkerror|load failed|aborted/i.test(m)) return 'The town API is not reachable just now.';
+  if (/^http 5\d\d/.test(m)) return 'The town API is busy. Try again in a moment.';
+  return m;
+}
+const fail = e => toastHtml(`<b>Stopped:</b> ${esc(plainErr(e))}${e.tx ? ' · ' + txl(e.tx) : ''}`, 'bad err');
+function showLoadError(e) {
+  const story = $('#story');
+  const log = $('#log');
+  if (log) log.replaceChildren();
+  if (!story) { fail(e); return; }
+  story.innerHTML = `<span data-testid="load-error">${esc(plainErr(e))}</span> <button type="button" data-testid="retry">Try again</button>`;
+  story.querySelector('button').onclick = () => { story.textContent = 'Loading your charter…'; main().catch(showLoadError); };
+}
 
 // ---------- step 1: wallet ----------
 async function refreshWho() {
@@ -550,6 +564,10 @@ async function main() {
   booted.ok();
   connector.on('wallet:signOut', () => { charter = null; ready = false; refreshWho().catch(fail); });
   $('#signout').onclick = async () => { await connector.disconnect().catch(() => {}); charter = null; ready = false; await refreshWho(); };
-  await refreshWho(); await loadBoard().catch(e => { $('#board').textContent = e.message; });
+  await refreshWho(); await loadBoard().catch(e => {
+    const b = $('#board');
+    b.innerHTML = `<p data-testid="load-error">${esc(plainErr(e))}</p><button type="button" data-testid="retry-board">Try again</button>`;
+    b.querySelector('button').onclick = () => { b.textContent = 'Loading…'; loadBoard().catch(err => { b.textContent = plainErr(err); }); };
+  });
 }
-main().catch(fail);
+main().catch(showLoadError);

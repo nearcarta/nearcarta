@@ -19,7 +19,7 @@ export const SHOPS = [
   { id: 'bank', name: 'Privacy Bank', icon: Landmark, tone: 'cau', state: 'Receipt check pending', C: BankView },
   { id: 'arena', name: 'Vault Arena', icon: Swords, tone: 'neu', state: 'Season 1 · preview', C: ArenaView },
   { id: 'nft', name: 'NFT Handoff', icon: Package, tone: 'neu', state: 'Not on chain yet', C: NftView },
-  { id: 'townhall', name: 'Town Hall', icon: Gavel, tone: 'pos', state: 'Proposal 4 passed 2/2', C: HallView },
+  { id: 'townhall', name: 'Town Hall', icon: Gavel, tone: 'pos', state: '0.001 NEAR allowed', C: HallView },
   { id: 'toll', name: 'Toll', icon: Signature, tone: 'pos', state: 'MPC 11-of-16 signed', C: TollView },
   { id: 'chronicle', name: 'Chronicle', icon: ScrollText, tone: 'pos', state: '21 events, all on chain', C: ChronicleView },
 ];

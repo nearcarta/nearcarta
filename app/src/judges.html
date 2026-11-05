@@ -1,9 +1,60 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Nearcarta · for judges</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/brand/chrome.css"><link rel="stylesheet" href="/console.css"></head>
-<body><header><p><a class="back-town" href="/" data-testid="back-town">Back to town</a></p><h1>For judges</h1><p class="links"><a href="/console">Live shops</a> <a href="https://github.com/nearcarta/nearcarta#readme">README</a> <a href="/llms.txt">llms.txt</a></p></header><main>
-<div class="card"><b>Do X, see Y</b><ol>
-<li>Open <a href="/console#ferry">Ferry</a>, press <i>Get dry quote</i>. See three PASS rows: 1Click signature, echo guard, dry.</li>
-<li>Set privacy to <i>confidential (basic)</i> and quote again. See privacy <b>basic</b> echoed back and still signed.</li>
-<li>Open <a href="/console#guardhouse">Guardhouse</a>. See 0 full-access keys and an agent key that can only call <code>propose</code>.</li>
-<li>Open <a href="/console#chronicle">Chronicle</a>. See the latest allowed and denied proposals read back from chain.</li>
-<li>Open <a href="/console#townhall">Town Hall</a>. See the oath FROZEN by a DAO vote.</li>
-</ol><p class="note">The repo's judges/VERIFY.md has the same steps as shell commands.</p></div></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nearcarta · for judges</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand/chrome.css">
+<link rel="stylesheet" href="/console.css">
+<link rel="stylesheet" href="/brand/brown.css">
+</head>
+<body>
+<header>
+  <p><a class="back-town" href="/" data-testid="back-town">Back to town</a></p>
+  <h1>Five checks on mainnet</h1>
+  <p class="links"><a href="/console">Live shops</a> <a href="https://github.com/nearcarta/nearcarta#readme">README</a> <a href="/llms.txt">llms.txt</a></p>
+</header>
+<main class="judge-grid">
+  <article class="card judge-step">
+    <span class="n">1</span>
+    <div>
+      <h2>Ferry quote stays dry</h2>
+      <p>Open <a href="/console#ferry">the Ferry tab</a> and press Get dry quote. You should see three PASS rows: the 1Click signature, the echo guard, and dry. A dry quote has no deposit address.</p>
+      <p>The recorded swap is a separate mainnet payment: <a href="https://nearblocks.io/txns/HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw">wrap</a>, <a href="https://nearblocks.io/txns/A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz">deposit</a>, <a href="https://nearblocks.io/txns/Be1ttdbmiKhqwxpstP33HefWUp3o1A8RwKosdcK2mquk">USDC withdraw</a>.</p>
+    </div>
+  </article>
+  <article class="card judge-step">
+    <span class="n">2</span>
+    <div>
+      <h2>Confidential quote is still signed</h2>
+      <p>On the same Ferry tab, set privacy to confidential (basic) and quote again. You should see privacy <b>basic</b> echoed back, and the signature check still PASS.</p>
+    </div>
+  </article>
+  <article class="card judge-step">
+    <span class="n">3</span>
+    <div>
+      <h2>The agent key can only propose</h2>
+      <p>Open <a href="/console#guardhouse">Guardhouse</a>. You should see 0 full-access keys, and an agent key whose methods are only <code>propose</code> and <code>propose_batch</code>.</p>
+      <p>The full-access key was deleted in <a href="https://nearblocks.io/txns/71Zio28gV3yubD5DecGtkguWzWdfix8brcKFy13d3zzt">71Zio28g…</a>.</p>
+    </div>
+  </article>
+  <article class="card judge-step">
+    <span class="n">4</span>
+    <div>
+      <h2>Chronicle shows allowed and refused</h2>
+      <p>Open <a href="/console#chronicle">Chronicle</a>. You should see one allowed payment and two refusals, each linked on nearblocks.io.</p>
+      <p>Allowed 0.001 NEAR <a href="https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia">4jEjzpiY…</a>. Over the cap <a href="https://nearblocks.io/txns/AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx">AsZUd9mZ…</a>.</p>
+    </div>
+  </article>
+  <article class="card judge-step">
+    <span class="n">5</span>
+    <div>
+      <h2>Town Hall payments, no shared DAO</h2>
+      <p>Open <a href="/shops/hall/">Town Hall</a>. You should see the recorded 0.001 NEAR reward marked allowed, and the 0.002 NEAR reward marked refused. A shared DAO is not built. A rule change is <code>set_rules</code> on your own row.</p>
+      <p>Allowed <a href="https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h">6UxwRmoE…</a>. Refused <a href="https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6">Cp2rWatn…</a>.</p>
+    </div>
+  </article>
+</main>
+</body>
+</html>

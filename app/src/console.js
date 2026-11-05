@@ -12,6 +12,12 @@ const nameOf = a => { const s = String(a ?? ''); for (const [re, n] of ROLE) if 
 const acct = a => `<a href="${NB}/address/${esc(a)}" target="_blank" rel="noopener" title="${esc(a)}">${esc(nameOf(a))}</a>`;
 const near = y => (y == null ? '–' : (Number(BigInt(y) / 10n ** 18n) / 1e6).toString() + ' NEAR');
 const mark = ok => `<b class="${ok ? 'pass' : 'fail'}" data-check="${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'}</b>`;
+function plainErr(e) {
+  const m = String(e?.message || e || '');
+  if (/failed to fetch|networkerror|load failed|aborted/i.test(m)) return 'The town API is not reachable just now.';
+  if (/^http 5\d\d/.test(m)) return 'The town API is busy. Try again in a moment.';
+  return m;
+}
 
 async function get(path, opts) {
   const r = await fetch(API + path, opts);
@@ -27,14 +33,14 @@ function show(t) {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('on', s.id === t));
   history.replaceState(null, '', '#' + t);
-  if (loaders[t] && !loaded[t]) { loaded[t] = 1; loaders[t]().catch(e => { $(`#${t} .out`).innerHTML = `<p class="fail">${esc(e.message)}</p>`; loaded[t] = 0; }); }
+  if (loaders[t] && !loaded[t]) { loaded[t] = 1; loaders[t]().catch(e => { const host = $(`#${t} .out`); host.innerHTML = `<p class="fail" data-testid="load-error">${esc(plainErr(e))}</p><button type="button" data-testid="retry">Try again</button>`; loaded[t] = 0; host.querySelector('button').onclick = () => show(t); }); }
 }
 
 get('/api/health').then(h => {
   const onMain = h.network?.contracts === 'mainnet';
   $('#health').innerHTML = onMain ? `Town contracts on mainnet ${mark(true)}` : `API up ${mark(!!h.ok)}`;
 })
-  .catch(e => { $('#health').innerHTML = `<span class="fail">API unreachable: ${esc(e.message)}</span>`; });
+  .catch(e => { const el = $('#health'); el.innerHTML = `<span class="fail" data-testid="load-error">${esc(plainErr(e))}</span> <button type="button" data-testid="retry">Try again</button>`; el.querySelector('button').onclick = () => location.reload(); });
 
 get('/api/mainnet').then(m => {
   if (!window.NEARCARTA_PUBLIC_MAINNET) return;
@@ -78,7 +84,7 @@ async function zcheck() {
     if (my !== zseq) return; // a newer address was typed while this one was being checked
     el.innerHTML = `<div class="card" data-testid="zec-check">Zcash recipient: <b>${esc(z.kind)}</b> · receivers ${esc(z.receivers.join(', '))} · ${z.shielded ? '<b class="pass">shielded</b>' : '<b class="fail">public on Zcash</b>'}<br><span class="note">${esc(z.note)}</span></div>`;
   } catch (e) { if (my !== zseq) return; const t = /^t[13]/.test(addr);
-    el.innerHTML = `<div class="card fail" data-testid="zec-check">${t ? '<b class="fail">public on Zcash</b> (transparent t-address) · ' : ''}check unavailable: ${esc(e.message)}</div>`; }
+    el.innerHTML = `<div class="card fail" data-testid="zec-check">${t ? '<b class="fail">public on Zcash</b> (transparent t-address) · ' : ''}check unavailable: ${esc(plainErr(e))}</div>`; }
 }
 form.to.onchange = () => { if (Object.values(SAMPLE).includes(form.recipient.value)) form.recipient.value = form.to.value.startsWith('ZEC') ? SAMPLE.zec : SAMPLE.near; zcheck(); };
 form.onsubmit = async ev => {
@@ -100,7 +106,7 @@ form.onsubmit = async ev => {
       <tr><td>All-in cost from signed USD amounts</td><td>${esc(q.cost_bps_signed)} bps = ${(q.cost_bps_signed / 100).toFixed(2)}% (includes the destination withdrawal fee)${q.cost_bps_signed > 200 ? ' <b class="fail">fees eat ' + (q.cost_bps_signed / 100).toFixed(1) + '% of this amount; try about 30 USDC</b>' : ''}</td></tr>
       <tr><td>Verdict</td><td>${q.ok ? '<b class="pass" data-testid="verdict">ACCEPTED</b>' : '<b class="fail" data-testid="verdict">REJECTED</b>'}</td></tr>
       </table><p class="note">quote in ${esc(q.ms)} ms · signature <code>${esc(q.signature)}</code></p></div>`;
-  } catch (e) { out.innerHTML = `<div class="card fail" data-testid="quote-error">${esc(e.message)}</div>`; }
+  } catch (e) { out.innerHTML = `<div class="card fail" data-testid="quote-error">${esc(plainErr(e))}</div>`; }
 };
 
 async function guardhouse() {
@@ -135,7 +141,7 @@ async function teeCheck(btn) {
     out.innerHTML = `<table>${block('Gateway', r.gateway)}${r.models.map(m => block(`Model ${m.model_name}`, m)).join('')}
       <tr><td>response is for the nonce this browser made</td><td>${mark(mine)}</td></tr></table>
       <p data-testid="tee-verdict" data-ok="${r.ok && mine}">${r.ok && mine ? '<b class="pass">TEE verified</b>' : '<b class="fail">TEE NOT verified</b>'} · ${esc(r.checkedAt)} · no completion sent (non-billable)</p>`;
-  } catch (e) { out.innerHTML = `<p class="fail" data-testid="tee-error">${esc(e.message)}</p>`; }
+  } catch (e) { out.innerHTML = `<p class="fail" data-testid="tee-error">${esc(plainErr(e))}</p>`; }
   btn.disabled = false;
 }
 

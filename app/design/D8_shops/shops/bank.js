@@ -49,7 +49,7 @@ export default async function bank() {
   [-.64, .64, 0].forEach(x => mesh(scene, new THREE.BoxGeometry(.07, .95, .08), PM.dark, [wx + x, wy, wz]));
   const glass = mesh(scene, new THREE.PlaneGeometry(1.22, .84), new THREE.MeshStandardMaterial({ color: 0xe8e2d4, transparent: true, opacity: .5, roughness: 1 }), [wx, wy, wz + .02], { cast: false });
   const shape = mesh(scene, new THREE.CircleGeometry(.18, 24), new THREE.MeshBasicMaterial({ color: C.accent, transparent: true, opacity: .75 }), [wx - .25, wy - .05, wz - .02], { cast: false });
-  const mistT = radial('#eef2ff'), mist = [0, 1, 2, 3].map(i => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistT, transparent: true, opacity: .35, depthWrite: false })); m.scale.set(.7, .45, 1); m.position.set(wx - .4 + i * .3, wy - .15 + (i % 2) * .25, wz + .05); scene.add(m); return m; });
+  const mistT = radial('#f3ead8'), mist = [0, 1, 2, 3].map(i => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistT, transparent: true, opacity: .35, depthWrite: false })); m.scale.set(.7, .45, 1); m.position.set(wx - .4 + i * .3, wy - .15 + (i % 2) * .25, wz + .05); scene.add(m); return m; });
   // the vault door: round, brass, bolted
   const vx = .95, vy = 1.0, vz = -.775;
   mesh(scene, new THREE.CylinderGeometry(.56, .56, .06, 40), PM.dark, [vx, vy, vz], { rx: Math.PI / 2 });

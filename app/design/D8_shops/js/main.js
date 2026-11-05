@@ -77,7 +77,7 @@ function ui() {
   sound.button($('#snd'));
   // the walkthrough video has a sound track, so its icon must read 'sound on' (a capture page is never unlocked by a gesture)
   if (CAPTURE && P.has('snd')) { const b = $('#snd'); b.setAttribute('aria-pressed', 'true'); b.setAttribute('aria-label', 'Sound on. Click to mute'); }
-  $('#back').onclick = () => leave(); $('#t-proof').onclick = () => drawer(true); $('#d-close').onclick = () => drawer(false);
+  $('#back').onclick = () => { location.assign('/'); }; $('#t-proof').onclick = () => drawer(true); $('#d-close').onclick = () => drawer(false);
   addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('#drawer').classList.contains('open')) drawer(false); else if (shop) leave(); } });
   if (APP) { $('#wallet').hidden = false; $('#t-say').hidden = false; document.body.classList.add('apps'); loadApps(); return; }
   $('#t-act').onclick = () => { if (!shop?.act || $('#t-act').disabled) return; sfx('click'); $('#t-act').disabled = true; $('#t-act').classList.add('busy'); run(shop.act()); };
