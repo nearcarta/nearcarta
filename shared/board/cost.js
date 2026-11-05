@@ -14,7 +14,13 @@ export const ACCOUNT_CREATION_YOCTO = 7_000_000_000_000_000_000_000n;
 export const GAS_PRICE_YOCTO = 100_000_000n;
 export const GAS_PURCHASE_YOCTO = 1_000_000_000n;
 export const ONE_NEAR = 10n ** 24n;
-export const MAX_DEPLOY_YOCTO = ONE_NEAR;
+// Cap raised from 1 NEAR to 1.2 NEAR after the 2026-11-05 redeploy (PR #22 wasm adds
+// propose_call + force_close). Source: /workspace/audit/board-redeploy-final.json and
+// nearblocks.io/txns/CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4: wasm 108955 bytes,
+// sha256 910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29,
+// code_hash Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C, live balance 1.0913 NEAR,
+// storage_usage 109130 bytes (block 223200774). The stake comes back on `reap`.
+export const MAX_DEPLOY_YOCTO = 12n * ONE_NEAR / 10n;
 
 const CREATE_SEND = 500_000_000_000n;
 const CREATE_EXEC = 7_200_000_000_000n;

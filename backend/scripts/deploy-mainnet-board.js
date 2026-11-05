@@ -39,10 +39,10 @@ console.log('Burned gas: ' + cost.burnedGasYocto.toString() + ' yoctoNEAR');
 console.log('Prepaid gas: ' + cost.prepaidYocto.toString() + ' yoctoNEAR, the difference is refunded');
 console.log('Total: ' + cost.totalYocto.toString() + ' yoctoNEAR (' + near(cost.totalYocto) + ' NEAR)');
 console.log('Peak: ' + cost.peakYocto.toString() + ' yoctoNEAR (' + near(cost.peakYocto) + ' NEAR)');
-console.log('Cap: ' + MAX_DEPLOY_YOCTO.toString() + ' yoctoNEAR (1 NEAR)');
+console.log('Cap: ' + MAX_DEPLOY_YOCTO.toString() + ' yoctoNEAR (1.2 NEAR)');
 console.log('Teardown: docs/MAINNET_BOARD.md');
 if (cost.totalYocto > MAX_DEPLOY_YOCTO || cost.peakYocto > MAX_DEPLOY_YOCTO) {
-  console.error('Refusing: the plan is over 1 NEAR.');
+  console.error('Refusing: the plan is over 1.2 NEAR.');
   process.exit(1);
 }
 if (!live) {

@@ -16,7 +16,7 @@ The refusal strings match the oath charter: `receiver_not_allowlisted`, `zero_am
 
 ## What the owner pays
 
-`node backend/scripts/deploy-mainnet-board.js` prints the storage stake, the burned gas, the 0.007 NEAR account-creation charge, and the total, in yoctoNEAR. The formula is `deployCost` in `shared/board/cost.js`. The script exits 1 if the total or the peak (stake plus prepaid gas) is over 1 NEAR. It does not sign unless the owner passes `--live` and `NEAR_MAINNET_SIGNER_KEY`. The key is not read from a file and is not printed.
+`node backend/scripts/deploy-mainnet-board.js` prints the storage stake, the burned gas, the 0.007 NEAR account-creation charge, and the total, in yoctoNEAR. The formula is `deployCost` in `shared/board/cost.js`. The script exits 1 if the total or the peak (stake plus prepaid gas) is over 1.2 NEAR (the live wasm is 108955 bytes, about 1.09 NEAR of storage, returned by `reap`). It does not sign unless the owner passes `--live` and `NEAR_MAINNET_SIGNER_KEY`. The key is not read from a file and is not printed.
 
 The account is created with no access key. `new` records the predecessor as the owner.
 
