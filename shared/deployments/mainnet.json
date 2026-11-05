@@ -69,7 +69,8 @@
         "propose_refused_0.01_over_per_action_cap": "AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx",
         "fund_topup_0.005": "34QArpijENRcPPYhWPpvVhmbhxXr1jPaBpE6xGNAZ4Lj",
         "propose_allowed_0.001_agent_key_no_wallet": "BecizuUP6eN4eQnRtYajq6wTudY8pX4gRSVMZMticz1s",
-        "propose_allowed_0.001_agent_key_no_wallet_2": "5A3QBy7Tp3q3tiJa9BQFP7Caniw54uBo5HVVr5MsWMe4"
+        "propose_allowed_0.001_agent_key_no_wallet_2": "5A3QBy7Tp3q3tiJa9BQFP7Caniw54uBo5HVVr5MsWMe4",
+        "ferry_ask_charter_0.005": "Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV"
       }
     },
     "redeploy": {

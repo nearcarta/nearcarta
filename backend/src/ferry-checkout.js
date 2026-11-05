@@ -85,13 +85,41 @@ export function rpcFor() {
   return cfg.mainnetRpc;
 }
 
+/** A board row (get_charter) shaped like the oath clause the checkout gate already checks. */
+export function boardRowAsGate(row) {
+  if (!row || row.per_action_cap == null || row.per_action_cap === '') return null;
+  return {
+    state: { frozen: !!row.frozen },
+    clause: {
+      receivers: Array.isArray(row.receivers) ? row.receivers : [],
+      per_action_cap: String(row.per_action_cap),
+      daily_budget: String(row.daily_budget ?? row.per_action_cap),
+      max_actions_per_day: Number(row.max_actions_per_day ?? 50),
+      window_start_min: Number(row.window_start_min ?? 0),
+      window_end_min: Number(row.window_end_min ?? 0),
+      min_amount: String(row.min_amount ?? '1'),
+      requires_receipt: false,
+    },
+    usage: { spent: String(row.spent_today ?? '0'), reserved: '0', count: Number(row.actions_today ?? 0) },
+    sealed: !!row.sealed,
+  };
+}
+
 export async function readCharterRules(account, clauseId, viewFn = view) {
   const url = rpcFor(account);
-  const [state, rules] = await Promise.all([
-    viewFn(account, 'get_state', {}, url),
-    viewFn(account, 'get_rules', { clause_id: clauseId }, url),
-  ]);
-  return { state, clause: rules?.clause || null, usage: rules?.usage || null, sealed: !!rules?.hidden_rule_sealed };
+  try {
+    const [state, rules] = await Promise.all([
+      viewFn(account, 'get_state', {}, url),
+      viewFn(account, 'get_rules', { clause_id: clauseId }, url),
+    ]);
+    if (state) return { state, clause: rules?.clause || null, usage: rules?.usage || null, sealed: !!rules?.hidden_rule_sealed };
+  } catch { /* a visitor row has no get_state; the rules are on the board */ }
+  const board = DEP.board?.contract;
+  if (!board) throw new Error('charter unread');
+  const row = await viewFn(board, 'get_charter', { owner: account }, url);
+  const gate = boardRowAsGate(row);
+  if (!gate) throw new Error('no charter row');
+  return gate;
 }
 
 export function checkoutInput(b) {
