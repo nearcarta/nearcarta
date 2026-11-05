@@ -10,7 +10,7 @@ paths = ['''(^|/)target/''', '''^app/dist/''', '''vendor/jsm/libs/chevrotain\.mo
 description = "public NEAR tx hashes (base58, 43-44 chars) in the readme, docs, deployments and judges notes. A 64-byte key is about 88 chars and stays flagged."
 paths = ['''^README\.md$''', '''^docs/.*\.md$''', '''^shared/deployments/.*\.json$''', '''^judges/''']
 regexTarget = "match"
-regexes = ['''(?<![1-9A-HJ-NP-Za-km-z])[1-9A-HJ-NP-Za-km-z]{43,44}(?![1-9A-HJ-NP-Za-km-z])''']
+regexes = ['''\b[1-9A-HJ-NP-Za-km-z]{43,44}\b''']
 
 [[allowlists]]
 description = "public NEAR tx hashes (base58, 43-44 chars) in the deployments file"
