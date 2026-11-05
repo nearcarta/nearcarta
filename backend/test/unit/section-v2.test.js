@@ -39,6 +39,29 @@ test('set_calls names each shop, the method and the caps', () => {
   assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call']);
 });
 
+test('wrap.near uses the rule cap when that cap is at least 0.05 NEAR', () => {
+  // propose_call: deposit <= rule.cap (lib.rs line 334) and deposit <= per_action_cap (line 337).
+  // set_calls stores the cap (line 293). A lower wrap.near cap would refuse the ferry near_deposit.
+  const Y = 10n ** 24n;
+  const cap = (Y * 6n / 100n).toString();
+  const daily = (Y * 12n / 100n).toString();
+  const policy = callPolicy(['charter.nearcarta.near'], cap, daily);
+  for (const method of ['near_deposit', 'storage_deposit', 'ft_transfer']) {
+    const row = policy.calls.find(c => c.receiver === 'wrap.near' && c.method === method);
+    assert.ok(row, method);
+    assert.equal(row.cap, cap, method);
+  }
+  const low = (Y / 1000n).toString();
+  const raised = callPolicy(['charter.nearcarta.near'], cap, daily, 'ft_transfer', [
+    { receiver: 'wrap.near', method: 'near_deposit', cap: low },
+    { receiver: 'other.near', method: 'ft_transfer', cap: low },
+  ]);
+  assert.equal(raised.calls.find(c => c.receiver === 'wrap.near' && c.method === 'near_deposit').cap, cap);
+  assert.equal(raised.calls.find(c => c.receiver === 'other.near').cap, low);
+  const edge = (Y / 20n).toString();
+  assert.equal(callPolicy(['charter.nearcarta.near'], edge, edge).calls.find(c => c.method === 'near_deposit').cap, edge);
+});
+
 test('the session script prints the plan and does not sign without --live', () => {
   const script = fileURLToPath(new URL('../../scripts/board-session-mainnet.js', import.meta.url));
   const dry = spawnSync(process.execPath, [script], { encoding: 'utf8' });

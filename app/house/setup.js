@@ -10,6 +10,7 @@ import { wallet, mainnetWallet, account, mainnetAccount, connect, disconnect, on
 import { balanceOn } from './onboard.js';
 import { setupJourney } from '../../shared/setup/path.js';
 import { tryTiles } from '../../shared/setup/try-tiles.js';
+import { TOPUP_MIN_YOCTO, TOPUP_RESERVE_YOCTO, charterFundMarkup, charterTopUpYocto, nearStringFromYocto, topUpRoom } from '../../shared/setup/charter-fund.js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf } from '../../shared/vault/tx.js';
@@ -498,17 +499,43 @@ async function boardAsk(amt) {
 const whyText = t => t.reason === 'ERR_BALANCE'
   ? `Your charter's own balance is too low for this payment (holds ${fmtN(nearOf(t.holds))}, needs ${fmtN(nearOf(t.amount))} NEAR). Your account balance is not used.`
   : (WHY[t.reason] || t.reason || t.decision);
-let rowBal = null, rowView = null, topUpBusy = false;
+let rowBal = null, rowView = null, topUpBusy = false, fundDraft = null;
 const tryNeed = () => toY(Math.min(+rules().cap, 0.001));
 const lowBal = () => boardLive() && !st.trial && rowBal !== null && rowBal < tryNeed();
+// Default add: enough to reach max(cap+0.01, 0.01), rounded up to 0.005.
+// fund (lib.rs 202–206) puts the deposit on the row. close_charter (208, release 229) sends it back.
+function fundChoice() {
+  const draft = fundDraft != null && String(fundDraft).trim() !== '';
+  const capYocto = toY(rules().cap);
+  const rowYocto = rowBal ?? 0n;
+  let yocto = 0n;
+  let soft = '';
+  if (draft) {
+    const n = Number(fundDraft);
+    if (!Number.isFinite(n) || n <= 0) return { ok: false, yocto: 0n, near: String(fundDraft), why: 'Enter an amount in NEAR.' };
+    yocto = BigInt(toY(n));
+  } else {
+    const open = charterTopUpYocto({ capYocto, rowYocto, accountYocto: null });
+    yocto = charterTopUpYocto({ capYocto, rowYocto, accountYocto: bal == null ? null : bal });
+    if (bal != null && yocto < open) soft = `The account keeps ${nearStringFromYocto(TOPUP_RESERVE_YOCTO)} NEAR for gas, so this add is ${nearStringFromYocto(yocto)} NEAR.`;
+  }
+  const near = draft ? String(fundDraft) : nearStringFromYocto(yocto);
+  if (bal == null) return { ok: false, yocto, near, why: 'Your account balance is still loading.' };
+  const room = topUpRoom(bal);
+  if (yocto > room) return { ok: false, yocto, near, why: `Leave ${nearStringFromYocto(TOPUP_RESERVE_YOCTO)} NEAR in the account for gas. You can add at most ${fmtN(nearOf(room.toString()))} NEAR.` };
+  if (yocto < TOPUP_MIN_YOCTO) return { ok: false, yocto, near, why: room < TOPUP_MIN_YOCTO ? `Leave ${nearStringFromYocto(TOPUP_RESERVE_YOCTO)} NEAR in the account for gas. This account can add ${fmtN(nearOf(room.toString()))} NEAR, which is under 0.001.` : 'Add at least 0.001 NEAR.' };
+  return { ok: true, yocto, near, why: soft };
+}
 async function topUp() {
+  const choice = fundChoice();
+  if (!choice.ok) throw new Error(choice.why);
   if (topUpBusy) return;
   topUpBusy = true; render();
-  try { await topUpRun(); } finally { topUpBusy = false; render(); }
+  try { await topUpRun(choice.yocto); fundDraft = null; } finally { topUpBusy = false; }
 }
-async function topUpRun() {
+async function topUpRun(deposit) {
   const w = await mainnetWallet().wallet(), before = rowBal ?? 0n;
-  const res = await w.signAndSendTransaction({ receiverId: MAIN.board.contract, actions: [{ type: 'FunctionCall', params: { methodName: 'fund', args: {}, gas: (GAS.agent * TG).toString(), deposit: TOPUP.toString() } }] });
+  const res = await w.signAndSendTransaction({ receiverId: MAIN.board.contract, actions: [{ type: 'FunctionCall', params: { methodName: 'fund', args: {}, gas: (GAS.agent * TG).toString(), deposit: deposit.toString() } }] });
   const tx = txHashOf(res); const mark = state => { const s = signLog.find(x => x.k === 'topup'); if (s) Object.assign(s, { state, tx }); else signLog.push({ k: 'topup', state, tx }); render(); };
   mark('run');
   // Re-read the row until the new balance shows (the fund call confirms in a block or two).
@@ -546,7 +573,7 @@ function sTry() {
      ${boardLive() && !st.trial ? `<div class="tiles" style="grid-template-columns:1fr 1fr;margin-top:12px"><button type="button" class="tile" id="t-freeze" data-testid="try-frozen"><i>❄</i><b>Freeze, then ask</b><span>One approval freezes the row. The ask is your agent key and should be refused. A second approval unfreezes it.</span></button>
        <button type="button" class="tile" id="t-expire" data-testid="try-expired"><i>⌛</i><b>Expire, then ask</b><span>One approval sets the session in the past. The ask is your agent key and should be refused. A second approval writes the session again.</span></button></div>` : ''}
      ${boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code> and <code>propose_call</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
-     ${lowBal() || topUpBusy ? `<div class="tabhelp" data-testid="try-lowbal"><p class="small">Your charter holds ${fmtN(nearOf(rowBal.toString()))} NEAR. Payments come from the charter's own balance, not your account. Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to it with one approval.</p><button type="button" class="btn" id="t-topup" data-testid="try-topup" ${topUpBusy ? 'disabled aria-busy="true"' : ''}>${topUpBusy ? 'Adding… waiting for confirmation' : `Add ${fmtN(nearOf(TOPUP.toString()))} NEAR to the charter`}</button></div>` : ''}
+     ${boardLive() && !st.trial ? charterFundMarkup({ amountNear: fundChoice().near, lowBalance: !!lowBal(), rowNear: rowBal == null ? '?' : fmtN(nearOf(rowBal.toString())), hintNear: fmtN(nearOf(TOPUP.toString())), busy: topUpBusy, disabled: !fundChoice().ok, note: fundChoice().why }) : ''}
      ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
      ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR… <span id="try-secs" data-testid="try-secs">${Math.floor((Date.now() - pendingTry.t0) / 1000)}s</span></span> ${txA(pendingTry.hash)}</div></div>` : ''}
      ${tries.map(t => `<div class="verdict ${t.passed ? 'good' : 'bad'}" data-testid="try-verdict"><span class="tag">${t.passed ? 'ALLOWED' : 'REFUSED'}</span><div><b>${fmtN(nearOf(t.amount))} NEAR → ${esc(short(t.receiver))}</b><br><span class="muted small">${esc(t.passed ? 'inside your rule · the charter paid' : whyText(t))}${t.passed ? '' : t.tx ? ' · refused on chain by the contract' : ' · refused before sending, nothing on chain'}${t.signer === 'agent' ? ' · signed by your agent key, no wallet' : ''}</span> ${txA(t.tx)}</div></div>`).join('')}
@@ -585,7 +612,7 @@ function wireTry() {
     : (amt, memo) => runAsk({ charter: st.charter, key: keyFrom(localStorage.getItem(agentLS(st.charter))), receiver: to, amount: toY(amt), memo, viewF: (c, m, a) => viewFn(rpcCall, c, m, a), send: sendPropose, rpcCall });
   const k = $('#t-key'); if (k) k.onclick = e => act(e.currentTarget, async () => { await signBoard(); keyReady = !!(await agentAccessKey(localStorage.getItem(agentLS(me)))); });
   if (boardLive() && !st.trial && keyReady === null) agentAccessKey(localStorage.getItem(agentLS(me))).then(a => { keyReady = !!a; if (STEPS[st.step][0] === 'try') render(); });
-  const tu = $('#t-topup'); if (tu) tu.onclick = e => act(e.currentTarget, topUp);
+  const fundForm = $('#try-fund'); if (fundForm) { const amt = $('#t-fund-amt'); if (amt) amt.oninput = e => { fundDraft = e.target.value; }; fundForm.onsubmit = e => { e.preventDefault(); act($('#t-topup'), topUp); }; }
   if (boardLive() && !st.trial && rowBal === null) readRowBal().then(() => { if (STEPS[st.step][0] === 'try' && rowBal !== null) render(); });
   clearInterval(secTimer); secTimer = setInterval(() => { const el = $('#try-secs'); if (el && pendingTry) el.textContent = Math.floor((Date.now() - pendingTry.t0) / 1000) + 's'; }, 1000);
   const okBtn = $('#t-ok'); if (okBtn && !okBtn.disabled) okBtn.onclick = e => act(e.currentTarget, async () => { const t = await ask(Math.min(+r.cap, 0.001), 'setup: allowed'); tries.push(t); if (t.passed) { st.allowedTx = t.tx || true; save(); } if (boardLive()) await readRowBal(); refreshBal(); });

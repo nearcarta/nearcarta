@@ -45,9 +45,26 @@ export const FERRY_CALL_TARGETS = [
   { receiver: 'wrap.near', method: 'storage_deposit' },
 ];
 
+// propose_call takes the deposit from the row and refuses it above this cap
+// (`over_shop_cap`, contracts/charter_board/src/lib.rs line 334) and above the
+// row's per_action_cap (line 337). set_calls stores the triple (line 293).
+// A wrap.near cap below the rule cap would block a near_deposit the rules already allow.
+function wrapCap(named, capYocto) {
+  const rule = String(capYocto);
+  const given = named == null || named === '' ? rule : String(named);
+  try {
+    if (BigInt(given) < BigInt(rule)) return rule;
+  } catch { return rule; }
+  return given;
+}
+
 export function callPolicy(receivers, capYocto, sessionCapYocto, method = 'ft_transfer', extra = FERRY_CALL_TARGETS) {
   const shop = receivers.map(receiver => ({ receiver, method, cap: String(capYocto) }));
-  const ferry = (extra || []).map(c => ({ receiver: c.receiver, method: c.method, cap: String(c.cap || capYocto) }));
+  const ferry = (extra || []).map(c => ({
+    receiver: c.receiver,
+    method: c.method,
+    cap: c.receiver === 'wrap.near' ? wrapCap(c.cap, capYocto) : String(c.cap || capYocto),
+  }));
   return {
     calls: [...shop, ...ferry],
     session_cap: String(sessionCapYocto),
