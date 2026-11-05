@@ -40,7 +40,7 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
       <h3>Your charter's score</h3><div class="score" id="score-mine-box" aria-live="polite"><p class="muted">Open or make a charter to see its score.</p></div>
     </section>
     <section class="card" id="s-create"><h2><span class="num">1</span>Your charter</h2><div id="create"></div><p class="factory muted" id="factory"></p></section>
-    <section class="card" id="s-rules"><h2><span class="num">2</span>Rules and agent key</h2><div id="facts"></div><div id="rules"></div></section>
+    <section class="card" id="s-rules"><h2><span class="num">2</span>Rules and agent key</h2><p id="rules-lock" data-testid="rules-lock">Locked until you sign in. This step writes rules and an agent key, and it does not run before that.</p><div id="facts"></div><div id="rules"></div></section>
 
   </div>
   <div class="panel" id="p-arena" role="tabpanel" aria-labelledby="tab-arena" hidden>
