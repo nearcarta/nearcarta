@@ -38,18 +38,11 @@ test('an empty factory list is an empty board, not a invented one', () => {
   assert.equal(pub.players.length, 0);
 });
 
-test('health names mainnet contracts and the testnet trial', async () => {
+test('health names mainnet and has no trial block', async () => {
   const j = await (await makeApp().request('/api/health', { headers: { 'cf-connecting-ip': '192.0.2.77' } })).json();
   assert.equal(j.ok, true);
   assert.deepEqual(j.network, { contracts: 'mainnet', journey: 'mainnet' });
   assert.equal(j.near.chain_id, 'mainnet');
-  assert.equal(j.trial.chain_id, 'testnet');
-  assert.equal(j.network.trial, undefined);
-  const prev = process.env.NEXT_PUBLIC_MAINNET;
-  process.env.NEXT_PUBLIC_MAINNET = '1';
-  try {
-    const flagged = await (await makeApp().request('/api/health', { headers: { 'cf-connecting-ip': '192.0.2.78' } })).json();
-    assert.equal(flagged.near.chain_id, 'mainnet');
-    assert.equal(flagged.trial, undefined);
-  } finally { if (prev === undefined) delete process.env.NEXT_PUBLIC_MAINNET; else process.env.NEXT_PUBLIC_MAINNET = prev; }
+  assert.equal(j.trial, undefined);
+  assert.equal(JSON.stringify(j).toLowerCase().includes('testnet'), false);
 });

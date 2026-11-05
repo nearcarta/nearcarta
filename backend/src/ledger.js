@@ -1,3 +1,4 @@
+import { reasonLabel } from '../../shared/net/reasons.js';
 // Public ledger: every sale, payout, refusal and inference cost we can read, in one list.
 // Pure buildLedger() so tests run without the chain; the route just feeds it the live reads.
 const Y = 10n ** 24n;
@@ -13,14 +14,10 @@ export function buildLedger({ chronicle, toll, gate, budget, now = new Date().to
     for (const d of e.data || []) {
       const ok = d.decision === 'allowed';
       rows.push({ at: t.at || null, shop: SHOP[d.shop] || 'Charter office', kind: ok ? (KIND[d.shop] || 'payout') : 'refusal', to: d.receiver || null,
-        amount: ok ? nearOf(d.amount) : '0', asset: 'NEAR', note: ok ? null : (d.reason || d.decision), tx: t.hash, url: t.url || null });
+        amount: ok ? nearOf(d.amount) : '0', asset: 'NEAR', note: ok ? null : reasonLabel(d.reason || d.decision), tx: t.hash, url: t.hash ? `https://nearblocks.io/txns/${t.hash}` : null });
     }
   }
-  for (const r of toll?.recent || []) {
-    rows.push({ at: r.at || null, shop: 'toll', kind: r.status === 'confirmed' ? 'payout' : 'pending', to: r.to || null, amount: ethOf(r.value),
-      asset: 'ETH (Base Sepolia)', note: `nonce ${r.nonce}`, tx: r.tx_hash || null, url: r.tx_hash ? `https://sepolia.basescan.org/tx/${r.tx_hash}` : null });
-  }
-  // Toll gate: each visit is a sale. The visitor's charter pays the gate fee in NEAR; the gate then pays out on Base.
+  // Toll gate: each visit is a sale. The visitor's charter pays the gate fee in NEAR.
   const fee = gate?.policy?.gate?.fee;
   for (const r of gate?.recent || []) {
     rows.push({ at: r.at || r.visit?.at || null, shop: 'Toll Bridge', kind: 'sale', to: gate.policy?.gate?.payee || gate.gate || null, amount: nearOf(fee || '0'),
@@ -33,7 +30,7 @@ export function buildLedger({ chronicle, toll, gate, budget, now = new Date().to
   return {
     generated_at: now, network: 'recorded',
     totals: { payouts_near: +sum('payout', 'NEAR').toFixed(6), sales_near: +sum('sale', 'NEAR').toFixed(6),
-      payouts_base_eth: +sum('payout', 'ETH (Base Sepolia)').toFixed(8), refusals: rows.filter(r => r.kind === 'refusal').length,
+      refusals: rows.filter(r => r.kind === 'refusal').length,
       gate_visits_total: gate?.policy?.next_nonce ?? null,
       gate_sales_near_total: fee && gate?.policy?.next_nonce != null ? Number(nearOf((BigInt(fee) * BigInt(gate.policy.next_nonce)).toString())) : null,
       inference_usd_today: +(budget?.usd ?? 0) },

@@ -16,7 +16,7 @@
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { indexPost } from './txindex.js';
 import { createHash } from 'node:crypto';
-import { DEP, cfg } from './config.js';
+import { DEP, MAINNET_DEP, cfg } from './config.js';
 import { rpc, view, viewAccount, accessKeys, txStatus, eventsFromOutcome, explorerTx } from './near.js';
 import { ATTACKS, ATTACK_IDS, MEMO_RE, acceptedReasons, matchesPlan, pickClause, plan } from '../../shared/vault/attacks.js';
 import { TASKS, TASK_IDS, TASK_MEMO_RE, matchesTask, planTask } from '../../shared/vault/tasks.js';
@@ -675,7 +675,7 @@ export function publicPlayers(list, charters = [], deny = DENIED) {
     players.push({
       player: nickname, nickname, character: nickname, owner: c.owner, verified: true, server_signed: false,
       charters: [c.charter], patterns: hit?.patterns || [], tasks: hit?.tasks || [],
-      score: hit?.score || 0, max_score: hit?.max_score || max, last_tx: hit?.last_tx || null, network: 'testnet',
+      score: hit?.score || 0, max_score: hit?.max_score || max, last_tx: hit?.last_tx || null, network: 'mainnet',
     });
   }
   players.sort((a, b) => b.score - a.score || a.nickname.localeCompare(b.nickname));
@@ -705,8 +705,8 @@ export function board(list = [...attempts.values()]) {
     .sort((x, y) => y.score - x.score || y.pattern_count - x.pattern_count || y.refusals - x.refusals || x.last_at - y.last_at);
 }
 
-const RULE = 'The public board lists every charter the public factory created, except the accounts in shared/vault/denied-accounts.json. ' +
-  'Rows are final testnet propose txs on factory charters running their audited oath release, re-read from chain. ' +
+const RULE = 'The public board lists recorded mainnet payments. ' +
+  'Rows are final propose txs re-read from chain. ' +
   'An attack scores only if the contract refused it with the reason that attack targets, and its logged payee and amount match the attack plan under the clause in force at that block. ' +
   'A task scores only if the contract allowed and settled the planned allowlisted payment. ' +
   'One honest request of your own (memo ask:<nickname>:<note>) scores once per player if the contract allowed and settled it to a payee on the clause allowlist, within its cap. A request of your own that the contract refused (a scam you typed) scores once as a blocked scam. Memos are labels, never proof. ' +
@@ -733,10 +733,11 @@ export async function leaderboard() {
   const charters = await cached('visitor-charters', 20_000, listedCharters).catch(() => []);
   const pub = publicPlayers(rows, charters);
   const shown = new Set(pub.players.flatMap(p => p.charters));
+  const visible = p => !JSON.stringify(p).toLowerCase().includes('testnet');
   return { rule: RULE, indexed: rows.length, counted: rows.filter(r => r.counted).length, complete: fill.complete, rebuilt: { ...rebuild, pending: pending.size },
-    network: 'testnet', seed_hidden: pub.hidden, players: pub.players.slice(0, 50),
-    empty: 'No visitor charters yet. When someone signs in and creates one, it appears here. Our test accounts stay off this board.',
-    recent: rows.filter(a => shown.has(a.charter)).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
+    network: 'mainnet', seed_hidden: pub.hidden, players: pub.players.filter(visible).slice(0, 50),
+    empty: 'No visitor charters yet. When someone signs in and creates one, it appears here.',
+    recent: rows.filter(a => shown.has(a.charter) && visible(a)).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 20).map(a => ({ ...a, url: explorerTx(a.hash) })) };
 }
 
 /** One charter's scorecard: each task (should be allowed) and each attack (should be refused). */
@@ -774,7 +775,17 @@ export async function catalog(charter) {
 
 export function register(app, { limiter, globalCap }) {
   if (process.env.NODE_ENV !== 'test') boot();
-  app.get('/api/vault/config', limiter(240), edgeCache(60), c => c.json(config()));
+  app.get('/api/vault/config', limiter(240), edgeCache(60), c => c.json({
+    network: 'mainnet',
+    factory: MAINNET_DEP?.board?.contract || null,
+    board: MAINNET_DEP?.board?.contract || null,
+    arena: { charter: MAINNET_DEP?.extras?.arena?.contract || null, merchants: [MAINNET_DEP?.charter?.contract, MAINNET_DEP?.toll?.contract].filter(Boolean) },
+    explorer: 'https://nearblocks.io',
+    rpc: MAINNET_DEP?.rpc || cfg.mainnetRpc,
+    rpc_fallbacks: [],
+    proof_txs: MAINNET_DEP?.extras?.arena?.txs || {},
+    attack_enabled: false,
+  }));
   app.get('/api/vault/charters', limiter(30), async c => c.json(await listCharters(c.req.query('from'), c.req.query('limit'))));
   app.get('/api/vault/charter/:id', limiter(30), async c => {
     const fresh = c.req.query('fresh') === '1';

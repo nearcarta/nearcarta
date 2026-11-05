@@ -51,7 +51,7 @@ test('the proposals page and the Town Hall room use the expiry, and the Mist Ban
   assert.match(page, /proposalState\(p, period, now\)/); assert.match(page, /data-status=/);
   const room = readFileSync(new URL('../../../app/design/D8_shops/shops/hall.js', import.meta.url), 'utf8');
   assert.match(room, /\/api\/townhall/); assert.match(room, /Expired: \['ice', 'expired'\]/);
-  const line = 'One fresh payee per payout; the Zcash send is run by an operator worker.';
+  const line = 'This payment is a charter check on mainnet.';
   assert.ok(readFileSync(new URL('../../../app/design/D8_shops/shops/bank.js', import.meta.url), 'utf8').includes(line));
   const ui = readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8');
   assert.ok(ui.includes(line));

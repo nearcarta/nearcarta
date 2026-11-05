@@ -271,10 +271,7 @@ async function pullStatus(url, setStatus, setError) {
   catch (e) { setError(String(e.message).slice(0, 120)); }
 }
 export async function refreshHealth() {
-  await Promise.all([
-    pullStatus(cfg.mainnetRpc, s => { journeyStatus = s; }, e => { journeyError = e; }),
-    pullStatus(cfg.rpc, s => { trialStatus = s; }, e => { trialError = e; }),
-  ]);
+  await pullStatus(cfg.mainnetRpc, s => { journeyStatus = s; }, e => { journeyError = e; });
 }
 export async function health() {
   try {

@@ -192,7 +192,7 @@ export async function tidepoolStatus(depositAddress, f = fetch, ver = tidepoolVe
   const refund = d.refundedAmount && d.refundedAmount !== '0' ? { amount: d.refundedAmount, formatted: d.refundedAmountFormatted, reason: d.refundReason || null } : null;
   return { env: 'TIDEPOOL', label: TIDEPOOL.label, depositAddress, status: j.status, help: statusHelp(j.status), final: FINAL.includes(j.status), updatedAt: j.updatedAt,
     deposited: d.depositedAmountFormatted ?? d.depositedAmount ?? null, received: d.amountOutFormatted ?? d.amountOut ?? null, refund,
-    near_txs: (d.nearTxHashes || []).map(h => ({ hash: h.hash || h, explorer: `https://testnet.nearblocks.io/txns/${h.hash || h}` })),
+    near_txs: (d.nearTxHashes || []).map(h => ({ hash: h.hash || h, explorer: `https://nearblocks.io/txns/${h.hash || h}` })),
     verifier, source: `${TIDEPOOL.api}/v0/status?depositAddress=${depositAddress}` };
 }
 

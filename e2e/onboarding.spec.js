@@ -25,7 +25,7 @@ for (const width of [1440, 390]) {
       await expect(page.getByText('Connect wallet')).toHaveCount(0);
       await expect(page.getByTestId('setup-net')).toHaveText('mainnet');
       await expect(page.getByTestId('setup-choices')).not.toContainText(/testnet/i);
-      await expect(page.getByTestId('setup-guest')).toBeVisible();
+      await expect(page.getByTestId('setup-guest')).toHaveCount(0);
 
       for (const step of steps) {
         await page.goto(`/setup/?preview=1#${step}`);

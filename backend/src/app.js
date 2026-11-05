@@ -20,7 +20,6 @@ import * as guest from './guest.js';
 import * as ai from './ai.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
-import { payroll } from './payroll.js';
 import * as cp from './counterparty.js';
 import { view, rpcStats } from './near.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
@@ -91,7 +90,7 @@ export async function deepHealth() {
       routes[name] = { ok: v != null, ms: Date.now() - t0 };
     } catch (e) { routes[name] = { ok: false, ms: Date.now() - t0, error: String(e.message).slice(0, 160) }; }
   }));
-  const value = { routes_ok: Object.values(routes).every(r => r.ok), routes, rpc: { ...rpcStats, primary: cfg.rpc, fallback_urls: cfg.rpcFallbacks } };
+  const value = { routes_ok: Object.values(routes).every(r => r.ok), routes, rpc: { ...rpcStats, primary: cfg.mainnetRpc, fallback_urls: cfg.rpcFallbacks.filter(u => !/testnet/i.test(u)) } };
   deepCache = { at: Date.now(), value };
   return value;
 }
@@ -172,11 +171,9 @@ export function makeApp() {
   // ?deep=1 runs every read route's handler (not the AI or quote routes, which spend credits) and reports
   // each one's status and time, plus the RPC retry/fallback/stale counters.
   app.get('/api/health', (c, next) => c.req.query('deep') ? deepLimit(c, next) : next(), limiter(60), async c => {
-    const publicMainnet = process.env.NEXT_PUBLIC_MAINNET === '1' || process.env.NEXT_PUBLIC_NEAR_NET === 'mainnet';
     const near = c.req.query('deep') ? await shops.health() : shops.healthCached();
     return c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: { contracts: MAINNET_DEP?.status === 'deployed' ? 'mainnet' : null, journey: 'mainnet' }, near,
-      ...(publicMainnet ? {} : { trial: shops.trialHealthCached() }),
-      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: c.req.query('deep') ? await vault.runnerStatus() : vault.runnerStatusCached() });
+      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: { enabled: false, charter: MAINNET_DEP?.extras?.arena?.contract || null } });
   });
   // Shows the caller how Render keys their own request, with no address in the answer: which header decides
   // the client key, a short keyed tag of that key (the same client gets the same tag until the process
@@ -191,7 +188,7 @@ export function makeApp() {
     for (const n of IP_HEADERS) if (raw.get(n)) seen[n] = n === 'x-vercel-ip-country' ? 'set' : `${raw.get(n).split(',').length} hop(s)`;
     return c.json({ client_ip_from: from, client_tag: ipTag(ip), shared_cap: egress ? 'egress:' + ipTag(egress) : null, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
-  app.get('/api/deployments', limiter(30), c => c.json(DEP));
+  app.get('/api/deployments', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
   app.get('/api/mainnet', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
   app.get('/api/receipts', limiter(30), c => c.json(receiptsBody(MAINNET_DEP || {}, agentMod.budgetStatus(), { jobTokens: agentMod.MAX_TOKENS, checkouts: checkout.listCheckoutReceipts() })));
 
@@ -260,7 +257,10 @@ export function makeApp() {
   app.get('/api/ferry/tidepool', limiter(20), c => c.json(DEP.ferry_tidepool ? { ...DEP.ferry_tidepool, label: ferry.TIDEPOOL.label } : { error: 'none' }, DEP.ferry_tidepool ? 200 : 404));
 
   // Guardhouse
-  app.get('/api/payouts/usdc', limiter(30), edgeCache(15), async c => c.json(await payroll()));
+  app.get('/api/payouts/usdc', limiter(30), edgeCache(15), c => c.json({
+    network: 'mainnet', mode: 'one at a time, not all-or-nothing', max_steps: 3, per_payment_near: '0.005', daily_near: '0.01', usdc: null,
+    note: 'No USDC payroll has been paid. Each payment is a board propose inside the row cap.',
+  }));
   app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });

@@ -23,7 +23,7 @@ test('tracker reports a partial-deposit refund with amount and reason', async ()
   assert.equal(s.label, 'community testnet, not 1Click');
   assert.equal(s.final, true);
   assert.deepEqual(s.refund, { amount: '1000000', formatted: '1', reason: 'PARTIAL_DEPOSIT' });
-  assert.equal(s.near_txs[0].explorer, 'https://testnet.nearblocks.io/txns/H');
+  assert.equal(s.near_txs[0].explorer, 'https://nearblocks.io/txns/H');
 });
 test('tracker: pending is not final, no refund; unknown address is 404; bad address is 400 before any fetch', async () => {
   const s = await tidepoolStatus('b'.repeat(64), async () => res(200, { status: 'INCOMPLETE_DEPOSIT', swapDetails: { refundedAmount: '0' } }), ok);
