@@ -1,7 +1,7 @@
 # Internal competitors register (Nearcarta)
 **Not public.** Do not link from README, site, or llms.txt. Never paste rival names into UI copy.
 
-Status: **I0 baseline plus I1–I3 on 2026-11-05.** The `/workspace/near` pack was not on this machine (those paths do not exist here). The I0 table below is the in-repo baseline. New rows are from public GitHub READMEs and `gh repo view` (stars, updated). Their transactions were not re-read on an explorer. X search for `#NEARHackathon` returned no posts.
+Status: **I0 baseline plus I1–I3 on 2026-11-05, pack re-read this round.** The zip was unpacked to `/tmp/research-pack`. `START_HERE.md`, `WIN_MATRIX.md` and `HACKATHON-now.md` were read. The I0 table still matches. New rows below are from the earlier public GitHub pass. Their transactions were not re-read on an explorer. X search for `#NEARHackathon` returned no posts.
 
 Sources: `docs/internal/RESEARCH_SOURCES.md`.
 

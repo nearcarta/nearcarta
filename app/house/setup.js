@@ -479,6 +479,19 @@ async function topUpRun() {
 }
 async function readRowBal() { const row = await viewFn(rpcClient([MAIN.rpc]), MAIN.board.contract, 'get_charter', { owner: me }).catch(() => null); rowView = row; rowBal = row ? BigInt(row.balance) : null; }
 function sTry() {
+  if (PREVIEW && !(boardLive() && st.charter)) {
+    const r = rules(), to = r.receivers[0] || 'townhall.nearcarta.near', ok = Math.min(+r.cap, 0.001), over = +(+r.cap * 2).toFixed(4);
+    const tiles = tryTiles({ actionsToday: 0, maxPerDay: r.per || 3, lowBalance: false });
+    const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
+    const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
+    return head('Try it', 'Watch the charter decide.', 'These buttons use your rules. This preview does not sign. The two transactions below are already on mainnet.')
+      + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button type="button" class="tile" id="t-ok" data-testid="try-allowed" aria-describedby="try-allow-hint"><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span id="try-allow-hint">${esc(tiles.allowReason)}</span><em class="go" style="font-style:normal">Tap to run →</em></button>
+       <button type="button" class="tile" id="t-no" data-testid="try-refused" aria-describedby="try-refuse-hint"><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span id="try-refuse-hint">${esc(tiles.refuseReason)}</span><em class="go" style="font-style:normal">Tap to run →</em></button></div>`
+      + (st.previewNote ? `<p data-testid="try-preview-note">${esc(st.previewNote)}</p>` : '')
+      + `<div class="verdict good" data-testid="try-verdict"><span class="tag">ALLOWED</span><div><b>0.001 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">inside the cap</span> ${txA(allowed)}</div></div>`
+      + `<div class="verdict bad" data-testid="try-verdict"><span class="tag">REFUSED</span><div><b>0.003 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">over the per-payment cap</span> ${txA(refused)}</div></div>`
+      + `<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Your House</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">Enter the town</a></span></div>`;
+  }
   if (!st.trial && !(boardLive() && st.charter)) {
     const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
     const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
@@ -501,6 +514,11 @@ function sTry() {
 }
 function next() { const n = new URLSearchParams(location.search).get('next'); return n && n.startsWith('/') && !n.startsWith('//') ? n : '/'; }
 function wireTry() {
+  if (PREVIEW && !(boardLive() && st.charter)) {
+    const okBtn = $('#t-ok'); if (okBtn) okBtn.onclick = () => { st.previewNote = 'Preview. The pass was not sent.'; render(); };
+    const noBtn = $('#t-no'); if (noBtn) noBtn.onclick = () => { st.previewNote = 'Preview. The refusal was not sent.'; render(); };
+    wire(); return;
+  }
   if (!st.trial && !(boardLive() && st.charter)) { wire(); return; }
   const r = rules(), to = r.receivers[0];
   const rpcCall = st.trial ? rpc : rpcClient([MAIN.rpc]);

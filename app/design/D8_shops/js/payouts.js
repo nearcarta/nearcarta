@@ -31,6 +31,39 @@ export function readBatch(value, n) {
   return { decision: 'denied', reason: bad >= 0 ? v[bad].reason : 'batch_refused', paid: 0, bad: bad >= 0 && v.some(o => o.reason === 'batch_refused') ? bad : null, ids: [] };
 }
 
+/** One receipt per payout. A shared tx means one propose_batch. An empty tx means prepared, not sent. */
+export function receiptsFor(rows, tx = '') {
+  return (rows || []).map((r, i) => ({
+    n: i + 1,
+    to: r.to || r.receiver || '',
+    amount: r.amt || r.amount || '',
+    asset: String(r.asset || 'NEAR').toUpperCase() === 'USDC' ? 'USDC' : 'NEAR',
+    tx: tx || r.tx || '',
+    url: (tx || r.tx) ? `https://nearblocks.io/txns/${tx || r.tx}` : '',
+  }));
+}
+
+/** CSV lines: account,amount,asset. Asset defaults to NEAR. USDC rows are kept and not sent. */
+export function parseCsv(text) {
+  const rows = [];
+  for (const line of String(text || '').split(/\n/)) {
+    const t = line.trim();
+    if (!t || /^account\b/i.test(t)) continue;
+    const [to, amt, asset] = t.split(',').map(s => s.trim());
+    if (!to) continue;
+    rows.push({ to, amt: amt || '0.001', asset: (asset || 'NEAR').toUpperCase() });
+  }
+  return rows.slice(0, 8);
+}
+
+export function splitAssets(rows) {
+  const list = rows || [];
+  return {
+    near: list.filter(r => String(r.asset || 'NEAR').toUpperCase() !== 'USDC'),
+    usdc: list.filter(r => String(r.asset || '').toUpperCase() === 'USDC').map(r => ({ ...r, send: false, maxUsd: 0.2 })),
+  };
+}
+
 /** What is left of today's budget, in NEAR (usage from get_usage: spent + reserved). */
 export function leftToday(clause, usage) {
   if (!clause) return 0;

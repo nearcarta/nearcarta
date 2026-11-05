@@ -25,8 +25,8 @@ export const drawerOpen=()=>$('#drawer').classList.contains('open');
 // warm it now (core + three addons + the D2 tile set) so the first door does not wait on the network
 export function preload(){ return core8().then(()=>APP&&ui8()).catch(()=>null); }
 // build one room; resolves {sh} or {err}
-export async function load(id){
-  try{ const C8=L.C8=await core8(); const mod=await import(D8+'shops/'+id+'.js'); const tk={}; const live=()=>L.sh&&L.sh.tk===tk;
+export async function load(id, bust){
+  try{ const C8=L.C8=await core8(); const mod=await import(D8+'shops/'+id+'.js'+(bust?`?r=${bust}`:'')); const tk={}; const live=()=>L.sh&&L.sh.tk===tk;
     const sh=await mod.default({ setResult:(...a)=>live()&&!APP&&setResult(...a), setHero:(...a)=>live()&&setHero(...a), live }); sh.id=id; sh.tk=tk; dress(sh.scene); return {sh}; }
   catch(err){ console.error(`[Nearcarta] shop "${id}" failed to load:`,err); return {err}; } }
 // back the room with the town's evening: sky gradient, the sea under the island, and a fog that melts the sea into the horizon

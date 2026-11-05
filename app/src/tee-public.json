@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "label": "attested",
+  "model": "z-ai/glm-5.3-flash",
+  "checkedAt": "2026-10-28T01:19:44.000Z",
+  "tcbStatus": "UpToDate",
+  "source": "judges/proofs/tee-check.json",
+  "note": "Recorded NEAR AI attestation summary. The live button calls GET /api/ai/tee. This file is the proof you can open without a key."
+}

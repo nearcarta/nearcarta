@@ -12,5 +12,5 @@ export function payoutReady(rows) {
 
 export function payoutLabel(rows) {
   const { count, enabled } = payoutReady(rows);
-  return enabled ? `Pay ${count} one at a time` : 'Pay';
+  return enabled ? `Prepare ${count} as one batch` : 'Pay';
 }

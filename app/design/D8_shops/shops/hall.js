@@ -9,8 +9,7 @@ export const PROOF = mainnet('hall') + proof(
       h3('Recorded payments'), row({ k: 'Reward paid', why: '0.001 NEAR allowed', st: 'ok', stText: 'allowed', tx: '6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h' }),
       row({ k: 'Reward over the cap', why: '0.002 NEAR refused', st: 'no', stText: 'refused', tx: 'Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6' }),
       note(`Contract ${acct(TH.oath)}. A shared DAO is not built. These two rows are mainnet transactions.`));
-// The DAO's latest proposals, read live from /api/townhall. A proposal past its vote window shows as expired:
-// Sputnik keeps it InProgress on chain until someone finalizes it, but nobody can vote on it any more.
+// Old vote rows, kept so a recorded list can still mark a closed vote. This room does not fetch them.
 const PST = { Approved: ['ok', 'approved'], Rejected: ['no', 'rejected'], Removed: ['no', 'removed'], Failed: ['no', 'failed'], Expired: ['ice', 'expired'], InProgress: ['pend', 'open'] };
 const plain = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 const KIND = { FunctionCall: 'Contract call', AddMemberToRole: 'Add a member', RemoveMemberFromRole: 'Remove a member', Transfer: 'Send NEAR', Vote: 'Vote' };
@@ -22,15 +21,11 @@ export function proposalRows(ps = []) {
     const r = row({ k: `#${p.id} · ${KIND[p.kind] || plain(p.kind)}`, why, st, stText, src: 'live' });
     return isOld(p) ? r.replace('<div class="row">', '<div class="row" data-old="1">') : r; });
 }
-export async function liveProposals(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, ''), bare = false) {
-  try { const c = new AbortController(), t = setTimeout(() => c.abort(), 6000);
-    const r = await fetchFn(base + '/api/townhall', { signal: c.signal }).finally(() => clearTimeout(t)); if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json(); const parts = [h3('Latest proposals · live read'), ...proposalRows(d.proposals), note(`Each vote stays open ${esc(d.proposal_period_h ?? '?')} h. An expired proposal can no longer pass.`)];
-    return bare ? parts.join('') : proof(...parts); }
-  catch { const n = note('The latest proposals could not be read just now; see the proposals page.'); return bare ? n : proof(n); }
+export async function liveProposals(_fetchFn, _base, bare = false) {
+  const parts = [h3('Recorded payments'), row({ k: 'Reward paid', why: '0.001 NEAR allowed', st: 'ok', stText: 'allowed', tx: '6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h' }), note('set_rules, set_frozen and set_seal. Gas only. A shared council is not on this page.')];
+  return bare ? parts.join('') : proof(...parts);
 }
-// The town's real proposals page (Sputnik DAO on mainnet).
-export const MORE = { href: '/shops/hall/', text: 'See proposals' };
+export const MORE = { href: '/shops/hall/?preview=1', text: 'Change my row' };
 export default async function hall(ctx) {
   const liveP = liveProposals();
   const { scene, camera } = await room({ cam: [0, 4.4, 8.6], look: [0, .8, 0] });

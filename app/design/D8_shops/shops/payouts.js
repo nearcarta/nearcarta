@@ -8,14 +8,14 @@ const BATCH_PROOF = proof(
   h3('One at a time'),
   row({ k: '0.001 NEAR allowed', why: 'inside the cap, on board.nearcarta.near', st: 'ok', stText: 'paid', tx: '4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia' }),
   row({ k: '0.01 NEAR refused', why: 'over the per-payment cap. Nothing was paid.', st: 'no', stText: 'refused', tx: 'AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx' }),
-  note('Up to three payments, each at most 0.005 NEAR. One at a time, not all-or-nothing.'));
+  note('This page prepares one propose_batch and does not send it. The live board signs propose, one payment at a time, each at most 0.005 NEAR.'));
 export const USDC_PROOF = proof(
   h3('USDC'),
   note('No USDC payroll has been paid from this town. A NEAR payment above is the record.'));
 export const PROOF = BATCH_PROOF + USDC_PROOF;
 export const MORE = null;
 // For the 2D fallback (js/flat.js and the town's fb.js)
-export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'One at a time, not all-or-nothing', hero: '<b class="num">3</b><span class="unit">max, 0.005 each</span>' };
+export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'Prepared as one batch. Not sent.', hero: '<b class="num">3</b><span class="unit">max, 0.005 each</span>' };
 export default async function payouts() {
   const { scene, camera } = await room({ cam: [.4, 3.9, 8.0], look: [0, .85, 0] });
   // the counting desk

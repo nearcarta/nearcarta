@@ -48,7 +48,7 @@ export const SHOPS = {
   toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay-per-use gate',
             card:'Pay 0.001 NEAR to toll.nearcarta.near. A refusal pays nothing.', tag:'propose · 0.001 NEAR'},
   payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'pay many at once',
-            card:'Up to three payments, one at a time, each at most 0.005 NEAR.', tag:'one at a time, not all-or-nothing'},
+            card:'Prepare a batch. The live row signs one payment at a time, each at most 0.005 NEAR.', tag:'prepared, not sent'},
 };
 export const GATE={q:-5,r:1,dir:3};
 export const tiles=new Map();
