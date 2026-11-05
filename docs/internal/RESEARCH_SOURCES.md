@@ -3,7 +3,7 @@ Do not link this file from the public README, site, or llms.txt.
 Cursor: read these **before** any GitHub/X hunt (TASKS §I). Then merge old+new into `docs/internal/competitors.md`.
 
 ## On this machine
-Checked 2026-11-05: `/workspace/near` and the pack files listed below are **not on this machine**. I0 used the in-repo baseline in `docs/internal/competitors.md`. Do not invent quotes from the missing pack.
+`/workspace/near` is not a checkout. The same pack was unzipped to `/tmp/research-pack` on 2026-11-05 and read before the shop-depth edits (`START_HERE.md`, `WIN_MATRIX.md`, `HACKATHON-now.md`, and the headings of the track notes). The I0 table in `docs/internal/competitors.md` matches that pack. Do not invent quotes past what those files say.
 
 ## Pack paths (not present here; kept so the next machine can open them)
 | Path | What it is |
