@@ -6,6 +6,7 @@ import { runSteps, runTask, runAsk } from '../../../shared/vault/run.js';
 import { parseAsk } from '../../../shared/vault/ask.js';
 import { lookalike } from '../../../shared/vault/attacks.js';
 import { roomError } from '../../src/room-error.js';
+import { visitor } from '../../design/D8_shops/js/session.js';
 import { installBoundary } from '../../src/panels/boundary.js';
 
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
@@ -58,6 +59,7 @@ async function refreshWho() {
   $('#who').innerHTML = me ? `<b data-testid="who">${esc(me)}</b>` : '';
   $('#connect').hidden = !!me; const guest = $('#guest'); if (guest) guest.hidden = !!me; $('#signout').hidden = !me;
   document.body.dataset.step = me ? (charter ? 'charter' : 'wallet') : 'none';
+  explainLock();
   if (me && !charter) {
     // Newest factory first, then the legacy ones: a guest who opened a charter before R17 keeps it.
     for (const f of [CFG.factory, ...(CFG.legacy || []).map(l => l.factory)]) {
@@ -68,6 +70,19 @@ async function refreshWho() {
   }
   renderCreate();
 }
+
+function explainLock() {
+  const el = $('#rules-lock');
+  if (!el) return;
+  const step = document.body.dataset.step;
+  const saved = visitor();
+  if (step === 'charter') { el.hidden = true; return; }
+  el.hidden = false;
+  el.textContent = (step === 'wallet' || saved.signedIn)
+    ? 'Locked because this browser has no factory charter. A board row is changed in Town Hall. This card does not issue an agent key before that.'
+    : 'Locked until you sign in. This step writes rules and an agent key, and it does not run before that.';
+}
+explainLock();
 
 // ---------- step 2: create ----------
 function renderCreate() {
@@ -129,7 +144,7 @@ async function createCharter() {
 }
 
 // ---------- step 3: rules + agent key ----------
-async function useCharter(id) { charter = id; document.body.dataset.step = 'charter'; renderCreate(); await renderFacts(); if (ready) setTarget('mine'); loadScore('mine').catch(() => {}); }
+async function useCharter(id) { charter = id; document.body.dataset.step = 'charter'; explainLock(); renderCreate(); await renderFacts(); if (ready) setTarget('mine'); loadScore('mine').catch(() => {}); }
 // Fresh charter facts; retried while RPC nodes catch up with a tx that just landed.
 async function facts(id, ready = f => !f.pending, tries = 20) {
   let f = null;

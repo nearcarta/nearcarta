@@ -34,7 +34,7 @@ export function shortId(id) {
 
 function rowLine(who) {
   if (!who) return '';
-  return `<span data-testid="hall-row-id" title="${esc(who)}">${esc(shortId(who))}</span><button type="button" class="primary copy-id" data-testid="hall-copy" data-copy="${esc(who)}">Copy</button>`;
+  return `<span data-testid="hall-row-id" title="${esc(who)}">${esc(shortId(who))}</span><span class="hall-id-full" data-testid="hall-row-full">${esc(who)}</span><button type="button" class="primary copy-id" data-testid="hall-copy" data-copy="${esc(who)}">Copy</button>`;
 }
 
 export function hallMarkup(row, person = null) {
@@ -84,6 +84,8 @@ export async function mountHall(root, hooks = {}) {
     if (connect) connect.hidden = !!(row?.owner || choice.owner || person.signedIn);
     const form = root.querySelector('#row-form');
     form.onsubmit = (e) => { e.preventDefault(); onSign(); };
+    const capEl = root.querySelector('#cap');
+    if (capEl && row?.per_action_cap != null) capEl.value = String(nearOf(row.per_action_cap));
     const copy = root.querySelector('[data-testid=hall-copy]');
     if (copy) copy.onclick = async () => {
       const full = copy.dataset.copy || '';
@@ -165,11 +167,12 @@ export async function mountHall(root, hooks = {}) {
   root.innerHTML = hallSkeleton();
   try {
     before = await readRow(choice.owner);
+    if (!before) before = await readRow(choice.owner, { fresh: true });
     paint(before);
     if (!before) {
       const person = visitor();
       const named = person.displayName || choice.owner;
-      root.querySelector('[data-testid=hall-facts]').innerHTML = `Signed in as ${esc(named)}. <span data-testid="hall-missing">No row for <code>${esc(choice.owner)}</code> on <code>${esc(BOARD)}</code>.</span>`;
+      root.querySelector('[data-testid=hall-facts]').innerHTML = `Signed in as ${esc(named)}. <span data-testid="hall-missing">No row for <code class="hall-id-full">${esc(choice.owner)}</code> on <code>${esc(BOARD)}</code>.</span>`;
     }
   } catch {
     paint(null);

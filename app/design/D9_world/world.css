@@ -481,3 +481,13 @@ body:has(#drawer.open) #back{visibility:hidden}
 #drawer .plain-line { font-size: 14px; line-height: 20px; color: #f3ead8; font-weight: 500; margin: 0; }
 #drawer .plain-line.warn { color: #ffd88a; }
 #drawer .plain-line a { color: #f3d78f; text-decoration: underline; }
+
+/* A plain shop list for a visitor who cannot use the city. It does not restyle the canvas. */
+nav.all-shops{position:fixed;z-index:60;top:120px;left:12px;max-width:min(280px,calc(100vw - 24px));background:#1a140f;color:#fff8ee;border:1px solid #c98f4e;border-radius:12px;padding:8px 12px;font:600 16px/1.35 system-ui,sans-serif}
+body:not(.ready) nav.all-shops{visibility:visible}
+nav.all-shops summary{list-style:none;cursor:pointer;color:#f5d08a}
+nav.all-shops summary::-webkit-details-marker{display:none}
+nav.all-shops summary:focus-visible{outline:2px solid #f5d08a;outline-offset:2px}
+nav.all-shops ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+nav.all-shops a{color:#fff8ee;text-decoration:none}
+nav.all-shops a:hover,nav.all-shops a:focus-visible{color:#f5d08a}

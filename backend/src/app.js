@@ -32,7 +32,20 @@ import { receiptsBody } from '../../shared/rails/receipts.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
-  const H = DEP.house; if (!H) return null;
+  const recorded = DEP.house && typeof DEP.house === 'object' ? DEP.house : DEP.extras?.house;
+  const H = recorded && typeof recorded === 'object' ? recorded : null;
+  if (!H) return null;
+  // The mainnet house record is the deed contract. It has no oath account, so this must not call view() on an empty id.
+  if (!H.oath) {
+    return {
+      kind: 'deed',
+      contract: H.contract || null,
+      owner: H.owner || null,
+      code_hash: H.code_hash || null,
+      txs: H.txs || null,
+      note: 'The mainnet house record is the deed contract. A visitor charter is a board row, read with get_charter.',
+    };
+  }
   const [snap, pending] = await Promise.all([guard.snapshot(H.oath), view(H.oath, 'get_pending')]);
   // get_pending is queued policy changes; held agent spends are actions with status "escalated", so read the latest few.
   const next = Number(snap.state.next_action || 0), actions = {};

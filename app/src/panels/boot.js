@@ -8,8 +8,10 @@ const root = document.getElementById('room');
 installBoundary(root || document.body);
 const id = document.body.dataset.shop || '';
 const saved = visitor();
-const accountP = resolveAccount();
-if (!saved.signedIn) await accountP;
+// A check or a quote does not wait on the wallet peek. That peek also downloads the house bundle,
+// and on the bank it was sitting in front of the TEE request.
+const accountP = pageSigns(id) ? resolveAccount() : Promise.resolve(null);
+if (!saved.signedIn && pageSigns(id)) await accountP;
 mountShop(id, root, { auto: true, accountP });
 document.querySelector('[data-testid=shop-skel]')?.remove();
 accountP.then(plan => {

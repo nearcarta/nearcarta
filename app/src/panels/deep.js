@@ -6,12 +6,13 @@ import { pickBest, quoteLine } from '../ferry-catalog.js';
 import { RECORDED, downloadCsv, exportCsv, queryFeed, verifyEntry } from '../chronicle-feed.js';
 import { explainCheck } from '../guard-score.js';
 import { TOLL_ADDRESS, TOLL_KEY, checkDerived } from '../toll-derive.js';
-import { PROOF_HREF, liveTee, teeView } from '../tee-view.js';
+import { PROOF_HREF, TEE_PLAN, TEE_TIMEOUT_MS, liveTee, teeTimeoutWhy, teeView } from '../tee-view.js';
 import { NEXT_LABEL, RUN_LABEL } from '../../design/D8_shops/shops/arena-labels.js';
 import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
 import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
+import { nearOf, normalizeRow } from './hall.js';
 import { boundaryHtml } from './boundary.js';
 import { shortId } from './hall-ui.js';
 
@@ -169,7 +170,7 @@ function mountGuard(root, hooks) {
 function mountToll(root) {
   const d = checkDerived({ publicKey: TOLL_KEY, recorded: TOLL_ADDRESS });
   const chains = (d.chains || []).map(c => `<li data-testid="toll-chain">${esc(c.chain)} ${esc(c.path)}${c.address ? ' ' + esc(c.address) : ''} — ${esc(c.note)}</li>`).join('');
-  root.innerHTML = `<div class="shop-stack"><div data-testid="toll-derive"><p>${esc(d.text)}</p><ul>${chains}</ul></div><button type="button" id="toll-sig" data-testid="check-signature">Check signature</button><p id="toll-sig-out" data-testid="check-signature-out"></p></div>`;
+  root.innerHTML = `<div class="shop-stack"><div data-testid="toll-derive"><p>${esc(d.text)}</p><ul>${chains}</ul></div><button type="button" class="primary" id="toll-sig" data-testid="check-signature">Check signature</button><p id="toll-sig-out" data-testid="check-signature-out"></p></div>`;
   const b = q$(root, '#toll-sig');
   b.onclick = async () => {
     const out = q$(root, '#toll-sig-out');
@@ -354,11 +355,41 @@ function mountPayouts(root, hooks) {
   render();
 }
 
-function teePanel(tee, recorded, proof) {
-  const view = teeView(tee);
-  const steps = view.steps.map(s => `<li data-testid="tee-step" data-ok="${s.ok ? '1' : '0'}"><b>${esc(s.label)}</b> ${s.ok ? 'pass' : esc(s.why || 'did not pass')}</li>`).join('');
-  const fail = view.ok ? '' : `<p data-testid="tee-fail">${esc(view.failed)}</p>`;
-  return `<div data-testid="tee-panel"><p data-testid="tee-live">${view.ok ? 'Live check passed' : 'Live check did not pass'}</p><p data-testid="tee-result">${esc(view.label)}</p>${fail}<ul data-testid="tee-steps">${steps}</ul>${recorded}${proof}</div>`;
+function teeSlot(recorded, proof) {
+  const steps = TEE_PLAN.map(([id, label]) => `<li data-testid="tee-step" data-step="${esc(id)}" data-ok=""><b>${esc(label)}</b> <span class="tee-why">Waiting</span></li>`).join('');
+  return `<div class="tee-slot" data-testid="tee-slot"><button type="button" class="primary" id="m-tee" data-testid="tee-verify">Verify the TEE now</button><ol class="tee-steps" data-testid="tee-steps">${steps}</ol><p data-testid="tee-live" class="tee-line"></p><p data-testid="tee-result" class="tee-line"></p><p data-testid="tee-fail" class="tee-line"></p>${recorded}${proof}</div>`;
+}
+
+function paintTee(slot, body) {
+  if (!slot) return;
+  const view = teeView(body);
+  const live = slot.querySelector('[data-testid=tee-live]');
+  const result = slot.querySelector('[data-testid=tee-result]');
+  const fail = slot.querySelector('[data-testid=tee-fail]');
+  if (live) live.textContent = view.ok ? 'Live check passed' : 'Live check did not pass';
+  if (result) result.textContent = view.label || '';
+  if (fail) fail.textContent = view.ok ? '' : (view.failed || '');
+  const byId = new Map((view.steps || []).map(s => [String(s.id), s]));
+  const requestOnly = view.steps.length === 1 && String(view.steps[0].id) === 'request';
+  slot.querySelectorAll('[data-testid=tee-step]').forEach(li => {
+    const id = li.dataset.step;
+    const why = li.querySelector('.tee-why');
+    const s = byId.get(id);
+    if (requestOnly && id !== 'request') {
+      li.dataset.ok = '';
+      if (why) why.textContent = 'Not run';
+      return;
+    }
+    if (!s) {
+      if (id === 'request' && view.steps.length) {
+        li.dataset.ok = '1';
+        if (why) why.textContent = 'pass';
+      }
+      return;
+    }
+    li.dataset.ok = s.ok ? '1' : '0';
+    if (why) why.textContent = s.ok ? 'pass' : (s.why || 'did not pass');
+  });
 }
 
 function mountBank(root, hooks) {
@@ -372,7 +403,7 @@ function mountBank(root, hooks) {
   const tee = state.tee;
   const recorded = `<p class="note tee-recorded" data-testid="tee-recorded">The file <a href="${PROOF_HREF}">tee-public.json</a> is a recorded attestation from Oct 28. The button is the live check.</p>`;
   const proof = `<a data-testid="tee-proof" href="${PROOF_HREF}">Proof file</a>`;
-  const panel = tee ? teePanel(tee, recorded, proof) : `<button type="button" class="primary" id="m-tee" data-testid="tee-verify">Verify the TEE now</button>${recorded}${proof}`;
+  const panel = teeSlot(recorded, proof);
   const sessionLine = who.signedIn ? `<p data-testid="bank-session">Signed in as ${esc(who.displayName || who.accountId)}.</p>` : '';
   const payeeBox = payees.length
     ? payees.map(a => `<label class="payee"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span class="payee-id" title="${esc(a)}">${esc(shortId(a))}</span></label>`).join('')
@@ -384,35 +415,75 @@ function mountBank(root, hooks) {
     ${panel}</div>`;
   root.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { state.amt = r.value; hooks.onNote?.(r.value); }; });
   root.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { state.to = r.value; hooks.onTo?.(r.value); }; });
+  const slot = q$(root, '[data-testid=tee-slot]');
+  if (tee) paintTee(slot, tee);
   const b = q$(root, '#m-tee');
   if (!b) return;
   b.onclick = async () => {
+    if (b.disabled) return;
     b.disabled = true;
-    const pg = document.createElement('p');
-    pg.className = 'tee-progress';
-    pg.dataset.testid = 'tee-progress';
-    pg.setAttribute('role', 'status');
-    b.after(pg);
-    pg.textContent = 'Checking the TEE…';
-    try { state.tee = hooks.tee ? await hooks.tee() : await liveTee({ api: api() }); }
-    catch (e) { state.tee = { ok: false, err: roomError(e), steps: [{ id: 'request', label: 'NEAR AI attestation', ok: false, why: roomError(e) }] }; }
-    mountBank(root, hooks);
+    const setAsk = (s) => {
+      const why = slot?.querySelector('[data-step=request] .tee-why');
+      if (why) why.textContent = `Asking NEAR AI · ${s}s`;
+    };
+    setAsk(0);
+    let secs = 0;
+    const clock = setInterval(() => { secs += 1; setAsk(secs); }, 1000);
+    try {
+      const run = hooks.tee ? hooks.tee() : liveTee({ api: api(), onTick: setAsk });
+      state.tee = hooks.tee
+        ? await Promise.race([
+          run,
+          new Promise(resolve => setTimeout(() => {
+            const why = teeTimeoutWhy(TEE_TIMEOUT_MS);
+            resolve({ ok: false, timeout: true, failure: `NEAR AI attestation: ${why}`, steps: [{ id: 'request', label: 'NEAR AI attestation', ok: false, why }] });
+          }, TEE_TIMEOUT_MS)),
+        ])
+        : await run;
+    } catch (e) {
+      const why = roomError(e);
+      state.tee = { ok: false, err: why, failure: `NEAR AI attestation: ${why}`, steps: [{ id: 'request', label: 'NEAR AI attestation', ok: false, why }] };
+    } finally {
+      clearInterval(clock);
+    }
+    paintTee(slot, state.tee);
+    if (b.isConnected) b.disabled = false;
   };
 }
 
-function mountHouse(root) {
-  root.innerHTML = `<div id="house"><p class="note">The town house is on mainnet. This page reads it. It does not hold a key.</p><div class="out">${deedMarkup()}</div></div>`;
-  import('/house.bundle.js').then(m => m.mountHouse()).catch((e) => {
-    const out = root.querySelector('.out');
-    if (!out || out.querySelector('[data-testid=house-state]')) return;
-    const note = document.createElement('p');
-    note.dataset.testid = 'room-boundary';
-    note.setAttribute('role', 'alert');
-    note.textContent = /no house/i.test(String(e?.message || e))
-      ? 'The house read did not return a row. The deed above is the public record. Nothing was signed.'
-      : roomError(e);
-    out.appendChild(note);
-  });
+export function houseCharterMarkup({ accountId = '', row = null, failed = false } = {}) {
+  if (row && row.per_action_cap != null && row.per_action_cap !== '') {
+    const cap = nearOf(row.per_action_cap);
+    const owner = accountId || row.owner || '';
+    return `<div class="house-state" data-testid="house-state" role="status"><p>This account has a charter row on the board.</p><p>Max per payment <b data-testid="house-cap">${esc(cap)}</b> NEAR.</p><p>The next step is Town Hall, where that cap can be changed. Nothing was signed here.</p><p><a class="primary" href="/shops/hall/?owner=${encodeURIComponent(owner)}">Open Town Hall</a></p></div>`;
+  }
+  if (failed) {
+    return `<div class="house-empty" data-testid="house-empty" role="status"><p>The charter read did not answer.</p><p>Try again in a moment. The buttons above are the public deed record. Nothing was signed.</p></div>`;
+  }
+  if (accountId) {
+    return `<div class="house-empty" data-testid="house-empty" role="status"><p>No charter row for this account yet.</p><p>Open a row in setup. This page reads it with get_charter. The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Open a row</a></p></div>`;
+  }
+  return `<div class="house-empty" data-testid="house-empty" role="status"><p>Sign in to read your charter row.</p><p>The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Sign in</a></p></div>`;
+}
+
+function mountHouse(root, hooks = {}) {
+  const who = typeof hooks.visitor === 'function' ? hooks.visitor() : visitor();
+  const params = new URLSearchParams(globalThis.location?.search || '');
+  const id = params.get('owner') || who.accountId || '';
+  root.innerHTML = `<div id="house"><p class="note">The town house is on mainnet. This page reads your charter row. It does not hold a key.</p><div class="out">${deedMarkup()}<div data-testid="house-read"></div></div></div>`;
+  const slot = root.querySelector('[data-testid=house-read]');
+  if (!id) {
+    slot.innerHTML = houseCharterMarkup({});
+    return;
+  }
+  slot.innerHTML = `<div class="house-state" data-testid="house-state" role="status"><p>Reading the charter row…</p></div>`;
+  const load = hooks.row
+    ? Promise.resolve(hooks.row)
+    : fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
+      .then(r => r.json())
+      .then(body => normalizeRow(body));
+  load.then(row => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, row }); })
+    .catch(() => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, failed: true }); });
 }
 
 const ALIAS = { guardhouse: 'guard', townhall: 'hall', mist: 'bank', mistbank: 'bank' };
