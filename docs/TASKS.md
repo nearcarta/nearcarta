@@ -179,3 +179,120 @@ The navy night-harbour colors are gone. Town sky, fog, meadow, lights, robot and
 - [x] F6 **Load errors.** The console and the charter office say the API is not reachable and offer Try again. The raw “Failed to fetch” string is not shown. Done: `dbe45bc`.
 - [x] F7 **No Back to town on the town page.** The street link is gone. The in-shop control still says Back to town. Done: `00d9aea`.
 - [x] F8 **Screenshots and contrast.** `e2e/brown-pass.spec.js` shoots every page at 1440 and 390 and checks axe color-contrast. The town start button stays fixed. Done: `adf8a9f`, `5c27a49`.
+
+## G. UX bugs (prod walkthrough, Nov 5 — keep brown palette; do not redesign colors)
+Constraint: restore/fix only. Original brown town and espresso/brass cards stay. No navy, no new palette. Every item needs a commit hash or `BLOCKED: <reason>`, a test, and a 1440 (and 390 where layout matters) screenshot.
+
+- [ ] G1 **Back to town hidden under the Nearcarta title card in every shop interior.** Hit target at about x=-16,y=0; unclickable. Fix: raise z-index of the Back control above the title card, or hide/shrink the title card inside rooms; enlarge the Esc hint. Accept: Playwright opens every shop from the town; `[data-testid=back-town]` (or the Back to town control) is visible, not covered, `.click()` returns to town within 2 s; Esc still works. Screenshot: one shop interior with the control circled.
+- [ ] G2 **City intro disappeared** (camera fly-in, walking characters, speech bubbles) since the PR #7 brown restore. Code still has a ~45 s `story()` in `app/design/D9_world/js/main.js` gated by `startStory=!P.has('nostory') && !P.has('explore') && !P.has('shop')`. Hypothesis (verify, do not assume): life/chars assets fail silently, story ends immediately, or a URL/flag skips it after polish. Fix: restore the living intro from the `450078a`-era behavior without changing brown look. Accept: fresh load of `/` with no query flags runs the story ≥ 20 s with visible camera motion and ≥1 speech bubble; `?nostory` still skips; e2e `town intro plays once`.
+- [ ] G3 **Rooms show "This room could not load" with raw JS errors.** Town Hall (`reading 'code_hash'`), Mist Bank, and after re-entry House/Ferry/Guardhouse/Vault Arena/Chronicle/Toll. Fix root cause (defensive null checks on API/config shapes, never assume nested fields). Friendly error + working Retry; never show raw `Cannot read properties…`. Skeleton while loading; Payouts must load in < 3 s warm / < 5 s cold (today 8–12 s). Accept: unit tests for missing `code_hash` / empty config; Playwright opens every shop twice in a row with 0 raw-error strings; retry recovers a forced 500.
+- [ ] G4 **Error panels show another room's copy** (Payouts rules leak into Chronicle etc.). Fix: reset shop UI state on enter/exit; no shared mutable panel copy across rooms. Accept: force-fail Hall then open Chronicle; Chronicle copy has 0 Payouts/Hall-only strings.
+- [ ] G5 **Fast room switching opens the wrong room.** Fix: lock input during enter/exit transitions; ignore clicks while `inShop` transition is pending. Accept: Playwright double-clicks two different pins within 200 ms; ends in exactly one intended room.
+- [ ] G6 **Payouts:** duplicate body copy; "Pay 0" enabled with 0 payouts; faint footer. Fix: one copy block; disable Pay when payout count or amount is 0; footer contrast ≥ 4.5:1. Accept: unit + axe on `/shops` Payouts panel; button disabled at 0.
+- [ ] G7 **Toll Bridge label "cross to Base" and console tab title "(testnet)".** Truthful mainnet only. Fix: Toll copy matches A24 (0.001 NEAR pass on mainnet + recorded chain-signature proofs); document titles and `<title>` have 0 `testnet`. Accept: `rg -i 'testnet|cross to Base' app` for visitor-visible strings = 0 outside the judges history section; Playwright `/console` title has 0 `testnet`.
+- [ ] G8 **For judges dropdown tiny/overlapping; unlabeled sound icon; unexplained Hold to freeze.** Fix: readable judges menu (≥ 14 px, no overlap); `aria-label` + tooltip on sound; short hint on Hold to freeze / curfew. Accept: axe + screenshot at 1440/390; tooltips visible on focus/hover.
+- [ ] G9 **Building labels small, overlapping, hard to hit.** Fix: larger labels, collision nudge (reuse prior pin logic), hit targets ≥ 44 CSS px. Accept: Playwright can click every open shop pin at 1440 and 390.
+- [ ] G10 **`/shops/vault/` throws `Cannot read properties of undefined (reading 'map')`.** Fix: guard task lists / CFG arrays (related to `da05182` House guard — apply same pattern). Accept: unit with undefined tasks; page loads with empty state, not a crash.
+- [ ] G11 **`/judges` says agent key methods `propose` + `propose_batch`; Guardhouse said only `propose`.** Live `/api/mainnet` (verified this run) returns `agent_methods: ["propose","propose_batch"]` on `charter.nearcarta.near`. Align every page to that on-chain truth. Accept: unit/e2e: Guardhouse, judges, README all list both; `rg` for a lone-`propose`-only claim in visitor UI = 0.
+- [ ] G12 **`/console` Mainnet proofs table sits above tabs and pushes shop content; Ferry heading overlaps.** Fix: proofs under the active shop (continue `60a0187` direction) or a collapsible; no overlap. Accept: screenshot console Ferry tab at 1440; no overlapping text in axe/screenshot review.
+- [ ] G13 **Faint text** on `/console`, `/setup` step 7, and truncated tx links on `/judges` and `/ledger`. Fix: contrast ≥ 4.5:1; tx links show ≥ 8 readable chars + full title/href. Accept: axe color-contrast 0 violations on those routes; e2e asserts link text length.
+- [ ] G14 **Mobile / narrow layouts.** Every setup step and every shop usable at 390 width: Back control reachable, no horizontal scroll trapping, primary CTA visible. Accept: Playwright 390 shots of setup + all shops; no horizontal overflow on `document.documentElement`.
+
+## H. Depth specs (beat the strongest known competitor per shop — research already in `/workspace/near` only)
+Rule: each shop is a complete working system on mainnet, not one demo tx. Depth beats feature-count. Mark `[x] <commit>` or `BLOCKED`. Acceptance tests are mandatory. Do not name competitors in public README/UI (internal names only in this file and `docs/internal/`). Brown palette unchanged. Tiny spends only; items needing owner spend > 0.05 NEAR total are listed under "Spends needing approval" and must not run until approved.
+
+Competitor bar used for H (from pack research, WIN_MATRIX, TOWN_PLAN, track guides — not a new web hunt):
+| Track | Strongest bar (internal) | Depth metric to beat |
+|---|---|---|
+| security | OutLayer policy+TEE pattern; Shore scoped API key | On-chain hard caps (not best-effort velocity); visible allow+refuse mainnet txs; freeze without agent key; 0 full-access keys |
+| agents / business | Agent Market escrow; Illia universal checkout; Shore multi-chain balance | Real Intents checkout + status + refund path; charter gate before deposit address |
+| defi | Rhea venue; HEX Intents front; 1Click live token list | Full live `/v0/tokens` surface (not 4 hard-coded pairs); quote, status, refund |
+| privacy | NEAR AI Cloud TEE; Confidential Intents | Attestation verify path + honest limits; no fake Zcash/testnet claims |
+| social | Sputnik + Trezu (do not rebuild multisig) | Own-row rule changes on board; honest about no shared mainnet DAO until A21 |
+| games | Town loop judged first (Agentropolis-class spatial demos) | Living town intro + walk + shops that move value |
+| nfts | Deed/account-with-behavior | Deed mainnet allow/refuse + control story |
+| realworld | Stablecoin rails / payroll patterns | Sequential mainnet payouts ≤ caps; USDC only with owner OK |
+| swarms | Multi-agent hire markets | Enter only with ≥2-agent proof tx |
+| open | Whole town as chain-abstraction skin | Tick when other proofs exist |
+
+### H1 Ferry (tracks: defi, agents, business, open)
+- [ ] H1a Live token/chain picker from `GET https://1click.chaindefuser.com/v0/tokens` (215 tokens / 38 chains verified this run). Replace the hard-coded 4 options in `app/src/ferry-pay.js`. Search + chain filter. Accept: unit mocks tokens endpoint; UI lists ≥ 50 assets when API returns ≥ 50; e2e picks a non-preset pair and gets a dry quote.
+- [ ] H1b Quote compare: dry quote shows amount out, USD, ETA, fee; optional second quote path if API allows. Accept: dry quote test with signature/echo checks (existing ferry tests still pass).
+- [ ] H1c Status machine UI: PENDING_DEPOSIT → … → SUCCESS | REFUNDED | FAILED with plain words + explorer link. Accept: status poll test for each terminal state.
+- [ ] H1d Refund path documented and shown when status is REFUNDED / incomplete deposit. Accept: README do-X-see-Y + UI copy.
+- [ ] H1e Charter gate before any live deposit address (keep F1). Cap ≤ 0.20 USD unless owner raises. Accept: existing refused-recipient / over-cap tests green.
+- [ ] H1f Confidential quote path labeled honestly (quote-only vs live) — no false "private swap settled" claim. Accept: copy test + `/api/receipts` shape.
+- Spend note: one live mainnet corridor deposit (e.g. 0.20 USD USDC) is **owner-run** via existing `ferry-live-swap.js --live`; agent does not send the deposit. Listed under spends if owner wants the agent to prepare more corridors.
+
+### H2 Guardhouse (security)
+- [ ] H2a Show full on-chain policy: allowlist, per-action cap, daily budget, daily count, window, frozen, sealed rule; both agent methods. Accept: page matches `/api/mainnet` + board `get_charter`.
+- [ ] H2b Demo allow + refuse without new spend when possible (link existing mainnet txs); optional gas-only refuse. Accept: both outcomes visible with nearblocks links.
+- [ ] H2c Owner freeze/unfreeze path on board row (`set_frozen`) with clear copy that agent key cannot unfreeze. Accept: e2e or unit on API shaping; no claim of OutLayer TEE custody unless built.
+- [ ] H2d Arena scam list wired as reputation input to refusals where already present (`arena-scams.json`); no fake registry. Accept: one scam payee refused with reason.
+
+### H3 Vault Arena / Charter office (security, agents)
+- [ ] H3a Board charter open/close/fund/propose flows all succeed on mainnet with ≤ 0.005 NEAR/tx. Accept: setup path e2e + unit board tests.
+- [ ] H3b Adversarial suite still documents over-cap, wrong payee, frozen. Accept: `npm test` includes those cases; README links refused txs.
+- [ ] H3c Load/error guards (ties G3/G10). Accept: no crash on partial CFG.
+
+### H4 Town Hall (social, business)
+- [ ] H4a Mainnet path = visitor `set_rules` / `set_frozen` / `set_seal` on own board row (A20); read back `get_charter`. Accept: Playwright changes a rule and sees it on reload.
+- [ ] H4b No testnet DAO vote in nav (T9/J16). Shared mainnet DAO stays **BLOCKED** pending owner (A21). Accept: 0 links to `sputnikv2.testnet`.
+- [ ] H4c Filing tiers: either enforce on chain or remove the claim. Accept: README/shop copy match code.
+
+### H5 Mist Bank (privacy)
+- [ ] H5a Mainnet NEAR leg via board `propose` + TEE attestation verify (A19/J12). Accept: verify button returns attested/failed with proof file link; 0 testnet/Zcash claims unless mainnet-true.
+- [ ] H5b Honest empty states when TEE key missing. Accept: friendly error, not raw stack.
+
+### H6 Payouts (realworld, business)
+- [ ] H6a Up to 3 sequential mainnet `propose` payouts (A23); progress list; disable when 0. Accept: G6 + integration test mocking board.
+- [ ] H6b Receipt per payout with nearblocks link. Accept: UI shows N receipts after N pays (mocked).
+- [ ] H6c Optional mainnet USDC ≤ 0.20 USD only after owner OK (see spends). Until then no USDC claim. Accept: copy has 0 USDC live claim without proof tx.
+
+### H7 Chronicle (open, thesis-adjacent feed — not a thesis product)
+- [ ] H7a Feed from `/api/chronicle?net=mainnet` only; add-entry = 0.001 propose. Accept: every link `nearblocks.io`; T1 greps stay green.
+- [ ] H7b No cross-room copy leak (G4). Accept: G4 test.
+
+### H8 Toll Bridge (business, agents — Chain Signatures story)
+- [ ] H8a Mainnet 0.001 pass (A24) + recorded allow/refuse chain-signature txs in proof drawer. Accept: W2/W3 greps; shop never says Sepolia/Base-as-destination unless a real mainnet Base relay is implemented and proven.
+- [ ] H8b If Base/cross-chain relay is not live, copy must say NEAR pass + separate recorded MPC proofs — never "cross to Base" as the action. Accept: G7.
+
+### H9 House (nfts)
+- [ ] H9a Deed allow/refuse mainnet proofs + "deed controls charter" explained with test or tx. Accept: J15; page survives missing glyph/config (G10-related).
+- [ ] H9b Character/hero still loads (O3). Accept: setup portrait visible.
+
+### H10 Setup / charter (all tracks' onboarding)
+- [ ] H10a All setup steps work at 1440 and 390; step 7 tiles are real buttons; remaining daily quota shown (W8/W9). Accept: e2e setup path.
+- [ ] H10b Cinematic onboarding film remains O1 open / optional; do not block H on it.
+
+### H11 AI agent / Lamplighter (agents, swarms-maybe)
+- [ ] H11a Inference budget caps enforced and shown; model cannot invent payee (O9). Accept: existing unit tests green.
+- [ ] H11b Agent actions only through charter methods; README names Intents / FC keys / board. Accept: judge-path section updated.
+- [ ] H11c Swarms track: only claim multi-agent if ≥2 agent proof txs exist; else omit from README tracks. Accept: README tracks list matches evidence.
+
+### H12 Whole-town depth gate
+- [ ] H12a Every open shop completes one real mainnet-capable flow (or clearly disabled with reason). Accept: checklist table in README with code + test + tx columns filled or struck.
+- [ ] H12b `npm test` 0 fail; no-testnet visible test green; `npm run verify:mainnet` on recorded txs. Accept: paste command output in TASKS tick.
+
+## I. Competitor deep-dive (Cursor agent must run this — do not skip)
+**Order is mandatory:** (1) read all existing research, (2) only then hunt GitHub/X for *new* names, (3) write one consolidated internal file covering old + new, (4) raise H where someone is deeper.
+
+- [ ] I0 **Read existing research first** (do not redo known rivals). Follow `docs/internal/RESEARCH_SOURCES.md`. At minimum open: `/workspace/near/pack/files/near-competitors-winners.md`, `near-ecosystem.md`, every `/workspace/near/pack/files/near-tracks/*.md`, `/workspace/near/WIN_MATRIX.md`, `/workspace/near/TOWN_PLAN.md` §0–1, `/workspace/near/SCRIM_FORENSIC.md`, `/workspace/near/WINNER_FORENSICS_DEEP.md`, `/workspace/near/research-tmp/HACKATHON-now.md`. Summarize already-known per-track bars into a draft table (names stay internal).
+- [ ] I1 Search GitHub for public repos clearly aimed at NEAR Hackathon 2026 (topics/descriptions/`#NEARHackathon`/nearhackathon in README; created or heavily committed since 2026-10-19) **excluding** names already covered in I0. Record name, repo, tracks claimed, last commit, stars.
+- [ ] I2 Search X for posts with `#NEARHackathon` / "built at NEAR HACKATHON" in the window; capture project + repo links; skip accounts/projects already in I0 unless they shipped a material new proof.
+- [ ] I3 For each **new** candidate: deep analysis — features, # chains/tokens or contract methods, real mainnet/testnet txs (explorer links), code quality (tests, README do-X-see-Y), honesty of claims. Rank per track against the I0 baseline.
+- [ ] I4 Write **one** consolidated `docs/internal/competitors.md` (internal only: do **not** link from public README, site, or llms.txt; never name rivals in public UI). Must cover **old (I0) + new (I1–I3)** with per-track ranking + "raise H?" decisions + links/paths to the source research files.
+- [ ] I5 Where a competitor (old or new) is deeper on a metric we claim, append concrete raises under H (new H items or tighter acceptance) and implement or `BLOCKED: needs owner spend/decision`.
+- [ ] I6 Produce a short report in the PR/agent summary: top threat per entered track, our gap, the H item that closes it.
+
+## Spends needing approval (do not execute until owner OK; keep total intentional)
+| ID | Action | Est. cost | Why |
+|---|---|---|---|
+| S1 | Owner-run Ferry live deposit one corridor (script already exists) | ≤ 0.20 USD stablecoin + tiny gas | Proof of live Intents checkout beyond dry quote |
+| S2 | Extra mainnet board proposes for demo freshness (Chronicle/Toll/Payouts) | ≤ 0.01 NEAR total at 0.001–0.005 each | Refresh judge-visible txs if old |
+| S3 | Optional mainnet USDC payout proof | ≤ 0.20 USD | Realworld track evidence |
+| S4 | Shared mainnet DAO (A21) | several NEAR storage | Owner decision — not built |
+Anything else that would push **aggregate new spend > 0.05 NEAR** in one agent run needs a fresh owner OK before signing.
+
+## Done when (G+H+I)
+All G items fixed or blocked with reason; H acceptance tests green or blocked; I0–I6 done with `docs/internal/competitors.md` (old+new) and `docs/internal/RESEARCH_SOURCES.md` present; brown town unchanged; `npm test` 0 fail; no secrets printed; Render env still one-key-at-a-time if touched; HISTORY.md updated under flock with this section add.
