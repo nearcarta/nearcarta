@@ -12,7 +12,7 @@ import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
 import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
-import { ROW_WAIT_MS, nearOf, normalizeRow, withRowWait } from './hall.js';
+import { ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './hall.js';
 import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
 
@@ -476,14 +476,48 @@ function mountHouse(root, hooks = {}) {
     slot.innerHTML = houseCharterMarkup({});
     return;
   }
-  slot.innerHTML = `<div class="house-state" data-testid="house-state" role="status"><p>Reading the charter row…</p></div>`;
-  const load = hooks.row
-    ? Promise.resolve(hooks.row)
-    : withRowWait(() => fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
-      .then(r => r.json())
-      .then(body => normalizeRow(body)), ROW_WAIT_MS);
-  load.then(row => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, row }); })
-    .catch(() => { if (slot.isConnected) slot.innerHTML = houseCharterMarkup({ accountId: id, failed: true }); });
+  let gen = 0;
+  const readRow = () => fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
+    .then(r => r.json())
+    .then(body => normalizeRow(body));
+  const showReason = why => {
+    slot.innerHTML = `<div class="house-state" data-testid="house-row-reason" role="alert"><p>${esc(why)}</p><p><button type="button" class="primary" data-testid="house-retry">Try again</button></p></div>`;
+    const retry = slot.querySelector('[data-testid=house-retry]');
+    if (retry) retry.onclick = () => start();
+  };
+  function start() {
+    const mine = ++gen;
+    slot.innerHTML = `<div class="house-state" data-testid="house-reading" role="status"><p>Reading the charter row…</p></div>`;
+    const job = mine === 1 && hooks.row != null
+      ? Promise.resolve(hooks.row).then(body => normalizeRow(body))
+      : readRow();
+    const timer = setTimeout(() => {
+      if (mine !== gen || !slot.isConnected || !slot.querySelector('[data-testid=house-reading]')) return;
+      showReason(rowWaitWhy(ROW_WAIT_MS));
+    }, ROW_WAIT_MS);
+    const paint = row => {
+      if (mine !== gen || !slot.isConnected) return;
+      clearTimeout(timer);
+      slot.innerHTML = houseCharterMarkup({ accountId: id, row });
+    };
+    withRowWait(() => job, ROW_WAIT_MS).then(row => {
+      paint(row);
+    }).catch(e => {
+      if (mine !== gen || !slot.isConnected) return;
+      clearTimeout(timer);
+      if (slot.querySelector('[data-testid=house-reading]')) {
+        const why = e?.code === 'row-wait'
+          ? e.message
+          : `The row could not be read. ${e?.message || 'The charter read did not answer.'} Nothing was signed.`;
+        showReason(why);
+      }
+      job.then(row => {
+        if (mine !== gen || !slot.isConnected || !slot.querySelector('[data-testid=house-row-reason]')) return;
+        paint(row);
+      }).catch(() => {});
+    });
+  }
+  start();
 }
 
 const ALIAS = { guardhouse: 'guard', townhall: 'hall', mist: 'bank', mistbank: 'bank' };
