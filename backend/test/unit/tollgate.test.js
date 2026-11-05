@@ -27,19 +27,24 @@ test('the toll gate is the mainnet contract', () => {
 });
 
 test('a 0.001 propose to the toll returns a pass', async () => {
-  const out = await issuePass({ hash: 'h', signer: 'visitor.near', secret, status: async () => tx() });
+  _clearUsed();
+  const out = await issuePass({ hash: 'gate-ok-hash', signer: 'visitor.near', secret, status: async () => tx() });
   assert.equal(out.network, 'mainnet');
   assert.equal(out.payee, 'toll.nearcarta.near');
   assert.equal(checkPass(out.pass, secret), true);
   assert.equal(checkPass(out.pass, 'other'), false);
+  _clearUsed();
 });
 
 test('a missing secret fails closed', async () => {
-  await assert.rejects(issuePass({ hash: 'h', signer: 'visitor.near', secret: '', status: async () => tx() }), e => e.status === 503);
+  _clearUsed();
+  await assert.rejects(issuePass({ hash: 'gate-no-secret', signer: 'visitor.near', secret: '', status: async () => tx() }), e => e.status === 503);
 });
 
 test('a refusal does not get a pass', async () => {
-  await assert.rejects(issuePass({ hash: 'h', signer: 'visitor.near', secret, status: async () => tx({ fail: 'over_per_action_cap' }) }), e => e.status === 400);
+  _clearUsed();
+  await assert.rejects(issuePass({ hash: 'gate-refuse', signer: 'visitor.near', secret, status: async () => tx({ fail: 'over_per_action_cap' }) }), e => e.status === 400);
+  _clearUsed();
 });
 
 test('the toll module source has no sepolia settler', () => {
@@ -50,8 +55,8 @@ test('the toll module source has no sepolia settler', () => {
 
 test('one toll tx buys one pass', async () => {
   _clearUsed();
-  const out = await issuePass({ hash: 'same', signer: 'visitor.near', secret, status: async () => tx() });
+  const out = await issuePass({ hash: 'gate-reuse', signer: 'visitor.near', secret, status: async () => tx() });
   assert.equal(out.network, 'mainnet');
-  await assert.rejects(issuePass({ hash: 'same', signer: 'visitor.near', secret, status: async () => tx() }), e => e.status === 409);
+  await assert.rejects(issuePass({ hash: 'gate-reuse', signer: 'visitor.near', secret, status: async () => tx() }), e => e.status === 409);
   _clearUsed();
 });
