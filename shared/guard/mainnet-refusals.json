@@ -1,0 +1,9 @@
+{
+  "entries": [
+    {
+      "account": "shop-moved-pay-here.near",
+      "reason": "Refused on mainnet: this payee is not on the allowlist",
+      "evidence": ["E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ"]
+    }
+  ]
+}

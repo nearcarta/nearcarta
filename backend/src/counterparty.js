@@ -9,6 +9,10 @@ import { view as nearView, viewAccount as nearViewAccount } from './near.js';
 import { fpost as fastPost } from './shops.js';
 
 export const DENY = JSON.parse(readFileSync(new URL('../../shared/guard/denylist.json', import.meta.url), 'utf8'));
+export const MAINNET_REFUSALS = JSON.parse(readFileSync(new URL('../../shared/guard/mainnet-refusals.json', import.meta.url), 'utf8'));
+export function recordedRefusal(account, list = MAINNET_REFUSALS) {
+  return (list?.entries || []).find(e => e.account === account) || null;
+}
 export const NEW_ACCOUNT_MS = 24 * 3600_000;
 export const CODE_CHANGE_MS = 24 * 3600_000;
 const EMPTY_CODE = '11111111111111111111111111111111';
@@ -53,7 +57,7 @@ export function decide(signals) {
 /** Read every signal. deps are injectable for tests. */
 export async function check(account, { charter = null, now = Date.now(), view = nearView, viewAccount = nearViewAccount, fpost = fastPost } = {}) {
   const s = { account, charter, exists: true, is_contract: false, allowlisted: false, prior_payments: 0, age_ms: null, first_seen: null, code_changed_ms: null, code_change_tx: null, lookalike_of: null, deny: null, index: 'ok' };
-  s.deny = DENY.entries.find(e => e.account === account) || null;
+  s.deny = DENY.entries.find(e => e.account === account) || recordedRefusal(account);
   let acct = null;
   try { acct = await viewAccount(account); } catch (e) { if (/UNKNOWN_ACCOUNT|does not exist/.test(e.message)) s.exists = false; else throw e; }
   if (acct) { s.is_contract = acct.code_hash !== EMPTY_CODE || !!(acct.global_contract_hash || acct.global_contract_account_id); s.code_hash = acct.global_contract_hash || acct.code_hash; }
