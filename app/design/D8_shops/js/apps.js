@@ -8,6 +8,7 @@ import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
+import { boardCallText, cityCheckoutBody, PROPOSE_CALL_TGAS, proposeCallAllowanceOk } from '/panels/ferry-settle.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -454,6 +455,68 @@ export function ferryClauseForPair(from, to) {
   return Object.keys(S.clauses || {}).find(isFerryClauseId) || id;
 }
 export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receiver: ferryPayee(route), amountY: ferryAmountY(q), memo: 'ferry:' + q.correlationId });
+
+/** Deposit address after the charter view allows the payee. At most 0.20 USD. Does not send the tokens. */
+export async function openFerryCheckout(q, pair) {
+  const charter = S.board ? S.me : S.charter;
+  const recipient = ferryPayee('pay');
+  const amountYocto = String(S.boardRow?.min_amount || S.clauses?.pay?.min_amount || '1');
+  if (!charter || !recipient) return { ok: false, reason: 'no_charter', depositAddress: null };
+  const body = cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo: refundFor(pair.from) });
+  const r = await fetch(API + '/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null };
+  return j;
+}
+
+export async function ferryStatus(depositAddress) {
+  const r = await fetch(API + '/api/ferry/status?depositAddress=' + encodeURIComponent(depositAddress));
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'status ' + r.status);
+  return j;
+}
+
+/**
+ * wrap.near steps via the session key's propose_call. Never opens a wallet.
+ * A missing key, a key that cannot call propose_call, or a chain refusal returns youSend.
+ */
+export async function ferryProposeCalls(steps) {
+  const you = (reason, extra = {}) => ({ ok: false, youSend: true, wallet: false, reason, ...extra });
+  if (!S.board || !S.me) return you('no_session');
+  const key = agent();
+  if (!key) return you('no_key');
+  const ak0 = await proposeAccessKey(key);
+  const names = ak0?.permission?.FunctionCall?.method_names || [];
+  if (!ak0 || (names.length && !names.includes('propose_call'))) return you('key_cannot_propose_call');
+  const allowance = ak0.permission.FunctionCall.allowance;
+  if (allowance && !proposeCallAllowanceOk(allowance)) return you('not_enough_allowance');
+  const txs = [];
+  for (const step of steps || []) {
+    const row = await view(S.board, 'get_charter', { owner: S.me });
+    if (!row) return you('no_row', { txs });
+    S.boardRow = row;
+    const argsStr = typeof step.args === 'string' ? step.args : JSON.stringify(step.args || {});
+    const deposit = String(step.deposit);
+    const argsHash = W.sha256hex(argsStr);
+    const msg = boardCallText({ contract: S.board, owner: S.me, receiver: step.receiver, method: step.method, argsHash, deposit, nonce: String(row.nonce) });
+    const signature = W.signMessage(key, msg);
+    const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: [...new TextEncoder().encode(argsStr)], deposit, signature };
+    const ak = await proposeAccessKey(key);
+    if (!ak) return you('no_session_key', { txs });
+    try {
+      const signed = W.signTx({
+        key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+        actions: [W.functionCall('propose_call', callArgs, BigInt(PROPOSE_CALL_TGAS) * TG)],
+      });
+      const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+      txs.push(signed.hash);
+      if (!sent.ok) return you(refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160), { tx: signed.hash, txs });
+    } catch (e) {
+      return you(refusalOf(e) || String(e?.message || e).slice(0, 160), { txs });
+    }
+  }
+  return { ok: true, youSend: false, wallet: false, txs, tx: txs.at(-1) || null };
+}
 // Hide routes whose dry quote failed in the server's last probe (/api/ferry/routes); keep at least one.
 export const routesReady = api('/api/ferry/routes').then(r => {
   const bad = new Set(r.routes.filter(x => !x.ok && x.to === 'ZEC@zec').map(x => x.from));

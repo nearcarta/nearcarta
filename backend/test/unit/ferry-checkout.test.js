@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import {
   charterGate, checkoutUsdOk, settlementYocto, openCheckout, checkLiveQuote, resetCheckouts,
   rememberCheckout, startCheckout, checkoutDeps, oneClickStatus, listCheckoutReceipts, MAX_CHECKOUT_USD,
+  boardRowAsGate, readCharterRules,
 } from '../../src/ferry-checkout.js';
 
 const clause = {
@@ -184,6 +185,29 @@ test('a shop on another site can call Pay', async () => {
   const r = await app.request('/api/ferry/rules?charter=nope', { method: 'OPTIONS', headers: { origin: 'https://shop.example', 'access-control-request-method': 'GET' } });
   assert.equal(r.status, 204);
   assert.equal(r.headers.get('access-control-allow-origin'), '*');
+});
+
+test('a visitor board row is the checkout gate when the account has no oath', async () => {
+  const row = {
+    frozen: false, receivers: ['payee.near'], per_action_cap: '5000000000000000000000000',
+    daily_budget: '10000000000000000000000000', max_actions_per_day: 3,
+    min_amount: '100000000000000000000', spent_today: '0', actions_today: 0,
+  };
+  const gate = boardRowAsGate(row);
+  assert.equal(charterGate({ ...gate, receiver: 'payee.near', amount: row.min_amount, nowMin: 0 }).ok, true);
+  const calls = [];
+  const viewFn = async (account, method) => {
+    calls.push([account, method]);
+    if (method === 'get_state' || method === 'get_rules') throw new Error('MethodNotFound');
+    if (method === 'get_charter') return row;
+    throw new Error(method);
+  };
+  const owner = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8';
+  const got = await readCharterRules(owner, 'pay', viewFn);
+  assert.equal(got.clause.receivers[0], 'payee.near');
+  assert.equal(got.clause.per_action_cap, row.per_action_cap);
+  assert.equal(calls.some(([, method]) => method === 'get_charter'), true);
+  assert.equal(calls.find(([, method]) => method === 'get_charter')[0], 'board.nearcarta.near');
 });
 
 test('startCheckout does not call the network when the body is empty', async () => {

@@ -14,14 +14,15 @@ import { DEED, controlAfterMove, metadataView, txUrl } from '/deed-control.js';
 import { teeResult, PROOF_HREF } from '/tee-view.js';
 import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
 import { mountShop } from '/panels/deep.js';
-import { pairClauseId, parseAgentFerry, chainLabel } from '/panels/ferry-pair.js';
+import { pairClauseId, chainLabel } from '/panels/ferry-pair.js';
+import { depositPlan, mayCheckout, nextFerryBeat } from '/panels/ferry-settle.js';
 import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues, prepareRows } from './payouts.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
 const yOf = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const { esc, fmt, short } = A;
 
-let cur = null, sh = null, phase = 'idle', last = null, runScene = null, extra = {};
+let cur = null, sh = null, phase = 'idle', last = null, runScene = null, extra = {}, ferryWatch = null;
 const say = t => { const e = $('#t-say'); e.innerHTML = `<span class="lamp" aria-hidden="true"></span><span>${t}</span>`; e.classList.remove('bump'); void e.offsetWidth; e.classList.add('bump'); };
 const btn = (label, kind = 'primary', dis = false) => { const b = $('#t-act'); b.hidden = !label; b.className = 'act ' + kind; b.disabled = dis; b.textContent = label || ''; b.classList.toggle('busy', phase === 'busy'); queueMicrotask(syncGo); };
 // Ferry quote, cargo, Ask charter and Get another quote live in the card. #t-act is a second copy of the same label.
@@ -43,6 +44,7 @@ function ensureFerryDock() {
   d.setAttribute('data-testid', 'ferry-agent-dock');
   // Mix sketch: character on the right; chat popup (input + send INSIDE) opens beside it.
   d.innerHTML = `<div id="ferry-agent-pop" class="ferry-agent-pop" data-testid="ferry-agent" hidden>
+      <p id="f-agent-log" class="ferry-agent-log" data-testid="ferry-agent-log" hidden></p>
       <div class="ferry-agent-row">
         <input id="f-agent" data-testid="ferry-agent-input" placeholder="Swap 3 USDC to ZEC" autocomplete="off" aria-label="Ask the AI Agent">
         <button type="button" class="ferry-agent-send" id="f-agent-go" data-testid="ferry-agent-go" aria-label="Send">➤</button>
@@ -57,17 +59,24 @@ function ensureFerryDock() {
   d.hidden = cur !== 'ferry';
   return d;
 }
-function wireFerryDock() {
+function wireFerryDock(hooks) {
   const d = ensureFerryDock();
-  if (!d || d.dataset.wired) return;
-  d.dataset.wired = '1';
-  const toggle = d.querySelector('[data-testid=ferry-agent-toggle]');
-  const pop = d.querySelector('#ferry-agent-pop');
-  toggle?.addEventListener('click', () => {
-    const open = pop.hasAttribute('hidden');
-    pop.toggleAttribute('hidden', !open);
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
+  if (!d) return;
+  if (!d.dataset.wired) {
+    d.dataset.wired = '1';
+    const toggle = d.querySelector('[data-testid=ferry-agent-toggle]');
+    const pop = d.querySelector('#ferry-agent-pop');
+    toggle?.addEventListener('click', () => {
+      const open = pop.hasAttribute('hidden');
+      pop.toggleAttribute('hidden', !open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
+  const go = d.querySelector('#f-agent-go');
+  const input = d.querySelector('#f-agent');
+  const send = () => { if (hooks?.runAgent) hooks.runAgent(go); };
+  if (go) go.onclick = send;
+  if (input) input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } };
 }
 function ferryPlainReason(reason) {
   const raw = String(reason || '');
@@ -80,55 +89,169 @@ function setCharterNote(o) {
   if (!o || o.decision === 'allowed') { extra.charterNote = ''; return; }
   extra.charterNote = `Charter refused the trip: ${ferryPlainReason(o.reason)}. The boat stays at the jetty.`;
 }
+function stopFerryWatch() { clearInterval(ferryWatch); ferryWatch = null; }
+function clearFerryDeposit() {
+  stopFerryWatch();
+  extra.depositAddress = '';
+  extra.depositUsd = '';
+  extra.depositHelp = '';
+  extra.depositMode = '';
+  extra.sailed = false;
+}
+function finishFerry(res) {
+  stopProgress();
+  phase = 'kept';
+  extra.acted = true;
+  say(res.say);
+  rcpt(res.rc || '');
+  document.body.dataset.app = res.kind || 'ok';
+  hero(APPS.ferry.hero());
+  hideFerryPrimary();
+  form(APPS.ferry.form()); APPS.ferry.bind?.();
+  ruleChip(); proofDrawer();
+  return res;
+}
+function watchFerryDeposit(address) {
+  stopFerryWatch();
+  const tick = async () => {
+    if (cur !== 'ferry' || extra.depositAddress !== address) { stopFerryWatch(); return; }
+    let st;
+    try { st = await A.ferryStatus(address); }
+    catch { return; }
+    const beat = nextFerryBeat(st.status, { sailed: !!extra.sailed });
+    extra.depositHelp = st.help || st.status || '';
+    extra.sailed = beat.sailed;
+    sh?.setOrder?.(beat.order);
+    const note = document.querySelector('[data-testid=ferry-status]');
+    if (note) note.textContent = extra.depositHelp;
+    if (beat.play && sh?.act && runScene) runScene(sh.act({ refused: false }));
+    if (beat.terminal) stopFerryWatch();
+    if (st.status === 'SUCCESS') say('1Click status is SUCCESS. The swap finished.');
+    else if (st.status === 'REFUNDED') say('Refunded. The boat turns back. Nothing else is sent.');
+    else if (st.status === 'FAILED') say('The swap failed. Nothing else is sent.');
+  };
+  tick();
+  ferryWatch = setInterval(tick, 4000);
+}
+/** Guest cinema, or a session stamp plus a ≤ $0.20 deposit. Delivered only after SUCCESS on the session path. */
+async function settleFerry(wantCharter) {
+  const pair = APPS.ferry.pairFromState();
+  const outAmt = extra.q.to?.amount || extra.q.amountOut || '';
+  const ready = APPS.ferry.charterReady();
+  if (!ready) {
+    if (wantCharter) {
+      return {
+        kind: 'ok', hero: APPS.ferry.hero(),
+        say: 'Open /setup to Ask charter. No wallet from here. You can still Load cargo as a guest.',
+        rc: '<a class="rc" href="/setup">Open /setup</a>',
+      };
+    }
+    sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
+    if (sh?.act && runScene) runScene(sh.act({ refused: false }));
+    return {
+      kind: 'ok', hero: APPS.ferry.hero(),
+      say: `Demo crossing only — ${esc(pair.fromSym)} to ${esc(pair.toSym)} is not a settled swap. Pay from any chain, or Ask charter for a stamp under the cap.`,
+      rc: '<span class="rc" data-testid="ferry-order-state">order · demo</span><a class="rc" href="/ferry-widget">Pay from any chain</a>',
+    };
+  }
+  sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
+  hideFerryPrimary();
+  const clause = A.ferryClauseForPair(pair.from, pair.to);
+  let o = null;
+  if (wantCharter) {
+    const asking = document.getElementById('f-charter');
+    if (asking) { asking.disabled = true; asking.textContent = 'Asking your charter…'; }
+    try { o = await A.ferry(clause, extra.q); }
+    catch (e) {
+      if (e.cancelled) throw e;
+      o = { decision: 'denied', reason: A.plainError(e), tx: e.tx || null };
+    }
+    extra.ferryTx = o?.tx || null;
+  }
+  const refused = o && o.decision !== 'allowed';
+  setCharterNote(o);
+  if (refused) {
+    if (sh?.act && runScene) runScene(sh.act({ refused: true, reason: A.why(o.reason) || o.reason || '' }));
+    return {
+      kind: 'no', o, hero: APPS.ferry.hero(),
+      say: `Charter refused the trip: ${esc(A.why(o.reason) || o.reason || 'refused')}. The boat stays at the jetty.`,
+      rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · refused</span>',
+      rule: A.ruleFor(o, clause),
+    };
+  }
+  const cap = mayCheckout(extra.q);
+  const stamp = o
+    ? `Charter stamped ${esc(pair.fromSym)} → ${esc(pair.toSym)} under the cap. That stamp is not the swap.`
+    : `Session is on. ${esc(pair.fromSym)} → ${esc(pair.toSym)} is a real deposit, not a demo crossing.`;
+  if (!cap.ok) {
+    sh?.hideRefuse?.();
+    sh?.setOrder?.('quoted');
+    extra.charterNote = cap.reason === 'over_checkout_cap'
+      ? 'No deposit address. This quote is over 0.20 USD.'
+      : 'No deposit address. This quote has no USD amount.';
+    return {
+      kind: 'ok', o, hero: APPS.ferry.hero(),
+      say: `${stamp} ${extra.charterNote}`,
+      rc: (o?.tx ? A.txLine(o.tx) : '') + '<a class="rc" href="/ferry-widget">Pay from any chain</a>',
+      rule: o ? A.ruleFor(o, clause) : '',
+    };
+  }
+  let checkout = null;
+  try { checkout = await A.openFerryCheckout(extra.q, pair); }
+  catch (e) { checkout = { ok: false, reason: e?.message || 'checkout failed', depositAddress: null }; }
+  if (!checkout?.ok || !checkout.depositAddress) {
+    sh?.hideRefuse?.();
+    sh?.setOrder?.('quoted');
+    const why = ferryPlainReason(checkout?.reason || checkout?.error);
+    extra.charterNote = `No deposit address: ${why}. Nothing was sent.`;
+    return {
+      kind: 'ok', o, hero: APPS.ferry.hero(),
+      say: `${stamp} ${extra.charterNote}`,
+      rc: (o?.tx ? A.txLine(o.tx) : '') + '<a class="rc" href="/ferry-widget">Pay from any chain</a>',
+      rule: o ? A.ruleFor(o, clause) : '',
+    };
+  }
+  extra.depositAddress = checkout.depositAddress;
+  extra.depositUsd = checkout.usd || String(cap.usd);
+  extra.depositHelp = checkout.help || 'Waiting for the deposit. The boat has not delivered.';
+  const plan = depositPlan({
+    from: pair.from,
+    amount: pair.amt,
+    depositAddress: checkout.depositAddress,
+    memo: checkout.depositMemo || null,
+    capYocto: A.S.boardRow?.per_action_cap || null,
+    balanceYocto: A.S.boardRow?.balance || null,
+  });
+  let sent = null;
+  if (plan.kind === 'propose_call') sent = await A.ferryProposeCalls(plan.steps);
+  const sentOk = !!(sent && sent.ok && sent.wallet === false);
+  extra.depositMode = sentOk ? 'propose_call' : 'you-send';
+  if (!sentOk) extra.depositHelp = plan.why || extra.depositHelp;
+  sh?.hideRefuse?.();
+  sh?.setOrder?.('deposit');
+  watchFerryDeposit(checkout.depositAddress);
+  const where = `<code>${esc(checkout.depositAddress)}</code>`;
+  const sayText = sentOk
+    ? `${stamp} The charter sent the NEAR deposit (no wallet). The boat waits until 1Click says SUCCESS.`
+    : `${stamp} Send at most ${esc(extra.depositUsd)} USD yourself to ${where}. ${esc(plan.why || 'The boat waits until 1Click says SUCCESS.')}`;
+  return {
+    kind: 'ok', o, hero: APPS.ferry.hero(),
+    say: sayText,
+    rc: (o?.tx ? A.txLine(o.tx) : '') + (sentOk && sent.tx ? A.txLine(sent.tx, 'deposit') : '') + `<span class="rc" data-testid="ferry-order-state">order · waiting</span>`,
+    rule: o ? A.ruleFor(o, clause) : '',
+  };
+}
 async function loadFerryCargo(wantCharter) {
   if (phase === 'busy' || cur !== 'ferry') return;
   if (!extra.q) { say('Get a quote first.'); return; }
   phase = 'busy';
   sfx('click');
-  const pair = APPS.ferry.pairFromState();
-  const outAmt = extra.q.to?.amount || extra.q.amountOut || '';
-  sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
-  let o = null;
-  const ready = APPS.ferry.charterReady();
-  if (wantCharter && ready) {
-    hideFerryPrimary();
-    const asking = document.getElementById('f-charter');
-    if (asking) { asking.disabled = true; asking.textContent = 'Asking your charter…'; }
-    say('Asking your charter on chain…');
-    const clause = A.ferryClauseForPair(pair.from, pair.to);
-    try { o = await A.ferry(clause, extra.q); }
-    catch (e) {
-      if (e.cancelled) { phase = 'idle'; fail(e); return; }
-      o = { decision: 'denied', reason: A.plainError(e), tx: e.tx || null };
-    }
-    extra.ferryTx = o?.tx || null;
-  } else if (wantCharter && !ready) {
+  try { return finishFerry(await settleFerry(!!wantCharter)); }
+  catch (e) {
+    if (e?.cancelled) { phase = 'idle'; fail(e); return; }
     phase = 'idle';
-    say('Open your charter and helper key in /setup to Ask charter. You can still Load cargo as a guest.');
-    btn('Open your charter');
-    return;
+    fail(e);
   }
-  const refused = o && o.decision !== 'allowed';
-  setCharterNote(o);
-  if (sh?.act && runScene) runScene(sh.act({ refused, reason: o ? A.why(o.reason) || o.reason : '' }));
-  stopProgress();
-  phase = 'kept';
-  extra.acted = true;
-  if (refused) {
-    say(`Charter refused the trip: ${esc(A.why(o.reason) || o.reason || 'refused')}. The boat stays at the jetty.`);
-    rcpt((o?.tx ? A.txLine(o.tx) : '') + `<span class="rc" data-testid="ferry-order-state">order · refused</span>`);
-    document.body.dataset.app = 'no';
-  } else {
-    say(o
-      ? `Charter allowed a tiny stamp for ${esc(pair.fromSym)} → ${esc(pair.toSym)}. Watching the crossing.`
-      : `The ferryman loads ${esc(pair.fromSym)} and sails for ${esc(pair.toSym)}.`);
-    rcpt((o?.tx ? A.txLine(o.tx) : '') + `<span class="rc" data-testid="ferry-order-state">order · in room</span><a class="rc" href="/ferry-widget">Pay from any chain</a>`);
-    document.body.dataset.app = 'ok';
-  }
-  hero(APPS.ferry.hero());
-  hideFerryPrimary();
-  form(APPS.ferry.form()); APPS.ferry.bind?.();
-  ruleChip(); proofDrawer();
 }
 const num = (n, u) => `<b class="num">${esc(n)}</b><span class="unit">${esc(u)}</span>`;
 const capFmt = 0;
@@ -257,7 +380,7 @@ const APPS = {
     form: () => '<div data-deep="ferry"></div>',
     bind: () => {
       ensureFerryDock();
-      mountShop('ferry', document.getElementById('t-form'), {
+      const hooks = {
         state: extra,
         routes: () => A.ROUTES,
         tokens: () => A.loadFerryTokens(),
@@ -269,8 +392,9 @@ const APPS = {
         onAgain: () => primary(),
         repaint: () => paint(),
         onPair: (pair) => { if (sh?.applyPair) sh.applyPair(pair); },
-      });
-      wireFerryDock();
+      };
+      mountShop('ferry', document.getElementById('t-form'), hooks);
+      wireFerryDock(hooks);
     },
     charterReady: () => A.S.ready && A.stage() === 'ready',
     btn: () => {
@@ -299,7 +423,12 @@ const APPS = {
       return { from, to, amt, fromSym: from.split('@')[0], fromChain: from.split('@')[1], toSym: to.split('@')[0], toChain: to.split('@')[1] };
     },
     run: async () => {
-      if (extra.acted) { extra.q = null; extra.acted = false; extra.fdone = true; extra.ferryTx = null; extra.charterNote = ''; sh?.setOrder?.('jetty'); }
+      if (extra.acted) {
+        extra.q = null; extra.acted = false; extra.fdone = true; extra.ferryTx = null; extra.charterNote = '';
+        clearFerryDeposit();
+        sh?.hideRefuse?.();
+        sh?.setOrder?.('jetty');
+      }
       if (!extra.q) {
         extra.fdone = false;
         const pair = APPS.ferry.pairFromState();
@@ -312,45 +441,15 @@ const APPS = {
         return {
           keep: true, hero: APPS.ferry.hero(),
           say: ready
-            ? `Quote stamped for ${esc(pair.from)} → ${esc(pair.to)}. Ask your charter (no popup if the session key is on), then watch the crossing.`
-            : `Quote stamped for ${esc(pair.from)} → ${esc(pair.to)}. Nothing left your wallet. Press Load the cargo to watch the crossing in the room.`,
+            ? `Quote ready for ${esc(pair.from)} → ${esc(pair.to)}. Ask charter is a stamp under the cap, then a deposit address if this quote is at most 0.20 USD. No wallet popup.`
+            : `Quote ready for ${esc(pair.from)} → ${esc(pair.to)}. Load cargo here is a demo crossing, not a settled swap.`,
           rc: `<a class="rc" href="/ferry-widget">Pay from any chain</a><span class="rc">1Click · ${esc((q.correlationId || '').slice(0, 8))}</span><span class="rc" data-testid="ferry-clause">clause ${esc(A.ferryClauseForPair?.(pair.from, pair.to) || pairClauseId(pair.from, pair.to))}</span>`,
         };
       }
-      // Second beat: optional charter ask under /setup caps, then in-room cargo cinema.
+      // Quote is up. Same path as the card: session settles, guest is a demo crossing.
+      const res = await settleFerry(APPS.ferry.charterReady());
       extra.acted = true;
-      const pair = APPS.ferry.pairFromState();
-      const outAmt = extra.q.to?.amount || extra.q.amountOut || '';
-      sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
-      let o = null;
-      if (APPS.ferry.charterReady()) {
-        const clause = A.ferryClauseForPair(pair.from, pair.to);
-        try { o = await A.ferry(clause, extra.q); }
-        catch (e) {
-          if (e.cancelled) throw e;
-          o = { decision: 'denied', reason: A.plainError(e), tx: e.tx || null };
-        }
-        extra.ferryTx = o?.tx || null;
-      }
-      const refused = o && o.decision !== 'allowed';
-      setCharterNote(o);
-      if (sh?.act && runScene) runScene(sh.act({ refused, reason: o ? A.why(o.reason) || o.reason : '' }));
-      if (refused) {
-        return {
-          o, keep: true, kind: 'no', hero: APPS.ferry.hero(),
-          say: `Charter refused the trip: ${esc(A.why(o.reason) || o.reason || 'refused')}. The boat stays at the jetty.`,
-          rc: (o?.tx ? A.txLine(o.tx) : '') + `<span class="rc" data-testid="ferry-order-state">order · refused</span>`,
-          rule: A.ruleFor(o, A.ferryClauseForPair(pair.from, pair.to)),
-        };
-      }
-      return {
-        o: o || undefined, keep: true, kind: 'ok', hero: APPS.ferry.hero(),
-        say: o
-          ? `Charter allowed a tiny stamp for ${esc(pair.fromSym)} → ${esc(pair.toSym)}. Watching the crossing.`
-          : `The ferryman loads ${esc(pair.fromSym)} and sails for ${esc(pair.toSym)}. Downgrade refused; signed quote crosses.`,
-        rc: (o?.tx ? A.txLine(o.tx) : '') + `<span class="rc" data-testid="ferry-order-state">order · in room</span><a class="rc" href="/ferry-widget">Pay from any chain</a>`,
-        rule: o ? A.ruleFor(o, A.ferryClauseForPair(pair.from, pair.to)) : '',
-      };
+      return { ...res, keep: true };
     },
   },
   bank: {
@@ -782,7 +881,7 @@ export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rul
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
   // the Toll room reopened with a visit under way: pick it up (countdown, or settle now if Base is final)
   if (id === 'toll') booted?.then(() => { const v = cur === 'toll' && A.stage() === 'ready' && A.tollVisit(); if (v && !v.done && phase === 'idle') primary(true); }).catch(() => {}); }
-export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; closeRules(); document.body.classList.remove('ferry-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };

@@ -4,7 +4,7 @@ export function proposalMessage({ contract, owner, receiver, amount, nonce }) {
   return `board-v1|${contract}|${owner}|${receiver}|${amount}|${nonce}`;
 }
 
-export const REFUSALS = ['receiver_not_allowlisted', 'zero_amount', 'below_min_amount', 'outside_time_window', 'over_per_action_cap', 'over_daily_budget', 'over_daily_action_count', 'frozen', 'clause_expired', 'hidden_rule_receiver', 'hidden_rule_cap', 'ERR_BAD_SIG', 'ERR_BALANCE', 'ERR_SEAL'];
+export const REFUSALS = ['receiver_not_allowlisted', 'zero_amount', 'below_min_amount', 'outside_time_window', 'over_per_action_cap', 'over_daily_budget', 'over_daily_action_count', 'over_shop_cap', 'over_session_cap', 'method_not_allowlisted', 'NotEnoughAllowance', 'frozen', 'clause_expired', 'hidden_rule_receiver', 'hidden_rule_cap', 'ERR_BAD_SIG', 'ERR_BALANCE', 'ERR_SEAL'];
 
 export function refusalOf(err) {
   const s = String(err?.message || err || '');

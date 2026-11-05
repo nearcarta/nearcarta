@@ -65,8 +65,8 @@ export function chainLabel(chain) {
 export function parseAgentFerry(text) {
   const t = String(text || '').trim();
   if (!t) return null;
-  // "swap 3 USDC on Base to ZEC", "convert ETH@eth into NEAR@near", Arabic "حوّل 2 USDC لـ ZEC"
-  const re = /(?:swap|convert|change|trade|exchange|حو[ّل]*|بدل)\s+(?:up\s+to\s+)?(\d+(?:\.\d+)?)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?\s+(?:to|into|for|→|->|ل(?:ـ)?|إلى)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?/i;
+  // "swap 3 USDC on Base to ZEC", "get a quote for 3 USDC on base to ZEC", Arabic "حوّل 2 USDC لـ ZEC"
+  const re = /(?:get\s+a\s+quote\s+for|quote|swap|convert|change|trade|exchange|حو[ّل]*|بدل)\s+(?:up\s+to\s+)?(\d+(?:\.\d+)?)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?\s+(?:to|into|for|→|->|ل(?:ـ)?|إلى)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?/i;
   const m = t.match(re);
   if (!m) {
     // "USDC@base → ZEC@zec" without verb
@@ -88,11 +88,36 @@ export function parseAgentFerry(text) {
   return { amt, from, to, fromId: from.replace('@', '|'), toId: to.replace('@', '|') };
 }
 
+/**
+ * What the in-shop agent should do with one sentence.
+ * quote: fill and quote only ("get a quote for …").
+ * charter: same path as Ask charter (session stamp, then the deposit flow).
+ * guest: demo crossing. setup: say open /setup, never a wallet.
+ */
+export function agentCargoPlan(text, { charterReady = false } = {}) {
+  const raw = String(text || '').trim();
+  const askCharter = /\bask\s+charter\b/i.test(raw);
+  const loadCargo = /\bload\s+cargo\b/i.test(raw);
+  const quoteOnly = /\b(?:get\s+a\s+quote|quote)\b/i.test(raw) && !askCharter && !loadCargo && !/\b(?:swap|convert|change|trade|exchange)\b/i.test(raw);
+  const parsed = parseAgentFerry(raw);
+  if (!parsed && !askCharter && !loadCargo) return { ok: false, hint: 'Try: Swap 3 USDC on Base to ZEC, or get a quote for 3 USDC on Base to ZEC' };
+  if (parsed && (String(parsed.from).endsWith('@') || String(parsed.to).endsWith('@'))) {
+    return { ok: false, hint: 'Name the chain too, e.g. USDC@base or USDC on Base.' };
+  }
+  let mode = 'guest';
+  if (quoteOnly && parsed) mode = 'quote';
+  else if (askCharter && !charterReady) mode = 'setup';
+  else if (loadCargo && !askCharter) mode = 'guest';
+  else if (charterReady) mode = 'charter';
+  return { ok: true, parsed, mode };
+}
+
 /** Order-chip states sketched in TOWN_PLAN (Ferry open order) + D9 sFerry labels. */
 export const ORDER_STATES = {
   jetty: { id: 'jetty', label: 'at the jetty', cls: 'order' },
   quoted: { id: 'quoted', label: 'quote stamped · waiting', cls: 'order gold' },
   loading: { id: 'loading', label: 'loading cargo', cls: 'order gold' },
+  deposit: { id: 'deposit', label: 'waiting for your send', cls: 'order gold' },
   transit: { id: 'transit', label: 'in transit · mid-river', cls: 'order gold' },
   delivered: { id: 'delivered', label: 'far bank · delivered', cls: 'order ok' },
   refunded: { id: 'refunded', label: 'boat returns · refunded', cls: 'order no' },

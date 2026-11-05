@@ -52,6 +52,7 @@ export default async function ferry(ctx) {
   mesh(scene, new THREE.BoxGeometry(.06, .9, .06), PM.dark, [-2.85, .45, -.9]); mesh(scene, new THREE.BoxGeometry(.06, .9, .06), PM.dark, [-2.35, .45, -.9]);
   mesh(scene, new THREE.BoxGeometry(.62, .42, .04), PM.wood, [-2.6, .78, -.9]); mesh(scene, new THREE.PlaneGeometry(.44, .3), new THREE.MeshStandardMaterial({ color: 0xefe6d2, roughness: 1 }), [-2.6, .78, -.875]);
   const seal = mesh(scene, new THREE.CylinderGeometry(.06, .06, .02, 20), brassM(), [-2.45, .7, -.86], { rx: Math.PI / 2 });
+  const sealIdle = seal.material;
   const sealNo = new THREE.MeshStandardMaterial({ color: 0xff6b6b, emissive: 0xff6b6b, emissiveIntensity: .5, roughness: .6 }), sealOk = new THREE.MeshStandardMaterial({ color: 0x00ec97, emissive: 0x00ec97, emissiveIntensity: .45, roughness: .6 });
   // the downgraded echo: a second quote slip with a coral band, which the board refuses and the strait swallows
   const slip = mesh(scene, new THREE.PlaneGeometry(.3, .2), new THREE.MeshStandardMaterial({ map: paper(THREE, 150, 100, (x, w, h) => { x.fillStyle = '#efe6d2'; x.fillRect(0, 0, w, h); x.fillStyle = '#ff6b6b'; x.fillRect(0, 0, w, 16); x.fillStyle = '#7b6a55'; for (let i = 0; i < 4; i++) x.fillRect(12, 32 + i * 16, 90 - i * 14, 4); }), roughness: 1, side: THREE.DoubleSide, transparent: true }), [2.4, .9, -.6], { cast: false }); slip.visible = false;
@@ -92,7 +93,12 @@ export default async function ferry(ctx) {
     else tags[2].html = orderChipHtml(id);
   };
   const swapsTo = () => { if (tags[0].el) tags[0].el.innerHTML = icon(cargo.toSym, cargo.toChain); };
+  const hideRefuse = () => {
+    tags[1].el?.classList.add('hide');
+    seal.material = sealIdle;
+  };
   const applyPair = (p = {}) => {
+    hideRefuse();
     const fromSym = p.fromSym || (p.from || '').split('@')[0] || cargo.fromSym;
     const fromChain = p.fromChain || (p.from || '').split('@')[1] || cargo.fromChain;
     const toSym = p.toSym || (p.to || '').split('@')[0] || cargo.toSym;
@@ -112,7 +118,7 @@ export default async function ferry(ctx) {
   let t = 0;
   const panel = { title: 'Ferry', src: 'quote', srcNote: 'A real mainnet price quote. Nothing is sent and nothing is spent.', label: LABEL, hero: heroOf(), action: 'Load the cargo' };
   return {
-    rob, scene, camera, tags, applyPair, setOrder: paintOrder, cargo,
+    rob, scene, camera, tags, applyPair, hideRefuse, setOrder: paintOrder, cargo,
     panel,
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },
@@ -143,7 +149,9 @@ export default async function ferry(ctx) {
       }
       // the signed quote matches the request: the seal goes mint and the boat crosses with the visitor's pair
       speak('Seal matches. Casting off.', 'speech');
-      seal.material = sealOk; sfx('allowed'); sfx('water'); rob.play('Idle'); paintOrder('transit');
+      seal.material = sealOk;
+      tags[1].el?.classList.add('hide');
+      sfx('allowed'); sfx('water'); rob.play('Idle'); paintOrder('transit');
       yield tween(2.2, k => { b.position.x = -.85 + 1.7 * k; b.rotation.z = Math.sin(k * 12) * .03; }, easeInOut);
       swapsTo(); speak(`Far bank · ${cargo.toSym}`, 'speech');
       yield tween(.9, k => pool.forEach((m, i) => { m.material.opacity = .55 * Math.min(1, Math.max(0, k * 1.4 - i * .2)); }));
