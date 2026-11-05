@@ -226,7 +226,7 @@ let pushT=0; function walkInto(dt){ const r=_nearDoor(); if(!r.id||!R.steer||r.d
   if((tx*R.steer.x+tz*R.steer.y)/(l*sl)>.55){ pushT+=dt; if(pushT>.3){ pushT=0; goIn(r.id); } } else pushT=0; }
 // skip to a shop (for judges): one list, one click, straight inside
 const sm=document.createElement('div'); sm.id='shopMenu'; sm.className='hud'; sm.hidden=true; sm.setAttribute('role','menu');
-sm.innerHTML=Object.entries(OPEN).map(([id,s])=>`<button type="button" role="menuitem" data-id="${id}" title="${[s.tag,s.track].filter(Boolean).join(' · ')}"><b>${s.name}</b><small>${s.card||s.role}</small></button>`).join('');
+sm.innerHTML=Object.entries(OPEN).map(([id,s])=>`<button type="button" role="menuitem" data-id="${id}" title="${[s.tag,s.track].filter(Boolean).join(' · ')}"><b>${s.name}</b><small>${s.track||s.card||s.role}</small></button>`).join('');
 document.body.appendChild(sm);
 const sbtn=document.createElement('button'); sbtn.id='shopsBtn'; sbtn.className='pill'; sbtn.type='button'; sbtn.textContent='Skip to a shop'; sbtn.setAttribute('aria-haspopup','menu'); $('#ctl').prepend(sbtn);
 sbtn.addEventListener('click',()=>{ sm.hidden=!sm.hidden; sbtn.setAttribute('aria-expanded',String(!sm.hidden)); });
@@ -259,7 +259,7 @@ zEl.style.setProperty('--z',(PC.z*100)+'%');
 const pinBox=$('#pins'); const GLYPH={chronicle:'C',hall:'H',bank:'B',ferry:'F',guard:'G',arena:'A',house:'K',toll:'T',payouts:'P'};
 const PINS=Object.entries(OPEN).map(([id,s])=>{ const b=document.createElement('button'); b.type='button'; b.className='pin'; b.tabIndex=-1; b.setAttribute('aria-label','Fly into '+s.name);
   b.innerHTML='<span class="ban"><span class="ic"></span><span><b></b><small></small></span><span class="go">Enter</span></span><span class="st"></span><span class="ft"></span>';
-  b.querySelector('.ic').textContent=GLYPH[id]||s.name[0]; b.querySelector('b').textContent=s.name; b.querySelector('small').textContent=s.role.split('·')[0].trim();
+  b.querySelector('.ic').textContent=GLYPH[id]||s.name[0]; b.querySelector('b').textContent=s.name; b.querySelector('small').textContent=s.track||s.role.split('·')[0].trim();
   b.addEventListener('click',ev=>{ const hit=shopAt(ev.clientX,ev.clientY); jump(hit||id); }); pinBox.appendChild(b); const bb=new THREE.Box3().setFromObject(W.B[id]); const top=hx(s.q,s.r).setY(bb.max.y+.15); return {id,el:b,top}; });
 function shopScreen(id){ const s=SHOPS[id]; if(!s) return null; const v=hx(s.q,s.r).setY(1.2).project(cam); if(v.z>1) return null; return {id,x:(v.x*.5+.5)*innerWidth,y:(-v.y*.5+.5)*innerHeight}; }
 function shopAt(x,y){ let best=null,bd=1e9; for(const id of Object.keys(SHOPS)){ const s=shopScreen(id); if(!s) continue; const d=Math.hypot(x-s.x,y-s.y); if(d<bd){ bd=d; best=id; } } return bd<120?best:null; }
@@ -283,7 +283,7 @@ function hover(e){ const id=pick(e); cv.classList.toggle('hov',!!id); let best=n
   for(const c of CAST_ALL()){ if(!c.obj.visible) continue; const f=screenOf(c.pos), h=screenOf(c.pos.clone().setY(c.height)); const hp=Math.max(8,f.y-h.y), w=hp*.42;
     if(Math.abs(e.clientX-f.x)<w && e.clientY<f.y+4 && e.clientY>h.y-6){ const d=Math.abs(e.clientX-f.x); if(d<bd){ bd=d; best=c; } } }
   if(best){ tagT={c:best}; tagEl.innerHTML=''; tagEl.textContent=best.name; tagEl.classList.add('on'); }
-  else if(id){ const s=SHOPS[id]; tagT={shop:id}; tagEl.innerHTML=''; tagEl.append(s.name); const sm2=document.createElement('small'); sm2.textContent=CLOSED.has(id)?'':play==='jump'?'click to fly in':'click to walk there'; if(sm2.textContent) tagEl.append(sm2); if(s.card){ const cd=document.createElement('span'); cd.className='cd'; cd.textContent=s.card; const tg=document.createElement('span'); tg.className='tg'; tg.textContent=[s.tag,s.track].filter(Boolean).join(' · '); cd.append(tg); tagEl.append(cd); } cv.classList.toggle('hov',!CLOSED.has(id)); tagEl.classList.add('on'); tagEl._x=e.clientX; tagEl._y=e.clientY; }
+  else if(id){ const s=SHOPS[id]; tagT={shop:id}; tagEl.innerHTML=''; tagEl.append(s.name); if(s.track){ const tr=document.createElement('small'); tr.className='trk'; tr.dataset.testid='shop-track'; tr.textContent=s.track; tagEl.append(tr); } const sm2=document.createElement('small'); sm2.textContent=CLOSED.has(id)?'':play==='jump'?'click to fly in':'click to walk there'; if(sm2.textContent) tagEl.append(sm2); if(s.card){ const cd=document.createElement('span'); cd.className='cd'; cd.textContent=s.card; const tg=document.createElement('span'); tg.className='tg'; tg.textContent=s.tag||''; if(tg.textContent) cd.append(tg); tagEl.append(cd); } cv.classList.toggle('hov',!CLOSED.has(id)); tagEl.classList.add('on'); tagEl._x=e.clientX; tagEl._y=e.clientY; }
   else tagOff(); }
 function placeTag(){ if(!tagT) return; let x,y; if(tagT.c){ const h=screenOf(tagT.c.pos.clone().setY(tagT.c.height+.12)); x=h.x; y=h.y; } else { x=tagEl._x; y=tagEl._y-14; } tagEl.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`; }
 const CAST_ALL=()=>chars;

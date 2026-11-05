@@ -8,6 +8,7 @@ import { lookalike } from '../../../shared/vault/attacks.js';
 import { roomError } from '../../src/room-error.js';
 import { clearSessionAccount, sessionPill, visitor } from '../../design/D8_shops/js/session.js';
 import { installBoundary } from '../../src/panels/boundary.js';
+import { paintTrack } from '../../design/D8_shops/js/names.js';
 
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
@@ -43,6 +44,7 @@ function toast(text, kind = 'info') { const t = $('#log'); const li = document.c
 function busy(btn, on, label) { if (!btn) return; btn.disabled = on; if (on) { btn.dataset.l = btn.textContent; btn.textContent = label || 'Waiting for chain…'; } else if (btn.dataset.l) btn.textContent = btn.dataset.l; }
 function plainErr(e) { return roomError(e); }
 installBoundary(document.querySelector('main') || document.body);
+paintTrack('vault');
 const fail = e => toastHtml(`<b>Stopped:</b> ${esc(plainErr(e))}${e.tx ? ' · ' + txl(e.tx) : ''}`, 'bad err');
 function showLoadError(e) {
   const story = $('#story');

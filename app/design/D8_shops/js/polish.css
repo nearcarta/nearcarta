@@ -26,3 +26,4 @@ img.tok{width:1.05em;height:1.05em;vertical-align:-.16em;border-radius:50%;flex:
 @media (prefers-reduced-motion:reduce){#onboard,#onboard .ob-card{animation:none}}
 
 .skel{display:grid;gap:8px;margin:6px 0;width:100%;flex:1 1 100%}.skel i{display:block;height:14px;border-radius:7px;background:linear-gradient(90deg,#ffffff2e,#ffffff5c,#ffffff2e);background-size:200% 100%;animation:skel 1.2s linear infinite}.skel i:nth-child(2){width:80%}.skel i:nth-child(3){width:55%}@keyframes skel{to{background-position:-200% 0}}
+#t-track.shop-track{margin:2px 0 0;color:var(--brass,#d6b46a);font:650 12px/1.2 var(--sans);letter-spacing:.04em}

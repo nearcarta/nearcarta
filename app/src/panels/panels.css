@@ -6,6 +6,17 @@
 [data-testid=room-boundary]{color:#e8c08a;font-weight:600}
 .shop-page{max-width:880px;margin:0 auto;padding:16px}
 .shop-page h1{font-size:28px;margin:8px 0}
+
+/* Track name under the shop title on /shops/<id>/ pages */
+header.shop-page #t-track,
+header.top #t-track,
+.vault-head #t-track{
+  margin:0 0 8px;
+  color:#d6b46a;
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:.04em;
+}
 .hall-facts,.hall-meta dd{overflow-wrap:anywhere}
 .hall-meta{display:grid;gap:6px;margin:0}
 .hall-meta div{display:grid;grid-template-columns:4.5rem minmax(0,1fr);gap:8px;align-items:start}

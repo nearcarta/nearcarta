@@ -3,7 +3,7 @@
 // proof drawer as in 3D (#shopUI). Nothing leaves this page. Pins are % of the 1920x1080 still (object-fit:cover crop).
 const $=s=>document.querySelector(s); const body=document.body;
 const D8=new URL('../../D8_shops/',import.meta.url).href;
-import { NAME as NAMES } from '../../D8_shops/js/names.js';
+import { NAME as NAMES, TRACK, paintTrack } from '../../D8_shops/js/names.js';
 import { roomError } from '/room-error.js';
 import { mountIntro } from './intro-dom.js';
 import { beginEnter, finishEnter } from './room-lock.js';
@@ -22,7 +22,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
   addEventListener('keydown',e=>{ if(e.key==='Escape') introCtl?.skip(); });
   const img=$('#fbimg'); const town=img.getAttribute('src');
   try{ const pins=await (await fetch('shots/fallback_pins.json')).json(); const box=$('#fbpins'); const els=[];
-    for(const p of pins){ const d=document.createElement('button'); d.type='button'; d.className='fbpin'; d.dataset.id=p.id; d.title=p.card?`${p.name}: ${p.card}`:`Enter ${p.name}`; d.innerHTML=`<b></b><span></span>`; d.querySelector('b').textContent=p.name; d.querySelector('span').textContent=p.role; box.appendChild(d); els.push([d,p]); }
+    for(const p of pins){ const d=document.createElement('button'); d.type='button'; d.className='fbpin'; d.dataset.id=p.id; d.title=p.card?`${p.name}: ${p.card}`:`Enter ${p.name}`; d.innerHTML=`<b></b><span></span>`; d.querySelector('b').textContent=p.name; d.querySelector('span').textContent=TRACK[p.id]||p.role; box.appendChild(d); els.push([d,p]); }
     const nearest=ev=>{ let best=null,bd=1e9; for(const [el,p] of els){ const ax=parseFloat(el.style.left), ay=parseFloat(el.style.top); if(!Number.isFinite(ax)) continue; const d=Math.hypot(ev.clientX-ax,ev.clientY-ay); const r=el.getBoundingClientRect(); const inside=ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom; if((inside||d<48)&&d<bd){ bd=d; best=p; } } return best; };
     box.addEventListener('click',ev=>{ const pin=ev.target.closest?.('.fbpin'); if(!pin) return; ev.preventDefault(); const hit=nearest(ev); if(hit) open(hit.id); });
     /* Pins stay clear of the HUD (brand, account row, blurb on top; rules CTA and curfew below) and of each other,
@@ -49,7 +49,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
     try{ [core,m]=await Promise.all([import(D8+'js/core.js'),import(D8+'shops/'+id+'.js'+(bust?`?r=${bust}`:''))]); }catch(e){ err=e; console.error(`[Nearcarta 2D] shop "${id}" failed to load:`,e); }
     if(ticket!==generation) return;
     fbCur=id;
-    img.onerror=null; img.src=D8+'shots/fallback_'+id+'.jpg'; /* D8 room still (shots/rooms/ was never shipped, so no 404 first) */ /* D9-dressed still (sky, sea), D8 still if missing */ $('#fbpins').hidden=true; body.classList.add('in-shop'); ui.hidden=false; { const CT={house:"Set your agent's rules →",guard:'Write a rule like this for your agent →',arena:'Put your own charter in the arena →'}, c=$('#t-cta'); c.hidden=!CT[id]; if(CT[id]){ c.textContent=CT[id]; c.href=(window.NEARCARTA_CHARTER||'/shops/vault/')+(id==='house'?'#create':''); } } $('#t-title').textContent=NAMES[id];
+    img.onerror=null; img.src=D8+'shots/fallback_'+id+'.jpg'; /* D8 room still (shots/rooms/ was never shipped, so no 404 first) */ /* D9-dressed still (sky, sea), D8 still if missing */ $('#fbpins').hidden=true; body.classList.add('in-shop'); ui.hidden=false; { const CT={house:"Set your agent's rules →",guard:'Write a rule like this for your agent →',arena:'Put your own charter in the arena →'}, c=$('#t-cta'); c.hidden=!CT[id]; if(CT[id]){ c.textContent=CT[id]; c.href=(window.NEARCARTA_CHARTER||'/shops/vault/')+(id==='house'?'#create':''); } } $('#t-title').textContent=NAMES[id]; paintTrack(id);
     const b=$('#t-act'), d=$('#d-body'), src=$('#t-src');
     if(err){ src.textContent='error'; src.className='src error'; $('#t-label').textContent='This room could not load'; $('#t-hero').innerHTML=''; b.hidden=false; b.disabled=false; b.className='act primary'; b.textContent='Try again'; b.dataset.retry=id; b.onclick=()=>open(id, Date.now());
       d.textContent=roomError(err); door=finishEnter(door); return; }
@@ -57,7 +57,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
       arena:['mainnet','split','5 attacks on the lab oath','<b class="num">0</b><span class="unit">breaches</span>'], toll:['mainnet','split','0.001 NEAR pass on mainnet','<b class="num">11</b><span class="unit">of 16 nodes</span>'],
       chronicle:['record','mainnet','Refusals on the record','<b class="num">2</b><span class="unit">recorded refusals</span>'], house:['mainnet','split','Tip cap',tok('0.002','NEAR')] }[id];
     const info=m.FLAT||(F&&{src:F[0],cls:F[1],label:F[2],hero:F[3]})||{src:'mainnet',cls:'mainnet',label:'',hero:''};
-    src.textContent=info.src==='mainnet'?'mainnet':info.src; src.className='src '+info.cls; $('#t-label').textContent=info.label; $('#t-hero').innerHTML=info.hero;
+    src.textContent=info.src==='mainnet'?'mainnet':info.src; src.className='src '+info.cls; $('#t-label').textContent=info.label; paintTrack(id); $('#t-hero').innerHTML=info.hero;
     { const mo=$('#t-more'); mo.hidden=!m.MORE; if(m.MORE){ mo.href=m.MORE.href; mo.textContent=m.MORE.text; } }
     const end=END[id]; b.onclick=null; b.hidden=!end; if(end){ b.className='act res '+end[0]; b.disabled=true; b.textContent=end[1]; }
     d.innerHTML=(m.PROOF||'<p class="note">This room has no proof list in the 2D view.</p>')+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>'; $('#d-title').textContent=NAMES[id]+' · proof';

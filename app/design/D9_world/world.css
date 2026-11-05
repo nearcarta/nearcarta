@@ -141,6 +141,7 @@ body.story #zoom{opacity:0;pointer-events:none}
 /* ---------- hover name tag ---------- */
 #tag{position:fixed;left:0;top:0;z-index:14;pointer-events:none;transform:translate(-50%,-100%);font:600 11px var(--sans);letter-spacing:.03em;color:var(--parch);background:rgba(23,19,15,.82);border:1px solid rgba(214,180,106,.5);border-radius:8px;padding:3px 8px;white-space:nowrap;opacity:0;transition:opacity .12s}
 #tag.on{opacity:1} #tag small{color:var(--brass);font-weight:500;margin-left:5px}
+#tag small.trk{display:block;margin:2px 0 0;margin-left:0;font:650 11px/1.2 var(--sans);letter-spacing:.04em;color:var(--brass)}
 #tag .cd{display:block;width:max-content;max-width:250px;white-space:normal;margin-top:4px;font:400 11px/1.4 var(--sans);letter-spacing:0;color:var(--parch2,#d9ccb4)} #tag .tg{display:block;margin-top:3px;font:500 10px var(--mono,ui-monospace,monospace);color:var(--brass)}
 #shopMenu small{line-height:1.35}
 
