@@ -778,6 +778,9 @@ export function register(app, { limiter, globalCap }) {
     factory: MAINNET_DEP?.board?.contract || null,
     board: MAINNET_DEP?.board?.contract || null,
     arena: { charter: MAINNET_DEP?.extras?.arena?.contract || null, merchants: [MAINNET_DEP?.charter?.contract, MAINNET_DEP?.toll?.contract].filter(Boolean) },
+    // Browser cards call .map on these; omit them and /shops/vault/ throws on load.
+    tasks: TASKS,
+    attacks: ATTACKS,
     explorer: 'https://nearblocks.io',
     rpc: MAINNET_DEP?.rpc || cfg.mainnetRpc,
     rpc_fallbacks: [],

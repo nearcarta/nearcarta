@@ -162,7 +162,7 @@ async function renderFacts() {
     <li class="${f.dao ? 'ok' : ''}">Co-guardian DAO: ${f.dao ? `<code>${esc(f.dao)}</code>` : 'none'}</li>
     <li class="${f.setup_open ? 'todo' : 'ok'}" data-testid="setup">${f.setup_open ? 'Setup window open: the first rules and agent key apply at once. Adding the agent key closes it.' : 'Setup closed: loosening rules or a new agent key now waits the timelock'}</li>
     <li>Balance: ${fmt(f.balance)}</li>
-    <li class="${cl ? 'ok' : 'todo'}">${cl ? `Rules: pays only ${cl.receivers.map(esc).join(', ')} · max ${fmt(cl.per_action_cap)} each · ${fmt(cl.daily_budget)} a day · ${cl.max_actions_per_day || '∞'} payments a day` : 'No rules yet'}</li>
+    <li class="${cl ? 'ok' : 'todo'}">${cl ? `Rules: pays only ${(cl.receivers || []).map(esc).join(', ')} · max ${fmt(cl.per_action_cap)} each · ${fmt(cl.daily_budget)} a day · ${cl.max_actions_per_day || '∞'} payments a day` : 'No rules yet'}</li>
     ${u ? `<li>Today: spent ${fmt(u.spent)} in ${u.count} payments</li>` : ''}
     <li class="${keyLive ? 'ok' : 'todo'}" data-testid="agent-key">${keyLive ? `Agent key in this browser, can only call <code>propose</code>` : pendWaiting ? 'New agent key made in this browser, waiting for its timelock' : 'No agent key in this browser yet'}</li></ul></details>
     ${queued.length ? `<h3>Waiting in the timelock</h3><ul class="facts" data-testid="pending">${queued.map(([id, p]) => {
@@ -344,7 +344,8 @@ function record(s, who) {
 
 // ---------- ask the agent to pay ----------
 function quickCards() {
-  $('#mine .tsks').innerHTML = CFG.tasks.map(t => `<button class="atk tsk" data-where="mine" data-task="${esc(t.id)}" data-testid="task-mine-${esc(t.id)}">
+  const tasks = CFG.tasks || [];
+  $('#mine .tsks').innerHTML = tasks.map(t => `<button class="atk tsk" data-where="mine" data-task="${esc(t.id)}" data-testid="task-mine-${esc(t.id)}">
     <b>${esc(t.name)}</b><em class="ok">allowed</em></button>`).join('');
   for (const b of $('#mine .tsks').querySelectorAll('.tsk')) b.onclick = () => task(b).catch(fail).finally(unlock);
 }
@@ -368,7 +369,7 @@ async function ask(e) {
   } catch (er) { brain = { by: 'fallback', fallback_why: 'model route failed: ' + er.message }; }
   finally { busy(btn, false); }
   if (!q) {
-    try { q = parseAsk(text, CFG.arena.merchants.concat(lastRules?.receivers || []), 'mine'); }
+    try { q = parseAsk(text, (CFG.arena?.merchants || []).concat(lastRules?.receivers || []), 'mine'); }
     catch (er) { out.innerHTML = `<p class="verdict bad" data-testid="verdict">${esc(er.message)}</p>`; return; }
   }
   lock(); busy(btn, true, 'Agent is paying…');
@@ -404,9 +405,11 @@ function setTarget(t) {
 }
 function arenaCards() {
   const w = target;
-  $('#arena .tsks').innerHTML = CFG.tasks.map(t => `<button class="atk tsk" data-where="${w}" data-task="${esc(t.id)}" data-testid="task-${w}-${esc(t.id)}" title="${esc(t.story)}">
+  const tasks = CFG.tasks || [];
+  const attacks = CFG.attacks || [];
+  $('#arena .tsks').innerHTML = tasks.map(t => `<button class="atk tsk" data-where="${w}" data-task="${esc(t.id)}" data-testid="task-${w}-${esc(t.id)}" title="${esc(t.story)}">
     <b>${esc(t.name)}</b><em class="ok">allowed</em></button>`).join('');
-  $('#arena .scams').innerHTML = CFG.attacks.map(a => `<button class="atk scam" data-where="${w}" data-attack="${esc(a.id)}" data-testid="atk-${w}-${esc(a.id)}" title="${esc(a.story)}">
+  $('#arena .scams').innerHTML = attacks.map(a => `<button class="atk scam" data-where="${w}" data-attack="${esc(a.id)}" data-testid="atk-${w}-${esc(a.id)}" title="${esc(a.story)}">
     <b>${esc(a.name)}</b><em>${esc(plain(a.expects))}</em></button>`).join('');
   for (const b of $('#arena .tsks').querySelectorAll('.tsk')) b.onclick = () => task(b).catch(fail).finally(unlock);
   for (const b of $('#arena .scams').querySelectorAll('.scam')) b.onclick = () => attack(b).catch(fail).finally(unlock);
@@ -557,7 +560,7 @@ async function main() {
     else factoryLine.innerHTML = `Factory <code>${esc(CFG.factory)}</code> · code hash <code title="${esc(CFG.code_hash)}">${esc(short(CFG.code_hash))}</code> · ${txl(CFG.proof_txs?.factory_full_access_key_deleted, 'factory keys deleted')}`;
   }
   $('#arena-id').textContent = CFG.arena.charter;
-  $('#ex-look').textContent = lookalike(CFG.arena.merchants[0]);
+  $('#ex-look').textContent = lookalike((CFG.arena?.merchants || [])[0] || '');
   quickCards(); setTarget('shared');
   const rl = CFG.runner; if (rl) $('#runner').title = `Shared runner: ${rl.left_today} of ${rl.daily_tx_cap} transactions left today (UTC), ${rl.gas_tgas} Tgas each.`;
   connector.on('wallet:signIn', () => refreshWho().then(signedIn).catch(fail));

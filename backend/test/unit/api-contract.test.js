@@ -99,3 +99,13 @@ test('CORS refuses an unknown origin', async () => {
   const r = await app.request('/api/deployments', { method: 'OPTIONS', headers: { origin: 'https://evil.example', 'access-control-request-method': 'GET' } });
   assert.notEqual(r.headers.get('access-control-allow-origin'), 'https://evil.example');
 });
+
+test('/api/vault/config returns tasks and attacks arrays the House page maps over', async () => {
+  const r = await get('/api/vault/config');
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.ok(Array.isArray(j.tasks) && j.tasks.length > 0, 'tasks missing');
+  assert.ok(Array.isArray(j.attacks) && j.attacks.length > 0, 'attacks missing');
+  assert.ok(j.tasks.every(t => t.id && t.name), 'task shape');
+  assert.ok(j.attacks.every(a => a.id && a.name), 'attack shape');
+});
