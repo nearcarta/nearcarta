@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 482 backend unit tests (479 pass, 3 skipped), offline
+npm test                                   # 487 backend unit tests (484 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -182,7 +182,7 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 482 unit tests (479 pass, 3 skipped)
+npm test                 # 487 unit tests (484 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -205,7 +205,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote, then Load cargo | A deposit address when the quote is at most 0.20 USD. The boat says delivered only after status is SUCCESS. Guest Load cargo stays a demo and says so. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js` | unit `a session load plans a deposit and a guest load stays a demo`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 482 unit tests (479 pass, 3 skipped):
+# 487 unit tests (484 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).

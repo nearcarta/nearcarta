@@ -9,6 +9,7 @@ import qrcode from 'qrcode-generator';
 import { wallet, mainnetWallet, account, mainnetAccount, connect, disconnect, onWallet, readyBoardKey } from './house.js';
 import { balanceOn } from './onboard.js';
 import { setupJourney } from '../../shared/setup/path.js';
+import { rulesDiff, rulesLiveHint, signRulesUpdate, updatePlan, RULES_DEPOSIT_YOCTO } from '../../shared/setup/rules-diff.js';
 import { tryTiles } from '../../shared/setup/try-tiles.js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
@@ -85,7 +86,7 @@ function top() {
   net.textContent = journey().badge;
   net.dataset.testid = 'setup-net';
   $('#who').innerHTML = me ? `<span data-testid="setup-who">${esc(short(me))}</span> · <span data-testid="setup-bal">${bal === undefined ? '…' : bal == null ? '? NEAR' : fmtN(nearOf(bal)) + ' NEAR'}</span><button class="btn link sm" id="out">Sign out</button>` : '';
-  const o = $('#out'); if (o) o.onclick = async () => { await disconnect(); await mainnetWallet().disconnect().catch(() => {}); await privy?.auth.logout().catch(() => {}); me = null; bal = undefined; st.done = []; st.trial = false; delete st.accountId; save(); go(0); };
+  const o = $('#out'); if (o) o.onclick = async () => { await disconnect(); await mainnetWallet().disconnect().catch(() => {}); await privy?.auth.logout().catch(() => {}); me = null; bal = undefined; st.done = []; st.trial = false; delete st.accountId; chainRow = null; chainLoadedFor = ''; chainError = ''; save(); go(0); };
 }
 const head = (eye, h, lede) => `${stepNav()}<p class="eyebrow">Step ${st.step + 1} of ${STEPS.length} · ${esc(eye)}</p><h1>${h}</h1>${lede ? `<p class="lede">${lede}</p>` : ''}`;
 const nav = (next, { back = true, nextOk = true, label = 'Continue' } = {}) => `<div class="actions">${back && st.step > 0 ? '<button class="btn" id="back">Back</button>' : '<span></span>'}${next ? `<button class="btn gold" id="next" data-testid="setup-next" ${nextOk ? '' : 'disabled'}>${esc(label)} →</button>` : ''}</div>`;
@@ -298,6 +299,7 @@ function sRules() {
   return head('Rules', 'Write the rules it cannot break.', (boardLive()
       ? 'These become your row on the mainnet board. Closing the row sends its storage and whatever is left unspent back to you.'
       : 'These stay in this browser with your character. The mainnet board is not deployed yet, so this page does not write them into a contract.')
+    + rulesLiveHint(boardLive() && !st.trial && rowLive())
     + `<div class="grid2"><div class="field"><label for="cap">Max per payment</label><div class="suffix"><input id="cap" type="number" step="0.001" min="0.001" value="${r.cap}" data-testid="rule-cap"><span>NEAR</span></div><p class="small muted">The most one payment can be. Bigger ones are refused.</p></div>
        <div class="field"><label for="daily">Daily budget</label><div class="suffix"><input id="daily" type="number" step="0.001" min="0.001" value="${r.daily}" data-testid="rule-daily"><span>NEAR</span></div><p class="small muted">All payments in one day added up.</p></div>
        <div class="field"><label for="per">Payments per day</label><div class="suffix"><input id="per" type="number" min="1" max="100" value="${r.per}" data-testid="rule-per"><span>per day</span></div><p class="small muted">How many payments the agent may make each day.</p></div>
@@ -316,6 +318,29 @@ function wireRules() {
 
 // ---------- 6. Sign ----------
 let signLog = [];
+let chainRow = null, chainLoadedFor = '', chainError = '';
+const rowLive = () => !!(st.charter && localStorage.getItem(agentLS(st.charter)));
+function agentMismatch(row) {
+  if (!row?.agent || !me) return false;
+  const sec = localStorage.getItem(agentLS(me));
+  if (!sec) return false;
+  try { return pubkeyHex(keyFrom(sec)) !== row.agent; } catch { return false; }
+}
+function limitLine(row) {
+  const shops = (row.receivers || []).join(', ');
+  return `On chain now: ${fmtN(nearOf(row.per_action_cap))} NEAR per payment, ${fmtN(nearOf(row.daily_budget))} NEAR a day, ${row.max_actions_per_day} payments, ${shops}`;
+}
+function signItems(onBoard, live, changed) {
+  if (!onBoard) return [['Create your charter', 'create'], ['Write the rule and add the agent key', 'rules']];
+  const updating = !!(live && (changed || signLog.some(x => x.k === 'rules' || x.k === 'calls' || x.k === 'agent')));
+  if (!updating) return [['Open your row', 'create'], ['Let your agent sign by itself', 'key']];
+  const items = [];
+  if (signLog.some(x => x.k === 'agent') || agentMismatch(chainRow)) items.push(['Set the agent key', 'agent']);
+  items.push(['Write your rules', 'rules'], ['Write the shop allowlist', 'calls']);
+  const wrote = signLog.find(x => x.k === 'rules');
+  if (wrote?.state === 'ok' && chainRow && !changed) items.push([limitLine(chainRow), 'now']);
+  return items;
+}
 function sSign() {
   if (!st.trial && !boardLive()) {
     const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
@@ -328,17 +353,27 @@ function sSign() {
       + errP() + nav(true, { label: 'Continue' });
   }
   const onBoard = boardLive() && !st.trial;
-  const r = rules(), id = st.charter || (onBoard ? me : `${st.agentName}.${CFG.factory}`), live = st.charter && localStorage.getItem(agentLS(st.charter));
+  const r = rules(), id = st.charter || (onBoard ? me : `${st.agentName}.${CFG.factory}`), live = rowLive();
+  const update = signRulesUpdate({ live: !!(live && onBoard), local: r, row: onBoard ? chainRow : null });
   const stake = onBoard ? '0.02' : fmtN(st.deposit);
-  const L = onBoard ? [['Open your row', 'create'], ['Let your agent sign by itself', 'key']] : [['Create your charter', 'create'], ['Write the rule and add the agent key', 'rules']];
-  return head('Sign', live ? 'Your agent is live.' : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), live ? 'These limits are read back from the chain, not from this page.' : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code> and <code>propose_call</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`))
+  const L = signItems(onBoard, live, update.changed);
+  const help = `<div id="signhelp" class="tabhelp" hidden data-testid="sign-tabhelp"><p class="small">The approval opened in another browser tab. Switch to it and approve. This page moves on by itself.</p><button type="button" class="btn" id="resign" data-testid="sign-reopen">Switch to approval tab</button></div>`;
+  const lede = live
+    ? (update.changed
+      ? 'Your saved rules differ from the chain. Update my rules writes them in one approval. The numbers below are what the chain has now.'
+      : 'These limits are read back from the chain, not from this page.')
+    : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code> and <code>propose_call</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`);
+  const factsHtml = onBoard && chainRow ? boardFacts(chainRow) : (onBoard && chainError ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div>` : '<div class="fact"><small>Reading your charter from the chain</small><b>…</b></div>');
+  return head('Sign', live ? 'Your agent is live.' : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), lede)
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
-    + (live ? `<div class="facts" id="facts" data-testid="setup-facts"><div class="fact"><small>Reading your charter from the chain</small><b>…</b></div></div>` : `<div class="preview">${preview(r)}</div>`)
-    + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
+    + (live ? `<div class="facts" id="facts" data-testid="setup-facts">${factsHtml}</div>` : `<div class="preview">${preview(r)}</div>`)
+    + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}" data-testid="setup-sign-${esc(k)}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
+    + update.html
+    + (update.changed ? help : '')
     + (live ? '' : (onBoard && bal != null && nearOf(bal) < SIGN_MIN
         ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
-        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.005 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your charter's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>`)
-      + `<div id="signhelp" class="tabhelp" hidden data-testid="sign-tabhelp"><p class="small">The approval opened in another browser tab. Switch to it and approve. This page moves on by itself.</p><button type="button" class="btn" id="resign" data-testid="sign-reopen">Switch to approval tab</button></div>`) + errP() + nav(live, { label: 'Try your agent' });
+        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.005 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your charter's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>${help}`))
+    + errP() + nav(live, { label: 'Try your agent' });
 }
 async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
 async function accountOn(id, network) {
@@ -374,6 +409,24 @@ async function agentAccessKey(sec) {
   const fc = ak?.permission?.FunctionCall;
   return fc && fc.receiver_id === MAIN.board.contract && fc.method_names.includes('propose') ? ak : null;
 }
+// Existing row: set_rules and set_calls, plus set_agent only when the key differs.
+// One signAndSendTransactions batch. The access-key add stays on the first Approve path.
+function ruleUpdateTransactions(row, r, sec) {
+  const key = keyFrom(sec);
+  const contract = MAIN.board.contract;
+  const plan = updatePlan({
+    rowAgent: row.agent,
+    agentHex: pubkeyHex(key),
+    rulesDepositYocto: RULES_DEPOSIT_YOCTO,
+    callsDepositYocto: CALLS_DEPOSIT_YOCTO,
+  });
+  return plan.map(step => {
+    const args = step.method === 'set_agent' ? { agent: key.publicKey }
+      : step.method === 'set_rules' ? { rules: ruleArgs(r) }
+      : callPolicy(r.receivers, toY(r.cap), toY(r.daily));
+    return [step.key, { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: step.method, args, gas: (GAS.agent * TG).toString(), deposit: step.deposit } }] }];
+  });
+}
 async function signBoard() {
   const r = rules(), w = await mainnetWallet().wallet(), contract = MAIN.board.contract;
   const mark = (k, state, tx) => { const s = signLog.find(x => x.k === k); if (s) Object.assign(s, { state, tx: tx || s.tx }); else signLog.push({ k, state, tx }); render(); };
@@ -389,9 +442,8 @@ async function signBoard() {
   else {
     // Update receivers/caps without close_charter (storage charge only; unused deposit refunded).
     // Source: contracts/charter_board/src/lib.rs set_rules + charge.
-    if (row.agent !== pubkeyHex(keyFrom(sec))) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: pk }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
-    txs.push(['rules', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_rules', args: { rules: ruleArgs(r) }, gas: (GAS.agent * TG).toString(), deposit: toY(0.001) } }] }]);
-    txs.push(['calls', { receiverId: contract, actions: [calls] }]);
+    // The step key 'create' is the open-row line on a first approval. Update my rules keeps 'agent'.
+    for (const [k, tx] of ruleUpdateTransactions(row, r, sec)) txs.push([k === 'agent' ? 'create' : k, tx]);
   }
   // Allowance cannot be raised on a key that is already on the account. Sign replaces it
   // (delete, then add the same key) so one approval refreshes the 0.05 gas budget.
@@ -414,25 +466,69 @@ async function signBoard() {
   mark('key', ak ? 'ok' : 'run');
   done(5); await refreshBal();
 }
+function noteSign(k, state, tx) {
+  const s = signLog.find(x => x.k === k);
+  if (s) Object.assign(s, { state, tx: tx || s.tx });
+  else signLog.push({ k, state, tx });
+}
+async function updateRules() {
+  const r = rules();
+  const w = await mainnetWallet().wallet();
+  const contract = MAIN.board.contract;
+  const readRpc = rpcClient([MAIN.rpc]);
+  const row = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null);
+  if (!row) throw new Error('No charter row on chain yet.');
+  chainRow = row;
+  adoptPluginKey(me);
+  const sec = localStorage.getItem(agentLS(me));
+  if (!sec) throw new Error('No agent key in this browser.');
+  const txs = ruleUpdateTransactions(row, r, sec);
+  // One wallet approval for set_rules, set_calls, and set_agent when the key differs.
+  const out = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: txs.map(t => t[1]) }) : [];
+  let res = out;
+  if (!w.signAndSendTransactions) for (const t of txs) res.push(await w.signAndSendTransaction(t[1]));
+  txs.forEach(([k], i) => noteSign(k, 'ok', txHashOf(res?.[i])));
+  let next = null;
+  for (let i = 0; i < 20; i++) {
+    next = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null);
+    if (next && !rulesDiff(r, next).length) break;
+    await wait(1500);
+  }
+  if (next) chainRow = next;
+  chainLoadedFor = me;
+  if (!next || rulesDiff(r, next).length) throw new Error('The row has not caught up yet. Wait a few seconds and press Update my rules again.');
+  done(5);
+  await refreshBal();
+}
 async function sign() {
   if (boardLive()) return signBoard();
   done(5);
 }
+function boardFacts(row) {
+  const key = me ? localStorage.getItem(agentLS(me)) : '';
+  let bound = 'not the key in this browser';
+  try { if (key && pubkeyHex(keyFrom(key)) === row?.agent) bound = 'bound to this browser'; } catch { /* unreadable key */ }
+  return [['Charter', acA(me)], ['Row balance', fmtN(nearOf(row?.balance)) + ' NEAR'], ['Row storage', fmtN(nearOf(row?.storage_locked)) + ' NEAR'],
+    ['Max per payment', fmtN(nearOf(row?.per_action_cap)) + ' NEAR'], ['Daily budget', fmtN(nearOf(row?.daily_budget)) + ' NEAR'],
+    ['Allowed shops', esc((row?.receivers || []).join(', '))],
+    ['Expires', row?.expires_at && row.expires_at !== '0' ? new Date(Number(BigInt(row.expires_at) / 1_000_000n)).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' }) : 'none'],
+    ['Agent key', bound]]
+    .map(([a, b]) => `<div class="fact"><small>${a}</small><b>${b}</b></div>`).join('');
+}
+async function ensureChainRow() {
+  if (!me || !boardLive() || st.trial) return;
+  if (chainLoadedFor === me) return;
+  const owner = me;
+  chainLoadedFor = owner;
+  const row = await viewFn(rpcClient([MAIN.rpc]), MAIN.board.contract, 'get_charter', { owner }).catch(() => null);
+  if (owner !== me) return;
+  chainRow = row;
+  chainError = row ? '' : 'The chain did not answer. Refresh the page to try again.';
+  if (STEPS[st.step][0] === 'sign') render();
+}
 async function facts() {
   const el = $('#facts'); if (!el || !st.charter) return;
   try {
-    if (boardLive() && !st.trial) {
-      const readRpc = rpcClient([MAIN.rpc]);
-      const row = await viewFn(readRpc, MAIN.board.contract, 'get_charter', { owner: me });
-      const key = localStorage.getItem(agentLS(me));
-      el.innerHTML = [['Charter', acA(me)], ['Row balance', fmtN(nearOf(row?.balance)) + ' NEAR'], ['Row storage', fmtN(nearOf(row?.storage_locked)) + ' NEAR'],
-        ['Max per payment', fmtN(nearOf(row?.per_action_cap)) + ' NEAR'], ['Daily budget', fmtN(nearOf(row?.daily_budget)) + ' NEAR'],
-        ['Allowed shops', esc((row?.receivers || []).join(', '))],
-        ['Expires', row?.expires_at && row.expires_at !== '0' ? new Date(Number(BigInt(row.expires_at) / 1_000_000n)).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' }) : 'none'],
-        ['Agent key', key && pubkeyHex(keyFrom(key)) === row?.agent ? 'bound to this browser' : 'not the key in this browser']]
-        .map(([a, b]) => `<div class="fact"><small>${a}</small><b>${b}</b></div>`).join('');
-      return;
-    }
     const readRpc = st.trial ? rpc : rpcClient([MAIN.rpc]);
     const read = (m, a) => viewFn(readRpc, st.charter, m, a);
     const cl = await read('get_clauses'); const c = (Array.isArray(cl) ? cl.find(x => (x.id || x[0]) === 'pay') : cl?.pay) || cl?.[0]; const k = c?.clause || c?.[1] || c;
@@ -449,12 +545,16 @@ async function facts() {
 function wireSign() {
   if (!st.trial && !boardLive()) { wire(() => { done(5); go(6); }); return; }
   const tf = $('#tofund'); if (tf) tf.onclick = e => { e.preventDefault(); go(1); };
-  const run = () => act(b, async () => {
+  const watch = (btn, job) => act(btn, async () => {
     const t = setTimeout(() => { if (busy && document.hasFocus()) { const h = $('#signhelp'); if (h) h.hidden = false; } }, 3000);
-    try { await sign(); } catch (e) { throw new Error(plainErr(e)); } finally { clearTimeout(t); }
+    try { await job(); } catch (e) { throw new Error(plainErr(e)); } finally { clearTimeout(t); }
   });
-  const b = $('#sign'); if (b) b.onclick = run;
-  const rs = $('#resign'); if (rs) rs.onclick = () => { busy = false; const h = $('#signhelp'); if (h) h.hidden = true; run(); }; wire(() => { done(5); go(6); }); facts();
+  const b = $('#sign'); if (b) b.onclick = () => watch(b, sign);
+  const up = $('[data-testid=setup-update-rules]'); if (up) up.onclick = () => watch(up, updateRules);
+  const rs = $('#resign'); if (rs) rs.onclick = () => { busy = false; const h = $('#signhelp'); if (h) h.hidden = true; if (up) watch(up, updateRules); else if (b) watch(b, sign); };
+  wire(() => { done(5); go(6); });
+  if (boardLive() && !st.trial && rowLive()) ensureChainRow();
+  else facts();
 }
 
 // ---------- 7. Try ----------
