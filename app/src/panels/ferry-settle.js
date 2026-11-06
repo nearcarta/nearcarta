@@ -163,7 +163,7 @@ export function quoteRecipient(to, me, other) {
   return isNearAccountId(me) ? me : '';
 }
 
-export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo, visitor }) {
+export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo, visitor, session }) {
   const fromSym = pair.fromSym || String(pair.from || '').split('@')[0];
   const fromChain = pair.fromChain || String(pair.from || '').split('@')[1];
   const toSym = pair.toSym || String(pair.to || '').split('@')[0];
@@ -183,5 +183,7 @@ export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refund
   // 1Click, for a NEAR token, is paid to the visitor. Those are different accounts.
   const swap = quoteRecipient({ chain: toChain }, visitor, '');
   if (swap) body.swap_recipient = swap;
+  // Board rows live on the board contract (get_charter { owner }), not on the visitor account.
+  if (session === 'board') body.board = true;
   return body;
 }

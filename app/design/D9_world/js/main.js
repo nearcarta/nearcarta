@@ -238,6 +238,7 @@ function jump(id,opt,tries=0){ id=ALIAS[id]||id; if(!OPEN[id]||tries>8) return;
   if(exiting||body.classList.contains('entering')||door.busy){ if(tries>4&&!inShop){ door={busy:false,id:null}; body.classList.remove('entering'); } setTimeout(()=>jump(id,opt,tries+1),350); return; }
   const next=beginEnter({busy:!!(inShop||door.busy),id:inShop||door.id},id); if(next.ignored){ setTimeout(()=>jump(id,opt,tries+1),350); return; } door={busy:true,id}; if(mode==='story') endStory(); if(mode!=='explore') explore(true); tagOff(); const s=SHOPS[id], d=hx(...s.door), c=hx(s.q,s.r);
   world.enterShop(id,opt).then(()=>{ if(inShop!==id) return; R.steer=null; R.stop(); R.place(d.x,d.z,Math.atan2(d.x-c.x,d.z-c.z)); }); }
+window.__openCityShop = (id) => jump(id);
 // ---------- Walk / Jump ----------
 const TOUCH=matchMedia('(pointer:coarse)').matches||P.has('touch'); if(TOUCH) body.classList.add('touch');
 let play=P.get('play')==='walk'?'walk':'jump'; const seg=$('#playSeg'); const hintEl=$('#hint');

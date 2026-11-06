@@ -223,8 +223,87 @@ test('a visitor board row is the checkout gate when the account has no oath', as
   const got = await readCharterRules(owner, 'pay', viewFn);
   assert.equal(got.clause.receivers[0], 'payee.near');
   assert.equal(got.clause.per_action_cap, row.per_action_cap);
+  assert.equal(calls.some(([, method]) => method === 'get_rules' || method === 'get_state'), false);
   assert.equal(calls.some(([, method]) => method === 'get_charter'), true);
   assert.equal(calls.find(([, method]) => method === 'get_charter')[0], 'board.nearcarta.near');
+});
+
+test('an implicit row skips get_rules, a named miss falls through, and a factory charter still uses get_rules', async () => {
+  const owner = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8';
+  const miss = `view ${owner}.get_rules: wasm execution failed with error: CompilationError(CodeDoesNotExist { account_id: "${owner}" })`;
+  const row = {
+    frozen: false, receivers: ['charter.nearcarta.near', 'toll.nearcarta.near', 'wrap.near'],
+    per_action_cap: '60000000000000000000000', daily_budget: '70000000000000000000000',
+    max_actions_per_day: 5, min_amount: '100000000000000000000', spent_today: '0', actions_today: 0,
+  };
+  const calls = [];
+  const viewFn = async (account, method, args) => {
+    calls.push({ account, method, args });
+    if (method === 'get_state' || method === 'get_rules') throw new Error(miss);
+    if (method === 'get_charter') return row;
+    throw new Error(method);
+  };
+  const got = await readCharterRules(owner, 'pay', viewFn);
+  assert.equal(calls.some(c => c.method === 'get_rules' || c.method === 'get_state'), false);
+  assert.deepEqual(calls[0], { account: 'board.nearcarta.near', method: 'get_charter', args: { owner } });
+  assert.equal(got.clause.per_action_cap, '60000000000000000000000');
+  assert.equal(got.clause.receivers[2], 'wrap.near');
+
+  calls.length = 0;
+  const named = 'visitor.near';
+  const namedView = async (account, method) => {
+    calls.push({ account, method });
+    if (account === named) throw new Error(`view ${named}.${method}: wasm execution failed with error: CompilationError(CodeDoesNotExist { account_id: "${named}" })`);
+    if (method === 'get_charter') return row;
+    throw new Error(method);
+  };
+  const namedGot = await readCharterRules(named, 'pay', namedView);
+  assert.equal(namedGot.clause.receivers[0], 'charter.nearcarta.near');
+  assert.equal(calls.filter(c => c.account === 'board.nearcarta.near' && c.method === 'get_charter').length, 1);
+
+  calls.length = 0;
+  const oath = async (account, method) => {
+    calls.push({ account, method });
+    if (method === 'get_state') return { frozen: false, next_nonce: '1', policy_version: 1 };
+    if (method === 'get_rules') return { clause: { receivers: ['payee.near'], per_action_cap: '1' }, usage: { spent: '0' } };
+    throw new Error('board read on a factory charter');
+  };
+  const oathGot = await readCharterRules('mine.factory.near', 'pay', oath);
+  assert.equal(oathGot.clause.receivers[0], 'payee.near');
+  assert.equal(calls.some(c => c.method === 'get_charter'), false);
+  assert.equal(calls.some(c => c.method === 'get_rules' && c.account === 'mine.factory.near'), true);
+
+  calls.length = 0;
+  const flagged = await readCharterRules('visitor.near', 'pay', namedView, { board: true });
+  assert.equal(flagged.clause.receivers[2], 'wrap.near');
+  assert.equal(calls.some(c => c.method === 'get_rules' || c.method === 'get_state'), false);
+});
+
+test('checkout with board:true asks the gate for the row and does not quote a missing charter', async () => {
+  const saved = { ...checkoutDeps };
+  const seen = [];
+  checkoutDeps.readCharter = async (account, clause, opts) => { seen.push({ account, clause, opts }); return allow(); };
+  checkoutDeps.tokens = async () => tokens;
+  checkoutDeps.quote = async () => ({ ok: false, error: 'stop before 1Click' });
+  checkoutDeps.postQuote = async () => { throw new Error('live quote should not run'); };
+  const scholar = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8';
+  const body = (extra) => ({
+    from: 'wNEAR@near', to: 'USDC@near', amount: '0.05', recipient: 'payee.near',
+    refundTo: 'nearcarta.near', clause_id: 'pay', amount_yocto: '1', swap_recipient: scholar, ...extra,
+  });
+  try {
+    const board = await startCheckout(body({ charter: scholar, board: true }));
+    assert.equal(board.depositAddress, null);
+    assert.equal(board.reason, 'quote_refused');
+    assert.equal(seen[0].opts.board, true);
+    assert.equal(seen[0].account, scholar);
+    const factory = await startCheckout(body({ charter: 'charter.nearcarta.near' }));
+    assert.equal(factory.reason, 'quote_refused');
+    assert.equal(seen[1].opts.board, false);
+    assert.equal(seen[1].account, 'charter.nearcarta.near');
+  } finally {
+    Object.assign(checkoutDeps, saved);
+  }
 });
 
 test('startCheckout does not call the network when the body is empty', async () => {

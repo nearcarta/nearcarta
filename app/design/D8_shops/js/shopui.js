@@ -46,10 +46,10 @@ function ensureFerryDock() {
   // Mix sketch: character on the right; chat popup (input + send INSIDE) opens beside it.
   d.innerHTML = `<div id="ferry-agent-pop" class="ferry-agent-pop" data-testid="ferry-agent" hidden>
       <p id="f-agent-log" class="ferry-agent-log" data-testid="ferry-agent-log" hidden></p>
-      <div class="ferry-agent-row">
+      <form id="f-agent-form" class="ferry-agent-row" data-testid="ferry-agent-form">
         <input id="f-agent" data-testid="ferry-agent-input" placeholder="Swap 0.05 wNEAR on NEAR to USDC" autocomplete="off" aria-label="Ask the AI Agent">
-        <button type="button" class="ferry-agent-send" id="f-agent-go" data-testid="ferry-agent-go" aria-label="Send">➤</button>
-      </div>
+        <button type="submit" class="ferry-agent-send" id="f-agent-go" data-testid="ferry-agent-go" aria-label="Send">➤</button>
+      </form>
     </div>
     <button type="button" class="ferry-agent-char" data-testid="ferry-agent-toggle" aria-expanded="false" aria-controls="ferry-agent-pop" title="AI Agent">
       <span class="ferry-agent-badge" aria-hidden="true">⋯</span>
@@ -81,9 +81,11 @@ function wireFerryDock(hooks) {
   });
   const go = d.querySelector('#f-agent-go');
   const input = d.querySelector('#f-agent');
+  const form = d.querySelector('#f-agent-form');
   const send = (e) => { e?.preventDefault?.(); return dispatchFerryDock(document); };
   if (go) go.onclick = send;
-  if (input) input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); send(e); } };
+  if (form) form.onsubmit = send;
+  if (input) input.onkeydown = (e) => { if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) { e.preventDefault(); send(e); } };
 }
 function ferryPlainReason(reason) {
   const raw = String(reason || '');

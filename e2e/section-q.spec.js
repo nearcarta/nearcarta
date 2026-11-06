@@ -7,7 +7,7 @@ const OWNER = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8'
 const SHOPS = [
   ['/shops/bank/', 'Mist Bank'],
   ['/shops/hall/', 'Town Hall'],
-  ['/shops/ferry/', 'Ferry'],
+  ['/?shop=ferry', 'Ferry'],
   ['/shops/guard/', 'Guardhouse'],
   ['/shops/arena/', 'Vault Arena'],
   ['/shops/toll/', 'Toll Bridge'],

@@ -153,6 +153,11 @@ test('dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not', async ()
   fire('keydown', input, { key: 'Enter' });
   await lastFerryDockSend();
   assert.equal(calls.length, 2);
+  const form = { id: 'f-agent-form', closest(sel) { return sel === '#f-agent-form' ? this : null; } };
+  input.value = phrase;
+  fire('submit', form);
+  await lastFerryDockSend();
+  assert.equal(calls.length, 3);
   armFerryDock(async () => ({ ok: false, hint: explainQuoteMiss('1Click answered HTTP 400: Amount is too low for bridge, try at least 1671417') }));
   input.value = 'swap 0.2 USDC on base to ZEC';
   fire('click', go);
@@ -172,6 +177,9 @@ test('the city send button is re-armed after every bind and cannot no-op', () =>
   assert.match(ui, /armFerryDock/);
   assert.match(ui, /go\.onclick = send/);
   assert.match(ui, /e\.key === 'Enter'/);
+  assert.match(ui, /id="f-agent-form"/);
+  assert.match(ui, /type="submit"/);
+  assert.match(ui, /form\.onsubmit = send/);
   assert.match(ui, /dispatchFerryDock\(document\)/);
   const deep = read('app/src/panels/deep.js');
   assert.match(deep, /armFerryDock\(\(text\) => runAgent\(text\)\)/);
@@ -181,6 +189,8 @@ test('the city send button is re-armed after every bind and cannot no-op', () =>
   const dock = read('app/src/panels/ferry-dock.js');
   assert.match(dock, /if \(result\?\.ok && input\) input\.value = ''/);
   assert.match(dock, /addEventListener\('click', onEvent, true\)/);
+  assert.match(dock, /addEventListener\('submit', onEvent, true\)/);
+  assert.match(dock, /e\.key === 'Enter'/);
 });
 
 test('typing ZEC or USDC filters both lists and keeps the chain filter', () => {
@@ -297,6 +307,22 @@ test('a failed quote and Get another quote both hide the refuse seal', () => {
   assert.match(idle, /USDC on near/);
 });
 
+test('0.05 wNEAR within a 0.06 cap is propose_call on wrap.near', () => {
+  const cap = '60000000000000000000000';
+  const plan = depositPlan({
+    from: 'wNEAR@near', amount: '0.05', depositAddress: 'ab'.repeat(32), memo: null,
+    capYocto: cap, balanceYocto: '65000000000000000000000',
+  });
+  assert.equal(plan.kind, 'propose_call');
+  assert.equal(plan.wallet, false);
+  assert.deepEqual(plan.steps.map(s => [s.receiver, s.method]), [
+    [WRAP, 'near_deposit'], [WRAP, 'storage_deposit'], [WRAP, 'ft_transfer'],
+  ]);
+  for (const s of plan.steps) assert.ok(BigInt(s.deposit) <= BigInt(cap));
+  const sum = plan.steps.reduce((n, s) => n + BigInt(s.deposit), 0n);
+  assert.ok(sum <= 65000000000000000000000n);
+});
+
 test('status SUCCESS sails once, and a refund does not', () => {
   const pending = nextFerryBeat('PENDING_DEPOSIT');
   assert.equal(pending.play, false);
@@ -331,6 +357,18 @@ test('a NEAR destination quotes the visitor account, and a ZEC quote keeps the u
   assert.equal(body.recipient, 'charter.nearcarta.near');
   assert.equal(body.swap_recipient, scholar);
   assert.equal(body.clause_id, 'pay');
+  assert.equal(body.board, undefined);
+  const boardBody = cityCheckoutBody({
+    pair: { from: 'wNEAR@near', to: 'USDC@near', amt: '0.05' },
+    recipient: 'charter.nearcarta.near',
+    charter: scholar,
+    amountYocto: '1',
+    refundTo: 'nearcarta.near',
+    visitor: scholar,
+    session: 'board',
+  });
+  assert.equal(boardBody.board, true);
+  assert.equal(boardBody.charter, scholar);
   const zec = cityCheckoutBody({
     pair: { from: 'USDC@base', to: 'ZEC@zec', amt: '0.2' },
     recipient: 'charter.nearcarta.near',
@@ -346,6 +384,7 @@ test('a NEAR destination quotes the visitor account, and a ZEC quote keeps the u
   assert.doesNotMatch(quote, /recipient: UA/);
   const checkout = apps.slice(apps.indexOf('export async function openFerryCheckout'), apps.indexOf('export async function ferryStatus'));
   assert.match(checkout, /visitor: S\.me/);
+  assert.match(checkout, /session: S\.board \? 'board' : undefined/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /data-testid', 'ferry-agent-dock'/);
   assert.match(ui, />AI Agent</);

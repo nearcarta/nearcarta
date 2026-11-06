@@ -400,7 +400,7 @@ function mountFerry(root, hooks) {
     const agentIn = q$(root, '#f-agent') || dockDoc?.getElementById('f-agent');
     if (agentIn) {
       agentIn.oninput = (e) => { state.agentText = e.target.value; };
-      agentIn.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); dispatchFerryDock(dockDoc); } };
+      agentIn.onkeydown = (e) => { if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) { e.preventDefault(); dispatchFerryDock(dockDoc); } };
     }
     armFerryDock((text) => runAgent(text));
     if (dockDoc) installFerryDock(dockDoc);

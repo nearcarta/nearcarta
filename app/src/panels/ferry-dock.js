@@ -22,7 +22,11 @@ export function ferryDockLog(doc, text) {
   return true;
 }
 
-/** One capture listener. Later onclick assignments cannot drop it. */
+export function dockEnter(e) {
+  return !!(e && (e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.keyCode === 13));
+}
+
+/** One capture listener. Later onclick assignments cannot drop it. Enter submits the dock form. */
 export function installFerryDock(doc) {
   if (!doc || typeof doc.addEventListener !== 'function' || doc.__nearcartaFerryDock) return;
   doc.__nearcartaFerryDock = true;
@@ -30,13 +34,15 @@ export function installFerryDock(doc) {
     const t = e.target;
     if (!t || typeof t.closest !== 'function') return;
     const click = e.type === 'click' && t.closest('#f-agent-go');
-    const enter = e.type === 'keydown' && e.key === 'Enter' && t.closest('#f-agent');
-    if (!click && !enter) return;
-    if (enter) e.preventDefault();
+    const enter = e.type === 'keydown' && dockEnter(e) && t.closest('#f-agent');
+    const submit = e.type === 'submit' && t.closest('#f-agent-form');
+    if (!click && !enter && !submit) return;
+    if (enter || submit) e.preventDefault();
     dispatchFerryDock(doc);
   };
   doc.addEventListener('click', onEvent, true);
   doc.addEventListener('keydown', onEvent, true);
+  doc.addEventListener('submit', onEvent, true);
 }
 
 export function dispatchFerryDock(doc) {
