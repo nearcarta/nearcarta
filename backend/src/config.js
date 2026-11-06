@@ -38,6 +38,7 @@ export const cfg = {
 export const secret = {
   oneClick: () => (process.env.ONECLICK_PARTNER_KEY || '').trim() || null,
   nearAi: () => (process.env.NEARAI_CLOUD_API_KEY || '').trim() || null,
+  hallMarket: () => (process.env.AGENT_API_TOKEN || '').trim() || null,
 };
 
 export const has = { oneClick: () => !!secret.oneClick(), nearAi: () => !!secret.nearAi() };
