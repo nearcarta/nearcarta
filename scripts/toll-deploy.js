@@ -163,6 +163,7 @@ if ((path === 'close_then_create' || path === 'create_only') && fund != null) {
   });
 }
 
+
 const init = {
   owner: OWNER,
   mpc: policy?.mpc || 'v1.signer',
@@ -171,9 +172,9 @@ const init = {
   foreign_address: policy?.foreign_address || MAIN.toll.foreign_address,
   fx_root_key: MAIN.fx_root_key,
   allow_to: [],
-  max_per_tx: policy?.max_per_tx || null,
-  budget: policy?.budget || null,
-  max_fee_cap: policy?.max_fee_cap || null,
+  max_per_tx: policy?.max_per_tx || '10000000000000',
+  budget: policy?.budget || '30000000000000',
+  max_fee_cap: policy?.max_fee_cap || '5000000000',
   verify_chain: policy?.verify_chain || 'Base',
   token: null,
   dao: null,
@@ -205,6 +206,7 @@ if (path === 'close_then_create') {
 if (path === 'close_then_create' || path === 'create_only') {
   pre.push({ check: 'balance covers the stake and slack', ok: !!covered, detail: !fund ? 'no wasm' : (path === 'create_only' ? OWNER + ' ' : 'the closed balance ') + yocto(fund) + ' NEAR' });
 }
+
 
 const report = {
   dry_run: !live,
@@ -241,7 +243,7 @@ const report = {
   prechecks: pre,
   init: path === 'view' ? null : init,
   set_price: fee ? {
-    board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: process.env.TOLL_HOLD_NS || '0',
+    board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
     note: 'usdc is the token contract, not a recipient. No visitor address is stored.',
   } : { skipped: true, note: 'Set TOLL_FEE_YOCTO and TOLL_MAX_TOKEN to publish a fee. Until then the card stays disabled.' },
   post_deploy_view: ['policy', 'address_of'],
@@ -310,7 +312,20 @@ if (path === 'close_then_create' || path === 'create_only') {
   ];
   if (fee && maxToken) {
     create.push(A.functionCall('set_price', {
-      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: process.env.TOLL_HOLD_NS || '0',
+      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
+    }, 30n * TG, 0n));
+  }
+  await send('create', SHOP, create);
+} else if (path === 'create_only') {
+  const create = [
+    A.createAccount(),
+    A.transfer(fund),
+    A.deployContract(wasm),
+    A.functionCall('new', init, 80n * TG, 0n),
+  ];
+  if (fee && maxToken) {
+    create.push(A.functionCall('set_price', {
+      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
     }, 30n * TG, 0n));
   }
   await send('create', SHOP, create);
