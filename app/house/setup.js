@@ -9,7 +9,7 @@ import qrcode from 'qrcode-generator';
 import { wallet, mainnetWallet, account, mainnetAccount, connect, disconnect, onWallet, readyBoardKey } from './house.js';
 import { balanceOn } from './onboard.js';
 import { setupJourney } from '../../shared/setup/path.js';
-import { callsFailedPanel, expiresToWrite, formatExpiry, hashesFromError, plainRulesError, rulesDiff, rulesLiveHint, signRulesUpdate, txHashForMethod, updatePlan, RULES_DEPOSIT_YOCTO } from '../../shared/setup/rules-diff.js';
+import { callsFailedPanel, expiresToWrite, formatExpiry, hashesFromError, liveShops, migrateShops, plainRulesError, rulesDiff, rulesLiveHint, signRulesUpdate, txHashForMethod, updatePlan, RULES_DEPOSIT_YOCTO } from '../../shared/setup/rules-diff.js';
 import { openRowTransactions } from '../../shared/setup/open-row.js';
 import { tryTiles } from '../../shared/setup/try-tiles.js';
 import { TOPUP_MIN_YOCTO, TOPUP_RESERVE_YOCTO, charterFundMarkup, charterTopUpYocto, nearStringFromYocto, topUpRoom } from '../../shared/setup/charter-fund.js';
@@ -17,7 +17,7 @@ import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf, storedAgentKey } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
-import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
+import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, fittingShops, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
 import { HOUSE_CALLS, HOUSE_SHOP } from '../../shared/house/shop.js';
 import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
@@ -304,12 +304,30 @@ function wireCharacter() {
 }
 
 // ---------- 5. Rules ----------
+// Shops a row can reach through propose_call_as. Toll, Guardhouse and House are the shops
+// whose own contracts take a call; each one contributes only the method it answers on.
+// charter.nearcarta.near is retired (mainnet.json `retired`), so a saved list that still
+// names it is stale; Guardhouse was deployed after the old default was written.
+const DEFAULT_SHOPS = [MAIN.toll?.contract, MAIN.guard?.contract, HOUSE_SHOP].filter(Boolean);
+const RETIRED_ACCOUNTS = Object.keys(MAIN.retired || {});
+// A list saved before the charter was retired still names `charter.nearcarta.near`. Filtering
+// it on every read hides it but leaves the stale value in localStorage, so this repairs the
+// saved list once at load and keeps the names it dropped for the note on the Rules step.
+let retiredDropped = [];
+function migrateSavedShops() {
+  if (!Array.isArray(st.receivers) || !st.receivers.length) return;
+  const { receivers, dropped } = migrateShops(st.receivers, RETIRED_ACCOUNTS);
+  if (!dropped.length) return;
+  retiredDropped = dropped;
+  st.receivers = receivers.length ? receivers : null;
+  save();
+}
 function rules() {
   const p = persona();
-  const mainShops = [MAIN.toll?.contract, HOUSE_SHOP].filter(Boolean);
+  const mainShops = DEFAULT_SHOPS;
   const fallback = st.trial ? (CFG?.arena?.merchants || []).slice(0, 2) : mainShops;
-  const saved = st.receivers;
-  const useSaved = saved && saved.length > 0;
+  const saved = liveShops(st.receivers, RETIRED_ACCOUNTS);
+  const useSaved = saved.length > 0;
   return { cap: st.cap ?? p.cap, daily: st.daily ?? p.daily, per: st.per ?? p.per, hours: SESSION_HOURS.includes(+st.hours) ? +st.hours : 1, receivers: useSaved ? saved : fallback };
 }
 function preview(r) {
@@ -327,10 +345,13 @@ function sRules() {
        <div class="field"><label for="per">Payments per day</label><div class="suffix"><input id="per" type="number" min="1" max="100" value="${r.per}" data-testid="rule-per"><span>per day</span></div><p class="small muted">How many payments the agent may make each day.</p></div>
        <div class="field"><label for="hours">Session</label><select id="hours" data-testid="rule-hours">${SESSION_HOURS.map(h => `<option value="${h}" ${h == r.hours ? 'selected' : ''}>${sessionLabel(h)}</option>`).join('')}</select><p class="small muted">After this the contract refuses every payment. You can write a new session later.</p></div></div>
      <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"><p class="small muted">The only accounts your agent may pay. A Try payment goes to the first listed shop. Ferry Ask charter calls stamp on the board and returns that NEAR to your row; it still uses one payment of your cap. Session also allowlists wrap.near for 1Click deposit calls, and the house shop's check-in and prepare calls.</p></div>
+     ${retiredDropped.length
+      ? `<p class="small" data-testid="rule-retired-note">Your saved list named ${esc(retiredDropped.join(', '))}, which no longer exists on mainnet, so ${retiredDropped.length > 1 ? 'they were' : 'it was'} removed. Toll, Guardhouse and House are live.</p>`
+      : ''}
      <div class="preview" id="prev" data-testid="rule-preview">${preview(r)}</div>${errP()}` + nav(true));
 }
 function wireRules() {
-  const upd = () => { st.cap = +$('#cap').value; st.daily = +$('#daily').value; st.per = +$('#per').value; st.hours = +$('#hours').value; st.receivers = $('#rcv').value.split(/[\s,]+/).map(s => s.trim().toLowerCase()).filter(Boolean); save(); $('#prev').innerHTML = preview(rules()); };
+  const upd = () => { st.cap = +$('#cap').value; st.daily = +$('#daily').value; st.per = +$('#per').value; st.hours = +$('#hours').value; st.receivers = liveShops($('#rcv').value.split(/[\s,]+/), RETIRED_ACCOUNTS); save(); $('#prev').innerHTML = preview(rules()); };
   ['cap', 'daily', 'per', 'rcv'].forEach(id => $('#' + id).oninput = upd);
   const hours = $('#hours');
   const onHours = e => { if (+e.target.value !== +st.hours) st.hoursEdited = true; upd(); };
@@ -338,7 +359,13 @@ function wireRules() {
   wire(() => { const r = rules();
     if (!(r.cap > 0) || !(r.daily >= r.cap)) { msg = 'The daily budget must be at least the per-payment cap.'; return render(); }
     if (!r.receivers.length || r.receivers.some(a => !/^[a-z0-9._-]{2,64}$/.test(a))) { msg = 'Add at least one valid account id.'; return render(); }
-    if (boardLive() && !st.trial && !callsFitRow(callsFor(r, MAIN.board.contract))) { msg = 'That shop list is too long for one row. A row holds 0.02 NEAR of storage, so shorter account ids or fewer shops fit.'; return render(); }
+    if (boardLive() && !st.trial && !callsFitRow(callsFor(r, MAIN.board.contract), r.receivers.length)) {
+      const keep = fittingShops(r.receivers, list => callsFor({ ...r, receivers: list }, MAIN.board.contract));
+      msg = keep.length
+        ? `That shop list is too long for one row. A row holds 0.02 NEAR of storage, and it can hold ${keep.length} of your ${r.receivers.length} shops. Keep ${keep.join(', ')} and drop the rest.`
+        : `A row holds 0.02 NEAR of storage and this list does not fit even one shop. Use a shorter account id.`;
+      return render();
+    }
     done(st.step); go(st.step + 1); });
 }
 
@@ -492,10 +519,11 @@ const AGENT_ALLOW = BigInt(GAS_TOPUP_YOCTO);
 // open_charter keeps ROW_FUND as the row's own spendable balance (enough for a full day at the default 0.01 budget);
 // the rest of the 0.02 deposit after storage (~0.004) is refunded in the same call.
 const ROW_FUND = YN / 100n, TOPUP = YN / 200n;
-// A row holds 0.02 NEAR of storage, and v2 bills the real trie bytes. `callsFitRow`
-// measures the call list (shops plus the wrap.near trio and the stamp) against that
-// budget: seven 20-byte shops fit, eight do not, and longer names fit fewer.
-// The measured numbers are in `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`.
+// A row holds 0.02 NEAR of storage, and v2 bills the real trie bytes. The row and its call
+// list share that budget, so the list's room shrinks as the rules name more receivers:
+// `callsFitRow(calls, receivers)` uses 2000 - 1380 - 22 x receivers.
+// The measured numbers are in `contracts/charter_board_sandbox/tests/setup_calls_row_size.rs`
+// and `setup_calls_deposit.rs`.
 const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: [...SESSION_METHODS], allowance: AGENT_ALLOW.toString() } } } });
 // The login plugin stores its key here. Use it as the row agent when this browser has not made one yet.
 function adoptPluginKey(id) {
@@ -739,6 +767,16 @@ function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursE
 }
 async function signBoard() {
   const r = rules(), contract = MAIN.board.contract;
+  // The Rules step refuses an over-full list, but a visitor can reach #sign by URL or by
+  // stepping back through the rail, and the open is what actually writes set_calls. Refuse
+  // here too, before any wallet opens: the row holds 0.02 NEAR and the board would panic
+  // ERR_ROW_TOO_BIG after open_charter had already spent the deposit.
+  if (!st.trial && !callsFitRow(callsFor(r, contract), r.receivers.length)) {
+    const keep = fittingShops(r.receivers, list => callsFor({ ...r, receivers: list }, contract));
+    throw new Error(keep.length
+      ? `That shop list is too long for one row. A row holds 0.02 NEAR of storage, and it can hold ${keep.length} of your ${r.receivers.length} shops. Keep ${keep.join(', ')} and drop the rest.`
+      : 'A row holds 0.02 NEAR of storage and this list does not fit even one shop. Use a shorter account id.');
+  }
   // `__NC_SETUP_WALLET` is the browser-test seam: it stands in for the NEAR Connect
   // wallet so a test can read the batch without a real approval. It never signs.
   const w = globalThis.__NC_SETUP_WALLET ? await globalThis.__NC_SETUP_WALLET() : await mainnetWallet().wallet();
@@ -882,6 +920,14 @@ async function updateRules() {
   const sec = localStorage.getItem(agentLS(me));
   if (!sec) throw new Error('No agent key in this browser.');
   const local = writtenRules(r, row);
+  // The update writes the same call list, so it hits the same row limit. Refuse before the
+  // wallet opens rather than letting set_calls panic ERR_ROW_TOO_BIG after set_rules lands.
+  if (!callsFitRow(callsFor(r, contract), r.receivers.length)) {
+    const keep = fittingShops(r.receivers, list => callsFor({ ...r, receivers: list }, contract));
+    throw new Error(keep.length
+      ? `That shop list is too long for one row. A row can hold ${keep.length} of your ${r.receivers.length} shops. Keep ${keep.join(', ')} and drop the rest. Update my rules would be refused on chain.`
+      : 'A row holds 0.02 NEAR of storage and this list does not fit even one shop. Update my rules would be refused on chain.');
+  }
   const txs = ruleUpdateTransactions(row, r, sec, local.expiresAt);
   // One wallet approval for set_rules, set_calls, and set_agent when the key differs.
   let res;
@@ -1168,6 +1214,7 @@ function render() {
 }
 
 function paintShell() {
+  migrateSavedShops();
   if (!me) me = st.accountId || readSessionAccount() || null;
   const want = STEPS.findIndex(s => s[0] === location.hash.slice(1));
   if (!PREVIEW && me && (location.hash === '#rules' || location.hash === '#sign') && want >= 0) st.step = want;
