@@ -69,9 +69,6 @@ test('the house deed links are brass and a missing oath is not a missing row', a
   assert.equal(DEP.extras?.house?.contract, 'house.nearcarta.near');
   assert.equal(DEP.extras?.house?.legacy, 'house.nearcarta.near');
   assert.equal(DEP.extras.house.shop, 'house.nearcarta.near');
-  // `unused` is the state after the v3 recreate kept the name: the fallback account
-  // is not needed. The record flipped from not_deployed (cc2ffb8) and these tests
-  // still expected the pre-recreate value.
   assert.equal(DEP.extras.house.fallback.status, 'unused');
   assert.equal(DEP.extras.house.fallback.account, 'house3.nearcarta.near');
   assert.equal(DEP.extras?.house?.oath, undefined);

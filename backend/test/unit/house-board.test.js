@@ -200,8 +200,6 @@ test('the city, the allow list and the denylist use the one shop id', () => {
   assert.equal(HOUSE_SHOP, 'house.nearcarta.near');
   assert.equal(MAIN.extras.house.contract, HOUSE_SHOP);
   assert.equal(MAIN.extras.house.shop, HOUSE_SHOP);
-  // After the v3 recreate kept house.nearcarta.near, the fallback account is not
-  // used (mainnet.json cc2ffb8). It is still named, so the deploy script can use it.
   assert.equal(MAIN.extras.house.fallback.status, 'unused');
   assert.equal(HOUSE_FALLBACK, 'house3.nearcarta.near');
   assert.equal(MAIN.extras.house.next.sha256, HOUSE_WASM_SHA256);
