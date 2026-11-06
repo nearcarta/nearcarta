@@ -9,6 +9,8 @@ import { DEED } from '../deed-control.js';
 import { runHouseTurn } from './house-agent.js';
 import { armHouseDock, ensureHouseDock, installHouseDock } from './house-dock.js';
 import { bindTokenFallbacks, tokenStack } from './token-badge.js';
+import { BOARD_RPC } from './board-rpc.js';
+import { boardAccessKey, browserKey, loadWallet, sendHouseCall, signerBlocker } from '../house-sign.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -84,6 +86,16 @@ function nearText(y) {
   try { return String(nearOf(y)); } catch { return ''; }
 }
 
+/** 0.001 ETH -> 1000000000000000. ETH is 18 decimals, USDC on Base is 6. */
+export function decimalToUnits(amount, asset) {
+  const decimals = String(asset || '').toUpperCase() === 'USDC' ? 6 : 18;
+  const s = String(amount ?? '').trim();
+  if (!/^\d+(\.\d+)?$/.test(s)) return '0';
+  const [whole, frac = ''] = s.split('.');
+  if (frac.length > decimals) return '0';
+  return (BigInt(whole) * 10n ** BigInt(decimals) + BigInt((frac + '0'.repeat(decimals)).slice(0, decimals) || '0')).toString();
+}
+
 export function mountHouseRoom(root, hooks = {}) {
   if (!root) return;
   const who = typeof hooks.visitor === 'function' ? hooks.visitor() : visitor();
@@ -150,6 +162,9 @@ export function mountHouseRoom(root, hooks = {}) {
     };
   }
   function sentence() {
+    if (state.tab === 'deed' && !state.token) {
+      return 'Mint my deed';
+    }
     if (state.tab === 'vaults') {
       const chain = root.querySelector('#house-chain')?.value || 'base';
       const asset = root.querySelector('#house-asset')?.value || 'ETH';
@@ -159,31 +174,113 @@ export function mountHouseRoom(root, hooks = {}) {
       const who = payee ? ` to ${payee}` : '';
       return `Send ${amt} ${asset} on ${chain}${who} gas ${gas}`;
     }
-    if (state.tab === 'heirs' && state.line?.line?.pending_ns) return 'Cancel the release';
+    if (state.tab === 'heirs') {
+      if (state.line?.line?.pending_ns) return 'Cancel the release';
+      const heir = root.querySelector('#house-heir')?.value?.trim() || '';
+      if (heir && heir !== 'Not set') return `Set heirs`;
+    }
     return "I'm alive";
   }
   async function turn(text) {
     hideSeal();
-    const result = await runHouseTurn(text, {
+    const ctx = {
       row: state.row,
       vault: state.tab === 'vaults' ? vaultFromFields() : state.vault,
       line: state.line,
       seen: state.seen,
       account: id || '',
       house: DEED.contract,
-      tokenId: state.token?.token_id || id || '',
+      tokenId: state.token?.token_id || '',
       board: BOARD,
       nonce: state.row?.nonce,
       epoch: state.row?.epoch ? state.row.epoch : undefined,
+      params: {
+        ...(state.tab === 'heirs' ? heirsFromFields() : {}),
+        ...(state.tab === 'vaults' ? vaultParamsFromFields() : {}),
+      },
       showTab,
       showSeal,
       hideRefuse: hideSeal,
       onDelivered: (out) => hooks.onDelivered?.(out),
-    });
+      // The executor. Without it the shop can only plan; with it the same CTA and the
+      // AI Agent sign with the visitor's session key and no wallet opens.
+      sign: (build, kind) => signAndSend(build, kind),
+      vaultState: state,
+    };
+    const result = await runHouseTurn(text, ctx);
     if (result?.seal && result.hint) showSeal(result.hint);
     else setStatus(result?.hint || '');
     if (result?.tab) showTab(result.tab);
+    if (result?.tx && hooks.onDelivered) hooks.onDelivered(result);
     return result;
+  }
+
+  function heirsFromFields() {
+    const heir = root.querySelector('#house-heir')?.value?.trim() || '';
+    const guardians = (root.querySelector('#house-guardians')?.value || '').split(/[,\s]+/).filter(Boolean);
+    return {
+      heirs: heir && heir !== 'Not set' ? [heir] : [],
+      guardians: guardians.filter(g => g !== 'Not set'),
+      threshold: Number(root.querySelector('#house-threshold')?.value || 1) || 1,
+      periodNs: state.line?.line?.period_ns || '60000000000',
+      waitNs: state.line?.line?.wait_ns || '60000000000',
+    };
+  }
+
+  function vaultParamsFromFields() {
+    const chain = root.querySelector('#house-chain')?.value || 'base';
+    const asset = (root.querySelector('#house-asset')?.value || (chain === 'btc' ? 'BTC' : 'ETH')).toUpperCase();
+    const to = root.querySelector('#house-payee')?.value?.trim() || '';
+    const amt = root.querySelector('#house-amt')?.value || '0';
+    const gas = Number(root.querySelector('#house-gas')?.value || 21000);
+    return { chain, asset, to, value: decimalToUnits(amt, asset), gasLimit: gas };
+  }
+
+  /** Sign one board call. Reads the key and the block hash at click time, never earlier. */
+  async function signAndSend(build, kind) {
+    const W = await loadWallet();
+    if (!W) return { ok: false, block: 'The wallet is not available. Nothing was signed.' };
+    const rpc = W.rpcClient([BOARD_RPC]);
+    const account = id || '';
+    const key = browserKey(account);
+    if (!key) return { ok: false, block: 'Set up your agent in /setup. Nothing was signed.' };
+    const accessKey = await boardAccessKey(rpc, account, key);
+    const blocker = signerBlocker({ key, row: state.row, board: BOARD, accessKey });
+    if (blocker) return { ok: false, block: blocker };
+    try {
+      const sent = await sendHouseCall({ rpc, key, accessKey, me: account, board: BOARD, build });
+      if (sent.ok) {
+        state.seen.add(kind || build.method);
+        readRowAgain();
+        readDeedAgain();
+      }
+      return sent;
+    } catch (e) {
+      return { ok: false, tx: null, decision: 'failed', reason: String(e?.message || e).slice(0, 160) };
+    }
+  }
+
+  /** After a landed write the nonce moved. Refetch without touching the UI state that is mid-render. */
+  function readRowAgain() {
+    fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(body => { const next = normalizeRow(body); if (next) state.row = next; })
+      .catch(() => {});
+  }
+
+  /** A mint creates the deed, so the token id appears only after the tx lands. */
+  function readDeedAgain() {
+    fetch(api() + '/api/house/deed/' + encodeURIComponent(id), { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(body => {
+        if (!body) return;
+        state.token = body.token || null;
+        state.purse = (body.purses || {})[id] || null;
+        paintVault();
+        const btn = root.querySelector('[data-testid=house-cta]');
+        if (btn && state.token) btn.textContent = state.tab === 'vaults' ? 'Send from house' : "I'm alive";
+      })
+      .catch(() => {});
   }
   root.querySelectorAll('[data-tab]').forEach(btn => {
     btn.onclick = () => showTab(btn.dataset.tab);

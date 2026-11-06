@@ -362,15 +362,23 @@ function signItems(onBoard, live, changed) {
   if (wrote?.state === 'ok' && chainRow && !changed) items.push([limitLine(chainRow), 'now']);
   return items;
 }
+function recordedVerdicts() {
+  // The board is the live rule book. The retired charter is history and is never shown as current.
+  const run = MAIN.board?.visitor_run || {};
+  return {
+    allowed: run.txs?.['propose_allowed_0.001_agent_key_no_wallet'] || run.txs?.['propose_allowed_0.001'],
+    refused: run.txs?.['propose_refused_0.01_over_per_action_cap'],
+    contract: MAIN.board?.contract || '',
+  };
+}
 function sSign() {
   if (!st.trial && !boardLive()) {
-    const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
-    const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
-    return head('Sign', 'Your account is on mainnet.', 'A personal charter is a row on the mainnet board. That contract is not deployed yet, so this page will not send a transaction that pretends to create one. The town charter, toll, arena, house and town hall already run on mainnet.')
+    const { allowed, refused, contract } = recordedVerdicts();
+    return head('Sign', 'Your account is on mainnet.', 'A personal charter is a row on the mainnet board. That contract is not deployed yet, so this page will not send a transaction that pretends to create one. The board, toll, arena, house and town hall already run on mainnet.')
       + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><span class="small muted">Saved in this browser</span></div></div>`
-      + `<div class="facts"><div class="fact"><small>Town charter</small><b>${acA(MAIN.charter.contract)}</b></div>
+      + `<div class="facts"><div class="fact"><small>The board</small><b>${acA(contract)}</b></div>
          <div class="fact"><small>Allowed 0.001 NEAR</small><b>${txA(allowed)}</b></div>
-         <div class="fact"><small>Refused 0.003 NEAR</small><b>${txA(refused)}</b></div></div>`
+         <div class="fact"><small>Refused 0.01 NEAR</small><b>${txA(refused)}</b></div></div>`
       + errP() + nav(true, { label: 'Continue' });
   }
   const onBoard = boardLive() && !st.trial;
@@ -1016,22 +1024,20 @@ function sTry() {
   if (PREVIEW && !(boardLive() && st.charter)) {
     const r = rules(), to = r.receivers[0] || 'townhall.nearcarta.near', ok = Math.min(+r.cap, 0.001), over = +(+r.cap * 2).toFixed(4);
     const tiles = tryTiles({ actionsToday: 0, maxPerDay: r.per || 3, lowBalance: false });
-    const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
-    const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
-    return head('Try it', 'Watch the charter decide.', 'These buttons use your rules. This preview does not sign. The two transactions below are already on mainnet.')
+    const { allowed, refused, contract } = recordedVerdicts();
+    return head('Try it', 'Watch the board decide.', 'These buttons use your rules. This preview does not sign. The two transactions below are already on mainnet.')
       + `<div class="tiles" style="grid-template-columns:1fr 1fr"><button type="button" class="tile" id="t-ok" data-testid="try-allowed" aria-describedby="try-allow-hint"><i>✓</i><b>Pay ${fmtN(ok)} NEAR to ${esc(short(to))}</b><span id="try-allow-hint">${esc(tiles.allowReason)}</span><em class="go" style="font-style:normal">${esc(tiles.allowAction)}</em></button>
        <button type="button" class="tile" id="t-no" data-testid="try-refused" aria-describedby="try-refuse-hint"><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span id="try-refuse-hint">${esc(tiles.refuseReason)}</span><em class="go" style="font-style:normal">${esc(tiles.refuseAction)}</em></button></div>`
       + (st.previewNote ? `<p data-testid="try-preview-note">${esc(st.previewNote)}</p>` : '')
-      + `<div class="verdict good" data-testid="try-verdict"><span class="tag">ALLOWED</span><div><b>0.001 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">inside the cap</span> ${txA(allowed)}</div></div>`
-      + `<div class="verdict bad" data-testid="try-verdict"><span class="tag">REFUSED</span><div><b>0.003 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">over the per-payment cap</span> ${txA(refused)}</div></div>`
+      + `<div class="verdict good" data-testid="try-verdict"><span class="tag">ALLOWED</span><div><b>0.001 NEAR on ${esc(contract)}</b><br><span class="muted small">inside the cap</span> ${txA(allowed)}</div></div>`
+      + `<div class="verdict bad" data-testid="try-verdict"><span class="tag">REFUSED</span><div><b>0.01 NEAR on ${esc(contract)}</b><br><span class="muted small">over the per-payment cap</span> ${txA(refused)}</div></div>`
       + `<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Your House</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">Enter the town</a></span></div>`;
   }
   if (!st.trial && !(boardLive() && st.charter)) {
-    const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
-    const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
-    return head('Try it', 'The town charter already decides on mainnet.', 'These two transactions are on mainnet. One payment inside the cap was allowed. One over the cap was refused. Your NEAR is not spent here.')
-      + `<div class="verdict good" data-testid="try-verdict"><span class="tag">ALLOWED</span><div><b>0.001 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">inside the cap</span> ${txA(allowed)}</div></div>`
-      + `<div class="verdict bad" data-testid="try-verdict"><span class="tag">REFUSED</span><div><b>0.003 NEAR on ${esc(MAIN.charter.contract)}</b><br><span class="muted small">over the per-payment cap</span> ${txA(refused)}</div></div>`
+    const { allowed, refused, contract } = recordedVerdicts();
+    return head('Try it', 'The board already decides on mainnet.', 'These two transactions are on mainnet. One payment inside the cap was allowed. One over the cap was refused. Your NEAR is not spent here.')
+      + `<div class="verdict good" data-testid="try-verdict"><span class="tag">ALLOWED</span><div><b>0.001 NEAR on ${esc(contract)}</b><br><span class="muted small">inside the cap</span> ${txA(allowed)}</div></div>`
+      + `<div class="verdict bad" data-testid="try-verdict"><span class="tag">REFUSED</span><div><b>0.01 NEAR on ${esc(contract)}</b><br><span class="muted small">over the per-payment cap</span> ${txA(refused)}</div></div>`
       + `<div class="actions"><button class="btn" id="back">Back</button><span class="row"><a class="btn" href="/shops/vault/" data-testid="setup-office">Your House</a><a class="btn gold" href="${esc(next())}" data-testid="setup-finish">Enter the town</a></span></div>`;
   }
   const r = rules(), to = r.receivers[0], ok = Math.min(+r.cap, 0.001 > +r.cap ? +r.cap : 0.001), over = +(+r.cap * 2).toFixed(4);

@@ -5,6 +5,7 @@
 // https://docs.near.org/protocol/accounts-contracts/access-keys
 
 import { effectTokenOk, proposeCallAs, cancelHoldArgs, expireSentArgs } from '../house-board.js';
+import { houseCall } from '../house-sign.js';
 
 const NAMED = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 const IMPLICIT = /^[0-9a-f]{64}$/;
@@ -110,7 +111,9 @@ function planCheckIn(ctx) {
   return {
     ok: true, action: 'checkin', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
     call, deposit, method: 'house_session_check_in',
-    hint: 'Ready for propose_call_as. The board writes row_owner. hold is false, so check-in runs now. The agent key must include propose_call_as. Nothing was signed.',
+    write: 'checkin',
+    hint: 'Ready to sign. The board writes row_owner; check-in moves 1 yocto of your row into the purse. Nothing is signed until you press.',
+    doneHint: 'Checked in. The release clock restarted.',
   };
 }
 
@@ -184,7 +187,7 @@ function planForeign(line, ctx) {
   const value = btc ? '0' : amt;
   const whole = /^\d+$/.test(String(value));
   let call = null;
-  let hint = 'Prepared. Live broadcast is blocked. Nothing was signed.';
+  let hint = 'Prepared. The vault call is not signed here; the board holds it. Nothing was spent.';
   if (whole && ctx.account && ctx.house && ctx.tokenId && ctx.board && ctx.row && ctx.nonce != null && ctx.epoch != null) {
     const receivers = (ctx.row.receivers || []).map(String);
     if (!receivers.some(r => r.toLowerCase() === String(ctx.house).toLowerCase())) {
@@ -209,7 +212,7 @@ function planForeign(line, ctx) {
         effects: [{ chain, asset, to, value, fee: '0' }],
         hold: true,
       });
-      hint = 'Prepared. propose_call_as holds it until confirm_hold. Live broadcast is blocked. Nothing was signed.';
+      hint = 'Ready to hold. propose_call_as stores this send on the board until confirm_hold. The vault signature is a second key, not this one.';
     } catch (e) {
       return refuse(`${e.message || 'The board call could not be built.'} Nothing was signed.`, { chain, asset, value, to });
     }
@@ -217,7 +220,9 @@ function planForeign(line, ctx) {
   return {
     ok: true, action: 'prepare', tab: 'vaults', seal: false, signed: false, live: false, label: 'prepared',
     chain, asset, value, to, gas, call,
+    write: 'prepare',
     hint,
+    doneHint: 'Held on the board. A second key confirms it before anything is signed for the vault.',
   };
 }
 
@@ -245,21 +250,68 @@ export function planHouseLine(text, ctx = {}) {
   }
   if (/\bcancel\b/i.test(line) && /\brelease\b/i.test(line)) {
     const waiting = !!ctx.line?.line?.pending_ns;
+    if (!waiting) {
+      return {
+        ok: true, action: 'cancel', tab: 'heirs', seal: false, signed: false, live: false, label: 'blocked',
+        hint: 'Blocked. No release is waiting. Nothing was signed.',
+      };
+    }
+    if (!ctx.account || !ctx.house || !ctx.tokenId) {
+      return {
+        ok: true, action: 'cancel', tab: 'heirs', seal: false, signed: false, live: false, label: 'simulation',
+        hint: 'Simulation. A release is waiting. Sign in with the holder to cancel it. Nothing was signed.',
+      };
+    }
+    // The holder stops a release with their own key (house_cancel_release, 1 yocto).
+    // A session cannot: the contract requires the holder. The CTA opens that approval.
     return {
-      ok: true, action: 'cancel', tab: 'heirs', seal: false, signed: false, live: false,
-      label: waiting ? 'simulation' : 'blocked',
-      hint: waiting
-        ? 'Simulation. A release is waiting. Cancel needs the holder. Nothing was signed.'
-        : 'Blocked. No release is waiting. Nothing was signed.',
+      ok: true, action: 'cancel', tab: 'heirs', seal: false, signed: false, live: false, label: 'planned',
+      method: 'house_cancel_release', tokenId: ctx.tokenId, oneYocto: true,
+      hint: 'Ready. Cancelling needs the holder\'s own key and 1 yocto. Nothing is signed until you approve.',
+      doneHint: 'Release cancelled. The check-in clock is where it was.',
     };
   }
   if (/\b(i'm alive|i’m alive|im alive|check[\s-]?in)\b/i.test(line)) {
     return planCheckIn(ctx);
   }
+  if (/\bmint\b/i.test(line) && /\bdeed\b/i.test(line)) {
+    if (!ctx.account) return { ok: false, action: 'miss', hint: 'Sign in first. Nothing was signed.' };
+    if (ctx.tokenId) {
+      return {
+        ok: true, action: 'mint', tab: 'deed', seal: false, signed: false, live: false, label: 'blocked',
+        hint: 'This account already has a deed. Minting a second one is refused on chain. Nothing was signed.',
+      };
+    }
+    return {
+      ok: true, action: 'mint', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
+      mint: true,
+      hint: 'Ready to mint your deed. 0.02 NEAR of your row pays storage and the rest fills the purse. Nothing is signed until you press.',
+      doneHint: 'Deed minted. You hold it now.',
+    };
+  }  if (/\b(heir|guardian|threshold)\b/i.test(line) && /\b(set|name|update|change|add)\b/i.test(line)) {
+    const heirs = (ctx.params?.heirs || []).map(String).filter(Boolean);
+    const guardians = (ctx.params?.guardians || []).map(String).filter(Boolean);
+    if (!heirs.length || !guardians.length) {
+      return {
+        ok: true, action: 'set_line', tab: 'heirs', seal: false, signed: false, live: false, label: 'simulation',
+        hint: 'Simulation. Name one heir and one guardian in the Heirs tab. Nothing was signed.',
+      };
+    }
+    if (!ctx.account || !ctx.tokenId) {
+      return { ok: true, action: 'set_line', tab: 'heirs', seal: false, signed: false, live: false, label: 'simulation', hint: 'Simulation. Sign in to write this line. Nothing was signed.' };
+    }
+    return {
+      ok: true, action: 'set_line', tab: 'heirs', seal: false, signed: false, live: false, label: 'planned',
+      line: { heirs, guardians, threshold: Number(ctx.params?.threshold || 1), periodNs: String(ctx.params?.periodNs || 0), waitNs: String(ctx.params?.waitNs || 0) },
+      write: 'setline',
+      hint: 'Ready to write the line. A session may set it or tighten it; changing heirs again needs the holder. Nothing is signed until you press.',
+      doneHint: 'Line written. The release clock starts from this check-in.',
+    };
+  }
   if (/\b(heir|guardian|threshold)\b/i.test(line) && !/\b(pay|send)\b/i.test(line)) {
     return {
       ok: true, action: 'show', tab: 'heirs', seal: false, signed: false, live: false, label: 'read',
-      hint: 'Heirs stay on the deed. Changing them needs the holder. Nothing was signed.',
+      hint: 'Heirs stay on the deed. Name them in the Heirs tab. Nothing was signed.',
     };
   }
   if (/\b(address|derived|ethereum|bitcoin)\b/i.test(line) && !/\b(pay|send)\b/i.test(line)) {
@@ -297,6 +349,34 @@ export async function runHouseTurn(text, ctx = {}) {
   }
   if (plan.seal) ctx.showSeal?.(plan.hint);
   if (plan.action === 'prepare') ctx.seen.add(id);
+
+  // With a signer, the same plan is sent. Without one (the standalone page, a
+  // signed-out visitor) the plan stands and nothing is signed.
+  if (ctx.sign && plan.write) {
+    let build = plan.call;
+    if (plan.write === 'mint' || plan.write === 'setline') {
+      build = houseCall({
+        kind: plan.write === 'mint' ? 'mint' : 'setline',
+        ctx,
+        params: plan.write === 'mint' ? {} : plan.line,
+      });
+    }
+    const sent = await ctx.sign(build, plan.write);
+    if (sent?.block) {
+      ctx.showSeal?.(sent.block);
+      return { ...plan, label: 'blocked', signed: false, hint: sent.block };
+    }
+    if (sent && !sent.ok) {
+      const why = sent.reason ? `Refused on chain: ${sent.reason}. Nothing was spent.` : 'The board did not take this call.';
+      ctx.showSeal?.(why);
+      return { ...plan, label: 'refused', signed: true, tx: sent.tx || null, seal: true, hint: why };
+    }
+    if (sent?.ok) {
+      const done = { ...plan, label: 'live', signed: true, live: true, tx: sent.tx, hint: plan.doneHint || plan.hint };
+      if (ctx.onDelivered) ctx.onDelivered(done);
+      return done;
+    }
+  }
   if (plan.label === 'live' && plan.tx) ctx.onDelivered?.(plan);
   return plan;
 }
