@@ -9,7 +9,7 @@ const plan = [
     id: 'S1',
     action: 'Ferry live deposit, one corridor',
     script: 'node backend/scripts/ferry-live-swap.js --live --amount 0.2 --from USDC@base --to USDC@near --refund-to 0xYOURADDRESS',
-    cost: '0.20 USD of the token you send, plus that chain\'s fee. NEAR gas is not spent by this repo. The script asks for a deposit address and does not send the deposit.',
+    cost: 'The token amount you send, plus that chain\'s fee. NEAR gas is not spent by this repo. The row cap is the only limit; there is no product-wide USD cap. The script asks for a deposit address and does not send the deposit.',
     execute: false,
   },
   {
@@ -23,7 +23,7 @@ const plan = [
     id: 'S3',
     action: 'One mainnet USDC payout',
     script: 'not run. The payout page keeps a USDC row and does not send it.',
-    cost: 'At most 0.20 USD. No NEAR transfer is attached. Not signed here.',
+    cost: 'The invoice amount. The visitor row sets the limit; there is no product-wide USD cap. No NEAR transfer is attached. Not signed here.',
     execute: false,
   },
   {

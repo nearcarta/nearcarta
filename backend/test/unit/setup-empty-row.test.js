@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { AGENT_METHODS, CALLS_DEPOSIT_YOCTO, callPolicy, callsFitRow, stampCalls } from '../../../shared/board/session.js';
+import { AGENT_METHODS, SESSION_METHODS, CALLS_DEPOSIT_YOCTO, callPolicy, callsFitRow, stampCalls } from '../../../shared/board/session.js';
 import { openRowTransactions } from '../../../shared/setup/open-row.js';
 
 const src = readFileSync(new URL('../../../app/house/setup.js', import.meta.url), 'utf8');
@@ -79,15 +79,15 @@ test('open_charter targets the board and carries the current rules', () => {
   assert.equal(open.actions[1].params.deposit, CALLS_DEPOSIT_YOCTO);
   assert.deepEqual(open.actions[1].params.args.calls, calls);
   assert.equal(open.actions[1].params.args.session_cap, rules.daily_budget);
-  // The key goes on the visitor's own account, limited to the board and four methods.
+  // The key goes on the visitor's own account, limited to the board and the session scope.
   assert.equal(key.receiverId, 'visitor.near');
-  assert.deepEqual(key.actions[0].params.accessKey.permission.methodNames, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
+  assert.deepEqual(key.actions[0].params.accessKey.permission.methodNames, ['propose', 'propose_call', 'propose_call_as', 'anchor', 'confirm_hold']);
   assert.equal(key.actions[0].params.accessKey.permission.receiverId, 'board.nearcarta.near');
   assert.equal(key.actions[0].params.accessKey.permission.allowance, '250000000000000000000000');
   // It is a function-call key, so it can never move NEAR by itself.
   assert.equal(key.actions[0].type, 'AddKey');
   assert.equal(key.actions[0].params.accessKey.permission.FunctionCall, undefined);
-  assert.ok(key.actions[0].params.accessKey.permission.methodNames.length === 4);
+  assert.equal(key.actions[0].params.accessKey.permission.methodNames.length, 5);
 
   const s = section('async function signBoard()', 'function noteSign');
   assert.match(s, /openRowTransactions\(\{/);
@@ -103,10 +103,10 @@ test('openRowTransactions refuses an incomplete batch', () => {
   assert.equal(openRowTransactions(base).open.actions.length, 2);
 });
 
-test('the new key allows propose, propose_call, propose_call_as and anchor on the board', () => {
+test('the new key allows the session scope on the board, including confirm_hold and anchor', () => {
   assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
-  assert.match(src, /receiverId: MAIN\.board\.contract, methodNames: \[\.\.\.AGENT_METHODS\]/);
-  // The warning text names all four, on both the sign step and the try step.
+  assert.deepEqual(SESSION_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor', 'confirm_hold']);
+  assert.match(src, /receiverId: MAIN\.board\.contract, methodNames: \[\.\.\.SESSION_METHODS\]/);
   const sign = section('function sSign()', 'async function charterState');
   assert.match(sign, /<code>propose<\/code>, <code>propose_call<\/code>, <code>propose_call_as<\/code> and <code>anchor<\/code>/);
   assert.match(src, /It calls <code>propose<\/code>, <code>propose_call<\/code>, <code>propose_call_as<\/code> and <code>anchor<\/code> on your row/);

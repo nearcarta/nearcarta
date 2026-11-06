@@ -6,6 +6,7 @@ import { keyFrom, pubkeyHex, AGENT_LS, storedAgentKey, signMessage } from '../..
 import { proposalMessage } from '../../../shared/board/message.js';
 import {
   AGENT_METHODS,
+  SESSION_METHODS,
   GAS_ALLOWANCE_YOCTO,
   GAS_TOPUP_YOCTO,
   agentMethodsReady,
@@ -16,15 +17,20 @@ import {
 const read = p => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 const BOARD = 'board.nearcarta.near';
 
-test('agentMethodsReady needs every AGENT_METHODS entry, or an empty list', () => {
+test('agentMethodsReady needs every session method entry, or an empty list', () => {
   assert.equal(agentMethodsReady([]), true);
   assert.equal(agentMethodsReady(undefined), true);
   assert.equal(agentMethodsReady(['propose']), false);
   assert.equal(agentMethodsReady(['propose_call']), false);
   assert.equal(agentMethodsReady(['propose', 'propose_call']), false);
-  assert.equal(agentMethodsReady(['propose', 'propose_call', 'propose_call_as', 'anchor']), true);
-  assert.equal(agentMethodsReady(['propose_call', 'propose', 'propose_call_as', 'anchor', 'extra']), true);
+  // The agent methods alone are stale now: the hold path needs confirm_hold, and the
+  // Chronicle anchor needs anchor, so the session scope is the four plus confirm_hold.
+  assert.equal(agentMethodsReady(['propose', 'propose_call', 'propose_call_as']), false);
+  assert.equal(agentMethodsReady(['propose', 'propose_call', 'propose_call_as', 'confirm_hold']), false);
+  assert.equal(agentMethodsReady(['propose', 'propose_call', 'propose_call_as', 'anchor', 'confirm_hold']), true);
+  assert.equal(agentMethodsReady(['propose_call', 'propose', 'propose_call_as', 'anchor', 'confirm_hold', 'extra']), true);
   assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
+  assert.deepEqual(SESSION_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor', 'confirm_hold']);
 });
 
 test('classifyBoardAgentKeys marks propose-only keys stale and flags renew', () => {
