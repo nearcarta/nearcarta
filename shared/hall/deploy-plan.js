@@ -16,6 +16,11 @@ const CALL_SEND_PER_BYTE = 47_683_715n;
 const CALL_EXEC = 780_000_000_000n;
 const CALL_EXEC_PER_BYTE = 2_235_934n;
 const RECEIPT_GAS = 108_059_500_000n + 108_059_500_000n;
+// The `migrate` FunctionCall attaches this much gas. The sender prepays all of it
+// at 0.001 NEAR/Tgas (0.08 NEAR) and is refunded the unused part after execution,
+// so the balance must hold it at send time even though most comes back.
+export const MIGRATE_TGAS = 80n;
+export const MIGRATE_ATTACHED_YOCTO = MIGRATE_TGAS * 10n ** 12n * GAS_PURCHASE_YOCTO;
 
 export const SMOKE_YOCTO = 10n ** 21n; // 0.001 NEAR, the smoke size only
 
@@ -76,12 +81,17 @@ export function hallDeployPlan({
   const gasRefund = TRANSFER_GAS * BigInt(Math.max(transfers.length, 1)) + RECEIPT_GAS;
   const burnedRefund = gasRefund * GAS_PRICE_YOCTO;
   const burnedDeploy = gasDeploy * GAS_PRICE_YOCTO;
-  const prepaidDeploy = gasDeploy * GAS_PURCHASE_YOCTO;
+  const prepaidDeploy = gasDeploy * GAS_PURCHASE_YOCTO + MIGRATE_ATTACHED_YOCTO;
   const balanceAfter = balance - refund - burnedRefund - burnedDeploy;
   const liquidAfter = balanceAfter - stakeAfter;
   const peakNeed = stakeAfter + prepaidDeploy;
   const afterRefund = balance - refund;
   const shortfall = afterRefund > peakNeed ? 0n : peakNeed - afterRefund;
+  // The exact shortfall leaves no liquid NEAR. New STATE keys at migrate add a few
+  // hundred bytes, and the smoke post needs its own deposit, so the printed top-up
+  // rounds up to the next 0.01 NEAR. The stake itself does not change.
+  const STEP = 10n ** 22n; // 0.01 NEAR
+  const recommendedTopUp = shortfall === 0n ? 0n : ((shortfall + STEP - 1n) / STEP) * STEP;
   const checks = [];
   const need = (ok, label) => checks.push({ ok: !!ok, label });
   need(fullAccessKeys >= 1, 'the shop account has a full-access key');
@@ -123,12 +133,15 @@ export function hallDeployPlan({
       refundNear: near(refund),
       burnedGas: (burnedRefund + burnedDeploy).toString(),
       prepaidDeploy: prepaidDeploy.toString(),
+      prepaidDeployNear: near(prepaidDeploy),
       after: balanceAfter.toString(),
       afterNear: near(balanceAfter),
       liquidAfter: liquidAfter.toString(),
       liquidAfterNear: near(liquidAfter),
       shortfall: shortfall.toString(),
       shortfallNear: near(shortfall),
+      recommendedTopUp: recommendedTopUp.toString(),
+      recommendedTopUpNear: near(recommendedTopUp),
     },
     transfers,
     checks,

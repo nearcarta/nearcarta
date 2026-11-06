@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { callAsMessage, injectRowOwner } from '../../../shared/board/call-as.js';
 import { BOARD_METHODS, holdFlow, proposeCallAs, stampCall } from '../../../shared/hall/v2.js';
-import { hallDeployPlan } from '../../../shared/hall/deploy-plan.js';
+import { hallDeployPlan, MIGRATE_ATTACHED_YOCTO } from '../../../shared/hall/deploy-plan.js';
 
-test('board v2 injects row_owner and the hold flow uses propose_call_as, stamp, confirm, cancel, expire_sent', () => {
+test('board v2 injects row_owner and the hold flow uses propose_call_as, stamp, confirm, cancel, expire_sent, settle, refund_action', () => {
   const raw = JSON.stringify({ task: 'readme', note: { row_owner: 'mallory.near' }, row_owner: 'mallory.near' });
   const injected = injectRowOwner(raw, 'alice.near');
   const parsed = JSON.parse(injected);
@@ -31,8 +31,10 @@ test('board v2 injects row_owner and the hold flow uses propose_call_as, stamp, 
   assert.deepEqual(flow.confirm, { method: 'confirm_hold', args: { owner: 'alice.near', action_id: '7', signature: 'ab' } });
   assert.deepEqual(flow.cancel, { method: 'cancel_hold', args: { action_id: '7' } });
   assert.deepEqual(flow.expire, { method: 'expire_sent', args: { owner: 'alice.near', action_id: '7' } });
+  assert.deepEqual(flow.settle, { method: 'settle', args: { owner: 'alice.near', action_id: '7' } });
+  assert.deepEqual(flow.refund, { method: 'refund_action', args: { owner: 'alice.near', action_id: '7' }, deposit: '1000' });
   assert.equal(flow.confirmText, 'board-confirm-v1|board.nearcarta.near|alice.near|7|cd|present');
-  assert.deepEqual(BOARD_METHODS, ['propose_call_as', 'confirm_hold', 'cancel_hold', 'expire_sent', 'stamp']);
+  assert.deepEqual(BOARD_METHODS, ['propose_call_as', 'confirm_hold', 'cancel_hold', 'expire_sent', 'settle', 'refund_action', 'stamp']);
   assert.deepEqual(stampCall({ owner: 'alice.near' }), { method: 'stamp', receiverIsBoard: true, args: { owner: 'alice.near' } });
   const sent = proposeCallAs({
     owner: 'bob.near', receiver: 'shop.near', method: 'bid', args: { job_id: '1' },
@@ -66,4 +68,29 @@ test('an open bounty refunds the posting signer and a stranger is refused', () =
     ...base,
     posts: [{ ...base.posts[0], signer: 'stranger.near' }],
   }), /not the dao or the shop/);
+});
+
+test('the live townhall plan names the real shortfall and covers the attached migrate gas', () => {
+  const live = {
+    shop: 'townhall.nearcarta.near', owner: 'nearcarta.near', board: 'board.nearcarta.near', dao: 'nearcarta.near',
+    balanceYocto: (19532653634875n * 10n ** 11n).toString(),
+    storageBytes: 192231, oldWasmBytes: 191351, newWasmBytes: 215902, wasmSha256: 'ab',
+    bounties: [{ hash: 'h', amount: '2000000000000000000000', claimed_by: null }],
+    posts: [{ method: 'post_bounty', bountyHash: 'h', amount: '2000000000000000000000', receiver: 'townhall.nearcarta.near', signer: 'nearcarta.near', tx: 'T' }],
+    fullAccessKeys: 1, codeHash: 'c', oldCodeHash: 'c', smokeWorkers: [],
+  };
+  const plan = hallDeployPlan(live);
+  // 80 Tgas attached to migrate is prepaid at 0.001 NEAR/Tgas on top of the fee gas.
+  assert.ok(BigInt(plan.balance.prepaidDeploy) >= BigInt(MIGRATE_ATTACHED_YOCTO));
+  assert.equal(plan.balance.shortfall, '322359569623911000000000');
+  assert.equal(plan.balance.shortfallNear, '0.322359');
+  // The printed top-up rounds up, so the account keeps liquid NEAR after the stake.
+  assert.equal(plan.balance.recommendedTopUp, '330000000000000000000000');
+  assert.equal(plan.balance.recommendedTopUpNear, '0.330000');
+  assert.equal(plan.ok, false); // nothing is signed until the top-up lands
+  // Adding the rounded top-up clears the shortfall and the plan becomes actionable.
+  const topped = hallDeployPlan({ ...live, balanceYocto: (BigInt(live.balanceYocto) + BigInt(plan.balance.recommendedTopUp)).toString() });
+  assert.equal(topped.balance.shortfall, '0');
+  assert.equal(topped.ok, true);
+  assert.deepEqual(topped.transfers.map(t => t.payee), ['nearcarta.near']);
 });

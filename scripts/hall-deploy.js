@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import MAIN from '../shared/deployments/mainnet.json' with { type: 'json' };
-import { hallDeployPlan } from '../shared/hall/deploy-plan.js';
+import { hallDeployPlan, MIGRATE_TGAS } from '../shared/hall/deploy-plan.js';
 
 const live = process.argv.includes('--live');
 if (process.argv.some(a => String(a).includes('ed25519:'))) {
@@ -112,20 +112,25 @@ function printPlan(plan) {
   console.log('Wasm: contracts/artifacts/hall.wasm (' + plan.wasm.bytes + ' bytes, sha256 ' + plan.wasm.sha256 + ')');
   console.log('Storage now: ' + plan.storage.bytesNow + ' bytes, stake ' + plan.storage.stakeNow + ' yoctoNEAR (' + plan.storage.stakeNowNear + ' NEAR)');
   console.log('Storage after: ' + plan.storage.bytesAfter + ' bytes, stake ' + plan.storage.stakeAfter + ' yoctoNEAR (' + plan.storage.stakeAfterNear + ' NEAR)');
+  console.log('  this is the peak during the tx. migrate drops the old bounty and state records, so the settled stake is lower.');
   console.log('Balance before: ' + plan.balance.before + ' yoctoNEAR (' + plan.balance.beforeNear + ' NEAR)');
   console.log('Refund: ' + plan.balance.refund + ' yoctoNEAR (' + plan.balance.refundNear + ' NEAR)');
   console.log('Burned gas estimate: ' + plan.balance.burnedGas + ' yoctoNEAR');
-  console.log('Prepaid deploy gas: ' + plan.balance.prepaidDeploy + ' yoctoNEAR');
+  console.log('Prepaid deploy gas: ' + plan.balance.prepaidDeploy + ' yoctoNEAR (' + plan.balance.prepaidDeployNear + ' NEAR, ' + MIGRATE_TGAS + ' Tgas of it attached to migrate; the unused part is refunded in the same tx)');
   console.log('Balance after: ' + plan.balance.after + ' yoctoNEAR (' + plan.balance.afterNear + ' NEAR)');
   console.log('Liquid after: ' + plan.balance.liquidAfter + ' yoctoNEAR (' + plan.balance.liquidAfterNear + ' NEAR)');
   console.log('Shortfall: ' + plan.balance.shortfall + ' yoctoNEAR (' + plan.balance.shortfallNear + ' NEAR)');
   if (plan.balance.shortfall !== '0') {
     console.log('Top-up, not signed by this script: ' + plan.owner + ' transfers at least ' + plan.balance.shortfall + ' yoctoNEAR to ' + plan.shop + ', then run this command again.');
+    console.log('  exact:  near send ' + plan.owner + ' ' + plan.shop + ' ' + plan.balance.shortfallNear);
+    console.log('  rounded: near send ' + plan.owner + ' ' + plan.shop + ' ' + plan.balance.recommendedTopUpNear + ' (leaves liquid NEAR for new STATE keys and the smoke deposit)');
   }
   if (plan.transfers.length === 0) console.log('Transfers: none');
   for (const t of plan.transfers) {
     console.log('Transfer: ' + t.amount + ' yoctoNEAR to ' + t.payee + ' (' + t.reason + ', source ' + t.sourceTx + ')');
   }
+  const payees = [...new Set([plan.owner, plan.shop, ...plan.transfers.map(t => t.payee)])];
+  console.log('Payees in this plan: ' + payees.join(', '));
   for (const step of plan.steps) {
     console.log('Step ' + step.n + ': ' + step.name);
     for (const pre of step.pre || []) console.log('  pre-check: ' + pre);
@@ -217,7 +222,7 @@ const migrated = await signer.signAndSendTransaction({
   throwOnFailure: false,
   actions: [
     A.deployContract(new Uint8Array(wasm)),
-    A.functionCall('migrate', { owner, board }, 80n * TG, 0n),
+    A.functionCall('migrate', { owner, board }, MIGRATE_TGAS * TG, 0n),
   ],
 });
 const badDeploy = migrated.status?.Failure || migrated.receipts_outcome?.find(x => x.outcome.status.Failure)?.outcome.status.Failure;
