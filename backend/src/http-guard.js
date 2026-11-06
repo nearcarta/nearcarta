@@ -116,6 +116,9 @@ export const OVERLOAD = /http (429|5\d\d)\b|timeout|aborted|fetch failed|ECONNRE
 export function onError(e, c) {
   const s = Number(e.status) || 500;
   if (s >= 400 && s < 500) return c.json({ error: e.message }, s);
+  // A missing feature switch is an operator fact, not an internal failure: the UI has to
+  // be able to say "this needs a server key" instead of a blank "unavailable".
+  if (e.expose === true) return c.json({ error: e.message }, s >= 500 && s < 600 ? s : 500);
   if (!e.status && OVERLOAD.test(String(e.message))) {
     console.error(c.req.method, c.req.path, e.message);
     c.header('Retry-After', '3');

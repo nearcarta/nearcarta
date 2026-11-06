@@ -10,7 +10,7 @@
 import { verifyQuoteSignature } from '@defuse-protocol/one-click-sdk-typescript';
 import { KeyPair } from 'near-api-js';
 import { cfg, secret, DEP, MAINNET_DEP } from './config.js';
-const QUOTE_SIGNER = DEP.ferry?.quote_signer || MAINNET_DEP?.ferry?.quote_signer || 'ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc';
+export const QUOTE_SIGNER = DEP.ferry?.quote_signer || MAINNET_DEP?.ferry?.quote_signer || 'ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc';
 import { zcashRecipient } from './zcash.js';
 import { echoGuard, orchardOnly } from './ferry-guard.js';
 
@@ -115,7 +115,7 @@ export async function postQuote(body, { auth = false } = {}) {
   const headers = { ...UA };
   if (auth) {
     const k = secret.oneClick();
-    if (!k) throw Object.assign(new Error('confidential quotes need ONECLICK_PARTNER_KEY on the server'), { status: 503 });
+    if (!k) throw Object.assign(new Error('confidential quotes need ONECLICK_PARTNER_KEY on the server'), { status: 503, expose: true });
     headers.Authorization = `Bearer ${k}`;
   }
   const t0 = Date.now();

@@ -9,6 +9,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { DEP, MAINNET_DEP, cfg, has, secret } from './config.js';
 import * as ferry from './ferry.js';
 import * as checkout from './ferry-checkout.js';
+import * as intents from './ferry-intents.js';
 import * as payoutsInvoice from './payouts-invoice.js';
 import { parsePayoutIntent } from './payouts-intent.js';
 import { zcashRecipient } from './zcash.js';
@@ -276,6 +277,50 @@ export function makeApp() {
     return c.json(body);
   });
   app.get('/api/ferry/routes', limiter(30), async c => c.json(await ferry.routes()));
+  // NEAR Intents beyond the deposit swap: signed intents and limit orders. None of these
+  // sign or send a deposit; the visitor's wallet signs the intent and funds the order.
+  app.post('/api/ferry/intents/quote', limiter(6), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const from = ferry.tokenRef(b.from), to = ferry.tokenRef(b.to);
+    if (!from || !to) return bad(c, 'missing or bad from/to');
+    for (const k of ['amount', 'recipient', 'refundTo']) if (!str(b[k], 300)) return bad(c, `missing or bad ${k}`);
+    const out = await intents.signedIntentQuote({ ...b, from, to });
+    const { httpStatus, ...body } = out;
+    return c.json(body, httpStatus || 200);
+  });
+  app.post('/api/ferry/intents/generate', limiter(6), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const out = await intents.generateIntent({ depositAddress: String(b.depositAddress || ''), signerId: String(b.signerId || ''), standard: b.standard });
+    const { httpStatus, ...body } = out;
+    return c.json(body, httpStatus || 200);
+  });
+  app.post('/api/ferry/intents/submit', limiter(6), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const out = await intents.submitIntent({ intent: b.intent, publicKey: b.public_key, signature: b.signature });
+    const { httpStatus, ...body } = out;
+    return c.json(body, httpStatus || 200);
+  });
+  app.get('/api/ferry/orders', limiter(20), async c => {
+    const out = await intents.listOrders({ openOnly: c.req.query('all') !== '1' });
+    const { httpStatus, ...body } = out;
+    return c.json(body, httpStatus || 200);
+  });
+  app.post('/api/ferry/orders', limiter(6), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const out = await intents.createOrder(b);
+    const { httpStatus, ...body } = out;
+    return c.json(body, httpStatus || 200);
+  });
+  app.get('/api/ferry/orders/:id', limiter(20), async c => {
+    const out = await intents.getOrder(c.req.param('id'));
+    const { httpStatus, ...body } = out;
+    return c.json(body, httpStatus || 200);
+  });
+  app.post('/api/ferry/orders/:id/cancel', limiter(6), oneClick, async c => {
+    const out = await intents.cancelOrder(c.req.param('id'));
+    const { httpStatus, ...body } = out;
+    return c.json(body, httpStatus || 200);
+  });
   app.get('/api/ferry/zcash/:addr', limiter(30), c => {
     try { return c.json(zcashRecipient(c.req.param('addr'))); } catch { return bad(c, 'not a valid Zcash address'); }
   });

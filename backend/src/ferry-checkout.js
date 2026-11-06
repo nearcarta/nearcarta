@@ -8,9 +8,10 @@ import { readFileSync } from 'node:fs';
 import { verifyQuoteSignature } from '@defuse-protocol/one-click-sdk-typescript';
 import { cfg, DEP } from './config.js';
 import { view } from './near.js';
-import { tokenRef, findToken, tokens, quote, postQuote, buildQuoteRequest, echoGuard, validDepositAddress, statusHelp } from './ferry.js';
+import { tokenRef, findToken, tokens, quote, postQuote, buildQuoteRequest, echoGuard, validDepositAddress, statusHelp, QUOTE_SIGNER } from './ferry.js';
 import { validateDestAddress } from '../../app/src/panels/ferry-settle.js';
 import { intentsCheckout } from '../../shared/rails/receipts.js';
+import { statusSignature, deliveryVerdict } from '../../shared/ferry/intents.js';
 
 /**
  * There is no USD limit to compute. The visitor's row states its allowance in NEAR, and
@@ -306,12 +307,18 @@ export async function fetchOneClickStatus(depositAddress, f = fetch) {
   const originHashes = (d.originChainTxHashes || []).map(asHash).filter(h => typeof h === 'string' && h.length > 0);
   const nearHashes = (d.nearTxHashes || []).map(asHash).filter(h => typeof h === 'string' && h.length > 0);
   const hashes = [...destHashes, ...originHashes, ...nearHashes];
+  // 1Click does not sign the status document. The signed thing it carries is the quote
+  // the deposit belongs to, so that is what is checked here; an unsigned or tampered
+  // status can never claim delivery.
+  const sig = statusSignature(j, q => verifyQuoteSignature(q, QUOTE_SIGNER));
+  const verdict = deliveryVerdict(j.status, sig);
   return {
     env: 'ONECLICK', depositAddress, status: j.status, help: statusHelp(j.status),
     final: FINAL.includes(j.status), tx: hashes[0] || null, destinationTx: destHashes[0] || null,
     originTx: originHashes[0] || null, nearTx: nearHashes[0] || null, updatedAt: j.updatedAt || null,
     amountOut: d.amountOutFormatted || d.amountOut || null,
     symbolOut: d.destinationToken || d.amountOutSymbol || null,
+    signed: sig.ok, signatureReason: sig.reason, delivered: verdict.delivered, unchecked: verdict.unchecked,
   };
 }
 
