@@ -6,7 +6,9 @@ import {
   yoctoNear, parseTollCommand, tollCapCheck, proofWords, addressWords, splitWords,
   assembleTollLive, rememberTollPass, tollChronicleRows, mergeTollChronicle, tollMarkup,
   passPaidCopy, nextRowBalance, policyWords, latestVisitorPass, describeVisitorPass, tollChronicleStore,
+  policyQuote, relayDecision, formatWei,
 } from '../../../app/src/panels/toll-room.js';
+import { broadcastLatest } from '../../src/toll-relay.js';
 import { readTollLive, tollLiveError } from '../../src/toll-views.js';
 import { armTollDock, installTollDock, dispatchTollDock, lastTollDockSend, DOCK_NOT_READY, tollPendingLine, tollDockLog } from '../../../app/src/panels/toll-dock.js';
 
@@ -29,21 +31,30 @@ function mem() {
   return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, v); } };
 }
 
-test('a toll command pays 0.001 and refuses any other amount', () => {
-  assert.equal(parseTollCommand('Pay the toll').action, 'pay');
-  assert.equal(parseTollCommand('Pay 0.001 NEAR toll').ok, true);
-  const other = parseTollCommand('Pay 0.05 NEAR');
-  assert.equal(other.ok, false);
-  assert.equal(other.action, 'amount');
-  assert.match(other.hint, /0\.001/);
-  assert.match(other.hint, /Nothing was signed/);
+test('a toll command pays the address the visitor names', () => {
+  const quote = { payable: true, feeNear: '0.002', feeYocto: '2000000000000000000000', chains: [{ name: 'Base' }, { name: 'Arbitrum' }] };
+  const to = '0x1111111111111111111111111111111111111111';
+  const cross = parseTollCommand(`pay 0.00001 ETH to ${to} on Base`, quote);
+  assert.equal(cross.action, 'cross');
+  assert.equal(cross.to, to);
+  assert.equal(cross.chain, 'Base');
+  assert.equal(cross.asset, 'native');
+  const usdc = parseTollCommand(`send 0.5 USDC to ${to} on Arbitrum`, quote);
+  assert.equal(usdc.asset, 'usdc');
+  assert.equal(usdc.chain, 'Arbitrum');
+  assert.equal(parseTollCommand('Pay the toll', quote).action, 'recipient');
+  assert.match(parseTollCommand('Pay the toll', quote).hint, /recipient/);
+  assert.equal(parseTollCommand('cross to Arbitrum', quote).action, 'recipient');
+  const off = parseTollCommand(`pay 1 ETH to ${to} on Ethereum`, quote);
+  assert.equal(off.action, 'route');
+  assert.match(off.hint, /not on the live policy/);
+  assert.equal(parseTollCommand('Pay the toll').action, 'fee');
+  assert.equal(parseTollCommand('fill gas on Base', quote).action, 'gas');
+  assert.match(parseTollCommand('fill gas on Base', quote).hint, /Nothing was sent/);
   assert.equal(parseTollCommand('Check signature').action, 'check');
-  assert.equal(parseTollCommand('pay toll').action, 'pay');
-  assert.equal(parseTollCommand('pass the bridge').action, 'pay');
-  assert.equal(parseTollCommand('cross').action, 'pay');
+  assert.equal(parseTollCommand('show my crossings', quote).action, 'ledger');
   assert.equal(parseTollCommand('Show policy').action, 'policy');
   assert.equal(parseTollCommand('Show my foreign address').action, 'address');
-  assert.equal(parseTollCommand('Explain the Base address').action, 'address');
   const miss = parseTollCommand('hello');
   assert.equal(miss.ok, false);
   assert.equal(miss.hint, TOLL_HINT);
@@ -95,7 +106,7 @@ test('a live toll view keeps the gate fee and does not call a signature a paymen
   assert.equal(live.recent[0].claim, 'signed');
   assert.doesNotMatch(live.recent[0].words, /Paid on Base/);
   assert.match(splitWords(live), /0\.001 NEAR/);
-  assert.match(splitWords(live), /does not broadcast/);
+  assert.match(splitWords(live), /not a Base payment/);
   assert.match(splitWords({}), /no revenue split/);
   const addr = addressWords({ recorded: '0xabc', live: '0xABC', path: 'base-1', chainId: 8453, ok: true });
   assert.match(addr.text, /base-1/);
@@ -116,7 +127,7 @@ test('a pass is remembered for Chronicle and a second copy of the same hash is d
     rows,
   );
   assert.equal(merged.length, 1);
-  assert.equal(merged[0].label, '0.001 NEAR pass');
+  assert.equal(merged[0].label, 'NEAR pass');
 });
 
 test('the toll card shows both actions, real icons, and no Base payment claim', () => {
@@ -133,9 +144,14 @@ test('the toll card shows both actions, real icons, and no Base payment claim', 
   assert.doesNotMatch(proofHtml, /data-testid="toll-pay"/);
   const split = tollMarkup({ tab: 'split' });
   assert.doesNotMatch(split.slice(split.indexOf('data-testid="toll-pane-split"')), /data-testid="toll-pay"|data-testid="check-signature"/);
+  assert.doesNotMatch(html, /0\.001/);
+  assert.match(html, /Live policy has no visitor fee/);
+  assert.match(html, /data-testid="toll-route-base"/);
+  assert.match(html, /data-testid="toll-route-arb"/);
   assert.match(html, /src="\/tokens\/near\.svg"/);
   assert.match(proof, /src="\/tokens\/chains\/base\.svg"/);
-  assert.match(proof, /alt="Base"/);
+  assert.match(proof, /alt="ETH"/);
+  assert.match(proof, /\/tokens\/chains\/base\.svg/);
   assert.doesNotMatch(html, /Paid on Base/);
   assert.doesNotMatch(html, /tokenBadge\('ETH'/);
   const busy = tollMarkup({ pending: 'Asking the charter under your cap…' });
@@ -225,6 +241,7 @@ test('the city toll door stays a link and does not resume an old visit', () => {
   assert.match(ui, /function tollPay/);
   assert.match(ui, /mergeTollChronicle/);
   assert.match(ui, /data-toll-chip="Pay the toll"/);
+  assert.match(ui, /data-toll-chip="Pay the toll on Base"/);
   assert.match(ui, /data-toll-chip="Check signature"/);
   assert.match(ui, /data-toll-chip="Show policy"/);
   assert.doesNotMatch(ui, /tollVisit\(\)/);
@@ -235,6 +252,13 @@ test('the city toll door stays a link and does not resume an old visit', () => {
   const body = tollFn.slice(tollFn.indexOf('export async function toll'), tollFn.indexOf('// Older gate calls'));
   assert.match(body, /Set up your agent in \/setup/);
   assert.doesNotMatch(body, /propose_batch|signTx|\bask\(/);
+  assert.doesNotMatch(body, /0\.001/);
+  const plan = read('backend/scripts/toll-redeploy.js');
+  assert.match(plan, /sends: false/);
+  assert.match(plan, /method: 'close'/);
+  assert.match(plan, /set_policy/);
+  assert.match(plan, /allow_to: \[\]/);
+  assert.match(plan, /nearcarta\.near/);
   assert.match(read('app/design/D9_world/world.css'), /min\(640px/);
   assert.match(read('app/src/panels/panels.css'), /pointer-events:auto/);
   assert.match(tear, /sends: false/);
@@ -245,9 +269,9 @@ test('the city toll door stays a link and does not resume an old visit', () => {
 test('a paid pass names the payment, the new balance, and the visitor receipt', () => {
   const hash = '3frACAL1EU4APBcAME8gNg1xw4uKSnXc81hj2c56Jdon';
   assert.equal(nextRowBalance('359249000000000000000000'), '0.358249');
-  const copy = passPaidCopy({ balanceNear: '0.358249' });
+  const copy = passPaidCopy({ balanceNear: '0.358249', feeNear: '0.002' });
   assert.match(copy, /Pass paid/);
-  assert.match(copy, /0\.001 NEAR went to toll\.nearcarta\.near/);
+  assert.match(copy, /0\.002 NEAR went to toll\.nearcarta\.near/);
   assert.match(copy, /Row balance 0\.358249 NEAR/);
   assert.match(copy, /not a Base payment/);
   const words = describeVisitorPass({ ok: true, decision: 'allowed', receiver: 'toll.nearcarta.near', amount: ONE }, { hash });
@@ -277,6 +301,55 @@ test('a toll pass stays in localStorage across a reload', () => {
     if (prev === undefined) delete globalThis.localStorage;
     else globalThis.localStorage = prev;
   }
+});
+
+test('the live policy prices the pass and a receipt is the only Base payment', async () => {
+  const live = assembleTollLive({
+    contract: 'toll.nearcarta.near',
+    policy: {
+      mpc: 'v1.signer', path: 'base-1', chain_id: 8453, verify_chain: 'Base',
+      foreign_address: '0x4c07c97812098f595ff1611d8cb3465e591ee38a',
+      allow_to: ['0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034'],
+      max_per_tx: '10000000000000', budget: '30000000000000', spent: '1000000000000',
+      cross: { board: 'board.nearcarta.near', pass_fee: '2000000000000000000000', foreign_value: '1000000000000' },
+    },
+    txs: [{ nonce: 0, status: 'signed', to: '0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034', tx_hash: '0x' + 'ab'.repeat(32), raw_signed: '0x02aa', value: '1000000000000' }],
+  });
+  assert.equal(live.quote.payable, true);
+  assert.equal(live.quote.feeNear, '0.002');
+  assert.equal(live.quote.foreignTo, '');
+  assert.equal(formatWei('1000000000000'), '0.000001');
+  assert.match(policyWords(live), /0\.002/);
+  assert.match(splitWords(live), /no revenue split/);
+  const judged = { ok: true, decision: 'allowed', receiver: 'toll.nearcarta.near', amount: '2000000000000000000000' };
+  const waiting = relayDecision({ judged, quote: live.quote, record: { status: 'signing' } });
+  assert.notEqual(waiting.claim, 'paid');
+  const signed = relayDecision({ judged, quote: live.quote, record: live.recent[0] });
+  assert.equal(signed.step, 'broadcast');
+  assert.doesNotMatch(signed.text, /Paid on Base/);
+  const paid = relayDecision({ judged, quote: live.quote, record: live.recent[0], receipt: { status: 1 } });
+  assert.equal(paid.claim, 'paid');
+  assert.match(paid.text, /basescan\.org\/tx\//);
+  const svg = readFileSync(new URL('../../../app/src/tokens/chains/base.svg', import.meta.url), 'utf8');
+  assert.ok((svg.match(/<path/g) || []).length > 1);
+  assert.match(svg, /fill="#fff"/i);
+  const calls = [];
+  const out = await broadcastLatest({
+    policy: live,
+    txs: live.recent,
+    fetchImpl: async (_url, opts) => {
+      const body = JSON.parse(opts.body);
+      calls.push(body.method);
+      if (body.method === 'eth_getTransactionReceipt') return { json: async () => ({ result: null }) };
+      return { json: async () => ({ result: '0x' + 'cd'.repeat(32) }) };
+    },
+  });
+  assert.deepEqual(calls, ['eth_getTransactionReceipt', 'eth_sendRawTransaction']);
+  assert.equal(out.claim, 'signed');
+  assert.doesNotMatch(out.text, /Paid on Base/);
+  const unread = policyQuote({ ok: false });
+  assert.equal(unread.payable, false);
+  assert.match(tollMarkup({}).replace(/\s+/g, ' '), /no visitor fee/);
 });
 
 test('the agent log keeps the nearblocks link when a pass is paid', () => {

@@ -17,6 +17,7 @@ import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
 import { issuePass } from './toll-pass.js';
 import { describeVisitorPass, readTollLive, tollLiveError } from './toll-views.js';
+import { broadcastLatest, relayById, walletPaths } from './toll-relay.js';
 import { verifyPropose } from './board-tx.js';
 import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
@@ -372,8 +373,37 @@ export function makeApp() {
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
   app.get('/api/toll/live', limiter(20), async c => {
-    try { return c.json(await readTollLive(view)); }
+    try {
+      const live = await readTollLive(view);
+      const recent = (live.recent || []).map(({ raw_signed, ...rest }) => rest);
+      return c.json({ ...live, recent });
+    }
     catch (e) { return c.json(tollLiveError(e)); }
+  });
+  app.get('/api/toll/wallet/:owner', limiter(20), async c => {
+    try {
+      const live = await readTollLive(view);
+      return c.json(walletPaths(c.req.param('owner'), live.chains || []));
+    } catch (e) {
+      return c.json({ ok: false, paths: [], note: 'The live policy did not answer. No address was invented.', error: String(e.message || 'no status').slice(0, 160) });
+    }
+  });
+  app.post('/api/toll/relay', limiter(10), async c => {
+    try {
+      const body = await c.req.json().catch(() => ({}));
+      const live = await readTollLive(view);
+      return c.json(await relayById({ id: body.id, policy: live, txs: live.recent }));
+    } catch (e) {
+      return c.json({ ok: false, claim: 'none', text: 'The chain check did not answer. Nothing moved on Base.', error: String(e.message || 'no status').slice(0, 160) });
+    }
+  });
+  app.post('/api/toll/broadcast', limiter(10), async c => {
+    try {
+      const live = await readTollLive(view);
+      return c.json(await broadcastLatest({ policy: live, txs: live.recent }));
+    } catch (e) {
+      return c.json({ ok: false, claim: 'none', text: 'The chain check did not answer. Nothing moved on Base.', error: String(e.message || 'no status').slice(0, 160) });
+    }
   });
   app.get('/api/toll/pass/:hash', limiter(20), async c => {
     const hash = c.req.param('hash');

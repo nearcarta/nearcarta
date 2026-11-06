@@ -414,6 +414,15 @@ body.ferry-tray #shopUI .btns .ghost{
 .toll-tabs{position:relative;z-index:2}
 .toll-tabs .toll-tab{position:relative;z-index:3;pointer-events:auto}
 .toll-pane{display:grid;gap:16px;min-width:0;align-content:start}
+.toll-routes{display:flex;flex-wrap:wrap;gap:8px}
+.toll-route{
+  min-height:36px;padding:6px 12px;border-radius:999px;border:1px solid #4a3a28;
+  background:#17130f;color:#fff8ee;font:600 13px/1.2 system-ui,sans-serif;
+}
+.toll-route.on{border-color:#f5d08a}
+.toll-route:disabled{opacity:.72;cursor:default}
+.toll-field{display:grid;gap:6px;color:#fff8ee;font:600 14px/1.3 system-ui,sans-serif}
+.toll-field input{min-height:44px;padding:8px 12px;border-radius:12px;border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:500 16px/1.3 ui-monospace,monospace}
 .toll-pane[hidden]{display:none}
 .toll-flow{
   display:flex;align-items:center;gap:18px;

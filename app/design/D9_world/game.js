@@ -357,7 +357,7 @@ function hover(id){ if(hovered===id) return; if(hovered&&B[hovered]) B[hovered].
 const GUAR={ guard:['Guardhouse','Every spend is checked before it can be signed: payee list, daily cap, weekly cap.','clause · payee_allowlist · daily_cap · weekly_cap'],
   bank:['Mist Bank','Amounts stay hidden. Public: the check passed, and when.','gate G3 · hidden amounts'],
   arena:['Vault Arena','A live vault anyone may try to break. Every failed attack is a Chronicle row.','arena.attack_failed · 0 breaches'],
-  hall:['Town Hall','Change the rules on your own charter row. Gas only.','set_rules · your row'], toll:['Toll','Pay 0.001 NEAR to toll.nearcarta.near. A refusal pays nothing.','propose · 0.001 NEAR'],
+  hall:['Town Hall','Change the rules on your own charter row. Gas only.','set_rules · your row'], toll:['Toll','The fee comes from the live toll policy. A refusal pays nothing.','propose · live policy'],
   house:['Your House','Only your house key can change the oath or ring the curfew. The agent key calls propose and propose_batch.','function-call key · propose and propose_batch'],
   chronicle:['Chronicle','Every decision, yes or no, is a public NEP-297 event with an explorer link.','EVENT_JSON · standard: oath'] };
 function clickB(id){ if(id==='ferry'){ openFerry(); return; } const g=GUAR[id]; if(g) toast(id==='guard'?'ref':'ok',g[0],g[1],g[2]); const s=SHOPS[id]; if(s){ setView({t:[hx(s.q,s.r).x,0,hx(s.q,s.r).z],az:-.4,pol:.92,d:20}); } }

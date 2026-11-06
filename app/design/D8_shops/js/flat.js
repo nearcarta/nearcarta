@@ -39,7 +39,7 @@ const FLAT = {
   hall: { src: 'mainnet', cls: 'split', label: 'Reward paid', hero: tok('0.001', 'NEAR') },
   bank: { src: 'mainnet', cls: 'mainnet', label: 'Street sees a payout, not the amount', hero: '<span class="commit">sha256…</span><span class="unit">amount hidden</span>' },
   arena: { src: 'mainnet', cls: 'split', label: '5 attacks on the lab oath', hero: '<b class="num">0</b><span class="unit">breaches</span>' },
-  toll: { src: 'mainnet', cls: 'split', label: '0.001 NEAR pass on mainnet', hero: '<b class="num">11</b><span class="unit">of 16 nodes</span>' },
+  toll: { src: 'mainnet', cls: 'split', label: 'Live policy fee on mainnet', hero: '<b class="num">11</b><span class="unit">of 16 nodes</span>' },
   chronicle: { src: 'mainnet', cls: 'mainnet', label: 'Refusals on the record', hero: '<b class="num">6</b><span class="unit">of 10 actions</span>' },
   house: { src: 'mainnet', cls: 'split', label: 'Tip cap · policy v4', hero: tok('0.5', 'NEAR') },
 };
