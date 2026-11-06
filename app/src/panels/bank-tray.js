@@ -11,6 +11,7 @@ import {
   tightenDecision, freshNonce, saltFor, commitmentText, hashText,
   proofLogEntry, plural, attestFields, attestForNonce, browserSignatureLine, checkSplitFor, CHECK_SPLIT,
 } from './bank-audit.js';
+import { tightenCall, anchorCall, boardRefusal } from './bank-board.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DOC = `<svg class="bank-doc" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><rect x="10" y="6" width="22" height="30" rx="3" fill="none" stroke="#f3e6cf" stroke-width="2"/><path d="M32 12h6v24a3 3 0 0 1-3 3H16" fill="none" stroke="#e2b35b" stroke-width="2"/><path d="M16 16h12M16 22h12M16 28h8" stroke="#f3e6cf" stroke-width="2" stroke-linecap="round"/></svg>`;
@@ -81,6 +82,12 @@ function absUrl(path) {
   return base.replace(/\/$/, '') + path;
 }
 
+/** A mainnet tx on the explorer, for a proof-log row that names a real transaction. */
+function txUrl(hash) {
+  const h = String(hash || '');
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(h) ? `https://nearblocks.io/txns/${h}` : '';
+}
+
 function flow(right) {
   return `<div class="bank-flow" data-testid="bank-flow">${DOC}<span class="bank-flow-arrow" aria-hidden="true">→</span>${right}</div>`;
 }
@@ -115,7 +122,7 @@ export function bankMarkup(state) {
   const anomalyLines = [...pairs.map(f => f.text), ...extras.map(a => a.text)];
   const anomalies = anomalyLines.length ? anomalyLines.map(t => esc(t)).join(' ') : (review ? 'No anomalies.' : '');
   const capNote = !review ? '' : (review.before == null || !Number.isFinite(Number(review.before))
-    ? `<p class="bank-format" data-testid="bank-cap-note">No per-payment cap is saved in /setup, so there is no limit to show.</p>
+    ? `<p class="bank-format" data-testid="bank-cap-note">No per-payment cap is saved on your board row, so there is no limit to show.</p>
       <p class="bank-format" data-testid="bank-apply-note">${esc(APPLY_NOTE)}</p>`
     : review.tighten
       ? `<label class="choice-label">Current cap</label><p class="bank-field" data-testid="bank-before">${esc(nearText(review.before))}</p>
@@ -158,7 +165,8 @@ export function bankMarkup(state) {
       </div>
       <div class="bank-foot" data-testid="bank-foot-audit">
       <div class="bank-foot-rows" data-testid="bank-foot-rows">
-        <p class="bank-status" data-testid="bank-status" title="${esc([state.status, state.status2].filter(Boolean).join(' '))}">${esc([state.status, state.status2].filter(Boolean).join(' '))}</p>
+        <p class="bank-status" data-testid="bank-status" title="${esc(state.status || '')}">${esc(state.status || '')}</p>
+        <p class="bank-status" data-testid="bank-status-2" title="${esc(state.status2 || '')}">${esc(state.status2 || '')}</p>
       </div>
       <button type="button" class="primary bank-cta" data-testid="bank-audit" id="bank-audit">${esc(cta)}</button>
       </div>
@@ -278,11 +286,16 @@ async function postAudit(rows, model) {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       const why = body.error || body.step || `audit route HTTP ${res.status}`;
-      return { verified: false, step: `Response signature: ${why}`, fields: null };
+      // A route that never answered is a provider outage, not a failed signature. Say which.
+      const outage = res.status >= 500 || res.status === 429 || /attestation|unavailable|busy|timeout|rpc/i.test(String(why));
+      return outage
+        ? { verified: false, outage: true, step: `NEAR AI did not answer (${why}). The parser named your rows, and nothing here is attested.`, fields: null }
+        : { verified: false, step: `Response signature: ${why}`, fields: null };
     }
     return body;
   } catch (e) {
-    return { verified: false, step: `Response signature: ${e?.message || 'the audit route did not answer'}`, fields: null };
+    const why = e?.message || 'the audit route did not answer';
+    return { verified: false, outage: true, step: `NEAR AI did not answer (${why}). The parser named your rows, and nothing here is attested.`, fields: null };
   }
 }
 
@@ -344,6 +357,15 @@ export function mountBankRoom(root, hooks = {}) {
     const proofUrl = /^https:\/\//.test(String(model?.verify_url || '')) ? String(model.verify_url) : '';
     if (proofUrl && Array.isArray(state.log) && state.log.length) {
       state.log = state.log.map((e, i) => (i === state.log.length - 1 ? { ...e, evidence: [{ label: 'NEAR AI receipt', url: proofUrl }] } : e));
+    }
+    if (model?.outage) {
+      // The provider did not answer. The rows were audited in this browser by the parser;
+      // no model sentence and no signature exists, so nothing may claim one.
+      state.browserSig = null;
+      state.signingAddress = '';
+      state.modelAnswer = '';
+      state.status2 = model.step || 'NEAR AI did not answer. The parser named your rows, and nothing here is attested.';
+      return;
     }
     if (model?.signed_text && model?.signature && model?.signing_address) {
       state.browserSig = await verifyBrowserSignature({
@@ -419,6 +441,9 @@ export function mountBankRoom(root, hooks = {}) {
     postAudit(asked, state.model).then(async model => {
       if (state.auditTicket !== ticket) return;
       await takeModel(model);
+      // An unanswered provider is named here, on the same line as the audit counts, so the
+      // page never shows an audit beside a claim that the model verified it.
+      if (model?.outage) state.status2 = String(model.step || 'NEAR AI did not answer. Nothing here is attested.').slice(0, 180);
       paint();
     }).catch(() => {});
     return { ok: true, hint: reply, say: reply, keep: true, kind: 'ok' };
@@ -432,19 +457,83 @@ export function mountBankRoom(root, hooks = {}) {
     const key = `${state.nonce}|${review.after}|${state.consent ? '1' : '0'}`;
     if (!decision.ok) return fail(decision.reason);
     if (state.appliedKey === key) return fail('Already reviewed. Nothing was signed again.');
+    if (!hooks.boardRow || !hooks.boardWrite) return fail('This page cannot reach the board, so nothing was signed.');
+
+    // Read the row the chain has right now: tighten_rules compares every field against it,
+    // and a cached row would be a stale nonce and a stale cap.
+    const before = await hooks.boardRow().catch(() => null);
+    if (!before) return fail('The board did not return your row. Nothing was signed.');
+    const call = tightenCall({ row: before, afterNear: review.after });
+    if (!call.ok) return fail(call.why);
     state.appliedKey = key;
-    state.status = decision.reason;
-    state.status2 = 'Simulation only. No wallet opened.';
-    if (state.consent) {
-      const salt = saltFor();
-      const text = commitmentText({ nonce: state.nonce, afterNear: decision.after, salt });
-      const hash = await hashText(text);
-      state.commitment = hash;
-      state.status2 = `Salted commitment ${hash.slice(0, 10)}… stays in this browser. It was not published.`;
-    }
-    pushLog(proofLogEntry({ kind: 'tighten-blocked', lines: review.lines, anomalyCount: review.anomalies.length, nonce: state.nonce, eligible: false }));
+    // Two short lines: what is being sent, then the result. The tx links live in the proof log.
+    state.status = `Tightening your cap: ${call.before} → ${call.after} NEAR.`;
+    state.status2 = 'Signed here. No wallet opens.';
     paint();
-    return { ok: false, hint: state.status, say: `${state.status} ${state.status2}`, keep: true, kind: 'no', live: 'blocked' };
+
+    let sent;
+    try {
+      sent = await hooks.boardWrite({ method: call.method, args: call.args, gasTgas: 30 });
+    } catch (e) {
+      const why = boardRefusal(e);
+      state.status = `Tighten not sent: ${why}`;
+      state.status2 = 'Nothing was signed.';
+      pushLog(proofLogEntry({ kind: 'tighten-failed', lines: review.lines, anomalyCount: review.anomalies.length, nonce: state.nonce, eligible: false }));
+      paint();
+      return { ok: false, hint: state.status, say: `${state.status} ${state.status2}`, keep: true, kind: 'no', live: 'blocked' };
+    }
+    const okChain = sent.decision === 'allowed';
+    state.status = okChain
+      ? `Cap on your row is now ${call.after} NEAR (was ${call.before}).`
+      : `Board refused the tighten: ${boardRefusal(sent.reason)}.`;
+    state.status2 = okChain ? 'The board wrote it. No wallet opened.' : 'Nothing changed.';
+    pushLog(proofLogEntry({
+      kind: okChain ? 'tighten' : 'tighten-refused',
+      lines: review.lines,
+      anomalyCount: review.anomalies.length,
+      nonce: state.nonce,
+      eligible: okChain,
+      evidence: sent.tx ? [{ label: 'tighten_rules', url: txUrl(sent.tx) }] : [],
+    }));
+
+    // The opt-in salted commitment is anchored only after the cap it commits to is on chain.
+    // The board hashes salt || digest itself and stores neither, so only the commitment goes out.
+    if (okChain && state.consent) {
+      const salt = saltFor();
+      const text = commitmentText({ nonce: state.nonce, afterNear: call.after, salt });
+      const digest = await hashText(text);
+      state.commitment = digest;
+      const anchor = anchorCall({ kind: 'bank_cap', digest, salt });
+      if (!anchor.ok) state.status2 = `Commitment not anchored: ${anchor.why}`;
+      else {
+        try {
+          const a = await hooks.boardWrite({ method: anchor.method, args: anchor.args, gasTgas: 20 });
+          const anchored = a.decision === 'allowed';
+          state.status2 = anchored
+            ? `Commitment ${digest.slice(0, 10)}… anchored. The statement is not in it.`
+            : `Commitment refused: ${boardRefusal(a.reason)}.`;
+          pushLog(proofLogEntry({
+            kind: anchored ? 'anchor' : 'anchor-refused',
+            lines: review.lines,
+            anomalyCount: review.anomalies.length,
+            nonce: state.nonce,
+            eligible: anchored,
+            evidence: a.tx ? [{ label: 'anchor', url: txUrl(a.tx) }] : [],
+          }));
+        } catch (e) {
+          state.status2 = `Commitment not anchored: ${boardRefusal(e)}.`;
+        }
+      }
+    }
+    paint();
+    return {
+      ok: okChain,
+      hint: state.status,
+      say: [state.status, state.status2].filter(Boolean).join(' '),
+      keep: true,
+      kind: okChain ? 'ok' : 'no',
+      live: okChain ? 'signed' : 'blocked',
+    };
   }
 
   async function runTee() {
@@ -568,10 +657,13 @@ export function mountBankRoom(root, hooks = {}) {
     await takeModel(model);
     const picked = preferModelSentence(model?.answer, rows, local);
     state.review = { ...state.review, wasteText: picked.text };
-    state.status = picked.source === 'model'
-      ? 'NEAR AI named the rows in your message.'
-      : 'The parser named the rows in your message.';
-    state.status2 = 'Nothing was signed.';
+    state.status = model?.outage
+      ? 'NEAR AI did not answer. These rows were named in this browser.'
+      : picked.source === 'model'
+        ? 'NEAR AI named the rows in your message.'
+        : 'The parser named the rows in your message.';
+    // An outage is named as one; the parser's sentence is still the answer, and it says so.
+    state.status2 = model?.outage ? String(model.step || 'Nothing here is attested.').slice(0, 180) : 'Nothing was signed.';
     paint();
     return { ok: true, hint: picked.text, say: picked.text, keep: true, kind: 'ok' };
   }

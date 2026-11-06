@@ -9,7 +9,9 @@
 // ft_transfer is NEP-141: https://github.com/near/NEPs/blob/master/neps/nep-0141.md
 import { functionCallAllowanceCost } from './cost.js';
 
-export const AGENT_METHODS = ['propose', 'propose_call', 'propose_call_as'];
+// `anchor` is the Chronicle tray's own call: it logs one event and stores nothing, so it
+// needs no cap and no deposit, but the session key must name it or the visitor signs twice.
+export const AGENT_METHODS = ['propose', 'propose_call', 'propose_call_as', 'anchor'];
 
 /**
  * The session key's scope for holds. Arena, Guard and Hall need three more board
@@ -25,8 +27,19 @@ export const AGENT_METHODS = ['propose', 'propose_call', 'propose_call_as'];
  *   `predecessor == owner` in the contract. Neither is granted: an agent that can cancel
  *   a WARN can quietly undo it, and one that can expire a sent hold decides a liability.
  *   The visitor's own wallet calls those two.
+ *
+ * Two more are listed because a shop changes the visitor's own row with no wallet popup:
+ *
+ * - `tighten_rules` can only shrink. The contract refuses every field that is not at
+ *   least as tight (`ERR_LOOSEN`: cap, daily budget, count, min amount, a payee that is
+ *   not already listed, an expiry that is later, a wider window), and it refuses to
+ *   move the nonce, the spend or the day. An agent calling it can make the row stricter,
+ *   never looser, so it cannot widen its own authority.
+ * - `anchor` writes nothing. It requires a row, hashes `salt || digest`, and logs one
+ *   event; the contract asserts its state bytes are unchanged (`ERR_STATE`). A salted
+ *   commitment is the only thing a shop publishes through it.
  */
-export const SESSION_METHODS = [...AGENT_METHODS, 'confirm_hold'];
+export const SESSION_METHODS = [...new Set([...AGENT_METHODS, 'confirm_hold', 'tighten_rules'])];
 /** Methods only the visitor's wallet may call. Never in a session key's list. */
 export const OWNER_ONLY_METHODS = ['cancel_hold', 'expire_sent'];
 /** The three hold methods a shop track needs, stated once for the shops and the docs. */
@@ -96,6 +109,24 @@ export const FERRY_CALL_TARGETS = [
 /** wrap.near plus the board's own stamp. The stamp returns its NEAR to the row. */
 export function stampCalls(board, capYocto) {
   return [...FERRY_CALL_TARGETS, { receiver: board, method: 'stamp', cap: String(capYocto) }];
+}
+
+// USDC on NEAR (the 64-hex contract). A Payouts row registers a zero-NEAR issuer for USDC through the
+// visitor's own row, so the money can arrive. storage_deposit is bounded by the row's per-payment cap,
+// and only the storage_deposit method is opened: this call cannot move USDC, only register an account.
+// https://github.com/near/NEPs/blob/master/neps/nep-0141.md
+export const USDC_NEAR = '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
+export const USDC_STORAGE_CALL = { receiver: USDC_NEAR, method: 'storage_deposit' };
+
+/**
+ * The call list a Payouts-capable row carries. The USDC storage pair is added only when the whole
+ * list still fits the row's 0.02 NEAR: the 64-hex contract costs 104 bytes, which a long shop list
+ * cannot spare. `fits` reports whether the pair made it, so the shop can say so instead of guessing.
+ */
+export function payoutsCalls(extra, capYocto) {
+  const base = [...(extra || [])];
+  const withUsdc = [...base, { ...USDC_STORAGE_CALL, cap: String(capYocto) }];
+  return callsFitRow(withUsdc) ? { calls: withUsdc, fits: true } : { calls: base, fits: false };
 }
 
 /**

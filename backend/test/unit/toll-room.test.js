@@ -267,12 +267,12 @@ test('the city toll door opens the toll tray inside the city and does not resume
   const tollFn = read('app/design/D8_shops/js/apps.js');
   const body = tollFn.slice(tollFn.indexOf('export async function toll'), tollFn.indexOf('// Older gate calls'));
   assert.match(body, /Set up your agent in \/setup/);
+  // The session key signs only propose_call_as. The row owner's own sign_cross call is
+  // a separate, second step at 150 Tgas; it never travels on the session key.
   assert.match(body, /propose_call_as/);
-  assert.match(body, /Nothing was signed/);
-  assert.doesNotMatch(body, /boardPay/);
+  assert.match(body, /sign_cross/);
   assert.doesNotMatch(body, /propose_batch|\bask\(/);
   assert.doesNotMatch(body, /0\.001/);
-  assert.doesNotMatch(body, /sign\(/);
   // The recipient and the amount come from the visitor's words, never a constant.
   assert.doesNotMatch(body, /0x[0-9a-fA-F]{40}/);
   assert.match(body, /quote\.to/);
@@ -421,3 +421,47 @@ function fakeDoc() {
     },
   };
 }
+
+// Two unrelated visitors own two different foreign addresses. The path is the row
+// owner's, so the addresses cannot collide and neither can spend the other's nonce.
+test('two visitors get two distinct paths and neither is the shared base-1', () => {
+  const a = addressWords({ path: 'row:alice.near:base', chainId: 8453, ok: true, live: '0xaaa', recorded: '0xaaa' });
+  const b = addressWords({ path: 'row:bob.near:base', chainId: 8453, ok: true, live: '0xbbb', recorded: '0xbbb' });
+  assert.match(a.text, /row:alice\.near:base/);
+  assert.match(b.text, /row:bob\.near:base/);
+  assert.notEqual(a.text, b.text);
+  // The shared legacy path is not a visitor wallet and must never be presented as one.
+  assert.doesNotMatch(a.text, /base-1/);
+  assert.doesNotMatch(b.text, /base-1/);
+});
+
+// The contract no longer publishes an amount cap, so the tray must not print one.
+test('the pay line names the fee and the row, never an invented cap', () => {
+  const live = { ok: true, price: { fee: '1000000000000000000000' }, verify_chain: 'Base', chain_id: 8453 };
+  const html = tollMarkup({ live, row: rowOk, tab: 'pass' });
+  assert.match(html, /Fee 0\.001 NEAR/);
+  assert.match(html, /Your row sets the amount cap/);
+  assert.doesNotMatch(html, /Caps left/);
+});
+
+test('the upgrade script is a dry run and retires both contract-wide caps', () => {
+  const src = read('scripts/toll-upgrade.js');
+  assert.match(src, /dry_run: !live/);
+  assert.match(src, /TOLL_SIGNER_KEY/);
+  assert.match(src, /never printed|is not printed/);
+  // In place: no close, no create, no transfer.
+  assert.doesNotMatch(src, /delete_account|createAccount|A\.transfer/);
+  assert.match(src, /'upgrade'/);
+  assert.match(src, /migrate/);
+});
+
+test('cross enforces no contract-wide amount cap', () => {
+  const src = read('contracts/toll/src/lib.rs');
+  const cross = src.slice(src.indexOf('pub fn cross'), src.indexOf('pub fn sign_cross'));
+  assert.doesNotMatch(cross, /max_per_tx/);
+  assert.doesNotMatch(cross, /price\.max_token/);
+  // The row budget is the amount rule that stays.
+  assert.match(cross, /row_budget/);
+  // policy publishes null, so a client cannot read a cap back out.
+  assert.match(src, /"max_per_tx": Value::Null/);
+});

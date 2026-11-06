@@ -1,6 +1,9 @@
-// Statement digest, browser checks, and the Board v2 anchor contract.
+// Statement digest, browser checks, and the Board v2 anchor call.
 // The NEAR AI call stays on the server. A matching ed25519 signature is not an Intel TEE quote.
-// The live board contract has no anchor method. Nothing here signs or spends.
+// The live board has `anchor(kind, digest, salt)` (contracts/charter_board/src/v2.rs): it stores
+// nothing, logs one `nearcarta-board` v2 `anchor` event, and needs the visitor's own row.
+// The call is signed in the browser by the visitor's session key and sent from the visitor's
+// account, so no server key exists. Nothing here signs by itself.
 import { teeView } from './tee-view.js';
 
 import { verifyResponseSignature } from './panels/signature-check.js';
@@ -63,6 +66,41 @@ function hexToBytes(hex) {
     out[i] = n;
   }
   return out;
+}
+
+/** sha256 of raw bytes, hex. Same helper family as sha256Hex, which takes a string. */
+function sha256BytesHex(bytes) {
+  const bitLen = bytes.length * 8;
+  const padded = new Uint8Array(((bytes.length + 9 + 63) >> 6) << 6);
+  padded.set(bytes);
+  padded[bytes.length] = 0x80;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, Math.floor(bitLen / 0x100000000));
+  view.setUint32(padded.length - 4, bitLen >>> 0);
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+  let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+  const w = new Uint32Array(64);
+  for (let i = 0; i < padded.length; i += 64) {
+    for (let t = 0; t < 16; t++) w[t] = view.getUint32(i + t * 4);
+    for (let t = 16; t < 64; t++) {
+      const s0 = rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >>> 3);
+      const s1 = rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10);
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) >>> 0;
+    }
+    let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+    for (let t = 0; t < 64; t++) {
+      const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + s1 + ch + K[t] + w[t]) >>> 0;
+      const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (s0 + maj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0;
+    h4 = (h4 + e) >>> 0; h5 = (h5 + f) >>> 0; h6 = (h6 + g) >>> 0; h7 = (h7 + h) >>> 0;
+  }
+  return [h0, h1, h2, h3, h4, h5, h6, h7].map(n => n.toString(16).padStart(8, '0')).join('');
 }
 
 export function canonicalManifest({ account = '', period = {}, rules = null, rows = [], statement = '', model = 'none', commitment = '' } = {}) {
@@ -210,54 +248,146 @@ export function teeNowText(proof, body) {
   return lines.join(' ');
 }
 
-// Board v2 event, when that contract exists:
-// { standard:'nearcarta', version:'1', event:'chronicle_anchor',
-//   data:[{ row_owner, kind:'statement', digest, nonce, time, version:1, commitment }] }
-// Zero persistent storage. The index is rebuilt from the events.
+// The board's real event, as `anchor` logs it (contracts/charter_board/src/v2.rs):
+// EVENT_JSON:{"standard":"nearcarta-board","version":"2","event":"anchor",
+//             "owner":"visitor.near","kind":"statement","commitment":"<hex32>","nonce":"0","time":"<ns>"}
+// `commitment` is sha256(salt_bytes || digest) and is the only thing published: neither the
+// salt nor the raw digest reaches the chain. Zero persistent storage; the index is the events.
+export const ANCHOR_STANDARD = 'nearcarta-board';
+export const ANCHOR_VERSION = '2';
+export const ANCHOR_EVENT = 'anchor';
+// The contract accepts 8..=64 ASCII alphanumeric. 16 hex chars is inside that range.
+export const ANCHOR_SALT_LEN = 16;
+
+/** Board `anchor` args for one bundle digest. Never a raw digest without a salt. */
 export function anchorPlan({ manifest, consent = false, privateNote = '', salt = '' } = {}) {
   const note = String(privateNote || '');
-  let commitment = '';
-  if (note) {
-    if (!consent) {
-      return { ok: false, signed: false, live: 'blocked', event: null, reason: 'Private note kept off the bundle. The raw hash was not published. Nothing was signed.' };
-    }
-    if (!salt) {
-      return { ok: false, signed: false, live: 'blocked', event: null, reason: 'The salt is missing, so the private note was not committed. Nothing was signed.' };
-    }
-    commitment = sha256Hex(`${salt}:${note}`);
+  const digest = String(manifest?.digest || '');
+  // Consent is decided before anything else: a note without consent must never reach the
+  // board, whatever else about the request is wrong.
+  if (note && !consent) {
+    return { ok: false, signed: false, live: 'blocked', args: null, event: null, reason: 'Private note kept off the bundle. The raw hash was not published. Nothing was signed.' };
   }
-  if (!manifest?.digest) {
-    return { ok: false, signed: false, live: 'blocked', event: null, reason: 'Write the statement first. Nothing was signed.' };
+  if (note && !salt) {
+    return { ok: false, signed: false, live: 'blocked', args: null, event: null, reason: 'The salt is missing, so the private note was not committed. Nothing was signed.' };
   }
-  const event = {
-    standard: 'nearcarta',
-    version: '1',
-    event: 'chronicle_anchor',
-    data: [{
-      row_owner: manifest.body?.account || '',
-      kind: 'statement',
-      digest: manifest.digest,
-      nonce: String((manifest.body?.receipts || []).length),
-      time: '',
-      version: 1,
-      commitment: commitment || null,
-    }],
+  if (!/^[0-9a-f]{64}$/.test(digest)) {
+    return { ok: false, signed: false, live: 'blocked', args: null, event: null, reason: 'Write the statement first. Nothing was signed.' };
+  }
+  if (salt && !/^[A-Za-z0-9]{8,64}$/.test(salt)) {
+    return { ok: false, signed: false, live: 'blocked', args: null, event: null, reason: 'The salt must be 8 to 64 letters or digits for the board. Nothing was signed.' };
+  }
+  // No private note still commits with a generated salt: the board refuses a raw digest.
+  const useSalt = salt || `${saltBytes()}`;
+  const args = { kind: 'statement', digest, salt: useSalt };
+  // The contract computes sha256(salt_bytes || digest_bytes) and logs only that
+  // (contracts/charter_board/src/v2.rs `anchor`). The tray must use the same formula or
+  // the event it reads back would never match the commitment it is looking for.
+  const commitment = anchorCommitment(useSalt, digest);
+  const localEvent = {
+    standard: ANCHOR_STANDARD,
+    version: ANCHOR_VERSION,
+    event: ANCHOR_EVENT,
+    owner: String(manifest?.body?.account || ''),
+    kind: 'statement',
+    commitment,
+    digest,
   };
   return {
-    ok: false,
+    ok: true,
     signed: false,
-    live: 'blocked',
-    event,
+    live: 'ready',
+    method: 'anchor',
+    args,
+    salt: useSalt,
     commitment,
-    reason: 'Live anchor blocked. Board v2 has no anchor method on this contract. The bundle was downloaded. Nothing was signed.',
+    noteCommitment: note ? sha256Hex(`${useSalt}:${note}`) : '',
+    event: localEvent,
+    reason: 'Ready to anchor. The board logs one event and stores nothing. The session key sends it from your own account.',
   };
 }
 
+/**
+ * What the board logs: sha256(salt_bytes || digest_bytes), hex.
+ * `digest` is the 64-char hex the manifest produced, decoded to 32 bytes first.
+ */
+export function anchorCommitment(salt, digestHex) {
+  const saltBytes = new TextEncoder().encode(String(salt || ''));
+  const raw = hexToBytes(digestHex);
+  if (!raw) return '';
+  const all = new Uint8Array(saltBytes.length + raw.length);
+  all.set(saltBytes, 0);
+  all.set(raw, saltBytes.length);
+  return sha256BytesHex(all);
+}
+
+/** The salt the board accepts. 16 hex chars, 8..=64 alphanumeric. */
+function saltBytes() {
+  const bytes = new Uint8Array(8);
+  globalThis.crypto?.getRandomValues?.(bytes);
+  return [...bytes].map(n => n.toString(16).padStart(2, '0')).join('');
+}
+
+/** Read a board anchor event out of a receipt's `EVENT_JSON:` log lines. */
+export function parseAnchorEvents(logs = []) {
+  const out = [];
+  for (const line of logs || []) {
+    const text = String(line || '');
+    const i = text.indexOf('EVENT_JSON:');
+    if (i < 0) continue;
+    let body;
+    try { body = JSON.parse(text.slice(i + 'EVENT_JSON:'.length)); } catch { continue; }
+    if (body?.standard !== ANCHOR_STANDARD || body?.event !== ANCHOR_EVENT) continue;
+    if (!body.commitment || !body.owner) continue;
+    out.push({
+      standard: ANCHOR_STANDARD,
+      version: String(body.version || ANCHOR_VERSION),
+      event: ANCHOR_EVENT,
+      owner: String(body.owner),
+      kind: String(body.kind || ''),
+      commitment: String(body.commitment),
+      nonce: String(body.nonce ?? ''),
+      time: String(body.time ?? ''),
+    });
+  }
+  return out;
+}
+
+/** Events for one visitor from RPC receipts_outcome[].outcome.logs, in chain order. */
+export function anchorEventsFromReceipts(receipts = []) {
+  const out = [];
+  for (const r of receipts || []) {
+    const owner = r?.executor_id || r?.predecessor_id || '';
+    const logs = r?.outcome?.logs || r?.outcome?.outcome?.logs || [];
+    for (const e of parseAnchorEvents(logs)) out.push({ ...e, tx: r?.id || r?.receipt_id || '', owner: e.owner || owner });
+  }
+  return out;
+}
+
+/**
+ * Rebuild the anchored index from events alone. This is the durable index: the board
+ * stores nothing, so a reader re-derives every anchored statement from the chain logs.
+ * The same digest anchored twice keeps the later event (chain order wins).
+ */
 export function rebuildIndex(events) {
+  const byCommitment = {};
   const byDigest = {};
   for (const e of events || []) {
-    if (e?.event !== 'chronicle_anchor') continue;
-    for (const row of e.data || []) if (row?.digest) byDigest[row.digest] = row;
+    if (e?.event !== ANCHOR_EVENT) continue;
+    if (!e.commitment) continue;
+    const row = { owner: e.owner || '', kind: e.kind || '', commitment: e.commitment, nonce: e.nonce || '', time: e.time || '', tx: e.tx || '' };
+    byCommitment[e.commitment] = row;
+    if (e.digest) byDigest[e.digest] = row;
   }
-  return byDigest;
+  return { byCommitment, byDigest };
+}
+
+/** Does a locally built commitment appear in the chain events for this visitor? */
+export function anchorProof({ commitment, owner, events = [] } = {}) {
+  const want = String(commitment || '');
+  const who = String(owner || '');
+  if (!want) return { ok: false, why: 'No commitment was built, so there is nothing to look for.' };
+  const hit = (events || []).find(e => e?.commitment === want && (!who || e.owner === who));
+  if (!hit) return { ok: false, why: 'The board has not logged this commitment yet. The transaction may still be confirming.' };
+  return { ok: true, event: hit, why: `The board logged this commitment for ${hit.owner}${hit.nonce ? ` at nonce ${hit.nonce}` : ''}.` };
 }

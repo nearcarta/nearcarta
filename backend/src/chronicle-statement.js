@@ -41,7 +41,7 @@ function tidy(text, digest) {
   out = out.replace(/canonical digest[:\s]*/ig, ' ').replace(/\s+/g, ' ').replace(/^[\s.:\-]+/, '').trim();
   if (!out || /^[0-9a-f]{8,}/i.test(out)) out = 'This statement covers the account and the rows in the bundle.';
   if (!/[.!?]$/.test(out)) out += '.';
-  if (!/Historic rules/i.test(out)) out += ' Historic rules: missing.';
+  if (!/Historic rules/i.test(out) && !/Rules version/i.test(out)) out += ' Historic rules: missing.';
   return out.slice(0, 600);
 }
 
@@ -50,7 +50,8 @@ export async function signStatement(input = {}, deps = {}) {
   const period = input.period || {};
   const rows = Array.isArray(input.rows) ? input.rows.slice(0, 40) : [];
   const digest = bundleDigest({ account, period, rows });
-  const facts = writeStatement({ account, period, rows, rules: null, totals: input.totals || null });
+  const rules = input.rules && input.rules.version ? { version: String(input.rules.version) } : null;
+  const facts = writeStatement({ account, period, rows, rules, totals: input.totals || null });
   const prompt = [
     'You are Chronicle, a read-only account auditor. Do not invent a transaction, a payee, or an amount.',
     `Canonical bundle digest: ${digest}`,

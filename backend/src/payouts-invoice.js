@@ -10,14 +10,14 @@ import {
   hostedCeiling, aboveHosted, canonicalInvoice, invoiceRecordId, publicInvoice, invoiceExpired,
   invoiceQuoteBody, invoiceDelivered, invoiceStatusLine, addressOk, registrationVerdict, indicativeRefund,
   USDC_NEAR_CONTRACT, USDC_CONTRACT_FALLBACK, nearFromYocto, quoteSummary, bridgeMinimumHint,
-  paymentLinks, receiptLine,
+  paymentLinks, receiptLine, sponsorshipPlan, USDC_STORAGE_NEAR,
 } from '../../app/src/panels/payouts-plan.js';
 import { nearAccountOk } from '../../app/design/D8_shops/js/payouts.js';
 import { tokenRef, findToken, tokens, postQuote, checkQuote, statusHelp, validDepositAddress } from './ferry.js';
 import { fetchOneClickStatus, defaultVerify } from './ferry-checkout.js';
 import { echoGuard } from './ferry-guard.js';
 
-export { invoiceDelivered, invoiceStatusLine, hostedCeiling, registrationVerdict, USDC_NEAR_CONTRACT };
+export { invoiceDelivered, invoiceStatusLine, hostedCeiling, registrationVerdict, USDC_NEAR_CONTRACT, sponsorshipPlan, USDC_STORAGE_NEAR, nearFromYocto, indicativeRefund };
 
 /** Live quote check for an invoice. Signature, echo and deposit address. No product USD cap. */
 export function checkPayoutQuote(sent, resp, verify) {
@@ -126,6 +126,72 @@ export function listInvoices(visitor, deps = {}) {
   }
   invoices.sort((a, b) => b.createdAt - a.createdAt);
   return { ok: true, visitor: who, invoices };
+}
+
+
+/**
+ * Price one foreign payroll row. The session deposits wNEAR; the rail pays the row's asset on its chain.
+ * EXACT_OUTPUT, so the payee receives exactly `amt`. A dry quote: no deposit address, nothing is sent.
+ * The row's NEAR cost is the signed quote's amountInFormatted, which the tray checks against the cap.
+ */
+export async function quotePayrollRow(input, deps = {}) {
+  const chain = String(input?.chain || '').toLowerCase();
+  const asset = String(input?.asset || 'USDC').toUpperCase();
+  const to = String(input?.to || '').trim();
+  const amt = Number(input?.amt);
+  if (!chain || chain === 'near') return { ok: false, reason: 'near_row', quote: null };
+  if (!addressOk(chain, to)) return { ok: false, reason: 'bad_recipient', quote: null };
+  if (!(amt > 0)) return { ok: false, reason: 'bad_amount', quote: null };
+  const destRef = `${asset}@${chain}`;
+  const list = await (deps.tokens || tokens)();
+  const from = findToken(list, 'wNEAR@near');
+  const toTok = findToken(list, destRef);
+  if (!from || !toTok) return { ok: false, reason: 'unknown_token', quote: null };
+  const [w, f = ''] = String(amt).split('.');
+  if (!/^\d+$/.test(w) || !/^\d*$/.test(f) || f.length > toTok.decimals) return { ok: false, reason: 'bad_amount', quote: null };
+  const outUnits = (BigInt(w) * 10n ** BigInt(toTok.decimals) + BigInt((f + '0'.repeat(toTok.decimals)).slice(0, toTok.decimals) || '0')).toString();
+  const REFUND = '561e8ef0fecb621469da30250dc6cdcd1e47a66e561e8ef0fecb621469da3025';
+  const body = {
+    dry: true,
+    swapType: 'EXACT_OUTPUT',
+    slippageTolerance: Number(input?.slippage) || 100,
+    originAsset: from.assetId,
+    depositType: 'ORIGIN_CHAIN',
+    destinationAsset: toTok.assetId,
+    amount: outUnits,
+    refundTo: REFUND,
+    refundType: 'ORIGIN_CHAIN',
+    recipient: to,
+    recipientType: 'DESTINATION_CHAIN',
+    deadline: new Date(Date.now() + 30 * 60e3).toISOString(),
+  };
+  const post = deps.postQuote || postQuote;
+  const res = await post(body);
+  if (res.http !== 201) {
+    return { ok: false, reason: 'quote_refused', quote: null, error: bridgeMinimumHint(res.body?.message || `HTTP ${res.http}`) };
+  }
+  const checks = (deps.checkQuote || checkQuote)(body, res.body);
+  if (!checks.accepted) return { ok: false, reason: 'quote_refused', quote: null };
+  const q = res.body.quote || {};
+  return {
+    ok: true,
+    reason: null,
+    dry: true,
+    depositAddress: null,
+    quote: {
+      chain, asset, to, amt,
+      near: Number(q.amountInFormatted),
+      nearUsd: Number(q.amountInUsd) || null,
+      out: q.amountOutFormatted || null,
+      outUsd: Number(q.amountOutUsd) || null,
+      minutes: Number(q.timeEstimate) || null,
+      deadline: q.deadline || null,
+      correlationId: res.body.correlationId || null,
+      signature: res.body.signature || null,
+      slippage: body.slippageTolerance,
+    },
+    help: 'Dry quote. The row pays from your session; no deposit address is created here.',
+  };
 }
 
 /** Read the stored invoice. Query overrides are listed and ignored. */
@@ -261,8 +327,7 @@ export async function quoteStored(id, payer, deps = {}) {
   };
 }
 
-export async function refreshInvoice(id, deps = {}) {
-  const store = invoiceBook(deps);
+export async function refreshInvoice(id, deps = {}) {  const store = invoiceBook(deps);
   const row = store.byId.get(String(id || ''));
   if (!row) return { ok: false, reason: 'unknown_invoice', delivered: false };
   if (!row.depositAddress) return { ok: true, invoice: publicInvoice(row), delivered: false, status: row.status };
@@ -298,7 +363,7 @@ export async function registrationOf(account, deps = {}) {
     }
   }
   const view = deps.view;
-  if (!view) return { ok: true, account: who, ...registrationVerdict(null, { error: 'no view' }) };
+  if (!view) return { ok: true, account: who, ...registrationVerdict(null, { error: 'no view', account: who }) };
   const contracts = deps.contracts || [deps.contract || USDC_NEAR_CONTRACT, USDC_CONTRACT_FALLBACK].filter((id, i, all) => id && all.indexOf(id) === i);
   let last = 'unread';
   for (const contract of contracts) {
@@ -309,10 +374,10 @@ export async function registrationOf(account, deps = {}) {
         const bounds = await view(contract, 'storage_balance_bounds', {});
         minNear = nearFromYocto(bounds?.min);
       } catch { /* the calm line still names who pays */ }
-      return { ok: true, account: who, contract, ...registrationVerdict(balance, { minNear: minNear || undefined }) };
+      return { ok: true, account: who, contract, ...registrationVerdict(balance, { minNear: minNear || undefined, account: who }) };
     } catch (e) {
       last = e?.message || last;
     }
   }
-  return { ok: true, account: who, ...registrationVerdict(null, { error: last }) };
+  return { ok: true, account: who, ...registrationVerdict(null, { error: last, account: who }) };
 }

@@ -54,7 +54,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 761 backend unit tests (760 pass, 1 skipped), offline
+npm test                                   # 830 backend unit tests (829 pass, 1 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -157,7 +157,7 @@ An agent with a wallet key can be talked into paying anyone: a fake invoice, a p
 | Ferry | *Get quote* for about 0.05 wNEAR on NEAR to USDC on NEAR, then *Load cargo* | Fund NEAR once in `/setup`. Ask charter is the stamp [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV), not the swap. A session Load cargo settles with `propose_call` when the row cap holds the wrap. There is no product USD cap. The boat says delivered only after SUCCESS. Guest Load cargo is a demo. Pay (`/ferry-widget`) is optional and you send that deposit yourself. Session swap SUCCESS: 0.04875 wNEAR to 0.174899 USDC [5vUC4zn1…](https://nearblocks.io/txns/5vUC4zn1PjLxLk57tTpG1fP98WkPcFgbPFEKdC3tvK2S) |
 | Mist Bank | Paste a card CSV or type *which charges look like waste in my list?*, or name the rows in the chat, then *Apply tighter limits* | The file is read in the browser. Amounts stay in their own currency. Rows named in the message are audited, through NEAR AI with the parser as the fallback. The pasted statement is used only when the message has no rows. An empty model sentence is not verified. The page names the signing algorithm the response reports: an ECDSA receipt is recovered from the EIP-191 message in the browser and compared with the attested address; an ed25519 one is checked against the 32-byte public key. The signer is shown in full. A new attestation nonce says it is not checked yet. A private audit never opens `/setup` and signs nothing. Live tighten is blocked until the board session can call it. | unit `a message that names rows is audited on those rows`; `an ecdsa receipt is recovered in the browser, and a wrong algorithm is never claimed as a pass` |
 | Guardhouse | City door, then Check, Pay safely, or Blocks. The same words work in the agent box | The check is server-side: age, code hash, lookalike, deny list. No TEE signature. Pay through guard uses the payee and amount you typed. A warning stays held until you press Confirm. A block refunds once and does not forward. The agent cannot confirm a warning. The guard contract is not deployed yet, so nothing is signed. Freeze only tightens the row |
-| Vault Arena | Write a scam, *Send the scam* | The NEAR AI model (`z-ai/glm-5.3-flash`) reads it and proposes a payment; a payment outside your rules is refused on chain. Six walls, points and a leaderboard |
+| Vault Arena | Open Guardians, Attack, or Score | Mint and Attack call the board as `propose_call_as` once arena v2 is deployed. Score reads `get_attempt`. *Simulate a week* signs nothing |
 | Payouts | *Pay reviewed rows*, or ask the AI Agent "Pay reviewed rows" | Each in-cap NEAR row is one `propose` on `board.nearcarta.near`. Over the row cap, the row is refused before any deposit. A foreign row is held. An invoice link stays on the receive account written at creation. Nothing is marked paid until 1Click status is `SUCCESS` |
 | Town Hall | *Post job*, *Agents*, *Receipts* | `set_rules`, `set_frozen` and `set_seal` on your own row. Deposit 0. A job ledger splits the budget you type. A pass is held. Chain release waits on `node scripts/hall-deploy.js`. Market hire is not available |
 | Chronicle | Open `/?shop=chronicle`. Type an account and press Show timeline. Choose Timeline, Statement, or Verify | The timeline lists that account’s rows, or says there are no rows. Write statement makes a local summary and does not sign. Anchor downloads the bundle and says the live anchor is blocked. Export CSV is off when there are no rows. Verify rejects a changed statement. No entry fee. Live anchor tx: (coordinator adds the nearblocks link) |
@@ -255,10 +255,26 @@ Live check, after the owner deploys:
 5. After a crossing is signed and relayed, Paid on Base appears only when the receipt status is 1. That basescan transaction is not in this change.
 6. Open Ledger. It names the fee and says this policy has no revenue split. Foreign amounts are not revenue.
 
+## Vault Arena
+
+The city door is the way in. All shops → Vault Arena stays in the town. `/shops/arena/` shows the same card.
+
+The card has three tabs: Guardians, Attack, and Score. One gold button mints, feeds, withdraws, or attacks, matching the open tab. Score has no spend button. The AI Agent uses the same planner as that button. Enter and the arrow both send. A week advance is labeled `Simulation. No transaction was signed.`
+
+Mint, feed, attack, and withdraw build `propose_call_as` on `board.nearcarta.near`. The board overwrites `row_owner`. An attack uses `hold: true`, then `confirm_hold`, `cancel_hold`, or `expire_sent`. Cancel returns a pending hold to the row. `expire_sent` does not refund. The session key has to name `propose_call_as` or the card signs nothing and does not open a wallet. `contracts/arena_v2` is not deployed. Its owner `upgrade` deploys new code and calls `migrate` in the same receipt, so a later change does not close the account. The model-signature check is not implemented; the contract field `verifier` is `unverified`.
+
+Score is `GET /api/arena/score`, which reads `get_attempt` on `arena.nearcarta.near`. A cancelled signature is not an attempt. `GET /api/arena/guardians` does not invent pets.
+
+Recorded earlier on the deployed arena, not from this card: allow [AZWxqZns…](https://nearblocks.io/txns/AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht), refuse [25LpJRFF…](https://nearblocks.io/txns/25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V). A v2 mint, attack, payout, and timeout refund are not linked here. The coordinator records those after deploy.
+
+`node scripts/arena-deploy.js` reads `arena.nearcarta.near` and does not sign. `--live` signs with `NEAR_MAINNET_SIGNER_KEY` and does not print that key. The account has no access key, so the plan closes it, returns the balance to the owner, and creates the same name. The committed wasm is `contracts/artifacts/arena_v2.wasm`, 222463 bytes, sha256 `df072f68d77a252cdf123f6829d469359705fb4c7ef44ed7c07bea72b2d341e0`. Measured storage is 222779 bytes, stake 2.22779 NEAR. The create transfer adds 0.05 NEAR of slack. A pot whose NFT owner is not that owner stops the plan. `node backend/scripts/arena-close.js` still only prints the old close plan.
+
+The arena cases are in `backend/test/unit/arena-market.test.js` and `backend/test/unit/arena-board-v2.test.js`. Contract cases are `cargo test --lib` in `contracts/arena_v2` (20).
+
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 761 unit tests (760 pass, 1 skipped)
+npm test                 # 830 unit tests (829 pass, 1 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -286,7 +302,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 | Town Hall | Open `/?shop=hall` in the city. Tabs are Post job, Agents, and Receipts. Type a task, a budget, and two worker accounts, then press Post job. One gold button sends the quote, the counter, the pass, or the refund | The CTA and the AI dock share one sender and sign the same board call, so both send real mainnet txs: post_job with its escrow, bid, one counter, accept, deliver with the worker's digest, review, refund. A chain refusal is reported as a refusal. `contracts/hall` refuses a pass review until the guard account clears the part, so a Guard BLOCK can never release, and the review must present the delivered digest, so a swapped review cannot pay. The release path goes live only after `scripts/hall-deploy.js --live`, which is dry-run by default and refuses while the account is short of the 0.450000 NEAR top-up. Market hire needs a buyer session token; public `GET /v1/agents` needs none. Personal rules link to `/setup/`. Code: `shared/hall/job.js`, `shared/hall/v2.js`, `app/src/panels/hall-actions.js`, `contracts/hall/src/lib.rs` | unit `a job conserves escrow, counters once, and does not pay on a swapped or blocked review`; unit `the gold button and the dock share one runner, and a move goes through one sender`; unit `the plan snapshots every legacy bounty and refuses a guard that is not the live one`; contract `a_pass_without_a_guard_clear_cannot_release`, `a_swapped_review_is_refused`, `two_workers_split_one_job_and_only_the_passed_part_is_paid` Earlier reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h) and refusal [Cp2rWatn…](https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6) are not this job |
 
-# 761 unit tests (760 pass, 1 skipped):
+# 830 unit tests (829 pass, 1 skipped):
 Proof rows (71/71 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.

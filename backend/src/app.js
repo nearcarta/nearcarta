@@ -10,6 +10,7 @@ import { DEP, MAINNET_DEP, cfg, has, secret } from './config.js';
 import * as ferry from './ferry.js';
 import * as checkout from './ferry-checkout.js';
 import * as payoutsInvoice from './payouts-invoice.js';
+import * as payoutsPayroll from './payouts-payroll.js';
 import { parsePayoutIntent } from './payouts-intent.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
@@ -19,7 +20,7 @@ import * as mist from './mistbank.js';
 import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
 import { issuePass } from './toll-pass.js';
-import { describeVisitorPass, readTollLive, tollLiveError } from './toll-views.js';
+import { describeVisitorPass, readTollLive, tollContractId, tollLiveError } from './toll-views.js';
 import { broadcastLatest, relayById } from './toll-relay.js';
 import { verifyPropose } from './board-tx.js';
 import { mainnetChronicle } from './board-chronicle.js';
@@ -32,12 +33,14 @@ import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
 import { view, viewAccount, txStatus, rpcStats } from './near.js';
-import { readLive } from './chronicle-live.js';
+import { accountTxHashes, readLive } from './chronicle-live.js';
+import { anchorIndex } from './chronicle-index.js';
 import { signStatement } from './chronicle-statement.js';
 import { nearAccountOk } from '../../shared/net/accounts.js';
 import { txVerdict } from '../../shared/net/tx-verdict.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 import { pastPrompts as arenaPrompts } from './arena.js';
+import { readGuardians, removedMarket, scorePayload } from './arena-economy.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
 import { marketStatus, marketWorkers, readBounties } from './hall-market.js';
 import { derivedFor, lineFor } from './house-views.js';
@@ -143,6 +146,11 @@ const knownAccounts = new Set([
   DEP.townhall_r16?.charter, DEP.toll_arbitrum?.oath, DEP.toll_usdc?.toll, DEP.toll_gate?.gate,
 ].filter(Boolean));
 const bad = (c, m) => c.json({ error: m }, 400);
+// Bounded storage sponsorship for a zero-NEAR issuer. It is on by default because the deposit comes
+// from the visitor's own session cap through their own row, never from the shop; an owner who does not
+// want the row to be able to call storage_deposit can set PAYOUTS_SPONSOR_STORAGE=0.
+// There is no amount here: the deposit is the USDC contract's own storage_balance_bounds.min.
+export const payoutsSponsorEnabled = (env = process.env) => String(env.PAYOUTS_SPONSOR_STORAGE || '').trim() !== '0';
 async function jsonBody(c) {
   try { const b = await c.req.json(); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; }
 }
@@ -173,6 +181,15 @@ export async function ledgerRead() {
     return { ...buildLedger({ chronicle: merged, toll, board: mainnetChronicle(), budget: agentMod.budgetStatus() }), charters: { live, history } };
 }
 const ledgerSwr = swr('ledger', ledgerRead, { ttl: 15_000, stale: 30 * 60_000 });
+// The deployments record is a file, not a chain read. One body is reused by /api/mainnet and
+// /api/chronicle, and the Chronicle tray used to ask for it again on every account read.
+let depBody = null, depAt = 0;
+export function deploymentsBody(now = Date.now()) {
+  if (depBody && now - depAt < 5 * 60_000) return depBody;
+  depBody = MAINNET_DEP || { status: 'not_deployed' };
+  depAt = now;
+  return depBody;
+}
 // Seed the ledger cache only from a mainnet snapshot.
 export const seedSwr = (name, v, at = Date.now()) => { if (v != null && !swrs.get(name)?.v) swrs.set(name, { v, at }); };
 { const snap = shops.ledgerSnapshot(); if (snap?.ledger?.network === 'mainnet') seedSwr('ledger', { ...snap.ledger, stale: true, snapshot_at: snap.at }, Date.now() - 15_001); }
@@ -233,7 +250,9 @@ export function makeApp() {
     return c.json({ client_ip_from: from, client_tag: ipTag(ip), shared_cap: egress ? 'egress:' + ipTag(egress) : null, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
   app.get('/api/deployments', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
-  app.get('/api/mainnet', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
+  // The deployments record is a file, not a chain read: cached at the edge and in this process,
+  // so the tray's per-account ask does not cost a route call each time.
+  app.get('/api/mainnet', limiter(120), edgeCache(60), c => c.json(deploymentsBody()));
   app.get('/api/receipts', limiter(30), c => c.json(receiptsBody(MAINNET_DEP || {}, agentMod.budgetStatus(), { jobTokens: agentMod.MAX_TOKENS, checkouts: checkout.listCheckoutReceipts() })));
 
   // Ferry
@@ -298,8 +317,59 @@ export function makeApp() {
   app.get('/api/payouts/usdc', limiter(30), edgeCache(15), c => c.json({
     network: 'mainnet', mode: 'reviewed rows', usdc: 'invoice',
     ceiling: payoutsInvoice.hostedCeiling(process.env),
-    note: 'NEAR rows use the visitor row cap. An over-cap row is refused before any deposit. Foreign rows are held. An invoice is EXACT_OUTPUT and is not paid until 1Click says SUCCESS.',
+    sponsorship: { enabled: payoutsSponsorEnabled(), contract: payoutsInvoice.USDC_NEAR_CONTRACT, minNearRead: 'storage_balance_bounds.min' },
+    note: 'Every row is paid by the visitor session under their own /setup cap: a NEAR row by propose on the board, a foreign row by the same session through the 1Click intents rail (a priced quote, not a stored rate). An over-cap row is refused before any deposit. An invoice is EXACT_OUTPUT and is not paid until 1Click says SUCCESS.',
   }));
+  // A foreign payroll row is priced by a dry 1Click quote. EXACT_OUTPUT: the payee gets exactly `amt`
+  // of `asset` on `chain`. The signed quote names the wNEAR the session deposits. No deposit address,
+  // nothing is sent, and the route does not sign.
+  app.post('/api/payouts/payroll/quote', limiter(20), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const out = await payoutsInvoice.quotePayrollRow(b);
+    return c.json(out, out.ok ? 200 : 400);
+  });
+  // A foreign payroll row's live quote: the visitor's own board row is the gate, then 1Click returns
+  // a deposit address for the wNEAR the session will deposit. Nothing here signs or sends the deposit.
+  app.post('/api/payouts/payroll/checkout', limiter(6), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const parsed = payoutsPayroll.payrollCheckoutInput(b);
+    if (parsed.error) return bad(c, parsed.error);
+    const board = MAINNET_DEP?.board?.contract;
+    const owner = String(b.owner || '').trim();
+    let row = null;
+    if (board && owner && ACCT.test(owner)) {
+      try { row = await view(board, 'get_charter', { owner }); } catch { row = null; }
+    }
+    if (!row) return c.json({ ok: false, reason: 'no_row', depositAddress: null, help: 'Open your row in /setup first. Nothing was sent.' }, 400);
+    const out = await payoutsPayroll.openPayrollCheckout(parsed.value, { row });
+    return c.json(out, out.ok ? 200 : 400);
+  });
+  app.get('/api/payouts/payroll/status', limiter(30), async c => {
+    try { return c.json(await payoutsPayroll.payrollStatus(c.req.query('depositAddress'))); }
+    catch (e) { return c.json({ error: e.message, paid: false, final: false }, e.status || 502); }
+  });
+  // Bounded storage sponsorship: the min the USDC contract asks for, read from its own bounds.
+  // This returns the board propose_call the visitor's session would make; it does not sign or send it.
+  app.get('/api/payouts/sponsor', limiter(30), edgeCache(15), async c => {
+    const account = c.req.query('account') || '';
+    if (!account) return bad(c, 'account is required');
+    const reg = await payoutsInvoice.registrationOf(account, { view, viewAccount });
+    if (reg.reason === 'missing_account') return c.json({ ok: false, ...reg }, 400);
+    let minNear;
+    try {
+      const bounds = await view(payoutsInvoice.USDC_NEAR_CONTRACT, 'storage_balance_bounds', {});
+      minNear = payoutsInvoice.nearFromYocto(bounds?.min);
+    } catch { minNear = undefined; }
+    // The row's own cap, budget and balance decide whether this is allowed; the page passes them.
+    return c.json({
+      enabled: payoutsSponsorEnabled(),
+      account,
+      minNear: minNear ?? payoutsInvoice.USDC_STORAGE_NEAR,
+      registered: reg.registered,
+      claim: reg.claim,
+      contract: payoutsInvoice.USDC_NEAR_CONTRACT,
+    });
+  });
   // Durable invoices. Creating one does not call 1Click. Checkout may ask for a deposit address.
   // Nothing here signs or sends the deposit. The receive account is the one stored on the invoice.
   app.post('/api/payouts/intent', limiter(12), async c => {
@@ -400,8 +470,11 @@ export function makeApp() {
   // ?charter= must be a Nearcarta charter: a known contract, a factory charter, or a row opened on the board.
   // A board row's owner account is the charter. It has no get_clauses of its own.
   const cpCache = new Map();
+  // A retired or deleted contract is not a charter: mainnet.json records why and where the money went.
+  const retiredAccount = (id) => !!(MAINNET_DEP?.retired && Object.prototype.hasOwnProperty.call(MAINNET_DEP.retired, id));
   async function nearcartaCharter(charter) {
     if (!ACCT.test(charter)) return null;
+    if (retiredAccount(charter)) return null;
     if (knownAccounts.has(charter)) return { kind: 'known' };
     if (await vault.isFactoryCharter(charter)) return { kind: 'factory' };
     const board = MAINNET_DEP?.board?.contract;
@@ -418,12 +491,19 @@ export function makeApp() {
     // Nearcarta contract (`known`), so a guest check compares against the deny list and
     // the account signals; a ?charter= that names a board row owner supplies that row's
     // allowlist. charter.nearcarta.near is reaped and must never be a default again.
+    // A retired or unknown contract is refused plainly instead of being read as today's
+    // rules, and the read must never 500 (a retired oath took the whole city tray down).
+    const asked = c.req.query('charter');
     const charter = c.req.query('charter') || BOARD_ID || null;
-    const found = charter ? await nearcartaCharter(charter) : null;
-    if (charter && !found) return bad(c, 'charter must be a Nearcarta charter');
-    const k = a + '|' + (charter || ''), hit = cpCache.get(k);
+    let found = null;
+    if (charter) {
+      found = await nearcartaCharter(charter).catch(() => null);
+      if (!found) return bad(c, asked ? 'charter must be a Nearcarta charter' : 'the board did not answer, try again');
+    }
+    const k = `${a}|${charter || ''}`, hit = cpCache.get(k);
     if (hit && Date.now() - hit.at < 20_000) return c.json(hit.v);
-    const v = await cp.check(a, { charter: charter || null, row: found?.row || null });
+    const v = await cp.check(a, { charter, row: found?.row || null });
+    if (!charter) v.no_allowlist = 'no charter was named, so no allowlist was read';
     cpCache.set(k, { at: Date.now(), v }); if (cpCache.size > 500) cpCache.delete(cpCache.keys().next().value);
     return c.json(v);
   });
@@ -484,7 +564,32 @@ export function makeApp() {
   app.get('/api/arena', limiter(20), async c => c.json(await reads.arena()));
   app.get('/api/arena/prompts', limiter(20), async c => c.json(await arenaPromptsSwr()));
   app.get('/api/arena/attempts', limiter(20), async c => c.json(await shops.arenaAttempts(c.req.query('from'), c.req.query('limit'))));
+  app.get('/api/arena/guardians', limiter(20), async c => c.json(await readGuardians(view)));
+  app.get('/api/arena/market', limiter(20), async c => {
+    const week = Math.min(7, Math.max(0, Number(c.req.query('week') || 0) || 0));
+    return c.json(removedMarket(week));
+  });
+  app.get('/api/arena/score', limiter(20), async c => {
+    const player = c.req.query('player') || '';
+    if (player && !nearAccountOk(player)) return bad(c, 'not a NEAR account');
+    try { return c.json(await scorePayload(player, view)); }
+    catch (e) { return c.json({ error: e.message, source: 'get_attempt', points: 0, tx: null }, 502); }
+  });
+  app.get('/api/arena/stall', limiter(20), c => c.json({ removed: true, tx: null, exists: false, note: 'The stall market is gone. Nothing was signed.' }));
   app.get('/api/toll', limiter(20), async c => c.json(await reads.toll()));
+  // One visitor's own derived address for their toll row. Read-only: `address_of` on the
+  // toll contract. Null until that row's first signature recovers an address. Two rows
+  // have two paths, so two addresses; nothing here is shared or invented.
+  app.get('/api/toll/address/:owner', limiter(30), async c => {
+    const owner = c.req.param('owner');
+    if (!nearAccountOk(owner)) return bad(c, 'not an account id');
+    try {
+      const got = await view(tollContractId(), 'address_of', { row_owner: owner, chain: 'base' });
+      return c.json({ owner, path: got?.path || null, address: got?.address || null });
+    } catch (e) {
+      return c.json({ owner, path: null, address: null, error: String(e?.message || e).slice(0, 160) }, 502);
+    }
+  });
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
@@ -590,7 +695,9 @@ export function makeApp() {
   });
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
-  app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
+  // Shared stale-while-revalidate in the process, and a short edge cache, so a room that also reads it
+  // does not re-run the chain reads. limiter(20) is per client; the shared copy absorbs the fan-out.
+  app.get('/api/ledger', limiter(60), edgeCache(15), async c => c.json(await ledgerSwr()));
   app.get('/api/chronicle', limiter(120), edgeCache(15), async c => c.json(mainnetChronicle(c.req.query('owner') || '')));
   app.get('/api/chronicle/live', limiter(30), async c => {
     const account = String(c.req.query('account') || '').trim();
@@ -610,6 +717,24 @@ export function makeApp() {
     const rows = Array.isArray(b?.rows) ? b.rows.slice(0, 40) : [];
     const out = await signStatement({ account, period: b?.period || {}, rows, totals: b?.totals || null });
     return c.json(out);
+  });
+  // The anchors and rule versions this account wrote. Read-only rebuild from its own txs:
+  // the board stores neither (anchor logs one event; set_rules overwrites the row).
+  app.get('/api/chronicle/anchors', limiter(30), async c => {
+    const account = String(c.req.query('account') || '').trim();
+    if (!nearAccountOk(account)) return bad(c, 'account must be a NEAR account id');
+    try {
+      const listed = await accountTxHashes(account);
+      const sender = account;
+      const txs = [];
+      for (const h of (listed.hashes || []).slice(0, 20)) {
+        try { txs.push(await txStatus(h, sender)); } catch { /* one missing tx is a gap, not a failed rebuild */ }
+      }
+      const body = await anchorIndex({ account, txs });
+      return c.json({ ...body, index: { source: listed.source, hashes: (listed.hashes || []).length, gap: listed.gap || '' } });
+    } catch (e) {
+      return c.json({ account, anchors: [], ruleWrites: [], gaps: [String(e.message || 'The rebuild did not answer.').slice(0, 160)] }, 200);
+    }
   });
   app.get('/api/chronicle/:account', limiter(120), edgeCache(15), async c => {
     const a = c.req.param('account');

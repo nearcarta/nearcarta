@@ -62,7 +62,9 @@ export function redteamParts() {
 const sh = a => a.length > 18 ? a.slice(0, 10) + '…' + a.slice(-7) : a;
 // older single-block markup (kept for any caller outside the side panel)
 export function redteamBlock() { const p = redteamParts(); return p.action + p.card + (p.more ? `<details><summary>Details</summary>${p.more}</details>` : ''); }
-export function bindRedteam(rerender, fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, '')) {
+let rerender = () => {};
+export function bindRedteam(render, fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, '')) {
+  rerender = render;
   if (globalThis.__rtBound) return; globalThis.__rtBound = true;
   globalThis.document?.addEventListener('click', async e => {
     if (e.target.closest?.('.redteam-next')) { advanceAttack(); rerender(); return; }

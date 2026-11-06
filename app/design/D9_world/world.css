@@ -596,11 +596,76 @@ body.ferry-tray #shopUI .rcpt:empty{display:none}
   font:700 16px/1 system-ui,sans-serif; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;
 }
+/* Arena mix tray: same air as Ferry, without hiding the scam result line. */
+body.arena-tray #shopUI #tray{
+  width:min(440px,calc(100vw - 28px));
+  max-width:440px;
+  left:16px; bottom:18px;
+  max-height:calc(100dvh - 240px);
+  padding:24px 22px 22px;
+  box-sizing:border-box;
+  overflow-x:hidden;
+  overflow-y:auto;
+  background:#1f1a15;
+  border:1px solid #3a3128;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+body.arena-tray #shopUI .t-head,
+body.arena-tray #shopUI .label,
+body.arena-tray #shopUI .hero,
+body.arena-tray #shopUI #t-who,
+body.arena-tray #shopUI #t-track,
+body.arena-tray #shopUI .shop-track,
+body.arena-tray #shopUI .say,
+body.arena-tray #shopUI .t-links,
+body.arena-tray #shopUI .rcpt{display:none!important}
+body.arena-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
+body.arena-tray #shopUI [data-testid=arena-live]{gap:14px}
+body.arena-tray #shopUI .ferry-tab{
+  min-height:44px;border:0;border-radius:11px;background:transparent;color:#d4c4a8;
+  font:700 15px/1 system-ui,sans-serif;
+}
+body.arena-tray #shopUI .ferry-tab[aria-selected=true]{
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;
+}
+body.arena-tray #shopUI .ferry-cta{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:auto;min-width:min(220px,100%);min-height:44px;padding:10px 22px;
+  border:1px solid #c9a05a;border-radius:14px;
+  background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
+  color:#2a1608;font:700 15px/1.15 system-ui,sans-serif;cursor:pointer;
+  box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 -2px 0 rgba(120,70,20,.22) inset,0 4px 0 #9a6f2e,0 8px 16px rgba(0,0,0,.28);
+}
+body.arena-tray #shopUI .arena-mode,
+body.arena-tray #shopUI .arena-next{
+  min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid #4a3a28;
+  background:#17130f;color:#fff8ee;font:650 16px/1 system-ui,sans-serif;cursor:pointer;
+}
+body.arena-tray #shopUI .arena-mode[aria-pressed=true]{border-color:#f5d08a;color:#f5d08a}
+body.arena-tray #shopUI .arena-actions{
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;
+}
+body.arena-tray #shopUI .ferry-pane{gap:10px}
+body.arena-tray #shopUI .ferry-field{gap:4px}
+body.arena-tray #shopUI .arena-agent-send{
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;border:0;
+}
+
 @media (max-width:720px){
   body.ferry-tray #shopUI #tray{
     width:min(100vw - 16px,420px); max-width:none;
     left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
     max-height:min(58dvh,calc(100dvh - 108px)); padding:20px 18px;
+  }
+  body.arena-tray #shopUI #tray{
+    width:min(100vw - 16px,420px); max-width:none;
+    left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    max-height:min(46dvh,calc(100dvh - 220px)); padding:20px 18px;
+  }
+  body.arena-tray #arena-agent-dock{
+    top:auto; right:8px; gap:8px;
+    bottom:calc(46dvh + 20px + env(safe-area-inset-bottom,0px));
   }
   #ferry-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
   .ferry-agent-avatar{width:72px;height:72px}

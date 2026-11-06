@@ -42,7 +42,7 @@ test('set_calls names each shop, the method and the caps', () => {
   assert.equal(withFerry.calls[0].receiver, 'charter.nearcarta.near');
   assert.ok(withFerry.calls.some(c => c.receiver === 'wrap.near' && c.method === 'ft_transfer'));
   assert.ok(withFerry.calls.some(c => c.receiver === 'wrap.near' && c.method === 'near_deposit'));
-  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as']);
+  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
 });
 
 test('wrap.near uses the rule cap when that cap is at least 0.05 NEAR', () => {
@@ -106,6 +106,8 @@ test('the session script prints the plan and does not sign without --live', () =
   assert.ok(plan.methods.includes('confirm_hold'));
   assert.equal(agentCanConfirmAlone(plan.methods), false);
   assert.equal(scopeHasOwnerOnly(plan.methods), false);
+  // The Chronicle anchor is in the same scope, so the tray never asks for a second approval.
+  assert.ok(plan.methods.includes('anchor'));
   const live = spawnSync(process.execPath, [script, '--live'], { encoding: 'utf8', env: { ...process.env, NEAR_MAINNET_SIGNER_KEY: '' } });
   assert.equal(live.status, 1);
   assert.match(live.stderr, /NEAR_MAINNET_SIGNER_KEY/);

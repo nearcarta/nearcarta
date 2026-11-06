@@ -427,6 +427,13 @@ const rb=$('#rulesBtn'); paintStart();
 const goTo=to=>{ window.dispatchEvent(new CustomEvent('world:navigate',{detail:{id:'house',to}})); if(!CAPTURE||!P.has('nonav')) location.assign(to); };
 const toCharter=(hash='')=>{ if(inShop||exiting){ goTo(CHARTER+hash); return; } jump('house',{to:CHARTER+hash}); };
 rb.addEventListener('click',e=>{ if(e.metaKey||e.ctrlKey||e.shiftKey||e.button) return; e.preventDefault(); body.classList.remove('cta'); sfx('click',{g:.3}); paintStart(); if(!ready()){ location.assign(SETUP); return; } toCharter(); });
+document.querySelector('[data-city-shop="arena"]')?.addEventListener('click', e => {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
+  e.preventDefault();
+  const det = e.currentTarget.closest('details');
+  if (det) det.open = false;
+  jump('arena');
+});
 function pointRules(){ body.classList.add('cta'); setTimeoutSim(()=>body.classList.remove('cta'),12); }
 // a wallet that connects during this visit: straight to Your House and "Create my charter"
 { let out=false, done=false; const chk=()=>{ if(done) return; if(document.querySelector('[data-testid=hud-connect],[data-x=in]')) out=true; else if(out&&document.querySelector('[data-testid=hud-account]')){ done=true; if(!body.classList.contains('in-shop')) onWallet(); } }; /* signed in inside a room: the room shows the next step */

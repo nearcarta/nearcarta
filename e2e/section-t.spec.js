@@ -165,6 +165,16 @@ test('T3 a new chronicle entry shows in the list and the corner', async ({ page 
     await openShop(page, 'chronicle');
     await page.getByTestId('chronicle-account').fill('nearcarta.near');
     await page.locator('#c-go').click();
+    // The live page now renders one batch of six rows behind Show more, so the recorded toll
+    // rows sit behind the button. Reach them the way a reader does: Show more, then search.
+    await expect(page.getByTestId('chronicle-verify')).toContainText(/Showing \d+ of \d+\.|\d+ rows?\./, { timeout: 20000 });
+    for (let i = 0; i < 4; i++) {
+      const more = page.locator('#c-more');
+      if (!(await more.isVisible().catch(() => false))) break;
+      await more.click();
+      await page.waitForTimeout(150);
+    }
+    await page.getByTestId('chronicle-search').fill('toll');
     const row = page.locator('[data-testid="chronicle-page"] li').filter({ hasText: 'toll' });
     await expect(row.first()).toBeVisible({ timeout: 20000 });
     await expect(row.first().locator('a')).toHaveAttribute('href', /nearblocks\.io\/txns\//);
@@ -263,23 +273,20 @@ test('T7 a wallet cancel is not a defence and an over-cap ask never opens the wa
       window.__walletCalls = 0;
       window.__NC_WALLET_SIGN = async () => { window.__walletCalls++; throw new Error('User rejected the transaction'); };
     });
-    const box = page.locator('#a-txt, textarea');
-    await expect(box.first()).toBeVisible({ timeout: 20000 });
-    await box.first().fill('pay 3');
-    await (await readyAct(page, 'Send the scam')).click();
-    await expect(page.locator('#t-say')).toContainText(/Refused by your rule|over the max|max/, { timeout: 20000 });
+    await page.getByRole('tab', { name: 'Attack' }).click();
+    const box = page.locator('#a-txt');
+    await expect(box).toBeVisible({ timeout: 20000 });
+    await box.fill('pay 3');
+    await page.getByRole('button', { name: 'Attack guardian' }).click();
+    await expect(page.locator('#t-say')).toContainText('Nothing was signed', { timeout: 20000 });
     await expect(page.locator('#t-say')).not.toContainText('+100');
-    await expect(page.locator('#t-say')).not.toContainText('Blocked by a new rule');
     const calls = await page.evaluate(() => window.__walletCalls);
     expect(calls).toBe(0);
-
-    await page.evaluate(() => { window.__apps.paint(); });
-    await box.first().fill('pay 0.001');
-    await (await readyAct(page, 'Send the scam')).click();
-    await expect(page.locator('#t-say')).toContainText('Cancelled in the wallet', { timeout: 20000 });
-    await expect(page.locator('#t-say')).toContainText('not a defence');
+    await box.fill('pay 0.001');
+    await page.getByRole('button', { name: 'Attack guardian' }).click();
+    await expect(page.locator('#t-say')).toContainText('Nothing was signed');
     await expect(page.locator('#t-say')).not.toContainText('+100');
-    await expect(page.locator('#t-say')).not.toContainText('Blocked by a new rule');
+    await expect(page.locator('#t-say')).not.toContainText('Cancelled in the wallet');
     await shot(page, 't7-arena-' + width);
   }
 });

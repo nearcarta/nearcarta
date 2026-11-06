@@ -94,7 +94,9 @@ test('browser modules the city imports raw resolve without a bundler', async () 
   const fileFor = url => (url.startsWith('/design/') ? design(url.slice('/design'.length)) : served(url));
   // build.mjs also copies whole directories to the deploy root (shared/hall -> /shared/hall).
   // A path there is reachable even though it is not under app/src.
-  const COPIES = [['/shared/hall/', `${root}shared/hall/`]];
+  // Chronicle's rules and receipts are copied the same way; v2.js is bundled by build.mjs,
+  // so it is generated rather than a plain copy.
+  const COPIES = [['/shared/hall/', `${root}shared/hall/`], ['/shared/chronicle/', `${root}shared/chronicle/`]];
   const onDisk = (url) => {
     const copy = COPIES.find(([prefix]) => url.startsWith(prefix));
     if (copy) return copy[1] + url.slice(copy[0].length);
@@ -105,13 +107,13 @@ test('browser modules the city imports raw resolve without a bundler', async () 
   // app/build.mjs bundles these with esbuild (`bundle: true`), so their own imports are
   // inlined at build time and never fetched by the browser. shared/hall/v2.js imports
   // ../board/call-as.js and ../deployments/mainnet.json, neither of which is published.
-  const bundled = new Set(['/shared/hall/v2.js']);
+  const bundled = new Set(['/shared/hall/v2.js', '/shared/guard/board-pay.js']);
   const seen = new Set();
   const bad = [];
   const walk = (url) => {
     if (seen.has(url)) return;
     seen.add(url);
-    if (generated.has(url)) return;
+    if (generated.has(url) || bundled.has(url)) return;
     const file = onDisk(url);
     if (!existsSync(file)) { bad.push(`${url} does not exist in the deploy root`); return; }
     const src = readFileSync(file, 'utf8');

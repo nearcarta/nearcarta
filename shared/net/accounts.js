@@ -8,11 +8,11 @@ export function nearAccountOk(id) {
   return IMPLICIT.test(s) || NAMED.test(s);
 }
 
-export const NEAR_CAP = 0.005;
-
-export function nearAmountOk(amt, cap = NEAR_CAP) {
-  const n = Number(amt);
-  return Number.isFinite(n) && n > 0 && n <= cap + 1e-12;
+/** At or under the visitor's own cap. A missing cap is a no, never a default. */
+export function nearAmountOk(amt, cap) {
+  const n = Number(amt), c = Number(cap);
+  if (cap == null || cap === '' || !Number.isFinite(c) || c <= 0) return false;
+  return Number.isFinite(n) && n > 0 && n <= c + 1e-12;
 }
 
 export function formatNear(amt) {

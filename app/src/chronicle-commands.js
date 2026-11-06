@@ -55,14 +55,16 @@ export function parseChronicleCommand(text) {
   const span = spanOf(line);
   const shop = SHOPS.find(s => new RegExp(`\\b${s}\\b`).test(line)) || '';
   const decision = decisionOf(line);
+  // A write verb wins over the account: "anchor X for alice.near" is an anchor, not a query that
+  // happens to mention an account. Read-only verbs still never sign.
+  if (/\banchor\b/.test(line)) return { ok: true, action: 'anchor', hint: '' };
+  if (/\b(write|statement|audit)\b/.test(line)) return { ok: true, action: 'statement', hint: '' };
   if (account) {
     return { ok: true, action: 'query', account, decision, today, span: span || (today ? 'today' : 'all'), shop, hint: '' };
   }
   if (/\b(add|record)\b/.test(line) && /\b(entry|ledger|payment)\b/.test(line)) {
     return { ok: true, action: 'nospend', hint: '' };
   }
-  if (/\banchor\b/.test(line)) return { ok: true, action: 'anchor', hint: '' };
-  if (/\b(statement|audit)\b/.test(line)) return { ok: true, action: 'statement', hint: '' };
   const hash = raw.match(HASH);
   if (/\b(verify|check)\b/.test(line)) {
     if (!hash) return { ok: false, action: 'miss', hint: `Name the transaction hash to verify. ${MISS_HINT}` };
@@ -107,7 +109,7 @@ export async function runChronicleCommand({
   }
   if (cmd.action === 'anchor') {
     const res = typeof onAnchor === 'function' ? await onAnchor() : null;
-    return { ok: true, action: 'anchor', hint: res?.status || 'Live anchor blocked. Nothing was signed.', clearSeal: true, paint: false };
+    return { ok: true, action: 'anchor', hint: res?.status || 'The anchor did not run. Nothing was signed.', clearSeal: true, paint: false };
   }
   if (cmd.action === 'query') {
     bag.account = cmd.account;
