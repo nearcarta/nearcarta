@@ -25,8 +25,9 @@ body.chronicle-tray #shopUI #t-form button.chronicle-tab[aria-selected=true]{
   background-image:linear-gradient(180deg,#ffe2a8 0%,rgb(245, 208, 138) 42%,#e2b35b 100%);
   color:rgb(42, 22, 8);
 }
-.chronicle-pane{display:grid; gap:12px; min-width:0; min-height:0; flex:1 1 0; overflow:auto;}
-.chronicle-pane[hidden]{display:none !important}
+.c-scroll{flex:1 1 auto; min-height:0; overflow:auto}
+.chronicle-pane{display:grid; gap:12px; min-width:0; overflow:visible}
+.chronicle-pane[hidden],.chronicle-card [hidden]{display:none !important}
 .c-filters{display:grid; grid-template-columns:1fr 1fr; gap:8px 12px}
 .c-filters .wide{grid-column:1 / -1}
 .c-flow{
@@ -38,13 +39,13 @@ body.chronicle-tray #shopUI #t-form button.chronicle-tab[aria-selected=true]{
 .c-flow .c-arrow{color:#f5d08a; font:700 18px/1 system-ui,sans-serif}
 .chronicle-field{display:flex; flex-direction:column; gap:4px; margin:0; color:#f3ead8; font:650 13px/1.2 system-ui,sans-serif}
 .chronicle-field input,.chronicle-field select,.chronicle-field textarea{
-  width:100%; min-height:44px; box-sizing:border-box; padding:10px 12px; border-radius:12px;
+  width:100%; min-height:44px; height:44px; flex:0 0 auto; box-sizing:border-box; padding:10px 12px; border-radius:12px;
   border:1px solid #4a3a28; background:#17130f; color:#fff8ee; font:600 15px/1.3 system-ui,sans-serif;
 }
-.chronicle-field textarea{min-height:88px; resize:vertical}
+.chronicle-field textarea{min-height:168px; height:168px; resize:vertical}
 .chronicle-check{display:flex; align-items:center; gap:10px; min-height:44px; color:#f3ead8; font:600 13px/1.3 system-ui,sans-serif}
 .chronicle-check input{width:20px; height:20px}
-.chronicle-card .feed{list-style:none; margin:0; padding:0; display:grid; gap:6px; max-height:96px; min-height:0; flex:none; overflow:auto}
+.chronicle-card .feed,body.chronicle-tray #shopUI .feed{list-style:none; margin:0; padding:0; display:grid; gap:6px; max-height:none !important; overflow:visible !important}
 .c-empty-line{margin:0; color:#f3ead8; font:600 14px/1.4 system-ui,sans-serif; overflow-wrap:anywhere}
 .c-health{margin:0; color:#f5d08a; font:650 13px/1.35 system-ui,sans-serif; overflow-wrap:anywhere}
 .c-cover-list{list-style:none; margin:0; padding:0; display:grid; gap:2px}
@@ -81,8 +82,10 @@ body.chronicle-tray #shopUI #t-form button.chronicle-gold{
   background-color:rgb(245, 208, 138); color:rgb(42, 22, 8); font:700 16px/1.15 system-ui,sans-serif; cursor:pointer;
   box-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 4px 0 #9a6f2e;
 }
-.c-lines{display:flex; flex-direction:column; gap:6px; flex:1 1 150px; min-height:0; overflow:auto}
-.c-foot{display:flex; flex-direction:column; align-items:stretch; gap:4px; min-height:44px}
+.c-sources{flex:none}
+.c-sources summary{cursor:pointer; color:#f5d08a; font:700 14px/44px system-ui,sans-serif; min-height:44px}
+.c-bundle{margin:0; color:#f3ead8; font:600 14px/1.45 system-ui,sans-serif; overflow-wrap:anywhere}
+.c-foot{display:flex; flex-direction:column; align-items:flex-end; gap:4px; min-height:44px; flex:none}
 .c-foot .c-status{min-width:0}
 .c-foot .chronicle-quiet{align-self:flex-end}
 .c-status{
@@ -154,7 +157,6 @@ body.chronicle-tray #shopUI #t-form > *{flex:1 1 auto; min-height:0; display:fle
   .chronicle-card{padding:12px; gap:8px}
   .c-flow{min-height:44px; padding:4px}
   .c-filters{gap:8px 12px}
-  .chronicle-card .feed{max-height:88px}
   .chronicle-tab{font-size:13px; padding:8px 6px}
   #chronicle-agent-dock{right:8px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); gap:8px}
   .chronicle-agent-pop{width:min(240px, calc(100vw - 120px))}

@@ -14,4 +14,12 @@ test('a board session is 1, 2 or 24 hours and the agent key names propose_call',
   await expect(page.getByTestId('setup-key-scope')).toContainText('propose_call_as');
   await expect(page.getByTestId('setup-key-scope')).toContainText('propose_call');
   await expect(page.getByTestId('sign-cost')).toContainText('0.015');
+  // The caps are on the page before the wallet opens, not only inside the wallet.
+  const caps = page.getByTestId('setup-caps');
+  await expect(caps).toBeVisible();
+  await expect(page.getByTestId('cap-per')).toContainText('NEAR');
+  await expect(page.getByTestId('cap-daily')).toContainText('NEAR');
+  await expect(page.getByTestId('cap-count')).not.toBeEmpty();
+  await expect(page.getByTestId('cap-receivers')).not.toBeEmpty();
+  await expect(page.getByTestId('cap-session')).toContainText('hour');
 });
