@@ -43,19 +43,20 @@ export async function fallback(why){ if(started) return; started=true; body.clas
   const APP=!/[?&]scripted\b/.test(location.search); let ui8m=null;
   const ui=$('#shopUI'), dr=$('#drawer'); const drawer=on=>{ dr.classList.toggle('open',on); dr.setAttribute('aria-hidden',on?'false':'true'); };
   $('#t-proof').onclick=()=>drawer(true); $('#d-close').onclick=()=>drawer(false);
-  const close=()=>{ generation++; fbCur=null; door=finishEnter({id:null}); drawer(false); ui.hidden=true; ui8m?.unmount(); body.classList.remove('apps'); img.onerror=null; img.src=town; body.classList.remove('in-shop'); $('#fbpins').hidden=false; };
+  const pinShop=on=>{ const pin=document.getElementById('rulesBtn'); if(pin) pin.inert=!!on; };
+  const close=()=>{ generation++; fbCur=null; door=finishEnter({id:null}); drawer(false); ui.hidden=true; ui8m?.unmount(); body.classList.remove('apps'); img.onerror=null; img.src=town; body.classList.remove('in-shop'); pinShop(false); $('#fbpins').hidden=false; };
   $('#back').onclick=close; addEventListener('keydown',e=>{ if(e.key==='Escape'&&!ui.hidden){ introCtl?.skip(); dr.classList.contains('open')?drawer(false):close(); } });
   let fbCur=null, door={busy:false,id:null}, generation=0; async function open(id, bust){ const next=beginEnter(door,id); if(next.ignored) return; door=next; const ticket=++generation; let m=null, err=null, core=null;
     try{ [core,m]=await Promise.all([import(D8+'js/core.js'),import(D8+'shops/'+id+'.js'+(bust?`?r=${bust}`:''))]); }catch(e){ err=e; console.error(`[Nearcarta 2D] shop "${id}" failed to load:`,e); }
     if(ticket!==generation) return;
     fbCur=id;
-    img.onerror=null; img.src=D8+'shots/fallback_'+id+'.jpg'; /* D8 room still (shots/rooms/ was never shipped, so no 404 first) */ /* D9-dressed still (sky, sea), D8 still if missing */ $('#fbpins').hidden=true; body.classList.add('in-shop'); ui.hidden=false; { const CT={house:"Set your agent's rules →",guard:'Write a rule like this for your agent →',arena:'Put your own charter in the arena →'}, c=$('#t-cta'); c.hidden=!CT[id]; if(CT[id]){ c.textContent=CT[id]; c.href=(window.NEARCARTA_CHARTER||'/shops/vault/')+(id==='house'?'#create':''); } } $('#t-title').textContent=NAMES[id]; paintTrack(id);
+    img.onerror=null; img.src=D8+'shots/fallback_'+id+'.jpg'; /* D8 room still (shots/rooms/ was never shipped, so no 404 first) */ /* D9-dressed still (sky, sea), D8 still if missing */ $('#fbpins').hidden=true; body.classList.add('in-shop'); pinShop(true); ui.hidden=false; { const CT={house:"Set your agent's rules →",guard:'Write a rule like this for your agent →',arena:'Put your own charter in the arena →'}, c=$('#t-cta'); c.hidden=!CT[id]; if(CT[id]){ c.textContent=CT[id]; c.href=(window.NEARCARTA_CHARTER||'/shops/vault/')+(id==='house'?'#create':''); } } $('#t-title').textContent=NAMES[id]; paintTrack(id);
     const b=$('#t-act'), d=$('#d-body'), src=$('#t-src');
     if(err){ src.textContent='error'; src.className='src error'; $('#t-label').textContent='This room could not load'; $('#t-hero').innerHTML=''; b.hidden=false; b.disabled=false; b.className='act primary'; b.textContent='Try again'; b.dataset.retry=id; b.onclick=()=>open(id, Date.now());
       d.textContent=roomError(err); door=finishEnter(door); return; }
     const tok=core.tok;     const F={ guard:['mainnet','split','Invoice with a hidden instruction',tok('0.001','NEAR')], hall:['mainnet','split','Reward paid',tok('0.001','NEAR')],
       arena:['mainnet','split','5 attacks on the lab oath','<b class="num">0</b><span class="unit">breaches</span>'], toll:['mainnet','split','Live policy fee on mainnet','<b class="num">11</b><span class="unit">of 16 nodes</span>'],
-      chronicle:['record','mainnet','Refusals on the record','<b class="num">2</b><span class="unit">recorded refusals</span>'], house:['mainnet','split','Tip cap',tok('0.002','NEAR')] }[id];
+      chronicle:['mainnet','mainnet','Public ledger','<b class="num">2</b><span class="unit">recorded refusals</span>'], house:['mainnet','split','Tip cap',tok('0.002','NEAR')] }[id];
     const info=m.FLAT||(F&&{src:F[0],cls:F[1],label:F[2],hero:F[3]})||{src:'mainnet',cls:'mainnet',label:'',hero:''};
     src.textContent=info.src==='mainnet'?'mainnet':info.src; src.className='src '+info.cls; $('#t-label').textContent=info.label; paintTrack(id); $('#t-hero').innerHTML=info.hero;
     { const mo=$('#t-more'); mo.hidden=!m.MORE; if(m.MORE){ mo.href=m.MORE.href; mo.textContent=m.MORE.text; } }

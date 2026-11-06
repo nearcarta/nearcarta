@@ -55,7 +55,18 @@ body:not(.ready) .lb { opacity: 0; }
 .stag .tok .sym { display: none; }
 
 /* the tray: bottom-left counter slip, one primary action */
-#tray { position: fixed; left: var(--s3); bottom: var(--s3); width: 360px; padding: var(--s3); background: var(--raised); border: 1px solid var(--line); border-radius: var(--R); z-index: 4; animation: up .24s var(--ease); }
+#tray { position: fixed; left: var(--s3); bottom: var(--s3); width: 360px; max-height: calc(100dvh - 96px); overflow-y: auto; padding: var(--s3); background: var(--raised); border: 1px solid var(--line); border-radius: var(--R); z-index: 4; animation: up .24s var(--ease); }
+/* Token picker. The open menu stays inside the tray and scrolls. It does not grow the slip off the screen. */
+#tray .token-listbox { position: relative; width: 100%; max-width: 100%; }
+#tray .token-listbox-btn { width: 100%; min-height: 44px; box-sizing: border-box; padding: 6px 28px 6px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--base); color: var(--text); font: 600 14px/1.2 Inter, system-ui, sans-serif; display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer; }
+#tray .token-listbox-btn .tic .ti { width: 22px; height: 22px; }
+#tray .token-listbox-btn .tic .ci { width: 12px; height: 12px; }
+#tray .token-listbox-menu { position: relative; z-index: 2; max-height: min(240px, 42vh); overflow: auto; overscroll-behavior: contain; margin: 4px 0 0; padding: 4px; list-style: none; border-radius: 12px; border: 1px solid var(--line); background: var(--base); box-shadow: 0 12px 28px rgba(0,0,0,.45); }
+#tray .token-listbox-menu[hidden] { display: none !important; }
+#tray .token-opt { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 8px; border-radius: 8px; cursor: pointer; color: var(--text); }
+#tray .token-opt .tic .ti { width: 22px; height: 22px; }
+#tray .token-opt .opt-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tray .token-opt.on, #tray .token-opt[aria-selected=true], #tray .token-opt:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 @keyframes up { from { transform: translateY(8px); opacity: 0; } }
 .t-head { display: flex; align-items: center; gap: var(--s1); margin-bottom: var(--s2); }
 #t-title { display: flex; align-items: center; gap: var(--s1); font-size: 20px; line-height: 28px; flex: 1; }

@@ -421,6 +421,40 @@ const DEST_EXPLORER = {
   zcash: 'https://blockchair.com/zcash/transaction/',
 };
 
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/**
+ * One status line for a session swap. No deposit address and no raw 1Click help text.
+ * SUCCESS names the amount and links each propose_call tx plus the destination explorer.
+ */
+export function ferryStatusView({ status, amount, symbol, txs, destTx, destChain } = {}) {
+  const raw = String(status || '').toUpperCase();
+  const hashes = (Array.isArray(txs) ? txs : []).filter(h => typeof h === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,88}$/.test(h));
+  const links = hashes.map(hash => ({
+    hash,
+    url: `https://nearblocks.io/txns/${hash}`,
+    label: `tx ${hash.slice(0, 8)}…`,
+  }));
+  const dest = destExplorer(destChain, destTx);
+  if (dest) links.push(dest);
+  const sym = String(symbol || 'USDC').trim() || 'USDC';
+  const amt = String(amount ?? '').trim();
+  let text = 'Waiting on 1Click.';
+  if (raw === 'SUCCESS') text = amt ? `Delivered ${amt} ${sym}.` : `Delivered ${sym}.`;
+  else if (raw === 'REFUNDED') text = 'Refunded. The boat turns back.';
+  else if (raw === 'FAILED') text = 'The swap failed. Nothing else is sent.';
+  return { text, links, order: raw || 'waiting' };
+}
+
+/** The card's single status line: sentence, explorer links, and the 1Click status chip. */
+export function ferryStatusHtml(view) {
+  const v = view || ferryStatusView({});
+  const links = (v.links || []).map(l => `<a class="tx" href="${escHtml(l.url)}" target="_blank" rel="noopener">${escHtml(l.label)}</a>`).join(' ');
+  return `${escHtml(v.text)}${links ? ' ' + links : ''} <span class="rc" data-testid="ferry-order-state">order · ${escHtml(v.order)}</span>`;
+}
+
 /** Explorer link for a 1Click destination-chain tx. Unknown chains return null. */
 export function destExplorer(chain, hash) {
   const h = String(hash || '').trim();

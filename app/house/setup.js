@@ -14,7 +14,7 @@ import { tryTiles } from '../../shared/setup/try-tiles.js';
 import { TOPUP_MIN_YOCTO, TOPUP_RESERVE_YOCTO, charterFundMarkup, charterTopUpYocto, nearStringFromYocto, topUpRoom } from '../../shared/setup/charter-fund.js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
-import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf } from '../../shared/vault/tx.js';
+import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf, storedAgentKey } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
 import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel } from '../../shared/board/session.js';
 import { pluginKeyName } from './board-key.js';
@@ -36,6 +36,14 @@ const fmtN = v => v == null ? '?' : (+v.toFixed(v > 0 && v < 0.01 ? 4 : 3)).toLo
 const short = a => { const s = String(a || ''); return s.length > 26 ? s.slice(0, 10) + '…' + s.slice(-8) : s; };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const agentLS = c => 'nearcarta.vault.agent.' + c, pendLS = c => 'nearcarta.vault.agent.pending.' + c;
+/** The wallet plugin keeps its own copy. Point it at the same secret the vault slot just stored. */
+function syncPluginAgent(account, secret) {
+  try {
+    const name = pluginKeyName(account);
+    const prev = JSON.parse(localStorage.getItem(name) || 'null');
+    if (prev && typeof prev === 'object') localStorage.setItem(name, JSON.stringify({ ...prev, privateKey: secret }));
+  } catch { /* the vault slot is the signer */ }
+}
 const SAVE = 'nearcarta.setup.v1';
 const RETURN_TO = nextPath(location.search);
 const PREVIEW = new URLSearchParams(location.search).has('preview') && !RETURN_TO;
@@ -482,6 +490,7 @@ async function renewAgentKey(deps = {}) {
   }
   txs.forEach(([k], i) => mark(k, 'run', txHashOf(res?.[i])));
   localStorage.setItem(agentLS(me), fresh.secretKey);
+  syncPluginAgent(me, fresh.secretKey);
   st.charter = me; save();
   // A stubbed wallet (tests / headless) never lands the key on chain — stop after the signer call.
   if (deps.wallet || deps.signAll) {
@@ -545,8 +554,9 @@ async function refreshAgentKey(deps = {}) {
   });
   const txs = [];
   const row = await viewFn(rpcClient([MAIN.rpc]), contract, 'get_charter', { owner: me }).catch(() => null);
-  if (row && String(row.agent || '') !== pubkeyHex(fresh)) {
-    txs.push(['agent', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: pk }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
+  const agentHex = pubkeyHex(fresh);
+  if (row && String(row.agent || '') !== agentHex) {
+    txs.push(['agent', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: agentHex }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
   }
   txs.push(['key', { receiverId: me, actions: keyActions }]);
   for (const [k] of txs) mark(k, 'run');
@@ -563,28 +573,42 @@ async function refreshAgentKey(deps = {}) {
     throw e;
   }
   txs.forEach(([k], i) => mark(k, 'run', txHashOf(res?.[i])));
+  // Save before the read-back. Ferry Load cargo signs whatever is in this slot.
   localStorage.setItem(agentLS(me), fresh.secretKey);
+  syncPluginAgent(me, fresh.secretKey);
   st.charter = me; save();
   if (deps.wallet || deps.signAll) {
     mark('key', 'ok');
     if (txs.some(([k]) => k === 'agent')) mark('agent', 'ok');
     keyReady = true; keyStale = false;
     gasLeft = GAS_TOPUP_YOCTO;
+    if (row) chainRow = { ...row, agent: agentHex };
+    chainLoadedFor = me;
     paintRefreshStatus('Agent key refreshed (signer stub). 0.25 NEAR of gas. Rules and the row balance were not changed. No mainnet tx was sent.');
     return { ok: true, renewed: true, stub: true, txs: txs.map(t => t[0]), signed: txs.map(t => t[1]) };
   }
   paintRefreshStatus('Confirming the new key on chain…');
   let ak = null;
-  for (let i = 0; i < 12 && !(ak = await agentAccessKey(fresh.secretKey)); i++) await wait(1200);
+  let rowNow = null;
+  for (let i = 0; i < 12; i++) {
+    if (!ak) ak = await agentAccessKey(fresh.secretKey);
+    rowNow = await viewFn(rpcClient([MAIN.rpc]), contract, 'get_charter', { owner: me }).catch(() => null);
+    if (ak && rowNow && String(rowNow.agent || '') === agentHex) break;
+    await wait(1200);
+  }
+  // Write it again after the chain read, so a late paint cannot keep the previous secret.
+  localStorage.setItem(agentLS(me), fresh.secretKey);
+  syncPluginAgent(me, fresh.secretKey);
   mark('key', ak ? 'ok' : 'run');
   if (txs.some(([k]) => k === 'agent')) mark('agent', ak ? 'ok' : 'run');
   keyReady = !!ak;
   keyStale = !ak;
   gasLeft = ak?.permission?.FunctionCall?.allowance || GAS_TOPUP_YOCTO;
+  if (rowNow) { chainRow = rowNow; chainLoadedFor = me; }
   await refreshBal();
-  if (!ak) {
-    paintRefreshStatus('The new agent key is not on the account yet. Wait a few seconds and press Refresh again.');
-    throw new Error('The new agent key is not on the account yet. Wait a few seconds and press Refresh again.');
+  if (!ak || !rowNow || String(rowNow.agent || '') !== agentHex) {
+    paintRefreshStatus('The new key is saved in this browser. The row has not caught up yet. Wait a few seconds and press Refresh again.');
+    throw new Error('The row still names the previous agent key.');
   }
   paintRefreshStatus('Agent key refreshed. 0.25 NEAR of gas. Rules and the row balance were not changed.');
   return { ok: true, renewed: true, txs: txs.map(t => t[0]) };
@@ -827,9 +851,12 @@ const reasonOf = t => Object.keys(WHY).find(k => String(t || '').includes(k)) ||
 async function boardAsk(amt) {
   const contract = MAIN.board.contract, amount = toY(amt), receiver = rules().receivers[0];
   const rpcCall = rpcClient([MAIN.rpc]);
-  const sec = localStorage.getItem(agentLS(me));
-  const key = keyFrom(sec);
   const row = await viewFn(rpcCall, contract, 'get_charter', { owner: me });
+  const key = storedAgentKey(k => localStorage.getItem(k), me);
+  const sec = key?.secretKey;
+  if (!key || pubkeyHex(key) !== String(row?.agent || '')) {
+    return { passed: false, before: true, reason: 'the agent key in this browser does not match the charter', amount, receiver };
+  }
   const signature = signMessage(key, proposalMessage({ contract, owner: me, receiver, amount, nonce: String(row.nonce) }));
   const args = { owner: me, receiver, amount, signature, reveal: null };
   const ak = await agentAccessKey(sec);
