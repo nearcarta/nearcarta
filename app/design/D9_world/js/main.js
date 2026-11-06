@@ -221,6 +221,7 @@ function goIn(id){ if(CLOSED.has(id)) return; const s=SHOPS[id]; R.steer=null; k
   const end=hx(...s.door).lerp(hx(s.q,s.r),.18); const far=R.pos.distanceTo(end);
   if(far<1.6) R.go([end],{arrive:go}); else if(!R.goHex(s.door,{end,run:far>4,arrive:go})) R.go([end],{arrive:go});
   setTimeoutSim(go,Math.min(6,.9+far/(far>4?R.runSpd:R.walkSpd)*1.25)); }
+window.__enterToll = () => goIn('toll');
 // walking straight into a door (keys held toward the shop, on its step) goes in, no button needed
 let pushT=0; function walkInto(dt){ const r=_nearDoor(); if(!r.id||!R.steer||r.d>.6){ pushT=0; return; } const c=hx(SHOPS[r.id].q,SHOPS[r.id].r); const tx=c.x-R.pos.x, tz=c.z-R.pos.z, l=Math.hypot(tx,tz)||1, sl=R.steer.length()||1;
   if((tx*R.steer.x+tz*R.steer.y)/(l*sl)>.55){ pushT+=dt; if(pushT>.3){ pushT=0; goIn(r.id); } } else pushT=0; }

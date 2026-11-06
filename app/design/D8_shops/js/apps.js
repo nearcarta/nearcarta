@@ -359,7 +359,10 @@ export function ruleFor(o, clauseId = 'pay') {
 export const TOLL_MAIN = 0.001;
 export async function toll() {
   // Only ever pay the toll account itself. If it is not on the allowlist, refuse before any signing.
+  // A function-call key that cannot call propose must not fall through to the wallet.
   if (S.board) { if (!TS.tollAllowed(pay()?.receivers)) throw new Error(TS.TOLL_NOT_LISTED);
+    const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
+    if (!await proposeAccessKey(key)) throw new Error('This browser key cannot call propose. Open /setup. Nothing was signed.');
     return boardPay({ shop: 'toll', receiver: TS.TOLL_ACCT, amountY: toY(TOLL_MAIN) }); }
   const payee = merchants()[0];
   if (!TS.canSplit(pay()?.receivers, payee, canBatch())) return ask({ shop: 'toll', receiver: payee, amountY: toY(TOLL_MAIN), memo: 'toll' });

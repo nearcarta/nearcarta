@@ -600,3 +600,96 @@ body.ferry-tray #shopUI .rcpt:empty{display:none}
   .ferry-agent-char{width:88px}
   .ferry-agent-pop{width:min(240px,calc(100vw - 120px))}
 }
+
+/* Toll Bridge tray: same mix as Ferry. The card owns the pass. */
+body.toll-tray #shopUI #tray{
+  width:min(440px,calc(100vw - 28px));
+  max-width:440px;
+  left:16px; bottom:18px;
+  max-height:calc(100dvh - 112px);
+  padding:24px 22px 22px;
+  box-sizing:border-box;
+  overflow-x:hidden;
+  overflow-y:auto;
+  background:#1f1a15;
+  border:1px solid #3a3128;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+body.toll-tray #shopUI .t-head,
+body.toll-tray #shopUI .label,
+body.toll-tray #shopUI .hero,
+body.toll-tray #shopUI #t-who,
+body.toll-tray #shopUI #t-track,
+body.toll-tray #shopUI .shop-track,
+body.toll-tray #shopUI .say,
+body.toll-tray #shopUI .t-links,
+body.toll-tray #shopUI .rcpt{display:none!important}
+body.toll-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
+body.toll-tray #shopUI #t-act[hidden]{display:none!important}
+body.toll-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
+body.toll-tray #shopUI select,
+body.toll-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
+#toll-agent-dock{
+  position:fixed; right:20px; bottom:22px; z-index:70;
+  display:flex; flex-direction:row; align-items:flex-end; gap:12px;
+  pointer-events:none;
+}
+#toll-agent-dock > *,
+#toll-agent-dock .toll-agent-send{pointer-events:auto}
+#toll-agent-dock[hidden]{display:none!important}
+.toll-agent-char{
+  position:relative; display:flex; flex-direction:column; align-items:center; gap:6px;
+  width:96px; padding:0; border:0; background:transparent; cursor:pointer; color:#fff8ee;
+}
+.toll-agent-char:focus-visible{outline:2px solid #f5d08a; outline-offset:4px; border-radius:12px}
+.toll-agent-avatar{
+  width:72px; height:72px; object-fit:contain; display:block;
+  filter:drop-shadow(0 10px 18px rgba(0,0,0,.45));
+}
+.toll-agent-badge{
+  position:absolute; top:-2px; right:6px; z-index:1;
+  width:26px; height:26px; border-radius:999px;
+  background:#fff; color:#2a1608; font:800 15px/26px system-ui,sans-serif;
+  text-align:center; box-shadow:0 4px 12px rgba(0,0,0,.35);
+}
+.toll-agent-char[aria-expanded="true"] .toll-agent-badge{opacity:.35}
+.toll-agent-name{
+  margin:0; color:#f5d08a; font:700 11px/1.2 system-ui,sans-serif;
+  letter-spacing:.05em; text-transform:uppercase; text-shadow:0 2px 8px rgba(0,0,0,.55);
+}
+.toll-agent-pop{
+  width:min(300px,calc(100vw - 140px));
+  box-sizing:border-box; padding:10px; border-radius:14px;
+  border:1px solid #d6b46a66; background:#1f1a15;
+  box-shadow:0 12px 28px rgba(0,0,0,.4);
+  display:grid; gap:8px; overflow:hidden;
+}
+.toll-agent-log{margin:0;color:#f5d08a;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.toll-agent-pop .toll-agent-row{
+  display:grid; grid-template-columns:minmax(0,1fr) 44px; gap:8px; align-items:stretch; min-width:0;
+}
+.toll-agent-pop input{
+  width:100%; min-width:0; box-sizing:border-box; min-height:44px;
+  padding:0 12px; border-radius:10px; border:1px solid #4a3a28;
+  background:#17130f; color:#fff8ee; font:500 14px/1.2 system-ui,sans-serif;
+}
+.toll-agent-pop .toll-agent-send,
+.toll-agent-pop button.toll-agent-send{
+  width:44px; min-width:44px; height:44px; margin:0; padding:0;
+  border:0; border-radius:10px;
+  background:linear-gradient(180deg,#f5d08a,#e2b35b); color:#2a1608;
+  font:700 16px/1 system-ui,sans-serif; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+@media (max-width:720px){
+  body.toll-tray #shopUI #tray{
+    width:min(100vw - 16px,420px); max-width:none;
+    left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    max-height:min(58dvh,calc(100dvh - 108px)); padding:20px 18px;
+  }
+  #toll-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
+  .toll-agent-avatar{width:72px;height:72px}
+  .toll-agent-char{width:88px}
+  .toll-agent-pop{width:min(240px,calc(100vw - 120px))}
+}

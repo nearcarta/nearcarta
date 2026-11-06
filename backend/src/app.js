@@ -16,6 +16,7 @@ import * as mist from './mistbank.js';
 import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
 import { issuePass } from './toll-pass.js';
+import { readTollLive, tollLiveError } from './toll-views.js';
 import { verifyPropose } from './board-tx.js';
 import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
@@ -370,6 +371,10 @@ export function makeApp() {
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
+  app.get('/api/toll/live', limiter(20), async c => {
+    try { return c.json(await readTollLive(view)); }
+    catch (e) { return c.json(tollLiveError(e)); }
+  });
   app.post('/api/toll/mainnet', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
     if (!HASH.test(b.tx || '')) return bad(c, 'tx must be a hash');
