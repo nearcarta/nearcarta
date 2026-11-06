@@ -39,7 +39,7 @@ import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edge
 import { pastPrompts as arenaPrompts } from './arena.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
 import { marketStatus, readBounties } from './hall-market.js';
-import { derivedFor, lineFor } from './house-views.js';
+import { derivedFor, lineFor, signerShipped } from './house-views.js';
 import { HOUSE_LEGACY, HOUSE_SHOP } from '../../shared/house/shop.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
@@ -369,7 +369,7 @@ export function makeApp() {
   app.get('/api/house/derived/:account', limiter(12), async c => {
     const a = c.req.param('account');
     if (!nearAccountOk(a)) return bad(c, 'not an account id');
-    return c.json(await derivedFor(a, view));
+    return c.json(await derivedFor(a, view, await signerShipped(rpc)));
   });
   app.get('/api/house/line/:account', limiter(12), async c => {
     const a = c.req.param('account');

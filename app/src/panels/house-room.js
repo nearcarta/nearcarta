@@ -60,6 +60,7 @@ function shell() {
         ${field('Amount', '<input id="house-amt" data-testid="house-amt" inputmode="decimal" value="0.001" autocomplete="off">')}
         ${field('Gas', '<input id="house-gas" data-testid="house-gas" inputmode="numeric" value="21000" autocomplete="off">')}
       </div>
+      <p class="note" data-testid="house-vault-note" hidden></p>
     </div>
     <div class="ferry-pane" data-panel="heirs" data-testid="house-panel-heirs" hidden>
       ${flow('ETH', 'base')}
@@ -301,9 +302,22 @@ export function mountHouseRoom(root, hooks = {}) {
     const eth = rows.find(r => r.chain === 'eth');
     const addr = root.querySelector('#house-address');
     if (!addr) return;
-    if (eth?.address) addr.value = eth.address;
+    // The address is the deed's path. It is only a vault once Toll can sign for it,
+    // so the field says which of the two it is rather than showing a bare 0x.
+    const live = state.derived?.live === true;
+    if (eth?.address) addr.value = live ? eth.address : `${eth.address} · not controlled yet`;
     else if (state.derivedError) addr.value = 'Signer did not answer.';
     else addr.value = 'Not live yet';
+    addr.title = live
+      ? 'Toll signs for this path. A confirm key still checks every send.'
+      : (state.derived?.why || 'No contract can sign for this path yet, so the deed does not control it.');
+    const note = root.querySelector('[data-testid=house-vault-note]');
+    if (note) {
+      note.textContent = live
+        ? 'Toll signs for this address under the deed. A confirm key checks each send.'
+        : 'This is the deed\'s path, not a vault the deed controls: no contract signs for it yet. Nothing can be spent from it here.';
+      note.hidden = false;
+    }
     const bal = root.querySelector('#house-balance');
     if (bal) {
       const purse = nearText(state.purse?.balance);
