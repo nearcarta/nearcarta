@@ -62,8 +62,17 @@ export function toUnits(amount, decimals) {
 
 export const PRIVACY = ['public', 'basic', 'advanced'];
 
+/** Implicit 64-hex or a named NEAR account. Longer strings (a Zcash UA) are not. */
+export function isNearRecipient(s) {
+  return typeof s === 'string' && s.length >= 2 && s.length <= 64
+    && (/^[0-9a-f]{64}$/.test(s) || /^([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/.test(s));
+}
+
 export function buildQuoteRequest({ from, to, amount, recipient, refundTo, privacy = 'public', slippageBps = 100, deadlineMin = 60, live = false }) {
   if (!PRIVACY.includes(privacy)) throw Object.assign(new Error('privacy must be public|basic|advanced'), { status: 400 });
+  if (to?.blockchain === 'near' && !isNearRecipient(recipient)) {
+    throw Object.assign(new Error('A NEAR destination needs a NEAR account as recipient'), { status: 400 });
+  }
   const body = {
     dry: live !== true,
     swapType: 'EXACT_INPUT',
@@ -73,6 +82,10 @@ export function buildQuoteRequest({ from, to, amount, recipient, refundTo, priva
     destinationAsset: to.assetId,
     amount: toUnits(amount, from.decimals),
     refundTo,
+    // ORIGIN_CHAIN refunds on the chain the deposit came from.
+    // DESTINATION_CHAIN pays the recipient on the destination chain.
+    // For USDC on NEAR that recipient is a NEAR account, not an Intents balance.
+    // https://docs.near-intents.org/integration/distribution-channels/1click-api
     refundType: 'ORIGIN_CHAIN',
     recipient,
     recipientType: 'DESTINATION_CHAIN',
@@ -122,6 +135,9 @@ export async function quote(input) {
     const g = orchardOnly(zec.receivers);
     zec.orchard_only = g.ok;
     if (!g.ok) return { ok: false, refused: 'recipient_not_orchard_only', error: `Refused before quoting: ${g.why}. The Ferry pays ZEC only to an Orchard-only unified address.`, zcash: zec };
+  }
+  if (to.blockchain === 'near' && !isNearRecipient(input.recipient)) {
+    return { ok: false, http: 400, error: 'A NEAR destination needs a NEAR account as recipient. Use the visitor account (64 hex or a named account).' };
   }
   const sent = buildQuoteRequest({ ...input, from, to });
   const res = await postQuote(sent, { auth: sent.confidentiality !== undefined });

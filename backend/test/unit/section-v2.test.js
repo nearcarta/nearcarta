@@ -62,6 +62,31 @@ test('wrap.near uses the rule cap when that cap is at least 0.05 NEAR', () => {
   assert.equal(callPolicy(['charter.nearcarta.near'], edge, edge).calls.find(c => c.method === 'near_deposit').cap, edge);
 });
 
+test('callPolicy dedupes the wrap.near shop and keeps the trio inside 8', () => {
+  // The hand-tested list. The shop entry wrap.near + ft_transfer is the same pair
+  // FERRY_CALL_TARGETS already adds, and set_calls panics ERR_RECEIVERS on a repeat.
+  const receivers = ['charter.nearcarta.near', 'toll.nearcarta.near', 'wrap.near'];
+  const policy = callPolicy(receivers, '1', '2');
+  const pairs = policy.calls.map(c => `${c.receiver}:${c.method}`);
+  assert.deepEqual(pairs, [
+    'charter.nearcarta.near:ft_transfer',
+    'toll.nearcarta.near:ft_transfer',
+    'wrap.near:near_deposit',
+    'wrap.near:ft_transfer',
+    'wrap.near:storage_deposit',
+  ]);
+  assert.equal(new Set(pairs).size, pairs.length);
+  assert.ok(pairs.length <= 8);
+  const many = ['a.near', 'b.near', 'c.near', 'd.near', 'e.near', 'f.near', 'g.near', 'h.near', 'i.near'];
+  const capped = callPolicy(many, '1', '2');
+  assert.equal(capped.calls.length, 8);
+  assert.deepEqual(capped.calls.slice(-3).map(c => [c.receiver, c.method]), [
+    ['wrap.near', 'near_deposit'],
+    ['wrap.near', 'ft_transfer'],
+    ['wrap.near', 'storage_deposit'],
+  ]);
+});
+
 test('the session script prints the plan and does not sign without --live', () => {
   const script = fileURLToPath(new URL('../../scripts/board-session-mainnet.js', import.meta.url));
   const dry = spawnSync(process.execPath, [script], { encoding: 'utf8' });

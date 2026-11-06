@@ -8,7 +8,7 @@ import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
-import { boardCallText, cityCheckoutBody, PROPOSE_CALL_TGAS, proposeCallAllowanceOk } from '/panels/ferry-settle.js';
+import { boardCallText, cityCheckoutBody, PROPOSE_CALL_TGAS, proposeCallAllowanceOk, quoteRecipient } from '/panels/ferry-settle.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -423,8 +423,13 @@ export async function quote(route, amount, to = 'ZEC@zec') {
 }
 /** Dry quote for any 1Click pair (symbol@chain). Used by the city Ferry live picker. */
 export async function quotePair(from, to, amount) {
+  const dest = to || 'ZEC@zec';
+  // USDC on NEAR is DESTINATION_CHAIN: the recipient is this visitor's NEAR account.
+  // A Zcash unified address is rejected by 1Click for that corridor ("recipient is not valid").
+  const recipient = quoteRecipient(dest, S.me, UA);
+  if (!recipient) return { ok: false, error: 'A NEAR destination needs your NEAR account as the recipient. Sign in, then get the quote again.' };
   return api('/api/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ from, to: to || 'ZEC@zec', amount: String(amount), recipient: UA, refundTo: refundFor(from), privacy: 'basic' }) });
+    body: JSON.stringify({ from, to: dest, amount: String(amount), recipient, refundTo: refundFor(from), privacy: 'basic' }) });
 }
 // A dry quote. Paying it is a board propose, inside the visitor's cap.
 // Payee: ferry-route clause receivers if present; else the board/pay allowlist (open_charter receivers).
@@ -462,7 +467,7 @@ export async function openFerryCheckout(q, pair) {
   const recipient = ferryPayee('pay');
   const amountYocto = String(S.boardRow?.min_amount || S.clauses?.pay?.min_amount || '1');
   if (!charter || !recipient) return { ok: false, reason: 'no_charter', depositAddress: null };
-  const body = cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo: refundFor(pair.from) });
+  const body = cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo: refundFor(pair.from), visitor: S.me });
   const r = await fetch(API + '/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null };

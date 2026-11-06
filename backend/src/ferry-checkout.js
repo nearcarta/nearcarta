@@ -130,13 +130,18 @@ export function checkoutInput(b) {
   if (!/^\d+(\.\d+)?$/.test(String(b.amount ?? ''))) return { error: 'bad amount' };
   if (!isNearAccount(b.charter)) return { error: 'bad charter' };
   if (!isNearAccount(b.recipient)) return { error: 'bad recipient' };
+  let swapRecipient = null;
+  if (b.swap_recipient != null && b.swap_recipient !== '') {
+    if (!isNearAccount(b.swap_recipient)) return { error: 'bad recipient' };
+    swapRecipient = b.swap_recipient;
+  }
   if (typeof b.refundTo !== 'string' || b.refundTo.length < 2 || b.refundTo.length > 128) return { error: 'bad refundTo' };
   const clauseId = b.clause_id || b.clauseId || 'pay';
   if (!/^[A-Za-z0-9._-]{1,64}$/.test(clauseId)) return { error: 'bad clause' };
   const amountYocto = String(b.amount_yocto || b.amountYocto || '');
   if (!/^\d{1,40}$/.test(amountYocto)) return { error: 'bad amount_yocto' };
   if (b.privacy !== undefined && b.privacy !== 'public') return { error: 'checkout is public only' };
-  return { ok: true, value: { from, to, amount: String(b.amount), recipient: b.recipient, refundTo: b.refundTo, charter: b.charter, clauseId, amountYocto, privacy: 'public', slippageBps: Number(b.slippageBps || 100) } };
+  return { ok: true, value: { from, to, amount: String(b.amount), recipient: b.recipient, swapRecipient, refundTo: b.refundTo, charter: b.charter, clauseId, amountYocto, privacy: 'public', slippageBps: Number(b.slippageBps || 100) } };
 }
 
 function refused(reason, extra = {}) {
@@ -198,14 +203,17 @@ export async function openCheckout(input, deps) {
     if (Number.isFinite(rough) && rough > MAX_CHECKOUT_USD * 1.05 + 1e-8) return refused('over_checkout_cap', { step: 'cap', recipient: input.recipient });
   }
 
-  const dry = await deps.quote({ ...input, from: input.from, to: input.to });
+  // The charter gate checked input.recipient (the allowlisted shop).
+  // A NEAR-destination token is delivered to swapRecipient, the visitor's account.
+  const clickRecipient = input.to?.chain === 'near' && input.swapRecipient ? input.swapRecipient : input.recipient;
+  const dry = await deps.quote({ ...input, from: input.from, to: input.to, recipient: clickRecipient });
   if (!dry?.ok) return { ok: false, step: 'quote', error: dry?.error || 'quote refused', depositAddress: null, reason: 'quote_refused', receipt: intentsCheckout({ decision: 'refused', reason: 'quote_refused', to: input.recipient, tx: null }) };
   const usd = checkoutUsdOk(dry.from?.usd);
   if (!usd.ok) return refused(usd.reason, { step: 'cap', recipient: input.recipient, usd: dry.from?.usd ?? null });
 
   const from = findToken(list, input.from), to = findToken(list, input.to);
   if (!from || !to) return { ok: false, step: 'quote', error: 'unknown token', depositAddress: null, status: 400 };
-  const sent = buildQuoteRequest({ ...input, from, to, live: true });
+  const sent = buildQuoteRequest({ ...input, recipient: clickRecipient, from, to, live: true });
   const res = await deps.postQuote(sent);
   if (res.http !== 201) return { ok: false, step: 'live', error: `1Click answered HTTP ${res.http}`, depositAddress: null, receipt: intentsCheckout({ decision: 'refused', reason: 'quote_refused', to: input.recipient, amount: usd.usd, tx: null }) };
   const verify = deps.verify || (() => false);

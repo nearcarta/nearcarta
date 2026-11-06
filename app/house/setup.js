@@ -9,7 +9,7 @@ import qrcode from 'qrcode-generator';
 import { wallet, mainnetWallet, account, mainnetAccount, connect, disconnect, onWallet, readyBoardKey } from './house.js';
 import { balanceOn } from './onboard.js';
 import { setupJourney } from '../../shared/setup/path.js';
-import { rulesDiff, rulesLiveHint, signRulesUpdate, updatePlan, RULES_DEPOSIT_YOCTO } from '../../shared/setup/rules-diff.js';
+import { callsFailedPanel, expiresToWrite, formatExpiry, hashesFromError, plainRulesError, rulesDiff, rulesLiveHint, signRulesUpdate, txHashForMethod, updatePlan, RULES_DEPOSIT_YOCTO } from '../../shared/setup/rules-diff.js';
 import { tryTiles } from '../../shared/setup/try-tiles.js';
 import { TOPUP_MIN_YOCTO, TOPUP_RESERVE_YOCTO, charterFundMarkup, charterTopUpYocto, nearStringFromYocto, topUpRoom } from '../../shared/setup/charter-fund.js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
@@ -200,6 +200,7 @@ const yToN = y => { try { return Number(BigInt(y) / 10n ** 18n) / 1e6; } catch {
 // Wallet errors in plain words: yocto numbers become NEAR and a shortfall.
 function plainErr(e) {
   const t = String(e?.message || e || '');
+  if (/ERR_RECEIVERS/.test(t)) return plainRulesError(e, { rulesSaved: /set_rules was saved/.test(t) || !!e?.rulesSaved });
   if (/window closed|popup closed|user (closed|rejected|cancel)|cancel+ed by user|rejected/i.test(t)) return 'You closed the approval tab. Nothing was sent.';
   if (/not enough balance|NotEnoughBalance|LackBalanceForState|insufficient/i.test(t)) {
     const nums = (t.match(/\d{19,}/g) || []).map(yToN).filter(n => n > 0);
@@ -310,7 +311,10 @@ function sRules() {
 }
 function wireRules() {
   const upd = () => { st.cap = +$('#cap').value; st.daily = +$('#daily').value; st.per = +$('#per').value; st.hours = +$('#hours').value; st.receivers = $('#rcv').value.split(/[\s,]+/).map(s => s.trim().toLowerCase()).filter(Boolean); save(); $('#prev').innerHTML = preview(rules()); };
-  ['cap', 'daily', 'per', 'hours', 'rcv'].forEach(id => $('#' + id).oninput = upd);
+  ['cap', 'daily', 'per', 'rcv'].forEach(id => $('#' + id).oninput = upd);
+  const hours = $('#hours');
+  const onHours = e => { if (+e.target.value !== +st.hours) st.hoursEdited = true; upd(); };
+  if (hours) { hours.oninput = onHours; hours.onchange = onHours; }
   wire(() => { const r = rules();
     if (!(r.cap > 0) || !(r.daily >= r.cap)) { msg = 'The daily budget must be at least the per-payment cap.'; return render(); }
     if (!r.receivers.length || r.receivers.some(a => !/^[a-z0-9._-]{2,64}$/.test(a))) { msg = 'Add at least one valid account id.'; return render(); }
@@ -355,7 +359,10 @@ function sSign() {
   }
   const onBoard = boardLive() && !st.trial;
   const r = rules(), id = st.charter || (onBoard ? me : `${st.agentName}.${CFG.factory}`), live = rowLive();
-  const update = signRulesUpdate({ live: !!(live && onBoard), local: r, row: onBoard ? chainRow : null });
+  const local = { ...r, expiresAt: onBoard && chainRow ? expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: chainRow.expires_at }) : undefined };
+  let update = signRulesUpdate({ live: !!(live && onBoard), local, row: onBoard ? chainRow : null });
+  const callsFailed = signLog.some(x => x.k === 'calls' && x.state === 'bad');
+  if (!update.changed && callsFailed && live && onBoard) update = { changed: true, html: callsFailedPanel() };
   const stake = onBoard ? '0.02' : fmtN(st.deposit);
   const L = signItems(onBoard, live, update.changed);
   const help = `<div id="signhelp" class="tabhelp" hidden data-testid="sign-tabhelp"><p class="small">The approval opened in another browser tab. Switch to it and approve. This page moves on by itself.</p><button type="button" class="btn" id="resign" data-testid="sign-reopen">Switch to approval tab</button></div>`;
@@ -412,7 +419,7 @@ async function agentAccessKey(sec) {
 }
 // Existing row: set_rules and set_calls, plus set_agent only when the key differs.
 // One signAndSendTransactions batch. The access-key add stays on the first Approve path.
-function ruleUpdateTransactions(row, r, sec) {
+function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: row?.expires_at })) {
   const key = keyFrom(sec);
   const contract = MAIN.board.contract;
   const plan = updatePlan({
@@ -423,7 +430,7 @@ function ruleUpdateTransactions(row, r, sec) {
   });
   return plan.map(step => {
     const args = step.method === 'set_agent' ? { agent: key.publicKey }
-      : step.method === 'set_rules' ? { rules: ruleArgs(r) }
+      : step.method === 'set_rules' ? { rules: ruleArgs(r, expiresAt) }
       : callPolicy(r.receivers, toY(r.cap), toY(r.daily));
     return [step.key, { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: step.method, args, gas: (GAS.agent * TG).toString(), deposit: step.deposit } }] }];
   });
@@ -472,6 +479,43 @@ function noteSign(k, state, tx) {
   if (s) Object.assign(s, { state, tx: tx || s.tx });
   else signLog.push({ k, state, tx });
 }
+function writtenRules(r, row) {
+  return { ...r, expiresAt: expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: row?.expires_at }) };
+}
+async function recentMethodTx(method, ok) {
+  if (!me) return null;
+  const url = `https://api.nearblocks.io/v1/account/${encodeURIComponent(me)}/txns-only?per_page=10`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    const j = await res.json();
+    return txHashForMethod(j.txns || [], { contract: MAIN.board.contract, method, ok });
+  } catch { return null; }
+}
+async function rememberPartial(txs, error, local) {
+  const text = String(error?.message || error || '');
+  const hashes = hashesFromError(error);
+  const failedCalls = /ERR_RECEIVERS/.test(text);
+  let next = null;
+  let saved = false;
+  const tries = failedCalls ? 4 : 1;
+  for (let i = 0; i < tries && !saved; i++) {
+    try { next = await viewFn(rpcClient([MAIN.rpc]), MAIN.board.contract, 'get_charter', { owner: me }); } catch { next = null; }
+    if (next) { chainRow = next; chainLoadedFor = me; }
+    saved = !!(next && !rulesDiff(local, next).length);
+    if (!saved && i + 1 < tries) await wait(1000);
+  }
+  if (saved) { st.hoursEdited = false; save(); }
+  let rulesTx = null;
+  let callsTx = failedCalls && hashes.length === 1 ? hashes[0] : null;
+  if (saved && !rulesTx) rulesTx = await recentMethodTx('set_rules', true);
+  if (failedCalls && !callsTx) callsTx = await recentMethodTx('set_calls', false);
+  if (saved) noteSign('rules', 'ok', rulesTx);
+  if (failedCalls) noteSign('calls', 'bad', callsTx);
+  for (const [k] of txs) if (k !== 'rules' && k !== 'calls' && !signLog.some(x => x.k === k)) noteSign(k, 'run');
+  const err = new Error(plainRulesError(text, { rulesSaved: saved }));
+  err.rulesSaved = saved;
+  throw err;
+}
 async function updateRules() {
   const r = rules();
   const w = await mainnetWallet().wallet();
@@ -483,21 +527,29 @@ async function updateRules() {
   adoptPluginKey(me);
   const sec = localStorage.getItem(agentLS(me));
   if (!sec) throw new Error('No agent key in this browser.');
-  const txs = ruleUpdateTransactions(row, r, sec);
+  const local = writtenRules(r, row);
+  const txs = ruleUpdateTransactions(row, r, sec, local.expiresAt);
   // One wallet approval for set_rules, set_calls, and set_agent when the key differs.
-  const out = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: txs.map(t => t[1]) }) : [];
-  let res = out;
-  if (!w.signAndSendTransactions) for (const t of txs) res.push(await w.signAndSendTransaction(t[1]));
+  let res;
+  try {
+    const out = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: txs.map(t => t[1]) }) : [];
+    res = out;
+    if (!w.signAndSendTransactions) { res = []; for (const t of txs) res.push(await w.signAndSendTransaction(t[1])); }
+  } catch (e) {
+    await rememberPartial(txs, e, local);
+  }
   txs.forEach(([k], i) => noteSign(k, 'ok', txHashOf(res?.[i])));
   let next = null;
   for (let i = 0; i < 20; i++) {
     next = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null);
-    if (next && !rulesDiff(r, next).length) break;
+    if (next && !rulesDiff(local, next).length) break;
     await wait(1500);
   }
   if (next) chainRow = next;
   chainLoadedFor = me;
-  if (!next || rulesDiff(r, next).length) throw new Error('The row has not caught up yet. Wait a few seconds and press Update my rules again.');
+  if (!next || rulesDiff(local, next).length) throw new Error('The row has not caught up yet. Wait a few seconds and press Update my rules again.');
+  st.hoursEdited = false;
+  save();
   done(5);
   await refreshBal();
 }
@@ -512,7 +564,7 @@ function boardFacts(row) {
   return [['Charter', acA(me)], ['Row balance', fmtN(nearOf(row?.balance)) + ' NEAR'], ['Row storage', fmtN(nearOf(row?.storage_locked)) + ' NEAR'],
     ['Max per payment', fmtN(nearOf(row?.per_action_cap)) + ' NEAR'], ['Daily budget', fmtN(nearOf(row?.daily_budget)) + ' NEAR'],
     ['Allowed shops', esc((row?.receivers || []).join(', '))],
-    ['Expires', row?.expires_at && row.expires_at !== '0' ? new Date(Number(BigInt(row.expires_at) / 1_000_000n)).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' }) : 'none'],
+    ['Expires', formatExpiry(row?.expires_at)],
     ['Agent key', bound]]
     .map(([a, b]) => `<div class="fact"><small>${a}</small><b>${b}</b></div>`).join('');
 }
