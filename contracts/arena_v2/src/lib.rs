@@ -6,10 +6,21 @@
 //! only when the predecessor is the board, and the visitor is the top-level
 //! `row_owner` argument. A nested account id is not authority.
 //!
-//! TEE signature verification is not implemented. The published NEAR AI
-//! verification write-up does not pin an ecrecover scheme we have tested with
-//! a signed fixture. The contract binds the oath, the pot, and the envelope.
-//! It does not pretend a model signature was checked.
+//! The model verdict is a signed NEAR AI receipt, and `resolve` checks it here
+//! with `env::ed25519_verify` against the signer the owner pinned with
+//! `set_model_signer`. The signed text names the round, so a verdict minted for
+//! one attempt cannot settle another:
+//!
+//!   nearcarta.arena.verdict.v1|network|contract|attempt|player|guardian|
+//!   prompt|oath|persona|response|pay_to|pay_amount|model
+//!
+//! Every hash in that line is the one snapshotted on the attempt, so a swapped
+//! player, prompt, oath, persona, nonce, response, or round fails the check.
+//! What is verified is that this attested model signed this verdict for this
+//! round. Whether the model's prose is "correct" is not a chain claim: the oath,
+//! not the model's pay fields, decides the payout. Until the owner pins a
+//! signer, `resolve` refuses (`ERR_NO_SIGNER`) rather than trusting an unsigned
+//! reply. https://docs.near.ai/cloud/verification
 use near_sdk::json_types::U128;
 use near_sdk::serde::Serialize;
 use near_sdk::store::{IterableMap, LookupMap};
@@ -17,9 +28,11 @@ use near_sdk::{
     assert_one_yocto, env, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise,
 };
 
-const STATE_VERSION: u32 = 2;
+const STATE_VERSION: u32 = 3;
 const TIMEOUT_NS: u64 = 60_000_000_000;
 const BADGE_PREFIX: &str = "case:";
+const VERDICT_PREFIX: &str = "nearcarta.arena.verdict.v1";
+const NETWORK: &str = "mainnet";
 
 #[near(serializers = [json, borsh])]
 #[derive(Clone)]
@@ -77,6 +90,12 @@ pub struct Envelope {
     pub nonce: u64,
     pub pay_to: Option<AccountId>,
     pub pay_amount: U128,
+    /// The model name the attested signer served, e.g. `z-ai/glm-5.3-flash`.
+    pub model: String,
+    /// NEAR AI receipt id. Not signed, kept so an explorer can find the job.
+    pub completion_id: String,
+    /// Hex ed25519 signature over the round text (128 hex characters).
+    pub signature: String,
 }
 
 #[derive(Serialize)]
@@ -113,6 +132,11 @@ pub struct Contract {
     pub inference_cost: u128,
     pub subsidy: bool,
     pub upgrade_nonce: u64,
+    /// The attested NEAR AI signing key (32 bytes) the owner pinned. None until
+    /// `set_model_signer`, and `resolve` refuses while it is None.
+    pub model_signer: Option<[u8; 32]>,
+    pub model_name: String,
+    pub resolve_nonce: u64,
     pub guardians: IterableMap<u64, Guardian>,
     pub attempts: IterableMap<u64, Attempt>,
     pub open_by_player: LookupMap<AccountId, u64>,
@@ -137,6 +161,9 @@ impl Contract {
             inference_cost: inference_cost.0,
             subsidy: false,
             upgrade_nonce: 0,
+            model_signer: None,
+            model_name: String::new(),
+            resolve_nonce: 0,
             guardians: IterableMap::new(b"g"),
             attempts: IterableMap::new(b"a"),
             open_by_player: LookupMap::new(b"o"),
@@ -153,6 +180,26 @@ impl Contract {
         self.inference_budget = budget.0;
         self.inference_cost = cost.0;
         self.subsidy = subsidy;
+    }
+
+    /// Owner only. Pin the attested NEAR AI signing key and the model name whose
+    /// receipts this contract will accept. `signing_address` is the 64-hex
+    /// ed25519 key from `/v1/attestation/report` after checking the TEE evidence.
+    /// `resolve` refuses while this is unset, so an unsigned reply cannot settle
+    /// a round. Clearing it is allowed and turns settlement off again.
+    pub fn set_model_signer(&mut self, signing_address: String, model: String) {
+        self.only_owner();
+        let key = parse_hex_n::<32>(&signing_address);
+        require!(!model.is_empty() && model.len() <= 64, "ERR_MODEL");
+        self.model_signer = Some(key);
+        self.model_name = model;
+    }
+
+    /// Owner only. Turn settlement back off until a new key is attested.
+    pub fn clear_model_signer(&mut self) {
+        self.only_owner();
+        self.model_signer = None;
+        self.model_name = String::new();
     }
 
     pub fn mint(
@@ -243,7 +290,8 @@ impl Contract {
         id
     }
 
-    /// Permissionless. The envelope must match the snapshotted attempt.
+    /// Permissionless. The envelope must match the snapshotted attempt and carry
+    /// an ed25519 signature from the pinned model signer over this exact round.
     /// The oath, not the model's pay fields, decides whether the pot pays.
     pub fn resolve(&mut self, envelope: Envelope, response: String) -> String {
         require!(hash_bytes(response.as_bytes()) == envelope.response_hash, "ERR_RESPONSE");
@@ -251,6 +299,7 @@ impl Contract {
         require!(attempt.state == "open", "ERR_STATE");
         require!(env::block_timestamp() <= attempt.deadline, "ERR_LATE");
         self.bind(&attempt, &envelope);
+        self.verify_verdict(&attempt, &envelope);
         let mut g = self.guardian(attempt.guardian_id);
         let cost = self.take_inference();
         attempt.inference = U128(cost);
@@ -431,7 +480,9 @@ impl Contract {
             inference_cost: U128(self.inference_cost),
             subsidy: self.subsidy,
             upgrade_nonce: self.upgrade_nonce,
-            verifier: "unverified",
+            verifier: if self.model_signer.is_some() { "ed25519-model" } else { "unverified" },
+            model_signer: self.model_signer.map(|k| hex_encode(&k)),
+            model_name: self.model_name.clone(),
         }
     }
 }
@@ -447,6 +498,9 @@ pub struct ConfigView {
     pub subsidy: bool,
     pub upgrade_nonce: u64,
     pub verifier: &'static str,
+    /// Hex of the pinned model signer, or null while settlement is off.
+    pub model_signer: Option<String>,
+    pub model_name: String,
 }
 
 impl Contract {
@@ -475,6 +529,49 @@ impl Contract {
         require!(envelope.oath_hash == attempt.oath_hash, "ERR_ENVELOPE");
         require!(envelope.persona_hash == attempt.persona_hash, "ERR_ENVELOPE");
         require!(envelope.nonce == attempt.nonce, "ERR_ENVELOPE");
+    }
+
+    /// The exact bytes the attested model signed for this round. Every account
+    /// id comes from the attempt or the contract, never from the caller, so a
+    /// re-signed envelope for another round cannot be reused here. The
+    /// envelope's own `player` is in the text as well, so an envelope that
+    /// claims another player is a different verdict.
+    pub fn verdict_text(&self, envelope: &Envelope) -> String {
+        let attempt = self.attempt(envelope.attempt_id);
+        require!(attempt.player == envelope.player, "ERR_ENVELOPE");
+        let pay_to = envelope.pay_to.as_ref().map(|a| a.to_string()).unwrap_or_default();
+        let contract = env::current_account_id();
+        format!(
+            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            VERDICT_PREFIX,
+            NETWORK,
+            contract,
+            attempt.id,
+            envelope.player,
+            attempt.guardian_id,
+            attempt.prompt_hash,
+            attempt.oath_hash,
+            attempt.persona_hash,
+            envelope.response_hash,
+            pay_to,
+            envelope.pay_amount.0,
+            self.model_name,
+        )
+    }
+
+    /// Refuse unless the pinned model signer signed this exact round. This is the
+    /// only place a verdict becomes chain-accepted, so the contract never trusts
+    /// an unsigned reply or a model name the caller chose.
+    fn verify_verdict(&self, attempt: &Attempt, envelope: &Envelope) {
+        let key = self.model_signer.expect("ERR_NO_SIGNER");
+        let text = self.verdict_text(envelope);
+        require!(envelope.signature.len() == 128, "ERR_SIG");
+        let sig = parse_hex_n::<64>(&envelope.signature);
+        require!(env::ed25519_verify(&sig, text.as_bytes(), &key), "ERR_SIG");
+        // The envelope's model name is a claim about which model answered; it has
+        // to be the model the owner pinned, so a cheaper model cannot stand in.
+        require!(envelope.model == self.model_name, "ERR_MODEL");
+        let _ = attempt;
     }
 
     fn oath_allows(&self, g: &Guardian, pay_to: Option<&AccountId>, amount: u128) -> bool {
@@ -538,6 +635,29 @@ fn hex_encode(bytes: &[u8]) -> String {
     out
 }
 
+/// Decode exactly `N` bytes of hex. Panics `ERR_HEX` on any other shape, so a
+/// truncated or padded signature cannot reach `ed25519_verify`.
+fn parse_hex_n<const N: usize>(hex: &str) -> [u8; N] {
+    require!(hex.len() == N * 2, "ERR_HEX");
+    let bytes = hex.as_bytes();
+    let mut out = [0u8; N];
+    for i in 0..N {
+        let hi = hex_val(bytes[i * 2]);
+        let lo = hex_val(bytes[i * 2 + 1]);
+        out[i] = (hi << 4) | lo;
+    }
+    out
+}
+
+fn hex_val(c: u8) -> u8 {
+    match c {
+        b'0'..=b'9' => c - b'0',
+        b'a'..=b'f' => c - b'a' + 10,
+        b'A'..=b'F' => c - b'A' + 10,
+        _ => env::panic_str("ERR_HEX"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -574,7 +694,10 @@ mod tests {
 
     fn boot() -> Contract {
         ctx(owner(), 0, 1);
-        Contract::new(board(), owner(), U128(1_000), U128(10))
+        let mut c = Contract::new(board(), owner(), U128(1_000), U128(10));
+        ctx(owner(), 0, 1);
+        c.set_model_signer(hex_encode(&model_key().verifying_key().to_bytes()), model_name());
+        c
     }
 
     fn mint_one(c: &mut Contract, who: AccountId, cap: u128) -> u64 {
@@ -590,10 +713,30 @@ mod tests {
         )
     }
 
+    /// A real ed25519 key pair for the pinned model signer. The contract checks
+    /// the signature with `env::ed25519_verify`, and the mock runs the same
+    /// ed25519-dalek verifier the chain uses, so these tests exercise the real
+    /// check rather than a flag.
+    fn model_key() -> ed25519_dalek::SigningKey {
+        ed25519_dalek::SigningKey::from_bytes(&[7u8; 32])
+    }
+    fn model_name() -> String {
+        "z-ai/glm-5.3-flash".to_string()
+    }
+    fn pin_model(c: &mut Contract) {
+        ctx(owner(), 0, 1);
+        c.set_model_signer(hex_encode(&model_key().verifying_key().to_bytes()), model_name());
+    }
+    fn sign_text(c: &Contract, envelope: &Envelope) -> String {
+        use ed25519_dalek::Signer;
+        let text = c.verdict_text(envelope);
+        hex_encode(&model_key().sign(text.as_bytes()).to_bytes())
+    }
+
     fn env_for(c: &Contract, attempt: u64, player: AccountId, prompt: &str, pay: u128) -> (Envelope, String) {
         let a = c.get_attempt(attempt).unwrap();
         let response = format!("reply-{attempt}");
-        let envelope = Envelope {
+        let mut envelope = Envelope {
             attempt_id: attempt,
             player,
             prompt_hash: hash_bytes(prompt.as_bytes()),
@@ -603,7 +746,11 @@ mod tests {
             nonce: a.nonce,
             pay_to: Some(prize()),
             pay_amount: U128(pay),
+            model: model_name(),
+            completion_id: format!("chatcmpl-{attempt}"),
+            signature: String::new(),
         };
+        envelope.signature = sign_text(c, &envelope);
         (envelope, response)
     }
 
@@ -781,8 +928,10 @@ mod tests {
     #[test]
     fn clean_starts_from_an_empty_state() {
         let c = Contract::clean(board(), owner());
-        assert_eq!(c.get_config().version, 2);
+        assert_eq!(c.get_config().version, 3);
+        // A fresh account has no pinned model signer, so resolve refuses until the owner sets one.
         assert_eq!(c.get_config().verifier, "unverified");
+        assert_eq!(c.get_config().model_signer, None);
         assert!(c.get_guardian(1).is_none());
     }
 
@@ -799,7 +948,10 @@ mod tests {
 
     /// Borsh length of `new` for the live board and owner. `scripts/arena-deploy.js`
     /// adds the account, the wasm, the STATE key and the 40-byte record.
-    const LIVE_STATE_BYTES: usize = 171;
+    /// Borsh length of `new` for the live board and owner. `scripts/arena-deploy.js`
+    /// adds the account, the wasm, the STATE key and the 40-byte record. It grew
+    /// from 171 when the pinned model signer, model name and resolve nonce arrived.
+    const LIVE_STATE_BYTES: usize = 184;
 
     #[test]
     fn live_account_ids_serialize_to_the_pinned_state() {
@@ -815,15 +967,16 @@ mod tests {
     }
 
     #[test]
-    fn migrate_keeps_version_two_and_upgrade_is_owner_only() {
+    fn migrate_keeps_the_current_version_and_upgrade_is_owner_only() {
         let mut c = boot();
         let guardians = c.next_guardian;
         near_sdk::env::state_write(&c);
         let here = near_sdk::env::current_account_id();
         ctx(here.clone(), 0, 2);
         let migrated = Contract::migrate();
-        assert_eq!(migrated.get_config().version, 2);
-        assert_eq!(migrated.get_config().verifier, "unverified");
+        assert_eq!(migrated.get_config().version, 3);
+        // The pinned signer survives the upgrade, so settlement stays on.
+        assert_eq!(migrated.get_config().verifier, "ed25519-model");
         assert_eq!(migrated.next_guardian, guardians);
         ctx_input(owner(), 1, 3, b"wasm");
         let _ = c.upgrade();
@@ -852,6 +1005,137 @@ mod tests {
         let mut c = boot();
         ctx(board(), 1, 3);
         c.upgrade();
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_OWNER")]
+    fn only_the_owner_pins_the_model_signer() {
+        let mut c = boot();
+        ctx(alice(), 0, 2);
+        c.set_model_signer(hex_encode(&model_key().verifying_key().to_bytes()), model_name());
+    }
+
+    #[test]
+    fn the_config_names_the_pinned_signer() {
+        let c = boot();
+        let cfg = c.get_config();
+        assert_eq!(cfg.verifier, "ed25519-model");
+        assert_eq!(cfg.model_signer.as_deref(), Some(hex_encode(&model_key().verifying_key().to_bytes()).as_str()));
+        assert_eq!(cfg.model_name, model_name());
+        // Clearing turns settlement off again, and the config says so.
+        let mut c2 = boot();
+        ctx(owner(), 0, 2);
+        c2.clear_model_signer();
+        assert_eq!(c2.get_config().verifier, "unverified");
+        assert_eq!(c2.get_config().model_signer, None);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_NO_SIGNER")]
+    fn an_unpinned_contract_refuses_to_settle() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "inside".into());
+        let (env, response) = env_for(&c, id, bob(), "inside", 1);
+        ctx(owner(), 0, 11);
+        c.clear_model_signer();
+        c.resolve(env, response);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_SIG")]
+    fn a_verdict_signed_by_another_key_rejects() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "inside".into());
+        let (mut env, response) = env_for(&c, id, bob(), "inside", 1);
+        use ed25519_dalek::Signer;
+        let impostor = ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]);
+        env.signature = hex_encode(&impostor.sign(c.verdict_text(&env).as_bytes()).to_bytes());
+        c.resolve(env, response);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_SIG")]
+    fn a_verdict_replayed_from_another_round_rejects() {
+        // Two rounds on the same guardian. The signature from round one is valid for
+        // round one only, because the round's attempt id, player and prompt hash are
+        // inside the signed text.
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let first = c.open_attempt(bob(), g, "round one".into());
+        let (first_env, first_response) = env_for(&c, first, bob(), "round one", 1);
+        assert_eq!(c.resolve(first_env.clone(), first_response), "paid");
+        ctx(board(), 5, 12);
+        let second = c.open_attempt(alice(), g, "round two".into());
+        let (mut env, response) = env_for(&c, second, alice(), "round two", 1);
+        // The attacker replays the first round's signature over the second round's text.
+        env.signature = first_env.signature;
+        c.resolve(env, response);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_SIG")]
+    fn a_verdict_signed_for_a_different_amount_rejects() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "inside".into());
+        let (env, response) = env_for(&c, id, bob(), "inside", 1);
+        // Keep the signature, raise the payout: the signed text names the amount.
+        let mut raised = env;
+        raised.pay_amount = U128(4);
+        c.resolve(raised, response);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_MODEL")]
+    fn a_verdict_for_another_model_rejects() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "inside".into());
+        let (env, response) = env_for(&c, id, bob(), "inside", 1);
+        let mut swapped = env;
+        swapped.model = "cheap/model".into();
+        c.resolve(swapped, response);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_RESPONSE")]
+    fn a_response_that_does_not_match_its_hash_rejects() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "inside".into());
+        let (env, _) = env_for(&c, id, bob(), "inside", 1);
+        c.resolve(env, "a different reply".into());
+    }
+
+    #[test]
+    fn the_verdict_text_binds_round_player_prompt_and_amount() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "inside".into());
+        let (env, _) = env_for(&c, id, bob(), "inside", 1);
+        let text = c.verdict_text(&env);
+        assert!(text.starts_with("nearcarta.arena.verdict.v1|mainnet|"), "{text}");
+        assert!(text.contains(&format!("|{id}|")), "the round id is inside the signed text");
+        assert!(text.contains("|bob.test|"), "the player is inside");
+        assert!(text.ends_with("|z-ai/glm-5.3-flash"), "{text}");
+        let mut other = env.clone();
+        other.pay_amount = U128(2);
+        assert_ne!(text, c.verdict_text(&other), "a different amount is a different verdict");
+        let mut moved = env;
+        moved.player = alice();
+        // The envelope's player must also be the attempt's, so this is refused outright
+        // rather than producing a second valid text.
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.verdict_text(&moved)));
+        assert!(caught.is_err(), "an envelope claiming another player is refused");
     }
 
     #[test]

@@ -1,10 +1,10 @@
 {
   "file": "arena_v2.wasm",
-  "bytes": 222463,
-  "sha256": "df072f68d77a252cdf123f6829d469359705fb4c7ef44ed7c07bea72b2d341e0",
-  "state_bytes": 171,
-  "storage_bytes": 222779,
-  "stake_yocto": "2227790000000000000000000",
+  "bytes": 229612,
+  "sha256": "66b12404633044d1a4814db0144856f0524d4f98e92cacb38a03343a10b74e86",
+  "state_bytes": 184,
+  "storage_bytes": 229941,
+  "stake_yocto": "2299410000000000000000000",
   "slack_yocto": "50000000000000000000000",
   "build": "rustc 1.95.0, near-sdk 5.27.0, wasm-opt 124 -Oz --strip-debug --strip-producers"
 }
