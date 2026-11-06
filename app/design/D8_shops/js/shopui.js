@@ -15,7 +15,7 @@ import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
 import { mountShop } from '/panels/deep.js';
 import { pairClauseId } from '/panels/ferry-pair.js';
 import { pairHero } from '/panels/token-badge.js';
-import { agentDeliveredNote, depositPlan, explainQuoteMiss, mayCheckout, nearAmount, nearNative, nextFerryBeat, pickWrapSpend, SESSION_SWAP, wrapProgressNote } from '/panels/ferry-settle.js';
+import { agentDeliveredNote, depositPlan, explainQuoteMiss, ferryStatusHtml, ferryStatusView, mayCheckout, nearAmount, nearNative, nextFerryBeat, pickWrapSpend, SESSION_SWAP, wrapProgressNote } from '/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
 import { armTollDock, dispatchTollDock, installTollDock } from '/panels/toll-dock.js';
 import { mergeTollChronicle, nextRowBalance, passPaidCopy, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
@@ -191,8 +191,11 @@ function finishFerry(res) {
   return res;
 }
 function playFerryDelivered() {
-  // Load cargo and the AI agent share this. refused:false skips the "Downgrade refused" beat.
-  if (sh?.act && runScene) runScene(sh.act({ refused: false }));
+  // Load cargo and the AI agent share this. delivered skips the weigh and sails to the far bank.
+  if (sh?.act && runScene) runScene(sh.act({ refused: false, delivered: true }));
+  else sh?.deliver?.();
+  // The sail is short. If it stops mid-river, the boat and the seal still finish.
+  setTimeout(() => { if (cur === 'ferry' && extra.sailed) sh?.deliver?.(); }, 6000);
 }
 function showAgentDelivered(st) {
   const toChain = extra.destChain || String(extra.toId || '').split('|')[1] || extra.q?.to?.chain || extra.q?.to?.blockchain || '';
@@ -226,18 +229,24 @@ function watchFerryDeposit(address) {
     try { st = await A.ferryStatus(address); }
     catch { return; }
     const beat = nextFerryBeat(st.status, { sailed: !!extra.sailed });
-    extra.depositHelp = st.help || st.status || '';
+    const sym = (st?.symbolOut && String(st.symbolOut).length <= 12) ? st.symbolOut : (extra.q?.to?.symbol || extra.outSym || 'USDC');
+    const view = ferryStatusView({
+      status: st.status,
+      amount: st?.amountOut || extra.q?.to?.amount || extra.outAmt || '',
+      symbol: sym,
+      txs: extra.depositTxs || [],
+      destTx: st?.destinationTx || '',
+      destChain: extra.destChain || String(extra.toId || '').split('|')[1] || '',
+    });
+    extra.ferryStatus = view;
+    extra.depositHelp = view.text;
     extra.sailed = beat.sailed;
     sh?.setOrder?.(beat.order);
     const note = document.querySelector('[data-testid=ferry-status]');
-    if (note) note.textContent = extra.depositHelp;
+    if (note) note.innerHTML = ferryStatusHtml(view);
     if (beat.play) playFerryDelivered();
     if (beat.terminal) stopFerryWatch();
-    if (st.status === 'SUCCESS') {
-      const done = showAgentDelivered(st);
-      say(`1Click status is SUCCESS. ${done.text}`);
-    } else if (st.status === 'REFUNDED') say('Refunded. The boat turns back. Nothing else is sent.');
-    else if (st.status === 'FAILED') say('The swap failed. Nothing else is sent.');
+    if (st.status === 'SUCCESS') showAgentDelivered(st);
   };
   tick();
   ferryWatch = setInterval(tick, 4000);
@@ -408,14 +417,16 @@ async function settleFerry(wantCharter) {
     extra.outAmt = extra.q?.to?.amount || '';
     extra.outSym = extra.q?.to?.symbol || 'USDC';
     extra.destChain = pair.toChain || '';
-    extra.depositHelp = 'Charter sent the NEAR deposit. Waiting until 1Click says SUCCESS. The boat has not delivered.';
+    extra.ferryStatus = ferryStatusView({
+      txs: extra.depositTxs, destChain: extra.destChain, amount: extra.outAmt, symbol: extra.outSym,
+    });
+    extra.depositHelp = extra.ferryStatus.text;
     sh?.setOrder?.('deposit');
     watchFerryDeposit(checkout.depositAddress);
-    const callLinks = extra.depositTxs.map(h => A.txLine(h, 'propose_call')).join('');
     return {
       kind: 'ok', o, hero: APPS.ferry.hero(),
-      say: `${stamp} The charter sent the NEAR deposit with propose_call (no wallet)${plan.recover ? ' from stranded wNEAR' : ''}. The boat waits until 1Click says SUCCESS.`,
-      rc: (o?.tx ? A.txLine(o.tx) : '') + callLinks + waiting,
+      say: extra.ferryStatus.text,
+      rc: '',
       rule: o ? A.ruleFor(o, clause) : '',
     };
   }

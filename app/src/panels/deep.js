@@ -17,7 +17,7 @@ import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
 import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks, pickerListbox, bindPickerListbox } from './token-badge.js';
 import { agentCargoPlan, chainLabel, receiveAsk, receiveConfirm } from './ferry-pair.js';
-import { explainQuoteMiss, SESSION_SWAP, quoteRecipient, validateDestAddress, isNearAccountId } from './ferry-settle.js';
+import { explainQuoteMiss, ferryStatusHtml, ferryStatusView, SESSION_SWAP, quoteRecipient, validateDestAddress, isNearAccountId } from './ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from './ferry-dock.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -206,9 +206,9 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       ${tokenStack(toSym, toChain, { size: 48, chainSize: 16 })}
     </div>`;
   const deposit = state.depositAddress
-    ? `<p class="ferry-deposit" data-testid="ferry-deposit">${state.depositMode === 'propose_call'
-      ? `Charter sent the NEAR deposit. Waiting on 1Click. <code data-testid="ferry-deposit-address">${esc(state.depositAddress)}</code>`
-      : `Send at most ${esc(state.depositUsd || '0.20')} USD yourself to <code data-testid="ferry-deposit-address">${esc(state.depositAddress)}</code>`}.</p><p data-testid="ferry-status">${esc(state.depositHelp || 'Waiting for the deposit. The boat has not delivered.')}</p>`
+    ? (state.depositMode === 'propose_call'
+      ? `<p class="ferry-status" data-testid="ferry-status">${ferryStatusHtml(state.ferryStatus || ferryStatusView({ txs: state.depositTxs, destChain: state.destChain, amount: state.outAmt, symbol: state.outSym }))}</p>`
+      : `<p class="ferry-deposit" data-testid="ferry-deposit">Send at most ${esc(state.depositUsd || '0.20')} USD yourself to <code data-testid="ferry-deposit-address">${esc(state.depositAddress)}</code>.</p><p data-testid="ferry-status">${esc(state.depositHelp || 'Waiting for the deposit. The boat has not delivered.')}</p>`)
     : '';
   const swap = `<div class="ferry-pane ferry-picker" data-pane="swap" data-testid="ferry-picker" ${tab === 'swap' ? '' : 'hidden'}>
       ${flow}

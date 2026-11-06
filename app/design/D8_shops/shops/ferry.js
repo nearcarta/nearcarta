@@ -63,6 +63,8 @@ export default async function ferry(ctx) {
   await put(scene, 'decoration/props/crate_A_big', { x: 2.9, z: .75, ry: -.5, fitW: .42 }); await put(scene, 'decoration/props/barrel', { x: 2.6, z: -.9 });
   for (const [n, x, z] of [['waterlily_A', -.4, -.9], ['waterlily_B', .5, 1.1], ['waterplant_A', .9, -1.1], ['waterlily_A', -.7, 1.2]]) await put(scene, 'decoration/nature/' + n, { x, z, fitW: .35 }).catch(() => null);
   const b = boat(new THREE.Vector3(-.85, -.02, .2)); b.scale.setScalar(1.25); scene.add(b);
+  const FAR_X = 1.55;
+  let arrived = false;
   const crate = await put(scene, 'decoration/props/crate_A_small', { x: -2.0, y: .15, z: .25, fitW: .42 });
   const rob = await makeRobot(scene); rob.at(-3.6, 1.6);
   // Live cargo follows the city tray picker (extra.fromId/toId/q). Default remains the snapshot USDC→ZEC.
@@ -128,13 +130,47 @@ export default async function ferry(ctx) {
     return cargo;
   };
   let t = 0;
+  const deliver = () => {
+    arrived = true;
+    hideRefuseTag();
+    seal.material = sealOk;
+    b.position.x = FAR_X;
+    swapsTo();
+    paintOrder('delivered');
+    rob.play('ThumbsUp', { once: true });
+    speak('');
+  };
   const panel = { title: 'Ferry', src: 'quote', srcNote: 'A real mainnet price quote. Nothing is sent and nothing is spent.', label: LABEL, hero: heroOf(), action: 'Load the cargo' };
   return {
-    rob, scene, camera, tags, applyPair, hideRefuse, setOrder: paintOrder, cargo,
+    rob, scene, camera, tags, applyPair, hideRefuse, setOrder: paintOrder, deliver, cargo,
     panel,
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },
     *act(opts = {}) {
+      // A live SUCCESS sails from here. The weigh already happened while 1Click was in flight.
+      if (opts.delivered && !opts.refused) {
+        hideRefuseTag();
+        speak('Seal matches. Casting off.', 'speech');
+        seal.material = sealOk;
+        sfx('allowed'); sfx('water');
+        rob.play('Idle');
+        paintOrder('transit');
+        const x0 = b.position.x;
+        yield tween(1.8, k => {
+          if (arrived) return;
+          b.position.x = x0 + (FAR_X - x0) * k;
+          b.rotation.z = Math.sin(k * 10) * .03;
+        }, easeInOut);
+        if (arrived) return;
+        swapsTo();
+        speak(`Far bank · ${cargo.toSym}`, 'speech');
+        yield tween(.6, k => pool.forEach((m, i) => { m.material.opacity = .55 * Math.min(1, Math.max(0, k * 1.4 - i * .2)); }));
+        deliver();
+        ctx.setResult('ok', cargo.result);
+        yield wait(1.2);
+        rob.play('Idle');
+        return;
+      }
       // Success and refusal share the weigh and the hand-over. Only a real charter refusal shows "Downgrade refused".
       const refused = !!opts.refused;
       paintOrder('loading');
@@ -164,7 +200,7 @@ export default async function ferry(ctx) {
       speak('Seal matches. Casting off.', 'speech');
       seal.material = sealOk;
       sfx('allowed'); sfx('water'); rob.play('Idle'); paintOrder('transit');
-      yield tween(2.2, k => { b.position.x = -.85 + 1.7 * k; b.rotation.z = Math.sin(k * 12) * .03; }, easeInOut);
+      yield tween(2.2, k => { if (arrived) return; b.position.x = -.85 + (FAR_X + .85) * k; b.rotation.z = Math.sin(k * 12) * .03; }, easeInOut);
       swapsTo(); speak(`Far bank · ${cargo.toSym}`, 'speech');
       yield tween(.9, k => pool.forEach((m, i) => { m.material.opacity = .55 * Math.min(1, Math.max(0, k * 1.4 - i * .2)); }));
       paintOrder('delivered');

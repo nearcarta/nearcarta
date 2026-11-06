@@ -7,7 +7,7 @@ import { agentCargoPlan, parseAgentFerry, receiveConfirm } from '../../../app/sr
 import { ferryMarkup } from '../../../app/src/panels/deep.js';
 import { runFerryAgent } from '../../../app/src/panels/deep.js';
 import {
-  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, destExplorer, explainQuoteMiss, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, PROPOSE_CALL_BYTES, proposeCallPrepaidYocto, proposeCallTgas, quoteRecipient, SESSION_SWAP, stepsAllowanceYocto, validateDestAddress, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto, wrapProgressNote,
+  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, destExplorer, explainQuoteMiss, ferryStatusHtml, ferryStatusView, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, PROPOSE_CALL_BYTES, proposeCallPrepaidYocto, proposeCallTgas, quoteRecipient, SESSION_SWAP, stepsAllowanceYocto, validateDestAddress, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto, wrapProgressNote,
 } from '../../../app/src/panels/ferry-settle.js';
 import { functionCallAllowanceCost } from '../../../shared/board/cost.js';
 import { GAS_TOPUP_YOCTO } from '../../../shared/board/session.js';
@@ -258,14 +258,76 @@ test('a session load plans a deposit and a guest load stays a demo', () => {
   assert.match(fn, /The boat does not say delivered/);
   assert.match(fn, /You are not asked to send USDC on Base/);
   assert.match(fn, /explainQuoteMiss/);
-  assert.doesNotMatch(fn, /sh\.act\(\{ refused: false \}\)/);
-  assert.match(ui, /sh\.act\(\{ refused: false \}\)/);
+  assert.doesNotMatch(fn, /sh\.act\(\{ refused: false/);
+  assert.match(ui, /sh\.act\(\{ refused: false, delivered: true \}\)/);
   const watch = ui.slice(ui.indexOf('function watchFerryDeposit'), ui.indexOf('async function settleFerry'));
   assert.match(watch, /beat\.play\) playFerryDelivered\(\)/);
   assert.match(watch, /showAgentDelivered/);
   assert.match(watch, /SUCCESS/);
   const play = ui.slice(ui.indexOf('function playFerryDelivered'), ui.indexOf('function showAgentDelivered'));
-  assert.match(play, /sh\.act\(\{ refused: false \}\)/);
+  assert.match(play, /sh\.act\(\{ refused: false, delivered: true \}\)/);
+  assert.match(play, /sh\?\.deliver\?\.\(\)/);
+});
+
+test('a cross-chain SUCCESS is one line, the boat arrives, and the shop url is the city tray', async () => {
+  const near = '5vUC4zn1CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw';
+  const base = '0xe23f332d4ce42bc918eaf20db48b4645373df527db2e66671f56bb246592f1ea';
+  const view = ferryStatusView({
+    status: 'SUCCESS', amount: '0.179713', symbol: 'USDC',
+    txs: [near, 'A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz'],
+    destTx: base, destChain: 'base',
+  });
+  assert.equal(view.order, 'SUCCESS');
+  assert.equal(view.text, 'Delivered 0.179713 USDC.');
+  assert.equal(view.links.at(-1).url, 'https://basescan.org/tx/' + base);
+  const html = ferryStatusHtml(view);
+  assert.match(html, /Delivered 0\.179713 USDC\./);
+  assert.match(html, new RegExp('nearblocks\\.io/txns/' + near));
+  assert.match(html, /basescan\.org\/tx\/0xe23f332d/);
+  assert.match(html, /order · SUCCESS/);
+  assert.doesNotMatch(html, /Charter sent the NEAR deposit|Done: the output was delivered|Waiting on 1Click/);
+  const card = ferryMarkup({
+    depositAddress: '27bab72c47cbcb4036c4e86ec197131ae886c66b927049073c19e49c6bc072b.near',
+    depositMode: 'propose_call', depositTxs: [near], destChain: 'base',
+    outAmt: '0.179713', outSym: 'USDC', fromId: 'wNEAR|near', toId: 'USDC|base',
+    ferryStatus: view,
+  });
+  assert.match(card, /data-testid="ferry-status"/);
+  assert.match(card, /class="ferry-tab/);
+  assert.match(card, /class="primary ferry-cta/);
+  assert.match(card, /order · SUCCESS/);
+  assert.doesNotMatch(card, /Charter sent the NEAR deposit/);
+  assert.doesNotMatch(card, /data-testid="ferry-deposit-address"/);
+  const page = read('app/design/D8_shops/index.html');
+  assert.match(page, /location\.replace\('\/\?shop=' \+ encodeURIComponent\(shop\)/);
+  assert.match(page, /q\.has\('2d'\)/);
+  assert.match(page, /q\.has\('scripted'\)/);
+  assert.match(page, /q\.has\('capture'\)/);
+  const city = read('app/design/D9_world/index.html');
+  assert.match(city, /href="\/panels\/panels\.css"/);
+  assert.match(city, /id="shopUI"/);
+  assert.match(city, /id="tray"/);
+  const scene = read('app/design/D8_shops/shops/ferry.js');
+  assert.match(scene, /const FAR_X = 1\.55/);
+  assert.match(scene, /opts\.delivered/);
+  assert.match(scene, /seal\.material = sealOk/);
+  assert.match(scene, /paintOrder\('delivered'\)/);
+  const addr = '0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034';
+  const loads = [];
+  const state = {};
+  const out = await runFerryAgent({
+    text: `swap 0.05 wNEAR to USDC on base to ${addr}`,
+    state,
+    charterReady: true,
+    quotePair: async (_from, _to, amt) => ({ ok: true, dry: true, from: { symbol: 'wNEAR', amount: amt, usd: '0.18' }, to: { symbol: 'USDC', amount: '0.179713' } }),
+    onLoadCargo: async (opts) => { loads.push(opts); return { say: 'Waiting on 1Click.' }; },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.loaded, true);
+  assert.deepEqual(loads, [{ charter: true }]);
+  assert.equal(state.fromId, 'wNEAR|near');
+  assert.equal(state.toId, 'USDC|base');
+  assert.equal(String(state.receiveAt).toLowerCase(), addr.toLowerCase());
 });
 
 test('a successful swap does not show Downgrade refused, and the AI popup names the USDC and the txs', () => {
@@ -273,7 +335,7 @@ test('a successful swap does not show Downgrade refused, and the AI popup names 
   const act = src.slice(src.indexOf('*act(opts'), src.indexOf('update(dt)'));
   const refused = act.indexOf('if (refused)');
   const shown = act.indexOf('showRefuseTag()');
-  const sailed = act.indexOf('seal.material = sealOk');
+  const sailed = act.indexOf('seal.material = sealOk', shown);
   assert.ok(refused >= 0 && shown > refused && sailed > shown);
   assert.doesNotMatch(act.slice(act.indexOf('return;', refused), sailed), /showRefuseTag/);
   const ui = read('app/design/D8_shops/js/shopui.js');
