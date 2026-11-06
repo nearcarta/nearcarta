@@ -37,7 +37,7 @@ Eight tracks. Each one is a building. The pin labels and the brown town are unch
 |---|---|---|---|---|
 | DeFi | Ferry | One recorded NEAR Intents swap: 0.045 wNEAR became 0.177937 USDC. New quotes stay dry | `intents.near` | [HzgUr618…](https://nearblocks.io/txns/HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw) |
 | Privacy | Mist Bank | The model call does not move NEAR. The TEE check is `judges/proofs/tee-check.json` | `board.nearcarta.near` | [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy) |
-| Autonomous Business | Chronicle, Toll Bridge | Chronicle lists what the charter allowed and refused. Toll asks the MPC signer | `board.nearcarta.near`, `toll.nearcarta.near` | chronicle [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR), toll allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) |
+| Autonomous Business | Chronicle, Toll Bridge | Chronicle reads one account and writes a local statement. It does not charge an entry. Toll asks the MPC signer | `board.nearcarta.near`, `toll.nearcarta.near` | chronicle [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR), toll allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) |
 | AI Security | Guardhouse | The charter refuses a payment over the cap and a payee off the list | `board.nearcarta.near` | over cap [CcPMX1Dt…](https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF), off list [E7KMexjS…](https://nearblocks.io/txns/E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ) |
 | Agent Economy | Town Hall | `set_rules`, `set_frozen` and `set_seal` on the visitor's own row. Deposit 0. The recorded rows are a reward and a refusal | `board.nearcarta.near` | reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h), refusal [Cp2rWatn…](https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6) |
 | Real-World Money | Payouts | The city room pays reviewed NEAR rows with `propose` under the row cap. An over-cap row is refused before any deposit. A foreign row is held. An invoice is a durable exact-dollar link | `board.nearcarta.near` | earlier propose [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia). New txs: see Payouts |
@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 564 backend unit tests (561 pass, 3 skipped), offline
+npm test                                   # 574 backend unit tests (571 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -159,6 +159,7 @@ An agent with a wallet key can be talked into paying anyone: a fake invoice, a p
 | Vault Arena | Write a scam, *Send the scam* | The NEAR AI model (`z-ai/glm-5.3-flash`) reads it and proposes a payment; a payment outside your rules is refused on chain. Six walls, points and a leaderboard |
 | Payouts | *Pay reviewed rows*, or ask the AI Agent "Pay reviewed rows" | Each in-cap NEAR row is one `propose` on `board.nearcarta.near`. Over the row cap, the row is refused before any deposit. A foreign row is held. An invoice link stays on the receive account written at creation. Nothing is marked paid until 1Click status is `SUCCESS` |
 | Town Hall | *Change my row* | `set_rules`, `set_frozen` and `set_seal` on your own row. Deposit 0. A preview reads the new cap back |
+| Chronicle | Open `/?shop=chronicle`. Type an account. Choose Timeline, Statement, or Verify | The timeline lists that account’s recorded proofs, or says the coverage is partial. Write statement makes a local summary and does not sign. Anchor downloads the bundle and says the live anchor is blocked. Export CSV totals match delivered, refunded, and attempted. Verify rejects a changed statement. No entry fee. Live anchor tx: (coordinator adds the nearblocks link) |
 
 The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes `set_rules` on that row.
 
@@ -167,6 +168,8 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 | Ferry quote and status | `app/src/ferry-catalog.js` `pickBest` | `two ferry quotes mark the larger amount out` | recorded swap [HzgUr618…](https://nearblocks.io/txns/HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw). A new deposit was not sent |
 | Guardhouse check | `app/src/guard-score.js` | `a guard check explains every signal` | refused payee [E7KMexjS…](https://nearblocks.io/txns/E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ) |
 | Chronicle search | `app/src/chronicle-feed.js` | `chronicle search, filter, export and verify` | allowed [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR) |
+| Chronicle ledger | `app/src/chronicle-loop.js` `accountRows` | `an unrelated account keeps its own live rows and does not borrow the owner feed` | same recorded allow. Live anchor tx: (coordinator adds the nearblocks link) |
+| Chronicle statement | `app/src/chronicle-audit.js` `verifyNearAi` | `an unrelated account keeps its own live rows and does not borrow the owner feed` | no new spend. The live anchor is blocked until Board v2 |
 | Toll address | `app/src/toll-derive.js` | `the toll key hashes to the recorded Base address` | allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) |
 | House deed | `app/src/deed-control.js` | `a deed move refuses the previous holder` | allow [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26), refuse [3Z4UAb6N…](https://nearblocks.io/txns/3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1) |
 | Town Hall row | `app/shops/hall/row.js` | `a hall preview reads the new cap back and builds gas-only calls` | reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h). `set_rules` was not sent |
@@ -174,10 +177,24 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 | Room load | `app/src/room-error.js` | `a room error never shows the engine text` | no new spend |
 | Town intro | `app/design/D9_world/js/main.js` `story` | `the 3D story starts without the flat overlay` | no new spend |
 
+### Chronicle
+An account auditor for the Autonomous Business loop. Open the city (`/?shop=chronicle`). Type an account. The tray reads `GET /api/chronicle/live?account=`, `GET /api/chronicle?owner=`, `GET /api/ledger` and `GET /api/mainnet`. The live route is a public read for any account: the board view, nearblocks.io transactions and fungible-token transfers, and NEAR RPC `EXPERIMENTAL_tx_status` for each receipt it shows. The browser holds no key. Each source names its count or its gap, including a missing rules version, a missing wrap.near transfer, and a 1Click match only when an `intents.near` transfer is on the page. An empty index says there are no rows. Recorded proofs are added only when the deployment names that account, and they are not called a live index. The read is cached so a warm answer does not call the index again.
+
+Timeline, Statement, and Verify sit on one card. The icon card is account to ledger. Write statement asks NEAR AI Cloud when `NEARAI_CLOUD_API_KEY` is set, and the prompt contains the canonical bundle digest. The response carries the model signature and the attestation fields. Verify re-checks the ed25519 signature, the request hash, and that digest. It says the Intel DCAP quote, TCB, and RTMR3 are not verified in the browser, and that the raw response bytes are not re-hashed there. With no key, or when the preflight or the signature does not come back, the statement is a labelled local fallback. Anchor asks for consent before a private note is committed. The commitment is `sha256(salt:note)`. The raw note hash is not published. The live board contract has no anchor method, so Anchor downloads the bundle and says the live anchor is blocked. Nothing is signed on chain. Export CSV counts delivered, refunded, and attempted.
+
+```
+git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
+npm test
+node --test backend/test/unit/chronicle-depth.test.js backend/test/unit/chronicle-live.test.js
+curl -s https://nearcarta-api.onrender.com/api/chronicle
+curl -s https://nearcarta-api.onrender.com/api/ledger
+```
+Recorded allow: [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR). Live anchor tx: (coordinator adds the nearblocks link).
+
 ## Tracks and the hints we use
 - DeFi (Ferry): one recorded NEAR Intents swap. New quotes stay dry.
 - Privacy (Mist Bank): a browser audit of a card CSV or a named sample. The agent names the biggest waste from the loaded statement, or asks for one instead of using a sample. A model audit sends those lines to NEAR AI, does not store them, and names any attestation step that did not verify. It does not move NEAR. Live tighten is blocked. Confidential pay stays off.
-- Autonomous Business (Chronicle, Toll Bridge): Chronicle lists what the charter allowed and refused. Toll asks the MPC signer at `toll.nearcarta.near`.
+- Autonomous Business (Chronicle, Toll Bridge): Chronicle audits one account and does not charge an entry. Toll asks the MPC signer at `toll.nearcarta.near`.
 - AI Security (Guardhouse): spending limits and a policy engine in the charter. The town charter agent key calls `propose` and `propose_batch`. Every served account has 0 full-access keys. The agent key cannot unfreeze the charter.
 - Agent Economy (Town Hall): `set_rules` on the visitor's own row. Deposit 0.
 - Real-World Money (Payouts): reviewed in-cap NEAR rows pay with `propose`. Over-cap rows are refused before any deposit. See the Payouts section. New txs are not filled in yet.
@@ -236,7 +253,7 @@ Live check, at most 0.06 NEAR (the pass itself is 0.001):
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 564 unit tests (561 pass, 3 skipped)
+npm test                 # 574 unit tests (571 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -260,7 +277,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 564 unit tests (561 pass, 3 skipped):
+# 574 unit tests (571 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).
