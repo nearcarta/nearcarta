@@ -321,7 +321,8 @@ export async function boardRowNow() {
  * No wallet popup: the key's allowance pays the gas, and the method list is checked here
  * so a key that cannot call the method says so instead of failing on chain.
  */
-export async function boardWriteOnRow({ method, args, gasTgas = 30 } = {}) {  if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
+export async function boardWriteOnRow({ method, args, gasTgas = 30 } = {}) {
+  if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
   if (!S.me) throw new Error('Sign in first. Nothing was signed.');
   if (!method) throw new Error('That is not a board method. Nothing was signed.');
   const key = agent();

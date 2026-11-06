@@ -109,15 +109,15 @@ body.bank-tray #shopUI #t-form .bank-meta input{
 .bank-scroll > *{flex:0 0 auto}
 .bank-field{height:auto;overflow-wrap:anywhere}
 .bank-steps li{overflow-wrap:anywhere}
-/* The foot keeps one fixed status row, then the gold button: same offset in every tab and every state. */
+/* The foot keeps two fixed status rows, then the gold button: same offset in every tab and every state. */
 .bank-foot{
   flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;
   padding:8px 0 2px;background:#1c1612;position:relative;z-index:2;
-  height:96px;min-height:96px;max-height:96px;box-sizing:border-box;overflow:hidden;
+  height:130px;min-height:130px;max-height:130px;box-sizing:border-box;overflow:hidden;
 }
 .bank-foot-rows{
   display:flex;flex-direction:column;gap:0;flex:0 0 auto;
-  height:34px;min-height:34px;max-height:34px;overflow:hidden;
+  height:68px;min-height:68px;max-height:68px;overflow:hidden;
 }
 .bank-foot-rows > p{
   margin:0;height:34px;min-height:34px;max-height:34px;overflow:hidden;flex:0 0 auto;

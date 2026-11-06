@@ -165,7 +165,8 @@ export function bankMarkup(state) {
       </div>
       <div class="bank-foot" data-testid="bank-foot-audit">
       <div class="bank-foot-rows" data-testid="bank-foot-rows">
-        <p class="bank-status" data-testid="bank-status" title="${esc([state.status, state.status2].filter(Boolean).join(' '))}">${esc([state.status, state.status2].filter(Boolean).join(' '))}</p>
+        <p class="bank-status" data-testid="bank-status" title="${esc(state.status || '')}">${esc(state.status || '')}</p>
+        <p class="bank-status" data-testid="bank-status-2" title="${esc(state.status2 || '')}">${esc(state.status2 || '')}</p>
       </div>
       <button type="button" class="primary bank-cta" data-testid="bank-audit" id="bank-audit">${esc(cta)}</button>
       </div>
@@ -465,8 +466,9 @@ export function mountBankRoom(root, hooks = {}) {
     const call = tightenCall({ row: before, afterNear: review.after });
     if (!call.ok) return fail(call.why);
     state.appliedKey = key;
-    state.status = `Sending tighten_rules: cap ${call.before} NEAR → ${call.after} NEAR.`;
-    state.status2 = 'Signed by the session key in this browser. No wallet opens.';
+    // Two short lines: what is being sent, then the result. The tx links live in the proof log.
+    state.status = `Tightening your cap: ${call.before} → ${call.after} NEAR.`;
+    state.status2 = 'Signed here. No wallet opens.';
     paint();
 
     let sent;
@@ -481,11 +483,10 @@ export function mountBankRoom(root, hooks = {}) {
       return { ok: false, hint: state.status, say: `${state.status} ${state.status2}`, keep: true, kind: 'no', live: 'blocked' };
     }
     const okChain = sent.decision === 'allowed';
-    const line = okChain
-      ? `Board says the cap is now ${call.after} NEAR (was ${call.before}).`
-      : `The board refused the tighten: ${boardRefusal(sent.reason)}. Nothing changed.`;
-    state.status = line;
-    state.status2 = okChain ? 'The session key signed it. No wallet opened.' : 'Nothing was signed beyond that call.';
+    state.status = okChain
+      ? `Cap on your row is now ${call.after} NEAR (was ${call.before}).`
+      : `Board refused the tighten: ${boardRefusal(sent.reason)}.`;
+    state.status2 = okChain ? 'The board wrote it. No wallet opened.' : 'Nothing changed.';
     pushLog(proofLogEntry({
       kind: okChain ? 'tighten' : 'tighten-refused',
       lines: review.lines,
@@ -497,34 +498,33 @@ export function mountBankRoom(root, hooks = {}) {
 
     // The opt-in salted commitment is anchored only after the cap it commits to is on chain.
     // The board hashes salt || digest itself and stores neither, so only the commitment goes out.
-    let anchorNote = '';
     if (okChain && state.consent) {
       const salt = saltFor();
       const text = commitmentText({ nonce: state.nonce, afterNear: call.after, salt });
       const digest = await hashText(text);
       state.commitment = digest;
       const anchor = anchorCall({ kind: 'bank_cap', digest, salt });
-      if (!anchor.ok) anchorNote = `The commitment was not anchored: ${anchor.why}`;
+      if (!anchor.ok) state.status2 = `Commitment not anchored: ${anchor.why}`;
       else {
         try {
           const a = await hooks.boardWrite({ method: anchor.method, args: anchor.args, gasTgas: 20 });
-          anchorNote = a.decision === 'allowed'
-            ? `Salted commitment anchored on your row: ${digest.slice(0, 10)}… salt ${salt}. The statement is not in it.`
-            : `The commitment was refused: ${boardRefusal(a.reason)}.`;
+          const anchored = a.decision === 'allowed';
+          state.status2 = anchored
+            ? `Commitment ${digest.slice(0, 10)}… anchored. The statement is not in it.`
+            : `Commitment refused: ${boardRefusal(a.reason)}.`;
           pushLog(proofLogEntry({
-            kind: a.decision === 'allowed' ? 'anchor' : 'anchor-refused',
+            kind: anchored ? 'anchor' : 'anchor-refused',
             lines: review.lines,
             anomalyCount: review.anomalies.length,
             nonce: state.nonce,
-            eligible: a.decision === 'allowed',
+            eligible: anchored,
             evidence: a.tx ? [{ label: 'anchor', url: txUrl(a.tx) }] : [],
           }));
         } catch (e) {
-          anchorNote = `The commitment was not anchored: ${boardRefusal(e)}.`;
+          state.status2 = `Commitment not anchored: ${boardRefusal(e)}.`;
         }
       }
     }
-    if (anchorNote) state.status2 = anchorNote;
     paint();
     return {
       ok: okChain,

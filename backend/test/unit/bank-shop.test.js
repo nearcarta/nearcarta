@@ -700,6 +700,9 @@ test('the anchor runs only after the cap it commits to is on chain', () => {
   // The commitment is over the salt and the cap, never the statement.
   assert.match(apply, /commitmentText\(\{ nonce: state\.nonce, afterNear: call\.after, salt \}\)/);
   assert.match(apply, /anchorCall\(\{ kind: 'bank_cap', digest, salt \}\)/);
+  // The foot keeps two short lines: the result, then one note. Tx links go to the proof log.
+  assert.doesNotMatch(apply, /state\.status = line/);
+  assert.match(apply, /Cap on your row is now \$\{call\.after\} NEAR \(was \$\{call\.before\}\)/);
   assert.match(apply, /evidence: sent\.tx \? \[\{ label: 'tighten_rules', url: txUrl\(sent\.tx\) \}\] : \[\]/);
 });
 
@@ -755,4 +758,23 @@ test('the bank audit route logs nothing that carries a statement line', () => {
   const route = app.slice(app.indexOf("'/api/bank/audit'"), app.indexOf("'/api/bank/audit'") + 700);
   assert.match(route, /limiter\(4\)/);
   assert.doesNotMatch(route, /writeFile|localStorage|sessionStorage/);
+});
+
+test('the dry-run script plans the two calls and signs nothing', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../../backend/scripts/bank-row-dry-run.js', import.meta.url), 'utf8');
+  // It reads the board and prints a plan.
+  assert.match(src, /request_type: 'call_function'/);
+  assert.match(src, /method_name: method/);
+  assert.match(src, /signed_by_this_script: false/);
+  // It must not be able to sign: no key read, no signer, no send.
+  assert.doesNotMatch(src, /NEAR_MAINNET_SIGNER_KEY/);
+  assert.doesNotMatch(src, /signTx\(|signAndSendTransaction|send_tx/);
+  assert.doesNotMatch(src, /--live/);
+  // A row with no cap is reported, not guessed.
+  assert.match(src, /has no row on the board, so there is nothing to tighten or anchor/);
+  // The plan names the same two methods the page sends, in the same order.
+  assert.match(src, /method: 'tighten_rules'/);
+  assert.match(src, /method: 'anchor'/);
+  assert.match(src, /only after tighten_rules is FINAL/);
 });
