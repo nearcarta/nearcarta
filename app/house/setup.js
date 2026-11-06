@@ -379,7 +379,9 @@ function sSign() {
       ? 'Your saved rules differ from the chain. Update my rules writes them in one approval. The numbers below are what the chain has now.'
       : 'These limits are read back from the chain, not from this page.')
     : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code> and <code>propose_call</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`);
-  const factsHtml = onBoard && chainRow ? boardFacts(chainRow) : (onBoard && chainError ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div>` : '<div class="fact"><small>Reading your charter from the chain</small><b>…</b></div>');
+  const factsHtml = onBoard && chainRow ? boardFacts(chainRow) : (onBoard && chainError
+    ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div><div class="fact"><small>Your row</small><b><button type="button" class="btn link sm" id="read-again" data-testid="setup-read-again">Read the chain again</button></b></div>`
+    : '<div class="fact"><small>Reading your charter from the chain</small><b>…</b></div>');
   return head('Sign', live ? (keyStale ? 'Renew your agent key.' : 'Your agent is live.') : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), lede)
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
     + (live ? `<div class="facts" id="facts" data-testid="setup-facts">${factsHtml}</div>` : `<div class="preview">${preview(r)}</div>`)
@@ -805,6 +807,8 @@ async function ensureChainRow() {
   if (owner !== me) return;
   chainRow = row;
   chainError = row ? '' : 'The chain did not answer. Refresh the page to try again.';
+  // A failed read is not a verdict on the row: let the next paint try again instead of freezing the page.
+  if (!row) chainLoadedFor = '';
   if (STEPS[st.step][0] === 'sign') render();
 }
 async function facts() {
@@ -831,6 +835,7 @@ function wireSign() {
     try { await job(); } catch (e) { throw new Error(plainErr(e)); } finally { clearTimeout(t); }
   });
   const b = $('#sign'); if (b) b.onclick = () => watch(b, sign);
+  const again = $('#read-again'); if (again) again.onclick = () => { chainError = ''; chainLoadedFor = ''; render(); ensureChainRow(); };
   const up = $('[data-testid=setup-update-rules]'); if (up) up.onclick = () => watch(up, updateRules);
   const rs = $('#resign'); if (rs) rs.onclick = () => { busy = false; const h = $('#signhelp'); if (h) h.hidden = true; if (up) watch(up, updateRules); else if (b) watch(b, sign); };
   // Sign is where the renew panel shows for a live stale key. wireTry alone never ran here.

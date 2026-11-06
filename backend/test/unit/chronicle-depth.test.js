@@ -281,6 +281,7 @@ test('an unrelated account keeps its own live rows and does not borrow the owner
   const manifest = canonicalManifest({ account: 'alice.near', rows, statement, model });
   const proof = {
     mode: 'near-ai', model, signature, signing_address: Buffer.from(kp.publicKey).toString('hex'),
+    signing_algo: 'ed25519',
     signature_kind: 'provider_tee', signed_text: signedText, reqSha, respSha, requestBody, digest: bound, serverVerified: false,
   };
   const ok = await verifyNearAi({ manifestText: manifest.text, statement, digest: manifest.digest, proof });

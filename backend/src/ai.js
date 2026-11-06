@@ -3,11 +3,13 @@
 //  2. GET  /v1/signature/{id}   -> {text, signature, signing_address, signing_algo}
 //  3. check text == model:sha256(request bytes):sha256(response bytes) when provider_tee
 //  4. GET  /v1/attestation/report with a fresh nonce -> the signing_address must be in model_attestations
-//  5. ed25519-verify the signature over text with that address (hex public key)
+//  5. verify the signature with the algorithm the response names: ed25519 against the 32-byte key,
+//     ecdsa by recovering the EIP-191 signer, per docs.near.ai/cloud/verification/cloud-api/response-signatures
 import { createHash, randomBytes } from 'node:crypto';
 import nacl from 'tweetnacl';
 import { cfg, secret } from './config.js';
 import { proveTee } from './tee.js';
+import { recoverEcdsaSigner } from '../../app/src/panels/signature-check.js';
 
 const sha = b => createHash('sha256').update(b).digest('hex');
 const hex = h => Uint8Array.from(Buffer.from(h.replace(/^0x/, ''), 'hex'));
@@ -75,10 +77,14 @@ export function verifyLink({ id, model, sig }) {
 }
 
 /**
- * Check one completion's signature against a verified ed25519 TEE preflight (docs.near.ai):
+ * Check one completion's signature against a verified TEE preflight (docs.near.ai):
  * provider_tee text must be exactly <model>:<sha256(request)>:<sha256(response)>; a gateway signature
  * signs <sha256(request)>:<sha256(response)> and only proves the gateway. The signer must match exactly
- * one verified report with the same algorithm, and the ed25519 signature must verify.
+ * one verified report with the same algorithm, and the signature must verify with that algorithm.
+ *
+ * NEAR AI answers ecdsa by default (/v1/signature defaults to ecdsa; the model report defaults to ecdsa),
+ * so both are checked: ed25519 with the 32-byte public key, ecdsa by recovering the EIP-191 signer.
+ * The browser repeats the check, so a pass here is never the only claim.
  */
 export function checkSigned(c, sig, pre) {
   const textMatches = sig.signature_kind === 'provider_tee'
@@ -87,8 +93,24 @@ export function checkSigned(c, sig, pre) {
   const pool = sig.signature_kind === 'gateway' ? [pre.gateway] : (pre.models || []);
   const matches = pool.filter(r => r?.ok && r.signing_algo === sig.signing_algo && r.signing_address?.toLowerCase() === sig.signing_address?.toLowerCase());
   const signerAttested = matches.length === 1;
-  const ed25519 = sig.signing_algo === 'ed25519' && verifySigned(sig);
-  return { checks: { textMatches, signerAttested, ed25519, modelInTee: sig.signature_kind === 'provider_tee' }, verified: textMatches && signerAttested && ed25519 };
+  const algo = String(sig.signing_algo || '').toLowerCase();
+  let signatureOk = false;
+  let recovered = '';
+  if (algo === 'ed25519') signatureOk = verifySigned(sig);
+  else if (algo === 'ecdsa') {
+    const got = recoverEcdsaSigner({ text: sig.text, signature: sig.signature, signingAddress: sig.signing_address });
+    signatureOk = got.ok;
+    recovered = got.recovered || '';
+  }
+  const unsupported = algo !== 'ed25519' && algo !== 'ecdsa';
+  return {
+    checks: { textMatches, signerAttested, signatureOk, algo: algo || 'missing', modelInTee: sig.signature_kind === 'provider_tee' },
+    algo,
+    recovered,
+    why: unsupported ? `The response named ${algo || 'no'} signing algorithm, so the signature was not checked`
+      : signatureOk ? '' : (algo === 'ecdsa' ? 'The recovered ECDSA address is not the attested signing address' : 'The ed25519 signature did not verify'),
+    verified: textMatches && signerAttested && signatureOk,
+  };
 }
 
 // Full proof run, used by /api/ai/prove (behind AI_PROVE_ENABLED) and the integration test.
