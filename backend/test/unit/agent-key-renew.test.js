@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import nacl from 'tweetnacl';
+import { keyFrom, pubkeyHex, AGENT_LS, storedAgentKey, signMessage } from '../../../shared/vault/tx.js';
+import { proposalMessage } from '../../../shared/board/message.js';
 import {
   AGENT_METHODS,
   GAS_ALLOWANCE_YOCTO,
@@ -143,4 +146,45 @@ test('wireSign binds Renew agent key on the Sign step (not only wireTry)', () =>
   assert.match(bind, /renewAgentKey/);
   assert.match(src, /setup-renew-status/);
   assert.match(src, /console\.error\('\[setup\] renewAgentKey/);
+});
+
+test('after renew, propose signatures verify against the new key', () => {
+  const oldK = keyFrom();
+  const fresh = keyFrom();
+  const account = 'scholar.test.near';
+  const box = new Map([[AGENT_LS(account), oldK.secretKey]]);
+  const getItem = k => box.get(k) ?? null;
+  // Refresh and Renew write the new secret into the one vault slot. The next propose reads that slot.
+  box.set(AGENT_LS(account), fresh.secretKey);
+  const key = storedAgentKey(getItem, account);
+  assert.equal(pubkeyHex(key), pubkeyHex(fresh));
+  const message = proposalMessage({
+    contract: 'board.nearcarta.near', owner: account, receiver: 'charter.nearcarta.near',
+    amount: '2000000000000000000000', nonce: '9',
+  });
+  const signature = signMessage(key, message);
+  const msg = new TextEncoder().encode(message);
+  const sig = Uint8Array.from(signature.match(/../g), h => parseInt(h, 16));
+  assert.equal(nacl.sign.detached.verify(msg, sig, fresh._pk), true);
+  assert.equal(nacl.sign.detached.verify(msg, sig, oldK._pk), false);
+  const apps = read('app/design/D8_shops/js/apps.js');
+  assert.match(apps, /const agent = \(\) => W\.storedAgentKey/);
+  const pay = apps.slice(apps.indexOf('async function boardPay'), apps.indexOf('export async function ask'));
+  assert.match(pay, /await view\(S\.board, 'get_charter'/);
+  assert.doesNotMatch(pay, /S\.boardRow \|\|/);
+  assert.ok(pay.indexOf('await view(S.board, \'get_charter\'') < pay.indexOf('const key = agent()'));
+  assert.ok(pay.indexOf('const key = agent()') < pay.indexOf('W.signMessage(key'));
+  assert.match(pay, /pubkeyHex\(key\) !== String\(row\.agent/);
+  const calls = apps.slice(apps.indexOf('export async function ferryProposeCalls'), apps.indexOf('export async function sessionAllowance'));
+  const loop = calls.slice(calls.indexOf('for (let i = 0'));
+  assert.ok(loop.indexOf('const key = agent()') >= 0 && loop.indexOf('const key = agent()') < loop.indexOf('W.signMessage(key'));
+  const setup = read('app/house/setup.js');
+  const ask = setup.slice(setup.indexOf('async function boardAsk'), setup.indexOf('function wireTry'));
+  assert.ok(ask.indexOf("viewFn(rpcCall, contract, 'get_charter'") < ask.indexOf('storedAgentKey'));
+  assert.ok(ask.indexOf('storedAgentKey') < ask.indexOf('signMessage(key'));
+  const refresh = setup.slice(setup.indexOf('async function refreshAgentKey'), setup.indexOf('function bindRefreshKey'));
+  assert.match(refresh, /syncPluginAgent\(me, fresh\.secretKey\)/);
+  const plugin = read('app/house/board-key.js');
+  assert.match(plugin, /AGENT_LS\(accountId\)/);
+  assert.match(plugin, /keyFrom\(vault \|\| stored\.privateKey\)/);
 });
