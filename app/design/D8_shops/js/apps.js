@@ -11,6 +11,8 @@ import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } fro
 import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCallTgas, quoteRecipient, stepsAllowanceYocto, WRAP } from '/panels/ferry-settle.js';
 import { freezePlan } from '/panels/guard-agent.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
+import { missingCross } from '/foreign-path.js';
+import { callAsMessage, crossArgs, unitsOf } from '/board-call-as.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 const onMain = () => true;
@@ -372,16 +374,70 @@ export function ruleFor(o, clauseId = 'pay') {
   return c ? `allowed · within your ${clauseId === 'pay' ? 'max per payment' : 'Ferry route max'} ${fmt(c.per_action_cap)}` : 'allowed';
 }
 
-export const TOLL_MAIN = 0.001;
-export async function toll() {
-  // City session only. A missing board row or a key that cannot call propose must not open a wallet or ask.
+export async function toll(quote) {
+  // The gold button and the agent call this. It signs propose_call_as on the board.
+  // The session key never calls cross or sign_cross, and this does not open a wallet.
+  // Paid on Base is a later Base receipt. This call only opens the order.
   if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
-  if (!TS.tollAllowed(pay()?.receivers)) throw new Error(TS.TOLL_NOT_LISTED);
+  if (!quote?.payable || !quote.feeYocto) throw new Error(quote?.hint || 'The live policy has no visitor fee. Nothing was signed.');
+  const miss = missingCross(quote);
+  if (miss) throw new Error(miss);
   const key = agent();
-  if (!key || !await proposeAccessKey(key)) throw new Error('Set up your agent in /setup. Nothing was signed.');
-  return boardPay({ shop: 'toll', receiver: TS.TOLL_ACCT, amountY: toY(TOLL_MAIN) });
+  const ak = key ? await proposeAccessKey(key) : null;
+  if (!key || !ak) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  const names = ak.permission?.FunctionCall?.method_names || [];
+  if (names.length && !names.includes('propose_call_as')) {
+    throw new Error('This key can call propose. It cannot call propose_call_as. Renew it in /setup. Nothing was signed.');
+  }
+  const gas = 150n * TG;
+  const allowance = BigInt(ak.permission?.FunctionCall?.allowance || 0);
+  if (allowance < gas / TG * 10n ** 21n) throw new Error('The session key allowance cannot buy this call. Nothing was signed.');
+  const row = await view(S.board, 'get_charter', { owner: S.me });
+  if (!row) throw new Error('no charter row yet: finish setup first');
+  if (W.pubkeyHex(key) !== String(row.agent || '')) throw new Error('This browser is not the agent on the row. Nothing was signed.');
+  const shop = TS.TOLL_ACCT;
+  const receivers = row.receivers || [];
+  if (receivers.length && !receivers.includes(shop)) throw new Error('Add toll.nearcarta.near in /setup. Nothing was signed.');
+  const decimals = quote.asset === 'usdc' ? 6 : 18;
+  let units;
+  try { units = unitsOf(quote.amount, decimals); }
+  catch (e) { throw new Error(e.message || 'Name the amount. Nothing was signed.'); }
+  if (quote.asset === 'native' && quote.maxPerTx && BigInt(units) > BigInt(quote.maxPerTx)) {
+    throw new Error('That is over the contract cap. Nothing was signed.');
+  }
+  if (quote.asset === 'usdc' && quote.maxToken && BigInt(units) > BigInt(quote.maxToken)) {
+    throw new Error('That is over the contract cap. Nothing was signed.');
+  }
+  const nonce = String(row.nonce ?? '0').replace(/^0+(?=\d)/, '');
+  const args = crossArgs({ actionId: nonce, chain: 'base', asset: quote.asset, to: String(quote.to).toLowerCase(), amount: units, rowBudget: units });
+  const effects = [{ chain: 'base', asset: quote.asset, to: String(quote.to).toLowerCase(), value: units, fee: '0' }];
+  const expiry = (BigInt(Date.now()) * 1_000_000n + 3_600_000_000_000n).toString();
+  const deposit = String(quote.feeYocto);
+  const signature = W.signMessage(key, callAsMessage({
+    network: 'mainnet', contract: S.board, owner: S.me, receiver: shop, method: 'cross',
+    args, deposit, nonce, expiry, epoch: String(row.epoch ?? '0'), effects, hold: false,
+  }));
+  const call = {
+    owner: S.me, receiver: shop, method: 'cross', args, deposit, expiry, effects, hold: false, signature,
+  };
+  try {
+    const signed = W.signTx({
+      key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+      actions: [W.functionCall('propose_call_as', call, gas)],
+    });
+    const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+    if (!sent.ok) {
+      const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+      return settled('toll', { tx: signed.hash, decision: 'denied', reason, action: nonce, amount: deposit, receiver: shop, fromChain: true, signer: 'agent' });
+    }
+    return settled('toll', { tx: signed.hash, decision: 'allowed', reason: 'ok', action: nonce, amount: deposit, receiver: shop, signer: 'agent' });
+  } catch (e) {
+    const code = refusalOf(e);
+    if (code || e.tx) return settled('toll', { tx: e.tx || null, decision: 'denied', reason: code || String(e.message || e).slice(0, 160), action: nonce, amount: deposit, receiver: shop, fromChain: !!e.tx });
+    throw e;
+  }
 }
-// Older gate calls stay for a wallet that already started one. A new toll is the 0.001 NEAR board payment above.
+// Older gate calls stay for a wallet that already started one. A new toll is the policy fee on the board.
 const LS_TOLL = c => 'nearcarta.d8.toll.' + c;
 export const tollVisit = () => (S.charter ? JSON.parse(localStorage.getItem(LS_TOLL(S.charter)) || 'null') : null);
 const saveVisit = v => S.charter && localStorage.setItem(LS_TOLL(S.charter), JSON.stringify(v));

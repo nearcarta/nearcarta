@@ -23,7 +23,7 @@ test('the toll gate is the mainnet contract', () => {
   const g = gate();
   assert.equal(g.network, 'mainnet');
   assert.equal(g.contract, 'toll.nearcarta.near');
-  assert.equal(g.amount_near, '0.001');
+  assert.equal(g.amount_near, null);
   assert.equal(retiredNet.test(JSON.stringify(g)), false);
 });
 

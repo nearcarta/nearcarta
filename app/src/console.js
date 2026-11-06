@@ -183,7 +183,7 @@ async function toll() {
   const d = await get('/api/mainnet');
   const t = d?.toll;
   if (!t?.txs) throw new Error('The toll record is not in this response.');
-  $('#toll .out').innerHTML = `<div class="card" data-testid="toll-state">Toll ${acct(t.contract)} · 0.001 NEAR pass on mainnet · recorded chain-signature proof · chain id ${esc(d.chain_id)} · the foreign chain was not paid from this gate<br>
+  $('#toll .out').innerHTML = `<div class="card" data-testid="toll-state">Toll ${acct(t.contract)} · live policy on mainnet · recorded chain-signature proof · chain id ${esc(d.chain_id)} · a signature is not a Base payment<br>
     Allowed ${tx(t.txs.owner_toll_pay_allowlisted)} · refused ${tx(t.txs.owner_toll_pay_not_allowlisted)}</div>`;
 }
 

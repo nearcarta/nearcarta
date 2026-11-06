@@ -21,7 +21,7 @@ import { armGuardDock, dispatchGuardDock, ensureGuardDock, installGuardDock } fr
 import { hideBankDock } from '/panels/bank-tray.js';
 import { capFromSetup } from '/panels/bank-audit.js';
 import { armTollDock, dispatchTollDock, installTollDock } from '/panels/toll-dock.js';
-import { mergeTollChronicle, nextRowBalance, passPaidCopy, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
+import { mergeTollChronicle, nextRowBalance, passPaidCopy, policyQuote, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
 import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, splitAssets, prepareRows } from './payouts.js';
 import { cinemaOk, sealText } from '/panels/payouts-plan.js';
@@ -77,6 +77,7 @@ function ensureTollDock() {
       <p id="t-agent-log" class="toll-agent-log" data-testid="toll-agent-log" hidden></p>
       <div class="toll-agent-chips" role="group" aria-label="Toll commands">
         <button type="button" class="toll-chip" data-toll-chip="Pay the toll">Pay the toll</button>
+        <button type="button" class="toll-chip" data-toll-chip="Pay the toll on Base">Pay the toll on Base</button>
         <button type="button" class="toll-chip" data-toll-chip="Check signature">Check signature</button>
         <button type="button" class="toll-chip" data-toll-chip="Show policy">Show policy</button>
       </div>
@@ -548,7 +549,7 @@ const STEPS = {
   hall: ['about 15 s', 'Writing the proposal', 'Signing on NEAR', 'Waiting for the council'],
   payouts: ['about 15 s', 'Checking every payout against your charter', 'Sending one payment on NEAR', 'Confirming'],
   house: ['about 10 s', 'Reading your charter', 'Counting your history'],
-  toll: ['about 30 s', 'Paying the 0.001 NEAR pass from your charter', 'Recording the pass', 'Recording the chain-signature proof'],
+  toll: ['about 30 s', 'Paying the policy fee from your charter', 'Recording the pass', 'Checking the foreign receipt'],
 };
 let prog = null;
 const stepLine = s => s;
@@ -611,11 +612,11 @@ async function tollStep(v, act, o) {
   const links = [split, A.txLine(v.pay_tx, 'gate'), st.tx_hash && (st.accepted || st.base || late) ? BSC(st.tx_hash) : '', v.settle_tx ? A.txLine(v.settle_tx, 'settle') : ''].join(' ');
   const rc = `<span class="rc" data-testid="toll-status" data-status="${esc(st.status)}" data-phase="${esc(st.phase || '')}">Status: ${esc(st.label || st.status)}</span> ${links}`;
   if (st.status === 'confirmed') { A.tollDone(v); return { o, kind: 'ok', rule: 'confirmed · recorded chain-signature proof', hero: num('✓', 'confirmed'), rc,
-    say: 'Confirmed. The 0.001 NEAR pass is on mainnet, and the chain-signature proof is recorded.' }; }
+    say: 'Confirmed. The NEAR pass is on mainnet. A Base payment needs its own receipt.' }; }
   if (st.settle) return { o, keep: true, kind: 'ok', rule: 'paid · proof recorded', rc, say: 'The proof is ready to record on NEAR.' };
   tollWatch(v, st);
-  return { o, keep: true, kind: 'ok', rule: 'paid · 0.001 NEAR pass', rc,
-    say: `The 0.001 NEAR pass is on mainnet. A recorded chain-signature proof sits beside it. This gate does not send your NEAR to another chain. <b data-testid="toll-leave">You can leave.</b>` };
+  return { o, keep: true, kind: 'ok', rule: 'paid · NEAR pass', rc,
+    say: `The NEAR pass is on mainnet. This receipt is not a Base payment. <b data-testid="toll-leave">You can leave.</b>` };
 }
 // Live countdown while Base finalizes; re-reads the gate every 20 s and settles as soon as it is final.
 let watch = null;
@@ -651,16 +652,21 @@ function tollPassRows() {
       decision: r.decision === 'allowed' ? 'allowed' : 'denied',
       reason: r.reason || '',
       h: r.h,
-      label: r.decision === 'allowed' ? '0.001 NEAR pass' : A.why(r.reason),
+      label: r.decision === 'allowed' ? 'NEAR pass' : A.why(r.reason),
     }));
   } catch { mine = []; }
   return [...saved, ...mine];
 }
-async function tollPay() {
+async function tollPay(quote) {
   sh?.hideRefuse?.();
   const ready = !!(A.S.ready && A.stage() === 'ready' && A.S.board);
   if (!ready) {
     const hint = 'Set up your agent in /setup. Nothing was signed.';
+    extra.seal = hint;
+    return { ok: false, hint, keep: true, kind: 'no', say: hint, refused: false };
+  }
+  if (!quote?.payable || !quote.feeYocto) {
+    const hint = quote?.hint || 'The live policy has no visitor fee. Nothing was signed.';
     extra.seal = hint;
     return { ok: false, hint, keep: true, kind: 'no', say: hint, refused: false };
   }
@@ -675,6 +681,7 @@ async function tollPay() {
     expiresAtNs: row.expires_at,
     nowNs: (BigInt(Date.now()) * 1_000_000n).toString(),
     frozen: !!row.frozen,
+    amountYocto: quote.feeYocto,
   });
   if (why) {
     extra.seal = why;
@@ -682,7 +689,7 @@ async function tollPay() {
     return { ok: false, hint: why, refused: true, keep: true, kind: 'no', say: why };
   }
   let o;
-  try { o = await A.toll(); }
+  try { o = await A.toll(quote); }
   catch (e) {
     const hint = String(A.plainError(e) || e.message || 'The pass did not run.').slice(0, 160);
     extra.seal = hint;
@@ -696,17 +703,19 @@ async function tollPay() {
     if (o?.tx) rememberTollPass({ h: o.tx, decision: 'denied', reason: o.reason || '', label: 'refused' });
     return { ok: false, o, hint, refused: true, keep: true, kind: 'no', say: hint, rc: A.txLine(o?.tx) };
   }
-  rememberTollPass({ h: o.tx, decision: 'allowed', reason: '', label: '0.001 NEAR pass' });
+  rememberTollPass({ h: o.tx, decision: 'allowed', reason: '', label: `${quote.feeNear} NEAR pass` });
   extra.seal = '';
   extra.passTx = o.tx;
-  if (A.S.boardRow?.balance != null) {
-    try { A.S.boardRow = { ...A.S.boardRow, balance: (BigInt(A.S.boardRow.balance) - (10n ** 21n)).toString() }; }
+  let fee;
+  try { fee = BigInt(quote.feeYocto); } catch { fee = 0n; }
+  if (A.S.boardRow?.balance != null && fee > 0n) {
+    try { A.S.boardRow = { ...A.S.boardRow, balance: (BigInt(A.S.boardRow.balance) - fee).toString() }; }
     catch { /* the reply still names the balance we computed */ }
   }
-  const balanceNear = nextRowBalance(row.balance);
+  const balanceNear = nextRowBalance(row.balance, fee);
   sh?.hideRefuse?.();
   if (sh?.act && runScene) runScene(sh.act({ success: true }));
-  const sayText = passPaidCopy({ balanceNear });
+  const sayText = passPaidCopy({ balanceNear, feeNear: quote.feeNear, to: quote.to });
   return { ok: true, o, tx: o.tx, balanceNear, hint: sayText, success: true, keep: true, kind: 'ok', say: sayText, rc: A.txLine(o.tx) };
 }
 
@@ -775,8 +784,8 @@ async function sendPayoutRows(rows, opts = {}) {
 
 const APPS = {
   toll: {
-    label: 'Toll Bridge · pay-per-use gate', idle: 'Total cost: 0.001 NEAR. One payment. Your charter checks it. A refusal pays nothing.',
-    btn: () => 'Pay 0.001 NEAR',
+    label: 'Toll Bridge · pay-per-use gate', idle: 'The fee, the chain and the recipient come from the live policy. A refusal pays nothing.',
+    btn: () => 'Pay the policy fee',
     hero: () => null,
     guest: true,
     form: () => '<div data-deep="toll"></div>',
@@ -787,14 +796,16 @@ const APPS = {
         row: () => A.S.boardRow || null,
         account: () => A.S.me || '',
         passes: () => tollPassRows(),
-        onPay: () => tollPay(),
+        onPay: (quote) => tollPay(quote),
+        onBroadcast: () => fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + '/api/toll/broadcast', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, text: 'The broadcast did not answer. Nothing moved on Base.' })),
+        onBasePaid: () => { if (sh?.act && runScene) runScene(sh.act({ basePaid: true })); },
         hideRefuse: () => sh?.hideRefuse?.(),
         showRefuse: (text) => sh?.showRefuse?.(text),
       };
       mountShop('toll', document.getElementById('t-form'), hooks);
       wireTollDock(hooks);
     },
-    run: async () => tollPay(),
+    run: async () => tollPay(extra.live?.quote || policyQuote(extra.live?.ok ? extra.live : { ok: false })),
   },
   ferry: {
     label: 'Ferry · cross-chain swap', idle: 'Fund NEAR once in /setup. Swap about 0.05 wNEAR on NEAR. Guest Load cargo is a demo.',
@@ -1062,7 +1073,7 @@ function tollGate() {
   if (g.error) return { list: '<p class="note" data-testid="gate-error">The gate did not answer. <button type="button" data-retry-gate>Retry</button></p>', more: '' };
   const low = g.gas?.low ? `<p class="warn" data-testid="gas-warning-row">Low gas: ${esc(g.gas.warning)}</p>` : '';
   return { list: low + (g.recent || []).map(row).join(''),
-    more: kv('Gate', idChip(g.gate)) + kv('Signer', esc(g.mpc)) + kv('Recorded address', idChip(g.policy.allow_to[0], `${esc(g.foreign_explorer)}`))
+    more: kv('Gate', idChip(g.gate)) + kv('Signer', esc(g.mpc)) + (g.policy?.allow_to?.[0] ? kv('Old allow list', idChip(g.policy.allow_to[0], `${esc(g.foreign_explorer)}`)) : kv('Visitor path', 'row:{account}:base'))
       + (g.gas && g.gas.visits_left_at_cap != null ? kv('Gas left', `${esc(g.gas.visits_left_at_cap)} visits`) : '') };
 }
 // Guardhouse, under Details: the same pay clause re-checked by OutLayer in a TEE, with its attestation. The charter stays the final gate.
@@ -1150,7 +1161,7 @@ function proofDrawer() {
   const mine = S.charter ? A.receipts().filter(r => (cur === 'house' ? true : r.shop === cur)) : [];
   mine.sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0));
   const top = newestReceipt(mine);
-  if (!latest && cur === 'toll' && extra.tst) { const st = extra.tst; latest = card({ d: st.status === 'confirmed' ? 'allowed' : st.status, title: 'Your visit', why: esc(st.status === 'confirmed' ? 'Proof recorded on NEAR.' : '0.001 NEAR pass on mainnet. The chain-signature proof is recorded separately.'), link: `<span class="note">#${esc(st.nonce)}</span>` }); }
+  if (!latest && cur === 'toll' && extra.tst) { const st = extra.tst; latest = card({ d: st.status === 'confirmed' ? 'allowed' : st.status, title: 'Your visit', why: esc(st.status === 'confirmed' ? 'Proof recorded on NEAR.' : 'NEAR pass on mainnet. A Base payment needs its own receipt.'), link: `<span class="note">#${esc(st.nonce)}</span>` }); }
   if (!latest && top) { const r = top; latest = card({ d: r.decision, amt: r.amt ? fmt(r.amt) : '', to: r.to || '', why: r.decision === 'allowed' ? '' : esc(A.why(r.reason)), link: A.txLine(r.h) }); }
   h += latest;
   // 4. history
