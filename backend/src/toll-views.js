@@ -1,7 +1,8 @@
 // Live toll views. Read-only. policy, get_tx. No signature and no broadcast.
 // U64 view args are numbers here: a JSON string GuestPanics on deserialize. https://docs.near.org/chain-abstraction/chain-signatures/implementation
 import { readFileSync } from 'node:fs';
-import { assembleTollLive } from '../../app/src/panels/toll-room.js';
+import { assembleTollLive, describeVisitorPass } from '../../app/src/panels/toll-room.js';
+export { describeVisitorPass };
 
 export function tollContractId() {
   const dep = JSON.parse(readFileSync(new URL('../../shared/deployments/mainnet.json', import.meta.url), 'utf8'));

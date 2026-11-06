@@ -361,24 +361,12 @@ export function ruleFor(o, clauseId = 'pay') {
 
 export const TOLL_MAIN = 0.001;
 export async function toll() {
-  // Only ever pay the toll account itself. If it is not on the allowlist, refuse before any signing.
-  // A function-call key that cannot call propose must not fall through to the wallet.
-  if (S.board) { if (!TS.tollAllowed(pay()?.receivers)) throw new Error(TS.TOLL_NOT_LISTED);
-    const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
-    if (!await proposeAccessKey(key)) throw new Error('This browser key cannot call propose. Open /setup. Nothing was signed.');
-    return boardPay({ shop: 'toll', receiver: TS.TOLL_ACCT, amountY: toY(TOLL_MAIN) }); }
-  const payee = merchants()[0];
-  if (!TS.canSplit(pay()?.receivers, payee, canBatch())) return ask({ shop: 'toll', receiver: payee, amountY: toY(TOLL_MAIN), memo: 'toll' });
-  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
-  const st = await view(S.charter, 'get_state');
-  const b = TS.planSplit({ payee, nonce: st.next_nonce, policy: st.policy_version, nowMs: Date.now() });
-  const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: S.charter, public_key: key.publicKey });
-  const signed = W.signTx({ key, signerId: S.charter, receiverId: S.charter, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
-    actions: [W.functionCall('propose_batch', { ps: b.ps }, BigInt(b.gasTgas) * TG)] });
-  const r = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
-  const v = r.ok ? P.readBatch(r.value, b.n) : { decision: 'failed', reason: r.error, ids: [] };
-  keep(signed.hash, 'toll', v.decision, v.reason); readRules().catch(() => {});
-  return { tx: signed.hash, decision: v.decision, reason: v.reason, action: v.ids?.[0] ?? null, amount: b.ps[0].amount, receiver: payee, split: b.legs, split_ids: v.ids };
+  // City session only. A missing board row or a key that cannot call propose must not open a wallet or ask.
+  if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  if (!TS.tollAllowed(pay()?.receivers)) throw new Error(TS.TOLL_NOT_LISTED);
+  const key = agent();
+  if (!key || !await proposeAccessKey(key)) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  return boardPay({ shop: 'toll', receiver: TS.TOLL_ACCT, amountY: toY(TOLL_MAIN) });
 }
 // Older gate calls stay for a wallet that already started one. A new toll is the 0.001 NEAR board payment above.
 const LS_TOLL = c => 'nearcarta.d8.toll.' + c;

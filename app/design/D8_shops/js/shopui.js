@@ -18,7 +18,7 @@ import { pairHero } from '/panels/token-badge.js';
 import { agentDeliveredNote, depositPlan, explainQuoteMiss, mayCheckout, nearNative, nextFerryBeat, pickWrapSpend, SESSION_SWAP } from '/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
 import { armTollDock, dispatchTollDock, installTollDock } from '/panels/toll-dock.js';
-import { mergeTollChronicle, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
+import { mergeTollChronicle, nextRowBalance, passPaidCopy, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
 import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues, prepareRows } from './payouts.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
@@ -70,6 +70,11 @@ function ensureTollDock() {
   d.setAttribute('data-testid', 'toll-agent-dock');
   d.innerHTML = `<div id="toll-agent-pop" class="toll-agent-pop" data-testid="toll-agent" hidden>
       <p id="t-agent-log" class="toll-agent-log" data-testid="toll-agent-log" hidden></p>
+      <div class="toll-agent-chips" role="group" aria-label="Toll commands">
+        <button type="button" class="toll-chip" data-toll-chip="Pay the toll">Pay the toll</button>
+        <button type="button" class="toll-chip" data-toll-chip="Check signature">Check signature</button>
+        <button type="button" class="toll-chip" data-toll-chip="Show policy">Show policy</button>
+      </div>
       <div class="toll-agent-row">
         <input id="t-agent" data-testid="toll-agent-input" placeholder="Pay the toll" autocomplete="off" aria-label="Ask the AI Agent">
         <button type="button" class="toll-agent-send" id="t-agent-go" data-testid="toll-agent-go" aria-label="Send">➤</button>
@@ -96,6 +101,15 @@ function wireTollDock(hooks) {
       const open = pop.hasAttribute('hidden');
       pop.toggleAttribute('hidden', !open);
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    d.querySelectorAll('[data-toll-chip]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const input = d.querySelector('#t-agent');
+        if (input) input.value = chip.getAttribute('data-toll-chip') || '';
+        pop?.removeAttribute('hidden');
+        toggle?.setAttribute('aria-expanded', 'true');
+        dispatchTollDock(document);
+      });
     });
   }
   armTollDock((text) => {
@@ -544,7 +558,7 @@ async function tollPay() {
   sh?.hideRefuse?.();
   const ready = !!(A.S.ready && A.stage() === 'ready' && A.S.board);
   if (!ready) {
-    const hint = 'Open /setup to fund the row and add toll.nearcarta.near. Nothing was signed.';
+    const hint = 'Set up your agent in /setup. Nothing was signed.';
     extra.seal = hint;
     return { ok: false, hint, keep: true, kind: 'no', say: hint, refused: false };
   }
@@ -583,10 +597,15 @@ async function tollPay() {
   rememberTollPass({ h: o.tx, decision: 'allowed', reason: '', label: '0.001 NEAR pass' });
   extra.seal = '';
   extra.passTx = o.tx;
+  if (A.S.boardRow?.balance != null) {
+    try { A.S.boardRow = { ...A.S.boardRow, balance: (BigInt(A.S.boardRow.balance) - (10n ** 21n)).toString() }; }
+    catch { /* the reply still names the balance we computed */ }
+  }
+  const balanceNear = nextRowBalance(row.balance);
   sh?.hideRefuse?.();
   if (sh?.act && runScene) runScene(sh.act({ success: true }));
-  const sayText = '0.001 NEAR is on mainnet. This pass does not pay Base.';
-  return { ok: true, o, hint: sayText, success: true, keep: true, kind: 'ok', say: sayText, rc: A.txLine(o.tx) };
+  const sayText = passPaidCopy({ balanceNear });
+  return { ok: true, o, tx: o.tx, balanceNear, hint: sayText, success: true, keep: true, kind: 'ok', say: sayText, rc: A.txLine(o.tx) };
 }
 
 // ---------- shop apps ----------
@@ -602,6 +621,8 @@ const APPS = {
       const hooks = {
         state: extra,
         row: () => A.S.boardRow || null,
+        account: () => A.S.me || '',
+        passes: () => tollPassRows(),
         onPay: () => tollPay(),
         hideRefuse: () => sh?.hideRefuse?.(),
         showRefuse: (text) => sh?.showRefuse?.(text),
