@@ -8,7 +8,7 @@ import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
-import { boardCallText, cityCheckoutBody, PROPOSE_CALL_TGAS, proposeCallAllowanceOk, quoteRecipient } from '/panels/ferry-settle.js';
+import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCallTgas, quoteRecipient, stepsAllowanceYocto, WRAP } from '/panels/ferry-settle.js';
 import { freezePlan } from '/panels/guard-agent.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
@@ -21,12 +21,12 @@ const fromY = y => Number(BigInt(y || 0) / 10n ** 18n) / 1e6;
 const fmt = y => +fromY(y).toFixed(4) + ' NEAR';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const short = (h, a = 6, b = 4) => h ? (h.length > a + b + 1 ? h.slice(0, a) + '…' + h.slice(-b) : h) : '';
-const UA = 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex';
 const REFUND = '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e';
-const REFUND_NEAR = 'nearcarta.near';
 const refundFor = (from) => {
   const chain = String(from || '').split('@')[1] || '';
-  return chain.toLowerCase() === 'near' ? REFUND_NEAR : REFUND;
+  // A NEAR-origin swap refunds to the visitor. Never a treasury account, never a hardcoded address.
+  if (chain.toLowerCase() === 'near') return isNearAccountId(S.me) ? S.me : '';
+  return REFUND;
 };
 // Shortcut corridors for the city Ferry room (quick ZEC picks). The live picker
 // loads the full 1Click list via /api/ferry/tokens (~215 tokens / 38 chains).
@@ -63,8 +63,11 @@ const PLAIN = [
   [/oath frozen/, 'the Toll is paused by its owner'],
   [/attach at least|Exceeded the prepaid gas|ERR_LOW_GAS/, 'the network ran out of gas for this step; try again'],
   [/expired|Expired/, 'the request expired before the network took it; try again'],
+  // wrap.near ft_transfer when the board holds less wNEAR than the plan (near_deposit kept storage).
+  [/The account doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
+  [/doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
   [/NotEnoughBalance|not enough balance/i, 'your account does not have enough NEAR for this step'],
-  [/NotEnoughAllowance/, 'the session key does not have enough gas allowance for this ask. Nothing was paid.'],
+  [/NotEnoughAllowance/, 'the session key does not have enough gas allowance for this ask'],
 ];
 export function plainError(e) {
   const m = String(e?.message || e || '');
@@ -359,21 +362,12 @@ export function ruleFor(o, clauseId = 'pay') {
 
 export const TOLL_MAIN = 0.001;
 export async function toll() {
-  // Only ever pay the toll account itself. If it is not on the allowlist, refuse before any signing.
-  if (S.board) { if (!TS.tollAllowed(pay()?.receivers)) throw new Error(TS.TOLL_NOT_LISTED);
-    return boardPay({ shop: 'toll', receiver: TS.TOLL_ACCT, amountY: toY(TOLL_MAIN) }); }
-  const payee = merchants()[0];
-  if (!TS.canSplit(pay()?.receivers, payee, canBatch())) return ask({ shop: 'toll', receiver: payee, amountY: toY(TOLL_MAIN), memo: 'toll' });
-  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
-  const st = await view(S.charter, 'get_state');
-  const b = TS.planSplit({ payee, nonce: st.next_nonce, policy: st.policy_version, nowMs: Date.now() });
-  const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: S.charter, public_key: key.publicKey });
-  const signed = W.signTx({ key, signerId: S.charter, receiverId: S.charter, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
-    actions: [W.functionCall('propose_batch', { ps: b.ps }, BigInt(b.gasTgas) * TG)] });
-  const r = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
-  const v = r.ok ? P.readBatch(r.value, b.n) : { decision: 'failed', reason: r.error, ids: [] };
-  keep(signed.hash, 'toll', v.decision, v.reason); readRules().catch(() => {});
-  return { tx: signed.hash, decision: v.decision, reason: v.reason, action: v.ids?.[0] ?? null, amount: b.ps[0].amount, receiver: payee, split: b.legs, split_ids: v.ids };
+  // City session only. A missing board row or a key that cannot call propose must not open a wallet or ask.
+  if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  if (!TS.tollAllowed(pay()?.receivers)) throw new Error(TS.TOLL_NOT_LISTED);
+  const key = agent();
+  if (!key || !await proposeAccessKey(key)) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  return boardPay({ shop: 'toll', receiver: TS.TOLL_ACCT, amountY: toY(TOLL_MAIN) });
 }
 // Older gate calls stay for a wallet that already started one. A new toll is the 0.001 NEAR board payment above.
 const LS_TOLL = c => 'nearcarta.d8.toll.' + c;
@@ -416,21 +410,27 @@ export async function tollServerSettle(v) {
   gateMemo = null; return s;
 }
 
-export async function quote(route, amount, to = 'ZEC@zec') {
+export async function quote(route, amount, to = 'ZEC@zec', receiveAt) {
   const rt = ROUTES.find(r => r.id === route);
   const from = rt?.from || (typeof route === 'string' && route.includes('@') ? route : null);
   if (!from) throw new Error('Unknown ferry route');
-  return quotePair(from, to, amount);
+  return quotePair(from, to, amount, receiveAt);
 }
 /** Dry quote for any 1Click pair (symbol@chain). Used by the city Ferry live picker. */
-export async function quotePair(from, to, amount) {
+export async function quotePair(from, to, amount, receiveAt) {
   const dest = to || 'ZEC@zec';
-  // USDC on NEAR is DESTINATION_CHAIN: the recipient is this visitor's NEAR account.
-  // A Zcash unified address is rejected by 1Click for that corridor ("recipient is not valid").
-  const recipient = quoteRecipient(dest, S.me, UA);
-  if (!recipient) return { ok: false, error: 'A NEAR destination needs your NEAR account as the recipient. Sign in, then get the quote again.' };
+  // DESTINATION_CHAIN: NEAR pays the visitor. Any other chain pays only the address they typed.
+  const recipient = quoteRecipient(dest, S.me, receiveAt);
+  if (!recipient) {
+    const near = String(dest).toLowerCase().endsWith('@near');
+    return { ok: false, error: near
+      ? 'A NEAR destination needs your NEAR account as the recipient. Sign in, then get the quote again.'
+      : 'Enter the address on the destination chain that should receive the tokens.' };
+  }
+  const refundTo = refundFor(from);
+  if (!refundTo) return { ok: false, error: 'A NEAR refund needs your NEAR account. Sign in, then get the quote again.' };
   return api('/api/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ from, to: dest, amount: String(amount), recipient, refundTo: refundFor(from), privacy: 'basic' }) });
+    body: JSON.stringify({ from, to: dest, amount: String(amount), recipient, refundTo, privacy: 'basic' }) });
 }
 // A dry quote. Paying it is a board propose, inside the visitor's cap.
 // Payee: ferry-route clause receivers if present; else the board/pay allowlist (open_charter receivers).
@@ -465,13 +465,28 @@ export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receive
 /** Deposit address after the charter view allows the payee. At most 0.20 USD. Does not send the tokens. */
 export async function openFerryCheckout(q, pair) {
   const charter = S.board ? S.me : S.charter;
+  // Charter gate: an allowlisted shop. 1Click recipient is swap_recipient (visitor on NEAR,
+  // or the address they typed on any other chain). Never a hardcoded Zcash address.
   const recipient = ferryPayee('pay');
+  const dest = pair?.to || (q?.to ? `${q.to.symbol}@${q.to.chain || q.to.blockchain || ''}` : '');
   const amountYocto = String(S.boardRow?.min_amount || S.clauses?.pay?.min_amount || '1');
   if (!charter || !recipient) return { ok: false, reason: 'no_charter', depositAddress: null };
-  const body = cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo: refundFor(pair.from), visitor: S.me, session: S.board ? 'board' : undefined });
+  const refundTo = refundFor(pair?.from);
+  if (!refundTo) return { ok: false, error: 'A NEAR refund needs your NEAR account. Sign in, then get the quote again.', depositAddress: null };
+  const body = cityCheckoutBody({ pair: { ...pair, to: dest, receiveAt: pair?.receiveAt || '' }, recipient, charter, amountYocto, refundTo, visitor: S.me, session: S.board ? 'board' : undefined });
+  if (!body.swap_recipient) {
+    const near = body.to?.chain === 'near';
+    return {
+      ok: false,
+      error: near
+        ? 'A NEAR destination needs a NEAR account as recipient. Use the visitor account (64 hex or a named account).'
+        : 'Enter the address on the destination chain that should receive the tokens.',
+      depositAddress: null,
+    };
+  }
   const r = await fetch(API + '/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null };
+  if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null, error: j.error || j.reason || null };
   return j;
 }
 
@@ -480,6 +495,27 @@ export async function ferryStatus(depositAddress) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'status ' + r.status);
   return j;
+}
+
+/**
+ * wrap.near storage_balance_of for any account (board or a 1Click deposit address).
+ */
+export async function wrapStorageOf(accountId) {
+  if (!accountId) return null;
+  return view(WRAP, 'storage_balance_of', { account_id: accountId }).catch(() => null);
+}
+
+/**
+ * wrap.near storage + wNEAR balance for the board account that signs propose_call.
+ * near_deposit auto-registers the board and keeps WRAP_STORAGE_YOCTO on first deposit.
+ */
+export async function wrapBoardState(board = S.board) {
+  if (!board) return { registered: false, balanceYocto: '0', storage: null };
+  const storage = await wrapStorageOf(board);
+  const raw = await view(WRAP, 'ft_balance_of', { account_id: board }).catch(() => '0');
+  const balanceYocto = String(raw?.amount ?? raw ?? '0');
+  const registered = !!(storage && (storage.total != null || storage.available != null));
+  return { registered, balanceYocto, storage };
 }
 
 /**
@@ -494,34 +530,59 @@ export async function ferryProposeCalls(steps) {
   const ak0 = await proposeAccessKey(key);
   const names = ak0?.permission?.FunctionCall?.method_names || [];
   if (!ak0 || (names.length && !names.includes('propose_call'))) return you('key_cannot_propose_call');
+  const list = steps || [];
   const allowance = ak0.permission.FunctionCall.allowance;
-  if (allowance && !proposeCallAllowanceOk(allowance)) return you('not_enough_allowance');
-  const txs = [];
-  for (const step of steps || []) {
+  // Prepaid gas for every remaining step. Do not start the wrap if the key cannot finish it.
+  if (allowance && BigInt(allowance) < stepsAllowanceYocto(list)) {
+    return you('not_enough_allowance', { txs: [], landed: [] });
+  }
+  const landed = [];
+  for (let i = 0; i < list.length; i++) {
+    const step = list[i];
     const row = await view(S.board, 'get_charter', { owner: S.me });
-    if (!row) return you('no_row', { txs });
+    if (!row) return you('no_row', { txs: landed.map(s => s.tx), landed });
     S.boardRow = row;
     const argsStr = typeof step.args === 'string' ? step.args : JSON.stringify(step.args || {});
     const deposit = String(step.deposit);
     const argsHash = W.sha256hex(argsStr);
     const msg = boardCallText({ contract: S.board, owner: S.me, receiver: step.receiver, method: step.method, argsHash, deposit, nonce: String(row.nonce) });
     const signature = W.signMessage(key, msg);
-    const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: [...new TextEncoder().encode(argsStr)], deposit, signature };
+    const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: argsStr, deposit, signature };
     const ak = await proposeAccessKey(key);
-    if (!ak) return you('no_session_key', { txs });
+    if (!ak) return you('no_session_key', { txs: landed.map(s => s.tx), landed });
+    const left = ak.permission?.FunctionCall?.allowance;
+    if (left && BigInt(left) < stepsAllowanceYocto(list.slice(i))) {
+      return you('not_enough_allowance', { txs: landed.map(s => s.tx), landed });
+    }
+    const gasTgas = step.gasTgas || proposeCallTgas(step.method);
     try {
       const signed = W.signTx({
         key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
-        actions: [W.functionCall('propose_call', callArgs, BigInt(PROPOSE_CALL_TGAS) * TG)],
+        actions: [W.functionCall('propose_call', callArgs, BigInt(gasTgas) * TG)],
       });
       const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
-      txs.push(signed.hash);
-      if (!sent.ok) return you(refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160), { tx: signed.hash, txs });
+      if (!sent.ok) {
+        const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+        return you(reason, { tx: signed.hash, txs: landed.map(s => s.tx), landed, failed: { method: step.method, reason } });
+      }
+      landed.push({ method: step.method, tx: signed.hash, amount: step.method === 'near_deposit' ? nearAmount(deposit) : '' });
     } catch (e) {
-      return you(refusalOf(e) || String(e?.message || e).slice(0, 160), { txs });
+      const reason = refusalOf(e) || String(e?.message || e).slice(0, 160);
+      return you(reason, { txs: landed.map(s => s.tx), landed, failed: { method: step.method, reason } });
     }
   }
-  return { ok: true, youSend: false, wallet: false, txs, tx: txs.at(-1) || null };
+  return { ok: true, youSend: false, wallet: false, txs: landed.map(s => s.tx), landed, tx: landed.at(-1)?.tx || null };
+}
+
+export async function sessionAllowance() {
+  const key = agent();
+  if (!key || !S.me) return { yocto: null, near: null, low: true };
+  const ak = await proposeAccessKey(key);
+  const yocto = ak?.permission?.FunctionCall?.allowance || null;
+  const need = stepsAllowanceYocto([{ method: 'near_deposit' }, { method: 'ft_transfer' }]);
+  let low = true;
+  try { low = !yocto || BigInt(yocto) < need; } catch { low = true; }
+  return { yocto, near: yocto ? nearAmount(yocto) : null, low };
 }
 // Hide routes whose dry quote failed in the server's last probe (/api/ferry/routes); keep at least one.
 export const routesReady = api('/api/ferry/routes').then(r => {
