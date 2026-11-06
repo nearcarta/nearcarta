@@ -99,6 +99,23 @@ test('an amount over 0.20 USD never asks for a deposit address', async () => {
   assert.equal(priced.calls.length, 0);
 });
 
+test('USDC on NEAR is quoted to the visitor while the charter gate still checks the shop', async () => {
+  resetCheckouts();
+  const scholar = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8';
+  const deps = liveDeps();
+  deps.quote = async (q) => { deps.dryTo = q.recipient; return { ok: true, from: { usd: '0.05' } }; };
+  const out = await openCheckout({ ...input, amount: '0.05', swapRecipient: scholar }, deps);
+  assert.equal(out.ok, true);
+  assert.equal(deps.dryTo, scholar);
+  assert.equal(deps.calls[0].recipient, scholar);
+  assert.equal(deps.calls[0].recipientType, 'DESTINATION_CHAIN');
+  assert.equal(deps.calls[0].refundType, 'ORIGIN_CHAIN');
+  assert.equal(deps.calls[0].dry, false);
+  const refused = await openCheckout({ ...input, recipient: 'other.near', swapRecipient: scholar }, liveDeps());
+  assert.equal(refused.reason, 'receiver_not_allowlisted');
+  assert.equal(refused.depositAddress, null);
+});
+
 test('an unsigned live quote does not hand out its deposit address', () => {
   const sent = { dry: false, recipient: 'payee.near' };
   const resp = { quoteRequest: { ...sent }, quote: { depositAddress: 'ab'.repeat(32), amountInUsd: '0.2' } };

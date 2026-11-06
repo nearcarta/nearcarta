@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
-import { CALLS_DEPOSIT_YOCTO } from '../../../shared/board/session.js';
-import { formatNear, nearToYocto, rulesDiff, rulesLiveHint, signRulesUpdate, updateCostLine, updatePlan, RULES_DEPOSIT_YOCTO } from '../../../shared/setup/rules-diff.js';
+import { CALLS_DEPOSIT_YOCTO, sessionExpiresAt } from '../../../shared/board/session.js';
+import { expiresToWrite, formatExpiry, formatNear, hashesFromError, nearToYocto, plainRulesError, rulesDiff, rulesLiveHint, signRulesUpdate, txHashForMethod, updateCostLine, updatePlan, RULES_DEPOSIT_YOCTO } from '../../../shared/setup/rules-diff.js';
 
 // Scholar row recorded in mainnet.json: cap 0.005, daily 0.01, charter + toll.
 const saved = MAIN.board.visitor_run.rules;
@@ -89,6 +89,47 @@ test('the update plan is set_rules and set_calls, and set_agent only when the ke
   ]);
 });
 
+test('an update keeps the chain expiry unless the visitor changed the session', () => {
+  const chainExp = (BigInt(Date.UTC(2026, 10, 12)) * 1_000_000n).toString();
+  const now = Date.UTC(2026, 10, 5, 18);
+  const kept = expiresToWrite({ hoursEdited: false, hours: 1, chainExpiresAt: chainExp, nowMs: now });
+  assert.equal(kept, chainExp);
+  const moved = expiresToWrite({ hoursEdited: true, hours: 24, chainExpiresAt: chainExp, nowMs: now });
+  assert.equal(moved, sessionExpiresAt(24, now));
+  assert.notEqual(moved, chainExp);
+  const day = formatExpiry(chainExp);
+  const sameDate = signRulesUpdate({ live: true, local: { ...edited, expiresAt: chainExp }, row: { ...chain, expires_at: chainExp } });
+  assert.match(sameDate.html, new RegExp(`data-testid="diff-expires">Expires: ${day} → ${day}`));
+  assert.match(sameDate.html, /diff-cap/);
+  const hoursOnly = signRulesUpdate({
+    live: true,
+    local: { cap: saved.per_action_cap_near, daily: saved.daily_budget_near, per: saved.max_actions_per_day, receivers: [...saved.receivers], expiresAt: moved },
+    row: { ...chain, expires_at: chainExp },
+  });
+  assert.equal(hoursOnly.changed, true);
+  assert.match(hoursOnly.html, new RegExp(`Expires: ${day} → ${formatExpiry(moved)}`));
+  assert.doesNotMatch(hoursOnly.html, /diff-cap|diff-daily|diff-per|diff-receivers/);
+});
+
+test('a partial batch says which part failed and keeps the set_rules hash', () => {
+  const panic = Object.assign(new Error('Smart contract panicked: ERR_RECEIVERS'), { txHash: 'EETg1qxxwtatHj8fwSQTxoRQJ18DTFc3mJmF5icFnVvp' });
+  assert.equal(plainRulesError(panic, { rulesSaved: true }), 'set_rules was saved. set_calls was refused: the shop list repeats an account and a method, or it names more than 8.');
+  assert.equal(plainRulesError(panic, { rulesSaved: false }), 'set_calls was refused: the shop list repeats an account and a method, or it names more than 8.');
+  assert.deepEqual(hashesFromError(panic), ['EETg1qxxwtatHj8fwSQTxoRQJ18DTFc3mJmF5icFnVvp']);
+  const rows = [
+    { receiver_account_id: 'board.nearcarta.near', transaction_hash: 'EETg1qxxwtatHj8fwSQTxoRQJ18DTFc3mJmF5icFnVvp', actions: [{ method: 'set_calls' }], outcomes: { status: false } },
+    { receiver_account_id: 'board.nearcarta.near', transaction_hash: 'DZjXkP1DwkXmYerQwyH2SAggjcxSCdqUREcujxnucysF', actions: [{ method: 'set_rules' }], outcomes: { status: true } },
+  ];
+  assert.equal(txHashForMethod(rows, { contract: 'board.nearcarta.near', method: 'set_rules', ok: true }), 'DZjXkP1DwkXmYerQwyH2SAggjcxSCdqUREcujxnucysF');
+  assert.equal(txHashForMethod(rows, { contract: 'board.nearcarta.near', method: 'set_calls', ok: false }), 'EETg1qxxwtatHj8fwSQTxoRQJ18DTFc3mJmF5icFnVvp');
+  const src = readFileSync(new URL('../../../app/house/setup.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('async function updateRules'), src.indexOf('async function sign('));
+  assert.match(fn, /rememberPartial/);
+  assert.match(src, /plainRulesError/);
+  assert.match(src, /hoursEdited/);
+  assert.match(src, /callsFailedPanel/);
+});
+
 test('setup paints the update panel and signs that plan in one wallet batch', () => {
   const src = readFileSync(new URL('../../../app/house/setup.js', import.meta.url), 'utf8');
   assert.match(src, /signRulesUpdate\(\{/);
@@ -96,7 +137,7 @@ test('setup paints the update panel and signs that plan in one wallet batch', ()
   assert.match(src, /data-testid="setup-sign-\$\{esc\(k\)\}"/);
   const fn = src.slice(src.indexOf('async function updateRules'), src.indexOf('async function sign('));
   assert.ok(fn.startsWith('async function updateRules'));
-  assert.match(fn, /ruleUpdateTransactions\(row, r, sec\)/);
+  assert.match(fn, /ruleUpdateTransactions\(row, r, sec, local\.expiresAt\)/);
   assert.match(fn, /signAndSendTransactions\(\{ transactions: txs\.map/);
   assert.match(fn, /get_charter/);
   assert.doesNotMatch(fn, /addKeyAction|DeleteKey|open_charter/);

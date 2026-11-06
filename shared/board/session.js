@@ -58,15 +58,41 @@ function wrapCap(named, capYocto) {
   return given;
 }
 
+// set_calls panics ERR_RECEIVERS when the list is longer than this or a
+// (receiver, method) pair is repeated. contracts/charter_board MAX_RECEIVERS.
+export const MAX_CALLS = 8;
+
+const callKey = (receiver, method) => `${String(receiver).toLowerCase()}\0${String(method)}`;
+
 export function callPolicy(receivers, capYocto, sessionCapYocto, method = 'ft_transfer', extra = FERRY_CALL_TARGETS) {
-  const shop = receivers.map(receiver => ({ receiver, method, cap: String(capYocto) }));
-  const ferry = (extra || []).map(c => ({
-    receiver: c.receiver,
-    method: c.method,
-    cap: c.receiver === 'wrap.near' ? wrapCap(c.cap, capYocto) : String(c.cap || capYocto),
-  }));
+  // The wrap.near trio is kept first when the shop list would crowd it out.
+  // A shop named wrap.near is the same ft_transfer pair the trio already has.
+  const ferry = [];
+  const seen = new Set();
+  for (const c of extra || []) {
+    const row = {
+      receiver: c.receiver,
+      method: c.method,
+      cap: c.receiver === 'wrap.near' ? wrapCap(c.cap, capYocto) : String(c.cap || capYocto),
+    };
+    const k = callKey(row.receiver, row.method);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    ferry.push(row);
+  }
+  const reserved = ferry.slice(0, MAX_CALLS);
+  const room = MAX_CALLS - reserved.length;
+  const shops = [];
+  for (const receiver of receivers || []) {
+    if (shops.length >= room) break;
+    const row = { receiver, method, cap: String(capYocto) };
+    const k = callKey(receiver, method);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    shops.push(row);
+  }
   return {
-    calls: [...shop, ...ferry],
+    calls: [...shops, ...reserved],
     session_cap: String(sessionCapYocto),
   };
 }

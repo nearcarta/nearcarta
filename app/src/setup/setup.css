@@ -93,7 +93,8 @@ input:hover,select:hover{border-color:#ffffff38}input::placeholder{color:#9c8f79
 .steps{list-style:none;padding:0;margin:16px 0}.steps li{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line);color:var(--t2)}
 .steps li::before{content:"";width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto}
 .steps li.run::before{border-color:var(--brass);border-top-color:transparent;animation:spin .8s linear infinite}.steps li.ok::before{content:"✓";border:0;background:#7fe0b033;color:var(--ok);display:grid;place-items:center;font-size:11px}
-.steps li.ok{color:var(--text)}.steps li a{margin-left:auto;font:12px var(--mono)}
+.steps li.bad::before{content:"!";border:0;background:#e07f7f33;color:#a33;display:grid;place-items:center;font-size:11px}
+.steps li.ok,.steps li.bad{color:var(--text)}.steps li a{margin-left:auto;font:12px var(--mono)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .verdict{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:16px;margin-top:12px;border:1px solid}
 .verdict.good{background:#7fe0b012;border-color:#7fe0b055}.verdict.bad{background:#ff8a8012;border-color:#ff8a8055}

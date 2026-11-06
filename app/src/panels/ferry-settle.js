@@ -138,12 +138,37 @@ export function depositPlan({ from, amount, depositAddress, memo = null, capYoct
   return { kind: 'propose_call', why: '', wallet: false, steps };
 }
 
-export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo }) {
+/** Chain of a "SYM@chain" string, a "SYM|chain" id, or a {chain} token. */
+export function chainOf(token) {
+  if (token && typeof token === 'object') return String(token.chain || token.blockchain || '').toLowerCase();
+  const s = String(token || '');
+  if (s.includes('@')) return s.split('@').pop().toLowerCase();
+  if (s.includes('|')) return s.split('|').pop().toLowerCase();
+  return '';
+}
+
+/** Implicit 64-hex account or a named NEAR account. A Zcash unified address is not one. */
+export function isNearAccountId(s) {
+  return typeof s === 'string' && s.length >= 2 && s.length <= 64
+    && (/^[0-9a-f]{64}$/.test(s) || /^([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/.test(s));
+}
+
+/**
+ * Who receives the swapped tokens.
+ * USDC on NEAR is DESTINATION_CHAIN, so the recipient is the visitor's NEAR account.
+ * Other chains keep the address the caller already chose (the Zcash unified address).
+ */
+export function quoteRecipient(to, me, other) {
+  if (chainOf(to) !== 'near') return other;
+  return isNearAccountId(me) ? me : '';
+}
+
+export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo, visitor }) {
   const fromSym = pair.fromSym || String(pair.from || '').split('@')[0];
   const fromChain = pair.fromChain || String(pair.from || '').split('@')[1];
   const toSym = pair.toSym || String(pair.to || '').split('@')[0];
   const toChain = pair.toChain || String(pair.to || '').split('@')[1];
-  return {
+  const body = {
     from: { symbol: fromSym, chain: fromChain },
     to: { symbol: toSym, chain: toChain },
     amount: String(pair.amt),
@@ -154,4 +179,9 @@ export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refund
     amount_yocto: String(amountYocto),
     privacy: 'public',
   };
+  // The charter gate still checks `recipient` (an allowlisted shop).
+  // 1Click, for a NEAR token, is paid to the visitor. Those are different accounts.
+  const swap = quoteRecipient({ chain: toChain }, visitor, '');
+  if (swap) body.swap_recipient = swap;
+  return body;
 }
