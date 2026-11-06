@@ -82,7 +82,11 @@ function planCheckIn(ctx) {
   if (row.balance != null && row.balance !== '' && big(deposit) > big(row.balance)) {
     return refuse('Your row does not hold that much. Nothing was signed.', { tab: 'deed' });
   }
-  if (ctx.nonce == null || ctx.epoch == null) {
+  // The epoch comes from the row when the caller did not pass one: the board derives it,
+  // and a missing epoch silently downgrades a real check-in to a plan.
+  const nonce = ctx.nonce ?? ctx.row.nonce;
+  const epoch = ctx.epoch ?? ctx.row.epoch ?? '0';
+  if (nonce == null) {
     return {
       ok: true, action: 'checkin', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
       deposit, method: 'house_session_check_in',
@@ -100,8 +104,8 @@ function planCheckIn(ctx) {
       args: { token_id: ctx.tokenId },
       deposit,
       expiry: ctx.expiry || '60000000000',
-      nonce: ctx.nonce,
-      epoch: ctx.epoch,
+      nonce: String(nonce),
+      epoch: String(epoch),
       effects: [],
       hold: false,
     });
@@ -248,6 +252,37 @@ export function planHouseLine(text, ctx = {}) {
       hint: 'Ready for expire_sent. After the hold was sent and its expiry passed, no NEAR comes back. Nothing was signed.',
     };
   }
+  if (/\b(approve|approval|guardian sign)\b/i.test(line) && /\b(release|guardian)\b|^\s*approve\b/i.test(line)) {
+    if (!ctx.account || !ctx.tokenId) {
+      return { ok: true, action: 'approve', tab: 'heirs', seal: false, signed: false, live: false, label: 'simulation', hint: 'Simulation. Sign in as a named guardian to approve. Nothing was signed.' };
+    }
+    return {
+      ok: true, action: 'approve', tab: 'heirs', seal: false, signed: false, live: false, label: 'planned',
+      method: 'house_guardian_approve', tokenId: ctx.tokenId, oneYocto: true,
+      hint: 'Ready. A named guardian approves after the check-in window ends. You approve with your own key and 1 yocto.',
+      doneHint: 'Approval recorded. A release starts once the threshold is met.',
+    };
+  }
+  if (/\b(release|hand over|inherit)\b/i.test(line) && !/\bcancel\b/i.test(line)) {
+    const line2 = ctx.line?.line;
+    const waiting = !!line2?.pending_ns;
+    if (!waiting) {
+      return { ok: true, action: 'release', tab: 'heirs', seal: false, signed: false, live: false, label: 'blocked', hint: 'Blocked. No release is waiting. A guardian approval starts one after the check-in window. Nothing was signed.' };
+    }
+    if (Date.now() * 1e6 < Number(line2.pending_ns) + Number(line2.wait_ns || 0)) {
+      const left = Math.ceil((Number(line2.pending_ns) + Number(line2.wait_ns || 0) - Date.now() * 1e6) / 1e9);
+      return { ok: true, action: 'release', tab: 'heirs', seal: false, signed: false, live: false, label: 'blocked', hint: `Blocked. The waiting period has ${left}s left. Nothing was signed.` };
+    }
+    if ((line2.approvals || []).length < Number(line2.threshold || 0)) {
+      return { ok: true, action: 'release', tab: 'heirs', seal: false, signed: false, live: false, label: 'blocked', hint: 'Blocked. Not enough guardians have approved. Nothing was signed.' };
+    }
+    return {
+      ok: true, action: 'release', tab: 'heirs', seal: false, signed: false, live: false, label: 'planned',
+      method: 'house_release', tokenId: ctx.tokenId,
+      hint: 'Ready. Anyone may finish a release the guardians started, once the wait has ended. The deed moves to the first heir.',
+      doneHint: 'Released. The deed is with the heir and the ownership epoch went up.',
+    };
+  }
   if (/\bcancel\b/i.test(line) && /\brelease\b/i.test(line)) {
     const waiting = !!ctx.line?.line?.pending_ns;
     if (!waiting) {
@@ -284,11 +319,12 @@ export function planHouseLine(text, ctx = {}) {
     }
     return {
       ok: true, action: 'mint', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
-      mint: true,
+      mint: true, write: 'mint',
       hint: 'Ready to mint your deed. 0.02 NEAR of your row pays storage and the rest fills the purse. Nothing is signed until you press.',
       doneHint: 'Deed minted. You hold it now.',
     };
-  }  if (/\b(heir|guardian|threshold)\b/i.test(line) && /\b(set|name|update|change|add)\b/i.test(line)) {
+  }
+  if (/\b(heirs?|guardians?|threshold)\b/i.test(line) && /\b(set|name|update|change|add)\b/i.test(line)) {
     const heirs = (ctx.params?.heirs || []).map(String).filter(Boolean);
     const guardians = (ctx.params?.guardians || []).map(String).filter(Boolean);
     if (!heirs.length || !guardians.length) {
@@ -308,7 +344,7 @@ export function planHouseLine(text, ctx = {}) {
       doneHint: 'Line written. The release clock starts from this check-in.',
     };
   }
-  if (/\b(heir|guardian|threshold)\b/i.test(line) && !/\b(pay|send)\b/i.test(line)) {
+  if (/\b(heirs?|guardians?|threshold)\b/i.test(line) && !/\b(pay|send)\b/i.test(line)) {
     return {
       ok: true, action: 'show', tab: 'heirs', seal: false, signed: false, live: false, label: 'read',
       hint: 'Heirs stay on the deed. Name them in the Heirs tab. Nothing was signed.',
@@ -352,6 +388,18 @@ export async function runHouseTurn(text, ctx = {}) {
 
   // With a signer, the same plan is sent. Without one (the standalone page, a
   // signed-out visitor) the plan stands and nothing is signed.
+  if (plan.oneYocto && plan.method && ctx.holderSign) {
+    // A holder-only method: the contract refuses a session, so this is one approval.
+    const sent = await ctx.holderSign(plan.method, plan.method === 'house_cancel_release' ? { token_id: plan.tokenId } : (plan.args || {}));
+    if (!sent?.ok) {
+      const why = sent?.reason || 'The wallet did not approve this. Nothing was signed.';
+      ctx.showSeal?.(why);
+      return { ...plan, label: 'refused', signed: false, seal: true, hint: why };
+    }
+    const done = { ...plan, label: 'live', signed: true, live: true, tx: sent.tx, signer: 'holder', hint: plan.doneHint || plan.hint };
+    if (ctx.onDelivered) ctx.onDelivered(done);
+    return done;
+  }
   if (ctx.sign && plan.write) {
     let build = plan.call;
     if (plan.write === 'mint' || plan.write === 'setline') {

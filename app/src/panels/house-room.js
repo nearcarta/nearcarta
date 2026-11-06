@@ -10,7 +10,7 @@ import { runHouseTurn } from './house-agent.js';
 import { armHouseDock, ensureHouseDock, installHouseDock } from './house-dock.js';
 import { bindTokenFallbacks, tokenStack } from './token-badge.js';
 import { BOARD_RPC } from './board-rpc.js';
-import { boardAccessKey, browserKey, loadWallet, sendHouseCall, signerBlocker } from '../house-sign.js';
+import { boardAccessKey, browserKey, loadWallet, sendHolderCall, sendHouseCall, signerBlocker } from '../house-sign.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -64,15 +64,16 @@ function shell() {
     </div>
     <div class="ferry-pane" data-panel="heirs" data-testid="house-panel-heirs" hidden>
       ${flow('ETH', 'base')}
-      ${field('Heir', '<input id="house-heir" data-testid="house-heir" readonly value="Not set">')}
-      ${field('Guardians', '<input id="house-guardians" data-testid="house-guardians" readonly value="Not set">')}
+      ${field('Heir', '<input id="house-heir" data-testid="house-heir" placeholder="one account id" autocomplete="off" value="Not set">')}
+      ${field('Guardians', '<input id="house-guardians" data-testid="house-guardians" placeholder="one to four account ids" autocomplete="off" value="Not set">')}
       <div class="house-pair">
-        ${field('Threshold', '<input id="house-threshold" data-testid="house-threshold" readonly value="—">')}
+        ${field('Threshold', '<input id="house-threshold" data-testid="house-threshold" inputmode="numeric" autocomplete="off" value="—">')}
         ${field('Period', '<input id="house-period" data-testid="house-period" readonly value="—">')}
         ${field('Wait', '<input id="house-wait" data-testid="house-wait" readonly value="—">')}
         ${field('Approvals', '<input id="house-approvals" data-testid="house-approvals" readonly value="0">')}
       </div>
       ${field('Countdown', '<input id="house-countdown" data-testid="house-countdown" readonly value="No release waiting">')}
+      ${field('Ownership epoch', '<input id="house-epoch" data-testid="house-epoch" readonly value="—">')}
     </div>
     <button type="button" class="primary ferry-cta" data-testid="house-cta" id="house-cta">I'm alive</button>
     <p class="ferry-rate" data-testid="house-status"></p>
@@ -206,6 +207,8 @@ export function mountHouseRoom(root, hooks = {}) {
       // The executor. Without it the shop can only plan; with it the same CTA and the
       // AI Agent sign with the visitor's session key and no wallet opens.
       sign: (build, kind) => signAndSend(build, kind),
+      // Holder-only steps need the holder's own key: one wallet approval, not a session.
+      holderSign: (method, args) => holderSignAndSend(method, args),
       vaultState: state,
     };
     const result = await runHouseTurn(text, ctx);
@@ -258,6 +261,18 @@ export function mountHouseRoom(root, hooks = {}) {
       return sent;
     } catch (e) {
       return { ok: false, tx: null, decision: 'failed', reason: String(e?.message || e).slice(0, 160) };
+    }
+  }
+
+  /** A holder-only call: the wallet approves 1 yocto to the house contract. */
+  async function holderSignAndSend(method, args) {
+    try {
+      const tx = await sendHolderCall({ sign: hooks.sign, house: DEED.contract, method, args });
+      return { ok: true, tx, signer: 'holder' };
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (/cancel/i.test(msg)) return { ok: false, reason: 'Cancelled in the wallet. Nothing was signed.' };
+      return { ok: false, reason: msg.slice(0, 160) };
     }
   }
 
@@ -339,7 +354,18 @@ export function mountHouseRoom(root, hooks = {}) {
     set('#house-period', String(line.period_ns ?? '—'));
     set('#house-wait', String(line.wait_ns ?? '—'));
     set('#house-approvals', String((line.approvals || []).length));
-    set('#house-countdown', line.pending_ns ? `Waiting since ${line.pending_ns}` : 'No release waiting');
+    // The timer is the honest part of a release: the wait is a chain time, so show what is left.
+    const nowNs = Date.now() * 1e6;
+    let countdown = 'No release waiting';
+    if (line.pending_ns) {
+      const endNs = Number(line.pending_ns) + Number(line.wait_ns || 0);
+      countdown = nowNs >= endNs ? 'The wait has ended. Anyone may release.' : `Release in ${Math.ceil((endNs - nowNs) / 1e9)}s`;
+    } else if (line.last_check_in_ns && line.period_ns) {
+      const endNs = Number(line.last_check_in_ns) + Number(line.period_ns);
+      countdown = nowNs >= endNs ? 'The check-in window has passed. A guardian may approve.' : `Check-in window ${Math.ceil((endNs - nowNs) / 1e9)}s left`;
+    }
+    set('#house-countdown', countdown);
+    set('#house-epoch', String(line.epoch ?? state.line?.epoch ?? '0'));
     showTab(state.tab);
   }
 

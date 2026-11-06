@@ -38,6 +38,21 @@ export async function loadWallet() {
 /** The wallet when it is already loaded. Callers that must not await use this. */
 export function houseWallet() { return W; }
 
+/**
+ * Holder-only house calls. The contract requires the deed holder's own key and 1 yocto,
+ * so a session cannot make them: this is one wallet approval, not an agent action.
+ * `method` is one of house_cancel_release, house_set_line, house_set_vault, house_withdraw.
+ */
+export function holderCallArgs(method, params = {}) {
+  return { method, params };
+}
+
+/** Send a holder-only call directly to the house contract, after the wallet approves it. */
+export async function sendHolderCall({ sign, house, method, args }) {
+  if (typeof sign !== 'function') throw new Error('No wallet to approve this. Nothing was signed.');
+  return sign(house, [{ type: 'FunctionCall', params: { methodName: method, args, gas: '100000000000000', deposit: '1' } }]);
+}
+
 export const TG = 10n ** 12n;
 /** Prepaid gas for one propose_call_as. The house callback is small; the board is the cost. */
 export const CALL_AS_TGAS = 150n;
