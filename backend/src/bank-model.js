@@ -2,7 +2,7 @@
 // Preflight first (docs.near.ai/cloud/verification), then the completion, then the response signature.
 // The statement is not stored and is not returned. POST /api/ai/prove stays behind its own flag.
 import { cfg } from './config.js';
-import { complete as aiComplete, signature as aiSignature, checkSigned } from './ai.js';
+import { complete as aiComplete, signature as aiSignature, checkSigned, verifyLink } from './ai.js';
 import { proveTee } from './tee.js';
 import { budgetLeft, budget, costUsd } from './agent.js';
 
@@ -106,6 +106,14 @@ export async function runModelAudit({
       answer: '',
       step: `Response signature: ${why}`,
       model: done.model || model,
+      // The same keys as a signed audit, so a reader never has to guess. No signature means no artifact.
+      signed_text: '',
+      signature: '',
+      signing_address: '',
+      signing_algo: '',
+      signature_kind: '',
+      nonce: pre.nonce || '',
+      verify_url: '',
       fields: quoteFields(pre, { ok: false, why }),
     };
   }
@@ -127,6 +135,8 @@ export async function runModelAudit({
     signing_algo: sig.signing_algo || '',
     signature_kind: sig.signature_kind || '',
     nonce: pre.nonce || '',
+    // A real artifact, and only when a signature exists: NEAR AI's own page for this receipt.
+    verify_url: sig.signature ? verifyLink({ id: done.id, model: done.reqModel || done.model || model, sig }) : '',
     fields: quoteFields(pre, { ok: signed, why: signed ? '' : why, kind: sig.signature_kind || '' }),
   };
 }

@@ -370,7 +370,7 @@ export function mountChronicleTray(root, hooks = {}) {
       ]);
       if (mine !== state.ticket) return;
       const liveRes = await livePromise;
-      if (!liveRes || !liveRes.ok) live = { error: 'The live timeline did not answer.', rows: [], gaps: ['The live timeline did not answer.'] };
+      if (!liveRes || !liveRes.ok) live = { error: liveRes?.status === 429 ? 'The live timeline is rate limited. Try again in a minute.' : 'The live timeline did not answer.', rows: [], gaps: ['The live timeline did not answer.'] };
       else live = await liveRes.json();
     } catch {
       live = live || { error: 'The live timeline did not answer.', rows: [], gaps: ['The live timeline did not answer.'] };
