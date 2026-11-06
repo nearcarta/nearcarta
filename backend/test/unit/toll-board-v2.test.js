@@ -83,6 +83,10 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   assert.deepEqual(report.init.allow_to, []);
   assert.equal(report.smoke.sends, false);
   assert.equal(report.smoke.to, null);
+  assert.ok(report.wasm.bytes < 240000);
+  assert.equal(report.balance.shortfall_near, '0');
+  const stake = report.prechecks.find(p => p.check === 'balance covers the new stake');
+  assert.equal(stake && stake.ok, true);
   const refused = spawnSync(process.execPath, [script, '--live'], {
     encoding: 'utf8',
     cwd: root,
