@@ -1,4 +1,4 @@
-// Toll: 0.001 NEAR to toll.nearcarta.near. The two recorded payments are in mainnet.json.
+// Toll: the live policy sets the fee. The recorded payments are in mainnet.json.
 import { THREE, room, put, makeRobot, C, D7, wait, tween, hx } from '../js/core.js';
 import { MPC } from '../../D6_dashboards/src/data.js';
 import { row, h3, note, proof, acct, mainnet } from './_ui.js';
@@ -6,7 +6,7 @@ import { M as PM, brassM, mesh, lantern } from './_props.js';
 
 // Proof list at module level so the 2D view (js/flat.js) can show it without building the scene.
 const sig = MPC.oathPay;
-export const PROOF = mainnet('toll') + proof(h3('Signed under the oath'), row({ k: '0.001 NEAR toll allowed', why: acct(MPC.oath), st: 'ok', stText: 'allowed', tx: '4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz' }),
+export const PROOF = mainnet('toll') + proof(h3('Signed under the oath'), row({ k: 'NEAR toll allowed', why: acct(MPC.oath), st: 'ok', stText: 'allowed', tx: '4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz' }),
       h3('Refused before signing'), row({ k: 'Payee not on the list', why: 'Nothing was paid.', st: 'no', stText: 'refused', tx: 'B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR' }));
 export default async function toll() {
   // Grass first so the door can open. Water, the bridge and the tower arrive after the tray is up.
@@ -41,7 +41,7 @@ export default async function toll() {
     rob.g = real.g;
   }).catch(() => null);
   const tags = [
-    { pos: new THREE.Vector3(5.6, .6, .3), html: `<img src="${D7}assets/tokens/chains/base.svg" width="20" height="20" alt="Base">`, cls: 'bare' },
+    { pos: new THREE.Vector3(5.6, .6, .3), html: '<img src="/tokens/chains/base.svg" width="20" height="20" alt="Base">', cls: 'bare' },
     { pos: new THREE.Vector3(bx, 1.35, bz), html: '<b data-testid="toll-seal-3d">Pass refused</b>', cls: 'no hide' },
   ];
   const hideRefuse = () => {
@@ -59,10 +59,10 @@ export default async function toll() {
   };
   return {
     rob, scene, camera, tags, hideRefuse, showRefuse,
-    panel: { title: 'Toll', src: 'mainnet', srcNote: '0.001 NEAR to toll.nearcarta.near. A refusal pays nothing.', label: '0.001 NEAR', hero: `<b class="num">0.001</b><span class="unit">NEAR</span>`, action: null },
+    panel: { title: 'Toll', src: 'mainnet', srcNote: 'The fee comes from the live policy. A refusal pays nothing.', label: 'Live policy', hero: '<b class="num">Policy</b><span class="unit">fee</span>', action: null },
     proof: PROOF,
     *act(opts = {}) {
-      if (!opts.success) return;
+      if (!opts.success && !opts.basePaid) return;
       const mine = ++actGen;
       hideRefuse();
       boom.rotation.x = 0;
