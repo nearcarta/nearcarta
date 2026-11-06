@@ -88,8 +88,10 @@ test('the deploy plan refunds a pot to its owner and refuses a different one', (
     storageUsage: 100,
     keys: [],
     wasm,
-    stateBytes: 171,
+    stateBytes: 184,
     ownerBalanceYocto: '1000000000000000000000000',
+    // The plan refuses to build without a funded model budget and a model to pin.
+    inference: { rounds: 20n, costYocto: 10n, model: 'z-ai/glm-5.3-flash' },
   };
   const same = planDeploy({
     ...fields,
@@ -115,6 +117,14 @@ test('the deploy plan refunds a pot to its owner and refuses a different one', (
   assert.ok(same.steps.some(s => s.step === 'close' && s.payee === 'owner.near'));
   assert.ok(same.steps.some(s => s.step === 'create' && s.sha256 === same.wasm.sha256));
   assert.ok(same.steps.some(s => s.step === 'precheck' && s.ok));
+  // The model budget is funded from the recovered NEAR, and the init step carries it.
+  assert.equal(same.inference.rounds, '20');
+  assert.equal(same.inference.budgetYocto, '200');
+  assert.equal(same.inference.model, 'z-ai/glm-5.3-flash');
+  const init = same.steps.find(s => s.step === 'init');
+  assert.equal(init.args.inference_budget, '200');
+  assert.equal(init.args.inference_cost, '10');
+  assert.ok(same.steps.some(s => s.step === 'pin-signer' && /set_model_signer/.test(s.method)));
   const other = planDeploy({
     ...fields,
     guardians: [{ token_id: 'g1', owner_id: 'visitor.near', pot: '1000', reserved: '0', in_flight: 0 }],

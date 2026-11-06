@@ -12,6 +12,9 @@ import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCa
 import { freezePlan } from '/panels/guard-agent.js';
 import { lookalike as lookalikeName } from '/guard-lookalike.js';
 import { createGuardLedger, guardSend } from '/panels/guard-live.js';
+import {
+  agentArenaSend, createArenaLedger, visitorHoldAction,
+} from '/panels/arena/arena-live.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 import { rulesPlan } from '../../../../shared/hall/plan.js';
 import { missingCross } from '/foreign-path.js';
@@ -743,55 +746,113 @@ export async function ferryProposeCalls(steps) {
   return { ok: true, youSend: false, wallet: false, txs: landed.map(s => s.tx), landed, tx: landed.at(-1)?.tx || null };
 }
 
+// ---- Arena, live: the CTA and the agent both send through arena-live.js ----
 // 10 Tgas for propose_call_as, 30 Tgas to the shop, 20 Tgas for on_called_as.
 const ARENA_GAS = 60n * TG;
-export async function arenaCall(plan) {
-  const stop = (reason = 'Nothing was signed.') => ({ ...plan, sign: false, tx: null, decision: 'blocked', live: 'blocked', reason, wallet: false });
-  const call = plan?.call;
-  if (!call || call.boardMethod !== 'propose_call_as') return stop();
-  if (!S.board || !S.me || !S.arena || call.receiver !== S.arena) return stop();
+const arenaLedger = createArenaLedger();
+globalThis.__arenaLedger = arenaLedger;
+
+/** The row, re-read because the board nonce moves on every propose. */
+async function arenaRowNow() {
+  if (!S.board || !S.me) return null;
+  S.boardRow = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  return S.boardRow;
+}
+
+/** One board function call from the visitor's session key. No wallet popup. */
+async function arenaBoardCall(method, args) {
   const key = agent();
-  if (!key) return stop();
-  const ak = await proposeAccessKey(key);
-  const names = ak?.permission?.FunctionCall?.method_names || [];
-  if (!ak || (names.length && !names.includes('propose_call_as'))) return stop();
-  const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
-  if (!row || W.pubkeyHex(key) !== String(row.agent || '')) return stop();
-  const msg = callAsMessage({
-    network: S.mainnet?.network || 'mainnet',
-    contract: S.board,
-    owner: S.me,
-    receiver: S.arena,
-    method: call.method,
-    args: call.args,
-    deposit: call.deposit,
-    nonce: String(row.nonce),
-    expiry: call.expiry,
-    epoch: String(row.epoch ?? '0'),
-    effects: call.effects || [],
-    hold: !!call.hold,
-  });
-  const signature = W.signMessage(key, msg);
-  const args = {
-    owner: S.me, receiver: S.arena, method: call.method, args: call.args,
-    deposit: String(call.deposit), expiry: String(call.expiry), effects: call.effects || [],
-    hold: !!call.hold, signature,
-  };
+  const ak = key ? await proposeAccessKey(key) : null;
+  if (!key || !ak) return { ok: false, tx: null, reason: 'no_session_key' };
+  const names = ak.permission?.FunctionCall?.method_names || [];
+  if (names.length && !names.includes(method)) return { ok: false, tx: null, reason: `key_cannot_${method}` };
+  const allowance = BigInt(ak.permission?.FunctionCall?.allowance || 0);
+  if (allowance && allowance < (ARENA_GAS / TG) * 10n ** 21n) return { ok: false, tx: null, reason: 'not_enough_allowance' };
   try {
     const signed = W.signTx({
       key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
-      actions: [W.functionCall('propose_call_as', args, ARENA_GAS)],
+      actions: [W.functionCall(method, args, ARENA_GAS)],
     });
     const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
-    if (!sent.ok) {
-      const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
-      return { ...plan, sign: true, tx: signed.hash, decision: 'denied', reason, wallet: false, fromChain: true };
-    }
-    if (call.hold) return { ...plan, sign: true, tx: signed.hash, decision: 'held', reason: 'Held. Confirm or cancel.', wallet: false };
-    return { ...plan, sign: true, tx: signed.hash, decision: 'allowed', reason: 'ok', wallet: false };
+    if (!sent.ok) return { ok: false, tx: signed.hash, reason: refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160) };
+    return { ok: true, tx: signed.hash, reason: 'ok' };
   } catch (e) {
-    return stop(String(e?.message || 'Nothing was signed.').slice(0, 160));
+    return { ok: false, tx: e.tx || null, reason: refusalOf(e) || String(e?.message || e).slice(0, 160) };
   }
+}
+
+/** The send step arena-live.js calls. The board supplies the exact signed bytes. */
+function arenaDeps(human = false) {
+  return {
+    ledger: arenaLedger,
+    boardView: (method, args) => view(S.board, method, args),
+    signText: (k, text) => W.signMessage(k, text),
+    keyFor: (kind) => {
+      if (kind === 'agent') return agent();
+      // The confirm and owner keys exist only while a visitor's button is running.
+      if (kind === 'confirm') return human ? globalThis.__arenaConfirmKey || null : null;
+      if (kind === 'owner') return human ? agent() : null;
+      return null;
+    },
+    send: (method, args) => arenaBoardCall(method, args),
+  };
+}
+
+/** Shape a refused plan the way the tray's seal expects. */
+function arenaNo(plan, why, extra = {}) {
+  return { ...plan, sign: false, tx: null, decision: 'blocked', live: 'blocked', reason: why, wallet: false, ...extra };
+}
+
+/**
+ * The gold CTA and the agent both come through here. `agentArenaSend` is the AI path: it
+ * cannot confirm, cancel or expire a hold, whatever the plan says.
+ */
+export async function arenaCall(plan) {
+  if (!S.board || !S.me || !S.arena) return arenaNo(plan, 'Sign in and finish /setup first. Nothing was signed.');
+  const call = plan?.call;
+  if (!call || call.boardMethod !== 'propose_call_as') return arenaNo(plan, 'Nothing was planned. Nothing was signed.');
+  const row = await arenaRowNow();
+  if (!row) return arenaNo(plan, 'No row on the board yet. Finish /setup. Nothing was signed.');
+  const key = agent();
+  if (!key) return arenaNo(plan, 'Finish /setup to add the agent key. Nothing was signed.');
+  if (W.pubkeyHex(key) !== String(row.agent || '')) return arenaNo(plan, 'The agent key is not the one on your row. Renew it in /setup. Nothing was signed.');
+  const action = call.method === 'mint' ? 'mint' : call.method === 'feed' ? 'feed'
+    : call.method === 'open_attempt' ? 'attack' : call.method === 'withdraw' ? 'withdraw' : '';
+  if (!action) return arenaNo(plan, 'That method is not an Arena action. Nothing was signed.');
+  try {
+    const out = await agentArenaSend({ action, plan, row, owner: S.me, arena: S.arena }, arenaDeps(false));
+    if (!out.ok) return arenaNo(plan, out.why || 'Nothing was signed.', out.duplicate ? { duplicate: true } : {});
+    if (out.hold) return { ...plan, sign: true, tx: out.tx, decision: 'held', reason: 'Held. Confirm or cancel.', wallet: false, holdId: out.nonce };
+    return { ...plan, sign: true, tx: out.tx, decision: 'allowed', reason: 'ok', wallet: false };
+  } catch (e) {
+    return arenaNo(plan, String(e?.message || 'Nothing was signed.').slice(0, 160));
+  }
+}
+
+/** The visitor's own button releases a held attack. The confirm key must be in this browser. */
+export async function arenaConfirm({ holdId, confirmKey } = {}) {
+  if (!S.board || !S.me || !S.arena) return { ok: false, signed: false, tx: null, why: 'Sign in first. Nothing was signed.' };
+  const row = await arenaRowNow();
+  const prev = globalThis.__arenaConfirmKey;
+  if (confirmKey) globalThis.__arenaConfirmKey = confirmKey;
+  try {
+    const out = await visitorHoldAction({ action: 'confirm', holdId, row, owner: S.me, arena: S.arena }, arenaDeps(true));
+    return out;
+  } finally { globalThis.__arenaConfirmKey = prev; }
+}
+
+/** Drop a held attack. The row owner's key returns the NEAR to the row. */
+export async function arenaCancel({ holdId } = {}) {
+  if (!S.board || !S.me || !S.arena) return { ok: false, signed: false, tx: null, why: 'Sign in first. Nothing was signed.' };
+  const row = await arenaRowNow();
+  return visitorHoldAction({ action: 'cancel', holdId, row, owner: S.me, arena: S.arena }, arenaDeps(true));
+}
+
+/** After a sent hold expired: free it, no refund. */
+export async function arenaExpire({ holdId } = {}) {
+  if (!S.board || !S.me || !S.arena) return { ok: false, signed: false, tx: null, why: 'Sign in first. Nothing was signed.' };
+  const row = await arenaRowNow();
+  return visitorHoldAction({ action: 'expire', holdId, row, owner: S.me, arena: S.arena }, arenaDeps(true));
 }
 
 export async function sessionAllowance() {

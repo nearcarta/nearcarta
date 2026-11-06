@@ -65,6 +65,14 @@ export function arenaHtml(state, attackAttr = 'data-testid="arena-attack"', boxA
     const body = href && String(line).includes(state.tx) ? esc(line).replace(esc(state.tx), `<a href="${href}">${esc(state.tx)}</a>`) : esc(line);
     return `<p class="arena-status">${body}</p>`;
   }).join('');
+  // A held attack waits for the visitor. These two buttons are the only path to
+  // confirm_hold / cancel_hold, and they run with human intent set.
+  const holdActions = state.holdId != null && state.holdId !== ''
+    ? `<div class="arena-hold" data-hold="${esc(state.holdId)}">
+        <button type="button" class="primary ferry-cta" data-hold-act="confirm" data-testid="arena-confirm">Confirm attack</button>
+        <button type="button" class="arena-next" data-hold-act="cancel" data-testid="arena-cancel">Cancel and return the fee</button>
+      </div>`
+    : '';
   const list = state.listError
     ? ''
     : guardians.length
@@ -89,6 +97,7 @@ export function arenaHtml(state, attackAttr = 'data-testid="arena-attack"', boxA
         <button type="button" class="primary ferry-cta" data-act="attack" data-testid="redteam-run">Attack guardian</button>
         <button type="button" class="arena-next" data-testid="redteam-next">${esc(NEXT_LABEL)}</button>
       </div>
+      ${holdActions}
     </div>
     <div class="ferry-pane" data-pane="score" ${tab === 'score' ? '' : 'hidden'}>
       ${flow('Winnings', 'Badge')}
@@ -128,6 +137,8 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
       ? 'Already planned. Nothing was signed.'
       : (result?.note && result.note !== state.status ? result.note : '');
     if (state.status2 === state.status) state.status2 = '';
+    // A held attack keeps its id so the visitor can confirm or cancel it.
+    state.holdId = result?.decision === 'held' ? (result.holdId ?? state.holdId ?? null) : null;
     globalThis.__arenaCoin = cinema?.tx || '';
     if (hooks.say) hooks.say([state.status, state.status2].filter(Boolean).slice(0, 2).join(' '));
     paint();
@@ -220,6 +231,31 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
     if (e.target.closest?.('[data-testid=redteam-next]')) {
       read();
       state.practice = advanceAttack();
+      paint();
+      return;
+    }
+    // The visitor's own release or cancellation of a held attack. This is the only place
+    // the confirm key is offered, and it is set only for the length of this click.
+    const holdBtn = e.target.closest?.('[data-hold-act]');
+    if (holdBtn) {
+      const which = holdBtn.dataset.holdAct;
+      const holdId = state.holdId;
+      holdBtn.disabled = true;
+      const confirmKey = which === 'confirm' ? (hooks.confirmKey ? hooks.confirmKey() : null) : null;
+      const out = which === 'confirm'
+        ? await (hooks.confirmHold ? hooks.confirmHold({ holdId, confirmKey }) : { ok: false, why: 'Nothing was signed.' })
+        : await (hooks.cancelHold ? hooks.cancelHold({ holdId }) : { ok: false, why: 'Nothing was signed.' });
+      if (out?.ok) {
+        state.holdId = null;
+        state.status = which === 'confirm'
+          ? `Attack sent. ${out.tx || ''}`.trim()
+          : 'Hold cancelled. The fee returned to your row.';
+        state.status2 = '';
+        state.tx = out.tx || null;
+      } else {
+        state.status = out?.why || 'Nothing was signed.';
+        state.status2 = '';
+      }
       paint();
       return;
     }

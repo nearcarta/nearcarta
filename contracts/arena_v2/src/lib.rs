@@ -1171,4 +1171,171 @@ mod tests {
         assert_eq!(row.inference.0, 0);
         assert_eq!(c.get_config().inference_budget.0, 1_000);
     }
+
+    // ---- money: the fee, the pot, the prize, the creator's share, one round ----
+
+    #[test]
+    fn a_round_conserves_the_fee_pot_prize_and_creator_share() {
+        // One mint, one in-oath win, one refused round. Every yocto is accounted for:
+        // the pot pays the prize and the creator's share of the entry fee, the rest of
+        // the fee stays in the contract as the creator's earning.
+        let mut c = boot();
+        ctx(owner(), 0, 2);
+        c.set_inference(U128(1_000), U128(10), false);
+        // mint: deposit 50, fee 5 -> pot 45, split 2000 bps (20%).
+        let g = mint_one(&mut c, alice(), 8);
+        assert_eq!(c.get_guardian(g).unwrap().pot.0, 45);
+        assert_eq!(c.get_guardian(g).unwrap().fee.0, 5);
+        assert_eq!(c.get_guardian(g).unwrap().split_bps, 2_000);
+
+        // An in-oath win of 4 from the pot.
+        ctx(board(), 5, 10);
+        let win = c.open_attempt(bob(), g, "inside".into());
+        let (env, response) = env_for(&c, win, bob(), "inside", 4);
+        assert_eq!(c.resolve(env, response), "paid");
+        assert_eq!(c.get_guardian(g).unwrap().pot.0, 41, "the pot paid exactly the prize");
+        // 5 fee * 2000/10000 = 1 to the creator, on both a win and a refusal.
+        assert_eq!(c.get_earnings(alice()).0, 1);
+
+        // An over-oath round mints one badge and still pays the creator's share.
+        ctx(board(), 5, 12);
+        let loss = c.open_attempt(alice(), g, "outside".into());
+        let (mut env, response) = env_for(&c, loss, alice(), "outside", 99);
+        env.pay_amount = U128(99);
+        assert_eq!(c.resolve(env, response), "refused");
+        assert_eq!(c.get_guardian(g).unwrap().pot.0, 41, "a refusal pays no prize");
+        assert_eq!(c.get_earnings(alice()).0, 2, "the creator's share is per round");
+        assert_eq!(c.mt_balance_of(alice(), format!("case:{loss}")).0, 1);
+
+        // The budget was debited once per resolved round, never per refusal of the fee.
+        assert_eq!(c.get_config().inference_budget.0, 1_000 - 20);
+        let a = c.get_attempt(win).unwrap();
+        assert_eq!(a.inference.0, 10);
+        assert!(!a.subsidy);
+    }
+
+    #[test]
+    fn a_creator_withdraws_exactly_their_earnings_and_nothing_more() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "inside".into());
+        let (env, response) = env_for(&c, id, bob(), "inside", 1);
+        c.resolve(env, response);
+        assert_eq!(c.get_earnings(alice()).0, 1);
+        // Withdraw goes through the board's call (predecessor == board), never a direct call.
+        ctx(alice(), 0, 12);
+        let direct = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.withdraw(bob(), U128(1))));
+        assert!(direct.is_err(), "a direct call is not the board");
+        // The board asks for bob, but bob has no earnings: nothing to take.
+        ctx(board(), 0, 13);
+        let none = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.withdraw(bob(), U128(1))));
+        assert!(none.is_err(), "another visitor has no earnings");
+        // Alice takes exactly what her guardian earned, through the board.
+        ctx(board(), 0, 14);
+        c.withdraw(alice(), U128(1));
+        assert_eq!(c.get_earnings(alice()).0, 0);
+        let again = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.withdraw(alice(), U128(1))));
+        assert!(again.is_err(), "a second withdrawal has nothing behind it");
+    }
+
+    #[test]
+    fn a_timeout_returns_the_fee_and_the_row_plays_again() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "wait".into());
+        // Too early is refused; after the deadline the fee goes back and the row frees.
+        ctx(board(), 0, 11);
+        let early = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.refund_timeout(id)));
+        assert!(early.is_err(), "a refund before the deadline is refused");
+        assert_eq!(c.get_attempt(id).unwrap().state, "open");
+        ctx(board(), 0, 10 + TIMEOUT_NS + 1);
+        c.refund_timeout(id);
+        let row = c.get_attempt(id).unwrap();
+        assert_eq!(row.state, "refunded");
+        assert_eq!(row.verdict.as_deref(), Some("refunded"));
+        // The same player opens a new round: the one-open-attempt slot was released.
+        ctx(board(), 5, 10 + TIMEOUT_NS + 2);
+        let again = c.open_attempt(bob(), g, "again".into());
+        assert_ne!(again, id);
+    }
+
+    #[test]
+    fn a_timeout_verdict_is_not_a_win_and_mints_no_badge() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "wait".into());
+        ctx(board(), 0, 10 + TIMEOUT_NS + 1);
+        c.refund_timeout(id);
+        assert_eq!(c.mt_supply(format!("case:{id}")), None, "a timeout is not a case");
+        assert_eq!(c.get_guardian(g).unwrap().pot.0, 45, "a timeout moves no pot");
+    }
+
+    #[test]
+    fn a_replayed_resolve_fails_and_pays_no_second_prize() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        ctx(board(), 5, 10);
+        let id = c.open_attempt(bob(), g, "inside".into());
+        let (env, response) = env_for(&c, id, bob(), "inside", 4);
+        assert_eq!(c.resolve(env.clone(), response.clone()), "paid");
+        let pot = c.get_guardian(g).unwrap().pot.0;
+        let earned = c.get_earnings(alice()).0;
+        // The identical envelope, replayed: the attempt is no longer open, so nothing moves.
+        let replay = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.resolve(env, response)));
+        assert!(replay.is_err(), "a resolved round cannot resolve again");
+        assert_eq!(c.get_guardian(g).unwrap().pot.0, pot, "the pot did not pay twice");
+        assert_eq!(c.get_earnings(alice()).0, earned, "the creator was not paid twice");
+    }
+
+    #[test]
+    fn two_visitors_play_two_rows_on_the_same_guardian() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 8);
+        // Each visitor opens their own round. Neither can resolve the other's.
+        ctx(board(), 5, 10);
+        let one = c.open_attempt(bob(), g, "bob asks".into());
+        ctx(board(), 5, 11);
+        let two = c.open_attempt(prize(), g, "prize asks".into());
+        assert_ne!(one, two);
+        assert_eq!(c.get_attempt(one).unwrap().player, bob());
+        assert_eq!(c.get_attempt(two).unwrap().player, prize());
+        let (env_one, response_one) = env_for(&c, one, bob(), "bob asks", 1);
+        let (env_two, response_two) = env_for(&c, two, prize(), "prize asks", 1);
+        // Bob's envelope cannot settle Prize's round.
+        let mut swapped = env_two.clone();
+        swapped.player = bob();
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.resolve(swapped, response_two.clone())));
+        assert!(caught.is_err(), "one row cannot settle another row's round");
+        // Each visitor settles their own, and both prizes come out of the one pot.
+        assert_eq!(c.resolve(env_one, response_one), "paid");
+        assert_eq!(c.resolve(env_two, response_two), "paid");
+        assert_eq!(c.get_guardian(g).unwrap().pot.0, 43);
+    }
+
+    #[test]
+    fn an_empty_budget_sleeps_and_the_budget_never_goes_negative() {
+        // The deploy funds 2 rounds. The third open_attempt sleeps before it takes a fee.
+        let mut c = boot();
+        ctx(owner(), 0, 2);
+        c.set_inference(U128(20), U128(10), false);
+        let g = mint_one(&mut c, alice(), 8);
+        for (i, ts) in [10u64, 20].iter().enumerate() {
+            let prompt = format!("round {i}");
+            ctx(board(), 5, *ts);
+            let id = c.open_attempt(bob(), g, prompt.clone());
+            let (env, response) = env_for(&c, id, bob(), &prompt, 1);
+            assert_eq!(c.resolve(env, response), "paid");
+        }
+        assert_eq!(c.get_config().inference_budget.0, 0);
+        // Empty: the next attempt panics before it stores the fee, so the pot is unchanged.
+        let pot = c.get_guardian(g).unwrap().pot.0;
+        ctx(board(), 5, 30);
+        let slept = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.open_attempt(bob(), g, "third".into())));
+        assert!(slept.is_err(), "an empty budget refuses the round");
+        assert_eq!(c.get_guardian(g).unwrap().pot.0, pot, "the pot is untouched");
+        assert_eq!(c.get_config().inference_budget.0, 0, "the budget never went negative");
+    }
 }

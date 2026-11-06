@@ -26,6 +26,21 @@ const PIN_FILE = new URL('../contracts/artifacts/arena_v2.json', import.meta.url
 // 0.05 NEAR. The create transfer is the measured stake plus this slack, and no more.
 export const MAX_SLACK_YOCTO = 50_000_000_000_000_000_000_000n;
 
+/**
+ * The model budget this deploy funds from the NEAR the close recovers. A round's charge
+ * is `inference_cost` yocto; the budget is `rounds` times that, and the whole amount is
+ * reserved inside the new account (the contract pays the model provider off chain from
+ * it and debits the budget on each resolve). 200 rounds at 0.0005 NEAR is 0.1 NEAR, so
+ * the first deploy has a real budget instead of the 0 the earlier plan left behind.
+ *
+ * This is an operator setting, not a visitor price: no player pays it. The exact numbers
+ * are printed so the owner can approve them before signing.
+ */
+export const INFERENCE_ROUNDS = 200n;
+export const INFERENCE_COST_YOCTO = 500_000_000_000_000_000_000n; // 0.0005 NEAR per resolve
+/** The model the owner pins. Override with ARENA_MODEL before a live run. */
+export const DEFAULT_MODEL = 'z-ai/glm-5.3-flash';
+
 export function nearText(yocto) {
   const y = BigInt(yocto);
   const neg = y < 0n;
@@ -39,7 +54,7 @@ export function measuredStorageBytes(wasmLen, stateBytes) {
   return ACCOUNT_BYTES + BigInt(wasmLen) + STATE_KEY_BYTES + BigInt(stateBytes) + RECORD_EXTRA;
 }
 
-export function planDeploy({ account, owner, board, balanceYocto, storageUsage, keys, guardians, wasm, stateBytes, slackYocto = MAX_SLACK_YOCTO, ownerBalanceYocto = null }) {
+export function planDeploy({ account, owner, board, balanceYocto, storageUsage, keys, guardians, wasm, stateBytes, slackYocto = MAX_SLACK_YOCTO, ownerBalanceYocto = null, inference = {} }) {
   const steps = [];
   const transfers = [];
   const blockers = [];
@@ -76,7 +91,18 @@ export function planDeploy({ account, owner, board, balanceYocto, storageUsage, 
   const stateLen = BigInt(stateBytes);
   const nextBytes = measuredStorageBytes(wasm.length, stateLen);
   const stakeYocto = nextBytes * BYTE_YOCTO;
-  const initArgs = JSON.stringify({ board, owner, inference_budget: '0', inference_cost: '0' });
+  const rounds = BigInt(inference.rounds ?? INFERENCE_ROUNDS);
+  const perRound = BigInt(inference.costYocto ?? INFERENCE_COST_YOCTO);
+  const inferenceBudget = rounds * perRound;
+  const modelName = String(inference.model || '');
+  if (rounds <= 0n) blockers.push('the inference budget is zero rounds, so no attempt could ever settle');
+  if (perRound <= 0n) blockers.push('the inference cost per round is zero');
+  if (!modelName) blockers.push('no model name is pinned for the attested verdict');
+  const initArgs = JSON.stringify({
+    board, owner,
+    inference_budget: inferenceBudget.toString(),
+    inference_cost: perRound.toString(),
+  });
   const gas = deployGas(wasm.length, Buffer.byteLength(initArgs));
   const burnedGasYocto = gas * GAS_PRICE_YOCTO;
   const prepaidYocto = gas * GAS_PURCHASE_YOCTO;
@@ -147,8 +173,15 @@ export function planDeploy({ account, owner, board, balanceYocto, storageUsage, 
     steps.push({
       step: 'init',
       method: 'new',
-      args: { board, owner, inference_budget: '0', inference_cost: '0' },
-      detail: 'empty guardians. The owner sets the inference budget after this.',
+      args: { board, owner, inference_budget: inferenceBudget.toString(), inference_cost: perRound.toString() },
+      detail: `empty guardians, ${rounds} rounds of model budget at ${nearText(perRound)} NEAR each, paid from the recovered NEAR.`,
+    });
+    steps.push({
+      step: 'pin-signer',
+      method: 'set_model_signer',
+      args: { signing_address: '<from the attested NEAR AI report>', model: modelName || '<model>' },
+      depositor: owner,
+      detail: 'the owner pins the attested NEAR AI key after checking the TEE report. Until then resolve refuses.',
     });
   }
   for (const t of foreign) steps.push({ step: 'unpaid', payee: t.payee, amount: t.amount, near: t.near, detail: t.why });
@@ -172,6 +205,16 @@ export function planDeploy({ account, owner, board, balanceYocto, storageUsage, 
       yocto: createYocto.toString(),
       near: nearText(createYocto),
       storageBytes: nextBytes.toString(),
+    },
+    inference: {
+      rounds: rounds.toString(),
+      costYocto: perRound.toString(),
+      costNear: nearText(perRound),
+      budgetYocto: inferenceBudget.toString(),
+      budgetNear: nearText(inferenceBudget),
+      model: modelName || null,
+      fundedFrom: 'the NEAR the close returns; no visitor pays it',
+      note: 'Reserved in the new account and debited per resolve. An empty budget makes open_attempt sleep before it takes the fee.',
     },
     balanceBefore: { yocto: balance.toString(), near: nearText(balance) },
     balanceAfter: {
@@ -229,6 +272,9 @@ function printPlan(plan) {
   console.log('Storage now: ' + plan.storage.bytes + ' bytes, stake ' + plan.storage.stake + ' yoctoNEAR (' + plan.storage.near + ' NEAR)');
   console.log('Storage after: ' + plan.nextStorage.bytes + ' bytes, stake ' + plan.nextStorage.stake + ' yoctoNEAR (' + plan.nextStorage.near + ' NEAR)');
   console.log('Create: stake ' + plan.create.stake + ' yoctoNEAR plus slack ' + plan.create.slack + ' yoctoNEAR (' + nearText(plan.create.slack) + ' NEAR, at most 0.05) = ' + plan.create.yocto + ' yoctoNEAR (' + plan.create.near + ' NEAR)');
+  if (plan.inference) {
+    console.log('Inference: ' + plan.inference.rounds + ' rounds at ' + plan.inference.costYocto + ' yoctoNEAR (' + plan.inference.costNear + ' NEAR) = ' + plan.inference.budgetYocto + ' yoctoNEAR (' + plan.inference.budgetNear + ' NEAR), ' + plan.inference.fundedFrom + ', model ' + (plan.inference.model || 'unset'));
+  }
   if (plan.ownerRunning) {
     console.log('Owner ' + plan.owner + ' balance: ' + plan.ownerRunning.open.yocto + ' yoctoNEAR (' + plan.ownerRunning.open.near + ' NEAR)');
     console.log('Owner ' + plan.owner + ' balance after close: ' + plan.ownerRunning.afterClose.yocto + ' yoctoNEAR (' + plan.ownerRunning.afterClose.near + ' NEAR)');
@@ -354,7 +400,9 @@ async function signLive(plan) {
         A.transfer(BigInt(plan.create.yocto)),
         A.deployContract(new Uint8Array(wasm)),
         A.functionCall('new', {
-          board: BOARD, owner: OWNER, inference_budget: '0', inference_cost: '0',
+          board: BOARD, owner: OWNER,
+          inference_budget: plan.inference.budgetYocto,
+          inference_cost: plan.inference.costYocto,
         }, 80n * TG, 0n),
       ],
     });
@@ -399,6 +447,11 @@ async function main() {
     wasm,
     stateBytes: pin.state_bytes,
     slackYocto: pin.slack_yocto,
+    inference: {
+      rounds: INFERENCE_ROUNDS,
+      costYocto: INFERENCE_COST_YOCTO,
+      model: process.env.ARENA_MODEL || DEFAULT_MODEL,
+    },
     ownerBalanceYocto: state.ownerAccount
       ? (BigInt(state.ownerAccount.amount) - BigInt(state.ownerAccount.storage_usage) * BYTE_YOCTO).toString()
       : null,

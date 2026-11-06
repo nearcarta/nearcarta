@@ -33,6 +33,41 @@ export const OWNER_ONLY_METHODS = ['cancel_hold', 'expire_sent'];
 export const HOLD_METHODS = ['confirm_hold', 'cancel_hold', 'expire_sent'];
 
 /**
+ * The human-intent scope. A hold is a shop action the agent asked for and the visitor must
+ * release. Three independent things have to agree that a human is present:
+ *
+ *  1. the *method*: `confirm_hold` is in the key's list, but the signature must come from
+ *     the row's separate confirm key, and `set_confirm_key` refuses `pk == agent`;
+ *  2. the *key slot*: the browser keeps the confirm key in a slot the agent path cannot
+ *     read (`arena-live.js` `visitorHoldAction` vs `agentArenaSend`), so a model that asks
+ *     to confirm has no key to sign with;
+ *  3. the *intent flag*: the executor's `humanIntent` is set by a click handler and fixed
+ *     false on the agent path, so the hold branch is unreachable from model output.
+ *
+ * `cancel_hold` and `expire_sent` are strictly the visitor's wallet (`predecessor ==
+ * owner` in the contract); they are never in a session key, so an agent cannot quietly
+ * undo a held WARN or decide its liability.
+ */
+export const HUMAN_INTENT_METHODS = Object.freeze(['confirm_hold']);
+/** The scope a visitor's confirm key is added for. Not the agent key's receiver scope. */
+export const CONFIRM_KEY_METHODS = Object.freeze(['confirm_hold']);
+
+/** True when a method needs a human at the keyboard rather than the agent. */
+export function needsHumanIntent(method) {
+  return HUMAN_INTENT_METHODS.includes(String(method || ''));
+}
+
+/**
+ * True when a confirm key would be the agent key. `set_confirm_key` refuses this on
+ * chain; this is the same check for the page, so setup can never build the unsafe shape.
+ */
+export function confirmKeyIsAgent(confirmKey, agentKey) {
+  const a = String(agentKey || '').trim();
+  const c = String(confirmKey || '').trim();
+  return !!a && a === c;
+}
+
+/**
  * True when a key scope would let the agent confirm a hold with nothing else. It cannot:
  * a confirm signature must come from the row's confirm key, and `set_confirm_key`
  * refuses to store the agent key. This is the invariant /setup and the shops rely on.

@@ -1020,6 +1020,9 @@ const APPS = {
         if (plan.decision === 'ready' && plan.call) return A.arenaCall(plan);
         return plan;
       },
+      confirmKey: () => globalThis.__arenaConfirmKeyValue || null,
+      confirmHold: (p) => A.arenaConfirm(p),
+      cancelHold: (p) => A.arenaCancel(p),
       say: (t) => say(String(t || '')),
     }),
     btn: '',
