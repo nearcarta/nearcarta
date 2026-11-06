@@ -31,10 +31,10 @@ test('the board wasm deploys for at most 2.1 NEAR and the state size matches the
   assert.equal(MAIN.board.full_access_keys, 0);
   // close_charter on the live wasm: smoke close H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf (nearblocks).
   assert.equal(MAIN.board.txs.smoke_close_charter, 'H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf');
-  assert.equal(MAIN.board.code_hash, 'Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C');
-  // The live account is still the 2026-11-05 wasm. The artifact is the v2 file, not that hash.
-  assert.equal(MAIN.board.wasm_sha256, '910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29');
-  assert.notEqual(MAIN.board.wasm_sha256, createHash('sha256').update(wasm).digest('hex'));
+  // Board v2 is live: recreate 8dSvGGoW23wAVVEBVL2CEDBHXBJvoVKbN9nPxKJrAgPj. The live hash is the artifact.
+  assert.equal(MAIN.board.code_hash, 'BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g');
+  assert.equal(MAIN.board.wasm_sha256, createHash('sha256').update(wasm).digest('hex'));
+  assert.equal(MAIN.board.previous.code_hash, 'Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C');
   assert.equal(MAIN.board.owner, MAIN.root);
   assert.equal(MAIN.board.max_row_yocto, '20000000000000000000000');
   assert.match(readFileSync(new URL('../../../contracts/charter_board/src/lib.rs', import.meta.url), 'utf8'), /fn reap/);

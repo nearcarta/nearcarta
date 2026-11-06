@@ -163,6 +163,12 @@ function moneyOf(row) {
   };
 }
 
+const MONTH_INDEX = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5,
+  jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+
 function parseDay(value) {
   const s = String(value || '').trim();
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
@@ -171,7 +177,23 @@ function parseDay(value) {
   if (m) return { y: +m[3], m: +m[1], d: +m[2] };
   m = s.match(/^(\d{1,2})[/-](\d{1,2})$/);
   if (m) return { y: 0, m: +m[1], d: +m[2] };
+  m = s.match(/^([A-Za-z]+)\.?\s+(\d{1,2})(?:,?\s*(\d{4}))?$/);
+  if (m) {
+    const month = MONTH_INDEX[m[1].toLowerCase()];
+    if (month) return { y: m[3] ? +m[3] : 0, m: month, d: +m[2] };
+  }
   return null;
+}
+
+/** A spoken date becomes a day parseDay can group. Yearless dates stay month/day. */
+export function spokenDate(text) {
+  const s = String(text || '').trim().replace(/\.$/, '');
+  if (!s) return '';
+  const day = parseDay(s);
+  if (!day) return '';
+  const month = String(day.m).padStart(2, '0');
+  const date = String(day.d).padStart(2, '0');
+  return day.y ? `${day.y}-${month}-${date}` : `${day.m}/${day.d}`;
 }
 
 function dayLabel(d) {
@@ -366,6 +388,111 @@ export function agentReply(rows, question, { capNear, sampleName } = {}) {
   return `${head}${bits.join(' ')}`;
 }
 
+const ROW_STOP = new Set('check my spending spend spent audit the a an and or on for of in to please these this those rows row charges charge charged look looks like waste list statement any duplicates duplicate double subscription subscriptions with from is are was were twice times time paid pay i me tell about what which show also then plus at usd dollars dollar near cap limit limits nonce sample week your you'.split(' '));
+
+function chargeCount(word) {
+  const s = String(word || '').toLowerCase();
+  if (!s) return 1;
+  if (/twice|double|x2|two/.test(s)) return 2;
+  const n = Number((s.match(/(\d+)/) || [])[1]);
+  if (!Number.isInteger(n) || n < 1) return 1;
+  return Math.min(n, 12);
+}
+
+/**
+ * Charges written in a chat line: merchant, amount, optional date, optional count.
+ * "Spotify 9.99 twice on Oct 3 and Amazon 40" is three rows. A line with no amount is empty.
+ */
+export function rowsInMessage(text) {
+  const src = String(text || '').replace(/[;|]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!src) return [];
+  const re = /(?<payee>[A-Za-z][A-Za-z0-9+'.&-]*)(?:\s+(?<extra>[A-Za-z][A-Za-z0-9+'.&-]*))?\s+(?:for\s+|of\s+|at\s+)?\$?(?<amount>\d+(?:\.\d{1,2})?)(?!\d)(?:\s+(?<count>twice|double|two\s+times|x2|\d+\s+times?))?(?:\s+on\s+(?<date>\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|[A-Za-z]{3,9}\.?\s+\d{1,2}(?:,?\s*\d{4})?))?/gi;
+  const rows = [];
+  for (const m of src.matchAll(re)) {
+    let payee = m.groups.payee;
+    const extra = m.groups.extra || '';
+    const extraStop = !extra || ROW_STOP.has(extra.toLowerCase()) || MONTH_INDEX[extra.toLowerCase()];
+    if (ROW_STOP.has(payee.toLowerCase()) || MONTH_INDEX[payee.toLowerCase()]) {
+      if (!extra || extraStop) continue;
+      payee = extra;
+    } else if (!extraStop) payee = `${payee} ${extra}`;
+    const amount = Number(m.groups.amount);
+    if (!payee || !Number.isFinite(amount) || amount <= 0) continue;
+    const date = spokenDate(m.groups.date || '');
+    const count = chargeCount(m.groups.count);
+    for (let i = 0; i < count && rows.length < CSV_MAX_ROWS; i++) {
+      rows.push({ date, payee, amount, currency: '', category: '' });
+    }
+  }
+  return rows;
+}
+
+function singleChargeText(row) {
+  const unit = row.currency ? ` ${row.currency}` : ' as written';
+  return `${row.payee}, ${amountText(row.amount)}${unit}. It is a single charge.`;
+}
+
+/** Repeats, then single charges, then subscriptions. Used when the rows came from the message. */
+export function messageAuditReply(rows) {
+  const findings = statementFindings(rows);
+  const repeats = findings.filter(f => f.kind !== 'subscription');
+  const subs = findings.filter(f => f.kind === 'subscription');
+  const repeated = new Set(repeats.map(f => f.payee.toLowerCase()));
+  const seen = new Set();
+  const singles = [];
+  for (const row of (Array.isArray(rows) ? rows : []).map(moneyOf)) {
+    if (!row.payee || !Number.isFinite(row.amount) || row.amount <= 0) continue;
+    const key = row.payee.toLowerCase();
+    if (repeated.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    singles.push(singleChargeText(row));
+  }
+  const bits = [...repeats.map(f => f.text), ...singles, ...subs.map(f => f.text)];
+  if (!bits.length) return 'No charge was named in that message.';
+  return bits.join(' ');
+}
+
+/**
+ * Keep a model sentence only when it names every merchant in the message.
+ * A repeated charge also has to be described as a repeat. Otherwise the parser's sentence is the answer.
+ */
+export function preferModelSentence(answer, rows, fallback) {
+  const text = String(answer || '').trim();
+  const payees = [...new Set((Array.isArray(rows) ? rows : []).map(r => String(r.payee || '').trim()).filter(Boolean))];
+  const local = String(fallback || '');
+  if (!text || !payees.length) return { text: local, source: 'parser' };
+  const low = text.toLowerCase();
+  if (!payees.every(p => low.includes(p.toLowerCase()))) return { text: local, source: 'parser' };
+  const repeats = statementFindings(rows).filter(f => f.kind !== 'subscription');
+  if (repeats.length && !/twice|double|times|repeat|again/.test(low)) return { text: local, source: 'parser' };
+  return { text: text.slice(0, 400), source: 'model' };
+}
+
+/** The verdict belongs to the nonce that was checked. Any other nonce has not been checked. */
+export function attestForNonce({ nonce, checkedNonce, label, live, fields, pending } = {}) {
+  if (pending && nonce && nonce !== checkedNonce) {
+    return { label: '', live: 'Asking NEAR AI', fields: [], checked: false, pending: true };
+  }
+  if (!nonce || nonce !== checkedNonce) {
+    return { label: '', live: 'Not checked yet.', fields: [], checked: false, pending: false };
+  }
+  return {
+    label: label || '',
+    live: live || 'Not checked yet.',
+    fields: Array.isArray(fields) ? fields : [],
+    checked: true,
+    pending: false,
+  };
+}
+
+export function browserSignatureLine(ok) {
+  return ok
+    ? 'ed25519 signature checked in your browser: valid'
+    : 'ed25519 signature checked in your browser: not valid';
+}
+
+export const CHECK_SPLIT = 'Checked in this browser: the ed25519 signature over the signed text. Checked on the server: the model report, the TDX quote, the GPU quote, the nonce, and that the signing address is bound to the quote.';
+
 function hexToBytes(hex) {
   const s = String(hex || '').trim().replace(/^0x/, '');
   if (!s || s.length % 2 || /[^0-9a-f]/i.test(s)) return null;
@@ -459,12 +586,12 @@ export function attestFields(body, signature) {
   const sig = signature || {};
   const sigOk = sig.ok === true;
   return [
-    { id: 'model', label: 'Model', ok: !!(body?.model && model.ok), value: body?.model || '', why: body?.model ? (model.ok ? '' : (body?.failure || 'The model report did not pass')) : 'No model was checked' },
-    { id: 'signer', label: 'Signing address', ok: signerOk, value: model.signing_address || '', why: signerOk ? '' : 'The signing address is not bound to the quote' },
-    { id: 'tdx', label: 'TDX quote', ok: tdxOk, value: model.tcbStatus || gateway.tcbStatus || '', why: tdxOk ? '' : (gateway.error || model.error || body?.failure || 'The TDX quote did not pass') },
-    { id: 'gpu', label: 'GPU quote', ok: gpuOk, value: gpuOk ? `${model.gpu.gpus || ''} GPU`.trim() : '', why: gpuOk ? '' : (model.gpu?.why || (model.gpu ? 'The GPU verdict did not pass' : 'No GPU evidence')) },
-    { id: 'nonce', label: 'Nonce', ok: nonceOk, value: body?.nonce || '', why: nonceOk ? '' : 'The quote nonce does not match the one this page sent' },
-    { id: 'signature', label: 'Response signature', ok: sigOk, value: sig.kind || '', why: sigOk ? '' : (sig.why || 'No completion was sent, so the response signature was not checked') },
+    { id: 'model', label: 'Model', where: 'server', ok: !!(body?.model && model.ok), value: body?.model || '', why: body?.model ? (model.ok ? '' : (body?.failure || 'The model report did not pass')) : 'No model was checked' },
+    { id: 'signer', label: 'Signing address', where: 'server', ok: signerOk, value: model.signing_address || '', why: signerOk ? '' : 'The signing address is not bound to the quote' },
+    { id: 'tdx', label: 'TDX quote', where: 'server', ok: tdxOk, value: model.tcbStatus || gateway.tcbStatus || '', why: tdxOk ? '' : (gateway.error || model.error || body?.failure || 'The TDX quote did not pass') },
+    { id: 'gpu', label: 'GPU quote', where: 'server', ok: gpuOk, value: gpuOk ? `${model.gpu.gpus || ''} GPU`.trim() : '', why: gpuOk ? '' : (model.gpu?.why || (model.gpu ? 'The GPU verdict did not pass' : 'No GPU evidence')) },
+    { id: 'nonce', label: 'Nonce', where: 'server', ok: nonceOk, value: body?.nonce || '', why: nonceOk ? '' : 'The quote nonce does not match the one this page sent' },
+    { id: 'signature', label: 'ed25519 signature', where: 'browser', ok: sigOk, value: sigOk ? 'valid' : '', why: sigOk ? '' : (sig.why || 'No completion was sent, so the response signature was not checked') },
   ];
 }
 

@@ -7,9 +7,9 @@ import { liveTee } from '../tee-view.js';
 import { tokenStack, bindTokenFallbacks } from './token-badge.js';
 import {
   DEFAULT_MODEL, SAMPLES, FORMAT_LINE, SAMPLE_CSV, sampleById, parseStatementCsv, auditStatement,
-  statementFindings, agentReply, APPLY_NOTE, verifyBrowserSignature,
+  statementFindings, agentReply, messageAuditReply, preferModelSentence, APPLY_NOTE, verifyBrowserSignature,
   tightenDecision, freshNonce, saltFor, commitmentText, hashText,
-  proofLogEntry, plural, attestFields,
+  proofLogEntry, plural, attestFields, attestForNonce, browserSignatureLine, CHECK_SPLIT,
 } from './bank-audit.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -79,6 +79,22 @@ function flow(right) {
   return `<div class="bank-flow" data-testid="bank-flow">${DOC}<span class="bank-flow-arrow" aria-hidden="true">→</span>${right}</div>`;
 }
 
+function fieldHtml(f) {
+  if (f.id === 'signature') {
+    const line = f.ok ? browserSignatureLine(true) : `${browserSignatureLine(false)}${f.why ? `. ${f.why}` : ''}`;
+    return `<li data-testid="tee-field-signature">${esc(line)}</li>`;
+  }
+  if (f.id === 'signer') {
+    const full = String(f.value || '');
+    const copy = full
+      ? ` <button type="button" class="bank-copy" data-testid="tee-copy-signer" data-copy="${esc(full)}">Copy</button>`
+      : '';
+    return `<li data-testid="tee-field-signer"><b>Signing address</b> checked on the server, ${f.ok ? 'verified' : 'not verified'} · <span class="bank-signer" data-testid="tee-signer">${esc(full)}</span>${copy}${f.ok ? '' : ` · ${esc(f.why)}`}</li>`;
+  }
+  const shown = f.id === 'nonce' ? shortNonce(f.value) : f.value;
+  return `<li data-testid="tee-field-${esc(f.id)}"><b>${esc(f.label)}</b> checked on the server, ${f.ok ? 'verified' : 'not verified'}${shown ? ` · ${esc(shown)}` : ''}${f.ok ? '' : ` · ${esc(f.why)}`}</li>`;
+}
+
 export function bankMarkup(state) {
   const tab = state.tab || 'audit';
   const who = state.who;
@@ -103,8 +119,12 @@ export function bankMarkup(state) {
       : `<label class="choice-label">Current cap</label><p class="bank-field" data-testid="bank-before">${esc(nearText(review.before))}</p>
       <p class="bank-format" data-testid="bank-cap-note">${esc(review.rateSource || 'No lower cap comes from this statement.')}</p>
       <p class="bank-format" data-testid="bank-apply-note">${esc(APPLY_NOTE)}</p>`);
-      const audit = `<section class="bank-pane" data-pane="audit" ${tab === 'audit' ? '' : 'hidden'}>
-      ${flow(tokenStack('NEAR', '', { size: 48 }))}
+  const sigLine = state.browserSig
+    ? (state.browserSig.ok ? browserSignatureLine(true) : (state.browserSig.why || browserSignatureLine(false)))
+    : '';
+  const audit = `<section class="bank-pane" data-pane="audit" data-testid="bank-pane-audit" ${tab === 'audit' ? '' : 'hidden'}>
+      <div class="bank-scroll" data-testid="bank-scroll">
+      ${review ? '' : flow(tokenStack('NEAR', '', { size: 40 }))}
       ${review ? '' : `<p class="bank-format" data-testid="bank-format">Accepted format: ${esc(FORMAT_LINE)}.</p>
       <button type="button" class="bank-sample-link" data-testid="bank-sample-file">Download a sample</button>
       <label class="choice-label" for="bank-sample" data-testid="bank-sample-label">Sample</label>
@@ -125,41 +145,76 @@ export function bankMarkup(state) {
       <label class="choice-label">Findings</label><p class="bank-field" data-testid="bank-waste">${esc(review.wasteText || '')}</p>
       <label class="choice-label">Anomalies</label><p class="bank-field" data-testid="bank-anomalies">${anomalies}</p>
       ${capNote}
-      <label class="bank-consent"><input type="checkbox" data-testid="bank-consent"${state.consent ? ' checked' : ''}> Publish a salted commitment, not the statement</label>` : ''}
+      <label class="bank-consent"><input type="checkbox" data-testid="bank-consent"${state.consent ? ' checked' : ''}> Publish a salted commitment, not the statement</label>
+      ${state.modelAnswer ? `<p class="bank-status" data-testid="bank-model-answer">${esc(state.modelAnswer)}</p>` : ''}
+      ${sigLine ? `<p class="bank-status" data-testid="bank-browser-sig">${esc(sigLine)}</p>` : ''}
+      ${state.status2 ? `<p class="bank-status" data-testid="bank-status-2">${esc(state.status2)}</p>` : ''}` : ''}
+      </div>
+      <div class="bank-foot" data-testid="bank-foot-audit">
+      ${review ? '<button type="button" class="bank-again" data-testid="bank-again">Audit another statement</button>' : ''}
       <button type="button" class="primary bank-cta" data-testid="bank-audit" id="bank-audit">${esc(cta)}</button>
       <p class="bank-status" data-testid="bank-status">${esc(state.status || '')}</p>
-      <p class="bank-status" data-testid="bank-status-2">${esc(state.status2 || '')}</p>
-      ${state.modelAnswer ? `<p class="bank-status" data-testid="bank-model-answer">${esc(state.modelAnswer)}</p>` : ''}
-      ${state.browserSig ? `<p class="bank-status" data-testid="bank-browser-sig">${state.browserSig.ok ? 'Checked in this browser.' : esc(state.browserSig.why)}</p>` : ''}
-      ${review ? '<button type="button" class="bank-again" data-testid="bank-again">Audit another statement</button>' : ''}
+      </div>
     </section>`;
-  const fields = (state.fields || []).map(f => `<li data-testid="tee-field-${esc(f.id)}"><b>${esc(f.label)}</b> ${f.ok ? 'verified' : 'not verified'}${f.value ? ` · ${esc(f.id === 'nonce' || f.id === 'signer' ? shortNonce(f.value) : f.value)}` : ''}${f.ok ? '' : ` · ${esc(f.why)}`}</li>`).join('');
-  const attest = `<section class="bank-pane" data-pane="attest" ${tab === 'attest' ? '' : 'hidden'}>
-      ${flow(SHIELD)}
+  const attestView = attestForNonce({
+    nonce: state.attestNonce,
+    checkedNonce: state.checkedNonce,
+    label: state.teeLabel,
+    live: state.teeLive,
+    fields: state.fields,
+    pending: state.attestPending,
+  });
+  const fieldOrder = ['model', 'tdx', 'gpu', 'nonce'];
+  const listed = (attestView.fields || []).filter(f => f.id !== 'signature' && f.id !== 'signer');
+  const fields = [...listed]
+    .sort((a, b) => fieldOrder.indexOf(a.id) - fieldOrder.indexOf(b.id))
+    .map(fieldHtml)
+    .join('');
+  const sigField = (attestView.fields || []).find(f => f.id === 'signature');
+  const signerField = (attestView.fields || []).find(f => f.id === 'signer');
+  const signerHex = String(signerField?.value || '');
+  const signerFoot = attestView.checked ? `<p class="bank-status" data-testid="tee-field-signature">${esc(sigField?.ok ? browserSignatureLine(true) : browserSignatureLine(false))}</p>
+      <div class="bank-signer-line" data-testid="bank-signer-line">
+        <span class="bank-kicker">Signing address</span>
+        ${signerHex ? `<button type="button" class="bank-copy" data-testid="tee-copy-signer" data-copy="${esc(signerHex)}">Copy</button>` : ''}
+        <span class="bank-signer" data-testid="tee-signer">${esc(signerHex || 'No signing address was in the report.')}</span>
+      </div>` : '';
+  const attest = `<section class="bank-pane" data-pane="attest" data-testid="bank-pane-attest" ${tab === 'attest' ? '' : 'hidden'}>
+      <div class="bank-scroll" data-testid="bank-scroll-attest">
+      ${attestView.checked ? '' : flow(SHIELD)}
       <div class="bank-meta">
         <label class="choice-label" for="bank-model">TEE model</label>
         <input id="bank-model" data-testid="bank-model" value="${esc(state.model || DEFAULT_MODEL)}" readonly>
         <label class="choice-label" for="bank-nonce">Fresh nonce</label>
-        <input id="bank-nonce" data-testid="bank-nonce" value="${esc(shortNonce(state.nonce))}" title="${esc(state.nonce)}" readonly>
+        <input id="bank-nonce" data-testid="bank-nonce" value="${esc(shortNonce(state.attestNonce))}" title="${esc(state.attestNonce || '')}" readonly>
       </div>
-      <p class="bank-field" data-testid="bank-eligibility">${esc(state.eligibility || 'Not checked yet.')}</p>
+      <p class="bank-field" data-testid="bank-eligibility">${esc(attestView.checked ? (state.eligibility || attestView.live) : attestView.live)}</p>
+      ${attestView.checked ? `<p class="bank-format" data-testid="tee-where">${esc(CHECK_SPLIT)}</p>` : ''}
       ${fields ? `<ul class="bank-steps" data-testid="tee-fields">${fields}</ul>` : ''}
+      </div>
+      <div class="bank-foot" data-testid="bank-foot-attest">
+      ${signerFoot}
       <button type="button" class="primary bank-cta" data-testid="tee-verify" id="tee-verify">Verify the TEE now</button>
-      <p class="bank-status" data-testid="tee-result">${esc(state.teeLabel || '')}</p>
-      <p class="bank-status" data-testid="tee-live">${esc(state.teeLive || '')}</p>
-      ${state.teeFail ? `<p class="bank-status" data-testid="tee-fail">${esc(state.teeFail)}</p>` : ''}
+      <p class="bank-status" data-testid="tee-result">${esc(attestView.label || '')}</p>
+      <p class="bank-status" data-testid="tee-live">${esc(attestView.live || '')}</p>
+      ${attestView.checked && state.teeFail ? `<p class="bank-status" data-testid="tee-fail">${esc(state.teeFail)}</p>` : ''}
+      </div>
     </section>`;
   const rows = (state.log || []).slice(-6).map(e => {
     const n = e.anomalyCount;
     const anom = n == null ? '' : `${plural(n, 'anomaly', 'anomalies')} · `;
     return `<li data-testid="bank-log-row">${esc(e.kind)} · ${e.lines == null ? 'no lines' : plural(e.lines, 'line', 'lines')} · ${anom}${esc(e.nonce)}</li>`;
   }).join('');
-  const log = `<section class="bank-pane" data-pane="log" ${tab === 'log' ? '' : 'hidden'}>
+  const log = `<section class="bank-pane" data-pane="log" data-testid="bank-pane-log" ${tab === 'log' ? '' : 'hidden'}>
+      <div class="bank-scroll" data-testid="bank-scroll-log">
       ${flow(LIST)}
       <ul class="bank-log" data-testid="bank-log">${rows || '<li data-testid="bank-log-empty">No audit yet.</li>'}</ul>
+      </div>
+      <div class="bank-foot" data-testid="bank-foot-log">
       <button type="button" class="primary bank-cta" data-testid="bank-file-btn" id="bank-file-btn">Show the attestation file</button>
       <p class="bank-status" data-testid="bank-file-note">${esc(state.fileNote || 'Request and response bytes are not stored.')}</p>
       <p class="bank-status" data-testid="bank-held">${esc(state.held || 'Confidential pay stays off. Nothing was spent.')}</p>
+      </div>
     </section>`;
   return `<div class="bank-card">
     <p class="bank-session" data-testid="bank-session" title="${esc(who?.account || '')}">${session}</p>
@@ -217,6 +272,7 @@ export function mountBankRoom(root, hooks = {}) {
   ensureBankDock(doc0);
   const state = hooks.state || {};
   if (!state.nonce) state.nonce = freshNonce();
+  if (!state.attestNonce) state.attestNonce = freshNonce(32);
   if (!state.sample) state.sample = 'cafe';
   if (!state.model) state.model = DEFAULT_MODEL;
   if (!state.log) state.log = [];
@@ -261,39 +317,20 @@ export function mountBankRoom(root, hooks = {}) {
   }
 
   async function takeModel(model) {
+    state.signingAddress = model?.signing_address || '';
     if (model?.signed_text && model?.signature && model?.signing_address) {
       state.browserSig = await verifyBrowserSignature({
         text: model.signed_text,
         signature: model.signature,
         signingAddress: model.signing_address,
       });
-    } else {
+    } else if (model) {
       state.browserSig = { ok: false, why: 'The signature bytes were not in the response, so this browser did not check them.' };
     }
-    if (Array.isArray(model?.fields)) {
-      state.fields = model.fields.map(f => {
-        if (f.id !== 'signature') return f;
-        return {
-          ...f,
-          ok: !!state.browserSig.ok,
-          why: state.browserSig.ok ? '' : state.browserSig.why,
-          value: model.signature_kind || f.value || '',
-        };
-      });
-    }
-    if (model?.answer) {
-      state.modelAnswer = model.answer;
-      state.status2 = `TEE model: ${model.answer}`;
-      state.eligibility = state.browserSig.ok
-        ? 'The model sentence was checked in this browser.'
-        : 'The model sentence arrived. This browser did not accept the signature.';
-    } else if (model?.step) {
-      state.modelAnswer = '';
-      state.status2 = model.step;
-      state.eligibility = model.step;
-    } else if (state.browserSig) {
-      state.eligibility = state.browserSig.ok ? 'Checked in this browser.' : state.browserSig.why;
-    }
+    if (model?.answer) state.modelAnswer = model.answer;
+    else state.modelAnswer = '';
+    if (state.browserSig?.ok) state.status2 = browserSignatureLine(true);
+    else if (model?.step) state.status2 = String(model.step).slice(0, 180);
   }
 
   async function runAudit(sampleId, opts = {}) {
@@ -345,8 +382,8 @@ export function mountBankRoom(root, hooks = {}) {
       nonce: state.nonce,
       eligible: false,
     }));
-    state.status = reply;
-    state.status2 = `${plural(report.lines, 'line', 'lines')}. ${plural(report.anomalies.length, 'anomaly', 'anomalies')}. Nothing was signed.`;
+    state.status = 'Nothing was signed.';
+    state.status2 = `${plural(report.lines, 'line', 'lines')}. ${plural(report.anomalies.length, 'anomaly', 'anomalies')}.`;
     const ticket = {};
     state.auditTicket = ticket;
     const asked = rows.map(r => ({ ...r }));
@@ -356,7 +393,7 @@ export function mountBankRoom(root, hooks = {}) {
       await takeModel(model);
       paint();
     }).catch(() => {});
-    return { ok: true, hint: state.status, say: state.status, keep: true, kind: 'ok' };
+    return { ok: true, hint: reply, say: reply, keep: true, kind: 'ok' };
   }
 
   async function runApply() {
@@ -385,33 +422,38 @@ export function mountBankRoom(root, hooks = {}) {
   async function runTee() {
     hooks.hideRefuse?.();
     state.tab = 'attest';
-    state.teeLabel = '';
-    state.teeLive = 'Asking NEAR AI';
+    if (!state.attestNonce || state.checkedNonce === state.attestNonce) state.attestNonce = freshNonce(32);
+    const nonce = state.attestNonce;
+    state.attestPending = true;
     state.teeFail = '';
     state.fields = [];
     paint();
     let body;
     try {
-      body = await liveTee({ api: apiBase(), model: state.model, timeoutMs: 20000 });
+      body = await liveTee({ api: apiBase(), model: state.model, nonce, timeoutMs: 20000 });
     } catch (e) {
-      body = { ok: false, failure: e?.message || 'The attestation request failed' };
+      body = { ok: false, nonce, failure: e?.message || 'The attestation request failed' };
     }
+    if (state.attestNonce !== nonce) return { ok: false, hint: 'Not checked yet.', say: 'Not checked yet.', keep: true, kind: 'no' };
     let signature = { ok: false, why: 'no completion was sent, so this step was not checked' };
     if (state.statement?.length) {
       const model = await postAudit(state.statement, state.model);
+      if (state.attestNonce !== nonce) return { ok: false, hint: 'Not checked yet.', say: 'Not checked yet.', keep: true, kind: 'no' };
       await takeModel(model);
-      if (!model.fields) {
-        signature = {
-          ok: !!state.browserSig?.ok,
-          why: state.browserSig?.ok ? '' : (state.browserSig?.why || String(model.step || '').replace(/^Response signature:\s*/i, '')),
-          kind: model.signature_kind || '',
-        };
-      }
+      signature = {
+        ok: !!state.browserSig?.ok,
+        why: state.browserSig?.ok ? '' : (state.browserSig?.why || String(model.step || '').replace(/^Response signature:\s*/i, '')),
+      };
     }
-    if (!state.fields?.length) state.fields = attestFields(body, signature);
-    const failed = (state.fields || []).filter(f => !f.ok);
+    const echoed = body?.nonce || nonce;
+    state.fields = attestFields({ ...body, nonce: echoed }, signature).map(f => (
+      f.id === 'nonce' ? { ...f, ok: f.ok && echoed === nonce, value: nonce, why: echoed === nonce ? f.why : 'The quote nonce does not match the one this page sent' } : f
+    ));
+    const failed = state.fields.filter(f => !f.ok);
+    state.attestPending = false;
+    state.checkedNonce = nonce;
     state.eligibility = failed.length ? failed.map(f => `${f.label}: ${f.why}`).join(' ') : 'Every listed field was verified.';
-    if (body?.ok && !failed.length) {
+    if (body?.ok && !failed.length && echoed === nonce) {
       state.teeLabel = 'attested';
       state.teeLive = 'Live check passed.';
       state.teeFail = '';
@@ -423,9 +465,9 @@ export function mountBankRoom(root, hooks = {}) {
         ? 'A listed step did not verify. Nothing was signed.'
         : 'The hardware check did not pass. Nothing was signed.';
     }
-    pushLog(proofLogEntry({ kind: 'tee', lines: null, anomalyCount: null, nonce: body?.nonce || state.nonce, eligible: !!body?.ok }));
+    pushLog(proofLogEntry({ kind: 'tee', lines: null, anomalyCount: null, nonce, eligible: state.teeLabel === 'attested' }));
     paint();
-    return { ok: !!body?.ok, hint: state.teeLive, say: state.eligibility, keep: true, kind: body?.ok ? 'ok' : 'no' };
+    return { ok: state.teeLabel === 'attested', hint: state.teeLive, say: state.eligibility, keep: true, kind: state.teeLabel === 'attested' ? 'ok' : 'no' };
   }
 
   async function runFile() {
@@ -457,6 +499,50 @@ export function mountBankRoom(root, hooks = {}) {
     return { ok: true, hint: text, say: text, keep: true, kind: 'ok' };
   }
 
+  async function runMessageAudit(rows) {
+    hooks.hideRefuse?.();
+    state.tab = 'audit';
+    const kept = (state.statement || []).map(r => ({ ...r }));
+    const currency = rows.map(r => r.currency).find(Boolean) || '';
+    const rate = currency && currency !== 'NEAR' ? await readRate(currency) : null;
+    const liveCap = capNear();
+    const report = auditStatement(rows, {
+      capNear: liveCap,
+      nearPerUnit: rate?.ok ? rate.nearPerUnit : null,
+      rateSource: rate?.source || '',
+    });
+    const local = messageAuditReply(rows);
+    state.statement = kept;
+    state.detected = 'These rows are from your message, not the pasted file.';
+    state.review = { ...report, wasteText: local, findings: statementFindings(rows) };
+    state.status = 'Asking NEAR AI about the rows in your message.';
+    state.status2 = 'Nothing was signed.';
+    state.modelAnswer = '';
+    state.browserSig = null;
+    const ticket = {};
+    state.auditTicket = ticket;
+    state.nonce = freshNonce();
+    pushLog(proofLogEntry({
+      kind: 'message',
+      lines: report.lines,
+      anomalyCount: report.anomalies.length,
+      nonce: state.nonce,
+      eligible: false,
+    }));
+    paint();
+    const model = await postAudit(rows, state.model);
+    if (state.auditTicket !== ticket) return { ok: true, hint: local, say: local, keep: true, kind: 'ok' };
+    await takeModel(model);
+    const picked = preferModelSentence(model?.answer, rows, local);
+    state.review = { ...state.review, wasteText: picked.text };
+    state.status = picked.source === 'model'
+      ? 'NEAR AI named the rows in your message.'
+      : 'The parser named the rows in your message.';
+    state.status2 = 'Nothing was signed.';
+    paint();
+    return { ok: true, hint: picked.text, say: picked.text, keep: true, kind: 'ok' };
+  }
+
   async function runAgent(text) {
     const live = root.querySelector('#bank-paste')?.value || '';
     if (live.trim()) {
@@ -472,6 +558,7 @@ export function mountBankRoom(root, hooks = {}) {
     if (parsed.action === 'file') return runFile();
     if (parsed.action === 'apply') return runApply();
     if (parsed.action === 'explain') return runExplain();
+    if (parsed.source === 'message') return runMessageAudit(parsed.rows);
     if (parsed.source === 'loaded') return runAudit(null, { loaded: true, question: parsed.question });
     return runAudit(parsed.sample, { sample: true, question: parsed.question });
   }
@@ -479,9 +566,27 @@ export function mountBankRoom(root, hooks = {}) {
 
   function bind() {
     const doc = root.ownerDocument || document;
+    root.querySelectorAll('[data-copy]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const text = btn.getAttribute('data-copy') || '';
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = 'Copied';
+        } catch {
+          btn.textContent = 'Copy';
+        }
+      });
+    });
     root.querySelectorAll('[data-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
-        state.tab = btn.getAttribute('data-tab');
+        const id = btn.getAttribute('data-tab');
+        if (id === 'attest' && state.tab !== 'attest' && state.attestNonce && state.checkedNonce === state.attestNonce) {
+          state.attestNonce = freshNonce(32);
+          state.attestPending = false;
+        } else if (id === 'attest' && !state.attestNonce) {
+          state.attestNonce = freshNonce(32);
+        }
+        state.tab = id;
         paint();
       });
     });
