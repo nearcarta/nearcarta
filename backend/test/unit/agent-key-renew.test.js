@@ -21,9 +21,10 @@ test('agentMethodsReady needs every AGENT_METHODS entry, or an empty list', () =
   assert.equal(agentMethodsReady(undefined), true);
   assert.equal(agentMethodsReady(['propose']), false);
   assert.equal(agentMethodsReady(['propose_call']), false);
-  assert.equal(agentMethodsReady(['propose', 'propose_call']), true);
-  assert.equal(agentMethodsReady(['propose_call', 'propose', 'extra']), true);
-  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call']);
+  assert.equal(agentMethodsReady(['propose', 'propose_call']), false);
+  assert.equal(agentMethodsReady(['propose', 'propose_call', 'propose_call_as']), true);
+  assert.equal(agentMethodsReady(['propose_call_as', 'propose_call', 'propose', 'extra']), true);
+  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as']);
 });
 
 test('classifyBoardAgentKeys marks propose-only keys stale and flags renew', () => {
@@ -53,7 +54,7 @@ test('classifyBoardAgentKeys marks propose-only keys stale and flags renew', () 
   const readyKeys = [
     {
       public_key: 'ed25519:Ready',
-      access_key: { permission: { FunctionCall: { receiver_id: BOARD, method_names: ['propose', 'propose_call'], allowance: '1' } } },
+      access_key: { permission: { FunctionCall: { receiver_id: BOARD, method_names: ['propose', 'propose_call', 'propose_call_as'], allowance: '1' } } },
     },
   ];
   const ok = classifyBoardAgentKeys(readyKeys, BOARD);
@@ -74,7 +75,7 @@ test('renewAgentKeyActions deletes stale keys then adds propose+propose_call', (
   assert.deepEqual(actions[1], { type: 'DeleteKey', params: { publicKey: 'ed25519:GoFAZP3cStale' } });
   assert.equal(actions[2].type, 'AddKey');
   assert.equal(actions[2].params.publicKey, 'ed25519:NewAgent');
-  assert.deepEqual(actions[2].params.accessKey.permission.methodNames, ['propose', 'propose_call']);
+  assert.deepEqual(actions[2].params.accessKey.permission.methodNames, ['propose', 'propose_call', 'propose_call_as']);
   assert.equal(actions[2].params.accessKey.permission.receiverId, BOARD);
   assert.equal(actions[2].params.accessKey.permission.allowance, GAS_ALLOWANCE_YOCTO);
 });
@@ -115,7 +116,7 @@ test('refresh replaces a ready board key with 0.25 NEAR of gas and does not touc
   assert.equal(actions[0].params.publicKey, 'ed25519:BzdHuEoDReady');
   assert.equal(actions[1].type, 'AddKey');
   assert.equal(actions[1].params.accessKey.permission.allowance, GAS_TOPUP_YOCTO);
-  assert.deepEqual(actions[1].params.accessKey.permission.methodNames, ['propose', 'propose_call']);
+  assert.deepEqual(actions[1].params.accessKey.permission.methodNames, ['propose', 'propose_call', 'propose_call_as']);
   const src = read('app/house/setup.js');
   const fn = src.slice(src.indexOf('async function refreshAgentKey'), src.indexOf('function bindRefreshKey'));
   assert.match(fn, /GAS_TOPUP_YOCTO/);

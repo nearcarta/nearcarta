@@ -690,3 +690,34 @@ fn a_stranger_cannot_open_a_crossing() {
     deposit("mallory.test", 5);
     let _ = o.cross(acc("visitor.test"), 1, "base".into(), "native".into(), OTHER.into(), U128(1), U128(50));
 }
+
+/// Board v2 (`propose_call_as` at a5d9bfe): a failed hold is `refund_action(owner, action_id)`
+/// with the service deposit attached. The top-level `row_owner` argument is the owner.
+/// `confirm_hold`, `cancel_hold` and `expire_sent` stay on the board.
+#[test]
+fn a_failed_crossing_promises_refund_action_for_that_row() {
+    let mut o = toll();
+    price(&mut o);
+    let id = open(&mut o, "visitor.test", 9, "native", OTHER, 1, 50);
+    assert_eq!(o.get_order(id).unwrap().row_owner, acc("visitor.test"));
+    set("board.test");
+    o.cancel_order(id);
+    let _ = o.refund_order(id);
+    let mut calls: Vec<(String, String, u128)> = vec![];
+    for r in near_sdk::test_utils::get_created_receipts() {
+        let to = r.receiver_id.to_string();
+        for a in r.actions {
+            if let near_sdk::mock::MockAction::FunctionCallWeight { method_name, args, attached_deposit, .. } = a {
+                let name = String::from_utf8(method_name).unwrap_or_default();
+                calls.push((format!("{to} {name}"), String::from_utf8(args).unwrap_or_default(), attached_deposit.as_yoctonear()));
+            }
+        }
+    }
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].0, "board.test refund_action");
+    assert_eq!(calls[0].2, 5);
+    let args: serde_json::Value = serde_json::from_str(&calls[0].1).unwrap();
+    assert_eq!(args["owner"], json!("visitor.test"));
+    assert_eq!(args["action_id"], json!("9"));
+    assert!(args.get("row_owner").is_none());
+}

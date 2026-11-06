@@ -219,6 +219,8 @@ export function policyQuote(live) {
     path: live.path || '',
     foreignAddress: live.foreign_address || '',
     maxPerTx: asYocto(live.max_per_tx) || '',
+    maxToken: asYocto(price?.max_token) || '',
+    contract: live.contract || '',
     spent: asYocto(live.spent) || '',
     budget: asYocto(live.budget) || '',
     board: cross?.board || live.board || '',
@@ -383,7 +385,7 @@ export function passPaidCopy({ balanceNear, feeNear, to } = {}) {
   const fee = feeNear || 'The policy fee in';
   const bal = balanceNear ? ` Row balance ${balanceNear} NEAR.` : '';
   const dest = to ? ` to ${to}` : '';
-  return `Pass paid. ${fee} NEAR went to toll.nearcarta.near.${bal} This receipt is not a Base payment. The crossing${dest} waits for the board. Nothing was signed on Base.`;
+  return `Pass paid. ${fee} NEAR went to toll.nearcarta.near.${bal} This receipt is not a Base payment. The board opened the crossing${dest}. Nothing was signed on Base.`;
 }
 
 export function policyWords(live) {

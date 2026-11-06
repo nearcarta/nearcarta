@@ -342,7 +342,9 @@ impl Oath {
 
     pub fn get_order(&self, id: u64) -> Option<Order> { self.orders.get(&id).cloned() }
 
-    /// The board opens a crossing. This does not call the signer, so it fits a 30 Tgas forward.
+    /// The board opens a crossing. This does not call the signer, so it fits the 30 Tgas
+    /// `propose_call_as` forward. `row_owner` is the top-level field the board injects.
+    /// A nested `row_owner` is not a parameter of this method. The predecessor must be the board.
     #[payable]
     pub fn cross(&mut self, row_owner: AccountId, action_id: u64, chain: String, asset: String, to: String, amount: U128, row_budget: U128) -> u64 {
         let price = self.price.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no price"));
@@ -409,17 +411,27 @@ impl Oath {
         self.fail_order(id);
     }
 
-    /// The board pulls a failed service deposit once. The foreign amount is not part of this refund.
+    /// One refund of a failed service deposit. The promise is `refund_action` on the board:
+    /// predecessor must be this shop, and the attached deposit must equal the hold.
+    /// `confirm_hold`, `cancel_hold` and `expire_sent` are board methods. This shop does not implement them.
+    /// A successful `cross` lets the board clear the hold in `on_called_as`, so this refund
+    /// only lands while that hold is still present.
     pub fn refund_order(&mut self, id: u64) -> Promise {
         let price = self.price.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no price"));
         require!(env::predecessor_account_id() == price.board, "REFUSED: only the board can refund a crossing");
         let mut liab = self.liabilities.get(&id).cloned().unwrap_or_else(|| env::panic_str("REFUSED: nothing is owed"));
         require!(!liab.refunded, "REFUSED: this deposit was already refunded");
+        let action_id = self.orders.get(&id).map(|o| o.action_id).unwrap_or_else(|| env::panic_str("REFUSED: no such crossing"));
         liab.refunded = true;
         self.service_held -= liab.amount.0;
         self.liabilities.insert(id, liab.clone());
         if let Some(mut order) = self.orders.get(&id).cloned() { order.status = "refunded".into(); self.orders.insert(id, order); }
-        Promise::new(price.board).function_call("credit_row".to_string(), json!({"row_owner": liab.row_owner, "amount": liab.amount.0.to_string(), "order_id": id}).to_string().into_bytes(), NearToken::from_yoctonear(liab.amount.0), Gas::from_tgas(20))
+        Promise::new(price.board).function_call(
+            "refund_action".to_string(),
+            json!({"owner": liab.row_owner, "action_id": action_id.to_string()}).to_string().into_bytes(),
+            NearToken::from_yoctonear(liab.amount.0),
+            Gas::from_tgas(20),
+        )
     }
 
     pub fn withdraw_surplus(&mut self, amount: U128) -> Promise {

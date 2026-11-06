@@ -267,10 +267,12 @@ test('the city toll door stays a link and does not resume an old visit', () => {
   const tollFn = read('app/design/D8_shops/js/apps.js');
   const body = tollFn.slice(tollFn.indexOf('export async function toll'), tollFn.indexOf('// Older gate calls'));
   assert.match(body, /Set up your agent in \/setup/);
-  assert.match(body, /The board has to open this crossing/);
+  assert.match(body, /propose_call_as/);
+  assert.match(body, /Nothing was signed/);
   assert.doesNotMatch(body, /boardPay/);
-  assert.doesNotMatch(body, /propose_batch|signTx|\bask\(/);
+  assert.doesNotMatch(body, /propose_batch|\bask\(/);
   assert.doesNotMatch(body, /0\.001/);
+  assert.doesNotMatch(body, /sign\(/);
   const plan = read('backend/scripts/toll-redeploy.js');
   assert.match(plan, /sends: false/);
   assert.match(plan, /method: 'close'/);

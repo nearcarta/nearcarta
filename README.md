@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 581 backend unit tests (578 pass, 3 skipped), offline
+npm test                                   # 585 backend unit tests (582 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -229,13 +229,13 @@ The city door is the way in. The all-shops list still links to `/shops/toll/`. W
 
 The card has three tabs: Pay, Wallet, and Ledger. Pay has one gold button. It reads the visitor fee from the live policy. The current policy has no visitor fee, so the button stays disabled and the room does not invent one. The visitor names the chain, the asset, the amount and the Base address, or the agent reads “pay 0.00001 ETH to 0x… on Base” and “pay 1 USDC to 0x… on Base”. A missing asset, amount or address asks. A NEAR amount other than the live fee is refused. “cross to Arbitrum” is refused. Wallet shows `row:{account}:base` and does not invent an address. The old shared path is not that wallet. Ledger separates the service fee from foreign transfers and does not claim a split until one is configured.
 
-In the city, the session key can call `propose` on the board. It cannot call `cross` on the toll, and the board's `propose_call` forwards 30 Tgas, which is not enough to start a signature. The button and the agent stop with “The board has to open this crossing. Nothing was signed.” They do not open a wallet and they do not call a NEAR transfer a Base payment. `cross` is board-authenticated and records the order. `sign_cross` is the row owner, at least 150 Tgas, and signs the stored order on `row:{owner}:base`. Paid on Base is reserved for a Base receipt whose status is 1. `POST /api/toll/relay` reads one raw transaction the contract already stored and may broadcast it. It does not sign NEAR and it does not edit the raw. No basescan success is claimed here.
+In the city, the gold button and the agent call the same check. When the session key lists `propose_call_as`, that call opens `cross` on the board. The key does not call `cross` or `sign_cross`, and the wallet stays closed. A key that only lists `propose` stops with “Nothing was signed.” `propose_call_as` forwards 30 Tgas, which records the order and does not start a signature. `sign_cross` is the row owner, at least 150 Tgas, and signs the stored order on `row:{owner}:base`. Paid on Base is reserved for a Base receipt whose status is 1. `POST /api/toll/relay` reads one raw transaction the contract already stored and may broadcast it. It does not sign NEAR and it does not edit the raw. No basescan success is claimed here.
 
 `GET /api/toll/live` reads `policy` and the recent `get_tx` rows. The public response omits `raw_signed`. A view that fails comes back as `{ ok: false }` so the card can say the policy did not answer.
 
 Recorded on mainnet: allowed [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz), refused [B9FFjcSA…](https://nearblocks.io/txns/B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR). Passes from this room: [3frACAL1…](https://nearblocks.io/txns/3frACAL1EU4APBcAME8gNg1xw4uKSnXc81hj2c56Jdon) and [CwcBGcw9…](https://nearblocks.io/txns/CwcBGcw9FUt7FmpaVdgSPVKK1d9krWt4TE1z46WUfHez). Each recorded pass paid `toll.nearcarta.near`. None of them is a Base payment. The signed foreign transaction for nonce 0 has not been broadcast from this change. A basescan link for a later receipt belongs here once its status is 1.
 
-The methods `set_price`, `address_of`, `cross`, `sign_cross`, `cancel_order`, `refund_order`, `upgrade` and `migrate` are in `contracts/toll` and are not deployed. `set_price` stores the board, the service fee, the cost and any configured split. It does not store a recipient. `address_of` returns `row:{owner}:base` and a null address until a signature for that path recovers one. `cross` is called by the board, checks the row budget and the per-asset cap, and does not call the signer. `sign_cross` builds the native or USDC payload from the stored order. Two rows do not share a nonce. A failed service deposit is refunded once, through `credit_row` on the board. The live board does not expose that method yet, so a live refund stays blocked and `close` refuses while a deposit is held. The path field `base-1` remains on the account. Visitor signatures do not use it. `backend/scripts/toll-redeploy.js` prints one close, then create, then `new` with an empty `allow_to`, then `set_price`. Later changes are `upgrade` and `migrate`. It sends nothing. The close returns the balance to `nearcarta.near`, which is the funding for the new account. `backend/scripts/toll-teardown.js` prints that call and does not send it.
+The methods `set_price`, `address_of`, `cross`, `sign_cross`, `cancel_order`, `refund_order`, `upgrade` and `migrate` are in `contracts/toll` and are not deployed. `set_price` stores the board, the service fee, the cost and any configured split. It does not store a recipient. `address_of` returns `row:{owner}:base` and a null address until a signature for that path recovers one. `cross` is called by the board. The `row_owner` it reads is the top-level field `propose_call_as` injects. A nested `row_owner` is not a parameter. The contract checks the per-tx cap and the gas limit. It does not keep an address allow list. `sign_cross` builds the native or USDC payload from the stored order. Two rows do not share a nonce. A failed service deposit is refunded once, by calling the board's `refund_action` with that row and the action id, and with the same deposit attached. `confirm_hold`, `cancel_hold` and `expire_sent` are board methods. The board clears a hold after a successful `cross`, so `refund_action` lands only while the hold is still open. `close` refuses while a deposit is held. The path field `base-1` remains on the account. Visitor signatures do not use it. `scripts/toll-deploy.js` is a dry-run. `--live` is the only path that signs, and it reads `TOLL_SIGNER_KEY` without printing it. The first install closes the account, because the live wasm has no upgrade method, then creates the same account with the recovered balance. The only payees are `nearcarta.near` and `toll.nearcarta.near`. `--live` refuses when a pre-check fails, including when the new wasm's storage stake is larger than that balance. Later changes are `upgrade` and `migrate`. `backend/scripts/toll-teardown.js` prints the close and does not send it. Tests: `a_failed_crossing_promises_refund_action_for_that_row` (`contracts/toll/src/tests.rs`); `board v2 injects the top-level row_owner` and `toll-deploy is a dry-run` (`backend/test/unit/toll-board-v2.test.js`).
 
 Chronicle lists a pass from this room beside the recorded rows. The pass is stored in localStorage and merged into the chronicle list, so a reload keeps it.
 
@@ -243,7 +243,7 @@ Live check, after the owner deploys:
 
 1. Open the town and use the Toll Bridge door. The card is Pay, Wallet, Ledger, with one gold button.
 2. On Pay, the fee comes from the live policy. With no fee, the button stays disabled.
-3. Ask the agent to pay ETH or USDC to an address on Base. Until the board can open `cross`, the reply is that nothing was signed. It does not say Paid on Base.
+3. Ask the agent “pay 0.00001 ETH to 0x… on Base” or “pay 1 USDC to 0x… on Base”. The gold button sends the same request. A key that lists `propose_call_as` opens the crossing. A key that does not lists nothing signed. It does not say Paid on Base.
 4. On Wallet, the path is `row:{account}:base`. No address is shown until the signer returns one. Fill gas does not send.
 5. After a crossing is signed and relayed, Paid on Base appears only when the receipt status is 1. That basescan transaction is not in this change.
 6. Open Ledger. It names the fee and says this policy has no revenue split. Foreign amounts are not revenue.
@@ -251,7 +251,7 @@ Live check, after the owner deploys:
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 581 unit tests (578 pass, 3 skipped)
+npm test                 # 585 unit tests (582 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -275,7 +275,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 581 unit tests (578 pass, 3 skipped):
+# 585 unit tests (582 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).
