@@ -764,7 +764,7 @@ export async function anchorStatement({ kind = 'statement', digest = '', salt = 
   try {
     const signed = W.signTx({
       key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
-      actions: [W.functionCall('anchor', { kind, digest, salt }, ANCHOR_TGAS * TG)],
+      actions: [W.functionCall('anchor', { kind, digest, salt }, BigInt(ANCHOR_TGAS) * TG)],
     });
     const result = await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' });
     const sent = W.outcomeOf(result);
