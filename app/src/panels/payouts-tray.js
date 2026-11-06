@@ -5,22 +5,14 @@ import { downloadCsv } from '../chronicle-feed.js';
 import { payoutFlow } from './payout-marks.js';
 import { qrSvg } from './qr-svg.js';
 import {
-  accountantCsv, agentCommand, classifyPayroll, invoiceDoneLine, invoiceStatusLine, nearFromYocto, payrollKey, rowsForCommand,
+  accountantCsv, agentCommand, agentInvoiceReply, classifyPayroll, invoiceDoneLine, invoiceStatusLine, nearFromYocto, payrollKey,
+  relativeInvoiceDates, rowsForCommand,
 } from './payouts-plan.js';
 import { armPayoutsDock, ensurePayoutsDock } from './payouts-dock.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 const q$ = (root, sel) => root.querySelector(sel);
-const pad = n => String(n).padStart(2, '0');
-const isoDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const isoLocal = d => `${isoDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-function shiftDays(n, hour) {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  if (hour != null) d.setHours(hour, 0, 0, 0);
-  return d;
-}
 function expiryIso(v) {
   const s = String(v || '').trim();
   if (!s) return '';
@@ -45,8 +37,12 @@ export function mountPayouts(root, hooks) {
   if (!state.tab) state.tab = 'invoice';
   if (!state.settled) state.settled = {};
   if (state.invoiceUsd == null) state.invoiceUsd = '';
-  if (state.due == null) state.due = isoDate(shiftDays(7));
-  if (state.expiry == null) state.expiry = isoLocal(shiftDays(14, 18));
+  if (state.due == null || state.expiry == null) {
+    const rel = relativeInvoiceDates();
+    if (state.due == null) state.due = rel.due;
+    if (state.expiry == null) state.expiry = rel.expiry;
+  }
+  if (!state.invoices) state.invoices = [];
   const fix = fixtureOf();
   if (fix && !state.fixtureApplied) {
     state.fixtureApplied = true;
@@ -77,6 +73,19 @@ export function mountPayouts(root, hooks) {
   const clearSeal = () => { if (state.fixture) return; state.seal = ''; hooks.hideRefuse?.(); };
   const showSeal = (text) => { state.seal = text || ''; if (text) hooks.showRefuse?.(text); else hooks.hideRefuse?.(); };
   const accountId = () => (hooks.account ? hooks.account() : '') || '';
+  function visitorId() {
+    const acct = String(accountId() || '').trim();
+    if (acct) return acct;
+    try {
+      const k = 'nearcarta-payout-visitor';
+      let id = globalThis.localStorage?.getItem(k) || '';
+      if (!id) {
+        id = 'guest-' + (globalThis.crypto?.randomUUID?.() || Math.random().toString(16).slice(2));
+        globalThis.localStorage?.setItem(k, id);
+      }
+      return id;
+    } catch { return ''; }
+  }
   const lines = (a = state.line, b = state.line2) => `<div class="payout-status" data-testid="payout-status"><p class="ferry-rate" data-testid="payout-line">${esc(a || '')}</p><p class="payout-calm" data-testid="payout-line-2">${esc(b || '')}</p></div>`;
   function resultCard() {
     const inv = state.invoice;
@@ -85,7 +94,7 @@ export function mountPayouts(root, hooks) {
     let qr = '';
     try { qr = qrSvg(url); } catch { qr = ''; }
     return `<div class="payout-result" data-testid="payout-result">
-      <p class="payout-facts">${esc(inv.id)} · ${esc(inv.usd)} USD · ${esc(inv.receive)}${state.expiry ? ` · expires ${esc(String(state.expiry).replace('T', ' '))}` : ''}</p>
+      <p class="payout-facts">${esc(inv.id)} · ${esc(inv.usd)} USDC · ${esc(inv.receive)}${state.expiry ? ` · expires ${esc(String(state.expiry).replace('T', ' '))}` : ''}</p>
       <p class="payout-link"><a href="${esc(url)}" data-testid="payout-link">${esc(url)}</a></p>
       <button type="button" id="p-copy" data-testid="payout-copy">Copy link</button>
       <div class="payout-qr" data-testid="payout-qr">${qr}</div>
@@ -224,7 +233,7 @@ export function mountPayouts(root, hooks) {
     const receive = String(state.receive || accountId() || '').trim();
     const usd = Number(state.invoiceUsd);
     if (!(usd > 0)) {
-      state.line = 'Name the invoice amount, for example 0.15 USD.';
+      state.line = 'Name the invoice amount, for example 0.15 USDC.';
       state.line2 = '';
       render();
       return { ok: false, hint: state.line };
@@ -239,7 +248,7 @@ export function mountPayouts(root, hooks) {
     try {
       const res = await fetch(api() + '/api/payouts/invoices', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ usd, receive, memo: state.memo || '', due: state.due || '', expiry: expiryIso(state.expiry) }),
+        body: JSON.stringify({ usd, receive, memo: state.memo || '', due: state.due || '', expiry: expiryIso(state.expiry), visitor: visitorId() }),
       });
       j = await res.json();
     } catch (e) {
@@ -260,7 +269,43 @@ export function mountPayouts(root, hooks) {
     state.line2 = 'Checking USDC registration.';
     render();
     lookUpRegistration(receive);
+    refreshList();
     return { ok: true, hint: invoiceDoneLine(j.invoice, origin) };
+  }
+
+  async function refreshList() {
+    const visitor = visitorId();
+    if (!visitor) { state.invoices = []; return; }
+    try {
+      const res = await fetch(api() + '/api/payouts/invoices?visitor=' + encodeURIComponent(visitor));
+      const body = await res.json();
+      const rows = Array.isArray(body?.invoices) ? body.invoices : [];
+      const next = [];
+      for (const inv of rows) {
+        let listStatus = inv.listStatus || 'Unpaid';
+        if (listStatus !== 'Expired') {
+          try {
+            const st = await fetch(api() + '/api/payouts/invoices/' + encodeURIComponent(inv.id) + '/status').then(r => r.json());
+            if (st?.status === 'SUCCESS' || st?.delivered === true) listStatus = 'Paid';
+            else if (st?.reason === 'expired') listStatus = 'Expired';
+          } catch { /* the stored status stays */ }
+        }
+        next.push({ ...inv, listStatus });
+      }
+      state.invoices = next;
+    } catch { /* the last list stays */ }
+    if (root.isConnected && state.tab === 'invoices') render();
+  }
+
+  function watchInvoices() {
+    if (state.tab !== 'invoices') {
+      if (state.poll) { clearInterval(state.poll); state.poll = 0; }
+      return;
+    }
+    if (state.poll) return;
+    state.poll = setInterval(() => {
+      if (root.isConnected && state.tab === 'invoices') refreshList();
+    }, 8000);
   }
 
   async function lookUpRegistration(account) {
@@ -291,15 +336,27 @@ export function mountPayouts(root, hooks) {
     return { ok: true, hint: state.line };
   }
 
+  async function commandFor(text) {
+    try {
+      const res = await fetch(api() + '/api/payouts/intent', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const body = await res.json();
+      if (body && (body.kind || body.hint)) return body;
+    } catch { /* the local parser is the fallback */ }
+    return agentCommand(text);
+  }
+
   async function runAgent(text) {
     if (state.fixture) return { ok: false, hint: 'Fixture. Not a live payment.' };
     clearSeal();
-    const cmd = agentCommand(text);
+    const cmd = await commandFor(text);
     if (!cmd.ok) return cmd;
     if (cmd.kind === 'csv') return { clear: true, ...exportCsvNow() };
     if (cmd.kind === 'status') {
       const origin = globalThis.location?.origin || '';
-      const hint = state.invoice ? invoiceDoneLine(state.invoice, origin) : capSentence();
+      const hint = state.invoice ? agentInvoiceReply(state.invoice, origin) : capSentence();
       state.line = state.invoice ? invoiceStatusLine(state.invoice.status) : capSentence();
       state.line2 = state.invoice ? 'Creating an invoice signs nothing.' : '';
       render();
@@ -307,10 +364,16 @@ export function mountPayouts(root, hooks) {
     }
     if (cmd.kind === 'invoice') {
       state.tab = 'invoice';
-      state.invoiceUsd = String(cmd.usd);
-      if (cmd.receive) state.receive = cmd.receive;
-      if (cmd.memo) state.memo = cmd.memo;
-      return { clear: true, ...(await createLink()) };
+      // render() copies the inputs into state first, so the parsed fields go in after that copy.
+      const patch = { invoiceUsd: String(cmd.usd) };
+      if (cmd.receive) patch.receive = cmd.receive;
+      if (cmd.memo) patch.memo = cmd.memo;
+      if (cmd.due) patch.due = cmd.due;
+      render(patch);
+      if (!state.receive) return { ok: false, hint: 'Name the receive account. Nothing was created.' };
+      const made = await createLink();
+      if (made.ok && state.invoice) made.hint = agentInvoiceReply(state.invoice, globalThis.location?.origin || '');
+      return { clear: !!made.ok, ...made };
     }
     if (cmd.kind === 'pay') {
       const picked = rowsForCommand(state.rows, cmd);
@@ -331,16 +394,18 @@ export function mountPayouts(root, hooks) {
     root.addEventListener('keydown', stopKeys);
     root.addEventListener('keyup', stopKeys);
   }
-  const render = () => {
+  const render = (patch) => {
     const mem = typeof document !== 'undefined' && document.activeElement && root.contains(document.activeElement)
       ? { id: document.activeElement.id, i: document.activeElement.dataset?.i || '', cls: document.activeElement.className || '', start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd }
       : null;
     const take = (sel, key) => { const el = q$(root, sel); if (el) state[key] = el.value; };
+    // A caller that already decided the fields (the agent) passes them in after the input copy.
     take('#p-usd', 'invoiceUsd');
     take('#p-receive', 'receive');
     take('#p-memo', 'memo');
     take('#p-due', 'due');
     take('#p-expiry', 'expiry');
+    if (patch && typeof patch === 'object') Object.assign(state, patch);
     root.querySelectorAll('.p-to').forEach(el => { const row = state.rows[+el.dataset.i]; if (row) row.to = el.value; });
     root.querySelectorAll('.p-amt').forEach(el => { const row = state.rows[+el.dataset.i]; if (row) row.amt = el.value; });
     const tab = state.tab || 'invoice';
@@ -349,10 +414,11 @@ export function mountPayouts(root, hooks) {
       <button type="button" role="tab" class="ferry-tab${tab === 'invoice' ? ' on' : ''}" data-tab="invoice" aria-selected="${tab === 'invoice'}" data-testid="payouts-tab-invoice">Invoice</button>
       <button type="button" role="tab" class="ferry-tab${tab === 'payroll' ? ' on' : ''}" data-tab="payroll" aria-selected="${tab === 'payroll'}" data-testid="payouts-tab-payroll">Payroll</button>
       <button type="button" role="tab" class="ferry-tab${tab === 'csv' ? ' on' : ''}" data-tab="csv" aria-selected="${tab === 'csv'}" data-testid="payouts-tab-csv">CSV</button>
+      <button type="button" role="tab" class="ferry-tab${tab === 'invoices' ? ' on' : ''}" data-tab="invoices" aria-selected="${tab === 'invoices'}" data-testid="payouts-tab-invoices">Invoices</button>
     </div>`;
     const invoice = `<div class="ferry-pane" data-pane="invoice" ${tab === 'invoice' ? '' : 'hidden'}>
       ${payoutFlow('invoice')}
-      <label class="field ferry-field"><span>Amount USD</span><input id="p-usd" data-testid="payout-invoice-usd" inputmode="decimal" placeholder="for example 0.15" value="${esc(state.invoiceUsd || '')}"></label>
+      <label class="field ferry-field"><span>Amount (USDC)</span><input id="p-usd" data-testid="payout-invoice-usd" inputmode="decimal" placeholder="for example 0.15" value="${esc(state.invoiceUsd || '')}"></label>
       <label class="field ferry-field"><span>Receive account</span><input id="p-receive" data-testid="payout-receive" value="${esc(state.receive || '')}" autocomplete="off" placeholder="name.near"></label>
       <label class="field ferry-field"><span>Memo</span><input id="p-memo" data-testid="payout-memo" value="${esc(state.memo || '')}" maxlength="140" placeholder="what this is for"></label>
       <label class="field ferry-field"><span>Due</span><input id="p-due" data-testid="payout-due" type="date" value="${esc(state.due || '')}"></label>
@@ -394,7 +460,21 @@ export function mountPayouts(root, hooks) {
       <pre data-testid="payout-csv-out">${esc(state.csvOut || '')}</pre>
       ${lines()}
     </div>`;
-    root.innerHTML = `<div class="shop-stack ferry-card" data-testid="payouts-card">${tabs}${invoice}${payroll}${csvPane}</div>`;
+    const origin = globalThis.location?.origin || '';
+    const invoiceRows = (state.invoices || []).map(inv => {
+      const href = origin + (inv.href || '');
+      return `<li class="payout-invoice-row" data-testid="payout-invoice-row">
+        <span class="payout-invoice-status" data-testid="payout-invoice-status">${esc(inv.listStatus || 'Unpaid')}</span>
+        <span>${esc(inv.usd)} USDC</span>
+        <span>${esc(inv.receive)}</span>
+        <a href="${esc(href)}" data-testid="payout-invoice-link">${esc(href)}</a>
+      </li>`;
+    }).join('');
+    const invoicesPane = `<div class="ferry-pane" data-pane="invoices" ${tab === 'invoices' ? '' : 'hidden'}>
+      <p class="ferry-picker-note">Invoices for this visitor. Unpaid, Paid, or Expired. The list checks again while this tab is open.</p>
+      ${invoiceRows ? `<ul class="payout-invoices" data-testid="payout-invoices">${invoiceRows}</ul>` : '<p data-testid="payout-invoices-empty">No invoices for this visitor yet.</p>'}
+    </div>`;
+    root.innerHTML = `<div class="shop-stack ferry-card" data-testid="payouts-card">${tabs}${invoice}${payroll}${csvPane}${invoicesPane}</div>`;
     const bind = (id, key) => { const el = q$(root, id); if (el) el.oninput = (e) => { state[key] = e.target.value; clearSeal(); }; };
     bind('#p-usd', 'invoiceUsd');
     bind('#p-receive', 'receive');
@@ -406,7 +486,12 @@ export function mountPayouts(root, hooks) {
     root.querySelectorAll('.p-chain').forEach(el => { el.onchange = () => { state.rows[+el.dataset.i].chain = el.value; clearSeal(); render(); }; });
     root.querySelectorAll('.p-asset').forEach(el => { el.onchange = () => { state.rows[+el.dataset.i].asset = el.value; clearSeal(); render(); }; });
     root.querySelectorAll('[data-tab]').forEach(btn => {
-      btn.onclick = () => { clearSeal(); state.tab = btn.dataset.tab || 'invoice'; render(); };
+      btn.onclick = () => {
+        clearSeal();
+        state.tab = btn.dataset.tab || 'invoice';
+        render();
+        if (state.tab === 'invoices') refreshList();
+      };
     });
     const add = q$(root, '#p-add');
     if (add) add.onclick = () => {
@@ -454,6 +539,7 @@ export function mountPayouts(root, hooks) {
       ensurePayoutsDock(doc);
       armPayoutsDock((text) => runAgent(text));
     }
+    watchInvoices();
   };
   render();
   loadCap();
