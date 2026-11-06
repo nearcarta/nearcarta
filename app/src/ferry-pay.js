@@ -2,6 +2,7 @@
 // (or the element named by data-root) and talks to this origin's /api. The charter is read
 // before a deposit address is asked for. This file never sends the deposit.
 import { tokenChoices, chainsOf, filterTokens, quoteView, pickBest, statusView } from './ferry-catalog.js';
+import { pickerListbox, bindPickerListbox, bindTokenFallbacks } from './panels/token-badge.js';
 
 const me = document.currentScript || document.querySelector('script[src*="ferry-pay.js"]');
 const origin = me ? new URL(me.src, location.href).origin : '';
@@ -18,9 +19,9 @@ if (root) {
   root.innerHTML = `
     <form id="nc-pay">
       <label>Find a token <input name="q" data-testid="widget-search" placeholder="USDC, near, base"></label>
-      <label>Chain <select name="chain" data-testid="widget-chain-filter"><option value="">All chains</option></select></label>
-      <label>Pay with <select name="from" data-testid="widget-chain"></select></label>
-      <label>Receive <select name="to" data-testid="widget-receive"></select></label>
+      <label>Chain <span data-host="chain"></span></label>
+      <label>Pay with <span data-host="from"></span></label>
+      <label>Receive <span data-host="to"></span></label>
       <label>Amount <input name="amount" value="0.2" inputmode="decimal" data-testid="widget-amount"></label>
       <label>Paid to <input name="recipient" readonly data-testid="widget-recipient" placeholder="the charter’s recipient"></label>
       <label>Your refund address, on the chain you pay from <input name="refundTo" required placeholder="0x…" data-testid="widget-refund"></label>
@@ -38,33 +39,44 @@ if (root) {
   const refundEl = root.querySelector('#nc-refund');
   const quotesEl = root.querySelector('[data-testid=widget-quotes]');
   const form = root.querySelector('#nc-pay');
-  const chain = form.querySelector('[name=from]');
-  const receive = form.querySelector('[name=to]');
   const amount = form.querySelector('[name=amount]');
   const recipient = form.querySelector('[name=recipient]');
   const search = form.querySelector('[name=q]');
-  const chainFilter = form.querySelector('[name=chain]');
-  const fill = () => {
-    const list = filterTokens(choices, { q: search.value, chain: chainFilter.value });
-    const opts = list.map(t => `<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('');
-    const keep = chain.value;
-    const keepTo = receive.value;
-    chain.innerHTML = opts;
-    receive.innerHTML = opts;
-    if ([...chain.options].some(o => o.value === keep)) chain.value = keep;
-    const usdc = list.find(t => t.symbol === 'USDC' && t.chain === 'near') || list[0];
-    if (usdc && ![...receive.options].some(o => o.value === keepTo)) receive.value = usdc.id;
-    else if (keepTo) receive.value = keepTo;
+  let payId = '';
+  let recvId = '';
+  let chainFilterValue = '';
+  const host = name => form.querySelector(`[data-host="${name}"]`);
+  const writeBox = (name, testid, options, selected, onChange) => {
+    const slot = host(name);
+    if (!slot) return;
+    slot.innerHTML = pickerListbox({ id: 'nc-' + name, testid, options, selected });
+    bindPickerListbox(slot.querySelector('.token-listbox'), onChange || (() => {}));
+    bindTokenFallbacks(slot);
   };
-  search.oninput = fill;
-  chainFilter.onchange = fill;
+  const tokenOptions = list => list.map(t => ({ value: t.id, label: t.label, symbol: t.symbol, chain: t.chain, icon: t.icon || '' }));
+  const renderPay = () => {
+    const list = filterTokens(choices, { q: search.value, chain: chainFilterValue });
+    const opts = tokenOptions(list);
+    if (!opts.some(o => o.value === payId)) payId = opts[0]?.value || '';
+    writeBox('from', 'widget-chain', opts, payId, (value) => { payId = value; });
+    if (!opts.some(o => o.value === recvId)) {
+      const usdc = list.find(t => t.symbol === 'USDC' && t.chain === 'near') || list[0];
+      recvId = usdc?.id || '';
+    }
+    writeBox('to', 'widget-receive', opts, recvId, (value) => { recvId = value; });
+  };
+  const renderChain = () => {
+    const options = [{ value: '', label: 'All chains', kind: 'chain' }].concat(chainsOf(choices).map(c => ({ value: c, label: c, kind: 'chain' })));
+    writeBox('chain', 'widget-chain-filter', options, chainFilterValue, (value) => { chainFilterValue = value; renderPay(); });
+  };
+  search.oninput = renderPay;
   let rules = null;
   const api = p => fetch(origin + p).then(r => r.json().then(j => ({ ok: r.ok, j })));
   async function loadTokens() {
     const { ok, j } = await api('/api/ferry/tokens');
     choices = tokenChoices(Array.isArray(j) ? j : j?.tokens || []);
-    chainsOf(choices).forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; chainFilter.append(o); });
-    fill();
+    renderChain();
+    renderPay();
     if (!ok && !choices.length) out.textContent = 'The token list did not load. The four common pairs are still a quote away once it does.';
   }
   async function loadRules(charter) {
@@ -80,8 +92,8 @@ if (root) {
     out.textContent = 'The charter allows ' + pick + '. At most 0.20 USD. Pay asks for a deposit address. You send the tokens yourself. A confidential quote is a quote only, not a settled private swap.';
   }
   function pair() {
-    const [symbol, chainName] = String(chain.value || '').split('|');
-    const [toSymbol, toChain] = String(receive.value || 'USDC|near').split('|');
+    const [symbol, chainName] = String(payId || '').split('|');
+    const [toSymbol, toChain] = String(recvId || 'USDC|near').split('|');
     return { from: { symbol, chain: chainName }, to: { symbol: toSymbol || 'USDC', chain: toChain || 'near' } };
   }
   function paintQuotes(rows) {
@@ -109,11 +121,12 @@ if (root) {
   form.querySelector('[data-testid=widget-routes]').onclick = async () => {
     quotesEl.textContent = 'Comparing two routes…';
     const first = await dryQuote('public');
-    const alt = choices.find(t => t.id !== chain.value && t.chain !== String(chain.value).split('|')[1]) || choices[1];
-    const saved = chain.value;
-    if (alt) chain.value = alt.id;
+    const alt = choices.find(t => t.id !== payId && t.chain !== String(payId).split('|')[1]) || choices[1];
+    const saved = payId;
+    if (alt) payId = alt.id;
     const second = await dryQuote('public');
-    chain.value = saved;
+    payId = saved;
+    renderPay();
     paintQuotes([first, second]);
   };
   (async () => {

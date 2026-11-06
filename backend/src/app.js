@@ -17,6 +17,7 @@ import * as mist from './mistbank.js';
 import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
 import { issuePass } from './toll-pass.js';
+import { describeVisitorPass, readTollLive, tollLiveError } from './toll-views.js';
 import { verifyPropose } from './board-tx.js';
 import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
@@ -196,7 +197,7 @@ export function makeApp() {
   app.get('/api/health', (c, next) => c.req.query('deep') ? deepLimit(c, next) : next(), limiter(60), async c => {
     const near = c.req.query('deep') ? await shops.health() : shops.healthCached();
     return c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: { contracts: MAINNET_DEP?.status === 'deployed' ? 'mainnet' : null, journey: 'mainnet' }, near,
-      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: { enabled: false, charter: MAINNET_DEP?.extras?.arena?.contract || null } });
+      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: { enabled: false, charter: MAINNET_DEP?.extras?.arena?.contract || null }, git: process.env.GIT_SHA || null });
   });
   // Shows the caller how Render keys their own request, with no address in the answer: which header decides
   // the client key, a short keyed tag of that key (the same client gets the same tag until the process
@@ -399,6 +400,22 @@ export function makeApp() {
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));
+  app.get('/api/toll/live', limiter(20), async c => {
+    try { return c.json(await readTollLive(view)); }
+    catch (e) { return c.json(tollLiveError(e)); }
+  });
+  app.get('/api/toll/pass/:hash', limiter(20), async c => {
+    const hash = c.req.param('hash');
+    const sender = c.req.query('sender') || '';
+    if (!HASH.test(hash) || !nearAccountOk(sender)) return bad(c, 'need a tx hash and ?sender=');
+    try {
+      const judged = await verifyPropose(hash, sender, { expectReceiver: 'toll.nearcarta.near' });
+      const words = describeVisitorPass(judged, { hash });
+      return c.json({ ...judged, hash, text: words.text });
+    } catch (e) {
+      return c.json({ ok: false, hash, text: 'The chain check did not answer. Nothing moved on Base.', error: String(e.message || 'no status').slice(0, 160) });
+    }
+  });
   app.post('/api/toll/mainnet', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
     if (!HASH.test(b.tx || '')) return bad(c, 'tx must be a hash');

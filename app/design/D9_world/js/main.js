@@ -221,6 +221,7 @@ function goIn(id){ if(CLOSED.has(id)) return; const s=SHOPS[id]; R.steer=null; k
   const end=hx(...s.door).lerp(hx(s.q,s.r),.18); const far=R.pos.distanceTo(end);
   if(far<1.6) R.go([end],{arrive:go}); else if(!R.goHex(s.door,{end,run:far>4,arrive:go})) R.go([end],{arrive:go});
   setTimeoutSim(go,Math.min(6,.9+far/(far>4?R.runSpd:R.walkSpd)*1.25)); }
+window.__enterToll = () => goIn('toll');
 // walking straight into a door (keys held toward the shop, on its step) goes in, no button needed
 let pushT=0; function walkInto(dt){ const r=_nearDoor(); if(!r.id||!R.steer||r.d>.6){ pushT=0; return; } const c=hx(SHOPS[r.id].q,SHOPS[r.id].r); const tx=c.x-R.pos.x, tz=c.z-R.pos.z, l=Math.hypot(tx,tz)||1, sl=R.steer.length()||1;
   if((tx*R.steer.x+tz*R.steer.y)/(l*sl)>.55){ pushT+=dt; if(pushT>.3){ pushT=0; goIn(r.id); } } else pushT=0; }
@@ -451,8 +452,8 @@ $('#loading').classList.add('done'); body.classList.add('ready');
 // warm every room while the town idles: each shop module and the room props it puts (D8 core caches both), one per idle slot,
 // so the first door at any width opens at warm speed instead of waiting on cold fetches
 // arena's Knight.glb (1.1 MB) is left cold to keep first-load wire under budget
-const WARM={ chronicle:['tiles/base/hex_grass','decoration/props/crate_A_big'], bank:['decoration/props/crate_B_small','decoration/props/sack'], guard:['buildings/neutral/wall_straight_gate','decoration/props/barrel','decoration/props/bucket_arrows','decoration/props/target','decoration/props/weaponrack'],
-  ferry:['decoration/props/crate_A_small'], arena:[], hall:['decoration/props/flag_blue'], house:[], payouts:[], toll:['buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A'] };
+const WARM={ toll:['tiles/base/hex_grass','tiles/base/hex_water','buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A','chars/RobotExpressive.glb'], chronicle:['tiles/base/hex_grass','decoration/props/crate_A_big'], bank:['decoration/props/crate_B_small','decoration/props/sack'], guard:['buildings/neutral/wall_straight_gate','decoration/props/barrel','decoration/props/bucket_arrows','decoration/props/target','decoration/props/weaponrack'],
+  ferry:['decoration/props/crate_A_small'], arena:[], hall:['decoration/props/flag_blue'], house:[], payouts:[] };
 function warmRooms(){ if(navigator.connection?.saveData) return; const D8=new URL('../../D8_shops/',import.meta.url).href; const q=Object.entries(WARM).filter(([id])=>OPEN[id]);
   const idle=f=>setTimeout(f,350);
   const next=()=>{ if(!q.length) return; if(inShop){ setTimeout(()=>idle(next),1500); return; } const [id,ps]=q.shift(); Promise.all([import(D8+'js/core.js'),import(D8+'shops/'+id+'.js')]).then(([C8])=>Promise.all(ps.map(p=>C8.load(p.endsWith('.glb')?p:'hex/'+p).catch(()=>null)))).catch(()=>null).then(()=>idle(next)); };
@@ -461,7 +462,12 @@ function warmRooms(){ if(navigator.connection?.saveData) return; const D8=new UR
 // so the first door the visitor opens does not pay the one-off GPU program and upload cost
 let warmed=null; const warmGPU=()=>warmed||(warmed=(async()=>{ if(inShop) return; const r=await SL.load('chronicle'); if(!r.sh||inShop) return; await warmRoom(r);
   const g=W.renderer, rt=new THREE.WebGLRenderTarget(64,64), au=g.shadowMap.autoUpdate; try{ g.shadowMap.autoUpdate=true; g.setRenderTarget(rt); g.render(r.sh.scene,r.sh.camera); }catch(e){} finally{ g.setRenderTarget(null); g.shadowMap.autoUpdate=au; rt.dispose(); } undressRoom(r.sh); window.__warm=Math.round(performance.now()); })().catch(()=>null));
-window.__render=draw; window.__shopsLayer='d9'; setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE){ setTimeout(()=>warmGPU().then(warmRooms),300); } }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
+window.__render=draw; window.__shopsLayer='d9';
+// Toll's floor, robot and policy start with the page so the first door is not a cold 20s fetch.
+setTimeout(()=>{ const D8=new URL('../../D8_shops/',import.meta.url).href; import(D8+'js/core.js').then(C8=>{
+  for (const p of ['hex/tiles/base/hex_grass','hex/tiles/base/hex_water','hex/buildings/neutral/building_bridge_A','hex/buildings/blue/building_tower_base_blue','chars/RobotExpressive.glb']) C8.load(p).catch(()=>null);
+}).catch(()=>{}); const api=(globalThis.NEARCARTA_API||'').replace(/\/$/,''); fetch(api+'/api/toll/live').catch(()=>{}); fetch(api+'/api/toll').catch(()=>{}); },0);
+setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE){ setTimeout(()=>warmGPU().then(warmRooms),300); } }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
 if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,SP,setSky,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
   // demo cursor driven on the sim clock (capture only)
   const dc=document.createElement('div'); dc.id='demoCur'; dc.innerHTML='<svg viewBox="0 0 22 22" width="22" height="22"><path d="M2 1l16 9-7 1.6L7.6 19z" fill="#f3ead8" stroke="#17130f" stroke-width="1.4" stroke-linejoin="round"/></svg><i></i>'; document.body.appendChild(dc);

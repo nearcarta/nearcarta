@@ -7,6 +7,7 @@ import { verifyQuoteSignature } from '@defuse-protocol/one-click-sdk-typescript'
 import { cfg, DEP } from './config.js';
 import { view } from './near.js';
 import { tokenRef, findToken, tokens, quote, postQuote, buildQuoteRequest, echoGuard, validDepositAddress, statusHelp } from './ferry.js';
+import { validateDestAddress } from '../../app/src/panels/ferry-settle.js';
 import { intentsCheckout } from '../../shared/rails/receipts.js';
 
 export const MAX_CHECKOUT_USD = 0.2;
@@ -149,8 +150,14 @@ export function checkoutInput(b) {
   if (!isNearAccount(b.recipient)) return { error: 'bad recipient' };
   let swapRecipient = null;
   if (b.swap_recipient != null && b.swap_recipient !== '') {
-    if (!isNearAccount(b.swap_recipient)) return { error: 'bad recipient' };
-    swapRecipient = b.swap_recipient;
+    if (to.chain === 'near') {
+      if (!isNearAccount(b.swap_recipient)) return { error: 'bad recipient' };
+      swapRecipient = b.swap_recipient;
+    } else {
+      const v = validateDestAddress(to.chain, b.swap_recipient);
+      if (!v.ok) return { error: 'bad recipient' };
+      swapRecipient = v.address;
+    }
   }
   if (typeof b.refundTo !== 'string' || b.refundTo.length < 2 || b.refundTo.length > 128) return { error: 'bad refundTo' };
   const clauseId = b.clause_id || b.clauseId || 'pay';
@@ -221,8 +228,29 @@ export async function openCheckout(input, deps) {
   }
 
   // The charter gate checked input.recipient (the allowlisted shop).
-  // A NEAR-destination token is delivered to swapRecipient, the visitor's account.
-  const clickRecipient = input.to?.chain === 'near' && input.swapRecipient ? input.swapRecipient : input.recipient;
+  // 1Click is paid to swapRecipient: the visitor on NEAR, or the address they typed
+  // on any other chain. Never the shop, and never a hardcoded address.
+  let clickRecipient = input.swapRecipient;
+  if (input.to?.chain === 'near') {
+    if (!input.swapRecipient || !isNearAccount(input.swapRecipient)) {
+      return {
+        ok: false, step: 'quote', depositAddress: null, reason: 'quote_refused',
+        error: 'A NEAR destination needs a NEAR account as recipient. Use the visitor account (64 hex or a named account).',
+        receipt: intentsCheckout({ decision: 'refused', reason: 'quote_refused', to: input.recipient, tx: null }),
+      };
+    }
+    clickRecipient = input.swapRecipient;
+  } else {
+    const v = validateDestAddress(input.to?.chain, input.swapRecipient);
+    if (!v.ok) {
+      return {
+        ok: false, step: 'quote', depositAddress: null, reason: 'quote_refused',
+        error: 'Enter the address on the destination chain that should receive the tokens.',
+        receipt: intentsCheckout({ decision: 'refused', reason: 'quote_refused', to: input.recipient, tx: null }),
+      };
+    }
+    clickRecipient = v.address;
+  }
   const dry = await deps.quote({ ...input, from: input.from, to: input.to, recipient: clickRecipient });
   if (!dry?.ok) return { ok: false, step: 'quote', error: dry?.error || 'quote refused', depositAddress: null, reason: 'quote_refused', receipt: intentsCheckout({ decision: 'refused', reason: 'quote_refused', to: input.recipient, tx: null }) };
   const usd = checkoutUsdOk(dry.from?.usd);
@@ -263,9 +291,16 @@ export async function fetchOneClickStatus(depositAddress, f = fetch) {
   if (!r.ok) throw Object.assign(new Error(`1click status http ${r.status}`), { status: 502 });
   const j = await r.json();
   const d = j.swapDetails || {};
-  const hashes = [...(d.destinationChainTxHashes || []), ...(d.originChainTxHashes || []), ...(d.nearTxHashes || [])]
-    .map(h => (typeof h === 'string' ? h : h?.hash)).filter(h => typeof h === 'string' && h.length > 0);
-  return { env: 'ONECLICK', depositAddress, status: j.status, help: statusHelp(j.status), final: FINAL.includes(j.status), tx: hashes[0] || null, updatedAt: j.updatedAt || null };
+  const asHash = h => (typeof h === 'string' ? h : h?.hash);
+  const destHashes = (d.destinationChainTxHashes || []).map(asHash).filter(h => typeof h === 'string' && h.length > 0);
+  const hashes = [...destHashes, ...(d.originChainTxHashes || []).map(asHash), ...(d.nearTxHashes || []).map(asHash)]
+    .filter(h => typeof h === 'string' && h.length > 0);
+  return {
+    env: 'ONECLICK', depositAddress, status: j.status, help: statusHelp(j.status),
+    final: FINAL.includes(j.status), tx: hashes[0] || null, destinationTx: destHashes[0] || null, updatedAt: j.updatedAt || null,
+    amountOut: d.amountOutFormatted || d.amountOut || null,
+    symbolOut: d.destinationToken || d.amountOutSymbol || null,
+  };
 }
 
 export async function oneClickStatus(depositAddress, f = fetch) {

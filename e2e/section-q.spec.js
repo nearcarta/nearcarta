@@ -134,6 +134,7 @@ test('Q4 check signature is the brass button', async ({ page }) => {
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/shops/toll/');
+    await page.getByTestId('toll-tab-proof').click();
     const btn = page.getByTestId('check-signature');
     await expect(btn).toBeVisible();
     await expect(btn).toHaveText('Check signature');

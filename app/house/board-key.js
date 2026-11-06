@@ -3,7 +3,7 @@
 // https://docs.near.org/web3-apps/tutorials/wallet-login
 // A function-call key cannot attach a deposit:
 // https://docs.near.org/protocol/accounts-contracts/access-keys
-import { functionCall, keyFrom, rpcClient, signTx } from '../../shared/vault/tx.js';
+import { AGENT_LS, functionCall, keyFrom, rpcClient, signTx } from '../../shared/vault/tx.js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 
 export const pluginKeyName = id => `access_key::plugin::mainnet::${id}`;
@@ -43,7 +43,9 @@ export function createBoardKeyPlugin({ contractId, methodNames, allowance }) {
       const eligible = stored && params.receiverId === stored.contractId && actions.length > 0 && actions.every(a =>
         a?.type === 'FunctionCall' && stored.methodNames.includes(a.params?.methodName) && BigInt(a.params?.deposit || 0) === 0n);
       if (!eligible) return next();
-      const key = keyFrom(stored.privateKey);
+      // The vault slot is the secret Refresh agent key writes. The plugin copy is only a fallback.
+      const vault = localStorage.getItem(AGENT_LS(accountId));
+      const key = keyFrom(vault || stored.privateKey);
       const rpc = rpcClient(MAIN.rpc_fallbacks?.length ? [MAIN.rpc, ...MAIN.rpc_fallbacks] : [MAIN.rpc]);
       const ak = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: accountId, public_key: key.publicKey }).catch(() => null);
       if (!ak?.permission?.FunctionCall) return next();

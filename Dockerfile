@@ -1,7 +1,8 @@
 # The read-only API (backend/src/server.js) as a container. No keys are baked in:
 # ONECLICK_PARTNER_KEY and NEARAI_CLOUD_API_KEY come from the host's env at runtime.
 FROM node:22-slim
-ENV NODE_ENV=production PORT=10000 NEAR_RPC=https://free.rpc.fastnear.com
+ARG GIT_SHA=dev
+ENV NODE_ENV=production PORT=10000 NEAR_RPC=https://free.rpc.fastnear.com GIT_SHA=$GIT_SHA
 WORKDIR /srv
 COPY package.json package-lock.json ./
 COPY backend/package.json backend/
@@ -10,6 +11,9 @@ RUN npm ci --omit=dev -w backend && npm cache clean --force
 COPY backend/src backend/src
 COPY backend/data backend/data
 COPY shared shared
+# toll-views imports assembleTollLive from the city panel (Node-safe pure helpers).
+COPY app/src/panels/toll-room.js app/src/panels/toll-dock.js app/src/panels/token-badge.js app/src/panels/icon-map.js app/src/panels/ferry-settle.js app/src/panels/
+COPY app/src/toll-derive.js app/src/
 USER node
 EXPOSE 10000
 HEALTHCHECK CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

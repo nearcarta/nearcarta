@@ -2,6 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>
+/* The approved tray is the town (?shop= opens that room). This page is not a second design. */
+(function () {
+  var q = new URLSearchParams(location.search);
+  var shop = q.get('shop');
+  if (!shop || q.has('2d') || q.has('scripted') || q.has('capture')) return;
+  q.delete('shop');
+  var rest = q.toString();
+  location.replace('/?shop=' + encodeURIComponent(shop) + (rest ? '&' + rest : ''));
+})();
+</script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nearcarta</title>
 <link rel="preload" href="fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
