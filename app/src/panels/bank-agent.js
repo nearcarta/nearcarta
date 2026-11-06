@@ -1,4 +1,5 @@
 // Natural-language commands for the Mist Bank auditor. The same actions as the gold button.
+import { rowsInMessage } from './bank-audit.js';
 
 export const BANK_HINT = 'Paste a statement or choose a file. You can also say Audit the cafe sample, Verify the TEE, or Show the proof log.';
 export const NEED_STATEMENT = 'Paste a statement or choose a file. I will not use a sample unless you name one.';
@@ -12,7 +13,8 @@ function questionOf(t) {
 }
 
 export function parseBankAgent(text, { review, hasStatement } = {}) {
-  const t = String(text || '').trim().toLowerCase();
+  const raw = String(text || '').trim();
+  const t = raw.toLowerCase();
   if (!t) return { ok: false, hint: BANK_HINT };
   if (/verify the tee|verify tee/.test(t)) return { ok: true, action: 'tee' };
   if (/attestation file|proof log|show the proof/.test(t)) return { ok: true, action: 'file' };
@@ -26,6 +28,10 @@ export function parseBankAgent(text, { review, hasStatement } = {}) {
   }
   const named = /\btravel\b/.test(t) ? 'travel' : /\bpayroll\b/.test(t) ? 'payroll' : (/\bcafe\b/.test(t) ? 'cafe' : '');
   const question = questionOf(t);
+  const rows = rowsInMessage(raw);
+  if (rows.length) {
+    return { ok: true, action: 'audit', source: 'message', question: question || 'rows', rows };
+  }
   const namedSample = named && /sample|cafe week|travel week|payroll/.test(t);
   if (namedSample && (/audit/.test(t) || question)) {
     return { ok: true, action: 'audit', sample: named, source: 'sample', question: question || 'audit' };
