@@ -198,14 +198,24 @@ const need = () => {
   if (boardLive()) return SIGN_MIN;
   return 0.05;
 };
-// Gas measured on mainnet (board.nearcarta.near): open_charter 2.59 TGas (BUqfZMBT…), set_agent 2.54 TGas (DqMrsEJj…),
-// propose with its payout 4.67 TGas (8WDqBeaN…). The board reserves 8 TGas for the on_paid callback.
-// A wallet buys attached gas at 0.001 NEAR per TGas before it sends, so opening a row holds
-// 0.02 NEAR deposit + 10 TGas x 0.001 = 0.03 NEAR. Unused gas comes back.
-// propose uses BOARD_PROPOSE_TGAS (40) so the 20 Tgas on_paid callback fits. 80 TGas is about 0.081 NEAR, over the 0.05 key allowance.
-const GAS = { open: 10n, agent: 10n, propose: BigInt(BOARD_PROPOSE_TGAS) };
+// Gas. open_charter and set_calls are separate receipts on the board, so each action
+// needs the whole burn of its own receipt; an underfunded one fails with
+// "Exceeded the prepaid gas" and the row never opens. Measured on the committed wasm in
+// contracts/charter_board_sandbox/tests/setup_open_gas.rs:
+//   open_charter, six receivers ......... 4.01 Tgas
+//   set_calls, widest list the row holds . 5.09 Tgas
+//   the two together, one transaction .... 8.53 Tgas
+// Sandbox gas runs low against mainnet (mainnet burnt 3.36 Tgas on the receipt that
+// the sandbox says needs 4.0), so this is 60 Tgas per action: far past the burn on
+// both, well under the 300 Tgas ceiling for the whole transaction, and about 0.12 NEAR
+// of prepaid gas that comes back unused.
+// set_agent was 2.54 TGas on mainnet (DqMrsEJj…); propose needs BOARD_PROPOSE_TGAS (40)
+// so the 20 Tgas on_paid callback fits, and 80 TGas would exceed the 0.05 key allowance.
+const GAS = { open: 60n, agent: 60n, propose: BigInt(BOARD_PROPOSE_TGAS) };
 const GAS_NEAR = t => Number(t) * 0.001;
-const SIGN_MIN = Math.round((0.02 + GAS_NEAR(GAS.open) + 0.005 + 0.002) * 1000) / 1000; // row + call allowlist + a little reserve
+// Both board actions are funded by the wallet up front, and the call allowlist deposit is
+// attached on top of the row deposit. A little is left for the wallet's own overhead.
+const SIGN_MIN = Math.round((0.02 + GAS_NEAR(GAS.open) + GAS_NEAR(GAS.agent) + 0.015 + 0.002) * 1000) / 1000;
 const yToN = y => { try { return Number(BigInt(y) / 10n ** 18n) / 1e6; } catch { return NaN; } };
 // Wallet errors in plain words: yocto numbers become NEAR and a shortfall.
 function plainErr(e) {
@@ -426,10 +436,27 @@ function sSign() {
   const heading = closedRow || (rowMissing && !chainRead) ? 'Open your row.' : onChain ? (keyStale ? 'Renew your agent key.' : 'Your agent is live.') : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.');
   // The open button needs the board's answer, unless there is no account to read for.
   const rowReady = noAccount || (chainRead && !readError);
+  // The rules that will be written, shown as numbers before the wallet opens. The
+  // transaction summary in /sign lists the calls and deposits but not the caps, and a
+  // visitor cannot check what they are approving without them.
+  const capsHtml = (onChain || rowMissing)
+    ? `<div class="preview" data-testid="setup-caps" aria-label="The rules this approval writes">
+        <p><b>These rules go on chain with this approval</b></p>
+        <ul>
+          <li>Each payment at most <b data-testid="cap-per">${fmtN(r.cap)} NEAR</b></li>
+          <li>One day in total at most <b data-testid="cap-daily">${fmtN(r.daily)} NEAR</b></li>
+          <li>At most <b data-testid="cap-count">${esc(String(r.per))}</b> payments a day</li>
+          <li>Only to <b data-testid="cap-receivers">${r.receivers.map(esc).join(', ') || 'nobody yet'}</b></li>
+          <li>The session ends <b data-testid="cap-session">${esc(sessionLabel(r.hours))}</b> after it is signed</li>
+        </ul>
+        <p class="small muted">The contract refuses anything else, even if the agent is tricked.</p>
+      </div>`
+    : '';
   return head('Sign', heading, lede)
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
     + (onChain || rowMissing ? `<div class="facts" id="facts" data-testid="setup-facts">${factsHtml}</div>` : `<div class="preview">${preview(r)}</div>`)
     + '<ul class="steps">' + L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}" data-testid="setup-sign-${esc(k)}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('') + '</ul>'
+    + capsHtml
     + update.html
     + (update.changed ? help : '')
     // Ready when the board answered. Without an account there is nothing to read, so the
@@ -734,52 +761,78 @@ async function signBoard() {
   localStorage.setItem(agentLS(me), sec);
   const pk = keyFrom(sec).publicKey;
   const txs = [];
+  // The key transaction is a separate approval that runs only after the row is on chain.
+  // On 2026-11-06 the batch sent the key swap beside an underfunded board call: the board
+  // call failed, the key swap succeeded, and the page was left with a valid key, no row,
+  // and nothing to press. Splitting them makes the second step depend on the first.
+  const keyTx = async () => {
+    // Allowance cannot be raised on a key that is already on the account. Add the key
+    // again replaces it, so one approval refreshes the gas budget. Stale board keys that
+    // omit propose_call_as are deleted in the same batch so Toll and Guard can call shops.
+    const existingKey = await agentAccessKey(sec);
+    const classified = await listBoardAgentKeys();
+    const stalePks = classified.stale.map(k => k.publicKey).filter(p => p !== pk);
+    const keyActions = [
+      ...stalePks.map(publicKey => ({ type: 'DeleteKey', params: { publicKey } })),
+      ...(existingKey || classified.board.some(k => k.publicKey === pk)
+        ? [{ type: 'DeleteKey', params: { publicKey: pk } }] : []),
+      addKeyAction(pk),
+    ];
+    return { receiverId: me, actions: keyActions };
+  };
+  const sendKey = async () => {
+    mark('key', 'run');
+    const tx = await keyTx();
+    const res = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: [tx] }) : [await w.signAndSendTransaction(tx)];
+    mark('key', 'run', txHashOf(res?.[0]));
+    let ak = null; for (let i = 0; i < 10 && !(ak = await agentAccessKey(sec)); i++) await wait(1200);
+    mark('key', ak ? 'ok' : 'run');
+    if (!ak) throw new Error('The board opened your row, but the agent key is not on your account yet. Wait a few seconds and press Open your row again.');
+  };
   if (!row) {
-    // open_charter and set_calls go to the board as one transaction, then the agent key
-    // goes on the visitor's own account. Shared with its test so the shape cannot drift.
+    // open_charter and set_calls go to the board as one transaction. The key goes on the
+    // visitor's own account afterwards, and only once the row is really there.
     const built = openRowTransactions({
       accountId: me, contract, rules: boardArgs(r, pk).rules, agentPublicKey: pk,
       fundYocto: ROW_FUND, rowDepositYocto: MAIN.board.max_row_yocto, callsDepositYocto: CALLS_DEPOSIT_YOCTO,
       calls: callsFor(r, contract), gasOpen: (GAS.open * TG).toString(), gasAgent: (GAS.agent * TG).toString(),
       allowance: AGENT_ALLOW.toString(),
     });
-    txs.push(['create', built.open]);
-    txs.push(['key', built.key]);
+    // A previous attempt may have landed the key without the row (that is exactly what
+    // 2026-11-06 left behind: key swap succeeded, board call failed). The row is what is
+    // missing, so open it; the key step below then sees a ready key and skips the swap.
+    mark('create', 'run'); mark('key', 'run');
+    const out = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: [built.open] }) : [await w.signAndSendTransaction(built.open)];
+    mark('create', 'run', txHashOf(out?.[0]));
+    // A failed board call must not be followed by the key swap. The row is the only proof.
+    let opened = null;
+    for (let i = 0; i < 20 && !opened; i += 1) {
+      if (i) await wait(1500);
+      opened = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null);
+    }
+    if (!opened) {
+      const failure = out?.find(o => o?.status && !('SuccessValue' in o.status));
+      const why = failure ? (refusalOf(JSON.stringify(failure.status)) || 'the call failed') : '';
+      throw new Error(failure
+        ? `The board did not open the row (${why}). Your agent key was not changed. Open your row tries again.`
+        : 'The row did not appear yet. Wait a few seconds and press Open your row again.');
+    }
+    row = opened;
+    mark('create', 'ok'); st.charter = me; save();
+    // Only swap the key when it is missing or stale. An already valid key needs no approval.
+    if (await agentAccessKey(sec)) { keyReady = true; keyStale = false; mark('key', 'ok'); }
+    else await sendKey();
   } else {
     // Update receivers/caps without close_charter (storage charge only; unused deposit refunded).
     // Source: contracts/charter_board/src/lib.rs set_rules + charge.
     // The step key 'create' is the open-row line on a first approval. Update my rules keeps 'agent'.
     for (const [k, tx] of ruleUpdateTransactions(row, r, sec)) txs.push([k === 'agent' ? 'create' : k, tx]);
-  }
-  // Allowance cannot be raised on a key that is already on the account. Sign replaces it
-  // (delete, then add) so one approval refreshes the 0.05 gas budget. Stale board keys
-  // that omit propose_call_as are deleted in the same batch so Toll and Guard can call shops.
-  const existingKey = await agentAccessKey(sec);
-  const classified = await listBoardAgentKeys();
-  const stalePks = classified.stale.map(k => k.publicKey).filter(p => p !== pk);
-  const keyActions = [
-    ...stalePks.map(publicKey => ({ type: 'DeleteKey', params: { publicKey } })),
-    ...(existingKey || classified.board.some(k => k.publicKey === pk)
-      ? [{ type: 'DeleteKey', params: { publicKey: pk } }] : []),
-    addKeyAction(pk),
-  ];
-  const keyTx = { receiverId: me, actions: keyActions };
-  // The open path already queued its own key transaction; replace it with this one so the
-  // stale keys are deleted in the same batch. The update path appends it.
-  const keyAt = txs.findIndex(([k]) => k === 'key');
-  if (keyAt >= 0) txs[keyAt] = ['key', keyTx]; else txs.push(['key', keyTx]);
-  for (const [k] of txs) mark(k, 'run');
-  if (txs.length) {
-    // One approval for both transactions when the wallet can batch them.
+    txs.push(['key', await keyTx()]);
+    for (const [k] of txs) mark(k, 'run');
     const out = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: txs.map(t => t[1]) }) : [];
-    let res = out; if (!w.signAndSendTransactions) for (const t of txs) res.push(await w.signAndSendTransaction(t[1]));
+    let res = out; if (!w.signAndSendTransactions) { res = []; for (const t of txs) res.push(await w.signAndSendTransaction(t[1])); }
     txs.forEach(([k], i) => mark(k, 'run', txHashOf(res?.[i])));
   }
-  for (let i = 0; i < 20 && !row; i++) { await wait(1500); row = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null); }
-  if (!row) throw new Error('The row did not appear yet. Wait a few seconds and press Approve again.');
-  mark('create', 'ok'); st.charter = me; save();
-  let ak = null; for (let i = 0; i < 10 && !(ak = await agentAccessKey(sec)); i++) await wait(1200);
-  mark('key', ak ? 'ok' : 'run');
   done(5); await refreshBal();
 }
 function noteSign(k, state, tx) {

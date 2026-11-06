@@ -395,14 +395,15 @@ export function makeApp() {
   }
   app.get('/api/guardhouse/check/:account', limiter(12), async c => {
     const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
-    // The board is the live rule book. The retired charter is history, so it is never the
-    // default: asking about an account must not name a deleted contract.
-    const charter = c.req.query('charter') || MAINNET_DEP?.board?.contract || MAINNET_DEP?.charter?.contract || DEP.guardhouse?.oath;
-    const found = await nearcartaCharter(charter);
-    if (!found) return bad(c, 'charter must be a Nearcarta charter');
-    const k = a + '|' + charter, hit = cpCache.get(k);
+    // No charter means a guest check: there is no allowlist to compare against, and the
+    // account signals alone decide. The old default was charter.nearcarta.near, which is
+    // retired (mainnet.json `retired`), so using it made every guest check fail.
+    const charter = c.req.query('charter') || null;
+    const found = charter ? await nearcartaCharter(charter) : null;
+    if (charter && !found) return bad(c, 'charter must be a Nearcarta charter');
+    const k = a + '|' + (charter || ''), hit = cpCache.get(k);
     if (hit && Date.now() - hit.at < 20_000) return c.json(hit.v);
-    const v = await cp.check(a, { charter, row: found.row || null });
+    const v = await cp.check(a, { charter: charter || null, row: found?.row || null });
     cpCache.set(k, { at: Date.now(), v }); if (cpCache.size > 500) cpCache.delete(cpCache.keys().next().value);
     return c.json(v);
   });

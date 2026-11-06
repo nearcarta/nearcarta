@@ -5,7 +5,6 @@
 // and prior confirmed payments to it from the same charter (get_action records on chain).
 // block = do not sign. warn = ask the human. allow = sign. The charter still decides on chain either way.
 import { readFileSync } from 'node:fs';
-import { MAINNET_DEP } from './config.js';
 import { view as nearView, viewAccount as nearViewAccount } from './near.js';
 import { fpost as fastPost } from './shops.js';
 
@@ -75,24 +74,22 @@ export async function check(account, { charter = null, row = null, now = Date.no
     s.actions_scanned = 0;
     s.board_row = true;
   } else if (charter) {
-    // The board has no get_clauses. A check against the board with no row for the
-    // account is "no rule book to compare against", not a crash.
-    const isBoard = charter === MAINNET_DEP?.board?.contract;
-    if (isBoard) {
-      s.allowlisted = false;
-      s.lookalike_of = null;
-      s.actions_scanned = 0;
-      s.board_row = false;
-      s.no_row_reason = 'the board has no row for this account';
-    } else {
-    const [clauses, st] = await Promise.all([view(charter, 'get_clauses'), view(charter, 'get_state')]);
-    const allowed = [...new Set(Object.values(clauses || {}).flatMap(c => c.receivers || []))];
-    s.allowlisted = allowed.includes(account);
-    s.lookalike_of = lookalikeOf(account, allowed);
-    const hi = Number(st.next_action || 0), lo = Math.max(Number(st.prune_cursor || 0), hi - 25);
-    const recs = await Promise.all(Array.from({ length: hi - lo }, (_, i) => view(charter, 'get_action', { action_id: String(lo + i) }).catch(() => null)));
-    s.prior_payments = recs.filter(a => a && a.receiver === account && a.status === 'confirmed').length;
-    s.actions_scanned = recs.length;
+    // A retired charter has no state left to read. That is not a reason to fail the
+    // whole check: the account signals above still stand, and the allowlist simply
+    // stays unknown. Without this, one dead default charter 500s every check.
+    try {
+      const [clauses, st] = await Promise.all([view(charter, 'get_clauses'), view(charter, 'get_state')]);
+      const allowed = [...new Set(Object.values(clauses || {}).flatMap(c => c.receivers || []))];
+      s.allowlisted = allowed.includes(account);
+      s.lookalike_of = lookalikeOf(account, allowed);
+      const hi = Number(st.next_action || 0), lo = Math.max(Number(st.prune_cursor || 0), hi - 25);
+      const recs = await Promise.all(Array.from({ length: hi - lo }, (_, i) => view(charter, 'get_action', { action_id: String(lo + i) }).catch(() => null)));
+      s.prior_payments = recs.filter(a => a && a.receiver === account && a.status === 'confirmed').length;
+      s.actions_scanned = recs.length;
+    } catch (e) {
+      // The allowlist is unknown, so allowlisted stays false and decide() keeps the
+      // verdict at warn (no_history). It cannot reach allow without a readable charter.
+      s.charter_unreadable = String(e?.message || e).slice(0, 120);
     }
   }
   if (s.exists) {
