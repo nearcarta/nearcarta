@@ -5,8 +5,11 @@
 import { readSession, readSessionAccount, sessionPill, visitor } from '../../design/D8_shops/js/session.js';
 import { roomError } from '../room-error.js';
 import {
-  BOARD, ROW_WAIT_MS, diffCharter, draftFrom, matchNote, nearOf, normalizeRow, readBack, readUntilChange, rowOwner, waitForFinal, withRowWait,
+  BOARD, ROW_WAIT_MS, diffCharter, draftFrom, matchNote, nearOf, normalizeRow, readUntilChange, rowOwner, waitForFinal, withRowWait,
 } from './hall.js';
+import { runHallCommand } from './hall-actions.js';
+import { armHallDock, ensureHallDock, installHallDock } from './hall-dock.js';
+import { capIcon, counterMarkup, hirePane, jobsPane, lampIcon, noteMarkup, receiptMarkup, scrollIcon, sealMarkup } from './hall-panes.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const apiBase = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -73,8 +76,33 @@ export function hallMarkup(row, person = null) {
   </form>`;
 }
 
+function hallFrame({ tab, rowHtml, jobsHtml, hireHtml, seal, line }) {
+  const on = name => (tab === name ? 'true' : 'false');
+  const hide = name => (tab === name ? '' : ' hidden');
+  return `<div class="hall-desk" data-testid="hall-desk">
+    <div class="hall-tabs" role="tablist">
+      <button type="button" class="hall-tab" role="tab" data-tab="row" aria-selected="${on('row')}" data-testid="hall-tab-row">${capIcon()}<span>My row</span></button>
+      <button type="button" class="hall-tab" role="tab" data-tab="jobs" aria-selected="${on('jobs')}" data-testid="hall-tab-jobs">${scrollIcon()}<span>Jobs</span></button>
+      <button type="button" class="hall-tab" role="tab" data-tab="hire" aria-selected="${on('hire')}" data-testid="hall-tab-hire">${lampIcon()}<span>Hire</span></button>
+    </div>
+    <div data-pane="row"${hide('row')}>${rowHtml}</div>
+    <div data-pane="jobs"${hide('jobs')}>${jobsHtml}</div>
+    <div data-pane="hire"${hide('hire')}>${hireHtml}</div>
+    ${sealMarkup(seal)}
+    ${noteMarkup(seal ? '' : line)}
+  </div>`;
+}
+
 export async function mountHall(root, hooks = {}) {
   if (!root) return;
+  let tab = 'row';
+  let seal = '';
+  let line = '';
+  let speech = '';
+  let pending = null;
+  let lastReceipt = null;
+  let jobs = { bounties: [], error: '', contract: 'townhall.nearcarta.near' };
+  let market = { blocked: 'no_token', assignments: [], draft: null, agent: null };
   if (hooks.accountP && !readSessionAccount()) {
     try { await hooks.accountP; } catch { /* a saved session is not required to paint */ }
   }
@@ -82,7 +110,21 @@ export async function mountHall(root, hooks = {}) {
   let before = null;
   const paint = (row) => {
     const person = visitor();
-    root.innerHTML = hallMarkup(row, person);
+    root.innerHTML = hallFrame({
+      tab,
+      rowHtml: hallMarkup(row, person),
+      jobsHtml: jobsPane(jobs),
+      hireHtml: hirePane(market),
+      seal,
+      line,
+    });
+    const counter = root.querySelector('#hall-counter');
+    if (counter) {
+      counter.hidden = !speech;
+      counter.innerHTML = counterMarkup(speech);
+    }
+    const slip = root.querySelector('#hall-receipt');
+    if (slip) slip.innerHTML = receiptMarkup(lastReceipt);
     const who = root.querySelector('#who') || document.getElementById('who');
     if (who) {
       const saved = readSession();
@@ -107,7 +149,69 @@ export async function mountHall(root, hooks = {}) {
         copy.textContent = 'Copy failed';
       }
     };
+    root.querySelectorAll('[data-tab]').forEach(btn => {
+      btn.onclick = () => { tab = btn.dataset.tab || 'row'; seal = ''; line = ''; paint(before); };
+    });
+    root.querySelectorAll('[data-cmd]').forEach(btn => {
+      btn.onclick = () => run(btn.dataset.cmd || '');
+    });
+    const hireGo = root.querySelector('[data-testid=hall-hire-go]');
+    if (hireGo) hireGo.onclick = () => {
+      const brief = root.querySelector('#hall-brief')?.value || 'a lamp check';
+      const near = root.querySelector('#hall-offer')?.value || '0.001';
+      run(`hire an agent for ${brief} ${near} near`);
+    };
+    const doc = typeof document !== 'undefined' ? document : null;
+    if (doc && doc.getElementById) {
+      ensureHallDock(doc);
+      installHallDock(doc);
+      armHallDock(text => run(text));
+      const dock = doc.getElementById('hall-agent-dock');
+      if (dock) dock.hidden = false;
+    }
+    hooks.runAgent = text => run(text);
+    if (hooks.state) hooks.state.hallRun = text => run(text);
   };
+
+  async function run(text) {
+    seal = '';
+    const result = await runHallCommand(text, {
+      row: async () => before,
+      market: async () => {
+        if (hooks.market) return hooks.market();
+        try {
+          const m = await fetch(apiBase() + '/api/hall/market', { cache: 'no-store' }).then(r => r.json());
+          if (m && typeof m === 'object') market = m;
+        } catch { market = { ...market, blocked: 'market_unread' }; }
+        return market;
+      },
+      pay: hooks.pay,
+      pending: () => pending,
+      setPending: (p) => { pending = p; },
+      clearPending: () => { pending = null; speech = ''; },
+      clearSeal: () => { seal = ''; },
+      signRules: async (calls) => {
+        const sign = hooks.sign || (async (list) => {
+          const m = await import('/shops/hall/hall.bundle.js');
+          return m.signCalls(list);
+        });
+        return sign(calls);
+      },
+    });
+    if (result?.speech) speech = result.speech;
+    if (result?.seal) seal = result.hint || 'Refused';
+    else seal = '';
+    line = result?.speech ? '' : (result?.hint || '');
+    if (result?.receipt) lastReceipt = result.receipt;
+    if (result?.listing) {
+      market = { ...market, blocked: result.listing.blocked, agent: result.listing.agent || market.agent, assignments: result.listing.assignments || market.assignments, draft: result.listing.draft || market.draft };
+    }
+    paint(before);
+    if (result?.cinema && result.tx) hooks.onPaid?.(result);
+    else if (result?.seal) hooks.onRefuse?.(result.hint);
+    else hooks.onClear?.();
+    return result;
+  }
 
   async function readRow(id, { fresh = false } = {}) {
     const q = fresh ? `?fresh=1&t=${Date.now()}` : '';
@@ -116,6 +220,11 @@ export async function mountHall(root, hooks = {}) {
   }
 
   async function onSign() {
+    seal = '';
+    line = '';
+    hooks.onClear?.();
+    const sealEl = root.querySelector('[data-testid=hall-refused]');
+    if (sealEl) { sealEl.hidden = true; sealEl.replaceChildren(); }
     const result = root.querySelector('#result');
     const list = root.querySelector('#list');
     if (!before) {
@@ -207,5 +316,22 @@ export async function mountHall(root, hooks = {}) {
       }).catch(() => {});
     }
   }
+  async function loadLive() {
+    const base = apiBase();
+    try {
+      const b = await fetch(base + '/api/hall/bounties', { cache: 'no-store' }).then(r => r.json());
+      jobs = { bounties: Array.isArray(b?.bounties) ? b.bounties : [], error: b?.error || '', contract: b?.contract || jobs.contract };
+    } catch {
+      jobs = { ...jobs, error: 'The hall did not answer.' };
+    }
+    try {
+      const m = hooks.market ? await hooks.market() : await fetch(base + '/api/hall/market', { cache: 'no-store' }).then(r => r.json());
+      if (m && typeof m === 'object') market = m;
+    } catch {
+      market = { ...market, blocked: 'market_unread' };
+    }
+    if (tab !== 'row' && root.querySelector('[data-testid=hall-desk]')) paint(before);
+  }
+  loadLive();
   start();
 }

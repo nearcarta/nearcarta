@@ -19,6 +19,7 @@ import { agentDeliveredNote, depositPlan, explainQuoteMiss, ferryStatusHtml, fer
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
 import { armTollDock, dispatchTollDock, installTollDock } from '/panels/toll-dock.js';
 import { mergeTollChronicle, nextRowBalance, passPaidCopy, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
+import { armHallDock, dispatchHallDock, ensureHallDock, installHallDock } from '/panels/hall-dock.js';
 import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues, prepareRows } from './payouts.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
@@ -147,6 +148,21 @@ function wireFerryDock(hooks) {
   const send = (e) => { e?.preventDefault?.(); return dispatchFerryDock(document); };
   if (go) go.onclick = send;
   if (form) form.onsubmit = send;
+  if (input) input.onkeydown = (e) => { if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) { e.preventDefault(); send(e); } };
+}
+function wireHallDock(hooks) {
+  const d = ensureHallDock(document);
+  if (!d) return;
+  installHallDock(document);
+  d.hidden = cur !== 'hall';
+  armHallDock((text) => {
+    if (typeof hooks?.runAgent === 'function') return hooks.runAgent(text);
+    return { ok: false, hint: 'The agent is not ready. Open Town Hall and press Send again.' };
+  });
+  const go = d.querySelector('#h-agent-go');
+  const input = d.querySelector('#h-agent');
+  const send = (e) => { e?.preventDefault?.(); return dispatchHallDock(document); };
+  if (go) go.onclick = send;
   if (input) input.onkeydown = (e) => { if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) { e.preventDefault(); send(e); } };
 }
 function ferryPlainReason(reason) {
@@ -832,15 +848,30 @@ const APPS = {
     },
   },
   hall: {
-    label: 'Town Hall · your row', idle: 'Apply a tighter or looser cap to your own row. Gas only. No bond.',
+    guest: true,
+    label: 'Town Hall · your row', idle: 'My row, jobs, and a hire. The agent key calls propose. No wallet popup.',
     form: () => '<div data-deep="hall"></div>',
-    bind: () => mountShop('hall', document.getElementById('t-form'), { state: extra }),
-    btn: 'Apply to my row',
+    bind: () => {
+      const hooks = {
+        state: extra,
+        pay: (plan) => A.hallPay({ receiver: plan.receiver, amountY: plan.amountY }),
+        sign: (calls) => A.hallSign(calls),
+        onPaid: (res) => { sh?.hideSeal?.(); if (sh?.act && runScene) runScene(sh.act({ paid: true, tx: res.tx })); },
+        onRefuse: (text) => { if (sh?.act && runScene) runScene(sh.act({ refused: true, reason: text || '' })); else sh?.showSeal?.(text); },
+        onClear: () => sh?.hideSeal?.(),
+      };
+      mountShop('hall', document.getElementById('t-form'), hooks);
+      wireHallDock(hooks);
+    },
+    btn: () => '',
     hero: () => A.S.clauses.pay ? num(+A.fromY(A.S.clauses.pay.per_action_cap).toFixed(4), 'NEAR max') : null,
     run: async () => {
-      const r = await A.hallChange(extra.hc || 'tighter');
-      const when = r.eta ? new Date(Number(BigInt(r.eta) / 1_000_000n)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-      return { o: { decision: 'allowed', tx: r.tx }, kind: 'ok', hero: APPS.hall.hero(), say: r.applied ? `Passed: ${r.what}, in force now.` : `Queued: ${r.what}, from ${when}.`, rule: r.applied ? 'applied on chain' : 'queued behind your cooling period' };
+      if (typeof extra.hallRun === 'function') {
+        const r = await extra.hallRun('tighten my cap');
+        return { keep: true, kind: r?.ok ? 'ok' : 'no', say: r?.hint || 'Nothing was signed.', rc: r?.tx ? A.txLine(r.tx) : '' };
+      }
+      const r = await A.hallChange('tighter');
+      return { o: { decision: r.tx ? 'allowed' : 'denied', tx: r.tx }, kind: r.tx ? 'ok' : 'no', hero: APPS.hall.hero(), say: r.what || 'Nothing was signed.', rule: r.tx ? 'applied on chain' : '' };
     },
   },
   payouts: {
@@ -1022,12 +1053,31 @@ function paint() {
   if (cur === 'toll') {
     document.body.classList.add('toll-tray');
     document.body.classList.remove('ferry-tray');
+    document.body.classList.remove('hall-tray');
     const fd = document.getElementById('ferry-agent-dock'); if (fd) fd.hidden = true;
+    const hd = document.getElementById('hall-agent-dock'); if (hd) hd.hidden = true;
     if (phase === 'idle') say(app.idle);
     hero(null);
     form(app.form());
     app.bind?.();
     hideFerryPrimary();
+    return;
+  }
+  if (cur === 'hall' && app.guest && app.form) {
+    document.body.classList.add('hall-tray');
+    document.body.classList.remove('ferry-tray');
+    document.body.classList.remove('toll-tray');
+    say(app.idle);
+    hero(app.hero ? app.hero() : null);
+    form(app.form());
+    app.bind?.();
+    hideFerryPrimary();
+    const ferryDockEl = document.getElementById('ferry-agent-dock');
+    if (ferryDockEl) ferryDockEl.hidden = true;
+    const tollDockEl = document.getElementById('toll-agent-dock');
+    if (tollDockEl) tollDockEl.hidden = true;
+    const hallDockEl = document.getElementById('hall-agent-dock');
+    if (hallDockEl) hallDockEl.hidden = false;
     return;
   }
   // Ferry: after a quote, keep the card + cargo CTAs even if charter stage is incomplete (guest cinema).
@@ -1064,17 +1114,18 @@ function paint() {
   }
   if (phase === 'idle') say(app.idle);
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
-  if (cur === 'ferry') {
-    document.body.classList.add('ferry-tray');
-    document.body.classList.remove('toll-tray');
-    const td = document.getElementById('toll-agent-dock'); if (td) td.hidden = true;
-    // The card owns Get quote, Load cargo, Ask charter and Get another quote. One of each.
+  document.body.classList.toggle('ferry-tray', cur === 'ferry');
+  document.body.classList.toggle('toll-tray', cur === 'toll');
+  document.body.classList.toggle('hall-tray', cur === 'hall');
+  const ferryDockEl = document.getElementById('ferry-agent-dock');
+  if (ferryDockEl) ferryDockEl.hidden = cur !== 'ferry';
+  const tollDockEl = document.getElementById('toll-agent-dock');
+  if (tollDockEl) tollDockEl.hidden = cur !== 'toll';
+  const hallDockEl = document.getElementById('hall-agent-dock');
+  if (hallDockEl) hallDockEl.hidden = cur !== 'hall';
+  if (cur === 'ferry' || cur === 'hall' || cur === 'toll') {
     hideFerryPrimary();
   } else {
-    document.body.classList.remove('ferry-tray');
-    document.body.classList.remove('toll-tray');
-    const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true;
-    const td = document.getElementById('toll-agent-dock'); if (td) td.hidden = true;
     btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
   }
 }
@@ -1199,15 +1250,16 @@ export function boot() {
   return booted;
 }
 export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
-  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('toll-tray', id === 'toll');
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('toll-tray', id === 'toll'); document.body.classList.toggle('hall-tray', id === 'hall');
   const dock0 = document.getElementById('ferry-agent-dock'); if (dock0) dock0.hidden = id !== 'ferry';
   const tollDock0 = document.getElementById('toll-agent-dock'); if (tollDock0) tollDock0.hidden = id !== 'toll';
+  const hallDock0 = document.getElementById('hall-agent-dock'); if (hallDock0) hallDock0.hidden = id !== 'hall';
   const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = '';
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
 }
-export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('toll-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('toll-tray'); document.body.classList.remove('hall-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; const hallDock = document.getElementById('hall-agent-dock'); if (hallDock) hallDock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };

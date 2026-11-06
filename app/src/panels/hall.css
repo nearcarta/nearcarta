@@ -1,0 +1,102 @@
+/* Town Hall tray. Loaded by the town, the shop room, and /shops/hall/. */
+body.hall-tray #tray{
+  width:min(440px,calc(100vw - 28px));
+  max-width:440px;
+  left:16px; bottom:18px;
+  max-height:calc(100dvh - 112px);
+  padding:24px 22px 22px;
+  box-sizing:border-box;
+  overflow-x:hidden;
+  overflow-y:auto;
+  background:#1f1a15;
+  border:1px solid #3a3128;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+  backdrop-filter:none;
+}
+body.hall-tray #tray .t-head,
+body.hall-tray #tray .label,
+body.hall-tray #tray .hero,
+body.hall-tray #tray #t-who,
+body.hall-tray #tray #t-track,
+body.hall-tray #tray .shop-track,
+body.hall-tray #tray .say,
+body.hall-tray #tray .t-links,
+body.hall-tray #tray .rcpt,
+body.hall-tray #t-act{display:none!important}
+body.hall-tray #t-form{margin:0;min-width:0;max-width:100%}
+body[data-shop=hall] main.shop-page{padding-bottom:128px}
+.hall-desk{display:grid;gap:16px;min-width:0}
+.hall-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.hall-tab{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  min-height:44px;padding:8px 10px;margin:0;
+  border:1px solid #4a3a28;border-radius:12px;
+  background:#17130f;color:#f3ead8;cursor:pointer;
+  font:700 13px/1.2 system-ui,sans-serif;
+}
+.hall-tab[aria-selected="true"]{border-color:#f5d08a;color:#f5d08a}
+.hall-tab .hall-ico{flex:0 0 auto}
+.hall-pane{display:grid;gap:14px;min-width:0}
+.hall-lead{display:flex;align-items:center;gap:8px;margin:0;color:#f5d08a;font:700 14px/1.3 system-ui,sans-serif}
+.hall-jobs{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.hall-job{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #4a3a28;border-radius:12px;background:#17130f;color:#fff8ee}
+.hall-job small{display:block;color:#d6b46a;font:600 12px/1.3 system-ui,sans-serif}
+.hall-field{display:grid;gap:6px;width:100%;color:#f3ead8;font:600 13px/1.3 system-ui,sans-serif}
+.hall-field input{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:10px;border:1px solid #4a3a28;background:#17130f;color:#fff8ee}
+.hall-cta{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:auto;min-width:min(180px,100%);max-width:100%;
+  min-height:44px;padding:10px 18px;margin:0;justify-self:center;
+  border:1px solid #c9a05a;border-radius:14px;
+  background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
+  color:#2a1608;font:700 15px/1.15 system-ui,sans-serif;cursor:pointer;
+  box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 -2px 0 rgba(120,70,20,.22) inset,0 4px 0 #9a6f2e,0 8px 16px rgba(0,0,0,.28);
+}
+.hall-cta-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.hall-cta-ghost{background:#17130f;color:#f5d08a;box-shadow:none}
+.hall-speech{margin:0;padding:12px 14px;border-radius:14px;background:#17130f;border:1px solid #d6b46a;color:#fff8ee;font:600 14px/1.45 system-ui,sans-serif;overflow-wrap:break-word}
+.hall-note{margin:0;color:#f3ead8;font:600 14px/1.4 system-ui,sans-serif;overflow-wrap:anywhere}
+.hall-seal{display:flex;align-items:center;gap:8px;margin:0;padding:12px 14px;border-radius:12px;background:#3a1614;color:#ffd0d0;font:700 14px/1.35 system-ui,sans-serif}
+.hall-seal[hidden]{display:none}
+#hall-agent-dock{
+  position:fixed;right:20px;bottom:22px;z-index:70;
+  display:flex;flex-direction:row;align-items:flex-end;gap:12px;
+  pointer-events:none;
+}
+#hall-agent-dock > *,
+#hall-agent-dock .hall-agent-send{pointer-events:auto}
+#hall-agent-dock[hidden]{display:none!important}
+.hall-agent-char{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  width:96px;padding:0;border:0;background:transparent;cursor:pointer;color:#fff8ee;
+}
+.hall-agent-avatar{width:72px;height:72px;object-fit:contain;display:block;filter:drop-shadow(0 10px 18px rgba(0,0,0,.45))}
+.hall-agent-name{margin:0;color:#f5d08a;font:700 11px/1.2 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+.hall-agent-pop[hidden]{display:none!important}
+.hall-agent-pop{
+  width:min(300px,calc(100vw - 140px));
+  box-sizing:border-box;padding:10px;border-radius:14px;
+  border:1px solid #d6b46a66;background:#1f1a15;
+  box-shadow:0 12px 28px rgba(0,0,0,.4);
+  display:grid;gap:8px;
+}
+.hall-agent-log{margin:0;color:#f5d08a;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.hall-agent-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px}
+.hall-agent-pop input{
+  width:100%;min-width:0;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:10px;
+  border:1px solid #4a3a28;background:#17130f;color:#fff8ee;
+}
+.hall-agent-send{
+  width:44px;min-width:44px;height:44px;margin:0;padding:0;border:0;border-radius:10px;
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1 system-ui,sans-serif;cursor:pointer;
+}
+@media (max-width:720px){
+  body.hall-tray #tray{
+    width:min(calc(100vw - 112px),420px);
+    left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    max-height:min(62dvh,calc(100dvh - 108px));
+    padding:20px 18px;
+  }
+  #hall-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  .hall-agent-pop{width:min(220px,calc(100vw - 120px))}
+}
