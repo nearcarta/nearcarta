@@ -145,10 +145,10 @@
   "toll": {
     "contract": "toll.nearcarta.near",
     "owner": "nearcarta.near",
-    "code_hash": "9RQw6e1PL81HSQ1x6dr6dyvv9yAMMBdqChRToyHuDwDP",
-    "wasm": "toll.v6p86.wasm",
-    "storage_bytes": 253139,
-    "locked_near": 2.53139,
+    "code_hash": "6aAGdUhyub9wAGkWrd2ksZQZ7t4E8BqtbSBfnCwe4uDb",
+    "wasm": "toll.v7.wasm",
+    "storage_bytes": 217747,
+    "locked_near": 2.17747,
     "full_access_keys": 0,
     "foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a",
     "txs": {
@@ -157,7 +157,21 @@
       "toll_sweep_surplus": "DVFgzmAx2My6cki1q6wXyNsm2VHQ3HzZo1KZHKwQtqEd",
       "owner_toll_pay_allowlisted": "4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz",
       "owner_toll_pay_not_allowlisted": "B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR",
-      "toll_delete_fak": "6C1rLPtYKpxQgX5ZYFYSyGsbQEify9AVQ23fdXKAskxY"
+      "toll_delete_fak": "6C1rLPtYKpxQgX5ZYFYSyGsbQEify9AVQ23fdXKAskxY",
+      "toll_v7_close": "HEGDeSoTXpKagGTrEcJPbkNvoWBfr75atSGUCA4FsJLP",
+      "toll_v7_create_deploy_new_set_price": "2FrvSxB5EwmY2ZDmKGq2xQJrWLdKiSAa7Cbh6j7C3uxU"
+    },
+    "sha256": "52c91514bff43b73d3252621eeeb41508b87afb408dc28df6e584e89a27bbaf2",
+    "funded_near": 2.20392,
+    "price": {
+      "board": "board.nearcarta.near",
+      "fee": "1000000000000000000000",
+      "cost": "1000000000000000000000",
+      "max_token": "10000000",
+      "usdc": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "hold_ns": 0,
+      "paused": false,
+      "splits": []
     }
   },
   "runbook": "docs/MAINNET_RUNBOOK.md",
@@ -289,5 +303,19 @@
       },
       "recovered_to": "nearcarta.near"
     }
+  },
+  "guard": {
+    "contract": "guard.nearcarta.near",
+    "owner": "nearcarta.near",
+    "status": "deployed",
+    "crate": "contracts/guard",
+    "wasm": "contracts/artifacts/guard.wasm",
+    "wasm_sha256": "ec6bbec2e09c53ca4115091e570d1d594c0340831a4ac5b3172ae26045494b89",
+    "storage_bytes": 33366,
+    "locked_near": 0.35366,
+    "full_access_keys": 0,
+    "board": "board.nearcarta.near",
+    "deploy_tx": "CN3SKjNS7PRdvrNQsxRxQW45Ks2vChe3BDAHhehhxt65",
+    "note": "Guard live after PR #35. Stake 0.35366 from nearcarta.near. Locked, no FA keys. reap() from owner returns stake."
   }
 }

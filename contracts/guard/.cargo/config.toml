@@ -1,0 +1,4 @@
+[target.wasm32-unknown-unknown]
+# `near` selects the host syscalls. Without it the SDK compiles software
+# hashes and signature checks into the wasm.
+rustflags = ["--cfg", "near", "-C", "link-arg=-s"]

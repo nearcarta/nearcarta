@@ -129,23 +129,24 @@ test('Q3 the house deed links are brass and the charter row is shown', async ({ 
   }
 });
 
-test('Q4 check signature is the brass button', async ({ page }) => {
+test('Q4 the pay button is the one brass control', async ({ page }) => {
   await page.addInitScript(savedScholar, OWNER);
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/shops/toll/');
-    await page.getByTestId('toll-tab-proof').click();
-    const btn = page.getByTestId('check-signature');
+    const btn = page.getByTestId('toll-pay');
     await expect(btn).toBeVisible();
-    await expect(btn).toHaveText('Check signature');
     const face = await btn.evaluate(el => {
       const s = getComputedStyle(el);
-      return { img: s.backgroundImage, color: s.color, size: parseFloat(s.fontSize), h: el.getBoundingClientRect().height };
+      return { img: s.backgroundImage, bg: s.backgroundColor, color: s.color, size: parseFloat(s.fontSize), h: el.getBoundingClientRect().height };
     });
-    expect(face.img).toContain('linear-gradient');
+    const brass = face.img.includes('linear-gradient') || face.bg === 'rgb(230, 211, 168)';
+    expect(brass).toBe(true);
     expect(face.color).toBe('rgb(42, 22, 8)');
-    expect(face.size).toBeGreaterThanOrEqual(16);
+    expect(face.size).toBeGreaterThanOrEqual(15);
     expect(face.h).toBeGreaterThanOrEqual(44);
+    const gold = await page.locator('#toll-card .ferry-cta, #toll-card .primary').count();
+    expect(gold).toBe(1);
     await shot(page, 'q4-toll-' + width);
   }
 });

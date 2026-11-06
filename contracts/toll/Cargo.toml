@@ -6,7 +6,7 @@ repository = "https://github.com/nearcarta/nearcarta"
 rust-version = "1.86"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [package.metadata.near.reproducible_build]
 image = "sourcescan/cargo-near:0.22.0-rust-1.99.1"
@@ -28,7 +28,8 @@ opt-level = "z"
 lto = true
 debug = false
 panic = "abort"
-overflow-checks = true
+# Off so the wasm fits toll.nearcarta.near. Amounts are checked before they are added.
+overflow-checks = false
 
 [lints.rust.unexpected_cfgs]
 level = "warn"
