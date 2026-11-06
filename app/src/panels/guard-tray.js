@@ -50,7 +50,7 @@ export function guardMarkup(state = {}, attacks = [], esc = s => String(s ?? '')
       <label class="field guard-field">Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || '')}" autocomplete="off"></label>
       <p class="example-row"><button type="button" class="example" data-testid="guard-example">Example: shop-moved-pay-here.near</button></p>
       <button type="button" class="primary guard-cta" id="g-check" data-testid="guard-check">Check this account</button>
-      ${scoreBlock(state.score, esc)}
+      ${tab === 'check' ? scoreBlock(state.score, esc) : ''}
       ${lampRow}
       ${deny}
       ${attestedLine(state.attested, esc)}
@@ -66,7 +66,7 @@ export function guardMarkup(state = {}, attacks = [], esc = s => String(s ?? '')
       <p class="guard-note" data-testid="guard-poison">Hidden line asks for ${TRICK_NEAR} NEAR to ${esc(POISON_PAYEE)}. The charter is asked only after this check.</p>
       <div class="guard-picks" role="radiogroup" aria-label="Tricks">${pick}</div>
       ${trickBtn}
-      ${scoreBlock(state.score, esc)}
+      ${tab === 'trick' ? scoreBlock(state.score, esc) : ''}
     </div>`;
   const rowLine = state.rowKnown
     ? (state.frozen ? 'Your row is frozen. A propose while frozen is refused.' : 'Your row is live.')
@@ -104,12 +104,19 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     else localPaint();
   };
 
-  function agentLog(text) {
+  function agentLog(text, reveal) {
     state.agentHint = text || '';
     const el = doc?.getElementById('g-agent-log');
-    if (!el) return;
-    el.hidden = !text;
-    el.textContent = text || '';
+    if (el) {
+      el.hidden = !text;
+      el.textContent = text || '';
+    }
+    if (!reveal || !text) return;
+    const pop = doc?.getElementById('guard-agent-pop');
+    const toggle = doc?.querySelector('[data-testid=guard-agent-toggle]');
+    if (!pop) return;
+    pop.hidden = false;
+    toggle?.setAttribute('aria-expanded', 'true');
   }
 
   function scene(result) {
@@ -139,7 +146,7 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     scene({ clear: true, seal: false });
     const result = await runGuardAgent({ text, ...ctx() });
     if (result?.ok) state.agentText = '';
-    agentLog(result?.hint || (result?.ok ? '' : 'That line did not run.'));
+    agentLog(result?.hint || (result?.ok ? '' : 'That line did not run.'), true);
     scene(result);
     if (!result?.loaded) paint();
     return result;

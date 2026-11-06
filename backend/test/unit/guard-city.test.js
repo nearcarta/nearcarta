@@ -292,7 +292,7 @@ test('the tray markup is tabs, real icons, and an empty account field', () => {
   const off = guardMarkup({ attested: { enabled: false } }, [], esc);
   assert.match(off, /Attested check is off/);
   const scored = guardMarkup({ score: { summary: 'Block because: on the deny list', verdict: 'block', lines: [{ id: 'denylist', title: 'Denylist', level: 'block', text: 'On the deny list', tx: 'E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ' }] } }, [], esc);
-  assert.match(scored, /data-testid="guard-verdict"/);
+  assert.equal((scored.match(/data-testid="guard-verdict"/g) || []).length, 1);
   assert.match(scored, /nearblocks\.io\/txns\/E7KMexjS/);
 });
 
@@ -300,6 +300,7 @@ test('city wiring keeps the guard door in town and cinema on a real tx', () => {
   assert.match(read('app/src/panels/deep.js'), /mountGuardTray/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /wireGuardDock/);
+  assert.match(ui, /cur === 'guard' && app\.form/);
   assert.match(ui, /installGuardDock/);
   assert.match(ui, /armGuardDock/);
   assert.match(ui, /result\.tx/);
@@ -315,7 +316,10 @@ test('city wiring keeps the guard door in town and cinema on a real tx', () => {
   assert.match(index, /data-city-shop="guard"/);
   assert.match(index, /__openCityShop/);
   assert.match(read('app/design/D9_world/js/main.js'), /enterShop/);
-  assert.match(read('app/src/panels/guard.css'), /button\.guard-cta\[disabled\]\{opacity:1/);
+  const css = read('app/src/panels/guard.css');
+  assert.match(css, /button\.guard-cta\[disabled\]\{opacity:1/);
+  assert.match(css, /\.guard-agent-pop\[hidden\]\{display:none!important\}/);
+  assert.match(css, /body\.guard-tray:has\(#guard-agent-pop:not\(\[hidden\]\)\) #shopUI #tray/);
   const dock = read('app/src/panels/guard-dock.js');
   assert.match(dock, /robotexpressive\.webp/);
   assert.match(dock, /g-agent-go/);

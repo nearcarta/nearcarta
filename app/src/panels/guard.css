@@ -105,7 +105,10 @@ button.guard-cta[disabled]{opacity:1;cursor:progress}
   box-shadow:0 12px 28px rgba(0,0,0,.4);
   display:grid; gap:12px;
 }
+.guard-agent-pop[hidden]{display:none!important}
 .guard-agent-log{margin:0;color:#f5d08a;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.guard-agent-log[hidden]{display:none!important}
+body[data-shop="guard"] #room{padding-bottom:140px}
 .guard-agent-pop .guard-agent-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:12px;align-items:stretch}
 .guard-agent-pop input{
   width:100%; min-width:0; box-sizing:border-box; min-height:44px;
@@ -121,9 +124,16 @@ button.guard-cta[disabled]{opacity:1;cursor:progress}
 }
 @media (max-width:720px){
   body.guard-tray #shopUI #tray{
-    width:min(100vw - 16px,420px); left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    max-height:min(58dvh,calc(100dvh - 108px)); padding:20px 18px;
+    width:min(100vw - 16px,420px); left:8px;
+    bottom:calc(118px + env(safe-area-inset-bottom,0px));
+    max-height:min(62dvh,calc(100dvh - 200px)); padding:20px 18px;
+  }
+  body.guard-tray:has(#guard-agent-pop:not([hidden])) #shopUI #tray{
+    bottom:calc(176px + env(safe-area-inset-bottom,0px));
+    max-height:min(52dvh,calc(100dvh - 260px));
   }
   #guard-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:12px}
   .guard-agent-pop{width:min(240px,calc(100vw - 120px))}
+  body[data-shop="guard"] #room{padding-bottom:180px}
+  body[data-shop="guard"]:has(#guard-agent-pop:not([hidden])) #room{padding-bottom:260px}
 }

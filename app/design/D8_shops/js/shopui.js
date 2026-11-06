@@ -849,11 +849,20 @@ function paint() {
       say('Quote ready. Load cargo as guest, or write your rules to Ask charter.');
       hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.(); btn('Write my rules'); return;
     }
+    if (cur === 'guard' && app.form) {
+      say(app.idle); hero(null); form(app.form()); app.bind?.(); btn('Write my rules'); return;
+    }
     say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return;
   }
-  if (st === 'wait') { say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(''); hero(null); btn('Check again'); return; }
+  if (st === 'wait') {
+    if (cur === 'guard' && app.form) {
+      say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(app.form()); app.bind?.(); btn('Check again'); return;
+    }
+    say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(''); hero(null); btn('Check again'); return;
+  }
   if (st === 'key') {
-    if (ferryQuoted && app.guest && app.form) {
+    if (cur === 'guard' && app.form) { form(app.form()); app.bind?.(); hero(null); }
+    else if (ferryQuoted && app.guest && app.form) {
       say('Quote ready. Load cargo as guest, or finish the helper key to Ask charter.');
       hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.();
     } else { form(''); hero(null); }
