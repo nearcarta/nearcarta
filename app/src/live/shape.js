@@ -8,68 +8,40 @@ const N = y => {
 
 const ghOf = dep => (dep && typeof dep === 'object' && dep.guardhouse && typeof dep.guardhouse === 'object') ? dep.guardhouse : null;
 
-/** True when /api/guardhouse answered with the live board rather than a fallback. */
-export const isLiveBoard = g => !!(g && typeof g === 'object' && g.board && g.config);
-
-export function shapeCore(dep, guard, sample) {
-  // The live guard charter is the visitor's row on the board. /api/guardhouse answers
-  // that shape now; the old oath `state` shape is still accepted for a recorded payload.
-  if (isLiveBoard(guard)) {
-    const gh = ghOf(dep);
-    const row = guard.row && typeof guard.row === 'object' ? guard.row : null;
-    return {
-      ...sample,
-      oath: guard.board,
-      owner: guard.config?.owner ?? sample.owner,
-      dao: guard.config?.owner ?? sample.dao,
-      policyVersion: row ? 'row' : `board ${guard.config?.rows ?? 0} rows`,
-      policyHash: gh?.code_hash || sample.policyHash,
-      freezeEpoch: 0,
-      frozen: row?.frozen === true,
-      agentKey: row?.agent ?? sample.agentKey,
-      codeHash: gh?.code_hash || sample.codeHash,
-      receiver: row?.receivers?.[0] ?? sample.receiver,
-      snapshot: 'live read ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC',
-      src: 'mainnet',
-    };
-  }
+/**
+ * CORE for the dashboards. The oath is the visitor board now: `guard` is the board
+ * snapshot (/api/guardhouse on board.nearcarta.near) and `board` is /api/board/config.
+ * The row cap and owner come from the board; the retired charter sample is not used.
+ */
+export function shapeCore(dep, guard, board, sample) {
   const st = guard && typeof guard.state === 'object' && guard.state ? guard.state : null;
-  if (!st) return sample;
+  const cfg = board && typeof board.config === 'object' && board.config ? board.config : null;
+  if (!st && !cfg) return sample;
   const gh = ghOf(dep);
   return {
     ...sample,
-    oath: guard.oath || sample.oath,
-    owner: st.owner ?? sample.owner,
-    dao: st.dao ?? sample.dao,
-    policyVersion: st.policy_version ?? sample.policyVersion,
-    policyHash: st.policy_hash ?? sample.policyHash,
-    freezeEpoch: st.freeze_epoch ?? sample.freezeEpoch,
-    frozen: st.frozen === true,
-    agentKey: st.agent_key ?? sample.agentKey,
+    oath: (cfg && cfg.contract) || guard?.board || guard?.oath || sample.oath,
+    owner: cfg?.owner ?? st?.owner ?? sample.owner,
+    dao: st?.dao ?? sample.dao,
+    policyVersion: st?.policy_version ?? sample.policyVersion,
+    policyHash: st?.policy_hash ?? sample.policyHash,
+    freezeEpoch: st?.freeze_epoch ?? sample.freezeEpoch,
+    frozen: st?.frozen === true,
+    agentKey: st?.agent_key ?? sample.agentKey,
     codeHash: gh?.code_hash || sample.codeHash,
     receiver: gh?.allowed_receiver || sample.receiver,
+    rows: cfg?.rows ?? st?.rows ?? sample.rows ?? null,
+    maxRowYocto: cfg?.max_row_yocto ?? st?.max_row_yocto ?? sample.maxRowYocto ?? null,
     snapshot: 'live read ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC',
     src: 'mainnet',
   };
 }
 
 export function shapeClauses(guard, sample) {
-  if (isLiveBoard(guard)) {
-    const row = guard.row && typeof guard.row === 'object' ? guard.row : null;
-    // No row yet is a real state (the visitor has not run /setup), and it is not the
-    // sample: report zero caps rather than a fixture cap that would look like a grant.
-    if (!row) return [{ id: 'pay', kind: 'Native transfer', payees: [], cap: 0, budget: 0, spent: 0, reserved: 0,
-      window: 'No row yet', escalate: null, receipt: false, src: 'mainnet', tx: null }];
-    return [{
-      id: 'pay', kind: 'Native transfer',
-      payees: Array.isArray(row.receivers) ? row.receivers : [],
-      cap: N(row.per_action_cap), budget: N(row.daily_budget),
-      spent: N(row.spent_today), reserved: 0,
-      window: 'Any time', escalate: null, receipt: false, src: 'mainnet', tx: null,
-    }];
-  }
   const clauses = guard && guard.clauses && typeof guard.clauses === 'object' ? guard.clauses : null;
-  if (!clauses) return sample;
+  // The board has no clauses: each visitor's rules live in their own row. With no
+  // clauses the sample would claim a charter that no longer exists, so return none.
+  if (!clauses) return guard?.source === 'board' ? [] : sample;
   const usage = guard.usage && typeof guard.usage === 'object' ? guard.usage : {};
   return Object.entries(clauses).map(([id, c]) => ({
     id,

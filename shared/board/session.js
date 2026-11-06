@@ -10,15 +10,43 @@
 import { functionCallAllowanceCost } from './cost.js';
 
 export const AGENT_METHODS = ['propose', 'propose_call', 'propose_call_as'];
-// The guard hold lifecycle, granted as its own scope. This is deliberately NOT in AGENT_METHODS:
-// an agent key that could call confirm_hold is an agent that can release a warning, which is the
-// one thing the guard exists to prevent. `confirm_hold` has no predecessor check of its own; the
-// confirm-key signature is the boundary, so the key that may send that call must be the visitor's
-// own. cancel_hold and expire_sent are owner-only on chain (predecessor == row owner).
-// contracts/charter_board/src/v2.rs: confirm_hold, cancel_hold, expire_sent.
-export const GUARD_HOLD_METHODS = ['confirm_hold', 'cancel_hold', 'expire_sent'];
-/** Every method a guard session needs, when the visitor opts into the hold lifecycle. */
-export const GUARD_SESSION_METHODS = [...AGENT_METHODS, ...GUARD_HOLD_METHODS];
+
+/**
+ * The session key's scope for holds. Arena, Guard and Hall need three more board
+ * methods, and they are not equal:
+ *
+ * - `confirm_hold` sends a held WARN. It is safe to *list* on the session key and
+ *   useless to the agent: the contract stores a separate confirm key, `set_confirm_key`
+ *   refuses `pk == agent`, and `confirm_hold` only accepts a signature from that stored
+ *   key. The agent cannot hold the visitor's confirm secret. So a WARN can never be
+ *   confirmed by the agent on its own, whatever the key's method list says. That is a
+ *   contract check, not a UI rule: `holdsCanConfirmWithoutOwner` pins it in the tests.
+ * - `cancel_hold` and `expire_sent` are the visitor changing their own record. Both are
+ *   `predecessor == owner` in the contract. Neither is granted: an agent that can cancel
+ *   a WARN can quietly undo it, and one that can expire a sent hold decides a liability.
+ *   The visitor's own wallet calls those two.
+ */
+export const SESSION_METHODS = [...AGENT_METHODS, 'confirm_hold'];
+/** Methods only the visitor's wallet may call. Never in a session key's list. */
+export const OWNER_ONLY_METHODS = ['cancel_hold', 'expire_sent'];
+/** The three hold methods a shop track needs, stated once for the shops and the docs. */
+export const HOLD_METHODS = ['confirm_hold', 'cancel_hold', 'expire_sent'];
+
+/**
+ * True when a key scope would let the agent confirm a hold with nothing else. It cannot:
+ * a confirm signature must come from the row's confirm key, and `set_confirm_key`
+ * refuses to store the agent key. This is the invariant /setup and the shops rely on.
+ */
+export function agentCanConfirmAlone(methodNames, { confirmKeyEqualsAgent = false } = {}) {
+  const names = Array.isArray(methodNames) ? methodNames : [];
+  return confirmKeyEqualsAgent === true && names.includes('confirm_hold');
+}
+
+/** True when a scope asks for a method only the visitor's wallet may call. */
+export function scopeHasOwnerOnly(methodNames) {
+  const names = Array.isArray(methodNames) ? methodNames : [];
+  return OWNER_ONLY_METHODS.some(m => names.includes(m));
+}
 export const SESSION_HOURS = [1, 2, 24];
 // 0.05 NEAR of gas. The key cannot spend it as a transfer.
 export const GAS_ALLOWANCE_YOCTO = (10n ** 24n / 20n).toString();
@@ -191,11 +219,13 @@ export const SESSION_BEATS = {
 };
 
 /**
- * A function-call key is ready when method_names is empty (any method) or
- * includes every required agent method. Propose-only keys are stale for Ferry.
+ * A function-call key is ready when method_names is empty (any method) or includes every
+ * method in the session scope. A key that only names propose, propose_call and
+ * propose_call_as is stale: the shops' hold path needs confirm_hold in the list too.
+ * Readiness follows SESSION_METHODS so /setup and the shops cannot disagree.
  * https://docs.near.org/protocol/accounts-contracts/access-keys#function-call-keys
  */
-export function agentMethodsReady(methodNames, required = AGENT_METHODS) {
+export function agentMethodsReady(methodNames, required = SESSION_METHODS) {
   const names = Array.isArray(methodNames) ? methodNames : [];
   if (!names.length) return true;
   return required.every(m => names.includes(m));
@@ -230,7 +260,7 @@ export function renewAgentKeyActions({
   stalePublicKeys = [],
   newPublicKey,
   boardContract,
-  methodNames = AGENT_METHODS,
+  methodNames = SESSION_METHODS,
   allowance = GAS_ALLOWANCE_YOCTO,
 } = {}) {
   if (!newPublicKey || !boardContract) throw new Error('renew needs a public key and the board contract');

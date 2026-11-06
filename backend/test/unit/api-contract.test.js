@@ -98,11 +98,15 @@ test('a guest guard check defaults to the live board, never a retired charter', 
   for (const dead of retired) assert.doesNotMatch(code, new RegExp(dead.replace(/\./g, '\\.')), `the route code must not name retired ${dead}`);
 });
 
-test('/api/guardhouse answers a live board payload, not the retired oath 404', () => {
+test('/api/guardhouse answers the live board, not the retired oath 404', () => {
   const src = readFileSync(new URL('../../src/app.js', import.meta.url), 'utf8');
   const route = src.slice(src.indexOf("app.get('/api/guardhouse',"), src.indexOf("app.get('/api/guardhouse/check"));
-  assert.match(route, /guard\.boardSnapshot/, 'the route reads the board');
-  assert.doesNotMatch(route, /reads\.guardhouse|guard\.snapshot\(\)/, 'it must not read the retired oath snapshot');
+  assert.match(route, /guard\.snapshot\(\)/, 'the route reads the live charter (the board)');
+  assert.match(route, /guard\.boardSnapshot\(guard\.boardId, \{ owner \}\)/, '?owner= adds that visitor row');
+  const gh = readFileSync(new URL('../../src/guardhouse.js', import.meta.url), 'utf8');
+  assert.match(gh, /source: 'board'/, 'the payload says it is the board');
+  // The retired oath must not be the default charter any more.
+  assert.match(gh, /oathId = .*boardId/, 'oathId falls back to the board, never the retired charter');
 });
 
 test('/api/whoami never echoes a client IP', async () => {

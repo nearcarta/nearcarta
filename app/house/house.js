@@ -5,7 +5,7 @@
 // https://docs.near.org/web3-apps/tutorials/wallet-login
 import { NearConnector } from '@hot-labs/near-connect';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
-import { AGENT_METHODS, GAS_TOPUP_YOCTO } from '../../shared/board/session.js';
+import { SESSION_METHODS, GAS_TOPUP_YOCTO } from '../../shared/board/session.js';
 import { createBoardKeyPlugin } from './board-key.js';
 import { addPrivy, NEAR_NET } from './privy.js';
 import { decoratePicker } from '../shops/vault/picker.js';
@@ -37,7 +37,7 @@ function connectorFor(network) {
   const c = new NearConnector({ network, features: { [network]: true, signAndSendTransaction: true }, footerBranding: null, walletConnect, cspNonce: document.querySelector('script[nonce]')?.nonce || undefined });
   if (network === 'mainnet') {
     c.__boardKey = c.use(createBoardKeyPlugin({
-      contractId: MAIN.board.contract, methodNames: AGENT_METHODS, allowance: GAS_TOPUP_YOCTO,
+      contractId: MAIN.board.contract, methodNames: SESSION_METHODS, allowance: GAS_TOPUP_YOCTO,
     })).catch(() => {});
   }
   connectors.set(network, c);

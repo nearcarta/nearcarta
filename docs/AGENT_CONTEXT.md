@@ -6,7 +6,7 @@ The town agent is the Lamplighter. Do not give agents human names.
 
 ## Hard rules
 
-- The API does not sign mainnet. `quote()` stays `dry: true`. `POST /api/ferry/checkout` may ask 1Click for a deposit address only after the charter view allows the recipient, and only for at most 0.20 USD (`backend/src/ferry-checkout.js`). It does not send the deposit.
+- The API does not sign mainnet. `quote()` stays `dry: true`. `POST /api/ferry/checkout` may ask 1Click for a deposit address only after the visitor row allows the recipient and the amount (`backend/src/ferry-checkout.js`). There is no product USD cap; the row is the only limit. It does not send the deposit.
 - The deployed API holds no NEAR key. Vault ask, attack, and task return 503 without one. Keys stay outside the repo. Never commit, log, or print a key or token.
 - Do not spend NEAR, broadcast `set_rules`, or click Run it live from an agent session.
 - Visitor and judge surfaces are mainnet. Addresses are read from `shared/deployments/mainnet.json`, not hardcoded.

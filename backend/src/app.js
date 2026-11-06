@@ -102,7 +102,7 @@ export const swr = (name, fn, { ttl = READ_TTL_MS, stale = READ_STALE_MS, now = 
 
 // One handler per public read route, shared by the routes and by /api/health?deep=1.
 const reads = Object.fromEntries(Object.entries({
-  guardhouse: swr('guardhouse', () => guard.boardSnapshot()),
+  guardhouse: swr('guardhouse', () => guard.snapshot()),
   attested: swr('attested', () => attested()),
   house: houseView,
   mistbank: swr('mistbank', () => mist.mistbank()),
@@ -181,7 +181,7 @@ export const WARM_DELAY_MS = Number(process.env.WARM_DELAY_MS ?? 3_000);
 // Reads run one at a time; the first tick waits WARM_DELAY_MS after boot so the health check is answered first.
 export function warm({ every = WARM_EVERY_MS, read, delay = read ? 0 : WARM_DELAY_MS } = {}) {
   let tick = 0, stopped = false, t = null;
-  const warmOath = () => MAINNET_DEP?.charter?.contract || DEP.guardhouse?.oath || null;
+  const warmOath = () => MAINNET_DEP?.board?.contract || DEP.guardhouse?.oath || null;
   const jobs = () => [() => shops.refreshHealth(),
     () => { const a = warmOath(); return a ? shops.chronicle(a, shops.FEED_MAX, ...(read ? [read] : [])) : null; },
     ...(read ? [] : [() => reads.mistbank(), tick++ % 2 === 0 ? () => arenaPromptsSwr() : () => ledgerSwr()])];
@@ -193,7 +193,7 @@ export function warm({ every = WARM_EVERY_MS, read, delay = read ? 0 : WARM_DELA
 export function makeApp() {
   const app = new Hono();
   // Pay is embedded on other sites. These routes carry no cookie, so any origin may call them.
-  // The charter view and the 0.20 USD cap still run before a deposit address is created.
+  // The charter view and the visitor's row cap both run before a deposit address is created.
   const payCors = cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['content-type'], maxAge: 600 });
   for (const p of ['/api/ferry/checkout', '/api/ferry/rules', '/api/ferry/status', '/api/mainnet']) app.use(p, payCors);
   // Global caps (all clients together) on routes that spend a paid key: 1Click partner key, NEAR AI key.
@@ -269,7 +269,8 @@ export function makeApp() {
     c.get('quoteDone')?.(v);
     return c.json(v);
   });
-  // Checkout: a deposit address only after the charter view allows the recipient and the quote is at most 0.20 USD.
+  // Checkout: a deposit address only after the charter view allows the recipient and the
+  // amount fits the visitor's row. There is no product-wide USD cap.
   // The route does not sign and does not send the deposit. The payer sends it from their own wallet.
   app.get('/api/ferry/rules', limiter(30), async c => {
     const out = await checkout.rulesFor(c.req.query('charter') || '', c.req.query('clause') || 'pay');
@@ -346,10 +347,16 @@ export function makeApp() {
     const out = await payoutsInvoice.registrationOf(c.req.query('account'), { view, viewAccount });
     return c.json(out, out.ok ? 200 : 400);
   });
-  // The live guard charter is the board. This is a real 200 read (board config, and a row
-  // when ?owner= names one). The retired oath is named in `retired_legacy`, not answered as
-  // a 404, so the dashboard loader has a payload and does not fall back to sample values.
-  app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await guard.boardSnapshot({ owner: c.req.query('owner') || null })));
+  // The live charter is the visitor row on the board (mainnet.json: charter.nearcarta.near is
+  // retired, so oathId resolves to the board). `?owner=` adds that visitor's live row. A retired
+  // or missing contract answers a readable state from lastGood, never a 500.
+  app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => {
+    const owner = c.req.query('owner');
+    const snap = await guard.snapshot();
+    if (!owner) return c.json(snap);
+    const row = await guard.boardSnapshot(guard.boardId, { owner });
+    return c.json({ ...snap, owner: row.owner, has_row: row.has_row, row: row.row, config: row.config, liabilities: row.liabilities });
+  });
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
   // House deed (NEP-171): the deed is the house. Its purse and cap live in the shop contract and only the
@@ -524,6 +531,16 @@ export function makeApp() {
     if (!ACCT.test(b.signer || '')) return bad(c, 'signer must be an account');
     try { return c.json(await issuePass({ hash: b.tx, signer: b.signer })); }
     catch (e) { return c.json({ error: e.message }, e.status || 502); }
+  });
+  // The board's own config: owner, rows, and the row cap. The city dashboards read this
+  // instead of the retired oath account.
+  app.get('/api/board/config', limiter(30), edgeCache(15), async c => {
+    const board = MAINNET_DEP?.board?.contract;
+    if (!board) return c.json({ error: 'no board' }, 404);
+    try {
+      const config = await view(board, 'get_config', {}, cfg.rpc);
+      return c.json({ board, config: config || null, source: 'board' });
+    } catch (e) { return c.json({ board, config: null, error: e.message }, 502); }
   });
   app.get('/api/board/row/:owner', limiter(20), async c => {
     const owner = c.req.param('owner');
