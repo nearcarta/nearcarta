@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 680 backend unit tests (679 pass, 1 skipped), offline
+npm test                                   # 687 backend unit tests (686 pass, 1 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -229,7 +229,11 @@ New txs, filled by the live run:
 
 The city door is the way in. The all-shops list still links to `/shops/toll/`. When the town is running, that link calls `window.__openCityShop('toll')` and opens the room. `window.__enterToll` is the fallback. The standalone page is the backup.
 
-The card has three tabs: Pay, Wallet, and Ledger. Pay has one gold button. It reads the visitor fee from the live policy. The live policy publishes a 0.001 NEAR fee, so the button prices the pass and the room invents no number of its own. The visitor names the chain, the asset, the amount and the Base address, or the agent reads “pay 0.00001 ETH to 0x… on Base” and “pay 1 USDC to 0x… on Base”. A missing asset, amount or address asks. A NEAR amount other than the live fee is refused. “cross to Arbitrum” is refused. Wallet shows `row:{account}:base` and does not invent an address. The old shared path is not that wallet. Ledger separates the service fee from foreign transfers and does not claim a split until one is configured.
+The card has three tabs: Pay, Wallet, and Ledger. Pay has one gold button. It reads the visitor fee from the live policy. The live policy publishes a 0.001 NEAR fee, so the button prices the pass and the room invents no number of its own. The visitor names the chain, the asset, the amount and the Base address, or the agent reads “pay 0.00001 ETH to 0x… on Base” and “pay 1 USDC to 0x… on Base”. A missing asset, amount or address asks. A NEAR amount other than the live fee is refused. “cross to Arbitrum” is refused. Wallet shows `row:{account}:base` and does not invent an address; the address comes from `/api/toll/address/:owner`, so two visitors see two addresses. Fill gas states the amount and the destination before it runs. The old shared path is not that wallet. Ledger separates the service fee from foreign transfers and does not claim a split until one is configured.
+
+There is no contract-wide amount cap. A crossing is bounded only by the visitor’s own row: the board’s per-action cap, daily budget and reserved effect budget, plus the row budget on the call. The v7 contract had a 0.00001 ETH and 10 USDC ceiling and the tray printed a “caps left” figure; both are gone, and `policy` reports them as null so a client cannot read a cap back out. Test: `cross enforces no contract-wide amount cap` (`backend/test/unit/toll-room.test.js`).
+
+Delivery is two signed steps, because the board forwards 30 Tgas to `cross` and cannot start the 50 Tgas signer call. The session key opens the order through `propose_call_as`; the row owner then signs the stored order with `sign_cross` at 150 Tgas. If the second step does not go out, the card says the board stored the crossing and this browser could not sign it, and never calls that a payment. `scripts/toll-upgrade.js` replaces the code on the same account through `upgrade` and `migrate`: no close, no transfer, no new account. Test: `the upgrade script is a dry run and retires both contract-wide caps`.
 
 A visitor with no board row sees “Open your row in /setup first” in the card and on the button, which opens `/setup`. That is a setup step, not a refusal: the board has no row to spend from, so nothing is signed. A row without a helper key asks for the key. Those three cases used to collapse into one “set up your agent” line. Test: `the city toll door stays a link and does not resume an old visit` (`backend/test/unit/toll-room.test.js`).
 
@@ -257,7 +261,7 @@ Live check, after the owner deploys:
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 680 unit tests (679 pass, 1 skipped)
+npm test                 # 687 unit tests (686 pass, 1 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -283,7 +287,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 | Town Hall | Open `/?shop=hall` in the city. Tabs are Post job, Agents, and Receipts. Type a task, a budget, and two worker accounts, then press Post job. One gold button sends the quote, the counter, the pass, or the refund | The ledger shows paid, remaining, and refunded. A pass says held, and the tray signs nothing. The chain release is `contracts/hall`, deployed in place by `scripts/hall-deploy.js` (dry-run by default), so no release tx exists yet. Market hire stays an open gap. Personal rules link to `/setup/`. `set_rules` copies the live expiry and the deposit stays 0. Code: `shared/hall/job.js`, `app/src/panels/hall-actions.js` | unit `a job conserves escrow, counters once, and does not pay on a swapped or blocked review`; unit `the hall arrow and Enter both send, and a miss leaves the input`; unit `the live townhall plan names the real shortfall and covers the attached migrate gas`. Earlier reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h) and refusal [Cp2rWatn…](https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6) are not this job |
 
-# 680 unit tests (679 pass, 1 skipped):
+# 687 unit tests (686 pass, 1 skipped):
 Proof rows (71/71 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
