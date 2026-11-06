@@ -97,6 +97,20 @@ export function orderForStatus(status) {
   return 'deposit';
 }
 
+/** What the AI popup says when 1Click has delivered. Links are the propose_call txs. */
+export function agentDeliveredNote({ amount, symbol, txs } = {}) {
+  const sym = String(symbol || 'USDC').trim() || 'USDC';
+  const amt = String(amount ?? '').trim();
+  const hashes = (Array.isArray(txs) ? txs : []).filter(h => typeof h === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,88}$/.test(h));
+  const text = amt ? `Delivered ${amt} ${sym}.` : `Delivered ${sym}.`;
+  const links = hashes.map(hash => ({
+    hash,
+    url: `https://nearblocks.io/txns/${hash}`,
+    label: `tx ${hash.slice(0, 8)}…`,
+  }));
+  return { text, links };
+}
+
 /** Sail only the first time status is SUCCESS. A refund does not play delivered. */
 export function nextFerryBeat(status, { sailed = false } = {}) {
   const raw = String(status || '').toUpperCase();

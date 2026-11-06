@@ -135,7 +135,7 @@ export default async function ferry(ctx) {
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },
     *act(opts = {}) {
-      // Character beats (depth-plan-v2 §1): read board → refuse downgrade → sail → hand over far-chain coin.
+      // Success and refusal share the weigh and the hand-over. Only a real charter refusal shows "Downgrade refused".
       const refused = !!opts.refused;
       paintOrder('loading');
       speak(`Weighing ${cargo.fromSym} → ${cargo.toSym}`, 'speech');
@@ -144,25 +144,25 @@ export default async function ferry(ctx) {
       sfx('send'); const c0 = crate.position.clone(), c1 = new THREE.Vector3(-.85, .36, .2);
       yield tween(.55, k => { crate.position.lerpVectors(c0, c1, k); crate.position.y += Math.sin(k * Math.PI) * .5; });
       crate.removeFromParent(); b.add(crate); crate.position.set(0, .3 / 1.25, 0); crate.scale.multiplyScalar(1 / 1.25); rob.play('Idle');
-      // a downgraded echo of the quote drifts in from the far shore; the board refuses it
-      speak('Stale quote? Checking the seal…', 'speech');
-      slip.visible = true; const s0 = slip.position.clone(), s1 = new THREE.Vector3(-2.6, .8, -.84); rob.lookAt(seal.position);
-      yield tween(1.1, k => { slip.position.lerpVectors(s0, s1, k); slip.position.y += Math.sin(k * Math.PI) * .6; slip.rotation.z = Math.sin(k * 8) * .2; }, easeInOut);
-      seal.material = sealNo; showRefuseTag(); sfx('refuse'); rob.play('No', { once: true }); yield wait(.5);
-      const d0 = slip.position.clone(), d1 = new THREE.Vector3(-1.3, -.25, -.7);
-      yield tween(.9, k => { slip.position.lerpVectors(d0, d1, k); slip.position.y = d0.y + (d1.y - d0.y) * k * k; slip.rotation.x = -k * 1.4; slip.material.opacity = 1 - k * .9; });
-      slip.visible = false; yield wait(.3);
       if (refused) {
+        // a downgraded echo of the quote drifts in from the far shore; the board refuses it
+        speak('Stale quote? Checking the seal…', 'speech');
+        slip.visible = true; const s0 = slip.position.clone(), s1 = new THREE.Vector3(-2.6, .8, -.84); rob.lookAt(seal.position);
+        yield tween(1.1, k => { slip.position.lerpVectors(s0, s1, k); slip.position.y += Math.sin(k * Math.PI) * .6; slip.rotation.z = Math.sin(k * 8) * .2; }, easeInOut);
+        seal.material = sealNo; showRefuseTag(); sfx('refuse'); rob.play('No', { once: true }); yield wait(.5);
+        const d0 = slip.position.clone(), d1 = new THREE.Vector3(-1.3, -.25, -.7);
+        yield tween(.9, k => { slip.position.lerpVectors(d0, d1, k); slip.position.y = d0.y + (d1.y - d0.y) * k * k; slip.rotation.x = -k * 1.4; slip.material.opacity = 1 - k * .9; });
+        slip.visible = false; yield wait(.3);
         speak('Charter said no. Boat stays.', 'speech no');
         paintOrder('frozen');
         ctx.setResult('no', opts.reason || 'Refused by your rules');
         rob.play('No', { once: true }); yield wait(1.4); rob.play('Idle'); speak('');
         return;
       }
-      // the signed quote matches the request: the seal goes mint and the boat crosses with the visitor's pair
+      // Same delivered sequence for Load cargo and the AI agent: mint seal, then the boat sails. No refuse label.
+      hideRefuseTag();
       speak('Seal matches. Casting off.', 'speech');
       seal.material = sealOk;
-      hideRefuseTag();
       sfx('allowed'); sfx('water'); rob.play('Idle'); paintOrder('transit');
       yield tween(2.2, k => { b.position.x = -.85 + 1.7 * k; b.rotation.z = Math.sin(k * 12) * .03; }, easeInOut);
       swapsTo(); speak(`Far bank · ${cargo.toSym}`, 'speech');

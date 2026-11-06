@@ -276,7 +276,12 @@ export async function fetchOneClickStatus(depositAddress, f = fetch) {
   const d = j.swapDetails || {};
   const hashes = [...(d.destinationChainTxHashes || []), ...(d.originChainTxHashes || []), ...(d.nearTxHashes || [])]
     .map(h => (typeof h === 'string' ? h : h?.hash)).filter(h => typeof h === 'string' && h.length > 0);
-  return { env: 'ONECLICK', depositAddress, status: j.status, help: statusHelp(j.status), final: FINAL.includes(j.status), tx: hashes[0] || null, updatedAt: j.updatedAt || null };
+  return {
+    env: 'ONECLICK', depositAddress, status: j.status, help: statusHelp(j.status),
+    final: FINAL.includes(j.status), tx: hashes[0] || null, updatedAt: j.updatedAt || null,
+    amountOut: d.amountOutFormatted || d.amountOut || null,
+    symbolOut: d.destinationToken || d.amountOutSymbol || null,
+  };
 }
 
 export async function oneClickStatus(depositAddress, f = fetch) {

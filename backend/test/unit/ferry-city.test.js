@@ -7,7 +7,7 @@ import { agentCargoPlan, parseAgentFerry } from '../../../app/src/panels/ferry-p
 import { ferryMarkup } from '../../../app/src/panels/deep.js';
 import { runFerryAgent } from '../../../app/src/panels/deep.js';
 import {
-  boardCallText, cityCheckoutBody, depositPlan, explainQuoteMiss, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, quoteRecipient, SESSION_SWAP, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto,
+  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, explainQuoteMiss, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, quoteRecipient, SESSION_SWAP, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto,
 } from '../../../app/src/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock, lastFerryDockSend } from '../../../app/src/panels/ferry-dock.js';
 
@@ -210,7 +210,7 @@ test('a successful seal hides Downgrade refused, and a new quote hides it again'
   const src = read('app/design/D8_shops/shops/ferry.js');
   const ok = src.indexOf('seal.material = sealOk');
   assert.ok(ok > 0);
-  assert.match(src.slice(ok, ok + 160), /hideRefuseTag\(\)/);
+  assert.match(src.slice(Math.max(0, ok - 180), ok + 40), /hideRefuseTag\(\)/);
   assert.match(src, /el\.classList\.add\('hide'\)/);
   assert.match(src, /setAttribute\('hidden'/);
   assert.match(src, /const hideRefuse = \(\)/);
@@ -240,8 +240,32 @@ test('a session load plans a deposit and a guest load stays a demo', () => {
   assert.doesNotMatch(fn, /sh\.act\(\{ refused: false \}\)/);
   assert.match(ui, /sh\.act\(\{ refused: false \}\)/);
   const watch = ui.slice(ui.indexOf('function watchFerryDeposit'), ui.indexOf('async function settleFerry'));
-  assert.match(watch, /beat\.play && sh\?\.act/);
+  assert.match(watch, /beat\.play\) playFerryDelivered\(\)/);
+  assert.match(watch, /showAgentDelivered/);
   assert.match(watch, /SUCCESS/);
+  const play = ui.slice(ui.indexOf('function playFerryDelivered'), ui.indexOf('function showAgentDelivered'));
+  assert.match(play, /sh\.act\(\{ refused: false \}\)/);
+});
+
+test('a successful swap does not show Downgrade refused, and the AI popup names the USDC and the txs', () => {
+  const src = read('app/design/D8_shops/shops/ferry.js');
+  const act = src.slice(src.indexOf('*act(opts'), src.indexOf('update(dt)'));
+  const refused = act.indexOf('if (refused)');
+  const shown = act.indexOf('showRefuseTag()');
+  const sailed = act.indexOf('seal.material = sealOk');
+  assert.ok(refused >= 0 && shown > refused && sailed > shown);
+  assert.doesNotMatch(act.slice(act.indexOf('return;', refused), sailed), /showRefuseTag/);
+  const ui = read('app/design/D8_shops/js/shopui.js');
+  assert.match(ui, /extra\.depositTxs = Array\.isArray\(sent\.txs\)/);
+  assert.match(ui, /playFerryDelivered\(\)/);
+  const note = agentDeliveredNote({
+    amount: '0.184831', symbol: 'USDC',
+    txs: ['5vUC4zn1CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw', 'A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz'],
+  });
+  assert.equal(note.text, 'Delivered 0.184831 USDC.');
+  assert.equal(note.links.length, 2);
+  assert.equal(note.links[0].url, 'https://nearblocks.io/txns/5vUC4zn1CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw');
+  assert.match(note.links[1].label, /^tx A6pqkcd3/);
 });
 
 test('USDC on Base is you-send, and NEAR under the cap is propose_call with no wallet', () => {
