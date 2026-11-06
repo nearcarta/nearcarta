@@ -685,6 +685,7 @@ body.house-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center
   background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1 system-ui,sans-serif;
 }
 nav.all-shops a[data-city-shop]{color:#fff8ee;text-decoration:none}
+.house-room{padding-bottom:148px}
 @media (max-width:720px){
   body.house-tray #shopUI #tray{
     width:min(100vw - 16px,420px);left:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));

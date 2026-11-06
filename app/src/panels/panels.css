@@ -453,3 +453,10 @@ body.ferry-tray #shopUI .btns .ghost{
   width:44px;height:44px;border:0;border-radius:10px;cursor:pointer;
   background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1 system-ui,sans-serif;
 }
+.house-room{padding-bottom:148px}
+@media (max-width:720px){
+  #house-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
+  .house-agent-pop{width:min(210px,calc(100vw - 112px))}
+  .house-agent-avatar{width:56px;height:56px}
+  .house-agent-char{width:72px}
+}

@@ -4,7 +4,14 @@
 // The charter checks the cap inside propose:
 // contracts/charter_board/src/lib.rs
 
-import { nearAccountOk } from '../../../shared/net/accounts.js';
+// Same named-account and implicit-account check as shared/net/accounts.js.
+// This file is served from /panels/, so it cannot import a path outside the site.
+const NAMED = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
+const IMPLICIT = /^[0-9a-f]{64}$/;
+function nearAccountOk(id) {
+  const s = String(id || '').trim();
+  return IMPLICIT.test(s) || NAMED.test(s);
+}
 
 const YOCTO = 10n ** 24n;
 
