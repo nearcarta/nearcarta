@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
 import { CALLS_DEPOSIT_YOCTO, sessionExpiresAt } from '../../../shared/board/session.js';
-import { expiresToWrite, formatExpiry, formatNear, hashesFromError, nearToYocto, plainRulesError, rulesDiff, rulesLiveHint, signRulesUpdate, txHashForMethod, updateCostLine, updatePlan, RULES_DEPOSIT_YOCTO } from '../../../shared/setup/rules-diff.js';
+import { expiresToWrite, expiryChange, formatExpiry, formatNear, hashesFromError, nearToYocto, plainRulesError, rulesDiff, rulesLiveHint, signRulesUpdate, txHashForMethod, updateCostLine, updatePlan, RULES_DEPOSIT_YOCTO } from '../../../shared/setup/rules-diff.js';
 
 // Scholar row recorded in mainnet.json: cap 0.005, daily 0.01, charter + toll.
 const saved = MAIN.board.visitor_run.rules;
@@ -99,8 +99,21 @@ test('an update keeps the chain expiry unless the visitor changed the session', 
   assert.notEqual(moved, chainExp);
   const day = formatExpiry(chainExp);
   const sameDate = signRulesUpdate({ live: true, local: { ...edited, expiresAt: chainExp }, row: { ...chain, expires_at: chainExp } });
-  assert.match(sameDate.html, new RegExp(`data-testid="diff-expires">Expires: ${day} → ${day}`));
+  assert.doesNotMatch(sameDate.html, /diff-expires/);
   assert.match(sameDate.html, /diff-cap/);
+  const laterSameDay = (BigInt(chainExp) + 3n * 3_600_000n * 1_000_000n).toString();
+  const clock = expiryChange(chainExp, laterSameDay);
+  assert.equal(formatExpiry(chainExp), formatExpiry(laterSameDay));
+  assert.match(clock.onChain, /UTC/);
+  assert.notEqual(clock.onChain, clock.next);
+  const sameDay = signRulesUpdate({
+    live: true,
+    local: { cap: saved.per_action_cap_near, daily: saved.daily_budget_near, per: saved.max_actions_per_day, receivers: [...saved.receivers], expiresAt: laterSameDay },
+    row: { ...chain, expires_at: chainExp },
+  });
+  assert.match(sameDay.html, /diff-expires/);
+  assert.match(sameDay.html, new RegExp(`Expires: ${clock.onChain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} → ${clock.next.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+  assert.doesNotMatch(sameDay.html, new RegExp(`Expires: ${day} → ${day}`));
   const hoursOnly = signRulesUpdate({
     live: true,
     local: { cap: saved.per_action_cap_near, daily: saved.daily_budget_near, per: saved.max_actions_per_day, receivers: [...saved.receivers], expiresAt: moved },
