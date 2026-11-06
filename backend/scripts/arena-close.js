@@ -9,5 +9,6 @@ const plan = {
   receiver_of_funds: 'nearcarta.near',
   signs: false,
   source: 'contracts/arena/src/lib.rs',
+  v2: 'contracts/arena_v2 is not deployed. Its close refuses while a pot, earnings, or an open attempt remains.',
 };
 console.log(JSON.stringify(plan));

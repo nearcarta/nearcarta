@@ -29,7 +29,7 @@ import { nearAccountOk } from '../../shared/net/accounts.js';
 import { txVerdict } from '../../shared/net/tx-verdict.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 import { pastPrompts as arenaPrompts } from './arena.js';
-import { marketPayload, scorePayload, stallOnChain } from './arena-market.js';
+import { readGuardians, removedMarket, scorePayload } from './arena-economy.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
@@ -368,21 +368,18 @@ export function makeApp() {
   app.get('/api/arena', limiter(20), async c => c.json(await reads.arena()));
   app.get('/api/arena/prompts', limiter(20), async c => c.json(await arenaPromptsSwr()));
   app.get('/api/arena/attempts', limiter(20), async c => c.json(await shops.arenaAttempts(c.req.query('from'), c.req.query('limit'))));
+  app.get('/api/arena/guardians', limiter(20), async c => c.json(await readGuardians(view)));
   app.get('/api/arena/market', limiter(20), async c => {
     const week = Math.min(7, Math.max(0, Number(c.req.query('week') || 0) || 0));
-    return c.json(marketPayload({ week }));
+    return c.json(removedMarket(week));
   });
   app.get('/api/arena/score', limiter(20), async c => {
     const player = c.req.query('player') || '';
     if (player && !nearAccountOk(player)) return bad(c, 'not a NEAR account');
     try { return c.json(await scorePayload(player, view)); }
-    catch (e) { return c.json({ error: e.message, source: 'get_attempt', points: 0 }, 502); }
+    catch (e) { return c.json({ error: e.message, source: 'get_attempt', points: 0, tx: null }, 502); }
   });
-  app.get('/api/arena/stall', limiter(20), async c => {
-    const account = c.req.query('account') || '';
-    if (!nearAccountOk(account)) return bad(c, 'not a NEAR account');
-    return c.json({ account, exists: await stallOnChain(account, viewAccount), tx: null });
-  });
+  app.get('/api/arena/stall', limiter(20), c => c.json({ removed: true, tx: null, exists: false, note: 'The stall market is gone. Nothing was signed.' }));
   app.get('/api/toll', limiter(20), async c => c.json(await reads.toll()));
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };

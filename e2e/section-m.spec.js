@@ -40,6 +40,7 @@ test('M2 another attack changes the prompt and does not ask the vault', async ({
   let asked = false;
   page.on('request', r => { if (r.url().includes('/api/vault/ask')) asked = true; });
   await page.goto('/shops/arena/');
+  await page.getByRole('tab', { name: 'Attack' }).click();
   const first = await page.getByTestId('arena-attack').innerText();
   expect(first.length).toBeGreaterThan(10);
   await page.getByTestId('redteam-next').click();

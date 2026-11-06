@@ -98,6 +98,7 @@ test('O3 arena actions have a gap and the attack box is tall', async ({ page }) 
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/shops/arena/');
+    await page.getByRole('tab', { name: 'Attack' }).click();
     const run = page.getByTestId('redteam-run');
     const next = page.getByTestId('redteam-next');
     await expect(run).toBeVisible();

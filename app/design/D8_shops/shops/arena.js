@@ -1,6 +1,6 @@
 // Vault Arena (static): Guardians stand round the vault. Five real lab attacks marked where they struck; none got in.
 import { THREE, room, put, makeRobot, load, Char, C, CSS, radial } from '../js/core.js';
-import { M as PM, brassM, mesh, lantern, banner } from './_props.js';
+import { M as PM, brassM, mesh, lantern } from './_props.js';
 import { ATTACKS, LAB } from '../../D6_dashboards/src/data.js';
 import { row, h3, note, proof, acct, mainnet } from './_ui.js';
 import { livePrompts } from './arenalive.js';
@@ -32,16 +32,9 @@ export default async function arena() {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.9, .006, 4, 96), new THREE.MeshBasicMaterial({ color: C.accent, transparent: true, opacity: .5 })); ring.rotation.x = Math.PI / 2; ring.position.y = .2; scene.add(ring);
   const kg = await load('chars/Knight.glb'); const guards = [[-1.7, .3, .9], [1.7, .3, -.9]].map(([x, z, f]) => { const k = new Char(kg, scene, { h: 1.0 }); k.root.traverse(m => { if (/Offhand|Rectangle|Round_Shield|Spike|2H_Sword/.test(m.name)) m.visible = false; }); k.at(x, z); k.g.rotation.y = f; k.play('Idle'); return k; });
   let t = 0; const rob = await makeRobot(scene); rob.at(.6, 2.2); rob.lookAt(new THREE.Vector3(0, 0, 0), { toViewer: .82 }); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
-  // Three stalls on the existing square. Prices live in the tray, from pricing.rules.json.
-  const stallSpots = [['Café', -1.55, 1.25, 0x6b4a33], ['Bakery', 1.55, 1.25, 0xc4a574], ['Smith', 0.1, -1.55, 0x3b2a1e]];
-  const stallTags = stallSpots.map(([name, x, z, col]) => {
-    mesh(scene, new THREE.BoxGeometry(.72, .42, .42), PM.wood, [x, .22, z]);
-    banner(scene, x, 1.2, z, col, { w: .34, h: .46 });
-    return { pos: new THREE.Vector3(x, 1.15, z), html: `<b>${name}</b>`, cls: 'arena-stall-tag' };
-  });
   let flash = 0;
   const ROOM = {
-    rob, scene, camera, tags: stallTags,
+    rob, scene, camera, tags: [],
     panel: { title: 'Vault Arena', src: 'split', srcNote: 'arena.nearcarta.near is on mainnet. The shared arena you can try is the mainnet charter.', label: `${ATTACKS.length} attacks on the lab oath`, hero: `<b class="num">0</b><span class="unit">breaches</span>`, action: null },
     // The past prompts arrive after the room is up: the town drawer reads sh.proof when it opens.
     proof: PROOF,
