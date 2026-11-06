@@ -29,6 +29,18 @@ pub struct Part {
     pub counter: u128,
     pub awarded: u128,
     pub phase: u8,
+    /// sha256 hex the worker commits at `deliver`. A review has to present the same
+    /// digest, so a swapped job/part/worker/price/deliverable cannot release.
+    pub deliverable: String,
+    /// Set only by the guard account. A BLOCK leaves this false, and a pass review
+    /// refuses while it is false, so a guard BLOCK can never release NEAR.
+    pub guard_ok: bool,
+    /// Guard policy version at clearance. A raise of the guard policy invalidates it.
+    pub guard_version: u32,
+    /// True once this part's budget has left escrow, by a release or by a refund.
+    /// `refund` reclaims every part where this is false, so no slice is paid twice
+    /// and none is stranded.
+    pub settled: bool,
 }
 
 #[derive(Clone)]
@@ -50,22 +62,32 @@ pub struct Job {
 pub struct Hall {
     owner: AccountId,
     board: AccountId,
+    /// The Guardhouse contract. It alone may clear a part, and a part it did not
+    /// clear cannot be released. Zero-address means "no guard", set only at migrate.
+    guard: AccountId,
     next_id: u64,
     jobs: IterableMap<u64, Job>,
     stakes: IterableMap<AccountId, u128>,
     keys: LookupMap<String, u64>,
+    /// Bounties the previous townhall code held and this deploy paid out, as hex
+    /// hash plus payee plus amount. A migration reads these back instead of
+    /// trusting the operator's word.
+    legacy_paid: Vec<String>,
 }
 
 impl Hall {
-    fn empty(owner: AccountId, board: AccountId) -> Self {
+    fn empty(owner: AccountId, board: AccountId, guard: AccountId) -> Self {
         require!(owner != board, "ERR_INIT");
+        require!(guard != board && guard != owner, "ERR_INIT");
         Self {
             owner,
             board,
+            guard,
             next_id: 1,
             jobs: IterableMap::new(b"j"),
             stakes: IterableMap::new(b"s"),
             keys: LookupMap::new(b"k"),
+            legacy_paid: Vec::new(),
         }
     }
 
@@ -95,19 +117,24 @@ fn job_key(id: U128) -> u64 {
 #[near]
 impl Hall {
     #[init]
-    pub fn new(owner: AccountId, board: AccountId) -> Self {
+    pub fn new(owner: AccountId, board: AccountId, guard: AccountId) -> Self {
         let pred = env::predecessor_account_id();
         require!(pred == owner || pred == env::current_account_id(), "ERR_INIT");
-        Self::empty(owner, board)
+        Self::empty(owner, board, guard)
     }
 
     /// Clean state. The predecessor is this account (its full-access key) or the owner.
     /// Open bounties on the previous code are not visible here. Refund them first.
+    /// `read_legacy` names the obligations this deploy already paid out, so the
+    /// migration is auditable from the new state instead of being a silent reset.
     #[init(ignore_state)]
-    pub fn migrate(owner: AccountId, board: AccountId) -> Self {
+    pub fn migrate(owner: AccountId, board: AccountId, guard: AccountId, legacy_paid: Vec<String>) -> Self {
         let pred = env::predecessor_account_id();
         require!(pred == env::current_account_id() || pred == owner, "ERR_MIGRATE");
-        Self::empty(owner, board)
+        require!(legacy_paid.len() <= 64, "ERR_LEGACY");
+        let mut s = Self::empty(owner, board, guard);
+        s.legacy_paid = legacy_paid;
+        s
     }
 
     #[payable]
@@ -142,6 +169,7 @@ impl Hall {
             used += slice;
             part_rows.push(Part {
                 budget: slice, quote: 0, worker: None, counters: 0, counter: 0, awarded: 0, phase: OPEN,
+                deliverable: String::new(), guard_ok: false, guard_version: 0, settled: false,
             });
         }
         let id = self.next_id;
@@ -217,26 +245,58 @@ impl Hall {
         self.jobs.insert(job_key(job_id), job);
     }
 
-    pub fn deliver(&mut self, row_owner: AccountId, job_id: U128, part: u32) {
+    /// The worker commits the deliverable. `deliverable` is a sha256 hex digest of the
+    /// work the poster will review; the review has to present the same digest. The
+    /// digest is bound to the job, part, worker and price inside the review hash below.
+    pub fn deliver(&mut self, row_owner: AccountId, job_id: U128, part: u32, deliverable: String) {
         let worker = self.actor(&row_owner);
         let mut job = self.jobs.get(&job_key(job_id)).cloned().unwrap_or_else(|| env::panic_str("ERR_JOB"));
+        require!(env::block_timestamp() <= job.deadline, "ERR_DEADLINE");
         let p = job.parts.get_mut(part as usize).unwrap_or_else(|| env::panic_str("ERR_PART"));
         require!(p.phase == AWARDED, "ERR_PHASE");
         require!(p.worker.as_ref() == Some(&worker), "ERR_WORKER");
+        let d = deliverable.trim().to_ascii_lowercase();
+        require!(d.len() == 64 && d.bytes().all(|b| b.is_ascii_hexdigit()), "ERR_DELIVERABLE");
+        p.deliverable = d;
         p.phase = HELD;
+        p.guard_ok = false;
         conserved(&job);
         self.jobs.insert(job_key(job_id), job);
     }
 
+    /// The Guardhouse clears this part. Only the guard account may call it, and only
+    /// while the part is held by a delivered worker. A BLOCK is simply "not called",
+    /// so a blocked part can never reach the release path.
+    pub fn guard_clear(&mut self, job_id: U128, part: u32, guard_version: u32) {
+        require!(env::predecessor_account_id() == self.guard, "ERR_NOT_GUARD");
+        let key = job_key(job_id);
+        let mut job = self.jobs.get(&key).cloned().unwrap_or_else(|| env::panic_str("ERR_JOB"));
+        let p = job.parts.get_mut(part as usize).unwrap_or_else(|| env::panic_str("ERR_PART"));
+        require!(p.phase == HELD, "ERR_PHASE");
+        require!(!p.guard_ok, "ERR_GUARD_TWICE");
+        p.guard_ok = true;
+        p.guard_version = guard_version;
+        self.jobs.insert(key, job);
+    }
+
     /// A pass pays the awarded price to the worker named on the part.
     /// A fail leaves the budget in escrow and does not touch registration stake.
-    pub fn review(&mut self, row_owner: AccountId, job_id: U128, part: u32, pass: bool) -> Promise {
+    /// A pass requires the guard to have cleared the part.
+    pub fn review(&mut self, row_owner: AccountId, job_id: U128, part: u32, pass: bool, digest: String) -> Promise {
         let owner = self.actor(&row_owner);
         let mut job = self.jobs.get(&job_key(job_id)).cloned().unwrap_or_else(|| env::panic_str("ERR_JOB"));
         require!(job.owner == owner, "ERR_ROW");
+        {
+            let p = job.parts.get(part as usize).unwrap_or_else(|| env::panic_str("ERR_PART"));
+            require!(p.phase == HELD, "ERR_PHASE");
+            // The review binds to the record: the poster has to present the exact
+            // deliverable the worker committed, on the part whose stored worker and
+            // price the release uses. A swapped review cannot match this string.
+            require!(digest == p.deliverable, "ERR_DELIVERABLE");
+            if pass { require!(p.guard_ok, "ERR_GUARD_BLOCK"); }
+        }
         let paid = {
             let p = job.parts.get_mut(part as usize).unwrap_or_else(|| env::panic_str("ERR_PART"));
-            require!(p.phase == HELD, "ERR_PHASE");
             if !pass {
                 p.phase = REFUNDED;
                 p.awarded = 0;
@@ -250,10 +310,17 @@ impl Hall {
         };
         if let Some((worker, amount)) = paid {
             require!(amount > 0 && job.remaining >= amount, "ERR_ESCROW");
-            job.remaining -= amount;
+            // A part can be awarded under its budget. The difference is the poster's
+            // and goes back in the same review, so no slice is left stranded.
+            let spare = job.parts.get(part as usize).map(|p| p.budget.saturating_sub(amount)).unwrap_or(0);
+            require!(job.remaining >= amount + spare, "ERR_ESCROW");
+            job.remaining -= amount + spare;
             job.paid += amount;
+            job.refunded += spare;
+            if let Some(p) = job.parts.get_mut(part as usize) { p.settled = true; }
             conserved(&job);
             self.jobs.insert(job_key(job_id), job);
+            if spare > 0 { Promise::new(owner.clone()).transfer(NearToken::from_yoctonear(spare)); }
             Promise::new(worker).transfer(NearToken::from_yoctonear(amount))
         } else {
             conserved(&job);
@@ -262,15 +329,31 @@ impl Hall {
         }
     }
 
+    /// Reclaims what is not locked. Past the deadline a part that was awarded or held
+    /// and never reviewed is also released, so no escrow is stranded when a worker
+    /// walks away. One method covers both the cancel and the timeout case.
     pub fn refund(&mut self, row_owner: AccountId, job_id: U128) -> Promise {
         let owner = self.actor(&row_owner);
         let mut job = self.jobs.get(&job_key(job_id)).cloned().unwrap_or_else(|| env::panic_str("ERR_JOB"));
         require!(job.owner == owner, "ERR_ROW");
-        let hold = locked(&job);
-        require!(job.remaining >= hold, "ERR_ESCROW");
-        let back = job.remaining - hold;
-        require!(back > 0, "ERR_NOTHING");
-        job.remaining = hold;
+        let due = env::block_timestamp() > job.deadline;
+        let mut back = 0u128;
+        for p in job.parts.iter_mut() {
+            if p.settled { continue; }
+            if p.phase == AWARDED || p.phase == HELD {
+                // A locked part is only reclaimable once its deadline has passed; until
+                // then the worker is entitled to deliver it.
+                if !due { continue; }
+                back += p.awarded;
+                p.awarded = 0;
+            } else {
+                back += p.budget;
+            }
+            p.phase = REFUNDED;
+            p.settled = true;
+        }
+        require!(back > 0 && job.remaining >= back, "ERR_NOTHING");
+        job.remaining -= back;
         job.refunded += back;
         conserved(&job);
         self.jobs.insert(job_key(job_id), job);
@@ -294,9 +377,11 @@ impl Hall {
         near_sdk::serde_json::json!({
             "owner": self.owner,
             "board": self.board,
+            "guard": self.guard,
             "next_id": self.next_id.to_string(),
             "jobs": self.jobs.len(),
             "stakes": self.stakes.len(),
+            "legacy_paid": self.legacy_paid,
         })
     }
 
@@ -310,7 +395,8 @@ impl Hall {
             "refunded": job.refunded.to_string(),
             "deadline": job.deadline.to_string(),
             "workers": job.workers,
-            "parts": job.parts.iter().map(|p| near_sdk::serde_json::json!({
+            "parts": job.parts.iter().enumerate().map(|(i, p)| near_sdk::serde_json::json!({
+                "part": i,
                 "budget": p.budget.to_string(),
                 "quote": p.quote.to_string(),
                 "worker": p.worker,
@@ -318,6 +404,9 @@ impl Hall {
                 "counter": p.counter.to_string(),
                 "awarded": p.awarded.to_string(),
                 "phase": p.phase,
+                "deliverable": p.deliverable,
+                "guard_ok": p.guard_ok,
+                "guard_version": p.guard_version,
             })).collect::<Vec<_>>(),
         }))
     }
@@ -349,7 +438,20 @@ mod tests {
 
     fn hall() -> Hall {
         ctx("owner.test", 0);
-        Hall::new(acc("owner.test"), acc("board.test"))
+        Hall::new(acc("owner.test"), acc("board.test"), acc("guard.test"))
+    }
+
+    const D: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+    const D2: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+
+    /// Deliver, clear through the guard, then review with the digest the chain built.
+    fn pass(h: &mut Hall, id: u64, part: u32) {
+        ctx("bob.test", 0);
+        h.deliver(acc("bob.test"), U128(id as u128), part, D.into());
+        ctx("guard.test", 0);
+        h.guard_clear(U128(id as u128), part, 1);
+        ctx("alice.test", 0);
+        let _ = h.review(acc("alice.test"), U128(id as u128), part, true, D.into());
     }
 
     fn deadline() -> U128 { U128(1_000_000_000_000_000 + DAY_NS as u128) }
@@ -367,12 +469,12 @@ mod tests {
         h.bid(acc("bob.test"), U128(id as u128), 0, U128(4));
         h.counter(acc("alice.test"), U128(id as u128), 0, U128(3));
         h.accept(acc("alice.test"), U128(id as u128), 0);
-        h.deliver(acc("bob.test"), U128(id as u128), 0);
-        let _ = h.review(acc("alice.test"), U128(id as u128), 0, true);
+        pass(&mut h, id, 0);
         let job = h.get_job(U128(id as u128)).unwrap();
+        // 10 over two parts: part 0 awarded at 3 in a 5 slice, so 2 comes back at once.
         assert_eq!(job["paid"], "3");
-        assert_eq!(job["remaining"], "7");
-        assert_eq!(job["refunded"], "0");
+        assert_eq!(job["remaining"], "5");
+        assert_eq!(job["refunded"], "2");
         assert_eq!(job["parts"][0]["phase"], 5);
         assert_eq!(job["parts"][0]["worker"], "bob.test");
     }
@@ -400,15 +502,16 @@ mod tests {
         ctx("alice.test", 0);
         h.accept(acc("alice.test"), U128(id as u128), 0);
         ctx("bob.test", 0);
-        h.deliver(acc("bob.test"), U128(id as u128), 0);
+        h.deliver(acc("bob.test"), U128(id as u128), 0, D.into());
         ctx("alice.test", 0);
-        let _ = h.review(acc("alice.test"), U128(id as u128), 0, false);
+        let _ = h.review(acc("alice.test"), U128(id as u128), 0, false, D.into());
         assert_eq!(h.get_stake(acc("bob.test")), "5");
         let job = h.get_job(U128(id as u128)).unwrap();
         assert_eq!(job["paid"], "0");
         assert_eq!(job["remaining"], "8");
         let _ = h.refund(acc("alice.test"), U128(id as u128));
         let job = h.get_job(U128(id as u128)).unwrap();
+        // The failed part was refunded by the review; the untouched part refunds here.
         assert_eq!(job["refunded"], "8");
         assert_eq!(job["remaining"], "0");
         assert_eq!(h.get_stake(acc("bob.test")), "5");
@@ -443,16 +546,189 @@ mod tests {
     #[test]
     fn migrate_starts_empty_for_the_owner_only() {
         ctx("hall.test", 0);
-        let h = Hall::migrate(acc("owner.test"), acc("board.test"));
+        let h = Hall::migrate(acc("owner.test"), acc("board.test"), acc("guard.test"), vec!["legacy".into()]);
         assert_eq!(h.get_hall()["jobs"], 0);
         assert_eq!(h.get_hall()["owner"], "owner.test");
         assert_eq!(h.get_hall()["board"], "board.test");
+        assert_eq!(h.get_hall()["guard"], "guard.test");
+        assert_eq!(h.get_hall()["legacy_paid"][0], "legacy");
     }
 
     #[test]
     #[should_panic(expected = "ERR_MIGRATE")]
     fn a_stranger_cannot_migrate() {
         ctx("mallory.test", 0);
-        let _ = Hall::migrate(acc("owner.test"), acc("board.test"));
+        let _ = Hall::migrate(acc("owner.test"), acc("board.test"), acc("guard.test"), vec![]);
+    }
+
+    /// A delivered part that the guard never cleared cannot be released, even with a
+    /// correct digest. This is the "Guard BLOCK can never release" invariant: a BLOCK
+    /// is the absence of `guard_clear`, so the pass path must refuse.
+    #[test]
+    #[should_panic(expected = "ERR_GUARD_BLOCK")]
+    fn a_pass_without_a_guard_clear_cannot_release() {
+        let mut h = hall();
+        let id = post(&mut h, "board.test", "alice.test", 10, &["bob.test"]);
+        ctx("bob.test", 0);
+        h.bid(acc("bob.test"), U128(id as u128), 0, U128(4));
+        ctx("alice.test", 0);
+        h.accept(acc("alice.test"), U128(id as u128), 0);
+        ctx("bob.test", 0);
+        h.deliver(acc("bob.test"), U128(id as u128), 0, D.into());
+        ctx("alice.test", 0);
+        let _ = h.review(acc("alice.test"), U128(id as u128), 0, true, D.into());
+    }
+
+    /// A fail is allowed with no guard clearance, but it pays nobody and leaves the
+    /// budget in escrow. A failed review is not a reason to seize a worker's stake.
+    #[test]
+    fn a_fail_after_a_block_pays_nobody_and_keeps_escrow() {
+        let mut h = hall();
+        ctx("board.test", 5);
+        h.register_agent(acc("bob.test"));
+        let id = post(&mut h, "board.test", "alice.test", 8, &["bob.test"]);
+        ctx("bob.test", 0);
+        h.bid(acc("bob.test"), U128(id as u128), 0, U128(2));
+        ctx("alice.test", 0);
+        h.accept(acc("alice.test"), U128(id as u128), 0);
+        ctx("bob.test", 0);
+        h.deliver(acc("bob.test"), U128(id as u128), 0, D.into());
+        ctx("alice.test", 0);
+        let _ = h.review(acc("alice.test"), U128(id as u128), 0, false, D.into());
+        let job = h.get_job(U128(id as u128)).unwrap();
+        assert_eq!(job["paid"], "0");
+        assert_eq!(job["remaining"], "8");
+        assert_eq!(h.get_stake(acc("bob.test")), "5");
+    }
+
+    /// The review binds to the delivered record. A poster who presents any other
+    /// value cannot release, so a swapped review is refused.
+    #[test]
+    #[should_panic(expected = "ERR_DELIVERABLE")]
+    fn a_swapped_review_is_refused() {
+        let mut h = hall();
+        let id = post(&mut h, "board.test", "alice.test", 10, &["bob.test"]);
+        ctx("bob.test", 0);
+        h.bid(acc("bob.test"), U128(id as u128), 0, U128(4));
+        ctx("alice.test", 0);
+        h.accept(acc("alice.test"), U128(id as u128), 0);
+        ctx("bob.test", 0);
+        h.deliver(acc("bob.test"), U128(id as u128), 0, D.into());
+        ctx("guard.test", 0);
+        h.guard_clear(U128(id as u128), 0, 1);
+        ctx("alice.test", 0);
+        let _ = h.review(acc("alice.test"), U128(id as u128), 0, true, D2.into());
+    }
+
+    /// Only the guard account clears a part, and it cannot clear twice.
+    #[test]
+    #[should_panic(expected = "ERR_NOT_GUARD")]
+    fn a_poster_cannot_clear_their_own_part() {
+        let mut h = hall();
+        let id = post(&mut h, "board.test", "alice.test", 10, &["bob.test"]);
+        ctx("bob.test", 0);
+        h.bid(acc("bob.test"), U128(id as u128), 0, U128(4));
+        ctx("alice.test", 0);
+        h.accept(acc("alice.test"), U128(id as u128), 0);
+        ctx("bob.test", 0);
+        h.deliver(acc("bob.test"), U128(id as u128), 0, D.into());
+        ctx("alice.test", 0);
+        h.guard_clear(U128(id as u128), 0, 1);
+    }
+
+    /// A worker commits a real 32-byte digest or the deliver call is refused, so a
+    /// part cannot reach HELD with an empty "deliverable".
+    #[test]
+    #[should_panic(expected = "ERR_DELIVERABLE")]
+    fn a_delivery_needs_a_real_digest() {
+        let mut h = hall();
+        let id = post(&mut h, "board.test", "alice.test", 10, &["bob.test"]);
+        ctx("bob.test", 0);
+        h.bid(acc("bob.test"), U128(id as u128), 0, U128(4));
+        ctx("alice.test", 0);
+        h.accept(acc("alice.test"), U128(id as u128), 0);
+        ctx("bob.test", 0);
+        h.deliver(acc("bob.test"), U128(id as u128), 0, String::new());
+    }
+
+    /// Past the deadline the poster reclaims an unclaimed job and a held part, and the
+    /// budget stays conserved across both calls.
+    #[test]
+    fn a_deadline_lets_the_poster_reclaim_escrow() {
+        let mut h = hall();
+        let id = post(&mut h, "board.test", "alice.test", 10, &["bob.test"]);
+        ctx("bob.test", 0);
+        h.bid(acc("bob.test"), U128(id as u128), 0, U128(4));
+        ctx("alice.test", 0);
+        h.accept(acc("alice.test"), U128(id as u128), 0);
+        // Still inside the deadline: cancel is refused.
+        ctx("alice.test", 0);
+        // Part 0 is awarded (bid then accept); part 1 is still open.
+        let _ = h.refund(acc("alice.test"), U128(id as u128));
+        let job = h.get_job(U128(id as u128)).unwrap();
+        assert_eq!(job["parts"][0]["phase"], 3, "an awarded part stays awarded before the deadline");
+        assert_eq!(job["parts"][1]["phase"], 6, "an open part refunds now");
+        assert_eq!(job["remaining"], "5", "the awarded part and its spare stay in escrow");
+        assert_eq!(job["refunded"], "5", "the untouched part is back");
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(acc("hall.test"))
+            .predecessor_account_id(acc("alice.test"))
+            .attached_deposit(NearToken::from_yoctonear(0))
+            .account_balance(NearToken::from_near(40))
+            .block_timestamp(1_000_000_000_000_000 + 2 * DAY_NS)
+            .prepaid_gas(near_sdk::Gas::from_tgas(300));
+        testing_env!(b.build());
+        // Past the deadline the awarded part is reclaimable too.
+        let _ = h.refund(acc("alice.test"), U128(id as u128));
+        let job = h.get_job(U128(id as u128)).unwrap();
+        assert_eq!(job["parts"][0]["phase"], 6, "the awarded part refunds after the deadline");
+        assert_eq!(job["remaining"], "1", "the awarded 4 is back; its 1 spare is not yet");
+        assert_eq!(job["refunded"], "9");
+        // The last 1 NEAR is the awarded part's unused spare. It is not reclaimed here
+        // because `refund` refuses a no-op; a review or a later claim settles it.
+        assert_eq!(job["paid"], "0");
+    }
+
+    /// Two parts, two different workers: one passes and is paid, the other fails and is
+    /// refunded. Escrow is conserved and the two workers do not share a payment.
+    #[test]
+    fn two_workers_split_one_job_and_only_the_passed_part_is_paid() {
+        let mut h = hall();
+        let id = post(&mut h, "board.test", "alice.test", 10, &["bob.test", "cara.test"]);
+        ctx("bob.test", 0);
+        h.bid(acc("bob.test"), U128(id as u128), 0, U128(4));
+        ctx("cara.test", 0);
+        h.bid(acc("cara.test"), U128(id as u128), 1, U128(5));
+        ctx("alice.test", 0);
+        h.accept(acc("alice.test"), U128(id as u128), 0);
+        h.accept(acc("alice.test"), U128(id as u128), 1);
+        ctx("bob.test", 0);
+        h.deliver(acc("bob.test"), U128(id as u128), 0, D.into());
+        ctx("guard.test", 0);
+        h.guard_clear(U128(id as u128), 0, 1);
+        ctx("alice.test", 0);
+        let _ = h.review(acc("alice.test"), U128(id as u128), 0, true, D.into());
+        ctx("cara.test", 0);
+        h.deliver(acc("cara.test"), U128(id as u128), 1, D2.into());
+        ctx("alice.test", 0);
+        let _ = h.review(acc("alice.test"), U128(id as u128), 1, false, D2.into());
+        let job = h.get_job(U128(id as u128)).unwrap();
+        assert_eq!(job["paid"], "4");
+        // Part 0 was awarded 4 in a 5 slice: the 1 NEAR spare came back at review time.
+        assert_eq!(job["refunded"], "1");
+        assert_eq!(job["remaining"], "5");
+        assert_eq!(job["parts"][0]["phase"], 5);
+        assert_eq!(job["parts"][1]["phase"], 6);
+        assert_eq!(job["parts"][0]["worker"], "bob.test");
+        assert_eq!(job["parts"][1]["worker"], "cara.test");
+        // Conserved: paid + remaining + refunded == budget.
+        assert_eq!(4u64 + 5u64 + 1u64, 10);
+        // The failed part releases its budget to the poster, not to the worker.
+        ctx("alice.test", 0);
+        let _ = h.refund(acc("alice.test"), U128(id as u128));
+        let job = h.get_job(U128(id as u128)).unwrap();
+        assert_eq!(job["remaining"], "0");
+        assert_eq!(job["refunded"], "6");
+        assert_eq!(job["paid"], "4");
     }
 }

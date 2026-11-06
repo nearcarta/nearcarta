@@ -36,7 +36,7 @@ test('the model proposes an allowlisted payment; signature verified against the 
   assert.equal(r.parsed.amount, '10000000000000000000000');
   assert.equal(r.parsed.memo, 'ask:mine:coffee');
   assert.equal(r.verification.verified, true);
-  assert.deepEqual(r.verification.checks, { teePreflight: true, textMatches: true, signerAttested: true, ed25519: true, modelInTee: true });
+  assert.deepEqual(r.verification.checks, { teePreflight: true, textMatches: true, signerAttested: true, signatureOk: true, algo: 'ed25519', modelInTee: true });
   assert.ok(r.cost.usd > 0 && r.cost.usd < 0.001);
 }));
 
