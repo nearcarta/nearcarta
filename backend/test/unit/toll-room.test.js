@@ -421,3 +421,47 @@ function fakeDoc() {
     },
   };
 }
+
+// Two unrelated visitors own two different foreign addresses. The path is the row
+// owner's, so the addresses cannot collide and neither can spend the other's nonce.
+test('two visitors get two distinct paths and neither is the shared base-1', () => {
+  const a = addressWords({ path: 'row:alice.near:base', chainId: 8453, ok: true, live: '0xaaa', recorded: '0xaaa' });
+  const b = addressWords({ path: 'row:bob.near:base', chainId: 8453, ok: true, live: '0xbbb', recorded: '0xbbb' });
+  assert.match(a.text, /row:alice\.near:base/);
+  assert.match(b.text, /row:bob\.near:base/);
+  assert.notEqual(a.text, b.text);
+  // The shared legacy path is not a visitor wallet and must never be presented as one.
+  assert.doesNotMatch(a.text, /base-1/);
+  assert.doesNotMatch(b.text, /base-1/);
+});
+
+// The contract no longer publishes an amount cap, so the tray must not print one.
+test('the pay line names the fee and the row, never an invented cap', () => {
+  const live = { ok: true, price: { fee: '1000000000000000000000' }, verify_chain: 'Base', chain_id: 8453 };
+  const html = tollMarkup({ live, row: rowOk, tab: 'pass' });
+  assert.match(html, /Fee 0\.001 NEAR/);
+  assert.match(html, /Your row sets the amount cap/);
+  assert.doesNotMatch(html, /Caps left/);
+});
+
+test('the upgrade script is a dry run and retires both contract-wide caps', () => {
+  const src = read('scripts/toll-upgrade.js');
+  assert.match(src, /dry_run: !live/);
+  assert.match(src, /TOLL_SIGNER_KEY/);
+  assert.match(src, /never printed|is not printed/);
+  // In place: no close, no create, no transfer.
+  assert.doesNotMatch(src, /delete_account|createAccount|A\.transfer/);
+  assert.match(src, /'upgrade'/);
+  assert.match(src, /migrate/);
+});
+
+test('cross enforces no contract-wide amount cap', () => {
+  const src = read('contracts/toll/src/lib.rs');
+  const cross = src.slice(src.indexOf('pub fn cross'), src.indexOf('pub fn sign_cross'));
+  assert.doesNotMatch(cross, /max_per_tx/);
+  assert.doesNotMatch(cross, /price\.max_token/);
+  // The row budget is the amount rule that stays.
+  assert.match(cross, /row_budget/);
+  // policy publishes null, so a client cannot read a cap back out.
+  assert.match(src, /"max_per_tx": Value::Null/);
+});

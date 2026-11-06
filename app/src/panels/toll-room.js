@@ -515,9 +515,9 @@ export function tollMarkup(state = {}) {
     <div class="ferry-pane toll-pane" data-testid="toll-pane-proof"${tab === 'proof' ? '' : ' hidden'}>
       <div class="ferry-flow tok-done">${chainIcon}<p class="toll-address" data-testid="toll-address">${esc(wallet.address || 'No address yet')}</p></div>
       <p class="ferry-rate" data-testid="toll-address-words">${esc(wallet.text)}</p>
-      <p class="ferry-rate" data-testid="toll-balance">${wallet.address ? 'Balance unread until this page asks the chain.' : 'No balance yet. The address is not recovered.'}</p>
+      <p class="ferry-rate" data-testid="toll-balance">${esc(state.balanceWords || (wallet.address ? 'Balance unread until this page asks the chain.' : 'No balance yet. The address is not recovered.'))}</p>
       <button type="button" class="toll-quiet" id="toll-copy" data-testid="toll-copy"${wallet.address ? '' : ' disabled'}>Copy address</button>
-      <button type="button" class="toll-quiet" id="toll-gas" data-testid="toll-gas">Fill gas</button>
+      <button type="button" class="toll-quiet" id="toll-gas" data-testid="toll-gas"${wallet.address ? '' : ' disabled'}>${esc(state.gasNear ? `Fill gas · ${state.gasNear} NEAR` : 'Fill gas')}</button>
       ${sig}
       <button type="button" class="toll-quiet" id="toll-sig" data-testid="check-signature"${state.pending ? ' disabled' : ''}>Check signature</button>
     </div>
@@ -537,6 +537,22 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
   if (!state.derive) state.derive = checkDerived({ publicKey: TOLL_KEY, recorded: TOLL_ADDRESS });
   const apiBase = env.api ?? ((globalThis.NEARCARTA_API || '').replace(/\/$/, ''));
   const doc = env.doc || (typeof document !== 'undefined' ? document : null);
+
+  // The row's own derived address, read from the toll's `address_of` for this visitor.
+  // Two unrelated visitors get different paths (`row:{owner}:base`) and so different
+  // addresses. Nothing is invented: before the first signature this stays null.
+  async function loadWallet() {
+    const owner = typeof hooks.account === 'function' ? String(hooks.account() || '') : '';
+    if (!owner) { state.rowAddress = null; state.balanceWords = ''; return; }
+    state.walletOwner = owner;
+    let got = null;
+    try { got = await fetch(apiBase + '/api/toll/address/' + encodeURIComponent(owner)).then(r => r.json()); }
+    catch { got = null; }
+    state.rowAddress = got?.address || null;
+    state.balanceWords = got?.address
+      ? (got?.balance_eth ? `Balance ${got.balance_eth} ETH on Base.` : 'Balance not read yet.')
+      : 'No address yet. The signer returns one with this row\'s first crossing.';
+  }
 
   const paint = () => {
     if (typeof hooks.row === 'function') state.row = hooks.row() || null;
@@ -680,9 +696,26 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
       list[n]?.click();
     });
     const gas = root.querySelector('#toll-gas');
-    if (gas) gas.onclick = () => {
-      state.seal = 'The Ferry fills gas for the recovered address. This row has none yet. Nothing was sent.';
-      state.tab = 'proof';
+    if (gas) gas.onclick = async () => {
+      // Gas lands on this row's own derived address, never the shared path and never
+      // another visitor's row. The amount is the visitor's call, defaulting to a small
+      // top-up. This is a NEAR transfer from the row, so it is stated before it runs.
+      if (!state.rowAddress) {
+        state.seal = 'No derived address for this row yet. The signer returns one with its first crossing. Nothing was sent.';
+        state.tab = 'proof'; paint(); return;
+      }
+      const near = state.gasNear || '0.02';
+      const words = `Fill ${near} NEAR of gas to ${state.rowAddress}? The row pays, under its own cap.`;
+      let go = true;
+      if (typeof hooks.confirm === 'function') go = await hooks.confirm(words);
+      else if (doc && typeof doc.defaultView?.confirm === 'function') go = doc.defaultView.confirm(words);
+      if (!go) { state.seal = 'Cancelled. Nothing was sent.'; state.tab = 'proof'; paint(); return; }
+      state.pending = 'Filling gas…'; state.tab = 'proof'; paint();
+      let r = null;
+      try { r = await hooks.onGas?.(state.rowAddress, near); }
+      catch (e) { r = { ok: false, hint: String(e?.message || e).slice(0, 160) }; }
+      state.pending = '';
+      state.seal = r?.hint || (r?.ok ? `Gas sent to ${state.rowAddress}.` : 'The gas fill did not answer. Nothing was sent.');
       paint();
     };
     const cast = root.querySelector('#toll-broadcast');
@@ -725,6 +758,9 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
   hooks.localPaint = paint;
   paint();
   loadLive();
+  // The Wallet tab names this visitor's own derived address, so read it once the row
+  // is known. A visitor with no row has no address and sees the setup line instead.
+  loadWallet().then(() => { if (root.isConnected !== false) paint(); }).catch(() => {});
 }
 
 if (typeof window !== 'undefined') prefetchTollPolicy();
