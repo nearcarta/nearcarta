@@ -336,9 +336,15 @@ function placeDoor(id){ const s=SHOPS[id], c=hx(s.q,s.r), st=hx(...s.door); cons
   const p=hit?hit.point.clone().setY(0):doorPoint(id).setY(0); DF.g.position.copy(p).addScaledVector(out,.012); DF.g.scale.set(w,h,w); DF.g.lookAt(p.clone().add(out)); DF.hinge.rotation.y=0; DF.glow.material.opacity=0; DF.g.visible=true;
   return {c:p.clone().setY(h*.5),out}; }
 function swingDoor(open,d=.55){ gsap.to(DF.hinge.rotation,{y:open?-1.75:0,duration:RM?.01:d,ease:open?'power2.out':'power2.in'}); gsap.to(DF.glow.material,{opacity:open?1:0,duration:RM?.01:d*.8}); }
-const fade=$('#fade'); let fadeTw=null;
-function fadeTo(a,dur,at){ return new Promise(r=>{ if(at){ fade.style.setProperty('--fx',at.x+'px'); fade.style.setProperty('--fy',at.y+'px'); } fade.classList.add('on'); fadeTw&&fadeTw.kill();
-  fadeTw=gsap.to(fade,{opacity:a,duration:RM?.01:dur,ease:a?'power2.in':'power2.out',onComplete:()=>{ if(!a) fade.classList.remove('on','wait'); r(); }}); }); }
+const fade=$('#fade'); let fadeTw=null, fadeWait=null;
+// Wall-clock safety: a killed tween or a stalled gsap.updateRoot must not leave #fade.on blocking the town.
+function fadeTo(a,dur,at){ return new Promise(r=>{ if(fadeWait){ const w=fadeWait; fadeWait=null; w(); }
+  if(at){ fade.style.setProperty('--fx',at.x+'px'); fade.style.setProperty('--fy',at.y+'px'); } fade.classList.add('on');
+  if(fadeTw){ fadeTw.kill(); fadeTw=null; }
+  let settled=false; const finish=()=>{ if(settled) return; settled=true; fadeWait=null; if(!a){ fade.classList.remove('on','wait'); fade.style.opacity=''; } r(); };
+  fadeWait=finish; const d=RM?.01:dur;
+  const safety=setTimeout(()=>{ fade.style.opacity=String(a); finish(); }, Math.max(80,(d*1000)+500));
+  fadeTw=gsap.to(fade,{opacity:a,duration:d,ease:a?'power2.in':'power2.out',onComplete:()=>{ clearTimeout(safety); finish(); }}); }); }
 const shopUI=$('#shopUI');
 let prevAU=true;
 function enterRoom(sh){ if(!body.classList.contains('in-shop')) prevAU=W.renderer.shadowMap.autoUpdate; room=sh; body.classList.add('in-shop'); shopUI.hidden=false; W.renderer.shadowMap.autoUpdate=true; tagOff(); prompt(null);
@@ -353,19 +359,30 @@ $('#t-act').addEventListener('click',async e=>{ const b=e.currentTarget; if(b.da
 // compile the room's shaders (parallel where the GPU allows) during the fly-in, so its first frame does not stall the fade
 // the entry beats run on the wall clock outside captures: sim time is clamped per frame, so a slow GPU would stretch the walk-in
 const wallT=(f,t)=>CAPTURE?setTimeoutSim(f,t):setTimeout(f,t*1000);
-const warmRoom=async r=>{ if(r.sh) try{ r.sh.id=r.sh.id||''; dressRoom(r.sh); }catch(e){} if(r.sh&&W.renderer.compileAsync) try{ await W.renderer.compileAsync(r.sh.scene,r.sh.camera); }catch(e){} return r; };
+const warmRoom=async r=>{ if(r.sh) try{ r.sh.id=r.sh.id||''; dressRoom(r.sh); }catch(e){} if(r.sh&&W.renderer.compileAsync) try{ await Promise.race([W.renderer.compileAsync(r.sh.scene,r.sh.camera), new Promise((_,rej)=>setTimeout(()=>rej(new Error('compile timeout')),4000))]); }catch(e){} return r; };
 world.enterShop=(id,opt={})=>new Promise(res=>{ if(!OPEN[id]) throw new Error('unknown shop '+id); if(inShop||exiting||body.classList.contains('entering')){ res({id,cancelled:true}); return; } tagOff(); if(mode==='story') endStory(); inShop=id; door={busy:true,id}; try{ SL.skeleton(id); }catch(e){} preShop={p:cam.position.clone(),t:D.cur.t.clone(),mode};
   R.steer=null; keys.clear(); prompt(null); sm.hidden=true; body.classList.add('entering'); const pend=SL.load(id).then(warmRoom);
-  const stuck=setTimeout(()=>{ if(inShop===id&&body.classList.contains('entering')){ body.classList.remove('entering'); door={busy:false,id}; } },2200); pend.finally(()=>clearTimeout(stuck)); const df=placeDoor(id), out=df.out, side=V(out.z,0,-out.x);
+  // Ferry's room pulls many GLBs. Keep the door lock short, but never leave #fade.on if enter is cancelled or gsap stalls.
+  const stuck=setTimeout(()=>{ if(inShop===id&&body.classList.contains('entering')){ body.classList.remove('entering'); door={busy:false,id}; } },2200);
+  const watchdog=setTimeout(()=>{ if(inShop!==id) return; if(!fade.classList.contains('on')||body.classList.contains('in-shop')) return;
+    if(fadeTw){ fadeTw.kill(); fadeTw=null; } if(fadeWait){ const w=fadeWait; fadeWait=null; w(); }
+    fade.style.opacity='0'; fade.classList.remove('on','wait'); body.classList.remove('entering'); door={busy:false,id};
+    try{ SL.showError(id,new Error('This room took too long to open')); enterRoom(null); }catch(_){ shopUI.hidden=false; }
+  },45000);
+  pend.finally(()=>{ clearTimeout(stuck); clearTimeout(watchdog); }); const df=placeDoor(id), out=df.out, side=V(out.z,0,-out.x);
   const dd=cam.position.distanceTo(df.c), dur=RM?.01:Math.min(.4,.18+dd*.006);
   const pf=innerWidth<innerHeight?1.45:1; shot(SH.fixed(df.c.clone().addScaledVector(out,2.4*pf).addScaledVector(side,.45).setY(df.c.y+.95),df.c,28),dur,'power3.inOut');
   wallT(()=>{ if(inShop!==id) return; sfx('door',{g:.5}); swingDoor(true);
     shot(SH.fixed(df.c.clone().addScaledVector(out,.7*pf).setY(df.c.y+.1),df.c.clone().addScaledVector(out,-.6),32),RM?.01:.28,'power2.in');
     wallT(async()=>{ if(inShop!==id) return; const ds=screenOf(df.c); const wt=setTimeout(()=>fade.classList.add('wait'),700); await fadeTo(1,.34,ds);
+      const lift=async()=>{ clearTimeout(wt); await fadeTo(0,.36); };
       if(opt.to){ clearTimeout(wt); fade.classList.add('wait'); window.dispatchEvent(new CustomEvent('world:navigate',{detail:{id,to:opt.to}})); if(!CAPTURE||!P.has('nonav')) location.assign(opt.to); res({id,to:opt.to}); return; }
-      const r=await pend; clearTimeout(wt); if(inShop!==id||exiting){ door={busy:false,id:inShop}; res({id,cancelled:true}); return; } DF.g.visible=false; W.lastDoor=ds;
-      if(r.err) { SL.showError(id,r.err); enterRoom(null); } else { SL.show(r.sh); enterRoom(r.sh); }
-      body.classList.remove('entering'); door={busy:false,id}; window.dispatchEvent(new CustomEvent('world:interior-ready',{detail:{id,doorScreen:ds}})); await fadeTo(0,.36); res({id,doorScreen:ds}); },RM?.02:.32); },RM?.02:Math.max(.05,dur-.05)); });
+      try{
+        const r=await pend; if(inShop!==id||exiting){ door={busy:false,id:inShop}; await lift(); res({id,cancelled:true}); return; } DF.g.visible=false; W.lastDoor=ds;
+        if(r.err) { SL.showError(id,r.err); enterRoom(null); } else { SL.show(r.sh); enterRoom(r.sh); }
+        body.classList.remove('entering'); door={busy:false,id}; window.dispatchEvent(new CustomEvent('world:interior-ready',{detail:{id,doorScreen:ds}})); await lift(); res({id,doorScreen:ds});
+      }catch(e){ body.classList.remove('entering'); door={busy:false,id:inShop}; try{ SL.showError(id,e); enterRoom(null); }catch(_){ } await lift(); res({id,error:true}); }
+    },RM?.02:.32); },RM?.02:Math.max(.05,dur-.05)); });
 world.exitShop=()=>new Promise(res=>{ if(!inShop||exiting){ res(); return; } exiting=true; const id=inShop; SL.drawer(false); sfx('doorC',{g:.4});
   fadeTo(1,.28,{x:innerWidth/2,y:innerHeight/2}).then(()=>{ leaveRoom(); body.classList.remove('entering'); const df=placeDoor(id), out=df.out; DF.hinge.rotation.y=-1.75; DF.glow.material.opacity=1;
     cut(SH.fixed(df.c.clone().addScaledVector(out,1.1).setY(df.c.y+.3),df.c,30)); const p=preShop; shot(SH.fixed(p.p,p.t,30),RM?.01:.8,'power2.inOut'); swingDoor(false,.6);
