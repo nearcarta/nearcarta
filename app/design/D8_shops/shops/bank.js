@@ -13,7 +13,7 @@ function live(b) {
   const s = b.street || {};
   return proof(
     note(ROOM_LINE),
-    note('A statement stays in this browser. A hardware report is a separate check. This room does not move ZEC and does not hold a key.'),
+    note('A card file is read in this browser. A model audit sends those lines to NEAR AI and this server does not store them. This room does not move ZEC and does not hold a key.'),
     h3('Recorded street read, not this audit'),
     row({ k: 'A recorded Zcash transaction is not this audit.', why: 'This page does not move ZEC and does not call that payment private.', st: 'no', stText: 'not this audit', src: 'live' }),
     note(s.url ? `<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(String(s.txid || '').slice(0, 12))}… ↗</a>` : 'No street row is part of this audit.'),
