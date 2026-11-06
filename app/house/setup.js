@@ -10,13 +10,14 @@ import { wallet, mainnetWallet, account, mainnetAccount, connect, disconnect, on
 import { balanceOn } from './onboard.js';
 import { setupJourney } from '../../shared/setup/path.js';
 import { callsFailedPanel, expiresToWrite, formatExpiry, hashesFromError, plainRulesError, rulesDiff, rulesLiveHint, signRulesUpdate, txHashForMethod, updatePlan, RULES_DEPOSIT_YOCTO } from '../../shared/setup/rules-diff.js';
+import { openRowTransactions } from '../../shared/setup/open-row.js';
 import { tryTiles } from '../../shared/setup/try-tiles.js';
 import { TOPUP_MIN_YOCTO, TOPUP_RESERVE_YOCTO, charterFundMarkup, charterTopUpYocto, nearStringFromYocto, topUpRoom } from '../../shared/setup/charter-fund.js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf, storedAgentKey } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
-import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
+import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
 import { HOUSE_CALLS, HOUSE_SHOP } from '../../shared/house/shop.js';
 import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
@@ -327,13 +328,19 @@ function wireRules() {
   wire(() => { const r = rules();
     if (!(r.cap > 0) || !(r.daily >= r.cap)) { msg = 'The daily budget must be at least the per-payment cap.'; return render(); }
     if (!r.receivers.length || r.receivers.some(a => !/^[a-z0-9._-]{2,64}$/.test(a))) { msg = 'Add at least one valid account id.'; return render(); }
+    if (boardLive() && !st.trial && !callsFitRow(callsFor(r, MAIN.board.contract))) { msg = 'That shop list is too long for one row. A row holds 0.02 NEAR of storage, so shorter account ids or fewer shops fit.'; return render(); }
     done(st.step); go(st.step + 1); });
 }
 
 // ---------- 6. Sign ----------
 let signLog = [];
-let chainRow = null, chainLoadedFor = '', chainError = '';
+let chainRow = null, chainLoadedFor = '', chainError = '', chainRead = false, readError = false;
+// True when this browser holds the agent key for the account's row. It does not mean
+// the row exists: a closed row leaves the key behind, and board v2 returns `null` from
+// `get_charter` once it is gone. `rowOnChain` is the check that matters.
 const rowLive = () => !!(st.charter && localStorage.getItem(agentLS(st.charter)));
+/** True only when the chain actually answered with a row. */
+const rowOnChain = () => !!chainRow;
 function agentMismatch(row) {
   if (!row?.agent || !me) return false;
   const sec = localStorage.getItem(agentLS(me));
@@ -368,31 +375,64 @@ function sSign() {
   }
   const onBoard = boardLive() && !st.trial;
   const r = rules(), id = st.charter || (onBoard ? me : `${st.agentName}.${CFG.factory}`), live = rowLive();
-  const local = { ...r, expiresAt: onBoard && chainRow ? expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: chainRow.expires_at }) : undefined };
-  let update = signRulesUpdate({ live: !!(live && onBoard), local, row: onBoard ? chainRow : null });
+  // A row is open only when the chain returns one. A browser that still holds an agent
+  // key from a row that was closed (or force_closed) must get the open-row primary
+  // action, not the update panel for a row that is not there.
+  const onChain = live && rowOnChain();
+  const local = { ...r, expiresAt: onChain ? expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: chainRow.expires_at }) : undefined };
+  let update = signRulesUpdate({ live: !!(onChain && onBoard), local, row: onChain && onBoard ? chainRow : null });
   const callsFailed = signLog.some(x => x.k === 'calls' && x.state === 'bad');
-  if (!update.changed && callsFailed && live && onBoard) update = { changed: true, html: callsFailedPanel() };
+  if (!update.changed && callsFailed && onChain && onBoard) update = { changed: true, html: callsFailedPanel() };
   const stake = onBoard ? '0.02' : fmtN(st.deposit);
-  const L = signItems(onBoard, live, update.changed);
+  const L = signItems(onBoard, onChain, update.changed);
   const help = `<div id="signhelp" class="tabhelp" hidden data-testid="sign-tabhelp"><p class="small">The approval opened in another browser tab. Switch to it and approve. This page moves on by itself.</p><button type="button" class="btn" id="resign" data-testid="sign-reopen">Switch to approval tab</button></div>`;
-  const lede = live
-    ? (update.changed
-      ? 'Your saved rules differ from the chain. Update my rules writes them in one approval. The numbers below are what the chain has now.'
-      : 'These limits are read back from the chain, not from this page.')
-    : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code> and <code>propose_call</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`);
-  const factsHtml = onBoard && chainRow ? boardFacts(chainRow) : (onBoard && chainError ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div>` : '<div class="fact"><small>Reading your charter from the chain</small><b>…</b></div>');
-  return head('Sign', live ? (keyStale ? 'Renew your agent key.' : 'Your agent is live.') : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), lede)
+  // `closedRow` is the case that used to read as a broken page: this browser still holds
+  // an agent key, but the board has no row (it was closed, force_closed, or never made).
+  const closedRow = onBoard && !onChain && chainRead && !readError;
+  const noAccount = !me;
+  const rowMissing = onBoard && !onChain;
+  // Without an account there is nothing to read, so show the open-row copy rather than
+  // waiting on a read that cannot start.
+  const lede = closedRow || (rowMissing && noAccount)
+    ? `There is no row on <code>${esc(MAIN.board.contract)}</code> for <code>${esc(me || 'your account')}</code> yet. Open your row to write these rules and let your agent pay inside them. At most ${stake} NEAR is attached; the contract keeps the row's storage and a small spendable balance and sends the rest back.`
+    : rowMissing && !chainRead
+      ? 'Checking your row on the board.'
+      : onChain
+        ? (update.changed
+          ? 'Your saved rules differ from the chain. Update my rules writes them in one approval. The numbers below are what the chain has now.'
+          : 'These limits are read back from the chain, not from this page.')
+        : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`);
+  // The facts panel always says what the board answered. A missing row is a state, not an error.
+  // Without an account there is nothing to read, so the panel must not sit on "Reading…".
+  const factsHtml = onChain
+    ? boardFacts(chainRow)
+    : noAccount
+      ? '<div class="fact"><small>Row</small><b>Sign in first. The board is read for your account.</b></div>'
+      : !chainRead
+        ? '<div class="fact"><small>Row</small><b>Reading the board…</b></div>'
+        : readError
+          ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div>`
+        : `<div class="fact" data-testid="setup-no-row"><small>Row</small><b>No row open on ${esc(MAIN.board.contract)}</b></div>
+           <div class="fact" data-testid="setup-key-scope"><small>Agent key will allow</small><b>${AGENT_METHODS.map(m => `<code>${esc(m)}</code>`).join(', ')}</b></div>
+           <div class="fact"><small>Next</small><b>Open your row</b></div>`;
+  const heading = closedRow || (rowMissing && !chainRead) ? 'Open your row.' : onChain ? (keyStale ? 'Renew your agent key.' : 'Your agent is live.') : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.');
+  // The open button needs the board's answer, unless there is no account to read for.
+  const rowReady = noAccount || (chainRead && !readError);
+  return head('Sign', heading, lede)
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
-    + (live ? `<div class="facts" id="facts" data-testid="setup-facts">${factsHtml}</div>` : `<div class="preview">${preview(r)}</div>`)
-    + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}" data-testid="setup-sign-${esc(k)}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
+    + (onChain || rowMissing ? `<div class="facts" id="facts" data-testid="setup-facts">${factsHtml}</div>` : `<div class="preview">${preview(r)}</div>`)
+    + '<ul class="steps">' + L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}" data-testid="setup-sign-${esc(k)}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('') + '</ul>'
     + update.html
     + (update.changed ? help : '')
-    + (live ? '' : (onBoard && bal != null && nearOf(bal) < SIGN_MIN
-        ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
-        : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.005 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your charter's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>${help}`))
-    + (live && keyReady && !keyStale ? gasPanel() : '')
-    + (live && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key has <code>propose</code> but not <code>propose_call</code>. Ferry Load cargo needs both. One wallet approval deletes the old board keys and adds a new one with <code>propose</code> and <code>propose_call</code> (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : '')
-    + errP() + nav(live && !keyStale, { label: 'Try your agent' });
+    // Ready when the board answered. Without an account there is nothing to read, so the
+    // button stays enabled and the click asks for sign-in instead of waiting forever.
+    + (rowMissing ? (onBoard && bal != null && nearOf(bal) < SIGN_MIN
+      ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
+      : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.015 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your row's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign" ${rowReady ? '' : 'disabled'}>${rowReady ? 'Open your row' : 'Reading the board'}</button>${help}`)
+      : '')
+    + (onChain && keyReady && !keyStale ? gasPanel() : '')
+    + (onChain && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key is missing one of <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code>. Ferry Load cargo needs <code>propose_call</code>; Toll and Guard call shops through <code>propose_call_as</code>. One wallet approval deletes the old board keys and adds a new one with all three (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : '')
+    + errP() + nav(onChain && !keyStale, { label: 'Try your agent' });
 }
 async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
 async function accountOn(id, network) {
@@ -407,8 +447,16 @@ function ruleArgs(r, expiresAt = sessionExpiresAt(r.hours)) {
 function boardArgs(r, agent) {
   return { rules: ruleArgs(r), agent, fund: ROW_FUND.toString() };
 }
-// The agent key is also added to the visitor's own account as a function-call access key. It may call
-// propose and propose_call on the board, with a gas allowance only. It cannot attach NEAR.
+// The call list this row will carry. `callsFitRow` checks it against the row's storage.
+// One builder for both the fit check and the transaction, so they cannot disagree.
+// The stamp returns the Ask-charter NEAR to the row; the house pair lets the House
+// shop be reached through propose_call_as.
+function callsFor(r, contract) {
+  return callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', [...stampCalls(contract, toY(r.cap)), ...HOUSE_CALLS]).calls;
+}
+// The agent key is also added to the visitor's own account as a function-call access key.
+// It may call propose, propose_call and propose_call_as on the board, with a gas allowance
+// only. It cannot attach NEAR.
 // https://docs.near.org/protocol/accounts-contracts/access-keys
 // GAS_ALLOWANCE_YOCTO (0.05 NEAR) cannot prepay two Ferry propose_call steps.
 // New keys use 0.25 NEAR of gas. The allowance is never spendable as NEAR.
@@ -416,6 +464,10 @@ const AGENT_ALLOW = BigInt(GAS_TOPUP_YOCTO);
 // open_charter keeps ROW_FUND as the row's own spendable balance (enough for a full day at the default 0.01 budget);
 // the rest of the 0.02 deposit after storage (~0.004) is refunded in the same call.
 const ROW_FUND = YN / 100n, TOPUP = YN / 200n;
+// A row holds 0.02 NEAR of storage, and v2 bills the real trie bytes. `callsFitRow`
+// measures the call list (shops plus the wrap.near trio and the stamp) against that
+// budget: seven 20-byte shops fit, eight do not, and longer names fit fewer.
+// The measured numbers are in `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`.
 const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: [...AGENT_METHODS], allowance: AGENT_ALLOW.toString() } } } });
 // The login plugin stores its key here. Use it as the row agent when this browser has not made one yet.
 function adoptPluginKey(id) {
@@ -437,7 +489,7 @@ async function listBoardAgentKeys() {
   const res = await rpcClient([MAIN.rpc])('query', { request_type: 'view_access_key_list', finality: 'optimistic', account_id: me }).catch(() => null);
   return classifyBoardAgentKeys(res?.keys || [], MAIN.board.contract);
 }
-/** Stale board keys (missing propose_call): one wallet approval deletes them and adds a key with propose + propose_call. */
+/** Stale board keys (missing any AGENT_METHODS entry): one approval replaces them with a key for all three. */
 function paintRenewStatus(text) {
   renewStatus = text || '';
   const el = $('[data-testid=setup-renew-status]');
@@ -456,7 +508,7 @@ async function renewAgentKey(deps = {}) {
     const sec = localStorage.getItem(agentLS(me));
     if (sec && await agentAccessKey(sec)) {
       keyReady = true; keyStale = false;
-      paintRenewStatus('This browser already has a key that can call propose and propose_call.');
+      paintRenewStatus('This browser already has a key that can call propose, propose_call and propose_call_as.');
       return { ok: true, renewed: false };
     }
   }
@@ -658,18 +710,34 @@ function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursE
   });
 }
 async function signBoard() {
-  const r = rules(), w = await mainnetWallet().wallet(), contract = MAIN.board.contract;
+  const r = rules(), contract = MAIN.board.contract;
+  // `__NC_SETUP_WALLET` is the browser-test seam: it stands in for the NEAR Connect
+  // wallet so a test can read the batch without a real approval. It never signs.
+  const w = globalThis.__NC_SETUP_WALLET ? await globalThis.__NC_SETUP_WALLET() : await mainnetWallet().wallet();
   const mark = (k, state, tx) => { const s = signLog.find(x => x.k === k); if (s) Object.assign(s, { state, tx: tx || s.tx }); else signLog.push({ k, state, tx }); render(); };
   const readRpc = rpcClient([MAIN.rpc]);
-  let row = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null);
+  // Read the board again: a row may have been closed or opened since this page loaded.
+  // `null` from `get_charter` means "no row", and that is the open-row path.
+  let readFailed = false;
+  let row = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => { readFailed = true; return null; });
+  if (readFailed) throw new Error('The board did not answer. Refresh the page and try again.');
   adoptPluginKey(me);
   const sec = localStorage.getItem(agentLS(me)) || keyFrom().secretKey;
   localStorage.setItem(agentLS(me), sec);
   const pk = keyFrom(sec).publicKey;
-  const calls = { type: 'FunctionCall', params: { methodName: 'set_calls', args: callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', [...stampCalls(contract, toY(r.cap)), ...HOUSE_CALLS]), gas: (GAS.agent * TG).toString(), deposit: CALLS_DEPOSIT_YOCTO } };
   const txs = [];
-  if (!row) txs.push(['create', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'open_charter', args: boardArgs(r, pk), gas: (GAS.open * TG).toString(), deposit: String(MAIN.board.max_row_yocto) } }, calls] }]);
-  else {
+  if (!row) {
+    // open_charter and set_calls go to the board as one transaction, then the agent key
+    // goes on the visitor's own account. Shared with its test so the shape cannot drift.
+    const built = openRowTransactions({
+      accountId: me, contract, rules: boardArgs(r, pk).rules, agentPublicKey: pk,
+      fundYocto: ROW_FUND, rowDepositYocto: MAIN.board.max_row_yocto, callsDepositYocto: CALLS_DEPOSIT_YOCTO,
+      calls: callsFor(r, contract), gasOpen: (GAS.open * TG).toString(), gasAgent: (GAS.agent * TG).toString(),
+      allowance: AGENT_ALLOW.toString(),
+    });
+    txs.push(['create', built.open]);
+    txs.push(['key', built.key]);
+  } else {
     // Update receivers/caps without close_charter (storage charge only; unused deposit refunded).
     // Source: contracts/charter_board/src/lib.rs set_rules + charge.
     // The step key 'create' is the open-row line on a first approval. Update my rules keeps 'agent'.
@@ -677,7 +745,7 @@ async function signBoard() {
   }
   // Allowance cannot be raised on a key that is already on the account. Sign replaces it
   // (delete, then add) so one approval refreshes the 0.05 gas budget. Stale board keys
-  // that omit propose_call are deleted in the same batch so Ferry can call it.
+  // that omit propose_call_as are deleted in the same batch so Toll and Guard can call shops.
   const existingKey = await agentAccessKey(sec);
   const classified = await listBoardAgentKeys();
   const stalePks = classified.stale.map(k => k.publicKey).filter(p => p !== pk);
@@ -687,7 +755,11 @@ async function signBoard() {
       ? [{ type: 'DeleteKey', params: { publicKey: pk } }] : []),
     addKeyAction(pk),
   ];
-  txs.push(['key', { receiverId: me, actions: keyActions }]);
+  const keyTx = { receiverId: me, actions: keyActions };
+  // The open path already queued its own key transaction; replace it with this one so the
+  // stale keys are deleted in the same batch. The update path appends it.
+  const keyAt = txs.findIndex(([k]) => k === 'key');
+  if (keyAt >= 0) txs[keyAt] = ['key', keyTx]; else txs.push(['key', keyTx]);
   for (const [k] of txs) mark(k, 'run');
   if (txs.length) {
     // One approval for both transactions when the wallet can batch them.
@@ -802,11 +874,15 @@ async function ensureChainRow() {
   if (chainLoadedFor === me) return;
   const owner = me;
   chainLoadedFor = owner;
-  const row = await viewFn(rpcClient([MAIN.rpc]), MAIN.board.contract, 'get_charter', { owner }).catch(() => null);
+  readError = false;
+  const row = await viewFn(rpcClient([MAIN.rpc]), MAIN.board.contract, 'get_charter', { owner }).catch(() => { readError = true; return null; });
   if (owner !== me) return;
-  chainRow = row;
-  chainError = row ? '' : 'The chain did not answer. Refresh the page to try again.';
-  if (STEPS[st.step][0] === 'sign') render();
+    chainRow = row;
+    chainRead = true;
+    // `get_charter` returns `null` for an account with no row. That is an answer, not
+    // a failed read, and it is the normal state after a close or a force_close.
+    chainError = row ? '' : (readError ? 'The chain did not answer. Refresh the page to try again.' : '');
+    if (STEPS[st.step][0] === 'sign') render();
 }
 async function facts() {
   const el = $('#facts'); if (!el || !st.charter) return;
@@ -838,7 +914,11 @@ function wireSign() {
   bindRenewKey(job => async () => { try { await job(); } catch (e) { throw new Error(plainErr(e)); } });
   bindRefreshKey(job => async () => { try { await job(); } catch (e) { throw new Error(plainErr(e)); } });
   wire(() => { done(5); go(6); });
-  if (boardLive() && !st.trial && rowLive()) {
+  // Always read the board on this step. The old condition required a stored agent key,
+  // so an account whose row was closed (or force_closed) skipped the read and fell into
+  // the legacy charter panel, which then showed a read error for a row that simply is
+  // not there. `get_charter` returning null is the answer that decides the open-row path.
+  if (boardLive() && !st.trial) {
     ensureChainRow();
     if (keyReady === null) refreshKeyReady().then(() => { if (STEPS[st.step][0] === 'sign') render(); });
   } else facts();
@@ -962,7 +1042,7 @@ function sTry() {
      ${boardLive() && !st.trial ? `<div class="tiles" style="grid-template-columns:1fr 1fr;margin-top:12px"><button type="button" class="tile" id="t-freeze" data-testid="try-frozen"><i>❄</i><b>Freeze, then ask</b><span>One approval freezes the row. The ask is your agent key and should be refused. A second approval unfreezes it.</span></button>
        <button type="button" class="tile" id="t-expire" data-testid="try-expired"><i>⌛</i><b>Expire, then ask</b><span>One approval sets the session in the past. The ask is your agent key and should be refused. A second approval writes the session again.</span></button></div>` : ''}
      ${boardLive() && !st.trial && keyReady ? gasPanel() : ''}
-     ${boardLive() && !st.trial && keyReady === false && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key has <code>propose</code> but not <code>propose_call</code>. Ferry Load cargo needs both. One wallet approval deletes the old board keys and adds a new one with <code>propose</code> and <code>propose_call</code> (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code> and <code>propose_call</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
+     ${boardLive() && !st.trial && keyReady === false && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key is missing one of <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code>. Ferry Load cargo needs <code>propose_call</code>; Toll and Guard call shops through <code>propose_call_as</code>. One wallet approval deletes the old board keys and adds a new one with all three (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
      ${boardLive() && !st.trial ? charterFundMarkup({ amountNear: fundChoice().near, lowBalance: !!lowBal(), rowNear: rowBal == null ? '?' : fmtN(nearOf(rowBal.toString())), hintNear: fmtN(nearOf(TOPUP.toString())), busy: topUpBusy, disabled: !fundChoice().ok, note: fundChoice().why }) : ''}
      ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
      ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR… <span id="try-secs" data-testid="try-secs">${Math.floor((Date.now() - pendingTry.t0) / 1000)}s</span></span> ${txA(pendingTry.hash)}</div></div>` : ''}
@@ -1017,7 +1097,11 @@ function wireTry() {
 const VIEWS = { signin: [sSignin, wireSignin], fund: [sFund, wireFund], privacy: [sPrivacy, wirePrivacy], character: [sCharacter, wireCharacter], rules: [sRules, wireRules], sign: [sSign, wireSign], try: [sTry, wireTry] };
 function render() {
   if (!PREVIEW && !me && st.step > 0) st.step = 0;
-  if (!PREVIEW && (st.trial || boardLive()) && st.step === 6 && !(st.charter && localStorage.getItem(agentLS(st.charter)))) st.step = 5;
+  // Board v2 returns `null` from `get_charter` for an account with no row, and a stored
+  // agent key can outlive a closed row. The sign step is where a row is opened, so it
+  // must stay reachable. It used to fall back to the rules step whenever no agent key
+  // was stored, which hid "Open your row" from exactly the visitor who needs it.
+  if (!PREVIEW && !(st.trial || boardLive()) && st.step === 6 && !(st.charter && localStorage.getItem(agentLS(st.charter)))) st.step = 5;
   document.body.classList.toggle('previewing', PREVIEW);
   rail(); top(); const [v, w] = VIEWS[STEPS[st.step][0]]; const c = $('#card');
   c.innerHTML = (PREVIEW ? '<p class="preview-banner" data-testid="preview-banner">Preview. Nothing is signed.</p>' : '') + v();

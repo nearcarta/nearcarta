@@ -25,56 +25,71 @@ export function sendersFor(dep, row) {
 }
 
 export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
-  const res = await fetchImpl(rpc, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } }),
-  });
-  const j = await res.json();
-  const tx = j.result?.transaction;
-  if (!tx) {
-    // Keep the code and the words: fastnear answers HTTP 200 with
-    // {"error":{"code":-429,"message":"Rate limits exceeded..."}} and no name,
-    // so a throttle must not read as "not found".
-    const code = j.error?.code;
-    const name = j.error?.cause?.name || j.error?.name;
-    return { hash, found: false, error: name || (code != null ? String(code) : 'not found'), message: j.error?.message || '', code, status: res.status };
+  let j = null;
+  // A public archival node answers a burst of 71 lookups with rate limits, and an
+  // empty result then looks like a missing tx. Retry the transient answers only.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt) await new Promise(r => setTimeout(r, 250 * attempt));
+    let res;
+    try {
+      res = await fetchImpl(rpc, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } }),
+      });
+    } catch (e) {
+      if (attempt === 2) return { hash, found: false, error: e?.message || 'network' };
+      continue;
+    }
+    if (res.ok === false) {
+      if (attempt === 2) return { hash, found: false, error: `http ${res.status}` };
+      continue;
+    }
+    j = await res.json().catch(() => null);
+    if (j?.result?.transaction) break;
+    // NOT_FOUND is final; anything else (timeout, rate limit, unknown) is worth a retry.
+    if (j?.error?.cause?.name === 'UNKNOWN_TRANSACTION' || j?.error?.cause?.name === 'NOT_FOUND') break;
   }
+  const tx = j?.result?.transaction;
+  if (!tx) return { hash, found: false, error: j?.error?.cause?.name || j?.error?.name || 'not found' };
   const status = j.result.status || {};
   const failure = Object.prototype.hasOwnProperty.call(status, 'Failure');
   return { hash, found: true, success: !failure && (Object.prototype.hasOwnProperty.call(status, 'SuccessValue') || Object.prototype.hasOwnProperty.call(status, 'SuccessReceiptId')), failure, signer: tx.signer_id || sender };
 }
 
-/** A throttled or failed call is not evidence the tx is missing. */
-export const TRANSIENT = new Set(['-429', -429, '429', 'RATE_LIMITED', 'TIMEOUT_ERROR', 'REQUEST_VALIDATOR_ERROR']);
-export const isThrottled = (one) => one.status === 429
-  || TRANSIENT.has(one.error) || TRANSIENT.has(one.code)
-  || /rate limit|-429|too many requests|timeout/i.test(String(one.message || ''));
-
-export async function checkAll(dep, { rpc, fetchImpl = fetch, tries = 4, backoffMs = 500, paceMs = 120 } = {}) {
+export async function checkAll(dep, { rpc, fetchImpl = fetch } = {}) {
   const rpcs = (Array.isArray(rpc) ? rpc : [rpc]).filter(Boolean);
-  const rows = [];
-  const wait = (ms) => new Promise(r => setTimeout(r, ms));
-  for (const row of collectMainnetTxs(dep)) {
+  const rows = collectMainnetTxs(dep);
+  // One hash can be recorded under several shops (a recovered house tx appears in
+  // the retired record and the live one). Ask once, not four times, then reuse.
+  const byHash = new Map();
+  const lookup = async (row) => {
+    if (byHash.has(row.hash)) return byHash.get(row.hash);
     let hit = { ...row, found: false, error: 'not found' };
     for (const sender of sendersFor(dep, row)) {
       for (const url of rpcs) {
-        // fastnear throttles a burst (HTTP 200 with code -429, and its archival host
-        // now says it is deprecated). A throttle is "not answered", never "not on
-        // chain", so pace the reads and retry with backoff. Without this, verify
-        // flipped between 67/71 and 71/71 on an unchanged tree and took CI with it.
-        for (let t = 0; t < tries; t++) {
-          const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
-          if (!isThrottled(one) || one.found) { hit = { ...row, ...one, sender }; break; }
-          hit = { ...row, ...one, sender, throttled: true };
-          if (t < tries - 1) await wait(backoffMs * 2 ** t);
-        }
-        if (hit.found) break;
+        const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
+        hit = { ...row, ...one, sender };
+        if (one.found) break;
       }
       if (hit.found) break;
     }
-    rows.push(hit);
-    if (paceMs) await wait(paceMs);
+    if (hit.found) byHash.set(row.hash, hit);
+    return hit;
+  };
+
+  const out = await Promise.all(rows.map(lookup));
+  // A public archival node can drop a lookup in a burst even when the tx is there:
+  // the same hash came back found on one row and missing on the next in CI. Retry
+  // the ones that did not resolve, with backoff, before calling them missing.
+  const pending = () => out.map((r, i) => [r, i]).filter(([r]) => !r.found);
+  for (let pass = 1; pass <= 3 && pending().length; pass += 1) {
+    await new Promise(r => setTimeout(r, 400 * pass));
+    for (const [, i] of pending()) {
+      const again = await lookup({ ...rows[i] });
+      if (again.found) out[i] = again;
+      else out[i] = { ...out[i], error: again.error };
+    }
   }
-  return { ok: rows.length > 0 && rows.every(r => r.found), rows };
+  return { ok: out.length > 0 && out.every(r => r.found), rows: out };
 }

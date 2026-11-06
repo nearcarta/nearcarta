@@ -30,42 +30,47 @@ test('a missing tx fails the check and a refusal still counts as found', async (
   assert.equal(miss.ok, false);
 });
 
-test('a rate-limited RPC is retried and never reported as a missing tx', async () => {
-  // The archival RPC returns -429 under load. Treating that as "not found" made
-  // `npm run verify` fail at random (10/71, 64/71, 70/71 on the same tree).
-  const dep = { network: 'mainnet', root: 'nearcarta.near', guard: { contract: 'guard.nearcarta.near', txs: { deploy: 'D'.repeat(44) } } };
-  let calls = 0;
-  const throttled = async () => {
-    calls += 1;
-    if (calls <= 2) return { status: 429, json: async () => ({ error: { code: -429, name: 'RATE_LIMITED', message: 'Rate limits exceeded' } }) };
-    return { status: 200, json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
-  };
-  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: throttled, backoffMs: 1 });
-  assert.equal(calls, 3, 'the throttle should be retried');
-  assert.equal(out.ok, true, 'a retried throttle must still find the tx');
-  assert.equal(out.rows[0].found, true);
-});
-
-test('a tx that stays throttled is reported as throttled, not as missing', async () => {
-  const dep = { network: 'mainnet', root: 'nearcarta.near', guard: { contract: 'guard.nearcarta.near', txs: { deploy: 'E'.repeat(44) } } };
-  const always = async () => ({ status: 429, json: async () => ({ error: { code: -429, name: 'RATE_LIMITED' } }) });
-  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: always, tries: 2, backoffMs: 1 });
-  assert.equal(out.ok, false, 'an unanswered check is not a pass');
-  assert.equal(out.rows[0].throttled, true);
-  assert.equal(out.rows[0].found, false);
-});
-
-test('fastnear throttling (HTTP 200, code -429, no name) is retried, not read as missing', async () => {
-  // This is the exact shape that made CI report 69/71 while the tx was on chain.
-  const dep = { network: 'mainnet', root: 'nearcarta.near', retired: { 'retired.charter.nearcarta.near': { txs: { reap: 'F'.repeat(44) } } } };
-  let calls = 0;
+test('a hash recorded twice is asked once, and a dropped lookup is retried', async () => {
+  // CI read the same house tx as found under one shop and missing under the next,
+  // so the read is not reliable in a burst. One hash is one question; a lookup that
+  // comes back empty is asked again before it is called missing.
+  const H = 'D'.repeat(44);
+  const dep = { root: 'nearcarta.near', retired: { house: { contract: 'house.nearcarta.near', txs: { pay: H } } }, house: { contract: 'house.nearcarta.near', txs: { pay: H } } };
+  let asked = 0;
   const fetchImpl = async () => {
-    calls += 1;
-    if (calls === 1) return { status: 200, json: async () => ({ jsonrpc: '2.0', id: '1', error: { code: -429, message: 'Rate limits exceeded. For higher rate limits get a subscription.' } }) };
+    asked += 1;
+    // Fail the first answer, then find it: the retry is what saves the row.
+    if (asked === 1) return { json: async () => ({ error: { cause: { name: 'TIMEOUT_ERROR' } } }) };
+    return { json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
+  };
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl });
+  assert.equal(out.ok, true);
+  assert.equal(out.rows.length, 2);
+  assert.equal(out.rows.every(r => r.found), true, 'both records of the same hash resolve');
+  assert.ok(asked <= 4, `one question for the shared hash plus retries, not one per record (asked ${asked})`);
+});
+test('fastnear throttling (HTTP 200, code -429, no name) is retried, not read as missing', async () => {
+  // fastnear answers a burst with HTTP 200 and {"error":{"code":-429,"message":"Rate
+  // limits exceeded..."}} and no error name. The name-only read made that identical
+  // to a tx that is not on chain, so verify flipped between 67/71 and 71/71 on an
+  // unchanged tree and failed the node CI job twice.
+  const dep = { network: 'mainnet', root: 'nearcarta.near', retired: { 'retired.charter.nearcarta.near': { txs: { reap: 'F'.repeat(44) } } } };
+  let asked = 0;
+  const fetchImpl = async () => {
+    asked += 1;
+    if (asked === 1) return { status: 200, json: async () => ({ jsonrpc: '2.0', id: '1', error: { code: -429, message: 'Rate limits exceeded. For higher rate limits get a subscription.' } }) };
     return { status: 200, json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
   };
-  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl, backoffMs: 1 });
-  assert.equal(calls, 2, 'a 200 with code -429 must be retried');
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl });
+  assert.ok(asked >= 2, 'a 200 with code -429 must be retried');
   assert.equal(out.ok, true);
   assert.equal(out.rows[0].found, true);
+});
+
+test('a tx that is not on chain is still reported missing', async () => {
+  const dep = { network: 'mainnet', root: 'nearcarta.near', guard: { contract: 'guard.nearcarta.near', txs: { gone: 'G'.repeat(44) } } };
+  const fetchImpl = async () => ({ json: async () => ({ error: { cause: { name: 'UNKNOWN_TRANSACTION' } } }) });
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl });
+  assert.equal(out.ok, false, 'a real miss must not be retried into a pass');
+  assert.equal(out.rows[0].found, false);
 });
