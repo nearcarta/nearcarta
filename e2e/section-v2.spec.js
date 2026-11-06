@@ -11,6 +11,7 @@ test('a board session is 1, 2 or 24 hours and the agent key names propose_call',
   await hours.selectOption('24');
   await expect(page.getByTestId('rule-preview')).toContainText('for 24 hours');
   await page.goto('/setup/?preview=1#sign');
-  await expect(page.getByText('propose_call')).toBeVisible();
-  await expect(page.getByTestId('sign-cost')).toContainText('0.005');
+  await expect(page.getByTestId('setup-key-scope')).toContainText('propose_call_as');
+  await expect(page.getByTestId('setup-key-scope')).toContainText('propose_call');
+  await expect(page.getByTestId('sign-cost')).toContainText('0.015');
 });
