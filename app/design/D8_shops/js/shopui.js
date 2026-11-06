@@ -661,9 +661,18 @@ async function tollPay(quote) {
   sh?.hideRefuse?.();
   const ready = !!(A.S.ready && A.stage() === 'ready' && A.S.board);
   if (!ready) {
-    const hint = 'Set up your agent in /setup. Nothing was signed.';
+    // Three different setup steps. Saying "set up your agent" to a visitor with no
+    // row sends them to the wrong part of /setup.
+    const stage = A.stage();
+    const hint = !A.S.me
+      ? 'Sign in first, then open your row in /setup. Nothing was signed.'
+      : !A.S.boardRow
+        ? 'Open your row in /setup first. The toll spends from that row, under your caps. Nothing was signed.'
+        : stage === 'key'
+          ? 'Finish the helper key in /setup so this browser can sign. Nothing was signed.'
+          : 'Finish /setup so this row can pass the toll. Nothing was signed.';
     extra.seal = hint;
-    return { ok: false, hint, keep: true, kind: 'no', say: hint, refused: false };
+    return { ok: false, hint, keep: true, kind: 'no', say: hint, refused: false, needsRow: !A.S.me || !A.S.boardRow };
   }
   if (!quote?.payable || !quote.feeYocto) {
     const hint = quote?.hint || 'The live policy has no visitor fee. Nothing was signed.';

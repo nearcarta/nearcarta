@@ -393,6 +393,9 @@ body.ferry-tray #shopUI .btns .ghost{
 .ferry-quote-err{margin:0;color:#ff8f8f;font:600 13px/1.35 system-ui,sans-serif}
 .ferry-charter-note,.ferry-quote-err,.ferry-rate{overflow-wrap:anywhere;word-break:break-word;max-width:100%}
 .ferry-charter-note{margin:0;color:#ff8f8f;font:600 13px/1.4 system-ui,sans-serif;text-align:center}
+/* A missing row is a setup step, not a refusal. Same slot, calm gold. */
+.toll-needs-row{margin:0;color:#f5d08a;font:600 13px/1.4 system-ui,sans-serif;text-align:center}
+.toll-needs-row a{color:#fff3d4;text-decoration:underline;text-underline-offset:2px}
 .ferry-deposit{margin:0;color:#f5d08a;font:600 13px/1.4 system-ui,sans-serif;text-align:center;overflow-wrap:anywhere}
 .ferry-deposit code{color:#fff8ee}
 .ferry-card,.ferry-pane,.ferry-field{min-width:0;max-width:100%}
