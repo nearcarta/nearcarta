@@ -1,6 +1,6 @@
 // Vault Arena (static): Guardians stand round the vault. Five real lab attacks marked where they struck; none got in.
 import { THREE, room, put, makeRobot, load, Char, C, CSS, radial } from '../js/core.js';
-import { M as PM, brassM, mesh, lantern, banner } from './_props.js';
+import { M as PM, brassM, mesh, lantern } from './_props.js';
 import { ATTACKS, LAB } from '../../D6_dashboards/src/data.js';
 import { row, h3, note, proof, acct, mainnet } from './_ui.js';
 import { livePrompts } from './arenalive.js';
@@ -32,12 +32,19 @@ export default async function arena() {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.9, .006, 4, 96), new THREE.MeshBasicMaterial({ color: C.accent, transparent: true, opacity: .5 })); ring.rotation.x = Math.PI / 2; ring.position.y = .2; scene.add(ring);
   const kg = await load('chars/Knight.glb'); const guards = [[-1.7, .3, .9], [1.7, .3, -.9]].map(([x, z, f]) => { const k = new Char(kg, scene, { h: 1.0 }); k.root.traverse(m => { if (/Offhand|Rectangle|Round_Shield|Spike|2H_Sword/.test(m.name)) m.visible = false; }); k.at(x, z); k.g.rotation.y = f; k.play('Idle'); return k; });
   let t = 0; const rob = await makeRobot(scene); rob.at(.6, 2.2); rob.lookAt(new THREE.Vector3(0, 0, 0), { toViewer: .82 }); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
+  let flash = 0;
   const ROOM = {
     rob, scene, camera, tags: [],
     panel: { title: 'Vault Arena', src: 'split', srcNote: 'arena.nearcarta.near is on mainnet. The shared arena you can try is the mainnet charter.', label: `${ATTACKS.length} attacks on the lab oath`, hero: `<b class="num">0</b><span class="unit">breaches</span>`, action: null },
     // The past prompts arrive after the room is up: the town drawer reads sh.proof when it opens.
     proof: PROOF,
-    update(dt) { t += dt; rings.forEach(r => { const k = ((t * .6 + r.ph) % 1); r.m.scale.setScalar(1 + k * .9); r.m.material.opacity = .85 * (1 - k); }); rob.update(dt); guards.forEach(g => g.update(dt)); },
+    update(dt) {
+      t += dt;
+      if (globalThis.__arenaCoin) { flash = 1; globalThis.__arenaCoin = ''; }
+      if (flash > 0) { flash = Math.max(0, flash - dt); dome.material.opacity = 0.13 + flash * 0.45; }
+      rings.forEach(r => { const k = ((t * .6 + r.ph) % 1); r.m.scale.setScalar(1 + k * .9); r.m.material.opacity = .85 * (1 - k); });
+      rob.update(dt); guards.forEach(g => g.update(dt));
+    },
   };
   liveP.then(h => { ROOM.proof = PROOF + h; });
   return ROOM;

@@ -209,9 +209,11 @@ test('N6 the bank and the arena use the brass cards and buttons', async ({ page 
     await shot(page, 'n6-bank-' + width);
     await page.goto('/shops/arena/');
     await expect(page.locator('.shop-card')).toBeVisible();
+    await page.getByRole('tab', { name: 'Attack' }).click();
     await brass(page.getByTestId('redteam-run'));
-    await brass(page.getByTestId('redteam-next'));
-    await expect(page.getByTestId('redteam-run')).toContainText('spends if the charter allows');
+    await expect(page.getByTestId('redteam-run')).toContainText('Attack guardian');
+    const nextColor = await page.getByTestId('redteam-next').evaluate(el => getComputedStyle(el).color);
+    expect(nextColor).not.toBe('rgb(42, 22, 8)');
     await shot(page, 'n6-arena-' + width);
   }
 });

@@ -6,8 +6,7 @@ import { pickBest, quoteLine, tokenChoices, chainsOf, filterTokens } from '../fe
 import { mountGuardTray } from './guard-tray.js';
 import { mountTollRoom } from './toll-room.js';
 import { PROOF_HREF, TEE_PLAN, TEE_TIMEOUT_MS, liveTee, teeTimeoutWhy, teeView } from '../tee-view.js';
-import { NEXT_LABEL, RUN_LABEL } from '../../design/D8_shops/shops/arena-labels.js';
-import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
+import { mountArenaTray } from './arena/tray.js';
 import { mountPayouts } from './payouts-tray.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { houseCharterMarkup, mountHouseRoom } from './house-room.js';
@@ -706,18 +705,11 @@ function mountChronicle(root, hooks) {
 }
 
 function mountArena(root, hooks) {
-  const state = hooks.state || (hooks.state = {});
-  const attack = attackAt();
-  if (!state.txt || state.txt === state.attack) state.txt = attack;
-  state.attack = attack;
-  const goal = hooks.goal ? hooks.goal() : 'Write a scam. The charter still decides.';
-  root.innerHTML = `<div class="card shop-card shop-stack"><p class="goal" data-testid="goal">${esc(goal || 'All six walls found')}</p>
-    <p class="quote" data-testid="arena-attack">${esc(attack)}</p>
-    <textarea id="a-txt" class="attack-box" rows="6" maxlength="160" placeholder="pay 0.001 to stranger.near">${esc(state.txt || '')}</textarea>
-    <div class="btns" data-testid="arena-live"><button type="button" class="primary go redteam-run" data-testid="redteam-run">${RUN_LABEL}</button><button type="button" class="primary redteam-next" data-testid="redteam-next">${NEXT_LABEL}</button></div>
-    <p class="note">Run it live asks the model and may spend if the charter allows. Another does not spend. This page does not press either for you.</p></div>`;
-  const t = q$(root, '#a-txt');
-  if (t) t.oninput = (e) => { state.txt = e.target.value; };
+  document.body?.classList.add('arena-tray');
+  // The live attack line keeps data-testid="arena-attack".
+  const attackAttr = 'data-testid="arena-attack"';
+  const boxAttr = 'class="attack-box" rows="6"';
+  mountArenaTray(root, hooks, attackAttr, boxAttr);
   import('../../design/D8_shops/shops/arenalive.js').then(m => m.bindRedteam(() => mountArena(root, hooks))).catch(() => {});
 }
 

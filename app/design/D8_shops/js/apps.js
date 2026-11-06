@@ -148,6 +148,7 @@ export async function refresh() {
   if (onMain()) {
     const board = S.mainnet?.board;
     S.board = board?.status === 'deployed' ? board.contract : null;
+    S.arena = S.mainnet?.planned?.arena || S.mainnet?.extras?.arena?.contract || null;
     S.charter = null;
     if (S.board && S.me) {
       const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
@@ -877,6 +878,56 @@ export async function anchorStatement({ kind = 'statement', digest = '', salt = 
 /** One anchor is a single small call: 30 Tgas covers it with room for the event log. */
 export const ANCHOR_TGAS = 30;
 
+// 10 Tgas for propose_call_as, 30 Tgas to the shop, 20 Tgas for on_called_as.
+const ARENA_GAS = 60n * TG;
+export async function arenaCall(plan) {
+  const stop = (reason = 'Nothing was signed.') => ({ ...plan, sign: false, tx: null, decision: 'blocked', live: 'blocked', reason, wallet: false });
+  const call = plan?.call;
+  if (!call || call.boardMethod !== 'propose_call_as') return stop();
+  if (!S.board || !S.me || !S.arena || call.receiver !== S.arena) return stop();
+  const key = agent();
+  if (!key) return stop();
+  const ak = await proposeAccessKey(key);
+  const names = ak?.permission?.FunctionCall?.method_names || [];
+  if (!ak || (names.length && !names.includes('propose_call_as'))) return stop();
+  const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  if (!row || W.pubkeyHex(key) !== String(row.agent || '')) return stop();
+  const msg = callAsMessage({
+    network: S.mainnet?.network || 'mainnet',
+    contract: S.board,
+    owner: S.me,
+    receiver: S.arena,
+    method: call.method,
+    args: call.args,
+    deposit: call.deposit,
+    nonce: String(row.nonce),
+    expiry: call.expiry,
+    epoch: String(row.epoch ?? '0'),
+    effects: call.effects || [],
+    hold: !!call.hold,
+  });
+  const signature = W.signMessage(key, msg);
+  const args = {
+    owner: S.me, receiver: S.arena, method: call.method, args: call.args,
+    deposit: String(call.deposit), expiry: String(call.expiry), effects: call.effects || [],
+    hold: !!call.hold, signature,
+  };
+  try {
+    const signed = W.signTx({
+      key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+      actions: [W.functionCall('propose_call_as', args, ARENA_GAS)],
+    });
+    const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+    if (!sent.ok) {
+      const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+      return { ...plan, sign: true, tx: signed.hash, decision: 'denied', reason, wallet: false, fromChain: true };
+    }
+    if (call.hold) return { ...plan, sign: true, tx: signed.hash, decision: 'held', reason: 'Held. Confirm or cancel.', wallet: false };
+    return { ...plan, sign: true, tx: signed.hash, decision: 'allowed', reason: 'ok', wallet: false };
+  } catch (e) {
+    return stop(String(e?.message || 'Nothing was signed.').slice(0, 160));
+  }
+}
 export async function sessionAllowance() {
   const key = agent();
   if (!key || !S.me) return { yocto: null, near: null, low: true };

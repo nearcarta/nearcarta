@@ -146,6 +146,7 @@ test('P5 arena actions use the standard button size', async ({ page }) => {
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/shops/arena/');
+    await page.getByRole('tab', { name: 'Attack' }).click();
     for (const id of ['redteam-run', 'redteam-next']) {
       const box = await page.getByTestId(id).boundingBox();
       const font = await page.getByTestId(id).evaluate(el => parseFloat(getComputedStyle(el).fontSize));
