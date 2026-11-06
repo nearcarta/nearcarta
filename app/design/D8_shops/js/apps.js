@@ -464,13 +464,25 @@ export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receive
 /** Deposit address after the charter view allows the payee. At most 0.20 USD. Does not send the tokens. */
 export async function openFerryCheckout(q, pair) {
   const charter = S.board ? S.me : S.charter;
+  // Charter gate: an allowlisted shop. 1Click (NEAR dest): the visitor — never a Zcash UA.
   const recipient = ferryPayee('pay');
+  const dest = pair?.to || (q?.to ? `${q.to.symbol}@${q.to.chain || q.to.blockchain || ''}` : '');
+  const visitor = quoteRecipient(dest || pair, S.me, '');
+  if (String(dest).toLowerCase().includes('@near') || (pair && String(pair.toChain || '').toLowerCase() === 'near')) {
+    if (!visitor) {
+      return {
+        ok: false,
+        error: 'A NEAR destination needs a NEAR account as recipient. Use the visitor account (64 hex or a named account).',
+        depositAddress: null,
+      };
+    }
+  }
   const amountYocto = String(S.boardRow?.min_amount || S.clauses?.pay?.min_amount || '1');
   if (!charter || !recipient) return { ok: false, reason: 'no_charter', depositAddress: null };
   const body = cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo: refundFor(pair.from), visitor: S.me, session: S.board ? 'board' : undefined });
   const r = await fetch(API + '/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null };
+  if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null, error: j.error || j.reason || null };
   return j;
 }
 

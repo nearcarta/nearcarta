@@ -378,6 +378,13 @@ test('a NEAR destination quotes the visitor account, and a ZEC quote keeps the u
     visitor: scholar,
   });
   assert.equal(zec.swap_recipient, undefined);
+  // Display labels like "NEAR" must still yield swap_recipient for the visitor.
+  const labeled = cityCheckoutBody({
+    pair: { from: 'wNEAR@near', to: 'USDC@near', amt: '0.05', fromSym: 'wNEAR', fromChain: 'near', toSym: 'USDC', toChain: 'NEAR' },
+    recipient: 'charter.nearcarta.near', charter: scholar, amountYocto: '1', refundTo: 'nearcarta.near', visitor: scholar, session: 'board',
+  });
+  assert.equal(labeled.to.chain, 'near');
+  assert.equal(labeled.swap_recipient, scholar);
   const apps = read('app/design/D8_shops/js/apps.js');
   const quote = apps.slice(apps.indexOf('export async function quotePair'), apps.indexOf('export const ferryNear'));
   assert.match(quote, /quoteRecipient\(dest, S\.me, UA\)/);
@@ -385,6 +392,8 @@ test('a NEAR destination quotes the visitor account, and a ZEC quote keeps the u
   const checkout = apps.slice(apps.indexOf('export async function openFerryCheckout'), apps.indexOf('export async function ferryStatus'));
   assert.match(checkout, /visitor: S\.me/);
   assert.match(checkout, /session: S\.board \? 'board' : undefined/);
+  assert.match(checkout, /quoteRecipient/);
+  assert.match(checkout, /NEAR destination needs a NEAR account/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /data-testid', 'ferry-agent-dock'/);
   assert.match(ui, />AI Agent</);

@@ -436,6 +436,7 @@ const APPS = {
         tokens: () => A.loadFerryTokens(),
         quote: (id, amt) => A.quote(id, amt),
         quotePair: (from, to, amt) => A.quotePair(from, to, amt),
+        visitor: () => A.S.me,
         charterReady: () => APPS.ferry.charterReady(),
         openRules: () => openRules(),
         onLoadCargo: (opts) => loadFerryCargo(!!opts?.charter),

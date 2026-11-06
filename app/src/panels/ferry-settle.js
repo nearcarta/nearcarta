@@ -165,9 +165,14 @@ export function quoteRecipient(to, me, other) {
 
 export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo, visitor, session }) {
   const fromSym = pair.fromSym || String(pair.from || '').split('@')[0];
-  const fromChain = pair.fromChain || String(pair.from || '').split('@')[1];
+  const fromChain = String(pair.fromChain || String(pair.from || '').split('@')[1] || '').toLowerCase();
   const toSym = pair.toSym || String(pair.to || '').split('@')[0];
-  const toChain = pair.toChain || String(pair.to || '').split('@')[1];
+  // Prefer the @chain in pair.to when toChain is missing or a display label (e.g. "NEAR"/"Zcash").
+  const toFromPair = chainOf(pair.to);
+  const toChainRaw = String(pair.toChain || '').toLowerCase();
+  const toChain = (toChainRaw === 'near' || toChainRaw === 'zec' || toChainRaw === 'base' || toChainRaw === 'eth' || toChainRaw === 'arb' || toChainRaw === 'sol')
+    ? toChainRaw
+    : (toFromPair || toChainRaw);
   const body = {
     from: { symbol: fromSym, chain: fromChain },
     to: { symbol: toSym, chain: toChain },

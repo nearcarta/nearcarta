@@ -16,9 +16,10 @@ const clause = {
 const usage = { spent: '0', reserved: '0', count: 0 };
 const state = { frozen: false };
 const yocto = '1000000000000000000000';
+const VISITOR = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8';
 const input = {
   from: { symbol: 'USDC', chain: 'base' }, to: { symbol: 'USDC', chain: 'near' }, amount: '0.2',
-  recipient: 'payee.near', refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
+  recipient: 'payee.near', swapRecipient: VISITOR, refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
   charter: 'charter.nearcarta.near', clauseId: 'pay', amountYocto: yocto, privacy: 'public',
 };
 const tokens = [
@@ -76,7 +77,7 @@ test('a refused recipient never asks 1Click, and an allowed one returns a deposi
   assert.equal(yes.depositAddress, 'ab'.repeat(32));
   assert.equal(okd.calls.length, 1);
   assert.equal(okd.calls[0].dry, false);
-  assert.equal(okd.calls[0].recipient, 'payee.near');
+  assert.equal(okd.calls[0].recipient, VISITOR);
   assert.equal(yes.receipt.rail, 'intents');
   assert.equal(yes.receipt.decision, 'allowed');
   assert.equal(yes.receipt.tx, yes.depositAddress);
@@ -114,6 +115,10 @@ test('USDC on NEAR is quoted to the visitor while the charter gate still checks 
   const refused = await openCheckout({ ...input, recipient: 'other.near', swapRecipient: scholar }, liveDeps());
   assert.equal(refused.reason, 'receiver_not_allowlisted');
   assert.equal(refused.depositAddress, null);
+  const noVisitor = await openCheckout({ ...input, amount: '0.05', swapRecipient: null }, liveDeps());
+  assert.equal(noVisitor.ok, false);
+  assert.match(noVisitor.error || '', /NEAR destination needs a NEAR account/);
+  assert.equal(noVisitor.depositAddress, null);
 });
 
 test('an unsigned live quote does not hand out its deposit address', () => {
@@ -154,7 +159,8 @@ test('POST /api/ferry/checkout refuses a bad body and a payee the charter does n
     assert.equal(j.depositAddress, null);
     assert.equal(calls.length, 0);
     const allowed = await post({
-      from: 'USDC@base', to: 'USDC@near', amount: '0.2', recipient: 'payee.near', refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
+      from: 'USDC@base', to: 'USDC@near', amount: '0.2', recipient: 'payee.near',
+      swap_recipient: VISITOR, refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
       charter: 'charter.nearcarta.near', clause_id: 'pay', amount_yocto: yocto,
     });
     const a = await allowed.json();

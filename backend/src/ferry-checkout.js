@@ -221,8 +221,19 @@ export async function openCheckout(input, deps) {
   }
 
   // The charter gate checked input.recipient (the allowlisted shop).
-  // A NEAR-destination token is delivered to swapRecipient, the visitor's account.
-  const clickRecipient = input.to?.chain === 'near' && input.swapRecipient ? input.swapRecipient : input.recipient;
+  // A NEAR-destination token is delivered to the visitor (swapRecipient), never the shop
+  // and never a Zcash UA. Missing visitor → refuse before 1Click.
+  let clickRecipient = input.recipient;
+  if (input.to?.chain === 'near') {
+    if (!input.swapRecipient || !isNearAccount(input.swapRecipient)) {
+      return {
+        ok: false, step: 'quote', depositAddress: null, reason: 'quote_refused',
+        error: 'A NEAR destination needs a NEAR account as recipient. Use the visitor account (64 hex or a named account).',
+        receipt: intentsCheckout({ decision: 'refused', reason: 'quote_refused', to: input.recipient, tx: null }),
+      };
+    }
+    clickRecipient = input.swapRecipient;
+  }
   const dry = await deps.quote({ ...input, from: input.from, to: input.to, recipient: clickRecipient });
   if (!dry?.ok) return { ok: false, step: 'quote', error: dry?.error || 'quote refused', depositAddress: null, reason: 'quote_refused', receipt: intentsCheckout({ decision: 'refused', reason: 'quote_refused', to: input.recipient, tx: null }) };
   const usd = checkoutUsdOk(dry.from?.usd);

@@ -17,7 +17,7 @@ import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
 import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks } from './token-badge.js';
 import { agentCargoPlan, chainLabel } from './ferry-pair.js';
-import { explainQuoteMiss, SESSION_SWAP } from './ferry-settle.js';
+import { explainQuoteMiss, SESSION_SWAP, quoteRecipient } from './ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from './ferry-dock.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -63,6 +63,12 @@ export function refundForChain(chain) {
   const c = String(chain || '').toLowerCase();
   return c === 'near' || c === 'near protocol' ? SAMPLE.near : SAMPLE.refund;
 }
+
+/** 1Click recipient: visitor NEAR account for NEAR destinations, else the Orchard UA. */
+function quotePayee(to, visitor) {
+  return quoteRecipient(to, visitor, SAMPLE.zec) || SAMPLE.zec;
+}
+
 
 /** Smart tray default: stables ~3, tiny for high-value, else 1. */
 export function defaultAmtFor(sym) {
@@ -428,7 +434,7 @@ function mountFerry(root, hooks) {
         const originChain = String(from).split('@')[1] || '';
         return fetch(api() + '/api/ferry/quote', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ from, to, amount: String(amt || SESSION_SWAP.amt), recipient: SAMPLE.zec, refundTo: refundForChain(originChain), privacy: 'basic' }),
+          body: JSON.stringify({ from, to, amount: String(amt || SESSION_SWAP.amt), recipient: quotePayee(to, hooks.visitor?.() || hooks.state?.me), refundTo: refundForChain(originChain), privacy: 'basic' }),
         }).then(r => r.json());
       },
       onPair: hooks.onPair,
@@ -490,7 +496,7 @@ function mountFerry(root, hooks) {
       else {
         const res = await fetch(api() + '/api/ferry/quote', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient: SAMPLE.zec, refundTo: refundForChain(originChain), privacy: 'basic' }),
+          body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient: quotePayee(to, hooks.visitor?.() || state.me), refundTo: refundForChain(originChain), privacy: 'basic' }),
         });
         q = await res.json();
       }
