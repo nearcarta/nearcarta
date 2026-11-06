@@ -691,13 +691,13 @@ test('a landed 0.05 wrap is reused and the next plan is only ft_transfer', () =>
   assert.notEqual(plan.steps[0].gasTgas, 300);
 });
 
-test('propose_call prepays the measured 42 Tgas, and 0.04188 cannot buy another step', () => {
-  assert.equal(proposeCallTgas('near_deposit'), 42);
-  assert.equal(proposeCallTgas('ft_transfer'), 42);
-  assert.equal(proposeCallTgas('storage_deposit'), 42);
+test('propose_call prepays 54 Tgas so the 20 Tgas callback fits, and 0.04188 cannot buy a step', () => {
+  assert.equal(proposeCallTgas('near_deposit'), 54);
+  assert.equal(proposeCallTgas('ft_transfer'), 54);
+  assert.equal(proposeCallTgas('storage_deposit'), 54);
   assert.ok(proposeCallTgas('ft_transfer') < 300);
-  const one = proposeCallPrepaidYocto(42);
-  assert.equal(one, functionCallAllowanceCost({ tgas: 42, numBytes: PROPOSE_CALL_BYTES }));
+  const one = proposeCallPrepaidYocto(54);
+  assert.equal(one, functionCallAllowanceCost({ tgas: 54, numBytes: PROPOSE_CALL_BYTES }));
   const left = 4188n * 10n ** 19n;
   assert.equal(nearAmount(left), '0.04188');
   assert.ok(left < one);

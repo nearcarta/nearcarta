@@ -87,7 +87,8 @@ async fn two_visitors_share_one_board_and_teardown_pays_the_owner() -> anyhow::R
         let before: u128 = row["balance"].as_str().unwrap().parse()?;
         let nonce = row["nonce"].as_str().unwrap();
         let deposit = NEAR / 2000;
-        let expiry = u64::MAX.to_string();
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos() as u64;
+        let expiry = now.saturating_add(3_600_000_000_000).to_string();
         let message = deployed.view("call_as_message").args_json(json!({
             "owner": user.id(),
             "receiver": shop.id(),

@@ -16,7 +16,7 @@ The refusal strings match the oath charter: `receiver_not_allowlisted`, `zero_am
 
 ## What the owner pays
 
-`node backend/scripts/deploy-mainnet-board.js` prints the storage stake, the burned gas, the 0.007 NEAR account-creation charge, and the total, in yoctoNEAR. The formula is `deployCost` in `shared/board/cost.js`. The script exits 1 if the total or the peak (stake plus prepaid gas) is over 1.2 NEAR (the live wasm is 108955 bytes, about 1.09 NEAR of storage, returned by `reap`). It does not sign unless the owner passes `--live` and `NEAR_MAINNET_SIGNER_KEY`. The key is not read from a file and is not printed.
+`node backend/scripts/deploy-mainnet-board.js` prints the storage stake, the burned gas, the 0.007 NEAR account-creation charge, and the total, in yoctoNEAR. The formula is `deployCost` in `shared/board/cost.js`. The script exits 1 if the total or the peak (stake plus prepaid gas) is over 2.1 NEAR. It prints that maximum. It does not sign unless the owner passes `--live` and `NEAR_MAINNET_SIGNER_KEY`. The key is not read from a file and is not printed. The account on mainnet is still the 108955-byte wasm (about 1.09 NEAR of storage, returned by `reap`).
 
 The account is created with no access key. `new` records the predecessor as the owner.
 
@@ -35,7 +35,7 @@ The `STATE` key layout did not change: `force_close` adds no field. `propose_cal
 
 The replacement sequence is the dry-run in `docs/BOARD_V2_MIGRATION.md`. It was not run. Do not call `reap` while `get_config` reports a row: the account balance includes that visitor's funds, and `reap` would send them to `nearcarta.near`.
 
-`node backend/scripts/deploy-mainnet-board.js` still prints the cost of the committed artifact and does not sign unless the owner passes `--live`. The v2 wasm is larger than that script's 1.2 NEAR cap. This change does not raise the cap.
+`node backend/scripts/deploy-mainnet-board.js` prints the cost of the committed artifact and does not sign unless the owner passes `--live`. The committed file is the v2 wasm: 130250 bytes, sha256 `48a98286a2785448b9a16d3cda735985f7e693343e32f258138ab032224b8e25`. `deployCost` for owner `nearcarta.near` is stake `1304920000000000000000000` yoctoNEAR (1.30492 NEAR), total `1314331742629904800000000`, peak `1329037426299048000000000`. That is under the 2.1 NEAR maximum. `mainnet.json` still records the live code hash `Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C`. The migration is `scripts/board-v2-migrate.js` (dry-run). See `docs/BOARD_V2_MIGRATION.md`.
 
 ## The site
 

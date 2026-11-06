@@ -120,26 +120,25 @@ test('login asks for a function-call key and a deposit still goes to the wallet'
   assert.equal(sent, 'wallet');
 });
 
-test('a board propose at 30 Tgas fits the 0.05 session allowance, and 80 Tgas does not', () => {
-  // Live Ferry Ask charter, 2026-11-05: allowance 0.05 NEAR, cost 80921036784705000000000.
-  // That cost is an 80 Tgas propose (310 bytes of method + args) bought at 0.001 NEAR/Tgas.
-  // The 0.005 stamp is not part of the cost. Deposit stays 0.
+test('a board propose at 40 Tgas fits the 0.05 session allowance, and 80 Tgas does not', () => {
+  // The on_paid callback is 20 Tgas, so propose attaches 40. An 80 Tgas call
+  // (the 2026-11-05 measurement, 310 bytes) still does not fit the 0.05 key.
   assert.equal(GAS_ALLOWANCE_YOCTO, '50000000000000000000000');
-  assert.equal(BOARD_PROPOSE_TGAS, 30);
+  assert.equal(BOARD_PROPOSE_TGAS, 40);
   const live = functionCallAllowanceCost({ tgas: 80, numBytes: FERRY_PROPOSE_BYTES });
   assert.equal(live.toString(), '80921036784705000000000');
   assert.ok(live > BigInt(GAS_ALLOWANCE_YOCTO));
   const fit = boardProposeAllowanceYocto();
-  assert.ok(fit <= BigInt(GAS_ALLOWANCE_YOCTO), `30 Tgas costs ${fit}`);
-  assert.equal(fit.toString(), '30921036784705000000000');
+  assert.ok(fit <= BigInt(GAS_ALLOWANCE_YOCTO), `40 Tgas costs ${fit}`);
+  assert.equal(fit.toString(), '40921036784705000000000');
   // A long payee still fits, and so does buying every fee at the 0.001 NEAR/Tgas price.
   const long = boardProposeAllowanceYocto(BOARD_PROPOSE_TGAS, 400);
   assert.ok(long <= BigInt(GAS_ALLOWANCE_YOCTO));
   const busy = functionCallAllowanceCost({ tgas: BOARD_PROPOSE_TGAS, numBytes: FERRY_PROPOSE_BYTES, gasPrice: 1_000_000_000n });
   assert.ok(busy <= BigInt(GAS_ALLOWANCE_YOCTO));
   const apps = readFileSync(new URL('../../../app/design/D8_shops/js/apps.js', import.meta.url), 'utf8');
-  assert.match(apps, /functionCall\('propose', args, 30n \* TG\)/);
-  assert.match(apps, /fc\('propose', args, 30\)/);
+  assert.match(apps, /functionCall\('propose', args, 40n \* TG\)/);
+  assert.match(apps, /fc\('propose', args, 40\)/);
   assert.doesNotMatch(apps, /propose', args, 80/);
   const setup = readFileSync(new URL('../../../app/house/setup.js', import.meta.url), 'utf8');
   assert.match(setup, /GAS_ALLOWANCE_YOCTO/);

@@ -14,13 +14,11 @@ export const ACCOUNT_CREATION_YOCTO = 7_000_000_000_000_000_000_000n;
 export const GAS_PRICE_YOCTO = 100_000_000n;
 export const GAS_PURCHASE_YOCTO = 1_000_000_000n;
 export const ONE_NEAR = 10n ** 24n;
-// Cap raised from 1 NEAR to 1.2 NEAR after the 2026-11-05 redeploy (PR #22 wasm adds
-// propose_call + force_close). Source: /workspace/audit/board-redeploy-final.json and
-// nearblocks.io/txns/CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4: wasm 108955 bytes,
-// sha256 910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29,
-// code_hash Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C, live balance 1.0913 NEAR,
-// storage_usage 109130 bytes (block 223200774). The stake comes back on `reap`.
-export const MAX_DEPLOY_YOCTO = 12n * ONE_NEAR / 10n;
+// 2.1 NEAR. The live account (108955 bytes, sha256 910268da…, code hash
+// Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C, deploy CfdUppnLo…) staked about
+// 1.09 NEAR. Board v2 is larger. The cap is a maximum, not a blank cheque.
+// The stake comes back on reap.
+export const MAX_DEPLOY_YOCTO = 21n * ONE_NEAR / 10n;
 
 const CREATE_SEND = 500_000_000_000n;
 const CREATE_EXEC = 7_200_000_000_000n;
@@ -43,10 +41,18 @@ export function initStateBytes(owner) {
   return 4 + owner.length + 4 + 4 + 4;
 }
 
+/** Empty v2 header: magic, owner, count, owed, hold count, "mainnet", hash, eta, flag. */
+export function headValueBytes(owner) {
+  if (!owner || owner.length > 64) throw new Error('owner account id');
+  return 4 + (4 + owner.length) + 4 + 16 + 4 + (4 + 'mainnet'.length) + 32 + 8 + 1;
+}
+
 export function storageBytes(wasmLen, owner) {
   const n = BigInt(wasmLen);
   if (n <= 0n) throw new Error('wasm length');
-  return ACCOUNT_BYTES + n + STATE_KEY_BYTES + BigInt(initStateBytes(owner)) + RECORD_EXTRA;
+  const v1 = ACCOUNT_BYTES + n + STATE_KEY_BYTES + BigInt(initStateBytes(owner)) + RECORD_EXTRA;
+  const v2 = ACCOUNT_BYTES + n + 4n + BigInt(headValueBytes(owner)) + RECORD_EXTRA;
+  return v1 > v2 ? v1 : v2;
 }
 
 /** Gas for CreateAccount + Transfer + DeployContract + FunctionCall("new", {}). */

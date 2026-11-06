@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), no_std)]
 //! One mainnet contract, one row per visitor.
 //!
 //! The row holds the allowlist, the per-payment cap, the daily budget and count,
@@ -23,11 +24,74 @@
 //! The refusal strings, the window rule and the sealed-rule commitment match
 //! the oath charter (`oath-hidden-v1`, clause id `pay`).
 
+extern crate alloc;
+
 mod v2;
-use v2::{acts_len, decode_acts, decode_meta, encode_acts, encode_meta, meta_empty};
+use v2::{acts_len, decode_acts, decode_meta, encode_acts};
 use near_sdk::json_types::{U128, U64};
+use near_sdk::store::LookupMap;
 use near_sdk::{env, require, AccountId, Gas, NearToken, Promise};
-use std::collections::{BTreeMap, BTreeSet};
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
+
+/// A few rows, not a tree. One call touches one visitor.
+struct Map<K, V> { v: Vec<(K, V)> }
+impl<K: PartialEq, V> Map<K, V> {
+    fn new() -> Self { Self { v: Vec::new() } }
+    fn len(&self) -> usize { self.v.len() }
+    fn is_empty(&self) -> bool { self.v.is_empty() }
+    fn contains_key(&self, k: &K) -> bool { self.v.iter().any(|(a, _)| a == k) }
+    fn get(&self, k: &K) -> Option<&V> { self.v.iter().find(|(a, _)| a == k).map(|(_, v)| v) }
+    fn get_mut(&mut self, k: &K) -> Option<&mut V> { self.v.iter_mut().find(|(a, _)| a == k).map(|(_, v)| v) }
+    fn insert(&mut self, k: K, val: V) -> Option<V> {
+        if let Some((_, slot)) = self.v.iter_mut().find(|(a, _)| a == &k) { return Some(core::mem::replace(slot, val)); }
+        self.v.push((k, val));
+        None
+    }
+    fn remove(&mut self, k: &K) -> Option<V> {
+        let i = self.v.iter().position(|(a, _)| a == k)?;
+        Some(self.v.swap_remove(i).1)
+    }
+    fn retain(&mut self, mut f: impl FnMut(&K, &V) -> bool) { self.v.retain(|(k, v)| f(k, v)); }
+    fn entry(&mut self, k: K) -> Ent<'_, K, V> { Ent { map: self, key: Some(k) } }
+    fn keys(&self) -> impl Iterator<Item = &K> { self.v.iter().map(|(k, _)| k) }
+    fn values(&self) -> impl Iterator<Item = &V> { self.v.iter().map(|(_, v)| v) }
+}
+impl<'a, K, V> IntoIterator for &'a Map<K, V> {
+    type Item = (&'a K, &'a V);
+    type IntoIter = MapIter<'a, K, V>;
+    fn into_iter(self) -> Self::IntoIter { MapIter { map: self, i: 0 } }
+}
+struct MapIter<'a, K, V> { map: &'a Map<K, V>, i: usize }
+impl<'a, K, V> Iterator for MapIter<'a, K, V> {
+    type Item = (&'a K, &'a V);
+    fn next(&mut self) -> Option<Self::Item> {
+        let pair = self.map.v.get(self.i)?;
+        self.i += 1;
+        Some((&pair.0, &pair.1))
+    }
+}
+struct Ent<'a, K, V> { map: &'a mut Map<K, V>, key: Option<K> }
+impl<'a, K: PartialEq, V> Ent<'a, K, V> {
+    fn or_insert(&mut self, val: V) -> &mut V {
+        let k = self.key.take().expect("entry");
+        if let Some(i) = self.map.v.iter().position(|(a, _)| a == &k) { return &mut self.map.v[i].1; }
+        self.map.v.push((k, val));
+        let n = self.map.v.len() - 1;
+        &mut self.map.v[n].1
+    }
+}
+struct Set<T> { v: Vec<T> }
+impl<T: PartialEq> Set<T> {
+    fn new() -> Self { Self { v: Vec::new() } }
+    fn insert(&mut self, t: T) -> bool {
+        if self.v.iter().any(|x| x == &t) { return false; }
+        self.v.push(t);
+        true
+    }
+}
 
 /// 0.02 NEAR. A row whose storage costs more than this is refused.
 pub const MAX_ROW_YOCTO: u128 = 20_000_000_000_000_000_000_000;
@@ -36,11 +100,16 @@ pub const MAX_RECEIVERS: usize = 8;
 pub const MAX_CALLS: usize = 24;
 pub const SIDE_RESERVE_BYTES: u64 = 600;
 pub const MAX_OPEN_HOLDS: usize = 2;
-pub const UPGRADE_DELAY_NS: u64 = 3_600_000_000_000;
+/// One day. `stage_upgrade` cannot be applied before this, and a hold cannot
+/// be signed to expire later than this.
+pub const UPGRADE_DELAY_NS: u64 = 86_400_000_000_000;
+pub const HOLD_MAX_NS: u64 = 86_400_000_000_000;
 pub const CALL_AS_VERSION: &str = "2";
 const NS_PER_MIN: u64 = 60_000_000_000;
 const NS_PER_DAY: u64 = 86_400 * NS_PER_MIN;
-const GAS_CALLBACK: Gas = Gas::from_tgas(8);
+/// Callbacks used to get 8 Tgas. Loading every row then failed, the refund
+/// never ran, and the hold blocked close and reap. 20 Tgas is the floor.
+const GAS_CALLBACK: Gas = Gas::from_tgas(20);
 
 #[derive(Clone)]
 pub struct Rules {
@@ -161,47 +230,65 @@ struct Hold {
     effects: Vec<EffectIn>,
     expires: u64,
     pending: bool,
+    /// Policy epoch and confirm key at the moment the hold was signed.
+    /// `confirm_hold` refuses when either has moved.
+    epoch: u64,
+    confirm: [u8; 32],
 }
 
 pub struct Board {
     owner: AccountId,
-    rows: BTreeMap<AccountId, Row>,
-    keys: BTreeMap<[u8; 32], AccountId>,
+    rows: Map<AccountId, Row>,
+    keys: Map<[u8; 32], AccountId>,
     count: u32,
-    calls: BTreeMap<AccountId, CallPolicy>,
-    effects: BTreeMap<AccountId, Vec<EffectCap>>,
-    holds: BTreeMap<(AccountId, u64), Hold>,
-    credit: BTreeMap<AccountId, u128>,
-    confirm: BTreeMap<AccountId, [u8; 32]>,
-    epoch: BTreeMap<AccountId, u64>,
+    calls: Map<AccountId, CallPolicy>,
+    effects: Map<AccountId, Vec<EffectCap>>,
+    holds: Map<(AccountId, u64), Hold>,
+    credit: Map<AccountId, u128>,
+    confirm: Map<AccountId, [u8; 32]>,
+    epoch: Map<AccountId, u64>,
     network: String,
     upgrade_hash: [u8; 32],
     upgrade_eta: u64,
     upgrade_set: bool,
+    /// Global liability. Used when `partial` is set and the maps hold one row.
+    owed: u128,
+    hold_count: u32,
+    /// True when this value was loaded from keyed storage and does not contain every row.
+    partial: bool,
+    dropped_rows: Vec<AccountId>,
+    dropped_keys: Vec<[u8; 32]>,
+    /// Hold ids loaded from storage, so a save can delete the ones that were removed.
+    seen_holds: Vec<(AccountId, u64)>,
 }
 
-fn board_from(owner: AccountId, rows: BTreeMap<AccountId, Row>, keys: BTreeMap<[u8; 32], AccountId>, count: u32, calls: BTreeMap<AccountId, CallPolicy>) -> Board {
+fn blank(owner: AccountId) -> Board {
+    board_from(owner, Map::new(), Map::new(), 0, Map::new())
+}
+fn board_from(owner: AccountId, rows: Map<AccountId, Row>, keys: Map<[u8; 32], AccountId>, count: u32, calls: Map<AccountId, CallPolicy>) -> Board {
     Board {
         owner, rows, keys, count, calls,
-        effects: BTreeMap::new(), holds: BTreeMap::new(), credit: BTreeMap::new(),
-        confirm: BTreeMap::new(), epoch: BTreeMap::new(), network: "mainnet".into(),
+        effects: Map::new(), holds: Map::new(), credit: Map::new(),
+        confirm: Map::new(), epoch: Map::new(), network: "mainnet".into(),
         upgrade_hash: [0; 32], upgrade_eta: 0, upgrade_set: false,
+        owed: 0, hold_count: 0, partial: false, dropped_rows: Vec::new(), dropped_keys: Vec::new(),
+        seen_holds: Vec::new(),
     }
 }
 
 impl Board {
     pub fn new() -> Self {
-        board_from(env::predecessor_account_id(), BTreeMap::new(), BTreeMap::new(), 0, BTreeMap::new())
+        board_from(env::predecessor_account_id(), Map::new(), Map::new(), 0, Map::new())
     }
 
     /// Open this visitor's row. `fund` stays as spendable balance.
     /// Deposit past the row's storage and that fund is transferred back.
     pub fn open_charter(&mut self, rules: RulesIn, agent: String, fund: U128) {
         let me = env::predecessor_account_id();
-        require!(!self.rows.contains_key(&me), "ERR_EXISTS");
+        require!(!self.row_exists(&me), "ERR_EXISTS");
         let rules = rules_from(rules);
         let pk = parse_pk(&agent);
-        require!(!self.keys.contains_key(&pk), "ERR_KEY_USED");
+        require!(!self.key_taken(&pk), "ERR_KEY_USED");
         let attached = env::attached_deposit().as_yoctonear();
         let before = self.bytes();
         self.rows.insert(me.clone(), Row {
@@ -222,11 +309,13 @@ impl Board {
         let row = self.rows.get_mut(&me).unwrap();
         row.storage_locked = cost;
         row.balance = fund.0;
+        self.owe((cost + fund.0) as i128);
         refund(&me, attached - cost - fund.0);
     }
 
     pub fn set_rules(&mut self, rules: RulesIn) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         let rules = rules_from(rules);
         let before = self.bytes();
         self.rows.get_mut(&me).expect("ERR_NO_CHARTER").rules = rules;
@@ -236,6 +325,7 @@ impl Board {
 
     pub fn set_frozen(&mut self, frozen: bool) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         self.rows.get_mut(&me).expect("ERR_NO_CHARTER").frozen = frozen;
         refund(&me, env::attached_deposit().as_yoctonear());
     }
@@ -244,6 +334,7 @@ impl Board {
     /// Empty clears it. The text is `oath-hidden-v1` with clause id `pay`.
     pub fn set_seal(&mut self, commitment: String) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         let seal = if commitment.is_empty() { None } else { Some(parse_hex32(&commitment)) };
         let before = self.bytes();
         self.rows.get_mut(&me).expect("ERR_NO_CHARTER").seal = seal;
@@ -252,11 +343,13 @@ impl Board {
 
     pub fn set_agent(&mut self, agent: String) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         let pk = parse_pk(&agent);
-        require!(self.keys.get(&pk).map(|o| o == &me).unwrap_or(true), "ERR_KEY_USED");
+        require!(self.key_owner(&pk).map(|o| o == me).unwrap_or(true), "ERR_KEY_USED");
         let before = self.bytes();
         let old = self.rows.get(&me).expect("ERR_NO_CHARTER").agent;
         self.keys.remove(&old);
+        if old != pk { self.dropped_keys.push(old); }
         self.keys.insert(pk, me.clone());
         self.rows.get_mut(&me).unwrap().agent = pk;
         self.charge(&me, before);
@@ -265,18 +358,24 @@ impl Board {
 
     pub fn fund(&mut self) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         let row = self.rows.get_mut(&me).expect("ERR_NO_CHARTER");
-        row.balance += env::attached_deposit().as_yoctonear();
+        let add = env::attached_deposit().as_yoctonear();
+        row.balance += add;
+        self.owe(add as i128);
     }
 
     pub fn close_charter(&mut self) -> Promise {
-        self.release(env::predecessor_account_id())
+        let me = env::predecessor_account_id();
+        self.hydrate(&me);
+        self.release(me)
     }
 
     /// Owner closes one visitor's row. The stake and the unspent balance go to
     /// that visitor, the same as `close_charter`. After the last row, `reap` can run.
     pub fn force_close(&mut self, visitor: AccountId) -> Promise {
         require!(env::predecessor_account_id() == self.owner, "ERR_NOT_OWNER");
+        self.hydrate(&visitor);
         self.release(visitor)
     }
 
@@ -287,6 +386,9 @@ impl Board {
         let acts_before = acts_len(self);
         let row = self.rows.remove(&who).expect("ERR_NO_CHARTER");
         self.keys.remove(&row.agent);
+        self.dropped_rows.push(who.clone());
+        self.dropped_keys.push(row.agent);
+        self.owe(-((row.balance + row.storage_locked) as i128));
         self.calls.remove(&who);
         self.effects.remove(&who);
         self.holds.retain(|(o, _), _| o != &who);
@@ -304,6 +406,7 @@ impl Board {
     }
 
     pub fn propose(&mut self, owner: AccountId, receiver: AccountId, amount: U128, signature: String, reveal: Option<Reveal>) -> Promise {
+        self.hydrate(&owner);
         let mut row = self.rows.get(&owner).cloned().expect("ERR_NO_CHARTER");
         let amount = amount.0;
         require!(signature.len() == 128, "ERR_BAD_SIG");
@@ -332,6 +435,7 @@ impl Board {
         }
         require!(row.balance >= amount, "ERR_BALANCE");
         row.balance -= amount;
+        self.owe(-(amount as i128));
         row.spent = next;
         row.count += 1;
         row.nonce += 1;
@@ -351,22 +455,27 @@ impl Board {
     }
 
     pub fn on_paid(&mut self, owner: AccountId, amount: U128, day: U64) {
+        self.hydrate(&owner);
         if near_sdk::is_promise_success() { return; }
-        let Some(row) = self.rows.get_mut(&owner) else { return; };
-        row.balance += amount.0;
-        if row.day == day.0 {
-            row.spent = row.spent.saturating_sub(amount.0);
-            row.count = row.count.saturating_sub(1);
-        }
+        let found = if let Some(row) = self.rows.get_mut(&owner) {
+            row.balance += amount.0;
+            if row.day == day.0 {
+                row.spent = row.spent.saturating_sub(amount.0);
+                row.count = row.count.saturating_sub(1);
+            }
+            true
+        } else { false };
+        if found { self.owe(amount.0 as i128); }
     }
 
     /// The visitor names which (receiver, method) pairs the agent may call, and the session ceiling.
     /// `propose` is unchanged. An empty list clears the policy.
     pub fn set_calls(&mut self, rules: Vec<(AccountId, String, u128)>, session_cap: u128) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         require!(self.rows.contains_key(&me), "ERR_NO_CHARTER");
         require!(rules.len() <= MAX_CALLS, "ERR_RECEIVERS");
-        let mut seen = BTreeSet::new();
+        let mut seen = Set::new();
         let mut parsed = Vec::new();
         for (receiver, method, cap) in rules {
             require!((1..=64).contains(&method.len()), "ERR_METHOD");
@@ -390,6 +499,7 @@ impl Board {
     /// A signed function call. The message covers the method and sha256(args). The deposit
     /// comes from the row. A failed call is returned by `on_called`.
     pub fn propose_call(&mut self, owner: AccountId, receiver: AccountId, method: String, args: Vec<u8>, deposit: U128, signature: String) -> Promise {
+        self.hydrate(&owner);
         let mut row = self.rows.get(&owner).cloned().expect("ERR_NO_CHARTER");
         let deposit = deposit.0;
         require!(signature.len() == 128, "ERR_BAD_SIG");
@@ -400,6 +510,12 @@ impl Board {
         if row.rules.expires_at != 0 {
             require!(env::block_timestamp() <= row.rules.expires_at, "clause_expired");
         }
+        require!(in_window(row.rules.window_start_min, row.rules.window_end_min), "outside_time_window");
+        require!(deposit >= row.rules.min_amount, "below_min_amount");
+        // `stamp` pays this contract and the method returns the NEAR to the same row.
+        // It is not a shop, so it does not need to be on the payee list.
+        let stamp = receiver == env::current_account_id() && method == "stamp";
+        require!(stamp || row.rules.receivers.contains(&receiver), "receiver_not_allowlisted");
         require!(args.len() <= 2048, "ERR_ARGS");
         require!((1..=64).contains(&method.len()), "ERR_METHOD");
         let Some(policy) = self.calls.get(&owner) else { env::panic_str("method_not_allowlisted"); };
@@ -415,6 +531,7 @@ impl Board {
         require!(row.count < row.rules.max_actions_per_day, "over_daily_action_count");
         require!(row.balance >= deposit, "ERR_BALANCE");
         row.balance -= deposit;
+        self.owe(-(deposit as i128));
         row.spent = next;
         row.count += 1;
         row.nonce += 1;
@@ -436,17 +553,32 @@ impl Board {
         ))
     }
 
+    /// Called only by `propose_call` on this contract. The attached deposit goes
+    /// back onto the same row. The daily counters stay spent: the stamp was allowed.
+    pub fn stamp(&mut self, owner: AccountId) {
+        require!(env::predecessor_account_id() == env::current_account_id(), "ERR_PRIVATE");
+        self.hydrate(&owner);
+        let add = env::attached_deposit().as_yoctonear();
+        let row = self.rows.get_mut(&owner).expect("ERR_NO_CHARTER");
+        row.balance += add;
+        self.owe(add as i128);
+    }
+
     pub fn on_called(&mut self, owner: AccountId, amount: U128, day: U64) {
+        self.hydrate(&owner);
         if near_sdk::is_promise_success() { return; }
-        let Some(row) = self.rows.get_mut(&owner) else { return; };
-        row.balance += amount.0;
-        if row.day == day.0 {
-            row.spent = row.spent.saturating_sub(amount.0);
-            row.count = row.count.saturating_sub(1);
-        }
+        let found = if let Some(row) = self.rows.get_mut(&owner) {
+            row.balance += amount.0;
+            if row.day == day.0 {
+                row.spent = row.spent.saturating_sub(amount.0);
+                row.count = row.count.saturating_sub(1);
+            }
+            true
+        } else { false };
         if let Some(policy) = self.calls.get_mut(&owner) {
             policy.session_spent = policy.session_spent.saturating_sub(amount.0);
         }
+        if found { self.owe(amount.0 as i128); }
     }
 
     pub fn call_message(&self, owner: AccountId, receiver: AccountId, method: String, args: Vec<u8>, deposit: U128, nonce: U64) -> String {
@@ -457,7 +589,8 @@ impl Board {
         require!(env::attached_deposit() == NearToken::from_yoctonear(1), "ERR_ONE_YOCTO");
         require!(env::predecessor_account_id() == self.owner, "ERR_NOT_OWNER");
         require!(self.count == 0, "ERR_NONEMPTY");
-        require!(self.holds.is_empty() && self.liabilities() == 0, "ERR_LIABILITY");
+        let holds_clear = if self.partial { self.hold_count == 0 } else { self.holds.is_empty() };
+        require!(holds_clear && self.liabilities() == 0, "ERR_LIABILITY");
         Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
 
@@ -523,14 +656,22 @@ impl Board {
             let row = self.rows.get_mut(me).unwrap();
             require!(row.storage_locked + cost <= MAX_ROW_YOCTO, "ERR_ROW_TOO_BIG");
             row.storage_locked += cost;
+            self.owe(cost as i128);
             refund(me, attached - cost);
         } else {
             let freed = (before - after) as u128 * price();
             if let Some(row) = self.rows.get_mut(me) {
                 row.storage_locked = row.storage_locked.saturating_sub(freed);
             }
+            self.owe(-(freed as i128));
             refund(me, freed + attached);
         }
+    }
+
+    fn owe(&mut self, delta: i128) {
+        if !self.partial || delta == 0 { return; }
+        if delta > 0 { self.owed = self.owed.saturating_add(delta as u128); }
+        else { self.owed = self.owed.saturating_sub((-delta) as u128); }
     }
 }
 
@@ -584,7 +725,7 @@ fn seal_bytes(reveal: &Reveal) -> [u8; 32] {
 
 fn rules_from(r: RulesIn) -> Rules {
     require!((1..=MAX_RECEIVERS).contains(&r.receivers.len()), "ERR_RECEIVERS");
-    let mut seen = BTreeSet::new();
+    let mut seen = Set::new();
     for a in &r.receivers {
         require!(a.as_str().len() <= 64 && seen.insert(a.clone()), "ERR_RECEIVERS");
     }
@@ -729,18 +870,18 @@ fn decode(raw: &[u8]) -> Board {
     let owner = r.acc();
     let n = r.u32() as usize;
     require!(n <= 10_000, "ERR_STATE");
-    let mut rows = BTreeMap::new();
+    let mut rows = Map::new();
     for _ in 0..n { let k = r.acc(); rows.insert(k, r.row()); }
     let m = r.u32() as usize;
     require!(m <= 10_000, "ERR_STATE");
-    let mut keys = BTreeMap::new();
+    let mut keys = Map::new();
     for _ in 0..m { let k = r.bytes32(); keys.insert(k, r.acc()); }
     let count = r.u32();
     require!(r.i == raw.len(), "ERR_STATE");
-    board_from(owner, rows, keys, count, BTreeMap::new())
+    board_from(owner, rows, keys, count, Map::new())
 }
 
-fn encode_calls(m: &BTreeMap<AccountId, CallPolicy>) -> Vec<u8> {
+fn encode_calls(m: &Map<AccountId, CallPolicy>) -> Vec<u8> {
     let mut o = Vec::new();
     put_u32(&mut o, m.len() as u32);
     for (owner, p) in m {
@@ -756,11 +897,11 @@ fn encode_calls(m: &BTreeMap<AccountId, CallPolicy>) -> Vec<u8> {
     }
     o
 }
-fn decode_calls(raw: &[u8]) -> BTreeMap<AccountId, CallPolicy> {
+fn decode_calls(raw: &[u8]) -> Map<AccountId, CallPolicy> {
     let mut r = Rd { s: raw, i: 0 };
     let n = r.u32() as usize;
     require!(n <= 10_000, "ERR_STATE");
-    let mut out = BTreeMap::new();
+    let mut out = Map::new();
     for _ in 0..n {
         let owner = r.acc();
         let k = r.u32() as usize;
@@ -775,22 +916,180 @@ fn decode_calls(raw: &[u8]) -> BTreeMap<AccountId, CallPolicy> {
     out
 }
 
-fn save(b: &Board) {
-    env::storage_write(b"STATE", &encode(b));
-    let calls = encode_calls(&b.calls);
-    if b.calls.is_empty() { env::storage_remove(b"CALLS"); }
-    else { env::storage_write(b"CALLS", &calls); }
-    if acts_len(b) == 0 { env::storage_remove(b"ACTS"); }
-    else { env::storage_write(b"ACTS", &encode_acts(b)); }
-    if meta_empty(b) { env::storage_remove(b"META"); }
-    else { env::storage_write(b"META", &encode_meta(b)); }
+fn kv(prefix: &[u8]) -> LookupMap<String, Vec<u8>> { LookupMap::new(prefix.to_vec()) }
+fn kv_get(prefix: &[u8], key: &str) -> Option<Vec<u8>> { kv(prefix).get(&key.to_string()).cloned() }
+fn kv_has(prefix: &[u8], key: &str) -> bool { kv(prefix).contains_key(&key.to_string()) }
+fn kv_set(prefix: &[u8], key: &str, val: Vec<u8>) { let mut m = kv(prefix); m.insert(key.to_string(), val); m.flush(); }
+fn kv_del(prefix: &[u8], key: &str) { let mut m = kv(prefix); m.remove(&key.to_string()); m.flush(); }
+
+fn row_bytes(r: &Row) -> Vec<u8> { let mut o = Vec::new(); put_row(&mut o, r); o }
+fn row_from(raw: &[u8]) -> Row { let mut r = Rd { s: raw, i: 0 }; let row = r.row(); require!(r.i == raw.len(), "ERR_STATE"); row }
+
+fn write_head(b: &Board) {
+    let owed = if b.partial { b.owed } else { b.liabilities() };
+    let holds = if b.partial { b.hold_count } else { b.holds.len() as u32 };
+    let mut o = Vec::new();
+    put_u32(&mut o, 2);
+    put_acc(&mut o, &b.owner);
+    put_u32(&mut o, b.count);
+    put_u128(&mut o, owed);
+    put_u32(&mut o, holds);
+    put_str(&mut o, &b.network);
+    o.extend_from_slice(&b.upgrade_hash);
+    put_u64(&mut o, b.upgrade_eta);
+    o.push(u8::from(b.upgrade_set));
+    env::storage_write(b"HEAD", &o);
 }
+fn read_head() -> Board {
+    let raw = env::storage_read(b"HEAD").unwrap_or_else(|| env::panic_str("ERR_NO_STATE"));
+    let mut r = Rd { s: &raw, i: 0 };
+    require!(r.u32() == 2, "ERR_STATE");
+    let mut b = blank(r.acc());
+    b.count = r.u32();
+    b.owed = r.u128();
+    b.hold_count = r.u32();
+    b.network = r.string();
+    b.upgrade_hash = r.bytes32();
+    b.upgrade_eta = r.u64();
+    b.upgrade_set = r.u8() == 1;
+    require!(r.i == raw.len(), "ERR_STATE");
+    b.partial = true;
+    b
+}
+
+impl Board {
+    fn row_exists(&self, id: &AccountId) -> bool {
+        self.rows.contains_key(id) || (self.partial && kv_has(b"r", id.as_str()))
+    }
+    fn key_owner(&self, pk: &[u8; 32]) -> Option<AccountId> {
+        if let Some(o) = self.keys.get(pk) { return Some(o.clone()); }
+        if !self.partial { return None; }
+        kv_get(b"k", &hex32(pk)).map(|raw| {
+            let mut r = Rd { s: &raw, i: 0 };
+            let id = r.acc();
+            require!(r.i == raw.len(), "ERR_STATE");
+            id
+        })
+    }
+    fn key_taken(&self, pk: &[u8; 32]) -> bool { self.key_owner(pk).is_some() }
+
+    /// Load one visitor. A callback then reads that row, not every row on the board.
+    fn hydrate(&mut self, owner: &AccountId) {
+        if !self.partial || self.rows.contains_key(owner) { return; }
+        if let Some(raw) = kv_get(b"r", owner.as_str()) {
+            let row = row_from(&raw);
+            let mut k = Vec::new();
+            put_acc(&mut k, owner);
+            kv_get(b"k", &hex32(&row.agent)).map(|raw| {
+                let mut r = Rd { s: &raw, i: 0 };
+                let id = r.acc();
+                if id == *owner { self.keys.insert(row.agent, id); }
+            });
+            self.rows.insert(owner.clone(), row);
+        }
+        if let Some(raw) = kv_get(b"c", owner.as_str()) {
+            let mut one = decode_calls(&raw);
+            if let Some(p) = one.remove(owner) { self.calls.insert(owner.clone(), p); }
+        }
+        if let Some(raw) = kv_get(b"e", owner.as_str()) {
+            let mut tmp = blank(self.owner.clone());
+            decode_acts(&mut tmp, &raw);
+            if let Some(caps) = tmp.effects.remove(owner) { self.effects.insert(owner.clone(), caps); }
+        }
+        if let Some(raw) = kv_get(b"s", owner.as_str()) {
+            let mut r = Rd { s: &raw, i: 0 };
+            let epoch = r.u64();
+            if epoch != 0 { self.epoch.insert(owner.clone(), epoch); }
+            if r.u8() == 1 { self.confirm.insert(owner.clone(), r.bytes32()); }
+            let credit = r.u128();
+            if credit != 0 { self.credit.insert(owner.clone(), credit); }
+            let n = r.u32() as usize;
+            require!(n <= MAX_OPEN_HOLDS, "ERR_STATE");
+            for _ in 0..n {
+                let id = r.u64();
+                self.seen_holds.push((owner.clone(), id));
+                let key = format!("{}/{}", owner.as_str(), id);
+                if let Some(hb) = kv_get(b"h", &key) {
+                    let mut tmp = blank(self.owner.clone());
+                    decode_acts(&mut tmp, &hb);
+                    if let Some(h) = tmp.holds.remove(&(owner.clone(), id)) { self.holds.insert((owner.clone(), id), h); }
+                }
+            }
+            require!(r.i == raw.len(), "ERR_STATE");
+        }
+    }
+}
+
+fn save(b: &Board) {
+    write_head(b);
+    for (id, row) in &b.rows { persist_owner(b, id, row); }
+    for id in &b.dropped_rows {
+        kv_del(b"r", id.as_str());
+        kv_del(b"c", id.as_str());
+        kv_del(b"e", id.as_str());
+        kv_del(b"s", id.as_str());
+    }
+    for pk in &b.dropped_keys { kv_del(b"k", &hex32(pk)); }
+    for (owner, id) in &b.seen_holds {
+        if !b.holds.contains_key(&(owner.clone(), *id)) {
+            kv_del(b"h", &format!("{}/{}", owner.as_str(), id));
+        }
+    }
+    env::storage_remove(b"STATE");
+    env::storage_remove(b"CALLS");
+    env::storage_remove(b"ACTS");
+    env::storage_remove(b"META");
+}
+
+fn persist_owner(b: &Board, id: &AccountId, row: &Row) {
+    kv_set(b"r", id.as_str(), row_bytes(row));
+    let mut key = Vec::new();
+    put_acc(&mut key, id);
+    kv_set(b"k", &hex32(&row.agent), key);
+    if let Some(p) = b.calls.get(id) {
+        let mut one = Map::new();
+        one.insert(id.clone(), p.clone());
+        kv_set(b"c", id.as_str(), encode_calls(&one));
+    } else { kv_del(b"c", id.as_str()); }
+    if let Some(caps) = b.effects.get(id) {
+        let mut tmp = blank(b.owner.clone());
+        tmp.effects.insert(id.clone(), caps.clone());
+        kv_set(b"e", id.as_str(), encode_acts(&tmp));
+    } else { kv_del(b"e", id.as_str()); }
+    let mut holds = Vec::new();
+    for ((owner, hid), h) in &b.holds {
+        if owner != id { continue; }
+        let mut tmp = blank(b.owner.clone());
+        tmp.holds.insert((owner.clone(), *hid), h.clone());
+        kv_set(b"h", &format!("{}/{}", id.as_str(), hid), encode_acts(&tmp));
+        holds.push(*hid);
+    }
+    let epoch = b.epoch.get(id).copied().unwrap_or(0);
+    let confirm = b.confirm.get(id).copied();
+    let credit = b.credit.get(id).copied().unwrap_or(0);
+    if epoch == 0 && confirm.is_none() && credit == 0 && holds.is_empty() {
+        kv_del(b"s", id.as_str());
+    } else {
+        let mut o = Vec::new();
+        put_u64(&mut o, epoch);
+        match confirm { Some(pk) => { o.push(1); o.extend_from_slice(&pk); } None => o.push(0) }
+        put_u128(&mut o, credit);
+        put_u32(&mut o, holds.len() as u32);
+        for id in &holds { put_u64(&mut o, *id); }
+        kv_set(b"s", id.as_str(), o);
+    }
+}
+
 fn load() -> Board {
+    if env::storage_has_key(b"HEAD") { return read_head(); }
     let raw = env::storage_read(b"STATE").unwrap_or_else(|| env::panic_str("ERR_NO_STATE"));
     let mut b = decode(&raw);
     if let Some(raw) = env::storage_read(b"CALLS") { b.calls = decode_calls(&raw); }
     if let Some(raw) = env::storage_read(b"ACTS") { decode_acts(&mut b, &raw); }
     if let Some(raw) = env::storage_read(b"META") { decode_meta(&mut b, &raw); }
+    b.partial = false;
+    b.owed = b.liabilities();
+    b.hold_count = b.holds.len() as u32;
     b
 }
 fn input_str() -> String {
@@ -847,6 +1146,13 @@ pub extern "C" fn set_calls() {
     save(&b);
 }
 #[no_mangle]
+pub extern "C" fn stamp() {
+    let v = parse(&input_str());
+    let mut b = load();
+    b.stamp(v.need("owner").account());
+    save(&b);
+}
+#[no_mangle]
 pub extern "C" fn propose_call() {
     let v = parse(&input_str());
     let mut b = load();
@@ -898,7 +1204,9 @@ pub extern "C" fn get_config() {
 pub extern "C" fn get_charter() {
     let v = parse(&input_str());
     let owner = v.need("owner").account();
-    match load().get_charter(owner) {
+    let mut b = load();
+    b.hydrate(&owner);
+    match b.get_charter(owner) {
         None => ret("null"),
         Some(c) => {
             let mut s = String::from("{\"owner\":\"");
@@ -982,9 +1290,9 @@ impl J<'_> {
     fn eat(&mut self, c: u8) { require!(self.peek() == c, "ERR_ARGS"); self.i += 1; }
     fn val(&mut self) -> Val {
         match self.peek() {
-            b'n' => { self.i += 4; Val::Null }
-            b't' => { self.i += 4; Val::Bool(true) }
-            b'f' => { self.i += 5; Val::Bool(false) }
+            b'n' => { self.word(b"null"); Val::Null }
+            b't' => { self.word(b"true"); Val::Bool(true) }
+            b'f' => { self.word(b"false"); Val::Bool(false) }
             b'"' => Val::Str(self.str()),
             b'[' => self.arr(),
             b'{' => self.obj(),
@@ -992,20 +1300,58 @@ impl J<'_> {
             _ => env::panic_str("ERR_ARGS"),
         }
     }
+    fn word(&mut self, w: &[u8]) {
+        require!(self.i + w.len() <= self.s.len() && &self.s[self.i..self.i + w.len()] == w, "ERR_ARGS");
+        self.i += w.len();
+    }
     fn str(&mut self) -> String {
         self.eat(b'"');
-        let mut o = String::new();
+        let mut raw = Vec::new();
         while self.i < self.s.len() {
-            let c = self.s[self.i]; self.i += 1;
-            if c == b'"' { return o; }
-            if c == b'\\' { let n = self.s[self.i]; self.i += 1; o.push(n as char); } else { o.push(c as char); }
+            let c = self.s[self.i];
+            self.i += 1;
+            if c == b'"' { return String::from_utf8(raw).unwrap_or_else(|_| env::panic_str("ERR_ARGS")); }
+            if c != b'\\' { raw.push(c); continue; }
+            require!(self.i < self.s.len(), "ERR_ARGS");
+            let e = self.s[self.i];
+            self.i += 1;
+            let byte = match e {
+                b'"' | b'\\' | b'/' => e,
+                b'b' => 0x08,
+                b'f' => 0x0c,
+                b'n' => b'\n',
+                b'r' => b'\r',
+                b't' => b'\t',
+                b'u' => {
+                    require!(self.i + 4 <= self.s.len(), "ERR_ARGS");
+                    let hex = core::str::from_utf8(&self.s[self.i..self.i + 4]).unwrap_or_else(|_| env::panic_str("ERR_ARGS"));
+                    self.i += 4;
+                    let u = u32::from_str_radix(hex, 16).unwrap_or_else(|_| env::panic_str("ERR_ARGS"));
+                    let ch = char::from_u32(u).unwrap_or_else(|| env::panic_str("ERR_ARGS"));
+                    let mut buf = [0u8; 4];
+                    raw.extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
+                    continue;
+                }
+                _ => env::panic_str("ERR_ARGS"),
+            };
+            raw.push(byte);
         }
         env::panic_str("ERR_ARGS")
     }
     fn num(&mut self) -> Val {
         let a = self.i;
-        if self.s[self.i] == b'-' { self.i += 1; }
-        while self.i < self.s.len() && self.s[self.i].is_ascii_digit() { self.i += 1; }
+        if self.s[self.i] == b'-' {
+            self.i += 1;
+            require!(self.i < self.s.len() && self.s[self.i].is_ascii_digit(), "ERR_ARGS");
+        }
+        require!(self.i < self.s.len() && self.s[self.i].is_ascii_digit(), "ERR_ARGS");
+        if self.s[self.i] == b'0' {
+            self.i += 1;
+            require!(self.i >= self.s.len() || !self.s[self.i].is_ascii_digit(), "ERR_ARGS");
+        } else {
+            while self.i < self.s.len() && self.s[self.i].is_ascii_digit() { self.i += 1; }
+        }
+        if self.i < self.s.len() && matches!(self.s[self.i], b'.' | b'e' | b'E') { env::panic_str("ERR_ARGS"); }
         Val::Num(String::from_utf8(self.s[a..self.i].to_vec()).unwrap())
     }
     fn arr(&mut self) -> Val { self.eat(b'['); let mut a = Vec::new(); if self.peek() != b']' { loop { a.push(self.val()); if self.peek() != b',' { break; } self.i += 1; } } self.eat(b']'); Val::Arr(a) }
@@ -1504,7 +1850,7 @@ mod tests {
         let mut b = VMContextBuilder::new();
         b.current_account_id(acc("board.nearcarta.near"))
             .predecessor_account_id(acc(owner))
-            .prepaid_gas(Gas::from_tgas(30))
+            .prepaid_gas(Gas::from_tgas(100))
             .account_balance(NearToken::from_near(30));
         testing_env!(b.build());
         assert_eq!(
@@ -1533,7 +1879,7 @@ mod tests {
             live.propose_call(acc(owner), acc("wrap.near"), "near_deposit".into(), b"{}".to_vec(), U128(amount), call_sig);
         })).unwrap_err();
         let msg = refuse(err);
-        assert!(msg.contains("method_not_allowlisted"), "{msg}");
+        assert!(msg.contains("receiver_not_allowlisted"), "{msg}");
         assert_eq!(live.get_charter(acc(owner)).unwrap().balance.0, row.balance.0);
         let (_, sig) = sign(&sk, &live, owner, "toll.nearcarta.near", amount);
         live.propose(acc(owner), acc("toll.nearcarta.near"), U128(amount), sig, None);
@@ -1634,6 +1980,10 @@ mod tests {
         EffectIn { chain: chain.into(), asset: asset.into(), to: to.into(), value, fee }
     }
 
+    fn sign_confirm(sk: &SigningKey, c: &Board, owner: &str, id: u64) -> String {
+        hex32_n(&sk.sign(c.confirm_message(acc(owner), U64(id)).as_bytes()).to_bytes())
+    }
+
     fn sign_as(sk: &SigningKey, c: &Board, owner: &str, receiver: &str, method: &str, args: &str, deposit: u128, expiry: u64, effects: Vec<EffectIn>, hold: bool) -> String {
         let nonce = c.get_charter(acc(owner)).unwrap().nonce.0;
         let msg = c.call_as_message(acc(owner), acc(receiver), method.into(), args.into(), U128(deposit), U64(nonce), U64(expiry), effects, hold);
@@ -1705,7 +2055,7 @@ mod tests {
     #[test]
     fn foreign_effects_are_capped_and_propose_call_does_not_admit_one() {
         let (mut c, sk, _) = boot();
-        let deposit = 1u128;
+        let deposit = NEAR / 10_000;
         go(ALICE, MAX_ROW_YOCTO, 0);
         c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
         let expiry = 50u64;
@@ -1966,7 +2316,10 @@ mod tests {
         let code = vec![0x11, 0x22, 0x33, 0x44];
         go("nearcarta.near", 1, 0);
         c.stage_upgrade(hex32(&env::sha256_array(&code)));
+        let staged = get_logs();
+        assert!(staged.iter().any(|l| l.contains("\"event\":\"stage_upgrade\"")), "{staged:?}");
         let eta = c.upgrade_eta();
+        assert_eq!(eta, UPGRADE_DELAY_NS, "the delay is one day");
         go("nearcarta.near", 0, eta - 1);
         let err = catch_unwind(AssertUnwindSafe(|| { c.upgrade(code.clone()); })).unwrap_err();
         assert!(refuse(err).contains("ERR_UPGRADE"), "too early");
@@ -1976,8 +2329,13 @@ mod tests {
         assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, alice_bal);
         go("nearcarta.near", 0, eta);
         c.upgrade(code.clone());
-        let deployed = get_created_receipts().into_iter().flat_map(|r| r.actions).any(|a| matches!(a, MockAction::DeployContract { code: wasm, .. } if wasm == code));
-        assert!(deployed);
+        assert!(!c.upgrade_set, "the staged hash cannot be replayed");
+        let receipts = get_created_receipts();
+        let batch = receipts.iter().find(|r| r.receiver_id == acc("charters.nearcarta.near")).expect("self receipt");
+        let deployed = batch.actions.iter().any(|a| matches!(a, MockAction::DeployContract { code: wasm, .. } if wasm == &code));
+        let migrates = batch.actions.iter().any(|a| matches!(a, MockAction::FunctionCallWeight { method_name, .. } if method_name == b"migrate"));
+        assert!(deployed && migrates, "deploy and migrate share one receipt");
+        assert_eq!(receipts.len(), 1, "no second receipt");
         assert!(c.liabilities() > 0);
         go("nearcarta.near", 1, 0);
         let err = catch_unwind(AssertUnwindSafe(|| { c.reap(); })).unwrap_err();
@@ -2004,11 +2362,172 @@ mod tests {
         let live = decode(raw);
         assert_eq!(encode(&live), raw.as_slice());
         assert_eq!(acts_len(&live), 0);
+        let owners: Vec<_> = live.rows.keys().cloned().collect();
+        let balances: Vec<_> = owners.iter().map(|o| live.get_charter(o.clone()).unwrap().balance.0).collect();
+        let owed = live.liabilities();
         save(&live);
-        let back = load();
-        assert_eq!(encode(&back), raw.as_slice());
+        let mut back = load();
+        assert!(back.partial, "a callback loads the header, not every row");
+        assert!(back.rows.is_empty());
         assert_eq!(back.get_config().rows, 2);
-        assert_eq!(back.liabilities() > 0, true);
+        assert_eq!(back.liabilities(), owed);
+        for (owner, balance) in owners.iter().zip(balances) {
+            back.hydrate(owner);
+            assert_eq!(back.get_charter(owner.clone()).unwrap().balance.0, balance);
+        }
+        assert_eq!(back.rows.len(), owners.len());
+    }
+
+    #[test]
+    fn one_thousand_rows_stay_keyed_and_a_callback_reads_one() {
+        let mut ctx = VMContextBuilder::new();
+        ctx.current_account_id(acc("charters.nearcarta.near"))
+            .predecessor_account_id(acc("nearcarta.near"))
+            .prepaid_gas(Gas::from_tgas(10_000))
+            .account_balance(NearToken::from_near(50));
+        testing_env!(ctx.build());
+        let mut c = Board::new();
+        let rules = Rules {
+            receivers: vec![acc(SHOP)], per_action_cap: NEAR, daily_budget: NEAR,
+            max_actions_per_day: 4, window_start_min: 0, window_end_min: 0, min_amount: 0, expires_at: 0,
+        };
+        for i in 0..1001u32 {
+            let id: AccountId = format!("v{i}.near").parse().unwrap();
+            let mut agent = [0u8; 32];
+            agent[..4].copy_from_slice(&i.to_le_bytes());
+            c.keys.insert(agent, id.clone());
+            c.rows.insert(id, Row {
+                rules: rules.clone(), agent, frozen: false, seal: None, nonce: 0, day: 0,
+                spent: 0, count: 0, balance: 7 + i as u128, storage_locked: 3,
+            });
+            c.count += 1;
+        }
+        save(&c);
+        let mut back = load();
+        assert_eq!(back.count, 1001);
+        assert!(back.rows.is_empty());
+        let one: AccountId = "v1000.near".parse().unwrap();
+        back.hydrate(&one);
+        assert_eq!(back.rows.len(), 1);
+        assert_eq!(back.get_charter(one).unwrap().balance.0, 7 + 1000);
+        assert_eq!(back.liabilities(), c.liabilities());
+    }
+
+    #[test]
+    fn a_stamp_returns_the_near_and_still_spends_the_daily_slot() {
+        let (mut c, sk, _) = boot();
+        let deposit = NEAR / 2000;
+        let board = "charters.nearcarta.near";
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(board), "stamp".into(), NEAR / 500)], NEAR / 200);
+        let before = c.get_charter(acc(ALICE)).unwrap().balance.0;
+        go(ALICE, 0, 0);
+        let msg = c.call_message(acc(ALICE), acc(board), "stamp".into(), format!(r#"{{"owner":"{ALICE}"}}"#).into_bytes(), U128(deposit), U64(0));
+        let sig = hex32_n(&sk.sign(msg.as_bytes()).to_bytes());
+        c.propose_call(acc(ALICE), acc(board), "stamp".into(), format!(r#"{{"owner":"{ALICE}"}}"#).into_bytes(), U128(deposit), sig);
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, before - deposit);
+        go(board, deposit, 0);
+        c.stamp(acc(ALICE));
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, before);
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(acc(board)).predecessor_account_id(acc(board)).prepaid_gas(Gas::from_tgas(30)).account_balance(NearToken::from_near(30));
+        testing_env!(b.build(), test_vm_config(), RuntimeFeesConfig::test(), Default::default(), vec![PromiseResult::Successful(vec![])]);
+        c.on_called(acc(ALICE), U128(deposit), U64(0));
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, before, "a successful stamp is not refunded twice");
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().spent_today.0, deposit);
+        let _ = sig;
+    }
+
+    #[test]
+    fn a_sent_hold_can_expire_without_a_refund() {
+        let (mut c, sk, _) = boot();
+        let deposit = NEAR / 2000;
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
+        let expiry = 1_000u64;
+        go(ALICE, 0, 0);
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", "{}", deposit, expiry, vec![], false);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), "{}".into(), U128(deposit), U64(expiry), vec![], false, sig);
+        let left = c.get_charter(acc(ALICE)).unwrap().balance.0;
+        go(ALICE, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.expire_sent(acc(ALICE), U64(0)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_EXPIRY"));
+        go(SHOP, 0, expiry + 1);
+        let err = catch_unwind(AssertUnwindSafe(|| c.expire_sent(acc(ALICE), U64(0)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_NOT_OWNER"), "the shop cannot expire it");
+        go(ALICE, 0, expiry + 1);
+        c.expire_sent(acc(ALICE), U64(0));
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, left, "delivered, so no refund");
+        assert!(c.holds.is_empty());
+        go("nearcarta.near", 0, expiry + 1);
+        let err = catch_unwind(AssertUnwindSafe(|| c.expire_sent(acc(ALICE), U64(0)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_ACTION"));
+    }
+
+    #[test]
+    fn confirm_rechecks_freeze_expiry_epoch_and_the_confirm_key() {
+        let (mut c, sk, _) = boot();
+        let deposit = NEAR / 2000;
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
+        let confirm = keypair(4);
+        go(ALICE, 0, 0);
+        c.set_confirm_key(confirm.1.clone());
+        let expiry = 50_000u64;
+        go(ALICE, 0, 0);
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", "{}", deposit, expiry, vec![], true);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), "{}".into(), U128(deposit), U64(expiry), vec![], true, sig);
+        go(ALICE, 0, 0);
+        c.set_frozen(true);
+        let present = sign_confirm(&confirm.0, &c, ALICE, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.confirm_hold(acc(ALICE), U64(0), present.clone()); })).unwrap_err();
+        assert!(refuse(err).contains("frozen"));
+        go(ALICE, 0, 0);
+        c.set_frozen(false);
+        c.rows.get_mut(&acc(ALICE)).unwrap().rules.expires_at = 10;
+        go(ALICE, 0, 11);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.confirm_hold(acc(ALICE), U64(0), present.clone()); })).unwrap_err();
+        assert!(refuse(err).contains("clause_expired"));
+        c.rows.get_mut(&acc(ALICE)).unwrap().rules.expires_at = 0;
+        go(ALICE, 0, 11);
+        let (agent2, pk2) = keypair(8);
+        c.set_agent(pk2);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.confirm_hold(acc(ALICE), U64(0), present.clone()); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_EPOCH"));
+        let sig = sign_as(&agent2, &c, ALICE, SHOP, "ft_transfer", "{}", deposit, expiry, vec![], true);
+        go(ALICE, 0, 11);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), "{}".into(), U128(deposit), U64(expiry), vec![], true, sig);
+        go(ALICE, 0, 11);
+        c.set_confirm_key(keypair(5).1);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.confirm_hold(acc(ALICE), U64(1), present); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_CONFIRM"), "a rotated confirm key does not sign the old hold");
+    }
+
+    #[test]
+    fn the_row_owner_can_cancel_a_pending_hold_and_expiry_is_capped() {
+        let (mut c, sk, _) = boot();
+        let deposit = NEAR / 2000;
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
+        let before = c.get_charter(acc(ALICE)).unwrap().balance.0;
+        go(ALICE, 0, 0);
+        let too_late = HOLD_MAX_NS + 1;
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", "{}", deposit, too_late, vec![], true);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), "{}".into(), U128(deposit), U64(too_late), vec![], true, sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_EXPIRY"));
+        let expiry = 80_000u64;
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", "{}", deposit, expiry, vec![], true);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), "{}".into(), U128(deposit), U64(expiry), vec![], true, sig);
+        assert!(c.get_charter(acc(ALICE)).unwrap().balance.0 < before);
+        go(SHOP, 0, 1);
+        let err = catch_unwind(AssertUnwindSafe(|| c.cancel_hold(U64(0)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_ACTION"), "only the row owner cancels");
+        go(ALICE, 0, 1);
+        c.cancel_hold(U64(0));
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, before);
+        assert!(c.holds.is_empty());
     }
 
     fn b58encode(data: &[u8]) -> String {

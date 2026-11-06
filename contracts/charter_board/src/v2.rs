@@ -16,12 +16,15 @@
 //! row, so a transfer back to the board is not a refund.
 
 use super::*;
-use std::collections::BTreeSet;
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 pub(crate) fn acts_len(b: &Board) -> u64 {
     if b.effects.is_empty() && b.holds.is_empty() { 0 } else { encode_acts(b).len() as u64 }
 }
 
+#[allow(dead_code)]
 pub(crate) fn meta_empty(b: &Board) -> bool {
     b.epoch.is_empty() && b.confirm.is_empty() && !b.upgrade_set && b.credit.is_empty()
 }
@@ -62,6 +65,8 @@ pub(crate) fn encode_acts(b: &Board) -> Vec<u8> {
         }
         put_u64(&mut o, h.expires);
         o.push(u8::from(h.pending));
+        put_u64(&mut o, h.epoch);
+        o.extend_from_slice(&h.confirm);
     }
     o
 }
@@ -101,11 +106,16 @@ pub(crate) fn decode_acts(b: &mut Board, raw: &[u8]) {
         for _ in 0..k {
             effects.push(EffectIn { chain: r.string(), asset: r.string(), to: r.string(), value: r.u128(), fee: r.u128() });
         }
-        b.holds.insert((owner, id), Hold { receiver, method, args, amount, day, effects, expires: r.u64(), pending: r.u8() == 1 });
+        let expires = r.u64();
+        let pending = r.u8() == 1;
+        let epoch = r.u64();
+        let confirm = r.bytes32();
+        b.holds.insert((owner, id), Hold { receiver, method, args, amount, day, effects, expires, pending, epoch, confirm });
     }
     require!(r.i == raw.len(), "ERR_STATE");
 }
 
+#[allow(dead_code)]
 pub(crate) fn encode_meta(b: &Board) -> Vec<u8> {
     let mut o = Vec::new();
     put_u32(&mut o, b.epoch.len() as u32);
@@ -187,7 +197,7 @@ fn json_of(v: &Val) -> String {
             s
         }
         Val::Obj(pairs) => {
-            let mut seen = BTreeSet::new();
+            let mut seen = Set::new();
             let mut s = String::from("{");
             for (i, (k, val)) in pairs.iter().enumerate() {
                 require!(seen.insert(k.clone()), "ERR_ARGS");
@@ -207,7 +217,7 @@ fn json_of(v: &Val) -> String {
 pub fn inject_row_owner(args: &str, owner: &AccountId) -> String {
     let v = parse(args);
     let Val::Obj(pairs) = v else { env::panic_str("ERR_ARGS"); };
-    let mut seen = BTreeSet::new();
+    let mut seen = Set::new();
     for (k, _) in &pairs { require!(seen.insert(k.clone()), "ERR_ARGS"); }
     let mut out = String::from("{");
     let mut first = true;
@@ -244,6 +254,7 @@ impl Board {
     }
 
     pub fn liabilities(&self) -> u128 {
+        if self.partial { return self.owed; }
         let rows = self.rows.values().fold(0u128, |a, r| a.saturating_add(r.balance).saturating_add(r.storage_locked));
         let inflight = self.holds.values().fold(0u128, |a, h| a.saturating_add(h.amount));
         rows.saturating_add(inflight)
@@ -273,6 +284,7 @@ impl Board {
         let attached = env::attached_deposit().as_yoctonear();
         require!(attached.saturating_add(call_freed) >= call_cost.saturating_add(reserve_need), "ERR_DEPOSIT");
         row.storage_locked = row.storage_locked.saturating_add(call_cost).saturating_add(reserve_need);
+        self.owe(call_cost as i128 + reserve_need as i128 - call_freed as i128);
         if reserve_need > 0 { *self.credit.entry(me.clone()).or_insert(0) += reserve_need; }
         refund(me, attached + call_freed - call_cost - reserve_need);
     }
@@ -285,10 +297,12 @@ impl Board {
             let row = self.rows.get_mut(me).unwrap();
             require!(row.storage_locked + cost <= MAX_ROW_YOCTO, "ERR_ROW_TOO_BIG");
             row.storage_locked += cost;
+            self.owe(cost as i128);
             refund(me, attached - cost);
         } else {
             let freed = (before - after) as u128 * price();
             if let Some(row) = self.rows.get_mut(me) { row.storage_locked = row.storage_locked.saturating_sub(freed); }
+            self.owe(-(freed as i128));
             refund(me, freed + attached);
         }
     }
@@ -326,6 +340,7 @@ impl Board {
     /// Owner setup. Raises or adds budgets. Spent counters carry over.
     pub fn set_effects(&mut self, effects: Vec<EffectIn>) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         require!(self.rows.contains_key(&me), "ERR_NO_CHARTER");
         let next = self.normalize_caps(&me, effects, false);
         let before = acts_len(self);
@@ -337,6 +352,7 @@ impl Board {
     /// Smaller budgets only. A counter that has already been spent cannot be erased.
     pub fn tighten_effects(&mut self, effects: Vec<EffectIn>) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         require!(self.rows.contains_key(&me), "ERR_NO_CHARTER");
         let next = self.normalize_caps(&me, effects, true);
         let before = acts_len(self);
@@ -348,7 +364,7 @@ impl Board {
     fn normalize_caps(&self, me: &AccountId, effects: Vec<EffectIn>, tighten: bool) -> Vec<EffectCap> {
         require!(effects.len() <= MAX_CALLS, "ERR_EFFECT");
         let old = self.effects.get(me).cloned().unwrap_or_default();
-        let mut seen = BTreeSet::new();
+        let mut seen = Set::new();
         let mut out = Vec::new();
         for e in &effects {
             require!(token(&e.chain) && token(&e.asset) && token(&e.to), "ERR_EFFECT");
@@ -372,6 +388,7 @@ impl Board {
 
     pub fn set_confirm_key(&mut self, key: String) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         let row = self.rows.get(&me).expect("ERR_NO_CHARTER");
         let pk = parse_pk(&key);
         require!(pk != row.agent, "ERR_CONFIRM");
@@ -382,6 +399,7 @@ impl Board {
 
     pub fn tighten_rules(&mut self, rules: RulesIn, freeze: bool) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         let next = rules_from(rules);
         let row = self.rows.get_mut(&me).expect("ERR_NO_CHARTER");
         let old = row.rules.clone();
@@ -399,15 +417,39 @@ impl Board {
         row.rules = next;
         if freeze { row.frozen = true; }
         require!(row.nonce == nonce && row.spent == spent && row.day == day && row.count == count, "ERR_STATE");
+        // A tighter payee list or cap also binds shop calls. A call whose
+        // receiver left the list is dropped. A call cap above the new
+        // per-action cap is lowered. The session ceiling cannot fall under
+        // what was already spent.
+        self.bind_calls(&me);
         self.bump_epoch(&me);
         refund(&me, env::attached_deposit().as_yoctonear());
     }
 
+    fn bind_calls(&mut self, me: &AccountId) {
+        let Some(row) = self.rows.get(me) else { return; };
+        let cap = row.rules.per_action_cap;
+        let daily = row.rules.daily_budget;
+        let allowed = row.rules.receivers.clone();
+        let Some(old) = self.calls.get(me).cloned() else { return; };
+        let mut rules = Vec::new();
+        for rule in old.rules {
+            if !allowed.contains(&rule.receiver) && rule.method != "stamp" { continue; }
+            let next_cap = rule.cap.min(cap);
+            if next_cap == 0 { continue; }
+            rules.push(CallRule { receiver: rule.receiver, method: rule.method, cap: next_cap });
+        }
+        let session_cap = old.session_cap.min(daily).max(old.session_spent);
+        if rules.is_empty() { self.calls.remove(me); }
+        else { self.calls.insert(me.clone(), CallPolicy { rules, session_cap, session_spent: old.session_spent }); }
+    }
+
     pub fn tighten_calls(&mut self, rules: Vec<(AccountId, String, u128)>, session_cap: u128) {
         let me = env::predecessor_account_id();
+        self.hydrate(&me);
         let old = self.calls.get(&me).cloned().expect("method_not_allowlisted");
         require!(session_cap <= old.session_cap && old.session_spent <= session_cap, "ERR_LOOSEN");
-        let mut seen = BTreeSet::new();
+        let mut seen = Set::new();
         let mut parsed = Vec::new();
         for (receiver, method, cap) in rules {
             let prev = old.rules.iter().find(|r| r.receiver == receiver && r.method == method).unwrap_or_else(|| env::panic_str("ERR_LOOSEN"));
@@ -418,23 +460,40 @@ impl Board {
         let before = encode_calls(&self.calls).len() as u64;
         if parsed.is_empty() { self.calls.remove(&me); }
         else { self.calls.insert(me.clone(), CallPolicy { rules: parsed, session_cap, session_spent: old.session_spent }); }
-        self.charge_calls_and_reserve(&me, before, encode_calls(&self.calls).len() as u64);
+        // Tightening only shrinks. It must not ask for the side reserve again.
+        let after = encode_calls(&self.calls).len() as u64;
+        let freed = before.saturating_sub(after) as u128 * price();
+        if let Some(row) = self.rows.get_mut(&me) {
+            row.storage_locked = row.storage_locked.saturating_sub(freed);
+        }
+        self.owe(-(freed as i128));
+        refund(&me, freed + env::attached_deposit().as_yoctonear());
         self.bump_epoch(&me);
     }
 
     pub fn propose_call_as(&mut self, owner: AccountId, receiver: AccountId, method: String, args: String, deposit: U128, expiry: U64, effects: Vec<EffectIn>, hold: bool, signature: String) -> Option<Promise> {
+        self.hydrate(&owner);
+        // A deposit on this method is not the spend. The spend comes from the row.
+        // Refund anything attached so a wallet's 1 yocto cannot stick to the contract.
+        let attached = env::attached_deposit().as_yoctonear();
+        if attached > 0 { refund(&env::predecessor_account_id(), attached); }
         let args_out = inject_row_owner(&args, &owner);
         require!(args_out.len() <= 2048, "ERR_ARGS");
         check_effects(&effects);
         let deposit = deposit.0;
-        require!(expiry.0 != 0 && env::block_timestamp() <= expiry.0, "ERR_EXPIRY");
+        let now = env::block_timestamp();
+        require!(expiry.0 != 0 && now <= expiry.0, "ERR_EXPIRY");
+        require!(expiry.0 <= now.saturating_add(HOLD_MAX_NS), "ERR_EXPIRY");
         let mut row = self.rows.get(&owner).cloned().expect("ERR_NO_CHARTER");
         require!(signature.len() == 128, "ERR_BAD_SIG");
         let sig = parse_hex_n::<64>(&signature);
         let msg = self.call_as_text(&owner, &receiver, &method, &args_out, deposit, row.nonce, expiry.0, &effects, hold);
         require!(env::ed25519_verify(&sig, msg.as_bytes(), &row.agent), "ERR_BAD_SIG");
         require!(!row.frozen, "frozen");
-        if row.rules.expires_at != 0 { require!(env::block_timestamp() <= row.rules.expires_at, "clause_expired"); }
+        if row.rules.expires_at != 0 { require!(now <= row.rules.expires_at, "clause_expired"); }
+        require!(in_window(row.rules.window_start_min, row.rules.window_end_min), "outside_time_window");
+        require!(deposit >= row.rules.min_amount, "below_min_amount");
+        require!(row.rules.receivers.contains(&receiver), "receiver_not_allowlisted");
         require!((1..=64).contains(&method.len()), "ERR_METHOD");
         let Some(policy) = self.calls.get(&owner) else { env::panic_str("method_not_allowlisted"); };
         let Some(rule) = policy.rules.iter().find(|r| r.receiver == receiver && r.method == method) else { env::panic_str("method_not_allowlisted"); };
@@ -452,6 +511,7 @@ impl Board {
         self.reserve_effects(&owner, &effects);
         let id = row.nonce;
         row.balance -= deposit;
+        // The hold keeps this NEAR as a liability, so the global total does not move.
         row.spent = next;
         row.count += 1;
         row.nonce += 1;
@@ -460,14 +520,19 @@ impl Board {
         policy.session_spent = next_session;
         self.calls.insert(owner.clone(), policy);
         let before = acts_len(self);
+        let confirm = self.confirm.get(&owner).copied().unwrap_or([0; 32]);
+        let epoch = self.epoch_of(&owner);
         self.holds.insert((owner.clone(), id), Hold {
             receiver: receiver.clone(), method: method.clone(), args: args_out.into_bytes(),
             amount: deposit, day, effects: effects.clone(), expires: expiry.0, pending: hold,
+            epoch, confirm,
         });
+        if self.partial { self.hold_count += 1; }
         let cost = acts_len(self).saturating_sub(before) as u128 * price();
         let have = self.credit.get(&owner).copied().unwrap_or(0);
         if cost > have {
             self.holds.remove(&(owner.clone(), id));
+            if self.partial { self.hold_count = self.hold_count.saturating_sub(1); }
             self.release_effects(&owner, &effects);
             let row = self.rows.get_mut(&owner).unwrap();
             row.balance += deposit;
@@ -502,10 +567,16 @@ impl Board {
     }
 
     pub fn confirm_hold(&mut self, owner: AccountId, action_id: U64, signature: String) -> Promise {
+        self.hydrate(&owner);
         let h = self.holds.get(&(owner.clone(), action_id.0)).cloned().expect("ERR_ACTION");
         require!(h.pending, "ERR_CONFIRM");
         require!(env::block_timestamp() <= h.expires, "ERR_EXPIRY");
+        let row = self.rows.get(&owner).expect("ERR_NO_CHARTER");
+        require!(!row.frozen, "frozen");
+        if row.rules.expires_at != 0 { require!(env::block_timestamp() <= row.rules.expires_at, "clause_expired"); }
         let key = self.confirm.get(&owner).copied().expect("ERR_CONFIRM");
+        require!(key == h.confirm, "ERR_CONFIRM");
+        require!(self.epoch_of(&owner) == h.epoch, "ERR_EPOCH");
         let digest = confirm_digest(&h.method, &h.args, h.amount, &effects_canon(&h.effects));
         let msg = confirm_text(&owner, action_id.0, &digest);
         require!(signature.len() == 128, "ERR_BAD_SIG");
@@ -513,14 +584,41 @@ impl Board {
         self.send_call(&owner, action_id.0)
     }
 
+    /// The row owner drops a hold that was never sent. The NEAR returns to that row.
+    pub fn cancel_hold(&mut self, action_id: U64) {
+        let me = env::predecessor_account_id();
+        self.hydrate(&me);
+        let h = self.holds.get(&(me.clone(), action_id.0)).cloned().expect("ERR_ACTION");
+        require!(h.pending, "ERR_ACTION");
+        self.finish(&me, action_id.0, false);
+    }
+
+    /// A sent hold whose shop never settled. After `expires`, the row owner or
+    /// the contract owner marks it delivered: no refund, the hold storage is freed.
+    pub fn expire_sent(&mut self, owner: AccountId, action_id: U64) {
+        self.hydrate(&owner);
+        let pred = env::predecessor_account_id();
+        require!(pred == owner || pred == self.owner, "ERR_NOT_OWNER");
+        let h = self.holds.get(&(owner.clone(), action_id.0)).cloned().expect("ERR_ACTION");
+        require!(!h.pending, "ERR_ACTION");
+        require!(env::block_timestamp() > h.expires, "ERR_EXPIRY");
+        let before = acts_len(self);
+        self.holds.remove(&(owner.clone(), action_id.0));
+        if self.partial { self.hold_count = self.hold_count.saturating_sub(1); }
+        self.give_credit(&owner, before, acts_len(self));
+        self.owe(-(h.amount as i128));
+    }
+
     pub fn on_called_as(&mut self, owner: AccountId, action_id: U64) {
         require!(env::predecessor_account_id() == env::current_account_id(), "ERR_PRIVATE");
+        self.hydrate(&owner);
         self.finish(&owner, action_id.0, true);
     }
 
     /// Shop refund of a call that already left, or the row owner reclaiming a hold
     /// that was never sent and has expired. The NEAR goes back to that row.
     pub fn refund_action(&mut self, owner: AccountId, action_id: U64) {
+        self.hydrate(&owner);
         let h = self.holds.get(&(owner.clone(), action_id.0)).cloned().expect("ERR_ACTION");
         let pred = env::predecessor_account_id();
         if h.pending {
@@ -533,12 +631,15 @@ impl Board {
     }
 
     pub fn settle(&mut self, owner: AccountId, action_id: U64) {
+        self.hydrate(&owner);
         let h = self.holds.get(&(owner.clone(), action_id.0)).cloned().expect("ERR_ACTION");
         require!(!h.pending, "ERR_SETTLE");
         require!(env::predecessor_account_id() == h.receiver, "ERR_SETTLE");
         let before = acts_len(self);
         self.holds.remove(&(owner.clone(), action_id.0));
+        if self.partial { self.hold_count = self.hold_count.saturating_sub(1); }
         self.give_credit(&owner, before, acts_len(self));
+        self.owe(-(h.amount as i128));
     }
 
     fn finish(&mut self, owner: &AccountId, id: u64, from_callback: bool) {
@@ -547,9 +648,10 @@ impl Board {
         if from_callback && h.pending { return; }
         let before = acts_len(self);
         self.holds.remove(&key);
+        if self.partial { self.hold_count = self.hold_count.saturating_sub(1); }
         self.give_credit(owner, before, acts_len(self));
         let restore = if from_callback { !near_sdk::is_promise_success() } else { true };
-        if !restore { return; }
+        if !restore { self.owe(-(h.amount as i128)); return; }
         self.restore_row(owner, h.amount, h.day);
         self.release_effects(owner, &h.effects);
         if let Some(p) = self.calls.get_mut(owner) {
@@ -634,6 +736,12 @@ impl Board {
         self.upgrade_hash = parse_hex32(&code_hash);
         self.upgrade_set = true;
         self.upgrade_eta = env::block_timestamp().saturating_add(UPGRADE_DELAY_NS);
+        let mut ev = String::from("EVENT_JSON:{\"standard\":\"nearcarta-board\",\"version\":\"2\",\"event\":\"stage_upgrade\",\"eta\":\"");
+        push_u128(&mut ev, self.upgrade_eta as u128);
+        ev.push_str("\",\"code_hash\":\"");
+        ev.push_str(&code_hash);
+        ev.push_str("\"}");
+        env::log_str(&ev);
         let owner = self.owner.clone();
         refund(&owner, 1);
     }
@@ -645,11 +753,12 @@ impl Board {
         require!(self.upgrade_set, "ERR_UPGRADE");
         require!(env::block_timestamp() >= self.upgrade_eta, "ERR_UPGRADE");
         require!(env::sha256_array(&code) == self.upgrade_hash, "ERR_UPGRADE");
-        Promise::new(env::current_account_id()).deploy_contract(code).then(
-            Promise::new(env::current_account_id()).function_call(
-                "migrate", b"{}".to_vec(), NearToken::from_yoctonear(0), GAS_CALLBACK,
-            ),
-        )
+        self.upgrade_set = false;
+        // One receipt: deploy, then migrate on the new code. A second receipt
+        // could land on the old code if the first one failed halfway.
+        Promise::new(env::current_account_id())
+            .deploy_contract(code)
+            .function_call("migrate", b"{}".to_vec(), NearToken::from_yoctonear(0), Gas::from_tgas(30))
     }
 
     /// Reads the rows already in memory and leaves them there. The callback
@@ -723,7 +832,9 @@ pub extern "C" fn propose_call_as() {
 #[no_mangle]
 pub extern "C" fn call_as_message() {
     let v = parse(&input_str());
-    let b = load();
+    let mut b = load();
+    let owner = v.need("owner").account();
+    b.hydrate(&owner);
     ret(&b.call_as_message(
         v.need("owner").account(), v.need("receiver").account(), v.need("method").string(), v.need("args").string(),
         U128(v.need("deposit").u128()), U64(v.need("nonce").u128() as u64), U64(v.need("expiry").u128() as u64),
@@ -780,8 +891,10 @@ pub extern "C" fn confirm_hold() {
 #[no_mangle]
 pub extern "C" fn confirm_message() {
     let v = parse(&input_str());
-    let b = load();
-    ret(&b.confirm_message(v.need("owner").account(), U64(v.need("action_id").u128() as u64)));
+    let mut b = load();
+    let owner = v.need("owner").account();
+    b.hydrate(&owner);
+    ret(&b.confirm_message(owner, U64(v.need("action_id").u128() as u64)));
 }
 #[no_mangle]
 pub extern "C" fn on_called_as() {
@@ -789,6 +902,20 @@ pub extern "C" fn on_called_as() {
     let v = parse(&input_str());
     let mut b = load();
     b.on_called_as(v.need("owner").account(), U64(v.need("action_id").u128() as u64));
+    save(&b);
+}
+#[no_mangle]
+pub extern "C" fn cancel_hold() {
+    let v = parse(&input_str());
+    let mut b = load();
+    b.cancel_hold(U64(v.need("action_id").u128() as u64));
+    save(&b);
+}
+#[no_mangle]
+pub extern "C" fn expire_sent() {
+    let v = parse(&input_str());
+    let mut b = load();
+    b.expire_sent(v.need("owner").account(), U64(v.need("action_id").u128() as u64));
     save(&b);
 }
 #[no_mangle]

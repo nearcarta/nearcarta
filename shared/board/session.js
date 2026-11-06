@@ -13,14 +13,15 @@ export const AGENT_METHODS = ['propose', 'propose_call'];
 export const SESSION_HOURS = [1, 2, 24];
 // 0.05 NEAR of gas. The key cannot spend it as a transfer.
 export const GAS_ALLOWANCE_YOCTO = (10n ** 24n / 20n).toString();
-// 0.25 NEAR of gas for a Ferry session. Each propose_call prepays about 0.043 NEAR
-// (42 Tgas at 0.001 NEAR/Tgas). A 0.05 key can buy the wrap and then refuse the
-// ft_transfer. Refresh replaces the key; it does not raise an existing allowance.
+// 0.25 NEAR of gas for a Ferry session. Each propose_call prepays about 0.055 NEAR
+// (54 Tgas at 0.001 NEAR/Tgas: 30 to the shop and 20 to the callback). A 0.05 key
+// cannot buy one of those calls. Refresh replaces the key; it does not raise an
+// existing allowance.
 export const GAS_TOPUP_YOCTO = (10n ** 24n / 4n).toString();
-// Prepaid gas for a silent board propose. 30 Tgas covers propose plus the 8 Tgas
-// on_paid callback (measured use is about 4.67 Tgas). 80 Tgas is bought for ~0.081
-// NEAR and exceeds this allowance. The 0.005 stamp is a contract argument, not a deposit.
-export const BOARD_PROPOSE_TGAS = 30;
+// Prepaid gas for a silent board propose. The on_paid callback is 20 Tgas, so 40
+// leaves room for propose itself. 80 Tgas is bought for ~0.081 NEAR and exceeds
+// the 0.05 allowance. The stamp amount is a contract argument, not a deposit.
+export const BOARD_PROPOSE_TGAS = 40;
 // Method name + JSON of the live Ferry propose that returned NotEnoughAllowance.
 export const FERRY_PROPOSE_BYTES = 310;
 
@@ -48,6 +49,11 @@ export const FERRY_CALL_TARGETS = [
   { receiver: 'wrap.near', method: 'ft_transfer' },
   { receiver: 'wrap.near', method: 'storage_deposit' },
 ];
+
+/** wrap.near plus the board's own stamp. The stamp returns its NEAR to the row. */
+export function stampCalls(board, capYocto) {
+  return [...FERRY_CALL_TARGETS, { receiver: board, method: 'stamp', cap: String(capYocto) }];
+}
 
 // propose_call takes the deposit from the row and refuses it above this cap
 // (`over_shop_cap`, contracts/charter_board/src/lib.rs line 334) and above the

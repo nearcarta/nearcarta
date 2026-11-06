@@ -63,9 +63,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.86.0
         with: { targets: wasm32-unknown-unknown }
       - uses: dtolnay/rust-toolchain@1.95.0
-      - run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+      - run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev binaryen
       - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh | sh
       - run: cd contracts/charter_board && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
+      - run: wasm-opt --enable-sign-ext --enable-mutable-globals --enable-bulk-memory -Oz --strip-debug --strip-producers -o /tmp/charter_board.wasm contracts/charter_board/target/near/charter_board.wasm && mv /tmp/charter_board.wasm contracts/charter_board/target/near/charter_board.wasm
       - run: cd contracts/charter_board_sandbox && cargo test --locked
   secrets:
     runs-on: ubuntu-latest
