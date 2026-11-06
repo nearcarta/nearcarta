@@ -111,7 +111,6 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     if (typeof hooks.owner === 'function') state.owner = hooks.owner() || '';
     if (typeof hooks.board === 'function') state.board = hooks.board() || '';
     if (typeof hooks.nonce === 'function') state.nonce = hooks.nonce();
-    if (typeof hooks.epoch === 'function') state.epoch = hooks.epoch();
     if (typeof hooks.guard === 'function') state.guard = hooks.guard() || '';
   };
 

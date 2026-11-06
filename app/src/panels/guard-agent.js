@@ -130,8 +130,8 @@ function boardOf(state, ctx, kind) {
     owner: state.owner || ctx.owner || state.rowId || '',
     guard: state.guard || ctx.guard || '',
     nonce,
-    expiry: state.expiry || ctx.expiry || String(BigInt(Date.now()) * 1000000n + 600000000000n),
-    epoch: state.epoch ?? ctx.epoch ?? '0',
+    // A hold cannot be more than a day out (contracts/charter_board v2).
+    expiry: state.expiry || ctx.expiry || String(BigInt(Date.now()) * 1000000n + 300000000000n),
     payee: state.acct || '',
     chain: state.chain || 'near',
     asset: state.asset || 'NEAR',

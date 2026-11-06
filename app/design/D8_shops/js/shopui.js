@@ -930,8 +930,10 @@ const APPS = {
         owner: () => A.S.me || '',
         board: () => A.S.board || '',
         nonce: () => A.S.boardRow?.nonce,
-        epoch: () => A.S.boardRow?.epoch ?? '0',
-        guard: () => A.S.mainnet?.root ? 'guard.' + A.S.mainnet.root : '',
+        // Prefer the deploy record. The deploy script creates guard.<root>, and
+        // that name is also the fallback so the shop works the moment it exists.
+        // The guard contract itself only accepts calls from the board.
+        guard: () => A.S.mainnet?.guard?.contract || (A.S.mainnet?.root ? 'guard.' + A.S.mainnet.root : ''),
         row: () => !!(A.S.board && A.S.boardRow),
         frozen: () => !!A.S.state?.frozen,
         capYocto: () => A.S.clauses?.pay?.per_action_cap || null,

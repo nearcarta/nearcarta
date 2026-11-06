@@ -11,7 +11,6 @@ const smoke = process.argv.includes('--smoke');
 const BYTE = 10n ** 19n;
 const SLACK = 2000n;
 const GAS_CUSHION = 5n * 10n ** 22n;
-const ONE = 1n;
 const TG = 10n ** 12n;
 const wasmPath = new URL('../contracts/artifacts/guard.wasm', import.meta.url);
 const guardId = 'guard.' + MAIN.root;
@@ -152,4 +151,6 @@ if (smoke) {
   console.log('This script does not send that payment. The visitor row sends it, inside that row\'s cap.');
 }
 console.log('reap() with 1 yocto from ' + MAIN.root + ' deletes ' + guardId + ' and returns the stake. Not sent.');
-console.log('one yocto marker: ' + ONE.toString());
+console.log('After a live run, the owner records it in shared/deployments/mainnet.json:');
+console.log('"guard": { "contract": "' + guardId + '", "owner": "' + MAIN.root + '", "status": "deployed", "crate": "contracts/guard", "wasm": "contracts/artifacts/guard.wasm", "wasm_sha256": "' + (sha || '') + '", "storage_bytes": ' + (wasm ? wasm.length : 0) + ', "deploy_tx": "<hash>" }');
+console.log('This script does not edit that file.');
