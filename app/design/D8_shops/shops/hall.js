@@ -62,18 +62,43 @@ export default async function hall(ctx) {
   const stones = [0, 1].map(i => { const s = new THREE.Mesh(new THREE.IcosahedronGeometry(.09, 0), new THREE.MeshStandardMaterial({ color: 0xd9d6cf, roughness: .8 })); s.castShadow = true; s.position.set(stools[i].position.x * .75, .78, .4); scene.add(s); return s; });
   const rob = await makeRobot(scene); rob.at(1.9, 3.2); rob.lookAt(new THREE.Vector3(0, 0, 0)); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
   const v2 = TH.versions[1], v3 = TH.versions[2];
+  let sealMesh = null;
+  const showSeal = () => {
+    if (!sealMesh) {
+      const map = paper(THREE, 256, 128, (x, w, h) => {
+        x.fillStyle = '#6b1d1d'; x.fillRect(0, 0, w, h);
+        x.strokeStyle = '#f3ead8'; x.lineWidth = 8; x.strokeRect(14, 14, w - 28, h - 28);
+        x.fillStyle = '#f3ead8'; x.font = '700 36px Inter, sans-serif'; x.textAlign = 'center';
+        x.fillText('REFUSED', w / 2, h / 2 + 12);
+      });
+      sealMesh = mesh(scene, new THREE.PlaneGeometry(.9, .45), new THREE.MeshStandardMaterial({ map, roughness: .55 }), [0, 1.45, -1.45]);
+    }
+    sealMesh.visible = true;
+  };
+  const hideSeal = () => { if (sealMesh) sealMesh.visible = false; };
   return {
-    rob, scene, camera, tags: [],
+    rob, scene, camera, tags: [], showSeal, hideSeal,
     panel: { title: 'Town Hall', src: 'split', srcNote: 'townhall.nearcarta.near is on mainnet. The two payments below are real mainnet transactions.', label: 'Reward paid', hero: tok('0.001', 'NEAR'), action: 'Show the payments', more: MORE },
     proof: (await liveP) + PROOF,
   // intro: the robot walks to beside the table, not behind it
     *intro() { setCap(v2.cap); yield rob.walk([new THREE.Vector3(1.95, 0, -.35)]); rob.lookAt(slab.position); },
-    *act() {
+    *act(opts = {}) {
+      if (opts?.refused) { showSeal(); ctx.setResult('no', 'Refused'); sfx('click'); return; }
+      if (opts?.paid && opts.tx) {
+        hideSeal();
+        const scroll = new THREE.Mesh(new THREE.BoxGeometry(.28, .08, .36), new THREE.MeshStandardMaterial({ color: 0xf3ead8, roughness: .7 }));
+        scroll.position.set(1.2, .9, .4); scroll.castShadow = true; scene.add(scroll);
+        sfx('click');
+        yield tween(.7, k => { scroll.position.x = 1.2 - .9 * k; scroll.position.y = .9 + Math.sin(k * Math.PI) * .25; });
+        ctx.setHero(tok('0.001', 'NEAR')); ctx.setResult('ok', 'Paid'); sfx('allowed'); rob.lookAt(camera.position); rob.play('Yes', { once: true }); yield wait(1.2); rob.play('Idle');
+        return;
+      }
+      hideSeal();
       for (const s of stones) { const y0 = s.position.y, p0 = s.position.clone(); sfx('click'); yield tween(.5, k => { s.position.lerpVectors(p0, new THREE.Vector3(stones.indexOf(s) ? .05 : -.05, .74, 0), k); s.position.y = y0 + Math.sin(k * Math.PI) * .35 - .04 * k; }); yield wait(.25); }
       yield wait(.2); sfx('swap');
       ghost.rotation.z = capAng(v2.cap); ghost.visible = true;
       yield tween(.9, k => setCap(v2.cap + (v3.cap - v2.cap) * k), k => 1 - Math.pow(1 - k, 3) + Math.sin(k * Math.PI) * .06);
-      ctx.setHero(tok('0.001', 'NEAR')); ctx.setResult('ok', 'Allowed · 0.001 NEAR'); sfx('allowed'); rob.lookAt(camera.position); rob.play('Yes', { once: true }); yield wait(1.4); rob.play('Idle');
+      ctx.setHero(tok('0.001', 'NEAR')); ctx.setResult('ok', 'Recorded · 0.001 NEAR'); sfx('allowed'); rob.lookAt(camera.position); rob.play('Yes', { once: true }); yield wait(1.4); rob.play('Idle');
     },
     update(dt) { rob.update(dt); },
   };

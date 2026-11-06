@@ -6,7 +6,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { bodyLimit } from 'hono/body-limit';
-import { DEP, MAINNET_DEP, cfg, has } from './config.js';
+import { DEP, MAINNET_DEP, cfg, has, secret } from './config.js';
 import * as ferry from './ferry.js';
 import * as checkout from './ferry-checkout.js';
 import * as payoutsInvoice from './payouts-invoice.js';
@@ -39,6 +39,7 @@ import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edge
 import { pastPrompts as arenaPrompts } from './arena.js';
 import { readGuardians, removedMarket, scorePayload } from './arena-economy.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
+import { marketStatus, readBounties } from './hall-market.js';
 import { derivedFor, lineFor } from './house-views.js';
 import { HOUSE_LEGACY, HOUSE_SHOP } from '../../shared/house/shop.js';
 
@@ -429,6 +430,8 @@ export function makeApp() {
     } catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
   app.get('/api/mistbank/street/:txid', limiter(10), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
+  app.get('/api/hall/market', limiter(20), async c => c.json(await marketStatus({ token: secret.hallMarket(), fetchImpl: fetch })));
+  app.get('/api/hall/bounties', limiter(20), async c => c.json(await readBounties({ view })));
   app.get('/api/townhall', limiter(20), async c => c.json(await reads.townhall()));
   app.get('/api/townhall/can-file/:account', limiter(20), async c => {
     const a = c.req.param('account');
