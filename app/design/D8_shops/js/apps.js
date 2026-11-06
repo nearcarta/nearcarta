@@ -406,12 +406,9 @@ export async function toll(quote) {
   let units;
   try { units = unitsOf(quote.amount, decimals); }
   catch (e) { throw new Error(e.message || 'Name the amount. Nothing was signed.'); }
-  if (quote.asset === 'native' && quote.maxPerTx && BigInt(units) > BigInt(quote.maxPerTx)) {
-    throw new Error('That is over the contract cap. Nothing was signed.');
-  }
-  if (quote.asset === 'usdc' && quote.maxToken && BigInt(units) > BigInt(quote.maxToken)) {
-    throw new Error('That is over the contract cap. Nothing was signed.');
-  }
+  // No contract-wide amount ceiling. The visitor's row is the only limit: the board
+  // refuses a value over its per-action cap, daily budget or reserved effect budget,
+  // before this call is sent. A hardcoded cap here would be a second, invented rule.
   const nonce = String(row.nonce ?? '0').replace(/^0+(?=\d)/, '');
   const args = crossArgs({ actionId: nonce, chain: 'base', asset: quote.asset, to: String(quote.to).toLowerCase(), amount: units, rowBudget: units });
   const effects = [{ chain: 'base', asset: quote.asset, to: String(quote.to).toLowerCase(), value: units, fee: '0' }];

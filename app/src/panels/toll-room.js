@@ -202,7 +202,7 @@ export function policyQuote(live) {
   const price = live.price || null;
   const feeRaw = asYocto(price?.fee) || asYocto(cross?.pass_fee) || asYocto(live.pass_fee) || asYocto(gate?.fee);
   const feeNear = feeRaw && feeRaw !== '0' ? yoctoNear(feeRaw) : '';
-  const foreignWei = asYocto(cross?.foreign_value) || asYocto(live.foreign_value) || asYocto(gate?.evm_value) || asYocto(live.max_per_tx) || '';
+  const foreignWei = asYocto(cross?.foreign_value) || asYocto(live.foreign_value) || asYocto(gate?.evm_value) || '';
   const chain = live.verify_chain || '';
   const payable = !!feeNear;
   return {
@@ -218,8 +218,9 @@ export function policyQuote(live) {
     chainId: live.chain_id ?? null,
     path: live.path || '',
     foreignAddress: live.foreign_address || '',
-    maxPerTx: asYocto(live.max_per_tx) || '',
-    maxToken: asYocto(price?.max_token) || '',
+    // The contract no longer publishes an amount cap. Null means "the row decides".
+    maxPerTx: null,
+    maxToken: null,
     contract: live.contract || '',
     spent: asYocto(live.spent) || '',
     budget: asYocto(live.budget) || '',
@@ -455,7 +456,7 @@ export function tollMarkup(state = {}) {
   const feeLine = live.ok === false
     ? 'The live policy did not answer.'
     : (quote.payable
-      ? `Fee ${quote.feeNear} NEAR. Caps left ${quote.foreignEth || 'unread'} ETH.`
+      ? `Fee ${quote.feeNear} NEAR. Your row sets the amount cap.`
       : 'The live policy has no visitor fee.');
   const status = state.seal || '';
   // A visitor with no board row cannot pass: the board has nothing to spend.
