@@ -10,6 +10,15 @@
 import { functionCallAllowanceCost } from './cost.js';
 
 export const AGENT_METHODS = ['propose', 'propose_call', 'propose_call_as'];
+// The guard hold lifecycle, granted as its own scope. This is deliberately NOT in AGENT_METHODS:
+// an agent key that could call confirm_hold is an agent that can release a warning, which is the
+// one thing the guard exists to prevent. `confirm_hold` has no predecessor check of its own; the
+// confirm-key signature is the boundary, so the key that may send that call must be the visitor's
+// own. cancel_hold and expire_sent are owner-only on chain (predecessor == row owner).
+// contracts/charter_board/src/v2.rs: confirm_hold, cancel_hold, expire_sent.
+export const GUARD_HOLD_METHODS = ['confirm_hold', 'cancel_hold', 'expire_sent'];
+/** Every method a guard session needs, when the visitor opts into the hold lifecycle. */
+export const GUARD_SESSION_METHODS = [...AGENT_METHODS, ...GUARD_HOLD_METHODS];
 export const SESSION_HOURS = [1, 2, 24];
 // 0.05 NEAR of gas. The key cannot spend it as a transfer.
 export const GAS_ALLOWANCE_YOCTO = (10n ** 24n / 20n).toString();
