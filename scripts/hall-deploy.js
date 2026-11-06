@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import MAIN from '../shared/deployments/mainnet.json' with { type: 'json' };
-import { hallDeployPlan, MIGRATE_TGAS } from '../shared/hall/deploy-plan.js';
+import { hallDeployPlan, MIGRATE_TGAS, SMOKE_TGAS, SMOKE_YOCTO } from '../shared/hall/deploy-plan.js';
 
 const live = process.argv.includes('--live');
 if (process.argv.some(a => String(a).includes('ed25519:'))) {
@@ -216,6 +216,17 @@ for (const t of plan.transfers) {
   if (bad) process.exit(1);
 }
 const wasm = readFileSync(wasmFile);
+// Re-read the account after the refunds. The deploy is irreversible and its stake is
+// charged at the new storage_usage, so a late withdrawal or a busier block must stop it.
+const after = await account();
+const needStake = BigInt(plan.storage.stakeAfter);
+const needGas = BigInt(plan.balance.prepaidDeploy);
+const have = BigInt(after.amount);
+console.log('Balance after the refunds: ' + have.toString() + ' yoctoNEAR');
+if (have < needStake + needGas) {
+  console.error('Refusing to deploy: the account holds ' + have.toString() + ' yoctoNEAR and the deploy needs ' + (needStake + needGas).toString() + '. Nothing else was signed.');
+  process.exit(1);
+}
 const migrated = await signer.signAndSendTransaction({
   receiverId: shop,
   waitUntil: 'FINAL',
@@ -230,6 +241,11 @@ console.log('Deploy ' + (badDeploy ? 'FAILED ' : 'OK ') + (migrated.transaction?
 if (badDeploy) process.exit(1);
 const hall = await view('get_hall', {});
 console.log('View get_hall: ' + JSON.stringify(hall));
+if (hall.owner !== owner || hall.board !== board || String(hall.jobs) !== '0') {
+  console.error('The post-deploy view does not match the migrate arguments. Stop and read the account.');
+  process.exit(1);
+}
+console.log('get_hall matches: owner ' + owner + ', board ' + board + ', 0 jobs.');
 const workers = smokeWorkers().filter(id => id !== shop && id !== board);
 if (workers.length < 1) {
   console.log('Smoke skipped. Set HALL_SMOKE_A and HALL_SMOKE_B.');
@@ -242,15 +258,32 @@ const posted = await signer.signAndSendTransaction({
   throwOnFailure: false,
   actions: [A.functionCall('post_job', {
     row_owner: shop, task: 'smoke', parts: 1, deadline, workers, idempotency: 'hall-smoke',
-  }, 80n * TG, 10n ** 21n)],
+  }, SMOKE_TGAS * TG, BigInt(SMOKE_YOCTO))],
 });
 console.log('Smoke post ' + (posted.transaction?.hash || ''));
+const badPost = posted.status?.Failure || posted.receipts_outcome?.find(x => x.outcome.status.Failure)?.outcome.status.Failure;
+if (badPost) { console.error('Smoke post FAILED ' + JSON.stringify(badPost).slice(0, 200)); process.exit(1); }
 const job = await view('get_hall', {});
 const id = String((BigInt(job.next_id) - 1n));
+const held = await view('get_job', { job_id: id });
+console.log('Smoke view get_job ' + id + ': ' + JSON.stringify(held));
+if (!held || String(held.budget) !== SMOKE_YOCTO.toString()) {
+  console.error('The smoke job does not hold the 0.001 NEAR deposit. Stop and read the job.');
+  process.exit(1);
+}
 const refunded = await signer.signAndSendTransaction({
   receiverId: shop,
   waitUntil: 'FINAL',
   throwOnFailure: false,
-  actions: [A.functionCall('refund', { row_owner: shop, job_id: id }, 30n * TG, 0n)],
+  actions: [A.functionCall('refund', { row_owner: shop, job_id: id }, SMOKE_TGAS * TG, 0n)],
 });
 console.log('Smoke refund ' + (refunded.transaction?.hash || '') + ' job ' + id);
+const badRefund = refunded.status?.Failure || refunded.receipts_outcome?.find(x => x.outcome.status.Failure)?.outcome.status.Failure;
+if (badRefund) { console.error('Smoke refund FAILED ' + JSON.stringify(badRefund).slice(0, 200)); process.exit(1); }
+const back = await view('get_job', { job_id: id });
+console.log('Smoke job after refund: ' + JSON.stringify(back));
+if (!back || String(back.remaining) !== '0' || String(back.refunded) !== SMOKE_YOCTO.toString()) {
+  console.error('The refund did not return the smoke deposit to the job owner.');
+  process.exit(1);
+}
+console.log('Smoke OK: 0.001 NEAR posted and refunded, escrow conserved.');

@@ -16,13 +16,17 @@ const CALL_SEND_PER_BYTE = 47_683_715n;
 const CALL_EXEC = 780_000_000_000n;
 const CALL_EXEC_PER_BYTE = 2_235_934n;
 const RECEIPT_GAS = 108_059_500_000n + 108_059_500_000n;
-// The `migrate` FunctionCall attaches this much gas. The sender prepays all of it
-// at 0.001 NEAR/Tgas (0.08 NEAR) and is refunded the unused part after execution,
-// so the balance must hold it at send time even though most comes back.
-export const MIGRATE_TGAS = 80n;
+// The `migrate` FunctionCall attaches this much gas (the same 30 Tgas the board's
+// `new` uses; migrate only writes one small STATE record). The sender must hold all
+// of it at send time at 0.001 NEAR/Tgas and is refunded the unused part after
+// execution, so the balance has to cover it even though almost all comes back.
+export const MIGRATE_TGAS = 30n;
 export const MIGRATE_ATTACHED_YOCTO = MIGRATE_TGAS * 10n ** 12n * GAS_PURCHASE_YOCTO;
 
 export const SMOKE_YOCTO = 10n ** 21n; // 0.001 NEAR, the smoke size only
+// The smoke `post_job` and `refund` attach 30 Tgas each, prepaid at 0.001 NEAR/Tgas.
+export const SMOKE_TGAS = 30n;
+export const SMOKE_ATTACHED_YOCTO = SMOKE_TGAS * 10n ** 12n * GAS_PURCHASE_YOCTO;
 
 const near = y => {
   const neg = y < 0n;
@@ -87,11 +91,15 @@ export function hallDeployPlan({
   const peakNeed = stakeAfter + prepaidDeploy;
   const afterRefund = balance - refund;
   const shortfall = afterRefund > peakNeed ? 0n : peakNeed - afterRefund;
-  // The exact shortfall leaves no liquid NEAR. New STATE keys at migrate add a few
-  // hundred bytes, and the smoke post needs its own deposit, so the printed top-up
-  // rounds up to the next 0.01 NEAR. The stake itself does not change.
-  const STEP = 10n ** 22n; // 0.01 NEAR
-  const recommendedTopUp = shortfall === 0n ? 0n : ((shortfall + STEP - 1n) / STEP) * STEP;
+  // The exact shortfall leaves no liquid NEAR. The prepaid gas float returns, but the
+  // burn is priced at the block's gas price (0.0001 NEAR/Tgas floor, higher when a block
+  // is busy), new STATE keys cost a few hundred bytes, and the smoke calls prepay their
+  // own gas and deposit. The printed top-up adds that reserve and rounds up to the next
+  // 0.05 NEAR, so the leftover in the account is real headroom.
+  const STEP = 5n * 10n ** 22n; // 0.05 NEAR
+  const reserve = SMOKE_ATTACHED_YOCTO + SMOKE_YOCTO;
+  const needed = shortfall === 0n ? 0n : shortfall + reserve;
+  const recommendedTopUp = needed === 0n ? 0n : ((needed + STEP - 1n) / STEP) * STEP;
   const checks = [];
   const need = (ok, label) => checks.push({ ok: !!ok, label });
   need(fullAccessKeys >= 1, 'the shop account has a full-access key');

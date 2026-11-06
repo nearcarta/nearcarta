@@ -80,13 +80,15 @@ test('the live townhall plan names the real shortfall and covers the attached mi
     fullAccessKeys: 1, codeHash: 'c', oldCodeHash: 'c', smokeWorkers: [],
   };
   const plan = hallDeployPlan(live);
-  // 80 Tgas attached to migrate is prepaid at 0.001 NEAR/Tgas on top of the fee gas.
+  // The 30 Tgas attached to migrate is prepaid at 0.001 NEAR/Tgas on top of the fee gas.
   assert.ok(BigInt(plan.balance.prepaidDeploy) >= BigInt(MIGRATE_ATTACHED_YOCTO));
-  assert.equal(plan.balance.shortfall, '322359569623911000000000');
-  assert.equal(plan.balance.shortfallNear, '0.322359');
-  // The printed top-up rounds up, so the account keeps liquid NEAR after the stake.
-  assert.equal(plan.balance.recommendedTopUp, '330000000000000000000000');
-  assert.equal(plan.balance.recommendedTopUpNear, '0.330000');
+  // The account must hold the new stake plus that prepaid float at the moment the
+  // deploy writes storage; the unused gas comes back only after the receipt.
+  assert.equal(plan.balance.shortfall, '272359569623911000000000');
+  assert.equal(plan.balance.shortfallNear, '0.272359');
+  // The printed top-up adds the smoke reserve and rounds up to the next 0.05 NEAR.
+  assert.equal(plan.balance.recommendedTopUp, '350000000000000000000000');
+  assert.equal(plan.balance.recommendedTopUpNear, '0.350000');
   assert.equal(plan.ok, false); // nothing is signed until the top-up lands
   // Adding the rounded top-up clears the shortfall and the plan becomes actionable.
   const topped = hallDeployPlan({ ...live, balanceYocto: (BigInt(live.balanceYocto) + BigInt(plan.balance.recommendedTopUp)).toString() });
