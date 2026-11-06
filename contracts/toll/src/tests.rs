@@ -443,13 +443,9 @@ fn close_without_yocto_panics() {
     let _ = o.close();
 }
 
-fn chains() -> Vec<ChainRule> {
-    vec![ChainRule { name: "Base".into(), chain_id: 84532, max_per_tx: U128(100), max_fee_cap: U128(10),
-                     usdc: Some("0x3333333333333333333333333333333333333333".into()) }]
-}
 fn arm(o: &mut Oath) {
     set("owner.test");
-    o.set_policy(acc("board.test"), U128(5), chains(), vec![Split { account: acc("contributor.test"), bps: 2500 }]);
+    o.set_cross(acc("board.test"), U128(5), TO.into(), U128(40), U128(5), U128(1));
 }
 fn deposit(pred: &str, yocto: u128) {
     let mut b = ctx(pred);
@@ -458,79 +454,88 @@ fn deposit(pred: &str, yocto: u128) {
 }
 
 #[test]
-fn a_visitor_names_any_recipient_and_two_rows_get_two_paths() {
+fn a_visitor_signs_the_fixed_payout_after_the_board_pass() {
     let mut o = toll();
     arm(&mut o);
-    assert_eq!(o.path_for(acc("visitor.test"), "Base".into()), "row:visitor.test:base");
-    assert_eq!(o.path_for(acc("other.test"), "base".into()), "row:other.test:base");
+    assert_eq!(o.policy()["path"], json!("toll"));
+    assert_eq!(o.policy()["chain_id"], json!(84532));
     deposit("board.test", 5);
-    let _ = o.cross(acc("visitor.test"), "Base".into(), OTHER.into(), "native".into(), U128(40), U128(5), U128(1), 21000);
-    deposit("board.test", 7);
-    let _ = o.cross(acc("other.test"), "Base".into(), TO.into(), "native".into(), U128(10), U128(5), U128(1), 21000);
-    let a = o.get_tx(0).unwrap();
-    let b = o.get_tx(1).unwrap();
-    assert_eq!(a.to, OTHER);
-    assert_eq!(a.sign_path.as_deref(), Some("row:visitor.test:base"));
-    assert_eq!(a.evm_nonce, Some(0));
-    assert_eq!(b.sign_path.as_deref(), Some("row:other.test:base"));
-    assert_eq!(b.evm_nonce, Some(0));
-    assert_eq!(o.policy()["fees_held"], json!("12"));
-    assert!(!o.policy()["allow_to"].as_array().unwrap().iter().any(|x| x == OTHER));
+    o.accept_pass(acc("visitor.test"));
+    set("visitor.test");
+    let _ = o.cross_after_board();
+    assert!(o.get_pass(0).unwrap().used);
+    let tx = o.get_tx(0).unwrap();
+    assert_eq!(tx.to, TO);
+    assert_eq!(tx.value.0, 40);
+    assert_eq!(tx.status, "signing");
+    assert_eq!(o.policy()["path"], json!("toll"));
+    assert_eq!(o.policy()["chain_id"], json!(84532));
 }
 
 #[test]
-fn a_token_crossing_uses_the_published_usdc() {
-    let mut o = toll();
-    arm(&mut o);
-    deposit("board.test", 5);
-    let _ = o.cross(acc("visitor.test"), "Base".into(), OTHER.into(), "0x3333333333333333333333333333333333333333".into(), U128(40), U128(5), U128(1), 60000);
-    let rec = o.get_tx(0).unwrap();
-    assert_eq!(rec.asset.as_deref(), Some("0x3333333333333333333333333333333333333333"));
-    assert_eq!(rec.to, OTHER);
-}
-
-#[test]
-#[should_panic(expected = "REFUSED: only the board can open a crossing")]
-fn a_stranger_cannot_open_a_crossing() {
+#[should_panic(expected = "REFUSED: only the board can pay this pass")]
+fn a_stranger_cannot_accept_a_pass() {
     let mut o = toll();
     arm(&mut o);
     deposit("mallory.test", 5);
-    let _ = o.cross(acc("visitor.test"), "Base".into(), OTHER.into(), "native".into(), U128(1), U128(1), U128(1), 21000);
+    o.accept_pass(acc("visitor.test"));
 }
 
 #[test]
-#[should_panic(expected = "REFUSED: the crossing paid less than the toll")]
-fn a_short_crossing_is_refused() {
+#[should_panic(expected = "REFUSED: the pass paid less than the toll")]
+fn a_short_pass_is_refused() {
     let mut o = toll();
     arm(&mut o);
     deposit("board.test", 4);
-    let _ = o.cross(acc("visitor.test"), "Base".into(), OTHER.into(), "native".into(), U128(1), U128(1), U128(1), 21000);
+    o.accept_pass(acc("visitor.test"));
 }
 
 #[test]
-#[should_panic(expected = "REFUSED: that is more than the toll has earned")]
-fn fees_cannot_be_withdrawn_beyond_what_was_earned() {
+#[should_panic(expected = "REFUSED: no board pass is waiting for you")]
+fn a_visitor_without_a_pass_cannot_cross() {
     let mut o = toll();
     arm(&mut o);
-    set("owner.test");
-    let _ = o.withdraw_fees(U128(1));
+    set("visitor.test");
+    let _ = o.cross_after_board();
 }
 
 #[test]
-fn the_owner_withdraws_only_earned_fees() {
+#[should_panic(expected = "REFUSED: the toll account cannot sign this crossing")]
+fn the_toll_account_cannot_sign_the_crossing() {
     let mut o = toll();
     arm(&mut o);
     deposit("board.test", 5);
-    let _ = o.cross(acc("visitor.test"), "Base".into(), OTHER.into(), "native".into(), U128(1), U128(1), U128(1), 21000);
-    set("owner.test");
-    let _ = o.withdraw_fees(U128(5));
-    assert_eq!(o.policy()["fees_held"], json!("0"));
+    o.accept_pass(acc("toll.test"));
+    set("toll.test");
+    let _ = o.cross_after_board();
 }
 
 #[test]
-#[should_panic(expected = "only owner")]
-fn a_stranger_cannot_upgrade() {
-    let o = toll();
-    set("mallory.test");
-    let _ = o.upgrade(near_sdk::json_types::Base64VecU8(vec![1]));
+#[should_panic(expected = "REFUSED: recipient not in oath allowlist")]
+fn the_fixed_recipient_must_already_be_allowlisted() {
+    let mut o = toll();
+    set("owner.test");
+    o.set_cross(acc("board.test"), U128(5), OTHER.into(), U128(40), U128(5), U128(1));
+}
+
+#[test]
+#[should_panic(expected = "attach at least 150 Tgas")]
+fn cross_after_board_needs_gas_for_the_signer() {
+    let mut o = toll();
+    arm(&mut o);
+    deposit("board.test", 5);
+    o.accept_pass(acc("visitor.test"));
+    let mut b = ctx("visitor.test");
+    b.prepaid_gas(Gas::from_tgas(10));
+    testing_env!(b.build());
+    let _ = o.cross_after_board();
+}
+
+#[test]
+#[should_panic(expected = "cross already set")]
+fn cross_is_set_once() {
+    let mut o = toll();
+    arm(&mut o);
+    set("owner.test");
+    o.set_cross(acc("board.test"), U128(5), TO.into(), U128(1), U128(1), U128(1));
 }

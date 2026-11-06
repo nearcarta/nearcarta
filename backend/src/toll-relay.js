@@ -33,19 +33,6 @@ export async function receiptStatus(hash, { fetchImpl = fetch, rpc = process.env
   return { status, block: rcpt.blockNumber || null };
 }
 
-/** Paths for one visitor. The address is recovered from a signature, not invented here. */
-export function walletPaths(owner, chains = []) {
-  const id = String(owner || '').trim();
-  return {
-    owner: id,
-    paths: (chains || []).map(c => {
-      const name = String(c.name || c || '');
-      return { chain: name, path: `row:${id}:${name.toLowerCase()}` };
-    }),
-    note: 'The address is the key the MPC returns for this path. This view does not invent one.',
-  };
-}
-
 /** Broadcast one signed raw tx the toll contract stored, chosen by id. Does not sign NEAR. */
 export async function relayById({ id, policy, txs, fetchImpl, rpc } = {}) {
   const rows = (txs || []).filter(t => String(t.nonce) === String(id));

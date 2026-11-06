@@ -31,13 +31,6 @@ pub struct TxRec {
     pub raw_signed: Option<String>,
     pub tx_hash: Option<String>,
     pub proof_payload_hash: Option<String>,
-    pub row_owner: Option<String>,
-    pub chain_name: Option<String>,
-    pub sign_path: Option<String>,
-    pub evm_nonce: Option<u64>,
-    pub chain_id_used: Option<u64>,
-    pub asset: Option<String>,
-    pub recovered: Option<String>,
 }
 
 #[near(contract_state)]
@@ -63,12 +56,9 @@ pub struct Oath {
     gate: Option<Gate>,       // v4: visitor gate; None = owner/agent only
     visits: LookupMap<String, u64>, // v4: "charter#action_id" -> EVM nonce it opened
     visit_of: LookupMap<u64, Visit>, // v4: EVM nonce -> the charter action that paid for it
-    board: Option<AccountId>, // v7: only this account (the visitor board) may call cross
-    fee: u128,               // v7: NEAR yocto charged per crossing; 0 until set_policy
-    chains: Vec<ChainRule>,  // v7: chains a visitor may pay on, with sanity caps
-    split: Vec<Split>,       // v7: fee shares in basis points; the rest stays with the owner
-    fees_held: u128,
-    path_nonce: LookupMap<String, u64>, // v7: EVM nonce per derived path
+    cross: Option<Cross>, // v7: board pass, then a fixed Base transfer on path base-1
+    passes: LookupMap<u64, PassRec>,
+    next_pass: u64,
 }
 
 /// v4: what a visitor's charter must have paid on NEAR, and the fixed EVM payout it buys.
@@ -89,21 +79,21 @@ pub struct Gate {
 #[derive(Clone)]
 pub struct Visit { pub charter: AccountId, pub action_id: u64, pub by: AccountId }
 
-/// v7: one chain a visitor may pay on. The recipient is not stored here.
+/// v7: the board pass fee and the fixed Base payout. The visitor does not choose either.
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
-pub struct ChainRule {
-    pub name: String,
-    pub chain_id: u64,
-    pub max_per_tx: U128,
-    pub max_fee_cap: U128,
-    pub usdc: Option<String>,
+pub struct Cross {
+    pub board: AccountId,
+    pub pass_fee: U128,
+    pub evm_to: String,
+    pub foreign_value: U128,
+    pub max_fee_per_gas: U128,
+    pub max_priority_fee_per_gas: U128,
 }
 
-/// v7: a share of the toll fee, in basis points.
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
-pub struct Split { pub account: AccountId, pub bps: u16 }
+pub struct PassRec { pub owner: AccountId, pub deposit: U128, pub used: bool }
 
 /// v4: gas for the visitor callback (it starts the MPC sign: 50 Tgas + on_signed 30 Tgas).
 pub const GATE_CB_GAS: u64 = 110;
@@ -193,7 +183,7 @@ impl Oath {
                max_per_tx: max_per_tx.0, budget: budget.0, spent: 0, max_fee_cap: max_fee_cap.0,
                next_nonce: 0, frozen: false, txs: LookupMap::new(b"t"), verify_chain, token, dao,
                gate, visits: LookupMap::new(b"v"), visit_of: LookupMap::new(b"w"),
-               board: None, fee: 0, chains: vec![], split: vec![], fees_held: 0, path_nonce: LookupMap::new(b"n") }
+               cross: None, passes: LookupMap::new(b"p"), next_pass: 0 }
     }
 
     fn assert_owner(&self) { require!(env::predecessor_account_id() == self.owner, "only owner"); }
@@ -225,110 +215,52 @@ impl Oath {
                "spent": self.spent.to_string(), "max_fee_cap": self.max_fee_cap.to_string(),
                "next_nonce": self.next_nonce, "frozen": self.frozen, "verify_chain": self.verify_chain,
                "asset": self.token.as_ref().map(|t| json!({"erc20": t})).unwrap_or(json!("native")), "dao": self.dao,
-               "gate": self.gate, "board": self.board, "fee": self.fee.to_string(), "chains": self.chains,
-               "split": self.split, "fees_held": self.fees_held.to_string()})
+               "gate": self.gate, "cross": self.cross, "next_pass": self.next_pass})
     }
 
-    /// v7: the owner publishes the board, the fee and the chains. There is no recipient list.
-    pub fn set_policy(&mut self, board: AccountId, fee: U128, chains: Vec<ChainRule>, split: Vec<Split>) {
+    /// v7: the owner sets the board and the fixed Base payout. Path and chain_id stay as in new().
+    pub fn set_cross(&mut self, board: AccountId, pass_fee: U128, evm_to: String, foreign_value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128) {
         self.assert_owner();
-        require!(fee.0 > 0, "fee must be set");
-        require!(!chains.is_empty() && chains.len() <= 8, "1 to 8 chains");
-        let mut bps: u32 = 0;
-        for s in &split {
-            require!(s.bps > 0, "split share must be set");
-            bps += s.bps as u32;
-        }
-        require!(bps <= 10_000, "split is over 100%");
-        let mut names = vec![];
-        for c in &chains {
-            let (_, ids) = evm_chain(&c.name).unwrap_or_else(|| env::panic_str("chain not supported"));
-            require!(ids.contains(&c.chain_id), "chain_id does not belong to the chain");
-            require!(!names.contains(&c.name), "duplicate chain");
-            names.push(c.name.clone());
-            if let Some(t) = &c.usdc { require!(t.len() == 42 && unhex(t).len() == 20, "usdc must be a 0x address"); }
-        }
-        self.board = Some(board);
-        self.fee = fee.0;
-        self.chains = chains;
-        self.split = split;
+        require!(self.cross.is_none(), "cross already set");
+        require!(pass_fee.0 > 0, "pass fee must be set");
+        let evm_to = evm_to.to_lowercase();
+        require!(self.allow_to.contains(&evm_to), "REFUSED: recipient not in oath allowlist");
+        require!(foreign_value.0 > 0 && foreign_value.0 <= self.max_per_tx, "foreign value over per-tx cap");
+        require!(max_fee_per_gas.0 <= self.max_fee_cap && max_priority_fee_per_gas.0 <= max_fee_per_gas.0, "cross fees over cap");
+        self.cross = Some(Cross { board, pass_fee, evm_to, foreign_value, max_fee_per_gas, max_priority_fee_per_gas });
     }
 
-    /// v7: the path whose signature belongs to this visitor on this chain.
-    pub fn path_for(&self, row_owner: AccountId, chain: String) -> String {
-        let rule = self.chain_rule(&chain);
-        format!("row:{row_owner}:{}", rule.name.to_lowercase())
-    }
+    pub fn get_pass(&self, id: u64) -> Option<PassRec> { self.passes.get(&id).cloned() }
 
-    fn chain_rule(&self, chain: &str) -> ChainRule {
-        self.chains.iter().find(|c| c.name.eq_ignore_ascii_case(chain)).cloned()
-            .unwrap_or_else(|| env::panic_str("REFUSED: that chain is not on this toll"))
-    }
-
-    /// v7: the board pays the fee and names the visitor. The visitor chose the recipient.
+    /// v7: the board attaches the pass fee. This does not call the MPC, so it fits a 30 Tgas forward.
     #[payable]
-    pub fn cross(&mut self, row_owner: AccountId, chain: String, to: String, asset: String, amount: U128,
-                 max_fee_per_gas: U128, max_priority_fee_per_gas: U128, gas_limit: u64) -> Promise {
-        let board = self.board.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no board"));
-        require!(env::predecessor_account_id() == board, "REFUSED: only the board can open a crossing");
+    pub fn accept_pass(&mut self, owner: AccountId) {
+        let c = self.cross.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no visitor pass"));
+        require!(env::predecessor_account_id() == c.board, "REFUSED: only the board can pay this pass");
         require!(!self.frozen, "REFUSED: oath frozen");
-        require!(self.fee > 0, "REFUSED: the toll has no fee");
         let dep = env::attached_deposit().as_yoctonear();
-        require!(dep >= self.fee, "REFUSED: the crossing paid less than the toll");
-        let rule = self.chain_rule(&chain);
-        let to = to.to_lowercase();
-        require!(to.len() == 42 && unhex(&to).len() == 20, "REFUSED: recipient must be an EVM address");
-        require!(amount.0 > 0 && amount.0 <= rule.max_per_tx.0, "REFUSED: amount over the chain cap");
-        require!(max_fee_per_gas.0 <= rule.max_fee_cap.0 && max_priority_fee_per_gas.0 <= max_fee_per_gas.0, "REFUSED: gas fee over cap");
-        let asset_l = asset.to_lowercase();
-        let token = if asset_l == "native" || asset_l.is_empty() {
-            require!(gas_limit <= 21000, "REFUSED: only plain transfers (gas 21000)");
-            None
-        } else {
-            let usdc = rule.usdc.clone().unwrap_or_else(|| env::panic_str("REFUSED: that chain has no token"));
-            require!(asset_l == usdc.to_lowercase(), "REFUSED: token is not on this chain");
-            require!(gas_limit <= ERC20_GAS_CAP, "REFUSED: gas limit over ERC-20 cap");
-            Some(usdc)
-        };
-        let path = format!("row:{row_owner}:{}", rule.name.to_lowercase());
-        let evm_nonce = self.path_nonce.get(&path).copied().unwrap_or(0);
-        self.path_nonce.insert(path.clone(), evm_nonce + 1);
-        self.fees_held += dep;
-        log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"cross_opened","data":{"owner":row_owner,"chain":rule.name,"to":to,"path":path}}));
-        self.start_cross(row_owner, rule.chain_id, rule.name, to, token, amount, max_fee_per_gas, max_priority_fee_per_gas, gas_limit, path, evm_nonce)
+        require!(dep >= c.pass_fee.0, "REFUSED: the pass paid less than the toll");
+        let id = self.next_pass;
+        self.next_pass = id + 1;
+        self.passes.insert(id, PassRec { owner: owner.clone(), deposit: U128(dep), used: false });
+        log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"pass_accepted","data":{"id":id,"owner":owner,"deposit":dep.to_string()}}));
     }
 
-    /// v7: the owner takes earned fees. Shares go out in basis points; the rest goes to the owner.
-    pub fn withdraw_fees(&mut self, amount: U128) -> Promise {
-        self.assert_owner();
-        require!(amount.0 > 0 && amount.0 <= self.fees_held, "REFUSED: that is more than the toll has earned");
-        self.fees_held -= amount.0;
-        let mut assigned = 0u128;
-        let mut parts: Vec<(AccountId, u128)> = vec![];
-        for s in &self.split {
-            let share = amount.0 * s.bps as u128 / 10_000;
-            if share > 0 { parts.push((s.account.clone(), share)); assigned += share; }
-        }
-        let rest = amount.0 - assigned;
-        if rest > 0 { parts.push((self.owner.clone(), rest)); }
-        let mut it = parts.into_iter();
-        let (account, yocto) = it.next().expect("a fee has a payee");
-        let mut p = Promise::new(account).transfer(NearToken::from_yoctonear(yocto));
-        for (account, yocto) in it { p = p.and(Promise::new(account).transfer(NearToken::from_yoctonear(yocto))); }
-        p
+    /// v7 Path A: the visitor who holds an unused board pass signs the fixed payout.
+    /// The toll account itself cannot call this, so a key on this contract is not the signer.
+    pub fn cross_after_board(&mut self) -> Promise {
+        require!(env::prepaid_gas() >= Gas::from_tgas(GATE_MIN_GAS), "attach at least 150 Tgas");
+        let caller = env::predecessor_account_id();
+        require!(caller != env::current_account_id(), "REFUSED: the toll account cannot sign this crossing");
+        let c = self.cross.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no visitor pass"));
+        let id = (0..self.next_pass).find(|n| self.passes.get(n).is_some_and(|p| !p.used && p.owner == caller))
+            .unwrap_or_else(|| env::panic_str("REFUSED: no board pass is waiting for you"));
+        let mut rec = self.passes.get(&id).cloned().expect("no pass");
+        rec.used = true;
+        self.passes.insert(id, rec);
+        log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"cross_signing","data":{"id":id,"owner":caller,"to":c.evm_to}}));
+        self.start_sign(c.evm_to, c.foreign_value, c.max_fee_per_gas, c.max_priority_fee_per_gas, 21000)
     }
-
-    /// v7: the owner deploys the next wasm. migrate reads the state back. close still returns every yocto.
-    pub fn upgrade(&self, code: near_sdk::json_types::Base64VecU8) -> Promise {
-        self.assert_owner();
-        require!(!code.0.is_empty(), "empty code");
-        Promise::new(env::current_account_id()).deploy_contract(code.0)
-            .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(15)).migrate())
-    }
-
-    #[private]
-    #[init(ignore_state)]
-    pub fn migrate() -> Self { env::state_read().expect("no state") }
     /// v4: the charter action that paid for EVM nonce `nonce`, if it came through the gate.
     pub fn get_visit(&self, nonce: u64) -> Option<Visit> { self.visit_of.get(&nonce).cloned() }
     /// v4: the EVM nonce a charter action opened, if any.
@@ -392,33 +324,12 @@ impl Oath {
         self.spent += value.0; // reserve
         self.next_nonce += 1;
         self.txs.insert(nonce, TxRec { to: to.clone(), value, nonce, status: "signing".into(), unsigned_hash: hx(&h),
-                                     raw_signed: None, tx_hash: None, proof_payload_hash: None,
-                                     row_owner: None, chain_name: None, sign_path: None, evm_nonce: None,
-                                     chain_id_used: None, asset: None, recovered: None });
+                                     raw_signed: None, tx_hash: None, proof_payload_hash: None });
         log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"sign_requested","data":{"nonce":nonce,"to":to,"value":value,"payload":hx(&h)}}));
         let args = json!({"request": {"path": self.path, "payload_v2": {"Ecdsa": hx(&h)}, "domain_id": 0}});
         Promise::new(self.mpc.clone())
             .function_call("sign".to_string(), args.to_string().into_bytes(), NearToken::from_yoctonear(1), Gas::from_tgas(50))
             .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(30)).on_signed(nonce, max_fee_per_gas, max_priority_fee_per_gas, gas_limit))
-    }
-
-    fn start_cross(&mut self, row_owner: AccountId, chain_id: u64, chain_name: String, to: String, token: Option<String>,
-                   amount: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128, gas_limit: u64, path: String, evm_nonce: u64) -> Promise {
-        let id = self.next_nonce;
-        let fields = self.fields_for(chain_id, token.as_deref(), evm_nonce, max_priority_fee_per_gas.0, max_fee_per_gas.0, gas_limit, &to, amount.0);
-        let mut pre = vec![0x02u8];
-        pre.extend(rlp::enc_list(&fields));
-        let h = env::keccak256(&pre);
-        self.next_nonce = id + 1;
-        self.txs.insert(id, TxRec { to: to.clone(), value: amount, nonce: id, status: "signing".into(), unsigned_hash: hx(&h),
-                                    raw_signed: None, tx_hash: None, proof_payload_hash: None,
-                                    row_owner: Some(row_owner.to_string()), chain_name: Some(chain_name), sign_path: Some(path.clone()),
-                                    evm_nonce: Some(evm_nonce), chain_id_used: Some(chain_id),
-                                    asset: Some(token.unwrap_or_else(|| "native".into())), recovered: None });
-        let args = json!({"request": {"path": path, "payload_v2": {"Ecdsa": hx(&h)}, "domain_id": 0}});
-        Promise::new(self.mpc.clone())
-            .function_call("sign".to_string(), args.to_string().into_bytes(), NearToken::from_yoctonear(1), Gas::from_tgas(50))
-            .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(30)).on_signed(id, max_fee_per_gas, max_priority_fee_per_gas, gas_limit))
     }
 
     /// `to`/`value` are the payout's recipient and amount; with a token the EVM tx goes to the token with value 0.
@@ -439,9 +350,7 @@ impl Oath {
                      #[callback_result] sig: Result<Value, PromiseError>) -> Option<TxRec> {
         let mut rec = self.txs.get(&nonce).cloned().expect("no rec");
         let sig = match sig { Ok(v) => v, Err(_) => {
-            rec.status = "failed".into();
-            if rec.sign_path.is_none() { self.spent -= rec.value.0; }
-            self.txs.insert(nonce, rec.clone());
+            rec.status = "failed".into(); self.spent -= rec.value.0; self.txs.insert(nonce, rec.clone());
             log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"sign_failed","data":{"nonce":nonce}}));
             return Some(rec); } };
         let big_r = unhex(sig["big_r"]["affine_point"].as_str().unwrap());
@@ -453,12 +362,8 @@ impl Oath {
         let h: [u8; 32] = unhex(&rec.unsigned_hash).try_into().unwrap();
         let pk = env::ecrecover(&h, &rs, v, true).expect("ecrecover failed");
         let addr = format!("0x{}", hx(&env::keccak256(&pk)[12..]));
-        if rec.sign_path.is_none() { require!(addr == self.foreign_address, "signature does not recover to oath address"); }
-        rec.recovered = Some(addr);
-        let mut f = match (rec.sign_path.clone(), rec.chain_id_used, rec.evm_nonce) {
-            (Some(_), Some(cid), Some(n)) => self.fields_for(cid, rec.asset.as_deref().filter(|a| *a != "native"), n, max_priority_fee_per_gas.0, max_fee_per_gas.0, gas_limit, &rec.to, rec.value.0),
-            _ => self.fields(nonce, max_priority_fee_per_gas.0, max_fee_per_gas.0, gas_limit, &rec.to, rec.value.0),
-        };
+        require!(addr == self.foreign_address, "signature does not recover to oath address");
+        let mut f = self.fields(nonce, max_priority_fee_per_gas.0, max_fee_per_gas.0, gas_limit, &rec.to, rec.value.0);
         f.push(rlp::enc_uint(v as u128));
         f.push(rlp::enc_bytes(rlp::strip(r)));
         f.push(rlp::enc_bytes(rlp::strip(&s)));

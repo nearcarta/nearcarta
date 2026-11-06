@@ -1,134 +1,330 @@
-# Toll Bridge — deep brief v2 (Autonomous Business)
+# Toll Bridge — deepen to Ferry depth (Cursor brief)
 
-**Audience:** the Cursor chat that owns `toll` (PR #33 merged, PR #43 UX fixes merged).
-**Repo:** `/workspace/near/tech/nearcarta` @ `08051dd`+. **Do not** send mainnet txs or deploy. The assistant runs live tests.
-**Owner correction (2026-11-06) built in:** no recipient allowlist fixed at deploy. The visitor types any recipient. Safety = the visitor's own `/setup` row caps + contract-wide sanity caps. The contract is upgradeable (`upgrade` + `migrate`) so this is the **last** redeploy, never one per user or wallet.
-
-## Read first
-1. `docs/internal/source-pack.md` §1 (Kain "revenue", Eddy "any address on a supported network"), §2 ThePiVortex list (wallet connector producing chain signatures + 1Click; cross-chain micropayments), §3 Business row, §4 Chain Signatures — especially the **proxy-path tutorial** (one contract, one foreign address per user), §5 near-multichain, §8 P1, **§12 P0 #1** (board must forward the row owner).
-2. `docs/internal/research/tracks/04-business.md`, `13-open.md`; `docs/internal/research/winners-patterns.md` (P1 is the strongest past-winner pattern and it is exactly this shop).
-3. Code: `contracts/toll/src/lib.rs`, `app/src/panels/toll-room.js`, `app/src/panels/toll-dock.js`, `app/src/toll-derive.js`, `backend/src/toll-pass.js`, `backend/src/toll-views.js`, `backend/src/tollgate.js`, `backend/src/shops.js` L90–132, `app/design/D8_shops/js/shopui.js` (APPS.toll), `shared/deployments/mainnet.json` → `toll`, `backend/scripts/toll-teardown.js`.
+**Audience:** the Cursor chat that owns `toll` (same chat that shipped PR #43 UX fixes).  
+**Repo:** `/workspace/near/tech/nearcarta` @ `0c72a47` (main).  
+**Owner ask (2026-11-06):** Toll is shallow and hardcoded at 0.001 NEAR transfer to `toll.nearcarta.near`. Make it as deep as Ferry: live policy-driven amounts/routes, real chain-signature **foreign** payment, AI NL, cinema, basescan proof.  
+**Do not** send mainnet txs or redeploy yourself. Prepare code + scripts; the assistant runs live tests.  
+**Hard rules:** teardown to `nearcarta.near`; no stranded NEAR; no naming other projects/owner in public artifacts; small commits; secrets only in hidden fields.
 
 ---
 
-## 1. Attack the idea (before any design)
+## 0. Verdict in one paragraph
 
-| Question | Today's honest answer |
+Today the city Toll room is a **fixed 0.001 NEAR board `propose` pass** plus a Proof tab that only **derives / describes** the Base address. It never calls `pay`, `pay_for`, or `sign`, never broadcasts, and never shows a basescan receipt. The live contract `toll.nearcarta.near` **can** own a Base wallet via Chain Signatures (`v1.signer`, path `base-1`), already has one MPC-signed EIP-1559 tx sitting at status `signed` (unbroadcast), but `gate` is `null`, FAKs were deleted, `allow_to` is a single hardcoded recipient that is **not** the owner's designated Base address, and the UI amount is a constant — not `policy`. That is why Toll feels shallow vs Ferry.
+
+---
+
+## 1. What the mainnet contract actually supports (read live)
+
+**Account:** `toll.nearcarta.near`  
+**Owner:** `nearcarta.near`  
+**Wasm:** `toll.v6p86.wasm` · code_hash `9RQw6e1PL81HSQ1x6dr6dyvv9yAMMBdqChRToyHuDwDP`  
+**Balance:** ~2.554 NEAR (almost all storage stake; do not drain)  
+**FAKs:** 0 (deleted in `toll_delete_fak`)
+
+### 1.1 Live `policy` (RPC view, 2026-11-06)
+
+```json
+{
+  "owner": "nearcarta.near",
+  "mpc": "v1.signer",
+  "path": "base-1",
+  "chain_id": 8453,
+  "foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a",
+  "allow_to": ["0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f"],
+  "max_per_tx": "10000000000000",
+  "budget": "30000000000000",
+  "spent": "1000000000000",
+  "max_fee_cap": "5000000000",
+  "next_nonce": 1,
+  "frozen": false,
+  "verify_chain": "Base",
+  "asset": "native",
+  "dao": null,
+  "gate": null
+}
+```
+
+| Field | Meaning | Human |
+|---|---|---|
+| `foreign_address` | Derived Base wallet for (`toll.nearcarta.near`, path `base-1`) | `0x4c07…e38a` |
+| `allow_to` | Only EVM recipients `pay`/`pay_for` may send to | **one** address `0x1cdb…ea0f` — **not** owner dest `0xBDfC…0034` |
+| `max_per_tx` | Cap per foreign transfer | **0.00001 ETH** |
+| `budget` / `spent` | Lifetime foreign budget | 0.00003 ETH / 0.000001 spent |
+| `max_fee_cap` | Max EIP-1559 maxFeePerGas | **5 gwei** |
+| `gate` | Visitor `pay_for` gate | **`null` → `pay_for` panics** |
+| `verify_chain` | MPC foreign proof chain | `Base` (8453) |
+
+**Config-driven (contract init, immutable without redeploy):** path, chain_id, foreign_address, allow_to, max_per_tx, budget, max_fee_cap, verify_chain, token, dao, gate.  
+**No setters** for allow_to / gate / budget / path (only `set_nonce`, `freeze`/`unfreeze`, `close`). Source: `contracts/toll/src/lib.rs` L179–189, L191–199.
+
+### 1.2 Methods that matter
+
+| Method | Who | What |
+|---|---|---|
+| `policy` | anyone (view) | live caps + destinations |
+| `get_tx(nonce)` | anyone (view) | TxRec: status signing\|signed\|failed\|confirmed\|refused_proof, `raw_signed`, `tx_hash` |
+| `get_visit` / `visit_nonce` | anyone (view) | gate visits (unused while gate=null) |
+| `pay(to, value, fees, gas_limit)` | **owner or self (FAK on this account)** | builds EIP-1559, calls `v1.signer.sign`, `on_signed` recovers address must equal `foreign_address` |
+| `pay_for(charter, action_id)` | anyone | only if `gate` set; reads factory `is_charter` + charter `get_action`; then signs **fixed** gate payout |
+| `settle(nonce, block_hash)` | anyone | MPC `verify_foreign_transaction` after broadcast |
+| `close()` | owner, 1 yocto | delete account → balance to owner (`nearcarta.near`) |
+
+Cite: `contracts/toll/src/lib.rs` L207–242 (pay/pay_for), L244–269 (start_sign → `v1.signer` `sign` with 1 yocto + 50 Tgas), L281–308 (on_signed), L312–348 (settle), L183–188 (close).
+
+Supported verify chains in wasm: Bnb, Base, Arbitrum, Polygon, Avalanche (`evm_chain` L119–127). **One chain per deployed instance.**
+
+### 1.3 Live `get_tx(0)` — already signed, never broadcast
+
+```json
+{
+  "to": "0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f",
+  "value": "1000000000000",
+  "nonce": 0,
+  "status": "signed",
+  "tx_hash": "0x096571bc0c235605f5c26f2849ba61383dbaa3f8f59fb918999963c30b0d45be",
+  "raw_signed": "0x02f870…",
+  "proof_payload_hash": null
+}
+```
+
+- Value: **0.000001 ETH** to allowlisted `0x1cdb…`.  
+- Recorded NEAR allow that produced the MPC sig: [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz).  
+- README already admits: *“The derived Base address was unfunded, so the foreign tx was not broadcast.”* (`README.md` Toll section; `shared/rails/receipts.js` ~L67).  
+- `next_nonce` is already **1** — a new `pay` would use nonce 1. Nonce 0 raw can still be broadcast if the foreign account still has nonce 0 and is funded.
+
+### 1.4 Gate vs `charter_board` (architecture gap)
+
+`pay_for` / `Gate` expect a **charter factory** (`is_charter`) and charter `get_action` with memo/fee/payee (`lib.rs` L61–73, L105–114, L214–224).  
+Nearcarta visitors use **`board.nearcarta.near` `propose`**, which does **not** expose that factory/`get_action` API. So **enabling the existing `gate` as-is will not work with the city board** without a contract change that accepts a board pass (see §4).
+
+---
+
+## 2. What the UI hardcodes (file:line)
+
+### 2.1 Canonical 0.001 constants
+
+| File:line | Constant / copy |
 |---|---|
-| 1. Real problem solved? What does the user gain? | **None.** The visitor pays 0.001 NEAR to `toll.nearcarta.near` and a boom lifts. No service is bought. The Proof tab shows one old Base signature that was never broadcast. |
-| 2. Who receives the money and why does it make sense? | Our own contract, for nothing. Meaningless. |
-| 3. What is new vs the ecosystem / past winners? | Nothing. A NEAR transfer is not new; the chain-signature part is a static record. |
-| 4. Why would these judges love it? | They would not. It fails the "distinctive NEAR capability" test (`winners-patterns.md`). |
-| 5. Works for any user, nothing hardcoded? | No. `0.001` is a constant in 10+ places; `allow_to` is one fixed address set at init; only the owner can call `pay`. |
-
-**Idea score today: 2/10. Implementation score: 5/10** (UX polished in PR #43, two no-popup mainnet passes proven).
-**Verdict: replace the idea, keep the slot, the track and the contract account.**
-
-## 2. Replacement concept: "Toll Bridge = your agent's wallet on every EVM chain"
-
-**One line:** the visitor's NEAR session row gets its **own** Base / Arbitrum / Ethereum address (Chain Signatures, path derived from the visitor's account), and their agent pays **anyone** on that chain in plain words — "pay 2 USDC to 0xabc on Base" — with no MetaMask, no seed phrase, no bridge, and no popup, under the same caps they set once in `/setup`. The Toll is a real business: it charges a published fee per crossing that pays the relayer's foreign gas, and its earnings are public in Chronicle.
-
-| Question | New answer |
-|---|---|
-| 1. Problem / gain | Agents (and people) on NEAR who must pay a vendor, an API, a freelancer, or their own MetaMask on Base/Arbitrum today need a second wallet, ETH for gas and a bridge. Here the NEAR row **is** the EVM wallet. Gain: time (one sentence), safety (caps the agent cannot edit, on chain), capability (an AI agent with spending power on 5 EVM chains without ever holding a private key). |
-| 2. Who gets the money | The **recipient the visitor names** (a vendor, a friend, their own wallet). The toll fee (e.g. 0.002 NEAR, read from `policy`) goes to `toll.nearcarta.near` and pays a real cost: the relayer's broadcast + the MPC call. Revenue is visible on chain. |
-| 3. What is new | Chain-signature wallets exist; session caps exist; **a per-visitor foreign address whose spending policy is the visitor's own NEAR session row, driven by an AI agent in natural language** does not exist in the ecosystem or among past winners (P1 winners used the user's full-access key or a single shared path). Gas top-up is solved by composing with Ferry: 1Click delivers ETH straight to the visitor's derived Base address. |
-| 4. Why judges love it | Illia/official stack: chain signatures + function-call keys + agents (source-pack §1). Eddy: "your counterparty only needs an address on a network supported…". Kain: "chain abstraction, AI and revenue". Past-winner P1 is exactly "one NEAR account controls money on other chains". The 2-minute demo ends on a **basescan** receipt. |
-| 5. Any user, nothing hardcoded | Yes: recipient, chain, amount and asset come from the visitor; the foreign address is derived from the visitor's account; fee and limits come from `policy` view. No contract change per user. |
-
-**Idea score after replacement: 9/10.**
-
-## 3. What exists today (main @ 08051dd)
-
-- **Contract** `toll.nearcarta.near` (`contracts/toll/src/lib.rs`): `new` L143, `freeze/unfreeze` L170–178, `set_nonce` L179, `close` L184 (owner, 1 yocto → `nearcarta.near`), `policy` L191, `get_visit` L201, `get_tx` L204, `pay` L207 (owner or self only), `pay_for` L214 (needs `gate`, which is null → panics), `on_signed` L282, `settle` L312, `on_verified` L326. One chain per instance (`evm_chain` L119). Signs with `v1.signer`, 1 yocto, path `base-1` — **one shared foreign address for everyone**.
-- **City room**: `toll-room.js` — Pass tab does a board `propose` of 0.001 NEAR to `toll.nearcarta.near` (no popup, works). Proof tab only shows/derives the shared address. AI dock (`toll-dock.js`) accepts only "pay the toll" at 0.001.
-- **Proven:** manual pass `6MteELyR…`, agent pass `3Ep1pJrV…`, earlier `3frACAL1…`, `CwcBGcw9…`. MPC sign `4LKGpA5v…` (status `signed`, never broadcast).
-
-## 4. Hardcoded and per-user limits (file:line)
-
-| Where | What |
-|---|---|
-| `app/src/panels/toll-room.js:13–14` | `PASS_NEAR = '0.001'`, `PASS_YOCTO` |
-| `app/src/panels/toll-room.js:353,359` | Hero `0.001 NEAR`, button `Pay 0.001 NEAR` |
+| `app/src/panels/toll-room.js:13` | `export const PASS_NEAR = '0.001'` |
+| `app/src/panels/toll-room.js:14` | `export const PASS_YOCTO = 10n ** 21n` |
+| `app/src/panels/toll-room.js:353` | Hero `<b>0.001</b> NEAR` |
+| `app/src/panels/toll-room.js:359` | Button `Pay 0.001 NEAR` |
 | `app/src/panels/toll-room.js:236–239` | Agent refuses any amount ≠ 0.001 |
-| `backend/src/toll-pass.js:8,52` | `ONE_MILLI`, `amount_near: '0.001'` |
-| `backend/src/shops.js:97–99` | `amount_near: '0.001'` |
-| `app/design/D8_shops/js/shopui.js:455,518,521–522,552,597,615` | Copy + cinema at 0.001 |
-| `app/src/toll-derive.js:91–98` | `TOLL_KEY`, `TOLL_ADDRESS`, `TOLL_CHAINS` constants (should come from `policy`) |
-| `app/src/panels/toll-room.js:331` + `app/src/tokens/chains/base.svg` | Base icon is a plain blue square (no mark) |
-| Contract init | `allow_to` = one fixed address; `path` = one shared path; `pay` owner/self only → **a new visitor can never send anything foreign** |
-| Contract | No `upgrade`/`migrate`; no setter for limits; `gate` incompatible with `charter_board` (expects a charter factory `is_charter` + `get_action`, `lib.rs` L61–73, L105–114) |
+| `backend/src/toll-pass.js:8` | `ONE_MILLI = 1e21` yocto |
+| `backend/src/toll-pass.js:52` | `amount_near: '0.001'` |
+| `backend/src/shops.js:97–99` | `amount_near: '0.001'` + note |
+| `app/design/D8_shops/js/shopui.js:455,518,521–522,552,597,615` | Cinema + copy + `Pay 0.001 NEAR` |
+| `README.md` Toll section | Documents the fixed pass (honest, but product is shallow) |
 
-## 5. Live mainnet views (fastnear RPC, 2026-11-06 06:25 Cairo)
+**Room never calls `pay` / `pay_for` / `sign`.** Explicit in `README.md` Toll Bridge section and `docs/internal/shops/toll.md`. Pass path = `board.propose` → `toll.nearcarta.near` only (`shopui.js` APPS.toll + `toll-room.js` mount).
 
-- Account: 2.5542 NEAR, storage 253,139 B, code_hash `9RQw6e1PL81HSQ1x6dr6dyvv9yAMMBdqChRToyHuDwDP`.
-- **Access keys: 1 function-call key** (`ed25519:GB83bZDd…`, receiver `toll.nearcarta.near`, methods `pay`, `settle`, allowance 0.25 NEAR). The old brief said 0 keys; that is outdated. This key is the interim "Path B" relayer; it is owner custody, not per-user.
-- `policy`: owner `nearcarta.near`, mpc `v1.signer`, path `base-1`, chain_id 8453, foreign `0x4c07…e38a`, `allow_to ["0x1cdb…ea0f"]`, max_per_tx 0.00001 ETH, budget 0.00003 ETH, spent 0.000001, max_fee_cap 5 gwei, next_nonce 1, gate null.
-- `get_tx(0)`: status `signed`, never broadcast (the derived address had no ETH).
+### 2.2 Proof tab Base icon = blue square (broken asset)
 
-## 6. Deep design
+Proof markup uses:
 
-### 6.1 Contract `toll` v7 (one last redeploy, then upgradeable)
-- **Identity:** accept calls only from `board.nearcarta.near` via the new board `propose_call_as` (source-pack §12 P0 #1). The board overwrites `row_owner` in args with the verified owner. The toll trusts `row_owner` only when `predecessor == board`.
-- **Per-visitor path:** `path = "row:{row_owner}:{chain_key}"` (proxy-path pattern from the NEAR tutorial, source-pack §4). Each visitor gets a distinct address per EVM chain; all share secp256k1 domain 0. Add view `address_of(row_owner, chain)` returning the derived public key (frontend derives the address, same as `toll-derive.js`).
-- **`cross(row_owner, chain, to, asset, amount, nonce, max_fee_per_gas, max_priority_fee, gas_limit)`**, `#[payable]`: requires attached deposit ≥ `policy.fee` (paid from the row by the board), checks `chain` ∈ `policy.chains` (Base 8453, Arbitrum 42161, Ethereum 1, Polygon 137, BNB 56 — data in state, editable by owner), `amount ≤ chain.max_per_tx` (sanity cap; the real cap is the board row), `max_fee_per_gas ≤ chain.max_fee_cap`, `to` is a 20-byte hex. Builds EIP-1559 (native) or ERC-20 `transfer` (asset = USDC address from `policy.assets[chain]`), calls `v1.signer.sign`, stores `TxRec{owner, chain, to, amount, status, raw_signed, tx_hash}` keyed by global id; emits `town-chronicle` events. **No `allow_to`.** The value comes from the visitor's own derived address, never from a shared pot.
-- **Remove** owner-only `pay`; keep `settle` (anyone) for MPC verify-foreign-tx.
-- **Admin:** `set_policy` (owner), `freeze`, `upgrade(code)` + `migrate()` (owner, per docs.near.org upgrade page), `close()` → `nearcarta.near` 1 yocto. `withdraw_fees(amount)` → `nearcarta.near` only.
-- **Revenue split (Autonomous Business "fixed share to contributors"):** `policy.split = [(account, bps)]`; `withdraw_fees` pays the split. Shows real revenue in the Split tab.
+```js
+// app/src/panels/toll-room.js:331
+const base = '<img class="ti" src="/tokens/chains/base.svg" alt="Base" width="36" height="36" …>';
+```
 
-### 6.2 Backend relayer
-- `POST /api/toll/relay {id}`: reads `get_tx(id)`, broadcasts `raw_signed` to the chain RPC (`BASE_RPC`, `ARB_RPC`…), polls receipt, returns explorer link. It holds **no** key; anyone could relay. Remove the `pay`/`settle` FAK after v7 (or keep only `settle`).
-- `GET /api/toll/wallet/:owner` → derived address per chain + live native/USDC balance + nonce (`eth_getTransactionCount`).
+Live file `app/src/tokens/chains/base.svg` contains **only** a `#00F` rounded-rect path — **no white Base mark**. That renders as a **solid blue square**. Compare with the correct circle mark in `app/src/tokens/base.svg` and the full `net:base` glyph in `app/design/D6_dashboards/src/tokenIcons.js` (`net:base`).  
+**Fix:** replace `/tokens/chains/base.svg` with the real web3icons Base network SVG (background + white mark), or point Proof at `tokenBadge` / `base.svg` the same way Ferry does. Add a unit test that the SVG has >1 path / non-empty white fill.
 
-### 6.3 Gas top-up through Ferry (no ETH needed from the visitor)
-- If the derived address has < 2× estimated gas, the room offers "Fill gas": a Ferry 1Click quote wNEAR → ETH on Base with `recipient = derived address`, `recipientType = DESTINATION_CHAIN`, settled by the same session `propose_call` path Ferry already proved. Corridor minimum: assistant checks live before claiming (Ferry lesson: bridge minimum).
+### 2.3 Derived address hardcodes
 
-### 6.4 City UX (Ferry pattern)
-- Tabs **Pay / Wallet / Ledger** (rename Pass→Pay, Proof→Wallet). Opaque spacious tray, raised gold CTAs.
-- **Pay:** chain picker with real web3icons (Base mark, not the blue square), asset (native ETH / USDC), amount, recipient field validated per chain (EIP-55), fee line from `policy.fee`, "your cap left today" from the row. Button: `Pay {amount} {asset} on {chain}`.
-- **Wallet:** the visitor's derived addresses per chain with balances and explorer links; "Fill gas" button.
-- **Ledger:** `get_tx` rows for this owner + basescan links; toll revenue total.
-- **Cinema:** boom lifts when the NEAR leg (cross) succeeds; the far-shore lantern lights only when the foreign receipt status = 1. Copy never says "Paid on Base" before that (`proofWords` L141–159 — keep).
+`app/src/toll-derive.js:91–98` — `TOLL_KEY`, `TOLL_ADDRESS`, `TOLL_CHAINS` (only Base marked `derived: true`). Should prefer live `policy.foreign_address` / `path` / `chain_id` from `GET /api/toll/live` (already partially wired in `assembleTollLive`).
 
-### 6.5 AI agent (executes under the session, no popup)
-| Command | Action |
+---
+
+## 3. Track fit (judges)
+
+**Primary track:** Autonomous Business (`audit/tracks/04-business.md`, README table, `docs/internal/shops-blueprint.md`).  
+Tagline: company of one; agent treasury/sales/procurement; **cross-chain payments**; revenue share; humans set constraints. Lean on: AI agents, Intents, **Chain Signatures**. Demo loop sale → cost → payout &lt; 2 minutes; public ledger.
+
+**Chain Signatures depth** (also Open Innovation lean-on, `audit/tracks/13-open.md`; official docs):
+
+- https://docs.near.org/chain-abstraction/chain-signatures  
+- https://docs.near.org/chain-abstraction/chain-signatures/implementation  
+- https://docs.near.org/chain-abstraction/chain-signatures/getting-started  
+- MPC contract mainnet: `v1.signer` · testnet `v1.signer-prod.testnet`  
+- Five steps judges expect: **derive → build tx → request signature → format → relay to foreign chain**  
+- Docs note Chain Signatures are **outbound-only**; “Paid on Base” only after a foreign success receipt (Toll already words this correctly in `proofWords` — keep that honesty).
+
+**Hackathon source pack:** `/workspace/audit/near-track-sources.md` (8 tracks only; Business loop is P1 in track-gap-audit).
+
+**What Toll must prove for judges (vs Ferry for DeFi):**
+
+| Judge want | Ferry today | Toll must become |
+|---|---|---|
+| Live non-hardcoded list / policy | 1Click ~215 tokens / ~38 chains | Live `policy` routes + amounts |
+| Agent under session caps, no popup | `propose_call` wrap | board pass **then** MPC sign + broadcast |
+| Real on-chain delivery + explorer | 1Click SUCCESS + nearblocks | **basescan (or arbiscan) success link** |
+| Public ledger | Chronicle / receipts | Chronicle line for NEAR pass **and** foreign tx |
+| Cinema only on real success | boat delivered after SUCCESS | boom lifts only after foreign receipt **or** clearly separate NEAR-pass cinema from Base-paid |
+
+---
+
+## 4. Target product: Deep Toll (Ferry-class)
+
+### 4.1 User story (≤2 minutes)
+
+1. Visitor already funded in `/setup`; row allows `toll.nearcarta.near`; cap ≥ pass fee from **live policy / gate fee** (not a constant).  
+2. Opens Toll from the city. Tray tabs: **Cross / Proof / Split** (rename Pass → Cross once foreign pay exists; keep Pass as the NEAR leg label if clearer).  
+3. Picks a **route** from live policy (Base now; Arbitrum later via second instance). Icons = real web3icons (fix Base square). Sees fee, foreign recipient from `allow_to` / gate `evm_to`, derived address from policy.  
+4. Manual CTA **or** AI (“pay the toll on Base”, “cross to Arbitrum”) under session:  
+   - **Leg A:** silent `board.propose` of the policy fee to `toll.nearcarta.near` (no popup).  
+   - **Leg B:** contract asks `v1.signer` to sign a tiny native transfer on Base to the allowlisted recipient.  
+   - **Leg C:** backend/relayer broadcasts `raw_signed`; UI polls until receipt status=1; shows **basescan** link.  
+5. Boom / cinema only after the leg the copy claims. “Paid on Base” **only** when `proofWords` claim=`paid` (receipt status 1).  
+6. Chronicle records both hashes. Split tab shows live revenue / fee words from policy (not “no split” forever).
+
+### 4.2 Contract work (redeploy required — see §5)
+
+**Problem:** visitors cannot trigger `pay` (owner/self only; FAK deleted). `pay_for` needs gate+factory charters incompatible with `charter_board`. `allow_to` cannot change without redeploy. Owner dest `0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034` is not allowlisted.
+
+**Recommended contract change (v7) — pick one primary path:**
+
+**Path A (preferred for Autonomous Business):** add visitor-callable  
+`cross_after_board({ board, owner })` (names flexible) that:
+
+1. Requires attached gas ≥ current `GATE_MIN_GAS` pattern.  
+2. Reads `board.get_charter({ owner })` (or equivalent) **or** accepts a recent board propose proof the API already verifies off-chain **and** a one-shot on-chain memo deposit.  
+3. Verifies the visitor’s row recently paid ≥ `fee` NEAR to this toll (or use attached deposit on a `propose_call` into a new `accept_pass` method).  
+4. Then calls existing `start_sign(allow_to[i], value, fees, 21000)` with value ≤ `max_per_tx` from **state**, not args the visitor chooses freely.  
+5. Emits chronicle events (already `town-chronicle`).
+
+If full board introspection is too heavy for one PR: **Path B (interim, still deep):** re-add a **method-scoped FAK** on `toll.nearcarta.near` limited to `pay` (+ maybe `settle`), held only in vault/hidden env; city flow = visitor board pass → API verifies pass → API calls `pay` with policy amounts → broadcast. Still show basescan. Document custody. Owner can rotate/delete FAK. **Do not** leave a full-access key.
+
+Also on redeploy init:
+
+- `allow_to`: include `0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034` (owner-designated Base recipient). Keep or drop `0x1cdb…` as needed.  
+- Keep `path: "base-1"`, `chain_id: 8453`, same derivation → **same** `foreign_address` `0x4c07…e38a` if predecessor+path unchanged (critical so prior funding still applies).  
+- `max_per_tx` / `budget`: tiny (≤ 0.00001 ETH class) so demos stay cheap.  
+- `max_fee_cap`: ≥ realistic Base gas (policy already 5 gwei; signed sample used ~0.1 gwei — **too low to land**; new pays must use fees under cap but high enough for Base inclusion).  
+- `close()` unchanged → funds to `nearcarta.near`.  
+- Optional second instance later: `toll-arb.nearcarta.near` with `verify_chain: "Arbitrum"` for “cross to Arbitrum” (one chain per instance — `lib.rs` header).
+
+**Do not claim gate revenue split until `gate` or a split field exists on-chain.** Split tab may show “all NEAR passes accrue on `toll.nearcarta.near`; foreign spends debit `spent`/`budget`” from live policy.
+
+### 4.3 Backend / relay
+
+Implement (or finish the commented intent in `app.js` L371):
+
+- `POST /api/toll/cross` (or `/relay`): after visitor pass verified, trigger `pay` / `cross_after_board`, wait for `get_tx` status `signed`, then `eth_sendRawTransaction` of `raw_signed` to Base RPC.  
+- `GET /api/toll/live` already reads `policy` + recent `get_tx` (`toll-views.js`) — extend with foreign receipt status via `evmFacts` (`shops.js` L121–132) and explorer URLs.  
+- Never say “Paid on Base” without receipt status 1 (`proofWords` in `toll-room.js` L141–159 — keep).  
+- Env: `BASE_RPC` (already referenced). Secrets for FAK only via vault/hidden fields if Path B.
+
+### 4.4 Frontend (Ferry pattern)
+
+- **Amounts / labels from live policy**, not `PASS_NEAR`. If policy/gate fee is X NEAR, button says `Pay {X} NEAR`, agent accepts that amount. Fallback refuse if live policy unread.  
+- **Route picker:** Base (live instance) + disabled/coming Arbitrum until second instance; real icons (fix `chains/base.svg`).  
+- **AI NL:** “pay the toll”, “pay the toll on Base”, “cross to Arbitrum”, “check signature”, “show my foreign address”, “show policy”. Execute Cross (both legs) when policy allows — not “fill form only”.  
+- **History:** list from `get_tx` + visitor chronicle rows; each foreign success → basescan link `https://basescan.org/tx/{tx_hash}`.  
+- **Cinema:** boom lift on allowed NEAR pass OK; separate “Base paid” beat only after receipt. Clear seals on next action (Ferry lesson).  
+- City entry primary; `/shops/toll/` backup.
+
+### 4.5 Acceptance checklist (assistant will live-test; you implement)
+
+- [ ] No hardcoded `0.001` as the only possible fee in UI/agent (constants may remain as defaults only if equal to live policy fee and overridden by policy).  
+- [ ] Proof Base icon is real Base mark, not blue square.  
+- [ ] Live `policy` drives recipient + max foreign value shown in tray.  
+- [ ] Session path: board propose (no popup) → MPC sign → broadcast → basescan success for a **tiny** Base transfer to allowlisted dest (prefer `0xBDfC…0034` after redeploy).  
+- [ ] AI and manual both run that path.  
+- [ ] Copy never claims Base paid without receipt.  
+- [ ] Chronicle shows NEAR pass + foreign tx.  
+- [ ] `npm test` green; teardown script still prints `close()` → `nearcarta.near`; README Toll section updated with placeholders for assistant-filled txs.  
+- [ ] First live foreign value ≤ `max_per_tx`; NEAR pass ≤ session cap (Scholar ~0.1).
+
+---
+
+## 5. Costs, funding, redeploy decision
+
+### 5.1 Is a redeploy needed?
+
+| Goal | Redeploy? |
 |---|---|
-| "pay 0.5 USDC to 0xabc… on Base" | cross → relay → receipt |
-| "send 0.00002 ETH to 0xabc on Arbitrum" | same, native |
-| "what's my Base address?" / "my balances" | Wallet tab data |
-| "fill gas on Base" | Ferry 1Click to derived address |
-| "show my crossings" | Ledger |
-| missing recipient | asks for it; never fills a default address |
+| Fix Base blue-square icon + UI copy from policy | **No** |
+| Broadcast existing `get_tx(0)` raw (to `0x1cdb…`) after funding foreign addr | **No** (demo of leg C only) |
+| Change `allow_to` to include `0xBDfC…0034` | **Yes** (no setter) |
+| Let visitors trigger MPC `pay` without owner FAK | **Yes** (new method) **or** Path B FAK (no code change, custody tradeoff) |
+| Enable stock `gate`/`pay_for` with `charter_board` | **Yes + code change** (gate incompatible as-is) |
 
-### 6.6 Chronicle
-Two entries per crossing: NEAR leg (board tx) and foreign leg (basescan hash). Toll fee entries count as revenue.
+**Recommendation:** plan a **controlled redeploy** of `toll.nearcarta.near` (or new subaccount then cut over) with v7 init: new allow_to, same path/foreign_address if possible, new `cross_after_board` (or document Path B FAK). Backup state (`policy`, all `get_tx`) to `shared/deployments/` before `close()`.
 
-## 7. Costs and redeploy
+Redeploy sequence (assistant runs; you prepare scripts):
 
-| Item | Cost |
+1. Snapshot `policy` + `get_tx` for nonces `0..next_nonce-1`.  
+2. Optional: fund foreign addr + broadcast existing signed raw as a one-shot proof (see §5.2).  
+3. Owner `close()` 1 yocto → ~2.55 NEAR returns to `nearcarta.near` (storage unlocked).  
+4. Recreate account, deploy wasm, `new(...)` with allow_to including `0xBDfC…0034`, owner `nearcarta.near`, mpc `v1.signer`, path `base-1`, chain_id `8453`, foreign_address matching derivation.  
+5. Verify `policy` view; update `mainnet.json`; no leftover FAKs unless Path B scoped key.  
+6. Fund foreign address again with tiny ETH for gas.  
+7. Teardown remains `close()` → `nearcarta.near`. **No NEAR left stranded.**
+
+### 5.2 Foreign-chain funding (Base)
+
+| Address | Role |
 |---|---|
-| Board v2 (`propose_call_as`) | One board redeploy (cross-shop, see §12). ≈1.1 NEAR storage recycled; open rows must close/reopen (Scholar row ≈0.41 NEAR returns to Scholar). |
-| Toll v7 | `close()` returns ≈2.55 NEAR to `nearcarta.near`; recreate + deploy needs ≈2.6 NEAR stake (net ≈0.05 NEAR incl. gas). Snapshot `policy` + `get_tx(0..)` first. |
-| Per crossing | Board fee to toll `policy.fee` (suggest 0.002 NEAR) + ≈0.003 NEAR gas from the session allowance; MPC deposit 1 yocto (proven on `4LKGpA5v`; re-check `v1.signer` current fee before live). |
-| Base gas | ≈0.000001–0.00001 ETH per transfer. Fund each derived address once with ≈0.00005 ETH via Ferry (≈0.05 wNEAR swap, check corridor min). |
-| First live test | 1 gas fill (≈0.05 NEAR) + 1 crossing of 0.1 USDC or 0.00001 ETH to the test address the assistant types in (never in code). |
+| `0x4c07c97812098f595ff1611d8cb3465e591ee38a` | Toll derived signer — **needs tiny ETH for gas** (README: was unfunded) |
+| `0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034` | Owner-designated **recipient** for demos (update allow_to) |
+| `0xf76e6b0920e9332ff4410f6dd53f01722abc71a3` | Owner wallet holding **USDC on Base** — use to buy/bridge tiny ETH for the derived address if needed; **not** the allow_to target unless policy says so |
 
-## 8. Acceptance checklist (assistant live-tests)
-- [ ] No `0.001` constant anywhere; fee and limits read from `policy`; agent accepts any amount ≤ row cap.
-- [ ] No address constant in code or init; recipient typed by the visitor or said to the agent.
-- [ ] Two different visitor rows show two different derived Base addresses.
-- [ ] Manual and AI both: session `cross` (no popup) → MPC signed → relayed → basescan status 1.
-- [ ] ERC-20 USDC on Base works, not only native ETH.
-- [ ] Over-cap amount refused on chain by the board, seal shown, nothing signed foreign.
-- [ ] "Fill gas" lands ETH on the derived address via 1Click.
-- [ ] Real Base/Arbitrum icons; no blue square.
-- [ ] Chronicle shows both legs; Split tab shows real fee revenue.
-- [ ] `upgrade` + `migrate` tested in sandbox; `close()` → `nearcarta.near` still works; no stranded NEAR.
-- [ ] `npm test` green; README Toll section rewritten with do-X-see-Y steps and placeholders for the assistant's tx links.
+Rough gas: 21000 gas × ~0.01–0.1 gwei on Base is still ≪ 0.00001 ETH; fund ~0.0001 ETH on `0x4c07…` to be safe for several demos. Transfer value per demo: ≤ `max_per_tx` (0.00001 ETH).
 
-## 9. PR plan
-1. Board v2 `propose_call_as` (shared; one chat owns it, see summary).
-2. Toll v7 contract + sandbox tests + deploy script (assistant deploys).
-3. Relayer + wallet API.
-4. Room: Pay / Wallet / Ledger + icons + AI commands.
-5. Ferry gas-fill composition.
+### 5.3 MPC / NEAR costs
+
+- Contract attaches **1 yocto** to `v1.signer.sign` (`lib.rs` L267). Proven working on mainnet (tx 4LKGpA5v → status `signed`).  
+- Docs often show ~0.1 NEAR attached when a **user account** calls MPC (`implementation` tutorials); this oath pattern uses the contract as predecessor with 1 yocto — keep that working pattern.  
+- Visitor NEAR pass: currently UI 0.001 NEAR; after deepen, use policy/gate fee (may stay 0.001). Gas for board propose paid by session key allowance.  
+- `settle` also 1 yocto to MPC verify — optional after broadcast for “confirmed” status.
+
+### 5.4 Do **not** (this brief)
+
+- Send mainnet txs from Cursor.  
+- Force-push.  
+- Claim Social Money / DAO.  
+- Claim “Paid on Base” without a receipt.  
+- Drain `toll.nearcarta.near` balance except via `close()` to `nearcarta.near`.
+
+---
+
+## 6. Implementation order (PR-sized)
+
+1. **P0 icon + honesty:** fix `chains/base.svg`; Proof uses real Base mark; tests.  
+2. **P0 live policy in tray:** replace hardcoded hero/button/agent amount with `GET /api/toll/live` fee + allow_to + foreign_address; keep refuse if unread.  
+3. **P0 relay path for existing signed tx (optional demo):** fund `0x4c07…` + broadcast `get_tx(0).raw_signed` → basescan (proves leg C; recipient still `0x1cdb…`).  
+4. **P1 contract v7 + redeploy plan scripts** (assistant executes): allow_to includes `0xBDfC…0034`; visitor `cross_after_board` **or** Path B FAK; fees under `max_fee_cap` but Base-viable.  
+5. **P1 city Cross flow:** board pass → sign → broadcast → poll → basescan; AI + manual; cinema; Chronicle.  
+6. **P2** Arbitrum instance + “cross to Arbitrum”; Split tab revenue from live state; README proofs placeholders.
+
+PR title suggestion: `toll: deep cross-chain pass (policy + chain-sig broadcast)`.
+
+---
+
+## 7. Sources (open and cite in PR)
+
+1. Live views: `policy` / `get_tx` on `toll.nearcarta.near` (this brief §1).  
+2. Contract: `contracts/toll/src/lib.rs`.  
+3. UI hardcodes: `app/src/panels/toll-room.js`, `backend/src/toll-pass.js`, `backend/src/shops.js`, `app/design/D8_shops/js/shopui.js`.  
+4. Derive: `app/src/toll-derive.js`.  
+5. Blueprint: `docs/internal/shops-blueprint.md`, `docs/internal/shops/toll.md`.  
+6. Tracks: `/workspace/audit/tracks/04-business.md`, `13-open.md`; `/workspace/audit/near-track-sources.md`.  
+7. Chain Signatures:  
+   - https://docs.near.org/chain-abstraction/chain-signatures  
+   - https://docs.near.org/chain-abstraction/chain-signatures/implementation  
+   - https://docs.near.org/chain-abstraction/chain-signatures/getting-started  
+   - https://github.com/near/mpc  
+8. Deploy record: `shared/deployments/mainnet.json` → `toll`.  
+9. Teardown script: `backend/scripts/toll-teardown.js`.  
+10. Ferry depth bar (pattern to match, not copy claims): city session, live data, AI executes, cinema on real success.
+
+---
+
+## 8. Out of scope for this Cursor chat
+
+- Ferry cross-chain recipient work (separate PR #44).  
+- Other shops’ deepening.  
+- Spending owner USDC/ETH except documenting the funding need for the assistant.  
+- Renaming tracks or claiming Social Money.

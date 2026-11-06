@@ -75,9 +75,6 @@ function ensureTollDock() {
         <button type="button" class="toll-chip" data-toll-chip="Pay the toll on Base">Pay the toll on Base</button>
         <button type="button" class="toll-chip" data-toll-chip="Check signature">Check signature</button>
         <button type="button" class="toll-chip" data-toll-chip="Show policy">Show policy</button>
-        <button type="button" class="toll-chip" data-toll-chip="what's my Base address">what's my Base address</button>
-        <button type="button" class="toll-chip" data-toll-chip="show my crossings">show my crossings</button>
-        <button type="button" class="toll-chip" data-toll-chip="fill gas on Base">fill gas on Base</button>
       </div>
       <div class="toll-agent-row">
         <input id="t-agent" data-testid="toll-agent-input" placeholder="Pay the toll" autocomplete="off" aria-label="Ask the AI Agent">

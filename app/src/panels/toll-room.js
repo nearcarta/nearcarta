@@ -192,9 +192,10 @@ export function policyQuote(live) {
   const allow = (live.allow_to || []).map(s => String(s).toLowerCase()).filter(Boolean);
   const cross = live.cross || null;
   const gate = live.gate || null;
-  const chains = Array.isArray(live.chains) ? live.chains : [];
-  const feeRaw = asYocto(live.fee) || asYocto(cross?.pass_fee) || asYocto(live.pass_fee) || asYocto(gate?.fee);
+  const feeRaw = asYocto(cross?.pass_fee) || asYocto(live.pass_fee) || asYocto(gate?.fee);
   const feeNear = feeRaw && feeRaw !== '0' ? yoctoNear(feeRaw) : '';
+  const named = String(cross?.evm_to || gate?.evm_to || '').toLowerCase();
+  const foreignTo = (named && allow.includes(named) ? named : allow[0]) || '';
   const foreignWei = asYocto(cross?.foreign_value) || asYocto(live.foreign_value) || asYocto(gate?.evm_value) || asYocto(live.max_per_tx) || '';
   const chain = live.verify_chain || '';
   const payable = !!feeNear;
@@ -203,11 +204,10 @@ export function policyQuote(live) {
     payable,
     feeYocto: payable ? feeRaw : '',
     feeNear,
-    foreignTo: '',
+    foreignTo,
     foreignWei,
     foreignEth: foreignWei ? formatWei(foreignWei) : '',
     allowTo: allow,
-    chains,
     chain,
     chainId: live.chain_id ?? null,
     path: live.path || '',
@@ -218,13 +218,6 @@ export function policyQuote(live) {
     board: cross?.board || live.board || '',
     hint: payable ? '' : 'The live policy has no visitor fee. Nothing was signed.',
   };
-}
-
-const KNOWN_CHAINS = ['Base', 'Arbitrum', 'Polygon', 'Bnb', 'Avalanche', 'Ethereum'];
-
-export function chainNamed(text) {
-  const lower = String(text || '').toLowerCase();
-  return KNOWN_CHAINS.find(name => lower.includes(name.toLowerCase())) || '';
 }
 
 export function relayDecision({ judged, quote, record, receipt } = {}) {
@@ -251,8 +244,8 @@ export function splitWords(live) {
   const budget = q.budget ? formatWei(q.budget) : '';
   const books = spent || budget ? ` Foreign spent ${spent || 'unread'} ETH of ${budget || 'unread'} ETH.` : '';
   const fee = q.payable ? ` The visitor fee is ${q.feeNear} NEAR.` : ' The live policy has no visitor fee.';
-  const shares = Array.isArray(live?.split) && live.split.length ? ` Fee shares ${live.split.map(s => `${s.bps} bps to ${s.account}`).join(', ')}.` : ' This policy has no revenue split.';
-  return `NEAR fees accrue on toll.nearcarta.near.${fee} The recipient is the one you name.${books}${shares} A signature is not a Base payment.`;
+  const to = q.foreignTo ? ` The foreign recipient is ${q.foreignTo}.` : '';
+  return `NEAR passes accrue on toll.nearcarta.near.${fee}${to}${books} This policy has no revenue split. A signature is not a Base payment.`;
 }
 
 function asYocto(v) {
@@ -322,32 +315,28 @@ export function assembleTollLive({ contract, policy, txs = [] } = {}) {
   return shaped;
 }
 
-/** Natural-language commands. The recipient, the chain and the amount come from the words. */
+/** Natural-language commands. The amount is the live policy fee. The recipient is the live allowlist. */
 export function parseTollCommand(text, quote) {
   const raw = String(text || '').trim();
   if (!raw) return { ok: false, action: 'miss', hint: TOLL_HINT };
   const lower = raw.toLowerCase();
   const nums = [...lower.matchAll(/(\d+(?:\.\d+)?)/g)].map(m => Number(m[1]));
-  const addr = (raw.match(/0x[0-9a-fA-F]{40}/) || [])[0] || '';
-  const chain = chainNamed(lower);
-  if (/\bfill gas\b/.test(lower)) return { ok: false, action: 'gas', hint: 'Fill gas uses the Ferry once this address is recovered. Nothing was sent.' };
-  const pay = /\b(pay|send|pass|cross)\b/.test(lower) || /\bthe toll\b/.test(lower) || /\bpay toll\b/.test(lower) || /\bpass the bridge\b/.test(lower);
+  if (/\barbitrum\b/.test(lower)) {
+    return { ok: false, action: 'route', hint: 'This toll signs one chain. Arbitrum needs its own instance. Nothing was signed.' };
+  }
+  const pay = /\b(pay|pass|cross)\b/.test(lower) || /\bthe toll\b/.test(lower) || /\bpay toll\b/.test(lower) || /\bpass the bridge\b/.test(lower);
   const check = /\bsignature\b|\bsign\b/.test(lower) && !pay;
   const policy = /\bpolicy\b/.test(lower) && !pay;
-  const ledger = /\bcrossings\b|\bledger\b/.test(lower);
-  const address = /\b(address|balance|foreign|explain)\b/.test(lower) && !pay && !policy;
-  if (ledger) return { ok: true, action: 'ledger', hint: '' };
+  const address = /\b(address|foreign|explain)\b/.test(lower) && !pay && !policy;
   if (pay) {
     if (!quote?.payable || !quote.feeNear) {
       return { ok: false, action: 'fee', hint: quote?.hint || 'The live policy has no visitor fee. Nothing was signed.' };
     }
-    if (!addr) return { ok: false, action: 'recipient', hint: 'Name the recipient address. Nothing was signed.' };
-    if (!chain) return { ok: false, action: 'route', hint: 'Name the chain. Nothing was signed.' };
-    const published = (quote.chains || []).some(c => String(c.name || c).toLowerCase() === chain.toLowerCase());
-    if (!published) return { ok: false, action: 'route', hint: `${chain} is not on the live policy. Nothing was signed.` };
-    if (!nums.length) return { ok: false, action: 'amount', hint: 'Name the amount. Nothing was signed.' };
-    const asset = /\busdc\b/.test(lower) ? 'usdc' : 'native';
-    return { ok: true, action: 'cross', to: addr.toLowerCase(), chain, asset, amount: String(nums[0]), feeYocto: quote.feeYocto, feeNear: quote.feeNear, hint: '' };
+    const fee = Number(quote.feeNear);
+    if (nums.some(n => Number.isFinite(n) && Math.abs(n - fee) > 1e-9)) {
+      return { ok: false, action: 'amount', hint: `The pass is ${quote.feeNear} NEAR. This gate will not pay a different amount. Nothing was signed.` };
+    }
+    return { ok: true, action: 'pay', amountNear: quote.feeNear, feeYocto: quote.feeYocto, hint: '' };
   }
   if (check) return { ok: true, action: 'check', hint: '' };
   if (policy) return { ok: true, action: 'policy', hint: '' };
@@ -370,7 +359,7 @@ export function nextRowBalance(balanceYocto, amountYocto = PASS_YOCTO) {
 export function passPaidCopy({ balanceNear, feeNear } = {}) {
   const fee = feeNear || 'The policy fee in';
   const bal = balanceNear ? ` Row balance ${balanceNear} NEAR.` : '';
-  return `Pass paid. ${fee} NEAR went to toll.nearcarta.near.${bal} This receipt is not a Base payment.`;
+  return `Pass paid. ${fee} NEAR went to toll.nearcarta.near.${bal} This receipt is not a Base payment. The Base transfer signs when you call cross_after_board.`;
 }
 
 export function policyWords(live) {
@@ -445,9 +434,10 @@ export function tollMarkup(state = {}) {
   const feeLabel = quote.payable ? quote.feeNear : '';
   const near = tokenBadge('NEAR', 'near', { size: 40, chainSize: 16, amount: feeLabel || null });
   const chainIcon = tokenBadge('ETH', 'base', { size: 36, chainSize: 16 });
-  const published = name => (quote.chains || []).some(c => String(c.name || c).toLowerCase() === name.toLowerCase());
-  const routeBtn = (name, testid) => `<button type="button" class="toll-route${published(name) ? ' on' : ''}" data-testid="${testid}" data-chain="${esc(name)}"${published(name) ? '' : ' disabled'}>${esc(name)}${published(name) ? '' : ' · not published'}</button>`;
-  const routes = `<div class="toll-routes" data-testid="toll-routes">${routeBtn('Base', 'toll-route-base')}${routeBtn('Arbitrum', 'toll-route-arb')}</div>`;
+  const routes = `<div class="toll-routes" data-testid="toll-routes">
+      <button type="button" class="toll-route on" data-testid="toll-route-base" disabled>Base${quote.chainId ? ` · ${esc(quote.chainId)}` : ''}</button>
+      <button type="button" class="toll-route" data-testid="toll-route-arb" disabled>Arbitrum · own instance</button>
+    </div>`;
   const seal = state.seal
     ? `<p class="toll-seal" data-testid="toll-refuse">${esc(state.seal)}</p>`
     : '<p class="toll-seal" data-testid="toll-refuse" hidden></p>';
@@ -461,8 +451,10 @@ export function tollMarkup(state = {}) {
     const link = r.explorer ? ` <a class="rc tx" data-testid="toll-foreign-tx" href="${esc(r.explorer)}" target="_blank" rel="noopener">basescan</a>` : '';
     return `<li data-testid="toll-live-row"><b>#${esc(r.nonce)}</b> ${esc(r.status || '')}. ${esc(r.words || '')}${link}</li>`;
   }).join('');
-  const payLabel = state.pending ? esc(state.pending) : (quote.payable ? `Pay on the chain you name` : 'Live policy has no visitor fee');
-  const foreignLine = `<p class="toll-lead" data-testid="toll-foreign">You name the recipient. ${quote.payable ? `The toll fee is ${esc(quote.feeNear)} NEAR.` : 'The live policy has not published a fee.'}</p>`;
+  const payLabel = state.pending ? esc(state.pending) : (quote.payable ? `Pay ${esc(quote.feeNear)} NEAR` : 'Live policy has no visitor fee');
+  const foreignLine = quote.foreignTo
+    ? `<p class="toll-lead" data-testid="toll-foreign">Up to ${esc(quote.foreignEth || 'the policy cap')} ETH to ${esc(quote.foreignTo)}.</p>`
+    : '<p class="toll-lead" data-testid="toll-foreign">The live policy did not name a foreign recipient.</p>';
   const canBroadcast = (live.recent || []).some(r => r.can_broadcast);
   const liveNote = live.ok === false
     ? `<p class="toll-note" data-testid="toll-live-miss">${esc(live.error || 'The live policy did not answer.')}</p>`
@@ -470,16 +462,14 @@ export function tollMarkup(state = {}) {
   const records = txLinks(state.recorded?.txs);
   return `<div class="toll-card" data-testid="toll-card">
     <div class="ferry-tabs toll-tabs" role="tablist" aria-label="Toll">
-      <button type="button" class="ferry-tab toll-tab${on('pass')}" role="tab" id="toll-tab-pass" data-testid="toll-tab-pass" data-tab="pass" aria-selected="${sel('pass')}">Pay</button>
-      <button type="button" class="ferry-tab toll-tab${on('proof')}" role="tab" id="toll-tab-proof" data-testid="toll-tab-proof" data-tab="proof" aria-selected="${sel('proof')}">Wallet</button>
-      <button type="button" class="ferry-tab toll-tab${on('split')}" role="tab" id="toll-tab-split" data-testid="toll-tab-split" data-tab="split" aria-selected="${sel('split')}">Ledger</button>
+      <button type="button" class="ferry-tab toll-tab${on('pass')}" role="tab" id="toll-tab-pass" data-testid="toll-tab-pass" data-tab="pass" aria-selected="${sel('pass')}">Cross</button>
+      <button type="button" class="ferry-tab toll-tab${on('proof')}" role="tab" id="toll-tab-proof" data-testid="toll-tab-proof" data-tab="proof" aria-selected="${sel('proof')}">Proof</button>
+      <button type="button" class="ferry-tab toll-tab${on('split')}" role="tab" id="toll-tab-split" data-testid="toll-tab-split" data-tab="split" aria-selected="${sel('split')}">Split</button>
     </div>
     <div class="toll-pane" data-testid="toll-pane-pass"${tab === 'pass' ? '' : ' hidden'}>
       ${routes}
       <div class="toll-flow tok-done">${near}</div>
-      <p class="toll-lead">${quote.payable ? `The toll fee is ${esc(quote.feeNear)} NEAR. You name the chain, the amount and the recipient.` : 'The live policy has no visitor fee, so this room will not invent one.'}</p>
-      <label class="toll-field">Recipient <input id="toll-to" data-testid="toll-to" autocomplete="off" spellcheck="false" placeholder="0x address"></label>
-      <label class="toll-field">Amount <input id="toll-amt" data-testid="toll-amt" inputmode="decimal" autocomplete="off"></label>
+      <p class="toll-lead">${quote.payable ? `One pass of ${esc(quote.feeNear)} NEAR to toll.nearcarta.near. The Base transfer is the fixed payout in the policy. A refusal pays nothing.` : 'The live policy has no visitor fee, so this room will not invent one.'}</p>
       ${foreignLine}
       ${cap}
       ${seal}
@@ -602,7 +592,7 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
     state.tab = 'pass';
     state.pending = PENDING_PAY;
     paint();
-    const res = await hooks.onPay(plan.action === 'cross' ? plan : quote);
+    const res = await hooks.onPay(quote);
     state.pending = '';
     if (!res?.ok) state.seal = res?.hint || '';
     else state.seal = '';
@@ -624,13 +614,7 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
       };
     });
     const pay = root.querySelector('#toll-pay');
-    if (pay) pay.onclick = () => {
-      const to = root.querySelector('#toll-to')?.value || '';
-      const amt = root.querySelector('#toll-amt')?.value || '';
-      const chain = root.querySelector('.toll-route.on')?.dataset.chain || '';
-      const line = to && amt && chain ? `pay ${amt} ETH to ${to} on ${chain}` : 'Pay the toll';
-      runAgent(line);
-    };
+    if (pay) pay.onclick = () => runAgent('Pay the toll');
     const cast = root.querySelector('#toll-broadcast');
     if (cast) cast.onclick = async () => {
       state.pending = 'Broadcasting the signed transaction…';

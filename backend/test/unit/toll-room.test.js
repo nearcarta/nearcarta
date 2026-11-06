@@ -31,28 +31,20 @@ function mem() {
   return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, v); } };
 }
 
-test('a toll command pays the address the visitor names', () => {
-  const quote = { payable: true, feeNear: '0.002', feeYocto: '2000000000000000000000', chains: [{ name: 'Base' }, { name: 'Arbitrum' }] };
-  const to = '0x1111111111111111111111111111111111111111';
-  const cross = parseTollCommand(`pay 0.00001 ETH to ${to} on Base`, quote);
-  assert.equal(cross.action, 'cross');
-  assert.equal(cross.to, to);
-  assert.equal(cross.chain, 'Base');
-  assert.equal(cross.asset, 'native');
-  const usdc = parseTollCommand(`send 0.5 USDC to ${to} on Arbitrum`, quote);
-  assert.equal(usdc.asset, 'usdc');
-  assert.equal(usdc.chain, 'Arbitrum');
-  assert.equal(parseTollCommand('Pay the toll', quote).action, 'recipient');
-  assert.match(parseTollCommand('Pay the toll', quote).hint, /recipient/);
-  assert.equal(parseTollCommand('cross to Arbitrum', quote).action, 'recipient');
-  const off = parseTollCommand(`pay 1 ETH to ${to} on Ethereum`, quote);
-  assert.equal(off.action, 'route');
-  assert.match(off.hint, /not on the live policy/);
+test('a toll command pays the live policy fee', () => {
+  const quote = { payable: true, feeNear: '0.002', feeYocto: '2000000000000000000000' };
+  const pay = parseTollCommand('Pay the toll', quote);
+  assert.equal(pay.action, 'pay');
+  assert.equal(pay.feeYocto, quote.feeYocto);
+  assert.equal(parseTollCommand('Pay the toll on Base', quote).action, 'pay');
+  const other = parseTollCommand('pay 0.001 NEAR', quote);
+  assert.equal(other.action, 'amount');
+  assert.match(other.hint, /0\.002/);
+  const arb = parseTollCommand('cross to Arbitrum', quote);
+  assert.equal(arb.action, 'route');
+  assert.match(arb.hint, /own instance/);
   assert.equal(parseTollCommand('Pay the toll').action, 'fee');
-  assert.equal(parseTollCommand('fill gas on Base', quote).action, 'gas');
-  assert.match(parseTollCommand('fill gas on Base', quote).hint, /Nothing was sent/);
   assert.equal(parseTollCommand('Check signature').action, 'check');
-  assert.equal(parseTollCommand('show my crossings', quote).action, 'ledger');
   assert.equal(parseTollCommand('Show policy').action, 'policy');
   assert.equal(parseTollCommand('Show my foreign address').action, 'address');
   const miss = parseTollCommand('hello');
@@ -251,14 +243,23 @@ test('the city toll door stays a link and does not resume an old visit', () => {
   const tollFn = read('app/design/D8_shops/js/apps.js');
   const body = tollFn.slice(tollFn.indexOf('export async function toll'), tollFn.indexOf('// Older gate calls'));
   assert.match(body, /Set up your agent in \/setup/);
+  assert.match(body, /boardPay/);
   assert.doesNotMatch(body, /propose_batch|signTx|\bask\(/);
   assert.doesNotMatch(body, /0\.001/);
   const plan = read('backend/scripts/toll-redeploy.js');
   assert.match(plan, /sends: false/);
   assert.match(plan, /method: 'close'/);
-  assert.match(plan, /set_policy/);
-  assert.match(plan, /allow_to: \[\]/);
+  assert.match(plan, /set_cross/);
+  assert.match(plan, /cross_after_board/);
+  assert.match(plan, /0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034/);
+  assert.match(plan, /base-1/);
+  assert.match(plan, /8453/);
+  assert.doesNotMatch(plan, /allow_to: \[\]/);
   assert.match(plan, /nearcarta\.near/);
+  const oath = read('contracts/toll/src/lib.rs');
+  assert.match(oath, /fn cross_after_board/);
+  assert.match(oath, /fn accept_pass/);
+  assert.doesNotMatch(oath, /fn set_policy/);
   assert.match(read('app/design/D9_world/world.css'), /min\(640px/);
   assert.match(read('app/src/panels/panels.css'), /pointer-events:auto/);
   assert.match(tear, /sends: false/);
@@ -317,7 +318,7 @@ test('the live policy prices the pass and a receipt is the only Base payment', a
   });
   assert.equal(live.quote.payable, true);
   assert.equal(live.quote.feeNear, '0.002');
-  assert.equal(live.quote.foreignTo, '');
+  assert.equal(live.quote.foreignTo, '0xbdfcee82bd42fefa58ee850b3709636a8b6b0034');
   assert.equal(formatWei('1000000000000'), '0.000001');
   assert.match(policyWords(live), /0\.002/);
   assert.match(splitWords(live), /no revenue split/);

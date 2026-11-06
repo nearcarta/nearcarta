@@ -17,7 +17,7 @@ import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
 import { issuePass } from './toll-pass.js';
 import { describeVisitorPass, readTollLive, tollLiveError } from './toll-views.js';
-import { broadcastLatest, relayById, walletPaths } from './toll-relay.js';
+import { broadcastLatest, relayById } from './toll-relay.js';
 import { verifyPropose } from './board-tx.js';
 import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
@@ -379,14 +379,6 @@ export function makeApp() {
       return c.json({ ...live, recent });
     }
     catch (e) { return c.json(tollLiveError(e)); }
-  });
-  app.get('/api/toll/wallet/:owner', limiter(20), async c => {
-    try {
-      const live = await readTollLive(view);
-      return c.json(walletPaths(c.req.param('owner'), live.chains || []));
-    } catch (e) {
-      return c.json({ ok: false, paths: [], note: 'The live policy did not answer. No address was invented.', error: String(e.message || 'no status').slice(0, 160) });
-    }
   });
   app.post('/api/toll/relay', limiter(10), async c => {
     try {

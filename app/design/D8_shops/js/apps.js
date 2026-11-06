@@ -360,12 +360,15 @@ export function ruleFor(o, clauseId = 'pay') {
 }
 
 export async function toll(quote) {
-  // City session only. A crossing needs the board to forward the row. This does not open a wallet or ask.
+  // City session only. The fee is the live policy. A missing board row must not open a wallet or ask.
   if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
-  if (quote?.action === 'cross') throw new Error('The board has to forward your row before this crossing can be signed. Nothing was signed.');
-  throw new Error(quote?.hint || 'Name the recipient address. Nothing was signed.');
+  if (!quote?.payable || !quote.feeYocto) throw new Error(quote?.hint || 'The live policy has no visitor fee. Nothing was signed.');
+  if (!TS.tollAllowed(pay()?.receivers)) throw new Error(TS.TOLL_NOT_LISTED);
+  const key = agent();
+  if (!key || !await proposeAccessKey(key)) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  return boardPay({ shop: 'toll', receiver: TS.TOLL_ACCT, amountY: String(quote.feeYocto) });
 }
-// Older gate calls stay for a wallet that already started one. A new crossing is named by the visitor.
+// Older gate calls stay for a wallet that already started one. A new toll is the policy fee on the board.
 const LS_TOLL = c => 'nearcarta.d8.toll.' + c;
 export const tollVisit = () => (S.charter ? JSON.parse(localStorage.getItem(LS_TOLL(S.charter)) || 'null') : null);
 const saveVisit = v => S.charter && localStorage.setItem(LS_TOLL(S.charter), JSON.stringify(v));
