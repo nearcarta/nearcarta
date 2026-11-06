@@ -75,7 +75,7 @@ test('the house deed links are brass and a missing oath is not a missing row', a
   assert.equal(body.kind, 'deed');
   assert.equal(body.contract, 'house.nearcarta.near');
   assert.equal(called, false);
-  const toll = read('app/src/panels/deep.js');
+  const toll = read('app/src/panels/toll-room.js');
   assert.match(toll, /class="primary" id="toll-sig" data-testid="check-signature"/);
 });
 

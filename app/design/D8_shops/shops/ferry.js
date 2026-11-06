@@ -2,17 +2,18 @@
 // The quote is a real dry 1Click read through the Nearcarta API (snapshot in data/live.js); the crossing re-enacts the visitor's picker choice, nothing is sent.
 // Before the boat leaves, a downgraded echo of the same quote is refused, with the same echo-guard rule as tech backend/src/ferry.js.
 // Sources: depth-plan-v2 §1; TOWN_PLAN Ferry live-oath-state (order chip); STRENGTHEN §4 standing order; brief-V V4; 1Click /v0/tokens.
-import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, tok, C } from '../js/core.js';
+import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, C } from '../js/core.js';
 import { SIGNED, UNSIGNED } from '../../D6_dashboards/src/data.js';
 import { boat } from '../js/town.js';
 import { row, h3, note, proof, paper, esc, mainnet } from './_ui.js';
 import { QUOTE } from '../data/live.js';
 import { M as PM, brassM, mesh, lantern } from './_props.js';
 import { chainLabel, orderChipHtml, ORDER_STATES } from '/panels/ferry-pair.js';
+import { pairHero, tokenStack } from '/panels/token-badge.js';
 
 const Q = QUOTE, short = a => a.slice(0, 8) + '…' + a.slice(-5);
 export const LABEL = 'A live quote. Nothing is sent.';
-export const HERO = `${tok(String(+Q.from.amt), Q.from.sym, { chain: Q.from.chain })}<span class="arrow" aria-hidden="true">→</span>${tok(Q.to.amt, Q.to.sym)}`;
+export const HERO = pairHero({ fromSym: Q.from.sym, fromChain: Q.from.chain, amt: String(+Q.from.amt), toSym: Q.to.sym, toChain: Q.to.chain, outAmt: Q.to.amt });
 export const RESULT = 'Crossed';
 const diffTxt = r => r.diffs ? r.diffs.map(d => `${d.field}: sent ${d.sent}, echo ${d.got}`).join('; ') : `receivers ${r.receivers.join(' + ')}`;
 const utc3 = s => { const d = new Date(s.replace(' UTC', 'Z').replace(' ', 'T')); if (isNaN(d)) return s; d.setUTCHours(d.getUTCHours() + 3); return d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC+3'; };
@@ -62,6 +63,8 @@ export default async function ferry(ctx) {
   await put(scene, 'decoration/props/crate_A_big', { x: 2.9, z: .75, ry: -.5, fitW: .42 }); await put(scene, 'decoration/props/barrel', { x: 2.6, z: -.9 });
   for (const [n, x, z] of [['waterlily_A', -.4, -.9], ['waterlily_B', .5, 1.1], ['waterplant_A', .9, -1.1], ['waterlily_A', -.7, 1.2]]) await put(scene, 'decoration/nature/' + n, { x, z, fitW: .35 }).catch(() => null);
   const b = boat(new THREE.Vector3(-.85, -.02, .2)); b.scale.setScalar(1.25); scene.add(b);
+  const FAR_X = 1.55;
+  let arrived = false;
   const crate = await put(scene, 'decoration/props/crate_A_small', { x: -2.0, y: .15, z: .25, fitW: .42 });
   const rob = await makeRobot(scene); rob.at(-3.6, 1.6);
   // Live cargo follows the city tray picker (extra.fromId/toId/q). Default remains the snapshot USDC→ZEC.
@@ -69,12 +72,11 @@ export default async function ferry(ctx) {
     fromSym: Q.from.sym, fromChain: Q.from.chain, toSym: Q.to.sym, toChain: Q.to.chain || 'Zcash',
     amt: String(+Q.from.amt), outAmt: Q.to.amt, result: RESULT,
   };
-  const icon = (sym, chain) => {
-    const ch = chainLabel(chain) || chain;
-    const html = tok(null, sym, { chain: ch });
-    return `<span class="tok">${html.replace('<span class="sym">' + sym + '</span>', '')}</span>`;
-  };
-  const heroOf = () => `${tok(cargo.amt, cargo.fromSym, { chain: chainLabel(cargo.fromChain) || cargo.fromChain })}<span class="arrow" aria-hidden="true">→</span>${tok(cargo.outAmt, cargo.toSym, { chain: chainLabel(cargo.toChain) || cargo.toChain })}`;
+  const icon = (sym, chain) => `<span class="tok">${tokenStack(sym, chainLabel(chain) || chain, { size: 28, chainSize: 14 })}</span>`;
+  const heroOf = () => pairHero({
+    fromSym: cargo.fromSym, fromChain: chainLabel(cargo.fromChain) || cargo.fromChain, amt: cargo.amt,
+    toSym: cargo.toSym, toChain: chainLabel(cargo.toChain) || cargo.toChain, outAmt: cargo.outAmt,
+  });
   const tags = [
     { obj: crate, pos: new THREE.Vector3(0, .9, 0), html: icon(cargo.fromSym, cargo.fromChain), cls: 'bare' },
     { obj: seal, pos: new THREE.Vector3(-.15, .55, 0), html: 'Downgrade refused', cls: 'no hide' },
@@ -128,14 +130,48 @@ export default async function ferry(ctx) {
     return cargo;
   };
   let t = 0;
+  const deliver = () => {
+    arrived = true;
+    hideRefuseTag();
+    seal.material = sealOk;
+    b.position.x = FAR_X;
+    swapsTo();
+    paintOrder('delivered');
+    rob.play('ThumbsUp', { once: true });
+    speak('');
+  };
   const panel = { title: 'Ferry', src: 'quote', srcNote: 'A real mainnet price quote. Nothing is sent and nothing is spent.', label: LABEL, hero: heroOf(), action: 'Load the cargo' };
   return {
-    rob, scene, camera, tags, applyPair, hideRefuse, setOrder: paintOrder, cargo,
+    rob, scene, camera, tags, applyPair, hideRefuse, setOrder: paintOrder, deliver, cargo,
     panel,
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(-2.8, 0, .9)]); rob.lookAt(crate.position); },
     *act(opts = {}) {
-      // Character beats (depth-plan-v2 §1): read board → refuse downgrade → sail → hand over far-chain coin.
+      // A live SUCCESS sails from here. The weigh already happened while 1Click was in flight.
+      if (opts.delivered && !opts.refused) {
+        hideRefuseTag();
+        speak('Seal matches. Casting off.', 'speech');
+        seal.material = sealOk;
+        sfx('allowed'); sfx('water');
+        rob.play('Idle');
+        paintOrder('transit');
+        const x0 = b.position.x;
+        yield tween(1.8, k => {
+          if (arrived) return;
+          b.position.x = x0 + (FAR_X - x0) * k;
+          b.rotation.z = Math.sin(k * 10) * .03;
+        }, easeInOut);
+        if (arrived) return;
+        swapsTo();
+        speak(`Far bank · ${cargo.toSym}`, 'speech');
+        yield tween(.6, k => pool.forEach((m, i) => { m.material.opacity = .55 * Math.min(1, Math.max(0, k * 1.4 - i * .2)); }));
+        deliver();
+        ctx.setResult('ok', cargo.result);
+        yield wait(1.2);
+        rob.play('Idle');
+        return;
+      }
+      // Success and refusal share the weigh and the hand-over. Only a real charter refusal shows "Downgrade refused".
       const refused = !!opts.refused;
       paintOrder('loading');
       speak(`Weighing ${cargo.fromSym} → ${cargo.toSym}`, 'speech');
@@ -144,27 +180,27 @@ export default async function ferry(ctx) {
       sfx('send'); const c0 = crate.position.clone(), c1 = new THREE.Vector3(-.85, .36, .2);
       yield tween(.55, k => { crate.position.lerpVectors(c0, c1, k); crate.position.y += Math.sin(k * Math.PI) * .5; });
       crate.removeFromParent(); b.add(crate); crate.position.set(0, .3 / 1.25, 0); crate.scale.multiplyScalar(1 / 1.25); rob.play('Idle');
-      // a downgraded echo of the quote drifts in from the far shore; the board refuses it
-      speak('Stale quote? Checking the seal…', 'speech');
-      slip.visible = true; const s0 = slip.position.clone(), s1 = new THREE.Vector3(-2.6, .8, -.84); rob.lookAt(seal.position);
-      yield tween(1.1, k => { slip.position.lerpVectors(s0, s1, k); slip.position.y += Math.sin(k * Math.PI) * .6; slip.rotation.z = Math.sin(k * 8) * .2; }, easeInOut);
-      seal.material = sealNo; showRefuseTag(); sfx('refuse'); rob.play('No', { once: true }); yield wait(.5);
-      const d0 = slip.position.clone(), d1 = new THREE.Vector3(-1.3, -.25, -.7);
-      yield tween(.9, k => { slip.position.lerpVectors(d0, d1, k); slip.position.y = d0.y + (d1.y - d0.y) * k * k; slip.rotation.x = -k * 1.4; slip.material.opacity = 1 - k * .9; });
-      slip.visible = false; yield wait(.3);
       if (refused) {
+        // a downgraded echo of the quote drifts in from the far shore; the board refuses it
+        speak('Stale quote? Checking the seal…', 'speech');
+        slip.visible = true; const s0 = slip.position.clone(), s1 = new THREE.Vector3(-2.6, .8, -.84); rob.lookAt(seal.position);
+        yield tween(1.1, k => { slip.position.lerpVectors(s0, s1, k); slip.position.y += Math.sin(k * Math.PI) * .6; slip.rotation.z = Math.sin(k * 8) * .2; }, easeInOut);
+        seal.material = sealNo; showRefuseTag(); sfx('refuse'); rob.play('No', { once: true }); yield wait(.5);
+        const d0 = slip.position.clone(), d1 = new THREE.Vector3(-1.3, -.25, -.7);
+        yield tween(.9, k => { slip.position.lerpVectors(d0, d1, k); slip.position.y = d0.y + (d1.y - d0.y) * k * k; slip.rotation.x = -k * 1.4; slip.material.opacity = 1 - k * .9; });
+        slip.visible = false; yield wait(.3);
         speak('Charter said no. Boat stays.', 'speech no');
         paintOrder('frozen');
         ctx.setResult('no', opts.reason || 'Refused by your rules');
         rob.play('No', { once: true }); yield wait(1.4); rob.play('Idle'); speak('');
         return;
       }
-      // the signed quote matches the request: the seal goes mint and the boat crosses with the visitor's pair
+      // Same delivered sequence for Load cargo and the AI agent: mint seal, then the boat sails. No refuse label.
+      hideRefuseTag();
       speak('Seal matches. Casting off.', 'speech');
       seal.material = sealOk;
-      hideRefuseTag();
       sfx('allowed'); sfx('water'); rob.play('Idle'); paintOrder('transit');
-      yield tween(2.2, k => { b.position.x = -.85 + 1.7 * k; b.rotation.z = Math.sin(k * 12) * .03; }, easeInOut);
+      yield tween(2.2, k => { if (arrived) return; b.position.x = -.85 + (FAR_X + .85) * k; b.rotation.z = Math.sin(k * 12) * .03; }, easeInOut);
       swapsTo(); speak(`Far bank · ${cargo.toSym}`, 'speech');
       yield tween(.9, k => pool.forEach((m, i) => { m.material.opacity = .55 * Math.min(1, Math.max(0, k * 1.4 - i * .2)); }));
       paintOrder('delivered');

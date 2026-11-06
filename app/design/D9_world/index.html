@@ -181,6 +181,18 @@ else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpr
     skipIntro();
   }, true);
   document.addEventListener('click', function (e) {
+    var toll = e.target.closest && e.target.closest('a[href="/shops/toll/"]');
+    if (toll && (typeof window.__openCityShop === 'function' || typeof window.__enterToll === 'function')) {
+      e.preventDefault();
+      skipIntro();
+      var tollDetails = toll.closest('details');
+      if (tollDetails) tollDetails.open = false;
+      if (typeof window.__openCityShop === 'function') window.__openCityShop('toll');
+      else window.__enterToll();
+      return;
+    }
+  }, true);
+  document.addEventListener('click', function (e) {
     var pointed = fromPointer;
     fromPointer = false;
     var nav = navOf(e);

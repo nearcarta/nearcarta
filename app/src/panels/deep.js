@@ -5,7 +5,7 @@ import { roomError } from '../room-error.js';
 import { pickBest, quoteLine, tokenChoices, chainsOf, filterTokens } from '../ferry-catalog.js';
 import { RECORDED, downloadCsv, exportCsv, queryFeed, verifyEntry } from '../chronicle-feed.js';
 import { explainCheck } from '../guard-score.js';
-import { TOLL_ADDRESS, TOLL_KEY, checkDerived } from '../toll-derive.js';
+import { mountTollRoom } from './toll-room.js';
 import { PROOF_HREF, TEE_PLAN, TEE_TIMEOUT_MS, liveTee, teeTimeoutWhy, teeView } from '../tee-view.js';
 import { mountArenaTray } from './arena/tray.js';
 import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
@@ -14,9 +14,9 @@ import { deedMarkup } from './deed.js';
 import { ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './hall.js';
 import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
-import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks } from './token-badge.js';
-import { agentCargoPlan, chainLabel } from './ferry-pair.js';
-import { explainQuoteMiss, SESSION_SWAP } from './ferry-settle.js';
+import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks, pickerListbox, bindPickerListbox } from './token-badge.js';
+import { agentCargoPlan, chainLabel, receiveAsk, receiveConfirm } from './ferry-pair.js';
+import { explainQuoteMiss, ferryStatusHtml, ferryStatusView, SESSION_SWAP, quoteRecipient, validateDestAddress, isNearAccountId } from './ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from './ferry-dock.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -53,15 +53,20 @@ export const DEFAULT_ROUTES = [
 ];
 
 const SAMPLE = {
-  zec: 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex',
   refund: '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e',
-  near: 'nearcarta.near',
 };
-/** Origin-chain refund: NEAR assets need a NEAR id; EVM corridors keep the 0x sample. */
-export function refundForChain(chain) {
+/** Origin-chain refund. A NEAR origin refunds to the visitor, never a treasury default. */
+export function refundForChain(chain, visitor) {
   const c = String(chain || '').toLowerCase();
-  return c === 'near' || c === 'near protocol' ? SAMPLE.near : SAMPLE.refund;
+  if (c === 'near' || c === 'near protocol') return isNearAccountId(visitor) ? visitor : '';
+  return SAMPLE.refund;
 }
+
+/** 1Click recipient. NEAR destinations use the visitor. Other chains use only the address they typed. */
+function quotePayee(to, visitor, receiveAt) {
+  return quoteRecipient(to, visitor, receiveAt);
+}
+
 
 /** Smart tray default: stables ~3, tiny for high-value, else 1. */
 export function defaultAmtFor(sym) {
@@ -111,9 +116,20 @@ function usdOf(line) {
   return `about $${Number.isFinite(n) ? n.toFixed(2) : line.usd}`;
 }
 
-function pickerOptions(choices, { q = '', chain = '', selected = '' } = {}) {
+function tokenOpts(choices, { q = '', chain = '', selected = '' } = {}) {
   const list = filterTokens(choices || [], { q, chain });
-  return list.map(t => `<option value="${esc(t.id)}"${t.id === selected ? ' selected' : ''}>${esc(t.label)}</option>`).join('');
+  const opts = list.map(t => ({ value: t.id, label: t.label, symbol: t.symbol, chain: t.chain, icon: t.icon || '' }));
+  // A fallback row only when the catalog itself is empty. A search that hides the
+  // current id must not paint that id back into the closed button.
+  if (!opts.length && selected && !(choices || []).length) {
+    const [symbol, chainName] = String(selected).split('|');
+    opts.push({ value: selected, label: `${symbol || ''} on ${chainName || ''}`.trim(), symbol: symbol || '', chain: chainName || '' });
+  }
+  return opts;
+}
+
+function chainOpts(choices) {
+  return [{ value: '', label: 'All', kind: 'chain' }].concat(chainsOf(choices).map(c => ({ value: c, label: c, kind: 'chain' })));
 }
 
 export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
@@ -133,13 +149,11 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const choices = state.choices || [];
   const nTok = choices.length;
   const tab = state.tab || 'swap';
-  const chainOpts = ['<option value="">All</option>']
-    .concat(chainsOf(choices).map(c => `<option value="${esc(c)}"${c === (state.chainFilter || '') ? ' selected' : ''}>${esc(c)}</option>`))
-    .join('');
   const defaultFromId = state.fromId || SESSION_SWAP.fromId;
   const defaultToId = state.toId || SESSION_SWAP.toId;
-  const fromOpts = pickerOptions(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId });
-  const toOpts = pickerOptions(choices, { q: state.tq || '', chain: '', selected: defaultToId });
+  const chainBox = pickerListbox({ id: 'f-chain', testid: 'ferry-chain-filter', options: chainOpts(choices), selected: state.chainFilter || '' });
+  const fromBox = pickerListbox({ id: 'f-from', testid: 'ferry-from', options: tokenOpts(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId }), selected: defaultFromId });
+  const toBox = pickerListbox({ id: 'f-to', testid: 'ferry-to', options: tokenOpts(choices, { q: state.tq || '', chain: '', selected: defaultToId }), selected: defaultToId });
   const pickFrom = String(defaultFromId).split('|');
   const pickSym = pickFrom[0] || meta.sym;
   const pickChain = pickFrom[1] || meta.chain;
@@ -191,29 +205,38 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       ${tokenStack(toSym, toChain, { size: 48, chainSize: 16 })}
     </div>`;
   const deposit = state.depositAddress
-    ? `<p class="ferry-deposit" data-testid="ferry-deposit">${state.depositMode === 'propose_call'
-      ? `Charter sent the NEAR deposit. Waiting on 1Click. <code data-testid="ferry-deposit-address">${esc(state.depositAddress)}</code>`
-      : `Send at most ${esc(state.depositUsd || '0.20')} USD yourself to <code data-testid="ferry-deposit-address">${esc(state.depositAddress)}</code>`}.</p><p data-testid="ferry-status">${esc(state.depositHelp || 'Waiting for the deposit. The boat has not delivered.')}</p>`
+    ? (state.depositMode === 'propose_call'
+      ? `<p class="ferry-status" data-testid="ferry-status">${ferryStatusHtml(state.ferryStatus || ferryStatusView({ txs: state.depositTxs, destChain: state.destChain, amount: state.outAmt, symbol: state.outSym }))}</p>`
+      : `<p class="ferry-deposit" data-testid="ferry-deposit">Send at most ${esc(state.depositUsd || '0.20')} USD yourself to <code data-testid="ferry-deposit-address">${esc(state.depositAddress)}</code>.</p><p data-testid="ferry-status">${esc(state.depositHelp || 'Waiting for the deposit. The boat has not delivered.')}</p>`)
     : '';
   const swap = `<div class="ferry-pane ferry-picker" data-pane="swap" data-testid="ferry-picker" ${tab === 'swap' ? '' : 'hidden'}>
       ${flow}
       <label class="field ferry-field"><span>Find a token</span><input id="f-find" data-testid="ferry-token-search" placeholder="ZEC, USDC, near" value="${esc(state.tq || '')}" autocomplete="off"></label>
-      <label class="field ferry-field"><span>Chain</span><select id="f-chain" data-testid="ferry-chain-filter">${chainOpts}</select></label>
-      <label class="field ferry-field"><span>You pay</span><select id="f-from" data-testid="ferry-from">${fromOpts || `<option value="${esc(defaultFromId)}">${esc(defaultFromId.replace('|', ' on '))}</option>`}</select></label>
-      <label class="field ferry-field"><span>You get</span><select id="f-to" data-testid="ferry-to">${toOpts || `<option value="${esc(defaultToId)}">${esc(defaultToId.replace('|', ' on '))}</option>`}</select></label>
+      <label class="field ferry-field"><span>Chain</span>${chainBox}</label>
+      <label class="field ferry-field"><span>You pay</span>${fromBox}</label>
+      <label class="field ferry-field"><span>You get</span>${toBox}</label>
       <label class="field ferry-field amt-field"><span>Amount</span>
         <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(amtVal)}" aria-label="Amount"><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
       </label>
-      <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote" ${acted ? 'hidden' : ''}>Get quote</button>
+      ${(() => {
+        const foreign = String(toChain || '').toLowerCase() !== 'near';
+        if (!foreign) return '';
+        const receive = validateDestAddress(toChain, state.receiveAt);
+        const bad = state.receiveAt && !receive.ok
+          ? `<p class="ferry-quote-err" data-testid="ferry-receive-error">${esc(receive.reason)}</p>`
+          : '';
+        return `<label class="field ferry-field" data-testid="ferry-receive-field"><span>Receive at</span><input id="f-receive" data-testid="ferry-receive" placeholder="Address on ${esc(toChain || 'this chain')}" value="${esc(state.receiveAt || '')}" autocomplete="off" spellcheck="false"></label>${bad}`;
+      })()}
+      <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote" ${acted ? 'hidden' : ''}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Get quote</button>
       ${rateLine}
       ${errLine}
       <div class="ferry-cargo-actions" data-testid="ferry-cargo-actions" ${showCargo ? '' : 'hidden'}>
-        <button type="button" class="primary ferry-cta" id="f-cargo" data-testid="ferry-load-cargo">Load cargo</button>
-        <button type="button" class="primary ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}>Ask charter · load cargo</button>
+        <button type="button" class="primary ferry-cta" id="f-cargo" data-testid="ferry-load-cargo"${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Load cargo</button>
+        <button type="button" class="primary ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Ask charter · load cargo</button>
       </div>
       <button type="button" class="primary ferry-cta" id="f-again" data-testid="ferry-again" ${showAgain ? '' : 'hidden'}>Get another quote</button>
       ${deposit}
-      ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}</p>` : ''}
+      ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}${state.renewSetup ? ` <a href="/setup" data-testid="${/refresh/i.test(state.renewLabel || '') ? 'ferry-refresh-key' : 'ferry-renew-setup'}">${esc(state.renewLabel || 'Renew agent key once in Setup')}</a>` : ''}${(state.landedLinks || []).map(l => ` <a class="tx" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('')}</p>` : ''}
     </div>`;
   const routesPane = `<div class="ferry-pane" data-pane="routes" ${tab === 'routes' ? '' : 'hidden'}>
       <p class="ferry-picker-note" data-testid="ferry-token-count" ${nTok ? '' : 'hidden'}>${nTok ? `${nTok} live tokens` : ''}</p>
@@ -233,18 +256,22 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       </details>
     </div>`;
   const rulesPane = `<div class="ferry-pane" data-pane="rules" ${tab === 'rules' ? '' : 'hidden'}>
-      <p class="ferry-kicker">Fund NEAR once in /setup. The session swap is about 0.05 wNEAR on NEAR to USDC on NEAR: the charter calls wrap.near and no wallet opens. Ask charter is a stamp, not the swap. Guest Load cargo is a demo. USDC on Base is optional Pay — you send it, and a bridge minimum can refuse it.</p>
+      <p class="ferry-kicker">Fund NEAR once in /setup. The session swap is about 0.05 wNEAR on NEAR to USDC on NEAR: the charter calls wrap.near and no wallet opens. A destination that is not NEAR needs the address that should receive the tokens. Ask charter is a stamp, not the swap. Guest Load cargo is a demo. Paying with USDC on Base is optional Pay — you send it, and a bridge minimum can refuse it.</p>
       <button type="button" class="primary ferry-cta" id="f-open-rules" data-testid="ferry-open-rules">Open /setup rules</button>
+      ${state.gasNear ? `<p data-testid="ferry-gas">Session gas left: ${esc(state.gasNear)} NEAR.${state.gasLow ? ' Session gas is low.' : ''}${state.gasLow ? ' <a href="/setup" data-testid="ferry-refresh-key">Refresh agent key</a>' : ''}</p>` : ''}
       <p class="ferry-agent-hint">Cap still binds. Session key signs with no wallet popup when ready.</p>
     </div>`;
   return `<div class="shop-stack ferry-card" data-testid="ferry-card">${tabs}${swap}${routesPane}${rulesPane}</div>`;
 }
 
-async function quoteOne(route, amount, hooks) {
+async function quoteOne(route, amount, hooks, receiveAt) {
   if (hooks.quote) return hooks.quote(route.id, amount || route.amt);
+  const visitor = hooks.visitor?.() || '';
+  const recipient = quotePayee({ chain: 'zec' }, visitor, receiveAt);
+  if (!recipient) return { ok: false, error: 'Enter the address on the destination chain that should receive the tokens.', dry: true };
   const res = await fetch(api() + '/api/ferry/quote', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ from: route.from, to: 'ZEC@zec', amount: String(amount || route.amt), recipient: SAMPLE.zec, refundTo: refundForChain(route.chain || parseRouteFrom(route.from).chain), privacy: 'basic' }),
+    body: JSON.stringify({ from: route.from, to: 'ZEC@zec', amount: String(amount || route.amt), recipient, refundTo: refundForChain(route.chain || parseRouteFrom(route.from).chain, visitor), privacy: 'basic' }),
   });
   return res.json();
 }
@@ -254,10 +281,21 @@ function idToFrom(id) {
   return sym && chain ? `${sym}@${chain}` : '';
 }
 
+function trayDestChain(state) {
+  return String(state?.toId || '').split('|')[1]?.toLowerCase() || '';
+}
+
 /** In-shop agent. A charter-ready swap calls onLoadCargo({ charter: true }) after the quote. No chain tx is built here. */
-export async function runFerryAgent({ text, state = {}, charterReady = false, quotePair, onLoadCargo, onPair, onSeal } = {}) {
+export async function runFerryAgent({ text, state = {}, charterReady = false, quotePair, onLoadCargo, onPair, onSeal, onNote } = {}) {
   const plan = agentCargoPlan(text, { charterReady });
   if (!plan.ok) return { ...plan, loaded: false };
+  if (plan.parsed?.receiveAt) state.receiveAt = plan.parsed.receiveAt;
+  if (!plan.parsed && plan.mode !== 'setup') {
+    const chain = trayDestChain(state);
+    if (chain && chain !== 'near' && !validateDestAddress(chain, state.receiveAt).ok) {
+      return { ok: false, loaded: false, hint: receiveAsk(chain) };
+    }
+  }
   if (plan.parsed) {
     onSeal?.();
     state.fromId = plan.parsed.fromId;
@@ -265,11 +303,11 @@ export async function runFerryAgent({ text, state = {}, charterReady = false, qu
     if (plan.parsed.amt) { state.amt = plan.parsed.amt; state.amtEdited = true; }
     state.q = null;
     state.quoteError = '';
-    state.charterNote = '';
+    state.charterNote = ''; state.renewSetup = false;
     state.sample = false;
     state.acted = false;
     let q;
-    try { q = await quotePair(plan.parsed.from, plan.parsed.to, plan.parsed.amt || state.amt || SESSION_SWAP.amt); }
+    try { q = await quotePair(plan.parsed.from, plan.parsed.to, plan.parsed.amt || state.amt || SESSION_SWAP.amt, state.receiveAt || ''); }
     catch (e) { onSeal?.(); return { ok: false, loaded: false, hint: explainQuoteMiss(e?.message || 'quote failed') }; }
     const failed = !q || ((q.ok === false || q.error) && !(q.to?.amount || q.amountOut));
     if (failed) { onSeal?.(); return { ok: false, loaded: false, quoted: false, hint: explainQuoteMiss(q?.error || q?.refused) }; }
@@ -280,19 +318,32 @@ export async function runFerryAgent({ text, state = {}, charterReady = false, qu
     onPair?.({
       from: plan.parsed.from, to: plan.parsed.to, amt: state.amt,
       fromSym: fs, fromChain: fc, toSym: ts, toChain: tc,
+      receiveAt: state.receiveAt || '',
       outAmt: q.to?.amount || q.amountOut || '', order: 'quoted',
     });
   } else if (!state.q && plan.mode !== 'setup') {
     return { ok: false, loaded: false, hint: 'Get a quote first. Try: Swap 0.05 wNEAR on NEAR to USDC' };
   }
-  if (plan.mode === 'quote') return { ok: true, loaded: false, quoted: true, mode: 'quote', hint: `Quote ready for ${plan.parsed.from} → ${plan.parsed.to}. Ask charter or Load cargo.` };
+  const where = receiveConfirm(trayDestChain(state) || String(plan.parsed?.to || '').split('@')[1], state.receiveAt);
+  const whereBit = where ? ` ${where}` : '';
+  if (plan.mode === 'quote') return { ok: true, loaded: false, quoted: true, mode: 'quote', hint: `Quote ready for ${plan.parsed.from} → ${plan.parsed.to}.${whereBit} Ask charter or Load cargo.` };
   if (plan.mode === 'setup') return { ok: true, loaded: false, mode: 'setup', hint: 'Open /setup to Ask charter. No wallet from here. You can still Load cargo as a guest.' };
   const sessionLoad = !!charterReady && plan.mode === 'guest';
-  await onLoadCargo?.({ charter: plan.mode === 'charter' });
+  if (where) onNote?.(where);
+  const loaded = await onLoadCargo?.({ charter: plan.mode === 'charter' });
+  if (loaded && (loaded.agentHint || loaded.lowGas)) {
+    const prefix = where ? `${where} ` : '';
+    return {
+      ok: true, loaded: true, mode: plan.mode, charter: plan.mode === 'charter',
+      hint: `${prefix}${loaded.agentHint || ''}`.trim(),
+      links: loaded.agentLinks || [],
+      lowGas: !!loaded.lowGas,
+    };
+  }
   const hint = plan.mode === 'charter'
-    ? 'Asking the charter under your cap. No wallet.'
+    ? `${where ? where + ' ' : ''}Asking the charter under your cap. No wallet.`
     : sessionLoad
-      ? 'Session is on. Load cargo asks for a deposit address, then propose_call on wrap.near. No wallet. You are not asked to send USDC on Base.'
+      ? `${where ? where + ' ' : ''}Session is on. Load cargo asks for a deposit address, then propose_call on wrap.near. No wallet. You are not asked to send USDC on Base.`
       : 'Demo crossing. Not a settled swap. The boat does not say delivered.';
   return { ok: true, loaded: true, mode: plan.mode, charter: plan.mode === 'charter', hint };
 }
@@ -334,54 +385,102 @@ function mountFerry(root, hooks) {
         state.toId = 'ZEC|zec';
         state.q = null;
         state.quoteError = '';
-        state.charterNote = '';
+        state.charterNote = ''; state.renewSetup = false;
         state.acted = false;
         state.sample = false;
         state.tab = 'swap';
+        emitPair('jetty');
         paint();
       };
     });
+    const emitPair = (order = 'jetty') => {
+      if (typeof hooks.onPair !== 'function') return;
+      const from = idToFrom(state.fromId);
+      const to = idToFrom(state.toId);
+      const [fs, fc] = String(state.fromId || '').split('|');
+      const [ts, tc] = String(state.toId || '').split('|');
+      hooks.onPair({ from, to, amt: state.amt, fromSym: fs, fromChain: fc, toSym: ts, toChain: tc, order });
+    };
+    const clearQuote = () => { state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
+    const onFrom = (value) => {
+      state.fromEdited = true;
+      state.fromId = value;
+      if (!state.amtEdited) state.amt = defaultAmtFor((value || '').split('|')[0]);
+      clearQuote();
+      emitPair('jetty');
+      localPaint();
+    };
+    const onTo = (value) => {
+      state.toEdited = true;
+      state.toId = value;
+      clearQuote();
+      emitPair('jetty');
+      localPaint();
+    };
+    const swapBox = (sel, html) => {
+      const el = q$(root, sel);
+      if (!el) return null;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = html;
+      const next = wrap.firstElementChild;
+      if (!next) return el;
+      el.replaceWith(next);
+      return next;
+    };
     const refill = () => {
-      const from = q$(root, '#f-from');
-      const to = q$(root, '#f-to');
+      const keepFrom = state.fromId || q$(root, '#f-from')?.dataset.value || '';
+      const keepTo = state.toId || q$(root, '#f-to')?.dataset.value || '';
+      const from = swapBox('#f-from', pickerListbox({
+        id: 'f-from', testid: 'ferry-from',
+        options: tokenOpts(state.choices || [], { q: state.tq || '', chain: state.chainFilter || '', selected: keepFrom }),
+        selected: keepFrom,
+      }));
+      const to = swapBox('#f-to', pickerListbox({
+        id: 'f-to', testid: 'ferry-to',
+        options: tokenOpts(state.choices || [], { q: state.tq || '', chain: '', selected: keepTo }),
+        selected: keepTo,
+      }));
+      const fromOptions = tokenOpts(state.choices || [], { q: state.tq || '', chain: state.chainFilter || '', selected: keepFrom });
+      if (fromOptions.some(o => o.value === keepFrom)) state.fromId = keepFrom;
+      else if (from?.dataset.value) state.fromId = from.dataset.value;
+      const toOptions = tokenOpts(state.choices || [], { q: state.tq || '', chain: '', selected: keepTo });
+      if (toOptions.some(o => o.value === keepTo)) state.toId = keepTo;
+      else {
+        const z = toOptions.find(o => String(o.value).startsWith('ZEC|'));
+        state.toId = z ? z.value : (to?.dataset.value || keepTo);
+      }
+      if (from) bindPickerListbox(from, onFrom);
+      if (to) bindPickerListbox(to, onTo);
       const note = q$(root, '[data-testid=ferry-token-count]');
-      if (from) {
-        const keep = state.fromId || from.value;
-        from.innerHTML = pickerOptions(state.choices || [], { q: state.tq || '', chain: state.chainFilter || '', selected: keep });
-        if ([...from.options].some(o => o.value === keep)) from.value = keep;
-        else if (from.options[0]) from.value = from.options[0].value;
-        state.fromId = from.value;
-      }
-      if (to) {
-        const keep = state.toId || to.value;
-        to.innerHTML = pickerOptions(state.choices || [], { q: state.tq || '', chain: '', selected: keep });
-        if ([...to.options].some(o => o.value === keep)) to.value = keep;
-        else {
-          const z = [...to.options].find(o => o.value.startsWith('ZEC|'));
-          if (z) to.value = z.value;
-        }
-        state.toId = to.value;
-      }
       if (note && state.choices?.length) { note.hidden = false; note.textContent = `${state.choices.length} live`; }
       const sym = q$(root, '#f-sym');
       if (sym && state.fromId) sym.textContent = state.fromId.split('|')[0] || '';
       bindTokenFallbacks(root);
     };
     const chain = q$(root, '#f-chain');
-    if (chain) chain.onchange = (e) => { state.chainFilter = e.target.value; refill(); };
+    if (chain) bindPickerListbox(chain, (value) => { state.chainFilter = value; refill(); });
     const find = q$(root, '#f-find');
     if (find) find.oninput = (e) => { state.tq = e.target.value; refill(); };
     const from = q$(root, '#f-from');
-    if (from) from.onchange = (e) => {
-      state.fromEdited = true;
-      state.fromId = e.target.value;
-      if (!state.amtEdited) state.amt = defaultAmtFor((e.target.value || '').split('|')[0]);
-      state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; refill(); localPaint();
-    };
+    if (from) bindPickerListbox(from, onFrom);
     const to = q$(root, '#f-to');
-    if (to) to.onchange = (e) => { state.toEdited = true; state.toId = e.target.value; state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; };
+    if (to) bindPickerListbox(to, onTo);
     const amt = q$(root, '#f-amt');
-    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; };
+    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
+    const recv = q$(root, '#f-receive');
+    if (recv) recv.oninput = (e) => {
+      const pos = e.target.selectionStart;
+      state.receiveAt = e.target.value;
+      state.q = null;
+      state.quoteError = '';
+      state.charterNote = '';
+      state.renewSetup = false;
+      state.acted = false;
+      state.sample = false;
+      paint();
+      const again = q$(root, '#f-receive');
+      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch { /* number-less */ } }
+    };
     const compare = q$(root, '#f-compare');
     if (compare) compare.onclick = () => runQuotes(compare);
     const one = q$(root, '#f-quote');
@@ -406,12 +505,14 @@ function mountFerry(root, hooks) {
     const agentGo = q$(root, '#f-agent-go') || dockDoc?.getElementById('f-agent-go');
     if (agentGo) agentGo.onclick = (e) => { e.preventDefault(); dispatchFerryDock(dockDoc); };
   };
-  function agentLog(text) {
+  function agentLog(text, links) {
     state.agentHint = text || '';
     const el = document.getElementById('f-agent-log');
     if (!el) return;
     el.hidden = !text;
-    el.textContent = text || '';
+    const extraLinks = (links || []).map(l => `<a class="tx" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join(' ');
+    if (extraLinks) el.innerHTML = `${esc(text || '')} ${extraLinks}`;
+    else el.textContent = text || '';
   }
   function clearSeal() { hooks.hideRefuse?.(); hooks.setOrder?.('jetty'); }
   async function runAgent(text) {
@@ -422,21 +523,25 @@ function mountFerry(root, hooks) {
       text: line,
       state,
       charterReady: !!(hooks.charterReady && hooks.charterReady()),
-      quotePair: (from, to, amt) => {
-        if (hooks.quotePair) return hooks.quotePair(from, to, amt);
+      quotePair: (from, to, amt, receiveAt) => {
+        if (hooks.quotePair) return hooks.quotePair(from, to, amt, receiveAt);
         const originChain = String(from).split('@')[1] || '';
+        const visitor = hooks.visitor?.() || hooks.state?.me;
+        const recipient = quotePayee(to, visitor, receiveAt);
+        if (!recipient) return Promise.resolve({ ok: false, error: 'Enter the address on the destination chain that should receive the tokens.' });
         return fetch(api() + '/api/ferry/quote', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ from, to, amount: String(amt || SESSION_SWAP.amt), recipient: SAMPLE.zec, refundTo: refundForChain(originChain), privacy: 'basic' }),
+          body: JSON.stringify({ from, to, amount: String(amt || SESSION_SWAP.amt), recipient, refundTo: refundForChain(originChain, visitor), privacy: 'basic' }),
         }).then(r => r.json());
       },
+      onNote: (text) => agentLog(text),
       onPair: hooks.onPair,
       onLoadCargo: (opts) => hooks.onLoadCargo && hooks.onLoadCargo(opts),
       onSeal: clearSeal,
     });
     if (!result?.ok) clearSeal();
     if (result?.ok) state.agentText = '';
-    agentLog(result?.hint || (result?.ok ? '' : 'That line did not run.'));
+    agentLog(result?.hint || (result?.ok ? '' : 'That line did not run.'), result?.links);
     state.tab = 'swap';
     if (!result?.loaded) paint();
     return result;
@@ -480,18 +585,31 @@ function mountFerry(root, hooks) {
     const from = idToFrom(state.fromId) || routes[state.ri || 0]?.from;
     const to = idToFrom(state.toId) || SESSION_SWAP.to;
     if (!from) return;
+    const toChain = String(to).split('@')[1] || '';
+    if (toChain && toChain !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok) {
+      state.quoteError = 'Enter the address on the destination chain that should receive the tokens.';
+      state.q = null;
+      paint();
+      return;
+    }
     holdButton(btn, 'Asking for a live quote.');
     const originChain = from.split('@')[1] || '';
     let q;
     try {
-      if (hooks.quotePair) q = await hooks.quotePair(from, to, state.amt || defaultAmtFor(from.split('@')[0]));
-      else if (hooks.quote && from === routes[state.ri || 0]?.from) q = await hooks.quote(routes[state.ri || 0].id, state.amt || routes[state.ri || 0].amt);
+      if (hooks.quotePair) q = await hooks.quotePair(from, to, state.amt || defaultAmtFor(from.split('@')[0]), state.receiveAt || '');
+      else if (hooks.quote && from === routes[state.ri || 0]?.from && toChain === 'zec') q = await hooks.quote(routes[state.ri || 0].id, state.amt || routes[state.ri || 0].amt);
       else {
-        const res = await fetch(api() + '/api/ferry/quote', {
-          method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient: SAMPLE.zec, refundTo: refundForChain(originChain), privacy: 'basic' }),
-        });
-        q = await res.json();
+        const visitor = hooks.visitor?.() || state.me;
+        const recipient = quotePayee(to, visitor, state.receiveAt);
+        if (!recipient) {
+          q = { ok: false, error: 'Enter the address on the destination chain that should receive the tokens.' };
+        } else {
+          const res = await fetch(api() + '/api/ferry/quote', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient, refundTo: refundForChain(originChain, visitor), privacy: 'basic' }),
+          });
+          q = await res.json();
+        }
       }
     } catch (e) {
       q = { ok: false, error: e?.message || 'quote failed', from: { symbol: from.split('@')[0], chain: originChain, amount: state.amt }, to: { symbol: to.split('@')[0], chain: to.split('@')[1] }, dry: true };
@@ -504,7 +622,7 @@ function mountFerry(root, hooks) {
     state.sample = !failed && !state.quotes.some(v => v.amountOut != null);
     state.fstatus = null;
     state.quoted = true;
-    state.charterNote = '';
+    state.charterNote = ''; state.renewSetup = false;
     state.acted = false;
     state.q = failed ? null : q;
     state.tab = 'swap';
@@ -515,6 +633,7 @@ function mountFerry(root, hooks) {
         from, to, amt: state.amt || defaultAmtFor(from.split('@')[0]),
         fromSym: fs || from.split('@')[0], fromChain: fc || from.split('@')[1],
         toSym: ts || to.split('@')[0], toChain: tc || to.split('@')[1],
+        receiveAt: state.receiveAt || '',
         outAmt: q.to?.amount || q.amountOut || '',
         order: 'quoted',
       });
@@ -528,7 +647,7 @@ function mountFerry(root, hooks) {
     holdButton(btn, 'Comparing routes. Waiting for the quotes.');
     const raw = [];
     for (const r of routes) {
-      try { raw.push(await quoteOne(r, state.amtEdited ? state.amt : r.amt, hooks)); }
+      try { raw.push(await quoteOne(r, state.amtEdited ? state.amt : r.amt, hooks, state.receiveAt)); }
       catch { raw.push({ label: r.label, from: { amount: state.amt || r.amt, symbol: r.sym, chain: r.chain }, to: { symbol: 'ZEC', chain: 'zec' }, dry: true }); }
     }
     const lines = raw.map((q, i) => {
@@ -599,24 +718,8 @@ function mountGuard(root, hooks) {
   };
 }
 
-function mountToll(root) {
-  const d = checkDerived({ publicKey: TOLL_KEY, recorded: TOLL_ADDRESS });
-  const chains = (d.chains || []).map(c => `<li data-testid="toll-chain">${esc(c.chain)} ${esc(c.path)}${c.address ? ' ' + esc(c.address) : ''} — ${esc(c.note)}</li>`).join('');
-  root.innerHTML = `<div class="shop-stack"><div data-testid="toll-derive"><p>${esc(d.text)}</p><ul>${chains}</ul></div><button type="button" class="primary" id="toll-sig" data-testid="check-signature">Check signature</button><p id="toll-sig-out" data-testid="check-signature-out"></p></div>`;
-  const b = q$(root, '#toll-sig');
-  b.onclick = async () => {
-    const out = q$(root, '#toll-sig-out');
-    out.textContent = 'Checking the recorded signature…';
-    b.disabled = true;
-    try {
-      const live = await fetch(api() + '/api/mainnet').then(r => r.json());
-      const hash = live?.toll?.txs?.owner_toll_pay_allowlisted;
-      const sender = live?.toll?.owner || '';
-      const st = await fetch(api() + '/api/tx-status/' + encodeURIComponent(hash || '') + '?sender=' + encodeURIComponent(sender)).then(r => r.json());
-      out.textContent = st.pass ? 'Pass. The recorded signature is on chain.' : 'Fail. ' + (st.why || 'The chain did not confirm it.');
-    } catch { out.textContent = 'Fail. The chain check did not answer.'; }
-    b.disabled = false;
-  };
+function mountToll(root, hooks) {
+  return mountTollRoom(root, hooks || {}, { api: api() });
 }
 
 function mountChronicle(root, hooks) {
