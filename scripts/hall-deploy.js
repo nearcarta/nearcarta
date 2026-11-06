@@ -23,6 +23,9 @@ if (process.argv.some(a => String(a).includes('ed25519:'))) {
 const shop = MAIN.extras.townhall.contract;
 const owner = MAIN.extras.townhall.owner;
 const board = MAIN.board.contract;
+// The Guardhouse clears a delivered part; without it no release path can run.
+const guard = MAIN.guard?.contract || 'guard.nearcarta.near';
+const guardExpectedCodeHash = MAIN.guard?.code_hash || '';
 const rpcUrl = MAIN.rpc;
 const oldWasmPath = new URL('../contracts/artifacts/townhall.p86.wasm', import.meta.url);
 const newWasmPath = new URL('../contracts/artifacts/hall.wasm', import.meta.url);
@@ -87,6 +90,15 @@ async function boardAccount() {
   }
 }
 
+// The Guardhouse that alone may clear a part for release.
+async function guardAccount() {
+  try {
+    return await rpc('query', { request_type: 'view_account', finality: 'final', account_id: guard });
+  } catch {
+    return null;
+  }
+}
+
 async function accessKeys() {
   return rpc('query', { request_type: 'view_access_key_list', finality: 'final', account_id: shop });
 }
@@ -117,8 +129,21 @@ function printPlan(plan) {
   console.log('Shop: ' + plan.shop);
   console.log('Owner: ' + plan.owner);
   console.log('Board: ' + plan.board);
+  console.log('Guard: ' + plan.guard);
   console.log('Dao: ' + plan.dao);
   console.log('Wasm: contracts/artifacts/hall.wasm (' + plan.wasm.bytes + ' bytes, sha256 ' + plan.wasm.sha256 + ')');
+  console.log('');
+  console.log('Legacy obligations on the live v1 code:');
+  if (!plan.legacy.rows.length) console.log('  none recorded');
+  for (const r of plan.legacy.rows) {
+    console.log('  ' + r.status.padEnd(14) + r.hash.slice(0, 16) + '… ' + r.amount + ' yoctoNEAR (' + (Number(BigInt(r.amount) / 10n ** 18n) / 1e6).toFixed(6) + ' NEAR)'
+      + (r.payee ? ' -> ' + r.payee : '')
+      + (r.sourceTx ? '  post ' + r.sourceTx : '')
+      + (r.claimedBy ? '  claimed_by ' + r.claimedBy : ''));
+  }
+  console.log('  owed now: ' + plan.legacy.owedYocto + ' yoctoNEAR (' + plan.legacy.owedNear + ' NEAR)');
+  console.log('  already paid: ' + plan.legacy.paidYocto + ' yoctoNEAR (' + plan.legacy.paidNear + ' NEAR)');
+  console.log('');
   console.log('Storage now: ' + plan.storage.bytesNow + ' bytes, stake ' + plan.storage.stakeNow + ' yoctoNEAR (' + plan.storage.stakeNowNear + ' NEAR)');
   console.log('Storage after: ' + plan.storage.bytesAfter + ' bytes, stake ' + plan.storage.stakeAfter + ' yoctoNEAR (' + plan.storage.stakeAfterNear + ' NEAR)');
   console.log('  this is the peak during the tx. migrate drops the old bounty and state records, so the settled stake is lower.');
@@ -163,8 +188,8 @@ async function gather() {
     console.error('The stored oath wasm does not match mainnet.json.');
     process.exit(1);
   }
-  const [acct, keys, state, bounties, boardAcct] = await Promise.all([
-    account(), accessKeys(), view('get_state', {}), view('get_bounties', {}), boardAccount(),
+  const [acct, keys, state, bounties, boardAcct, guardAcct] = await Promise.all([
+    account(), accessKeys(), view('get_state', {}), view('get_bounties', {}), boardAccount(), guardAccount(),
   ]);
   const full = (keys.keys || []).filter(k => k.access_key?.permission === 'FullAccess');
   const labels = Object.entries(MAIN.extras.townhall.txs).filter(([name]) => name.includes('post_bounty'));
@@ -186,6 +211,9 @@ async function gather() {
     smokeWorkers: smokeWorkers().filter(id => id !== shop && id !== board),
     boardCodeHash: boardAcct?.code_hash || '',
     boardExpectedCodeHash: MAIN.board?.code_hash || '',
+    guard,
+    guardCodeHash: guardAcct?.code_hash || '',
+    guardExpectedCodeHash,
   });
 }
 
@@ -245,13 +273,29 @@ if (!boardNow || boardNow.code_hash !== (MAIN.board?.code_hash || boardNow.code_
   console.error('Refusing to deploy: ' + board + ' is not the v2 wasm this contract expects. Nothing else was signed.');
   process.exit(1);
 }
+// Same re-read for the guard: the migrate names it, and a guard on another wasm
+// would leave every release path dead.
+const guardNow = await guardAccount();
+if (!guardNow || (guardExpectedCodeHash && guardNow.code_hash !== guardExpectedCodeHash)) {
+  console.error('Refusing to deploy: ' + guard + ' is not the guard wasm this contract expects. Nothing else was signed.');
+  process.exit(1);
+}
+// Re-read the obligations: a bounty posted between the dry-run and this send must
+// not be wiped by migrate.
+const [bountiesNow, stateNow] = await Promise.all([view('get_bounties', {}), view('get_state', {})]);
+const openNow = bountiesNow.filter(([, r]) => r.claimed_by == null || r.claimed_by === '');
+const owedNow = openNow.reduce((n, [, r]) => n + BigInt(r.amount), 0n);
+if (owedNow !== BigInt(plan.legacy.owedYocto) || Number(stateNow.version) !== Number(state.version ?? 1)) {
+  console.error('Refusing to deploy: the legacy obligations changed since the dry-run (owed ' + owedNow.toString() + ' yoctoNEAR now, ' + plan.legacy.owedYocto + ' at plan time). Nothing else was signed.');
+  process.exit(1);
+}
 const migrated = await signer.signAndSendTransaction({
   receiverId: shop,
   waitUntil: 'FINAL',
   throwOnFailure: false,
   actions: [
     A.deployContract(new Uint8Array(wasm)),
-    A.functionCall('migrate', { owner, board }, MIGRATE_TGAS * TG, 0n),
+    A.functionCall('migrate', { owner, board, guard, legacy_paid: plan.legacy.snapshot }, MIGRATE_TGAS * TG, 0n),
   ],
 });
 const badDeploy = migrated.status?.Failure || migrated.receipts_outcome?.find(x => x.outcome.status.Failure)?.outcome.status.Failure;
@@ -259,11 +303,16 @@ console.log('Deploy ' + (badDeploy ? 'FAILED ' : 'OK ') + (migrated.transaction?
 if (badDeploy) process.exit(1);
 const hall = await view('get_hall', {});
 console.log('View get_hall: ' + JSON.stringify(hall));
-if (hall.owner !== owner || hall.board !== board || String(hall.jobs) !== '0') {
+if (hall.owner !== owner || hall.board !== board || hall.guard !== guard || String(hall.jobs) !== '0') {
   console.error('The post-deploy view does not match the migrate arguments. Stop and read the account.');
   process.exit(1);
 }
-console.log('get_hall matches: owner ' + owner + ', board ' + board + ', 0 jobs.');
+if (!Array.isArray(hall.legacy_paid) || hall.legacy_paid.length !== plan.legacy.snapshot.length) {
+  console.error('The migrated state does not carry the legacy snapshot. Stop and read the account.');
+  process.exit(1);
+}
+console.log('get_hall matches: owner ' + owner + ', board ' + board + ', guard ' + guard + ', 0 jobs, ' + hall.legacy_paid.length + ' legacy rows recorded.');
+console.log('  legacy snapshot: ' + JSON.stringify(hall.legacy_paid));
 const workers = smokeWorkers().filter(id => id !== shop && id !== board);
 if (workers.length < 1) {
   console.log('Smoke skipped. Set HALL_SMOKE_A and HALL_SMOKE_B.');

@@ -39,7 +39,7 @@ import { txVerdict } from '../../shared/net/tx-verdict.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 import { pastPrompts as arenaPrompts } from './arena.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
-import { marketStatus, readBounties } from './hall-market.js';
+import { marketStatus, marketWorkers, readBounties } from './hall-market.js';
 import { derivedFor, lineFor } from './house-views.js';
 import { HOUSE_LEGACY, HOUSE_SHOP } from '../../shared/house/shop.js';
 
@@ -75,6 +75,11 @@ const lastGood = (name, fn) => async () => {
     const g = good.get(name);
     if (g && OVERLOAD.test(String(e.message)) && Date.now() - g.at < 15 * 60e3)
       return g.v && typeof g.v === 'object' && !Array.isArray(g.v) ? { ...g.v, stale: true, stale_age_s: Math.round((Date.now() - g.at) / 1000) } : g.v;
+    // A retired or missing contract is a fact about the deployment, not a server fault.
+    // The room reads this instead of a 500, which used to take the whole city tray down.
+    if (e?.status === 404 || e?.status === 503) {
+      return { error: String(e.message || 'unavailable').slice(0, 200), retired: true, status: e.status, at: new Date().toISOString() };
+    }
     throw e;
   }
 };
@@ -446,7 +451,13 @@ export function makeApp() {
     } catch (e) { return c.json({ error: e.message }, e.status || 502); }
   });
   app.get('/api/mistbank/street/:txid', limiter(10), async c => c.json(mist.streetCheck(await mist.fetchStreet(c.req.param('txid')))));
-  app.get('/api/hall/market', limiter(20), async c => c.json(await marketStatus({ token: secret.hallMarket(), fetchImpl: fetch })));
+  app.get('/api/hall/market', limiter(20), async c => {
+    // Public worker discovery needs no token; the token path adds the buyer view.
+    const { workers, status } = await marketWorkers({ fetchImpl: fetch });
+    return c.json(await marketStatus({ token: secret.hallMarket(), fetchImpl: fetch, workers, agentsStatus: status }));
+  });
+  // Real third-party agents on the market, no credential and no write.
+  app.get('/api/hall/workers', limiter(30), async c => c.json(await marketWorkers({ fetchImpl: fetch })));
   app.get('/api/hall/bounties', limiter(20), async c => c.json(await readBounties({ view })));
   app.get('/api/townhall', limiter(20), async c => c.json(await reads.townhall()));
   app.get('/api/townhall/can-file/:account', limiter(20), async c => {
