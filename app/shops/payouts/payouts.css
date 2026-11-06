@@ -112,11 +112,12 @@ body.payouts-tray #shopUI textarea{max-width:100%;min-width:0;box-sizing:border-
 .payouts-agent-char[aria-expanded="true"] .payouts-agent-badge{opacity:.35}
 .payouts-agent-name{margin:0;color:#f5d08a;font:700 11px/1.2 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
 .payouts-agent-pop{
-  width:min(300px,calc(100vw - 140px));box-sizing:border-box;padding:10px;border-radius:14px;
+  width:min(380px,calc(100vw - 24px));max-height:min(46dvh,320px);overflow:auto;
+  box-sizing:border-box;padding:10px;border-radius:14px;
   border:1px solid #d6b46a66;background:#1f1a15;box-shadow:0 12px 28px rgba(0,0,0,.4);
   display:grid;gap:8px;
 }
-.payouts-agent-log{margin:0;color:#f5d08a;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.payouts-agent-log{margin:0;color:#f5d08a;font:600 13px/1.45 system-ui,sans-serif;overflow-wrap:anywhere;white-space:normal}
 .payouts-agent-pop .payouts-agent-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px}
 .payouts-agent-pop input{
   width:100%;min-width:0;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:10px;
@@ -139,10 +140,44 @@ body.payouts-tray #shopUI textarea{max-width:100%;min-width:0;box-sizing:border-
   body.payouts-tray #shopUI .ferry-flow .tic .ti{width:36px!important;height:36px!important}
   body.payouts-tray #shopUI textarea{height:44px;min-height:44px}
   #payouts-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-  .payouts-agent-pop{width:min(240px,calc(100vw - 120px))}
+  .payouts-agent-pop{width:min(320px,calc(100vw - 16px))}
+  body.payouts-tray #shopUI .ferry-field > input,
+  body.payouts-tray #shopUI .ferry-field select{font-size:16px}
 }
 
 nav.all-shops button[data-enter-shop]{
   background:transparent;border:0;padding:0;color:#fff8ee;font:600 16px/1.35 system-ui,sans-serif;cursor:pointer;text-align:left;
 }
 nav.all-shops button[data-enter-shop]:hover,nav.all-shops button[data-enter-shop]:focus-visible{color:#f5d08a}
+
+/* #shopUI button clears backgrounds. The active pill has to win that rule. */
+body.payouts-tray #shopUI #t-form .ferry-tab{
+  background:#17130f;color:#d4c4a8;border:0;box-shadow:none;
+}
+body.payouts-tray #shopUI #t-form .ferry-tab.on,
+body.payouts-tray #shopUI #t-form .ferry-tab[aria-selected="true"]{
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;border:0;
+}
+body.payouts-tray #shopUI .payout-status{min-height:3.4em;display:grid;align-content:start;gap:2px}
+body.payouts-tray #shopUI .payout-status p{margin:0;min-height:1.35em}
+body.payouts-tray #shopUI .payout-calm{margin:0;color:#d4c4a8;font:600 13px/1.35 system-ui,sans-serif}
+body.payouts-tray #shopUI .ferry-flow .tic.payout-mark{position:relative;display:inline-flex;width:48px;height:48px}
+body.payouts-tray #shopUI .ferry-flow .tic.payout-mark > .ti{width:48px;height:48px;display:block}
+body.payouts-tray #shopUI .ferry-flow .tic.payout-mark .ci{
+  position:absolute;right:-4px;bottom:-4px;width:22px!important;height:22px!important;
+  border-radius:999px;overflow:hidden;box-shadow:0 0 0 2px #17130f;font-size:0;
+}
+body.payouts-tray #shopUI .ferry-flow .tic.payout-mark .ci svg{width:22px;height:22px;display:block}
+body.payouts-tray #shopUI .payout-facts,
+body.payouts-tray #shopUI .payout-link{margin:0;color:#fff8ee;font:600 13px/1.4 system-ui,sans-serif;overflow-wrap:anywhere}
+body.payouts-tray #shopUI .payout-link a{color:#f5d08a}
+body.payouts-tray #shopUI #p-copy{
+  min-height:44px;padding:0 14px;border-radius:12px;border:1px solid #d6b46a;
+  background:#241c14;color:#f5d08a;font:700 14px/1 system-ui,sans-serif;cursor:pointer;
+}
+body.payouts-tray #shopUI .payout-qr{display:flex;justify-content:center}
+body.payouts-tray #shopUI .payout-qr svg{width:168px;height:168px;background:#fff8ee;border-radius:12px}
+body.payouts-tray #shopUI input[type="date"],
+body.payouts-tray #shopUI input[type="datetime-local"]{color-scheme:dark}
+body.payouts-tray #shopUI .ferry-field input::placeholder,
+body.payouts-tray #shopUI .ferry-field textarea::placeholder{color:#8c7b66;opacity:1}

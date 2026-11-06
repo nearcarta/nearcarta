@@ -5,9 +5,10 @@ import { readFileSync } from 'node:fs';
 import {
   MISS_HINT, nearFromYocto, hostedCeiling, classifyPayroll, agentCommand, rowsForCommand, invoiceQuoteBody,
   invoiceDelivered, invoiceStatusLine, cinemaOk, sealText, accountantCsv, canonicalInvoice, invoiceRecordId,
-  publicInvoice, registrationVerdict, payrollKey,
+  publicInvoice, registrationVerdict, payrollKey, addressOk, quoteLine, invoiceDoneLine, paymentLinks, usdcChoices,
 } from '../../../app/src/panels/payouts-plan.js';
-import { createInvoice, readInvoice, checkoutInvoice, quoteInvoice, resetInvoices, payerInput } from '../../src/payouts-invoice.js';
+import { qrSvg } from '../../../app/src/panels/qr-svg.js';
+import { createInvoice, readInvoice, checkoutInvoice, quoteInvoice, resetInvoices, payerInput, registrationOf } from '../../src/payouts-invoice.js';
 
 const TX = '4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia';
 const REFUND = '0x' + 'ab'.repeat(20);
@@ -119,17 +120,22 @@ test('plan: invoice status words only call SUCCESS delivered', () => {
   assert.doesNotMatch(invoiceStatusLine('PENDING_DEPOSIT'), /Paid/);
 });
 
-test('plan: registration does not claim gasless when storage is missing or unread', () => {
+test('plan: registration names registered, who pays, or unknown', () => {
   const yes = registrationVerdict({ total: '1250000000000000000000' });
   assert.equal(yes.registered, true);
+  assert.match(yes.text, /Registered for USDC/);
   assert.match(yes.text, /can hold USDC/);
   const no = registrationVerdict(null);
   assert.equal(no.registered, false);
-  assert.match(no.text, /storage_deposit/);
-  assert.match(no.text, /does not claim the solver/);
+  assert.match(no.text, /storage deposit/);
+  assert.match(no.text, /receive account pays/);
+  assert.match(no.text, /0\.00125 NEAR/);
   const unread = registrationVerdict(null, { error: 'rpc' });
-  assert.equal(unread.claim, 'unread');
-  assert.match(unread.text, /Not claimed gasless/);
+  assert.equal(unread.ok, true);
+  assert.equal(unread.claim, 'unknown');
+  assert.match(unread.text, /unknown/);
+  assert.match(unread.text, /invoice is still valid/);
+  for (const row of [yes, no, unread]) assert.doesNotMatch(row.text, /gasless/i);
 });
 
 test('plan: cinema and seal stay quiet unless a real step happened', () => {
@@ -214,6 +220,103 @@ test('invoice: an expired bill does not ask for a deposit address', async () => 
   const out = await checkoutInvoice(made.invoice.id, payer, { store: book, now: Date.parse('2026-11-06T00:00:00Z'), postQuote: boom('postQuote') });
   assert.equal(out.reason, 'expired');
   assert.equal(out.depositAddress, null);
+});
+
+test('invoice: USDC storage reads the short contract and a missing account is an error', async () => {
+  const calls = [];
+  const seen = await registrationOf('nearcarta.near', {
+    viewAccount: async () => ({ amount: '1' }),
+    view: async (contract, method, args) => {
+      calls.push({ contract, method, args });
+      if (method === 'storage_balance_of') return { total: '1250000000000000000000', available: '0' };
+      if (method === 'storage_balance_bounds') return { min: '1250000000000000000000' };
+      throw new Error(method);
+    },
+  });
+  assert.equal(seen.ok, true);
+  assert.equal(seen.claim, 'registered');
+  assert.equal(calls[0].contract, '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1');
+  assert.equal(calls[0].contract.includes('.factory.bridge.near'), false);
+  assert.deepEqual(calls[0].args, { account_id: 'nearcarta.near' });
+  let views = 0;
+  const missing = await registrationOf('no-such-payouts-account.near', {
+    viewAccount: async () => { const e = new Error('account no-such-payouts-account.near does not exist while viewing'); e.name = 'UNKNOWN_ACCOUNT'; throw e; },
+    view: async () => { views += 1; return null; },
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.reason, 'missing_account');
+  assert.equal(views, 0);
+  assert.match(missing.text, /does not exist on NEAR/);
+  const tried = [];
+  const unknown = await registrationOf('alice.near', {
+    viewAccount: async () => ({}),
+    view: async (contract) => { tried.push(contract); throw new Error('Account ID is too long'); },
+  });
+  assert.equal(unknown.ok, true);
+  assert.equal(unknown.claim, 'unknown');
+  assert.equal(tried[0], '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1');
+  assert.match(tried[1], /factory\.bridge\.near$/);
+});
+
+test('invoice: a dry quote names the send amount, the fee and the time', async () => {
+  const quoted = await quoteInvoice({ usd: 0.15, from: 'USDC@base', recipient: 'cafe.near', refundTo: REFUND }, {
+    tokens: async () => [usdcBase, usdcNear],
+    postQuote: async () => ({ http: 201, body: { quote: { amountInFormatted: '0.151549', amountInUsd: '0.1515', amountOutFormatted: '0.15', amountOutUsd: '0.15', timeEstimate: 35 }, quoteRequest: {}, signature: 'sig' } }),
+    checkQuote: () => ({ accepted: true }),
+  });
+  assert.equal(quoted.depositAddress, null);
+  assert.equal(quoted.send, '0.151549');
+  assert.equal(quoted.seconds, 35);
+  assert.match(quoteLine(quoted), /You send 0.151549 USDC/);
+  assert.match(quoteLine(quoted), /35 seconds/);
+  const low = await quoteInvoice({ usd: 0.01, from: 'USDC@base', recipient: 'cafe.near', refundTo: REFUND }, {
+    tokens: async () => [usdcBase, usdcNear],
+    postQuote: async () => ({ http: 400, body: { message: 'Amount is too low for bridge, try at least 149983' } }),
+  });
+  assert.equal(low.depositAddress, null);
+  assert.match(low.error, /0\.15 USD/);
+});
+
+test('plan: the agent reply names the invoice and a pay link becomes a QR', () => {
+  const cmd = agentCommand('Create invoice 0.15 USD to alice.near memo logo design');
+  assert.equal(cmd.receive, 'alice.near');
+  assert.equal(cmd.memo, 'logo design');
+  const line = invoiceDoneLine({ id: 'inv_abc', usd: 0.15, receive: 'alice.near', memo: 'logo design', expiry: '2026-11-20T18:00:00Z', href: '/pay/inv_abc' }, 'https://nearcarta.vercel.app');
+  assert.match(line, /0\.15 USD to alice\.near/);
+  assert.match(line, /logo design/);
+  assert.match(line, /https:\/\/nearcarta\.vercel\.app\/pay\/inv_abc/);
+  assert.match(line, /signs nothing/);
+  assert.equal(addressOk('sol', '1'.repeat(32)), true);
+  assert.equal(addressOk('op', REFUND), true);
+  assert.equal(addressOk('base', 'not-an-address'), false);
+  const choices = usdcChoices([
+    { symbol: 'USDC', blockchain: 'base', assetId: 'nep141:base' },
+    { symbol: 'USDC', chain: 'near', assetId: 'nep141:near' },
+    { symbol: 'USDC', blockchain: 'sol', assetId: 'nep141:sol' },
+  ]);
+  assert.deepEqual(choices.map(c => c.id), ['base', 'sol']);
+  const links = paymentLinks({ destinationTx: 'H'.repeat(32), originTx: '0x' + 'ab'.repeat(32), chain: 'base' });
+  assert.match(links[0].href, /nearblocks\.io/);
+  assert.match(links[1].href, /basescan\.org/);
+  const svg = qrSvg('https://nearcarta.vercel.app/pay/inv_abc');
+  assert.match(svg, /<svg/);
+  assert.match(svg, /<path/);
+});
+
+test('source: the tray keeps amount empty, reserves status, and stops key events', () => {
+  const tray = readFileSync(new URL('../../../app/src/panels/payouts-tray.js', import.meta.url), 'utf8');
+  const world = readFileSync(new URL('../../../app/design/D9_world/js/main.js', import.meta.url), 'utf8');
+  const ui = readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(tray, /invoiceUsd = '0\.15'/);
+  assert.doesNotMatch(tray, /per-row cap/);
+  assert.match(tray, /Your \/setup cap/);
+  assert.match(tray, /type="date"/);
+  assert.match(tray, /type="datetime-local"/);
+  assert.match(tray, /Creating an invoice signs nothing/);
+  assert.match(tray, /stopPropagation/);
+  assert.match(world, /pin\.inert/);
+  assert.match(world, /shopFieldFocused/);
+  assert.match(ui, /stopPropagation/);
 });
 
 test('source: ANY_INPUT is not requested, and the payer page has one checkout button', () => {

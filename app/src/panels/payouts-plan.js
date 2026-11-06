@@ -10,8 +10,12 @@ import { nearAccountOk } from '../../design/D8_shops/js/payouts.js';
 
 export const MISS_HINT = 'Try: Create invoice 0.15 USD, Pay reviewed rows, or Export accountant CSV.';
 
-// Bridged USDC on NEAR. A storage_balance_of view uses this account. A failed view is "unread", not gasless.
-export const USDC_NEAR_CONTRACT = '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1.factory.bridge.near';
+// Native USDC on NEAR. The RPC accepts this 64-hex implicit account.
+// The .factory.bridge.near alias is 84 characters, and every JSON-RPC rejects it as too long.
+// storage_balance_bounds on this contract is 0.00125 NEAR. The receive account pays that, not this shop.
+export const USDC_NEAR_CONTRACT = '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
+export const USDC_CONTRACT_FALLBACK = `${USDC_NEAR_CONTRACT}.factory.bridge.near`;
+export const USDC_STORAGE_NEAR = '0.00125';
 
 const MICRO = 10n ** 18n;
 const LOCKED_QUERY = ['recipient', 'receive', 'amount', 'usd', 'refundTo', 'recipientType', 'destination'];
@@ -47,13 +51,18 @@ export function aboveHosted(usd, ceiling) {
 }
 
 /** Chain address check. Unsupported chains are rejected, not guessed. */
+const EVM_CHAINS = new Set(['base', 'eth', 'ethereum', 'arb', 'arbitrum', 'op', 'optimism', 'pol', 'polygon', 'matic', 'bsc', 'bnb', 'avax', 'avalanche', 'gnosis', 'monad', 'xlayer', 'hypercore']);
+
 export function addressOk(chain, value) {
   const c = String(chain || '').toLowerCase();
   const s = String(value || '').trim();
   if (!s || s.length > 128) return false;
   if (c === 'near') return nearAccountOk(s);
-  if (c === 'base' || c === 'eth' || c === 'ethereum' || c === 'arb' || c === 'arbitrum') return /^0x[0-9a-fA-F]{40}$/.test(s);
-  return false;
+  if (EVM_CHAINS.has(c)) return /^0x[0-9a-fA-F]{40}$/.test(s);
+  if (c === 'sol' || c === 'solana') return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
+  if (c === 'sui' || c === 'aptos') return /^0x[0-9a-fA-F]{64}$/.test(s);
+  if (c === 'stellar') return /^G[A-Z2-7]{55}$/.test(s);
+  return s.length >= 20 && !/\s/.test(s);
 }
 
 /**
@@ -129,7 +138,9 @@ export function agentCommand(text) {
     const usd = m ? Number(m[1]) : null;
     if (!(usd > 0)) return { ok: false, hint: 'Name the invoice amount, for example 0.15 USD.' };
     const origin = /base/.test(t) ? 'USDC@base' : 'USDC@near';
-    return { ok: true, kind: 'invoice', usd, origin, destination: 'USDC@near', hint: '' };
+    const to = raw.match(/\b(?:to|for)\s+([a-z0-9][a-z0-9._-]{1,62})/i);
+    const memo = raw.match(/\bmemo\s+(.+?)(?:\s+(?:due|expir)\b|$)/i);
+    return { ok: true, kind: 'invoice', usd, origin, destination: 'USDC@near', receive: to?.[1] || '', memo: memo ? memo[1].trim() : '', hint: '' };
   }
   return { ok: false, hint: MISS_HINT };
 }
@@ -278,20 +289,135 @@ export function invoiceStatusLine(status) {
  * https://docs.near.org/protocol/transactions/meta-tx
  * https://github.com/near/NEPs/blob/master/neps/nep-0141.md
  */
-export function registrationVerdict(viewResult, { error = null } = {}) {
+export function registrationVerdict(viewResult, { error = null, minNear = USDC_STORAGE_NEAR } = {}) {
   if (error) {
-    return { ok: false, registered: null, claim: 'unread', text: 'Could not read USDC storage. Not claimed gasless.' };
+    return { ok: true, registered: null, claim: 'unknown', text: 'USDC registration is unknown. The invoice is still valid.' };
   }
   const total = viewResult && (viewResult.total ?? viewResult.total_balance);
   if (total != null && String(total) !== '0') {
-    return { ok: true, registered: true, claim: 'registered', text: 'This account can hold USDC. No extra storage deposit is due for the first receipt.' };
+    return { ok: true, registered: true, claim: 'registered', text: 'Registered for USDC. This account can hold USDC. No storage deposit is due.' };
   }
   return {
     ok: true,
     registered: false,
     claim: 'storage_required',
-    text: 'USDC on NEAR needs storage_deposit before the first tokens. A function-call key cannot attach that deposit, and a meta-transaction pays gas, not storage. This shop does not claim the solver covers it. Sponsorship is not funded.',
+    text: `Needs USDC registration. The receive account pays the storage deposit (about ${minNear} NEAR). This shop does not pay it.`,
   };
+}
+
+/** What the payer sends, the fee and the time. A dry quote has no deposit address. */
+export function quoteSummary(resp) {
+  const q = resp?.quote || {};
+  const sendUsd = Number(q.amountInUsd);
+  const outUsd = Number(q.amountOutUsd);
+  const fee = Number.isFinite(sendUsd) && Number.isFinite(outUsd) ? Math.round((sendUsd - outUsd) * 1e6) / 1e6 : null;
+  return {
+    send: q.amountInFormatted || null,
+    sendUsd: Number.isFinite(sendUsd) ? sendUsd : null,
+    receive: q.amountOutFormatted || null,
+    feeUsd: fee,
+    seconds: Number(q.timeEstimate) || null,
+  };
+}
+
+export function quoteLine(summary) {
+  if (!summary?.send) return '';
+  const fee = summary.feeUsd == null ? '' : ` Fee about ${summary.feeUsd} USD.`;
+  const time = summary.seconds ? ` About ${summary.seconds} seconds.` : '';
+  const receive = summary.receive ? ` The invoice receives ${summary.receive} USDC on NEAR.` : '';
+  return `You send ${summary.send} USDC.${fee}${time}${receive}`;
+}
+
+/** 1Click names the minimum in the destination token's smallest units. USDC on NEAR has 6 decimals. */
+export function bridgeMinimumHint(message) {
+  const raw = String(message || '').trim();
+  const m = raw.match(/try at least (\d+)/i);
+  if (!m) return raw || '1Click did not quote this amount.';
+  const units = Number(m[1]);
+  if (!(units >= 1000)) return raw;
+  return `1Click needs at least ${(units / 1e6).toFixed(2)} USD on this chain.`;
+}
+
+export function invoiceDoneLine(inv, origin = '') {
+  const link = (origin ? String(origin).replace(/\/$/, '') : '') + (inv?.href || '');
+  const when = prettyWhen(inv?.expiry);
+  return [
+    `Created an invoice for ${inv?.usd} USD to ${inv?.receive}.`,
+    inv?.memo ? `Memo: ${inv.memo}.` : '',
+    when ? `Expires ${when}.` : '',
+    link ? `Pay link: ${link}.` : '',
+    'Creating an invoice signs nothing.',
+  ].filter(Boolean).join(' ');
+}
+
+function prettyWhen(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  try {
+    return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(d) + ' UTC';
+  } catch {
+    return s;
+  }
+}
+
+export const USDC_ORIGIN_CHAINS = [
+  ['base', 'Base'], ['eth', 'Ethereum'], ['arb', 'Arbitrum'], ['op', 'Optimism'],
+  ['pol', 'Polygon'], ['bsc', 'BNB Chain'], ['avax', 'Avalanche'], ['gnosis', 'Gnosis'],
+  ['sol', 'Solana'], ['sui', 'Sui'], ['aptos', 'Aptos'], ['stellar', 'Stellar'],
+  ['monad', 'Monad'], ['xlayer', 'X Layer'], ['hypercore', 'HyperCore'],
+];
+const CHAIN_LABEL = Object.fromEntries(USDC_ORIGIN_CHAINS);
+
+export function chainLabel(id) {
+  const key = String(id || '').toLowerCase();
+  return CHAIN_LABEL[key] || (key ? key.charAt(0).toUpperCase() + key.slice(1) : '');
+}
+
+/** USDC origins 1Click lists, excluding NEAR because the invoice already pays out there. */
+export function usdcChoices(tokens) {
+  const rows = (tokens || []).filter(t => String(t?.symbol || '').toUpperCase() === 'USDC' && String(t?.blockchain || t?.chain || '').toLowerCase() !== 'near');
+  if (!rows.length) return USDC_ORIGIN_CHAINS.map(([id, label]) => ({ id, label: `USDC on ${label}`, assetId: '' }));
+  const seen = new Set();
+  const out = [];
+  for (const t of rows) {
+    const id = String(t.blockchain || t.chain).toLowerCase();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, label: `USDC on ${chainLabel(id)}`, assetId: t.assetId || '' });
+  }
+  return out;
+}
+
+const EXPLORER = {
+  base: 'https://basescan.org/tx/',
+  eth: 'https://etherscan.io/tx/',
+  ethereum: 'https://etherscan.io/tx/',
+  arb: 'https://arbiscan.io/tx/',
+  op: 'https://optimistic.etherscan.io/tx/',
+  pol: 'https://polygonscan.com/tx/',
+  bsc: 'https://bscscan.com/tx/',
+  avax: 'https://snowscan.xyz/tx/',
+  gnosis: 'https://gnosisscan.io/tx/',
+  sol: 'https://solscan.io/tx/',
+};
+
+export function paymentLinks({ destinationTx, nearTx, originTx, chain } = {}) {
+  const links = [];
+  const dest = destinationTx || nearTx || '';
+  if (dest) links.push({ label: 'Delivered on NEAR', href: `https://nearblocks.io/txns/${dest}` });
+  if (originTx) {
+    const base = EXPLORER[String(chain || '').toLowerCase()];
+    links.push({ label: 'Your deposit', href: base ? base + originTx : '', hash: originTx });
+  }
+  return links;
+}
+
+export function receiptLine(inv, status) {
+  const paid = status === 'SUCCESS';
+  return `Receipt ${inv?.id || ''}. ${inv?.usd ?? ''} USD to ${inv?.receive || ''}. ${paid ? 'Delivered.' : invoiceStatusLine(status)}`;
 }
 
 /** Success cinema only when every submitted step was allowed and has a tx hash. */
