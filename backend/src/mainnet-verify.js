@@ -34,13 +34,20 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch, tries = 1,
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } }),
+        signal: AbortSignal.timeout(20000),
       });
     } catch (e) {
       // A dropped connection says nothing about the transaction.
       last = { hash, found: false, error: e?.message || 'network', retry: true };
       continue;
     }
-    const j = await res.json().catch(() => ({}));
+    let j = null;
+    try { j = await res.json(); } catch { j = null; }
+    if (!j || typeof j !== 'object') {
+      // A gateway page or an empty body is not an answer about the transaction.
+      last = { hash, found: false, error: `unreadable response ${res.status}`, retry: true };
+      continue;
+    }
     const tx = j.result?.transaction;
     if (!tx) {
       // A rate limit or a server error is not an answer about the transaction: retry.
@@ -57,7 +64,7 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch, tries = 1,
   return last;
 }
 
-export async function checkAll(dep, { rpc, fetchImpl = fetch, tries = 4, wait, pauseMs = 120 } = {}) {
+export async function checkAll(dep, { rpc, fetchImpl = fetch, tries = 3, wait, pauseMs = 120, rounds = 2 } = {}) {
   const rpcs = (Array.isArray(rpc) ? rpc : [rpc]).filter(Boolean);
   const waitFn = wait || (ms => new Promise(r => setTimeout(r, ms)));
   const rows = [];
@@ -67,13 +74,18 @@ export async function checkAll(dep, { rpc, fetchImpl = fetch, tries = 4, wait, p
     if (!first && pauseMs > 0) await waitFn(pauseMs);
     first = false;
     let hit = { ...row, found: false, error: 'not found' };
-    for (const sender of sendersFor(dep, row)) {
-      for (const url of rpcs) {
-        const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl, tries, wait: waitFn });
-        hit = { ...row, ...one, sender };
-        if (one.found) break;
+    // Every endpoint before any tx is called missing, and one more pass if a
+    // free RPC rate-limits the whole burst.
+    for (let round = 0; round < rounds && !hit.found; round += 1) {
+      for (const sender of sendersFor(dep, row)) {
+        for (const url of rpcs) {
+          const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl, tries, wait: waitFn });
+          hit = { ...row, ...one, sender };
+          if (one.found) break;
+        }
+        if (hit.found) break;
       }
-      if (hit.found) break;
+      if (!hit.found && pauseMs > 0) await waitFn(pauseMs * 4 * (round + 1));
     }
     rows.push(hit);
   }
