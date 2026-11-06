@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import nacl from 'tweetnacl';
 import { assembleLive, readLive, _resetLiveCache } from '../../src/chronicle-live.js';
+import { formatUnits, presentAmount } from '../../../app/src/chronicle-amount.js';
 import { signStatement } from '../../src/chronicle-statement.js';
 import { bundleDigest } from '../../../app/src/chronicle-audit.js';
 
@@ -177,6 +178,15 @@ test('a nearblocks 429 falls back to fastnear and the key stays out of the body'
   assert.equal(calls.length, 0);
 });
 
+test('yocto and token units are not shown as whole NEAR', () => {
+  assert.equal(formatUnits('1250000000000000000000', 24, 'NEAR'), '0.00125 NEAR');
+  assert.equal(formatUnits(1.25e21, 24, 'NEAR'), '0.00125 NEAR');
+  assert.equal(presentAmount('1.25e+21 NEAR'), '0.00125 NEAR');
+  assert.equal(formatUnits('1000000000000000000000000', 24, 'NEAR'), '1 NEAR');
+  assert.equal(formatUnits(-297, 6, 'USDC'), '-0.000297 USDC');
+  assert.equal(presentAmount('0.00125 NEAR'), '0.00125 NEAR');
+});
+
 test('a chain failure is not called a refusal', async () => {
   _resetLiveCache();
   const HASH3 = 'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
@@ -205,7 +215,48 @@ test('a chain failure is not called a refusal', async () => {
   const row = body.rows.find(r => r.hash === HASH3);
   assert.ok(row);
   assert.equal(row.decision, 'failed');
+  assert.equal(row.amount, '0.00125 NEAR');
   assert.equal(body.rows.some(r => r.decision === 'denied'), false);
+});
+
+test('an older page follows the nearblocks cursor and a yocto deposit stays NEAR', async () => {
+  _resetLiveCache();
+  const seen = [];
+  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  const hashes = Array.from({ length: 25 }, (_, i) => alphabet[i] + 'C'.repeat(42));
+  const fetchFn = async (url, opts = {}) => {
+    const u = String(url);
+    seen.push(u);
+    if (u.includes('/ft-txns')) {
+      return new Response(JSON.stringify({
+        txns: [{ transaction_hash: hashes[0], delta_amount: -297, ft: { symbol: 'USDC', decimals: 6, contract: 'usdc.near' }, outcomes: { status: true } }],
+      }), { status: 200 });
+    }
+    if (u.includes('/txns')) {
+      const txns = hashes.map(h => ({
+        transaction_hash: h, predecessor_account_id: 'aurora.near', receiver_account_id: 'wrap.near',
+        block_timestamp: '1700000000000000000', receipt_outcome: { status: true },
+        actions: [{ action: 'FUNCTION_CALL', method: 'storage_deposit', deposit: 1.25e21 }],
+      }));
+      const body = JSON.stringify({ cursor: 'cursor-2', txns });
+      assert.match(body, /1\.25e\+21/);
+      return new Response(body, { status: 200 });
+    }
+    if (opts.method === 'POST') return new Response(JSON.stringify({ result: { status: { Failure: {} } } }), { status: 200 });
+    return new Response('no', { status: 500 });
+  };
+  const deps = {
+    fetch: fetchFn, view: async () => null, board: 'board.nearcarta.near',
+    index: 'https://api.nearblocks.io', fastnearTx: 'https://tx.main.fastnear.com', fastnear: 'https://api.fastnear.com', rpc: 'https://rpc.test',
+  };
+  const first = await readLive('aurora.near', deps);
+  assert.equal(first.rows.filter(r => r.amount === '0.00125 NEAR').length, 24);
+  assert.equal(first.rows.find(r => r.hash === hashes[0]).amount, '-0.000297 USDC');
+  assert.equal(first.nextCursor, 'cursor-2');
+  assert.equal(first.rows.length, 25);
+  const older = await readLive('aurora.near', { ...deps, cursor: 'cursor-2', more: true });
+  assert.ok(seen.some(u => u.includes('cursor=cursor-2')));
+  assert.equal(older.cached, false);
 });
 
 test('an unanswered timeline is not cached', async () => {
