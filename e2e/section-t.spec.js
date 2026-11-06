@@ -65,7 +65,7 @@ function viewBytes(value) {
 }
 
 /** Stub the board read and swallow send_tx. A continued send_tx would be a real broadcast. */
-async function stubChain(page, { accessKey = null, onSend = null, accountAmount = null } = {}) {
+async function stubChain(page, { accessKey = null, onSend = null, accountAmount = null, charter = undefined } = {}) {
   const row = charterRow();
   await page.route('**/*', async route => {
     const req = route.request();
@@ -81,7 +81,9 @@ async function stubChain(page, { accessKey = null, onSend = null, accountAmount 
     }
     if (body.method !== 'query') return route.continue();
     if (p.request_type === 'call_function' && p.method_name === 'get_charter') {
-      return route.fulfill({ json: { jsonrpc: '2.0', id, result: viewBytes(row) } });
+      // `null` is what board v2 returns for an account with no row. It is an answer,
+      // not a failed read, and the page must say so.
+      return route.fulfill({ json: { jsonrpc: '2.0', id, result: viewBytes(charter === undefined ? row : charter) } });
     }
     if (p.request_type === 'view_access_key') {
       if (!accessKey) return route.fulfill({ json: { jsonrpc: '2.0', id, error: { name: 'UNKNOWN_ACCESS_KEY', message: 'unknown key' } } });
@@ -396,4 +398,59 @@ test('T12 a click on the payouts anchor opens Payouts when another label covers 
     await expect(page.locator('#t-title')).not.toHaveText('Town Hall');
     await shot(page, 't12-pins-' + width);
   }
+});
+
+test('T13 no row on the board reads as an empty row, and Open your row is the primary action', async ({ page }) => {
+  await page.addInitScript(savedScholar, agentKey.secretKey);
+  // Board v2 answers `null` for this account. The row was force_closed, so the stored
+  // agent key outlives the row. The page used to call that "The chain did not answer".
+  await stubChain(page, { charter: null });
+  for (const width of [1440, 390]) {
+    await at(page, width);
+    await page.goto('/setup/#sign');
+    const noRow = page.getByTestId('setup-no-row');
+    await expect(noRow).toBeVisible({ timeout: 30000 });
+    await expect(noRow).toContainText('No row open on board.nearcarta.near');
+    await expect(page.locator('#card')).not.toContainText('The chain did not answer');
+    const open = page.getByTestId('setup-sign');
+    await expect(open).toBeVisible();
+    await expect(open).toHaveText('Open your row');
+    await expect(open).toBeEnabled();
+    await expect(page.getByTestId('setup-sign-create')).toContainText('Open your row');
+    await shot(page, 't13-no-row-' + width);
+  }
+});
+
+test('T14 Open your row sends open_charter and set_calls to the board and the three-method key', async ({ page }) => {
+  await page.addInitScript(savedScholar, agentKey.secretKey);
+  await stubChain(page, { charter: null });
+  // Stand in for the wallet so the batch can be read. Nothing is signed or broadcast.
+  await page.addInitScript(() => {
+    window.__ncSent = [];
+    window.__NC_SETUP_WALLET = async () => ({
+      signAndSendTransactions: async ({ transactions }) => {
+        window.__ncSent.push(...transactions);
+        return transactions.map(() => ({ transaction_outcome: { id: 'stub' } }));
+      },
+      signAndSendTransaction: async tx => { window.__ncSent.push(tx); return { transaction_outcome: { id: 'stub' } }; },
+    });
+  });
+  await at(page, 1440);
+  await page.goto('/setup/#sign');
+  const open = page.getByTestId('setup-sign');
+  await expect(open).toHaveText('Open your row', { timeout: 30000 });
+  await open.click();
+  await expect.poll(() => page.evaluate(() => window.__ncSent.length), { timeout: 20000 }).toBeGreaterThan(0);
+  const sent = await page.evaluate(() => window.__ncSent);
+  const board = sent.find(t => t.receiverId === 'board.nearcarta.near');
+  expect(board, 'the open transaction goes to the board').toBeTruthy();
+  const methods = board.actions.map(a => a.params.methodName);
+  expect(methods).toEqual(['open_charter', 'set_calls']);
+  expect(board.actions[0].params.deposit).toBe('20000000000000000000000');
+  expect(board.actions[0].params.args.rules.receivers.length).toBeGreaterThan(0);
+  const key = sent.find(t => t.receiverId === OWNER);
+  expect(key, 'the agent key goes on the visitor account').toBeTruthy();
+  expect(key.actions[0].params.accessKey.permission.receiverId).toBe('board.nearcarta.near');
+  expect(key.actions[0].params.accessKey.permission.methodNames).toEqual(['propose', 'propose_call', 'propose_call_as']);
+  await shot(page, 't14-open-row');
 });
