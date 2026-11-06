@@ -84,6 +84,7 @@ test('guard, chronicle, toll, house, ferry and the bank proof are usable', async
   await expect(page.getByTestId('guard-score')).toContainText('Recorded refusals');
   await page.goto('/?mode=2d&nostory&shop=chronicle');
   await page.getByTestId('chronicle-account').fill('nearcarta.near');
+  await page.locator('#c-go').click();
   await expect(page.getByTestId('chronicle-page')).toContainText('toll', { timeout: 20_000 });
   await page.getByTestId('chronicle-search').fill('toll');
   await expect(page.getByTestId('chronicle-page')).toContainText('toll');

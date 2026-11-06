@@ -24,6 +24,6 @@ export const ICONS = {
 
 export function iconFor(shop, decision) {
   const id = String(shop || '').toLowerCase();
-  const mark = decision === 'denied' ? ICONS.denied : ICONS.allowed;
+  const mark = decision === 'denied' || decision === 'failed' ? ICONS.denied : ICONS.allowed;
   return mark + (ICONS[id] || ICONS.scroll);
 }

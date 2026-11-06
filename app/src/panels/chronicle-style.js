@@ -2,7 +2,7 @@
 
 export const CHRONICLE_CSS = `
 .chronicle-card{
-  display:flex; flex-direction:column; gap:8px; align-items:stretch; min-width:0; min-height:0; max-width:100%;
+  display:flex; flex-direction:column; gap:8px; align-items:stretch; min-width:0; min-height:0; height:100%; max-width:100%;
   box-sizing:border-box; padding:16px; border-radius:22px; background:#24180f;
   border:1px solid rgba(214,180,106,.5); color:#fff8ee; overflow:hidden;
 }
@@ -25,7 +25,7 @@ body.chronicle-tray #shopUI #t-form button.chronicle-tab[aria-selected=true]{
   background-image:linear-gradient(180deg,#ffe2a8 0%,rgb(245, 208, 138) 42%,#e2b35b 100%);
   color:rgb(42, 22, 8);
 }
-.chronicle-pane{display:grid; gap:12px; min-width:0; min-height:0; flex:1 1 auto; overflow:auto;}
+.chronicle-pane{display:grid; gap:12px; min-width:0; min-height:0; flex:1 1 0; overflow:auto;}
 .chronicle-pane[hidden]{display:none !important}
 .c-filters{display:grid; grid-template-columns:1fr 1fr; gap:8px 12px}
 .c-filters .wide{grid-column:1 / -1}
@@ -44,20 +44,23 @@ body.chronicle-tray #shopUI #t-form button.chronicle-tab[aria-selected=true]{
 .chronicle-field textarea{min-height:88px; resize:vertical}
 .chronicle-check{display:flex; align-items:center; gap:10px; min-height:44px; color:#f3ead8; font:600 13px/1.3 system-ui,sans-serif}
 .chronicle-check input{width:20px; height:20px}
-.chronicle-card .feed{list-style:none; margin:0; padding:0; display:grid; gap:0; max-height:52px; overflow:auto}
+.chronicle-card .feed{list-style:none; margin:0; padding:0; display:grid; gap:6px; max-height:96px; min-height:0; flex:none; overflow:auto}
+.c-empty-line{margin:0; color:#f3ead8; font:600 14px/1.4 system-ui,sans-serif; overflow-wrap:anywhere}
+.c-health{margin:0; color:#f5d08a; font:650 13px/1.35 system-ui,sans-serif; overflow-wrap:anywhere}
+.c-cover-list{list-style:none; margin:0; padding:0; display:grid; gap:2px}
+.c-cover-list li{margin:0; color:#f3ead8; font:600 13px/1.35 system-ui,sans-serif; overflow-wrap:anywhere}
 .chronicle-card .feed[hidden]{display:none !important}
 .chronicle-card .feed li{
   display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:4px 8px; align-items:center;
   margin:0; padding:4px 8px; border-radius:12px; background:#17130f; border:1px solid #4a3a28; color:#fff8ee;
 }
-.chronicle-card .c-rowline{display:flex; flex-wrap:nowrap; gap:6px; align-items:baseline; min-width:0; overflow:hidden}
-.chronicle-card .feed li.c-empty{
-  display:block; padding:2px 2px 0; min-height:0; background:transparent; border:0; color:#f3ead8;
-  font:600 13px/1.35 system-ui,sans-serif;
-}
+.chronicle-card .c-rowline{display:flex; flex-wrap:wrap; gap:6px; align-items:baseline; min-width:0}
+.chronicle-card .feed li.c-empty{display:none}
 .chronicle-card .c-mark{display:flex; gap:6px; align-items:center}
 .chronicle-card .c-shop{font:700 14px/1.2 system-ui,sans-serif; color:#fff8ee; white-space:nowrap; flex:none}
-.chronicle-card .c-dec,.chronicle-card .c-amt{color:#f3ead8; font:600 13px/1.3 system-ui,sans-serif; white-space:nowrap}
+.chronicle-card .c-dec{color:#f3ead8; font:600 13px/1.3 system-ui,sans-serif; white-space:normal}
+.chronicle-card .c-amt{color:#f3ead8; font:600 13px/1.3 system-ui,sans-serif; white-space:nowrap}
+.chronicle-card .feed li.no .c-dec,.chronicle-card .feed li.fail .c-dec{color:#ffb4a8}
 .chronicle-card .c-tx{color:#f5d08a; font:600 13px/1.2 system-ui,sans-serif; white-space:nowrap; flex:none}
 body.chronicle-tray #room button.c-v,
 body.chronicle-tray #room button.chronicle-quiet,
@@ -67,6 +70,10 @@ body.chronicle-tray #shopUI #t-form button.chronicle-quiet{
   min-height:44px; padding:8px 10px; box-shadow:none; font:700 13px/1.2 system-ui,sans-serif; cursor:pointer;
   white-space:nowrap; flex:none;
 }
+body.chronicle-tray #room button.chronicle-quiet:disabled,
+body.chronicle-tray #shopUI #t-form button.chronicle-quiet:disabled{
+  opacity:.45; cursor:default;
+}
 body.chronicle-tray #room button.chronicle-gold,
 body.chronicle-tray #shopUI #t-form button.chronicle-gold{
   appearance:none; flex:none; width:100%; border:0; border-radius:14px; min-height:48px; padding:12px 16px; margin:0;
@@ -74,14 +81,14 @@ body.chronicle-tray #shopUI #t-form button.chronicle-gold{
   background-color:rgb(245, 208, 138); color:rgb(42, 22, 8); font:700 16px/1.15 system-ui,sans-serif; cursor:pointer;
   box-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 4px 0 #9a6f2e;
 }
-.c-lines{display:grid; gap:4px; flex:none}
-.c-foot{display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px}
+.c-lines{display:flex; flex-direction:column; gap:6px; flex:1 1 150px; min-height:0; overflow:auto}
+.c-foot{display:flex; flex-direction:column; align-items:stretch; gap:4px; min-height:44px}
+.c-foot .c-status{min-width:0}
+.c-foot .chronicle-quiet{align-self:flex-end}
 .c-status{
-  margin:0; color:#f3ead8; font:600 13px/1.35 system-ui,sans-serif; overflow-wrap:anywhere;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  margin:0; color:#f3ead8; font:600 13px/1.45 system-ui,sans-serif; overflow-wrap:anywhere; white-space:normal;
 }
-.c-status.c-cover{-webkit-line-clamp:2}
-.c-status.c-attest{-webkit-line-clamp:8}
+button.chronicle-quiet:disabled, button#c-csv:disabled{opacity:.45; cursor:default}
 .c-status a{color:#f5d08a}
 .chronicle-seal{display:none !important}
 body.chronicle-tray #shopUI #t-say,
@@ -96,8 +103,9 @@ body.chronicle-tray nav.all-shops{top:16px; left:370px; right:auto}
 body.chronicle-tray #shopUI #tray{
   display:flex; flex-direction:column;
   width:min(440px, calc(100vw - 24px)); max-width:440px;
-  left:12px; bottom:16px; max-height:calc(100dvh - 132px);
+  left:12px; bottom:16px; height:min(680px, calc(100dvh - 132px)); max-height:calc(100dvh - 132px);
   padding:14px; box-sizing:border-box; overflow:hidden; background:#1a140f;
+  transition:height .18s ease;
 }
 body.chronicle-tray #shopUI #t-form{display:flex; flex:1 1 auto; min-height:0; margin:0; min-width:0; max-width:100%; overflow:hidden}
 body.chronicle-tray #shopUI #t-form > *{flex:1 1 auto; min-height:0; display:flex; flex-direction:column}
@@ -136,7 +144,7 @@ body.chronicle-tray #shopUI #t-form > *{flex:1 1 auto; min-height:0; display:fle
 @media (max-width:720px){
   body.chronicle-tray #shopUI #tray{
     width:min(440px, calc(100vw - 16px)); max-width:none;
-    left:8px; top:52px; bottom:140px; max-height:none; padding:8px;
+    left:8px; top:52px; bottom:140px; height:auto; max-height:none; padding:8px;
   }
   .chronicle-card{gap:6px; padding:10px}
   .chronicle-field{gap:2px}
@@ -146,7 +154,7 @@ body.chronicle-tray #shopUI #t-form > *{flex:1 1 auto; min-height:0; display:fle
   .chronicle-card{padding:12px; gap:8px}
   .c-flow{min-height:44px; padding:4px}
   .c-filters{gap:8px 12px}
-  .chronicle-card .feed{max-height:52px}
+  .chronicle-card .feed{max-height:88px}
   .chronicle-tab{font-size:13px; padding:8px 6px}
   #chronicle-agent-dock{right:8px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); gap:8px}
   .chronicle-agent-pop{width:min(240px, calc(100vw - 120px))}

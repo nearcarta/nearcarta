@@ -26,7 +26,8 @@ export function shopId(name) {
 export function decisionOf(raw) {
   const d = String(raw || '').toLowerCase();
   if (['allowed', 'allow', 'opened', 'success', 'sale', 'payout'].includes(d)) return 'allowed';
-  if (['denied', 'refused', 'refusal', 'failed'].includes(d)) return 'denied';
+  if (['failed', 'failure'].includes(d)) return 'failed';
+  if (['denied', 'refused', 'refusal'].includes(d)) return 'denied';
   return '';
 }
 
@@ -139,7 +140,18 @@ export async function loadChronicleSources(fetchFn, apiBase = '') {
 }
 
 function take(out, seen, row, source) {
-  if (!row?.h || seen.has(row.h)) return;
+  if (!row?.h) return;
+  if (seen.has(row.h)) {
+    // A recorded board or rule refusal keeps the name Refused, even when the same hash also failed on chain.
+    if (row.decision !== 'denied') return;
+    const hit = out.find(r => r.h === row.h);
+    if (!hit || hit.decision === 'denied') return;
+    hit.decision = 'denied';
+    hit.reason = row.reason || hit.reason;
+    hit.label = row.label || hit.label;
+    hit.shop = row.shop || hit.shop;
+    return;
+  }
   seen.add(row.h);
   out.push({ ...row, source, chain: row.chain || (row.shop === 'ferry' ? 'NEAR Intents' : 'NEAR') });
 }
