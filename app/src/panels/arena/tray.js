@@ -147,7 +147,16 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
         paint();
         return { ok: true, hint: state.status || 'Score is on the Score tab.' };
       }
-      const plan = planFromCommand(cmd, state.guardians, state.budget);
+      const plan = planFromCommand(cmd, state.guardians, state.budget, {
+        arena: hooks.arena ? hooks.arena() : '',
+        board: hooks.board ? hooks.board() : '',
+        owner: hooks.player ? hooks.player() : '',
+        allow: hooks.receivers ? hooks.receivers() : undefined,
+        network: 'mainnet',
+        nonce: hooks.nonce ? String(hooks.nonce()) : '0',
+        epoch: hooks.epoch ? String(hooks.epoch()) : '0',
+        expiry: String((BigInt(Date.now()) + 600000n) * 1000000n),
+      });
       if (plan.decision === 'ask') {
         show(plan);
         return { ok: false, hint: plan.reason };
@@ -221,15 +230,25 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
       await act({ ...simulateWeek(state.guardians, 7), decision: 'sim' });
       return;
     }
+    const spend = {
+      arena: hooks.arena ? hooks.arena() : '',
+      board: hooks.board ? hooks.board() : '',
+      owner: hooks.player ? hooks.player() : '',
+      allow: hooks.receivers ? hooks.receivers() : undefined,
+      network: 'mainnet',
+      nonce: hooks.nonce ? String(hooks.nonce()) : '0',
+      epoch: hooks.epoch ? String(hooks.epoch()) : '0',
+      expiry: String((BigInt(Date.now()) + 600000n) * 1000000n),
+    };
     if (button.dataset.act === 'attack') {
       const id = state.attackId || state.guardians?.[0]?.id || '';
       const g = (state.guardians || []).find(row => String(row.id) === String(id));
-      await act(planAttack({ id, message: state.message, fee: g ? Number(g.fee) : null, budget: state.budget }));
+      await act(planAttack({ ...spend, id, message: state.message, fee: g ? Number(g.fee) : null, budget: state.budget }));
       return;
     }
-    if (state.mode === 'feed') await act(planFeed({ id: state.feedId, amount: state.feedAmt }));
-    else if (state.mode === 'withdraw') await act(planWithdraw({ amount: state.withdrawAmt }));
-    else await act(planMint(state));
+    if (state.mode === 'feed') await act(planFeed({ ...spend, id: state.feedId, amount: state.feedAmt }));
+    else if (state.mode === 'withdraw') await act(planWithdraw({ ...spend, amount: state.withdrawAmt }));
+    else await act(planMint({ ...spend, ...state }));
   });
 
   const fixture = new URLSearchParams(globalThis.location?.search || '').get('arenaFixture');

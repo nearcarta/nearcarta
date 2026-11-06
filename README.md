@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 581 backend unit tests (578 pass, 3 skipped), offline
+npm test                                   # 594 backend unit tests (591 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -256,20 +256,20 @@ The city door is the way in. All shops → Vault Arena stays in the town. `/shop
 
 The card has three tabs: Guardians, Attack, and Score. One gold button mints, feeds, withdraws, or attacks, matching the open tab. Score has no spend button. The AI Agent uses the same planner as that button. Enter and the arrow both send. A week advance is labeled `Simulation. No transaction was signed.`
 
-Live mint and attack do not sign. Board `propose_call` still names the board as the predecessor, so the deployed `arena.nearcarta.near` would share one open attempt across the city. `contracts/arena_v2` takes a call only from `board.nearcarta.near` and reads the visitor from `row_owner`. That crate is not deployed. The model-signature check is not implemented; the contract field `verifier` is `unverified`.
+Mint, feed, attack, and withdraw build `propose_call_as` on `board.nearcarta.near`. The board overwrites `row_owner`. An attack uses `hold: true`, then `confirm_hold`, `cancel_hold`, or `expire_sent`. Cancel returns a pending hold to the row. `expire_sent` does not refund. The session key has to name `propose_call_as` or the card signs nothing and does not open a wallet. `contracts/arena_v2` is not deployed. The model-signature check is not implemented; the contract field `verifier` is `unverified`.
 
 Score is `GET /api/arena/score`, which reads `get_attempt` on `arena.nearcarta.near`. A cancelled signature is not an attempt. `GET /api/arena/guardians` does not invent pets.
 
 Recorded earlier on the deployed arena, not from this card: allow [AZWxqZns…](https://nearblocks.io/txns/AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht), refuse [25LpJRFF…](https://nearblocks.io/txns/25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V). A v2 mint, attack, payout, and timeout refund are not linked here. The coordinator records those after deploy.
 
-`node backend/scripts/arena-close.js` prints the owner close plan and does not sign. v2 `close` refuses while a pot, earnings, or an open attempt remains, then the balance can return to `nearcarta.near`.
+`node scripts/arena-deploy.js` reads `arena.nearcarta.near` and does not sign. `--live` signs with `NEAR_MAINNET_SIGNER_KEY`. The account has no access key, so the plan closes it, returns the balance to the owner, and creates the same name with arena v2. A pot whose NFT owner is not that owner stops the plan. `node backend/scripts/arena-close.js` still only prints the old close plan.
 
-The arena cases are in `backend/test/unit/arena-market.test.js`. Contract cases are `cargo test --lib` in `contracts/arena_v2` (17).
+The arena cases are in `backend/test/unit/arena-market.test.js` and `backend/test/unit/arena-board-v2.test.js`. Contract cases are `cargo test --lib` in `contracts/arena_v2` (18).
 
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 581 unit tests (578 pass, 3 skipped)
+npm test                 # 594 unit tests (591 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -293,7 +293,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 581 unit tests (578 pass, 3 skipped):
+# 594 unit tests (591 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).

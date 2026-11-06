@@ -331,6 +331,13 @@ impl Contract {
         self.version = STATE_VERSION;
     }
 
+    /// First call after a code deploy onto an account that still has the old
+    /// arena state. The old bytes are not read. Pots have to be refunded first.
+    #[init(ignore_state)]
+    pub fn clean(board: AccountId, owner: AccountId) -> Self {
+        Self::new(board, owner, U128(0), U128(0))
+    }
+
     pub fn mt_balance_of(&self, account_id: AccountId, token_id: String) -> U128 {
         U128(self.mt_balance.get(&(account_id, token_id)).copied().unwrap_or(0))
     }
@@ -751,6 +758,14 @@ mod tests {
         assert_eq!(c.get_guardian(g).unwrap().pot.0, 0);
         ctx(owner(), 1, 21);
         c.close();
+    }
+
+    #[test]
+    fn clean_starts_from_an_empty_state() {
+        let c = Contract::clean(board(), owner());
+        assert_eq!(c.get_config().version, 2);
+        assert_eq!(c.get_config().verifier, "unverified");
+        assert!(c.get_guardian(1).is_none());
     }
 
     #[test]

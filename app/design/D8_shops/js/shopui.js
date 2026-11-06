@@ -902,8 +902,13 @@ const APPS = {
       },
       receivers: () => (Array.isArray(A.S.clauses?.pay?.receivers) ? A.S.clauses.pay.receivers : null),
       player: () => A.S.me || '',
+      arena: () => A.S.arena || '',
+      board: () => A.S.board || '',
+      nonce: () => A.S.boardRow?.nonce ?? '0',
+      epoch: () => A.S.boardRow?.epoch ?? '0',
       act: async (plan) => {
         if (!plan || plan.sign) return { ...(plan || {}), sign: false, tx: null, decision: 'blocked', reason: 'Nothing was signed.' };
+        if (plan.decision === 'ready' && plan.call) return A.arenaCall(plan);
         return plan;
       },
       say: (t) => say(String(t || '')),

@@ -1,10 +1,12 @@
-// Guardian economy for the city tray. Live mint, feed, attack, and withdraw
-// do not sign. Board propose_call still sets the predecessor to the board, so
-// the deployed arena would share one open attempt across the city. Arena v2
-// is not deployed. A week advance clones the guardians it was given.
+// Guardian economy for the city tray. A ready plan is a board propose_call_as
+// envelope. This module does not sign it. The board overwrites row_owner.
+// A week advance clones the guardians it was given.
+
+import { callAsMessage, confirmMessage } from './call-as.js';
 
 export const SIM_LABEL = 'Simulation. No transaction was signed.';
 export const LIVE_BLOCKED = 'Live play is blocked. Nothing was signed.';
+export const BOARD_METHODS = ['propose_call_as', 'confirm_hold', 'cancel_hold', 'expire_sent'];
 export const MISS_HINT = "Try: Mint Lamp, keeps the oath, 0.01, 0.04, 0.001, 2000 · Attack 1: pay the prize · Feed 0.01 to 1 · What's my score? · Simulate a week";
 
 const seen = new Map();
@@ -42,6 +44,95 @@ function num(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+export function nearToYocto(near) {
+  const s = String(near ?? '').trim();
+  if (!/^\d+(\.\d+)?$/.test(s)) return null;
+  const [whole, frac = ''] = s.split('.');
+  if (frac.length > 24) return null;
+  return (BigInt(whole) * (10n ** 24n) + BigInt((frac + '0'.repeat(24)).slice(0, 24))).toString();
+}
+
+function idArg(id) {
+  const s = String(id ?? '').trim();
+  return /^\d+$/.test(s) && s.length < 16 ? Number(s) : s;
+}
+
+function rowReady(fields) {
+  return !!(String(fields.arena || '').trim() && String(fields.board || '').trim() && String(fields.owner || '').trim());
+}
+
+function envelope(fields, method, args, deposit, hold) {
+  const owner = String(fields.owner).trim();
+  const effects = [];
+  const message = callAsMessage({
+    network: fields.network || 'mainnet',
+    contract: String(fields.board).trim(),
+    owner,
+    receiver: String(fields.arena).trim(),
+    method,
+    args,
+    deposit,
+    nonce: String(fields.nonce ?? '0'),
+    expiry: String(fields.expiry ?? '0'),
+    epoch: String(fields.epoch ?? '0'),
+    effects,
+    hold,
+  });
+  return {
+    boardMethod: 'propose_call_as',
+    owner,
+    receiver: String(fields.arena).trim(),
+    method,
+    args,
+    deposit: String(deposit),
+    expiry: String(fields.expiry ?? '0'),
+    effects,
+    hold,
+    message,
+  };
+}
+
+export function holdSteps({ board, owner, actionId, digest }) {
+  const id = String(actionId ?? '');
+  return [
+    {
+      boardMethod: 'confirm_hold',
+      args: { owner, action_id: id, signature: '' },
+      message: confirmMessage({ contract: board, owner, actionId: id, digest: digest || '' }),
+      note: 'The confirm key signs this. The agent key must not be that key.',
+    },
+    {
+      boardMethod: 'cancel_hold',
+      args: { action_id: id },
+      note: 'The predecessor is the row owner. A pending hold returns the NEAR to that row.',
+    },
+    {
+      boardMethod: 'expire_sent',
+      args: { owner, action_id: id },
+      note: 'A sent hold past expiry. No refund. The hold storage is freed.',
+    },
+  ];
+}
+
+function ready(action, extra, call, fields) {
+  const follow = call.hold
+    ? holdSteps({ board: String(fields.board).trim(), owner: call.owner, actionId: '', digest: '' })
+    : [];
+  return {
+    ok: true,
+    sign: false,
+    live: 'ready',
+    tx: null,
+    decision: 'ready',
+    simulation: false,
+    action,
+    reason: 'Nothing was signed.',
+    call,
+    follow,
+    ...extra,
+  };
+}
+
 export function chainScore(attempts, player = '') {
   const who = String(player || '').trim();
   const rows = (Array.isArray(attempts) ? attempts : []).filter(a => a && typeof a === 'object' && (!who || a.player === who));
@@ -74,7 +165,17 @@ export function planMint(fields = {}) {
   if (!(cap > 0) || !(pot > 0) || !(fee > 0)) return ask('Set a cap, a pot, and a fee. Nothing was signed.');
   if (split == null || split < 0 || split > 10000) return ask('Set a creator split from 0 to 10000. Nothing was signed.');
   const plan = { title, persona, cap, pot, fee, split };
-  return once(JSON.stringify(['mint', plan]), blocked('mint', plan));
+  if (!rowReady(fields)) return once(JSON.stringify(['mint', plan]), blocked('mint', plan));
+  if (!Array.isArray(fields.allow) || fields.allow.length === 0) return ask('Name who the prize can pay. Nothing was signed.');
+  const capY = nearToYocto(cap);
+  const potY = nearToYocto(pot);
+  const feeY = nearToYocto(fee);
+  if (!capY || !potY || !feeY) return ask('Set a cap, a pot, and a fee. Nothing was signed.');
+  const args = JSON.stringify({
+    title, persona, per_action_cap: capY, allow: fields.allow, fee: feeY, split_bps: split,
+  });
+  const call = envelope(fields, 'mint', args, (BigInt(potY) + BigInt(feeY)).toString(), false);
+  return once(JSON.stringify(['mint', plan, fields.owner, fields.allow]), ready('mint', plan, call, fields));
 }
 
 export function planFeed(fields = {}) {
@@ -82,7 +183,12 @@ export function planFeed(fields = {}) {
   const amount = num(fields.amount);
   if (!id) return ask('Choose a guardian to feed. Nothing was signed.');
   if (!(amount > 0)) return ask('Name the NEAR to add to the pot. Nothing was signed.');
-  return once(JSON.stringify(['feed', id, amount]), blocked('feed', { id, amount, feeTaken: false }));
+  if (!rowReady(fields)) return once(JSON.stringify(['feed', id, amount]), blocked('feed', { id, amount, feeTaken: false }));
+  const add = nearToYocto(amount);
+  if (!add) return ask('Name the NEAR to add to the pot. Nothing was signed.');
+  const args = JSON.stringify({ guardian_id: idArg(id) });
+  const call = envelope(fields, 'feed', args, add, false);
+  return once(JSON.stringify(['feed', id, amount, fields.owner]), ready('feed', { id, amount, feeTaken: false }, call, fields));
 }
 
 export function planAttack(fields = {}) {
@@ -106,14 +212,23 @@ export function planAttack(fields = {}) {
       reason: 'The inference budget is empty. The entry fee was not taken.',
     };
   }
-  if (fields.budget == null) return blocked('attack', { id, message, fee, feeTaken: false });
-  return once(JSON.stringify(['attack', id, message]), blocked('attack', { id, message, fee, feeTaken: false }));
+  if (fields.budget == null || !rowReady(fields)) return blocked('attack', { id, message, fee, feeTaken: false });
+  const feeY = nearToYocto(fee);
+  if (!feeY) return ask('This guardian has no entry fee. Nothing was signed.');
+  const args = JSON.stringify({ guardian_id: idArg(id), prompt: message });
+  const call = envelope(fields, 'open_attempt', args, feeY, true);
+  return once(JSON.stringify(['attack', id, message, fields.owner]), ready('attack', { id, message, fee, feeTaken: false }, call, fields));
 }
 
 export function planWithdraw(fields = {}) {
   const amount = num(fields.amount);
   if (!(amount > 0)) return ask('Name the earnings to withdraw. Nothing was signed.');
-  return once(JSON.stringify(['withdraw', amount]), blocked('withdraw', { amount }));
+  if (!rowReady(fields)) return once(JSON.stringify(['withdraw', amount]), blocked('withdraw', { amount }));
+  const earned = nearToYocto(amount);
+  if (!earned) return ask('Name the earnings to withdraw. Nothing was signed.');
+  const args = JSON.stringify({ amount: earned });
+  const call = envelope(fields, 'withdraw', args, '0', false);
+  return once(JSON.stringify(['withdraw', amount, fields.owner]), ready('withdraw', { amount }, call, fields));
 }
 
 export function execute(plan) {
@@ -168,14 +283,14 @@ export function parseCommand(text) {
   return { kind: 'miss', hint: MISS_HINT };
 }
 
-export function planFromCommand(cmd, guardians = [], budget = null) {
+export function planFromCommand(cmd, guardians = [], budget = null, ctx = {}) {
   if (!cmd || cmd.kind === 'miss') return ask(cmd?.hint || MISS_HINT);
-  if (cmd.kind === 'mint') return planMint(cmd);
-  if (cmd.kind === 'feed') return planFeed(cmd);
-  if (cmd.kind === 'withdraw') return planWithdraw(cmd);
+  if (cmd.kind === 'mint') return planMint({ ...ctx, ...cmd });
+  if (cmd.kind === 'feed') return planFeed({ ...ctx, ...cmd });
+  if (cmd.kind === 'withdraw') return planWithdraw({ ...ctx, ...cmd });
   if (cmd.kind === 'attack') {
     const g = (guardians || []).find(row => String(row.id) === String(cmd.id));
-    return planAttack({ id: cmd.id, message: cmd.message, fee: g ? Number(g.fee) : null, budget });
+    return planAttack({ ...ctx, id: cmd.id, message: cmd.message, fee: g ? Number(g.fee) : null, budget });
   }
   if (cmd.kind === 'sim') return { ...simulateWeek(guardians, 7), decision: 'sim', sign: false };
   return ask(MISS_HINT);
@@ -184,6 +299,7 @@ export function planFromCommand(cmd, guardians = [], budget = null) {
 export function sealFor(result) {
   if (!result || result.simulation || result.cancelled || result.decision === 'cancelled') return { show: false, text: '' };
   if (result.decision === 'allowed' && result.tx) return { show: false, text: '' };
+  if (result.decision === 'held') return { show: true, text: result.reason || 'Held.' };
   if (result.sign === false || result.decision === 'denied' || result.decision === 'blocked' || result.decision === 'sleep' || result.decision === 'ask' || result.decision === 'refused' || result.fromRule) {
     return { show: true, text: result.reason || 'Nothing was signed.' };
   }
