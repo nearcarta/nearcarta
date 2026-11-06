@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 578 backend unit tests (575 pass, 3 skipped), offline
+npm test                                   # 581 backend unit tests (578 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -159,7 +159,7 @@ An agent with a wallet key can be talked into paying anyone: a fake invoice, a p
 | Vault Arena | Write a scam, *Send the scam* | The NEAR AI model (`z-ai/glm-5.3-flash`) reads it and proposes a payment; a payment outside your rules is refused on chain. Six walls, points and a leaderboard |
 | Payouts | *Pay reviewed rows*, or ask the AI Agent "Pay reviewed rows" | Each in-cap NEAR row is one `propose` on `board.nearcarta.near`. Over the row cap, the row is refused before any deposit. A foreign row is held. An invoice link stays on the receive account written at creation. Nothing is marked paid until 1Click status is `SUCCESS` |
 | Town Hall | *Change my row* | `set_rules`, `set_frozen` and `set_seal` on your own row. Deposit 0. A preview reads the new cap back |
-| Chronicle | Open `/?shop=chronicle`. Type an account. Choose Timeline, Statement, or Verify | The timeline lists that account’s recorded proofs, or says the coverage is partial. Write statement makes a local summary and does not sign. Anchor downloads the bundle and says the live anchor is blocked. Export CSV totals match delivered, refunded, and attempted. Verify rejects a changed statement. No entry fee. Live anchor tx: (coordinator adds the nearblocks link) |
+| Chronicle | Open `/?shop=chronicle`. Type an account and press Show timeline. Choose Timeline, Statement, or Verify | The timeline lists that account’s rows, or says there are no rows. Write statement makes a local summary and does not sign. Anchor downloads the bundle and says the live anchor is blocked. Export CSV is off when there are no rows. Verify rejects a changed statement. No entry fee. Live anchor tx: (coordinator adds the nearblocks link) |
 
 The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes `set_rules` on that row.
 
@@ -178,7 +178,7 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 | Town intro | `app/design/D9_world/js/main.js` `story` | `the 3D story starts without the flat overlay` | no new spend |
 
 ### Chronicle
-An account auditor for the Autonomous Business loop. Open the city (`/?shop=chronicle`). Type an account. The tray reads `GET /api/chronicle/live?account=`, `GET /api/chronicle?owner=`, `GET /api/ledger` and `GET /api/mainnet`. The live route is a public read for any account: the board view, nearblocks.io transactions and fungible-token transfers, and NEAR RPC `EXPERIMENTAL_tx_status` for each receipt it shows. The browser holds no key. Each source names its count or its gap, including a missing rules version, a missing wrap.near transfer, and a 1Click match only when an `intents.near` transfer is on the page. An empty index says there are no rows. Recorded proofs are added only when the deployment names that account, and they are not called a live index. The read is cached so a warm answer does not call the index again.
+An account auditor for the Autonomous Business loop. Open the city (`/?shop=chronicle`). Type an account. The tray reads `GET /api/chronicle/live?account=`, `GET /api/chronicle?owner=`, `GET /api/ledger` and `GET /api/mainnet`. The live route is a public read for any account. It tries nearblocks.io, then FastNEAR (`api.fastnear.com` and `tx.main.fastnear.com`), then NEAR RPC `EXPERIMENTAL_tx_status`. A failed or unanswered read is not cached. An answered read is cached for 60 seconds. The health line names the source that answered. `NEARBLOCKS_API_KEY` is optional and is not written into the response. The browser holds no key. Test: `a nearblocks 429 falls back to fastnear and the key stays out of the body`. A plain execution failure is `failed` and the tray says Failed on chain. Refused stays a Nearcarta board or rule refusal. Test: `a chain failure is not called a refusal`. Each source names its count or its gap, including a missing rules version, a missing wrap.near transfer, and a 1Click match only when an `intents.near` transfer is on the page. An empty index says there are no rows. Recorded proofs are added only when the deployment names that account, and they are not called a live index. The read is cached so a warm answer does not call the index again.
 
 Timeline, Statement, and Verify sit on one card. The icon card is account to ledger. Write statement asks NEAR AI Cloud when `NEARAI_CLOUD_API_KEY` is set, and the prompt contains the canonical bundle digest. The response carries the model signature and the attestation fields. Verify re-checks the ed25519 signature, the request hash, and that digest. It says the Intel DCAP quote, TCB, and RTMR3 are not verified in the browser, and that the raw response bytes are not re-hashed there. With no key, or when the preflight or the signature does not come back, the statement is a labelled local fallback. Anchor asks for consent before a private note is committed. The commitment is `sha256(salt:note)`. The raw note hash is not published. The live board contract has no anchor method, so Anchor downloads the bundle and says the live anchor is blocked. Nothing is signed on chain. Export CSV counts delivered, refunded, and attempted.
 
@@ -253,13 +253,13 @@ Live check, at most 0.06 NEAR (the pass itself is 0.001):
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 578 unit tests (575 pass, 3 skipped)
+npm test                 # 581 unit tests (578 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
 npx playwright install chromium && npm run e2e   # 127 browser tests: 124 passed, 2 skipped, 1 flaky
 ```
-Optional: `ONECLICK_PARTNER_KEY` enables confidential quotes. `NEARAI_CLOUD_API_KEY` enables the live NEAR AI TEE check (`npm run tee`; non-billable). Without them the public paths still run.
+Optional: `ONECLICK_PARTNER_KEY` enables confidential quotes. `NEARAI_CLOUD_API_KEY` enables the live NEAR AI TEE check (`npm run tee`; non-billable). `NEARBLOCKS_API_KEY` is an optional nearblocks.io key for the Chronicle timeline. Without them the public paths still run.
 
 ## Check each shop
 The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run verify:mainnet`.
@@ -277,7 +277,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 578 unit tests (575 pass, 3 skipped):
+# 581 unit tests (578 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).

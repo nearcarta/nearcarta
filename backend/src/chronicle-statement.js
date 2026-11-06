@@ -36,11 +36,13 @@ function fallback(input, digest, why) {
 }
 
 function tidy(text, digest) {
-  let out = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 600);
-  if (!out) out = 'The model returned no words.';
-  if (!out.includes(digest)) out = `${out} Canonical digest ${digest}.`;
-  if (!/Historic rules/i.test(out)) out = `${out} Historic rules: missing.`;
-  return out;
+  let out = String(text || '').replace(/\s+/g, ' ').trim();
+  if (digest) out = out.split(digest).join(' ');
+  out = out.replace(/canonical digest[:\s]*/ig, ' ').replace(/\s+/g, ' ').replace(/^[\s.:\-]+/, '').trim();
+  if (!out || /^[0-9a-f]{8,}/i.test(out)) out = 'This statement covers the account and the rows in the bundle.';
+  if (!/[.!?]$/.test(out)) out += '.';
+  if (!/Historic rules/i.test(out)) out += ' Historic rules: missing.';
+  return out.slice(0, 600);
 }
 
 export async function signStatement(input = {}, deps = {}) {
@@ -52,7 +54,7 @@ export async function signStatement(input = {}, deps = {}) {
   const prompt = [
     'You are Chronicle, a read-only account auditor. Do not invent a transaction, a payee, or an amount.',
     `Canonical bundle digest: ${digest}`,
-    'Repeat that digest exactly. Then two short sentences on delivered, refunded, and attempted.',
+    'Start with a sentence naming the account. Then one sentence on delivered, refunded, and attempted. Do not begin with the digest and do not print the digest.',
     facts.text,
   ].join('\n');
   const completeF = deps.complete || complete;

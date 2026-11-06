@@ -103,7 +103,7 @@ test('a statement without a key is labelled, and a signed one binds the digest',
         const reqBody = JSON.stringify({ model, messages });
         const resp = '{"id":"c1"}';
         built = {
-          id: 'c1', model, reqModel: model, content: `Count is one. ${digest}`,
+          id: 'c1', model, reqModel: model, content: `${digest} Count is one.`,
           usage: { prompt_tokens: 10, completion_tokens: 10 },
           reqSha: createHash('sha256').update(reqBody).digest('hex'),
           respSha: createHash('sha256').update(resp).digest('hex'),
@@ -128,7 +128,99 @@ test('a statement without a key is labelled, and a signed one binds the digest',
   assert.equal(signed.digest, digest);
   assert.equal(signed.serverVerified, true);
   assert.match(signed.text, /Historic rules: missing/);
+  assert.equal(signed.text.startsWith(digest), false);
+  assert.match(signed.text, /^Count is one/);
   assert.match(signed.status, /Nothing was signed on chain/);
   assert.ok(signed.attestation.unverified.some(s => /Intel DCAP/.test(s)));
   assert.equal(/bearer /i.test(signed.requestBody), false);
+});
+
+const HASH2 = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC';
+
+test('a nearblocks 429 falls back to fastnear and the key stays out of the body', async () => {
+  _resetLiveCache();
+  let auth = '';
+  const fetchFn = async (url, opts = {}) => {
+    const u = String(url);
+    if (u.includes('nearblocks.io')) {
+      if (opts.headers?.authorization) auth = opts.headers.authorization;
+      return new Response('slow', { status: 429 });
+    }
+    if (u.includes('/v0/account')) {
+      return new Response(JSON.stringify({ account_txs: [{
+        transaction_hash: HASH2, tx_block_timestamp: '1700000000000000000', is_success: true, is_real_signer: true, account_id: 'alice.near',
+      }] }), { status: 200 });
+    }
+    if (u.includes('/v0/transactions')) {
+      return new Response(JSON.stringify({ transactions: [{
+        transaction: { hash: HASH2, signer_id: 'alice.near', receiver_id: 'bob.near', actions: [{ Transfer: { deposit: '1000000000000000000000000' } }] },
+        execution_outcome: { block_timestamp: '1700000000000000000', outcome: { status: { SuccessValue: '' } } },
+      }] }), { status: 200 });
+    }
+    if (u.includes('/ft')) return new Response(JSON.stringify({ account_id: 'alice.near', tokens: [] }), { status: 200 });
+    if (opts.method === 'POST') return new Response(JSON.stringify({ result: { status: { SuccessValue: '' } } }), { status: 200 });
+    return new Response('no', { status: 500 });
+  };
+  const deps = {
+    fetch: fetchFn, view: async () => null, board: 'board.nearcarta.near', nearblocksKey: 'super-secret-key',
+    index: 'https://api.nearblocks.io', fastnearTx: 'https://tx.main.fastnear.com', fastnear: 'https://api.fastnear.com', rpc: 'https://rpc.test',
+  };
+  const first = await readLive('alice.near', deps);
+  assert.ok(first.rows.some(r => r.hash === HASH2 && r.url.includes('nearblocks.io')));
+  assert.match(first.health, /transactions fastnear/);
+  assert.equal(auth, 'Bearer super-secret-key');
+  assert.equal(JSON.stringify(first).includes('super-secret-key'), false);
+  const calls = [];
+  const wrapped = async (url, opts) => { calls.push(String(url)); return fetchFn(url, opts); };
+  const second = await readLive('alice.near', { ...deps, fetch: wrapped });
+  assert.equal(second.cached, true);
+  assert.equal(calls.length, 0);
+});
+
+test('a chain failure is not called a refusal', async () => {
+  _resetLiveCache();
+  const HASH3 = 'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+  const fetchFn = async (url, opts = {}) => {
+    const u = String(url);
+    if (u.includes('nearblocks.io')) return new Response('no', { status: 429 });
+    if (u.includes('/v0/account')) {
+      return new Response(JSON.stringify({ account_txs: [{
+        transaction_hash: HASH3, tx_block_timestamp: '1700000000000000000', is_success: false, is_real_signer: true,
+      }] }), { status: 200 });
+    }
+    if (u.includes('/v0/transactions')) {
+      return new Response(JSON.stringify({ transactions: [{
+        transaction: { hash: HASH3, signer_id: 'carol.near', receiver_id: 'wrap.near', actions: [{ FunctionCall: { method_name: 'storage_deposit', deposit: '1250000000000000000000' } }] },
+        execution_outcome: { block_timestamp: '1700000000000000000', outcome: { status: { Failure: { ActionError: { kind: { AccountDoesNotExist: { account_id: 'carol.near' } } } } } } },
+      }] }), { status: 200 });
+    }
+    if (u.includes('/ft')) return new Response(JSON.stringify({ account_id: 'carol.near', tokens: [] }), { status: 200 });
+    if (opts.method === 'POST') return new Response(JSON.stringify({ result: { status: { Failure: {} } } }), { status: 200 });
+    return new Response('no', { status: 500 });
+  };
+  const body = await readLive('carol.near', {
+    fetch: fetchFn, view: async () => null, board: 'board.nearcarta.near',
+    index: 'https://api.nearblocks.io', fastnearTx: 'https://tx.main.fastnear.com', fastnear: 'https://api.fastnear.com', rpc: 'https://rpc.test',
+  });
+  const row = body.rows.find(r => r.hash === HASH3);
+  assert.ok(row);
+  assert.equal(row.decision, 'failed');
+  assert.equal(body.rows.some(r => r.decision === 'denied'), false);
+});
+
+test('an unanswered timeline is not cached', async () => {
+  _resetLiveCache();
+  let n = 0;
+  const fetchFn = async () => { n += 1; return new Response('no', { status: 429 }); };
+  const deps = {
+    fetch: fetchFn, view: async () => { throw new Error('down'); }, board: 'board.nearcarta.near',
+    index: 'https://api.nearblocks.io', fastnearTx: 'https://tx.main.fastnear.com', fastnear: 'https://api.fastnear.com', rpc: 'https://rpc.test',
+  };
+  const first = await readLive('bob.near', deps);
+  assert.equal(first.rows.length, 0);
+  assert.equal(first.cached, false);
+  assert.match(first.health, /transactions none/);
+  const seen = n;
+  await readLive('bob.near', deps);
+  assert.ok(n > seen);
 });

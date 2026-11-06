@@ -88,7 +88,7 @@ test('R2 the chronicle action is one brass button', async ({ page }) => {
     await page.goto('/shops/chronicle/');
     const btn = page.locator('#c-go');
     await expect(btn).toBeVisible();
-    await expect(btn).toHaveText('Write statement');
+    await expect(btn).toHaveText('Show timeline');
     await btn.scrollIntoViewIfNeeded();
     const face = await btn.evaluate(faceOf);
     expect(face.img).toContain('245, 208, 138');
