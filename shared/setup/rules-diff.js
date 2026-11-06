@@ -11,6 +11,53 @@ const MICRO = 10n ** 18n;
 // 0.001 NEAR. set_rules attaches this; charge refunds whatever storage does not use.
 export const RULES_DEPOSIT_YOCTO = (10n ** 21n).toString();
 
+/**
+ * Shops a row can still reach. `charter.nearcarta.near` was retired to `nearcarta.near`
+ * (mainnet.json `retired`), so a saved rules list that still names it is stale: the row
+ * spends 0.02 NEAR of storage on a call that can never run. Guardhouse was deployed after
+ * the old default was written and was missing from it.
+ *
+ * Takes the retired ids as an argument so the caller reads them from the deployment record
+ * rather than this file keeping its own copy.
+ */
+export function liveShops(list, retired = []) {
+  const dead = new Set((retired || []).map(s => String(s).toLowerCase()));
+  const out = [];
+  for (const raw of list || []) {
+    const id = String(raw || '').trim().toLowerCase();
+    if (!id || dead.has(id) || out.includes(id)) continue;
+    out.push(id);
+  }
+  return out;
+}
+
+/** True when the list names an account that no longer exists. */
+export function namesRetired(list, retired = []) {
+  const dead = new Set((retired || []).map(s => String(s).toLowerCase()));
+  return (list || []).some(s => dead.has(String(s).trim().toLowerCase()));
+}
+
+/**
+ * Rewrite a saved shop list in place: drop the retired ids and any duplicate, and report
+ * which ids went so the page can say so once.
+ * A visitor who saved rules before the charter was retired keeps `charter.nearcarta.near`
+ * in localStorage. Filtering it out on every read hides it but never repairs the saved list,
+ * so the page would keep sending it. This returns the list to store instead.
+ * @returns {{receivers:string[], dropped:string[]}}
+ */
+export function migrateShops(list, retired = []) {
+  const dead = new Set((retired || []).map(s => String(s).toLowerCase()));
+  const dropped = [];
+  const kept = [];
+  for (const raw of list || []) {
+    const id = String(raw || '').trim().toLowerCase();
+    if (!id) continue;
+    if (dead.has(id)) { if (!dropped.includes(id)) dropped.push(id); continue; }
+    if (!kept.includes(id)) kept.push(id);
+  }
+  return { receivers: kept, dropped };
+}
+
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** Yocto string at 6 decimal places, the same rounding setup.js uses for rule args. */
