@@ -63,9 +63,13 @@ test('a second shop pin during the door transition is ignored', () => {
 test('pay is disabled when the payout total is zero', () => {
   assert.equal(payoutReady([{ to: 'a.near', amt: '0' }]).enabled, false);
   assert.equal(payoutLabel([{ to: 'a.near', amt: '0' }]), 'Pay');
-  const ready = payoutReady([{ to: 'a.near', amt: '0.001' }, { to: 'b.near', amt: '0.001' }]);
+  const ready = payoutReady([{ to: 'a.near', amt: '0.001' }, { to: 'b.near', amt: '0.001' }], null, 0.005);
   assert.equal(ready.enabled, true);
   assert.equal(ready.count, 2);
+  // The cap is the visitor's own /setup cap, never a constant in the shop.
+  assert.equal(payoutReady([{ to: 'a.near', amt: '0.006' }], null, 0.005).enabled, false);
+  assert.equal(payoutReady([{ to: 'a.near', amt: '0.006' }], null, 0.02).enabled, true);
+  assert.equal(payoutReady([{ to: 'a.near', amt: '0.001' }]).enabled, false, 'an unread cap pays nothing');
   assert.match(read('app/design/D8_shops/js/shopui.js'), /payoutReady/);
   assert.doesNotMatch(read('app/design/D8_shops/js/shopui.js'), /Sending (it )?to Base|cross to Base|Pays on Base/);
 });
