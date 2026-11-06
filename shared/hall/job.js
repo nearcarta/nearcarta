@@ -168,8 +168,14 @@ export function acceptPart(ledger, input = {}) {
   if (!job) return refuse('No job is posted. Nothing was signed.', 'ask');
   if (closed(job, input.nowMs)) return refundJob(ledger, { jobId: job.id, reason: 'timeout', nowMs: input.nowMs });
   const part = partOf(job, input.partId);
-  if (!part || part.phase !== 'counter' || !part.counter) return refuse('There is no counter to accept. Nothing was signed.', 'counter');
-  part.awarded = { worker: part.counter.worker, priceY: part.counter.offerY };
+  if (!part) return refuse('There is no counter to accept. Nothing was signed.', 'counter');
+  if (part.phase === 'bid' && part.worker && part.quoteY) {
+    part.awarded = { worker: part.worker, priceY: part.quoteY };
+  } else if (part.phase === 'counter' && part.counter) {
+    part.awarded = { worker: part.counter.worker, priceY: part.counter.offerY };
+  } else {
+    return refuse('There is no counter to accept. Nothing was signed.', 'counter');
+  }
   part.phase = 'awarded';
   part.settlement = 'awarded';
   part.counter = null;
@@ -257,7 +263,9 @@ export function activeCta(job) {
   if (counter) return { label: 'Accept counter', action: 'accept', partId: counter.id, tab: 'agents' };
   const awarded = job.parts.find(p => p.settlement === 'awarded');
   if (awarded) return { label: 'Record pass', action: 'pass', partId: awarded.id, tab: 'agents' };
-  const open = job.parts.find(p => p.settlement === 'open');
+  const bid = job.parts.find(p => p.phase === 'bid' && p.settlement === 'open');
+  if (bid) return { label: 'Accept bid', action: 'accept', partId: bid.id, tab: 'agents' };
+  const open = job.parts.find(p => p.settlement === 'open' && p.phase !== 'bid');
   if (open) return { label: 'Send quote', action: 'quote', partId: open.id, tab: 'agents' };
   if (job.status !== 'closed' && BigInt(job.remainingY) > 0n) return { label: 'Refund remaining', action: 'refund', tab: 'receipts' };
   return null;

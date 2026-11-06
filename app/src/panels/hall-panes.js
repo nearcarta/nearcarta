@@ -47,11 +47,14 @@ function postPane(form, tab) {
     <label class="hall-field" for="hall-budget"><span>Budget</span>
       <span class="hall-amt"><input id="hall-budget" data-testid="hall-budget" inputmode="decimal" value="${esc(form.budget)}" aria-label="Budget"><span>NEAR</span></span>
     </label>
-    ${field('Asset', 'hall-asset', 'NEAR', 'readonly')}
-    ${field('Deadline in hours', 'hall-deadline', form.deadline, 'inputmode="numeric"')}
-    ${field('Max parts', 'hall-parts', form.parts, 'inputmode="numeric"')}
-    ${field('Worker account', 'hall-worker-a', form.workerA, 'autocomplete="off" spellcheck="false"')}
-    ${field('Second worker', 'hall-worker-b', form.workerB, 'autocomplete="off" spellcheck="false"')}
+    <div class="hall-split">
+      ${field('Deadline in hours', 'hall-deadline', form.deadline, 'inputmode="numeric"')}
+      ${field('Max parts', 'hall-parts', form.parts, 'inputmode="numeric"')}
+    </div>
+    <div class="hall-split">
+      ${field('First worker', 'hall-worker-a', form.workerA, 'autocomplete="off" spellcheck="false"')}
+      ${field('Second worker', 'hall-worker-b', form.workerB, 'autocomplete="off" spellcheck="false"')}
+    </div>
   </div>`;
 }
 
@@ -61,7 +64,9 @@ function agentsPane(job, form, market, tab) {
     ? `<p class="hall-line">Listed read: ${esc(market.agent.handle)}. Not hired.</p>`
     : '';
   const parts = (job?.parts || []).map(p => {
-    const quote = p.counter
+    const quote = p.settlement === 'held' && p.awarded
+      ? `Held ${nearOf(p.awarded.priceY)} NEAR`
+      : p.counter
       ? `Counter once ${nearOf(p.counter.offerY)} NEAR`
       : p.quoteY ? `Bid ${nearOf(p.quoteY)} NEAR` : 'No quote yet';
     const who = p.worker ? esc(p.worker) : 'no worker';
@@ -100,7 +105,7 @@ export function jobTray({ tab = 'post', form = {}, job = null, market = null, se
   const showCta = cta && (cta.tab === tab || !job);
   const status = (lines.length ? lines : statusLines(job)).slice(0, 2);
   const gold = showCta
-    ? `<button type="button" class="hall-cta" data-testid="hall-cta" data-action="${esc(cta.action)}" data-part="${cta.partId || ''}">${esc(cta.label)}</button>`
+    ? `<button type="button" class="hall-cta primary" data-testid="hall-cta" data-action="${esc(cta.action)}" data-part="${cta.partId || ''}">${esc(cta.label)}</button>`
     : '';
   return `<div class="hall-card" data-testid="hall-desk">
     ${tabs(tab)}

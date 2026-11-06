@@ -276,7 +276,7 @@ test('the city wires the hall dock and the all-shops link still enters the room'
   assert.doesNotMatch(panes, />\?</);
   assert.match(panes, /web3icons/);
   const tray = jobTray({ form: { task: '', budget: '', deadline: '24', parts: '2', workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '' } });
-  assert.equal(tray.match(/class="hall-cta"/g).length, 1);
+  assert.equal(tray.match(/class="hall-cta primary"/g).length, 1);
   assert.match(tray, /class="web3icons"/);
   assert.match(read('app/src/panels/hall.css'), /hall-agent-pop\[hidden\]/);
   assert.doesNotMatch(read('app/src/panels/hall-actions.js'), /ctx\.pay/);

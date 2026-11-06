@@ -1,9 +1,9 @@
 /* Town Hall tray. Loaded by the town, the shop room, and /shops/hall/. */
-body.hall-tray #tray{
+body.hall-tray #shopUI #tray{
   width:min(440px,calc(100vw - 28px));
   max-width:440px;
   left:16px; bottom:18px;
-  max-height:calc(100dvh - 112px);
+  max-height:calc(100dvh - 200px);
   padding:24px 22px 22px;
   box-sizing:border-box;
   overflow-x:hidden;
@@ -13,17 +13,17 @@ body.hall-tray #tray{
   box-shadow:0 16px 40px rgba(0,0,0,.45);
   backdrop-filter:none;
 }
-body.hall-tray #tray .t-head,
-body.hall-tray #tray .label,
-body.hall-tray #tray .hero,
-body.hall-tray #tray #t-who,
-body.hall-tray #tray #t-track,
-body.hall-tray #tray .shop-track,
-body.hall-tray #tray .say,
-body.hall-tray #tray .t-links,
-body.hall-tray #tray .rcpt,
-body.hall-tray #t-act{display:none!important}
-body.hall-tray #t-form{margin:0;min-width:0;max-width:100%}
+body.hall-tray #shopUI .t-head,
+body.hall-tray #shopUI .label,
+body.hall-tray #shopUI .hero,
+body.hall-tray #shopUI #t-who,
+body.hall-tray #shopUI #t-track,
+body.hall-tray #shopUI .shop-track,
+body.hall-tray #shopUI .say,
+body.hall-tray #shopUI .t-links,
+body.hall-tray #shopUI .rcpt,
+body.hall-tray #shopUI #t-act{display:none!important}
+body.hall-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
 body[data-shop=hall] main.shop-page{padding-bottom:128px}
 .hall-card{display:grid;gap:18px;min-width:0;max-width:100%}
 .hall-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28}
@@ -32,7 +32,9 @@ body[data-shop=hall] main.shop-page{padding-bottom:128px}
   background:transparent;color:#d4c4a8;cursor:pointer;
   font:700 15px/1 system-ui,sans-serif;
 }
-.hall-tab.on,.hall-tab[aria-selected="true"]{background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608}
+.hall-split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+body.hall-tray #shopUI .hall-tab.on,
+body.hall-tray #shopUI .hall-tab[aria-selected="true"]{background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608}
 .hall-flow{display:flex;align-items:center;justify-content:center;gap:16px;padding:16px 14px;border-radius:16px;background:#17130f;border:1px solid rgba(214,180,106,.35)}
 .hall-flow-ico{width:48px;height:48px;display:flex}
 .hall-flow-ico svg{width:48px;height:48px;border-radius:12px}
@@ -50,10 +52,10 @@ body[data-shop=hall] main.shop-page{padding-bottom:128px}
 .hall-amt span{color:#f5d08a;font:700 13px/1 system-ui,sans-serif}
 .hall-line,.hall-gap{margin:0;color:#fff8ee;font:600 14px/1.4 system-ui,sans-serif;overflow-wrap:break-word}
 .hall-gap{color:#f5d08a}
-.hall-cta{
+body.hall-tray #shopUI .hall-cta{
   display:inline-flex;align-items:center;justify-content:center;
   width:auto;min-width:min(220px,100%);max-width:100%;
-  min-height:44px;padding:10px 22px;margin:0;justify-self:center;box-sizing:border-box;
+  min-height:48px;padding:12px 22px;margin:0;justify-self:center;box-sizing:border-box;
   border:1px solid #c9a05a;border-radius:14px;
   background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
   color:#2a1608;font:700 15px/1.15 system-ui,sans-serif;cursor:pointer;
@@ -102,13 +104,33 @@ body[data-shop=hall] main.shop-page{padding-bottom:128px}
   width:44px;min-width:44px;height:44px;margin:0;padding:0;border:0;border-radius:10px;
   background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1 system-ui,sans-serif;cursor:pointer;
 }
+#shopUI #t-form button.hall-tab:not(.route-chip){
+  background:transparent;color:#d4c4a8;border:0;min-height:44px;border-radius:11px;
+  box-shadow:none;padding:8px 6px;
+}
+#shopUI #t-form button.hall-tab.on:not(.route-chip),
+#shopUI #t-form button.hall-tab[aria-selected="true"]:not(.route-chip){
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;border:0;
+}
+#shopUI #t-form button.hall-cta{
+  min-height:48px;border:1px solid #c9a05a;border-radius:14px;color:#2a1608;
+  background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 -2px 0 rgba(120,70,20,.22) inset,0 4px 0 #9a6f2e,0 8px 16px rgba(0,0,0,.28);
+}
+#shopUI #t-form button.hall-text:not(.route-chip){background:transparent;border:0;box-shadow:none;color:#f5d08a;min-height:44px}
 @media (max-width:720px){
-  body.hall-tray #tray{
-    width:min(calc(100vw - 112px),420px);
+  body.hall-tray #shopUI #tray{
+    width:min(calc(100vw - 112px),420px)!important;
+    right:auto!important;
     left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    max-height:min(62dvh,calc(100dvh - 108px));
-    padding:20px 18px;
+    max-height:min(68dvh,calc(100dvh - 188px));
+    padding:16px 14px;
   }
+  .hall-tab{font-size:13px}
+  body.hall-tray #shopUI .hall-cta{min-width:min(200px,100%)}
+  .hall-card{gap:12px}
+  .hall-pane{gap:10px}
+  .hall-flow{padding:10px 12px}
   #hall-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
   .hall-agent-pop{width:min(220px,calc(100vw - 120px))}
 }

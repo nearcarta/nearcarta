@@ -147,6 +147,7 @@ export async function mountHall(root, hooks = {}) {
       const dock = doc.getElementById('hall-agent-dock');
       if (dock) dock.hidden = false;
     }
+    document.querySelector('#shopUI #tray')?.scrollTo?.(0, 0);
     hooks.runAgent = text => run(text);
     if (hooks.state) hooks.state.hallRun = text => run(text);
   };

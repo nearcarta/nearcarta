@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 536 backend unit tests (533 pass, 3 skipped), offline
+npm test                                   # 545 backend unit tests (542 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -214,7 +214,7 @@ Live check, at most 0.06 NEAR (the pass itself is 0.001):
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 536 unit tests (533 pass, 3 skipped)
+npm test                 # 545 unit tests (542 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -238,7 +238,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 | Town Hall | Open `/?shop=hall` in the city. Tabs are Post job, Agents, and Receipts. Type a task, a budget, and two worker accounts, then press Post job. One gold button sends the quote, the counter, the pass, or the refund | The ledger shows paid, remaining, and refunded. A pass says held. Chain release is blocked, so nothing is signed. Market hire stays an open gap. Personal rules link to `/setup/`. `set_rules` copies the live expiry and the deposit stays 0. Code: `shared/hall/job.js`, `app/src/panels/hall-actions.js` | unit `a job conserves escrow, counters once, and does not pay on a swapped or blocked review`; unit `the hall arrow and Enter both send, and a miss leaves the input`. A live release tx is pending until an approved in-place migration. Earlier reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h) and refusal [Cp2rWatn…](https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6) are not this job |
 
-# 536 unit tests (533 pass, 3 skipped):
+# 545 unit tests (542 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).
