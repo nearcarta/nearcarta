@@ -6,3 +6,8 @@
 !backend/src/**
 !shared/**
 !backend/data/**
+!app/src/panels/toll-room.js
+!app/src/panels/toll-dock.js
+!app/src/panels/token-badge.js
+!app/src/panels/icon-map.js
+!app/src/toll-derive.js
