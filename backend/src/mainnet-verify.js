@@ -30,26 +30,40 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } }),
   });
+  // A 429 is a busy public node, not a missing tx: say so, so the row is retried instead of reported missing.
+  const status = res.status;
+  if (typeof status === 'number' && status >= 400) {
+    return { hash, found: false, retryable: status === 429 || status >= 500, error: 'http ' + status };
+  }
   const j = await res.json();
   const tx = j.result?.transaction;
   if (!tx) return { hash, found: false, error: j.error?.cause?.name || j.error?.name || 'not found' };
-  const status = j.result.status || {};
-  const failure = Object.prototype.hasOwnProperty.call(status, 'Failure');
-  return { hash, found: true, success: !failure && (Object.prototype.hasOwnProperty.call(status, 'SuccessValue') || Object.prototype.hasOwnProperty.call(status, 'SuccessReceiptId')), failure, signer: tx.signer_id || sender };
+  const outcome = j.result.status || {};
+  const failure = Object.prototype.hasOwnProperty.call(outcome, 'Failure');
+  return { hash, found: true, success: !failure && (Object.prototype.hasOwnProperty.call(outcome, 'SuccessValue') || Object.prototype.hasOwnProperty.call(outcome, 'SuccessReceiptId')), failure, signer: tx.signer_id || sender };
 }
 
-export async function checkAll(dep, { rpc, fetchImpl = fetch } = {}) {
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+export async function checkAll(dep, { rpc, fetchImpl = fetch, pause = sleep, attempts = 4 } = {}) {
   const rpcs = (Array.isArray(rpc) ? rpc : [rpc]).filter(Boolean);
   const rows = [];
   for (const row of collectMainnetTxs(dep)) {
     let hit = { ...row, found: false, error: 'not found' };
-    for (const sender of sendersFor(dep, row)) {
-      for (const url of rpcs) {
-        const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
-        hit = { ...row, ...one, sender };
-        if (one.found) break;
+    for (let attempt = 0; attempt < attempts && !hit.found; attempt++) {
+      if (attempt) await pause(400 * attempt);
+      let rateLimited = false;
+      for (const sender of sendersFor(dep, row)) {
+        for (const url of rpcs) {
+          const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
+          hit = { ...row, ...one, sender };
+          if (one.retryable) rateLimited = true;
+          if (one.found) break;
+        }
+        if (hit.found) break;
       }
-      if (hit.found) break;
+      // Only a real answer ends the retries; a busy node or a timeout gets another pass.
+      if (!hit.found && !rateLimited && attempt === 0) break;
     }
     rows.push(hit);
   }

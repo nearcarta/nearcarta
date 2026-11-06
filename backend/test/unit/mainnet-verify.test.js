@@ -29,3 +29,25 @@ test('a missing tx fails the check and a refusal still counts as found', async (
   const miss = await checkAll({ root: 'nearcarta.near', toll: { contract: 'toll.nearcarta.near', txs: { gone: 'C'.repeat(44) } } }, { rpc: 'https://rpc.example', fetchImpl });
   assert.equal(miss.ok, false);
 });
+
+test('a busy public node is retried, not reported as a missing tx', async () => {
+  const dep = { network: 'mainnet', root: 'nearcarta.near', toll: { txs: { busy: 'D'.repeat(44) } } };
+  let calls = 0;
+  const fetchImpl = async (_url, opts) => {
+    calls++;
+    const body = JSON.parse(opts.body);
+    if (calls === 1) return { status: 429, json: async () => ({ error: { name: 'TOO_MANY_REQUESTS' } }) };
+    assert.equal(body.params.tx_hash, 'D'.repeat(44));
+    return { status: 200, json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
+  };
+  const paused = [];
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl, pause: async ms => paused.push(ms) });
+  assert.equal(out.ok, true);
+  assert.equal(out.rows[0].found, true);
+  assert.ok(calls > 1);
+  assert.equal(paused.length, 1);
+  const busy = await checkTx({ hash: 'D'.repeat(44), sender: 'nearcarta.near', rpc: 'https://rpc.example', fetchImpl: async () => ({ status: 429, json: async () => ({}) }) });
+  assert.equal(busy.found, false);
+  assert.equal(busy.retryable, true);
+  assert.equal(busy.error, 'http 429');
+});
