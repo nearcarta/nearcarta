@@ -1,12 +1,12 @@
 // Payouts tray. Same card as the Ferry: tabs, icon flow, labelled fields, one gold button.
 // The gold button and the agent call the same functions. Nothing here signs.
-import { addPayoutRow, formatNear, parseCsv, prepareRows } from '../../design/D8_shops/js/payouts.js';
+import { PAY_ASSETS, PAY_CHAINS, addPayoutRow, formatNear, parseCsv, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { downloadCsv } from '../chronicle-feed.js';
 import { payoutFlow } from './payout-marks.js';
 import { qrSvg } from './qr-svg.js';
 import {
-  accountantCsv, agentCommand, agentInvoiceReply, classifyPayroll, invoiceDoneLine, invoiceStatusLine, memoFromWords, nearFromYocto, payrollKey,
-  relativeInvoiceDates, rowsForCommand,
+  accountantCsv, agentCommand, agentInvoiceReply, classifyPayroll, csvReconcile, invoiceDoneLine, invoiceStatusLine, memoFromWords, nearFromYocto, payrollFeeUsd,
+  payrollKey, payrollQuote, relativeInvoiceDates, rowsForCommand, sponsorshipPlan,
 } from './payouts-plan.js';
 import { armPayoutsDock, ensurePayoutsDock } from './payouts-dock.js';
 
@@ -21,8 +21,9 @@ function expiryIso(v) {
   return Number.isNaN(d.getTime()) ? s : d.toISOString();
 }
 
-const CHAINS = [['near', 'NEAR'], ['base', 'Base'], ['eth', 'Ethereum'], ['arb', 'Arbitrum']];
-const ASSETS = ['NEAR', 'USDC'];
+const CHAINS = PAY_CHAINS;
+const ASSETS = PAY_ASSETS;
+const chainName = id => (PAY_CHAINS.find(([k]) => k === String(id || '').toLowerCase()) || [id, id])[1];
 
 function fixtureOf() {
   try {
@@ -36,6 +37,7 @@ export function mountPayouts(root, hooks) {
   if (!state.rows) state.rows = [];
   if (!state.tab) state.tab = 'invoice';
   if (!state.settled) state.settled = {};
+  if (!state.quotes) state.quotes = {};
   if (state.invoiceUsd == null) state.invoiceUsd = '';
   if (state.due == null || state.expiry == null) {
     const rel = relativeInvoiceDates();
@@ -87,6 +89,53 @@ export function mountPayouts(root, hooks) {
     } catch { return ''; }
   }
   const lines = (a = state.line, b = state.line2) => `<div class="payout-status" data-testid="payout-status"><p class="ferry-rate" data-testid="payout-line">${esc(a || '')}</p><p class="payout-calm" data-testid="payout-line-2">${esc(b || '')}</p></div>`;
+  /**
+   * The bounded storage sponsorship, when the receive account cannot hold USDC yet.
+   * The deposit is the contract's own minimum and is paid from this visitor's own session cap,
+   * through the same board propose_call as every other payment. It is never the shop's money.
+   */
+  function sponsorCard() {
+    const sp = state.sponsor;
+    if (!sp || !state.invoice || state.tab !== 'invoice') return '';
+    if (sp.registered === true && !state.sponsorDone) return '';
+    if (sp.call && !state.sponsorDone) {
+      return `<div class="payout-result" data-testid="payout-sponsor">
+        <p class="payout-calm">${esc(sp.text || '')}</p>
+        <button type="button" id="p-sponsor" data-testid="payout-sponsor-go">Register ${esc(sp.account)} for USDC</button>
+      </div>`;
+    }
+    if (sp.reason === 'already_registered' || sp.registered === true) return '';
+    if (sp.reason || state.sponsorDone) {
+      const text = state.sponsorNote || (state.sponsorDone ? `Registered ${sp.account} for USDC. ${formatNear(sp.depositNear)} NEAR came from your session cap.` : '');
+      return text ? `<div class="payout-result" data-testid="payout-sponsor"><p class="payout-calm">${esc(text)}</p></div>` : '';
+    }
+    return '';
+  }
+
+  async function sponsorNow() {
+    const sp = state.sponsor;
+    if (!sp?.call) return { ok: false, hint: 'Nothing to register.' };
+    if (typeof hooks.onSponsor !== 'function') {
+      state.sponsorNote = 'Open the city to register this account. Nothing was sent.';
+      render();
+      return { ok: false, hint: state.sponsorNote };
+    }
+    state.sponsorNote = 'Registering. A wallet may open once.';
+    render();
+    const out = await hooks.onSponsor({ account: sp.account, depositNear: sp.depositNear, call: sp.call }, { capNear: liveCap() });
+    if (out?.ok && out.tx) {
+      state.sponsorDone = true;
+      state.sponsorNote = `Registered ${sp.account} for USDC. ${formatNear(sp.depositNear)} NEAR came from your session cap.`;
+      state.sponsorUrl = `https://nearblocks.io/txns/${out.tx}`;
+    } else {
+      state.sponsorNote = out?.reason === 'over_per_action_cap'
+        ? 'That storage is above your /setup cap. Nothing was sent.'
+        : (out?.reason ? `Not registered: ${String(out.reason).slice(0, 120)}. Nothing was sent.` : 'Not registered. Nothing was sent.');
+    }
+    render();
+    return out || { ok: false, hint: state.sponsorNote };
+  }
+
   function resultCard() {
     const inv = state.invoice;
     const url = state.payUrl;
@@ -111,6 +160,8 @@ export function mountPayouts(root, hooks) {
       const body = await fetch(api() + '/api/board/row/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json());
       const y = body?.row?.per_action_cap;
       if (y != null && y !== '') state.capNear = nearFromYocto(y);
+      const per = Number(body?.row?.max_actions_per_day);
+      if (Number.isFinite(per) && per > 0) state.maxActions = per;
     } catch { /* the cap line stays unread */ }
     if (root.isConnected && state.tab === 'payroll') render();
   }
@@ -123,32 +174,76 @@ export function mountPayouts(root, hooks) {
 
   function receiptHtml(list) {
     return (list || []).map(r => {
-      const tail = r.status || (r.tx ? 'sent' : 'not sent');
+      const tail = r.payoutText || r.status || (r.tx ? 'sent' : 'not sent');
+      const chain = r.chain && r.chain !== 'near' ? ` on ${esc(chainName(r.chain))}` : '';
+      const fee = r.feeUsd === '' || r.feeUsd == null ? '' : ` · fee about ${esc(r.feeUsd)} USD`;
+      const near = r.chain !== 'near' && r.near ? ` · ${esc(formatNear(r.near))} NEAR deposit` : '';
       const link = r.url ? ` <a href="${esc(r.url)}">Receipt</a>` : '';
-      return `<li data-testid="payout-receipt">${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)} · ${esc(tail)}${link}</li>`;
+      return `<li data-testid="payout-receipt">${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)}${chain}${near}${fee} · ${esc(tail)}${link}</li>`;
     }).join('');
   }
 
+  /** One receipt row per planned row, carrying the chain, the fee the route quoted and the refund address. */
   function rowsFromPlan(plan) {
-    return plan.rows.map((r, i) => ({
-      n: i + 1,
-      to: r.to,
-      amount: r.amt,
-      asset: r.asset,
-      source: r.chain,
-      destination: r.to,
-      fee: '',
-      refund: '',
-      status: r.action === 'propose' ? 'not sent' : r.action === 'refused' ? 'refused' : r.action === 'held' || r.action === 'hold' ? 'held' : 'not sent',
-      tx: '',
-    }));
+    const refundTo = accountId() || '';
+    return plan.rows.map((r, i) => {
+      const fee = r.quote ? payrollFeeUsd({ inUsd: r.quote.nearUsd, outUsd: r.quote.outUsd }) : '';
+      const status = r.send ? 'not sent' : r.action === 'refused' ? 'refused'
+        : r.action === 'quote' ? 'needs a quote' : r.action === 'held' || r.action === 'hold' ? 'held' : 'not sent';
+      return {
+        n: i + 1,
+        to: r.to,
+        amount: r.amt,
+        asset: r.asset,
+        chain: r.chain,
+        source: 'near',
+        destination: r.to,
+        feeUsd: fee == null ? '' : fee,
+        refund: r.chain === 'near' ? '' : refundTo,
+        near: r.near ?? (r.chain === 'near' ? r.amt : ''),
+        status,
+        tx: '',
+        quote: r.quote || null,
+      };
+    });
   }
 
-  function prepareNow() {
+  /** A row's price belongs to its payee, amount, asset and chain, so editing it drops every cached quote. */
+  const dropQuote = () => { state.quotes = {}; };
+
+  /** Price every foreign row through the dry 1Click quote. A row stays out of the send list until it has one. */
+  async function priceForeign(rows) {
+    const parts = splitAssets(rows);
+    const out = {};
+    for (const r of parts.usdc) {
+      const key = payrollKey(r);
+      if (state.quotes[key] && state.quotes[key].ok) { out[key] = state.quotes[key]; continue; }
+      try {
+        const body = await fetch(api() + '/api/payouts/payroll/quote', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ to: r.to, amt: String(r.amt), asset: r.asset, chain: r.chain }),
+        }).then(x => x.json());
+        if (body?.ok && body.quote) {
+          out[key] = payrollQuote(r, { quote: { amountInFormatted: body.quote.near, amountOutFormatted: body.quote.out, amountOutUsd: body.quote.outUsd, timeEstimate: body.quote.minutes, deadline: body.quote.deadline }, correlationId: body.quote.correlationId });
+          out[key].nearUsd = body.quote.nearUsd;
+        } else {
+          out[key] = { key, ok: false, reason: body?.reason || 'quote_refused', error: body?.error || '' };
+        }
+      } catch { out[key] = { key, ok: false, reason: 'quote_unread' }; }
+    }
+    state.quotes = { ...state.quotes, ...out };
+    return state.quotes;
+  }
+
+  /**
+   * Review the rows. A foreign row is priced first (dry 1Click quote), because its NEAR cost is what
+   * the visitor's cap has to hold. Nothing is sent: this only builds the receipt list and the plan.
+   */
+  async function prepareNow() {
     if (state.fixture) return { ok: false, hint: 'Fixture. Not a live payment.' };
     clearSeal();
     const parsed = parseCsv(state.csv || q$(root, '#p-csv')?.value || '');
-    const use = parsed.length ? parsed.map(r => ({ ...r, chain: String(r.asset).toUpperCase() === 'USDC' ? 'base' : 'near' })) : state.rows;
+    const use = parsed.length ? parsed : state.rows;
     const prep = prepareRows(use);
     if (prep.blocked) {
       state.receipts = [];
@@ -157,16 +252,39 @@ export function mountPayouts(root, hooks) {
       render();
       return { ok: true, hint: prep.note || 'A row needs a payee. Nothing was prepared.' };
     }
-    if (parsed.length) state.rows = prep.rows.slice(0, 3);
+    if (parsed.length) state.rows = prep.rows;
     state.reviewed = true;
-    const plan = classifyPayroll(prep.rows, { capNear: liveCap() });
+    state.payLine = 'Pricing the foreign rows. Nothing is sent.';
+    state.payLine2 = '';
+    render();
+    const quotes = await priceForeign(prep.rows);
+    const plan = classifyPayroll(prep.rows, { capNear: liveCap(), quotes });
+    state.plan = plan;
     state.receipts = rowsFromPlan(plan);
-    state.usdcNote = plan.held.some(r => r.asset === 'USDC') ? 'Not sent. Foreign USDC is held.' : '';
+    state.usdcNote = plan.needsQuote.length ? 'A foreign row needs a quote before it can be paid.' : '';
     state.dropNote = prep.note || '';
     state.payLine = plan.refused.length ? 'Refused before any deposit.' : 'Reviewed. Nothing was sent.';
     state.payLine2 = state.usdcNote || '';
     render();
     return { ok: true, hint: 'Prepared. Nothing was sent.' };
+  }
+
+  /** The row's own NEAR cost: a NEAR row pays its amount, a foreign row pays the wNEAR its quote names. */
+  const costOf = r => (r.chain === 'near' ? Number(r.amt) : Number(r.quote?.near));
+
+  /** What a session needs for one foreign row after the quote returns a deposit address. */
+  async function payForeignRow(r, cap) {
+    const body = await fetch(api() + '/api/payouts/payroll/checkout', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        owner: accountId(), to: r.to, amt: String(r.amt), asset: r.asset, chain: r.chain,
+        near: Number(r.quote?.near), refundTo: accountId(), slippage: r.quote?.slippage || 100,
+      }),
+    }).then(x => x.json()).catch(() => null);
+    if (!body?.ok || !body.depositAddress) {
+      return { ok: false, reason: body?.reason || 'quote_refused', error: body?.error || '', depositAddress: null };
+    }
+    return { ok: true, depositAddress: body.depositAddress, depositMemo: body.depositMemo || null, near: Number(body.near) };
   }
 
   async function payReviewed(list) {
@@ -179,23 +297,26 @@ export function mountPayouts(root, hooks) {
       return { ok: false, hint: prep.note || 'A row needs a payee. Nothing was sent.' };
     }
     const cap = liveCap();
-    const plan = classifyPayroll(prep.rows, { capNear: cap });
-    const fresh = plan.propose.filter(r => !state.settled[payrollKey(r)]);
-    const replayed = plan.propose.filter(r => state.settled[payrollKey(r)]);
+    const quotes = await priceForeign(prep.rows);
+    const plan = classifyPayroll(prep.rows, { capNear: cap, quotes });
+    state.plan = plan;
+    const fresh = plan.send.filter(r => !state.settled[payrollKey(r)]);
+    const replayed = plan.send.filter(r => state.settled[payrollKey(r)]);
     state.receipts = rowsFromPlan(plan);
     for (const r of replayed) {
-      const hit = state.receipts.find(x => x.to === r.to && String(x.amount) === String(r.amt));
+      const hit = state.receipts.find(x => x.to === r.to && String(x.amount) === String(r.amt) && x.chain === r.chain);
       if (hit) { hit.status = 'sent'; hit.tx = state.settled[payrollKey(r)]; hit.url = `https://nearblocks.io/txns/${hit.tx}`; }
     }
     if (!fresh.length) {
       const hint = plan.refused.length ? 'Refused before any deposit. Nothing was sent.'
         : replayed.length ? 'Already sent. Not sent again.'
+        : plan.needsQuote.length ? 'A foreign row needs a quote first. Nothing was sent.'
         : plan.held.length ? 'Held. Nothing was sent.'
         : 'Nothing was sent.';
       state.payLine = hint;
       state.payLine2 = '';
       if (plan.refused.length) showSeal(hint);
-      state.usdcNote = plan.held.some(r => r.asset === 'USDC') ? 'Not sent. Foreign USDC is held.' : '';
+      state.usdcNote = plan.needsQuote.length ? 'A foreign row needs a quote before it can be paid.' : '';
       render();
       return { ok: replayed.length > 0 && !plan.refused.length, hint, replayed: replayed.length > 0 };
     }
@@ -205,27 +326,118 @@ export function mountPayouts(root, hooks) {
       render();
       return { ok: false, hint: state.payLine };
     }
-    const sendRows = fresh.map(r => ({ to: r.to, amt: String(r.amt), asset: 'NEAR', chain: 'near' }));
-    const result = await hooks.onPay(sendRows, { capNear: cap });
-    const steps = result?.o?.steps || [];
-    fresh.forEach((r, i) => {
-      const step = steps[i];
-      const row = state.receipts.find(x => x.to === r.to && String(x.amount) === String(r.amt) && x.asset === 'NEAR');
-      if (!row) return;
-      if (step?.decision === 'allowed' && step.tx) {
-        row.status = 'sent'; row.tx = step.tx; row.url = `https://nearblocks.io/txns/${step.tx}`;
-        state.settled[payrollKey(r)] = step.tx;
-      } else if (step) row.status = 'refused';
-    });
-    const cinema = !plan.refused.length && !plan.held.length && (result?.ok === true);
+    // A NEAR row is one board propose. A foreign row is the same session, through the 1Click rail:
+    // the board's propose_call deposits wNEAR to the deposit address the 1Click quote named.
+    const nearRows = fresh.filter(r => r.chain === 'near');
+    let nearSteps = [];
+    let result = null;
+    if (nearRows.length) {
+      result = await hooks.onPay(nearRows.map(r => ({ to: r.to, amt: String(r.amt), asset: 'NEAR', chain: 'near' })), { capNear: cap });
+      nearSteps = result?.o?.steps || [];
+      nearRows.forEach((r, i) => {
+        const step = nearSteps[i];
+        const row = state.receipts.find(x => x.to === r.to && String(x.amount) === String(r.amt) && x.chain === 'near');
+        if (!row) return;
+        if (step?.decision === 'allowed' && step.tx) {
+          row.status = 'sent'; row.tx = step.tx; row.url = `https://nearblocks.io/txns/${step.tx}`;
+          state.settled[payrollKey(r)] = step.tx;
+        } else if (step) row.status = 'refused';
+      });
+    }
+    const foreign = fresh.filter(r => r.chain !== 'near');
+    let foreignPaid = 0, foreignSent = 0;
+    for (const r of foreign) {
+      const row = state.receipts.find(x => x.to === r.to && String(x.amount) === String(r.amt) && x.chain === r.chain);
+      const opened = await payForeignRow(r, cap);
+      if (!opened.ok) {
+        if (row) { row.status = 'refused'; row.reason = opened.reason; row.error = opened.error; }
+        continue;
+      }
+      let sent;
+      try {
+        sent = await hooks.onForeignPay?.({ ...r, depositAddress: opened.depositAddress, depositMemo: opened.depositMemo, near: opened.near }, { capNear: cap });
+      } catch (e) { sent = { ok: false, reason: e?.message || 'the deposit did not go' }; }
+      if (sent?.ok && sent.tx) {
+        foreignSent += 1;
+        if (row) {
+          row.status = 'sent'; row.tx = sent.tx; row.url = `https://nearblocks.io/txns/${sent.tx}`;
+          row.depositAddress = opened.depositAddress; row.payoutStatus = 'PENDING_DEPOSIT';
+          row.payoutText = 'Waiting for the deposit.';
+        }
+        state.settled[payrollKey(r)] = sent.tx;
+        // The rail pays on its own clock: watch the row until 1Click settles or the page closes.
+        watchForeignRow(r, opened.depositAddress);
+      } else if (row) {
+        row.status = 'refused'; row.reason = sent?.reason || 'deposit_refused';
+        row.depositAddress = opened.depositAddress;
+      }
+    }
+    const paidRows = state.receipts.filter(x => x.status === 'sent').length;
+    const cinema = !plan.refused.length && !plan.needsQuote.length && paidRows > 0 && (nearRows.length ? result?.ok === true : true);
     if (plan.refused.length) showSeal('Refused before any deposit.');
     else if (cinema) { clearSeal(); hooks.onCinema?.({ paid: true, refused: false }); }
     else if (result?.seal) showSeal(result.seal);
-    state.payLine = plan.refused.length ? 'Refused before any deposit.' : (result?.hint || 'Reviewed.');
+    state.payLine = plan.refused.length ? 'Refused before any deposit.'
+      : paidRows ? `Sent ${paidRows} ${paidRows === 1 ? 'row' : 'rows'}. A foreign row is paid when 1Click says SUCCESS.`
+      : (result?.hint || 'Reviewed.');
     state.payLine2 = '';
-    state.usdcNote = plan.held.some(r => r.asset === 'USDC') ? 'Not sent. Foreign USDC is held.' : '';
+    state.usdcNote = plan.needsQuote.length ? 'A foreign row needs a quote before it can be paid.' : '';
     render();
-    return result || { ok: false, hint: state.payLine };
+    return result || { ok: cinema, hint: state.payLine, foreign: foreignSent };
+  }
+
+  /** Poll one foreign row's 1Click status and let the receipt say Paid only on SUCCESS. */
+  function watchForeignRow(r, depositAddress) {
+    if (!depositAddress) return;
+    if (!state.watchers) state.watchers = {};
+    const key = payrollKey(r);
+    if (state.watchers[key]) return;
+    const tick = async () => {
+      if (!root.isConnected) { clearInterval(state.watchers[key]); delete state.watchers[key]; return; }
+      let st;
+      try { st = await fetch(api() + '/api/payouts/payroll/status?depositAddress=' + encodeURIComponent(depositAddress)).then(x => x.json()); }
+      catch { return; }
+      const row = (state.receipts || []).find(x => x.to === r.to && String(x.amount) === String(r.amt) && x.chain === r.chain);
+      if (row) {
+        row.payoutStatus = st?.status || row.payoutStatus;
+        row.payoutText = st?.text || row.payoutText;
+        if (st?.paid) row.status = 'paid';
+        else if (st?.final) row.status = String(st.status || '').toLowerCase();
+        else if (st?.status) row.status = 'sent';
+        if (root.isConnected && state.tab === 'payroll') render();
+      }
+      if (st?.final) { clearInterval(state.watchers[key]); delete state.watchers[key]; }
+    };
+    state.watchers[key] = setInterval(tick, 6000);
+    setTimeout(tick, 1200);
+  }
+
+  /** The bounded storage sponsorship for the invoice's receive account, when one is needed. */
+  /**
+   * What it would take to register this receive account for USDC. The route reports the contract's own
+   * minimum and whether the account already holds USDC; the row's own cap decides the rest, here, from the
+   * same numbers the payment uses. Nothing is sent by looking this up.
+   */
+  async function lookUpSponsor(account) {
+    try {
+      const body = await fetch(api() + '/api/payouts/sponsor?account=' + encodeURIComponent(account)).then(r => r.json());
+      const plan = sponsorshipPlan({
+        enabled: body?.enabled === true,
+        account,
+        minNear: body?.minNear,
+        capNear: liveCap(),
+        registered: body?.registered,
+      });
+      state.sponsor = {
+        account,
+        depositNear: plan.depositNear ?? body?.minNear ?? null,
+        call: plan.call || null,
+        reason: plan.ok ? '' : plan.reason,
+        text: plan.text || '',
+        registered: body?.registered,
+      };
+      if (root.isConnected) render();
+    } catch { /* the registration line stays */ }
   }
 
   async function createLink() {
@@ -271,6 +483,7 @@ export function mountPayouts(root, hooks) {
     render();
     lookUpRegistration(receive);
     refreshList();
+    lookUpSponsor(receive);
     return { ok: true, hint: invoiceDoneLine(j.invoice, origin) };
   }
 
@@ -327,15 +540,18 @@ export function mountPayouts(root, hooks) {
 
   function exportCsvNow() {
     clearSeal();
-    const csv = accountantCsv(state.receipts || []);
+    const rows = state.receipts || [];
+    const csv = accountantCsv(rows);
+    const summary = csvReconcile(rows, { refund: accountId() || '' });
     state.csvOut = csv;
-    downloadCsv(csv, 'payouts.csv');
+    state.csvSummary = summary;
+    downloadCsv(`${csv}\n\n${summary}\n`, 'payouts.csv');
     state.tab = 'csv';
-    state.csvNote = 'CSV ready. A row without a tx says not sent.';
+    state.csvNote = 'CSV ready. A row without a tx says not sent. The block under it reconciles the session.';
     state.line = '';
     state.line2 = '';
     render();
-    return { ok: true, hint: state.line };
+    return { ok: true, hint: state.csvNote };
   }
 
   async function commandFor(text) {
@@ -411,7 +627,9 @@ export function mountPayouts(root, hooks) {
     root.querySelectorAll('.p-to').forEach(el => { const row = state.rows[+el.dataset.i]; if (row) row.to = el.value; });
     root.querySelectorAll('.p-amt').forEach(el => { const row = state.rows[+el.dataset.i]; if (row) row.amt = el.value; });
     const tab = state.tab || 'invoice';
-    const full = state.rows.length >= 3;
+    const rowMax = Number(state.maxActions || 0);
+    const full = rowMax > 0 && state.rows.length >= rowMax;
+    const addNote = full ? `Your /setup allows ${rowMax} ${rowMax === 1 ? 'payment' : 'payments'} a day.` : '';
     const tabs = `<div class="ferry-tabs" role="tablist" data-testid="payouts-tabs">
       <button type="button" role="tab" class="ferry-tab${tab === 'invoice' ? ' on' : ''}" data-tab="invoice" aria-selected="${tab === 'invoice'}" data-testid="payouts-tab-invoice">Invoice</button>
       <button type="button" role="tab" class="ferry-tab${tab === 'payroll' ? ' on' : ''}" data-tab="payroll" aria-selected="${tab === 'payroll'}" data-testid="payouts-tab-payroll">Payroll</button>
@@ -427,6 +645,7 @@ export function mountPayouts(root, hooks) {
       <label class="field ferry-field"><span>Expiry</span><input id="p-expiry" data-testid="payout-expiry" type="datetime-local" value="${esc(state.expiry || '')}"></label>
       <button type="button" class="primary ferry-cta" id="p-create" data-testid="payout-create">Create invoice link</button>
       ${lines()}
+      ${sponsorCard()}
       ${resultCard()}
     </div>`;
     const rowList = state.rows.map((r, i) => {
@@ -448,9 +667,9 @@ export function mountPayouts(root, hooks) {
       ${payoutFlow('payroll')}
       ${state.payLine ? lines(state.payLine, state.payLine2) : `<div class="payout-status" data-testid="payout-status"><p class="payout-calm" data-testid="payout-caps">${esc(capSentence())}</p><p class="payout-calm"></p></div>`}
       <ol class="plist" data-testid="payout-list">${rowList}</ol>
-      <button type="button" id="p-add" data-testid="payout-add"${full ? ' disabled data-reason="Three rows is the daily count on this charter."' : ''}>Add a row</button>
-      <p data-testid="payout-add-note">${full ? 'Three rows is the daily count on this charter.' : ''}</p>
-      <label class="field ferry-field"><span>CSV</span><textarea id="p-csv" data-testid="payout-csv" rows="2" placeholder="account,amount,asset">${esc(state.csv || '')}</textarea></label>
+      <button type="button" id="p-add" data-testid="payout-add"${full ? ` disabled data-reason="${esc(addNote)}"` : ''}>Add a row</button>
+      <p data-testid="payout-add-note">${esc(addNote)}</p>
+      <label class="field ferry-field"><span>Paste rows</span><textarea id="p-csv" data-testid="payout-csv" rows="2" placeholder="account,amount,asset,chain">${esc(state.csv || '')}</textarea></label>
       <button type="button" id="p-prep" class="${nextGold === 'review' ? 'primary ferry-cta' : ''}" data-testid="payout-prepare">Review these rows</button>
       <button type="button" id="p-pay" class="${nextGold === 'pay' ? 'primary ferry-cta' : ''}" data-testid="payout-send">Pay reviewed rows</button>
       <p data-testid="payout-drop"${state.dropNote ? '' : ' hidden'}>${esc(state.dropNote || '')}</p>
@@ -458,9 +677,10 @@ export function mountPayouts(root, hooks) {
       <p data-testid="payout-usdc"${state.usdcNote ? '' : ' hidden'}>${esc(state.usdcNote || '')}</p>
     </div>`;
     const csvPane = `<div class="ferry-pane" data-pane="csv" ${tab === 'csv' ? '' : 'hidden'}>
-      <p class="ferry-picker-note">The file lists source, destination, fee and refund. A row with no tx says not sent.</p>
+      <p class="ferry-picker-note">One row per payment: source, destination chain, asset, amount, the NEAR it cost, the fee in USD, where a refund goes, and the tx. A row with no tx says not sent.</p>
       <button type="button" class="primary ferry-cta" id="p-export" data-testid="payout-export">Export accountant CSV</button>
       <pre data-testid="payout-csv-out">${esc(state.csvOut || '')}</pre>
+      ${state.csvSummary ? `<pre data-testid="payout-csv-reconcile">${esc(state.csvSummary)}</pre>` : ''}
       ${state.csvNote ? lines(state.csvNote, '') : ''}
     </div>`;
     const origin = globalThis.location?.origin || '';
@@ -484,10 +704,10 @@ export function mountPayouts(root, hooks) {
     bind('#p-memo', 'memo');
     bind('#p-due', 'due');
     bind('#p-expiry', 'expiry');
-    root.querySelectorAll('.p-to').forEach(el => { el.oninput = () => { state.rows[+el.dataset.i].to = el.value; state.reviewed = false; clearSeal(); }; });
-    root.querySelectorAll('.p-amt').forEach(el => { el.oninput = () => { state.rows[+el.dataset.i].amt = el.value; state.reviewed = false; clearSeal(); }; });
-    root.querySelectorAll('.p-chain').forEach(el => { el.onchange = () => { state.rows[+el.dataset.i].chain = el.value; clearSeal(); render(); }; });
-    root.querySelectorAll('.p-asset').forEach(el => { el.onchange = () => { state.rows[+el.dataset.i].asset = el.value; clearSeal(); render(); }; });
+    root.querySelectorAll('.p-to').forEach(el => { el.oninput = () => { state.rows[+el.dataset.i].to = el.value; state.reviewed = false; dropQuote(); clearSeal(); }; });
+    root.querySelectorAll('.p-amt').forEach(el => { el.oninput = () => { state.rows[+el.dataset.i].amt = el.value; state.reviewed = false; dropQuote(); clearSeal(); }; });
+    root.querySelectorAll('.p-chain').forEach(el => { el.onchange = () => { state.rows[+el.dataset.i].chain = el.value; state.reviewed = false; clearSeal(); render(); }; });
+    root.querySelectorAll('.p-asset').forEach(el => { el.onchange = () => { state.rows[+el.dataset.i].asset = el.value; state.reviewed = false; clearSeal(); render(); }; });
     root.querySelectorAll('[data-tab]').forEach(btn => {
       btn.onclick = () => {
         clearSeal();
@@ -507,7 +727,7 @@ export function mountPayouts(root, hooks) {
     const add = q$(root, '#p-add');
     if (add) add.onclick = () => {
       clearSeal();
-      const next = addPayoutRow(state.rows);
+      const next = addPayoutRow(state.rows, state.maxActions || null);
       state.rows = next.rows;
       state.reviewed = false;
       render();
@@ -544,6 +764,8 @@ export function mountPayouts(root, hooks) {
         try { if (mem.start != null && el.setSelectionRange) el.setSelectionRange(mem.start, mem.end); } catch { /* date inputs have no caret */ }
       }
     }
+    const sp = q$(root, '#p-sponsor');
+    if (sp) sp.onclick = () => sponsorNow();
     const exp = q$(root, '#p-export');
     if (exp) exp.onclick = () => exportCsvNow();
     const doc = typeof document !== 'undefined' ? document : null;
