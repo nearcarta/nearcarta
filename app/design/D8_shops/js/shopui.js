@@ -15,7 +15,7 @@ import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
 import { mountShop } from '/panels/deep.js';
 import { pairClauseId } from '/panels/ferry-pair.js';
 import { pairHero } from '/panels/token-badge.js';
-import { agentDeliveredNote, depositPlan, explainQuoteMiss, ferryStatusHtml, ferryStatusView, mayCheckout, nearAmount, nearNative, nextFerryBeat, pickWrapSpend, SESSION_SWAP, wrapProgressNote } from '/panels/ferry-settle.js';
+import { agentDeliveredNote, depositPlan, explainQuoteMiss, ferryStatusHtml, ferryStatusView, mayCheckout, nearAmount, nearNative, newestReceipt, nextFerryBeat, pickWrapSpend, SESSION_SWAP, wrapProgressNote } from '/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
 import { hideBankDock } from '/panels/bank-tray.js';
 import { capFromSetup } from '/panels/bank-audit.js';
@@ -252,7 +252,18 @@ function watchFerryDeposit(address) {
     if (note) note.innerHTML = ferryStatusHtml(view);
     if (beat.play) playFerryDelivered();
     if (beat.terminal) stopFerryWatch();
-    if (st.status === 'SUCCESS') showAgentDelivered(st);
+    if (st.status === 'SUCCESS') {
+      showAgentDelivered(st);
+      const h = (extra.depositTxs || []).at(-1) || '';
+      if (h && extra.ferryReceipt !== h) {
+        extra.ferryReceipt = h;
+        A.rememberReceipt(h, 'ferry', 'allowed', 'delivered', {
+          amt: extra.spendYocto || '',
+          to: extra.receiveAt || '',
+        });
+        proofDrawer();
+      }
+    }
   };
   tick();
   ferryWatch = setInterval(tick, 4000);
@@ -423,6 +434,10 @@ async function settleFerry(wantCharter) {
     extra.depositUsd = checkout.usd || String(cap.usd);
     extra.depositMode = 'propose_call';
     extra.depositTxs = Array.isArray(sent.txs) && sent.txs.length ? sent.txs : (sent.tx ? [sent.tx] : []);
+    extra.spendYocto = plan.transferYocto || '';
+    extra.receiveAt = spendPair.receiveAt || pair.receiveAt || '';
+    const landed = extra.depositTxs.at(-1);
+    if (landed) A.rememberReceipt(landed, 'ferry', 'allowed', 'propose_call', { amt: extra.spendYocto, to: extra.receiveAt });
     extra.outAmt = extra.q?.to?.amount || '';
     extra.outSym = extra.q?.to?.symbol || 'USDC';
     extra.destChain = pair.toChain || '';
@@ -1094,8 +1109,10 @@ function proofDrawer() {
   else h += '<section class="dz act1"><button type="button" class="go" data-drawer-go data-testid="drawer-action" hidden></button></section>';
   // 3. latest result
   const mine = S.charter ? A.receipts().filter(r => (cur === 'house' ? true : r.shop === cur)) : [];
+  mine.sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0));
+  const top = newestReceipt(mine);
   if (!latest && cur === 'toll' && extra.tst) { const st = extra.tst; latest = card({ d: st.status === 'confirmed' ? 'allowed' : st.status, title: 'Your visit', why: esc(st.status === 'confirmed' ? 'Proof recorded on NEAR.' : 'NEAR pass on mainnet. A Base payment needs its own receipt.'), link: `<span class="note">#${esc(st.nonce)}</span>` }); }
-  if (!latest && mine[0]) { const r = mine[0]; latest = card({ d: r.decision, amt: r.amt ? fmt(r.amt) : '', to: r.to || '', why: r.decision === 'allowed' ? '' : esc(A.why(r.reason)), link: A.txLine(r.h) }); }
+  if (!latest && top) { const r = top; latest = card({ d: r.decision, amt: r.amt ? fmt(r.amt) : '', to: r.to || '', why: r.decision === 'allowed' ? '' : esc(A.why(r.reason)), link: A.txLine(r.h) }); }
   h += latest;
   // 4. history
   if (S.charter) h += list(cur === 'house' ? 'Your history' : 'Your history here', mine.slice(latest && !(cur === 'toll' && extra.tst) ? 1 : 0, 12).map(r => prow(esc(r.shop) + ' · ' + esc(r.decision), r.reason && r.decision !== 'allowed' ? esc(A.why(r.reason)) : '', `<span class="st ${r.decision === 'denied' ? 'no' : 'ok'}" aria-label="${esc(r.decision)}">${r.decision === 'denied' ? '✕' : '✓'}</span>${A.txLine(r.h, '↗')}`)), 'Nothing signed yet.');

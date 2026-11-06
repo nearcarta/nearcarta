@@ -23,7 +23,7 @@ test('agentMethodsReady needs every AGENT_METHODS entry, or an empty list', () =
   assert.equal(agentMethodsReady(['propose_call']), false);
   assert.equal(agentMethodsReady(['propose', 'propose_call']), false);
   assert.equal(agentMethodsReady(['propose', 'propose_call', 'propose_call_as']), true);
-  assert.equal(agentMethodsReady(['propose_call_as', 'propose_call', 'propose', 'extra']), true);
+  assert.equal(agentMethodsReady(['propose_call', 'propose', 'propose_call_as', 'extra']), true);
   assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as']);
 });
 

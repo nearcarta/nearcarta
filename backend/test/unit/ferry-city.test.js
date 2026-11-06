@@ -7,7 +7,7 @@ import { agentCargoPlan, parseAgentFerry, receiveConfirm } from '../../../app/sr
 import { ferryMarkup } from '../../../app/src/panels/deep.js';
 import { runFerryAgent } from '../../../app/src/panels/deep.js';
 import {
-  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, destExplorer, explainQuoteMiss, ferryStatusHtml, ferryStatusView, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, PROPOSE_CALL_BYTES, proposeCallPrepaidYocto, proposeCallTgas, quoteRecipient, SESSION_SWAP, stepsAllowanceYocto, validateDestAddress, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto, wrapProgressNote,
+  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, destExplorer, explainQuoteMiss, ferryStatusHtml, ferryStatusView, mayCheckout, nearAmount, newestReceipt, nextFerryBeat, pickWrapSpend, PROPOSE_CALL_BYTES, proposeCallPrepaidYocto, proposeCallTgas, quoteRecipient, SESSION_SWAP, stepsAllowanceYocto, validateDestAddress, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto, wrapProgressNote,
 } from '../../../app/src/panels/ferry-settle.js';
 import { functionCallAllowanceCost } from '../../../shared/board/cost.js';
 import { GAS_TOPUP_YOCTO } from '../../../shared/board/session.js';
@@ -691,13 +691,13 @@ test('a landed 0.05 wrap is reused and the next plan is only ft_transfer', () =>
   assert.notEqual(plan.steps[0].gasTgas, 300);
 });
 
-test('propose_call prepays the measured 42 Tgas, and 0.04188 cannot buy another step', () => {
-  assert.equal(proposeCallTgas('near_deposit'), 42);
-  assert.equal(proposeCallTgas('ft_transfer'), 42);
-  assert.equal(proposeCallTgas('storage_deposit'), 42);
+test('propose_call prepays 54 Tgas so the 20 Tgas callback fits, and 0.04188 cannot buy a step', () => {
+  assert.equal(proposeCallTgas('near_deposit'), 54);
+  assert.equal(proposeCallTgas('ft_transfer'), 54);
+  assert.equal(proposeCallTgas('storage_deposit'), 54);
   assert.ok(proposeCallTgas('ft_transfer') < 300);
-  const one = proposeCallPrepaidYocto(42);
-  assert.equal(one, functionCallAllowanceCost({ tgas: 42, numBytes: PROPOSE_CALL_BYTES }));
+  const one = proposeCallPrepaidYocto(54);
+  assert.equal(one, functionCallAllowanceCost({ tgas: 54, numBytes: PROPOSE_CALL_BYTES }));
   const left = 4188n * 10n ** 19n;
   assert.equal(nearAmount(left), '0.04188');
   assert.ok(left < one);
@@ -764,6 +764,20 @@ test('Ferry rules show the session gas that is left', () => {
   assert.match(html, /Session gas is low/);
   assert.match(html, /data-testid="ferry-refresh-key"/);
   assert.match(html, /href="\/setup"/);
+});
+
+test('the latest ferry result is the newest receipt, not an older denial', () => {
+  const old = { h: '8HeBdwjXAVaokGoRKjYHhf7sUVLmXReqkn1yysyDddxP', shop: 'ferry', decision: 'denied', reason: 'ERR_BAD_SIG', amt: '2000000000000000000000', to: 'charter.nearcarta.near', at: 1 };
+  const next = { h: '6L29V63Hnewest', shop: 'ferry', decision: 'allowed', reason: 'delivered', amt: '50000000000000000000000', to: '0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034', at: 2 };
+  assert.equal(newestReceipt([old, next]).h, next.h);
+  assert.equal(newestReceipt([next, old]).h, next.h);
+  assert.equal(newestReceipt([old]).h, old.h);
+  const ui = read('app/design/D8_shops/js/shopui.js');
+  assert.match(ui, /newestReceipt\(mine\)/);
+  assert.match(ui, /rememberReceipt\(h, 'ferry', 'allowed', 'delivered'/);
+  const apps = read('app/design/D8_shops/js/apps.js');
+  assert.match(apps, /export function rememberReceipt/);
+  assert.match(apps, /r\.h === h && r\.shop === shop/);
 });
 
 test('a refused stamp stays at the jetty and does not freeze the boat', () => {

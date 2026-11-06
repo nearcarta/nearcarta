@@ -8,7 +8,6 @@ export const MAX_YOCTO = 5_000_000_000_000_000_000_000n; // 0.005 NEAR
 
 const SHOP = {
   'toll.nearcarta.near': 'toll',
-  'charter.nearcarta.near': 'charter',
   'townhall.nearcarta.near': 'hall',
   'arena.nearcarta.near': 'arena',
   'house.nearcarta.near': 'house',
