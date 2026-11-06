@@ -99,8 +99,12 @@ let policy = null;
 let keys = [];
 let viewError = '';
 try {
-  account = await viewAccount(SHOP);
   ownerAccount = await viewAccount(OWNER);
+} catch (e) {
+  viewError = viewError || e.message;
+}
+try {
+  account = await viewAccount(SHOP);
   policy = await viewCall(SHOP, 'policy', {}).catch(e => { viewError = e.message; return null; });
   const listed = await rpc('query', { request_type: 'view_access_key_list', finality: 'final', account_id: SHOP });
   keys = listed.keys || [];
@@ -115,7 +119,9 @@ const serviceHeld = policy && policy.service_held != null ? BigInt(policy.servic
 const openOrders = policy && policy.service_held != null ? 'service_held is the NEAR liability' : 'this wasm has no visitor service deposit';
 const codeMatchesRecorded = account && account.code_hash === RECORDED_CODE;
 const alreadyThisWasm = account && codeHash && account.code_hash === codeHash;
-const path = alreadyThisWasm ? 'view' : (codeMatchesRecorded ? 'close_then_create' : 'upgrade_then_migrate');
+const path = alreadyThisWasm ? 'view'
+  : (!account ? 'create_only'
+  : (codeMatchesRecorded ? 'close_then_create' : 'upgrade_then_migrate'));
 
 const oldWasmFile = 'contracts/artifacts/toll.v6p86.wasm';
 const oldWasmBytes = existsSync(oldWasmFile) ? BigInt(readFileSync(oldWasmFile).length) : 0n;
@@ -138,6 +144,16 @@ if (path === 'close_then_create' && balanceBefore != null && fund != null) {
     note: `Stake ${yocto(stakeAfter)} NEAR is this wasm's storage. Slack is ${yocto(slack)} NEAR for order storage and the signer deposit. ${stays == null ? 'The balance does not cover this transfer.' : yocto(stays) + ' NEAR stays on nearcarta.near.'}`,
   });
 }
+if (path === 'create_only' && fund != null) {
+  const ownerBal = ownerAccount ? BigInt(ownerAccount.amount) : 0n;
+  const coveredByOwner = ownerBal >= fund;
+  transfers.push({
+    step: 'create_account', payee: payee(SHOP), amount_yocto: fund.toString(), amount_near: yocto(fund),
+    stake_near: yocto(stakeAfter), slack_near: yocto(slack),
+    note: `Account already closed. Stake ${yocto(stakeAfter)} + slack ${yocto(slack)}. Owner covers: ${coveredByOwner}.`,
+  });
+}
+
 
 const init = {
   owner: OWNER,
@@ -147,9 +163,9 @@ const init = {
   foreign_address: policy?.foreign_address || MAIN.toll.foreign_address,
   fx_root_key: MAIN.fx_root_key,
   allow_to: [],
-  max_per_tx: policy?.max_per_tx || null,
-  budget: policy?.budget || null,
-  max_fee_cap: policy?.max_fee_cap || null,
+  max_per_tx: policy?.max_per_tx || '10000000000000',
+  budget: policy?.budget || '30000000000000',
+  max_fee_cap: policy?.max_fee_cap || '5000000000',
   verify_chain: policy?.verify_chain || 'Base',
   token: null,
   dao: null,
@@ -165,7 +181,7 @@ const smokeAmount = process.env.TOLL_SMOKE_AMOUNT || '1';
 const smokeOwner = process.env.TOLL_SMOKE_OWNER || OWNER;
 
 const pre = [
-  { check: 'account', ok: SHOP === 'toll.nearcarta.near' && !!account, detail: SHOP },
+  { check: 'account', ok: SHOP === 'toll.nearcarta.near' && (!!account || path === 'create_only'), detail: account ? SHOP : SHOP + ' (missing, create_only)' },
   { check: 'owner', ok: OWNER === 'nearcarta.near' && (!policy || policy.owner === OWNER), detail: policy?.owner || OWNER },
   { check: 'no full-access key', ok: fullAccess === 0, detail: String(fullAccess) },
   { check: 'no visitor NEAR to refund', ok: serviceHeld === 0n, detail: openOrders + ', service_held ' + serviceHeld.toString() },
@@ -178,6 +194,12 @@ if (path === 'close_then_create') {
   pre.push({ check: 'balance covers the new stake', ok: covered, detail: stakeAfter ? yocto(stakeAfter) + ' NEAR stake from the wasm' : 'no wasm' });
   pre.push({ check: 'slack', ok: slack != null && slack <= MAX_SLACK, detail: slack == null ? 'no stake' : yocto(slack) + ' NEAR, max 0.05' });
 }
+if (path === 'create_only') {
+  const ownerBal = ownerAccount ? BigInt(ownerAccount.amount) : 0n;
+  pre.push({ check: 'owner covers the new stake', ok: fund != null && ownerBal >= fund, detail: fund ? yocto(fund) + ' NEAR from owner' : 'no fund' });
+  pre.push({ check: 'slack', ok: slack != null && slack <= MAX_SLACK, detail: slack == null ? 'no stake' : yocto(slack) + ' NEAR, max 0.05' });
+}
+
 
 const report = {
   dry_run: !live,
@@ -211,7 +233,7 @@ const report = {
   prechecks: pre,
   init: path === 'view' ? null : init,
   set_price: fee ? {
-    board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: process.env.TOLL_HOLD_NS || '0',
+    board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
     note: 'usdc is the token contract, not a recipient. No visitor address is stored.',
   } : { skipped: true, note: 'Set TOLL_FEE_YOCTO and TOLL_MAX_TOKEN to publish a fee. Until then the card stays disabled.' },
   post_deploy_view: ['policy', 'address_of'],
@@ -278,7 +300,20 @@ if (path === 'close_then_create') {
   ];
   if (fee && maxToken) {
     create.push(A.functionCall('set_price', {
-      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: process.env.TOLL_HOLD_NS || '0',
+      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
+    }, 30n * TG, 0n));
+  }
+  await send('create', SHOP, create);
+} else if (path === 'create_only') {
+  const create = [
+    A.createAccount(),
+    A.transfer(fund),
+    A.deployContract(wasm),
+    A.functionCall('new', init, 80n * TG, 0n),
+  ];
+  if (fee && maxToken) {
+    create.push(A.functionCall('set_price', {
+      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
     }, 30n * TG, 0n));
   }
   await send('create', SHOP, create);
