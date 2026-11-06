@@ -6,9 +6,11 @@ import {
   MISS_HINT, nearFromYocto, hostedCeiling, classifyPayroll, agentCommand, rowsForCommand, invoiceQuoteBody,
   invoiceDelivered, invoiceStatusLine, cinemaOk, sealText, accountantCsv, canonicalInvoice, invoiceRecordId,
   publicInvoice, registrationVerdict, payrollKey, addressOk, quoteLine, invoiceDoneLine, paymentLinks, usdcChoices,
+  relativeInvoiceDates, agentInvoiceReply, acceptModelIntent, indicativeRefund,
 } from '../../../app/src/panels/payouts-plan.js';
 import { qrSvg } from '../../../app/src/panels/qr-svg.js';
-import { createInvoice, readInvoice, checkoutInvoice, quoteInvoice, resetInvoices, payerInput, registrationOf } from '../../src/payouts-invoice.js';
+import { createInvoice, readInvoice, checkoutInvoice, quoteInvoice, quoteStored, resetInvoices, payerInput, registrationOf, listInvoices } from '../../src/payouts-invoice.js';
+import { parsePayoutIntent } from '../../src/payouts-intent.js';
 
 const TX = '4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia';
 const REFUND = '0x' + 'ab'.repeat(20);
@@ -274,7 +276,7 @@ test('invoice: a dry quote names the send amount, the fee and the time', async (
     postQuote: async () => ({ http: 400, body: { message: 'Amount is too low for bridge, try at least 149983' } }),
   });
   assert.equal(low.depositAddress, null);
-  assert.match(low.error, /0\.15 USD/);
+  assert.match(low.error, /0\.15 USDC/);
 });
 
 test('plan: the agent reply names the invoice and a pay link becomes a QR', () => {
@@ -282,7 +284,7 @@ test('plan: the agent reply names the invoice and a pay link becomes a QR', () =
   assert.equal(cmd.receive, 'alice.near');
   assert.equal(cmd.memo, 'logo design');
   const line = invoiceDoneLine({ id: 'inv_abc', usd: 0.15, receive: 'alice.near', memo: 'logo design', expiry: '2026-11-20T18:00:00Z', href: '/pay/inv_abc' }, 'https://nearcarta.vercel.app');
-  assert.match(line, /0\.15 USD to alice\.near/);
+  assert.match(line, /0\.15 USDC to alice\.near/);
   assert.match(line, /logo design/);
   assert.match(line, /https:\/\/nearcarta\.vercel\.app\/pay\/inv_abc/);
   assert.match(line, /signs nothing/);
@@ -309,6 +311,10 @@ test('source: the tray keeps amount empty, reserves status, and stops key events
   const ui = readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8');
   assert.doesNotMatch(tray, /invoiceUsd = '0\.15'/);
   assert.doesNotMatch(tray, /per-row cap/);
+  assert.doesNotMatch(tray, /Amount USD/);
+  assert.match(tray, /Amount \(USDC\)/);
+  assert.match(tray, /relativeInvoiceDates/);
+  assert.match(tray, /data-tab="invoices"/);
   assert.match(tray, /Your \/setup cap/);
   assert.match(tray, /type="date"/);
   assert.match(tray, /type="datetime-local"/);
@@ -329,5 +335,142 @@ test('source: ANY_INPUT is not requested, and the payer page has one checkout bu
   assert.match(page, /Pay this invoice/);
   assert.equal((page.match(/ferry-cta/g) || []).length, 1);
   assert.match(page, /Not paid/);
+  assert.match(page, /Amount \(USDC\)/);
+  assert.doesNotMatch(page, /Amount USD/);
   assert.doesNotMatch(page, /\bPAID\b/);
+  const payJs = readFileSync(new URL('../../../app/src/panels/pay-invoice.js', import.meta.url), 'utf8');
+  assert.match(payJs, /payload\.indicative = true/);
+  assert.doesNotMatch(payJs, /Add a refund address to see/);
+  const css = readFileSync(new URL('../../../app/shops/payouts/payouts.css', import.meta.url), 'utf8');
+  assert.match(css, /top:96px/);
+  assert.match(css, /max-height:none/);
+});
+
+test('plan: due and expiry are counted from today', () => {
+  const now = new Date(2026, 0, 1, 10, 0, 0);
+  const dates = relativeInvoiceDates(now);
+  assert.equal(dates.due, '2026-01-08');
+  assert.equal(dates.expiry, '2026-01-15T18:00');
+  const later = relativeInvoiceDates(new Date(2026, 10, 6, 9, 0, 0));
+  assert.equal(later.due, '2026-11-13');
+  assert.notEqual(later.due, dates.due);
+});
+
+test('plan: free text fills the payee, the amount, the memo and the due date', () => {
+  const now = new Date(2026, 10, 6, 9, 0, 0);
+  const hex = 'ab'.repeat(32);
+  const phrases = [
+    ['bill alice.near 0.3 USDC for the April article', { usd: 0.3, receive: 'alice.near', memo: 'the April article', due: '' }],
+    ['send 0.5 USDC to cafe.near for coffee', { usd: 0.5, receive: 'cafe.near', memo: 'coffee', due: '' }],
+    ['Create invoice 0.15 USD to bob.near memo logo design', { usd: 0.15, receive: 'bob.near', memo: 'logo design', due: '' }],
+    [`charge ${hex} 2 USDC for the audit`, { usd: 2, receive: hex, memo: 'the audit', due: '' }],
+    ['invoice 1 USDC to dana.near due 2026-12-01 memo website', { usd: 1, receive: 'dana.near', memo: 'website', due: '2026-12-01' }],
+    ['bill alice.near $0.4 due tomorrow for the poster', { usd: 0.4, receive: 'alice.near', memo: 'the poster', due: '2026-11-07' }],
+  ];
+  assert.ok(phrases.length >= 6);
+  for (const [text, want] of phrases) {
+    const cmd = agentCommand(text, now);
+    assert.equal(cmd.ok, true, text);
+    assert.equal(cmd.kind, 'invoice', text);
+    assert.equal(cmd.usd, want.usd, text);
+    assert.equal(cmd.receive, want.receive, text);
+    assert.equal(cmd.memo, want.memo, text);
+    assert.equal(cmd.due, want.due, text);
+  }
+  assert.equal(agentCommand('pay these rows').kind, 'pay');
+  assert.equal(agentCommand('export csv').kind, 'csv');
+  const reply = agentInvoiceReply(
+    { usd: 0.3, receive: 'alice.near', memo: 'the April article', due: '2026-11-13', href: '/pay/inv_abc' },
+    'https://nearcarta.vercel.app',
+  );
+  assert.match(reply, /Made a 0\.3 USDC invoice to alice\.near for the April article, due 2026-11-13/);
+  assert.match(reply, /Here is the link\. https:\/\/nearcarta\.vercel\.app\/pay\/inv_abc/);
+  assert.match(reply, /signs nothing/);
+});
+
+test('plan: a model that invents a payee or raises the amount is kept to the words', () => {
+  const text = 'bill alice.near 0.3 USDC for the April article';
+  const fallback = agentCommand(text);
+  const invented = acceptModelIntent(text, { kind: 'invoice', usd: 0.3, receive: 'evil.near', memo: 'the April article' }, fallback);
+  assert.equal(invented.receive, 'alice.near');
+  assert.equal(invented.source, 'parser');
+  const raised = acceptModelIntent(text, { kind: 'invoice', usd: 9, receive: 'alice.near', memo: 'the April article' }, fallback);
+  assert.equal(raised.usd, 0.3);
+  assert.equal(raised.source, 'parser');
+  const kept = acceptModelIntent(text, { kind: 'invoice', usd: 0.3, receive: 'alice.near', memo: 'the April article' }, fallback);
+  assert.equal(kept.source, 'model');
+  assert.equal(kept.usd, 0.3);
+  const bare = acceptModelIntent('bill alice.near for the April article', { kind: 'invoice', usd: 0.3, receive: 'alice.near' }, agentCommand('bill alice.near for the April article'));
+  assert.equal(bare.ok, false);
+});
+
+test('intent: no key and a failed model both use the parser', async () => {
+  const text = 'bill alice.near 0.3 USDC for the April article';
+  const offline = await parsePayoutIntent(text, { hasKey: () => false, complete: () => { throw new Error('must not call'); } });
+  assert.equal(offline.source, 'parser');
+  assert.equal(offline.usd, 0.3);
+  assert.equal(offline.receive, 'alice.near');
+  const failed = await parsePayoutIntent(text, {
+    hasKey: () => true,
+    allow: () => ({ ok: true }),
+    preflight: async () => ({ ok: true }),
+    complete: async () => { throw new Error('model down'); },
+    skipBudget: true,
+  });
+  assert.equal(failed.source, 'parser');
+  assert.equal(failed.memo, 'the April article');
+  const model = await parsePayoutIntent(text, {
+    hasKey: () => true,
+    allow: () => ({ ok: true }),
+    preflight: async () => ({ ok: true }),
+    complete: async () => ({ content: '{"kind":"invoice","usd":0.3,"receive":"alice.near","memo":"the April article","due":""}', usage: { prompt_tokens: 1, completion_tokens: 1 } }),
+    skipBudget: true,
+  });
+  assert.equal(model.source, 'model');
+  assert.equal(model.receive, 'alice.near');
+});
+
+test('invoice: an indicative quote does not need a refund, and checkout still does', async () => {
+  const open = payerInput({ from: 'USDC@base', chain: 'base', indicative: true }, { allowIndicative: true });
+  assert.equal(open.ok, true);
+  assert.equal(open.value.indicative, true);
+  assert.equal(addressOk('base', open.value.refundTo), true);
+  assert.equal(payerInput({ from: 'USDC@base', chain: 'base' }).error, 'bad refundTo');
+  for (const chain of ['base', 'sol', 'sui', 'stellar', 'near']) assert.equal(addressOk(chain, indicativeRefund(chain)), true, chain);
+  const book = store();
+  const made = createInvoice({ usd: 0.15, receive: 'cafe.near', visitor: 'alice.near' }, { store: book, env: {} });
+  let saw = '';
+  const quoted = await quoteStored(made.invoice.id, open.value, {
+    store: book,
+    tokens: async () => [usdcBase, usdcNear],
+    postQuote: async (body) => { saw = body.refundTo; return { http: 201, body: { quote: { amountInFormatted: '0.151549', amountInUsd: '0.1515', amountOutFormatted: '0.15', amountOutUsd: '0.15', timeEstimate: 35 }, quoteRequest: body } }; },
+    checkQuote: () => ({ accepted: true }),
+  });
+  assert.equal(quoted.ok, true);
+  assert.equal(quoted.indicative, true);
+  assert.equal(quoted.depositAddress, null);
+  assert.equal(saw, open.value.refundTo);
+  assert.match(quoteLine(quoted), /0\.151549 USDC/);
+});
+
+test('invoice: the list is per visitor and names Unpaid, Paid, or Expired', () => {
+  const book = store();
+  const now = Date.parse('2026-11-06T12:00:00Z');
+  createInvoice({ usd: 0.3, receive: 'alice.near', memo: 'april', due: '2026-11-13', expiry: '2026-12-01T00:00:00Z', visitor: 'visitor.near' }, { store: book, env: {}, now });
+  createInvoice({ usd: 0.2, receive: 'bob.near', memo: 'old', expiry: '2020-01-01T00:00:00Z', visitor: 'visitor.near' }, { store: book, env: {}, now });
+  createInvoice({ usd: 1, receive: 'cafe.near', memo: 'other', visitor: 'other.near' }, { store: book, env: {}, now });
+  const row = [...book.byId.values()].find(r => r.receive === 'alice.near');
+  row.status = 'SUCCESS';
+  const mine = listInvoices('visitor.near', { store: book, now });
+  assert.equal(mine.ok, true);
+  assert.equal(mine.invoices.length, 2);
+  assert.deepEqual(mine.invoices.map(i => i.listStatus).sort(), ['Expired', 'Paid']);
+  const other = listInvoices('other.near', { store: book, now });
+  assert.equal(other.invoices.length, 1);
+  assert.equal(other.invoices[0].listStatus, 'Unpaid');
+  assert.equal(other.invoices[0].receive, 'cafe.near');
+  assert.equal(listInvoices('', { store: book }).ok, false);
+  const again = createInvoice({ usd: 1, receive: 'cafe.near', memo: 'other', visitor: 'guest-2' }, { store: book, env: {}, now });
+  assert.equal(again.replayed, true);
+  assert.equal(listInvoices('guest-2', { store: book, now }).invoices.length, 1);
 });
