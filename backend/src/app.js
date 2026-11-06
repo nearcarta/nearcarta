@@ -23,6 +23,8 @@ import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
 import * as ai from './ai.js';
 import * as bankProof from './bank-proof.js';
+import * as bankRate from './bank-rate.js';
+import * as bankModel from './bank-model.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
@@ -569,6 +571,17 @@ export function makeApp() {
     if (text) { try { body = JSON.parse(text); } catch { return bad(c, 'body'); } }
     if (!body || typeof body !== 'object' || Array.isArray(body)) return bad(c, 'body');
     return c.json(await bankProof.bankProve({ receipt: body.receipt || null }));
+  });
+  // Cap conversion only. The statement is not sent here.
+  app.get('/api/bank/rate', limiter(12), async c => c.json(await bankRate.nearRate(c.req.query('currency') || '')));
+  // One TEE audit completion. The rows are not stored and are not returned.
+  app.post('/api/bank/audit', limiter(4), nearAi, async c => {
+    let body = {};
+    const text = await c.req.text();
+    if (text) { try { body = JSON.parse(text); } catch { return bad(c, 'body'); } }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return bad(c, 'body');
+    const model = typeof body.model === 'string' ? body.model.slice(0, 120) : '';
+    return c.json(await bankModel.runModelAudit({ rows: body.rows, ...(model ? { model } : {}) }));
   });
   // Charters (factory) and Vault Arena: backend/src/vault.js
   vault.register(app, { limiter, globalCap });

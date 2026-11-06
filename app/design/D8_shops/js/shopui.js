@@ -838,7 +838,7 @@ const APPS = {
   },
   bank: {
     guest: true,
-    label: 'Mist Bank · private audit', idle: 'This audit does not send a payment. The statement stays in this browser.',
+    label: 'Mist Bank · private audit', idle: 'This audit does not send a payment. A card file is read in this browser.',
     form: () => '<div data-deep="bank"></div>',
     bind: () => {
       mountShop('bank', document.getElementById('t-form'), {

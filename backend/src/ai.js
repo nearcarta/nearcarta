@@ -18,10 +18,10 @@ function auth() {
   return { Authorization: `Bearer ${k}` };
 }
 
-export async function complete(messages, { model = cfg.nearAiModel, maxTokens = 64, extra = {} } = {}) {
+export async function complete(messages, { model = cfg.nearAiModel, maxTokens = 64, extra = {}, headers = {} } = {}) {
   const reqBody = JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: 0, stream: false, ...extra });
   const r = await fetch(`${cfg.nearAi}/v1/chat/completions`, {
-    method: 'POST', headers: { ...auth(), 'content-type': 'application/json' }, body: reqBody,
+    method: 'POST', headers: { ...auth(), 'content-type': 'application/json', 'x-no-aliasing': 'true', ...headers }, body: reqBody,
   });
   const respText = await r.text();
   if (!r.ok) throw Object.assign(new Error(`near ai http ${r.status}`), { status: 502 });
