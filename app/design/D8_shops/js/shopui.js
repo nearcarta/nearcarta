@@ -945,6 +945,9 @@ const APPS = {
       mountShop('bank', document.getElementById('t-form'), {
         state: extra,
         capNear: () => bankCapNear(),
+        // The row the chain has now, and the one silent sender both the CTA and the AI use.
+        boardRow: () => A.boardRowNow(),
+        boardWrite: (call) => A.boardWriteOnRow(call),
         who: () => {
           let saved = null;
           try { saved = JSON.parse(localStorage.getItem('nearcarta.setup.v1') || 'null'); } catch { saved = null; }

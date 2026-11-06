@@ -251,10 +251,12 @@ test('a local audit drops the statement and a looser cap is refused', () => {
   assert.equal(tightenDecision({ beforeCap: 0.05, afterCap: 0.02, swapKey: true }).ok, false);
   assert.equal(tightenDecision({ beforeCap: 0.05, afterCap: 0.02, widenReceivers: true }).ok, false);
   assert.equal(tightenDecision({ beforeCap: 0.05, afterCap: 0.02, grantCalls: true }).ok, false);
+  // A lower cap is a real board write now; the send itself is in bank-tray.js.
   const held = tightenDecision({ beforeCap: 0.05, afterCap: 0.02 });
   assert.equal(held.ok, true);
-  assert.equal(held.live, 'blocked');
-  assert.match(held.reason, /Nothing was signed/);
+  assert.equal(held.live, 'ready');
+  assert.match(held.reason, /Ready to tighten/);
+  assert.match(held.reason, /board row/);
   const text = commitmentText({ nonce: 'abc', afterNear: 0.02, salt: 'saltsalt' });
   assert.equal(text.includes('cafe.near'), false);
   assert.match(text, /^bank-audit-v1\|/);
@@ -312,8 +314,8 @@ test('a card csv keeps its currency and names the biggest waste', async () => {
   assert.doesNotMatch(tray, /Audit another sample/);
   assert.match(tray, /APPLY_NOTE/);
   assert.match(tray, /bank-apply-note/);
-  assert.match(tray, /No per-payment cap is saved in \/setup/);
-  assert.match(read('app/src/panels/bank-audit.js'), /Apply tighter limits lowers the per-payment cap on your own \/setup rules/);
+  assert.match(tray, /No per-payment cap is saved on your board row/);
+  assert.match(read('app/src/panels/bank-audit.js'), /Apply tighter limits lowers the per-payment cap on your own board row/);
   assert.match(read('app/design/D8_shops/js/shopui.js'), /cur === 'bank' && app\.guest && app\.form/);
   // The gold button for the bank never falls through to the /setup redirect, whatever stage the page reads.
   const shopui = read('app/design/D8_shops/js/shopui.js');
@@ -613,4 +615,166 @@ test('the billable prove route stays gated and the bank proof route does not', (
   assert.match(app, /\/api\/bank\/(proof|prove)/);
   const bankRoute = app.slice(app.search(/\/api\/bank\/(proof|prove)/));
   assert.doesNotMatch(bankRoute.slice(0, 400), /AI_PROVE_ENABLED !== '1'/);
+});
+
+test('the tighten the CTA sends is a real, shrink-only board call', async () => {
+  const { tightenCall, rulesInFromRow, anchorCall, boardRefusal } = await import('../../../app/src/panels/bank-board.js');
+  const row = {
+    owner: 'visitor.near', receivers: ['cafe.near'], per_action_cap: '50000000000000000000000',
+    daily_budget: '200000000000000000000000', max_actions_per_day: 4, window_start_min: 0, window_end_min: 0,
+    min_amount: '1', expires_at: '0', nonce: '7', frozen: false,
+  };
+  const call = tightenCall({ row, afterNear: 0.02 });
+  assert.equal(call.ok, true);
+  assert.equal(call.method, 'tighten_rules');
+  assert.equal(call.args.freeze, false);
+  // Every other field is sent back exactly as the row has it: the contract compares each one.
+  const sent = call.args.rules;
+  assert.equal(sent.per_action_cap, '20000000000000000000000');
+  assert.equal(sent.daily_budget, row.daily_budget);
+  assert.deepEqual(sent.receivers, row.receivers);
+  assert.equal(sent.max_actions_per_day, row.max_actions_per_day);
+  assert.equal(sent.min_amount, row.min_amount);
+  assert.equal(sent.expires_at, row.expires_at);
+  assert.equal(call.before, 0.05);
+  assert.equal(call.after, 0.02);
+
+  // Anything that is not strictly lower is refused before a signature exists.
+  assert.equal(tightenCall({ row, afterNear: 0.05 }).ok, false);
+  assert.match(tightenCall({ row, afterNear: 0.05 }).why, /matches your current cap/);
+  assert.equal(tightenCall({ row, afterNear: 0.2 }).ok, false);
+  assert.match(tightenCall({ row, afterNear: 0.2 }).why, /higher than your current cap/);
+  assert.equal(tightenCall({ row, afterNear: 0 }).ok, false);
+  assert.equal(tightenCall({ row: null, afterNear: 0.02 }).ok, false);
+  // A row without a numeric cap is not a row to tighten.
+  assert.equal(tightenCall({ row: { ...row, per_action_cap: 'nope' }, afterNear: 0.02 }).ok, false);
+  assert.equal(rulesInFromRow({ ...row, per_action_cap: '0' }), null);
+
+  // The anchor carries a digest and a salt, and nothing else. The board hashes them.
+  const digest = 'ab'.repeat(32);
+  const anchor = anchorCall({ kind: 'bank_cap', digest, salt: 'saltsalt' });
+  assert.equal(anchor.ok, true);
+  assert.equal(anchor.method, 'anchor');
+  assert.deepEqual(anchor.args, { kind: 'bank_cap', digest, salt: 'saltsalt' });
+  assert.equal(anchorCall({ digest: 'ab', salt: 'saltsalt' }).ok, false);
+  assert.equal(anchorCall({ digest, salt: 'short' }).ok, false);
+  assert.equal(anchorCall({ digest, salt: 'has space here' }).ok, false);
+  assert.equal(anchorCall({ kind: 'bad kind', digest, salt: 'saltsalt' }).ok, false);
+
+  assert.match(boardRefusal({ message: 'Smart contract panicked: ERR_LOOSEN' }), /looser rule/);
+  assert.match(boardRefusal({ message: 'ERR_NO_CHARTER' }), /no row/);
+  assert.match(boardRefusal({ message: 'NotEnoughAllowance' }), /session key/);
+  assert.match(boardRefusal({ message: 'http 503' }), /town is busy/);
+});
+
+test('the CTA and the AI dock send the same board write, through one sender', () => {
+  const tray = read('app/src/panels/bank-tray.js');
+  const apps = read('app/design/D8_shops/js/apps.js');
+  const shopui = read('app/design/D8_shops/js/shopui.js');
+  // One send path: the tray calls the shared executor, and the page passes it in.
+  assert.match(tray, /hooks\.boardWrite\(\{ method: call\.method, args: call\.args/);
+  assert.match(shopui, /boardWrite: \(call\) => A\.boardWriteOnRow\(call\)/);
+  assert.match(shopui, /boardRow: \(\) => A\.boardRowNow\(\)/);
+  // The executor reads the live row, signs with the key from this browser, and sends.
+  assert.match(apps, /export async function boardWriteOnRow/);
+  assert.match(apps, /export async function boardRowNow/);
+  assert.match(apps, /const ak = await proposeAccessKey\(key\)/);
+  assert.match(apps, /W\.functionCall\(method, args \|\| \{\}, gas\)/);
+  assert.match(apps, /wait_until: 'FINAL'/);
+  // No wallet on this path.
+  assert.doesNotMatch(apps.slice(apps.indexOf('export async function boardWriteOnRow'), apps.indexOf('export async function readRules')), /await sign\(/);
+  // The session key must be allowed to call both methods, or the send says why.
+  assert.match(apps, /cannot call \$\{method\}/);
+  const session = read('shared/board/session.js');
+  assert.match(session, /SESSION_METHODS = \[\.\.\.AGENT_METHODS, 'confirm_hold', 'tighten_rules', 'anchor'\]/);
+});
+
+test('the anchor runs only after the cap it commits to is on chain', () => {
+  const tray = read('app/src/panels/bank-tray.js');
+  const apply = tray.slice(tray.indexOf('async function runApply'), tray.indexOf('async function runTee'));
+  // The tighten is sent first, and only a chain-allowed result reaches the anchor.
+  const tightenAt = apply.indexOf("method: call.method, args: call.args");
+  const anchorAt = apply.indexOf('await hooks.boardWrite({ method: anchor.method');
+  assert.ok(tightenAt > 0 && anchorAt > tightenAt, 'tighten is sent before the anchor');
+  assert.match(apply, /if \(okChain && state\.consent\)/);
+  // The commitment is over the salt and the cap, never the statement.
+  assert.match(apply, /commitmentText\(\{ nonce: state\.nonce, afterNear: call\.after, salt \}\)/);
+  assert.match(apply, /anchorCall\(\{ kind: 'bank_cap', digest, salt \}\)/);
+  // The foot keeps two short lines: the result, then one note. Tx links go to the proof log.
+  assert.doesNotMatch(apply, /state\.status = line/);
+  assert.match(apply, /Cap on your row is now \$\{call\.after\} NEAR \(was \$\{call\.before\}\)/);
+  assert.match(apply, /evidence: sent\.tx \? \[\{ label: 'tighten_rules', url: txUrl\(sent\.tx\) \}\] : \[\]/);
+});
+
+test('the audit response never echoes the statement, and an outage says so', async () => {
+  const { runModelAudit } = await import('../../../backend/src/bank-model.js');
+  const kp = nacl.sign.keyPair();
+  const hx = u => Buffer.from(u).toString('hex');
+  const pre = async () => ({ ok: true, nonce: 'ab'.repeat(32), checkedAt: 't', gateway: { ok: true, checks: { quote: true, nonceBound: true }, tcbStatus: 'UpToDate' },
+    models: [{ ok: true, signing_algo: 'ed25519', signing_address: hx(kp.publicKey), checks: { quote: true, nonceBound: true, signerBound: true }, tcbStatus: 'UpToDate', gpu: { ok: true, gpus: 8 } }] });
+  const rows = [{ payee: 'STATEMENT-SENTINEL', amount: 12.5, currency: 'NEAR', date: '2026-10-02' }];
+  const prompt = (await import('../../../backend/src/bank-model.js')).auditPrompt([{ payee: 'STATEMENT-SENTINEL', amount: 12.5, currency: 'NEAR', date: '2026-10-02' }]);
+  // The model sees the lines. That is the whole point of the call.
+  assert.match(prompt, /STATEMENT-SENTINEL/);
+
+  // A signed audit returns no prompt text and no payee list: the reply names the payee, the payload does not.
+  const done = await runModelAudit({
+    rows, preflight: pre,
+    complete: async () => ({ id: 'c1', model: 'z-ai/glm-5.3-flash', reqModel: 'z-ai/glm-5.3-flash', content: 'It is a single charge.', usage: {}, reqSha: 'aa', respSha: 'bb' }),
+    sign: async () => ({ available: true, text: 'x', signature: 'cd'.repeat(64), signing_address: hx(kp.publicKey), signing_algo: 'ed25519', signature_kind: 'provider_tee' }),
+    check: () => ({ verified: true, checks: {} }), allow: () => ({ ok: true }),
+  });
+  const payload = JSON.stringify(done);
+  assert.equal(payload.includes('2026-10-02'), false, 'no statement row is echoed back');
+  assert.equal(payload.includes('12.5'), false, 'no statement amount is echoed back');
+  assert.equal(done.answer, 'It is a single charge.');
+
+  // A provider that never answered is an outage, and the parser's sentence is the answer.
+  const tray = read('app/src/panels/bank-tray.js');
+  assert.match(tray, /outage: true, step: `NEAR AI did not answer/);
+  assert.match(tray, /state\.status = model\?\.outage/);
+  assert.match(tray, /NEAR AI did not answer\. These rows were named in this browser\./);
+  // Outage text must never claim a verified sentence: no signature, no signer, no model answer.
+  const outageBranch = tray.slice(tray.indexOf('if (model?.outage)'), tray.indexOf('if (model?.signed_text'));
+  assert.match(outageBranch, /state\.browserSig = null/);
+  assert.match(outageBranch, /state\.signingAddress = ''/);
+  assert.match(outageBranch, /state\.modelAnswer = ''/);
+  // The user-facing sentence says nothing is attested, rather than implying a check ran.
+  assert.match(outageBranch, /nothing here is attested/);
+});
+
+test('the bank audit route logs nothing that carries a statement line', () => {
+  const model = read('backend/src/bank-model.js');
+  // No console write in the bank model path at all: counts and cost only live in agent.js.
+  assert.doesNotMatch(model, /console\.(log|error|warn|info)/);
+  const proof = read('backend/src/bank-proof.js');
+  assert.doesNotMatch(proof, /console\.(log|error|warn|info)/);
+  // The one retention sentence, and it says what is kept rather than claiming blindness.
+  assert.match(NO_RETENTION, /request and response bytes are not stored/i);
+  assert.match(NO_RETENTION, /hashed for the signature check/);
+  assert.match(NO_RETENTION, /keeps the hashes, the signer, and the attestation summary/);
+  // The route itself is rate limited and does not persist the body anywhere.
+  const app = read('backend/src/app.js');
+  const route = app.slice(app.indexOf("'/api/bank/audit'"), app.indexOf("'/api/bank/audit'") + 700);
+  assert.match(route, /limiter\(4\)/);
+  assert.doesNotMatch(route, /writeFile|localStorage|sessionStorage/);
+});
+
+test('the dry-run script plans the two calls and signs nothing', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../../backend/scripts/bank-row-dry-run.js', import.meta.url), 'utf8');
+  // It reads the board and prints a plan.
+  assert.match(src, /request_type: 'call_function'/);
+  assert.match(src, /method_name: method/);
+  assert.match(src, /signed_by_this_script: false/);
+  // It must not be able to sign: no key read, no signer, no send.
+  assert.doesNotMatch(src, /NEAR_MAINNET_SIGNER_KEY/);
+  assert.doesNotMatch(src, /signTx\(|signAndSendTransaction|send_tx/);
+  assert.doesNotMatch(src, /--live/);
+  // A row with no cap is reported, not guessed.
+  assert.match(src, /has no row on the board, so there is nothing to tighten or anchor/);
+  // The plan names the same two methods the page sends, in the same order.
+  assert.match(src, /method: 'tighten_rules'/);
+  assert.match(src, /method: 'anchor'/);
+  assert.match(src, /only after tighten_rules is FINAL/);
 });
