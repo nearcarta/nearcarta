@@ -358,3 +358,14 @@ test('public worker discovery needs no credential, and the buyer view names the 
   assert.match(rejected.credential, /worker token cannot read a buyer job/);
   assert.equal(rejected.sent, false);
 });
+
+test('a retired contract answers a state, not a 500 that takes the city tray down', async () => {
+  // The Guardhouse oath is the retired charter. Before this, /api/guardhouse threw and
+  // the whole shop mount failed with it; now it answers a readable state.
+  const res = await makeApp().request('/api/guardhouse');
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.retired, true);
+  assert.ok(body.error, 'the message names what is retired');
+  assert.doesNotMatch(JSON.stringify(body), /at .*\.js:/, 'no stack trace in the body');
+});

@@ -74,6 +74,11 @@ const lastGood = (name, fn) => async () => {
     const g = good.get(name);
     if (g && OVERLOAD.test(String(e.message)) && Date.now() - g.at < 15 * 60e3)
       return g.v && typeof g.v === 'object' && !Array.isArray(g.v) ? { ...g.v, stale: true, stale_age_s: Math.round((Date.now() - g.at) / 1000) } : g.v;
+    // A retired or missing contract is a fact about the deployment, not a server fault.
+    // The room reads this instead of a 500, which used to take the whole city tray down.
+    if (e?.status === 404 || e?.status === 503) {
+      return { error: String(e.message || 'unavailable').slice(0, 200), retired: true, status: e.status, at: new Date().toISOString() };
+    }
     throw e;
   }
 };
