@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256 } from '@noble/hashes/sha2.js';
 import {
@@ -61,10 +63,16 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   const script = fileURLToPath(new URL('../../../scripts/toll-deploy.js', import.meta.url));
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const secret = 'ed25519:this-is-not-a-real-key-and-must-not-appear';
+  // The live account now runs the recorded wasm, so a plain run takes the read-only view path.
+  // A one-byte copy of the wasm plans the recreate without asking the chain which build is deployed.
+  const wasm = join(mkdtempSync(join(tmpdir(), 'toll-plan-')), 'toll.wasm');
+  const bytes = readFileSync(new URL('../../../contracts/artifacts/toll.v7.wasm', import.meta.url));
+  bytes[bytes.length - 1] ^= 0x01;
+  writeFileSync(wasm, bytes);
   const dry = spawnSync(process.execPath, [script], {
     encoding: 'utf8',
     cwd: root,
-    env: { ...process.env, TOLL_SIGNER_KEY: secret },
+    env: { ...process.env, TOLL_SIGNER_KEY: secret, TOLL_WASM: wasm },
     timeout: 120000,
   });
   assert.equal(dry.status, 0, dry.stderr);
@@ -77,6 +85,7 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   assert.ok(report.wasm.bytes > 0);
   assert.match(report.wasm.sha256, /^[0-9a-f]{64}$/);
   assert.ok(report.balance.shop_before_near || report.balance.recorded_locked_near);
+  assert.equal(report.path, 'close_then_create');
   for (const t of report.transfers) {
     assert.ok(t.payee === 'nearcarta.near' || t.payee === 'toll.nearcarta.near');
   }
@@ -121,7 +130,7 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   const refused = spawnSync(process.execPath, [script, '--live'], {
     encoding: 'utf8',
     cwd: root,
-    env: { ...process.env, TOLL_SIGNER_KEY: '' },
+    env: { ...process.env, TOLL_SIGNER_KEY: '', TOLL_WASM: wasm },
     timeout: 120000,
   });
   assert.equal(refused.status, 1);
