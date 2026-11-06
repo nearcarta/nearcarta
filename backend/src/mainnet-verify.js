@@ -32,7 +32,14 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
   });
   const j = await res.json();
   const tx = j.result?.transaction;
-  if (!tx) return { hash, found: false, error: j.error?.cause?.name || j.error?.name || 'not found', status: res.status };
+  if (!tx) {
+    // Keep the code and the words: fastnear answers HTTP 200 with
+    // {"error":{"code":-429,"message":"Rate limits exceeded..."}} and no name,
+    // so a throttle must not read as "not found".
+    const code = j.error?.code;
+    const name = j.error?.cause?.name || j.error?.name;
+    return { hash, found: false, error: name || (code != null ? String(code) : 'not found'), message: j.error?.message || '', code, status: res.status };
+  }
   const status = j.result.status || {};
   const failure = Object.prototype.hasOwnProperty.call(status, 'Failure');
   return { hash, found: true, success: !failure && (Object.prototype.hasOwnProperty.call(status, 'SuccessValue') || Object.prototype.hasOwnProperty.call(status, 'SuccessReceiptId')), failure, signer: tx.signer_id || sender };
@@ -40,28 +47,34 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
 
 /** A throttled or failed call is not evidence the tx is missing. */
 export const TRANSIENT = new Set(['-429', -429, '429', 'RATE_LIMITED', 'TIMEOUT_ERROR', 'REQUEST_VALIDATOR_ERROR']);
+export const isThrottled = (one) => one.status === 429
+  || TRANSIENT.has(one.error) || TRANSIENT.has(one.code)
+  || /rate limit|-429|too many requests|timeout/i.test(String(one.message || ''));
 
-export async function checkAll(dep, { rpc, fetchImpl = fetch, tries = 3, backoffMs = 400 } = {}) {
+export async function checkAll(dep, { rpc, fetchImpl = fetch, tries = 4, backoffMs = 500, paceMs = 120 } = {}) {
   const rpcs = (Array.isArray(rpc) ? rpc : [rpc]).filter(Boolean);
   const rows = [];
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
   for (const row of collectMainnetTxs(dep)) {
     let hit = { ...row, found: false, error: 'not found' };
     for (const sender of sendersFor(dep, row)) {
       for (const url of rpcs) {
-        // The archival RPC throttles: a 429 is "not answered", never "not on chain".
-        // Retrying keeps a rate limit from turning into a red proof check.
+        // fastnear throttles a burst (HTTP 200 with code -429, and its archival host
+        // now says it is deprecated). A throttle is "not answered", never "not on
+        // chain", so pace the reads and retry with backoff. Without this, verify
+        // flipped between 67/71 and 71/71 on an unchanged tree and took CI with it.
         for (let t = 0; t < tries; t++) {
           const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
-          const throttled = one.status === 429 || TRANSIENT.has(one.error);
-          if (!throttled || one.found) { hit = { ...row, ...one, sender }; break; }
+          if (!isThrottled(one) || one.found) { hit = { ...row, ...one, sender }; break; }
           hit = { ...row, ...one, sender, throttled: true };
-          if (t < tries - 1) await new Promise(r => setTimeout(r, backoffMs * 2 ** t));
+          if (t < tries - 1) await wait(backoffMs * 2 ** t);
         }
         if (hit.found) break;
       }
       if (hit.found) break;
     }
     rows.push(hit);
+    if (paceMs) await wait(paceMs);
   }
   return { ok: rows.length > 0 && rows.every(r => r.found), rows };
 }

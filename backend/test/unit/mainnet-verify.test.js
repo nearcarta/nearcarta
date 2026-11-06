@@ -54,3 +54,18 @@ test('a tx that stays throttled is reported as throttled, not as missing', async
   assert.equal(out.rows[0].throttled, true);
   assert.equal(out.rows[0].found, false);
 });
+
+test('fastnear throttling (HTTP 200, code -429, no name) is retried, not read as missing', async () => {
+  // This is the exact shape that made CI report 69/71 while the tx was on chain.
+  const dep = { network: 'mainnet', root: 'nearcarta.near', retired: { 'retired.charter.nearcarta.near': { txs: { reap: 'F'.repeat(44) } } } };
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls === 1) return { status: 200, json: async () => ({ jsonrpc: '2.0', id: '1', error: { code: -429, message: 'Rate limits exceeded. For higher rate limits get a subscription.' } }) };
+    return { status: 200, json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
+  };
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl, backoffMs: 1 });
+  assert.equal(calls, 2, 'a 200 with code -429 must be retried');
+  assert.equal(out.ok, true);
+  assert.equal(out.rows[0].found, true);
+});
