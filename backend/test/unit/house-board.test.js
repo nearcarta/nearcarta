@@ -200,7 +200,9 @@ test('the city, the allow list and the denylist use the one shop id', () => {
   assert.equal(HOUSE_SHOP, 'house.nearcarta.near');
   assert.equal(MAIN.extras.house.contract, HOUSE_SHOP);
   assert.equal(MAIN.extras.house.shop, HOUSE_SHOP);
-  assert.equal(MAIN.extras.house.fallback.status, 'not_deployed');
+  // house.nearcarta.near itself was recreated as the v3 shop, so the separate
+  // fallback account is not needed. The record keeps it for a future recreate.
+  assert.equal(MAIN.extras.house.fallback.status, 'unused');
   assert.equal(HOUSE_FALLBACK, 'house3.nearcarta.near');
   assert.equal(MAIN.extras.house.next.sha256, HOUSE_WASM_SHA256);
   assert.equal(shopOf(HOUSE_SHOP), 'house');
