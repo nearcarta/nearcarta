@@ -395,7 +395,9 @@ export function makeApp() {
   }
   app.get('/api/guardhouse/check/:account', limiter(12), async c => {
     const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
-    const charter = c.req.query('charter') || MAINNET_DEP?.charter?.contract || DEP.guardhouse?.oath;
+    // The board is the live rule book. The retired charter is history, so it is never the
+    // default: asking about an account must not name a deleted contract.
+    const charter = c.req.query('charter') || MAINNET_DEP?.board?.contract || MAINNET_DEP?.charter?.contract || DEP.guardhouse?.oath;
     const found = await nearcartaCharter(charter);
     if (!found) return bad(c, 'charter must be a Nearcarta charter');
     const k = a + '|' + charter, hit = cpCache.get(k);
