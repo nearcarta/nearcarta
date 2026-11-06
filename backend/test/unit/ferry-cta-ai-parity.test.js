@@ -75,7 +75,7 @@ test('the post-recreate board is the only contract the city touches', () => {
   // No visitor gets a contract of their own: the row is keyed by owner on the board.
   assert.equal(MAIN.board.owner, 'nearcarta.near');
   // The session key lists every method the hold and row paths need, on this contract.
-  for (const m of SESSION_METHODS) assert.ok(['propose', 'propose_call', 'propose_call_as', 'confirm_hold', 'tighten_rules', 'anchor'].includes(m), m);
+  for (const m of SESSION_METHODS) assert.ok(['propose', 'propose_call', 'propose_call_as', 'anchor', 'confirm_hold', 'tighten_rules'].includes(m), m);
 });
 
 test('the CTA builds a real transaction inside the row cap', () => {

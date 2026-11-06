@@ -28,8 +28,10 @@ test('agentMethodsReady needs every session method entry, or an empty list', () 
   assert.equal(agentMethodsReady(['propose', 'propose_call', 'propose_call_as', 'confirm_hold']), false, 'the row path also needs tighten_rules and anchor');
   assert.equal(agentMethodsReady(['propose', 'propose_call', 'propose_call_as', 'confirm_hold', 'tighten_rules', 'anchor']), true);
   assert.equal(agentMethodsReady(['propose_call', 'propose', 'propose_call_as', 'confirm_hold', 'tighten_rules', 'anchor', 'extra']), true);
-  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as']);
-  assert.deepEqual(SESSION_METHODS, ['propose', 'propose_call', 'propose_call_as', 'confirm_hold', 'tighten_rules', 'anchor']);
+  // `anchor` sits in AGENT_METHODS (the Chronicle tray signs it with no wallet), so the
+  // session list must not repeat it: a duplicated entry in a key's method list is noise.
+  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
+  assert.deepEqual(SESSION_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor', 'confirm_hold', 'tighten_rules']);
 });
 
 test('classifyBoardAgentKeys marks propose-only keys stale and flags renew', () => {
@@ -80,7 +82,7 @@ test('renewAgentKeyActions deletes stale keys then adds propose+propose_call', (
   assert.deepEqual(actions[1], { type: 'DeleteKey', params: { publicKey: 'ed25519:GoFAZP3cStale' } });
   assert.equal(actions[2].type, 'AddKey');
   assert.equal(actions[2].params.publicKey, 'ed25519:NewAgent');
-  assert.deepEqual(actions[2].params.accessKey.permission.methodNames, ['propose', 'propose_call', 'propose_call_as']);
+  assert.deepEqual(actions[2].params.accessKey.permission.methodNames, [...AGENT_METHODS], 'the renewed key carries every agent method, including anchor');
   assert.equal(actions[2].params.accessKey.permission.receiverId, BOARD);
   assert.equal(actions[2].params.accessKey.permission.allowance, GAS_ALLOWANCE_YOCTO);
 });
@@ -121,7 +123,7 @@ test('refresh replaces a ready board key with 0.25 NEAR of gas and does not touc
   assert.equal(actions[0].params.publicKey, 'ed25519:BzdHuEoDReady');
   assert.equal(actions[1].type, 'AddKey');
   assert.equal(actions[1].params.accessKey.permission.allowance, GAS_TOPUP_YOCTO);
-  assert.deepEqual(actions[1].params.accessKey.permission.methodNames, ['propose', 'propose_call', 'propose_call_as']);
+  assert.deepEqual(actions[1].params.accessKey.permission.methodNames, [...AGENT_METHODS], 'the refreshed key carries every agent method');
   const src = read('app/house/setup.js');
   const fn = src.slice(src.indexOf('async function refreshAgentKey'), src.indexOf('function bindRefreshKey'));
   assert.match(fn, /GAS_TOPUP_YOCTO/);

@@ -686,7 +686,9 @@ test('the CTA and the AI dock send the same board write, through one sender', ()
   // The session key must be allowed to call both methods, or the send says why.
   assert.match(apps, /cannot call \$\{method\}/);
   const session = read('shared/board/session.js');
-  assert.match(session, /SESSION_METHODS = \[\.\.\.AGENT_METHODS, 'confirm_hold', 'tighten_rules', 'anchor'\]/);
+  // The session key names every agent method (anchor included) once, plus the hold and row paths.
+  assert.match(session, /SESSION_METHODS = \[\.\.\.new Set\(\[\.\.\.AGENT_METHODS, 'confirm_hold', 'tighten_rules'\]\)\]/);
+  assert.doesNotMatch(session, /SESSION_METHODS = \[\.\.\.AGENT_METHODS[^\]]*'anchor'\]/);
 });
 
 test('the anchor runs only after the cap it commits to is on chain', () => {

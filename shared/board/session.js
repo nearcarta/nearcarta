@@ -39,7 +39,7 @@ export const AGENT_METHODS = ['propose', 'propose_call', 'propose_call_as', 'anc
  *   event; the contract asserts its state bytes are unchanged (`ERR_STATE`). A salted
  *   commitment is the only thing a shop publishes through it.
  */
-export const SESSION_METHODS = [...AGENT_METHODS, 'confirm_hold', 'tighten_rules', 'anchor'];
+export const SESSION_METHODS = [...new Set([...AGENT_METHODS, 'confirm_hold', 'tighten_rules'])];
 /** Methods only the visitor's wallet may call. Never in a session key's list. */
 export const OWNER_ONLY_METHODS = ['cancel_hold', 'expire_sent'];
 /** The three hold methods a shop track needs, stated once for the shops and the docs. */

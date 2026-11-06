@@ -104,13 +104,16 @@ test('openRowTransactions refuses an incomplete batch', () => {
 });
 
 test('the new key allows the session scope on the board, including confirm_hold', () => {
-  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as']);
-  assert.deepEqual(SESSION_METHODS, ['propose', 'propose_call', 'propose_call_as', 'confirm_hold', 'tighten_rules', 'anchor']);
+  // `anchor` is an agent method (the Chronicle tray signs it), and the session adds the
+  // hold and row paths. No method is listed twice.
+  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
+  assert.deepEqual(SESSION_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor', 'confirm_hold', 'tighten_rules']);
+  assert.equal(new Set(SESSION_METHODS).size, SESSION_METHODS.length, 'no duplicate method in the key list');
   assert.match(src, /receiverId: MAIN\.board\.contract, methodNames: \[\.\.\.SESSION_METHODS\]/);
-  // The warning text names the agent's three, on both the sign step and the try step.
+  // The visible copy names every agent method, on both the sign step and the try step.
   const sign = section('function sSign()', 'async function charterState');
-  assert.match(sign, /<code>propose<\/code>, <code>propose_call<\/code> and <code>propose_call_as<\/code>/);
-  assert.match(src, /It calls <code>propose<\/code>, <code>propose_call<\/code> and <code>propose_call_as<\/code> on your row/);
+  assert.match(sign, /<code>propose<\/code>, <code>propose_call<\/code>, <code>propose_call_as<\/code> and <code>anchor<\/code>/);
+  assert.match(src, /It calls <code>propose<\/code>, <code>propose_call<\/code>, <code>propose_call_as<\/code> and <code>anchor<\/code> on your row/);
   // No stale two-method sentence is left anywhere the visitor can see.
   assert.doesNotMatch(src, /has <code>propose<\/code> but not <code>propose_call<\/code>/);
   assert.doesNotMatch(src, /It calls <code>propose<\/code> and <code>propose_call<\/code> on your row/);
