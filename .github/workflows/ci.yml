@@ -54,6 +54,20 @@ jobs:
       - run: cd contracts/oath && cargo +1.86.0 near build non-reproducible-wasm --locked
       - run: cd contracts/reaper && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
       - run: cd contracts/oath && cargo test --locked --test sandbox --test exploits --test props --test adversarial --test teardown
+  board-sandbox:
+    # One local board, two visitors, then reap. The wasm is rustc 1.86 / near-sdk 5.27.
+    # The runner is a separate crate so the 1.86 unit job does not need OpenSSL.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.86.0
+        with: { targets: wasm32-unknown-unknown }
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev binaryen
+      - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh | sh
+      - run: cd contracts/charter_board && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
+      - run: wasm-opt --enable-sign-ext --enable-mutable-globals --enable-bulk-memory -Oz --strip-debug --strip-producers -o /tmp/charter_board.wasm contracts/charter_board/target/near/charter_board.wasm && mv /tmp/charter_board.wasm contracts/charter_board/target/near/charter_board.wasm
+      - run: cd contracts/charter_board_sandbox && cargo test --locked
   secrets:
     runs-on: ubuntu-latest
     steps:

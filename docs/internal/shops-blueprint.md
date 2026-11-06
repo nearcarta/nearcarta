@@ -103,7 +103,7 @@ Every shop aiming for 10/10 must match this **shape**:
 |---|---|---|
 | Cap too small for the action | Row `per_action_cap` 0.005 NEAR while session swap needs ~0.05 | Size caps to the **real** action before claiming agent settle; UI must refuse locally with plain words when under-capped |
 | `/setup` could not update a live row | No “Update my rules” / Sign path calling `set_rules`+`set_calls` on an open row | Always expose update on live rows; never require close+reopen for allowlist growth |
-| `set_calls` `ERR_RECEIVERS` | Duplicate `(receiver, method)` or >8 pairs (`lib.rs` L296–303) | Dedupe before send (`callPolicy` + tests); never append `FERRY_CALL_TARGETS` twice |
+| `set_calls` `ERR_RECEIVERS` | Duplicate `(receiver, method)` or more than 24 pairs (`MAX_CALLS`) | Dedupe before send (`callPolicy` + tests); never append `FERRY_CALL_TARGETS` twice |
 | Expiry silently shortened | Update path rewrote `expires_at` to “now” without asking | Preserve existing expiry unless the visitor picks a new window (`PR #31` lineage) |
 | Wrong 1Click recipient / recipientType | Zcash / wrong type sent for a NEAR destination | Use `quoteRecipient` / `cityCheckoutBody` for the **destination chain**; visitor NEAR ≠ depositAddress |
 | Gate read visitor as oath | First tried `get_rules` on the visitor implicit account | Visitor rows: always `get_charter` on `board.nearcarta.near`; oath `get_rules` only for per-visitor oath contracts |

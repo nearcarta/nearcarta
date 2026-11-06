@@ -7,11 +7,12 @@
 // Shops trust that field only when the predecessor is the board. A nested
 // row_owner is not authority. Duplicate keys are rejected on chain.
 import { createHash } from 'node:crypto';
+// row-owner.js holds the same function without node:crypto, so the town bundle
+// can import it. This file re-exports it for the signed envelope.
 import { injectRowOwner } from './row-owner.js';
 
 export { injectRowOwner };
 export const CALL_AS_VERSION = '2';
-
 export function effectsCanon(effects) {
   if (!effects || effects.length === 0) return '-';
   return effects.map(e => `${e.chain}|${e.asset}|${e.to}|${e.value}|${e.fee}`).join(';');
