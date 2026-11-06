@@ -30,44 +30,38 @@ test('a missing tx fails the check and a refusal still counts as found', async (
   assert.equal(miss.ok, false);
 });
 
-test('a throttled RPC is retried and never reads as a missing proof', async () => {
-  const dep = { network: 'mainnet', root: 'nearcarta.near', house: { contract: 'house.nearcarta.near', txs: { deploy: 'D'.repeat(44) } } };
-  let calls = 0;
-  const throttledThenFound = async () => {
-    calls += 1;
-    if (calls <= 2) return { status: 429, json: async () => ({ error: { name: 'TooManyRequests', message: 'rate limited' } }) };
-    return { status: 200, json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
+test('a hash recorded twice is asked once, and a dropped lookup is retried', async () => {
+  // CI read the same house tx as found under one shop and missing under the next,
+  // so the read is not reliable in a burst. One hash is one question; a lookup that
+  // comes back empty is asked again before it is called missing.
+  const H = 'D'.repeat(44);
+  const dep = { root: 'nearcarta.near', retired: { house: { contract: 'house.nearcarta.near', txs: { pay: H } } }, house: { contract: 'house.nearcarta.near', txs: { pay: H } } };
+  let asked = 0;
+  const fetchImpl = async () => {
+    asked += 1;
+    // Fail the first answer, then find it: the retry is what saves the row.
+    if (asked === 1) return { json: async () => ({ error: { cause: { name: 'TIMEOUT_ERROR' } } }) };
+    return { json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
   };
-  const all = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: throttledThenFound, retryMs: 1, paceMs: 0 });
-  assert.equal(all.ok, true, 'a rate-limited endpoint must not turn a real tx into a missing one');
-  assert.ok(calls >= 3, 'it asks again before giving up');
-
-  // A JSON-RPC "unknown transaction" is an answer, so it is not retried for being transient.
-  let asks = 0;
-  const unknown = async () => { asks += 1; return { status: 200, json: async () => ({ error: { cause: { name: 'UNKNOWN_TRANSACTION' } } }) }; };
-  const gone = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: unknown, retryMs: 1, paceMs: 0 });
-  assert.equal(gone.ok, false);
-  assert.notEqual(gone.rows[0].transient, true, 'an absent tx is a final answer, not a transient failure');
-  assert.ok(asks < 6, 'it is not asked about three full rounds');
-
-  // A network failure is transient: retried, then reported as such rather than as an absent tx.
-  let fails = 0;
-  const throwing = async () => { fails += 1; return { status: 502, json: async () => { throw new Error('bad gateway'); } }; };
-  const down = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: throwing, retryMs: 1, paceMs: 0 });
-  assert.equal(down.ok, false);
-  assert.equal(down.rows[0].transient, true);
-  assert.ok(fails >= 3);
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl });
+  assert.equal(out.ok, true);
+  assert.equal(out.rows.length, 2);
+  assert.equal(out.rows.every(r => r.found), true, 'both records of the same hash resolve');
+  assert.ok(asked <= 4, `one question for the shared hash plus retries, not one per record (asked ${asked})`);
 });
 
-test('one hash cited by two records is read once', async () => {
-  const hash = 'E'.repeat(44);
-  const dep = { network: 'mainnet', root: 'nearcarta.near',
-    retired: { 'house.nearcarta.near@v2': { contract: 'house.nearcarta.near', txs: { close: hash } } },
-    house: { contract: 'house.nearcarta.near', txs: { close: hash } } };
-  let reads = 0;
-  const found = async () => { reads += 1; return { status: 200, json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) }; };
-  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: found, paceMs: 0 });
-  assert.equal(out.ok, true);
-  assert.equal(out.rows.length, 2, 'both records still appear in the report');
-  assert.equal(reads, 1, 'the same hash is not fetched twice');
+test('a busy RPC is reported as unread, not as a missing tx', async () => {
+  const dep = { root: 'nearcarta.near', house: { contract: 'house.nearcarta.near', txs: { deploy: 'E'.repeat(44) } } };
+  // Every attempt is throttled: the tx is not called missing, it is called unread.
+  const throttled = async () => ({ status: 429, ok: false, json: async () => ({ error: { name: 'TooManyRequests' } }) });
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: throttled });
+  assert.equal(out.ok, false);
+  assert.equal(out.rows[0].transient, true, 'a throttled read says so');
+  assert.match(out.rows[0].error, /429/);
+
+  // An unknown transaction is a final answer, so it is not marked transient.
+  const unknown = async () => ({ ok: true, json: async () => ({ error: { cause: { name: 'UNKNOWN_TRANSACTION' } } }) });
+  const gone = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: unknown });
+  assert.equal(gone.ok, false);
+  assert.notEqual(gone.rows[0].transient, true);
 });

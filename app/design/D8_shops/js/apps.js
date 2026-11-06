@@ -12,7 +12,10 @@ import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCa
 import { freezePlan } from '/panels/guard-agent.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 import { missingCross } from '/foreign-path.js';
-import { callAsMessage, crossArgs, unitsOf } from '/board-call-as.js';
+import { callAsMessage, crossArgs, unitsOf, setSha256Hex } from '/board-call-as.js';
+// `/board-call-as.js` is served as-is, so it cannot import a package. The wallet
+// bundle already carries sha256; hand it over before any signed text is built.
+setSha256Hex(W.sha256hex);
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 const onMain = () => true;

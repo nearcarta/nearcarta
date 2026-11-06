@@ -10,7 +10,11 @@
 // House, Arena, the toll room and the city bundle share this module. The
 // browser loads app/src/board-call-as.js, which is the implementation; this
 // file keeps the node import path. It must stay free of node:crypto so the
-// city bundle can import it.
+// city bundle can import it. The browser copy cannot import @noble directly
+// (it is served as-is, with no import map), so this file wires the hash in.
+import { sha256 } from '@noble/hashes/sha2.js';
+import { setSha256Hex, nobleSha256Hex } from '../../app/src/board-call-as.js';
+setSha256Hex(nobleSha256Hex(sha256));
 export {
   CALL_AS_VERSION, BOARD_V2, injectRowOwner, effectsCanon, callAsMessage, confirmMessage,
   refundActionArgs, settleArgs, unitsOf, crossArgs,
