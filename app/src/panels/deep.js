@@ -76,7 +76,8 @@ export function defaultAmtFor(sym) {
   if (s.startsWith('USDC') || s === 'USDT' || s === 'DAI' || s === 'USDCE') return '3';
   if (s === 'ETH' || s === 'WETH') return '0.002';
   if (s === 'BTC' || s === 'WBTC') return '0.00005';
-  // 0.05 wNEAR quotes at about $0.185, under the 0.20 USD checkout cap, and fits propose_call when the row cap holds it.
+  // 0.05 wNEAR is the session default. Whether it fits is the visitor's row cap, not a
+  // product USD limit: depositPlan falls back to you-send when the row cannot hold it.
   if (s === 'NEAR' || s === 'WNEAR') return SESSION_SWAP.amt;
   return '1';
 }
