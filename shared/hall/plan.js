@@ -209,6 +209,10 @@ export function parseHallCommand(text) {
   if (accept) return { ok: true, kind: 'accept', partId: Number(accept[1]) };
   const walk = raw.match(/\bwalk\s+part\s+(\d+)\b/i);
   if (walk) return { ok: true, kind: 'walk', partId: Number(walk[1]) };
+  // "deliver part 1 3f2a…" carries the sha256 of the work. The digest is the binding
+  // the review has to present, so it is part of the command, not a free-text note.
+  const deliver = raw.match(/\bdeliver\s+part\s+(\d+)\s+([0-9a-fA-F]{64})\b/i);
+  if (deliver) return { ok: true, kind: 'deliver', partId: Number(deliver[1]), deliverable: deliver[2].toLowerCase() };
   const quote = raw.match(/\bquote\s+part\s+(\d+)\s+from\s+(\S+)\s+at\s+(\d+(?:\.\d+)?)/i);
   if (quote) return { ok: true, kind: 'quote', partId: Number(quote[1]), worker: quote[2].toLowerCase(), near: quote[3] };
   const pass = raw.match(/\bpass\s+part\s+(\d+)\b/i);

@@ -11,6 +11,10 @@ import { runHallCommand } from './hall-actions.js';
 import { armHallDock, ensureHallDock, installHallDock } from './hall-dock.js';
 import { jobTray } from './hall-panes.js';
 import { createLedger, statusLines } from '../../../shared/hall/job.js';
+import { HALL_SHOP_ID } from '../../../shared/hall/v2.js';
+
+// The Hall shop account, read from the deployment record.
+const shopId = HALL_SHOP_ID;
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const apiBase = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -167,6 +171,7 @@ export async function mountHall(root, hooks = {}) {
     const result = await runHallCommand(text, {
       row: async () => before,
       form: () => form,
+      shop: shopId,
       ledger,
       job: () => posted,
       nowMs: hooks.nowMs,
@@ -179,6 +184,15 @@ export async function mountHall(root, hooks = {}) {
         return market;
       },
       clearSeal: () => { seal = ''; },
+      // The whole lifecycle goes through the same sender the CTA uses. `hooks.sendJob`
+      // is the city bundle's hallJob; the standalone page falls back to the bundle too.
+      sendJob: async (step) => {
+        const send = hooks.sendJob || (async (one) => {
+          const m = await import('/shops/hall/hall.bundle.js');
+          return m.sendJob(one);
+        });
+        return send(step);
+      },
       signRules: async (calls) => {
         const sign = hooks.sign || (async (list) => {
           const m = await import('/shops/hall/hall.bundle.js');

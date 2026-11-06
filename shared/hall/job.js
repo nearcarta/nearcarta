@@ -204,6 +204,7 @@ export function reviewPart(ledger, input = {}) {
     return refuse('That part was already reviewed. Nothing was signed again.', 'double');
   }
   if (part.settlement !== 'awarded' || !part.awarded) return refuse('Award the part before review. Nothing was signed.', 'part');
+  if (part.phase !== 'delivered') return refuse('The worker has not delivered this part yet. Nothing was signed.', 'deliver');
   const worker = accountOk(input.worker || part.awarded.worker);
   const priceY = String(input.priceY || part.awarded.priceY);
   if (worker !== part.awarded.worker || priceY !== part.awarded.priceY) {

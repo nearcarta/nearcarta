@@ -677,9 +677,18 @@ async function tollPay(quote) {
   sh?.hideRefuse?.();
   const ready = !!(A.S.ready && A.stage() === 'ready' && A.S.board);
   if (!ready) {
-    const hint = 'Set up your agent in /setup. Nothing was signed.';
+    // Three different setup steps. Saying "set up your agent" to a visitor with no
+    // row sends them to the wrong part of /setup.
+    const stage = A.stage();
+    const hint = !A.S.me
+      ? 'Sign in first, then open your row in /setup. Nothing was signed.'
+      : !A.S.boardRow
+        ? 'Open your row in /setup first. The toll spends from that row, under your caps. Nothing was signed.'
+        : stage === 'key'
+          ? 'Finish the helper key in /setup so this browser can sign. Nothing was signed.'
+          : 'Finish /setup so this row can pass the toll. Nothing was signed.';
     extra.seal = hint;
-    return { ok: false, hint, keep: true, kind: 'no', say: hint, refused: false };
+    return { ok: false, hint, keep: true, kind: 'no', say: hint, refused: false, needsRow: !A.S.me || !A.S.boardRow };
   }
   if (!quote?.payable || !quote.feeYocto) {
     const hint = quote?.hint || 'The live policy has no visitor fee. Nothing was signed.';
@@ -1028,6 +1037,8 @@ const APPS = {
         onPaid: (res) => { sh?.hideSeal?.(); if (sh?.act && runScene) runScene(sh.act({ paid: true, tx: res.tx })); },
         onRefuse: (text) => { if (sh?.act && runScene) runScene(sh.act({ refused: true, reason: text || '' })); else sh?.showSeal?.(text); },
         onClear: () => sh?.hideSeal?.(),
+        // The gold CTA and the AI dock share this sender, so both sign the same call.
+        sendJob: (step) => A.hallJob({ ...step, expiry: null, signature: null }),
       };
       mountShop('hall', document.getElementById('t-form'), hooks);
       wireHallDock(hooks);
@@ -1385,6 +1396,12 @@ function paint() {
 }
 async function primary(auto = false) {
   if (phase === 'busy' || !cur) return; const st = A.stage(); if (!auto) sfx('click');
+  // A private bank audit signs nothing, so it never needs a wallet, a charter or a session key.
+  // No state of /setup (missing account, missing row, a failed chain read) may route this shop there.
+  if (cur === 'bank') {
+    if (APPS.bank.run) { phase = 'busy'; try { const res = await APPS.bank.run(); phase = res?.keep ? 'kept' : 'done'; say(res?.say || 'Nothing was signed.'); } catch (e) { fail(e); } }
+    return;
+  }
   if (st === 'load' || st === 'connect' || st === 'build') { location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.search + location.hash)); return; }
   if (st === 'rules') return openRules();
   if (st === 'wait' || st === 'key') { phase = 'busy'; btn(st === 'key' && !A.pendingKey() ? 'Approve in your wallet…' : 'Checking…', 'primary busy', true);
