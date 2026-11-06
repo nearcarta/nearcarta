@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 636 backend unit tests (633 pass, 3 skipped), offline
+npm test                                   # 638 backend unit tests (635 pass, 3 skipped), offline
 
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
@@ -229,7 +229,11 @@ New txs, filled by the live run:
 
 The city door is the way in. The all-shops list still links to `/shops/toll/`. When the town is running, that link calls `window.__openCityShop('toll')` and opens the room. `window.__enterToll` is the fallback. The standalone page is the backup.
 
-The card has three tabs: Pay, Wallet, and Ledger. Pay has one gold button. It reads the visitor fee from the live policy. The current policy has no visitor fee, so the button stays disabled and the room does not invent one. The visitor names the chain, the asset, the amount and the Base address, or the agent reads “pay 0.00001 ETH to 0x… on Base” and “pay 1 USDC to 0x… on Base”. A missing asset, amount or address asks. A NEAR amount other than the live fee is refused. “cross to Arbitrum” is refused. Wallet shows `row:{account}:base` and does not invent an address. The old shared path is not that wallet. Ledger separates the service fee from foreign transfers and does not claim a split until one is configured.
+The card has three tabs: Pay, Wallet, and Ledger. Pay has one gold button. It reads the visitor fee from the live policy. The live policy publishes a 0.001 NEAR fee, so the button prices the pass and the room invents no number of its own. The visitor names the chain, the asset, the amount and the Base address, or the agent reads “pay 0.00001 ETH to 0x… on Base” and “pay 1 USDC to 0x… on Base”. A missing asset, amount or address asks. A NEAR amount other than the live fee is refused. “cross to Arbitrum” is refused. Wallet shows `row:{account}:base` and does not invent an address. The old shared path is not that wallet. Ledger separates the service fee from foreign transfers and does not claim a split until one is configured.
+
+A visitor with no board row sees “Open your row in /setup first” in the card and on the button, which opens `/setup`. That is a setup step, not a refusal: the board has no row to spend from, so nothing is signed. A row without a helper key asks for the key. Those three cases used to collapse into one “set up your agent” line. Test: `the city toll door stays a link and does not resume an old visit` (`backend/test/unit/toll-room.test.js`).
+
+The tray is served by the city, which loads these modules raw rather than through a bundler. Two import faults kept the tray on “Opening…” and then “Try again”: `app/src/panels/guard-agent.js` imported `../../../shared/guard/board-pay.js`, which is outside the deploy root, and `app/src/board-call-as.js` imported `@noble/hashes`, a bare specifier a browser cannot resolve. The implementation now lives in `app/src/guard-board-pay.js` (with `shared/guard/board-pay.js` re-exporting it, the same as `shared/board/call-as.js`), and the envelope hashes with `app/src/sha256.js`. Tests: `browser modules the city imports raw resolve without a bundler` and `the guard board module resolves inside the deploy root` (`backend/test/unit/board-call-as.test.js`).
 
 In the city, the gold button and the agent call the same check. When the session key lists `propose_call_as`, that call opens `cross` on the board. The key does not call `cross` or `sign_cross`, and the wallet stays closed. A key that only lists `propose` stops with “Nothing was signed.” `propose_call_as` forwards 30 Tgas, which records the order and does not start a signature. `sign_cross` is the row owner, at least 150 Tgas, and signs the stored order on `row:{owner}:base`. Paid on Base is reserved for a Base receipt whose status is 1. `POST /api/toll/relay` reads one raw transaction the contract already stored and may broadcast it. It does not sign NEAR and it does not edit the raw. No basescan success is claimed here.
 
@@ -253,7 +257,7 @@ Live check, after the owner deploys:
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 636 unit tests (633 pass, 3 skipped)
+npm test                 # 638 unit tests (635 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -278,7 +282,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | House | City door, or `/shops/house/`. Deed / Vaults / Heirs. One gold button: I'm alive, Send from house, or Cancel release. The agent uses that same check | No wallet and no charter spend. I'm alive builds `propose_call_as` for `house_session_check_in` on `extras.house.shop` from that visitor's row. The board writes `row_owner`. A foreign send is a hold until `confirm_hold`. Over the row cap or the vault cap shows a seal and does not sign. A prepared send says live broadcast is blocked. Toll's predecessor would be `extras.house.shop`; `live` stays false. Cinema does not play. `node scripts/house-recover.js` returns the shop balance first. `node scripts/house-deploy.js` recreates that same account from the pinned wasm and does not sign. Code: `app/src/panels/house-room.js`, `app/src/panels/house-agent.js`, `app/src/house-board.js`, `shared/house/shop.js`, `scripts/house-deploy.js`, `scripts/house-recover.js` | unit `a house pay over the cap is refused before any signature`; unit `a visitor check-in builds propose_call_as from that visitor's row`; unit `the city, the allow list and the denylist use the one shop id`; unit `the legacy wasm recovers by house_pay and then close`; recorded allow [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26). Inheritance tx: not sent. Base receipt: not sent. Heir same-address receipt: not sent |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 636 unit tests (633 pass, 3 skipped):
+# 638 unit tests (635 pass, 3 skipped):
 Proof rows (63/63 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
