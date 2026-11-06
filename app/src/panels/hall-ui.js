@@ -5,8 +5,12 @@
 import { readSession, readSessionAccount, sessionPill, visitor } from '../../design/D8_shops/js/session.js';
 import { roomError } from '../room-error.js';
 import {
-  BOARD, ROW_WAIT_MS, diffCharter, draftFrom, matchNote, nearOf, normalizeRow, readBack, readUntilChange, rowOwner, waitForFinal, withRowWait,
+  BOARD, ROW_WAIT_MS, diffCharter, draftFrom, matchNote, nearOf, normalizeRow, readUntilChange, rowOwner, waitForFinal, withRowWait,
 } from './hall.js';
+import { runHallCommand } from './hall-actions.js';
+import { armHallDock, ensureHallDock, installHallDock } from './hall-dock.js';
+import { jobTray } from './hall-panes.js';
+import { createLedger, statusLines } from '../../../shared/hall/job.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const apiBase = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -75,39 +79,130 @@ export function hallMarkup(row, person = null) {
 
 export async function mountHall(root, hooks = {}) {
   if (!root) return;
+  let tab = 'post';
+  let seal = '';
+  let lines = [];
+  let posted = null;
+  const ledger = createLedger();
+  const form = {
+    task: '', budget: '', deadline: '24', parts: '2',
+    workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '',
+  };
+  let market = { blocked: 'no_token', assignments: [], draft: null, agent: null };
   if (hooks.accountP && !readSessionAccount()) {
     try { await hooks.accountP; } catch { /* a saved session is not required to paint */ }
   }
   const choice = ownerNow();
   let before = null;
-  const paint = (row) => {
+  const readForm = () => {
+    const take = (id, key) => {
+      const el = root.querySelector('#' + id);
+      if (el) form[key] = el.value;
+    };
+    take('hall-task', 'task');
+    take('hall-budget', 'budget');
+    take('hall-deadline', 'deadline');
+    take('hall-parts', 'parts');
+    take('hall-worker-a', 'workerA');
+    take('hall-worker-b', 'workerB');
+    take('hall-quote-part', 'quotePart');
+    take('hall-quote-worker', 'quoteWorker');
+    take('hall-quote-near', 'quoteNear');
+    take('hall-deliverable', 'deliverable');
+  };
+  const paint = () => {
     const person = visitor();
-    root.innerHTML = hallMarkup(row, person);
+    root.innerHTML = jobTray({ tab, form, job: posted, market, seal, lines });
     const who = root.querySelector('#who') || document.getElementById('who');
     if (who) {
       const saved = readSession();
-      const id = row?.owner || choice.owner || '';
+      const id = before?.owner || choice.owner || '';
       const pill = id ? sessionPill({ accountId: id, displayName: saved.displayName, balanceNear: saved.balanceNear }) : '';
       who.innerHTML = id ? `<b data-testid="who" data-account="${esc(id)}">${esc(pill)}</b>` : '';
     }
     const connect = document.getElementById('connect');
-    if (connect) connect.hidden = !!(row?.owner || choice.owner || person.signedIn);
-    const form = root.querySelector('#row-form');
-    if (form) form.onsubmit = (e) => { e.preventDefault(); onSign(); };
-    const capEl = root.querySelector('#cap');
-    if (capEl && row?.per_action_cap != null) capEl.value = String(nearOf(row.per_action_cap));
-    const copy = root.querySelector('[data-testid=hall-copy]');
-    if (copy) copy.onclick = async () => {
-      const full = copy.dataset.copy || '';
-      try {
-        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(full);
-        else throw new Error('copy');
-        copy.textContent = 'Copied';
-      } catch {
-        copy.textContent = 'Copy failed';
+    if (connect) connect.hidden = !!(before?.owner || choice.owner || person.signedIn);
+    root.querySelectorAll('[data-tab]').forEach(btn => {
+      btn.onclick = () => { readForm(); tab = btn.dataset.tab || 'post'; seal = ''; paint(); };
+    });
+    root.querySelectorAll('[data-cmd]').forEach(btn => {
+      btn.onclick = () => { readForm(); run(btn.dataset.cmd || ''); };
+    });
+    const cta = root.querySelector('[data-testid=hall-cta]');
+    if (cta) cta.onclick = () => {
+      readForm();
+      if (cta.dataset.action === 'post' && (!form.task.trim() || !form.budget.trim())) {
+        lines = ['Name the task and the budget. Nothing was signed.'];
+        seal = '';
+        paint();
+        return;
       }
+      run(ctaText(cta));
     };
+    const doc = typeof document !== 'undefined' ? document : null;
+    if (doc && doc.getElementById) {
+      ensureHallDock(doc);
+      installHallDock(doc);
+      armHallDock(text => run(text));
+      const dock = doc.getElementById('hall-agent-dock');
+      if (dock) dock.hidden = false;
+    }
+    document.querySelector('#shopUI #tray')?.scrollTo?.(0, 0);
+    hooks.runAgent = text => run(text);
+    if (hooks.state) hooks.state.hallRun = text => run(text);
   };
+  function ctaText(cta) {
+    const action = cta.dataset.action;
+    const part = cta.dataset.part || form.quotePart || '1';
+    if (action === 'post') return `post ${form.task} for ${form.budget} near`;
+    if (action === 'quote') return `quote part ${form.quotePart || part} from ${form.quoteWorker} at ${form.quoteNear}`;
+    if (action === 'accept') return `accept part ${part}`;
+    if (action === 'pass') return `pass part ${part}`;
+    if (action === 'refund') return 'refund';
+    return '';
+  }
+
+  async function run(text) {
+    seal = '';
+    const result = await runHallCommand(text, {
+      row: async () => before,
+      form: () => form,
+      ledger,
+      job: () => posted,
+      nowMs: hooks.nowMs,
+      market: async () => {
+        if (hooks.market) return hooks.market();
+        try {
+          const m = await fetch(apiBase() + '/api/hall/market', { cache: 'no-store' }).then(r => r.json());
+          if (m && typeof m === 'object') market = m;
+        } catch { market = { ...market, blocked: 'market_unread' }; }
+        return market;
+      },
+      clearSeal: () => { seal = ''; },
+      signRules: async (calls) => {
+        const sign = hooks.sign || (async (list) => {
+          const m = await import('/shops/hall/hall.bundle.js');
+          return m.signCalls(list);
+        });
+        return sign(calls);
+      },
+    });
+    if (result?.job) posted = result.job;
+    if (result?.seal) seal = result.hint || 'Refused';
+    else seal = '';
+    const hint = result?.hint || '';
+    const escrow = posted ? statusLines(posted)[0] : '';
+    lines = [hint, escrow].filter(Boolean).slice(0, 2);
+    if (result?.listing) {
+      market = { ...market, blocked: result.listing.blocked, agent: result.listing.agent || market.agent, assignments: result.listing.assignments || market.assignments, draft: result.listing.draft || market.draft };
+    }
+    if (result?.job && tab === 'post' && result.ok && !result.duplicate) tab = 'agents';
+    paint();
+    if (result?.cinema && result.tx) hooks.onPaid?.(result);
+    else if (result?.seal) hooks.onRefuse?.(result.hint);
+    else hooks.onClear?.();
+    return result;
+  }
 
   async function readRow(id, { fresh = false } = {}) {
     const q = fresh ? `?fresh=1&t=${Date.now()}` : '';
@@ -116,6 +211,10 @@ export async function mountHall(root, hooks = {}) {
   }
 
   async function onSign() {
+    seal = '';
+    hooks.onClear?.();
+    const sealEl = root.querySelector('[data-testid=hall-refused]');
+    if (sealEl) { sealEl.hidden = true; sealEl.replaceChildren(); }
     const result = root.querySelector('#result');
     const list = root.querySelector('#list');
     if (!before) {
@@ -207,5 +306,16 @@ export async function mountHall(root, hooks = {}) {
       }).catch(() => {});
     }
   }
+  async function loadLive() {
+    const base = apiBase();
+    try {
+      const m = hooks.market ? await hooks.market() : await fetch(base + '/api/hall/market', { cache: 'no-store' }).then(r => r.json());
+      if (m && typeof m === 'object') market = m;
+    } catch {
+      market = { ...market, blocked: 'market_unread' };
+    }
+    if (root.querySelector('[data-testid=hall-desk]')) paint();
+  }
+  loadLive();
   start();
 }
