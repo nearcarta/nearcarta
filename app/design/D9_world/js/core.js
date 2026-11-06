@@ -46,7 +46,7 @@ export const SHOPS = {
   house:    {q:-4,r:0, m:'buildings/blue/building_home_A_blue',   name:'Your House', role:'your rules and history', track:'Open',
             card:'Only your house key can change the oath or ring the curfew. The agent key calls propose and propose_batch.', tag:'function-call key · propose and propose_batch'},
   toll:     {q:-1,r:5, m:'buildings/blue/building_tower_base_blue',name:'Toll Bridge', role:'pay-per-use gate', track:'Autonomous Business',
-            card:'Pay 0.001 NEAR to toll.nearcarta.near. A refusal pays nothing.', tag:'propose · 0.001 NEAR'},
+            card:'The fee comes from the live toll policy. A refusal pays nothing.', tag:'propose · live policy'},
   payouts:  {q:-1,r:-3,m:'buildings/blue/building_tavern_blue',  name:'Payouts', role:'pay under the cap', track:'Real-World Money',
             card:'Pay NEAR rows with propose. The row cap refuses the rest on chain.', tag:'propose · row cap'},
 };

@@ -8,7 +8,6 @@ mkdirSync(shots, { recursive: true });
 const OWNER = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8';
 const BOARD = 'board.nearcarta.near';
 const CHRON = 'GVFKTgzgKcepGTmLs318LzNzzrf3pjtYgquZBopLjeCY';
-const TOLL_TX = '9rin6TybBLoFBiDLJwfQTvWQ3ndc4j6BH24XyHupiA15';
 const BLOCK = bs58.encode(Buffer.alloc(32, 9));
 // A throwaway key for this process. It is never printed and send_tx is stubbed, so it cannot spend.
 const agentKey = keyFrom();
@@ -125,13 +124,13 @@ test('T1 a landed tx shows the receipt, not a load error', async ({ page }) => {
     await expect(page.locator('#t-say')).not.toContainText('Stopped:');
     await shot(page, 't1-chronicle-' + width);
 
-    await page.evaluate(hash => { window.__NC_WALLET_SIGN = async () => hash; }, TOLL_TX);
     await page.locator('#back').click();
     await page.locator('.fbpin[data-id="toll"]').click();
-    await page.evaluate(hash => { window.__NC_WALLET_SIGN = async () => hash; }, TOLL_TX);
-    await (await readyAct(page, 'Pay 0.001 NEAR')).click();
-    await expect(page.locator('a.rc.tx').first()).toHaveAttribute('href', `https://nearblocks.io/txns/${TOLL_TX}`, { timeout: 20000 });
-    await expect(page.locator('#t-say')).not.toContainText('something did not load');
+    const pay = page.getByTestId('toll-pay');
+    await expect(pay).toBeVisible({ timeout: 20000 });
+    const label = (await pay.innerText()).trim();
+    expect(label === 'Live policy has no visitor fee' || label === 'Pay on Base' || /^Pay [\d.]+ NEAR$/.test(label)).toBe(true);
+    await expect(page.getByTestId('toll-card')).not.toContainText('Paid on Base');
     await shot(page, 't1-toll-' + width);
   }
 });

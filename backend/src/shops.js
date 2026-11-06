@@ -94,9 +94,9 @@ export async function toll() {
   const T = MAINNET_DEP?.toll;
   if (!T) return { network: 'mainnet', contract: null };
   return {
-    network: 'mainnet', contract: T.contract, amount_near: '0.001', chain_id: MAINNET_DEP.chain_id,
+    network: 'mainnet', contract: T.contract, amount_near: null, chain_id: MAINNET_DEP.chain_id,
     foreign_address: T.foreign_address, txs: T.txs,
-    note: 'One payment of 0.001 NEAR to toll.nearcarta.near. A refusal pays nothing.',
+    note: 'The visitor fee, the chain and the recipient come from the live policy.',
   };
 }
 
