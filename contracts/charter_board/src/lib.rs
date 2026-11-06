@@ -27,7 +27,7 @@
 extern crate alloc;
 
 mod v2;
-use v2::{acts_len, decode_acts, decode_meta, encode_acts};
+use v2::{decode_acts, decode_meta, encode_acts};
 use near_sdk::json_types::{U128, U64};
 use near_sdk::store::LookupMap;
 use near_sdk::{env, require, AccountId, Gas, NearToken, Promise};
@@ -99,6 +99,9 @@ pub const MAX_RECEIVERS: usize = 8;
 /// `set_calls` dedupes (receiver, method) and stops at this many. Pay receivers stay at 8.
 pub const MAX_CALLS: usize = 24;
 pub const SIDE_RESERVE_BYTES: u64 = 600;
+/// Extra bytes on top of the measured `storage_usage` growth. A later trie
+/// record must not be paid from the contract's own stake.
+pub const STORAGE_MARGIN_BYTES: u64 = 32;
 pub const MAX_OPEN_HOLDS: usize = 2;
 /// One day. `stage_upgrade` cannot be applied before this, and a hold cannot
 /// be signed to expire later than this.
@@ -290,18 +293,20 @@ impl Board {
         let pk = parse_pk(&agent);
         require!(!self.key_taken(&pk), "ERR_KEY_USED");
         let attached = env::attached_deposit().as_yoctonear();
-        let before = self.bytes();
+        let before = env::storage_usage();
         self.rows.insert(me.clone(), Row {
             rules, agent: pk, frozen: false, seal: None, nonce: 0, day: today(),
             spent: 0, count: 0, balance: 0, storage_locked: 0,
         });
         self.keys.insert(pk, me.clone());
         self.count += 1;
-        let cost = self.grew(before);
+        let cost = self.measured_growth(&me, before);
         if cost == 0 || cost > MAX_ROW_YOCTO || attached < cost + fund.0 {
             self.rows.remove(&me);
             self.keys.remove(&pk);
             self.count -= 1;
+            self.erase_owner(&me);
+            kv_del(b"k", &hex32(&pk));
             if cost == 0 { env::panic_str("ERR_STORAGE"); }
             if cost > MAX_ROW_YOCTO { env::panic_str("ERR_ROW_TOO_BIG"); }
             env::panic_str("ERR_DEPOSIT");
@@ -317,10 +322,10 @@ impl Board {
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         let rules = rules_from(rules);
-        let before = self.bytes();
+        let before = self.baseline(&me);
         self.rows.get_mut(&me).expect("ERR_NO_CHARTER").rules = rules;
-        self.charge(&me, before);
         self.bump_epoch(&me);
+        self.charge(&me, before);
     }
 
     pub fn set_frozen(&mut self, frozen: bool) {
@@ -336,7 +341,7 @@ impl Board {
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         let seal = if commitment.is_empty() { None } else { Some(parse_hex32(&commitment)) };
-        let before = self.bytes();
+        let before = self.baseline(&me);
         self.rows.get_mut(&me).expect("ERR_NO_CHARTER").seal = seal;
         self.charge(&me, before);
     }
@@ -346,14 +351,14 @@ impl Board {
         self.hydrate(&me);
         let pk = parse_pk(&agent);
         require!(self.key_owner(&pk).map(|o| o == me).unwrap_or(true), "ERR_KEY_USED");
-        let before = self.bytes();
+        let before = self.baseline(&me);
         let old = self.rows.get(&me).expect("ERR_NO_CHARTER").agent;
         self.keys.remove(&old);
         if old != pk { self.dropped_keys.push(old); }
         self.keys.insert(pk, me.clone());
         self.rows.get_mut(&me).unwrap().agent = pk;
-        self.charge(&me, before);
         self.bump_epoch(&me);
+        self.charge(&me, before);
     }
 
     pub fn fund(&mut self) {
@@ -381,9 +386,7 @@ impl Board {
 
     fn release(&mut self, who: AccountId) -> Promise {
         require!(!self.holds.keys().any(|(o, _)| o == &who), "ERR_IN_FLIGHT");
-        let before = self.bytes();
-        let calls_before = encode_calls(&self.calls).len() as u64;
-        let acts_before = acts_len(self);
+        let before = self.baseline(&who);
         let row = self.rows.remove(&who).expect("ERR_NO_CHARTER");
         self.keys.remove(&row.agent);
         self.dropped_rows.push(who.clone());
@@ -391,16 +394,20 @@ impl Board {
         self.owe(-((row.balance + row.storage_locked) as i128));
         self.calls.remove(&who);
         self.effects.remove(&who);
-        self.holds.retain(|(o, _), _| o != &who);
+        let hold_ids: Vec<u64> = self.holds.keys().filter(|(o, _)| o == &who).map(|(_, id)| *id).collect();
+        for id in &hold_ids {
+            self.holds.remove(&(who.clone(), *id));
+            kv_del(b"h", &format!("{}/{}", who.as_str(), id));
+        }
         let credit = self.credit.remove(&who).unwrap_or(0);
         self.confirm.remove(&who);
         self.epoch.remove(&who);
         self.count -= 1;
-        let freed = self.shrank(before);
-        let calls_after = encode_calls(&self.calls).len() as u64;
-        let calls_freed = (calls_before - calls_after) as u128 * price();
-        let acts_freed = acts_before.saturating_sub(acts_len(self)) as u128 * price();
-        let back = freed + calls_freed + acts_freed + credit + row.balance + env::attached_deposit().as_yoctonear();
+        self.flush_owner(&who);
+        let freed_bytes = before.saturating_sub(env::storage_usage());
+        // The margin charged on the way in is not stored, so it is not in this
+        // drop. It stays with the contract.
+        let back = freed_bytes as u128 * price() + credit + row.balance + env::attached_deposit().as_yoctonear();
         require!(back > 0, "ERR_REFUND");
         Promise::new(who).transfer(NearToken::from_yoctonear(back))
     }
@@ -486,14 +493,14 @@ impl Board {
         }
         let spent = self.calls.get(&me).map(|p| p.session_spent).unwrap_or(0);
         require!(spent <= session_cap, "ERR_CAP");
-        let before = encode_calls(&self.calls).len() as u64;
+        let before = self.baseline(&me);
         if parsed.is_empty() {
             self.calls.remove(&me);
         } else {
             self.calls.insert(me.clone(), CallPolicy { rules: parsed, session_cap, session_spent: spent });
         }
-        self.charge_calls_and_reserve(&me, before, encode_calls(&self.calls).len() as u64);
         self.bump_epoch(&me);
+        self.charge_calls_and_reserve(&me, before);
     }
 
     /// A signed function call. The message covers the method and sha256(args). The deposit
@@ -635,23 +642,51 @@ impl Board {
 
     fn bytes(&self) -> u64 { encode(self).len() as u64 }
 
-    fn grew(&self, before: u64) -> u128 {
-        let after = self.bytes();
-        require!(after >= before, "ERR_STORAGE");
-        (after - before) as u128 * price()
+    /// Write the visitor's current keys if this VM has not seen them yet.
+    /// A unit test resets the trie between calls. Mainnet does not, so this
+    /// read is the only cost there.
+    fn baseline(&mut self, me: &AccountId) -> u64 {
+        if self.rows.contains_key(me) && !kv_has(b"r", me.as_str()) {
+            let row = self.rows.get(me).unwrap().clone();
+            persist_owner(self, me, &row);
+        }
+        env::storage_usage()
     }
 
-    fn shrank(&self, before: u64) -> u128 {
-        let after = self.bytes();
-        require!(before >= after, "ERR_STORAGE");
-        (before - after) as u128 * price()
+    fn flush_owner(&mut self, me: &AccountId) {
+        if let Some(row) = self.rows.get(me).cloned() {
+            persist_owner(self, me, &row);
+        } else {
+            self.erase_owner(me);
+        }
+        for pk in &self.dropped_keys { kv_del(b"k", &hex32(pk)); }
+        let stale: Vec<(AccountId, u64)> = self.seen_holds.iter().cloned().filter(|(o, id)| !self.holds.contains_key(&(o.clone(), *id))).collect();
+        for (owner, id) in stale { kv_del(b"h", &format!("{}/{}", owner.as_str(), id)); }
+    }
+
+    fn erase_owner(&self, me: &AccountId) {
+        kv_del(b"r", me.as_str());
+        kv_del(b"c", me.as_str());
+        kv_del(b"e", me.as_str());
+        kv_del(b"s", me.as_str());
+        let ids: Vec<u64> = self.holds.keys().filter(|(o, _)| o == me).map(|(_, id)| *id).collect();
+        for id in ids { kv_del(b"h", &format!("{}/{}", me.as_str(), id)); }
+    }
+
+    /// Bytes `storage_usage` grew while this visitor's keys were written, plus the margin.
+    fn measured_growth(&mut self, me: &AccountId, before: u64) -> u128 {
+        self.flush_owner(me);
+        let after = env::storage_usage();
+        if after <= before { return 0; }
+        (after - before + STORAGE_MARGIN_BYTES) as u128 * price()
     }
 
     fn charge(&mut self, me: &AccountId, before: u64) {
         let attached = env::attached_deposit().as_yoctonear();
-        let after = self.bytes();
+        self.flush_owner(me);
+        let after = env::storage_usage();
         if after > before {
-            let cost = (after - before) as u128 * price();
+            let cost = (after - before + STORAGE_MARGIN_BYTES) as u128 * price();
             require!(attached >= cost, "ERR_DEPOSIT");
             let row = self.rows.get_mut(me).unwrap();
             require!(row.storage_locked + cost <= MAX_ROW_YOCTO, "ERR_ROW_TOO_BIG");
@@ -1475,6 +1510,39 @@ mod tests {
     }
 
     #[test]
+    fn storage_fees_cover_rows_of_different_sizes_and_the_free_balance_holds() {
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        let mut c = Board::new();
+        let cash0 = env::account_balance().as_yoctonear() as i128;
+        let mut deposits: i128 = 0;
+        let mut floor = cash0 - env::storage_usage() as i128 * price() as i128;
+        let mut seen: u128 = 0;
+        for n in [1usize, 8] {
+            let usage = env::storage_usage();
+            let mut wide = rules((0, 0), 4);
+            wide.receivers = (0..n).map(|i| acc(&format!("shop{i}.near"))).collect();
+            c.open_charter(wide, keypair((7 + n) as u8).1, U128(NEAR / 1000));
+            deposits += MAX_ROW_YOCTO as i128;
+            let grown = env::storage_usage() - usage;
+            let locked = c.get_charter(acc(ALICE)).unwrap().storage_locked.0;
+            assert!(locked >= grown as u128 * price(), "{n} receivers locked {locked} for {grown} bytes");
+            seen = transfers_to(ALICE).into_iter().sum();
+            let held = c.get_charter(acc(ALICE)).unwrap().balance.0 as i128;
+            let free = cash0 + deposits - seen as i128 - held - env::storage_usage() as i128 * price() as i128;
+            assert!(free >= floor, "{n} receivers free {free} below {floor}");
+            floor = free;
+            c.close_charter();
+            deposits += MAX_ROW_YOCTO as i128;
+            seen = transfers_to(ALICE).into_iter().sum();
+            let free = cash0 + deposits - seen as i128 - env::storage_usage() as i128 * price() as i128;
+            assert!(free >= floor, "close of {n} receivers free {free} below {floor}");
+            floor = free;
+            assert!(c.get_charter(acc(ALICE)).is_none());
+            assert!(env::storage_usage() <= usage + 64, "closed row left storage behind");
+        }
+    }
+
+    #[test]
     fn an_allowed_payment_moves_only_that_visitors_balance() {
         let (mut c, sk, _) = boot();
         go(BOB, MAX_ROW_YOCTO, 0);
@@ -1517,7 +1585,7 @@ mod tests {
             let msg = refuse(err);
             assert!(msg.contains(reason), "{msg}");
         }
-        go(ALICE, 0, 100 * NS_PER_MIN);
+        go(ALICE, MAX_ROW_YOCTO, 100 * NS_PER_MIN);
         c.set_rules(rules((0, 50), 4));
         go(ALICE, 0, 100 * NS_PER_MIN);
         let (_, sig) = sign(&sk, &c, ALICE, SHOP, NEAR / 2000);
@@ -1535,7 +1603,7 @@ mod tests {
     fn daily_budget_count_freeze_and_expiry_refuse() {
         let (mut c, sk, _) = boot();
         let amount = NEAR / 2000;
-        go(ALICE, 0, 0);
+        go(ALICE, MAX_ROW_YOCTO, 0);
         c.set_rules(RulesIn {
             per_action_cap: U128(amount),
             daily_budget: U128(amount),
@@ -1673,7 +1741,8 @@ mod tests {
         go(ALICE, 0, 0);
         c.close_charter();
         assert!(c.get_charter(acc(ALICE)).is_none());
-        assert_eq!(transfers_to(ALICE).last().copied(), Some(locked + NEAR / 1000));
+        let margin = STORAGE_MARGIN_BYTES as u128 * price();
+        assert_eq!(transfers_to(ALICE).last().copied(), Some(locked - margin + NEAR / 1000));
         let bob = c.get_charter(acc(BOB)).unwrap();
         assert_eq!(bob.balance.0, NEAR / 500);
         assert_eq!(bob.storage_locked.0, bob_locked);
@@ -1704,7 +1773,8 @@ mod tests {
         go("nearcarta.near", 0, 0);
         c.force_close(acc(ALICE));
         assert!(c.get_charter(acc(ALICE)).is_none());
-        assert_eq!(transfers_to(ALICE).last().copied(), Some(locked + NEAR / 1000));
+        let margin = STORAGE_MARGIN_BYTES as u128 * price();
+        assert_eq!(transfers_to(ALICE).last().copied(), Some(locked - margin + NEAR / 1000));
         let bob = c.get_charter(acc(BOB)).unwrap();
         assert_eq!(bob.balance.0, NEAR / 500);
         assert_eq!(bob.storage_locked.0, bob_locked);
@@ -1713,7 +1783,7 @@ mod tests {
         assert!(refuse(err).contains("ERR_NONEMPTY"));
         go("nearcarta.near", 0, 0);
         c.force_close(acc(BOB));
-        assert_eq!(transfers_to(BOB).last().copied(), Some(bob_locked + NEAR / 500));
+        assert_eq!(transfers_to(BOB).last().copied(), Some(bob_locked - margin + NEAR / 500));
         assert_eq!(c.count, 0);
         go("nearcarta.near", 1, 0);
         c.reap();
@@ -2140,8 +2210,9 @@ mod tests {
         let bytes = c.calls_encoded_len();
         let locked = c.get_charter(acc(ALICE)).unwrap().storage_locked.0;
         // 24 short pairs, plus the row and the 600-byte side reserve, stay inside 0.02 NEAR.
+        // `bytes` is the in-memory encode. `locked` is the trie bytes the write actually used.
         assert_eq!(bytes, 836);
-        assert_eq!(locked, 16_850_000_000_000_000_000_000);
+        assert_eq!(locked, 19_940_000_000_000_000_000_000);
         many.push((acc("s24.near"), "m".into(), NEAR / 500));
         go(ALICE, MAX_ROW_YOCTO, 0);
         let err = catch_unwind(AssertUnwindSafe(|| c.set_calls(many, NEAR / 100))).unwrap_err();
@@ -2189,7 +2260,7 @@ mod tests {
         go(ALICE, 0, 0);
         let err = catch_unwind(AssertUnwindSafe(|| c.set_confirm_key(keypair(7).1))).unwrap_err();
         assert!(refuse(err).contains("ERR_CONFIRM"));
-        go(ALICE, 0, 0);
+        go(ALICE, MAX_ROW_YOCTO, 0);
         c.set_confirm_key(confirm_pk);
         go(ALICE, MAX_ROW_YOCTO, 0);
         c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
@@ -2471,7 +2542,7 @@ mod tests {
         go(ALICE, MAX_ROW_YOCTO, 0);
         c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
         let confirm = keypair(4);
-        go(ALICE, 0, 0);
+        go(ALICE, MAX_ROW_YOCTO, 0);
         c.set_confirm_key(confirm.1.clone());
         let expiry = 50_000u64;
         go(ALICE, 0, 0);
@@ -2497,7 +2568,7 @@ mod tests {
         let sig = sign_as(&agent2, &c, ALICE, SHOP, "ft_transfer", "{}", deposit, expiry, vec![], true);
         go(ALICE, 0, 11);
         c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), "{}".into(), U128(deposit), U64(expiry), vec![], true, sig);
-        go(ALICE, 0, 11);
+        go(ALICE, MAX_ROW_YOCTO, 11);
         c.set_confirm_key(keypair(5).1);
         let err = catch_unwind(AssertUnwindSafe(|| { c.confirm_hold(acc(ALICE), U64(1), present); })).unwrap_err();
         assert!(refuse(err).contains("ERR_CONFIRM"), "a rotated confirm key does not sign the old hold");

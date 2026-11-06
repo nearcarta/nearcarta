@@ -17,8 +17,8 @@ const wasm = readFileSync(new URL('../../../contracts/artifacts/charter_board.wa
 // wasm 108955 B, sha256 910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29,
 // code_hash Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C, deploy tx CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4.
 test('the board wasm deploys for at most 2.1 NEAR and the state size matches the contract', () => {
-  assert.equal(wasm.length, 130250);
-  assert.equal(createHash('sha256').update(wasm).digest('hex'), '48a98286a2785448b9a16d3cda735985f7e693343e32f258138ab032224b8e25');
+  assert.equal(wasm.length, 132083);
+  assert.equal(createHash('sha256').update(wasm).digest('hex'), '982bf6b6666e626d6af267c8a780cf5bb93cd73b2864a68b0c02dca4d07af9a1');
   assert.ok(deployCost(wasm.length, 'nearcarta.near').stakeYocto > 10n ** 24n, 'storage stake is over 1 NEAR on this wasm');
   assert.equal(initStateBytes('nearcarta.near'), 30);
   const cost = deployCost(wasm.length, 'nearcarta.near');

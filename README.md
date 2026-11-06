@@ -280,4 +280,4 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 # 579 unit tests (576 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
-`contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board source is `contracts/charter_board` (29 unit tests, rustc 1.86). The deployed account is unchanged.
+`contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board source is `contracts/charter_board` (30 unit tests, rustc 1.86). The deployed account is unchanged.

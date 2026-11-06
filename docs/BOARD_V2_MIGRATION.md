@@ -16,7 +16,7 @@ Read-only views on 2026-11-06, `https://rpc.mainnet.fastnear.com`, finality `fin
 | Wasm sha256 | `910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29` |
 | Deploy tx | `CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4` |
 | Live wasm on the account | 108955 bytes, sha256 above |
-| Committed v2 artifact | `contracts/artifacts/charter_board.wasm`, 130250 bytes, sha256 `48a98286a2785448b9a16d3cda735985f7e693343e32f258138ab032224b8e25` |
+| Committed v2 artifact | `contracts/artifacts/charter_board.wasm`, 132083 bytes, sha256 `982bf6b6666e626d6af267c8a780cf5bb93cd73b2864a68b0c02dca4d07af9a1` |
 | Access keys | 0 |
 | `get_config` | `rows` 1, `max_row_yocto` `20000000000000000000000` |
 | Account amount | `1302749999999999999999995` yoctoNEAR |
@@ -50,19 +50,19 @@ Output: `contracts/charter_board/target/near/charter_board.wasm`.
 
 | | |
 |---|---|
-| Bytes | 130250 |
-| sha256 | `48a98286a2785448b9a16d3cda735985f7e693343e32f258138ab032224b8e25` |
+| Bytes | 132083 |
+| sha256 | `982bf6b6666e626d6af267c8a780cf5bb93cd73b2864a68b0c02dca4d07af9a1` |
 
-`deployCost` in `shared/board/cost.js` for 130250 bytes and owner `nearcarta.near`:
+`deployCost` in `shared/board/cost.js` for 132083 bytes and owner `nearcarta.near`:
 
 | | yoctoNEAR |
 |---|---|
-| Storage bytes | 130492 |
-| Stake | `1304920000000000000000000` (1.30492 NEAR) |
-| Burned gas | `2411742629904800000000` |
+| Storage bytes | 132325 |
+| Stake | `1323250000000000000000000` (1.32325 NEAR) |
+| Burned gas | `2432319275499500000000` |
 | Account creation | `7000000000000000000000` |
-| Total | `1314331742629904800000000` |
-| Peak the owner must hold to send it | `1329037426299048000000000` |
+| Total | `1332682319275499500000000` |
+| Peak the owner must hold to send it | `1347573192754995000000000` |
 
 The committed artifact is this file. `MAX_DEPLOY_YOCTO` is 2.1 NEAR and the script prints that maximum. `mainnet.json` still names the live hash `910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29`. Docker is not on this machine, so this is not a cargo-near reproducible-wasm build. The bytes come from `cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi` and then `wasm-opt --enable-sign-ext --enable-mutable-globals --enable-bulk-memory -Oz --strip-debug --strip-producers`.
 
@@ -72,7 +72,7 @@ A plain `cargo build --target wasm32-unknown-unknown --release` wasm was not use
 
 `cargo +1.86.0 test --lib --locked` in `contracts/charter_board`: 29 passed. `the_live_state_dump_still_decodes_and_propose_is_unchanged` still decodes `testdata/mainnet-state.bin` (block 223191542, 804 bytes, 2 rows) and the encoded `STATE` of that dump is unchanged. `init` state stays 30 bytes for `nearcarta.near`.
 
-The 24-pair row in `calls_stop_at_24_pairs_and_tightening_cannot_grant_or_reset` encodes `CALLS` as 836 bytes and locks `16850000000000000000000` yoctoNEAR (0.01685 NEAR). That lock includes the 600-byte side reserve (`SIDE_RESERVE_BYTES`). Pay receivers stay at 8.
+The 24-pair row in `calls_stop_at_24_pairs_and_tightening_cannot_grant_or_reset` encodes `CALLS` as 836 bytes and locks `19940000000000000000000` yoctoNEAR (0.01994 NEAR). The lock is the trie bytes `env::storage_usage` measured around the write, plus the 600-byte side reserve (`SIDE_RESERVE_BYTES`). A growth that is not covered by that reserve also adds `STORAGE_MARGIN_BYTES` (32). Close refunds the measured drop, so the margin stays with the contract. Pay receivers stay at 8. `expire_sent` does not credit a row after a 20 Tgas callback that ran out of gas: that callback cannot tell a shop that kept the NEAR from one that refunded it.
 
 `contracts/charter_board_sandbox` (rustc 1.95.0, near-workspaces 0.24) deploys the cargo-near wasm onto one local account and opens two rows. Neither visitor account has a contract. A failed shop call refunds only that visitor. Alice's `propose` does not move Bob's balance. After both `close_charter` calls, `get_liabilities` is 0 and the owner `reap`s with 1 yocto. The sandbox registrar cannot create `nearcarta.near`, so that test's owner is the account `nearcarta` and `new` records it. `reap` pays `self.owner`. The unit tests boot with predecessor `nearcarta.near`, which is the production beneficiary.
 
@@ -84,7 +84,7 @@ Gas burned in that sandbox run: one `propose_call_as` whose shop call failed and
 2. That visitor calls `close_charter`. The 2026-11-05 deployment record says `force_close` is in the live wasm and the refund goes to the visitor, not to an account the caller picks. Prefer the visitor's own `close_charter`. Do not spend the row to pay for the new wasm. If the refund receipt fails because the account is short, the owner tops the contract up from `nearcarta.near` and retries the close. The top-up is not recovered by taking the visitor's balance.
 3. Re-read `get_config`. `rows` must be 0. The live wasm has no `get_liabilities`. The check on that wasm is `rows: 0` and an account balance that no longer contains the visitor's `balance`.
 4. The owner calls `reap` with exactly 1 yoctoNEAR. The contract deletes the account and the remainder, including the old wasm stake, goes to `nearcarta.near`.
-5. Create `board.nearcarta.near` again. Deploy the wasm above. The stake is about 1.30492 NEAR, under the 2.1 NEAR maximum. Call `new` from `nearcarta.near`. The board starts empty. Visitors open rows again in `/setup`.
+5. Create `board.nearcarta.near` again. Deploy the wasm above. The stake is about 1.32325 NEAR, under the 2.1 NEAR maximum. Call `new` from `nearcarta.near`. The board starts empty. Visitors open rows again in `/setup`.
 6. After that deploy, a later upgrade is `stage_upgrade` (1 yocto, owner, code hash), a wait of one day (`86400000000000` nanoseconds), then one receipt that deploys the wasm and calls `migrate`. `migrate` copies a v1 `STATE` blob into keyed rows and does not change balances. This change did not stage anything.
 
 `scripts/board-v2-migrate.js` prints this sequence and does not sign. Step 0 retires `charter.nearcarta.near`: `queue_upgrade` of the reaper sha256 `afe81ba2a0f07af4de3b849aac4f62db9e22d777ef445077a215209eea0ac199`, wait 90 seconds, `execute_change` (the oath will not upgrade until the hash is marked ready), `upgrade` with the raw reaper bytes, then `reap` to `nearcarta.near`. The script refuses a payee other than the open row's owner or `nearcarta.near`. `scripts/board-v2-smoke.js` prints the wrap smoke and does not sign.

@@ -35,7 +35,7 @@ The `STATE` key layout did not change: `force_close` adds no field. `propose_cal
 
 The replacement sequence is the dry-run in `docs/BOARD_V2_MIGRATION.md`. It was not run. Do not call `reap` while `get_config` reports a row: the account balance includes that visitor's funds, and `reap` would send them to `nearcarta.near`.
 
-`node backend/scripts/deploy-mainnet-board.js` prints the cost of the committed artifact and does not sign unless the owner passes `--live`. The committed file is the v2 wasm: 130250 bytes, sha256 `48a98286a2785448b9a16d3cda735985f7e693343e32f258138ab032224b8e25`. `deployCost` for owner `nearcarta.near` is stake `1304920000000000000000000` yoctoNEAR (1.30492 NEAR), total `1314331742629904800000000`, peak `1329037426299048000000000`. That is under the 2.1 NEAR maximum. `mainnet.json` still records the live code hash `Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C`. The migration is `scripts/board-v2-migrate.js` (dry-run). See `docs/BOARD_V2_MIGRATION.md`.
+`node backend/scripts/deploy-mainnet-board.js` prints the cost of the committed artifact and does not sign unless the owner passes `--live`. The committed file is the v2 wasm: 132083 bytes, sha256 `982bf6b6666e626d6af267c8a780cf5bb93cd73b2864a68b0c02dca4d07af9a1`. `deployCost` for owner `nearcarta.near` is stake `1323250000000000000000000` yoctoNEAR (1.32325 NEAR), total `1332682319275499500000000`, peak `1347573192754995000000000`. That is under the 2.1 NEAR maximum. `mainnet.json` still records the live code hash `Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C`. The migration is `scripts/board-v2-migrate.js` (dry-run). See `docs/BOARD_V2_MIGRATION.md`.
 
 ## The site
 
