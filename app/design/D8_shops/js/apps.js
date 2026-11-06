@@ -158,8 +158,7 @@ export async function refresh() {
   if (S.charter) await readRules();
   return S;
 }
-export async function readRules() {
-  if (S.board && S.me) {
+export async function readRules() {  if (S.board && S.me) {
     const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
     if (!row) {
       // A failed re-read after a tx must not wipe a row we already have.
@@ -307,6 +306,62 @@ async function proposeAccessKey(key) {
   if (names.length && !names.includes('propose')) return null;
   return ak;
 }
+
+/** The row the board has for this visitor right now, or null. Never a cached copy. */
+export async function boardRowNow() {
+  if (!S.board || !S.me) return S.boardRow || null;
+  const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  if (row) S.boardRow = row;
+  return row || null;
+}
+
+/**
+ * One board write on the visitor's own row, signed by the session key in this browser.
+ * Mist Bank's gold CTA and its AI dock both call this, so they send the same transaction.
+ * No wallet popup: the key's allowance pays the gas, and the method list is checked here
+ * so a key that cannot call the method says so instead of failing on chain.
+ */
+export async function boardWriteOnRow({ method, args, gasTgas = 30 } = {}) {  if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  if (!S.me) throw new Error('Sign in first. Nothing was signed.');
+  if (!method) throw new Error('That is not a board method. Nothing was signed.');
+  const key = agent();
+  if (!key) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  const ak = await proposeAccessKey(key);
+  if (!ak) throw new Error('This browser has no session key for the board. Open /setup and add one. Nothing was signed.');
+  const names = ak.permission?.FunctionCall?.method_names || [];
+  if (names.length && !names.includes(method)) {
+    throw new Error(`This session key cannot call ${method}. Renew it in /setup. Nothing was signed.`);
+  }
+  const gas = BigInt(gasTgas) * 10n ** 12n;
+  const allowance = BigInt(ak.permission?.FunctionCall?.allowance || 0);
+  // Gas is bought at 0.001 NEAR/Tgas; the key must cover this call's own gas.
+  if (allowance && allowance < gas / 10n ** 12n * 10n ** 21n) {
+    throw new Error('The session key allowance cannot buy this call. Nothing was signed.');
+  }
+  const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  if (!row) throw new Error('no charter row yet: finish setup first');
+  if (W.pubkeyHex(key) !== String(row.agent || '')) {
+    throw new Error('This browser is not the agent on the row. Nothing was signed.');
+  }
+  const signed = W.signTx({
+    key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+    actions: [W.functionCall(method, args || {}, gas)],
+  });
+  const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+  const out = { tx: signed.hash, method, row, sent };
+  if (sent.ok) {
+    keep(signed.hash, 'bank', 'allowed', 'ok', { amt: '', to: S.me });
+    const after = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+    if (after) S.boardRow = after;
+    // Re-read the row so the header and every shop see the cap that is now on chain.
+    readRules().catch(() => {});
+    return { ...out, decision: 'allowed', reason: 'ok' };
+  }
+  const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+  keep(signed.hash, 'bank', 'denied', reason, { amt: '', to: S.me });
+  return { ...out, decision: 'denied', reason };
+}
+
 function settled(shop, out) {
   keep(out.tx, shop, out.decision, out.reason, { amt: out.amount, to: out.receiver });
   // The wallet path already refreshed the header inside sign(). The agent path never opens a wallet.
