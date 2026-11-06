@@ -66,10 +66,10 @@ test('each shop route and the console use the one shop module', () => {
   const boot = read('../../../app/src/panels/boot.js');
   const build = read('../../../app/shops/build.mjs');
   const consoleJs = read('../../../app/src/console.js');
-  for (const id of ['ferry', 'guard', 'toll', 'chronicle', 'arena', 'hall', 'payouts', 'bank']) {
+  for (const id of ['ferry', 'guard', 'toll', 'chronicle', 'arena', 'hall', 'payouts', 'bank', 'house']) {
     assert.match(shopui, new RegExp(`mountShop\\('${id}'`));
   }
-  assert.match(shopui, /deedMarkup\(\)/);
+  assert.match(read('../../../app/src/panels/house-room.js'), /deedMarkup\(\)/);
   assert.match(boot, /mountShop/);
   assert.match(build, /\['ferry', 'ferry', 'Ferry'\]/);
   assert.match(consoleJs, /mountShop/);
