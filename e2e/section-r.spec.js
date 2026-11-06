@@ -82,20 +82,19 @@ test('R1 the charter office uses the shop title and the shop shell', async ({ pa
   }
 });
 
-test('R2 the chronicle controls are brass buttons', async ({ page }) => {
-  const ids = ['#c-prev', '#c-next', '[data-testid=chronicle-export]', 'button.c-v'];
+test('R2 the chronicle action is one brass button', async ({ page }) => {
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/shops/chronicle/');
-    await expect(page.locator('button.c-v').first()).toBeVisible();
-    for (const sel of ids) {
-      const btn = page.locator(sel).first();
-      await btn.scrollIntoViewIfNeeded();
-      const face = await btn.evaluate(faceOf);
-      expect(face.img).toContain('245, 208, 138');
-      expect(face.color).toBe('rgb(42, 22, 8)');
-      expect(face.border).toBe('0px');
-    }
+    const btn = page.locator('#c-go');
+    await expect(btn).toBeVisible();
+    await expect(btn).toHaveText('Write statement');
+    await btn.scrollIntoViewIfNeeded();
+    const face = await btn.evaluate(faceOf);
+    expect(face.img).toContain('245, 208, 138');
+    expect(face.color).toBe('rgb(42, 22, 8)');
+    expect(face.border).toBe('0px');
+    await expect(page.locator('.chronicle-gold')).toHaveCount(1);
     await shot(page, 'r2-chronicle-' + width);
   }
 });

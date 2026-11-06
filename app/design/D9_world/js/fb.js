@@ -55,7 +55,7 @@ export async function fallback(why){ if(started) return; started=true; body.clas
       d.textContent=roomError(err); door=finishEnter(door); return; }
     const tok=core.tok;     const F={ guard:['mainnet','split','Invoice with a hidden instruction',tok('0.001','NEAR')], hall:['mainnet','split','Reward paid',tok('0.001','NEAR')],
       arena:['mainnet','split','5 attacks on the lab oath','<b class="num">0</b><span class="unit">breaches</span>'], toll:['mainnet','split','0.001 NEAR pass on mainnet','<b class="num">11</b><span class="unit">of 16 nodes</span>'],
-      chronicle:['record','mainnet','Refusals on the record','<b class="num">2</b><span class="unit">recorded refusals</span>'], house:['mainnet','split','Tip cap',tok('0.002','NEAR')] }[id];
+      chronicle:['mainnet','mainnet','Public ledger','<b class="num">2</b><span class="unit">recorded refusals</span>'], house:['mainnet','split','Tip cap',tok('0.002','NEAR')] }[id];
     const info=m.FLAT||(F&&{src:F[0],cls:F[1],label:F[2],hero:F[3]})||{src:'mainnet',cls:'mainnet',label:'',hero:''};
     src.textContent=info.src==='mainnet'?'mainnet':info.src; src.className='src '+info.cls; $('#t-label').textContent=info.label; paintTrack(id); $('#t-hero').innerHTML=info.hero;
     { const mo=$('#t-more'); mo.hidden=!m.MORE; if(m.MORE){ mo.href=m.MORE.href; mo.textContent=m.MORE.text; } }

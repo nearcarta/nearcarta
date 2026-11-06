@@ -27,6 +27,8 @@ import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
 import { view, viewAccount, txStatus, rpcStats } from './near.js';
+import { readLive } from './chronicle-live.js';
+import { signStatement } from './chronicle-statement.js';
 import { nearAccountOk } from '../../shared/net/accounts.js';
 import { txVerdict } from '../../shared/net/tx-verdict.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
@@ -474,6 +476,22 @@ export function makeApp() {
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
   app.get('/api/chronicle', limiter(120), edgeCache(15), async c => c.json(mainnetChronicle(c.req.query('owner') || '')));
+  app.get('/api/chronicle/live', limiter(30), async c => {
+    const account = String(c.req.query('account') || '').trim();
+    if (!nearAccountOk(account)) return bad(c, 'account must be a NEAR account id');
+    try { return c.json(await readLive(account)); }
+    catch (e) {
+      return c.json({ account, live: false, rows: [], gaps: [String(e.message || 'Live read failed.').slice(0, 160)], sources: [], label: 'No rows for this account. The live timeline did not answer.' });
+    }
+  });
+  app.post('/api/chronicle/statement', limiter(8), async c => {
+    const b = await jsonBody(c);
+    const account = String(b?.account || '').trim();
+    if (!nearAccountOk(account)) return bad(c, 'account must be a NEAR account id');
+    const rows = Array.isArray(b?.rows) ? b.rows.slice(0, 40) : [];
+    const out = await signStatement({ account, period: b?.period || {}, rows, totals: b?.totals || null });
+    return c.json(out);
+  });
   app.get('/api/chronicle/:account', limiter(120), edgeCache(15), async c => {
     const a = c.req.param('account');
     // Visitor charters made by the vault factory count too (B13 "What happened" feed): the id must sit under the
