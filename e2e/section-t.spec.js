@@ -66,6 +66,7 @@ function viewBytes(value) {
 /** Stub the board read and swallow send_tx. A continued send_tx would be a real broadcast. */
 async function stubChain(page, { accessKey = null, onSend = null, accountAmount = null, charter = undefined } = {}) {
   const row = charterRow();
+
   await page.route('**/*', async route => {
     const req = route.request();
     if (req.method() !== 'POST') return route.continue();
@@ -82,7 +83,8 @@ async function stubChain(page, { accessKey = null, onSend = null, accountAmount 
     if (p.request_type === 'call_function' && p.method_name === 'get_charter') {
       // `null` is what board v2 returns for an account with no row. It is an answer,
       // not a failed read, and the page must say so.
-      return route.fulfill({ json: { jsonrpc: '2.0', id, result: viewBytes(charter === undefined ? row : charter) } });
+      const value = charter === null ? null : (charter !== undefined ? charter : row);
+      return route.fulfill({ json: { jsonrpc: '2.0', id, result: viewBytes(value) } });
     }
     if (p.request_type === 'view_access_key') {
       if (!accessKey) return route.fulfill({ json: { jsonrpc: '2.0', id, error: { name: 'UNKNOWN_ACCESS_KEY', message: 'unknown key' } } });
@@ -418,7 +420,7 @@ test('T13 no row on the board reads as an empty row, and Open your row is the pr
   }
 });
 
-test('T14 Open your row sends open_charter and set_calls to the board and the three-method key', async ({ page }) => {
+test('T14 Open your row sends the board transaction first, with gas for both actions', async ({ page }) => {
   await page.addInitScript(savedScholar, agentKey.secretKey);
   await stubChain(page, { charter: null });
   // Stand in for the wallet so the batch can be read. Nothing is signed or broadcast.
@@ -426,10 +428,13 @@ test('T14 Open your row sends open_charter and set_calls to the board and the th
     window.__ncSent = [];
     window.__NC_SETUP_WALLET = async () => ({
       signAndSendTransactions: async ({ transactions }) => {
-        window.__ncSent.push(...transactions);
-        return transactions.map(() => ({ transaction_outcome: { id: 'stub' } }));
+        window.__ncSent.push({ batch: transactions.length, txs: transactions });
+        return transactions.map(() => ({ transaction_outcome: { id: 'stub' }, status: { SuccessValue: '' } }));
       },
-      signAndSendTransaction: async tx => { window.__ncSent.push(tx); return { transaction_outcome: { id: 'stub' } }; },
+      signAndSendTransaction: async tx => {
+        window.__ncSent.push({ batch: 1, txs: [tx] });
+        return { transaction_outcome: { id: 'stub' }, status: { SuccessValue: '' } };
+      },
     });
   });
   await at(page, 1440);
@@ -438,16 +443,19 @@ test('T14 Open your row sends open_charter and set_calls to the board and the th
   await expect(open).toHaveText('Open your row', { timeout: 30000 });
   await open.click();
   await expect.poll(() => page.evaluate(() => window.__ncSent.length), { timeout: 20000 }).toBeGreaterThan(0);
-  const sent = await page.evaluate(() => window.__ncSent);
-  const board = sent.find(t => t.receiverId === 'board.nearcarta.near');
-  expect(board, 'the open transaction goes to the board').toBeTruthy();
-  const methods = board.actions.map(a => a.params.methodName);
-  expect(methods).toEqual(['open_charter', 'set_calls']);
+  const calls = await page.evaluate(() => window.__ncSent);
+  // The first approval carries the board transaction and nothing else: no second
+  // account's actions in the same batch, so a failed board call cannot leave a key behind.
+  expect(calls[0].batch).toBe(1);
+  const board = calls[0].txs[0];
+  expect(board.receiverId).toBe('board.nearcarta.near');
+  expect(board.actions.map(a => a.params.methodName)).toEqual(['open_charter', 'set_calls']);
   expect(board.actions[0].params.deposit).toBe('20000000000000000000000');
   expect(board.actions[0].params.args.rules.receivers.length).toBeGreaterThan(0);
-  const key = sent.find(t => t.receiverId === OWNER);
-  expect(key, 'the agent key goes on the visitor account').toBeTruthy();
-  expect(key.actions[0].params.accessKey.permission.receiverId).toBe('board.nearcarta.near');
-  expect(key.actions[0].params.accessKey.permission.methodNames).toEqual(['propose', 'propose_call', 'propose_call_as']);
+  expect(board.actions[1].params.deposit).toBe('15000000000000000000000');
+  // Both actions carry gas for the whole receipt. 10 Tgas failed on mainnet.
+  for (const a of board.actions) {
+    expect(BigInt(a.params.gas)).toBeGreaterThanOrEqual(40n * 10n ** 12n);
+  }
   await shot(page, 't14-open-row');
 });

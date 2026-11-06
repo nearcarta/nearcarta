@@ -81,6 +81,23 @@ test('/api/mainnet answers with the mainnet file or not_deployed, never an error
   assert.equal(r.status, 200);
   assert.equal(typeof await r.json(), 'object');
 });
+test('a guest guard check never defaults to a retired charter', () => {
+  // The guest CTA calls /api/guardhouse/check/:account with no ?charter=. The live
+  // default used to be charter.nearcarta.near, which is retired, and the check threw,
+  // so every guest check was a 500. The route now passes null and lets the account
+  // signals decide. This pins that: no retired account may be the default again.
+  const file = JSON.parse(readFileSync(new URL('../../../shared/deployments/mainnet.json', import.meta.url)));
+  const retired = new Set(Object.keys(file.retired || {}));
+  assert.ok(retired.size > 0, 'the record should name the retired charter');
+  const src = readFileSync(new URL('../../src/app.js', import.meta.url), 'utf8');
+  const route = src.slice(src.indexOf("'/api/guardhouse/check/:account'"), src.indexOf("'/api/guardhouse/attested'"));
+  assert.ok(route, 'the check route should exist');
+  assert.match(route, /c\.req\.query\('charter'\) \|\| null/, 'a guest check must not fall back to a default charter');
+  assert.doesNotMatch(route, /charter = .*MAINNET_DEP\?\.charter\?\.contract/, 'the retired charter must not be the default');
+  // Code only: strip comments so a note about the retired account does not trip this.
+  const code = route.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const dead of retired) assert.doesNotMatch(code, new RegExp(dead.replace(/\./g, '\\.')), `the route code must not name retired ${dead}`);
+});
 
 test('/api/whoami never echoes a client IP', async () => {
   const r = await get('/api/whoami', { 'x-forwarded-for': '198.51.100.77', 'x-real-ip': '198.51.100.78' });
