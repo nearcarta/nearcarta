@@ -259,8 +259,9 @@ test('guardhouse: a retired charter is not a policy, and an unreadable one is no
   const { retiredSnapshot } = await import('../../src/guardhouse.js');
   const r = retiredSnapshot('charter.nearcarta.near');
   assert.equal(r.oath, null);
+  assert.equal(r.retired, true);
   assert.equal(r.board, 'board.nearcarta.near');
-  assert.match(r.retired.why, /retired/);
+  assert.match(r.why, /retired/);
   const cp = await import('../../src/counterparty.js');
   const unread = async () => { throw new Error('UNKNOWN_ACCOUNT: charter does not exist while viewing'); };
   const v = await cp.check('cafe.near', {

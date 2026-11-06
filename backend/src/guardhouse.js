@@ -14,19 +14,26 @@ const RETIRED = new Set(Object.entries(MAINNET_DEP?.retired || {})
   .map(([id]) => id));
 export const oathId = G?.oath || MAINNET_DEP?.charter?.contract || null;
 
-/** What is true today when the old oath is gone: the live rules are per visitor row on the board. */
+/**
+ * What is true today when the old oath is gone. The shape is the one the city already reads for a
+ * retired or missing contract (`error` plus `retired: true`), so no page has to special-case it, and
+ * the fact is joined by the retired account, its reap tx and the board that really holds the rules.
+ */
 export function retiredSnapshot(oath) {
   const rec = MAINNET_DEP?.retired?.[oath] || {};
   const board = MAINNET_DEP?.board?.contract || null;
   const tx = rec.txs?.reap || rec.txs?.execute_change || null;
+  const why = `${oath} was retired; its NEAR returned to ${rec.recovered_to || 'the owner'}.`;
   return {
+    error: why,
+    retired: true,
+    status: 404,
+    at: new Date().toISOString(),
     oath: null,
-    retired: {
-      account: oath,
-      why: `${oath} was retired; its NEAR returned to ${rec.recovered_to || 'the owner'}.`,
-      tx,
-      url: tx ? explorerTx(tx) : null,
-    },
+    account: oath,
+    why,
+    tx,
+    url: tx ? explorerTx(tx) : null,
     board,
     state: null,
     clauses: {},

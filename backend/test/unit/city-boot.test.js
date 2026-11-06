@@ -42,10 +42,12 @@ test('a retired oath answers the retired fact and the live board, never a 404 or
   const { snapshot } = await import('../../../backend/src/guardhouse.js');
   const s = await snapshot('charter.nearcarta.near');
   assert.equal(s.oath, null, 'no page may read a deleted contract as the current rules');
-  assert.equal(s.retired.account, 'charter.nearcarta.near');
-  assert.match(s.retired.why, /retired/);
-  assert.match(s.retired.why, /nearcarta\.near/);
-  assert.match(s.retired.tx, /^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
+  assert.equal(s.retired, true, 'the room reads this flag instead of a 500');
+  assert.equal(s.account, 'charter.nearcarta.near');
+  assert.match(s.why, /retired/);
+  assert.match(s.why, /nearcarta\.near/);
+  assert.match(s.error, /retired/);
+  assert.match(s.tx, /^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
   assert.equal(s.board, 'board.nearcarta.near');
   assert.match(s.note, /row on board\.nearcarta\.near/);
   assert.deepEqual(s.clauses, {});
