@@ -505,7 +505,7 @@ export async function ferryProposeCalls(steps) {
     const argsHash = W.sha256hex(argsStr);
     const msg = boardCallText({ contract: S.board, owner: S.me, receiver: step.receiver, method: step.method, argsHash, deposit, nonce: String(row.nonce) });
     const signature = W.signMessage(key, msg);
-    const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: [...new TextEncoder().encode(argsStr)], deposit, signature };
+    const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: argsStr, deposit, signature };
     const ak = await proposeAccessKey(key);
     if (!ak) return you('no_session_key', { txs });
     try {
