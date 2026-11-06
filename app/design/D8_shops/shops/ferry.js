@@ -2,17 +2,18 @@
 // The quote is a real dry 1Click read through the Nearcarta API (snapshot in data/live.js); the crossing re-enacts the visitor's picker choice, nothing is sent.
 // Before the boat leaves, a downgraded echo of the same quote is refused, with the same echo-guard rule as tech backend/src/ferry.js.
 // Sources: depth-plan-v2 §1; TOWN_PLAN Ferry live-oath-state (order chip); STRENGTHEN §4 standing order; brief-V V4; 1Click /v0/tokens.
-import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, tok, C } from '../js/core.js';
+import { THREE, room, put, makeRobot, sfx, wait, tween, easeInOut, C } from '../js/core.js';
 import { SIGNED, UNSIGNED } from '../../D6_dashboards/src/data.js';
 import { boat } from '../js/town.js';
 import { row, h3, note, proof, paper, esc, mainnet } from './_ui.js';
 import { QUOTE } from '../data/live.js';
 import { M as PM, brassM, mesh, lantern } from './_props.js';
 import { chainLabel, orderChipHtml, ORDER_STATES } from '/panels/ferry-pair.js';
+import { pairHero, tokenStack } from '/panels/token-badge.js';
 
 const Q = QUOTE, short = a => a.slice(0, 8) + '…' + a.slice(-5);
 export const LABEL = 'A live quote. Nothing is sent.';
-export const HERO = `${tok(String(+Q.from.amt), Q.from.sym, { chain: Q.from.chain })}<span class="arrow" aria-hidden="true">→</span>${tok(Q.to.amt, Q.to.sym)}`;
+export const HERO = pairHero({ fromSym: Q.from.sym, fromChain: Q.from.chain, amt: String(+Q.from.amt), toSym: Q.to.sym, toChain: Q.to.chain, outAmt: Q.to.amt });
 export const RESULT = 'Crossed';
 const diffTxt = r => r.diffs ? r.diffs.map(d => `${d.field}: sent ${d.sent}, echo ${d.got}`).join('; ') : `receivers ${r.receivers.join(' + ')}`;
 const utc3 = s => { const d = new Date(s.replace(' UTC', 'Z').replace(' ', 'T')); if (isNaN(d)) return s; d.setUTCHours(d.getUTCHours() + 3); return d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC+3'; };
@@ -69,12 +70,11 @@ export default async function ferry(ctx) {
     fromSym: Q.from.sym, fromChain: Q.from.chain, toSym: Q.to.sym, toChain: Q.to.chain || 'Zcash',
     amt: String(+Q.from.amt), outAmt: Q.to.amt, result: RESULT,
   };
-  const icon = (sym, chain) => {
-    const ch = chainLabel(chain) || chain;
-    const html = tok(null, sym, { chain: ch });
-    return `<span class="tok">${html.replace('<span class="sym">' + sym + '</span>', '')}</span>`;
-  };
-  const heroOf = () => `${tok(cargo.amt, cargo.fromSym, { chain: chainLabel(cargo.fromChain) || cargo.fromChain })}<span class="arrow" aria-hidden="true">→</span>${tok(cargo.outAmt, cargo.toSym, { chain: chainLabel(cargo.toChain) || cargo.toChain })}`;
+  const icon = (sym, chain) => `<span class="tok">${tokenStack(sym, chainLabel(chain) || chain, { size: 28, chainSize: 14 })}</span>`;
+  const heroOf = () => pairHero({
+    fromSym: cargo.fromSym, fromChain: chainLabel(cargo.fromChain) || cargo.fromChain, amt: cargo.amt,
+    toSym: cargo.toSym, toChain: chainLabel(cargo.toChain) || cargo.toChain, outAmt: cargo.outAmt,
+  });
   const tags = [
     { obj: crate, pos: new THREE.Vector3(0, .9, 0), html: icon(cargo.fromSym, cargo.fromChain), cls: 'bare' },
     { obj: seal, pos: new THREE.Vector3(-.15, .55, 0), html: 'Downgrade refused', cls: 'no hide' },

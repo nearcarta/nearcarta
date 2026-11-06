@@ -68,6 +68,7 @@ body:not(.ready) .lb { opacity: 0; }
 .tok { display: inline-flex; align-items: center; gap: 6px; }
 .tok .tic { position: relative; display: inline-grid; }
 .tok .ci { position: absolute; right: -3px; bottom: -3px; border-radius: 50%; box-shadow: 0 0 0 2px var(--raised); }
+.tok .ti { border-radius: 50%; object-fit: cover; display: block; }
 .hero .tok .ti { width: 32px; height: 32px; } .hero .tok .ci { width: 14px; height: 14px; }
 .hero .tok .sym { font-size: 20px; color: var(--muted); font-weight: 400; }
 .t-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }

@@ -13,6 +13,7 @@ export function normalizeToken(row) {
     label: `${symbol} on ${chain}`,
     decimals: row.decimals ?? null,
     price: row.price ?? null,
+    icon: typeof row.icon === 'string' ? row.icon.trim() : '',
   };
 }
 
