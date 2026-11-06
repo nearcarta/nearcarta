@@ -1,5 +1,15 @@
 # Toll Bridge — deepen to Ferry depth (Cursor brief)
 
+**Owner correction (2026-11-06), overrides every `allow_to` instruction below.** Do not put a recipient in contract init. That includes the address currently on mainnet and any other fixed destination. A global list means a new visitor needs a new deploy, and that is the wrong design.
+
+The visitor types any `0x` + 40 hex address in the tray, or the agent reads it from “pay the toll on Base to 0x…”. `cross_after_board(to)` takes that address. The NEAR safety is the visitor's own board row: per-action cap, daily budget, and expiry, set once in `/setup`. The contract adds `max_per_tx`, `budget`, `max_fee_cap`, `frozen`, and the verified board pass. `set_book` is an optional list stored for that visitor only. An empty book allows any address. It is never a list fixed at deploy.
+
+Path stays `base-1` and chain stays 8453, so the derived address stays the one in `shared/deployments/mainnet.json`. The live wasm cannot upgrade itself, so the first install is one `close` and a new wasm. That wasm has `upgrade` and `migrate` for the owner. A later change does not close the account, and a new visitor does not need a deploy. No function-call key. The toll account cannot call `cross_after_board`.
+
+The live snapshot in §1 records what mainnet holds today. It is not the init for the next wasm.
+
+---
+
 **Audience:** the Cursor chat that owns `toll` (same chat that shipped PR #43 UX fixes).  
 **Repo:** `/workspace/near/tech/nearcarta` @ `0c72a47` (main).  
 **Owner ask (2026-11-06):** Toll is shallow and hardcoded at 0.001 NEAR transfer to `toll.nearcarta.near`. Make it as deep as Ferry: live policy-driven amounts/routes, real chain-signature **foreign** payment, AI NL, cinema, basescan proof.  
@@ -171,39 +181,38 @@ Tagline: company of one; agent treasury/sales/procurement; **cross-chain payment
 
 1. Visitor already funded in `/setup`; row allows `toll.nearcarta.near`; cap ≥ pass fee from **live policy / gate fee** (not a constant).  
 2. Opens Toll from the city. Tray tabs: **Cross / Proof / Split** (rename Pass → Cross once foreign pay exists; keep Pass as the NEAR leg label if clearer).  
-3. Picks a **route** from live policy (Base now; Arbitrum later via second instance). Icons = real web3icons (fix Base square). Sees fee, foreign recipient from `allow_to` / gate `evm_to`, derived address from policy.  
-4. Manual CTA **or** AI (“pay the toll on Base”, “cross to Arbitrum”) under session:  
+3. Picks a **route** from live policy (Base now; Arbitrum later via second instance). Icons = real web3icons (fix Base square). Types any Base address. Sees the fee and the foreign cap from policy, and the derived address from policy.  
+4. Manual CTA **or** AI (“pay the toll on Base to 0x…”, “cross to Arbitrum”) under session:  
    - **Leg A:** silent `board.propose` of the policy fee to `toll.nearcarta.near` (no popup).  
-   - **Leg B:** contract asks `v1.signer` to sign a tiny native transfer on Base to the allowlisted recipient.  
+   - **Leg B:** the visitor calls `cross_after_board(to)`. The contract asks `v1.signer` to sign a tiny native transfer on Base to that address, inside the caps.  
    - **Leg C:** backend/relayer broadcasts `raw_signed`; UI polls until receipt status=1; shows **basescan** link.  
 5. Boom / cinema only after the leg the copy claims. “Paid on Base” **only** when `proofWords` claim=`paid` (receipt status 1).  
 6. Chronicle records both hashes. Split tab shows live revenue / fee words from policy (not “no split” forever).
 
 ### 4.2 Contract work (redeploy required — see §5)
 
-**Problem:** visitors cannot trigger `pay` (owner/self only; FAK deleted). `pay_for` needs gate+factory charters incompatible with `charter_board`. `allow_to` cannot change without redeploy. Owner dest `0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034` is not allowlisted.
+**Problem:** visitors cannot trigger `pay` (owner/self only; FAK deleted). `pay_for` needs gate+factory charters incompatible with `charter_board`. A global recipient list cannot grow without a redeploy, so the visitor method does not use one.
 
-**Recommended contract change (v7) — pick one primary path:**
+**Contract change (v7), Path A.** Do not add a function-call key.
 
-**Path A (preferred for Autonomous Business):** add visitor-callable  
-`cross_after_board({ board, owner })` (names flexible) that:
+`accept_pass` records the board's deposit and does not call the signer. `cross_after_board(to)` :
 
-1. Requires attached gas ≥ current `GATE_MIN_GAS` pattern.  
-2. Reads `board.get_charter({ owner })` (or equivalent) **or** accepts a recent board propose proof the API already verifies off-chain **and** a one-shot on-chain memo deposit.  
-3. Verifies the visitor’s row recently paid ≥ `fee` NEAR to this toll (or use attached deposit on a `propose_call` into a new `accept_pass` method).  
-4. Then calls existing `start_sign(allow_to[i], value, fees, 21000)` with value ≤ `max_per_tx` from **state**, not args the visitor chooses freely.  
-5. Emits chronicle events (already `town-chronicle`).
+1. Requires attached gas ≥ current `GATE_MIN_GAS`.  
+2. The predecessor is the visitor who holds an unused pass. The toll account cannot call it.  
+3. `to` is `0x` and 40 hex. The value and the fees come from `set_cross` and must sit inside `max_per_tx`, `budget` and `max_fee_cap`. The contract also refuses a frozen oath.  
+4. If that visitor has a non-empty `set_book` list, `to` must be in it. An empty book allows any address. The book is per account, set by that account, never a list in `new`.  
+5. Signs on path `base-1` so the signature recovers to the derived address. Emits `town-chronicle`.
 
-If full board introspection is too heavy for one PR: **Path B (interim, still deep):** re-add a **method-scoped FAK** on `toll.nearcarta.near` limited to `pay` (+ maybe `settle`), held only in vault/hidden env; city flow = visitor board pass → API verifies pass → API calls `pay` with policy amounts → broadcast. Still show basescan. Document custody. Owner can rotate/delete FAK. **Do not** leave a full-access key.
+`upgrade` and `migrate` belong to the owner. After this wasm is installed, a later change calls those and does not `close`.
 
-Also on redeploy init:
+Init:
 
-- `allow_to`: include `0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034` (owner-designated Base recipient). Keep or drop `0x1cdb…` as needed.  
-- Keep `path: "base-1"`, `chain_id: 8453`, same derivation → **same** `foreign_address` `0x4c07…e38a` if predecessor+path unchanged (critical so prior funding still applies).  
+- `allow_to` is empty. Do not write a recipient into `new` or `set_cross`.  
+- Keep `path: "base-1"`, `chain_id: 8453`, same derivation → **same** `foreign_address` if the account id and path stay the same.  
 - `max_per_tx` / `budget`: tiny (≤ 0.00001 ETH class) so demos stay cheap.  
-- `max_fee_cap`: ≥ realistic Base gas (policy already 5 gwei; signed sample used ~0.1 gwei — **too low to land**; new pays must use fees under cap but high enough for Base inclusion).  
-- `close()` unchanged → funds to `nearcarta.near`.  
-- Optional second instance later: `toll-arb.nearcarta.near` with `verify_chain: "Arbitrum"` for “cross to Arbitrum” (one chain per instance — `lib.rs` header).
+- `max_fee_cap`: the live cap is 5 gwei. New pays use fees under that cap.  
+- `close()` stays available → funds to `nearcarta.near`. The first install uses it once because the live wasm has no `upgrade`.  
+- Optional second instance later: its own account with `verify_chain: "Arbitrum"` (one chain per instance).
 
 **Do not claim gate revenue split until `gate` or a split field exists on-chain.** Split tab may show “all NEAR passes accrue on `toll.nearcarta.near`; foreign spends debit `spent`/`budget`” from live policy.
 
@@ -214,7 +223,7 @@ Implement (or finish the commented intent in `app.js` L371):
 - `POST /api/toll/cross` (or `/relay`): after visitor pass verified, trigger `pay` / `cross_after_board`, wait for `get_tx` status `signed`, then `eth_sendRawTransaction` of `raw_signed` to Base RPC.  
 - `GET /api/toll/live` already reads `policy` + recent `get_tx` (`toll-views.js`) — extend with foreign receipt status via `evmFacts` (`shops.js` L121–132) and explorer URLs.  
 - Never say “Paid on Base” without receipt status 1 (`proofWords` in `toll-room.js` L141–159 — keep).  
-- Env: `BASE_RPC` (already referenced). Secrets for FAK only via vault/hidden fields if Path B.
+- Env: `BASE_RPC` (already referenced). The API does not hold a key and does not call `cross_after_board`.
 
 ### 4.4 Frontend (Ferry pattern)
 
@@ -229,8 +238,8 @@ Implement (or finish the commented intent in `app.js` L371):
 
 - [ ] No hardcoded `0.001` as the only possible fee in UI/agent (constants may remain as defaults only if equal to live policy fee and overridden by policy).  
 - [ ] Proof Base icon is real Base mark, not blue square.  
-- [ ] Live `policy` drives recipient + max foreign value shown in tray.  
-- [ ] Session path: board propose (no popup) → MPC sign → broadcast → basescan success for a **tiny** Base transfer to allowlisted dest (prefer `0xBDfC…0034` after redeploy).  
+- [ ] Live `policy` drives the fee and the foreign cap. The recipient is the address the visitor types.  
+- [ ] Session path: board propose (no popup) → the visitor calls `cross_after_board(to)` → broadcast → basescan success for a tiny Base transfer to that address. A basescan link waits for receipt status 1.  
 - [ ] AI and manual both run that path.  
 - [ ] Copy never claims Base paid without receipt.  
 - [ ] Chronicle shows NEAR pass + foreign tx.  
@@ -247,19 +256,19 @@ Implement (or finish the commented intent in `app.js` L371):
 |---|---|
 | Fix Base blue-square icon + UI copy from policy | **No** |
 | Broadcast existing `get_tx(0)` raw (to `0x1cdb…`) after funding foreign addr | **No** (demo of leg C only) |
-| Change `allow_to` to include `0xBDfC…0034` | **Yes** (no setter) |
-| Let visitors trigger MPC `pay` without owner FAK | **Yes** (new method) **or** Path B FAK (no code change, custody tradeoff) |
+| Add `cross_after_board(to)` so a visitor names the recipient | **Yes, once** (the live wasm has no upgrade) |
+| Let visitors trigger MPC `pay` without a key on this account | **Yes** (the visitor method). Do not add a function-call key. |
 | Enable stock `gate`/`pay_for` with `charter_board` | **Yes + code change** (gate incompatible as-is) |
 
-**Recommendation:** plan a **controlled redeploy** of `toll.nearcarta.near` (or new subaccount then cut over) with v7 init: new allow_to, same path/foreign_address if possible, new `cross_after_board` (or document Path B FAK). Backup state (`policy`, all `get_tx`) to `shared/deployments/` before `close()`.
+**Recommendation:** one install of `toll.nearcarta.near`. Snapshot first. `close` once because the live wasm cannot upgrade. Deploy the new wasm on the same account id with empty `allow_to`, path `base-1`, chain 8453. `set_cross` stores no recipient. After that, `upgrade` then `migrate`. No key on the account.
 
 Redeploy sequence (assistant runs; you prepare scripts):
 
 1. Snapshot `policy` + `get_tx` for nonces `0..next_nonce-1`.  
 2. Optional: fund foreign addr + broadcast existing signed raw as a one-shot proof (see §5.2).  
 3. Owner `close()` 1 yocto → ~2.55 NEAR returns to `nearcarta.near` (storage unlocked).  
-4. Recreate account, deploy wasm, `new(...)` with allow_to including `0xBDfC…0034`, owner `nearcarta.near`, mpc `v1.signer`, path `base-1`, chain_id `8453`, foreign_address matching derivation.  
-5. Verify `policy` view; update `mainnet.json`; no leftover FAKs unless Path B scoped key.  
+4. Recreate the same account, deploy wasm, `new(...)` with `allow_to: []`, owner `nearcarta.near`, mpc `v1.signer`, path `base-1`, chain_id `8453`, foreign_address matching derivation. Then `set_cross` with the board, the fee and the value. No recipient argument.  
+5. Verify `policy`. Later wasm changes call `upgrade` and `migrate`. No function-call key.  
 6. Fund foreign address again with tiny ETH for gas.  
 7. Teardown remains `close()` → `nearcarta.near`. **No NEAR left stranded.**
 
@@ -268,7 +277,7 @@ Redeploy sequence (assistant runs; you prepare scripts):
 | Address | Role |
 |---|---|
 | `0x4c07c97812098f595ff1611d8cb3465e591ee38a` | Toll derived signer — **needs tiny ETH for gas** (README: was unfunded) |
-| `0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034` | Owner-designated **recipient** for demos (update allow_to) |
+| A visitor's `0x` address | The recipient for that crossing. It is an argument, not an init field. |
 | `0xf76e6b0920e9332ff4410f6dd53f01722abc71a3` | Owner wallet holding **USDC on Base** — use to buy/bridge tiny ETH for the derived address if needed; **not** the allow_to target unless policy says so |
 
 Rough gas: 21000 gas × ~0.01–0.1 gwei on Base is still ≪ 0.00001 ETH; fund ~0.0001 ETH on `0x4c07…` to be safe for several demos. Transfer value per demo: ≤ `max_per_tx` (0.00001 ETH).
@@ -293,9 +302,9 @@ Rough gas: 21000 gas × ~0.01–0.1 gwei on Base is still ≪ 0.00001 ETH; fund 
 ## 6. Implementation order (PR-sized)
 
 1. **P0 icon + honesty:** fix `chains/base.svg`; Proof uses real Base mark; tests.  
-2. **P0 live policy in tray:** replace hardcoded hero/button/agent amount with `GET /api/toll/live` fee + allow_to + foreign_address; keep refuse if unread.  
-3. **P0 relay path for existing signed tx (optional demo):** fund `0x4c07…` + broadcast `get_tx(0).raw_signed` → basescan (proves leg C; recipient still `0x1cdb…`).  
-4. **P1 contract v7 + redeploy plan scripts** (assistant executes): allow_to includes `0xBDfC…0034`; visitor `cross_after_board` **or** Path B FAK; fees under `max_fee_cap` but Base-viable.  
+2. **P0 live policy in tray:** replace the hardcoded amount with `GET /api/toll/live` fee, cap and foreign address. The visitor types the recipient. Refuse if the policy is unread or the address is missing.  
+3. **P0 relay of an already signed raw:** broadcast only a raw the contract stored. Paid on Base only when the receipt status is 1. Do not send it from this change.  
+4. **P1 contract v7 + one print-only install script:** `cross_after_board(to)`, empty `allow_to`, `upgrade` + `migrate`. No function-call key. Fees under `max_fee_cap`.  
 5. **P1 city Cross flow:** board pass → sign → broadcast → poll → basescan; AI + manual; cinema; Chronicle.  
 6. **P2** Arbitrum instance + “cross to Arbitrum”; Split tab revenue from live state; README proofs placeholders.
 

@@ -56,9 +56,10 @@ pub struct Oath {
     gate: Option<Gate>,       // v4: visitor gate; None = owner/agent only
     visits: LookupMap<String, u64>, // v4: "charter#action_id" -> EVM nonce it opened
     visit_of: LookupMap<u64, Visit>, // v4: EVM nonce -> the charter action that paid for it
-    cross: Option<Cross>, // v7: board pass, then a fixed Base transfer on path base-1
+    cross: Option<Cross>, // v7: board pass, then the visitor names the Base recipient
     passes: LookupMap<u64, PassRec>,
     next_pass: u64,
+    book: LookupMap<AccountId, Vec<String>>, // v7: optional recipients for one visitor; empty means any address
 }
 
 /// v4: what a visitor's charter must have paid on NEAR, and the fixed EVM payout it buys.
@@ -79,13 +80,12 @@ pub struct Gate {
 #[derive(Clone)]
 pub struct Visit { pub charter: AccountId, pub action_id: u64, pub by: AccountId }
 
-/// v7: the board pass fee and the fixed Base payout. The visitor does not choose either.
+/// v7: the board pass fee and the Base value. The visitor names the recipient on the call.
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
 pub struct Cross {
     pub board: AccountId,
     pub pass_fee: U128,
-    pub evm_to: String,
     pub foreign_value: U128,
     pub max_fee_per_gas: U128,
     pub max_priority_fee_per_gas: U128,
@@ -132,6 +132,13 @@ pub fn check_visit(g: &Gate, a: &Value) {
     require!(a["status"].as_str() == Some("confirmed"), "REFUSED: the charter has not paid (action not confirmed)");
 }
 fn unhex(s: &str) -> Vec<u8> { hex::decode(s.trim_start_matches("0x")).expect("bad hex") }
+
+fn evm_addr(raw: &str) -> String {
+    let to = raw.trim().to_lowercase();
+    let hex = to.strip_prefix("0x").unwrap_or("");
+    require!(hex.len() == 40 && hex.chars().all(|c| c.is_ascii_hexdigit()), "REFUSED: recipient must be an EVM address");
+    to
+}
 
 /// EVM chains the MPC network verifies (`v1.signer` get_available_foreign_chains), with the
 /// borsh index of each in ForeignChainRpcRequest and the chain ids that belong to it.
@@ -183,7 +190,7 @@ impl Oath {
                max_per_tx: max_per_tx.0, budget: budget.0, spent: 0, max_fee_cap: max_fee_cap.0,
                next_nonce: 0, frozen: false, txs: LookupMap::new(b"t"), verify_chain, token, dao,
                gate, visits: LookupMap::new(b"v"), visit_of: LookupMap::new(b"w"),
-               cross: None, passes: LookupMap::new(b"p"), next_pass: 0 }
+               cross: None, passes: LookupMap::new(b"p"), next_pass: 0, book: LookupMap::new(b"b") }
     }
 
     fn assert_owner(&self) { require!(env::predecessor_account_id() == self.owner, "only owner"); }
@@ -215,20 +222,44 @@ impl Oath {
                "spent": self.spent.to_string(), "max_fee_cap": self.max_fee_cap.to_string(),
                "next_nonce": self.next_nonce, "frozen": self.frozen, "verify_chain": self.verify_chain,
                "asset": self.token.as_ref().map(|t| json!({"erc20": t})).unwrap_or(json!("native")), "dao": self.dao,
-               "gate": self.gate, "cross": self.cross, "next_pass": self.next_pass})
+               "gate": self.gate, "cross": self.cross, "next_pass": self.next_pass, "recipients": "visitor"})
     }
 
-    /// v7: the owner sets the board and the fixed Base payout. Path and chain_id stay as in new().
-    pub fn set_cross(&mut self, board: AccountId, pass_fee: U128, evm_to: String, foreign_value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128) {
+    /// v7: the owner sets the board, the pass fee and the Base value. The recipient is not stored here.
+    pub fn set_cross(&mut self, board: AccountId, pass_fee: U128, foreign_value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128) {
         self.assert_owner();
-        require!(self.cross.is_none(), "cross already set");
         require!(pass_fee.0 > 0, "pass fee must be set");
-        let evm_to = evm_to.to_lowercase();
-        require!(self.allow_to.contains(&evm_to), "REFUSED: recipient not in oath allowlist");
         require!(foreign_value.0 > 0 && foreign_value.0 <= self.max_per_tx, "foreign value over per-tx cap");
         require!(max_fee_per_gas.0 <= self.max_fee_cap && max_priority_fee_per_gas.0 <= max_fee_per_gas.0, "cross fees over cap");
-        self.cross = Some(Cross { board, pass_fee, evm_to, foreign_value, max_fee_per_gas, max_priority_fee_per_gas });
+        self.cross = Some(Cross { board, pass_fee, foreign_value, max_fee_per_gas, max_priority_fee_per_gas });
     }
+
+    /// v7: one visitor's own recipient list. An empty list means any address. This is not a global allow list.
+    pub fn set_book(&mut self, recipients: Vec<String>) {
+        let caller = env::predecessor_account_id();
+        require!(caller != env::current_account_id(), "REFUSED: the toll account cannot set a book");
+        require!(recipients.len() <= 8, "at most 8 recipients");
+        let mut out = vec![];
+        for raw in recipients {
+            let to = evm_addr(&raw);
+            if !out.contains(&to) { out.push(to); }
+        }
+        self.book.insert(caller, out);
+    }
+
+    pub fn get_book(&self, owner: AccountId) -> Vec<String> { self.book.get(&owner).cloned().unwrap_or_default() }
+
+    /// The owner deploys the next wasm. migrate reads this state back, so a later change does not recreate the account.
+    pub fn upgrade(&self, code: near_sdk::json_types::Base64VecU8) -> Promise {
+        self.assert_owner();
+        require!(!code.0.is_empty(), "empty code");
+        Promise::new(env::current_account_id()).deploy_contract(code.0)
+            .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(15)).migrate())
+    }
+
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate() -> Self { env::state_read().expect("no state") }
 
     pub fn get_pass(&self, id: u64) -> Option<PassRec> { self.passes.get(&id).cloned() }
 
@@ -246,20 +277,25 @@ impl Oath {
         log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"pass_accepted","data":{"id":id,"owner":owner,"deposit":dep.to_string()}}));
     }
 
-    /// v7 Path A: the visitor who holds an unused board pass signs the fixed payout.
+    /// v7 Path A: the visitor who holds an unused board pass names the recipient.
     /// The toll account itself cannot call this, so a key on this contract is not the signer.
-    pub fn cross_after_board(&mut self) -> Promise {
+    pub fn cross_after_board(&mut self, to: String) -> Promise {
         require!(env::prepaid_gas() >= Gas::from_tgas(GATE_MIN_GAS), "attach at least 150 Tgas");
         let caller = env::predecessor_account_id();
         require!(caller != env::current_account_id(), "REFUSED: the toll account cannot sign this crossing");
+        require!(!self.frozen, "REFUSED: oath frozen");
         let c = self.cross.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no visitor pass"));
+        let to = evm_addr(&to);
+        if let Some(book) = self.book.get(&caller) {
+            if !book.is_empty() { require!(book.iter().any(|a| a == &to), "REFUSED: that address is not in your book"); }
+        }
         let id = (0..self.next_pass).find(|n| self.passes.get(n).is_some_and(|p| !p.used && p.owner == caller))
             .unwrap_or_else(|| env::panic_str("REFUSED: no board pass is waiting for you"));
         let mut rec = self.passes.get(&id).cloned().expect("no pass");
         rec.used = true;
         self.passes.insert(id, rec);
-        log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"cross_signing","data":{"id":id,"owner":caller,"to":c.evm_to}}));
-        self.start_sign(c.evm_to, c.foreign_value, c.max_fee_per_gas, c.max_priority_fee_per_gas, 21000)
+        log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"cross_signing","data":{"id":id,"owner":caller,"to":to}}));
+        self.sign(to, c.foreign_value, c.max_fee_per_gas, c.max_priority_fee_per_gas, 21000, false)
     }
     /// v4: the charter action that paid for EVM nonce `nonce`, if it came through the gate.
     pub fn get_visit(&self, nonce: u64) -> Option<Visit> { self.visit_of.get(&nonce).cloned() }
@@ -306,9 +342,13 @@ impl Oath {
     }
 
     fn start_sign(&mut self, to: String, value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128, gas_limit: u64) -> Promise {
+        self.sign(to, value, max_fee_per_gas, max_priority_fee_per_gas, gas_limit, true)
+    }
+
+    fn sign(&mut self, to: String, value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128, gas_limit: u64, listed: bool) -> Promise {
         require!(!self.frozen, "REFUSED: oath frozen");
         let to = to.to_lowercase();
-        require!(self.allow_to.contains(&to), "REFUSED: recipient not in oath allowlist");
+        if listed { require!(self.allow_to.contains(&to), "REFUSED: recipient not in oath allowlist"); }
         require!(value.0 <= self.max_per_tx, "REFUSED: value over per-tx cap");
         require!(self.spent + value.0 <= self.budget, "REFUSED: budget exhausted");
         require!(max_fee_per_gas.0 <= self.max_fee_cap && max_priority_fee_per_gas.0 <= max_fee_per_gas.0, "REFUSED: gas fee over cap");

@@ -31,18 +31,22 @@ function mem() {
   return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, v); } };
 }
 
-test('a toll command pays the live policy fee', () => {
+test('a toll command pays the address the visitor names', () => {
   const quote = { payable: true, feeNear: '0.002', feeYocto: '2000000000000000000000' };
-  const pay = parseTollCommand('Pay the toll', quote);
+  const to = '0x0000000000000000000000000000000000000001';
+  const pay = parseTollCommand(`pay the toll on Base to ${to}`, quote);
   assert.equal(pay.action, 'pay');
+  assert.equal(pay.to, to);
   assert.equal(pay.feeYocto, quote.feeYocto);
-  assert.equal(parseTollCommand('Pay the toll on Base', quote).action, 'pay');
+  assert.equal(parseTollCommand('Pay the toll', quote).action, 'recipient');
+  assert.match(parseTollCommand('Pay the toll on Base', quote).hint, /0x and 40 hex/);
   const other = parseTollCommand('pay 0.001 NEAR', quote);
   assert.equal(other.action, 'amount');
   assert.match(other.hint, /0\.002/);
   const arb = parseTollCommand('cross to Arbitrum', quote);
   assert.equal(arb.action, 'route');
   assert.match(arb.hint, /own instance/);
+  assert.equal(parseTollCommand('pay the toll to 0x123', quote).action, 'recipient');
   assert.equal(parseTollCommand('Pay the toll').action, 'fee');
   assert.equal(parseTollCommand('Check signature').action, 'check');
   assert.equal(parseTollCommand('Show policy').action, 'policy');
@@ -138,6 +142,9 @@ test('the toll card shows both actions, real icons, and no Base payment claim', 
   assert.doesNotMatch(split.slice(split.indexOf('data-testid="toll-pane-split"')), /data-testid="toll-pay"|data-testid="check-signature"/);
   assert.doesNotMatch(html, /0\.001/);
   assert.match(html, /Live policy has no visitor fee/);
+  assert.match(html, /data-testid="toll-to"/);
+  assert.match(html, /You name the Base address/);
+  assert.doesNotMatch(html, /0xBDfC|0x1cdb/i);
   assert.match(html, /data-testid="toll-route-base"/);
   assert.match(html, /data-testid="toll-route-arb"/);
   assert.match(html, /src="\/tokens\/near\.svg"/);
@@ -251,14 +258,18 @@ test('the city toll door stays a link and does not resume an old visit', () => {
   assert.match(plan, /method: 'close'/);
   assert.match(plan, /set_cross/);
   assert.match(plan, /cross_after_board/);
-  assert.match(plan, /0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034/);
+  assert.match(plan, /allow_to: \[\]/);
+  assert.match(plan, /method: 'upgrade'/);
+  assert.match(plan, /migrate/);
   assert.match(plan, /base-1/);
   assert.match(plan, /8453/);
-  assert.doesNotMatch(plan, /allow_to: \[\]/);
+  assert.doesNotMatch(plan, /0xBDfC|0x1cdb/i);
   assert.match(plan, /nearcarta\.near/);
   const oath = read('contracts/toll/src/lib.rs');
   assert.match(oath, /fn cross_after_board/);
   assert.match(oath, /fn accept_pass/);
+  assert.match(oath, /fn set_book/);
+  assert.match(oath, /fn migrate/);
   assert.doesNotMatch(oath, /fn set_policy/);
   assert.match(read('app/design/D9_world/world.css'), /min\(640px/);
   assert.match(read('app/src/panels/panels.css'), /pointer-events:auto/);
@@ -318,7 +329,7 @@ test('the live policy prices the pass and a receipt is the only Base payment', a
   });
   assert.equal(live.quote.payable, true);
   assert.equal(live.quote.feeNear, '0.002');
-  assert.equal(live.quote.foreignTo, '0xbdfcee82bd42fefa58ee850b3709636a8b6b0034');
+  assert.equal(live.quote.foreignTo, '');
   assert.equal(formatWei('1000000000000'), '0.000001');
   assert.match(policyWords(live), /0\.002/);
   assert.match(splitWords(live), /no revenue split/);

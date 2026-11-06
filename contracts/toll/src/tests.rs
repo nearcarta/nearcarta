@@ -445,7 +445,7 @@ fn close_without_yocto_panics() {
 
 fn arm(o: &mut Oath) {
     set("owner.test");
-    o.set_cross(acc("board.test"), U128(5), TO.into(), U128(40), U128(5), U128(1));
+    o.set_cross(acc("board.test"), U128(5), U128(40), U128(5), U128(1));
 }
 fn deposit(pred: &str, yocto: u128) {
     let mut b = ctx(pred);
@@ -462,10 +462,10 @@ fn a_visitor_signs_the_fixed_payout_after_the_board_pass() {
     deposit("board.test", 5);
     o.accept_pass(acc("visitor.test"));
     set("visitor.test");
-    let _ = o.cross_after_board();
+    let _ = o.cross_after_board(OTHER.into());
     assert!(o.get_pass(0).unwrap().used);
     let tx = o.get_tx(0).unwrap();
-    assert_eq!(tx.to, TO);
+    assert_eq!(tx.to, OTHER);
     assert_eq!(tx.value.0, 40);
     assert_eq!(tx.status, "signing");
     assert_eq!(o.policy()["path"], json!("toll"));
@@ -496,7 +496,7 @@ fn a_visitor_without_a_pass_cannot_cross() {
     let mut o = toll();
     arm(&mut o);
     set("visitor.test");
-    let _ = o.cross_after_board();
+    let _ = o.cross_after_board(OTHER.into());
 }
 
 #[test]
@@ -507,15 +507,44 @@ fn the_toll_account_cannot_sign_the_crossing() {
     deposit("board.test", 5);
     o.accept_pass(acc("toll.test"));
     set("toll.test");
-    let _ = o.cross_after_board();
+    let _ = o.cross_after_board(OTHER.into());
 }
 
 #[test]
-#[should_panic(expected = "REFUSED: recipient not in oath allowlist")]
-fn the_fixed_recipient_must_already_be_allowlisted() {
+fn a_visitor_names_any_address_and_a_personal_book_can_narrow_it() {
     let mut o = toll();
-    set("owner.test");
-    o.set_cross(acc("board.test"), U128(5), OTHER.into(), U128(40), U128(5), U128(1));
+    arm(&mut o);
+    assert!(o.policy()["allow_to"].as_array().unwrap().iter().all(|x| x != OTHER));
+    deposit("board.test", 5);
+    o.accept_pass(acc("visitor.test"));
+    set("visitor.test");
+    o.set_book(vec![OTHER.into()]);
+    let _ = o.cross_after_board(OTHER.into());
+    assert_eq!(o.get_tx(0).unwrap().to, OTHER);
+    assert_eq!(o.get_book(acc("other.test")), Vec::<String>::new());
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: that address is not in your book")]
+fn a_personal_book_refuses_an_address_the_visitor_did_not_list() {
+    let mut o = toll();
+    arm(&mut o);
+    deposit("board.test", 5);
+    o.accept_pass(acc("visitor.test"));
+    set("visitor.test");
+    o.set_book(vec![TO.into()]);
+    let _ = o.cross_after_board(OTHER.into());
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: recipient must be an EVM address")]
+fn a_short_recipient_is_refused() {
+    let mut o = toll();
+    arm(&mut o);
+    deposit("board.test", 5);
+    o.accept_pass(acc("visitor.test"));
+    set("visitor.test");
+    let _ = o.cross_after_board("0x1234".into());
 }
 
 #[test]
@@ -528,14 +557,13 @@ fn cross_after_board_needs_gas_for_the_signer() {
     let mut b = ctx("visitor.test");
     b.prepaid_gas(Gas::from_tgas(10));
     testing_env!(b.build());
-    let _ = o.cross_after_board();
+    let _ = o.cross_after_board(OTHER.into());
 }
 
 #[test]
-#[should_panic(expected = "cross already set")]
-fn cross_is_set_once() {
-    let mut o = toll();
-    arm(&mut o);
-    set("owner.test");
-    o.set_cross(acc("board.test"), U128(5), TO.into(), U128(1), U128(1), U128(1));
+#[should_panic(expected = "only owner")]
+fn a_stranger_cannot_upgrade() {
+    let o = toll();
+    set("mallory.test");
+    let _ = o.upgrade(near_sdk::json_types::Base64VecU8(vec![1]));
 }

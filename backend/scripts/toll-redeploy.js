@@ -1,15 +1,14 @@
-// Redeploy plan for toll.nearcarta.near. Prints the steps. Does not sign and does not send.
+// One install for toll.nearcarta.near. Prints the steps. Does not sign and does not send.
+// The live wasm has no upgrade method, so this install is close, then the same account again.
+// After it, the owner calls upgrade and migrate. A new visitor does not need another deploy.
 // close() with 1 yocto returns every yocto, storage included, to nearcarta.near.
-// The new account keeps path base-1 and chain 8453, so the derived foreign address stays the same.
-// Path A: the board records a pass, then the visitor calls cross_after_board. No key is added here.
+// Path base-1 and chain 8453 keep the derived foreign address. Init stores no recipient.
 import { readFileSync } from 'node:fs';
 
 const dep = JSON.parse(readFileSync(new URL('../../shared/deployments/mainnet.json', import.meta.url), 'utf8'));
 const toll = dep.toll || {};
 const foreign = String(toll.foreign_address || dep.foreign_address || '').toLowerCase();
 
-const DEST = '0xBDfCeE82Bd42FEfA58ee850B3709636a8B6b0034';
-const PRIOR = '0x1cdbf67e974a3b07b2a52ee7c2d3821c8ec7ea0f';
 const FOREIGN_VALUE = '1000000000000';
 const MAX_FEE = '5000000000';
 const PRIORITY = '1000000000';
@@ -22,7 +21,7 @@ const plan = {
   path: 'base-1',
   chain_id: 8453,
   foreign_address: foreign,
-  note: 'Run snapshot, then close, then create the same account and deploy the new wasm. No NEAR stays on a deleted account. This script does not send.',
+  note: 'This is the last close. The new wasm is upgradeable. No recipient is stored at init. This script does not send.',
   steps: [
     {
       step: 'snapshot',
@@ -37,7 +36,7 @@ const plan = {
       deposit_yocto: '1',
       signer: 'nearcarta.near',
       beneficiary: 'nearcarta.near',
-      note: 'The balance, including storage stake, returns to nearcarta.near.',
+      note: 'Only because the live wasm cannot upgrade itself. The balance, including storage stake, returns to nearcarta.near.',
     },
     {
       step: 'create_and_deploy',
@@ -46,7 +45,7 @@ const plan = {
       signer: 'nearcarta.near',
       full_access_keys_after: 0,
       function_call_keys_after: 0,
-      note: 'No function-call key. The visitor calls cross_after_board. The toll account cannot.',
+      note: 'No function-call key. The visitor calls cross_after_board and names the recipient.',
     },
     {
       step: 'new',
@@ -58,7 +57,7 @@ const plan = {
         chain_id: 8453,
         foreign_address: foreign,
         fx_root_key: dep.fx_root_key || '',
-        allow_to: [DEST, PRIOR],
+        allow_to: [],
         max_per_tx: '10000000000000',
         budget: '30000000000000',
         max_fee_cap: MAX_FEE,
@@ -67,7 +66,7 @@ const plan = {
         dao: null,
         gate: null,
       },
-      note: 'Same account id, path base-1 and chain 8453 keep the derived address. allow_to includes the fixed payout.',
+      note: 'Same account id, path base-1 and chain 8453 keep the derived address. allow_to is empty. A visitor is not a new deploy.',
     },
     {
       step: 'set_cross',
@@ -75,30 +74,25 @@ const plan = {
       args: {
         board: 'board.nearcarta.near',
         pass_fee: '<yocto the owner sets; the UI reads this back>',
-        evm_to: DEST,
         foreign_value: FOREIGN_VALUE,
         max_fee_per_gas: MAX_FEE,
         max_priority_fee_per_gas: PRIORITY,
       },
-      note: 'The payout is fixed. The visitor does not choose the recipient, the value or the fees. Arbitrum stays off this account.',
+      note: 'The value and the fees are caps. The recipient is an argument on cross_after_board.',
     },
     {
       step: 'verify',
       view: 'policy',
-      expect: { path: 'base-1', chain_id: 8453, foreign_address: foreign, evm_to: DEST },
+      expect: { path: 'base-1', chain_id: 8453, foreign_address: foreign, allow_to: [], recipients: 'visitor' },
     },
     {
-      step: 'fund_foreign',
-      address: foreign,
-      note: 'Tiny ETH for gas on the derived address. This script does not send it.',
-    },
-    {
-      step: 'teardown',
-      method: 'close',
-      deposit_yocto: '1',
-      beneficiary: 'nearcarta.near',
+      step: 'later',
+      method: 'upgrade',
+      then: 'migrate',
+      signer: 'nearcarta.near',
+      note: 'A later wasm change is upgrade, then migrate. It does not close the account and it is not once per visitor.',
     },
   ],
 };
 console.log(JSON.stringify(plan, null, 2));
-console.log('v7 Path A: the board records the pass, then the visitor calls cross_after_board. The payout is fixed. No key is added to this account.');
+console.log('v7 Path A: the visitor names the recipient. Init stores none. The owner upgrades later with migrate.');

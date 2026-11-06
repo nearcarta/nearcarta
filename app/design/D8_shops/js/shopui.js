@@ -635,7 +635,7 @@ async function tollPay(quote) {
   const balanceNear = nextRowBalance(row.balance, fee);
   sh?.hideRefuse?.();
   if (sh?.act && runScene) runScene(sh.act({ success: true }));
-  const sayText = passPaidCopy({ balanceNear, feeNear: quote.feeNear });
+  const sayText = passPaidCopy({ balanceNear, feeNear: quote.feeNear, to: quote.to });
   return { ok: true, o, tx: o.tx, balanceNear, hint: sayText, success: true, keep: true, kind: 'ok', say: sayText, rc: A.txLine(o.tx) };
 }
 
