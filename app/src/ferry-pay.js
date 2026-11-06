@@ -88,8 +88,21 @@ if (root) {
     const pick = preset.recipient || list[0] || '';
     recipient.value = pick;
     if (preset.recipient && list.length && !list.includes(preset.recipient)) { out.textContent = 'That recipient is not on the charter list.'; return; }
-    if (!j.ok) { out.textContent = 'The charter will not take this payment' + (j.reason ? ': ' + j.reason : '') + '.'; return; }
-    out.textContent = 'The charter allows ' + pick + '. At most 0.20 USD. Pay asks for a deposit address. You send the tokens yourself. A confidential quote is a quote only, not a settled private swap.';
+    if (!j.ok) {
+      // No row is its own state: say where to open one instead of a raw reason.
+      if (j.reason === 'no_row') {
+        out.innerHTML = '';
+        out.append(`${j.error || 'No row on the board for this account yet.'} `);
+        const a = document.createElement('a');
+        a.href = (j.next && j.next.href) || '/setup/#sign';
+        a.textContent = (j.next && j.next.label) || 'Open your row in /setup';
+        out.append(a, '. Nothing was sent.');
+        return;
+      }
+      out.textContent = 'The charter will not take this payment' + (j.reason ? ': ' + j.reason : '') + '.';
+      return;
+    }
+    out.textContent = 'The charter allows ' + pick + '. Your row sets the limit. Pay asks for a deposit address. You send the tokens yourself. A confidential quote is a quote only, not a settled private swap.';
   }
   function pair() {
     const [symbol, chainName] = String(payId || '').split('|');

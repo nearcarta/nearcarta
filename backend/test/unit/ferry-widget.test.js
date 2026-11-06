@@ -11,7 +11,10 @@ test('the pay widget quotes a checkout and shows an embed snippet', () => {
   assert.match(html, /id="nearcarta-pay"/);
   assert.match(html, /ferry-pay\.js/);
   assert.match(html, /data-testid="widget-embed"/);
-  assert.match(html, /0\.20 USD/);
+  // The widget names the row as the limit; there is no product-wide USD cap.
+  assert.doesNotMatch(html, /0\.20 USD/);
+  assert.match(html, /The limit is your own row/);
+  assert.match(js, /Your row sets the limit/);
   assert.match(js, /\/api\/ferry\/checkout/);
   assert.match(js, /\/api\/ferry\/rules/);
   assert.match(js, /\/api\/ferry\/status/);
@@ -23,7 +26,9 @@ test('the pay widget quotes a checkout and shows an embed snippet', () => {
 test('the live swap script prints the steps and does not ask 1Click unless --live', () => {
   const r = spawnSync(process.execPath, ['backend/scripts/ferry-live-swap.js'], { cwd: new URL('../../..', import.meta.url), encoding: 'utf8' });
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /0\.2 USD/);
+  // No product USD cap is claimed; the visitor's row is named as the limit.
+  assert.doesNotMatch(r.stdout, /USD cap of|at most 0\.2 USD/);
+  assert.match(r.stdout, /the row is the limit/);
   assert.match(r.stdout, /does not send funds/);
   assert.doesNotMatch(r.stdout + r.stderr, /depositAddress":/);
 });

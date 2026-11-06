@@ -12,7 +12,34 @@ const G = DEP.guardhouse || null;
 const RETIRED = new Set(Object.entries(MAINNET_DEP?.retired || {})
   .filter(([, v]) => v?.status === 'deleted')
   .map(([id]) => id));
-export const oathId = G?.oath || MAINNET_DEP?.charter?.contract || null;
+// The visitor board replaced the oath: a row per account on board.nearcarta.near.
+export const boardId = MAINNET_DEP?.board?.contract || null;
+export const oathId = G?.oath || (MAINNET_DEP?.charter?.contract && !RETIRED.has(MAINNET_DEP.charter.contract) ? MAINNET_DEP.charter.contract : null) || boardId;
+
+/**
+ * The board is the oath now. It has no `get_state`/`get_clauses`: the rules live in each
+ * visitor's row, and `get_config` is the only whole-contract read. Return the same shape
+ * the old oath snapshot had, so the dashboards keep working with the live source.
+ */
+export async function boardSnapshot(board) {
+  const [config, keys] = await Promise.all([view(board, 'get_config'), accessKeys(board)]);
+  const fullAccess = keys.keys.filter(k => k.access_key.permission === 'FullAccess').length;
+  const fc = keys.keys.filter(k => k.access_key.permission !== 'FullAccess').map(k => ({
+    public_key: k.public_key, receiver: k.access_key.permission.FunctionCall.receiver_id, methods: k.access_key.permission.FunctionCall.method_names }));
+  return {
+    board,
+    oath: board,
+    state: {
+      owner: config.owner, dao: null, frozen: false,
+      policy_version: 2, policy_hash: null, freeze_epoch: 0, agent_key: null,
+      rows: config.rows, max_row_yocto: config.max_row_yocto,
+    },
+    clauses: null,
+    usage: {},
+    keys: { fullAccess, functionCall: fc },
+    source: 'board',
+  };
+}
 
 /**
  * What is true today when the old oath is gone. The shape is the one the city already reads for a
@@ -50,6 +77,8 @@ export async function snapshot(oath = oathId) {
   // A retired account is not a server fault and not a live policy: answer with the retired fact and
   // the live board, so no page reads a deleted charter as the current rules.
   if (RETIRED.has(oath)) return retiredSnapshot(oath);
+  // The board itself is the live spend gate now, so a read of it returns its row shape.
+  if (boardId && oath === boardId) return boardSnapshot(oath);
   const oathId = oath;
   const [state, clauses, keys] = await Promise.all([view(oathId, 'get_state'), view(oathId, 'get_clauses'), accessKeys(oathId)]);
   const usage = {};
