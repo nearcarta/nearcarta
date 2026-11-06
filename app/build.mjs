@@ -37,6 +37,10 @@ mkdirSync(dist + '/shared/hall', { recursive: true });
 mkdirSync(dist + '/shared/rails', { recursive: true });
 cpSync(here + '../shared/hall/plan.js', dist + '/shared/hall/plan.js');
 cpSync(here + '../shared/hall/job.js', dist + '/shared/hall/job.js');
+// The Chronicle tray imports these as raw modules (rules reconstruction, cross-shop receipts).
+mkdirSync(dist + '/shared/chronicle', { recursive: true });
+cpSync(here + '../shared/chronicle/rules.js', dist + '/shared/chronicle/rules.js');
+cpSync(here + '../shared/chronicle/receipts.js', dist + '/shared/chronicle/receipts.js');
 // v2.js pulls in board/call-as.js (a bare @noble specifier) and a JSON import, so it
 // has to be bundled, not copied. The Hall panels import it at /shared/hall/v2.js.
 await (await import('esbuild')).build({

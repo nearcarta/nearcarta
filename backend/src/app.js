@@ -32,7 +32,8 @@ import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
 import { view, viewAccount, txStatus, rpcStats } from './near.js';
-import { readLive } from './chronicle-live.js';
+import { accountTxHashes, readLive } from './chronicle-live.js';
+import { anchorIndex } from './chronicle-index.js';
 import { signStatement } from './chronicle-statement.js';
 import { nearAccountOk } from '../../shared/net/accounts.js';
 import { txVerdict } from '../../shared/net/tx-verdict.js';
@@ -173,6 +174,15 @@ export async function ledgerRead() {
     return { ...buildLedger({ chronicle: merged, toll, board: mainnetChronicle(), budget: agentMod.budgetStatus() }), charters: { live, history } };
 }
 const ledgerSwr = swr('ledger', ledgerRead, { ttl: 15_000, stale: 30 * 60_000 });
+// The deployments record is a file, not a chain read. One body is reused by /api/mainnet and
+// /api/chronicle, and the Chronicle tray used to ask for it again on every account read.
+let depBody = null, depAt = 0;
+export function deploymentsBody(now = Date.now()) {
+  if (depBody && now - depAt < 5 * 60_000) return depBody;
+  depBody = MAINNET_DEP || { status: 'not_deployed' };
+  depAt = now;
+  return depBody;
+}
 // Seed the ledger cache only from a mainnet snapshot.
 export const seedSwr = (name, v, at = Date.now()) => { if (v != null && !swrs.get(name)?.v) swrs.set(name, { v, at }); };
 { const snap = shops.ledgerSnapshot(); if (snap?.ledger?.network === 'mainnet') seedSwr('ledger', { ...snap.ledger, stale: true, snapshot_at: snap.at }, Date.now() - 15_001); }
@@ -233,7 +243,9 @@ export function makeApp() {
     return c.json({ client_ip_from: from, client_tag: ipTag(ip), shared_cap: egress ? 'egress:' + ipTag(egress) : null, proxy_verified: proxyVerified(c), ip_headers: seen, header_names: [...raw.keys()].filter(n => !IP_HEADERS.includes(n)).sort() });
   });
   app.get('/api/deployments', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
-  app.get('/api/mainnet', limiter(30), c => c.json(MAINNET_DEP || { status: 'not_deployed' }));
+  // The deployments record is a file, not a chain read: cached at the edge and in this process,
+  // so the tray's per-account ask does not cost a route call each time.
+  app.get('/api/mainnet', limiter(120), edgeCache(60), c => c.json(deploymentsBody()));
   app.get('/api/receipts', limiter(30), c => c.json(receiptsBody(MAINNET_DEP || {}, agentMod.budgetStatus(), { jobTokens: agentMod.MAX_TOKENS, checkouts: checkout.listCheckoutReceipts() })));
 
   // Ferry
@@ -590,7 +602,9 @@ export function makeApp() {
   });
   // The town's own feed (the guardhouse oath), so a page can ask for it without reading /api/deployments first.
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
-  app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
+  // Shared stale-while-revalidate in the process, and a short edge cache, so a room that also reads it
+  // does not re-run the chain reads. limiter(20) is per client; the shared copy absorbs the fan-out.
+  app.get('/api/ledger', limiter(60), edgeCache(15), async c => c.json(await ledgerSwr()));
   app.get('/api/chronicle', limiter(120), edgeCache(15), async c => c.json(mainnetChronicle(c.req.query('owner') || '')));
   app.get('/api/chronicle/live', limiter(30), async c => {
     const account = String(c.req.query('account') || '').trim();
@@ -610,6 +624,24 @@ export function makeApp() {
     const rows = Array.isArray(b?.rows) ? b.rows.slice(0, 40) : [];
     const out = await signStatement({ account, period: b?.period || {}, rows, totals: b?.totals || null });
     return c.json(out);
+  });
+  // The anchors and rule versions this account wrote. Read-only rebuild from its own txs:
+  // the board stores neither (anchor logs one event; set_rules overwrites the row).
+  app.get('/api/chronicle/anchors', limiter(30), async c => {
+    const account = String(c.req.query('account') || '').trim();
+    if (!nearAccountOk(account)) return bad(c, 'account must be a NEAR account id');
+    try {
+      const listed = await accountTxHashes(account);
+      const sender = account;
+      const txs = [];
+      for (const h of (listed.hashes || []).slice(0, 20)) {
+        try { txs.push(await txStatus(h, sender)); } catch { /* one missing tx is a gap, not a failed rebuild */ }
+      }
+      const body = await anchorIndex({ account, txs });
+      return c.json({ ...body, index: { source: listed.source, hashes: (listed.hashes || []).length, gap: listed.gap || '' } });
+    } catch (e) {
+      return c.json({ account, anchors: [], ruleWrites: [], gaps: [String(e.message || 'The rebuild did not answer.').slice(0, 160)] }, 200);
+    }
   });
   app.get('/api/chronicle/:account', limiter(120), edgeCache(15), async c => {
     const a = c.req.param('account');

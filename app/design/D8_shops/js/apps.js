@@ -742,6 +742,46 @@ export async function ferryProposeCalls(steps) {
   return { ok: true, youSend: false, wallet: false, txs: landed.map(s => s.tx), landed, tx: landed.at(-1)?.tx || null };
 }
 
+/**
+ * Anchor a statement commitment on the visitor's own board row.
+ * `anchor(kind, digest, salt)` stores nothing and logs one nearcarta-board v2 event
+ * (contracts/charter_board/src/v2.rs). The session key is a FunctionCall key on the
+ * visitor's account that names the board, so this needs no wallet popup and no deposit.
+ * The board takes no signature on `anchor`: the row is the predecessor's own, so the
+ * account that sends it is the authorisation. Never signs a payment.
+ */
+export async function anchorStatement({ kind = 'statement', digest = '', salt = '' } = {}) {
+  const you = (reason, extra = {}) => ({ ok: false, reason, ...extra });
+  if (!S.board || !S.me) return you('no_session');
+  if (!/^[0-9a-f]{64}$/.test(String(digest))) return you('no_digest');
+  if (!/^[A-Za-z0-9]{8,64}$/.test(String(salt))) return you('no_salt');
+  const key = agent();
+  if (!key) return you('no_key');
+  const ak = await proposeAccessKey(key);
+  if (!ak) return you('no_session_key');
+  const names = ak?.permission?.FunctionCall?.method_names || [];
+  if (names.length && !names.includes('anchor')) return you('key_cannot_anchor');
+  const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  if (!row) return you('no_row');
+  try {
+    const signed = W.signTx({
+      key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+      actions: [W.functionCall('anchor', { kind, digest, salt }, BigInt(ANCHOR_TGAS) * TG)],
+    });
+    const result = await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' });
+    const sent = W.outcomeOf(result);
+    if (!sent.ok) return you(refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160), { tx: signed.hash });
+    // The board logs the commitment in this receipt. Read it back rather than trusting the send.
+    const logs = (result?.receipts_outcome || []).flatMap(r => r?.outcome?.logs || []);
+    return { ok: true, tx: signed.hash, logs, reason: '' };
+  } catch (e) {
+    return you(refusalOf(e) || String(e?.message || e).slice(0, 160));
+  }
+}
+
+/** One anchor is a single small call: 30 Tgas covers it with room for the event log. */
+export const ANCHOR_TGAS = 30;
+
 export async function sessionAllowance() {
   const key = agent();
   if (!key || !S.me) return { yocto: null, near: null, low: true };

@@ -703,8 +703,11 @@ impl Board {
         self.effects.get(owner).and_then(|caps| caps.iter().find(|c| c.chain == chain && c.asset == asset && c.receiver == to)).map(|c| (c.value_spent, c.fee_spent)).unwrap_or((0, 0))
     }
 
-    pub fn anchor(&self, kind: String, digest: String, salt: String) {
+    pub fn anchor(&mut self, kind: String, digest: String, salt: String) {
         let me = env::predecessor_account_id();
+        // The live board loads the header, not every row (`read_head`). Without this the
+        // visitor's own row is absent from memory and the call panics ERR_NO_CHARTER.
+        self.hydrate(&me);
         require!(self.rows.contains_key(&me), "ERR_NO_CHARTER");
         require!((1..=32).contains(&kind.len()) && kind.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_'), "ERR_KIND");
         let raw = parse_hex32(&digest);
@@ -932,10 +935,12 @@ pub extern "C" fn settle() {
 #[no_mangle]
 pub extern "C" fn anchor() {
     let v = parse(&input_str());
-    let b = load();
-    let before = encode(&b);
+    let mut b = load();
+    // "Stores nothing" is about the trie, so compare storage usage rather than the
+    // in-memory encode: the live load hydrates the visitor's row before the event.
+    let before = env::storage_usage();
     b.anchor(v.need("kind").string(), v.need("digest").string(), v.need("salt").string());
-    require!(encode(&b) == before, "ERR_STATE");
+    require!(env::storage_usage() == before, "ERR_STATE");
     save(&b);
 }
 #[no_mangle]

@@ -9,7 +9,9 @@
 // ft_transfer is NEP-141: https://github.com/near/NEPs/blob/master/neps/nep-0141.md
 import { functionCallAllowanceCost } from './cost.js';
 
-export const AGENT_METHODS = ['propose', 'propose_call', 'propose_call_as'];
+// `anchor` is the Chronicle tray's own call: it logs one event and stores nothing, so it
+// needs no cap and no deposit, but the session key must name it or the visitor signs twice.
+export const AGENT_METHODS = ['propose', 'propose_call', 'propose_call_as', 'anchor'];
 
 /**
  * The session key's scope for holds. Arena, Guard and Hall need three more board
