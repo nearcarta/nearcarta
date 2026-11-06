@@ -118,7 +118,8 @@ test('the city door and the tray stay in the source', () => {
   const room = readFileSync(new URL('../../../app/design/D8_shops/shops/arena.js', import.meta.url), 'utf8');
   const tray = readFileSync(new URL('../../../app/src/panels/arena/tray.js', import.meta.url), 'utf8');
   assert.match(deep, /data-testid="arena-attack"/);
-  assert.match(index, /data-city-shop="arena"/);
+  // The city list opens the shop in place (`/?shop=arena`). The standalone page stays a backup.
+  assert.match(index, /href="\/\?shop=arena" data-enter-shop="arena"/);
   assert.doesNotMatch(room, /Café/);
   assert.match(tray, /Mint guardian/);
   assert.match(tray, /Attack guardian/);

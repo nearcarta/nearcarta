@@ -9,6 +9,7 @@ import { tickLife, setSky, hushLife } from './life.js';
 import * as SL from './shops.js';
 import { mountIntro } from './intro-dom.js';
 import { beginEnter } from './room-lock.js';
+import { createRouter, shopKey, shopQuery } from './city-route.js';
 import { icon } from '../d7/js/d7.js';
 const $=s=>document.querySelector(s); const body=document.body; const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 window.__alog=[]; // audio event log (t in story seconds) for the offline video mix
@@ -77,7 +78,9 @@ const letterbox=on=>body.classList.toggle('letterbox',on);
 // shops with no room yet: still part of the town, but no pin, no door, no menu entry
 const CLOSED=new Set([]); /* every door opens: Toll Bridge runs its real paid flow too */ const OPEN=Object.fromEntries(Object.entries(SHOPS).filter(([id])=>!CLOSED.has(id)));
 const CHARTER=window.NEARCARTA_CHARTER||'/shops/vault/';
-const ALIAS={chron:'chronicle',townhall:'hall',mistbank:'bank',guardhouse:'guard',vault:'house'};
+// One route for every way into a shop: ?shop=, the All shops list, the pins and the door prompt.
+// Before boot finishes the first request is held here instead of falling back to a page load.
+const route=createRouter({ open:id=>jump(id) });
 
 function chron(k,label){ const tx=TX[k]; const li=document.createElement('li'); li.className=tx.cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
   li.querySelector('.w').textContent=label||tx.what; const a=li.querySelector('a'); a.href=txUrl(tx.h); a.textContent=tx.h.slice(0,6)+'…'+tx.h.slice(-4); a.title=tx.ev;
@@ -233,16 +236,15 @@ document.body.appendChild(sm);
 const sbtn=document.createElement('button'); sbtn.id='shopsBtn'; sbtn.className='pill'; sbtn.type='button'; sbtn.textContent='Skip to a shop'; sbtn.setAttribute('aria-haspopup','menu'); $('#ctl').prepend(sbtn);
 sbtn.addEventListener('click',()=>{ sm.hidden=!sm.hidden; sbtn.setAttribute('aria-expanded',String(!sm.hidden)); });
 sm.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; sm.hidden=true; sbtn.setAttribute('aria-expanded','false'); jump(b.dataset.id); });
-document.querySelector('[data-testid=all-shops-list]')?.addEventListener('click',e=>{ const b=e.target.closest('[data-enter-shop]'); if(!b) return; e.preventDefault(); jump(b.dataset.enterShop); });
+document.querySelector('[data-testid=all-shops-list]')?.addEventListener('click',e=>{ const a=e.target.closest('[data-enter-shop]'); if(!a) return; e.preventDefault(); route.open(a.dataset.enterShop); });
 // Jump: fly straight from wherever the camera is into the shop door; the Lamplighter waits on that step for the way back out
 let door={busy:false,id:null};
-document.querySelector('[data-testid=all-shops-list]')?.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href="/shops/hall/"]'); if (!a || !OPEN.hall) return; e.preventDefault(); jump('hall'); });
-function jump(id,opt,tries=0){ id=ALIAS[id]||id; if(!OPEN[id]||tries>8) return;
+function jump(id,opt,tries=0){ id=shopKey(id); if(!id||!OPEN[id]||tries>8) return;
   if(inShop&&inShop!==id){ world.exitShop().then(()=>jump(id,opt,tries+1)); return; }
   if(exiting||body.classList.contains('entering')||door.busy){ if(tries>4&&!inShop){ door={busy:false,id:null}; body.classList.remove('entering'); } setTimeout(()=>jump(id,opt,tries+1),350); return; }
   const next=beginEnter({busy:!!(inShop||door.busy),id:inShop||door.id},id); if(next.ignored){ setTimeout(()=>jump(id,opt,tries+1),350); return; } door={busy:true,id}; if(mode==='story') endStory(); if(mode!=='explore') explore(true); tagOff(); const s=SHOPS[id], d=hx(...s.door), c=hx(s.q,s.r);
   world.enterShop(id,opt).then(()=>{ if(inShop!==id) return; R.steer=null; R.stop(); R.place(d.x,d.z,Math.atan2(d.x-c.x,d.z-c.z)); }); }
-window.__openCityShop = (id) => jump(id);
+window.__openCityShop = (id) => route.open(id);
 // ---------- Walk / Jump ----------
 const TOUCH=matchMedia('(pointer:coarse)').matches||P.has('touch'); if(TOUCH) body.classList.add('touch');
 let play=P.get('play')==='walk'?'walk':'jump'; const seg=$('#playSeg'); const hintEl=$('#hint');
@@ -460,7 +462,10 @@ step(1/30); draw();
 { const g=W.renderer.getContext(), px=new Uint8Array(4); let lit=0; for(const [fx,fy] of [[.5,.5],[.25,.4],[.75,.4],[.5,.2],[.3,.75],[.7,.75]]){ g.readPixels((g.drawingBufferWidth*fx)|0,(g.drawingBufferHeight*fy)|0,1,1,g.RGBA,g.UNSIGNED_BYTE,px); if(px[0]+px[1]+px[2]>24) lit++; }
   if(!lit&&!window.__gl?.soft&&!CAPTURE){ console.error('[Nearcarta] first 3D frame came back black'); await fallback('blank first frame'); throw new Error('blank first frame'); } }
 $('#loading').classList.add('done'); body.classList.add('ready');
-{ const q=P.get('shop'); const id=q&&(ALIAS[q]||q); if(id&&OPEN[id]) setTimeoutSim(()=>jump(id),.4); }
+const start=shopQuery(location.search)||shopKey(window.__cityWant); if(start&&OPEN[start]) route.open(start);
+// The town can open a room from now on. A request that arrived during the boot opens here, in the city,
+// instead of the page falling back to a standalone shop link.
+route.arm();
 // warm every room while the town idles: each shop module and the room props it puts (D8 core caches both), one per idle slot,
 // so the first door at any width opens at warm speed instead of waiting on cold fetches
 // arena's Knight.glb (1.1 MB) is left cold to keep first-load wire under budget
