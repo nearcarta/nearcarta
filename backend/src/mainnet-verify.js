@@ -59,8 +59,12 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
 
 export async function checkAll(dep, { rpc, fetchImpl = fetch } = {}) {
   const rpcs = (Array.isArray(rpc) ? rpc : [rpc]).filter(Boolean);
-  const rows = [];
-  for (const row of collectMainnetTxs(dep)) {
+  const rows = collectMainnetTxs(dep);
+  // One hash can be recorded under several shops (a recovered house tx appears in
+  // the retired record and the live one). Ask once, not four times, then reuse.
+  const byHash = new Map();
+  const lookup = async (row) => {
+    if (byHash.has(row.hash)) return byHash.get(row.hash);
     let hit = { ...row, found: false, error: 'not found' };
     for (const sender of sendersFor(dep, row)) {
       for (const url of rpcs) {
@@ -70,7 +74,22 @@ export async function checkAll(dep, { rpc, fetchImpl = fetch } = {}) {
       }
       if (hit.found) break;
     }
-    rows.push(hit);
+    if (hit.found) byHash.set(row.hash, hit);
+    return hit;
+  };
+
+  const out = await Promise.all(rows.map(lookup));
+  // A public archival node can drop a lookup in a burst even when the tx is there:
+  // the same hash came back found on one row and missing on the next in CI. Retry
+  // the ones that did not resolve, with backoff, before calling them missing.
+  const pending = () => out.map((r, i) => [r, i]).filter(([r]) => !r.found);
+  for (let pass = 1; pass <= 3 && pending().length; pass += 1) {
+    await new Promise(r => setTimeout(r, 400 * pass));
+    for (const [, i] of pending()) {
+      const again = await lookup({ ...rows[i] });
+      if (again.found) out[i] = again;
+      else out[i] = { ...out[i], error: again.error };
+    }
   }
-  return { ok: rows.length > 0 && rows.every(r => r.found), rows };
+  return { ok: out.length > 0 && out.every(r => r.found), rows: out };
 }
