@@ -29,8 +29,14 @@ export const FERRY_PROPOSE_BYTES = 310;
 export function boardProposeAllowanceYocto(tgas = BOARD_PROPOSE_TGAS, numBytes = FERRY_PROPOSE_BYTES) {
   return functionCallAllowanceCost({ tgas, numBytes });
 }
-// Storage for the call allowlist. Unused yocto is refunded by charge_len.
-export const CALLS_DEPOSIT_YOCTO = (10n ** 24n / 200n).toString();
+// Storage for the call allowlist, prepended as one deposit and refunded down to
+// what the write used (`charge_calls_and_reserve`).
+// Board v2 measures the real trie bytes: each pair is the receiver, the method and
+// a 16-byte cap, plus the 600-byte side reserve. 0.005 NEAR was the old in-memory
+// estimate and is refused with ERR_DEPOSIT now. A full default list measured
+// 0.0116 NEAR in the sandbox, and the widest list the row cap allows measured
+// 0.01494 (`contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`).
+export const CALLS_DEPOSIT_YOCTO = (15n * 10n ** 21n).toString();
 
 export function sessionExpiresAt(hours, nowMs = Date.now()) {
   const h = SESSION_HOURS.includes(Number(hours)) ? Number(hours) : SESSION_HOURS[0];
@@ -72,6 +78,39 @@ function wrapCap(named, capYocto) {
 // (receiver, method) pair is repeated. contracts/charter_board MAX_CALLS.
 // Pay receivers stay at MAX_RECEIVERS (8).
 export const MAX_CALLS = 24;
+
+// A board row holds MAX_ROW_YOCTO (0.02 NEAR = 2000 bytes) of storage, and v2 bills
+// the real trie bytes. The call list is the row's largest part, so how many shops fit
+// depends on how long their account ids are. Measured on the committed wasm in
+// `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`: seven 20-byte shops
+// locked 0.01967 NEAR and eight failed ERR_ROW_TOO_BIG; six 32-byte shops locked
+// 0.01984 and seven failed; five 48-byte shops locked 0.01997 and six failed; four
+// 56-byte shops locked 0.01946 and five failed.
+// A row costs about 501 bytes and the fixed side record takes the rest, leaving about
+// 600 bytes for the pairs. Each pair adds the receiver, the method and a 16-byte cap,
+// which is `receiver.length + method.length + 24`; the budget counts the wrap.near
+// trio, the board stamp and the House shop's two calls too, with the 20-byte production
+// board id. Measured in `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`:
+// 5 shops of 20 bytes fit (597) and 6 do not (652); 4 of 26 fit (562) and 5 do not (622);
+// 4 of 33 fit (590) and 5 do not (657); 3 of 41 fit (547) and 4 do not (622); 3 of 49 fit
+// (571) and 4 do not (654); 3 of 57 fit (595) and 4 do not (686). 602 keeps that one byte
+// of headroom below the first refusal.
+export const MAX_PAIR_BYTES = 602;
+
+/** Trie bytes one (receiver, method) pair adds to the row. */
+export function callPairBytes(receiver, method) {
+  return String(receiver).length + String(method).length + 24;
+}
+
+/**
+ * True when this call list fits the row's 0.02 NEAR of storage.
+ * The deposit does not decide this: ERR_ROW_TOO_BIG does, and the page should stop
+ * before it sends. The budget was measured with the wrap.near trio and the stamp on
+ * the same row, which is what `callPolicy` always puts there.
+ */
+export function callsFitRow(calls) {
+  return (calls || []).reduce((n, c) => n + callPairBytes(c.receiver, c.method), 0) <= MAX_PAIR_BYTES;
+}
 
 const callKey = (receiver, method) => `${String(receiver).toLowerCase()}\0${String(method)}`;
 
