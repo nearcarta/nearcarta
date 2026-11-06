@@ -2358,6 +2358,31 @@ mod tests {
     }
 
     #[test]
+    fn an_anchor_on_the_live_header_load_still_finds_the_visitors_row() {
+        // The live board calls `read_head` (partial), not `decode(STATE)`. A row is loaded
+        // only by `hydrate`, so `anchor` must hydrate or it panics ERR_NO_CHARTER.
+        let (mut c, _, _) = boot();
+        open_bob(&mut c);
+        save(&c);
+        let owed = c.liabilities();
+        go(ALICE, 0, 5);
+        let mut live = load();
+        assert!(live.partial, "the deployed board reads the header");
+        assert!(live.rows.is_empty(), "the live load holds no rows yet");
+        live.anchor("statement".into(), "ab".repeat(32), "saltsalt".into());
+        let logs = get_logs();
+        assert!(logs.iter().any(|l| l.contains("\"event\":\"anchor\"") && l.contains("\"owner\":\"alice.near\"") && l.contains("\"kind\":\"statement\"")), "the anchor event names the visitor");
+        assert!(logs.iter().all(|l| !l.contains("saltsalt")), "the salt is not logged");
+        assert_eq!(live.liabilities(), owed, "an anchor moves no money");
+        assert_eq!(live.get_charter(acc(ALICE)).unwrap().balance.0, c.get_charter(acc(ALICE)).unwrap().balance.0);
+        // A visitor with no row is still refused, not silently anchored.
+        go("mallory.near", 0, 5);
+        let mut other = load();
+        let err = catch_unwind(AssertUnwindSafe(|| other.anchor("statement".into(), "ab".repeat(32), "saltsalt".into()))).unwrap_err();
+        assert!(refuse(err).contains("ERR_NO_CHARTER"));
+    }
+
+    #[test]
     fn anchor_stores_nothing_and_migrate_keeps_both_rows() {
         let (mut c, _, _) = boot();
         open_bob(&mut c);
