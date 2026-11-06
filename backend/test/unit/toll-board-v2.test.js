@@ -80,36 +80,43 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   for (const t of report.transfers) {
     assert.ok(t.payee === 'nearcarta.near' || t.payee === 'toll.nearcarta.near');
   }
-  // Once the recorded wasm is live, `path` is view. The init args still appear so a
-  // reader can check them, so `init.allow_to` is always there.
-  assert.deepEqual(report.init.allow_to, []);
+  // A view carries no init args; a create does, and they must name no allow list.
+  if (report.init) assert.deepEqual(report.init.allow_to, []);
+  else assert.equal(report.path, 'view');
   assert.equal(report.smoke.sends, false);
   assert.equal(report.smoke.to, null);
   assert.ok(report.wasm.bytes < 240000);
   const ONE = 10n ** 24n;
   const slack = BigInt(report.storage.slack_yocto);
+  const stake = BigInt(report.storage.stake_after_yocto);
   assert.equal(slack, 2n * ONE / 100n);
   assert.ok(slack <= 5n * ONE / 100n);
-  // Once the recorded wasm is live the path is a view and nothing moves. The
-  // transfer and stake checks below only apply to a create or a replace.
+  assert.ok(stake > 0n);
   assert.ok(['view', 'close_then_create', 'create_only', 'upgrade_then_migrate'].includes(report.path));
-  if (report.path !== 'view') {
+  const stakeCheck = report.prechecks.find(p => p.check === 'stake from the wasm');
+  assert.equal(stakeCheck && stakeCheck.ok, true);
+  const slackCheck = report.prechecks.find(p => p.check === 'slack');
+  assert.equal(slackCheck && slackCheck.ok, true);
+  // A view moves nothing. A create or a replace names its stake and its slack.
+  const create = report.transfers.find(t => t.step === 'create_account');
+  const close = report.transfers.find(t => t.step === 'close');
+  if (report.path === 'view') {
+    assert.deepEqual(report.transfers, []);
+  } else {
     assert.equal(report.balance.shortfall_near, '0');
-    const stake = report.prechecks.find(p => p.check === 'balance covers the new stake');
-    assert.equal(stake && stake.ok, true);
-    const slackCheck = report.prechecks.find(p => p.check === 'slack');
-    assert.equal(slackCheck && slackCheck.ok, true);
-    const create = report.transfers.find(t => t.step === 'create_account');
-    const close = report.transfers.find(t => t.step === 'close');
+    const funded = report.prechecks.find(p => p.check === 'balance covers the stake and slack');
+    assert.equal(funded && funded.ok, true);
+  }
+  if (create) {
     assert.equal(create.payee, 'toll.nearcarta.near');
+    assert.equal(create.slack_near, '0.02');
+    assert.equal(BigInt(create.amount_yocto), stake + slack);
+  }
+  if (close) {
     assert.equal(close.payee, 'nearcarta.near');
-    assert.equal(BigInt(create.amount_yocto), BigInt(report.storage.stake_after_yocto) + slack);
     assert.equal(close.amount_yocto, report.balance.shop_before_yocto);
     assert.ok(BigInt(close.amount_yocto) > BigInt(create.amount_yocto));
     assert.equal(report.balance.shop_after_liquid_near, '0.02');
-    assert.equal(create.slack_near, '0.02');
-  } else {
-    assert.deepEqual(report.transfers, []);
   }
   const refused = spawnSync(process.execPath, [script, '--live'], {
     encoding: 'utf8',
