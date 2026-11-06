@@ -9,7 +9,7 @@ import { anchorPlan, anchorProof, bundleDigest, canonicalManifest, parseAnchorEv
 import { totalsLine, totalsOf } from '../../../shared/chronicle/receipts.js';
 import { reconstructRules } from '../../../shared/chronicle/rules.js';
 import { liveTee } from '../tee-view.js';
-import { armChronicleDock, chronicleDockLog, dispatchChronicleDock, ensureChronicleDock, installChronicleDock } from './chronicle-dock.js';
+import { armChronicleDock, chronicleDockLog, ensureChronicleDock, installChronicleDock } from './chronicle-dock.js';
 import { ensureChronicleStyle } from './chronicle-style.js';
 
 const ROW_PAGE = 6;
@@ -277,7 +277,7 @@ export function mountChronicleTray(root, hooks = {}) {
     showOut();
   };
 
-  function drawList() {
+  async function drawList() {
     prepareRows();
     const ol = q$(root, '[data-testid=chronicle-page]');
     if (!ol) return paint();
@@ -292,7 +292,19 @@ export function mountChronicleTray(root, hooks = {}) {
     const needMore = state.rowTotal > (state.viewRows || []).length || state.nextCursor || state.ftCursor;
     if (moreBtn) moreBtn.hidden = !needMore;
     if (/^(Showing \d+ of \d+\.|\d+ rows\.)/.test(state.verify || '')) state.verify = countText(state);
+    showTotals();
     showOut();
+  }
+
+  // Totals and the rules line are part of the same answer as the list, so they are refreshed
+  // with it instead of waiting for the next full paint.
+  function showTotals() {
+    const totals = root.isConnected ? q$(root, '[data-testid=chronicle-totals]') : null;
+    if (totals) totals.textContent = state.totals ? totalsLine(state.totals) : '';
+    const rules = root.isConnected ? q$(root, '[data-testid=chronicle-rules]') : null;
+    if (rules) rules.textContent = state.rules?.version
+      ? `Rules version ${state.rules.version} (${state.rules.versions.length} readable).`
+      : (state.rules?.why || '');
   }
 
   async function readAccount(account, opts = {}) {
@@ -699,12 +711,9 @@ export function mountChronicleTray(root, hooks = {}) {
       verifyRow(row);
     });
     armChronicleDock((text) => runAgent(text));
-    const agentIn = doc?.getElementById?.('c-agent');
-    const agentGo = doc?.getElementById?.('c-agent-go');
-    if (agentIn) agentIn.onkeydown = (e) => {
-      if (e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); dispatchChronicleDock(doc); }
-    };
-    if (agentGo) agentGo.onclick = (e) => { e.preventDefault(); dispatchChronicleDock(doc); };
+    // The send path is installed once by installChronicleDock (a capturing click/keydown
+    // listener). A second onclick here fired the same line twice, so an empty box ran a
+    // second command and overwrote the first answer.
   }
 
   if (!state.sourceText) state.sourceText = 'Type an account, then press Show timeline.';

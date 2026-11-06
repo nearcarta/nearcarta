@@ -8,7 +8,8 @@
 // Nothing here invents an amount. The categories are the same three the CSV has always used:
 // delivered (allowed), refunded (a return), attempted (refused or failed on chain).
 
-import { presentAmount } from '../../app/src/chronicle-amount.js';
+/** Trim trailing zeros from a decimal string. */
+const trimFrac = t => String(t || '').replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
 
 /** NEAR's own decimals, then each known token's own decimals. */
 const TOKEN_DECIMALS = { NEAR: 24, wNEAR: 24, USDC: 6, USDT: 6, DAI: 18, ZEC: 8, GP: 0, cheems: 18 };
@@ -17,6 +18,23 @@ export function tokenDecimals(symbol, given) {
   const n = Number(given);
   if (Number.isFinite(n) && n >= 0 && n <= 30) return n;
   return TOKEN_DECIMALS[String(symbol || '').trim()] ?? null;
+}
+
+/**
+ * A yocto-style amount, already formatted (the tray passes presentAmount output through).
+ * Kept here as a copy rather than an import: this file is served to the browser from
+ * /shared/, and app/src is not on that path.
+ */
+export function presentAmount(amount) {
+  const s = String(amount || '').trim();
+  const m = s.match(/^(-?(?:\d+\.\d+[eE][+-]?\d+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?))\s+([A-Za-z][A-Za-z0-9.]*)\s*$/);
+  if (!m) return s;
+  const num = m[1];
+  const symbol = m[2];
+  if (!/e/i.test(num) && !/^-?\d{16,}$/.test(num)) return s;
+  if (symbol.toUpperCase() !== 'NEAR') return s;
+  const d = decimalOf(num, 24);
+  return d ? `${trimFrac(d)} ${symbol}` : s;
 }
 
 /** Smallest units to a trimmed decimal, keeping 8 significant digits so tiny token amounts survive. */

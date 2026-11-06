@@ -88,6 +88,11 @@ test('chronicle commands filter, export, verify and refuse an under-cap entry', 
   assert.equal(asked.action, 'query');
   assert.equal(asked.account, 'aurora.near');
   assert.equal(asked.decision, '');
+  // An explicit verb wins over the account, so the AI can anchor the account it is auditing.
+  const anchored = parseChronicleCommand('anchor the statement for aurora.near');
+  assert.equal(anchored.action, 'anchor');
+  assert.equal(parseChronicleCommand('Anchor this statement').action, 'anchor');
+  assert.equal(parseChronicleCommand('write the statement for aurora.near').action, 'statement');
   const implicit = parseChronicleCommand('timeline for 8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8 last week ferry');
   assert.equal(implicit.account, '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8');
   assert.equal(implicit.span, '7d');
