@@ -5,6 +5,7 @@
 // https://docs.near.ai/cloud/verification
 
 import { explainCheck } from '../guard-score.js';
+import { boardStep } from '../../../shared/guard/board-pay.js';
 import {
   LIVE_ENFORCEMENT, bindVerdict, contextMatches, createLedger, nearToYocto,
 } from './guard-pay.js';
@@ -121,6 +122,25 @@ function bookOf(state) {
   return state.book;
 }
 
+function boardOf(state, ctx, kind) {
+  const yocto = nearToYocto(state.amount);
+  const nonce = state.nonce ?? ctx.nonce;
+  return boardStep(kind, {
+    board: state.board || ctx.board || '',
+    owner: state.owner || ctx.owner || state.rowId || '',
+    guard: state.guard || ctx.guard || '',
+    nonce,
+    expiry: state.expiry || ctx.expiry || String(BigInt(Date.now()) * 1000000n + 600000000000n),
+    epoch: state.epoch ?? ctx.epoch ?? '0',
+    payee: state.acct || '',
+    chain: state.chain || 'near',
+    asset: state.asset || 'NEAR',
+    amount: yocto == null ? '' : yocto.toString(),
+    invoice: state.invoice || '',
+    actionId: state.actionId || nonce,
+  });
+}
+
 async function readCheck(check, account) {
   const raw = await check(account);
   return { raw, explained: explainCheck(raw), lamps: lampsFor(raw) };
@@ -192,9 +212,15 @@ export async function runGuardAction(plan, ctx = {}) {
     const result = bookOf(state).pay(state.bound);
     state.pending = result.needsHuman ? 'human' : null;
     state.holdId = result.hold?.id || state.holdId || null;
+    const kind = result.verdict === 'block' || result.status === 'refunded' ? 'block' : result.status === 'held' ? 'hold' : result.status === 'prepared' ? 'allow' : null;
+    const call = kind ? boardOf(state, ctx, kind) : null;
+    if (call?.ready) state.actionId = String(state.nonce ?? ctx.nonce ?? '');
+    if (result.status === 'held') state.notice = 'Held for confirm_hold. The agent cannot confirm. Nothing was signed.';
+    if (result.status === 'prepared') state.notice = 'Allow prepares propose_call_as. Nothing was signed.';
+    if (result.verdict === 'block') state.notice = 'Blocked. No propose_call_as. Nothing was signed.';
     return {
       ...result, action: 'pay', propose: false, lamps: lampsFor(state.chk), seal: result.status === 'refunded' || result.status === 'held',
-      verdict: state.bound?.verdict,
+      verdict: state.bound?.verdict, call,
     };
   }
 
@@ -203,13 +229,15 @@ export async function runGuardAction(plan, ctx = {}) {
     const hold = id && state.book?.book.holds.get(id);
     const result = bookOf(state).confirm(id, { actor: plan.actor || 'agent', intentDigest: hold?.digest });
     if (result.ok) state.pending = null;
-    return { ...result, action: 'confirm', propose: false, seal: false, lamps: lampsFor(state.chk) };
+    const call = result.ok ? boardOf(state, ctx, 'confirm') : null;
+    return { ...result, action: 'confirm', propose: false, seal: false, lamps: lampsFor(state.chk), call };
   }
 
   if (plan.action === 'cancel') {
+    const call = boardOf(state, ctx, 'cancel');
     const result = bookOf(state).cancel(state.holdId);
     if (result.ok) { state.pending = null; state.holdId = null; }
-    return { ...result, action: 'cancel', propose: false, seal: false };
+    return { ...result, action: 'cancel', propose: false, seal: false, call: result.ok ? call : null };
   }
 
   if (plan.action === 'freeze') {

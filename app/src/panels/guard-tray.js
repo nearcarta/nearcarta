@@ -10,7 +10,7 @@ function statusBlock(state, esc) {
   if (!score) {
     const bits = [];
     if (state.denyCount != null) bits.push(`${state.denyCount} on the live deny list.`);
-    bits.push(state.attested?.enabled ? 'Attested check is on.' : 'Attested check is off. The charter still decides on chain.');
+    bits.push(state.attested?.enabled ? 'Attested check is on.' : 'Server-side: age, code hash, lookalike, deny list. No TEE signature. Attested check is off. The charter cap is on chain.');
     if (state.notice) bits.push(state.notice);
     return `<p class="guard-status" data-testid="guard-attested">${esc(bits.join(' '))}</p>`;
   }
@@ -108,6 +108,11 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     if (typeof hooks.row === 'function') state.rowKnown = !!hooks.row();
     if (typeof hooks.frozen === 'function' && state.rowKnown) state.frozen = !!hooks.frozen();
     state.rowId = typeof hooks.charter === 'function' ? (hooks.charter() || '') : (state.rowId || '');
+    if (typeof hooks.owner === 'function') state.owner = hooks.owner() || '';
+    if (typeof hooks.board === 'function') state.board = hooks.board() || '';
+    if (typeof hooks.nonce === 'function') state.nonce = hooks.nonce();
+    if (typeof hooks.epoch === 'function') state.epoch = hooks.epoch();
+    if (typeof hooks.guard === 'function') state.guard = hooks.guard() || '';
   };
 
   const paint = () => {
