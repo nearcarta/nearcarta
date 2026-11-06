@@ -85,19 +85,27 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   assert.equal(report.smoke.sends, false);
   assert.equal(report.smoke.to, null);
   assert.ok(report.wasm.bytes < 240000);
-  assert.equal(report.balance.shortfall_near, '0');
   const ONE = 10n ** 24n;
   const slack = BigInt(report.storage.slack_yocto);
   const stake = BigInt(report.storage.stake_after_yocto);
   assert.equal(slack, 2n * ONE / 100n);
   assert.ok(slack <= 5n * ONE / 100n);
+  assert.ok(stake > 0n);
+  assert.ok(['view', 'close_then_create', 'create_only', 'upgrade_then_migrate'].includes(report.path));
   const stakeCheck = report.prechecks.find(p => p.check === 'stake from the wasm');
   assert.equal(stakeCheck && stakeCheck.ok, true);
   const slackCheck = report.prechecks.find(p => p.check === 'slack');
   assert.equal(slackCheck && slackCheck.ok, true);
-  assert.ok(stake > 0n);
+  // A view moves nothing. A create or a replace names its stake and its slack.
   const create = report.transfers.find(t => t.step === 'create_account');
   const close = report.transfers.find(t => t.step === 'close');
+  if (report.path === 'view') {
+    assert.deepEqual(report.transfers, []);
+  } else {
+    assert.equal(report.balance.shortfall_near, '0');
+    const funded = report.prechecks.find(p => p.check === 'balance covers the stake and slack');
+    assert.equal(funded && funded.ok, true);
+  }
   if (create) {
     assert.equal(create.payee, 'toll.nearcarta.near');
     assert.equal(create.slack_near, '0.02');
@@ -106,9 +114,9 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   if (close) {
     assert.equal(close.payee, 'nearcarta.near');
     assert.equal(close.amount_yocto, report.balance.shop_before_yocto);
-    if (create) assert.ok(BigInt(close.amount_yocto) > BigInt(create.amount_yocto));
+    assert.ok(BigInt(close.amount_yocto) > BigInt(create.amount_yocto));
+    assert.equal(report.balance.shop_after_liquid_near, '0.02');
   }
-  if (create && close) assert.equal(report.balance.shop_after_liquid_near, '0.02');
   const refused = spawnSync(process.execPath, [script, '--live'], {
     encoding: 'utf8',
     cwd: root,

@@ -17,6 +17,7 @@ import { pairClauseId } from '/panels/ferry-pair.js';
 import { pairHero } from '/panels/token-badge.js';
 import { agentDeliveredNote, depositPlan, explainQuoteMiss, ferryStatusHtml, ferryStatusView, mayCheckout, nearAmount, nearNative, newestReceipt, nextFerryBeat, pickWrapSpend, SESSION_SWAP, wrapProgressNote } from '/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
+import { armGuardDock, dispatchGuardDock, ensureGuardDock, installGuardDock } from '/panels/guard-dock.js';
 import { hideBankDock } from '/panels/bank-tray.js';
 import { capFromSetup } from '/panels/bank-audit.js';
 import { armTollDock, dispatchTollDock, installTollDock } from '/panels/toll-dock.js';
@@ -153,6 +154,42 @@ function wireFerryDock(hooks) {
   if (go) go.onclick = send;
   if (form) form.onsubmit = send;
   if (input) input.onkeydown = (e) => { if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) { e.preventDefault(); send(e); } };
+}
+function wireGuardDock(hooks) {
+  const d = ensureGuardDock(document);
+  if (!d) return;
+  d.hidden = cur !== 'guard';
+  installGuardDock(document);
+  if (!d.dataset.wired) {
+    d.dataset.wired = '1';
+    const toggle = d.querySelector('[data-testid=guard-agent-toggle]');
+    const pop = d.querySelector('#guard-agent-pop');
+    toggle?.addEventListener('click', () => {
+      const open = pop.hasAttribute('hidden');
+      pop.toggleAttribute('hidden', !open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
+  armGuardDock((text) => {
+    if (typeof hooks?.runAgent === 'function') return hooks.runAgent(text);
+    return { ok: false, hint: 'The agent is not ready. Open the Guardhouse and press Send again.' };
+  });
+  const go = d.querySelector('#g-agent-go');
+  const input = d.querySelector('#g-agent');
+  const send = (e) => { e?.preventDefault?.(); return dispatchGuardDock(document); };
+  if (go) go.onclick = send;
+  if (input) input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); send(e); } };
+}
+function applyGuardScene(result) {
+  if (!result || !sh) return;
+  if (result.clear) { sh.hideRefuse?.(); return; }
+  if (result.cinema === 'refuse' && result.tx && sh.act && runScene) runScene(sh.act({ live: true, refused: true, reason: A.why(result.reason) || result.reason || '' }));
+  else if (result.cinema === 'pass' && result.tx && sh.act && runScene) runScene(sh.act({ live: true, refused: false }));
+  if (result.cinema === 'freeze' && result.tx) sh.setChains?.(true);
+  if (result.cinema === 'unfreeze' && result.tx) sh.setChains?.(false);
+  if (result.seal) sh.showSeal?.(result.hint || result.reason || 'Refused');
+  else sh.hideRefuse?.();
+  if (result.lamps) sh.lightLamps?.(result.lamps);
 }
 function ferryPlainReason(reason) {
   const raw = String(reason || '');
@@ -892,29 +929,42 @@ const APPS = {
     run: async () => (extra.runAgent ? extra.runAgent('Audit privately') : { ok: false, hint: 'Open the card. Nothing was signed.', say: 'Open the card. Nothing was signed.', keep: true, kind: 'no' }),
   },
   guard: {
-    label: 'Guardhouse · prompt-injection test', idle: 'Pick a trick, such as an invoice with a hidden line telling AI helpers to pay someone else. I\u2019ll check the payee before I sign. A try costs at most 0.001 NEAR, and only if your rules allow it.',
+    label: 'Guardhouse · pay through a check', idle: 'Type the payee and the amount. Check first. Pay through the guard uses that payment. A warning stays held until you press Confirm.',
     guest: true,
     form: () => '<div data-deep="guard"></div>',
-    bind: () => mountShop('guard', document.getElementById('t-form'), { state: extra, attacks: () => A.attacks().filter(a => A.GUARD_ATTACKS.includes(a.id)), repaint: () => paint() }),
-    btn: () => !extra.chk ? 'Try to trick my agent' : extra.chk.verdict === 'block' ? 'Let it knock anyway' : extra.chk.verdict === 'warn' ? 'I checked. Ask the charter' : 'Ask the charter',
-    run: async () => {
-      const id = extra.atk || 'poisoned-invoice';
-      if (!extra.chk) {
-        const p = await A.trickPlan(id); const c = await A.checkPayee(p.receiver); extra.chk = c;
-        if (c.verdict === 'allow') return APPS.guard.send(id);
-        const first = c.reasons.find(r => r.level === c.verdict) || c.reasons[0];
-        return { keep: true, kind: 'ok', say: c.verdict === 'block' ? `Stopped before signing: ${esc(first.text).replace(/[.!?]+$/, "")}.` : `Wait: ${esc(first.text)}. Your call.`,
-          rule: c.verdict === 'block' ? 'payee check · blocked, nothing signed' : 'payee check · needs you', rc: '<span class="rc">checked off chain: deny list, account age, code changes, your past payments</span>' };
-      }
-      return APPS.guard.send(id);
+    bind: () => {
+      const hooks = {
+        state: extra,
+        attacks: () => A.attacks().filter(a => A.GUARD_ATTACKS.includes(a.id)),
+        repaint: () => { if (cur === 'guard') paint(); },
+        charter: () => (A.S.board && A.S.me) ? A.S.me : (A.S.charter || ''),
+        owner: () => A.S.me || '',
+        board: () => A.S.board || '',
+        nonce: () => A.S.boardRow?.nonce,
+        // Prefer the deploy record. The deploy script creates guard.<root>, and
+        // that name is also the fallback so the shop works the moment it exists.
+        // The guard contract itself only accepts calls from the board.
+        guard: () => A.S.mainnet?.guard?.contract || (A.S.mainnet?.root ? 'guard.' + A.S.mainnet.root : ''),
+        row: () => !!(A.S.board && A.S.boardRow),
+        frozen: () => !!A.S.state?.frozen,
+        capYocto: () => A.S.clauses?.pay?.per_action_cap || null,
+        minYocto: () => A.S.clauses?.pay?.min_amount || null,
+        check: async (acct) => {
+          const charter = (A.S.board && A.S.me) ? A.S.me : (A.S.charter || '');
+          if (charter) return A.checkPayee(acct);
+          const r = await fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + '/api/guardhouse/check/' + encodeURIComponent(acct));
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || 'The check did not answer.');
+          return j;
+        },
+        freeze: (opts) => A.guardFreeze({ ...opts, frozen: true }),
+        onScene: applyGuardScene,
+      };
+      mountShop('guard', document.getElementById('t-form'), hooks);
+      wireGuardDock(hooks);
     },
-    send: async id => {
-      const was = extra.chk?.verdict; extra.chk = null;
-      const r = await A.trickSend(id); const s = r.steps.at(-1) || {};
-      if (r.refused && sh?.act && runScene) runScene(sh.act());
-      const two = was === 'block' && r.refused;
-      return { o: { decision: r.refused ? 'denied' : s.decision, reason: r.reason, tx: s.tx }, say: r.refused ? (w => two ? `Second check: your spending rules refused it. ${w.charAt(0).toUpperCase() + w.slice(1)}.` : `Blocked: ${w}.`)(A.why(r.reason)) : 'It got through. Tighten your rules.' };
-    },
+    btn: () => 'Check payee',
+    run: async () => ({ keep: true, kind: 'ok', say: 'Use Check payee, then Pay through guard. Nothing was signed.' }),
   },
   arena: {
     guest: true,
@@ -1134,11 +1184,13 @@ function paint() {
   document.body.classList.toggle('chronicle-tray', cur === 'chronicle');
   document.body.classList.toggle('bank-tray', cur === 'bank');
   document.body.classList.toggle('ferry-tray', cur === 'ferry');
+  document.body.classList.toggle('guard-tray', cur === 'guard');
   document.body.classList.toggle('toll-tray', cur === 'toll');
   document.body.classList.toggle('payouts-tray', cur === 'payouts');
   const cdock = document.getElementById('chronicle-agent-dock');
   if (cdock) cdock.hidden = cur !== 'chronicle';
-  if (cur !== 'ferry') { const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; }
+  const ferryDock = document.getElementById('ferry-agent-dock'); if (ferryDock) ferryDock.hidden = cur !== 'ferry';
+  const guardDock = document.getElementById('guard-agent-dock'); if (guardDock) guardDock.hidden = cur !== 'guard';
   if (cur !== 'toll') { const td = document.getElementById('toll-agent-dock'); if (td) td.hidden = true; }
   if (cur !== 'bank') hideBankDock();
   const pDock = document.getElementById('payouts-agent-dock');
@@ -1160,6 +1212,9 @@ function paint() {
   // Ferry: after a quote, keep the card + cargo CTAs even if charter stage is incomplete (guest cinema).
   const ferryQuoted = cur === 'ferry' && extra.q;
   if (st === 'load' || st === 'connect' || st === 'build') {
+    if (cur === 'guard' && app.form) {
+      say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
+    }
     say(ferryQuoted ? (APPS.ferry.charterReady() ? 'Quote ready. Ask charter or Load cargo.' : 'Quote ready. Load cargo as guest, or open your charter.') : (app.idle || 'This is what the shop does. The proof is already on mainnet.'));
     hero(app.hero ? app.hero() : null);
     if (app.guest && app.form) { form(app.form()); app.bind?.(); } else form('');
@@ -1175,19 +1230,23 @@ function paint() {
       say('Quote ready. Load cargo as guest, or write your rules to Ask charter.');
       hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.(); btn('Write my rules'); return;
     }
-    if (cur === 'bank' && app.guest && app.form) {
+    if ((cur === 'guard' || (cur === 'bank' && app.guest)) && app.form) {
       say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
     }
     say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return;
   }
   if (st === 'wait') {
+    if (cur === 'guard' && app.form) {
+      say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
+    }
     if (cur === 'bank' && app.guest && app.form) {
       say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
     }
     say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(''); hero(null); btn('Check again'); return;
   }
   if (st === 'key') {
-    if (ferryQuoted && app.guest && app.form) {
+    if (cur === 'guard' && app.form) { say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return; }
+    else if (ferryQuoted && app.guest && app.form) {
       say('Quote ready. Load cargo as guest, or finish the helper key to Ask charter.');
       hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.();
     } else if (cur === 'bank' && app.guest && app.form) {
@@ -1202,12 +1261,9 @@ function paint() {
   if (phase === 'idle') say(app.idle);
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
   if (cur === 'payouts') document.body.dataset.payoutReady = payoutReady(APPS.payouts.rows()).enabled ? 'yes' : 'no';
-  if (cur === 'ferry' || cur === 'bank' || cur === 'payouts') {
-    // Ferry, Bank, and Payouts own the gold button inside the card.
+  if (cur === 'ferry' || cur === 'guard' || cur === 'bank' || cur === 'payouts' || cur === 'toll') {
     hideFerryPrimary();
   } else if (cur === 'chronicle') {
-    document.body.classList.remove('ferry-tray');
-    const fd = document.getElementById('ferry-agent-dock'); if (fd) fd.hidden = true;
     btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary');
   } else {
     btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', false);
@@ -1241,7 +1297,7 @@ async function primary(auto = false) {
     say(res.say); react(kind);
     rcpt((rule ? `<span class="rule ${kind}" data-testid="rule">${kind === 'ok' ? '✓' : '✕'} ${esc(rule)}</span>` : '') + (res.rc || A.txLine(res.o?.tx)));
     const app = APPS[cur];
-    if (cur === 'ferry' || cur === 'bank') hideFerryPrimary();
+    if (cur === 'ferry' || cur === 'guard' || cur === 'toll' || cur === 'bank' || cur === 'payouts') hideFerryPrimary();
     else btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : (AGAIN[cur] || 'Do it again')));
     if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
     document.body.dataset.app = kind; ruleChip(); proofDrawer();
@@ -1253,7 +1309,7 @@ async function primary(auto = false) {
   }
 }
 const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another statement', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Audit another statement', toll: 'Pass the gate again' };
-function fail(e) { stopProgress(); phase = 'idle'; if (cur === 'ferry') { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); } if (cur === 'toll') sh?.showRefuse?.(A.plainError(e).slice(0, 140)); if (cur === 'bank') sh?.hideRefuse?.(); say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry' || cur === 'toll' || cur === 'bank' || cur === 'chronicle') hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
+function fail(e) { stopProgress(); phase = 'idle'; if (cur === 'ferry') { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); } if (cur === 'guard') sh?.hideRefuse?.(); if (cur === 'toll') sh?.showRefuse?.(A.plainError(e).slice(0, 140)); if (cur === 'bank') sh?.hideRefuse?.(); say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry' || cur === 'toll' || cur === 'guard' || cur === 'bank' || cur === 'chronicle') hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
 
 // ---------- rules sheet ----------
 function openRules() {
@@ -1349,8 +1405,9 @@ export function boot() {
   return booted;
 }
 export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
-  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('chronicle-tray', id === 'chronicle'); document.body.classList.toggle('toll-tray', id === 'toll'); document.body.classList.toggle('bank-tray', id === 'bank'); document.body.classList.toggle('payouts-tray', id === 'payouts');
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('guard-tray', id === 'guard'); document.body.classList.toggle('chronicle-tray', id === 'chronicle'); document.body.classList.toggle('toll-tray', id === 'toll'); document.body.classList.toggle('bank-tray', id === 'bank'); document.body.classList.toggle('payouts-tray', id === 'payouts');
   const dock0 = document.getElementById('ferry-agent-dock'); if (dock0) dock0.hidden = id !== 'ferry';
+  const guardDock0 = document.getElementById('guard-agent-dock'); if (guardDock0) guardDock0.hidden = id !== 'guard';
   const cdock0 = document.getElementById('chronicle-agent-dock'); if (cdock0) cdock0.hidden = id !== 'chronicle';
   const tollDock0 = document.getElementById('toll-agent-dock'); if (tollDock0) tollDock0.hidden = id !== 'toll';
   if (id !== 'bank') hideBankDock();
@@ -1360,7 +1417,7 @@ export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rul
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
 }
-export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('chronicle-tray'); document.body.classList.remove('toll-tray'); document.body.classList.remove('bank-tray'); document.body.classList.remove('payouts-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const cdock = document.getElementById('chronicle-agent-dock'); if (cdock) cdock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; hideBankDock(); const pDock = document.getElementById('payouts-agent-dock'); if (pDock) pDock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('guard-tray'); document.body.classList.remove('chronicle-tray'); document.body.classList.remove('toll-tray'); document.body.classList.remove('bank-tray'); document.body.classList.remove('payouts-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const guardDock = document.getElementById('guard-agent-dock'); if (guardDock) guardDock.hidden = true; const cdock = document.getElementById('chronicle-agent-dock'); if (cdock) cdock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; hideBankDock(); const pDock = document.getElementById('payouts-agent-dock'); if (pDock) pDock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };
