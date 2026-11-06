@@ -458,6 +458,15 @@ export function tollMarkup(state = {}) {
       ? `Fee ${quote.feeNear} NEAR. Caps left ${quote.foreignEth || 'unread'} ETH.`
       : 'The live policy has no visitor fee.');
   const status = state.seal || '';
+  // A visitor with no board row cannot pass: the board has nothing to spend.
+  // That is a setup step, not an error, so it gets its own line and link.
+  const needsRow = !!state.needsRow;
+  const rowNote = needsRow
+    ? `<p class="toll-needs-row" data-testid="toll-needs-row" role="status">Open your row in <a href="/setup/" data-testid="toll-setup-link">/setup</a> first. The toll spends from that row, under your caps. Nothing was signed.</p>`
+    : '';
+  // With no row the button is the way to /setup, so it stays pressable.
+  const ctaBlocked = state.pending || (needsRow ? false : !quote.payable);
+  const ctaText = needsRow ? 'Open your row in /setup' : payLabel;
   const passTx = state.passTx
     ? `<a class="rc tx" data-testid="toll-pass-tx" href="https://nearblocks.io/txns/${esc(state.passTx)}" target="_blank" rel="noopener">NEAR pass</a>`
     : '';
@@ -498,8 +507,9 @@ export function tollMarkup(state = {}) {
       </label>
       <p class="ferry-rate tok-done" data-testid="toll-foreign">${esc(feeLine)}</p>
       <p class="ferry-charter-note tok-done" data-testid="toll-refuse"${status ? '' : ' hidden'}>${esc(status)}</p>
+      ${rowNote}
       ${passTx ? `<p class="toll-pass-tx">${passTx}</p>` : ''}
-      <button type="button" class="ferry-cta" id="toll-pay" data-testid="toll-pay"${state.pending || !quote.payable ? ' disabled' : ''}>${payLabel}</button>
+      <button type="button" class="ferry-cta" id="toll-pay" data-testid="toll-pay"${ctaBlocked ? ' disabled' : ''}>${esc(ctaText)}</button>
     </div>
     <div class="ferry-pane toll-pane" data-testid="toll-pane-proof"${tab === 'proof' ? '' : ' hidden'}>
       <div class="ferry-flow tok-done">${chainIcon}<p class="toll-address" data-testid="toll-address">${esc(wallet.address || 'No address yet')}</p></div>
@@ -529,10 +539,15 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
 
   const paint = () => {
     if (typeof hooks.row === 'function') state.row = hooks.row() || null;
+    // No row means the board has nothing to spend from. Show that as a setup
+    // step before the visitor presses the button, not as a refusal after.
+    state.needsRow = !state.row;
     state.capText = capLine(state.row, policyQuote(state.live?.ok ? state.live : { ok: false }));
     root.innerHTML = tollMarkup(state);
     bind();
     bindTokenFallbacks(root);
+    const goto = root.querySelector('[data-testid="toll-setup-link"]');
+    if (goto) goto.onclick = (e) => { if (e) e.preventDefault(); globalThis.location?.assign?.('/setup/'); };
   };
 
   const clearSeal = () => {
@@ -645,7 +660,10 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
       const line = amount && to ? `pay ${amount} ${asset} to ${to} on Base` : (to ? `pay the toll on Base to ${to}` : 'Pay the toll');
       runAgent(line);
     };
-    if (pay) pay.onclick = sendPay;
+    if (pay) pay.onclick = () => {
+      if (state.needsRow) { globalThis.location?.assign?.('/setup/'); return; }
+      sendPay();
+    };
     root.querySelectorAll('#toll-to, #toll-amount').forEach(input => {
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); sendPay(); }

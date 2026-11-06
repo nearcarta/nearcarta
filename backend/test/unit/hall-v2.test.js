@@ -56,6 +56,7 @@ test('an open bounty refunds the posting signer and a stranger is refused', () =
     ],
     posts: [{ method: 'post_bounty', bountyHash: 'aa', amount: '2000000000000000000000', receiver: 'shop.near', signer: 'dao.near', tx: 'TX' }],
     fullAccessKeys: 1, codeHash: 'old', oldCodeHash: 'old', smokeWorkers: ['w1.near', 'w2.near'],
+    guard: 'guard.near', guardCodeHash: 'G', guardExpectedCodeHash: 'G',
   };
   const plan = hallDeployPlan(base);
   assert.equal(plan.transfers.length, 1);
@@ -74,21 +75,30 @@ test('the live townhall plan names the real shortfall and covers the attached mi
   const live = {
     shop: 'townhall.nearcarta.near', owner: 'nearcarta.near', board: 'board.nearcarta.near', dao: 'nearcarta.near',
     balanceYocto: (19532653634875n * 10n ** 11n).toString(),
-    storageBytes: 192231, oldWasmBytes: 191351, newWasmBytes: 215902, wasmSha256: 'ab',
+    storageBytes: 192231, oldWasmBytes: 191351, newWasmBytes: 229717, wasmSha256: 'ab',
     bounties: [{ hash: 'h', amount: '2000000000000000000000', claimed_by: null }],
     posts: [{ method: 'post_bounty', bountyHash: 'h', amount: '2000000000000000000000', receiver: 'townhall.nearcarta.near', signer: 'nearcarta.near', tx: 'T' }],
     fullAccessKeys: 1, codeHash: 'c', oldCodeHash: 'c', smokeWorkers: [],
+    guard: 'guard.near', guardCodeHash: 'G', guardExpectedCodeHash: 'G',
   };
   const plan = hallDeployPlan(live);
   // The 30 Tgas attached to migrate is prepaid at 0.001 NEAR/Tgas on top of the fee gas.
   assert.ok(BigInt(plan.balance.prepaidDeploy) >= BigInt(MIGRATE_ATTACHED_YOCTO));
   // The account must hold the new stake plus that prepaid float at the moment the
-  // deploy writes storage; the unused gas comes back only after the receipt.
-  assert.equal(plan.balance.shortfall, '272359569623911000000000');
-  assert.equal(plan.balance.shortfallNear, '0.272359');
+  // deploy writes storage; the unused gas comes back only after the receipt. The
+  // exact figure tracks the committed wasm, so assert its arithmetic, not a constant.
+  const stake = BigInt(plan.storage.stakeAfter);
+  const need = stake + BigInt(plan.balance.prepaidDeploy);
+  const have = BigInt(live.balanceYocto) - BigInt(plan.balance.refund);
+  assert.equal(BigInt(plan.balance.shortfall), need - have);
+  assert.ok(BigInt(plan.balance.shortfall) > 0n);
   // The printed top-up adds the smoke reserve and rounds up to the next 0.05 NEAR.
-  assert.equal(plan.balance.recommendedTopUp, '350000000000000000000000');
-  assert.equal(plan.balance.recommendedTopUpNear, '0.350000');
+  const STEP = 5n * 10n ** 22n;
+  const reserve = 3n * 10n ** 22n + 10n ** 21n; // smoke gas + smoke deposit
+  const rounded = ((need - have + reserve + STEP - 1n) / STEP) * STEP;
+  assert.equal(plan.balance.recommendedTopUp, rounded.toString());
+  assert.equal(plan.balance.recommendedTopUp, '450000000000000000000000');
+  assert.ok(BigInt(plan.balance.recommendedTopUp) > BigInt(plan.balance.shortfall));
   assert.equal(plan.ok, false); // nothing is signed until the top-up lands
   // Adding the rounded top-up clears the shortfall and the plan becomes actionable.
   const topped = hallDeployPlan({ ...live, balanceYocto: (BigInt(live.balanceYocto) + BigInt(plan.balance.recommendedTopUp)).toString() });
@@ -105,6 +115,7 @@ test('the deploy refuses when the board is not the v2 wasm the contract trusts',
     bounties: [], posts: [], fullAccessKeys: 1, codeHash: 'c', oldCodeHash: 'c', smokeWorkers: [],
     boardCodeHash: 'BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g',
     boardExpectedCodeHash: 'BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g',
+    guard: 'guard.near', guardCodeHash: 'G', guardExpectedCodeHash: 'G',
   };
   const ok = hallDeployPlan(base);
   assert.equal(ok.checks.find(c => /v2 wasm/.test(c.label)).ok, true);
@@ -116,4 +127,39 @@ test('the deploy refuses when the board is not the v2 wasm the contract trusts',
   // An unreadable board is the same refusal, not a pass.
   const missing = hallDeployPlan({ ...base, boardCodeHash: '' });
   assert.equal(missing.ok, false);
+});
+
+test('the plan snapshots every legacy bounty and refuses a guard that is not the live one', () => {
+  const base = {
+    shop: 'shop.near', owner: 'dao.near', board: 'board.near', dao: 'dao.near',
+    balanceYocto: (3n * 10n ** 24n).toString(),
+    storageBytes: 1000, oldWasmBytes: 800, newWasmBytes: 800, wasmSha256: 'ab',
+    bounties: [
+      { hash: 'aa', amount: '2000000000000000000000', claimed_by: null },
+      { hash: 'bb', amount: '1000000000000000000000', claimed_by: 'paid.near' },
+    ],
+    posts: [{ method: 'post_bounty', bountyHash: 'aa', amount: '2000000000000000000000', receiver: 'shop.near', signer: 'dao.near', tx: 'TX' }],
+    fullAccessKeys: 1, codeHash: 'old', oldCodeHash: 'old', smokeWorkers: [],
+    guard: 'guard.near', guardCodeHash: 'G', guardExpectedCodeHash: 'G',
+  };
+  const plan = hallDeployPlan(base);
+  // Both bounties appear, owed and paid, so a reader can audit the migration.
+  assert.equal(plan.legacy.rows.length, 2);
+  assert.deepEqual(plan.legacy.rows.map(r => r.status), ['refund_now', 'already_paid']);
+  assert.equal(plan.legacy.owedYocto, '2000000000000000000000');
+  assert.equal(plan.legacy.paidYocto, '1000000000000000000000');
+  // The migrate arg carries the snapshot, so the new state proves what was paid.
+  assert.equal(plan.steps[1].args.legacy_paid.length, 2);
+  assert.match(plan.steps[1].args.legacy_paid[0], /^aa:refund_now:2000000000000000000000:dao\.near$/);
+  assert.match(plan.steps[1].args.legacy_paid[1], /^bb:already_paid:1000000000000000000000:paid\.near$/);
+  assert.equal(plan.steps[1].args.guard, 'guard.near');
+
+  // A guard on another wasm would leave every release path dead.
+  const staleGuard = hallDeployPlan({ ...base, guardCodeHash: 'other' });
+  assert.equal(staleGuard.checks.find(c => /guard account is the wasm/.test(c.label)).ok, false);
+  assert.equal(staleGuard.ok, false);
+  // No guard named at all is the same refusal, not a pass.
+  assert.equal(hallDeployPlan({ ...base, guard: '' }).ok, false);
+  // The shop and the board cannot be their own guard.
+  assert.equal(hallDeployPlan({ ...base, guard: 'shop.near' }).ok, false);
 });

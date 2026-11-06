@@ -61,6 +61,23 @@ export function stampCalls(board, capYocto) {
   return [...FERRY_CALL_TARGETS, { receiver: board, method: 'stamp', cap: String(capYocto) }];
 }
 
+/**
+ * The Town Hall job lifecycle as board calls. Each one is a part of one job, and the
+ * board's own row rules (per-action cap, daily budget, receiver list) still gate every
+ * call: these pairs grant no spending power the row does not already have.
+ *
+ * A Hall row carries these instead of the ferry trio, which it never needs. The
+ * measured cost is 430 of the row's 602 pair bytes, so a Hall-only row fits with
+ * room for a second shop.
+ */
+export const HALL_SHOP = 'townhall.nearcarta.near';
+export const HALL_CALL_METHODS = Object.freeze([
+  'post_job', 'bid', 'counter', 'accept', 'deliver', 'review', 'refund',
+]);
+export function hallCalls(shop = HALL_SHOP) {
+  return HALL_CALL_METHODS.map(method => ({ receiver: shop, method }));
+}
+
 // propose_call takes the deposit from the row and refuses it above this cap
 // (`over_shop_cap`, contracts/charter_board/src/lib.rs line 334) and above the
 // row's per_action_cap (line 337). set_calls stores the triple (line 293).
