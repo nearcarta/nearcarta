@@ -110,8 +110,33 @@ test('chronicle commands filter, export, verify and refuse an under-cap entry', 
   assert.deepEqual(reads, ['aurora.near']);
   assert.equal(bag.account, 'aurora.near');
   assert.equal(bag.cd, '');
-  assert.match(queried.hint, /aurora\.near has 2 rows/);
-  assert.match(queried.hint, /1 allowed, 1 refused/);
+  assert.match(queried.hint, /aurora\.near has 2 rows: 1 allowed, 1 refused, 0 failed on chain/);
+  const chain = await runChronicleCommand({
+    text: 'timeline for aurora.near',
+    state: {},
+    rowsOf: () => [
+      { shop: 'ledger', decision: 'failed', h: HASH },
+      { shop: 'ledger', decision: 'failed', h: 'CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF' },
+      { shop: 'guard', decision: 'denied', h: 'B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR' },
+    ],
+  });
+  assert.match(chain.hint, /aurora\.near has 3 rows: 0 allowed, 1 refused, 2 failed on chain/);
+  const plain = accountRows({
+    account: 'alice.near',
+    live: { rows: [{ hash: 'B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR', signer: 'alice.near', decision: 'failed', shop: 'ledger', note: 'storage_deposit' }], gaps: [] },
+    board: { txs: [] },
+    ledger: { rows: [] },
+    mainnet: {},
+  });
+  assert.equal(plain.rows.find(r => r.h === 'B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR').decision, 'failed');
+  const ruled = accountRows({
+    account: 'alice.near',
+    live: { rows: [{ hash: HASH, signer: 'alice.near', decision: 'failed', shop: 'ledger', note: 'storage_deposit' }], gaps: [] },
+    board: { txs: [{ hash: HASH, signer: 'alice.near', decision: 'denied', shop: 'guard', note: 'over_per_action_cap' }] },
+    ledger: { rows: [] },
+    mainnet: {},
+  });
+  assert.equal(ruled.rows.find(r => r.h === HASH).decision, 'denied');
   const totals = csvTotals(dated);
   assert.equal(totals.attempted, 1);
   assert.match(exportCsv(dated), /attempted/);
@@ -175,6 +200,7 @@ test('chronicle icons, brass and city wiring stay on the ledger path', () => {
   assert.match(view, /Write statement/);
   assert.match(view, /Show timeline/);
   assert.match(view, /Check this bundle/);
+  assert.match(view, /Failed on chain/);
   assert.doesNotMatch(view, /Add today/);
   const deep = read('app/src/panels/deep.js');
   assert.match(deep, /return mountChronicleTray\(root, hooks\)/);

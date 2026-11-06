@@ -14,6 +14,18 @@ const q$ = (root, sel) => root.querySelector(sel);
 const ACCOUNT_MARK = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#2a2218" stroke="#f5d08a" stroke-width="1.5"/><circle cx="18" cy="14" r="4" fill="#f5d08a"/><path d="M10 26c1.2-4 4-6 8-6s6.8 2 8 6" fill="none" stroke="#f5d08a" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 const LEDGER_MARK = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#2a2218" stroke="#f5d08a" stroke-width="1.5"/><rect x="11" y="9" width="14" height="18" rx="2" fill="none" stroke="#f5d08a" stroke-width="1.5"/><path d="M14 14h8M14 18h8M14 22h5" stroke="#f5d08a" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 
+function decisionText(decision) {
+  if (decision === 'denied') return 'Refused';
+  if (decision === 'failed') return 'Failed on chain';
+  return 'Allowed';
+}
+
+function rowClass(decision) {
+  if (decision === 'denied') return 'no';
+  if (decision === 'failed') return 'fail';
+  return 'ok';
+}
+
 function ctaOf(state) {
   if (state.tab === 'verify') return 'Check this bundle';
   if (state.tab === 'statement') return state.statement ? 'Anchor' : 'Write statement';
@@ -47,11 +59,10 @@ export function chronicleMarkup(state) {
   const rows = state.viewRows || [];
   const tabBtn = (id, label) => `<button type="button" class="chronicle-tab${tab === id ? ' on' : ''}" data-ctab="${id}" role="tab" aria-selected="${tab === id ? 'true' : 'false'}">${label}</button>`;
   const list = rows.map(x => {
-    const denied = x.decision === 'denied';
     const href = x.url || (x.h ? `https://nearblocks.io/txns/${x.h}` : '');
-    return `<li class="${denied ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}">
+    return `<li class="${rowClass(x.decision)}" data-hash="${esc(x.h || '')}">
       <span class="c-mark">${iconFor(x.shop, x.decision)}</span>
-      <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
+      <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${decisionText(x.decision)}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
       <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
     </li>`;
   }).join('');
@@ -78,7 +89,7 @@ export function chronicleMarkup(state) {
         <label class="chronicle-field">Period <select id="c-span" data-testid="chronicle-period">${opt('all', 'All', state.span || 'all')}${opt('today', 'Today', state.span || 'all')}${opt('7d', '7 days', state.span || 'all')}</select></label>
         <label class="chronicle-field">Shop <select id="c-shop" data-testid="chronicle-shop">${opt('', 'All', state.shop || '')}${['toll', 'ferry', 'guard', 'payouts', 'house', 'board'].map(s => opt(s, s, state.shop || '')).join('')}</select></label>
         <label class="chronicle-field">Chain <select id="c-chain" data-testid="chronicle-chain">${opt('', 'All', state.chain || '')}${opt('NEAR', 'NEAR', state.chain || '')}${opt('NEAR Intents', 'NEAR Intents', state.chain || '')}</select></label>
-        <label class="chronicle-field">Decision <select id="c-d" data-testid="chronicle-filter">${opt('', 'All', state.cd || '')}${opt('allowed', 'Allowed', state.cd || '')}${opt('denied', 'Refused', state.cd || '')}</select></label>
+        <label class="chronicle-field">Decision <select id="c-d" data-testid="chronicle-filter">${opt('', 'All', state.cd || '')}${opt('allowed', 'Allowed', state.cd || '')}${opt('denied', 'Refused', state.cd || '')}${opt('failed', 'Failed on chain', state.cd || '')}</select></label>
         <label class="chronicle-field wide">Words <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}" autocomplete="off"></label>
       </div>
     </div>
@@ -217,11 +228,10 @@ export function mountChronicleTray(root, hooks = {}) {
     const ol = q$(root, '[data-testid=chronicle-page]');
     if (!ol) return paint();
     ol.innerHTML = (state.viewRows || []).map(x => {
-      const denied = x.decision === 'denied';
       const href = x.url || (x.h ? `https://nearblocks.io/txns/${x.h}` : '');
-      return `<li class="${denied ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}">
+      return `<li class="${rowClass(x.decision)}" data-hash="${esc(x.h || '')}">
         <span class="c-mark">${iconFor(x.shop, x.decision)}</span>
-        <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
+        <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${decisionText(x.decision)}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
         <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
       </li>`;
     }).join('');

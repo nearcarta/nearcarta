@@ -19,9 +19,12 @@ export function parseAccountId(text) {
 
 function decisionOf(line) {
   const refused = /\b(refus\w*|denied|reject\w*)\b/.test(line);
+  const failed = /\bfail\w*\b/.test(line);
   const spent = /\b(spent|spend\w*|paid|pay|sent|allow\w*)\b/.test(line);
-  if (refused && spent) return '';
+  const kinds = [refused, failed, spent].filter(Boolean).length;
+  if (kinds > 1) return '';
   if (refused) return 'denied';
+  if (failed) return 'failed';
   if (spent) return 'allowed';
   return '';
 }
@@ -69,6 +72,12 @@ export function parseChronicleCommand(text) {
   if (/\b(export|csv|json|download)\b/.test(line)) {
     return { ok: true, action: 'export', today, json: /\bjson\b/.test(line), hint: '' };
   }
+  if (/\bfail\w*\b/.test(line) && /\b(refus\w*|denied|reject\w*)\b/.test(line)) {
+    return { ok: true, action: 'filter', decision: '', today, q: '', hint: '' };
+  }
+  if (/\bfail\w*\b/.test(line)) {
+    return { ok: true, action: 'filter', decision: 'failed', today, q: '', hint: '' };
+  }
   if (/\b(refus\w*|denied|reject\w*)\b/.test(line)) {
     return { ok: true, action: 'filter', decision: 'denied', today, q: '', hint: '' };
   }
@@ -114,9 +123,10 @@ export async function runChronicleCommand({
     const q = queryFeed(rowsNow, { q: '', decision: bag.cd, day: bag.day, page: 1, pageSize: 500 });
     const shown = bag.shop ? q.rows.filter(r => r.shop === bag.shop) : q.rows;
     const allowed = shown.filter(r => r.decision === 'allowed').length;
-    const denied = shown.filter(r => r.decision === 'denied').length;
+    const refused = shown.filter(r => r.decision === 'denied').length;
+    const failed = shown.filter(r => r.decision === 'failed').length;
     const hint = shown.length
-      ? `${cmd.account} has ${shown.length} rows. ${allowed} allowed, ${denied} refused.`
+      ? `${cmd.account} has ${shown.length} rows: ${allowed} allowed, ${refused} refused, ${failed} failed on chain.`
       : `${cmd.account} has no rows in this view.`;
     bag.verify = hint;
     return { ok: true, action: 'query', hint, clearSeal: true, paint: true };

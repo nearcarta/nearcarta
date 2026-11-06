@@ -58,7 +58,9 @@ body.chronicle-tray #shopUI #t-form button.chronicle-tab[aria-selected=true]{
 .chronicle-card .feed li.c-empty{display:none}
 .chronicle-card .c-mark{display:flex; gap:6px; align-items:center}
 .chronicle-card .c-shop{font:700 14px/1.2 system-ui,sans-serif; color:#fff8ee; white-space:nowrap; flex:none}
-.chronicle-card .c-dec,.chronicle-card .c-amt{color:#f3ead8; font:600 13px/1.3 system-ui,sans-serif; white-space:nowrap}
+.chronicle-card .c-dec{color:#f3ead8; font:600 13px/1.3 system-ui,sans-serif; white-space:normal}
+.chronicle-card .c-amt{color:#f3ead8; font:600 13px/1.3 system-ui,sans-serif; white-space:nowrap}
+.chronicle-card .feed li.no .c-dec,.chronicle-card .feed li.fail .c-dec{color:#ffb4a8}
 .chronicle-card .c-tx{color:#f5d08a; font:600 13px/1.2 system-ui,sans-serif; white-space:nowrap; flex:none}
 body.chronicle-tray #room button.c-v,
 body.chronicle-tray #room button.chronicle-quiet,

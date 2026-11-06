@@ -177,6 +177,37 @@ test('a nearblocks 429 falls back to fastnear and the key stays out of the body'
   assert.equal(calls.length, 0);
 });
 
+test('a chain failure is not called a refusal', async () => {
+  _resetLiveCache();
+  const HASH3 = 'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+  const fetchFn = async (url, opts = {}) => {
+    const u = String(url);
+    if (u.includes('nearblocks.io')) return new Response('no', { status: 429 });
+    if (u.includes('/v0/account')) {
+      return new Response(JSON.stringify({ account_txs: [{
+        transaction_hash: HASH3, tx_block_timestamp: '1700000000000000000', is_success: false, is_real_signer: true,
+      }] }), { status: 200 });
+    }
+    if (u.includes('/v0/transactions')) {
+      return new Response(JSON.stringify({ transactions: [{
+        transaction: { hash: HASH3, signer_id: 'carol.near', receiver_id: 'wrap.near', actions: [{ FunctionCall: { method_name: 'storage_deposit', deposit: '1250000000000000000000' } }] },
+        execution_outcome: { block_timestamp: '1700000000000000000', outcome: { status: { Failure: { ActionError: { kind: { AccountDoesNotExist: { account_id: 'carol.near' } } } } } } },
+      }] }), { status: 200 });
+    }
+    if (u.includes('/ft')) return new Response(JSON.stringify({ account_id: 'carol.near', tokens: [] }), { status: 200 });
+    if (opts.method === 'POST') return new Response(JSON.stringify({ result: { status: { Failure: {} } } }), { status: 200 });
+    return new Response('no', { status: 500 });
+  };
+  const body = await readLive('carol.near', {
+    fetch: fetchFn, view: async () => null, board: 'board.nearcarta.near',
+    index: 'https://api.nearblocks.io', fastnearTx: 'https://tx.main.fastnear.com', fastnear: 'https://api.fastnear.com', rpc: 'https://rpc.test',
+  });
+  const row = body.rows.find(r => r.hash === HASH3);
+  assert.ok(row);
+  assert.equal(row.decision, 'failed');
+  assert.equal(body.rows.some(r => r.decision === 'denied'), false);
+});
+
 test('an unanswered timeline is not cached', async () => {
   _resetLiveCache();
   let n = 0;

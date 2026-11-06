@@ -253,7 +253,7 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
       if (!HASH.test(t.hash || '')) continue;
       const rpc = rpcBy.get(t.hash);
       const onBoard = boardId && (t.receiver === boardId || t.predecessor === boardId);
-      const decision = rpc?.ok ? (rpc.success ? 'allowed' : 'denied') : (t.indexerOk === false ? 'denied' : 'allowed');
+      const decision = rpc?.ok ? (rpc.success ? 'allowed' : 'failed') : (t.indexerOk === false ? 'failed' : 'allowed');
       rows.push({
         hash: t.hash,
         signer: t.signer || account,
@@ -328,7 +328,7 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
       rows.push({
         hash: f.hash,
         signer: f.signer || account,
-        decision: f.ok === false ? 'denied' : 'allowed',
+        decision: f.ok === false ? 'failed' : 'allowed',
         shop: click || wrap ? 'ferry' : 'ledger',
         note,
         amount: f.amount || '',
