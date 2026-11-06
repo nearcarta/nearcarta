@@ -1,12 +1,12 @@
-// Live timeline for any NEAR account. Public reads only: a board view, the nearblocks
-// index, and one NEAR RPC tx status per receipt. This module never holds a key and never signs.
+// Live timeline for any NEAR account. Public reads only. Nearblocks first, then FastNEAR,
+// then NEAR RPC tx status. This module never holds a key and never signs.
 import { DEP, cfg } from './config.js';
 import { view } from './near.js';
 
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 const TX_CAP = 6;
 const FRESH_MS = 60_000;
-const STALE_MS = 10 * 60_000;
+const BUDGET_MS = 5200;
 const WRAP = 'wrap.near';
 const INTENTS = 'intents.near';
 const link = (h) => `https://nearblocks.io/txns/${h}`;
@@ -44,18 +44,58 @@ function nearAmount(deposit) {
   return `${n} NEAR`;
 }
 
-async function getJson(fetchFn, url) {
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('timeout')), ms); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function makeBudget(ms) {
+  const t0 = Date.now();
+  return { left: () => Math.max(0, ms - (Date.now() - t0)) };
+}
+
+function nbHeaders(key) {
+  const headers = { accept: 'application/json' };
+  const k = String(key || '').trim();
+  if (k) headers.authorization = `Bearer ${k}`;
+  return headers;
+}
+
+function rpcName(url) {
+  const u = String(url || '');
+  if (/archival/i.test(u)) return 'archival';
+  if (/fastnear/i.test(u)) return 'fastnear';
+  return 'rpc';
+}
+
+async function fetchJson(fetchFn, url, { method = 'GET', headers = {}, body = null, timeout = 1000, budget } = {}) {
+  if (budget && budget.left() < 250) return { ok: false, status: 0, json: null };
+  const ms = Math.max(200, Math.min(timeout, (budget?.left() ?? timeout) - 40));
+  try {
+    const r = await fetchFn(url, {
+      method,
+      headers,
+      body: body == null ? undefined : body,
+      signal: AbortSignal.timeout(ms),
+    });
+    const json = await r.json().catch(() => null);
+    return { ok: !!r.ok && json != null, status: r.status, json };
+  } catch {
+    return { ok: false, status: 0, json: null };
+  }
+}
+
+async function withRetry(budget, run) {
   let last = { ok: false, status: 0, json: null };
   for (let i = 0; i < 2; i++) {
-    try {
-      const r = await fetchFn(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(4000) });
-      const json = await r.json().catch(() => null);
-      last = { ok: !!r.ok && json != null, status: r.status, json };
-      if (last.ok) return last;
-    } catch {
-      last = { ok: false, status: 0, json: null };
-    }
-    if (i === 0) await new Promise(r => setTimeout(r, 300));
+    last = await run();
+    if (last.ok) return last;
+    const retry = last.status === 429 || last.status === 408 || last.status === 503 || last.status === 0 || last.status >= 500;
+    if (!retry || i === 1 || (budget && budget.left() < 700)) return last;
+    await sleep(Math.min(150, Math.max(40, Math.floor((budget?.left() || 150) / 4))));
   }
   return last;
 }
@@ -134,35 +174,32 @@ function rpcOk(result) {
   return Object.prototype.hasOwnProperty.call(st, 'SuccessValue') || Object.prototype.hasOwnProperty.call(st, 'SuccessReceiptId');
 }
 
-async function rpcOnce(fetchFn, url, hash, sender) {
-  try {
-    const r = await fetchFn(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 'chronicle', method: 'EXPERIMENTAL_tx_status',
-        params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' },
-      }),
-      signal: AbortSignal.timeout(4000),
-    });
-    const j = await r.json().catch(() => null);
-    if (!r.ok || !j || j.error || !j.result) {
-      const unknown = /UNKNOWN_TRANSACTION|unknown transaction/i.test(JSON.stringify(j?.error || ''));
-      return { hash, ok: false, success: false, unknown };
-    }
-    return { hash, ok: true, success: rpcOk(j.result), unknown: false };
-  } catch {
-    return { hash, ok: false, success: false, unknown: false };
+async function rpcOnce(fetchFn, url, hash, sender, budget) {
+  const hit = await fetchJson(fetchFn, url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0', id: 'chronicle', method: 'EXPERIMENTAL_tx_status',
+      params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' },
+    }),
+    timeout: 900,
+    budget,
+  });
+  if (!hit.ok || hit.json?.error || !hit.json?.result) {
+    const unknown = hit.status === 0 || /UNKNOWN_TRANSACTION|unknown transaction/i.test(JSON.stringify(hit.json?.error || ''));
+    return { hash, ok: false, success: false, unknown, via: rpcName(url) };
   }
+  return { hash, ok: true, success: rpcOk(hit.json.result), unknown: false, via: rpcName(url) };
 }
 
-async function rpcStatus(fetchFn, urls, hash, sender) {
-  let last = { hash, ok: false, success: false };
+async function rpcStatus(fetchFn, urls, hash, sender, budget) {
+  let last = { hash, ok: false, success: false, via: 'none' };
   for (const url of urls) {
-    last = await rpcOnce(fetchFn, url, hash, sender);
+    if (budget && budget.left() < 300) return last;
+    last = await rpcOnce(fetchFn, url, hash, sender, budget);
     if (last.ok || !last.unknown) return last;
   }
-  return { hash, ok: false, success: false };
+  return { hash, ok: false, success: false, via: 'none' };
 }
 
 function coverageLabel(rows, sources) {
@@ -184,7 +221,7 @@ function coverageLabel(rows, sources) {
   return `${head} ${bits.join('. ')}.`;
 }
 
-export function assembleLive({ account = '', boardContract = '', board = null, indexOk = false, ftOk = false, receipts = [], fts = [], confirmed = [], indexedCount = 0 } = {}) {
+export function assembleLive({ account = '', boardContract = '', board = null, indexOk = false, ftOk = false, receipts = [], fts = [], confirmed = [], indexedCount = 0, txGap = '', ftGap = '' } = {}) {
   const gaps = [];
   const sources = [];
   const rows = [];
@@ -208,14 +245,15 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
 
   let txRows = 0;
   if (!indexOk) {
-    sources.push({ source: 'transactions', ok: false, rows: 0, gap: 'nearblocks.io did not answer.' });
-    gaps.push('nearblocks.io did not answer.');
+    const gap = txGap || 'nearblocks.io did not answer.';
+    sources.push({ source: 'transactions', ok: false, rows: 0, gap });
+    gaps.push(gap);
   } else {
     for (const t of receipts) {
       if (!HASH.test(t.hash || '')) continue;
       const rpc = rpcBy.get(t.hash);
       const onBoard = boardId && (t.receiver === boardId || t.predecessor === boardId);
-      const decision = rpc?.ok ? (rpc.success ? 'allowed' : 'denied') : (t.indexerOk === false ? 'denied' : 'allowed');
+      const decision = rpc?.ok ? (rpc.success ? 'allowed' : 'failed') : (t.indexerOk === false ? 'failed' : 'allowed');
       rows.push({
         hash: t.hash,
         signer: t.signer || account,
@@ -258,10 +296,11 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
   let clickRows = 0;
   const seenFt = new Set();
   if (!ftOk) {
-    sources.push({ source: 'ft', ok: false, rows: 0, gap: 'FT index did not answer.' });
+    const gap = ftGap || 'FT index did not answer.';
+    sources.push({ source: 'ft', ok: false, rows: 0, gap });
     sources.push({ source: 'wrap.near', ok: false, rows: 0, gap: 'wrap.near was not read.' });
     sources.push({ source: '1click', ok: false, rows: 0, gap: 'No 1Click deposit matched.' });
-    gaps.push('FT index did not answer.');
+    gaps.push(gap);
     gaps.push('No 1Click deposit matched.');
   } else {
     for (const f of fts) {
@@ -289,7 +328,7 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
       rows.push({
         hash: f.hash,
         signer: f.signer || account,
-        decision: f.ok === false ? 'denied' : 'allowed',
+        decision: f.ok === false ? 'failed' : 'allowed',
         shop: click || wrap ? 'ferry' : 'ledger',
         note,
         amount: f.amount || '',
@@ -299,7 +338,7 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
         chain: click ? 'NEAR Intents' : 'NEAR',
       });
     }
-    sources.push({ source: 'ft', ok: true, rows: seenFt.size, gap: seenFt.size ? '' : 'No fungible-token transfer on this page.' });
+    sources.push({ source: 'ft', ok: true, rows: seenFt.size, gap: seenFt.size ? '' : (ftGap || 'No fungible-token transfer on this page.') });
     sources.push({ source: 'wrap.near', ok: true, rows: wrapRows, gap: wrapRows ? '' : 'No wrap.near transfer on this page.' });
     const clickGap = clickRows
       ? '1Click matched an intents.near transfer. Not a completed swap.'
@@ -313,55 +352,174 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
   return { account, live: true, rows, gaps, sources, label: coverageLabel(rows, sources) };
 }
 
+function detailOfFast(row) {
+  const tx = row?.transaction || {};
+  const actions = Array.isArray(tx.actions) ? tx.actions : [];
+  const call = actions.find(a => a?.FunctionCall)?.FunctionCall;
+  const transfer = actions.find(a => a?.Transfer)?.Transfer;
+  const status = row?.execution_outcome?.outcome?.status;
+  return {
+    hash: tx.hash || '',
+    signer: tx.signer_id || '',
+    receiver: tx.receiver_id || '',
+    method: call?.method_name || (transfer ? 'TRANSFER' : 'transaction'),
+    amount: nearAmount(transfer?.deposit || call?.deposit),
+    at: isoFromNs(row?.execution_outcome?.block_timestamp),
+    success: !!(status && (Object.prototype.hasOwnProperty.call(status, 'SuccessValue') || Object.prototype.hasOwnProperty.call(status, 'SuccessReceiptId'))),
+  };
+}
+
+function ftFromDetail(d, account) {
+  if (!HASH.test(d?.hash || '')) return null;
+  const click = d.receiver === INTENTS || d.signer === INTENTS;
+  const wrap = d.receiver === WRAP || d.signer === WRAP;
+  if (!click && !wrap && !/ft_transfer/i.test(d.method || '')) return null;
+  return {
+    hash: d.hash,
+    symbol: '',
+    contract: wrap ? WRAP : (click ? INTENTS : d.receiver),
+    amount: d.amount || '',
+    involved: click ? INTENTS : (d.signer || ''),
+    affected: d.receiver || '',
+    at: d.at || '',
+    ok: d.success !== false,
+    signer: d.signer || account,
+  };
+}
+
+function cacheable(body) {
+  const tx = (body?.sources || []).find(s => s.source === 'transactions');
+  const ft = (body?.sources || []).find(s => s.source === 'ft');
+  return !!(tx?.ok || ft?.ok);
+}
+
 async function load(account, deps) {
   const fetchFn = deps.fetch || fetch;
   const viewFn = deps.view || view;
   const boardContract = deps.board || DEP.board?.contract || '';
   const index = (deps.index || 'https://api.nearblocks.io').replace(/\/$/, '');
+  const fastTx = (deps.fastnearTx || 'https://tx.main.fastnear.com').replace(/\/$/, '');
+  const fastApi = (deps.fastnear || 'https://api.fastnear.com').replace(/\/$/, '');
   const rpcUrls = [deps.rpc || cfg.rpc, deps.archival || cfg.archivalRpc].filter(Boolean);
-  const [boardRes, txRes, ftRes] = await Promise.all([
-    (async () => {
-      if (!boardContract) return { ok: false, row: null };
-      try {
-        const row = await viewFn(boardContract, 'get_charter', { owner: account });
-        return { ok: true, row: row || null };
-      } catch {
-        return { ok: false, row: null };
-      }
-    })(),
-    getJson(fetchFn, `${index}/v1/account/${encodeURIComponent(account)}/txns?page=1&per_page=25`),
-    getJson(fetchFn, `${index}/v1/account/${encodeURIComponent(account)}/ft-txns?page=1&per_page=10`),
+  const key = deps.nearblocksKey != null ? deps.nearblocksKey : (process.env.NEARBLOCKS_API_KEY || '');
+  const headers = nbHeaders(key);
+  const budget = deps.budget || makeBudget(BUDGET_MS);
+  const id = encodeURIComponent(account);
+
+  const boardPromise = (async () => {
+    if (!boardContract) return { ok: false, row: null };
+    try {
+      const row = await withTimeout(viewFn(boardContract, 'get_charter', { owner: account }), 1200);
+      return { ok: true, row: row || null };
+    } catch {
+      return { ok: false, row: null };
+    }
+  })();
+
+  const [txNear, ftNear] = await Promise.all([
+    withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${id}/txns?page=1&per_page=25`, { headers, timeout: 1100, budget })),
+    withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${id}/ft-txns?page=1&per_page=10`, { headers, timeout: 1100, budget })),
   ]);
-  const indexOk = !!(txRes.ok && Array.isArray(txRes.json?.txns));
-  const ftOk = !!(ftRes.ok && Array.isArray(ftRes.json?.txns));
-  const grouped = indexOk ? groupReceipts(txRes.json.txns) : [];
-  const page = grouped.slice(0, TX_CAP);
-  const described = await mapLimit(page, 4, async (group) => {
-    const detail = await getJson(fetchFn, `${index}/v1/txns/${group.hash}`);
-    return describe(group, detail.ok ? txnOf(detail.json) : null);
-  });
-  const confirmed = await mapLimit(described.filter(t => t.signer), 4, (t) => rpcStatus(fetchFn, rpcUrls, t.hash, t.signer));
-  return assembleLive({
+
+  let txSource = 'none';
+  let ftSource = 'none';
+  let receipts = [];
+  let indexedCount = 0;
+  let fts = [];
+  let ftGap = '';
+  let txGap = '';
+
+  if (txNear.ok && Array.isArray(txNear.json?.txns)) {
+    txSource = 'nearblocks';
+    const grouped = groupReceipts(txNear.json.txns);
+    indexedCount = grouped.length;
+    const page = grouped.slice(0, TX_CAP);
+    receipts = await mapLimit(page, 4, async (group) => {
+      if (group.predecessor && budget.left() < 800) return describe(group, null);
+      const detail = group.predecessor ? { ok: false } : await fetchJson(fetchFn, `${index}/v1/txns/${group.hash}`, { headers, timeout: 700, budget });
+      return describe(group, detail.ok ? txnOf(detail.json) : null);
+    });
+  } else {
+    const fx = await withRetry(budget, () => fetchJson(fetchFn, `${fastTx}/v0/account`, {
+      method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ account_id: account, limit: 25, desc: true }), timeout: 1100, budget,
+    }));
+    const list = Array.isArray(fx.json?.account_txs) ? fx.json.account_txs : null;
+    if (fx.ok && list) {
+      txSource = 'fastnear';
+      indexedCount = list.length;
+      const page = list.filter(t => HASH.test(t?.transaction_hash || '')).slice(0, TX_CAP);
+      let details = [];
+      if (page.length && budget.left() > 400) {
+        const packed = await fetchJson(fetchFn, `${fastTx}/v0/transactions`, {
+          method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ tx_hashes: page.map(t => t.transaction_hash) }), timeout: 1100, budget,
+        });
+        details = (packed.json?.transactions || []).map(detailOfFast);
+      }
+      const byHash = new Map(details.map(d => [d.hash, d]));
+      receipts = page.map(t => {
+        const d = byHash.get(t.transaction_hash) || {};
+        return {
+          hash: t.transaction_hash,
+          signer: d.signer || (t.is_real_signer || t.is_signer ? account : ''),
+          method: d.method || 'transaction',
+          amount: d.amount || '',
+          at: d.at || isoFromNs(t.tx_block_timestamp),
+          receiver: d.receiver || '',
+          predecessor: d.signer || '',
+          indexerOk: t.is_success !== false,
+        };
+      });
+    } else txGap = 'Transactions did not answer. nearblocks and FastNEAR were tried.';
+  }
+
+  if (ftNear.ok && Array.isArray(ftNear.json?.txns)) {
+    ftSource = 'nearblocks';
+    fts = ftNear.json.txns.map(t => mapFt(t, account));
+  } else {
+    const bal = await withRetry(budget, () => fetchJson(fetchFn, `${fastApi}/v1/account/${id}/ft`, { headers: { accept: 'application/json' }, timeout: 900, budget }));
+    const fromTx = receipts.map(r => ftFromDetail({
+      hash: r.hash, signer: r.signer, receiver: r.receiver, method: r.method, amount: r.amount, at: r.at, success: r.indexerOk !== false,
+    }, account)).filter(Boolean);
+    if (bal.ok && Array.isArray(bal.json?.tokens)) {
+      ftSource = 'fastnear';
+      fts = fromTx;
+      if (!fromTx.length) ftGap = 'FastNEAR returned token balances, not a transfer list.';
+    } else if (fromTx.length) {
+      ftSource = 'fastnear';
+      fts = fromTx;
+    } else ftGap = 'FT index did not answer. nearblocks and FastNEAR were tried.';
+  }
+
+  const confirmed = await mapLimit(receipts.filter(t => t.signer).slice(0, TX_CAP), 4, (t) => rpcStatus(fetchFn, rpcUrls, t.hash, t.signer, budget));
+  const rpcSource = confirmed.find(c => c.ok)?.via || (receipts.some(t => t.signer) ? 'none' : 'not asked');
+  const body = assembleLive({
     account,
     boardContract,
-    board: boardRes,
-    indexOk,
-    ftOk,
-    receipts: described,
-    fts: ftOk ? (ftRes.json.txns || []).map(t => mapFt(t, account)) : [],
+    board: await boardPromise,
+    indexOk: txSource !== 'none',
+    ftOk: ftSource !== 'none',
+    receipts,
+    fts,
     confirmed,
-    indexedCount: grouped.length,
+    indexedCount,
+    txGap,
+    ftGap,
   });
+  body.health = `Health: transactions ${txSource}. ft ${ftSource}. rpc ${rpcSource}.`;
+  body.txSource = txSource;
+  body.ftSource = ftSource;
+  body.rpcSource = rpcSource;
+  return body;
 }
 
 export async function readLive(account, deps = {}) {
   const id = String(account || '').trim();
   const clock = deps.now || Date.now;
   const hit = cache.get(id);
-  if (hit && clock() - hit.at < STALE_MS) {
-    if (clock() - hit.at >= FRESH_MS) refresh(id, deps).catch(() => {});
-    return { ...hit.body, cached: true };
-  }
+  if (hit && clock() - hit.at < FRESH_MS) return { ...hit.body, cached: true };
+  if (hit) cache.delete(id);
   const body = await refresh(id, deps);
   return { ...body, cached: false };
 }
@@ -370,7 +528,7 @@ function refresh(id, deps) {
   if (inflight.has(id)) return inflight.get(id);
   const clock = deps.now || Date.now;
   const p = load(id, deps).then(body => {
-    cache.set(id, { at: clock(), body });
+    if (cacheable(body)) cache.set(id, { at: clock(), body });
     return body;
   }).finally(() => inflight.delete(id));
   inflight.set(id, p);
