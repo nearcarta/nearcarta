@@ -8,12 +8,12 @@
 import { Account, JsonRpcProvider, KeyPairSigner } from 'near-api-js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { proposalMessage } from '../../shared/board/message.js';
-import { AGENT_METHODS, BOARD_PROPOSE_TGAS, GAS_TOPUP_YOCTO, SESSION_BEATS, SESSION_HOURS, callPolicy, sessionExpiresAt } from '../../shared/board/session.js';
+import { SESSION_METHODS, BOARD_PROPOSE_TGAS, GAS_TOPUP_YOCTO, SESSION_BEATS, SESSION_HOURS, callPolicy, sessionExpiresAt } from '../../shared/board/session.js';
 import { functionCall, keyFrom, outcomeOf, rpcClient, signMessage, signTx, viewFn } from '../../shared/vault/tx.js';
 
 const live = process.argv.includes('--live');
 if (!live) {
-  console.log(JSON.stringify({ plan: SESSION_BEATS, methods: AGENT_METHODS, hours: SESSION_HOURS }));
+  console.log(JSON.stringify({ plan: SESSION_BEATS, methods: SESSION_METHODS, hours: SESSION_HOURS }));
   process.exit(0);
 }
 
@@ -81,9 +81,9 @@ try {
   await call('open', 'open_charter', { rules, agent: agent.publicKey, fund: near(SESSION_BEATS.fundNear).toString() }, near(SESSION_BEATS.openDepositNear));
   opened = true;
   await call('calls', 'set_calls', callPolicy([SHOP], near(SESSION_BEATS.perActionNear).toString(), near(SESSION_BEATS.dailyNear).toString(), SESSION_BEATS.method), near(SESSION_BEATS.callsDepositNear));
-  await me.addFunctionCallAccessKey({ publicKey: agent.publicKey, contractId: BOARD, methodNames: [...AGENT_METHODS], allowance: GAS_TOPUP_YOCTO });
+  await me.addFunctionCallAccessKey({ publicKey: agent.publicKey, contractId: BOARD, methodNames: [...SESSION_METHODS], allowance: GAS_TOPUP_YOCTO });
   added = true;
-  console.log(JSON.stringify({ label: 'agent_key', publicKey: agent.publicKey, methods: AGENT_METHODS }));
+  console.log(JSON.stringify({ label: 'agent_key', publicKey: agent.publicKey, methods: SESSION_METHODS }));
   await propose('allowed', SESSION_BEATS.allowedNear, 'allowed');
   await propose('over_cap', SESSION_BEATS.overNear, 'over_per_action_cap');
   await call('freeze', 'set_frozen', { frozen: true }, 0);

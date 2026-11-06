@@ -78,8 +78,9 @@ test('GET /api/chronicle serves the recorded mainnet board (no live index)', asy
   } finally { globalThis.fetch = real; }
 });
 
-test('warm() pre-reads the mainnet charter feed at FEED_MAX, so the first account request is served from the cache', async () => {
-  const a = MAINNET_DEP.charter.contract;
+test('warm() pre-reads the board feed at FEED_MAX, so the first account request is served from the cache', async () => {
+  // The board is the oath now, so warm() primes board.nearcarta.near, not the retired charter.
+  const a = MAINNET_DEP.board.contract;
   const r = reader(); const w = warm({ every: 0, read: r }); await w.first; w.stop();
   assert.equal(r.n, 1);
   const res = await makeApp().request('/api/chronicle'); const j = await res.json();

@@ -17,7 +17,7 @@ import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf, storedAgentKey } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
-import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
+import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
 import { HOUSE_CALLS, HOUSE_SHOP } from '../../shared/house/shop.js';
 import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
@@ -422,7 +422,7 @@ function sSign() {
         : readError
           ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div><div class="fact"><small>Your row</small><b><button type="button" class="btn link sm" id="read-again" data-testid="setup-read-again">Read the chain again</button></b></div>`
         : `<div class="fact" data-testid="setup-no-row"><small>Row</small><b>No row open on ${esc(MAIN.board.contract)}</b></div>
-           <div class="fact" data-testid="setup-key-scope"><small>Agent key will allow</small><b>${AGENT_METHODS.map(m => `<code>${esc(m)}</code>`).join(', ')}</b></div>
+           <div class="fact" data-testid="setup-key-scope"><small>Agent key will allow</small><b>${SESSION_METHODS.map(m => `<code>${esc(m)}</code>`).join(', ')}</b></div>
            <div class="fact"><small>Next</small><b>Open your row</b></div>`;
   const heading = closedRow || (rowMissing && !chainRead) ? 'Open your row.' : onChain ? (keyStale ? 'Renew your agent key.' : 'Your agent is live.') : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.');
   // The open button needs the board's answer, unless there is no account to read for.
@@ -439,6 +439,8 @@ function sSign() {
           <li>At most <b data-testid="cap-count">${esc(String(r.per))}</b> payments a day</li>
           <li>Only to <b data-testid="cap-receivers">${r.receivers.map(esc).join(', ') || 'nobody yet'}</b></li>
           <li>The session ends <b data-testid="cap-session">${esc(sessionLabel(r.hours))}</b> after it is signed</li>
+          <li>Your agent key may call <b data-testid="cap-key-scope">${SESSION_METHODS.map(esc).join(', ')}</b> on the board</li>
+          <li data-testid="cap-holds">A held WARN waits for you. Your agent can ask for one but cannot confirm it: only your confirm key signs that, and it is not the agent key. Cancel and expire stay in your wallet.</li>
         </ul>
         <p class="small muted">The contract refuses anything else, even if the agent is tricked.</p>
       </div>`
@@ -494,7 +496,7 @@ const ROW_FUND = YN / 100n, TOPUP = YN / 200n;
 // measures the call list (shops plus the wrap.near trio and the stamp) against that
 // budget: seven 20-byte shops fit, eight do not, and longer names fit fewer.
 // The measured numbers are in `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`.
-const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: [...AGENT_METHODS], allowance: AGENT_ALLOW.toString() } } } });
+const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: [...SESSION_METHODS], allowance: AGENT_ALLOW.toString() } } } });
 // The login plugin stores its key here. Use it as the row agent when this browser has not made one yet.
 function adoptPluginKey(id) {
   if (!id || localStorage.getItem(agentLS(id))) return;
@@ -515,7 +517,7 @@ async function listBoardAgentKeys() {
   const res = await rpcClient([MAIN.rpc])('query', { request_type: 'view_access_key_list', finality: 'optimistic', account_id: me }).catch(() => null);
   return classifyBoardAgentKeys(res?.keys || [], MAIN.board.contract);
 }
-/** Stale board keys (missing any AGENT_METHODS entry): one approval replaces them with a key for all three. */
+/** Stale board keys (missing any SESSION_METHODS entry): one approval replaces them with a key for all three. */
 function paintRenewStatus(text) {
   renewStatus = text || '';
   const el = $('[data-testid=setup-renew-status]');
@@ -545,7 +547,7 @@ async function renewAgentKey(deps = {}) {
     stalePublicKeys: stalePks,
     newPublicKey: pk,
     boardContract: contract,
-    methodNames: AGENT_METHODS,
+    methodNames: SESSION_METHODS,
     allowance: AGENT_ALLOW.toString(),
   });
   const txs = [];
@@ -628,7 +630,7 @@ async function refreshAgentKey(deps = {}) {
     stalePublicKeys: classified.board.map(k => k.publicKey),
     newPublicKey: pk,
     boardContract: contract,
-    methodNames: AGENT_METHODS,
+    methodNames: SESSION_METHODS,
     allowance: GAS_TOPUP_YOCTO,
   });
   const txs = [];

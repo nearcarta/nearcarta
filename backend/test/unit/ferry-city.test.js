@@ -382,8 +382,12 @@ test('USDC on Base is you-send, and NEAR under the cap is propose_call with no w
   });
   assert.equal(locked.kind, 'you-send');
   assert.equal(locked.wallet, false);
-  assert.equal(mayCheckout({ from: { usd: '0.21' } }).ok, false);
-  assert.equal(mayCheckout({ from: { usd: '0.2' } }).ok, true);
+  // No product USD cap in the panel either: any positive quote is usable, and the row
+  // is what decides whether the deposit fits.
+  assert.equal(mayCheckout({ from: { usd: '0.21' } }).ok, true);
+  assert.equal(mayCheckout({ from: { usd: '5' } }).ok, true);
+  assert.equal(mayCheckout({ from: { usd: '0' } }).ok, false);
+  assert.equal(mayCheckout({ from: { usd: '0' } }).reason, 'bad_usd');
   const session = depositPlan({
     from: SESSION_SWAP.from, amount: SESSION_SWAP.amt, depositAddress: 'intents.near',
     capYocto: '60000000000000000000000', balanceYocto: '200000000000000000000000',
@@ -403,7 +407,8 @@ test('USDC on Base is you-send, and NEAR under the cap is propose_call with no w
   assert.match(bridge, /1671417/);
   assert.match(bridge, /No deposit address/);
   assert.match(bridge, /has not delivered/);
-  assert.match(explainQuoteMiss('over_checkout_cap'), /0\.20/);
+  assert.match(explainQuoteMiss('over_per_action_cap'), /row allows/);
+  assert.match(explainQuoteMiss('over_checkout_cap'), /limit your row allows/);
 });
 
 test('a failed quote and Get another quote both hide the refuse seal', () => {

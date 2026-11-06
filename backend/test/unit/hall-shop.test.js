@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeApp } from '../../src/app.js';
+import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
 import {
   LAMPLIGHTER_REGISTER, asRow, nearOf, parseHallCommand, payPlan, rulesPlan, yoctoOf,
 } from '../../../shared/hall/plan.js';
@@ -360,14 +361,19 @@ test('public worker discovery needs no credential, and the buyer view names the 
   assert.equal(rejected.sent, false);
 });
 
-test('a retired contract answers a state, not a 500 that takes the city tray down', async () => {
-  // The Guardhouse oath is the retired charter. Before this, /api/guardhouse threw and
-  // the whole shop mount failed with it; now it answers a readable state.
+test('the guardhouse answers the live board, not a 500 that takes the city tray down', async () => {
+  // The Guardhouse oath used to be charter.nearcarta.near, which is retired: the read threw
+  // and the whole shop mount failed with it. The board is the oath now, so the tray gets a
+  // live state. A retired or missing contract still answers a readable `{retired:true}` from
+  // `lastGood` instead of a 500; city-boot covers that 404 on the snapshot itself.
   const res = await makeApp().request('/api/guardhouse');
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.equal(body.retired, true);
-  assert.ok(body.error, 'the message names what is retired');
+  assert.equal(body.retired, undefined, 'the live board is not a retired contract');
+  assert.equal(body.source, 'board');
+  assert.equal(body.oath, MAIN.board.contract);
+  assert.equal(typeof body.state?.owner, 'string', 'the room can read an owner');
+  assert.equal(body.state?.frozen, false);
   assert.doesNotMatch(JSON.stringify(body), /at .*\.js:/, 'no stack trace in the body');
 });
 
