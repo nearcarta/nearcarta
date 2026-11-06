@@ -12,7 +12,8 @@ export function intentPrompt(text) {
     + 'Extract one payout command. Reply with JSON only, no prose: '
     + '{"kind":"invoice"|"pay"|"csv"|"miss","usd":null,"receive":"","memo":"","due":""}. '
     + 'kind pay means pay the reviewed rows. kind csv means export the csv. '
-    + 'For an invoice, copy the account and the amount from the message. Never invent either. due is YYYY-MM-DD or "". '
+    + 'For an invoice, copy the account and the amount from the message. Never invent either. '
+    + 'memo is only the purpose, never the amount, the token or the receiver. due is YYYY-MM-DD or "". '
     + 'Message:\n' + String(text || '').slice(0, 400);
 }
 
