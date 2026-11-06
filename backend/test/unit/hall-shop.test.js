@@ -3,14 +3,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeApp } from '../../src/app.js';
 import {
-  LAMPLIGHTER_REGISTER, asRow, hirePlan, nearOf, parseHallCommand, payPlan, rulesPlan, yoctoOf,
+  LAMPLIGHTER_REGISTER, asRow, nearOf, parseHallCommand, payPlan, rulesPlan, yoctoOf,
 } from '../../../shared/hall/plan.js';
+import {
+  acceptPart, conserved, createLedger, postJob, quotePart, refundJob, reviewPart,
+} from '../../../shared/hall/job.js';
 import {
   assignmentRows, bountyRows, marketStatus, readBounties,
 } from '../../src/hall-market.js';
 import { armHallDock, dispatchHallDock, installHallDock, lastHallDockSend } from '../../../app/src/panels/hall-dock.js';
 import { runHallCommand } from '../../../app/src/panels/hall-actions.js';
-import { lampIcon, noteMarkup } from '../../../app/src/panels/hall-panes.js';
+import { jobTray, noteMarkup } from '../../../app/src/panels/hall-panes.js';
 
 const read = (p) => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 const Y = n => yoctoOf(n);
@@ -34,33 +37,80 @@ function row(over = {}) {
   });
 }
 
-test('hall commands name list, hire, bounty, cap, and freeze', () => {
-  assert.equal(parseHallCommand('list the lamplighter').kind, 'list');
-  assert.equal(parseHallCommand('hire an agent for a lamp check 0.001 near').near, '0.001');
-  assert.equal(parseHallCommand('post a bounty 0.001').kind, 'bounty');
+test('hall commands post a job and refuse a hire that would pay townhall', () => {
+  const post = parseHallCommand('post a readme pass for 0.002 near');
+  assert.equal(post.kind, 'post');
+  assert.equal(post.near, '0.002');
+  assert.equal(parseHallCommand('quote part 1 from worker-a.near at 0.003').kind, 'quote');
+  assert.equal(parseHallCommand('accept part 1').partId, 1);
+  assert.equal(parseHallCommand('walk part 2').kind, 'walk');
+  assert.equal(parseHallCommand('pass part 1').kind, 'pass');
+  assert.equal(parseHallCommand('fail part 2').kind, 'fail');
+  assert.equal(parseHallCommand('refund').kind, 'refund');
   assert.equal(parseHallCommand('tighten my cap').tighter, true);
   assert.equal(parseHallCommand('freeze my row').frozen, true);
-  assert.equal(parseHallCommand('accept').kind, 'accept');
-  assert.equal(parseHallCommand('walk away').kind, 'walk');
+  assert.equal(parseHallCommand('list the lamplighter').kind, 'list');
+  assert.equal(parseHallCommand('hire an agent for a lamp check 0.001 near').ok, false);
+  assert.equal(parseHallCommand('post a bounty 0.001').ok, false);
   assert.equal(parseHallCommand('hello').ok, false);
 });
 
-test('a hire over the cap counters, and a fitting bounty does not sign by itself', () => {
+test('a job conserves escrow, counters once, and does not pay on a swapped or blocked review', () => {
   const live = row();
-  const over = hirePlan({ brief: 'a lamp check', near: '0.05', row: live });
-  assert.equal(over.phase, 'counter');
-  assert.equal(over.pending.near, '0.002');
-  assert.equal(over.seal, false);
-  const fit = payPlan({ near: '0.001', row: live });
-  assert.equal(fit.ok, true);
-  assert.equal(fit.amountY, Y('0.001'));
-  const blocked = payPlan({ near: '0.05', row: live });
-  assert.equal(blocked.reason, 'over_per_action_cap');
-  assert.equal(blocked.seal, true);
-  const stranger = payPlan({ near: '0.001', row: row({ receivers: ['other.near'] }) });
-  assert.equal(stranger.reason, 'receiver_not_allowlisted');
-  assert.equal(payPlan({ near: '0.001', row: row({ frozen: true }) }).reason, 'frozen');
-  assert.equal(payPlan({ near: '0.001', row: row({ expires_at: '1' }), nowMs: Date.now() }).reason, 'clause_expired');
+  assert.equal(payPlan({ near: '0.05', row: live }).reason, 'over_per_action_cap');
+  const ledger = createLedger();
+  const workers = ['worker-a.near', 'worker-b.near'];
+  const posted = postJob(ledger, { task: 'a readme pass', budgetNear: '0.002', workers, maxParts: 2, nowMs: 1_000 });
+  assert.equal(posted.ok, true);
+  assert.equal(posted.tx, null);
+  assert.equal(posted.job.live, false);
+  const again = postJob(ledger, { task: 'a readme pass', budgetNear: '0.002', workers, maxParts: 2, nowMs: 1_000 });
+  assert.equal(again.duplicate, true);
+  assert.equal(ledger.jobs.length, 1);
+  const own = postJob(createLedger(), { task: 'a readme pass', budgetNear: '0.002', workers: ['worker-a.near', 'townhall.nearcarta.near'] });
+  assert.equal(own.ok, false);
+  const high = quotePart(ledger, { jobId: posted.job.id, partId: 1, worker: 'worker-a.near', quoteNear: '0.01', nowMs: 1_000 });
+  assert.match(high.hint, /Counter once/);
+  const second = quotePart(ledger, { jobId: posted.job.id, partId: 1, worker: 'worker-a.near', quoteNear: '0.02', nowMs: 1_000 });
+  assert.equal(second.reason, 'counter_once');
+  const awarded = acceptPart(ledger, { jobId: posted.job.id, partId: 1, nowMs: 1_000 });
+  assert.equal(awarded.job.parts[0].settlement, 'awarded');
+  const swapped = reviewPart(ledger, {
+    jobId: posted.job.id, partId: 1, worker: 'worker-b.near', priceY: awarded.job.parts[0].awarded.priceY,
+    deliverable: 'a paragraph', verdict: 'pass', nowMs: 1_000,
+  });
+  assert.equal(swapped.reason, 'swapped');
+  const blocked = reviewPart(ledger, {
+    jobId: posted.job.id, partId: 1, deliverable: 'a paragraph', verdict: 'pass', guard: 'BLOCK', nowMs: 1_000,
+  });
+  assert.equal(blocked.reason, 'guard_block');
+  assert.equal(posted.job.paidY, '0');
+  quotePart(ledger, { jobId: posted.job.id, partId: 2, worker: 'worker-b.near', quoteNear: '0.001', nowMs: 1_000 });
+  const low = posted.job.parts[1];
+  low.awarded = { worker: 'worker-b.near', priceY: low.quoteY };
+  low.settlement = 'awarded';
+  const failed = reviewPart(ledger, {
+    jobId: posted.job.id, partId: 2, deliverable: 'empty', verdict: 'ai_fail', nowMs: 1_000,
+  });
+  assert.equal(failed.job.parts[1].stake, 'not seized');
+  assert.match(failed.hint, /does not seize/);
+  const passed = reviewPart(ledger, {
+    jobId: posted.job.id, partId: 1, deliverable: 'a paragraph', verdict: 'pass', nowMs: 1_000,
+  });
+  assert.equal(passed.job.parts[0].settlement, 'held');
+  assert.equal(passed.job.parts[0].chain.tx, null);
+  assert.equal(conserved(passed.job), true);
+  const twice = reviewPart(ledger, {
+    jobId: posted.job.id, partId: 1, deliverable: 'a paragraph', verdict: 'pass', nowMs: 1_000,
+  });
+  assert.equal(twice.reason, 'double');
+  const book = createLedger();
+  const open = postJob(book, { task: 'a second pass', budgetNear: '0.002', workers, deadlineHours: 1, nowMs: 1_000 });
+  const back = refundJob(book, { jobId: open.job.id, reason: 'timeout', nowMs: open.job.deadlineMs + 1 });
+  assert.equal(back.job.remainingY, '0');
+  assert.equal(back.job.paidY, '0');
+  assert.equal(conserved(back.job), true);
+  assert.equal(nearOf(back.job.refundedY), '0.002');
 });
 
 test('tightening a cap keeps the live expiry and does not repeat a method', () => {
@@ -123,28 +173,32 @@ test('GET /api/hall/market reports a missing token and does not echo one', async
   if (!process.env.AGENT_API_TOKEN) assert.equal(body.blocked, 'no_token');
 });
 
-test('accept pays through the same plan the button uses, and a miss keeps the line', async () => {
-  const live = row();
+test('the gold button and the dock share a runner that does not sign', async () => {
+  const ledger = createLedger();
+  let posted = null;
   const pays = [];
   const ctx = {
-    row: async () => live,
-    pending: () => ctx._p,
-    setPending: p => { ctx._p = p; },
-    clearPending: () => { ctx._p = null; },
-    pay: async (plan) => { pays.push(plan); return { decision: 'allowed', tx: 'abc', signer: 'agent' }; },
+    ledger,
+    job: () => posted,
+    form: () => ({
+      task: 'a readme pass', budget: '0.002', deadline: '24', parts: '2',
+      workerA: 'worker-a.near', workerB: 'worker-b.near', deliverable: 'a paragraph', guard: 'ALLOW',
+    }),
+    pay: async () => { pays.push('pay'); return { decision: 'allowed', tx: 'abc' }; },
+    nowMs: 1_000,
   };
-  const bid = await runHallCommand('hire an agent for a lamp check 0.001 near', ctx);
+  const bid = await runHallCommand('post a readme pass for 0.002 near', ctx);
+  posted = bid.job;
   assert.equal(bid.ok, true);
+  assert.equal(bid.cinema, false);
+  assert.equal(bid.tx, null);
   assert.equal(pays.length, 0);
-  assert.match(bid.speech, /Accept pays/);
-  const paid = await runHallCommand('accept', ctx);
-  assert.equal(pays.length, 1);
-  assert.equal(pays[0].amountY, Y('0.001'));
-  assert.equal(paid.cinema, true);
-  assert.equal(paid.tx, 'abc');
-  const refused = await runHallCommand('post a bounty 0.05', { row: async () => live, pay: async () => { throw new Error('should not pay'); } });
-  assert.equal(refused.seal, true);
-  assert.equal(refused.cinema, false);
+  const quoted = await runHallCommand('quote part 1 from worker-a.near at 0.01', ctx);
+  assert.match(quoted.hint, /Counter once/);
+  const hired = await runHallCommand('hire an agent for a lamp check 0.001 near', ctx);
+  assert.equal(hired.ok, false);
+  assert.match(hired.hint, /townhall\.nearcarta\.near/);
+  assert.equal(pays.length, 0);
 });
 
 function fakeDock() {
@@ -220,8 +274,12 @@ test('the city wires the hall dock and the all-shops link still enters the room'
   assert.doesNotMatch(market, new RegExp(['sp' + 'utnik', 'social' + ' money'].join('|'), 'i'));
   const panes = read('app/src/panels/hall-panes.js');
   assert.doesNotMatch(panes, />\?</);
-  assert.match(lampIcon(), /<svg/);
+  assert.match(panes, /web3icons/);
+  const tray = jobTray({ form: { task: '', budget: '', deadline: '24', parts: '2', workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '' } });
+  assert.equal(tray.match(/class="hall-cta"/g).length, 1);
+  assert.match(tray, /class="web3icons"/);
   assert.match(read('app/src/panels/hall.css'), /hall-agent-pop\[hidden\]/);
+  assert.doesNotMatch(read('app/src/panels/hall-actions.js'), /ctx\.pay/);
   assert.match(noteMarkup('Listing is blocked'), /data-testid="hall-note"/);
   assert.equal(noteMarkup(''), '');
   assert.doesNotMatch(read('app/src/panels/hall-ui.js'), new RegExp(['sp' + 'utnik', 'social' + ' money'].join('|'), 'i'));

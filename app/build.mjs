@@ -27,6 +27,7 @@ cpSync(here + '../shared/townhall/reputation.js', dist + '/live/townhall-reputat
 mkdirSync(dist + '/shared/hall', { recursive: true });
 mkdirSync(dist + '/shared/rails', { recursive: true });
 cpSync(here + '../shared/hall/plan.js', dist + '/shared/hall/plan.js');
+cpSync(here + '../shared/hall/job.js', dist + '/shared/hall/job.js');
 cpSync(here + '../shared/rails/receipts.js', dist + '/shared/rails/receipts.js');
 // Your House: NEAR Wallet Selector bundled into one ES module (the only part of the console that asks a wallet to sign).
 await (await import('esbuild')).build({ entryPoints: [here + 'house/house.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',

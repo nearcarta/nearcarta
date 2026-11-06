@@ -9,7 +9,8 @@ import {
 } from './hall.js';
 import { runHallCommand } from './hall-actions.js';
 import { armHallDock, ensureHallDock, installHallDock } from './hall-dock.js';
-import { capIcon, counterMarkup, hirePane, jobsPane, lampIcon, noteMarkup, receiptMarkup, scrollIcon, sealMarkup } from './hall-panes.js';
+import { jobTray } from './hall-panes.js';
+import { createLedger, statusLines } from '../../../shared/hall/job.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const apiBase = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -76,90 +77,67 @@ export function hallMarkup(row, person = null) {
   </form>`;
 }
 
-function hallFrame({ tab, rowHtml, jobsHtml, hireHtml, seal, line }) {
-  const on = name => (tab === name ? 'true' : 'false');
-  const hide = name => (tab === name ? '' : ' hidden');
-  return `<div class="hall-desk" data-testid="hall-desk">
-    <div class="hall-tabs" role="tablist">
-      <button type="button" class="hall-tab" role="tab" data-tab="row" aria-selected="${on('row')}" data-testid="hall-tab-row">${capIcon()}<span>My row</span></button>
-      <button type="button" class="hall-tab" role="tab" data-tab="jobs" aria-selected="${on('jobs')}" data-testid="hall-tab-jobs">${scrollIcon()}<span>Jobs</span></button>
-      <button type="button" class="hall-tab" role="tab" data-tab="hire" aria-selected="${on('hire')}" data-testid="hall-tab-hire">${lampIcon()}<span>Hire</span></button>
-    </div>
-    <div data-pane="row"${hide('row')}>${rowHtml}</div>
-    <div data-pane="jobs"${hide('jobs')}>${jobsHtml}</div>
-    <div data-pane="hire"${hide('hire')}>${hireHtml}</div>
-    ${sealMarkup(seal)}
-    ${noteMarkup(seal ? '' : line)}
-  </div>`;
-}
-
 export async function mountHall(root, hooks = {}) {
   if (!root) return;
-  let tab = 'row';
+  let tab = 'post';
   let seal = '';
-  let line = '';
-  let speech = '';
-  let pending = null;
-  let lastReceipt = null;
-  let jobs = { bounties: [], error: '', contract: 'townhall.nearcarta.near' };
+  let lines = [];
+  let posted = null;
+  const ledger = createLedger();
+  const form = {
+    task: '', budget: '', deadline: '24', parts: '2',
+    workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '',
+  };
   let market = { blocked: 'no_token', assignments: [], draft: null, agent: null };
   if (hooks.accountP && !readSessionAccount()) {
     try { await hooks.accountP; } catch { /* a saved session is not required to paint */ }
   }
   const choice = ownerNow();
   let before = null;
-  const paint = (row) => {
+  const readForm = () => {
+    const take = (id, key) => {
+      const el = root.querySelector('#' + id);
+      if (el) form[key] = el.value;
+    };
+    take('hall-task', 'task');
+    take('hall-budget', 'budget');
+    take('hall-deadline', 'deadline');
+    take('hall-parts', 'parts');
+    take('hall-worker-a', 'workerA');
+    take('hall-worker-b', 'workerB');
+    take('hall-quote-part', 'quotePart');
+    take('hall-quote-worker', 'quoteWorker');
+    take('hall-quote-near', 'quoteNear');
+    take('hall-deliverable', 'deliverable');
+  };
+  const paint = () => {
     const person = visitor();
-    root.innerHTML = hallFrame({
-      tab,
-      rowHtml: hallMarkup(row, person),
-      jobsHtml: jobsPane(jobs),
-      hireHtml: hirePane(market),
-      seal,
-      line,
-    });
-    const counter = root.querySelector('#hall-counter');
-    if (counter) {
-      counter.hidden = !speech;
-      counter.innerHTML = counterMarkup(speech);
-    }
-    const slip = root.querySelector('#hall-receipt');
-    if (slip) slip.innerHTML = receiptMarkup(lastReceipt);
+    root.innerHTML = jobTray({ tab, form, job: posted, market, seal, lines });
     const who = root.querySelector('#who') || document.getElementById('who');
     if (who) {
       const saved = readSession();
-      const id = row?.owner || choice.owner || '';
+      const id = before?.owner || choice.owner || '';
       const pill = id ? sessionPill({ accountId: id, displayName: saved.displayName, balanceNear: saved.balanceNear }) : '';
       who.innerHTML = id ? `<b data-testid="who" data-account="${esc(id)}">${esc(pill)}</b>` : '';
     }
     const connect = document.getElementById('connect');
-    if (connect) connect.hidden = !!(row?.owner || choice.owner || person.signedIn);
-    const form = root.querySelector('#row-form');
-    if (form) form.onsubmit = (e) => { e.preventDefault(); onSign(); };
-    const capEl = root.querySelector('#cap');
-    if (capEl && row?.per_action_cap != null) capEl.value = String(nearOf(row.per_action_cap));
-    const copy = root.querySelector('[data-testid=hall-copy]');
-    if (copy) copy.onclick = async () => {
-      const full = copy.dataset.copy || '';
-      try {
-        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(full);
-        else throw new Error('copy');
-        copy.textContent = 'Copied';
-      } catch {
-        copy.textContent = 'Copy failed';
-      }
-    };
+    if (connect) connect.hidden = !!(before?.owner || choice.owner || person.signedIn);
     root.querySelectorAll('[data-tab]').forEach(btn => {
-      btn.onclick = () => { tab = btn.dataset.tab || 'row'; seal = ''; line = ''; paint(before); };
+      btn.onclick = () => { readForm(); tab = btn.dataset.tab || 'post'; seal = ''; paint(); };
     });
     root.querySelectorAll('[data-cmd]').forEach(btn => {
-      btn.onclick = () => run(btn.dataset.cmd || '');
+      btn.onclick = () => { readForm(); run(btn.dataset.cmd || ''); };
     });
-    const hireGo = root.querySelector('[data-testid=hall-hire-go]');
-    if (hireGo) hireGo.onclick = () => {
-      const brief = root.querySelector('#hall-brief')?.value || 'a lamp check';
-      const near = root.querySelector('#hall-offer')?.value || '0.001';
-      run(`hire an agent for ${brief} ${near} near`);
+    const cta = root.querySelector('[data-testid=hall-cta]');
+    if (cta) cta.onclick = () => {
+      readForm();
+      if (cta.dataset.action === 'post' && (!form.task.trim() || !form.budget.trim())) {
+        lines = ['Name the task and the budget. Nothing was signed.'];
+        seal = '';
+        paint();
+        return;
+      }
+      run(ctaText(cta));
     };
     const doc = typeof document !== 'undefined' ? document : null;
     if (doc && doc.getElementById) {
@@ -172,11 +150,25 @@ export async function mountHall(root, hooks = {}) {
     hooks.runAgent = text => run(text);
     if (hooks.state) hooks.state.hallRun = text => run(text);
   };
+  function ctaText(cta) {
+    const action = cta.dataset.action;
+    const part = cta.dataset.part || form.quotePart || '1';
+    if (action === 'post') return `post ${form.task} for ${form.budget} near`;
+    if (action === 'quote') return `quote part ${form.quotePart || part} from ${form.quoteWorker} at ${form.quoteNear}`;
+    if (action === 'accept') return `accept part ${part}`;
+    if (action === 'pass') return `pass part ${part}`;
+    if (action === 'refund') return 'refund';
+    return '';
+  }
 
   async function run(text) {
     seal = '';
     const result = await runHallCommand(text, {
       row: async () => before,
+      form: () => form,
+      ledger,
+      job: () => posted,
+      nowMs: hooks.nowMs,
       market: async () => {
         if (hooks.market) return hooks.market();
         try {
@@ -185,10 +177,6 @@ export async function mountHall(root, hooks = {}) {
         } catch { market = { ...market, blocked: 'market_unread' }; }
         return market;
       },
-      pay: hooks.pay,
-      pending: () => pending,
-      setPending: (p) => { pending = p; },
-      clearPending: () => { pending = null; speech = ''; },
       clearSeal: () => { seal = ''; },
       signRules: async (calls) => {
         const sign = hooks.sign || (async (list) => {
@@ -198,15 +186,17 @@ export async function mountHall(root, hooks = {}) {
         return sign(calls);
       },
     });
-    if (result?.speech) speech = result.speech;
+    if (result?.job) posted = result.job;
     if (result?.seal) seal = result.hint || 'Refused';
     else seal = '';
-    line = result?.speech ? '' : (result?.hint || '');
-    if (result?.receipt) lastReceipt = result.receipt;
+    const hint = result?.hint || '';
+    const escrow = posted ? statusLines(posted)[0] : '';
+    lines = [hint, escrow].filter(Boolean).slice(0, 2);
     if (result?.listing) {
       market = { ...market, blocked: result.listing.blocked, agent: result.listing.agent || market.agent, assignments: result.listing.assignments || market.assignments, draft: result.listing.draft || market.draft };
     }
-    paint(before);
+    if (result?.job && tab === 'post' && result.ok && !result.duplicate) tab = 'agents';
+    paint();
     if (result?.cinema && result.tx) hooks.onPaid?.(result);
     else if (result?.seal) hooks.onRefuse?.(result.hint);
     else hooks.onClear?.();
@@ -221,7 +211,6 @@ export async function mountHall(root, hooks = {}) {
 
   async function onSign() {
     seal = '';
-    line = '';
     hooks.onClear?.();
     const sealEl = root.querySelector('[data-testid=hall-refused]');
     if (sealEl) { sealEl.hidden = true; sealEl.replaceChildren(); }
@@ -319,18 +308,12 @@ export async function mountHall(root, hooks = {}) {
   async function loadLive() {
     const base = apiBase();
     try {
-      const b = await fetch(base + '/api/hall/bounties', { cache: 'no-store' }).then(r => r.json());
-      jobs = { bounties: Array.isArray(b?.bounties) ? b.bounties : [], error: b?.error || '', contract: b?.contract || jobs.contract };
-    } catch {
-      jobs = { ...jobs, error: 'The hall did not answer.' };
-    }
-    try {
       const m = hooks.market ? await hooks.market() : await fetch(base + '/api/hall/market', { cache: 'no-store' }).then(r => r.json());
       if (m && typeof m === 'object') market = m;
     } catch {
       market = { ...market, blocked: 'market_unread' };
     }
-    if (tab !== 'row' && root.querySelector('[data-testid=hall-desk]')) paint(before);
+    if (root.querySelector('[data-testid=hall-desk]')) paint();
   }
   loadLive();
   start();

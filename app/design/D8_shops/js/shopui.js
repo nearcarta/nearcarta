@@ -849,7 +849,7 @@ const APPS = {
   },
   hall: {
     guest: true,
-    label: 'Town Hall · your row', idle: 'My row, jobs, and a hire. The agent key calls propose. No wallet popup.',
+    label: 'Town Hall · a job', idle: 'Post a job, then one quote. A pass stays held. Nothing is signed here.',
     form: () => '<div data-deep="hall"></div>',
     bind: () => {
       const hooks = {

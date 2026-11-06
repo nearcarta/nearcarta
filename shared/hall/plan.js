@@ -13,7 +13,7 @@ export const LAMPLIGHTER_REGISTER = {
   category: 'operations',
 };
 
-export const HALL_HINT = 'Try: Tighten my cap. Freeze my row. Post a bounty 0.001. List the Lamplighter. Hire an agent for a lamp check at 0.001. Accept. Walk.';
+export const HALL_HINT = 'Try: Post a readme pass for 0.002 near. Quote part 1 from worker.near at 0.001. Accept part 1. Walk part 1. Pass part 1. Fail part 2. Refund.';
 
 const PLAIN = {
   over_per_action_cap: 'That is more than your max per payment.',
@@ -123,28 +123,12 @@ export function payPlan({ near, row, payee = HALL_PAYEE, nowMs = Date.now() } = 
   return { ok: true, seal: false, reason: null, hint: '', receiver: payee, amountY, near: nearOf(amountY), capNear: nearOf(cap) };
 }
 
-export function hirePlan({ brief = '', near = '0.001', row, payee = HALL_PAYEE, nowMs = Date.now() } = {}) {
-  const task = String(brief || 'a small task').replace(/\s+/g, ' ').trim().slice(0, 180);
-  const offer = payPlan({ near, row, payee, nowMs });
-  if (offer.ok) {
-    return {
-      ok: true, phase: 'bid', seal: false, brief: task, near: offer.near, amountY: offer.amountY,
-      receiver: payee, speech: `Bid ${offer.near} NEAR for “${task}”. Accept pays ${payee}. Walk leaves it.`,
-      pending: { near: offer.near, amountY: offer.amountY, receiver: payee, brief: task },
-    };
-  }
-  if (offer.reason === 'over_per_action_cap' && offer.capNear && offer.capNear !== '0') {
-    const counter = payPlan({ near: offer.capNear, row, payee, nowMs });
-    if (counter.ok) {
-      return {
-        ok: true, phase: 'counter', seal: false, brief: task, near: counter.near, amountY: counter.amountY,
-        receiver: payee,
-        speech: `${offer.hint} Counter-offer: ${counter.near} NEAR. Accept pays that. Walk leaves it.`,
-        pending: { near: counter.near, amountY: counter.amountY, receiver: payee, brief: task },
-      };
-    }
-  }
-  return { ok: false, phase: 'refused', seal: offer.seal, reason: offer.reason, hint: offer.hint, speech: offer.hint, brief: task, pending: null };
+export function hirePlan() {
+  return {
+    ok: false, phase: 'refused', seal: false, cinema: false, tx: null, pending: null,
+    hint: 'This tray does not pay townhall.nearcarta.near. Post a job and name two workers. Nothing was signed.',
+    speech: 'This tray does not pay townhall.nearcarta.near. Post a job and name two workers. Nothing was signed.',
+  };
 }
 
 function scaleCap(yocto, num, den) {
@@ -221,23 +205,28 @@ export function parseHallCommand(text) {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   const t = raw.toLowerCase();
   if (!t) return { ok: false, kind: 'miss', hint: HALL_HINT };
-  if (/^(accept|yes|take it)\b/.test(t)) return { ok: true, kind: 'accept' };
-  if (/^(walk|decline|no)\b/.test(t) || /\bwalk away\b/.test(t)) return { ok: true, kind: 'walk' };
+  const accept = raw.match(/\baccept\s+part\s+(\d+)\b/i);
+  if (accept) return { ok: true, kind: 'accept', partId: Number(accept[1]) };
+  const walk = raw.match(/\bwalk\s+part\s+(\d+)\b/i);
+  if (walk) return { ok: true, kind: 'walk', partId: Number(walk[1]) };
+  const quote = raw.match(/\bquote\s+part\s+(\d+)\s+from\s+(\S+)\s+at\s+(\d+(?:\.\d+)?)/i);
+  if (quote) return { ok: true, kind: 'quote', partId: Number(quote[1]), worker: quote[2].toLowerCase(), near: quote[3] };
+  const pass = raw.match(/\bpass\s+part\s+(\d+)\b/i);
+  if (pass) return { ok: true, kind: 'pass', partId: Number(pass[1]) };
+  const fail = raw.match(/\bfail\s+part\s+(\d+)\b/i);
+  if (fail) return { ok: true, kind: 'fail', partId: Number(fail[1]) };
+  if (/^refund\b/.test(t)) return { ok: true, kind: 'refund' };
   const rules = {};
   if (/\bfreeze\b/.test(t) && /\brow\b/.test(t)) rules.frozen = true;
   if (/\bunfreeze\b/.test(t)) rules.frozen = false;
   if (/\btighten\b/.test(t) && /\bcap\b/.test(t)) rules.tighter = true;
   if (/\bloosen\b/.test(t) && /\bcap\b/.test(t)) rules.looser = true;
   if (rules.tighter || rules.looser || rules.frozen != null) return { ok: true, kind: 'rules', ...rules };
-  const bounty = t.match(/\bbounty\b[^\d]{0,24}(\d+(?:\.\d+)?)/);
-  if (bounty && /\b(post|pin|pay)\b/.test(t)) return { ok: true, kind: 'bounty', near: bounty[1] };
+  const post = raw.match(/\bpost\b(?:\s+a)?\s+(.+?)\s+for\s+(\d+(?:\.\d+)?)\s*near\b/i);
+  if (post) return { ok: true, kind: 'post', task: post[1].trim(), near: post[2] };
   if (/\blist\b/.test(t) && /\b(lamplighter|agent|market)\b/.test(t)) return { ok: true, kind: 'list' };
-  const hire = raw.match(/\bhire\b(?:\s+an?\s+agent)?(?:\s+for\s+(.+))?/i);
-  if (hire) {
-    const rest = String(hire[1] || '').trim();
-    const amt = rest.match(/(\d+(?:\.\d+)?)/);
-    const brief = rest.replace(/(\d+(?:\.\d+)?)\s*near\b/i, '').trim() || rest || 'a small task';
-    return { ok: true, kind: 'hire', brief, near: amt ? amt[1] : '0.001' };
+  if (/\b(bounty|hire)\b/.test(t)) {
+    return { ok: false, kind: 'miss', hint: 'This tray does not pay townhall.nearcarta.near. Post a job and name two workers. Nothing was signed.' };
   }
   return { ok: false, kind: 'miss', hint: HALL_HINT };
 }

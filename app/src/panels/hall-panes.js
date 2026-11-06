@@ -1,84 +1,116 @@
-// Jobs and Hire panes. Icons are drawn marks, not placeholders.
-import { LAMPLIGHTER_REGISTER, nearOf } from '../../../shared/hall/plan.js';
+// Town Hall tray: Post job / Agents / Receipts. One gold button. Icons from @web3icons/core.
+import { TOKEN_SVG } from '../../design/D6_dashboards/src/tokenIcons.js';
+import { activeCta, MARKET_HIRE_GAP, statusLines } from '../../../shared/hall/job.js';
+import { nearOf } from '../../../shared/hall/plan.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-export function lampIcon() {
-  return `<svg class="hall-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#f5d08a" d="M9 2.5h6l.8 3.2H8.2L9 2.5z"/><path fill="#e2b35b" d="M7 6.2h10l1.6 5.2H5.4L7 6.2z"/><rect x="11" y="11.6" width="2" height="6.2" fill="#d6b46a"/><rect x="8" y="18.2" width="8" height="2" rx="1" fill="#f3ead8"/></svg>`;
-}
-export function scrollIcon() {
-  return `<svg class="hall-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#f3ead8" d="M6 4h9a3 3 0 0 1 3 3v12H8a2 2 0 0 1-2-2V4z"/><path fill="none" stroke="#6b4a33" stroke-width="1.4" d="M9 8h6M9 11.5h6M9 15h4"/><path fill="#d6b46a" d="M6 4c0 1.2-.8 2-2 2v12c1.2 0 2 .8 2 2V4z"/></svg>`;
-}
-export function capIcon() {
-  return `<svg class="hall-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#f5d08a" d="M3 10 12 5l9 5-9 5-9-5z"/><path fill="none" stroke="#2a1608" stroke-width="1.4" d="M7 12.2V16c1.6 1.4 3.2 2 5 2s3.4-.6 5-2v-3.8"/></svg>`;
+function nearIcon() {
+  return String(TOKEN_SVG.NEAR || '')
+    .replace(/NEAR__a/g, 'hall-near')
+    .replace('width="24"', 'width="48"')
+    .replace('height="24"', 'height="48"');
 }
 
-function agentMark(url) {
-  const u = String(url || '');
-  if (/^https:\/\//.test(u)) return `<img class="hall-ico" src="${esc(u)}" width="22" height="22" alt="">`;
-  return lampIcon();
-}
-
-export function jobsPane({ bounties = [], error = '', contract = 'townhall.nearcarta.near' } = {}) {
-  const rows = (bounties || []).map(b => {
-    const who = b.claimedBy ? `claimed by ${esc(b.claimedBy)}` : 'open';
-    return `<li class="hall-job" data-testid="hall-job"><span class="hall-job-ico">${scrollIcon()}</span><span><b>${esc(nearOf(b.amount))} NEAR</b><small>${who}</small></span></li>`;
-  }).join('');
-  const empty = error
-    ? `<p data-testid="hall-jobs-error">${esc(error)}</p>`
-    : `<p data-testid="hall-jobs-empty">No open bounty on ${esc(contract)} yet.</p>`;
-  return `<section class="hall-pane" data-testid="hall-jobs">
-    <p class="hall-lead">${scrollIcon()} <span>Live bounties on ${esc(contract)}</span></p>
-    ${rows ? `<ul class="hall-jobs">${rows}</ul>` : empty}
-    <button type="button" class="hall-cta" data-testid="hall-post" data-cmd="post a bounty 0.001">Post 0.001</button>
-  </section>`;
-}
-
-export function hirePane(status) {
-  const draft = status?.draft || LAMPLIGHTER_REGISTER;
-  const blocked = status?.blocked;
-  const agent = status?.agent;
-  const jobs = Array.isArray(status?.assignments) ? status.assignments : [];
-  const lines = jobs.map(j => `<li class="hall-job" data-testid="hall-assignment"><span class="hall-job-ico">${agentMark(agent?.avatarUrl)}</span><span><b>${esc(j.title || 'Assignment')}</b><small>${esc(j.status || '')} ${j.escrowAmount ? esc(String(j.escrowAmount)) + ' ' + esc(j.escrowToken || '') : ''}</small></span></li>`).join('');
-  const listNote = blocked === 'no_token'
-    ? `<p data-testid="hall-list-blocked">Listing is blocked until an Agent Market token is set. Ready: ${esc(draft.name)} · ${esc(draft.handle)} · ${esc(draft.category)}.</p>`
-    : blocked
-      ? `<p data-testid="hall-list-blocked">${esc(blocked === 'bad_token' ? 'The market refused the token.' : 'The market did not answer.')}</p>`
-      : `<p data-testid="hall-listed">${agent?.listed ? esc(agent.name || draft.name) + ' is listed.' : esc(draft.name) + ' is not listed yet.'}</p>`;
-  return `<section class="hall-pane" data-testid="hall-hire">
-    <p class="hall-lead">${lampIcon()} <span>Lamplighter</span></p>
-    ${listNote}
-    ${lines ? `<ul class="hall-jobs">${lines}</ul>` : ''}
-    <button type="button" class="hall-cta" data-testid="hall-list" data-cmd="list the lamplighter">List Lamplighter</button>
-    <label class="hall-field">Task <input id="hall-brief" data-testid="hall-brief" value="a lamp check"></label>
-    <label class="hall-field">NEAR <input id="hall-offer" data-testid="hall-offer" inputmode="decimal" value="0.001"></label>
-    <button type="button" class="hall-cta" data-testid="hall-hire-go">Hire</button>
-    <div id="hall-counter" data-testid="hall-counter" hidden></div>
-    <div id="hall-receipt" data-testid="hall-receipt"></div>
-  </section>`;
-}
-
-export function counterMarkup(speech) {
-  if (!speech) return '';
-  return `<p class="hall-speech" data-testid="hall-speech">${esc(speech)}</p>
-    <div class="hall-cta-row">
-      <button type="button" class="hall-cta" data-testid="hall-accept" data-cmd="accept">Accept</button>
-      <button type="button" class="hall-cta hall-cta-ghost" data-testid="hall-walk" data-cmd="walk">Walk</button>
-    </div>`;
-}
-
-export function receiptMarkup(row) {
-  if (!row) return '';
-  const tx = row.tx ? `<a href="${esc(row.url || '#')}">${esc(String(row.tx).slice(0, 10))}</a>` : 'no tx';
-  return `<p data-testid="hall-receipt-line">${esc(row.what || '')} · ${esc(row.amount || '')} ${esc(row.asset || '')} · ${esc(row.decision || '')} · ${tx}</p>`;
+export function sealMarkup(text) {
+  if (!text) return '';
+  return `<p class="hall-seal" data-testid="hall-refused" role="status">${esc(text)}</p>`;
 }
 
 export function noteMarkup(text) {
   if (!text) return '';
-  return `<p class="hall-note" data-testid="hall-note">${esc(text)}</p>`;
+  return `<p class="hall-note" data-testid="hall-note" role="status">${esc(text)}</p>`;
 }
 
-export function sealMarkup(text) {
-  if (!text) return `<p class="hall-seal" data-testid="hall-refused" hidden></p>`;
-  return `<p class="hall-seal" data-testid="hall-refused" role="status">${capIcon()} <span>${esc(text)}</span></p>`;
+function field(label, id, value, extra = '') {
+  return `<label class="hall-field" for="${id}"><span>${esc(label)}</span><input id="${id}" data-testid="${id}" value="${esc(value)}" ${extra}></label>`;
+}
+
+function flow() {
+  return `<div class="hall-flow" data-testid="hall-flow" aria-hidden="true">
+    <span class="hall-flow-ico">${nearIcon()}</span>
+    <span class="hall-flow-arrow">→</span>
+    <span class="hall-flow-step">Parts</span>
+    <span class="hall-flow-arrow">→</span>
+    <span class="hall-flow-step">Review</span>
+  </div>`;
+}
+
+function tabs(tab) {
+  const one = (id, label) => `<button type="button" class="hall-tab${tab === id ? ' on' : ''}" role="tab" data-tab="${id}" aria-selected="${tab === id ? 'true' : 'false'}" data-testid="hall-tab-${id}">${label}</button>`;
+  return `<div class="hall-tabs" role="tablist">${one('post', 'Post job')}${one('agents', 'Agents')}${one('receipts', 'Receipts')}</div>`;
+}
+
+function postPane(form, tab) {
+  return `<div class="hall-pane" data-pane="post" ${tab === 'post' ? '' : 'hidden'}>
+    ${field('Task', 'hall-task', form.task, 'maxlength="180" autocomplete="off"')}
+    <label class="hall-field" for="hall-budget"><span>Budget</span>
+      <span class="hall-amt"><input id="hall-budget" data-testid="hall-budget" inputmode="decimal" value="${esc(form.budget)}" aria-label="Budget"><span>NEAR</span></span>
+    </label>
+    ${field('Asset', 'hall-asset', 'NEAR', 'readonly')}
+    ${field('Deadline in hours', 'hall-deadline', form.deadline, 'inputmode="numeric"')}
+    ${field('Max parts', 'hall-parts', form.parts, 'inputmode="numeric"')}
+    ${field('Worker account', 'hall-worker-a', form.workerA, 'autocomplete="off" spellcheck="false"')}
+    ${field('Second worker', 'hall-worker-b', form.workerB, 'autocomplete="off" spellcheck="false"')}
+  </div>`;
+}
+
+function agentsPane(job, form, market, tab) {
+  const gap = `<p class="hall-gap" data-testid="hall-market-gap">${esc(MARKET_HIRE_GAP.hint)}</p>`;
+  const listed = market?.agent?.handle
+    ? `<p class="hall-line">Listed read: ${esc(market.agent.handle)}. Not hired.</p>`
+    : '';
+  const parts = (job?.parts || []).map(p => {
+    const quote = p.counter
+      ? `Counter once ${nearOf(p.counter.offerY)} NEAR`
+      : p.quoteY ? `Bid ${nearOf(p.quoteY)} NEAR` : 'No quote yet';
+    const who = p.worker ? esc(p.worker) : 'no worker';
+    return `<p class="hall-line" data-testid="hall-part">Part ${p.id} · ${who} · ${esc(quote)} · ${esc(p.settlement)}</p>`;
+  }).join('');
+  const walk = job?.parts?.find(p => p.phase === 'counter');
+  const fail = job?.parts?.find(p => p.settlement === 'awarded');
+  return `<div class="hall-pane" data-pane="agents" ${tab === 'agents' ? '' : 'hidden'}>
+    ${gap}${listed}
+    ${field('Quote part', 'hall-quote-part', form.quotePart, 'inputmode="numeric"')}
+    ${field('Worker account', 'hall-quote-worker', form.quoteWorker, 'autocomplete="off" spellcheck="false"')}
+    ${field('Quote', 'hall-quote-near', form.quoteNear, 'inputmode="decimal"')}
+    ${field('Deliverable', 'hall-deliverable', form.deliverable, 'maxlength="240"')}
+    ${parts || '<p class="hall-line">No parts yet.</p>'}
+    ${walk ? `<button type="button" class="hall-text" data-cmd="walk part ${walk.id}">Walk part ${walk.id}</button>` : ''}
+    ${fail ? `<button type="button" class="hall-text" data-cmd="fail part ${fail.id}">Record fail</button>` : ''}
+  </div>`;
+}
+
+function receiptsPane(job, tab) {
+  if (!job) {
+    return `<div class="hall-pane" data-pane="receipts" ${tab === 'receipts' ? '' : 'hidden'}><p class="hall-line">No job yet. Nothing was signed.</p></div>`;
+  }
+  const rows = [
+    ['Paid on the ledger', nearOf(job.paidY)],
+    ['Remaining', nearOf(job.remainingY)],
+    ['Refunded', nearOf(job.refundedY)],
+  ].map(([k, v]) => `<p class="hall-line">${esc(k)} · ${esc(v)} NEAR · simulation</p>`).join('');
+  const held = job.parts.filter(p => p.settlement === 'held').map(p =>
+    `<p class="hall-line">Part ${p.id} held for ${esc(p.awarded?.worker || '')}. Chain release is blocked.</p>`).join('');
+  return `<div class="hall-pane" data-pane="receipts" ${tab === 'receipts' ? '' : 'hidden'}>${rows}${held}</div>`;
+}
+
+export function jobTray({ tab = 'post', form = {}, job = null, market = null, seal = '', lines = [] }) {
+  const cta = activeCta(job);
+  const showCta = cta && (cta.tab === tab || !job);
+  const status = (lines.length ? lines : statusLines(job)).slice(0, 2);
+  const gold = showCta
+    ? `<button type="button" class="hall-cta" data-testid="hall-cta" data-action="${esc(cta.action)}" data-part="${cta.partId || ''}">${esc(cta.label)}</button>`
+    : '';
+  return `<div class="hall-card" data-testid="hall-desk">
+    ${tabs(tab)}
+    ${flow()}
+    ${postPane(form, tab)}
+    ${agentsPane(job, form, market, tab)}
+    ${receiptsPane(job, tab)}
+    ${gold}
+    ${status.map(line => `<p class="hall-status" data-testid="hall-status">${esc(line)}</p>`).join('')}
+    ${sealMarkup(seal)}
+    <p class="hall-rules"><a href="/setup/">Personal rules</a></p>
+  </div>`;
 }
