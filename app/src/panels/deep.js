@@ -214,7 +214,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       </div>
       <button type="button" class="primary ferry-cta" id="f-again" data-testid="ferry-again" ${showAgain ? '' : 'hidden'}>Get another quote</button>
       ${deposit}
-      ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}</p>` : ''}
+      ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}${state.renewSetup ? ` <a href="/setup" data-testid="ferry-renew-setup">Renew agent key once in Setup</a>` : ''}</p>` : ''}
     </div>`;
   const routesPane = `<div class="ferry-pane" data-pane="routes" ${tab === 'routes' ? '' : 'hidden'}>
       <p class="ferry-picker-note" data-testid="ferry-token-count" ${nTok ? '' : 'hidden'}>${nTok ? `${nTok} live tokens` : ''}</p>
@@ -266,7 +266,7 @@ export async function runFerryAgent({ text, state = {}, charterReady = false, qu
     if (plan.parsed.amt) { state.amt = plan.parsed.amt; state.amtEdited = true; }
     state.q = null;
     state.quoteError = '';
-    state.charterNote = '';
+    state.charterNote = ''; state.renewSetup = false;
     state.sample = false;
     state.acted = false;
     let q;
@@ -335,7 +335,7 @@ function mountFerry(root, hooks) {
         state.toId = 'ZEC|zec';
         state.q = null;
         state.quoteError = '';
-        state.charterNote = '';
+        state.charterNote = ''; state.renewSetup = false;
         state.acted = false;
         state.sample = false;
         state.tab = 'swap';
@@ -377,12 +377,12 @@ function mountFerry(root, hooks) {
       state.fromEdited = true;
       state.fromId = e.target.value;
       if (!state.amtEdited) state.amt = defaultAmtFor((e.target.value || '').split('|')[0]);
-      state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; refill(); localPaint();
+      state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; refill(); localPaint();
     };
     const to = q$(root, '#f-to');
-    if (to) to.onchange = (e) => { state.toEdited = true; state.toId = e.target.value; state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; };
+    if (to) to.onchange = (e) => { state.toEdited = true; state.toId = e.target.value; state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
     const amt = q$(root, '#f-amt');
-    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; };
+    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
     const compare = q$(root, '#f-compare');
     if (compare) compare.onclick = () => runQuotes(compare);
     const one = q$(root, '#f-quote');
@@ -505,7 +505,7 @@ function mountFerry(root, hooks) {
     state.sample = !failed && !state.quotes.some(v => v.amountOut != null);
     state.fstatus = null;
     state.quoted = true;
-    state.charterNote = '';
+    state.charterNote = ''; state.renewSetup = false;
     state.acted = false;
     state.q = failed ? null : q;
     state.tab = 'swap';

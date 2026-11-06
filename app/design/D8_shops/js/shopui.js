@@ -89,6 +89,7 @@ function wireFerryDock(hooks) {
 }
 function ferryPlainReason(reason) {
   const raw = String(reason || '');
+  if (/key_cannot_propose_call/i.test(raw)) return 'your agent key cannot call propose_call yet';
   if (/NotEnoughAllowance/i.test(raw)) return 'the session key does not have enough gas allowance for this ask';
   const plain = String(A.plainError(raw) || '').replace(/\s+/g, ' ').trim();
   if (!plain || /[{"]|account_id|send_tx|InvalidTx|public_key|yocto/i.test(plain)) return 'the charter did not accept this ask';
@@ -237,10 +238,16 @@ async function settleFerry(wantCharter) {
       extra.depositAddress = '';
       extra.depositMode = '';
       const why = ferryPlainReason(sent?.reason) || plan.why || 'the charter did not send the wrap';
-      extra.charterNote = `No wrap was sent: ${why}. No wallet opened. You are not asked to send USDC on Base. The boat has not delivered.`;
+      const needRenew = /key_cannot_propose_call/i.test(String(sent?.reason || ''));
+      extra.renewSetup = needRenew;
+      extra.charterNote = needRenew
+        ? 'No wrap was sent: your agent key cannot call propose_call yet. Renew agent key once in Setup. No wallet opened here. The boat has not delivered.'
+        : `No wrap was sent: ${why}. No wallet opened. You are not asked to send USDC on Base. The boat has not delivered.`;
       return {
         kind: 'ok', o, hero: APPS.ferry.hero(),
-        say: `${stamp} ${extra.charterNote}`,
+        say: needRenew
+          ? `${stamp} ${extra.charterNote} <a href="/setup" data-testid="ferry-renew-setup">Open Setup</a>`
+          : `${stamp} ${extra.charterNote}`,
         rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · quoted</span>',
         rule: o ? A.ruleFor(o, clause) : '',
       };
@@ -469,7 +476,7 @@ const APPS = {
     },
     run: async () => {
       if (extra.acted) {
-        extra.q = null; extra.acted = false; extra.fdone = true; extra.ferryTx = null; extra.charterNote = '';
+        extra.q = null; extra.acted = false; extra.fdone = true; extra.ferryTx = null; extra.charterNote = ''; extra.renewSetup = false;
         clearFerryDeposit();
         sh?.hideRefuse?.();
         sh?.setOrder?.('jetty');
