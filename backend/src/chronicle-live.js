@@ -2,9 +2,11 @@
 // then NEAR RPC tx status. This module never holds a key and never signs.
 import { DEP, cfg } from './config.js';
 import { view } from './near.js';
+import { formatUnits } from '../../app/src/chronicle-amount.js';
 
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
-const TX_CAP = 6;
+const PAGE = 25;
+const CONFIRM_CAP = 8;
 const FRESH_MS = 60_000;
 const BUDGET_MS = 5200;
 const WRAP = 'wrap.near';
@@ -30,18 +32,26 @@ function isoFromNs(ns) {
 }
 
 function nearAmount(deposit) {
-  if (deposit == null || deposit === '' || deposit === 0 || deposit === '0') return '';
-  const s = String(deposit);
-  if (/^\d{18,}$/.test(s)) {
-    const y = BigInt(s);
-    const whole = y / 10n ** 24n;
-    const frac = (y % 10n ** 24n).toString().padStart(24, '0').slice(0, 4).replace(/0+$/, '');
-    const text = frac ? `${whole}.${frac}` : String(whole);
-    return text === '0' ? '' : `${text} NEAR`;
-  }
-  const n = Number(s);
-  if (!Number.isFinite(n) || n === 0) return '';
-  return `${n} NEAR`;
+  return formatUnits(deposit, 24, 'NEAR');
+}
+
+function expandSci(raw) {
+  const m = String(raw || '').trim().match(/^(-?)(\d+)(?:\.(\d+))?[eE]\+?(\d+)$/);
+  if (!m) return '';
+  const frac = m[3] || '';
+  const exp = Number(m[4]);
+  if (!Number.isInteger(exp) || exp < frac.length || exp > 80) return '';
+  return m[1] + m[2] + frac + '0'.repeat(exp - frac.length);
+}
+
+function parseIndexed(text) {
+  if (!text) return null;
+  const quoted = String(text).replace(/(-?\d+\.\d+[eE][+-]?\d+|-?\d{16,})(?=\s*[,}\]])/g, (raw) => {
+    const dig = /[eE]/.test(raw) ? expandSci(raw) : raw;
+    return dig ? `"${dig}"` : raw;
+  });
+  try { return JSON.parse(quoted); }
+  catch { return null; }
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -81,7 +91,8 @@ async function fetchJson(fetchFn, url, { method = 'GET', headers = {}, body = nu
       body: body == null ? undefined : body,
       signal: AbortSignal.timeout(ms),
     });
-    const json = await r.json().catch(() => null);
+    const text = await r.text();
+    const json = parseIndexed(text);
     return { ok: !!r.ok && json != null, status: r.status, json };
   } catch {
     return { ok: false, status: 0, json: null };
@@ -142,11 +153,16 @@ function describe(group, detail) {
 }
 
 function mapFt(t, account) {
+  const symbol = t?.ft?.symbol || '';
+  const decimals = Number(t?.ft?.decimals);
+  const amount = Number.isInteger(decimals) && t?.delta_amount != null && t.delta_amount !== ''
+    ? formatUnits(t.delta_amount, decimals, symbol)
+    : (t?.delta_amount != null ? `${t.delta_amount} ${symbol}`.trim() : '');
   return {
     hash: t?.transaction_hash || '',
-    symbol: t?.ft?.symbol || '',
+    symbol,
     contract: t?.ft?.contract || '',
-    amount: t?.delta_amount != null ? `${t.delta_amount} ${t?.ft?.symbol || ''}`.trim() : '',
+    amount,
     involved: t?.involved_account_id || '',
     affected: t?.affected_account_id || '',
     at: isoFromNs(t?.block_timestamp),
@@ -221,7 +237,7 @@ function coverageLabel(rows, sources) {
   return `${head} ${bits.join('. ')}.`;
 }
 
-export function assembleLive({ account = '', boardContract = '', board = null, indexOk = false, ftOk = false, receipts = [], fts = [], confirmed = [], indexedCount = 0, txGap = '', ftGap = '' } = {}) {
+export function assembleLive({ account = '', boardContract = '', board = null, indexOk = false, ftOk = false, receipts = [], fts = [], confirmed = [], indexedCount = 0, txGap = '', ftGap = '', txHeld = false, ftHeld = false } = {}) {
   const gaps = [];
   const sources = [];
   const rows = [];
@@ -244,7 +260,9 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
   if (board?.ok && !gaps.some(g => /rules version/i.test(g))) gaps.push('Historic rules version: missing.');
 
   let txRows = 0;
-  if (!indexOk) {
+  if (txHeld) {
+    sources.push({ source: 'transactions', ok: true, rows: 0, gap: '' });
+  } else if (!indexOk) {
     const gap = txGap || 'nearblocks.io did not answer.';
     sources.push({ source: 'transactions', ok: false, rows: 0, gap });
     gaps.push(gap);
@@ -280,7 +298,9 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
   for (const t of receipts) {
     if (rpcBy.get(t.hash)?.ok) confirmedN++;
   }
-  if (!indexOk) {
+  if (txHeld) {
+    sources.push({ source: 'rpc', ok: true, rows: 0, gap: '' });
+  } else if (!indexOk) {
     sources.push({ source: 'rpc', ok: false, rows: 0, gap: 'RPC was not asked.' });
   } else if (!asked) {
     sources.push({ source: 'rpc', ok: true, rows: 0, gap: 'No receipt had a signer to confirm.' });
@@ -295,7 +315,11 @@ export function assembleLive({ account = '', boardContract = '', board = null, i
   let wrapRows = 0;
   let clickRows = 0;
   const seenFt = new Set();
-  if (!ftOk) {
+  if (ftHeld) {
+    sources.push({ source: 'ft', ok: true, rows: 0, gap: '' });
+    sources.push({ source: 'wrap.near', ok: true, rows: 0, gap: '' });
+    sources.push({ source: '1click', ok: true, rows: 0, gap: '' });
+  } else if (!ftOk) {
     const gap = ftGap || 'FT index did not answer.';
     sources.push({ source: 'ft', ok: false, rows: 0, gap });
     sources.push({ source: 'wrap.near', ok: false, rows: 0, gap: 'wrap.near was not read.' });
@@ -405,6 +429,13 @@ async function load(account, deps) {
   const headers = nbHeaders(key);
   const budget = deps.budget || makeBudget(BUDGET_MS);
   const id = encodeURIComponent(account);
+  const more = !!deps.more;
+  const txCursor = String(deps.cursor || '');
+  const ftCursor = String(deps.ftCursor || '');
+  const wantTx = !more || !!txCursor;
+  const wantFt = !more || !!ftCursor;
+  const txQuery = `per_page=${PAGE}${txCursor ? `&cursor=${encodeURIComponent(txCursor)}` : ''}`;
+  const ftQuery = `per_page=${PAGE}${ftCursor ? `&cursor=${encodeURIComponent(ftCursor)}` : ''}`;
 
   const boardPromise = (async () => {
     if (!boardContract) return { ok: false, row: null };
@@ -417,8 +448,12 @@ async function load(account, deps) {
   })();
 
   const [txNear, ftNear] = await Promise.all([
-    withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${id}/txns?page=1&per_page=25`, { headers, timeout: 1100, budget })),
-    withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${id}/ft-txns?page=1&per_page=10`, { headers, timeout: 1100, budget })),
+    wantTx
+      ? withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${id}/txns?${txQuery}`, { headers, timeout: 1100, budget }))
+      : Promise.resolve({ ok: false, status: 0, json: null, skipped: true }),
+    wantFt
+      ? withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${id}/ft-txns?${ftQuery}`, { headers, timeout: 1100, budget }))
+      : Promise.resolve({ ok: false, status: 0, json: null, skipped: true }),
   ]);
 
   let txSource = 'none';
@@ -428,13 +463,18 @@ async function load(account, deps) {
   let fts = [];
   let ftGap = '';
   let txGap = '';
+  let nextCursor = '';
+  let nextFtCursor = '';
 
-  if (txNear.ok && Array.isArray(txNear.json?.txns)) {
+  if (!wantTx) {
+    txSource = 'page';
+    txGap = '';
+  } else if (txNear.ok && Array.isArray(txNear.json?.txns)) {
     txSource = 'nearblocks';
     const grouped = groupReceipts(txNear.json.txns);
     indexedCount = grouped.length;
-    const page = grouped.slice(0, TX_CAP);
-    receipts = await mapLimit(page, 4, async (group) => {
+    if (txNear.json.txns.length >= PAGE && txNear.json.cursor) nextCursor = String(txNear.json.cursor);
+    receipts = await mapLimit(grouped, 4, async (group) => {
       if (group.predecessor && budget.left() < 800) return describe(group, null);
       const detail = group.predecessor ? { ok: false } : await fetchJson(fetchFn, `${index}/v1/txns/${group.hash}`, { headers, timeout: 700, budget });
       return describe(group, detail.ok ? txnOf(detail.json) : null);
@@ -448,7 +488,7 @@ async function load(account, deps) {
     if (fx.ok && list) {
       txSource = 'fastnear';
       indexedCount = list.length;
-      const page = list.filter(t => HASH.test(t?.transaction_hash || '')).slice(0, TX_CAP);
+      const page = list.filter(t => HASH.test(t?.transaction_hash || ''));
       let details = [];
       if (page.length && budget.left() > 400) {
         const packed = await fetchJson(fetchFn, `${fastTx}/v0/transactions`, {
@@ -474,9 +514,13 @@ async function load(account, deps) {
     } else txGap = 'Transactions did not answer. nearblocks and FastNEAR were tried.';
   }
 
-  if (ftNear.ok && Array.isArray(ftNear.json?.txns)) {
+  if (!wantFt) {
+    ftSource = 'page';
+    ftGap = '';
+  } else if (ftNear.ok && Array.isArray(ftNear.json?.txns)) {
     ftSource = 'nearblocks';
     fts = ftNear.json.txns.map(t => mapFt(t, account));
+    if (ftNear.json.txns.length >= PAGE && ftNear.json.cursor) nextFtCursor = String(ftNear.json.cursor);
   } else {
     const bal = await withRetry(budget, () => fetchJson(fetchFn, `${fastApi}/v1/account/${id}/ft`, { headers: { accept: 'application/json' }, timeout: 900, budget }));
     const fromTx = receipts.map(r => ftFromDetail({
@@ -492,45 +536,54 @@ async function load(account, deps) {
     } else ftGap = 'FT index did not answer. nearblocks and FastNEAR were tried.';
   }
 
-  const confirmed = await mapLimit(receipts.filter(t => t.signer).slice(0, TX_CAP), 4, (t) => rpcStatus(fetchFn, rpcUrls, t.hash, t.signer, budget));
+  const confirmed = await mapLimit(receipts.filter(t => t.signer).slice(0, CONFIRM_CAP), 4, (t) => rpcStatus(fetchFn, rpcUrls, t.hash, t.signer, budget));
   const rpcSource = confirmed.find(c => c.ok)?.via || (receipts.some(t => t.signer) ? 'none' : 'not asked');
   const body = assembleLive({
     account,
     boardContract,
     board: await boardPromise,
-    indexOk: txSource !== 'none',
-    ftOk: ftSource !== 'none',
+    indexOk: wantTx && txSource !== 'none',
+    ftOk: wantFt && ftSource !== 'none',
     receipts,
     fts,
     confirmed,
     indexedCount,
     txGap,
     ftGap,
+    txHeld: !wantTx,
+    ftHeld: !wantFt,
   });
   body.health = `Health: transactions ${txSource}. ft ${ftSource}. rpc ${rpcSource}.`;
   body.txSource = txSource;
   body.ftSource = ftSource;
   body.rpcSource = rpcSource;
+  body.nextCursor = nextCursor;
+  body.ftCursor = nextFtCursor;
   return body;
+}
+
+function cacheKey(id, deps) {
+  return `${id}|${deps.cursor || ''}|${deps.ftCursor || ''}`;
 }
 
 export async function readLive(account, deps = {}) {
   const id = String(account || '').trim();
+  const key = cacheKey(id, deps);
   const clock = deps.now || Date.now;
-  const hit = cache.get(id);
+  const hit = cache.get(key);
   if (hit && clock() - hit.at < FRESH_MS) return { ...hit.body, cached: true };
-  if (hit) cache.delete(id);
-  const body = await refresh(id, deps);
+  if (hit) cache.delete(key);
+  const body = await refresh(key, id, deps);
   return { ...body, cached: false };
 }
 
-function refresh(id, deps) {
-  if (inflight.has(id)) return inflight.get(id);
+function refresh(key, id, deps) {
+  if (inflight.has(key)) return inflight.get(key);
   const clock = deps.now || Date.now;
   const p = load(id, deps).then(body => {
-    if (cacheable(body)) cache.set(id, { at: clock(), body });
+    if (cacheable(body)) cache.set(key, { at: clock(), body });
     return body;
-  }).finally(() => inflight.delete(id));
-  inflight.set(id, p);
+  }).finally(() => inflight.delete(key));
+  inflight.set(key, p);
   return p;
 }
