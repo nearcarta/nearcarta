@@ -438,14 +438,58 @@ impl Contract {
         let _ = memo;
         assert_one_yocto();
         let from = env::predecessor_account_id();
-        require!(amount.0 > 0, "ERR_AMOUNT");
-        let key = (from.clone(), token_id.clone());
-        let have = self.mt_balance.get(&key).copied().unwrap_or(0);
-        require!(have >= amount.0, "ERR_BALANCE");
-        self.mt_balance.insert(key, have - amount.0);
-        let dest = (receiver_id, token_id);
-        let there = self.mt_balance.get(&dest).copied().unwrap_or(0);
-        self.mt_balance.insert(dest, there + amount.0);
+        self.mt_move(&from, &receiver_id, &token_id, amount.0);
+    }
+
+    /// NEP-245 batch transfer. One 1-yocto check for the whole batch; every pair must
+    /// move, or the receipt reverts and no balance changes.
+    #[payable]
+    pub fn mt_batch_transfer(
+        &mut self,
+        receiver_id: AccountId,
+        token_ids: Vec<String>,
+        amounts: Vec<U128>,
+        memo: Option<String>,
+    ) {
+        let _ = memo;
+        assert_one_yocto();
+        require!(token_ids.len() == amounts.len(), "ERR_AMOUNT");
+        require!(!token_ids.is_empty(), "ERR_AMOUNT");
+        let from = env::predecessor_account_id();
+        for (id, amount) in token_ids.iter().zip(amounts.iter()) {
+            self.mt_move(&from, &receiver_id, id, amount.0);
+        }
+    }
+
+    /// NEP-245 transfer-and-call. The badge is moved before the receiver is called, so a
+    /// receiver that panics leaves the token with it (the standard's own rule for a
+    /// non-refundable call). This shop never uses it; it exists so the interface is real.
+    #[payable]
+    pub fn mt_transfer_call(
+        &mut self,
+        receiver_id: AccountId,
+        token_id: String,
+        amount: U128,
+        memo: Option<String>,
+        msg: String,
+    ) -> Promise {
+        let _ = memo;
+        assert_one_yocto();
+        let from = env::predecessor_account_id();
+        self.mt_move(&from, &receiver_id, &token_id, amount.0);
+        let args = serde_json::json!({
+            "sender_id": from,
+            "previous_owner_ids": [from],
+            "token_id": token_id,
+            "amount": amount.0.to_string(),
+            "msg": msg,
+        });
+        Promise::new(receiver_id).function_call(
+            "mt_on_transfer".to_string(),
+            args.to_string().into_bytes(),
+            NearToken::from_yoctonear(0),
+            Gas::from_tgas(30),
+        )
     }
 
     pub fn nft_token(&self, token_id: String) -> Option<JsonToken> {
@@ -613,6 +657,20 @@ impl Contract {
         require!(self.mt_supply.get(&token_id).copied().unwrap_or(0) == 0, "ERR_BADGE");
         self.mt_supply.insert(token_id.clone(), 1);
         self.mt_balance.insert((player.clone(), token_id), 1);
+    }
+
+    /// One NEP-245 move: refuse a zero amount, an empty balance, or a move that would
+    /// leave the badge's supply inconsistent, then debit and credit.
+    fn mt_move(&mut self, from: &AccountId, to: &AccountId, token_id: &str, amount: u128) {
+        require!(amount > 0, "ERR_AMOUNT");
+        require!(self.mt_supply.get(token_id).copied().unwrap_or(0) > 0, "ERR_TOKEN");
+        let key = (from.clone(), token_id.to_string());
+        let have = self.mt_balance.get(&key).copied().unwrap_or(0);
+        require!(have >= amount, "ERR_BALANCE");
+        self.mt_balance.insert(key, have - amount);
+        let dest = (to.clone(), token_id.to_string());
+        let there = self.mt_balance.get(&dest).copied().unwrap_or(0);
+        self.mt_balance.insert(dest, there + amount);
     }
 }
 
@@ -1150,10 +1208,62 @@ mod tests {
         ctx(bob(), 1, 11);
         c.mt_transfer(alice(), token.clone(), U128(1), None);
         assert_eq!(c.mt_balance_of(bob(), token.clone()).0, 0);
-        assert_eq!(c.mt_balance_of(alice(), token).0, 1);
+        assert_eq!(c.mt_balance_of(alice(), token.clone()).0, 1);
         let nft = c.nft_token(g.to_string()).unwrap();
         assert_eq!(nft.owner_id, alice());
         assert_eq!(nft.metadata.title, "Lamp");
+        // The transfer moved the badge, not its supply.
+        assert_eq!(c.mt_supply(token).unwrap().0, 1);
+    }
+
+    #[test]
+    fn a_batch_transfer_moves_every_pair_and_refuses_a_short_list() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 1);
+        ctx(board(), 5, 10);
+        let a = c.open_attempt(bob(), g, "one".into());
+        let (env, response) = env_for(&c, a, bob(), "one", 9);
+        c.resolve(env, response);
+        ctx(board(), 5, 12);
+        let b = c.open_attempt(alice(), g, "two".into());
+        let (env, response) = env_for(&c, b, alice(), "two", 9);
+        c.resolve(env, response);
+        let ta = format!("case:{a}");
+        let tb = format!("case:{b}");
+        // Bob holds case a; Alice holds case b. Bob moves his own badge in a batch.
+        ctx(bob(), 1, 14);
+        c.mt_batch_transfer(prize(), vec![ta.clone()], vec![U128(1)], None);
+        assert_eq!(c.mt_balance_of(prize(), ta.clone()).0, 1);
+        // A mismatched list is refused before anything moves.
+        ctx(alice(), 1, 15);
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            c.mt_batch_transfer(prize(), vec![tb.clone(), ta.clone()], vec![U128(1)], None)
+        }));
+        assert!(caught.is_err(), "a batch with fewer amounts than ids is refused");
+        assert_eq!(c.mt_balance_of(alice(), tb).0, 1, "nothing moved on the refused batch");
+        assert_eq!(c.mt_balance_of(prize(), ta).0, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_BALANCE")]
+    fn a_badge_cannot_move_from_a_holder_who_does_not_have_it() {
+        let mut c = boot();
+        let g = mint_one(&mut c, alice(), 1);
+        ctx(board(), 5, 10);
+        let bad = c.open_attempt(bob(), g, "no".into());
+        let (env, response) = env_for(&c, bad, bob(), "no", 9);
+        c.resolve(env, response);
+        // Alice has no badge; the holder is Bob.
+        ctx(alice(), 1, 11);
+        c.mt_transfer(prize(), format!("case:{bad}"), U128(1), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_TOKEN")]
+    fn a_badge_that_was_never_minted_cannot_be_transferred() {
+        let mut c = boot();
+        ctx(alice(), 1, 5);
+        c.mt_transfer(prize(), "case:999".into(), U128(1), None);
     }
 
     #[test]
