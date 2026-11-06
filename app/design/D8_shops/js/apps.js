@@ -467,7 +467,7 @@ export async function openFerryCheckout(q, pair) {
   const recipient = ferryPayee('pay');
   const amountYocto = String(S.boardRow?.min_amount || S.clauses?.pay?.min_amount || '1');
   if (!charter || !recipient) return { ok: false, reason: 'no_charter', depositAddress: null };
-  const body = cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo: refundFor(pair.from), visitor: S.me });
+  const body = cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo: refundFor(pair.from), visitor: S.me, session: S.board ? 'board' : undefined });
   const r = await fetch(API + '/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null };

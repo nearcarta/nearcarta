@@ -105,15 +105,32 @@ export function boardRowAsGate(row) {
   };
 }
 
-export async function readCharterRules(account, clauseId, viewFn = view) {
+// A 64-hex account has no contract. get_rules on it is CodeDoesNotExist, not a charter.
+const implicitAccount = id => /^[0-9a-f]{64}$/.test(id);
+
+export function boardSessionRequested(b) {
+  if (!b || typeof b !== 'object') return false;
+  if (b.board === true || b.session === 'board') return true;
+  return typeof b.board === 'string' && !!DEP.board?.contract && b.board === DEP.board.contract;
+}
+
+/**
+ * Factory charters answer get_state and get_rules on their own account.
+ * A board row does not: the charter is the board contract, keyed by owner.
+ * Implicit accounts skip the oath views so CodeDoesNotExist never becomes the checkout error.
+ */
+export async function readCharterRules(account, clauseId, viewFn = view, opts = {}) {
   const url = rpcFor(account);
-  try {
-    const [state, rules] = await Promise.all([
-      viewFn(account, 'get_state', {}, url),
-      viewFn(account, 'get_rules', { clause_id: clauseId }, url),
-    ]);
-    if (state) return { state, clause: rules?.clause || null, usage: rules?.usage || null, sealed: !!rules?.hidden_rule_sealed };
-  } catch { /* a visitor row has no get_state; the rules are on the board */ }
+  const boardRow = opts?.board === true || implicitAccount(account);
+  if (!boardRow) {
+    try {
+      const [state, rules] = await Promise.all([
+        viewFn(account, 'get_state', {}, url),
+        viewFn(account, 'get_rules', { clause_id: clauseId }, url),
+      ]);
+      if (state) return { state, clause: rules?.clause || null, usage: rules?.usage || null, sealed: !!rules?.hidden_rule_sealed };
+    } catch { /* a named account with no oath: the row is on the board */ }
+  }
   const board = DEP.board?.contract;
   if (!board) throw new Error('charter unread');
   const row = await viewFn(board, 'get_charter', { owner: account }, url);
@@ -141,7 +158,7 @@ export function checkoutInput(b) {
   const amountYocto = String(b.amount_yocto || b.amountYocto || '');
   if (!/^\d{1,40}$/.test(amountYocto)) return { error: 'bad amount_yocto' };
   if (b.privacy !== undefined && b.privacy !== 'public') return { error: 'checkout is public only' };
-  return { ok: true, value: { from, to, amount: String(b.amount), recipient: b.recipient, swapRecipient, refundTo: b.refundTo, charter: b.charter, clauseId, amountYocto, privacy: 'public', slippageBps: Number(b.slippageBps || 100) } };
+  return { ok: true, value: { from, to, amount: String(b.amount), recipient: b.recipient, swapRecipient, refundTo: b.refundTo, charter: b.charter, clauseId, amountYocto, privacy: 'public', slippageBps: Number(b.slippageBps || 100), board: boardSessionRequested(b) } };
 }
 
 function refused(reason, extra = {}) {
@@ -190,7 +207,7 @@ export function listCheckoutReceipts() {
 
 export async function openCheckout(input, deps) {
   let chain;
-  try { chain = await deps.readCharter(input.charter, input.clauseId); }
+  try { chain = await deps.readCharter(input.charter, input.clauseId, { board: input.board === true }); }
   catch (e) { return refused('charter_unread', { step: 'charter', error: e.message, recipient: input.recipient }); }
   const gate = charterGate({ state: chain.state, clause: chain.clause, usage: chain.usage, receiver: input.recipient, amount: input.amountYocto, nowMin: utcMinute(), sealed: chain.sealed });
   if (!gate.ok) return refused(gate.reason, { step: 'charter', recipient: input.recipient });
@@ -272,7 +289,7 @@ export const checkoutDeps = {
   quote: input => quote(input),
   tokens: () => tokens(),
   postQuote: body => postQuote(body),
-  readCharter: (account, clauseId) => readCharterRules(account, clauseId),
+  readCharter: (account, clauseId, opts) => readCharterRules(account, clauseId, view, opts),
   verify: null,
 };
 
@@ -298,7 +315,7 @@ export async function startCheckout(body) {
     quote: input => checkoutDeps.quote(input),
     tokens: () => checkoutDeps.tokens(),
     postQuote: body2 => checkoutDeps.postQuote(body2),
-    readCharter: (a, c) => checkoutDeps.readCharter(a, c),
+    readCharter: (a, c, opts) => checkoutDeps.readCharter(a, c, opts),
     verify: checkoutDeps.verify || defaultVerify,
   });
   return { ...out, httpStatus: 200 };

@@ -49,7 +49,7 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
     <ul data-testid="all-shops-list">
       <li><a href="/shops/bank/">Mist Bank</a></li>
       <li><a href="/shops/hall/">Town Hall</a></li>
-      <li><a href="/shops/ferry/">Ferry</a></li>
+      <li><a href="/?shop=ferry" data-city-shop="ferry">Ferry</a></li>
       <li><a href="/shops/guard/">Guardhouse</a></li>
       <li><a href="/shops/arena/">Vault Arena</a></li>
       <li><a href="/shops/toll/">Toll Bridge</a></li>
@@ -185,6 +185,17 @@ else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpr
     fromPointer = false;
     var nav = navOf(e);
     if (!nav) return;
+    var city = e.target.closest('a[data-city-shop]');
+    if (city) {
+      e.preventDefault();
+      skipIntro();
+      var details = city.closest('details');
+      if (details) details.open = false;
+      var id = city.getAttribute('data-city-shop');
+      if (typeof window.__openCityShop === 'function') window.__openCityShop(id);
+      else location.assign(city.getAttribute('href') || ('/?shop=' + id));
+      return;
+    }
     if (e.target.closest('a')) { skipIntro(); return; }
     if (e.target.closest('summary')) {
       e.preventDefault();

@@ -66,5 +66,6 @@ export async function fallback(why){ if(started) return; started=true; body.clas
       const c=$('#t-cta'); c.hidden=id!=='house'; c.className='link cta8'; if(id==='house'){ c.textContent='Open the charter office →'; c.href='/shops/vault/'; }
       import(D8+'js/shopui.js').then(u=>{ ui8m=u; if(ui.hidden||fbCur!==id){ door=finishEnter({id}); return; } u.mount(id,{id},()=>{}); /* mount boots the wallet and paints its own state: no waiting on "Opening…" */ b.onclick=()=>window.__apps?.primary(); door=finishEnter({id}); })
         .catch(e=>{ console.warn('[Nearcarta 2D] shop app failed to load',e); b.disabled=false; b.textContent='Try again'; b.onclick=()=>open(id); door=finishEnter({id}); }); } else door=finishEnter({id}); }
+  window.__openCityShop = (id) => { open(id); };
   const A={chron:'chronicle',townhall:'hall',mistbank:'bank',guardhouse:'guard',vault:'house'}; const q=new URLSearchParams(location.search).get('shop'); const start=q&&(A[q]||q); if(start&&NAMES[start]) open(start);
   window.__ready=true; }
