@@ -123,3 +123,80 @@ async fn a_six_receiver_row_holds_fewer_pairs_than_a_one_receiver_row() -> anyho
     }
     Ok(())
 }
+
+/// The lists the page sends after the fix: the new default (Toll, Guardhouse, House) and the
+/// same list a visitor saved before Guardhouse existed (Toll, House). Both must fit a row, and
+/// `shared/board/session.js` `pairBudgetBytes` must agree with the bytes the contract locks.
+#[tokio::test]
+async fn the_default_shop_list_fits_a_row() -> anyhow::Result<()> {
+    let wasm = std::fs::read(WASM).expect("build target/near/charter_board.wasm first");
+    let worker = near_workspaces::sandbox().await?;
+    let owner = worker.create_tla("nearcarta".parse()?, SecretKey::from_random(KeyType::ED25519)).await?.into_result()?;
+    let board = owner.create_subaccount("board").initial_balance(NearToken::from_near(80)).transact().await?.into_result()?;
+    let deployed = board.deploy(&wasm).await?.into_result()?;
+    let init = owner.call(deployed.id(), "new").gas(near_workspaces::types::Gas::from_tgas(50)).transact().await?;
+    assert!(init.is_success(), "new: {:?}", init.failures());
+
+    // `callPolicy` builds the pairs per shop, then the wrap.near trio, the board stamp and the
+    // two House session calls. These are those lists, in wire order.
+    let tail: [(&str, &str); 4] = [
+        ("wrap.near", "ft_transfer"),
+        ("wrap.near", "storage_deposit"),
+        ("board.nearcarta.near", "stamp"),
+        ("house.nearcarta.near", "house_session_check_in"),
+    ];
+    let house_pair = ("house.nearcarta.near", "house_session_prepare_send");
+
+    let shapes: [(&str, Vec<&str>, Vec<(&str, &str)>); 3] = [
+        (
+            "default toll+guard+house",
+            vec!["toll.nearcarta.near", "guard.nearcarta.near", "house.nearcarta.near"],
+            vec![("toll.nearcarta.near", "cross"), ("guard.nearcarta.near", "pay"), ("wrap.near", "near_deposit")],
+        ),
+        (
+            "saved toll+house",
+            vec!["toll.nearcarta.near", "house.nearcarta.near"],
+            vec![("toll.nearcarta.near", "cross"), ("wrap.near", "near_deposit")],
+        ),
+        // The failed visitor's list with the retired charter dropped: the shape the box
+        // retests at /setup. Its own method is narrower than ft_transfer, which is what
+        // brings it back under the budget.
+        (
+            "failed list minus charter",
+            vec!["toll.nearcarta.near", "wrap.near", "arena.nearcarta.near", "house.nearcarta.near", "townhall.nearcarta.near"],
+            vec![("toll.nearcarta.near", "cross"), ("wrap.near", "near_deposit"), ("arena.nearcarta.near", "ft_transfer"), ("townhall.nearcarta.near", "ft_transfer")],
+        ),
+    ];
+
+    for (n, (label, receivers, shops)) in shapes.into_iter().enumerate() {
+        let mut list = shops;
+        list.extend(tail.iter());
+        list.push(house_pair);
+        let mut seen = std::collections::BTreeSet::new();
+        list.retain(|p| seen.insert(*p));
+
+        let visitor = worker.dev_create_account().await?;
+        // A key can only open one row (ERR_KEY_USED), so each shape gets its own.
+        let key = SigningKey::from_bytes(&[7u8 + n as u8; 32]);
+        let opened = visitor.call(deployed.id(), "open_charter")
+            .args_json(json!({ "rules": rules(&receivers), "agent": hex32(key.verifying_key().as_bytes()), "fund": (NEAR / 100).to_string() }))
+            .deposit(NearToken::from_yoctonear(MAX_ROW))
+            .gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
+            .transact().await?;
+        assert!(opened.is_success(), "{label} open: {:?}", opened.failures());
+        let out = visitor.call(deployed.id(), "set_calls")
+            .args_json(calls(&list))
+            .deposit(NearToken::from_yoctonear(CALLS_DEPOSIT))
+            .gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
+            .transact().await?;
+        let row: Value = deployed.view("get_charter").args_json(json!({ "owner": visitor.id() })).await?.json()?;
+        let locked = row["storage_locked"].as_str().unwrap_or("0").parse::<u128>().unwrap_or(0) / 10u128.pow(19);
+        let pair_bytes: usize = list.iter().map(|(r, m)| r.len() + m.len() + 24).sum();
+        println!("{label}: receivers={} pairs={} {} locked_bytes={locked} budget={}",
+            receivers.len(), list.len(), why(&out), 2000usize.saturating_sub(1380 + 22 * receivers.len()));
+        assert!(out.is_success(), "{label} set_calls: {:?}", out.failures());
+        assert!(locked <= 2000, "{label} locked {locked} bytes, over the 2000 a 0.02 NEAR row holds");
+        assert!(pair_bytes <= 2000 - 1380 - 22 * receivers.len(), "{label} pair bytes {pair_bytes} exceed the page's budget");
+    }
+    Ok(())
+}
