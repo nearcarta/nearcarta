@@ -5,11 +5,11 @@
 //   node backend/scripts/ferry-live-swap.js --live --amount 0.2 --from USDC@base --to USDC@near --refund-to 0xYOURADDRESS
 //   node backend/scripts/ferry-live-swap.js --status DEPOSIT_ADDRESS
 //
-// --live reads the town charter on mainnet, refuses unless that charter would allow 0.001 NEAR
-// to its listed recipient, then asks 1Click for a deposit address of at most 0.20 USD.
+// --live reads the visitor's row on the board, refuses unless that row would allow the
+// recipient and the amount, then asks 1Click for a deposit address. There is no USD cap:
+// the row's own NEAR allowance is the only limit.
 // You send the tokens from your own wallet. Then --status polls the swap.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { MAX_CHECKOUT_USD } from '../src/ferry-checkout.js';
 
 const argv = process.argv.slice(2);
 const flag = n => {
@@ -20,7 +20,7 @@ const live = argv.includes('--live');
 const statusOf = flag('--status');
 
 if (!live && !statusOf) {
-  console.log(`A Pay button is /ferry-widget. POST /api/ferry/checkout returns a deposit address only after the charter allows the recipient, and only for at most ${MAX_CHECKOUT_USD} USD.
+  console.log(`A Pay button is /ferry-widget. POST /api/ferry/checkout returns a deposit address only after the visitor's board row allows the recipient and the amount. There is no USD cap: the row is the limit.
 This script does not send funds. One real swap:
   node backend/scripts/ferry-live-swap.js --live --amount 0.2 --from USDC@base --to USDC@near --refund-to 0xYOURADDRESS
 Then send that amount from your wallet to the printed address and run:
@@ -43,8 +43,8 @@ const to = flag('--to') || 'USDC@near';
 const refundTo = flag('--refund-to');
 if (!refundTo) { console.error('Pass --refund-to, the address on the chain you pay from.'); process.exit(1); }
 const n = Number(amount);
-if (!Number.isFinite(n) || n <= 0 || n > MAX_CHECKOUT_USD) {
-  console.error(`Refusing amount ${amount}. The cap is ${MAX_CHECKOUT_USD} USD.`);
+if (!Number.isFinite(n) || n <= 0) {
+  console.error(`Refusing amount ${amount}. Name a positive amount.`);
   process.exit(1);
 }
 

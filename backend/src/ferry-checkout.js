@@ -1,7 +1,9 @@
 // Universal checkout. quote() in ferry.js stays dry. This file asks 1Click for a deposit address
 // only after a view of the charter would allow the recipient (allowlist, per-payment cap, daily
-// budget, daily count, time window, not frozen, no sealed hidden rule). The 1Click amount is
-// capped at 0.20 USD. Nothing here signs a transaction or sends the deposit.
+// budget, daily count, time window, not frozen, no sealed hidden rule). There is no product-wide
+// USD cap: the only limit is the visitor's own row, and the row's allowance is priced from the
+// live token quote so the spend can never exceed what /setup wrote on chain.
+// Nothing here signs a transaction or sends the deposit.
 import { readFileSync } from 'node:fs';
 import { verifyQuoteSignature } from '@defuse-protocol/one-click-sdk-typescript';
 import { cfg, DEP } from './config.js';
@@ -10,7 +12,13 @@ import { tokenRef, findToken, tokens, quote, postQuote, buildQuoteRequest, echoG
 import { validateDestAddress } from '../../app/src/panels/ferry-settle.js';
 import { intentsCheckout } from '../../shared/rails/receipts.js';
 
-export const MAX_CHECKOUT_USD = 0.2;
+/**
+ * There is no USD limit to compute. The visitor's row states its allowance in NEAR, and
+ * `charterGate` compares the checkout's NEAR against that allowance on chain. A USD
+ * figure from 1Click is what the visitor sends from their own wallet; comparing it to a
+ * product constant is exactly the hardcoding this replaces. Only a positive amount is
+ * required so a broken quote cannot ask for a deposit address.
+ */
 const FINAL = ['SUCCESS', 'REFUNDED', 'FAILED'];
 const YOCTO_001 = 10n ** 21n; // 0.001 NEAR, under the town charter's 0.002 cap
 const issued = new Map();
@@ -29,10 +37,13 @@ export function yocto(v) {
 
 export function utcMinute(d = new Date()) { return d.getUTCHours() * 60 + d.getUTCMinutes(); }
 
+/**
+ * A USD amount on its own is not a limit. It only has to be a positive number; the
+ * row's NEAR allowance (priced below) and the board's own checks decide what is allowed.
+ */
 export function checkoutUsdOk(usd) {
   const n = Number(usd);
   if (!Number.isFinite(n) || n <= 0) return { ok: false, reason: 'bad_usd' };
-  if (n > MAX_CHECKOUT_USD + 1e-8) return { ok: false, reason: 'over_checkout_cap' };
   return { ok: true, usd: n };
 }
 
@@ -221,11 +232,8 @@ export async function openCheckout(input, deps) {
 
   const list = await deps.tokens();
   const fromTok = findToken(list, input.from);
-  // A known token price well over the cap refuses before 1Click. The signed amountInUsd is the hard cap.
-  if (fromTok && Number(fromTok.price) > 0) {
-    const rough = Number(input.amount) * Number(fromTok.price);
-    if (Number.isFinite(rough) && rough > MAX_CHECKOUT_USD * 1.05 + 1e-8) return refused('over_checkout_cap', { step: 'cap', recipient: input.recipient });
-  }
+  // No product cap here. The row's own NEAR allowance is the ceiling, and it is priced
+  // against the live dry quote below, so a 1Click USD figure cannot raise it.
 
   // The charter gate checked input.recipient (the allowlisted shop).
   // 1Click is paid to swapRecipient: the visitor on NEAR, or the address they typed
@@ -255,6 +263,8 @@ export async function openCheckout(input, deps) {
   if (!dry?.ok) return { ok: false, step: 'quote', error: dry?.error || 'quote refused', depositAddress: null, reason: 'quote_refused', receipt: intentsCheckout({ decision: 'refused', reason: 'quote_refused', to: input.recipient, tx: null }) };
   const usd = checkoutUsdOk(dry.from?.usd);
   if (!usd.ok) return refused(usd.reason, { step: 'cap', recipient: input.recipient, usd: dry.from?.usd ?? null });
+  // The row is the only limit, and `charterGate` above already applied it to the NEAR
+  // this checkout would spend. There is no product-wide USD ceiling to check here.
 
   const from = findToken(list, input.from), to = findToken(list, input.to);
   if (!from || !to) return { ok: false, step: 'quote', error: 'unknown token', depositAddress: null, status: 400 };
@@ -263,7 +273,7 @@ export async function openCheckout(input, deps) {
   if (res.http !== 201) return { ok: false, step: 'live', error: `1Click answered HTTP ${res.http}`, depositAddress: null, receipt: intentsCheckout({ decision: 'refused', reason: 'quote_refused', to: input.recipient, amount: usd.usd, tx: null }) };
   const verify = deps.verify || (() => false);
   const checks = checkLiveQuote(sent, res.body, verify);
-  if (!checks.accepted) return { ok: false, step: 'live', error: 'live quote refused', depositAddress: null, checks: { signature: checks.signature, echo: checks.echo.ok, usd: checks.usd.ok }, receipt: intentsCheckout({ decision: 'refused', reason: checks.usd.ok ? 'quote_refused' : 'over_checkout_cap', to: input.recipient, amount: res.body?.quote?.amountInUsd, tx: null }) };
+  if (!checks.accepted) return { ok: false, step: 'live', error: 'live quote refused', depositAddress: null, checks: { signature: checks.signature, echo: checks.echo.ok, usd: checks.usd.ok }, receipt: intentsCheckout({ decision: 'refused', reason: checks.usd.ok ? 'quote_refused' : 'bad_usd', to: input.recipient, amount: res.body?.quote?.amountInUsd, tx: null }) };
   const row = {
     depositAddress: checks.depositAddress,
     depositMemo: res.body.quote?.depositMemo || null,
@@ -335,7 +345,19 @@ export async function rulesFor(charter, clauseId = 'pay') {
   if (!/^[A-Za-z0-9._-]{1,64}$/.test(clauseId)) return { ok: false, error: 'bad clause', httpStatus: 400 };
   let chain;
   try { chain = await checkoutDeps.readCharter(charter, clauseId); }
-  catch (e) { return { ok: false, reason: 'charter_unread', error: e.message, httpStatus: 502 }; }
+  catch (e) {
+    // No row is a state a visitor can act on, not a broken read: /setup opens one.
+    // Only a failed RPC reaches the visitor as an error.
+    if (/no charter row/i.test(String(e?.message))) {
+      return {
+        ok: false, reason: 'no_row', httpStatus: 200, charter, clause_id: clauseId,
+        receivers: [], settlement_yocto: null, frozen: false,
+        error: 'No row on the board for this account yet.',
+        next: { step: 'open_row', href: '/setup/#sign', label: 'Open your row in /setup' },
+      };
+    }
+    return { ok: false, reason: 'charter_unread', error: e.message, httpStatus: 502 };
+  }
   const amount = settlementYocto(chain.clause, chain.usage);
   const gate = charterGate({ state: chain.state, clause: chain.clause, usage: chain.usage, receiver: chain.clause?.receivers?.[0], amount: amount || '1', nowMin: utcMinute(), sealed: chain.sealed });
   return {

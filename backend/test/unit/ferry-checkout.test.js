@@ -5,8 +5,8 @@ import { receiptsBody, RECEIPT_KEYS } from '../../../shared/rails/receipts.js';
 import { readFileSync } from 'node:fs';
 import {
   charterGate, checkoutInput, checkoutUsdOk, settlementYocto, openCheckout, checkLiveQuote, resetCheckouts,
-  rememberCheckout, startCheckout, checkoutDeps, oneClickStatus, listCheckoutReceipts, MAX_CHECKOUT_USD,
-  boardRowAsGate, readCharterRules,
+  rememberCheckout, startCheckout, checkoutDeps, oneClickStatus, listCheckoutReceipts,
+  boardRowAsGate, readCharterRules, rulesFor,
 } from '../../src/ferry-checkout.js';
 
 const clause = {
@@ -20,13 +20,13 @@ const VISITOR = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c
 const input = {
   from: { symbol: 'USDC', chain: 'base' }, to: { symbol: 'USDC', chain: 'near' }, amount: '0.2',
   recipient: 'payee.near', swapRecipient: VISITOR, refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
-  charter: 'charter.nearcarta.near', clauseId: 'pay', amountYocto: yocto, privacy: 'public',
+  charter: VISITOR, clauseId: 'pay', amountYocto: yocto, privacy: 'public',
 };
 const tokens = [
   { assetId: 'nep141:base-usdc', symbol: 'USDC', blockchain: 'base', decimals: 6, price: 1 },
   { assetId: 'nep141:usdc.near', symbol: 'USDC', blockchain: 'near', decimals: 6, price: 1 },
 ];
-const allow = () => ({ state, clause, usage, sealed: false });
+const allow = (over = {}) => ({ state, clause: { ...clause, ...over }, usage, sealed: false });
 
 function liveDeps(extra = {}) {
   const calls = [];
@@ -54,9 +54,24 @@ test('the charter gate matches the oath rules', () => {
   assert.equal(charterGate({ state, clause: { ...clause, window_start_min: 0, window_end_min: 60 }, usage, receiver: 'payee.near', amount: yocto, nowMin: 120 }).reason, 'outside_time_window');
   assert.equal(charterGate({ state, clause, usage, receiver: 'payee.near', amount: yocto, nowMin: 0, sealed: true }).reason, 'hidden_rule');
   assert.equal(checkoutUsdOk('0.2').ok, true);
-  assert.equal(checkoutUsdOk('0.21').reason, 'over_checkout_cap');
-  assert.equal(MAX_CHECKOUT_USD, 0.2);
+  // A USD number alone is not a limit; only a non-positive one is refused here.
+  assert.equal(checkoutUsdOk('0.21').ok, true);
+  assert.equal(checkoutUsdOk('5').ok, true);
+  assert.equal(checkoutUsdOk('0').reason, 'bad_usd');
   assert.equal(settlementYocto(clause, usage), yocto);
+});
+
+test('no product USD cap: only the row decides, and the amount must be positive', () => {
+  // A USD number on its own is not a limit. 5, 0.21 and 0.2 all pass this check; the
+  // row gate is what refuses a spend, and it compares NEAR, not dollars.
+  for (const v of ['0.2', '0.21', '5']) assert.equal(checkoutUsdOk(v).ok, true, v);
+  assert.equal(checkoutUsdOk('0').reason, 'bad_usd');
+  assert.equal(checkoutUsdOk('-1').reason, 'bad_usd');
+  assert.equal(checkoutUsdOk('abc').reason, 'bad_usd');
+  // And the source has no product constant left to drift.
+  const src = readFileSync(new URL('../../src/ferry-checkout.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /MAX_CHECKOUT_USD/);
+  assert.doesNotMatch(src, /over_checkout_cap/);
 });
 
 test('a refused recipient never asks 1Click, and an allowed one returns a deposit address', async () => {
@@ -87,17 +102,21 @@ test('a refused recipient never asks 1Click, and an allowed one returns a deposi
   resetCheckouts();
 });
 
-test('an amount over 0.20 USD never asks for a deposit address', async () => {
-  const deps = liveDeps({ tokens: async () => tokens.map(t => ({ ...t, price: 1 })) });
-  const over = await openCheckout({ ...input, amount: '1' }, deps);
-  assert.equal(over.reason, 'over_checkout_cap');
+test('an amount the row refuses never asks for a deposit address', async () => {
+  // The row allows 0.005 NEAR per payment. A 1 NEAR checkout is over that, so the row
+  // gate refuses it before any 1Click call. The amount is the NEAR the row spends.
+  const deps = liveDeps({ tokens: async () => tokens.map(t => ({ ...t, price: 3 })) });
+  const over = await openCheckout({ ...input, amount: '1', amountYocto: '1000000000000000000000000' }, deps);
+  assert.equal(over.ok, false);
+  assert.equal(over.reason, 'over_per_action_cap');
   assert.equal(over.depositAddress, null);
   assert.equal(deps.calls.length, 0);
 
-  const priced = liveDeps({ quote: async () => ({ ok: true, from: { usd: '0.5' } }) });
-  const soft = await openCheckout({ ...input, amount: '0.2' }, { ...priced, tokens: async () => tokens.map(t => ({ ...t, price: 0 })) });
-  assert.equal(soft.reason, 'over_checkout_cap');
-  assert.equal(priced.calls.length, 0);
+  // Inside the row it is allowed, and a wider row allows more with no code change.
+  const fits = liveDeps({ quote: async () => ({ ok: true, from: { usd: '0.01' } }) });
+  assert.equal((await openCheckout({ ...input, amount: '0.004' }, fits)).ok, true);
+  const wide = liveDeps({ quote: async () => ({ ok: true, from: { usd: '0.5' } }), readCharter: async () => allow({ per_action_cap: '1000000000000000000000000', daily_budget: '2000000000000000000000000' }) });
+  assert.equal((await openCheckout({ ...input, amount: '0.4', amountYocto: '400000000000000000000000' }, wide)).ok, true);
 });
 
 test('USDC on NEAR is quoted to the visitor while the charter gate still checks the shop', async () => {
@@ -354,4 +373,44 @@ test('checkout with board:true asks the gate for the row and does not quote a mi
 test('startCheckout does not call the network when the body is empty', async () => {
   const out = await startCheckout(null);
   assert.equal(out.httpStatus, 400);
+});
+
+test('a visitor with no row gets a clean no-row state that points at /setup', async () => {
+  const saved = { ...checkoutDeps };
+  checkoutDeps.readCharter = async () => { throw new Error('no charter row'); };
+  try {
+    const out = await rulesFor(VISITOR, 'pay');
+    // No row is a state, not a broken read: 200, a reason the UI can show, and a link.
+    assert.equal(out.httpStatus, 200);
+    assert.equal(out.ok, false);
+    assert.equal(out.reason, 'no_row');
+    assert.equal(out.next.href, '/setup/#sign');
+    assert.match(out.error, /No row on the board/);
+    assert.equal(out.settlement_yocto, null);
+  } finally {
+    Object.assign(checkoutDeps, saved);
+  }
+  // A real RPC failure is still an error, so a broken node is not hidden as "no row".
+  checkoutDeps.readCharter = async () => { throw new Error('rpc timeout'); };
+  try {
+    const bad = await rulesFor(VISITOR, 'pay');
+    assert.equal(bad.httpStatus, 502);
+    assert.equal(bad.reason, 'charter_unread');
+  } finally {
+    Object.assign(checkoutDeps, saved);
+  }
+});
+
+test('a row that exists still answers /api/ferry/rules with its caps', async () => {
+  const saved = { ...checkoutDeps };
+  checkoutDeps.readCharter = async () => allow();
+  try {
+    const out = await rulesFor(VISITOR, 'pay');
+    assert.equal(out.httpStatus, 200);
+    assert.equal(out.charter, VISITOR);
+    assert.deepEqual(out.receivers, ['payee.near']);
+    assert.equal(out.ok, true);
+  } finally {
+    Object.assign(checkoutDeps, saved);
+  }
 });
