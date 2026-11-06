@@ -1,0 +1,17 @@
+[package]
+name = "charter_board_sandbox"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Separate from the contract crate so this runner can use a current
+# near-sandbox. The wasm itself is built with rustc 1.86 and near-sdk 5.27.
+
+[dependencies]
+
+[dev-dependencies]
+near-workspaces = { version = "0.24.0", features = ["unstable"] }
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
