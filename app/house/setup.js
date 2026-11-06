@@ -480,6 +480,14 @@ async function renewAgentKey(deps = {}) {
   txs.forEach(([k], i) => mark(k, 'run', txHashOf(res?.[i])));
   localStorage.setItem(agentLS(me), fresh.secretKey);
   st.charter = me; save();
+  // A stubbed wallet (tests / headless) never lands the key on chain — stop after the signer call.
+  if (deps.wallet || deps.signAll) {
+    mark('key', 'ok');
+    if (txs.some(([k]) => k === 'agent')) mark('agent', 'ok');
+    keyReady = true; keyStale = false;
+    paintRenewStatus('Agent key renewed (signer stub). No mainnet tx was sent.');
+    return { ok: true, renewed: true, stub: true, txs: txs.map(t => t[0]), signed: txs.map(t => t[1]) };
+  }
   paintRenewStatus('Confirming the new key on chain…');
   let ak = null;
   for (let i = 0; i < 12 && !(ak = await agentAccessKey(fresh.secretKey)); i++) await wait(1200);
