@@ -49,6 +49,10 @@ const CURRENCY_NAMES = ['currency', 'ccy', 'curr'];
 const CATEGORY_NAMES = ['category', 'type'];
 
 const round6 = n => Math.round(Number(n) * 1e6) / 1e6;
+const amountText = n => {
+  const v = round6(n);
+  return Number.isInteger(v) ? String(v) : v.toFixed(2);
+};
 
 export function plural(n, one, many) {
   const k = Math.abs(Number(n) || 0);
@@ -144,17 +148,120 @@ export function parseStatementCsv(text) {
   return { ok: true, rows, detected, detectedText: detectedLine(detected), currency: codes.length === 1 ? codes[0] : '' };
 }
 
+const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const SUBSCRIPTIONS = ['netflix', 'spotify', 'hulu', 'disney+', 'disney plus', 'apple music', 'apple tv', 'icloud', 'youtube premium', 'youtube', 'adobe', 'dropbox', 'amazon prime', 'prime video', 'hbo', 'paramount', 'peacock', 'audible', 'github', 'notion'];
+
 function moneyOf(row) {
   const amount = Number(row?.amount ?? row?.near);
   const currency = String(row?.currency || (row?.near != null && row?.amount == null ? 'NEAR' : '')).toUpperCase();
-  return { payee: String(row?.payee || '').trim(), amount, currency };
+  return {
+    payee: String(row?.payee || '').trim(),
+    amount,
+    currency,
+    date: String(row?.date || '').trim(),
+    category: String(row?.category || '').trim(),
+  };
+}
+
+function parseDay(value) {
+  const s = String(value || '').trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return { y: +m[1], m: +m[2], d: +m[3] };
+  m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) return { y: +m[3], m: +m[1], d: +m[2] };
+  m = s.match(/^(\d{1,2})[/-](\d{1,2})$/);
+  if (m) return { y: 0, m: +m[1], d: +m[2] };
+  return null;
+}
+
+function dayLabel(d) {
+  const month = MONTHS[d?.m] || 'that day';
+  if (!d) return 'the same day';
+  return d.y ? `${month} ${d.d}, ${d.y}` : `${month} ${d.d}`;
+}
+
+function timesWord(n) {
+  return n === 2 ? 'twice' : `${n} times`;
+}
+
+function isSubscription(row) {
+  const cat = String(row.category || '').toLowerCase();
+  if (/subscription|streaming/.test(cat)) return true;
+  const name = String(row.payee || '').toLowerCase();
+  return SUBSCRIPTIONS.some(s => name === s || name.includes(s));
+}
+
+function genericRepeat(kind) {
+  if (kind === 'same-day') return 'A payee and amount repeat on the same day.';
+  if (kind === 'month') return 'A payee and amount repeat in the same month.';
+  return 'A payee and amount repeat.';
+}
+
+/** Named lines for the tray and the agent. The proof log uses auditStatement, which omits payees. */
+export function statementFindings(rows) {
+  const list = (Array.isArray(rows) ? rows : []).map(moneyOf).filter(r => r.payee && Number.isFinite(r.amount) && r.amount > 0);
+  const largest = list.reduce((m, r) => Math.max(m, r.amount), 0);
+  const groups = new Map();
+  for (const row of list) {
+    const key = `${row.payee}|${row.amount}|${row.currency}`;
+    const prev = groups.get(key) || { payee: row.payee, amount: row.amount, currency: row.currency, dates: [], category: row.category };
+    prev.dates.push(row.date);
+    if (row.category) prev.category = row.category;
+    groups.set(key, prev);
+  }
+  const findings = [];
+  for (const g of groups.values()) {
+    if (g.dates.length < 2) continue;
+    const days = g.dates.map(parseDay);
+    const known = days.filter(Boolean);
+    const dayKeys = new Set(known.map(d => `${d.y}-${d.m}-${d.d}`));
+    const monthKeys = new Set(known.map(d => `${d.y}-${d.m}`));
+    const unit = g.currency ? ` ${g.currency}` : ' as written';
+    const shown = `${amountText(g.amount)}${unit}`;
+    const times = timesWord(g.dates.length);
+    const largestBit = round6(g.amount) === round6(largest) ? ' It is the largest line.' : '';
+    let kind = 'repeat';
+    let why = `It appears ${g.dates.length} times.${largestBit}`;
+    if (known.length === g.dates.length && dayKeys.size === 1) {
+      kind = 'same-day';
+      why = `It appears ${times} on ${dayLabel(known[0])}. Likely a double charge.${largestBit}`;
+    } else if (known.length === g.dates.length && monthKeys.size === 1) {
+      kind = 'month';
+      why = `It appears ${times} in ${MONTHS[known[0].m] || 'one month'}.${largestBit}`;
+    }
+    findings.push({
+      kind,
+      payee: g.payee,
+      amount: round6(g.amount),
+      currency: g.currency,
+      count: g.dates.length,
+      why,
+      text: `${g.payee}, ${shown}. ${why}`,
+    });
+  }
+  const order = { 'same-day': 0, month: 1, repeat: 2 };
+  findings.sort((a, b) => (order[a.kind] - order[b.kind]) || b.amount - a.amount);
+  const subs = [];
+  const seen = new Set();
+  for (const row of list) {
+    if (!isSubscription(row)) continue;
+    const key = row.payee.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    subs.push(row.payee);
+  }
+  if (subs.length === 1) findings.push({ kind: 'subscription', payee: subs[0], text: `${subs[0]} is a subscription.` });
+  else if (subs.length > 1) {
+    const text = `${subs.slice(0, -1).join(', ')} and ${subs[subs.length - 1]} are subscriptions.`;
+    findings.push({ kind: 'subscription', payee: subs.join(', '), text });
+  }
+  return findings;
 }
 
 /** Counts and generic anomaly sentences. Payee names are not copied out. */
 export function auditStatement(rows, { capNear, nearPerUnit, rateSource } = {}) {
   const list = (Array.isArray(rows) ? rows : []).map(moneyOf);
   const anomalies = [];
-  const seen = new Map();
   let total = 0;
   let counted = 0;
   let max = 0;
@@ -173,18 +280,15 @@ export function auditStatement(rows, { capNear, nearPerUnit, rateSource } = {}) 
       if (row.currency) currencies.add(row.currency);
       const inNear = row.currency === 'NEAR' ? row.amount : (Number.isFinite(Number(nearPerUnit)) ? row.amount * Number(nearPerUnit) : null);
       if (cap != null && inNear != null && inNear > cap) over += 1;
-      if (row.payee) {
-        const key = `${row.payee}|${row.amount}|${row.currency}`;
-        seen.set(key, (seen.get(key) || 0) + 1);
-      }
     }
   }
   if (blank) anomalies.push({ kind: 'blank-payee', text: blank === 1 ? 'One line has no payee.' : `${blank} lines have no payee.` });
   if (bad) anomalies.push({ kind: 'bad-amount', text: bad === 1 ? 'One line has no positive amount.' : `${bad} lines have no positive amount.` });
   if (over) anomalies.push({ kind: 'over-cap', text: over === 1 ? 'One line is above your current cap.' : `${over} lines are above your current cap.` });
-  let dup = 0;
-  for (const n of seen.values()) if (n > 1) dup += 1;
-  if (dup) anomalies.push({ kind: 'duplicate', text: dup === 1 ? 'The same payee and amount appear more than once.' : `${dup} payee and amount pairs repeat.` });
+  for (const finding of statementFindings(rows)) {
+    if (finding.kind === 'subscription') continue;
+    anomalies.push({ kind: finding.kind, text: genericRepeat(finding.kind) });
+  }
   if (currencies.size > 1) anomalies.push({ kind: 'mixed', text: 'The statement uses more than one currency. Each amount stays in its own currency.' });
   const before = cap;
   const one = currencies.size === 1 ? [...currencies][0] : '';
@@ -216,25 +320,74 @@ export function auditStatement(rows, { capNear, nearPerUnit, rateSource } = {}) 
   };
 }
 
-/** Names the line the visitor asked about. This is not written to the proof log. */
+/** Names the largest repeated line. This is not written to the proof log. */
 export function biggestWaste(rows) {
+  const findings = statementFindings(rows).filter(f => f.kind !== 'subscription');
+  if (findings.length) {
+    const pick = [...findings].sort((a, b) => b.amount - a.amount || b.count - a.count)[0];
+    return { payee: pick.payee, amount: pick.amount, currency: pick.currency || 'as written', why: pick.why, count: pick.count };
+  }
   const list = (Array.isArray(rows) ? rows : []).map(moneyOf).filter(r => r.payee && Number.isFinite(r.amount) && r.amount > 0);
   if (!list.length) return null;
-  const groups = new Map();
-  for (const row of list) {
-    const key = `${row.payee}|${row.amount}|${row.currency}`;
-    const prev = groups.get(key) || { ...row, count: 0 };
-    prev.count += 1;
-    groups.set(key, prev);
+  const pick = [...list].sort((a, b) => b.amount - a.amount)[0];
+  return { payee: pick.payee, amount: round6(pick.amount), currency: pick.currency || 'as written', why: 'It is the largest line.', count: 1 };
+}
+
+export const APPLY_NOTE = 'Apply tighter limits lowers the per-payment cap on your own /setup rules. Nothing is signed until the board can tighten.';
+
+export function capFromSetup(liveCap, savedCap) {
+  const live = Number(liveCap);
+  if (Number.isFinite(live) && live > 0) return live;
+  const saved = Number(savedCap);
+  if (Number.isFinite(saved) && saved > 0) return saved;
+  return null;
+}
+
+/** One sentence for the dock. Names the merchants in the loaded statement. */
+export function agentReply(rows, question, { capNear, sampleName } = {}) {
+  const findings = statementFindings(rows);
+  const charges = findings.filter(f => f.kind !== 'subscription');
+  const subs = findings.filter(f => f.kind === 'subscription');
+  const head = sampleName ? `This is the ${sampleName} sample, not your statement. ` : '';
+  if (question === 'subscription') {
+    return subs.length ? `${head}${subs.map(s => s.text).join(' ')}` : `${head}No subscription is marked in this statement.`;
   }
-  const dups = [...groups.values()].filter(g => g.count > 1);
-  const pool = dups.length ? dups : [...groups.values()];
-  const pick = pool.sort((a, b) => b.amount - a.amount || b.count - a.count)[0];
-  const largest = Math.max(...list.map(r => r.amount));
-  const why = pick.count > 1
-    ? `It appears ${pick.count} times${pick.amount === largest ? ' and it is the largest line' : ''}.`
-    : 'It is the largest line.';
-  return { payee: pick.payee, amount: round6(pick.amount), currency: pick.currency || 'as written', why, count: pick.count };
+  if (question === 'duplicate') {
+    return charges.length ? `${head}${charges.map(f => f.text).join(' ')}` : `${head}No repeated payee and amount is in this statement.`;
+  }
+  if (question === 'limit') {
+    if (capNear == null || !Number.isFinite(Number(capNear))) {
+      return `${head}No per-payment cap is saved in /setup, so there is no limit to tighten. Nothing was signed.`;
+    }
+    return `${head}Your per-payment cap is ${capNear} NEAR. ${APPLY_NOTE}`;
+  }
+  const bits = [...charges, ...subs].map(f => f.text);
+  if (!bits.length) return `${head}No repeated charge stands out in this statement.`;
+  return `${head}${bits.join(' ')}`;
+}
+
+function hexToBytes(hex) {
+  const s = String(hex || '').trim().replace(/^0x/, '');
+  if (!s || s.length % 2 || /[^0-9a-f]/i.test(s)) return null;
+  const out = new Uint8Array(s.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(s.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+/** Re-check the ed25519 signature in the browser. The server flag is not enough. */
+export async function verifyBrowserSignature({ text, signature, signingAddress } = {}) {
+  const key = hexToBytes(signingAddress);
+  const sig = hexToBytes(signature);
+  if (!key || key.length !== 32) return { ok: false, why: 'The signing address is not a 32-byte key.' };
+  if (!sig || sig.length !== 64) return { ok: false, why: 'The signature is not 64 bytes.' };
+  if (typeof text !== 'string' || !text) return { ok: false, why: 'The signed text is missing.' };
+  try {
+    const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'Ed25519' }, false, ['verify']);
+    const ok = await crypto.subtle.verify({ name: 'Ed25519' }, cryptoKey, sig, new TextEncoder().encode(text));
+    return ok ? { ok: true, why: '' } : { ok: false, why: 'This browser rejected the ed25519 signature.' };
+  } catch (err) {
+    return { ok: false, why: err?.message || 'This browser could not check the signature.' };
+  }
 }
 
 export function wasteSentence(waste, { sampleName } = {}) {
