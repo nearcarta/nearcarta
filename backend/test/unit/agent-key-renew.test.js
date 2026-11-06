@@ -96,3 +96,16 @@ test('Ferry shows a Setup renew link for key_cannot_propose_call, not the raw co
   const markup = deep.slice(deep.indexOf('ferry-charter-note'), deep.indexOf('ferry-charter-note') + 280);
   assert.match(markup, /renewSetup/);
 });
+
+
+test('wireSign binds Renew agent key on the Sign step (not only wireTry)', () => {
+  const src = read('app/house/setup.js');
+  const sign = src.slice(src.indexOf('function wireSign'), src.indexOf('function wireTry'));
+  assert.match(sign, /bindRenewKey/);
+  assert.match(sign, /setup-renew-key-btn|renew-key/);
+  const bind = src.slice(src.indexOf('function bindRenewKey'), src.indexOf('globalThis.__ncRenewAgentKey'));
+  assert.match(bind, /act\(e\.currentTarget/);
+  assert.match(bind, /renewAgentKey/);
+  assert.match(src, /setup-renew-status/);
+  assert.match(src, /console\.error\('\[setup\] renewAgentKey/);
+});
