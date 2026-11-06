@@ -6,7 +6,7 @@
 // The contract overwrites the top-level row_owner after this text is signed.
 // Shops trust that field only when the predecessor is the board. A nested
 // row_owner is not authority. Duplicate keys are rejected on chain.
-// Same text as contracts/charter_board on PR #52 (`call_as_text`, version 2).
+// Same text as contracts/charter_board on main (`call_as_text`, version 2).
 import { createHash } from 'node:crypto';
 
 export const CALL_AS_VERSION = '2';
