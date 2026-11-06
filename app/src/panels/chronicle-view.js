@@ -14,6 +14,22 @@ const q$ = (root, sel) => root.querySelector(sel);
 const ACCOUNT_MARK = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#2a2218" stroke="#f5d08a" stroke-width="1.5"/><circle cx="18" cy="14" r="4" fill="#f5d08a"/><path d="M10 26c1.2-4 4-6 8-6s6.8 2 8 6" fill="none" stroke="#f5d08a" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 const LEDGER_MARK = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#2a2218" stroke="#f5d08a" stroke-width="1.5"/><rect x="11" y="9" width="14" height="18" rx="2" fill="none" stroke="#f5d08a" stroke-width="1.5"/><path d="M14 14h8M14 18h8M14 22h5" stroke="#f5d08a" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 
+function ctaOf(state) {
+  if (state.tab === 'verify') return 'Check this bundle';
+  if (state.tab === 'statement') return state.statement ? 'Anchor' : 'Write statement';
+  return 'Show timeline';
+}
+
+function coverageItems(state) {
+  const items = [];
+  for (const s of state.liveSources || []) {
+    if (s.gap) items.push(s.gap);
+    else if (s.rows) items.push(`${s.source}: ${s.rows}`);
+    else items.push(`${s.source}: none`);
+  }
+  return items;
+}
+
 function shortHash(h) {
   const s = String(h || '');
   if (s.length < 12) return s;
@@ -38,8 +54,10 @@ export function chronicleMarkup(state) {
       <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
       <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
     </li>`;
-  }).join('') || `<li class="c-empty">${esc(state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.')}</li>`;
-  const cta = state.tab === 'verify' ? 'Check this bundle' : (state.tab === 'statement' && state.statement ? 'Anchor' : 'Write statement');
+  }).join('');
+  const cta = ctaOf(state);
+  const emptyText = state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.';
+  const cover = coverageItems(state).map(t => `<li>${esc(t)}</li>`).join('');
   const verifyHtml = `${esc(state.verify || 'Nothing is signed from this tray.')}${state.verifyUrl ? ` <a data-testid="chronicle-link" href="${esc(state.verifyUrl)}">View transaction</a>` : ''}`;
   const attest = /TEE quote/.test(state.verify || '');
   const opt = (value, label, cur) => `<option value="${value}"${cur === value ? ' selected' : ''}>${label}</option>`;
@@ -56,17 +74,19 @@ export function chronicleMarkup(state) {
     </div>
     <div class="chronicle-pane" data-pane="timeline"${tab === 'timeline' ? '' : ' hidden'}>
       <div class="c-filters">
-        <label class="chronicle-field wide">Account <input id="c-account" data-testid="chronicle-account" value="${esc(state.account || '')}" autocomplete="off" spellcheck="false" placeholder="name.near"></label>
+        <label class="chronicle-field wide">Account <input id="c-account" data-testid="chronicle-account" value="${esc(state.accountDraft ?? state.account ?? '')}" autocomplete="off" spellcheck="false" placeholder="name.near"></label>
         <label class="chronicle-field">Period <select id="c-span" data-testid="chronicle-period">${opt('all', 'All', state.span || 'all')}${opt('today', 'Today', state.span || 'all')}${opt('7d', '7 days', state.span || 'all')}</select></label>
         <label class="chronicle-field">Shop <select id="c-shop" data-testid="chronicle-shop">${opt('', 'All', state.shop || '')}${['toll', 'ferry', 'guard', 'payouts', 'house', 'board'].map(s => opt(s, s, state.shop || '')).join('')}</select></label>
         <label class="chronicle-field">Chain <select id="c-chain" data-testid="chronicle-chain">${opt('', 'All', state.chain || '')}${opt('NEAR', 'NEAR', state.chain || '')}${opt('NEAR Intents', 'NEAR Intents', state.chain || '')}</select></label>
         <label class="chronicle-field">Decision <select id="c-d" data-testid="chronicle-filter">${opt('', 'All', state.cd || '')}${opt('allowed', 'Allowed', state.cd || '')}${opt('denied', 'Refused', state.cd || '')}</select></label>
         <label class="chronicle-field wide">Words <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}" autocomplete="off"></label>
-        <ol class="feed wide" data-testid="chronicle-page">${list}</ol>
       </div>
     </div>
+    <ol class="feed" data-testid="chronicle-page"${rows.length ? '' : ' hidden'}>${list}</ol>
+    <p class="c-empty-line" data-testid="chronicle-empty"${rows.length ? ' hidden' : ''}>${esc(emptyText)}</p>
     <div class="chronicle-pane" data-pane="statement"${tab === 'statement' ? '' : ' hidden'}>
       <label class="chronicle-field">Statement <textarea id="c-statement" data-testid="chronicle-statement" readonly>${esc(state.statement || '')}</textarea></label>
+      <label class="chronicle-field">Digest <input id="c-digest-line" data-testid="chronicle-digest-line" value="${esc(state.digest || '')}" readonly autocomplete="off" spellcheck="false"></label>
       <label class="chronicle-field">Signature <input id="c-sig" data-testid="chronicle-signature" value="${esc(state.signature || '')}" autocomplete="off" spellcheck="false" placeholder="No signature yet"></label>
       <label class="chronicle-field">Private note <input id="c-note" data-testid="chronicle-private" value="${esc(state.privateNote || '')}" autocomplete="off"></label>
       <label class="chronicle-check"><input id="c-consent" data-testid="chronicle-consent" type="checkbox"${state.consent ? ' checked' : ''}> Salt this note. Do not publish the raw hash.</label>
@@ -78,11 +98,12 @@ export function chronicleMarkup(state) {
     </div>
     <button type="button" class="chronicle-gold" id="c-go" data-testid="chronicle-go">${cta}</button>
     <div class="c-lines">
-      <p class="c-status c-cover" data-testid="chronicle-source">${esc(state.sourceText || 'Type an account. No history is assumed.')}</p>
+      ${tab === 'verify' ? '' : `<p class="c-health" data-testid="chronicle-health">${esc(state.health || '')}</p><ul class="c-cover-list" data-testid="chronicle-coverage">${cover}</ul><p class="c-status c-cover" data-testid="chronicle-source">${esc(state.sourceText || 'Type an account. No history is assumed.')}</p>`}
       <div class="c-foot">
         <p class="c-status${attest ? ' c-attest' : ''}" id="c-out" data-testid="chronicle-verify">${verifyHtml}</p>
-        <button type="button" class="chronicle-quiet" id="c-csv" data-testid="chronicle-export">Export CSV</button>
+        <button type="button" class="chronicle-quiet" id="c-csv" data-testid="chronicle-export"${state.exportCount ? '' : ' disabled'}>Export CSV</button>
       </div>
+      ${tab === 'verify' ? `<p class="c-health" data-testid="chronicle-health">${esc(state.health || '')}</p><ul class="c-cover-list" data-testid="chronicle-coverage">${cover}</ul>` : ''}
     </div>
     <p id="c-seal" class="chronicle-seal" data-testid="chronicle-seal" hidden>${esc(state.seal || '')}</p>
   </div>`;
@@ -137,8 +158,17 @@ export function mountChronicleTray(root, hooks = {}) {
     return all;
   }
 
+  function rememberFields() {
+    const account = root.isConnected ? q$(root, '#c-account') : null;
+    if (account && doc.activeElement === account) state.accountDraft = account.value;
+    const words = root.isConnected ? q$(root, '#c-q') : null;
+    if (words && doc.activeElement === words) state.cq = words.value;
+  }
+
   const paint = () => {
+    rememberFields();
     prepareRows();
+    state.exportCount = matchingRows().length;
     if (!root.isConnected && hooks.repaint) { hooks.repaint(); return; }
     root.innerHTML = chronicleMarkup(state);
     bind();
@@ -153,13 +183,19 @@ export function mountChronicleTray(root, hooks = {}) {
     }
     const source = root.isConnected ? q$(root, '[data-testid=chronicle-source]') : null;
     if (source) source.textContent = state.sourceText || '';
+    const health = root.isConnected ? q$(root, '[data-testid=chronicle-health]') : null;
+    if (health) health.textContent = state.health || '';
+    const cover = root.isConnected ? q$(root, '[data-testid=chronicle-coverage]') : null;
+    if (cover) cover.innerHTML = coverageItems(state).map(t => `<li>${esc(t)}</li>`).join('');
     const seal = root.isConnected ? q$(root, '#c-seal') : null;
     if (seal) {
       seal.hidden = !state.seal;
       seal.textContent = state.seal || '';
     }
     const go = root.isConnected ? q$(root, '#c-go') : null;
-    if (go) go.textContent = state.tab === 'verify' ? 'Check this bundle' : (state.tab === 'statement' && state.statement ? 'Anchor' : 'Write statement');
+    if (go) go.textContent = ctaOf(state);
+    const csv = root.isConnected ? q$(root, '#c-csv') : null;
+    if (csv) csv.disabled = !matchingRows().length;
   };
 
   const clearSeal = () => {
@@ -188,21 +224,35 @@ export function mountChronicleTray(root, hooks = {}) {
         <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
         <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
       </li>`;
-    }).join('') || `<li class="c-empty">${esc(state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.')}</li>`;
+    }).join('');
+    ol.hidden = !(state.viewRows || []).length;
+    const empty = q$(root, '[data-testid=chronicle-empty]');
+    if (empty) {
+      empty.hidden = !ol.hidden;
+      empty.textContent = state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.';
+    }
     showOut();
   }
 
   async function readAccount(account) {
     const id = String(account || '').trim();
+    const typed = root.isConnected ? q$(root, '#c-account') : null;
+    const focused = !!(typed && doc.activeElement === typed);
+    state.accountDraft = focused ? typed.value : id;
     state.account = id;
     const mine = ++state.ticket;
     if (!id) {
+      state.reading = false;
       state.auditRows = [];
+      state.health = '';
+      state.liveSources = [];
       state.sourceText = 'Type an account. No history is assumed.';
       drawList();
       return;
     }
-    state.sourceText = 'Reading this account…';
+    state.reading = true;
+    state.health = 'Reading this account…';
+    state.sourceText = state.health;
     showOut();
     const base = api();
     const get = async (path) => {
@@ -219,11 +269,6 @@ export function mountChronicleTray(root, hooks = {}) {
         get('/api/mainnet'),
       ]);
       if (mine !== state.ticket) return;
-      const early = accountRows({ account: id, board, ledger, mainnet, index: { busy: true } });
-      state.auditRows = early.rows;
-      state.coverage = early.coverage;
-      state.sourceText = early.rows.length ? early.coverage.label : 'Reading the live timeline…';
-      drawList();
       const liveRes = await livePromise;
       if (!liveRes || !liveRes.ok) live = { error: 'The live timeline did not answer.', rows: [], gaps: ['The live timeline did not answer.'] };
       else live = await liveRes.json();
@@ -231,10 +276,13 @@ export function mountChronicleTray(root, hooks = {}) {
       live = live || { error: 'The live timeline did not answer.', rows: [], gaps: ['The live timeline did not answer.'] };
     }
     if (mine !== state.ticket) return;
+    state.reading = false;
     const audit = accountRows({ account: id, board, ledger, mainnet, live });
     state.auditRows = audit.rows;
     state.coverage = audit.coverage;
-    state.sourceText = audit.coverage.label;
+    state.health = live?.health || '';
+    state.liveSources = Array.isArray(live?.sources) ? live.sources : [];
+    state.sourceText = String(audit.coverage.label || '').replace(/^No rows for this account\.\s*/, '').trim() || state.health;
     drawList();
   }
 
@@ -359,11 +407,17 @@ export function mountChronicleTray(root, hooks = {}) {
   function exportRows() {
     clearSeal();
     const rows = filteredAll();
+    if (!rows.length) {
+      state.verify = 'Nothing to export.';
+      state.verifyUrl = '';
+      showOut();
+      return;
+    }
     const text = exportCsv(rows);
     if (hooks.downloadCsv) hooks.downloadCsv(text);
     else downloadCsv(text);
     const shops = [...new Set(rows.map(r => r.shop).filter(Boolean))].slice(0, 3).join(', ');
-    state.verify = rows.length ? `Exported ${rows.length} rows: ${shops}.` : 'Nothing to export.';
+    state.verify = `Exported ${rows.length} rows: ${shops}.`;
     state.verifyUrl = '';
     showOut();
   }
@@ -372,11 +426,13 @@ export function mountChronicleTray(root, hooks = {}) {
     if (state.goldBusy) return;
     state.goldBusy = true;
     try {
-      if (state.tab === 'verify') await checkBundle();
-      else if (state.tab === 'statement' && state.statement) await anchorNow();
+      if (state.tab === 'timeline') await readAccount(q$(root, '#c-account')?.value ?? state.accountDraft ?? state.account ?? '');
+      else if (state.tab === 'verify') await checkBundle();
+      else if (state.statement) await anchorNow();
       else await writeNow();
     } finally {
       state.goldBusy = false;
+      showOut();
     }
   }
 
@@ -391,6 +447,8 @@ export function mountChronicleTray(root, hooks = {}) {
       downloadJson: (body, name) => (hooks.downloadJson ? hooks.downloadJson(body, name) : downloadCsv(body, name || 'chronicle.json')),
       onStatement: () => writeNow(),
       onAnchor: () => anchorNow(),
+      onRead: (account) => readAccount(account),
+      rowsOf: () => state.auditRows || [],
     });
     if (result?.seal) setSeal(result.seal);
     else if (result?.clearSeal) clearSeal();
@@ -412,7 +470,7 @@ export function mountChronicleTray(root, hooks = {}) {
       };
     });
     const account = q$(root, '#c-account');
-    if (account) account.oninput = (e) => { readAccount(e.target.value); };
+    if (account) account.oninput = (e) => { state.accountDraft = e.target.value; };
     const search = q$(root, '#c-q');
     if (search) search.oninput = (e) => { state.cq = e.target.value; clearSeal(); drawList(); };
     for (const [sel, key] of [['#c-d', 'cd'], ['#c-shop', 'shop'], ['#c-chain', 'chain'], ['#c-span', 'span']]) {
@@ -438,8 +496,23 @@ export function mountChronicleTray(root, hooks = {}) {
     if (agentGo) agentGo.onclick = (e) => { e.preventDefault(); dispatchChronicleDock(doc); };
   }
 
-  if (!state.sourceText) state.sourceText = 'Type an account. No history is assumed.';
+  if (!state.sourceText) state.sourceText = 'Type an account, then press Show timeline.';
   if (!state.verify) state.verify = 'Nothing is signed from this tray.';
+  if (!root.__chronicleKeys) {
+    root.__chronicleKeys = true;
+    const stopKeys = (e) => {
+      const t = e.target;
+      if (!t?.closest?.('input, textarea, select, .chronicle-card')) return;
+      e.stopPropagation();
+      if (e.type === 'keydown' && e.key === 'Enter' && t.id === 'c-account') {
+        e.preventDefault();
+        readAccount(t.value);
+      }
+    };
+    root.addEventListener('keydown', stopKeys);
+    root.addEventListener('keyup', stopKeys);
+    root.addEventListener('keypress', stopKeys);
+  }
   paint();
   return { paint, runAgent, readAccount };
 }

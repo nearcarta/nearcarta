@@ -49,6 +49,12 @@ test('chronicle commands filter, export, verify and refuse an under-cap entry', 
   assert.equal(shown.clearSeal, true);
   const today = await runChronicleCommand({ text: "Export today's ledger", rows, state, now: new Date('2026-11-06T00:00:00Z') });
   assert.match(today.hint, /No rows are dated today/);
+  const emptyCsv = [];
+  const emptyExport = await runChronicleCommand({
+    text: 'Export CSV', rows: [], state: {}, downloadCsv: (body) => emptyCsv.push(body),
+  });
+  assert.match(emptyExport.hint, /Nothing to export/);
+  assert.equal(emptyCsv.length, 0);
   const dated = [{ shop: 'toll', decision: 'denied', reason: 'receiver_not_allowlisted', amount: '0', h: 'B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR', at: '2026-11-04T21:06:50Z' }];
   const csv = [];
   const exported = await runChronicleCommand({
@@ -78,6 +84,34 @@ test('chronicle commands filter, export, verify and refuse an under-cap entry', 
   const parsed = parseChronicleCommand('Show refuses today');
   assert.equal(parsed.decision, 'denied');
   assert.equal(parsed.today, true);
+  const asked = parseChronicleCommand('show me what aurora.near spent and anything refused');
+  assert.equal(asked.action, 'query');
+  assert.equal(asked.account, 'aurora.near');
+  assert.equal(asked.decision, '');
+  const implicit = parseChronicleCommand('timeline for 8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8 last week ferry');
+  assert.equal(implicit.account, '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8');
+  assert.equal(implicit.span, '7d');
+  assert.equal(implicit.shop, 'ferry');
+  const bag = { auditRows: [] };
+  const reads = [];
+  const queried = await runChronicleCommand({
+    text: 'show me what aurora.near spent and anything refused',
+    rows: [],
+    state: bag,
+    onRead: async (account) => {
+      reads.push(account);
+      bag.auditRows = [
+        { shop: 'ledger', decision: 'allowed', h: HASH, amount: '1 NEAR' },
+        { shop: 'guard', decision: 'denied', h: 'CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF', amount: '0' },
+      ];
+    },
+    rowsOf: () => bag.auditRows,
+  });
+  assert.deepEqual(reads, ['aurora.near']);
+  assert.equal(bag.account, 'aurora.near');
+  assert.equal(bag.cd, '');
+  assert.match(queried.hint, /aurora\.near has 2 rows/);
+  assert.match(queried.hint, /1 allowed, 1 refused/);
   const totals = csvTotals(dated);
   assert.equal(totals.attempted, 1);
   assert.match(exportCsv(dated), /attempted/);
@@ -139,6 +173,8 @@ test('chronicle icons, brass and city wiring stay on the ledger path', () => {
   const view = read('app/src/panels/chronicle-view.js');
   assert.match(view, /Timeline/);
   assert.match(view, /Write statement/);
+  assert.match(view, /Show timeline/);
+  assert.match(view, /Check this bundle/);
   assert.doesNotMatch(view, /Add today/);
   const deep = read('app/src/panels/deep.js');
   assert.match(deep, /return mountChronicleTray\(root, hooks\)/);

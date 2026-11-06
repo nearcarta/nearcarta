@@ -66,6 +66,9 @@ export function ensureChronicleDock(doc, active = true) {
       <span class="chronicle-agent-name">AI Agent</span>
     </button>`;
     (doc.getElementById('shopUI') || doc.body).appendChild(d);
+    const stopKeys = (e) => e.stopPropagation();
+    d.addEventListener('keydown', stopKeys);
+    d.addEventListener('keyup', stopKeys);
     const toggle = d.querySelector('[data-testid=chronicle-agent-toggle]');
     const pop = d.querySelector('#chronicle-agent-pop');
     toggle?.addEventListener('click', () => {

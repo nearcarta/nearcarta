@@ -117,6 +117,7 @@ test('T1 a landed tx shows the receipt, not a load error', async ({ page }) => {
     await openShop(page, 'chronicle');
     await page.evaluate(() => { window.__walletSigns = 0; window.__NC_WALLET_SIGN = async () => { window.__walletSigns += 1; return 'GVFKTgzgKcepGTmLs318LzNzzrf3pjtYgquZBopLjeCY'; }; });
     await expect(page.locator('#t-act')).toBeHidden();
+    await page.getByRole('tab', { name: 'Statement' }).click();
     await page.locator('#c-go').click();
     await expect(page.getByTestId('chronicle-verify')).toContainText('Nothing was signed');
     expect(await page.evaluate(() => window.__walletSigns)).toBe(0);
@@ -160,9 +161,11 @@ test('T3 a new chronicle entry shows in the list and the corner', async ({ page 
     await at(page, width);
     await openShop(page, 'chronicle');
     await page.getByTestId('chronicle-account').fill('nearcarta.near');
+    await page.locator('#c-go').click();
     const row = page.locator('[data-testid="chronicle-page"] li').filter({ hasText: 'toll' });
     await expect(row.first()).toBeVisible({ timeout: 20000 });
     await expect(row.first().locator('a')).toHaveAttribute('href', /nearblocks\.io\/txns\//);
+    await page.getByRole('tab', { name: 'Statement' }).click();
     await page.locator('#c-go').click();
     await expect(page.getByTestId('chronicle-statement')).toContainText('Historic rules: missing');
     await expect(page.getByTestId('chronicle-verify')).toContainText('Nothing was signed');
@@ -310,6 +313,7 @@ test('T9 a propose-only key signs without opening the wallet', async ({ page }) 
     await at(page, width);
     await openShop(page, 'chronicle');
     await page.evaluate(() => { window.__walletCalls = 0; window.__NC_WALLET_SIGN = async () => { window.__walletCalls++; return 'should-not-run'; }; });
+    await page.getByRole('tab', { name: 'Statement' }).click();
     await page.locator('#c-go').click();
     await expect(page.getByTestId('chronicle-verify')).toContainText('Nothing was signed');
     expect(sent).toBe(0);

@@ -5,6 +5,33 @@ import { exportCsv, exportJson, queryFeed, verifyEntry } from './chronicle-feed.
 export const MISS_HINT = 'Try “Show refused payments”, “Export today’s ledger”, “Write statement”, or “Verify” plus a transaction hash.';
 
 const HASH = /[1-9A-HJ-NP-Za-km-z]{43,44}/;
+const NAMED = /\b((?:[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?\.)+(?:near|tg))\b/i;
+const IMPLICIT = /\b([0-9a-f]{64})\b/i;
+const SHOPS = ['toll', 'ferry', 'guard', 'payouts', 'house', 'board', 'hall', 'arena', 'bank', 'chronicle', 'ledger'];
+
+export function parseAccountId(text) {
+  const raw = String(text || '');
+  const hex = raw.match(IMPLICIT);
+  if (hex) return hex[1].toLowerCase();
+  const named = raw.match(NAMED);
+  return named ? named[1].toLowerCase() : '';
+}
+
+function decisionOf(line) {
+  const refused = /\b(refus\w*|denied|reject\w*)\b/.test(line);
+  const spent = /\b(spent|spend\w*|paid|pay|sent|allow\w*)\b/.test(line);
+  if (refused && spent) return '';
+  if (refused) return 'denied';
+  if (spent) return 'allowed';
+  return '';
+}
+
+function spanOf(line) {
+  if (/\b(today|todays)\b/.test(line)) return 'today';
+  if (/\b(7\s*days|seven days|last week|this week|week)\b/.test(line)) return '7d';
+  if (/\b(all time|everything|all history)\b/.test(line)) return 'all';
+  return '';
+}
 
 export function isoDay(now = new Date()) {
   const d = now instanceof Date ? now : new Date(now);
@@ -21,6 +48,13 @@ export function parseChronicleCommand(text) {
   const line = norm(raw);
   if (!line) return { ok: false, action: 'miss', hint: `Type a command. ${MISS_HINT}` };
   const today = /\btodays?\b/.test(line);
+  const account = parseAccountId(raw);
+  const span = spanOf(line);
+  const shop = SHOPS.find(s => new RegExp(`\\b${s}\\b`).test(line)) || '';
+  const decision = decisionOf(line);
+  if (account) {
+    return { ok: true, action: 'query', account, decision, today, span: span || (today ? 'today' : 'all'), shop, hint: '' };
+  }
   if (/\b(add|record)\b/.test(line) && /\b(entry|ledger|payment)\b/.test(line)) {
     return { ok: true, action: 'nospend', hint: '' };
   }
@@ -50,7 +84,7 @@ export function parseChronicleCommand(text) {
 }
 
 export async function runChronicleCommand({
-  text, rows, state, now = new Date(), verify, downloadCsv: saveCsv, downloadJson: saveJson, onStatement, onAnchor,
+  text, rows, state, now = new Date(), verify, downloadCsv: saveCsv, downloadJson: saveJson, onStatement, onAnchor, onRead, rowsOf,
 } = {}) {
   const cmd = parseChronicleCommand(text);
   const bag = state || {};
@@ -65,6 +99,27 @@ export async function runChronicleCommand({
   if (cmd.action === 'anchor') {
     const res = typeof onAnchor === 'function' ? await onAnchor() : null;
     return { ok: true, action: 'anchor', hint: res?.status || 'Live anchor blocked. Nothing was signed.', clearSeal: true, paint: false };
+  }
+  if (cmd.action === 'query') {
+    bag.account = cmd.account;
+    bag.accountDraft = cmd.account;
+    bag.cd = cmd.decision || '';
+    bag.shop = cmd.shop || '';
+    bag.span = cmd.span || 'all';
+    bag.day = cmd.today ? isoDay(now) : '';
+    bag.cq = '';
+    bag.tab = 'timeline';
+    if (typeof onRead === 'function') await onRead(cmd.account);
+    const rowsNow = typeof rowsOf === 'function' ? rowsOf() : (bag.auditRows || rows || []);
+    const q = queryFeed(rowsNow, { q: '', decision: bag.cd, day: bag.day, page: 1, pageSize: 500 });
+    const shown = bag.shop ? q.rows.filter(r => r.shop === bag.shop) : q.rows;
+    const allowed = shown.filter(r => r.decision === 'allowed').length;
+    const denied = shown.filter(r => r.decision === 'denied').length;
+    const hint = shown.length
+      ? `${cmd.account} has ${shown.length} rows. ${allowed} allowed, ${denied} refused.`
+      : `${cmd.account} has no rows in this view.`;
+    bag.verify = hint;
+    return { ok: true, action: 'query', hint, clearSeal: true, paint: true };
   }
   if (cmd.action === 'filter') {
     bag.cd = cmd.decision || '';
@@ -82,8 +137,10 @@ export async function runChronicleCommand({
     const q = queryFeed(rows || [], { q: bag.cq || '', decision: bag.cd || '', day, page: 1, pageSize: 500 });
     const body = cmd.json ? exportJson(q.rows) : exportCsv(q.rows);
     const name = cmd.today ? (cmd.json ? 'chronicle-today.json' : 'chronicle-today.csv') : (cmd.json ? 'chronicle.json' : 'chronicle.csv');
-    if (cmd.json) saveJson?.(body, name);
-    else saveCsv?.(body, name);
+    if (q.total) {
+      if (cmd.json) saveJson?.(body, name);
+      else saveCsv?.(body, name);
+    }
     bag.tab = 'timeline';
     bag.day = day;
     const hint = q.total ? `Exported ${q.total} rows.` : (cmd.today ? 'No rows are dated today.' : 'Nothing to export.');
