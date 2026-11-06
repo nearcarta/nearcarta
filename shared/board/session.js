@@ -116,23 +116,38 @@ function wrapCap(named, capYocto) {
 // Pay receivers stay at MAX_RECEIVERS (8).
 export const MAX_CALLS = 24;
 
-// A board row holds MAX_ROW_YOCTO (0.02 NEAR = 2000 bytes) of storage, and v2 bills
-// the real trie bytes. The call list is the row's largest part, so how many shops fit
-// depends on how long their account ids are. Measured on the committed wasm in
-// `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`: seven 20-byte shops
-// locked 0.01967 NEAR and eight failed ERR_ROW_TOO_BIG; six 32-byte shops locked
-// 0.01984 and seven failed; five 48-byte shops locked 0.01997 and six failed; four
-// 56-byte shops locked 0.01946 and five failed.
-// A row costs about 501 bytes and the fixed side record takes the rest, leaving about
-// 600 bytes for the pairs. Each pair adds the receiver, the method and a 16-byte cap,
-// which is `receiver.length + method.length + 24`; the budget counts the wrap.near
-// trio, the board stamp and the House shop's two calls too, with the 20-byte production
-// board id. Measured in `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`:
-// 5 shops of 20 bytes fit (597) and 6 do not (652); 4 of 26 fit (562) and 5 do not (622);
-// 4 of 33 fit (590) and 5 do not (657); 3 of 41 fit (547) and 4 do not (622); 3 of 49 fit
-// (571) and 4 do not (654); 3 of 57 fit (595) and 4 do not (686). 602 keeps that one byte
-// of headroom below the first refusal.
-export const MAX_PAIR_BYTES = 602;
+// The row and its call list share one 0.02 NEAR of storage (MAX_ROW_YOCTO = 2000 bytes).
+// Two things were wrong in the earlier budget, and a mainnet transaction proved it:
+//
+//   Tx 7H3H2HFiqPiGTPkF8gkkFLvbMecARWQdyG9DCdBPNnh9 (2026-11-06) opened a six-receiver
+//   row with 60 Tgas attached and then panicked ERR_ROW_TOO_BIG on set_calls with 11
+//   pairs. Gas was fine (6.80 Tgas burnt of 60); the row was full.
+//
+// The budget below used to be a flat 602 bytes measured from a ONE-receiver row. The row
+// itself is bigger when the rules name more receivers, and every one of those bytes comes
+// out of the same 2000. Measured on the committed wasm in
+// `contracts/charter_board_sandbox/tests/setup_calls_row_size.rs`, using that exact list:
+//
+//   one receiver, 10 pairs -> 1911 bytes locked; 11 pairs -> refused
+//   six receivers,  9 pairs -> 1956 bytes locked; 10 pairs -> refused
+//
+// That solves to a fixed 1380 bytes for the row plus about 22 bytes per receiver, so the
+// pair list gets 2000 - 1380 - 22 x receivers. `callsFitRow` now takes the receiver count.
+//
+// Each pair is the receiver, the method and a 16-byte cap: `receiver.length + method.length
+// + 24`. The list almost always carries the wrap.near trio, the board stamp and the House
+// shop's two calls, and those count too.
+export const ROW_FIXED_BYTES = 1380;
+export const ROW_BYTES_PER_RECEIVER = 22;
+/** The whole row's storage allowance, from contracts/charter_board MAX_ROW_YOCTO. */
+export const ROW_STORAGE_BYTES = 2000;
+/** Room for the pair list when the rules name `receivers` receivers. */
+export function pairBudgetBytes(receivers = 1) {
+  const n = Math.max(1, Number(receivers) || 1);
+  return Math.max(0, ROW_STORAGE_BYTES - ROW_FIXED_BYTES - ROW_BYTES_PER_RECEIVER * n);
+}
+/** Kept for callers that ask for the widest budget a one-receiver row allows. */
+export const MAX_PAIR_BYTES = pairBudgetBytes(1);
 
 /** Trie bytes one (receiver, method) pair adds to the row. */
 export function callPairBytes(receiver, method) {
@@ -140,13 +155,14 @@ export function callPairBytes(receiver, method) {
 }
 
 /**
- * True when this call list fits the row's 0.02 NEAR of storage.
- * The deposit does not decide this: ERR_ROW_TOO_BIG does, and the page should stop
- * before it sends. The budget was measured with the wrap.near trio and the stamp on
- * the same row, which is what `callPolicy` always puts there.
+ * True when this call list fits the row's 0.02 NEAR of storage alongside `receivers`
+ * rule receivers. The deposit does not decide this: ERR_ROW_TOO_BIG does, and the page
+ * must stop before it sends. Pass the receiver count from the same rules the row is
+ * opened with, or the two disagree and the board refuses the second action.
  */
-export function callsFitRow(calls) {
-  return (calls || []).reduce((n, c) => n + callPairBytes(c.receiver, c.method), 0) <= MAX_PAIR_BYTES;
+export function callsFitRow(calls, receivers = 1) {
+  const used = (calls || []).reduce((n, c) => n + callPairBytes(c.receiver, c.method), 0);
+  return used <= pairBudgetBytes(receivers);
 }
 
 const callKey = (receiver, method) => `${String(receiver).toLowerCase()}\0${String(method)}`;

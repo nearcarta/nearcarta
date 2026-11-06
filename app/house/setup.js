@@ -338,7 +338,7 @@ function wireRules() {
   wire(() => { const r = rules();
     if (!(r.cap > 0) || !(r.daily >= r.cap)) { msg = 'The daily budget must be at least the per-payment cap.'; return render(); }
     if (!r.receivers.length || r.receivers.some(a => !/^[a-z0-9._-]{2,64}$/.test(a))) { msg = 'Add at least one valid account id.'; return render(); }
-    if (boardLive() && !st.trial && !callsFitRow(callsFor(r, MAIN.board.contract))) { msg = 'That shop list is too long for one row. A row holds 0.02 NEAR of storage, so shorter account ids or fewer shops fit.'; return render(); }
+    if (boardLive() && !st.trial && !callsFitRow(callsFor(r, MAIN.board.contract), r.receivers.length)) { msg = `That shop list is too long for one row. A row holds 0.02 NEAR of storage, and your ${r.receivers.length} allowed shop${r.receivers.length === 1 ? '' : 's'} already use part of it. Remove a shop or use a shorter account id.`; return render(); }
     done(st.step); go(st.step + 1); });
 }
 
@@ -493,10 +493,11 @@ const AGENT_ALLOW = BigInt(GAS_TOPUP_YOCTO);
 // open_charter keeps ROW_FUND as the row's own spendable balance (enough for a full day at the default 0.01 budget);
 // the rest of the 0.02 deposit after storage (~0.004) is refunded in the same call.
 const ROW_FUND = YN / 100n, TOPUP = YN / 200n;
-// A row holds 0.02 NEAR of storage, and v2 bills the real trie bytes. `callsFitRow`
-// measures the call list (shops plus the wrap.near trio and the stamp) against that
-// budget: seven 20-byte shops fit, eight do not, and longer names fit fewer.
-// The measured numbers are in `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`.
+// A row holds 0.02 NEAR of storage, and v2 bills the real trie bytes. The row and its call
+// list share that budget, so the list's room shrinks as the rules name more receivers:
+// `callsFitRow(calls, receivers)` uses 2000 - 1380 - 22 x receivers.
+// The measured numbers are in `contracts/charter_board_sandbox/tests/setup_calls_row_size.rs`
+// and `setup_calls_deposit.rs`.
 const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: [...SESSION_METHODS], allowance: AGENT_ALLOW.toString() } } } });
 // The login plugin stores its key here. Use it as the row agent when this browser has not made one yet.
 function adoptPluginKey(id) {
@@ -883,6 +884,11 @@ async function updateRules() {
   const sec = localStorage.getItem(agentLS(me));
   if (!sec) throw new Error('No agent key in this browser.');
   const local = writtenRules(r, row);
+  // The update writes the same call list, so it hits the same row limit. Refuse before the
+  // wallet opens rather than letting set_calls panic ERR_ROW_TOO_BIG after set_rules lands.
+  if (!callsFitRow(callsFor(r, contract), r.receivers.length)) {
+    throw new Error(`That shop list is too long for one row. A row holds 0.02 NEAR of storage, and your ${r.receivers.length} allowed shop${r.receivers.length === 1 ? '' : 's'} already use part of it. Remove a shop or use a shorter account id. Update my rules would be refused on chain.`);
+  }
   const txs = ruleUpdateTransactions(row, r, sec, local.expiresAt);
   // One wallet approval for set_rules, set_calls, and set_agent when the key differs.
   let res;
