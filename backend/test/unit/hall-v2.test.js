@@ -96,3 +96,24 @@ test('the live townhall plan names the real shortfall and covers the attached mi
   assert.equal(topped.ok, true);
   assert.deepEqual(topped.transfers.map(t => t.payee), ['nearcarta.near']);
 });
+
+test('the deploy refuses when the board is not the v2 wasm the contract trusts', () => {
+  const base = {
+    shop: 'townhall.nearcarta.near', owner: 'nearcarta.near', board: 'board.nearcarta.near', dao: 'nearcarta.near',
+    balanceYocto: (3n * 10n ** 24n).toString(),
+    storageBytes: 192231, oldWasmBytes: 191351, newWasmBytes: 215902, wasmSha256: 'ab',
+    bounties: [], posts: [], fullAccessKeys: 1, codeHash: 'c', oldCodeHash: 'c', smokeWorkers: [],
+    boardCodeHash: 'BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g',
+    boardExpectedCodeHash: 'BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g',
+  };
+  const ok = hallDeployPlan(base);
+  assert.equal(ok.checks.find(c => /v2 wasm/.test(c.label)).ok, true);
+  assert.equal(ok.ok, true);
+  // A board on any other code hash leaves row_owner untrusted, so nothing may deploy.
+  const stale = hallDeployPlan({ ...base, boardCodeHash: 'Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C' });
+  assert.equal(stale.checks.find(c => /v2 wasm/.test(c.label)).ok, false);
+  assert.equal(stale.ok, false);
+  // An unreadable board is the same refusal, not a pass.
+  const missing = hallDeployPlan({ ...base, boardCodeHash: '' });
+  assert.equal(missing.ok, false);
+});

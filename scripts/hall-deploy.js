@@ -78,6 +78,15 @@ async function account() {
   return rpc('query', { request_type: 'view_account', finality: 'final', account_id: shop });
 }
 
+// The board the new contract will trust as the row_owner writer.
+async function boardAccount() {
+  try {
+    return await rpc('query', { request_type: 'view_account', finality: 'final', account_id: board });
+  } catch {
+    return null;
+  }
+}
+
 async function accessKeys() {
   return rpc('query', { request_type: 'view_access_key_list', finality: 'final', account_id: shop });
 }
@@ -154,8 +163,8 @@ async function gather() {
     console.error('The stored oath wasm does not match mainnet.json.');
     process.exit(1);
   }
-  const [acct, keys, state, bounties] = await Promise.all([
-    account(), accessKeys(), view('get_state', {}), view('get_bounties', {}),
+  const [acct, keys, state, bounties, boardAcct] = await Promise.all([
+    account(), accessKeys(), view('get_state', {}), view('get_bounties', {}), boardAccount(),
   ]);
   const full = (keys.keys || []).filter(k => k.access_key?.permission === 'FullAccess');
   const labels = Object.entries(MAIN.extras.townhall.txs).filter(([name]) => name.includes('post_bounty'));
@@ -175,6 +184,8 @@ async function gather() {
     codeHash: acct.code_hash,
     oldCodeHash: MAIN.extras.townhall.code_hash,
     smokeWorkers: smokeWorkers().filter(id => id !== shop && id !== board),
+    boardCodeHash: boardAcct?.code_hash || '',
+    boardExpectedCodeHash: MAIN.board?.code_hash || '',
   });
 }
 
@@ -225,6 +236,13 @@ const have = BigInt(after.amount);
 console.log('Balance after the refunds: ' + have.toString() + ' yoctoNEAR');
 if (have < needStake + needGas) {
   console.error('Refusing to deploy: the account holds ' + have.toString() + ' yoctoNEAR and the deploy needs ' + (needStake + needGas).toString() + '. Nothing else was signed.');
+  process.exit(1);
+}
+// The board can be redeployed between the dry-run and this send. Re-read its code
+// hash: a board that is no longer the v2 wasm would leave every Hall call unroutable.
+const boardNow = await boardAccount();
+if (!boardNow || boardNow.code_hash !== (MAIN.board?.code_hash || boardNow.code_hash)) {
+  console.error('Refusing to deploy: ' + board + ' is not the v2 wasm this contract expects. Nothing else was signed.');
   process.exit(1);
 }
 const migrated = await signer.signAndSendTransaction({

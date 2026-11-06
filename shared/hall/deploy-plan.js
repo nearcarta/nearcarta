@@ -70,6 +70,7 @@ export function refundTransfers({ shop, dao, bounties, posts }) {
 export function hallDeployPlan({
   shop, owner, board, dao, balanceYocto, storageBytes, oldWasmBytes, newWasmBytes, wasmSha256,
   bounties, posts, fullAccessKeys, codeHash, oldCodeHash, smokeWorkers,
+  boardCodeHash, boardExpectedCodeHash,
 }) {
   const transfers = refundTransfers({ shop, dao, bounties, posts });
   const refund = transfers.reduce((n, t) => n + BigInt(t.amount), 0n);
@@ -104,6 +105,10 @@ export function hallDeployPlan({
   const need = (ok, label) => checks.push({ ok: !!ok, label });
   need(fullAccessKeys >= 1, 'the shop account has a full-access key');
   need(oldCodeHash && codeHash === oldCodeHash, 'the code hash is still the oath wasm');
+  // The new contract trusts row_owner only when the predecessor is this board. A
+  // board that is not the live v2 wasm would leave every Hall call unroutable, so
+  // the deploy is refused unless the board's code hash is the one we expect.
+  need(!boardExpectedCodeHash || boardCodeHash === boardExpectedCodeHash, 'the board account is the v2 wasm this contract expects');
   need(balance > stakeNow, 'the balance covers the current storage stake');
   need(refund > 0n || (bounties || []).every(b => b.claimed_by), 'every open bounty is in the refund list');
   need(transfers.every(t => t.payee === dao || t.payee === shop), 'each refund payee is the posting signer');
