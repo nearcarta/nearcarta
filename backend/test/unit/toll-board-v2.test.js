@@ -80,6 +80,7 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   for (const t of report.transfers) {
     assert.ok(t.payee === 'nearcarta.near' || t.payee === 'toll.nearcarta.near');
   }
+  // A view carries no init args; a create does, and they must name no allow list.
   if (report.init) assert.deepEqual(report.init.allow_to, []);
   else assert.equal(report.path, 'view');
   assert.equal(report.smoke.sends, false);

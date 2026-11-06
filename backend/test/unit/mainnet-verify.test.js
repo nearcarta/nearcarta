@@ -29,3 +29,23 @@ test('a missing tx fails the check and a refusal still counts as found', async (
   const miss = await checkAll({ root: 'nearcarta.near', toll: { contract: 'toll.nearcarta.near', txs: { gone: 'C'.repeat(44) } } }, { rpc: 'https://rpc.example', fetchImpl });
   assert.equal(miss.ok, false);
 });
+
+test('a hash recorded twice is asked once, and a dropped lookup is retried', async () => {
+  // CI read the same house tx as found under one shop and missing under the next,
+  // so the read is not reliable in a burst. One hash is one question; a lookup that
+  // comes back empty is asked again before it is called missing.
+  const H = 'D'.repeat(44);
+  const dep = { root: 'nearcarta.near', retired: { house: { contract: 'house.nearcarta.near', txs: { pay: H } } }, house: { contract: 'house.nearcarta.near', txs: { pay: H } } };
+  let asked = 0;
+  const fetchImpl = async () => {
+    asked += 1;
+    // Fail the first answer, then find it: the retry is what saves the row.
+    if (asked === 1) return { json: async () => ({ error: { cause: { name: 'TIMEOUT_ERROR' } } }) };
+    return { json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
+  };
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl });
+  assert.equal(out.ok, true);
+  assert.equal(out.rows.length, 2);
+  assert.equal(out.rows.every(r => r.found), true, 'both records of the same hash resolve');
+  assert.ok(asked <= 4, `one question for the shared hash plus retries, not one per record (asked ${asked})`);
+});
