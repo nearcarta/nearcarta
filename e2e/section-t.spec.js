@@ -290,7 +290,16 @@ test('T8 the house reads the board row', async ({ page }) => {
   for (const width of [1440, 390]) {
     await at(page, width);
     await openShop(page, 'house');
-    await expect(page.getByTestId('house-cta')).toHaveText("I'm alive", { timeout: 20000 });
+    // The label must match the action. A scholar with no deed is offered the mint,
+    // not a check-in that would only be refused; with a deed it is "I'm alive".
+    const cta = page.getByTestId('house-cta');
+    await expect(cta).toHaveText(/Mint my deed|I'm alive/, { timeout: 20000 });
+    const label = (await cta.innerText()).trim();
+    const deed = await page.evaluate(async () => {
+      const r = await fetch('/api/house/deed/8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8', { cache: 'no-store' }).catch(() => null);
+      return r && r.ok ? !!(await r.json()).token : false;
+    });
+    expect(label).toBe(deed ? "I'm alive" : 'Mint my deed');
     await expect(page.locator('#t-act')).toBeHidden();
     await expect(page.locator('#t-say')).toContainText(/Max 0\.005/, { timeout: 20000 });
     await expect(page.locator('#t-say')).not.toContainText('something did not load');
