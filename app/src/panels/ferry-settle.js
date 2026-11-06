@@ -118,14 +118,25 @@ export function proposeCallPrepaidYocto(tgas = PROPOSE_CALL_TGAS, numBytes = PRO
 }
 
 /**
- * Tgas the session key attaches for one propose_call. The board forwards 30 Tgas
- * to the shop and 20 Tgas to the callback. near_deposit and ft_transfer prepay the
- * same outer gas. The inner budget sits inside the 30. This is never 300.
+ * Tgas the session key attaches for one propose_call.
+ *
+ * The promise tree is: this outer call pays for the board's own execution (which
+ * hydrates the row and writes the counters), then the board forwards `forward` Tgas
+ * to the shop and `GAS_CALLBACK` to on_called. The outer prepaid gas has to cover all
+ * three, so it was underpaying by the board's own work whenever it was set to
+ * `4 + forward + 20`: mainnet refused with "Exceeded the prepaid gas" before the
+ * board's function body could even burn its first Tgas (propose_call with a 54 Tgas
+ * attach failed on 2026-11-06, tx 6456LV35...).
+ *
+ * 30 Tgas covers the board's worst case measured on mainnet (a row write plus a call
+ * policy write burns under 10), and the forward and callback are the contract's own
+ * constants. Keep 100 Tgas of headroom under the 300 Tgas transaction limit.
  */
+export const BOARD_SELF_TGAS = 30;
 export function proposeCallTgas(method) {
   const inner = INNER_GAS_TGAS[method] || 20;
   const forward = Math.max(30, inner);
-  return 4 + forward + 20;
+  return BOARD_SELF_TGAS + forward + 20;
 }
 
 /** Allowance the key must still hold before the first of these steps is sent. */
