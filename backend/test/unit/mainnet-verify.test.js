@@ -45,7 +45,7 @@ test('a busy public node is retried, not reported as a missing tx', async () => 
   assert.equal(out.ok, true);
   assert.equal(out.rows[0].found, true);
   assert.ok(calls > 1);
-  assert.equal(paused.length, 1);
+  assert.ok(paused.length >= 1, 'a busy node waits before the next try');
   const busy = await checkTx({ hash: 'D'.repeat(44), sender: 'nearcarta.near', rpc: 'https://rpc.example', fetchImpl: async () => ({ status: 429, json: async () => ({}) }) });
   assert.equal(busy.found, false);
   assert.equal(busy.retryable, true);

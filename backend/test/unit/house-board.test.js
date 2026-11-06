@@ -200,7 +200,6 @@ test('the city, the allow list and the denylist use the one shop id', () => {
   assert.equal(HOUSE_SHOP, 'house.nearcarta.near');
   assert.equal(MAIN.extras.house.contract, HOUSE_SHOP);
   assert.equal(MAIN.extras.house.shop, HOUSE_SHOP);
-  // After the v3 recreate the shop keeps its own name, so the fallback account was never used.
   assert.equal(MAIN.extras.house.fallback.status, 'unused');
   assert.equal(HOUSE_FALLBACK, 'house3.nearcarta.near');
   assert.equal(MAIN.extras.house.next.sha256, HOUSE_WASM_SHA256);

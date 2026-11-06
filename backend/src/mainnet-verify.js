@@ -45,26 +45,39 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-export async function checkAll(dep, { rpc, fetchImpl = fetch, pause = sleep, attempts = 4 } = {}) {
+export async function checkAll(dep, { rpc, fetchImpl = fetch, pause = sleep, attempts = 6 } = {}) {
   const rpcs = (Array.isArray(rpc) ? rpc : [rpc]).filter(Boolean);
   const rows = [];
+  // The same tx is cited by more than one row (a retired account and its shop), so ask once per hash.
+  const answered = new Map();
+  const busy = new Map(rpcs.map(url => [url, 0]));
   for (const row of collectMainnetTxs(dep)) {
+    if (answered.has(row.hash)) { rows.push({ ...row, ...answered.get(row.hash) }); continue; }
     let hit = { ...row, found: false, error: 'not found' };
     for (let attempt = 0; attempt < attempts && !hit.found; attempt++) {
-      if (attempt) await pause(400 * attempt);
-      let rateLimited = false;
+      if (attempt) await pause(250 * 2 ** (attempt - 1));
+      let retryable = false;
       for (const sender of sendersFor(dep, row)) {
         for (const url of rpcs) {
+          // A node that just said 429 or 5xx waits while a quieter one answers.
+          const wait = busy.get(url) || 0;
+          if (wait) await pause(Math.min(wait, 2000));
           const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
           hit = { ...row, ...one, sender };
-          if (one.retryable) rateLimited = true;
+          if (one.retryable) {
+            retryable = true;
+            busy.set(url, Math.min((busy.get(url) || 500) * 2, 4000));
+            continue;
+          }
+          busy.set(url, 0);
           if (one.found) break;
         }
         if (hit.found) break;
       }
-      // Only a real answer ends the retries; a busy node or a timeout gets another pass.
-      if (!hit.found && !rateLimited && attempt === 0) break;
+      // Only a real answer ends the retries; a busy node gets another pass.
+      if (!hit.found && !retryable && attempt === 0) break;
     }
+    if (hit.found) answered.set(row.hash, { found: true, success: hit.success, failure: hit.failure, signer: hit.signer, sender: hit.sender });
     rows.push(hit);
   }
   return { ok: rows.length > 0 && rows.every(r => r.found), rows };

@@ -417,7 +417,7 @@
       "success": true,
       "failure": false,
       "signer": "nearcarta.near",
-      "sender": "arena.nearcarta.near"
+      "sender": "nearcarta.near"
     },
     {
       "shop": "extras.arena",
@@ -681,7 +681,7 @@
       "success": true,
       "failure": false,
       "signer": "intents.near",
-      "sender": "nearcarta.near"
+      "sender": "charter.nearcarta.near"
     },
     {
       "shop": "retired.charter.nearcarta.near",
@@ -692,7 +692,7 @@
       "success": true,
       "failure": false,
       "signer": "nearcarta.near",
-      "sender": "nearcarta.near"
+      "sender": "charter.nearcarta.near"
     },
     {
       "shop": "retired.charter.nearcarta.near",
@@ -725,7 +725,7 @@
       "success": true,
       "failure": false,
       "signer": "nearcarta.near",
-      "sender": "nearcarta.near"
+      "sender": "charter.nearcarta.near"
     },
     {
       "shop": "retired.house.nearcarta.near@v2",
