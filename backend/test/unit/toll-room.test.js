@@ -245,14 +245,14 @@ test('Send clears the line only when the agent accepted it', async () => {
   assert.equal(miss.hint, DOCK_NOT_READY);
 });
 
-test('the city toll door stays a link and does not resume an old visit', () => {
+test('the city toll door opens the toll tray inside the city and does not resume an old visit', () => {
   const html = read('app/design/D9_world/index.html');
   const main = read('app/design/D9_world/js/main.js');
   const ui = read('app/design/D8_shops/js/shopui.js');
   const scene = read('app/design/D8_shops/shops/toll.js');
   const tear = read('backend/scripts/toll-teardown.js');
-  assert.match(html, /href="\/shops\/toll\/"/);
-  assert.match(html, /window\.__enterToll/);
+  assert.match(html, /href="\/\?shop=toll"/);
+  assert.match(html, /data-enter-shop="toll"/);
   assert.match(main, /window\.__enterToll = \(\) => goIn\('toll'\)/);
   assert.match(ui, /function tollPay/);
   assert.match(ui, /mergeTollChronicle/);

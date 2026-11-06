@@ -302,10 +302,10 @@ test('the city wires the hall dock and the all-shops link still enters the room'
   assert.match(ui, /hallPay/);
   assert.match(ui, /onPaid/);
   const home = read('app/design/D9_world/index.html');
-  assert.match(home, /href="\/shops\/hall\/"/);
+  assert.match(home, /href="\/\?shop=hall" data-enter-shop="hall"/);
   const main = read('app/design/D9_world/js/main.js');
-  assert.match(main, /a\[href="\/shops\/hall\/"\]/);
-  assert.match(main, /jump\('hall'\)/);
+  assert.match(main, /export|import \{ createRouter/);
+  assert.match(main, /route\.open\(/);
   const apps = read('app/design/D8_shops/js/apps.js');
   assert.doesNotMatch(apps.slice(apps.indexOf('export async function hallChange'), apps.indexOf('export async function hallPay')), /864e5/);
   const market = read('backend/src/hall-market.js');
