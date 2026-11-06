@@ -40,13 +40,29 @@ export function queryFeed(rows, { q = '', decision = '', page = 1, pageSize = 4,
 
 const nearblocks = h => (h ? `https://nearblocks.io/txns/${h}` : '');
 
+export function categoryOf(row) {
+  const blob = `${row?.reason || ''} ${row?.label || ''} ${row?.note || ''}`.toLowerCase();
+  if (blob.includes('refund')) return 'refunded';
+  if (row?.decision === 'denied' || row?.decision === 'refused') return 'attempted';
+  if (row?.decision === 'allowed') return 'delivered';
+  return 'attempted';
+}
+
+export function csvTotals(rows) {
+  const totals = { delivered: 0, refunded: 0, attempted: 0 };
+  for (const row of rows || []) totals[categoryOf(row)] += 1;
+  return totals;
+}
+
 export function exportCsv(rows) {
   const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = ['shop,decision,reason,amount,tx,url'];
+  const lines = ['shop,decision,category,reason,amount,tx,url'];
   for (const r of rows || []) {
     const url = r.url || nearblocks(r.h);
-    lines.push([r.shop, r.decision, r.reason || '', r.amount || '', r.h || '', url].map(cell).join(','));
+    lines.push([r.shop, r.decision, categoryOf(r), r.reason || '', r.amount || '', r.h || '', url].map(cell).join(','));
   }
+  const t = csvTotals(rows);
+  lines.push(['totals', '', 'delivered', String(t.delivered), 'refunded', String(t.refunded), 'attempted', String(t.attempted)].map(cell).join(','));
   return lines.join('\n');
 }
 

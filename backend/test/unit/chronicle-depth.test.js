@@ -1,15 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { exportCsv } from '../../../app/src/chronicle-feed.js';
+import nacl from 'tweetnacl';
+import { exportCsv, csvTotals } from '../../../app/src/chronicle-feed.js';
 import { parseChronicleCommand, runChronicleCommand } from '../../../app/src/chronicle-commands.js';
-import { entryPlan, mergeChronicle, ENTRY_YOCTO } from '../../../app/src/chronicle-loop.js';
+import { accountRows, mergeChronicle } from '../../../app/src/chronicle-loop.js';
+import { anchorPlan, canonicalManifest, rebuildIndex, sha256Hex, verifyBundle, writeStatement } from '../../../app/src/chronicle-audit.js';
 import { iconFor } from '../../../app/src/chronicle-icons.js';
 import { CHRONICLE_CSS } from '../../../app/src/panels/chronicle-style.js';
 import { armChronicleDock, dispatchChronicleDock, installChronicleDock } from '../../../app/src/panels/chronicle-dock.js';
 
 const read = p => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
-const CAP = '60000000000000000000000';
 const HASH = '8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR';
 
 const dep = {
@@ -70,19 +71,16 @@ test('chronicle commands filter, export, verify and refuse an under-cap entry', 
   assert.equal(miss.ok, false);
   assert.equal(miss.clearSeal, true);
   assert.match(miss.hint, /Show refused payments/);
-  const small = entryPlan({ capYocto: '100000000000000000000', balanceYocto: CAP, receivers: ['scribe.near'], receiver: 'scribe.near' });
-  assert.equal(small.ok, false);
-  assert.match(small.reason, /Nothing was signed/);
-  const low = entryPlan({ capYocto: CAP, balanceYocto: '1', receivers: ['scribe.near'], receiver: 'scribe.near' });
-  assert.match(low.reason, /does not hold/);
-  const off = entryPlan({ capYocto: CAP, balanceYocto: CAP, receivers: ['other.near'], receiver: 'scribe.near' });
-  assert.match(off.reason, /not on your board row/);
-  const ok = entryPlan({ capYocto: CAP, balanceYocto: CAP, spentYocto: '0', dailyYocto: CAP, receivers: ['scribe.near'], receiver: 'scribe.near' });
-  assert.equal(ok.ok, true);
-  assert.equal(ok.amountYocto, ENTRY_YOCTO);
+  let signed = false;
+  const nospend = await runChronicleCommand({ text: 'add an entry', rows, state: {}, onEntry: () => { signed = true; } });
+  assert.equal(signed, false);
+  assert.match(nospend.hint, /Nothing was signed/);
   const parsed = parseChronicleCommand('Show refuses today');
   assert.equal(parsed.decision, 'denied');
   assert.equal(parsed.today, true);
+  const totals = csvTotals(dated);
+  assert.equal(totals.attempted, 1);
+  assert.match(exportCsv(dated), /attempted/);
 });
 
 function fakeDock() {
@@ -135,12 +133,15 @@ test('chronicle icons, brass and city wiring stay on the ledger path', () => {
   assert.match(CHRONICLE_CSS, /rgb\(245, 208, 138\)/);
   assert.match(CHRONICLE_CSS, /border:0/);
   const shopui = read('app/design/D8_shops/js/shopui.js');
-  assert.match(shopui, /entryPlan\(/);
-  assert.match(shopui, /onEntry: \(\) => chronicleEntry\(\)/);
+  assert.doesNotMatch(shopui, /chronicleEntry/);
+  assert.doesNotMatch(shopui, /Add today/);
   assert.match(shopui, /Nothing was signed/);
+  const view = read('app/src/panels/chronicle-view.js');
+  assert.match(view, /Timeline/);
+  assert.match(view, /Write statement/);
+  assert.doesNotMatch(view, /Add today/);
   const deep = read('app/src/panels/deep.js');
   assert.match(deep, /return mountChronicleTray\(root, hooks\)/);
-  const view = read('app/src/panels/chronicle-view.js');
   assert.match(view, /armChronicleDock/);
   assert.match(view, /data-testid="chronicle-search"/);
   assert.match(view, /data-testid="chronicle-export"/);
@@ -149,4 +150,66 @@ test('chronicle icons, brass and city wiring stay on the ledger path', () => {
   const index = read('app/design/D9_world/index.html');
   assert.match(index, /href="\/\?shop=chronicle"/);
   assert.match(index, /data-city-shop="chronicle"/);
+});
+
+test('an unrelated account is not given the recorded owner feed', () => {
+  const empty = accountRows({});
+  assert.equal(empty.rows.length, 0);
+  assert.match(empty.coverage.label, /Type an account/);
+  const mainnet = { toll: { owner: 'nearcarta.near', txs: dep.toll.txs }, ferry_intents: { status: 'SUCCESS', from: 'other.near', amount_out: '0.1 USDC', txs: { wrap_near: 'HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw' } } };
+  const other = accountRows({
+    account: 'alice.near',
+    board: { txs: [{ hash: HASH, signer: 'nearcarta.near', decision: 'allowed', shop: 'board', note: 'allowed' }] },
+    mainnet,
+    index: { skipped: 'Not a town charter, so the live index was not queried.' },
+  });
+  assert.equal(other.rows.length, 0);
+  assert.match(other.coverage.label, /No rows/);
+  assert.match(other.coverage.gaps.join(' '), /Historic rules version: missing/);
+  const owner = accountRows({ account: 'nearcarta.near', mainnet, index: { txs: [] } });
+  assert.ok(owner.rows.some(r => r.shop === 'toll' && r.h.startsWith('4LKGpA5v')));
+  assert.equal(owner.rows.some(r => r.shop === 'ferry'), false);
+  assert.match(owner.coverage.label, /Recorded proofs, not a live index/);
+  const ferry = accountRows({ account: 'other.near', mainnet: { ferry_intents: { ...mainnet.ferry_intents, status: 'SUCCESS' } }, index: { txs: [] } });
+  assert.equal(ferry.rows.filter(r => r.shop === 'ferry').length, 1);
+  const pending = accountRows({ account: 'other.near', mainnet: { ferry_intents: { ...mainnet.ferry_intents, status: 'PENDING' } }, index: { txs: [] } });
+  assert.equal(pending.rows.some(r => r.shop === 'ferry'), false);
+});
+
+test('a statement digest rejects tampering and a private note stays salted', async () => {
+  assert.equal(sha256Hex('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  const rows = [{ shop: 'toll', decision: 'allowed', h: HASH, amount: '0.001 NEAR' }, { shop: 'toll', decision: 'denied', reason: 'refunded', h: 'B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR', amount: '0' }];
+  const totals = csvTotals(rows);
+  assert.equal(totals.delivered, 1);
+  assert.equal(totals.refunded, 1);
+  const written = writeStatement({ account: 'alice.near', period: { from: '', to: '' }, rows, totals });
+  assert.match(written.text, /Historic rules: missing/);
+  assert.match(written.status, /Nothing was signed/);
+  const manifest = canonicalManifest({ account: 'alice.near', rows, statement: written.text, rules: null });
+  const intact = await verifyBundle({ manifestText: manifest.text, statement: written.text, digest: manifest.digest });
+  assert.equal(intact.ok, true);
+  assert.match(intact.why, /unverified|missing/i);
+  const tampered = await verifyBundle({ manifestText: manifest.text, statement: written.text + ' extra', digest: manifest.digest });
+  assert.equal(tampered.ok, false);
+  const flipped = manifest.text.replace(HASH, HASH.replace('8', '9'));
+  const badDigest = await verifyBundle({ manifestText: flipped, statement: written.text, digest: manifest.digest });
+  assert.equal(badDigest.ok, false);
+  const kp = nacl.sign.keyPair();
+  const sig = Buffer.from(nacl.sign.detached(new TextEncoder().encode(written.text), kp.secretKey)).toString('hex');
+  const pub = Buffer.from(kp.publicKey).toString('hex');
+  const signed = await verifyBundle({ manifestText: manifest.text, statement: written.text, digest: manifest.digest, signature: sig, publicKey: pub });
+  assert.equal(signed.ok, true);
+  assert.match(signed.why, /TEE binding is unverified/);
+  const badSig = await verifyBundle({ manifestText: manifest.text, statement: written.text + 'x', digest: manifest.digest, signature: sig, publicKey: pub });
+  assert.equal(badSig.ok, false);
+  const blocked = anchorPlan({ manifest, consent: false, privateNote: 'secret note', salt: 'salt' });
+  assert.equal(blocked.event, null);
+  assert.match(blocked.reason, /raw hash was not published/i);
+  const held = anchorPlan({ manifest, consent: true, privateNote: 'secret note', salt: 'salt' });
+  assert.equal(held.signed, false);
+  assert.match(held.reason, /Live anchor blocked/);
+  assert.notEqual(held.commitment, sha256Hex('secret note'));
+  const index = rebuildIndex([held.event]);
+  assert.equal(index[manifest.digest].digest, manifest.digest);
+  assert.equal(index[manifest.digest].commitment, held.commitment);
 });

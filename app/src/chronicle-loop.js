@@ -3,9 +3,6 @@
 
 const link = h => `https://nearblocks.io/txns/${h}`;
 
-export const ENTRY_NEAR = '0.001';
-export const ENTRY_YOCTO = '1000000000000000000000';
-
 const SHOP_ID = {
   'toll bridge': 'toll', toll: 'toll',
   ferry: 'ferry',
@@ -101,7 +98,7 @@ export function rowFromLedger(r) {
   const decision = r.kind === 'refusal' ? 'denied' : 'allowed';
   return {
     shop: shopId(r.shop), decision, reason: r.note || '', label: r.note || '',
-    h: r.tx, signer: '', amount: r.amount ? `${r.amount} ${r.asset || ''}`.trim() : '',
+    h: r.tx, signer: r.signer || '', amount: r.amount ? `${r.amount} ${r.asset || ''}`.trim() : '',
     url: r.url || link(r.tx), at: r.at || '',
   };
 }
@@ -141,32 +138,53 @@ export async function loadChronicleSources(fetchFn, apiBase = '') {
   return { board, ledger, mainnet, any: !!(board || ledger || mainnet) };
 }
 
-export function entryPlan({
-  capYocto, balanceYocto = null, receivers = null, receiver = '',
-  amountYocto = ENTRY_YOCTO, spentYocto = null, dailyYocto = null,
-} = {}) {
-  let cap, amt;
-  try {
-    cap = BigInt(capYocto);
-    amt = BigInt(amountYocto);
-  } catch {
-    return { ok: false, reason: 'The board row has no per-payment cap yet. Nothing was signed.' };
+function take(out, seen, row, source) {
+  if (!row?.h || seen.has(row.h)) return;
+  seen.add(row.h);
+  out.push({ ...row, source, chain: row.chain || (row.shop === 'ferry' ? 'NEAR Intents' : 'NEAR') });
+}
+
+// Rows for one typed account. Recorded proofs are included only when the deployment names that account.
+// An empty account and an unrelated account get no borrowed history.
+export function accountRows({ account = '', board = null, ledger = null, mainnet = null, index = null } = {}) {
+  const id = String(account || '').trim();
+  const gaps = [];
+  if (!id) {
+    return { rows: [], coverage: { partial: true, live: false, gaps: ['Type an account. No history is assumed.'], label: 'Type an account. No history is assumed.' } };
   }
-  if (amt <= 0n) return { ok: false, reason: 'The entry amount is empty. Nothing was signed.' };
-  if (amt > cap) return { ok: false, reason: 'This 0.001 NEAR entry is larger than the per-payment cap on your board row. Nothing was signed.' };
-  if (balanceYocto != null && balanceYocto !== '') {
-    try {
-      if (BigInt(balanceYocto) < amt) return { ok: false, reason: 'The board row does not hold 0.001 NEAR for this entry. Nothing was signed.' };
-    } catch { /* an unreadable balance is not a pass */ }
+  const out = [];
+  const seen = new Set();
+  if (index?.skipped) gaps.push(index.skipped);
+  else if (index?.error) gaps.push(String(index.error));
+  else if (index?.busy) gaps.push('Live index is busy.');
+  else if (index && !(index.txs || []).length) gaps.push('Live index returned no rows.');
+  else if (!index) gaps.push('Live index was not read.');
+  for (const t of index?.txs || []) take(out, seen, rowFromBoard(t), 'live index');
+  for (const t of board?.txs || []) {
+    if (t.signer !== id) continue;
+    take(out, seen, rowFromBoard(t), 'recorded proof');
   }
-  if (dailyYocto != null && dailyYocto !== '' && spentYocto != null && spentYocto !== '') {
-    try {
-      if (BigInt(spentYocto) + amt > BigInt(dailyYocto)) return { ok: false, reason: 'This entry would pass the daily budget on your board row. Nothing was signed.' };
-    } catch { /* ignore an unreadable budget */ }
-  }
-  const list = Array.isArray(receivers) ? receivers : null;
-  if (list && list.length && receiver && !list.includes(receiver)) {
-    return { ok: false, reason: 'That payee is not on your board row. Nothing was signed.' };
-  }
-  return { ok: true, amountYocto: amt.toString(), near: ENTRY_NEAR };
+  const tollOwner = mainnet?.toll?.owner || '';
+  if (tollOwner && tollOwner === id) {
+    for (const row of rowsFromMainnet({ toll: mainnet.toll })) take(out, seen, { ...row, signer: id }, 'recorded proof');
+  } else gaps.push('Toll proofs are not tied to this account.');
+  const ferry = mainnet?.ferry_intents;
+  if (ferry && String(ferry.from || '') === id && String(ferry.status || '').toUpperCase() === 'SUCCESS') {
+    for (const row of rowsFromMainnet({ ferry_intents: ferry })) take(out, seen, row, 'recorded proof');
+  } else gaps.push('No ferry receipt is tied to this account.');
+  const house = mainnet?.extras?.house || mainnet?.house;
+  const houseOwner = house?.owner || '';
+  if (houseOwner && houseOwner === id) {
+    for (const row of rowsFromMainnet({ extras: { house } })) take(out, seen, { ...row, signer: id }, 'recorded proof');
+  } else gaps.push('House proofs are not tied to this account.');
+  const unsigned = (ledger?.rows || []).filter(r => r.signer !== id).length;
+  if (unsigned) gaps.push('Public ledger rows without this signer were left out.');
+  for (const r of ledger?.rows || []) if (r.signer === id) take(out, seen, rowFromLedger(r), 'ledger');
+  if (!mainnet) gaps.push('Deployment record did not load.');
+  gaps.push('Historic rules version: missing.');
+  const live = out.some(r => r.source === 'live index');
+  const label = out.length
+    ? `${out.length} for this account. ${live ? 'Live index included.' : 'Recorded proofs, not a live index.'}`
+    : `No rows for this account. ${gaps[0] || 'Coverage is partial.'}`;
+  return { rows: out, coverage: { partial: true, live, gaps, label } };
 }

@@ -8,7 +8,6 @@ import { watch as watchTokens } from './tokens.js';
 import { maybeOnboard } from './onboard.js';
 import { hallRowHref, readSession, readSessionAccount, sessionPill, signedCopy, tollRefusal } from './session.js';
 import { explainCheck } from '/guard-score.js';
-import { entryPlan } from '/chronicle-loop.js';
 import { checkDerived, TOLL_KEY, TOLL_ADDRESS } from '/toll-derive.js';
 import { DEED, controlAfterMove, metadataView, txUrl } from '/deed-control.js';
 import { teeResult, PROOF_HREF } from '/tee-view.js';
@@ -25,7 +24,7 @@ const { esc, fmt, short } = A;
 
 let cur = null, sh = null, phase = 'idle', last = null, runScene = null, extra = {}, ferryWatch = null;
 const say = t => { const e = $('#t-say'); e.innerHTML = `<span class="lamp" aria-hidden="true"></span><span>${t}</span>`; e.classList.remove('bump'); void e.offsetWidth; e.classList.add('bump'); };
-const btn = (label, kind = 'primary', dis = false) => { const b = $('#t-act'); b.hidden = !label; b.className = 'act ' + kind; b.disabled = dis; b.textContent = label || ''; b.classList.toggle('busy', phase === 'busy'); queueMicrotask(syncGo); };
+const btn = (label, kind = 'primary', dis = false) => { if (cur === 'chronicle') label = ''; const b = $('#t-act'); b.hidden = !label; b.className = 'act ' + kind; b.disabled = dis; b.textContent = label || ''; b.classList.toggle('busy', phase === 'busy'); queueMicrotask(syncGo); };
 // Ferry quote, cargo, Ask charter and Get another quote live in the card. #t-act is a second copy of the same label.
 function hideFerryPrimary() {
   const b = $('#t-act');
@@ -297,56 +296,8 @@ async function loadFerryCargo(wantCharter) {
   }
 }
 const num = (n, u) => `<b class="num">${esc(n)}</b><span class="unit">${esc(u)}</span>`;
-async function chronicleEntry() {
-  sh?.hideRefuse?.();
-  if (A.stage() !== 'ready') {
-    const reason = 'Open /setup and finish your board row. Nothing was signed.';
-    extra.seal = reason;
-    sh?.showRefuse?.(reason);
-    return { ok: false, keep: true, kind: 'no', say: reason, hint: reason, seal: reason };
-  }
-  const row = A.S.boardRow;
-  const clause = A.S.clauses?.pay;
-  const receivers = row?.receivers || clause?.receivers || [];
-  const receiver = receivers.find(Boolean) || '';
-  if (!receiver) {
-    const reason = 'Add a payee on your board row first. Nothing was signed.';
-    extra.seal = reason;
-    sh?.showRefuse?.(reason);
-    return { ok: false, keep: true, kind: 'no', say: reason, hint: reason, seal: reason };
-  }
-  const plan = entryPlan({
-    capYocto: row?.per_action_cap || clause?.per_action_cap,
-    balanceYocto: row?.balance,
-    spentYocto: row?.spent_today,
-    dailyYocto: row?.daily_budget || clause?.daily_budget,
-    receivers,
-    receiver,
-  });
-  if (!plan.ok) {
-    extra.seal = plan.reason;
-    sh?.showRefuse?.(plan.reason);
-    return { ok: false, keep: true, kind: 'no', say: plan.reason, hint: plan.reason, seal: plan.reason };
-  }
-  const o = await A.ask({ shop: 'chronicle', receiver, amountY: plan.amountYocto, memo: 'chronicle:entry' });
-  extra.feed = extra.feed || { local: [] };
-  const decision = o.decision === 'allowed' ? 'allowed' : 'denied';
-  extra.feed.local.unshift({
-    shop: 'chronicle', decision, reason: o.reason || '', label: A.why(o.reason),
-    h: o.tx || '', signer: A.S.me || '', amount: '0.001 NEAR', at: new Date().toISOString(),
-  });
-  if (o.tx) dispatchEvent(new CustomEvent('nearcarta:chronicle', { detail: { hash: o.tx, shop: 'chronicle', decision } }));
-  if (o.decision === 'allowed' && o.tx) {
-    sh?.hideRefuse?.();
-    if (sh?.act && runScene) runScene(sh.act({ success: true, tx: o.tx }));
-    extra.seal = '';
-    const said = 'Entry signed: the charter paid 0.001 NEAR.';
-    return { ok: true, o, keep: true, kind: 'ok', hero: num(extra.feed.local.length, 'asks'), rc: A.txLine(o.tx), say: said, hint: said, clearSeal: true, successTx: o.tx };
-  }
-  const said = `The charter refused this entry. ${A.why(o.reason) || 'Nothing was paid.'}`;
-  extra.seal = said;
-  sh?.showRefuse?.(said);
-  return { ok: false, o, keep: true, kind: 'no', rc: o.tx ? A.txLine(o.tx) : '', say: said, hint: said, seal: said };
+function chronicleRead() {
+  return { ok: true, keep: true, kind: 'ok', say: 'Use Write statement in the tray. Nothing was signed.' };
 }
 const capFmt = 0;
 // Plain names for accounts a visitor sees; the raw id stays in the tooltip and under "advanced".
@@ -355,7 +306,7 @@ export const nice = a => { if (!a) return ''; if (a === A.S.me) return 'You'; co
   if (/gate/.test(a)) return 'Toll gate'; if (/treasury/.test(a)) return 'Town treasury'; return a.split('.')[0]; };
 // Progress for the long actions: plain steps with a time hint, ticking while the button is busy.
 const STEPS = {
-  chronicle: ['about 20 s', 'Writing today\u2019s entry', 'Asking your charter', 'Signing on NEAR', 'Reading your feed'],
+  chronicle: ['about 5 s', 'Reading this account', 'Writing a local statement'],
   bank: ['about 25 s', 'Checking the private AI is genuine', 'Asking your charter', 'Sealing the note', 'Recording it on NEAR'],
   ferry: ['about 15 s', 'Fetching a signed live quote', 'Asking your charter', 'Signing on NEAR'],
   guard: ['about 15 s', 'Checking the payee', 'Asking your charter', 'Recording the answer'],
@@ -671,17 +622,15 @@ const APPS = {
   },
   chronicle: {
     guest: true,
-    label: 'Chronicle · public ledger', idle: 'Every allow and refusal, with the transaction. Today’s entry is 0.001 NEAR when your row allows it.',
-    btn: 'Add today’s entry · 0.001 NEAR',
+    label: 'Chronicle · account audit', idle: 'Type an account. Nothing was signed from this tray.',
+    btn: '',
     form: () => '<div data-deep="chronicle"></div>',
     bind: () => mountShop('chronicle', document.getElementById('t-form'), {
       state: extra,
       repaint: () => paint(),
-      rows: () => extra.feed?.local || [],
-      onEntry: () => chronicleEntry(),
       onSeal: (text) => { if (text) sh?.showRefuse?.(text); else sh?.hideRefuse?.(); },
     }),
-    run: () => chronicleEntry(),
+    run: () => chronicleRead(),
   },
 };
 
@@ -897,7 +846,7 @@ async function primary(auto = false) {
     document.body.dataset.app = 'ok';
   }
 }
-const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another entry', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Send another note', toll: 'Pass the gate again' };
+const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another statement', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Send another note', toll: 'Pass the gate again' };
 function fail(e) { stopProgress(); phase = 'idle'; if (cur === 'ferry') { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); } say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry') hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
 
 // ---------- rules sheet ----------
