@@ -33,9 +33,12 @@ test('the restore banner is only for a page that signs', () => {
   assert.match(boot, /if \(!pageSigns\(id\)\) return/);
 });
 
-test('guardhouse starts empty and offers the example as a button', () => {
+test('guardhouse starts empty and offers a derived example as a button', () => {
   const tray = read('app/src/panels/guard-tray.js');
-  assert.match(tray, /data-testid="guard-example">Example: shop-moved-pay-here\.near/);
+  // The example comes from the visitor (a look-alike of their own account), so no fixed
+  // payee is baked into the tray.
+  assert.match(tray, /data-testid="guard-example">\$\{esc\(state\.example \|\| 'Example: a look-alike of your own account'\)\}/);
+  assert.doesNotMatch(tray, /shop-moved-pay-here/);
   assert.match(tray, /data-testid="guard-account" value="\$\{esc\(state\.acct \|\| ''\)\}"/);
   assert.doesNotMatch(tray, /guard-account" value="\$\{esc\(state\.acct \|\| 'shop-moved-pay-here\.near'\)\}"/);
   assert.match(read('app/src/panels/deep.js'), /mountGuardTray/);

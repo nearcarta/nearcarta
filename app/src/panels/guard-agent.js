@@ -5,7 +5,6 @@
 // https://docs.near.ai/cloud/verification
 
 import { explainCheck } from '../guard-score.js';
-import { boardStep } from './guard-board-pay.js';
 import {
   LIVE_ENFORCEMENT, bindVerdict, contextMatches, createLedger, nearToYocto,
 } from './guard-pay.js';
@@ -122,25 +121,6 @@ function bookOf(state) {
   return state.book;
 }
 
-function boardOf(state, ctx, kind) {
-  const yocto = nearToYocto(state.amount);
-  const nonce = state.nonce ?? ctx.nonce;
-  return boardStep(kind, {
-    board: state.board || ctx.board || '',
-    owner: state.owner || ctx.owner || state.rowId || '',
-    guard: state.guard || ctx.guard || '',
-    nonce,
-    // A hold cannot be more than a day out (contracts/charter_board v2).
-    expiry: state.expiry || ctx.expiry || String(BigInt(Date.now()) * 1000000n + 300000000000n),
-    payee: state.acct || '',
-    chain: state.chain || 'near',
-    asset: state.asset || 'NEAR',
-    amount: yocto == null ? '' : yocto.toString(),
-    invoice: state.invoice || '',
-    actionId: state.actionId || nonce,
-  });
-}
-
 async function readCheck(check, account) {
   const raw = await check(account);
   return { raw, explained: explainCheck(raw), lamps: lampsFor(raw) };
@@ -155,7 +135,7 @@ function applyRead(state, read) {
 
 export async function runGuardAction(plan, ctx = {}) {
   const state = ctx.state || {};
-  const { check, freeze, capYocto = null } = ctx;
+  const { check, freeze, capYocto = null, sendPay, sendConfirm, sendCancel } = ctx;
   if (!plan?.ok && !plan?.action) return { ok: false, propose: false, cinema: false, seal: false, live: LIVE_ENFORCEMENT, hint: plan?.hint || GUARD_MISS };
 
   if (plan.action === 'note') {
@@ -209,35 +189,67 @@ export async function runGuardAction(plan, ctx = {}) {
       catch (e) { return { ok: false, propose: false, cinema: false, seal: false, hint: e?.message || 'The check did not answer.' }; }
       applyRead(state, read);
     }
+    // A payment needs a verdict bound to exactly these fields. Pressing Pay before Check (or
+    // after editing a field) is not a payment: say so instead of running the offline ledger.
+    if (!state.bound?.bound) {
+      return { ok: false, signed: false, propose: false, cinema: false, seal: false, action: 'pay',
+        hint: 'Check this payee first. Pay signs only a payment the check has seen. Nothing was signed.' };
+    }
     const result = bookOf(state).pay(state.bound);
     state.pending = result.needsHuman ? 'human' : null;
     state.holdId = result.hold?.id || state.holdId || null;
-    const kind = result.verdict === 'block' || result.status === 'refunded' ? 'block' : result.status === 'held' ? 'hold' : result.status === 'prepared' ? 'allow' : null;
-    const call = kind ? boardOf(state, ctx, kind) : null;
-    if (call?.ready) state.actionId = String(state.nonce ?? ctx.nonce ?? '');
-    if (result.status === 'held') state.notice = 'Held for confirm_hold. The agent cannot confirm. Nothing was signed.';
-    if (result.status === 'prepared') state.notice = 'Allow prepares propose_call_as. Nothing was signed.';
-    if (result.verdict === 'block') state.notice = 'Blocked. No propose_call_as. Nothing was signed.';
+    const verdict = state.bound?.verdict === 'block' || result.status === 'refunded' ? 'block'
+      : result.status === 'prepared' ? 'allow' : 'warn';
+    // The live executor is the only thing that signs. It is shared with the gold CTA, so the
+    // agent cannot take a different path to the chain. A block never reaches it.
+    let live = null;
+    if (verdict === 'block') {
+      live = { ok: false, signed: false, tx: null, why: 'Blocked. No call was built and nothing was signed.' };
+    } else if (typeof sendPay === 'function') {
+      try {
+        live = await sendPay({ payee: state.acct, amountYocto: yocto == null ? '' : yocto.toString(), invoice: state.invoice || '', verdict, chain: state.chain || 'near', asset: state.asset || 'NEAR' });
+      } catch (e) { live = { ok: false, signed: false, tx: null, why: e?.message || 'The guard did not answer.' }; }
+    }
+    if (live?.tx) {
+      state.notice = live.hold ? 'Held on the board. Only you can confirm it.' : `Paid through the guard. tx ${String(live.tx).slice(0, 10)}…`;
+    } else if (live && !live.ok) {
+      state.notice = live.why || live.reason || 'The guard refused. Nothing was forwarded.';
+    } else if (result.status === 'held') state.notice = 'Held for confirm_hold. The agent cannot confirm.';
+    else if (result.status === 'prepared') state.notice = 'Allow matched. Pay through guard signs it.';
+    else if (verdict === 'block') state.notice = 'Blocked. No call was built.';
     return {
       ...result, action: 'pay', propose: false, lamps: lampsFor(state.chk), seal: result.status === 'refunded' || result.status === 'held',
-      verdict: state.bound?.verdict, call,
+      verdict: state.bound?.verdict, live: live || undefined,
     };
   }
 
   if (plan.action === 'confirm') {
     const id = state.holdId;
-    const hold = id && state.book?.book.holds.get(id);
-    const result = bookOf(state).confirm(id, { actor: plan.actor || 'agent', intentDigest: hold?.digest });
-    if (result.ok) state.pending = null;
-    const call = result.ok ? boardOf(state, ctx, 'confirm') : null;
-    return { ...result, action: 'confirm', propose: false, seal: false, lamps: lampsFor(state.chk), call };
+    // A WARN is released only by the visitor's own button. The agent has no confirm key, and
+    // `sendConfirm` refuses without one, so an agent "confirm" cannot release a hold even if a
+    // model is talked into saying it.
+    if ((plan.actor || 'agent') !== 'human') {
+      return { ok: false, signed: false, propose: false, cinema: false, seal: false, action: 'confirm',
+        hint: 'The agent cannot confirm a warning. Press Confirm this payment yourself.' };
+    }
+    if (typeof sendConfirm !== 'function') return { ok: false, signed: false, propose: false, cinema: false, seal: false, hint: 'The confirm key is not loaded. Nothing was signed.' };
+    let live;
+    try { live = await sendConfirm({ holdId: id }); }
+    catch (e) { live = { ok: false, signed: false, tx: null, why: e?.message || 'The confirm did not answer.' }; }
+    if (live?.ok) state.pending = null;
+    return { ...live, action: 'confirm', propose: false, cinema: !!live?.tx, seal: false, lamps: lampsFor(state.chk),
+      hint: live?.tx ? 'You released the hold. The board called the guard.' : (live?.why || 'The confirm was refused. Nothing moved.') };
   }
 
   if (plan.action === 'cancel') {
-    const call = boardOf(state, ctx, 'cancel');
-    const result = bookOf(state).cancel(state.holdId);
-    if (result.ok) { state.pending = null; state.holdId = null; }
-    return { ...result, action: 'cancel', propose: false, seal: false, call: result.ok ? call : null };
+    const id = state.holdId;
+    if (typeof sendCancel !== 'function') return { ok: false, signed: false, propose: false, cinema: false, seal: false, hint: 'Cancel needs the row owner. Nothing was signed.' };
+    let live;
+    try { live = await sendCancel({ holdId: id }); }
+    catch (e) { live = { ok: false, signed: false, tx: null, why: e?.message || 'Cancel did not answer.' }; }
+    if (live?.ok) { state.pending = null; state.holdId = null; }
+    return { ...live, action: 'cancel', propose: false, seal: false,
+      hint: live?.tx ? 'Cancelled. The NEAR returned to your row.' : (live?.why || 'Cancel was refused. Nothing moved.') };
   }
 
   if (plan.action === 'freeze') {

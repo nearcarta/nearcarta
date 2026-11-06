@@ -140,7 +140,7 @@ export function createLedger() {
       const forward = { payee: bound.payee, chain: bound.chain, asset: bound.asset, amount: bound.amount, row: bound.row };
       return {
         ok: true, signed: false, status: 'prepared', live: LIVE_ENFORCEMENT, forward, cinema: false, tx: null, verdict: 'allow',
-        hint: 'Allow matches this payee and amount. The guard contract is not deployed yet, so nothing was signed.',
+        hint: 'Allow matches this payee and amount. Pay through guard sends it.',
       };
     },
     confirm(id, { actor, intentDigest } = {}, now = Date.now()) {
@@ -154,7 +154,7 @@ export function createLedger() {
       return {
         ok: true, signed: false, status: 'prepared', live: LIVE_ENFORCEMENT, cinema: false, tx: null,
         forward: { payee: hold.payee, chain: hold.chain, asset: hold.asset, amount: hold.amount, row: hold.row },
-        hint: 'You confirmed the warning. The guard contract is not deployed yet, so nothing was signed.',
+        hint: 'You confirmed the warning. The board can now call the guard.',
       };
     },
     cancel(id, now = Date.now()) {

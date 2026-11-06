@@ -15,8 +15,14 @@ test('a browser module has no bare package import or unpublished shared path', (
   assert.doesNotMatch(boardCallAs, /from '@noble\//);
   const guardAgent = read('app/src/panels/guard-agent.js');
   assert.doesNotMatch(guardAgent, /from '\.\.\/\.\.\/\.\.\/shared\//);
-  assert.match(guardAgent, /from '\.\/guard-board-pay\.js'/);
-  assert.ok(read('app/src/panels/guard-board-pay.js').length > 0);
+  // The live executor is served next to the panel that imports it, and the tray and the
+  // agent both reach the chain through it (one validated plan, one signature, one send).
+  assert.match(guardAgent, /sendPay/);
+  assert.ok(read('app/src/panels/guard-live.js').length > 0);
+  const live = read('app/src/panels/guard-live.js');
+  assert.doesNotMatch(live, /from '\.\.\/\.\.\/\.\.\/shared\//, 'the served executor must not import outside app/');
+  assert.match(live, /propose_call_as/);
+  assert.match(live, /confirm_hold/);
 });
 
 test('the guard board call is served next to the panel that imports it', () => {

@@ -7,10 +7,20 @@ import { armGuardDock, dispatchGuardDock, ensureGuardDock, installGuardDock } fr
 
 function statusBlock(state, esc) {
   const score = state.score;
+  // The attested line says what was actually checked. `attested:true` only when a TDX report
+  // bound to THIS payment passed every check (backend/src/guard-attested.js); a failure names it.
+  const att = state.attested;
+  const attLine = att
+    ? (att.attested === true
+      ? 'TEE: a TDX report bound to this payment passed every check.'
+      : att.enabled === false
+        ? `TEE: off on the server (${att.reason || 'no key'}). The row cap still decides on chain.`
+        : `TEE: not attested (${String(att.failure || 'a check failed').slice(0, 120)}). The row cap still decides on chain.`)
+    : '';
   if (!score) {
     const bits = [];
     if (state.denyCount != null) bits.push(`${state.denyCount} on the live deny list.`);
-    bits.push(state.attested?.enabled ? 'Attested check is on.' : 'Server-side: age, code hash, lookalike, deny list. No TEE signature. Attested check is off. The charter cap is on chain.');
+    bits.push(attLine || 'Server-side: age, code hash, lookalike, deny list. The row cap is on chain.');
     if (state.notice) bits.push(state.notice);
     return `<p class="guard-status" data-testid="guard-attested">${esc(bits.join(' '))}</p>`;
   }
@@ -22,8 +32,12 @@ function statusBlock(state, esc) {
   if (titles.includes('Recorded refusals')) bits.push('Recorded refusals');
   const link = (score.lines || []).find(l => l.tx);
   const href = link?.tx ? ` <a class="guard-tx" href="https://nearblocks.io/txns/${esc(link.tx)}">Recorded refusal</a>` : '';
+  // A real send shows its receipt here, as one labelled link, never a bare hash.
+  const sent = state.liveTx
+    ? ` <a class="guard-tx" data-testid="guard-live-tx" href="https://nearblocks.io/txns/${esc(state.liveTx)}" target="_blank" rel="noopener">${esc(state.liveLabel || 'payment')} receipt ↗</a>`
+    : '';
   const extra = state.notice ? ` ${esc(state.notice)}` : '';
-  return `<p class="guard-status" data-testid="guard-verdict">${esc(score.summary || '')}</p><p class="guard-status" data-testid="guard-score">${bits.join(' · ')}${reasons ? ' ' + reasons : ''}${href}${extra}</p>`;
+  return `<p class="guard-status" data-testid="guard-verdict">${esc(score.summary || '')}</p><p class="guard-status" data-testid="guard-score">${bits.join(' · ')}${reasons ? ' ' + reasons : ''}${href}${sent}${extra}</p>`;
 }
 
 function gold(id, testid, label) {
@@ -47,7 +61,7 @@ export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? ''
   const check = `<div class="guard-pane" data-pane="check" data-testid="guard-pane-check" ${tab === 'check' ? '' : 'hidden'}>
       ${tab === 'check' ? flow : ''}
       ${tab === 'check' ? payee : ''}
-      <p class="example-row"><button type="button" class="example" data-testid="guard-example">Example: shop-moved-pay-here.near</button></p>
+      <p class="example-row"><button type="button" class="example" data-testid="guard-example">${esc(state.example || 'Example: a look-alike of your own account')}</button></p>
       ${tab === 'check' ? gold('g-check', 'guard-check', 'Check payee') : ''}
       ${tab === 'check' ? status : ''}
     </div>`;
@@ -112,6 +126,11 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     if (typeof hooks.board === 'function') state.board = hooks.board() || '';
     if (typeof hooks.nonce === 'function') state.nonce = hooks.nonce();
     if (typeof hooks.guard === 'function') state.guard = hooks.guard() || '';
+    if (typeof hooks.injected === 'function') {
+      const t = hooks.injected() || '';
+      // Show the derived name, not a fixed one. With no session the button explains itself.
+      state.example = t ? `Example: ${t}` : 'Example: a look-alike of your own account';
+    }
   };
 
   const paint = () => {
@@ -137,6 +156,15 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
   function scene(result) {
     if (result?.lamps) state.lamps = result.lamps;
     state.notice = result?.hint && result?.action !== 'check' ? result.hint : state.notice;
+    // Only a real tx gets a link. A prepared or refused step never shows a receipt.
+    const tx = result?.tx || result?.live?.tx || null;
+    if (tx) {
+      state.liveTx = tx;
+      state.liveLabel = result?.action === 'confirm' ? 'release' : result?.action === 'cancel' ? 'refund'
+        : result?.action === 'expire' ? 'expire' : (result?.live?.hold ? 'held' : 'payment');
+    } else if (result?.action === 'pay' || result?.action === 'cancel') {
+      state.liveTx = null;
+    }
     hooks.onScene?.(result);
   }
 
@@ -153,6 +181,10 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     check: loadCheck,
     freeze: hooks.freeze,
     capYocto: hooks.capYocto?.() ?? null,
+    // The one live executor, shared with the gold CTA below.
+    sendPay: hooks.sendPay,
+    sendConfirm: hooks.sendConfirm,
+    sendCancel: hooks.sendCancel,
   });
 
   async function runAgent(text) {
@@ -169,6 +201,13 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
   async function runPlan(plan) {
     scene({ clear: true, seal: false });
     readForm();
+    const fields = {
+      payee: (state.acct || '').trim(), chain: state.chain || 'near', asset: state.asset || 'NEAR',
+      amount: state.amount || '', invoice: state.invoice || '', row: state.owner || '',
+    };
+    // A new check invalidates the old attested verdict: it was bound to the old context.
+    if (plan.action === 'check' && fields.payee && fields.amount) loadAttested(fields);
+    else if (plan.action === 'check') { state.attested = null; }
     const result = await runGuardAction(plan, ctx());
     state.notice = result?.hint || '';
     scene(result);
@@ -201,9 +240,14 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     });
     const example = q$(root, '[data-testid=guard-example]');
     if (example) example.onclick = () => {
-      state.acct = 'shop-moved-pay-here.near';
+      // The example is derived from this visitor, never a fixed payee. No session means no
+      // example name: the tray says so instead of inventing a destination.
+      const target = typeof hooks.injected === 'function' ? (hooks.injected() || '') : '';
+      if (!target) { state.notice = 'Finish /setup. The example is a look-alike of your own account.'; localPaint(); return; }
+      state.acct = target;
       const input = q$(root, '#g-acct');
       if (input) input.value = state.acct;
+      localPaint();
     };
     const checkBtn = q$(root, '#g-check');
     if (checkBtn) checkBtn.onclick = async () => {
@@ -239,11 +283,27 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
       const deny = await fetch(api() + '/api/guardhouse/denylist').then(r => r.json());
       state.denyCount = Array.isArray(deny?.entries) ? deny.entries.length : null;
     } catch { state.denyCount = null; }
-    try {
-      const att = await fetch(api() + '/api/guardhouse/attested').then(r => r.json());
-      state.attested = att && typeof att === 'object' ? att : { enabled: false };
-    } catch { state.attested = { enabled: false, error: true }; }
     if (state.holding) return;
+    if (root?.isConnected !== false) paint();
+  }
+
+  /**
+   * Ask for the TEE verdict on THIS payment. The context is the typed payee, chain, asset,
+   * amount, invoice and row, so the report is bound to this payment; an edited field is a
+   * different nonce and cannot reuse it. Called after a check, and after a field edit it is
+   * stale (cleared) rather than shown against the new values.
+   */
+  async function loadAttested(fields) {
+    state.attested = { pending: true, enabled: true };
+    if (root?.isConnected !== false) paint();
+    try {
+      const qs = new URLSearchParams({
+        payee: fields.payee || '', chain: fields.chain || 'near', asset: fields.asset || 'NEAR',
+        amount: fields.amount || '', invoice: fields.invoice || '', row: fields.row || '',
+      });
+      const att = await fetch(api() + '/api/guardhouse/attested?' + qs).then(r => r.json());
+      state.attested = att && typeof att === 'object' ? att : { enabled: false };
+    } catch { state.attested = { enabled: false, error: true, reason: 'the server did not answer' }; }
     if (root?.isConnected !== false) paint();
   }
 
