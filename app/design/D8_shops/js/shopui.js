@@ -1041,7 +1041,8 @@ const APPS = {
   payouts: {
     guest: true,
     label: 'Payouts · pay under the cap', idle: 'Pay reviewed rows with the session key. Nothing is sent until setup. An over-cap row is refused before any deposit.',
-    rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.001' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.001' }); } return extra.rows.slice(0, 3); },
+    // Seed one row per payee the visitor's own rules name. The count and the cap are the visitor's, not this file's.
+    rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.map(to => ({ to, amt: '0.001', asset: 'NEAR', chain: 'near' })); if (!extra.rows.length) extra.rows.push({ to: '', amt: '', asset: 'NEAR', chain: 'near' }); } return extra.rows; },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => '<div data-deep="payouts"></div>',
     bind: () => mountShop('payouts', document.getElementById('t-form'), {

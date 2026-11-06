@@ -223,6 +223,17 @@ test('the row call list carries the USDC storage pair when the row has room', ()
   assert.match(tray, /payouts\/sponsor/);
 });
 
+test('source: the tray starts content under the tabs, at the approved Ferry spacing', () => {
+  const css = readFileSync(new URL('../../../app/shops/payouts/payouts.css', import.meta.url), 'utf8');
+  // The tab bar and the pane are 10px apart, and the pane's first child has no extra top margin.
+  assert.match(css, /body\.payouts-tray #shopUI \.ferry-card\{gap:10px\}/);
+  assert.match(css, /body\.payouts-tray #shopUI \.ferry-card > \.ferry-tabs\{gap:0;margin:0\}/);
+  assert.match(css, /body\.payouts-tray #shopUI \.ferry-pane > :first-child\{margin-top:0\}/);
+  // The flow card keeps one fixed height on every tab, so the fields do not move after a create.
+  assert.match(css, /height:80px;min-height:80px;max-height:80px/);
+  assert.match(css, /align-content:start/);
+});
+
 test('CSV reconcile sums what the session did, and paid only from SUCCESS', () => {
   const rows = [
     { to: 'cafe.near', amount: '0.001', asset: 'NEAR', chain: 'near', near: '0.001', status: 'sent', tx: 'A'.repeat(43) },

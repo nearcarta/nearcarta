@@ -127,6 +127,9 @@ export function mountPayouts(root, hooks) {
       state.sponsorDone = true;
       state.sponsorNote = `Registered ${sp.account} for USDC. ${formatNear(sp.depositNear)} NEAR came from your session cap.`;
       state.sponsorUrl = `https://nearblocks.io/txns/${out.tx}`;
+      lookUpRegistration(sp.account);
+    } else if (/method_not_allowlisted/i.test(String(out?.reason || ''))) {
+      state.sponsorNote = 'Your row does not allow storage_deposit yet. Open /setup and press Update my rules once. Nothing was sent.';
     } else {
       state.sponsorNote = out?.reason === 'over_per_action_cap'
         ? 'That storage is above your /setup cap. Nothing was sent.'
@@ -263,7 +266,13 @@ export function mountPayouts(root, hooks) {
     state.receipts = rowsFromPlan(plan);
     state.usdcNote = plan.needsQuote.length ? 'A foreign row needs a quote before it can be paid.' : '';
     state.dropNote = prep.note || '';
-    state.payLine = plan.refused.length ? 'Refused before any deposit.' : 'Reviewed. Nothing was sent.';
+    // A review says how many rows are ready and how many the visitor's own limits refuse. It never
+    // turns one refused row into "all refused", and never calls a reviewed row sent.
+    const ready = plan.send.length, refused = plan.refused.length;
+    const parts = [];
+    if (ready) parts.push(`${ready} ${ready === 1 ? 'row is' : 'rows are'} ready.`);
+    if (refused) parts.push(`${refused} ${refused === 1 ? 'row is' : 'rows are'} refused before any deposit.`);
+    state.payLine = parts.length ? parts.join(' ') : 'Reviewed. Nothing was sent.';
     state.payLine2 = state.usdcNote || '';
     render();
     return { ok: true, hint: 'Prepared. Nothing was sent.' };
@@ -370,20 +379,34 @@ export function mountPayouts(root, hooks) {
       } else if (row) {
         row.status = 'refused'; row.reason = sent?.reason || 'deposit_refused';
         row.depositAddress = opened.depositAddress;
+        // The row's call list is written when the row is opened. An older row has no USDC storage pair
+        // and no wrap.near calls, so the board refuses before any deposit. Say exactly that.
+        if (/method_not_allowlisted/i.test(String(row.reason))) {
+          row.status = 'refused';
+          row.payoutText = 'Your row does not allow this call yet. Open /setup and press Update my rules once, then Pay again.';
+        }
       }
     }
-    const paidRows = state.receipts.filter(x => x.status === 'sent').length;
-    const cinema = !plan.refused.length && !plan.needsQuote.length && paidRows > 0 && (nearRows.length ? result?.ok === true : true);
-    if (plan.refused.length) showSeal('Refused before any deposit.');
+    const paidRows = state.receipts.filter(x => x.status === 'sent' || x.status === 'paid').length;
+    const refusedRows = state.receipts.filter(x => x.status === 'refused').length;
+    const leftRows = state.receipts.filter(x => x.status === 'not sent').length;
+    const allRefused = refusedRows > 0 && paidRows === 0;
+    const cinema = refusedRows === 0 && !plan.needsQuote.length && paidRows > 0 && (nearRows.length ? result?.ok === true : true);
+    if (allRefused) showSeal('Refused before any deposit.');
     else if (cinema) { clearSeal(); hooks.onCinema?.({ paid: true, refused: false }); }
     else if (result?.seal) showSeal(result.seal);
-    state.payLine = plan.refused.length ? 'Refused before any deposit.'
-      : paidRows ? `Sent ${paidRows} ${paidRows === 1 ? 'row' : 'rows'}. A foreign row is paid when 1Click says SUCCESS.`
-      : (result?.hint || 'Reviewed.');
+    // A partial run says exactly what happened to each group: a refusal is never hidden behind a send,
+    // and a sent row is never called paid before 1Click says so.
+    const parts = [];
+    if (paidRows) parts.push(`Sent ${paidRows} ${paidRows === 1 ? 'row' : 'rows'}.`);
+    if (refusedRows) parts.push(`${refusedRows} ${refusedRows === 1 ? 'row was' : 'rows were'} refused before any deposit.`);
+    if (leftRows) parts.push(`${leftRows} ${leftRows === 1 ? 'row was' : 'rows were'} not sent.`);
+    state.payLine = parts.length ? parts.join(' ') + (paidRows ? ' A foreign row is paid when 1Click says SUCCESS.' : '')
+      : (result?.hint || 'Reviewed. Nothing was sent.');
     state.payLine2 = '';
     state.usdcNote = plan.needsQuote.length ? 'A foreign row needs a quote before it can be paid.' : '';
     render();
-    return result || { ok: cinema, hint: state.payLine, foreign: foreignSent };
+    return { ...(result || {}), ok: cinema, hint: state.payLine, paid: paidRows, refused: refusedRows, foreign: foreignSent };
   }
 
   /** Poll one foreign row's 1Click status and let the receipt say Paid only on SUCCESS. */

@@ -35,6 +35,10 @@ Every price is a real 1Click quote; every limit is read from your row.
 
 Do this in the city, signed in, with a row that has a balance and a cap above the row's NEAR cost:
 
+0. If your row was opened before this change, press **Update my rules** once in `/setup` (one wallet
+   approval). That rewrites the row's call list so it includes the `wrap.near` calls and the USDC
+   `storage_deposit` pair. Without it the board refuses the row with `method_not_allowlisted` and
+   nothing is deposited; the tray now says so in plain words.
 1. Open `https://nearcarta.vercel.app/?shop=payouts`, Payroll tab.
 2. Add one row: Receiver = a Base address you control, Chain = Base, Asset = USDC, Amount = 0.15.
 3. Press **Review these rows**. The row is priced; the receipt shows the route spread in USD.

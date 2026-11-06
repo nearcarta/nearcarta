@@ -976,6 +976,7 @@ export async function payouts(rows, opts = {}) {
   const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
   if (S.board) {
     // NEAR rows only: a foreign row is paid by payoutsForeign (the 1Click rail), not by a transfer.
+    // The row count is the visitor's own /setup count, so nothing is sliced here.
     const plan = (rows || []).filter(r => {
       const asset = String(r?.asset || 'NEAR').toUpperCase();
       return asset === 'NEAR' && String(r?.chain || 'near').toLowerCase() === 'near';
