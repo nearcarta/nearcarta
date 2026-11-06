@@ -275,7 +275,7 @@
       }
     }
   },
-  "root_balance_near": 0.561379,
+  "root_balance_near": 3.2899,
   "ferry_intents": {
     "rail": "NEAR Intents 1Click",
     "from": "nearcarta.near",
@@ -313,6 +313,15 @@
         "reap": "9fULF7hdKU5mJ6H6T7hfqfCJXZCu9qRVxbGQFYmns2N4"
       },
       "recovered_to": "nearcarta.near"
+    },
+    "house.nearcarta.near@v2": {
+      "status": "replaced_same_name",
+      "txs": {
+        "house_pay": "ddaVgHkMGQzHcquj94qMuWTywXY8X4B7bWhkJF7aJEQ",
+        "close": "Eykw3LPZrDdCNbMxsZsGfpTVZogDmWmgkt3x3ykryzPv"
+      },
+      "recovered_to": "nearcarta.near",
+      "note": "Legacy house wasm closed; account recreated as v3 on same name."
     }
   },
   "guard": {
@@ -328,5 +337,24 @@
     "board": "board.nearcarta.near",
     "deploy_tx": "CN3SKjNS7PRdvrNQsxRxQW45Ks2vChe3BDAHhehhxt65",
     "note": "Guard live after PR #35. Stake 0.35366 from nearcarta.near. Locked, no FA keys. reap() from owner returns stake."
+  },
+  "house": {
+    "contract": "house.nearcarta.near",
+    "owner": "nearcarta.near",
+    "status": "deployed",
+    "crate": "contracts/house_nft",
+    "wasm": "contracts/artifacts/house_nft.v3.oz.wasm",
+    "wasm_sha256": "29bb13027fd672d0b666d04ae23ab248371a03ad21738d0732b8d2f6f559e093",
+    "code_hash": "3ouAaAD1ccZ81CdLu26FoDxixYSynrmzPa58u1Focn66",
+    "storage_bytes": 373476,
+    "locked_near": 3.75199,
+    "full_access_keys": 0,
+    "house_version": 3,
+    "txs": {
+      "house_pay_recover": "ddaVgHkMGQzHcquj94qMuWTywXY8X4B7bWhkJF7aJEQ",
+      "house_close": "Eykw3LPZrDdCNbMxsZsGfpTVZogDmWmgkt3x3ykryzPv",
+      "house_v3_create_deploy_new": "9b5rS4do5bVisMYpcmfLBKgXJrxQCNuYoDi6hDDPsyLj"
+    },
+    "note": "House v3 after PR #36. Recovered legacy ~2.50 via house_pay+close, recreated same name stake 3.75199. Locked, no FA keys."
   }
 }

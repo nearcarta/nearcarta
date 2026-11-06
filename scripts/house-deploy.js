@@ -259,7 +259,7 @@ async function main() {
   }
   const { Account, JsonRpcProvider, KeyPairSigner, actions: A } = await import('near-api-js');
   const signer = new Account(HOUSE_OWNER, new JsonRpcProvider({ url: MAIN.rpc }), KeyPairSigner.fromSecretKey(key));
-  const pub = signer.signer.getPublicKey().toString();
+  const pub = (await signer.signer.getPublicKey()).toString();
   let keyOnAccount = false;
   try {
     await signer.provider.query({ request_type: 'view_access_key', finality: 'final', account_id: HOUSE_OWNER, public_key: pub });
