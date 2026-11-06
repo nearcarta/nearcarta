@@ -127,7 +127,7 @@ test('a new payout row is blank and the third row is the daily count', () => {
 test('a waiting button keeps its reason in the shop source', () => {
   const deep = read('app/src/panels/deep.js');
   assert.match(deep, /Comparing routes\. Waiting for the quotes\./);
-  assert.match(deep, /Checking this account\./);
+  assert.match(read('app/src/panels/guard-tray.js'), /Checking this account\./);
   const css = read('app/src/panels/panels.css');
   assert.match(css, /button:disabled,button\.primary:disabled\{opacity:1 !important;color:#2A1608 !important/);
   assert.match(css, /overflow-wrap:anywhere/);

@@ -314,5 +314,19 @@
       },
       "recovered_to": "nearcarta.near"
     }
+  },
+  "guard": {
+    "contract": "guard.nearcarta.near",
+    "owner": "nearcarta.near",
+    "status": "deployed",
+    "crate": "contracts/guard",
+    "wasm": "contracts/artifacts/guard.wasm",
+    "wasm_sha256": "ec6bbec2e09c53ca4115091e570d1d594c0340831a4ac5b3172ae26045494b89",
+    "storage_bytes": 33366,
+    "locked_near": 0.35366,
+    "full_access_keys": 0,
+    "board": "board.nearcarta.near",
+    "deploy_tx": "CN3SKjNS7PRdvrNQsxRxQW45Ks2vChe3BDAHhehhxt65",
+    "note": "Guard live after PR #35. Stake 0.35366 from nearcarta.near. Locked, no FA keys. reap() from owner returns stake."
   }
 }

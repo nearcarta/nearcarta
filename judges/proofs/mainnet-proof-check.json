@@ -46,6 +46,39 @@
       "sender": "nearcarta.near"
     },
     {
+      "shop": "board",
+      "label": "v2_force_close_visitor",
+      "hash": "DVRqkE2NaMLXYJY84EBKdcg4VbUzbL27iC2r5k53GeHZ",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "board",
+      "label": "v2_reap_old_board",
+      "hash": "HmYjkCTFuvLYjso6TnEpvbgVB99DBZnhu5PHTC1HLGU5",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "board",
+      "label": "v2_recreate",
+      "hash": "8dSvGGoW23wAVVEBVL2CEDBHXBJvoVKbN9nPxKJrAgPj",
+      "contract": "board.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
       "shop": "board.visitor_run",
       "label": "open_charter",
       "hash": "6xMQyXcczLjxymmrYfBhFDuRy9MpFV62CviqdYHrnTdQ",
@@ -296,6 +329,28 @@
       "success": true,
       "failure": false,
       "signer": "toll.nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "toll",
+      "label": "toll_v7_close",
+      "hash": "HEGDeSoTXpKagGTrEcJPbkNvoWBfr75atSGUCA4FsJLP",
+      "contract": "toll.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "toll",
+      "label": "toll_v7_create_deploy_new_set_price",
+      "hash": "2FrvSxB5EwmY2ZDmKGq2xQJrWLdKiSAa7Cbh6j7C3uxU",
+      "contract": "toll.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
       "sender": "nearcarta.near"
     },
     {
@@ -593,6 +648,50 @@
       "success": true,
       "failure": false,
       "signer": "intents.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "retired.charter.nearcarta.near",
+      "label": "queue_upgrade",
+      "hash": "7fZXtTFZ9A7Du6VKc42H9FobQkFgiD9oM6CXRWm4sqjG",
+      "contract": null,
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "retired.charter.nearcarta.near",
+      "label": "execute_change",
+      "hash": "AjCL1UFt7EfiCMa3FYDw7Bdn8m7Dg3QxftBcLupMzg7i",
+      "contract": null,
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "retired.charter.nearcarta.near",
+      "label": "upgrade_reaper",
+      "hash": "5hKgDDKKjWqGVnihtkGb5vybEPJj8i4sBnsY7TypBjff",
+      "contract": null,
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "retired.charter.nearcarta.near",
+      "label": "reap",
+      "hash": "9fULF7hdKU5mJ6H6T7hfqfCJXZCu9qRVxbGQFYmns2N4",
+      "contract": null,
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
       "sender": "nearcarta.near"
     }
   ]
