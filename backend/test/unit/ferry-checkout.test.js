@@ -4,7 +4,7 @@ import { makeApp } from '../../src/app.js';
 import { receiptsBody, RECEIPT_KEYS } from '../../../shared/rails/receipts.js';
 import { readFileSync } from 'node:fs';
 import {
-  charterGate, checkoutUsdOk, settlementYocto, openCheckout, checkLiveQuote, resetCheckouts,
+  charterGate, checkoutInput, checkoutUsdOk, settlementYocto, openCheckout, checkLiveQuote, resetCheckouts,
   rememberCheckout, startCheckout, checkoutDeps, oneClickStatus, listCheckoutReceipts, MAX_CHECKOUT_USD,
   boardRowAsGate, readCharterRules,
 } from '../../src/ferry-checkout.js';
@@ -16,9 +16,10 @@ const clause = {
 const usage = { spent: '0', reserved: '0', count: 0 };
 const state = { frozen: false };
 const yocto = '1000000000000000000000';
+const VISITOR = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8';
 const input = {
   from: { symbol: 'USDC', chain: 'base' }, to: { symbol: 'USDC', chain: 'near' }, amount: '0.2',
-  recipient: 'payee.near', refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
+  recipient: 'payee.near', swapRecipient: VISITOR, refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
   charter: 'charter.nearcarta.near', clauseId: 'pay', amountYocto: yocto, privacy: 'public',
 };
 const tokens = [
@@ -76,7 +77,7 @@ test('a refused recipient never asks 1Click, and an allowed one returns a deposi
   assert.equal(yes.depositAddress, 'ab'.repeat(32));
   assert.equal(okd.calls.length, 1);
   assert.equal(okd.calls[0].dry, false);
-  assert.equal(okd.calls[0].recipient, 'payee.near');
+  assert.equal(okd.calls[0].recipient, VISITOR);
   assert.equal(yes.receipt.rail, 'intents');
   assert.equal(yes.receipt.decision, 'allowed');
   assert.equal(yes.receipt.tx, yes.depositAddress);
@@ -114,6 +115,49 @@ test('USDC on NEAR is quoted to the visitor while the charter gate still checks 
   const refused = await openCheckout({ ...input, recipient: 'other.near', swapRecipient: scholar }, liveDeps());
   assert.equal(refused.reason, 'receiver_not_allowlisted');
   assert.equal(refused.depositAddress, null);
+  const noVisitor = await openCheckout({ ...input, amount: '0.05', swapRecipient: null }, liveDeps());
+  assert.equal(noVisitor.ok, false);
+  assert.match(noVisitor.error || '', /NEAR destination needs a NEAR account/);
+  assert.equal(noVisitor.depositAddress, null);
+});
+
+test('USDC on Base is quoted to the typed address and a missing address never asks 1Click', async () => {
+  resetCheckouts();
+  const addr = '0xf76e6b0920e9332ff4410f6dd53f01722abc71a3';
+  const deps = liveDeps({
+    tokens: async () => [
+      { assetId: 'nep141:wrap.near', symbol: 'wNEAR', blockchain: 'near', decimals: 24, price: 1 },
+      { assetId: 'nep141:base-usdc', symbol: 'USDC', blockchain: 'base', decimals: 6, price: 1 },
+    ],
+  });
+  deps.quote = async (q) => { deps.dryTo = q.recipient; return { ok: true, from: { usd: '0.181' } }; };
+  const body = {
+    from: { symbol: 'wNEAR', chain: 'near' }, to: { symbol: 'USDC', chain: 'base' }, amount: '0.05',
+    recipient: 'payee.near', swapRecipient: addr, refundTo: VISITOR,
+    charter: 'charter.nearcarta.near', clauseId: 'pay', amountYocto: yocto, privacy: 'public',
+  };
+  const out = await openCheckout(body, deps);
+  assert.equal(out.ok, true);
+  assert.equal(deps.dryTo, addr);
+  assert.equal(deps.calls[0].recipient, addr);
+  assert.equal(deps.calls[0].recipientType, 'DESTINATION_CHAIN');
+  assert.equal(deps.calls[0].refundTo, VISITOR);
+  assert.equal(deps.calls[0].refundType, 'ORIGIN_CHAIN');
+  const missing = await openCheckout({ ...body, swapRecipient: null }, liveDeps());
+  assert.equal(missing.ok, false);
+  assert.equal(missing.depositAddress, null);
+  assert.match(missing.error || '', /address on the destination chain/);
+  const parsed = checkoutInput({
+    from: 'wNEAR@near', to: 'USDC@base', amount: '0.05', recipient: 'payee.near',
+    swap_recipient: addr, refundTo: VISITOR, charter: 'charter.nearcarta.near', amount_yocto: '1',
+  });
+  assert.equal(parsed.value.swapRecipient, addr);
+  assert.equal(parsed.value.recipient, 'payee.near');
+  const bad = checkoutInput({
+    from: 'wNEAR@near', to: 'USDC@base', amount: '0.05', recipient: 'payee.near',
+    swap_recipient: 'not-an-address', refundTo: VISITOR, charter: 'charter.nearcarta.near', amount_yocto: '1',
+  });
+  assert.equal(bad.error, 'bad recipient');
 });
 
 test('an unsigned live quote does not hand out its deposit address', () => {
@@ -154,7 +198,8 @@ test('POST /api/ferry/checkout refuses a bad body and a payee the charter does n
     assert.equal(j.depositAddress, null);
     assert.equal(calls.length, 0);
     const allowed = await post({
-      from: 'USDC@base', to: 'USDC@near', amount: '0.2', recipient: 'payee.near', refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
+      from: 'USDC@base', to: 'USDC@near', amount: '0.2', recipient: 'payee.near',
+      swap_recipient: VISITOR, refundTo: '0x552ad18e18a49ddad1e7d96b7ddf813b04a9cfb5',
       charter: 'charter.nearcarta.near', clause_id: 'pay', amount_yocto: yocto,
     });
     const a = await allowed.json();
