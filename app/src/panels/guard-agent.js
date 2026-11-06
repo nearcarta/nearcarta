@@ -5,9 +5,7 @@
 // https://docs.near.ai/cloud/verification
 
 import { explainCheck } from '../guard-score.js';
-// A module the browser loads raw must use a relative path. app/src/guard-board-pay.js
-// is inside the deploy root; shared/ is not, so the shared file re-exports this one.
-import { boardStep } from '../guard-board-pay.js';
+import { boardStep } from './guard-board-pay.js';
 import {
   LIVE_ENFORCEMENT, bindVerdict, contextMatches, createLedger, nearToYocto,
 } from './guard-pay.js';
