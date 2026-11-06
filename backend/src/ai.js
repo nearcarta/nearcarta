@@ -18,16 +18,16 @@ function auth() {
   return { Authorization: `Bearer ${k}` };
 }
 
-export async function complete(messages, { model = cfg.nearAiModel, maxTokens = 64, extra = {} } = {}) {
+export async function complete(messages, { model = cfg.nearAiModel, maxTokens = 64, extra = {}, headers = {} } = {}) {
   const reqBody = JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: 0, stream: false, ...extra });
   const r = await fetch(`${cfg.nearAi}/v1/chat/completions`, {
-    method: 'POST', headers: { ...auth(), 'content-type': 'application/json' }, body: reqBody,
+    method: 'POST', headers: { ...auth(), 'content-type': 'application/json', 'x-no-aliasing': 'true', ...headers }, body: reqBody,
   });
   const respText = await r.text();
   if (!r.ok) throw Object.assign(new Error(`near ai http ${r.status}`), { status: 502 });
   const j = JSON.parse(respText);
   return { id: j.id, model: j.model || model, reqModel: model, content: j.choices?.[0]?.message?.content ?? '', usage: j.usage,
-    reqSha: sha(reqBody), respSha: sha(respText) };  // raw bodies (incl. any reasoning_content) are hashed, never kept
+    reqSha: sha(reqBody), respSha: sha(respText), reqBody };  // raw response (incl. any reasoning_content) is hashed, never kept
 }
 
 export async function signature(id, model, { tries = 6 } = {}) {

@@ -21,6 +21,10 @@
       "destination": "/ferry-widget.html"
     },
     {
+      "source": "/pay/:id",
+      "destination": "/pay/index.html"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "https://nearcarta-api.onrender.com/api/$1"
     }

@@ -1,0 +1,173 @@
+/* Mist Bank city tray. Same shape as the approved Ferry card: top tabs, one gold button. */
+body.bank-tray #shopUI #tray{
+  width:min(400px,calc(100vw - 28px));
+  max-width:400px;
+  left:16px; top:172px; bottom:auto;
+  height:auto;
+  max-height:calc(100dvh - 188px);
+  padding:12px 14px 14px;
+  box-sizing:border-box;
+  overflow-x:hidden;
+  overflow-y:auto;
+  background:#241c14;
+  border:1px solid #6b5430;
+  border-radius:22px;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+  color:#f3e6cf;
+}
+body.bank-tray #shopUI .t-head,
+body.bank-tray #shopUI .label,
+body.bank-tray #shopUI .hero,
+body.bank-tray #shopUI #t-who,
+body.bank-tray #shopUI #t-track,
+body.bank-tray #shopUI .shop-track,
+body.bank-tray #shopUI .say,
+body.bank-tray #shopUI .t-links,
+body.bank-tray #shopUI .rcpt{display:none!important}
+body.bank-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
+body.bank-tray #shopUI #t-act[hidden]{display:none!important}
+body.bank-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
+body[data-shop=bank] #room{padding-bottom:120px}
+
+.bank-card{display:flex;flex-direction:column;gap:8px;min-width:0;color:#f3e6cf;font:500 15px/1.35 system-ui,sans-serif}
+.bank-session{margin:0;color:#e6d3b0;font:600 14px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.bank-tabs{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;
+  padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28;
+}
+.bank-tab{
+  min-height:44px;min-width:0;padding:0 8px;border-radius:11px;cursor:pointer;
+  background:transparent;color:#d4c4a8;border:0;
+  font:700 14px/1 system-ui,sans-serif;
+}
+/* #shopUI #t-form button:not(.primary) paints every control brass. These two beat it. */
+body.bank-tray #shopUI #t-form button.bank-tab{
+  appearance:none;-webkit-appearance:none;
+  width:auto;min-height:44px;padding:0 8px;border:0;border-radius:11px;
+  background:#17130f;background-image:none;box-shadow:none;animation:none;
+  color:#d4c4a8;font:700 14px/1 system-ui,sans-serif;
+}
+body.bank-tray #shopUI #t-form button.bank-tab.on{
+  border:0;color:#2a1608;
+  background:#e2b35b;
+  background-image:linear-gradient(180deg,#f5d08a,#e2b35b);
+}
+body.bank-tray #shopUI #t-form button.bank-sample-link,
+body.bank-tray #shopUI #t-form button.bank-again{
+  appearance:none;-webkit-appearance:none;
+  width:auto;min-height:0;padding:0;border:0;border-radius:0;
+  background:transparent;background-image:none;box-shadow:none;animation:none;
+  color:#f5d08a;text-decoration:underline;text-underline-offset:3px;
+  font:700 14px/1.3 system-ui,sans-serif;
+}
+.bank-card .shop-card{margin:0;padding:10px;background:#1c1612;border-radius:16px;min-width:0;min-height:0}
+.bank-format{margin:0;color:#e6d3b0;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.bank-sample-link{align-self:flex-start;padding:0;border:0;background:transparent;color:#f5d08a;font:700 14px/1.3 system-ui,sans-serif;text-decoration:underline;cursor:pointer}
+.bank-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:start}
+.bank-split > div{min-width:0}
+.bank-meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;min-width:0}
+.bank-meta .choice-label{margin:0}
+body.bank-tray #shopUI #t-form .bank-meta input{
+  width:auto;flex:1 1 120px;min-width:0;min-height:36px;padding:4px 8px;
+  font:600 13px/1.2 system-ui,sans-serif;
+}
+.bank-card textarea{
+  width:100%;min-height:52px;box-sizing:border-box;margin:0;resize:vertical;
+  padding:8px 12px;border-radius:12px;border:1px solid #6b5430;
+  background:#1a140f;color:#f3e6cf;font:600 15px/1.35 system-ui,sans-serif;
+}
+.bank-flow{
+  display:flex;align-items:center;justify-content:center;gap:18px;
+  min-height:52px;margin:0;padding:6px;border-radius:14px;
+  background:#14110e;border:1px solid #3a3128;
+}
+.bank-flow .ti{width:48px;height:48px;border-radius:50%}
+.bank-flow-arrow{color:#e2b35b;font:700 22px/1 system-ui,sans-serif}
+.bank-doc{display:block;flex:0 0 auto}
+.bank-pane{display:flex;flex-direction:column;gap:4px;min-width:0}
+.bank-pane[hidden]{display:none!important}
+.bank-card .choice-label{margin:4px 0 0;color:#e6d3b0;font:600 13px/1.2 system-ui,sans-serif}
+.bank-card select,
+.bank-card input[type="text"],
+.bank-card input:not([type="checkbox"]):not([type="file"]),
+.bank-card input[type="file"]{
+  width:100%;min-height:44px;box-sizing:border-box;margin:0;
+  padding:6px 12px;border-radius:12px;border:1px solid #6b5430;
+  background:#1a140f;color:#f3e6cf;font:600 16px/1.25 system-ui,sans-serif;
+}
+.bank-card input[type="file"]{color:transparent;font-size:0}
+.bank-card input[type="file"]::file-selector-button{
+  min-height:32px;margin-right:0;padding:0 12px;border:0;border-radius:8px;
+  background:#2a2118;color:#f5d08a;font:700 14px/1 system-ui,sans-serif;cursor:pointer;
+}
+.bank-field{
+  margin:0;min-height:44px;box-sizing:border-box;padding:10px 12px;border-radius:12px;
+  border:1px solid #6b5430;background:#1a140f;color:#f3e6cf;font:600 16px/1.25 system-ui,sans-serif;
+}
+.bank-consent{display:flex;align-items:center;gap:12px;min-height:44px;color:#f3e6cf;font:600 14px/1.3 system-ui,sans-serif}
+.bank-consent input{width:22px;height:22px;flex:0 0 auto}
+.bank-card .bank-again{
+  min-height:44px;margin:0;padding:0;border:0;background:transparent;color:#f5d08a;
+  font:700 14px/1 system-ui,sans-serif;cursor:pointer;
+}
+.bank-card .bank-cta{
+  min-height:48px;margin-top:8px;border:0;border-radius:999px;cursor:pointer;
+  font:700 16px/1 system-ui,sans-serif;
+}
+.bank-status{margin:0;text-align:center;color:#f3e6cf;font:600 14px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.bank-steps{margin:0;padding-left:18px;color:#e6d3b0;font:600 13px/1.35 system-ui,sans-serif}
+.bank-log{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px}
+.bank-log li{overflow-wrap:anywhere}
+
+#bank-agent-dock{
+  position:fixed; right:20px; bottom:22px; z-index:70;
+  display:flex; flex-direction:row; align-items:flex-end; gap:12px;
+  pointer-events:none;
+}
+#bank-agent-dock > *,
+#bank-agent-dock .bank-agent-send{pointer-events:auto}
+#bank-agent-dock[hidden]{display:none!important}
+#bank-agent-dock .bank-agent-char{
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  width:96px; padding:0; border:0; background:transparent; cursor:pointer; color:#f3e6cf;
+  order:2;
+}
+#bank-agent-dock .bank-agent-avatar{
+  width:72px; height:72px; object-fit:contain; display:block;
+  filter:drop-shadow(0 10px 18px rgba(0,0,0,.45));
+}
+#bank-agent-dock .bank-agent-name{
+  margin:0; color:#f5d08a; font:700 11px/1.2 system-ui,sans-serif;
+  letter-spacing:.05em; text-transform:uppercase;
+}
+.bank-agent-pop{
+  order:1; width:min(300px,calc(100vw - 140px)); min-width:220px;
+  box-sizing:border-box; padding:14px; border-radius:16px;
+  border:1px solid #6b5430; background:#1c1612;
+  box-shadow:0 12px 28px rgba(0,0,0,.4);
+  display:flex; flex-direction:column; gap:10px;
+}
+.bank-agent-pop[hidden]{display:none}
+.bank-agent-pop .bank-agent-row{display:flex; align-items:stretch; gap:10px; min-width:0}
+.bank-agent-pop .bank-agent-row input{
+  flex:1; min-width:0; min-height:44px; box-sizing:border-box; padding:0 12px; border-radius:12px;
+  border:1px solid #6b5430; background:#1a140f; color:#f3e6cf; font:600 15px/1.2 system-ui,sans-serif;
+}
+.bank-agent-pop .bank-agent-send{
+  flex:0 0 44px; width:44px; min-height:44px; border-radius:12px; cursor:pointer;
+  border:1px solid #6b5430; background:#1a140f; color:#f5d08a; font:700 18px/1 system-ui,sans-serif;
+}
+
+@media (max-width:720px){
+  body.bank-tray #shopUI #tray{
+    top:168px; left:10px; right:auto; bottom:auto;
+    width:min(270px,calc(100vw - 116px)); max-width:none;
+    height:auto;
+    max-height:calc(100dvh - 184px);
+  }
+  body.bank-tray #shopUI #t-form button.bank-tab{font-size:12px;padding:0 2px}
+  #bank-agent-dock{right:6px; bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  #bank-agent-dock .bank-agent-char{width:72px}
+  #bank-agent-dock .bank-agent-avatar{width:56px;height:56px}
+}

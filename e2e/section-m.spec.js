@@ -20,6 +20,7 @@ async function shot(page, name) {
 test('M1 the bank TEE check names a pass or the failing step', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/shops/bank/');
+  await page.getByTestId('bank-tab-attest').click();
   const tee = page.waitForResponse(r => r.url().includes('/api/ai/tee'), { timeout: 60_000 });
   await page.getByTestId('tee-verify').click();
   const res = await tee;
@@ -53,6 +54,7 @@ test('M2 another attack changes the prompt and does not ask the vault', async ({
 test('M3 a blank payee prepares nothing', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/shops/payouts/');
+  await page.getByTestId('payouts-tab-payroll').click();
   await expect(page.getByTestId('payout-to')).toHaveCount(0);
   await page.getByTestId('payout-add').click();
   await page.getByTestId('payout-add').click();
@@ -77,8 +79,8 @@ test('M4 one session on the chip, the hall and the bank', async ({ page }) => {
   await shot(page, 'm4-hall-1440');
   await page.goto('/shops/bank/');
   await expect(page.getByTestId('bank-session')).toContainText('Signed in as Scholar');
-  await expect(page.getByTestId('bank-to')).not.toContainText('Sign in to choose a payee');
-  await expect(page.getByTestId('bank-to')).toContainText('visitor.near');
+  await expect(page.getByTestId('bank-session')).toContainText('visitor.near');
+  await expect(page.getByTestId('bank-session')).not.toContainText('Sign in to choose a payee');
   await shot(page, 'm4-bank-1440');
   await page.goto('/?mode=2d&nostory');
   await expect(page.getByTestId('hero-chip')).toContainText('Scholar', { timeout: 20_000 });

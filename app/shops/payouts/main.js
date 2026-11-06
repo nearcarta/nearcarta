@@ -11,5 +11,6 @@ document.querySelector('[data-testid=payout-skel]')?.remove();
 const who = visitor();
 mountShop('payouts', app, {
   auto: true,
+  dock: false,
   rows: () => (who.signedIn ? [{ to: who.accountId, amt: '0.001' }] : []),
 });

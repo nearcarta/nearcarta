@@ -293,11 +293,13 @@ export async function fetchOneClickStatus(depositAddress, f = fetch) {
   const d = j.swapDetails || {};
   const asHash = h => (typeof h === 'string' ? h : h?.hash);
   const destHashes = (d.destinationChainTxHashes || []).map(asHash).filter(h => typeof h === 'string' && h.length > 0);
-  const hashes = [...destHashes, ...(d.originChainTxHashes || []).map(asHash), ...(d.nearTxHashes || []).map(asHash)]
-    .filter(h => typeof h === 'string' && h.length > 0);
+  const originHashes = (d.originChainTxHashes || []).map(asHash).filter(h => typeof h === 'string' && h.length > 0);
+  const nearHashes = (d.nearTxHashes || []).map(asHash).filter(h => typeof h === 'string' && h.length > 0);
+  const hashes = [...destHashes, ...originHashes, ...nearHashes];
   return {
     env: 'ONECLICK', depositAddress, status: j.status, help: statusHelp(j.status),
-    final: FINAL.includes(j.status), tx: hashes[0] || null, destinationTx: destHashes[0] || null, updatedAt: j.updatedAt || null,
+    final: FINAL.includes(j.status), tx: hashes[0] || null, destinationTx: destHashes[0] || null,
+    originTx: originHashes[0] || null, nearTx: nearHashes[0] || null, updatedAt: j.updatedAt || null,
     amountOut: d.amountOutFormatted || d.amountOut || null,
     symbolOut: d.destinationToken || d.amountOutSymbol || null,
   };

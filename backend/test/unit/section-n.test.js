@@ -119,7 +119,7 @@ test('a new payout row is blank and the third row is the daily count', () => {
   assert.equal(full.added, false);
   assert.equal(full.rows.length, 3);
   assert.match(full.reason, /Three rows is the daily count/);
-  const deep = read('app/src/panels/deep.js');
+  const deep = read('app/src/panels/payouts-tray.js');
   assert.match(deep, /data-testid="payout-add"/);
   assert.doesNotMatch(deep, /\{ to: '', amt: '0\.001' \}, \{ to: '', amt: '0\.001' \}/);
 });
