@@ -165,6 +165,16 @@ test('T3 a new chronicle entry shows in the list and the corner', async ({ page 
     await openShop(page, 'chronicle');
     await page.getByTestId('chronicle-account').fill('nearcarta.near');
     await page.locator('#c-go').click();
+    // The live page now renders one batch of six rows behind Show more, so the recorded toll
+    // rows sit behind the button. Reach them the way a reader does: Show more, then search.
+    await expect(page.getByTestId('chronicle-verify')).toContainText(/Showing \d+ of \d+\.|\d+ rows?\./, { timeout: 20000 });
+    for (let i = 0; i < 4; i++) {
+      const more = page.locator('#c-more');
+      if (!(await more.isVisible().catch(() => false))) break;
+      await more.click();
+      await page.waitForTimeout(150);
+    }
+    await page.getByTestId('chronicle-search').fill('toll');
     const row = page.locator('[data-testid="chronicle-page"] li').filter({ hasText: 'toll' });
     await expect(row.first()).toBeVisible({ timeout: 20000 });
     await expect(row.first().locator('a')).toHaveAttribute('href', /nearblocks\.io\/txns\//);
