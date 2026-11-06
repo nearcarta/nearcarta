@@ -22,6 +22,7 @@ import { verifyPropose } from './board-tx.js';
 import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
 import * as ai from './ai.js';
+import * as bankProof from './bank-proof.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
@@ -558,6 +559,16 @@ export function makeApp() {
     // Completions are billable. This demo route is off unless AI_PROVE_ENABLED=1; the agent (agent.js) has its own budget.
     if (process.env.AI_PROVE_ENABLED !== '1') return c.json({ error: 'completions disabled on this deployment (AI_PROVE_ENABLED!=1)' }, 403);
     return c.json(await ai.prove());
+  });
+  // Mist Bank: live hardware attestation, plus an envelope check when the body carries a receipt.
+  // Neither route refuses just because completions are off. The download has hashes and the summary.
+  app.get('/api/bank/proof', limiter(6), nearAi, async c => c.json(await bankProof.bankProve({ enabled: false })));
+  app.post('/api/bank/prove', limiter(6), nearAi, async c => {
+    let body = {};
+    const text = await c.req.text();
+    if (text) { try { body = JSON.parse(text); } catch { return bad(c, 'body'); } }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return bad(c, 'body');
+    return c.json(await bankProof.bankProve({ receipt: body.receipt || null }));
   });
   // Charters (factory) and Vault Arena: backend/src/vault.js
   vault.register(app, { limiter, globalCap });

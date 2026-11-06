@@ -1,7 +1,6 @@
-// Mist Bank: a vault with a street window. The street sees that a payout happened; the ledger shows only the on-chain
-// commitment to the amount. The API no longer returns the amount, salt or viewing key, and this view never shows an amount.
+// Mist Bank: a private expense auditor. The statement stays in the browser. This room does not move ZEC.
 // Data: D6 BANK when the host provides it (tech app), else the live-read snapshot in data/live.js (tools/snapshot.mjs).
-import { THREE, room, put, makeRobot, C, CSS, radial } from '../js/core.js';
+import { THREE, room, put, makeRobot, C, CSS, radial, wait, tween } from '../js/core.js';
 import { row, h3, note, proof, paper, esc } from './_ui.js';
 import * as D from '../../D6_dashboards/src/data.js';
 import { BANK } from '../data/live.js';
@@ -9,34 +8,21 @@ import { M as PM, brassM, mesh, lantern, candle, rug } from './_props.js';
 
 const B = D.BANK || BANK;
 // The room's one-line summary of how a payout runs (room copy; the README is the charter worker's).
-export const ROOM_LINE = 'This payment is a charter check on mainnet.';
-const LEG = { shield: 'Shield ZEC into a confidential balance', transfer: 'Transfer between confidential balances', unshield: 'Unshield to a public Intents balance' };
-const short = c => `${String(c).slice(0, 8)}…${String(c).slice(-6)}`;
+export const ROOM_LINE = 'This audit does not send a payment.';
 function live(b) {
-  const s = b.street;
+  const s = b.street || {};
   return proof(
     note(ROOM_LINE),
-    h3('The street window · public explorer, live read'),
-    row({ k: 'A payout happened. The amount is hidden.', why: 'The public record shows a shielded payment and a small fee. This page never shows the amount.', st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'amount hidden' : 'amount visible', src: 'live' }),
-    `<details class="more"><summary>Technical details</summary>`,
-    row({ k: `Recorded at block ${s.height}`, why: s.hidden ? `The amount stays inside a shielded pool. The fee is ${s.fee} of the smallest Zcash unit.` : `Amount visible: ${s.reasons.join(', ')}`, st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'hidden' : 'visible', src: 'live' }),
-    note(`<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.txid.slice(0, 12))}… ↗</a> · ${esc(String(s.confirmations))} confirmations${b.at ? ' · read ' + esc(b.at) : ''}`),
-    h3('The oath · NEAR'),
-    row({ k: `Payout approved by clause ${b.oath.clause}`, why: 'the memo on chain holds only a commitment to the amount', st: b.oath.ok ? 'ok' : 'no', stText: b.oath.ok ? 'allowed' : 'not verified', tx: b.oath.tx }),
-    h3('The commitment · NEAR memo'),
-    row({ k: `sha256 ${short(b.commitment.value)}`, why: 'binds the paid amount without showing it; this app never receives the amount, salt or viewing key', st: 'ok', stText: 'amount hidden', src: 'mainnet' }),
-    `<p class="kv">${esc(b.commitment.value)}</p>`,
-    note(`Auditor check: with the payee viewing key, read the amount and salt from the encrypted memo and hash them, or ${esc(b.auditor?.verify || 'POST /api/mistbank/verify')}. A match proves the paid amount is the committed one.`),
-    ...(b.binding && !b.binding.capsAmount ? [note('The charter approves the payout and stores the commitment; it does not cap the Zcash amount.')] : []),
-    h3('The desk · NEAR Intents Confidential, dry quotes'),
-    ...(b.desk?.length ? b.desk.map(l => row({ k: LEG[l.leg] || l.leg, why: `privacy ${l.privacy} · signature ${l.sig ? 'verified' : 'FAILED'} · echo ${l.echo ? 'ok' : 'differs'}`, st: l.ok ? 'ok' : 'no', stText: l.ok ? 'quoted' : 'rejected', src: 'live' }))
-      : [row({ k: 'Confidential quotes', why: 'not available on this server', st: 'no', stText: 'off', src: 'live' })]),
-    note('Practice quotes only: nothing was spent.'),
-    `</details>`);
+    note('A statement stays in this browser. A hardware report is a separate check. This room does not move ZEC and does not hold a key.'),
+    h3('Recorded street read, not this audit'),
+    row({ k: 'A recorded Zcash transaction is not this audit.', why: 'This page does not move ZEC and does not call that payment private.', st: 'no', stText: 'not this audit', src: 'live' }),
+    note(s.url ? `<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(String(s.txid || '').slice(0, 12))}… ↗</a>` : 'No street row is part of this audit.'),
+    h3('Confidential settlement'),
+    row({ k: 'Confidential pay stays off.', why: 'No deposit address is requested until a documented receipt exists.', st: 'no', stText: 'off', src: 'live' }),
+  );
 }
-const HERO = `<span class="commit" title="sha256 commitment on NEAR">${esc(String(B.commitment?.value || '').slice(0, 8))}…</span><span class="unit">amount hidden</span>`;
-// For the 2D fallback (js/flat.js)
-export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'Street sees a payout, not the amount · operator-run worker', hero: HERO };
+const HERO = `<span class="unit">browser audit</span>`;
+export const FLAT = { src: 'local', cls: 'local', label: 'Private expense auditor · fictional samples', hero: HERO };
 export const PROOF = live(B);
 
 export default async function bank() {
@@ -77,11 +63,43 @@ export default async function bank() {
   await put(scene, 'decoration/props/crate_B_small', { x: -1.75, z: .75, fitW: .45 });
   lantern(scene, -1.9, -.5, { h: 1.5 });
   const rob = await makeRobot(scene); rob.at(1.45, .95); rob.lookAt(new THREE.Vector3(.75, 0, .55), { toViewer: .8 }); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
+  const wax = new THREE.MeshStandardMaterial({ color: 0xc0463e, roughness: .5 });
+  const stamps = [-0.2, 0.15, 0.5].map(x => {
+    const m = mesh(scene, new THREE.CylinderGeometry(.07, .07, .025, 18), wax, [x, .82, .78], { rx: Math.PI / 2 });
+    m.scale.setScalar(0.001);
+    return m;
+  });
+  const tags = [
+    { obj: stamps[1], pos: new THREE.Vector3(0, .4, 0), html: 'Charter refused', cls: 'no hide' },
+  ];
+  const hideRefuse = () => {
+    const el = tags[0].el;
+    if (el) { el.classList.add('hide'); el.setAttribute('hidden', ''); }
+    stamps.forEach(m => m.scale.setScalar(0.001));
+  };
+  const showRefuse = () => {
+    const el = tags[0].el;
+    if (!el) return;
+    el.classList.remove('hide');
+    el.removeAttribute('hidden');
+  };
   let t = 0;
   return {
-    rob, scene, camera, tags: [],
+    rob, scene, camera, tags, hideRefuse,
     panel: { title: 'Mist Bank', src: 'mainnet', srcNote: 'Operator-run worker: the mainnet send is made by a worker Nearcarta runs, not by your charter or a contract.', label: FLAT.label, hero: HERO, action: null },
     proof: PROOF,
+    *act(opts = {}) {
+      if (opts.refused) {
+        showRefuse();
+        yield wait(.4);
+        return;
+      }
+      hideRefuse();
+      for (const m of stamps) {
+        yield tween(.35, k => m.scale.setScalar(Math.max(0.001, k)));
+        yield wait(.15);
+      }
+    },
     update(dt) { t += dt; rob.update(dt); mist.forEach((m, i) => { m.position.x = wx - .42 + ((t * .08 + i * .3) % .84); m.material.opacity = .25 + .12 * Math.sin(t + i); }); shape.material.opacity = .6 + .15 * Math.sin(t * .8); wheel.rotation.z = Math.sin(t * .3) * .08; },
   };
 }

@@ -405,16 +405,16 @@ function fireSpark(){ const sp=sparks.find(s=>s.t<0); if(!sp) return; const c=hx
 // ---------- scripted night (AI Town-style: plan → walk → act → reflect) ----------
 function vfx(k){ const b=document.body; b.classList.remove('vfx-ref','vfx-ok','vfx-frz'); void b.offsetWidth; b.classList.add('vfx-'+k); }
 function resetWorld(){ killAll(); $('#freezeBtn').lastChild.textContent='Hold to freeze'; document.body.classList.remove('inferry','frozen'); frzGoal=0; mistGoal=0; hitT=0; bot.setOpacity(1); stranger.g.visible=false; stranger.setOpacity(0); [bot,stranger,...knights].forEach(clearBubble);
-  boat.userData.goal=0; setLabel('ferry','<i class="c-mint">●</i> at the jetty'); setLabel('gate','<i class="c-mint">●</i> sealed'); setLabel('bank','<i class="c-violet">◐</i> amounts hidden'); setLabel('house','<i class="c-mint">●</i> owner key · offline');
+  boat.userData.goal=0; setLabel('ferry','<i class="c-mint">●</i> at the jetty'); setLabel('gate','<i class="c-mint">●</i> sealed'); setLabel('bank','<i class="c-violet">◐</i> auditor'); setLabel('house','<i class="c-mint">●</i> owner key · offline');
   Object.keys(QS).forEach(k=>delete QS[k]); drawQ(); setBudget(66.40); seedChron(); agentSt('idle'); $('#toast').classList.remove('show'); }
 function* patrol(){ const p=chars.patrol; const loop=[[1,-1],[-1,0],[0,1],[2,-2]]; let i=0; while(true){ yield p.walkTo(...loop[i++%loop.length]); yield wait(1.5); } }
-function* sBank(){ setQ('bank','walk','walking'); agentSt('walking'); bubble(bot,'think','Rent is due tonight. landlord.near is on my payee list, so I will pay it from the Mist Bank.',{cl:'payee_allowlist ✓  daily_cap 150 ✓'});
+function* sBank(){ setQ('bank','walk','walking'); agentSt('walking'); bubble(bot,'think','I will audit a fictional statement at the Mist Bank. The lines stay in the browser.',{cl:'local audit · nothing signed'});
   const s=SHOPS.bank; yield bot.walkTo(...s.door,{end:hx(s.q,s.r).lerp(hx(...s.door),.55)}); bot.lookAt(hx(s.q,s.r));
-  bubble(bot,'say','Proposing 120 USDC to landlord.near, amount hidden.',{cl:'propose() → oath.validate'}); yield wait(1.4);
-  mistGoal=1; sfx.mist(); agentSt('in the mist','priv'); setQ('bank','priv','in the mist'); setLabel('bank','<i class="c-violet">◐</i> someone is inside · amount hidden');
+  bubble(bot,'say','The audit is local. Nothing was signed.',{cl:'browser · no propose'}); yield wait(1.4);
+  mistGoal=1; sfx.mist(); agentSt('auditing','priv'); setQ('bank','priv','auditing'); setLabel('bank','<i class="c-violet">◐</i> reviewing a sample');
   for(let k=0;k<12;k++){ bot.setOpacity(1-k/12*.75); yield wait(.08); } yield wait(1.8);
-  chron('pv','◐','Paid <b>landlord.near</b> · amount hidden','oath.intent_confirmed'); setBudget(186.40); setQ('bank','priv','done'); sfx.chime();
-  for(let k=0;k<12;k++){ bot.setOpacity(.25+k/12*.75); yield wait(.06); } bot.setOpacity(1); mistGoal=0; setLabel('bank','<i class="c-violet">◐</i> amounts hidden'); clearBubble(bot); }
+  chron('pv','◐','Audited a fictional sample · nothing signed','browser.audit'); setQ('bank','priv','done'); sfx.chime();
+  for(let k=0;k<12;k++){ bot.setOpacity(.25+k/12*.75); yield wait(.06); } bot.setOpacity(1); mistGoal=0; setLabel('bank','<i class="c-violet">◐</i> auditor'); clearBubble(bot); }
 function* sFerry(){ setQ('ferry','walk','walking'); agentSt('walking'); bubble(bot,'think','Standing order: swap up to 50 USDC into NEAR on the far bank. The Ferry is the only way across.',{cl:'standing_order #1 · daily_cap ✓'});
   const s=SHOPS.ferry; yield bot.walkTo(...s.door,{end:jetty.home.clone().lerp(hx(s.q,s.r),.55).setY(0)}); bot.lookAt(jetty.far);
   bubble(bot,'say','Quote is signed: recipient, refundTo, minAmountOut, deadline. Sending the boat.',{cl:'1Click quote · ed25519 verified'}); yield wait(1.6);
