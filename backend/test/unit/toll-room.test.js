@@ -273,6 +273,13 @@ test('the city toll door stays a link and does not resume an old visit', () => {
   assert.doesNotMatch(body, /propose_batch|\bask\(/);
   assert.doesNotMatch(body, /0\.001/);
   assert.doesNotMatch(body, /sign\(/);
+  // The recipient and the amount come from the visitor's words, never a constant.
+  assert.doesNotMatch(body, /0x[0-9a-fA-F]{40}/);
+  assert.match(body, /quote\.to/);
+  assert.match(body, /quote\.amount/);
+  // A visitor with no row is told to open one, not handed a generic setup error.
+  assert.match(ui, /Open your row in \/setup first/);
+  assert.match(ui, /Finish the helper key in \/setup/);
   const plan = read('backend/scripts/toll-redeploy.js');
   assert.match(plan, /sends: false/);
   assert.match(plan, /method: 'close'/);
