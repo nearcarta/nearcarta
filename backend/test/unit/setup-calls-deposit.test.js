@@ -6,12 +6,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CALLS_DEPOSIT_YOCTO, MAX_PAIR_BYTES, callPairBytes, callPolicy, callsFitRow, stampCalls } from '../../../shared/board/session.js';
+import { HOUSE_CALLS } from '../../../shared/house/shop.js';
 import { plainRulesError } from '../../../shared/setup/rules-diff.js';
 
 const YN = 10n ** 24n;
 const CAP = (YN * 5n / 1000n).toString(), DAILY = (YN * 10n / 1000n).toString();
 const BOARD = 'board.nearcarta.near';
-const policy = shops => callPolicy(shops, CAP, DAILY, 'ft_transfer', stampCalls(BOARD, CAP)).calls;
+// The page's list: shops, the wrap.near trio, the board stamp, then the House calls.
+const policy = shops => callPolicy(shops, CAP, DAILY, 'ft_transfer', [...stampCalls(BOARD, CAP), ...HOUSE_CALLS]).calls;
 
 // Realistic shop ids padded to a chosen length, ending in .nearcarta.near.
 const names = (n, len) => Array.from({ length: n }, (_, i) => {
@@ -32,8 +34,9 @@ test('the set_calls deposit covers the default list and the widest that fits', (
 });
 
 test('callsFitRow matches the row capacity measured in the sandbox', () => {
-  // name length -> most shops the row held, from setup_calls_deposit.rs.
-  for (const [len, fit] of [[19, 7], [25, 6], [32, 6], [40, 5], [48, 5], [56, 4]]) {
+  // name length -> most shops the row held, from setup_calls_deposit.rs. The House
+  // calls take two pairs of that budget, so these are lower than the pre-House figures.
+  for (const [len, fit] of [[19, 5], [25, 4], [32, 4], [40, 3], [48, 3], [56, 3]]) {
     assert.equal(callsFitRow(policy(names(fit, len))), true, `${fit} shops of ${len} bytes should fit`);
     assert.equal(callsFitRow(policy(names(fit + 1, len))), false, `${fit + 1} shops of ${len} bytes should not fit`);
   }
@@ -42,18 +45,18 @@ test('callsFitRow matches the row capacity measured in the sandbox', () => {
 test('the pair byte count is the same number the sandbox test computes', () => {
   // setup_calls_deposit.rs builds the same list and asserts these exact totals.
   const total = (k, len) => policy(names(k, len)).reduce((n, c) => n + callPairBytes(c.receiver, c.method), 0);
-  assert.equal(total(7, 19), 571);
-  assert.equal(total(8, 19), 626);
-  assert.equal(total(6, 25), 546);
-  assert.equal(total(7, 25), 606);
-  assert.equal(total(6, 32), 588);
-  assert.equal(total(7, 32), 655);
-  assert.equal(total(5, 40), 561);
-  assert.equal(total(6, 40), 636);
-  assert.equal(total(5, 48), 601);
-  assert.equal(total(6, 48), 684);
-  assert.equal(total(4, 56), 550);
-  assert.equal(total(5, 56), 641);
+  assert.equal(total(5, 19), 597);
+  assert.equal(total(6, 19), 652);
+  assert.equal(total(4, 25), 562);
+  assert.equal(total(5, 25), 622);
+  assert.equal(total(4, 32), 590);
+  assert.equal(total(5, 32), 657);
+  assert.equal(total(3, 40), 547);
+  assert.equal(total(4, 40), 622);
+  assert.equal(total(3, 48), 571);
+  assert.equal(total(4, 48), 654);
+  assert.equal(total(3, 56), 595);
+  assert.equal(total(4, 56), 686);
 });
 
 test('the default /setup list always fits a row', () => {

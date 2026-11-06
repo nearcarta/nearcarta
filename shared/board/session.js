@@ -89,12 +89,12 @@ export const MAX_CALLS = 24;
 // A row costs about 501 bytes and the fixed side record takes the rest, leaving about
 // 600 bytes for the pairs. Each pair adds the receiver, the method and a 16-byte cap,
 // which is `receiver.length + method.length + 24`; the budget counts the wrap.near
-// trio and the stamp too, with the 20-byte production board id.
-// Measured in `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`: 7 shops of
-// 20 bytes fit (571) and 8 do not (626); 6 of 26 fit (546) and 7 do not (606); 6 of 33
-// fit (588) and 7 do not (655); 5 of 41 fit (561) and 6 do not (636); 5 of 49 fit (601)
-// and 6 do not (684); 4 of 57 fit (550) and 5 do not (641). 602 keeps that one byte of
-// headroom below the first refusal.
+// trio, the board stamp and the House shop's two calls too, with the 20-byte production
+// board id. Measured in `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`:
+// 5 shops of 20 bytes fit (597) and 6 do not (652); 4 of 26 fit (562) and 5 do not (622);
+// 4 of 33 fit (590) and 5 do not (657); 3 of 41 fit (547) and 4 do not (622); 3 of 49 fit
+// (571) and 4 do not (654); 3 of 57 fit (595) and 4 do not (686). 602 keeps that one byte
+// of headroom below the first refusal.
 export const MAX_PAIR_BYTES = 602;
 
 /** Trie bytes one (receiver, method) pair adds to the row. */

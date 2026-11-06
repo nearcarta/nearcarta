@@ -24,6 +24,7 @@ import { ASK_MEMO_RE, parseAsk } from '../../shared/vault/ask.js';
 import * as agent from './agent.js';
 import { mainnetReceiverOk } from '../../shared/net/accounts.js';
 import deniedAccounts from '../../shared/vault/denied-accounts.json' with { type: 'json' };
+import { HOUSE_LEGACY, HOUSE_SHOP } from '../../shared/house/shop.js';
 
 export const V = DEP.vault || null;
 const ACCOUNT_RE = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -654,7 +655,7 @@ export function boot({ fill = backfill, firstMs = 1000, snapshotFile, boardFile 
 }
 
 /** Accounts and script nicknames we created. A visitor charter is public unless its id or owner is in this set. */
-export const DENIED = new Set((deniedAccounts.accounts || []).map(id => String(id).toLowerCase()));
+export const DENIED = new Set([...(deniedAccounts.accounts || []), HOUSE_SHOP, HOUSE_LEGACY].filter(Boolean).map(id => String(id).toLowerCase()));
 export function isDenied(id, deny = DENIED) {
   const s = String(id || '').toLowerCase();
   if (!s) return true;

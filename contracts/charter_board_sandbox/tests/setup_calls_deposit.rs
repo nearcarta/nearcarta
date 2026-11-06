@@ -44,6 +44,11 @@ fn rules(receiver: &str) -> Value {
 }
 
 /// The same shape `callPolicy` builds: the shops, the wrap.near trio, then the stamp.
+/// The same shape `callPolicy` builds: the shops, the wrap.near trio, the board stamp,
+/// then the House shop's two calls. shared/house/shop.js HOUSE_CALLS.
+const HOUSE_SHOP: &str = "house.nearcarta.near";
+const HOUSE_METHODS: [&str; 2] = ["house_session_check_in", "house_session_prepare_send"];
+
 fn setup_calls(board: &AccountId, shops: &[String]) -> Value {
     let cap = (NEAR / 200).to_string();
     let mut calls: Vec<Value> = shops.iter().map(|s| json!({ "receiver": s, "method": "ft_transfer", "cap": cap })).collect();
@@ -51,6 +56,9 @@ fn setup_calls(board: &AccountId, shops: &[String]) -> Value {
         calls.push(json!({ "receiver": "wrap.near", "method": m, "cap": cap }));
     }
     calls.push(json!({ "receiver": board, "method": "stamp", "cap": cap }));
+    for m in HOUSE_METHODS {
+        calls.push(json!({ "receiver": HOUSE_SHOP, "method": m, "cap": cap }));
+    }
     json!({ "calls": calls, "session_cap": (NEAR / 100).to_string() })
 }
 
@@ -59,7 +67,8 @@ fn pair_bytes(_board: &AccountId, shops: &[String]) -> usize {
     let shops: usize = shops.iter().map(|s| pair(s, "ft_transfer")).sum();
     let ferry: usize = [("wrap.near", "near_deposit"), ("wrap.near", "ft_transfer"), ("wrap.near", "storage_deposit")]
         .iter().map(|(r, m)| pair(r, m)).sum();
-    shops + ferry + BOARD_ID_LEN + "stamp".len() + 24
+    let house: usize = HOUSE_METHODS.iter().map(|m| pair(HOUSE_SHOP, m)).sum();
+    shops + ferry + house + BOARD_ID_LEN + "stamp".len() + 24
 }
 
 fn refused(out: &near_workspaces::result::ExecutionFinalResult, code: &str) -> bool {

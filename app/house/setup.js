@@ -18,6 +18,7 @@ import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf, storedAgentKey } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
 import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
+import { HOUSE_CALLS, HOUSE_SHOP } from '../../shared/house/shop.js';
 import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
 import { runAsk } from '../../shared/vault/run.js';
@@ -295,7 +296,7 @@ function wireCharacter() {
 // ---------- 5. Rules ----------
 function rules() {
   const p = persona();
-  const mainShops = [MAIN.toll?.contract].filter(Boolean);
+  const mainShops = [MAIN.toll?.contract, HOUSE_SHOP].filter(Boolean);
   const fallback = st.trial ? (CFG?.arena?.merchants || []).slice(0, 2) : mainShops;
   const saved = st.receivers;
   const useSaved = saved && saved.length > 0;
@@ -315,7 +316,7 @@ function sRules() {
        <div class="field"><label for="daily">Daily budget</label><div class="suffix"><input id="daily" type="number" step="0.001" min="0.001" value="${r.daily}" data-testid="rule-daily"><span>NEAR</span></div><p class="small muted">All payments in one day added up.</p></div>
        <div class="field"><label for="per">Payments per day</label><div class="suffix"><input id="per" type="number" min="1" max="100" value="${r.per}" data-testid="rule-per"><span>per day</span></div><p class="small muted">How many payments the agent may make each day.</p></div>
        <div class="field"><label for="hours">Session</label><select id="hours" data-testid="rule-hours">${SESSION_HOURS.map(h => `<option value="${h}" ${h == r.hours ? 'selected' : ''}>${sessionLabel(h)}</option>`).join('')}</select><p class="small muted">After this the contract refuses every payment. You can write a new session later.</p></div></div>
-     <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"><p class="small muted">The only accounts your agent may pay. A Try payment goes to the first listed shop. Ferry Ask charter calls stamp on the board and returns that NEAR to your row; it still uses one payment of your cap. Session also allowlists wrap.near for 1Click deposit calls.</p></div>
+     <div class="field"><label for="rcv">Allowed shops (account ids, comma separated)</label><input id="rcv" value="${esc(r.receivers.join(', '))}" spellcheck="false" data-testid="rule-receivers"><p class="small muted">The only accounts your agent may pay. A Try payment goes to the first listed shop. Ferry Ask charter calls stamp on the board and returns that NEAR to your row; it still uses one payment of your cap. Session also allowlists wrap.near for 1Click deposit calls, and the house shop's check-in and prepare calls.</p></div>
      <div class="preview" id="prev" data-testid="rule-preview">${preview(r)}</div>${errP()}` + nav(true));
 }
 function wireRules() {
@@ -447,8 +448,11 @@ function boardArgs(r, agent) {
   return { rules: ruleArgs(r), agent, fund: ROW_FUND.toString() };
 }
 // The call list this row will carry. `callsFitRow` checks it against the row's storage.
+// One builder for both the fit check and the transaction, so they cannot disagree.
+// The stamp returns the Ask-charter NEAR to the row; the house pair lets the House
+// shop be reached through propose_call_as.
 function callsFor(r, contract) {
-  return callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', stampCalls(contract, toY(r.cap))).calls;
+  return callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', [...stampCalls(contract, toY(r.cap)), ...HOUSE_CALLS]).calls;
 }
 // The agent key is also added to the visitor's own account as a function-call access key.
 // It may call propose, propose_call and propose_call_as on the board, with a gas allowance
@@ -701,7 +705,7 @@ function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursE
   return plan.map(step => {
     const args = step.method === 'set_agent' ? { agent: key.publicKey }
       : step.method === 'set_rules' ? { rules: ruleArgs(r, expiresAt) }
-      : callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', stampCalls(contract, toY(r.cap)));
+      : callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', [...stampCalls(contract, toY(r.cap)), ...HOUSE_CALLS]);
     return [step.key, { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: step.method, args, gas: (GAS.agent * TG).toString(), deposit: step.deposit } }] }];
   });
 }
