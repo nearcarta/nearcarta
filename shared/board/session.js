@@ -63,8 +63,9 @@ function wrapCap(named, capYocto) {
 }
 
 // set_calls panics ERR_RECEIVERS when the list is longer than this or a
-// (receiver, method) pair is repeated. contracts/charter_board MAX_RECEIVERS.
-export const MAX_CALLS = 8;
+// (receiver, method) pair is repeated. contracts/charter_board MAX_CALLS.
+// Pay receivers stay at MAX_RECEIVERS (8).
+export const MAX_CALLS = 24;
 
 const callKey = (receiver, method) => `${String(receiver).toLowerCase()}\0${String(method)}`;
 

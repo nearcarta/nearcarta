@@ -1,0 +1,105 @@
+# Board v2 dry-run
+
+This is a plan for the owner. Nothing in this file was sent to mainnet. No account was created, no wasm was deployed, and no row was closed.
+
+The source adds `propose_call_as`, effect budgets, a second confirm key, monotonic `tighten_*`, salted anchors, and a delayed `stage_upgrade` / `upgrade` / `migrate`. The account `board.nearcarta.near` is still the 2026-11-05 wasm. That wasm has no upgrade method and the account has no access key, so the new code cannot be deployed onto it. The path is refund, then `reap`, then create the same name again.
+
+## What is live
+
+Read-only views on 2026-11-06, `https://rpc.mainnet.fastnear.com`, finality `final`. Account id from `shared/deployments/mainnet.json`.
+
+| | |
+|---|---|
+| Account | `board.nearcarta.near` |
+| Owner | `nearcarta.near` |
+| Code hash | `Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C` |
+| Wasm sha256 | `910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29` |
+| Deploy tx | `CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4` |
+| Committed wasm | `contracts/artifacts/charter_board.wasm`, 108955 bytes |
+| Access keys | 0 |
+| `get_config` | `rows` 1, `max_row_yocto` `20000000000000000000000` |
+| Account amount | `1302749999999999999999995` yoctoNEAR |
+| `storage_usage` | 110174 bytes |
+| State keys | `STATE` 505 bytes, `CALLS` 524 bytes. No `ACTS`. No `META`. |
+
+The one open row is the visitor already published in `board.visitor_run.signer` of `shared/deployments/mainnet.json`. `get_charter` for that account:
+
+| field | value |
+|---|---|
+| `balance` | `201499999999999999999995` |
+| `storage_locked` | `9950000000000000000000` |
+| `nonce` | `23` |
+| `frozen` | false |
+
+`balance` plus `storage_locked` is `211449999999999999999995` yoctoNEAR. That is the visitor's money. It is not treasury and it is not the stake for a new wasm. `reap` sends the whole account to `nearcarta.near`, so it must not run while this row is open.
+
+The contract does not list row keys. `rows: 1` matched this known visitor. The owner re-reads `get_config` and this `get_charter` immediately before any close. A second row would show up as `rows` greater than 1.
+
+## The wasm that was compiled and not deployed
+
+```bash
+cd contracts/charter_board
+cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
+```
+
+Toolchain: rustc 1.86.0, near-sdk 5.27.0, cargo-near 0.22.0. `--no-abi` is required because the methods are `extern "C"` and cargo-near finds no ABI symbols. Do not build with near-sdk 5.30. That wasm failed to link on mainnet (`failed_deploy_tx` `4mq8P3jugnatzbbc9VzDbufCBpyj27TxwK4w3L7nTPCX`).
+
+Output: `contracts/charter_board/target/near/charter_board.wasm`.
+
+| | |
+|---|---|
+| Bytes | 196792 |
+| sha256 | `c24728aba3e9a2db115932f421c8b1e493cf4c17413f458da3ec1e5853c8c39c` |
+| code hash (base58 sha256) | `E5P2YasJ8MdkmUaKeMj5NSVUmbEt2N9t6ZNgKkSskX1m` |
+
+`deployCost` in `shared/board/cost.js` for 196792 bytes and owner `nearcarta.near`:
+
+| | yoctoNEAR |
+|---|---|
+| Storage bytes | 196967 |
+| Stake | `1969670000000000000000000` (1.96967 NEAR) |
+| Burned gas | `3158720890222600000000` |
+| Account creation | `7000000000000000000000` |
+| Total | `1979828720890222600000000` |
+| Peak the owner must hold to send it | `2001257208902226000000000` |
+
+The live artifact stakes about 1.09 NEAR and comes back on `reap`. This wasm needs about 1.97 NEAR of stake. `backend/scripts/deploy-mainnet-board.js` refuses a total over 1.2 NEAR (`MAX_DEPLOY_YOCTO`). This change does not raise that cap and does not replace `contracts/artifacts/charter_board.wasm`.
+
+A plain `cargo build --target wasm32-unknown-unknown --release` wasm was not used. The near-sandbox rejected it while deserializing. The cargo-near file above is the one the sandbox deployed.
+
+## What the tests measured
+
+`cargo +1.86.0 test --lib --locked` in `contracts/charter_board`: 24 passed. `the_live_state_dump_still_decodes_and_propose_is_unchanged` still decodes `testdata/mainnet-state.bin` (block 223191542, 804 bytes, 2 rows) and the encoded `STATE` of that dump is unchanged. `init` state stays 30 bytes for `nearcarta.near`.
+
+The 24-pair row in `calls_stop_at_24_pairs_and_tightening_cannot_grant_or_reset` encodes `CALLS` as 836 bytes and locks `16850000000000000000000` yoctoNEAR (0.01685 NEAR). That lock includes the 600-byte side reserve (`SIDE_RESERVE_BYTES`). Pay receivers stay at 8.
+
+`contracts/charter_board_sandbox` (rustc 1.95.0, near-workspaces 0.24) deploys the cargo-near wasm onto one local account and opens two rows. Neither visitor account has a contract. A failed shop call refunds only that visitor. Alice's `propose` does not move Bob's balance. After both `close_charter` calls, `get_liabilities` is 0 and the owner `reap`s with 1 yocto. The sandbox registrar cannot create `nearcarta.near`, so that test's owner is the account `nearcarta` and `new` records it. `reap` pays `self.owner`. The unit tests boot with predecessor `nearcarta.near`, which is the production beneficiary.
+
+Gas burned in that sandbox run: one `propose_call_as` whose shop call failed and was refunded cost `7081555489393` gas (the two calls together were `14163110978786`). One `propose` cost `5915695481667` gas. The board account with this wasm and two rows reported `storage_usage` 198434.
+
+## Sequence, not executed
+
+1. Re-read `get_config`, the known visitor's `get_charter`, `view_account`, and the state-key list. Stop if `rows` is not the one known visitor, or if `balance` and `storage_locked` are not still that visitor's.
+2. That visitor calls `close_charter`. The 2026-11-05 deployment record says `force_close` is in the live wasm and the refund goes to the visitor, not to an account the caller picks. Prefer the visitor's own `close_charter`. Do not spend the row to pay for the new wasm. If the refund receipt fails because the account is short, the owner tops the contract up from `nearcarta.near` and retries the close. The top-up is not recovered by taking the visitor's balance.
+3. Re-read `get_config`. `rows` must be 0. The live wasm has no `get_liabilities`. The check on that wasm is `rows: 0` and an account balance that no longer contains the visitor's `balance`.
+4. The owner calls `reap` with exactly 1 yoctoNEAR. The contract deletes the account and the remainder, including the old wasm stake, goes to `nearcarta.near`.
+5. Create `board.nearcarta.near` again. Deploy the cargo-near wasm above only after the owner has reviewed the hash and raised the 1.2 NEAR deploy cap. Call `new` from `nearcarta.near`. The board starts empty. Visitors open rows again in `/setup`.
+6. After that deploy, a later upgrade is `stage_upgrade` (1 yocto, owner, code hash), a wait of `3600000000000` nanoseconds, then `upgrade` with the matching wasm, which calls `migrate`. `migrate` does not rewrite rows, nonces, or balances. This change did not stage anything.
+
+`close_charter` and `force_close` both refuse with `ERR_IN_FLIGHT` while that visitor has a hold. The live account has no holds. The new code does.
+
+## Interface the shops do not have yet
+
+This PR does not change Toll, Guard, House, Arena, Hall, Bank, Payouts, or Chronicle. No shop calls `propose_call_as`. The signed envelope the shops will use is `shared/board/call-as.js`.
+
+`propose_call_as` checks the active agent key over `board-call-as-v1`, the network (default `mainnet`, stored outside the `STATE` blob), the contract account, version `2`, the owner, the receiver, the method, the sha256 of the injected args, the deposit, the nonce, the expiry, the policy epoch, and the effect list. Args must be a JSON object. The contract overwrites a top-level `row_owner` with the row owner and rejects a duplicate of that key. A nested `row_owner` is not authority. A shop accepts the call only when `predecessor` is the board and the top-level `row_owner` is the visitor. `propose` and `propose_call` are unchanged.
+
+`propose_call` still caps the NEAR deposit only. An empty effect list on `propose_call_as` also means NEAR only. A non-empty effect with no matching budget panics `ERR_EFFECT` and creates no promise. A shop that keeps calling `propose_call` for wNEAR is still doing that, and that call is not a foreign-asset authorization. Setup records chain, asset, receiver, value, and fee through `set_effects`, which is owner-signed because raising a cap is a privilege expansion. `tighten_effects` can only lower a cap. A counter that has been spent cannot be deleted. The reservation is released when the promise fails, when the receiver refunds the exact amount, or when a pending hold is past expiry. `settle` is the receiver, after the call has been sent, and it keeps the reservation. A stranger cannot refund. A plain transfer to the board is not a row refund: `fund` credits only the predecessor's own row.
+
+`tighten_rules` and `tighten_calls` can shrink a cap, a receiver list, a method list, or the expiry, and can freeze. They cannot unfreeze, raise a cap, grant a call, or reset `spent`, the day, or the nonce. `set_frozen(false)` stays the owner's unfreeze. The contract sees the same predecessor for the session key and the owner's full-access key, so setup must not put `set_rules`, `set_frozen`, `set_agent`, or `set_effects` on the session key.
+
+`confirm_hold` checks a second key, `set_confirm_key`, which must differ from the agent key (`ERR_CONFIRM`). The message is `board-confirm-v1|<contract>|<owner>|<action_id>|<digest>|present`. The agent key cannot sign it. A browser that holds the confirm key can sign `present` without another wallet popup. That is the compromise boundary.
+
+`anchor` writes an `EVENT_JSON` log of a salted commitment, `sha256(salt || digest bytes)`, and stores nothing. The salt is required, 8 to 64 alphanumeric characters (`ERR_SALT`). The salt and the raw digest are not logged. There is no `anchors_of` map. A history view has to be rebuilt from the logs.
+
+Epoch, confirm key, and the upgrade record live in `META` and are not charged to the visitor. The 600-byte side reserve is charged to the visitor on `set_calls` and is refunded on `close_charter`. New fields are not added to the row or to `encode` of `STATE`.

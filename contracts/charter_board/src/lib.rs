@@ -15,10 +15,16 @@
 //! signature, so one visitor's key cannot spend another visitor's row.
 //! `propose` is unchanged. `propose_call` is a second method: the visitor
 //! allowlists (receiver, method) pairs with `set_calls`, and that policy
-//! lives under the `CALLS` storage key, not inside `STATE`.
+//! lives under the `CALLS` storage key, not inside `STATE`. `propose_call`
+//! caps the NEAR deposit only. A foreign asset needs `propose_call_as`.
+//! Effect budgets, in-flight holds and the side reserve live under `ACTS`.
+//! The policy epoch, the confirm key and the upgrade timer live under `META`.
+//! Neither key is inside `STATE`, so a row opened by the previous wasm still loads.
 //! The refusal strings, the window rule and the sealed-rule commitment match
 //! the oath charter (`oath-hidden-v1`, clause id `pay`).
 
+mod v2;
+use v2::{acts_len, decode_acts, decode_meta, encode_acts, encode_meta, meta_empty};
 use near_sdk::json_types::{U128, U64};
 use near_sdk::{env, require, AccountId, Gas, NearToken, Promise};
 use std::collections::{BTreeMap, BTreeSet};
@@ -26,6 +32,12 @@ use std::collections::{BTreeMap, BTreeSet};
 /// 0.02 NEAR. A row whose storage costs more than this is refused.
 pub const MAX_ROW_YOCTO: u128 = 20_000_000_000_000_000_000_000;
 pub const MAX_RECEIVERS: usize = 8;
+/// `set_calls` dedupes (receiver, method) and stops at this many. Pay receivers stay at 8.
+pub const MAX_CALLS: usize = 24;
+pub const SIDE_RESERVE_BYTES: u64 = 600;
+pub const MAX_OPEN_HOLDS: usize = 2;
+pub const UPGRADE_DELAY_NS: u64 = 3_600_000_000_000;
+pub const CALL_AS_VERSION: &str = "2";
 const NS_PER_MIN: u64 = 60_000_000_000;
 const NS_PER_DAY: u64 = 86_400 * NS_PER_MIN;
 const GAS_CALLBACK: Gas = Gas::from_tgas(8);
@@ -119,17 +131,67 @@ pub struct Config {
     pub byte_yocto: U128,
 }
 
+#[derive(Clone)]
+pub struct EffectIn {
+    pub chain: String,
+    pub asset: String,
+    pub to: String,
+    pub value: u128,
+    pub fee: u128,
+}
+
+#[derive(Clone)]
+struct EffectCap {
+    chain: String,
+    asset: String,
+    receiver: String,
+    value_cap: u128,
+    value_spent: u128,
+    fee_cap: u128,
+    fee_spent: u128,
+}
+
+#[derive(Clone)]
+struct Hold {
+    receiver: AccountId,
+    method: String,
+    args: Vec<u8>,
+    amount: u128,
+    day: u64,
+    effects: Vec<EffectIn>,
+    expires: u64,
+    pending: bool,
+}
+
 pub struct Board {
     owner: AccountId,
     rows: BTreeMap<AccountId, Row>,
     keys: BTreeMap<[u8; 32], AccountId>,
     count: u32,
     calls: BTreeMap<AccountId, CallPolicy>,
+    effects: BTreeMap<AccountId, Vec<EffectCap>>,
+    holds: BTreeMap<(AccountId, u64), Hold>,
+    credit: BTreeMap<AccountId, u128>,
+    confirm: BTreeMap<AccountId, [u8; 32]>,
+    epoch: BTreeMap<AccountId, u64>,
+    network: String,
+    upgrade_hash: [u8; 32],
+    upgrade_eta: u64,
+    upgrade_set: bool,
+}
+
+fn board_from(owner: AccountId, rows: BTreeMap<AccountId, Row>, keys: BTreeMap<[u8; 32], AccountId>, count: u32, calls: BTreeMap<AccountId, CallPolicy>) -> Board {
+    Board {
+        owner, rows, keys, count, calls,
+        effects: BTreeMap::new(), holds: BTreeMap::new(), credit: BTreeMap::new(),
+        confirm: BTreeMap::new(), epoch: BTreeMap::new(), network: "mainnet".into(),
+        upgrade_hash: [0; 32], upgrade_eta: 0, upgrade_set: false,
+    }
 }
 
 impl Board {
     pub fn new() -> Self {
-        Self { owner: env::predecessor_account_id(), rows: BTreeMap::new(), keys: BTreeMap::new(), count: 0, calls: BTreeMap::new() }
+        board_from(env::predecessor_account_id(), BTreeMap::new(), BTreeMap::new(), 0, BTreeMap::new())
     }
 
     /// Open this visitor's row. `fund` stays as spendable balance.
@@ -169,6 +231,7 @@ impl Board {
         let before = self.bytes();
         self.rows.get_mut(&me).expect("ERR_NO_CHARTER").rules = rules;
         self.charge(&me, before);
+        self.bump_epoch(&me);
     }
 
     pub fn set_frozen(&mut self, frozen: bool) {
@@ -197,6 +260,7 @@ impl Board {
         self.keys.insert(pk, me.clone());
         self.rows.get_mut(&me).unwrap().agent = pk;
         self.charge(&me, before);
+        self.bump_epoch(&me);
     }
 
     pub fn fund(&mut self) {
@@ -217,16 +281,24 @@ impl Board {
     }
 
     fn release(&mut self, who: AccountId) -> Promise {
+        require!(!self.holds.keys().any(|(o, _)| o == &who), "ERR_IN_FLIGHT");
         let before = self.bytes();
         let calls_before = encode_calls(&self.calls).len() as u64;
+        let acts_before = acts_len(self);
         let row = self.rows.remove(&who).expect("ERR_NO_CHARTER");
         self.keys.remove(&row.agent);
         self.calls.remove(&who);
+        self.effects.remove(&who);
+        self.holds.retain(|(o, _), _| o != &who);
+        let credit = self.credit.remove(&who).unwrap_or(0);
+        self.confirm.remove(&who);
+        self.epoch.remove(&who);
         self.count -= 1;
         let freed = self.shrank(before);
         let calls_after = encode_calls(&self.calls).len() as u64;
         let calls_freed = (calls_before - calls_after) as u128 * price();
-        let back = freed + calls_freed + row.balance + env::attached_deposit().as_yoctonear();
+        let acts_freed = acts_before.saturating_sub(acts_len(self)) as u128 * price();
+        let back = freed + calls_freed + acts_freed + credit + row.balance + env::attached_deposit().as_yoctonear();
         require!(back > 0, "ERR_REFUND");
         Promise::new(who).transfer(NearToken::from_yoctonear(back))
     }
@@ -293,7 +365,7 @@ impl Board {
     pub fn set_calls(&mut self, rules: Vec<(AccountId, String, u128)>, session_cap: u128) {
         let me = env::predecessor_account_id();
         require!(self.rows.contains_key(&me), "ERR_NO_CHARTER");
-        require!(rules.len() <= MAX_RECEIVERS, "ERR_RECEIVERS");
+        require!(rules.len() <= MAX_CALLS, "ERR_RECEIVERS");
         let mut seen = BTreeSet::new();
         let mut parsed = Vec::new();
         for (receiver, method, cap) in rules {
@@ -311,7 +383,8 @@ impl Board {
         } else {
             self.calls.insert(me.clone(), CallPolicy { rules: parsed, session_cap, session_spent: spent });
         }
-        self.charge_len(&me, before, encode_calls(&self.calls).len() as u64);
+        self.charge_calls_and_reserve(&me, before, encode_calls(&self.calls).len() as u64);
+        self.bump_epoch(&me);
     }
 
     /// A signed function call. The message covers the method and sha256(args). The deposit
@@ -384,6 +457,7 @@ impl Board {
         require!(env::attached_deposit() == NearToken::from_yoctonear(1), "ERR_ONE_YOCTO");
         require!(env::predecessor_account_id() == self.owner, "ERR_NOT_OWNER");
         require!(self.count == 0, "ERR_NONEMPTY");
+        require!(self.holds.is_empty() && self.liabilities() == 0, "ERR_LIABILITY");
         Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
 
@@ -438,24 +512,6 @@ impl Board {
         let after = self.bytes();
         require!(before >= after, "ERR_STORAGE");
         (before - after) as u128 * price()
-    }
-
-    fn charge_len(&mut self, me: &AccountId, before: u64, after: u64) {
-        let attached = env::attached_deposit().as_yoctonear();
-        if after > before {
-            let cost = (after - before) as u128 * price();
-            require!(attached >= cost, "ERR_DEPOSIT");
-            let row = self.rows.get_mut(me).unwrap();
-            require!(row.storage_locked + cost <= MAX_ROW_YOCTO, "ERR_ROW_TOO_BIG");
-            row.storage_locked += cost;
-            refund(me, attached - cost);
-        } else {
-            let freed = (before - after) as u128 * price();
-            if let Some(row) = self.rows.get_mut(me) {
-                row.storage_locked = row.storage_locked.saturating_sub(freed);
-            }
-            refund(me, freed + attached);
-        }
     }
 
     fn charge(&mut self, me: &AccountId, before: u64) {
@@ -681,7 +737,7 @@ fn decode(raw: &[u8]) -> Board {
     for _ in 0..m { let k = r.bytes32(); keys.insert(k, r.acc()); }
     let count = r.u32();
     require!(r.i == raw.len(), "ERR_STATE");
-    Board { owner, rows, keys, count, calls: BTreeMap::new() }
+    board_from(owner, rows, keys, count, BTreeMap::new())
 }
 
 fn encode_calls(m: &BTreeMap<AccountId, CallPolicy>) -> Vec<u8> {
@@ -708,7 +764,7 @@ fn decode_calls(raw: &[u8]) -> BTreeMap<AccountId, CallPolicy> {
     for _ in 0..n {
         let owner = r.acc();
         let k = r.u32() as usize;
-        require!(k <= MAX_RECEIVERS, "ERR_STATE");
+        require!(k <= MAX_CALLS, "ERR_STATE");
         let mut rules = Vec::with_capacity(k);
         for _ in 0..k {
             rules.push(CallRule { receiver: r.acc(), method: r.string(), cap: r.u128() });
@@ -724,11 +780,17 @@ fn save(b: &Board) {
     let calls = encode_calls(&b.calls);
     if b.calls.is_empty() { env::storage_remove(b"CALLS"); }
     else { env::storage_write(b"CALLS", &calls); }
+    if acts_len(b) == 0 { env::storage_remove(b"ACTS"); }
+    else { env::storage_write(b"ACTS", &encode_acts(b)); }
+    if meta_empty(b) { env::storage_remove(b"META"); }
+    else { env::storage_write(b"META", &encode_meta(b)); }
 }
 fn load() -> Board {
     let raw = env::storage_read(b"STATE").unwrap_or_else(|| env::panic_str("ERR_NO_STATE"));
     let mut b = decode(&raw);
     if let Some(raw) = env::storage_read(b"CALLS") { b.calls = decode_calls(&raw); }
+    if let Some(raw) = env::storage_read(b"ACTS") { decode_acts(&mut b, &raw); }
+    if let Some(raw) = env::storage_read(b"META") { decode_meta(&mut b, &raw); }
     b
 }
 fn input_str() -> String {
@@ -953,9 +1015,10 @@ impl J<'_> {
 #[allow(unused_must_use)]
 mod tests {
     use super::*;
+    use super::v2::{acts_len, inject_row_owner};
     use ed25519_dalek::{Signer, SigningKey};
     use near_sdk::mock::MockAction;
-    use near_sdk::test_utils::{get_created_receipts, VMContextBuilder};
+    use near_sdk::test_utils::{get_created_receipts, get_logs, VMContextBuilder};
     use near_sdk::{testing_env, test_vm_config, Gas, PromiseResult, RuntimeFeesConfig};
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -1565,6 +1628,387 @@ mod tests {
         c.on_called(acc(ALICE), U128(deposit), U64(0));
         assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, bal);
         assert_eq!(c.calls.get(&acc(ALICE)).unwrap().session_spent, spent);
+    }
+
+    fn effect(chain: &str, asset: &str, to: &str, value: u128, fee: u128) -> EffectIn {
+        EffectIn { chain: chain.into(), asset: asset.into(), to: to.into(), value, fee }
+    }
+
+    fn sign_as(sk: &SigningKey, c: &Board, owner: &str, receiver: &str, method: &str, args: &str, deposit: u128, expiry: u64, effects: Vec<EffectIn>, hold: bool) -> String {
+        let nonce = c.get_charter(acc(owner)).unwrap().nonce.0;
+        let msg = c.call_as_message(acc(owner), acc(receiver), method.into(), args.into(), U128(deposit), U64(nonce), U64(expiry), effects, hold);
+        hex32_n(&sk.sign(msg.as_bytes()).to_bytes())
+    }
+
+    fn open_bob(c: &mut Board) {
+        go(BOB, MAX_ROW_YOCTO, 0);
+        c.open_charter(rules((0, 0), 4), keypair(9).1, U128(NEAR / 500));
+    }
+
+    #[test]
+    fn the_call_as_envelope_overwrites_only_the_top_level_owner() {
+        let (c, _, _) = boot();
+        let args = r#"{"amount":"1","note":{"row_owner":"mallory.near"}}"#;
+        let msg = c.call_as_message(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(1), U64(0), U64(99), vec![], false);
+        assert_eq!(msg, "board-call-as-v1|mainnet|charters.nearcarta.near|2|alice.near|shop.nearcarta.near|ft_transfer|b99351d51b134e460c661fda6f7bfedf1ed9ba92d887028a142a14469a2308f3|1|0|99|0|-|exec");
+        assert_eq!(inject_row_owner(args, &acc(ALICE)), r#"{"amount":"1","note":{"row_owner":"mallory.near"},"row_owner":"alice.near"}"#);
+        for bad in [r#"["nope"]"#, "null", r#""str""#, "1", r#"{"row_owner":"a.near","row_owner":"b.near"}"#, r#"{"a":"1","a":"2"}"#] {
+            let err = catch_unwind(AssertUnwindSafe(|| inject_row_owner(bad, &acc(ALICE)))).unwrap_err();
+            assert!(refuse(err).contains("ERR_ARGS"), "{bad}");
+        }
+    }
+
+    #[test]
+    fn two_visitors_spend_only_their_own_row_and_no_second_contract_is_created() {
+        let (mut c, alice_sk, _) = boot();
+        open_bob(&mut c);
+        let (bob_sk, _) = keypair(9);
+        let deposit = NEAR / 2000;
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
+        go(BOB, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![effect("base", "usdc", "0xabc", 1_000, 10)]);
+        go(BOB, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![effect("base", "usdc", "0xabc", 50, 5)]);
+        let bob_bal = c.get_charter(acc(BOB)).unwrap().balance.0;
+        let bob_epoch = c.epoch_of(&acc(BOB));
+        let expiry = 1_000_000_000_000;
+        let effects = vec![effect("base", "usdc", "0xabc", 25, 1)];
+        go(ALICE, 0, 0);
+        let sig = sign_as(&alice_sk, &c, ALICE, SHOP, "ft_transfer", r#"{"amount":"1","note":{"row_owner":"mallory.near"}}"#, deposit, expiry, effects.clone(), false);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), r#"{"amount":"1","note":{"row_owner":"mallory.near"}}"#.into(), U128(deposit), U64(expiry), effects, false, sig);
+        let alice = c.get_charter(acc(ALICE)).unwrap();
+        assert_eq!(alice.balance.0, NEAR / 1000 - deposit);
+        assert_eq!(alice.nonce.0, 1);
+        assert_eq!(c.effect_spent(&acc(ALICE), "base", "usdc", "0xabc"), (25, 1));
+        assert_eq!(c.get_charter(acc(BOB)).unwrap().balance.0, bob_bal);
+        assert_eq!(c.get_charter(acc(BOB)).unwrap().nonce.0, 0);
+        assert_eq!(c.effect_spent(&acc(BOB), "base", "usdc", "0xabc"), (0, 0));
+        assert_eq!(c.epoch_of(&acc(BOB)), bob_epoch);
+        let forwarded = get_created_receipts().into_iter().flat_map(|r| r.actions).find_map(|a| match a {
+            MockAction::FunctionCallWeight { method_name, args, attached_deposit, .. } if method_name == b"ft_transfer" && attached_deposit.as_yoctonear() == deposit => Some(String::from_utf8(args).unwrap()),
+            _ => None,
+        }).expect("shop call");
+        assert_eq!(forwarded, r#"{"amount":"1","note":{"row_owner":"mallory.near"},"row_owner":"alice.near"}"#);
+        assert_eq!(c.get_config().rows, 2);
+        go(BOB, 0, 0);
+        let sig = sign_as(&bob_sk, &c, BOB, SHOP, "ft_transfer", r#"{"amount":"1"}"#, deposit, expiry, vec![effect("base", "usdc", "0xabc", 1_000, 1)], false);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(BOB), acc(SHOP), "ft_transfer".into(), r#"{"amount":"1"}"#.into(), U128(deposit), U64(expiry), vec![effect("base", "usdc", "0xabc", 1_000, 1)], false, sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_EFFECT"), "bob cannot spend alice's budget or past his own");
+        assert_eq!(c.get_charter(acc(BOB)).unwrap().balance.0, bob_bal);
+    }
+
+    #[test]
+    fn foreign_effects_are_capped_and_propose_call_does_not_admit_one() {
+        let (mut c, sk, _) = boot();
+        let deposit = 1u128;
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
+        let expiry = 50u64;
+        go(ALICE, 0, 0);
+        let args = "{}";
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", args, deposit, expiry, vec![effect("base", "usdc", "0xabc", 1_000_000, 1)], false);
+        let before = get_created_receipts().len();
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(deposit), U64(expiry), vec![effect("base", "usdc", "0xabc", 1_000_000, 1)], false, sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_EFFECT"));
+        assert_eq!(get_created_receipts().len(), before, "no shop call without a budget");
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, NEAR / 1000);
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![effect("base", "usdc", "0xabc", 10, 1)]);
+        go(ALICE, 0, 0);
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", args, deposit, expiry, vec![effect("base", "usdc", "0xabc", 11, 1)], false);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(deposit), U64(expiry), vec![effect("base", "usdc", "0xabc", 11, 1)], false, sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_EFFECT"), "over the value budget");
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 50)], NEAR / 50);
+        go(ALICE, 0, 0);
+        let big = NEAR / 100;
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", args, big, expiry, vec![effect("base", "usdc", "0xabc", 1, 1)], false);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(big), U64(expiry), vec![effect("base", "usdc", "0xabc", 1, 1)], false, sig);
+        })).unwrap_err();
+        assert!(refuse(err).contains("over_per_action_cap"), "the NEAR deposit still counts");
+    }
+
+    #[test]
+    fn signatures_reject_replay_stale_epoch_and_the_wrong_domain() {
+        let (mut c, sk, _) = boot();
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![effect("base", "usdc", "0xabc", 100, 10)]);
+        let deposit = NEAR / 2000;
+        let expiry = 1_000_000u64;
+        let effects = vec![effect("base", "usdc", "0xabc", 2, 1)];
+        let args = "{}";
+        go(ALICE, 0, 0);
+        let used = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", args, deposit, expiry, effects.clone(), false);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(deposit), U64(expiry), effects.clone(), false, used.clone());
+        go(ALICE, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(deposit), U64(expiry), effects.clone(), false, used);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_BAD_SIG"), "replay");
+        go(ALICE, 0, 0);
+        let stale = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", args, deposit, expiry, effects.clone(), false);
+        c.tighten_rules(RulesIn { per_action_cap: U128(NEAR / 1000), ..rules((0, 0), 4) }, false);
+        go(ALICE, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(deposit), U64(expiry), effects.clone(), false, stale);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_BAD_SIG"), "epoch moved");
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().nonce.0, 1, "a rejected signature does not burn the nonce");
+        let nonce = c.get_charter(acc(ALICE)).unwrap().nonce.0;
+        let mut forged = c.call_as_message(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(deposit), U64(nonce), U64(expiry), effects.clone(), false);
+        forged = forged.replacen("mainnet", "testnet", 1);
+        let bad = hex32_n(&sk.sign(forged.as_bytes()).to_bytes());
+        go(ALICE, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(deposit), U64(expiry), effects, false, bad);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_BAD_SIG"), "domain");
+    }
+
+    #[test]
+    fn calls_stop_at_24_pairs_and_tightening_cannot_grant_or_reset() {
+        let (mut c, sk, _) = boot();
+        let mut many = Vec::new();
+        for i in 0..24 {
+            many.push((acc(&format!("s{i}.near")), "m".into(), NEAR / 500));
+        }
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(many.clone(), NEAR / 100);
+        assert_eq!(c.call_count(&acc(ALICE)), 24);
+        let bytes = c.calls_encoded_len();
+        let locked = c.get_charter(acc(ALICE)).unwrap().storage_locked.0;
+        // 24 short pairs, plus the row and the 600-byte side reserve, stay inside 0.02 NEAR.
+        assert_eq!(bytes, 836);
+        assert_eq!(locked, 16_850_000_000_000_000_000_000);
+        many.push((acc("s24.near"), "m".into(), NEAR / 500));
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.set_calls(many, NEAR / 100))).unwrap_err();
+        assert!(refuse(err).contains("ERR_RECEIVERS"));
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.set_calls(vec![(acc("s0.near"), "m".into(), NEAR / 500), (acc("s0.near"), "m".into(), NEAR / 500)], NEAR / 100);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_RECEIVERS"), "duplicate pair");
+        let spent_before = c.get_charter(acc(ALICE)).unwrap().spent_today.0;
+        let nonce = c.get_charter(acc(ALICE)).unwrap().nonce.0;
+        go(ALICE, 0, 0);
+        c.tighten_calls(vec![(acc("s0.near"), "m".into(), NEAR / 1000)], NEAR / 200);
+        assert_eq!(c.call_count(&acc(ALICE)), 1);
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().nonce.0, nonce);
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().spent_today.0, spent_before);
+        go(ALICE, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.tighten_calls(vec![(acc("s1.near"), "m".into(), 1)], 1))).unwrap_err();
+        assert!(refuse(err).contains("ERR_LOOSEN"), "cannot grant a method");
+        go(ALICE, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.tighten_rules(RulesIn { per_action_cap: U128(NEAR / 100), daily_budget: U128(NEAR / 100), ..rules((0, 0), 4) }, false);
+        })).unwrap_err();
+        assert!(refuse(err).contains("ERR_LOOSEN"));
+        go(ALICE, 0, 0);
+        c.tighten_rules(RulesIn { per_action_cap: U128(NEAR / 1000), daily_budget: U128(NEAR / 400), expires_at: U64(10), ..rules((10, 20), 2) }, true);
+        let row = c.get_charter(acc(ALICE)).unwrap();
+        assert!(row.frozen);
+        assert_eq!(row.nonce.0, nonce);
+        assert_eq!(row.expires_at.0, 10);
+        go(ALICE, 0, 0);
+        c.set_rules(rules((0, 0), 4));
+        assert!(c.get_charter(acc(ALICE)).unwrap().frozen, "tighten's freeze stays through a rules edit");
+        go(ALICE, 0, 0);
+        c.set_frozen(false);
+        assert!(!c.get_charter(acc(ALICE)).unwrap().frozen);
+        let _ = sk;
+    }
+
+    #[test]
+    fn a_confirm_key_is_not_the_agent_and_a_refund_cannot_be_spoofed() {
+        let (mut c, agent, _) = boot();
+        open_bob(&mut c);
+        let (confirm, confirm_pk) = keypair(11);
+        go(ALICE, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.set_confirm_key(keypair(7).1))).unwrap_err();
+        assert!(refuse(err).contains("ERR_CONFIRM"));
+        go(ALICE, 0, 0);
+        c.set_confirm_key(confirm_pk);
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 200);
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![effect("base", "usdc", "0xabc", 100, 10)]);
+        let deposit = NEAR / 2000;
+        let expiry = 100u64;
+        let effects = vec![effect("base", "usdc", "0xabc", 4, 1)];
+        let args = "{}";
+        go(ALICE, 0, 0);
+        let sig = sign_as(&agent, &c, ALICE, SHOP, "ft_transfer", args, deposit, expiry, effects.clone(), true);
+        let receipts_before = get_created_receipts().len();
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), args.into(), U128(deposit), U64(expiry), effects, true, sig);
+        assert_eq!(get_created_receipts().len(), receipts_before, "a hold does not call the shop");
+        assert_eq!(c.effect_spent(&acc(ALICE), "base", "usdc", "0xabc"), (4, 1));
+        let id = 0u64;
+        go(ALICE, 0, 0);
+        let agent_msg = c.confirm_message(acc(ALICE), U64(id));
+        let agent_sig = hex32_n(&agent.sign(agent_msg.as_bytes()).to_bytes());
+        let err = catch_unwind(AssertUnwindSafe(|| { c.confirm_hold(acc(ALICE), U64(id), agent_sig); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_BAD_SIG"), "the agent key is not human approval");
+        go(ALICE, 0, 0);
+        let ok = hex32_n(&confirm.sign(c.confirm_message(acc(ALICE), U64(id)).as_bytes()).to_bytes());
+        c.confirm_hold(acc(ALICE), U64(id), ok);
+        let called = get_created_receipts().into_iter().flat_map(|r| r.actions).any(|a| matches!(a, MockAction::FunctionCallWeight { method_name, .. } if method_name == b"ft_transfer"));
+        assert!(called);
+        let bob_bal = c.get_charter(acc(BOB)).unwrap().balance.0;
+        go(OTHER, deposit, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.refund_action(acc(ALICE), U64(id)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_REFUND"));
+        go(SHOP, deposit, 0);
+        c.refund_action(acc(ALICE), U64(id));
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, NEAR / 1000);
+        assert_eq!(c.effect_spent(&acc(ALICE), "base", "usdc", "0xabc"), (0, 0));
+        assert_eq!(c.get_charter(acc(BOB)).unwrap().balance.0, bob_bal);
+        go(SHOP, deposit, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.refund_action(acc(ALICE), U64(id)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_ACTION"), "replay");
+        go(SHOP, NEAR, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.fund())).unwrap_err();
+        assert!(refuse(err).contains("ERR_NO_CHARTER"), "a transfer to the board is not a row refund");
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, NEAR / 1000);
+    }
+
+    #[test]
+    fn failure_timeout_and_settle_release_only_that_action() {
+        let (mut c, sk, _) = boot();
+        open_bob(&mut c);
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "ft_transfer".into(), NEAR / 500)], NEAR / 50);
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![effect("base", "usdc", "0xabc", 100, 10)]);
+        let deposit = NEAR / 2000;
+        let expiry = 100u64;
+        let effects = vec![effect("base", "usdc", "0xabc", 3, 1)];
+        go(ALICE, 0, 0);
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", "{}", deposit, expiry, effects.clone(), false);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), "{}".into(), U128(deposit), U64(expiry), effects, false, sig);
+        let bal = c.get_charter(acc(ALICE)).unwrap().balance.0;
+        go(SHOP, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.on_called_as(acc(ALICE), U64(0)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_PRIVATE"), "the shop cannot pretend to be the callback");
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(acc("charters.nearcarta.near"))
+            .predecessor_account_id(acc("charters.nearcarta.near"))
+            .prepaid_gas(Gas::from_tgas(30))
+            .account_balance(NearToken::from_near(30));
+        testing_env!(b.build(), test_vm_config(), RuntimeFeesConfig::test(), Default::default(), vec![PromiseResult::Failed]);
+        c.on_called_as(acc(ALICE), U64(0));
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, bal + deposit);
+        assert_eq!(c.effect_spent(&acc(ALICE), "base", "usdc", "0xabc"), (0, 0));
+        c.on_called_as(acc(ALICE), U64(0));
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, bal + deposit, "replay does not pay twice");
+        let effects = vec![effect("base", "usdc", "0xabc", 3, 1)];
+        go(ALICE, 0, 0);
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", "{}", deposit, expiry, effects.clone(), true);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), "{}".into(), U128(deposit), U64(expiry), effects, true, sig);
+        go(ALICE, 0, 50);
+        let err = catch_unwind(AssertUnwindSafe(|| c.refund_action(acc(ALICE), U64(1)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_REFUND"), "too early");
+        go(ALICE, 0, expiry + 1);
+        c.refund_action(acc(ALICE), U64(1));
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, NEAR / 1000);
+        assert_eq!(c.get_charter(acc(BOB)).unwrap().balance.0, NEAR / 500);
+        go(ALICE, 0, 0);
+        let effects = vec![effect("base", "usdc", "0xabc", 3, 1)];
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "ft_transfer", "{}", deposit, 1_000_000, effects.clone(), false);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "ft_transfer".into(), "{}".into(), U128(deposit), U64(1_000_000), effects, false, sig);
+        go(SHOP, 0, 0);
+        c.settle(acc(ALICE), U64(2));
+        go(SHOP, deposit, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.refund_action(acc(ALICE), U64(2)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_ACTION"), "settled");
+        assert_eq!(c.effect_spent(&acc(ALICE), "base", "usdc", "0xabc"), (3, 1), "settle keeps the reservation");
+    }
+
+    #[test]
+    fn anchor_stores_nothing_and_migrate_keeps_both_rows() {
+        let (mut c, _, _) = boot();
+        open_bob(&mut c);
+        let state = encode(&c);
+        let owed = c.liabilities();
+        go(ALICE, 0, 5);
+        c.anchor("note".into(), "ab".repeat(32), "saltsalt".into());
+        let logs = get_logs();
+        assert!(logs.iter().any(|l| l.contains("\"event\":\"anchor\"") && l.contains("\"owner\":\"alice.near\"") && !l.contains("saltsalt") && !l.contains(&"ab".repeat(32))));
+        assert_eq!(encode(&c), state);
+        assert_eq!(c.liabilities(), owed);
+        go(ALICE, 0, 5);
+        let err = catch_unwind(AssertUnwindSafe(|| c.anchor("note".into(), "ab".repeat(32), "".into()))).unwrap_err();
+        assert!(refuse(err).contains("ERR_SALT"), "a raw digest is not the default");
+        let alice_bal = c.get_charter(acc(ALICE)).unwrap().balance.0;
+        let bob_bal = c.get_charter(acc(BOB)).unwrap().balance.0;
+        let nonce = c.get_charter(acc(ALICE)).unwrap().nonce.0;
+        go("charters.nearcarta.near", 0, 5);
+        c.migrate();
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, alice_bal);
+        assert_eq!(c.get_charter(acc(BOB)).unwrap().balance.0, bob_bal);
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().nonce.0, nonce);
+        assert_eq!(encode(&c), state);
+        go(ALICE, 1, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| c.stage_upgrade("11".repeat(32)))).unwrap_err();
+        assert!(refuse(err).contains("ERR_NOT_OWNER"));
+        let code = vec![0x11, 0x22, 0x33, 0x44];
+        go("nearcarta.near", 1, 0);
+        c.stage_upgrade(hex32(&env::sha256_array(&code)));
+        let eta = c.upgrade_eta();
+        go("nearcarta.near", 0, eta - 1);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.upgrade(code.clone()); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_UPGRADE"), "too early");
+        go("nearcarta.near", 0, eta);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.upgrade(vec![0x22]); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_UPGRADE"), "hash");
+        assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, alice_bal);
+        go("nearcarta.near", 0, eta);
+        c.upgrade(code.clone());
+        let deployed = get_created_receipts().into_iter().flat_map(|r| r.actions).any(|a| matches!(a, MockAction::DeployContract { code: wasm, .. } if wasm == code));
+        assert!(deployed);
+        assert!(c.liabilities() > 0);
+        go("nearcarta.near", 1, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.reap(); })).unwrap_err();
+        let msg = refuse(err);
+        assert!(msg.contains("ERR_NONEMPTY") || msg.contains("ERR_LIABILITY"), "{msg}");
+        go(ALICE, 0, 0);
+        c.close_charter();
+        let alice_back = transfers_to(ALICE).last().copied().expect("alice refund");
+        assert!(alice_back >= alice_bal);
+        go(BOB, 0, 0);
+        c.close_charter();
+        assert!(transfers_to(BOB).last().copied().unwrap() >= bob_bal);
+        assert_eq!(c.liabilities(), 0);
+        go("nearcarta.near", 1, 0);
+        c.reap();
+        let deleted = get_created_receipts().into_iter().flat_map(|r| r.actions).any(|a| matches!(a, MockAction::DeleteAccount { beneficiary_id, .. } if beneficiary_id == acc("nearcarta.near")));
+        assert!(deleted, "teardown pays the owner");
+    }
+
+    #[test]
+    fn live_rows_round_trip_through_v2_storage_without_changing_state() {
+        go("nearcarta.near", 0, 0);
+        let raw = include_bytes!("../testdata/mainnet-state.bin");
+        let live = decode(raw);
+        assert_eq!(encode(&live), raw.as_slice());
+        assert_eq!(acts_len(&live), 0);
+        save(&live);
+        let back = load();
+        assert_eq!(encode(&back), raw.as_slice());
+        assert_eq!(back.get_config().rows, 2);
+        assert_eq!(back.liabilities() > 0, true);
     }
 
     fn b58encode(data: &[u8]) -> String {

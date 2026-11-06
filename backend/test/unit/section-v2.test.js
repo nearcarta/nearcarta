@@ -62,7 +62,7 @@ test('wrap.near uses the rule cap when that cap is at least 0.05 NEAR', () => {
   assert.equal(callPolicy(['charter.nearcarta.near'], edge, edge).calls.find(c => c.method === 'near_deposit').cap, edge);
 });
 
-test('callPolicy dedupes the wrap.near shop and keeps the trio inside 8', () => {
+test('callPolicy dedupes the wrap.near shop and keeps the trio inside 24', () => {
   // The hand-tested list. The shop entry wrap.near + ft_transfer is the same pair
   // FERRY_CALL_TARGETS already adds, and set_calls panics ERR_RECEIVERS on a repeat.
   const receivers = ['charter.nearcarta.near', 'toll.nearcarta.near', 'wrap.near'];
@@ -76,10 +76,10 @@ test('callPolicy dedupes the wrap.near shop and keeps the trio inside 8', () => 
     'wrap.near:storage_deposit',
   ]);
   assert.equal(new Set(pairs).size, pairs.length);
-  assert.ok(pairs.length <= 8);
+  assert.ok(pairs.length <= 24);
   const many = ['a.near', 'b.near', 'c.near', 'd.near', 'e.near', 'f.near', 'g.near', 'h.near', 'i.near'];
   const capped = callPolicy(many, '1', '2');
-  assert.equal(capped.calls.length, 8);
+  assert.equal(capped.calls.length, 12);
   assert.deepEqual(capped.calls.slice(-3).map(c => [c.receiver, c.method]), [
     ['wrap.near', 'near_deposit'],
     ['wrap.near', 'ft_transfer'],

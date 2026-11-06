@@ -29,17 +29,13 @@ Gas burned by deploy, by payments, and by the 0.007 NEAR account-creation charge
 
 ## Redeploy
 
-The live account has no access key (`full_access_keys` is 0 in `shared/deployments/mainnet.json`) and the wasm has no upgrade method. Nothing can deploy new code onto it. `force_close` is in this source. It is not in the wasm that is live (code hash `6aBm6TugZzge9uHDpSsr6pG7XPfZm22JoZ8XZxknRGsa`, deploy `CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt`). This repo does not sign a replacement. A `view_access_key_list` read on this change returned no keys, and no signer was set, so no deploy transaction and no payment were sent. Replacing the account still requires every open row to call `close_charter` first, which returns that visitor's balance. That is not a test amount.
+The account that is live is the `board` entry in `shared/deployments/mainnet.json`: code hash `Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C`, wasm sha256 `910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29`, deploy `CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4`, 108955 bytes. A read-only view on 2026-11-06 saw no access keys. That wasm has no upgrade method, so this repo cannot put new code on it. An earlier wasm (code hash `6aBm6TugZzge9uHDpSsr6pG7XPfZm22JoZ8XZxknRGsa`, deploy `CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt`) is not the account that is live. The v2 source is not deployed. The dry-run, which was not executed, is `docs/BOARD_V2_MIGRATION.md`. `reap` pays the owner recorded by `new`, and on this account that owner is `nearcarta.near`.
 
 The `STATE` key layout did not change: `force_close` adds no field. `propose_call` stores its allowlist in a separate `CALLS` key, which `save` writes only after `set_calls`. A board with no call policy has no `CALLS` key, and `encode` of `STATE` stays the same bytes. `state_roundtrips_and_wallet_json_parses` still decodes a board written by this code. `the_live_state_dump_still_decodes_and_propose_is_unchanged` decodes the `view_state` copy in `contracts/charter_board/testdata/mainnet-state.bin` (block 223191542, 804 bytes, 2 rows), checks `get_charter` against `testdata/mainnet-views.json`, refuses a bad `propose` signature without moving the row, refuses `propose_call` with `method_not_allowlisted` until `set_calls`, and then pays the copied row's minimum with `propose`. The `propose` argument names are unchanged. A later wasm can read those rows only if it is built with near-sdk 5.27.0 and rustc 1.86.0 (`contracts/charter_board/rust-toolchain.toml`). The near-sdk 5.30 wasm did not link on mainnet (`failed_deploy_tx` `4mq8P3jugnatzbbc9VzDbufCBpyj27TxwK4w3L7nTPCX`, unknown import). Do not build the replacement with that sdk.
 
-Because the live account cannot take new code, the owner does this by hand:
+The replacement sequence is the dry-run in `docs/BOARD_V2_MIGRATION.md`. It was not run. Do not call `reap` while `get_config` reports a row: the account balance includes that visitor's funds, and `reap` would send them to `nearcarta.near`.
 
-1. Each visitor calls `close_charter` on the live board. That is the only refund on the live wasm. The owner cannot `force_close` there yet. The contract does not list row keys, so the owner uses the visitors they already know (the proof row is the owner account in `board.proof`).
-2. When `get_config` reports `rows: 0`, the owner calls `reap` with 1 yoctoNEAR. The account is deleted and the wasm stake returns to `nearcarta.near`.
-3. The owner creates the subaccount again and deploys this crate's wasm, built with rustc 1.86.0 and near-sdk 5.27.0, then calls `new`. The new board starts empty. The rows were refunded in step 1, not dropped. From then on `force_close` is what lets `reap` run without waiting on a visitor.
-
-`node backend/scripts/deploy-mainnet-board.js` still prints the cost and does not sign unless the owner passes `--live`.
+`node backend/scripts/deploy-mainnet-board.js` still prints the cost of the committed artifact and does not sign unless the owner passes `--live`. The v2 wasm is larger than that script's 1.2 NEAR cap. This change does not raise the cap.
 
 ## The site
 

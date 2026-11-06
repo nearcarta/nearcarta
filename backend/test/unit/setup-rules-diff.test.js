@@ -113,8 +113,8 @@ test('an update keeps the chain expiry unless the visitor changed the session', 
 
 test('a partial batch says which part failed and keeps the set_rules hash', () => {
   const panic = Object.assign(new Error('Smart contract panicked: ERR_RECEIVERS'), { txHash: 'EETg1qxxwtatHj8fwSQTxoRQJ18DTFc3mJmF5icFnVvp' });
-  assert.equal(plainRulesError(panic, { rulesSaved: true }), 'set_rules was saved. set_calls was refused: the shop list repeats an account and a method, or it names more than 8.');
-  assert.equal(plainRulesError(panic, { rulesSaved: false }), 'set_calls was refused: the shop list repeats an account and a method, or it names more than 8.');
+  assert.equal(plainRulesError(panic, { rulesSaved: true }), 'set_rules was saved. set_calls was refused: the shop list repeats an account and a method, or it names more than 24.');
+  assert.equal(plainRulesError(panic, { rulesSaved: false }), 'set_calls was refused: the shop list repeats an account and a method, or it names more than 24.');
   assert.deepEqual(hashesFromError(panic), ['EETg1qxxwtatHj8fwSQTxoRQJ18DTFc3mJmF5icFnVvp']);
   const rows = [
     { receiver_account_id: 'board.nearcarta.near', transaction_hash: 'EETg1qxxwtatHj8fwSQTxoRQJ18DTFc3mJmF5icFnVvp', actions: [{ method: 'set_calls' }], outcomes: { status: false } },
