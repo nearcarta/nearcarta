@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 501 backend unit tests (498 pass, 3 skipped), offline
+npm test                                   # 509 backend unit tests (506 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -182,7 +182,7 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 501 unit tests (498 pass, 3 skipped)
+npm test                 # 509 unit tests (506 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -206,7 +206,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | House | City door, or `/shops/house/`. Deed shows the recorded allow and refuse. Purse pays 0.001 NEAR from the charter row when the cap holds it. Guardians shows the derived key. Check in does not sign | `propose` under the row cap. No wallet. Over the cap shows a seal and does not sign. `house_pay` is not called. Cinema only after a real allowed tx. Code: `app/src/panels/house-room.js`, `app/src/panels/house-agent.js`, `backend/src/house-views.js` | unit `a house pay over the cap is refused before any signature`; unit `an eth key becomes the toll address method`; recorded allow [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26). Inheritance: not sent |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 501 unit tests (498 pass, 3 skipped):
+# 509 unit tests (506 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).
