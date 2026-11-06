@@ -153,6 +153,7 @@ function wireFerryDock(hooks) {
 }
 function ferryPlainReason(reason) {
   const raw = String(reason || '');
+  if (/ERR_BAD_SIG|agent_key_mismatch/i.test(raw)) return 'the signature does not match the agent key stored in this browser';
   if (/key_cannot_propose_call/i.test(raw)) return 'your agent key cannot call propose_call yet';
   if (/NotEnoughAllowance/i.test(raw)) return 'the session key does not have enough gas allowance for this ask';
   if (/doesn't have enough balance|does not hold enough wNEAR/i.test(raw)) {
@@ -291,11 +292,14 @@ async function settleFerry(wantCharter) {
   const refused = o && o.decision !== 'allowed';
   setCharterNote(o);
   if (refused) {
-    if (sh?.act && runScene) runScene(sh.act({ refused: true, reason: A.why(o.reason) || o.reason || '' }));
+    // One refused stamp is an error. It does not play the downgrade cinema or freeze the boat.
+    sh?.hideRefuse?.();
+    if (!extra.sailed) sh?.setOrder?.('jetty');
+    const why = ferryPlainReason(o.reason);
     return {
       kind: 'no', o, hero: APPS.ferry.hero(),
-      say: `Charter refused the trip: ${esc(A.why(o.reason) || o.reason || 'refused')}. The boat stays at the jetty.`,
-      rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · refused</span>',
+      say: `Charter refused the trip: ${esc(why)}. The boat stays at the jetty.`,
+      rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · jetty</span>',
       rule: A.ruleFor(o, clause),
     };
   }

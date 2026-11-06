@@ -47,7 +47,7 @@ const LS_AGENT = c => 'nearcarta.vault.agent.' + c;
 const LS_RCPT = c => 'nearcarta.d8.receipts.' + c;
 const LS_OPEN = c => 'nearcarta.d8.mist.' + c;
 const WHY = {
-  receiver_not_allowlisted: 'you never allowed that account', over_per_action_cap: 'more than your max per payment', over_daily_budget: 'more than your daily cap',
+  receiver_not_allowlisted: 'you never allowed that account', agent_key_mismatch: 'the agent key in this browser does not match the charter', over_per_action_cap: 'more than your max per payment', over_daily_budget: 'more than your daily cap',
   over_daily_action_count: 'too many payments today (your rules cap the count; it resets at midnight UTC)', below_min_amount: 'smaller than your smallest payment', outside_time_window: 'outside the hours you allowed',
   unknown_clause: 'you never allowed that route', stale_policy_version: 'your rules changed mid-ask', expired: 'the request expired', storage_reserve_low: 'your charter needs a top-up', frozen: 'your charter is frozen', batch_refused: 'another payout broke a rule',
 };
@@ -70,6 +70,7 @@ const PLAIN = [
 ];
 export function plainError(e) {
   const m = String(e?.message || e || '');
+  if (/ERR_BAD_SIG/.test(m)) return 'the signature does not match the agent key stored in this browser';
   if (/http (429|502|503|504)|Failed to fetch|NetworkError|Load failed/i.test(m)) return 'the town is busy right now; try again in a moment';
   if (/Cannot read prop|is not a function|is not defined|Cannot convert undefined or null/.test(m) && !/ERR_/.test(m)) return 'something did not load; try again in a moment';
   for (const [re, t] of PLAIN) if (re.test(m)) return t;
@@ -82,7 +83,8 @@ let CFG = null, rpc = null, conn = null;
 export const S = { me: null, charter: null, clauses: {}, usage: {}, state: null, ready: false };
 const api = async (p, o) => { const r = await fetch(API + p, o); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'http ' + r.status); return j; };
 const view = (c, m, a) => W.viewFn(rpc, c, m, a);
-const agent = () => { const k = S.charter && localStorage.getItem(LS_AGENT(S.charter)); return k ? W.keyFrom(k) : null; };
+// Read the one stored secret at call time. A key captured before Refresh agent key is never reused.
+const agent = () => W.storedAgentKey(k => globalThis.localStorage?.getItem(k) ?? null, S.charter);
 const pay = () => S.clauses.pay;
 // every signed result shows its tx as one visible link (round-2 judges: a collapsed "details" read as no link at all)
 // One real mainnet payment by a visitor's agent on board.nearcarta.near (shared/deployments/mainnet.json visitor_run).
@@ -301,13 +303,17 @@ function settled(shop, out) {
   return out;
 }
 async function boardPay({ shop, receiver, amountY, reveal = null }) {
-  const row = S.boardRow || await view(S.board, 'get_charter', { owner: S.me });
+  // The row nonce moves on every propose. A cached S.boardRow signs the previous nonce and the contract returns ERR_BAD_SIG.
+  const row = await view(S.board, 'get_charter', { owner: S.me });
   if (!row) throw new Error('no charter row yet: finish setup first');
   S.boardRow = row;
   const amount = String(amountY);
   const local = localRefusal(receiver, amount);
   if (local) return { tx: null, decision: 'denied', reason: local, action: null, amount, receiver, fromRule: true, cap: pay()?.per_action_cap || null };
   const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
+  if (W.pubkeyHex(key) !== String(row.agent || '')) {
+    return { tx: null, decision: 'denied', reason: 'agent_key_mismatch', action: null, amount, receiver, fromRule: true, cap: pay()?.per_action_cap || null };
+  }
   const msg = proposalMessage({ contract: S.board, owner: S.me, receiver, amount, nonce: String(row.nonce) });
   const signature = W.signMessage(key, msg);
   const args = { owner: S.me, receiver, amount, signature, reveal: reveal || null };
@@ -342,8 +348,8 @@ async function boardPay({ shop, receiver, amountY, reveal = null }) {
 }
 export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null, reveal = null }) {
   if (S.board) return boardPay({ shop, receiver, amountY, reveal });
-  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
   const st = await view(S.charter, 'get_state');
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
   const p = { shop, clause_id: clauseId, receiver, amount: String(amountY), nonce: String(st.next_nonce), policy_version: st.policy_version,
     expires_at: String(BigInt(Date.now() + 10 * 60_000) * 1_000_000n), memo, receipt: null };
   const r = await W.sendPropose(rpc, { key, charter: S.charter, p });
@@ -524,9 +530,9 @@ export async function wrapBoardState(board = S.board) {
 export async function ferryProposeCalls(steps) {
   const you = (reason, extra = {}) => ({ ok: false, youSend: true, wallet: false, reason, ...extra });
   if (!S.board || !S.me) return you('no_session');
-  const key = agent();
-  if (!key) return you('no_key');
-  const ak0 = await proposeAccessKey(key);
+  const sessionKey = agent();
+  if (!sessionKey) return you('no_key');
+  const ak0 = await proposeAccessKey(sessionKey);
   const names = ak0?.permission?.FunctionCall?.method_names || [];
   if (!ak0 || (names.length && !names.includes('propose_call'))) return you('key_cannot_propose_call');
   const list = steps || [];
@@ -544,6 +550,10 @@ export async function ferryProposeCalls(steps) {
     const argsStr = typeof step.args === 'string' ? step.args : JSON.stringify(step.args || {});
     const deposit = String(step.deposit);
     const argsHash = W.sha256hex(argsStr);
+    const key = agent();
+    if (!key || W.pubkeyHex(key) !== String(row.agent || '')) {
+      return you('agent_key_mismatch', { txs: landed.map(s => s.tx), landed });
+    }
     const msg = boardCallText({ contract: S.board, owner: S.me, receiver: step.receiver, method: step.method, argsHash, deposit, nonce: String(row.nonce) });
     const signature = W.signMessage(key, msg);
     const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: argsStr, deposit, signature };

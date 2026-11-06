@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 544 backend unit tests (541 pass, 3 skipped), offline
+npm test                                   # 546 backend unit tests (543 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -125,6 +125,7 @@ Open the tx. You should see the charter allow or refuse it. Links are https://ne
 - Ferry, AI agent in the city chat, mainnet: the visitor typed `Swap 0.05 wNEAR on NEAR to USDC`, the agent answered "Asking the charter under your cap. No wallet.", and the session key ran `propose_call` steps on `board.nearcarta.near` with no wallet popup: [CY47nQJG…](https://nearblocks.io/txns/CY47nQJGeWhzZmFqXsEv2Tnf8NpjCYhH4uQSWRLzSJbi), [3ManZC3x…](https://nearblocks.io/txns/3ManZC3xpzd9c6iTEM7sCzraas6DM3JSPGfx7SfAbjft), [Gyn611i1…](https://nearblocks.io/txns/Gyn611i1gvbteCpCtzzGxK3czRtfLhNCcf6nM3hrTGt5). 1Click status for deposit `4612544e…2ca57e` is SUCCESS (0.05 wNEAR, $0.1865 in; intents `FFieVBET…`, `DsdNaxWy…`). The visitor's USDC on NEAR went from 0.174899 to 0.359730.
 - Ferry, cross-chain from NEAR to Base with no wallet popup (mainnet, visitor `8e20273e…74e661c8`): the visitor picked USDC on Base and typed a Base address in Receive at. The tray reused 0.05 wNEAR already in the row, the session key ran `propose_call` steps [9Nhv9pQM…](https://nearblocks.io/txns/9Nhv9pQML9AYpkTYVGFHHeHNjSc8bow2M8cHKdY1P98h) and [AJxxwngS…](https://nearblocks.io/txns/AJxxwngS7CSUk7RxsDxXzwDvKfzUuh5iYto4xWJgM981), 1Click reported SUCCESS, and 0.179713 USDC arrived on Base at `0xBDfC…0034` [0xe23f332d…](https://basescan.org/tx/0xe23f332d4ce42bc918eaf20db48b4645373df527db2e66671f56bb246592f1ea) (quote 0.180145).
 - Ferry in the city tray, cross-chain to Base, after the delivered and seal fix: 0.05 wNEAR became 0.180409 USDC at `0xBDfC…0034`, with no wallet popup. The session key ran [7fvFqxxh…](https://nearblocks.io/txns/7fvFqxxhYoxKc8x9oe1FTun1uqs5wapp5ym1LHwNETe), [CXyha4bS…](https://nearblocks.io/txns/CXyha4bSqUabTWH7w9QtpTDc5xGwJdKsnFSpjriaH1Qe), [5kb9rtTA…](https://nearblocks.io/txns/5kb9rtTAgW7QN2pNyyPo5P6LDV6sdjcFUi3Beeiib7sU). 1Click reported SUCCESS and the Base delivery is [0x1e55eae7…](https://basescan.org/tx/0x1e55eae78492ae9b0ca552d5f1032fd7000360698675cdf277465b1487c3626d). The boat read far bank, delivered.
+- Ferry AI agent in the city, cross-chain to Base: a typed sentence (swap 0.05 wNEAR to USDC on base to an address) ran the same Load cargo function as the button and delivered 0.18057 USDC at `0xBDfC…0034`, with no wallet popup. The session key ran [6L29V63H…](https://nearblocks.io/txns/6L29V63HXDkCAmqybwbZqYxfTyxTDydwUwSrJEfnP6kP) and [8jcbYZPM…](https://nearblocks.io/txns/8jcbYZPMTKQKnakj8PeXVHX4fGrTEt2tB5s9aCqZac8o). 1Click reported SUCCESS and the Base delivery is [0xda4a4e7b…](https://basescan.org/tx/0xda4a4e7b890ce77c01cf7424014d4394817e1b007f7b8d6b586306af67b1ff6a).
 - `curl https://nearcarta-api.onrender.com/api/receipts`. You should see one object shape for `near`, `chain-signatures`, `intents` and `near-ai`. The dry intents row has `"decision":"dry"` and `"tx":null`. A checkout adds another intents row whose `tx` is the deposit address. Code: `shared/rails/receipts.js`. Test: `every rail uses the same receipt keys`.
 
 ### Where the spend gate is, and what a receipt is
@@ -213,7 +214,7 @@ Live check, at most 0.06 NEAR (the pass itself is 0.001):
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 544 unit tests (541 pass, 3 skipped)
+npm test                 # 546 unit tests (543 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -237,7 +238,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 544 unit tests (541 pass, 3 skipped):
+# 546 unit tests (543 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).

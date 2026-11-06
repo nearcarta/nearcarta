@@ -287,7 +287,7 @@ function trayDestChain(state) {
   return String(state?.toId || '').split('|')[1]?.toLowerCase() || '';
 }
 
-/** In-shop agent. A charter-ready swap calls onLoadCargo({ charter: true }) after the quote. No chain tx is built here. */
+/** In-shop agent. A parsed swap calls the same Load cargo hook as the button ({ charter: false }). No chain tx is built here. */
 export async function runFerryAgent({ text, state = {}, charterReady = false, quotePair, onLoadCargo, onPair, onSeal, onNote } = {}) {
   const plan = agentCargoPlan(text, { charterReady });
   if (!plan.ok) return { ...plan, loaded: false };
@@ -331,23 +331,25 @@ export async function runFerryAgent({ text, state = {}, charterReady = false, qu
   if (plan.mode === 'quote') return { ok: true, loaded: false, quoted: true, mode: 'quote', hint: `Quote ready for ${plan.parsed.from} → ${plan.parsed.to}.${whereBit} Ask charter or Load cargo.` };
   if (plan.mode === 'setup') return { ok: true, loaded: false, mode: 'setup', hint: 'Open /setup to Ask charter. No wallet from here. You can still Load cargo as a guest.' };
   const sessionLoad = !!charterReady && plan.mode === 'guest';
+  // A swap sentence is Load cargo. "Ask charter" with no pair is the only stamp.
+  const stamp = plan.mode === 'charter' && !plan.parsed;
   if (where) onNote?.(where);
-  const loaded = await onLoadCargo?.({ charter: plan.mode === 'charter' });
+  const loaded = await onLoadCargo?.({ charter: stamp });
   if (loaded && (loaded.agentHint || loaded.lowGas)) {
     const prefix = where ? `${where} ` : '';
     return {
-      ok: true, loaded: true, mode: plan.mode, charter: plan.mode === 'charter',
+      ok: true, loaded: true, mode: plan.mode, charter: stamp,
       hint: `${prefix}${loaded.agentHint || ''}`.trim(),
       links: loaded.agentLinks || [],
       lowGas: !!loaded.lowGas,
     };
   }
-  const hint = plan.mode === 'charter'
+  const hint = stamp
     ? `${where ? where + ' ' : ''}Asking the charter under your cap. No wallet.`
-    : sessionLoad
+    : (plan.mode === 'charter' || sessionLoad)
       ? `${where ? where + ' ' : ''}Session is on. Load cargo asks for a deposit address, then propose_call on wrap.near. No wallet. You are not asked to send USDC on Base.`
       : 'Demo crossing. Not a settled swap. The boat does not say delivered.';
-  return { ok: true, loaded: true, mode: plan.mode, charter: plan.mode === 'charter', hint };
+  return { ok: true, loaded: true, mode: plan.mode, charter: stamp, hint };
 }
 
 function mountFerry(root, hooks) {
