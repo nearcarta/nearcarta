@@ -16,7 +16,7 @@ import * as mist from './mistbank.js';
 import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
 import { issuePass } from './toll-pass.js';
-import { readTollLive, tollLiveError } from './toll-views.js';
+import { describeVisitorPass, readTollLive, tollLiveError } from './toll-views.js';
 import { verifyPropose } from './board-tx.js';
 import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
@@ -374,6 +374,18 @@ export function makeApp() {
   app.get('/api/toll/live', limiter(20), async c => {
     try { return c.json(await readTollLive(view)); }
     catch (e) { return c.json(tollLiveError(e)); }
+  });
+  app.get('/api/toll/pass/:hash', limiter(20), async c => {
+    const hash = c.req.param('hash');
+    const sender = c.req.query('sender') || '';
+    if (!HASH.test(hash) || !nearAccountOk(sender)) return bad(c, 'need a tx hash and ?sender=');
+    try {
+      const judged = await verifyPropose(hash, sender, { expectReceiver: 'toll.nearcarta.near' });
+      const words = describeVisitorPass(judged, { hash });
+      return c.json({ ...judged, hash, text: words.text });
+    } catch (e) {
+      return c.json({ ok: false, hash, text: 'The chain check did not answer. Nothing moved on Base.', error: String(e.message || 'no status').slice(0, 160) });
+    }
   });
   app.post('/api/toll/mainnet', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');

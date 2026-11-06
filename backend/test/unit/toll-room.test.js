@@ -5,9 +5,10 @@ import {
   PASS_YOCTO, TOLL_HINT, TOLL_CHRONICLE_KEY,
   yoctoNear, parseTollCommand, tollCapCheck, proofWords, addressWords, splitWords,
   assembleTollLive, rememberTollPass, tollChronicleRows, mergeTollChronicle, tollMarkup,
+  passPaidCopy, nextRowBalance, policyWords, latestVisitorPass, describeVisitorPass, tollChronicleStore,
 } from '../../../app/src/panels/toll-room.js';
 import { readTollLive, tollLiveError } from '../../src/toll-views.js';
-import { armTollDock, installTollDock, dispatchTollDock, lastTollDockSend, DOCK_NOT_READY } from '../../../app/src/panels/toll-dock.js';
+import { armTollDock, installTollDock, dispatchTollDock, lastTollDockSend, DOCK_NOT_READY, tollPendingLine, tollDockLog } from '../../../app/src/panels/toll-dock.js';
 
 const read = (p) => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 const ONE = PASS_YOCTO.toString();
@@ -37,6 +38,10 @@ test('a toll command pays 0.001 and refuses any other amount', () => {
   assert.match(other.hint, /0\.001/);
   assert.match(other.hint, /Nothing was signed/);
   assert.equal(parseTollCommand('Check signature').action, 'check');
+  assert.equal(parseTollCommand('pay toll').action, 'pay');
+  assert.equal(parseTollCommand('pass the bridge').action, 'pay');
+  assert.equal(parseTollCommand('cross').action, 'pay');
+  assert.equal(parseTollCommand('Show policy').action, 'policy');
   assert.equal(parseTollCommand('Show my foreign address').action, 'address');
   assert.equal(parseTollCommand('Explain the Base address').action, 'address');
   const miss = parseTollCommand('hello');
@@ -118,12 +123,24 @@ test('the toll card shows both actions, real icons, and no Base payment claim', 
   const html = tollMarkup({});
   assert.match(html, /data-testid="toll-pane-proof" hidden/);
   assert.match(html, /data-testid="toll-pane-split" hidden/);
-  assert.match(html, /class="primary" id="toll-sig" data-testid="check-signature">Check signature</);
+  assert.match(html, /type="button"[^>]*data-testid="toll-tab-proof"/);
+  assert.match(html, /data-testid="toll-pay"/);
+  assert.equal(html.slice(0, html.indexOf('data-testid="toll-pane-proof"')).includes('check-signature'), false);
+  const proof = tollMarkup({ tab: 'proof' });
+  const proofHtml = proof.slice(proof.indexOf('data-testid="toll-pane-proof"'), proof.indexOf('data-testid="toll-pane-split"'));
+  assert.match(proofHtml, /class="primary" id="toll-sig" data-testid="check-signature"/);
+  assert.match(proofHtml, /Check signature/);
+  assert.doesNotMatch(proofHtml, /data-testid="toll-pay"/);
+  const split = tollMarkup({ tab: 'split' });
+  assert.doesNotMatch(split.slice(split.indexOf('data-testid="toll-pane-split"')), /data-testid="toll-pay"|data-testid="check-signature"/);
   assert.match(html, /src="\/tokens\/near\.svg"/);
-  assert.match(html, /src="\/tokens\/chains\/base\.svg"/);
-  assert.match(html, /alt="Base"/);
+  assert.match(proof, /src="\/tokens\/chains\/base\.svg"/);
+  assert.match(proof, /alt="Base"/);
   assert.doesNotMatch(html, /Paid on Base/);
   assert.doesNotMatch(html, /tokenBadge\('ETH'/);
+  const busy = tollMarkup({ pending: 'Asking the charter under your cap…' });
+  assert.match(busy, /disabled/);
+  assert.match(busy, /Asking the charter under your cap/);
 });
 
 test('the live toll read asks for policy and numeric nonces, and skips a missing row', async () => {
@@ -207,11 +224,67 @@ test('the city toll door stays a link and does not resume an old visit', () => {
   assert.match(main, /window\.__enterToll = \(\) => goIn\('toll'\)/);
   assert.match(ui, /function tollPay/);
   assert.match(ui, /mergeTollChronicle/);
+  assert.match(ui, /data-toll-chip="Pay the toll"/);
+  assert.match(ui, /data-toll-chip="Check signature"/);
+  assert.match(ui, /data-toll-chip="Show policy"/);
   assert.doesNotMatch(ui, /tollVisit\(\)/);
   assert.match(scene, /if \(!opts\.success/);
+  assert.doesNotMatch(scene, /if \(!opts\.success \|\| opened\)/);
+  assert.match(scene, /actGen/);
+  const tollFn = read('app/design/D8_shops/js/apps.js');
+  const body = tollFn.slice(tollFn.indexOf('export async function toll'), tollFn.indexOf('// Older gate calls'));
+  assert.match(body, /Set up your agent in \/setup/);
+  assert.doesNotMatch(body, /propose_batch|signTx|\bask\(/);
+  assert.match(read('app/design/D9_world/world.css'), /min\(640px/);
+  assert.match(read('app/src/panels/panels.css'), /pointer-events:auto/);
   assert.match(tear, /sends: false/);
   assert.match(tear, /method: 'close'/);
   assert.match(tear, /deposit_yocto: '1'/);
+});
+
+test('a paid pass names the payment, the new balance, and the visitor receipt', () => {
+  const hash = '3frACAL1EU4APBcAME8gNg1xw4uKSnXc81hj2c56Jdon';
+  assert.equal(nextRowBalance('359249000000000000000000'), '0.358249');
+  const copy = passPaidCopy({ balanceNear: '0.358249' });
+  assert.match(copy, /Pass paid/);
+  assert.match(copy, /0\.001 NEAR went to toll\.nearcarta\.near/);
+  assert.match(copy, /Row balance 0\.358249 NEAR/);
+  assert.match(copy, /not a Base payment/);
+  const words = describeVisitorPass({ ok: true, decision: 'allowed', receiver: 'toll.nearcarta.near', amount: ONE }, { hash });
+  assert.match(words.text, /Your latest pass/);
+  assert.match(words.text, /not a Base payment/);
+  assert.match(words.text, new RegExp(hash));
+  assert.equal(describeVisitorPass({ ok: true, decision: 'allowed', receiver: 'other.near', amount: ONE }, { hash }).ok, false);
+  assert.equal(latestVisitorPass({ rows: [{ h: hash, decision: 'denied' }, { h: 'CwcBGcw9FUt7FmpaVdgSPVKK1d9krWt4TE1z46WUfHez', decision: 'allowed' }] }).h, 'CwcBGcw9FUt7FmpaVdgSPVKK1d9krWt4TE1z46WUfHez');
+  assert.match(policyWords({ ok: true, contract: 'toll.nearcarta.near', path: 'base-1', chain_id: 8453 }), /base-1/);
+  assert.match(policyWords({ ok: false }), /did not answer/);
+  assert.equal(tollPendingLine('Pay the toll'), 'Asking the charter under your cap…');
+  assert.equal(tollPendingLine('cross'), 'Asking the charter under your cap…');
+  assert.equal(tollPendingLine('Show policy'), 'Reading…');
+});
+
+test('a toll pass stays in localStorage across a reload', () => {
+  const box = mem();
+  const prev = globalThis.localStorage;
+  globalThis.localStorage = box;
+  try {
+    assert.equal(tollChronicleStore(), box);
+    const hash = '3frACAL1EU4APBcAME8gNg1xw4uKSnXc81hj2c56Jdon';
+    rememberTollPass({ h: hash, decision: 'allowed', label: '0.001 NEAR pass' });
+    assert.equal(tollChronicleRows().length, 1);
+    assert.equal(JSON.parse(box.getItem(TOLL_CHRONICLE_KEY))[0].h, hash);
+  } finally {
+    if (prev === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = prev;
+  }
+});
+
+test('the agent log keeps the nearblocks link when a pass is paid', () => {
+  const doc = fakeDoc();
+  const hash = '3frACAL1EU4APBcAME8gNg1xw4uKSnXc81hj2c56Jdon';
+  tollDockLog(doc, passPaidCopy({ balanceNear: '0.358249' }), { tx: hash });
+  assert.match(doc._nodes['t-agent-log'].textContent, /Pass paid/);
+  assert.match(doc._nodes['t-agent-log'].textContent, new RegExp(hash));
 });
 
 function fakeDoc() {

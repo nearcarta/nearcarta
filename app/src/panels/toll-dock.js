@@ -13,12 +13,35 @@ export function armTollDock(fn) {
   runner = typeof fn === 'function' ? fn : null;
 }
 
-export function tollDockLog(doc, text) {
+const TX_HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
+
+export function tollPendingLine(text) {
+  const lower = String(text || '').toLowerCase();
+  const pay = /\b(pay|pass|cross)\b/.test(lower) || /\bthe toll\b/.test(lower) || /\bpay toll\b/.test(lower) || /\bpass the bridge\b/.test(lower);
+  return pay ? 'Asking the charter under your cap…' : 'Reading…';
+}
+
+export function tollDockLog(doc, text, extra = {}) {
   const el = doc?.getElementById?.('t-agent-log');
   if (!el) return false;
-  const msg = text || '';
-  el.hidden = !msg;
-  el.textContent = msg;
+  const msg = String(text || '');
+  const tx = String(extra.tx || '');
+  const href = TX_HASH.test(tx) ? 'https://nearblocks.io/txns/' + tx : '';
+  el.hidden = !msg && !href;
+  const docu = typeof document !== 'undefined' ? document : null;
+  if (href && docu?.createElement && typeof el.replaceChildren === 'function') {
+    el.replaceChildren();
+    if (msg) el.append(docu.createTextNode(msg + ' '));
+    const a = docu.createElement('a');
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.dataset.testid = 'toll-agent-tx';
+    a.textContent = 'View the pass';
+    el.append(a);
+    return true;
+  }
+  el.textContent = msg + (href ? ' ' + href : '');
   return true;
 }
 
@@ -57,11 +80,12 @@ async function runDock(doc) {
       tollDockLog(doc, DOCK_NOT_READY);
       return { ok: false, hint: DOCK_NOT_READY };
     }
-    tollDockLog(doc, 'Reading…');
+    tollDockLog(doc, tollPendingLine(text));
     const result = await runner(text);
     if (result?.ok && input) input.value = '';
     const hint = result?.hint || (result?.ok ? '' : 'That line did not run.');
-    tollDockLog(doc, hint);
+    const tx = result?.ok ? (result.tx || result.o?.tx || '') : '';
+    tollDockLog(doc, hint, { tx });
     return result || { ok: false, hint };
   } catch (e) {
     const hint = e?.message || 'The agent could not send that line.';

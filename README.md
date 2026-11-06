@@ -183,28 +183,28 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 
 ## Toll Bridge
 
-The city door is the way in. The all-shops list still links to `/shops/toll/`. When the town is running, that link calls `window.__enterToll` and opens the room. The standalone page is the backup.
+The city door is the way in. The all-shops list still links to `/shops/toll/`. When the town is running, that link calls `window.__openCityShop('toll')` and opens the room. `window.__enterToll` is the fallback. The standalone page is the backup.
 
-The card has three tabs: Pass, Proof, and Split. Pay 0.001 NEAR and Check signature stay on the card. The AI Agent on the other side takes the same lines: “Pay the toll”, “Check signature”, “Show my foreign address”. Enter and the Send button both send. A line the agent does not know stays in the box and shows a hint.
+The card has three tabs: Pass, Proof, and Split. Pay 0.001 NEAR is on Pass. Check signature is on Proof. Split has no extra button. The AI Agent takes “Pay the toll”, “Check signature”, and “Show policy”, including the short forms “pay toll”, “pass the bridge”, and “cross”. The same three lines are chips in the chat. Enter and the Send button both send. A line the agent does not know stays in the box and shows a hint.
 
-A pass is one `propose` on `board.nearcarta.near` paying `toll.nearcarta.near` 0.001 NEAR, under the visitor’s row cap. The same button does that call. No wallet opens when the session key can call `propose`. A different amount, a missing allowlist entry, a frozen or expired row, a short balance, or a daily budget that cannot hold 0.001 NEAR stops before any signature. The boom lifts only after a real allowed transaction. A refusal shows a seal and clears on the next action.
+A pass is one `propose` on `board.nearcarta.near` paying `toll.nearcarta.near` 0.001 NEAR, under the visitor’s row cap. The same button does that call. In the city, a session with no board row does not open a wallet. No wallet opens when the session key can call `propose`. A different amount, a missing allowlist entry, a frozen or expired row, a short balance, or a daily budget that cannot hold 0.001 NEAR stops before any signature. While the charter is asked, the button says “Asking the charter under your cap…”. The boom lifts on every allowed pass, including one sent from the chat. A refusal shows a seal and clears on the next action. The chat then says the pass was paid, names the new row balance, and links the transaction.
 
-Check signature reads the recorded allow transaction and its chain status. A signature, and a NEAR pass, are not a payment on Base. Paid on Base is reserved for a success receipt the page has actually read. This room does not broadcast.
+Check signature reads the visitor’s latest NEAR pass to `toll.nearcarta.near` (`GET /api/toll/pass/:hash`). It does not treat the recorded owner allow as that pass. A signature, and a NEAR pass, are not a payment on Base. Paid on Base is reserved for a success receipt the page has actually read. This room does not broadcast.
 
 `GET /api/toll/live` reads `policy` and the recent `get_tx` rows. A view that fails comes back as `{ ok: false }` so the card can say the policy did not answer. The gate route is unchanged.
 
-Recorded on mainnet: allowed [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz), refused [B9FFjcSA…](https://nearblocks.io/txns/B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR). A new 0.001 NEAR pass from this room: (the assistant adds the nearblocks link).
+Recorded on mainnet: allowed [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz), refused [B9FFjcSA…](https://nearblocks.io/txns/B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR). Passes from this room: [3frACAL1…](https://nearblocks.io/txns/3frACAL1EU4APBcAME8gNg1xw4uKSnXc81hj2c56Jdon) and [CwcBGcw9…](https://nearblocks.io/txns/CwcBGcw9FUt7FmpaVdgSPVKK1d9krWt4TE1z46WUfHez). Each one is 0.001 NEAR to `toll.nearcarta.near`. Neither is a Base payment.
 
 Teardown is `close()` with 1 yocto, predecessor the owner, and the balance returns to `nearcarta.near`. `backend/scripts/toll-teardown.js` prints that call and does not send it. This change does not redeploy the toll contract. If `on_signed` recovers an address that does not match the recorded foreign address, that callback panics; the earlier sign receipt can still stand. The room never calls `pay`, `pay_for`, or `sign`.
 
-Chronicle lists a pass from this room beside the recorded rows. The pass is stored for the tab and merged into the chronicle list.
+Chronicle lists a pass from this room beside the recorded rows. The pass is stored in localStorage and merged into the chronicle list, so a reload keeps it.
 
 Live check, at most 0.06 NEAR (the pass itself is 0.001):
 
 1. Open the town and use the Toll Bridge door, not the standalone page first.
 2. On Pass, say “Pay the toll” to the agent, or press Pay 0.001 NEAR.
-3. Expect one mainnet transaction to `toll.nearcarta.near` for 0.001 NEAR, then the boom. The line says the pass does not pay Base.
-4. On Proof, press Check signature. The recorded allow is on NEAR. The card does not say the toll was paid on Base.
+3. Expect one mainnet transaction to `toll.nearcarta.near` for 0.001 NEAR, then the boom. The line says the pass was paid and links the transaction. It also says the receipt is not a Base payment.
+4. On Proof, press Check signature. It checks your latest pass to `toll.nearcarta.near`. The card does not say the toll was paid on Base.
 5. If `toll.nearcarta.near` is missing from the row, or the cap is under 0.001 NEAR, the seal shows and the boom stays down. The next command clears the seal.
 6. Open Chronicle. The new pass is listed with the recorded allow and the recorded refusal.
 
