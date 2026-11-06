@@ -546,7 +546,10 @@ export function makeApp() {
   app.get('/api/chronicle/live', limiter(30), async c => {
     const account = String(c.req.query('account') || '').trim();
     if (!nearAccountOk(account)) return bad(c, 'account must be a NEAR account id');
-    try { return c.json(await readLive(account)); }
+    const cursor = c.req.query('cursor');
+    const ftCursor = c.req.query('ftCursor');
+    const more = cursor != null || ftCursor != null;
+    try { return c.json(await readLive(account, { cursor: cursor || '', ftCursor: ftCursor || '', more })); }
     catch (e) {
       return c.json({ account, live: false, rows: [], gaps: [String(e.message || 'Live read failed.').slice(0, 160)], sources: [], label: 'No rows for this account. The live timeline did not answer.' });
     }

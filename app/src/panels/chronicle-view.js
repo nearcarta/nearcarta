@@ -1,13 +1,16 @@
 // Chronicle tray: Timeline, Statement, Verify. One gold action. No entry fee.
 import { downloadCsv, exportCsv, queryFeed, verifyEntry } from '../chronicle-feed.js';
 import { csvTotals } from '../chronicle-feed.js';
+import { presentAmount } from '../chronicle-amount.js';
 import { iconFor } from '../chronicle-icons.js';
 import { accountRows } from '../chronicle-loop.js';
 import { runChronicleCommand } from '../chronicle-commands.js';
-import { anchorPlan, bundleDigest, canonicalManifest, verifyBundle, verifyNearAi, writeStatement } from '../chronicle-audit.js';
+import { anchorPlan, bundleDigest, canonicalManifest, teeNowText, verifyBundle, verifyNearAi, writeStatement } from '../chronicle-audit.js';
+import { liveTee } from '../tee-view.js';
 import { armChronicleDock, chronicleDockLog, dispatchChronicleDock, ensureChronicleDock, installChronicleDock } from './chronicle-dock.js';
 import { ensureChronicleStyle } from './chronicle-style.js';
 
+const ROW_PAGE = 6;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 const q$ = (root, sel) => root.querySelector(sel);
@@ -54,23 +57,38 @@ function saltBytes() {
   return [...bytes].map(n => n.toString(16).padStart(2, '0')).join('');
 }
 
+function rowHtml(x) {
+  const href = x.url || (x.h ? `https://nearblocks.io/txns/${x.h}` : '');
+  const amount = presentAmount(x.amount);
+  return `<li class="${rowClass(x.decision)}" data-hash="${esc(x.h || '')}">
+      <span class="c-mark">${iconFor(x.shop, x.decision)}</span>
+      <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${decisionText(x.decision)}${amount ? ' · ' + esc(amount) : ''}</span></span>
+      <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
+    </li>`;
+}
+
+function countText(state) {
+  const loaded = state.rowTotal || 0;
+  const shown = Math.min(state.shown || ROW_PAGE, loaded);
+  if (!state.account) return 'Type an account, then press Show timeline.';
+  if (!loaded) return 'No rows for this account.';
+  if (shown < loaded) return `Showing ${shown} of ${loaded}.`;
+  if (state.nextCursor || state.ftCursor) return `${loaded} rows. More on the index.`;
+  return `${loaded} rows.`;
+}
+
 export function chronicleMarkup(state) {
   const tab = state.tab || 'timeline';
   const rows = state.viewRows || [];
+  const loaded = state.rowTotal || rows.length;
+  const moreRows = loaded > rows.length || state.nextCursor || state.ftCursor;
   const tabBtn = (id, label) => `<button type="button" class="chronicle-tab${tab === id ? ' on' : ''}" data-ctab="${id}" role="tab" aria-selected="${tab === id ? 'true' : 'false'}">${label}</button>`;
-  const list = rows.map(x => {
-    const href = x.url || (x.h ? `https://nearblocks.io/txns/${x.h}` : '');
-    return `<li class="${rowClass(x.decision)}" data-hash="${esc(x.h || '')}">
-      <span class="c-mark">${iconFor(x.shop, x.decision)}</span>
-      <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${decisionText(x.decision)}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
-      <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
-    </li>`;
-  }).join('');
+  const list = rows.map(rowHtml).join('');
   const cta = ctaOf(state);
   const emptyText = state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.';
   const cover = coverageItems(state).map(t => `<li>${esc(t)}</li>`).join('');
   const verifyHtml = `${esc(state.verify || 'Nothing is signed from this tray.')}${state.verifyUrl ? ` <a data-testid="chronicle-link" href="${esc(state.verifyUrl)}">View transaction</a>` : ''}`;
-  const attest = /TEE quote/.test(state.verify || '');
+  const attest = /TEE quote/.test(state.verify || '') || /TEE quote/.test(state.bundleText || '');
   const opt = (value, label, cur) => `<option value="${value}"${cur === value ? ' selected' : ''}>${label}</option>`;
   return `<div class="chronicle-card" data-testid="chronicle-card">
     <div class="chronicle-tabs" role="tablist" aria-label="Chronicle">
@@ -83,38 +101,44 @@ export function chronicleMarkup(state) {
       <span class="c-arrow" aria-hidden="true">→</span>
       <span class="c-mark-lg" title="Ledger">${LEDGER_MARK}</span>
     </div>
-    <div class="chronicle-pane" data-pane="timeline"${tab === 'timeline' ? '' : ' hidden'}>
-      <div class="c-filters">
-        <label class="chronicle-field wide">Account <input id="c-account" data-testid="chronicle-account" value="${esc(state.accountDraft ?? state.account ?? '')}" autocomplete="off" spellcheck="false" placeholder="name.near"></label>
-        <label class="chronicle-field">Period <select id="c-span" data-testid="chronicle-period">${opt('all', 'All', state.span || 'all')}${opt('today', 'Today', state.span || 'all')}${opt('7d', '7 days', state.span || 'all')}</select></label>
-        <label class="chronicle-field">Shop <select id="c-shop" data-testid="chronicle-shop">${opt('', 'All', state.shop || '')}${['toll', 'ferry', 'guard', 'payouts', 'house', 'board'].map(s => opt(s, s, state.shop || '')).join('')}</select></label>
-        <label class="chronicle-field">Chain <select id="c-chain" data-testid="chronicle-chain">${opt('', 'All', state.chain || '')}${opt('NEAR', 'NEAR', state.chain || '')}${opt('NEAR Intents', 'NEAR Intents', state.chain || '')}</select></label>
-        <label class="chronicle-field">Decision <select id="c-d" data-testid="chronicle-filter">${opt('', 'All', state.cd || '')}${opt('allowed', 'Allowed', state.cd || '')}${opt('denied', 'Refused', state.cd || '')}${opt('failed', 'Failed on chain', state.cd || '')}</select></label>
-        <label class="chronicle-field wide">Words <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}" autocomplete="off"></label>
+    <div class="c-scroll" data-testid="chronicle-scroll">
+      <div class="chronicle-pane" data-pane="timeline"${tab === 'timeline' ? '' : ' hidden'}>
+        <div class="c-filters">
+          <label class="chronicle-field wide">Account <input id="c-account" data-testid="chronicle-account" value="${esc(state.accountDraft ?? state.account ?? '')}" autocomplete="off" spellcheck="false" placeholder="name.near"></label>
+          <label class="chronicle-field">Period <select id="c-span" data-testid="chronicle-period">${opt('all', 'All', state.span || 'all')}${opt('today', 'Today', state.span || 'all')}${opt('7d', '7 days', state.span || 'all')}</select></label>
+          <label class="chronicle-field">Shop <select id="c-shop" data-testid="chronicle-shop">${opt('', 'All', state.shop || '')}${['toll', 'ferry', 'guard', 'payouts', 'house', 'board'].map(s => opt(s, s, state.shop || '')).join('')}</select></label>
+          <label class="chronicle-field">Chain <select id="c-chain" data-testid="chronicle-chain">${opt('', 'All', state.chain || '')}${opt('NEAR', 'NEAR', state.chain || '')}${opt('NEAR Intents', 'NEAR Intents', state.chain || '')}</select></label>
+          <label class="chronicle-field">Decision <select id="c-d" data-testid="chronicle-filter">${opt('', 'All', state.cd || '')}${opt('allowed', 'Allowed', state.cd || '')}${opt('denied', 'Refused', state.cd || '')}${opt('failed', 'Failed on chain', state.cd || '')}</select></label>
+          <label class="chronicle-field wide">Words <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}" autocomplete="off"></label>
+        </div>
+        <ol class="feed" data-testid="chronicle-page"${rows.length ? '' : ' hidden'}>${list}</ol>
+        <p class="c-empty-line" data-testid="chronicle-empty"${rows.length ? ' hidden' : ''}>${esc(emptyText)}</p>
+        <button type="button" class="chronicle-quiet" id="c-more" data-testid="chronicle-more"${moreRows ? '' : ' hidden'}>Show more</button>
       </div>
-    </div>
-    <ol class="feed" data-testid="chronicle-page"${rows.length ? '' : ' hidden'}>${list}</ol>
-    <p class="c-empty-line" data-testid="chronicle-empty"${rows.length ? ' hidden' : ''}>${esc(emptyText)}</p>
-    <div class="chronicle-pane" data-pane="statement"${tab === 'statement' ? '' : ' hidden'}>
-      <label class="chronicle-field">Statement <textarea id="c-statement" data-testid="chronicle-statement" readonly>${esc(state.statement || '')}</textarea></label>
-      <label class="chronicle-field">Digest <input id="c-digest-line" data-testid="chronicle-digest-line" value="${esc(state.digest || '')}" readonly autocomplete="off" spellcheck="false"></label>
-      <label class="chronicle-field">Signature <input id="c-sig" data-testid="chronicle-signature" value="${esc(state.signature || '')}" autocomplete="off" spellcheck="false" placeholder="No signature yet"></label>
-      <label class="chronicle-field">Private note <input id="c-note" data-testid="chronicle-private" value="${esc(state.privateNote || '')}" autocomplete="off"></label>
-      <label class="chronicle-check"><input id="c-consent" data-testid="chronicle-consent" type="checkbox"${state.consent ? ' checked' : ''}> Salt this note. Do not publish the raw hash.</label>
-    </div>
-    <div class="chronicle-pane" data-pane="verify"${tab === 'verify' ? '' : ' hidden'}>
-      <label class="chronicle-field">Bundle <textarea id="c-manifest" data-testid="chronicle-manifest">${esc(state.manifestText || '')}</textarea></label>
-      <label class="chronicle-field">Digest <input id="c-digest" data-testid="chronicle-digest" value="${esc(state.digest || '')}" autocomplete="off" spellcheck="false"></label>
-      <label class="chronicle-field">Signature <input id="c-vsig" data-testid="chronicle-verify-signature" value="${esc(state.signature || '')}" autocomplete="off" spellcheck="false"></label>
+      <div class="chronicle-pane" data-pane="statement"${tab === 'statement' ? '' : ' hidden'}>
+        <label class="chronicle-field">Statement <textarea id="c-statement" data-testid="chronicle-statement" readonly>${esc(state.statement || '')}</textarea></label>
+        <label class="chronicle-field">Digest <input id="c-digest-line" data-testid="chronicle-digest-line" value="${esc(state.digest || '')}" readonly autocomplete="off" spellcheck="false"></label>
+        <label class="chronicle-field">Signature <input id="c-sig" data-testid="chronicle-signature" value="${esc(state.signature || '')}" autocomplete="off" spellcheck="false" placeholder="No signature yet"></label>
+        <label class="chronicle-field">Private note <input id="c-note" data-testid="chronicle-private" value="${esc(state.privateNote || '')}" autocomplete="off"></label>
+        <label class="chronicle-check"><input id="c-consent" data-testid="chronicle-consent" type="checkbox"${state.consent ? ' checked' : ''}> Salt this note. Do not publish the raw hash.</label>
+      </div>
+      <div class="chronicle-pane" data-pane="verify"${tab === 'verify' ? '' : ' hidden'}>
+        <p class="c-bundle" data-testid="chronicle-bundle">${esc(state.bundleText || 'Check this bundle, then Verify TEE now for the live quote.')}</p>
+        <button type="button" class="chronicle-quiet" id="c-tee" data-testid="chronicle-tee">Verify TEE now</button>
+        <label class="chronicle-field">Bundle <textarea id="c-manifest" data-testid="chronicle-manifest">${esc(state.manifestText || '')}</textarea></label>
+        <label class="chronicle-field">Digest <input id="c-digest" data-testid="chronicle-digest" value="${esc(state.digest || '')}" autocomplete="off" spellcheck="false"></label>
+        <label class="chronicle-field">Signature <input id="c-vsig" data-testid="chronicle-verify-signature" value="${esc(state.signature || '')}" autocomplete="off" spellcheck="false"></label>
+      </div>
     </div>
     <button type="button" class="chronicle-gold" id="c-go" data-testid="chronicle-go">${cta}</button>
-    <div class="c-lines">
-      ${tab === 'verify' ? '' : `<p class="c-health" data-testid="chronicle-health">${esc(state.health || '')}</p><ul class="c-cover-list" data-testid="chronicle-coverage">${cover}</ul><p class="c-status c-cover" data-testid="chronicle-source">${esc(state.sourceText || 'Type an account. No history is assumed.')}</p>`}
-      <div class="c-foot">
-        <p class="c-status${attest ? ' c-attest' : ''}" id="c-out" data-testid="chronicle-verify">${verifyHtml}</p>
-        <button type="button" class="chronicle-quiet" id="c-csv" data-testid="chronicle-export"${state.exportCount ? '' : ' disabled'}>Export CSV</button>
-      </div>
-      ${tab === 'verify' ? `<p class="c-health" data-testid="chronicle-health">${esc(state.health || '')}</p><ul class="c-cover-list" data-testid="chronicle-coverage">${cover}</ul>` : ''}
+    <p class="c-status${attest ? ' c-attest' : ''}" id="c-out" data-testid="chronicle-verify">${verifyHtml}</p>
+    <details class="c-sources" data-testid="chronicle-sources">
+      <summary>Sources</summary>
+      <p class="c-health" data-testid="chronicle-health">${esc(state.health || '')}</p>
+      <ul class="c-cover-list" data-testid="chronicle-coverage">${cover}</ul>
+    </details>
+    <div class="c-foot">
+      <button type="button" class="chronicle-quiet" id="c-csv" data-testid="chronicle-export"${state.exportCount ? '' : ' disabled'}>Export CSV</button>
     </div>
     <p id="c-seal" class="chronicle-seal" data-testid="chronicle-seal" hidden>${esc(state.seal || '')}</p>
   </div>`;
@@ -165,7 +189,10 @@ export function mountChronicleTray(root, hooks = {}) {
 
   function prepareRows() {
     const all = matchingRows();
-    state.viewRows = all.slice(0, 8);
+    const n = Math.max(ROW_PAGE, Number(state.shown) || ROW_PAGE);
+    state.shown = n;
+    state.rowTotal = all.length;
+    state.viewRows = all.slice(0, n);
     return all;
   }
 
@@ -192,8 +219,6 @@ export function mountChronicleTray(root, hooks = {}) {
       live.innerHTML = html;
       live.classList.toggle('c-attest', /TEE quote/.test(state.verify || ''));
     }
-    const source = root.isConnected ? q$(root, '[data-testid=chronicle-source]') : null;
-    if (source) source.textContent = state.sourceText || '';
     const health = root.isConnected ? q$(root, '[data-testid=chronicle-health]') : null;
     if (health) health.textContent = state.health || '';
     const cover = root.isConnected ? q$(root, '[data-testid=chronicle-coverage]') : null;
@@ -227,42 +252,60 @@ export function mountChronicleTray(root, hooks = {}) {
     prepareRows();
     const ol = q$(root, '[data-testid=chronicle-page]');
     if (!ol) return paint();
-    ol.innerHTML = (state.viewRows || []).map(x => {
-      const href = x.url || (x.h ? `https://nearblocks.io/txns/${x.h}` : '');
-      return `<li class="${rowClass(x.decision)}" data-hash="${esc(x.h || '')}">
-        <span class="c-mark">${iconFor(x.shop, x.decision)}</span>
-        <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${decisionText(x.decision)}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
-        <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
-      </li>`;
-    }).join('');
+    ol.innerHTML = (state.viewRows || []).map(rowHtml).join('');
     ol.hidden = !(state.viewRows || []).length;
     const empty = q$(root, '[data-testid=chronicle-empty]');
     if (empty) {
       empty.hidden = !ol.hidden;
       empty.textContent = state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.';
     }
+    const moreBtn = q$(root, '#c-more');
+    const needMore = state.rowTotal > (state.viewRows || []).length || state.nextCursor || state.ftCursor;
+    if (moreBtn) moreBtn.hidden = !needMore;
+    if (/^(Showing \d+ of \d+\.|\d+ rows\.)/.test(state.verify || '')) state.verify = countText(state);
     showOut();
   }
 
-  async function readAccount(account) {
+  async function readAccount(account, opts = {}) {
+    const more = !!opts.more;
     const id = String(account || '').trim();
     const typed = root.isConnected ? q$(root, '#c-account') : null;
     const focused = !!(typed && doc.activeElement === typed);
     state.accountDraft = focused ? typed.value : id;
-    state.account = id;
+    const switching = id !== state.account;
     const mine = ++state.ticket;
     if (!id) {
+      state.account = '';
       state.reading = false;
       state.auditRows = [];
       state.health = '';
       state.liveSources = [];
-      state.sourceText = 'Type an account. No history is assumed.';
+      state.nextCursor = '';
+      state.ftCursor = '';
+      state.shown = ROW_PAGE;
+      state.bundleText = '';
+      state.verify = 'Type an account, then press Show timeline.';
+      state.verifyUrl = '';
       drawList();
       return;
     }
+    const cursor = more && !switching ? (state.nextCursor || '') : '';
+    const ftCursor = more && !switching ? (state.ftCursor || '') : '';
+    if (!more || switching) {
+      state.account = id;
+      if (switching) {
+        state.auditRows = [];
+        state.health = '';
+        state.liveSources = [];
+        state.nextCursor = '';
+        state.ftCursor = '';
+        state.shown = ROW_PAGE;
+        state.bundleText = '';
+        state.verifyUrl = '';
+      }
+      state.verify = 'Reading this account…';
+    } else state.verify = 'Reading older rows…';
     state.reading = true;
-    state.health = 'Reading this account…';
-    state.sourceText = state.health;
     showOut();
     const base = api();
     const get = async (path) => {
@@ -270,9 +313,12 @@ export function mountChronicleTray(root, hooks = {}) {
       if (!res.ok) return null;
       return res.json();
     };
+    const liveQuery = new URLSearchParams({ account: id });
+    if (cursor) liveQuery.set('cursor', cursor);
+    if (ftCursor) liveQuery.set('ftCursor', ftCursor);
     let board = null, ledger = null, mainnet = null, live = null;
     try {
-      const livePromise = fetch(`${base}/api/chronicle/live?account=` + encodeURIComponent(id), { signal: AbortSignal.timeout(8000) }).catch(() => null);
+      const livePromise = fetch(`${base}/api/chronicle/live?${liveQuery}`, { signal: AbortSignal.timeout(8000) }).catch(() => null);
       [board, ledger, mainnet] = await Promise.all([
         get('/api/chronicle?owner=' + encodeURIComponent(id)),
         get('/api/ledger'),
@@ -288,12 +334,28 @@ export function mountChronicleTray(root, hooks = {}) {
     if (mine !== state.ticket) return;
     state.reading = false;
     const audit = accountRows({ account: id, board, ledger, mainnet, live });
-    state.auditRows = audit.rows;
+    if (more && !switching) {
+      const seen = new Set((state.auditRows || []).map(r => r.h));
+      const added = (audit.rows || []).filter(r => r.h && !seen.has(r.h));
+      state.auditRows = (state.auditRows || []).concat(added);
+      state.shown = Math.min(state.auditRows.length, (state.shown || ROW_PAGE) + ROW_PAGE);
+      state.nextCursor = added.length ? (live?.nextCursor || '') : '';
+      state.ftCursor = added.length ? (live?.ftCursor || '') : '';
+    } else {
+      state.auditRows = audit.rows;
+      state.shown = ROW_PAGE;
+      state.nextCursor = live?.nextCursor || '';
+      state.ftCursor = live?.ftCursor || '';
+    }
     state.coverage = audit.coverage;
     state.health = live?.health || '';
     state.liveSources = Array.isArray(live?.sources) ? live.sources : [];
-    state.sourceText = String(audit.coverage.label || '').replace(/^No rows for this account\.\s*/, '').trim() || state.health;
-    drawList();
+    prepareRows();
+    state.verify = countText(state);
+    state.verifyUrl = '';
+    const needMore = state.rowTotal > (state.viewRows || []).length || state.nextCursor || state.ftCursor;
+    if (!q$(root, '#c-more') && needMore) paint();
+    else drawList();
   }
 
   async function chainOf(row) {
@@ -406,12 +468,52 @@ export function mountChronicleTray(root, hooks = {}) {
       : await verifyBundle({ manifestText, statement, digest, signature, publicKey: state.publicKey || '' });
     state.manifestText = manifestText;
     state.digest = digest;
-    state.verify = verdict.why;
+    state.bundleChecked = verdict.why;
+    state.bundleText = verdict.why;
+    state.verify = verdict.ok ? 'Bundle checked.' : 'This bundle did not check.';
     state.verifyUrl = '';
-    if (!verdict.ok) setSeal(verdict.why);
-    else clearSeal();
+    const box = root.isConnected ? q$(root, '[data-testid=chronicle-bundle]') : null;
+    if (box) box.textContent = verdict.why;
+    if (!verdict.ok) {
+      state.seal = verdict.why;
+      hooks.onSeal?.(verdict.why);
+    } else clearSeal();
     showOut();
     return verdict;
+  }
+
+  async function verifyTeeNow() {
+    if (state.teeBusy) return;
+    state.teeBusy = true;
+    state.bundleText = 'Checking the TEE…';
+    const box = root.isConnected ? q$(root, '[data-testid=chronicle-bundle]') : null;
+    if (box) box.textContent = state.bundleText;
+    try {
+      const body = await liveTee({ api: api(), model: state.proof?.model || '' });
+      const extra = teeNowText(state.proof, body);
+      state.bundleText = `${state.bundleChecked || ''} ${extra}`.trim();
+      if (box) box.textContent = state.bundleText;
+      state.verify = body?.ok ? 'TEE check passed.' : 'TEE check did not pass.';
+    } catch {
+      state.bundleText = `${state.bundleChecked || ''} TEE quote: the live check did not answer.`.trim();
+      if (box) box.textContent = state.bundleText;
+      state.verify = 'TEE check did not pass.';
+    } finally {
+      state.teeBusy = false;
+      showOut();
+    }
+  }
+
+  async function showMore() {
+    const loaded = matchingRows().length;
+    if ((state.shown || ROW_PAGE) < loaded) {
+      state.shown = (state.shown || ROW_PAGE) + ROW_PAGE;
+      prepareRows();
+      state.verify = countText(state);
+      drawList();
+      return;
+    }
+    if (state.nextCursor || state.ftCursor) await readAccount(state.account, { more: true });
   }
 
   function exportRows() {
@@ -489,6 +591,10 @@ export function mountChronicleTray(root, hooks = {}) {
     }
     const csv = q$(root, '#c-csv');
     if (csv) csv.onclick = () => exportRows();
+    const more = q$(root, '#c-more');
+    if (more) more.onclick = () => showMore();
+    const tee = q$(root, '#c-tee');
+    if (tee) tee.onclick = () => verifyTeeNow();
     const go = q$(root, '#c-go');
     if (go) go.onclick = () => onGold();
     q$(root, '[data-testid=chronicle-page]')?.addEventListener('click', (e) => {

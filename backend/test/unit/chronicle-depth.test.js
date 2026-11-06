@@ -5,7 +5,7 @@ import nacl from 'tweetnacl';
 import { exportCsv, csvTotals } from '../../../app/src/chronicle-feed.js';
 import { parseChronicleCommand, runChronicleCommand } from '../../../app/src/chronicle-commands.js';
 import { accountRows, mergeChronicle } from '../../../app/src/chronicle-loop.js';
-import { anchorPlan, bundleDigest, canonicalManifest, rebuildIndex, sha256Hex, verifyBundle, verifyNearAi, writeStatement } from '../../../app/src/chronicle-audit.js';
+import { anchorPlan, bundleDigest, canonicalManifest, rebuildIndex, sha256Hex, teeNowText, verifyBundle, verifyNearAi, writeStatement } from '../../../app/src/chronicle-audit.js';
 import { iconFor } from '../../../app/src/chronicle-icons.js';
 import { CHRONICLE_CSS } from '../../../app/src/panels/chronicle-style.js';
 import { armChronicleDock, dispatchChronicleDock, installChronicleDock } from '../../../app/src/panels/chronicle-dock.js';
@@ -191,6 +191,8 @@ test('chronicle icons, brass and city wiring stay on the ledger path', () => {
   assert.match(CHRONICLE_CSS, /gap:16px/);
   assert.match(CHRONICLE_CSS, /rgb\(245, 208, 138\)/);
   assert.match(CHRONICLE_CSS, /border:0/);
+  assert.match(CHRONICLE_CSS, /\.c-scroll\{/);
+  assert.doesNotMatch(CHRONICLE_CSS, /max-height:96px/);
   const shopui = read('app/design/D8_shops/js/shopui.js');
   assert.doesNotMatch(shopui, /chronicleEntry/);
   assert.doesNotMatch(shopui, /Add today/);
@@ -201,6 +203,10 @@ test('chronicle icons, brass and city wiring stay on the ledger path', () => {
   assert.match(view, /Show timeline/);
   assert.match(view, /Check this bundle/);
   assert.match(view, /Failed on chain/);
+  assert.match(view, /Show more/);
+  assert.match(view, /Sources/);
+  assert.match(view, /Verify TEE now/);
+  assert.match(view, /data-pane="timeline"/);
   assert.doesNotMatch(view, /Add today/);
   const deep = read('app/src/panels/deep.js');
   assert.match(deep, /return mountChronicleTray\(root, hooks\)/);
@@ -289,6 +295,15 @@ test('an unrelated account keeps its own live rows and does not borrow the owner
   assert.match(ok.why, /Ed25519 signature over the request and response hashes: verified/);
   assert.match(ok.why, /Canonical digest inside that request: verified/);
   assert.match(ok.why, /TEE quote \(Intel DCAP, TCB, RTMR3\): not verified in this browser/);
+  assert.match(ok.why, /server-side/);
+  const tee = teeNowText(proof, {
+    ok: true,
+    models: [{ signing_address: proof.signing_address, checks: { quote: true, debugOff: true, nonceBound: true, echoedNonce: true, signerBound: true, configBound: true, composeEvent: true, rtmr3: true }, tcbStatus: 'UpToDate' }],
+    gateway: { checks: { quote: true, debugOff: true, nonceBound: true, echoedNonce: true, signerBound: true, configBound: true, composeEvent: true, rtmr3: true }, tcbStatus: 'UpToDate' },
+    nonce: 'abc',
+  });
+  assert.match(tee, /Intel TDX quote: verified/);
+  assert.match(tee, /Signer matches the live attestation/);
   const flipped = { ...proof, digest: 'b'.repeat(64) };
   const bad = await verifyNearAi({ manifestText: manifest.text, statement, digest: manifest.digest, proof: flipped });
   assert.equal(bad.ok, false);
