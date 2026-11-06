@@ -8,7 +8,7 @@ import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
-import { boardCallText, cityCheckoutBody, PROPOSE_CALL_TGAS, proposeCallAllowanceOk, quoteRecipient, WRAP } from '/panels/ferry-settle.js';
+import { boardCallText, cityCheckoutBody, isNearAccountId, PROPOSE_CALL_TGAS, proposeCallAllowanceOk, quoteRecipient, WRAP } from '/panels/ferry-settle.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -20,12 +20,12 @@ const fromY = y => Number(BigInt(y || 0) / 10n ** 18n) / 1e6;
 const fmt = y => +fromY(y).toFixed(4) + ' NEAR';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const short = (h, a = 6, b = 4) => h ? (h.length > a + b + 1 ? h.slice(0, a) + '…' + h.slice(-b) : h) : '';
-const UA = 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex';
 const REFUND = '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e';
-const REFUND_NEAR = 'nearcarta.near';
 const refundFor = (from) => {
   const chain = String(from || '').split('@')[1] || '';
-  return chain.toLowerCase() === 'near' ? REFUND_NEAR : REFUND;
+  // A NEAR-origin swap refunds to the visitor. Never a treasury account, never a hardcoded address.
+  if (chain.toLowerCase() === 'near') return isNearAccountId(S.me) ? S.me : '';
+  return REFUND;
 };
 // Shortcut corridors for the city Ferry room (quick ZEC picks). The live picker
 // loads the full 1Click list via /api/ferry/tokens (~215 tokens / 38 chains).
@@ -421,21 +421,27 @@ export async function tollServerSettle(v) {
   gateMemo = null; return s;
 }
 
-export async function quote(route, amount, to = 'ZEC@zec') {
+export async function quote(route, amount, to = 'ZEC@zec', receiveAt) {
   const rt = ROUTES.find(r => r.id === route);
   const from = rt?.from || (typeof route === 'string' && route.includes('@') ? route : null);
   if (!from) throw new Error('Unknown ferry route');
-  return quotePair(from, to, amount);
+  return quotePair(from, to, amount, receiveAt);
 }
 /** Dry quote for any 1Click pair (symbol@chain). Used by the city Ferry live picker. */
-export async function quotePair(from, to, amount) {
+export async function quotePair(from, to, amount, receiveAt) {
   const dest = to || 'ZEC@zec';
-  // USDC on NEAR is DESTINATION_CHAIN: the recipient is this visitor's NEAR account.
-  // A Zcash unified address is rejected by 1Click for that corridor ("recipient is not valid").
-  const recipient = quoteRecipient(dest, S.me, UA);
-  if (!recipient) return { ok: false, error: 'A NEAR destination needs your NEAR account as the recipient. Sign in, then get the quote again.' };
+  // DESTINATION_CHAIN: NEAR pays the visitor. Any other chain pays only the address they typed.
+  const recipient = quoteRecipient(dest, S.me, receiveAt);
+  if (!recipient) {
+    const near = String(dest).toLowerCase().endsWith('@near');
+    return { ok: false, error: near
+      ? 'A NEAR destination needs your NEAR account as the recipient. Sign in, then get the quote again.'
+      : 'Enter the address on the destination chain that should receive the tokens.' };
+  }
+  const refundTo = refundFor(from);
+  if (!refundTo) return { ok: false, error: 'A NEAR refund needs your NEAR account. Sign in, then get the quote again.' };
   return api('/api/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ from, to: dest, amount: String(amount), recipient, refundTo: refundFor(from), privacy: 'basic' }) });
+    body: JSON.stringify({ from, to: dest, amount: String(amount), recipient, refundTo, privacy: 'basic' }) });
 }
 // A dry quote. Paying it is a board propose, inside the visitor's cap.
 // Payee: ferry-route clause receivers if present; else the board/pay allowlist (open_charter receivers).
@@ -470,22 +476,25 @@ export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receive
 /** Deposit address after the charter view allows the payee. At most 0.20 USD. Does not send the tokens. */
 export async function openFerryCheckout(q, pair) {
   const charter = S.board ? S.me : S.charter;
-  // Charter gate: an allowlisted shop. 1Click (NEAR dest): the visitor — never a Zcash UA.
+  // Charter gate: an allowlisted shop. 1Click recipient is swap_recipient (visitor on NEAR,
+  // or the address they typed on any other chain). Never a hardcoded Zcash address.
   const recipient = ferryPayee('pay');
   const dest = pair?.to || (q?.to ? `${q.to.symbol}@${q.to.chain || q.to.blockchain || ''}` : '');
-  const visitor = quoteRecipient(dest || pair, S.me, '');
-  if (String(dest).toLowerCase().includes('@near') || (pair && String(pair.toChain || '').toLowerCase() === 'near')) {
-    if (!visitor) {
-      return {
-        ok: false,
-        error: 'A NEAR destination needs a NEAR account as recipient. Use the visitor account (64 hex or a named account).',
-        depositAddress: null,
-      };
-    }
-  }
   const amountYocto = String(S.boardRow?.min_amount || S.clauses?.pay?.min_amount || '1');
   if (!charter || !recipient) return { ok: false, reason: 'no_charter', depositAddress: null };
-  const body = cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo: refundFor(pair.from), visitor: S.me, session: S.board ? 'board' : undefined });
+  const refundTo = refundFor(pair?.from);
+  if (!refundTo) return { ok: false, error: 'A NEAR refund needs your NEAR account. Sign in, then get the quote again.', depositAddress: null };
+  const body = cityCheckoutBody({ pair: { ...pair, to: dest, receiveAt: pair?.receiveAt || '' }, recipient, charter, amountYocto, refundTo, visitor: S.me, session: S.board ? 'board' : undefined });
+  if (!body.swap_recipient) {
+    const near = body.to?.chain === 'near';
+    return {
+      ok: false,
+      error: near
+        ? 'A NEAR destination needs a NEAR account as recipient. Use the visitor account (64 hex or a named account).'
+        : 'Enter the address on the destination chain that should receive the tokens.',
+      depositAddress: null,
+    };
+  }
   const r = await fetch(API + '/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null, error: j.error || j.reason || null };

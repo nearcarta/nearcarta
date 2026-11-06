@@ -160,6 +160,7 @@ function clearFerryDeposit() {
   extra.depositTxs = [];
   extra.outAmt = '';
   extra.outSym = '';
+  extra.destChain = '';
   extra.sailed = false;
 }
 function finishFerry(res) {
@@ -180,10 +181,13 @@ function playFerryDelivered() {
   if (sh?.act && runScene) runScene(sh.act({ refused: false }));
 }
 function showAgentDelivered(st) {
+  const toChain = extra.destChain || String(extra.toId || '').split('|')[1] || extra.q?.to?.chain || extra.q?.to?.blockchain || '';
   const note = agentDeliveredNote({
     amount: st?.amountOut || extra.q?.to?.amount || extra.outAmt || '',
     symbol: (st?.symbolOut && String(st.symbolOut).length <= 12) ? st.symbolOut : (extra.q?.to?.symbol || extra.outSym || 'USDC'),
     txs: extra.depositTxs || [],
+    destTx: st?.destinationTx || '',
+    destChain: toChain,
   });
   extra.agentHint = note.text;
   extra.agentText = '';
@@ -284,7 +288,7 @@ async function settleFerry(wantCharter) {
   if (spend.recover && String(spend.amount) !== String(pair.amt)) {
     spendPair = { ...pair, amt: spend.amount };
     try {
-      const q2 = await A.quotePair(spendPair.from, spendPair.to, spendPair.amt);
+      const q2 = await A.quotePair(spendPair.from, spendPair.to, spendPair.amt, spendPair.receiveAt);
       if (q2) extra.q = q2;
     } catch { /* keep the prior quote; checkout still uses spendPair.amt */ }
   }
@@ -367,6 +371,7 @@ async function settleFerry(wantCharter) {
     extra.depositTxs = Array.isArray(sent.txs) && sent.txs.length ? sent.txs : (sent.tx ? [sent.tx] : []);
     extra.outAmt = extra.q?.to?.amount || '';
     extra.outSym = extra.q?.to?.symbol || 'USDC';
+    extra.destChain = pair.toChain || '';
     extra.depositHelp = 'Charter sent the NEAR deposit. Waiting until 1Click says SUCCESS. The boat has not delivered.';
     sh?.setOrder?.('deposit');
     watchFerryDeposit(checkout.depositAddress);
@@ -393,6 +398,7 @@ async function settleFerry(wantCharter) {
   extra.depositAddress = checkout.depositAddress;
   extra.depositUsd = checkout.usd || String(cap.usd);
   extra.depositMode = 'you-send';
+  extra.destChain = pair.toChain || '';
   extra.depositHelp = `${plan.why || 'Send the tokens yourself.'} The boat has not delivered.`;
   sh?.setOrder?.('deposit');
   watchFerryDeposit(checkout.depositAddress);
@@ -615,8 +621,8 @@ const APPS = {
         state: extra,
         routes: () => A.ROUTES,
         tokens: () => A.loadFerryTokens(),
-        quote: (id, amt) => A.quote(id, amt),
-        quotePair: (from, to, amt) => A.quotePair(from, to, amt),
+        quote: (id, amt) => A.quote(id, amt, 'ZEC@zec', extra.receiveAt),
+        quotePair: (from, to, amt, receiveAt) => A.quotePair(from, to, amt, receiveAt ?? extra.receiveAt),
         visitor: () => A.S.me,
         charterReady: () => APPS.ferry.charterReady(),
         openRules: () => openRules(),
@@ -658,7 +664,7 @@ const APPS = {
       const from = (fs && fc) ? `${fs}@${fc}` : (A.ROUTES[extra.ri || 0]?.from || SESSION_SWAP.from);
       const to = (ts && tc) ? `${ts}@${tc}` : SESSION_SWAP.to;
       const amt = extra.amt || A.ROUTES[extra.ri || 0]?.amt || SESSION_SWAP.amt;
-      return { from, to, amt, fromSym: from.split('@')[0], fromChain: from.split('@')[1], toSym: to.split('@')[0], toChain: to.split('@')[1] };
+      return { from, to, amt, fromSym: from.split('@')[0], fromChain: from.split('@')[1], toSym: to.split('@')[0], toChain: to.split('@')[1], receiveAt: extra.receiveAt || '' };
     },
     run: async () => {
       if (extra.acted) {
@@ -672,7 +678,7 @@ const APPS = {
         sh?.hideRefuse?.();
         sh?.setOrder?.('jetty');
         const pair = APPS.ferry.pairFromState();
-        const q = await A.quotePair(pair.from, pair.to, pair.amt);
+        const q = await A.quotePair(pair.from, pair.to, pair.amt, pair.receiveAt);
         if (!q.ok || !q.checks?.signature) {
           sh?.hideRefuse?.();
           throw new Error(explainQuoteMiss(q.error || 'quote not signed'));

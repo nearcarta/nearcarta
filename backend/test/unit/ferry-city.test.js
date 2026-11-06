@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { callMessage } from '../../../shared/board/message.js';
-import { agentCargoPlan, parseAgentFerry } from '../../../app/src/panels/ferry-pair.js';
+import { agentCargoPlan, parseAgentFerry, receiveConfirm } from '../../../app/src/panels/ferry-pair.js';
 import { ferryMarkup } from '../../../app/src/panels/deep.js';
 import { runFerryAgent } from '../../../app/src/panels/deep.js';
 import {
-  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, explainQuoteMiss, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, quoteRecipient, SESSION_SWAP, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto,
+  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, destExplorer, explainQuoteMiss, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, quoteRecipient, SESSION_SWAP, validateDestAddress, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto,
 } from '../../../app/src/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock, lastFerryDockSend } from '../../../app/src/panels/ferry-dock.js';
 
@@ -21,13 +21,19 @@ const choices = [
   { id: 'ETH|eth', symbol: 'ETH', chain: 'eth', label: 'ETH on eth' },
 ];
 
+const ZEC_UA = 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex';
+
 test('get a quote for 3 USDC on base to ZEC fills the pair and does not spend', async () => {
-  const phrase = 'get a quote for 3 USDC on base to ZEC';
+  const phrase = `get a quote for 3 USDC on base to ZEC to ${ZEC_UA}`;
   const parsed = parseAgentFerry(phrase);
   assert.equal(parsed.from, 'USDC@base');
   assert.equal(parsed.to, 'ZEC@zec');
   assert.equal(parsed.amt, '3');
+  assert.equal(parsed.receiveAt, ZEC_UA);
   assert.equal(agentCargoPlan(phrase, { charterReady: true }).mode, 'quote');
+  const missing = agentCargoPlan('get a quote for 3 USDC on base to ZEC', { charterReady: true });
+  assert.equal(missing.ok, false);
+  assert.match(missing.hint, /Where should the tokens arrive on zec/);
   const calls = [];
   const loads = [];
   const state = {};
@@ -53,18 +59,31 @@ test('get a quote for 3 USDC on base to ZEC fills the pair and does not spend', 
 
 test('a charter-ready swap asks the charter after the quote and invents no tx', async () => {
   const loads = [];
+  const notes = [];
   const state = {};
-  const out = await runFerryAgent({
+  const bare = await runFerryAgent({
     text: 'Swap 3 USDC on Base to ZEC',
+    state: {},
+    charterReady: true,
+    quotePair: async () => { throw new Error('should not quote without an address'); },
+    onLoadCargo: async () => { throw new Error('should not load'); },
+  });
+  assert.equal(bare.ok, false);
+  assert.match(bare.hint, /Where should the tokens arrive on zec/);
+  const out = await runFerryAgent({
+    text: `Swap 3 USDC on Base to ZEC to ${ZEC_UA}`,
     state,
     charterReady: true,
     quotePair: async () => ({ ok: true, dry: true, from: { amount: '3', usd: '3' }, to: { amount: '0.01' } }),
     onLoadCargo: async (opts) => { loads.push(opts); },
+    onNote: (text) => { notes.push(text); },
   });
   assert.equal(out.ok, true);
   assert.equal(out.loaded, true);
   assert.deepEqual(loads, [{ charter: true }]);
   assert.equal(state.q.tx, undefined);
+  assert.equal(notes[0], receiveConfirm('zec', ZEC_UA));
+  assert.match(out.hint, /Receiving on zec at/);
 });
 
 test('ask charter without a session points at setup and does not load cargo', async () => {
@@ -257,6 +276,8 @@ test('a successful swap does not show Downgrade refused, and the AI popup names 
   assert.doesNotMatch(act.slice(act.indexOf('return;', refused), sailed), /showRefuseTag/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /extra\.depositTxs = Array\.isArray\(sent\.txs\)/);
+  assert.match(ui, /extra\.destChain = pair\.toChain/);
+  assert.match(ui, /destTx: st\?\.destinationTx/);
   assert.match(ui, /playFerryDelivered\(\)/);
   const note = agentDeliveredNote({
     amount: '0.184831', symbol: 'USDC',
@@ -421,12 +442,68 @@ test('status SUCCESS sails once, and a refund does not', () => {
   assert.equal(back.order, 'refunded');
 });
 
-test('a NEAR destination quotes the visitor account, and a ZEC quote keeps the unified address', () => {
+test('a destination address is checked per chain and never invented', () => {
+  const addr = '0xf76e6b0920e9332ff4410f6dd53f01722abc71a3';
+  const mixed = '0xF76E6b0920e9332ff4410f6dd53f01722abc71A3';
+  assert.equal(validateDestAddress('base', addr).ok, true);
+  assert.equal(validateDestAddress('arb', mixed).address, mixed);
+  assert.equal(validateDestAddress('pol', addr).ok, true);
+  assert.equal(validateDestAddress('base', '').ok, false);
+  assert.equal(validateDestAddress('base', '0x1234').ok, false);
+  assert.equal(validateDestAddress('base', addr.slice(2)).ok, false);
+  assert.equal(validateDestAddress('sol', '11111111111111111111111111111111').ok, true);
+  assert.equal(validateDestAddress('sol', '0OIl' + '1'.repeat(28)).ok, false);
+  assert.equal(validateDestAddress('btc', 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4').ok, true);
+  assert.equal(validateDestAddress('zec', ZEC_UA).ok, true);
+  assert.equal(validateDestAddress('zec', addr).ok, false);
+  assert.equal(validateDestAddress('near', '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8').ok, true);
+  const phrase = `Swap 0.05 wNEAR on NEAR to USDC on Base to ${addr}`;
+  const parsed = parseAgentFerry(phrase);
+  assert.equal(parsed.from, 'wNEAR@near');
+  assert.equal(parsed.to, 'USDC@base');
+  assert.equal(parsed.amt, '0.05');
+  assert.equal(parsed.receiveAt, addr);
+  assert.equal(parseAgentFerry('Swap 0.05 wNEAR on NEAR to USDC on Base at ' + addr).receiveAt, addr);
+  const asked = agentCargoPlan('Swap 0.05 wNEAR on NEAR to USDC on Base', { charterReady: true });
+  assert.equal(asked.ok, false);
+  assert.match(asked.hint, /on base/);
+  const nearHtml = ferryMarkup({ fromId: 'wNEAR|near', toId: 'USDC|near', amt: '0.05' });
+  assert.doesNotMatch(nearHtml, /data-testid="ferry-receive"/);
+  assert.doesNotMatch(nearHtml, /data-testid="ferry-quote"[^>]*disabled/);
+  const empty = ferryMarkup({ fromId: 'wNEAR|near', toId: 'USDC|base', amt: '0.05' });
+  assert.match(empty, /Receive at/);
+  assert.match(empty, /data-testid="ferry-receive" [^>]*value=""/);
+  assert.doesNotMatch(empty, /0xf76e6b0920e9332ff4410f6dd53f01722abc71a3/);
+  assert.match(empty, /data-testid="ferry-quote"[^>]*disabled/);
+  const ready = ferryMarkup({ fromId: 'wNEAR|near', toId: 'USDC|base', amt: '0.05', receiveAt: addr, q: { from: { symbol: 'wNEAR', amount: '0.05' }, to: { symbol: 'USDC', amount: '0.181' } }, charterReady: true });
+  assert.match(ready, new RegExp(`value="${addr}"`));
+  assert.doesNotMatch(ready, /data-testid="ferry-quote"[^>]*disabled/);
+  assert.doesNotMatch(ready, /data-testid="ferry-load-cargo"[^>]*disabled/);
+  const hash = '0x' + 'ab'.repeat(32);
+  const link = destExplorer('base', hash);
+  assert.equal(link.url, 'https://basescan.org/tx/' + hash);
+  assert.equal(destExplorer('arb', hash).url, 'https://arbiscan.io/tx/' + hash);
+  assert.equal(destExplorer('pol', hash).url, 'https://polygonscan.com/tx/' + hash);
+  assert.equal(destExplorer('sol', '5'.repeat(44)).url, 'https://solscan.io/tx/' + '5'.repeat(44));
+  const note = agentDeliveredNote({
+    amount: '0.181', symbol: 'USDC',
+    txs: ['5vUC4zn1CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw'],
+    destTx: hash, destChain: 'base',
+  });
+  assert.equal(note.links.length, 2);
+  assert.match(note.links[0].url, /nearblocks\.io/);
+  assert.equal(note.links[1].url, link.url);
+});
+
+test('a NEAR destination quotes the visitor account, and a typed ZEC address is kept', () => {
   const scholar = '8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8';
   const ua = 'u1naczqa5m5nefpyqnhs8h3dw8un8z8us45xwgfh4ees95mayyru9snc33dkfk2dc27r5syu4uveyyd5dt8wwad89kpc3f8cah055lm0ex';
   assert.equal(quoteRecipient('USDC@near', scholar, ua), scholar);
   assert.equal(quoteRecipient({ chain: 'near' }, scholar, ua), scholar);
   assert.equal(quoteRecipient('ZEC@zec', scholar, ua), ua);
+  assert.equal(quoteRecipient('USDC@base', scholar, ''), '');
+  assert.equal(quoteRecipient('USDC@base', scholar, ua), '');
+  assert.equal(quoteRecipient('USDC@base', scholar, '0xf76e6b0920e9332ff4410f6dd53f01722abc71a3'), '0xf76e6b0920e9332ff4410f6dd53f01722abc71a3');
   assert.equal(quoteRecipient('USDC@near', '', ua), '');
   const body = cityCheckoutBody({
     pair: { from: 'wNEAR@near', to: 'USDC@near', amt: '0.05' },
@@ -460,6 +537,25 @@ test('a NEAR destination quotes the visitor account, and a ZEC quote keeps the u
     visitor: scholar,
   });
   assert.equal(zec.swap_recipient, undefined);
+  const baseBody = cityCheckoutBody({
+    pair: { from: 'wNEAR@near', to: 'USDC@base', amt: '0.05', receiveAt: '0xf76e6b0920e9332ff4410f6dd53f01722abc71a3' },
+    recipient: 'charter.nearcarta.near',
+    charter: scholar,
+    amountYocto: '1',
+    refundTo: scholar,
+    visitor: scholar,
+    session: 'board',
+  });
+  assert.equal(baseBody.to.chain, 'base');
+  assert.equal(baseBody.recipient, 'charter.nearcarta.near');
+  assert.equal(baseBody.swap_recipient, '0xf76e6b0920e9332ff4410f6dd53f01722abc71a3');
+  assert.equal(baseBody.refundTo, scholar);
+  assert.equal(baseBody.board, true);
+  const baseMissing = cityCheckoutBody({
+    pair: { from: 'wNEAR@near', to: 'USDC@base', amt: '0.05' },
+    recipient: 'charter.nearcarta.near', charter: scholar, amountYocto: '1', refundTo: scholar, visitor: scholar,
+  });
+  assert.equal(baseMissing.swap_recipient, undefined);
   // Display labels like "NEAR" must still yield swap_recipient for the visitor.
   const labeled = cityCheckoutBody({
     pair: { from: 'wNEAR@near', to: 'USDC@near', amt: '0.05', fromSym: 'wNEAR', fromChain: 'near', toSym: 'USDC', toChain: 'NEAR' },
@@ -469,12 +565,13 @@ test('a NEAR destination quotes the visitor account, and a ZEC quote keeps the u
   assert.equal(labeled.swap_recipient, scholar);
   const apps = read('app/design/D8_shops/js/apps.js');
   const quote = apps.slice(apps.indexOf('export async function quotePair'), apps.indexOf('export const ferryNear'));
-  assert.match(quote, /quoteRecipient\(dest, S\.me, UA\)/);
-  assert.doesNotMatch(quote, /recipient: UA/);
+  assert.match(quote, /quoteRecipient\(dest, S\.me, receiveAt\)/);
+  assert.doesNotMatch(quote, /u1naczq/);
+  assert.doesNotMatch(apps, /const UA =/);
   const checkout = apps.slice(apps.indexOf('export async function openFerryCheckout'), apps.indexOf('export async function ferryStatus'));
   assert.match(checkout, /visitor: S\.me/);
   assert.match(checkout, /session: S\.board \? 'board' : undefined/);
-  assert.match(checkout, /quoteRecipient/);
+  assert.match(checkout, /receiveAt: pair\?\.receiveAt/);
   assert.match(checkout, /NEAR destination needs a NEAR account/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /data-testid', 'ferry-agent-dock'/);

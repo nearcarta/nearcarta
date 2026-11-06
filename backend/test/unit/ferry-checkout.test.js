@@ -4,7 +4,7 @@ import { makeApp } from '../../src/app.js';
 import { receiptsBody, RECEIPT_KEYS } from '../../../shared/rails/receipts.js';
 import { readFileSync } from 'node:fs';
 import {
-  charterGate, checkoutUsdOk, settlementYocto, openCheckout, checkLiveQuote, resetCheckouts,
+  charterGate, checkoutInput, checkoutUsdOk, settlementYocto, openCheckout, checkLiveQuote, resetCheckouts,
   rememberCheckout, startCheckout, checkoutDeps, oneClickStatus, listCheckoutReceipts, MAX_CHECKOUT_USD,
   boardRowAsGate, readCharterRules,
 } from '../../src/ferry-checkout.js';
@@ -119,6 +119,45 @@ test('USDC on NEAR is quoted to the visitor while the charter gate still checks 
   assert.equal(noVisitor.ok, false);
   assert.match(noVisitor.error || '', /NEAR destination needs a NEAR account/);
   assert.equal(noVisitor.depositAddress, null);
+});
+
+test('USDC on Base is quoted to the typed address and a missing address never asks 1Click', async () => {
+  resetCheckouts();
+  const addr = '0xf76e6b0920e9332ff4410f6dd53f01722abc71a3';
+  const deps = liveDeps({
+    tokens: async () => [
+      { assetId: 'nep141:wrap.near', symbol: 'wNEAR', blockchain: 'near', decimals: 24, price: 1 },
+      { assetId: 'nep141:base-usdc', symbol: 'USDC', blockchain: 'base', decimals: 6, price: 1 },
+    ],
+  });
+  deps.quote = async (q) => { deps.dryTo = q.recipient; return { ok: true, from: { usd: '0.181' } }; };
+  const body = {
+    from: { symbol: 'wNEAR', chain: 'near' }, to: { symbol: 'USDC', chain: 'base' }, amount: '0.05',
+    recipient: 'payee.near', swapRecipient: addr, refundTo: VISITOR,
+    charter: 'charter.nearcarta.near', clauseId: 'pay', amountYocto: yocto, privacy: 'public',
+  };
+  const out = await openCheckout(body, deps);
+  assert.equal(out.ok, true);
+  assert.equal(deps.dryTo, addr);
+  assert.equal(deps.calls[0].recipient, addr);
+  assert.equal(deps.calls[0].recipientType, 'DESTINATION_CHAIN');
+  assert.equal(deps.calls[0].refundTo, VISITOR);
+  assert.equal(deps.calls[0].refundType, 'ORIGIN_CHAIN');
+  const missing = await openCheckout({ ...body, swapRecipient: null }, liveDeps());
+  assert.equal(missing.ok, false);
+  assert.equal(missing.depositAddress, null);
+  assert.match(missing.error || '', /address on the destination chain/);
+  const parsed = checkoutInput({
+    from: 'wNEAR@near', to: 'USDC@base', amount: '0.05', recipient: 'payee.near',
+    swap_recipient: addr, refundTo: VISITOR, charter: 'charter.nearcarta.near', amount_yocto: '1',
+  });
+  assert.equal(parsed.value.swapRecipient, addr);
+  assert.equal(parsed.value.recipient, 'payee.near');
+  const bad = checkoutInput({
+    from: 'wNEAR@near', to: 'USDC@base', amount: '0.05', recipient: 'payee.near',
+    swap_recipient: 'not-an-address', refundTo: VISITOR, charter: 'charter.nearcarta.near', amount_yocto: '1',
+  });
+  assert.equal(bad.error, 'bad recipient');
 });
 
 test('an unsigned live quote does not hand out its deposit address', () => {

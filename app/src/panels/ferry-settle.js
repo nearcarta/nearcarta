@@ -97,8 +97,8 @@ export function orderForStatus(status) {
   return 'deposit';
 }
 
-/** What the AI popup says when 1Click has delivered. Links are the propose_call txs. */
-export function agentDeliveredNote({ amount, symbol, txs } = {}) {
+/** What the AI popup says when 1Click has delivered. NEAR links are the propose_call txs. destTx is the destination-chain hash. */
+export function agentDeliveredNote({ amount, symbol, txs, destTx, destChain } = {}) {
   const sym = String(symbol || 'USDC').trim() || 'USDC';
   const amt = String(amount ?? '').trim();
   const hashes = (Array.isArray(txs) ? txs : []).filter(h => typeof h === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,88}$/.test(h));
@@ -108,6 +108,8 @@ export function agentDeliveredNote({ amount, symbol, txs } = {}) {
     url: `https://nearblocks.io/txns/${hash}`,
     label: `tx ${hash.slice(0, 8)}…`,
   }));
+  const dest = destExplorer(destChain, destTx);
+  if (dest) links.push(dest);
   return { text, links };
 }
 
@@ -237,14 +239,115 @@ export function isNearAccountId(s) {
     && (/^[0-9a-f]{64}$/.test(s) || /^([a-z\d]+[-_])*[a-z\d]+(\.([a-z\d]+[-_])*[a-z\d]+)*$/.test(s));
 }
 
+const EVM_CHAINS = new Set([
+  'eth', 'ethereum', 'base', 'arb', 'arbitrum', 'op', 'optimism',
+  'pol', 'polygon', 'matic', 'bsc', 'bnb', 'avax', 'avalanche',
+  'gnosis', 'scroll', 'linea', 'blast', 'zksync', 'mantle', 'celo', 'ftm', 'fantom',
+]);
+
+/** 0x plus 40 hex. Any case is accepted; a checksum is not required. */
+export function isEvmAddress(s) {
+  return typeof s === 'string' && /^0x[0-9a-fA-F]{40}$/.test(s);
+}
+
+export function isSolanaAddress(s) {
+  return typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
+}
+
+export function isBtcAddress(s) {
+  return typeof s === 'string' && (/^(bc1)[0-9a-z]{20,87}$/i.test(s) || /^[13][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(s));
+}
+
+export function isZecAddress(s) {
+  return typeof s === 'string' && (/^u1[0-9a-z]{20,200}$/i.test(s) || /^t[13][1-9A-HJ-NP-Za-km-z]{20,80}$/.test(s));
+}
+
+/**
+ * Destination-chain recipient. Empty is never valid. Nothing here invents an address.
+ * EVM is checksum-tolerant: 0x and 40 hex in any case. Solana is base58. BTC and Zcash
+ * use their address shapes. Any other chain needs a single token of reasonable length.
+ */
+export function validateDestAddress(chain, address) {
+  const c = String(chain || '').toLowerCase();
+  const a = String(address || '').trim();
+  if (!a) return { ok: false, address: '', reason: 'Enter the address that should receive the tokens.' };
+  if (c === 'near') {
+    return isNearAccountId(a)
+      ? { ok: true, address: a, reason: '' }
+      : { ok: false, address: a, reason: 'That is not a NEAR account.' };
+  }
+  if (EVM_CHAINS.has(c)) {
+    return isEvmAddress(a)
+      ? { ok: true, address: a, reason: '' }
+      : { ok: false, address: a, reason: 'An EVM address is 0x followed by 40 hex characters.' };
+  }
+  if (c === 'sol' || c === 'solana') {
+    return isSolanaAddress(a)
+      ? { ok: true, address: a, reason: '' }
+      : { ok: false, address: a, reason: 'That is not a Solana address.' };
+  }
+  if (c === 'btc' || c === 'bitcoin') {
+    return isBtcAddress(a)
+      ? { ok: true, address: a, reason: '' }
+      : { ok: false, address: a, reason: 'That is not a Bitcoin address.' };
+  }
+  if (c === 'zec' || c === 'zcash') {
+    return isZecAddress(a)
+      ? { ok: true, address: a, reason: '' }
+      : { ok: false, address: a, reason: 'That is not a Zcash address.' };
+  }
+  if (a.length >= 8 && a.length <= 256 && !/\s/.test(a)) return { ok: true, address: a, reason: '' };
+  return { ok: false, address: a, reason: 'Enter the address on the destination chain.' };
+}
+
+const DEST_EXPLORER = {
+  base: 'https://basescan.org/tx/',
+  eth: 'https://etherscan.io/tx/',
+  ethereum: 'https://etherscan.io/tx/',
+  arb: 'https://arbiscan.io/tx/',
+  arbitrum: 'https://arbiscan.io/tx/',
+  pol: 'https://polygonscan.com/tx/',
+  polygon: 'https://polygonscan.com/tx/',
+  matic: 'https://polygonscan.com/tx/',
+  sol: 'https://solscan.io/tx/',
+  solana: 'https://solscan.io/tx/',
+  op: 'https://optimistic.etherscan.io/tx/',
+  optimism: 'https://optimistic.etherscan.io/tx/',
+  bsc: 'https://bscscan.com/tx/',
+  btc: 'https://mempool.space/tx/',
+  bitcoin: 'https://mempool.space/tx/',
+  zec: 'https://blockchair.com/zcash/transaction/',
+  zcash: 'https://blockchair.com/zcash/transaction/',
+};
+
+/** Explorer link for a 1Click destination-chain tx. Unknown chains return null. */
+export function destExplorer(chain, hash) {
+  const h = String(hash || '').trim();
+  const prefix = DEST_EXPLORER[String(chain || '').toLowerCase()];
+  const ok = /^0x[0-9a-fA-F]{64}$/.test(h) || /^[0-9a-fA-F]{64}$/.test(h) || /^[1-9A-HJ-NP-Za-km-z]{32,88}$/.test(h);
+  if (!prefix || !ok) return null;
+  const short = h.length > 12 ? `${h.slice(0, 8)}…` : h;
+  return { hash: h, url: prefix + h, label: `${String(chain || '').toLowerCase()} ${short}` };
+}
+
+export function shortReceive(address) {
+  const s = String(address || '');
+  if (s.length <= 12) return s;
+  return `${s.slice(0, 6)}…${s.slice(-4)}`;
+}
+
 /**
  * Who receives the swapped tokens.
- * USDC on NEAR is DESTINATION_CHAIN, so the recipient is the visitor's NEAR account.
- * Other chains keep the address the caller already chose (the Zcash unified address).
+ * NEAR destinations use the visitor's NEAR account.
+ * Every other chain uses only the address the visitor typed. An empty or invalid
+ * address returns '' so a quote cannot fall back to an address they do not own.
  */
-export function quoteRecipient(to, me, other) {
-  if (chainOf(to) !== 'near') return other;
-  return isNearAccountId(me) ? me : '';
+export function quoteRecipient(to, me, receiveAt) {
+  const chain = chainOf(to);
+  if (chain === 'near') return isNearAccountId(me) ? me : '';
+  if (!chain) return '';
+  const v = validateDestAddress(chain, receiveAt);
+  return v.ok ? v.address : '';
 }
 
 export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo, visitor, session }) {
@@ -269,8 +372,9 @@ export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refund
     privacy: 'public',
   };
   // The charter gate still checks `recipient` (an allowlisted shop).
-  // 1Click, for a NEAR token, is paid to the visitor. Those are different accounts.
-  const swap = quoteRecipient({ chain: toChain }, visitor, '');
+  // 1Click is paid to swap_recipient: the visitor on NEAR, or the address they typed
+  // on any other chain. refundTo stays the visitor's NEAR account for a NEAR origin.
+  const swap = quoteRecipient({ chain: toChain }, visitor, pair.receiveAt || '');
   if (swap) body.swap_recipient = swap;
   // Board rows live on the board contract (get_charter { owner }), not on the visitor account.
   if (session === 'board') body.board = true;
