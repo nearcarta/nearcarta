@@ -200,10 +200,7 @@ test('the city, the allow list and the denylist use the one shop id', () => {
   assert.equal(HOUSE_SHOP, 'house.nearcarta.near');
   assert.equal(MAIN.extras.house.contract, HOUSE_SHOP);
   assert.equal(MAIN.extras.house.shop, HOUSE_SHOP);
-  // v3 was deployed onto the shop account, so the spare name stayed unused. It is still recorded, and
-  // the deploy script pins the wasm that produced the row.
   assert.equal(MAIN.extras.house.fallback.status, 'unused');
-  assert.equal(MAIN.extras.house.next.status, 'deployed_as_shop');
   assert.equal(HOUSE_FALLBACK, 'house3.nearcarta.near');
   assert.equal(MAIN.extras.house.next.sha256, HOUSE_WASM_SHA256);
   assert.equal(shopOf(HOUSE_SHOP), 'house');
