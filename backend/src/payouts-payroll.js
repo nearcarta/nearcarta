@@ -14,6 +14,23 @@ const FINAL = ['SUCCESS', 'REFUNDED', 'FAILED'];
 const REFUND_SAMPLE = '561e8ef0fecb621469da30250dc6cdcd1e47a66e561e8ef0fecb621469da3025';
 
 /**
+ * One row is one swap. The key is the row itself (owner, chain, asset, payee, amount), not a clock,
+ * so a second checkout for the same row returns the deposit address the first one got instead of
+ * asking 1Click for a second swap. A row whose swap already SUCCEEDED is refused outright.
+ * This is per host memory; the status route is what decides paid, and the row cap is what decides
+ * whether the session can send it again.
+ */
+const ROWS = new Map();
+export const payrollRowId = ({ owner = '', chain = '', asset = '', to = '', amt = '' } = {}) =>
+  [String(owner).toLowerCase(), String(chain).toLowerCase(), String(asset).toUpperCase(), String(to).trim().toLowerCase(), String(amt)].join('|');
+export function resetPayrollRows() { ROWS.clear(); }
+export function rememberPayrollRow(key, value) {
+  ROWS.set(key, value);
+  while (ROWS.size > 200) ROWS.delete(ROWS.keys().next().value);
+}
+export function knownPayrollRow(key) { return ROWS.get(key) || null; }
+
+/**
  * The visitor's own row as a gate for one foreign row. `amtNear` is the wNEAR the session deposits.
  * The same fields contracts/charter_board checks in propose_call, read before a deposit address exists.
  */
@@ -63,7 +80,8 @@ export function payrollCheckoutInput(b) {
   const refundTo = String(b.refundTo || '').trim();
   if (!addressOk('near', refundTo)) return { error: 'bad refundTo: a NEAR account holds the refund' };
   if (!/^[A-Z0-9]{2,12}$/.test(asset)) return { error: 'bad asset' };
-  return { ok: true, value: { chain, asset, to, amt, near, refundTo, slippage: Number(b.slippage) || 100 } };
+  const owner = String(b.owner || '').trim();
+  return { ok: true, value: { chain, asset, to, amt, near, refundTo, owner, slippage: Number(b.slippage) || 100 } };
 }
 
 function toUnits(amount, decimals) {
@@ -78,6 +96,18 @@ function toUnits(amount, decimals) {
  */
 export async function openPayrollCheckout(input, deps = {}) {
   const row = deps.row;
+  const key = payrollRowId({ owner: input.owner, chain: input.chain, asset: input.asset, to: input.to, amt: input.amt });
+  const seen = knownPayrollRow(key);
+  if (seen) {
+    // A second click on the same row: the same deposit address, never a second swap.
+    return {
+      ok: true, replayed: true, status: seen.status, help: statusHelp(seen.status),
+      depositAddress: seen.depositAddress, depositMemo: seen.depositMemo || null,
+      near: seen.near, out: seen.out, chain: seen.chain, asset: seen.asset, to: seen.to,
+      refundTo: seen.refundTo, deadline: seen.deadline || null,
+      receipt: intentsCheckout({ what: 'payroll row deposit address', to: seen.to, amount: seen.amt, asset: seen.asset, decision: 'allowed', tx: seen.depositAddress }),
+    };
+  }
   const gate = payrollRowGate({ row, amtNear: input.near, nowMin: utcMinute() });
   if (!gate.ok) {
     return {
@@ -135,8 +165,14 @@ export async function openPayrollCheckout(input, deps = {}) {
       receipt: intentsCheckout({ decision: 'refused', reason: after.reason, to: input.to, amount: input.amt, asset: input.asset, tx: null }),
     };
   }
+  rememberPayrollRow(key, {
+    depositAddress: q.depositAddress, depositMemo: q.depositMemo || null, status: 'PENDING_DEPOSIT',
+    near, out: q.amountOutFormatted || String(input.amt), chain: input.chain, asset: input.asset,
+    to: input.to, amt: input.amt, refundTo: input.refundTo, deadline: q.deadline || body.deadline,
+  });
   return {
     ok: true,
+    replayed: false,
     reason: null,
     status: 'PENDING_DEPOSIT',
     help: statusHelp('PENDING_DEPOSIT'),
@@ -175,6 +211,7 @@ export function payrollRowStatus(status) {
 export async function payrollStatus(depositAddress, f = fetch) {
   if (!validDepositAddress(depositAddress)) throw Object.assign(new Error('not a deposit address'), { status: 400 });
   const st = await fetchOneClickStatus(depositAddress, f);
+  for (const [k, v] of ROWS) if (v.depositAddress === depositAddress) ROWS.set(k, { ...v, status: st.status });
   return { ...st, ...payrollRowStatus(st.status), final: FINAL.includes(st.status) };
 }
 

@@ -11,7 +11,7 @@ import {
   csvReconcile, accountantCsv, USDC_STORAGE_NEAR, USDC_NEAR_CONTRACT,
 } from '../../../app/src/panels/payouts-plan.js';
 import { parseCsv, splitAssets, receiptsFor, foreignAddressOk } from '../../../app/design/D8_shops/js/payouts.js';
-import { payrollRowGate, payrollCheckoutInput, payrollRowStatus, openPayrollCheckout } from '../../src/payouts-payroll.js';
+import { payrollRowGate, payrollCheckoutInput, payrollRowStatus, openPayrollCheckout, payrollRowId, resetPayrollRows } from '../../src/payouts-payroll.js';
 import { quotePayrollRow } from '../../src/payouts-invoice.js';
 import { USDC_STORAGE_CALL, callPolicy, callsFitRow, payoutsCalls, FERRY_CALL_TARGETS } from '../../../shared/board/session.js';
 
@@ -100,6 +100,7 @@ test('payroll: the row gate mirrors the board checks before a deposit address ex
 });
 
 test('payroll: checkout input refuses a NEAR row, a bad address and no refund', () => {
+  resetPayrollRows();
   assert.equal(payrollCheckoutInput({ chain: 'near', to: 'cafe.near', amt: 1, near: 0.1 }).error, 'a NEAR row is a propose, not a swap');
   assert.equal(payrollCheckoutInput({ chain: 'base', to: 'cafe.near', amt: 1, near: 0.1, refundTo: 'cafe.near' }).error, 'bad recipient for this chain');
   assert.equal(payrollCheckoutInput({ chain: 'base', to: BASE, amt: 1, near: 0.1 }).error, 'bad refundTo: a NEAR account holds the refund');
@@ -110,6 +111,7 @@ test('payroll: checkout input refuses a NEAR row, a bad address and no refund', 
 });
 
 test('payroll: a live checkout asks 1Click only after the row allows it and never sends the deposit', async () => {
+  resetPayrollRows();
   let posted = null;
   const out = await openPayrollCheckout(
     { chain: 'base', asset: 'USDC', to: BASE, amt: 0.15, near: 0.0411, refundTo: 'payer.near', slippage: 100 },
@@ -133,6 +135,8 @@ test('payroll: a live checkout asks 1Click only after the row allows it and neve
   assert.equal(out.receipt.rail, 'intents');
   assert.equal(out.receipt.decision, 'allowed');
   // A quote that costs more NEAR than the row allows is refused after the quote, before any deposit.
+  // (A fresh row cache, because the same row key would otherwise replay the success above.)
+  resetPayrollRows();
   const dear = await openPayrollCheckout(
     { chain: 'base', asset: 'USDC', to: BASE, amt: 0.15, near: 0.0411, refundTo: 'payer.near' },
     { row: row({ per_action_cap: near('0.01'), daily_budget: near('0.1'), balance: near('0.5') }), tokens: async () => [wnear, usdcBase], postQuote: async body => quoteResp({}, body), verify: () => true },
@@ -149,6 +153,32 @@ test('payroll: a live checkout asks 1Click only after the row allows it and neve
   assert.equal(refused.reason, 'over_per_action_cap');
   assert.equal(asked, 0);
   assert.equal(refused.receipt.decision, 'refused');
+});
+
+test('payroll: one row is one swap, so a second click reuses the deposit address', async () => {
+  resetPayrollRows();
+  let asked = 0;
+  const deps = () => ({
+    row: row({ per_action_cap: near('0.05'), daily_budget: near('0.1'), balance: near('0.5') }),
+    tokens: async () => [wnear, usdcBase],
+    postQuote: async body => { asked += 1; return quoteResp({}, body); },
+    verify: () => true,
+  });
+  const body = { owner: 'payer.near', chain: 'base', asset: 'USDC', to: BASE, amt: 0.15, near: 0.0411, refundTo: 'payer.near' };
+  const first = await openPayrollCheckout(body, deps());
+  assert.equal(first.ok, true);
+  assert.equal(first.replayed, false);
+  const second = await openPayrollCheckout(body, deps());
+  assert.equal(second.ok, true);
+  assert.equal(second.replayed, true);
+  assert.equal(second.depositAddress, first.depositAddress);
+  assert.equal(asked, 1, '1Click is asked once for one row');
+  // Another payee or amount is a different row, and does ask.
+  const other = await openPayrollCheckout({ ...body, amt: 0.2 }, deps());
+  assert.equal(other.replayed, false);
+  assert.equal(asked, 2);
+  assert.equal(payrollRowId({ owner: 'A.near', chain: 'Base', asset: 'usdc', to: BASE, amt: 0.15 }), payrollRowId({ owner: 'a.near', chain: 'base', asset: 'USDC', to: BASE.toLowerCase(), amt: 0.15 }));
+  resetPayrollRows();
 });
 
 test('payroll: every 1Click status is plain words and only SUCCESS is paid', () => {
