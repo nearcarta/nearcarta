@@ -225,14 +225,25 @@
     },
     "house": {
       "contract": "house.nearcarta.near",
+      "legacy": "house.nearcarta.near",
+      "shop": "house.nearcarta.near",
+      "fallback": {
+        "status": "unused",
+        "account": "house3.nearcarta.near"
+      },
+      "next": {
+        "status": "deployed_as_shop",
+        "wasm": "contracts/artifacts/house_nft.v3.oz.wasm",
+        "sha256": "29bb13027fd672d0b666d04ae23ab248371a03ad21738d0732b8d2f6f559e093"
+      },
       "owner": "nearcarta.near",
-      "wasm": "house_nft.p86.wasm",
-      "sha256": "70a8923bbd187b2b0dd89c66c9ba37902a656640919b16ad4861470fc1ea8806",
-      "code_hash": "8amkMEcCFxQHbHkgZqP72LXJnoJ1iecGq6B71gPiNMXK",
-      "storage_bytes": 247204,
-      "locked_near": 2.47204,
+      "wasm": "contracts/artifacts/house_nft.v3.oz.wasm",
+      "sha256": "29bb13027fd672d0b666d04ae23ab248371a03ad21738d0732b8d2f6f559e093",
+      "code_hash": "3ouAaAD1ccZ81CdLu26FoDxixYSynrmzPa58u1Focn66",
+      "storage_bytes": 373476,
+      "locked_near": 3.75199,
       "full_access_keys": 0,
-      "teardown": "owner close() with 1 yocto",
+      "teardown": "owner close() with 1 yocto after house_pay empties purse",
       "txs": {
         "house_create_fund": "FeuBqYhuDY2S2EZW4C9u6o7cftyLFTQohvgrpXVZ1ycj",
         "house_deploy_init": "6j1ot7BtC52FhLysYDkVNoc7KKWAQgy9VELGmSU8LzVj",
@@ -240,8 +251,13 @@
         "house_pay_allowed_0.001": "83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26",
         "house_pay_refused_0.002": "3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1",
         "house_sweep_surplus": "FPv1CzUVGBerogRdZ58FK924e4L33Nn57frKS4WcwPRD",
-        "house_delete_fak": "DxZXKNx3SvcGQSVooJwwNrgVMhp5CRdPHEsfxnWny8jB"
-      }
+        "house_delete_fak": "DxZXKNx3SvcGQSVooJwwNrgVMhp5CRdPHEsfxnWny8jB",
+        "house_pay_recover": "ddaVgHkMGQzHcquj94qMuWTywXY8X4B7bWhkJF7aJEQ",
+        "house_close": "Eykw3LPZrDdCNbMxsZsGfpTVZogDmWmgkt3x3ykryzPv",
+        "house_v3_create_deploy_new": "9b5rS4do5bVisMYpcmfLBKgXJrxQCNuYoDi6hDDPsyLj"
+      },
+      "status": "deployed",
+      "house_version": 3
     },
     "townhall": {
       "contract": "townhall.nearcarta.near",
@@ -264,7 +280,7 @@
       }
     }
   },
-  "root_balance_near": 0.561379,
+  "root_balance_near": 3.2899,
   "ferry_intents": {
     "rail": "NEAR Intents 1Click",
     "from": "nearcarta.near",
@@ -302,6 +318,15 @@
         "reap": "9fULF7hdKU5mJ6H6T7hfqfCJXZCu9qRVxbGQFYmns2N4"
       },
       "recovered_to": "nearcarta.near"
+    },
+    "house.nearcarta.near@v2": {
+      "status": "replaced_same_name",
+      "txs": {
+        "house_pay": "ddaVgHkMGQzHcquj94qMuWTywXY8X4B7bWhkJF7aJEQ",
+        "close": "Eykw3LPZrDdCNbMxsZsGfpTVZogDmWmgkt3x3ykryzPv"
+      },
+      "recovered_to": "nearcarta.near",
+      "note": "Legacy house wasm closed; account recreated as v3 on same name."
     }
   },
   "guard": {
@@ -317,5 +342,24 @@
     "board": "board.nearcarta.near",
     "deploy_tx": "CN3SKjNS7PRdvrNQsxRxQW45Ks2vChe3BDAHhehhxt65",
     "note": "Guard live after PR #35. Stake 0.35366 from nearcarta.near. Locked, no FA keys. reap() from owner returns stake."
+  },
+  "house": {
+    "contract": "house.nearcarta.near",
+    "owner": "nearcarta.near",
+    "status": "deployed",
+    "crate": "contracts/house_nft",
+    "wasm": "contracts/artifacts/house_nft.v3.oz.wasm",
+    "wasm_sha256": "29bb13027fd672d0b666d04ae23ab248371a03ad21738d0732b8d2f6f559e093",
+    "code_hash": "3ouAaAD1ccZ81CdLu26FoDxixYSynrmzPa58u1Focn66",
+    "storage_bytes": 373476,
+    "locked_near": 3.75199,
+    "full_access_keys": 0,
+    "house_version": 3,
+    "txs": {
+      "house_pay_recover": "ddaVgHkMGQzHcquj94qMuWTywXY8X4B7bWhkJF7aJEQ",
+      "house_close": "Eykw3LPZrDdCNbMxsZsGfpTVZogDmWmgkt3x3ykryzPv",
+      "house_v3_create_deploy_new": "9b5rS4do5bVisMYpcmfLBKgXJrxQCNuYoDi6hDDPsyLj"
+    },
+    "note": "House v3 after PR #36. Recovered legacy ~2.50 via house_pay+close, recreated same name stake 3.75199. Locked, no FA keys."
   }
 }

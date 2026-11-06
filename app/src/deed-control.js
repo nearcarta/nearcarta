@@ -1,8 +1,10 @@
 // The house deed is a NEP-171 token. The current holder is the only account that may spend the purse.
-// These hashes are the recorded mainnet payments. This module does not sign.
+// These hashes are the recorded payments on the legacy shop. This module does not sign.
+import { HOUSE_LEGACY, HOUSE_SHOP } from './house-shop.js';
 
 export const DEED = {
-  contract: 'house.nearcarta.near',
+  contract: HOUSE_SHOP,
+  legacy: HOUSE_LEGACY,
   standard: 'nep171',
   name: 'Nearcarta House deeds',
   symbol: 'HOUSE',
