@@ -1,5 +1,5 @@
 // Chronicle (static): the crier's scroll. One mark per real decision from the core mainnet run; refusals in the refused colour.
-import { THREE, room, put, makeRobot, C, CSS } from '../js/core.js';
+import { THREE, room, put, makeRobot, C, CSS, tween } from '../js/core.js';
 import { M as PM, brassM, mesh, lantern, banner, candle, rug } from './_props.js';
 import { CORE_TXS, CORE, CLAUSES } from '../../D6_dashboards/src/data.js';
 import { explain, replayPlan } from '../js/why.js';
@@ -38,15 +38,36 @@ export default async function chronicle() {
   const bell = mesh(scene, new THREE.CylinderGeometry(.08, .19, .3, 20, 1, true), brassM(), [-1.75, 1.38, -.2]); bell.material.side = THREE.DoubleSide; mesh(scene, new THREE.SphereGeometry(.08, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), brassM(), [-1.75, 1.53, -.2]);
   mesh(scene, new THREE.SphereGeometry(.035, 8, 6), PM.dark, [-1.75, 1.22, -.2]);
   mesh(scene, new THREE.BoxGeometry(.1, .8, .1), PM.wood, [1.75, .4, .5]); mesh(scene, new THREE.BoxGeometry(.5, .05, .38), PM.wood, [1.75, .83, .5], { rx: .5 }); mesh(scene, new THREE.BoxGeometry(.4, .012, .28), new THREE.MeshStandardMaterial({ color: 0xf3ead8, roughness: 1 }), [1.75, .863, .515], { rx: .5 }); // the day's sheet, tilted to the viewer
-  mesh(scene, new THREE.CylinderGeometry(.06, .06, .02, 20), new THREE.MeshStandardMaterial({ color: 0xc0463e, roughness: .5, emissive: 0x3a0c08 }), [1.84, .88, .53], { rx: .5 });
+  const seal = mesh(scene, new THREE.CylinderGeometry(.06, .06, .02, 20), new THREE.MeshStandardMaterial({ color: 0xc0463e, roughness: .5, emissive: 0x3a0c08 }), [1.84, .88, .53], { rx: .5 });
   const scroll = new THREE.MeshStandardMaterial({ color: 0xe9dcc0, roughness: 1 }); [[-1.25, .2, .55, 0], [-1.05, .2, .7, .5], [-1.15, .34, .62, .25]].forEach(([x, y, z, r]) => mesh(scene, new THREE.CylinderGeometry(.06, .06, .5, 12), scroll, [x, y - .1, z], { rz: Math.PI / 2, ry: r }));
   banner(scene, -.85, 2.25, -.05, 0xa8644a, { w: .2, h: .45 }); banner(scene, .85, 2.25, -.05, 0xa8644a, { w: .2, h: .45 });
   lantern(scene, -2.35, .7, { h: 1.3 }); lantern(scene, 2.05, -1.25, { h: 1.3, light: false }); rug(scene, 0, 1.0, 2.6, 1.3, 0x5e3427);
   await put(scene, 'decoration/props/crate_A_big', { x: 1.6, z: -1.75, ry: .4, fitW: .42 }).catch(() => null);
   const rob = await makeRobot(scene); rob.at(.6, 1.25); rob.lookAt(new THREE.Vector3(.2, 0, 3));
+  const tags = [{ obj: seal, pos: new THREE.Vector3(0, .16, 0), html: 'Entry refused', cls: 'no hide' }];
+  const hideRefuse = () => {
+    const el = tags[0].el;
+    if (!el) return;
+    el.classList.add('hide');
+    el.setAttribute('hidden', '');
+  };
+  const showRefuse = (text) => {
+    const el = tags[0].el;
+    if (!el) return;
+    el.textContent = text || 'Entry refused';
+    el.classList.remove('hide');
+    el.removeAttribute('hidden');
+  };
+  function* act(opts = {}) {
+    if (!opts.success || !opts.tx) return;
+    hideRefuse();
+    const base = bell.rotation.z;
+    yield tween(.7, k => { bell.rotation.z = base + Math.sin(k * Math.PI * 3) * .4 * (1 - k); });
+    bell.rotation.z = base;
+  }
   return {
-    rob, scene, camera, tags: [],
-    panel: { title: 'Chronicle', src: 'mainnet', label: 'Refusals on the record', hero: `<b class="num">${denied.length}</b><span class="unit">of ${acts.length} actions</span>`, action: null },
+    rob, scene, camera, tags, hideRefuse, showRefuse, act,
+    panel: { title: 'Chronicle', src: 'mainnet', label: 'Public ledger', hero: `<b class="num">${denied.length}</b><span class="unit">of ${acts.length} actions</span>`, action: null },
     proof: PROOF,
     update(dt) { rob.update(dt); },
   };
