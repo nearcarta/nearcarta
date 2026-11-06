@@ -112,7 +112,7 @@ export function receiptsBody(mainnet, budget = {}, { jobTokens = 160, checkouts 
     rails: {
       near: 'A propose on the charter. The receipt is the NEAR tx: allowed, or refused with a reason.',
       'chain-signatures': 'The toll contract asks the MPC signer. The receipt is the NEAR tx that requested the signature. An address off the list is refused before a signature.',
-      intents: 'A dry 1Click quote has no deposit address and no tx. A checkout adds another intents receipt only after the charter allows the recipient: its tx is the deposit address, then the chain tx once the status says the swap settled. The amount is at most 0.20 USD.',
+      intents: 'A dry 1Click quote has no deposit address and no tx. A checkout adds another intents receipt only after the visitor board row allows the recipient and the amount: its tx is the deposit address, then the chain tx once the status says the swap settled. The row is the only limit; there is no product-wide USD cap.',
       'near-ai': 'A TEE model call. The call is capped per job and per day before it is sent. Any NEAR it asks to move is still judged by the charter.',
     },
     inference: {

@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBoardKeyPlugin } from '../../../app/house/board-key.js';
 import { callMessage } from '../../../shared/board/message.js';
-import { AGENT_METHODS, BOARD_PROPOSE_TGAS, FERRY_PROPOSE_BYTES, GAS_ALLOWANCE_YOCTO, SESSION_HOURS, boardProposeAllowanceYocto, callPolicy, sessionExpiresAt, sessionLabel } from '../../../shared/board/session.js';
+import { AGENT_METHODS, SESSION_METHODS, agentCanConfirmAlone, scopeHasOwnerOnly, BOARD_PROPOSE_TGAS, FERRY_PROPOSE_BYTES, GAS_ALLOWANCE_YOCTO, SESSION_HOURS, boardProposeAllowanceYocto, callPolicy, sessionExpiresAt, sessionLabel } from '../../../shared/board/session.js';
 import { functionCallAllowanceCost } from '../../../shared/board/cost.js';
 
 test('a session is 1, 2 or 24 hours and the expiry is that many nanoseconds ahead', () => {
@@ -94,7 +94,11 @@ test('the session script prints the plan and does not sign without --live', () =
   const plan = JSON.parse(dry.stdout);
   assert.deepEqual(plan.plan.expect, ['allowed', 'over_per_action_cap', 'frozen', 'clause_expired']);
   assert.equal(plan.plan.allowedNear, '0.001');
-  assert.deepEqual(plan.methods, ['propose', 'propose_call', 'propose_call_as']);
+  assert.deepEqual(plan.methods, SESSION_METHODS);
+  // The scope carries confirm_hold, and that still cannot let the agent confirm alone.
+  assert.ok(plan.methods.includes('confirm_hold'));
+  assert.equal(agentCanConfirmAlone(plan.methods), false);
+  assert.equal(scopeHasOwnerOnly(plan.methods), false);
   const live = spawnSync(process.execPath, [script, '--live'], { encoding: 'utf8', env: { ...process.env, NEAR_MAINNET_SIGNER_KEY: '' } });
   assert.equal(live.status, 1);
   assert.match(live.stderr, /NEAR_MAINNET_SIGNER_KEY/);

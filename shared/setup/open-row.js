@@ -2,10 +2,10 @@
 // One is sent to the board: `open_charter` writes the rules and the agent key, and
 // `set_calls` writes the shop allowlist. The other stays on the visitor's own account:
 // it adds the function-call access key that lets the agent ask without a wallet popup.
-// The key is limited to AGENT_METHODS on the board and carries a gas allowance only.
+// The key is limited to SESSION_METHODS on the board and carries a gas allowance only.
 // Source: contracts/charter_board/src/lib.rs open_charter, set_calls, MAX_ROW_YOCTO.
 // https://docs.near.org/protocol/accounts-contracts/access-keys
-import { AGENT_METHODS } from '../board/session.js';
+import { SESSION_METHODS } from '../board/session.js';
 
 /**
  * @param {object} o
@@ -18,7 +18,7 @@ import { AGENT_METHODS } from '../board/session.js';
  * @param {string} o.callsDepositYocto    what set_calls may use for storage
  * @param {string} o.gasOpen              gas for open_charter, in yocto
  * @param {string} o.gasAgent             gas for set_calls and for the key add
- * @param {string[]} [o.methodNames]      defaults to AGENT_METHODS
+ * @param {string[]} [o.methodNames]      defaults to SESSION_METHODS
  * @param {string} o.allowance            gas allowance for the agent key, in yocto
  * @returns {{ open: object, key: object }}
  */
@@ -33,7 +33,7 @@ export function openRowTransactions({
   calls,
   gasOpen,
   gasAgent,
-  methodNames = AGENT_METHODS,
+  methodNames = SESSION_METHODS,
   allowance,
 }) {
   if (!accountId || !contract || !agentPublicKey) throw new Error('open row needs an account, the board and a key');

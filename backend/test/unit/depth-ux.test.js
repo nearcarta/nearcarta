@@ -14,11 +14,20 @@ const read = p => readFileSync(new URL(`../../../${p}`, import.meta.url), 'utf8'
 
 test('a deployments payload with no guardhouse keeps the sample code hash', () => {
   const sample = { codeHash: 'sample-hash', oath: 'sample.near', receiver: 'payee.near' };
-  const core = shapeCore({ charter: { contract: 'charter.nearcarta.near' } }, { state: { owner: 'owner.near', frozen: false }, oath: 'charter.nearcarta.near' }, sample);
+  // The board is the oath now: the snapshot comes from board.nearcarta.near and the
+  // config from /api/board/config. No retired charter account takes part.
+  const board = { board: 'board.nearcarta.near', config: { contract: 'board.nearcarta.near', owner: 'nearcarta.near', rows: 0, max_row_yocto: '20000000000000000000000' } };
+  const core = shapeCore({ board: { contract: 'board.nearcarta.near' } }, { state: { owner: 'owner.near', frozen: false }, oath: 'board.nearcarta.near', source: 'board' }, board, sample);
   assert.equal(core.codeHash, 'sample-hash');
-  assert.equal(core.oath, 'charter.nearcarta.near');
+  assert.equal(core.oath, 'board.nearcarta.near');
+  assert.equal(core.owner, 'nearcarta.near');
+  assert.equal(core.rows, 0);
   assert.equal(core.src, 'mainnet');
-  assert.equal(shapeCore({ charter: {} }, {}, sample), sample);
+  // No guardhouse and no board config: the caller's sample stands untouched.
+  assert.equal(shapeCore({ board: {} }, {}, null, sample), sample);
+  // A board snapshot has no clauses, so the sample's retired charter clauses are not shown.
+  assert.deepEqual(shapeClauses({ clauses: null, source: 'board' }, ['stale-charter']), []);
+  // A factory charter still has clauses and keeps them.
   assert.deepEqual(shapeClauses({ clauses: null }, ['keep']), ['keep']);
   assert.deepEqual(shapeClauses({}, ['keep']), ['keep']);
 });
@@ -142,7 +151,9 @@ test('the pay page lists a long token catalog and every terminal status', () => 
   assert.equal(statusView({ status: 'SUCCESS' }).terminal, true);
   assert.match(read('app/src/ferry-pay.js'), /\/api\/ferry\/tokens/);
   assert.match(read('app/src/ferry-pay.js'), /You send the tokens yourself/);
-  assert.match(read('app/src/ferry-pay.js'), /0\.20 USD/);
+  // No product-wide USD cap: the visitor's row is the limit.
+  assert.doesNotMatch(read('app/src/ferry-pay.js'), /0\.20 USD/);
+  assert.match(read('app/src/ferry-pay.js'), /Your row sets the limit/);
 });
 
 test('the guardhouse policy card names both methods and a recorded scam payee is blocked', () => {
