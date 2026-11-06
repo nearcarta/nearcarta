@@ -11,7 +11,7 @@ export function guardiansPayload(rows = []) {
     creator: row.owner_id || row.creator || '',
     pot: row.pot ?? '—',
     fee: row.fee ?? '—',
-    source: 'deployed-v1',
+    source: 'chain',
   })).filter(g => g.id);
   return {
     contract: ARENA,
@@ -45,9 +45,28 @@ export function removedMarket(week = 0) {
 
 export async function readGuardians(viewFn, contract = ARENA) {
   if (typeof viewFn !== 'function') return guardiansPayload([]);
+  // The contract's own config says whether it is v2 (player-owned pots, a pinned model
+  // signer, a funded budget) or the old v1 token contract. The payload repeats what the
+  // chain says rather than guessing from a deployment record.
+  const cfg = await viewFn(contract, 'get_config', {}).catch(() => null);
+  const v2 = !!cfg && typeof cfg === 'object' && 'model_signer' in cfg;
   try {
     const tokens = await viewFn(contract, 'nft_tokens', { from_index: '0', limit: 20 });
-    return guardiansPayload(Array.isArray(tokens) ? tokens : []);
+    const base = guardiansPayload(Array.isArray(tokens) ? tokens : []);
+    if (!v2) return base;
+    return {
+      ...base,
+      live: cfg.model_signer ? 'ready' : 'no-signer',
+      inference_budget: cfg.inference_budget ?? null,
+      inference_cost: cfg.inference_cost ?? null,
+      subsidy: cfg.subsidy ?? false,
+      verifier: cfg.verifier || 'unverified',
+      model: cfg.model_name || null,
+      model_signer: cfg.model_signer || null,
+      note: cfg.model_signer
+        ? `Pot, fee and creator are on ${contract}. A round settles only with a verdict signed by the pinned model.`
+        : `Pot, fee and creator are on ${contract}. No model signer is pinned yet, so no round can settle.`,
+    };
   } catch {
     return { ...guardiansPayload([]), note: 'The guardian list did not answer. Nothing was invented.' };
   }

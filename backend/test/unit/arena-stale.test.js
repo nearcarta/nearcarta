@@ -48,8 +48,9 @@ test('corpus: every past prompt has a decision tx; the bounty text is never in i
 });
 
 test('pastPrompts reads the mainnet arena once and caches', async () => {
-  let n = 0; const v = async (_a, _m, { attempt_id }) => {
+  let n = 0; const v = async (_a, m, { attempt_id } = {}) => {
     n++;
+    if (m === 'get_config') return { verifier: 'ed25519-model', model_name: 'z-ai/glm-5.3-flash' };
     const p = LIVE[attempt_id];
     if (_a !== 'arena.nearcarta.near' || !p) throw new Error('none');
     return { prompt_hash_hex: p.prompt ? sha(p.prompt) : 'x', revealed: !!p.prompt, verdict: p.verdict };
@@ -60,7 +61,24 @@ test('pastPrompts reads the mainnet arena once and caches', async () => {
   assert.equal(d.count, LIVE.length);
   assert.equal(d.shown, LIVE.filter(p => p.prompt).length);
   assert.equal(d.prompts[0].id, LIVE.length - 1);
+  // The note comes from the contract's own config, so it cannot claim a signed model run
+  // the chain does not support.
+  assert.equal(d.verifier, 'ed25519-model');
+  assert.equal(d.model, 'z-ai/glm-5.3-flash');
+  assert.equal(d.signed_verdicts, true);
+  assert.match(d.source_note, /checks that signature on chain/);
   const calls = n; await pastPrompts(v, 3e12 + 1000); assert.equal(n, calls);
+});
+
+test('an unpinned arena says no row can be a signed model verdict', async () => {
+  // v1 answers no get_config at all: the note must not imply a model run.
+  const v = async (_a, m) => { if (m === 'get_config') throw new Error('MethodNotFound'); throw new Error('none'); };
+  const d = await pastPrompts(v, 5e12);
+  assert.equal(d.verifier, 'unverified');
+  assert.equal(d.model, null);
+  assert.equal(d.signed_verdicts, false);
+  assert.match(d.source_note, /no pinned model signer/);
+  assert.doesNotMatch(d.source_note, /signed by/);
 });
 
 test('room rows escape text and mark expired', () => {

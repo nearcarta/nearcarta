@@ -189,7 +189,15 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
       state.guardians = Array.isArray(body.guardians) ? body.guardians : [];
       state.budget = body.inference_budget;
       state.live = body.live || 'blocked';
-      if (!state.status) state.status = state.guardians.length ? 'Deployed token. Not an arena v2 pot.' : '';
+      state.budget = body.inference_budget ?? state.budget;
+      state.verifier = body.verifier || 'unverified';
+      if (!state.status) {
+        state.status = body.live === 'ready'
+          ? 'Pot, fee and creator are on chain. A round settles only with a signed model verdict.'
+          : body.live === 'no-signer'
+            ? 'The arena has no pinned model signer yet, so a round cannot settle. Nothing was signed.'
+            : '';
+      }
     } catch {
       state.guardians = [];
       state.listError = true;

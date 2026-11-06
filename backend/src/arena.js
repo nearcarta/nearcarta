@@ -34,8 +34,29 @@ export async function pastPrompts(v = view, now = Date.now()) {
   const same = ARENA === ARENA_V1;
   const parts = same ? [await read(ARENA, PAST)] : await Promise.all([read(ARENA, PAST), read(ARENA_V1, PAST_V1)]);
   const prompts = parts.flat();
-  const body = { contract: ARENA, history_contract: same ? null : ARENA_V1, standard: 'NEP-245 (mt_transfer, mt_batch_transfer, mt_transfer_call, mt_resolve_transfer)', count: prompts.length, seeded: prompts.filter(p => p.source === 'seeded').length,
-    source_note: 'seeded = attempts our scripts wrote with a scripted agent (no model call). Live model runs are the red-team and Ask runs on the shared charter (POST /api/vault/ask), not listed here.', shown: prompts.filter(p => p.prompt).length, prompts,
-    rule: 'prompt text shown only when sha256(prompt) equals the on-chain commitment and the attempt is revealed on chain' };
+  // The config names the verifier and the model. It is read from the same contract the
+  // prompts come from, so this note can never claim a model run that the chain does not
+  // show: a v1 contract has no `get_config` and no signed verdict, and says so.
+  const cfg = await v(ARENA, 'get_config', {}).catch(() => null);
+  const verifier = cfg?.verifier || 'unverified';
+  const model = cfg?.model_name || null;
+  const signed = verifier === 'ed25519-model';
+  const sourceNote = signed
+    ? `Each round is settled by a model verdict signed by ${model || 'the pinned model'}; the Arena contract checks that signature on chain (verifier ${verifier}). Rows below were written before that key was pinned and are labelled by how they were produced.`
+    : 'The live contract has no pinned model signer yet, so no round on it can be a signed model verdict. Rows below are seeded (our scripts, a scripted agent, no model call) or player rows; none is presented as a model run.';
+  const body = {
+    contract: ARENA,
+    history_contract: same ? null : ARENA_V1,
+    standard: 'NEP-245 (mt_transfer, mt_batch_transfer, mt_transfer_call, mt_resolve_transfer)',
+    count: prompts.length,
+    seeded: prompts.filter(p => p.source === 'seeded').length,
+    verifier,
+    model,
+    signed_verdicts: signed,
+    source_note: sourceNote,
+    shown: prompts.filter(p => p.prompt).length,
+    prompts,
+    rule: 'prompt text shown only when sha256(prompt) equals the on-chain commitment and the attempt is revealed on chain',
+  };
   cache = { at: now, body }; return body;
 }
