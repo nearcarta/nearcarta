@@ -39,7 +39,7 @@ export function chronicleMarkup(state) {
       <span><span class="c-shop">${esc(x.shop || '')}</span><br><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span>${href ? `<br><a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(label)} · ${esc(shortHash(x.h))}</a>` : ''}</span>
       <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
     </li>`;
-  }).join('') || `<li>${esc(state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.')}</li>`;
+  }).join('') || `<li class="c-empty">${esc(state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.')}</li>`;
   const cta = state.tab === 'verify' ? 'Check this bundle' : (state.tab === 'statement' && state.statement ? 'Anchor' : 'Write statement');
   const verifyHtml = `${esc(state.verify || 'Nothing is signed from this tray.')}${state.verifyUrl ? ` <a data-testid="chronicle-link" href="${esc(state.verifyUrl)}">View transaction</a>` : ''}`;
   const opt = (value, label, cur) => `<option value="${value}"${cur === value ? ' selected' : ''}>${label}</option>`;
@@ -57,12 +57,12 @@ export function chronicleMarkup(state) {
     <div class="chronicle-pane" data-pane="timeline"${tab === 'timeline' ? '' : ' hidden'}>
       <div class="c-filters">
         <label class="chronicle-field wide">Account <input id="c-account" data-testid="chronicle-account" value="${esc(state.account || '')}" autocomplete="off" spellcheck="false" placeholder="name.near"></label>
-        <ol class="feed wide" data-testid="chronicle-page">${list}</ol>
         <label class="chronicle-field">Period <select id="c-span" data-testid="chronicle-period">${opt('all', 'All', state.span || 'all')}${opt('today', 'Today', state.span || 'all')}${opt('7d', '7 days', state.span || 'all')}</select></label>
         <label class="chronicle-field">Shop <select id="c-shop" data-testid="chronicle-shop">${opt('', 'All', state.shop || '')}${['toll', 'ferry', 'guard', 'payouts', 'house', 'board'].map(s => opt(s, s, state.shop || '')).join('')}</select></label>
         <label class="chronicle-field">Chain <select id="c-chain" data-testid="chronicle-chain">${opt('', 'All', state.chain || '')}${opt('NEAR', 'NEAR', state.chain || '')}${opt('NEAR Intents', 'NEAR Intents', state.chain || '')}</select></label>
         <label class="chronicle-field">Decision <select id="c-d" data-testid="chronicle-filter">${opt('', 'All', state.cd || '')}${opt('allowed', 'Allowed', state.cd || '')}${opt('denied', 'Refused', state.cd || '')}</select></label>
         <label class="chronicle-field wide">Words <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}" autocomplete="off"></label>
+        <ol class="feed wide" data-testid="chronicle-page">${list}</ol>
       </div>
     </div>
     <div class="chronicle-pane" data-pane="statement"${tab === 'statement' ? '' : ' hidden'}>
@@ -186,7 +186,7 @@ export function mountChronicleTray(root, hooks = {}) {
         <span><span class="c-shop">${esc(x.shop || '')}</span><br><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span>${href ? `<br><a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(label)} · ${esc(shortHash(x.h))}</a>` : ''}</span>
         <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
       </li>`;
-    }).join('') || `<li>${esc(state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.')}</li>`;
+    }).join('') || `<li class="c-empty">${esc(state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.')}</li>`;
     showOut();
   }
 

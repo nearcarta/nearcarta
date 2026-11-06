@@ -49,6 +49,10 @@ body.chronicle-tray #shopUI #t-form button.chronicle-tab[aria-selected=true]{
   display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:8px 12px; align-items:center;
   margin:0; padding:12px; border-radius:12px; background:#17130f; border:1px solid #4a3a28; color:#fff8ee;
 }
+.chronicle-card .feed li.c-empty{
+  display:block; padding:2px 2px 0; min-height:0; background:transparent; border:0; color:#f3ead8;
+  font:600 13px/1.35 system-ui,sans-serif;
+}
 .chronicle-card .c-mark{display:flex; gap:6px; align-items:center}
 .chronicle-card .c-shop{font:700 14px/1.2 system-ui,sans-serif; color:#fff8ee; white-space:nowrap}
 .chronicle-card .c-dec,.chronicle-card .c-amt{color:#f3ead8; font:600 13px/1.3 system-ui,sans-serif}
@@ -59,6 +63,7 @@ body.chronicle-tray #shopUI #t-form button.c-v,
 body.chronicle-tray #shopUI #t-form button.chronicle-quiet{
   appearance:none; width:auto; border:0; background:transparent; background-image:none; color:#f5d08a;
   min-height:44px; padding:8px 10px; box-shadow:none; font:700 13px/1.2 system-ui,sans-serif; cursor:pointer;
+  white-space:nowrap; flex:none;
 }
 body.chronicle-tray #room button.chronicle-gold,
 body.chronicle-tray #shopUI #t-form button.chronicle-gold{
@@ -127,9 +132,13 @@ body.chronicle-tray #shopUI #t-form > *{flex:1 1 auto; min-height:0; display:fle
 @media (max-width:720px){
   body.chronicle-tray #shopUI #tray{
     width:min(440px, calc(100vw - 16px)); max-width:none;
-    left:8px; top:72px; bottom:200px; max-height:none; padding:12px;
+    left:8px; top:72px; bottom:148px; max-height:none; padding:12px;
   }
   body.chronicle-tray nav.all-shops{top:8px; left:8px; right:auto}
+  .chronicle-card{padding:12px; gap:8px}
+  .c-flow{min-height:52px; padding:6px}
+  .c-filters{gap:8px 12px}
+  .chronicle-card .feed{max-height:72px}
   .chronicle-tab{font-size:13px; padding:8px 6px}
   #chronicle-agent-dock{right:8px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); gap:8px}
   .chronicle-agent-pop{width:min(240px, calc(100vw - 120px))}

@@ -99,9 +99,13 @@ test('guard, chronicle, toll, house, ferry and the bank proof are usable', async
   await expect(page.getByTestId('deed-moved')).toContainText('previous holder');
   await expect(page.getByTestId('deed-allow')).toHaveAttribute('href', /83nyJmTW/);
   await page.goto('/?mode=2d&nostory&shop=ferry');
+  await page.getByTestId('ferry-tab-routes').click();
+  await expect(page.getByTestId('ferry-corridors')).toContainText('No quote yet');
+  await page.getByTestId('ferry-compare-wrap').locator('summary').click();
   await page.getByTestId('ferry-compare').click();
-  await expect(page.getByTestId('ferry-row').first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('ferry-idle')).toContainText('No deposit has been requested');
+  await expect(page.getByTestId('ferry-corridors')).toContainText(/USD not quoted|on zec/, { timeout: 30_000 });
+  await page.getByTestId('ferry-compare-wrap').locator('summary').click();
+  await expect(page.getByTestId('ferry-row').first()).toBeVisible();
   await expect(page.locator('body')).not.toContainText('Waiting for the deposit');
   await page.goto('/?mode=2d&nostory&shop=bank');
   await expect(page.getByTestId('tee-proof')).toHaveAttribute('href', '/tee-public.json');
