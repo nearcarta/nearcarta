@@ -1,5 +1,5 @@
 // Live toll views. Read-only. policy, get_tx. No signature and no broadcast.
-// U64 view args are strings. https://docs.near.org/chain-abstraction/chain-signatures/implementation
+// U64 view args are numbers here: a JSON string GuestPanics on deserialize. https://docs.near.org/chain-abstraction/chain-signatures/implementation
 import { readFileSync } from 'node:fs';
 import { assembleTollLive } from '../../app/src/panels/toll-room.js';
 
@@ -23,7 +23,8 @@ export async function readTollLive(call) {
   const end = Number.isFinite(next) ? next : 0;
   for (let n = start; n < end; n++) {
     try {
-      const tx = await call(contract, 'get_tx', { nonce: String(n) });
+      // near-sdk u64 rejects JSON strings here (GuestPanic deserialize); numbers work.
+      const tx = await call(contract, 'get_tx', { nonce: n });
       if (tx) txs.push(tx);
     } catch { /* a gap in the nonce list is skipped */ }
   }

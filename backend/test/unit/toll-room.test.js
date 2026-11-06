@@ -126,21 +126,21 @@ test('the toll card shows both actions, real icons, and no Base payment claim', 
   assert.doesNotMatch(html, /tokenBadge\('ETH'/);
 });
 
-test('the live toll read asks for policy and string nonces, and skips a missing row', async () => {
+test('the live toll read asks for policy and numeric nonces, and skips a missing row', async () => {
   const seen = [];
   const out = await readTollLive(async (contract, method, args) => {
     seen.push({ contract, method, args });
     if (method === 'policy') {
       return { next_nonce: '2', path: 'base-1', chain_id: 8453, foreign_address: '0xabc', mpc: 'v1.signer', gate: { fee: ONE, payee: 'p.near' } };
     }
-    if (args.nonce === '0') throw new Error('gap');
+    if (args.nonce === 0) throw new Error('gap');
     return { nonce: args.nonce, status: 'signed' };
   });
   assert.equal(seen[0].method, 'policy');
   assert.equal(seen[0].contract, 'toll.nearcarta.near');
-  assert.deepEqual(seen.filter(s => s.method === 'get_tx').map(s => s.args.nonce), ['0', '1']);
+  assert.deepEqual(seen.filter(s => s.method === 'get_tx').map(s => s.args.nonce), [0, 1]);
   assert.equal(out.recent.length, 1);
-  assert.equal(out.recent[0].nonce, '1');
+  assert.equal(out.recent[0].nonce, 1);
   assert.equal(out.gate.fee_near, '0.001');
 });
 
