@@ -58,10 +58,10 @@
  {
   "id": "toll",
   "name": "Toll Bridge",
-  "role": "pay 0.001 NEAR to pass",
+  "role": "pay the live policy fee",
   "x": 48.7,
   "y": 87.1,
-  "card": "Pay 0.001 NEAR from your own charter. The recorded chain-signature proof is a separate check. This pass does not send a foreign-chain payout."
+  "card": "The fee comes from the live toll policy. A chain signature is a separate check. A signature is not a Base payment."
  },
  {
   "id": "payouts",

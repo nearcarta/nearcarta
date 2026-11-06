@@ -50,7 +50,7 @@ export const PURPOSE = {
   hall: 'Change the rules on your own row',
   bank: 'A charter check before a payment',
   arena: 'Try to trick the Lamplighter',
-  toll: 'Pay 0.001 NEAR, or pay nothing',
+  toll: 'Pay the live policy fee, or pay nothing',
   chronicle: 'What the charter allowed and refused',
   house: 'Your rules, on chain',
   payouts: 'Pay under the row cap. One propose per NEAR row',
