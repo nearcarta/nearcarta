@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 513 backend unit tests (510 pass, 3 skipped), offline
+npm test                                   # 523 backend unit tests (520 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -181,10 +181,37 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 - Games (Vault Arena): a recorded payment and an over-cap refusal.
 - Open (Your House): the house deed, and the visitor's rules on their row.
 
+## Toll Bridge
+
+The city door is the way in. The all-shops list still links to `/shops/toll/`. When the town is running, that link calls `window.__enterToll` and opens the room. The standalone page is the backup.
+
+The card has three tabs: Pass, Proof, and Split. Pay 0.001 NEAR and Check signature stay on the card. The AI Agent on the other side takes the same lines: “Pay the toll”, “Check signature”, “Show my foreign address”. Enter and the Send button both send. A line the agent does not know stays in the box and shows a hint.
+
+A pass is one `propose` on `board.nearcarta.near` paying `toll.nearcarta.near` 0.001 NEAR, under the visitor’s row cap. The same button does that call. No wallet opens when the session key can call `propose`. A different amount, a missing allowlist entry, a frozen or expired row, a short balance, or a daily budget that cannot hold 0.001 NEAR stops before any signature. The boom lifts only after a real allowed transaction. A refusal shows a seal and clears on the next action.
+
+Check signature reads the recorded allow transaction and its chain status. A signature, and a NEAR pass, are not a payment on Base. Paid on Base is reserved for a success receipt the page has actually read. This room does not broadcast.
+
+`GET /api/toll/live` reads `policy` and the recent `get_tx` rows. A view that fails comes back as `{ ok: false }` so the card can say the policy did not answer. The gate route is unchanged.
+
+Recorded on mainnet: allowed [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz), refused [B9FFjcSA…](https://nearblocks.io/txns/B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR). A new 0.001 NEAR pass from this room: (the assistant adds the nearblocks link).
+
+Teardown is `close()` with 1 yocto, predecessor the owner, and the balance returns to `nearcarta.near`. `backend/scripts/toll-teardown.js` prints that call and does not send it. This change does not redeploy the toll contract. If `on_signed` recovers an address that does not match the recorded foreign address, that callback panics; the earlier sign receipt can still stand. The room never calls `pay`, `pay_for`, or `sign`.
+
+Chronicle lists a pass from this room beside the recorded rows. The pass is stored for the tab and merged into the chronicle list.
+
+Live check, at most 0.06 NEAR (the pass itself is 0.001):
+
+1. Open the town and use the Toll Bridge door, not the standalone page first.
+2. On Pass, say “Pay the toll” to the agent, or press Pay 0.001 NEAR.
+3. Expect one mainnet transaction to `toll.nearcarta.near` for 0.001 NEAR, then the boom. The line says the pass does not pay Base.
+4. On Proof, press Check signature. The recorded allow is on NEAR. The card does not say the toll was paid on Base.
+5. If `toll.nearcarta.near` is missing from the row, or the cap is under 0.001 NEAR, the seal shows and the boom stays down. The next command clears the seal.
+6. Open Chronicle. The new pass is listed with the recorded allow and the recorded refusal.
+
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 513 unit tests (510 pass, 3 skipped)
+npm test                 # 523 unit tests (520 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -207,7 +234,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 513 unit tests (510 pass, 3 skipped):
+# 523 unit tests (520 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).

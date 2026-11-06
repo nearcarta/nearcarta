@@ -5,7 +5,7 @@ import { roomError } from '../room-error.js';
 import { pickBest, quoteLine, tokenChoices, chainsOf, filterTokens } from '../ferry-catalog.js';
 import { RECORDED, downloadCsv, exportCsv, queryFeed, verifyEntry } from '../chronicle-feed.js';
 import { explainCheck } from '../guard-score.js';
-import { TOLL_ADDRESS, TOLL_KEY, checkDerived } from '../toll-derive.js';
+import { mountTollRoom } from './toll-room.js';
 import { PROOF_HREF, TEE_PLAN, TEE_TIMEOUT_MS, liveTee, teeTimeoutWhy, teeView } from '../tee-view.js';
 import { NEXT_LABEL, RUN_LABEL } from '../../design/D8_shops/shops/arena-labels.js';
 import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
@@ -649,24 +649,8 @@ function mountGuard(root, hooks) {
   };
 }
 
-function mountToll(root) {
-  const d = checkDerived({ publicKey: TOLL_KEY, recorded: TOLL_ADDRESS });
-  const chains = (d.chains || []).map(c => `<li data-testid="toll-chain">${esc(c.chain)} ${esc(c.path)}${c.address ? ' ' + esc(c.address) : ''} — ${esc(c.note)}</li>`).join('');
-  root.innerHTML = `<div class="shop-stack"><div data-testid="toll-derive"><p>${esc(d.text)}</p><ul>${chains}</ul></div><button type="button" class="primary" id="toll-sig" data-testid="check-signature">Check signature</button><p id="toll-sig-out" data-testid="check-signature-out"></p></div>`;
-  const b = q$(root, '#toll-sig');
-  b.onclick = async () => {
-    const out = q$(root, '#toll-sig-out');
-    out.textContent = 'Checking the recorded signature…';
-    b.disabled = true;
-    try {
-      const live = await fetch(api() + '/api/mainnet').then(r => r.json());
-      const hash = live?.toll?.txs?.owner_toll_pay_allowlisted;
-      const sender = live?.toll?.owner || '';
-      const st = await fetch(api() + '/api/tx-status/' + encodeURIComponent(hash || '') + '?sender=' + encodeURIComponent(sender)).then(r => r.json());
-      out.textContent = st.pass ? 'Pass. The recorded signature is on chain.' : 'Fail. ' + (st.why || 'The chain did not confirm it.');
-    } catch { out.textContent = 'Fail. The chain check did not answer.'; }
-    b.disabled = false;
-  };
+function mountToll(root, hooks) {
+  return mountTollRoom(root, hooks || {}, { api: api() });
 }
 
 function mountChronicle(root, hooks) {
