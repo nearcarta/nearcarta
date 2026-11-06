@@ -130,9 +130,13 @@ export const MAX_CALLS = 24;
 //
 //   one receiver, 10 pairs -> 1911 bytes locked; 11 pairs -> refused
 //   six receivers,  9 pairs -> 1956 bytes locked; 10 pairs -> refused
+//   three receivers, 8 pairs (the default Toll + Guard + House list) -> 1842 bytes locked
+//   five receivers,  9 pairs (the failed list, retired charter dropped) -> 1948 bytes locked
 //
 // That solves to a fixed 1380 bytes for the row plus about 22 bytes per receiver, so the
 // pair list gets 2000 - 1380 - 22 x receivers. `callsFitRow` now takes the receiver count.
+// The model runs about 21 bytes over what the trie actually locks on the shapes measured,
+// which is the direction that matters: it refuses slightly early rather than on chain.
 //
 // Each pair is the receiver, the method and a 16-byte cap: `receiver.length + method.length
 // + 24`. The list almost always carries the wrap.near trio, the board stamp and the House
@@ -165,7 +169,54 @@ export function callsFitRow(calls, receivers = 1) {
   return used <= pairBudgetBytes(receivers);
 }
 
+/**
+ * The largest subset of `receivers` whose call list still fits, so a page can tell the
+ * visitor what to keep instead of only refusing. `build(receivers)` must return that
+ * receiver list's pairs.
+ *
+ * Shops whose own contract takes a call (Toll, Guard, House) are kept ahead of a plain
+ * `ft_transfer` payee, because dropping one of those breaks a shop the visitor just
+ * allowed, while dropping an ordinary payee only narrows the list. Order is preserved
+ * within each group.
+ */
+export const SHOP_PRIORITY_METHODS = ['cross', 'pay', 'house_session_check_in', 'house_session_prepare_send'];
+export function fittingShops(receivers, build) {
+  const list = Array.from(receivers || []);
+  const important = r => (methodsForShop(r, 'ft_transfer').some(m => SHOP_PRIORITY_METHODS.includes(m)) ? 0 : 1);
+  if (callsFitRow(build(list), list.length)) return list;
+  // Drop the least important entries first: a plain payee before a shop whose own
+  // contract takes the call. Within a rank, drop from the end so the typed order stays.
+  const ranked = list.map((r, i) => ({ r, i, rank: important(r) })).sort((a, b) => b.rank - a.rank || b.i - a.i);
+  for (let drop = 1; drop <= ranked.length; drop += 1) {
+    const gone = new Set(ranked.slice(0, drop).map(x => x.i));
+    const keep = list.filter((_, i) => !gone.has(i));
+    if (keep.length && callsFitRow(build(keep), keep.length)) return keep;
+  }
+  return [];
+}
+
 const callKey = (receiver, method) => `${String(receiver).toLowerCase()}\0${String(method)}`;
+
+/**
+ * The method each shop is actually reached on through `propose_call_as`. Paying
+ * `ft_transfer` to a shop that answers on `cross` or `pay` is dead weight in the row's
+ * call list, and the row has only 0.02 NEAR to share.
+ *
+ * - Toll's crossing is `cross` (app/design/D8_shops/js/apps.js builds it).
+ * - Guard's payment is `pay` (app/src/panels/guard-board-pay.js).
+ * - House needs its two session calls (shared/house/shop.js HOUSE_CALLS).
+ * - Anything else keeps `ft_transfer`: townhall, arena, wrap.near, and a shop the visitor
+ *   names that we do not know.
+ */
+export const SHOP_METHODS = {
+  'toll.nearcarta.near': ['cross'],
+  'guard.nearcarta.near': ['pay'],
+  'house.nearcarta.near': ['house_session_check_in', 'house_session_prepare_send'],
+};
+/** The methods one allowed shop contributes to the call list. */
+export function methodsForShop(receiver, fallback = 'ft_transfer') {
+  return SHOP_METHODS[String(receiver || '').toLowerCase()] || [fallback];
+}
 
 export function callPolicy(receivers, capYocto, sessionCapYocto, method = 'ft_transfer', extra = FERRY_CALL_TARGETS) {
   // The wrap.near trio is kept first when the shop list would crowd it out.
@@ -187,12 +238,15 @@ export function callPolicy(receivers, capYocto, sessionCapYocto, method = 'ft_tr
   const room = MAX_CALLS - reserved.length;
   const shops = [];
   for (const receiver of receivers || []) {
-    if (shops.length >= room) break;
-    const row = { receiver, method, cap: String(capYocto) };
-    const k = callKey(receiver, method);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    shops.push(row);
+    // A known shop contributes only the method it answers on; anything else keeps the default.
+    for (const m of methodsForShop(receiver, method)) {
+      if (shops.length >= room) break;
+      const row = { receiver, method: m, cap: String(capYocto) };
+      const k = callKey(row.receiver, row.method);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      shops.push(row);
+    }
   }
   return {
     calls: [...shops, ...reserved],
