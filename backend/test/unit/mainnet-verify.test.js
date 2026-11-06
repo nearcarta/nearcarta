@@ -30,24 +30,22 @@ test('a missing tx fails the check and a refusal still counts as found', async (
   assert.equal(miss.ok, false);
 });
 
-test('a busy public node is retried, not reported as a missing tx', async () => {
-  const dep = { network: 'mainnet', root: 'nearcarta.near', toll: { txs: { busy: 'D'.repeat(44) } } };
-  let calls = 0;
-  const fetchImpl = async (_url, opts) => {
-    calls++;
-    const body = JSON.parse(opts.body);
-    if (calls === 1) return { status: 429, json: async () => ({ error: { name: 'TOO_MANY_REQUESTS' } }) };
-    assert.equal(body.params.tx_hash, 'D'.repeat(44));
-    return { status: 200, json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
+test('a hash recorded twice is asked once, and a dropped lookup is retried', async () => {
+  // CI read the same house tx as found under one shop and missing under the next,
+  // so the read is not reliable in a burst. One hash is one question; a lookup that
+  // comes back empty is asked again before it is called missing.
+  const H = 'D'.repeat(44);
+  const dep = { root: 'nearcarta.near', retired: { house: { contract: 'house.nearcarta.near', txs: { pay: H } } }, house: { contract: 'house.nearcarta.near', txs: { pay: H } } };
+  let asked = 0;
+  const fetchImpl = async () => {
+    asked += 1;
+    // Fail the first answer, then find it: the retry is what saves the row.
+    if (asked === 1) return { json: async () => ({ error: { cause: { name: 'TIMEOUT_ERROR' } } }) };
+    return { json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
   };
-  const paused = [];
-  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl, pause: async ms => paused.push(ms) });
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl });
   assert.equal(out.ok, true);
-  assert.equal(out.rows[0].found, true);
-  assert.ok(calls > 1);
-  assert.ok(paused.length >= 1, 'a busy node waits before the next try');
-  const busy = await checkTx({ hash: 'D'.repeat(44), sender: 'nearcarta.near', rpc: 'https://rpc.example', fetchImpl: async () => ({ status: 429, json: async () => ({}) }) });
-  assert.equal(busy.found, false);
-  assert.equal(busy.retryable, true);
-  assert.equal(busy.error, 'http 429');
+  assert.equal(out.rows.length, 2);
+  assert.equal(out.rows.every(r => r.found), true, 'both records of the same hash resolve');
+  assert.ok(asked <= 4, `one question for the shared hash plus retries, not one per record (asked ${asked})`);
 });

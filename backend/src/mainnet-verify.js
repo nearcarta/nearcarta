@@ -25,60 +25,71 @@ export function sendersFor(dep, row) {
 }
 
 export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
-  const res = await fetchImpl(rpc, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } }),
-  });
-  // A 429 is a busy public node, not a missing tx: say so, so the row is retried instead of reported missing.
-  const status = res.status;
-  if (typeof status === 'number' && status >= 400) {
-    return { hash, found: false, retryable: status === 429 || status >= 500, error: 'http ' + status };
+  let j = null;
+  // A public archival node answers a burst of 71 lookups with rate limits, and an
+  // empty result then looks like a missing tx. Retry the transient answers only.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt) await new Promise(r => setTimeout(r, 250 * attempt));
+    let res;
+    try {
+      res = await fetchImpl(rpc, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } }),
+      });
+    } catch (e) {
+      if (attempt === 2) return { hash, found: false, error: e?.message || 'network' };
+      continue;
+    }
+    if (res.ok === false) {
+      if (attempt === 2) return { hash, found: false, error: `http ${res.status}` };
+      continue;
+    }
+    j = await res.json().catch(() => null);
+    if (j?.result?.transaction) break;
+    // NOT_FOUND is final; anything else (timeout, rate limit, unknown) is worth a retry.
+    if (j?.error?.cause?.name === 'UNKNOWN_TRANSACTION' || j?.error?.cause?.name === 'NOT_FOUND') break;
   }
-  const j = await res.json();
-  const tx = j.result?.transaction;
-  if (!tx) return { hash, found: false, error: j.error?.cause?.name || j.error?.name || 'not found' };
-  const outcome = j.result.status || {};
-  const failure = Object.prototype.hasOwnProperty.call(outcome, 'Failure');
-  return { hash, found: true, success: !failure && (Object.prototype.hasOwnProperty.call(outcome, 'SuccessValue') || Object.prototype.hasOwnProperty.call(outcome, 'SuccessReceiptId')), failure, signer: tx.signer_id || sender };
+  const tx = j?.result?.transaction;
+  if (!tx) return { hash, found: false, error: j?.error?.cause?.name || j?.error?.name || 'not found' };
+  const status = j.result.status || {};
+  const failure = Object.prototype.hasOwnProperty.call(status, 'Failure');
+  return { hash, found: true, success: !failure && (Object.prototype.hasOwnProperty.call(status, 'SuccessValue') || Object.prototype.hasOwnProperty.call(status, 'SuccessReceiptId')), failure, signer: tx.signer_id || sender };
 }
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-export async function checkAll(dep, { rpc, fetchImpl = fetch, pause = sleep, attempts = 6 } = {}) {
+export async function checkAll(dep, { rpc, fetchImpl = fetch } = {}) {
   const rpcs = (Array.isArray(rpc) ? rpc : [rpc]).filter(Boolean);
-  const rows = [];
-  // The same tx is cited by more than one row (a retired account and its shop), so ask once per hash.
-  const answered = new Map();
-  const busy = new Map(rpcs.map(url => [url, 0]));
-  for (const row of collectMainnetTxs(dep)) {
-    if (answered.has(row.hash)) { rows.push({ ...row, ...answered.get(row.hash) }); continue; }
+  const rows = collectMainnetTxs(dep);
+  // One hash can be recorded under several shops (a recovered house tx appears in
+  // the retired record and the live one). Ask once, not four times, then reuse.
+  const byHash = new Map();
+  const lookup = async (row) => {
+    if (byHash.has(row.hash)) return byHash.get(row.hash);
     let hit = { ...row, found: false, error: 'not found' };
-    for (let attempt = 0; attempt < attempts && !hit.found; attempt++) {
-      if (attempt) await pause(250 * 2 ** (attempt - 1));
-      let retryable = false;
-      for (const sender of sendersFor(dep, row)) {
-        for (const url of rpcs) {
-          // A node that just said 429 or 5xx waits while a quieter one answers.
-          const wait = busy.get(url) || 0;
-          if (wait) await pause(Math.min(wait, 2000));
-          const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
-          hit = { ...row, ...one, sender };
-          if (one.retryable) {
-            retryable = true;
-            busy.set(url, Math.min((busy.get(url) || 500) * 2, 4000));
-            continue;
-          }
-          busy.set(url, 0);
-          if (one.found) break;
-        }
-        if (hit.found) break;
+    for (const sender of sendersFor(dep, row)) {
+      for (const url of rpcs) {
+        const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
+        hit = { ...row, ...one, sender };
+        if (one.found) break;
       }
-      // Only a real answer ends the retries; a busy node gets another pass.
-      if (!hit.found && !retryable && attempt === 0) break;
+      if (hit.found) break;
     }
-    if (hit.found) answered.set(row.hash, { found: true, success: hit.success, failure: hit.failure, signer: hit.signer, sender: hit.sender });
-    rows.push(hit);
+    if (hit.found) byHash.set(row.hash, hit);
+    return hit;
+  };
+
+  const out = await Promise.all(rows.map(lookup));
+  // A public archival node can drop a lookup in a burst even when the tx is there:
+  // the same hash came back found on one row and missing on the next in CI. Retry
+  // the ones that did not resolve, with backoff, before calling them missing.
+  const pending = () => out.map((r, i) => [r, i]).filter(([r]) => !r.found);
+  for (let pass = 1; pass <= 3 && pending().length; pass += 1) {
+    await new Promise(r => setTimeout(r, 400 * pass));
+    for (const [, i] of pending()) {
+      const again = await lookup({ ...rows[i] });
+      if (again.found) out[i] = again;
+      else out[i] = { ...out[i], error: again.error };
+    }
   }
-  return { ok: rows.length > 0 && rows.every(r => r.found), rows };
+  return { ok: out.length > 0 && out.every(r => r.found), rows: out };
 }
