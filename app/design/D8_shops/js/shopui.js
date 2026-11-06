@@ -8,7 +8,7 @@ import { watch as watchTokens } from './tokens.js';
 import { maybeOnboard } from './onboard.js';
 import { hallRowHref, readSession, readSessionAccount, sessionPill, signedCopy, tollRefusal } from './session.js';
 import { explainCheck } from '/guard-score.js';
-import { queryFeed, exportCsv, downloadCsv, verifyEntry, RECORDED } from '/chronicle-feed.js';
+import { entryPlan } from '/chronicle-loop.js';
 import { checkDerived, TOLL_KEY, TOLL_ADDRESS } from '/toll-derive.js';
 import { DEED, controlAfterMove, metadataView, txUrl } from '/deed-control.js';
 import { teeResult, PROOF_HREF } from '/tee-view.js';
@@ -297,6 +297,57 @@ async function loadFerryCargo(wantCharter) {
   }
 }
 const num = (n, u) => `<b class="num">${esc(n)}</b><span class="unit">${esc(u)}</span>`;
+async function chronicleEntry() {
+  sh?.hideRefuse?.();
+  if (A.stage() !== 'ready') {
+    const reason = 'Open /setup and finish your board row. Nothing was signed.';
+    extra.seal = reason;
+    sh?.showRefuse?.(reason);
+    return { ok: false, keep: true, kind: 'no', say: reason, hint: reason, seal: reason };
+  }
+  const row = A.S.boardRow;
+  const clause = A.S.clauses?.pay;
+  const receivers = row?.receivers || clause?.receivers || [];
+  const receiver = receivers.find(Boolean) || '';
+  if (!receiver) {
+    const reason = 'Add a payee on your board row first. Nothing was signed.';
+    extra.seal = reason;
+    sh?.showRefuse?.(reason);
+    return { ok: false, keep: true, kind: 'no', say: reason, hint: reason, seal: reason };
+  }
+  const plan = entryPlan({
+    capYocto: row?.per_action_cap || clause?.per_action_cap,
+    balanceYocto: row?.balance,
+    spentYocto: row?.spent_today,
+    dailyYocto: row?.daily_budget || clause?.daily_budget,
+    receivers,
+    receiver,
+  });
+  if (!plan.ok) {
+    extra.seal = plan.reason;
+    sh?.showRefuse?.(plan.reason);
+    return { ok: false, keep: true, kind: 'no', say: plan.reason, hint: plan.reason, seal: plan.reason };
+  }
+  const o = await A.ask({ shop: 'chronicle', receiver, amountY: plan.amountYocto, memo: 'chronicle:entry' });
+  extra.feed = extra.feed || { local: [] };
+  const decision = o.decision === 'allowed' ? 'allowed' : 'denied';
+  extra.feed.local.unshift({
+    shop: 'chronicle', decision, reason: o.reason || '', label: A.why(o.reason),
+    h: o.tx || '', signer: A.S.me || '', amount: '0.001 NEAR', at: new Date().toISOString(),
+  });
+  if (o.tx) dispatchEvent(new CustomEvent('nearcarta:chronicle', { detail: { hash: o.tx, shop: 'chronicle', decision } }));
+  if (o.decision === 'allowed' && o.tx) {
+    sh?.hideRefuse?.();
+    if (sh?.act && runScene) runScene(sh.act({ success: true, tx: o.tx }));
+    extra.seal = '';
+    const said = 'Entry signed: the charter paid 0.001 NEAR.';
+    return { ok: true, o, keep: true, kind: 'ok', hero: num(extra.feed.local.length, 'asks'), rc: A.txLine(o.tx), say: said, hint: said, clearSeal: true, successTx: o.tx };
+  }
+  const said = `The charter refused this entry. ${A.why(o.reason) || 'Nothing was paid.'}`;
+  extra.seal = said;
+  sh?.showRefuse?.(said);
+  return { ok: false, o, keep: true, kind: 'no', rc: o.tx ? A.txLine(o.tx) : '', say: said, hint: said, seal: said };
+}
 const capFmt = 0;
 // Plain names for accounts a visitor sees; the raw id stays in the tooltip and under "advanced".
 export const nice = a => { if (!a) return ''; if (a === A.S.me) return 'You'; const m = A.merchants?.() || [];
@@ -620,19 +671,17 @@ const APPS = {
   },
   chronicle: {
     guest: true,
-    label: 'Chronicle · activity log', idle: 'Your activity log: every payment your agent asked for, and the answer. Adding today’s entry costs 0.001 NEAR, paid only if your rules allow it.',
-    btn: 'Add today\u2019s entry · 0.001 NEAR',
+    label: 'Chronicle · public ledger', idle: 'Every allow and refusal, with the transaction. Today’s entry is 0.001 NEAR when your row allows it.',
+    btn: 'Add today’s entry · 0.001 NEAR',
     form: () => '<div data-deep="chronicle"></div>',
-    bind: () => mountShop('chronicle', document.getElementById('t-form'), { state: extra, repaint: () => paint(), rows: () => [...(extra.feed?.local || []), ...RECORDED].map(x => ({ ...x, label: A.why(x.reason) })) }),
-    // a real entry: the agent asks the charter to pay the scribe 0.001 NEAR; allowed or refused, the answer is on chain
-    run: async () => {
-      const payee = A.merchants()[0] || (A.S.clauses.pay?.receivers || []).find(Boolean);
-      if (!payee) throw new Error('add a payee to your rules first');
-      const o = await A.ask({ shop: 'chronicle', receiver: payee, amountY: A.toY(0.001), memo: 'chronicle:entry' });
-      extra.feed = await A.feed().catch(() => ({ local: A.receipts(), onchain: [], nonce: A.receipts().length }));
-      if (o.tx) dispatchEvent(new CustomEvent('nearcarta:chronicle', { detail: { hash: o.tx, shop: 'chronicle', decision: o.decision } }));
-      return { o, keep: true, hero: num(extra.feed.nonce ?? 0, 'asks'), rc: A.txLine(o.tx), say: o.decision === 'allowed' ? 'Entry signed: your agent paid 0.001 NEAR to record it.' : `Entry signed. Refused: ${A.why(o.reason)}. Nothing was paid.` };
-    },
+    bind: () => mountShop('chronicle', document.getElementById('t-form'), {
+      state: extra,
+      repaint: () => paint(),
+      rows: () => extra.feed?.local || [],
+      onEntry: () => chronicleEntry(),
+      onSeal: (text) => { if (text) sh?.showRefuse?.(text); else sh?.hideRefuse?.(); },
+    }),
+    run: () => chronicleEntry(),
   },
 };
 
@@ -755,6 +804,9 @@ function proofDrawer() {
 // ---------- gate: wallet → charter → rules → shop ----------
 function paint() {
   const app = APPS[cur]; if (!app) return; const st = A.S.ready ? A.stage() : 'load';
+  document.body.classList.toggle('chronicle-tray', cur === 'chronicle');
+  const cdock = document.getElementById('chronicle-agent-dock');
+  if (cdock) cdock.hidden = cur !== 'chronicle';
   wallet(); ruleChip(); label(app.label); proofDrawer();
   if (cur === 'hall') { const m = $('#t-more'); if (m) { m.href = hallRowHref(who()); m.classList.add('row-btn'); m.dataset.testid = 'change-my-row'; } }
   if (phase === 'busy') return;
@@ -796,6 +848,10 @@ function paint() {
     document.body.classList.add('ferry-tray');
     // The card owns Get quote, Load cargo, Ask charter and Get another quote. One of each.
     hideFerryPrimary();
+  } else if (cur === 'chronicle') {
+    document.body.classList.remove('ferry-tray');
+    const fd = document.getElementById('ferry-agent-dock'); if (fd) fd.hidden = true;
+    btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary');
   } else {
     document.body.classList.remove('ferry-tray');
     const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true;
@@ -923,15 +979,16 @@ export function boot() {
   return booted;
 }
 export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
-  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry');
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('chronicle-tray', id === 'chronicle');
   const dock0 = document.getElementById('ferry-agent-dock'); if (dock0) dock0.hidden = id !== 'ferry';
+  const cdock0 = document.getElementById('chronicle-agent-dock'); if (cdock0) cdock0.hidden = id !== 'chronicle';
   const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = '';
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
   // the Toll room reopened with a visit under way: pick it up (countdown, or settle now if Base is final)
   if (id === 'toll') booted?.then(() => { const v = cur === 'toll' && A.stage() === 'ready' && A.tollVisit(); if (v && !v.done && phase === 'idle') primary(true); }).catch(() => {}); }
-export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('chronicle-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const cdock = document.getElementById('chronicle-agent-dock'); if (cdock) cdock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };

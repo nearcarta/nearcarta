@@ -91,10 +91,11 @@ test('the locked rules card says why, and the home page lists the shops', () => 
   const home = read('app/design/D9_world/index.html');
   assert.match(home, /data-testid="all-shops"/);
   assert.match(home, /data-testid="all-shops-link">All shops</);
-  for (const href of ['/shops/bank/', '/shops/hall/', '/?shop=ferry', '/shops/guard/', '/shops/arena/', '/shops/toll/', '/shops/chronicle/', '/shops/house/', '/shops/payouts/', '/shops/vault/']) {
+  for (const href of ['/shops/bank/', '/shops/hall/', '/?shop=ferry', '/shops/guard/', '/shops/arena/', '/shops/toll/', '/?shop=chronicle', '/shops/house/', '/shops/payouts/', '/shops/vault/']) {
     assert.match(home, new RegExp('href="' + href.replace(/[?]/g, '\\?') + '"'));
   }
   assert.match(home, /data-city-shop="ferry"/);
+  assert.match(home, /data-city-shop="chronicle"/);
   assert.match(home, /__openCityShop/);
   assert.match(home, /details\.open = false/);
   const town = read('app/design/D9_world/js/main.js');
