@@ -26,8 +26,19 @@ export async function complete(messages, { model = cfg.nearAiModel, maxTokens = 
   const respText = await r.text();
   if (!r.ok) throw Object.assign(new Error(`near ai http ${r.status}`), { status: 502 });
   const j = JSON.parse(respText);
-  return { id: j.id, model: j.model || model, reqModel: model, content: j.choices?.[0]?.message?.content ?? '', usage: j.usage,
-    reqSha: sha(reqBody), respSha: sha(respText), reqBody };  // raw response (incl. any reasoning_content) is hashed, never kept
+  const msg = j.choices?.[0]?.message || {};
+  const content = msg.content ?? '';
+  const reasoning = String(msg.reasoning_content || msg.reasoning || '').trim();
+  const out = {
+    id: j.id, model: j.model || model, reqModel: model, content, usage: j.usage,
+    reqSha: sha(reqBody), respSha: sha(respText), reqBody,
+    finish_reason: j.choices?.[0]?.finish_reason || '',
+  };
+  // The raw response is hashed for the signature and is not stored.
+  // A reply that already has content drops its reasoning. A blank reply keeps
+  // reasoning_content so a verified signature can still supply the sentence.
+  if (!String(content).trim() && reasoning) out.reasoning_content = reasoning;
+  return out;
 }
 
 export async function signature(id, model, { tries = 6 } = {}) {

@@ -76,23 +76,27 @@ async function load() {
     const body = await res.json();
     paint(body.invoice || null);
     if (body.invoice?.depositAddress) showDeposit(body.invoice.depositAddress);
+    if (body.invoice) scheduleQuote();
   } catch { setLine('The invoice could not be read.', ''); }
 }
 
 async function refreshQuote() {
   if (!record) return;
-  const refundTo = $('#pay-refund').value.trim();
-  if (!refundTo) { setQuote('Add a refund address to see what you send, the fee and the time.'); return; }
-  if (!addressOk(chain(), refundTo)) { setQuote('That refund address does not match this chain.'); return; }
+  const typed = $('#pay-refund').value.trim();
+  if (typed && !addressOk(chain(), typed)) { setQuote('That refund address does not match this chain.'); return; }
   setQuote('Reading the 1Click quote.');
+  const payload = { from: fromRef(), chain: chain(), recipientType: 'DESTINATION_CHAIN' };
+  if (typed) payload.refundTo = typed;
+  else payload.indicative = true;
   try {
     const res = await fetch('/api/payouts/invoices/' + encodeURIComponent(record.id) + '/quote', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ from: fromRef(), chain: chain(), refundTo, recipientType: 'DESTINATION_CHAIN' }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json();
     if (!body.ok) { setQuote(body.error || '1Click did not quote this amount.'); return; }
-    setQuote(quoteLine(body) || 'Quote ready. Nothing was sent.');
+    const note = body.indicative ? ' Indicative quote. The refund address is only needed for the deposit address.' : '';
+    setQuote((quoteLine(body) || 'Quote ready. Nothing was sent.') + note);
   } catch { setQuote('The quote could not be read.'); }
 }
 

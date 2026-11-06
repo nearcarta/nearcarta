@@ -7,7 +7,8 @@ import { liveTee } from '../tee-view.js';
 import { tokenStack, bindTokenFallbacks } from './token-badge.js';
 import {
   DEFAULT_MODEL, SAMPLES, FORMAT_LINE, SAMPLE_CSV, sampleById, parseStatementCsv, auditStatement,
-  biggestWaste, wasteSentence, tightenDecision, freshNonce, saltFor, commitmentText, hashText,
+  statementFindings, agentReply, APPLY_NOTE, verifyBrowserSignature,
+  tightenDecision, freshNonce, saltFor, commitmentText, hashText,
   proofLogEntry, plural, attestFields,
 } from './bank-audit.js';
 
@@ -87,7 +88,21 @@ export function bankMarkup(state) {
   const tabBtn = (id, label) => `<button type="button" role="tab" class="bank-tab${tab === id ? ' on' : ''}" data-tab="${id}" aria-selected="${tab === id ? 'true' : 'false'}" data-testid="bank-tab-${id}">${label}</button>`;
   const review = state.review;
   const cta = review ? 'Apply tighter limits' : 'Audit privately';
-  const anomalies = review?.anomalies?.length ? review.anomalies.map(a => esc(a.text)).join(' ') : (review ? 'No anomalies.' : '');
+  const pairs = (review?.findings || []).filter(f => f.kind !== 'subscription');
+  const extras = (review?.anomalies || []).filter(a => !['same-day', 'month', 'repeat', 'duplicate'].includes(a.kind));
+  const anomalyLines = [...pairs.map(f => f.text), ...extras.map(a => a.text)];
+  const anomalies = anomalyLines.length ? anomalyLines.map(t => esc(t)).join(' ') : (review ? 'No anomalies.' : '');
+  const capNote = !review ? '' : (review.before == null || !Number.isFinite(Number(review.before))
+    ? `<p class="bank-format" data-testid="bank-cap-note">No per-payment cap is saved in /setup, so there is no limit to show.</p>
+      <p class="bank-format" data-testid="bank-apply-note">${esc(APPLY_NOTE)}</p>`
+    : review.tighten
+      ? `<label class="choice-label">Current cap</label><p class="bank-field" data-testid="bank-before">${esc(nearText(review.before))}</p>
+      <label class="choice-label">Proposed cap</label><p class="bank-field" data-testid="bank-after">${esc(nearText(review.after))}</p>
+      <p class="bank-format" data-testid="bank-rate">${esc(review.rateSource || '')}</p>
+      <p class="bank-format" data-testid="bank-apply-note">${esc(APPLY_NOTE)} This statement would move it from ${esc(nearText(review.before))} to ${esc(nearText(review.after))}.</p>`
+      : `<label class="choice-label">Current cap</label><p class="bank-field" data-testid="bank-before">${esc(nearText(review.before))}</p>
+      <p class="bank-format" data-testid="bank-cap-note">${esc(review.rateSource || 'No lower cap comes from this statement.')}</p>
+      <p class="bank-format" data-testid="bank-apply-note">${esc(APPLY_NOTE)}</p>`);
       const audit = `<section class="bank-pane" data-pane="audit" ${tab === 'audit' ? '' : 'hidden'}>
       ${flow(tokenStack('NEAR', '', { size: 48 }))}
       ${review ? '' : `<p class="bank-format" data-testid="bank-format">Accepted format: ${esc(FORMAT_LINE)}.</p>
@@ -107,16 +122,16 @@ export function bankMarkup(state) {
       <p class="bank-format" data-testid="bank-detected">${esc(state.detected || 'No file yet.')}</p>`}
       ${review ? `<p class="bank-format" data-testid="bank-detected">${esc(state.detected || '')}</p>
       <label class="choice-label">Summary</label><p class="bank-field" data-testid="bank-summary">${esc(plural(review.lines, 'line', 'lines'))} · ${esc(plural(review.counted, 'counted', 'counted'))}${review.currency ? ` · ${esc(review.currency)}` : ''}</p>
-      <label class="choice-label">Biggest waste</label><p class="bank-field" data-testid="bank-waste">${esc(review.wasteText || '')}</p>
+      <label class="choice-label">Findings</label><p class="bank-field" data-testid="bank-waste">${esc(review.wasteText || '')}</p>
       <label class="choice-label">Anomalies</label><p class="bank-field" data-testid="bank-anomalies">${anomalies}</p>
-      <label class="choice-label">Current cap</label><p class="bank-field" data-testid="bank-before">${esc(nearText(review.before))}</p>
-      <label class="choice-label">Proposed cap</label><p class="bank-field" data-testid="bank-after">${esc(nearText(review.after))}</p>
-      <p class="bank-format" data-testid="bank-rate">${esc(review.rateSource || '')}</p>
+      ${capNote}
       <label class="bank-consent"><input type="checkbox" data-testid="bank-consent"${state.consent ? ' checked' : ''}> Publish a salted commitment, not the statement</label>` : ''}
       <button type="button" class="primary bank-cta" data-testid="bank-audit" id="bank-audit">${esc(cta)}</button>
       <p class="bank-status" data-testid="bank-status">${esc(state.status || '')}</p>
       <p class="bank-status" data-testid="bank-status-2">${esc(state.status2 || '')}</p>
-      ${review ? '<button type="button" class="bank-again" data-testid="bank-again">Audit another sample</button>' : ''}
+      ${state.modelAnswer ? `<p class="bank-status" data-testid="bank-model-answer">${esc(state.modelAnswer)}</p>` : ''}
+      ${state.browserSig ? `<p class="bank-status" data-testid="bank-browser-sig">${state.browserSig.ok ? 'Checked in this browser.' : esc(state.browserSig.why)}</p>` : ''}
+      ${review ? '<button type="button" class="bank-again" data-testid="bank-again">Audit another statement</button>' : ''}
     </section>`;
   const fields = (state.fields || []).map(f => `<li data-testid="tee-field-${esc(f.id)}"><b>${esc(f.label)}</b> ${f.ok ? 'verified' : 'not verified'}${f.value ? ` · ${esc(f.id === 'nonce' || f.id === 'signer' ? shortNonce(f.value) : f.value)}` : ''}${f.ok ? '' : ` · ${esc(f.why)}`}</li>`).join('');
   const attest = `<section class="bank-pane" data-pane="attest" ${tab === 'attest' ? '' : 'hidden'}>
@@ -171,6 +186,7 @@ async function postAudit(rows, model) {
   const payload = {
     model,
     rows: rows.map(r => ({
+      date: r.date || '',
       payee: r.payee,
       amount: r.amount ?? r.near,
       currency: r.currency || (r.near != null ? 'NEAR' : ''),
@@ -244,6 +260,42 @@ export function mountBankRoom(root, hooks = {}) {
     state.detected = detected || state.detected;
   }
 
+  async function takeModel(model) {
+    if (model?.signed_text && model?.signature && model?.signing_address) {
+      state.browserSig = await verifyBrowserSignature({
+        text: model.signed_text,
+        signature: model.signature,
+        signingAddress: model.signing_address,
+      });
+    } else {
+      state.browserSig = { ok: false, why: 'The signature bytes were not in the response, so this browser did not check them.' };
+    }
+    if (Array.isArray(model?.fields)) {
+      state.fields = model.fields.map(f => {
+        if (f.id !== 'signature') return f;
+        return {
+          ...f,
+          ok: !!state.browserSig.ok,
+          why: state.browserSig.ok ? '' : state.browserSig.why,
+          value: model.signature_kind || f.value || '',
+        };
+      });
+    }
+    if (model?.answer) {
+      state.modelAnswer = model.answer;
+      state.status2 = `TEE model: ${model.answer}`;
+      state.eligibility = state.browserSig.ok
+        ? 'The model sentence was checked in this browser.'
+        : 'The model sentence arrived. This browser did not accept the signature.';
+    } else if (model?.step) {
+      state.modelAnswer = '';
+      state.status2 = model.step;
+      state.eligibility = model.step;
+    } else if (state.browserSig) {
+      state.eligibility = state.browserSig.ok ? 'Checked in this browser.' : state.browserSig.why;
+    }
+  }
+
   async function runAudit(sampleId, opts = {}) {
     hooks.hideRefuse?.();
     state.tab = 'audit';
@@ -272,15 +324,19 @@ export function mountBankRoom(root, hooks = {}) {
     }
     const currency = rows.map(r => r.currency).find(Boolean) || '';
     const rate = currency && currency !== 'NEAR' ? await readRate(currency) : null;
+    const liveCap = capNear();
     const report = auditStatement(rows, {
-      capNear: capNear(),
+      capNear: liveCap,
       nearPerUnit: rate?.ok ? rate.nearPerUnit : null,
       rateSource: rate?.source || '',
     });
-    const waste = biggestWaste(rows);
-    const wasteText = wasteSentence(waste, { sampleName });
+    const findings = statementFindings(rows);
+    const wasteText = agentReply(rows, 'waste', { sampleName });
+    const reply = opts.question && opts.question !== 'waste'
+      ? agentReply(rows, opts.question, { capNear: liveCap, sampleName })
+      : wasteText;
     state.statement = rows.map(r => ({ ...r }));
-    state.review = { ...report, wasteText };
+    state.review = { ...report, wasteText, findings };
     state.nonce = freshNonce();
     pushLog(proofLogEntry({
       kind: uploaded ? 'upload' : (sampleName ? state.sample : 'audit'),
@@ -289,23 +345,15 @@ export function mountBankRoom(root, hooks = {}) {
       nonce: state.nonce,
       eligible: false,
     }));
-    state.status = wasteText;
+    state.status = reply;
     state.status2 = `${plural(report.lines, 'line', 'lines')}. ${plural(report.anomalies.length, 'anomaly', 'anomalies')}. Nothing was signed.`;
     const ticket = {};
     state.auditTicket = ticket;
     const asked = rows.map(r => ({ ...r }));
     paint();
-    postAudit(asked, state.model).then(model => {
+    postAudit(asked, state.model).then(async model => {
       if (state.auditTicket !== ticket) return;
-      if (model.fields) state.fields = model.fields;
-      if (model.verified && model.answer) {
-        state.modelAnswer = model.answer;
-        state.status2 = `TEE model: ${model.answer}`;
-        state.eligibility = 'The model audit was checked. The fields are on Attestation.';
-      } else if (model.step) {
-        state.status2 = model.step;
-        state.eligibility = model.step;
-      }
+      await takeModel(model);
       paint();
     }).catch(() => {});
     return { ok: true, hint: state.status, say: state.status, keep: true, kind: 'ok' };
@@ -351,10 +399,14 @@ export function mountBankRoom(root, hooks = {}) {
     let signature = { ok: false, why: 'no completion was sent, so this step was not checked' };
     if (state.statement?.length) {
       const model = await postAudit(state.statement, state.model);
-      if (model.fields) {
-        state.fields = model.fields;
-        signature = { ok: !!model.verified, why: String(model.step || '').replace(/^Response signature:\s*/i, ''), kind: model.signature_kind || '' };
-      } else if (model.step) signature = { ok: false, why: String(model.step).replace(/^Response signature:\s*/i, '') };
+      await takeModel(model);
+      if (!model.fields) {
+        signature = {
+          ok: !!state.browserSig?.ok,
+          why: state.browserSig?.ok ? '' : (state.browserSig?.why || String(model.step || '').replace(/^Response signature:\s*/i, '')),
+          kind: model.signature_kind || '',
+        };
+      }
     }
     if (!state.fields?.length) state.fields = attestFields(body, signature);
     const failed = (state.fields || []).filter(f => !f.ok);
