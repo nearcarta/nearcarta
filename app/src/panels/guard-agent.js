@@ -1,33 +1,40 @@
-// Guardhouse commands. A check is a view. A trick asks the charter only after the
-// gate below. Freeze is set_frozen on the visitor's row (gas only, deposit 0).
-// Function-call keys name one receiver. method_names omitted means every method
-// on that receiver. They cannot attach NEAR.
+// Guardhouse commands. A check is a view. Pay uses the typed payee and amount.
+// An invoice cannot replace that payee. Warn stays held until a person confirms.
+// Block refunds once and does not forward. Freeze only tightens the row.
 // https://docs.near.org/protocol/accounts-contracts/access-keys
-// https://docs.near.org/web3-apps/tutorials/wallet-login
-// set_frozen: contracts/charter_board/src/lib.rs (predecessor, refunds deposit).
+// https://docs.near.ai/cloud/verification
 
 import { explainCheck } from '../guard-score.js';
+import {
+  LIVE_ENFORCEMENT, bindVerdict, contextMatches, createLedger, nearToYocto,
+} from './guard-pay.js';
 
-export const POISON_PAYEE = 'shop-moved-pay-here.near';
-export const TRICK_NEAR = '0.001';
-/** 0.001 NEAR in yocto. Same scale as apps.js toY. */
-export const TRICK_YOCTO = '1000000000000000000000';
-export const GUARD_MISS = 'Try: Check shop-moved-pay-here.near · Try poisoned invoice · Freeze my row · Unfreeze';
-
+export const GUARD_MISS = 'Try: Check cafe.near · Pay 0.002 NEAR on near to cafe.near · Freeze my row';
 const ACCOUNT = /(?:^|[^a-z0-9._-])([a-z0-9](?:[a-z0-9._-]{0,61}[a-z0-9])?\.near|[a-f0-9]{64})(?![a-z0-9._-])/i;
+const PAY = /^pay\s+(\d+(?:\.\d{1,6})?)\s+([a-z][a-z0-9]{0,11})\s+(?:on\s+([a-z][a-z0-9]{0,15})\s+)?to\s+([a-z0-9](?:[a-z0-9._-]{0,61}[a-z0-9])?\.near|[a-f0-9]{64})\b([\s\S]*)$/i;
 
 export function parseGuardCommand(text) {
   const raw = String(text || '').trim();
   const s = raw.toLowerCase().replace(/[.!?]+$/g, '').replace(/\s+/g, ' ').trim();
   if (!s) return { ok: false, hint: GUARD_MISS };
-  if (/\bi checked\b/.test(s) || /^(confirm|ask the charter)$/.test(s)) return { ok: true, action: 'confirm' };
-  if (/let it knock|knock anyway/.test(s)) return { ok: true, action: 'knock' };
-  if (/\bunfreeze\b|\bthaw\b/.test(s)) return { ok: true, action: 'freeze', frozen: false };
+  if (/\bi checked\b/.test(s) || /^(confirm|release|ask the charter)$/.test(s)) return { ok: true, action: 'confirm', actor: 'agent' };
+  if (/^(cancel|refund)$/.test(s) || /\bcancel the hold\b/.test(s)) return { ok: true, action: 'cancel' };
+  if (/\bunfreeze\b|\bthaw\b/.test(s)) return { ok: true, action: 'loosen' };
   if (/\bfreeze\b/.test(s)) return { ok: true, action: 'freeze', frozen: true };
-  if (/poison|trick/.test(s) || /\binvoice\b/.test(s)) return { ok: true, action: 'trick', id: 'poisoned-invoice' };
+  const pay = raw.match(PAY);
+  if (pay) {
+    return {
+      ok: true, action: 'pay',
+      amount: pay[1], asset: pay[2].toUpperCase(), chain: (pay[3] || 'near').toLowerCase(),
+      account: pay[4].toLowerCase(), invoice: String(pay[5] || '').trim(),
+    };
+  }
+  if (/poison|trick/.test(s) || /\binvoice\b/.test(s)) {
+    return { ok: true, action: 'note', invoice: raw, hint: 'An invoice cannot change the payee. Nothing was signed.' };
+  }
   const m = raw.match(ACCOUNT);
   if (/^check\b/.test(s) || m) {
-    if (!m) return { ok: false, hint: 'Name an account. Try: Check shop-moved-pay-here.near' };
+    if (!m) return { ok: false, hint: 'Name an account. Try: Check cafe.near' };
     return { ok: true, action: 'check', account: m[1].toLowerCase() };
   }
   return { ok: false, hint: GUARD_MISS };
@@ -40,8 +47,9 @@ export function checkUrl(account, charter) {
 }
 
 /** Unknown cap does not block. A known cap must cover the ask. */
-export function capHolds(capYocto, amountYocto = TRICK_YOCTO) {
+export function capHolds(capYocto, amountYocto) {
   if (capYocto == null || capYocto === '') return { ok: true, unknown: true };
+  if (amountYocto == null) return { ok: false, unknown: false };
   try {
     return { ok: BigInt(capYocto) >= BigInt(amountYocto), unknown: false };
   } catch {
@@ -49,33 +57,14 @@ export function capHolds(capYocto, amountYocto = TRICK_YOCTO) {
   }
 }
 
-export function trickAmountYocto(minYocto, capYocto) {
-  let amt = BigInt(TRICK_YOCTO);
-  try { if (minYocto && BigInt(minYocto) > amt) amt = BigInt(minYocto); } catch { /* keep 0.001 */ }
-  const hold = capHolds(capYocto, amt.toString());
-  return { amount: amt.toString(), ok: hold.unknown || hold.ok, unknown: !!hold.unknown };
-}
-
-/** Warn never proposes until confirmed. Block never proposes until the visitor says knock. */
-export function trickGate(verdict, { confirmed = false, knock = false } = {}) {
-  if (verdict === 'allow') return { propose: true, seal: false, hint: 'Allow. Asking the charter for 0.001 NEAR. No wallet.' };
-  if (verdict === 'warn') {
-    if (!confirmed) return { propose: false, seal: true, needs: 'confirm', hint: 'Warn. Nothing was signed. Say I checked, or press the button, before the charter is asked.' };
-    return { propose: true, seal: false, hint: 'You confirmed the warning. Asking the charter. No wallet.' };
-  }
-  if (verdict === 'block') {
-    if (!knock) return { propose: false, seal: true, needs: 'knock', hint: 'Blocked before signing. Nothing was signed. Say Let it knock to ask the charter anyway.' };
-    return { propose: true, seal: false, hint: 'Asking the charter. The check is advice. The charter still decides. No wallet.' };
-  }
-  return { propose: false, seal: false, hint: 'The check did not return a verdict. Nothing was signed.' };
-}
-
 /**
  * methodNames null: the key was not read, so do not sign silently.
  * methodNames []: omitted list, every method on the receiver.
  * Otherwise set_frozen must be named. approve opens one wallet approval.
+ * This shop only freezes. It does not unfreeze.
  */
 export function freezePlan({ methodNames, hasRow = true, approve = false, frozen = true } = {}) {
+  if (!frozen) return { ok: false, sign: false, wallet: false, hint: 'Unfreeze would loosen the row. This shop cannot do that. Nothing was signed.' };
   if (!hasRow) return { ok: false, sign: false, wallet: false, hint: 'No row on the board yet. Finish /setup. Nothing was signed.' };
   const names = Array.isArray(methodNames) ? methodNames : null;
   const allowed = !!names && (names.length === 0 || names.includes('set_frozen'));
@@ -87,13 +76,13 @@ export function freezePlan({ methodNames, hasRow = true, approve = false, frozen
   }
   if (!allowed && approve) {
     return {
-      ok: true, sign: true, wallet: true, deposit: '0', method: 'set_frozen', frozen: !!frozen,
-      hint: frozen ? 'One approval freezes the row. Deposit 0.' : 'One approval unfreezes the row. Deposit 0.',
+      ok: true, sign: true, wallet: true, deposit: '0', method: 'set_frozen', frozen: true,
+      hint: 'One approval freezes the row. Deposit 0.',
     };
   }
   return {
-    ok: true, sign: true, wallet: false, deposit: '0', method: 'set_frozen', frozen: !!frozen,
-    hint: frozen ? 'Freezing the row. Gas only. No wallet.' : 'Unfreezing the row. Gas only. No wallet.',
+    ok: true, sign: true, wallet: false, deposit: '0', method: 'set_frozen', frozen: true,
+    hint: 'Freezing the row. Gas only. No wallet.',
   };
 }
 
@@ -114,20 +103,22 @@ export function lampsFor(check) {
   ];
 }
 
-function sentResult(sent) {
-  if (!sent) return { ok: false, propose: false, cinema: false, seal: false, hint: 'The charter did not answer. Nothing was signed.' };
-  const tx = sent.tx || null;
-  const reason = sent.reason || '';
-  if (sent.fromRule || (sent.refused && !tx)) {
-    return { ok: true, propose: false, cinema: false, seal: true, reason, hint: `Refused before signing: ${reason || 'your rules'}. Nothing was signed.` };
-  }
-  if (sent.refused && tx) {
-    return { ok: true, propose: true, refused: true, cinema: 'refuse', seal: true, tx, reason, hint: `Refused on chain: ${reason}.` };
-  }
-  if ((sent.decision === 'allowed' || sent.ok) && tx && !sent.refused) {
-    return { ok: true, propose: true, refused: false, cinema: 'pass', seal: false, tx, hint: 'The charter allowed 0.001 NEAR.' };
-  }
-  return { ok: false, propose: false, cinema: false, seal: false, hint: reason || 'The charter did not answer. Nothing was signed.' };
+function fieldsOf(state) {
+  return {
+    payee: state.acct || '',
+    chain: state.chain || 'near',
+    asset: state.asset || 'NEAR',
+    amount: state.amount || '',
+    invoice: state.invoice || '',
+    row: state.rowId || '',
+    keyEpoch: state.keyEpoch || '',
+    policyVersion: state.policyVersion || '',
+  };
+}
+
+function bookOf(state) {
+  if (!state.book) state.book = createLedger();
+  return state.book;
 }
 
 async function readCheck(check, account) {
@@ -135,110 +126,110 @@ async function readCheck(check, account) {
   return { raw, explained: explainCheck(raw), lamps: lampsFor(raw) };
 }
 
+function applyRead(state, read) {
+  state.chk = read.raw;
+  state.score = read.explained;
+  state.bound = bindVerdict({ ...fieldsOf(state), check: read.raw });
+  state.pending = state.bound.release === 'warn' ? 'human' : null;
+}
+
 export async function runGuardAction(plan, ctx = {}) {
   const state = ctx.state || {};
-  const { check, trickPlan, trickSend, freeze, capYocto = null, minYocto = null } = ctx;
-  if (!plan?.ok && !plan?.action) return { ok: false, propose: false, cinema: false, seal: false, hint: plan?.hint || GUARD_MISS };
+  const { check, freeze, capYocto = null } = ctx;
+  if (!plan?.ok && !plan?.action) return { ok: false, propose: false, cinema: false, seal: false, live: LIVE_ENFORCEMENT, hint: plan?.hint || GUARD_MISS };
+
+  if (plan.action === 'note') {
+    state.invoice = plan.invoice || state.invoice || '';
+    return { ok: true, propose: false, cinema: false, seal: false, live: LIVE_ENFORCEMENT, hint: plan.hint };
+  }
+
+  if (plan.action === 'loosen') {
+    return { ok: false, propose: false, cinema: false, seal: false, live: LIVE_ENFORCEMENT, hint: 'Unfreeze would loosen the row. This shop cannot do that. Nothing was signed.' };
+  }
 
   if (plan.action === 'check') {
     state.tab = 'check';
-    state.pending = null;
     state.acct = plan.account;
     if (typeof check !== 'function') return { ok: false, propose: false, cinema: false, seal: false, hint: 'The check is not wired.' };
     let read;
     try { read = await readCheck(check, plan.account); }
-    catch (e) { return { ok: false, propose: false, cinema: false, seal: false, hint: e?.message || 'The check did not answer.' }; }
-    state.chk = read.raw;
-    state.score = read.explained;
+    catch (e) {
+      const raw = { account: plan.account, verdict: 'warn', reasons: [{ code: 'account_missing', level: 'warn', text: e?.message || 'The check did not answer.' }], signals: {} };
+      state.chk = raw;
+      state.score = explainCheck(raw);
+      state.bound = null;
+      state.pending = null;
+      return { ok: false, propose: false, cinema: false, seal: false, hint: state.score.summary, lamps: lampsFor(raw) };
+    }
+    applyRead(state, read);
     const blocked = read.explained.verdict === 'block' || read.explained.verdict === 'warn';
     return {
-      ok: true, action: 'check', propose: false, cinema: false, lamps: read.lamps,
-      seal: blocked, verdict: read.explained.verdict, account: plan.account,
-      hint: read.explained.summary,
+      ok: true, action: 'check', propose: false, cinema: false, lamps: read.lamps, live: LIVE_ENFORCEMENT,
+      seal: blocked, verdict: read.explained.verdict, account: plan.account, hint: read.explained.summary,
     };
   }
 
-  if (plan.action === 'trick' || plan.action === 'confirm' || plan.action === 'knock') {
-    state.tab = 'trick';
+  if (plan.action === 'pay') {
+    state.tab = 'pay';
+    if (plan.account) state.acct = plan.account;
+    if (plan.amount) state.amount = plan.amount;
+    if (plan.asset) state.asset = plan.asset;
+    if (plan.chain) state.chain = plan.chain;
+    if (plan.invoice) state.invoice = plan.invoice;
+    if (!state.acct) return { ok: false, propose: false, cinema: false, seal: false, hint: 'Name a payee. Nothing was signed.' };
+    if (!state.amount) return { ok: false, propose: false, cinema: false, seal: false, hint: 'Name an amount. Nothing was signed.' };
+    const yocto = nearToYocto(state.amount);
+    const cap = capHolds(capYocto, yocto == null ? null : yocto.toString());
+    if (!cap.ok) return { ok: false, propose: false, cinema: false, seal: true, hint: 'That amount is over your max per payment. Nothing was signed.' };
     if (typeof check !== 'function') return { ok: false, propose: false, cinema: false, seal: false, hint: 'The check is not wired.' };
-    if (plan.action === 'trick') {
-      state.atk = plan.id || 'poisoned-invoice';
-      state.pending = null;
-      state.chk = null;
-    } else if (state.pending !== plan.action) {
-      return { ok: false, propose: false, cinema: false, seal: false, hint: 'Nothing is waiting. Try the poisoned invoice first.' };
+    const fields = fieldsOf(state);
+    if (!state.bound || !contextMatches(state.bound, fields)) {
+      let read;
+      try { read = await readCheck(check, state.acct); }
+      catch (e) { return { ok: false, propose: false, cinema: false, seal: false, hint: e?.message || 'The check did not answer.' }; }
+      applyRead(state, read);
     }
-    let receiver = state.receiver || POISON_PAYEE;
-    if (plan.action === 'trick' && typeof trickPlan === 'function') {
-      try {
-        const p = await trickPlan(state.atk);
-        if (p?.receiver) receiver = p.receiver;
-      } catch (e) {
-        return { ok: false, propose: false, cinema: false, seal: false, hint: e?.message || 'The trick could not be planned.' };
-      }
-    }
-    state.receiver = receiver;
-    state.acct = receiver;
-    let read;
-    try {
-      read = (plan.action !== 'trick' && state.chk)
-        ? { raw: state.chk, explained: explainCheck(state.chk), lamps: lampsFor(state.chk) }
-        : await readCheck(check, receiver);
-    } catch (e) {
-      return { ok: false, propose: false, cinema: false, seal: false, hint: e?.message || 'The check did not answer.' };
-    }
-    state.chk = read.raw;
-    state.score = read.explained;
-    const sized = trickAmountYocto(minYocto, capYocto);
-    if (!sized.ok) {
-      state.pending = null;
-      return {
-        ok: false, propose: false, cinema: false, seal: true, lamps: read.lamps,
-        hint: 'Your max per payment is under 0.001 NEAR. Nothing was signed.',
-        verdict: read.explained.verdict,
-      };
-    }
-    const gate = trickGate(read.raw?.verdict, { confirmed: plan.action === 'confirm', knock: plan.action === 'knock' });
-    state.pending = gate.needs || null;
-    if (!gate.propose) {
-      return {
-        ok: true, action: plan.action, propose: false, cinema: false, seal: !!gate.seal,
-        lamps: read.lamps, verdict: read.raw?.verdict, pending: state.pending,
-        hint: `${read.explained.summary}. ${gate.hint}`,
-      };
-    }
-    if (typeof trickSend !== 'function') {
-      return { ok: false, propose: false, cinema: false, seal: false, lamps: read.lamps, hint: 'Open the town door to ask the charter. This page did not sign.' };
-    }
-    let sent;
-    try { sent = await trickSend(state.atk || 'poisoned-invoice'); }
-    catch (e) { return { ok: false, propose: false, cinema: false, seal: false, hint: e?.message || 'The charter did not answer.' }; }
-    state.pending = null;
-    state.chk = null;
-    return { ...sentResult(sent), action: plan.action, lamps: read.lamps, verdict: read.raw?.verdict };
+    const result = bookOf(state).pay(state.bound);
+    state.pending = result.needsHuman ? 'human' : null;
+    state.holdId = result.hold?.id || state.holdId || null;
+    return {
+      ...result, action: 'pay', propose: false, lamps: lampsFor(state.chk), seal: result.status === 'refunded' || result.status === 'held',
+      verdict: state.bound?.verdict,
+    };
+  }
+
+  if (plan.action === 'confirm') {
+    const id = state.holdId;
+    const hold = id && state.book?.book.holds.get(id);
+    const result = bookOf(state).confirm(id, { actor: plan.actor || 'agent', intentDigest: hold?.digest });
+    if (result.ok) state.pending = null;
+    return { ...result, action: 'confirm', propose: false, seal: false, lamps: lampsFor(state.chk) };
+  }
+
+  if (plan.action === 'cancel') {
+    const result = bookOf(state).cancel(state.holdId);
+    if (result.ok) { state.pending = null; state.holdId = null; }
+    return { ...result, action: 'cancel', propose: false, seal: false };
   }
 
   if (plan.action === 'freeze') {
-    state.tab = 'freeze';
+    state.tab = 'blocks';
     state.pending = null;
     if (typeof freeze !== 'function') return { ok: false, propose: false, cinema: false, seal: false, hint: 'Open the town door to freeze the row. Nothing was signed.' };
     let out;
-    try { out = await freeze({ frozen: !!plan.frozen, approve: !!plan.approve }); }
+    try { out = await freeze({ frozen: true, approve: !!plan.approve }); }
     catch (e) { return { ok: false, propose: false, cinema: false, seal: false, hint: e?.message || 'Freeze did not sign.' }; }
     if (out?.ok && out.tx) {
-      state.frozen = !!plan.frozen;
+      state.frozen = true;
       state.needsApproval = false;
       state.rowKnown = true;
-      return {
-        ok: true, action: 'freeze', propose: false, seal: false, tx: out.tx, frozen: !!plan.frozen,
-        cinema: plan.frozen ? 'freeze' : 'unfreeze', hint: out.hint,
-      };
+      return { ok: true, action: 'freeze', propose: false, seal: false, tx: out.tx, frozen: true, cinema: 'freeze', hint: out.hint, live: LIVE_ENFORCEMENT };
     }
     state.needsApproval = !!out?.needsApproval;
     return {
       ok: !!out?.needsApproval, action: 'freeze', propose: false, cinema: false,
       seal: !out?.needsApproval && !out?.ok, needsApproval: !!out?.needsApproval,
-      hint: out?.hint || 'Freeze did not sign.',
+      hint: out?.hint || 'Freeze did not sign.', live: LIVE_ENFORCEMENT,
     };
   }
 

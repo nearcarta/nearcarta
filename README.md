@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 536 backend unit tests (533 pass, 3 skipped), offline
+npm test                                   # 551 backend unit tests (548 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -154,7 +154,7 @@ An agent with a wallet key can be talked into paying anyone: a fake invoice, a p
 | Toll Bridge | *Pay 0.001 NEAR* | A 0.001 NEAR pass to `toll.nearcarta.near`. The chain-signature proofs are recorded separately. The foreign chain was not paid from this gate. Recorded allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) |
 | Ferry | *Get quote* for about 0.05 wNEAR on NEAR to USDC on NEAR, then *Load cargo* | Fund NEAR once in `/setup`. Ask charter is the stamp [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV), not the swap. A session Load cargo settles with `propose_call` when the quote is at most 0.20 USD and the row cap holds the wrap. The boat says delivered only after SUCCESS. Guest Load cargo is a demo. Pay (`/ferry-widget`) is optional and you send that deposit yourself. Session swap SUCCESS: 0.04875 wNEAR to 0.174899 USDC [5vUC4zn1…](https://nearblocks.io/txns/5vUC4zn1PjLxLk57tTpG1fP98WkPcFgbPFEKdC3tvK2S) |
 | Mist Bank | *Send 0.01 NEAR privately* (fixed note sizes), then *Verify the seal*; *Verify the TEE now* | The charter memo carries a commitment and the seal matches the chain; the send comes with a NEAR AI TEE check that uses the commitment as its nonce (*Verify the TEE now* uses a fresh random one). The ZEC payout is mainnet only |
-| Guardhouse | City door, then Check, Trick, or Freeze. The same words work in the agent box | A check is a view. Trick asks the charter for 0.001 NEAR only after the verdict: warn waits for a confirm, block waits until you let it knock. Freeze is `set_frozen` with deposit 0. A session key limited to `propose` and `propose_call` needs one approval for that call. The attested check is off |
+| Guardhouse | City door, then Check, Pay safely, or Blocks. The same words work in the agent box | A check is a view. Pay through guard uses the payee and amount you typed. A warning stays held until you press Confirm. A block refunds once and does not forward. The agent cannot confirm a warning. Live guard is not on mainnet yet, so nothing is signed. Freeze only tightens the row |
 | Vault Arena | Write a scam, *Send the scam* | The NEAR AI model (`z-ai/glm-5.3-flash`) reads it and proposes a payment; a payment outside your rules is refused on chain. Six walls, points and a leaderboard |
 | Payouts | *Prepare the batch*, or paste a CSV | One receipt per row. Nothing is sent. A USDC row stays under 0.20 USD and is not sent. The live board signs `propose` only |
 | Town Hall | *Change my row* | `set_rules`, `set_frozen` and `set_seal` on your own row. Deposit 0. A preview reads the new cap back |
@@ -165,6 +165,7 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 |---|---|---|---|
 | Ferry quote and status | `app/src/ferry-catalog.js` `pickBest` | `two ferry quotes mark the larger amount out` | recorded swap [HzgUr618…](https://nearblocks.io/txns/HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw). A new deposit was not sent |
 | Guardhouse check | `app/src/guard-score.js` | `a guard check explains every signal` | refused payee [E7KMexjS…](https://nearblocks.io/txns/E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ) |
+| Guardhouse pay | `shared/guard/verifier.js` | `a guarded pay holds a warning until a person confirms` | ALLOW forward, WARN release, and BLOCK refund receipts are not linked until those transactions are seen |
 | Chronicle search | `app/src/chronicle-feed.js` | `chronicle search, filter, export and verify` | allowed [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR) |
 | Toll address | `app/src/toll-derive.js` | `the toll key hashes to the recorded Base address` | allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) |
 | House deed | `app/src/deed-control.js` | `a deed move refuses the previous holder` | allow [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26), refuse [3Z4UAb6N…](https://nearblocks.io/txns/3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1) |
@@ -177,7 +178,7 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 - DeFi (Ferry): one recorded NEAR Intents swap. New quotes stay dry.
 - Privacy (Mist Bank): NEAR AI Cloud TEE check. The model call does not move NEAR.
 - Autonomous Business (Chronicle, Toll Bridge): Chronicle lists what the charter allowed and refused. Toll asks the MPC signer at `toll.nearcarta.near`.
-- AI Security (Guardhouse): spending limits and a policy engine on `board.nearcarta.near`. A function-call key names one receiver. If `method_names` is omitted, every method on that receiver can be called, and the allowance pays gas only, so the key cannot attach NEAR ([access keys](https://docs.near.org/protocol/accounts-contracts/access-keys), [login key](https://docs.near.org/web3-apps/tutorials/wallet-login)). The town session key is limited to `propose` and `propose_call`, so that key cannot unfreeze the row. `set_frozen` is signed by the account, deposit 0, and the contract refunds any attached deposit. The attested checker is off: `outlayer.near` is the published contract and this town has no project there, so nothing here calls `request_execution`. Recorded refusals stay the evidence: over cap [CcPMX1Dt…](https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF), off list [E7KMexjS…](https://nearblocks.io/txns/E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ). A new 0.001 NEAR refusal and a `set_frozen` receipt are not linked until those transactions are seen. Verify with `npm test` (`a guard check explains every signal`).
+- AI Security (Guardhouse): a typed payee check, then Pay through guard. Warn stays held until the person presses Confirm. Block refunds once to the visitor row and does not forward. An invoice cannot replace the payee. The agent cannot confirm a warning or unfreeze the row. Live enforcement is not on mainnet: the verifier binds the typed payment and rejects a reused or edited context, and it does not claim an on-chain TEE ([NEAR AI verification](https://docs.near.ai/cloud/verification), [access keys](https://docs.near.org/protocol/accounts-contracts/access-keys)). `set_frozen` still tightens the row, deposit 0. The attested checker is off: `outlayer.near` is published and nothing here calls `request_execution`. Recorded refusals stay the evidence: over cap [CcPMX1Dt…](https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF), off list [E7KMexjS…](https://nearblocks.io/txns/E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ). An ALLOW forward, a WARN release, and a BLOCK refund are not linked until those transactions are seen. Verify with `npm test` (`a guard check explains every signal`, `a guarded pay holds a warning until a person confirms`).
 - Agent Economy (Town Hall): `set_rules` on the visitor's own row. Deposit 0.
 - Real-World Money (Payouts): the page prepares a batch and does not send it. A live payment is one `propose`, at most 0.005 NEAR.
 - Games (Vault Arena): a recorded payment and an over-cap refusal.
@@ -213,7 +214,7 @@ Live check, at most 0.06 NEAR (the pass itself is 0.001):
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 536 unit tests (533 pass, 3 skipped)
+npm test                 # 551 unit tests (548 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -236,7 +237,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 536 unit tests (533 pass, 3 skipped):
+# 551 unit tests (548 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).

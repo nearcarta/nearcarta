@@ -815,7 +815,7 @@ const APPS = {
     },
   },
   guard: {
-    label: 'Guardhouse · prompt-injection test', idle: 'Pick a trick, such as an invoice with a hidden line telling AI helpers to pay someone else. I\u2019ll check the payee before I sign. A try costs at most 0.001 NEAR, and only if your rules allow it.',
+    label: 'Guardhouse · pay through a check', idle: 'Type the payee and the amount. Check first. Pay through the guard uses that payment. A warning stays held until you press Confirm.',
     guest: true,
     form: () => '<div data-deep="guard"></div>',
     bind: () => {
@@ -836,40 +836,14 @@ const APPS = {
           if (!r.ok) throw new Error(j.error || 'The check did not answer.');
           return j;
         },
-        trickPlan: (id) => A.trickPlan(id),
-        trickSend: async (id) => {
-          const r = await A.trickSend(id);
-          const s = Array.isArray(r?.steps) ? (r.steps.at(-1) || {}) : {};
-          const refused = r?.refused != null ? !!r.refused : s.decision === 'denied';
-          return { refused, reason: r?.reason || s.reason || '', tx: s.tx || r?.tx || null, decision: s.decision || r?.decision, fromRule: !!(s.fromRule || r?.fromRule) };
-        },
-        freeze: (opts) => A.guardFreeze(opts),
+        freeze: (opts) => A.guardFreeze({ ...opts, frozen: true }),
         onScene: applyGuardScene,
       };
       mountShop('guard', document.getElementById('t-form'), hooks);
       wireGuardDock(hooks);
     },
-    btn: () => !extra.chk ? 'Try to trick my agent' : extra.chk.verdict === 'block' ? 'Let it knock anyway' : extra.chk.verdict === 'warn' ? 'I checked. Ask the charter' : 'Ask the charter',
-    run: async () => {
-      sh?.hideRefuse?.();
-      const id = extra.atk || 'poisoned-invoice';
-      if (!extra.chk) {
-        const p = await A.trickPlan(id); const c = await A.checkPayee(p.receiver); extra.chk = c;
-        if (c.verdict === 'allow') return APPS.guard.send(id);
-        const first = c.reasons.find(r => r.level === c.verdict) || c.reasons[0];
-        return { keep: true, kind: 'ok', say: c.verdict === 'block' ? `Stopped before signing: ${esc(first.text).replace(/[.!?]+$/, "")}.` : `Wait: ${esc(first.text)}. Your call.`,
-          rule: c.verdict === 'block' ? 'payee check · blocked, nothing signed' : 'payee check · needs you', rc: '<span class="rc">checked off chain: deny list, account age, code changes, your past payments</span>' };
-      }
-      return APPS.guard.send(id);
-    },
-    send: async id => {
-      const was = extra.chk?.verdict; extra.chk = null;
-      const r = await A.trickSend(id); const s = r.steps.at(-1) || {};
-      if (r.refused && s.tx && sh?.act && runScene) runScene(sh.act({ live: true, refused: true, reason: A.why(r.reason) || r.reason || '' }));
-      if (!r.refused && s.tx && s.decision === 'allowed' && sh?.act && runScene) runScene(sh.act({ live: true, refused: false }));
-      const two = was === 'block' && r.refused;
-      return { o: { decision: r.refused ? 'denied' : s.decision, reason: r.reason, tx: s.tx }, say: r.refused ? (w => two ? `Second check: your spending rules refused it. ${w.charAt(0).toUpperCase() + w.slice(1)}.` : `Blocked: ${w}.`)(A.why(r.reason)) : 'It got through. Tighten your rules.' };
-    },
+    btn: () => 'Check payee',
+    run: async () => ({ keep: true, kind: 'ok', say: 'Use Check payee, then Pay through guard. Nothing was signed.' }),
   },
   arena: {
     guest: true,
@@ -1106,6 +1080,9 @@ function paint() {
   // Ferry: after a quote, keep the card + cargo CTAs even if charter stage is incomplete (guest cinema).
   const ferryQuoted = cur === 'ferry' && extra.q;
   if (st === 'load' || st === 'connect' || st === 'build') {
+    if (cur === 'guard' && app.form) {
+      say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
+    }
     say(ferryQuoted ? (APPS.ferry.charterReady() ? 'Quote ready. Ask charter or Load cargo.' : 'Quote ready. Load cargo as guest, or open your charter.') : (app.idle || 'This is what the shop does. The proof is already on mainnet.'));
     hero(app.hero ? app.hero() : null);
     if (app.guest && app.form) { form(app.form()); app.bind?.(); } else form('');
@@ -1122,18 +1099,18 @@ function paint() {
       hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.(); btn('Write my rules'); return;
     }
     if (cur === 'guard' && app.form) {
-      say(app.idle); hero(null); form(app.form()); app.bind?.(); btn('Write my rules'); return;
+      say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
     }
     say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return;
   }
   if (st === 'wait') {
     if (cur === 'guard' && app.form) {
-      say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(app.form()); app.bind?.(); btn('Check again'); return;
+      say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
     }
     say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(''); hero(null); btn('Check again'); return;
   }
   if (st === 'key') {
-    if (cur === 'guard' && app.form) { form(app.form()); app.bind?.(); hero(null); }
+    if (cur === 'guard' && app.form) { say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return; }
     else if (ferryQuoted && app.guest && app.form) {
       say('Quote ready. Load cargo as guest, or finish the helper key to Ask charter.');
       hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.();
@@ -1164,7 +1141,8 @@ function paint() {
     document.body.classList.remove('toll-tray');
     const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true;
     const td = document.getElementById('toll-agent-dock'); if (td) td.hidden = true;
-    btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
+    if (cur === 'guard') hideFerryPrimary();
+    else btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
   }
 }
 async function primary(auto = false) {
@@ -1195,7 +1173,7 @@ async function primary(auto = false) {
     say(res.say); react(kind);
     rcpt((rule ? `<span class="rule ${kind}" data-testid="rule">${kind === 'ok' ? '✓' : '✕'} ${esc(rule)}</span>` : '') + (res.rc || A.txLine(res.o?.tx)));
     const app = APPS[cur];
-    if (cur === 'ferry' || (cur === 'guard' && A.stage() === 'ready')) hideFerryPrimary();
+    if (cur === 'ferry' || cur === 'guard' || cur === 'toll') hideFerryPrimary();
     else btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : (AGAIN[cur] || 'Do it again')));
     if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
     document.body.dataset.app = kind; ruleChip(); proofDrawer();

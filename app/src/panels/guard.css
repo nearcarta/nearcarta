@@ -3,8 +3,9 @@ body.guard-tray #shopUI #tray{
   width:min(440px,calc(100vw - 28px));
   max-width:440px;
   left:16px; bottom:18px;
-  max-height:calc(100dvh - 112px);
-  padding:24px 22px 22px;
+  /* All shops is fixed at top:120px. Keep this card below it. */
+  max-height:calc(100dvh - 176px);
+  padding:16px 18px 16px;
   box-sizing:border-box;
   overflow-x:hidden;
   overflow-y:auto;
@@ -34,21 +35,41 @@ body.guard-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center
 body.guard-tray #shopUI select,
 body.guard-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
 
-.guard-card{display:grid;gap:16px;min-width:0}
-.guard-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:6px;border-radius:14px;background:#17130f;border:1px solid #4a3a28}
+.guard-card{display:grid;gap:12px;min-width:0}
+.guard-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28;position:sticky;top:0;z-index:2}
 .guard-tab{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-  min-height:64px;padding:8px 6px;border:0;border-radius:12px;
-  background:transparent;color:#d4c4a8;font:700 14px/1 system-ui,sans-serif;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  min-height:44px;padding:8px 4px;border:0;border-radius:11px;
+  background:transparent;color:#d4c4a8;font:700 14px/1.1 system-ui,sans-serif;cursor:pointer;
+  white-space:nowrap;
 }
 .guard-tab.on,.guard-tab[aria-selected=true]{background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608}
 .guard-ico{display:block;object-fit:contain;flex:none}
-.guard-pane{display:grid;gap:16px;min-width:0}
+.guard-pane{display:grid;gap:10px;min-width:0}
 .guard-pane[hidden]{display:none!important}
 .guard-field{display:flex;flex-direction:column;gap:8px;margin:0;color:#e8d7b8;font:650 13px/1.2 system-ui,sans-serif}
-.guard-field input{
+.guard-field input,.guard-field select,.guard-field textarea{
   width:100%;min-height:48px;box-sizing:border-box;padding:0 12px;border-radius:12px;
   border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:600 15px/1.2 system-ui,sans-serif;
+}
+.guard-field textarea{min-height:48px;padding:12px;resize:vertical}
+.guard-split{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-width:0}
+.guard-flow{
+  display:flex;align-items:center;justify-content:center;gap:16px;
+  padding:10px 14px;border-radius:16px;background:#17130f;border:1px solid rgba(214,180,106,.35);
+}
+.guard-flow .tic{position:relative;display:inline-flex}
+.guard-flow .ti{width:48px;height:48px;border-radius:50%;display:block}
+.guard-flow .ci{position:absolute;right:-4px;bottom:-4px;width:16px;height:16px;border-radius:50%}
+.guard-flow-arrow{color:#c98f4e;font:700 22px/1 system-ui,sans-serif}
+.guard-payee-mark{
+  width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+  background:#17130f;border:1px solid #d6b46a;color:#f5d08a;font:700 18px/1 system-ui,sans-serif;
+}
+.guard-status{margin:0;color:#f3ead8;font:600 14px/1.35 system-ui,sans-serif;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.guard-quiet{
+  justify-self:center;min-height:44px;min-width:44px;padding:8px 12px;border:0;background:transparent;
+  color:#d6b46a;font:700 14px/1 system-ui,sans-serif;cursor:pointer;
 }
 .guard-note{margin:0;color:#f3ead8;font:500 14px/1.45 system-ui,sans-serif}
 .guard-picks{display:grid;gap:12px}
@@ -71,7 +92,8 @@ body.guard-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
 }
 .guard-cta:active{transform:translateY(3px)}
 button.guard-cta[disabled]{opacity:1;cursor:progress}
-.guard-pane > .guard-cta{justify-self:center}
+.guard-actions{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px}
+.guard-pane > .guard-cta,.guard-actions > .guard-cta{justify-self:center}
 
 #guard-agent-dock{
   position:fixed; right:20px; bottom:22px; z-index:70;
@@ -125,9 +147,12 @@ body[data-shop="guard"] #room{padding-bottom:140px}
 @media (max-width:720px){
   body.guard-tray #shopUI #tray{
     width:min(100vw - 16px,420px); left:8px;
-    bottom:calc(118px + env(safe-area-inset-bottom,0px));
-    max-height:min(62dvh,calc(100dvh - 200px)); padding:20px 18px;
+    bottom:calc(96px + env(safe-area-inset-bottom,0px));
+    max-height:min(74dvh,calc(100dvh - 148px)); padding:14px 14px 16px;
   }
+  .guard-card,.guard-pane{gap:10px}
+  .guard-flow{padding:10px 12px}
+  .guard-tab{font-size:13px}
   body.guard-tray:has(#guard-agent-pop:not([hidden])) #shopUI #tray{
     bottom:calc(176px + env(safe-area-inset-bottom,0px));
     max-height:min(52dvh,calc(100dvh - 260px));

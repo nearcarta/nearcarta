@@ -1,85 +1,83 @@
-// Guardhouse mix tray: Check / Trick / Freeze. The city door mounts this.
-// Icons are the shipped 3D set under /design/D2_game/d7/assets/3dicons/192/.
-// A check reads GET /api/guardhouse/check (board row when the visitor is the charter).
+// Guardhouse tray: Check / Pay safely / Blocks. One gold button.
+// The city door mounts this. Icons are the shipped token set (web3icons / token svgs).
 
-import { explainCheck } from '../guard-score.js';
-import { roomError } from '../room-error.js';
-import {
-  POISON_PAYEE, TRICK_NEAR, checkUrl, lampsFor, runGuardAction, runGuardAgent, trickAmountYocto,
-} from './guard-agent.js';
+import { bindTokenFallbacks, tokenStack } from './token-badge.js';
+import { checkUrl, runGuardAction, runGuardAgent } from './guard-agent.js';
 import { armGuardDock, dispatchGuardDock, ensureGuardDock, installGuardDock } from './guard-dock.js';
 
-const ICON = '/design/D2_game/d7/assets/3dicons/192/';
-
-export function guardIcon(name, size = 28) {
-  return `<img class="guard-ico" src="${ICON}${name}-premium.webp" alt="" width="${size}" height="${size}" decoding="async">`;
-}
-
-function scoreBlock(score, esc) {
-  if (!score) return '<div data-testid="guard-score"></div>';
-  const items = (score.lines || []).map(l => {
-    const flag = l.level === 'warn' || l.level === 'block' || l.level === 'unknown';
-    const tx = l.tx ? ` <a class="guard-tx" href="https://nearblocks.io/txns/${esc(l.tx)}" target="_blank" rel="noopener">${esc(String(l.tx).slice(0, 8))}…</a>` : '';
-    return `<li data-signal="${esc(l.id)}"${flag ? ' data-testid="guard-reason"' : ''}><b>${esc(l.title)}</b> ${esc(l.text)}${tx}</li>`;
-  }).join('');
-  return `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.summary || score.verdict || '')}</p><ul>${items}</ul></div>`;
-}
-
-function attestedLine(att, esc) {
-  if (!att) return '<p class="guard-note" data-testid="guard-attested">Reading the attested check…</p>';
-  if (att.enabled && Array.isArray(att.runs) && att.runs.length) {
-    const links = att.runs.map(r => r?.attestation
-      ? `<a href="${esc(r.attestation)}" target="_blank" rel="noopener">${esc(r.label || 'attestation')}</a>`
-      : '').filter(Boolean).join(' ');
-    return `<p class="guard-note" data-testid="guard-attested">Attested check is on. ${links}</p>`;
+function statusBlock(state, esc) {
+  const score = state.score;
+  if (!score) {
+    const bits = [];
+    if (state.denyCount != null) bits.push(`${state.denyCount} on the live deny list.`);
+    bits.push(state.attested?.enabled ? 'Attested check is on.' : 'Attested check is off. The charter still decides on chain.');
+    if (state.notice) bits.push(state.notice);
+    return `<p class="guard-status" data-testid="guard-attested">${esc(bits.join(' '))}</p>`;
   }
-  return '<p class="guard-note" data-testid="guard-attested">Attested check is off. The charter still decides on chain.</p>';
+  const flagged = (score.lines || []).filter(l => l.level === 'warn' || l.level === 'block' || l.level === 'unknown');
+  const reasons = flagged.map(l => `<span data-testid="guard-reason">${esc(l.text)}</span>`).join(' · ');
+  const titles = (score.lines || []).map(l => l.title);
+  const bits = [];
+  if (titles.includes('Lookalike')) bits.push('Lookalike');
+  if (titles.includes('Recorded refusals')) bits.push('Recorded refusals');
+  const link = (score.lines || []).find(l => l.tx);
+  const href = link?.tx ? ` <a class="guard-tx" href="https://nearblocks.io/txns/${esc(link.tx)}">Recorded refusal</a>` : '';
+  const extra = state.notice ? ` ${esc(state.notice)}` : '';
+  return `<p class="guard-status" data-testid="guard-verdict">${esc(score.summary || '')}</p><p class="guard-status" data-testid="guard-score">${bits.join(' · ')}${reasons ? ' ' + reasons : ''}${href}${extra}</p>`;
 }
 
-export function guardMarkup(state = {}, attacks = [], esc = s => String(s ?? '')) {
+function gold(id, testid, label) {
+  return `<button type="button" class="primary guard-cta" id="${id}" data-testid="${testid}">${label}</button>`;
+}
+
+export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? '')) {
   const tab = state.tab || 'check';
-  const tabBtn = (id, icon, label) => `<button type="button" role="tab" class="guard-tab${tab === id ? ' on' : ''}" data-tab="${id}" aria-selected="${tab === id ? 'true' : 'false'}" data-testid="guard-tab-${id}">${guardIcon(icon, 22)}<span>${label}</span></button>`;
-  const tabs = `<div class="guard-tabs" role="tablist" data-testid="guard-tabs">${tabBtn('check', 'shield', 'Check')}${tabBtn('trick', 'file-text', 'Trick')}${tabBtn('freeze', 'lock', 'Freeze')}</div>`;
-  const deny = state.denyError
-    ? '<p class="guard-note" data-testid="guard-denylist">The deny list did not answer.</p>'
-    : (state.denyCount == null ? '<p class="guard-note" data-testid="guard-denylist">Reading the deny list…</p>'
-      : `<p class="guard-note" data-testid="guard-denylist">${esc(String(state.denyCount))} on the live deny list.</p>`);
-  const lamps = (state.lamps || []).map(l => `<li data-lamp="${esc(l.id)}" data-level="${esc(l.level)}">${guardIcon(l.level === 'block' ? 'thumb-down' : l.level === 'warn' ? 'flash' : 'tick', 16)}<span>${esc(l.label)}</span></li>`).join('');
-  const lampRow = lamps ? `<ul class="guard-lamps" data-testid="guard-lamps">${lamps}</ul>` : '';
+  const tabBtn = (id, label) => `<button type="button" role="tab" class="guard-tab${tab === id ? ' on' : ''}" data-tab="${id}" aria-selected="${tab === id ? 'true' : 'false'}" data-testid="guard-tab-${id}">${label}</button>`;
+  const tabs = `<div class="guard-tabs" role="tablist" data-testid="guard-tabs">${tabBtn('check', 'Check')}${tabBtn('pay', 'Pay safely')}${tabBtn('blocks', 'Blocks')}</div>`;
+  const asset = state.asset || 'NEAR';
+  const chain = state.chain || 'near';
+  const flow = `<div class="guard-flow" data-testid="guard-flow" aria-hidden="true">${tokenStack(asset, chain, { size: 48, chainSize: 16 })}<span class="guard-flow-arrow">→</span><span class="guard-payee-mark" aria-hidden="true">${esc((state.acct || 'payee').slice(0, 1).toUpperCase())}</span></div>`;
+  const payee = `<label class="field guard-field">Payee <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || '')}" autocomplete="off"></label>`;
+  const chainField = `<label class="field guard-field">Chain <select id="g-chain" data-testid="guard-chain"><option value="near" ${chain === 'near' ? 'selected' : ''}>near</option><option value="base" ${chain === 'base' ? 'selected' : ''}>base</option></select></label>`;
+  const assetField = `<label class="field guard-field">Asset <select id="g-asset" data-testid="guard-asset"><option value="NEAR" ${asset === 'NEAR' ? 'selected' : ''}>NEAR</option></select></label>`;
+  const pair = `<div class="guard-split">${chainField}${assetField}</div>`;
+  const amount = `<label class="field guard-field">Amount <input id="g-amt" data-testid="guard-amount" inputmode="decimal" value="${esc(state.amount || '')}" autocomplete="off"></label>`;
+  const invoice = `<label class="field guard-field">Invoice <textarea id="g-invoice" data-testid="guard-invoice" rows="2">${esc(state.invoice || '')}</textarea></label>`;
+  const status = statusBlock(state, esc);
   const check = `<div class="guard-pane" data-pane="check" data-testid="guard-pane-check" ${tab === 'check' ? '' : 'hidden'}>
-      <label class="field guard-field">Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || '')}" autocomplete="off"></label>
+      ${tab === 'check' ? flow : ''}
+      ${tab === 'check' ? payee : ''}
       <p class="example-row"><button type="button" class="example" data-testid="guard-example">Example: shop-moved-pay-here.near</button></p>
-      <button type="button" class="primary guard-cta" id="g-check" data-testid="guard-check">Check this account</button>
-      ${tab === 'check' ? scoreBlock(state.score, esc) : ''}
-      ${lampRow}
-      ${deny}
-      ${attestedLine(state.attested, esc)}
+      ${tab === 'check' ? gold('g-check', 'guard-check', 'Check payee') : ''}
+      ${tab === 'check' ? status : ''}
     </div>`;
-  const pick = (attacks || []).map(a => `<label class="guard-pick"><input type="radio" name="atk" value="${esc(a.id)}" ${a.id === (state.atk || attacks[0]?.id) ? 'checked' : ''}>${guardIcon('file-text', 18)}<span>${esc(a.name)}</span></label>`).join('');
-  const pending = state.pending;
-  const trickBtn = pending === 'confirm'
-    ? '<button type="button" class="primary guard-cta" id="g-confirm" data-testid="guard-confirm">I checked. Ask the charter</button>'
-    : pending === 'knock'
-      ? '<button type="button" class="primary guard-cta" id="g-knock" data-testid="guard-knock">Let it knock anyway</button>'
-      : `<button type="button" class="primary guard-cta" id="g-trick" data-testid="guard-trick">Try poisoned invoice · ${TRICK_NEAR} NEAR</button>`;
-  const trick = `<div class="guard-pane" data-pane="trick" data-testid="guard-pane-trick" ${tab === 'trick' ? '' : 'hidden'}>
-      <p class="guard-note" data-testid="guard-poison">Hidden line asks for ${TRICK_NEAR} NEAR to ${esc(POISON_PAYEE)}. The charter is asked only after this check.</p>
-      <div class="guard-picks" role="radiogroup" aria-label="Tricks">${pick}</div>
-      ${trickBtn}
-      ${tab === 'trick' ? scoreBlock(state.score, esc) : ''}
+  const held = state.pending === 'human' && state.holdId;
+  const payCta = held
+    ? gold('g-confirm', 'guard-confirm', 'Confirm this payment')
+    : gold('g-pay', 'guard-pay', 'Pay through guard');
+  const cancel = held ? '<button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel">Cancel</button>' : '';
+  const pay = `<div class="guard-pane" data-pane="pay" data-testid="guard-pane-pay" ${tab === 'pay' ? '' : 'hidden'}>
+      ${tab === 'pay' ? `${flow}${payee}${pair}${amount}${invoice}<div class="guard-actions">${payCta}${cancel}</div>${status}` : ''}
     </div>`;
+  const holds = state.book ? [...state.book.book.holds.values()] : [];
+  const refunds = state.book ? [...state.book.book.refunds.values()] : [];
+  const rows = [
+    ...holds.map(h => `<li data-testid="guard-hold">Held · ${esc(h.payee)} · ${esc(h.amount)} ${esc(h.asset)}</li>`),
+    ...refunds.map(r => `<li data-testid="guard-refund">Refunded · ${esc(r.payee)} · ${esc(r.amount)} ${esc(r.asset)} · ${esc(r.why)}</li>`),
+  ];
+  const list = rows.length ? `<ul class="guard-blocks" data-testid="guard-blocks">${rows.join('')}</ul>` : '<p class="guard-status" data-testid="guard-blocks">No held payment.</p>';
   const rowLine = state.rowKnown
-    ? (state.frozen ? 'Your row is frozen. A propose while frozen is refused.' : 'Your row is live.')
+    ? (state.frozen ? 'Your row is frozen.' : 'Your row is live.')
     : 'Finish /setup to read your row.';
-  const freezeBtn = state.needsApproval
-    ? `<button type="button" class="primary guard-cta" id="g-approve" data-testid="guard-approve">${state.frozen ? 'Approve unfreeze' : 'Approve freeze'}</button>`
-    : `<button type="button" class="primary guard-cta" id="g-freeze" data-testid="guard-freeze">${state.frozen ? 'Unfreeze my row' : 'Freeze my row'}</button>`;
-  const freeze = `<div class="guard-pane" data-pane="freeze" data-testid="guard-pane-freeze" ${tab === 'freeze' ? '' : 'hidden'}>
-      <p class="guard-note" data-testid="guard-frozen">${esc(rowLine)}</p>
-      <p class="guard-note">The session key calls propose and propose_call. It cannot attach NEAR. set_frozen is gas only, deposit 0. If the key does not list set_frozen, one approval is required.</p>
-      ${freezeBtn}
+  const freeze = state.needsApproval
+    ? gold('g-approve', 'guard-approve', 'Approve freeze')
+    : gold('g-freeze', 'guard-freeze', 'Freeze my row');
+  const blocks = `<div class="guard-pane" data-pane="blocks" data-testid="guard-pane-blocks" ${tab === 'blocks' ? '' : 'hidden'}>
+      <p class="guard-status" data-testid="guard-frozen">${esc(rowLine)}</p>
+      ${list}
+      ${tab === 'blocks' ? freeze : ''}
     </div>`;
-  return `<div class="shop-stack guard-card" data-testid="guard-card">${tabs}${check}${trick}${freeze}</div>`;
+  return `<div class="shop-stack guard-card" data-testid="guard-card">${tabs}${check}${pay}${blocks}</div>`;
 }
 
 export function mountGuardTray(root, hooks = {}, deps = {}) {
@@ -89,14 +87,27 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
   const q$ = deps.q$ || ((node, sel) => node.querySelector(sel));
   const state = hooks.state || (hooks.state = {});
   if (!state.tab) state.tab = 'check';
-  const attacks = () => (hooks.attacks ? hooks.attacks() : []);
+  if (!state.chain) state.chain = 'near';
+  if (!state.asset) state.asset = 'NEAR';
   const doc = root?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+
+  const readForm = () => {
+    const acct = q$(root, '#g-acct');
+    const amt = q$(root, '#g-amt');
+    const chain = q$(root, '#g-chain');
+    const asset = q$(root, '#g-asset');
+    const invoice = q$(root, '#g-invoice');
+    if (acct) state.acct = acct.value;
+    if (amt) state.amount = amt.value;
+    if (chain) state.chain = chain.value;
+    if (asset) state.asset = asset.value;
+    if (invoice) state.invoice = invoice.value;
+  };
 
   const syncRow = () => {
     if (typeof hooks.row === 'function') state.rowKnown = !!hooks.row();
     if (typeof hooks.frozen === 'function' && state.rowKnown) state.frozen = !!hooks.frozen();
-    const sized = trickAmountYocto(hooks.minYocto?.() ?? null, hooks.capYocto?.() ?? null);
-    state.capOk = sized.ok;
+    state.rowId = typeof hooks.charter === 'function' ? (hooks.charter() || '') : (state.rowId || '');
   };
 
   const paint = () => {
@@ -121,6 +132,7 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
 
   function scene(result) {
     if (result?.lamps) state.lamps = result.lamps;
+    state.notice = result?.hint && result?.action !== 'check' ? result.hint : state.notice;
     hooks.onScene?.(result);
   }
 
@@ -135,27 +147,26 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
   const ctx = () => ({
     state,
     check: loadCheck,
-    trickPlan: hooks.trickPlan,
-    trickSend: hooks.trickSend,
     freeze: hooks.freeze,
     capYocto: hooks.capYocto?.() ?? null,
-    minYocto: hooks.minYocto?.() ?? null,
   });
 
   async function runAgent(text) {
     scene({ clear: true, seal: false });
+    readForm();
     const result = await runGuardAgent({ text, ...ctx() });
     if (result?.ok) state.agentText = '';
     agentLog(result?.hint || (result?.ok ? '' : 'That line did not run.'), true);
     scene(result);
-    if (!result?.loaded) paint();
+    paint();
     return result;
   }
 
   async function runPlan(plan) {
     scene({ clear: true, seal: false });
+    readForm();
     const result = await runGuardAction(plan, ctx());
-    agentLog(result?.hint || '');
+    state.notice = result?.hint || '';
     scene(result);
     paint();
     return result;
@@ -163,8 +174,11 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
 
   const localPaint = () => {
     syncRow();
-    root.innerHTML = guardMarkup(state, attacks(), esc);
+    root.innerHTML = guardMarkup(state, [], esc);
     bind();
+    bindTokenFallbacks(root);
+    const tray = root.closest('#tray');
+    if (tray) tray.scrollTop = 0;
   };
 
   const bind = () => {
@@ -175,62 +189,42 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     }
     root.querySelectorAll('[data-tab]').forEach(btn => {
       btn.onclick = () => {
+        readForm();
         state.tab = btn.dataset.tab || 'check';
         scene({ clear: true, seal: false });
         localPaint();
       };
     });
-    const input = q$(root, '#g-acct');
-    if (input) input.addEventListener('input', () => { state.acct = input.value; });
     const example = q$(root, '[data-testid=guard-example]');
     if (example) example.onclick = () => {
-      state.acct = POISON_PAYEE;
+      state.acct = 'shop-moved-pay-here.near';
+      const input = q$(root, '#g-acct');
       if (input) input.value = state.acct;
     };
-    root.querySelectorAll('input[name=atk]').forEach(i => {
-      i.onchange = () => { state.atk = i.value; };
-    });
     const checkBtn = q$(root, '#g-check');
     if (checkBtn) checkBtn.onclick = async () => {
-      const acct = (q$(root, '#g-acct')?.value || '').trim();
-      state.acct = acct;
+      readForm();
       state.holding = true;
       if (holdButton) holdButton(checkBtn, 'Checking this account.');
-      scene({ clear: true, seal: false });
-      try {
-        const raw = await loadCheck(acct);
-        state.score = explainCheck(raw);
-        state.chk = raw;
-        state.lamps = lampsFor(raw);
-        state.pending = null;
-        const blocked = state.score.verdict === 'block' || state.score.verdict === 'warn';
-        scene({ seal: blocked, lamps: state.lamps, hint: state.score.summary, cinema: false, propose: false });
-        agentLog(state.score.summary);
-      } catch (e) {
-        state.score = explainCheck({ account: acct, verdict: 'warn', reasons: [{ code: 'account_missing', text: roomError(e) }], signals: {} });
-        agentLog(state.score.summary);
-      } finally {
-        state.holding = false;
-        if (hooks.repaint) hooks.repaint();
-        else localPaint();
-      }
+      try { await runPlan({ ok: true, action: 'check', account: (state.acct || '').trim() }); }
+      finally { state.holding = false; }
     };
-    const trick = q$(root, '#g-trick');
-    if (trick) trick.onclick = () => runPlan({ ok: true, action: 'trick', id: state.atk || 'poisoned-invoice' });
+    const pay = q$(root, '#g-pay');
+    if (pay) pay.onclick = () => runPlan({ ok: true, action: 'pay' });
     const confirm = q$(root, '#g-confirm');
-    if (confirm) confirm.onclick = () => runPlan({ ok: true, action: 'confirm' });
-    const knock = q$(root, '#g-knock');
-    if (knock) knock.onclick = () => runPlan({ ok: true, action: 'knock' });
+    if (confirm) confirm.onclick = () => runPlan({ ok: true, action: 'confirm', actor: 'human' });
+    const cancel = q$(root, '#g-cancel');
+    if (cancel) cancel.onclick = () => runPlan({ ok: true, action: 'cancel' });
     const freeze = q$(root, '#g-freeze');
-    if (freeze) freeze.onclick = () => runPlan({ ok: true, action: 'freeze', frozen: !state.frozen, approve: false });
+    if (freeze) freeze.onclick = () => runPlan({ ok: true, action: 'freeze', frozen: true, approve: false });
     const approve = q$(root, '#g-approve');
-    if (approve) approve.onclick = () => runPlan({ ok: true, action: 'freeze', frozen: !state.frozen, approve: true });
-    const agentIn = q$(root, '#g-agent') || doc?.getElementById('g-agent');
+    if (approve) approve.onclick = () => runPlan({ ok: true, action: 'freeze', frozen: true, approve: true });
+    const agentIn = doc?.getElementById('g-agent');
     if (agentIn) {
       agentIn.oninput = (e) => { state.agentText = e.target.value; };
       agentIn.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); dispatchGuardDock(doc); } };
     }
-    const agentGo = q$(root, '#g-agent-go') || doc?.getElementById('g-agent-go');
+    const agentGo = doc?.getElementById('g-agent-go');
     if (agentGo) agentGo.onclick = (e) => { e.preventDefault(); dispatchGuardDock(doc); };
   };
 
@@ -240,8 +234,7 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     try {
       const deny = await fetch(api() + '/api/guardhouse/denylist').then(r => r.json());
       state.denyCount = Array.isArray(deny?.entries) ? deny.entries.length : null;
-      if (state.denyCount == null) state.denyError = true;
-    } catch { state.denyError = true; }
+    } catch { state.denyCount = null; }
     try {
       const att = await fetch(api() + '/api/guardhouse/attested').then(r => r.json());
       state.attested = att && typeof att === 'object' ? att : { enabled: false };
