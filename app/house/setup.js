@@ -16,7 +16,7 @@ import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
-import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_ALLOWANCE_YOCTO, SESSION_HOURS, callPolicy, sessionExpiresAt, sessionLabel } from '../../shared/board/session.js';
+import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_ALLOWANCE_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel } from '../../shared/board/session.js';
 import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
 import { runAsk } from '../../shared/vault/run.js';
@@ -372,7 +372,7 @@ function sSign() {
       : 'These limits are read back from the chain, not from this page.')
     : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code> and <code>propose_call</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`);
   const factsHtml = onBoard && chainRow ? boardFacts(chainRow) : (onBoard && chainError ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div>` : '<div class="fact"><small>Reading your charter from the chain</small><b>…</b></div>');
-  return head('Sign', live ? 'Your agent is live.' : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), lede)
+  return head('Sign', live ? (keyStale ? 'Renew your agent key.' : 'Your agent is live.') : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.'), lede)
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
     + (live ? `<div class="facts" id="facts" data-testid="setup-facts">${factsHtml}</div>` : `<div class="preview">${preview(r)}</div>`)
     + `<ul class="steps">${L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}" data-testid="setup-sign-${esc(k)}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('')}</ul>`
@@ -381,7 +381,8 @@ function sSign() {
     + (live ? '' : (onBoard && bal != null && nearOf(bal) < SIGN_MIN
         ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
         : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.005 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your charter's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign">Approve in wallet</button>${help}`))
-    + errP() + nav(live, { label: 'Try your agent' });
+    + (live && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key has <code>propose</code> but not <code>propose_call</code>. Ferry Load cargo needs both. One wallet approval deletes the old board keys and adds a new one with <code>propose</code> and <code>propose_call</code> (same 0.05 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : '')
+    + errP() + nav(live && !keyStale, { label: 'Try your agent' });
 }
 async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
 async function accountOn(id, network) {
@@ -415,8 +416,114 @@ async function agentAccessKey(sec) {
   if (!sec || !me) return null;
   const ak = await rpcClient([MAIN.rpc])('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: me, public_key: keyFrom(sec).publicKey }).catch(() => null);
   const fc = ak?.permission?.FunctionCall;
-  return fc && fc.receiver_id === MAIN.board.contract && fc.method_names.includes('propose') ? ak : null;
+  if (!fc || fc.receiver_id !== MAIN.board.contract) return null;
+  // Empty method_names means any method. Keys that omit propose_call are stale for Ferry.
+  return agentMethodsReady(fc.method_names) ? ak : null;
 }
+async function listBoardAgentKeys() {
+  if (!me) return classifyBoardAgentKeys([], MAIN.board.contract);
+  const res = await rpcClient([MAIN.rpc])('query', { request_type: 'view_access_key_list', finality: 'optimistic', account_id: me }).catch(() => null);
+  return classifyBoardAgentKeys(res?.keys || [], MAIN.board.contract);
+}
+/** Stale board keys (missing propose_call): one wallet approval deletes them and adds a key with propose + propose_call. */
+function paintRenewStatus(text) {
+  renewStatus = text || '';
+  const el = $('[data-testid=setup-renew-status]');
+  if (!el) return;
+  el.hidden = !renewStatus;
+  el.textContent = renewStatus;
+}
+/** Optional deps.wallet / deps.signAll let tests stub the Privy/NEAR Connect signer without a mainnet tx. */
+async function renewAgentKey(deps = {}) {
+  const contract = MAIN.board.contract;
+  const mark = (k, state, tx) => { const s = signLog.find(x => x.k === k); if (s) Object.assign(s, { state, tx: tx || s.tx }); else signLog.push({ k, state, tx }); };
+  paintRenewStatus('Checking your agent key on chain…');
+  const classified = await listBoardAgentKeys();
+  if (classified.ready.length) {
+    // A ready key is already on chain; keep using the matching secret when we have it.
+    const sec = localStorage.getItem(agentLS(me));
+    if (sec && await agentAccessKey(sec)) {
+      keyReady = true; keyStale = false;
+      paintRenewStatus('This browser already has a key that can call propose and propose_call.');
+      return { ok: true, renewed: false };
+    }
+  }
+  const fresh = keyFrom();
+  const pk = fresh.publicKey;
+  const stalePks = classified.board.map(k => k.publicKey);
+  const keyActions = renewAgentKeyActions({
+    stalePublicKeys: stalePks,
+    newPublicKey: pk,
+    boardContract: contract,
+    methodNames: AGENT_METHODS,
+    allowance: AGENT_ALLOW.toString(),
+  });
+  const txs = [];
+  const row = await viewFn(rpcClient([MAIN.rpc]), contract, 'get_charter', { owner: me }).catch(() => null);
+  if (row && String(row.agent || '') !== pubkeyHex(fresh)) {
+    txs.push(['agent', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: pk }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
+  }
+  txs.push(['key', { receiverId: me, actions: keyActions }]);
+  for (const [k] of txs) mark(k, 'run');
+  paintRenewStatus('Approve the renewal in your wallet…');
+  let res;
+  try {
+    const w = deps.wallet ? await deps.wallet() : await mainnetWallet().wallet();
+    if (deps.signAll) res = await deps.signAll(txs.map(t => t[1]), w);
+    else if (w.signAndSendTransactions) res = await w.signAndSendTransactions({ transactions: txs.map(t => t[1]) });
+    else { res = []; for (const t of txs) res.push(await w.signAndSendTransaction(t[1])); }
+  } catch (e) {
+    console.error('[setup] renewAgentKey signer', e);
+    paintRenewStatus(plainErr(e));
+    throw e;
+  }
+  txs.forEach(([k], i) => mark(k, 'run', txHashOf(res?.[i])));
+  localStorage.setItem(agentLS(me), fresh.secretKey);
+  st.charter = me; save();
+  // A stubbed wallet (tests / headless) never lands the key on chain — stop after the signer call.
+  if (deps.wallet || deps.signAll) {
+    mark('key', 'ok');
+    if (txs.some(([k]) => k === 'agent')) mark('agent', 'ok');
+    keyReady = true; keyStale = false;
+    paintRenewStatus('Agent key renewed (signer stub). No mainnet tx was sent.');
+    return { ok: true, renewed: true, stub: true, txs: txs.map(t => t[0]), signed: txs.map(t => t[1]) };
+  }
+  paintRenewStatus('Confirming the new key on chain…');
+  let ak = null;
+  for (let i = 0; i < 12 && !(ak = await agentAccessKey(fresh.secretKey)); i++) await wait(1200);
+  mark('key', ak ? 'ok' : 'run');
+  if (txs.some(([k]) => k === 'agent')) mark('agent', ak ? 'ok' : 'run');
+  keyReady = !!ak;
+  keyStale = !ak;
+  await refreshBal();
+  if (!ak) {
+    paintRenewStatus('The renewed agent key is not on the account yet. Wait a few seconds and press Renew again.');
+    throw new Error('The renewed agent key is not on the account yet. Wait a few seconds and press Renew again.');
+  }
+  paintRenewStatus('Agent key renewed. Ferry can call propose_call.');
+  return { ok: true, renewed: true, txs: txs.map(t => t[0]) };
+}
+/** Same Privy / mainnetWallet path as Update my rules. Returns true when the button was bound. */
+function bindRenewKey(wrap = job => job) {
+  const rk = $('#renew-key');
+  if (!rk) return false;
+  rk.onclick = e => act(e.currentTarget, wrap(async () => {
+    try { await renewAgentKey(); }
+    catch (err) { console.error('[setup] renewAgentKey', err); throw err; }
+  }));
+  return true;
+}
+if (typeof globalThis !== 'undefined') globalThis.__ncRenewAgentKey = renewAgentKey;
+async function refreshKeyReady() {
+  const sec = localStorage.getItem(agentLS(me));
+  const ak = await agentAccessKey(sec);
+  if (ak) { keyReady = true; keyStale = false; return true; }
+  const classified = await listBoardAgentKeys();
+  keyStale = classified.needsRenew;
+  keyReady = false;
+  return false;
+}
+
 // Existing row: set_rules and set_calls, plus set_agent only when the key differs.
 // One signAndSendTransactions batch. The access-key add stays on the first Approve path.
 function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursEdited: !!st.hoursEdited, hours: r.hours, chainExpiresAt: row?.expires_at })) {
@@ -454,11 +561,17 @@ async function signBoard() {
     for (const [k, tx] of ruleUpdateTransactions(row, r, sec)) txs.push([k === 'agent' ? 'create' : k, tx]);
   }
   // Allowance cannot be raised on a key that is already on the account. Sign replaces it
-  // (delete, then add the same key) so one approval refreshes the 0.05 gas budget.
+  // (delete, then add) so one approval refreshes the 0.05 gas budget. Stale board keys
+  // that omit propose_call are deleted in the same batch so Ferry can call it.
   const existingKey = await agentAccessKey(sec);
-  const keyActions = existingKey
-    ? [{ type: 'DeleteKey', params: { publicKey: pk } }, addKeyAction(pk)]
-    : [addKeyAction(pk)];
+  const classified = await listBoardAgentKeys();
+  const stalePks = classified.stale.map(k => k.publicKey).filter(p => p !== pk);
+  const keyActions = [
+    ...stalePks.map(publicKey => ({ type: 'DeleteKey', params: { publicKey } })),
+    ...(existingKey || classified.board.some(k => k.publicKey === pk)
+      ? [{ type: 'DeleteKey', params: { publicKey: pk } }] : []),
+    addKeyAction(pk),
+  ];
   txs.push(['key', { receiverId: me, actions: keyActions }]);
   for (const [k] of txs) mark(k, 'run');
   if (txs.length) {
@@ -605,13 +718,17 @@ function wireSign() {
   const b = $('#sign'); if (b) b.onclick = () => watch(b, sign);
   const up = $('[data-testid=setup-update-rules]'); if (up) up.onclick = () => watch(up, updateRules);
   const rs = $('#resign'); if (rs) rs.onclick = () => { busy = false; const h = $('#signhelp'); if (h) h.hidden = true; if (up) watch(up, updateRules); else if (b) watch(b, sign); };
+  // Sign is where the renew panel shows for a live stale key. wireTry alone never ran here.
+  bindRenewKey(job => async () => { try { await job(); } catch (e) { throw new Error(plainErr(e)); } });
   wire(() => { done(5); go(6); });
-  if (boardLive() && !st.trial && rowLive()) ensureChainRow();
-  else facts();
+  if (boardLive() && !st.trial && rowLive()) {
+    ensureChainRow();
+    if (keyReady === null) refreshKeyReady().then(() => { if (STEPS[st.step][0] === 'sign') render(); });
+  } else facts();
 }
 
 // ---------- 7. Try ----------
-let tries = [], keyReady = null, secTimer = null;
+let tries = [], keyReady = null, keyStale = false, renewStatus = '', secTimer = null;
 const WHY = { over_per_action_cap: 'over your per-payment cap', over_daily_budget: 'over your daily budget', over_daily_action_count: 'over your payments-per-day limit', receiver_not_allowlisted: 'that shop is not on your list', below_min_amount: 'below the smallest payment', clause_expired: 'your rule has expired', frozen: 'the charter is frozen', ERR_BALANCE: 'your charter\'s own balance is too low' };
 let pendingTry = null; // { amount, hash } while a try is on its way, so the link shows before the result
 const reasonOf = t => Object.keys(WHY).find(k => String(t || '').includes(k)) || refusalOf(t) || '';
@@ -724,7 +841,7 @@ function sTry() {
        <button type="button" class="tile" id="t-no" data-testid="try-refused" aria-describedby="try-refuse-hint" ${tiles.refuseDisabled ? 'disabled' : ''}><i>✕</i><b>Pay ${fmtN(over)} NEAR to ${esc(short(to))}</b><span id="try-refuse-hint">${esc(tiles.refuseReason)}</span><em class="go" style="font-style:normal">${esc(tiles.refuseAction)}</em></button></div>
      ${boardLive() && !st.trial ? `<div class="tiles" style="grid-template-columns:1fr 1fr;margin-top:12px"><button type="button" class="tile" id="t-freeze" data-testid="try-frozen"><i>❄</i><b>Freeze, then ask</b><span>One approval freezes the row. The ask is your agent key and should be refused. A second approval unfreezes it.</span></button>
        <button type="button" class="tile" id="t-expire" data-testid="try-expired"><i>⌛</i><b>Expire, then ask</b><span>One approval sets the session in the past. The ask is your agent key and should be refused. A second approval writes the session again.</span></button></div>` : ''}
-     ${boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code> and <code>propose_call</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
+     ${boardLive() && !st.trial && keyReady === false && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key has <code>propose</code> but not <code>propose_call</code>. Ferry Load cargo needs both. One wallet approval deletes the old board keys and adds a new one with <code>propose</code> and <code>propose_call</code> (same 0.05 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code> and <code>propose_call</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
      ${boardLive() && !st.trial ? charterFundMarkup({ amountNear: fundChoice().near, lowBalance: !!lowBal(), rowNear: rowBal == null ? '?' : fmtN(nearOf(rowBal.toString())), hintNear: fmtN(nearOf(TOPUP.toString())), busy: topUpBusy, disabled: !fundChoice().ok, note: fundChoice().why }) : ''}
      ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
      ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR… <span id="try-secs" data-testid="try-secs">${Math.floor((Date.now() - pendingTry.t0) / 1000)}s</span></span> ${txA(pendingTry.hash)}</div></div>` : ''}
@@ -762,8 +879,9 @@ function wireTry() {
   const ask = boardLive() && !st.trial
     ? amt => boardAsk(amt)
     : (amt, memo) => runAsk({ charter: st.charter, key: keyFrom(localStorage.getItem(agentLS(st.charter))), receiver: to, amount: toY(amt), memo, viewF: (c, m, a) => viewFn(rpcCall, c, m, a), send: sendPropose, rpcCall });
-  const k = $('#t-key'); if (k) k.onclick = e => act(e.currentTarget, async () => { await signBoard(); keyReady = !!(await agentAccessKey(localStorage.getItem(agentLS(me)))); });
-  if (boardLive() && !st.trial && keyReady === null) agentAccessKey(localStorage.getItem(agentLS(me))).then(a => { keyReady = !!a; if (STEPS[st.step][0] === 'try') render(); });
+  const k = $('#t-key'); if (k) k.onclick = e => act(e.currentTarget, async () => { await signBoard(); keyReady = !!(await agentAccessKey(localStorage.getItem(agentLS(me)))); keyStale = false; });
+  bindRenewKey();
+  if (boardLive() && !st.trial && keyReady === null) refreshKeyReady().then(() => { if (STEPS[st.step][0] === 'try' || STEPS[st.step][0] === 'sign') render(); });
   const fundForm = $('#try-fund'); if (fundForm) { const amt = $('#t-fund-amt'); if (amt) amt.oninput = e => { fundDraft = e.target.value; }; fundForm.onsubmit = e => { e.preventDefault(); act($('#t-topup'), topUp); }; }
   if (boardLive() && !st.trial && rowBal === null) readRowBal().then(() => { if (STEPS[st.step][0] === 'try' && rowBal !== null) render(); });
   clearInterval(secTimer); secTimer = setInterval(() => { const el = $('#try-secs'); if (el && pendingTry) el.textContent = Math.floor((Date.now() - pendingTry.t0) / 1000) + 's'; }, 1000);

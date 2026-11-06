@@ -15,9 +15,9 @@ import { deedMarkup } from './deed.js';
 import { ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './hall.js';
 import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
-import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks } from './token-badge.js';
+import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks, pickerListbox, bindPickerListbox } from './token-badge.js';
 import { agentCargoPlan, chainLabel } from './ferry-pair.js';
-import { explainQuoteMiss, SESSION_SWAP } from './ferry-settle.js';
+import { explainQuoteMiss, SESSION_SWAP, quoteRecipient } from './ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from './ferry-dock.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -63,6 +63,12 @@ export function refundForChain(chain) {
   const c = String(chain || '').toLowerCase();
   return c === 'near' || c === 'near protocol' ? SAMPLE.near : SAMPLE.refund;
 }
+
+/** 1Click recipient: visitor NEAR account for NEAR destinations, else the Orchard UA. */
+function quotePayee(to, visitor) {
+  return quoteRecipient(to, visitor, SAMPLE.zec) || SAMPLE.zec;
+}
+
 
 /** Smart tray default: stables ~3, tiny for high-value, else 1. */
 export function defaultAmtFor(sym) {
@@ -112,9 +118,20 @@ function usdOf(line) {
   return `about $${Number.isFinite(n) ? n.toFixed(2) : line.usd}`;
 }
 
-function pickerOptions(choices, { q = '', chain = '', selected = '' } = {}) {
+function tokenOpts(choices, { q = '', chain = '', selected = '' } = {}) {
   const list = filterTokens(choices || [], { q, chain });
-  return list.map(t => `<option value="${esc(t.id)}"${t.id === selected ? ' selected' : ''}>${esc(t.label)}</option>`).join('');
+  const opts = list.map(t => ({ value: t.id, label: t.label, symbol: t.symbol, chain: t.chain, icon: t.icon || '' }));
+  // A fallback row only when the catalog itself is empty. A search that hides the
+  // current id must not paint that id back into the closed button.
+  if (!opts.length && selected && !(choices || []).length) {
+    const [symbol, chainName] = String(selected).split('|');
+    opts.push({ value: selected, label: `${symbol || ''} on ${chainName || ''}`.trim(), symbol: symbol || '', chain: chainName || '' });
+  }
+  return opts;
+}
+
+function chainOpts(choices) {
+  return [{ value: '', label: 'All', kind: 'chain' }].concat(chainsOf(choices).map(c => ({ value: c, label: c, kind: 'chain' })));
 }
 
 export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
@@ -134,13 +151,11 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const choices = state.choices || [];
   const nTok = choices.length;
   const tab = state.tab || 'swap';
-  const chainOpts = ['<option value="">All</option>']
-    .concat(chainsOf(choices).map(c => `<option value="${esc(c)}"${c === (state.chainFilter || '') ? ' selected' : ''}>${esc(c)}</option>`))
-    .join('');
   const defaultFromId = state.fromId || SESSION_SWAP.fromId;
   const defaultToId = state.toId || SESSION_SWAP.toId;
-  const fromOpts = pickerOptions(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId });
-  const toOpts = pickerOptions(choices, { q: state.tq || '', chain: '', selected: defaultToId });
+  const chainBox = pickerListbox({ id: 'f-chain', testid: 'ferry-chain-filter', options: chainOpts(choices), selected: state.chainFilter || '' });
+  const fromBox = pickerListbox({ id: 'f-from', testid: 'ferry-from', options: tokenOpts(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId }), selected: defaultFromId });
+  const toBox = pickerListbox({ id: 'f-to', testid: 'ferry-to', options: tokenOpts(choices, { q: state.tq || '', chain: '', selected: defaultToId }), selected: defaultToId });
   const pickFrom = String(defaultFromId).split('|');
   const pickSym = pickFrom[0] || meta.sym;
   const pickChain = pickFrom[1] || meta.chain;
@@ -199,9 +214,9 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const swap = `<div class="ferry-pane ferry-picker" data-pane="swap" data-testid="ferry-picker" ${tab === 'swap' ? '' : 'hidden'}>
       ${flow}
       <label class="field ferry-field"><span>Find a token</span><input id="f-find" data-testid="ferry-token-search" placeholder="ZEC, USDC, near" value="${esc(state.tq || '')}" autocomplete="off"></label>
-      <label class="field ferry-field"><span>Chain</span><select id="f-chain" data-testid="ferry-chain-filter">${chainOpts}</select></label>
-      <label class="field ferry-field"><span>You pay</span><select id="f-from" data-testid="ferry-from">${fromOpts || `<option value="${esc(defaultFromId)}">${esc(defaultFromId.replace('|', ' on '))}</option>`}</select></label>
-      <label class="field ferry-field"><span>You get</span><select id="f-to" data-testid="ferry-to">${toOpts || `<option value="${esc(defaultToId)}">${esc(defaultToId.replace('|', ' on '))}</option>`}</select></label>
+      <label class="field ferry-field"><span>Chain</span>${chainBox}</label>
+      <label class="field ferry-field"><span>You pay</span>${fromBox}</label>
+      <label class="field ferry-field"><span>You get</span>${toBox}</label>
       <label class="field ferry-field amt-field"><span>Amount</span>
         <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(amtVal)}" aria-label="Amount"><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
       </label>
@@ -214,7 +229,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       </div>
       <button type="button" class="primary ferry-cta" id="f-again" data-testid="ferry-again" ${showAgain ? '' : 'hidden'}>Get another quote</button>
       ${deposit}
-      ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}</p>` : ''}
+      ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}${state.renewSetup ? ` <a href="/setup" data-testid="ferry-renew-setup">Renew agent key once in Setup</a>` : ''}</p>` : ''}
     </div>`;
   const routesPane = `<div class="ferry-pane" data-pane="routes" ${tab === 'routes' ? '' : 'hidden'}>
       <p class="ferry-picker-note" data-testid="ferry-token-count" ${nTok ? '' : 'hidden'}>${nTok ? `${nTok} live tokens` : ''}</p>
@@ -266,7 +281,7 @@ export async function runFerryAgent({ text, state = {}, charterReady = false, qu
     if (plan.parsed.amt) { state.amt = plan.parsed.amt; state.amtEdited = true; }
     state.q = null;
     state.quoteError = '';
-    state.charterNote = '';
+    state.charterNote = ''; state.renewSetup = false;
     state.sample = false;
     state.acted = false;
     let q;
@@ -335,54 +350,88 @@ function mountFerry(root, hooks) {
         state.toId = 'ZEC|zec';
         state.q = null;
         state.quoteError = '';
-        state.charterNote = '';
+        state.charterNote = ''; state.renewSetup = false;
         state.acted = false;
         state.sample = false;
         state.tab = 'swap';
+        emitPair('jetty');
         paint();
       };
     });
+    const emitPair = (order = 'jetty') => {
+      if (typeof hooks.onPair !== 'function') return;
+      const from = idToFrom(state.fromId);
+      const to = idToFrom(state.toId);
+      const [fs, fc] = String(state.fromId || '').split('|');
+      const [ts, tc] = String(state.toId || '').split('|');
+      hooks.onPair({ from, to, amt: state.amt, fromSym: fs, fromChain: fc, toSym: ts, toChain: tc, order });
+    };
+    const clearQuote = () => { state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
+    const onFrom = (value) => {
+      state.fromEdited = true;
+      state.fromId = value;
+      if (!state.amtEdited) state.amt = defaultAmtFor((value || '').split('|')[0]);
+      clearQuote();
+      emitPair('jetty');
+      localPaint();
+    };
+    const onTo = (value) => {
+      state.toEdited = true;
+      state.toId = value;
+      clearQuote();
+      emitPair('jetty');
+      localPaint();
+    };
+    const swapBox = (sel, html) => {
+      const el = q$(root, sel);
+      if (!el) return null;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = html;
+      const next = wrap.firstElementChild;
+      if (!next) return el;
+      el.replaceWith(next);
+      return next;
+    };
     const refill = () => {
-      const from = q$(root, '#f-from');
-      const to = q$(root, '#f-to');
+      const keepFrom = state.fromId || q$(root, '#f-from')?.dataset.value || '';
+      const keepTo = state.toId || q$(root, '#f-to')?.dataset.value || '';
+      const from = swapBox('#f-from', pickerListbox({
+        id: 'f-from', testid: 'ferry-from',
+        options: tokenOpts(state.choices || [], { q: state.tq || '', chain: state.chainFilter || '', selected: keepFrom }),
+        selected: keepFrom,
+      }));
+      const to = swapBox('#f-to', pickerListbox({
+        id: 'f-to', testid: 'ferry-to',
+        options: tokenOpts(state.choices || [], { q: state.tq || '', chain: '', selected: keepTo }),
+        selected: keepTo,
+      }));
+      const fromOptions = tokenOpts(state.choices || [], { q: state.tq || '', chain: state.chainFilter || '', selected: keepFrom });
+      if (fromOptions.some(o => o.value === keepFrom)) state.fromId = keepFrom;
+      else if (from?.dataset.value) state.fromId = from.dataset.value;
+      const toOptions = tokenOpts(state.choices || [], { q: state.tq || '', chain: '', selected: keepTo });
+      if (toOptions.some(o => o.value === keepTo)) state.toId = keepTo;
+      else {
+        const z = toOptions.find(o => String(o.value).startsWith('ZEC|'));
+        state.toId = z ? z.value : (to?.dataset.value || keepTo);
+      }
+      if (from) bindPickerListbox(from, onFrom);
+      if (to) bindPickerListbox(to, onTo);
       const note = q$(root, '[data-testid=ferry-token-count]');
-      if (from) {
-        const keep = state.fromId || from.value;
-        from.innerHTML = pickerOptions(state.choices || [], { q: state.tq || '', chain: state.chainFilter || '', selected: keep });
-        if ([...from.options].some(o => o.value === keep)) from.value = keep;
-        else if (from.options[0]) from.value = from.options[0].value;
-        state.fromId = from.value;
-      }
-      if (to) {
-        const keep = state.toId || to.value;
-        to.innerHTML = pickerOptions(state.choices || [], { q: state.tq || '', chain: '', selected: keep });
-        if ([...to.options].some(o => o.value === keep)) to.value = keep;
-        else {
-          const z = [...to.options].find(o => o.value.startsWith('ZEC|'));
-          if (z) to.value = z.value;
-        }
-        state.toId = to.value;
-      }
       if (note && state.choices?.length) { note.hidden = false; note.textContent = `${state.choices.length} live`; }
       const sym = q$(root, '#f-sym');
       if (sym && state.fromId) sym.textContent = state.fromId.split('|')[0] || '';
       bindTokenFallbacks(root);
     };
     const chain = q$(root, '#f-chain');
-    if (chain) chain.onchange = (e) => { state.chainFilter = e.target.value; refill(); };
+    if (chain) bindPickerListbox(chain, (value) => { state.chainFilter = value; refill(); });
     const find = q$(root, '#f-find');
     if (find) find.oninput = (e) => { state.tq = e.target.value; refill(); };
     const from = q$(root, '#f-from');
-    if (from) from.onchange = (e) => {
-      state.fromEdited = true;
-      state.fromId = e.target.value;
-      if (!state.amtEdited) state.amt = defaultAmtFor((e.target.value || '').split('|')[0]);
-      state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; refill(); localPaint();
-    };
+    if (from) bindPickerListbox(from, onFrom);
     const to = q$(root, '#f-to');
-    if (to) to.onchange = (e) => { state.toEdited = true; state.toId = e.target.value; state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; };
+    if (to) bindPickerListbox(to, onTo);
     const amt = q$(root, '#f-amt');
-    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.acted = false; state.sample = false; };
+    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
     const compare = q$(root, '#f-compare');
     if (compare) compare.onclick = () => runQuotes(compare);
     const one = q$(root, '#f-quote');
@@ -428,7 +477,7 @@ function mountFerry(root, hooks) {
         const originChain = String(from).split('@')[1] || '';
         return fetch(api() + '/api/ferry/quote', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ from, to, amount: String(amt || SESSION_SWAP.amt), recipient: SAMPLE.zec, refundTo: refundForChain(originChain), privacy: 'basic' }),
+          body: JSON.stringify({ from, to, amount: String(amt || SESSION_SWAP.amt), recipient: quotePayee(to, hooks.visitor?.() || hooks.state?.me), refundTo: refundForChain(originChain), privacy: 'basic' }),
         }).then(r => r.json());
       },
       onPair: hooks.onPair,
@@ -490,7 +539,7 @@ function mountFerry(root, hooks) {
       else {
         const res = await fetch(api() + '/api/ferry/quote', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient: SAMPLE.zec, refundTo: refundForChain(originChain), privacy: 'basic' }),
+          body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient: quotePayee(to, hooks.visitor?.() || state.me), refundTo: refundForChain(originChain), privacy: 'basic' }),
         });
         q = await res.json();
       }
@@ -505,7 +554,7 @@ function mountFerry(root, hooks) {
     state.sample = !failed && !state.quotes.some(v => v.amountOut != null);
     state.fstatus = null;
     state.quoted = true;
-    state.charterNote = '';
+    state.charterNote = ''; state.renewSetup = false;
     state.acted = false;
     state.q = failed ? null : q;
     state.tab = 'swap';

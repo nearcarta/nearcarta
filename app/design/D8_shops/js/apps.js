@@ -8,7 +8,7 @@ import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
-import { boardCallText, cityCheckoutBody, PROPOSE_CALL_TGAS, proposeCallAllowanceOk, quoteRecipient } from '/panels/ferry-settle.js';
+import { boardCallText, cityCheckoutBody, PROPOSE_CALL_TGAS, proposeCallAllowanceOk, quoteRecipient, WRAP } from '/panels/ferry-settle.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -62,6 +62,9 @@ const PLAIN = [
   [/oath frozen/, 'the Toll is paused by its owner'],
   [/attach at least|Exceeded the prepaid gas|ERR_LOW_GAS/, 'the network ran out of gas for this step; try again'],
   [/expired|Expired/, 'the request expired before the network took it; try again'],
+  // wrap.near ft_transfer when the board holds less wNEAR than the plan (near_deposit kept storage).
+  [/The account doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
+  [/doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
   [/NotEnoughBalance|not enough balance/i, 'your account does not have enough NEAR for this step'],
   [/NotEnoughAllowance/, 'the session key does not have enough gas allowance for this ask. Nothing was paid.'],
 ];
@@ -467,13 +470,25 @@ export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receive
 /** Deposit address after the charter view allows the payee. At most 0.20 USD. Does not send the tokens. */
 export async function openFerryCheckout(q, pair) {
   const charter = S.board ? S.me : S.charter;
+  // Charter gate: an allowlisted shop. 1Click (NEAR dest): the visitor — never a Zcash UA.
   const recipient = ferryPayee('pay');
+  const dest = pair?.to || (q?.to ? `${q.to.symbol}@${q.to.chain || q.to.blockchain || ''}` : '');
+  const visitor = quoteRecipient(dest || pair, S.me, '');
+  if (String(dest).toLowerCase().includes('@near') || (pair && String(pair.toChain || '').toLowerCase() === 'near')) {
+    if (!visitor) {
+      return {
+        ok: false,
+        error: 'A NEAR destination needs a NEAR account as recipient. Use the visitor account (64 hex or a named account).',
+        depositAddress: null,
+      };
+    }
+  }
   const amountYocto = String(S.boardRow?.min_amount || S.clauses?.pay?.min_amount || '1');
   if (!charter || !recipient) return { ok: false, reason: 'no_charter', depositAddress: null };
   const body = cityCheckoutBody({ pair, recipient, charter, amountYocto, refundTo: refundFor(pair.from), visitor: S.me, session: S.board ? 'board' : undefined });
   const r = await fetch(API + '/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null };
+  if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null, error: j.error || j.reason || null };
   return j;
 }
 
@@ -482,6 +497,27 @@ export async function ferryStatus(depositAddress) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'status ' + r.status);
   return j;
+}
+
+/**
+ * wrap.near storage_balance_of for any account (board or a 1Click deposit address).
+ */
+export async function wrapStorageOf(accountId) {
+  if (!accountId) return null;
+  return view(WRAP, 'storage_balance_of', { account_id: accountId }).catch(() => null);
+}
+
+/**
+ * wrap.near storage + wNEAR balance for the board account that signs propose_call.
+ * near_deposit auto-registers the board and keeps WRAP_STORAGE_YOCTO on first deposit.
+ */
+export async function wrapBoardState(board = S.board) {
+  if (!board) return { registered: false, balanceYocto: '0', storage: null };
+  const storage = await wrapStorageOf(board);
+  const raw = await view(WRAP, 'ft_balance_of', { account_id: board }).catch(() => '0');
+  const balanceYocto = String(raw?.amount ?? raw ?? '0');
+  const registered = !!(storage && (storage.total != null || storage.available != null));
+  return { registered, balanceYocto, storage };
 }
 
 /**
@@ -508,7 +544,7 @@ export async function ferryProposeCalls(steps) {
     const argsHash = W.sha256hex(argsStr);
     const msg = boardCallText({ contract: S.board, owner: S.me, receiver: step.receiver, method: step.method, argsHash, deposit, nonce: String(row.nonce) });
     const signature = W.signMessage(key, msg);
-    const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: [...new TextEncoder().encode(argsStr)], deposit, signature };
+    const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: argsStr, deposit, signature };
     const ak = await proposeAccessKey(key);
     if (!ak) return you('no_session_key', { txs });
     try {
