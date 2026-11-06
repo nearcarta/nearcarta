@@ -32,22 +32,32 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
   });
   const j = await res.json();
   const tx = j.result?.transaction;
-  if (!tx) return { hash, found: false, error: j.error?.cause?.name || j.error?.name || 'not found' };
+  if (!tx) return { hash, found: false, error: j.error?.cause?.name || j.error?.name || 'not found', status: res.status };
   const status = j.result.status || {};
   const failure = Object.prototype.hasOwnProperty.call(status, 'Failure');
   return { hash, found: true, success: !failure && (Object.prototype.hasOwnProperty.call(status, 'SuccessValue') || Object.prototype.hasOwnProperty.call(status, 'SuccessReceiptId')), failure, signer: tx.signer_id || sender };
 }
 
-export async function checkAll(dep, { rpc, fetchImpl = fetch } = {}) {
+/** A throttled or failed call is not evidence the tx is missing. */
+export const TRANSIENT = new Set(['-429', -429, '429', 'RATE_LIMITED', 'TIMEOUT_ERROR', 'REQUEST_VALIDATOR_ERROR']);
+
+export async function checkAll(dep, { rpc, fetchImpl = fetch, tries = 3, backoffMs = 400 } = {}) {
   const rpcs = (Array.isArray(rpc) ? rpc : [rpc]).filter(Boolean);
   const rows = [];
   for (const row of collectMainnetTxs(dep)) {
     let hit = { ...row, found: false, error: 'not found' };
     for (const sender of sendersFor(dep, row)) {
       for (const url of rpcs) {
-        const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
-        hit = { ...row, ...one, sender };
-        if (one.found) break;
+        // The archival RPC throttles: a 429 is "not answered", never "not on chain".
+        // Retrying keeps a rate limit from turning into a red proof check.
+        for (let t = 0; t < tries; t++) {
+          const one = await checkTx({ hash: row.hash, sender, rpc: url, fetchImpl });
+          const throttled = one.status === 429 || TRANSIENT.has(one.error);
+          if (!throttled || one.found) { hit = { ...row, ...one, sender }; break; }
+          hit = { ...row, ...one, sender, throttled: true };
+          if (t < tries - 1) await new Promise(r => setTimeout(r, backoffMs * 2 ** t));
+        }
+        if (hit.found) break;
       }
       if (hit.found) break;
     }
