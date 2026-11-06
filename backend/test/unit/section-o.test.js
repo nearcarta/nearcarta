@@ -34,10 +34,11 @@ test('the restore banner is only for a page that signs', () => {
 });
 
 test('guardhouse starts empty and offers the example as a button', () => {
-  const deep = read('app/src/panels/deep.js');
-  assert.match(deep, /data-testid="guard-example">Example: shop-moved-pay-here\.near/);
-  assert.match(deep, /data-testid="guard-account" value="\$\{esc\(state\.acct \|\| ''\)\}"/);
-  assert.doesNotMatch(deep, /guard-account" value="\$\{esc\(state\.acct \|\| 'shop-moved-pay-here\.near'\)\}"/);
+  const tray = read('app/src/panels/guard-tray.js');
+  assert.match(tray, /data-testid="guard-example">Example: shop-moved-pay-here\.near/);
+  assert.match(tray, /data-testid="guard-account" value="\$\{esc\(state\.acct \|\| ''\)\}"/);
+  assert.doesNotMatch(tray, /guard-account" value="\$\{esc\(state\.acct \|\| 'shop-moved-pay-here\.near'\)\}"/);
+  assert.match(read('app/src/panels/deep.js'), /mountGuardTray/);
 });
 
 test('ferry routes are brass cards and the arena box is tall', () => {
