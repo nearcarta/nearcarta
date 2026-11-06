@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { callAsMessage as nodeMessage, injectRowOwner as nodeInject } from '../../../shared/board/call-as.js';
 import { callAsMessage, injectRowOwner } from '../../../app/src/panels/arena/call-as.js';
 import { holdSteps, nearToYocto, planAttack, planFromCommand, planMint, resetPlans } from '../../../app/src/panels/arena/economy.js';
-import { planDeploy } from '../../../scripts/arena-deploy.js';
+import { MAX_SLACK_YOCTO, planDeploy } from '../../../scripts/arena-deploy.js';
 
 const ctx = {
   arena: 'arena.example.near',
@@ -79,15 +80,20 @@ test('a mint and an attack plan propose_call_as and do not sign themselves', () 
 
 test('the deploy plan refunds a pot to its owner and refuses a different one', () => {
   const wasm = Buffer.from('arena-wasm');
-  const same = planDeploy({
+  const fields = {
     account: 'arena.example.near',
     owner: 'owner.near',
     board: 'board.example.near',
     balanceYocto: '5000000000000000000000000',
     storageUsage: 100,
     keys: [],
-    guardians: [{ token_id: 'g1', owner_id: 'owner.near', pot: '1000', reserved: '0', in_flight: 0 }],
     wasm,
+    stateBytes: 171,
+    ownerBalanceYocto: '1000000000000000000000000',
+  };
+  const same = planDeploy({
+    ...fields,
+    guardians: [{ token_id: 'g1', owner_id: 'owner.near', pot: '1000', reserved: '0', in_flight: 0 }],
   });
   assert.equal(same.path, 'same_name');
   assert.equal(same.signs, false);
@@ -95,16 +101,23 @@ test('the deploy plan refunds a pot to its owner and refuses a different one', (
   assert.equal(same.transfers[0].amount, '1000');
   assert.equal(same.wasm.bytes, wasm.length);
   assert.equal(same.wasm.sha256.length, 64);
+  assert.ok(BigInt(same.create.slack) <= MAX_SLACK_YOCTO);
+  assert.equal(BigInt(same.create.yocto), BigInt(same.create.stake) + BigInt(same.create.slack));
+  assert.equal(
+    BigInt(same.ownerRunning.afterClose.yocto),
+    BigInt(fields.ownerBalanceYocto) + BigInt(fields.balanceYocto),
+  );
+  assert.equal(
+    BigInt(same.ownerRunning.afterCreate.yocto),
+    BigInt(same.ownerRunning.afterClose.yocto) - BigInt(same.create.yocto),
+  );
+  assert.ok(same.steps.some(s => s.step === 'stake' && s.payee === 'owner.near'));
+  assert.ok(same.steps.some(s => s.step === 'close' && s.payee === 'owner.near'));
+  assert.ok(same.steps.some(s => s.step === 'create' && s.sha256 === same.wasm.sha256));
   assert.ok(same.steps.some(s => s.step === 'precheck' && s.ok));
   const other = planDeploy({
-    account: 'arena.example.near',
-    owner: 'owner.near',
-    board: 'board.example.near',
-    balanceYocto: '5000000000000000000000000',
-    storageUsage: 100,
-    keys: [],
+    ...fields,
     guardians: [{ token_id: 'g1', owner_id: 'visitor.near', pot: '1000', reserved: '0', in_flight: 0 }],
-    wasm,
   });
   assert.equal(other.path, 'refuse');
   assert.equal(other.transfers[0].payee, 'visitor.near');
@@ -117,4 +130,12 @@ test('the deploy script is dry unless --live, and it does not print the key', ()
   assert.match(src, /--live/);
   assert.doesNotMatch(src, /console\.(log|error|info)\([^)]*signerKey/);
   assert.doesNotMatch(src, /ed25519:[1-9A-HJ-NP-Za-km-z]{20}/);
+  const wasm = readFileSync(new URL('../../../contracts/artifacts/arena_v2.wasm', import.meta.url));
+  const pin = JSON.parse(readFileSync(new URL('../../../contracts/artifacts/arena_v2.json', import.meta.url), 'utf8'));
+  assert.equal(createHash('sha256').update(wasm).digest('hex'), pin.sha256);
+  assert.equal(wasm.length, pin.bytes);
+  const rust = readFileSync(new URL('../../../contracts/arena_v2/src/lib.rs', import.meta.url), 'utf8');
+  const stateBytes = Number(rust.match(/LIVE_STATE_BYTES: usize = (\d+)/)[1]);
+  assert.equal(stateBytes, pin.state_bytes);
+  assert.ok(BigInt(pin.slack_yocto) <= MAX_SLACK_YOCTO);
 });

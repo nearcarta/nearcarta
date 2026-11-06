@@ -316,19 +316,37 @@ impl Contract {
         Promise::new(self.owner.clone()).delete_account(self.owner.clone())
     }
 
+    /// Owner only, 1 yocto. The argument is the raw wasm. The new code's
+    /// `migrate` runs in the same receipt, so a later change does not close
+    /// the account. https://docs.near.org/smart-contracts/release/upgrade
     #[payable]
     pub fn upgrade(&mut self) -> Promise {
         assert_one_yocto();
         self.only_owner();
-        self.upgrade_nonce += 1;
         let code = env::input().unwrap_or_default();
-        Promise::new(env::current_account_id()).deploy_contract(code)
+        require!(!code.is_empty(), "ERR_NO_CODE");
+        self.upgrade_nonce += 1;
+        Promise::new(env::current_account_id())
+            .deploy_contract(code)
+            .function_call(
+                "migrate",
+                Vec::new(),
+                NearToken::from_yoctonear(0),
+                Gas::from_tgas(30),
+            )
     }
 
-    pub fn migrate(&mut self) {
-        self.only_owner();
-        require!(self.version <= STATE_VERSION, "ERR_VERSION");
-        self.version = STATE_VERSION;
+    /// Called by this contract at the end of `upgrade`. Ignores the old
+    /// bytes so a future layout can read them here. The current layout is
+    /// version 2, so this writes that version back.
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate() -> Self {
+        require!(env::predecessor_account_id() == env::current_account_id(), "Method is private");
+        let mut contract: Contract = env::state_read().expect("ERR_STATE");
+        require!(contract.version <= STATE_VERSION, "ERR_VERSION");
+        contract.version = STATE_VERSION;
+        contract
     }
 
     /// First call after a code deploy onto an account that still has the old
@@ -768,16 +786,64 @@ mod tests {
         assert!(c.get_guardian(1).is_none());
     }
 
+    fn ctx_input(pred: AccountId, deposit: u128, ts: u64, input: &[u8]) {
+        let mut b = VMContextBuilder::new();
+        b.predecessor_account_id(pred)
+            .attached_deposit(NearToken::from_yoctonear(deposit))
+            .block_timestamp(ts)
+            .prepaid_gas(Gas::from_tgas(300));
+        let mut vm = b.build();
+        vm.input = std::rc::Rc::from(input);
+        testing_env!(vm);
+    }
+
+    /// Borsh length of `new` for the live board and owner. `scripts/arena-deploy.js`
+    /// adds the account, the wasm, the STATE key and the 40-byte record.
+    const LIVE_STATE_BYTES: usize = 171;
+
     #[test]
-    fn migrate_and_upgrade_are_owner_only() {
+    fn live_account_ids_serialize_to_the_pinned_state() {
+        ctx(owner(), 0, 1);
+        let c = Contract::new(
+            id("board.nearcarta.near"),
+            id("nearcarta.near"),
+            U128(0),
+            U128(0),
+        );
+        let n = near_sdk::borsh::to_vec(&c).expect("state").len();
+        assert_eq!(n, LIVE_STATE_BYTES, "state bytes {n}");
+    }
+
+    #[test]
+    fn migrate_keeps_version_two_and_upgrade_is_owner_only() {
         let mut c = boot();
-        ctx(owner(), 0, 2);
-        c.migrate();
-        assert_eq!(c.get_config().version, 2);
-        assert_eq!(c.get_config().verifier, "unverified");
-        ctx(owner(), 1, 3);
-        c.upgrade();
+        let guardians = c.next_guardian;
+        near_sdk::env::state_write(&c);
+        let here = near_sdk::env::current_account_id();
+        ctx(here.clone(), 0, 2);
+        let migrated = Contract::migrate();
+        assert_eq!(migrated.get_config().version, 2);
+        assert_eq!(migrated.get_config().verifier, "unverified");
+        assert_eq!(migrated.next_guardian, guardians);
+        ctx_input(owner(), 1, 3, b"wasm");
+        let _ = c.upgrade();
         assert_eq!(c.get_config().upgrade_nonce, 1);
+        let sent = format!("{:?}", near_sdk::test_utils::get_created_receipts());
+        assert!(sent.contains("DeployContract"), "{sent}");
+        assert!(sent.contains("FunctionCallWeight"), "{sent}");
+        assert!(sent.contains("109, 105, 103, 114, 97, 116, 101"), "{sent}");
+    }
+
+    #[test]
+    #[should_panic(expected = "Method is private")]
+    fn a_visitor_cannot_migrate() {
+        let c = boot();
+        near_sdk::env::state_write(&c);
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(id("arena.nearcarta.near"))
+            .predecessor_account_id(id("visitor.near"));
+        testing_env!(b.build());
+        let _ = Contract::migrate();
     }
 
     #[test]

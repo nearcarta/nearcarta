@@ -11,15 +11,20 @@
 // when a full-access key is already on the account. A pot whose owner is
 // someone else stops the script. v1 has no method that pays that holder.
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import MAIN from '../shared/deployments/mainnet.json' with { type: 'json' };
-import { BYTE_YOCTO, deployCost } from '../shared/board/cost.js';
+import {
+  ACCOUNT_BYTES, ACCOUNT_CREATION_YOCTO, BYTE_YOCTO, GAS_PRICE_YOCTO, GAS_PURCHASE_YOCTO,
+  RECORD_EXTRA, STATE_KEY_BYTES, deployGas,
+} from '../shared/board/cost.js';
 
 const ACCOUNT = MAIN.planned.arena;
 const OWNER = MAIN.extras.arena.owner;
 const BOARD = MAIN.board.contract;
-const WASM_FILE = new URL('../contracts/arena_v2/target/wasm32-unknown-unknown/release/arena_v2.wasm', import.meta.url);
+const WASM_FILE = new URL('../contracts/artifacts/arena_v2.wasm', import.meta.url);
+const PIN_FILE = new URL('../contracts/artifacts/arena_v2.json', import.meta.url);
+// 0.05 NEAR. The create transfer is the measured stake plus this slack, and no more.
+export const MAX_SLACK_YOCTO = 50_000_000_000_000_000_000_000n;
 
 export function nearText(yocto) {
   const y = BigInt(yocto);
@@ -30,7 +35,11 @@ export function nearText(yocto) {
   return (neg ? '-' : '') + (frac ? `${whole}.${frac}` : String(whole));
 }
 
-export function planDeploy({ account, owner, board, balanceYocto, storageUsage, keys, guardians, wasm, ownerBalanceYocto = null }) {
+export function measuredStorageBytes(wasmLen, stateBytes) {
+  return ACCOUNT_BYTES + BigInt(wasmLen) + STATE_KEY_BYTES + BigInt(stateBytes) + RECORD_EXTRA;
+}
+
+export function planDeploy({ account, owner, board, balanceYocto, storageUsage, keys, guardians, wasm, stateBytes, slackYocto = MAX_SLACK_YOCTO, ownerBalanceYocto = null }) {
   const steps = [];
   const transfers = [];
   const blockers = [];
@@ -62,9 +71,18 @@ export function planDeploy({ account, owner, board, balanceYocto, storageUsage, 
   }
   if (pots > liquid) blockers.push('pots are larger than the liquid balance');
   const sha = createHash('sha256').update(wasm).digest('hex');
-  const cost = deployCost(wasm.length, owner);
+  const slack = BigInt(slackYocto);
+  if (slack < 0n || slack > MAX_SLACK_YOCTO) blockers.push('create slack is above 0.05 NEAR');
+  const stateLen = BigInt(stateBytes);
+  const nextBytes = measuredStorageBytes(wasm.length, stateLen);
+  const stakeYocto = nextBytes * BYTE_YOCTO;
+  const initArgs = JSON.stringify({ board, owner, inference_budget: '0', inference_cost: '0' });
+  const gas = deployGas(wasm.length, Buffer.byteLength(initArgs));
+  const burnedGasYocto = gas * GAS_PRICE_YOCTO;
+  const prepaidYocto = gas * GAS_PURCHASE_YOCTO;
+  const createYocto = stakeYocto + slack;
   const ownerBalance = ownerBalanceYocto == null ? null : BigInt(ownerBalanceYocto);
-  const need = cost.stakeYocto + cost.prepaidYocto;
+  const need = createYocto + prepaidYocto;
   const covered = ownerBalance == null ? null : ownerBalance + balance;
   const shortfall = covered == null ? null : (need > covered ? need - covered : 0n);
   const foreign = transfers.filter(t => t.payee !== owner);
@@ -101,7 +119,7 @@ export function planDeploy({ account, owner, board, balanceYocto, storageUsage, 
       });
     }
     steps.push({
-      step: 'storage',
+      step: 'stake',
       payee: owner,
       amount: stakeNow.toString(),
       near: nearText(stakeNow),
@@ -118,11 +136,13 @@ export function planDeploy({ account, owner, board, balanceYocto, storageUsage, 
     steps.push({
       step: 'create',
       account,
-      stake: cost.stakeYocto.toString(),
-      near: nearText(cost.stakeYocto),
+      stake: stakeYocto.toString(),
+      slack: slack.toString(),
+      amount: createYocto.toString(),
+      near: nearText(createYocto),
       bytes: wasm.length,
       sha256: sha,
-      detail: 'the same account name, new code',
+      detail: 'the same account name. Transfer is the measured stake plus slack of at most 0.05 NEAR.',
     });
     steps.push({
       step: 'init',
@@ -132,7 +152,10 @@ export function planDeploy({ account, owner, board, balanceYocto, storageUsage, 
     });
   }
   for (const t of foreign) steps.push({ step: 'unpaid', payee: t.payee, amount: t.amount, near: t.near, detail: t.why });
-  const after = path === 'same_name' ? cost.stakeYocto : path === 'in_place' ? balance - pots : balance;
+  const after = path === 'same_name' ? createYocto : path === 'in_place' ? balance - pots : balance;
+  const afterClose = ownerBalance == null ? null : ownerBalance + balance;
+  const afterCreate = afterClose == null ? null : afterClose - createYocto;
+  const afterGas = afterCreate == null ? null : afterCreate - burnedGasYocto - ACCOUNT_CREATION_YOCTO;
   return {
     account,
     owner,
@@ -142,21 +165,36 @@ export function planDeploy({ account, owner, board, balanceYocto, storageUsage, 
     signs: false,
     wasm: { bytes: wasm.length, sha256: sha },
     storage: { bytes: usage.toString(), stake: stakeNow.toString(), near: nearText(stakeNow) },
-    nextStorage: { bytes: cost.storageBytes.toString(), stake: cost.stakeYocto.toString(), near: nearText(cost.stakeYocto) },
+    nextStorage: { bytes: nextBytes.toString(), stake: stakeYocto.toString(), near: nearText(stakeYocto) },
+    create: {
+      stake: stakeYocto.toString(),
+      slack: slack.toString(),
+      yocto: createYocto.toString(),
+      near: nearText(createYocto),
+      storageBytes: nextBytes.toString(),
+    },
     balanceBefore: { yocto: balance.toString(), near: nearText(balance) },
     balanceAfter: {
       yocto: after.toString(),
       near: nearText(after),
       note: path === 'same_name'
-        ? 'the new arena balance is the storage stake. close pays the old balance to the owner first. Gas is paid by the signer and the unused part is refunded.'
+        ? 'the new arena balance is the measured stake plus slack. close pays the old balance to the owner first. Gas is paid by the signer and the unused part is refunded.'
         : 'arena balance after the pot transfers, before gas',
     },
     ownerReceives: path === 'same_name' ? { yocto: balance.toString(), near: nearText(balance) } : null,
+    ownerRunning: path === 'same_name' && ownerBalance != null ? {
+      open: { yocto: ownerBalance.toString(), near: nearText(ownerBalance) },
+      afterClose: { yocto: afterClose.toString(), near: nearText(afterClose) },
+      afterCreate: { yocto: afterCreate.toString(), near: nearText(afterCreate) },
+      afterGas: { yocto: afterGas.toString(), near: nearText(afterGas) },
+    } : null,
     funding: {
-      prepaidGas: cost.prepaidYocto.toString(),
-      prepaidNear: nearText(cost.prepaidYocto),
-      burnedGas: cost.burnedGasYocto.toString(),
-      burnedNear: nearText(cost.burnedGasYocto),
+      prepaidGas: prepaidYocto.toString(),
+      prepaidNear: nearText(prepaidYocto),
+      burnedGas: burnedGasYocto.toString(),
+      burnedNear: nearText(burnedGasYocto),
+      accountCreation: ACCOUNT_CREATION_YOCTO.toString(),
+      accountCreationNear: nearText(ACCOUNT_CREATION_YOCTO),
       need: need.toString(),
       needNear: nearText(need),
       ownerBalance: ownerBalance == null ? null : ownerBalance.toString(),
@@ -190,22 +228,26 @@ function printPlan(plan) {
   console.log('Wasm: ' + plan.wasm.bytes + ' bytes, sha256 ' + plan.wasm.sha256);
   console.log('Storage now: ' + plan.storage.bytes + ' bytes, stake ' + plan.storage.stake + ' yoctoNEAR (' + plan.storage.near + ' NEAR)');
   console.log('Storage after: ' + plan.nextStorage.bytes + ' bytes, stake ' + plan.nextStorage.stake + ' yoctoNEAR (' + plan.nextStorage.near + ' NEAR)');
-  console.log('Balance before: ' + plan.balanceBefore.yocto + ' yoctoNEAR (' + plan.balanceBefore.near + ' NEAR)');
-  console.log('Balance after: ' + plan.balanceAfter.yocto + ' yoctoNEAR (' + plan.balanceAfter.near + ' NEAR)');
-  console.log(plan.balanceAfter.note);
-  if (plan.ownerReceives) console.log('Owner receives from close: ' + plan.ownerReceives.yocto + ' yoctoNEAR (' + plan.ownerReceives.near + ' NEAR)');
-  if (plan.funding) {
-    console.log('Prepaid gas: ' + plan.funding.prepaidGas + ' yoctoNEAR (' + plan.funding.prepaidNear + ' NEAR), burned about ' + plan.funding.burnedNear + ' NEAR');
-    console.log('Owner must cover stake plus prepaid gas: ' + plan.funding.need + ' yoctoNEAR (' + plan.funding.needNear + ' NEAR), counting the close refund');
-    if (plan.funding.ownerNear) console.log('Owner liquid now: ' + plan.funding.ownerBalance + ' yoctoNEAR (' + plan.funding.ownerNear + ' NEAR)');
-    if (plan.funding.shortfallNear) console.log('Shortfall after the refund: ' + plan.funding.shortfall + ' yoctoNEAR (' + plan.funding.shortfallNear + ' NEAR)');
+  console.log('Create: stake ' + plan.create.stake + ' yoctoNEAR plus slack ' + plan.create.slack + ' yoctoNEAR (' + nearText(plan.create.slack) + ' NEAR, at most 0.05) = ' + plan.create.yocto + ' yoctoNEAR (' + plan.create.near + ' NEAR)');
+  if (plan.ownerRunning) {
+    console.log('Owner ' + plan.owner + ' balance: ' + plan.ownerRunning.open.yocto + ' yoctoNEAR (' + plan.ownerRunning.open.near + ' NEAR)');
+    console.log('Owner ' + plan.owner + ' balance after close: ' + plan.ownerRunning.afterClose.yocto + ' yoctoNEAR (' + plan.ownerRunning.afterClose.near + ' NEAR)');
+    console.log('Owner ' + plan.owner + ' balance after create: ' + plan.ownerRunning.afterCreate.yocto + ' yoctoNEAR (' + plan.ownerRunning.afterCreate.near + ' NEAR)');
+    console.log('Owner ' + plan.owner + ' balance after gas: ' + plan.ownerRunning.afterGas.yocto + ' yoctoNEAR (' + plan.ownerRunning.afterGas.near + ' NEAR)');
   }
-  if (!plan.transfers.length) console.log('Transfers: none');
-  for (const t of plan.transfers) console.log('Transfer: ' + t.amount + ' yoctoNEAR (' + t.near + ' NEAR) to ' + t.payee + ' (' + t.why + ')');
+  if (plan.funding) {
+    console.log('Prepaid gas: ' + plan.funding.prepaidGas + ' yoctoNEAR (' + plan.funding.prepaidNear + ' NEAR), burned about ' + plan.funding.burnedNear + ' NEAR, account creation ' + plan.funding.accountCreationNear + ' NEAR');
+    if (plan.funding.shortfall && plan.funding.shortfall !== '0') {
+      console.log('Shortfall after the refund: ' + plan.funding.shortfall + ' yoctoNEAR (' + plan.funding.shortfallNear + ' NEAR)');
+    }
+  }
+  for (const t of plan.transfers) console.log('Pot refund: ' + t.amount + ' yoctoNEAR (' + t.near + ' NEAR) to ' + t.payee + ' (' + t.why + ')');
+  if (!plan.transfers.length) console.log('Pot refund: none');
   for (const s of plan.steps) {
     const payee = s.payee ? ' payee ' + s.payee : '';
     const amount = s.amount ? ' amount ' + s.amount : '';
-    console.log('Step ' + s.step + ':' + payee + amount + ' ' + (s.detail || ''));
+    const hash = s.sha256 ? ' wasm sha256 ' + s.sha256 : '';
+    console.log('Step ' + s.step + ':' + payee + amount + hash + ' ' + (s.detail || ''));
   }
   console.log('Post-deploy view: ' + plan.postDeploy.method + ' on ' + plan.postDeploy.account);
   console.log('Smoke: view ' + plan.smoke.view + ', then mint fee ' + plan.smoke.mint.fee + ' yocto, pot ' + plan.smoke.mint.pot + ' yocto, deposit ' + plan.smoke.mint.deposit + ' yocto, allow ' + plan.smoke.mint.allow + '. ' + plan.smoke.mint.detail);
@@ -213,14 +255,14 @@ function printPlan(plan) {
 }
 
 function wasmBytes() {
-  if (!existsSync(WASM_FILE)) {
-    const built = spawnSync('cargo', ['+1.95.0', 'build', '--target', 'wasm32-unknown-unknown', '--release', '--locked'], {
-      cwd: new URL('../contracts/arena_v2/', import.meta.url),
-      stdio: 'inherit',
-    });
-    if (built.status !== 0 || !existsSync(WASM_FILE)) throw new Error('arena_v2 wasm did not build');
-  }
-  return readFileSync(WASM_FILE);
+  const wasm = readFileSync(WASM_FILE);
+  const pin = JSON.parse(readFileSync(PIN_FILE, 'utf8'));
+  const sha = createHash('sha256').update(wasm).digest('hex');
+  if (sha !== pin.sha256 || wasm.length !== pin.bytes) throw new Error('arena_v2 wasm does not match the pinned sha256');
+  const stake = measuredStorageBytes(wasm.length, pin.state_bytes) * BYTE_YOCTO;
+  if (stake.toString() !== String(pin.stake_yocto)) throw new Error('pinned stake does not match the measured storage');
+  if (BigInt(pin.slack_yocto) > MAX_SLACK_YOCTO) throw new Error('pinned slack is above 0.05 NEAR');
+  return { wasm, pin, sha };
 }
 
 async function rpc(method, params) {
@@ -287,9 +329,8 @@ async function signLive(plan) {
     process.exit(1);
   }
   const ownerAccount = new Account(OWNER, provider, signer);
-  const wasm = wasmBytes();
+  const { wasm } = wasmBytes();
   const TG = 10n ** 12n;
-  const cost = deployCost(wasm.length, OWNER);
   let sent;
   if (plan.path === 'same_name') {
     const closed = await ownerAccount.signAndSendTransaction({
@@ -310,7 +351,7 @@ async function signLive(plan) {
       throwOnFailure: false,
       actions: [
         A.createAccount(),
-        A.transfer(cost.stakeYocto),
+        A.transfer(BigInt(plan.create.yocto)),
         A.deployContract(new Uint8Array(wasm)),
         A.functionCall('new', {
           board: BOARD, owner: OWNER, inference_budget: '0', inference_cost: '0',
@@ -345,7 +386,7 @@ async function signLive(plan) {
 
 async function main() {
   if (!ACCOUNT || !OWNER || !BOARD) throw new Error('mainnet.json is missing the arena account, its owner, or the board');
-  const wasm = wasmBytes();
+  const { wasm, pin } = wasmBytes();
   const state = await liveState();
   const plan = planDeploy({
     account: ACCOUNT,
@@ -356,6 +397,8 @@ async function main() {
     keys: state.keys,
     guardians: state.guardians,
     wasm,
+    stateBytes: pin.state_bytes,
+    slackYocto: pin.slack_yocto,
     ownerBalanceYocto: state.ownerAccount
       ? (BigInt(state.ownerAccount.amount) - BigInt(state.ownerAccount.storage_usage) * BYTE_YOCTO).toString()
       : null,

@@ -256,15 +256,15 @@ The city door is the way in. All shops → Vault Arena stays in the town. `/shop
 
 The card has three tabs: Guardians, Attack, and Score. One gold button mints, feeds, withdraws, or attacks, matching the open tab. Score has no spend button. The AI Agent uses the same planner as that button. Enter and the arrow both send. A week advance is labeled `Simulation. No transaction was signed.`
 
-Mint, feed, attack, and withdraw build `propose_call_as` on `board.nearcarta.near`. The board overwrites `row_owner`. An attack uses `hold: true`, then `confirm_hold`, `cancel_hold`, or `expire_sent`. Cancel returns a pending hold to the row. `expire_sent` does not refund. The session key has to name `propose_call_as` or the card signs nothing and does not open a wallet. `contracts/arena_v2` is not deployed. The model-signature check is not implemented; the contract field `verifier` is `unverified`.
+Mint, feed, attack, and withdraw build `propose_call_as` on `board.nearcarta.near`. The board overwrites `row_owner`. An attack uses `hold: true`, then `confirm_hold`, `cancel_hold`, or `expire_sent`. Cancel returns a pending hold to the row. `expire_sent` does not refund. The session key has to name `propose_call_as` or the card signs nothing and does not open a wallet. `contracts/arena_v2` is not deployed. Its owner `upgrade` deploys new code and calls `migrate` in the same receipt, so a later change does not close the account. The model-signature check is not implemented; the contract field `verifier` is `unverified`.
 
 Score is `GET /api/arena/score`, which reads `get_attempt` on `arena.nearcarta.near`. A cancelled signature is not an attempt. `GET /api/arena/guardians` does not invent pets.
 
 Recorded earlier on the deployed arena, not from this card: allow [AZWxqZns…](https://nearblocks.io/txns/AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht), refuse [25LpJRFF…](https://nearblocks.io/txns/25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V). A v2 mint, attack, payout, and timeout refund are not linked here. The coordinator records those after deploy.
 
-`node scripts/arena-deploy.js` reads `arena.nearcarta.near` and does not sign. `--live` signs with `NEAR_MAINNET_SIGNER_KEY`. The account has no access key, so the plan closes it, returns the balance to the owner, and creates the same name with arena v2. A pot whose NFT owner is not that owner stops the plan. `node backend/scripts/arena-close.js` still only prints the old close plan.
+`node scripts/arena-deploy.js` reads `arena.nearcarta.near` and does not sign. `--live` signs with `NEAR_MAINNET_SIGNER_KEY` and does not print that key. The account has no access key, so the plan closes it, returns the balance to the owner, and creates the same name. The committed wasm is `contracts/artifacts/arena_v2.wasm`, 222463 bytes, sha256 `df072f68d77a252cdf123f6829d469359705fb4c7ef44ed7c07bea72b2d341e0`. Measured storage is 222779 bytes, stake 2.22779 NEAR. The create transfer adds 0.05 NEAR of slack. A pot whose NFT owner is not that owner stops the plan. `node backend/scripts/arena-close.js` still only prints the old close plan.
 
-The arena cases are in `backend/test/unit/arena-market.test.js` and `backend/test/unit/arena-board-v2.test.js`. Contract cases are `cargo test --lib` in `contracts/arena_v2` (18).
+The arena cases are in `backend/test/unit/arena-market.test.js` and `backend/test/unit/arena-board-v2.test.js`. Contract cases are `cargo test --lib` in `contracts/arena_v2` (20).
 
 ## Run it (2 minutes)
 ```
