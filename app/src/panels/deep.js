@@ -3,7 +3,6 @@
 
 import { roomError } from '../room-error.js';
 import { pickBest, quoteLine, tokenChoices, chainsOf, filterTokens } from '../ferry-catalog.js';
-import { RECORDED, downloadCsv, exportCsv, queryFeed, verifyEntry } from '../chronicle-feed.js';
 import { explainCheck } from '../guard-score.js';
 import { mountTollRoom } from './toll-room.js';
 import { PROOF_HREF, TEE_PLAN, TEE_TIMEOUT_MS, liveTee, teeTimeoutWhy, teeView } from '../tee-view.js';
@@ -19,6 +18,7 @@ import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks, pickerListb
 import { agentCargoPlan, chainLabel, receiveAsk, receiveConfirm } from './ferry-pair.js';
 import { explainQuoteMiss, ferryStatusHtml, ferryStatusView, SESSION_SWAP, quoteRecipient, validateDestAddress, isNearAccountId } from './ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from './ferry-dock.js';
+import { mountChronicleTray } from './chronicle-view.js';
 import { mountBankRoom } from './bank-tray.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -727,60 +727,7 @@ function mountToll(root, hooks) {
 }
 
 function mountChronicle(root, hooks) {
-  const state = hooks.state || (hooks.state = {});
-  const rows = () => {
-    const src = hooks.rows ? hooks.rows() : RECORDED;
-    return (src || []).map(x => ({ ...x, label: x.label || x.reason || '' }));
-  };
-  const draw = () => {
-    const q = queryFeed(rows(), { q: state.cq || '', decision: state.cd || '', page: state.cp || 1 });
-    const ol = q$(root, '[data-testid=chronicle-page]');
-    if (ol) {
-      ol.innerHTML = q.rows.map(x => `<li class="${x.decision === 'denied' ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}"><span>${esc(x.shop)}</span><span>${x.decision === 'denied' ? '✕ ' + esc(x.label || x.reason || '') : '✓ ' + esc(x.decision)}</span><button type="button" class="primary c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button></li>`).join('') || '<li>Nothing yet</li>';
-      ol.dataset.total = String(q.total);
-    }
-    const pages = q$(root, '[data-testid=chronicle-pages]');
-    if (pages) pages.textContent = `${q.page} / ${q.pages}`;
-  };
-  const verifyHtml = () => `${esc(state.verify || '')}${state.verifyUrl ? ` <a data-testid="chronicle-link" href="${esc(state.verifyUrl)}">explorer</a>` : ''}`;
-  root.innerHTML = `<div class="shop-stack"><label class="field">Search <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}"></label><label class="field">Decision <select id="c-d" data-testid="chronicle-filter"><option value="">All</option><option value="allowed">Allowed</option><option value="denied">Refused</option></select></label><ol class="feed" data-testid="chronicle-page"></ol><p data-testid="chronicle-pages"></p><div class="btns"><button type="button" class="primary" id="c-prev">Previous</button><button type="button" class="primary" id="c-next">Next</button><button type="button" class="primary" id="c-csv" data-testid="chronicle-export">Export</button></div><p id="c-out" data-testid="chronicle-verify">${verifyHtml()}</p></div>`;
-  const filter = q$(root, '#c-d');
-  if (state.cd) filter.value = state.cd;
-  draw();
-  q$(root, '#c-q').oninput = (e) => { state.cq = e.target.value; state.cp = 1; draw(); };
-  filter.onchange = (e) => { state.cd = e.target.value; state.cp = 1; draw(); };
-  q$(root, '#c-prev').onclick = () => { state.cp = Math.max(1, (state.cp || 1) - 1); draw(); };
-  q$(root, '#c-next').onclick = () => { state.cp = (state.cp || 1) + 1; draw(); };
-  const showVerify = () => {
-    const html = verifyHtml();
-    const live = root.isConnected ? q$(root, '#c-out') : null;
-    if (live) live.innerHTML = html;
-    else if (hooks.repaint) hooks.repaint();
-  };
-  q$(root, '#c-csv').onclick = () => {
-    const text = exportCsv(queryFeed(rows(), { q: state.cq || '', decision: state.cd || '', page: 1, pageSize: 100 }).rows);
-    downloadCsv(text);
-    state.verify = text;
-    state.verifyUrl = '';
-    showVerify();
-  };
-  q$(root, '[data-testid=chronicle-page]').addEventListener('click', async (e) => {
-    const b = e.target.closest?.('.c-v');
-    if (!b) return;
-    const row = rows().find(r => r.h === b.dataset.hash) || { h: b.dataset.hash, signer: b.dataset.signer };
-    state.verify = 'Checking the chain…';
-    state.verifyUrl = '';
-    showVerify();
-    let chain = null;
-    try {
-      const res = await fetch(api() + '/api/tx-status/' + encodeURIComponent(row.h) + '?sender=' + encodeURIComponent(row.signer || 'nearcarta.near'));
-      chain = await res.json();
-    } catch { chain = null; }
-    const v = verifyEntry(row, chain);
-    state.verify = chain ? v.text : (v.url ? v.text : 'The chain check did not answer.');
-    state.verifyUrl = v.url || '';
-    showVerify();
-  });
+  return mountChronicleTray(root, hooks);
 }
 
 function mountArena(root, hooks) {
