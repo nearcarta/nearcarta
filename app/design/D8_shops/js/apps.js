@@ -463,6 +463,7 @@ export async function toll(quote) {
   }
 }
 
+
 /** The order the toll just recorded for this action id, so the row owner can sign it. */
 async function findOrder(shop, actionId) {
   // `get_order` is keyed by the toll's own id, which the board's return value does not
@@ -477,6 +478,79 @@ async function findOrder(shop, actionId) {
   } catch { /* no order read: the caller reports that a signature is still needed */ }
   return null;
 }
+
+/**
+ * One Town Hall job move, signed by this browser's agent key and forwarded by the
+ * board. The gold CTA and the AI dock both call this, so the two paths cannot drift.
+ *
+ * The board checks the row's caps, receivers and daily budget; the Hall contract
+ * checks that the predecessor is the board and that `row_owner` is the visitor.
+ * Nothing here opens a wallet, and no backend key is involved.
+ */
+export async function hallJob(step) {
+  if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  if (!step || !step.method) throw new Error('That move is not part of a job. Nothing was signed.');
+  const key = agent();
+  const ak = key ? await proposeAccessKey(key) : null;
+  if (!key || !ak) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  const names = ak.permission?.FunctionCall?.method_names || [];
+  if (names.length && !names.includes('propose_call_as')) {
+    throw new Error('This key can call propose. It cannot call propose_call_as. Renew it in /setup. Nothing was signed.');
+  }
+  const gas = 150n * TG;
+  const allowance = BigInt(ak.permission?.FunctionCall?.allowance || 0);
+  if (allowance < gas / TG * 10n ** 21n) throw new Error('The session key allowance cannot buy this call. Nothing was signed.');
+  const row = await view(S.board, 'get_charter', { owner: S.me });
+  if (!row) throw new Error('no charter row yet: finish setup first');
+  if (W.pubkeyHex(key) !== String(row.agent || '')) throw new Error('This browser is not the agent on the row. Nothing was signed.');
+  const shop = String(step.receiver);
+  const receivers = row.receivers || [];
+  if (receivers.length && !receivers.includes(shop)) throw new Error('Add ' + shop + ' in /setup. Nothing was signed.');
+  // The row's own limits decide the money. They are checked here so the button says
+  // why, and again on chain so the answer does not depend on this page.
+  const deposit = BigInt(step.deposit || 0);
+  if (deposit > 0n) {
+    const cap = BigInt(row.per_action_cap || 0);
+    if (cap && deposit > cap) throw new Error('That is over your max per payment. Nothing was signed.');
+    const daily = BigInt(row.daily_budget || 0);
+    const spent = BigInt(row.spent_today ?? row.spent ?? 0);
+    if (daily && spent + deposit > daily) throw new Error('That is over your daily cap. Nothing was signed.');
+  }
+  const args = JSON.stringify(step.args || {});
+  const effects = [];
+  const expiry = String(step.expiry || (BigInt(Date.now()) * 1_000_000n + 3_600_000_000_000n));
+  const nonce = String(row.nonce ?? '0').replace(/^0+(?=\d)/, '');
+  const signature = W.signMessage(key, callAsMessage({
+    network: 'mainnet', contract: S.board, owner: S.me, receiver: shop, method: step.method,
+    args, deposit: String(deposit), nonce, expiry, epoch: String(row.epoch ?? '0'), effects, hold: false,
+  }));
+  const call = {
+    owner: S.me, receiver: shop, method: step.method, args, deposit: String(deposit), expiry, effects, hold: false, signature,
+  };
+  try {
+    const signed = W.signTx({
+      key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+      actions: [W.functionCall('propose_call_as', call, gas)],
+    });
+    const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+    if (!sent.ok) {
+      const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+      return settled('hall', { tx: signed.hash, decision: 'denied', reason, method: step.method, amount: String(deposit), receiver: shop, fromChain: true, signer: 'agent' });
+    }
+    return settled('hall', { tx: signed.hash, decision: 'allowed', reason: 'ok', method: step.method, amount: String(deposit), receiver: shop, signer: 'agent' });
+  } catch (e) {
+    const code = refusalOf(e);
+    if (code || e.tx) return settled('hall', { tx: e.tx || null, decision: 'denied', reason: code || String(e.message || e).slice(0, 160), method: step.method, amount: String(deposit), receiver: shop, fromChain: !!e.tx });
+    throw e;
+  }
+}
+
+/** Read one job from the live Hall contract, or null when it is not there yet. */
+export async function hallJobView(jobId) {
+  const r = await view(TS.HALL_ACCT, 'get_job', { job_id: String(jobId) }).catch(() => null);
+  return r || null;
+}
+
 // Older gate calls stay for a wallet that already started one. A new toll is the policy fee on the board.
 const LS_TOLL = c => 'nearcarta.d8.toll.' + c;
 export const tollVisit = () => (S.charter ? JSON.parse(localStorage.getItem(LS_TOLL(S.charter)) || 'null') : null);

@@ -31,3 +31,5 @@ export function planSplit({ payee, nonce, policy, nowMs, ttlMs = 10 * 60_000, cl
 export const TOLL_ACCT = 'toll.nearcarta.near';
 export const TOLL_NOT_LISTED = 'Add toll.nearcarta.near to your allowlist first';
 export const tollAllowed = rc => Array.isArray(rc) && rc.includes(TOLL_ACCT);
+// The Town Hall job shop. One account, any visitor; the board forwards every call.
+export const HALL_ACCT = 'townhall.nearcarta.near';

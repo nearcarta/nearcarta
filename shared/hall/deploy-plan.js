@@ -58,6 +58,7 @@ export function refundTransfers({ shop, dao, bounties, posts }) {
       throw err;
     }
     transfers.push({
+      hash: bounty.hash,
       payee: post.signer,
       amount: String(bounty.amount),
       reason: 'open bounty ' + bounty.hash,
@@ -70,10 +71,31 @@ export function refundTransfers({ shop, dao, bounties, posts }) {
 export function hallDeployPlan({
   shop, owner, board, dao, balanceYocto, storageBytes, oldWasmBytes, newWasmBytes, wasmSha256,
   bounties, posts, fullAccessKeys, codeHash, oldCodeHash, smokeWorkers,
-  boardCodeHash, boardExpectedCodeHash,
+  boardCodeHash, boardExpectedCodeHash, guard, guardCodeHash, guardExpectedCodeHash,
 }) {
   const transfers = refundTransfers({ shop, dao, bounties, posts });
+  // Every bounty the legacy code records, owed or paid, is snapshotted here. The
+  // audit row is what makes the migration checkable without reading the old STATE:
+  // an open bounty must appear in `transfers`, a claimed one must not.
+  const legacy = (bounties || []).map(b => {
+    const open = b.claimed_by == null || b.claimed_by === '';
+    const t = transfers.find(x => x.hash === b.hash);
+    return {
+      hash: b.hash,
+      amount: String(b.amount),
+      claimedBy: b.claimed_by || null,
+      owed: open,
+      payee: t ? t.payee : (b.claimed_by || null),
+      sourceTx: t ? t.sourceTx : null,
+      status: open ? 'refund_now' : 'already_paid',
+    };
+  });
+  const owedYocto = legacy.filter(l => l.owed).reduce((n, l) => n + BigInt(l.amount), 0n);
+  const paidYocto = legacy.filter(l => !l.owed).reduce((n, l) => n + BigInt(l.amount), 0n);
   const refund = transfers.reduce((n, t) => n + BigInt(t.amount), 0n);
+  // The new state records exactly what this deploy paid out, so a later reader can
+  // tell a clean migration from a silent reset.
+  const legacyPaid = legacy.map(l => `${l.hash}:${l.status}:${l.amount}:${l.payee || ''}`);
   const balance = BigInt(balanceYocto);
   const storage = BigInt(storageBytes);
   const oldWasm = BigInt(oldWasmBytes);
@@ -81,7 +103,7 @@ export function hallDeployPlan({
   const stakeNow = storage * BYTE_YOCTO;
   const storageAfter = storage - oldWasm + nextWasm;
   const stakeAfter = storageAfter * BYTE_YOCTO;
-  const migrateArgs = JSON.stringify({ owner, board });
+  const migrateArgs = JSON.stringify({ owner, board, guard, legacy_paid: legacyPaid });
   const gasDeploy = deployGas(nextWasm, migrateArgs.length);
   const gasRefund = TRANSFER_GAS * BigInt(Math.max(transfers.length, 1)) + RECEIPT_GAS;
   const burnedRefund = gasRefund * GAS_PRICE_YOCTO;
@@ -109,6 +131,12 @@ export function hallDeployPlan({
   // board that is not the live v2 wasm would leave every Hall call unroutable, so
   // the deploy is refused unless the board's code hash is the one we expect.
   need(!boardExpectedCodeHash || boardCodeHash === boardExpectedCodeHash, 'the board account is the v2 wasm this contract expects');
+  // The part clearance path calls this guard account by name. Deploying with a guard
+  // that is not the live Guardhouse would leave every release path dead.
+  need(!!guard && guard !== shop && guard !== board, 'a guard account is named for part clearance');
+  need(!guardExpectedCodeHash || guardCodeHash === guardExpectedCodeHash, 'the guard account is the wasm this contract expects');
+  need(legacyPaid.length === (bounties || []).length, 'every legacy bounty is in the snapshot');
+  need(owedYocto === refund, 'the refund total equals the owed legacy bounties');
   need(balance > stakeNow, 'the balance covers the current storage stake');
   need(refund > 0n || (bounties || []).every(b => b.claimed_by), 'every open bounty is in the refund list');
   need(transfers.every(t => t.payee === dao || t.payee === shop), 'each refund payee is the posting signer');
@@ -129,8 +157,16 @@ export function hallDeployPlan({
     : { skipped: true, deposit: SMOKE_YOCTO.toString(), workers: [], note: 'Set HALL_SMOKE_A and HALL_SMOKE_B. No worker account is hardcoded.' };
 
   return {
-    shop, owner, board, dao,
+    shop, owner, board, guard, dao,
     wasm: { bytes: Number(nextWasm), sha256: wasmSha256 },
+    legacy: {
+      rows: legacy,
+      owedYocto: owedYocto.toString(),
+      owedNear: near(owedYocto),
+      paidYocto: paidYocto.toString(),
+      paidNear: near(paidYocto),
+      snapshot: legacyPaid,
+    },
     storage: {
       bytesNow: storage.toString(),
       stakeNow: stakeNow.toString(),
@@ -161,8 +197,8 @@ export function hallDeployPlan({
     ok: checks.every(c => c.ok),
     steps: [
       { n: 1, name: 'refund open bounties', pre: ['view get_bounties', 'view get_state', 'match each open bounty to its post_bounty signer'], transfers },
-      { n: 2, name: 'deploy hall wasm and migrate', pre: ['refund transfers above are the only spends', 'code hash is still the oath wasm', 'new stake fits'], method: 'migrate', args: { owner, board } },
-      { n: 3, name: 'post-deploy view', method: 'get_hall', expect: { owner, board, jobs: 0 } },
+      { n: 2, name: 'deploy hall wasm and migrate', pre: ['refund transfers above are the only spends', 'code hash is still the oath wasm', 'new stake fits'], method: 'migrate', args: { owner, board, guard, legacy_paid: legacyPaid } },
+      { n: 3, name: 'post-deploy view', method: 'get_hall', expect: { owner, board, guard, jobs: 0, legacy_paid: legacyPaid.length } },
       { n: 4, name: 'smoke', ...smoke },
     ],
   };

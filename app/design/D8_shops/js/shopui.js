@@ -1039,6 +1039,8 @@ const APPS = {
         onPaid: (res) => { sh?.hideSeal?.(); if (sh?.act && runScene) runScene(sh.act({ paid: true, tx: res.tx })); },
         onRefuse: (text) => { if (sh?.act && runScene) runScene(sh.act({ refused: true, reason: text || '' })); else sh?.showSeal?.(text); },
         onClear: () => sh?.hideSeal?.(),
+        // The gold CTA and the AI dock share this sender, so both sign the same call.
+        sendJob: (step) => A.hallJob({ ...step, expiry: null, signature: null }),
       };
       mountShop('hall', document.getElementById('t-form'), hooks);
       wireHallDock(hooks);
@@ -1384,6 +1386,12 @@ function paint() {
 }
 async function primary(auto = false) {
   if (phase === 'busy' || !cur) return; const st = A.stage(); if (!auto) sfx('click');
+  // A private bank audit signs nothing, so it never needs a wallet, a charter or a session key.
+  // No state of /setup (missing account, missing row, a failed chain read) may route this shop there.
+  if (cur === 'bank') {
+    if (APPS.bank.run) { phase = 'busy'; try { const res = await APPS.bank.run(); phase = res?.keep ? 'kept' : 'done'; say(res?.say || 'Nothing was signed.'); } catch (e) { fail(e); } }
+    return;
+  }
   if (st === 'load' || st === 'connect' || st === 'build') { location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.search + location.hash)); return; }
   if (st === 'rules') return openRules();
   if (st === 'wait' || st === 'key') { phase = 'busy'; btn(st === 'key' && !A.pendingKey() ? 'Approve in your wallet…' : 'Checking…', 'primary busy', true);
