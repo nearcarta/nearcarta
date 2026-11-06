@@ -37,8 +37,8 @@ test('read routes: an RPC 429 serves the last good value marked stale, or 503 + 
     : new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { result: [...Buffer.from(JSON.stringify({ ok: 1 }))], logs: [] } }), { status: 200 });
   const app = makeApp();
   busy = true;
-  // /api/guardhouse now answers 404 for the retired charter before it reads RPC,
-  // and several reads serve a snapshot instead of failing. /api/arena propagates.
+  // /api/guardhouse answers the retired fact (no RPC read), and several reads serve a snapshot
+  // instead of failing. /api/arena propagates.
   const cold = await app.request('/api/arena');
   assert.equal(cold.status, 503); assert.equal(cold.headers.get('retry-after'), '3');
   assert.equal((await cold.json()).retry, true);

@@ -100,6 +100,24 @@ export function stampCalls(board, capYocto) {
   return [...FERRY_CALL_TARGETS, { receiver: board, method: 'stamp', cap: String(capYocto) }];
 }
 
+// USDC on NEAR (the 64-hex contract). A Payouts row registers a zero-NEAR issuer for USDC through the
+// visitor's own row, so the money can arrive. storage_deposit is bounded by the row's per-payment cap,
+// and only the storage_deposit method is opened: this call cannot move USDC, only register an account.
+// https://github.com/near/NEPs/blob/master/neps/nep-0141.md
+export const USDC_NEAR = '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
+export const USDC_STORAGE_CALL = { receiver: USDC_NEAR, method: 'storage_deposit' };
+
+/**
+ * The call list a Payouts-capable row carries. The USDC storage pair is added only when the whole
+ * list still fits the row's 0.02 NEAR: the 64-hex contract costs 104 bytes, which a long shop list
+ * cannot spare. `fits` reports whether the pair made it, so the shop can say so instead of guessing.
+ */
+export function payoutsCalls(extra, capYocto) {
+  const base = [...(extra || [])];
+  const withUsdc = [...base, { ...USDC_STORAGE_CALL, cap: String(capYocto) }];
+  return callsFitRow(withUsdc) ? { calls: withUsdc, fits: true } : { calls: base, fits: false };
+}
+
 /**
  * The Town Hall job lifecycle as board calls. Each one is a part of one job, and the
  * board's own row rules (per-action cap, daily budget, receiver list) still gate every

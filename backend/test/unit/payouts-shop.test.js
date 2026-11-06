@@ -28,22 +28,48 @@ test('plan: hosted ceiling is config, not a 0.20 product cap', () => {
   assert.equal(typeof MISS_HINT, 'string');
 });
 
-test('plan: classifyPayroll sends the in-cap row, refuses the big one before deposit, holds USDC', () => {
+test('plan: classifyPayroll sends the in-cap rows, refuses the big one before deposit, prices the foreign row', () => {
   const rows = [
     { to: 'cafe.near', amt: '0.001', asset: 'NEAR', chain: 'near' },
     { to: 'books.near', amt: '0.02', asset: 'NEAR', chain: 'near' },
     { to: '0x' + '11'.repeat(20), amt: '0.15', asset: 'USDC', chain: 'base' },
   ];
-  const p = classifyPayroll(rows, { capNear: 0.005 });
-  assert.equal(p.propose.length, 1);
-  assert.equal(p.propose[0].to, 'cafe.near');
-  assert.equal(p.propose[0].send, true);
-  assert.equal(p.refused.length, 1);
-  assert.equal(p.refused[0].send, false);
-  assert.equal(p.refused[0].reason, 'over_per_action_cap');
-  assert.equal(p.held.length, 1);
-  assert.equal(p.held[0].reason, 'foreign_effect_unproved');
-  assert.equal(p.held[0].send, false);
+  const foreign = rows[2];
+  // A foreign row is paid by the same session through the 1Click rail; its NEAR cost is the quote.
+  const key = payrollKey(foreign);
+  const priced = classifyPayroll(rows, { capNear: 0.05, quotes: { [key]: { ok: true, near: 0.0411, out: '0.15' } } });
+  assert.equal(priced.propose.length, 2);
+  assert.equal(priced.propose[0].to, 'cafe.near');
+  assert.equal(priced.propose[0].send, true);
+  assert.equal(priced.refused.length, 0);
+  assert.equal(priced.foreign.length, 1);
+  assert.equal(priced.foreign[0].to, foreign.to);
+  assert.equal(priced.foreign[0].action, 'send');
+  assert.equal(priced.foreign[0].near, 0.0411);
+  assert.equal(priced.held.length, 0);
+  // A NEAR row over the visitor's cap is still refused before any deposit.
+  const tight = classifyPayroll(rows, { capNear: 0.005, quotes: { [key]: { ok: true, near: 0.0411 } } });
+  assert.equal(tight.refused.length, 2);
+  assert.deepEqual(tight.refused.map(r => r.reason), ['over_per_action_cap', 'over_per_action_cap']);
+  assert.equal(tight.refused[0].to, 'books.near');
+  assert.equal(tight.foreign.length, 0);
+  // No quote yet: the row waits, and nothing is sent for it.
+  const waiting = classifyPayroll(rows, { capNear: 0.2 });
+  assert.equal(waiting.needsQuote.length, 1);
+  assert.equal(waiting.needsQuote[0].reason, 'quote_needed');
+  assert.equal(waiting.send.length, 2);
+  assert.equal(waiting.blocked, false);
+  // A quote whose NEAR cost is over the cap is refused before any deposit.
+  const dear = classifyPayroll([foreign], { capNear: 0.01, quotes: { [key]: { ok: true, near: 0.05 } } });
+  assert.equal(dear.refused.length, 1);
+  assert.equal(dear.refused[0].reason, 'over_per_action_cap');
+  // A refused quote is refused, not sent.
+  const bad = classifyPayroll([foreign], { capNear: 1, quotes: { [key]: { ok: false, reason: 'quote_refused' } } });
+  assert.equal(bad.refused.length, 1);
+  assert.equal(bad.send.length, 0);
+  // A foreign payee must be an address of its chain's shape.
+  const wrong = classifyPayroll([{ to: 'not-an-address', amt: '1', asset: 'USDC', chain: 'base' }], { capNear: 1 });
+  assert.equal(wrong.skipped[0].reason, 'bad_account');
 });
 
 test('plan: classifyPayroll holds every NEAR row when the cap was not read', () => {
@@ -135,8 +161,9 @@ test('plan: registration names registered, who pays, or unknown', () => {
   const no = registrationVerdict(null);
   assert.equal(no.registered, false);
   assert.match(no.text, /storage deposit/);
-  assert.match(no.text, /receive account pays/);
+  assert.match(no.text, /your own session cap/);
   assert.match(no.text, /0\.00125 NEAR/);
+  assert.match(registrationVerdict(null, { account: 'zero-near.near' }).text, /register zero-near\.near/);
   const unread = registrationVerdict(null, { error: 'rpc' });
   assert.equal(unread.ok, true);
   assert.equal(unread.claim, 'unknown');
@@ -154,14 +181,16 @@ test('plan: cinema and seal stay quiet unless a real step happened', () => {
 
 test('plan: accountant CSV does not stamp paid without SUCCESS', () => {
   const csv = accountantCsv([
-    { source: 'near', to: 'cafe.near', amount: '0.001', asset: 'NEAR', tx: '', status: 'paid' },
-    { source: 'base', to: 'cafe.near', amount: '0.15', asset: 'USDC', status: 'SUCCESS', delivered: true, fee: '0.01', refund: REFUND },
+    { source: 'near', chain: 'near', to: 'cafe.near', amount: '0.001', asset: 'NEAR', tx: '', status: 'paid' },
+    { source: 'near', chain: 'base', to: 'cafe.near', amount: '0.15', asset: 'USDC', status: 'SUCCESS', delivered: true, near: '0.0411', feeUsd: '0.01', refund: REFUND },
   ]);
   const [head, unpaid, paid] = csv.split('\n');
-  assert.equal(head, 'source,destination,asset,amount,fee,refund,status,tx');
+  assert.equal(head, 'source,chain,destination,asset,amount,near,fee_usd,refund,status,tx');
   assert.match(unpaid, /not sent/);
-  assert.doesNotMatch(unpaid, /paid/);
+  assert.doesNotMatch(unpaid, /,paid,/);
   assert.match(paid, /,paid,/);
+  // The foreign row carries its chain, the fee the route charged and the refund address.
+  assert.match(paid, /^near,base,cafe\.near,USDC,0\.15,0\.0411,0\.01,0xabab/);
 });
 
 test('invoice: creating the same bill twice returns one id and does not call 1Click', () => {

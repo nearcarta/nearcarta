@@ -21,6 +21,7 @@ import { callAsMessage, crossArgs, unitsOf, setSha256Hex } from '/board-call-as.
 setSha256Hex(W.sha256hex);
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
+const USDC_NEAR = '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
 const onMain = () => true;
 const explorer = () => 'https://nearblocks.io';
 const YN = 10n ** 24n, TG = 10n ** 12n;
@@ -1253,7 +1254,12 @@ export const payoutLeft = () => P.leftToday(pay(), S.usage.pay);
 export async function payouts(rows, opts = {}) {
   const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
   if (S.board) {
-    const plan = (rows || []).slice(0, 3).filter(r => String(r?.asset || 'NEAR').toUpperCase() !== 'USDC');
+    // NEAR rows only: a foreign row is paid by payoutsForeign (the 1Click rail), not by a transfer.
+    // The row count is the visitor's own /setup count, so nothing is sliced here.
+    const plan = (rows || []).filter(r => {
+      const asset = String(r?.asset || 'NEAR').toUpperCase();
+      return asset === 'NEAR' && String(r?.chain || 'near').toLowerCase() === 'near';
+    });
     if (plan.some(r => String(r?.to || '').trim() && !P.nearAccountOk(r.to))) throw new Error('Check the account name. Nothing was sent.');
     const capNear = opts.capNear == null ? null : Number(opts.capNear);
     const out = [];
@@ -1283,4 +1289,73 @@ export async function payouts(rows, opts = {}) {
   keep(signed.hash, 'payouts', v.decision, v.reason); readRules().catch(() => {});
   return { tx: signed.hash, ...v, n: b.n, total: b.total };
 }
+/**
+ * One foreign payroll row through the 1Click rail, paid by the visitor's own session.
+ * `row.depositAddress` comes from a live EXACT_OUTPUT quote and `row.near` is the wNEAR the quote named.
+ * The board's propose_call deposits that wNEAR to the deposit address: wrap.near near_deposit,
+ * storage_deposit for the address, then ft_transfer with the 1Click memo. No wallet opens.
+ * The row is paid on 1Click SUCCESS, never before; this returns the NEAR receipt, not the payout.
+ */
+export async function payoutsForeign(row, opts = {}) {
+  if (!S.board || !S.me) return { ok: false, reason: 'no_session', wallet: false };
+  const key = agent();
+  if (!key) return { ok: false, reason: 'no_key', wallet: false };
+  const ak0 = await proposeAccessKey(key);
+  const names = ak0?.permission?.FunctionCall?.method_names || [];
+  if (!ak0 || (names.length && !names.includes('propose_call'))) return { ok: false, reason: 'key_cannot_propose_call', wallet: false };
+  const depositAddress = String(row?.depositAddress || '');
+  const near = Number(row?.near);
+  if (!depositAddress || !(near > 0)) return { ok: false, reason: 'no_deposit_address', wallet: false };
+  const capNear = opts.capNear == null || opts.capNear === '' ? (pay()?.per_action_cap ? fromY(pay().per_action_cap) : null) : Number(opts.capNear);
+  if (capNear != null && near > capNear + 1e-12) return { ok: false, reason: 'over_per_action_cap', wallet: false };
+  let wrap = { registered: true, balanceYocto: '0' };
+  try { wrap = await wrapBoardState(); } catch { /* plan with a fresh deposit */ }
+  let depRegistered = null;
+  try {
+    const st = await wrapStorageOf(depositAddress);
+    depRegistered = !!(st && (st.total != null || st.available != null));
+  } catch { depRegistered = null; }
+  const spend = pickWrapSpend({ wantAmount: near, wrapBalanceYocto: wrap.balanceYocto });
+  const plan = depositPlan({
+    from: 'wNEAR@near',
+    amount: spend.amount,
+    depositAddress,
+    memo: row.depositMemo || null,
+    capYocto: pay()?.per_action_cap || null,
+    balanceYocto: S.boardRow?.balance || null,
+    wrapRegistered: wrap.registered,
+    wrapBalanceYocto: wrap.balanceYocto,
+    depositAccountRegistered: depRegistered,
+  });
+  if (plan.kind !== 'propose_call') return { ok: false, reason: plan.why || 'you_send', wallet: false, youSend: true };
+  const sent = await ferryProposeCalls(plan.steps);
+  if (!sent?.ok) return { ok: false, reason: sent?.reason || 'the deposit did not go', wallet: false, txs: sent?.txs || [], landed: sent?.landed || [] };
+  keep(sent.tx, 'payouts', 'allowed', 'payout_row', { amt: String(toY(near)), to: row.to, chain: row.chain, asset: row.asset, depositAddress });
+  readRules().catch(() => {});
+  return { ok: true, wallet: false, tx: sent.tx, txs: sent.txs, landed: sent.landed, depositAddress, near };
+}
+
+/**
+ * Bounded USDC storage sponsorship for a zero-NEAR issuer. The visitor's own row pays
+ * `storage_deposit` on native USDC through propose_call, capped by that row's per-payment cap.
+ * Only the storage_deposit method is opened in the row's call list, so this cannot move USDC.
+ * The amount is the contract's own storage_balance_bounds.min, never a number typed here.
+ */
+export async function payoutsSponsor(account, depositNear, opts = {}) {
+  if (!S.board || !S.me) return { ok: false, reason: 'no_session' };
+  const who = String(account || '').trim();
+  const amount = Number(depositNear);
+  if (!isNearAccountId(who)) return { ok: false, reason: 'bad_receive' };
+  if (!(amount > 0)) return { ok: false, reason: 'no_bounds' };
+  const capNear = opts.capNear == null || opts.capNear === '' ? (pay()?.per_action_cap ? fromY(pay().per_action_cap) : null) : Number(opts.capNear);
+  if (capNear == null) return { ok: false, reason: 'no_row' };
+  if (amount > capNear + 1e-12) return { ok: false, reason: 'over_per_action_cap' };
+  const args = JSON.stringify({ account_id: who, registration_only: true });
+  const sent = await ferryProposeCalls([{ receiver: USDC_NEAR, method: 'storage_deposit', args, deposit: toY(amount), gasTgas: 30 }]);
+  if (!sent?.ok) return { ok: false, reason: sent?.reason || 'the registration did not go', txs: sent?.txs || [] };
+  keep(sent.tx, 'payouts', 'allowed', 'storage_sponsor', { amt: String(toY(amount)), to: who });
+  readRules().catch(() => {});
+  return { ok: true, tx: sent.tx, account: who, near: amount };
+}
+
 export { fmt, esc, short, toY, fromY };

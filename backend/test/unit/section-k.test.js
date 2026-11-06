@@ -96,15 +96,16 @@ test('the judges page and the console share one script', () => {
   assert.match(readFileSync(new URL('../../../app/src/console.js', import.meta.url), 'utf8'), /chronicleSummary/);
 });
 
-test('a payout rejects a bad name, a missing account and a row over 0.005', () => {
+test('a payout rejects a bad name, a missing account and a row over the visitor cap', () => {
   assert.equal(nearAccountOk('bad account!'), false);
   assert.equal(nearAccountOk('cafe.near'), true);
   assert.equal(formatNear(0.001), '0.001');
-  assert.equal(payoutReady([{ to: 'bad account!', amt: '0.001' }]).enabled, false);
-  assert.equal(payoutReady([{ to: 'cafe.near', amt: '0.5' }]).enabled, false);
-  assert.equal(payoutReady([{ to: 'cafe.near', amt: '0.001' }], { 'cafe.near': false }).enabled, false);
-  assert.equal(payoutReady([{ to: 'cafe.near', amt: '0.001' }]).enabled, true);
-  assert.ok(payoutIssues([{ to: 'bad account!', amt: '0.5' }]).length >= 2);
+  assert.equal(payoutReady([{ to: 'bad account!', amt: '0.001' }], null, 0.005).enabled, false);
+  assert.equal(payoutReady([{ to: 'cafe.near', amt: '0.5' }], null, 0.005).enabled, false);
+  assert.equal(payoutReady([{ to: 'cafe.near', amt: '0.001' }], { 'cafe.near': false }, 0.005).enabled, false);
+  assert.equal(payoutReady([{ to: 'cafe.near', amt: '0.001' }], null, 0.005).enabled, true);
+  assert.equal(payoutReady([{ to: 'cafe.near', amt: '0.001' }]).enabled, false);
+  assert.ok(payoutIssues([{ to: 'bad account!', amt: '0.5' }], null, 0.005).length >= 2);
 });
 
 test('a chronicle verify without a chain status is not a pass, and export can download', () => {
