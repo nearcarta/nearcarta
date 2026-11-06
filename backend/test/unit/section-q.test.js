@@ -68,8 +68,9 @@ test('the house deed links are brass and a missing oath is not a missing row', a
   assert.doesNotMatch(empty, /data-testid="hall-cap"|id="cap"/);
   assert.equal(DEP.extras?.house?.contract, 'house.nearcarta.near');
   assert.equal(DEP.extras?.house?.legacy, 'house.nearcarta.near');
-  assert.equal(DEP.extras.house.shop.status, 'not_deployed');
-  assert.notEqual(DEP.extras.house.shop.account, DEP.extras.house.legacy);
+  assert.equal(DEP.extras.house.shop, 'house.nearcarta.near');
+  assert.equal(DEP.extras.house.fallback.status, 'not_deployed');
+  assert.equal(DEP.extras.house.fallback.account, 'house3.nearcarta.near');
   assert.equal(DEP.extras?.house?.oath, undefined);
   let called = false;
   globalThis.fetch = async () => { called = true; throw new Error('rpc should not run'); };
@@ -77,7 +78,7 @@ test('the house deed links are brass and a missing oath is not a missing row', a
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.kind, 'deed');
-  assert.equal(body.contract, DEP.extras.house.shop.account);
+  assert.equal(body.contract, DEP.extras.house.shop);
   assert.equal(body.legacy, 'house.nearcarta.near');
   assert.equal(called, false);
   const toll = read('app/src/panels/toll-room.js');

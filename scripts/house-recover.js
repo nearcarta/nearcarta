@@ -104,7 +104,7 @@ export function recoveryPlan(input) {
       depositYocto: '1',
       args: {},
       pre: held > 0n || purse > 0n
-        ? 'Run this only after house_held is 0. The house_pay callback has to finish first. This command signs one step at a time.'
+        ? 'Wait for the house_pay callback. close runs only once house_held is 0.'
         : 'house_held is 0, so close can run.',
       recovers: 'the remaining account balance, including storage, by delete_account to ' + owner,
       note: NOTES.close,
@@ -118,6 +118,8 @@ export function recoveryPlan(input) {
     locked: steps.length === 0,
     steps,
     absent,
+    requiredBeforeCreate: steps.length > 0,
+    waitForCallback: steps.some(step => step.method === 'house_pay') && steps.some(step => step.method === 'close'),
     why: steps.length
       ? 'The open purse leaves by house_pay to the deed holder. The storage leaves by close, which is the self-delete. Neither needs a key on the shop. There is no owner withdraw besides close, and no migrate or upgrade on this wasm.'
       : 'No owner withdraw, deed-holder spend, migrate, upgrade, or self-delete is exported. That NEAR stays on the shop. This script does not touch it.',
@@ -139,7 +141,7 @@ async function rpc(method, params) {
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
   const body = await res.json();
-  if (body.error) throw new Error(body.error.message || 'rpc');
+  if (body.error) throw new Error(JSON.stringify(body.error));
   return body.result;
 }
 
@@ -154,8 +156,14 @@ async function viewCall(account, method, args) {
   return JSON.parse(Buffer.from(result.result).toString());
 }
 
-export function printRecovery({ plan, exports, source, sha256, recordedSha }) {
+export function printRecovery({ plan, exports, source, sha256, recordedSha, balanceYocto }) {
   console.log('Legacy shop: ' + plan.shop);
+  if (balanceYocto != null) {
+    const whole = BigInt(balanceYocto) / 10n ** 24n;
+    const frac = (BigInt(balanceYocto) % 10n ** 24n).toString().padStart(24, '0').replace(/0+$/, '');
+    console.log('Account balance: ' + balanceYocto + ' yoctoNEAR (' + (frac ? whole + '.' + frac : whole) + ' NEAR)');
+    console.log('house_pay then close returns this whole balance to ' + plan.owner + '. It is the funding source for the recreate, and it is required before the create.');
+  }
   console.log('Wasm sha256: ' + sha256);
   console.log('Recorded sha256: ' + (recordedSha || 'none') + (recordedSha && recordedSha === sha256 ? ' (matches)' : ''));
   console.log('Public methods on the chain wasm: ' + exports.join(', '));
@@ -203,15 +211,23 @@ async function main() {
   }
   const heldRaw = await viewCall(HOUSE_LEGACY, 'house_held', {});
   const held = BigInt(typeof heldRaw === 'string' ? heldRaw : (heldRaw?.amount ?? heldRaw ?? 0));
+  let balanceYocto = '0';
+  try {
+    const account = await rpc('query', { request_type: 'view_account', finality: 'final', account_id: HOUSE_LEGACY });
+    balanceYocto = account.amount;
+  } catch (err) {
+    if (!/UNKNOWN_ACCOUNT|does not exist/i.test(String(err?.message || err))) throw err;
+  }
   const plan = recoveryPlan({
     exports, purseYocto: purse.toString(), heldYocto: held.toString(), holder, owner: HOUSE_OWNER, shop: HOUSE_LEGACY,
   });
-  printRecovery({ plan, exports, source, sha256, recordedSha: MAIN.extras?.house?.sha256 });
+  printRecovery({ plan, exports, source, sha256, recordedSha: MAIN.extras?.house?.sha256, balanceYocto });
   const keySet = !!process.env.NEAR_MAINNET_SIGNER_KEY;
   console.log('Signer key: ' + (keySet ? 'set' : 'not set') + ' (the value is not printed)');
   if (!live) {
     console.log('Dry-run. This command does not sign and does not send NEAR.');
-    console.log('Live command, one step at a time: NEAR_MAINNET_SIGNER_KEY=\'ed25519:...\' node scripts/house-recover.js --live');
+    console.log('Required before create: NEAR_MAINNET_SIGNER_KEY=\'ed25519:...\' node scripts/house-recover.js --live');
+    console.log('That signs house_pay, waits until house_held is 0, then signs close.');
     process.exit(0);
   }
   if (plan.locked) {
@@ -223,24 +239,35 @@ async function main() {
     console.error('Refusing to sign: set NEAR_MAINNET_SIGNER_KEY to the ed25519 secret of ' + HOUSE_OWNER + '.');
     process.exit(2);
   }
-  const step = plan.steps[0];
-  if (step.method === 'close' && (purse > 0n || held > 0n)) {
-    console.error('Refusing to sign close while house_held is above 0.');
-    process.exit(2);
-  }
   const { Account, JsonRpcProvider, KeyPairSigner, actions: A } = await import('near-api-js');
-  const signer = new Account(step.signer, new JsonRpcProvider({ url: MAIN.rpc }), KeyPairSigner.fromSecretKey(key));
+  const signer = new Account(HOUSE_OWNER, new JsonRpcProvider({ url: MAIN.rpc }), KeyPairSigner.fromSecretKey(key));
   const TG = 10n ** 12n;
-  const sent = await signer.signAndSendTransaction({
-    receiverId: step.receiver,
-    waitUntil: 'FINAL',
-    throwOnFailure: false,
-    actions: [A.functionCall(step.method, step.args, 80n * TG, 1n)],
-  });
-  const bad = sent.status?.Failure || sent.receipts_outcome?.find(x => x.outcome.status.Failure)?.outcome.status.Failure;
-  console.log((bad ? 'FAILED' : 'OK') + (sent.transaction?.hash ? ' ' + sent.transaction.hash : ''));
-  if (bad) process.exit(1);
-  if (plan.steps.length > 1) console.log('One step was signed. Run the dry-run again before the next step.');
+  const send = async (step) => {
+    const sent = await signer.signAndSendTransaction({
+      receiverId: step.receiver,
+      waitUntil: 'FINAL',
+      throwOnFailure: false,
+      actions: [A.functionCall(step.method, step.args, 80n * TG, 1n)],
+    });
+    const bad = sent.status?.Failure || sent.receipts_outcome?.find(x => x.outcome.status.Failure)?.outcome.status.Failure;
+    console.log(step.method + ' ' + (bad ? 'FAILED' : 'OK') + (sent.transaction?.hash ? ' ' + sent.transaction.hash : ''));
+    if (bad) process.exit(1);
+  };
+  const pay = plan.steps.find(step => step.method === 'house_pay');
+  const close = plan.steps.find(step => step.method === 'close');
+  if (pay && (purse > 0n || held > 0n)) await send(pay);
+  if (close) {
+    for (let i = 0; i < 30; i++) {
+      const now = BigInt(await viewCall(HOUSE_LEGACY, 'house_held', {}).then(v => (typeof v === 'string' ? v : (v?.amount ?? v ?? 0))).catch(() => 0));
+      if (now === 0n) break;
+      if (i === 29) {
+        console.error('Refusing to sign close: house_held is still above 0.');
+        process.exit(2);
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    await send(close);
+  }
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

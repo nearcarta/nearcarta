@@ -1,31 +1,26 @@
 #!/usr/bin/env node
-// Create the successor house shop and deploy the contract onto it.
-// The legacy shop has no access key, so this does not touch it.
-// Dry-run by default. --live signs. The signer key is read from NEAR_MAINNET_SIGNER_KEY
-// and is never printed.
+// Recreate the house shop after house-recover.js returns its balance.
+// Dry-run by default. --live signs only once that account is gone.
+// The signer key is read from NEAR_MAINNET_SIGNER_KEY and is never printed.
+// The wasm is the committed size-optimized file, not a fresh cargo build.
 //
+//   node scripts/house-recover.js
 //   node scripts/house-deploy.js
+//   NEAR_MAINNET_SIGNER_KEY='ed25519:...' node scripts/house-recover.js --live
 //   NEAR_MAINNET_SIGNER_KEY='ed25519:...' node scripts/house-deploy.js --live
-//
-// The transfer is from the owner to the new shop only. The owner's balance is read
-// at run time. The board v2 migration is expected to return about 4.37 NEAR to that
-// owner; that figure is printed as an expectation, not as a measured balance.
 
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
   ACCOUNT_BYTES, ACCOUNT_CREATION_YOCTO, BYTE_YOCTO, GAS_PRICE_YOCTO, GAS_PURCHASE_YOCTO, deployGas,
 } from '../shared/board/cost.js';
-import { HOUSE_LEGACY, HOUSE_OWNER, HOUSE_SHOP } from '../shared/house/shop.js';
+import { HOUSE_FALLBACK, HOUSE_LEGACY, HOUSE_OWNER, HOUSE_SHOP, HOUSE_WASM_PATH, HOUSE_WASM_SHA256 } from '../shared/house/shop.js';
 import MAIN from '../shared/deployments/mainnet.json' with { type: 'json' };
 
 export const HOUSE_STATE_SLACK = 2048n;
-export const BOARD_V2_RETURN_NEAR = '4.37';
-const WASM_REL = 'contracts/house_nft/target/wasm32-unknown-unknown/release/house_nft.wasm';
+export const MAX_STAKE_NEAR = '3.8';
+export const MAX_STAKE_YOCTO = 3_800_000_000_000_000_000_000_000n;
 
 export function nearOf(yocto) {
   const v = BigInt(yocto);
@@ -45,12 +40,12 @@ export function yoctoOfNear(text) {
 }
 
 /**
- * Stake and the one transfer for a fresh subaccount.
- * The state slack covers the empty NFT metadata and map prefixes. The live shop
- * was 1,208 bytes past its wasm. Unused slack stays liquid on the new account.
+ * Stake for recreating the shop after close. The funding source is the legacy balance.
+ * The state slack covers the empty NFT metadata and map prefixes.
  * @param {{
- *   shop: string, owner: string, legacy: string, wasmBytes: number, wasmSha256: string,
- *   ownerBalanceYocto: string, shopExists: boolean, argBytes?: number,
+ *   shop: string, owner: string, legacy: string, fallback?: string,
+ *   wasmBytes: number, wasmSha256: string, pinnedSha256: string,
+ *   ownerBalanceYocto: string, legacyBalanceYocto: string, shopExists: boolean, argBytes?: number,
  * }} input
  */
 export function planSuccessor(input) {
@@ -58,7 +53,6 @@ export function planSuccessor(input) {
   const owner = input.owner;
   const legacy = input.legacy;
   if (!shop || !owner || !legacy) throw new Error('shop, owner and legacy are required');
-  if (shop === legacy) throw new Error('the successor is a new account');
   const wasmBytes = BigInt(input.wasmBytes);
   if (wasmBytes <= 0n) throw new Error('wasm length');
   const args = JSON.stringify({ owner });
@@ -68,31 +62,66 @@ export function planSuccessor(input) {
   const gas = deployGas(wasmBytes, argBytes);
   const prepaid = gas * GAS_PURCHASE_YOCTO;
   const burned = gas * GAS_PRICE_YOCTO;
-  const balance = BigInt(input.ownerBalanceYocto);
+  const ownerBalance = BigInt(input.ownerBalanceYocto || 0);
+  const legacyBalance = BigInt(input.legacyBalanceYocto || 0);
   const peak = stake + prepaid;
-  const returned = yoctoOfNear(BOARD_V2_RETURN_NEAR);
-  const afterReturn = balance + returned;
+  const afterRecovery = ownerBalance + legacyBalance;
+  const hashOk = input.wasmSha256 === input.pinnedSha256 && !!input.pinnedSha256;
+  const stakeOk = stake <= MAX_STAKE_YOCTO;
+  const recovered = !input.shopExists;
+  const coveredAfterRecovery = afterRecovery >= peak;
   const transfer = {
     kind: 'fund',
     from: owner,
     payee: shop,
     amountYocto: stake.toString(),
-    why: 'create the successor and stake its storage. The legacy shop is not a source and is not a payee.',
+    source: legacy,
+    sourceYocto: legacyBalance.toString(),
+    why: 'recreate ' + shop + ' after close. The funding source is the legacy balance house_pay and close return to ' + owner,
   };
   if (transfer.payee !== shop || transfer.from !== owner) throw new Error('funding parties');
+  if (input.fallback && transfer.payee === input.fallback) throw new Error('the fallback account is not the payee');
   const steps = [
-    { step: 'read the owner balance', pre: `${owner} holds ${nearOf(balance)} NEAR now`, ok: true },
-    { step: 'successor is absent', pre: input.shopExists ? `${shop} already exists; this script does not redeploy it` : `${shop} is not on chain`, ok: !input.shopExists },
-    { step: 'owner covers the peak', pre: balance >= peak ? 'the balance covers the stake and the prepaid gas' : `short by ${nearOf(peak - balance)} NEAR before the expected board return`, ok: balance >= peak },
-    { step: 'expected board return', pre: `about ${BOARD_V2_RETURN_NEAR} NEAR back to ${owner} would leave ${nearOf(afterReturn)} NEAR. That covers the peak: ${afterReturn >= peak ? 'yes' : 'no'}`, ok: afterReturn >= peak },
-    { step: 'create, transfer, deploy, new', pre: `one transaction from ${owner}. new owner is ${owner}. wasm ${wasmBytes} bytes, sha256 ${input.wasmSha256}`, ok: !!input.wasmSha256 && !input.shopExists && balance >= peak },
+    {
+      step: 'recover first',
+      pre: input.shopExists
+        ? `run house-recover.js first. ${legacy} holds ${nearOf(legacyBalance)} NEAR, and that balance is the funding source`
+        : `${legacy} is already gone. Its balance has returned to ${owner}`,
+      ok: recovered,
+    },
+    {
+      step: 'pinned wasm',
+      pre: hashOk
+        ? `sha256 ${input.wasmSha256} matches the pin`
+        : `sha256 ${input.wasmSha256 || 'missing'} does not match the pin ${input.pinnedSha256 || 'missing'}`,
+      ok: hashOk,
+    },
+    {
+      step: 'stake under 3.8 NEAR',
+      pre: stakeOk ? `stake ${nearOf(stake)} NEAR` : `stake ${nearOf(stake)} NEAR is over ${MAX_STAKE_NEAR} NEAR`,
+      ok: stakeOk,
+    },
+    {
+      step: 'recovered balance covers the peak',
+      pre: `${owner} holds ${nearOf(ownerBalance)} NEAR now. After close it holds ${nearOf(afterRecovery)} NEAR. Peak is ${nearOf(peak)} NEAR`,
+      ok: coveredAfterRecovery,
+    },
+    {
+      step: 'create, transfer, deploy, new',
+      pre: `one transaction from ${owner} recreates ${shop}. wasm ${wasmBytes} bytes`,
+      ok: hashOk && stakeOk && recovered && ownerBalance >= peak,
+    },
   ];
   return {
     shop,
     owner,
     legacy,
+    fallback: input.fallback || '',
     wasmBytes: Number(wasmBytes),
     wasmSha256: input.wasmSha256,
+    pinnedSha256: input.pinnedSha256,
+    hashOk,
+    stakeOk,
     initArgs: args,
     storageBytes: storage.toString(),
     stateSlackBytes: HOUSE_STATE_SLACK.toString(),
@@ -105,58 +134,50 @@ export function planSuccessor(input) {
     burnedNear: nearOf(burned),
     accountCreationYocto: ACCOUNT_CREATION_YOCTO.toString(),
     accountCreationNear: nearOf(ACCOUNT_CREATION_YOCTO),
-    ownerBalanceYocto: balance.toString(),
-    ownerBalanceNear: nearOf(balance),
-    expectedReturnNear: BOARD_V2_RETURN_NEAR,
-    ownerAfterReturnYocto: afterReturn.toString(),
-    ownerAfterReturnNear: nearOf(afterReturn),
+    ownerBalanceYocto: ownerBalance.toString(),
+    ownerBalanceNear: nearOf(ownerBalance),
+    legacyBalanceYocto: legacyBalance.toString(),
+    legacyBalanceNear: nearOf(legacyBalance),
+    fundingSource: legacy,
+    fundingSourceYocto: legacyBalance.toString(),
+    afterRecoveryYocto: afterRecovery.toString(),
+    afterRecoveryNear: nearOf(afterRecovery),
     peakYocto: peak.toString(),
     peakNear: nearOf(peak),
-    coveredNow: balance >= peak,
-    coveredAfterReturn: afterReturn >= peak,
+    coveredAfterRecovery,
     shopExists: !!input.shopExists,
     transfer,
     transfers: [transfer],
     steps,
-    liveReady: !input.shopExists && balance >= peak && !!input.wasmSha256,
+    liveReady: hashOk && stakeOk && recovered && ownerBalance >= peak,
   };
 }
 
 export function printPlan(plan) {
-  console.log('Successor: ' + plan.shop);
-  console.log('Legacy shop (not touched): ' + plan.legacy);
+  console.log('Shop: ' + plan.shop);
+  console.log('Fallback (not used): ' + (plan.fallback || 'none'));
   console.log('Owner: ' + plan.owner);
   console.log('Wasm bytes: ' + plan.wasmBytes);
   console.log('Wasm sha256: ' + plan.wasmSha256);
+  console.log('Pinned sha256: ' + plan.pinnedSha256 + (plan.hashOk ? ' (matches)' : ' (does not match)'));
   console.log('Storage bytes: ' + plan.storageBytes + ' (100 byte account + wasm + ' + plan.stateSlackBytes + ' byte state slack)');
   console.log('Storage stake: ' + plan.stakeYocto + ' yoctoNEAR (' + plan.stakeNear + ' NEAR)');
+  console.log('Funding source: ' + plan.fundingSource + ' balance ' + plan.fundingSourceYocto + ' yoctoNEAR (' + plan.legacyBalanceNear + ' NEAR), returned by house_pay then close');
   console.log('Transfer: ' + plan.transfer.amountYocto + ' yoctoNEAR (' + plan.stakeNear + ' NEAR) from ' + plan.transfer.from + ' to ' + plan.transfer.payee);
   console.log('Prepaid gas: ' + plan.prepaidYocto + ' yoctoNEAR (' + plan.prepaidNear + ' NEAR), of which ' + plan.burnedNear + ' NEAR is burned');
   console.log('Account creation burn: ' + plan.accountCreationYocto + ' yoctoNEAR (' + plan.accountCreationNear + ' NEAR), taken from the gas refund');
-  console.log('Peak the owner must hold: ' + plan.peakYocto + ' yoctoNEAR (' + plan.peakNear + ' NEAR)');
-  console.log('Owner balance now: ' + plan.ownerBalanceYocto + ' yoctoNEAR (' + plan.ownerBalanceNear + ' NEAR). Covers the peak: ' + (plan.coveredNow ? 'yes' : 'no'));
-  console.log('Expected board v2 return: about ' + plan.expectedReturnNear + ' NEAR to ' + plan.owner + '. Balance after that return: ' + plan.ownerAfterReturnNear + ' NEAR. Covers the peak: ' + (plan.coveredAfterReturn ? 'yes' : 'no'));
+  console.log('Peak: ' + plan.peakYocto + ' yoctoNEAR (' + plan.peakNear + ' NEAR)');
+  console.log('Owner balance now: ' + plan.ownerBalanceYocto + ' yoctoNEAR (' + plan.ownerBalanceNear + ' NEAR)');
+  console.log('Owner balance after recovery: ' + plan.afterRecoveryYocto + ' yoctoNEAR (' + plan.afterRecoveryNear + ' NEAR). Covers the peak: ' + (plan.coveredAfterRecovery ? 'yes' : 'no'));
   console.log('Steps:');
   for (const step of plan.steps) console.log('  ' + (step.ok ? 'ok' : 'blocked') + '  ' + step.step + ' — ' + step.pre);
-  console.log('The legacy shop is not a source and is not a payee. Its NEAR is a separate recovery.');
+  console.log('Recover with node scripts/house-recover.js before this create.');
 }
 
-function optimize(wasm) {
-  const src = join(tmpdir(), 'house_nft.in.wasm');
-  const out = join(tmpdir(), 'house_nft.opt.wasm');
-  writeFileSync(src, wasm);
-  const ran = spawnSync('wasm-opt', ['-Oz', src, '-o', out], { stdio: 'inherit' });
-  if (ran.status !== 0) return wasm;
-  return readFileSync(out);
-}
-
-function buildWasm(root) {
-  const path = join(root, WASM_REL);
-  const built = spawnSync('cargo', ['+1.86.0', 'build', '--manifest-path', 'contracts/house_nft/Cargo.toml', '--target', 'wasm32-unknown-unknown', '--release', '--locked'], {
-    cwd: root, stdio: 'inherit',
-  });
-  if (built.status !== 0 || !existsSync(path)) throw new Error('house wasm did not build');
-  return optimize(readFileSync(path));
+function pinnedWasm() {
+  const wasm = readFileSync(new URL('../' + HOUSE_WASM_PATH, import.meta.url));
+  const sha = createHash('sha256').update(wasm).digest('hex');
+  return { wasm, sha };
 }
 
 async function rpc(method, params) {
@@ -187,13 +208,15 @@ async function accountOf(id) {
 
 async function main() {
   const live = process.argv.includes('--live');
-  if (HOUSE_SHOP === HOUSE_LEGACY || HOUSE_OWNER !== MAIN.root) {
-    console.error('extras.house.shop must be a new subaccount of ' + MAIN.root);
+  if (HOUSE_SHOP !== HOUSE_LEGACY || HOUSE_OWNER !== MAIN.root) {
+    console.error('extras.house.shop must be the shop account ' + HOUSE_LEGACY);
     process.exit(1);
   }
-  const root = new URL('..', import.meta.url).pathname;
-  const wasm = buildWasm(root);
-  const sha = createHash('sha256').update(wasm).digest('hex');
+  if (!HOUSE_WASM_PATH || !HOUSE_WASM_SHA256) {
+    console.error('extras.house.next wasm and sha256 are required');
+    process.exit(1);
+  }
+  const { wasm, sha } = pinnedWasm();
   const owner = await accountOf(HOUSE_OWNER);
   const shop = await accountOf(HOUSE_SHOP);
   if (!owner.exists) throw new Error(HOUSE_OWNER + ' was not readable');
@@ -201,17 +224,24 @@ async function main() {
     shop: HOUSE_SHOP,
     owner: HOUSE_OWNER,
     legacy: HOUSE_LEGACY,
+    fallback: HOUSE_FALLBACK,
     wasmBytes: wasm.length,
     wasmSha256: sha,
+    pinnedSha256: HOUSE_WASM_SHA256,
     ownerBalanceYocto: owner.amount,
+    legacyBalanceYocto: shop.exists ? shop.amount : '0',
     shopExists: shop.exists,
   });
   printPlan(plan);
   const keySet = !!process.env.NEAR_MAINNET_SIGNER_KEY;
   console.log('Signer key: ' + (keySet ? 'set' : 'not set') + ' (the value is not printed)');
+  if (!plan.hashOk || !plan.stakeOk) {
+    console.error('Dry-run failed: the wasm hash must match the pin and the stake must be at most ' + MAX_STAKE_NEAR + ' NEAR.');
+    process.exit(1);
+  }
   if (!live) {
     console.log('Dry-run. This command does not sign and does not send NEAR.');
-    console.log('Live command: NEAR_MAINNET_SIGNER_KEY=\'ed25519:...\' node scripts/house-deploy.js --live');
+    console.log('Live command, after house-recover.js --live: NEAR_MAINNET_SIGNER_KEY=\'ed25519:...\' node scripts/house-deploy.js --live');
     process.exit(0);
   }
   const key = process.env.NEAR_MAINNET_SIGNER_KEY || '';
@@ -220,10 +250,10 @@ async function main() {
     process.exit(2);
   }
   if (plan.shopExists) {
-    console.error('Refusing to sign: ' + HOUSE_SHOP + ' already exists.');
+    console.error('Refusing to sign: run node scripts/house-recover.js --live first. ' + HOUSE_SHOP + ' still holds ' + plan.legacyBalanceNear + ' NEAR.');
     process.exit(2);
   }
-  if (!plan.coveredNow) {
+  if (!plan.liveReady) {
     console.error('Refusing to sign: ' + HOUSE_OWNER + ' holds ' + plan.ownerBalanceNear + ' NEAR and the peak is ' + plan.peakNear + ' NEAR.');
     process.exit(2);
   }

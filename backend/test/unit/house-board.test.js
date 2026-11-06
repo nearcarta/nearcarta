@@ -7,9 +7,9 @@ import {
 } from '../../../app/src/house-board.js';
 import { sha256Hex } from '../../../app/src/sha256.js';
 import { planHouseLine } from '../../../app/src/panels/house-agent.js';
-import { planSuccessor } from '../../../scripts/house-deploy.js';
+import { planSuccessor, MAX_STAKE_YOCTO } from '../../../scripts/house-deploy.js';
 import { recoveryPlan, sourceMethods, wasmExports } from '../../../scripts/house-recover.js';
-import { HOUSE_CALLS, HOUSE_LEGACY, HOUSE_SHOP } from '../../../shared/house/shop.js';
+import { HOUSE_CALLS, HOUSE_FALLBACK, HOUSE_LEGACY, HOUSE_SHOP, HOUSE_WASM_SHA256 } from '../../../shared/house/shop.js';
 import { FERRY_CALL_TARGETS, MAX_CALLS, callPolicy } from '../../../shared/board/session.js';
 import { shopOf } from '../../../backend/src/board-tx.js';
 import { isDenied } from '../../../backend/src/vault.js';
@@ -120,34 +120,44 @@ test('a visitor check-in builds propose_call_as from that visitor\'s row', () =>
   assert.equal(missing.signed, false);
 });
 
-test('the successor plan funds the new shop from the owner', () => {
+test('the recreate uses the pinned wasm and the legacy balance', () => {
   const plan = planSuccessor({
     shop: HOUSE_SHOP,
     owner: 'nearcarta.near',
     legacy: HOUSE_LEGACY,
+    fallback: HOUSE_FALLBACK,
     wasmBytes: 373051,
-    wasmSha256: 'abc',
-    ownerBalanceYocto: '1000000000000000000000000',
-    shopExists: false,
+    wasmSha256: HOUSE_WASM_SHA256,
+    pinnedSha256: HOUSE_WASM_SHA256,
+    ownerBalanceYocto: '450990806577335499999999',
+    legacyBalanceYocto: '2502774762262500000000000',
+    shopExists: true,
   });
-  assert.equal(plan.transfers.length, 1);
+  assert.equal(plan.hashOk, true);
+  assert.equal(plan.stakeOk, true);
+  assert.equal(plan.stakeNear, '3.75199');
+  assert.ok(BigInt(plan.stakeYocto) <= MAX_STAKE_YOCTO);
+  assert.equal(plan.fundingSource, HOUSE_LEGACY);
   assert.equal(plan.transfer.from, 'nearcarta.near');
-  assert.equal(plan.transfer.payee, HOUSE_SHOP);
-  assert.notEqual(plan.transfer.payee, HOUSE_LEGACY);
-  assert.equal(plan.transfer.amountYocto, plan.stakeYocto);
+  assert.equal(plan.transfer.payee, 'house.nearcarta.near');
+  assert.notEqual(plan.transfer.payee, HOUSE_FALLBACK);
   assert.equal(plan.liveReady, false);
-  assert.equal(plan.coveredNow, false);
-  assert.equal(plan.shopExists, false);
-  const funded = planSuccessor({ ...{
-    shop: HOUSE_SHOP, owner: 'nearcarta.near', legacy: HOUSE_LEGACY, wasmBytes: 373051, wasmSha256: 'abc', shopExists: false,
-  }, ownerBalanceYocto: plan.peakYocto });
-  assert.equal(funded.coveredNow, true);
-  assert.equal(funded.liveReady, true);
-  const taken = planSuccessor({
-    shop: HOUSE_SHOP, owner: 'nearcarta.near', legacy: HOUSE_LEGACY, wasmBytes: 373051, wasmSha256: 'abc',
-    ownerBalanceYocto: plan.peakYocto, shopExists: true,
+  assert.equal(plan.steps[0].step, 'recover first');
+  assert.equal(plan.steps[0].ok, false);
+  const grown = planSuccessor({
+    shop: HOUSE_SHOP, owner: 'nearcarta.near', legacy: HOUSE_LEGACY, fallback: HOUSE_FALLBACK,
+    wasmBytes: 600400, wasmSha256: HOUSE_WASM_SHA256, pinnedSha256: HOUSE_WASM_SHA256,
+    ownerBalanceYocto: '1', legacyBalanceYocto: '1', shopExists: true,
   });
-  assert.equal(taken.liveReady, false);
+  assert.equal(grown.stakeOk, false);
+  assert.equal(grown.stakeNear, '6.02548');
+  const wrong = planSuccessor({
+    shop: HOUSE_SHOP, owner: 'nearcarta.near', legacy: HOUSE_LEGACY,
+    wasmBytes: 373051, wasmSha256: 'abc', pinnedSha256: HOUSE_WASM_SHA256,
+    ownerBalanceYocto: '1', legacyBalanceYocto: '1', shopExists: false,
+  });
+  assert.equal(wrong.hashOk, false);
+  assert.equal(wrong.liveReady, false);
   const src = readFileSync(new URL('../../../contracts/house_nft/src/lib.rs', import.meta.url), 'utf8');
   assert.match(src, /fn migrate_from_v2/);
   assert.match(src, /only the contract may migrate/);
@@ -171,6 +181,8 @@ test('the legacy wasm recovers by house_pay and then close', () => {
   assert.equal(plan.steps[0].args.amount, '1000000000000000000000');
   assert.equal(plan.steps[0].args.receiver_id, 'nearcarta.near');
   assert.equal(plan.steps[1].method, 'close');
+  assert.equal(plan.requiredBeforeCreate, true);
+  assert.equal(plan.waitForCallback, true);
   assert.equal(plan.absent.includes('upgrade'), true);
   assert.equal(plan.absent.includes('migrate'), true);
   assert.equal(plan.absent.includes('house_withdraw'), true);
@@ -185,10 +197,12 @@ test('the legacy wasm recovers by house_pay and then close', () => {
 
 test('the city, the allow list and the denylist use the one shop id', () => {
   assert.equal(HOUSE_LEGACY, 'house.nearcarta.near');
-  assert.equal(MAIN.extras.house.contract, HOUSE_LEGACY);
-  assert.equal(MAIN.extras.house.shop.status, 'not_deployed');
-  assert.equal(MAIN.extras.house.shop.account, HOUSE_SHOP);
-  assert.notEqual(HOUSE_SHOP, HOUSE_LEGACY);
+  assert.equal(HOUSE_SHOP, 'house.nearcarta.near');
+  assert.equal(MAIN.extras.house.contract, HOUSE_SHOP);
+  assert.equal(MAIN.extras.house.shop, HOUSE_SHOP);
+  assert.equal(MAIN.extras.house.fallback.status, 'not_deployed');
+  assert.equal(HOUSE_FALLBACK, 'house3.nearcarta.near');
+  assert.equal(MAIN.extras.house.next.sha256, HOUSE_WASM_SHA256);
   assert.equal(shopOf(HOUSE_SHOP), 'house');
   assert.equal(shopOf(HOUSE_LEGACY), 'house');
   assert.equal(isDenied(HOUSE_SHOP), true);

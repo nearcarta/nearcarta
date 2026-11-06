@@ -204,9 +204,15 @@
     "house": {
       "contract": "house.nearcarta.near",
       "legacy": "house.nearcarta.near",
-      "shop": {
+      "shop": "house.nearcarta.near",
+      "fallback": {
         "status": "not_deployed",
         "account": "house3.nearcarta.near"
+      },
+      "next": {
+        "status": "not_deployed",
+        "wasm": "contracts/artifacts/house_nft.v3.oz.wasm",
+        "sha256": "29bb13027fd672d0b666d04ae23ab248371a03ad21738d0732b8d2f6f559e093"
       },
       "owner": "nearcarta.near",
       "wasm": "house_nft.p86.wasm",
