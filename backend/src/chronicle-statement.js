@@ -115,12 +115,12 @@ export async function signStatement(input = {}, deps = {}) {
     verify_url: verifyLink({ id: c.id, model: c.reqModel || c.model, sig }),
     attestation: {
       verified: [
-        checked.checks.ed25519 ? 'ed25519 signature over the signed text' : null,
+        checked.checks.signatureOk ? `${(checked.algo || 'the response').toUpperCase()} signature over the signed text` : null,
         checked.checks.textMatches ? 'signed text matches the model and the two hashes' : null,
         checked.checks.signerAttested ? 'server matched the signer to one TEE preflight report' : null,
       ].filter(Boolean),
       unverified: ['TEE quote (Intel DCAP, TCB, RTMR3) in the browser', 'raw model response bytes in the browser'],
-      note: 'The browser re-checks the ed25519 signature, the request hash, and the digest. It does not verify the Intel quote.',
+      note: `The browser re-checks the ${checked.algo || 'response'} signature, the request hash, and the digest. It does not verify the Intel quote.`,
     },
     status: 'NEAR AI signature returned. Nothing was signed on chain.',
   };

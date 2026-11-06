@@ -2,6 +2,12 @@
 // The shop reads the top-level row_owner the board injects. This module never
 // treats a nested row_owner as the visitor, and it names no payee of its own.
 import { BOARD_V2, callAsMessage, confirmMessage, injectRowOwner, refundActionArgs, settleArgs } from '../board/call-as.js';
+import MAIN from '../deployments/mainnet.json' with { type: 'json' };
+
+/** The Hall shop account, read from the deployment record. Never hardcoded here. */
+export const HALL_SHOP_ID = MAIN.extras?.townhall?.contract || 'townhall.nearcarta.near';
+/** The board that forwards a row's calls and injects `row_owner`. */
+export const HALL_BOARD_ID = MAIN.board?.contract || 'board.nearcarta.near';
 
 // One source of method names: BOARD_V2 is the object the city bundle and the
 // toll room use, so a rename on chain shows up here too. `stamp` is a board
@@ -90,3 +96,37 @@ export function holdFlow(input) {
 }
 
 export { callAsMessage, confirmMessage, injectRowOwner, BOARD_V2 };
+
+/**
+ * The ordered calls one job move needs on chain. The CTA and the AI dock both run
+ * this, so neither path can drift from the other.
+ *
+ * Each step is a board `propose_call_as` to the Hall shop with `hold:false`: the
+ * board forwards the call, the Hall contract checks `row_owner` against the board
+ * predecessor, and the row caps still apply to the NEAR that moves. `post_job`
+ * carries the deposit; the rest are 0. The board's own row rules decide whether
+ * the call is allowed, so this module grants nothing by itself.
+ */
+export function lifecycleStep({ kind, owner, jobId = null, part = null, near, expiry, signature, deliverable = '', pass = null }) {
+  const base = { owner, receiver: HALL_SHOP_ID, deposit: '0', expiry, effects: [], hold: false, signature };
+  switch (kind) {
+    case 'post_job':
+      return { ...base, method: 'post_job', deposit: String(near), args: { task: '', parts: 1 } };
+    case 'bid':
+      return { ...base, method: 'bid', args: { job_id: String(jobId), part, price: String(near) } };
+    case 'counter':
+      return { ...base, method: 'counter', args: { job_id: String(jobId), part, price: String(near) } };
+    case 'accept':
+      return { ...base, method: 'accept', args: { job_id: String(jobId), part } };
+    case 'deliver':
+      return { ...base, method: 'deliver', args: { job_id: String(jobId), part, deliverable } };
+    case 'review':
+      // The review presents the delivered record and the pass flag. A pass without a
+      // guard clearance is refused on chain, so a Guard BLOCK can never release.
+      return { ...base, method: 'review', args: { job_id: String(jobId), part, pass: !!pass, digest: deliverable } };
+    case 'refund':
+      return { ...base, method: 'refund', args: { job_id: String(jobId) } };
+    default:
+      return null;
+  }
+}

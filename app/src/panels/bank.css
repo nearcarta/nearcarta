@@ -16,6 +16,8 @@ body.bank-tray #shopUI #tray{
   box-shadow:0 16px 40px rgba(0,0,0,.45);
   backdrop-filter:none; -webkit-backdrop-filter:none;
   color:#f3e6cf;
+  /* No entrance animation: a transform that can freeze mid-animation moves the card under the tab buttons. */
+  animation:none!important;
 }
 body.bank-tray #shopUI .t-head,
 body.bank-tray #shopUI .label,
@@ -102,14 +104,42 @@ body.bank-tray #shopUI #t-form .bank-meta input{
   flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;
   display:flex;flex-direction:column;gap:6px;
   padding-right:2px;
+  overscroll-behavior:contain;
 }
 .bank-scroll > *{flex:0 0 auto}
 .bank-field{height:auto;overflow-wrap:anywhere}
 .bank-steps li{overflow-wrap:anywhere}
+/* The foot keeps one fixed status row, then the gold button: same offset in every tab and every state. */
 .bank-foot{
-  flex:0 0 auto;display:flex;flex-direction:column;gap:6px;
-  padding:12px 0 2px;background:#1c1612;position:relative;z-index:2;
+  flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;
+  padding:8px 0 2px;background:#1c1612;position:relative;z-index:2;
+  height:96px;min-height:96px;max-height:96px;box-sizing:border-box;overflow:hidden;
 }
+.bank-foot-rows{
+  display:flex;flex-direction:column;gap:0;flex:0 0 auto;
+  height:34px;min-height:34px;max-height:34px;overflow:hidden;
+}
+.bank-foot-rows > p{
+  margin:0;height:34px;min-height:34px;max-height:34px;overflow:hidden;flex:0 0 auto;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  text-align:center;color:#f3e6cf;font:600 12.5px/1.25 system-ui,sans-serif;overflow-wrap:anywhere;
+}
+.bank-foot-rows > p[hidden]{display:none}
+.bank-line{
+  margin:0;max-height:34px;overflow:hidden;flex:0 0 auto;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  text-align:center;color:#f3e6cf;font:600 13px/1.25 system-ui,sans-serif;overflow-wrap:anywhere;
+}
+.bank-status{margin:0;min-height:0;max-height:34px;overflow:hidden;flex:0 0 auto;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  text-align:center;color:#f3e6cf;font:600 13px/1.25 system-ui,sans-serif;overflow-wrap:anywhere}
+.bank-status:empty{display:none}
+.bank-where{margin:0;color:#d4c4a8;font:500 12px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.bank-note{margin:0;color:#e6d3b0;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.bank-row{display:flex;gap:8px;align-items:center;min-width:0}
+.bank-row select{flex:1 1 auto;min-width:0}
+.bank-row .bank-sample-link{flex:0 0 auto}
+.bank-plain{color:#a08e74;font:600 12px/1.2 system-ui,sans-serif}
+.bank-art{color:#f5d08a;font:700 12px/1.2 system-ui,sans-serif}
 .bank-signer-line{
   display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;
   margin:0;padding:8px 10px;border-radius:12px;border:1px solid #6b5430;background:#1a140f;
@@ -147,14 +177,20 @@ body.bank-tray #shopUI #t-form button.bank-copy{
 .bank-consent{display:flex;align-items:center;gap:12px;min-height:44px;color:#f3e6cf;font:600 14px/1.3 system-ui,sans-serif}
 .bank-consent input{width:22px;height:22px;flex:0 0 auto}
 .bank-card .bank-again{
-  min-height:44px;margin:0;padding:0;border:0;background:transparent;color:#f5d08a;
-  font:700 14px/1 system-ui,sans-serif;cursor:pointer;
+  min-height:22px;margin:0;padding:0;border:0;background:transparent;color:#f5d08a;
+  font:700 13px/1.2 system-ui,sans-serif;cursor:pointer;
 }
 .bank-card .bank-cta{
-  min-height:48px;margin-top:8px;border:0;border-radius:999px;cursor:pointer;
+  min-height:48px;margin:0;border:0;border-radius:999px;cursor:pointer;
   font:700 16px/1 system-ui,sans-serif;
+  /* No press transform: a lingering :active state would move the gold button off its anchor. */
+  transform:none!important;
 }
-.bank-status{margin:0;text-align:center;color:#f3e6cf;font:600 14px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.bank-card .bank-cta:active,
+.bank-card .bank-cta:hover,
+.bank-card .bank-cta:focus,
+.bank-card .bank-cta:focus-visible{transform:none!important}
+.bank-card .bank-cta:hover{filter:brightness(1.04)}
 .bank-steps{margin:0;padding-left:18px;color:#e6d3b0;font:600 13px/1.35 system-ui,sans-serif}
 .bank-log{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px}
 .bank-log li{overflow-wrap:anywhere}

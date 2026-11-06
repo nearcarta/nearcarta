@@ -1,6 +1,10 @@
 // Browser-side expense audit. Payee names stay out of the proof log.
 // A tighter cap is monotonic. The live board session cannot write it yet.
 
+import { signatureLine, checkSplit, verifyResponseSignature, signerIdentity } from './signature-check.js';
+
+export { verifyResponseSignature, signerIdentity, signatureLine, checkSplit };
+
 export const CSV_MAX_CHARS = 6000;
 export const CSV_MAX_ROWS = 32;
 export const DEFAULT_MODEL = 'z-ai/glm-5.3-flash';
@@ -485,36 +489,25 @@ export function attestForNonce({ nonce, checkedNonce, label, live, fields, pendi
   };
 }
 
-export function browserSignatureLine(ok) {
+export function browserSignatureLine(ok, algo, opts = {}) {
+  const a = algo || opts.algo;
+  if (a || opts.checked === false) return signatureLine({ ok, algo: a, checked: opts.checked !== false, why: opts.why });
   return ok
-    ? 'ed25519 signature checked in your browser: valid'
-    : 'ed25519 signature checked in your browser: not valid';
+    ? 'signature checked in your browser: valid'
+    : 'signature checked in your browser: not valid';
 }
 
-export const CHECK_SPLIT = 'Checked in this browser: the ed25519 signature over the signed text. Checked on the server: the model report, the TDX quote, the GPU quote, the nonce, and that the signing address is bound to the quote.';
+/** What ran where. Follows the algorithm the response named, so the claim cannot outrun the check. */
+export function checkSplitFor(algo) {
+  return checkSplit(algo);
+}
 
-function hexToBytes(hex) {
-  const s = String(hex || '').trim().replace(/^0x/, '');
-  if (!s || s.length % 2 || /[^0-9a-f]/i.test(s)) return null;
-  const out = new Uint8Array(s.length / 2);
-  for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(s.slice(i * 2, i * 2 + 2), 16);
+export const CHECK_SPLIT = checkSplit('ecdsa');
+
+/** Re-check the signature in the browser. The server flag is not enough. The algorithm comes from the response. */
+export async function verifyBrowserSignature({ text, signature, signingAddress, algo } = {}) {
+  const out = await verifyResponseSignature({ text, signature, signingAddress, algo });
   return out;
-}
-
-/** Re-check the ed25519 signature in the browser. The server flag is not enough. */
-export async function verifyBrowserSignature({ text, signature, signingAddress } = {}) {
-  const key = hexToBytes(signingAddress);
-  const sig = hexToBytes(signature);
-  if (!key || key.length !== 32) return { ok: false, why: 'The signing address is not a 32-byte key.' };
-  if (!sig || sig.length !== 64) return { ok: false, why: 'The signature is not 64 bytes.' };
-  if (typeof text !== 'string' || !text) return { ok: false, why: 'The signed text is missing.' };
-  try {
-    const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'Ed25519' }, false, ['verify']);
-    const ok = await crypto.subtle.verify({ name: 'Ed25519' }, cryptoKey, sig, new TextEncoder().encode(text));
-    return ok ? { ok: true, why: '' } : { ok: false, why: 'This browser rejected the ed25519 signature.' };
-  } catch (err) {
-    return { ok: false, why: err?.message || 'This browser could not check the signature.' };
-  }
 }
 
 export function wasteSentence(waste, { sampleName } = {}) {
@@ -585,18 +578,27 @@ export function attestFields(body, signature) {
   const gpuOk = model.gpu?.ok === true;
   const sig = signature || {};
   const sigOk = sig.ok === true;
+  const algo = String(body?.signingAlgo || model.signing_algo || gateway.signing_algo || sig.algo || '').toLowerCase();
+  const who = signerIdentity({ signingAddress: model.signing_address, algo });
   return [
     { id: 'model', label: 'Model', where: 'server', ok: !!(body?.model && model.ok), value: body?.model || '', why: body?.model ? (model.ok ? '' : (body?.failure || 'The model report did not pass')) : 'No model was checked' },
-    { id: 'signer', label: 'Signing address', where: 'server', ok: signerOk, value: model.signing_address || '', why: signerOk ? '' : 'The signing address is not bound to the quote' },
+    { id: 'signer', label: who.label, where: 'server', ok: signerOk && who.ok, value: model.signing_address || '', why: signerOk ? who.why : 'The signing address is not bound to the quote' },
     { id: 'tdx', label: 'TDX quote', where: 'server', ok: tdxOk, value: model.tcbStatus || gateway.tcbStatus || '', why: tdxOk ? '' : (gateway.error || model.error || body?.failure || 'The TDX quote did not pass') },
     { id: 'gpu', label: 'GPU quote', where: 'server', ok: gpuOk, value: gpuOk ? `${model.gpu.gpus || ''} GPU`.trim() : '', why: gpuOk ? '' : (model.gpu?.why || (model.gpu ? 'The GPU verdict did not pass' : 'No GPU evidence')) },
     { id: 'nonce', label: 'Nonce', where: 'server', ok: nonceOk, value: body?.nonce || '', why: nonceOk ? '' : 'The quote nonce does not match the one this page sent' },
-    { id: 'signature', label: 'ed25519 signature', where: 'browser', ok: sigOk, value: sigOk ? 'valid' : '', why: sigOk ? '' : (sig.why || 'No completion was sent, so the response signature was not checked') },
+    { id: 'signature', label: algo === 'ecdsa' ? 'ECDSA signature' : algo === 'ed25519' ? 'ed25519 signature' : 'Response signature', where: 'browser', ok: sigOk, algo, checked: sig.checked !== false, value: sigOk ? 'valid' : '', why: sigOk ? '' : (sig.why || 'No completion was sent, so the response signature was not checked') },
   ];
 }
 
-/** Proof-log row. Counts and a nonce prefix only. */
-export function proofLogEntry({ kind, lines, anomalyCount, nonce, eligible }) {
+/** Proof-log row. Counts and a nonce prefix only. `evidence` names a real artifact, or nothing. */
+export function proofLogEntry({ kind, lines, anomalyCount, nonce, eligible, evidence = null }) {
+  const shown = [];
+  for (const item of Array.isArray(evidence) ? evidence : []) {
+    const url = String(item?.url || '');
+    // An absolute link to a page that exists. A local preview is http; production is https.
+    if (!/^https?:\/\/[^\s<>"']+$/i.test(url)) continue;
+    shown.push({ label: String(item.label || 'artifact').slice(0, 40), url });
+  }
   return {
     at: new Date().toISOString(),
     kind: String(kind || 'audit'),
@@ -604,5 +606,6 @@ export function proofLogEntry({ kind, lines, anomalyCount, nonce, eligible }) {
     anomalyCount: Number.isFinite(Number(anomalyCount)) ? Number(anomalyCount) : null,
     nonce: nonce ? String(nonce).slice(0, 8) : '',
     eligible: !!eligible,
+    evidence: shown,
   };
 }

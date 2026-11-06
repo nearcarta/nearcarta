@@ -421,7 +421,7 @@ function sSign() {
       : !chainRead
         ? '<div class="fact"><small>Row</small><b>Reading the board…</b></div>'
         : readError
-          ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div>`
+          ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div><div class="fact"><small>Your row</small><b><button type="button" class="btn link sm" id="read-again" data-testid="setup-read-again">Read the chain again</button></b></div>`
         : `<div class="fact" data-testid="setup-no-row"><small>Row</small><b>No row open on ${esc(MAIN.board.contract)}</b></div>
            <div class="fact" data-testid="setup-key-scope"><small>Agent key will allow</small><b>${SESSION_METHODS.map(m => `<code>${esc(m)}</code>`).join(', ')}</b></div>
            <div class="fact"><small>Next</small><b>Open your row</b></div>`;
@@ -937,6 +937,8 @@ async function ensureChainRow() {
     // `get_charter` returns `null` for an account with no row. That is an answer, not
     // a failed read, and it is the normal state after a close or a force_close.
     chainError = row ? '' : (readError ? 'The chain did not answer. Refresh the page to try again.' : '');
+    // A read that failed is not a verdict on the row: let the next paint try again.
+    if (readError) chainLoadedFor = '';
     if (STEPS[st.step][0] === 'sign') render();
 }
 async function facts() {
@@ -963,6 +965,7 @@ function wireSign() {
     try { await job(); } catch (e) { throw new Error(plainErr(e)); } finally { clearTimeout(t); }
   });
   const b = $('#sign'); if (b) b.onclick = () => watch(b, sign);
+  const again = $('#read-again'); if (again) again.onclick = () => { chainError = ''; chainLoadedFor = ''; chainRead = false; readError = false; render(); ensureChainRow(); };
   const up = $('[data-testid=setup-update-rules]'); if (up) up.onclick = () => watch(up, updateRules);
   const rs = $('#resign'); if (rs) rs.onclick = () => { busy = false; const h = $('#signhelp'); if (h) h.hidden = true; if (up) watch(up, updateRules); else if (b) watch(b, sign); };
   // Sign is where the renew panel shows for a live stale key. wireTry alone never ran here.
