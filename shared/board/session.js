@@ -9,7 +9,7 @@
 // ft_transfer is NEP-141: https://github.com/near/NEPs/blob/master/neps/nep-0141.md
 import { functionCallAllowanceCost } from './cost.js';
 
-export const AGENT_METHODS = ['propose', 'propose_call'];
+export const AGENT_METHODS = ['propose', 'propose_call', 'propose_call_as'];
 export const SESSION_HOURS = [1, 2, 24];
 // 0.05 NEAR of gas. The key cannot spend it as a transfer.
 export const GAS_ALLOWANCE_YOCTO = (10n ** 24n / 20n).toString();

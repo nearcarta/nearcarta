@@ -79,9 +79,7 @@ const signer = new Account(ROOT, rpc, KeyPairSigner.fromSecretKey(key));
 const TG = 10n ** 12n;
 
 async function view(account, method, args) {
-  const raw = await rpc.callFunction(account, method, args || {}, { finality: 'final' });
-  const text = Buffer.from(raw).toString('utf8');
-  try { return JSON.parse(text); } catch { return text; }
+  return rpc.callFunction({ contractId: account, method, args: args || {}, blockQuery: { finality: 'final' } });
 }
 async function accountOf(id) {
   return rpc.query({ request_type: 'view_account', finality: 'final', account_id: id });
