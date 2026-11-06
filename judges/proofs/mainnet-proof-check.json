@@ -332,6 +332,28 @@
       "sender": "nearcarta.near"
     },
     {
+      "shop": "toll",
+      "label": "toll_v7_close",
+      "hash": "HEGDeSoTXpKagGTrEcJPbkNvoWBfr75atSGUCA4FsJLP",
+      "contract": "toll.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "toll",
+      "label": "toll_v7_create_deploy_new_set_price",
+      "hash": "2FrvSxB5EwmY2ZDmKGq2xQJrWLdKiSAa7Cbh6j7C3uxU",
+      "contract": "toll.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
       "shop": "extras.arena",
       "label": "arena_create_fund",
       "hash": "68A7yYMYA8HecYS1kfDzPwBWTHv3iyN8fapggRRmy3ga",

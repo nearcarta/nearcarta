@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [oath, arena, toll, townhall, hall, charter_factory, charter_factory_lock, charter_board, house_nft, attested_check]
+        crate: [oath, arena, toll, townhall, hall, charter_factory, charter_factory_lock, charter_board, house_nft, attested_check, guard]
     steps:
       - uses: actions/checkout@v4
       # charter_board pins rustc 1.86 in rust-toolchain.toml (the wasm mainnet accepted).

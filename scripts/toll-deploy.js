@@ -231,7 +231,10 @@ const report = {
   },
   transfers,
   prechecks: pre,
-  init: path === 'view' ? null : init,
+  // The init args are what a create would use, so they stay in the report even
+  // when this wasm is already live and the path is a view. The pre-check above
+  // reads init.allow_to the same way.
+  init,
   set_price: fee ? {
     board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
     note: 'usdc is the token contract, not a recipient. No visitor address is stored.',
