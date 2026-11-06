@@ -1,6 +1,5 @@
-// City and /shops/house/ tray: Deed, Purse, Guardians.
-// The deed links and the charter row stay in the Deed tab.
-// A session pay uses the caller's ask hook (board propose). This file does not sign.
+// City and /shops/house/ tray. Deed, Vaults, Heirs.
+// One gold button. The AI Agent calls the same runHouseTurn. Neither signs.
 
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
@@ -9,83 +8,80 @@ import { ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './ha
 import { DEED } from '../deed-control.js';
 import { runHouseTurn } from './house-agent.js';
 import { armHouseDock, ensureHouseDock, installHouseDock } from './house-dock.js';
+import { bindTokenFallbacks, tokenStack } from './token-badge.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 
-const ICO = {
-  deed: '<svg class="house-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="8" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 12h9M16 12v3M19 12v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
-  purse: '<svg class="house-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><ellipse cx="12" cy="8" rx="7" ry="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 8v8c0 1.7 3.1 3 7 3s7-1.3 7-3V8" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
-  guard: '<svg class="house-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3l7 3v6c0 4.2-2.8 7.2-7 9-4.2-1.8-7-4.8-7-9V6l7-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
-};
-
 export function houseCharterMarkup({ accountId = '', row = null, failed = false } = {}) {
   if (row && row.per_action_cap != null && row.per_action_cap !== '') {
     const cap = nearOf(row.per_action_cap);
-    const owner = accountId || row.owner || '';
-    return `<div class="house-state" data-testid="house-state" role="status"><p>This account has a charter row on the board.</p><p>Max per payment <b data-testid="house-cap">${esc(cap)}</b> NEAR.</p><p>The next step is Town Hall, where that cap can be changed. Nothing was signed here.</p><p><a class="primary" href="/shops/hall/?owner=${encodeURIComponent(owner)}">Open Town Hall</a></p></div>`;
+    return `<div class="house-state" data-testid="house-state" role="status"><p class="ferry-rate">Max per payment <b data-testid="house-cap">${esc(cap)}</b> NEAR. Change it in Town Hall.</p></div>`;
   }
   if (failed) {
-    return `<div class="house-empty" data-testid="house-empty" role="status"><p>The charter read did not answer.</p><p>Try again in a moment. The buttons above are the public deed record. Nothing was signed.</p></div>`;
+    return `<div class="house-empty" data-testid="house-empty" role="status"><p>The charter read did not answer. Nothing was signed.</p></div>`;
   }
   if (accountId) {
     return charterSetupCta({ accountId, note: 'This account has no charter row. Nothing was signed.' });
   }
-  return `<div class="house-empty" data-testid="house-empty" role="status"><p>Sign in to read your charter row.</p><p>The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Sign in</a></p></div>`;
+  return `<div class="house-empty" data-testid="house-empty" role="status"><p>Sign in to read your charter row. Nothing was signed.</p><p><a href="/setup/?next=%2Fshops%2Fhouse%2F">Sign in</a></p></div>`;
 }
 
-function tabBtn(id, label, icon, on) {
-  return `<button type="button" class="house-tab" role="tab" data-tab="${id}" aria-selected="${on ? 'true' : 'false'}" data-testid="house-tab-${id}">${icon}<span>${label}</span></button>`;
+function tabBtn(id, label, on) {
+  return `<button type="button" role="tab" class="ferry-tab${on ? ' on' : ''}" data-tab="${id}" aria-selected="${on ? 'true' : 'false'}" data-testid="house-tab-${id}">${label}</button>`;
+}
+
+function flow(toSym, toChain) {
+  return `<div class="ferry-flow" data-testid="house-flow" aria-hidden="true">${tokenStack('NEAR', 'near', { size: 48, chainSize: 16 })}<span class="ferry-flow-arrow">→</span>${tokenStack(toSym, toChain, { size: 48, chainSize: 16 })}</div>`;
+}
+
+function field(label, inner) {
+  return `<label class="field ferry-field"><span>${label}</span>${inner}</label>`;
 }
 
 function shell() {
-  return `<div id="house" class="house-room" data-testid="house-room">
-    <div class="house-tabs" role="tablist">${tabBtn('deed', 'Deed', ICO.deed, true)}${tabBtn('purse', 'Purse', ICO.purse, false)}${tabBtn('guardians', 'Guardians', ICO.guard, false)}</div>
-    <div class="house-panel" data-panel="deed" data-testid="house-panel-deed">${deedMarkup()}<div data-testid="house-read"></div></div>
-    <div class="house-panel" data-panel="purse" data-testid="house-panel-purse" hidden></div>
-    <div class="house-panel" data-panel="guardians" data-testid="house-panel-guardians" hidden></div>
-    <p class="house-seal" data-testid="house-seal" role="alert" hidden></p>
-    <p class="house-hint" data-testid="house-hint"></p>
+  return `<div id="house" class="house-room ferry-card" data-testid="house-room">
+    <div class="ferry-tabs" role="tablist" data-testid="house-tabs">${tabBtn('deed', 'Deed', true)}${tabBtn('vaults', 'Vaults', false)}${tabBtn('heirs', 'Heirs', false)}</div>
+    <div class="ferry-pane" data-panel="deed" data-testid="house-panel-deed">
+      ${flow('ETH', 'base')}
+      ${field('Holder', '<input id="house-holder" data-testid="house-holder" readonly>')}
+      ${field('Check-in', '<input id="house-check" data-testid="house-check" value="Not on this deed yet" readonly>')}
+    </div>
+    <div class="ferry-pane" data-panel="vaults" data-testid="house-panel-vaults" hidden>
+      ${flow('ETH', 'base')}
+      ${field('Chain', '<select id="house-chain" data-testid="house-chain"><option value="base">Base</option><option value="btc">Bitcoin · signing only</option></select>')}
+      ${field('Derived address', '<input id="house-address" data-testid="house-address" readonly value="Not live yet" title="The deed contract does not call the signer.">')}
+      ${field('Payee', '<input id="house-payee" data-testid="house-payee" placeholder="0x… or a named payee" autocomplete="off">')}
+      <div class="house-pair">
+        ${field('Balance', '<input id="house-balance" data-testid="house-balance" readonly value="Not read">')}
+        ${field('Asset', '<input id="house-asset" data-testid="house-asset" value="ETH" autocomplete="off">')}
+        ${field('Amount', '<input id="house-amt" data-testid="house-amt" inputmode="decimal" value="0.001" autocomplete="off">')}
+        ${field('Gas', '<input id="house-gas" data-testid="house-gas" inputmode="numeric" value="21000" autocomplete="off">')}
+      </div>
+    </div>
+    <div class="ferry-pane" data-panel="heirs" data-testid="house-panel-heirs" hidden>
+      ${flow('ETH', 'base')}
+      ${field('Heir', '<input id="house-heir" data-testid="house-heir" readonly value="Not set">')}
+      ${field('Guardians', '<input id="house-guardians" data-testid="house-guardians" readonly value="Not set">')}
+      <div class="house-pair">
+        ${field('Threshold', '<input id="house-threshold" data-testid="house-threshold" readonly value="—">')}
+        ${field('Period', '<input id="house-period" data-testid="house-period" readonly value="—">')}
+        ${field('Wait', '<input id="house-wait" data-testid="house-wait" readonly value="—">')}
+        ${field('Approvals', '<input id="house-approvals" data-testid="house-approvals" readonly value="0">')}
+      </div>
+      ${field('Countdown', '<input id="house-countdown" data-testid="house-countdown" readonly value="No release waiting">')}
+    </div>
+    <button type="button" class="primary ferry-cta" data-testid="house-cta" id="house-cta">I'm alive</button>
+    <p class="ferry-rate" data-testid="house-status"></p>
+    <p class="ferry-quote-err" data-testid="house-status-2" hidden></p>
+    <p class="note" data-testid="house-failures" hidden>A lost or hostile guardian cannot release this deed. The owner can cancel.</p>
+    <details class="house-record" data-testid="house-record" open><summary>Recorded payments</summary>${deedMarkup()}<div data-testid="house-read"></div></details>
   </div>`;
 }
 
 function nearText(y) {
-  if (y == null || y === '') return '–';
-  try { return String(nearOf(y)); } catch { return '–'; }
-}
-
-function purseHtml(state) {
-  const p = state.purse;
-  const receivers = state.row?.receivers || [];
-  const opts = receivers.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
-  const figures = p
-    ? `<p data-testid="house-purse">Purse <b>${esc(nearText(p.balance))}</b> NEAR. Cap <b data-testid="house-purse-cap">${esc(nearText(p.cap))}</b> NEAR a payment. Paid ${esc(nearText(p.paid))} in ${esc(p.pays ?? 0)}.</p>`
-    : `<p data-testid="house-purse">No deed purse for this account yet. The public deed record is on the Deed tab.</p>`;
-  return `${figures}
-    <p>Pay from your charter row with the session key. The deed purse is separate: house_pay needs 1 yocto from the holder, and this key cannot attach NEAR.</p>
-    <div class="house-fields">
-      <label>Amount<input id="house-amt" data-testid="house-amt" inputmode="decimal" value="0.001" autocomplete="off"></label>
-      <label>To<select id="house-to" data-testid="house-to">${opts || '<option value="">No payee on the row</option>'}</select></label>
-    </div>
-    <button type="button" class="house-cta" data-testid="house-pay">Pay from my row</button>`;
-}
-
-function guardiansHtml(state) {
-  const rows = state.derived?.rows || [];
-  const keys = rows.length
-    ? rows.map(r => `<p class="house-key" data-testid="house-derived-${esc(r.chain)}"><b>${r.chain === 'eth' ? 'Ethereum' : 'Bitcoin'}</b> · path ${esc(r.path)} · predecessor ${esc(r.predecessor)} · domain ${esc(r.domain_id)}<br>${r.address ? esc(r.address) : 'No address on this page.'}<br>${esc(r.public_key || r.note || '')}</p>`).join('')
-    : `<p data-testid="house-derived-wait">${esc(state.derivedError || 'Reading the signer…')}</p>`;
-  const line = state.line;
-  const live = line?.live
-    ? `<p data-testid="house-line">Check-in is on this contract. Last check-in ${esc(line.line?.last_check_in_ns || '0')}.</p>`
-    : `<p data-testid="house-line">${esc(line?.why || 'Inheritance is prepared in the contract source. This live deed has no house_line view. Nothing was signed.')}</p>`;
-  return `${keys}${live}
-    <ul class="house-notes" data-testid="house-failures">
-      <li>Lost guardian keys: a release never starts. The purse stays with the deed holder.</li>
-      <li>A hostile guardian: one voice is not enough when the threshold is higher. The owner can cancel until the wait ends.</li>
-      <li>The owner is alive but offline: check-in, or cancel during the wait. Nothing releases by itself. Someone must send the transaction.</li>
-    </ul>
-    <button type="button" class="house-cta" data-testid="house-checkin">Check in</button>`;
+  if (y == null || y === '') return '';
+  try { return String(nearOf(y)); } catch { return ''; }
 }
 
 export function mountHouseRoom(root, hooks = {}) {
@@ -96,68 +92,98 @@ export function mountHouseRoom(root, hooks = {}) {
   const state = hooks.state || (hooks.state = {});
   state.id = id;
   state.tab = state.tab || 'deed';
+  state.seen = state.seen || new Set();
   root.innerHTML = shell();
+  bindTokenFallbacks(root);
   const slot = root.querySelector('[data-testid=house-read]');
+  const holder = root.querySelector('#house-holder');
+  if (holder) holder.value = id || 'Sign in';
 
   function showTab(name) {
     state.tab = name || 'deed';
     root.querySelectorAll('[data-panel]').forEach(p => { p.hidden = p.dataset.panel !== state.tab; });
-    root.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === state.tab ? 'true' : 'false'));
+    root.querySelectorAll('[data-tab]').forEach(b => {
+      const on = b.dataset.tab === state.tab;
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.classList.toggle('on', on);
+    });
+    const cta = root.querySelector('[data-testid=house-cta]');
+    if (cta) {
+      if (state.tab === 'vaults') cta.textContent = 'Send from house';
+      else if (state.tab === 'heirs' && state.line?.line?.pending_ns) cta.textContent = 'Cancel release';
+      else cta.textContent = "I'm alive";
+    }
+    setStatus('');
+    const note = root.querySelector('[data-testid=house-failures]');
+    if (note) note.hidden = state.tab !== 'heirs';
+    const record = root.querySelector('[data-testid=house-record]');
+    if (record) {
+      record.hidden = state.tab !== 'deed';
+      if (document.getElementById('shopUI')) record.open = false;
+    }
   }
-  function setHint(text) {
-    const el = root.querySelector('[data-testid=house-hint]');
-    if (el) el.textContent = text || '';
+  function setStatus(text, second) {
+    const a = root.querySelector('[data-testid=house-status]');
+    const b = root.querySelector('[data-testid=house-status-2]');
+    if (a) a.textContent = text || '';
+    if (b) {
+      b.hidden = !second;
+      b.textContent = second || '';
+    }
   }
   function showSeal(text) {
-    const el = root.querySelector('[data-testid=house-seal]');
-    if (el) { el.hidden = !text; el.textContent = text || ''; }
+    setStatus('', text || 'Refused. Nothing was signed.');
     hooks.onRefuse?.(text);
   }
   function hideSeal() {
-    const el = root.querySelector('[data-testid=house-seal]');
-    if (el) { el.hidden = true; el.textContent = ''; }
+    const b = root.querySelector('[data-testid=house-status-2]');
+    if (b && !b.hidden) { b.hidden = true; b.textContent = ''; }
     hooks.hideRefuse?.();
   }
-  function paintPurse() {
-    const panel = root.querySelector('[data-panel=purse]');
-    if (!panel) return;
-    panel.innerHTML = purseHtml(state);
-    const go = panel.querySelector('[data-testid=house-pay]');
-    if (go) go.onclick = () => {
-      const amt = panel.querySelector('#house-amt')?.value || '0.001';
-      const to = panel.querySelector('#house-to')?.value || '';
-      const text = to ? `Pay ${amt} NEAR to ${to}` : `Pay ${amt} NEAR`;
-      turn(text);
+  function vaultFromFields() {
+    const chain = root.querySelector('#house-chain')?.value || 'base';
+    const asset = (root.querySelector('#house-asset')?.value || (chain === 'btc' ? 'BTC' : 'ETH')).toUpperCase();
+    const payee = root.querySelector('#house-payee')?.value?.trim() || '';
+    return {
+      chain, asset, max_value: '0.05', max_gas: 100000,
+      receivers: payee ? [payee] : [],
     };
   }
-  function paintGuardians() {
-    const panel = root.querySelector('[data-panel=guardians]');
-    if (!panel) return;
-    panel.innerHTML = guardiansHtml(state);
-    const go = panel.querySelector('[data-testid=house-checkin]');
-    if (go) go.onclick = () => turn('Check in');
+  function sentence() {
+    if (state.tab === 'vaults') {
+      const chain = root.querySelector('#house-chain')?.value || 'base';
+      const asset = root.querySelector('#house-asset')?.value || 'ETH';
+      const amt = root.querySelector('#house-amt')?.value || '';
+      const payee = root.querySelector('#house-payee')?.value?.trim() || '';
+      const gas = root.querySelector('#house-gas')?.value || '21000';
+      const who = payee ? ` to ${payee}` : '';
+      return `Send ${amt} ${asset} on ${chain}${who} gas ${gas}`;
+    }
+    if (state.tab === 'heirs' && state.line?.line?.pending_ns) return 'Cancel the release';
+    return "I'm alive";
   }
   async function turn(text) {
     hideSeal();
     const result = await runHouseTurn(text, {
       row: state.row,
+      vault: state.tab === 'vaults' ? vaultFromFields() : state.vault,
+      line: state.line,
+      seen: state.seen,
       showTab,
       showSeal,
       hideRefuse: hideSeal,
       onDelivered: (out) => hooks.onDelivered?.(out),
-      ask: hooks.ask,
     });
     if (result?.seal && result.hint) showSeal(result.hint);
-    setHint(result?.hint || '');
-    if (result?.action === 'propose' || result?.tab === 'purse') paintPurse();
+    else setStatus(result?.hint || '');
     if (result?.tab) showTab(result.tab);
     return result;
   }
   root.querySelectorAll('[data-tab]').forEach(btn => {
     btn.onclick = () => showTab(btn.dataset.tab);
   });
-  paintPurse();
-  paintGuardians();
+  const cta = root.querySelector('[data-testid=house-cta]');
+  if (cta) cta.onclick = () => turn(sentence());
   showTab(state.tab);
 
   const dockDoc = typeof document !== 'undefined' ? document : null;
@@ -165,6 +191,39 @@ export function mountHouseRoom(root, hooks = {}) {
     ensureHouseDock(dockDoc);
     installHouseDock(dockDoc);
     armHouseDock((text) => turn(text));
+  }
+
+  function paintVault() {
+    const rows = state.derived?.rows || [];
+    const eth = rows.find(r => r.chain === 'eth');
+    const addr = root.querySelector('#house-address');
+    if (!addr) return;
+    if (eth?.address) addr.value = eth.address;
+    else if (state.derivedError) addr.value = 'Signer did not answer.';
+    else addr.value = 'Not live yet';
+    const bal = root.querySelector('#house-balance');
+    if (bal) {
+      const purse = nearText(state.purse?.balance);
+      bal.value = purse ? `${purse} NEAR in the purse. Foreign balance is not read.` : 'Foreign balance is not read.';
+    }
+  }
+  function paintHeirs() {
+    const line = state.line?.line;
+    const set = (sel, val) => { const el = root.querySelector(sel); if (el) el.value = val; };
+    if (!line) {
+      set('#house-check', state.line?.why || 'Inheritance is not on this live deed.');
+      set('#house-heir', 'Not set');
+      return;
+    }
+    set('#house-check', line.last_check_in_ns ? `Last check-in ${line.last_check_in_ns}` : 'No check-in yet');
+    set('#house-heir', (line.heirs || []).join(', ') || 'Not set');
+    set('#house-guardians', (line.guardians || []).join(', ') || 'Not set');
+    set('#house-threshold', String(line.threshold ?? '—'));
+    set('#house-period', String(line.period_ns ?? '—'));
+    set('#house-wait', String(line.wait_ns ?? '—'));
+    set('#house-approvals', String((line.approvals || []).length));
+    set('#house-countdown', line.pending_ns ? `Waiting since ${line.pending_ns}` : 'No release waiting');
+    showTab(state.tab);
   }
 
   if (!id) {
@@ -178,13 +237,13 @@ export function mountHouseRoom(root, hooks = {}) {
     .then(body => normalizeRow(body));
   function start() {
     const mine = ++gen;
-    if (slot) slot.innerHTML = `<div class="house-state" data-testid="house-reading" role="status"><p>Reading the charter row…</p></div>`;
+    if (slot) slot.innerHTML = `<div class="house-state" data-testid="house-reading" role="status"><p class="note">Reading the charter row…</p></div>`;
     const job = mine === 1 && hooks.row != null
       ? Promise.resolve(hooks.row).then(body => normalizeRow(body))
       : readRow();
     const timer = setTimeout(() => {
       if (mine !== gen || !slot?.isConnected || !slot.querySelector('[data-testid=house-reading]')) return;
-      slot.innerHTML = `<div class="house-state" data-testid="house-row-reason" role="alert"><p>${esc(rowWaitWhy(ROW_WAIT_MS))}</p><p><button type="button" class="house-cta" data-testid="house-retry">Try again</button></p></div>`;
+      slot.innerHTML = `<div class="house-state" data-testid="house-row-reason" role="alert"><p class="note">${esc(rowWaitWhy(ROW_WAIT_MS))}</p><p><button type="button" data-testid="house-retry">Try again</button></p></div>`;
       const retry = slot.querySelector('[data-testid=house-retry]');
       if (retry) retry.onclick = () => start();
     }, ROW_WAIT_MS);
@@ -193,14 +252,13 @@ export function mountHouseRoom(root, hooks = {}) {
       clearTimeout(timer);
       state.row = row;
       if (slot) slot.innerHTML = houseCharterMarkup({ accountId: id, row });
-      paintPurse();
     };
     withRowWait(() => job, ROW_WAIT_MS).then(row => paint(row)).catch(e => {
       if (mine !== gen || (slot && !slot.isConnected)) return;
       clearTimeout(timer);
       if (slot?.querySelector('[data-testid=house-reading]')) {
         const why = e?.code === 'row-wait' ? e.message : `The row could not be read. ${e?.message || 'The charter read did not answer.'} Nothing was signed.`;
-        slot.innerHTML = `<div class="house-state" data-testid="house-row-reason" role="alert"><p>${esc(why)}</p><p><button type="button" class="house-cta" data-testid="house-retry">Try again</button></p></div>`;
+        slot.innerHTML = `<div class="house-state" data-testid="house-row-reason" role="alert"><p class="note">${esc(why)}</p><p><button type="button" data-testid="house-retry">Try again</button></p></div>`;
         const retry = slot.querySelector('[data-testid=house-retry]');
         if (retry) retry.onclick = () => start();
       }
@@ -214,17 +272,17 @@ export function mountHouseRoom(root, hooks = {}) {
       const purses = body?.purses || {};
       state.purse = purses[id] || Object.values(purses)[0] || null;
       state.token = body?.token || null;
-      paintPurse();
+      paintVault();
     })
     .catch(() => {});
   fetch(api() + '/api/house/derived/' + encodeURIComponent(id), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : Promise.reject(new Error('signer did not answer')))
-    .then(body => { state.derived = body; paintGuardians(); })
-    .catch(() => { state.derivedError = 'The signer did not answer. Nothing was signed.'; paintGuardians(); });
+    .then(body => { state.derived = body; paintVault(); })
+    .catch(() => { state.derivedError = 'The signer did not answer. Nothing was signed.'; paintVault(); });
   fetch(api() + '/api/house/line/' + encodeURIComponent(id), { cache: 'no-store' })
     .then(r => r.json())
-    .then(body => { state.line = body; paintGuardians(); })
-    .catch(() => { state.line = { live: false, why: 'house_line is not on this deed. Nothing was signed.' }; paintGuardians(); });
+    .then(body => { state.line = body; paintHeirs(); })
+    .catch(() => { state.line = { live: false, why: 'house_line is not on this deed. Nothing was signed.' }; paintHeirs(); });
 
   state.contract = DEED.contract;
   return { turn, state };

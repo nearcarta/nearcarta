@@ -26,7 +26,14 @@ export async function derivedFor(owner, viewFn) {
       });
     }
   }
-  return { signer: 'v1.signer', owner, predecessor: owner, rows };
+  return {
+    signer: 'v1.signer',
+    owner,
+    predecessor: rows[0]?.predecessor || 'house.nearcarta.near',
+    live: false,
+    why: 'The live house contract does not call the signer. This address is not a vault the deed controls yet.',
+    rows,
+  };
 }
 
 export async function lineFor(account, contract, viewFn) {

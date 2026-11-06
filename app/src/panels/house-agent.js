@@ -1,11 +1,9 @@
-// House commands. A session pay is board propose. house_pay needs 1 yocto from the deed holder.
+// House commands. The gold button and the AI Agent both call runHouseTurn.
+// Neither one signs. A charter propose is not a spend from the deed.
 // A function-call key cannot attach NEAR:
 // https://docs.near.org/protocol/accounts-contracts/access-keys
-// The charter checks the cap inside propose:
-// contracts/charter_board/src/lib.rs
+// The board call that would act as the holder is not deployed. Live broadcast stays blocked.
 
-// Same named-account and implicit-account check as shared/net/accounts.js.
-// This file is served from /panels/, so it cannot import a path outside the site.
 const NAMED = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 const IMPLICIT = /^[0-9a-f]{64}$/;
 function nearAccountOk(id) {
@@ -15,7 +13,7 @@ function nearAccountOk(id) {
 
 const YOCTO = 10n ** 24n;
 
-export const HOUSE_MISS = 'Try: Pay 0.001 NEAR to toll.nearcarta.near · Show my ETH derived address · Check in';
+export const HOUSE_MISS = 'Try: I\'m alive · Send 0.001 ETH on Base · Pay 0.001 NEAR is not a house spend';
 
 export function yoctoFromNear(near) {
   const s = String(near ?? '').trim();
@@ -34,6 +32,7 @@ export function findAccount(line) {
   for (const raw of String(line).split(/[\s,]+/)) {
     const s = raw.replace(/^[("']+|[).,;:!?]+$/g, '');
     if (/^\d+(\.\d+)?$/.test(s)) continue;
+    if (/^0x[0-9a-fA-F]{6,}$/.test(s)) return s;
     if (/^[0-9a-f]{64}$/.test(s) || (s.includes('.') && nearAccountOk(s))) return s;
   }
   return '';
@@ -43,45 +42,29 @@ function big(v) {
   try { return BigInt(v); } catch { return 0n; }
 }
 
-function refuse(hint, extra = {}) {
-  return { ok: true, action: 'refuse', tab: 'purse', seal: true, signed: false, hint, ...extra };
+function num(s) {
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
 }
 
-/** Decide what a house line means. It does not sign. */
-export function planHouseLine(text, ctx = {}) {
-  const line = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!line) return { ok: false, action: 'miss', hint: HOUSE_MISS };
-  if (/\bcheck[\s-]?in\b/i.test(line)) {
-    return {
-      ok: true, action: 'checkin', tab: 'guardians', seal: false, signed: false,
-      hint: 'Check-in needs your full key on house_check_in (1 yocto). Your session key cannot attach NEAR, and this live deed has no check-in method yet. Nothing was signed.',
-    };
-  }
-  if (/\b(address|derived|ethereum|bitcoin)\b/i.test(line) || /\b(eth|btc)\b/i.test(line)) {
-    if (!/\b(pay|send)\b/i.test(line)) {
-      return {
-        ok: true, action: 'derive', tab: 'guardians', seal: false, signed: false,
-        hint: 'Reading the signer for your paths. Nothing was signed.',
-      };
-    }
-  }
-  if (/\b(purse|balance|deed)\b/i.test(line) && !/\b(pay|send)\b/i.test(line)) {
-    return {
-      ok: true, action: 'show', tab: /\b(purse|balance)\b/i.test(line) ? 'purse' : 'deed',
-      seal: false, signed: false,
-      hint: 'These figures are read from the chain. Nothing was signed.',
-    };
-  }
-  if (!/\b(pay|send)\b/i.test(line)) return { ok: false, action: 'miss', hint: HOUSE_MISS };
-  if (/\bpurse\b/i.test(line) || /house_pay/i.test(line) || /\bfrom (my |the )?deed\b/i.test(line)) {
-    return {
-      ok: true, action: 'purse-pay', tab: 'purse', seal: true, signed: false,
-      hint: 'house_pay needs 1 yocto from the deed holder. Your session key cannot attach NEAR, so it was not called. Nothing was signed.',
-    };
-  }
-  const amtMatch = line.match(/(\d+(?:\.\d+)?)/);
-  if (!amtMatch) return { ok: false, action: 'miss', hint: 'Name an amount in NEAR, for example 0.001. Nothing was signed.' };
-  const amountY = yoctoFromNear(amtMatch[1]);
+function refuse(hint, extra = {}) {
+  return { ok: true, action: 'refuse', tab: extra.tab || 'vaults', seal: true, signed: false, live: false, label: 'refused', hint, ...extra };
+}
+
+function amountOf(line) {
+  const m = String(line).match(/(\d+(?:\.\d+)?)/);
+  return m ? m[1] : '';
+}
+
+/** Same fields, same id. A second click does not prepare a second send. */
+export function houseActionId(plan) {
+  return [plan.action, plan.chain || '', plan.asset || '', plan.value || '', plan.to || '', plan.receiver || '', plan.amountY || ''].join('|');
+}
+
+function planNear(line, ctx) {
+  const amt = amountOf(line);
+  if (!amt) return { ok: false, action: 'miss', hint: 'Name an amount in NEAR, for example 0.001. Nothing was signed.' };
+  const amountY = yoctoFromNear(amt);
   if (!amountY || BigInt(amountY) === 0n) return { ok: false, action: 'miss', hint: 'Name an amount above 0. Nothing was signed.' };
   const row = ctx.row || null;
   if (!row || row.per_action_cap == null || row.per_action_cap === '') {
@@ -113,42 +96,106 @@ export function planHouseLine(text, ctx = {}) {
   const canonical = receivers.find(r => r.toLowerCase() === receiver.toLowerCase());
   if (!canonical) return refuse('That account is not on your row. Nothing was signed.', { amountY, receiver });
   return {
-    ok: true, action: 'propose', tab: 'purse', seal: false, signed: false,
-    near: amtMatch[1], amountY, receiver: canonical,
-    hint: `Asking the charter to pay ${amtMatch[1]} NEAR to ${canonical}. The deed purse stays put.`,
+    ok: true, action: 'blocked', tab: 'vaults', seal: false, signed: false, live: false, label: 'blocked',
+    near: amt, amountY, receiver: canonical,
+    hint: 'Blocked. A charter payment does not spend this house. Nothing was signed.',
   };
 }
 
-/** Run a line. Cinema (onDelivered) only after a real allowed tx. */
+function planForeign(line, ctx) {
+  const btc = /\b(btc|bitcoin)\b/i.test(line);
+  const chain = btc ? 'btc' : 'base';
+  const asset = btc ? 'BTC' : (/\busdc\b/i.test(line) ? 'USDC' : 'ETH');
+  const amt = amountOf(line);
+  const gasMatch = String(line).match(/\bgas\s+(\d+)/i);
+  const gas = gasMatch ? Number(gasMatch[1]) : 21000;
+  if (btc && amt && num(amt) > 0) {
+    return refuse('Bitcoin is signing only. A value would be a spend, and this house does not broadcast one. Nothing was signed.', { tab: 'vaults', action: 'refuse', chain, asset });
+  }
+  if (!btc && (!amt || num(amt) <= 0)) {
+    return { ok: false, action: 'miss', tab: 'vaults', hint: 'Name an amount above 0. Nothing was signed.' };
+  }
+  const vault = ctx.vault || null;
+  const to = findAccount(line) || (vault?.receivers?.length === 1 ? vault.receivers[0] : '');
+  if (vault) {
+    if (chain !== String(vault.chain || '').toLowerCase()) return refuse('That chain is not this vault. Nothing was signed.', { chain, asset });
+    if (asset !== String(vault.asset || '').toUpperCase()) return refuse('That asset is not this vault. Nothing was signed.', { chain, asset });
+    if (!btc && num(amt) > num(vault.max_value)) return refuse('That is over the vault cap. Nothing was signed.', { chain, asset, value: amt });
+    if (Number(vault.max_gas) > 0 && Number(gas) > Number(vault.max_gas)) return refuse('That gas is over the vault cap. Nothing was signed.', { chain, asset, value: amt });
+    const receivers = (vault.receivers || []).map(String);
+    if (!to) return { ok: false, action: 'miss', tab: 'vaults', hint: 'Name who receives it. Nothing was signed.' };
+    if (!receivers.some(r => r.toLowerCase() === to.toLowerCase())) {
+      return refuse('That payee is not on this vault. Nothing was signed.', { chain, asset, value: amt, to });
+    }
+  }
+  return {
+    ok: true, action: 'prepare', tab: 'vaults', seal: false, signed: false, live: false, label: 'prepared',
+    chain, asset, value: btc ? '0' : amt, to, gas,
+    hint: 'Prepared. Live broadcast is blocked. Nothing was signed.',
+  };
+}
+
+/** Decide what a house line means. It does not sign and it does not ask the charter to pay. */
+export function planHouseLine(text, ctx = {}) {
+  const line = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!line) return { ok: false, action: 'miss', hint: HOUSE_MISS };
+  if (/\bcancel\b/i.test(line) && /\brelease\b/i.test(line)) {
+    const waiting = !!ctx.line?.line?.pending_ns;
+    return {
+      ok: true, action: 'cancel', tab: 'heirs', seal: false, signed: false, live: false,
+      label: waiting ? 'simulation' : 'blocked',
+      hint: waiting
+        ? 'Simulation. A release is waiting. Cancel needs the holder. Nothing was signed.'
+        : 'Blocked. No release is waiting. Nothing was signed.',
+    };
+  }
+  if (/\b(i'm alive|i’m alive|im alive|check[\s-]?in)\b/i.test(line)) {
+    return {
+      ok: true, action: 'checkin', tab: 'deed', seal: false, signed: false, live: false, label: 'blocked',
+      hint: 'Blocked. Check-in needs 1 yocto from the holder, or the board acting as you. That board call is not live. Nothing was signed.',
+    };
+  }
+  if (/\b(heir|guardian|threshold)\b/i.test(line) && !/\b(pay|send)\b/i.test(line)) {
+    return {
+      ok: true, action: 'show', tab: 'heirs', seal: false, signed: false, live: false, label: 'read',
+      hint: 'Heirs stay on the deed. Changing them needs the holder. Nothing was signed.',
+    };
+  }
+  if (/\b(address|derived|ethereum|bitcoin)\b/i.test(line) && !/\b(pay|send)\b/i.test(line)) {
+    return {
+      ok: true, action: 'derive', tab: 'vaults', seal: false, signed: false, live: false, label: 'read',
+      hint: 'This address follows the deed, not the current holder. The live contract does not call the signer. Nothing was signed.',
+    };
+  }
+  if (/\b(purse|balance|deed)\b/i.test(line) && !/\b(pay|send)\b/i.test(line)) {
+    return {
+      ok: true, action: 'show', tab: /\bdeed\b/i.test(line) && !/\bpurse\b/i.test(line) ? 'deed' : 'vaults',
+      seal: false, signed: false, live: false, label: 'read',
+      hint: 'These figures are read from the chain. Nothing was signed.',
+    };
+  }
+  if (/\bpurse\b/i.test(line) || /house_pay/i.test(line) || /\bfrom (my |the )?deed\b/i.test(line)) {
+    return refuse('The session does not spend the deed purse. house_pay needs 1 yocto from the holder. Nothing was signed.', { action: 'purse-pay' });
+  }
+  const foreign = /\b(btc|bitcoin|eth|base)\b/i.test(line) || /\bfrom (the )?house\b/i.test(line) || /^\s*send\b/i.test(line);
+  if (foreign) return planForeign(line, ctx);
+  if (/\b(pay|send)\b/i.test(line)) return planNear(line, ctx);
+  return { ok: false, action: 'miss', hint: HOUSE_MISS };
+}
+
+/** Run a line. The button and the agent share this. Cinema only after a live destination tx, which this path does not produce. */
 export async function runHouseTurn(text, ctx = {}) {
   const plan = planHouseLine(text, ctx);
   ctx.hideRefuse?.();
   if (plan.tab) ctx.showTab?.(plan.tab);
   if (!plan.ok) return plan;
+  const id = houseActionId(plan);
+  if (!ctx.seen) ctx.seen = new Set();
+  if (plan.action === 'prepare' && ctx.seen.has(id)) {
+    return { ...plan, idempotent: true, hint: 'Already prepared. Nothing was signed again.' };
+  }
   if (plan.seal) ctx.showSeal?.(plan.hint);
-  if (plan.action !== 'propose') return plan;
-  if (typeof ctx.ask !== 'function') {
-    return { ...plan, hint: `${plan.hint} Nothing was signed.` };
-  }
-  try {
-    const out = await ctx.ask(plan.receiver, plan.amountY);
-    if (out?.decision === 'allowed' && out.tx) {
-      ctx.hideRefuse?.();
-      ctx.onDelivered?.(out);
-      return {
-        ok: true, success: true, signed: true, tx: out.tx, action: 'propose',
-        hint: `Paid ${plan.near} NEAR from your charter row to ${plan.receiver}. The deed purse was not spent.`,
-      };
-    }
-    const why = String(out?.reason || 'the charter refused');
-    ctx.showSeal?.(why);
-    return {
-      ok: true, success: false, signed: !!out?.tx, tx: out?.tx || '', action: 'propose',
-      hint: `Refused: ${why}. Nothing was paid.`,
-    };
-  } catch (e) {
-    const why = e?.message || 'the ask stopped';
-    ctx.showSeal?.(why);
-    return { ok: false, action: 'propose', hint: why };
-  }
+  if (plan.action === 'prepare') ctx.seen.add(id);
+  if (plan.label === 'live' && plan.tx) ctx.onDelivered?.(plan);
+  return plan;
 }

@@ -8,7 +8,7 @@
 import { Account, JsonRpcProvider, KeyPairSigner } from 'near-api-js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { proposalMessage } from '../../shared/board/message.js';
-import { AGENT_METHODS, BOARD_PROPOSE_TGAS, GAS_ALLOWANCE_YOCTO, SESSION_BEATS, SESSION_HOURS, callPolicy, sessionExpiresAt } from '../../shared/board/session.js';
+import { AGENT_METHODS, BOARD_PROPOSE_TGAS, GAS_TOPUP_YOCTO, SESSION_BEATS, SESSION_HOURS, callPolicy, sessionExpiresAt } from '../../shared/board/session.js';
 import { functionCall, keyFrom, outcomeOf, rpcClient, signMessage, signTx, viewFn } from '../../shared/vault/tx.js';
 
 const live = process.argv.includes('--live');
@@ -81,7 +81,7 @@ try {
   await call('open', 'open_charter', { rules, agent: agent.publicKey, fund: near(SESSION_BEATS.fundNear).toString() }, near(SESSION_BEATS.openDepositNear));
   opened = true;
   await call('calls', 'set_calls', callPolicy([SHOP], near(SESSION_BEATS.perActionNear).toString(), near(SESSION_BEATS.dailyNear).toString(), SESSION_BEATS.method), near(SESSION_BEATS.callsDepositNear));
-  await me.addFunctionCallAccessKey({ publicKey: agent.publicKey, contractId: BOARD, methodNames: [...AGENT_METHODS], allowance: GAS_ALLOWANCE_YOCTO });
+  await me.addFunctionCallAccessKey({ publicKey: agent.publicKey, contractId: BOARD, methodNames: [...AGENT_METHODS], allowance: GAS_TOPUP_YOCTO });
   added = true;
   console.log(JSON.stringify({ label: 'agent_key', publicKey: agent.publicKey, methods: AGENT_METHODS }));
   await propose('allowed', SESSION_BEATS.allowedNear, 'allowed');

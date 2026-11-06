@@ -1,26 +1,30 @@
-// Chain-signature paths for a house deed.
+// Chain-signature path for a house deed.
 // The signer view is derived_public_key on v1.signer.
-// domain_id 0 is secp256k1 (Ethereum and Bitcoin).
+// domain_id 0 is secp256k1 (Ethereum and Bitcoin). domain 1 is Ed25519, not Bitcoin.
 // https://docs.near.org/chain-abstraction/chain-signatures
-// https://github.com/near/mpc/blob/main/crates/contract/src/api/keys.rs
+// https://docs.near.org/chain-abstraction/chain-signatures/implementation
+// The predecessor is the house contract, so the address stays when the deed moves.
+// https://docs.near.org/chain-abstraction/chain-signatures/tutorials/controlling-near-accounts/1-setup
 // The address is keccak256 of the 64-byte key, last 20 bytes (same as toll-derive).
-// This module does not sign.
+// The live house contract does not call the signer. This module does not sign.
 
 import { addressFromKey } from './toll-derive.js';
 
 export const SIGNER_ACCOUNT = 'v1.signer';
+export const HOUSE_CONTRACT = 'house.nearcarta.near';
 
-/** Args for one unsigned view. Predecessor is the owner's account. */
-export function derivationRequest(owner, chain) {
-  const id = String(owner || '').trim();
+/** Args for one unsigned view. Predecessor is the house contract, not the current holder. */
+export function derivationRequest(tokenId, chain, predecessor = HOUSE_CONTRACT) {
+  const id = String(tokenId || '').trim();
   const which = chain === 'btc' ? 'btc' : 'eth';
   return {
     chain: which,
     path: `${id}-${which}-1`,
-    predecessor: id,
+    predecessor: predecessor || HOUSE_CONTRACT,
     domain_id: 0,
     method: 'derived_public_key',
     account: SIGNER_ACCOUNT,
+    live: false,
   };
 }
 
@@ -31,7 +35,7 @@ export function readDerivedKey(publicKey, chain) {
     return {
       public_key: key,
       address: null,
-      note: 'Bitcoin uses this secp256k1 key (domain 0). This page does not print a Bitcoin address.',
+      note: 'Bitcoin uses this secp256k1 key (domain 0). Signing only. This page does not print a Bitcoin address.',
     };
   }
   if (!key.startsWith('secp256k1:')) {
@@ -43,7 +47,7 @@ export function readDerivedKey(publicKey, chain) {
     return {
       public_key: key,
       address: got.address,
-      note: 'Ethereum address is the last 20 bytes of keccak256 of the 64-byte key. Predecessor is your account.',
+      note: 'Ethereum address is the last 20 bytes of keccak256 of the 64-byte key. The path stays with the deed. The live contract does not call the signer.',
     };
   } catch {
     return { public_key: key, address: null, note: 'The key could not be read.' };

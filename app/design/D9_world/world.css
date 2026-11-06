@@ -191,6 +191,12 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #shopUI .stag .tok .sym { display: none; }
 /* the tray: bottom-left counter slip, one primary action */
 #shopUI #tray { position: fixed; left: var(--s3); bottom: var(--s3); width: 300px; max-height: calc(100dvh - 96px); overflow-y: auto; padding: var(--s3); background: var(--raised); border: 1px solid var(--line); border-radius: var(--R); z-index: 4; animation: shup .24s var(--ease); }
+#shopUI .token-listbox { position: relative; width: 100%; }
+#shopUI .token-listbox-btn { width: 100%; min-height: 44px; box-sizing: border-box; padding: 6px 28px 6px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--base); color: var(--text); font: 600 14px/1.2 Inter, system-ui, sans-serif; display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer; }
+#shopUI .token-listbox-menu { position: relative; z-index: 2; max-height: min(240px, 42vh); overflow: auto; overscroll-behavior: contain; margin: 4px 0 0; padding: 4px; list-style: none; border-radius: 12px; border: 1px solid var(--line); background: var(--base); box-shadow: 0 12px 28px rgba(0,0,0,.45); }
+#shopUI .token-listbox-menu[hidden] { display: none !important; }
+#shopUI .token-opt { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 8px; border-radius: 8px; cursor: pointer; color: var(--text); }
+#shopUI .token-opt.on, #shopUI .token-opt[aria-selected=true], #shopUI .token-opt:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 @keyframes shup { from { transform: translateY(8px); opacity: 0; } }
 #shopUI .t-head { display: flex; align-items: center; gap: var(--s1); margin-bottom: var(--s2); }
 #shopUI #t-title { display: flex; align-items: center; gap: var(--s1); font-size: 20px; line-height: 28px; flex: 1; }
@@ -203,6 +209,7 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #shopUI .tok { display: inline-flex; align-items: center; gap: 6px; }
 #shopUI .tok .tic { position: relative; display: inline-grid; }
 #shopUI .tok .ci { position: absolute; right: -3px; bottom: -3px; border-radius: 50%; box-shadow: 0 0 0 2px var(--raised); }
+#shopUI .tok .ti { border-radius: 50%; object-fit: cover; display: block; }
 #shopUI .hero .tok .ti { width: 32px; height: 32px; } #shopUI .hero .tok .ci { width: 14px; height: 14px; }
 #shopUI .hero .tok .sym { font-size: 20px; color: var(--muted); font-weight: 400; }
 #shopUI .t-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
@@ -606,8 +613,27 @@ body.house-tray #shopUI #tray{
   width:min(440px,calc(100vw - 28px));
   max-width:440px;
   left:16px; bottom:18px;
-  max-height:calc(100dvh - 112px);
+  top:auto;
+  height:auto;
+  max-height:calc(100dvh - 196px);
   padding:24px 22px 22px;
+  box-sizing:border-box;
+  overflow-x:hidden;
+  overflow-y:auto;
+  background:#1f1a15;
+  border:1px solid #3a3128;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+/* Toll Bridge tray: same mix as Ferry. The card owns the pass. */
+body.toll-tray #shopUI #tray{
+  width:min(640px,calc(100vw - 140px));
+  max-width:640px;
+  left:16px; bottom:18px;
+  height:min(560px,calc(100dvh - 120px));
+  min-height:420px;
+  max-height:min(560px,calc(100dvh - 120px));
+  padding:28px 26px 26px;
   box-sizing:border-box;
   overflow-x:hidden;
   overflow-y:auto;
@@ -622,8 +648,30 @@ body.house-tray #shopUI .hero,
 body.house-tray #shopUI #t-who,
 body.house-tray #shopUI #t-track,
 body.house-tray #shopUI .shop-track,
-body.house-tray #shopUI .t-links{display:none!important}
+body.house-tray #shopUI .say,
+body.house-tray #shopUI .t-links,
+body.house-tray #shopUI .rcpt,
+body.house-tray #shopUI #t-cta{display:none!important}
 body.house-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
+body.house-tray #shopUI #t-act[hidden]{display:none!important}
+body.house-tray #shopUI .ferry-tab{min-height:44px;height:44px;border:0;border-radius:11px;background:transparent;color:#d4c4a8;font:700 15px/1 system-ui,sans-serif}
+body.house-tray #shopUI .ferry-tab.on,
+body.house-tray #shopUI .ferry-tab[aria-selected=true]{background:linear-gradient(180deg,#f5d08a,#e2b35b)!important;color:#2a1608!important}
+body.house-tray #shopUI #house-cta{justify-self:center;width:auto!important;min-width:min(220px,100%);min-height:44px}
+body.house-tray #shopUI .ferry-pane{gap:8px}
+body.house-tray #shopUI .ferry-field{gap:4px}
+body.house-tray #shopUI .ferry-flow{padding:8px 12px}
+body.house-tray #shopUI .ferry-card{gap:10px}
+@media (max-width:720px){
+  body.house-tray #shopUI #tray{
+    width:min(440px,calc(100vw - 120px));
+    max-height:calc(100dvh - 168px);
+    bottom:8px;
+    padding:14px 12px 12px;
+  }
+}
+body.house-tray #shopUI .house-record{margin-top:8px;color:#fff8ee}
+body.house-tray #shopUI .house-record summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:#f5d08a}
 body.house-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
 .house-tabs{display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap}
 .house-tab{
@@ -685,12 +733,98 @@ body.house-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center
   background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1 system-ui,sans-serif;
 }
 nav.all-shops a[data-city-shop]{color:#fff8ee;text-decoration:none}
-.house-room{padding-bottom:148px}
+.house-room{padding-bottom:8px}
 @media (max-width:720px){
   body.house-tray #shopUI #tray{
-    width:min(100vw - 16px,420px);left:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    max-height:min(58dvh,calc(100dvh - 108px));padding:20px 18px;
+    width:min(440px,calc(100vw - 120px));
+    left:8px;
+    bottom:8px;
+    max-height:calc(100dvh - 168px);
+    padding:14px 12px 12px;
   }
   #house-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
   .house-agent-pop{width:min(240px,calc(100vw - 120px))}
+}
+body.toll-tray #shopUI .t-head,
+body.toll-tray #shopUI .label,
+body.toll-tray #shopUI .hero,
+body.toll-tray #shopUI #t-who,
+body.toll-tray #shopUI #t-track,
+body.toll-tray #shopUI .shop-track,
+body.toll-tray #shopUI .say,
+body.toll-tray #shopUI .t-links,
+body.toll-tray #shopUI .rcpt{display:none!important}
+body.toll-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
+body.toll-tray #shopUI #t-act[hidden]{display:none!important}
+body.toll-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
+body.toll-tray #shopUI select,
+body.toll-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
+#toll-agent-dock{
+  position:fixed; right:20px; bottom:22px; z-index:70;
+  display:flex; flex-direction:row; align-items:flex-end; gap:12px;
+  pointer-events:none;
+}
+#toll-agent-dock > *,
+#toll-agent-dock .toll-agent-send{pointer-events:auto}
+#toll-agent-dock[hidden]{display:none!important}
+.toll-agent-char{
+  position:relative; display:flex; flex-direction:column; align-items:center; gap:6px;
+  width:96px; padding:0; border:0; background:transparent; cursor:pointer; color:#fff8ee;
+}
+.toll-agent-char:focus-visible{outline:2px solid #f5d08a; outline-offset:4px; border-radius:12px}
+.toll-agent-avatar{
+  width:72px; height:72px; object-fit:contain; display:block;
+  filter:drop-shadow(0 10px 18px rgba(0,0,0,.45));
+}
+.toll-agent-badge{
+  position:absolute; top:-2px; right:6px; z-index:1;
+  width:26px; height:26px; border-radius:999px;
+  background:#fff; color:#2a1608; font:800 15px/26px system-ui,sans-serif;
+  text-align:center; box-shadow:0 4px 12px rgba(0,0,0,.35);
+}
+.toll-agent-char[aria-expanded="true"] .toll-agent-badge{opacity:.35}
+.toll-agent-name{
+  margin:0; color:#f5d08a; font:700 11px/1.2 system-ui,sans-serif;
+  letter-spacing:.05em; text-transform:uppercase; text-shadow:0 2px 8px rgba(0,0,0,.55);
+}
+.toll-agent-pop{
+  width:min(300px,calc(100vw - 140px));
+  box-sizing:border-box; padding:10px; border-radius:14px;
+  border:1px solid #d6b46a66; background:#1f1a15;
+  box-shadow:0 12px 28px rgba(0,0,0,.4);
+  display:grid; gap:8px; overflow:hidden;
+}
+.toll-agent-log{margin:0;color:#f5d08a;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.toll-agent-pop .toll-agent-row{
+  display:grid; grid-template-columns:minmax(0,1fr) 44px; gap:8px; align-items:stretch; min-width:0;
+}
+.toll-agent-pop input{
+  width:100%; min-width:0; box-sizing:border-box; min-height:44px;
+  padding:0 12px; border-radius:10px; border:1px solid #4a3a28;
+  background:#17130f; color:#fff8ee; font:500 14px/1.2 system-ui,sans-serif;
+}
+.toll-agent-pop .toll-agent-send,
+.toll-agent-pop button.toll-agent-send{
+  width:44px; min-width:44px; height:44px; margin:0; padding:0;
+  border:0; border-radius:10px;
+  background:linear-gradient(180deg,#f5d08a,#e2b35b); color:#2a1608;
+  font:700 16px/1 system-ui,sans-serif; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+body.toll-tray #shopUI .stag{pointer-events:none}
+body.toll-tray #shopUI .tokw{display:inline-flex;align-items:center;gap:10px}
+body.toll-tray #shopUI .tokw img.tok{width:22px;height:22px;flex:none;display:block}
+@media (max-width:720px){
+  body.toll-tray #shopUI #tray{
+    width:min(100vw - 16px,640px); max-width:none;
+    left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    height:min(520px,calc(100dvh - 108px));
+    min-height:0;
+    max-height:min(520px,calc(100dvh - 108px));
+    padding:20px 18px;
+  }
+  #toll-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
+  .toll-agent-avatar{width:72px;height:72px}
+  .toll-agent-char{width:88px}
+  .toll-agent-pop{width:min(240px,calc(100vw - 120px))}
 }
