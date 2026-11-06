@@ -1,5 +1,5 @@
-// Local statement, digest, and the Board v2 anchor contract.
-// A matching ed25519 signature is not a NEAR AI TEE attestation.
+// Statement digest, browser checks, and the Board v2 anchor contract.
+// The NEAR AI call stays on the server. A matching ed25519 signature is not an Intel TEE quote.
 // The live board contract has no anchor method. Nothing here signs or spends.
 
 const K = new Uint32Array([
@@ -76,6 +76,14 @@ export function canonicalManifest({ account = '', period = {}, rules = null, row
   return { body, text, digest: sha256Hex(text) };
 }
 
+export function bundleDigest({ account = '', period = {}, rows = [] } = {}) {
+  return canonicalManifest({ account, period, rows, statement: '', model: 'none' }).digest;
+}
+
+export function ed25519Hex(address) {
+  return String(address || '').trim().replace(/^ed25519:/i, '');
+}
+
 export function writeStatement({ account = '', period = {}, rows = [], rules = null, totals } = {}) {
   const t = totals || { delivered: 0, refunded: 0, attempted: 0 };
   const rulesLine = rules?.version
@@ -85,9 +93,9 @@ export function writeStatement({ account = '', period = {}, rows = [], rules = n
     `Account ${account || '(none)'} from ${period.from || 'the start'} to ${period.to || 'now'}.`,
     `Delivered ${t.delivered}. Refunded ${t.refunded}. Attempted ${t.attempted}.`,
     rulesLine,
-    'Local summary. No NEAR AI signature was requested.',
+    'Local fallback. Not a NEAR AI signature.',
   ].join(' ');
-  return { text, mode: 'dry', signature: '', model: 'none', status: 'Local summary. No signature. Nothing was signed.' };
+  return { text, mode: 'local-fallback', signature: '', model: 'none', status: 'Nothing was signed. Local fallback. Not a NEAR AI signature.' };
 }
 
 export async function verifyEd25519(message, signatureHex, publicKeyHex) {
@@ -126,6 +134,55 @@ export async function verifyBundle({ manifestText = '', statement = '', digest =
     return { ok: true, protocol: 'unverified', why: `The digest matches this statement.${rulesNote} No signature was supplied. This is not a NEAR AI TEE attestation.` };
   }
   return { ok: true, protocol: 'ed25519', why: `The ed25519 signature matches this statement.${rulesNote} The NEAR AI TEE binding is unverified.` };
+}
+
+function signedTextOf(proof) {
+  if (proof?.signature_kind === 'gateway') return `${proof.reqSha}:${proof.respSha}`;
+  return `${proof?.model || ''}:${proof?.reqSha || ''}:${proof?.respSha || ''}`;
+}
+
+// Browser check for a NEAR AI signature. The Intel quote is not verified here.
+export async function verifyNearAi({ manifestText = '', statement = '', digest = '', proof = null } = {}) {
+  const base = await verifyBundle({ manifestText, statement, digest });
+  if (!base.ok) return base;
+  const mode = proof?.mode || 'local-fallback';
+  if (mode !== 'near-ai') {
+    return {
+      ok: true,
+      protocol: 'local-fallback',
+      why: 'Local fallback. Not a NEAR AI signature. Ed25519: not present. Canonical digest: not signed. TEE quote (Intel DCAP, TCB, RTMR3): not verified in this browser.',
+    };
+  }
+  let parsed = {};
+  try { parsed = JSON.parse(manifestText); } catch { parsed = {}; }
+  const bound = bundleDigest({
+    account: parsed.account || '',
+    period: parsed.period || {},
+    rows: (parsed.receipts || []).map(h => ({ h })),
+  });
+  const requestBody = String(proof.requestBody || '');
+  const reqSha = requestBody ? sha256Hex(requestBody) : '';
+  const digestBound = !!proof.digest && proof.digest === bound && requestBody.includes(proof.digest) && reqSha === proof.reqSha;
+  const textOk = String(proof.signed_text || '') === signedTextOf(proof);
+  const sig = await verifyEd25519(proof.signed_text || '', proof.signature || '', ed25519Hex(proof.signing_address));
+  const parts = [
+    sig.ok
+      ? 'Ed25519 signature over the request and response hashes: verified.'
+      : `Ed25519 signature: not verified. ${sig.why || ''}`.trim(),
+    digestBound
+      ? 'Canonical digest inside that request: verified.'
+      : 'Canonical digest inside that request: not verified.',
+    textOk
+      ? 'Signed text matches the model and the two hashes: verified.'
+      : 'Signed text matches the model and the two hashes: not verified.',
+    proof.serverVerified
+      ? 'Server signer match against a TEE preflight: recorded, not re-checked in this browser.'
+      : 'Server signer match against a TEE preflight: not recorded.',
+    'Raw model response bytes: not re-hashed in this browser.',
+    'TEE quote (Intel DCAP, TCB, RTMR3): not verified in this browser.',
+  ];
+  const ok = !!(sig.ok && digestBound && textOk);
+  return { ok, protocol: ok ? 'ed25519' : 'rejected', why: parts.join(' ') };
 }
 
 // Board v2 event, when that contract exists:

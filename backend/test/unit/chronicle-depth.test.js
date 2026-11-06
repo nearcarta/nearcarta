@@ -5,7 +5,7 @@ import nacl from 'tweetnacl';
 import { exportCsv, csvTotals } from '../../../app/src/chronicle-feed.js';
 import { parseChronicleCommand, runChronicleCommand } from '../../../app/src/chronicle-commands.js';
 import { accountRows, mergeChronicle } from '../../../app/src/chronicle-loop.js';
-import { anchorPlan, canonicalManifest, rebuildIndex, sha256Hex, verifyBundle, writeStatement } from '../../../app/src/chronicle-audit.js';
+import { anchorPlan, bundleDigest, canonicalManifest, rebuildIndex, sha256Hex, verifyBundle, verifyNearAi, writeStatement } from '../../../app/src/chronicle-audit.js';
 import { iconFor } from '../../../app/src/chronicle-icons.js';
 import { CHRONICLE_CSS } from '../../../app/src/panels/chronicle-style.js';
 import { armChronicleDock, dispatchChronicleDock, installChronicleDock } from '../../../app/src/panels/chronicle-dock.js';
@@ -145,6 +145,10 @@ test('chronicle icons, brass and city wiring stay on the ledger path', () => {
   assert.match(view, /armChronicleDock/);
   assert.match(view, /data-testid="chronicle-search"/);
   assert.match(view, /data-testid="chronicle-export"/);
+  assert.match(view, /aria-label="Account to ledger"/);
+  assert.match(view, /\/api\/chronicle\/live/);
+  assert.doesNotMatch(view, /usdc\.svg/);
+  assert.doesNotMatch(view, /tokens\/near\.svg/);
   const room = read('app/design/D8_shops/shops/chronicle.js');
   assert.match(room, /if \(!opts\.success \|\| !opts\.tx\) return/);
   const index = read('app/design/D9_world/index.html');
@@ -174,6 +178,61 @@ test('an unrelated account is not given the recorded owner feed', () => {
   assert.equal(ferry.rows.filter(r => r.shop === 'ferry').length, 1);
   const pending = accountRows({ account: 'other.near', mainnet: { ferry_intents: { ...mainnet.ferry_intents, status: 'PENDING' } }, index: { txs: [] } });
   assert.equal(pending.rows.some(r => r.shop === 'ferry'), false);
+});
+
+test('an unrelated account keeps its own live rows and does not borrow the owner feed', async () => {
+  const hash = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+  const mainnet = { toll: { owner: 'nearcarta.near', txs: dep.toll.txs } };
+  const live = {
+    rows: [{ hash, signer: 'alice.near', decision: 'allowed', shop: 'ledger', note: 'TRANSFER', amount: '1 NEAR', url: `https://nearblocks.io/txns/${hash}`, source: 'live' }],
+    gaps: ['No board row for this account.', 'No 1Click deposit matched.', 'Historic rules version: missing.'],
+    label: 'Live timeline. 1 rows. board none, rules missing. tx 1. rpc 1. ft none. wrap none. 1click none.',
+  };
+  const got = accountRows({
+    account: 'alice.near',
+    board: { txs: [{ hash: HASH, signer: 'nearcarta.near', decision: 'allowed', shop: 'board', note: 'allowed' }] },
+    mainnet,
+    live,
+  });
+  assert.equal(got.rows.length, 1);
+  assert.equal(got.rows[0].h, hash);
+  assert.match(got.rows[0].url, /nearblocks\.io\/txns\//);
+  assert.match(got.coverage.label, /Live timeline/);
+  assert.equal(got.rows.some(r => r.h === HASH), false);
+  assert.match(got.coverage.gaps.join(' '), /No 1Click deposit matched/);
+  const empty = accountRows({
+    account: 'nobody.near', mainnet,
+    live: { rows: [], gaps: ['nearblocks.io returned no transactions for this account.'], label: 'No rows for this account. board: none, rules missing. transactions: none.' },
+  });
+  assert.equal(empty.rows.length, 0);
+  assert.match(empty.coverage.label, /No rows/);
+  const rows = [{ h: hash }];
+  const bound = bundleDigest({ account: 'alice.near', period: {}, rows });
+  const requestBody = JSON.stringify({ messages: [{ role: 'user', content: `Canonical bundle digest: ${bound}` }] });
+  const reqSha = sha256Hex(requestBody);
+  const respSha = sha256Hex('response-bytes');
+  const model = 'test-model';
+  const signedText = `${model}:${reqSha}:${respSha}`;
+  const kp = nacl.sign.keyPair();
+  const signature = Buffer.from(nacl.sign.detached(new TextEncoder().encode(signedText), kp.secretKey)).toString('hex');
+  const statement = `Delivered 1. Canonical digest ${bound}. Historic rules: missing.`;
+  const manifest = canonicalManifest({ account: 'alice.near', rows, statement, model });
+  const proof = {
+    mode: 'near-ai', model, signature, signing_address: Buffer.from(kp.publicKey).toString('hex'),
+    signature_kind: 'provider_tee', signed_text: signedText, reqSha, respSha, requestBody, digest: bound, serverVerified: false,
+  };
+  const ok = await verifyNearAi({ manifestText: manifest.text, statement, digest: manifest.digest, proof });
+  assert.equal(ok.ok, true);
+  assert.match(ok.why, /Ed25519 signature over the request and response hashes: verified/);
+  assert.match(ok.why, /Canonical digest inside that request: verified/);
+  assert.match(ok.why, /TEE quote \(Intel DCAP, TCB, RTMR3\): not verified in this browser/);
+  const flipped = { ...proof, digest: 'b'.repeat(64) };
+  const bad = await verifyNearAi({ manifestText: manifest.text, statement, digest: manifest.digest, proof: flipped });
+  assert.equal(bad.ok, false);
+  const local = await verifyNearAi({ manifestText: manifest.text, statement, digest: manifest.digest, proof: { mode: 'local-fallback', digest: bound } });
+  assert.equal(local.ok, true);
+  assert.match(local.why, /Local fallback\. Not a NEAR AI signature/);
+  assert.match(local.why, /TEE quote \(Intel DCAP, TCB, RTMR3\): not verified/);
 });
 
 test('a statement digest rejects tampering and a private note stays salted', async () => {

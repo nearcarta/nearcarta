@@ -89,7 +89,7 @@ export function rowFromBoard(t) {
   return {
     shop: shopId(t.shop || 'board'), decision, reason: note, label: note,
     h, signer: t.signer || '', amount: t.amount || amountFromNote(note),
-    url: t.url || link(h), at: t.at || '',
+    url: t.url || link(h), at: t.at || '', chain: t.chain || '',
   };
 }
 
@@ -145,8 +145,8 @@ function take(out, seen, row, source) {
 }
 
 // Rows for one typed account. Recorded proofs are included only when the deployment names that account.
-// An empty account and an unrelated account get no borrowed history.
-export function accountRows({ account = '', board = null, ledger = null, mainnet = null, index = null } = {}) {
+// Live rows come from the account-scoped timeline. An unrelated account never inherits another account's proofs.
+export function accountRows({ account = '', board = null, ledger = null, mainnet = null, index = null, live = null } = {}) {
   const id = String(account || '').trim();
   const gaps = [];
   if (!id) {
@@ -154,12 +154,16 @@ export function accountRows({ account = '', board = null, ledger = null, mainnet
   }
   const out = [];
   const seen = new Set();
-  if (index?.skipped) gaps.push(index.skipped);
+  if (live) {
+    if (live.error) gaps.push(String(live.error));
+    for (const g of live.gaps || []) if (g && !gaps.includes(g)) gaps.push(g);
+    for (const t of live.rows || []) take(out, seen, rowFromBoard(t), t.source || 'live');
+  } else if (index?.skipped) gaps.push(index.skipped);
   else if (index?.error) gaps.push(String(index.error));
   else if (index?.busy) gaps.push('Live index is busy.');
   else if (index && !(index.txs || []).length) gaps.push('Live index returned no rows.');
   else if (!index) gaps.push('Live index was not read.');
-  for (const t of index?.txs || []) take(out, seen, rowFromBoard(t), 'live index');
+  if (!live) for (const t of index?.txs || []) take(out, seen, rowFromBoard(t), 'live index');
   for (const t of board?.txs || []) {
     if (t.signer !== id) continue;
     take(out, seen, rowFromBoard(t), 'recorded proof');
@@ -181,10 +185,12 @@ export function accountRows({ account = '', board = null, ledger = null, mainnet
   if (unsigned) gaps.push('Public ledger rows without this signer were left out.');
   for (const r of ledger?.rows || []) if (r.signer === id) take(out, seen, rowFromLedger(r), 'ledger');
   if (!mainnet) gaps.push('Deployment record did not load.');
-  gaps.push('Historic rules version: missing.');
-  const live = out.some(r => r.source === 'live index');
-  const label = out.length
-    ? `${out.length} for this account. ${live ? 'Live index included.' : 'Recorded proofs, not a live index.'}`
-    : `No rows for this account. ${gaps[0] || 'Coverage is partial.'}`;
-  return { rows: out, coverage: { partial: true, live, gaps, label } };
+  if (!gaps.some(g => /rules version/i.test(g))) gaps.push('Historic rules version: missing.');
+  const liveRows = out.some(r => r.source && r.source !== 'recorded proof' && r.source !== 'ledger');
+  let label;
+  if (!out.length) label = live?.label || `No rows for this account. ${gaps[0] || 'Coverage is partial.'}`;
+  else if (liveRows) label = live?.label || `${out.length} for this account. Live timeline.`;
+  else if (live?.error) label = `${out.length} for this account. Recorded proofs, not a live index. ${live.error}`;
+  else label = `${out.length} for this account. Recorded proofs, not a live index.`;
+  return { rows: out, coverage: { partial: true, live: liveRows, gaps, label } };
 }

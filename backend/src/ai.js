@@ -27,7 +27,7 @@ export async function complete(messages, { model = cfg.nearAiModel, maxTokens = 
   if (!r.ok) throw Object.assign(new Error(`near ai http ${r.status}`), { status: 502 });
   const j = JSON.parse(respText);
   return { id: j.id, model: j.model || model, reqModel: model, content: j.choices?.[0]?.message?.content ?? '', usage: j.usage,
-    reqSha: sha(reqBody), respSha: sha(respText) };  // raw bodies (incl. any reasoning_content) are hashed, never kept
+    reqSha: sha(reqBody), respSha: sha(respText), reqBody };  // raw response (incl. any reasoning_content) is hashed, never kept
 }
 
 export async function signature(id, model, { tries = 6 } = {}) {

@@ -4,15 +4,15 @@ import { csvTotals } from '../chronicle-feed.js';
 import { iconFor } from '../chronicle-icons.js';
 import { accountRows } from '../chronicle-loop.js';
 import { runChronicleCommand } from '../chronicle-commands.js';
-import { anchorPlan, canonicalManifest, verifyBundle, writeStatement } from '../chronicle-audit.js';
+import { anchorPlan, bundleDigest, canonicalManifest, verifyBundle, verifyNearAi, writeStatement } from '../chronicle-audit.js';
 import { armChronicleDock, chronicleDockLog, dispatchChronicleDock, ensureChronicleDock, installChronicleDock } from './chronicle-dock.js';
 import { ensureChronicleStyle } from './chronicle-style.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 const q$ = (root, sel) => root.querySelector(sel);
-const NEAR_ICON = 'd7/assets/tokens/tokens/near.svg';
-const USDC_ICON = 'd7/assets/tokens/tokens/usdc.svg';
+const ACCOUNT_MARK = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#2a2218" stroke="#f5d08a" stroke-width="1.5"/><circle cx="18" cy="14" r="4" fill="#f5d08a"/><path d="M10 26c1.2-4 4-6 8-6s6.8 2 8 6" fill="none" stroke="#f5d08a" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+const LEDGER_MARK = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#2a2218" stroke="#f5d08a" stroke-width="1.5"/><rect x="11" y="9" width="14" height="18" rx="2" fill="none" stroke="#f5d08a" stroke-width="1.5"/><path d="M14 14h8M14 18h8M14 22h5" stroke="#f5d08a" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 
 function shortHash(h) {
   const s = String(h || '');
@@ -33,15 +33,15 @@ export function chronicleMarkup(state) {
   const list = rows.map(x => {
     const denied = x.decision === 'denied';
     const href = x.url || (x.h ? `https://nearblocks.io/txns/${x.h}` : '');
-    const label = `${x.shop || 'row'} on NEAR`;
     return `<li class="${denied ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}">
       <span class="c-mark">${iconFor(x.shop, x.decision)}</span>
-      <span><span class="c-shop">${esc(x.shop || '')}</span><br><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span>${href ? `<br><a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(label)} · ${esc(shortHash(x.h))}</a>` : ''}</span>
+      <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
       <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
     </li>`;
   }).join('') || `<li class="c-empty">${esc(state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.')}</li>`;
   const cta = state.tab === 'verify' ? 'Check this bundle' : (state.tab === 'statement' && state.statement ? 'Anchor' : 'Write statement');
   const verifyHtml = `${esc(state.verify || 'Nothing is signed from this tray.')}${state.verifyUrl ? ` <a data-testid="chronicle-link" href="${esc(state.verifyUrl)}">View transaction</a>` : ''}`;
+  const attest = /TEE quote/.test(state.verify || '');
   const opt = (value, label, cur) => `<option value="${value}"${cur === value ? ' selected' : ''}>${label}</option>`;
   return `<div class="chronicle-card" data-testid="chronicle-card">
     <div class="chronicle-tabs" role="tablist" aria-label="Chronicle">
@@ -49,10 +49,10 @@ export function chronicleMarkup(state) {
       ${tabBtn('statement', 'Statement')}
       ${tabBtn('verify', 'Verify')}
     </div>
-    <div class="c-flow" data-testid="chronicle-flow">
-      <img src="${NEAR_ICON}" alt="NEAR" width="36" height="36">
+    <div class="c-flow" data-testid="chronicle-flow" aria-label="Account to ledger">
+      <span class="c-mark-lg" title="Account">${ACCOUNT_MARK}</span>
       <span class="c-arrow" aria-hidden="true">→</span>
-      <img src="${USDC_ICON}" alt="USDC" width="36" height="36">
+      <span class="c-mark-lg" title="Ledger">${LEDGER_MARK}</span>
     </div>
     <div class="chronicle-pane" data-pane="timeline"${tab === 'timeline' ? '' : ' hidden'}>
       <div class="c-filters">
@@ -78,9 +78,9 @@ export function chronicleMarkup(state) {
     </div>
     <button type="button" class="chronicle-gold" id="c-go" data-testid="chronicle-go">${cta}</button>
     <div class="c-lines">
-      <p class="c-status" data-testid="chronicle-source">${esc(state.sourceText || 'Type an account. No history is assumed.')}</p>
+      <p class="c-status c-cover" data-testid="chronicle-source">${esc(state.sourceText || 'Type an account. No history is assumed.')}</p>
       <div class="c-foot">
-        <p class="c-status" id="c-out" data-testid="chronicle-verify">${verifyHtml}</p>
+        <p class="c-status${attest ? ' c-attest' : ''}" id="c-out" data-testid="chronicle-verify">${verifyHtml}</p>
         <button type="button" class="chronicle-quiet" id="c-csv" data-testid="chronicle-export">Export CSV</button>
       </div>
     </div>
@@ -147,7 +147,10 @@ export function mountChronicleTray(root, hooks = {}) {
   const showOut = () => {
     const live = root.isConnected ? q$(root, '#c-out') : null;
     const html = `${esc(state.verify || 'Nothing is signed from this tray.')}${state.verifyUrl ? ` <a data-testid="chronicle-link" href="${esc(state.verifyUrl)}">View transaction</a>` : ''}`;
-    if (live) live.innerHTML = html;
+    if (live) {
+      live.innerHTML = html;
+      live.classList.toggle('c-attest', /TEE quote/.test(state.verify || ''));
+    }
     const source = root.isConnected ? q$(root, '[data-testid=chronicle-source]') : null;
     if (source) source.textContent = state.sourceText || '';
     const seal = root.isConnected ? q$(root, '#c-seal') : null;
@@ -180,10 +183,9 @@ export function mountChronicleTray(root, hooks = {}) {
     ol.innerHTML = (state.viewRows || []).map(x => {
       const denied = x.decision === 'denied';
       const href = x.url || (x.h ? `https://nearblocks.io/txns/${x.h}` : '');
-      const label = `${x.shop || 'row'} on NEAR`;
       return `<li class="${denied ? 'no' : 'ok'}" data-hash="${esc(x.h || '')}">
         <span class="c-mark">${iconFor(x.shop, x.decision)}</span>
-        <span><span class="c-shop">${esc(x.shop || '')}</span><br><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span>${href ? `<br><a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(label)} · ${esc(shortHash(x.h))}</a>` : ''}</span>
+        <span class="c-rowline">${href ? `<a class="c-tx" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(x.h || '')}">${esc(shortHash(x.h))}</a>` : ''}<span class="c-shop">${esc(x.shop || '')}</span><span class="c-dec">${denied ? 'Refused' : 'Allowed'}${x.amount ? ' · ' + esc(x.amount) : ''}</span></span>
         <button type="button" class="c-v" data-hash="${esc(x.h || '')}" data-signer="${esc(x.signer || '')}">Verify</button>
       </li>`;
     }).join('') || `<li class="c-empty">${esc(state.account ? 'No rows for this account.' : 'Type an account. No history is assumed.')}</li>`;
@@ -208,23 +210,28 @@ export function mountChronicleTray(root, hooks = {}) {
       if (!res.ok) return null;
       return res.json();
     };
-    let board = null, ledger = null, mainnet = null, index = null;
+    let board = null, ledger = null, mainnet = null, live = null;
     try {
+      const livePromise = fetch(`${base}/api/chronicle/live?account=` + encodeURIComponent(id), { signal: AbortSignal.timeout(8000) }).catch(() => null);
       [board, ledger, mainnet] = await Promise.all([
         get('/api/chronicle?owner=' + encodeURIComponent(id)),
         get('/api/ledger'),
         get('/api/mainnet'),
       ]);
-      const idxRes = await fetch(`${base}/api/chronicle/${encodeURIComponent(id)}`).catch(() => null);
-      if (!idxRes) index = { error: 'The live index did not answer.' };
-      else if (idxRes.status === 400) index = { skipped: 'Not a town charter, so the live index was not queried.' };
-      else if (!idxRes.ok) index = { error: 'The live index did not answer.' };
-      else index = await idxRes.json();
+      if (mine !== state.ticket) return;
+      const early = accountRows({ account: id, board, ledger, mainnet, index: { busy: true } });
+      state.auditRows = early.rows;
+      state.coverage = early.coverage;
+      state.sourceText = early.rows.length ? early.coverage.label : 'Reading the live timeline…';
+      drawList();
+      const liveRes = await livePromise;
+      if (!liveRes || !liveRes.ok) live = { error: 'The live timeline did not answer.', rows: [], gaps: ['The live timeline did not answer.'] };
+      else live = await liveRes.json();
     } catch {
-      index = index || { error: 'The live index did not answer.' };
+      live = live || { error: 'The live timeline did not answer.', rows: [], gaps: ['The live timeline did not answer.'] };
     }
     if (mine !== state.ticket) return;
-    const audit = accountRows({ account: id, board, ledger, mainnet, index });
+    const audit = accountRows({ account: id, board, ledger, mainnet, live });
     state.auditRows = audit.rows;
     state.coverage = audit.coverage;
     state.sourceText = audit.coverage.label;
@@ -264,17 +271,51 @@ export function mountChronicleTray(root, hooks = {}) {
     const rows = filteredAll();
     const period = periodOf();
     const totals = csvTotals(rows);
-    const written = writeStatement({ account: state.account, period, rows, rules: null, totals });
-    state.statement = written.text;
-    state.signature = '';
-    state.manifest = canonicalManifest({ account: state.account, period, rows, rules: null, statement: written.text, model: 'none' });
-    state.manifestText = state.manifest.text;
-    state.digest = state.manifest.digest;
-    state.verify = written.status;
+    const local = writeStatement({ account: state.account, period, rows, rules: null, totals });
+    const bound = bundleDigest({ account: state.account, period, rows });
+    state.verify = 'Asking NEAR AI…';
+    showOut();
+    let proof = null;
+    try {
+      const res = await fetch(`${api()}/api/chronicle/statement`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          account: state.account,
+          period,
+          digest: bound,
+          totals,
+          rows: rows.slice(0, 40).map(r => ({ h: r.h, shop: r.shop, decision: r.decision, amount: r.amount || '' })),
+        }),
+        signal: AbortSignal.timeout(25000),
+      });
+      if (res.ok) proof = await res.json();
+    } catch { proof = null; }
+    if (!proof?.text) {
+      proof = {
+        mode: 'local-fallback',
+        text: local.text,
+        model: 'none',
+        signature: '',
+        digest: bound,
+        status: local.status,
+        attestation: { note: 'Local fallback. Not a NEAR AI signature. The statement route did not answer.' },
+      };
+    }
+    const text = proof.text || local.text;
+    state.statement = text;
+    state.signature = proof.signature || '';
+    state.publicKey = String(proof.signing_address || '').replace(/^ed25519:/i, '');
+    state.proof = proof;
+    const manifest = canonicalManifest({ account: state.account, period, rows, rules: null, statement: text, model: proof.model || 'none' });
+    state.manifest = manifest;
+    state.manifestText = manifest.text;
+    state.digest = manifest.digest;
+    state.verify = proof.status || local.status;
     state.verifyUrl = '';
     state.tab = 'statement';
     paint();
-    return { status: written.status };
+    return { status: state.verify };
   }
 
   async function anchorNow() {
@@ -301,7 +342,10 @@ export function mountChronicleTray(root, hooks = {}) {
     const statement = q$(root, '#c-statement')?.value || state.statement || '';
     const digest = q$(root, '#c-digest')?.value ?? state.digest ?? '';
     const signature = q$(root, '#c-vsig')?.value || q$(root, '#c-sig')?.value || state.signature || '';
-    const verdict = await verifyBundle({ manifestText, statement, digest, signature, publicKey: state.publicKey || '' });
+    const proof = state.proof ? { ...state.proof, signature: signature || state.proof.signature || '' } : null;
+    const verdict = proof
+      ? await verifyNearAi({ manifestText, statement, digest, proof })
+      : await verifyBundle({ manifestText, statement, digest, signature, publicKey: state.publicKey || '' });
     state.manifestText = manifestText;
     state.digest = digest;
     state.verify = verdict.why;
