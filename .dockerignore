@@ -10,4 +10,5 @@
 !app/src/panels/toll-dock.js
 !app/src/panels/token-badge.js
 !app/src/panels/icon-map.js
+!app/src/panels/ferry-settle.js
 !app/src/toll-derive.js
