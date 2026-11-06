@@ -53,6 +53,8 @@ async function desktop(browser) {
   await page.fill('#p-memo', 'a live pass');
   await page.click('[data-testid=payout-create]');
   await page.waitForSelector('[data-testid=payout-result]', { timeout: 20000 });
+  // The registration and sponsor lookups each repaint; wait for the repaint to settle before measuring.
+  await page.waitForTimeout(1200);
   const flowAfter = await box(page, '[data-pane=invoice] [data-testid=payout-flow]');
   const fieldsAfter = await box(page, '#p-usd');
   out.flow = { before: flowBefore, after: flowAfter };
