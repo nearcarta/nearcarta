@@ -12,7 +12,7 @@ COPY backend/src backend/src
 COPY backend/data backend/data
 COPY shared shared
 # toll-views imports assembleTollLive from the city panel (Node-safe pure helpers).
-COPY app/src/panels/toll-room.js app/src/panels/toll-dock.js app/src/panels/token-badge.js app/src/panels/icon-map.js app/src/panels/
+COPY app/src/panels/toll-room.js app/src/panels/toll-dock.js app/src/panels/token-badge.js app/src/panels/icon-map.js app/src/panels/ferry-settle.js app/src/panels/
 COPY app/src/toll-derive.js app/src/
 USER node
 EXPOSE 10000
