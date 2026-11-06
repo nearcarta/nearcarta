@@ -25,14 +25,33 @@ export function sendersFor(dep, row) {
 }
 
 export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
-  const res = await fetchImpl(rpc, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } }),
-  });
-  const j = await res.json();
-  const tx = j.result?.transaction;
-  if (!tx) return { hash, found: false, error: j.error?.cause?.name || j.error?.name || 'not found' };
+  let j = null;
+  // A public archival node answers a burst of 71 lookups with rate limits, and an
+  // empty result then looks like a missing tx. Retry the transient answers only.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt) await new Promise(r => setTimeout(r, 250 * attempt));
+    let res;
+    try {
+      res = await fetchImpl(rpc, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } }),
+      });
+    } catch (e) {
+      if (attempt === 2) return { hash, found: false, error: e?.message || 'network' };
+      continue;
+    }
+    if (res.ok === false) {
+      if (attempt === 2) return { hash, found: false, error: `http ${res.status}` };
+      continue;
+    }
+    j = await res.json().catch(() => null);
+    if (j?.result?.transaction) break;
+    // NOT_FOUND is final; anything else (timeout, rate limit, unknown) is worth a retry.
+    if (j?.error?.cause?.name === 'UNKNOWN_TRANSACTION' || j?.error?.cause?.name === 'NOT_FOUND') break;
+  }
+  const tx = j?.result?.transaction;
+  if (!tx) return { hash, found: false, error: j?.error?.cause?.name || j?.error?.name || 'not found' };
   const status = j.result.status || {};
   const failure = Object.prototype.hasOwnProperty.call(status, 'Failure');
   return { hash, found: true, success: !failure && (Object.prototype.hasOwnProperty.call(status, 'SuccessValue') || Object.prototype.hasOwnProperty.call(status, 'SuccessReceiptId')), failure, signer: tx.signer_id || sender };
