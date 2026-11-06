@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
   hostedCeiling, aboveHosted, canonicalInvoice, invoiceRecordId, publicInvoice, invoiceExpired,
-  invoiceQuoteBody, invoiceDelivered, invoiceStatusLine, addressOk, registrationVerdict,
+  invoiceQuoteBody, invoiceDelivered, invoiceStatusLine, addressOk, registrationVerdict, indicativeRefund,
   USDC_NEAR_CONTRACT, USDC_CONTRACT_FALLBACK, nearFromYocto, quoteSummary, bridgeMinimumHint,
   paymentLinks, receiptLine,
 } from '../../app/src/panels/payouts-plan.js';
@@ -85,11 +85,47 @@ export function createInvoice(input, deps = {}) {
   const store = invoiceBook(deps);
   const id = invoiceRecordId(canon.value);
   const existing = store.byId.get(id);
-  if (existing) return { ok: true, replayed: true, invoice: publicInvoice(existing), depositAddress: existing.depositAddress || null, durability: DURABILITY };
-  const row = { ...canon.value, id, status: 'UNPAID', depositAddress: null, createdAt: deps.now || Date.now() };
+  if (existing) {
+    rememberVisitor(existing, input?.visitor);
+    saveFile(store, deps.file ?? filePath(deps.env || process.env));
+    return { ok: true, replayed: true, invoice: publicInvoice(existing), depositAddress: existing.depositAddress || null, durability: DURABILITY };
+  }
+  const row = { ...canon.value, id, status: 'UNPAID', depositAddress: null, visitors: [], createdAt: deps.now || Date.now() };
+  rememberVisitor(row, input?.visitor);
   store.byId.set(id, row);
   saveFile(store, deps.file ?? filePath(deps.env || process.env));
   return { ok: true, replayed: false, invoice: publicInvoice(row), depositAddress: null, durability: DURABILITY };
+}
+
+function rememberVisitor(row, visitor) {
+  const who = String(visitor || '').trim().slice(0, 80);
+  if (!who) return;
+  if (!Array.isArray(row.visitors)) row.visitors = [];
+  if (!row.visitors.some(v => String(v).toLowerCase() === who.toLowerCase())) row.visitors.push(who);
+}
+
+/** Unpaid, Paid, or Expired. Paid is 1Click SUCCESS. Expired is the stored expiry, and it is not paid. */
+export function listStatus(row, now = Date.now()) {
+  if (row?.status === 'SUCCESS') return 'Paid';
+  if (invoiceExpired(row, now)) return 'Expired';
+  return 'Unpaid';
+}
+
+/** Invoices this visitor created. Another visitor's rows are not included. */
+export function listInvoices(visitor, deps = {}) {
+  const who = String(visitor || '').trim();
+  if (!who || who.length > 80) return { ok: false, reason: 'visitor', invoices: [] };
+  const store = invoiceBook(deps);
+  const now = deps.now || Date.now();
+  const key = who.toLowerCase();
+  const invoices = [];
+  for (const row of store.byId.values()) {
+    const owners = (row.visitors || []).map(v => String(v).toLowerCase());
+    if (!owners.includes(key)) continue;
+    invoices.push({ ...publicInvoice(row), createdAt: row.createdAt || 0, listStatus: listStatus(row, now) });
+  }
+  invoices.sort((a, b) => b.createdAt - a.createdAt);
+  return { ok: true, visitor: who, invoices };
 }
 
 /** Read the stored invoice. Query overrides are listed and ignored. */
@@ -100,14 +136,20 @@ export function readInvoice(id, query = {}, deps = {}) {
   return { ok: true, invoice: publicInvoice(row, query), durability: DURABILITY };
 }
 
-export function payerInput(b) {
+export function payerInput(b, { allowIndicative = false } = {}) {
   if (!b || typeof b !== 'object') return { error: 'body must be a JSON object' };
   const from = tokenRef(b.from || 'USDC@base');
   if (!from) return { error: 'missing or bad from' };
   const chain = String(b.chain || from.chain || 'base');
-  if (!addressOk(chain, b.refundTo)) return { error: 'bad refundTo' };
   if (b.recipientType != null && b.recipientType !== 'DESTINATION_CHAIN') return { error: 'recipientType is fixed' };
-  return { ok: true, value: { from, chain, refundTo: b.refundTo } };
+  const typed = String(b.refundTo || '').trim();
+  if (!typed && allowIndicative) {
+    const refundTo = indicativeRefund(chain);
+    if (!refundTo) return { error: 'This chain needs a refund address before a quote.' };
+    return { ok: true, value: { from, chain, refundTo, indicative: true } };
+  }
+  if (!addressOk(chain, typed)) return { error: 'bad refundTo' };
+  return { ok: true, value: { from, chain, refundTo: typed, indicative: false } };
 }
 
 /**
@@ -210,7 +252,13 @@ export async function quoteStored(id, payer, deps = {}) {
   const out = await quoteInvoice({
     usd: row.usd, from: payer.from, to: 'USDC@near', recipient: row.receive, refundTo: payer.refundTo,
   }, deps);
-  return { ...out, invoice: publicInvoice(row), depositAddress: null };
+  return {
+    ...out,
+    indicative: payer.indicative === true,
+    help: payer.indicative ? 'Indicative quote. The refund address is only needed for the deposit address.' : out.help,
+    invoice: publicInvoice(row),
+    depositAddress: null,
+  };
 }
 
 export async function refreshInvoice(id, deps = {}) {
