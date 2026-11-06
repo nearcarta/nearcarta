@@ -107,11 +107,57 @@ export function nextFerryBeat(status, { sailed = false } = {}) {
 }
 
 /**
+ * Decimal NEAR/wNEAR string from a yocto integer. Keeps exact fractions like 0.04875.
+ */
+export function nearAmount(yocto) {
+  try {
+    const s = BigInt(yocto).toString();
+    if (s === '0') return '0';
+    if (s.length <= 24) {
+      const frac = s.padStart(24, '0').replace(/0+$/, '');
+      return frac ? `0.${frac}` : '0';
+    }
+    const whole = s.slice(0, -24);
+    const frac = s.slice(-24).replace(/0+$/, '');
+    return frac ? `${whole}.${frac}` : whole;
+  } catch { return null; }
+}
+
+/**
+ * How much wNEAR this Load cargo should quote and transfer.
+ * When wrap.near already holds stranded board balance from an earlier near_deposit
+ * (e.g. 0.04875 after storage was kept), spend that and skip a new deposit.
+ */
+export function pickWrapSpend({ wantAmount, wrapBalanceYocto = null } = {}) {
+  const want = yoctoNear(wantAmount);
+  if (!want) return { amount: wantAmount == null ? '' : String(wantAmount), amountYocto: null, recover: false };
+  let bal = 0n;
+  try { if (wrapBalanceYocto != null && wrapBalanceYocto !== '') bal = BigInt(wrapBalanceYocto); } catch { bal = 0n; }
+  if (bal <= 0n) return { amount: String(wantAmount), amountYocto: want, recover: false };
+  const use = bal < BigInt(want) ? bal : BigInt(want);
+  return { amount: nearAmount(use), amountYocto: use.toString(), recover: true };
+}
+
+/** NEAR attached to near_deposit so wrap.near credits exactly `transferYocto` wNEAR. */
+export function wrapDepositYocto(transferYocto, wrapRegistered) {
+  const t = BigInt(transferYocto);
+  if (wrapRegistered === false) return (t + BigInt(WRAP_STORAGE_YOCTO)).toString();
+  return t.toString();
+}
+
+/**
  * NEAR-native corridors can be wrap.near calls from the row.
  * Anything else, or a deposit over the cap, is "you send". wallet is always false.
+ *
+ * wrapRegistered / wrapBalanceYocto come from wrap.near view calls on the board:
+ * - unregistered board: near_deposit keeps WRAP_STORAGE_YOCTO, so attach transfer+storage
+ * - stranded wNEAR (wrapBalance >= transfer): skip near_deposit; only storage_deposit + ft_transfer
  */
-export function depositPlan({ from, amount, depositAddress, memo = null, capYocto = null, balanceYocto = null, keyMethods = null } = {}) {
-  const you = (why) => ({ kind: 'you-send', why, wallet: false, steps: [] });
+export function depositPlan({
+  from, amount, depositAddress, memo = null, capYocto = null, balanceYocto = null, keyMethods = null,
+  wrapRegistered = null, wrapBalanceYocto = null, depositAccountRegistered = null,
+} = {}) {
+  const you = (why) => ({ kind: 'you-send', why, wallet: false, steps: [], recover: false });
   if (!nearNative(from)) return you('This chain is not wrap.near. Send the tokens yourself to the deposit address.');
   if (Array.isArray(keyMethods) && keyMethods.length && !keyMethods.includes('propose_call')) {
     return you('This session key cannot call propose_call. Send the tokens yourself. No wallet will open.');
@@ -121,13 +167,30 @@ export function depositPlan({ from, amount, depositAddress, memo = null, capYoct
   if (!amt) return you('The NEAR amount is not a number. Send the tokens yourself.');
   let cap = null;
   let bal = null;
+  let wrapBal = 0n;
   try { if (capYocto != null && capYocto !== '') cap = BigInt(capYocto); } catch { return you('The session cap is not a number.'); }
   try { if (balanceYocto != null && balanceYocto !== '') bal = BigInt(balanceYocto); } catch { bal = null; }
-  const steps = [
-    { receiver: WRAP, method: 'near_deposit', args: '{}', deposit: amt },
-    { receiver: WRAP, method: 'storage_deposit', args: JSON.stringify({ account_id: depositAddress, registration_only: true }), deposit: WRAP_STORAGE_YOCTO },
-    { receiver: WRAP, method: 'ft_transfer', args: JSON.stringify({ receiver_id: depositAddress, amount: amt, memo: memo || null }), deposit: '1' },
-  ];
+  try { if (wrapBalanceYocto != null && wrapBalanceYocto !== '') wrapBal = BigInt(wrapBalanceYocto); } catch { wrapBal = 0n; }
+  const recover = wrapBal >= BigInt(amt);
+  const steps = [];
+  if (!recover) {
+    steps.push({
+      receiver: WRAP, method: 'near_deposit', args: '{}',
+      deposit: wrapDepositYocto(amt, wrapRegistered),
+    });
+  }
+  if (depositAccountRegistered !== true) {
+    steps.push({
+      receiver: WRAP, method: 'storage_deposit',
+      args: JSON.stringify({ account_id: depositAddress, registration_only: true }),
+      deposit: WRAP_STORAGE_YOCTO,
+    });
+  }
+  steps.push({
+    receiver: WRAP, method: 'ft_transfer',
+    args: JSON.stringify({ receiver_id: depositAddress, amount: amt, memo: memo || null }),
+    deposit: '1',
+  });
   let sum = 0n;
   for (const s of steps) {
     const d = BigInt(s.deposit);
@@ -135,7 +198,14 @@ export function depositPlan({ from, amount, depositAddress, memo = null, capYoct
     if (cap != null && d > cap) return you('That amount is over the session cap. Send it yourself to the deposit address.');
   }
   if (bal != null && sum > bal) return you('The row does not hold enough NEAR for this wrap. Send it yourself to the deposit address.');
-  return { kind: 'propose_call', why: '', wallet: false, steps };
+  return {
+    kind: 'propose_call',
+    why: recover ? 'Using stranded wNEAR on the board; no new near_deposit.' : '',
+    wallet: false,
+    steps,
+    recover,
+    transferYocto: amt,
+  };
 }
 
 /** Chain of a "SYM@chain" string, a "SYM|chain" id, or a {chain} token. */

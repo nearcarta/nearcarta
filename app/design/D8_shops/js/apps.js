@@ -8,7 +8,7 @@ import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
-import { boardCallText, cityCheckoutBody, PROPOSE_CALL_TGAS, proposeCallAllowanceOk, quoteRecipient } from '/panels/ferry-settle.js';
+import { boardCallText, cityCheckoutBody, PROPOSE_CALL_TGAS, proposeCallAllowanceOk, quoteRecipient, WRAP } from '/panels/ferry-settle.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -62,6 +62,9 @@ const PLAIN = [
   [/oath frozen/, 'the Toll is paused by its owner'],
   [/attach at least|Exceeded the prepaid gas|ERR_LOW_GAS/, 'the network ran out of gas for this step; try again'],
   [/expired|Expired/, 'the request expired before the network took it; try again'],
+  // wrap.near ft_transfer when the board holds less wNEAR than the plan (near_deposit kept storage).
+  [/The account doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
+  [/doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
   [/NotEnoughBalance|not enough balance/i, 'your account does not have enough NEAR for this step'],
   [/NotEnoughAllowance/, 'the session key does not have enough gas allowance for this ask. Nothing was paid.'],
 ];
@@ -491,6 +494,27 @@ export async function ferryStatus(depositAddress) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'status ' + r.status);
   return j;
+}
+
+/**
+ * wrap.near storage_balance_of for any account (board or a 1Click deposit address).
+ */
+export async function wrapStorageOf(accountId) {
+  if (!accountId) return null;
+  return view(WRAP, 'storage_balance_of', { account_id: accountId }).catch(() => null);
+}
+
+/**
+ * wrap.near storage + wNEAR balance for the board account that signs propose_call.
+ * near_deposit auto-registers the board and keeps WRAP_STORAGE_YOCTO on first deposit.
+ */
+export async function wrapBoardState(board = S.board) {
+  if (!board) return { registered: false, balanceYocto: '0', storage: null };
+  const storage = await wrapStorageOf(board);
+  const raw = await view(WRAP, 'ft_balance_of', { account_id: board }).catch(() => '0');
+  const balanceYocto = String(raw?.amount ?? raw ?? '0');
+  const registered = !!(storage && (storage.total != null || storage.available != null));
+  return { registered, balanceYocto, storage };
 }
 
 /**

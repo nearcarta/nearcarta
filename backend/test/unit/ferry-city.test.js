@@ -7,7 +7,7 @@ import { agentCargoPlan, parseAgentFerry } from '../../../app/src/panels/ferry-p
 import { ferryMarkup } from '../../../app/src/panels/deep.js';
 import { runFerryAgent } from '../../../app/src/panels/deep.js';
 import {
-  boardCallText, cityCheckoutBody, depositPlan, explainQuoteMiss, mayCheckout, nextFerryBeat, quoteRecipient, SESSION_SWAP, WRAP,
+  boardCallText, cityCheckoutBody, depositPlan, explainQuoteMiss, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, quoteRecipient, SESSION_SWAP, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto,
 } from '../../../app/src/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock, lastFerryDockSend } from '../../../app/src/panels/ferry-dock.js';
 
@@ -227,6 +227,9 @@ test('a session load plans a deposit and a guest load stays a demo', () => {
   assert.match(fn, /Demo crossing only/);
   assert.match(fn, /A\.openFerryCheckout/);
   assert.match(fn, /A\.ferryProposeCalls/);
+  assert.match(fn, /A\.wrapBoardState/);
+  assert.match(fn, /pickWrapSpend/);
+  assert.match(fn, /wrapRegistered/);
   assert.match(fn, /watchFerryDeposit/);
   assert.match(fn, /setOrder\?\.\('deposit'\)/);
   assert.match(fn, /hideRefuse/);
@@ -321,6 +324,61 @@ test('0.05 wNEAR within a 0.06 cap is propose_call on wrap.near', () => {
   for (const s of plan.steps) assert.ok(BigInt(s.deposit) <= BigInt(cap));
   const sum = plan.steps.reduce((n, s) => n + BigInt(s.deposit), 0n);
   assert.ok(sum <= 65000000000000000000000n);
+});
+
+test('unregistered board near_deposit attaches transfer plus wrap storage', () => {
+  const transfer = '50000000000000000000000';
+  assert.equal(wrapDepositYocto(transfer, false), (BigInt(transfer) + BigInt(WRAP_STORAGE_YOCTO)).toString());
+  assert.equal(wrapDepositYocto(transfer, true), transfer);
+  const plan = depositPlan({
+    from: 'wNEAR@near', amount: '0.05', depositAddress: 'ab'.repeat(32),
+    capYocto: '60000000000000000000000', balanceYocto: '70000000000000000000000',
+    wrapRegistered: false, wrapBalanceYocto: '0',
+  });
+  assert.equal(plan.kind, 'propose_call');
+  assert.equal(plan.recover, false);
+  assert.equal(plan.steps[0].method, 'near_deposit');
+  assert.equal(plan.steps[0].deposit, '51250000000000000000000');
+  const ft = JSON.parse(plan.steps[2].args);
+  assert.equal(ft.amount, transfer);
+});
+
+test('stranded board wNEAR skips near_deposit and transfers the exact balance', () => {
+  const stranded = '48750000000000000000000';
+  assert.equal(nearAmount(stranded), '0.04875');
+  const pick = pickWrapSpend({ wantAmount: '0.05', wrapBalanceYocto: stranded });
+  assert.equal(pick.recover, true);
+  assert.equal(pick.amount, '0.04875');
+  assert.equal(pick.amountYocto, stranded);
+  const plan = depositPlan({
+    from: 'wNEAR@near', amount: pick.amount, depositAddress: 'cd'.repeat(32),
+    capYocto: '60000000000000000000000', balanceYocto: '13750000000000000000000',
+    wrapRegistered: true, wrapBalanceYocto: stranded,
+  });
+  assert.equal(plan.kind, 'propose_call');
+  assert.equal(plan.recover, true);
+  assert.deepEqual(plan.steps.map(s => s.method), ['storage_deposit', 'ft_transfer']);
+  assert.equal(JSON.parse(plan.steps[1].args).amount, stranded);
+  const sum = plan.steps.reduce((n, s) => n + BigInt(s.deposit), 0n);
+  assert.ok(sum <= 13750000000000000000000n);
+  const registeredDeposit = depositPlan({
+    from: 'wNEAR@near', amount: pick.amount, depositAddress: 'cd'.repeat(32),
+    capYocto: '60000000000000000000000', balanceYocto: '13750000000000000000000',
+    wrapRegistered: true, wrapBalanceYocto: stranded, depositAccountRegistered: true,
+  });
+  assert.deepEqual(registeredDeposit.steps.map(s => s.method), ['ft_transfer']);
+  assert.equal(registeredDeposit.steps[0].deposit, '1');
+});
+
+test('apps.js maps the wrap.near balance panic to stranded wNEAR copy', () => {
+  const apps = read('app/design/D8_shops/js/apps.js');
+  assert.match(apps, /wrapBoardState/);
+  assert.match(apps, /wrapStorageOf/);
+  assert.match(apps, /does not hold enough wNEAR/);
+  assert.match(apps, /stranded wNEAR/);
+  const ui = read('app/design/D8_shops/js/shopui.js');
+  assert.match(ui, /pickWrapSpend/);
+  assert.match(ui, /stranded wNEAR/);
 });
 
 test('status SUCCESS sails once, and a refund does not', () => {
