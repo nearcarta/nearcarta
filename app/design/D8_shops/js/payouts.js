@@ -27,7 +27,7 @@ export function addPayoutRow(rows) {
 export function issueLine(x) {
   if (x.code === 'bad_account') return `${x.to} is not a NEAR account`;
   if (x.code === 'missing_account') return `${x.to} was not found on chain`;
-  return `${x.amt} NEAR is over the 0.005 cap`;
+  return `${x.amt} NEAR is over the ${x.cap ?? NEAR_CAP} cap`;
 }
 
 export function issueText(issues) {
@@ -43,15 +43,16 @@ export function issueText(issues) {
 }
 
 /** NEAR rows must be real account ids at or under the cap. USDC rows are kept and not sent. A blank name is not an error. */
-export function payoutIssues(rows, exists) {
+export function payoutIssues(rows, exists, cap = NEAR_CAP) {
   const issues = [];
+  const limit = Number.isFinite(Number(cap)) ? Number(cap) : NEAR_CAP;
   for (const r of rows || []) {
     if (String(r?.asset || 'NEAR').toUpperCase() === 'USDC') continue;
     const to = String(r?.to || '').trim();
     if (!to) continue;
     if (!nearAccountOk(to)) issues.push({ code: 'bad_account', to });
     else if (exists && exists[to] === false) issues.push({ code: 'missing_account', to });
-    if (!nearAmountOk(r?.amt)) issues.push({ code: 'over_cap', to, amt: r?.amt });
+    if (!nearAmountOk(r?.amt, limit)) issues.push({ code: 'over_cap', to, amt: r?.amt, cap: limit });
   }
   return issues;
 }

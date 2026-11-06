@@ -48,7 +48,7 @@ const LS_AGENT = c => 'nearcarta.vault.agent.' + c;
 const LS_RCPT = c => 'nearcarta.d8.receipts.' + c;
 const LS_OPEN = c => 'nearcarta.d8.mist.' + c;
 const WHY = {
-  receiver_not_allowlisted: 'you never allowed that account', over_per_action_cap: 'more than your max per payment', over_daily_budget: 'more than your daily cap',
+  receiver_not_allowlisted: 'you never allowed that account', agent_key_mismatch: 'the agent key in this browser does not match the charter', over_per_action_cap: 'more than your max per payment', over_daily_budget: 'more than your daily cap',
   over_daily_action_count: 'too many payments today (your rules cap the count; it resets at midnight UTC)', below_min_amount: 'smaller than your smallest payment', outside_time_window: 'outside the hours you allowed',
   unknown_clause: 'you never allowed that route', stale_policy_version: 'your rules changed mid-ask', expired: 'the request expired', storage_reserve_low: 'your charter needs a top-up', frozen: 'your charter is frozen', batch_refused: 'another payout broke a rule',
 };
@@ -71,6 +71,7 @@ const PLAIN = [
 ];
 export function plainError(e) {
   const m = String(e?.message || e || '');
+  if (/ERR_BAD_SIG/.test(m)) return 'the signature does not match the agent key stored in this browser';
   if (/http (429|502|503|504)|Failed to fetch|NetworkError|Load failed/i.test(m)) return 'the town is busy right now; try again in a moment';
   if (/Cannot read prop|is not a function|is not defined|Cannot convert undefined or null/.test(m) && !/ERR_/.test(m)) return 'something did not load; try again in a moment';
   for (const [re, t] of PLAIN) if (re.test(m)) return t;
@@ -83,7 +84,8 @@ let CFG = null, rpc = null, conn = null;
 export const S = { me: null, charter: null, clauses: {}, usage: {}, state: null, ready: false };
 const api = async (p, o) => { const r = await fetch(API + p, o); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'http ' + r.status); return j; };
 const view = (c, m, a) => W.viewFn(rpc, c, m, a);
-const agent = () => { const k = S.charter && localStorage.getItem(LS_AGENT(S.charter)); return k ? W.keyFrom(k) : null; };
+// Read the one stored secret at call time. A key captured before Refresh agent key is never reused.
+const agent = () => W.storedAgentKey(k => globalThis.localStorage?.getItem(k) ?? null, S.charter);
 const pay = () => S.clauses.pay;
 // every signed result shows its tx as one visible link (round-2 judges: a collapsed "details" read as no link at all)
 // One real mainnet payment by a visitor's agent on board.nearcarta.near (shared/deployments/mainnet.json visitor_run).
@@ -301,17 +303,22 @@ function settled(shop, out) {
   readRules().catch(() => {});
   return out;
 }
-async function boardPay({ shop, receiver, amountY }) {
-  const row = S.boardRow || await view(S.board, 'get_charter', { owner: S.me });
+async function boardPay({ shop, receiver, amountY, chainCap = false, reveal = null }) {
+  // The row nonce moves on every propose. A cached S.boardRow signs the previous nonce and the contract returns ERR_BAD_SIG.
+  const row = await view(S.board, 'get_charter', { owner: S.me });
   if (!row) throw new Error('no charter row yet: finish setup first');
   S.boardRow = row;
   const amount = String(amountY);
   const local = localRefusal(receiver, amount);
-  if (local) return { tx: null, decision: 'denied', reason: local, action: null, amount, receiver, fromRule: true, cap: pay()?.per_action_cap || null };
+  // Payouts submits an over-cap row so propose can refuse it on chain. Other shops still stop here.
+  if (local && !(chainCap && local === 'over_per_action_cap')) return { tx: null, decision: 'denied', reason: local, action: null, amount, receiver, fromRule: true, cap: pay()?.per_action_cap || null };
   const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
+  if (W.pubkeyHex(key) !== String(row.agent || '')) {
+    return { tx: null, decision: 'denied', reason: 'agent_key_mismatch', action: null, amount, receiver, fromRule: true, cap: pay()?.per_action_cap || null };
+  }
   const msg = proposalMessage({ contract: S.board, owner: S.me, receiver, amount, nonce: String(row.nonce) });
   const signature = W.signMessage(key, msg);
-  const args = { owner: S.me, receiver, amount, signature, reveal: null };
+  const args = { owner: S.me, receiver, amount, signature, reveal: reveal || null };
   const ak = await proposeAccessKey(key);
   try {
     if (ak) {
@@ -341,10 +348,10 @@ async function boardPay({ shop, receiver, amountY }) {
     throw e;
   }
 }
-export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null }) {
-  if (S.board) return boardPay({ shop, receiver, amountY });
-  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
+export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null, reveal = null }) {
+  if (S.board) return boardPay({ shop, receiver, amountY, reveal });
   const st = await view(S.charter, 'get_state');
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
   const p = { shop, clause_id: clauseId, receiver, amount: String(amountY), nonce: String(st.next_nonce), policy_version: st.policy_version,
     expires_at: String(BigInt(Date.now() + 10 * 60_000) * 1_000_000n), memo, receipt: null };
   const r = await W.sendPropose(rpc, { key, charter: S.charter, p });
@@ -525,9 +532,9 @@ export async function wrapBoardState(board = S.board) {
 export async function ferryProposeCalls(steps) {
   const you = (reason, extra = {}) => ({ ok: false, youSend: true, wallet: false, reason, ...extra });
   if (!S.board || !S.me) return you('no_session');
-  const key = agent();
-  if (!key) return you('no_key');
-  const ak0 = await proposeAccessKey(key);
+  const sessionKey = agent();
+  if (!sessionKey) return you('no_key');
+  const ak0 = await proposeAccessKey(sessionKey);
   const names = ak0?.permission?.FunctionCall?.method_names || [];
   if (!ak0 || (names.length && !names.includes('propose_call'))) return you('key_cannot_propose_call');
   const list = steps || [];
@@ -545,6 +552,10 @@ export async function ferryProposeCalls(steps) {
     const argsStr = typeof step.args === 'string' ? step.args : JSON.stringify(step.args || {});
     const deposit = String(step.deposit);
     const argsHash = W.sha256hex(argsStr);
+    const key = agent();
+    if (!key || W.pubkeyHex(key) !== String(row.agent || '')) {
+      return you('agent_key_mismatch', { txs: landed.map(s => s.tx), landed });
+    }
     const msg = boardCallText({ contract: S.board, owner: S.me, receiver: step.receiver, method: step.method, argsHash, deposit, nonce: String(row.nonce) });
     const signature = W.signMessage(key, msg);
     const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: argsStr, deposit, signature };
@@ -602,7 +613,7 @@ export const bucketOf = a => BUCKETS.find(b => a <= b) ?? Math.ceil(a * 10) / 10
 // Default: yourself if you listed yourself, else the first payee you added.
 export const bankPayees = () => (pay()?.receivers || []);
 export const bankDefault = () => { const r = bankPayees(); return r.includes(S.me) ? S.me : r[0] || null; };
-export async function mist(amount, to = bankDefault()) {
+export async function mist(amount, to = bankDefault(), reveal = null) {
   if (!to) throw new Error('add a payee to your rules first');
   if (!notes().includes(amount)) throw new Error('pick one of the set amounts: ' + notes().join(', ') + ' NEAR');
   const yocto = toY(amount), salt = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
@@ -611,7 +622,7 @@ export async function mist(amount, to = bankDefault()) {
   if (!tee.ok) throw new Error('TEE check failed, nothing sent');
   try { localStorage.setItem('nearcarta.sign.flow', 'private'); } catch { /* the prompt falls back to the method line */ }
   let o;
-  try { o = await ask({ shop: 'mistbank', receiver: to, amountY: yocto, memo: commitment }); }
+  try { o = await ask({ shop: 'mistbank', receiver: to, amountY: yocto, memo: commitment, reveal }); }
   finally { try { localStorage.removeItem('nearcarta.sign.flow'); } catch { /* leave the flag if storage is blocked */ } }
   localStorage.setItem(LS_OPEN(S.charter), JSON.stringify({ yocto, salt, commitment, action: o.action, tx: o.tx }));
   return { ...o, commitment, bucket: amount, tee, to };
@@ -858,19 +869,27 @@ export async function teeCheck(nonce) {
 }
 export const teeFresh = () => teeCheck(Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join(''));
 export const payoutLeft = () => P.leftToday(pay(), S.usage.pay);
-export async function payouts(rows) {
-  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
+export async function payouts(rows, opts = {}) {
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
   if (S.board) {
-    const plan = rows.slice(0, 3);
-    if (P.payoutIssues(plan).length) throw new Error('Check the account name and the 0.005 NEAR cap. Nothing was sent.');
+    const plan = (rows || []).slice(0, 3).filter(r => String(r?.asset || 'NEAR').toUpperCase() !== 'USDC');
+    if (plan.some(r => String(r?.to || '').trim() && !P.nearAccountOk(r.to))) throw new Error('Check the account name. Nothing was sent.');
+    const capNear = opts.capNear == null ? null : Number(opts.capNear);
     const out = [];
     for (const row of plan) {
       const amt = Number(row.amt) || 0;
-      if (!(amt > 0)) continue;
-      out.push(await boardPay({ shop: 'payouts', receiver: row.to, amountY: toY(amt) }));
+      const to = String(row.to || '').trim();
+      if (!(amt > 0) || !to) continue;
+      const over = capNear != null && amt > capNear + 1e-12;
+      try {
+        out.push(await boardPay({ shop: 'payouts', receiver: to, amountY: toY(amt), chainCap: over }));
+      } catch (e) {
+        out.push({ tx: e.tx || null, decision: e.cancelled ? 'cancelled' : 'denied', reason: String(e.message || e).slice(0, 160), receiver: to, amount: String(toY(amt)) });
+        if (e.cancelled) break;
+      }
     }
     const paid = out.filter(o => o.decision === 'allowed').length;
-    return { tx: out.at(-1)?.tx || null, decision: paid === out.length && out.length ? 'allowed' : 'denied', reason: out.find(o => o.decision !== 'allowed')?.reason || 'ok', n: out.length, total: plan.reduce((t, r) => t + Math.min(0.005, Number(r.amt) || 0), 0), paid, steps: out };
+    return { tx: out.at(-1)?.tx || null, decision: paid === out.length && out.length ? 'allowed' : (out.length ? 'denied' : 'denied'), reason: out.find(o => o.decision !== 'allowed')?.reason || (out.length ? 'ok' : 'nothing_to_send'), n: out.length, total: plan.reduce((t, r) => t + (Number(r.amt) || 0), 0), paid, steps: out };
   }
   if (!canBatch()) throw new Error('your charter pays one at a time');
   const st = await view(S.charter, 'get_state');

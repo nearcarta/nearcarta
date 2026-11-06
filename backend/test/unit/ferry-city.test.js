@@ -59,7 +59,7 @@ test('get a quote for 3 USDC on base to ZEC fills the pair and does not spend', 
   assert.equal(state.q.tx, undefined);
 });
 
-test('a charter-ready swap asks the charter after the quote and invents no tx', async () => {
+test('a charter-ready swap calls Load cargo after the quote and invents no tx', async () => {
   const loads = [];
   const notes = [];
   const state = {};
@@ -82,10 +82,12 @@ test('a charter-ready swap asks the charter after the quote and invents no tx', 
   });
   assert.equal(out.ok, true);
   assert.equal(out.loaded, true);
-  assert.deepEqual(loads, [{ charter: true }]);
+  assert.deepEqual(loads, [{ charter: false }]);
   assert.equal(state.q.tx, undefined);
   assert.equal(notes[0], receiveConfirm('zec', ZEC_UA));
   assert.match(out.hint, /Receiving on zec at/);
+  assert.match(out.hint, /propose_call/);
+  assert.doesNotMatch(out.hint, /Asking the charter/);
 });
 
 test('ask charter without a session points at setup and does not load cargo', async () => {
@@ -324,10 +326,13 @@ test('a cross-chain SUCCESS is one line, the boat arrives, and the shop url is t
   });
   assert.equal(out.ok, true);
   assert.equal(out.loaded, true);
-  assert.deepEqual(loads, [{ charter: true }]);
+  assert.deepEqual(loads, [{ charter: false }]);
+  assert.equal(state.amt, '0.05');
   assert.equal(state.fromId, 'wNEAR|near');
   assert.equal(state.toId, 'USDC|base');
   assert.equal(String(state.receiveAt).toLowerCase(), addr.toLowerCase());
+  assert.match(out.hint, /propose_call/);
+  assert.doesNotMatch(out.hint, /Asking the charter/);
 });
 
 test('a successful swap does not show Downgrade refused, and the AI popup names the USDC and the txs', () => {
@@ -759,4 +764,22 @@ test('Ferry rules show the session gas that is left', () => {
   assert.match(html, /Session gas is low/);
   assert.match(html, /data-testid="ferry-refresh-key"/);
   assert.match(html, /href="\/setup"/);
+});
+
+test('a refused stamp stays at the jetty and does not freeze the boat', () => {
+  const ui = read('app/design/D8_shops/js/shopui.js');
+  const fn = ui.slice(ui.indexOf('async function settleFerry'), ui.indexOf('async function loadFerryCargo'));
+  const branch = fn.slice(fn.indexOf('if (refused)'));
+  assert.doesNotMatch(branch, /refused:\s*true/);
+  assert.match(branch, /hideRefuse/);
+  assert.match(branch, /setOrder\?\.\('jetty'\)/);
+  assert.match(branch, /order · jetty/);
+  assert.match(ui, /ERR_BAD_SIG\|agent_key_mismatch/);
+  assert.match(ui, /does not match the agent key stored in this browser/);
+  const scene = read('app/design/D8_shops/shops/ferry.js');
+  const delivered = scene.slice(scene.indexOf('if (opts.delivered'), scene.indexOf('const refused = !!opts.refused'));
+  assert.match(delivered, /seal\.material = sealOk/);
+  const deliver = scene.slice(scene.indexOf('const deliver = ()'), scene.indexOf('const panel ='));
+  assert.match(deliver, /seal\.material = sealOk/);
+  assert.match(deliver, /hideRefuseTag\(\)/);
 });

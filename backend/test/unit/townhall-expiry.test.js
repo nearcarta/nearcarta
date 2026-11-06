@@ -53,7 +53,7 @@ test('the Town Hall page changes the visitor row and does not file a council pro
   const room = readFileSync(new URL('../../../app/design/D8_shops/shops/hall.js', import.meta.url), 'utf8');
   assert.match(room, /Recorded payments/);
   assert.doesNotMatch(room, /\/api\/townhall/);
-  const line = 'This payment is a charter check on mainnet.';
+  const line = 'This audit does not send a payment.';
   assert.ok(readFileSync(new URL('../../../app/design/D8_shops/shops/bank.js', import.meta.url), 'utf8').includes(line));
   const ui = readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8');
   assert.ok(ui.includes(line));
