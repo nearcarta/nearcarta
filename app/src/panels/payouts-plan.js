@@ -165,14 +165,49 @@ export function accountsIn(text) {
   return found;
 }
 
-function parseMemo(raw) {
-  const explicit = String(raw || '').match(/\bmemo\s+(.+?)(?:\s+\bdue\b|\s+\bexpir\w*\b|$)/i);
-  if (explicit) return explicit[1].trim().slice(0, 140);
-  const soft = String(raw || '').match(/\bfor\s+(.+?)(?:\s+\bdue\b|\s+\bexpir\w*\b|$)/i);
-  if (!soft) return '';
-  const memo = soft[1].trim();
-  if (!memo || /^(?:example|usdc|usd|near)\b/i.test(memo)) return '';
-  return memo.slice(0, 140);
+function escapeReg(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Drop the amount, the token and the receiver. What remains is the purpose. */
+export function stripMemoFacts(chunk, source) {
+  let s = String(chunk || '');
+  s = s.replace(/\$\s*\d+(?:\.\d+)?/g, ' ');
+  s = s.replace(/\b\d+(?:\.\d+)?\s*(?:usdc|usd)\b/gi, ' ');
+  for (const id of accountsIn(source || chunk)) {
+    s = s.replace(new RegExp(`\\b${escapeReg(id)}\\b`, 'ig'), ' ');
+  }
+  s = s.replace(/\b(?:usdc|usd)\b/gi, ' ');
+  let prev = '';
+  while (s !== prev) {
+    prev = s;
+    s = s.replace(/\s+/g, ' ').trim();
+    s = s.replace(/^(?:to|for|an|a)\b\s*/i, '').trim();
+  }
+  if (!s || /^(?:to|for|usdc|usd|near|example)$/i.test(s)) return '';
+  return s;
+}
+
+/**
+ * The purpose in the visitor's words. "memo …" wins. Otherwise the last "for …"
+ * that is still a purpose after the amount, token and receiver are removed.
+ * No purpose word means an empty memo.
+ */
+export function memoFromWords(raw) {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim();
+  const explicit = text.match(/\bmemo\s+(.+?)(?:\s+\b(?:due|expir\w*)\b|$)/i);
+  if (explicit) {
+    const clean = stripMemoFacts(explicit[1], text);
+    if (clean) return clean.slice(0, 140);
+  }
+  const stripped = stripMemoFacts(text, text);
+  const parts = stripped.split(/\bfor\b/i).slice(1);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const cut = parts[i].replace(/\s+\b(?:due|expir\w*|memo)\b[\s\S]*$/i, '');
+    const clean = stripMemoFacts(cut, text);
+    if (clean) return clean.slice(0, 140);
+  }
+  return '';
 }
 
 function parseDue(raw, now) {
@@ -209,7 +244,7 @@ function readInvoicePhrase(raw, now) {
     origin: /\bbase\b/i.test(raw) ? 'USDC@base' : 'USDC@near',
     destination: 'USDC@near',
     receive: accounts[0] || '',
-    memo: parseMemo(raw),
+    memo: memoFromWords(raw),
     due: parseDue(raw, now),
     hint: '',
   };
@@ -263,8 +298,9 @@ export function acceptModelIntent(text, model, fallback) {
   const modelUsd = Number(model.usd);
   const raised = !(modelUsd > 0) || modelUsd > Math.max(...named) + 1e-8;
   const usd = asked;
-  let memo = String(model.memo || '').trim().slice(0, 140);
-  if (!memo || !String(text).toLowerCase().includes(memo.toLowerCase())) memo = local.memo || '';
+  let memo = memoFromWords(text);
+  const modelMemo = stripMemoFacts(model.memo, text);
+  if (!memo && modelMemo && String(text).toLowerCase().includes(modelMemo.toLowerCase())) memo = modelMemo.slice(0, 140);
   const due = local.due || (/^\d{4}-\d{2}-\d{2}$/.test(String(model.due || '')) ? model.due : '');
   return {
     ok: true,
@@ -286,7 +322,7 @@ export function agentInvoiceReply(inv, origin = '') {
   const memo = inv?.memo ? ` for ${inv.memo}` : '';
   const due = inv?.due ? `, due ${prettyWhen(inv.due)}` : '';
   const href = link ? ` Here is the link. ${link}` : '';
-  return `Made a ${inv?.usd} USDC invoice to ${inv?.receive}${memo}${due}.${href} Creating an invoice signs nothing.`;
+  return `Made a ${inv?.usd} USDC invoice to ${inv?.receive}${memo}${due}.${href}`;
 }
 
 /** Stand-in used only on a dry indicative quote. Checkout still requires the payer's address.
@@ -431,11 +467,11 @@ export function invoiceDelivered(status) {
 
 export function invoiceStatusLine(status) {
   const s = String(status || '');
-  if (s === 'SUCCESS') return 'Paid. 1Click status is SUCCESS.';
+  if (s === 'SUCCESS') return 'Delivered. The invoice was paid.';
   if (s === 'REFUNDED') return 'Refunded. Nothing else was sent.';
   if (s === 'FAILED') return 'The invoice swap failed. Nothing else was sent.';
   if (s === 'INCOMPLETE_DEPOSIT') return 'The deposit was short of the quote. Not paid.';
-  if (s === 'PENDING_DEPOSIT') return 'Waiting for the deposit. Not paid yet.';
+  if (s === 'PENDING_DEPOSIT') return 'Waiting for your deposit.';
   if (s === 'KNOWN_DEPOSIT_TX' || s === 'PROCESSING') return 'The deposit was seen. Not paid yet.';
   if (s === 'UNPAID') return 'Not paid.';
   return 'No settled status yet. Not paid.';
