@@ -696,20 +696,23 @@ test('a landed 0.05 wrap is reused and the next plan is only ft_transfer', () =>
   assert.notEqual(plan.steps[0].gasTgas, 300);
 });
 
-test('propose_call prepays 54 Tgas so the 20 Tgas callback fits, and 0.04188 cannot buy a step', () => {
-  assert.equal(proposeCallTgas('near_deposit'), 54);
-  assert.equal(proposeCallTgas('ft_transfer'), 54);
-  assert.equal(proposeCallTgas('storage_deposit'), 54);
-  assert.ok(proposeCallTgas('ft_transfer') < 300);
-  const one = proposeCallPrepaidYocto(54);
-  assert.equal(one, functionCallAllowanceCost({ tgas: 54, numBytes: PROPOSE_CALL_BYTES }));
-  const left = 4188n * 10n ** 19n;
-  assert.equal(nearAmount(left), '0.04188');
-  assert.ok(left < one);
+test('propose_call prepays the board, the forward and the callback, which 54 Tgas did not', () => {
+  // 54 = 4 + 30 + 20 covered only the forward and the callback. The board's own
+  // execution (hydrate + write the row and the call policy) had nothing left, so
+  // mainnet refused with "Exceeded the prepaid gas" before any shop call ran:
+  // tx 6456LV35sBzFHT2sUtPKmaYyPyBWu5sMiF62GboDojUo on 2026-11-06.
+  for (const m of ['near_deposit', 'ft_transfer', 'storage_deposit']) assert.equal(proposeCallTgas(m), 80, m);
+  assert.ok(proposeCallTgas('ft_transfer') < 300, 'one action must stay under the 300 Tgas transaction limit');
+  const one = proposeCallPrepaidYocto(80);
+  assert.equal(one, functionCallAllowanceCost({ tgas: 80, numBytes: PROPOSE_CALL_BYTES }));
+  // the gas the old number attached is not enough to buy a step now
+  const old = 4188n * 10n ** 19n;
+  assert.equal(nearAmount(old), '0.04188');
+  assert.ok(old < one);
   const three = stepsAllowanceYocto([
     { method: 'near_deposit' }, { method: 'storage_deposit' }, { method: 'ft_transfer' },
   ]);
-  assert.ok(BigInt(GAS_TOPUP_YOCTO) >= three);
+  assert.ok(BigInt(GAS_TOPUP_YOCTO) >= three, 'one top-up must cover a three-step wrap');
   assert.ok(BigInt('50000000000000000000000') < stepsAllowanceYocto([{ method: 'near_deposit' }, { method: 'ft_transfer' }]));
 });
 

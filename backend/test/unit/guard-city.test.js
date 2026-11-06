@@ -274,8 +274,8 @@ test('city wiring keeps the guard door in town and cinema on a real tx', () => {
   const room = read('app/design/D8_shops/shops/guard.js');
   for (const name of ['hideRefuse', 'showSeal', 'lightLamps', 'setChains', 'Refused · not on the list']) assert.match(room, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   const index = read('app/design/D9_world/index.html');
-  assert.match(index, /href="\/shops\/guard\/"/);
-  assert.match(index, /data-city-shop="guard"/);
+  assert.match(index, /href="\/\?shop=guard"/);
+  assert.match(index, /data-enter-shop="guard"/);
   assert.match(index, /__openCityShop/);
   assert.match(read('app/design/D9_world/js/main.js'), /enterShop/);
   const css = read('app/src/panels/guard.css');
