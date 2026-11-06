@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nearcarta · Pay an invoice</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/panels/panels.css">
+<style>
+  body{margin:0;background:#1a140f;color:#f3ead8;font:16px/1.45 system-ui,sans-serif}
+  main{max-width:420px;margin:0 auto;padding:24px 16px 48px}
+  a{color:#d6b46a}
+  .ferry-card{padding:8px 0}
+</style>
+</head>
+<body>
+<main>
+  <p><a href="/" data-testid="back-town">Back to town</a></p>
+  <div class="ferry-card" data-testid="payer-card">
+    <div class="ferry-flow" aria-hidden="true">
+      <img class="ti" src="/tokens/usdc.svg" alt="" width="48" height="48">
+      <span class="ferry-flow-arrow">→</span>
+      <img class="ti" src="/tokens/usdc.svg" alt="" width="48" height="48">
+    </div>
+    <p class="ferry-picker-note" id="pay-kicker">Exact USDC on NEAR. A link query cannot change the receive account.</p>
+    <label class="field ferry-field"><span>Amount USD</span><input id="pay-usd" data-testid="payer-usd" readonly></label>
+    <label class="field ferry-field"><span>Receive account</span><input id="pay-receive" data-testid="payer-receive" readonly></label>
+    <label class="field ferry-field"><span>You pay</span>
+      <select id="pay-from" data-testid="payer-from">
+        <option value="USDC@base">USDC on Base</option>
+        <option value="USDC@eth">USDC on Ethereum</option>
+        <option value="USDC@arb">USDC on Arbitrum</option>
+      </select>
+    </label>
+    <label class="field ferry-field"><span>Refund address</span><input id="pay-refund" data-testid="payer-refund" autocomplete="off" spellcheck="false"></label>
+    <button type="button" class="primary ferry-cta" id="pay-go" data-testid="payer-go">Pay this invoice</button>
+    <p class="ferry-rate" id="pay-line" data-testid="payer-line">Not paid.</p>
+    <p class="ferry-charter-note" id="pay-line-2" data-testid="payer-line-2"></p>
+  </div>
+</main>
+<script type="module">
+const id = location.pathname.split('/').filter(Boolean).pop();
+const $ = s => document.querySelector(s);
+const line = (a, b) => { $('#pay-line').textContent = a || ''; $('#pay-line-2').textContent = b || ''; };
+let record = null;
+function paint(inv) {
+  record = inv;
+  $('#pay-usd').value = inv ? String(inv.usd) : '';
+  $('#pay-receive').value = inv ? inv.receive : '';
+  if (!inv) { line('This invoice was not found.', ''); return; }
+  const paid = inv.delivered === true || inv.status === 'SUCCESS';
+  line(paid ? 'Paid. 1Click status is SUCCESS.' : 'Not paid.', inv.status && inv.status !== 'UNPAID' ? inv.status : '');
+}
+async function load() {
+  if (!id || id === 'pay' || id === 'index.html') { line('Missing invoice link.', ''); return; }
+  try {
+    const res = await fetch('/api/payouts/invoices/' + encodeURIComponent(id) + location.search);
+    const body = await res.json();
+    paint(body.invoice || null);
+  } catch { line('The invoice could not be read.', ''); }
+}
+$('#pay-go').onclick = async () => {
+  if (!record) return;
+  const refundTo = $('#pay-refund').value.trim();
+  if (!refundTo) { line('Not paid.', 'Type the refund address.'); return; }
+  line('Asking for a deposit address. Not paid.', '');
+  try {
+    const res = await fetch('/api/payouts/invoices/' + encodeURIComponent(record.id) + '/checkout', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: $('#pay-from').value, refundTo, recipientType: 'DESTINATION_CHAIN' }),
+    });
+    const body = await res.json();
+    if (!body.ok) { line('Not paid.', body.reason || 'No deposit address.'); return; }
+    if (body.delivered) { line('Paid. 1Click status is SUCCESS.', ''); return; }
+    line('Not paid.', 'Deposit address ready. Send it yourself.');
+  } catch { line('Not paid.', 'Checkout did not answer.'); }
+};
+load();
+</script>
+</body>
+</html>

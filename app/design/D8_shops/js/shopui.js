@@ -1,6 +1,6 @@
 // Tray controller: one robot line, one big button, loading / error / success, a one-line receipt.
 import * as A from './apps.js';
-import { payoutReady, payoutLabel } from './payout-ready.js';
+import { payoutLabel, payoutReady } from './payout-ready.js';
 import { $, sfx } from './core.js';
 import { ruleChip as ruleChipText } from './rules-default.js';
 import { receipt } from './receipt.js';
@@ -21,7 +21,8 @@ import { hideBankDock } from '/panels/bank-tray.js';
 import { armTollDock, dispatchTollDock, installTollDock } from '/panels/toll-dock.js';
 import { mergeTollChronicle, nextRowBalance, passPaidCopy, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
 import { deedMarkup } from '/panels/deed.js';
-import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues, prepareRows } from './payouts.js';
+import { receiptsFor, splitAssets, prepareRows } from './payouts.js';
+import { cinemaOk, sealText } from '/panels/payouts-plan.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
 const yOf = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const { esc, fmt, short } = A;
@@ -652,6 +653,68 @@ async function tollPay() {
 }
 
 // ---------- shop apps ----------
+/** Board session: one propose per NEAR row. Over the row cap still goes to the chain. USDC is not sent. */
+async function sendPayoutRows(rows, opts = {}) {
+  sh?.hideRefuse?.();
+  const capNear = opts.capNear != null && opts.capNear !== '' ? Number(opts.capNear) : (A.S.clauses?.pay ? A.fromY(A.S.clauses.pay.per_action_cap) : null);
+  const parts = splitAssets(rows);
+  const usdcNote = parts.usdc.length ? `${parts.usdc.length} USDC ${parts.usdc.length === 1 ? 'row' : 'rows'} kept. Not sent.` : '';
+  if (!A.S.board || A.stage() !== 'ready') {
+    const hint = 'Finish /setup. Nothing was sent.';
+    return { ok: false, hint, seal: '', receipts: receiptsFor(parts.near), usdcNote, keep: true, kind: 'ok', say: hint, hero: null, rc: '' };
+  }
+  if (capNear == null || !Number.isFinite(capNear)) {
+    const hint = 'The row cap is still unread. Nothing was sent.';
+    return { ok: false, hint, seal: '', receipts: receiptsFor(parts.near), usdcNote, keep: true, kind: 'ok', say: hint, hero: null, rc: '' };
+  }
+  const over = parts.near.filter(r => Number(r.amt) > capNear + 1e-12);
+  const under = parts.near.filter(r => !(Number(r.amt) > capNear + 1e-12));
+  if (over.length && !under.length) {
+    const hint = 'Refused before any deposit. Nothing was sent.';
+    return { ok: false, hint, seal: hint, receipts: receiptsFor(parts.near).map(r => ({ ...r, status: 'refused' })), usdcNote, keep: true, kind: 'no', say: hint, hero: null, rc: '' };
+  }
+  parts.near = under;
+  if (!parts.near.length) {
+    const hint = 'USDC rows are invoices, not a NEAR propose. Nothing was sent.';
+    return { ok: false, hint, seal: '', receipts: [], usdcNote, keep: true, kind: 'ok', say: hint, hero: null, rc: '' };
+  }
+  let o;
+  try { o = await A.payouts(parts.near, { capNear }); }
+  catch (e) {
+    const hint = `${A.plainError(e).slice(0, 140)} Nothing was sent.`;
+    return { ok: false, hint, seal: hint, receipts: receiptsFor(parts.near), usdcNote, keep: true, kind: 'no', say: hint, o: { decision: 'denied', reason: e.message, tx: e.tx || null } };
+  }
+  const steps = o.steps || [];
+  const receipts = parts.near.map((r, i) => {
+    const step = steps[i];
+    const tx = step?.tx || '';
+    return { n: i + 1, to: r.to, amount: r.amt, asset: 'NEAR', tx, url: tx ? `https://nearblocks.io/txns/${tx}` : '', status: step?.decision === 'allowed' ? 'sent' : (step ? 'refused' : 'not sent') };
+  });
+  for (const r of parts.usdc) receipts.push({ n: receipts.length + 1, to: r.to, amount: r.amt, asset: 'USDC', tx: '', url: '', status: 'not sent' });
+  extra.pay = o;
+  extra.receipts = receipts;
+  extra.usdcNote = usdcNote;
+  const seal = sealText(steps);
+  const cinema = cinemaOk(steps);
+  if (seal) sh?.showRefuse?.(seal);
+  else sh?.hideRefuse?.();
+  try {
+    if (cinema && sh?.act && runScene) runScene(sh.act({ paid: true, refused: false }));
+    else if (seal && steps.some(s => s.tx) && sh?.act && runScene) runScene(sh.act({ paid: false, refused: true }));
+  } catch { /* the receipt still shows if the room pose is missing */ }
+  const paid = steps.filter(s => s.decision === 'allowed' && s.tx).length;
+  const hint = !steps.length
+    ? (parts.usdc.length ? 'USDC rows are invoices, not a NEAR propose. Nothing was sent.' : 'Nothing was sent.')
+    : cinema ? `Paid ${paid} on chain.` : (seal || `Paid ${paid}.`);
+  return {
+    ok: cinema, hint, seal, receipts, usdcNote, o, keep: true,
+    kind: cinema ? 'ok' : 'no', hero: null,
+    say: hint,
+    rc: steps.filter(s => s.tx).map(s => A.txLine(s.tx)).join(' '),
+    rule: cinema ? `paid · ${paid}` : (seal ? 'refused' : 'not sent'),
+  };
+}
+
 const APPS = {
   toll: {
     label: 'Toll Bridge · pay-per-use gate', idle: 'Total cost: 0.001 NEAR. One payment. Your charter checks it. A refusal pays nothing.',
@@ -864,24 +927,26 @@ const APPS = {
   },
   payouts: {
     guest: true,
-    label: 'Payouts · prepare a batch', idle: 'Prepare several payments. Each one stays within your cap. This page does not send them.',
+    label: 'Payouts · pay under the cap', idle: 'Pay reviewed rows with the session key. Nothing is sent until setup. An over-cap row is refused before any deposit.',
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.001' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.001' }); } return extra.rows.slice(0, 3); },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => '<div data-deep="payouts"></div>',
-    bind: () => mountShop('payouts', document.getElementById('t-form'), { state: extra, repaint: () => paint(), rows: () => APPS.payouts.rows(), onReady: ok => btn(APPS.payouts.btn(), 'primary', !ok || !A.canBatch()) }),
+    bind: () => mountShop('payouts', document.getElementById('t-form'), {
+      state: extra, repaint: () => paint(), rows: () => APPS.payouts.rows(),
+      capNear: () => (A.S.clauses?.pay ? A.fromY(A.S.clauses.pay.per_action_cap) : null),
+      account: () => A.S.me || '',
+      onPay: (rows, opts) => sendPayoutRows(rows, opts),
+      onCinema: (opts) => { if ((opts?.paid || opts?.refused) && sh?.act && runScene) runScene(sh.act(opts)); },
+      hideRefuse: () => sh?.hideRefuse?.(),
+      showRefuse: (text) => sh?.showRefuse?.(text),
+      onReady: ok => { if (cur === 'payouts') return; btn(APPS.payouts.btn(), 'primary', !ok || !A.canBatch()); },
+    }),
     btn: () => payoutLabel(APPS.payouts.rows()),
     hero: () => extra.pay ? num(`${extra.pay.paid}/${extra.pay.n}`, 'paid') : num(APPS.payouts.rows().length, 'payouts'),
     run: async () => {
-      const prepared = APPS.payouts.rows();
-      const prep = prepareRows(prepared);
-      if (prep.blocked) throw new Error(prep.note);
-      if (payoutIssues(prep.rows, extra.exists).length) throw new Error('Check the account name and the 0.005 NEAR cap. Nothing was sent.');
-      if (A.S.board) { const parts = splitAssets(prep.rows); extra.usdc = parts.usdc; extra.receipts = receiptsFor(prep.rows); return { keep: true, kind: 'ok', hero: APPS.payouts.hero(), say: `${prep.note ? prep.note + ' ' : ''}Prepared ${parts.near.length} NEAR payments as one propose_batch. The live board signs propose only, so this page did not send it.`, rc: extra.receipts.map(r => `<span class="rc" data-testid="payout-receipt">#${r.n} ${esc(r.to)} ${esc(r.amount)} ${esc(r.asset)} · not sent</span>`).join(' ') }; }
-      if (!A.canBatch()) throw new Error('your charter pays one at a time');
-      const o = await A.payouts(prep.rows); extra.pay = o;
-      const ok = o.decision === 'allowed', who = o.bad != null ? ` Payout ${o.bad + 1}: ${A.why(o.reason)}.` : '';
-      return { o, keep: true, kind: ok ? 'ok' : 'no', hero: APPS.payouts.hero(), rule: ok ? `paid · ${o.n} payouts in one tx` : o.decision === 'failed' ? 'failed · ' + String(o.reason).slice(0, 60) : `refused whole · ${A.why(o.reason)}`,
-        say: ok ? `Paid all ${o.n}, ${o.total} NEAR, in one batch.` : o.decision === 'failed' ? 'Nothing moved.' : `Refused all ${o.n}. Nothing moved.${who}` };
+      const prep = prepareRows(APPS.payouts.rows());
+      if (prep.blocked) throw new Error(prep.note || 'A row needs a payee. Nothing was sent.');
+      return sendPayoutRows(prep.rows);
     },
   },
   house: {
@@ -1038,9 +1103,12 @@ function paint() {
   document.body.classList.toggle('bank-tray', cur === 'bank');
   document.body.classList.toggle('ferry-tray', cur === 'ferry');
   document.body.classList.toggle('toll-tray', cur === 'toll');
+  document.body.classList.toggle('payouts-tray', cur === 'payouts');
   if (cur !== 'ferry') { const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; }
   if (cur !== 'toll') { const td = document.getElementById('toll-agent-dock'); if (td) td.hidden = true; }
   if (cur !== 'bank') hideBankDock();
+  const pDock = document.getElementById('payouts-agent-dock');
+  if (pDock) pDock.hidden = cur !== 'payouts';
   wallet(); ruleChip(); label(app.label); proofDrawer();
   if (cur === 'hall') { const m = $('#t-more'); if (m) { m.href = hallRowHref(who()); m.classList.add('row-btn'); m.dataset.testid = 'change-my-row'; } }
   if (phase === 'busy') return;
@@ -1089,10 +1157,12 @@ function paint() {
   }
   if (phase === 'idle') say(app.idle);
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
-  if (cur === 'ferry' || cur === 'bank') {
+  if (cur === 'payouts') document.body.dataset.payoutReady = payoutReady(APPS.payouts.rows()).enabled ? 'yes' : 'no';
+  if (cur === 'ferry' || cur === 'bank' || cur === 'payouts') {
+    // Ferry, Bank, and Payouts own the gold button inside the card.
     hideFerryPrimary();
   } else {
-    btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
+    btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', false);
   }
 }
 async function primary(auto = false) {
@@ -1216,7 +1286,7 @@ export function boot() {
   return booted;
 }
 export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
-  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('toll-tray', id === 'toll'); document.body.classList.toggle('bank-tray', id === 'bank');
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('toll-tray', id === 'toll'); document.body.classList.toggle('bank-tray', id === 'bank'); document.body.classList.toggle('payouts-tray', id === 'payouts');
   const dock0 = document.getElementById('ferry-agent-dock'); if (dock0) dock0.hidden = id !== 'ferry';
   const tollDock0 = document.getElementById('toll-agent-dock'); if (tollDock0) tollDock0.hidden = id !== 'toll';
   if (id !== 'bank') hideBankDock();
@@ -1225,7 +1295,7 @@ export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rul
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
 }
-export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('toll-tray'); document.body.classList.remove('bank-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; hideBankDock(); const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('toll-tray'); document.body.classList.remove('bank-tray'); document.body.classList.remove('payouts-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; hideBankDock(); const pDock = document.getElementById('payouts-agent-dock'); if (pDock) pDock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };

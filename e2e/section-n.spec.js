@@ -261,6 +261,7 @@ test('N8 payouts start empty and grow by one row', async ({ page }) => {
   await page.addInitScript(quietWallet);
   await at(page, 1440);
   await page.goto('/shops/payouts/');
+  await page.getByTestId('payouts-tab-payroll').click();
   await expect(page.getByTestId('payout-add')).toBeVisible();
   await expect(page.getByTestId('payout-to')).toHaveCount(0);
   await expect(page.getByTestId('payout-amt')).toHaveCount(0);
