@@ -729,6 +729,13 @@ async function tollPay(quote) {
     return { ok: false, o, hint, refused: true, keep: true, kind: 'no', say: hint, rc: A.txLine(o?.tx) };
   }
   rememberTollPass({ h: o.tx, decision: 'allowed', reason: '', label: `${quote.feeNear} NEAR pass` });
+  // A stored order whose signature did not go out is not a signed crossing. Say so.
+  if (o.needsSignature) {
+    const hint = o.note || 'The board stored the crossing. The row owner still has to sign it.';
+    extra.seal = hint;
+    extra.passTx = o.tx;
+    return { ok: true, o, tx: o.tx, hint, success: false, needsSignature: true, keep: true, kind: 'ok', say: hint, rc: A.txLine(o.tx) };
+  }
   extra.seal = '';
   extra.passTx = o.tx;
   let fee;

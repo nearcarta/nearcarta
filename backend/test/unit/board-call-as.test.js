@@ -113,7 +113,7 @@ test('browser modules the city imports raw resolve without a bundler', async () 
   const walk = (url) => {
     if (seen.has(url)) return;
     seen.add(url);
-    if (generated.has(url)) return;
+    if (generated.has(url) || bundled.has(url)) return;
     const file = onDisk(url);
     if (!existsSync(file)) { bad.push(`${url} does not exist in the deploy root`); return; }
     const src = readFileSync(file, 'utf8');

@@ -19,7 +19,7 @@ import * as mist from './mistbank.js';
 import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
 import { issuePass } from './toll-pass.js';
-import { describeVisitorPass, readTollLive, tollLiveError } from './toll-views.js';
+import { describeVisitorPass, readTollLive, tollContractId, tollLiveError } from './toll-views.js';
 import { broadcastLatest, relayById } from './toll-relay.js';
 import { verifyPropose } from './board-tx.js';
 import { mainnetChronicle } from './board-chronicle.js';
@@ -497,6 +497,19 @@ export function makeApp() {
   app.get('/api/arena/prompts', limiter(20), async c => c.json(await arenaPromptsSwr()));
   app.get('/api/arena/attempts', limiter(20), async c => c.json(await shops.arenaAttempts(c.req.query('from'), c.req.query('limit'))));
   app.get('/api/toll', limiter(20), async c => c.json(await reads.toll()));
+  // One visitor's own derived address for their toll row. Read-only: `address_of` on the
+  // toll contract. Null until that row's first signature recovers an address. Two rows
+  // have two paths, so two addresses; nothing here is shared or invented.
+  app.get('/api/toll/address/:owner', limiter(30), async c => {
+    const owner = c.req.param('owner');
+    if (!nearAccountOk(owner)) return bad(c, 'not an account id');
+    try {
+      const got = await view(tollContractId(), 'address_of', { row_owner: owner, chain: 'base' });
+      return c.json({ owner, path: got?.path || null, address: got?.address || null });
+    } catch (e) {
+      return c.json({ owner, path: null, address: null, error: String(e?.message || e).slice(0, 160) }, 502);
+    }
+  });
   // Toll gate (v4): read the gate, one record, or relay the raw tx the gate signed on chain (nothing is signed here)
   const tg = fn => async c => { try { return c.json(await fn(c)); } catch (e) { if (e.status) return c.json({ error: e.message }, e.status); throw e; } };
   app.get('/api/toll/gate', limiter(20), tg(() => reads.toll_gate()));

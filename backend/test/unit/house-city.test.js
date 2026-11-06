@@ -5,6 +5,7 @@ import { planHouseLine, runHouseTurn, yoctoFromNear } from '../../../app/src/pan
 import { derivationRequest, readDerivedKey, HOUSE_CONTRACT } from '../../../app/src/house-derive.js';
 import { TOLL_ADDRESS, TOLL_KEY } from '../../../app/src/toll-derive.js';
 import { derivedFor, lineFor } from '../../src/house-views.js';
+import { signerRequest, foreignAddress } from '../../../shared/toll/signer.js';
 
 const row = (patch = {}) => ({
   receivers: ['toll.nearcarta.near'],
@@ -133,13 +134,14 @@ test('an eth key becomes the toll address method', () => {
 });
 
 test('the signer view is domain 0 for both paths', async () => {
-  const eth = derivationRequest('alice.near', 'eth');
-  assert.equal(eth.path, 'alice.near-eth-1');
-  assert.equal(eth.domain_id, 0);
+  // House reads its ETH row from the shared Toll signer: same path Toll signs for.
+  const eth = signerRequest('alice.near');
+  assert.equal(eth.path, 'row:alice.near:base');
+  assert.equal(eth.args.domain_id, 0);
   assert.equal(eth.account, 'v1.signer');
   assert.equal(eth.method, 'derived_public_key');
-  assert.equal(eth.predecessor, HOUSE_CONTRACT);
-  assert.equal(eth.live, false);
+  assert.equal(eth.predecessor, 'toll.nearcarta.near');
+  // The BTC row stays the deed's own derivation.
   const btc = derivationRequest('alice.near', 'btc');
   assert.equal(btc.path, 'alice.near-btc-1');
   assert.equal(btc.domain_id, 0);
@@ -147,8 +149,11 @@ test('the signer view is domain 0 for both paths', async () => {
   const body = await derivedFor('alice.near', async () => TOLL_KEY);
   assert.equal(body.rows[0].address, TOLL_ADDRESS);
   assert.equal(body.rows[1].address, null);
-  assert.equal(body.rows[0].predecessor, HOUSE_CONTRACT);
-  assert.equal(body.live, false);
+  assert.equal(body.rows[0].predecessor, 'toll.nearcarta.near');
+  // Toll now ships the signer House calls, so the read is live rather than blocked.
+  assert.equal(body.live, true);
+  assert.equal(body.version, 1);
+  assert.equal(body.methods.sign, 'sign_cross');
 });
 
 test('a missing inheritance view is not a live line', async () => {
@@ -186,4 +191,59 @@ test('bitcoin value is refused and a waiting release is a simulation', () => {
   assert.equal(cancel.signed, false);
   const none = planHouseLine('Cancel the release', { line: { live: false, line: null } });
   assert.equal(none.label, 'blocked');
+});
+
+// The shared foreign-signer interface: Toll owns it, any shop calls it. One version,
+// one path per owner, and never a fabricated address.
+test('the shared signer gives two visitors two addresses and no shared path', async () => {
+  const seen = [];
+  const fakeView = async (account, method, args) => {
+    seen.push({ account, method, args });
+    return TOLL_KEY;
+  };
+  const a = await foreignAddress('alice.near', fakeView);
+  const b = await foreignAddress('bob.near', fakeView);
+  assert.equal(a.version, 1);
+  assert.equal(a.live, true);
+  assert.equal(a.path, 'row:alice.near:base');
+  assert.equal(b.path, 'row:bob.near:base');
+  assert.notEqual(a.path, b.path);
+  assert.equal(seen[0].account, 'v1.signer');
+  assert.equal(seen[0].method, 'derived_public_key');
+  assert.equal(seen[0].args.predecessor, 'toll.nearcarta.near');
+  assert.equal(seen[0].args.domain_id, 0);
+  assert.equal(a.methods.sign, 'sign_cross');
+});
+
+// Two paths to the real signer really do derive two different keys. This is the
+// invariant the audit asked for, read live rather than assumed.
+test('two row paths derive two different keys from the live signer', async (t) => {
+  const { view } = await import('../../src/near.js');
+  let a, b;
+  try {
+    a = await foreignAddress('alice.near', view);
+    b = await foreignAddress('bob.near', view);
+  } catch (e) {
+    return t.skip('no network to v1.signer: ' + String(e.message).slice(0, 60));
+  }
+  if (!a?.live || !b?.live) return t.skip('the signer did not answer for both rows');
+  assert.notEqual(a.public_key, b.public_key);
+  assert.notEqual(a.address, b.address);
+  assert.notEqual(a.address, TOLL_ADDRESS); // not the shared base-1 address
+});
+
+test('the shared signer refuses to invent an address', async () => {
+  const dead = await foreignAddress('alice.near', async () => { throw new Error('rpc down'); });
+  assert.equal(dead.live, false);
+  assert.equal(dead.address, null);
+  assert.match(dead.error, /rpc down/);
+  const empty = await foreignAddress('alice.near', async () => '');
+  assert.equal(empty.live, false);
+  assert.equal(empty.address, null);
+  const bad = await foreignAddress('alice.near', async () => 'ed25519:abc');
+  assert.equal(bad.live, false);
+  assert.equal(bad.address, null);
+  // No owner, no request: a caller cannot derive for nobody.
+  const none = signerRequest('');
+  assert.equal(none.ok, false);
 });
