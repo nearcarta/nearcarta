@@ -197,7 +197,7 @@ function printPlan(plan) {
   if (plan.funding) {
     console.log('Prepaid gas: ' + plan.funding.prepaidGas + ' yoctoNEAR (' + plan.funding.prepaidNear + ' NEAR), burned about ' + plan.funding.burnedNear + ' NEAR');
     console.log('Owner must cover stake plus prepaid gas: ' + plan.funding.need + ' yoctoNEAR (' + plan.funding.needNear + ' NEAR), counting the close refund');
-    if (plan.funding.ownerNear) console.log('Owner balance now: ' + plan.funding.ownerBalance + ' yoctoNEAR (' + plan.funding.ownerNear + ' NEAR)');
+    if (plan.funding.ownerNear) console.log('Owner liquid now: ' + plan.funding.ownerBalance + ' yoctoNEAR (' + plan.funding.ownerNear + ' NEAR)');
     if (plan.funding.shortfallNear) console.log('Shortfall after the refund: ' + plan.funding.shortfall + ' yoctoNEAR (' + plan.funding.shortfallNear + ' NEAR)');
   }
   if (!plan.transfers.length) console.log('Transfers: none');
@@ -356,7 +356,9 @@ async function main() {
     keys: state.keys,
     guardians: state.guardians,
     wasm,
-    ownerBalanceYocto: state.ownerAccount?.amount ?? null,
+    ownerBalanceYocto: state.ownerAccount
+      ? (BigInt(state.ownerAccount.amount) - BigInt(state.ownerAccount.storage_usage) * BYTE_YOCTO).toString()
+      : null,
   });
   printPlan(plan);
   if (!process.argv.includes('--live')) return;
