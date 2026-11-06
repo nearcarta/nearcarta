@@ -70,13 +70,13 @@ A plain `cargo build --target wasm32-unknown-unknown --release` wasm was not use
 
 ## What the tests measured
 
-`cargo +1.86.0 test --lib --locked` in `contracts/charter_board`: 29 passed. `the_live_state_dump_still_decodes_and_propose_is_unchanged` still decodes `testdata/mainnet-state.bin` (block 223191542, 804 bytes, 2 rows) and the encoded `STATE` of that dump is unchanged. `init` state stays 30 bytes for `nearcarta.near`.
+`cargo +1.86.0 test --lib --locked` in `contracts/charter_board`: 30 passed. `storage_fees_cover_rows_of_different_sizes_and_the_free_balance_holds` opens and closes a one-receiver row and an eight-receiver row in one VM and checks the contract's free balance does not fall. `the_live_state_dump_still_decodes_and_propose_is_unchanged` still decodes `testdata/mainnet-state.bin` (block 223191542, 804 bytes, 2 rows) and the encoded `STATE` of that dump is unchanged. `init` state stays 30 bytes for `nearcarta.near`.
 
 The 24-pair row in `calls_stop_at_24_pairs_and_tightening_cannot_grant_or_reset` encodes `CALLS` as 836 bytes and locks `19940000000000000000000` yoctoNEAR (0.01994 NEAR). The lock is the trie bytes `env::storage_usage` measured around the write, plus the 600-byte side reserve (`SIDE_RESERVE_BYTES`). A growth that is not covered by that reserve also adds `STORAGE_MARGIN_BYTES` (32). Close refunds the measured drop, so the margin stays with the contract. Pay receivers stay at 8. `expire_sent` does not credit a row after a 20 Tgas callback that ran out of gas: that callback cannot tell a shop that kept the NEAR from one that refunded it.
 
 `contracts/charter_board_sandbox` (rustc 1.95.0, near-workspaces 0.24) deploys the cargo-near wasm onto one local account and opens two rows. Neither visitor account has a contract. A failed shop call refunds only that visitor. Alice's `propose` does not move Bob's balance. After both `close_charter` calls, `get_liabilities` is 0 and the owner `reap`s with 1 yocto. The sandbox registrar cannot create `nearcarta.near`, so that test's owner is the account `nearcarta` and `new` records it. `reap` pays `self.owner`. The unit tests boot with predecessor `nearcarta.near`, which is the production beneficiary.
 
-Gas burned in that sandbox run: one `propose_call_as` whose shop call failed and was refunded cost `7081555489393` gas (the two calls together were `14163110978786`). One `propose` cost `5915695481667` gas. The board account with this wasm and two rows reported `storage_usage` 198434.
+Gas burned in that sandbox run of this wasm: the two `propose_call_as` calls together cost `22626885277974` gas. One `propose` cost `7717616996613` gas. The board account with two rows reported `storage_usage` 134096.
 
 ## Sequence, not executed
 
