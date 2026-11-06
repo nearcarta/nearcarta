@@ -77,7 +77,7 @@ test('one visitor reads the session for the chip, the hall and the bank', () => 
   assert.match(hallMarkup(null, who), /Signed in as Scholar/);
   assert.doesNotMatch(hallMarkup(null, who), /Sign in, then open/);
   assert.match(read('app/design/D9_world/js/hero-town.js'), /visitor\(\)/);
-  assert.match(read('app/src/panels/deep.js'), /bank-session/);
+  assert.match(read('app/src/panels/bank-tray.js'), /bank-session/);
 });
 
 test('ferry idle copy does not claim a quote or a deposit', () => {
