@@ -2,6 +2,8 @@
 // Sources: depth-plan-v2 §1 (all live 1Click assets); TOWN_PLAN live-oath-state for Ferry;
 // 1Click tokens GET https://1click.chaindefuser.com/v0/tokens; brief-V V4.
 
+import { shortReceive, validateDestAddress } from './ferry-settle.js';
+
 /** Normalize a user/token id into symbol@chain. Accepts "USDC@base", "USDC|base", "USDC on base". */
 export function toAsset(raw) {
   const s = String(raw || '').trim();
@@ -91,26 +93,59 @@ function pairOf(amt, fromRaw, fromGiven, toRaw, toGiven) {
   return { amt: amt || '', from, to, fromId: from.replace('@', '|'), toId: to.replace('@', '|') };
 }
 
+function destChainOf(to) {
+  const s = String(to || '');
+  const i = s.lastIndexOf('@');
+  return i >= 0 ? s.slice(i + 1).toLowerCase() : '';
+}
+
+/** Address named after the pair: "to 0x…", "at <base58>", or a bare 0x. */
+function receiveFrom(text, fromIndex) {
+  const rest = String(text || '').slice(fromIndex);
+  const named = rest.match(/(?:receive\s+)?(?:to|at|into)\s+(0x[0-9a-fA-F]{40}|u1[0-9a-z]{20,200}|t[13][1-9A-HJ-NP-Za-km-z]{20,80}|bc1[0-9a-z]{20,87}|[1-9A-HJ-NP-Za-km-z]{32,44})\b/i);
+  if (named) return named[1];
+  const evm = rest.match(/0x[0-9a-fA-F]{40}/);
+  return evm ? evm[0] : '';
+}
+
+function withReceive(pair, text, end) {
+  const receiveAt = receiveFrom(text, end);
+  return receiveAt ? { ...pair, receiveAt } : pair;
+}
+
 /** Parse a natural-language Ferry ask into from/to/amount. Returns null if not a swap ask. */
 export function parseAgentFerry(text) {
   const t = String(text || '').trim();
   if (!t) return null;
-  // "swap 0.05 wNEAR on NEAR to USDC", "get a quote for 3 USDC on base to ZEC", Arabic "حوّل 2 USDC لـ ZEC"
+  // "swap 0.05 wNEAR on NEAR to USDC", "… to USDC on Base to 0x…", Arabic "حوّل 2 USDC لـ ZEC"
   const re = /(?:get\s+a\s+quote\s+for|quote|swap|convert|change|trade|exchange|حو[ّل]*|بدل)\s+(?:up\s+to\s+)?(\d+(?:\.\d+)?)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?\s+(?:to|into|for|→|->|ل(?:ـ)?|إلى)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?/i;
   const m = t.match(re);
   if (!m) {
     // "wNEAR@near → USDC" without a verb. A missing destination chain follows chainFor.
     const bare = t.match(/^(\d+(?:\.\d+)?)?\s*([A-Za-z0-9.]+)\s*(?:@|on)\s*([A-Za-z0-9_-]+)\s*(?:→|->|to|into|ل(?:ـ)?|إلى)\s*([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?/i);
     if (!bare) return null;
-    return pairOf(bare[1] || '', bare[2], bare[3], bare[4], bare[5] || '');
+    return withReceive(pairOf(bare[1] || '', bare[2], bare[3], bare[4], bare[5] || ''), t, bare.index + bare[0].length);
   }
-  return pairOf(m[1], m[2], m[3] || '', m[4], m[5] || '');
+  return withReceive(pairOf(m[1], m[2], m[3] || '', m[4], m[5] || ''), t, m.index + m[0].length);
+}
+
+export function receiveAsk(chain) {
+  const c = String(chain || 'that chain');
+  return `Where should the tokens arrive on ${c}? Add the address, for example: Swap 0.05 wNEAR on NEAR to USDC on Base to 0x…`;
+}
+
+/** One line the popup shows before a foreign-chain swap runs. */
+export function receiveConfirm(chain, address) {
+  const c = String(chain || '').toLowerCase();
+  const a = String(address || '').trim();
+  if (!c || c === 'near' || !a) return '';
+  return `Receiving on ${c} at ${shortReceive(a)}.`;
 }
 
 /**
  * What the in-shop agent should do with one sentence.
  * quote: fill and quote only ("get a quote for …").
- * charter: same path as Ask charter (session stamp, then the deposit flow).
+ * charter: a session is ready. A parsed swap still calls Load cargo, not the stamp.
  * guest: demo crossing. setup: say open /setup, never a wallet.
  */
 export function agentCargoPlan(text, { charterReady = false } = {}) {
@@ -118,10 +153,18 @@ export function agentCargoPlan(text, { charterReady = false } = {}) {
   const askCharter = /\bask\s+charter\b/i.test(raw);
   const loadCargo = /\bload\s+cargo\b/i.test(raw);
   const quoteOnly = /\b(?:get\s+a\s+quote|quote)\b/i.test(raw) && !askCharter && !loadCargo && !/\b(?:swap|convert|change|trade|exchange)\b/i.test(raw);
-  const parsed = parseAgentFerry(raw);
+  let parsed = parseAgentFerry(raw);
   if (!parsed && !askCharter && !loadCargo) return { ok: false, hint: 'Try: Swap 0.05 wNEAR on NEAR to USDC, or get a quote for 0.05 wNEAR on NEAR to USDC' };
   if (parsed && (String(parsed.from).endsWith('@') || String(parsed.to).endsWith('@'))) {
     return { ok: false, hint: 'Name the chain too, e.g. USDC@base or USDC on Base.' };
+  }
+  if (parsed) {
+    const chain = destChainOf(parsed.to);
+    if (chain && chain !== 'near') {
+      const v = validateDestAddress(chain, parsed.receiveAt);
+      if (!v.ok) return { ok: false, hint: receiveAsk(chain) };
+      parsed = { ...parsed, receiveAt: v.address };
+    }
   }
   let mode = 'guest';
   if (quoteOnly && parsed) mode = 'quote';

@@ -343,17 +343,17 @@ test('T10 the ferry quote says nothing is sent', async ({ page }) => {
   }
 });
 
-test('T11 payouts says it prepares a batch', async ({ page }) => {
+test('T11 payouts pays under the cap and does not send before setup', async ({ page }) => {
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/?mode=2d&nostory=1', { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => window.__skipTownIntro?.());
     const pin = page.locator('.fbpin[data-id="payouts"]');
-    await expect(pin).toContainText(/prepare a batch/i);
+    await expect(pin).toContainText(/pay under the cap/i);
     await expect(pin).not.toContainText(/pay many/i);
     await pin.click();
-    await expect(page.locator('#t-label')).toContainText(/prepare a batch/i, { timeout: 20000 });
-    await expect(page.locator('#t-say')).toContainText(/does not send/i);
+    await expect(page.locator('#t-label')).toContainText(/pay under the cap/i, { timeout: 20000 });
+    await expect(page.locator('#t-say')).toContainText(/nothing is sent until setup/i);
     await expect(page.locator('#shopUI')).not.toContainText(/pay many at once/i);
     await shot(page, 't11-payouts-' + width);
   }

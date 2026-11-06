@@ -112,6 +112,7 @@ test('guard, chronicle, toll, house, ferry and the bank proof are usable', async
   await page.getByTestId('tee-verify').click();
   await expect(page.getByTestId('tee-result')).toHaveText(/attested|failed/, { timeout: 60_000 });
   await page.goto('/?mode=2d&nostory&shop=payouts');
+  await page.getByTestId('payouts-tab-payroll').click();
   await page.getByTestId('payout-csv').fill('cafe.near,0.001,NEAR\npay.near,0.2,USDC');
   await page.getByTestId('payout-prepare').click();
   await expect(page.getByTestId('payout-receipt')).toHaveCount(2);

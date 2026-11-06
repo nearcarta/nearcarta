@@ -94,6 +94,35 @@ test('the charter agent key is named as propose and propose_batch', () => {
   assert.doesNotMatch(ui, /can only call <code>propose<\/code>|propose-only/);
 });
 
+test('popular assets lead the ferry picker', () => {
+  const rows = [
+    { symbol: 'USDe', blockchain: 'hood' },
+    { symbol: 'ZEC', blockchain: 'sol' },
+    { symbol: 'USDC', blockchain: 'base' },
+    { symbol: 'ETH', blockchain: 'eth' },
+    { symbol: 'BTC', blockchain: 'btc' },
+    { symbol: 'SOL', blockchain: 'sol' },
+    { symbol: 'NEAR', blockchain: 'near' },
+    { symbol: 'USDC', blockchain: 'arb' },
+    { symbol: 'USDC', blockchain: 'pol' },
+    { symbol: 'wNEAR', blockchain: 'near' },
+  ];
+  assert.deepEqual(tokenChoices(rows).map(t => t.id).slice(0, 8), [
+    'USDC|base', 'USDC|arb', 'USDC|pol', 'ETH|eth', 'BTC|btc', 'SOL|sol', 'NEAR|near', 'wNEAR|near',
+  ]);
+  const css = read('app/design/D8_shops/styles.css');
+  assert.match(css, /#tray \.token-listbox-menu/);
+  assert.match(css, /max-height:\s*min\(240px,\s*42vh\)/);
+  assert.match(css, /overflow:\s*auto/);
+  assert.match(css, /token-listbox-menu\[hidden\]/);
+  const brown = read('app/src/brand/brown.css');
+  assert.match(brown, /body:has\(article#card\) header\.top/);
+  assert.match(brown, /position:\s*static/);
+  const world = read('app/design/D9_world/world.css');
+  assert.match(world, /#shopUI \.token-listbox-menu/);
+  assert.match(world, /max-height:\s*min\(240px,\s*42vh\)/);
+});
+
 test('the pay page lists a long token catalog and every terminal status', () => {
   const rows = Array.from({ length: 60 }, (_, i) => ({ symbol: 'T' + i, blockchain: i % 2 ? 'near' : 'base', decimals: 6, price: 1 }));
   const choices = tokenChoices(rows);

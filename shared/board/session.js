@@ -13,6 +13,10 @@ export const AGENT_METHODS = ['propose', 'propose_call'];
 export const SESSION_HOURS = [1, 2, 24];
 // 0.05 NEAR of gas. The key cannot spend it as a transfer.
 export const GAS_ALLOWANCE_YOCTO = (10n ** 24n / 20n).toString();
+// 0.25 NEAR of gas for a Ferry session. Each propose_call prepays about 0.043 NEAR
+// (42 Tgas at 0.001 NEAR/Tgas). A 0.05 key can buy the wrap and then refuse the
+// ft_transfer. Refresh replaces the key; it does not raise an existing allowance.
+export const GAS_TOPUP_YOCTO = (10n ** 24n / 4n).toString();
 // Prepaid gas for a silent board propose. 30 Tgas covers propose plus the 8 Tgas
 // on_paid callback (measured use is about 4.67 Tgas). 80 Tgas is bought for ~0.081
 // NEAR and exceeds this allowance. The 0.005 stamp is a contract argument, not a deposit.
@@ -113,3 +117,72 @@ export const SESSION_BEATS = {
   overNear: '0.003',
   expect: ['allowed', 'over_per_action_cap', 'frozen', 'clause_expired'],
 };
+
+/**
+ * A function-call key is ready when method_names is empty (any method) or
+ * includes every required agent method. Propose-only keys are stale for Ferry.
+ * https://docs.near.org/protocol/accounts-contracts/access-keys#function-call-keys
+ */
+export function agentMethodsReady(methodNames, required = AGENT_METHODS) {
+  const names = Array.isArray(methodNames) ? methodNames : [];
+  if (!names.length) return true;
+  return required.every(m => names.includes(m));
+}
+
+/** Board FunctionCall keys from view_access_key_list, split into ready vs stale. */
+export function classifyBoardAgentKeys(keys, boardContract, required = AGENT_METHODS) {
+  const board = [];
+  for (const row of keys || []) {
+    const fc = row?.access_key?.permission?.FunctionCall;
+    if (!fc || fc.receiver_id !== boardContract) continue;
+    const methodNames = Array.isArray(fc.method_names) ? fc.method_names : [];
+    board.push({
+      publicKey: row.public_key,
+      methodNames,
+      ready: agentMethodsReady(methodNames, required),
+      allowance: fc.allowance ?? null,
+    });
+  }
+  const ready = board.filter(k => k.ready);
+  const stale = board.filter(k => !k.ready);
+  return { board, ready, stale, needsRenew: stale.length > 0 && ready.length === 0 };
+}
+
+/**
+ * Wallet-selector actions for one approval on the visitor account:
+ * DeleteKey every stale board FunctionCall key, then AddKey the new one.
+ * Same receiver (the account). Actions run in order; one failure rolls all back.
+ * https://docs.near.org/protocol/transactions/transaction-anatomy#actions
+ */
+export function renewAgentKeyActions({
+  stalePublicKeys = [],
+  newPublicKey,
+  boardContract,
+  methodNames = AGENT_METHODS,
+  allowance = GAS_ALLOWANCE_YOCTO,
+} = {}) {
+  if (!newPublicKey || !boardContract) throw new Error('renew needs a public key and the board contract');
+  const seen = new Set();
+  const dels = [];
+  for (const pk of stalePublicKeys) {
+    if (!pk || seen.has(pk) || pk === newPublicKey) continue;
+    seen.add(pk);
+    dels.push({ type: 'DeleteKey', params: { publicKey: pk } });
+  }
+  return [
+    ...dels,
+    {
+      type: 'AddKey',
+      params: {
+        publicKey: newPublicKey,
+        accessKey: {
+          permission: {
+            receiverId: boardContract,
+            methodNames: [...methodNames],
+            allowance: String(allowance),
+          },
+        },
+      },
+    },
+  ];
+}
