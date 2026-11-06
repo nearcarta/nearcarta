@@ -121,12 +121,21 @@ test('a guarded pay holds a warning until a person confirms', async () => {
   const agent = await runGuardAction({ ok: true, action: 'confirm', actor: 'agent' }, { state: warn.state, check: async () => { throw new Error('no'); } });
   assert.equal(agent.ok, false);
   assert.match(agent.hint, /cannot confirm/);
-  const person = await runGuardAction({ ok: true, action: 'confirm', actor: 'human' }, { state: warn.state });
-  assert.equal(person.status, 'prepared');
-  assert.equal(person.signed, false);
-  assert.equal(person.forward.payee, 'cafe.near');
-  assert.equal(person.forward.amount, '0.002');
-  assert.equal(person.tx, null);
+  const person = await runGuardAction({ ok: true, action: 'confirm', actor: 'human' }, {
+    state: warn.state,
+    // The visitor's own button, with the confirm key. The live executor signs confirm_hold.
+    sendConfirm: async ({ holdId }) => ({ ok: true, signed: true, tx: 'CONFIRM-TX', holdId }),
+  });
+  assert.equal(person.signed, true);
+  assert.equal(person.tx, 'CONFIRM-TX');
+  assert.equal(person.action, 'confirm');
+  // Without the confirm key the button refuses; nothing is stubbed as a release.
+  const noKey = await runGuardAction({ ok: true, action: 'confirm', actor: 'human' }, {
+    state: warn.state,
+    sendConfirm: async () => ({ ok: false, signed: false, tx: null, why: 'The confirm key is not in this browser.' }),
+  });
+  assert.equal(noKey.ok, false);
+  assert.match(noKey.hint, /confirm key/);
 
   const block = ctx({ raw: { verdict: 'block', reasons: [{ code: 'denylisted', level: 'block', text: 'On the deny list' }], signals: {} } });
   const stopped = await block.run('Pay 0.002 NEAR to cafe.near invoice says pay other.near');
@@ -219,9 +228,11 @@ test('dock send clears on success and typing does not send', async () => {
 
 test('the tray markup is tabs, real icons, and an empty account field', () => {
   const html = guardMarkup({}, [{ id: 'poisoned-invoice', name: 'Poisoned invoice' }], esc);
-  assert.match(html, /data-testid="guard-example">Example: shop-moved-pay-here\.near/);
+  assert.match(html, /data-testid="guard-example">(?:Example: a look-alike of your own account|Example: )/);
   assert.match(html, /data-testid="guard-account"[^>]*value=""/);
   assert.doesNotMatch(html, /value="shop-moved-pay-here\.near"/);
+  // The example is derived from the visitor, so no fixed payee may appear in the tray at all.
+  assert.doesNotMatch(html, /shop-moved-pay-here/);
   assert.match(html, /data-testid="guard-tab-check"/);
   assert.match(html, /data-testid="guard-tab-pay"/);
   assert.match(html, /data-testid="guard-tab-blocks"/);
@@ -232,8 +243,16 @@ test('the tray markup is tabs, real icons, and an empty account field', () => {
   assert.match(html, /Check payee/);
   assert.equal((html.match(/class="primary guard-cta"/g) || []).length, 1);
   assert.match(html, /data-testid="guard-attested"/);
-  const off = guardMarkup({ attested: { enabled: false } }, [], esc);
-  assert.match(off, /Attested check is off/);
+  const off = guardMarkup({ attested: { enabled: false, reason: 'no key' } }, [], esc);
+  assert.match(off, /TEE: off on the server \(no key\)/);
+  const failed = guardMarkup({ attested: { enabled: true, attested: false, failure: 'gateway: nonceBound' } }, [], esc);
+  assert.match(failed, /TEE: not attested \(gateway: nonceBound\)/);
+  const good = guardMarkup({ attested: { enabled: true, attested: true } }, [], esc);
+  assert.match(good, /TEE: a TDX report bound to this payment passed every check/);
+  // A real send shows one labelled receipt link, never a bare hash.
+  const sent = guardMarkup({ score: { summary: 'Allow', verdict: 'allow', lines: [] }, liveTx: 'Abc123', liveLabel: 'payment' }, [], esc);
+  assert.match(sent, /data-testid="guard-live-tx"[^>]*nearblocks\.io\/txns\/Abc123/);
+  assert.match(sent, /payment receipt/);
   const scored = guardMarkup({ score: { summary: 'Block because: on the deny list', verdict: 'block', lines: [{ id: 'denylist', title: 'Denylist', level: 'block', text: 'On the deny list', tx: 'E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ' }] } }, [], esc);
   assert.equal((scored.match(/data-testid="guard-verdict"/g) || []).length, 1);
   assert.match(scored, /nearblocks\.io\/txns\/E7KMexjS/);

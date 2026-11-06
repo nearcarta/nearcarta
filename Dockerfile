@@ -11,9 +11,10 @@ RUN npm ci --omit=dev -w backend && npm cache clean --force
 COPY backend/src backend/src
 COPY backend/data backend/data
 COPY shared shared
-# toll-views imports assembleTollLive from the city panel (Node-safe pure helpers).
-COPY app/src/panels/toll-room.js app/src/panels/toll-dock.js app/src/panels/token-badge.js app/src/panels/icon-map.js app/src/panels/ferry-settle.js app/src/panels/
-COPY app/src/toll-derive.js app/src/
+# Backend modules import a few pure helpers from app/src (toll views, payouts plan, the
+# board call signer, chronicle helpers). A hand-written COPY list drifted and the image
+# failed to boot on a missing file, so build-image.mjs copies exactly what resolves.
+COPY app/src/app-imports app/src
 USER node
 EXPOSE 10000
 HEALTHCHECK CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

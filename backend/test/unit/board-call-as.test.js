@@ -134,15 +134,20 @@ test('browser modules the city imports raw resolve without a bundler', async () 
   assert.deepEqual(bad, [], `unreachable browser imports:\n${bad.join('\n')}`);
 });
 
-// The guard board module is imported by a browser module, so the implementation
-// has to sit inside the deploy root. shared/ keeps the node import path.
+// The guard board modules are imported by a browser module, so the implementation has to sit
+// inside the deploy root. shared/ keeps the node import path. The live executor is the one
+// signer, and both the CTA and the agent reach the chain through it.
 test('the guard board module resolves inside the deploy root', async () => {
   const { readFileSync, existsSync } = await import('node:fs');
   const { fileURLToPath } = await import('node:url');
   const root = fileURLToPath(new URL('../../..', import.meta.url));
-  const src = readFileSync(`${root}app/src/panels/guard-agent.js`, 'utf8');
-  assert.match(src, /from '\.\/guard-board-pay\.js'/);
-  assert.doesNotMatch(src, /\.\.\/\.\.\/\.\.\/shared\//);
+  assert.ok(existsSync(`${root}app/src/panels/guard-live.js`), 'the executor lives in app/src so the browser can load it');
+  const live = readFileSync(`${root}app/src/panels/guard-live.js`, 'utf8');
+  assert.doesNotMatch(live, /\.\.\/\.\.\/\.\.\/shared\//, 'the served executor must not import outside app/');
+  assert.match(live, /propose_call_as/);
+  assert.match(live, /confirm_hold/);
+  assert.match(live, /cancel_hold/);
+  assert.match(live, /expire_sent/);
   assert.ok(existsSync(`${root}shared/guard/board-pay.js`));
   assert.match(readFileSync(`${root}shared/guard/board-pay.js`, 'utf8'), /from '\.\.\/\.\.\/app\/src\/panels\/guard-board-pay\.js'/);
   assert.ok(existsSync(`${root}app/src/panels/guard-board-pay.js`), 'the implementation lives in app/src so the browser can load it');

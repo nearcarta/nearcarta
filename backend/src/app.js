@@ -14,6 +14,7 @@ import { parsePayoutIntent } from './payouts-intent.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
 import { attested } from './outlayer.js';
+import { attestedVerdict } from './guard-attested.js';
 import * as mist from './mistbank.js';
 import * as shops from './shops.js';
 import * as tollgate from './tollgate.js';
@@ -132,6 +133,9 @@ export async function deepHealth() {
 
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 const ACCT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
+// The live guard charter: the visitor's row lives on the board. The retired oath must never
+// be a default again (mainnet.json `retired`).
+const BOARD_ID = MAINNET_DEP?.board?.contract || null;
 const knownAccounts = new Set([
   MAINNET_DEP?.charter?.contract, MAINNET_DEP?.board?.contract, MAINNET_DEP?.toll?.contract,
   MAINNET_DEP?.extras?.arena?.contract, MAINNET_DEP?.extras?.house?.contract,
@@ -343,7 +347,16 @@ export function makeApp() {
     const out = await payoutsInvoice.registrationOf(c.req.query('account'), { view, viewAccount });
     return c.json(out, out.ok ? 200 : 400);
   });
-  app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await reads.guardhouse()));
+  // The live charter is the visitor row on the board (mainnet.json: charter.nearcarta.near is
+  // retired, so oathId resolves to the board). `?owner=` adds that visitor's live row. A retired
+  // or missing contract answers a readable state from lastGood, never a 500.
+  app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => {
+    const owner = c.req.query('owner');
+    const snap = await guard.snapshot();
+    if (!owner) return c.json(snap);
+    const row = await guard.boardSnapshot(guard.boardId, { owner });
+    return c.json({ ...snap, owner: row.owner, has_row: row.has_row, row: row.row, config: row.config, liabilities: row.liabilities });
+  });
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
   // House deed (NEP-171): the deed is the house. Its purse and cap live in the shop contract and only the
@@ -401,10 +414,11 @@ export function makeApp() {
   }
   app.get('/api/guardhouse/check/:account', limiter(12), async c => {
     const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
-    // No charter means a guest check: there is no allowlist to compare against, and the
-    // account signals alone decide. The old default was charter.nearcarta.near, which is
-    // retired (mainnet.json `retired`), so using it made every guest check fail.
-    const charter = c.req.query('charter') || null;
+    // The default charter is the live board, never the retired oath. The board is a
+    // Nearcarta contract (`known`), so a guest check compares against the deny list and
+    // the account signals; a ?charter= that names a board row owner supplies that row's
+    // allowlist. charter.nearcarta.near is reaped and must never be a default again.
+    const charter = c.req.query('charter') || BOARD_ID || null;
     const found = charter ? await nearcartaCharter(charter) : null;
     if (charter && !found) return bad(c, 'charter must be a Nearcarta charter');
     const k = a + '|' + (charter || ''), hit = cpCache.get(k);
@@ -413,7 +427,20 @@ export function makeApp() {
     cpCache.set(k, { at: Date.now(), v }); if (cpCache.size > 500) cpCache.delete(cpCache.keys().next().value);
     return c.json(v);
   });
-  app.get('/api/guardhouse/attested', limiter(30), async c => c.json(await reads.attested()));
+  // Attested verdict for one typed payment. The payment context is hashed and becomes the TEE
+  // nonce, so the report is bound to this payee/amount/invoice/row and to nothing else. Without
+  // a context it reports the scheme and the reason it is off, never a bare `enabled:false`.
+  app.get('/api/guardhouse/attested', limiter(30), async c => {
+    const q = c.req.query();
+    const has = ['payee', 'amount'].every(k => typeof q[k] === 'string' && q[k].length);
+    if (!has) return c.json({ ...(await reads.attested()), context: null, need: 'pass payee and amount to bind a verdict to a payment' });
+    if (q.payee.length > 64 || q.amount.length > 40) return bad(c, 'payee or amount too long');
+    const out = await attestedVerdict({
+      payee: q.payee, chain: q.chain || 'near', asset: q.asset || 'NEAR', amount: q.amount,
+      invoice: q.invoice || '', row: q.row || '', keyEpoch: q.keyEpoch || '', policyVersion: q.policyVersion || '',
+    });
+    return c.json(out);
+  });
   app.get('/api/guardhouse/denylist', limiter(30), c => c.json(cp.DENY));
   app.get('/api/guardhouse/action/:id', limiter(30), async c => {
     const id = c.req.param('id'); if (!/^\d{1,9}$/.test(id)) return bad(c, 'action id must be a number');

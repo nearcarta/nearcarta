@@ -973,6 +973,11 @@ const APPS = {
         // that name is also the fallback so the shop works the moment it exists.
         // The guard contract itself only accepts calls from the board.
         guard: () => A.S.mainnet?.guard?.contract || (A.S.mainnet?.root ? 'guard.' + A.S.mainnet.root : ''),
+        injected: () => (typeof A.injectedPayee === 'function' ? A.injectedPayee() : ''),
+        // The live executor. The gold CTA and the agent box both call these.
+        sendPay: (p) => A.guardPay(p),
+        sendConfirm: (p) => A.guardConfirm(p),
+        sendCancel: (p) => A.guardCancel(p),
         row: () => !!(A.S.board && A.S.boardRow),
         frozen: () => !!A.S.state?.frozen,
         capYocto: () => A.S.clauses?.pay?.per_action_cap || null,
@@ -1142,12 +1147,24 @@ function attestedLine() {
   if (!extra.att && !extra.attL) { extra.attL = true; A.attestedCheck().then(a => { extra.att = a; }).catch(() => { extra.att = { error: true }; }).finally(() => { extra.attL = false; if (cur === 'guard') proofDrawer(); }); }
   const a = extra.att;
   if (!a) return kv('Attested check', '<span class="note">Reading…</span>');
-  if (a.error || !a.enabled) return kv('Attested check', '<span class="note">Unavailable. The charter still checks every payment itself.</span>');
+  if (a.error || !a.enabled) return kv('Attested check', '<span class="note">Unavailable. The row cap still checks every payment itself.</span>');
+  // Two payloads reach here: the OutLayer runs list (`checks[]`, `wasm_sha256`) and the
+  // NEAR AI bound-context verdict (backend/src/guard-attested.js: no `checks[]`, a `failure`
+  // string and a `context_sha256`). Read whichever arrived instead of assuming the first.
+  if (a.scheme === 'near-ai-tdx-bound-context') {
+    const ok = a.attested === true;
+    const tag = `<span class="st ${ok ? 'ok' : 'no'}" data-testid="attested-decision">${ok ? '✓ attested' : '✕ ' + esc(String(a.failure || 'not attested').slice(0, 80))}</span>`;
+    const ctx = a.context_sha256 ? `<code title="${esc(a.context_sha256)}">${esc(a.context_sha256.slice(0, 12))}…</code>` : '—';
+    return `<div data-testid="attested-check">` + kv('Attested check', tag)
+      + kv('Bound to', ctx) + kv('Scheme', esc(a.scheme || ''))
+      + `<p class="note">${esc(a.claims || 'The row cap still decides on chain. This is an extra, independent check.')}</p></div>`;
+  }
   const c = a.checks?.[0], ok = c?.decision === 'allow';
   const tag = c ? `<span class="st ${ok ? 'ok' : 'no'}" data-testid="attested-decision">${ok ? '✓ allow' : '✕ ' + esc(c.decision)}</span>${!ok && c.reasons?.[0] ? ` <span class="why">${esc(c.reasons[0])}</span>` : ''}` : '<span class="note">No checks yet</span>';
-  const proofs = (a.runs || []).map(r => `<a class="tx" href="${esc(r.attestation)}" target="_blank" rel="noopener" aria-label="TEE attestation for the ${esc(r.label)} check">${r.decision === 'allow' ? '✓' : '✕'} ${esc(r.label.replace('_', ' '))} proof ↗</a> <a class="tx" href="https://nearblocks.io/txns/${esc(r.tx)}" target="_blank" rel="noopener" aria-label="Open the ${esc(r.label)} check">${esc(short(r.tx, 6, 4))} ↗</a>`).join('<br>');
-  return `<div data-testid="attested-check">` + kv('Attested check', tag) + kv('Checker', `OutLayer TEE · wasm <code title="${esc(a.wasm_sha256)}">${esc(a.wasm_sha256.slice(0, 12))}…</code>`)
-    + kv('Proof', proofs) + kv('Proxy', idChip(a.proxy)) + `<p class="note">The charter still decides on chain. This is an extra, independent check.</p></div>`;
+  const proofs = (a.runs || []).map(r => `<a class="tx" href="${esc(r.attestation)}" target="_blank" rel="noopener" aria-label="TEE attestation for the ${esc(r.label)} check">${r.decision === 'allow' ? '✓' : '✕'} ${esc(String(r.label || '').replace('_', ' '))} proof ↗</a> <a class="tx" href="https://nearblocks.io/txns/${esc(r.tx)}" target="_blank" rel="noopener" aria-label="Open the ${esc(String(r.label || ''))} check">${esc(short(r.tx, 6, 4))} ↗</a>`).join('<br>');
+  const wasm = String(a.wasm_sha256 || '');
+  return `<div data-testid="attested-check">` + kv('Attested check', tag) + kv('Checker', `OutLayer TEE · wasm <code title="${esc(wasm)}">${esc(wasm ? wasm.slice(0, 12) + '…' : '—')}</code>`)
+    + kv('Proof', proofs) + kv('Proxy', idChip(a.proxy)) + `<p class="note">The row cap still decides on chain. This is an extra, independent check.</p></div>`;
 }
 // Live lists from the shop modules (Town Hall proposals, Arena past prompts, Toll records): rows only, their notes go to Details.
 function lazyList(key, mod, fn, id) {

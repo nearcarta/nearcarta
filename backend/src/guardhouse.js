@@ -20,20 +20,48 @@ export const oathId = G?.oath || (MAINNET_DEP?.charter?.contract && !RETIRED.has
  * The board is the oath now. It has no `get_state`/`get_clauses`: the rules live in each
  * visitor's row, and `get_config` is the only whole-contract read. Return the same shape
  * the old oath snapshot had, so the dashboards keep working with the live source.
+ *
+ * `opts.owner` adds that visitor's row (the live policy: caps, receivers, nonce, frozen),
+ * and `retired_legacy` names the reaped oath so a reader can see what happened to it instead
+ * of getting a bare 404.
  */
-export async function boardSnapshot(board) {
-  const [config, keys] = await Promise.all([view(board, 'get_config'), accessKeys(board)]);
+export async function boardSnapshot(board, { owner = null } = {}) {
+  const [config, keys, liabilities] = await Promise.all([
+    view(board, 'get_config'), accessKeys(board),
+    view(board, 'get_liabilities').catch(() => null),
+  ]);
   const fullAccess = keys.keys.filter(k => k.access_key.permission === 'FullAccess').length;
   const fc = keys.keys.filter(k => k.access_key.permission !== 'FullAccess').map(k => ({
     public_key: k.public_key, receiver: k.access_key.permission.FunctionCall.receiver_id, methods: k.access_key.permission.FunctionCall.method_names }));
+  const want = typeof owner === 'string' && /^[a-z0-9][a-z0-9._-]{0,62}\.near$/.test(owner) ? owner : null;
+  const row = want ? await view(board, 'get_charter', { owner: want }).catch(() => null) : null;
+  const legacy = [...RETIRED][0] || null;
   return {
     board,
     oath: board,
     state: {
-      owner: config.owner, dao: null, frozen: false,
-      policy_version: 2, policy_hash: null, freeze_epoch: 0, agent_key: null,
+      owner: config.owner, dao: null, frozen: row?.frozen === true,
+      policy_version: 2, policy_hash: null, freeze_epoch: 0, agent_key: row?.agent ?? null,
       rows: config.rows, max_row_yocto: config.max_row_yocto,
     },
+    config: { owner: config.owner, rows: Number(config.rows), max_row_yocto: String(config.max_row_yocto), byte_yocto: String(config.byte_yocto) },
+    liabilities: liabilities == null ? null : String(liabilities),
+    retired_legacy: legacy,
+    retired_note: legacy
+      ? `${legacy} is retired; its NEAR returned to ${MAINNET_DEP?.retired?.[legacy]?.recovered_to || 'the owner'}. The live guard charter is the visitor row on ${board}.`
+      : null,
+    owner: want,
+    has_row: !!row,
+    row: row ? {
+      owner: row.owner,
+      per_action_cap: String(row.per_action_cap), daily_budget: String(row.daily_budget),
+      max_actions_per_day: Number(row.max_actions_per_day), min_amount: String(row.min_amount),
+      expires_at: String(row.expires_at), frozen: row.frozen === true, sealed: row.sealed === true,
+      agent: row.agent, nonce: String(row.nonce), balance: String(row.balance),
+      storage_locked: String(row.storage_locked),
+      receivers: Array.isArray(row.receivers) ? row.receivers : [],
+      spent_today: String(row.spent_today), actions_today: Number(row.actions_today),
+    } : null,
     clauses: null,
     usage: {},
     keys: { fullAccess, functionCall: fc },
