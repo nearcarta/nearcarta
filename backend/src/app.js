@@ -340,10 +340,12 @@ export function makeApp() {
   app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
-  // House deed v2 (NEP-171): the deed is the house. Its purse and cap live in the deed contract and only the
+  // House deed (NEP-171): the deed is the house. Its purse and cap live in the shop contract and only the
   // current holder may spend (1 yocto, full wallet approval). The server never signs: /mint returns the unsigned
   // call for the visitor's wallet (NEAR Connect signAndSendTransaction); token_id is the minter's account id.
-  const D = DEP.house_deed;
+  // The live shop is extras.house.shop. house_deed was never a key in mainnet.json, so these routes used to 404
+  // and the city could never load a deed. Contracts/house_nft mint_deed takes {house, cap} and 0.02 NEAR minimum.
+  const D = DEP.house_deed || { contract: HOUSE_SHOP, mint: { gas: '100000000000000', deposit_yocto: '20000000000000000000000' } };
   const deedTx = (house) => ({ receiverId: D.contract, actions: [{ type: 'FunctionCall', params: { methodName: 'mint_deed',
     args: { house: house || null, cap: '50000000000000000000000' }, gas: D.mint.gas, deposit: D.mint.deposit_yocto } }] });
   app.get('/api/house/deed', limiter(20), async c => {

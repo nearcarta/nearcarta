@@ -7,10 +7,18 @@ import { DEP, MAINNET_DEP, cfg } from './config.js';
 import { view, txStatus, eventsFromOutcome, txResult, explorerTx, accessKeys } from './near.js';
 
 const G = DEP.guardhouse || null;
+// charter.nearcarta.near was retired to nearcarta.near (recorded in mainnet.json `retired`).
+// A snapshot of a deleted account is not a server fault, so this answers a plain 404 instead of 500.
+const RETIRED = new Set(Object.entries(MAINNET_DEP?.retired || {})
+  .filter(([, v]) => v?.status === 'deleted')
+  .map(([id]) => id));
 export const oathId = G?.oath || MAINNET_DEP?.charter?.contract || null;
 
 export async function snapshot(oath = oathId) {
   if (!oath) throw Object.assign(new Error('no oath on this network'), { status: 503 });
+  if (RETIRED.has(oath)) {
+    throw Object.assign(new Error(`${oath} is retired; its NEAR returned to ${MAINNET_DEP?.retired?.[oath]?.recovered_to || 'the owner'}`), { status: 404 });
+  }
   const oathId = oath;
   const [state, clauses, keys] = await Promise.all([view(oathId, 'get_state'), view(oathId, 'get_clauses'), accessKeys(oathId)]);
   const usage = {};
