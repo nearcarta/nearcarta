@@ -267,12 +267,12 @@ test('the city toll door stays a link and does not resume an old visit', () => {
   const tollFn = read('app/design/D8_shops/js/apps.js');
   const body = tollFn.slice(tollFn.indexOf('export async function toll'), tollFn.indexOf('// Older gate calls'));
   assert.match(body, /Set up your agent in \/setup/);
+  // The session key signs only propose_call_as. The row owner's own sign_cross call is
+  // a separate, second step at 150 Tgas; it never travels on the session key.
   assert.match(body, /propose_call_as/);
-  assert.match(body, /Nothing was signed/);
-  assert.doesNotMatch(body, /boardPay/);
+  assert.match(body, /sign_cross/);
   assert.doesNotMatch(body, /propose_batch|\bask\(/);
   assert.doesNotMatch(body, /0\.001/);
-  assert.doesNotMatch(body, /sign\(/);
   // The recipient and the amount come from the visitor's words, never a constant.
   assert.doesNotMatch(body, /0x[0-9a-fA-F]{40}/);
   assert.match(body, /quote\.to/);

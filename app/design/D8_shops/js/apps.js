@@ -382,6 +382,11 @@ export async function toll(quote) {
   // The gold button and the agent call this. It signs propose_call_as on the board.
   // The session key never calls cross or sign_cross, and this does not open a wallet.
   // Paid on Base is a later Base receipt. This call only opens the order.
+  //
+  // The board forwards 30 Tgas to cross, which records the order and cannot start the
+  // MPC sign. The second step is sign_cross by the row owner at 150 Tgas. With a
+  // helper key this browser sends it; without one the order is already stored and the
+  // owner signs it from their own wallet. Neither step opens a wallet prompt.
   if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
   if (!quote?.payable || !quote.feeYocto) throw new Error(quote?.hint || 'The live policy has no visitor fee. Nothing was signed.');
   const miss = missingCross(quote);
@@ -431,12 +436,46 @@ export async function toll(quote) {
       const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
       return settled('toll', { tx: signed.hash, decision: 'denied', reason, action: nonce, amount: deposit, receiver: shop, fromChain: true, signer: 'agent' });
     }
-    return settled('toll', { tx: signed.hash, decision: 'allowed', reason: 'ok', action: nonce, amount: deposit, receiver: shop, signer: 'agent' });
+    // Step two: the row owner signs the stored order. This is what starts the MPC
+    // sign; the board's 30 Tgas call only recorded it. A failure here is reported as
+    // a stored order that still needs its signature, not a payment.
+    const orderId = await findOrder(shop, nonce);
+    let signedTx = null;
+    if (orderId != null) {
+      try { signedTx = await sign(shop, [fc('sign_cross', { id: orderId }, 150)]); }
+      catch (e) {
+        const why = String(e?.message || e).slice(0, 140);
+        return settled('toll', {
+          tx: signed.hash, decision: 'allowed', reason: 'stored', action: nonce, amount: deposit, receiver: shop, signer: 'agent',
+          needsSignature: true,
+          note: `The board stored the crossing. This browser could not sign it: ${why}`,
+        });
+      }
+    }
+    return settled('toll', {
+      tx: signed.hash, decision: 'allowed', reason: 'ok', action: nonce, amount: deposit,
+      receiver: shop, signer: 'agent', orderId, signTx: signedTx, needsSignature: orderId == null,
+    });
   } catch (e) {
     const code = refusalOf(e);
     if (code || e.tx) return settled('toll', { tx: e.tx || null, decision: 'denied', reason: code || String(e.message || e).slice(0, 160), action: nonce, amount: deposit, receiver: shop, fromChain: !!e.tx });
     throw e;
   }
+}
+
+/** The order the toll just recorded for this action id, so the row owner can sign it. */
+async function findOrder(shop, actionId) {
+  // `get_order` is keyed by the toll's own id, which the board's return value does not
+  // surface to the browser. Read the few ids past the live nonce and match the action.
+  try {
+    const live = await W.viewFn(rpc, shop, 'policy', {});
+    const n = Number(live?.next_nonce ?? 0);
+    for (let id = Math.max(0, n - 6); id < n + 3; id++) {
+      const o = await W.viewFn(rpc, shop, 'get_order', { id }).catch(() => null);
+      if (o && String(o.action_id) === String(actionId)) return id;
+    }
+  } catch { /* no order read: the caller reports that a signature is still needed */ }
+  return null;
 }
 // Older gate calls stay for a wallet that already started one. A new toll is the policy fee on the board.
 const LS_TOLL = c => 'nearcarta.d8.toll.' + c;
