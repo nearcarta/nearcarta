@@ -49,19 +49,39 @@ test('a hash recorded twice is asked once, and a dropped lookup is retried', asy
   assert.equal(out.rows.every(r => r.found), true, 'both records of the same hash resolve');
   assert.ok(asked <= 4, `one question for the shared hash plus retries, not one per record (asked ${asked})`);
 });
+test('fastnear throttling (HTTP 200, code -429, no name) is retried, not read as missing', async () => {
+  // fastnear answers a burst with HTTP 200 and {"error":{"code":-429,"message":"Rate
+  // limits exceeded..."}} and no error name. The name-only read made that identical
+  // to a tx that is not on chain, so verify flipped between 67/71 and 71/71 on an
+  // unchanged tree and failed the node CI job twice.
+  const dep = { network: 'mainnet', root: 'nearcarta.near', retired: { 'retired.charter.nearcarta.near': { txs: { reap: 'F'.repeat(44) } } } };
+  let asked = 0;
+  const fetchImpl = async () => {
+    asked += 1;
+    if (asked === 1) return { status: 200, json: async () => ({ jsonrpc: '2.0', id: '1', error: { code: -429, message: 'Rate limits exceeded. For higher rate limits get a subscription.' } }) };
+    return { status: 200, json: async () => ({ result: { transaction: { signer_id: 'nearcarta.near' }, status: { SuccessValue: '' } } }) };
+  };
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl });
+  assert.ok(asked >= 2, 'a 200 with code -429 must be retried');
+  assert.equal(out.ok, true);
+  assert.equal(out.rows[0].found, true);
+});
 
-test('a busy RPC is reported as unread, not as a missing tx', async () => {
-  const dep = { root: 'nearcarta.near', house: { contract: 'house.nearcarta.near', txs: { deploy: 'E'.repeat(44) } } };
-  // Every attempt is throttled: the tx is not called missing, it is called unread.
-  const throttled = async () => ({ status: 429, ok: false, json: async () => ({ error: { name: 'TooManyRequests' } }) });
-  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: throttled });
+test('a tx that is not on chain is still reported missing', async () => {
+  const dep = { network: 'mainnet', root: 'nearcarta.near', guard: { contract: 'guard.nearcarta.near', txs: { gone: 'G'.repeat(44) } } };
+  const fetchImpl = async () => ({ json: async () => ({ error: { cause: { name: 'UNKNOWN_TRANSACTION' } } }) });
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl });
+  assert.equal(out.ok, false, 'a real miss must not be retried into a pass');
+  assert.equal(out.rows[0].found, false);
+  assert.notEqual(out.rows[0].transient, true, 'an absent tx is a final answer, not an unread one');
+});
+
+test('a read that never resolved says it was unread, not missing', async () => {
+  // Every attempt fails at the HTTP layer. The tx is not called missing: the reader could not ask.
+  const dep = { network: 'mainnet', root: 'nearcarta.near', house: { contract: 'house.nearcarta.near', txs: { deploy: 'E'.repeat(44) } } };
+  const broken = async () => ({ status: 503, ok: false, json: async () => { throw new Error('bad gateway'); } });
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: broken });
   assert.equal(out.ok, false);
-  assert.equal(out.rows[0].transient, true, 'a throttled read says so');
-  assert.match(out.rows[0].error, /429/);
-
-  // An unknown transaction is a final answer, so it is not marked transient.
-  const unknown = async () => ({ ok: true, json: async () => ({ error: { cause: { name: 'UNKNOWN_TRANSACTION' } } }) });
-  const gone = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: unknown });
-  assert.equal(gone.ok, false);
-  assert.notEqual(gone.rows[0].transient, true);
+  assert.equal(out.rows[0].found, false);
+  assert.equal(out.rows[0].transient, true, 'verify-mainnet prints this row as UNREAD');
 });

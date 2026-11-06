@@ -58,6 +58,22 @@ test('index outage degrades to the on-chain signals, never to allow-by-error', a
   const r = await check('stranger.near', { now: NOW, viewAccount: plain, view: charterView(), fpost: async () => { throw new Error('fastnear tx http 429'); }, charter: 'c.near' });
   assert.match(r.signals.index, /unavailable/); assert.equal(r.verdict, 'warn');
 });
+test('a retired charter is unreadable, not a crash, and cannot reach allow', async () => {
+  // charter.nearcarta.near is reaped (mainnet.json `retired`), so its views throw.
+  const retired = async () => { throw new Error('rpc query: UNKNOWN_ACCOUNT "account charter.nearcarta.near does not exist while viewing"'); };
+  const r = await check('cafe.shop.near', { now: NOW, viewAccount: plain, view: retired, fpost: firstTx(30 * DAY), charter: 'charter.nearcarta.near' });
+  assert.match(r.signals.charter_unreadable, /UNKNOWN_ACCOUNT/);
+  assert.equal(r.signals.allowlisted, false);
+  assert.equal(r.verdict, 'warn', 'an unreadable allowlist must not allow a payment');
+  assert.ok(r.reasons.some(x => x.code === 'no_history'));
+});
+test('a guest check with no charter still reads the account signals', async () => {
+  const r = await check('stranger.near', { now: NOW, viewAccount: plain, view: async () => { throw new Error('no charter should be read'); }, fpost: firstTx(30 * DAY) });
+  assert.equal(r.verdict, 'warn');
+  assert.equal(r.charter, null);
+  assert.equal(r.signals.charter_unreadable, undefined);
+  assert.deepEqual(r.reasons.map(x => x.code), ['no_history']);
+});
 test('decide: block wins over warn', () => {
   assert.equal(decide({ exists: true, deny: { reason: 'x', evidence: [] }, allowlisted: false, prior_payments: 0 }).verdict, 'block');
 });
