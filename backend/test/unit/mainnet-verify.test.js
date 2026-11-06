@@ -73,4 +73,15 @@ test('a tx that is not on chain is still reported missing', async () => {
   const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl });
   assert.equal(out.ok, false, 'a real miss must not be retried into a pass');
   assert.equal(out.rows[0].found, false);
+  assert.notEqual(out.rows[0].transient, true, 'an absent tx is a final answer, not an unread one');
+});
+
+test('a read that never resolved says it was unread, not missing', async () => {
+  // Every attempt fails at the HTTP layer. The tx is not called missing: the reader could not ask.
+  const dep = { network: 'mainnet', root: 'nearcarta.near', house: { contract: 'house.nearcarta.near', txs: { deploy: 'E'.repeat(44) } } };
+  const broken = async () => ({ status: 503, ok: false, json: async () => { throw new Error('bad gateway'); } });
+  const out = await checkAll(dep, { rpc: 'https://rpc.example', fetchImpl: broken });
+  assert.equal(out.ok, false);
+  assert.equal(out.rows[0].found, false);
+  assert.equal(out.rows[0].transient, true, 'verify-mainnet prints this row as UNREAD');
 });
