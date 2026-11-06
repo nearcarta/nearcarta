@@ -8,7 +8,7 @@
 // https://github.com/near/NEPs/blob/master/neps/nep-0141.md
 import { nearAccountOk } from '../../design/D8_shops/js/payouts.js';
 
-export const MISS_HINT = 'Try: Create invoice 0.15 USD, Pay reviewed rows, or Export accountant CSV.';
+export const MISS_HINT = 'Try: bill alice.near 0.3 USDC for the April article, Pay these rows, or Export CSV.';
 
 // Native USDC on NEAR. The RPC accepts this 64-hex implicit account.
 // The .factory.bridge.near alias is 84 characters, and every JSON-RPC rejects it as too long.
@@ -117,13 +117,114 @@ export function payrollKey(row) {
   return [chain, asset, String(row?.to || '').trim().toLowerCase(), String(row?.amt ?? '')].join('|');
 }
 
-/** Natural-language commands. A miss returns a hint and does not spend. Amounts are not raised. */
-export function agentCommand(text) {
+const MONTHS = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3, may: 4,
+  jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7, sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
+};
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function isoDay(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function addDays(now, n) {
+  const d = new Date(now);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+/** Due and expiry from the day the visitor opens the form. Nothing here is a fixed calendar date. */
+export function relativeInvoiceDates(now = new Date()) {
+  const due = addDays(now, 7);
+  const exp = addDays(now, 14);
+  exp.setHours(18, 0, 0, 0);
+  return { due: isoDay(due), expiry: `${isoDay(exp)}T18:00` };
+}
+
+/** Amounts the visitor actually wrote, in order. A model may not add one. */
+export function amountsIn(text) {
+  const out = [];
+  const re = /\$\s*(\d+(?:\.\d+)?)|(?:^|[^\d.])(\d+(?:\.\d+)?)\s*(?:usdc|usd)\b/gi;
+  for (const m of String(text || '').matchAll(re)) {
+    const n = Number(m[1] || m[2]);
+    if (n > 0) out.push(n);
+  }
+  return out;
+}
+
+/** Named accounts and 64-hex accounts that appear in the words. */
+export function accountsIn(text) {
+  const found = [];
+  const seen = new Set();
+  const add = (id) => {
+    const norm = String(id || '').trim().toLowerCase();
+    if (!norm || seen.has(norm) || /^\d+(?:\.\d+)+$/.test(norm) || !nearAccountOk(norm)) return;
+    seen.add(norm);
+    found.push(norm);
+  };
+  for (const m of String(text || '').matchAll(/\b[0-9a-fA-F]{64}\b/g)) add(m[0]);
+  for (const m of String(text || '').matchAll(/\b[a-z0-9][a-z0-9_-]{0,57}(?:\.[a-z0-9][a-z0-9_-]{0,57})+\b/gi)) add(m[0]);
+  return found;
+}
+
+function parseMemo(raw) {
+  const explicit = String(raw || '').match(/\bmemo\s+(.+?)(?:\s+\bdue\b|\s+\bexpir\w*\b|$)/i);
+  if (explicit) return explicit[1].trim().slice(0, 140);
+  const soft = String(raw || '').match(/\bfor\s+(.+?)(?:\s+\bdue\b|\s+\bexpir\w*\b|$)/i);
+  if (!soft) return '';
+  const memo = soft[1].trim();
+  if (!memo || /^(?:example|usdc|usd|near)\b/i.test(memo)) return '';
+  return memo.slice(0, 140);
+}
+
+function parseDue(raw, now) {
+  const text = String(raw || '');
+  const iso = text.match(/\bdue\s+(\d{4}-\d{2}-\d{2})\b/i);
+  if (iso) return iso[1];
+  if (/\bdue\s+tomorrow\b/i.test(text)) return isoDay(addDays(now, 1));
+  const days = text.match(/\bdue\s+in\s+(\d+)\s+days?\b/i);
+  if (days) return isoDay(addDays(now, Number(days[1])));
+  if (/\bdue\s+next week\b/i.test(text)) return isoDay(addDays(now, 7));
+  const mon = text.match(/\bdue\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,?\s*(\d{4}))?/i);
+  if (!mon) return '';
+  const month = MONTHS[mon[1].toLowerCase()];
+  const day = Number(mon[2]);
+  let year = mon[3] ? Number(mon[3]) : now.getFullYear();
+  if (!mon[3]) {
+    const candidate = new Date(year, month, day);
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (candidate < start) year += 1;
+  }
+  return isoDay(new Date(year, month, day));
+}
+
+function readInvoicePhrase(raw, now) {
+  const amounts = amountsIn(raw);
+  const accounts = accountsIn(raw);
+  const named = /\b(invoice|bill|charge)\b/i.test(raw);
+  if (!named && !(amounts.length && accounts.length)) return null;
+  if (!amounts.length) return { ok: false, hint: 'Name the invoice amount, for example 0.15 USDC.' };
+  return {
+    ok: true,
+    kind: 'invoice',
+    usd: amounts[0],
+    origin: /\bbase\b/i.test(raw) ? 'USDC@base' : 'USDC@near',
+    destination: 'USDC@near',
+    receive: accounts[0] || '',
+    memo: parseMemo(raw),
+    due: parseDue(raw, now),
+    hint: '',
+  };
+}
+
+/**
+ * Natural-language commands. A miss returns a hint and does not spend.
+ * The amount and the account have to be in the words. Nothing here is raised.
+ */
+export function agentCommand(text, now = new Date()) {
   const raw = String(text || '').trim();
   const t = raw.toLowerCase().replace(/\s+/g, ' ');
   if (!t) return { ok: false, hint: MISS_HINT };
-  if (/export/.test(t) && /csv/.test(t)) return { ok: true, kind: 'csv', hint: 'CSV ready.' };
-  if (/status|overdue/.test(t)) return { ok: true, kind: 'status', hint: '' };
+  if (/\bexport\b/.test(t) && /\bcsv\b/.test(t)) return { ok: true, kind: 'csv', hint: 'CSV ready. A row without a tx says not sent.' };
+  if (/\b(status|overdue)\b/.test(t) && !amountsIn(raw).length) return { ok: true, kind: 'status', hint: '' };
   const one = t.match(/(?:send|pay)\s+payout\s+(\d+)/);
   if (one) {
     const n = Number(one[1]);
@@ -133,16 +234,72 @@ export function agentCommand(text) {
   if (/(pay these|pay reviewed|send payroll|send the payroll|pay the rows|pay payroll|send these|pay all)/.test(t)) {
     return { ok: true, kind: 'pay', index: null, hint: '' };
   }
-  if (/invoice/.test(t)) {
-    const m = t.match(/(\d+(?:\.\d+)?)\s*(?:usd|usdc)/);
-    const usd = m ? Number(m[1]) : null;
-    if (!(usd > 0)) return { ok: false, hint: 'Name the invoice amount, for example 0.15 USD.' };
-    const origin = /base/.test(t) ? 'USDC@base' : 'USDC@near';
-    const to = raw.match(/\b(?:to|for)\s+([a-z0-9][a-z0-9._-]{1,62})/i);
-    const memo = raw.match(/\bmemo\s+(.+?)(?:\s+(?:due|expir)\b|$)/i);
-    return { ok: true, kind: 'invoice', usd, origin, destination: 'USDC@near', receive: to?.[1] || '', memo: memo ? memo[1].trim() : '', hint: '' };
-  }
+  const invoice = readInvoicePhrase(raw, now);
+  if (invoice) return invoice;
   return { ok: false, hint: MISS_HINT };
+}
+
+/**
+ * A model parse is kept only when the account and the amount are in the visitor's words.
+ * An invented payee is dropped. A raised amount is put back to the amount in the message.
+ */
+export function acceptModelIntent(text, model, fallback) {
+  const local = fallback || agentCommand(text);
+  if (!model || typeof model !== 'object') return { ...local, source: 'parser' };
+  const kind = String(model.kind || '').toLowerCase();
+  if (kind === 'pay' || kind === 'csv') {
+    if (local.ok && local.kind === kind) return { ...local, source: 'model' };
+    return { ...local, source: 'parser' };
+  }
+  if (kind !== 'invoice') return { ...local, source: 'parser' };
+  const named = amountsIn(text);
+  const accounts = accountsIn(text);
+  if (!named.length) return { ...local, source: 'parser' };
+  let receive = String(model.receive || '').trim().toLowerCase();
+  const invented = !!receive && !accounts.some(a => a === receive);
+  if (invented || !receive) receive = (local.kind === 'invoice' && local.receive) || accounts[0] || '';
+  if (!nearAccountOk(receive)) return { ...local, source: 'parser' };
+  const asked = local.kind === 'invoice' && local.usd ? local.usd : named[0];
+  const modelUsd = Number(model.usd);
+  const raised = !(modelUsd > 0) || modelUsd > Math.max(...named) + 1e-8;
+  const usd = asked;
+  let memo = String(model.memo || '').trim().slice(0, 140);
+  if (!memo || !String(text).toLowerCase().includes(memo.toLowerCase())) memo = local.memo || '';
+  const due = local.due || (/^\d{4}-\d{2}-\d{2}$/.test(String(model.due || '')) ? model.due : '');
+  return {
+    ok: true,
+    kind: 'invoice',
+    usd,
+    origin: local.origin || 'USDC@near',
+    destination: 'USDC@near',
+    receive,
+    memo,
+    due,
+    hint: '',
+    source: invented || raised ? 'parser' : 'model',
+  };
+}
+
+/** What the agent says after it creates an invoice. The link is the full pay URL. */
+export function agentInvoiceReply(inv, origin = '') {
+  const link = (origin ? String(origin).replace(/\/$/, '') : '') + (inv?.href || '');
+  const memo = inv?.memo ? ` for ${inv.memo}` : '';
+  const due = inv?.due ? `, due ${prettyWhen(inv.due)}` : '';
+  const href = link ? ` Here is the link. ${link}` : '';
+  return `Made a ${inv?.usd} USDC invoice to ${inv?.receive}${memo}${due}.${href} Creating an invoice signs nothing.`;
+}
+
+/** Stand-in used only on a dry indicative quote. Checkout still requires the payer's address.
+ * 1Click refuses the burn address, so the EVM stand-in is the same sample the ferry dry quotes use. */
+const EVM_SAMPLE = '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e';
+export function indicativeRefund(chain) {
+  const c = String(chain || '').toLowerCase();
+  if (EVM_CHAINS.has(c)) return EVM_SAMPLE;
+  if (c === 'sol' || c === 'solana') return '11111111111111111111111111111111';
+  if (c === 'near') return 'nearcarta.near';
+  if (c === 'sui' || c === 'aptos') return '0x' + '1'.repeat(64);
+  if (c === 'stellar') return 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7';
+  return '';
 }
 
 /** Rows a pay command should review. Index is zero-based. */
@@ -335,14 +492,14 @@ export function bridgeMinimumHint(message) {
   if (!m) return raw || '1Click did not quote this amount.';
   const units = Number(m[1]);
   if (!(units >= 1000)) return raw;
-  return `1Click needs at least ${(units / 1e6).toFixed(2)} USD on this chain.`;
+  return `1Click needs at least ${(units / 1e6).toFixed(2)} USDC on this chain.`;
 }
 
 export function invoiceDoneLine(inv, origin = '') {
   const link = (origin ? String(origin).replace(/\/$/, '') : '') + (inv?.href || '');
   const when = prettyWhen(inv?.expiry);
   return [
-    `Created an invoice for ${inv?.usd} USD to ${inv?.receive}.`,
+    `Created an invoice for ${inv?.usd} USDC to ${inv?.receive}.`,
     inv?.memo ? `Memo: ${inv.memo}.` : '',
     when ? `Expires ${when}.` : '',
     link ? `Pay link: ${link}.` : '',
@@ -417,7 +574,7 @@ export function paymentLinks({ destinationTx, nearTx, originTx, chain } = {}) {
 
 export function receiptLine(inv, status) {
   const paid = status === 'SUCCESS';
-  return `Receipt ${inv?.id || ''}. ${inv?.usd ?? ''} USD to ${inv?.receive || ''}. ${paid ? 'Delivered.' : invoiceStatusLine(status)}`;
+  return `Receipt ${inv?.id || ''}. ${inv?.usd ?? ''} USDC to ${inv?.receive || ''}. ${paid ? 'Delivered.' : invoiceStatusLine(status)}`;
 }
 
 /** Success cinema only when every submitted step was allowed and has a tx hash. */
