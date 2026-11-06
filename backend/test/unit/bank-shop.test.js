@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import nacl from 'tweetnacl';
 import { parseBankAgent, BANK_HINT } from '../../../app/src/panels/bank-agent.js';
-import { SAMPLES, parseStatementCsv, auditStatement, tightenDecision, commitmentText, proofLogEntry, modelEligibility, biggestWaste, wasteSentence, plural, attestFields } from '../../../app/src/panels/bank-audit.js';
+import { SAMPLES, parseStatementCsv, auditStatement, tightenDecision, commitmentText, proofLogEntry, modelEligibility, biggestWaste, wasteSentence, plural, attestFields, statementFindings, agentReply, capFromSetup, verifyBrowserSignature } from '../../../app/src/panels/bank-audit.js';
 import { nearRate, _clearRateCache } from '../../../backend/src/bank-rate.js';
 import { runModelAudit } from '../../../backend/src/bank-model.js';
 import { sealText, revealArgs } from '../../../shared/board/bank-seal.js';
@@ -36,6 +36,19 @@ test('an audit line picks the sample and a miss shows the hint', () => {
   const loaded = parseBankAgent('audit my spending and tell me the biggest waste', { hasStatement: true });
   assert.equal(loaded.source, 'loaded');
   assert.equal(loaded.sample, undefined);
+  assert.equal(loaded.question, 'waste');
+
+  const free = parseBankAgent('which charges look like waste in my list?');
+  assert.equal(free.ok, false);
+  assert.equal(free.sample, undefined);
+  assert.match(free.hint, /will not use a sample/);
+  const freeLoaded = parseBankAgent('which charges look like waste in my list?', { hasStatement: true });
+  assert.equal(freeLoaded.ok, true);
+  assert.equal(freeLoaded.source, 'loaded');
+  assert.equal(freeLoaded.question, 'waste');
+  assert.equal(parseBankAgent('any duplicates in this list?', { hasStatement: true }).question, 'duplicate');
+  assert.equal(parseBankAgent('which subscriptions do I pay?', { hasStatement: true }).question, 'subscription');
+  assert.equal(parseBankAgent('what is my cap?', { hasStatement: true }).question, 'limit');
 
   const loose = parseBankAgent('Raise the cap');
   assert.equal(loose.ok, false);
@@ -104,7 +117,7 @@ test('a card csv keeps its currency and names the biggest waste', async () => {
   const waste = biggestWaste(parsed.rows);
   assert.equal(waste.payee, 'Cloud Host');
   assert.equal(waste.amount, 29);
-  assert.match(waste.why, /appears 2 times/);
+  assert.match(waste.why, /twice in November/);
   assert.match(waste.why, /largest line/);
   assert.match(wasteSentence(waste), /Cloud Host, 29 as written/);
   const priced = auditStatement(parsed.rows.map(r => ({ ...r, currency: 'USD' })), {
@@ -125,6 +138,16 @@ test('a card csv keeps its currency and names the biggest waste', async () => {
   assert.match(bankCss, /#shopUI #t-form button\.bank-tab\.on/);
   assert.match(bankCss, /linear-gradient\(180deg,#f5d08a,#e2b35b\)/);
   assert.match(bankCss, /grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
+  assert.match(bankCss, /button\.bank-tab\[aria-selected="true"\]/);
+  assert.match(bankCss, /inset 0 -4px 0 #8b5e2b/);
+  const tray = read('app/src/panels/bank-tray.js');
+  assert.match(tray, /Audit another statement/);
+  assert.doesNotMatch(tray, /Audit another sample/);
+  assert.match(tray, /APPLY_NOTE/);
+  assert.match(tray, /bank-apply-note/);
+  assert.match(tray, /No per-payment cap is saved in \/setup/);
+  assert.match(read('app/src/panels/bank-audit.js'), /Apply tighter limits lowers the per-payment cap on your own \/setup rules/);
+  assert.match(read('app/design/D8_shops/js/shopui.js'), /cur === 'bank' && app\.guest && app\.form/);
 
   _clearRateCache();
   const rate = await nearRate('usd', {
@@ -167,6 +190,101 @@ test('a card csv keeps its currency and names the biggest waste', async () => {
   assert.equal(view.find(f => f.id === 'gpu').ok, true);
   assert.equal(view.find(f => f.id === 'tdx').value, 'UpToDate');
   assert.equal(view.find(f => f.id === 'signature').ok, true);
+});
+
+test('an empty model sentence is not verified and the browser checks the signature', async () => {
+  const csv = `date,merchant,amount
+2026-10-03,Starbucks,5.40
+2026-10-03,Starbucks,5.40
+2026-10-03,Netflix,15.99
+2026-10-12,Netflix,15.99
+2026-10-08,Uber,12.30
+2026-10-15,Spotify,10.99
+`;
+  const parsed = parseStatementCsv(csv);
+  assert.equal(parsed.ok, true);
+  const findings = statementFindings(parsed.rows);
+  const pairs = findings.filter(f => f.kind !== 'subscription');
+  const subs = findings.filter(f => f.kind === 'subscription');
+  assert.equal(pairs.length, 2);
+  assert.match(pairs.find(f => f.kind === 'same-day').text, /Starbucks, 5\.40 as written/);
+  assert.match(pairs.find(f => f.kind === 'same-day').text, /double charge/);
+  assert.match(pairs.find(f => f.kind === 'month').text, /Netflix, 15\.99 as written/);
+  assert.match(pairs.find(f => f.kind === 'month').text, /October/);
+  assert.match(subs[0].text, /Netflix/);
+  assert.match(subs[0].text, /Spotify/);
+  assert.match(subs[0].text, /subscriptions/);
+  const report = auditStatement(parsed.rows);
+  assert.equal(report.anomalies.length, pairs.length);
+  assert.equal(JSON.stringify(report).includes('Starbucks'), false);
+  assert.equal(JSON.stringify(report).includes('Netflix'), false);
+  const reply = agentReply(parsed.rows, 'waste');
+  assert.match(reply, /Starbucks/);
+  assert.match(reply, /Netflix/);
+  assert.match(reply, /Spotify/);
+  assert.match(reply, /double charge/);
+  assert.match(agentReply(parsed.rows, 'duplicate'), /Starbucks/);
+  assert.match(agentReply(parsed.rows, 'subscription'), /Spotify/);
+  assert.match(agentReply(parsed.rows, 'limit'), /no limit to tighten/);
+  assert.match(agentReply(parsed.rows, 'limit', { capNear: 0.2 }), /0\.2 NEAR/);
+  assert.equal(capFromSetup(null, 0.2), 0.2);
+  assert.equal(capFromSetup(0.5, 0.2), 0.5);
+  assert.equal(capFromSetup(null, 0), null);
+
+  const pre = {
+    ok: true, model: 'z-ai/glm-5.3-flash', nonce: 'ab'.repeat(32),
+    gateway: { ok: true, tcbStatus: 'UpToDate', checks: { quote: true, nonceBound: true }, signing_address: '11'.repeat(20) },
+    models: [{ ok: true, tcbStatus: 'UpToDate', checks: { quote: true, nonceBound: true, signerBound: true }, signing_address: '22'.repeat(20), signing_algo: 'ed25519', gpu: { ok: true, gpus: 8 } }],
+  };
+  let opts;
+  const empty = await runModelAudit({
+    rows: parsed.rows,
+    preflight: async () => pre,
+    complete: async (_msgs, o) => { opts = o; return { id: 'chat', model: 'z-ai/glm-5.3-flash', reqModel: 'z-ai/glm-5.3-flash', content: '   ', reasoning_content: '', usage: {}, reqSha: 'aa', respSha: 'bb' }; },
+    sign: async () => ({ available: true, text: 'signed-body', signature: 'ab'.repeat(64), signing_address: '22'.repeat(32), signing_algo: 'ed25519', signature_kind: 'provider_tee' }),
+    check: () => ({ verified: true, checks: {} }),
+    allow: () => ({ ok: true }),
+  });
+  assert.equal(opts.maxTokens, 512);
+  assert.equal(opts.extra.reasoning_effort, 'low');
+  assert.equal(empty.answer, '');
+  assert.equal(empty.verified, false);
+  assert.match(empty.step, /empty/);
+  assert.equal(empty.signed_text, 'signed-body');
+  assert.equal(empty.signature, 'ab'.repeat(64));
+  assert.equal(empty.signing_address, '22'.repeat(32));
+  assert.equal(JSON.stringify(empty).includes('Starbucks'), false);
+
+  const reasoned = await runModelAudit({
+    rows: [{ payee: 'Netflix', amount: 15.99, currency: 'USD' }],
+    preflight: async () => pre,
+    complete: async () => ({ id: 'chat', model: 'z-ai/glm-5.3-flash', reqModel: 'z-ai/glm-5.3-flash', content: '', reasoning_content: 'Netflix is the waste.', usage: {}, reqSha: 'aa', respSha: 'bb' }),
+    sign: async () => ({ available: true, text: 'signed-body', signature: 'cd'.repeat(64), signing_address: '22'.repeat(32), signing_algo: 'ed25519', signature_kind: 'provider_tee' }),
+    check: () => ({ verified: true, checks: {} }),
+    allow: () => ({ ok: true }),
+  });
+  assert.equal(reasoned.answer, 'Netflix is the waste.');
+  assert.equal(reasoned.verified, true);
+
+  const unsigned = await runModelAudit({
+    rows: [{ payee: 'Netflix', amount: 15.99, currency: 'USD' }],
+    preflight: async () => pre,
+    complete: async () => ({ id: 'chat', content: '', reasoning_content: 'Netflix is the waste.', reqModel: 'z-ai/glm-5.3-flash', reqSha: 'aa', respSha: 'bb' }),
+    sign: async () => ({ available: true, text: 'signed-body', signature: 'cd'.repeat(64), signing_address: '22'.repeat(32), signing_algo: 'ed25519', signature_kind: 'provider_tee' }),
+    check: () => ({ verified: false, checks: {} }),
+    allow: () => ({ ok: true }),
+  });
+  assert.equal(unsigned.answer, '');
+  assert.equal(unsigned.verified, false);
+
+  const kp = nacl.sign.keyPair();
+  const text = 'model:req:resp';
+  const sig = hex(nacl.sign.detached(new TextEncoder().encode(text), kp.secretKey));
+  const good = await verifyBrowserSignature({ text, signature: sig, signingAddress: hex(kp.publicKey) });
+  assert.equal(good.ok, true);
+  const flipped = (parseInt(sig.slice(0, 2), 16) ^ 1).toString(16).padStart(2, '0') + sig.slice(2);
+  const bad = await verifyBrowserSignature({ text, signature: flipped, signingAddress: hex(kp.publicKey) });
+  assert.equal(bad.ok, false);
 });
 
 test('the sealed rule text matches the board and stays hidden in the reveal args', () => {
