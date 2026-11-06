@@ -10,6 +10,7 @@ import { DEP, MAINNET_DEP, cfg, has, secret } from './config.js';
 import * as ferry from './ferry.js';
 import * as checkout from './ferry-checkout.js';
 import * as payoutsInvoice from './payouts-invoice.js';
+import * as payoutsPayroll from './payouts-payroll.js';
 import { parsePayoutIntent } from './payouts-intent.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
@@ -134,6 +135,11 @@ const knownAccounts = new Set([
   DEP.townhall_r16?.charter, DEP.toll_arbitrum?.oath, DEP.toll_usdc?.toll, DEP.toll_gate?.gate,
 ].filter(Boolean));
 const bad = (c, m) => c.json({ error: m }, 400);
+// Bounded storage sponsorship for a zero-NEAR issuer. It is on by default because the deposit comes
+// from the visitor's own session cap through their own row, never from the shop; an owner who does not
+// want the row to be able to call storage_deposit can set PAYOUTS_SPONSOR_STORAGE=0.
+// There is no amount here: the deposit is the USDC contract's own storage_balance_bounds.min.
+export const payoutsSponsorEnabled = (env = process.env) => String(env.PAYOUTS_SPONSOR_STORAGE || '').trim() !== '0';
 async function jsonBody(c) {
   try { const b = await c.req.json(); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; }
 }
@@ -288,8 +294,59 @@ export function makeApp() {
   app.get('/api/payouts/usdc', limiter(30), edgeCache(15), c => c.json({
     network: 'mainnet', mode: 'reviewed rows', usdc: 'invoice',
     ceiling: payoutsInvoice.hostedCeiling(process.env),
-    note: 'NEAR rows use the visitor row cap. An over-cap row is refused before any deposit. Foreign rows are held. An invoice is EXACT_OUTPUT and is not paid until 1Click says SUCCESS.',
+    sponsorship: { enabled: payoutsSponsorEnabled(), contract: payoutsInvoice.USDC_NEAR_CONTRACT, minNearRead: 'storage_balance_bounds.min' },
+    note: 'Every row is paid by the visitor session under their own /setup cap: a NEAR row by propose on the board, a foreign row by the same session through the 1Click intents rail (a priced quote, not a stored rate). An over-cap row is refused before any deposit. An invoice is EXACT_OUTPUT and is not paid until 1Click says SUCCESS.',
   }));
+  // A foreign payroll row is priced by a dry 1Click quote. EXACT_OUTPUT: the payee gets exactly `amt`
+  // of `asset` on `chain`. The signed quote names the wNEAR the session deposits. No deposit address,
+  // nothing is sent, and the route does not sign.
+  app.post('/api/payouts/payroll/quote', limiter(20), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const out = await payoutsInvoice.quotePayrollRow(b);
+    return c.json(out, out.ok ? 200 : 400);
+  });
+  // A foreign payroll row's live quote: the visitor's own board row is the gate, then 1Click returns
+  // a deposit address for the wNEAR the session will deposit. Nothing here signs or sends the deposit.
+  app.post('/api/payouts/payroll/checkout', limiter(6), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const parsed = payoutsPayroll.payrollCheckoutInput(b);
+    if (parsed.error) return bad(c, parsed.error);
+    const board = MAINNET_DEP?.board?.contract;
+    const owner = String(b.owner || '').trim();
+    let row = null;
+    if (board && owner && ACCT.test(owner)) {
+      try { row = await view(board, 'get_charter', { owner }); } catch { row = null; }
+    }
+    if (!row) return c.json({ ok: false, reason: 'no_row', depositAddress: null, help: 'Open your row in /setup first. Nothing was sent.' }, 400);
+    const out = await payoutsPayroll.openPayrollCheckout(parsed.value, { row });
+    return c.json(out, out.ok ? 200 : 400);
+  });
+  app.get('/api/payouts/payroll/status', limiter(30), async c => {
+    try { return c.json(await payoutsPayroll.payrollStatus(c.req.query('depositAddress'))); }
+    catch (e) { return c.json({ error: e.message, paid: false, final: false }, e.status || 502); }
+  });
+  // Bounded storage sponsorship: the min the USDC contract asks for, read from its own bounds.
+  // This returns the board propose_call the visitor's session would make; it does not sign or send it.
+  app.get('/api/payouts/sponsor', limiter(30), edgeCache(15), async c => {
+    const account = c.req.query('account') || '';
+    if (!account) return bad(c, 'account is required');
+    const reg = await payoutsInvoice.registrationOf(account, { view, viewAccount });
+    if (reg.reason === 'missing_account') return c.json({ ok: false, ...reg }, 400);
+    let minNear;
+    try {
+      const bounds = await view(payoutsInvoice.USDC_NEAR_CONTRACT, 'storage_balance_bounds', {});
+      minNear = payoutsInvoice.nearFromYocto(bounds?.min);
+    } catch { minNear = undefined; }
+    // The row's own cap, budget and balance decide whether this is allowed; the page passes them.
+    return c.json({
+      enabled: payoutsSponsorEnabled(),
+      account,
+      minNear: minNear ?? payoutsInvoice.USDC_STORAGE_NEAR,
+      registered: reg.registered,
+      claim: reg.claim,
+      contract: payoutsInvoice.USDC_NEAR_CONTRACT,
+    });
+  });
   // Durable invoices. Creating one does not call 1Click. Checkout may ask for a deposit address.
   // Nothing here signs or sends the deposit. The receive account is the one stored on the invoice.
   app.post('/api/payouts/intent', limiter(12), async c => {
