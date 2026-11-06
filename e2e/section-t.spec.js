@@ -462,3 +462,25 @@ test('T14 Open your row sends the board transaction first, with gas for both act
   }
   await shot(page, 't14-open-row');
 });
+
+test('T15 the Ferry tray offers the signed-intent route and lists open orders', async ({ page }) => {
+  await at(page, 1440);
+  await page.goto('/?mode=2d&nostory&shop=ferry');
+  // The tray mounts asynchronously; wait for the route choice before touching a control.
+  await expect(page.getByTestId('ferry-route-choice')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByTestId('ferry-quote')).toBeVisible({ timeout: 30000 });
+  // The deposit route is the default; the signed-intent route sits beside it.
+  await expect(page.getByTestId('ferry-route-deposit')).toBeChecked();
+  await expect(page.getByTestId('ferry-route-signed')).not.toBeChecked();
+  await page.getByTestId('ferry-route-signed').click({ force: true, noWaitAfter: true });
+  // The radio stays selected across the repaint, and the signed-intent action appears.
+  await expect(page.getByTestId('ferry-route-signed')).toBeChecked();
+  await expect(page.getByTestId('ferry-sig-quote')).toBeVisible();
+  await expect(page.getByTestId('ferry-signed-hint')).toContainText(/Intents balance/);
+  // The Routes tab carries the limit-order list and the refund note.
+  await page.getByTestId('ferry-tab-routes').click({ force: true, noWaitAfter: true });
+  await expect(page.getByTestId('ferry-orders')).toBeVisible();
+  await expect(page.getByTestId('ferry-orders')).toContainText(/No open orders|OPEN|AWAITING_DEPOSIT/);
+  await expect(page.getByTestId('ferry-orders-note')).toContainText('unfilled remainder is refunded');
+  await shot(page, 't15-ferry-intents');
+});
