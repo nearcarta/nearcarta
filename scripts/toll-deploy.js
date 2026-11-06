@@ -6,7 +6,8 @@
 //
 // The live wasm has no upgrade method and no full-access key, so the first
 // install is close, then the same account. close() sends the balance to
-// nearcarta.near. The next transaction sends it back. Later installs call
+// nearcarta.near. The next transaction sends back the storage stake of this
+// wasm plus 0.02 NEAR. The rest stays on nearcarta.near. Later installs call
 // upgrade, then migrate. No visitor address, amount, or allow list is stored.
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -23,7 +24,8 @@ const BOARD = MAIN.board.contract;
 const RPC = MAIN.rpc;
 const BYTE = 10n ** 19n;
 const ONE = 10n ** 24n;
-const GAS_CUSHION = ONE / 20n;
+const SLACK = 2n * ONE / 100n;
+const MAX_SLACK = 5n * ONE / 100n;
 const RECORDED_CODE = MAIN.toll.code_hash;
 const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
@@ -115,19 +117,26 @@ const codeMatchesRecorded = account && account.code_hash === RECORDED_CODE;
 const alreadyThisWasm = account && codeHash && account.code_hash === codeHash;
 const path = alreadyThisWasm ? 'view' : (codeMatchesRecorded ? 'close_then_create' : 'upgrade_then_migrate');
 
-const sendBack = balanceBefore == null ? null : (balanceBefore > GAS_CUSHION ? balanceBefore - GAS_CUSHION : balanceBefore);
 const oldWasmFile = 'contracts/artifacts/toll.v6p86.wasm';
 const oldWasmBytes = existsSync(oldWasmFile) ? BigInt(readFileSync(oldWasmFile).length) : 0n;
 const usageNow = account ? BigInt(account.storage_usage) : BigInt(MAIN.toll.storage_bytes || 0);
-const usageAfter = wasm && oldWasmBytes > 0n ? usageNow - oldWasmBytes + BigInt(wasm.length) : (wasm ? BigInt(wasm.length) + 8000n : 0n);
+const usageAfter = wasm && oldWasmBytes > 0n ? usageNow - oldWasmBytes + BigInt(wasm.length) : (wasm ? BigInt(wasm.length) : 0n);
 const stakeAfter = usageAfter > 0n ? usageAfter * BYTE : null;
-const shopAfter = sendBack != null && stakeAfter != null && sendBack > stakeAfter ? sendBack - stakeAfter : null;
-const shortfall = sendBack != null && stakeAfter != null && stakeAfter > sendBack ? stakeAfter - sendBack : 0n;
+const fund = stakeAfter == null ? null : stakeAfter + SLACK;
+const slack = fund == null ? null : fund - stakeAfter;
+const covered = balanceBefore != null && fund != null && balanceBefore >= fund;
+const shopAfter = covered ? slack : null;
+const shortfall = balanceBefore != null && fund != null && fund > balanceBefore ? fund - balanceBefore : 0n;
+const stays = covered ? balanceBefore - fund : null;
 
 const transfers = [];
-if (path === 'close_then_create' && balanceBefore != null) {
+if (path === 'close_then_create' && balanceBefore != null && fund != null) {
   transfers.push({ step: 'close', method: 'delete_account', payee: payee(OWNER), amount_yocto: balanceBefore.toString(), amount_near: yocto(balanceBefore), note: 'The live wasm cannot upgrade. close() returns every yocto, storage included.' });
-  transfers.push({ step: 'create_account', payee: payee(SHOP), amount_yocto: sendBack.toString(), amount_near: yocto(sendBack), note: 'The same NEAR pays the new storage. 0.05 NEAR stays with the owner for gas.' });
+  transfers.push({
+    step: 'create_account', payee: payee(SHOP), amount_yocto: fund.toString(), amount_near: yocto(fund),
+    stake_near: yocto(stakeAfter), slack_near: yocto(slack),
+    note: `Stake ${yocto(stakeAfter)} NEAR is this wasm's storage. Slack is ${yocto(slack)} NEAR for order storage and the signer deposit. ${stays == null ? 'The balance does not cover this transfer.' : yocto(stays) + ' NEAR stays on nearcarta.near.'}`,
+  });
 }
 
 const init = {
@@ -166,7 +175,8 @@ const pre = [
 ];
 if (path === 'close_then_create') {
   pre.push({ check: 'recorded code', ok: codeMatchesRecorded, detail: account?.code_hash || 'unread' });
-  pre.push({ check: 'balance covers the new stake', ok: !!(shopAfter && shopAfter > 0n), detail: stakeAfter ? yocto(stakeAfter) + ' NEAR estimated stake' : 'no wasm' });
+  pre.push({ check: 'balance covers the new stake', ok: covered, detail: stakeAfter ? yocto(stakeAfter) + ' NEAR stake from the wasm' : 'no wasm' });
+  pre.push({ check: 'slack', ok: slack != null && slack <= MAX_SLACK, detail: slack == null ? 'no stake' : yocto(slack) + ' NEAR, max 0.05' });
 }
 
 const report = {
@@ -182,13 +192,17 @@ const report = {
     usage_bytes: account ? account.storage_usage : MAIN.toll.storage_bytes,
     stake_now_near: storageNow != null ? yocto(storageNow) : String(MAIN.toll.locked_near),
     stake_after_near: stakeAfter != null ? yocto(stakeAfter) : null,
-    stake_after_note: 'Current storage, minus the live wasm, plus the new wasm. The chain charges the real usage after deploy.',
+    stake_after_yocto: stakeAfter != null ? stakeAfter.toString() : null,
+    slack_near: slack != null ? yocto(slack) : null,
+    slack_yocto: slack != null ? slack.toString() : null,
+    stake_after_note: 'Current storage, minus the live wasm, plus this wasm. Computed from the wasm size at this run. The chain charges the real usage after deploy.',
   },
   balance: {
     shop_before_near: balanceBefore != null ? yocto(balanceBefore) : null,
     shop_before_yocto: balanceBefore != null ? balanceBefore.toString() : null,
     owner_before_near: ownerAccount ? yocto(ownerAccount.amount) : null,
     shop_after_liquid_near: shopAfter != null ? yocto(shopAfter) : null,
+    stays_on_owner_near: stays != null ? yocto(stays) : null,
     shortfall_near: shortfall > 0n ? yocto(shortfall) : '0',
     recorded_locked_near: MAIN.toll.locked_near,
     view_error: viewError || null,
@@ -218,7 +232,7 @@ const failed = pre.filter(p => !p.ok);
 console.log(JSON.stringify(report, null, 2));
 if (!live) {
   console.log('This command does not sign and does not send NEAR.');
-  process.exit(failed.some(p => p.check === 'wasm') ? 1 : 0);
+  process.exit(failed.some(p => p.check === 'wasm' || p.check === 'slack') ? 1 : 0);
 }
 
 const key = process.env.TOLL_SIGNER_KEY || '';
@@ -258,7 +272,7 @@ if (path === 'close_then_create') {
   }
   const create = [
     A.createAccount(),
-    A.transfer(sendBack),
+    A.transfer(fund),
     A.deployContract(wasm),
     A.functionCall('new', init, 80n * TG, 0n),
   ];
