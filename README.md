@@ -13,7 +13,7 @@ Each claim names the code, the test that pins it, and a tx you can open. Test na
 | The town charter agent key calls `propose` and `propose_batch`. It cannot call owner methods or move NEAR by itself | `contracts/oath/src/lib.rs` `propose` (line 667); `shared/deployments/mainnet.json` `agent_methods` | `adv_agent_key_cannot_call_owner_methods_or_transfer`, `the charter agent key is named as propose and propose_batch` | full-access key deleted [71Zio28gV3…](https://nearblocks.io/txns/71Zio28gV3yubD5DecGtkguWzWdfix8brcKFy13d3zzt) |
 | A payee off the allowlist, over the cap or over the daily budget is refused | `clause_checks` (line 1164) | `adv_allowlist_cap_and_budget`; property tests in `tests/props.rs` | over cap [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH); payee off the list [E7KMexjS…](https://nearblocks.io/txns/E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ) |
 | Over-cap waits for the owner (NEP-519 yield) | `resolve_escalation` (line 888) | `exploit_f4_escalation_after_freeze_and_allowlist_removal` (`tests/exploits.rs`), `c5_escalation_band_is_held_not_yielded` (`src/tests.rs`) | board over cap refused [CcPMX1Dt…](https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF) |
-| The live board signs `propose`, one payment at a time. The payout page prepares one `propose_batch` and does not send it | `contracts/charter_board` `propose`; `app/design/D8_shops/js/payouts.js` `receiptsFor` | `a payout batch has one receipt per row and does not send USDC` | allowed [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia), refused [AsZUd9mZ…](https://nearblocks.io/txns/AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx) |
+| Payouts pays each in-cap NEAR row with `propose` and submits an over-cap row so the charter can refuse it. A USDC row is an invoice, not a NEAR transfer. An invoice over 0.20 USD does not ask for a deposit address | `app/src/panels/payouts-plan.js` `classifyPayroll`, `invoiceQuoteBody`; `backend/src/payouts-invoice.js` `quoteInvoice`; `contracts/charter_board` `propose` | `plan: classifyPayroll sends the in-cap row, lets the chain refuse the big one, keeps USDC as an invoice`, `invoice: quoteInvoice over 0.20 USD returns before it reads tokens or asks 1Click` | earlier allowed [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia), earlier refused [AsZUd9mZ…](https://nearblocks.io/txns/AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx). New payroll txs are not in this commit |
 | Closing a board row returns its stake | `contracts/charter_board` `close_charter` | `a_failed_transfer_returns_the_balance_and_the_owner_cannot_reap_early` | close [7XtAUzNq…](https://nearblocks.io/txns/7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf) |
 | Sign in on /setup uses a mainnet account and real NEAR. A personal charter row opens on `board.nearcarta.near` | `shared/setup/path.js` `setupJourney`, `contracts/charter_board`, `docs/MAINNET_BOARD.md` | `the default setup path is mainnet and does not offer the faucet or a charter factory`, `a trial flag does not open a guest path` | board deploy [CaZr8GmM…](https://nearblocks.io/txns/CaZr8GmMM83WUEESUShTiKtth8PWgxtRTesYGs1mkdpt) |
 | Pay reads the charter, lists the tokens 1Click returns, compares two quotes and marks the larger amount out, shows USD, ETA and fee, then asks for a deposit address of at most 0.20 USD. The page does not send the deposit. A short or failed deposit is described as a refund. A confidential line is a quote only | `backend/src/ferry-checkout.js` `openCheckout`, `app/src/ferry-pay.js`, `app/src/ferry-catalog.js` `pickBest` | `a refused recipient never asks 1Click, and an allowed one returns a deposit address`, `the pay page lists a long token catalog and every terminal status`, `two ferry quotes mark the larger amount out` | recorded swap [HzgUr618CQ…](https://nearblocks.io/txns/HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw). No new deposit is sent from this repo |
@@ -40,12 +40,12 @@ Eight tracks. Each one is a building. The pin labels and the brown town are unch
 | Autonomous Business | Chronicle, Toll Bridge | Chronicle lists what the charter allowed and refused. Toll asks the MPC signer | `board.nearcarta.near`, `toll.nearcarta.near` | chronicle [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR), toll allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) |
 | AI Security | Guardhouse | The charter refuses a payment over the cap and a payee off the list | `board.nearcarta.near` | over cap [CcPMX1Dt…](https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF), off list [E7KMexjS…](https://nearblocks.io/txns/E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ) |
 | Agent Economy | Town Hall | `set_rules`, `set_frozen` and `set_seal` on the visitor's own row. Deposit 0. The recorded rows are a reward and a refusal | `board.nearcarta.near` | reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h), refusal [Cp2rWatn…](https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6) |
-| Real-World Money | Payouts | The page prepares a batch and does not send it. The live row signs one payment at a time, each at most 0.005 NEAR | `board.nearcarta.near` | [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia) |
+| Real-World Money | Payouts | The city room pays NEAR rows with `propose` under the row cap. An over-cap row is refused on chain. A USDC invoice is a dry 1Click quote unless it is at most 0.20 USD | `board.nearcarta.near` | earlier propose [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia). New txs: see Payouts |
 | Games | Vault Arena | A recorded arena payment and an over-cap refusal | `arena.nearcarta.near` | [AZWxqZns…](https://nearblocks.io/txns/AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht), [25LpJRFF…](https://nearblocks.io/txns/25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V) |
 | Open | Your House | A house deed payment of 0.001 NEAR was allowed and 0.002 NEAR was refused | `house.nearcarta.near` | [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26), [3Z4UAb6N…](https://nearblocks.io/txns/3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1) |
 
 ## Limits
-The live board wasm has no access key, no `propose_batch` and no upgrade method. A row is closed with `close_charter`. The API does not sign mainnet. A Pay checkout asks for a deposit address of at most 0.20 USD and does not send the deposit. The payout page prepares one `propose_batch` and does not send it. The recorded payouts are single `propose` calls, each at most 0.005 NEAR. A USDC row is kept and not sent. Owner costs, not signed: a ferry deposit of 0.20 USD (`node backend/scripts/ferry-live-swap.js` without `--live` prints the steps); three board proposes of 0.001 NEAR move 0.003 NEAR (`3000000000000000000000` yoctoNEAR) from the row; one USDC payout of at most 0.20 USD. `set_rules`, `set_frozen` and `set_seal` attach a deposit of 0. The list is `node backend/scripts/spend-plan.js`.
+The live board wasm has no access key, no `propose_batch` and no upgrade method. A row is closed with `close_charter`. The API does not sign mainnet. A Pay checkout asks for a deposit address of at most 0.20 USD and does not send the deposit. The payout room sends one `propose` per NEAR row. The recorded payouts above are earlier single `propose` calls. A USDC row is an invoice and is not a NEAR transfer. An invoice checkout asks for a deposit address only at or under 0.20 USD and does not send the deposit. Owner costs, not signed: a ferry deposit of 0.20 USD (`node backend/scripts/ferry-live-swap.js` without `--live` prints the steps); three board proposes of 0.001 NEAR move 0.003 NEAR (`3000000000000000000000` yoctoNEAR) from the row; one USDC payout of at most 0.20 USD. `set_rules`, `set_frozen` and `set_seal` attach a deposit of 0. The list is `node backend/scripts/spend-plan.js`.
 
 ## The town loop
 Open the town, walk to a shop, and press the button. The Lamplighter asks. The charter allows or refuses. The chronicle lists the result with a nearblocks.io link. The chain stays in the proof drawer.
@@ -152,7 +152,7 @@ An agent with a wallet key can be talked into paying anyone: a fake invoice, a p
 | Mist Bank | *Send 0.01 NEAR privately* (fixed note sizes), then *Verify the seal*; *Verify the TEE now* | The charter memo carries a commitment and the seal matches the chain; the send comes with a NEAR AI TEE check that uses the commitment as its nonce (*Verify the TEE now* uses a fresh random one). The ZEC payout is mainnet only |
 | Guardhouse | Type an account and press *Check this account* | Age, code hash, lookalike, denylist and any recorded refusal, each with a sentence. A recorded refusal links the mainnet tx |
 | Vault Arena | Write a scam, *Send the scam* | The NEAR AI model (`z-ai/glm-5.3-flash`) reads it and proposes a payment; a payment outside your rules is refused on chain. Six walls, points and a leaderboard |
-| Payouts | *Prepare the batch*, or paste a CSV | One receipt per row. Nothing is sent. A USDC row stays under 0.20 USD and is not sent. The live board signs `propose` only |
+| Payouts | *Pay under the cap*, or ask the AI Agent "Pay these three" | Each NEAR row is one `propose` on `board.nearcarta.near`. Over the row cap, the charter refuses that row. A USDC line is an invoice quote. Nothing is marked paid until the tx or 1Click status says so |
 | Town Hall | *Change my row* | `set_rules`, `set_frozen` and `set_seal` on your own row. Deposit 0. A preview reads the new cap back |
 
 The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes `set_rules` on that row.
@@ -165,7 +165,7 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 | Toll address | `app/src/toll-derive.js` | `the toll key hashes to the recorded Base address` | allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) |
 | House deed | `app/src/deed-control.js` | `a deed move refuses the previous holder` | allow [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26), refuse [3Z4UAb6N…](https://nearblocks.io/txns/3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1) |
 | Town Hall row | `app/shops/hall/row.js` | `a hall preview reads the new cap back and builds gas-only calls` | reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h). `set_rules` was not sent |
-| Payout batch | `app/design/D8_shops/js/payouts.js` | `a payout batch has one receipt per row and does not send USDC` | allowed [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia). The batch was not sent |
+| Payouts | `app/src/panels/payouts-plan.js` `classifyPayroll` | `plan: classifyPayroll sends the in-cap row, lets the chain refuse the big one, keeps USDC as an invoice` | earlier allowed [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia). New payroll txs are not in this commit |
 | Room load | `app/src/room-error.js` | `a room error never shows the engine text` | no new spend |
 | Town intro | `app/design/D9_world/js/main.js` `story` | `the 3D story starts without the flat overlay` | no new spend |
 
@@ -175,9 +175,31 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 - Autonomous Business (Chronicle, Toll Bridge): Chronicle lists what the charter allowed and refused. Toll asks the MPC signer at `toll.nearcarta.near`.
 - AI Security (Guardhouse): spending limits and a policy engine in the charter. The town charter agent key calls `propose` and `propose_batch`. Every served account has 0 full-access keys. The agent key cannot unfreeze the charter.
 - Agent Economy (Town Hall): `set_rules` on the visitor's own row. Deposit 0.
-- Real-World Money (Payouts): the page prepares a batch and does not send it. A live payment is one `propose`, at most 0.005 NEAR.
+- Real-World Money (Payouts): the city room pays with `propose` under the row cap. See the Payouts section. New txs are not filled in yet.
 - Games (Vault Arena): a recorded payment and an over-cap refusal.
 - Open (Your House): the house deed, and the visitor's rules on their row.
+
+## Payouts
+
+The city door is the shop. `/shops/payouts/` is the backup list: it can prepare rows, and Pay there does not send, because that page does not hold the session key.
+
+Payroll calls `propose` on `board.nearcarta.near`, one NEAR row at a time, with the session key from `/setup`. No wallet popup. The amount has to fit the row's `per_action_cap` (read with `get_charter`, not `get_rules` on the visitor). An amount over that cap is still submitted so the contract can refuse it. A USDC row is not a NEAR transfer.
+
+An invoice is a dry 1Click `EXACT_OUTPUT` quote (`POST /api/payouts/invoice/quote`). The merchant recipient is the visitor's NEAR account. It is not the deposit address. `ANY_INPUT` is not requested. A checkout (`POST /api/payouts/invoice/checkout`) may ask for a deposit address only when the amount is at most 0.20 USD and the row allows that account. The API does not send the deposit. The room says paid only when 1Click status is `SUCCESS`.
+
+`close_charter` on the visitor's row returns the unspent balance. There is no new payouts contract.
+
+The accountant CSV lists `account,amount,asset,tx,status`. A row with no tx says `not sent`.
+
+Earlier proposes, not from this payroll run: allowed [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia), refused [AsZUd9mZ…](https://nearblocks.io/txns/AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx).
+
+New txs, filled by the live run:
+
+- Pay 1: (assistant adds the nearblocks link)
+- Pay 2: (assistant adds the nearblocks link)
+- Pay 3: (assistant adds the nearblocks link)
+- Refusal: (assistant adds the nearblocks link)
+- Invoice: (assistant adds the status or the nearblocks link)
 
 ## Run it (2 minutes)
 ```

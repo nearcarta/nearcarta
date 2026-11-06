@@ -1,5 +1,6 @@
-// Payouts (C3): the counting house. A ledger desk with one coin stack per payout and a brass batch seal: the charter
-// pays the whole list in one propose_batch, or refuses all of it. The live flow is the tray app (js/shopui.js, APPS.payouts).
+// Payouts (C3): the counting house. A ledger desk with one coin stack per payout and a wax seal.
+// The session pays each NEAR row with propose. An over-cap row is refused on chain. USDC is an invoice.
+// The live flow is the tray app (js/shopui.js, APPS.payouts).
 import { THREE, room, put, makeRobot, C } from '../js/core.js';
 import { row, h3, note, proof, paper, acct } from './_ui.js';
 import { M as PM, brassM, mesh, lantern, candle, rug, banner } from './_props.js';
@@ -8,14 +9,14 @@ const BATCH_PROOF = proof(
   h3('One at a time'),
   row({ k: '0.001 NEAR allowed', why: 'inside the cap, on board.nearcarta.near', st: 'ok', stText: 'paid', tx: '4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia' }),
   row({ k: '0.01 NEAR refused', why: 'over the per-payment cap. Nothing was paid.', st: 'no', stText: 'refused', tx: 'AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx' }),
-  note('This page prepares one propose_batch and does not send it. The live board signs propose, one payment at a time, each at most 0.005 NEAR.'));
+  note('A session pays each NEAR row with propose. An over-cap row is the on-chain refusal. USDC is an invoice, not a NEAR transfer. The two txs above are earlier single proposes.'));
 export const USDC_PROOF = proof(
   h3('USDC'),
   note('No USDC payroll has been paid from this town. A NEAR payment above is the record.'));
 export const PROOF = BATCH_PROOF + USDC_PROOF;
 export const MORE = null;
 // For the 2D fallback (js/flat.js and the town's fb.js)
-export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'Prepared as one batch. Not sent.', hero: '<b class="num">3</b><span class="unit">max, 0.005 each</span>' };
+export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'Pay under the row cap', hero: '<b class="num">3</b><span class="unit">rows, one propose each</span>' };
 export default async function payouts() {
   const { scene, camera } = await room({ cam: [.4, 3.9, 8.0], look: [0, .85, 0] });
   // the counting desk
@@ -31,7 +32,9 @@ export default async function payouts() {
   const coinM = brassM(), stacks = [3, 5, 2, 4, 3].map((h, i) => { const g = new THREE.Group(); g.position.set(.16 + i * .18, .82, .12); scene.add(g);
     for (let k = 0; k < h; k++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(.055, .055, .02, 20), coinM); c.position.y = k * .022; c.castShadow = true; g.add(c); } return g; });
   // the batch seal: a brass stamp on a wax disc, beside a candle
-  mesh(scene, new THREE.CylinderGeometry(.09, .09, .02, 24), new THREE.MeshStandardMaterial({ color: C.no ?? 0xc0463e, roughness: .5 }), [.75, .8, -.25]);
+  const waxIdle = new THREE.MeshStandardMaterial({ color: C.no ?? 0xc0463e, roughness: .5 });
+  const waxPaid = new THREE.MeshStandardMaterial({ color: 0x2f8f5b, roughness: .45 });
+  const disc = mesh(scene, new THREE.CylinderGeometry(.09, .09, .02, 24), waxIdle, [.75, .8, -.25]);
   const stamp = new THREE.Group(); stamp.position.set(.75, .86, -.25); scene.add(stamp);
   stamp.add(new THREE.Mesh(new THREE.CylinderGeometry(.07, .08, .05, 20), brassM())); const hdl = new THREE.Mesh(new THREE.CylinderGeometry(.025, .03, .16, 12), PM.wood); hdl.position.y = .1; stamp.add(hdl);
   const knob = new THREE.Mesh(new THREE.SphereGeometry(.045, 12, 8), PM.wood); knob.position.y = .2; stamp.add(knob);
@@ -49,10 +52,29 @@ export default async function payouts() {
   await put(scene, 'decoration/props/crate_B_small', { x: 1.75, z: .45, ry: .3, fitW: .42 }).catch(() => null);
   const rob = await makeRobot(scene); rob.at(1.55, 1.0); rob.lookAt(new THREE.Vector3(.4, 0, .1), { toViewer: .8 }); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
   let t = 0;
+  let sealOn = false;
+  const hideRefuse = () => { sealOn = false; if (disc) disc.material = waxIdle; };
+  const showRefuse = () => { sealOn = true; if (disc) disc.material = waxIdle; };
   return {
-    rob, scene, camera, tags: [],
-    panel: { title: 'Payouts', src: 'mainnet', label: 'One at a time, not all-or-nothing', hero: '<b class="num">3</b><span class="unit">max, 0.005 each</span>', action: null },
+    rob, scene, camera, tags: [], hideRefuse, showRefuse,
+    panel: { title: 'Payouts', src: 'mainnet', label: 'One propose per row, under the cap', hero: '<b class="num">3</b><span class="unit">rows</span>', action: null },
     proof: PROOF,
-    update(dt) { t += dt; rob.update(dt); stamp.position.y = .86 + Math.max(0, Math.sin(t * 1.1)) * .03; stacks.forEach((s, i) => { s.rotation.y = Math.sin(t * .5 + i) * .08; }); },
+    *act(opts = {}) {
+      if (opts.paid && !opts.refused) {
+        hideRefuse();
+        if (disc) disc.material = waxPaid;
+        rob.play?.('Yes', { once: true });
+        stacks.forEach(s => { s.position.y += 0.06; });
+        return;
+      }
+      if (opts.refused) {
+        showRefuse();
+        stamp.position.y = .82;
+        rob.play?.('No', { once: true });
+        return;
+      }
+      hideRefuse();
+    },
+    update(dt) { t += dt; rob.update(dt); if (!sealOn) stamp.position.y = .86 + Math.max(0, Math.sin(t * 1.1)) * .03; stacks.forEach((s, i) => { s.rotation.y = Math.sin(t * .5 + i) * .08; }); },
   };
 }

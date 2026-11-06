@@ -1,9 +1,110 @@
-body{margin:0;background:#1a140f;color:#f3ead8;font:16px/1.45 system-ui,sans-serif}
-header,main{max-width:720px;margin:0 auto;padding:24px}
-a{color:#d6b46a}
-.skel{padding:16px;border:1px solid #d6b46a;border-radius:12px;background:#2a1d14}
-ol{padding:0;list-style:none;display:grid;gap:10px}
-li,label{display:flex;gap:8px;align-items:center}
-input,select,textarea,button{font:inherit;color:#f3ead8;background:#2a1d14;border:1px solid #d6b46a;border-radius:8px;padding:8px}
-button{min-height:40px}
-.bad{color:#e7b2a2}
+/* Standalone page chrome. City and D8 only see the scoped blocks below. */
+body[data-shop="payouts"]{margin:0;background:#1a140f;color:#f3ead8;font:16px/1.45 system-ui,sans-serif}
+body[data-shop="payouts"] header,body[data-shop="payouts"] main{max-width:720px;margin:0 auto;padding:24px}
+body[data-shop="payouts"] a{color:#d6b46a}
+body[data-shop="payouts"] .skel{padding:16px;border:1px solid #d6b46a;border-radius:12px;background:#2a1d14}
+body[data-shop="payouts"] .bad{color:#e7b2a2}
+
+/* Mix tray: opaque card, left tabs, raised gold CTAs with gaps. */
+.payouts-card{display:grid;gap:16px;min-width:0}
+.payouts-tabs{display:flex;gap:12px;flex-wrap:wrap}
+.payouts-tab{
+  min-height:40px;padding:8px 14px;border-radius:12px;border:1px solid #4a3a28;
+  background:#17130f;color:#f3ead8;font:700 14px/1.2 system-ui,sans-serif;cursor:pointer;
+}
+.payouts-tab.on{background:#2a2118;color:#f5d08a;border-color:#d6b46a}
+.payouts-pane{display:grid;gap:14px;min-width:0}
+.payouts-pane[hidden]{display:none}
+.payouts-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.payouts-cta{
+  min-height:44px;padding:10px 18px;border-radius:14px;border:1px solid #c9a05a;
+  background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
+  color:#2a1608;font:700 15px/1.15 system-ui,sans-serif;cursor:pointer;
+  box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 4px 0 #9a6f2e,0 8px 16px rgba(0,0,0,.28);
+}
+.payouts-cta:focus-visible,.payouts-tab:focus-visible{outline:2px solid #f5d08a;outline-offset:3px}
+.payouts-kicker{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;color:#fff8ee;font:650 14px/1.3 system-ui,sans-serif}
+.payouts-arrow{color:#c98f4e;font-weight:700}
+.payouts-seal{margin:0;padding:10px 12px;border:1px solid #e7b2a2;border-radius:12px;background:#2a140f;color:#ffd0c4;font:650 14px/1.4 system-ui,sans-serif}
+.payouts-seal[hidden]{display:none}
+.payout-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.payouts-pane .field{display:grid;gap:4px;color:#f3ead8;font:600 13px/1.3 system-ui,sans-serif;min-width:0}
+.payouts-pane input,.payouts-pane select,.payouts-pane textarea{
+  width:100%;box-sizing:border-box;min-height:40px;padding:8px 10px;border-radius:10px;
+  border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:500 15px/1.3 system-ui,sans-serif;
+}
+.payouts-pane pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:#f3ead8;font:13px/1.4 ui-monospace,monospace}
+.payouts-pane .bad{color:#ffb4a4}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+
+body.payouts-tray #shopUI #tray{
+  width:min(440px,calc(100vw - 28px));max-width:440px;left:16px;bottom:18px;
+  max-height:calc(100dvh - 112px);padding:24px 22px 22px;box-sizing:border-box;
+  overflow-x:hidden;overflow-y:auto;background:#1f1a15;border:1px solid #3a3128;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+body.payouts-tray #shopUI .t-head,
+body.payouts-tray #shopUI .label,
+body.payouts-tray #shopUI .hero,
+body.payouts-tray #shopUI #t-who,
+body.payouts-tray #shopUI #t-track,
+body.payouts-tray #shopUI .shop-track,
+body.payouts-tray #shopUI .say,
+body.payouts-tray #shopUI .t-links,
+body.payouts-tray #shopUI .rcpt{display:none!important}
+body.payouts-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
+body.payouts-tray #shopUI #t-act[hidden]{display:none!important}
+body.payouts-tray #shopUI select,
+body.payouts-tray #shopUI input,
+body.payouts-tray #shopUI textarea{max-width:100%;min-width:0;box-sizing:border-box}
+
+#payouts-agent-dock{
+  position:fixed;right:20px;bottom:22px;z-index:70;
+  display:flex;flex-direction:row;align-items:flex-end;gap:12px;pointer-events:none;
+}
+#payouts-agent-dock > *,
+#payouts-agent-dock .payouts-agent-send{pointer-events:auto}
+#payouts-agent-dock[hidden]{display:none!important}
+.payouts-agent-char{
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;
+  width:96px;padding:0;border:0;background:transparent;cursor:pointer;color:#fff8ee;
+}
+.payouts-agent-avatar{
+  width:72px;height:72px;object-fit:contain;display:block;
+  filter:drop-shadow(0 10px 18px rgba(0,0,0,.45));
+}
+.payouts-agent-badge{
+  position:absolute;top:-2px;right:6px;z-index:1;width:26px;height:26px;border-radius:999px;
+  background:#fff;color:#2a1608;font:800 15px/26px system-ui,sans-serif;text-align:center;
+  box-shadow:0 4px 12px rgba(0,0,0,.35);
+}
+.payouts-agent-char[aria-expanded="true"] .payouts-agent-badge{opacity:.35}
+.payouts-agent-name{margin:0;color:#f5d08a;font:700 11px/1.2 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+.payouts-agent-pop{
+  width:min(300px,calc(100vw - 140px));box-sizing:border-box;padding:10px;border-radius:14px;
+  border:1px solid #d6b46a66;background:#1f1a15;box-shadow:0 12px 28px rgba(0,0,0,.4);
+  display:grid;gap:8px;
+}
+.payouts-agent-log{margin:0;color:#f5d08a;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.payouts-agent-pop .payouts-agent-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px}
+.payouts-agent-pop input{
+  width:100%;min-width:0;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:10px;
+  border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:500 14px/1.2 system-ui,sans-serif;
+}
+.payouts-agent-pop .payouts-agent-send{
+  width:44px;height:44px;margin:0;padding:0;border:0;border-radius:10px;
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1 system-ui,sans-serif;cursor:pointer;
+}
+@media (max-width:720px){
+  body.payouts-tray #shopUI #tray{
+    width:min(100vw - 16px,420px);left:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    max-height:min(58dvh,calc(100dvh - 108px));padding:20px 18px;
+  }
+  #payouts-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  .payouts-agent-pop{width:min(240px,calc(100vw - 120px))}
+}
+
+nav.all-shops button[data-enter-shop]{
+  background:transparent;border:0;padding:0;color:#fff8ee;font:600 16px/1.35 system-ui,sans-serif;cursor:pointer;text-align:left;
+}
+nav.all-shops button[data-enter-shop]:hover,nav.all-shops button[data-enter-shop]:focus-visible{color:#f5d08a}

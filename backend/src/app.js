@@ -9,6 +9,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { DEP, MAINNET_DEP, cfg, has } from './config.js';
 import * as ferry from './ferry.js';
 import * as checkout from './ferry-checkout.js';
+import * as payoutsInvoice from './payouts-invoice.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
 import { attested } from './outlayer.js';
@@ -274,8 +275,29 @@ export function makeApp() {
   // Guardhouse
   app.get('/api/payouts/usdc', limiter(30), edgeCache(15), c => c.json({
     network: 'mainnet', mode: 'one at a time, not all-or-nothing', max_steps: 3, per_payment_near: '0.005', daily_near: '0.01', usdc: null,
-    note: 'No USDC payroll has been paid. Each payment is a board propose inside the row cap.',
+    note: 'No USDC payroll has been paid. Each NEAR payment is a board propose inside the row cap. A USDC invoice is a 1Click quote, not a NEAR transfer.',
   }));
+  // Invoice quotes stay dry. Checkout may ask 1Click for a deposit address only at or under 0.20 USD.
+  // Nothing here signs or sends the deposit. The merchant recipient is a NEAR account, not the deposit address.
+  app.post('/api/payouts/invoice/quote', limiter(10), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const parsed = payoutsInvoice.invoiceInput(b);
+    if (parsed.error) return bad(c, parsed.error);
+    const out = await payoutsInvoice.quoteInvoice(parsed.value);
+    return c.json(out, out.ok ? 200 : 400);
+  });
+  app.post('/api/payouts/invoice/checkout', limiter(6), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const parsed = payoutsInvoice.invoiceInput(b);
+    if (parsed.error) return bad(c, parsed.error);
+    const out = await payoutsInvoice.openInvoice(parsed.value);
+    if (out.depositAddress && !(Number(out.usd) <= 0.2)) return c.json({ ok: false, reason: 'over_checkout_cap', depositAddress: null }, 400);
+    return c.json(out, out.ok ? 200 : 400);
+  });
+  app.get('/api/payouts/invoice/status', limiter(30), async c => {
+    try { return c.json(await payoutsInvoice.invoiceStatus(c.req.query('depositAddress'))); }
+    catch (e) { return c.json({ error: e.message, delivered: false }, e.status || 502); }
+  });
   app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
