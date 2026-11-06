@@ -11,6 +11,7 @@ import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } fro
 import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCallTgas, quoteRecipient, stepsAllowanceYocto, WRAP } from '/panels/ferry-settle.js';
 import { freezePlan } from '/panels/guard-agent.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
+import { rulesPlan } from '../../../../shared/hall/plan.js';
 import { missingCross } from '/foreign-path.js';
 import { callAsMessage, crossArgs, unitsOf, setSha256Hex } from '/board-call-as.js';
 // `/board-call-as.js` is served as-is, so it cannot import a package. The wallet
@@ -793,22 +794,41 @@ export const board = () => api('/api/vault/leaderboard');
 
 export const HALL = { contract: 'board.nearcarta.near' };
 export async function hallChange(kind) {
-  const r = rulesNow();
-  const cap = kind === 'tighter' ? Math.max(0.001, +(r.cap * 0.6).toFixed(3)) : Math.min(0.005, +(r.cap * 1.6).toFixed(3));
-  const rules = {
-    receivers: r.receivers.slice(0, 8),
-    per_action_cap: toY(cap),
-    daily_budget: toY(Math.max(r.budget, cap)),
-    max_actions_per_day: r.count,
-    window_start_min: r.ws || 0,
-    window_end_min: r.we || 0,
-    min_amount: toY(r.min || 0.001),
-    expires_at: String(BigInt(Date.now() + 30 * 864e5) * 1_000_000n),
-  };
+  const row = S.boardRow;
+  const plan = rulesPlan(row, { tighter: kind !== 'looser', looser: kind === 'looser' });
+  if (!plan.ok) throw new Error(plan.hint);
+  if (!plan.calls.length) return { tx: null, applied: false, dao: false, what: plan.hint };
   const target = S.board || HALL.contract;
-  const h = await sign(target, [fc('set_rules', { rules }, 40)]);
-  keep(h, 'hall', 'applied', 'set_rules');
-  return { tx: h, applied: true, dao: false, what: `max per payment ${cap} NEAR` };
+  const h = await sign(target, plan.calls.map(c => fc(c.method, c.args, 40)));
+  keep(h, 'hall', 'applied', plan.calls[0].method);
+  return { tx: h, applied: true, dao: false, what: plan.capNear ? `max per payment ${plan.capNear} NEAR` : plan.hint };
+}
+
+/** Wallet sign for set_rules, set_frozen and set_seal. Deposit stays 0. */
+export async function hallSign(calls) {
+  const list = Array.isArray(calls) ? calls : [];
+  if (!list.length) return { hash: null, tx: null };
+  if (list.some(c => !['set_rules', 'set_frozen', 'set_seal'].includes(c.method) || String(c.deposit ?? '0') !== '0')) {
+    throw new Error('Only set_rules, set_frozen and set_seal are signed here. Deposit stays 0.');
+  }
+  const target = S.board || HALL.contract;
+  const h = await sign(target, list.map(c => fc(c.method, c.args, 40, '0')));
+  keep(h, 'hall', 'applied', list[0].method);
+  return { hash: h, tx: h };
+}
+
+/** propose under the session key. Never opens a wallet. */
+export async function hallPay({ receiver, amountY }) {
+  const amount = String(amountY);
+  if (!S.board || !S.me) return { tx: null, decision: 'denied', reason: 'no_session', amount, receiver, fromRule: true, wallet: false };
+  const key = agent();
+  if (!key) return { tx: null, decision: 'denied', reason: 'no_key', amount, receiver, fromRule: true, wallet: false };
+  const ak = await proposeAccessKey(key);
+  const names = ak?.permission?.FunctionCall?.method_names || [];
+  if (!ak || (names.length && !names.includes('propose'))) {
+    return { tx: null, decision: 'denied', reason: 'key_cannot_propose', amount, receiver, fromRule: true, wallet: false };
+  }
+  return boardPay({ shop: 'hall', receiver, amountY: amount });
 }
 
 export async function feed() {

@@ -69,6 +69,7 @@ test('the house deed links are brass and a missing oath is not a missing row', a
   assert.equal(DEP.extras?.house?.contract, 'house.nearcarta.near');
   assert.equal(DEP.extras?.house?.legacy, 'house.nearcarta.near');
   assert.equal(DEP.extras.house.shop, 'house.nearcarta.near');
+  // The v3 recreate kept house.nearcarta.near, so the house3 fallback is unused.
   assert.equal(DEP.extras.house.fallback.status, 'unused');
   assert.equal(DEP.extras.house.fallback.account, 'house3.nearcarta.near');
   assert.equal(DEP.extras?.house?.oath, undefined);

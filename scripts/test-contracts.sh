@@ -7,6 +7,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/../contracts"
 for c in arena toll townhall house_nft attested_check; do echo "== $c"; (cd "$c" && cargo test --lib -q); done
+echo "== hall"
+(cd hall && cargo test --locked --lib -q)
 # charter_board pins rustc in rust-toolchain.toml. near-sdk 5.30 / a newer rustc produced a wasm
 # mainnet rejected (unknown import). Do not override that pin.
 board_tc=$(sed -n 's/^channel *= *"\([^"]*\)".*/\1/p' charter_board/rust-toolchain.toml)
