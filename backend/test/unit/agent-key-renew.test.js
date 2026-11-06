@@ -117,6 +117,11 @@ test('refresh replaces a ready board key with 0.25 NEAR of gas and does not touc
   const fn = src.slice(src.indexOf('async function refreshAgentKey'), src.indexOf('function bindRefreshKey'));
   assert.match(fn, /GAS_TOPUP_YOCTO/);
   assert.match(fn, /set_agent/);
+  assert.match(fn, /agent: agentHex/);
+  assert.match(fn, /localStorage\.setItem\(agentLS\(me\), fresh\.secretKey\)/);
+  assert.ok(fn.indexOf('localStorage.setItem(agentLS(me), fresh.secretKey)') < fn.indexOf('agentAccessKey(fresh.secretKey)'));
+  assert.match(fn, /chainRow = rowNow/);
+  assert.match(fn, /String\(rowNow\.agent \|\| ''\) === agentHex/);
   assert.doesNotMatch(fn, /set_rules/);
   assert.doesNotMatch(fn, /methodName: 'fund'/);
   assert.match(src, /setup-refresh-key/);
