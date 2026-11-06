@@ -14,7 +14,7 @@ import { houseCharterMarkup, mountHouseRoom } from './house-room.js';
 import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
 import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks, pickerListbox, bindPickerListbox } from './token-badge.js';
-import { agentCargoPlan, chainLabel, receiveAsk, receiveConfirm } from './ferry-pair.js';
+import { agentCargoPlan, chainLabel, parseOrderCommand, receiveAsk, receiveConfirm } from './ferry-pair.js';
 import { explainQuoteMiss, ferryStatusHtml, ferryStatusView, SESSION_SWAP, quoteRecipient, validateDestAddress, isNearAccountId } from './ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from './ferry-dock.js';
 import { mountChronicleTray } from './chronicle-view.js';
@@ -193,6 +193,19 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const errLine = state.quoteError
     ? `<p class="ferry-quote-err" data-testid="ferry-quote-error">${esc(state.quoteError)}</p>`
     : (state.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : '');
+  // The route choice: an on-chain deposit (default) or a signed intent that spends an
+  // Intents balance with no deposit tx. Both are quoted by 1Click; only the deposit type
+  // and who signs change.
+  const signedReady = state.signedQuote && state.signedQuote.ok !== false && state.signedQuote.needsSignature;
+  const sigLine = state.signedQuote
+    ? (state.signedQuote.ok === false
+      ? `<p class="ferry-quote-err" data-testid="ferry-signed-error">${esc(explainQuoteMiss(state.signedQuote.error || ''))}</p>`
+      : `<p class="ferry-rate" data-testid="ferry-signed-quote">Signed intent · ${esc(state.signedQuote.from?.amount || '')} ${esc(state.signedQuote.from?.symbol || '')} → ${esc(state.signedQuote.to?.amount || '')} ${esc(state.signedQuote.to?.symbol || '')}${state.signedQuote.signed ? ' · quote signed by 1Click' : ''}</p>
+         <p class="small muted" data-testid="ferry-signed-note">Nothing is deposited. Your wallet signs the intent; the funds stay in Intents until the swap runs.</p>
+         <button type="button" class="primary ferry-cta" id="f-signed" data-testid="ferry-signed-submit">Sign the intent</button>`)
+    : '';
+  const sigResult = state.signedResult
+    ? `<p class="ferry-status" data-testid="ferry-signed-result" role="status">${esc(state.signedResult)}</p>` : '';
   const acted = !!state.acted;
   const showCargo = !!(state.q && !acted && !state.sample && !state.quoteError);
   const showAgain = acted && !state.sample;
@@ -234,6 +247,11 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote" ${acted ? 'hidden' : ''}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Get quote</button>
       ${rateLine}
       ${errLine}
+      <div class="ferry-route-choice" data-testid="ferry-route-choice">
+        <label class="ferry-radio"><input type="radio" name="f-route" value="deposit" data-testid="ferry-route-deposit"${state.route !== 'signed' ? ' checked' : ''}> Deposit on the origin chain</label>
+        <label class="ferry-radio"><input type="radio" name="f-route" value="signed" data-testid="ferry-route-signed"${state.route === 'signed' ? ' checked' : ''}> Signed intent · no deposit tx</label>
+        ${state.route === 'signed' ? `<p class="small muted" data-testid="ferry-signed-hint">Uses an Intents balance. ${state.hasPartnerKey === false ? 'A confidential quote needs the server partner key.' : 'Nothing leaves your wallet until you sign.'}</p><button type="button" class="primary ferry-cta" id="f-sig-quote" data-testid="ferry-sig-quote">Quote a signed intent</button>${sigLine}${sigResult}` : ''}
+      </div>
       <div class="ferry-cargo-actions" data-testid="ferry-cargo-actions" ${showCargo ? '' : 'hidden'}>
         <button type="button" class="primary ferry-cta" id="f-cargo" data-testid="ferry-load-cargo"${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Load cargo</button>
         <button type="button" class="primary ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Ask charter · load cargo</button>
@@ -242,7 +260,29 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       ${deposit}
       ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}${state.renewSetup ? ` <a href="/setup" data-testid="${/refresh/i.test(state.renewLabel || '') ? 'ferry-refresh-key' : 'ferry-renew-setup'}">${esc(state.renewLabel || 'Renew agent key once in Setup')}</a>` : ''}${(state.landedLinks || []).map(l => ` <a class="tx" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('')}</p>` : ''}
     </div>`;
+  // Limit orders: the visitor's own price. 1Click rests the order and refunds whatever
+  // did not fill to the refund address the order was created with.
+  const ordersHtml = (() => {
+    const orders = Array.isArray(state.orders) ? state.orders : [];
+    const rows = orders.length
+      ? orders.map(o => `<li class="ferry-order" data-testid="ferry-order" data-id="${esc(o.id || '')}">
+          <b>${esc(o.side || '')} ${esc(o.quantity || '')}</b> at <b>${esc(o.price || '')}</b>
+          <small>${esc(o.fillStatus || '')}${o.payoutStatus ? ' · payout ' + esc(o.payoutStatus) : ''}${o.final ? ' · final' : ''}</small>
+          ${o.withdrawalTx ? ` <a class="tx" href="https://nearblocks.io/txns/${esc(o.withdrawalTx)}" target="_blank" rel="noopener">filled</a>` : ''}
+          ${o.refundTx ? ` <a class="tx" href="https://nearblocks.io/txns/${esc(o.refundTx)}" target="_blank" rel="noopener">refund</a>` : ''}
+          <button type="button" class="btn sm" data-cancel-order="${esc(o.id || '')}" data-testid="ferry-order-cancel">Cancel</button>
+        </li>`).join('')
+      : '<li class="small muted" data-testid="ferry-orders-empty">No open orders. An order rests at your price until it fills or you cancel it.</li>';
+    return `<div class="ferry-orders" data-testid="ferry-orders">
+        <p class="ferry-shortcuts-label">Limit orders</p>
+        <ul class="ferry-order-list">${rows}</ul>
+        ${state.ordersNote ? `<p class="ferry-quote-err" data-testid="ferry-orders-error">${esc(state.ordersNote)}</p>` : ''}
+        <p class="small muted" data-testid="ferry-orders-note">A cancel stops matching. Filled output is still withdrawn and the unfilled remainder is refunded to your refund address. A last slice can still fill.</p>
+        <button type="button" class="btn sm" id="f-orders-refresh" data-testid="ferry-orders-refresh">Refresh orders</button>
+      </div>`;
+  })();
   const routesPane = `<div class="ferry-pane" data-pane="routes" ${tab === 'routes' ? '' : 'hidden'}>
+      ${ordersHtml}
       <p class="ferry-picker-note" data-testid="ferry-token-count" ${nTok ? '' : 'hidden'}>${nTok ? `${nTok} live tokens` : ''}</p>
       <p class="ferry-shortcuts-label">Quick ZEC corridors</p>
       <div class="route-row" role="group" aria-label="Quick ZEC corridors" data-testid="ferry-routes">${routes.map((r, i) => {
@@ -290,7 +330,22 @@ function trayDestChain(state) {
 }
 
 /** In-shop agent. A parsed swap calls the same Load cargo hook as the button ({ charter: false }). No chain tx is built here. */
-export async function runFerryAgent({ text, state = {}, charterReady = false, quotePair, onLoadCargo, onPair, onSeal, onNote } = {}) {
+export async function runFerryAgent({ text, state = {}, charterReady = false, quotePair, onLoadCargo, onPair, onSeal, onNote, onOrder } = {}) {
+  // Limit orders are their own sentence and never touch the swap path.
+  const order = parseOrderCommand(text);
+  if (order) {
+    if (!onOrder) return { ok: false, loaded: false, hint: 'This tray cannot place orders yet.' };
+    if (order.kind === 'place' && (!String(order.base).split('@')[1] || !String(order.quote).split('@')[1])) {
+      return { ok: false, loaded: false, hint: 'Name both chains, e.g. Sell 1 NEAR on NEAR at 5 USDC on Base.' };
+    }
+    let out;
+    try { out = await onOrder(order); }
+    catch (e) { return { ok: false, loaded: false, hint: explainQuoteMiss(e?.message || 'the order did not go') }; }
+    return {
+      ok: out?.ok !== false, loaded: false, mode: 'order', order: order.kind,
+      hint: out?.hint || (order.kind === 'list' ? 'Reading your open orders.' : 'Order sent. Nothing was deposited.'),
+    };
+  }
   const plan = agentCargoPlan(text, { charterReady });
   if (!plan.ok) return { ...plan, loaded: false };
   if (plan.parsed?.receiveAt) state.receiveAt = plan.parsed.receiveAt;
@@ -359,6 +414,8 @@ function mountFerry(root, hooks) {
   const state = hooks.state || (hooks.state = {});
   if (!state.toId) state.toId = SESSION_SWAP.toId;
   if (!state.tab) state.tab = 'swap';
+  // The deposit route is the default; the signed-intent route is opt-in next to it.
+  if (!state.route) state.route = 'deposit';
   // Session corridor: wNEAR@near → USDC@near at 0.05 (USD under 0.20, propose_call when the row cap holds it).
   if (!state.fromId) state.fromId = SESSION_SWAP.fromId;
   if (state.amt == null || state.amt === '') state.amt = SESSION_SWAP.amt;
@@ -491,6 +548,19 @@ function mountFerry(root, hooks) {
     if (compare) compare.onclick = () => runQuotes(compare);
     const one = q$(root, '#f-quote');
     if (one) one.onclick = () => runOne(one);
+    // Route choice: an on-chain deposit, or a signed intent against an Intents balance.
+    for (const r of root.querySelectorAll('input[name="f-route"]')) {
+      r.onchange = () => { state.route = r.value; state.signedQuote = null; state.signedResult = ''; paint(); };
+    }
+    const sigQuote = q$(root, '#f-sig-quote');
+    if (sigQuote) sigQuote.onclick = () => runSignedQuote(sigQuote);
+    const sigSubmit = q$(root, '#f-signed');
+    if (sigSubmit) sigSubmit.onclick = () => submitSigned(sigSubmit);
+    const refresh = q$(root, '#f-orders-refresh');
+    if (refresh) refresh.onclick = () => loadOrders(refresh);
+    for (const b of root.querySelectorAll('[data-cancel-order]')) {
+      b.onclick = () => cancelOrder(b.getAttribute('data-cancel-order'), b);
+    }
     const cargo = q$(root, '#f-cargo');
     if (cargo) cargo.onclick = () => hooks.onLoadCargo && hooks.onLoadCargo({ charter: false });
     const charter = q$(root, '#f-charter');
@@ -521,6 +591,37 @@ function mountFerry(root, hooks) {
     else el.textContent = text || '';
   }
   function clearSeal() { hooks.hideRefuse?.(); hooks.setOrder?.('jetty'); }
+  /**
+   * An order sentence from the chat, through the same endpoints the Routes tab uses.
+   * A placement needs the visitor's own account as the refund/recipient address, so the
+   * order is refused when there is no signed-in visitor: nothing is guessed.
+   */
+  async function runAgentOrder(cmd) {
+    const visitor = hooks.visitor?.() || state.me;
+    if (cmd.kind === 'list') {
+      await loadOrders(null);
+      state.tab = 'routes'; paint();
+      return { ok: true, hint: state.orders?.length ? `${state.orders.length} open order${state.orders.length === 1 ? '' : 's'}.` : 'No open orders.' };
+    }
+    if (cmd.kind === 'cancel') {
+      if (!cmd.orderId) return { ok: false, hint: 'Name the order id to cancel, or open Routes and press Cancel.' };
+      const j = await fetch(api() + '/api/ferry/orders/' + encodeURIComponent(cmd.orderId) + '/cancel', { method: 'POST' }).then(r => r.json());
+      return { ok: j.ok !== false, hint: j.ok === false ? (j.error || 'The order was not cancelled.') : (j.note || 'Cancel requested.') };
+    }
+    if (!visitor) return { ok: false, hint: 'Sign in first: an order needs your own account as the refund address.' };
+    const j = await fetch(api() + '/api/ferry/orders', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        base: cmd.base, quote: cmd.quote, quantity: cmd.quantity, side: cmd.side, price: cmd.price,
+        refundTo: visitor, refundType: 'ORIGIN_CHAIN', recipient: visitor, recipientType: 'ORIGIN_CHAIN',
+        confidentiality: 'basic',
+      }),
+    }).then(r => r.json());
+    if (j.ok === false) return { ok: false, hint: explainQuoteMiss(j.error || 'the order did not go') };
+    await loadOrders(null);
+    state.tab = 'routes'; paint();
+    return { ok: true, hint: `Order placed at your price. Send ${j.deposit?.amount || cmd.quantity} to ${j.deposit?.address || 'the deposit address'} when you are ready. Nothing was deposited.` };
+  }
   async function runAgent(text) {
     const line = String(typeof text === 'string' ? text : (state.agentText || '')).trim();
     state.agentText = line;
@@ -543,6 +644,7 @@ function mountFerry(root, hooks) {
       onNote: (text) => agentLog(text),
       onPair: hooks.onPair,
       onLoadCargo: (opts) => hooks.onLoadCargo && hooks.onLoadCargo(opts),
+      onOrder: (cmd) => runAgentOrder(cmd),
       onSeal: clearSeal,
     });
     if (!result?.ok) clearSeal();
@@ -649,8 +751,70 @@ function mountFerry(root, hooks) {
       : 'Quote ready. Ask charter or Load cargo.';
     paint();
   }
-  async function runQuotes(btn) {
-    holdButton(btn, 'Comparing routes. Waiting for the quotes.');
+  // Signed intent: quote with depositType INTENTS, then have the wallet sign the payload
+  // 1Click generates, then submit. No deposit transaction on this path.
+  async function runSignedQuote(btn) {
+    const from = idToFrom(state.fromId) || routes[state.ri || 0]?.from;
+    const to = idToFrom(state.toId) || SESSION_SWAP.to;
+    if (!from || !to) return;
+    const visitor = hooks.visitor?.() || state.me;
+    const recipient = quotePayee(to, visitor, state.receiveAt);
+    if (!recipient) { state.signedQuote = { ok: false, error: 'Enter the address on the destination chain that should receive the tokens.' }; paint(); return; }
+    holdButton(btn, 'Asking 1Click for a signed-intent quote.');
+    try {
+      const res = await fetch(api() + '/api/ferry/intents/quote', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient, refundTo: refundForChain(String(to).split('@')[1] || '', visitor), depositType: 'INTENTS', privacy: state.privacy || 'public' }),
+      });
+      state.signedQuote = await res.json();
+    } catch (e) { state.signedQuote = { ok: false, error: e?.message || 'quote failed' }; }
+    state.signedResult = '';
+    paint();
+  }
+  async function submitSigned(btn) {
+    const q = state.signedQuote;
+    if (!q?.depositAddress) return;
+    const signerId = hooks.visitor?.() || state.me;
+    holdButton(btn, 'Asking 1Click what to sign.');
+    try {
+      const gen = await fetch(api() + '/api/ferry/intents/generate', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ depositAddress: q.depositAddress, signerId, standard: 'nep413' }),
+      }).then(r => r.json());
+      if (gen.ok === false || !gen.intent) throw new Error(gen.error || 'no intent to sign');
+      // The wallet signs the exact payload 1Click returned. Nothing here can sign it.
+      const signed = await hooks.signIntent?.(gen);
+      if (!signed || !signed.signature) throw new Error('The wallet did not return a signature. Nothing was submitted.');
+      const out = await fetch(api() + '/api/ferry/intents/submit', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ intent: gen.intent, public_key: signed.publicKey, signature: signed.signature }),
+      }).then(r => r.json());
+      if (out.ok === false) throw new Error(out.error || '1Click did not accept the signed intent');
+      state.signedResult = `Signed intent submitted${out.intentHash ? ' · ' + out.intentHash.slice(0, 10) + '…' : ''}. No deposit transaction was sent.`;
+    } catch (e) { state.signedResult = explainQuoteMiss(e?.message || 'the signed intent did not go'); }
+    paint();
+  }
+  /** Orders: the visitor's own price, resting at 1Click. */
+  async function loadOrders(btn) {
+    if (btn) holdButton(btn, 'Reading your open orders.');
+    try {
+      const j = await fetch(api() + '/api/ferry/orders').then(r => r.json());
+      state.orders = Array.isArray(j.open) ? j.open : (Array.isArray(j.orders) ? j.orders : []);
+      // An error document has no `ok`, only `error`; both shapes mean the read failed.
+      state.ordersNote = (j.ok === false || j.error) ? (j.error || 'Orders did not load.') : '';
+    } catch (e) { state.orders = []; state.ordersNote = e?.message || 'Orders did not load.'; }
+    paint();
+  }
+  async function cancelOrder(id, btn) {
+    if (!id) return;
+    holdButton(btn, 'Asking 1Click to cancel.');
+    try {
+      const j = await fetch(api() + '/api/ferry/orders/' + encodeURIComponent(id) + '/cancel', { method: 'POST' }).then(r => r.json());
+      state.ordersNote = (j.ok === false || j.error) ? (j.error || 'The order was not cancelled.') : (j.note || 'Cancel requested.');
+      await loadOrders(null);
+    } catch (e) { state.ordersNote = e?.message || 'The order was not cancelled.'; paint(); }
+  }
+  async function runQuotes(btn) {    holdButton(btn, 'Comparing routes. Waiting for the quotes.');
     const raw = [];
     for (const r of routes) {
       try { raw.push(await quoteOne(r, state.amtEdited ? state.amt : r.amt, hooks, state.receiveAt)); }

@@ -134,6 +134,34 @@ export function receiveAsk(chain) {
   return `Where should the tokens arrive on ${c}? Add the address, for example: Swap 0.05 wNEAR on NEAR to USDC on Base to 0x…`;
 }
 
+/**
+ * A limit order sentence. "sell 1 NEAR at 5 USDC", "buy 1 NEAR at 5 USDC",
+ * "cancel order ord_123", "cancel my order", "show my orders".
+ *
+ * The price is the visitor's own: quote units per one base unit, exactly as the 1Click
+ * docs define it. Nothing here signs or deposits.
+ */
+export function parseOrderCommand(text) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  const cancel = t.match(/\bcancel\b(?:\s+(?:my\s+)?order)?\s*([A-Za-z0-9_-]{6,128})?/i);
+  if (cancel) return { kind: 'cancel', orderId: cancel[1] || '' };
+  if (/\b(?:show|list|see|my)\b[^.]*\borders?\b/i.test(t) && !/\b(?:sell|buy)\b/i.test(t)) return { kind: 'list' };
+  // sell|buy <qty> <base> [on <chain>] at <price> <quote> [on <chain>]
+  const m = t.match(/\b(sell|buy)\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?\s+(?:at|@|for)\s+(\d+(?:\.\d+)?)\s+([A-Za-z0-9.]+)(?:\s*(?:@|on)\s*([A-Za-z0-9_-]+))?/i);
+  if (!m) return null;
+  const baseChain = chainFor(canonSymbol(m[3]), m[4] || '', 'from', '');
+  const quoteChain = chainFor(canonSymbol(m[6]), m[7] || '', 'to', baseChain);
+  return {
+    kind: 'place',
+    side: m[1].toUpperCase(),
+    quantity: m[2],
+    base: baseChain ? `${canonSymbol(m[3])}@${baseChain}` : `${canonSymbol(m[3])}@`,
+    price: m[5],
+    quote: quoteChain ? `${canonSymbol(m[6])}@${quoteChain}` : `${canonSymbol(m[6])}@`,
+  };
+}
+
 /** One line the popup shows before a foreign-chain swap runs. */
 export function receiveConfirm(chain, address) {
   const c = String(chain || '').toLowerCase();
