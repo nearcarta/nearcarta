@@ -10,6 +10,7 @@ import { DEP, MAINNET_DEP, cfg, has, secret } from './config.js';
 import * as ferry from './ferry.js';
 import * as checkout from './ferry-checkout.js';
 import * as payoutsInvoice from './payouts-invoice.js';
+import { parsePayoutIntent } from './payouts-intent.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
 import { attested } from './outlayer.js';
@@ -287,6 +288,14 @@ export function makeApp() {
   }));
   // Durable invoices. Creating one does not call 1Click. Checkout may ask for a deposit address.
   // Nothing here signs or sends the deposit. The receive account is the one stored on the invoice.
+  app.post('/api/payouts/intent', limiter(12), async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    return c.json(await parsePayoutIntent(String(b.text || '').slice(0, 400)));
+  });
+  app.get('/api/payouts/invoices', limiter(30), c => {
+    const out = payoutsInvoice.listInvoices(c.req.query('visitor'));
+    return c.json(out, out.ok ? 200 : 400);
+  });
   app.post('/api/payouts/invoices', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
     const who = String(b.receive || b.recipient || '').trim();
@@ -304,7 +313,7 @@ export function makeApp() {
   });
   app.post('/api/payouts/invoices/:id/quote', limiter(10), oneClick, async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
-    const parsed = payoutsInvoice.payerInput(b);
+    const parsed = payoutsInvoice.payerInput(b, { allowIndicative: true });
     if (parsed.error) return bad(c, parsed.error);
     const out = await payoutsInvoice.quoteStored(c.req.param('id'), parsed.value);
     return c.json(out, out.ok ? 200 : 400);
