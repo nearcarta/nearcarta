@@ -203,6 +203,11 @@
     },
     "house": {
       "contract": "house.nearcarta.near",
+      "legacy": "house.nearcarta.near",
+      "shop": {
+        "status": "not_deployed",
+        "account": "house3.nearcarta.near"
+      },
       "owner": "nearcarta.near",
       "wasm": "house_nft.p86.wasm",
       "sha256": "70a8923bbd187b2b0dd89c66c9ba37902a656640919b16ad4861470fc1ea8806",

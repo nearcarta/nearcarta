@@ -6,6 +6,15 @@ const here = new URL('.', import.meta.url).pathname;
 const dist = here + 'dist';
 rmSync(dist, { recursive: true, force: true }); mkdirSync(dist);
 cpSync(here + 'src', dist, { recursive: true });
+const mainnet = JSON.parse(readFileSync(here + '../shared/deployments/mainnet.json', 'utf8'));
+const houseRec = mainnet.extras.house;
+const houseShop = typeof houseRec.shop === 'string' ? houseRec.shop : houseRec.shop.account;
+writeFileSync(dist + '/house-shop.js',
+  '// Generated from shared/deployments/mainnet.json. The city imports this file.\n'
+  + `export const HOUSE_SHOP = ${JSON.stringify(houseShop)};\n`
+  + `export const HOUSE_LEGACY = ${JSON.stringify(houseRec.legacy)};\n`
+  + `export const HOUSE_OWNER = ${JSON.stringify(houseRec.owner)};\n`
+  + `export const HOUSE_BOARD = ${JSON.stringify(mainnet.board.contract)};\n`);
 cpSync(here + 'design', dist + '/design', { recursive: true });
 // OutLayer fetches the charter check WASM from here and refuses it unless its sha256 matches the pin.
 mkdirSync(dist + '/outlayer'); cpSync(here + '../outlayer/artifacts/charter_check.wasm', dist + '/outlayer/charter_check.wasm');

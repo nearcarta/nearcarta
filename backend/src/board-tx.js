@@ -1,5 +1,6 @@
 // Read a board propose back from a mainnet tx status. No signing.
 import { mainnetReceiverOk } from '../../shared/net/accounts.js';
+import { HOUSE_LEGACY, HOUSE_SHOP } from '../../shared/house/shop.js';
 import { MAINNET_DEP } from './config.js';
 import { txStatus } from './near.js';
 
@@ -11,9 +12,10 @@ const SHOP = {
   'charter.nearcarta.near': 'charter',
   'townhall.nearcarta.near': 'hall',
   'arena.nearcarta.near': 'arena',
-  'house.nearcarta.near': 'house',
   'nearcarta.near': 'root',
 };
+if (HOUSE_LEGACY) SHOP[HOUSE_LEGACY] = 'house';
+if (HOUSE_SHOP) SHOP[HOUSE_SHOP] = 'house';
 const REASONS = /receiver_not_allowlisted|over_per_action_cap|over_daily_budget|over_daily_action_count|frozen|clause_expired|outside_time_window|below_min_amount|hidden_rule_receiver|hidden_rule_cap|ERR_BALANCE|ERR_BAD_SIG|ERR_NO_CHARTER/;
 
 export function shopOf(payee) {

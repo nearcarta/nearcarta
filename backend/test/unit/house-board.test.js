@@ -7,7 +7,13 @@ import {
 } from '../../../app/src/house-board.js';
 import { sha256Hex } from '../../../app/src/sha256.js';
 import { planHouseLine } from '../../../app/src/panels/house-agent.js';
-import { planDeploy } from '../../../scripts/house-deploy.js';
+import { planSuccessor } from '../../../scripts/house-deploy.js';
+import { recoveryPlan, sourceMethods, wasmExports } from '../../../scripts/house-recover.js';
+import { HOUSE_CALLS, HOUSE_LEGACY, HOUSE_SHOP } from '../../../shared/house/shop.js';
+import { FERRY_CALL_TARGETS, MAX_CALLS, callPolicy } from '../../../shared/board/session.js';
+import { shopOf } from '../../../backend/src/board-tx.js';
+import { isDenied } from '../../../backend/src/vault.js';
+import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
 
 test('sha256 matches node', () => {
   assert.equal(sha256Hex('abc'), createHash('sha256').update('abc').digest('hex'));
@@ -114,30 +120,91 @@ test('a visitor check-in builds propose_call_as from that visitor\'s row', () =>
   assert.equal(missing.signed, false);
 });
 
-test('the deploy plan refunds the holder and funds only the shop', () => {
-  const plan = planDeploy({
-    shop: 'house.nearcarta.near',
+test('the successor plan funds the new shop from the owner', () => {
+  const plan = planSuccessor({
+    shop: HOUSE_SHOP,
     owner: 'nearcarta.near',
-    wasmBytes: 370200,
+    legacy: HOUSE_LEGACY,
+    wasmBytes: 373051,
     wasmSha256: 'abc',
-    oldCodeBytes: 245996,
-    storageUsage: 247204,
-    balanceYocto: '2502774762262500000000000',
-    fullAccessKeys: 0,
-    codeHash: '8amkMEcCFxQHbHkgZqP72LXJnoJ1iecGq6B71gPiNMXK',
-    recordedHash: '8amkMEcCFxQHbHkgZqP72LXJnoJ1iecGq6B71gPiNMXK',
-    purses: [{ tokenId: 'visitor.near', owner: 'visitor.near', balanceYocto: '1000000000000000000000' }],
+    ownerBalanceYocto: '1000000000000000000000000',
+    shopExists: false,
   });
-  assert.equal(plan.refunds.length, 1);
-  assert.equal(plan.refunds[0].payee, 'visitor.near');
-  assert.equal(plan.refunds[0].amountYocto, '1000000000000000000000');
   assert.equal(plan.transfers.length, 1);
-  assert.equal(plan.transfers[0].from, 'nearcarta.near');
-  assert.equal(plan.transfers[0].payee, 'house.nearcarta.near');
+  assert.equal(plan.transfer.from, 'nearcarta.near');
+  assert.equal(plan.transfer.payee, HOUSE_SHOP);
+  assert.notEqual(plan.transfer.payee, HOUSE_LEGACY);
+  assert.equal(plan.transfer.amountYocto, plan.stakeYocto);
   assert.equal(plan.liveReady, false);
-  assert.ok(BigInt(plan.stakeYocto) > BigInt(plan.balanceBeforeYocto));
+  assert.equal(plan.coveredNow, false);
+  assert.equal(plan.shopExists, false);
+  const funded = planSuccessor({ ...{
+    shop: HOUSE_SHOP, owner: 'nearcarta.near', legacy: HOUSE_LEGACY, wasmBytes: 373051, wasmSha256: 'abc', shopExists: false,
+  }, ownerBalanceYocto: plan.peakYocto });
+  assert.equal(funded.coveredNow, true);
+  assert.equal(funded.liveReady, true);
+  const taken = planSuccessor({
+    shop: HOUSE_SHOP, owner: 'nearcarta.near', legacy: HOUSE_LEGACY, wasmBytes: 373051, wasmSha256: 'abc',
+    ownerBalanceYocto: plan.peakYocto, shopExists: true,
+  });
+  assert.equal(taken.liveReady, false);
   const src = readFileSync(new URL('../../../contracts/house_nft/src/lib.rs', import.meta.url), 'utf8');
   assert.match(src, /fn migrate_from_v2/);
   assert.match(src, /only the contract may migrate/);
   assert.match(src, /top-level argument the board writes/);
+});
+
+test('the legacy wasm recovers by house_pay and then close', () => {
+  const exports = wasmExports(Buffer.from('AGFzbQEAAAABBAFgAAADBAMAAAAHIQMFY2xvc2UAAAlob3VzZV9wYXkAAQluZnRfdG9rZW4AAgoNAwMAAQsDAAELAwABCw==', 'base64'));
+  assert.deepEqual(exports, ['close', 'house_pay', 'nft_token']);
+  const plan = recoveryPlan({
+    exports: ['nft_token', 'house_pay', 'house_fund', 'close', 'house_held'],
+    purseYocto: '1000000000000000000000',
+    heldYocto: '1000000000000000000000',
+    holder: 'nearcarta.near',
+    owner: 'nearcarta.near',
+    shop: HOUSE_LEGACY,
+  });
+  assert.equal(plan.locked, false);
+  assert.equal(plan.steps[0].method, 'house_pay');
+  assert.equal(plan.steps[0].signer, 'nearcarta.near');
+  assert.equal(plan.steps[0].args.amount, '1000000000000000000000');
+  assert.equal(plan.steps[0].args.receiver_id, 'nearcarta.near');
+  assert.equal(plan.steps[1].method, 'close');
+  assert.equal(plan.absent.includes('upgrade'), true);
+  assert.equal(plan.absent.includes('migrate'), true);
+  assert.equal(plan.absent.includes('house_withdraw'), true);
+  const locked = recoveryPlan({
+    exports: ['nft_token', 'house_fund'], purseYocto: '1', heldYocto: '1', holder: 'nearcarta.near', owner: 'nearcarta.near', shop: HOUSE_LEGACY,
+  });
+  assert.equal(locked.locked, true);
+  assert.match(locked.why, /stays on the shop/);
+  const src = sourceMethods('impl Contract { pub fn house_pay(&self) {} pub fn close(&mut self) {} }');
+  assert.deepEqual(src, ['house_pay', 'close']);
+});
+
+test('the city, the allow list and the denylist use the one shop id', () => {
+  assert.equal(HOUSE_LEGACY, 'house.nearcarta.near');
+  assert.equal(MAIN.extras.house.contract, HOUSE_LEGACY);
+  assert.equal(MAIN.extras.house.shop.status, 'not_deployed');
+  assert.equal(MAIN.extras.house.shop.account, HOUSE_SHOP);
+  assert.notEqual(HOUSE_SHOP, HOUSE_LEGACY);
+  assert.equal(shopOf(HOUSE_SHOP), 'house');
+  assert.equal(shopOf(HOUSE_LEGACY), 'house');
+  assert.equal(isDenied(HOUSE_SHOP), true);
+  assert.equal(isDenied(HOUSE_LEGACY), true);
+  const policy = callPolicy(
+    [MAIN.charter.contract, MAIN.toll.contract, HOUSE_SHOP],
+    '1', '1', 'ft_transfer', [...FERRY_CALL_TARGETS, ...HOUSE_CALLS],
+  );
+  assert.ok(policy.calls.length <= MAX_CALLS);
+  assert.equal(policy.calls.some(row => row.receiver === HOUSE_SHOP && row.method === 'house_session_check_in'), true);
+  assert.equal(policy.calls.some(row => row.receiver === HOUSE_SHOP && row.method === 'house_session_prepare_send'), true);
+  const setup = readFileSync(new URL('../../../app/house/setup.js', import.meta.url), 'utf8');
+  assert.match(setup, /HOUSE_SHOP/);
+  assert.doesNotMatch(setup, /house3\.nearcarta\.near/);
+  const readme = readFileSync(new URL('../../../README.md', import.meta.url), 'utf8');
+  assert.match(readme, /extras\.house\.shop/);
+  assert.match(readme, /legacy shop/);
+  assert.doesNotMatch(readme, /house3\.nearcarta\.near/);
 });

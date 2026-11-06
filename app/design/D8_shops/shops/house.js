@@ -46,7 +46,7 @@ export default async function house() {
   const deliver = () => { flare = 2.6; hideSeal(); };
   return {
     rob, scene, camera, tags: [], showSeal, hideSeal, deliver,
-    panel: { title: 'Your House', src: 'split', srcNote: 'house.nearcarta.near is on mainnet. A charter you create is the mainnet charter.', label: `Tip cap · policy v${CORE.policyVersion}`, hero: tok(String(tip.cap), 'NEAR'), action: null },
+    panel: { title: 'Your House', src: 'split', srcNote: 'Recorded payments are the legacy shop. The city shop is extras.house.shop. A charter you create is the mainnet charter.', label: `Tip cap · policy v${CORE.policyVersion}`, hero: tok(String(tip.cap), 'NEAR'), action: null },
     proof: PROOF,
     update(dt) { tt += dt; rob.update(dt); fire.material.opacity = .75 + .2 * Math.sin(tt * 9) * Math.sin(tt * 3.7); flames.forEach((f, i) => f.scale.y = 1 + .18 * Math.sin(tt * (7 + i * 2.3) + i)); fl.intensity = 1.4 + .3 * Math.sin(tt * 7); if (flare > 0) { flare = Math.max(0, flare - dt); fl.intensity += flare * 1.4; } },
   };

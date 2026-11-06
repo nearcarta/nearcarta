@@ -4,7 +4,7 @@
 //! (a full wallet approval, never a function-call key) and stays under the deed's cap. Transfer the deed and the
 //! purse and the rule move with it; the old owner is refused from then on. Anyone may `house_fund` a deed.
 //! Any account may mint one deed (token_id = minter account id). The deployer may upgrade, then migrate.
-//! The live account has no access key until one is added for that deploy.
+//! The recorded shop has no access key. A successor account is created outside this contract.
 use near_contract_standards::non_fungible_token::metadata::{
     NFTContractMetadata, NonFungibleTokenMetadataProvider, TokenMetadata, NFT_METADATA_SPEC,
 };

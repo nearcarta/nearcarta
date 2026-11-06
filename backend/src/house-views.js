@@ -3,6 +3,7 @@
 // A missing house_line means the live deed has not grown the inheritance methods.
 
 import { derivationRequest, readDerivedKey } from '../../app/src/house-derive.js';
+import { HOUSE_SHOP } from '../../shared/house/shop.js';
 
 export async function derivedFor(owner, viewFn) {
   const chains = ['eth', 'btc'];
@@ -29,9 +30,9 @@ export async function derivedFor(owner, viewFn) {
   return {
     signer: 'v1.signer',
     owner,
-    predecessor: rows[0]?.predecessor || 'house.nearcarta.near',
+    predecessor: rows[0]?.predecessor || HOUSE_SHOP,
     live: false,
-    why: 'The live house contract does not call the signer. This address is not a vault the deed controls yet.',
+    why: 'Toll has not shipped a signer this shop can call. The predecessor would be ' + HOUSE_SHOP + '. This address is not a vault the deed controls yet.',
     rows,
   };
 }

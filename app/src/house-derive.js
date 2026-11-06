@@ -9,9 +9,16 @@
 // The live house contract does not call the signer. This module does not sign.
 
 import { addressFromKey } from './toll-derive.js';
+import { HOUSE_LEGACY, HOUSE_SHOP } from './house-shop.js';
 
 export const SIGNER_ACCOUNT = 'v1.signer';
-export const HOUSE_CONTRACT = 'house.nearcarta.near';
+// Predecessor for a Toll signature is the successor shop, not the legacy account.
+// Toll must expose one function this contract can call. The predecessor is HOUSE_CONTRACT
+// (extras.house.shop). The path is `{token_id}-eth-1` or `{token_id}-btc-1`. domain_id is 0.
+// The argument is the effect { chain, to, asset, value, gas_limit }. It returns a receipt.
+// live stays false until Toll ships that function. The shop does not wait on it.
+export const HOUSE_CONTRACT = HOUSE_SHOP;
+export const HOUSE_LEGACY_CONTRACT = HOUSE_LEGACY;
 
 /** Args for one unsigned view. Predecessor is the house contract, not the current holder. */
 export function derivationRequest(tokenId, chain, predecessor = HOUSE_CONTRACT) {

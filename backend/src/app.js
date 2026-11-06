@@ -38,6 +38,7 @@ import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edge
 import { pastPrompts as arenaPrompts } from './arena.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
 import { derivedFor, lineFor } from './house-views.js';
+import { HOUSE_LEGACY, HOUSE_SHOP } from '../../shared/house/shop.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
@@ -48,11 +49,12 @@ async function houseView() {
   if (!H.oath) {
     return {
       kind: 'deed',
-      contract: H.contract || null,
+      contract: HOUSE_SHOP,
+      legacy: HOUSE_LEGACY,
       owner: H.owner || null,
       code_hash: H.code_hash || null,
       txs: H.txs || null,
-      note: 'The mainnet house record is the deed contract. A visitor charter is a board row, read with get_charter.',
+      note: 'The city shop is extras.house.shop. extras.house.legacy is the recorded shop. A visitor charter is a board row, read with get_charter.',
     };
   }
   const [snap, pending] = await Promise.all([guard.snapshot(H.oath), view(H.oath, 'get_pending')]);
