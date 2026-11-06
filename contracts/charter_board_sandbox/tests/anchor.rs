@@ -143,6 +143,9 @@ async fn a_session_key_anchors_one_statement_event_and_stores_nothing() -> anyho
     let mut pre = salt.as_bytes().to_vec();
     pre.extend(hex_to_bytes(&digest));
     assert_eq!(ev["commitment"], hex32(&near_sdk_sha256_bytes(&pre)), "commitment is sha256(salt || digest)");
+    // Pinned: backend/test/unit/chronicle-depth.test.js asserts the same literal for the tray,
+    // so the browser and the contract cannot drift on this value.
+    assert_eq!(ev["commitment"], "038b315d7cb111c589bc2fc9c18098a18960026d0d147dddf03e772157dbf75a");
     assert!(ev["nonce"].as_str().unwrap().parse::<u64>().is_ok());
     assert!(ev["time"].as_str().unwrap().parse::<u128>().is_ok());
 

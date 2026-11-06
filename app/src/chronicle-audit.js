@@ -66,6 +66,41 @@ function hexToBytes(hex) {
   return out;
 }
 
+/** sha256 of raw bytes, hex. Same helper family as sha256Hex, which takes a string. */
+function sha256BytesHex(bytes) {
+  const bitLen = bytes.length * 8;
+  const padded = new Uint8Array(((bytes.length + 9 + 63) >> 6) << 6);
+  padded.set(bytes);
+  padded[bytes.length] = 0x80;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, Math.floor(bitLen / 0x100000000));
+  view.setUint32(padded.length - 4, bitLen >>> 0);
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+  let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+  const w = new Uint32Array(64);
+  for (let i = 0; i < padded.length; i += 64) {
+    for (let t = 0; t < 16; t++) w[t] = view.getUint32(i + t * 4);
+    for (let t = 16; t < 64; t++) {
+      const s0 = rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >>> 3);
+      const s1 = rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10);
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) >>> 0;
+    }
+    let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+    for (let t = 0; t < 64; t++) {
+      const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + s1 + ch + K[t] + w[t]) >>> 0;
+      const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (s0 + maj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0;
+    h4 = (h4 + e) >>> 0; h5 = (h5 + f) >>> 0; h6 = (h6 + g) >>> 0; h7 = (h7 + h) >>> 0;
+  }
+  return [h0, h1, h2, h3, h4, h5, h6, h7].map(n => n.toString(16).padStart(8, '0')).join('');
+}
+
 export function canonicalManifest({ account = '', period = {}, rules = null, rows = [], statement = '', model = 'none', commitment = '' } = {}) {
   const body = {
     account: String(account || ''),
@@ -219,15 +254,13 @@ export const ANCHOR_SALT_LEN = 16;
 export function anchorPlan({ manifest, consent = false, privateNote = '', salt = '' } = {}) {
   const note = String(privateNote || '');
   const digest = String(manifest?.digest || '');
-  let commitment = '';
-  if (note) {
-    if (!consent) {
-      return { ok: false, signed: false, live: 'blocked', args: null, event: null, reason: 'Private note kept off the bundle. The raw hash was not published. Nothing was signed.' };
-    }
-    if (!salt) {
-      return { ok: false, signed: false, live: 'blocked', args: null, event: null, reason: 'The salt is missing, so the private note was not committed. Nothing was signed.' };
-    }
-    commitment = sha256Hex(`${salt}:${note}`);
+  // Consent is decided before anything else: a note without consent must never reach the
+  // board, whatever else about the request is wrong.
+  if (note && !consent) {
+    return { ok: false, signed: false, live: 'blocked', args: null, event: null, reason: 'Private note kept off the bundle. The raw hash was not published. Nothing was signed.' };
+  }
+  if (note && !salt) {
+    return { ok: false, signed: false, live: 'blocked', args: null, event: null, reason: 'The salt is missing, so the private note was not committed. Nothing was signed.' };
   }
   if (!/^[0-9a-f]{64}$/.test(digest)) {
     return { ok: false, signed: false, live: 'blocked', args: null, event: null, reason: 'Write the statement first. Nothing was signed.' };
@@ -238,13 +271,17 @@ export function anchorPlan({ manifest, consent = false, privateNote = '', salt =
   // No private note still commits with a generated salt: the board refuses a raw digest.
   const useSalt = salt || `${saltBytes()}`;
   const args = { kind: 'statement', digest, salt: useSalt };
+  // The contract computes sha256(salt_bytes || digest_bytes) and logs only that
+  // (contracts/charter_board/src/v2.rs `anchor`). The tray must use the same formula or
+  // the event it reads back would never match the commitment it is looking for.
+  const commitment = anchorCommitment(useSalt, digest);
   const localEvent = {
     standard: ANCHOR_STANDARD,
     version: ANCHOR_VERSION,
     event: ANCHOR_EVENT,
     owner: String(manifest?.body?.account || ''),
     kind: 'statement',
-    commitment: note ? commitment : sha256Hex(`${useSalt}:${digest}`),
+    commitment,
     digest,
   };
   return {
@@ -254,10 +291,25 @@ export function anchorPlan({ manifest, consent = false, privateNote = '', salt =
     method: 'anchor',
     args,
     salt: useSalt,
-    commitment: localEvent.commitment,
+    commitment,
+    noteCommitment: note ? sha256Hex(`${useSalt}:${note}`) : '',
     event: localEvent,
     reason: 'Ready to anchor. The board logs one event and stores nothing. The session key sends it from your own account.',
   };
+}
+
+/**
+ * What the board logs: sha256(salt_bytes || digest_bytes), hex.
+ * `digest` is the 64-char hex the manifest produced, decoded to 32 bytes first.
+ */
+export function anchorCommitment(salt, digestHex) {
+  const saltBytes = new TextEncoder().encode(String(salt || ''));
+  const raw = hexToBytes(digestHex);
+  if (!raw) return '';
+  const all = new Uint8Array(saltBytes.length + raw.length);
+  all.set(saltBytes, 0);
+  all.set(raw, saltBytes.length);
+  return sha256BytesHex(all);
 }
 
 /** The salt the board accepts. 16 hex chars, 8..=64 alphanumeric. */
