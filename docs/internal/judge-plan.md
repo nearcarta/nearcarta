@@ -67,3 +67,79 @@ Findings that cost points today:
 - Doc drift: `docs/MAINNET_BOARD.md` and the README board line describe the previous board wasm.
 - CI is red on #35 and #40 (`readme-numbers`).
 - Jargon on the standalone pages (row, charter, TEE, secp256k1) with no plain first line. Town Hall and Mist Bank score 3/10 for clear value to a first-time visitor.
+
+## 4. Critique of the current plan
+
+The plan is `shops-blueprint.md`, `shops/*-deep.md` and the depth summary.
+
+What it gets right: the board diagnosis; removing every 0.001 payment; Ferry as the reference; Toll as row-owned foreign addresses; Arena guardians whose pot pays their inference (a direct hit on Illia's AI Tamagotchi idea); House as the Open Innovation prompt; keeping Payouts.
+
+What is wrong or weak:
+
+1. Too much to build. Board v2, toll v7, arena v2, house v3, a new hall, a new guard and a new chronicle contract make 7 mainnet deploys. Each is unaudited, they ship in 8 days, and they are funded one after another from about 0.45 NEAR. One failed deploy stalls every shop behind it. This plan uses 5 deploys, no new account for Chronicle, and Town Hall in place.
+2. Board v2 is under-specified. There is no method signature and no test list. It does not say what happens when the args are not a JSON object, when `row_owner` is nested, or when a deposit is attached; whether the deposit counts against caps; or what happens to every visitor's existing session key. It also keeps the 8-pair CALLS cap. Ferry alone uses 3 pairs on `wrap.near`, so 8 pairs cannot cover Ferry, 1Click deposits and six shop methods.
+3. Board v2 still has no upgrade path, so the next fix means another reap and every visitor redoing setup.
+4. OutLayer is a single point of failure for the Guardhouse. The mainnet contract id is unverified, the cost is unmeasured and it is `enabled: false`. Here, Guardhouse enforces a NEAR AI TEE-signed verdict on chain with one shared verifier, and OutLayer is optional.
+5. The Town Hall swarm needs the Agent Market API, stakes, TEE review, a Guardhouse flag and USDC escrow. That is more than the window, and the API is unverified. This plan builds a narrow slice on the existing townhall account.
+6. Mist Bank bets the Privacy track on a partner JWT for Confidential Intents. This plan builds the Privacy prompt itself, a private auditor in a TEE, on what already works (`/api/ai/tee`). Confidential pay stays behind a flag.
+7. Chronicle spends about 1.5 NEAR of stake to store hashes. Here, a board v2 `anchor` emits an event and needs zero stake.
+8. Toll covers five chains plus USDC, a gas-fill keeper and a split. A keeper that refills gas needs a server key, which breaks the rule that the API holds no key. This plan covers Base only, native ETH first and USDC as a stretch, and the visitor fills their own Base address through Ferry.
+9. Arena sends a 20% fee to the city owner. That fails "who gets the money and why". Here, the guardian's creator earns and the city takes nothing.
+10. Toll and House each plan their own signing and relay. This plan builds one shared foreign-chain module.
+11. Rule conflict: `AGENTS.md` fixes a 0.20 USD checkout ceiling, and the owner's bar forbids fixed amounts. Here, the visitor's row cap is the real cap. The hosted ceiling becomes server config (env) documented as a demo safety rail, not a code constant.
+12. Missing from the plan: implementation-after scores, a design standard, an architecture for an agent that executes, a cut line and a funding source for new stake.
+13. The NEAR AI budget is one global cap ($0.05 a day, 300 calls). Mist Bank, Chronicle, Guardhouse, Arena and Town Hall will all call the TEE model. Add a per-visitor and per-shop share in `agent.js`, and raise the global cap only when there are credits.
+14. Old PRs: #36 changes `house_nft` with no `migrate` on an account with no key, so it can never land. #37 to #40 implement the 0.001 actions this plan removes.
+
+## 5. Shared foundations (build once, use everywhere)
+
+### 5.1 Board v2: decision YES, deployed once and first
+
+Without it, a shop cannot know which visitor called, so every shop collapses into a board transfer and per-visitor state (arena attempts, house deeds, guard holds, hall jobs, toll addresses) is impossible.
+
+Spec:
+- `propose_call_as(owner, receiver, method, args, deposit, nonce, expires, sig)`: verify exactly like `propose_call`. Require `args` to be a JSON object. Set top-level `args.row_owner = owner`, overwriting any value the agent sent. Count `deposit` against per-payment and daily caps. Emit an event.
+- Shops trust `row_owner` only when `predecessor == board.nearcarta.near`. Every shop method that takes `row_owner` asserts this.
+- Raise CALLS from 8 to 24 `(receiver, method)` pairs, deduplicated.
+- `tighten_rules(owner, caps, sig)`: the agent may lower caps, shorten expiry or freeze. It can never raise them. Raising still needs the wallet, by design.
+- `anchor(owner, kind, sha256, sig)`: event only, no storage. Used by Chronicle, Mist Bank and Guardhouse.
+- Owner-only `upgrade(code)` plus `migrate` (`#[init(ignore_state)]`) behind a short delay with an event. Visitors can `close_charter` at any time during the delay. This is the last time the board needs a reap.
+- Keep `force_close`, `close_charter` and `reap`.
+- Sandbox tests: impersonation (the agent passes another `row_owner`), non-object args, nested `row_owner`, deposit over cap, expired session, replayed nonce, 24 pairs, tighten cannot loosen, upgrade then migrate keeps rows, reap refunds every row.
+- Migration: announce it, `force_close` the live rows (each refunds its owner), `reap` (about +1.09 NEAR to `nearcarta.near`), recreate `board.nearcarta.near` under the same name so setup code and judge links keep working, then deploy v2. Visitors redo /setup once, and the setup approval deletes their stale board key in the same tx.
+- Build with rustc 1.86 and near-sdk 5.27 (a 5.30 build failed to link).
+- Cost: net about 0.05 to 0.1 NEAR plus gas.
+- Docs: https://docs.near.org/protocol/accounts-contracts/access-keys and https://docs.near.org/smart-contracts/release/upgrade#migrating-the-state
+
+### 5.2 A shop agent that executes
+
+- The backend calls a NEAR AI Cloud TEE model with the shop's tool list (JSON schema). It returns one tool call or one question.
+- Validation stays as today: the amount and payee must appear in the visitor's words, and the amount must fit the live row caps. Otherwise the agent asks.
+- The browser runs the same function the gold CTA runs, signed by the session key. The server never signs.
+- The status line and the cinema play only on a SUCCESS receipt. A refusal shows the refusal tx.
+- Every tool also works without the model through a keyword fallback.
+- Publish the tools in `skills/nearcarta/SKILL.md` so outside agents can drive the shops (Stepan: "if an agent can't use it, don't ship it").
+
+### 5.3 TEE verdict verifier (one Rust module, used by Guardhouse, Arena and Town Hall)
+
+- NEAR AI Cloud signs each response with a key bound to its TEE attestation (https://docs.near.ai/cloud/verification, https://github.com/nearai/nearai-cloud-verifier).
+- The contract stores a `signer_address` per model. The owner sets it with the attestation report sha256, emitted as an event.
+- A verdict is accepted only when `ecrecover(sig, hash(signed text)) == signer_address`. The verdict field is then parsed from that text. Anyone can submit a verdict, so no server key is needed.
+- Day-one spike: confirm the exact signed message format and that `env::ecrecover` reproduces it. Go or no-go by Nov 8.
+- Fallback A: OutLayer `request_execution` with yield/resume (https://app.outlayer.ai/docs/getting-started), only if its mainnet id is confirmed. Fallback B: today's off-chain verdict plus the board refusal, labelled exactly that in the README.
+- This is Illia's "turn judgement into code via verifiable AI" and winners pattern P2.
+
+### 5.4 Foreign-chain module (used by Toll and House)
+
+- Derive an address from `v1.signer` with a per-row or per-deed path, build an EIP-1559 tx, request the signature, and return `raw_signed`.
+- `POST /api/toll/relay` broadcasts a raw signed tx and holds no key.
+- Base first. Bitcoin is address and signature only, labelled as such.
+- Docs: https://docs.near.org/chain-abstraction/chain-signatures, https://docs.near.org/chain-abstraction/chain-signatures/implementation, https://github.com/near-examples/near-multichain
+
+### 5.5 Rules for every redeploy
+
+- Owner-only `upgrade` plus `migrate`.
+- `close()` or `reap` returns everything to `nearcarta.near`, and refuses while visitor funds are held.
+- No full-access key is left on any shop account.
+- Sandbox tests include teardown.
+- Close first, check the balance, then create. Never two creates in flight.
