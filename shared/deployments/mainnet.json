@@ -20,14 +20,14 @@
     "crate": "contracts/charter_board",
     "wasm": "contracts/artifacts/charter_board.wasm",
     "max_row_yocto": "20000000000000000000000",
-    "note": "Live (redeployed 2026-11-05). One contract, one row per visitor, no access key. close_charter / force_close refund visitor; reap (owner, 1 yocto, rows=0) deletes account. propose_call + CALLS allowlist on this wasm. See docs/MAINNET_BOARD.md.",
-    "code_hash": "Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C",
-    "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
+    "note": "Board v2 live (PR #52): propose_call_as, holds/effects, staged upgrade. One row per visitor, no access key. Old board force_closed (visitor refunded) and reaped to nearcarta.near, then recreated. See docs/MAINNET_BOARD.md.",
+    "code_hash": "BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g",
+    "wasm_sha256": "982bf6b6666e626d6af267c8a780cf5bb93cd73b2864a68b0c02dca4d07af9a1",
     "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --no-abi (wasm-opt -O); source includes PR#22 propose_call + force_close (5126bdb lineage)",
-    "storage_bytes": 109130,
-    "locked_near": 1.0913,
+    "storage_bytes": 132083,
+    "locked_near": 1.32325,
     "full_access_keys": 0,
-    "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4",
+    "deploy_tx": "8dSvGGoW23wAVVEBVL2CEDBHXBJvoVKbN9nPxKJrAgPj",
     "failed_deploy_tx": "4mq8P3jugnatzbbc9VzDbufCBpyj27TxwK4w3L7nTPCX",
     "proof": {
       "visitor": "nearcarta.near",
@@ -43,7 +43,10 @@
       "deploy": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4",
       "reap_prior": "3H6ZypLBdvFfSqtr5wjDPEN462p12Y43FopXcdQUgD2A",
       "smoke_open_charter": "AmYExaBSM5rC3q68AV8ESL1teEJcDMxcRb3rNdhNCDZB",
-      "smoke_close_charter": "H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf"
+      "smoke_close_charter": "H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf",
+      "v2_force_close_visitor": "DVRqkE2NaMLXYJY84EBKdcg4VbUzbL27iC2r5k53GeHZ",
+      "v2_reap_old_board": "HmYjkCTFuvLYjso6TnEpvbgVB99DBZnhu5PHTC1HLGU5",
+      "v2_recreate": "8dSvGGoW23wAVVEBVL2CEDBHXBJvoVKbN9nPxKJrAgPj"
     },
     "visitor_run": {
       "note": "A real visitor, start to finish, in the browser at nearcarta.vercel.app/setup: email sign-in made this implicit account, nearcarta.near funded it, the visitor opened a row and the agent's request inside the cap was paid; the one over the cap was refused by the contract.",
@@ -95,6 +98,11 @@
       "refused_over_per_action_cap": "CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF",
       "refused_receiver_not_allowlisted": "E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ",
       "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
+    },
+    "previous": {
+      "code_hash": "Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C",
+      "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
+      "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4"
     }
   },
   "mpc": "v1.signer",
@@ -269,5 +277,17 @@
     "verifier_mainnet": "intents.near",
     "quote_signer": "ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc",
     "note": "1Click quotes are dry:true (no deposit address, nothing spent)."
+  },
+  "retired": {
+    "charter.nearcarta.near": {
+      "status": "deleted",
+      "txs": {
+        "queue_upgrade": "7fZXtTFZ9A7Du6VKc42H9FobQkFgiD9oM6CXRWm4sqjG",
+        "execute_change": "AjCL1UFt7EfiCMa3FYDw7Bdn8m7Dg3QxftBcLupMzg7i",
+        "upgrade_reaper": "5hKgDDKKjWqGVnihtkGb5vybEPJj8i4sBnsY7TypBjff",
+        "reap": "9fULF7hdKU5mJ6H6T7hfqfCJXZCu9qRVxbGQFYmns2N4"
+      },
+      "recovered_to": "nearcarta.near"
+    }
   }
 }

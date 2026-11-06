@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import nacl from 'tweetnacl';
 import { parseBankAgent, BANK_HINT } from '../../../app/src/panels/bank-agent.js';
-import { SAMPLES, parseStatementCsv, auditStatement, tightenDecision, commitmentText, proofLogEntry, modelEligibility, biggestWaste, wasteSentence, plural, attestFields, statementFindings, agentReply, capFromSetup, verifyBrowserSignature } from '../../../app/src/panels/bank-audit.js';
+import { SAMPLES, parseStatementCsv, auditStatement, tightenDecision, commitmentText, proofLogEntry, modelEligibility, biggestWaste, wasteSentence, plural, attestFields, statementFindings, agentReply, capFromSetup, verifyBrowserSignature, rowsInMessage, messageAuditReply, preferModelSentence, attestForNonce, browserSignatureLine, CHECK_SPLIT } from '../../../app/src/panels/bank-audit.js';
 import { nearRate, _clearRateCache } from '../../../backend/src/bank-rate.js';
 import { runModelAudit } from '../../../backend/src/bank-model.js';
 import { sealText, revealArgs } from '../../../shared/board/bank-seal.js';
@@ -55,6 +55,105 @@ test('an audit line picks the sample and a miss shows the hint', () => {
   assert.match(loose.hint, /Nothing was signed/);
   assert.match(parseBankAgent('Reset spent').hint, /Nothing was signed/);
   assert.match(parseBankAgent('Unfreeze the row').hint, /Nothing was signed/);
+});
+
+test('a message that names rows is audited on those rows', () => {
+  const phrasings = [
+    'Check my spending: Spotify 9.99 twice on Oct 3 and Amazon 40',
+    'spotify $9.99 twice on october 3 and amazon 40',
+    'Please audit Spotify 9.99 2 times on Oct 3, and Amazon for 40',
+  ];
+  for (const line of phrasings) {
+    const parsed = parseBankAgent(line, { hasStatement: true, review: { lines: 5 } });
+    assert.equal(parsed.ok, true, line);
+    assert.equal(parsed.source, 'message', line);
+    assert.equal(parsed.rows.length, 3, line);
+    const names = parsed.rows.map(r => r.payee.toLowerCase());
+    assert.deepEqual(names, ['spotify', 'spotify', 'amazon'], line);
+    const reply = messageAuditReply(parsed.rows);
+    assert.match(reply, /Spotify|spotify/i, line);
+    assert.match(reply, /9\.99/, line);
+    assert.match(reply, /twice/, line);
+    assert.match(reply, /October 3/, line);
+    assert.match(reply, /double charge/, line);
+    assert.match(reply, /Amazon|amazon/i, line);
+    assert.match(reply, /single charge/, line);
+    assert.doesNotMatch(reply, /Starbucks|Netflix/);
+  }
+
+  const dated = parseBankAgent('Netflix 15.99 on 2026-10-03 and Netflix 15.99 on 2026-10-12', { hasStatement: true });
+  assert.equal(dated.source, 'message');
+  assert.equal(dated.rows.length, 2);
+  assert.match(messageAuditReply(dated.rows), /twice in October/);
+
+  const sameDay = parseBankAgent('Starbucks $6.45 on October 2 and Starbucks $6.45 on October 2');
+  assert.equal(sameDay.rows.length, 2);
+  assert.match(messageAuditReply(sameDay.rows), /double charge/);
+  assert.match(messageAuditReply(sameDay.rows), /October 2/);
+
+  const one = parseBankAgent('Please look at Uber 12.30 on 10/8');
+  assert.equal(one.source, 'message');
+  assert.equal(one.rows.length, 1);
+  assert.match(messageAuditReply(one.rows), /Uber, 12\.30 as written\. It is a single charge/);
+
+  const loaded = parseBankAgent('which charges look like waste in my list?', { hasStatement: true });
+  assert.equal(loaded.source, 'loaded');
+  assert.equal(loaded.rows, undefined);
+  assert.equal(rowsInMessage('which charges look like waste in my list?').length, 0);
+  assert.equal(parseBankAgent('Audit the cafe sample').source, 'sample');
+
+  const fallback = preferModelSentence('Starbucks was charged twice.', one.rows, 'Uber, 12.30 as written. It is a single charge.');
+  assert.equal(fallback.source, 'parser');
+  assert.match(fallback.text, /Uber/);
+  const kept = preferModelSentence('Spotify appears twice and Amazon is a single charge.', phrasings.map(() => null) && parseBankAgent(phrasings[0]).rows, 'parser sentence');
+  assert.equal(kept.source, 'model');
+  assert.match(kept.text, /Spotify/);
+  assert.match(kept.text, /Amazon/);
+  const vague = preferModelSentence('Spotify and Amazon are in the note.', parseBankAgent(phrasings[0]).rows, 'parser sentence');
+  assert.equal(vague.source, 'parser');
+
+  const stale = attestForNonce({ nonce: 'bb'.repeat(32), checkedNonce: 'aa'.repeat(32), label: 'attested', live: 'Live check passed.', fields: [{ id: 'nonce' }] });
+  assert.equal(stale.checked, false);
+  assert.equal(stale.live, 'Not checked yet.');
+  assert.equal(stale.label, '');
+  assert.equal(stale.fields.length, 0);
+  const same = attestForNonce({ nonce: 'aa'.repeat(32), checkedNonce: 'aa'.repeat(32), label: 'attested', live: 'Live check passed.', fields: [{ id: 'model' }] });
+  assert.equal(same.checked, true);
+  assert.equal(same.live, 'Live check passed.');
+  assert.equal(same.fields.length, 1);
+  const asking = attestForNonce({ nonce: 'cc'.repeat(32), checkedNonce: '', pending: true, label: 'attested', live: 'Live check passed.' });
+  assert.equal(asking.live, 'Asking NEAR AI');
+  assert.equal(asking.label, '');
+
+  assert.equal(browserSignatureLine(true), 'ed25519 signature checked in your browser: valid');
+  assert.match(browserSignatureLine(false), /not valid/);
+  assert.match(CHECK_SPLIT, /Checked in this browser/);
+  assert.match(CHECK_SPLIT, /Checked on the server/);
+  const tray = read('app/src/panels/bank-tray.js');
+  assert.match(tray, /browserSignatureLine\(true\)/);
+  assert.match(tray, /data-testid="tee-copy-signer"/);
+  assert.match(tray, /data-testid="tee-signer"/);
+  assert.match(tray, /CHECK_SPLIT/);
+  assert.match(tray, /attestForNonce/);
+  assert.match(tray, /source === 'message'/);
+  assert.doesNotMatch(tray, /f\.id === 'nonce' \|\| f\.id === 'signer'/);
+  assert.doesNotMatch(tray, /provider_tee/);
+  const css = read('app/src/panels/bank.css');
+  assert.match(css, /\.bank-scroll\{/);
+  assert.match(css, /height:min\(640px,calc\(100dvh - 120px\)\)/);
+  assert.match(css, /\.bank-foot\{/);
+  assert.doesNotMatch(css, /height:fit-content/);
+  const fields = attestFields(
+    { ok: true, model: 'z-ai/glm-5.3-flash', nonce: 'ab'.repeat(32), models: [{ ok: true, signing_address: 'cd'.repeat(32), checks: { signerBound: true, quote: true, nonceBound: true }, tcbStatus: 'UpToDate', gpu: { ok: true, gpus: 1 } }], gateway: { checks: { quote: true, nonceBound: true }, tcbStatus: 'UpToDate' } },
+    { ok: true, kind: 'provider_tee' },
+  );
+  const signature = fields.find(f => f.id === 'signature');
+  assert.equal(signature.where, 'browser');
+  assert.equal(signature.value, 'valid');
+  assert.notEqual(signature.value, 'provider_tee');
+  const signer = fields.find(f => f.id === 'signer');
+  assert.equal(signer.value, 'cd'.repeat(32));
+  assert.equal(signer.where, 'server');
 });
 
 test('a local audit drops the statement and a looser cap is refused', () => {
