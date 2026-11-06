@@ -74,14 +74,23 @@ export async function check(account, { charter = null, row = null, now = Date.no
     s.actions_scanned = 0;
     s.board_row = true;
   } else if (charter) {
-    const [clauses, st] = await Promise.all([view(charter, 'get_clauses'), view(charter, 'get_state')]);
+    let clauses, st;
+    try {
+      [clauses, st] = await Promise.all([view(charter, 'get_clauses'), view(charter, 'get_state')]);
+    } catch (e) {
+      // The charter did not answer (retired, deleted, or an RPC miss). The check still runs on the
+      // deny list and the account itself, and it says it could not read an allowlist. Never a 500.
+      s.charter_unread = String(e?.message || 'the charter did not answer').slice(0, 160);
+    }
     const allowed = [...new Set(Object.values(clauses || {}).flatMap(c => c.receivers || []))];
     s.allowlisted = allowed.includes(account);
     s.lookalike_of = lookalikeOf(account, allowed);
-    const hi = Number(st.next_action || 0), lo = Math.max(Number(st.prune_cursor || 0), hi - 25);
-    const recs = await Promise.all(Array.from({ length: hi - lo }, (_, i) => view(charter, 'get_action', { action_id: String(lo + i) }).catch(() => null)));
-    s.prior_payments = recs.filter(a => a && a.receiver === account && a.status === 'confirmed').length;
-    s.actions_scanned = recs.length;
+    if (st) {
+      const hi = Number(st.next_action || 0), lo = Math.max(Number(st.prune_cursor || 0), hi - 25);
+      const recs = await Promise.all(Array.from({ length: hi - lo }, (_, i) => view(charter, 'get_action', { action_id: String(lo + i) }).catch(() => null)));
+      s.prior_payments = recs.filter(a => a && a.receiver === account && a.status === 'confirmed').length;
+      s.actions_scanned = recs.length;
+    }
   }
   if (s.exists) {
     try {

@@ -438,8 +438,11 @@ export function makeApp() {
   // ?charter= must be a Nearcarta charter: a known contract, a factory charter, or a row opened on the board.
   // A board row's owner account is the charter. It has no get_clauses of its own.
   const cpCache = new Map();
+  // A retired or deleted contract is not a charter: mainnet.json records why and where the money went.
+  const retiredAccount = (id) => !!(MAINNET_DEP?.retired && Object.prototype.hasOwnProperty.call(MAINNET_DEP.retired, id));
   async function nearcartaCharter(charter) {
     if (!ACCT.test(charter)) return null;
+    if (retiredAccount(charter)) return null;
     if (knownAccounts.has(charter)) return { kind: 'known' };
     if (await vault.isFactoryCharter(charter)) return { kind: 'factory' };
     const board = MAINNET_DEP?.board?.contract;
@@ -452,12 +455,22 @@ export function makeApp() {
   }
   app.get('/api/guardhouse/check/:account', limiter(12), async c => {
     const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
-    const charter = c.req.query('charter') || MAINNET_DEP?.charter?.contract || DEP.guardhouse?.oath;
-    const found = await nearcartaCharter(charter);
-    if (!found) return bad(c, 'charter must be a Nearcarta charter');
-    const k = a + '|' + charter, hit = cpCache.get(k);
+    // No default charter: the retired charter.nearcarta.near is not used to judge a payment.
+    // Without ?charter= or a visitor board row, the check still runs (deny list, account shape, age)
+    // and says plainly that no allowlist was read, instead of 500 on a stale contract.
+    const asked = String(c.req.query('charter') || '').trim();
+    let found = null, why = '';
+    if (asked) {
+      found = await nearcartaCharter(asked);
+      why = found ? '' : 'that charter is not a Nearcarta charter, so no allowlist was read';
+    } else {
+      why = 'no charter was named, so no allowlist was read';
+    }
+    const charter = found ? asked : null;
+    const k = `${a}|${charter || '-'}`, hit = cpCache.get(k);
     if (hit && Date.now() - hit.at < 20_000) return c.json(hit.v);
-    const v = await cp.check(a, { charter, row: found.row || null });
+    const v = await cp.check(a, { charter, row: found?.row || null });
+    if (why) v.no_allowlist = why;
     cpCache.set(k, { at: Date.now(), v }); if (cpCache.size > 500) cpCache.delete(cpCache.keys().next().value);
     return c.json(v);
   });

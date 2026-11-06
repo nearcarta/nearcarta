@@ -253,6 +253,20 @@ test('the row call list carries the USDC storage pair when the row has room', ()
   assert.match(tray, /payouts\/sponsor/);
 });
 
+test('guardhouse: no retired charter default and no 500 on an unreadable one', async () => {
+  const { makeApp } = await import('../../src/app.js');
+  const app = makeApp();
+  const res = await app.request('/api/guardhouse/check/cafe.near');
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.charter, null, 'no retired charter is used as the judge');
+  assert.match(body.no_allowlist || '', /no charter was named|not a Nearcarta charter/);
+  // Naming the retired contract is refused as a charter, not turned into a 500.
+  const old = await app.request('/api/guardhouse/check/cafe.near?charter=charter.nearcarta.near');
+  assert.equal(old.status, 200);
+  assert.equal((await old.json()).charter, null);
+});
+
 test('source: the tray starts content under the tabs, at the approved Ferry spacing', () => {
   const css = readFileSync(new URL('../../../app/shops/payouts/payouts.css', import.meta.url), 'utf8');
   // The tab bar and the pane are 10px apart, and the pane's first child has no extra top margin.
