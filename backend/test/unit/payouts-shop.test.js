@@ -120,6 +120,11 @@ test('plan: invoice status words only call SUCCESS delivered', () => {
   assert.equal(invoiceDelivered('REFUNDED'), false);
   assert.match(invoiceStatusLine('FAILED'), /failed/);
   assert.doesNotMatch(invoiceStatusLine('PENDING_DEPOSIT'), /Paid/);
+  assert.equal(invoiceStatusLine('PENDING_DEPOSIT'), 'Waiting for your deposit.');
+  assert.equal(invoiceStatusLine('KNOWN_DEPOSIT_TX'), 'The deposit was seen. Not paid yet.');
+  assert.equal(invoiceStatusLine('PROCESSING'), 'The deposit was seen. Not paid yet.');
+  assert.doesNotMatch(invoiceStatusLine('SUCCESS'), /SUCCESS/);
+  assert.doesNotMatch(invoiceStatusLine('REFUNDED'), /REFUNDED/);
 });
 
 test('plan: registration names registered, who pays, or unknown', () => {
@@ -340,10 +345,14 @@ test('source: ANY_INPUT is not requested, and the payer page has one checkout bu
   assert.doesNotMatch(page, /\bPAID\b/);
   const payJs = readFileSync(new URL('../../../app/src/panels/pay-invoice.js', import.meta.url), 'utf8');
   assert.match(payJs, /payload\.indicative = true/);
+  assert.match(payJs, /invoiceStatusLine/);
+  assert.doesNotMatch(payJs, /status !== 'UNPAID' \? status/);
   assert.doesNotMatch(payJs, /Add a refund address to see/);
   const css = readFileSync(new URL('../../../app/shops/payouts/payouts.css', import.meta.url), 'utf8');
   assert.match(css, /top:96px/);
   assert.match(css, /max-height:none/);
+  assert.match(css, /height:80px/);
+  assert.match(css, /align-content:start/);
 });
 
 test('plan: due and expiry are counted from today', () => {
@@ -366,6 +375,9 @@ test('plan: free text fills the payee, the amount, the memo and the due date', (
     [`charge ${hex} 2 USDC for the audit`, { usd: 2, receive: hex, memo: 'the audit', due: '' }],
     ['invoice 1 USDC to dana.near due 2026-12-01 memo website', { usd: 1, receive: 'dana.near', memo: 'website', due: '2026-12-01' }],
     ['bill alice.near $0.4 due tomorrow for the poster', { usd: 0.4, receive: 'alice.near', memo: 'the poster', due: '2026-11-07' }],
+    ['Create an invoice for 0.2 USDC to bob.near for design work', { usd: 0.2, receive: 'bob.near', memo: 'design work', due: '' }],
+    ['bill bob.near 0.2 USDC', { usd: 0.2, receive: 'bob.near', memo: '', due: '' }],
+    ['invoice alice.near 0.4 USDC memo the April article', { usd: 0.4, receive: 'alice.near', memo: 'the April article', due: '' }],
   ];
   assert.ok(phrases.length >= 6);
   for (const [text, want] of phrases) {
@@ -383,9 +395,15 @@ test('plan: free text fills the payee, the amount, the memo and the due date', (
     { usd: 0.3, receive: 'alice.near', memo: 'the April article', due: '2026-11-13', href: '/pay/inv_abc' },
     'https://nearcarta.vercel.app',
   );
-  assert.match(reply, /Made a 0\.3 USDC invoice to alice\.near for the April article, due 2026-11-13/);
-  assert.match(reply, /Here is the link\. https:\/\/nearcarta\.vercel\.app\/pay\/inv_abc/);
-  assert.match(reply, /signs nothing/);
+  assert.match(reply, /^Made a 0\.3 USDC invoice to alice\.near for the April article, due 2026-11-13\. Here is the link\. https:\/\/nearcarta\.vercel\.app\/pay\/inv_abc$/);
+  assert.equal(reply.split('0.3 USDC').length, 2);
+  const noisy = agentInvoiceReply(
+    { usd: 0.2, receive: 'bob.near', memo: 'design work', due: '2026-11-13', href: '/pay/inv_bob' },
+    'https://nearcarta.vercel.app',
+  );
+  assert.match(noisy, /^Made a 0\.2 USDC invoice to bob\.near for design work, due 2026-11-13\. Here is the link\. /);
+  assert.doesNotMatch(noisy, /for 0\.2 USDC/);
+  assert.doesNotMatch(noisy, /signs nothing/);
 });
 
 test('plan: a model that invents a payee or raises the amount is kept to the words', () => {
@@ -400,6 +418,11 @@ test('plan: a model that invents a payee or raises the amount is kept to the wor
   const kept = acceptModelIntent(text, { kind: 'invoice', usd: 0.3, receive: 'alice.near', memo: 'the April article' }, fallback);
   assert.equal(kept.source, 'model');
   assert.equal(kept.usd, 0.3);
+  const long = 'Create an invoice for 0.2 USDC to bob.near for design work';
+  const copied = acceptModelIntent(long, { kind: 'invoice', usd: 0.2, receive: 'bob.near', memo: '0.2 USDC to bob.near for design work' }, agentCommand(long));
+  assert.equal(copied.memo, 'design work');
+  assert.equal(copied.receive, 'bob.near');
+  assert.equal(agentCommand('bill bob.near 0.2 USDC').memo, '');
   const bare = acceptModelIntent('bill alice.near for the April article', { kind: 'invoice', usd: 0.3, receive: 'alice.near' }, agentCommand('bill alice.near for the April article'));
   assert.equal(bare.ok, false);
 });
