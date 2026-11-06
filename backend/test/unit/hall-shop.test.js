@@ -9,7 +9,7 @@ import {
   acceptPart, conserved, createLedger, postJob, quotePart, refundJob, reviewPart,
 } from '../../../shared/hall/job.js';
 import {
-  assignmentRows, bountyRows, marketStatus, readBounties,
+  assignmentRows, bountyRows, marketStatus, marketWorkers, readBounties,
 } from '../../src/hall-market.js';
 import { armHallDock, dispatchHallDock, installHallDock, lastHallDockSend } from '../../../app/src/panels/hall-dock.js';
 import { runHallCommand } from '../../../app/src/panels/hall-actions.js';
@@ -75,13 +75,19 @@ test('a job conserves escrow, counters once, and does not pay on a swapped or bl
   assert.equal(second.reason, 'counter_once');
   const awarded = acceptPart(ledger, { jobId: posted.job.id, partId: 1, nowMs: 1_000 });
   assert.equal(awarded.job.parts[0].settlement, 'awarded');
+  // A review before delivery is refused: the chain binds the decision to the record.
+  const early = reviewPart(ledger, { jobId: posted.job.id, partId: 1, deliverable: 'a paragraph', verdict: 'pass', nowMs: 1_000 });
+  assert.equal(early.reason, 'deliver');
+  const D = 'a'.repeat(64);
+  awarded.job.parts[0].phase = 'delivered';
+  awarded.job.parts[0].deliverable = D;
   const swapped = reviewPart(ledger, {
     jobId: posted.job.id, partId: 1, worker: 'worker-b.near', priceY: awarded.job.parts[0].awarded.priceY,
-    deliverable: 'a paragraph', verdict: 'pass', nowMs: 1_000,
+    deliverable: D, verdict: 'pass', nowMs: 1_000,
   });
   assert.equal(swapped.reason, 'swapped');
   const blocked = reviewPart(ledger, {
-    jobId: posted.job.id, partId: 1, deliverable: 'a paragraph', verdict: 'pass', guard: 'BLOCK', nowMs: 1_000,
+    jobId: posted.job.id, partId: 1, deliverable: D, verdict: 'pass', guard: 'BLOCK', nowMs: 1_000,
   });
   assert.equal(blocked.reason, 'guard_block');
   assert.equal(posted.job.paidY, '0');
@@ -89,13 +95,15 @@ test('a job conserves escrow, counters once, and does not pay on a swapped or bl
   const low = posted.job.parts[1];
   low.awarded = { worker: 'worker-b.near', priceY: low.quoteY };
   low.settlement = 'awarded';
+  low.phase = 'delivered';
+  low.deliverable = 'b'.repeat(64);
   const failed = reviewPart(ledger, {
     jobId: posted.job.id, partId: 2, deliverable: 'empty', verdict: 'ai_fail', nowMs: 1_000,
   });
   assert.equal(failed.job.parts[1].stake, 'not seized');
   assert.match(failed.hint, /does not seize/);
   const passed = reviewPart(ledger, {
-    jobId: posted.job.id, partId: 1, deliverable: 'a paragraph', verdict: 'pass', nowMs: 1_000,
+    jobId: posted.job.id, partId: 1, deliverable: D, verdict: 'pass', nowMs: 1_000,
   });
   assert.equal(passed.job.parts[0].settlement, 'held');
   assert.equal(passed.job.parts[0].chain.tx, null);
@@ -173,32 +181,61 @@ test('GET /api/hall/market reports a missing token and does not echo one', async
   if (!process.env.AGENT_API_TOKEN) assert.equal(body.blocked, 'no_token');
 });
 
-test('the gold button and the dock share a runner that does not sign', async () => {
+test('the gold button and the dock share one runner, and a move goes through one sender', async () => {
   const ledger = createLedger();
   let posted = null;
-  const pays = [];
+  const sent = [];
   const ctx = {
     ledger,
+    shop: 'townhall.nearcarta.near',
     job: () => posted,
     form: () => ({
       task: 'a readme pass', budget: '0.002', deadline: '24', parts: '2',
       workerA: 'worker-a.near', workerB: 'worker-b.near', deliverable: 'a paragraph', guard: 'ALLOW',
     }),
-    pay: async () => { pays.push('pay'); return { decision: 'allowed', tx: 'abc' }; },
+    // One sender for both paths, exactly as the tray arms it.
+    sendJob: async (step) => {
+      sent.push(step);
+      if (step.method === 'post_job') return { tx: 'TXPOST', decision: 'allowed', signer: 'agent' };
+      if (step.method === 'review' && step.pass) return { tx: 'TXREV', decision: 'denied', reason: 'ERR_GUARD_BLOCK', signer: 'agent' };
+      return { tx: 'TX' + step.method.toUpperCase(), decision: 'allowed', signer: 'agent' };
+    },
     nowMs: 1_000,
   };
   const bid = await runHallCommand('post a readme pass for 0.002 near', ctx);
   posted = bid.job;
   assert.equal(bid.ok, true);
-  assert.equal(bid.cinema, false);
-  assert.equal(bid.tx, null);
-  assert.equal(pays.length, 0);
+  assert.equal(bid.tx, 'TXPOST');
+  assert.equal(sent[0].method, 'post_job');
+  assert.equal(sent[0].deposit, posted.budgetY);
+  assert.equal(sent[0].receiver, 'townhall.nearcarta.near');
+
   const quoted = await runHallCommand('quote part 1 from worker-a.near at 0.01', ctx);
   assert.match(quoted.hint, /Counter once/);
+  assert.equal(sent[1].method, 'counter', 'a bid over the slice is the single counter');
+
+  const accepted = await runHallCommand('accept part 1', ctx);
+  assert.equal(accepted.tx, 'TXACCEPT');
+  assert.equal(sent[2].method, 'accept');
+
+  const delivered = await runHallCommand('deliver part 1 ' + 'a'.repeat(64), ctx);
+  assert.equal(delivered.tx, 'TXDELIVER');
+  assert.equal(sent[3].method, 'deliver');
+  assert.equal(sent[3].deliverable, 'a'.repeat(64));
+
+  // A pass is refused by the chain when the guard has not cleared the part, and the
+  // tray reports that refusal instead of claiming a release.
+  const passed = await runHallCommand('pass part 1', ctx);
+  assert.equal(passed.ok, false);
+  assert.equal(passed.tx, 'TXREV');
+  assert.match(passed.hint, /ERR_GUARD_BLOCK/);
+  assert.match(passed.hint, /Nothing was released/);
+
+  // An invented hire still never reaches the sender.
+  const before = sent.length;
   const hired = await runHallCommand('hire an agent for a lamp check 0.001 near', ctx);
   assert.equal(hired.ok, false);
-  assert.match(hired.hint, /townhall\.nearcarta\.near/);
-  assert.equal(pays.length, 0);
+  assert.equal(sent.length, before);
 });
 
 function fakeDock() {
@@ -283,4 +320,41 @@ test('the city wires the hall dock and the all-shops link still enters the room'
   assert.match(noteMarkup('Listing is blocked'), /data-testid="hall-note"/);
   assert.equal(noteMarkup(''), '');
   assert.doesNotMatch(read('app/src/panels/hall-ui.js'), new RegExp(['sp' + 'utnik', 'social' + ' money'].join('|'), 'i'));
+});
+
+test('public worker discovery needs no credential, and the buyer view names the one it needs', async () => {
+  // A real GET /v1/agents row, shaped as the live API returns it.
+  const live = { agents: [
+    { agent_id: '30ba50df-5509-452f-b936-8211e516979f', handle: 'web-research', name: 'Web Research', description: 'Cited briefs' },
+    { agent_id: null, handle: null, name: 'no handle' },
+  ] };
+  const seen = [];
+  const workers = await marketWorkers({
+    fetchImpl: async (url) => { seen.push(url); return { status: 200, async text() { return JSON.stringify(live); } }; },
+  });
+  assert.equal(seen.length, 1);
+  assert.match(seen[0], /\/v1\/agents\?limit=24$/);
+  assert.equal(workers.workers.length, 1);
+  assert.equal(workers.workers[0].handle, 'web-research');
+  assert.equal(workers.status, 200);
+
+  // No token: the shop states the exact credential and makes no authenticated call.
+  let calls = 0;
+  const blocked = await marketStatus({ token: null, fetchImpl: async () => { calls += 1; throw new Error('no call'); } });
+  assert.equal(calls, 0);
+  assert.equal(blocked.blocked, 'no_token');
+  assert.match(blocked.credential, /AGENT_API_TOKEN/);
+  assert.match(blocked.credential, /v1\/jobs\/board/);
+  assert.equal(blocked.sent, false);
+
+  // A worker token that lands on the buyer endpoint is reported as such, not as a hire.
+  const rejected = await marketStatus({
+    token: 'worker-token',
+    fetchImpl: async (url) => (String(url).includes('/assignments')
+      ? { status: 403, async text() { return '{"error":"forbidden"}'; } }
+      : { status: 200, async text() { return '{}'; } }),
+  });
+  assert.equal(rejected.blocked, 'bad_token');
+  assert.match(rejected.credential, /worker token cannot read a buyer job/);
+  assert.equal(rejected.sent, false);
 });

@@ -1023,6 +1023,8 @@ const APPS = {
         onPaid: (res) => { sh?.hideSeal?.(); if (sh?.act && runScene) runScene(sh.act({ paid: true, tx: res.tx })); },
         onRefuse: (text) => { if (sh?.act && runScene) runScene(sh.act({ refused: true, reason: text || '' })); else sh?.showSeal?.(text); },
         onClear: () => sh?.hideSeal?.(),
+        // The gold CTA and the AI dock share this sender, so both sign the same call.
+        sendJob: (step) => A.hallJob({ ...step, expiry: null, signature: null }),
       };
       mountShop('hall', document.getElementById('t-form'), hooks);
       wireHallDock(hooks);
