@@ -7,8 +7,10 @@ import { agentCargoPlan, parseAgentFerry, receiveConfirm } from '../../../app/sr
 import { ferryMarkup } from '../../../app/src/panels/deep.js';
 import { runFerryAgent } from '../../../app/src/panels/deep.js';
 import {
-  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, destExplorer, explainQuoteMiss, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, quoteRecipient, SESSION_SWAP, validateDestAddress, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto,
+  agentDeliveredNote, boardCallText, cityCheckoutBody, depositPlan, destExplorer, explainQuoteMiss, mayCheckout, nearAmount, nextFerryBeat, pickWrapSpend, PROPOSE_CALL_BYTES, proposeCallPrepaidYocto, proposeCallTgas, quoteRecipient, SESSION_SWAP, stepsAllowanceYocto, validateDestAddress, WRAP, WRAP_STORAGE_YOCTO, wrapDepositYocto, wrapProgressNote,
 } from '../../../app/src/panels/ferry-settle.js';
+import { functionCallAllowanceCost } from '../../../shared/board/cost.js';
+import { GAS_TOPUP_YOCTO } from '../../../shared/board/session.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock, lastFerryDockSend } from '../../../app/src/panels/ferry-dock.js';
 
 const read = p => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
@@ -598,4 +600,101 @@ test('the city checkout body uses the pay clause, and propose_call signs the boa
   assert.match(fn, /propose_call/);
   assert.doesNotMatch(fn, /(?<![.\w])sign\(/);
   assert.match(fn, /wallet: false/);
+  assert.match(fn, /stepsAllowanceYocto/);
+  assert.match(fn, /proposeCallTgas/);
+  assert.doesNotMatch(fn, /300n \* TG/);
+});
+
+test('a landed 0.05 wrap is reused and the next plan is only ft_transfer', () => {
+  const held = '50000000000000000000000';
+  const pick = pickWrapSpend({ wantAmount: '0.05', wrapBalanceYocto: held });
+  assert.equal(pick.recover, true);
+  assert.equal(pick.amount, '0.05');
+  assert.equal(pick.amountYocto, held);
+  const plan = depositPlan({
+    from: 'wNEAR@near', amount: pick.amount, depositAddress: 'ab'.repeat(32),
+    capYocto: '60000000000000000000000', balanceYocto: '10000000000000000000000',
+    wrapRegistered: true, wrapBalanceYocto: held, depositAccountRegistered: true,
+  });
+  assert.equal(plan.kind, 'propose_call');
+  assert.equal(plan.recover, true);
+  assert.deepEqual(plan.steps.map(s => s.method), ['ft_transfer']);
+  assert.equal(JSON.parse(plan.steps[0].args).amount, held);
+  assert.equal(plan.steps[0].gasTgas, proposeCallTgas('ft_transfer'));
+  assert.notEqual(plan.steps[0].gasTgas, 300);
+});
+
+test('propose_call prepays the measured 42 Tgas, and 0.04188 cannot buy another step', () => {
+  assert.equal(proposeCallTgas('near_deposit'), 42);
+  assert.equal(proposeCallTgas('ft_transfer'), 42);
+  assert.equal(proposeCallTgas('storage_deposit'), 42);
+  assert.ok(proposeCallTgas('ft_transfer') < 300);
+  const one = proposeCallPrepaidYocto(42);
+  assert.equal(one, functionCallAllowanceCost({ tgas: 42, numBytes: PROPOSE_CALL_BYTES }));
+  const left = 4188n * 10n ** 19n;
+  assert.equal(nearAmount(left), '0.04188');
+  assert.ok(left < one);
+  const three = stepsAllowanceYocto([
+    { method: 'near_deposit' }, { method: 'storage_deposit' }, { method: 'ft_transfer' },
+  ]);
+  assert.ok(BigInt(GAS_TOPUP_YOCTO) >= three);
+  assert.ok(BigInt('50000000000000000000000') < stepsAllowanceYocto([{ method: 'near_deposit' }, { method: 'ft_transfer' }]));
+});
+
+test('a landed wrap and a failed send name the tx and do not say nothing was sent', () => {
+  const hash = '6srGqpyujq1qfKvhTsWacj3rGqLJUZh1VcL71MtZ4W5U';
+  const note = wrapProgressNote({
+    amount: '0.05',
+    landed: [{ method: 'near_deposit', tx: hash }],
+    failedReason: 'NotEnoughAllowance',
+  });
+  assert.match(note.text, /Wrapped 0\.05 NEAR \(tx 6srG…\)/);
+  assert.match(note.text, /The send to 1Click did not go: session gas allowance is low/);
+  assert.match(note.text, /Your wNEAR is safe in your row and will be used on the next try/);
+  assert.doesNotMatch(note.text, /No wrap was sent/);
+  assert.equal(note.links[0].url, `https://nearblocks.io/txns/${hash}`);
+  assert.equal(note.lowGas, true);
+  const blocked = wrapProgressNote({ failedReason: 'not_enough_allowance' });
+  assert.match(blocked.text, /Session gas is low/);
+  assert.match(blocked.text, /The wrap was not started/);
+  assert.doesNotMatch(blocked.text, /Wrapped /);
+  const stranded = wrapProgressNote({ failedReason: 'not_enough_allowance', stranded: true });
+  assert.match(stranded.text, /wNEAR is safe in your row/);
+  const ui = read('app/design/D8_shops/js/shopui.js');
+  assert.match(ui, /wrapProgressNote/);
+  assert.match(ui, /Refresh agent key/);
+  const deep = read('app/src/panels/deep.js');
+  assert.match(deep, /ferry-refresh-key/);
+  assert.match(deep, /data-testid="ferry-gas"/);
+});
+
+test('the agent repeats the honest wrap note and its nearblocks link', async () => {
+  const hash = '6srGqpyujq1qfKvhTsWacj3rGqLJUZh1VcL71MtZ4W5U';
+  const hint = 'Wrapped 0.05 NEAR (tx 6srG…). The send to 1Click did not go: session gas allowance is low. Your wNEAR is safe in your row and will be used on the next try.';
+  const out = await runFerryAgent({
+    text: 'load cargo',
+    state: { q: { from: { usd: '0.18' } }, toId: 'USDC|base', receiveAt: '0xf76e6b0920e9332ff4410f6dd53f01722abc71a3' },
+    charterReady: true,
+    onLoadCargo: async () => ({
+      agentHint: hint,
+      agentLinks: [{ url: `https://nearblocks.io/txns/${hash}`, label: 'near_deposit 6srG…' }],
+      lowGas: true,
+    }),
+  });
+  assert.match(out.hint, /Wrapped 0\.05 NEAR/);
+  assert.match(out.hint, /Receiving on base/);
+  assert.equal(out.links.length, 1);
+  assert.equal(out.links[0].url, `https://nearblocks.io/txns/${hash}`);
+  assert.equal(out.lowGas, true);
+});
+
+test('Ferry rules show the session gas that is left', () => {
+  const html = ferryMarkup({
+    tab: 'rules', gasNear: '0.04188', gasLow: true, toId: 'USDC|near', fromId: 'wNEAR|near', amt: '0.05',
+  });
+  assert.match(html, /data-testid="ferry-gas"/);
+  assert.match(html, /Session gas left: 0\.04188 NEAR/);
+  assert.match(html, /Session gas is low/);
+  assert.match(html, /data-testid="ferry-refresh-key"/);
+  assert.match(html, /href="\/setup"/);
 });

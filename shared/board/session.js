@@ -13,6 +13,10 @@ export const AGENT_METHODS = ['propose', 'propose_call'];
 export const SESSION_HOURS = [1, 2, 24];
 // 0.05 NEAR of gas. The key cannot spend it as a transfer.
 export const GAS_ALLOWANCE_YOCTO = (10n ** 24n / 20n).toString();
+// 0.25 NEAR of gas for a Ferry session. Each propose_call prepays about 0.043 NEAR
+// (42 Tgas at 0.001 NEAR/Tgas). A 0.05 key can buy the wrap and then refuse the
+// ft_transfer. Refresh replaces the key; it does not raise an existing allowance.
+export const GAS_TOPUP_YOCTO = (10n ** 24n / 4n).toString();
 // Prepaid gas for a silent board propose. 30 Tgas covers propose plus the 8 Tgas
 // on_paid callback (measured use is about 4.67 Tgas). 80 Tgas is bought for ~0.081
 // NEAR and exceeds this allowance. The 0.005 stamp is a contract argument, not a deposit.

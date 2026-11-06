@@ -45,9 +45,16 @@ export function explainQuoteMiss(error) {
 }
 // wrap.near storage_balance_bounds.min — 0.00125 NEAR.
 export const WRAP_STORAGE_YOCTO = '1250000000000000000000';
-// Board forwards 30 Tgas plus an 8 Tgas callback. 42 Tgas leaves a little for propose_call
-// itself and buys at about 0.042 NEAR, under the 0.05 session allowance.
+// Live near_deposit 6srGqpyujq1qfKvhTsWacj3rGqLJUZh1VcL71MtZ4W5U attached 42 Tgas and burnt:
+// propose_call 2.687 Tgas, wrap.near near_deposit 1.584 Tgas, on_called 1.630 Tgas.
+// The deployed board still forwards 30 Tgas to the inner call and 8 Tgas to on_called
+// (contracts/charter_board). The session key must prepay that forward. 300 Tgas is the
+// wallet default and is not used: the allowance is charged on prepaid gas at 0.001 NEAR/Tgas.
+// https://docs.near.org/protocol/transactions/gas#buying-vs-burning-gas
 export const PROPOSE_CALL_TGAS = 42;
+export const PROPOSE_CALL_BYTES = 800;
+// Inner burns we measured or budgeted. They sit inside the 30 Tgas the board forwards.
+export const INNER_GAS_TGAS = { near_deposit: 10, storage_deposit: 10, ft_transfer: 20 };
 
 export function quoteUsd(q) {
   const raw = q?.from?.usd ?? q?.usd ?? q?.amountInUsd ?? null;
@@ -80,12 +87,103 @@ export function boardCallText({ contract, owner, receiver, method, argsHash, dep
   return `board-call-v1|${contract}|${owner}|${receiver}|${method}|${argsHash}|${deposit}|${nonce}`;
 }
 
-/** 0.001 NEAR per Tgas, plus 0.001 NEAR of slack for the receipt fees. */
+// Same split as shared/board/cost.js functionCallAllowanceCost. Kept here so the
+// city panel does not import a path the browser cannot serve.
+const GAS_PRICE_YOCTO = 100_000_000n;
+const GAS_PURCHASE_YOCTO = 1_000_000_000n;
+const CALL_SEND = 200_000_000_000n;
+const CALL_SEND_PER_BYTE = 47_683_715n;
+const CALL_EXEC = 780_000_000_000n;
+const CALL_EXEC_PER_BYTE = 2_235_934n;
+const RECEIPT_SEND = 108_059_500_000n;
+const RECEIPT_EXEC = 108_059_500_000n;
+
+/** Prepaid yocto one zero-deposit propose_call takes from the function-call allowance. */
+export function proposeCallPrepaidYocto(tgas = PROPOSE_CALL_TGAS, numBytes = PROPOSE_CALL_BYTES) {
+  const bytes = BigInt(numBytes);
+  const attached = BigInt(tgas) * 10n ** 12n;
+  const burnt = RECEIPT_SEND + CALL_SEND + CALL_SEND_PER_BYTE * bytes;
+  const remaining = attached + RECEIPT_EXEC + CALL_EXEC + CALL_EXEC_PER_BYTE * bytes;
+  const buy = GAS_PRICE_YOCTO > GAS_PURCHASE_YOCTO ? GAS_PRICE_YOCTO : GAS_PURCHASE_YOCTO;
+  return burnt * GAS_PRICE_YOCTO + remaining * buy;
+}
+
+/**
+ * Tgas the session key attaches for one propose_call. The board always forwards 30
+ * Tgas, so near_deposit and ft_transfer prepay the same outer gas. The inner budget
+ * (10 or 20) is inside that forward. This is never 300.
+ */
+export function proposeCallTgas(method) {
+  const inner = INNER_GAS_TGAS[method] || 20;
+  const forward = Math.max(30, inner);
+  return 4 + forward + 8;
+}
+
+/** Allowance the key must still hold before the first of these steps is sent. */
+export function stepsAllowanceYocto(steps) {
+  return (steps || []).reduce((n, s) => n + proposeCallPrepaidYocto(proposeCallTgas(s?.method)), 0n);
+}
+
+/** True when the live allowance can prepay one propose_call at this gas. */
 export function proposeCallAllowanceOk(allowanceYocto, tgas = PROPOSE_CALL_TGAS) {
-  try {
-    const need = BigInt(tgas) * 10n ** 21n + 10n ** 21n;
-    return BigInt(allowanceYocto) >= need;
-  } catch { return false; }
+  try { return BigInt(allowanceYocto) >= proposeCallPrepaidYocto(tgas); }
+  catch { return false; }
+}
+
+export function shortTx(hash) {
+  const h = String(hash || '');
+  return h.length > 6 ? `${h.slice(0, 4)}…` : h;
+}
+
+/**
+ * What to say after propose_call steps. A landed near_deposit is not "nothing was sent".
+ * Links are the steps that reached the chain.
+ */
+export function wrapProgressNote({ amount = '', landed = [], failedReason = '', stranded = false } = {}) {
+  const rows = (Array.isArray(landed) ? landed : []).filter(s => s && typeof s.tx === 'string' && s.tx);
+  const links = rows.map(s => ({
+    hash: s.tx,
+    method: s.method || '',
+    url: `https://nearblocks.io/txns/${s.tx}`,
+    label: `${s.method || 'tx'} ${shortTx(s.tx)}`,
+  }));
+  const wrap = rows.find(s => s.method === 'near_deposit');
+  const low = /not_enough_allowance|NotEnoughAllowance|allowance/i.test(String(failedReason || ''));
+  const amt = String(amount || '').trim() || '0.05';
+  if (wrap) {
+    const why = low
+      ? 'session gas allowance is low'
+      : (String(failedReason || 'the send failed').replace(/\s+/g, ' ').trim().slice(0, 140) || 'the send failed');
+    return {
+      lowGas: low,
+      wrapped: true,
+      text: `Wrapped ${amt} NEAR (tx ${shortTx(wrap.tx)}). The send to 1Click did not go: ${why}. Your wNEAR is safe in your row and will be used on the next try.`,
+      links,
+    };
+  }
+  if (low && stranded) {
+    return {
+      lowGas: true,
+      wrapped: true,
+      text: 'Session gas is low. Your wNEAR is safe in your row and will be used on the next try. Refresh the agent key, then Load cargo again.',
+      links,
+    };
+  }
+  if (low) {
+    return {
+      lowGas: true,
+      wrapped: false,
+      text: 'Session gas is low. The wrap was not started, so no NEAR left the row. Refresh the agent key, then Load cargo again.',
+      links,
+    };
+  }
+  const why = String(failedReason || 'the charter did not send the wrap').replace(/\s+/g, ' ').trim().slice(0, 160);
+  return {
+    lowGas: false,
+    wrapped: false,
+    text: `No wrap was sent: ${why}. No wallet opened. You are not asked to send USDC on Base. The boat has not delivered.`,
+    links,
+  };
 }
 
 export function orderForStatus(status) {
@@ -193,6 +291,7 @@ export function depositPlan({
     steps.push({
       receiver: WRAP, method: 'near_deposit', args: '{}',
       deposit: wrapDepositYocto(amt, wrapRegistered),
+      gasTgas: proposeCallTgas('near_deposit'),
     });
   }
   if (depositAccountRegistered !== true) {
@@ -200,12 +299,14 @@ export function depositPlan({
       receiver: WRAP, method: 'storage_deposit',
       args: JSON.stringify({ account_id: depositAddress, registration_only: true }),
       deposit: WRAP_STORAGE_YOCTO,
+      gasTgas: proposeCallTgas('storage_deposit'),
     });
   }
   steps.push({
     receiver: WRAP, method: 'ft_transfer',
     args: JSON.stringify({ receiver_id: depositAddress, amount: amt, memo: memo || null }),
     deposit: '1',
+    gasTgas: proposeCallTgas('ft_transfer'),
   });
   let sum = 0n;
   for (const s of steps) {
