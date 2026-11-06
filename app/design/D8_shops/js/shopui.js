@@ -407,7 +407,7 @@ async function sendPayoutRows(rows, opts = {}) {
   sh?.hideRefuse?.();
   const capNear = opts.capNear != null && opts.capNear !== '' ? Number(opts.capNear) : (A.S.clauses?.pay ? A.fromY(A.S.clauses.pay.per_action_cap) : null);
   const parts = splitAssets(rows);
-  const usdcNote = parts.usdc.length ? `${parts.usdc.length} USDC ${parts.usdc.length === 1 ? 'row' : 'rows'} kept. Not sent. Cap 0.20 USD.` : '';
+  const usdcNote = parts.usdc.length ? `${parts.usdc.length} USDC ${parts.usdc.length === 1 ? 'row' : 'rows'} kept. Not sent.` : '';
   if (!A.S.board || A.stage() !== 'ready') {
     const hint = 'Finish /setup. Nothing was sent.';
     return { ok: false, hint, seal: '', receipts: receiptsFor(parts.near), usdcNote, keep: true, kind: 'ok', say: hint, hero: null, rc: '' };
@@ -416,6 +416,13 @@ async function sendPayoutRows(rows, opts = {}) {
     const hint = 'The row cap is still unread. Nothing was sent.';
     return { ok: false, hint, seal: '', receipts: receiptsFor(parts.near), usdcNote, keep: true, kind: 'ok', say: hint, hero: null, rc: '' };
   }
+  const over = parts.near.filter(r => Number(r.amt) > capNear + 1e-12);
+  const under = parts.near.filter(r => !(Number(r.amt) > capNear + 1e-12));
+  if (over.length && !under.length) {
+    const hint = 'Refused before any deposit. Nothing was sent.';
+    return { ok: false, hint, seal: hint, receipts: receiptsFor(parts.near).map(r => ({ ...r, status: 'refused' })), usdcNote, keep: true, kind: 'no', say: hint, hero: null, rc: '' };
+  }
+  parts.near = under;
   if (!parts.near.length) {
     const hint = 'USDC rows are invoices, not a NEAR propose. Nothing was sent.';
     return { ok: false, hint, seal: '', receipts: [], usdcNote, keep: true, kind: 'ok', say: hint, hero: null, rc: '' };
@@ -640,7 +647,7 @@ const APPS = {
   },
   payouts: {
     guest: true,
-    label: 'Payouts · pay under the cap', idle: 'Pay NEAR rows with the session key. Nothing is sent until setup. An over-cap row is refused on chain. USDC is an invoice, not a transfer.',
+    label: 'Payouts · pay under the cap', idle: 'Pay reviewed rows with the session key. Nothing is sent until setup. An over-cap row is refused before any deposit.',
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.001' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.001' }); } return extra.rows.slice(0, 3); },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => '<div data-deep="payouts"></div>',

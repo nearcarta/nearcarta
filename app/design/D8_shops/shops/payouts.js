@@ -1,5 +1,5 @@
 // Payouts (C3): the counting house. A ledger desk with one coin stack per payout and a wax seal.
-// The session pays each NEAR row with propose. An over-cap row is refused on chain. USDC is an invoice.
+// The session pays each reviewed in-cap NEAR row with propose. An over-cap row is refused before any deposit. A foreign row is held.
 // The live flow is the tray app (js/shopui.js, APPS.payouts).
 import { THREE, room, put, makeRobot, C } from '../js/core.js';
 import { row, h3, note, proof, paper, acct } from './_ui.js';

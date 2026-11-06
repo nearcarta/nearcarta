@@ -1,37 +1,180 @@
-// Payouts invoices. A dry EXACT_OUTPUT quote names the merchant USDC.
-// A deposit address is created only at or under 0.20 USD, after get_charter on the board.
-// This file does not sign and does not send the deposit.
-// ANY_INPUT is partner-only (1Click docs) and is not requested.
+// Durable payout invoices. EXACT_OUTPUT only. This file does not sign and does not send the deposit.
+// The receive account and the amount are fixed when the invoice is created. A payer query cannot move them.
+// A second checkout returns the same deposit address. ANY_INPUT is not requested.
+// https://docs.near-intents.org/integration/distribution-channels/1click-api/quickstart
 // https://docs.near-intents.org/integration/distribution-channels/1click-api/swap-types
-// https://docs.near-intents.org/api-reference/oneclick/request-a-swap-quote
-// https://docs.near-intents.org/api-reference/oneclick/check-swap-execution-status
-import { invoiceQuoteBody, invoiceDelivered, invoiceStatusLine, CHECKOUT_USD } from '../../app/src/panels/payouts-plan.js';
-import { tokenRef, findToken, tokens, postQuote, checkQuote, isNearRecipient, statusHelp } from './ferry.js';
-import { checkoutUsdOk, readCharterRules, charterGate, checkLiveQuote, rememberCheckout, oneClickStatus, defaultVerify, MAX_CHECKOUT_USD } from './ferry-checkout.js';
+// https://github.com/near/NEPs/blob/master/neps/nep-0141.md
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import {
+  hostedCeiling, aboveHosted, canonicalInvoice, invoiceRecordId, publicInvoice, invoiceExpired,
+  invoiceQuoteBody, invoiceDelivered, invoiceStatusLine, addressOk, registrationVerdict, USDC_NEAR_CONTRACT,
+} from '../../app/src/panels/payouts-plan.js';
+import { tokenRef, findToken, tokens, postQuote, checkQuote, statusHelp, validDepositAddress } from './ferry.js';
+import { oneClickStatus, defaultVerify } from './ferry-checkout.js';
+import { echoGuard } from './ferry-guard.js';
 
-export { CHECKOUT_USD, MAX_CHECKOUT_USD, invoiceDelivered, invoiceStatusLine };
+export { invoiceDelivered, invoiceStatusLine, hostedCeiling, registrationVerdict, USDC_NEAR_CONTRACT };
+
+/** Live quote check for an invoice. Signature, echo and deposit address. No product USD cap. */
+export function checkPayoutQuote(sent, resp, verify) {
+  let signature = false;
+  try { signature = !!verify(resp); } catch { signature = false; }
+  const echo = echoGuard(sent, resp?.quoteRequest);
+  const addr = resp?.quote?.depositAddress;
+  const dryOff = sent?.dry === false && resp?.quoteRequest?.dry === false;
+  const deposit = validDepositAddress(addr);
+  const accepted = signature && echo.ok && dryOff && deposit;
+  return { signature, echo, dry: dryOff, deposit, accepted, depositAddress: accepted ? addr : null };
+}
+
+const MEMORY = { byId: new Map() };
+const DURABILITY = 'This API reloads the invoice file on the host. A new host starts empty. This is not a chain record.';
+
+function filePath(env = process.env) {
+  const p = env.PAYOUTS_INVOICE_FILE;
+  return p && String(p).trim() ? String(p) : '';
+}
+
+function loadFile(store, path) {
+  if (!path || store.loaded) return;
+  store.loaded = true;
+  try {
+    const rows = JSON.parse(readFileSync(path, 'utf8'));
+    if (Array.isArray(rows)) for (const row of rows) if (row?.id) store.byId.set(row.id, row);
+  } catch { /* a missing file means an empty book */ }
+}
+
+function saveFile(store, path) {
+  if (!path) return;
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify([...store.byId.values()]));
+  } catch { /* the memory copy still serves this process */ }
+}
+
+export function invoiceBook(deps = {}) {
+  const store = deps.store || MEMORY;
+  loadFile(store, deps.file ?? filePath(deps.env || process.env));
+  return store;
+}
+
+export function resetInvoices(store = MEMORY) {
+  store.byId.clear();
+  store.loaded = true;
+}
 
 export function invoiceInput(b) {
   if (!b || typeof b !== 'object') return { error: 'body must be a JSON object' };
-  const from = tokenRef(b.from);
-  const to = tokenRef(b.to || 'USDC@near');
-  if (!from) return { error: 'missing or bad from' };
-  if (!to) return { error: 'missing or bad to' };
-  const usd = Number(b.usd ?? b.amount);
-  if (!Number.isFinite(usd) || usd <= 0) return { error: 'bad amount' };
-  if (!isNearRecipient(b.recipient)) return { error: 'A NEAR merchant needs a NEAR account as recipient' };
-  if (typeof b.refundTo !== 'string' || b.refundTo.length < 2 || b.refundTo.length > 128) return { error: 'bad refundTo' };
-  return { ok: true, value: { from, to, usd, recipient: b.recipient, refundTo: b.refundTo, charter: b.charter || b.recipient } };
+  const canon = canonicalInvoice({ usd: b.usd ?? b.amount, receive: b.receive || b.recipient, memo: b.memo, due: b.due, expiry: b.expiry });
+  if (!canon.ok) return { error: canon.reason };
+  return { ok: true, value: canon.value };
 }
 
-/** Dry quote. depositAddress is always null. Over 0.20 USD never calls 1Click. */
+/** Create or return the invoice. No 1Click call. A quote is not a payment. */
+export function createInvoice(input, deps = {}) {
+  const canon = canonicalInvoice(input || {});
+  if (!canon.ok) return { ok: false, reason: canon.reason, depositAddress: null, invoice: null };
+  const ceiling = deps.ceiling || hostedCeiling(deps.env || process.env);
+  if (aboveHosted(canon.value.usd, ceiling)) {
+    return { ok: false, reason: 'hosted_abuse_ceiling', depositAddress: null, invoice: null, ceiling, dry: true };
+  }
+  const store = invoiceBook(deps);
+  const id = invoiceRecordId(canon.value);
+  const existing = store.byId.get(id);
+  if (existing) return { ok: true, replayed: true, invoice: publicInvoice(existing), depositAddress: existing.depositAddress || null, durability: DURABILITY };
+  const row = { ...canon.value, id, status: 'UNPAID', depositAddress: null, createdAt: deps.now || Date.now() };
+  store.byId.set(id, row);
+  saveFile(store, deps.file ?? filePath(deps.env || process.env));
+  return { ok: true, replayed: false, invoice: publicInvoice(row), depositAddress: null, durability: DURABILITY };
+}
+
+/** Read the stored invoice. Query overrides are listed and ignored. */
+export function readInvoice(id, query = {}, deps = {}) {
+  const store = invoiceBook(deps);
+  const row = store.byId.get(String(id || ''));
+  if (!row) return { ok: false, reason: 'unknown_invoice', invoice: null };
+  return { ok: true, invoice: publicInvoice(row, query), durability: DURABILITY };
+}
+
+export function payerInput(b) {
+  if (!b || typeof b !== 'object') return { error: 'body must be a JSON object' };
+  const from = tokenRef(b.from || 'USDC@base');
+  if (!from) return { error: 'missing or bad from' };
+  const chain = String(b.chain || from.chain || 'base');
+  if (!addressOk(chain, b.refundTo)) return { error: 'bad refundTo' };
+  if (b.recipientType != null && b.recipientType !== 'DESTINATION_CHAIN') return { error: 'recipientType is fixed' };
+  return { ok: true, value: { from, chain, refundTo: b.refundTo } };
+}
+
+/**
+ * Payer checkout. The stored receive account is the recipient.
+ * A body recipient, even a different one, is ignored.
+ * A second call does not ask 1Click again.
+ */
+export async function checkoutInvoice(id, payer, deps = {}) {
+  const store = invoiceBook(deps);
+  const row = store.byId.get(String(id || ''));
+  if (!row) return { ok: false, reason: 'unknown_invoice', depositAddress: null, delivered: false };
+  if (invoiceDelivered(row.status)) {
+    return { ok: true, replayed: true, delivered: true, status: 'SUCCESS', depositAddress: row.depositAddress, invoice: publicInvoice(row) };
+  }
+  if (row.depositAddress) {
+    return { ok: true, replayed: true, delivered: false, status: row.status, depositAddress: row.depositAddress, invoice: publicInvoice(row) };
+  }
+  if (invoiceExpired(row, deps.now || Date.now())) {
+    return { ok: false, reason: 'expired', depositAddress: null, delivered: false, status: row.status };
+  }
+  const ceiling = deps.ceiling || hostedCeiling(deps.env || process.env);
+  if (aboveHosted(row.usd, ceiling)) {
+    return { ok: false, reason: 'hosted_abuse_ceiling', depositAddress: null, delivered: false, ceiling };
+  }
+  const list = await (deps.tokens || tokens)();
+  const from = findToken(list, payer.from);
+  const to = findToken(list, 'USDC@near');
+  const built = invoiceQuoteBody({
+    from, to, usd: row.usd, recipient: row.receive, refundTo: payer.refundTo, ceiling,
+  });
+  if (!built.ok) return { ok: false, reason: built.reason, depositAddress: null, delivered: false };
+  const sent = { ...built.body, dry: false };
+  const post = deps.postQuote || postQuote;
+  const res = await post(sent);
+  if (res.http !== 201) return { ok: false, reason: 'quote_refused', depositAddress: null, delivered: false, error: res.body?.message || `HTTP ${res.http}` };
+  const verify = deps.verify || defaultVerify;
+  const checks = (deps.checkPayoutQuote || checkPayoutQuote)(sent, res.body, verify);
+  if (!checks.accepted || !checks.depositAddress) {
+    return { ok: false, reason: 'quote_refused', depositAddress: null, delivered: false };
+  }
+  if (String(res.body.quoteRequest?.recipient) !== row.receive) {
+    return { ok: false, reason: 'recipient_moved', depositAddress: null, delivered: false };
+  }
+  row.depositAddress = checks.depositAddress;
+  row.status = 'PENDING_DEPOSIT';
+  row.refundTo = payer.refundTo;
+  store.byId.set(row.id, row);
+  saveFile(store, deps.file ?? filePath(deps.env || process.env));
+  return {
+    ok: true,
+    replayed: false,
+    delivered: false,
+    dry: false,
+    depositAddress: row.depositAddress,
+    status: 'PENDING_DEPOSIT',
+    help: statusHelp('PENDING_DEPOSIT'),
+    invoice: publicInvoice(row),
+  };
+}
+
+/** Dry quote for a stored amount. depositAddress stays null. A hosted ceiling, when set, returns first. */
 export async function quoteInvoice(input, deps = {}) {
-  const cap = checkoutUsdOk(input.usd);
-  if (!cap.ok) return { ok: false, reason: cap.reason, dry: true, depositAddress: null, status: null };
+  const ceiling = deps.ceiling || hostedCeiling(deps.env || process.env);
+  if (aboveHosted(input.usd, ceiling)) {
+    return { ok: false, reason: 'hosted_abuse_ceiling', dry: true, depositAddress: null, status: null, ceiling };
+  }
   const list = await (deps.tokens || tokens)();
   const from = findToken(list, input.from);
-  const to = findToken(list, input.to);
-  const built = invoiceQuoteBody({ from, to, usd: input.usd, recipient: input.recipient, refundTo: input.refundTo });
+  const to = findToken(list, input.to || 'USDC@near');
+  const built = invoiceQuoteBody({ from, to, usd: input.usd, recipient: input.recipient || input.receive, refundTo: input.refundTo, ceiling });
   if (!built.ok) return { ok: false, reason: built.reason, dry: true, depositAddress: null, status: null };
   const post = deps.postQuote || postQuote;
   const res = await post(built.body);
@@ -39,7 +182,6 @@ export async function quoteInvoice(input, deps = {}) {
     return { ok: false, reason: 'quote_refused', dry: true, depositAddress: null, status: null, error: res.body?.message || `HTTP ${res.http}` };
   }
   const checks = (deps.checkQuote || checkQuote)(built.body, res.body);
-  const q = res.body.quote || {};
   return {
     ok: !!checks.accepted,
     reason: checks.accepted ? null : 'quote_refused',
@@ -47,87 +189,31 @@ export async function quoteInvoice(input, deps = {}) {
     depositAddress: null,
     status: 'quoted',
     swapType: 'EXACT_OUTPUT',
-    usd: q.amountOutUsd || q.amountInUsd || String(input.usd),
-    amountIn: q.amountInFormatted || null,
-    amountOut: q.amountOutFormatted || null,
-    origin: from ? { symbol: from.symbol, chain: from.blockchain } : null,
-    destination: to ? { symbol: to.symbol, chain: to.blockchain } : null,
     help: 'Dry quote. No deposit address. Nothing was sent.',
-    correlationId: res.body.correlationId || null,
   };
 }
 
-/**
- * Live quote with a deposit address. Refuses above 0.20 USD before 1Click.
- * The charter view is get_charter on the board (readCharterRules), not get_rules on the visitor.
- * The 1Click recipient is the merchant NEAR account. It is not the deposit address.
- */
-export async function openInvoice(input, deps = {}) {
-  const cap = checkoutUsdOk(input.usd);
-  if (!cap.ok) return { ok: false, reason: cap.reason, depositAddress: null, status: null, dry: false };
-  let chain;
+export async function refreshInvoice(id, deps = {}) {
+  const store = invoiceBook(deps);
+  const row = store.byId.get(String(id || ''));
+  if (!row) return { ok: false, reason: 'unknown_invoice', delivered: false };
+  if (!row.depositAddress) return { ok: true, invoice: publicInvoice(row), delivered: false, status: row.status };
+  const st = await (deps.oneClickStatus || oneClickStatus)(row.depositAddress);
+  if (st?.status) row.status = st.status;
+  store.byId.set(row.id, row);
+  saveFile(store, deps.file ?? filePath(deps.env || process.env));
+  const view = publicInvoice(row);
+  return { ...st, ...view, delivered: invoiceDelivered(row.status), help: st?.help || invoiceStatusLine(row.status) };
+}
+
+export async function registrationOf(account, deps = {}) {
+  const who = String(account || '').trim();
+  if (!who) return { ok: false, reason: 'bad_account', ...registrationVerdict(null, { error: 'bad_account' }) };
   try {
-    chain = await (deps.readCharter || readCharterRules)(input.charter || input.recipient, 'pay');
+    const view = deps.view || (async () => null);
+    const balance = await view(deps.contract || USDC_NEAR_CONTRACT, 'storage_balance_of', { account_id: who });
+    return { ok: true, account: who, contract: deps.contract || USDC_NEAR_CONTRACT, ...registrationVerdict(balance) };
   } catch (e) {
-    return { ok: false, reason: 'charter_unread', error: e.message, depositAddress: null, status: null };
+    return { ok: false, account: who, ...registrationVerdict(null, { error: e.message }) };
   }
-  const gate = charterGate({
-    state: chain.state,
-    clause: chain.clause,
-    usage: chain.usage,
-    receiver: input.recipient,
-    amount: String(chain.clause?.min_amount || '1'),
-    nowMin: deps.nowMin ?? 0,
-    sealed: chain.sealed,
-  });
-  if (!gate.ok) return { ok: false, reason: gate.reason, depositAddress: null, status: null };
-
-  const list = await (deps.tokens || tokens)();
-  const from = findToken(list, input.from);
-  const to = findToken(list, input.to);
-  if (to?.blockchain === 'near' && !isNearRecipient(input.recipient)) {
-    return { ok: false, reason: 'near_recipient', depositAddress: null, status: null };
-  }
-  const built = invoiceQuoteBody({ from, to, usd: input.usd, recipient: input.recipient, refundTo: input.refundTo });
-  if (!built.ok) return { ok: false, reason: built.reason, depositAddress: null, status: null };
-  const sent = { ...built.body, dry: false };
-  const post = deps.postQuote || postQuote;
-  const res = await post(sent);
-  if (res.http !== 201) return { ok: false, reason: 'quote_refused', depositAddress: null, status: null, error: res.body?.message || `HTTP ${res.http}` };
-  const verify = deps.verify || defaultVerify;
-  const checks = checkLiveQuote(sent, res.body, verify);
-  if (!checks.accepted) {
-    const reason = checks.usd?.ok ? 'quote_refused' : 'over_checkout_cap';
-    return { ok: false, reason, depositAddress: null, status: null, checks: { signature: checks.signature, echo: checks.echo?.ok, usd: checks.usd?.ok } };
-  }
-  const usd = String(res.body.quote?.amountInUsd || input.usd);
-  if (!checkoutUsdOk(usd).ok) return { ok: false, reason: 'over_checkout_cap', depositAddress: null, status: null };
-  const row = {
-    depositAddress: checks.depositAddress,
-    depositMemo: res.body.quote?.depositMemo || null,
-    recipient: input.recipient,
-    charter: input.charter || input.recipient,
-    usd,
-    status: 'PENDING_DEPOSIT',
-    tx: null,
-    correlationId: res.body.correlationId || null,
-  };
-  (deps.remember || rememberCheckout)(row);
-  return {
-    ok: true,
-    reason: null,
-    dry: false,
-    depositAddress: row.depositAddress,
-    depositMemo: row.depositMemo,
-    status: 'PENDING_DEPOSIT',
-    help: statusHelp('PENDING_DEPOSIT'),
-    usd: row.usd,
-    delivered: false,
-    correlationId: row.correlationId,
-  };
-}
-
-export async function invoiceStatus(depositAddress, deps = {}) {
-  const st = await (deps.oneClickStatus || oneClickStatus)(depositAddress);
-  return { ...st, delivered: invoiceDelivered(st.status), help: st.help || invoiceStatusLine(st.status) };
 }

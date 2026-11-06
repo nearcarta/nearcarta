@@ -1,258 +1,230 @@
-// Payouts shop: the plan helpers (app/src/panels/payouts-plan.js) and the invoice flow (backend/src/payouts-invoice.js).
-// No wallet, no network, no signing.
+// Payouts shop: invoice records and payroll review. No wallet, no network, no signing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  CHECKOUT_USD, MISS_HINT, nearFromYocto, classifyPayroll, agentCommand, rowsForCommand, invoiceQuoteBody,
-  invoiceDelivered, invoiceStatusLine, cinemaOk, sealText, accountantCsv,
+  MISS_HINT, nearFromYocto, hostedCeiling, classifyPayroll, agentCommand, rowsForCommand, invoiceQuoteBody,
+  invoiceDelivered, invoiceStatusLine, cinemaOk, sealText, accountantCsv, canonicalInvoice, invoiceRecordId,
+  publicInvoice, registrationVerdict, payrollKey,
 } from '../../../app/src/panels/payouts-plan.js';
-import { invoiceInput, quoteInvoice, openInvoice } from '../../src/payouts-invoice.js';
+import { createInvoice, readInvoice, checkoutInvoice, quoteInvoice, resetInvoices, payerInput } from '../../src/payouts-invoice.js';
 
 const TX = '4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia';
-const REFUND = 'a'.repeat(64);
+const REFUND = '0x' + 'ab'.repeat(20);
+const DEPOSIT = 'c'.repeat(64);
 const usdcNear = { assetId: 'nep141:usdc-near', blockchain: 'near', decimals: 6, symbol: 'USDC', price: '1' };
 const usdcBase = { assetId: 'nep141:usdc-base', blockchain: 'base', decimals: 6, symbol: 'USDC', price: '1' };
-
-const caps = {
-  per_action_cap: '1000000000000000000000000', daily_budget: '1000000000000000000000000', min_amount: '1',
-  max_actions_per_day: 10, window_start_min: 0, window_end_min: 0,
-};
-const chainFor = receivers => ({
-  state: { frozen: false },
-  clause: { receivers, ...caps },
-  usage: { spent: '0', reserved: '0', count: 0 },
-  sealed: false,
-});
 const boom = name => () => { throw new Error(`${name} must not be called`); };
+const store = () => ({ byId: new Map(), loaded: true });
 
-test('plan: checkout cap, miss hint and yocto to NEAR', () => {
-  assert.equal(CHECKOUT_USD, 0.2);
-  assert.equal(typeof MISS_HINT, 'string');
-  assert.ok(MISS_HINT.length > 0);
+test('plan: hosted ceiling is config, not a 0.20 product cap', () => {
+  assert.equal(hostedCeiling({}).usd, null);
+  assert.match(hostedCeiling({}).disclosed, /Not a product price|visitor chooses/i);
+  assert.equal(hostedCeiling({ PAYOUTS_USD_CEILING: '2' }).usd, 2);
   assert.equal(nearFromYocto('5000000000000000000000'), 0.005);
-  assert.equal(nearFromYocto('60000000000000000000000'), 0.06);
+  assert.equal(typeof MISS_HINT, 'string');
 });
 
-test('plan: classifyPayroll sends the in-cap row, lets the chain refuse the big one, keeps USDC as an invoice', () => {
-  const rows = [{ to: 'cafe.near', amt: '0.001' }, { to: 'books.near', amt: '0.02' }, { to: 'me.near', amt: '0.001', asset: 'USDC' }];
+test('plan: classifyPayroll sends the in-cap row, refuses the big one before deposit, holds USDC', () => {
+  const rows = [
+    { to: 'cafe.near', amt: '0.001', asset: 'NEAR', chain: 'near' },
+    { to: 'books.near', amt: '0.02', asset: 'NEAR', chain: 'near' },
+    { to: '0x' + '11'.repeat(20), amt: '0.15', asset: 'USDC', chain: 'base' },
+  ];
   const p = classifyPayroll(rows, { capNear: 0.005 });
   assert.equal(p.propose.length, 1);
   assert.equal(p.propose[0].to, 'cafe.near');
-  assert.equal(p.chainRefuse.length, 1);
-  assert.equal(p.chainRefuse[0].to, 'books.near');
-  assert.equal(p.chainRefuse[0].reason, 'over_per_action_cap');
-  assert.equal(p.chainRefuse[0].send, true);
-  assert.equal(p.invoices.length, 1);
-  assert.equal(p.invoices[0].send, false);
-  assert.equal(p.blocked, false);
+  assert.equal(p.propose[0].send, true);
+  assert.equal(p.refused.length, 1);
+  assert.equal(p.refused[0].send, false);
+  assert.equal(p.refused[0].reason, 'over_per_action_cap');
+  assert.equal(p.held.length, 1);
+  assert.equal(p.held[0].reason, 'foreign_effect_unproved');
+  assert.equal(p.held[0].send, false);
 });
 
-test('plan: classifyPayroll holds every NEAR row when the cap was not read, and skips a bad account', () => {
-  const held = classifyPayroll([{ to: 'cafe.near', amt: '0.001' }, { to: 'books.near', amt: '0.02' }], { capNear: null });
-  assert.equal(held.rows.length, 2);
-  for (const r of held.rows) { assert.equal(r.action, 'hold'); assert.equal(r.send, false); }
+test('plan: classifyPayroll holds every NEAR row when the cap was not read', () => {
+  const held = classifyPayroll([{ to: 'cafe.near', amt: '0.001' }], { capNear: null });
+  assert.equal(held.rows[0].action, 'hold');
+  assert.equal(held.rows[0].send, false);
   assert.equal(held.blocked, true);
-  const bad = classifyPayroll([{ to: 'not an account', amt: '0.001' }], { capNear: 0.005 });
-  assert.equal(bad.rows[0].action, 'skip');
+  const bad = classifyPayroll([{ to: 'not an account', amt: '0.001', chain: 'near' }], { capNear: 0.005 });
   assert.equal(bad.rows[0].reason, 'bad_account');
-  assert.equal(bad.blocked, true);
 });
 
-test('plan: agentCommand misses give the hint and spend nothing', () => {
-  for (const t of ['', 'hello there']) {
-    const c = agentCommand(t);
-    assert.equal(c.ok, false);
-    assert.equal(c.hint, MISS_HINT);
-  }
+test('plan: a paid row key does not change if the same row is asked again', () => {
+  const a = { to: 'cafe.near', amt: '0.001', asset: 'NEAR', chain: 'near' };
+  assert.equal(payrollKey(a), payrollKey({ ...a }));
+  assert.notEqual(payrollKey(a), payrollKey({ ...a, amt: '0.002' }));
 });
 
-test('plan: agentCommand reads pay, prepare and csv', () => {
-  assert.deepEqual(agentCommand('Pay these three'), { ok: true, kind: 'pay', index: null, hint: '' });
-  const one = agentCommand('Send payout 1');
-  assert.equal(one.ok, true); assert.equal(one.kind, 'pay'); assert.equal(one.index, 0);
-  assert.equal(agentCommand('Prepare payroll').kind, 'prepare');
+test('plan: agentCommand misses give the hint and a named amount is kept', () => {
+  assert.equal(agentCommand('hello').ok, false);
+  assert.equal(agentCommand('hello').hint, MISS_HINT);
+  assert.equal(agentCommand('Pay reviewed rows').kind, 'pay');
+  assert.equal(agentCommand('Send payout 1').index, 0);
   assert.equal(agentCommand('Export accountant CSV').kind, 'csv');
-});
-
-test('plan: agentCommand reads invoices and refuses over 0.20 USD', () => {
-  const a = agentCommand('Create invoice 0.15 USD on Base USDC');
-  assert.equal(a.ok, true); assert.equal(a.kind, 'invoice'); assert.equal(a.usd, 0.15);
-  assert.equal(a.origin, 'USDC@base'); assert.equal(a.destination, 'USDC@near');
-  const b = agentCommand('Make invoice for 0.15 USDC');
-  assert.equal(b.ok, true); assert.equal(b.usd, 0.15); assert.equal(b.origin, 'USDC@near');
-  const c = agentCommand('Create invoice 0.25 USD on Base USDC');
-  assert.equal(c.ok, false);
-  assert.equal(c.reason, 'over_checkout_cap');
-  assert.match(c.hint, /0\.20/);
-  assert.match(c.hint, /deposit address/);
+  const inv = agentCommand('Create invoice 0.15 USD on Base USDC');
+  assert.equal(inv.ok, true);
+  assert.equal(inv.usd, 0.15);
+  assert.equal(inv.origin, 'USDC@base');
+  const big = agentCommand('Create invoice 1.5 USD');
+  assert.equal(big.ok, true);
+  assert.equal(big.usd, 1.5);
 });
 
 test('plan: rowsForCommand picks one row by index or all of them', () => {
   const rows = [{ to: 'a.near' }, { to: 'b.near' }, { to: 'c.near' }];
   assert.deepEqual(rowsForCommand(rows, { kind: 'pay', index: 1 }), [{ to: 'b.near' }]);
-  assert.deepEqual(rowsForCommand(rows, { kind: 'pay', index: null }).map(r => r.to), ['a.near', 'b.near', 'c.near']);
-  assert.deepEqual(rowsForCommand(rows, { kind: 'csv' }), []);
+  assert.equal(rowsForCommand(rows, { kind: 'pay', index: null }).length, 3);
 });
 
-test('plan: invoiceQuoteBody is a dry EXACT_OUTPUT quote with no deposit address', () => {
-  const r = invoiceQuoteBody({ from: usdcBase, to: usdcNear, usd: 0.15, recipient: 'cafe.near', refundTo: REFUND });
+test('plan: invoiceQuoteBody is EXACT_OUTPUT and does not invent a 0.20 cap', () => {
+  const r = invoiceQuoteBody({ from: usdcBase, to: usdcNear, usd: 1.5, recipient: 'cafe.near', refundTo: REFUND });
   assert.equal(r.ok, true);
-  assert.equal(r.body.dry, true);
   assert.equal(r.body.swapType, 'EXACT_OUTPUT');
-  assert.notEqual(r.body.swapType, 'ANY_INPUT');
-  assert.equal(r.body.recipientType, 'DESTINATION_CHAIN');
-  assert.equal(r.body.depositType, 'ORIGIN_CHAIN');
-  assert.equal(r.body.amount, '150000');
   assert.equal(r.body.recipient, 'cafe.near');
-  assert.equal(r.body.originAsset, 'nep141:usdc-base');
-  assert.equal(r.body.destinationAsset, 'nep141:usdc-near');
-  assert.equal('depositAddress' in r.body, false);
+  assert.equal(r.body.recipientType, 'DESTINATION_CHAIN');
+  assert.equal(r.body.amount, '1500000');
   assert.equal(r.depositAddress, null);
+  const capped = invoiceQuoteBody({ from: usdcBase, to: usdcNear, usd: 3, recipient: 'cafe.near', refundTo: REFUND, ceiling: hostedCeiling({ PAYOUTS_USD_CEILING: '2' }) });
+  assert.equal(capped.ok, false);
+  assert.equal(capped.reason, 'hosted_abuse_ceiling');
+  const bad = invoiceQuoteBody({ from: usdcBase, to: usdcNear, usd: 0.15, recipient: 'not an account', refundTo: REFUND });
+  assert.equal(bad.reason, 'near_recipient');
+  const refund = invoiceQuoteBody({ from: usdcBase, to: usdcNear, usd: 0.15, recipient: 'cafe.near', refundTo: 'not an address' });
+  assert.equal(refund.reason, 'bad_refund');
 });
 
-test('plan: invoiceQuoteBody refuses over the cap and a bad NEAR recipient', () => {
-  const over = invoiceQuoteBody({ from: usdcBase, to: usdcNear, usd: 0.25, recipient: 'cafe.near', refundTo: REFUND });
-  assert.equal(over.ok, false); assert.equal(over.reason, 'over_checkout_cap'); assert.equal(over.body, null);
-  const bad = invoiceQuoteBody({ from: usdcBase, to: usdcNear, usd: 0.15, recipient: 'not an account', refundTo: REFUND });
-  assert.equal(bad.ok, false); assert.equal(bad.reason, 'near_recipient'); assert.equal(bad.body, null);
+test('plan: the same invoice fields keep one id, and a payer query cannot move the receive account', () => {
+  const a = canonicalInvoice({ usd: 0.15, receive: 'cafe.near', memo: 'poster', due: '2026-11-20', expiry: '2026-11-21T18:00:00Z' });
+  const b = canonicalInvoice({ usd: '0.15', receive: 'cafe.near', memo: 'poster', due: '2026-11-20', expiry: '2026-11-21T18:00:00Z' });
+  assert.equal(a.ok, true);
+  assert.equal(invoiceRecordId(a.value), invoiceRecordId(b.value));
+  const record = { ...a.value, id: invoiceRecordId(a.value), status: 'UNPAID', depositAddress: null };
+  const view = publicInvoice(record, { recipient: 'evil.near', usd: '9', refundTo: REFUND });
+  assert.equal(view.receive, 'cafe.near');
+  assert.equal(view.usd, 0.15);
+  assert.equal(view.redirected, false);
+  assert.ok(view.ignoredQuery.includes('recipient'));
+  assert.ok(view.ignoredQuery.includes('usd'));
+  assert.equal(view.delivered, false);
 });
 
 test('plan: invoice status words only call SUCCESS delivered', () => {
   assert.equal(invoiceDelivered('SUCCESS'), true);
   assert.equal(invoiceDelivered('PENDING_DEPOSIT'), false);
   assert.equal(invoiceDelivered('REFUNDED'), false);
-  assert.ok(invoiceStatusLine('SUCCESS').includes('SUCCESS'));
-  assert.ok(invoiceStatusLine('REFUNDED').includes('Refunded'));
-  const failed = invoiceStatusLine('FAILED');
-  assert.ok(failed.includes('failed'));
-  assert.doesNotMatch(failed, /Paid/);
+  assert.match(invoiceStatusLine('FAILED'), /failed/);
+  assert.doesNotMatch(invoiceStatusLine('PENDING_DEPOSIT'), /Paid/);
 });
 
-test('plan: cinemaOk needs every step allowed with a tx hash', () => {
+test('plan: registration does not claim gasless when storage is missing or unread', () => {
+  const yes = registrationVerdict({ total: '1250000000000000000000' });
+  assert.equal(yes.registered, true);
+  assert.match(yes.text, /can hold USDC/);
+  const no = registrationVerdict(null);
+  assert.equal(no.registered, false);
+  assert.match(no.text, /storage_deposit/);
+  assert.match(no.text, /does not claim the solver/);
+  const unread = registrationVerdict(null, { error: 'rpc' });
+  assert.equal(unread.claim, 'unread');
+  assert.match(unread.text, /Not claimed gasless/);
+});
+
+test('plan: cinema and seal stay quiet unless a real step happened', () => {
   assert.equal(cinemaOk([{ decision: 'allowed', tx: TX }]), true);
-  assert.equal(cinemaOk([{ decision: 'allowed', tx: '' }]), false);
-  assert.equal(cinemaOk([{ decision: 'denied', tx: TX, reason: 'over_per_action_cap' }]), false);
-  assert.equal(cinemaOk([]), false);
-});
-
-test('plan: sealText is empty for allowed, names the refusal, and says Not sent without a tx', () => {
+  assert.equal(cinemaOk([{ decision: 'denied', tx: '', reason: 'over_per_action_cap' }]), false);
+  assert.match(sealText([{ decision: 'denied', reason: 'over_per_action_cap' }]), /Refused before any deposit/);
   assert.equal(sealText([{ decision: 'allowed', tx: TX }]), '');
-  const withTx = sealText([{ decision: 'denied', tx: TX, reason: 'over_per_action_cap' }]);
-  assert.ok(withTx.includes('Charter refused'));
-  assert.ok(withTx.includes('over_per_action_cap'));
-  const noTx = sealText([{ decision: 'denied', tx: '', reason: 'over_per_action_cap' }]);
-  assert.ok(noTx.startsWith('Not sent'));
 });
 
-test('plan: accountantCsv marks a row without a tx "not sent" and one with a tx "sent"', () => {
-  const unsent = accountantCsv([{ to: 'cafe.near', amount: '0.001', asset: 'NEAR', tx: '' }]);
-  const [head, line] = unsent.split('\n');
-  assert.equal(head, 'account,amount,asset,tx,status');
-  assert.ok(line.includes('not sent'));
-  const sent = accountantCsv([{ to: 'cafe.near', amount: '0.001', asset: 'NEAR', tx: TX }]).split('\n')[1];
-  assert.equal(sent, `cafe.near,0.001,NEAR,${TX},sent`);
+test('plan: accountant CSV does not stamp paid without SUCCESS', () => {
+  const csv = accountantCsv([
+    { source: 'near', to: 'cafe.near', amount: '0.001', asset: 'NEAR', tx: '', status: 'paid' },
+    { source: 'base', to: 'cafe.near', amount: '0.15', asset: 'USDC', status: 'SUCCESS', delivered: true, fee: '0.01', refund: REFUND },
+  ]);
+  const [head, unpaid, paid] = csv.split('\n');
+  assert.equal(head, 'source,destination,asset,amount,fee,refund,status,tx');
+  assert.match(unpaid, /not sent/);
+  assert.doesNotMatch(unpaid, /paid/);
+  assert.match(paid, /,paid,/);
 });
 
-test('invoice: invoiceInput checks the body', () => {
-  assert.ok(invoiceInput(null).error);
-  const ok = invoiceInput({ from: 'USDC@base', usd: 0.15, recipient: 'cafe.near', refundTo: 'cafe.near' });
-  assert.equal(ok.ok, true);
-  assert.equal(ok.value.usd, 0.15);
-  assert.ok(invoiceInput({ from: 'USDC@base', usd: 0.15, refundTo: 'cafe.near' }).error);
+test('invoice: creating the same bill twice returns one id and does not call 1Click', () => {
+  const book = store();
+  const body = { usd: 0.15, receive: 'cafe.near', memo: 'poster', due: '2026-11-20', expiry: '' };
+  const a = createInvoice(body, { store: book, env: {} });
+  const b = createInvoice(body, { store: book, env: {}, postQuote: boom('postQuote') });
+  assert.equal(a.ok, true);
+  assert.equal(a.replayed, false);
+  assert.equal(b.replayed, true);
+  assert.equal(a.invoice.id, b.invoice.id);
+  assert.equal(a.depositAddress, null);
+  assert.equal(a.invoice.delivered, false);
 });
 
-test('invoice: quoteInvoice over 0.20 USD returns before it reads tokens or asks 1Click', async () => {
-  const input = invoiceInput({ from: 'USDC@base', usd: 0.25, recipient: 'cafe.near', refundTo: REFUND }).value;
-  const r = await quoteInvoice(input, { tokens: boom('tokens'), postQuote: boom('postQuote'), checkQuote: boom('checkQuote') });
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'over_checkout_cap');
-  assert.equal(r.depositAddress, null);
-  assert.equal(r.dry, true);
+test('invoice: a hosted ceiling refuses before tokens or 1Click', async () => {
+  const book = store();
+  const made = createInvoice({ usd: 5, receive: 'cafe.near' }, { store: book, ceiling: hostedCeiling({ PAYOUTS_USD_CEILING: '2' }) });
+  assert.equal(made.ok, false);
+  assert.equal(made.reason, 'hosted_abuse_ceiling');
+  const quoted = await quoteInvoice({ usd: 5, from: 'USDC@base', recipient: 'cafe.near', refundTo: REFUND }, {
+    ceiling: hostedCeiling({ PAYOUTS_USD_CEILING: '2' }), tokens: boom('tokens'), postQuote: boom('postQuote'),
+  });
+  assert.equal(quoted.reason, 'hosted_abuse_ceiling');
+  assert.equal(quoted.depositAddress, null);
 });
 
-test('invoice: quoteInvoice happy path is a dry EXACT_OUTPUT quote with no deposit address', async () => {
-  const input = invoiceInput({ from: 'USDC@base', usd: 0.15, recipient: 'cafe.near', refundTo: REFUND }).value;
-  let sent;
-  const r = await quoteInvoice(input, {
+test('invoice: a payer query cannot redirect, and a second checkout reuses the deposit address', async () => {
+  const book = store();
+  const made = createInvoice({ usd: 0.15, receive: 'cafe.near', memo: 'poster' }, { store: book, env: {} });
+  const tampered = readInvoice(made.invoice.id, { recipient: 'evil.near', usd: '9' }, { store: book });
+  assert.equal(tampered.invoice.receive, 'cafe.near');
+  assert.equal(tampered.invoice.usd, 0.15);
+  assert.equal(tampered.invoice.redirected, false);
+  let posts = 0;
+  const payer = payerInput({ from: 'USDC@base', refundTo: REFUND, recipient: 'evil.near' }).value;
+  const live = await checkoutInvoice(made.invoice.id, payer, {
+    store: book,
+    env: {},
     tokens: async () => [usdcBase, usdcNear],
     postQuote: async body => {
-      sent = body;
-      return {
-        http: 201,
-        body: {
-          quote: { amountInFormatted: '0.16', amountOutFormatted: '0.15', amountInUsd: '0.16', amountOutUsd: '0.15' },
-          quoteRequest: body, correlationId: 'c1', signature: 'sig',
-        },
-      };
+      posts += 1;
+      assert.equal(body.recipient, 'cafe.near');
+      assert.equal(body.swapType, 'EXACT_OUTPUT');
+      assert.notEqual(body.recipient, 'evil.near');
+      return { http: 201, body: { quote: { depositAddress: DEPOSIT }, quoteRequest: body, signature: 'sig' } };
     },
-    checkQuote: () => ({ accepted: true, echo: { ok: true } }),
+    verify: () => true,
   });
-  assert.equal(sent.swapType, 'EXACT_OUTPUT');
-  assert.equal(sent.dry, true);
-  assert.equal(r.ok, true);
-  assert.equal(r.dry, true);
-  assert.equal(r.depositAddress, null);
-  assert.equal(r.swapType, 'EXACT_OUTPUT');
-  assert.equal(r.status, 'quoted');
-  assert.equal(r.correlationId, 'c1');
+  assert.equal(live.ok, true);
+  assert.equal(live.depositAddress, DEPOSIT);
+  assert.equal(live.delivered, false);
+  const again = await checkoutInvoice(made.invoice.id, payer, { store: book, postQuote: boom('postQuote') });
+  assert.equal(again.replayed, true);
+  assert.equal(again.depositAddress, DEPOSIT);
+  assert.equal(posts, 1);
 });
 
-test('invoice: quoteInvoice with a refused quote has no deposit address', async () => {
-  const input = invoiceInput({ from: 'USDC@base', usd: 0.15, recipient: 'cafe.near', refundTo: REFUND }).value;
-  const r = await quoteInvoice(input, {
-    tokens: async () => [usdcBase, usdcNear],
-    postQuote: async () => ({ http: 400, body: { message: 'bad' } }),
-  });
-  assert.equal(r.ok, false);
-  assert.equal(r.depositAddress, null);
+test('invoice: an expired bill does not ask for a deposit address', async () => {
+  const book = store();
+  const made = createInvoice({ usd: 0.15, receive: 'cafe.near', expiry: '2020-01-01T00:00:00Z' }, { store: book, env: {} });
+  const payer = payerInput({ from: 'USDC@base', refundTo: REFUND }).value;
+  const out = await checkoutInvoice(made.invoice.id, payer, { store: book, now: Date.parse('2026-11-06T00:00:00Z'), postQuote: boom('postQuote') });
+  assert.equal(out.reason, 'expired');
+  assert.equal(out.depositAddress, null);
 });
 
-test('invoice: openInvoice over 0.20 USD never calls 1Click', async () => {
-  const input = invoiceInput({ from: 'USDC@base', usd: 0.25, recipient: 'cafe.near', refundTo: REFUND }).value;
-  const r = await openInvoice(input, { postQuote: boom('postQuote'), tokens: boom('tokens'), readCharter: boom('readCharter') });
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'over_checkout_cap');
-  assert.equal(r.depositAddress, null);
-});
-
-test('invoice: openInvoice stops when the charter cannot be read', async () => {
-  const input = invoiceInput({ from: 'USDC@base', usd: 0.15, recipient: 'cafe.near', refundTo: REFUND }).value;
-  const r = await openInvoice(input, { readCharter: async () => { throw new Error('rpc down'); }, postQuote: boom('postQuote') });
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'charter_unread');
-  assert.equal(r.depositAddress, null);
-});
-
-test('invoice: openInvoice stops when the charter does not allow the recipient', async () => {
-  const input = invoiceInput({ from: 'USDC@base', usd: 0.15, recipient: 'cafe.near', refundTo: REFUND }).value;
-  const r = await openInvoice(input, { readCharter: async () => chainFor(['other.near']), postQuote: boom('postQuote'), tokens: boom('tokens') });
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'receiver_not_allowlisted');
-  assert.equal(r.depositAddress, null);
-});
-
-test('invoice: openInvoice after a passing charter and a refused quote has no deposit address', async () => {
-  const input = invoiceInput({ from: 'USDC@base', usd: 0.15, recipient: 'cafe.near', refundTo: REFUND }).value;
-  let posted = 0;
-  const r = await openInvoice(input, {
-    readCharter: async () => chainFor(['cafe.near']),
-    tokens: async () => [usdcBase, usdcNear],
-    postQuote: async body => { posted++; assert.equal(body.swapType, 'EXACT_OUTPUT'); assert.equal(body.dry, false); return { http: 400, body: { message: 'bad' } }; },
-  });
-  assert.equal(posted, 1);
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'quote_refused');
-  assert.equal(r.depositAddress, null);
-});
-
-test('source: ANY_INPUT is not requested by the invoice code', () => {
+test('source: ANY_INPUT is not requested, and the payer page has one checkout button', () => {
   const noComments = src => src.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
   const backend = readFileSync(new URL('../../src/payouts-invoice.js', import.meta.url), 'utf8');
   const plan = readFileSync(new URL('../../../app/src/panels/payouts-plan.js', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../../../app/pay/index.html', import.meta.url), 'utf8');
   assert.equal(noComments(backend).includes('ANY_INPUT'), false);
   assert.equal(noComments(plan).includes('ANY_INPUT'), false);
-  const r = invoiceQuoteBody({ from: usdcBase, to: usdcNear, usd: 0.2, recipient: 'cafe.near', refundTo: REFUND });
-  assert.equal(r.ok, true);
-  assert.equal(r.body.swapType, 'EXACT_OUTPUT');
+  assert.match(page, /Pay this invoice/);
+  assert.equal((page.match(/ferry-cta/g) || []).length, 1);
+  assert.match(page, /Not paid/);
+  assert.doesNotMatch(page, /\bPAID\b/);
 });

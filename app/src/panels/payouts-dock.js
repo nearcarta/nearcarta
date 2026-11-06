@@ -7,7 +7,7 @@ let busy = false;
 let inflight = null;
 
 export const DOCK_NOT_READY = 'The agent is not ready. Open Payouts and press Send again.';
-export const DOCK_MISS = 'Try: Pay these three, Send payout 1, Create invoice 0.15 USD on Base USDC, or Export accountant CSV.';
+export const DOCK_MISS = 'Try: Create invoice 0.15 USD, Pay reviewed rows, or Export accountant CSV.';
 
 export function armPayoutsDock(fn) {
   runner = typeof fn === 'function' ? fn : null;
@@ -53,7 +53,7 @@ export function payoutsDockHtml() {
     <div id="payouts-agent-pop" class="payouts-agent-pop" data-testid="payouts-agent" hidden>
       <p id="p-agent-log" class="payouts-agent-log" data-testid="payouts-agent-log" hidden></p>
       <div class="payouts-agent-row">
-        <input id="p-agent" data-testid="payouts-agent-input" placeholder="Pay these three" autocomplete="off" aria-label="Ask the AI Agent">
+        <input id="p-agent" data-testid="payouts-agent-input" placeholder="Create invoice 0.15 USD" autocomplete="off" aria-label="Ask the AI Agent">
         <button type="button" class="payouts-agent-send" id="p-agent-go" data-testid="payouts-agent-go" aria-label="Send">➤</button>
       </div>
     </div>

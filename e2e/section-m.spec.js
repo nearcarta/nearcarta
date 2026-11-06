@@ -53,6 +53,7 @@ test('M2 another attack changes the prompt and does not ask the vault', async ({
 test('M3 a blank payee prepares nothing', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/shops/payouts/');
+  await page.getByTestId('payouts-tab-payroll').click();
   await expect(page.getByTestId('payout-to')).toHaveCount(0);
   await page.getByTestId('payout-add').click();
   await page.getByTestId('payout-add').click();
