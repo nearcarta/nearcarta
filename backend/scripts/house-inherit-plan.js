@@ -1,8 +1,7 @@
-// Print the house successor plan. This process does not sign and does not spend.
-// The live house account has no access key, so this wasm cannot replace it.
-// Refund the purse to the current holder first. close() refuses while a purse
-// or a funded foreign vault still holds value. Then the owner closes and a new
-// account receives the v3 code.
+// Print where the house redeploy lives. This process does not sign and does not spend.
+// The dry-run is scripts/house-deploy.js. It targets the existing shop account.
+// Refund each open purse to its current holder first. close() still refuses while a purse
+// or a funded foreign vault holds value.
 // https://docs.near.org/protocol/accounts-contracts/access-keys
 // https://docs.near.org/smart-contracts/release/upgrade#migrating-the-state
 import { readFileSync } from 'node:fs';
@@ -17,8 +16,9 @@ const plan = {
   owner: house.owner,
   full_access_keys: house.full_access_keys,
   upgrade: false,
-  successor: true,
-  why: 'house.nearcarta.near has no access key, and house_line is not on the live code, so this wasm cannot replace it',
+  successor: false,
+  redeploy: 'node scripts/house-deploy.js',
+  why: 'Redeploy onto the existing shop account. scripts/house-deploy.js is the dry-run. --live needs a full-access key on that account. This script does not sign.',
   refund: 'house_withdraw pays the purse only to the current holder',
   teardown: 'close() with 1 yocto, only when house_held is 0 and no foreign vault is marked funded, refunds the owner',
   foreign: 'A funded vault blocks close until the deployer records an evacuation. Teardown does not destroy control of a funded foreign path.',
