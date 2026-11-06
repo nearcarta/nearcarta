@@ -99,16 +99,16 @@ test('the locked rules card says why, and the home page lists the shops', () => 
   const home = read('app/design/D9_world/index.html');
   assert.match(home, /data-testid="all-shops"/);
   assert.match(home, /data-testid="all-shops-link">All shops</);
-  for (const href of ['/shops/bank/', '/shops/hall/', '/?shop=ferry', '/shops/guard/', '/shops/arena/', '/shops/toll/', '/?shop=chronicle', '/shops/house/', '/shops/payouts/', '/shops/vault/']) {
+  for (const href of ['/?shop=bank', '/?shop=hall', '/?shop=ferry', '/?shop=guard', '/?shop=arena', '/?shop=toll', '/?shop=chronicle', '/?shop=house', '/?shop=payouts', '/shops/vault/']) {
     assert.match(home, new RegExp('href="' + href.replace(/[?]/g, '\\?') + '"'));
   }
-  assert.match(home, /data-city-shop="ferry"/);
-  assert.match(home, /data-city-shop="chronicle"/);
+  assert.match(home, /data-enter-shop="ferry"/);
+  assert.match(home, /data-enter-shop="chronicle"/);
   assert.match(home, /__openCityShop/);
   assert.match(home, /details\.open = false/);
   const town = read('app/design/D9_world/js/main.js');
-  assert.match(town, /window\.__openCityShop = \(id\) => jump\(id\)/);
-  assert.match(town, /P\.get\('shop'\)/);
+  assert.match(town, /window\.__openCityShop = \(id\) => route\.open\(id\)/);
+  assert.match(town, /shopQuery\(location\.search\)/);
   const fb = read('app/design/D9_world/js/fb.js');
   assert.match(fb, /window\.__openCityShop = \(id\) => \{ open\(id\); \}/);
   assert.match(fb, /open\(start\)/);

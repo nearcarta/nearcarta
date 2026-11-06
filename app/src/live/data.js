@@ -18,18 +18,20 @@ async function j(path, body) {
   } catch { return null; } finally { clearTimeout(t); }
 }
 
-// All reads at once (no waterfall): /api/chronicle is the guardhouse oath feed, so it needs no deployments read first.
-// No shop room reads QUOTE from here (the Ferry room uses shops-live.js), so the dry 1Click quote is not fetched:
-// it was the slowest read (1-2.5 s) and held every room's entry.
-const [DEP, g, ch, mb] = await Promise.all([
+// All reads at once (no waterfall). The oath is the visitor board now: /api/guardhouse
+// reads board.nearcarta.near, and /api/board/config carries its rows and owner. No shop
+// room reads QUOTE from here (the Ferry room uses shops-live.js), so the dry 1Click quote
+// is not fetched: it was the slowest read (1-2.5 s) and held every room's entry.
+const [DEP, g, b, ch, mb] = await Promise.all([
   j('/api/deployments'),
   j('/api/guardhouse'),
+  j('/api/board/config'),
   j('/api/chronicle?limit=12'),
   j('/api/mistbank'),
 ]);
 export const QUOTE = S.QUOTE;
 
-export const CORE = shapeCore(DEP, g, S.CORE);
+export const CORE = shapeCore(DEP, g, b, S.CORE);
 
 export const CLAUSES = shapeClauses(g, S.CLAUSES);
 

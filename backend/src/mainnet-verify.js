@@ -38,11 +38,11 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
         body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'EXPERIMENTAL_tx_status', params: { tx_hash: hash, sender_account_id: sender, wait_until: 'NONE' } }),
       });
     } catch (e) {
-      if (attempt === 2) return { hash, found: false, error: e?.message || 'network' };
+      if (attempt === 2) return { hash, found: false, error: e?.message || 'network', transient: true };
       continue;
     }
     if (res.ok === false) {
-      if (attempt === 2) return { hash, found: false, error: `http ${res.status}` };
+      if (attempt === 2) return { hash, found: false, error: `http ${res.status}`, transient: true };
       continue;
     }
     j = await res.json().catch(() => null);
@@ -51,7 +51,12 @@ export async function checkTx({ hash, sender, rpc, fetchImpl = fetch }) {
     if (j?.error?.cause?.name === 'UNKNOWN_TRANSACTION' || j?.error?.cause?.name === 'NOT_FOUND') break;
   }
   const tx = j?.result?.transaction;
-  if (!tx) return { hash, found: false, error: j?.error?.cause?.name || j?.error?.name || 'not found' };
+  if (!tx) {
+    const name = j?.error?.cause?.name || j?.error?.name || '';
+    // An absent tx is an answer; anything else failed to be read, and says so.
+    const final = name === 'UNKNOWN_TRANSACTION' || name === 'NOT_FOUND';
+    return { hash, found: false, error: name || 'not found', ...(final ? {} : { transient: true }) };
+  }
   const status = j.result.status || {};
   const failure = Object.prototype.hasOwnProperty.call(status, 'Failure');
   return { hash, found: true, success: !failure && (Object.prototype.hasOwnProperty.call(status, 'SuccessValue') || Object.prototype.hasOwnProperty.call(status, 'SuccessReceiptId')), failure, signer: tx.signer_id || sender };
@@ -88,7 +93,7 @@ export async function checkAll(dep, { rpc, fetchImpl = fetch } = {}) {
     for (const [, i] of pending()) {
       const again = await lookup({ ...rows[i] });
       if (again.found) out[i] = again;
-      else out[i] = { ...out[i], error: again.error };
+      else out[i] = { ...out[i], error: again.error, ...(again.transient ? { transient: true } : {}) };
     }
   }
   return { ok: out.length > 0 && out.every(r => r.found), rows: out };

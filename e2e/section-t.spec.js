@@ -471,3 +471,50 @@ test('T14 Open your row sends the board transaction first, with gas for both act
   }
   await shot(page, 't14-open-row');
 });
+
+test('T16 Open your row refuses a shop list the row cannot hold, before the wallet opens', async ({ page }) => {
+  // The 2026-11-06 failure: open_charter landed, set_calls panicked ERR_ROW_TOO_BIG.
+  // A row holds 0.02 NEAR of storage, and the row and its call list share it. The Rules
+  // step refuses an over-full list, but #sign is reachable by URL, so the open refuses too.
+  await page.addInitScript(savedScholar, agentKey.secretKey);
+  // The saved list that broke the reopen, plus a seventh shop so it is over budget even
+  // after the retired charter is dropped at load.
+  await page.addInitScript(() => {
+    const st = JSON.parse(localStorage.getItem('nearcarta.setup.v1') || '{}');
+    Object.assign(st, {
+      receivers: [
+        'charter.nearcarta.near', 'toll.nearcarta.near', 'guard.nearcarta.near',
+        'wrap.near', 'arena.nearcarta.near', 'house.nearcarta.near', 'townhall.nearcarta.near',
+      ],
+      cap: 0.005, daily: 0.02, per: 20,
+    });
+    localStorage.setItem('nearcarta.setup.v1', JSON.stringify(st));
+  });
+  await stubChain(page, { charter: null });
+  await page.addInitScript(() => {
+    window.__ncSent = [];
+    window.__NC_SETUP_WALLET = async () => ({
+      signAndSendTransactions: async ({ transactions }) => {
+        window.__ncSent.push({ batch: transactions.length, txs: transactions });
+        return transactions.map(() => ({ transaction_outcome: { id: 'stub' }, status: { SuccessValue: '' } }));
+      },
+      signAndSendTransaction: async tx => {
+        window.__ncSent.push({ batch: 1, txs: [tx] });
+        return { transaction_outcome: { id: 'stub' }, status: { SuccessValue: '' } };
+      },
+    });
+  });
+  await at(page, 1440);
+  await page.goto('/setup/#sign');
+  const open = page.getByTestId('setup-sign');
+  await expect(open).toHaveText('Open your row', { timeout: 30000 });
+  await open.click();
+  const err = page.getByTestId('setup-err');
+  await expect(err).toBeVisible({ timeout: 20000 });
+  await expect(err).toContainText('too long for one row');
+  // The message names how many fit, so the visitor can act instead of guessing.
+  await expect(err).toContainText('shops');
+  // Nothing was sent: the refusal happens before the wallet is asked for anything.
+  expect(await page.evaluate(() => window.__ncSent.length)).toBe(0);
+  await shot(page, 't16-row-too-big');
+});

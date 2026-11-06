@@ -2,16 +2,16 @@
 // The boat says delivered only when 1Click says SUCCESS.
 // propose_call is wrap.near only, and only when the row cap can hold the deposit.
 // A function-call key cannot attach NEAR and must not fall through to a wallet.
-// Sources: backend/src/ferry-checkout.js MAX_CHECKOUT_USD; shared/board/session.js FERRY_CALL_TARGETS;
+// There is no product-wide USD cap here: the visitor's row is the only limit.
+// Sources: shared/board/session.js FERRY_CALL_TARGETS;
 // contracts/charter_board call_text; NEP-141 ft_transfer; wrap.near near_deposit / storage_deposit.
 // https://docs.near.org/protocol/accounts-contracts/access-keys
 // https://github.com/near/NEPs/blob/master/neps/nep-0141.md
 
-export const MAX_CHECKOUT_USD = 0.2;
 export const WRAP = 'wrap.near';
-// Primary session settle. A dry 1Click quote of 0.05 wNEAR@near → USDC@near is about $0.185,
-// under MAX_CHECKOUT_USD, and the origin chain is NEAR so depositPlan returns propose_call.
-// 1Click can still reject a different corridor under that USD cap when the amount is below the
+// Primary session settle. The row cap decides whether this fits; when it does not,
+// depositPlan falls back to the you-send wallet path instead of a hardcoded USD limit.
+// 1Click can still reject a corridor under that cap when the amount is below the
 // bridge minimum ("Amount is too low for bridge, try at least N" raw units).
 // https://docs.near-intents.org/integration/distribution-channels/1click-api
 // wrap.near near_deposit / storage_deposit / ft_transfer:
@@ -34,8 +34,14 @@ export function explainQuoteMiss(error) {
   if (low) {
     return `Below this corridor's bridge minimum. 1Click asked for at least ${low[1]} raw units. No deposit address. Nothing was sent. The boat has not delivered.`;
   }
-  if (/over_checkout_cap|over 0\.20/i.test(raw)) {
-    return 'Over the 0.20 USD checkout cap. No deposit address. Nothing was sent. The boat has not delivered.';
+  if (/over_row_cap|over_per_action_cap/i.test(raw)) {
+    return 'Over what your row allows for one payment. Raise the cap in /setup if you want to send more. No deposit address. Nothing was sent. The boat has not delivered.';
+  }
+  if (/over_checkout_cap/i.test(raw)) {
+    return 'Over the limit your row allows. No deposit address. Nothing was sent. The boat has not delivered.';
+  }
+  if (/over_daily_budget/i.test(raw)) {
+    return 'Over what your row allows for today. Raise the daily budget in /setup if you want to send more. No deposit address. Nothing was sent. The boat has not delivered.';
   }
   if (raw === 'no_usd' || /no usd|has no USD/i.test(raw)) {
     return 'No deposit address. This quote has no USD amount. Nothing was sent. The boat has not delivered.';
@@ -62,11 +68,15 @@ export function quoteUsd(q) {
   return Number.isFinite(n) ? n : null;
 }
 
-/** No deposit address unless the signed quote is known and at most 0.20 USD. */
+/**
+ * A quote is usable when it has a positive USD amount. There is no product cap: the
+ * visitor's row is the limit, and the row cap check happens in depositPlan and again
+ * on chain. The backend prices the row's NEAR allowance the same way.
+ */
 export function mayCheckout(q) {
   const usd = quoteUsd(q);
   if (usd == null) return { ok: false, reason: 'no_usd', usd: null };
-  if (usd <= 0 || usd > MAX_CHECKOUT_USD + 1e-9) return { ok: false, reason: 'over_checkout_cap', usd };
+  if (usd <= 0) return { ok: false, reason: 'bad_usd', usd };
   return { ok: true, reason: null, usd };
 }
 
@@ -108,14 +118,25 @@ export function proposeCallPrepaidYocto(tgas = PROPOSE_CALL_TGAS, numBytes = PRO
 }
 
 /**
- * Tgas the session key attaches for one propose_call. The board forwards 30 Tgas
- * to the shop and 20 Tgas to the callback. near_deposit and ft_transfer prepay the
- * same outer gas. The inner budget sits inside the 30. This is never 300.
+ * Tgas the session key attaches for one propose_call.
+ *
+ * The promise tree is: this outer call pays for the board's own execution (which
+ * hydrates the row and writes the counters), then the board forwards `forward` Tgas
+ * to the shop and `GAS_CALLBACK` to on_called. The outer prepaid gas has to cover all
+ * three, so it was underpaying by the board's own work whenever it was set to
+ * `4 + forward + 20`: mainnet refused with "Exceeded the prepaid gas" before the
+ * board's function body could even burn its first Tgas (propose_call with a 54 Tgas
+ * attach failed on 2026-11-06, tx 6456LV35...).
+ *
+ * 30 Tgas covers the board's worst case measured on mainnet (a row write plus a call
+ * policy write burns under 10), and the forward and callback are the contract's own
+ * constants. Keep 100 Tgas of headroom under the 300 Tgas transaction limit.
  */
+export const BOARD_SELF_TGAS = 30;
 export function proposeCallTgas(method) {
   const inner = INNER_GAS_TGAS[method] || 20;
   const forward = Math.max(30, inner);
-  return 4 + forward + 20;
+  return BOARD_SELF_TGAS + forward + 20;
 }
 
 /** Allowance the key must still hold before the first of these steps is sent. */

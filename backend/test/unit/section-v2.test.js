@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBoardKeyPlugin } from '../../../app/house/board-key.js';
 import { callMessage } from '../../../shared/board/message.js';
-import { AGENT_METHODS, BOARD_PROPOSE_TGAS, FERRY_PROPOSE_BYTES, GAS_ALLOWANCE_YOCTO, SESSION_HOURS, boardProposeAllowanceYocto, callPolicy, sessionExpiresAt, sessionLabel } from '../../../shared/board/session.js';
+import { AGENT_METHODS, SESSION_METHODS, agentCanConfirmAlone, scopeHasOwnerOnly, BOARD_PROPOSE_TGAS, FERRY_PROPOSE_BYTES, GAS_ALLOWANCE_YOCTO, SESSION_HOURS, boardProposeAllowanceYocto, callPolicy, sessionExpiresAt, sessionLabel } from '../../../shared/board/session.js';
 import { functionCallAllowanceCost } from '../../../shared/board/cost.js';
 
 test('a session is 1, 2 or 24 hours and the expiry is that many nanoseconds ahead', () => {
@@ -28,8 +28,14 @@ test('propose_call signs the same message the board builds', () => {
 });
 
 test('set_calls names each shop, the method and the caps', () => {
+  // A known shop contributes the method it answers on: Toll's crossing is `cross`.
   assert.deepEqual(callPolicy(['toll.nearcarta.near'], '2', '5', 'ft_transfer', []), {
-    calls: [{ receiver: 'toll.nearcarta.near', method: 'ft_transfer', cap: '2' }],
+    calls: [{ receiver: 'toll.nearcarta.near', method: 'cross', cap: '2' }],
+    session_cap: '5',
+  });
+  // An unknown payee keeps the caller's method.
+  assert.deepEqual(callPolicy(['friend.near'], '2', '5', 'ft_transfer', []), {
+    calls: [{ receiver: 'friend.near', method: 'ft_transfer', cap: '2' }],
     session_cap: '5',
   });
   const withFerry = callPolicy(['charter.nearcarta.near'], '2', '5');
@@ -65,12 +71,13 @@ test('wrap.near uses the rule cap when that cap is at least 0.05 NEAR', () => {
 test('callPolicy dedupes the wrap.near shop and keeps the trio inside 24', () => {
   // The hand-tested list. The shop entry wrap.near + ft_transfer is the same pair
   // FERRY_CALL_TARGETS already adds, and set_calls panics ERR_RECEIVERS on a repeat.
+  // Toll answers on `cross`; an unknown payee keeps the caller's method.
   const receivers = ['charter.nearcarta.near', 'toll.nearcarta.near', 'wrap.near'];
   const policy = callPolicy(receivers, '1', '2');
   const pairs = policy.calls.map(c => `${c.receiver}:${c.method}`);
   assert.deepEqual(pairs, [
     'charter.nearcarta.near:ft_transfer',
-    'toll.nearcarta.near:ft_transfer',
+    'toll.nearcarta.near:cross',
     'wrap.near:near_deposit',
     'wrap.near:ft_transfer',
     'wrap.near:storage_deposit',
@@ -94,7 +101,11 @@ test('the session script prints the plan and does not sign without --live', () =
   const plan = JSON.parse(dry.stdout);
   assert.deepEqual(plan.plan.expect, ['allowed', 'over_per_action_cap', 'frozen', 'clause_expired']);
   assert.equal(plan.plan.allowedNear, '0.001');
-  assert.deepEqual(plan.methods, ['propose', 'propose_call', 'propose_call_as']);
+  assert.deepEqual(plan.methods, SESSION_METHODS);
+  // The scope carries confirm_hold, and that still cannot let the agent confirm alone.
+  assert.ok(plan.methods.includes('confirm_hold'));
+  assert.equal(agentCanConfirmAlone(plan.methods), false);
+  assert.equal(scopeHasOwnerOnly(plan.methods), false);
   const live = spawnSync(process.execPath, [script, '--live'], { encoding: 'utf8', env: { ...process.env, NEAR_MAINNET_SIGNER_KEY: '' } });
   assert.equal(live.status, 1);
   assert.match(live.stderr, /NEAR_MAINNET_SIGNER_KEY/);
