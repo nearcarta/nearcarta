@@ -237,7 +237,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       </div>
       <button type="button" class="primary ferry-cta" id="f-again" data-testid="ferry-again" ${showAgain ? '' : 'hidden'}>Get another quote</button>
       ${deposit}
-      ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}${state.renewSetup ? ` <a href="/setup" data-testid="ferry-renew-setup">Renew agent key once in Setup</a>` : ''}</p>` : ''}
+      ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}${state.renewSetup ? ` <a href="/setup" data-testid="${/refresh/i.test(state.renewLabel || '') ? 'ferry-refresh-key' : 'ferry-renew-setup'}">${esc(state.renewLabel || 'Renew agent key once in Setup')}</a>` : ''}${(state.landedLinks || []).map(l => ` <a class="tx" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('')}</p>` : ''}
     </div>`;
   const routesPane = `<div class="ferry-pane" data-pane="routes" ${tab === 'routes' ? '' : 'hidden'}>
       <p class="ferry-picker-note" data-testid="ferry-token-count" ${nTok ? '' : 'hidden'}>${nTok ? `${nTok} live tokens` : ''}</p>
@@ -259,6 +259,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const rulesPane = `<div class="ferry-pane" data-pane="rules" ${tab === 'rules' ? '' : 'hidden'}>
       <p class="ferry-kicker">Fund NEAR once in /setup. The session swap is about 0.05 wNEAR on NEAR to USDC on NEAR: the charter calls wrap.near and no wallet opens. A destination that is not NEAR needs the address that should receive the tokens. Ask charter is a stamp, not the swap. Guest Load cargo is a demo. Paying with USDC on Base is optional Pay — you send it, and a bridge minimum can refuse it.</p>
       <button type="button" class="primary ferry-cta" id="f-open-rules" data-testid="ferry-open-rules">Open /setup rules</button>
+      ${state.gasNear ? `<p data-testid="ferry-gas">Session gas left: ${esc(state.gasNear)} NEAR.${state.gasLow ? ' Session gas is low.' : ''}${state.gasLow ? ' <a href="/setup" data-testid="ferry-refresh-key">Refresh agent key</a>' : ''}</p>` : ''}
       <p class="ferry-agent-hint">Cap still binds. Session key signs with no wallet popup when ready.</p>
     </div>`;
   return `<div class="shop-stack ferry-card" data-testid="ferry-card">${tabs}${swap}${routesPane}${rulesPane}</div>`;
@@ -330,7 +331,16 @@ export async function runFerryAgent({ text, state = {}, charterReady = false, qu
   if (plan.mode === 'setup') return { ok: true, loaded: false, mode: 'setup', hint: 'Open /setup to Ask charter. No wallet from here. You can still Load cargo as a guest.' };
   const sessionLoad = !!charterReady && plan.mode === 'guest';
   if (where) onNote?.(where);
-  await onLoadCargo?.({ charter: plan.mode === 'charter' });
+  const loaded = await onLoadCargo?.({ charter: plan.mode === 'charter' });
+  if (loaded && (loaded.agentHint || loaded.lowGas)) {
+    const prefix = where ? `${where} ` : '';
+    return {
+      ok: true, loaded: true, mode: plan.mode, charter: plan.mode === 'charter',
+      hint: `${prefix}${loaded.agentHint || ''}`.trim(),
+      links: loaded.agentLinks || [],
+      lowGas: !!loaded.lowGas,
+    };
+  }
   const hint = plan.mode === 'charter'
     ? `${where ? where + ' ' : ''}Asking the charter under your cap. No wallet.`
     : sessionLoad
@@ -496,12 +506,14 @@ function mountFerry(root, hooks) {
     const agentGo = q$(root, '#f-agent-go') || dockDoc?.getElementById('f-agent-go');
     if (agentGo) agentGo.onclick = (e) => { e.preventDefault(); dispatchFerryDock(dockDoc); };
   };
-  function agentLog(text) {
+  function agentLog(text, links) {
     state.agentHint = text || '';
     const el = document.getElementById('f-agent-log');
     if (!el) return;
     el.hidden = !text;
-    el.textContent = text || '';
+    const extraLinks = (links || []).map(l => `<a class="tx" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join(' ');
+    if (extraLinks) el.innerHTML = `${esc(text || '')} ${extraLinks}`;
+    else el.textContent = text || '';
   }
   function clearSeal() { hooks.hideRefuse?.(); hooks.setOrder?.('jetty'); }
   async function runAgent(text) {
@@ -530,7 +542,7 @@ function mountFerry(root, hooks) {
     });
     if (!result?.ok) clearSeal();
     if (result?.ok) state.agentText = '';
-    agentLog(result?.hint || (result?.ok ? '' : 'That line did not run.'));
+    agentLog(result?.hint || (result?.ok ? '' : 'That line did not run.'), result?.links);
     state.tab = 'swap';
     if (!result?.loaded) paint();
     return result;

@@ -15,7 +15,7 @@ import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
 import { mountShop } from '/panels/deep.js';
 import { pairClauseId } from '/panels/ferry-pair.js';
 import { pairHero } from '/panels/token-badge.js';
-import { agentDeliveredNote, depositPlan, explainQuoteMiss, mayCheckout, nearNative, nextFerryBeat, pickWrapSpend, SESSION_SWAP } from '/panels/ferry-settle.js';
+import { agentDeliveredNote, depositPlan, explainQuoteMiss, mayCheckout, nearAmount, nearNative, nextFerryBeat, pickWrapSpend, SESSION_SWAP, wrapProgressNote } from '/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
 import { armTollDock, dispatchTollDock, installTollDock } from '/panels/toll-dock.js';
 import { mergeTollChronicle, nextRowBalance, passPaidCopy, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
@@ -364,21 +364,43 @@ async function settleFerry(wantCharter) {
       sh?.setOrder?.('quoted');
       extra.depositAddress = '';
       extra.depositMode = '';
-      const why = ferryPlainReason(sent?.reason) || plan.why || 'the charter did not send the wrap';
       const needRenew = /key_cannot_propose_call/i.test(String(sent?.reason || ''));
-      extra.renewSetup = needRenew;
-      extra.charterNote = needRenew
-        ? 'No wrap was sent: your agent key cannot call propose_call yet. Renew agent key once in Setup. No wallet opened here. The boat has not delivered.'
-        : `No wrap was sent: ${why}. No wallet opened. You are not asked to send USDC on Base. The boat has not delivered.`;
+      if (needRenew) {
+        extra.renewSetup = true;
+        extra.renewLabel = 'Renew agent key once in Setup';
+        extra.landedLinks = [];
+        extra.charterNote = 'No wrap was sent: your agent key cannot call propose_call yet. Renew agent key once in Setup. No wallet opened here. The boat has not delivered.';
+        return {
+          kind: 'ok', o, hero: APPS.ferry.hero(),
+          say: `${stamp} ${extra.charterNote} <a href="/setup" data-testid="ferry-renew-setup">Open Setup</a>`,
+          rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · quoted</span>',
+          rule: o ? A.ruleFor(o, clause) : '',
+          agentHint: extra.charterNote, agentLinks: [], lowGas: false,
+        };
+      }
+      const note = wrapProgressNote({
+        amount: nearAmount(plan.transferYocto) || spendPair.amt,
+        landed: sent?.landed || [],
+        failedReason: sent?.reason || '',
+        stranded: !!plan.recover,
+      });
+      extra.charterNote = note.text;
+      extra.renewSetup = !!note.lowGas;
+      extra.renewLabel = note.lowGas ? 'Refresh agent key' : '';
+      extra.landedLinks = note.links || [];
+      const linkHtml = extra.landedLinks.map(l => `<a class="rc tx" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('');
+      const refresh = note.lowGas ? ' <a href="/setup" data-testid="ferry-refresh-key">Refresh agent key</a>' : '';
       return {
         kind: 'ok', o, hero: APPS.ferry.hero(),
-        say: needRenew
-          ? `${stamp} ${extra.charterNote} <a href="/setup" data-testid="ferry-renew-setup">Open Setup</a>`
-          : `${stamp} ${extra.charterNote}`,
-        rc: (o?.tx ? A.txLine(o.tx) : '') + '<span class="rc" data-testid="ferry-order-state">order · quoted</span>',
+        say: `${stamp} ${esc(note.text)} ${linkHtml}${refresh}`,
+        rc: (o?.tx ? A.txLine(o.tx) : '') + linkHtml + '<span class="rc" data-testid="ferry-order-state">order · quoted</span>',
         rule: o ? A.ruleFor(o, clause) : '',
+        agentHint: note.text, agentLinks: extra.landedLinks, lowGas: !!note.lowGas,
       };
     }
+    extra.charterNote = '';
+    extra.renewSetup = false;
+    extra.landedLinks = [];
     extra.depositAddress = checkout.depositAddress;
     extra.depositUsd = checkout.usd || String(cap.usd);
     extra.depositMode = 'propose_call';
@@ -656,6 +678,14 @@ const APPS = {
       };
       mountShop('ferry', document.getElementById('t-form'), hooks);
       wireFerryDock(hooks);
+      if (!extra.gasAsked && A.sessionAllowance) {
+        extra.gasAsked = true;
+        A.sessionAllowance().then(g => {
+          extra.gasNear = g?.near || '';
+          extra.gasLow = !!g?.low;
+          if (cur === 'ferry') paint();
+        }).catch(() => {});
+      }
     },
     charterReady: () => A.S.ready && A.stage() === 'ready',
     btn: () => {

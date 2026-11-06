@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   AGENT_METHODS,
   GAS_ALLOWANCE_YOCTO,
+  GAS_TOPUP_YOCTO,
   agentMethodsReady,
   classifyBoardAgentKeys,
   renewAgentKeyActions,
@@ -97,6 +98,35 @@ test('Ferry shows a Setup renew link for key_cannot_propose_call, not the raw co
   assert.match(markup, /renewSetup/);
 });
 
+
+test('refresh replaces a ready board key with 0.25 NEAR of gas and does not touch rules', () => {
+  assert.equal(GAS_TOPUP_YOCTO, (10n ** 24n / 4n).toString());
+  const actions = renewAgentKeyActions({
+    stalePublicKeys: ['ed25519:BzdHuEoDReady'],
+    newPublicKey: 'ed25519:Fresh',
+    boardContract: BOARD,
+    methodNames: AGENT_METHODS,
+    allowance: GAS_TOPUP_YOCTO,
+  });
+  assert.equal(actions[0].type, 'DeleteKey');
+  assert.equal(actions[0].params.publicKey, 'ed25519:BzdHuEoDReady');
+  assert.equal(actions[1].type, 'AddKey');
+  assert.equal(actions[1].params.accessKey.permission.allowance, GAS_TOPUP_YOCTO);
+  assert.deepEqual(actions[1].params.accessKey.permission.methodNames, ['propose', 'propose_call']);
+  const src = read('app/house/setup.js');
+  const fn = src.slice(src.indexOf('async function refreshAgentKey'), src.indexOf('function bindRefreshKey'));
+  assert.match(fn, /GAS_TOPUP_YOCTO/);
+  assert.match(fn, /set_agent/);
+  assert.doesNotMatch(fn, /set_rules/);
+  assert.doesNotMatch(fn, /methodName: 'fund'/);
+  assert.match(src, /setup-refresh-key/);
+  assert.match(src, /Refresh agent key/);
+  assert.match(src, /setup-gas-left/);
+  assert.match(src, /Session gas left/);
+  assert.match(src, /bindRefreshKey/);
+  const sign = src.slice(src.indexOf('function wireSign'), src.indexOf('function wireTry'));
+  assert.match(sign, /bindRefreshKey/);
+});
 
 test('wireSign binds Renew agent key on the Sign step (not only wireTry)', () => {
   const src = read('app/house/setup.js');

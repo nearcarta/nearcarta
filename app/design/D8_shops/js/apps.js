@@ -8,7 +8,7 @@ import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
-import { boardCallText, cityCheckoutBody, isNearAccountId, PROPOSE_CALL_TGAS, proposeCallAllowanceOk, quoteRecipient, WRAP } from '/panels/ferry-settle.js';
+import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCallTgas, quoteRecipient, stepsAllowanceYocto, WRAP } from '/panels/ferry-settle.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -66,7 +66,7 @@ const PLAIN = [
   [/The account doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
   [/doesn't have enough balance/i, 'the wrap account does not hold enough wNEAR for this transfer; Load cargo again to use the stranded wNEAR'],
   [/NotEnoughBalance|not enough balance/i, 'your account does not have enough NEAR for this step'],
-  [/NotEnoughAllowance/, 'the session key does not have enough gas allowance for this ask. Nothing was paid.'],
+  [/NotEnoughAllowance/, 'the session key does not have enough gas allowance for this ask'],
 ];
 export function plainError(e) {
   const m = String(e?.message || e || '');
@@ -529,12 +529,17 @@ export async function ferryProposeCalls(steps) {
   const ak0 = await proposeAccessKey(key);
   const names = ak0?.permission?.FunctionCall?.method_names || [];
   if (!ak0 || (names.length && !names.includes('propose_call'))) return you('key_cannot_propose_call');
+  const list = steps || [];
   const allowance = ak0.permission.FunctionCall.allowance;
-  if (allowance && !proposeCallAllowanceOk(allowance)) return you('not_enough_allowance');
-  const txs = [];
-  for (const step of steps || []) {
+  // Prepaid gas for every remaining step. Do not start the wrap if the key cannot finish it.
+  if (allowance && BigInt(allowance) < stepsAllowanceYocto(list)) {
+    return you('not_enough_allowance', { txs: [], landed: [] });
+  }
+  const landed = [];
+  for (let i = 0; i < list.length; i++) {
+    const step = list[i];
     const row = await view(S.board, 'get_charter', { owner: S.me });
-    if (!row) return you('no_row', { txs });
+    if (!row) return you('no_row', { txs: landed.map(s => s.tx), landed });
     S.boardRow = row;
     const argsStr = typeof step.args === 'string' ? step.args : JSON.stringify(step.args || {});
     const deposit = String(step.deposit);
@@ -543,20 +548,40 @@ export async function ferryProposeCalls(steps) {
     const signature = W.signMessage(key, msg);
     const callArgs = { owner: S.me, receiver: step.receiver, method: step.method, args: argsStr, deposit, signature };
     const ak = await proposeAccessKey(key);
-    if (!ak) return you('no_session_key', { txs });
+    if (!ak) return you('no_session_key', { txs: landed.map(s => s.tx), landed });
+    const left = ak.permission?.FunctionCall?.allowance;
+    if (left && BigInt(left) < stepsAllowanceYocto(list.slice(i))) {
+      return you('not_enough_allowance', { txs: landed.map(s => s.tx), landed });
+    }
+    const gasTgas = step.gasTgas || proposeCallTgas(step.method);
     try {
       const signed = W.signTx({
         key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
-        actions: [W.functionCall('propose_call', callArgs, BigInt(PROPOSE_CALL_TGAS) * TG)],
+        actions: [W.functionCall('propose_call', callArgs, BigInt(gasTgas) * TG)],
       });
       const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
-      txs.push(signed.hash);
-      if (!sent.ok) return you(refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160), { tx: signed.hash, txs });
+      if (!sent.ok) {
+        const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+        return you(reason, { tx: signed.hash, txs: landed.map(s => s.tx), landed, failed: { method: step.method, reason } });
+      }
+      landed.push({ method: step.method, tx: signed.hash, amount: step.method === 'near_deposit' ? nearAmount(deposit) : '' });
     } catch (e) {
-      return you(refusalOf(e) || String(e?.message || e).slice(0, 160), { txs });
+      const reason = refusalOf(e) || String(e?.message || e).slice(0, 160);
+      return you(reason, { txs: landed.map(s => s.tx), landed, failed: { method: step.method, reason } });
     }
   }
-  return { ok: true, youSend: false, wallet: false, txs, tx: txs.at(-1) || null };
+  return { ok: true, youSend: false, wallet: false, txs: landed.map(s => s.tx), landed, tx: landed.at(-1)?.tx || null };
+}
+
+export async function sessionAllowance() {
+  const key = agent();
+  if (!key || !S.me) return { yocto: null, near: null, low: true };
+  const ak = await proposeAccessKey(key);
+  const yocto = ak?.permission?.FunctionCall?.allowance || null;
+  const need = stepsAllowanceYocto([{ method: 'near_deposit' }, { method: 'ft_transfer' }]);
+  let low = true;
+  try { low = !yocto || BigInt(yocto) < need; } catch { low = true; }
+  return { yocto, near: yocto ? nearAmount(yocto) : null, low };
 }
 // Hide routes whose dry quote failed in the server's last probe (/api/ferry/routes); keep at least one.
 export const routesReady = api('/api/ferry/routes').then(r => {
