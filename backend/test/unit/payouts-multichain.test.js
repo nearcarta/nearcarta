@@ -270,7 +270,7 @@ test('guardhouse: a retired charter is not a policy, and an unreadable one is no
     fpost: async () => ({ account_txs: [] }),
   });
   assert.equal(v.verdict, 'warn', 'a check with no readable allowlist warns, it does not throw');
-  assert.match(v.signals.charter_unread, /UNKNOWN_ACCOUNT/);
+  assert.match(v.signals.charter_unreadable, /UNKNOWN_ACCOUNT/);
   assert.equal(v.charter, 'charter.nearcarta.near');
 });
 

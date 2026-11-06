@@ -74,22 +74,22 @@ export async function check(account, { charter = null, row = null, now = Date.no
     s.actions_scanned = 0;
     s.board_row = true;
   } else if (charter) {
-    let clauses, st;
+    // A retired charter has no state left to read. That is not a reason to fail the
+    // whole check: the account signals above still stand, and the allowlist simply
+    // stays unknown. Without this, one dead default charter 500s every check.
     try {
-      [clauses, st] = await Promise.all([view(charter, 'get_clauses'), view(charter, 'get_state')]);
-    } catch (e) {
-      // The charter did not answer (retired, deleted, or an RPC miss). The check still runs on the
-      // deny list and the account itself, and it says it could not read an allowlist. Never a 500.
-      s.charter_unread = String(e?.message || 'the charter did not answer').slice(0, 160);
-    }
-    const allowed = [...new Set(Object.values(clauses || {}).flatMap(c => c.receivers || []))];
-    s.allowlisted = allowed.includes(account);
-    s.lookalike_of = lookalikeOf(account, allowed);
-    if (st) {
+      const [clauses, st] = await Promise.all([view(charter, 'get_clauses'), view(charter, 'get_state')]);
+      const allowed = [...new Set(Object.values(clauses || {}).flatMap(c => c.receivers || []))];
+      s.allowlisted = allowed.includes(account);
+      s.lookalike_of = lookalikeOf(account, allowed);
       const hi = Number(st.next_action || 0), lo = Math.max(Number(st.prune_cursor || 0), hi - 25);
       const recs = await Promise.all(Array.from({ length: hi - lo }, (_, i) => view(charter, 'get_action', { action_id: String(lo + i) }).catch(() => null)));
       s.prior_payments = recs.filter(a => a && a.receiver === account && a.status === 'confirmed').length;
       s.actions_scanned = recs.length;
+    } catch (e) {
+      // The allowlist is unknown, so allowlisted stays false and decide() keeps the
+      // verdict at warn (no_history). It cannot reach allow without a readable charter.
+      s.charter_unreadable = String(e?.message || e).slice(0, 120);
     }
   }
   if (s.exists) {

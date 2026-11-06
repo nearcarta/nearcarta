@@ -1,6 +1,7 @@
 // Statement digest, browser checks, and the Board v2 anchor contract.
 // The NEAR AI call stays on the server. A matching ed25519 signature is not an Intel TEE quote.
 // The live board contract has no anchor method. Nothing here signs or spends.
+import { teeView } from './tee-view.js';
 
 const K = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -176,13 +177,28 @@ export async function verifyNearAi({ manifestText = '', statement = '', digest =
       ? 'Signed text matches the model and the two hashes: verified.'
       : 'Signed text matches the model and the two hashes: not verified.',
     proof.serverVerified
-      ? 'Server signer match against a TEE preflight: recorded, not re-checked in this browser.'
-      : 'Server signer match against a TEE preflight: not recorded.',
-    'Raw model response bytes: not re-hashed in this browser.',
-    'TEE quote (Intel DCAP, TCB, RTMR3): not verified in this browser.',
+      ? 'Signer match against a TEE preflight: server-side, recorded, not re-checked in this browser.'
+      : 'Signer match against a TEE preflight: server-side, not recorded.',
+    'Raw model response bytes: server-side, not re-hashed in this browser.',
+    'TEE quote (Intel DCAP, TCB, RTMR3): not verified in this browser. Press Verify TEE now for the live quote.',
   ];
   const ok = !!(sig.ok && digestBound && textOk);
   return { ok, protocol: ok ? 'ed25519' : 'rejected', why: parts.join(' ') };
+}
+
+// The six quote fields Bank checks, plus whether this statement's signer is in that report.
+export function teeNowText(proof, body) {
+  const view = teeView(body || {});
+  const lines = (view.steps || []).map(s => `${s.label}: ${s.ok ? 'verified' : `not verified. ${s.why || 'did not pass'}`.trim()}`);
+  if (!lines.length) lines.push('NEAR AI attestation: the live check did not name a step.');
+  const addr = String(proof?.signing_address || '').replace(/^ed25519:/i, '').toLowerCase();
+  const models = Array.isArray(body?.models) ? body.models : [];
+  const match = !!addr && models.some(m => String(m.signing_address || '').replace(/^ed25519:/i, '').toLowerCase() === addr);
+  lines.push(addr
+    ? (match ? 'Signer matches the live attestation.' : 'Signer was not in the live attestation.')
+    : 'Signer: this statement has no signing address to match.');
+  lines.push('Raw model response bytes stay on the server. This browser does not re-hash them.');
+  return lines.join(' ');
 }
 
 // Board v2 event, when that contract exists:

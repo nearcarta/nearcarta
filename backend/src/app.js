@@ -455,22 +455,20 @@ export function makeApp() {
   }
   app.get('/api/guardhouse/check/:account', limiter(12), async c => {
     const a = c.req.param('account'); if (!ACCT.test(a) || a.length > 64) return bad(c, 'not an account id');
-    // No default charter: the retired charter.nearcarta.near is not used to judge a payment.
-    // Without ?charter= or a visitor board row, the check still runs (deny list, account shape, age)
-    // and says plainly that no allowlist was read, instead of 500 on a stale contract.
-    const asked = String(c.req.query('charter') || '').trim();
-    let found = null, why = '';
+    // A guest check names no charter, so the account signals alone decide and the answer says no
+    // allowlist was read. A named charter must be a live Nearcarta one: a retired contract is
+    // refused plainly instead of being read as today's rules, and nothing 500s.
+    const asked = c.req.query('charter') || null;
+    let found = null;
     if (asked) {
       found = await nearcartaCharter(asked);
-      why = found ? '' : 'that charter is not a Nearcarta charter, so no allowlist was read';
-    } else {
-      why = 'no charter was named, so no allowlist was read';
+      if (!found) return bad(c, 'charter must be a Nearcarta charter');
     }
-    const charter = found ? asked : null;
-    const k = `${a}|${charter || '-'}`, hit = cpCache.get(k);
+    const charter = asked;
+    const k = `${a}|${charter || ''}`, hit = cpCache.get(k);
     if (hit && Date.now() - hit.at < 20_000) return c.json(hit.v);
     const v = await cp.check(a, { charter, row: found?.row || null });
-    if (why) v.no_allowlist = why;
+    if (!charter) v.no_allowlist = 'no charter was named, so no allowlist was read';
     cpCache.set(k, { at: Date.now(), v }); if (cpCache.size > 500) cpCache.delete(cpCache.keys().next().value);
     return c.json(v);
   });
@@ -613,7 +611,10 @@ export function makeApp() {
   app.get('/api/chronicle/live', limiter(30), async c => {
     const account = String(c.req.query('account') || '').trim();
     if (!nearAccountOk(account)) return bad(c, 'account must be a NEAR account id');
-    try { return c.json(await readLive(account)); }
+    const cursor = c.req.query('cursor');
+    const ftCursor = c.req.query('ftCursor');
+    const more = cursor != null || ftCursor != null;
+    try { return c.json(await readLive(account, { cursor: cursor || '', ftCursor: ftCursor || '', more })); }
     catch (e) {
       return c.json({ account, live: false, rows: [], gaps: [String(e.message || 'Live read failed.').slice(0, 160)], sources: [], label: 'No rows for this account. The live timeline did not answer.' });
     }
