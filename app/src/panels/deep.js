@@ -14,11 +14,12 @@ import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
 import { ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './hall.js';
 import { boundaryHtml } from './boundary.js';
-import { charterSetupCta, shortId } from './hall-ui.js';
+import { charterSetupCta } from './hall-ui.js';
 import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks } from './token-badge.js';
 import { agentCargoPlan, chainLabel } from './ferry-pair.js';
 import { explainQuoteMiss, SESSION_SWAP } from './ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from './ferry-dock.js';
+import { mountBankRoom } from './bank-tray.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -825,64 +826,10 @@ function paintTee(slot, body) {
   });
 }
 
+// Mist Bank tray, dock, and attestation live in bank-tray.js.
+// data-testid="bank-session" is rendered there.
 function mountBank(root, hooks) {
-  const state = hooks.state || (hooks.state = {});
-  const who = typeof hooks.visitor === 'function' ? hooks.visitor() : visitor();
-  const notes = hooks.notes ? hooks.notes() : [0.001, 0.002, 0.005];
-  const named = hooks.payees ? hooks.payees() : [];
-  const payees = named.length ? named : (who.signedIn ? [who.accountId] : []);
-  const note = notes.includes(+state.amt) ? +state.amt : notes[0];
-  const to = state.to || (hooks.def ? hooks.def() : payees[0] || '');
-  const tee = state.tee;
-  const recorded = `<p class="note tee-recorded" data-testid="tee-recorded">The file <a href="${PROOF_HREF}">tee-public.json</a> is a recorded attestation from Oct 28. The button is the live check.</p>`;
-  const proof = `<a data-testid="tee-proof" href="${PROOF_HREF}">Proof file</a>`;
-  const panel = teeSlot(recorded, proof);
-  const sessionLine = who.signedIn ? `<p data-testid="bank-session">Signed in as ${esc(who.displayName || who.accountId)}.</p>` : '';
-  const payeeBox = payees.length
-    ? payees.map(a => `<label class="payee"><input type="radio" name="mto" value="${esc(a)}" ${a === to ? 'checked' : ''}><span class="payee-id" title="${esc(a)}">${esc(shortId(a))}</span></label>`).join('')
-    : '<p>Sign in to choose a payee.</p>';
-  const proofHtml = hooks.proof ? hooks.proof() : '';
-  root.innerHTML = `<div class="card shop-card shop-stack"><p class="note" data-testid="bank-net">This payment is a charter check on mainnet. ${proofHtml}</p>
-    ${sessionLine}
-    <div class="choice" data-testid="bank-amount"><p class="choice-label">Amount</p><div class="seg notes" role="radiogroup" aria-label="Amount" data-testid="bank-notes">${notes.map(n => `<label class="beside"><input type="radio" name="note" value="${n}" ${n === note ? 'checked' : ''}><span>${n} NEAR</span></label>`).join('')}</div></div>
-    <div class="choice" data-testid="bank-payee"><p class="choice-label">Payee</p><div class="seg to" id="m-to" data-testid="bank-to">${payeeBox}</div></div>
-    ${panel}</div>`;
-  root.querySelectorAll('input[name=note]').forEach(r => { r.onchange = () => { state.amt = r.value; hooks.onNote?.(r.value); }; });
-  root.querySelectorAll('input[name=mto]').forEach(r => { r.onchange = () => { state.to = r.value; hooks.onTo?.(r.value); }; });
-  const slot = q$(root, '[data-testid=tee-slot]');
-  if (tee) paintTee(slot, tee);
-  const b = q$(root, '#m-tee');
-  if (!b) return;
-  b.onclick = async () => {
-    if (b.disabled) return;
-    b.disabled = true;
-    const setAsk = (s) => {
-      const why = slot?.querySelector('[data-step=request] .tee-why');
-      if (why) why.textContent = `Asking NEAR AI · ${s}s`;
-    };
-    setAsk(0);
-    let secs = 0;
-    const clock = setInterval(() => { secs += 1; setAsk(secs); }, 1000);
-    try {
-      const run = hooks.tee ? hooks.tee() : liveTee({ api: api(), onTick: setAsk });
-      state.tee = hooks.tee
-        ? await Promise.race([
-          run,
-          new Promise(resolve => setTimeout(() => {
-            const why = teeTimeoutWhy(TEE_TIMEOUT_MS);
-            resolve({ ok: false, timeout: true, failure: `NEAR AI attestation: ${why}`, steps: [{ id: 'request', label: 'NEAR AI attestation', ok: false, why }] });
-          }, TEE_TIMEOUT_MS)),
-        ])
-        : await run;
-    } catch (e) {
-      const why = roomError(e);
-      state.tee = { ok: false, err: why, failure: `NEAR AI attestation: ${why}`, steps: [{ id: 'request', label: 'NEAR AI attestation', ok: false, why }] };
-    } finally {
-      clearInterval(clock);
-    }
-    paintTee(slot, state.tee);
-    if (b.isConnected) b.disabled = false;
-  };
+  return mountBankRoom(root, hooks);
 }
 
 export function houseCharterMarkup({ accountId = '', row = null, failed = false } = {}) {

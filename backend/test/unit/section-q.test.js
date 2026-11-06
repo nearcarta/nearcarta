@@ -32,9 +32,10 @@ test('a TEE check names each step and times out with a reason', async () => {
   assert.match(boot, /pageSigns\(id\) \? resolveAccount\(\)/);
   assert.match(boot, /if \(!saved\.signedIn && pageSigns\(id\)\) await accountP/);
   assert.match(boot, /if \(!pageSigns\(id\)\) return/);
-  const deep = read('app/src/panels/deep.js');
-  assert.match(deep, /Asking NEAR AI/);
-  assert.doesNotMatch(deep, /Checking the TEE/);
+  const tray = read('app/src/panels/bank-tray.js');
+  assert.match(tray, /Asking NEAR AI/);
+  assert.doesNotMatch(tray, /Checking the TEE/);
+  assert.doesNotMatch(read('app/src/panels/deep.js'), /Checking the TEE/);
 });
 
 test('the hall cap is the on-chain amount and the copy control is under the id', () => {

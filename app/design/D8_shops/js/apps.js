@@ -297,7 +297,7 @@ function settled(shop, out) {
   readRules().catch(() => {});
   return out;
 }
-async function boardPay({ shop, receiver, amountY }) {
+async function boardPay({ shop, receiver, amountY, reveal = null }) {
   const row = S.boardRow || await view(S.board, 'get_charter', { owner: S.me });
   if (!row) throw new Error('no charter row yet: finish setup first');
   S.boardRow = row;
@@ -307,7 +307,7 @@ async function boardPay({ shop, receiver, amountY }) {
   const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
   const msg = proposalMessage({ contract: S.board, owner: S.me, receiver, amount, nonce: String(row.nonce) });
   const signature = W.signMessage(key, msg);
-  const args = { owner: S.me, receiver, amount, signature, reveal: null };
+  const args = { owner: S.me, receiver, amount, signature, reveal: reveal || null };
   const ak = await proposeAccessKey(key);
   try {
     if (ak) {
@@ -337,8 +337,8 @@ async function boardPay({ shop, receiver, amountY }) {
     throw e;
   }
 }
-export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null }) {
-  if (S.board) return boardPay({ shop, receiver, amountY });
+export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null, reveal = null }) {
+  if (S.board) return boardPay({ shop, receiver, amountY, reveal });
   const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
   const st = await view(S.charter, 'get_state');
   const p = { shop, clause_id: clauseId, receiver, amount: String(amountY), nonce: String(st.next_nonce), policy_version: st.policy_version,
@@ -540,7 +540,7 @@ export const bucketOf = a => BUCKETS.find(b => a <= b) ?? Math.ceil(a * 10) / 10
 // Default: yourself if you listed yourself, else the first payee you added.
 export const bankPayees = () => (pay()?.receivers || []);
 export const bankDefault = () => { const r = bankPayees(); return r.includes(S.me) ? S.me : r[0] || null; };
-export async function mist(amount, to = bankDefault()) {
+export async function mist(amount, to = bankDefault(), reveal = null) {
   if (!to) throw new Error('add a payee to your rules first');
   if (!notes().includes(amount)) throw new Error('pick one of the set amounts: ' + notes().join(', ') + ' NEAR');
   const yocto = toY(amount), salt = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
@@ -549,7 +549,7 @@ export async function mist(amount, to = bankDefault()) {
   if (!tee.ok) throw new Error('TEE check failed, nothing sent');
   try { localStorage.setItem('nearcarta.sign.flow', 'private'); } catch { /* the prompt falls back to the method line */ }
   let o;
-  try { o = await ask({ shop: 'mistbank', receiver: to, amountY: yocto, memo: commitment }); }
+  try { o = await ask({ shop: 'mistbank', receiver: to, amountY: yocto, memo: commitment, reveal }); }
   finally { try { localStorage.removeItem('nearcarta.sign.flow'); } catch { /* leave the flag if storage is blocked */ } }
   localStorage.setItem(LS_OPEN(S.charter), JSON.stringify({ yocto, salt, commitment, action: o.action, tx: o.tx }));
   return { ...o, commitment, bucket: amount, tee, to };

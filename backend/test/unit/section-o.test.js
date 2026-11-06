@@ -47,7 +47,7 @@ test('ferry routes are brass cards and the arena box is tall', () => {
   assert.equal((html.match(/data-testid="ferry-route"/g) || []).length, 3);
   const deep = read('app/src/panels/deep.js');
   assert.match(deep, /class="attack-box" rows="6"/);
-  assert.match(deep, /class="beside"><input type="radio" name="note"/);
+  assert.match(read('app/src/panels/bank-tray.js'), /class="beside"><input type="radio" name="note"/);
   const css = read('app/src/panels/panels.css');
   assert.match(css, /animation:routeShine/);
   assert.match(css, /gap:18px 12px/);

@@ -17,6 +17,7 @@ import { mountShop } from '/panels/deep.js';
 import { pairClauseId, chainLabel } from '/panels/ferry-pair.js';
 import { depositPlan, explainQuoteMiss, mayCheckout, nearNative, nextFerryBeat, SESSION_SWAP } from '/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
+import { hideBankDock } from '/panels/bank-tray.js';
 import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues, prepareRows } from './payouts.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
@@ -33,6 +34,7 @@ function hideFerryPrimary() {
   b.hidden = true;
   b.classList.remove('busy');
 }
+function hideBankPrimary() { hideFerryPrimary(); }
 const form = html => { $('#t-form').innerHTML = html || ''; $('#t-form').hidden = !html; };
 const hero = html => { if (html != null) $('#t-hero').innerHTML = html; $('#t-hero').hidden = !html; };
 const rcpt = html => { $('#t-rcpt').innerHTML = html || ''; };
@@ -399,6 +401,89 @@ function gasNote() {
   const w = extra.gate?.gas?.warning;
   return w ? `<p class="plain-line warn" data-testid="gas-warning">⚠ ${esc(w)}</p>` : '';
 }
+const BANK_OPENING = 'nearcarta.bank.opening.v1';
+function readBankOpening() {
+  try { return JSON.parse(sessionStorage.getItem(BANK_OPENING) || 'null'); } catch { return null; }
+}
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function bankCapYocto() {
+  return A.S.clauses?.pay?.per_action_cap || A.S.boardRow?.per_action_cap || null;
+}
+function bankCapNear() {
+  const y = bankCapYocto();
+  return y ? A.fromY(y) : null;
+}
+async function playBankScene(refused, reason) {
+  if (!sh?.act || !runScene) return;
+  const g = sh.act({ refused: !!refused, reason: reason || '' });
+  if (g) await runScene(g);
+}
+async function openBankEnvelope() {
+  const contract = A.S.board;
+  if (!contract) return { ok: false, hint: 'Finish /setup first. Nothing was sealed.' };
+  const cap = bankCapYocto();
+  const salt = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
+  const text = `oath-hidden-v1|${contract}|pay|${cap || 'none'}||${salt}`;
+  const commitment = await sha256hex(text);
+  const reveal = { max_amount: cap ? String(cap) : null, deny: [], salt };
+  extra.reveal = reveal;
+  extra.commitment = commitment;
+  try { sessionStorage.setItem(BANK_OPENING, JSON.stringify({ contract, reveal, commitment })); } catch { /* the opening stays in this tab's extra */ }
+  return { ok: true, commitment, hint: 'Hidden until used. This browser holds the opening. The session key cannot call set_seal.' };
+}
+async function showBankFile() {
+  try {
+    const r = await fetch((globalThis.NEARCARTA_API || '') + '/api/bank/proof', { cache: 'no-store' });
+    const j = await r.json();
+    const note = j.retention || j.proof?.retention || 'Request and response bytes are not stored.';
+    const body = JSON.stringify(j.proof || { retention: note }, null, 2);
+    extra.proofNote = note;
+    extra.proofHref = URL.createObjectURL(new Blob([body], { type: 'application/json' }));
+    return { ok: true, hint: note, note, href: extra.proofHref };
+  } catch (e) {
+    return { ok: false, hint: 'The attestation file could not be read. Nothing was sent.' };
+  }
+}
+/** One send path for the card, the dock, and the tray button. Cinema only after an allowed tx. */
+async function sendBankNote(amount) {
+  sh?.hideRefuse?.();
+  const notes = A.notes();
+  const amt = notes.includes(+amount) ? +amount : notes[0];
+  const to = extra.to || A.bankDefault();
+  const hintOf = (hint) => ({ ok: false, kind: 'no', say: hint, hint, keep: true });
+  if (A.stage() !== 'ready' || !A.S.board) return hintOf('Finish /setup first. Nothing was sent. No wallet opened.');
+  if (!to) return hintOf('Add a payee in /setup. Nothing was sent.');
+  const cap = bankCapYocto();
+  if (cap && BigInt(A.toY(amt)) > BigInt(cap)) return hintOf('That amount is over your cap. Nothing was sent.');
+  let reveal = null;
+  if (A.S.boardRow?.sealed) {
+    const saved = extra.reveal || readBankOpening()?.reveal;
+    if (!saved) return hintOf('This row has a sealed rule and this browser does not have the opening. Nothing was sent.');
+    reveal = saved;
+  }
+  let o;
+  try { o = await A.mist(amt, to, reveal); }
+  catch (e) {
+    if (A.userCancelled(e)) throw e;
+    sh?.hideRefuse?.();
+    return hintOf(A.plainError(e).slice(0, 160));
+  }
+  if (o.decision === 'allowed' && o.tx) {
+    extra.sent = o;
+    extra.tee = o.tee;
+    sh?.hideRefuse?.();
+    await playBankScene(false);
+    const say = `Sent ${o.bucket} NEAR. The charter allowed it. The amount is public in the propose arguments. The sealed rule stayed hidden until this send.`;
+    return { ok: true, kind: 'ok', o, say, hint: say, keep: true, hero: o.commitment ? `<span class="commit" data-testid="commit">${esc(String(o.commitment).slice(0, 10))}…</span><span class="unit">sealed</span>` : null, rc: A.txLine(o.tx) };
+  }
+  const why = A.why(o.reason);
+  await playBankScene(true, why);
+  const hint = o.tx ? `Charter refused: ${why}.` : `Charter refused: ${why}. Nothing was sent.`;
+  return { ok: false, kind: 'no', o, say: hint, hint, keep: true, rc: o.tx ? A.txLine(o.tx) : '' };
+}
 
 // ---------- shop apps ----------
 const APPS = {
@@ -504,17 +589,30 @@ const APPS = {
   },
   bank: {
     guest: true,
-    label: 'Mist Bank · private payouts', idle: 'Pick an amount and who gets it. This payment is a charter check on mainnet. Everyone sends one of the same few amounts, so no payment stands out. The amount is never shown; Nearcarta\u2019s own server makes the Zcash transfer.',
+    label: 'Mist Bank · private payouts', idle: 'This payment is a charter check on mainnet. Pick a note under your cap. The sealed rule stays hidden until that send uses it.',
     form: () => '<div data-deep="bank"></div>',
-    bind: () => mountShop('bank', document.getElementById('t-form'), { state: extra, notes: () => A.notes(), payees: () => A.bankPayees(), proof: () => A.mainProof(), def: () => extra.to || A.bankDefault(), tee: () => A.teeFresh(), onNote: v => { extra.amt = v; if (!extra.sent) btn(APPS.bank.btn()); }, onTo: v => { extra.to = v; } }),
-    btn: () => extra.sent ? 'Check the hidden amount' : `Send ${A.notes().includes(+extra.amt) ? +extra.amt : A.notes()[0]} NEAR privately`,
-    hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(extra.sent.commitment.slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
-    run: async () => {
-      if (extra.sent) { const v = await A.mistVerify(); extra.sent = null; return { keep: true, kind: v.match ? 'ok' : 'no', say: v.match ? 'Checked: the amount you sent matches the fingerprint saved on chain.' : 'The amount you sent does not match the fingerprint saved on chain.', rc: A.txLine(v.tx, 'on-chain memo') }; }
-      const o = await A.mist(A.notes().includes(+extra.amt) ? +extra.amt : A.notes()[0], extra.to || A.bankDefault());
-      extra.tee = o.tee; if (o.decision === 'allowed') extra.sent = o;
-      return { o, keep: o.decision === 'allowed', hero: o.decision === 'allowed' ? APPS.bank.hero() : null, say: o.decision === 'allowed' ? `Sent ${o.bucket} NEAR to ${o.to === A.S.me ? 'you' : esc(short(o.to, 12, 6))}. Only a fingerprint of the amount is public.` : `Refused: ${A.why(o.reason)}.`, rc: `<span class="rc">${o.tee?.ok ? 'Checked in a secure enclave' : 'Enclave check ran'}</span>` + A.txLine(o.tx) };
+    bind: () => {
+      const hooks = {
+        state: extra,
+        notes: () => A.notes(),
+        payees: () => A.bankPayees(),
+        proof: () => A.mainProof(),
+        def: () => extra.to || A.bankDefault(),
+        capNear: () => bankCapNear(),
+        tee: () => A.teeFresh(),
+        onNote: v => { extra.amt = v; },
+        onTo: v => { extra.to = v; },
+        hideRefuse: () => sh?.hideRefuse?.(),
+        onSend: (opts) => sendBankNote(opts?.amount),
+        onSeal: () => openBankEnvelope(),
+        onFile: () => showBankFile(),
+        repaint: () => { if (cur === 'bank') paint(); },
+      };
+      mountShop('bank', document.getElementById('t-form'), hooks);
     },
+    btn: () => `Send ${A.notes().includes(+extra.amt) ? +extra.amt : A.notes()[0]} NEAR privately`,
+    hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(String(extra.sent.commitment || '').slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
+    run: async () => sendBankNote(A.notes().includes(+extra.amt) ? +extra.amt : A.notes()[0]),
   },
   guard: {
     label: 'Guardhouse · prompt-injection test', idle: 'Pick a trick, such as an invoice with a hidden line telling AI helpers to pay someone else. I\u2019ll check the payee before I sign. A try costs at most 0.001 NEAR, and only if your rules allow it.',
@@ -755,6 +853,10 @@ function proofDrawer() {
 // ---------- gate: wallet → charter → rules → shop ----------
 function paint() {
   const app = APPS[cur]; if (!app) return; const st = A.S.ready ? A.stage() : 'load';
+  document.body.classList.toggle('bank-tray', cur === 'bank');
+  document.body.classList.toggle('ferry-tray', cur === 'ferry');
+  if (cur !== 'ferry') { const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; }
+  if (cur !== 'bank') hideBankDock();
   wallet(); ruleChip(); label(app.label); proofDrawer();
   if (cur === 'hall') { const m = $('#t-more'); if (m) { m.href = hallRowHref(who()); m.classList.add('row-btn'); m.dataset.testid = 'change-my-row'; } }
   if (phase === 'busy') return;
@@ -793,12 +895,11 @@ function paint() {
   if (phase === 'idle') say(app.idle);
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
   if (cur === 'ferry') {
-    document.body.classList.add('ferry-tray');
     // The card owns Get quote, Load cargo, Ask charter and Get another quote. One of each.
     hideFerryPrimary();
+  } else if (cur === 'bank' && st === 'ready') {
+    hideBankPrimary();
   } else {
-    document.body.classList.remove('ferry-tray');
-    const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true;
     btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
   }
 }
@@ -830,7 +931,7 @@ async function primary(auto = false) {
     say(res.say); react(kind);
     rcpt((rule ? `<span class="rule ${kind}" data-testid="rule">${kind === 'ok' ? '✓' : '✕'} ${esc(rule)}</span>` : '') + (res.rc || A.txLine(res.o?.tx)));
     const app = APPS[cur];
-    if (cur === 'ferry') hideFerryPrimary();
+    if (cur === 'ferry' || (cur === 'bank' && A.stage() === 'ready')) hideFerryPrimary();
     else btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : (AGAIN[cur] || 'Do it again')));
     if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
     document.body.dataset.app = kind; ruleChip(); proofDrawer();
@@ -842,7 +943,7 @@ async function primary(auto = false) {
   }
 }
 const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another entry', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Send another note', toll: 'Pass the gate again' };
-function fail(e) { stopProgress(); phase = 'idle'; if (cur === 'ferry') { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); } say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry') hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
+function fail(e) { stopProgress(); phase = 'idle'; if (cur === 'ferry') { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); } if (cur === 'bank') sh?.hideRefuse?.(); say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry' || (cur === 'bank' && A.stage() === 'ready')) hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
 
 // ---------- rules sheet ----------
 function openRules() {
@@ -923,15 +1024,16 @@ export function boot() {
   return booted;
 }
 export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
-  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry');
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('bank-tray', id === 'bank');
   const dock0 = document.getElementById('ferry-agent-dock'); if (dock0) dock0.hidden = id !== 'ferry';
+  if (id !== 'bank') hideBankDock();
   const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = '';
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
   // the Toll room reopened with a visit under way: pick it up (countdown, or settle now if Base is final)
   if (id === 'toll') booted?.then(() => { const v = cur === 'toll' && A.stage() === 'ready' && A.tollVisit(); if (v && !v.done && phase === 'idle') primary(true); }).catch(() => {}); }
-export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('bank-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; hideBankDock(); const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };

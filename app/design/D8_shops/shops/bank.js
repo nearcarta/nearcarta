@@ -1,7 +1,7 @@
-// Mist Bank: a vault with a street window. The street sees that a payout happened; the ledger shows only the on-chain
-// commitment to the amount. The API no longer returns the amount, salt or viewing key, and this view never shows an amount.
+// Mist Bank: a vault with a street window. A shielded street payout hides its amount. A charter propose on the
+// board publishes the NEAR amount. A sealed rule stays a commitment until the send that uses it.
 // Data: D6 BANK when the host provides it (tech app), else the live-read snapshot in data/live.js (tools/snapshot.mjs).
-import { THREE, room, put, makeRobot, C, CSS, radial } from '../js/core.js';
+import { THREE, room, put, makeRobot, C, CSS, radial, wait, tween } from '../js/core.js';
 import { row, h3, note, proof, paper, esc } from './_ui.js';
 import * as D from '../../D6_dashboards/src/data.js';
 import { BANK } from '../data/live.js';
@@ -23,6 +23,7 @@ function live(b) {
     note(`<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.txid.slice(0, 12))}… ↗</a> · ${esc(String(s.confirmations))} confirmations${b.at ? ' · read ' + esc(b.at) : ''}`),
     h3('The oath · NEAR'),
     row({ k: `Payout approved by clause ${b.oath.clause}`, why: 'the memo on chain holds only a commitment to the amount', st: b.oath.ok ? 'ok' : 'no', stText: b.oath.ok ? 'allowed' : 'not verified', tx: b.oath.tx }),
+    note('On the board path the NEAR amount is a public argument of propose. A sealed rule stays hidden until the send that uses it.'),
     h3('The commitment · NEAR memo'),
     row({ k: `sha256 ${short(b.commitment.value)}`, why: 'binds the paid amount without showing it; this app never receives the amount, salt or viewing key', st: 'ok', stText: 'amount hidden', src: 'mainnet' }),
     `<p class="kv">${esc(b.commitment.value)}</p>`,
@@ -77,11 +78,43 @@ export default async function bank() {
   await put(scene, 'decoration/props/crate_B_small', { x: -1.75, z: .75, fitW: .45 });
   lantern(scene, -1.9, -.5, { h: 1.5 });
   const rob = await makeRobot(scene); rob.at(1.45, .95); rob.lookAt(new THREE.Vector3(.75, 0, .55), { toViewer: .8 }); rob.face = rob.faceGoal; rob.g.rotation.y = rob.face;
+  const wax = new THREE.MeshStandardMaterial({ color: 0xc0463e, roughness: .5 });
+  const stamps = [-0.2, 0.15, 0.5].map(x => {
+    const m = mesh(scene, new THREE.CylinderGeometry(.07, .07, .025, 18), wax, [x, .82, .78], { rx: Math.PI / 2 });
+    m.scale.setScalar(0.001);
+    return m;
+  });
+  const tags = [
+    { obj: stamps[1], pos: new THREE.Vector3(0, .4, 0), html: 'Charter refused', cls: 'no hide' },
+  ];
+  const hideRefuse = () => {
+    const el = tags[0].el;
+    if (el) { el.classList.add('hide'); el.setAttribute('hidden', ''); }
+    stamps.forEach(m => m.scale.setScalar(0.001));
+  };
+  const showRefuse = () => {
+    const el = tags[0].el;
+    if (!el) return;
+    el.classList.remove('hide');
+    el.removeAttribute('hidden');
+  };
   let t = 0;
   return {
-    rob, scene, camera, tags: [],
+    rob, scene, camera, tags, hideRefuse,
     panel: { title: 'Mist Bank', src: 'mainnet', srcNote: 'Operator-run worker: the mainnet send is made by a worker Nearcarta runs, not by your charter or a contract.', label: FLAT.label, hero: HERO, action: null },
     proof: PROOF,
+    *act(opts = {}) {
+      if (opts.refused) {
+        showRefuse();
+        yield wait(.4);
+        return;
+      }
+      hideRefuse();
+      for (const m of stamps) {
+        yield tween(.35, k => m.scale.setScalar(Math.max(0.001, k)));
+        yield wait(.15);
+      }
+    },
     update(dt) { t += dt; rob.update(dt); mist.forEach((m, i) => { m.position.x = wx - .42 + ((t * .08 + i * .3) % .84); m.material.opacity = .25 + .12 * Math.sin(t + i); }); shape.material.opacity = .6 + .15 * Math.sin(t * .8); wheel.rotation.z = Math.sin(t * .3) * .08; },
   };
 }
