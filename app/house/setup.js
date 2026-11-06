@@ -16,7 +16,7 @@ import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf, storedAgentKey } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
-import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
+import { AGENT_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
 import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
 import { runAsk } from '../../shared/vault/run.js';
@@ -326,6 +326,7 @@ function wireRules() {
   wire(() => { const r = rules();
     if (!(r.cap > 0) || !(r.daily >= r.cap)) { msg = 'The daily budget must be at least the per-payment cap.'; return render(); }
     if (!r.receivers.length || r.receivers.some(a => !/^[a-z0-9._-]{2,64}$/.test(a))) { msg = 'Add at least one valid account id.'; return render(); }
+    if (boardLive() && !st.trial && !callsFitRow(callsFor(r, MAIN.board.contract))) { msg = 'That shop list is too long for one row. A row holds 0.02 NEAR of storage, so shorter account ids or fewer shops fit.'; return render(); }
     done(st.step); go(st.step + 1); });
 }
 
@@ -406,6 +407,10 @@ function ruleArgs(r, expiresAt = sessionExpiresAt(r.hours)) {
 function boardArgs(r, agent) {
   return { rules: ruleArgs(r), agent, fund: ROW_FUND.toString() };
 }
+// The call list this row will carry. `callsFitRow` checks it against the row's storage.
+function callsFor(r, contract) {
+  return callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', stampCalls(contract, toY(r.cap))).calls;
+}
 // The agent key is also added to the visitor's own account as a function-call access key. It may call
 // propose and propose_call on the board, with a gas allowance only. It cannot attach NEAR.
 // https://docs.near.org/protocol/accounts-contracts/access-keys
@@ -415,6 +420,10 @@ const AGENT_ALLOW = BigInt(GAS_TOPUP_YOCTO);
 // open_charter keeps ROW_FUND as the row's own spendable balance (enough for a full day at the default 0.01 budget);
 // the rest of the 0.02 deposit after storage (~0.004) is refunded in the same call.
 const ROW_FUND = YN / 100n, TOPUP = YN / 200n;
+// A row holds 0.02 NEAR of storage, and v2 bills the real trie bytes. `callsFitRow`
+// measures the call list (shops plus the wrap.near trio and the stamp) against that
+// budget: seven 20-byte shops fit, eight do not, and longer names fit fewer.
+// The measured numbers are in `contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`.
 const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: [...AGENT_METHODS], allowance: AGENT_ALLOW.toString() } } } });
 // The login plugin stores its key here. Use it as the row agent when this browser has not made one yet.
 function adoptPluginKey(id) {
