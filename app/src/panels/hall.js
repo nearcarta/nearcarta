@@ -75,6 +75,7 @@ export function normalizeRow(body) {
     sealed: !!(raw.sealed ?? rules.sealed),
     agent: raw.agent || '',
     nonce: String(raw.nonce ?? '0'),
+    epoch: raw.epoch == null || raw.epoch === '' ? '' : String(raw.epoch),
     balance: String(raw.balance ?? '0'),
     spent_today: String(raw.spent_today ?? '0'),
     actions_today: Number(raw.actions_today ?? 0),
