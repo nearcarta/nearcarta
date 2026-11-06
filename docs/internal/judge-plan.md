@@ -382,3 +382,95 @@ Every shop uses the approved tray (section 7) and the shared agent (5.2). "No co
   - No 0.001 defaults.
 - Cost: spend the 0.001 purse, `close()` returns about 2.47 and recreating costs about 2.6, so net about 0.13 NEAR. The visitor pays the 0.02 mint storage and their Base ETH through Ferry.
 - Priority: P2c, after Toll, because it reuses 5.4.
+
+## 7. Design standard: the approved tray
+
+The reference is `docs/internal/design/approved-tray-ferry.jpg`, the city Ferry tray. Every shop uses this pattern in the city. The standalone `/design/D8_shops/?shop=<id>` page is legacy and must open this same tray.
+
+The tray, top to bottom:
+1. Tabs at the top (three per shop).
+2. An icon flow card showing what moves where, with real icons from the icon library. No placeholder squares.
+3. Labelled fields with space between them: label above, field below.
+4. One clear gold CTA.
+5. Short status lines: at most two, with a tx link when there is a tx.
+
+Per-shop tabs, fields and CTA:
+
+| Shop | Tabs | Icon flow card | Fields | Gold CTA |
+|---|---|---|---|---|
+| Ferry | Swap / Routes / Rules | token to token, with chain badges | Find a token, Chain, You pay, You get, Amount, Receive at; Rules: Max slippage, Repeat, Every | Get quote, then Swap |
+| Toll Bridge | Cross / Ledger / Policy | NEAR row to Base, with your derived address | Chain, Asset, To address, Amount, Fee (read from policy), Your Base address (copy) | Cross to Base |
+| Chronicle | Feed / Statement / Verify | account to ledger to anchor | Account, Period, Shop filter; Verify: Hash | Write statement, then Anchor |
+| Guardhouse | Check / Pay safely / Blocks | payee to shield to verdict lamp | Payee account, Amount, Invoice or instruction text | Check payee, then Pay through guard |
+| Town Hall | Post job / Agents / Receipts | budget to contractor to agents | Task, Budget, Deadline, Max parts; Agents: Your agent name, Bond | Post job |
+| Mist Bank | Audit / Attestation / Proof log | statement to TEE chip to verified | Statement (sample or upload), Model, Nonce (auto) | Audit privately |
+| Payouts | Invoice / Payroll / CSV | any chain token to USDC on NEAR | Invoice: Amount USD, Receive account, Memo, Due; Payroll rows: Payee, Chain, Asset, Amount | Create invoice link, or Pay rows |
+| Vault Arena | Guardians / Attack / Score | message to guardian to pot | Attack: Guardian, Your message, Entry fee (read from the guardian); Mint: Name, Persona, Oath, Pot, Entry fee | Attack, or Mint guardian |
+| Your House | Deed / Vaults / Heirs | deed to Base and Bitcoin addresses | Vaults: Chain, To, Amount; Heirs: Heir, Guardians, Check-in window, Wait | I'm alive, or Send from house |
+
+The first line of every tray says in plain words what the visitor gains. Jargon (row, charter, TEE, secp256k1) only appears behind a label or a tooltip.
+
+Design acceptance check (required for every shop PR):
+- The shop's chat opens https://nearcarta.vercel.app in its browser, enters the shop from All shops inside the city (not the standalone page), and screenshots every tab at 1280x800 and 390x844. The screenshots go in the PR.
+- Fail if:
+  - any block of white text runs more than three lines without a label or spacing (cramped stacked text);
+  - any button is under 40 px tall or any tap target is under 44x44 px;
+  - more than one gold CTA is visible;
+  - there is no icon flow card, or any icon is a placeholder;
+  - a status runs longer than two short lines;
+  - the tray overlaps All shops, Back to town or the AI bubble;
+  - any "something did not load" error shows.
+- The legacy `/design/D8_shops/?shop=<id>` renders the same tray.
+
+## 8. Funding, build order and cut line
+
+Liquid on `nearcarta.near`: about 0.45 NEAR (`mainnet.json` last recorded 0.56). Recycling stake one step at a time covers board, toll, house and arena. Guardhouse needs about 1.0 to 1.5 NEAR of new stake. Options:
+
+- A: top up about 1.5 NEAR.
+- B: retire `charter.nearcarta.near` (about 4.26 NEAR) through its own `queue_upgrade` to reaper then `reap` path. Do this only after a dry run shows `npm run verify` and `npm run check-cited` re-read txs and not live state. Then update the README: retired, proofs stay on chain.
+
+Recommendation: B if that dry run passes, otherwise A.
+
+Every step is close or reap first, check the balance, then create.
+
+| When | Work | NEAR (net) |
+|---|---|---|
+| Nov 6-7 (P0) | Honesty fixes; shared tray; shared executing agent; Ferry Rules; Payouts fixes and merge #34; Mist Bank auditor UI and API; Chronicle timeline and statement; fix doc drift; fix or close #35 and #40 CI | 0 |
+| Nov 7-8 (P1) | Board v2 sandbox and exploit tests; verifier spike go or no-go; deploy board v2; re-setup deletes stale keys | about -0.1 |
+| Nov 9 (P2a) | Toll v7 with the foreign module | about -0.07 |
+| Nov 10 (P2b) | Guardhouse contract with the verifier | about -1.0 to -1.5 (funding A or B) |
+| Nov 11 (P2c) | House v3; cut-line review | about -0.13 |
+| Nov 12 (P3) | Arena v2 | about -0.1 |
+| Nov 13 (P4) | Town Hall in place, or cut; readme-numbers, verify, check-cited, gitleaks, demo video | about -0.4 from townhall's own balance |
+| Nov 14 | Submit | 0 |
+
+Cut line (Nov 11): if Toll or Guardhouse is not live with a tx by then, drop Town Hall to its honest listing and keep Arena on the current contract with the verifier off-chain. Never cut the P0 honesty fixes.
+
+Old PRs:
+- #34: merge after the fixes above.
+- #35, #37, #38: rework into the new tray. Salvage the check endpoint, the attestation UI and the feed, export and verify UI.
+- #36: close. Its contract change cannot land; rewrite as house v3.
+- #39, #40: close and replace.
+
+Global acceptance (every shop, live-tested):
+- It passes the design check in section 7.
+- No amount or payee constants in `app/src` or `app/design`. Grep for 0.001, 0.005, 0.2 and our accounts used as a payee.
+- A fresh account after /setup completes the main action with no wallet popup.
+- The AI agent executes every listed tool, and the gold CTA produces the same tx.
+- Cinema plays only after a SUCCESS receipt. The refused path shows its refusal tx.
+- Every README claim links to a test or a tx.
+- Sandbox teardown returns all NEAR to `nearcarta.near` and leaves no full-access key.
+
+## 9. Differences from the current plan, in one list
+
+1. Board v2 also gets 24 call pairs, tighten-only rules from the agent, an event-only anchor and an upgrade path, so it is the last board reap.
+2. Guardhouse enforces a TEE-signed verdict on chain, and OutLayer is optional.
+3. One verifier serves Guardhouse, Arena and Town Hall, and one foreign module serves Toll and House.
+4. Five deploys instead of seven. Chronicle needs no contract, and Town Hall deploys in place on townhall.
+5. Mist Bank builds the Privacy prompt (a private auditor) and keeps confidential pay behind a flag.
+6. Toll is an autonomous relay business that pays its own costs. The visitor fills gas through Ferry, so there is no keeper key.
+7. Arena's fees go to creators and players, and the city takes nothing.
+8. One executing agent, where the browser signs and the CTA and the agent share one function.
+9. The design standard and the in-city screenshot check are required for every shop PR.
+10. A named funding source for new stake, and a dated cut line.
+11. The aim is four likely firsts, four placements and a grand-prize story, not "first in all 8".
