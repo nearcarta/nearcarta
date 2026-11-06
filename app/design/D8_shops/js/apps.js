@@ -302,21 +302,22 @@ function settled(shop, out) {
   readRules().catch(() => {});
   return out;
 }
-async function boardPay({ shop, receiver, amountY }) {
+async function boardPay({ shop, receiver, amountY, chainCap = false, reveal = null }) {
   // The row nonce moves on every propose. A cached S.boardRow signs the previous nonce and the contract returns ERR_BAD_SIG.
   const row = await view(S.board, 'get_charter', { owner: S.me });
   if (!row) throw new Error('no charter row yet: finish setup first');
   S.boardRow = row;
   const amount = String(amountY);
   const local = localRefusal(receiver, amount);
-  if (local) return { tx: null, decision: 'denied', reason: local, action: null, amount, receiver, fromRule: true, cap: pay()?.per_action_cap || null };
+  // Payouts submits an over-cap row so propose can refuse it on chain. Other shops still stop here.
+  if (local && !(chainCap && local === 'over_per_action_cap')) return { tx: null, decision: 'denied', reason: local, action: null, amount, receiver, fromRule: true, cap: pay()?.per_action_cap || null };
   const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
   if (W.pubkeyHex(key) !== String(row.agent || '')) {
     return { tx: null, decision: 'denied', reason: 'agent_key_mismatch', action: null, amount, receiver, fromRule: true, cap: pay()?.per_action_cap || null };
   }
   const msg = proposalMessage({ contract: S.board, owner: S.me, receiver, amount, nonce: String(row.nonce) });
   const signature = W.signMessage(key, msg);
-  const args = { owner: S.me, receiver, amount, signature, reveal: null };
+  const args = { owner: S.me, receiver, amount, signature, reveal: reveal || null };
   const ak = await proposeAccessKey(key);
   try {
     if (ak) {
@@ -346,8 +347,8 @@ async function boardPay({ shop, receiver, amountY }) {
     throw e;
   }
 }
-export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null }) {
-  if (S.board) return boardPay({ shop, receiver, amountY });
+export async function ask({ shop, clauseId = 'pay', receiver, amountY, memo = null, reveal = null }) {
+  if (S.board) return boardPay({ shop, receiver, amountY, reveal });
   const st = await view(S.charter, 'get_state');
   const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
   const p = { shop, clause_id: clauseId, receiver, amount: String(amountY), nonce: String(st.next_nonce), policy_version: st.policy_version,
@@ -611,7 +612,7 @@ export const bucketOf = a => BUCKETS.find(b => a <= b) ?? Math.ceil(a * 10) / 10
 // Default: yourself if you listed yourself, else the first payee you added.
 export const bankPayees = () => (pay()?.receivers || []);
 export const bankDefault = () => { const r = bankPayees(); return r.includes(S.me) ? S.me : r[0] || null; };
-export async function mist(amount, to = bankDefault()) {
+export async function mist(amount, to = bankDefault(), reveal = null) {
   if (!to) throw new Error('add a payee to your rules first');
   if (!notes().includes(amount)) throw new Error('pick one of the set amounts: ' + notes().join(', ') + ' NEAR');
   const yocto = toY(amount), salt = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
@@ -620,7 +621,7 @@ export async function mist(amount, to = bankDefault()) {
   if (!tee.ok) throw new Error('TEE check failed, nothing sent');
   try { localStorage.setItem('nearcarta.sign.flow', 'private'); } catch { /* the prompt falls back to the method line */ }
   let o;
-  try { o = await ask({ shop: 'mistbank', receiver: to, amountY: yocto, memo: commitment }); }
+  try { o = await ask({ shop: 'mistbank', receiver: to, amountY: yocto, memo: commitment, reveal }); }
   finally { try { localStorage.removeItem('nearcarta.sign.flow'); } catch { /* leave the flag if storage is blocked */ } }
   localStorage.setItem(LS_OPEN(S.charter), JSON.stringify({ yocto, salt, commitment, action: o.action, tx: o.tx }));
   return { ...o, commitment, bucket: amount, tee, to };
@@ -830,19 +831,27 @@ export async function teeCheck(nonce) {
 }
 export const teeFresh = () => teeCheck(Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join(''));
 export const payoutLeft = () => P.leftToday(pay(), S.usage.pay);
-export async function payouts(rows) {
-  const key = agent(); if (!key) throw new Error('no agent key in this browser: sign your rules first');
+export async function payouts(rows, opts = {}) {
+  const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
   if (S.board) {
-    const plan = rows.slice(0, 3);
-    if (P.payoutIssues(plan).length) throw new Error('Check the account name and the 0.005 NEAR cap. Nothing was sent.');
+    const plan = (rows || []).slice(0, 3).filter(r => String(r?.asset || 'NEAR').toUpperCase() !== 'USDC');
+    if (plan.some(r => String(r?.to || '').trim() && !P.nearAccountOk(r.to))) throw new Error('Check the account name. Nothing was sent.');
+    const capNear = opts.capNear == null ? null : Number(opts.capNear);
     const out = [];
     for (const row of plan) {
       const amt = Number(row.amt) || 0;
-      if (!(amt > 0)) continue;
-      out.push(await boardPay({ shop: 'payouts', receiver: row.to, amountY: toY(amt) }));
+      const to = String(row.to || '').trim();
+      if (!(amt > 0) || !to) continue;
+      const over = capNear != null && amt > capNear + 1e-12;
+      try {
+        out.push(await boardPay({ shop: 'payouts', receiver: to, amountY: toY(amt), chainCap: over }));
+      } catch (e) {
+        out.push({ tx: e.tx || null, decision: e.cancelled ? 'cancelled' : 'denied', reason: String(e.message || e).slice(0, 160), receiver: to, amount: String(toY(amt)) });
+        if (e.cancelled) break;
+      }
     }
     const paid = out.filter(o => o.decision === 'allowed').length;
-    return { tx: out.at(-1)?.tx || null, decision: paid === out.length && out.length ? 'allowed' : 'denied', reason: out.find(o => o.decision !== 'allowed')?.reason || 'ok', n: out.length, total: plan.reduce((t, r) => t + Math.min(0.005, Number(r.amt) || 0), 0), paid, steps: out };
+    return { tx: out.at(-1)?.tx || null, decision: paid === out.length && out.length ? 'allowed' : (out.length ? 'denied' : 'denied'), reason: out.find(o => o.decision !== 'allowed')?.reason || (out.length ? 'ok' : 'nothing_to_send'), n: out.length, total: plan.reduce((t, r) => t + (Number(r.amt) || 0), 0), paid, steps: out };
   }
   if (!canBatch()) throw new Error('your charter pays one at a time');
   const st = await view(S.charter, 'get_state');
