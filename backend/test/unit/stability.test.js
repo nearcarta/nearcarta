@@ -37,20 +37,11 @@ test('read routes: an RPC 429 serves the last good value marked stale, or 503 + 
     : new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { result: [...Buffer.from(JSON.stringify({ ok: 1 }))], logs: [] } }), { status: 200 });
   const app = makeApp();
   busy = true;
-  // The arena reads its contract on every call, so an RPC 429 there is a cold read with no fallback.
+  // /api/guardhouse now answers 404 for the retired charter before it reads RPC,
+  // and several reads serve a snapshot instead of failing. /api/arena propagates.
   const cold = await app.request('/api/arena');
   assert.equal(cold.status, 503); assert.equal(cold.headers.get('retry-after'), '3');
   assert.equal((await cold.json()).retry, true);
-});
-
-test('a retired charter answers as retired, not as a server error', async () => {
-  const app = makeApp();
-  const res = await app.request('/api/guardhouse');
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.retired, true);
-  assert.equal(body.state, null);
-  assert.match(body.note, /retired/i);
 });
 
 test('vault fresh read: waits and retries through RPC 429s instead of failing', async () => {

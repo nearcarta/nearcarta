@@ -7,23 +7,17 @@ import { DEP, MAINNET_DEP, cfg } from './config.js';
 import { view, txStatus, eventsFromOutcome, txResult, explorerTx, accessKeys } from './near.js';
 
 const G = DEP.guardhouse || null;
-/** True when this deployment's charter account was reaped: a fact, not a server error. */
-export const charterRetired = (id) => {
-  const list = MAINNET_DEP?.retired;
-  if (!id || !list || typeof list !== 'object') return false;
-  return list[id]?.status === 'deleted';
-};
+// charter.nearcarta.near was retired to nearcarta.near (recorded in mainnet.json `retired`).
+// A snapshot of a deleted account is not a server fault, so this answers a plain 404 instead of 500.
+const RETIRED = new Set(Object.entries(MAINNET_DEP?.retired || {})
+  .filter(([, v]) => v?.status === 'deleted')
+  .map(([id]) => id));
 export const oathId = G?.oath || MAINNET_DEP?.charter?.contract || null;
 
 export async function snapshot(oath = oathId) {
   if (!oath) throw Object.assign(new Error('no oath on this network'), { status: 503 });
-  if (charterRetired(oath)) {
-    // Board v2 replaced the charter account. Say so with a shaped answer: no page should show a 500
-    // for a contract that was retired on purpose, and no route should treat it as a transient error.
-    return {
-      oath, retired: true, state: null, clauses: {}, usage: {}, keys: { fullAccess: 0, functionCall: [] },
-      note: 'The charter account was retired when board v2 went live. A visitor rule is a board row; read it with get_charter.',
-    };
+  if (RETIRED.has(oath)) {
+    throw Object.assign(new Error(`${oath} is retired; its NEAR returned to ${MAINNET_DEP?.retired?.[oath]?.recovered_to || 'the owner'}`), { status: 404 });
   }
   const oathId = oath;
   const [state, clauses, keys] = await Promise.all([view(oathId, 'get_state'), view(oathId, 'get_clauses'), accessKeys(oathId)]);
