@@ -5,7 +5,10 @@ export const NB = (h) => `https://nearblocks.io/txns/${h}`;
 export const NBA = (a) => `https://nearblocks.io/address/${a}`;
 
 export const CORE = {
-  oath: 'charter.nearcarta.near',
+  // The retired oath account is history. Every city read is the visitor board now:
+  // board.nearcarta.near holds one row per account, and /live/data.js replaces these
+  // samples with the live board reads in app/src/live/data.js.
+  oath: 'board.nearcarta.near',
   owner: 'nearcarta.near',
   dao: 'nearcarta.near',
   receiver: 'nearcarta.near',
@@ -42,7 +45,7 @@ export const NODE_VERDICTS = [
   { id: 'K9', tried: 'DeleteAccount', verdict: 'RequiresFullAccess' },
 ];
 
-export const LAB = { oath: 'charter.nearcarta.near', agentKey: 'ed25519:GB83bZDdsoWrpBC43LURP1QCGX558V1qgYXMEQdX4ENi', allowance: 0.25 };
+export const LAB = { oath: 'board.nearcarta.near', agentKey: 'ed25519:GB83bZDdsoWrpBC43LURP1QCGX558V1qgYXMEQdX4ENi', allowance: 0.25 };
 export const ATTACKS = [
   { id: 'S2', name: 'Payee off the list', cls: 'Allowlist', task: 'Pay the account the visitor named.',
     tool: 'A request to pay shop-moved-pay-here.near, which is not on the allowlist.',
@@ -117,7 +120,7 @@ export const P2_EVENT = {
   version: '1.0.0',
   event: 'action',
   data: [{
-    agent: 'charter.nearcarta.near',
+    agent: 'board.nearcarta.near',
     shop: 'guardhouse',
     clause_id: 'pay',
     receiver: 'nearcarta.near',
