@@ -19,6 +19,7 @@ import { agentDeliveredNote, depositPlan, explainQuoteMiss, ferryStatusHtml, fer
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
 import { armGuardDock, dispatchGuardDock, ensureGuardDock, installGuardDock } from '/panels/guard-dock.js';
 import { hideBankDock } from '/panels/bank-tray.js';
+import { capFromSetup } from '/panels/bank-audit.js';
 import { armTollDock, dispatchTollDock, installTollDock } from '/panels/toll-dock.js';
 import { mergeTollChronicle, nextRowBalance, passPaidCopy, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
 import { deedMarkup } from '/panels/deed.js';
@@ -621,7 +622,9 @@ function gasNote() {
 }
 function bankCapNear() {
   const y = A.S.clauses?.pay?.per_action_cap || A.S.boardRow?.per_action_cap || null;
-  return y ? A.fromY(y) : null;
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('nearcarta.setup.v1') || 'null')?.cap; } catch { saved = null; }
+  return capFromSetup(y ? A.fromY(y) : null, saved);
 }
 
 function tollPassRows() {
@@ -1197,7 +1200,7 @@ function paint() {
       say('Quote ready. Load cargo as guest, or write your rules to Ask charter.');
       hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.(); btn('Write my rules'); return;
     }
-    if (cur === 'guard' && app.form) {
+    if ((cur === 'guard' || (cur === 'bank' && app.guest)) && app.form) {
       say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
     }
     say('Write my rules. I can never break them.'); form(''); hero(null); btn('Write my rules'); return;
@@ -1206,6 +1209,9 @@ function paint() {
     if (cur === 'guard' && app.form) {
       say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
     }
+    if (cur === 'bank' && app.guest && app.form) {
+      say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
+    }
     say(`Your rules are queued. ${esc(A.pendingNote())}.`); form(''); hero(null); btn('Check again'); return;
   }
   if (st === 'key') {
@@ -1213,6 +1219,8 @@ function paint() {
     else if (ferryQuoted && app.guest && app.form) {
       say('Quote ready. Load cargo as guest, or finish the helper key to Ask charter.');
       hero(app.hero ? app.hero() : null); form(app.form()); app.bind?.();
+    } else if (cur === 'bank' && app.guest && app.form) {
+      say(app.idle); hero(null); form(app.form()); app.bind?.(); hideFerryPrimary(); return;
     } else { form(''); hero(null); }
     const q = A.pendingKey();
     if (q && Date.now() >= q.eta) { if (!ferryQuoted) say('Your helper key is ready to turn on.'); btn('Turn on helper key'); }
@@ -1270,7 +1278,7 @@ async function primary(auto = false) {
     document.body.dataset.app = 'ok';
   }
 }
-const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another statement', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Audit another sample', toll: 'Pass the gate again' };
+const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another statement', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Audit another statement', toll: 'Pass the gate again' };
 function fail(e) { stopProgress(); phase = 'idle'; if (cur === 'ferry') { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); } if (cur === 'guard') sh?.hideRefuse?.(); if (cur === 'toll') sh?.showRefuse?.(A.plainError(e).slice(0, 140)); if (cur === 'bank') sh?.hideRefuse?.(); say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry' || cur === 'toll' || cur === 'guard' || cur === 'bank' || cur === 'chronicle') hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
 
 // ---------- rules sheet ----------
