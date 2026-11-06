@@ -71,3 +71,59 @@ test('the shared module stays free of node built-ins', async () => {
   assert.doesNotMatch(src, /from\s+['"]node:/);
   assert.doesNotMatch(src, /require\(/);
 });
+
+// A static host serves only app/dist. A module the city imports raw cannot use a
+// bare specifier unless the page's import map names it, and cannot reach outside
+// the deploy root. The Toll tray hung on "Opening…" because two of these failed:
+// ../../../shared/guard/board-pay.js 404'd, and @noble/hashes did not resolve.
+test('browser modules the city imports raw resolve without a bundler', async () => {
+  const { readFileSync, existsSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const dist = `${root}app/dist`;
+  // The page's own import map is the only thing that can resolve a bare specifier.
+  const town = readFileSync(`${dist}/index.html`, 'utf8');
+  const map = JSON.parse((town.match(/<script type="importmap">([\s\S]*?)<\/script>/) || [, '{"imports":{}}'])[1]);
+  const mapped = key => Object.keys(map.imports || {}).some(k => (k.endsWith('/') ? key.startsWith(k) : key === k));
+  // These are loaded by the browser as modules, not bundled by esbuild.
+  const entries = ['/board-call-as.js', '/guard-board-pay.js', '/panels/guard-agent.js',
+    '/panels/deep.js', '/panels/toll-room.js', '/design/D8_shops/js/apps.js', '/design/D8_shops/js/shopui.js'];
+  const seen = new Set();
+  const bad = [];
+  const walk = (url) => {
+    if (seen.has(url)) return;
+    seen.add(url);
+    const file = dist + new URL(url, 'https://site/').pathname;
+    if (!existsSync(file)) { bad.push(`${url} does not exist in dist`); return; }
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(/(?:^|\n)\s*(?:import|export)\s[^'"]*from\s*['"]([^'"]+)['"]/g)) {
+      const spec = m[1];
+      if (!spec.startsWith('.') && !spec.startsWith('/')) {
+        if (!mapped(spec)) bad.push(`${url} -> ${spec} (bare, not in the import map)`);
+        continue;
+      }
+      // Resolve like a browser: relative to the module, clamped at the origin root.
+      const next = new URL(spec, 'https://site' + url).pathname;
+      // Anything that leaves dist resolves to a path the host does not have.
+      if (!existsSync(dist + next)) { bad.push(`${url} -> ${spec} (${next} is not in dist)`); continue; }
+      walk(next);
+    }
+  };
+  for (const e of entries) walk(e);
+  assert.deepEqual(bad, [], `unreachable browser imports:\n${bad.join('\n')}`);
+});
+
+// The guard board module is imported by a browser module, so the implementation
+// has to sit inside the deploy root. shared/ keeps the node import path.
+test('the guard board module resolves inside the deploy root', async () => {
+  const { readFileSync, existsSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const src = readFileSync(`${root}app/src/panels/guard-agent.js`, 'utf8');
+  assert.match(src, /from '\.\.\/guard-board-pay\.js'/);
+  assert.doesNotMatch(src, /\.\.\/\.\.\/\.\.\/shared\//);
+  assert.ok(existsSync(`${root}shared/guard/board-pay.js`));
+  assert.match(readFileSync(`${root}shared/guard/board-pay.js`, 'utf8'), /from '\.\.\/\.\.\/app\/src\/guard-board-pay\.js'/);
+  assert.ok(existsSync(`${root}app/src/guard-board-pay.js`), 'the implementation lives in app/src so the browser can load it');
+  assert.match(readFileSync(`${root}app/src/guard-board-pay.js`, 'utf8'), /from '\.\/board-call-as\.js'/);
+});

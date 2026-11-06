@@ -2,7 +2,11 @@
 // on cursor/board-v2-1e87 (a5d9bfe and later). The contract rebuilds this
 // string. A shop trusts row_owner only when the predecessor is the board.
 // A nested row_owner is not authority.
-import { sha256 } from '@noble/hashes/sha2.js';
+//
+// This module is served raw to the browser (the city imports /board-call-as.js),
+// so it must use relative paths: a bare specifier such as @noble/hashes cannot
+// resolve in a browser without an import map. sha256.js is the same hash.
+import { sha256Hex } from './sha256.js';
 
 export const CALL_AS_VERSION = '2';
 export const BOARD_V2 = {
@@ -13,8 +17,6 @@ export const BOARD_V2 = {
   refund: 'refund_action',
   settle: 'settle',
 };
-
-const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 
 export function injectRowOwner(args, owner) {
   const value = JSON.parse(args);
@@ -35,7 +37,7 @@ export function effectsCanon(effects) {
 
 export function callAsMessage({ network, contract, owner, receiver, method, args, deposit, nonce, expiry, epoch, effects, hold }) {
   const injected = injectRowOwner(args, owner);
-  const hash = hex(sha256(new TextEncoder().encode(injected)));
+  const hash = sha256Hex(injected);
   return [
     'board-call-as-v1', network, contract, CALL_AS_VERSION, owner, receiver, method, hash,
     String(deposit), String(nonce), String(expiry), String(epoch), effectsCanon(effects),
