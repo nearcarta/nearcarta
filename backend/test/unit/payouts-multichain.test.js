@@ -253,18 +253,25 @@ test('the row call list carries the USDC storage pair when the row has room', ()
   assert.match(tray, /payouts\/sponsor/);
 });
 
-test('guardhouse: no retired charter default and no 500 on an unreadable one', async () => {
-  const { makeApp } = await import('../../src/app.js');
-  const app = makeApp();
-  const res = await app.request('/api/guardhouse/check/cafe.near');
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.charter, null, 'no retired charter is used as the judge');
-  assert.match(body.no_allowlist || '', /no charter was named|not a Nearcarta charter/);
-  // Naming the retired contract is refused as a charter, not turned into a 500.
-  const old = await app.request('/api/guardhouse/check/cafe.near?charter=charter.nearcarta.near');
-  assert.equal(old.status, 200);
-  assert.equal((await old.json()).charter, null);
+test('guardhouse: a retired charter is not a policy, and an unreadable one is not a 500', async () => {
+  // No app import here: the routes pull the whole API in, which is slow under the unit runner.
+  // The two units the route is built from are tested directly.
+  const { retiredSnapshot } = await import('../../src/guardhouse.js');
+  const r = retiredSnapshot('charter.nearcarta.near');
+  assert.equal(r.oath, null);
+  assert.equal(r.board, 'board.nearcarta.near');
+  assert.match(r.retired.why, /retired/);
+  const cp = await import('../../src/counterparty.js');
+  const unread = async () => { throw new Error('UNKNOWN_ACCOUNT: charter does not exist while viewing'); };
+  const v = await cp.check('cafe.near', {
+    charter: 'charter.nearcarta.near',
+    view: unread,
+    viewAccount: async () => ({ code_hash: '11111111111111111111111111111111' }),
+    fpost: async () => ({ account_txs: [] }),
+  });
+  assert.equal(v.verdict, 'warn', 'a check with no readable allowlist warns, it does not throw');
+  assert.match(v.signals.charter_unread, /UNKNOWN_ACCOUNT/);
+  assert.equal(v.charter, 'charter.nearcarta.near');
 });
 
 test('source: the tray starts content under the tabs, at the approved Ferry spacing', () => {

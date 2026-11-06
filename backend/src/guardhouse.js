@@ -14,11 +14,35 @@ const RETIRED = new Set(Object.entries(MAINNET_DEP?.retired || {})
   .map(([id]) => id));
 export const oathId = G?.oath || MAINNET_DEP?.charter?.contract || null;
 
+/** What is true today when the old oath is gone: the live rules are per visitor row on the board. */
+export function retiredSnapshot(oath) {
+  const rec = MAINNET_DEP?.retired?.[oath] || {};
+  const board = MAINNET_DEP?.board?.contract || null;
+  const tx = rec.txs?.reap || rec.txs?.execute_change || null;
+  return {
+    oath: null,
+    retired: {
+      account: oath,
+      why: `${oath} was retired; its NEAR returned to ${rec.recovered_to || 'the owner'}.`,
+      tx,
+      url: tx ? explorerTx(tx) : null,
+    },
+    board,
+    state: null,
+    clauses: {},
+    usage: {},
+    keys: { fullAccess: 0, functionCall: [] },
+    note: board
+      ? `There is no single agent oath any more. Each visitor's rules are a row on ${board} (get_charter { owner }), and the board is the spend gate.`
+      : 'There is no single agent oath any more. Each visitor row is the spend gate.',
+  };
+}
+
 export async function snapshot(oath = oathId) {
   if (!oath) throw Object.assign(new Error('no oath on this network'), { status: 503 });
-  if (RETIRED.has(oath)) {
-    throw Object.assign(new Error(`${oath} is retired; its NEAR returned to ${MAINNET_DEP?.retired?.[oath]?.recovered_to || 'the owner'}`), { status: 404 });
-  }
+  // A retired account is not a server fault and not a live policy: answer with the retired fact and
+  // the live board, so no page reads a deleted charter as the current rules.
+  if (RETIRED.has(oath)) return retiredSnapshot(oath);
   const oathId = oath;
   const [state, clauses, keys] = await Promise.all([view(oathId, 'get_state'), view(oathId, 'get_clauses'), accessKeys(oathId)]);
   const usage = {};

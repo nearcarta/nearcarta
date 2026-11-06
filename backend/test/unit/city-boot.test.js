@@ -38,7 +38,16 @@ test('the shipped sha256 matches node:crypto on the board call text', () => {
   assert.match(msg, /^board-call-as-v1\|mainnet\|board\.nearcarta\.near\|2\|alice\.near\|house\.nearcarta\.near\|house_session_check_in\|[0-9a-f]{64}\|1\|4\|9\|0\|-\|exec$/);
 });
 
-test('a retired oath answers 404, not 500', async () => {
+test('a retired oath answers the retired fact and the live board, never a 404 or a 500', async () => {
   const { snapshot } = await import('../../../backend/src/guardhouse.js');
-  await assert.rejects(() => snapshot('charter.nearcarta.near'), e => e.status === 404 && /retired/.test(e.message));
+  const s = await snapshot('charter.nearcarta.near');
+  assert.equal(s.oath, null, 'no page may read a deleted contract as the current rules');
+  assert.equal(s.retired.account, 'charter.nearcarta.near');
+  assert.match(s.retired.why, /retired/);
+  assert.match(s.retired.why, /nearcarta\.near/);
+  assert.match(s.retired.tx, /^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
+  assert.equal(s.board, 'board.nearcarta.near');
+  assert.match(s.note, /row on board\.nearcarta\.near/);
+  assert.deepEqual(s.clauses, {});
+  assert.equal(s.state, null);
 });
