@@ -94,8 +94,13 @@ export const txLine = (h, label = 'receipt') => h ? `<a class="rc tx" data-testi
 export const receipts = () => (S.charter ? JSON.parse(localStorage.getItem(LS_RCPT(S.charter)) || '[]') : []);
 function keep(h, shop, decision, reason, x = {}) {
   if (!S.charter || !h) return; const k = LS_RCPT(S.charter); const l = JSON.parse(localStorage.getItem(k) || '[]');
-  l.unshift({ h, shop, decision, reason, ...x, at: Date.now() }); localStorage.setItem(k, JSON.stringify(l.slice(0, 40)));
+  const row = { h, shop, decision, reason, ...x, at: Date.now() };
+  const i = l.findIndex(r => r && r.h === h && r.shop === shop);
+  if (i >= 0) l.splice(i, 1);
+  l.unshift(row); localStorage.setItem(k, JSON.stringify(l.slice(0, 40)));
 }
+/** A shop result for the side panel. The same tx replaces its older row and becomes the newest. */
+export function rememberReceipt(h, shop, decision, reason, x = {}) { keep(h, shop, decision, reason, x); }
 
 // ---------- boot + wallet ----------
 // Config: retry with backoff (429/503 from a busy room), keep the last good copy, never fail on a busy API.
@@ -322,11 +327,11 @@ async function boardPay({ shop, receiver, amountY, chainCap = false, reveal = nu
   try {
     if (ak) {
       // The key installed at setup may only call propose. It signs here. The wallet tab stays closed.
-      // 30 Tgas (shared/board/session.js BOARD_PROPOSE_TGAS). Gas is bought at 0.001 NEAR/Tgas,
-      // so 80 Tgas costs ~0.081 NEAR and the 0.05 session allowance refuses NotEnoughAllowance.
-      // Deposit stays 0. The stamp moves from the row inside propose, not as an attached deposit.
+      // 40 Tgas (shared/board/session.js BOARD_PROPOSE_TGAS). The callback is 20 Tgas.
+      // Gas is bought at 0.001 NEAR/Tgas, so 80 Tgas costs ~0.081 NEAR and the 0.05
+      // session allowance refuses NotEnoughAllowance. Deposit stays 0.
       const signed = W.signTx({ key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
-        actions: [W.functionCall('propose', args, 30n * TG)] });
+        actions: [W.functionCall('propose', args, 40n * TG)] });
       const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
       if (!sent.ok) {
         const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
@@ -334,7 +339,7 @@ async function boardPay({ shop, receiver, amountY, chainCap = false, reveal = nu
       }
       return settled(shop, { tx: signed.hash, decision: 'allowed', reason: 'ok', action: null, amount, receiver, signer: 'agent' });
     }
-    const h = await sign(S.board, [fc('propose', args, 30)]);
+    const h = await sign(S.board, [fc('propose', args, 40)]);
     return settled(shop, { tx: h, decision: 'allowed', reason: 'ok', action: null, amount, receiver, signer: 'wallet' });
   } catch (e) {
     if (userCancelled(e)) {
@@ -466,7 +471,25 @@ export function ferryClauseForPair(from, to) {
   if (preset && S.clauses[preset.id]) return preset.id;
   return Object.keys(S.clauses || {}).find(isFerryClauseId) || id;
 }
-export const ferry = (route, q) => ask({ shop: 'ferry', clauseId: route, receiver: ferryPayee(route), amountY: ferryAmountY(q), memo: 'ferry:' + q.correlationId });
+// Ask charter on a board session calls stamp on the board. The NEAR returns to the row.
+// A session with no board still proposes to the old charter payee.
+export async function ferry(route, q) {
+  if (!S.board) return ask({ shop: 'ferry', clauseId: route, receiver: ferryPayee(route), amountY: ferryAmountY(q), memo: 'ferry:' + q.correlationId });
+  const amountY = ferryAmountY(q);
+  const args = JSON.stringify({ owner: S.me });
+  const sent = await ferryProposeCalls([{ receiver: S.board, method: 'stamp', args, deposit: String(amountY) }]);
+  const out = {
+    tx: sent.tx || null,
+    decision: sent.ok ? 'allowed' : 'denied',
+    reason: sent.ok ? 'ok' : (sent.reason || 'refused'),
+    action: null,
+    amount: String(amountY),
+    receiver: S.board,
+    signer: 'agent',
+  };
+  if (out.tx) keep(out.tx, 'ferry', out.decision, out.reason, { amt: out.amount, to: out.receiver });
+  return out;
+}
 
 /** Deposit address after the charter view allows the payee. At most 0.20 USD. Does not send the tokens. */
 export async function openFerryCheckout(q, pair) {

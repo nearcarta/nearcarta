@@ -45,13 +45,12 @@ export function explainQuoteMiss(error) {
 }
 // wrap.near storage_balance_bounds.min — 0.00125 NEAR.
 export const WRAP_STORAGE_YOCTO = '1250000000000000000000';
-// Live near_deposit 6srGqpyujq1qfKvhTsWacj3rGqLJUZh1VcL71MtZ4W5U attached 42 Tgas and burnt:
-// propose_call 2.687 Tgas, wrap.near near_deposit 1.584 Tgas, on_called 1.630 Tgas.
-// The deployed board still forwards 30 Tgas to the inner call and 8 Tgas to on_called
-// (contracts/charter_board). The session key must prepay that forward. 300 Tgas is the
-// wallet default and is not used: the allowance is charged on prepaid gas at 0.001 NEAR/Tgas.
+// Live near_deposit 6srGqpyujq1qfKvhTsWacj3rGqLJUZh1VcL71MtZ4W5U attached 42 Tgas on the
+// previous board (8 Tgas callback). Board v2 forwards 30 Tgas to the shop and 20 Tgas
+// to on_called, so the outer transaction prepays 54. 300 Tgas is the wallet default
+// and is not used. The allowance is charged on prepaid gas at 0.001 NEAR/Tgas.
 // https://docs.near.org/protocol/transactions/gas#buying-vs-burning-gas
-export const PROPOSE_CALL_TGAS = 42;
+export const PROPOSE_CALL_TGAS = 54;
 export const PROPOSE_CALL_BYTES = 800;
 // Inner burns we measured or budgeted. They sit inside the 30 Tgas the board forwards.
 export const INNER_GAS_TGAS = { near_deposit: 10, storage_deposit: 10, ft_transfer: 20 };
@@ -109,14 +108,14 @@ export function proposeCallPrepaidYocto(tgas = PROPOSE_CALL_TGAS, numBytes = PRO
 }
 
 /**
- * Tgas the session key attaches for one propose_call. The board always forwards 30
- * Tgas, so near_deposit and ft_transfer prepay the same outer gas. The inner budget
- * (10 or 20) is inside that forward. This is never 300.
+ * Tgas the session key attaches for one propose_call. The board forwards 30 Tgas
+ * to the shop and 20 Tgas to the callback. near_deposit and ft_transfer prepay the
+ * same outer gas. The inner budget sits inside the 30. This is never 300.
  */
 export function proposeCallTgas(method) {
   const inner = INNER_GAS_TGAS[method] || 20;
   const forward = Math.max(30, inner);
-  return 4 + forward + 8;
+  return 4 + forward + 20;
 }
 
 /** Allowance the key must still hold before the first of these steps is sent. */
@@ -514,4 +513,15 @@ export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refund
   // Board rows live on the board contract (get_charter { owner }), not on the visitor account.
   if (session === 'board') body.board = true;
   return body;
+}
+
+/** The receipt with the latest `at`. A missing time sorts last. Ties keep the earlier row. */
+export function newestReceipt(rows) {
+  let best = null;
+  let bestAt = -1;
+  (rows || []).forEach(r => {
+    const at = Number(r?.at) || 0;
+    if (!best || at > bestAt) { best = r; bestAt = at; }
+  });
+  return best;
 }

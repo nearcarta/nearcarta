@@ -48,14 +48,29 @@ function showReceivers(list) {
   return names.length ? names.join(', ') : 'nobody';
 }
 
-/** Calendar day for a chain expires_at (nanoseconds). Matches the Sign facts line. */
-export function formatExpiry(ns) {
+/** Calendar day for a chain expires_at (nanoseconds). With time, the UTC clock is included. */
+export function formatExpiry(ns, withTime = false) {
   if (ns == null || ns === '' || ns === '0') return 'none';
   try {
     const ms = Number(BigInt(ns) / 1_000_000n);
     if (!Number.isFinite(ms)) return 'none';
-    return new Date(ms).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    const date = new Date(ms).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    if (!withTime) return date;
+    const time = new Date(ms).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' });
+    return `${date} ${time} UTC`;
   } catch { return 'none'; }
+}
+
+/** Visible expiry change. Same calendar text is hidden. Same day with a different clock shows the time. */
+export function expiryChange(onChainNs, nextNs) {
+  if (nextNs == null || nextNs === '') return null;
+  if (String(onChainNs ?? '') === String(nextNs)) return null;
+  const dayOn = formatExpiry(onChainNs);
+  const dayNext = formatExpiry(nextNs);
+  if (dayOn === dayNext) {
+    return { id: 'expires', label: 'Expires', onChain: formatExpiry(onChainNs, true), next: formatExpiry(nextNs, true) };
+  }
+  return { id: 'expires', label: 'Expires', onChain: dayOn, next: dayNext };
 }
 
 /**
@@ -83,16 +98,9 @@ export function rulesDiff(local, row) {
   if (dailyY !== String(row.daily_budget ?? '')) out.push({ id: 'daily', label: 'Daily budget', onChain: showNear(row.daily_budget), next: showNear(dailyY) });
   if (Number(local.per) !== Number(row.max_actions_per_day)) out.push({ id: 'per', label: 'Payments per day', onChain: String(row.max_actions_per_day ?? ''), next: String(local.per) });
   if (!sameReceivers(local.receivers, row.receivers)) out.push({ id: 'receivers', label: 'Allowed shops', onChain: showReceivers(row.receivers), next: showReceivers(local.receivers) });
-  if (local.expiresAt != null && local.expiresAt !== '' && String(local.expiresAt) !== String(row.expires_at ?? '')) {
-    out.push({ id: 'expires', label: 'Expires', onChain: formatExpiry(row.expires_at), next: formatExpiry(local.expiresAt) });
-  }
+  const exp = expiryChange(row.expires_at, local.expiresAt);
+  if (exp) out.push(exp);
   return out;
-}
-
-/** Expiry line for the diff, including the case where the date stays. */
-export function expiryLine(local, row) {
-  if (!local || !row || local.expiresAt == null || local.expiresAt === '') return null;
-  return { id: 'expires', label: 'Expires', onChain: formatExpiry(row.expires_at), next: formatExpiry(local.expiresAt) };
 }
 
 /** Deposit sentence for the update button. Amounts come from the contract deposits, not a guess. */
@@ -109,8 +117,7 @@ export function updateCostLine() {
 export function signRulesUpdate({ live, local, row }) {
   const fields = live && row ? rulesDiff(local, row) : [];
   if (!fields.length) return { changed: false, html: '' };
-  const shown = fields.some(f => f.id === 'expires') ? fields : [...fields, expiryLine(local, row)].filter(Boolean);
-  const lines = shown.map(f => `<li data-testid="diff-${esc(f.id)}">${esc(f.label)}: ${esc(f.onChain)} → ${esc(f.next)}</li>`).join('');
+  const lines = fields.map(f => `<li data-testid="diff-${esc(f.id)}">${esc(f.label)}: ${esc(f.onChain)} → ${esc(f.next)}</li>`).join('');
   const html = `<div class="preview" data-testid="setup-rules-diff"><p><b>On chain → New</b></p><ul>${lines}</ul></div>`
     + `<p class="small muted" data-testid="sign-update-cost">${esc(updateCostLine())}</p>`
     + `<button type="button" class="btn gold big" data-testid="setup-update-rules">Update my rules</button>`;
@@ -126,12 +133,12 @@ export function callsFailedPanel() {
 
 /**
  * Words for a partial Update my rules. The raw panic names no method.
- * ERR_RECEIVERS is set_calls (duplicate pair, or more than 8).
+ * ERR_RECEIVERS is set_calls (duplicate pair, or more than 24).
  */
 export function plainRulesError(error, { rulesSaved = false } = {}) {
   const t = String(error?.message || error || '');
   if (/ERR_RECEIVERS/.test(t)) {
-    const why = 'set_calls was refused: the shop list repeats an account and a method, or it names more than 8.';
+    const why = 'set_calls was refused: the shop list repeats an account and a method, or it names more than 24.';
     return rulesSaved ? `set_rules was saved. ${why}` : why;
   }
   return t.replace(/^Smart contract panicked:\s*/i, '');

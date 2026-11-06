@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 605 backend unit tests (602 pass, 3 skipped), offline
+npm test                                   # 607 backend unit tests (604 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -69,11 +69,11 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 |---|---|
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
-| toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 15 |
+| toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 29 |
 | backend unit (`npm test`) | 470 (467 pass, 3 skipped) |
 | browser e2e | 124 passed, 2 skipped, 1 flaky on retry. The skips need a partner key or a NEAR AI key |
 
-The 2 skipped e2e tests need a 1Click partner key or a NEAR AI key; they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
+The 2 skipped e2e tests need a 1Click partner key or a NEAR AI key; they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath, factory, and board sandbox suites, and gitleaks.
 
 ### Security model
 - The agent signs with a function-call key limited to the charter and `propose`/`propose_batch`; it cannot attach deposits, transfer, or call owner methods.
@@ -253,7 +253,7 @@ Live check, at most 0.06 NEAR (the pass itself is 0.001):
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 605 unit tests (602 pass, 3 skipped)
+npm test                 # 607 unit tests (604 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -278,7 +278,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | House | City door, or `/shops/house/`. Deed / Vaults / Heirs. One gold button: I'm alive, Send from house, or Cancel release. The agent uses that same check | No wallet and no charter spend. I'm alive builds `propose_call_as` for `house_session_check_in` on `extras.house.shop` from that visitor's row. The board writes `row_owner`. A foreign send is a hold until `confirm_hold`. Over the row cap or the vault cap shows a seal and does not sign. A prepared send says live broadcast is blocked. Toll's predecessor would be `extras.house.shop`; `live` stays false. Cinema does not play. `node scripts/house-recover.js` returns the shop balance first. `node scripts/house-deploy.js` recreates that same account from the pinned wasm and does not sign. Code: `app/src/panels/house-room.js`, `app/src/panels/house-agent.js`, `app/src/house-board.js`, `shared/house/shop.js`, `scripts/house-deploy.js`, `scripts/house-recover.js` | unit `a house pay over the cap is refused before any signature`; unit `a visitor check-in builds propose_call_as from that visitor's row`; unit `the city, the allow list and the denylist use the one shop id`; unit `the legacy wasm recovers by house_pay and then close`; recorded allow [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26). Inheritance tx: not sent. Base receipt: not sent. Heir same-address receipt: not sent |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 605 unit tests (602 pass, 3 skipped):
+# 607 unit tests (604 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
-`contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).
+`contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board source is `contracts/charter_board` (30 unit tests, rustc 1.86). The deployed account is unchanged.

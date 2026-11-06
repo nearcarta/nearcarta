@@ -16,9 +16,9 @@ const wasm = readFileSync(new URL('../../../contracts/artifacts/charter_board.wa
 // Live figures (2026-11-05 redeploy, /workspace/audit/board-redeploy-final.json):
 // wasm 108955 B, sha256 910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29,
 // code_hash Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C, deploy tx CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4.
-test('the board wasm deploys for at most 1.2 NEAR and the state size matches the contract', () => {
-  assert.equal(wasm.length, 108955);
-  assert.equal(createHash('sha256').update(wasm).digest('hex'), '910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29');
+test('the board wasm deploys for at most 2.1 NEAR and the state size matches the contract', () => {
+  assert.equal(wasm.length, 132083);
+  assert.equal(createHash('sha256').update(wasm).digest('hex'), '982bf6b6666e626d6af267c8a780cf5bb93cd73b2864a68b0c02dca4d07af9a1');
   assert.ok(deployCost(wasm.length, 'nearcarta.near').stakeYocto > 10n ** 24n, 'storage stake is over 1 NEAR on this wasm');
   assert.equal(initStateBytes('nearcarta.near'), 30);
   const cost = deployCost(wasm.length, 'nearcarta.near');
@@ -32,7 +32,9 @@ test('the board wasm deploys for at most 1.2 NEAR and the state size matches the
   // close_charter on the live wasm: smoke close H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf (nearblocks).
   assert.equal(MAIN.board.txs.smoke_close_charter, 'H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf');
   assert.equal(MAIN.board.code_hash, 'Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C');
-  assert.equal(MAIN.board.wasm_sha256, createHash('sha256').update(wasm).digest('hex'));
+  // The live account is still the 2026-11-05 wasm. The artifact is the v2 file, not that hash.
+  assert.equal(MAIN.board.wasm_sha256, '910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29');
+  assert.notEqual(MAIN.board.wasm_sha256, createHash('sha256').update(wasm).digest('hex'));
   assert.equal(MAIN.board.owner, MAIN.root);
   assert.equal(MAIN.board.max_row_yocto, '20000000000000000000000');
   assert.match(readFileSync(new URL('../../../contracts/charter_board/src/lib.rs', import.meta.url), 'utf8'), /fn reap/);
