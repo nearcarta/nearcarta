@@ -41,12 +41,11 @@ cpSync(here + '../shared/hall/job.js', dist + '/shared/hall/job.js');
 mkdirSync(dist + '/shared/chronicle', { recursive: true });
 cpSync(here + '../shared/chronicle/rules.js', dist + '/shared/chronicle/rules.js');
 cpSync(here + '../shared/chronicle/receipts.js', dist + '/shared/chronicle/receipts.js');
-// v2.js pulls in board/call-as.js (a bare @noble specifier) and a JSON import, so it
-// has to be bundled, not copied. The Hall panels import it at /shared/hall/v2.js.
-await (await import('esbuild')).build({
-  entryPoints: [here + '../shared/hall/v2.js'], bundle: true, format: 'esm', target: 'es2022',
-  outfile: dist + '/shared/hall/v2.js', logLevel: 'warning',
-});
+// Hall's browser copy now lives in app/src/panels/hall-v2.js and is served as a raw module
+// (copied with src/), so it needs no bundle step and the raw-load test can walk it.
+// shared/hall/v2.js stays the node shim over it.
+mkdirSync(dist + '/shared/hall', { recursive: true });
+cpSync(here + 'src/panels/hall-v2.js', dist + '/shared/hall/v2.js');
 cpSync(here + '../shared/rails/receipts.js', dist + '/shared/rails/receipts.js');
 // The Guardhouse room imports this as a raw module. Without it the import 404s and
 // every shop mount in boot.js fails, not just the Guardhouse. board-pay.js pulls in

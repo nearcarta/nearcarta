@@ -401,13 +401,12 @@ function signItems(onBoard, live, changed) {
 }
 function sSign() {
   if (!st.trial && !boardLive()) {
-    const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
-    const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
-    return head('Sign', 'Your account is on mainnet.', 'A personal charter is a row on the mainnet board. That contract is not deployed yet, so this page will not send a transaction that pretends to create one. The town charter, toll, arena, house and town hall already run on mainnet.')
+    // The town charter (charter.nearcarta.near) was retired and its NEAR returned to
+    // nearcarta.near, so this page no longer names it or links its old txs. What is
+    // left is the honest state: the board holds the row, and this page will not
+    // pretend to create one.
+    return head('Sign', 'Your account is on mainnet.', 'A personal charter is a row on the mainnet board. That contract is not reachable right now, so this page will not send a transaction that pretends to create one. Toll, arena, house and town hall already run on mainnet.')
       + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><span class="small muted">Saved in this browser</span></div></div>`
-      + `<div class="facts"><div class="fact"><small>Town charter</small><b>${acA(MAIN.charter.contract)}</b></div>
-         <div class="fact"><small>Allowed 0.001 NEAR</small><b>${txA(allowed)}</b></div>
-         <div class="fact"><small>Refused 0.003 NEAR</small><b>${txA(refused)}</b></div></div>`
       + errP() + nav(true, { label: 'Continue' });
   }
   const onBoard = boardLive() && !st.trial;

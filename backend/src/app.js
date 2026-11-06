@@ -493,7 +493,7 @@ export function makeApp() {
     // A retired or unknown contract is refused plainly instead of being read as today's
     // rules, and the read must never 500 (a retired oath took the whole city tray down).
     const asked = c.req.query('charter');
-    const charter = asked || BOARD_ID || null;
+    const charter = c.req.query('charter') || BOARD_ID || null;
     let found = null;
     if (charter) {
       found = await nearcartaCharter(charter).catch(() => null);

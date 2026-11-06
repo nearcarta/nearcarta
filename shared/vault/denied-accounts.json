@@ -2,7 +2,6 @@
  "accounts": [
   "aiprobe",
   "arena.nearcarta.near",
-  "charter.nearcarta.near",
   "cloud-api.near",
   "e2e",
   "fallback-test",
