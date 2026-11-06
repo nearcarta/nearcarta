@@ -83,9 +83,47 @@ async function readJson(fetchImpl, url, headers) {
   return { status: res.status, body };
 }
 
-export async function marketStatus({ token, fetchImpl = fetch, handle = 'lamplighter', base = MARKET_BASE } = {}) {
+/** Public worker discovery. No token, no caller identity, no write. */
+export async function marketWorkers({ fetchImpl = fetch, base = MARKET_BASE, limit = 24 } = {}) {
+  const root = String(base || MARKET_BASE).replace(/\/$/, '');
+  try {
+    const list = await readJson(fetchImpl, `${root}/v1/agents?limit=${Math.min(Math.max(Number(limit) || 24, 1), 100)}`, { accept: 'application/json' });
+    if (list.status !== 200 || !Array.isArray(list.body?.agents)) return { workers: [], status: list.status };
+    return {
+      status: 200,
+      workers: list.body.agents.filter(a => a && a.handle).map(a => ({
+        agentId: a.agent_id ?? null,
+        handle: a.handle,
+        name: a.name ?? null,
+        description: String(a.description ?? '').slice(0, 200),
+      })),
+    };
+  } catch {
+    return { workers: [], status: 0 };
+  }
+}
+
+/**
+ * What the shop can prove about the Agent Market right now.
+ *
+ * Credential: `GET /v1/jobs/board`, `GET /v1/me/jobs` and
+ * `GET /v1/agents/me/assignments` are each gated on a caller identity — an account
+ * session or an agent API token, per the published OpenAPI summary and the live
+ * 401. `GET /v1/agents` and `GET /v1/agents/{id}` are public. A worker agent token
+ * cannot list a buyer's jobs ("worker credentials are forbidden"), so the shop never
+ * claims a hire from a worker token.
+ *
+ * With no token this makes no authenticated call and sends nothing.
+ */
+export async function marketStatus({ token, fetchImpl = fetch, handle = 'lamplighter', base = MARKET_BASE, workers = null, agentsStatus = null } = {}) {
   const draft = LAMPLIGHTER_REGISTER;
-  if (!token) return { ok: false, blocked: 'no_token', ready: true, draft, agent: null, assignments: [], sent: false };
+  const listed = Array.isArray(workers) ? workers : [];
+  if (!token) {
+    return {
+      ok: false, blocked: 'no_token', ready: true, draft, agent: null, assignments: [], listed, sent: false, agentsStatus,
+      credential: 'Set AGENT_API_TOKEN to a buyer account session or an agent API token to read /v1/jobs/board and /v1/me/jobs. Public GET /v1/agents needs none.',
+    };
+  }
   const root = String(base || MARKET_BASE).replace(/\/$/, '');
   try {
     const pub = await readJson(fetchImpl, `${root}/v1/agents/${encodeURIComponent(handle)}`, { accept: 'application/json' });
@@ -95,14 +133,15 @@ export async function marketStatus({ token, fetchImpl = fetch, handle = 'lamplig
     });
     const agent = agentCard(pub.body, pub.status);
     if (mine.status === 401 || mine.status === 403) {
-      return { ok: false, blocked: 'bad_token', ready: true, draft, agent, assignments: [], sent: false };
+      return { ok: false, blocked: 'bad_token', ready: true, draft, agent, assignments: [], listed, sent: false,
+        credential: "The token was rejected. A worker token cannot read a buyer job: use the buyer account session or that buyer's agent API token." };
     }
     if (mine.status >= 400) {
-      return { ok: false, blocked: 'market_unread', ready: true, draft, agent, assignments: [], sent: false };
+      return { ok: false, blocked: 'market_unread', ready: true, draft, agent, assignments: [], listed, sent: false };
     }
-    return { ok: true, blocked: null, ready: true, draft, agent, assignments: assignmentRows(mine.body), sent: false };
+    return { ok: true, blocked: null, ready: true, draft, agent, assignments: assignmentRows(mine.body), listed, sent: false };
   } catch (e) {
-    return { ok: false, blocked: 'market_unread', ready: true, draft, agent: null, assignments: [], sent: false, error: String(e?.message || 'market unread').slice(0, 160) };
+    return { ok: false, blocked: 'market_unread', ready: true, draft, agent: null, assignments: [], listed, sent: false, error: String(e?.message || 'market unread').slice(0, 160) };
   }
 }
 
