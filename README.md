@@ -21,6 +21,7 @@ Each claim names the code, the test that pins it, and a tx you can open. Test na
 | One receipt shape covers a NEAR payment, a chain-signature toll, a dry Intents quote and a capped model job | `shared/rails/receipts.js` `receiptsBody`, `GET /api/receipts` | `every rail uses the same receipt keys` | allowed [JChWxmAN…](https://nearblocks.io/txns/JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy), refused [BvDNZk6F…](https://nearblocks.io/txns/BvDNZk6F5mAH2fqDCkLgf61hCmHJcJTbcQYnRc7reKbH) |
 | A room still opens when the deployments payload has no guardhouse field | `app/src/live/shape.js` `shapeCore` | `a deployments payload with no guardhouse keeps the sample code hash` | no new spend |
 | A house deed payment of 0.001 NEAR was allowed and 0.002 NEAR was refused | `shared/deployments/mainnet.json` `extras.house` | `the recorded house deed payments are the allow and the refusal` | allowed [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26), refused [3Z4UAb6N…](https://nearblocks.io/txns/3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1) |
+| A row holds 0.02 NEAR of storage and its call list shares it, so the page refuses an over-full shop list before the wallet opens, and a retired shop is dropped from a saved list | `shared/board/session.js` `pairBudgetBytes`, `callsFitRow`; `shared/setup/rules-diff.js` `migrateShops`; `app/house/setup.js` `signBoard` | `the fail row could not hold what the page sent, and the new default can`, `a stale saved list is migrated, so charter is not sent again`, e2e `T16 Open your row refuses a shop list the row cannot hold, before the wallet opens`, sandbox `the_default_shop_list_fits_a_row` | refused: `open_charter` ok, `set_calls` panicked `ERR_ROW_TOO_BIG` [7H3H2HF…](https://nearblocks.io/txns/7H3H2HFiqPiGTPkF8gkkFLvbMecARWQdyG9DCdBPNnh9) |
 
 ## Technologies
 - NEAR contract: `contracts/charter_board`, live at `board.nearcarta.near`. The visitor signs `open_charter`, `set_rules`, `propose`.
@@ -53,7 +54,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 714 backend unit tests (713 pass, 1 skipped), offline
+npm test                                   # 724 backend unit tests (723 pass, 1 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -257,7 +258,7 @@ Live check, after the owner deploys:
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 714 unit tests (713 pass, 1 skipped)
+npm test                 # 724 unit tests (723 pass, 1 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -286,7 +287,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 | Town Hall | Open `/?shop=hall` in the city. Tabs are Post job, Agents, and Receipts. Type a task, a budget, and two worker accounts, then press Post job. One gold button sends the quote, the counter, the pass, or the refund | The CTA and the AI dock share one sender and sign the same board call, so both send real mainnet txs: post_job with its escrow, bid, one counter, accept, deliver with the worker's digest, review, refund. A chain refusal is reported as a refusal. `contracts/hall` refuses a pass review until the guard account clears the part, so a Guard BLOCK can never release, and the review must present the delivered digest, so a swapped review cannot pay. The release path goes live only after `scripts/hall-deploy.js --live`, which is dry-run by default and refuses while the account is short of the 0.450000 NEAR top-up. Market hire needs a buyer session token; public `GET /v1/agents` needs none. Personal rules link to `/setup/`. Code: `shared/hall/job.js`, `shared/hall/v2.js`, `app/src/panels/hall-actions.js`, `contracts/hall/src/lib.rs` | unit `a job conserves escrow, counters once, and does not pay on a swapped or blocked review`; unit `the gold button and the dock share one runner, and a move goes through one sender`; unit `the plan snapshots every legacy bounty and refuses a guard that is not the live one`; contract `a_pass_without_a_guard_clear_cannot_release`, `a_swapped_review_is_refused`, `two_workers_split_one_job_and_only_the_passed_part_is_paid` Earlier reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h) and refusal [Cp2rWatn…](https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6) are not this job |
 
-# 714 unit tests (713 pass, 1 skipped):
+# 724 unit tests (723 pass, 1 skipped):
 Proof rows (71/71 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
