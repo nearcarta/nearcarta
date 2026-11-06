@@ -545,8 +545,9 @@ async function refreshAgentKey(deps = {}) {
   });
   const txs = [];
   const row = await viewFn(rpcClient([MAIN.rpc]), contract, 'get_charter', { owner: me }).catch(() => null);
-  if (row && String(row.agent || '') !== pubkeyHex(fresh)) {
-    txs.push(['agent', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: pk }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
+  const agentHex = pubkeyHex(fresh);
+  if (row && String(row.agent || '') !== agentHex) {
+    txs.push(['agent', { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: 'set_agent', args: { agent: agentHex }, gas: (GAS.agent * TG).toString(), deposit: '1' } }] }]);
   }
   txs.push(['key', { receiverId: me, actions: keyActions }]);
   for (const [k] of txs) mark(k, 'run');
@@ -563,6 +564,7 @@ async function refreshAgentKey(deps = {}) {
     throw e;
   }
   txs.forEach(([k], i) => mark(k, 'run', txHashOf(res?.[i])));
+  // Save before the read-back. Ferry Load cargo signs whatever is in this slot.
   localStorage.setItem(agentLS(me), fresh.secretKey);
   st.charter = me; save();
   if (deps.wallet || deps.signAll) {
@@ -570,21 +572,32 @@ async function refreshAgentKey(deps = {}) {
     if (txs.some(([k]) => k === 'agent')) mark('agent', 'ok');
     keyReady = true; keyStale = false;
     gasLeft = GAS_TOPUP_YOCTO;
+    if (row) chainRow = { ...row, agent: agentHex };
+    chainLoadedFor = me;
     paintRefreshStatus('Agent key refreshed (signer stub). 0.25 NEAR of gas. Rules and the row balance were not changed. No mainnet tx was sent.');
     return { ok: true, renewed: true, stub: true, txs: txs.map(t => t[0]), signed: txs.map(t => t[1]) };
   }
   paintRefreshStatus('Confirming the new key on chain…');
   let ak = null;
-  for (let i = 0; i < 12 && !(ak = await agentAccessKey(fresh.secretKey)); i++) await wait(1200);
+  let rowNow = null;
+  for (let i = 0; i < 12; i++) {
+    if (!ak) ak = await agentAccessKey(fresh.secretKey);
+    rowNow = await viewFn(rpcClient([MAIN.rpc]), contract, 'get_charter', { owner: me }).catch(() => null);
+    if (ak && rowNow && String(rowNow.agent || '') === agentHex) break;
+    await wait(1200);
+  }
+  // Write it again after the chain read, so a late paint cannot keep the previous secret.
+  localStorage.setItem(agentLS(me), fresh.secretKey);
   mark('key', ak ? 'ok' : 'run');
   if (txs.some(([k]) => k === 'agent')) mark('agent', ak ? 'ok' : 'run');
   keyReady = !!ak;
   keyStale = !ak;
   gasLeft = ak?.permission?.FunctionCall?.allowance || GAS_TOPUP_YOCTO;
+  if (rowNow) { chainRow = rowNow; chainLoadedFor = me; }
   await refreshBal();
-  if (!ak) {
-    paintRefreshStatus('The new agent key is not on the account yet. Wait a few seconds and press Refresh again.');
-    throw new Error('The new agent key is not on the account yet. Wait a few seconds and press Refresh again.');
+  if (!ak || !rowNow || String(rowNow.agent || '') !== agentHex) {
+    paintRefreshStatus('The new key is saved in this browser. The row has not caught up yet. Wait a few seconds and press Refresh again.');
+    throw new Error('The row still names the previous agent key.');
   }
   paintRefreshStatus('Agent key refreshed. 0.25 NEAR of gas. Rules and the row balance were not changed.');
   return { ok: true, renewed: true, txs: txs.map(t => t[0]) };

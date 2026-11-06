@@ -17,6 +17,12 @@ export function normalizeToken(row) {
   };
 }
 
+// Shown first in both pickers. The rest keep the order 1Click returned.
+const POPULAR_IDS = [
+  'usdc|base', 'usdc|arb', 'usdc|pol', 'usdc|polygon',
+  'eth|eth', 'btc|btc', 'sol|sol', 'near|near', 'wnear|near',
+];
+
 export function tokenChoices(rows) {
   const out = [];
   const seen = new Set();
@@ -26,6 +32,13 @@ export function tokenChoices(rows) {
     seen.add(t.id);
     out.push(t);
   }
+  const rank = new Map(POPULAR_IDS.map((id, i) => [id, i]));
+  const tail = POPULAR_IDS.length;
+  out.sort((a, b) => {
+    const ra = rank.has(String(a.id).toLowerCase()) ? rank.get(String(a.id).toLowerCase()) : tail;
+    const rb = rank.has(String(b.id).toLowerCase()) ? rank.get(String(b.id).toLowerCase()) : tail;
+    return ra - rb;
+  });
   return out;
 }
 
