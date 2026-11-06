@@ -2,33 +2,32 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { sha256Hex } from '../../../app/src/sha256.js';
+import { callAsMessage, injectRowOwner, setSha256Hex } from '../../../app/src/board-call-as.js';
 
 const read = p => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 
 // The city loads JS straight from the served tree, so a module the build never
-// publishes is a dead shop. These three regressions each took the whole city
-// down: a bare package specifier, a ../../../shared path, and a deed route that
-// read a config key mainnet.json never had.
+// publishes is a dead shop. Each of these regressions took the whole city down:
+// a bare package specifier, and a shared path the build never copies.
 test('a browser module has no bare package import or unpublished shared path', () => {
   const boardCallAs = read('app/src/board-call-as.js');
   assert.doesNotMatch(boardCallAs, /from '@noble\//);
-  assert.match(boardCallAs, /from '\.\/sha256\.js'/);
   const guardAgent = read('app/src/panels/guard-agent.js');
   assert.doesNotMatch(guardAgent, /from '\.\.\/\.\.\/\.\.\/shared\//);
-  assert.match(guardAgent, /from '\.\.\/board-pay\.js'/);
+  assert.match(guardAgent, /from '\.\/guard-board-pay\.js'/);
+  assert.ok(read('app/src/panels/guard-board-pay.js').length > 0);
 });
 
-test('the guard board call exists where the browser can load it', () => {
-  const app = read('app/src/board-pay.js');
-  assert.match(app, /export function boardStep/);
-  assert.match(app, /from '\.\/board-call-as\.js'/);
+test('the guard board call is served next to the panel that imports it', () => {
+  const panel = read('app/src/panels/guard-board-pay.js');
+  assert.match(panel, /export function boardStep/);
   const shared = read('shared/guard/board-pay.js');
-  assert.match(shared, /from '\.\.\/\.\.\/app\/src\/board-pay\.js'/);
+  assert.match(shared, /from '\.\.\/\.\.\/app\/src\/panels\/guard-board-pay\.js'/);
 });
 
-test('the shipped sha256 matches node:crypto on the board call text', async () => {
-  const { sha256Hex } = await import('../../../app/src/sha256.js');
-  const { callAsMessage, injectRowOwner } = await import('../../../app/src/board-call-as.js');
+test('the shipped sha256 matches node:crypto on the board call text', () => {
+  setSha256Hex(sha256Hex);
   const args = '{"token_id":"alice.near"}';
   const injected = injectRowOwner(args, 'alice.near');
   assert.equal(sha256Hex(injected), createHash('sha256').update(injected).digest('hex'));

@@ -5,7 +5,7 @@
 // https://docs.near.ai/cloud/verification
 
 import { explainCheck } from '../guard-score.js';
-import { boardStep } from '../board-pay.js';
+import { boardStep } from './guard-board-pay.js';
 import {
   LIVE_ENFORCEMENT, bindVerdict, contextMatches, createLedger, nearToYocto,
 } from './guard-pay.js';

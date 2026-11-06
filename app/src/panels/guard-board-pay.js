@@ -1,11 +1,6 @@
 // The call the guard shop asks the board to make. The board overwrites
 // row_owner. This file does not sign and does not name a payee of its own.
 //
-// Browser copy. app/src is copied to the dist root, so /panels/guard-agent.js
-// reaches this as /board-pay.js. shared/guard/board-pay.js re-exports it for
-// the node import path, the same way shared/board/call-as.js does. A relative
-// ../../../shared/ import resolves to a path the build never publishes.
-//
 // The signed text is NOT assembled here. The live board derives the epoch
 // itself (`epoch_of(owner)` inside `call_as_message`) and `get_charter` does
 // not return it, so the only correct source is the board view. Ask the board
@@ -14,7 +9,7 @@
 // contracts/charter_board/src/v2.rs `call_as_message`, `propose_call_as`.
 // https://github.com/nearcarta/nearcarta/pull/52
 
-import { BOARD_V2, injectRowOwner } from './board-call-as.js';
+import { BOARD_V2, injectRowOwner } from '../board-call-as.js';
 
 /** The board's method names. Nothing here invents one. */
 export const GUARD_BOARD = BOARD_V2;

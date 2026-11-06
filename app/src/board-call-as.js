@@ -2,11 +2,17 @@
 // on cursor/board-v2-1e87 (a5d9bfe and later). The contract rebuilds this
 // string. A shop trusts row_owner only when the predecessor is the board.
 // A nested row_owner is not authority.
-// The browser has no import map for a bare package specifier, so the hash comes
-// from the local sync copy. `sha256Hex` is checked against node:crypto.
-import { sha256Hex } from './sha256.js';
-
+//
+// This file is served to the browser as-is (`/board-call-as.js`), so it cannot
+// import a bare package specifier: the browser has no import map for it and the
+// city shop fails to load. `sha256hex` is injected by the caller instead. The
+// bundled shop wallet passes the @noble implementation; the node tests import
+// `shared/board/call-as.js`, which fills it in from the same package.
 export const CALL_AS_VERSION = '2';
+
+/** Set once per environment: the synchronous sha256 the message text is hashed with. */
+export let sha256hex = null;
+export function setSha256Hex(fn) { sha256hex = fn; }
 export const BOARD_V2 = {
   open: 'propose_call_as',
   confirm: 'confirm_hold',
@@ -15,6 +21,12 @@ export const BOARD_V2 = {
   refund: 'refund_action',
   settle: 'settle',
 };
+
+export const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+/** The @noble sha256, hex encoded. Node and the shop wallet both pass their own. */
+export function nobleSha256Hex(sha256) {
+  return s => hex(sha256(new TextEncoder().encode(s)));
+}
 
 export function injectRowOwner(args, owner) {
   const value = JSON.parse(args);
@@ -34,8 +46,9 @@ export function effectsCanon(effects) {
 }
 
 export function callAsMessage({ network, contract, owner, receiver, method, args, deposit, nonce, expiry, epoch, effects, hold }) {
+  if (typeof sha256hex !== 'function') throw new Error('sha256 is not configured');
   const injected = injectRowOwner(args, owner);
-  const hash = sha256Hex(injected);
+  const hash = sha256hex(injected);
   return [
     'board-call-as-v1', network, contract, CALL_AS_VERSION, owner, receiver, method, hash,
     String(deposit), String(nonce), String(expiry), String(epoch), effectsCanon(effects),

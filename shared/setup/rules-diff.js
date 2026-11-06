@@ -3,7 +3,7 @@
 // with get_charter. A difference is what Update my rules writes:
 // set_rules (0.001 NEAR deposit) and set_calls (CALLS_DEPOSIT_YOCTO).
 // set_agent is included only when the row's key is not the key in this browser.
-// Unused deposit is refunded by charge / charge_len.
+// Unused deposit is refunded by charge / charge_calls_and_reserve.
 // Source: contracts/charter_board/src/lib.rs set_rules, set_calls, set_agent, charge.
 import { CALLS_DEPOSIT_YOCTO, sessionExpiresAt } from '../board/session.js';
 
@@ -134,14 +134,18 @@ export function callsFailedPanel() {
 /**
  * Words for a partial Update my rules. The raw panic names no method.
  * ERR_RECEIVERS is set_calls (duplicate pair, or more than 24).
+ * ERR_ROW_TOO_BIG is also set_calls: the row holds 0.02 NEAR of storage and a long
+ * shop list can exceed it.
+ * ERR_DEPOSIT is set_calls with a deposit under the trie bytes it writes.
  */
 export function plainRulesError(error, { rulesSaved = false } = {}) {
   const t = String(error?.message || error || '');
-  if (/ERR_RECEIVERS/.test(t)) {
-    const why = 'set_calls was refused: the shop list repeats an account and a method, or it names more than 24.';
-    return rulesSaved ? `set_rules was saved. ${why}` : why;
-  }
-  return t.replace(/^Smart contract panicked:\s*/i, '');
+  let why = '';
+  if (/ERR_RECEIVERS/.test(t)) why = 'set_calls was refused: the shop list repeats an account and a method, or it names more than 24.';
+  else if (/ERR_ROW_TOO_BIG/.test(t)) why = 'set_calls was refused: this shop list does not fit a row that holds 0.02 NEAR. Remove a shop or use a shorter account id.';
+  else if (/ERR_DEPOSIT/.test(t)) why = 'set_calls was refused: the deposit did not cover the storage this list writes. Reload the page and try again.';
+  if (!why) return t.replace(/^Smart contract panicked:\s*/i, '');
+  return rulesSaved ? `set_rules was saved. ${why}` : why;
 }
 
 const TX_HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;

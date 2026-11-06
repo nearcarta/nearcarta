@@ -200,10 +200,8 @@ test('the city, the allow list and the denylist use the one shop id', () => {
   assert.equal(HOUSE_SHOP, 'house.nearcarta.near');
   assert.equal(MAIN.extras.house.contract, HOUSE_SHOP);
   assert.equal(MAIN.extras.house.shop, HOUSE_SHOP);
-  // The fallback is a config value the deploy may relabel; the account it names is what matters.
-  assert.equal(typeof MAIN.extras.house.fallback.status, 'string');
-  assert.ok(MAIN.extras.house.fallback.status.length > 0);
-  assert.equal(HOUSE_FALLBACK, MAIN.extras.house.fallback.account);
+  assert.equal(MAIN.extras.house.fallback.status, 'unused');
+  assert.equal(HOUSE_FALLBACK, 'house3.nearcarta.near');
   assert.equal(MAIN.extras.house.next.sha256, HOUSE_WASM_SHA256);
   assert.equal(shopOf(HOUSE_SHOP), 'house');
   assert.equal(shopOf(HOUSE_LEGACY), 'house');
