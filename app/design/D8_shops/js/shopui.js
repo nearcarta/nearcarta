@@ -1073,7 +1073,7 @@ function proofDrawer() {
     h += `<div class="lead">${idChip(S.charter)}</div><div class="chips">`
       + (S.state ? `<span class="chip ${S.state.frozen ? 'ice' : 'ok'}">${S.state.frozen ? 'Frozen' : 'Live'} · v${esc(S.state.policy_version)}</span>` : '')
       + (A.pendingNote() ? `<span class="chip" data-testid="pending-chip">${esc(A.pendingNote())}</span>` : '')
-      + (c ? `<span class="chip">Max ${fmt(c.per_action_cap)}</span><span class="chip">${fmt(c.daily_budget)} / day</span>` : '') + '</div>';
+      + (c && cur === 'payouts' ? `<span class="chip">Your /setup cap ${fmt(c.per_action_cap)}</span><span class="chip">Your /setup day ${fmt(c.daily_budget)}</span>` : c ? `<span class="chip">Max ${fmt(c.per_action_cap)}</span><span class="chip">${fmt(c.daily_budget)} / day</span>` : '') + '</div>';
     details.push(kv('Charter', idChip(S.charter)) + (S.me ? kv('Owner', idChip(S.me)) : '') + (c?.receivers?.length ? kv('Payees', c.receivers.map(r => idChip(r)).join(' ')) : ''));
   }
   h += '</section>';
@@ -1300,6 +1300,21 @@ async function signRules() {
 let booted = null;
 export function boot() {
   if (booted) return booted;
+  const shop = document.getElementById('shopUI');
+  if (shop && !shop.dataset.keys) {
+    shop.dataset.keys = '1';
+    const stopKeys = (e) => {
+      const t = e.target;
+      if (!t?.closest?.('input, textarea, select')) return;
+      if (!t.closest('#shopUI')) return;
+      e.stopPropagation();
+    };
+    shop.addEventListener('keydown', stopKeys);
+    shop.addEventListener('keyup', stopKeys);
+    shop.addEventListener('focusin', (e) => {
+      if (e.target?.closest?.('input, textarea, select')) window.dispatchEvent(new CustomEvent('nearcarta:typing'));
+    });
+  }
   $('#t-act').onclick = () => primary(); $('#t-rules').onclick = openRules; $('#r-close').onclick = closeRules; $('#r-sign').onclick = signRules;
   if (!HOSTED() && $('#wallet')) $('#wallet').onclick = () => { if (A.S.me) return openRules(); location.assign('/setup/?next=' + encodeURIComponent(location.pathname + location.search + location.hash)); };
   booted = A.init(() => paint()).then(() => paint()).catch(e => { A.S.ready = true; fail(e); });

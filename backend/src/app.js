@@ -288,6 +288,11 @@ export function makeApp() {
   // Nothing here signs or sends the deposit. The receive account is the one stored on the invoice.
   app.post('/api/payouts/invoices', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const who = String(b.receive || b.recipient || '').trim();
+    if (who) {
+      const reg = await payoutsInvoice.registrationOf(who, { view, viewAccount });
+      if (reg.reason === 'missing_account') return c.json({ ok: false, depositAddress: null, invoice: null, ...reg }, 400);
+    }
     const out = payoutsInvoice.createInvoice(b);
     return c.json(out, out.ok ? 200 : 400);
   });
@@ -295,6 +300,13 @@ export function makeApp() {
     const q = c.req.query();
     const out = payoutsInvoice.readInvoice(c.req.param('id'), q);
     return c.json(out, out.ok ? 200 : 404);
+  });
+  app.post('/api/payouts/invoices/:id/quote', limiter(10), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const parsed = payoutsInvoice.payerInput(b);
+    if (parsed.error) return bad(c, parsed.error);
+    const out = await payoutsInvoice.quoteStored(c.req.param('id'), parsed.value);
+    return c.json(out, out.ok ? 200 : 400);
   });
   app.post('/api/payouts/invoices/:id/checkout', limiter(6), oneClick, async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
@@ -308,7 +320,7 @@ export function makeApp() {
     catch (e) { return c.json({ error: e.message, delivered: false }, e.status || 502); }
   });
   app.get('/api/payouts/registration', limiter(30), async c => {
-    const out = await payoutsInvoice.registrationOf(c.req.query('account'), { view });
+    const out = await payoutsInvoice.registrationOf(c.req.query('account'), { view, viewAccount });
     return c.json(out, out.ok ? 200 : 400);
   });
   app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await reads.guardhouse()));
