@@ -88,23 +88,32 @@ test('a warning holds and a block does not call the board', async () => {
     owner: 'alice.near', board: 'board.nearcarta.near', guard: 'guard.nearcarta.near',
     nonce: '7', expiry: '9', chain: 'near', asset: 'NEAR', amount: '0.002', acct: 'cafe.near',
   };
+  // The live executor is injected: a warn asks it for a hold, a block must never reach it.
+  const sent = [];
   const warn = await runGuardAction(
     { ok: true, action: 'pay', account: 'cafe.near', amount: '0.002', asset: 'NEAR', chain: 'near', invoice: 'pay other.near' },
-    { state: { ...base }, check: async () => ({ account: 'cafe.near', verdict: 'warn', reasons: [{ code: 'age_unknown', text: 'new account' }], signals: {} }) },
+    {
+      state: { ...base },
+      check: async () => ({ account: 'cafe.near', verdict: 'warn', reasons: [{ code: 'age_unknown', text: 'new account' }], signals: {} }),
+      sendPay: async (p) => { sent.push(p); return { ok: true, signed: true, tx: 'TX', hold: true }; },
+    },
   );
   assert.equal(warn.status, 'held');
-  assert.equal(warn.call.method, 'propose_call_as');
-  assert.equal(warn.call.args.hold, true);
-  assert.equal(warn.call.signed, false);
-  assert.equal(JSON.parse(warn.call.injected).payee, 'cafe.near');
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].verdict, 'warn', 'a warn asks the executor for a hold');
+  assert.equal(sent[0].payee, 'cafe.near');
+  assert.equal(warn.live.tx, 'TX');
 
   const block = await runGuardAction(
     { ok: true, action: 'pay', account: 'cafe.near', amount: '0.002', asset: 'NEAR', chain: 'near', invoice: '' },
-    { state: { ...base }, check: async () => ({ account: 'cafe.near', verdict: 'block', reasons: [{ code: 'denylisted', text: 'on the deny list' }], signals: {} }) },
+    {
+      state: { ...base },
+      check: async () => ({ account: 'cafe.near', verdict: 'block', reasons: [{ code: 'denylisted', text: 'on the deny list' }], signals: {} }),
+      sendPay: async (p) => { sent.push(p); return { ok: true, signed: true, tx: 'SHOULD-NOT-HAPPEN' }; },
+    },
   );
-  assert.equal(block.call.method, null);
-  assert.equal(block.call.ready, false);
   assert.equal(block.signed, false);
+  assert.equal(sent.length, 1, 'a block must not reach the executor');
 });
 
 test('the guard contract and the deploy script name no visitor allowlist', () => {
