@@ -8,10 +8,13 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
   hostedCeiling, aboveHosted, canonicalInvoice, invoiceRecordId, publicInvoice, invoiceExpired,
-  invoiceQuoteBody, invoiceDelivered, invoiceStatusLine, addressOk, registrationVerdict, USDC_NEAR_CONTRACT,
+  invoiceQuoteBody, invoiceDelivered, invoiceStatusLine, addressOk, registrationVerdict,
+  USDC_NEAR_CONTRACT, USDC_CONTRACT_FALLBACK, nearFromYocto, quoteSummary, bridgeMinimumHint,
+  paymentLinks, receiptLine,
 } from '../../app/src/panels/payouts-plan.js';
+import { nearAccountOk } from '../../app/design/D8_shops/js/payouts.js';
 import { tokenRef, findToken, tokens, postQuote, checkQuote, statusHelp, validDepositAddress } from './ferry.js';
-import { oneClickStatus, defaultVerify } from './ferry-checkout.js';
+import { fetchOneClickStatus, defaultVerify } from './ferry-checkout.js';
 import { echoGuard } from './ferry-guard.js';
 
 export { invoiceDelivered, invoiceStatusLine, hostedCeiling, registrationVerdict, USDC_NEAR_CONTRACT };
@@ -151,6 +154,7 @@ export async function checkoutInvoice(id, payer, deps = {}) {
   row.depositAddress = checks.depositAddress;
   row.status = 'PENDING_DEPOSIT';
   row.refundTo = payer.refundTo;
+  row.payChain = payer.chain || '';
   store.byId.set(row.id, row);
   saveFile(store, deps.file ?? filePath(deps.env || process.env));
   return {
@@ -179,7 +183,10 @@ export async function quoteInvoice(input, deps = {}) {
   const post = deps.postQuote || postQuote;
   const res = await post(built.body);
   if (res.http !== 201) {
-    return { ok: false, reason: 'quote_refused', dry: true, depositAddress: null, status: null, error: res.body?.message || `HTTP ${res.http}` };
+    return {
+      ok: false, reason: 'quote_refused', dry: true, depositAddress: null, status: null,
+      error: bridgeMinimumHint(res.body?.message || `HTTP ${res.http}`),
+    };
   }
   const checks = (deps.checkQuote || checkQuote)(built.body, res.body);
   return {
@@ -190,7 +197,20 @@ export async function quoteInvoice(input, deps = {}) {
     status: 'quoted',
     swapType: 'EXACT_OUTPUT',
     help: 'Dry quote. No deposit address. Nothing was sent.',
+    ...quoteSummary(res.body),
   };
+}
+
+/** Dry quote for a stored invoice. The payer cannot move the receive account or the amount. */
+export async function quoteStored(id, payer, deps = {}) {
+  const store = invoiceBook(deps);
+  const row = store.byId.get(String(id || ''));
+  if (!row) return { ok: false, reason: 'unknown_invoice', depositAddress: null };
+  if (invoiceExpired(row, deps.now || Date.now())) return { ok: false, reason: 'expired', depositAddress: null };
+  const out = await quoteInvoice({
+    usd: row.usd, from: payer.from, to: 'USDC@near', recipient: row.receive, refundTo: payer.refundTo,
+  }, deps);
+  return { ...out, invoice: publicInvoice(row), depositAddress: null };
 }
 
 export async function refreshInvoice(id, deps = {}) {
@@ -198,22 +218,53 @@ export async function refreshInvoice(id, deps = {}) {
   const row = store.byId.get(String(id || ''));
   if (!row) return { ok: false, reason: 'unknown_invoice', delivered: false };
   if (!row.depositAddress) return { ok: true, invoice: publicInvoice(row), delivered: false, status: row.status };
-  const st = await (deps.oneClickStatus || oneClickStatus)(row.depositAddress);
+  const st = await (deps.oneClickStatus || fetchOneClickStatus)(row.depositAddress);
   if (st?.status) row.status = st.status;
   store.byId.set(row.id, row);
   saveFile(store, deps.file ?? filePath(deps.env || process.env));
   const view = publicInvoice(row);
-  return { ...st, ...view, delivered: invoiceDelivered(row.status), help: st?.help || invoiceStatusLine(row.status) };
+  const links = paymentLinks({
+    destinationTx: st?.destinationTx, nearTx: st?.nearTx, originTx: st?.originTx, chain: row.payChain,
+  });
+  return {
+    ...st, ...view, links, receipt: receiptLine(view, row.status),
+    delivered: invoiceDelivered(row.status), help: st?.help || invoiceStatusLine(row.status),
+  };
 }
 
+/**
+ * storage_balance_of on native USDC. Args stay JSON { account_id }, base64 inside view().
+ * The 64-hex contract is tried first. An account id that is too long falls through to the factory alias.
+ * A view that still fails is unknown, and the invoice stays valid. A missing account is a clear error.
+ */
 export async function registrationOf(account, deps = {}) {
   const who = String(account || '').trim();
-  if (!who) return { ok: false, reason: 'bad_account', ...registrationVerdict(null, { error: 'bad_account' }) };
-  try {
-    const view = deps.view || (async () => null);
-    const balance = await view(deps.contract || USDC_NEAR_CONTRACT, 'storage_balance_of', { account_id: who });
-    return { ok: true, account: who, contract: deps.contract || USDC_NEAR_CONTRACT, ...registrationVerdict(balance) };
-  } catch (e) {
-    return { ok: false, account: who, ...registrationVerdict(null, { error: e.message }) };
+  if (!nearAccountOk(who)) return { ok: false, reason: 'bad_account', claim: 'bad_account', text: 'That is not a NEAR account name.' };
+  if (typeof deps.viewAccount === 'function') {
+    try { await deps.viewAccount(who); }
+    catch (e) {
+      const msg = String(e?.message || '');
+      if (/UNKNOWN_ACCOUNT|does not exist/i.test(msg)) {
+        return { ok: false, account: who, reason: 'missing_account', claim: 'missing', text: `${who} does not exist on NEAR. Check the name before anyone pays.` };
+      }
+    }
   }
+  const view = deps.view;
+  if (!view) return { ok: true, account: who, ...registrationVerdict(null, { error: 'no view' }) };
+  const contracts = deps.contracts || [deps.contract || USDC_NEAR_CONTRACT, USDC_CONTRACT_FALLBACK].filter((id, i, all) => id && all.indexOf(id) === i);
+  let last = 'unread';
+  for (const contract of contracts) {
+    try {
+      const balance = await view(contract, 'storage_balance_of', { account_id: who });
+      let minNear;
+      try {
+        const bounds = await view(contract, 'storage_balance_bounds', {});
+        minNear = nearFromYocto(bounds?.min);
+      } catch { /* the calm line still names who pays */ }
+      return { ok: true, account: who, contract, ...registrationVerdict(balance, { minNear: minNear || undefined }) };
+    } catch (e) {
+      last = e?.message || last;
+    }
+  }
+  return { ok: true, account: who, ...registrationVerdict(null, { error: last }) };
 }

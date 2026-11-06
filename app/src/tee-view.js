@@ -90,10 +90,11 @@ export function teeResult(body, proofHref = PROOF_HREF) {
   };
 }
 
-export async function liveTee({ fetchImpl = globalThis.fetch, api = '', nonce, timeoutMs = TEE_TIMEOUT_MS, onTick } = {}) {
+export async function liveTee({ fetchImpl = globalThis.fetch, api = '', nonce, model = '', timeoutMs = TEE_TIMEOUT_MS, onTick } = {}) {
   const bytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
   const n = nonce || [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
   const base = String(api || '').replace(/\/$/, '');
+  const modelQ = model ? `&model=${encodeURIComponent(model)}` : '';
   const ctrl = new AbortController();
   const started = Date.now();
   if (onTick) onTick(0);
@@ -102,7 +103,7 @@ export async function liveTee({ fetchImpl = globalThis.fetch, api = '', nonce, t
   const fail = (why) => ({ ok: false, nonce: n, error: why, failure: `NEAR AI attestation: ${why}`, steps: [step('request', 'NEAR AI attestation', false, why)] });
   try {
     const res = await Promise.race([
-      Promise.resolve(fetchImpl(`${base}/api/ai/tee?nonce=${encodeURIComponent(n)}`, { signal: ctrl.signal })),
+      Promise.resolve(fetchImpl(`${base}/api/ai/tee?nonce=${encodeURIComponent(n)}${modelQ}`, { signal: ctrl.signal })),
       new Promise((_, reject) => {
         ctrl.signal.addEventListener('abort', () => {
           const err = new Error('aborted');

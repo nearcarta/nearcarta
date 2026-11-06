@@ -23,6 +23,8 @@ import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
 import * as ai from './ai.js';
 import * as bankProof from './bank-proof.js';
+import * as bankRate from './bank-rate.js';
+import * as bankModel from './bank-model.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
@@ -286,6 +288,11 @@ export function makeApp() {
   // Nothing here signs or sends the deposit. The receive account is the one stored on the invoice.
   app.post('/api/payouts/invoices', limiter(10), async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const who = String(b.receive || b.recipient || '').trim();
+    if (who) {
+      const reg = await payoutsInvoice.registrationOf(who, { view, viewAccount });
+      if (reg.reason === 'missing_account') return c.json({ ok: false, depositAddress: null, invoice: null, ...reg }, 400);
+    }
     const out = payoutsInvoice.createInvoice(b);
     return c.json(out, out.ok ? 200 : 400);
   });
@@ -293,6 +300,13 @@ export function makeApp() {
     const q = c.req.query();
     const out = payoutsInvoice.readInvoice(c.req.param('id'), q);
     return c.json(out, out.ok ? 200 : 404);
+  });
+  app.post('/api/payouts/invoices/:id/quote', limiter(10), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const parsed = payoutsInvoice.payerInput(b);
+    if (parsed.error) return bad(c, parsed.error);
+    const out = await payoutsInvoice.quoteStored(c.req.param('id'), parsed.value);
+    return c.json(out, out.ok ? 200 : 400);
   });
   app.post('/api/payouts/invoices/:id/checkout', limiter(6), oneClick, async c => {
     const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
@@ -306,7 +320,7 @@ export function makeApp() {
     catch (e) { return c.json({ error: e.message, delivered: false }, e.status || 502); }
   });
   app.get('/api/payouts/registration', limiter(30), async c => {
-    const out = await payoutsInvoice.registrationOf(c.req.query('account'), { view });
+    const out = await payoutsInvoice.registrationOf(c.req.query('account'), { view, viewAccount });
     return c.json(out, out.ok ? 200 : 400);
   });
   app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await reads.guardhouse()));
@@ -587,6 +601,17 @@ export function makeApp() {
     if (text) { try { body = JSON.parse(text); } catch { return bad(c, 'body'); } }
     if (!body || typeof body !== 'object' || Array.isArray(body)) return bad(c, 'body');
     return c.json(await bankProof.bankProve({ receipt: body.receipt || null }));
+  });
+  // Cap conversion only. The statement is not sent here.
+  app.get('/api/bank/rate', limiter(12), async c => c.json(await bankRate.nearRate(c.req.query('currency') || '')));
+  // One TEE audit completion. The rows are not stored and are not returned.
+  app.post('/api/bank/audit', limiter(4), nearAi, async c => {
+    let body = {};
+    const text = await c.req.text();
+    if (text) { try { body = JSON.parse(text); } catch { return bad(c, 'body'); } }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return bad(c, 'body');
+    const model = typeof body.model === 'string' ? body.model.slice(0, 120) : '';
+    return c.json(await bankModel.runModelAudit({ rows: body.rows, ...(model ? { model } : {}) }));
   });
   // Charters (factory) and Vault Arena: backend/src/vault.js
   vault.register(app, { limiter, globalCap });
