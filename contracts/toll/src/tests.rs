@@ -567,3 +567,126 @@ fn a_stranger_cannot_upgrade() {
     set("mallory.test");
     let _ = o.upgrade(near_sdk::json_types::Base64VecU8(vec![1]));
 }
+
+fn price(o: &mut Oath) {
+    set("owner.test");
+    o.set_price(acc("board.test"), U128(5), U128(2), vec![Split { account: acc("contributor.test"), bps: 2500 }], false,
+        "0x3333333333333333333333333333333333333333".into(), U128(1000), 0);
+}
+fn open(o: &mut Oath, owner: &str, action: u64, asset: &str, to: &str, amount: u128, budget: u128) -> u64 {
+    deposit("board.test", 5);
+    o.cross(acc(owner), action, "base".into(), asset.into(), to.into(), U128(amount), U128(budget))
+}
+
+#[test]
+fn two_rows_derive_two_paths_and_do_not_share_a_nonce() {
+    let mut o = toll();
+    price(&mut o);
+    let a = open(&mut o, "visitor.test", 1, "native", OTHER, 10, 50);
+    let b = open(&mut o, "other.test", 1, "native", TO, 10, 50);
+    assert_eq!(o.address_of(acc("visitor.test"), "base".into())["path"], json!("row:visitor.test:base"));
+    assert_eq!(o.address_of(acc("other.test"), "base".into())["path"], json!("row:other.test:base"));
+    assert!(o.address_of(acc("visitor.test"), "base".into())["address"].is_null());
+    set("visitor.test");
+    let _ = o.sign_cross(a);
+    set("other.test");
+    let _ = o.sign_cross(b);
+    let left = o.get_tx(0).unwrap();
+    let right = o.get_tx(1).unwrap();
+    assert_eq!(left.path.as_deref(), Some("row:visitor.test:base"));
+    assert_eq!(right.path.as_deref(), Some("row:other.test:base"));
+    assert_eq!(left.evm_nonce, Some(0));
+    assert_eq!(right.evm_nonce, Some(0));
+    assert_eq!(left.to, OTHER);
+    assert_eq!(right.to, TO);
+    assert_eq!(o.policy()["earned"], json!("0"));
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: value over per-tx cap")]
+fn an_excessive_foreign_value_fails_before_a_signature() {
+    let mut o = toll();
+    price(&mut o);
+    let _ = open(&mut o, "visitor.test", 1, "native", OTHER, 101, 200);
+}
+
+#[test]
+fn a_usdc_order_keeps_the_token_and_does_not_sign_until_asked() {
+    let mut o = toll();
+    price(&mut o);
+    let id = open(&mut o, "visitor.test", 7, "usdc", OTHER, 25, 100);
+    assert_eq!(o.get_order(id).unwrap().status, "open");
+    assert!(o.get_tx(0).is_none());
+    set("visitor.test");
+    let _ = o.sign_cross(id);
+    let tx = o.get_tx(0).unwrap();
+    assert_eq!(tx.token_used.as_deref(), Some("0x3333333333333333333333333333333333333333"));
+    assert_eq!(tx.to, OTHER);
+    assert_eq!(tx.path.as_deref(), Some("row:visitor.test:base"));
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: this crossing was already opened")]
+fn the_same_action_cannot_be_opened_twice() {
+    let mut o = toll();
+    price(&mut o);
+    let _ = open(&mut o, "visitor.test", 3, "native", OTHER, 1, 50);
+    let _ = open(&mut o, "visitor.test", 3, "native", TO, 1, 50);
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: this crossing was already signed")]
+fn a_crossing_cannot_be_signed_twice() {
+    let mut o = toll();
+    price(&mut o);
+    let id = open(&mut o, "visitor.test", 4, "native", OTHER, 1, 50);
+    set("visitor.test");
+    let _ = o.sign_cross(id);
+    let _ = o.sign_cross(id);
+}
+
+#[test]
+fn a_failed_service_deposit_is_refunded_once() {
+    let mut o = toll();
+    price(&mut o);
+    let id = open(&mut o, "visitor.test", 5, "native", OTHER, 1, 50);
+    assert_eq!(o.policy()["service_held"], json!("5"));
+    set("board.test");
+    o.cancel_order(id);
+    let _ = o.refund_order(id);
+    assert_eq!(o.policy()["service_held"], json!("0"));
+    assert_eq!(o.get_order(id).unwrap().status, "refunded");
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: this deposit was already refunded")]
+fn a_second_refund_is_refused() {
+    let mut o = toll();
+    price(&mut o);
+    let id = open(&mut o, "visitor.test", 6, "native", OTHER, 1, 50);
+    set("board.test");
+    o.cancel_order(id);
+    let _ = o.refund_order(id);
+    let _ = o.refund_order(id);
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: service deposits are still held")]
+fn close_waits_while_a_deposit_is_held() {
+    let mut o = toll();
+    price(&mut o);
+    let _ = open(&mut o, "visitor.test", 8, "native", OTHER, 1, 50);
+    let mut b = ctx("owner.test");
+    b.attached_deposit(NearToken::from_yoctonear(1));
+    testing_env!(b.build());
+    let _ = o.close();
+}
+
+#[test]
+#[should_panic(expected = "REFUSED: only the board can open a crossing")]
+fn a_stranger_cannot_open_a_crossing() {
+    let mut o = toll();
+    price(&mut o);
+    deposit("mallory.test", 5);
+    let _ = o.cross(acc("visitor.test"), 1, "base".into(), "native".into(), OTHER.into(), U128(1), U128(50));
+}

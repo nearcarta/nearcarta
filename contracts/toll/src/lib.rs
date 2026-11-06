@@ -31,6 +31,11 @@ pub struct TxRec {
     pub raw_signed: Option<String>,
     pub tx_hash: Option<String>,
     pub proof_payload_hash: Option<String>,
+    pub path: Option<String>,
+    pub evm_nonce: Option<u64>,
+    pub asset: Option<String>,
+    pub row_owner: Option<String>,
+    pub token_used: Option<String>,
 }
 
 #[near(contract_state)]
@@ -59,7 +64,19 @@ pub struct Oath {
     cross: Option<Cross>, // v7: board pass, then the visitor names the Base recipient
     passes: LookupMap<u64, PassRec>,
     next_pass: u64,
-    book: LookupMap<AccountId, Vec<String>>, // v7: optional recipients for one visitor; empty means any address
+    book: LookupMap<AccountId, Vec<String>>, // optional recipients for one visitor; empty means any address
+    orders: LookupMap<u64, Order>,
+    next_order: u64,
+    row_nonce: LookupMap<String, u64>,
+    row_spent: LookupMap<String, u128>,
+    derived: LookupMap<String, String>,
+    liabilities: LookupMap<u64, Liab>,
+    actions: LookupMap<String, u64>,
+    tx_order: LookupMap<u64, u64>,
+    service_held: u128,
+    earned: u128,
+    surplus: u128,
+    price: Option<Price>,
 }
 
 /// v4: what a visitor's charter must have paid on NEAR, and the fixed EVM payout it buys.
@@ -94,6 +111,54 @@ pub struct Cross {
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
 pub struct PassRec { pub owner: AccountId, pub deposit: U128, pub used: bool }
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Split { pub account: AccountId, pub bps: u16 }
+
+/// Service price. The foreign transfer is not part of this fee.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Price {
+    pub board: AccountId,
+    pub fee: U128,
+    pub cost: U128,
+    pub splits: Vec<Split>,
+    pub paused: bool,
+    pub usdc: String,
+    pub max_token: U128,
+    pub hold_ns: u64,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Order {
+    pub id: u64,
+    pub action_id: u64,
+    pub row_owner: AccountId,
+    pub chain: String,
+    pub path: String,
+    pub asset: String,
+    pub to: String,
+    pub amount: U128,
+    pub fee: U128,
+    pub status: String,
+    pub evm_nonce: u64,
+    pub tx_nonce: Option<u64>,
+    pub opened_at: u64,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Liab { pub row_owner: AccountId, pub amount: U128, pub refunded: bool }
+
+pub fn row_path(owner: &AccountId, chain: &str) -> String {
+    require!(chain.eq_ignore_ascii_case("base"), "REFUSED: that chain is not on this toll");
+    format!("row:{owner}:base")
+}
+
+fn spend_key(owner: &AccountId, chain: &str, asset: &str) -> String { format!("{owner}#{chain}#{asset}") }
+fn action_key(owner: &AccountId, action_id: u64) -> String { format!("{owner}#{action_id}") }
 
 /// v4: gas for the visitor callback (it starts the MPC sign: 50 Tgas + on_signed 30 Tgas).
 pub const GATE_CB_GAS: u64 = 110;
@@ -190,7 +255,10 @@ impl Oath {
                max_per_tx: max_per_tx.0, budget: budget.0, spent: 0, max_fee_cap: max_fee_cap.0,
                next_nonce: 0, frozen: false, txs: LookupMap::new(b"t"), verify_chain, token, dao,
                gate, visits: LookupMap::new(b"v"), visit_of: LookupMap::new(b"w"),
-               cross: None, passes: LookupMap::new(b"p"), next_pass: 0, book: LookupMap::new(b"b") }
+               cross: None, passes: LookupMap::new(b"p"), next_pass: 0, book: LookupMap::new(b"b"),
+               orders: LookupMap::new(b"o"), next_order: 0, row_nonce: LookupMap::new(b"r"), row_spent: LookupMap::new(b"s"),
+               derived: LookupMap::new(b"d"), liabilities: LookupMap::new(b"l"), actions: LookupMap::new(b"a"),
+               tx_order: LookupMap::new(b"x"), service_held: 0, earned: 0, surplus: 0, price: None }
     }
 
     fn assert_owner(&self) { require!(env::predecessor_account_id() == self.owner, "only owner"); }
@@ -211,6 +279,12 @@ impl Oath {
     pub fn close(&mut self) -> Promise {
         near_sdk::assert_one_yocto();
         self.assert_owner();
+        require!(self.service_held == 0, "REFUSED: service deposits are still held");
+        for id in 0..self.next_order {
+            if let Some(order) = self.orders.get(&id) {
+                require!(order.status != "open" && order.status != "signing", "REFUSED: a crossing is still open");
+            }
+        }
         log!("close: deleting {} to {}", env::current_account_id(), self.owner);
         Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
@@ -222,7 +296,8 @@ impl Oath {
                "spent": self.spent.to_string(), "max_fee_cap": self.max_fee_cap.to_string(),
                "next_nonce": self.next_nonce, "frozen": self.frozen, "verify_chain": self.verify_chain,
                "asset": self.token.as_ref().map(|t| json!({"erc20": t})).unwrap_or(json!("native")), "dao": self.dao,
-               "gate": self.gate, "cross": self.cross, "next_pass": self.next_pass, "recipients": "visitor"})
+               "gate": self.gate, "cross": self.cross, "next_pass": self.next_pass, "recipients": "visitor",
+               "price": self.price, "service_held": self.service_held.to_string(), "earned": self.earned.to_string(), "surplus": self.surplus.to_string()})
     }
 
     /// v7: the owner sets the board, the pass fee and the Base value. The recipient is not stored here.
@@ -248,6 +323,137 @@ impl Oath {
     }
 
     pub fn get_book(&self, owner: AccountId) -> Vec<String> { self.book.get(&owner).cloned().unwrap_or_default() }
+
+    /// The owner publishes the service price. No recipient is stored.
+    pub fn set_price(&mut self, board: AccountId, fee: U128, cost: U128, splits: Vec<Split>, paused: bool, usdc: String, max_token: U128, hold_ns: u64) {
+        self.assert_owner();
+        require!(fee.0 > 0 && cost.0 <= fee.0, "cost must sit inside the fee");
+        let mut bps = 0u32;
+        for s in &splits { require!(s.bps > 0, "split share must be set"); bps += s.bps as u32; }
+        require!(bps <= 10_000, "split is over 100%");
+        let usdc = evm_addr(&usdc);
+        self.price = Some(Price { board, fee, cost, splits, paused, usdc, max_token, hold_ns });
+    }
+
+    pub fn address_of(&self, row_owner: AccountId, chain: String) -> Value {
+        let path = row_path(&row_owner, &chain);
+        json!({"path": path, "address": self.derived.get(&path).cloned()})
+    }
+
+    pub fn get_order(&self, id: u64) -> Option<Order> { self.orders.get(&id).cloned() }
+
+    /// The board opens a crossing. This does not call the signer, so it fits a 30 Tgas forward.
+    #[payable]
+    pub fn cross(&mut self, row_owner: AccountId, action_id: u64, chain: String, asset: String, to: String, amount: U128, row_budget: U128) -> u64 {
+        let price = self.price.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no price"));
+        require!(env::predecessor_account_id() == price.board, "REFUSED: only the board can open a crossing");
+        require!(!self.frozen && !price.paused, "REFUSED: oath frozen");
+        let dep = env::attached_deposit().as_yoctonear();
+        require!(dep >= price.fee.0, "REFUSED: the crossing paid less than the toll");
+        let chain_l = chain.to_lowercase();
+        require!(chain_l == "base", "REFUSED: that chain is not on this toll");
+        let asset_l = asset.to_lowercase();
+        require!(asset_l == "native" || asset_l == "usdc", "REFUSED: asset must be native or usdc");
+        let to = evm_addr(&to);
+        if let Some(book) = self.book.get(&row_owner) {
+            if !book.is_empty() { require!(book.iter().any(|a| a == &to), "REFUSED: that address is not in your book"); }
+        }
+        require!(amount.0 > 0, "REFUSED: amount must be set");
+        let cap = if asset_l == "native" { self.max_per_tx } else { price.max_token.0 };
+        require!(amount.0 <= cap, "REFUSED: value over per-tx cap");
+        require!(amount.0 <= row_budget.0, "REFUSED: value over the row budget");
+        let key = action_key(&row_owner, action_id);
+        require!(!self.actions.contains_key(&key), "REFUSED: this crossing was already opened");
+        let spent_key = spend_key(&row_owner, "base", &asset_l);
+        let spent = self.row_spent.get(&spent_key).copied().unwrap_or(0);
+        require!(spent + amount.0 <= row_budget.0, "REFUSED: the row budget is spent");
+        let id = self.next_order;
+        self.next_order = id + 1;
+        let path = row_path(&row_owner, "base");
+        self.actions.insert(key, id);
+        self.row_spent.insert(spent_key, spent + amount.0);
+        self.service_held += dep;
+        log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"cross_opened","data":{"id":id,"owner":row_owner,"to":to}}));
+        self.orders.insert(id, Order { id, action_id, row_owner, chain: "base".into(), path, asset: asset_l, to, amount, fee: U128(dep), status: "open".into(), evm_nonce: 0, tx_nonce: None, opened_at: env::block_timestamp() });
+        id
+    }
+
+    /// The visitor signs the order the board already stored. The arguments cannot change the recipient or the amount.
+    pub fn sign_cross(&mut self, id: u64) -> Promise {
+        require!(env::prepaid_gas() >= Gas::from_tgas(GATE_MIN_GAS), "attach at least 150 Tgas");
+        let caller = env::predecessor_account_id();
+        require!(caller != env::current_account_id(), "REFUSED: the toll account cannot sign this crossing");
+        let mut order = self.orders.get(&id).cloned().unwrap_or_else(|| env::panic_str("REFUSED: no such crossing"));
+        require!(order.row_owner == caller, "REFUSED: this crossing is not yours");
+        require!(order.status == "open", "REFUSED: this crossing was already signed");
+        let evm_nonce = self.row_nonce.get(&order.path).copied().unwrap_or(0);
+        self.row_nonce.insert(order.path.clone(), evm_nonce + 1);
+        order.evm_nonce = evm_nonce;
+        order.status = "signing".into();
+        let price = self.price.clone().expect("price");
+        let token = if order.asset == "usdc" { Some(price.usdc) } else { None };
+        let (fee, prio) = (U128(self.max_fee_cap), U128(self.max_fee_cap / 5));
+        let gas = if token.is_some() { 60_000 } else { 21000 };
+        let tx = self.sign(order.to.clone(), order.amount, fee, prio, gas, false, order.path.clone(), Some(evm_nonce), Some(order.asset.clone()), Some(caller.to_string()), token, Some(id));
+        order.tx_nonce = Some(self.next_nonce - 1);
+        self.orders.insert(id, order);
+        tx
+    }
+
+    pub fn cancel_order(&mut self, id: u64) {
+        let price = self.price.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no price"));
+        require!(env::predecessor_account_id() == price.board, "REFUSED: only the board can cancel a crossing");
+        let order = self.orders.get(&id).cloned().unwrap_or_else(|| env::panic_str("REFUSED: no such crossing"));
+        require!(order.status == "open", "REFUSED: this crossing was already signed");
+        require!(env::block_timestamp() >= order.opened_at.saturating_add(price.hold_ns), "REFUSED: the hold has not ended");
+        self.fail_order(id);
+    }
+
+    /// The board pulls a failed service deposit once. The foreign amount is not part of this refund.
+    pub fn refund_order(&mut self, id: u64) -> Promise {
+        let price = self.price.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no price"));
+        require!(env::predecessor_account_id() == price.board, "REFUSED: only the board can refund a crossing");
+        let mut liab = self.liabilities.get(&id).cloned().unwrap_or_else(|| env::panic_str("REFUSED: nothing is owed"));
+        require!(!liab.refunded, "REFUSED: this deposit was already refunded");
+        liab.refunded = true;
+        self.service_held -= liab.amount.0;
+        self.liabilities.insert(id, liab.clone());
+        if let Some(mut order) = self.orders.get(&id).cloned() { order.status = "refunded".into(); self.orders.insert(id, order); }
+        Promise::new(price.board).function_call("credit_row".to_string(), json!({"row_owner": liab.row_owner, "amount": liab.amount.0.to_string(), "order_id": id}).to_string().into_bytes(), NearToken::from_yoctonear(liab.amount.0), Gas::from_tgas(20))
+    }
+
+    pub fn withdraw_surplus(&mut self, amount: U128) -> Promise {
+        self.assert_owner();
+        require!(amount.0 > 0 && amount.0 <= self.surplus, "REFUSED: that is more than the surplus");
+        self.surplus -= amount.0;
+        let price = self.price.clone().unwrap_or_else(|| env::panic_str("REFUSED: this toll has no price"));
+        let mut assigned = 0u128;
+        let mut parts: Vec<(AccountId, u128)> = vec![];
+        for s in &price.splits {
+            let share = amount.0 * s.bps as u128 / 10_000;
+            if share > 0 { parts.push((s.account.clone(), share)); assigned += share; }
+        }
+        let rest = amount.0 - assigned;
+        if rest > 0 { parts.push((self.owner.clone(), rest)); }
+        let mut it = parts.into_iter();
+        let (account, yocto) = it.next().expect("a surplus has a payee");
+        let mut p = Promise::new(account).transfer(NearToken::from_yoctonear(yocto));
+        for (account, yocto) in it { p = p.and(Promise::new(account).transfer(NearToken::from_yoctonear(yocto))); }
+        p
+    }
+
+    fn fail_order(&mut self, id: u64) {
+        let mut order = match self.orders.get(&id).cloned() { Some(o) => o, None => return };
+        if order.status == "failed" || order.status == "refunded" { return; }
+        let key = spend_key(&order.row_owner, &order.chain, &order.asset);
+        let spent = self.row_spent.get(&key).copied().unwrap_or(0);
+        self.row_spent.insert(key, spent.saturating_sub(order.amount.0));
+        if self.liabilities.get(&id).is_none() {
+            self.liabilities.insert(id, Liab { row_owner: order.row_owner.clone(), amount: order.fee, refunded: false });
+        }
+        order.status = "failed".into();
+        self.orders.insert(id, order);
+    }
 
     /// The owner deploys the next wasm. migrate reads this state back, so a later change does not recreate the account.
     pub fn upgrade(&self, code: near_sdk::json_types::Base64VecU8) -> Promise {
@@ -295,7 +501,8 @@ impl Oath {
         rec.used = true;
         self.passes.insert(id, rec);
         log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"cross_signing","data":{"id":id,"owner":caller,"to":to}}));
-        self.sign(to, c.foreign_value, c.max_fee_per_gas, c.max_priority_fee_per_gas, 21000, false)
+        let path = row_path(&caller, "base");
+        self.sign(to, c.foreign_value, c.max_fee_per_gas, c.max_priority_fee_per_gas, 21000, false, path, None, None, Some(caller.to_string()), None, None)
     }
     /// v4: the charter action that paid for EVM nonce `nonce`, if it came through the gate.
     pub fn get_visit(&self, nonce: u64) -> Option<Visit> { self.visit_of.get(&nonce).cloned() }
@@ -342,31 +549,36 @@ impl Oath {
     }
 
     fn start_sign(&mut self, to: String, value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128, gas_limit: u64) -> Promise {
-        self.sign(to, value, max_fee_per_gas, max_priority_fee_per_gas, gas_limit, true)
+        self.sign(to, value, max_fee_per_gas, max_priority_fee_per_gas, gas_limit, true, self.path.clone(), None, None, None, None, None)
     }
 
-    fn sign(&mut self, to: String, value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128, gas_limit: u64, listed: bool) -> Promise {
+    fn sign(&mut self, to: String, value: U128, max_fee_per_gas: U128, max_priority_fee_per_gas: U128, gas_limit: u64, listed: bool, path: String, evm_nonce: Option<u64>, asset: Option<String>, row_owner: Option<String>, token: Option<String>, order_id: Option<u64>) -> Promise {
         require!(!self.frozen, "REFUSED: oath frozen");
         let to = to.to_lowercase();
         if listed { require!(self.allow_to.contains(&to), "REFUSED: recipient not in oath allowlist"); }
-        require!(value.0 <= self.max_per_tx, "REFUSED: value over per-tx cap");
-        require!(self.spent + value.0 <= self.budget, "REFUSED: budget exhausted");
+        if order_id.is_none() {
+            require!(value.0 <= self.max_per_tx, "REFUSED: value over per-tx cap");
+            require!(self.spent + value.0 <= self.budget, "REFUSED: budget exhausted");
+        }
         require!(max_fee_per_gas.0 <= self.max_fee_cap && max_priority_fee_per_gas.0 <= max_fee_per_gas.0, "REFUSED: gas fee over cap");
-        match self.token {
+        match token.as_deref().or(self.token.as_deref()) {
             None => require!(gas_limit <= 21000, "REFUSED: only plain transfers (gas 21000)"),
             Some(_) => require!(gas_limit <= ERC20_GAS_CAP, "REFUSED: gas limit over ERC-20 cap"),
         }
         let nonce = self.next_nonce;
-        let fields = self.fields(nonce, max_priority_fee_per_gas.0, max_fee_per_gas.0, gas_limit, &to, value.0);
+        let evm_n = evm_nonce.unwrap_or(nonce);
+        let fields = self.fields_for(self.chain_id, token.as_deref().or(self.token.as_deref()), evm_n, max_priority_fee_per_gas.0, max_fee_per_gas.0, gas_limit, &to, value.0);
         let mut pre = vec![0x02u8];
         pre.extend(rlp::enc_list(&fields));
         let h = env::keccak256(&pre);
-        self.spent += value.0; // reserve
+        if order_id.is_none() { self.spent += value.0; }
         self.next_nonce += 1;
         self.txs.insert(nonce, TxRec { to: to.clone(), value, nonce, status: "signing".into(), unsigned_hash: hx(&h),
-                                     raw_signed: None, tx_hash: None, proof_payload_hash: None });
-        log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"sign_requested","data":{"nonce":nonce,"to":to,"value":value,"payload":hx(&h)}}));
-        let args = json!({"request": {"path": self.path, "payload_v2": {"Ecdsa": hx(&h)}, "domain_id": 0}});
+                                     raw_signed: None, tx_hash: None, proof_payload_hash: None, path: Some(path.clone()),
+                                     evm_nonce: Some(evm_n), asset, row_owner, token_used: token.clone() });
+        if let Some(id) = order_id { self.tx_order.insert(nonce, id); }
+        log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"sign_requested","data":{"nonce":nonce,"to":to,"value":value,"payload":hx(&h),"path":path}}));
+        let args = json!({"request": {"path": path, "payload_v2": {"Ecdsa": hx(&h)}, "domain_id": 0}});
         Promise::new(self.mpc.clone())
             .function_call("sign".to_string(), args.to_string().into_bytes(), NearToken::from_yoctonear(1), Gas::from_tgas(50))
             .then(Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(30)).on_signed(nonce, max_fee_per_gas, max_priority_fee_per_gas, gas_limit))
@@ -390,7 +602,10 @@ impl Oath {
                      #[callback_result] sig: Result<Value, PromiseError>) -> Option<TxRec> {
         let mut rec = self.txs.get(&nonce).cloned().expect("no rec");
         let sig = match sig { Ok(v) => v, Err(_) => {
-            rec.status = "failed".into(); self.spent -= rec.value.0; self.txs.insert(nonce, rec.clone());
+            rec.status = "failed".into();
+            if self.tx_order.get(&nonce).is_none() { self.spent -= rec.value.0; }
+            self.txs.insert(nonce, rec.clone());
+            if let Some(id) = self.tx_order.get(&nonce).copied() { self.fail_order(id); }
             log!("EVENT_JSON:{}", json!({"standard":"town-chronicle","event":"sign_failed","data":{"nonce":nonce}}));
             return Some(rec); } };
         let big_r = unhex(sig["big_r"]["affine_point"].as_str().unwrap());
@@ -402,8 +617,34 @@ impl Oath {
         let h: [u8; 32] = unhex(&rec.unsigned_hash).try_into().unwrap();
         let pk = env::ecrecover(&h, &rs, v, true).expect("ecrecover failed");
         let addr = format!("0x{}", hx(&env::keccak256(&pk)[12..]));
-        require!(addr == self.foreign_address, "signature does not recover to oath address");
-        let mut f = self.fields(nonce, max_priority_fee_per_gas.0, max_fee_per_gas.0, gas_limit, &rec.to, rec.value.0);
+        if let Some(path) = rec.path.clone() {
+            if path != self.path {
+                match self.derived.get(&path).cloned() {
+                    Some(prev) => require!(addr == prev, "signature does not recover to the row address"),
+                    None => { self.derived.insert(path, addr); }
+                }
+            } else {
+                require!(addr == self.foreign_address, "signature does not recover to oath address");
+            }
+        } else {
+            require!(addr == self.foreign_address, "signature does not recover to oath address");
+        }
+        let n = rec.evm_nonce.unwrap_or(nonce);
+        let token = rec.token_used.clone();
+        let mut f = self.fields_for(self.chain_id, token.as_deref().or(if rec.path.as_deref() == Some(self.path.as_str()) { self.token.as_deref() } else { None }), n, max_priority_fee_per_gas.0, max_fee_per_gas.0, gas_limit, &rec.to, rec.value.0);
+        if let Some(id) = self.tx_order.get(&nonce).copied() {
+            if let Some(mut order) = self.orders.get(&id).cloned() {
+                if order.status == "signing" {
+                    let fee = order.fee.0;
+                    let cost = self.price.as_ref().map(|p| p.cost.0.min(fee)).unwrap_or(0);
+                    if self.service_held >= fee { self.service_held -= fee; }
+                    self.earned += fee;
+                    self.surplus += fee - cost;
+                    order.status = "signed".into();
+                    self.orders.insert(id, order);
+                }
+            }
+        }
         f.push(rlp::enc_uint(v as u128));
         f.push(rlp::enc_bytes(rlp::strip(r)));
         f.push(rlp::enc_bytes(rlp::strip(&s)));

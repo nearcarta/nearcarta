@@ -130,7 +130,7 @@ test('T1 a landed tx shows the receipt, not a load error', async ({ page }) => {
     const pay = page.getByTestId('toll-pay');
     await expect(pay).toBeVisible({ timeout: 20000 });
     const label = (await pay.innerText()).trim();
-    expect(label === 'Live policy has no visitor fee' || /^Pay [\d.]+ NEAR$/.test(label)).toBe(true);
+    expect(label === 'Live policy has no visitor fee' || label === 'Pay on Base' || /^Pay [\d.]+ NEAR$/.test(label)).toBe(true);
     await expect(page.getByTestId('toll-card')).not.toContainText('Paid on Base');
     await shot(page, 't1-toll-' + width);
   }

@@ -1,12 +1,10 @@
 # Toll Bridge — deepen to Ferry depth (Cursor brief)
 
-**Owner correction (2026-11-06), overrides every `allow_to` instruction below.** Do not put a recipient in contract init. That includes the address currently on mainnet and any other fixed destination. A global list means a new visitor needs a new deploy, and that is the wrong design.
+**Final plan (docs/internal/final-plan.md on main, commit dda7f91) overrides this brief where they differ.** Do not put a recipient in contract init. Do not use the shared `base-1` address as a visitor wallet.
 
-The visitor types any `0x` + 40 hex address in the tray, or the agent reads it from “pay the toll on Base to 0x…”. `cross_after_board(to)` takes that address. The NEAR safety is the visitor's own board row: per-action cap, daily budget, and expiry, set once in `/setup`. The contract adds `max_per_tx`, `budget`, `max_fee_cap`, `frozen`, and the verified board pass. `set_book` is an optional list stored for that visitor only. An empty book allows any address. It is never a list fixed at deploy.
+Each visitor row derives `row:{owner}:base`. The address appears only after the signer returns it. `cross` is board-authenticated and does not sign. `sign_cross` is the row owner and signs the stored native or USDC order. A failed service deposit refunds once. `close` refuses while a deposit is held. The live wasm still cannot upgrade itself, so the first install is one close. The recovered NEAR funds that install. No top-up is part of this plan.
 
-Path stays `base-1` and chain stays 8453, so the derived address stays the one in `shared/deployments/mainnet.json`. The live wasm cannot upgrade itself, so the first install is one `close` and a new wasm. That wasm has `upgrade` and `migrate` for the owner. A later change does not close the account, and a new visitor does not need a deploy. No function-call key. The toll account cannot call `cross_after_board`.
-
-The live snapshot in §1 records what mainnet holds today. It is not the init for the next wasm.
+The sections below are the earlier brief. Where they say the visitor signs on path `base-1`, the final plan wins.
 
 ---
 

@@ -10,6 +10,7 @@ import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
 import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCallTgas, quoteRecipient, stepsAllowanceYocto, WRAP } from '/panels/ferry-settle.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
+import { missingCross } from '/foreign-path.js';
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 const onMain = () => true;
@@ -360,13 +361,16 @@ export function ruleFor(o, clauseId = 'pay') {
 }
 
 export async function toll(quote) {
-  // City session only. The fee is the live policy. A missing board row must not open a wallet or ask.
+  // City session only. The gold button and the agent call this same check.
+  // The session key can call propose on the board. It cannot call cross on the toll, and propose forwards 30 Tgas.
+  // Nothing here opens a wallet or sends the foreign transfer.
   if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
   if (!quote?.payable || !quote.feeYocto) throw new Error(quote?.hint || 'The live policy has no visitor fee. Nothing was signed.');
-  if (!TS.tollAllowed(pay()?.receivers)) throw new Error(TS.TOLL_NOT_LISTED);
+  const miss = missingCross(quote);
+  if (miss) throw new Error(miss);
   const key = agent();
   if (!key || !await proposeAccessKey(key)) throw new Error('Set up your agent in /setup. Nothing was signed.');
-  return boardPay({ shop: 'toll', receiver: TS.TOLL_ACCT, amountY: String(quote.feeYocto) });
+  throw new Error('The board has to open this crossing. Nothing was signed.');
 }
 // Older gate calls stay for a wallet that already started one. A new toll is the policy fee on the board.
 const LS_TOLL = c => 'nearcarta.d8.toll.' + c;

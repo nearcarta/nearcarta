@@ -2,16 +2,17 @@
 // The live wasm has no upgrade method, so this install is close, then the same account again.
 // After it, the owner calls upgrade and migrate. A new visitor does not need another deploy.
 // close() with 1 yocto returns every yocto, storage included, to nearcarta.near.
-// Path base-1 and chain 8453 keep the derived foreign address. Init stores no recipient.
+// It refuses while a service deposit is held or a crossing is still open.
+// The recovered balance pays the new account. This plan does not ask for a top-up.
+// Path base-1 stays on the account so the old derived address is unchanged.
+// A visitor crossing uses row:{owner}:base and does not spend from that shared address.
 import { readFileSync } from 'node:fs';
 
 const dep = JSON.parse(readFileSync(new URL('../../shared/deployments/mainnet.json', import.meta.url), 'utf8'));
 const toll = dep.toll || {};
 const foreign = String(toll.foreign_address || dep.foreign_address || '').toLowerCase();
 
-const FOREIGN_VALUE = '1000000000000';
 const MAX_FEE = '5000000000';
-const PRIORITY = '1000000000';
 
 const plan = {
   sends: false,
@@ -45,7 +46,7 @@ const plan = {
       signer: 'nearcarta.near',
       full_access_keys_after: 0,
       function_call_keys_after: 0,
-      note: 'No function-call key. The visitor calls cross_after_board and names the recipient.',
+      note: 'No function-call key. The board opens cross. The row owner calls sign_cross. No keeper key.',
     },
     {
       step: 'new',
@@ -66,19 +67,22 @@ const plan = {
         dao: null,
         gate: null,
       },
-      note: 'Same account id, path base-1 and chain 8453 keep the derived address. allow_to is empty. A visitor is not a new deploy.',
+      note: 'Same account id. path base-1 is the old shared derivation, not a visitor wallet. allow_to is empty.',
     },
     {
-      step: 'set_cross',
-      method: 'set_cross',
+      step: 'set_price',
+      method: 'set_price',
       args: {
         board: 'board.nearcarta.near',
-        pass_fee: '<yocto the owner sets; the UI reads this back>',
-        foreign_value: FOREIGN_VALUE,
-        max_fee_per_gas: MAX_FEE,
-        max_priority_fee_per_gas: PRIORITY,
+        fee: '<yocto the owner sets; the UI reads this back>',
+        cost: '<yocto, at most the fee>',
+        splits: [],
+        paused: false,
+        usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        max_token: '<token units the owner sets>',
+        hold_ns: '0',
       },
-      note: 'The value and the fees are caps. The recipient is an argument on cross_after_board.',
+      note: 'Circle USDC on Base is the token contract, not a recipient. The owner can replace it. Splits stay empty until a contributor is configured. No visitor address is stored.',
     },
     {
       step: 'verify',
@@ -95,4 +99,4 @@ const plan = {
   ],
 };
 console.log(JSON.stringify(plan, null, 2));
-console.log('v7 Path A: the visitor names the recipient. Init stores none. The owner upgrades later with migrate.');
+console.log('Visitor path is row:{owner}:base. The shared address is not a visitor wallet. This script does not send.');

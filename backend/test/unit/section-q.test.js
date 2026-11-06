@@ -76,7 +76,8 @@ test('the house deed links are brass and a missing oath is not a missing row', a
   assert.equal(body.contract, 'house.nearcarta.near');
   assert.equal(called, false);
   const toll = read('app/src/panels/toll-room.js');
-  assert.match(toll, /class="primary" id="toll-sig" data-testid="check-signature"/);
+  assert.match(toll, /class="ferry-cta" id="toll-pay" data-testid="toll-pay"/);
+  assert.match(toll, /class="toll-quiet" id="toll-sig" data-testid="check-signature"/);
 });
 
 test('the locked rules card says why, and the home page lists the shops', () => {

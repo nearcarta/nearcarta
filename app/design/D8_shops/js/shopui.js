@@ -910,7 +910,7 @@ function tollGate() {
   if (g.error) return { list: '<p class="note" data-testid="gate-error">The gate did not answer. <button type="button" data-retry-gate>Retry</button></p>', more: '' };
   const low = g.gas?.low ? `<p class="warn" data-testid="gas-warning-row">Low gas: ${esc(g.gas.warning)}</p>` : '';
   return { list: low + (g.recent || []).map(row).join(''),
-    more: kv('Gate', idChip(g.gate)) + kv('Signer', esc(g.mpc)) + kv('Recorded address', idChip(g.policy.allow_to[0], `${esc(g.foreign_explorer)}`))
+    more: kv('Gate', idChip(g.gate)) + kv('Signer', esc(g.mpc)) + (g.policy?.allow_to?.[0] ? kv('Old allow list', idChip(g.policy.allow_to[0], `${esc(g.foreign_explorer)}`)) : kv('Visitor path', 'row:{account}:base'))
       + (g.gas && g.gas.visits_left_at_cap != null ? kv('Gas left', `${esc(g.gas.visits_left_at_cap)} visits`) : '') };
 }
 // Guardhouse, under Details: the same pay clause re-checked by OutLayer in a TEE, with its attestation. The charter stays the final gate.
