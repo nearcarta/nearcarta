@@ -35,12 +35,15 @@ test('the no-row state offers Open your row as the primary action', () => {
   assert.match(s, /data-testid="setup-no-row"/);
   assert.match(s, /No row open on \$\{esc\(MAIN\.board\.contract\)\}/);
   assert.match(s, /There is no row on <code>/);
-  assert.match(s, /\$\{onBoard \? \(chainRead && !readError \? 'Open your row' : 'Reading the board'\) : 'Approve in wallet'\}/);
-  // The primary button is gated on the read finishing, not on a stored key.
-  assert.match(s, /chainRead && !readError \? '' : 'disabled'/);
+  // The primary button is "Open your row" whenever the row is missing.
+  assert.match(s, /\$\{rowReady \? 'Open your row' : 'Reading the board'\}/);
+  // It is enabled once the board answered, and immediately when there is no account to read for.
+  assert.match(s, /const rowReady = noAccount \|\| \(chainRead && !readError\);/);
   // And the open path is the only primary action when there is no row.
   assert.match(s, /const L = signItems\(onBoard, onChain, update\.changed\)/);
   assert.match(s, /signRulesUpdate\(\{ live: !!\(onChain && onBoard\)/);
+  // The key scope is spelled out on the empty-row panel, not only in the lede.
+  assert.match(s, /data-testid="setup-key-scope"/);
 });
 
 test('open_charter targets the board and carries the current rules', () => {

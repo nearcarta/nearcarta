@@ -388,9 +388,12 @@ function sSign() {
   // `closedRow` is the case that used to read as a broken page: this browser still holds
   // an agent key, but the board has no row (it was closed, force_closed, or never made).
   const closedRow = onBoard && !onChain && chainRead && !readError;
+  const noAccount = !me;
   const rowMissing = onBoard && !onChain;
-  const lede = closedRow
-    ? `There is no row on <code>${esc(MAIN.board.contract)}</code> for <code>${esc(me || '')}</code> yet. Open your row to write these rules and let your agent pay inside them. At most ${stake} NEAR is attached; the contract keeps the row's storage and a small spendable balance and sends the rest back.`
+  // Without an account there is nothing to read, so show the open-row copy rather than
+  // waiting on a read that cannot start.
+  const lede = closedRow || (rowMissing && noAccount)
+    ? `There is no row on <code>${esc(MAIN.board.contract)}</code> for <code>${esc(me || 'your account')}</code> yet. Open your row to write these rules and let your agent pay inside them. At most ${stake} NEAR is attached; the contract keeps the row's storage and a small spendable balance and sends the rest back.`
     : rowMissing && !chainRead
       ? 'Checking your row on the board.'
       : onChain
@@ -399,24 +402,32 @@ function sSign() {
           : 'These limits are read back from the chain, not from this page.')
         : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`);
   // The facts panel always says what the board answered. A missing row is a state, not an error.
+  // Without an account there is nothing to read, so the panel must not sit on "Reading…".
   const factsHtml = onChain
     ? boardFacts(chainRow)
-    : !chainRead
-      ? '<div class="fact"><small>Row</small><b>Reading the board…</b></div>'
-      : readError
-        ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div>`
+    : noAccount
+      ? '<div class="fact"><small>Row</small><b>Sign in first. The board is read for your account.</b></div>'
+      : !chainRead
+        ? '<div class="fact"><small>Row</small><b>Reading the board…</b></div>'
+        : readError
+          ? `<div class="fact"><small>Read</small><b>${esc(chainError)}</b></div>`
         : `<div class="fact" data-testid="setup-no-row"><small>Row</small><b>No row open on ${esc(MAIN.board.contract)}</b></div>
+           <div class="fact" data-testid="setup-key-scope"><small>Agent key will allow</small><b>${AGENT_METHODS.map(m => `<code>${esc(m)}</code>`).join(', ')}</b></div>
            <div class="fact"><small>Next</small><b>Open your row</b></div>`;
   const heading = closedRow || (rowMissing && !chainRead) ? 'Open your row.' : onChain ? (keyStale ? 'Renew your agent key.' : 'Your agent is live.') : (onBoard ? 'One approval in your wallet.' : 'Two approvals in your wallet.');
+  // The open button needs the board's answer, unless there is no account to read for.
+  const rowReady = noAccount || (chainRead && !readError);
   return head('Sign', heading, lede)
     + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><code class="small">${esc(id)}</code></div></div>`
     + (onChain || rowMissing ? `<div class="facts" id="facts" data-testid="setup-facts">${factsHtml}</div>` : `<div class="preview">${preview(r)}</div>`)
     + '<ul class="steps">' + L.map(([t, k]) => { const s = signLog.find(x => x.k === k); return `<li class="${s?.state || ''}" data-testid="setup-sign-${esc(k)}">${esc(t)}${s?.tx ? txA(s.tx) : ''}</li>`; }).join('') + '</ul>'
     + update.html
     + (update.changed ? help : '')
+    // Ready when the board answered. Without an account there is nothing to read, so the
+    // button stays enabled and the click asks for sign-in instead of waiting forever.
     + (rowMissing ? (onBoard && bal != null && nearOf(bal) < SIGN_MIN
-      ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" ${chainRead && !readError ? '' : 'disabled'}>${chainRead && !readError ? 'Open your row' : 'Reading the board'}</button>`
-      : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.015 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your row's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign" ${chainRead && !readError ? '' : 'disabled'}>${onBoard ? (chainRead && !readError ? 'Open your row' : 'Reading the board') : 'Approve in wallet'}</button>${help}`)
+      ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
+      : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.015 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your row's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign" ${rowReady ? '' : 'disabled'}>${rowReady ? 'Open your row' : 'Reading the board'}</button>${help}`)
       : '')
     + (onChain && keyReady && !keyStale ? gasPanel() : '')
     + (onChain && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key is missing one of <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code>. Ferry Load cargo needs <code>propose_call</code>; Toll and Guard call shops through <code>propose_call_as</code>. One wallet approval deletes the old board keys and adds a new one with all three (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : '')
