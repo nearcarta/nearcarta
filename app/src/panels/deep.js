@@ -11,14 +11,15 @@ import { NEXT_LABEL, RUN_LABEL } from '../../design/D8_shops/shops/arena-labels.
 import { attackAt } from '../../design/D8_shops/shops/arenalive.js';
 import { addPayoutRow, formatNear, issueText, parseCsv, payoutIssues, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
-import { deedMarkup } from './deed.js';
-import { ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './hall.js';
+import { houseCharterMarkup, mountHouseRoom } from './house-room.js';
 import { boundaryHtml } from './boundary.js';
-import { charterSetupCta, shortId } from './hall-ui.js';
+import { shortId } from './hall-ui.js';
 import { parseRouteFrom, tokenStack, tokenBadge, bindTokenFallbacks } from './token-badge.js';
 import { agentCargoPlan, chainLabel } from './ferry-pair.js';
 import { explainQuoteMiss, SESSION_SWAP } from './ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from './ferry-dock.js';
+
+export { houseCharterMarkup };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
@@ -885,73 +886,8 @@ function mountBank(root, hooks) {
   };
 }
 
-export function houseCharterMarkup({ accountId = '', row = null, failed = false } = {}) {
-  if (row && row.per_action_cap != null && row.per_action_cap !== '') {
-    const cap = nearOf(row.per_action_cap);
-    const owner = accountId || row.owner || '';
-    return `<div class="house-state" data-testid="house-state" role="status"><p>This account has a charter row on the board.</p><p>Max per payment <b data-testid="house-cap">${esc(cap)}</b> NEAR.</p><p>The next step is Town Hall, where that cap can be changed. Nothing was signed here.</p><p><a class="primary" href="/shops/hall/?owner=${encodeURIComponent(owner)}">Open Town Hall</a></p></div>`;
-  }
-  if (failed) {
-    return `<div class="house-empty" data-testid="house-empty" role="status"><p>The charter read did not answer.</p><p>Try again in a moment. The buttons above are the public deed record. Nothing was signed.</p></div>`;
-  }
-  if (accountId) {
-    return charterSetupCta({ accountId, note: 'This account has no charter row. Nothing was signed.' });
-  }
-  return `<div class="house-empty" data-testid="house-empty" role="status"><p>Sign in to read your charter row.</p><p>The buttons above are the public deed record. Nothing was signed.</p><p><a class="primary" href="/setup/?next=%2Fshops%2Fhouse%2F">Sign in</a></p></div>`;
-}
-
 function mountHouse(root, hooks = {}) {
-  const who = typeof hooks.visitor === 'function' ? hooks.visitor() : visitor();
-  const params = new URLSearchParams(globalThis.location?.search || '');
-  const id = params.get('owner') || who.accountId || '';
-  root.innerHTML = `<div id="house"><p class="note">The town house is on mainnet. This page reads your charter row. It does not hold a key.</p><div class="out">${deedMarkup()}<div data-testid="house-read"></div></div></div>`;
-  const slot = root.querySelector('[data-testid=house-read]');
-  if (!id) {
-    slot.innerHTML = houseCharterMarkup({});
-    return;
-  }
-  let gen = 0;
-  const readRow = () => fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
-    .then(r => r.json())
-    .then(body => normalizeRow(body));
-  const showReason = why => {
-    slot.innerHTML = `<div class="house-state" data-testid="house-row-reason" role="alert"><p>${esc(why)}</p><p><button type="button" class="primary" data-testid="house-retry">Try again</button></p></div>`;
-    const retry = slot.querySelector('[data-testid=house-retry]');
-    if (retry) retry.onclick = () => start();
-  };
-  function start() {
-    const mine = ++gen;
-    slot.innerHTML = `<div class="house-state" data-testid="house-reading" role="status"><p>Reading the charter row…</p></div>`;
-    const job = mine === 1 && hooks.row != null
-      ? Promise.resolve(hooks.row).then(body => normalizeRow(body))
-      : readRow();
-    const timer = setTimeout(() => {
-      if (mine !== gen || !slot.isConnected || !slot.querySelector('[data-testid=house-reading]')) return;
-      showReason(rowWaitWhy(ROW_WAIT_MS));
-    }, ROW_WAIT_MS);
-    const paint = row => {
-      if (mine !== gen || !slot.isConnected) return;
-      clearTimeout(timer);
-      slot.innerHTML = houseCharterMarkup({ accountId: id, row });
-    };
-    withRowWait(() => job, ROW_WAIT_MS).then(row => {
-      paint(row);
-    }).catch(e => {
-      if (mine !== gen || !slot.isConnected) return;
-      clearTimeout(timer);
-      if (slot.querySelector('[data-testid=house-reading]')) {
-        const why = e?.code === 'row-wait'
-          ? e.message
-          : `The row could not be read. ${e?.message || 'The charter read did not answer.'} Nothing was signed.`;
-        showReason(why);
-      }
-      job.then(row => {
-        if (mine !== gen || !slot.isConnected || !slot.querySelector('[data-testid=house-row-reason]')) return;
-        paint(row);
-      }).catch(() => {});
-    });
-  }
-  start();
+  return mountHouseRoom(root, hooks);
 }
 
 const ALIAS = { guardhouse: 'guard', townhall: 'hall', mist: 'bank', mistbank: 'bank' };

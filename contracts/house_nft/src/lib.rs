@@ -12,7 +12,7 @@ use near_contract_standards::non_fungible_token::{NonFungibleToken, NonFungibleT
 use near_contract_standards::non_fungible_token::approval::NonFungibleTokenApproval;
 use near_contract_standards::non_fungible_token::core::{NonFungibleTokenCore, NonFungibleTokenResolver};
 use near_sdk::collections::{LazyOption, LookupMap};
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::{assert_one_yocto, env, log, near, require, AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue, PromiseResult};
 use std::collections::HashMap;
 
@@ -21,9 +21,30 @@ use std::collections::HashMap;
 #[derive(Clone)]
 pub struct Purse { pub balance: U128, pub cap: U128, pub paid: U128, pub pays: u32, pub refused_note: Option<String> }
 
+/// Inheritance on one deed. Time is `env::block_timestamp` nanoseconds. Nothing fires by itself.
+/// A demo may use a 60 second window. The owner can cancel until the wait ends.
+/// https://github.com/near/NEPs/blob/master/neps/nep-0171.md (the release is an nft transfer)
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Line {
+    pub heirs: Vec<AccountId>,
+    pub guardians: Vec<AccountId>,
+    pub threshold: u32,
+    pub last_check_in_ns: u64,
+    pub period_ns: u64,
+    pub wait_ns: u64,
+    pub pending_ns: u64,
+    pub approvals: Vec<AccountId>,
+    pub released: bool,
+}
+
+/// Shortest check-in or cancel window: 60 seconds. Longest: 366 days.
+const MIN_WINDOW_NS: u64 = 60 * 1_000_000_000;
+const MAX_WINDOW_NS: u64 = 366 * 24 * 60 * 60 * 1_000_000_000;
+
 #[derive(BorshStorageKey)]
 #[near]
-enum Key { Owner, Meta, Enum, Approval, ContractMeta, Purse }
+enum Key { Owner, Meta, Enum, Approval, ContractMeta, Purse, Line }
 
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
@@ -31,6 +52,8 @@ pub struct Contract {
     tokens: NonFungibleToken,
     metadata: LazyOption<NFTContractMetadata>,
     purses: LookupMap<TokenId, Purse>,
+    /// Inheritance line per deed. Absent until the holder calls house_set_line.
+    lines: LookupMap<TokenId, Line>,
     /// The deployer: may only close the contract, and only while no purse holds NEAR.
     owner: AccountId,
     /// Sum of every purse balance (user money); close() refuses while it is above 0.
@@ -56,6 +79,7 @@ impl Contract {
             tokens: NonFungibleToken::new(Key::Owner, env::current_account_id(), Some(Key::Meta), Some(Key::Enum), Some(Key::Approval)),
             metadata: LazyOption::new(Key::ContractMeta, Some(&metadata)),
             purses: LookupMap::new(Key::Purse),
+            lines: LookupMap::new(Key::Line),
             owner: owner.unwrap_or_else(env::predecessor_account_id),
             held: 0,
         }
@@ -155,6 +179,106 @@ impl Contract {
     }
 
     pub fn house_purse(&self, token_id: TokenId) -> Option<Purse> { self.purses.get(&token_id) }
+
+    /// The holder names heirs and guardians. One yocto, so a session key cannot call it.
+    /// https://docs.near.org/protocol/accounts-contracts/access-keys
+    #[payable]
+    pub fn house_set_line(&mut self, token_id: TokenId, heirs: Vec<AccountId>, guardians: Vec<AccountId>, threshold: u32, period_ns: U64, wait_ns: U64) {
+        assert_one_yocto();
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == owner, "only the deed holder");
+        require!((1..=4).contains(&heirs.len()), "name one heir");
+        require!((1..=4).contains(&guardians.len()), "name a guardian");
+        require!(threshold >= 1 && (threshold as usize) <= guardians.len(), "threshold");
+        require!(period_ns.0 >= MIN_WINDOW_NS && period_ns.0 <= MAX_WINDOW_NS, "window");
+        require!(wait_ns.0 >= MIN_WINDOW_NS && wait_ns.0 <= MAX_WINDOW_NS, "window");
+        require!(distinct(&heirs) && distinct(&guardians), "repeated name");
+        require!(!heirs.contains(&owner) && !guardians.contains(&owner), "the owner is not an heir or a guardian");
+        self.lines.insert(&token_id, &Line {
+            heirs, guardians, threshold,
+            last_check_in_ns: env::block_timestamp(),
+            period_ns: period_ns.0, wait_ns: wait_ns.0,
+            pending_ns: 0, approvals: Vec::new(), released: false,
+        });
+    }
+
+    /// The holder is here. Clears a pending release.
+    #[payable]
+    pub fn house_check_in(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == owner, "only the deed holder");
+        let mut line = self.line_of(&token_id);
+        require!(!line.released, "already released");
+        line.last_check_in_ns = env::block_timestamp();
+        line.pending_ns = 0;
+        line.approvals.clear();
+        self.lines.insert(&token_id, &line);
+        log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_check_in\",\"data\":[{{\"token_id\":\"{}\"}}]}}", token_id);
+    }
+
+    /// The holder stops a release that has not finished. The check-in clock stays where it was.
+    #[payable]
+    pub fn house_cancel_release(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == owner, "only the deed holder");
+        let mut line = self.line_of(&token_id);
+        require!(line.pending_ns > 0, "no release is waiting");
+        line.pending_ns = 0;
+        line.approvals.clear();
+        self.lines.insert(&token_id, &line);
+    }
+
+    /// A named guardian, after the check-in window. Threshold starts the wait.
+    #[payable]
+    pub fn house_guardian_approve(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        let who = env::predecessor_account_id();
+        let mut line = self.line_of(&token_id);
+        require!(!line.released, "already released");
+        require!(line.guardians.contains(&who), "not a guardian");
+        let now = env::block_timestamp();
+        require!(now > line.last_check_in_ns.saturating_add(line.period_ns), "still inside the check-in window");
+        if !line.approvals.contains(&who) { line.approvals.push(who); }
+        if line.approvals.len() as u32 >= line.threshold && line.pending_ns == 0 { line.pending_ns = now; }
+        self.lines.insert(&token_id, &line);
+    }
+
+    /// After the wait, the deed moves to the first heir. The purse stays on the token.
+    #[payable]
+    pub fn house_release(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        let mut line = self.line_of(&token_id);
+        require!(!line.released, "already released");
+        require!(line.pending_ns > 0, "no release is waiting");
+        require!(line.approvals.len() as u32 >= line.threshold, "not enough guardians");
+        let now = env::block_timestamp();
+        require!(now >= line.pending_ns.saturating_add(line.wait_ns), "the waiting period has not ended");
+        let owner = self.owner_of(&token_id);
+        let heir = line.heirs[0].clone();
+        require!(heir != owner, "the heir already holds the deed");
+        self.tokens.internal_transfer(&owner, &heir, &token_id, None, Some("inheritance release".into()));
+        line.released = true;
+        line.pending_ns = 0;
+        self.lines.insert(&token_id, &line);
+        log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_release\",\"data\":[{{\"token_id\":\"{}\",\"to\":\"{}\"}}]}}", token_id, heir);
+    }
+
+    pub fn house_line(&self, token_id: TokenId) -> Option<Line> { self.lines.get(&token_id) }
+
+    fn owner_of(&self, token_id: &TokenId) -> AccountId {
+        self.tokens.owner_by_id.get(token_id).unwrap_or_else(|| env::panic_str("no such deed"))
+    }
+
+    fn line_of(&self, token_id: &TokenId) -> Line {
+        self.lines.get(token_id).unwrap_or_else(|| env::panic_str("no inheritance line"))
+    }
+}
+
+fn distinct(ids: &[AccountId]) -> bool {
+    let mut seen = std::collections::BTreeSet::new();
+    ids.iter().all(|id| seen.insert(id))
 }
 
 #[near]
@@ -386,5 +510,118 @@ mod tests {
         ctx(1, 2 * 10u128.pow(22)); c.mint_deed(None, None);
         assert_eq!(c.house_held().0, 0);
         ctx(0, 1); let _ = c.close();
+    }
+
+    const SEC: u64 = 1_000_000_000;
+    fn at(who: usize, deposit: u128, ts: u64) {
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id(accounts(who)).attached_deposit(NearToken::from_yoctonear(deposit))
+            .block_timestamp(ts).build());
+    }
+    fn fresh() -> (Contract, String) {
+        ctx(0, 0);
+        let mut c = Contract::new(None);
+        let id = accounts(1).to_string();
+        at(1, 2 * 10u128.pow(22), SEC);
+        c.mint_deed(None, None);
+        at(1, 1, 2 * SEC);
+        c.house_set_line(id.clone(), vec![accounts(4)], vec![accounts(3)], 1, U64(60 * SEC), U64(60 * SEC));
+        (c, id)
+    }
+
+    #[test]
+    #[should_panic(expected = "still inside the check-in window")]
+    fn guardian_during_the_window_is_refused() {
+        let (mut c, id) = fresh();
+        at(3, 1, 30 * SEC);
+        c.house_guardian_approve(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "not a guardian")]
+    fn a_stranger_cannot_approve_a_release() {
+        let (mut c, id) = fresh();
+        at(5, 1, 70 * SEC);
+        c.house_guardian_approve(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "the waiting period has not ended")]
+    fn release_during_the_wait_is_refused() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        at(2, 1, 80 * SEC);
+        c.house_release(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "no release is waiting")]
+    fn a_cancelled_release_cannot_be_executed() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        at(1, 1, 80 * SEC);
+        c.house_cancel_release(id.clone());
+        at(2, 1, 200 * SEC);
+        c.house_release(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "still inside the check-in window")]
+    fn check_in_restarts_the_window() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        at(1, 1, 80 * SEC);
+        c.house_check_in(id.clone());
+        at(3, 1, 100 * SEC);
+        c.house_guardian_approve(id);
+    }
+
+    #[test]
+    fn one_guardian_does_not_start_the_wait_when_two_are_required() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        let id = accounts(1).to_string();
+        at(1, 2 * 10u128.pow(22), SEC);
+        c.mint_deed(None, None);
+        at(1, 1, 2 * SEC);
+        c.house_set_line(id.clone(), vec![accounts(4)], vec![accounts(3), accounts(5)], 2, U64(60 * SEC), U64(60 * SEC));
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        assert_eq!(c.house_line(id).unwrap().pending_ns, 0);
+    }
+
+    #[test]
+    fn release_after_the_wait_moves_the_deed() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        let started = c.house_line(id.clone()).unwrap().pending_ns;
+        at(2, 1, started + 60 * SEC);
+        c.house_release(id.clone());
+        assert_eq!(c.nft_token(id.clone()).unwrap().owner_id, accounts(4));
+        assert!(c.house_line(id).unwrap().released);
+    }
+
+    #[test]
+    #[should_panic(expected = "only the deed holder")]
+    fn the_previous_holder_cannot_pay_after_release() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        let started = c.house_line(id.clone()).unwrap().pending_ns;
+        at(2, 1, started + 60 * SEC);
+        c.house_release(id.clone());
+        at(1, 1, started + 61 * SEC);
+        let _ = c.house_pay(id, accounts(4), U128(10u128.pow(21)));
+    }
+
+    #[test]
+    fn close_still_returns_when_the_purse_is_empty_even_with_a_line() {
+        let (mut c, _) = fresh();
+        assert_eq!(c.house_held().0, 0);
+        at(0, 1, 10 * SEC);
+        let _ = c.close();
     }
 }

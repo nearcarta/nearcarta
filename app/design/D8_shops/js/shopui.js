@@ -17,7 +17,6 @@ import { mountShop } from '/panels/deep.js';
 import { pairClauseId, chainLabel } from '/panels/ferry-pair.js';
 import { depositPlan, explainQuoteMiss, mayCheckout, nearNative, nextFerryBeat, SESSION_SWAP } from '/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
-import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, parseCsv, splitAssets, formatNear, payoutIssues, prepareRows } from './payouts.js';
 import { NEXT_LABEL, RUN_LABEL } from '../shops/arena-labels.js';
 const yOf = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
@@ -607,7 +606,19 @@ const APPS = {
   house: {
     guest: true,
     label: 'Your House · your charter', idle: 'Your charter is the rule book your agent cannot break. It can only pay inside those rules.',
-    form: () => deedMarkup(),
+    form: () => '<div data-deep="house"></div>',
+    bind: () => {
+      document.body.classList.add('house-tray');
+      const dock = document.getElementById('house-agent-dock');
+      if (dock) dock.hidden = false;
+      mountShop('house', document.getElementById('t-form'), {
+        state: extra,
+        ask: (receiver, amountY) => A.ask({ shop: 'house', receiver, amountY }),
+        onDelivered: () => { sh?.hideSeal?.(); sh?.deliver?.(); },
+        onRefuse: () => sh?.showSeal?.(),
+        hideRefuse: () => sh?.hideSeal?.(),
+      });
+    },
     btn: 'See my rules & record',
     hero: () => A.S.charter ? `<span class="commit" title="${esc(A.S.charter)}">${esc(short(A.S.charter.split('.')[0], 8, 6))}</span>` : null,
     run: async () => {
@@ -794,11 +805,16 @@ function paint() {
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
   if (cur === 'ferry') {
     document.body.classList.add('ferry-tray');
+    document.body.classList.remove('house-tray');
+    const houseDock = document.getElementById('house-agent-dock'); if (houseDock) houseDock.hidden = true;
     // The card owns Get quote, Load cargo, Ask charter and Get another quote. One of each.
     hideFerryPrimary();
   } else {
     document.body.classList.remove('ferry-tray');
     const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true;
+    document.body.classList.toggle('house-tray', cur === 'house');
+    const houseDock = document.getElementById('house-agent-dock');
+    if (houseDock) houseDock.hidden = cur !== 'house';
     btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
   }
 }
@@ -923,15 +939,16 @@ export function boot() {
   return booted;
 }
 export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
-  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry');
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('house-tray', id === 'house');
   const dock0 = document.getElementById('ferry-agent-dock'); if (dock0) dock0.hidden = id !== 'ferry';
+  const houseDock0 = document.getElementById('house-agent-dock'); if (houseDock0) houseDock0.hidden = id !== 'house';
   const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = '';
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
   // the Toll room reopened with a visit under way: pick it up (countdown, or settle now if Base is final)
   if (id === 'toll') booted?.then(() => { const v = cur === 'toll' && A.stage() === 'ready' && A.tollVisit(); if (v && !v.done && phase === 'idle') primary(true); }).catch(() => {}); }
-export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('house-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const houseDock = document.getElementById('house-agent-dock'); if (houseDock) houseDock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };

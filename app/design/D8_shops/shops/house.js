@@ -38,11 +38,16 @@ export default async function house() {
   mesh(scene, new THREE.BoxGeometry(.9, .04, .22), PM.wood, [1.15, .78, -.7]); ['#7a3e2c', '#3f6f6d', '#a8644a', '#6b4a33', '#52653b', '#d6b46a'].forEach((c, i) => mesh(scene, new THREE.BoxGeometry(.07, .2 + (i % 3) * .03, .16), new THREE.MeshStandardMaterial({ color: c, roughness: .9 }), [.8 + i * .09, .9 + (i % 3) * .015, -.7]));
   rug(scene, -.2, .8, 2.4, 1.5, 0x7a3e2c); lantern(scene, -2.0, .9, { h: 1.3, light: false });
   const rob = await makeRobot(scene); rob.at(.25, 1.05); rob.lookAt(sheet.position);
-  const tip = CLAUSES[0]; let tt = 0;
+  const seal = new THREE.Mesh(new THREE.CircleGeometry(.22, 24), new THREE.MeshBasicMaterial({ color: 0x8a3b36, transparent: true, opacity: 0 }));
+  seal.position.set(0, 1.25, -.72); seal.visible = false; scene.add(seal);
+  const tip = CLAUSES[0]; let tt = 0, flare = 0;
+  const showSeal = () => { seal.visible = true; seal.material.opacity = 0.95; };
+  const hideSeal = () => { seal.visible = false; seal.material.opacity = 0; };
+  const deliver = () => { flare = 2.6; hideSeal(); };
   return {
-    rob, scene, camera, tags: [],
+    rob, scene, camera, tags: [], showSeal, hideSeal, deliver,
     panel: { title: 'Your House', src: 'split', srcNote: 'house.nearcarta.near is on mainnet. A charter you create is the mainnet charter.', label: `Tip cap · policy v${CORE.policyVersion}`, hero: tok(String(tip.cap), 'NEAR'), action: null },
     proof: PROOF,
-    update(dt) { tt += dt; rob.update(dt); fire.material.opacity = .75 + .2 * Math.sin(tt * 9) * Math.sin(tt * 3.7); flames.forEach((f, i) => f.scale.y = 1 + .18 * Math.sin(tt * (7 + i * 2.3) + i)); fl.intensity = 1.4 + .3 * Math.sin(tt * 7); },
+    update(dt) { tt += dt; rob.update(dt); fire.material.opacity = .75 + .2 * Math.sin(tt * 9) * Math.sin(tt * 3.7); flames.forEach((f, i) => f.scale.y = 1 + .18 * Math.sin(tt * (7 + i * 2.3) + i)); fl.intensity = 1.4 + .3 * Math.sin(tt * 7); if (flare > 0) { flare = Math.max(0, flare - dt); fl.intensity += flare * 1.4; } },
   };
 }

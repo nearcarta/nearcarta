@@ -394,3 +394,62 @@ body.ferry-tray #shopUI .btns .ghost{
 .route-copy small{display:block;color:#d6b46a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 .ferry-idle{margin:0;color:#9a8b74;font:500 12px/1.35 system-ui,sans-serif}
+
+/* House shop. Same card language as the city tray. */
+.house-tabs{display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap}
+.house-tab{
+  display:inline-flex;align-items:center;gap:8px;
+  min-height:44px;padding:0 14px;border-radius:12px;
+  border:1px solid #4a3a28;background:#2a221b;color:#fff8ee;
+  font:600 15px/1 system-ui,sans-serif;cursor:pointer;
+}
+.house-tab[aria-selected="true"]{background:#3a2e22;border-color:#d6b46a;color:#f5d08a}
+.house-tab .house-ico{display:block;flex:none}
+.house-panel{display:grid;gap:12px;color:#fff8ee;font:500 15px/1.45 system-ui,sans-serif}
+.house-panel[hidden]{display:none!important}
+.house-cta{
+  min-height:44px;padding:0 16px;border:0;border-radius:12px;cursor:pointer;
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;
+  font:700 15px/1 system-ui,sans-serif;
+  box-shadow:0 3px 0 #8a6a32,0 8px 16px rgba(0,0,0,.28);
+}
+.house-fields{display:grid;gap:12px}
+.house-fields label{display:grid;gap:6px;color:#f5d08a;font:600 13px/1.2 system-ui,sans-serif}
+.house-fields input,.house-fields select{
+  min-height:44px;padding:0 12px;border-radius:10px;border:1px solid #4a3a28;
+  background:#17130f;color:#fff8ee;font:500 15px/1.2 system-ui,sans-serif;
+}
+.house-seal{
+  margin:0;padding:10px 12px;border-radius:12px;border:1px solid #8a3b36;
+  background:#2a1412;color:#fff8ee;font:700 14px/1.35 system-ui,sans-serif;
+}
+.house-hint{margin:0;color:#f5d08a;font:600 14px/1.4 system-ui,sans-serif}
+.house-notes{margin:0;padding-left:18px;display:grid;gap:8px}
+.house-key{margin:0;overflow-wrap:anywhere;color:#fff8ee;font:500 13px/1.4 ui-monospace,monospace}
+#house-agent-dock{
+  position:fixed;right:20px;bottom:22px;z-index:70;
+  display:flex;flex-direction:row;align-items:flex-end;gap:12px;pointer-events:none;
+}
+#house-agent-dock > *,
+#house-agent-dock .house-agent-send{pointer-events:auto}
+#house-agent-dock[hidden]{display:none!important}
+.house-agent-char{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  width:96px;padding:0;border:0;background:transparent;cursor:pointer;color:#fff8ee;
+}
+.house-agent-avatar{width:72px;height:72px;object-fit:contain;display:block}
+.house-agent-name{margin:0;color:#f5d08a;font:700 11px/1.2 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+.house-agent-pop{
+  width:min(300px,calc(100vw - 140px));box-sizing:border-box;padding:10px;border-radius:14px;
+  border:1px solid #d6b46a66;background:#1f1a15;display:grid;gap:8px;
+}
+.house-agent-log{margin:0;color:#f5d08a;font:600 13px/1.35 system-ui,sans-serif}
+.house-agent-pop .house-agent-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px}
+.house-agent-pop input{
+  width:100%;min-width:0;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:10px;
+  border:1px solid #4a3a28;background:#17130f;color:#fff8ee;
+}
+.house-agent-pop .house-agent-send{
+  width:44px;height:44px;border:0;border-radius:10px;cursor:pointer;
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1 system-ui,sans-serif;
+}

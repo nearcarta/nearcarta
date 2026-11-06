@@ -29,6 +29,7 @@ import { txVerdict } from '../../shared/net/tx-verdict.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
 import { pastPrompts as arenaPrompts } from './arena.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
+import { derivedFor, lineFor } from './house-views.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
 async function houseView() {
@@ -302,6 +303,17 @@ export function makeApp() {
     const [token, held] = await Promise.all([view(D.contract, 'nft_token', { token_id: a }), view(D.contract, 'nft_tokens_for_owner', { account_id: a, limit: 10 })]);
     const purses = Object.fromEntries(await Promise.all((held || []).map(async t => [t.token_id, await view(D.contract, 'house_purse', { token_id: t.token_id })])));
     return token || held?.length ? c.json({ contract: D.contract, token, held, purses }) : c.json({ contract: D.contract, token: null, held: [], mint: deedTx(null) }, 404);
+  });
+  app.get('/api/house/derived/:account', limiter(12), async c => {
+    const a = c.req.param('account');
+    if (!nearAccountOk(a)) return bad(c, 'not an account id');
+    return c.json(await derivedFor(a, view));
+  });
+  app.get('/api/house/line/:account', limiter(12), async c => {
+    const a = c.req.param('account');
+    if (!nearAccountOk(a)) return bad(c, 'not an account id');
+    if (!D) return c.json({ live: false, line: null, why: 'house_line is not on this deed. Nothing was signed.' });
+    return c.json(await lineFor(a, D.contract, view));
   });
   // Counterparty check before a payment: allow / warn / block with reasons (backend/src/counterparty.js).
   // ?charter= must be a Nearcarta charter: a known contract, a factory charter, or a row opened on the board.
