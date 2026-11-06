@@ -123,8 +123,10 @@ export function mountHouseRoom(root, hooks = {}) {
     });
     const cta = root.querySelector('[data-testid=house-cta]');
     if (cta) {
+      // The label must match what the click will do, so both read the same state.
       if (state.tab === 'vaults') cta.textContent = 'Send from house';
       else if (state.tab === 'heirs' && state.line?.line?.pending_ns) cta.textContent = 'Cancel release';
+      else if (state.tab === 'deed' && !state.token) cta.textContent = 'Mint my deed';
       else cta.textContent = "I'm alive";
     }
     setStatus('');
@@ -343,8 +345,13 @@ export function mountHouseRoom(root, hooks = {}) {
     const line = state.line?.line;
     const set = (sel, val) => { const el = root.querySelector(sel); if (el) el.value = val; };
     if (!line) {
-      set('#house-check', state.line?.why || 'Inheritance is not on this live deed.');
+      // Two different reasons: no deed yet, or a line the deed has not written.
+      const noDeed = !state.token;
+      set('#house-check', noDeed
+        ? 'No deed yet. Mint one from the Deed tab, then name an heir here.'
+        : (state.line?.why || 'This deed has no inheritance line yet. Name an heir to write one.'));
       set('#house-heir', 'Not set');
+      set('#house-epoch', '—');
       return;
     }
     set('#house-check', line.last_check_in_ns ? `Last check-in ${line.last_check_in_ns}` : 'No check-in yet');

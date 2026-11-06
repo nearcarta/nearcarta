@@ -30,7 +30,7 @@ import * as bankModel from './bank-model.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
-import { view, viewAccount, txStatus, rpcStats } from './near.js';
+import { view, viewAccount, txStatus, rpcStats, rpc } from './near.js';
 import { readLive } from './chronicle-live.js';
 import { signStatement } from './chronicle-statement.js';
 import { nearAccountOk } from '../../shared/net/accounts.js';

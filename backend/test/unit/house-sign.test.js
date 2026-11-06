@@ -47,6 +47,8 @@ test('all four writes exist: mint, check-in, set-line and pay', () => {
 });
 
 test('a signed house call leaves the browser and names the session key as signer', async () => {
+  // setWallet is process-global, so this test sets it right before it signs.
+  setWallet(W);
   const key = W.keyFrom();
   const rpc = okRpc();
   const build = houseCall({ kind: 'checkin', ctx: ctxFor(key) });
@@ -101,4 +103,22 @@ test('the room and the agent both reach the executor, and neither signs on impor
 test('the house envelope hashes with the shipped sha256', () => {
   const args = '{"token_id":"alice.near"}';
   assert.equal(sha256Hex(args), createHash('sha256').update(args).digest('hex'));
+});
+
+test('the CTA and the AI produce the same signed call for the same intent', async () => {
+  const { planHouseLine, runHouseTurn } = await import('../../../app/src/panels/house-agent.js');
+  const key = W.keyFrom();
+  const ctx = {
+    account: 'alice.near', board: 'board.nearcarta.near', house: 'house.nearcarta.near', tokenId: '',
+    row: { nonce: '4', epoch: '0', min_amount: '1000000000000000000000', per_action_cap: '5000000000000000000000', balance: '50000000000000000000000', receivers: ['house.nearcarta.near'] },
+  };
+  // The CTA reads sentence(); the dock passes typed text. Both reach the same plan.
+  const plan = planHouseLine('Mint my deed', ctx);
+  assert.equal(plan.action, 'mint');
+  assert.equal(plan.write, 'mint');
+  const seen = [];
+  const out = await runHouseTurn('Mint my deed', { ...ctx, sign: async (build, kind) => { seen.push([build.method, build.args.method, kind]); return { ok: true, tx: 'SAME' }; } });
+  assert.equal(out.label, 'live');
+  assert.equal(out.tx, 'SAME');
+  assert.deepEqual(seen[0], ['propose_call_as', 'house_session_mint', 'mint']);
 });
