@@ -3,7 +3,7 @@
 
 import { roomError } from '../room-error.js';
 import { pickBest, quoteLine, tokenChoices, chainsOf, filterTokens } from '../ferry-catalog.js';
-import { explainCheck } from '../guard-score.js';
+import { mountGuardTray } from './guard-tray.js';
 import { mountTollRoom } from './toll-room.js';
 import { PROOF_HREF, TEE_PLAN, TEE_TIMEOUT_MS, liveTee, teeTimeoutWhy, teeView } from '../tee-view.js';
 import { NEXT_LABEL, RUN_LABEL } from '../../design/D8_shops/shops/arena-labels.js';
@@ -691,35 +691,8 @@ function mountFerry(root, hooks) {
 }
 
 function mountGuard(root, hooks) {
-  const state = hooks.state || (hooks.state = {});
-  const attacks = hooks.attacks ? hooks.attacks() : [];
-  const score = state.score;
-  const scoreHtml = score ? `<div data-testid="guard-score"><p data-testid="guard-verdict">${esc(score.summary || score.verdict)}</p><ul>${(score.lines || []).map(l => `<li data-signal="${esc(l.id)}"${l.level === 'warn' || l.level === 'block' || l.level === 'unknown' ? ' data-testid="guard-reason"' : ''}><b>${esc(l.title)}</b> ${esc(l.text)}</li>`).join('')}</ul></div>` : '<div data-testid="guard-score"></div>';
-  const pick = attacks.length ? `<div class="seg beside" role="radiogroup" aria-label="Tricks">${attacks.map(a => `<label class="beside"><input type="radio" name="atk" value="${esc(a.id)}" ${a.id === (state.atk || attacks[0].id) ? 'checked' : ''}><span>${esc(a.name)}</span></label>`).join('')}</div>` : '';
-  root.innerHTML = `<div class="shop-stack"><label class="field">Account <input id="g-acct" data-testid="guard-account" value="${esc(state.acct || '')}" autocomplete="off"></label><p class="example-row"><button type="button" class="example" data-testid="guard-example">Example: shop-moved-pay-here.near</button></p><button type="button" class="primary" id="g-check" data-testid="guard-check">Check this account</button>${scoreHtml}${pick}</div>`;
-  const input = q$(root, '#g-acct');
-  if (input) input.addEventListener('input', () => { state.acct = input.value; });
-  const example = q$(root, '[data-testid=guard-example]');
-  if (example) example.onclick = () => {
-    state.acct = 'shop-moved-pay-here.near';
-    if (input) input.value = state.acct;
-  };
-  root.querySelectorAll('input[name=atk]').forEach(i => { i.onchange = () => { state.atk = i.value; if (hooks.repaint) hooks.repaint(); }; });
-  const btn = q$(root, '#g-check');
-  if (!btn) return;
-  btn.onclick = async () => {
-    const acct = (q$(root, '#g-acct')?.value || '').trim();
-    state.acct = acct;
-    holdButton(btn, 'Checking this account.');
-    try {
-      const r = await fetch(api() + '/api/guardhouse/check/' + encodeURIComponent(acct));
-      state.score = explainCheck(await r.json());
-    } catch (e) {
-      state.score = explainCheck({ account: acct, verdict: 'warn', reasons: [{ code: 'account_missing', text: roomError(e) }], signals: {} });
-    }
-    if (hooks.repaint) hooks.repaint();
-    else mountGuard(root, hooks);
-  };
+  if (root?.ownerDocument?.body) root.ownerDocument.body.classList.add('guard-tray');
+  return mountGuardTray(root, hooks, { esc, holdButton, api, q$ });
 }
 
 function mountToll(root, hooks) {
