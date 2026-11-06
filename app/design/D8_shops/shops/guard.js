@@ -47,18 +47,57 @@ export default async function guard(ctx) {
   const curve = new THREE.QuadraticBezierCurve3(A, M, H); inv.position.copy(A); scene.add(inv);
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(48)), new THREE.LineDashedMaterial({ color: C.no, dashSize: .12, gapSize: .1, transparent: true, opacity: 0 })); line.computeLineDistances(); scene.add(line);
   const rob = await makeRobot(scene); rob.at(1.9, 2.1); rob.lookAt(new THREE.Vector3(0, 0, .3));
-  const S2 = ATTACKS.find(a => a.id === 'S2');
-  const tags = [{ obj: inv, pos: new THREE.Vector3(0, .26, 0), html: `<span aria-hidden="true">→</span>attacker`, cls: '' }];
+  const lampColor = { idle: 0x3a3128, ok: 0x1f9d6a, warn: 0xe2b35b, block: 0xc4554a };
+  const lampMat = {};
+  [['denylist', -1.05], ['lookalike', -0.55], ['age', 0], ['code', 0.55], ['list', 1.05]].forEach(([id, x]) => {
+    const mat = new THREE.MeshBasicMaterial({ color: lampColor.idle });
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(.045, 10, 8), mat);
+    bulb.position.set(x, fy1 + .18, pz); scene.add(bulb); lampMat[id] = mat;
+  });
+  const chains = new THREE.Group();
+  const cmat = new THREE.MeshStandardMaterial({ color: 0x8a8175, metalness: .55, roughness: .4 });
+  [[-.16, .92, .08], [.16, .92, .08]].forEach(([x, y, z]) => {
+    const link = new THREE.Mesh(new THREE.TorusGeometry(.055, .012, 6, 10), cmat);
+    link.position.set(x, y, z); link.rotation.y = Math.PI / 2; chains.add(link);
+  });
+  chains.visible = false; rob.g.add(chains);
+  const sealTag = { obj: pane, pos: new THREE.Vector3(0, gh * .42, .02), html: '<span data-testid="guard-seal" hidden></span>', cls: 'no' };
+  const tags = [{ obj: inv, pos: new THREE.Vector3(0, .26, 0), html: `<span aria-hidden="true">→</span>attacker`, cls: '' }, sealTag];
   let t = 0;
+  function hideRefuse() {
+    line.material.opacity = 0;
+    tags[0].el?.classList.remove('no');
+    if (sealTag.el) { sealTag.el.hidden = true; sealTag.el.textContent = ''; }
+  }
+  function showSeal(text) {
+    const msg = String(text || 'Refused').slice(0, 140);
+    ctx.setResult('no', msg);
+    if (sealTag.el) { sealTag.el.hidden = false; sealTag.el.textContent = msg; }
+  }
+  function lightLamps(list) {
+    const by = {};
+    for (const l of list || []) if (l?.id) by[l.id] = l.level || 'idle';
+    for (const id of Object.keys(lampMat)) lampMat[id].color.setHex(lampColor[by[id]] || lampColor.idle);
+  }
+  function setChains(on) { chains.visible = !!on; }
   return {
-    rob, scene, camera, tags,
+    rob, scene, camera, tags, hideRefuse, showSeal, lightLamps, setChains,
     panel: { title: 'Guardhouse', src: 'split', srcNote: 'charter.nearcarta.near is on mainnet. Letting it knock here is the mainnet charter.', label: 'Invoice with a hidden instruction', hero: tok('0.001', 'NEAR'), action: 'Let it knock' },
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(1.15, 0, 1.75)]); rob.lookAt(pane.position); },
-    *act() {
+    *act(opts = {}) {
+      const liveOk = !!(opts && opts.live && opts.refused === false);
+      const reason = String((opts && opts.reason) || 'Refused · not on the list').slice(0, 160);
+      if (liveOk) {
+        hideRefuse();
+        sfx('allowed'); rob.play('Yes', { once: true });
+        ctx.setResult('ok', 'Allowed · 0.001 NEAR');
+        yield wait(1.2); rob.play('Idle');
+        return;
+      }
       yield tween(.5, k => line.material.opacity = k * .9); yield wait(.25);
       yield tween(.9, k => { curve.getPoint(k, inv.position); inv.rotation.set(0, -.5 + k * .5, Math.sin(k * 9) * .15); }, k => k * k * (3 - 2 * k));
-      sfx('refuse'); rob.play('No', { once: true }); ctx.setResult('no', 'Refused · not on the list'); tags[0].el?.classList.add('no'); line.material.opacity = 0;
+      sfx('refuse'); rob.play('No', { once: true }); ctx.setResult('no', reason); tags[0].el?.classList.add('no'); line.material.opacity = 0;
       const p0 = inv.position.clone(), p1 = new THREE.Vector3(-1.1, .02, -2.4);
       U.hit.value = 1; yield tween(1.1, k => { U.hit.value = 1 - k; const q = p0.clone().lerp(p1, k); q.y = p0.y + (p1.y - p0.y) * k + Math.sin(k * Math.PI) * .6 * (1 - k); inv.position.copy(q); inv.rotation.x = -k * Math.PI / 2; });
       yield wait(1.2); rob.play('Idle');

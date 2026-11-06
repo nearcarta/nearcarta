@@ -9,6 +9,7 @@ import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
 import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCallTgas, quoteRecipient, stepsAllowanceYocto, WRAP } from '/panels/ferry-settle.js';
+import { freezePlan } from '/panels/guard-agent.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
 import { missingCross } from '/foreign-path.js';
 import { callAsMessage, crossArgs, unitsOf, setSha256Hex } from '/board-call-as.js';
@@ -748,6 +749,43 @@ export async function trickSend(id) {
   if (id !== 'poisoned-invoice') return attack(id, 'guard');
   const o = await ask({ shop: 'guard', receiver: injected(), amountY: toY(Math.max(0.001, Number(fromY(pay()?.min_amount || '0')))), memo: 'guard:poisoned-invoice' });
   return { refused: o.decision === 'denied', reason: o.reason, steps: [o] };
+}
+/** set_frozen on the visitor's row. Deposit 0. The session key signs only when it may call that method. */
+export async function guardFreeze({ frozen = true, approve = false } = {}) {
+  if (!S.board || !S.me) return { ok: false, wallet: false, hint: 'Finish /setup to read your row. Nothing was signed.' };
+  const row = S.boardRow || await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  if (!row) return { ok: false, wallet: false, hint: 'No row on the board yet. Finish /setup. Nothing was signed.' };
+  S.boardRow = row;
+  const key = agent();
+  let methodNames = null;
+  let ak = null;
+  if (key && rpc) {
+    const viewKey = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: S.me, public_key: key.publicKey }).catch(() => null);
+    const perm = viewKey?.permission?.FunctionCall;
+    if (perm && perm.receiver_id === S.board) {
+      methodNames = Array.isArray(perm.method_names) ? perm.method_names : [];
+      ak = viewKey;
+    }
+  }
+  const plan = freezePlan({ methodNames, hasRow: true, approve: !!approve, frozen: !!frozen });
+  if (!plan.sign) return { ok: false, needsApproval: !!plan.needsApproval, wallet: false, hint: plan.hint };
+  const args = { frozen: !!frozen };
+  if (plan.wallet) {
+    const h = await sign(S.board, [fc('set_frozen', args, 10, '0')]);
+    await readRules().catch(() => {});
+    return { ok: true, tx: h, wallet: true, hint: frozen ? 'The row is frozen. Deposit was 0.' : 'The row is live again. Deposit was 0.' };
+  }
+  if (!ak || !key) return { ok: false, wallet: false, hint: 'The session key was not found. Nothing was signed.' };
+  const signed = W.signTx({ key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+    actions: [W.functionCall('set_frozen', args, 10n * TG)] });
+  const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+  if (!sent.ok) {
+    const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+    return { ok: false, wallet: false, tx: signed.hash, hint: `Freeze did not land: ${why(reason) || reason}.` };
+  }
+  keep(signed.hash, 'guard', 'allowed', frozen ? 'frozen' : 'live');
+  await readRules().catch(() => {});
+  return { ok: true, tx: signed.hash, wallet: false, hint: frozen ? 'The row is frozen. Gas only. No wallet.' : 'The row is live again. Gas only. No wallet.' };
 }
 export const ARENA_ORDER = ['fake-invoice', 'injected-recipient', 'lookalike', 'impersonation', 'slow-drain', 'split-under-cap'];
 export const record = tx => api('/api/vault/record', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tx, charter: S.charter }) });
