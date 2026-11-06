@@ -80,26 +80,23 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   for (const t of report.transfers) {
     assert.ok(t.payee === 'nearcarta.near' || t.payee === 'toll.nearcarta.near');
   }
+  assert.deepEqual(report.init.allow_to, []);
   assert.equal(report.smoke.sends, false);
   assert.equal(report.smoke.to, null);
   assert.ok(report.wasm.bytes < 240000);
-  assert.equal(report.balance.shortfall_near, '0');
-  // Once the live code is this wasm the script has nothing to deploy, so it
-  // reports the account and stops. The dry-run guarantees below hold either way.
+  const ONE = 10n ** 24n;
+  const slack = BigInt(report.storage.slack_yocto);
+  assert.equal(slack, 2n * ONE / 100n);
+  assert.ok(slack <= 5n * ONE / 100n);
+  // Once the recorded wasm is live the path is a view and nothing moves. The
+  // transfer and stake checks below only apply to a create or a replace.
   assert.ok(['view', 'close_then_create', 'create_only', 'upgrade_then_migrate'].includes(report.path));
-  if (report.path === 'view') {
-    assert.equal(report.init, null);
-    assert.deepEqual(report.transfers, []);
-  } else {
-    assert.deepEqual(report.init.allow_to, []);
+  if (report.path !== 'view') {
+    assert.equal(report.balance.shortfall_near, '0');
     const stake = report.prechecks.find(p => p.check === 'balance covers the new stake');
     assert.equal(stake && stake.ok, true);
     const slackCheck = report.prechecks.find(p => p.check === 'slack');
     assert.equal(slackCheck && slackCheck.ok, true);
-    const ONE = 10n ** 24n;
-    const slack = BigInt(report.storage.slack_yocto);
-    assert.equal(slack, 2n * ONE / 100n);
-    assert.ok(slack <= 5n * ONE / 100n);
     const create = report.transfers.find(t => t.step === 'create_account');
     const close = report.transfers.find(t => t.step === 'close');
     assert.equal(create.payee, 'toll.nearcarta.near');
@@ -109,6 +106,8 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
     assert.ok(BigInt(close.amount_yocto) > BigInt(create.amount_yocto));
     assert.equal(report.balance.shop_after_liquid_near, '0.02');
     assert.equal(create.slack_near, '0.02');
+  } else {
+    assert.deepEqual(report.transfers, []);
   }
   const refused = spawnSync(process.execPath, [script, '--live'], {
     encoding: 'utf8',
