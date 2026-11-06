@@ -14,6 +14,7 @@ import {
 import { armHallDock, dispatchHallDock, installHallDock, lastHallDockSend } from '../../../app/src/panels/hall-dock.js';
 import { runHallCommand } from '../../../app/src/panels/hall-actions.js';
 import { jobTray, noteMarkup } from '../../../app/src/panels/hall-panes.js';
+import { DENIED } from '../../src/vault.js';
 
 const read = (p) => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 const Y = n => yoctoOf(n);
@@ -368,4 +369,17 @@ test('a retired contract answers a state, not a 500 that takes the city tray dow
   assert.equal(body.retired, true);
   assert.ok(body.error, 'the message names what is retired');
   assert.doesNotMatch(JSON.stringify(body), /at .*\.js:/, 'no stack trace in the body');
+});
+
+test('the retired charter is not on the public denylist or in the sign screen', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  // The retired account cannot appear as a live charter, so denying it is dead weight.
+  // townhall.nearcarta.near stays: it is a live shop.
+  assert.equal(DENIED.has('charter.nearcarta.near'), false, 'the retired charter is not a denylist entry');
+  assert.equal(DENIED.has('townhall.nearcarta.near'), true, 'the live Town Hall shop stays denied as a player');
+  // The sign screen used to print the retired account and link its old txs.
+  const setup = readFileSync(fileURLToPath(new URL('../../../app/house/setup.js', import.meta.url)), 'utf8');
+  assert.doesNotMatch(setup, /acA\(MAIN\.charter\.contract\)/, 'no link to the retired charter');
+  assert.doesNotMatch(setup, /town charter, toll, arena, house and town hall already run/);
 });
