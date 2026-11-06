@@ -19,15 +19,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [oath, arena, toll, townhall, charter_factory, charter_factory_lock, charter_board, house_nft, attested_check, guard]
+        crate: [oath, arena, toll, townhall, hall, charter_factory, charter_factory_lock, charter_board, house_nft, attested_check, guard]
     steps:
       - uses: actions/checkout@v4
       # charter_board pins rustc 1.86 in rust-toolchain.toml (the wasm mainnet accepted).
       # The other crates stay on 1.95. RUSTUP_TOOLCHAIN would hide the file, so set it per crate.
       - uses: dtolnay/rust-toolchain@1.86.0
-        if: matrix.crate == 'charter_board'
+        if: matrix.crate == 'charter_board' || matrix.crate == 'hall'
       - uses: dtolnay/rust-toolchain@1.95.0
-        if: matrix.crate != 'charter_board'
+        if: matrix.crate != 'charter_board' && matrix.crate != 'hall'
       - run: cd contracts/${{ matrix.crate }} && cargo test --lib --locked
   factory-sandbox:
     # Local near-sandbox: publish the committed charter as a global contract, deploy the factory,

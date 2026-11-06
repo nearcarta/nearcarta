@@ -236,6 +236,7 @@ sm.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) retu
 document.querySelector('[data-testid=all-shops-list]')?.addEventListener('click',e=>{ const b=e.target.closest('[data-enter-shop]'); if(!b) return; e.preventDefault(); jump(b.dataset.enterShop); });
 // Jump: fly straight from wherever the camera is into the shop door; the Lamplighter waits on that step for the way back out
 let door={busy:false,id:null};
+document.querySelector('[data-testid=all-shops-list]')?.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href="/shops/hall/"]'); if (!a || !OPEN.hall) return; e.preventDefault(); jump('hall'); });
 function jump(id,opt,tries=0){ id=ALIAS[id]||id; if(!OPEN[id]||tries>8) return;
   if(inShop&&inShop!==id){ world.exitShop().then(()=>jump(id,opt,tries+1)); return; }
   if(exiting||body.classList.contains('entering')||door.busy){ if(tries>4&&!inShop){ door={busy:false,id:null}; body.classList.remove('entering'); } setTimeout(()=>jump(id,opt,tries+1),350); return; }
