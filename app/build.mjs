@@ -6,6 +6,15 @@ const here = new URL('.', import.meta.url).pathname;
 const dist = here + 'dist';
 rmSync(dist, { recursive: true, force: true }); mkdirSync(dist);
 cpSync(here + 'src', dist, { recursive: true });
+const mainnet = JSON.parse(readFileSync(here + '../shared/deployments/mainnet.json', 'utf8'));
+const houseRec = mainnet.extras.house;
+const houseShop = typeof houseRec.shop === 'string' ? houseRec.shop : houseRec.shop.account;
+writeFileSync(dist + '/house-shop.js',
+  '// Generated from shared/deployments/mainnet.json. The city imports this file.\n'
+  + `export const HOUSE_SHOP = ${JSON.stringify(houseShop)};\n`
+  + `export const HOUSE_LEGACY = ${JSON.stringify(houseRec.legacy)};\n`
+  + `export const HOUSE_OWNER = ${JSON.stringify(houseRec.owner)};\n`
+  + `export const HOUSE_BOARD = ${JSON.stringify(mainnet.board.contract)};\n`);
 cpSync(here + 'design', dist + '/design', { recursive: true });
 // OutLayer fetches the charter check WASM from here and refuses it unless its sha256 matches the pin.
 mkdirSync(dist + '/outlayer'); cpSync(here + '../outlayer/artifacts/charter_check.wasm', dist + '/outlayer/charter_check.wasm');
@@ -29,6 +38,15 @@ mkdirSync(dist + '/shared/rails', { recursive: true });
 cpSync(here + '../shared/hall/plan.js', dist + '/shared/hall/plan.js');
 cpSync(here + '../shared/hall/job.js', dist + '/shared/hall/job.js');
 cpSync(here + '../shared/rails/receipts.js', dist + '/shared/rails/receipts.js');
+// The Guardhouse room imports this as a raw module. Without it the import 404s and
+// every shop mount in boot.js fails, not just the Guardhouse. board-pay.js pulls in
+// shared/board/call-as.js, which resolves @noble/hashes as a bare specifier, so a plain
+// copy cannot load in a browser. Bundle it to one file instead.
+mkdirSync(dist + '/shared/guard', { recursive: true });
+await (await import('esbuild')).build({
+  entryPoints: [here + '../shared/guard/board-pay.js'], bundle: true, format: 'esm', target: 'es2022',
+  outfile: dist + '/shared/guard/board-pay.js', logLevel: 'warning',
+});
 // Your House: NEAR Wallet Selector bundled into one ES module (the only part of the console that asks a wallet to sign).
 await (await import('esbuild')).build({ entryPoints: [here + 'house/house.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
   outfile: dist + '/house.bundle.js', define: { 'process.env.NODE_ENV': '"production"', __WC_ID__: JSON.stringify(process.env.VITE_WC_PROJECT_ID || ''), ...walletDefine }, external: ['/wc.bundle.js'], logLevel: 'warning' });
