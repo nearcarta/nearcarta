@@ -4,8 +4,11 @@ export const AGENT_NAME = 'the Lamplighter';
 export const NB = (h) => `https://nearblocks.io/txns/${h}`;
 export const NBA = (a) => `https://nearblocks.io/address/${a}`;
 
+// The sample names the live board, not the retired charter.nearcarta.near (mainnet.json
+// `retired`: that account was reaped and its NEAR returned to nearcarta.near). A page that
+// has to fall back shows the board it would read, never a contract that no longer exists.
 export const CORE = {
-  oath: 'charter.nearcarta.near',
+  oath: 'board.nearcarta.near',
   owner: 'nearcarta.near',
   dao: 'nearcarta.near',
   receiver: 'nearcarta.near',

@@ -31,6 +31,57 @@ export async function snapshot(oath = oathId) {
 
 export const action = (id, oath = oathId) => view(oath, 'get_action', { action_id: id });
 
+// ---- the live guard charter is the board ----
+// charter.nearcarta.near is reaped (mainnet.json `retired`). The charter a visitor
+// actually has is their row on board.nearcarta.near, so /api/guardhouse reads that:
+// the board config, a row when ?owner= names one, and the live policy of that row.
+// It answers 200 with `retired_legacy` naming the old oath instead of a bare 404,
+// so a dashboard that reads this route gets a real payload and does not fall back.
+export const BOARD = MAINNET_DEP?.board?.contract || null;
+
+export async function boardSnapshot({ owner = null } = {}) {
+  if (!BOARD) throw Object.assign(new Error('no board on this network'), { status: 503 });
+  const [config, liabilities] = await Promise.all([
+    view(BOARD, 'get_config').catch(() => null),
+    view(BOARD, 'get_liabilities').catch(() => null),
+  ]);
+  const want = typeof owner === 'string' && /^[a-z0-9][a-z0-9._-]{0,62}\.near$/.test(owner) ? owner : null;
+  const row = want ? await view(BOARD, 'get_charter', { owner: want }).catch(() => null) : null;
+  return {
+    oath: BOARD,
+    board: BOARD,
+    network: 'mainnet',
+    retired_legacy: [...RETIRED][0] || null,
+    retired_note: [...RETIRED].length
+      ? `${[...RETIRED][0]} is retired; its NEAR returned to ${MAINNET_DEP?.retired?.[[...RETIRED][0]]?.recovered_to || 'the owner'}. The live guard charter is the visitor row on ${BOARD}.`
+      : null,
+    config: config ? { owner: config.owner, rows: Number(config.rows), max_row_yocto: String(config.max_row_yocto), byte_yocto: String(config.byte_yocto) } : null,
+    liabilities: liabilities == null ? null : String(liabilities),
+    owner: want,
+    row: row ? {
+      owner: row.owner,
+      per_action_cap: String(row.per_action_cap),
+      daily_budget: String(row.daily_budget),
+      max_actions_per_day: Number(row.max_actions_per_day),
+      min_amount: String(row.min_amount),
+      expires_at: String(row.expires_at),
+      frozen: row.frozen === true,
+      sealed: row.sealed === true,
+      agent: row.agent,
+      nonce: String(row.nonce),
+      balance: String(row.balance),
+      storage_locked: String(row.storage_locked),
+      receivers: Array.isArray(row.receivers) ? row.receivers : [],
+      spent_today: String(row.spent_today),
+      actions_today: Number(row.actions_today),
+    } : null,
+    has_row: !!row,
+    src: 'mainnet',
+    snapshot: new Date().toISOString(),
+  };
+}
+
+
 export async function proposal({ clause_id, receiver, amount, memo = null, shop = 'guardhouse', ttlSec = 3600 }, oath = oathId) {
   const s = await view(oath, 'get_state');
   return { shop, clause_id, receiver, amount: String(amount), nonce: s.next_nonce, policy_version: s.policy_version,

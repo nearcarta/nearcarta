@@ -8,7 +8,31 @@ const N = y => {
 
 const ghOf = dep => (dep && typeof dep === 'object' && dep.guardhouse && typeof dep.guardhouse === 'object') ? dep.guardhouse : null;
 
+/** True when /api/guardhouse answered with the live board rather than a fallback. */
+export const isLiveBoard = g => !!(g && typeof g === 'object' && g.board && g.config);
+
 export function shapeCore(dep, guard, sample) {
+  // The live guard charter is the visitor's row on the board. /api/guardhouse answers
+  // that shape now; the old oath `state` shape is still accepted for a recorded payload.
+  if (isLiveBoard(guard)) {
+    const gh = ghOf(dep);
+    const row = guard.row && typeof guard.row === 'object' ? guard.row : null;
+    return {
+      ...sample,
+      oath: guard.board,
+      owner: guard.config?.owner ?? sample.owner,
+      dao: guard.config?.owner ?? sample.dao,
+      policyVersion: row ? 'row' : `board ${guard.config?.rows ?? 0} rows`,
+      policyHash: gh?.code_hash || sample.policyHash,
+      freezeEpoch: 0,
+      frozen: row?.frozen === true,
+      agentKey: row?.agent ?? sample.agentKey,
+      codeHash: gh?.code_hash || sample.codeHash,
+      receiver: row?.receivers?.[0] ?? sample.receiver,
+      snapshot: 'live read ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC',
+      src: 'mainnet',
+    };
+  }
   const st = guard && typeof guard.state === 'object' && guard.state ? guard.state : null;
   if (!st) return sample;
   const gh = ghOf(dep);
@@ -30,6 +54,20 @@ export function shapeCore(dep, guard, sample) {
 }
 
 export function shapeClauses(guard, sample) {
+  if (isLiveBoard(guard)) {
+    const row = guard.row && typeof guard.row === 'object' ? guard.row : null;
+    // No row yet is a real state (the visitor has not run /setup), and it is not the
+    // sample: report zero caps rather than a fixture cap that would look like a grant.
+    if (!row) return [{ id: 'pay', kind: 'Native transfer', payees: [], cap: 0, budget: 0, spent: 0, reserved: 0,
+      window: 'No row yet', escalate: null, receipt: false, src: 'mainnet', tx: null }];
+    return [{
+      id: 'pay', kind: 'Native transfer',
+      payees: Array.isArray(row.receivers) ? row.receivers : [],
+      cap: N(row.per_action_cap), budget: N(row.daily_budget),
+      spent: N(row.spent_today), reserved: 0,
+      window: 'Any time', escalate: null, receipt: false, src: 'mainnet', tx: null,
+    }];
+  }
   const clauses = guard && guard.clauses && typeof guard.clauses === 'object' ? guard.clauses : null;
   if (!clauses) return sample;
   const usage = guard.usage && typeof guard.usage === 'object' ? guard.usage : {};
