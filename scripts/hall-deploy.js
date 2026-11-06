@@ -257,7 +257,7 @@ const posted = await signer.signAndSendTransaction({
   waitUntil: 'FINAL',
   throwOnFailure: false,
   actions: [A.functionCall('post_job', {
-    row_owner: shop, task: 'smoke', parts: 1, deadline, workers, idempotency: 'hall-smoke',
+    row_owner: shop, task: 'smoke', parts: 1, deadline, workers, idempotency: 'hall-smoke-' + Date.now(),
   }, SMOKE_TGAS * TG, BigInt(SMOKE_YOCTO))],
 });
 console.log('Smoke post ' + (posted.transaction?.hash || ''));
