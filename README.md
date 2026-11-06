@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 589 backend unit tests (586 pass, 3 skipped), offline
+npm test                                   # 590 backend unit tests (587 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -69,11 +69,11 @@ cd ../oath          && cargo test --locked --test sandbox --test exploits --test
 |---|---|
 | oath unit (`src/tests.rs`) | 122 |
 | oath sandbox / exploits / adversarial / teardown / properties | 3 / 10 / 10 / 2 / 21 |
-| toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 15 |
+| toll, arena, townhall, house_nft, attested_check, charter_factory, charter_factory_lock, charter_board unit | 67, 17, 15, 16, 4, 23, 13, 29 |
 | backend unit (`npm test`) | 470 (467 pass, 3 skipped) |
 | browser e2e | 124 passed, 2 skipped, 1 flaky on retry. The skips need a partner key or a NEAR AI key |
 
-The 2 skipped e2e tests need a 1Click partner key or a NEAR AI key; they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks.
+The 2 skipped e2e tests need a 1Click partner key or a NEAR AI key; they are not faked offline. There is no published line-coverage figure. CI (`.github/workflows/ci.yml`) runs the backend tests, proof verify and build, every crate's unit tests, the oath, factory, and board sandbox suites, and gitleaks.
 
 ### Security model
 - The agent signs with a function-call key limited to the charter and `propose`/`propose_batch`; it cannot attach deposits, transfer, or call owner methods.
@@ -253,7 +253,7 @@ Live check, at most 0.06 NEAR (the pass itself is 0.001):
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 589 unit tests (586 pass, 3 skipped)
+npm test                 # 590 unit tests (587 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -277,7 +277,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 589 unit tests (586 pass, 3 skipped):
+# 590 unit tests (587 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
-`contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).
+`contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board source is `contracts/charter_board` (30 unit tests, rustc 1.86). The deployed account is unchanged.

@@ -126,12 +126,12 @@ export function callsFailedPanel() {
 
 /**
  * Words for a partial Update my rules. The raw panic names no method.
- * ERR_RECEIVERS is set_calls (duplicate pair, or more than 8).
+ * ERR_RECEIVERS is set_calls (duplicate pair, or more than 24).
  */
 export function plainRulesError(error, { rulesSaved = false } = {}) {
   const t = String(error?.message || error || '');
   if (/ERR_RECEIVERS/.test(t)) {
-    const why = 'set_calls was refused: the shop list repeats an account and a method, or it names more than 8.';
+    const why = 'set_calls was refused: the shop list repeats an account and a method, or it names more than 24.';
     return rulesSaved ? `set_rules was saved. ${why}` : why;
   }
   return t.replace(/^Smart contract panicked:\s*/i, '');
