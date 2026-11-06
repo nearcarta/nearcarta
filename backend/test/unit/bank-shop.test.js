@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import nacl from 'tweetnacl';
 import { parseBankAgent, BANK_HINT } from '../../../app/src/panels/bank-agent.js';
+import { SAMPLES, parseStatementCsv, auditStatement, tightenDecision, commitmentText, proofLogEntry, modelEligibility } from '../../../app/src/panels/bank-audit.js';
 import { sealText, revealArgs } from '../../../shared/board/bank-seal.js';
 import { verifyResponseSignature, proofFile, bankProve, NO_RETENTION } from '../../../backend/src/bank-proof.js';
 import { armBankDock, dispatchBankDock, installBankDock } from '../../../app/src/panels/bank-dock.js';
@@ -11,32 +12,71 @@ import { armBankDock, dispatchBankDock, installBankDock } from '../../../app/src
 const read = p => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 
-test('a private send line picks the note and a miss shows the hint', () => {
-  const send = parseBankAgent('Send 0.001 NEAR privately');
-  assert.equal(send.ok, true);
-  assert.equal(send.action, 'send');
-  assert.equal(Number(send.amount), 0.001);
+test('an audit line picks the sample and a miss shows the hint', () => {
+  const cafe = parseBankAgent('Audit the cafe sample');
+  assert.equal(cafe.ok, true);
+  assert.equal(cafe.action, 'audit');
+  assert.equal(cafe.sample, 'cafe');
+  assert.equal(parseBankAgent('Audit the travel week').sample, 'travel');
   assert.equal(parseBankAgent('Verify the TEE').action, 'tee');
   assert.equal(parseBankAgent('Verify TEE now').action, 'tee');
-  assert.equal(parseBankAgent('Verify the seal').action, 'seal');
   assert.equal(parseBankAgent('Show the attestation file').action, 'file');
+  assert.equal(parseBankAgent('Show the proof log').action, 'file');
+  assert.equal(parseBankAgent('Apply tighter limits').ok, false);
+  assert.equal(parseBankAgent('Apply tighter limits', { review: { lines: 3 } }).action, 'apply');
 
   const miss = parseBankAgent('hello');
   assert.equal(miss.ok, false);
   assert.equal(miss.hint, BANK_HINT);
 
-  const notes = [0.001, 0.002, 0.005];
-  const off = parseBankAgent('Send 1 NEAR privately', { notes });
-  assert.equal(off.ok, false);
-  assert.match(off.hint, /0\.001/);
-  assert.match(off.hint, /0\.002/);
-  assert.match(off.hint, /0\.005/);
-  assert.match(off.hint, /Nothing was sent/);
+  const loose = parseBankAgent('Raise the cap');
+  assert.equal(loose.ok, false);
+  assert.match(loose.hint, /Nothing was signed/);
+  assert.match(parseBankAgent('Reset spent').hint, /Nothing was signed/);
+  assert.match(parseBankAgent('Unfreeze the row').hint, /Nothing was signed/);
+});
 
-  const over = parseBankAgent('Send 0.005 NEAR privately', { notes, capNear: 0.002 });
-  assert.equal(over.ok, false);
-  assert.ok(over.hint.includes('over your cap'));
-  assert.ok(over.hint.includes('Nothing was sent'));
+test('a local audit drops the statement and a looser cap is refused', () => {
+  assert.equal(SAMPLES.length, 3);
+  for (const sample of SAMPLES) {
+    const report = auditStatement(sample.rows, { capNear: 0.05 });
+    const dumped = JSON.stringify(report);
+    for (const row of sample.rows) if (row.payee) assert.equal(dumped.includes(row.payee), false);
+    assert.ok(report.lines >= 1);
+  }
+  const travel = auditStatement(SAMPLES[1].rows, { capNear: 0.05 });
+  assert.ok(travel.anomalies.some(a => a.kind === 'blank-payee'));
+  assert.ok(travel.anomalies.some(a => a.kind === 'over-cap'));
+  assert.equal(travel.tighten, false);
+  const cafe = auditStatement(SAMPLES[0].rows, { capNear: 0.05 });
+  assert.equal(cafe.tighten, true);
+  assert.ok(cafe.after < cafe.before);
+  const csv = parseStatementCsv('date,payee,near\n2026-11-01,cafe.near,0.01\n');
+  assert.equal(csv.ok, true);
+  assert.equal(parseStatementCsv('x'.repeat(6001)).ok, false);
+  assert.match(parseStatementCsv('nope\n1').error, /header/);
+  const loose = tightenDecision({ beforeCap: 0.05, afterCap: 0.2 });
+  assert.equal(loose.ok, false);
+  assert.match(loose.reason, /Nothing was signed/);
+  assert.equal(tightenDecision({ beforeCap: 0.05, afterCap: 0.02, resetSpent: true }).ok, false);
+  assert.equal(tightenDecision({ beforeCap: 0.05, afterCap: 0.02, unfreeze: true }).ok, false);
+  assert.equal(tightenDecision({ beforeCap: 0.05, afterCap: 0.02, swapKey: true }).ok, false);
+  assert.equal(tightenDecision({ beforeCap: 0.05, afterCap: 0.02, widenReceivers: true }).ok, false);
+  assert.equal(tightenDecision({ beforeCap: 0.05, afterCap: 0.02, grantCalls: true }).ok, false);
+  const held = tightenDecision({ beforeCap: 0.05, afterCap: 0.02 });
+  assert.equal(held.ok, true);
+  assert.equal(held.live, 'blocked');
+  assert.match(held.reason, /Nothing was signed/);
+  const text = commitmentText({ nonce: 'abc', afterNear: 0.02, salt: 'saltsalt' });
+  assert.equal(text.includes('cafe.near'), false);
+  assert.match(text, /^bank-audit-v1\|/);
+  const entry = proofLogEntry({ kind: 'cafe', lines: 3, anomalyCount: 1, nonce: 'abcdef1234', eligible: false });
+  assert.equal(JSON.stringify(entry).includes('cafe.near'), false);
+  assert.equal(entry.nonce, 'abcdef12');
+  const proxied = modelEligibility({ model: 'plain-model', teeOk: true, attested: ['z-ai/glm-5.3-flash'] });
+  assert.equal(proxied.eligible, false);
+  assert.equal(proxied.proxied, true);
+  assert.equal(modelEligibility({ model: 'z-ai/glm-5.3-flash', teeOk: false, attested: ['z-ai/glm-5.3-flash'] }).eligible, false);
 });
 
 test('the sealed rule text matches the board and stays hidden in the reveal args', () => {
@@ -149,20 +189,21 @@ test('the bank dock clears the input on send and keeps a hint on a miss', async 
   installBankDock(doc);
 
   input.value = 'nope';
-  armBankDock(async () => ({ ok: false, hint: 'Try: Send 0.001 NEAR privately' }));
+  armBankDock(async () => ({ ok: false, hint: 'Try Audit the cafe sample' }));
   await dispatchBankDock(doc);
   assert.equal(input.value, 'nope');
-  assert.equal(log.textContent, 'Try: Send 0.001 NEAR privately');
+  assert.equal(log.textContent, 'Try Audit the cafe sample');
 
-  armBankDock(async () => ({ ok: true, hint: 'Sending 0.001 NEAR privately under your cap. No wallet.' }));
-  input.value = 'Send 0.001 NEAR privately';
+  armBankDock(async () => ({ ok: true, hint: '3 lines. Nothing was signed.' }));
+  input.value = 'Audit the cafe sample';
   await dispatchBankDock(doc);
   assert.equal(input.value, '');
 });
 
 test('city bank copy has no untraceable claim', () => {
-  for (const p of ['app/src/panels/bank-tray.js', 'app/design/D8_shops/shops/bank.js', 'README.md']) {
+  for (const p of ['app/src/panels/bank-tray.js', 'app/design/D8_shops/shops/bank.js', 'README.md', 'app/design/D8_shops/js/shopui.js']) {
     assert.doesNotMatch(read(p), /untraceable/i, p);
+    assert.doesNotMatch(read(p), /Send privately/, p);
   }
 });
 

@@ -24,15 +24,14 @@ test('shop pages load their files from the folder', () => {
   assert.match(serve, /\/shops\\\/\[a-z0-9-\]\+\$/);
 });
 
-test('the bank splits payee from amount and shortens the account', () => {
+test('the bank labels the sample and does not print a full account', () => {
   assert.equal(shortId(ROW), '8e2027…61c8');
   const bank = read('app/src/panels/bank-tray.js');
-  assert.match(bank, /data-testid="bank-amount"/);
-  assert.match(bank, /class="choice-label">Amount/);
-  assert.match(bank, /data-testid="bank-payee"/);
-  assert.match(bank, /class="choice-label">Payee/);
-  assert.match(bank, /shortId\(a\)/);
-  assert.doesNotMatch(bank, /class="payee-id">\$\{esc\(a\)\}/);
+  assert.match(bank, /data-testid="bank-sample"/);
+  assert.match(bank, /class="choice-label" for="bank-sample"/);
+  assert.match(bank, /data-testid="bank-model"/);
+  assert.match(bank, /class="choice-label" for="bank-model">TEE model/);
+  assert.doesNotMatch(bank, /Send privately/);
   const css = read('app/src/panels/panels.css');
   assert.match(css, /min-height:44px/);
   assert.match(css, /font:600 16px\/1\.25 system-ui,sans-serif/);

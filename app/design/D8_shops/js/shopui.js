@@ -28,7 +28,7 @@ const { esc, fmt, short } = A;
 
 let cur = null, sh = null, phase = 'idle', last = null, runScene = null, extra = {}, ferryWatch = null;
 const say = t => { const e = $('#t-say'); e.innerHTML = `<span class="lamp" aria-hidden="true"></span><span>${t}</span>`; e.classList.remove('bump'); void e.offsetWidth; e.classList.add('bump'); };
-const btn = (label, kind = 'primary', dis = false) => { const b = $('#t-act'); b.hidden = !label; b.className = 'act ' + kind; b.disabled = dis; b.textContent = label || ''; b.classList.toggle('busy', phase === 'busy'); queueMicrotask(syncGo); };
+const btn = (label, kind = 'primary', dis = false) => { if (cur === 'bank') { hideFerryPrimary(); return; } const b = $('#t-act'); b.hidden = !label; b.className = 'act ' + kind; b.disabled = dis; b.textContent = label || ''; b.classList.toggle('busy', phase === 'busy'); queueMicrotask(syncGo); };
 // Ferry quote, cargo, Ask charter and Get another quote live in the card. #t-act is a second copy of the same label.
 function hideFerryPrimary() {
   const b = $('#t-act');
@@ -574,88 +574,9 @@ function gasNote() {
   const w = extra.gate?.gas?.warning;
   return w ? `<p class="plain-line warn" data-testid="gas-warning">⚠ ${esc(w)}</p>` : '';
 }
-const BANK_OPENING = 'nearcarta.bank.opening.v1';
-function readBankOpening() {
-  try { return JSON.parse(sessionStorage.getItem(BANK_OPENING) || 'null'); } catch { return null; }
-}
-async function sha256hex(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
-function bankCapYocto() {
-  return A.S.clauses?.pay?.per_action_cap || A.S.boardRow?.per_action_cap || null;
-}
 function bankCapNear() {
-  const y = bankCapYocto();
+  const y = A.S.clauses?.pay?.per_action_cap || A.S.boardRow?.per_action_cap || null;
   return y ? A.fromY(y) : null;
-}
-async function playBankScene(refused, reason) {
-  if (!sh?.act || !runScene) return;
-  const g = sh.act({ refused: !!refused, reason: reason || '' });
-  if (g) await runScene(g);
-}
-async function openBankEnvelope() {
-  const contract = A.S.board;
-  if (!contract) return { ok: false, hint: 'Finish /setup first. Nothing was sealed.' };
-  const cap = bankCapYocto();
-  const salt = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
-  const text = `oath-hidden-v1|${contract}|pay|${cap || 'none'}||${salt}`;
-  const commitment = await sha256hex(text);
-  const reveal = { max_amount: cap ? String(cap) : null, deny: [], salt };
-  extra.reveal = reveal;
-  extra.commitment = commitment;
-  try { sessionStorage.setItem(BANK_OPENING, JSON.stringify({ contract, reveal, commitment })); } catch { /* the opening stays in this tab's extra */ }
-  return { ok: true, commitment, hint: 'Hidden until used. This browser holds the opening. The session key cannot call set_seal.' };
-}
-async function showBankFile() {
-  try {
-    const r = await fetch((globalThis.NEARCARTA_API || '') + '/api/bank/proof', { cache: 'no-store' });
-    const j = await r.json();
-    const note = j.retention || j.proof?.retention || 'Request and response bytes are not stored.';
-    const body = JSON.stringify(j.proof || { retention: note }, null, 2);
-    extra.proofNote = note;
-    extra.proofHref = URL.createObjectURL(new Blob([body], { type: 'application/json' }));
-    return { ok: true, hint: note, note, href: extra.proofHref };
-  } catch (e) {
-    return { ok: false, hint: 'The attestation file could not be read. Nothing was sent.' };
-  }
-}
-/** One send path for the card, the dock, and the tray button. Cinema only after an allowed tx. */
-async function sendBankNote(amount) {
-  sh?.hideRefuse?.();
-  const notes = A.notes();
-  const amt = notes.includes(+amount) ? +amount : notes[0];
-  const to = extra.to || A.bankDefault();
-  const hintOf = (hint) => ({ ok: false, kind: 'no', say: hint, hint, keep: true });
-  if (A.stage() !== 'ready' || !A.S.board) return hintOf('Finish /setup first. Nothing was sent. No wallet opened.');
-  if (!to) return hintOf('Add a payee in /setup. Nothing was sent.');
-  const cap = bankCapYocto();
-  if (cap && BigInt(A.toY(amt)) > BigInt(cap)) return hintOf('That amount is over your cap. Nothing was sent.');
-  let reveal = null;
-  if (A.S.boardRow?.sealed) {
-    const saved = extra.reveal || readBankOpening()?.reveal;
-    if (!saved) return hintOf('This row has a sealed rule and this browser does not have the opening. Nothing was sent.');
-    reveal = saved;
-  }
-  let o;
-  try { o = await A.mist(amt, to, reveal); }
-  catch (e) {
-    if (A.userCancelled(e)) throw e;
-    sh?.hideRefuse?.();
-    return hintOf(A.plainError(e).slice(0, 160));
-  }
-  if (o.decision === 'allowed' && o.tx) {
-    extra.sent = o;
-    extra.tee = o.tee;
-    sh?.hideRefuse?.();
-    await playBankScene(false);
-    const say = `Sent ${o.bucket} NEAR. The charter allowed it. The amount is public in the propose arguments. The sealed rule stayed hidden until this send.`;
-    return { ok: true, kind: 'ok', o, say, hint: say, keep: true, hero: o.commitment ? `<span class="commit" data-testid="commit">${esc(String(o.commitment).slice(0, 10))}…</span><span class="unit">sealed</span>` : null, rc: A.txLine(o.tx) };
-  }
-  const why = A.why(o.reason);
-  await playBankScene(true, why);
-  const hint = o.tx ? `Charter refused: ${why}.` : `Charter refused: ${why}. Nothing was sent.`;
-  return { ok: false, kind: 'no', o, say: hint, hint, keep: true, rc: o.tx ? A.txLine(o.tx) : '' };
 }
 
 function tollPassRows() {
@@ -850,30 +771,26 @@ const APPS = {
   },
   bank: {
     guest: true,
-    label: 'Mist Bank · private payouts', idle: 'This payment is a charter check on mainnet. Pick a note under your cap. The sealed rule stays hidden until that send uses it.',
+    label: 'Mist Bank · private audit', idle: 'This audit does not send a payment. The statement stays in this browser.',
     form: () => '<div data-deep="bank"></div>',
     bind: () => {
-      const hooks = {
+      mountShop('bank', document.getElementById('t-form'), {
         state: extra,
-        notes: () => A.notes(),
-        payees: () => A.bankPayees(),
-        proof: () => A.mainProof(),
-        def: () => extra.to || A.bankDefault(),
         capNear: () => bankCapNear(),
-        tee: () => A.teeFresh(),
-        onNote: v => { extra.amt = v; },
-        onTo: v => { extra.to = v; },
+        who: () => {
+          let saved = null;
+          try { saved = JSON.parse(localStorage.getItem('nearcarta.setup.v1') || 'null'); } catch { saved = null; }
+          const account = A.S.me || saved?.accountId || '';
+          if (!account) return null;
+          return { name: saved?.displayName || account, account };
+        },
         hideRefuse: () => sh?.hideRefuse?.(),
-        onSend: (opts) => sendBankNote(opts?.amount),
-        onSeal: () => openBankEnvelope(),
-        onFile: () => showBankFile(),
         repaint: () => { if (cur === 'bank') paint(); },
-      };
-      mountShop('bank', document.getElementById('t-form'), hooks);
+      });
     },
-    btn: () => `Send ${A.notes().includes(+extra.amt) ? +extra.amt : A.notes()[0]} NEAR privately`,
-    hero: () => extra.sent ? `<span class="commit" data-testid="commit">${esc(String(extra.sent.commitment || '').slice(0, 10))}…</span><span class="unit">sealed</span>` : null,
-    run: async () => sendBankNote(A.notes().includes(+extra.amt) ? +extra.amt : A.notes()[0]),
+    btn: () => '',
+    hero: () => null,
+    run: async () => (extra.runAgent ? extra.runAgent('Audit privately') : { ok: false, hint: 'Open the card. Nothing was signed.', say: 'Open the card. Nothing was signed.', keep: true, kind: 'no' }),
   },
   guard: {
     label: 'Guardhouse · prompt-injection test', idle: 'Pick a trick, such as an invoice with a hidden line telling AI helpers to pay someone else. I\u2019ll check the payee before I sign. A try costs at most 0.001 NEAR, and only if your rules allow it.',
@@ -1168,7 +1085,7 @@ function paint() {
   }
   if (phase === 'idle') say(app.idle);
   form(app.form ? app.form() : ''); app.bind?.(); hero(app.hero ? app.hero() : null);
-  if (cur === 'ferry' || (cur === 'bank' && st === 'ready')) {
+  if (cur === 'ferry' || cur === 'bank') {
     hideFerryPrimary();
   } else {
     btn(typeof app.btn === 'function' ? app.btn() : app.btn, 'primary', cur === 'payouts' && !payoutReady(APPS.payouts.rows()).enabled);
@@ -1181,7 +1098,7 @@ async function primary(auto = false) {
   if (st === 'wait' || st === 'key') { phase = 'busy'; btn(st === 'key' && !A.pendingKey() ? 'Approve in your wallet…' : 'Checking…', 'primary busy', true);
     try { if (st === 'key' && !(A.pendingKey() && Date.now() < A.pendingKey().eta)) { const r = await A.helperKey(); rcpt(A.txLine(r.tx, 'helper key')); } else await A.readRules(); phase = 'idle'; paint(); } catch (e) { fail(e); } return; }
   phase = 'busy';
-  if (cur === 'ferry' || cur === 'toll') {
+  if (cur === 'ferry' || cur === 'toll' || cur === 'bank') {
     hideFerryPrimary();
     const again = document.getElementById('f-again');
     if (again) { again.disabled = true; again.textContent = 'Getting a quote…'; }
@@ -1202,7 +1119,7 @@ async function primary(auto = false) {
     say(res.say); react(kind);
     rcpt((rule ? `<span class="rule ${kind}" data-testid="rule">${kind === 'ok' ? '✓' : '✕'} ${esc(rule)}</span>` : '') + (res.rc || A.txLine(res.o?.tx)));
     const app = APPS[cur];
-    if (cur === 'ferry' || (cur === 'bank' && A.stage() === 'ready')) hideFerryPrimary();
+    if (cur === 'ferry' || cur === 'bank') hideFerryPrimary();
     else btn(typeof app.btn === 'function' ? app.btn() : (res.keep ? app.btn : (AGAIN[cur] || 'Do it again')));
     if (app.form && !res.noform) { form(app.form()); app.bind?.(); }
     document.body.dataset.app = kind; ruleChip(); proofDrawer();
@@ -1213,8 +1130,8 @@ async function primary(auto = false) {
     document.body.dataset.app = 'ok';
   }
 }
-const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another entry', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Send another note', toll: 'Pass the gate again' };
-function fail(e) { stopProgress(); phase = 'idle'; if (cur === 'ferry') { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); } if (cur === 'toll') sh?.showRefuse?.(A.plainError(e).slice(0, 140)); if (cur === 'bank') sh?.hideRefuse?.(); say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry' || cur === 'toll' || (cur === 'bank' && A.stage() === 'ready')) hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
+const AGAIN = { hall: 'Propose another rule', chronicle: 'Write another entry', ferry: 'Get a new quote', guard: 'Check another payee', arena: 'Try another message', payouts: 'Send another batch', house: 'Check again', bank: 'Audit another sample', toll: 'Pass the gate again' };
+function fail(e) { stopProgress(); phase = 'idle'; if (cur === 'ferry') { sh?.hideRefuse?.(); sh?.setOrder?.('jetty'); } if (cur === 'toll') sh?.showRefuse?.(A.plainError(e).slice(0, 140)); if (cur === 'bank') sh?.hideRefuse?.(); say(`Stopped: ${esc(A.plainError(e).slice(0, 140))}`); rcpt(e.tx ? A.txLine(e.tx) : ''); if (cur === 'ferry' || cur === 'toll' || cur === 'bank') hideFerryPrimary(); else btn(A.stage() === 'ready' ? 'Try again' : 'Retry'); document.body.dataset.app = 'err'; }
 
 // ---------- rules sheet ----------
 function openRules() {
@@ -1303,7 +1220,6 @@ export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rul
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
-  if (id === 'toll') booted?.then(() => { const v = cur === 'toll' && A.stage() === 'ready' && A.tollVisit(); if (v && !v.done && phase === 'idle') primary(true); }).catch(() => {}); }
 }
 export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('toll-tray'); document.body.classList.remove('bank-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; hideBankDock(); const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');

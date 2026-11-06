@@ -1,17 +1,20 @@
-/* Mist Bank city tray: same opaque box and raised gold buttons as the Ferry tray */
+/* Mist Bank city tray. Same shape as the approved Ferry card: top tabs, one gold button. */
 body.bank-tray #shopUI #tray{
-  width:min(440px,calc(100vw - 28px));
-  max-width:440px;
-  left:16px; bottom:18px;
-  max-height:calc(100dvh - 112px);
-  padding:22px;
+  width:min(400px,calc(100vw - 28px));
+  max-width:400px;
+  left:16px; top:172px; bottom:16px;
+  height:auto;
+  max-height:calc(100dvh - 172px);
+  padding:12px 14px 14px;
   box-sizing:border-box;
   overflow-x:hidden;
   overflow-y:auto;
-  background:#1f1a15;
-  border:1px solid #3a3128;
+  background:#241c14;
+  border:1px solid #6b5430;
+  border-radius:22px;
   box-shadow:0 16px 40px rgba(0,0,0,.45);
   backdrop-filter:none; -webkit-backdrop-filter:none;
+  color:#f3e6cf;
 }
 body.bank-tray #shopUI .t-head,
 body.bank-tray #shopUI .label,
@@ -25,113 +28,63 @@ body.bank-tray #shopUI .rcpt{display:none!important}
 body.bank-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
 body.bank-tray #shopUI #t-act[hidden]{display:none!important}
 body.bank-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
-body.bank-tray #shopUI select,
-body.bank-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
+body[data-shop=bank] #room{padding-bottom:120px}
 
-.bank-card{
-  display:grid; grid-template-columns:148px 1fr; gap:16px;
-  align-items:start; min-width:0; max-width:100%;
-  color:#fff8ee; font:500 14px/1.4 system-ui,sans-serif;
+.bank-card{display:flex;flex-direction:column;gap:8px;min-width:0;color:#f3e6cf;font:500 15px/1.35 system-ui,sans-serif}
+.bank-session{margin:0;color:#e6d3b0;font:600 14px/1.3 system-ui,sans-serif}
+.bank-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.bank-tab{
+  min-height:44px;min-width:0;padding:0 8px;border-radius:12px;cursor:pointer;
+  background:#1a140f;color:#f3e6cf;border:1px solid #6b5430;
+  font:700 14px/1 system-ui,sans-serif;
 }
-.bank-card .bank-tabs{
-  display:flex; flex-direction:column; gap:12px; min-width:0;
+#room .bank-card button.bank-tab,
+body.bank-tray .bank-card button.bank-tab{background:#1a140f;color:#f3e6cf;border:1px solid #6b5430;box-shadow:none}
+.bank-tab.on,
+#room .bank-card button.bank-tab.on,
+body.bank-tray .bank-card button.bank-tab.on{border-color:#e2b35b;color:#f5d08a;background:#2a2118}
+.bank-card .shop-card{margin:0;padding:12px;background:#1c1612;border-radius:16px;min-width:0}
+.bank-flow{
+  display:flex;align-items:center;justify-content:center;gap:18px;
+  min-height:64px;margin:0;padding:8px;border-radius:14px;
+  background:#14110e;border:1px solid #3a3128;
 }
-.bank-card .bank-tab{
-  display:flex; align-items:center; justify-content:flex-start; gap:8px;
-  width:100%; min-height:44px; margin:0; padding:8px 10px; box-sizing:border-box;
-  border:1px solid #3a3128; border-radius:12px;
-  background:#2a241e; color:#fff8ee;
-  font:700 13px/1.15 system-ui,sans-serif; cursor:pointer;
-  white-space:nowrap; overflow:visible;
+.bank-flow .ti{width:48px;height:48px;border-radius:50%}
+.bank-flow-arrow{color:#e2b35b;font:700 22px/1 system-ui,sans-serif}
+.bank-doc{display:block;flex:0 0 auto}
+.bank-pane{display:flex;flex-direction:column;gap:6px;min-width:0}
+.bank-pane[hidden]{display:none!important}
+.bank-card .choice-label{margin:4px 0 0;color:#e6d3b0;font:600 13px/1.2 system-ui,sans-serif}
+.bank-card select,
+.bank-card input[type="text"],
+.bank-card input:not([type="checkbox"]):not([type="file"]),
+.bank-card input[type="file"]{
+  width:100%;min-height:44px;box-sizing:border-box;margin:0;
+  padding:6px 12px;border-radius:12px;border:1px solid #6b5430;
+  background:#1a140f;color:#f3e6cf;font:600 16px/1.25 system-ui,sans-serif;
 }
-.bank-card .bank-tab svg{
-  flex:0 0 18px; width:18px; height:18px; display:block;
-  fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+.bank-card input[type="file"]::file-selector-button{
+  min-height:32px;margin-right:12px;padding:0 12px;border:0;border-radius:8px;
+  background:#2a2118;color:#f5d08a;font:700 14px/1 system-ui,sans-serif;cursor:pointer;
 }
-.bank-card .bank-tab:hover{background:#352d25}
-.bank-card .bank-tab:focus-visible{outline:2px solid #f5d08a; outline-offset:2px}
-.bank-card .bank-tab[aria-selected="true"],
-.bank-card .bank-tab.on,
-.bank-card .bank-tab.is-on{
-  background:#f5d08a; border-color:#c9a05a; color:#2a1608;
+.bank-field{
+  margin:0;min-height:44px;box-sizing:border-box;padding:10px 12px;border-radius:12px;
+  border:1px solid #6b5430;background:#1a140f;color:#f3e6cf;font:600 16px/1.25 system-ui,sans-serif;
 }
-.bank-card .bank-pane{
-  display:grid; row-gap:16px; min-width:0; align-content:start;
+.bank-consent{display:flex;align-items:center;gap:12px;min-height:44px;color:#f3e6cf;font:600 14px/1.3 system-ui,sans-serif}
+.bank-consent input{width:22px;height:22px;flex:0 0 auto}
+.bank-card .bank-again{
+  min-height:44px;margin:0;padding:0;border:0;background:transparent;color:#f5d08a;
+  font:700 14px/1 system-ui,sans-serif;cursor:pointer;
 }
-.bank-card .bank-pane[hidden]{display:none}
-
-.bank-cta{
-  display:inline-flex; align-items:center; justify-content:center;
-  width:auto; min-width:min(220px,100%); max-width:100%;
-  min-height:44px; padding:10px 22px; margin:0; box-sizing:border-box;
-  justify-self:center;
-  border:1px solid #c9a05a; border-radius:14px;
-  background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
-  color:#2a1608; font:700 15px/1.15 system-ui,sans-serif; cursor:pointer;
-  box-shadow:
-    0 1px 0 rgba(255,255,255,.55) inset,
-    0 -2px 0 rgba(120,70,20,.22) inset,
-    0 4px 0 #9a6f2e,
-    0 8px 16px rgba(0,0,0,.28);
-  transform:translateY(0);
-  transition:transform .08s ease,box-shadow .08s ease,filter .08s ease;
+.bank-card .bank-cta{
+  min-height:48px;margin-top:8px;border:0;border-radius:999px;cursor:pointer;
+  font:700 16px/1 system-ui,sans-serif;
 }
-.bank-cta:hover{filter:brightness(1.04)}
-.bank-cta:active{
-  transform:translateY(3px);
-  box-shadow:
-    0 1px 0 rgba(255,255,255,.4) inset,
-    0 -1px 0 rgba(120,70,20,.25) inset,
-    0 1px 0 #9a6f2e,
-    0 3px 8px rgba(0,0,0,.25);
-}
-.bank-cta:focus-visible{outline:2px solid #fff8ee; outline-offset:3px}
-.bank-cta[disabled]{
-  opacity:.7; cursor:progress; filter:none; transform:none;
-  color:#3a2610;
-  box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 2px 0 #9a6f2e;
-}
-.bank-card .bank-pane > .bank-cta,
-.bank-card .bank-actions > .bank-cta{justify-self:center}
-.bank-card .bank-actions{display:grid; justify-items:center; gap:14px; margin-top:14px}
-
-.bank-card .bank-notes,
-.bank-card .bank-payees{
-  display:flex; flex-wrap:wrap; gap:12px; margin:0; padding:0; list-style:none; min-width:0;
-}
-.bank-card .bank-notes > *,
-.bank-card .bank-payees > *{
-  display:inline-flex; align-items:center; justify-content:center;
-  min-height:40px; margin:0; padding:8px 14px; box-sizing:border-box;
-  border:1px solid #3a3128; border-radius:999px;
-  background:#2a241e; color:#fff8ee;
-  font:650 14px/1.2 system-ui,sans-serif; cursor:pointer;
-  max-width:100%; overflow-wrap:anywhere;
-}
-.bank-card .bank-notes > *:hover,
-.bank-card .bank-payees > *:hover{background:#352d25}
-.bank-card .bank-notes > [aria-pressed="true"],
-.bank-card .bank-notes > .on,
-.bank-card .bank-notes > .is-on,
-.bank-card .bank-payees > [aria-pressed="true"],
-.bank-card .bank-payees > .on,
-.bank-card .bank-payees > .is-on{
-  outline:2px solid #f5d08a; outline-offset:0; background:#2a241e;
-}
-.bank-card .bank-notes > *:focus-visible,
-.bank-card .bank-payees > *:focus-visible{outline:2px solid #f5d08a; outline-offset:2px}
-
-.bank-card .bank-seal-line,
-.bank-card .bank-proof-line{
-  position:static; margin:0; color:#f3ead8;
-  font:500 14px/1.4 system-ui,sans-serif; overflow-wrap:anywhere;
-}
-.bank-card .bank-refuse{
-  position:static; margin:0; padding:8px 12px; border-radius:10px;
-  background:#2a241e; color:#ffb4b4;
-  font:600 14px/1.4 system-ui,sans-serif; overflow-wrap:anywhere;
-}
-.bank-card .bank-refuse[hidden]{display:none}
+.bank-status{margin:0;text-align:center;color:#f3e6cf;font:600 14px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.bank-steps{margin:0;padding-left:18px;color:#e6d3b0;font:600 13px/1.35 system-ui,sans-serif}
+.bank-log{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px}
+.bank-log li{overflow-wrap:anywhere}
 
 #bank-agent-dock{
   position:fixed; right:20px; bottom:22px; z-index:70;
@@ -143,10 +96,9 @@ body.bank-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
 #bank-agent-dock[hidden]{display:none!important}
 #bank-agent-dock .bank-agent-char{
   display:flex; flex-direction:column; align-items:center; gap:6px;
-  width:96px; padding:0; border:0; background:transparent; cursor:pointer; color:#fff8ee;
+  width:96px; padding:0; border:0; background:transparent; cursor:pointer; color:#f3e6cf;
   order:2;
 }
-#bank-agent-dock .bank-agent-char:focus-visible{outline:2px solid #f5d08a; outline-offset:4px; border-radius:12px}
 #bank-agent-dock .bank-agent-avatar{
   width:72px; height:72px; object-fit:contain; display:block;
   filter:drop-shadow(0 10px 18px rgba(0,0,0,.45));
@@ -156,68 +108,31 @@ body.bank-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
   letter-spacing:.05em; text-transform:uppercase;
 }
 .bank-agent-pop{
-  order:1;
-  width:min(300px,calc(100vw - 140px)); min-width:260px;
+  order:1; width:min(300px,calc(100vw - 140px)); min-width:220px;
   box-sizing:border-box; padding:14px; border-radius:16px;
-  border:1px solid #c9a05a; background:#1f1a15;
+  border:1px solid #6b5430; background:#1c1612;
   box-shadow:0 12px 28px rgba(0,0,0,.4);
-  display:flex; flex-direction:column; gap:10px; overflow:hidden;
+  display:flex; flex-direction:column; gap:10px;
 }
 .bank-agent-pop[hidden]{display:none}
-.bank-agent-pop .bank-agent-row{
-  display:flex; flex-direction:row; align-items:stretch; gap:10px; min-width:0; margin:0 0 10px;
-}
+.bank-agent-pop .bank-agent-row{display:flex; align-items:stretch; gap:10px; min-width:0}
 .bank-agent-pop .bank-agent-row input{
-  flex:1 1 auto; width:100%; min-width:0; box-sizing:border-box; min-height:44px;
-  padding:0 12px; border-radius:10px; border:1px solid #4a3a28;
-  background:#17130f; color:#fff8ee; font:500 14px/1.2 system-ui,sans-serif;
+  flex:1; min-width:0; min-height:44px; box-sizing:border-box; padding:0 12px; border-radius:12px;
+  border:1px solid #6b5430; background:#1a140f; color:#f3e6cf; font:600 15px/1.2 system-ui,sans-serif;
 }
 .bank-agent-pop .bank-agent-send{
-  flex:0 0 44px; width:44px; min-width:44px; height:44px; margin:0; padding:0;
-  display:inline-flex; align-items:center; justify-content:center;
-  border:1px solid #c9a05a; border-radius:12px;
-  background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
-  color:#2a1608; font:700 18px/1 system-ui,sans-serif; cursor:pointer;
-  box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 3px 0 #9a6f2e,0 6px 12px rgba(0,0,0,.28);
-  transition:transform .08s ease,box-shadow .08s ease;
-}
-.bank-agent-pop .bank-agent-send svg{width:18px; height:18px; display:block; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round}
-.bank-agent-pop .bank-agent-send:active{
-  transform:translateY(2px);
-  box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 1px 0 #9a6f2e,0 3px 6px rgba(0,0,0,.25);
-}
-.bank-agent-pop .bank-agent-send:focus-visible{outline:2px solid #fff8ee; outline-offset:2px}
-.bank-agent-pop .bank-agent-log{
-  position:static; margin:0; color:#fff8ee;
-  font:500 14px/1.4 system-ui,sans-serif; overflow-wrap:anywhere;
-}
-.bank-agent-pop .bank-refuse{color:#ffb4b4; background:transparent; padding:0}
-
-#room .bank-card button.bank-tab,
-#shopUI #t-form .bank-card button.bank-tab{
-  background:#2a241e; color:#fff8ee; border:1px solid #3a3128; width:100%;
-  box-shadow:none; animation:none;
-}
-#room .bank-card button.bank-tab.on,
-#shopUI #t-form .bank-card button.bank-tab.on{
-  background:#f5d08a; color:#2a1608; border-color:#c9a05a;
+  flex:0 0 44px; width:44px; min-height:44px; border-radius:12px; cursor:pointer;
+  border:1px solid #6b5430; background:#1a140f; color:#f5d08a; font:700 18px/1 system-ui,sans-serif;
 }
 
 @media (max-width:720px){
-  body[data-shop=bank] #room{padding-bottom:120px}
   body.bank-tray #shopUI #tray{
-    width:min(100vw - 16px,420px); max-width:none;
-    left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    max-height:min(58dvh,calc(100dvh - 108px)); padding:20px 18px;
-    background:#1f1a15; backdrop-filter:none; -webkit-backdrop-filter:none;
+    top:168px; left:10px; right:auto; bottom:12px;
+    width:min(270px,calc(100vw - 116px)); max-width:none;
+    max-height:calc(100dvh - 120px);
   }
-  .bank-card{grid-template-columns:1fr; gap:12px}
-  .bank-card .bank-tabs{
-    flex-direction:row; gap:12px; overflow-x:auto; overflow-y:hidden;
-    -webkit-overflow-scrolling:touch; padding-bottom:4px;
-  }
-  .bank-card .bank-tab{width:auto; flex:0 0 auto}
-  #bank-agent-dock{right:8px; bottom:calc(12px + env(safe-area-inset-bottom,0px)); gap:8px}
-  #bank-agent-dock .bank-agent-char{width:88px}
-  .bank-agent-pop{width:min(260px,calc(100vw - 120px))}
+  .bank-tab{font-size:12px;padding:0 2px}
+  #bank-agent-dock{right:6px; bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  #bank-agent-dock .bank-agent-char{width:72px}
+  #bank-agent-dock .bank-agent-avatar{width:56px;height:56px}
 }

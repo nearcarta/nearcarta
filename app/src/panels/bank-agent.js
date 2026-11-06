@@ -1,29 +1,23 @@
-// In-shop lines for Mist Bank. The same actions as the tray buttons.
-export const BANK_HINT = 'Try: Send 0.001 NEAR privately · Verify the TEE · Show the attestation file.';
+// Natural-language commands for the Mist Bank auditor. The same actions as the gold button.
 
-const NOTES = [0.001, 0.002, 0.005];
+export const BANK_HINT = 'Try Audit the cafe sample, Verify the TEE, Show the proof log, or Apply tighter limits.';
 
-export function parseBankAgent(text, { notes = NOTES, capNear = null } = {}) {
-  const t = String(text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+export function parseBankAgent(text, { review } = {}) {
+  const t = String(text || '').trim().toLowerCase();
   if (!t) return { ok: false, hint: BANK_HINT };
-  if (t === 'verify the tee' || t === 'verify tee now' || t === 'verify tee') {
-    return { ok: true, action: 'tee', hint: 'Checking the live attestation. No NEAR moves.' };
+  if (/verify the tee|verify tee/.test(t)) return { ok: true, action: 'tee' };
+  if (/attestation file|proof log|show the proof/.test(t)) return { ok: true, action: 'file' };
+  if (/what was unusual|explain the anomal/.test(t)) return { ok: true, action: 'explain' };
+  if (/loosen|raise the cap|reset spent|unfreeze|swap the key|wider payee/.test(t)) {
+    return { ok: false, hint: 'A looser limit, a reset, or an unfreeze was refused. Nothing was signed.' };
   }
-  if (t === 'verify the seal' || t === 'verify seal') {
-    return { ok: true, action: 'seal', hint: 'The sealed rule stays hidden until it is used.' };
+  if (/apply tighter|tighter limits/.test(t)) {
+    if (!review) return { ok: false, hint: 'Audit a sample first. Nothing was signed.' };
+    return { ok: true, action: 'apply' };
   }
-  if (t === 'show the attestation file' || t === 'show attestation file' || t === 'show attestation' || t === 'show the proof file') {
-    return { ok: true, action: 'file', hint: 'The attestation file is ready.' };
+  if (/audit/.test(t)) {
+    const sample = /travel/.test(t) ? 'travel' : /payroll/.test(t) ? 'payroll' : 'cafe';
+    return { ok: true, action: 'audit', sample };
   }
-  const m = t.match(/^send\s+(\d+(?:\.\d+)?)\s*near\b/);
-  if (!m) return { ok: false, hint: BANK_HINT };
-  const amount = Number(m[1]);
-  const allowed = (notes || NOTES).map(Number);
-  if (capNear != null && Number.isFinite(Number(capNear)) && amount > Number(capNear) + 1e-12) {
-    return { ok: false, hint: `That note is over your cap of ${capNear} NEAR. Nothing was sent.` };
-  }
-  if (!allowed.some(n => Math.abs(n - amount) < 1e-9)) {
-    return { ok: false, hint: `Pick one of the set amounts: ${allowed.join(', ')} NEAR. Nothing was sent.` };
-  }
-  return { ok: true, action: 'send', amount, hint: `Sending ${amount} NEAR privately under your cap. No wallet.` };
+  return { ok: false, hint: BANK_HINT };
 }

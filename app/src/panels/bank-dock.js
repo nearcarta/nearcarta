@@ -5,7 +5,7 @@ let runner = null;
 let busy = false;
 let inflight = null;
 
-export const BANK_NOT_READY = 'The agent is not ready. Open Mist Bank and press Send again.';
+export const BANK_NOT_READY = 'The agent is not ready. Open Mist Bank and press Audit privately again.';
 
 export function armBankDock(fn) {
   runner = typeof fn === 'function' ? fn : null;
@@ -27,7 +27,7 @@ export function installBankDock(doc) {
     const t = e.target;
     if (!t || typeof t.closest !== 'function') return;
     const click = e.type === 'click' && t.closest('#bank-agent-go');
-    const enter = e.type === 'keydown' && e.key === 'Enter' && t.closest('#bank-agent');
+    const enter = e.type === 'keydown' && (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) && t.closest('#bank-agent');
     if (!click && !enter) return;
     if (enter) e.preventDefault();
     dispatchBankDock(doc);
@@ -61,7 +61,7 @@ async function runDock(doc) {
     bankDockLog(doc, hint);
     return result || { ok: false, hint };
   } catch (e) {
-    const hint = e?.message || 'The agent could not send that line.';
+    const hint = e?.message || 'The agent could not run that line.';
     bankDockLog(doc, hint);
     return { ok: false, hint };
   }

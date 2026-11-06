@@ -1,5 +1,4 @@
-// Mist Bank: a vault with a street window. A shielded street payout hides its amount. A charter propose on the
-// board publishes the NEAR amount. A sealed rule stays a commitment until the send that uses it.
+// Mist Bank: a private expense auditor. The statement stays in the browser. This room does not move ZEC.
 // Data: D6 BANK when the host provides it (tech app), else the live-read snapshot in data/live.js (tools/snapshot.mjs).
 import { THREE, room, put, makeRobot, C, CSS, radial, wait, tween } from '../js/core.js';
 import { row, h3, note, proof, paper, esc } from './_ui.js';
@@ -9,35 +8,21 @@ import { M as PM, brassM, mesh, lantern, candle, rug } from './_props.js';
 
 const B = D.BANK || BANK;
 // The room's one-line summary of how a payout runs (room copy; the README is the charter worker's).
-export const ROOM_LINE = 'This payment is a charter check on mainnet.';
-const LEG = { shield: 'Shield ZEC into a confidential balance', transfer: 'Transfer between confidential balances', unshield: 'Unshield to a public Intents balance' };
-const short = c => `${String(c).slice(0, 8)}…${String(c).slice(-6)}`;
+export const ROOM_LINE = 'This audit does not send a payment.';
 function live(b) {
-  const s = b.street;
+  const s = b.street || {};
   return proof(
     note(ROOM_LINE),
-    h3('The street window · public explorer, live read'),
-    row({ k: 'A payout happened. The amount is hidden.', why: 'The public record shows a shielded payment and a small fee. This page never shows the amount.', st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'amount hidden' : 'amount visible', src: 'live' }),
-    `<details class="more"><summary>Technical details</summary>`,
-    row({ k: `Recorded at block ${s.height}`, why: s.hidden ? `The amount stays inside a shielded pool. The fee is ${s.fee} of the smallest Zcash unit.` : `Amount visible: ${s.reasons.join(', ')}`, st: s.hidden ? 'ok' : 'no', stText: s.hidden ? 'hidden' : 'visible', src: 'live' }),
-    note(`<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.txid.slice(0, 12))}… ↗</a> · ${esc(String(s.confirmations))} confirmations${b.at ? ' · read ' + esc(b.at) : ''}`),
-    h3('The oath · NEAR'),
-    row({ k: `Payout approved by clause ${b.oath.clause}`, why: 'the memo on chain holds only a commitment to the amount', st: b.oath.ok ? 'ok' : 'no', stText: b.oath.ok ? 'allowed' : 'not verified', tx: b.oath.tx }),
-    note('On the board path the NEAR amount is a public argument of propose. A sealed rule stays hidden until the send that uses it.'),
-    h3('The commitment · NEAR memo'),
-    row({ k: `sha256 ${short(b.commitment.value)}`, why: 'binds the paid amount without showing it; this app never receives the amount, salt or viewing key', st: 'ok', stText: 'amount hidden', src: 'mainnet' }),
-    `<p class="kv">${esc(b.commitment.value)}</p>`,
-    note(`Auditor check: with the payee viewing key, read the amount and salt from the encrypted memo and hash them, or ${esc(b.auditor?.verify || 'POST /api/mistbank/verify')}. A match proves the paid amount is the committed one.`),
-    ...(b.binding && !b.binding.capsAmount ? [note('The charter approves the payout and stores the commitment; it does not cap the Zcash amount.')] : []),
-    h3('The desk · NEAR Intents Confidential, dry quotes'),
-    ...(b.desk?.length ? b.desk.map(l => row({ k: LEG[l.leg] || l.leg, why: `privacy ${l.privacy} · signature ${l.sig ? 'verified' : 'FAILED'} · echo ${l.echo ? 'ok' : 'differs'}`, st: l.ok ? 'ok' : 'no', stText: l.ok ? 'quoted' : 'rejected', src: 'live' }))
-      : [row({ k: 'Confidential quotes', why: 'not available on this server', st: 'no', stText: 'off', src: 'live' })]),
-    note('Practice quotes only: nothing was spent.'),
-    `</details>`);
+    note('A statement stays in this browser. A hardware report is a separate check. This room does not move ZEC and does not hold a key.'),
+    h3('Recorded street read, not this audit'),
+    row({ k: 'A recorded Zcash transaction is not this audit.', why: 'This page does not move ZEC and does not call that payment private.', st: 'no', stText: 'not this audit', src: 'live' }),
+    note(s.url ? `<a class="tx" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(String(s.txid || '').slice(0, 12))}… ↗</a>` : 'No street row is part of this audit.'),
+    h3('Confidential settlement'),
+    row({ k: 'Confidential pay stays off.', why: 'No deposit address is requested until a documented receipt exists.', st: 'no', stText: 'off', src: 'live' }),
+  );
 }
-const HERO = `<span class="commit" title="sha256 commitment on NEAR">${esc(String(B.commitment?.value || '').slice(0, 8))}…</span><span class="unit">amount hidden</span>`;
-// For the 2D fallback (js/flat.js)
-export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'Street sees a payout, not the amount · operator-run worker', hero: HERO };
+const HERO = `<span class="unit">browser audit</span>`;
+export const FLAT = { src: 'local', cls: 'local', label: 'Private expense auditor · fictional samples', hero: HERO };
 export const PROOF = live(B);
 
 export default async function bank() {
