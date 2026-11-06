@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import nacl from 'tweetnacl';
 import { parseBankAgent, BANK_HINT } from '../../../app/src/panels/bank-agent.js';
-import { SAMPLES, parseStatementCsv, auditStatement, tightenDecision, commitmentText, proofLogEntry, modelEligibility, biggestWaste, wasteSentence, plural, attestFields, statementFindings, agentReply, capFromSetup, verifyBrowserSignature, rowsInMessage, messageAuditReply, preferModelSentence, attestForNonce, browserSignatureLine, CHECK_SPLIT } from '../../../app/src/panels/bank-audit.js';
+import { SAMPLES, parseStatementCsv, auditStatement, tightenDecision, commitmentText, proofLogEntry, modelEligibility, biggestWaste, wasteSentence, plural, attestFields, statementFindings, agentReply, capFromSetup, verifyBrowserSignature, rowsInMessage, messageAuditReply, preferModelSentence, attestForNonce, browserSignatureLine, CHECK_SPLIT, checkSplitFor, signerIdentity } from '../../../app/src/panels/bank-audit.js';
 import { nearRate, _clearRateCache } from '../../../backend/src/bank-rate.js';
 import { runModelAudit } from '../../../backend/src/bank-model.js';
 import { sealText, revealArgs } from '../../../shared/board/bank-seal.js';
@@ -125,23 +125,33 @@ test('a message that names rows is audited on those rows', () => {
   assert.equal(asking.live, 'Asking NEAR AI');
   assert.equal(asking.label, '');
 
-  assert.equal(browserSignatureLine(true), 'ed25519 signature checked in your browser: valid');
-  assert.match(browserSignatureLine(false), /not valid/);
+  assert.equal(browserSignatureLine(true, 'ed25519'), 'ed25519 signature checked in your browser with the attested public key: valid');
+  assert.equal(browserSignatureLine(true, 'ecdsa'), 'ECDSA signature recovered in your browser matches the attested signing address');
+  assert.match(browserSignatureLine(false, 'ed25519'), /not valid/);
+  assert.match(browserSignatureLine(false, 'ecdsa'), /did not recover/);
+  assert.match(browserSignatureLine(true), /^signature checked in your browser: valid$/, 'no algorithm named: no algorithm claimed');
+  assert.equal(browserSignatureLine(false, 'ecdsa', { checked: false }), 'No response signature was checked (ECDSA was named in the report).');
   assert.match(CHECK_SPLIT, /Checked in this browser/);
   assert.match(CHECK_SPLIT, /Checked on the server/);
+  assert.match(checkSplitFor('ecdsa'), /ECDSA signature, recovered/);
+  assert.match(checkSplitFor('ed25519'), /ed25519 signature over the signed text/);
+  assert.match(checkSplitFor(''), /did not check a response signature/);
   const tray = read('app/src/panels/bank-tray.js');
-  assert.match(tray, /browserSignatureLine\(true\)/);
+  assert.match(tray, /browserSignatureLine\([^)]*algo/);
   assert.match(tray, /data-testid="tee-copy-signer"/);
   assert.match(tray, /data-testid="tee-signer"/);
-  assert.match(tray, /CHECK_SPLIT/);
+  assert.match(tray, /checkSplitFor/);
   assert.match(tray, /attestForNonce/);
   assert.match(tray, /source === 'message'/);
   assert.doesNotMatch(tray, /f\.id === 'nonce' \|\| f\.id === 'signer'/);
   assert.doesNotMatch(tray, /provider_tee/);
+  // A private audit never routes to /setup, and the gold button never moves under the pointer.
+  assert.doesNotMatch(tray, /location\.assign|location\.href/);
   const css = read('app/src/panels/bank.css');
   assert.match(css, /\.bank-scroll\{/);
   assert.match(css, /height:min\(640px,calc\(100dvh - 120px\)\)/);
   assert.match(css, /\.bank-foot\{/);
+  assert.match(css, /\.bank-cta:active/);
   assert.doesNotMatch(css, /height:fit-content/);
   const fields = attestFields(
     { ok: true, model: 'z-ai/glm-5.3-flash', nonce: 'ab'.repeat(32), models: [{ ok: true, signing_address: 'cd'.repeat(32), checks: { signerBound: true, quote: true, nonceBound: true }, tcbStatus: 'UpToDate', gpu: { ok: true, gpus: 1 } }], gateway: { checks: { quote: true, nonceBound: true }, tcbStatus: 'UpToDate' } },
@@ -154,6 +164,64 @@ test('a message that names rows is audited on those rows', () => {
   const signer = fields.find(f => f.id === 'signer');
   assert.equal(signer.value, 'cd'.repeat(32));
   assert.equal(signer.where, 'server');
+});
+
+test('an ecdsa receipt is recovered in the browser, and a wrong algorithm is never claimed as a pass', async () => {
+  const { recoverEcdsaSigner } = await import('../../../app/src/panels/signature-check.js');
+  // A fixed secp256k1 receipt over an EIP-191 message. The address is keccak256(x||y)[12:] of the key,
+  // and the signature is v||r||s (the layout @noble/curves emits), the way NEAR AI's ecdsa replies arrive.
+  const address = '0x4d958b39872d523f795c021be6c148a49e662899';
+  const text = 'z-ai/glm-5.3-flash:req:resp';
+  const sig = '01ff5b7ff6a9f97b7407749253a0ddb1d7028d32d76101351d4af53e3e7867dd434c70054cc5ed277099fe3e0bb32eba9f2d10fdcd8e9fd1935dfc349b0cb555ba';
+
+  const good = await verifyBrowserSignature({ text, signature: sig, signingAddress: address, algo: 'ecdsa' });
+  assert.equal(good.ok, true);
+  assert.equal(good.recovered.toLowerCase(), address.toLowerCase());
+  assert.equal(browserSignatureLine(good.ok, 'ecdsa'), 'ECDSA signature recovered in your browser matches the attested signing address');
+
+  const tampered = await verifyBrowserSignature({ text: `${text}x`, signature: sig, signingAddress: address, algo: 'ecdsa' });
+  assert.equal(tampered.ok, false, 'a different message must not recover the attested address');
+  assert.match(browserSignatureLine(tampered.ok, 'ecdsa'), /did not recover/);
+
+  const other = '0x' + '11'.repeat(20);
+  assert.equal((await verifyBrowserSignature({ text, signature: sig, signingAddress: other, algo: 'ecdsa' })).ok, false);
+  // The same 20-byte address labelled as an ed25519 key is a size mismatch, not a pass.
+  const mislabelled = await verifyBrowserSignature({ text, signature: sig, signingAddress: address, algo: 'ed25519' });
+  assert.equal(mislabelled.ok, false);
+  assert.match(mislabelled.why, /32-byte ed25519 key/);
+  // An unnamed algorithm is not guessed from the address length.
+  const unnamed = await verifyBrowserSignature({ text, signature: sig, signingAddress: address });
+  assert.equal(unnamed.ok, false);
+  assert.match(unnamed.why, /did not name ed25519 or ecdsa/);
+
+  // r||s||v (the Ethereum tooling order) recovers the same address.
+  const rsv = sig.slice(2, 130) + '01';
+  assert.equal((await verifyBrowserSignature({ text, signature: rsv, signingAddress: address, algo: 'ecdsa' })).ok, true);
+
+  const sync = recoverEcdsaSigner({ text, signature: sig, signingAddress: address });
+  assert.equal(sync.ok, true);
+
+  const who = signerIdentity({ signingAddress: address, algo: 'ecdsa' });
+  assert.equal(who.label, 'ECDSA signing address');
+  assert.equal(who.bytes, 20);
+  assert.equal(who.ok, true);
+  const wrongSize = signerIdentity({ signingAddress: address, algo: 'ed25519' });
+  assert.equal(wrongSize.ok, false, 'a 40-hex address is not an ed25519 public key');
+  assert.match(wrongSize.why, /20 bytes/);
+});
+
+test('the proof log links a real artifact and says so plainly when there is none', () => {
+  const plain = proofLogEntry({ kind: 'upload', lines: 5, anomalyCount: 1, nonce: 'aa'.repeat(32) });
+  assert.deepEqual(plain.evidence, []);
+  assert.equal(plain.nonce.length, 8, 'the log keeps a nonce prefix, not the whole statement');
+  const withArt = proofLogEntry({ kind: 'tee', nonce: 'bb'.repeat(32), eligible: true, evidence: [{ label: 'report', url: 'https://nearcarta.example/api/ai/tee?nonce=bb' }] });
+  assert.equal(withArt.evidence.length, 1);
+  assert.match(withArt.evidence[0].url, /^https:\/\//);
+  const junk = proofLogEntry({ kind: 'tee', nonce: 'cc'.repeat(32), evidence: [{ label: 'x', url: 'javascript:alert(1)' }, { label: 'y', url: '' }] });
+  assert.deepEqual(junk.evidence, [], 'only an absolute http(s) artifact becomes a link');
+  const traySource = read('app/src/panels/bank-tray.js');
+  assert.match(traySource, /data-testid="bank-log-link"/);
+  assert.match(traySource, /no public artifact/);
 });
 
 test('a local audit drops the statement and a looser cap is refused', () => {
@@ -247,6 +315,12 @@ test('a card csv keeps its currency and names the biggest waste', async () => {
   assert.match(tray, /No per-payment cap is saved in \/setup/);
   assert.match(read('app/src/panels/bank-audit.js'), /Apply tighter limits lowers the per-payment cap on your own \/setup rules/);
   assert.match(read('app/design/D8_shops/js/shopui.js'), /cur === 'bank' && app\.guest && app\.form/);
+  // The gold button for the bank never falls through to the /setup redirect, whatever stage the page reads.
+  const shopui = read('app/design/D8_shops/js/shopui.js');
+  const primaryFn = shopui.slice(shopui.indexOf('async function primary('));
+  const bankBranch = primaryFn.indexOf("if (cur === 'bank')");
+  const setupRedirect = primaryFn.indexOf("st === 'load' || st === 'connect' || st === 'build'");
+  assert.ok(bankBranch > 0 && bankBranch < setupRedirect, 'the bank branch must come before the /setup redirect');
 
   _clearRateCache();
   const rate = await nearRate('usd', {
@@ -349,6 +423,8 @@ test('an empty model sentence is not verified and the browser checks the signatu
   assert.equal(empty.answer, '');
   assert.equal(empty.verified, false);
   assert.match(empty.step, /empty/);
+  // The reply has a signature, so NEAR AI's verify page is the artifact even when the sentence was empty.
+  assert.match(empty.verify_url, /^https:\/\/cloud\.near\.ai\/verify\?model=/);
   assert.equal(empty.signed_text, 'signed-body');
   assert.equal(empty.signature, 'ab'.repeat(64));
   assert.equal(empty.signing_address, '22'.repeat(32));
@@ -364,6 +440,19 @@ test('an empty model sentence is not verified and the browser checks the signatu
   });
   assert.equal(reasoned.answer, 'Netflix is the waste.');
   assert.equal(reasoned.verified, true);
+  // A signed reply names NEAR AI's own verify page; an unsigned one names no artifact at all.
+  assert.match(reasoned.verify_url, /^https:\/\/cloud\.near\.ai\/verify\?model=/);
+  // With no signature at all there is no artifact, so nothing may be linked.
+  const unsignedAudit = await runModelAudit({
+    rows: [{ payee: 'Netflix', amount: 15.99, currency: 'USD' }],
+    preflight: async () => pre,
+    complete: async () => ({ id: 'chat', model: 'z-ai/glm-5.3-flash', reqModel: 'z-ai/glm-5.3-flash', content: 'Netflix is the waste.', usage: {}, reqSha: 'aa', respSha: 'bb' }),
+    sign: async () => ({ available: false, http: 404 }),
+    check: () => ({ verified: false, checks: {} }),
+    allow: () => ({ ok: true }),
+  });
+  assert.equal(unsignedAudit.verify_url, '');
+  assert.equal(unsignedAudit.signature, '');
 
   const unsigned = await runModelAudit({
     rows: [{ payee: 'Netflix', amount: 15.99, currency: 'USD' }],
@@ -379,11 +468,14 @@ test('an empty model sentence is not verified and the browser checks the signatu
   const kp = nacl.sign.keyPair();
   const text = 'model:req:resp';
   const sig = hex(nacl.sign.detached(new TextEncoder().encode(text), kp.secretKey));
-  const good = await verifyBrowserSignature({ text, signature: sig, signingAddress: hex(kp.publicKey) });
+  const good = await verifyBrowserSignature({ text, signature: sig, signingAddress: hex(kp.publicKey), algo: 'ed25519' });
   assert.equal(good.ok, true);
   const flipped = (parseInt(sig.slice(0, 2), 16) ^ 1).toString(16).padStart(2, '0') + sig.slice(2);
-  const bad = await verifyBrowserSignature({ text, signature: flipped, signingAddress: hex(kp.publicKey) });
+  const bad = await verifyBrowserSignature({ text, signature: flipped, signingAddress: hex(kp.publicKey), algo: 'ed25519' });
   assert.equal(bad.ok, false);
+  const wrongAlgo = await verifyBrowserSignature({ text, signature: sig, signingAddress: hex(kp.publicKey) });
+  assert.equal(wrongAlgo.ok, false, 'an unnamed algorithm is not checked, and never claimed as a pass');
+  assert.match(wrongAlgo.why, /did not name ed25519 or ecdsa/);
 });
 
 test('the sealed rule text matches the board and stays hidden in the reveal args', () => {
@@ -444,7 +536,7 @@ test('an envelope signature verifies without sending a completion', async () => 
   });
   assert.equal(result.completionSent, false);
   assert.equal(result.verified, true);
-  assert.equal(result.checks.ed25519, true);
+  assert.equal(result.checks.signatureOk, true);
   const proofJson = JSON.stringify(result.proof);
   assert.doesNotMatch(proofJson, /lamp|prompt|untraceable/i);
   assert.ok(!proofJson.includes(secretChat));
