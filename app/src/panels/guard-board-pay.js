@@ -43,7 +43,7 @@ export function proposePay({
     return { ready: false, signed: false, tx: null, method: BOARD_V2.open, hint: 'The row is not loaded. Nothing was signed.' };
   }
   if (!guard) {
-    return { ready: false, signed: false, tx: null, method: BOARD_V2.open, hint: 'The guard contract is not deployed yet. Nothing was signed.' };
+    return { ready: false, signed: false, tx: null, method: BOARD_V2.open, hint: 'The guard shop account is not in the deployment record. Nothing was signed.' };
   }
   if (!payee || amount == null || amount === '') {
     return { ready: false, signed: false, tx: null, method: BOARD_V2.open, hint: 'Name a payee and an amount. Nothing was signed.' };
