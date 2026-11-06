@@ -4,7 +4,9 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import nacl from 'tweetnacl';
 import { parseBankAgent, BANK_HINT } from '../../../app/src/panels/bank-agent.js';
-import { SAMPLES, parseStatementCsv, auditStatement, tightenDecision, commitmentText, proofLogEntry, modelEligibility } from '../../../app/src/panels/bank-audit.js';
+import { SAMPLES, parseStatementCsv, auditStatement, tightenDecision, commitmentText, proofLogEntry, modelEligibility, biggestWaste, wasteSentence, plural, attestFields } from '../../../app/src/panels/bank-audit.js';
+import { nearRate, _clearRateCache } from '../../../backend/src/bank-rate.js';
+import { runModelAudit } from '../../../backend/src/bank-model.js';
 import { sealText, revealArgs } from '../../../shared/board/bank-seal.js';
 import { verifyResponseSignature, proofFile, bankProve, NO_RETENTION } from '../../../backend/src/bank-proof.js';
 import { armBankDock, dispatchBankDock, installBankDock } from '../../../app/src/panels/bank-dock.js';
@@ -28,6 +30,12 @@ test('an audit line picks the sample and a miss shows the hint', () => {
   const miss = parseBankAgent('hello');
   assert.equal(miss.ok, false);
   assert.equal(miss.hint, BANK_HINT);
+  const spending = parseBankAgent('audit my spending and tell me the biggest waste');
+  assert.equal(spending.ok, false);
+  assert.match(spending.hint, /will not use a sample/);
+  const loaded = parseBankAgent('audit my spending and tell me the biggest waste', { hasStatement: true });
+  assert.equal(loaded.source, 'loaded');
+  assert.equal(loaded.sample, undefined);
 
   const loose = parseBankAgent('Raise the cap');
   assert.equal(loose.ok, false);
@@ -77,6 +85,88 @@ test('a local audit drops the statement and a looser cap is refused', () => {
   assert.equal(proxied.eligible, false);
   assert.equal(proxied.proxied, true);
   assert.equal(modelEligibility({ model: 'z-ai/glm-5.3-flash', teeOk: false, attested: ['z-ai/glm-5.3-flash'] }).eligible, false);
+});
+
+test('a card csv keeps its currency and names the biggest waste', async () => {
+  const csv = `date,merchant,amount,category
+2026-11-01,Cafe,4.50,food
+2026-11-02,Cloud Host,29.00,software
+2026-11-03,Cloud Host,29.00,software
+2026-11-04,Books,12.00,shopping
+`;
+  const parsed = parseStatementCsv(csv);
+  assert.equal(parsed.ok, true);
+  assert.match(parsed.detectedText, /Detected date, merchant, amount, category/);
+  assert.match(parsed.detectedText, /No currency column/);
+  const report = auditStatement(parsed.rows, { capNear: 0.1 });
+  assert.equal(JSON.stringify(report).includes('Cloud Host'), false);
+  assert.match(report.rateSource, /not converted/);
+  const waste = biggestWaste(parsed.rows);
+  assert.equal(waste.payee, 'Cloud Host');
+  assert.equal(waste.amount, 29);
+  assert.match(waste.why, /appears 2 times/);
+  assert.match(waste.why, /largest line/);
+  assert.match(wasteSentence(waste), /Cloud Host, 29 as written/);
+  const priced = auditStatement(parsed.rows.map(r => ({ ...r, currency: 'USD' })), {
+    capNear: 20,
+    nearPerUnit: 0.5,
+    rateSource: 'CoinGecko near/usd at test: 1 NEAR = 2 USD.',
+  });
+  assert.equal(priced.currency, 'USD');
+  assert.equal(priced.tighten, true);
+  assert.ok(priced.after < priced.before);
+  assert.match(priced.rateSource, /CoinGecko/);
+  assert.equal(plural(1, 'anomaly', 'anomalies'), '1 anomaly');
+  assert.equal(plural(3, 'anomaly', 'anomalies'), '3 anomalies');
+  assert.doesNotMatch(read('app/src/panels/bank-tray.js'), /\$\{review\.anomalies\.length\} anomalies/);
+  assert.match(read('app/src/panels/bank-tray.js'), /Accepted format/);
+  assert.match(read('app/src/panels/bank-tray.js'), /data-testid="bank-paste"/);
+  const bankCss = read('app/src/panels/bank.css');
+  assert.match(bankCss, /#shopUI #t-form button\.bank-tab\.on/);
+  assert.match(bankCss, /linear-gradient\(180deg,#f5d08a,#e2b35b\)/);
+  assert.match(bankCss, /grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
+
+  _clearRateCache();
+  const rate = await nearRate('usd', {
+    now: () => Date.parse('2026-11-06T00:00:00.000Z'),
+    fetchImpl: async () => ({ ok: true, json: async () => ({ near: { usd: 2 } }) }),
+  });
+  assert.equal(rate.ok, true);
+  assert.equal(rate.nearPerUnit, 0.5);
+  assert.match(rate.source, /CoinGecko near\/usd/);
+  assert.match(rate.source, /1 NEAR = 2 USD/);
+
+  let sent = 0;
+  const held = await runModelAudit({
+    rows: [{ payee: 'SECRET_PAYEE', amount: 29, currency: 'USD' }],
+    preflight: async () => ({ ok: false, failure: 'model: quote', model: 'z-ai/glm-5.3-flash', models: [], gateway: {} }),
+    complete: async () => { sent += 1; return {}; },
+  });
+  assert.equal(sent, 0);
+  assert.match(held.step, /not sent/);
+  assert.equal(JSON.stringify(held).includes('SECRET_PAYEE'), false);
+
+  const pre = {
+    ok: true, model: 'z-ai/glm-5.3-flash', nonce: 'ab'.repeat(32),
+    gateway: { ok: true, tcbStatus: 'UpToDate', checks: { quote: true, nonceBound: true }, signing_address: '11'.repeat(20) },
+    models: [{ ok: true, tcbStatus: 'UpToDate', checks: { quote: true, nonceBound: true, signerBound: true }, signing_address: '22'.repeat(20), signing_algo: 'ed25519', gpu: { ok: true, gpus: 8 }, model_name: 'z-ai/glm-5.3-flash' }],
+  };
+  const done = await runModelAudit({
+    rows: [{ payee: 'SECRET_PAYEE', amount: 29, currency: 'USD' }],
+    preflight: async () => pre,
+    complete: async () => ({ id: 'chat', model: 'z-ai/glm-5.3-flash', reqModel: 'z-ai/glm-5.3-flash', content: 'Cloud Host, 29 USD. It appears twice.', usage: { prompt_tokens: 1, completion_tokens: 1 }, reqSha: 'aa', respSha: 'bb' }),
+    sign: async () => ({ available: true, text: 'nope', signature: '00', signing_address: '22'.repeat(20), signing_algo: 'ed25519', signature_kind: 'provider_tee' }),
+    check: () => ({ verified: false, checks: {} }),
+    allow: () => ({ ok: true }),
+  });
+  assert.equal(done.verified, false);
+  assert.match(done.step, /Response signature/);
+  assert.equal(JSON.stringify(done.fields).includes('SECRET_PAYEE'), false);
+  assert.equal(done.answer.includes('SECRET_PAYEE'), false);
+  const view = attestFields(pre, { ok: true, kind: 'provider_tee' });
+  assert.equal(view.find(f => f.id === 'gpu').ok, true);
+  assert.equal(view.find(f => f.id === 'tdx').value, 'UpToDate');
+  assert.equal(view.find(f => f.id === 'signature').ok, true);
 });
 
 test('the sealed rule text matches the board and stays hidden in the reveal args', () => {

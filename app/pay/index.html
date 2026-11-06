@@ -6,76 +6,68 @@
 <title>Nearcarta · Pay an invoice</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/panels/panels.css">
+<link rel="stylesheet" href="/shops/payouts/payouts.css">
 <style>
-  body{margin:0;background:#1a140f;color:#f3ead8;font:16px/1.45 system-ui,sans-serif}
-  main{max-width:420px;margin:0 auto;padding:24px 16px 48px}
-  a{color:#d6b46a}
-  .ferry-card{padding:8px 0}
+  body{margin:0;min-height:100dvh;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(180deg,#f6d7a4 0%,#d5e0b0 46%,#8ea56a 100%);
+    color:#f3ead8;font:16px/1.45 system-ui,sans-serif}
+  main{width:min(420px,100%);padding:16px;box-sizing:border-box}
+  a{color:#f5d08a}
+  .pay-card{background:#1a140f;border:1px solid #4a3a28;border-radius:22px;padding:16px 16px 18px;
+    box-shadow:0 18px 40px rgba(42,22,8,.28);display:grid;gap:14px}
+  .pay-back{margin:0 0 10px;text-align:center}
+  .pay-back a{color:#2a1608;font-weight:700;text-decoration:none}
+  .pay-kicker,.pay-hint{margin:0;color:#d4c4a8;font:600 13px/1.4 system-ui,sans-serif}
+  .pay-card .payout-status{min-height:3.4em}
+  .pay-card .payout-status p{margin:0;min-height:1.35em;color:#f5d08a;font:600 14px/1.4 system-ui,sans-serif;overflow-wrap:anywhere}
+  .pay-card .ferry-flow .tic{position:relative;display:inline-flex;width:48px;height:48px}
+  .pay-card .ferry-flow .ci{position:absolute;right:-4px;bottom:-4px;width:22px;height:22px;border-radius:999px;overflow:hidden;box-shadow:0 0 0 2px #17130f}
+  .pay-card .ferry-flow .ci img{width:22px;height:22px;display:block}
+  .pay-deposit{display:grid;gap:8px}
+  .pay-deposit[hidden]{display:none}
+  .pay-card #pay-copy{min-height:44px;border-radius:12px;border:1px solid #d6b46a;background:#241c14;color:#f5d08a;font:700 14px/1 system-ui,sans-serif;cursor:pointer}
+  .pay-links{margin:0;display:flex;flex-wrap:wrap;gap:8px}
+  .pay-links a{color:#f5d08a}
+  @media (max-width:720px){
+    main{padding:12px}
+    .pay-card .ferry-field > input,.pay-card .ferry-field select{font-size:16px}
+  }
 </style>
 </head>
 <body>
 <main>
-  <p><a href="/" data-testid="back-town">Back to town</a></p>
-  <div class="ferry-card" data-testid="payer-card">
-    <div class="ferry-flow" aria-hidden="true">
-      <img class="ti" src="/tokens/usdc.svg" alt="" width="48" height="48">
-      <span class="ferry-flow-arrow">→</span>
-      <img class="ti" src="/tokens/usdc.svg" alt="" width="48" height="48">
+  <p class="pay-back"><a href="/" data-testid="back-town">Back to town</a></p>
+  <div class="ferry-card pay-card" data-testid="payer-card">
+    <div class="ferry-flow" data-testid="payer-flow">
+      <span class="tic"><svg class="ti" width="48" height="48" viewBox="0 0 32 32" aria-hidden="true"><circle fill="#3E73C4" cx="16" cy="16" r="16"/><path fill="#fff" d="M20.022 18.124c0-2.124-1.28-2.852-3.84-3.156-1.828-.243-2.193-.728-2.193-1.578 0-.85.61-1.396 1.828-1.396 1.097 0 1.707.364 2.011 1.275a.458.458 0 00.427.303h.975a.416.416 0 00.427-.425v-.06a3.04 3.04 0 00-2.743-2.489V9.142c0-.243-.183-.425-.487-.486h-.915c-.243 0-.426.182-.487.486v1.396c-1.829.242-2.986 1.456-2.986 2.974 0 2.002 1.218 2.791 3.778 3.095 1.707.303 2.255.668 2.255 1.639 0 .97-.853 1.638-2.011 1.638-1.585 0-2.133-.667-2.316-1.578-.06-.242-.244-.364-.427-.364h-1.036a.416.416 0 00-.426.425v.06c.243 1.518 1.219 2.61 3.23 2.914v1.457c0 .242.183.425.487.485h.915c.243 0 .426-.182.487-.485V21.34c1.829-.303 3.047-1.578 3.047-3.217z"/></svg><span class="ci"><img id="pay-chain" alt="" width="22" height="22" src="/tokens/chains/base.svg"></span></span>
+      <span class="ferry-flow-arrow" aria-hidden="true">→</span>
+      <span class="tic"><svg class="ti" width="48" height="48" viewBox="0 0 32 32" aria-hidden="true"><circle fill="#3E73C4" cx="16" cy="16" r="16"/><path fill="#fff" d="M20.022 18.124c0-2.124-1.28-2.852-3.84-3.156-1.828-.243-2.193-.728-2.193-1.578 0-.85.61-1.396 1.828-1.396 1.097 0 1.707.364 2.011 1.275a.458.458 0 00.427.303h.975a.416.416 0 00.427-.425v-.06a3.04 3.04 0 00-2.743-2.489V9.142c0-.243-.183-.425-.487-.486h-.915c-.243 0-.426.182-.487.486v1.396c-1.829.242-2.986 1.456-2.986 2.974 0 2.002 1.218 2.791 3.778 3.095 1.707.303 2.255.668 2.255 1.639 0 .97-.853 1.638-2.011 1.638-1.585 0-2.133-.667-2.316-1.578-.06-.242-.244-.364-.427-.364h-1.036a.416.416 0 00-.426.425v.06c.243 1.518 1.219 2.61 3.23 2.914v1.457c0 .242.183.425.487.485h.915c.243 0 .426-.182.487-.485V21.34c1.829-.303 3.047-1.578 3.047-3.217z"/></svg><span class="ci"><img alt="" width="22" height="22" src="/tokens/chains/near.svg"></span></span>
     </div>
-    <p class="ferry-picker-note" id="pay-kicker">Exact USDC on NEAR. A link query cannot change the receive account.</p>
+    <p class="pay-kicker" id="pay-kicker">Exact USDC on NEAR. A link query cannot change the receive account.</p>
     <label class="field ferry-field"><span>Amount USD</span><input id="pay-usd" data-testid="payer-usd" readonly></label>
     <label class="field ferry-field"><span>Receive account</span><input id="pay-receive" data-testid="payer-receive" readonly></label>
     <label class="field ferry-field"><span>You pay</span>
       <select id="pay-from" data-testid="payer-from">
-        <option value="USDC@base">USDC on Base</option>
-        <option value="USDC@eth">USDC on Ethereum</option>
-        <option value="USDC@arb">USDC on Arbitrum</option>
+        <option value="base" data-from="USDC@base">USDC on Base</option>
       </select>
     </label>
-    <label class="field ferry-field"><span>Refund address</span><input id="pay-refund" data-testid="payer-refund" autocomplete="off" spellcheck="false"></label>
+    <label class="field ferry-field"><span>Refund address</span><input id="pay-refund" data-testid="payer-refund" autocomplete="off" spellcheck="false" placeholder="Address on the chain you pay from"></label>
+    <p class="pay-hint" data-testid="payer-refund-hint">The address on the chain you pay from. A refund goes here if the swap cannot finish. It cannot change who receives the invoice.</p>
+    <div class="payout-status" data-testid="payer-quote"><p id="pay-quote">Add a refund address to see what you send, the fee and the time.</p></div>
     <button type="button" class="primary ferry-cta" id="pay-go" data-testid="payer-go">Pay this invoice</button>
-    <p class="ferry-rate" id="pay-line" data-testid="payer-line">Not paid.</p>
-    <p class="ferry-charter-note" id="pay-line-2" data-testid="payer-line-2"></p>
+    <div class="payout-status" data-testid="payer-status">
+      <p class="ferry-rate" id="pay-line" data-testid="payer-line">Not paid.</p>
+      <p id="pay-line-2" data-testid="payer-line-2"></p>
+    </div>
+    <div class="pay-deposit" id="pay-deposit" data-testid="payer-deposit" hidden>
+      <label class="field ferry-field"><span>Deposit address</span><input id="pay-address" data-testid="payer-address" readonly></label>
+      <button type="button" id="pay-copy" data-testid="payer-copy">Copy deposit address</button>
+      <p class="pay-hint">Send the quoted USDC yourself. This page does not send it.</p>
+    </div>
+    <p class="pay-links" id="pay-links" data-testid="payer-links"></p>
+    <p class="pay-hint" id="pay-receipt" data-testid="payer-receipt"></p>
   </div>
 </main>
-<script type="module">
-const id = location.pathname.split('/').filter(Boolean).pop();
-const $ = s => document.querySelector(s);
-const line = (a, b) => { $('#pay-line').textContent = a || ''; $('#pay-line-2').textContent = b || ''; };
-let record = null;
-function paint(inv) {
-  record = inv;
-  $('#pay-usd').value = inv ? String(inv.usd) : '';
-  $('#pay-receive').value = inv ? inv.receive : '';
-  if (!inv) { line('This invoice was not found.', ''); return; }
-  const paid = inv.delivered === true || inv.status === 'SUCCESS';
-  line(paid ? 'Paid. 1Click status is SUCCESS.' : 'Not paid.', inv.status && inv.status !== 'UNPAID' ? inv.status : '');
-}
-async function load() {
-  if (!id || id === 'pay' || id === 'index.html') { line('Missing invoice link.', ''); return; }
-  try {
-    const res = await fetch('/api/payouts/invoices/' + encodeURIComponent(id) + location.search);
-    const body = await res.json();
-    paint(body.invoice || null);
-  } catch { line('The invoice could not be read.', ''); }
-}
-$('#pay-go').onclick = async () => {
-  if (!record) return;
-  const refundTo = $('#pay-refund').value.trim();
-  if (!refundTo) { line('Not paid.', 'Type the refund address.'); return; }
-  line('Asking for a deposit address. Not paid.', '');
-  try {
-    const res = await fetch('/api/payouts/invoices/' + encodeURIComponent(record.id) + '/checkout', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ from: $('#pay-from').value, refundTo, recipientType: 'DESTINATION_CHAIN' }),
-    });
-    const body = await res.json();
-    if (!body.ok) { line('Not paid.', body.reason || 'No deposit address.'); return; }
-    if (body.delivered) { line('Paid. 1Click status is SUCCESS.', ''); return; }
-    line('Not paid.', 'Deposit address ready. Send it yourself.');
-  } catch { line('Not paid.', 'Checkout did not answer.'); }
-};
-load();
-</script>
+<script type="module" src="/panels/pay-invoice.js"></script>
 </body>
 </html>
