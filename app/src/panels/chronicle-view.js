@@ -5,7 +5,9 @@ import { presentAmount } from '../chronicle-amount.js';
 import { iconFor } from '../chronicle-icons.js';
 import { accountRows } from '../chronicle-loop.js';
 import { runChronicleCommand } from '../chronicle-commands.js';
-import { anchorPlan, bundleDigest, canonicalManifest, teeNowText, verifyBundle, verifyNearAi, writeStatement } from '../chronicle-audit.js';
+import { anchorPlan, anchorProof, bundleDigest, canonicalManifest, parseAnchorEvents, sha256Hex, teeNowText, verifyBundle, verifyNearAi, writeStatement } from '../chronicle-audit.js';
+import { totalsLine, totalsOf } from '../../../shared/chronicle/receipts.js';
+import { reconstructRules } from '../../../shared/chronicle/rules.js';
 import { liveTee } from '../tee-view.js';
 import { armChronicleDock, chronicleDockLog, dispatchChronicleDock, ensureChronicleDock, installChronicleDock } from './chronicle-dock.js';
 import { ensureChronicleStyle } from './chronicle-style.js';
@@ -51,10 +53,33 @@ function shortHash(h) {
   return `${s.slice(0, 6)}…${s.slice(-4)}`;
 }
 
-function saltBytes() {
-  const bytes = new Uint8Array(16);
+const saltBytes = () => {
+  const bytes = new Uint8Array(8);
   globalThis.crypto?.getRandomValues?.(bytes);
   return [...bytes].map(n => n.toString(16).padStart(2, '0')).join('');
+};
+
+// One shared read per page for answers that do not depend on the typed account.
+// Two mounts of the tray (the city room and the console) must not each call /api/ledger.
+const sharedCache = new Map(); // key -> { at, body }
+const sharedInflight = new Map(); // key -> Promise
+export const SHARED_TTL_MS = 60_000;
+export function _resetShared() { sharedCache.clear(); sharedInflight.clear(); }
+export async function sharedJson(url, key = url, { now = Date.now(), ttl = SHARED_TTL_MS, fetchImpl = null } = {}) {
+  const hit = sharedCache.get(key);
+  if (hit && now - hit.at < ttl) return hit.body;
+  if (sharedInflight.has(key)) return sharedInflight.get(key);
+  const doFetch = fetchImpl || ((u) => fetch(u));
+  const p = doFetch(url)
+    .then(r => (r && r.ok === false ? null : r.json()))
+    .catch(() => null)
+    .then(body => {
+      if (body) sharedCache.set(key, { at: now, body });
+      return body;
+    })
+    .finally(() => sharedInflight.delete(key));
+  sharedInflight.set(key, p);
+  return p;
 }
 
 function rowHtml(x) {
@@ -136,6 +161,8 @@ export function chronicleMarkup(state) {
       <summary>Sources</summary>
       <p class="c-health" data-testid="chronicle-health">${esc(state.health || '')}</p>
       <ul class="c-cover-list" data-testid="chronicle-coverage">${cover}</ul>
+      <p class="c-totals" data-testid="chronicle-totals">${esc(state.totals ? totalsLine(state.totals) : '')}</p>
+      <p class="c-rules" data-testid="chronicle-rules">${esc(state.rules?.version ? `Rules version ${state.rules.version} (${state.rules.versions.length} readable).` : (state.rules?.why || ''))}</p>
     </details>
     <div class="c-foot">
       <button type="button" class="chronicle-quiet" id="c-csv" data-testid="chronicle-export"${state.exportCount ? '' : ' disabled'}>Export CSV</button>
@@ -193,6 +220,8 @@ export function mountChronicleTray(root, hooks = {}) {
     state.shown = n;
     state.rowTotal = all.length;
     state.viewRows = all.slice(0, n);
+    // Totals are computed from the same rows the list and CSV use, so the three always agree.
+    state.totals = totalsOf(all);
     return all;
   }
 
@@ -319,10 +348,13 @@ export function mountChronicleTray(root, hooks = {}) {
     let board = null, ledger = null, mainnet = null, live = null;
     try {
       const livePromise = fetch(`${base}/api/chronicle/live?${liveQuery}`, { signal: AbortSignal.timeout(8000) }).catch(() => null);
+      // The public ledger and the deployment record are the same answer for every account, so they
+      // are read once per page and shared. A second account read (or Show more) must not re-ask them:
+      // that fan-out is what the ledger/mainnet 429 reports were about.
       [board, ledger, mainnet] = await Promise.all([
         get('/api/chronicle?owner=' + encodeURIComponent(id)),
-        get('/api/ledger'),
-        get('/api/mainnet'),
+        sharedJson(`${base}/api/ledger`, 'ledger'),
+        sharedJson(`${base}/api/mainnet`, 'mainnet'),
       ]);
       if (mine !== state.ticket) return;
       const liveRes = await livePromise;
@@ -386,12 +418,40 @@ export function mountChronicleTray(root, hooks = {}) {
     return matchingRows();
   }
 
+  // The rules version the statement is written against: rebuilt from the account's own
+  // row-writing transactions, never assumed. Missing history is labelled, not filled in.
+  async function rulesNow() {
+    if (state.rules && state.rules.account === state.account && !state.rules.refresh) return state.rules;
+    const out = { account: state.account, version: '', why: 'The rules were not read yet.', versions: [] };
+    try {
+      const res = await fetch(`${api()}/api/chronicle/anchors?account=${encodeURIComponent(state.account)}`, { signal: AbortSignal.timeout(9000) });
+      if (res.ok) {
+        const body = await res.json();
+        const built = reconstructRules({
+          row: body.snapshot ? { ...body.snapshot, owner: state.account } : null,
+          writes: (body.ruleWrites || []).map(w => ({ ...w, rowAfter: null })),
+          hashHex: sha256Hex,
+          owner: state.account,
+        });
+        out.version = built.current?.version || '';
+        out.versions = built.versions;
+        out.why = built.why || (out.version ? '' : 'Historic rules: missing.');
+        out.anchorCount = (body.anchors || []).length;
+        out.gaps = body.gaps || [];
+      } else out.why = 'The rule history did not answer. Historic rules: missing.';
+    } catch { out.why = 'The rule history did not answer. Historic rules: missing.'; }
+    state.rules = out;
+    return out;
+  }
+
   async function writeNow() {
     clearSeal();
     const rows = filteredAll();
     const period = periodOf();
-    const totals = csvTotals(rows);
-    const local = writeStatement({ account: state.account, period, rows, rules: null, totals });
+    const totals = totalsOf(rows).totals;
+    const rules = await rulesNow();
+    const rulesArg = rules.version ? { version: rules.version } : null;
+    const local = writeStatement({ account: state.account, period, rows, rules: rulesArg, totals });
     const bound = bundleDigest({ account: state.account, period, rows });
     state.verify = 'Asking NEAR AI…';
     showOut();
@@ -405,6 +465,7 @@ export function mountChronicleTray(root, hooks = {}) {
           period,
           digest: bound,
           totals,
+          rules: rulesArg,
           rows: rows.slice(0, 40).map(r => ({ h: r.h, shop: r.shop, decision: r.decision, amount: r.amount || '' })),
         }),
         signal: AbortSignal.timeout(25000),
@@ -427,10 +488,11 @@ export function mountChronicleTray(root, hooks = {}) {
     state.signature = proof.signature || '';
     state.publicKey = String(proof.signing_address || '').replace(/^ed25519:/i, '');
     state.proof = proof;
-    const manifest = canonicalManifest({ account: state.account, period, rows, rules: null, statement: text, model: proof.model || 'none' });
+    const manifest = canonicalManifest({ account: state.account, period, rows, rules: rulesArg, statement: text, model: proof.model || 'none' });
     state.manifest = manifest;
     state.manifestText = manifest.text;
     state.digest = manifest.digest;
+    state.totals = totalsOf(rows);
     state.verify = proof.status || local.status;
     state.verifyUrl = '';
     state.tab = 'statement';
@@ -445,16 +507,49 @@ export function mountChronicleTray(root, hooks = {}) {
     state.consent = !!consent;
     if (consent && note && !state.salt) state.salt = saltBytes();
     const plan = anchorPlan({ manifest: state.manifest, consent: !!consent, privateNote: note, salt: state.salt || '' });
-    state.verify = plan.reason;
     state.verifyUrl = '';
-    if (plan.event) {
-      const file = JSON.stringify({ manifest: state.manifest, event: plan.event, salt: consent ? (state.salt || '') : '', commitment: plan.commitment || '' }, null, 2);
-      if (hooks.downloadJson) hooks.downloadJson(file, 'chronicle-statement.json');
-      else downloadCsv(file, 'chronicle-statement.json');
+    if (!plan.ok) {
+      state.verify = plan.reason;
+      clearSeal();
+      showOut();
+      return { status: plan.reason, signed: false };
     }
-    clearSeal();
+    // The CTA and the AI both come here: one real board.anchor under the visitor's session key.
+    const send = hooks.onAnchor;
+    if (typeof send !== 'function') {
+      state.verify = 'No session is attached, so the anchor was not sent. The bundle is still downloadable.';
+      showOut();
+      return { status: state.verify, signed: false };
+    }
+    state.verify = 'Anchoring on the board…';
     showOut();
-    return { status: plan.reason, signed: false };
+    let sent = null;
+    try { sent = await send(plan); }
+    catch (e) { sent = { ok: false, reason: String(e?.message || e) }; }
+    state.anchorPlan = plan;
+    if (!sent?.ok) {
+      const why = sent?.reason || 'refused';
+      state.verify = `The board did not log the anchor: ${why}. Nothing was stored, and the bundle is still downloadable.`;
+      state.verifyUrl = sent?.tx ? `https://nearblocks.io/txns/${sent.tx}` : '';
+      clearSeal();
+      showOut();
+      return { status: state.verify, signed: false };
+    }
+    const events = parseAnchorEvents(sent.logs || []);
+    const proof = anchorProof({ commitment: plan.commitment, owner: state.account, events });
+    state.anchorEvents = events;
+    state.verify = proof.ok
+      ? `Anchored on the board. ${proof.why}`
+      : 'The board accepted the call but this receipt did not carry the anchor event. Check the transaction.';
+    state.verifyUrl = `https://nearblocks.io/txns/${sent.tx}`;
+    const file = JSON.stringify({ manifest: state.manifest, plan: { method: plan.method, args: plan.args, commitment: plan.commitment }, tx: sent.tx, events }, null, 2);
+    try {
+      if (hooks.downloadJson) hooks.downloadJson(file, 'chronicle-anchor.json');
+      else downloadCsv(file, 'chronicle-anchor.json');
+    } catch { /* the download is a convenience, never the proof */ }
+    if (proof.ok) clearSeal(); else setSeal(state.verify);
+    showOut();
+    return { status: state.verify, signed: true, tx: sent.tx };
   }
 
   async function checkBundle() {

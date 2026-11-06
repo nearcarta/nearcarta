@@ -37,6 +37,10 @@ mkdirSync(dist + '/shared/hall', { recursive: true });
 mkdirSync(dist + '/shared/rails', { recursive: true });
 cpSync(here + '../shared/hall/plan.js', dist + '/shared/hall/plan.js');
 cpSync(here + '../shared/hall/job.js', dist + '/shared/hall/job.js');
+// The Chronicle tray imports these as raw modules (rules reconstruction, cross-shop receipts).
+mkdirSync(dist + '/shared/chronicle', { recursive: true });
+cpSync(here + '../shared/chronicle/rules.js', dist + '/shared/chronicle/rules.js');
+cpSync(here + '../shared/chronicle/receipts.js', dist + '/shared/chronicle/receipts.js');
 cpSync(here + '../shared/rails/receipts.js', dist + '/shared/rails/receipts.js');
 // The Guardhouse room imports this as a raw module. Without it the import 404s and
 // every shop mount in boot.js fails, not just the Guardhouse. board-pay.js pulls in

@@ -5,7 +5,7 @@ import nacl from 'tweetnacl';
 import { exportCsv, csvTotals } from '../../../app/src/chronicle-feed.js';
 import { parseChronicleCommand, runChronicleCommand } from '../../../app/src/chronicle-commands.js';
 import { accountRows, mergeChronicle } from '../../../app/src/chronicle-loop.js';
-import { anchorPlan, bundleDigest, canonicalManifest, rebuildIndex, sha256Hex, teeNowText, verifyBundle, verifyNearAi, writeStatement } from '../../../app/src/chronicle-audit.js';
+import { anchorEventsFromReceipts, anchorPlan, anchorProof, bundleDigest, canonicalManifest, rebuildIndex, sha256Hex, teeNowText, verifyBundle, verifyNearAi, writeStatement } from '../../../app/src/chronicle-audit.js';
 import { iconFor } from '../../../app/src/chronicle-icons.js';
 import { CHRONICLE_CSS } from '../../../app/src/panels/chronicle-style.js';
 import { armChronicleDock, dispatchChronicleDock, installChronicleDock } from '../../../app/src/panels/chronicle-dock.js';
@@ -341,11 +341,59 @@ test('a statement digest rejects tampering and a private note stays salted', asy
   const blocked = anchorPlan({ manifest, consent: false, privateNote: 'secret note', salt: 'salt' });
   assert.equal(blocked.event, null);
   assert.match(blocked.reason, /raw hash was not published/i);
-  const held = anchorPlan({ manifest, consent: true, privateNote: 'secret note', salt: 'salt' });
-  assert.equal(held.signed, false);
-  assert.match(held.reason, /Live anchor blocked/);
+  const held = anchorPlan({ manifest, consent: true, privateNote: 'secret note', salt: 'salt1234' });
+  assert.equal(held.ok, true);
+  assert.equal(held.signed, false, 'the plan never claims a signature it did not send');
+  assert.equal(held.method, 'anchor');
+  assert.equal(held.args.digest, manifest.digest);
+  assert.equal(held.args.salt, 'salt1234');
+  // The board accepts 8..=64 ASCII alphanumerics, so a short or symbolic salt never reaches it.
+  assert.match(anchorPlan({ manifest, salt: 'short' }).reason, /8 to 64/);
+  assert.match(anchorPlan({ manifest, salt: 'salt-1234' }).reason, /8 to 64/);
+  assert.match(anchorPlan({ manifest: { digest: 'nope' } }).reason, /Write the statement first/);
   assert.notEqual(held.commitment, sha256Hex('secret note'));
-  const index = rebuildIndex([held.event]);
-  assert.equal(index[manifest.digest].digest, manifest.digest);
-  assert.equal(index[manifest.digest].commitment, held.commitment);
+  assert.notEqual(held.commitment, manifest.digest, 'the raw digest is never the published commitment');
+});
+
+test('a real board anchor event rebuilds the index and proves the commitment', () => {
+  const manifest = canonicalManifest({ account: 'alice.near', period: { from: '', to: '' }, rows: [{ h: HASH }], statement: 'Statement text.', model: 'near-ai' });
+  const plan = anchorPlan({ manifest, salt: 'saltsalt' });
+  assert.equal(plan.ok, true);
+  // The event shape `anchor` logs, byte for byte from contracts/charter_board/src/v2.rs.
+  const line = 'EVENT_JSON:' + JSON.stringify({
+    standard: 'nearcarta-board', version: '2', event: 'anchor', owner: 'alice.near',
+    kind: 'statement', commitment: plan.commitment, nonce: '3', time: '1700000000000000000',
+  });
+  const events = anchorEventsFromReceipts([{ id: 'TX1', executor_id: 'alice.near', outcome: { logs: [line] } }]);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].commitment, plan.commitment);
+  assert.equal(events[0].nonce, '3');
+  assert.equal(events[0].tx, 'TX1');
+  assert.equal(events[0].digest, undefined, 'the raw digest is not in the event');
+  const index = rebuildIndex(events);
+  assert.equal(index.byCommitment[plan.commitment].owner, 'alice.near');
+  assert.equal(index.byCommitment[plan.commitment].commitment, plan.commitment);
+  const proof = anchorProof({ commitment: plan.commitment, owner: 'alice.near', events });
+  assert.equal(proof.ok, true);
+  assert.match(proof.why, /alice\.near/);
+  assert.match(proof.why, /nonce 3/);
+  // Another visitor's event never proves this one, and a stranger's commitment never matches.
+  assert.equal(anchorProof({ commitment: plan.commitment, owner: 'bob.near', events }).ok, false);
+  assert.equal(anchorProof({ commitment: 'ab'.repeat(32), owner: 'alice.near', events }).ok, false);
+  assert.match(anchorProof({ commitment: plan.commitment, events: [] }).why, /has not logged this commitment/);
+  // A non-anchor log, a malformed line and the migrate event are all ignored.
+  const noise = anchorEventsFromReceipts([{ id: 'TX2', outcome: { logs: [
+    'EVENT_JSON:{"standard":"nearcarta-board","version":"2","event":"migrate","rows":"2"}',
+    'EVENT_JSON:{not json',
+    'plain log line',
+  ] } }]);
+  assert.deepEqual(noise, []);
+  // Two anchors of the same commitment keep chain order: the later event wins.
+  const second = line.replace('"nonce":"3"', '"nonce":"9"');
+  const both = rebuildIndex(anchorEventsFromReceipts([
+    { id: 'TX1', outcome: { logs: [line] } },
+    { id: 'TX3', outcome: { logs: [second] } },
+  ]));
+  assert.equal(both.byCommitment[plan.commitment].nonce, '9');
+  assert.equal(both.byCommitment[plan.commitment].tx, 'TX3');
 });

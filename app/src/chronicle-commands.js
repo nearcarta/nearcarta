@@ -107,7 +107,7 @@ export async function runChronicleCommand({
   }
   if (cmd.action === 'anchor') {
     const res = typeof onAnchor === 'function' ? await onAnchor() : null;
-    return { ok: true, action: 'anchor', hint: res?.status || 'Live anchor blocked. Nothing was signed.', clearSeal: true, paint: false };
+    return { ok: true, action: 'anchor', hint: res?.status || 'The anchor did not run. Nothing was signed.', clearSeal: true, paint: false };
   }
   if (cmd.action === 'query') {
     bag.account = cmd.account;

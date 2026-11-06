@@ -79,15 +79,15 @@ test('open_charter targets the board and carries the current rules', () => {
   assert.equal(open.actions[1].params.deposit, CALLS_DEPOSIT_YOCTO);
   assert.deepEqual(open.actions[1].params.args.calls, calls);
   assert.equal(open.actions[1].params.args.session_cap, rules.daily_budget);
-  // The key goes on the visitor's own account, limited to the board and three methods.
+  // The key goes on the visitor's own account, limited to the board and four methods.
   assert.equal(key.receiverId, 'visitor.near');
-  assert.deepEqual(key.actions[0].params.accessKey.permission.methodNames, ['propose', 'propose_call', 'propose_call_as']);
+  assert.deepEqual(key.actions[0].params.accessKey.permission.methodNames, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
   assert.equal(key.actions[0].params.accessKey.permission.receiverId, 'board.nearcarta.near');
   assert.equal(key.actions[0].params.accessKey.permission.allowance, '250000000000000000000000');
   // It is a function-call key, so it can never move NEAR by itself.
   assert.equal(key.actions[0].type, 'AddKey');
   assert.equal(key.actions[0].params.accessKey.permission.FunctionCall, undefined);
-  assert.ok(key.actions[0].params.accessKey.permission.methodNames.length === 3);
+  assert.ok(key.actions[0].params.accessKey.permission.methodNames.length === 4);
 
   const s = section('async function signBoard()', 'function noteSign');
   assert.match(s, /openRowTransactions\(\{/);
@@ -103,13 +103,13 @@ test('openRowTransactions refuses an incomplete batch', () => {
   assert.equal(openRowTransactions(base).open.actions.length, 2);
 });
 
-test('the new key allows propose, propose_call and propose_call_as on the board', () => {
-  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as']);
+test('the new key allows propose, propose_call, propose_call_as and anchor on the board', () => {
+  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
   assert.match(src, /receiverId: MAIN\.board\.contract, methodNames: \[\.\.\.AGENT_METHODS\]/);
-  // The warning text names all three, on both the sign step and the try step.
+  // The warning text names all four, on both the sign step and the try step.
   const sign = section('function sSign()', 'async function charterState');
-  assert.match(sign, /<code>propose<\/code>, <code>propose_call<\/code> and <code>propose_call_as<\/code>/);
-  assert.match(src, /It calls <code>propose<\/code>, <code>propose_call<\/code> and <code>propose_call_as<\/code> on your row/);
+  assert.match(sign, /<code>propose<\/code>, <code>propose_call<\/code>, <code>propose_call_as<\/code> and <code>anchor<\/code>/);
+  assert.match(src, /It calls <code>propose<\/code>, <code>propose_call<\/code>, <code>propose_call_as<\/code> and <code>anchor<\/code> on your row/);
   // No stale two-method sentence is left anywhere the visitor can see.
   assert.doesNotMatch(src, /has <code>propose<\/code> but not <code>propose_call<\/code>/);
   assert.doesNotMatch(src, /It calls <code>propose<\/code> and <code>propose_call<\/code> on your row/);

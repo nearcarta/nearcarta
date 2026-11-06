@@ -1102,6 +1102,10 @@ const APPS = {
       repaint: () => paint(),
       onSeal: (text) => { if (text) sh?.showRefuse?.(text); else sh?.hideRefuse?.(); },
       rows: () => mergeTollChronicle([...(extra.feed?.local || []), ...RECORDED], tollPassRows()).map(x => ({ ...x, label: x.label || A.why(x.reason) })),
+      // The anchor runs on the visitor's own row through the session key. No wallet popup, no deposit.
+      onAnchor: (plan) => A.anchorStatement({ kind: plan?.args?.kind || 'statement', digest: plan?.args?.digest || '', salt: plan?.args?.salt || '' }),
+      board: () => A.S.board || '',
+      account: () => A.S.me || '',
     }),
     run: () => chronicleRead(),
   },

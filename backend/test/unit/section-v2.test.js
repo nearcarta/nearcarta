@@ -36,7 +36,7 @@ test('set_calls names each shop, the method and the caps', () => {
   assert.equal(withFerry.calls[0].receiver, 'charter.nearcarta.near');
   assert.ok(withFerry.calls.some(c => c.receiver === 'wrap.near' && c.method === 'ft_transfer'));
   assert.ok(withFerry.calls.some(c => c.receiver === 'wrap.near' && c.method === 'near_deposit'));
-  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as']);
+  assert.deepEqual(AGENT_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
 });
 
 test('wrap.near uses the rule cap when that cap is at least 0.05 NEAR', () => {
@@ -94,7 +94,7 @@ test('the session script prints the plan and does not sign without --live', () =
   const plan = JSON.parse(dry.stdout);
   assert.deepEqual(plan.plan.expect, ['allowed', 'over_per_action_cap', 'frozen', 'clause_expired']);
   assert.equal(plan.plan.allowedNear, '0.001');
-  assert.deepEqual(plan.methods, ['propose', 'propose_call', 'propose_call_as']);
+  assert.deepEqual(plan.methods, ['propose', 'propose_call', 'propose_call_as', 'anchor']);
   const live = spawnSync(process.execPath, [script, '--live'], { encoding: 'utf8', env: { ...process.env, NEAR_MAINNET_SIGNER_KEY: '' } });
   assert.equal(live.status, 1);
   assert.match(live.stderr, /NEAR_MAINNET_SIGNER_KEY/);
