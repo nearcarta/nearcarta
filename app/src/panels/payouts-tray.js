@@ -5,7 +5,7 @@ import { downloadCsv } from '../chronicle-feed.js';
 import { payoutFlow } from './payout-marks.js';
 import { qrSvg } from './qr-svg.js';
 import {
-  accountantCsv, agentCommand, agentInvoiceReply, classifyPayroll, invoiceDoneLine, invoiceStatusLine, nearFromYocto, payrollKey,
+  accountantCsv, agentCommand, agentInvoiceReply, classifyPayroll, invoiceDoneLine, invoiceStatusLine, memoFromWords, nearFromYocto, payrollKey,
   relativeInvoiceDates, rowsForCommand,
 } from './payouts-plan.js';
 import { armPayoutsDock, ensurePayoutsDock } from './payouts-dock.js';
@@ -158,6 +158,7 @@ export function mountPayouts(root, hooks) {
       return { ok: true, hint: prep.note || 'A row needs a payee. Nothing was prepared.' };
     }
     if (parsed.length) state.rows = prep.rows.slice(0, 3);
+    state.reviewed = true;
     const plan = classifyPayroll(prep.rows, { capNear: liveCap() });
     state.receipts = rowsFromPlan(plan);
     state.usdcNote = plan.held.some(r => r.asset === 'USDC') ? 'Not sent. Foreign USDC is held.' : '';
@@ -330,7 +331,8 @@ export function mountPayouts(root, hooks) {
     state.csvOut = csv;
     downloadCsv(csv, 'payouts.csv');
     state.tab = 'csv';
-    state.line = 'CSV ready. A row without a tx says not sent.';
+    state.csvNote = 'CSV ready. A row without a tx says not sent.';
+    state.line = '';
     state.line2 = '';
     render();
     return { ok: true, hint: state.line };
@@ -365,9 +367,9 @@ export function mountPayouts(root, hooks) {
     if (cmd.kind === 'invoice') {
       state.tab = 'invoice';
       // render() copies the inputs into state first, so the parsed fields go in after that copy.
-      const patch = { invoiceUsd: String(cmd.usd) };
+      // The memo is taken from the words again so an older API reply cannot keep the amount in it.
+      const patch = { invoiceUsd: String(cmd.usd), memo: memoFromWords(text) };
       if (cmd.receive) patch.receive = cmd.receive;
-      if (cmd.memo) patch.memo = cmd.memo;
       if (cmd.due) patch.due = cmd.due;
       render(patch);
       if (!state.receive) return { ok: false, hint: 'Name the receive account. Nothing was created.' };
@@ -441,6 +443,7 @@ export function mountPayouts(root, hooks) {
         </div>
       </li>`;
     }).join('');
+    const nextGold = state.reviewed ? 'pay' : 'review';
     const payroll = `<div class="ferry-pane" data-pane="payroll" ${tab === 'payroll' ? '' : 'hidden'}>
       ${payoutFlow('payroll')}
       ${state.payLine ? lines(state.payLine, state.payLine2) : `<div class="payout-status" data-testid="payout-status"><p class="payout-calm" data-testid="payout-caps">${esc(capSentence())}</p><p class="payout-calm"></p></div>`}
@@ -448,8 +451,8 @@ export function mountPayouts(root, hooks) {
       <button type="button" id="p-add" data-testid="payout-add"${full ? ' disabled data-reason="Three rows is the daily count on this charter."' : ''}>Add a row</button>
       <p data-testid="payout-add-note">${full ? 'Three rows is the daily count on this charter.' : ''}</p>
       <label class="field ferry-field"><span>CSV</span><textarea id="p-csv" data-testid="payout-csv" rows="2" placeholder="account,amount,asset">${esc(state.csv || '')}</textarea></label>
-      <button type="button" id="p-prep" data-testid="payout-prepare">Review these rows</button>
-      <button type="button" class="primary ferry-cta" id="p-pay" data-testid="payout-send">Pay reviewed rows</button>
+      <button type="button" id="p-prep" class="${nextGold === 'review' ? 'primary ferry-cta' : ''}" data-testid="payout-prepare">Review these rows</button>
+      <button type="button" id="p-pay" class="${nextGold === 'pay' ? 'primary ferry-cta' : ''}" data-testid="payout-send">Pay reviewed rows</button>
       <p data-testid="payout-drop"${state.dropNote ? '' : ' hidden'}>${esc(state.dropNote || '')}</p>
       <ul data-testid="payout-receipts">${receiptHtml(state.receipts)}</ul>
       <p data-testid="payout-usdc"${state.usdcNote ? '' : ' hidden'}>${esc(state.usdcNote || '')}</p>
@@ -458,7 +461,7 @@ export function mountPayouts(root, hooks) {
       <p class="ferry-picker-note">The file lists source, destination, fee and refund. A row with no tx says not sent.</p>
       <button type="button" class="primary ferry-cta" id="p-export" data-testid="payout-export">Export accountant CSV</button>
       <pre data-testid="payout-csv-out">${esc(state.csvOut || '')}</pre>
-      ${lines()}
+      ${state.csvNote ? lines(state.csvNote, '') : ''}
     </div>`;
     const origin = globalThis.location?.origin || '';
     const invoiceRows = (state.invoices || []).map(inv => {
@@ -481,14 +484,22 @@ export function mountPayouts(root, hooks) {
     bind('#p-memo', 'memo');
     bind('#p-due', 'due');
     bind('#p-expiry', 'expiry');
-    root.querySelectorAll('.p-to').forEach(el => { el.oninput = () => { state.rows[+el.dataset.i].to = el.value; clearSeal(); }; });
-    root.querySelectorAll('.p-amt').forEach(el => { el.oninput = () => { state.rows[+el.dataset.i].amt = el.value; clearSeal(); }; });
+    root.querySelectorAll('.p-to').forEach(el => { el.oninput = () => { state.rows[+el.dataset.i].to = el.value; state.reviewed = false; clearSeal(); }; });
+    root.querySelectorAll('.p-amt').forEach(el => { el.oninput = () => { state.rows[+el.dataset.i].amt = el.value; state.reviewed = false; clearSeal(); }; });
     root.querySelectorAll('.p-chain').forEach(el => { el.onchange = () => { state.rows[+el.dataset.i].chain = el.value; clearSeal(); render(); }; });
     root.querySelectorAll('.p-asset').forEach(el => { el.onchange = () => { state.rows[+el.dataset.i].asset = el.value; clearSeal(); render(); }; });
     root.querySelectorAll('[data-tab]').forEach(btn => {
       btn.onclick = () => {
         clearSeal();
-        state.tab = btn.dataset.tab || 'invoice';
+        const next = btn.dataset.tab || 'invoice';
+        if (next !== state.tab) {
+          state.line = '';
+          state.line2 = '';
+          state.payLine = '';
+          state.payLine2 = '';
+          state.csvNote = '';
+        }
+        state.tab = next;
         render();
         if (state.tab === 'invoices') refreshList();
       };
@@ -498,6 +509,7 @@ export function mountPayouts(root, hooks) {
       clearSeal();
       const next = addPayoutRow(state.rows);
       state.rows = next.rows;
+      state.reviewed = false;
       render();
     };
     const csv = q$(root, '#p-csv');

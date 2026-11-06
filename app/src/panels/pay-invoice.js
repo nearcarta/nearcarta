@@ -1,6 +1,6 @@
 // Payer page for /pay/<id>. Dry quote, then a deposit address. This page does not send the deposit.
 import { CHAIN_FILE } from './icon-map.js';
-import { addressOk, quoteLine, usdcChoices } from './payouts-plan.js';
+import { addressOk, invoiceStatusLine, quoteLine, usdcChoices } from './payouts-plan.js';
 
 const $ = s => document.querySelector(s);
 const id = location.pathname.split('/').filter(Boolean).pop();
@@ -63,10 +63,10 @@ function paint(inv) {
   $('#pay-receive').value = inv ? inv.receive : '';
   if (!inv) { setLine('This invoice was not found.', ''); return; }
   if (inv.delivered === true || inv.status === 'SUCCESS') {
-    setLine('Delivered.', inv.receipt || '');
+    setLine(invoiceStatusLine('SUCCESS'), inv.receipt || '');
     return;
   }
-  setLine('Not paid.', inv.status && inv.status !== 'UNPAID' ? inv.status : '');
+  setLine(invoiceStatusLine(inv.status || 'UNPAID'), '');
 }
 
 async function load() {
@@ -115,7 +115,7 @@ function showDeposit(address) {
 function paintLive(body) {
   const status = body?.status || '';
   const delivered = body?.delivered === true || status === 'SUCCESS';
-  setLine(delivered ? 'Delivered.' : (body?.help || 'Not paid.'), delivered ? '' : (status && status !== 'UNPAID' ? status : ''));
+  setLine(invoiceStatusLine(delivered ? 'SUCCESS' : (status || 'UNPAID')), '');
   const links = $('#pay-links');
   if (links) {
     links.replaceChildren(...(body?.links || []).filter(l => l?.href).map(l => {

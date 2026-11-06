@@ -613,9 +613,9 @@ body.toll-tray #shopUI #tray{
   width:min(640px,calc(100vw - 140px));
   max-width:640px;
   left:16px; bottom:18px;
-  height:min(560px,calc(100dvh - 120px));
-  min-height:420px;
-  max-height:min(560px,calc(100dvh - 120px));
+  height:auto;
+  min-height:0;
+  max-height:calc(100dvh - 112px);
   padding:28px 26px 26px;
   box-sizing:border-box;
   overflow-x:hidden;
@@ -637,6 +637,24 @@ body.toll-tray #shopUI .t-links,
 body.toll-tray #shopUI .rcpt{display:none!important}
 body.toll-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
 body.toll-tray #shopUI #t-act[hidden]{display:none!important}
+body.toll-tray #shopUI button.ferry-cta{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:auto;min-width:min(220px,100%);max-width:100%;
+  min-height:44px !important;padding:10px 22px;margin:4px auto 0;box-sizing:border-box;
+  border:1px solid #c9a05a !important;border-radius:14px;
+  background-color:#f5d08a !important;
+  background-image:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%) !important;
+  color:#2a1608 !important;font:700 15px/1.15 system-ui,sans-serif;cursor:pointer;
+  box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 -2px 0 rgba(120,70,20,.22) inset,0 4px 0 #9a6f2e,0 8px 16px rgba(0,0,0,.28);
+}
+body.toll-tray #shopUI button.ferry-cta:disabled{opacity:.72;cursor:not-allowed;color:#2a1608;min-height:44px}
+body.toll-tray #shopUI button.toll-quiet,
+body.toll-tray #shopUI button.toll-quiet:disabled{
+  min-height:44px !important;padding:8px 16px !important;border-radius:12px !important;
+  border:1px solid #4a3a28 !important;background:#17130f !important;background-image:none !important;
+  color:#fff8ee !important;box-shadow:none !important;opacity:1;
+}
+body.toll-tray #shopUI button.toll-quiet:disabled{opacity:.55 !important;cursor:default}
 body.toll-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
 body.toll-tray #shopUI select,
 body.toll-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
@@ -699,10 +717,11 @@ body.toll-tray #shopUI .tokw img.tok{width:22px;height:22px;flex:none;display:bl
   body.toll-tray #shopUI #tray{
     width:min(100vw - 16px,640px); max-width:none;
     left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    height:min(520px,calc(100dvh - 108px));
+    height:auto;
     min-height:0;
-    max-height:min(520px,calc(100dvh - 108px));
-    padding:20px 18px;
+    max-height:calc(100dvh - 168px);
+    bottom:calc(96px + env(safe-area-inset-bottom,0px));
+    padding:16px 16px 18px;
   }
   #toll-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
   .toll-agent-avatar{width:72px;height:72px}

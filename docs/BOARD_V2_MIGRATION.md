@@ -93,9 +93,9 @@ Rows, holds and effects are keyed (`LookupMap`). Callbacks get 20 Tgas. `expire_
 
 `close_charter` and `force_close` both refuse with `ERR_IN_FLIGHT` while that visitor has a hold. The live account has no holds. The new code does.
 
-## Interface the shops do not have yet
+## The first shop that calls it
 
-This PR does not change Toll, Guard, House, Arena, Hall, Bank, Payouts, or Chronicle. No shop calls `propose_call_as`. The signed envelope the shops will use is `shared/board/call-as.js`.
+The board v2 change on its own did not change Toll, Guard, House, Arena, Hall, Bank, Payouts, or Chronicle. The toll branch is the first shop that calls `propose_call_as`, from `app/design/D8_shops/js/apps.js`. The signed envelope is `app/src/board-call-as.js`, and `shared/board/call-as.js` re-exports it so node tests import the same bytes the browser signs. Test: `board v2 injects the top-level row_owner` (`backend/test/unit/toll-board-v2.test.js`).
 
 `propose_call_as` checks the active agent key over `board-call-as-v1`, the network (default `mainnet`, stored outside the `STATE` blob), the contract account, version `2`, the owner, the receiver, the method, the sha256 of the injected args, the deposit, the nonce, the expiry, the policy epoch, and the effect list. Args must be a JSON object. The contract overwrites a top-level `row_owner` with the row owner and rejects a duplicate of that key. A nested `row_owner` is not authority. A shop accepts the call only when `predecessor` is the board and the top-level `row_owner` is the visitor. `propose` and `propose_call` are unchanged.
 
