@@ -198,6 +198,7 @@ function playCam(dt){ PC.zs+=(PC.z-PC.zs)*Math.min(1,dt*7); const z=PC.zs; const
 // keyboard steering, relative to the camera
 const KM={w:[0,1],arrowup:[0,1],s:[0,-1],arrowdown:[0,-1],a:[-1,0],arrowleft:[-1,0],d:[1,0],arrowright:[1,0]};
 const typing=e=>e.target.closest&&e.target.closest('input,textarea,select,[contenteditable="true"]');
+addEventListener('nearcarta:typing',()=>keys.clear());
 addEventListener('keydown',e=>{ if(typing(e)) return; const k=e.key.toLowerCase(); if(e.target.closest&&e.target.closest('button,input,textarea')&&k==='enter') return;
   if(KM[k]){ e.preventDefault(); if(inShop) return; if(mode!=='explore') explore(true); if(play!=='walk') setPlay('walk'); keys.add(k); body.classList.add('moved'); }
   if((k==='='||k==='+')&&!inShop){ setZoom(PC.z-.12); } if((k==='-'||k==='_')&&!inShop){ setZoom(PC.z+.12); } if(k==='o'&&!inShop){ setZoom(PC.z>.7?.14:1); }
@@ -232,6 +233,7 @@ document.body.appendChild(sm);
 const sbtn=document.createElement('button'); sbtn.id='shopsBtn'; sbtn.className='pill'; sbtn.type='button'; sbtn.textContent='Skip to a shop'; sbtn.setAttribute('aria-haspopup','menu'); $('#ctl').prepend(sbtn);
 sbtn.addEventListener('click',()=>{ sm.hidden=!sm.hidden; sbtn.setAttribute('aria-expanded',String(!sm.hidden)); });
 sm.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; sm.hidden=true; sbtn.setAttribute('aria-expanded','false'); jump(b.dataset.id); });
+document.querySelector('[data-testid=all-shops-list]')?.addEventListener('click',e=>{ const b=e.target.closest('[data-enter-shop]'); if(!b) return; e.preventDefault(); jump(b.dataset.enterShop); });
 // Jump: fly straight from wherever the camera is into the shop door; the Lamplighter waits on that step for the way back out
 let door={busy:false,id:null};
 function jump(id,opt,tries=0){ id=ALIAS[id]||id; if(!OPEN[id]||tries>8) return;
@@ -348,11 +350,12 @@ function fadeTo(a,dur,at){ return new Promise(r=>{ if(fadeWait){ const w=fadeWai
   fadeTw=gsap.to(fade,{opacity:a,duration:d,ease:a?'power2.in':'power2.out',onComplete:()=>{ clearTimeout(safety); finish(); }}); }); }
 const shopUI=$('#shopUI');
 let prevAU=true;
-function enterRoom(sh){ if(!body.classList.contains('in-shop')) prevAU=W.renderer.shadowMap.autoUpdate; room=sh; body.classList.add('in-shop'); shopUI.hidden=false; W.renderer.shadowMap.autoUpdate=true; tagOff(); prompt(null);
+function pinShop(on){ const pin=document.getElementById('rulesBtn'); if(pin) pin.inert=!!on; }
+function enterRoom(sh){ if(!body.classList.contains('in-shop')) prevAU=W.renderer.shadowMap.autoUpdate; room=sh; body.classList.add('in-shop'); pinShop(true); shopUI.hidden=false; W.renderer.shadowMap.autoUpdate=true; tagOff(); prompt(null);
   if(sh){ try{ dressRoom(sh); }catch(e){} const c=sh.camera; if(!c.userData.home0) c.userData.home0=c.position.clone(); const look=c.userData.look; roomLook=look; const fit=SL.frame(c), home=c.userData.home0.clone().sub(look).multiplyScalar(fit).add(look); const far=home.clone().sub(look).multiplyScalar(1.22).add(look); c.position.copy(far); c.lookAt(look);
     const o={k:0}; gsap.to(o,{k:1,duration:RM?.01:.9,ease:'power2.out',onUpdate:()=>{ c.position.lerpVectors(far,home,o.k); c.lookAt(look); }});
     if(sh.intro) setTimeoutSim(()=>{ if(room===sh) SL.L.C8.run(sh.intro()); },RM?.02:.5); } }
-function leaveRoom(){ undressRoom(room); SL.clear(); room=null; body.classList.remove('in-shop'); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
+function leaveRoom(){ undressRoom(room); SL.clear(); room=null; body.classList.remove('in-shop'); pinShop(false); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
 addEventListener('resize',()=>{ if(!room) return; const c=room.camera, look=c.userData.look, fit=SL.frame(c); if(c.userData.home0){ c.position.copy(c.userData.home0).sub(look).multiplyScalar(fit).add(look); c.lookAt(look); } });
 $('#back').addEventListener('click',()=>world.exitShop());
 $('#t-proof').addEventListener('click',()=>{ SL.drawer(true); sfx('page',{g:.3}); }); $('#d-close').addEventListener('click',()=>SL.drawer(false));
@@ -402,7 +405,9 @@ function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(
   if(D.shake>0){ D.shake=Math.max(0,D.shake-dt*1.4); cam.position.x+=Math.sin(clock.T*41)*.02*D.shake; cam.position.y+=Math.sin(clock.T*37)*.015*D.shake; }
   SP.update(); }
 // clamp .1 s (not .05): sim time, gsap and the door/fade beats all run on it, so a slow GPU keeps close to real time
-function frame(now){ if(stopped) return; const dt=Math.min(.1,(now-last)/1000); last=now; step(dt); draw();
+function shopFieldFocused(){ const el=document.activeElement; return !!(el&&el.closest&&el.closest('#shopUI')&&el.closest('input,textarea,select')); }
+let uiDraw=0;
+function frame(now){ if(stopped) return; if(shopFieldFocused()&&now-uiDraw<150){ requestAnimationFrame(frame); return; } if(shopFieldFocused()) uiDraw=now; const dt=Math.min(.1,(now-last)/1000); last=now; step(dt); draw();
   // auto low-power: if the first seconds run under ~24 fps, drop the post chain and shadows
   if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<8&&!P.has('full')&&!P.has('3d')&&!window.__gl?.soft){ fallback(`3D too slow here (${(1/avg).toFixed(1)} fps)`); return; } if(1/avg<24&&!P.has('full')){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } else if(1/avg>50&&!SHM) setShadowMode(true); lpDone=true; } }
   requestAnimationFrame(frame); }

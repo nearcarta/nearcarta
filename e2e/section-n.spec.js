@@ -164,31 +164,28 @@ test('N4 a reload restores the wallet or offers one click', async ({ page, brows
   await ctx.close();
 });
 
-test('N5 a payee radio sits beside its account', async ({ page }) => {
+test('N5 the sample field sits under its label', async ({ page }) => {
   await page.addInitScript(savedScholar, OWNER);
   await at(page, 1440);
   await page.goto('/shops/bank/');
-  const radio = page.locator('[data-testid=bank-to] input');
-  const id = page.locator('[data-testid=bank-to] .payee-id');
-  await expect(id).toHaveText('8e2027…61c8');
-  await expect(id).toHaveAttribute('title', OWNER);
-  const left = await radio.boundingBox();
-  const label = await id.boundingBox();
+  const label = page.getByTestId('bank-sample-label');
+  const field = page.getByTestId('bank-sample');
+  await expect(label).toHaveText('Sample');
+  const lab = await label.boundingBox();
+  const box = await field.boundingBox();
   const card = await page.locator('.shop-card').boundingBox();
-  const amount = await page.getByTestId('bank-amount').boundingBox();
-  const payee = await page.getByTestId('bank-payee').boundingBox();
-  expect(payee.y).toBeGreaterThanOrEqual(amount.y + amount.height - 1);
-  expect(left.x).toBeLessThan(card.x + 80);
-  expect(label.x).toBeLessThan(left.x + left.width + 20);
-  await shot(page, 'n5-bank-payee-1440');
+  expect(box.y).toBeGreaterThanOrEqual(lab.y + lab.height - 1);
+  expect(box.x).toBeGreaterThanOrEqual(card.x);
+  expect(box.x).toBeLessThan(card.x + 80);
+  expect(box.height).toBeGreaterThanOrEqual(40);
+  await shot(page, 'n5-bank-sample-1440');
   await at(page, 390);
-  await expect(id).toHaveText('8e2027…61c8');
-  const wrapped = await id.boundingBox();
-  expect(wrapped.height).toBeLessThan(36);
-  await noSideways(page);
-  const narrow = await radio.boundingBox();
+  await expect(label).toBeVisible();
+  const narrow = await field.boundingBox();
+  expect(narrow.height).toBeGreaterThanOrEqual(40);
   expect(narrow.x).toBeLessThan(80);
-  await shot(page, 'n5-bank-payee-390');
+  await noSideways(page);
+  await shot(page, 'n5-bank-sample-390');
 });
 
 test('N6 the bank and the arena use the brass cards and buttons', async ({ page }) => {
@@ -207,6 +204,7 @@ test('N6 the bank and the arena use the brass cards and buttons', async ({ page 
     await expect(page.locator('.shop-card')).toBeVisible();
     const edge = await page.locator('.shop-card').evaluate(el => getComputedStyle(el, '::before').backgroundImage);
     expect(edge).toContain('linear-gradient');
+    await page.getByTestId('bank-tab-attest').click();
     await brass(page.getByTestId('tee-verify'));
     await shot(page, 'n6-bank-' + width);
     await page.goto('/shops/arena/');
@@ -265,6 +263,7 @@ test('N8 payouts start empty and grow by one row', async ({ page }) => {
   await page.addInitScript(quietWallet);
   await at(page, 1440);
   await page.goto('/shops/payouts/');
+  await page.getByTestId('payouts-tab-payroll').click();
   await expect(page.getByTestId('payout-add')).toBeVisible();
   await expect(page.getByTestId('payout-to')).toHaveCount(0);
   await expect(page.getByTestId('payout-amt')).toHaveCount(0);

@@ -51,7 +51,7 @@ export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; $('#t-title').t
   $('#d-title').textContent=(p.title||NAMES[sh.id]); $('#d-body').innerHTML=sh.proof+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>';
   sh.tags?.forEach(t=>{ if(t.html){ t.el=document.createElement('div'); t.el.className='stag '+(t.cls||''); t.el.innerHTML=t.html; $('#stags').appendChild(t.el); } }); frame(sh.camera);
   document.body.classList.toggle('apps',APP); $('#t-say').hidden=!APP; if(!APP) return;
-  b.hidden=false; b.disabled=true; if (sh.id === 'payouts') { skeleton(sh.id); b.textContent = 'Prepare the batch'; }
+  b.hidden=false; b.disabled=true; if (sh.id === 'payouts') { skeleton(sh.id); b.textContent = 'Pay under the cap'; }
   else if (!b.textContent.trim()) b.textContent='Opening…';
   const go=()=>ui8().then(m=>{ if(L.sh?.id===sh.id) m.mount(sh.id,L.sh,g=>L.C8.run(g)); }).catch(e=>{ if(L.sh?.id!==sh.id) return; console.warn('[Nearcarta] shop app failed to load',e); b.disabled=false; b.textContent='Try again'; b.dataset.retry=sh.id; });
   go(); setTimeout(()=>{ if(L.sh?.id===sh.id&&b.disabled&&/^(Opening…|Sign in)$/.test(b.textContent.trim())){ b.textContent='Still opening this shop'; go(); } },2000); }

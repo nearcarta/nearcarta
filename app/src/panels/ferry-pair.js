@@ -145,7 +145,7 @@ export function receiveConfirm(chain, address) {
 /**
  * What the in-shop agent should do with one sentence.
  * quote: fill and quote only ("get a quote for …").
- * charter: same path as Ask charter (session stamp, then the deposit flow).
+ * charter: a session is ready. A parsed swap still calls Load cargo, not the stamp.
  * guest: demo crossing. setup: say open /setup, never a wallet.
  */
 export function agentCargoPlan(text, { charterReady = false } = {}) {

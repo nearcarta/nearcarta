@@ -53,5 +53,5 @@ export const PURPOSE = {
   toll: 'Pay 0.001 NEAR, or pay nothing',
   chronicle: 'What the charter allowed and refused',
   house: 'Your rules, on chain',
-  payouts: 'Prepare a batch. The live row signs one payment at a time',
+  payouts: 'Pay under the row cap. One propose per NEAR row',
 };
