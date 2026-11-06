@@ -326,6 +326,20 @@ label.amt input{width:9rem;flex:0 0 9rem;min-width:0;box-sizing:border-box}
 }
 .ferry-field select{background-color:#17130f;background-image:linear-gradient(45deg,transparent 50%,#d6b46a 50%),linear-gradient(135deg,#d6b46a 50%,transparent 50%);background-position:calc(100% - 16px) calc(50% - 3px),calc(100% - 11px) calc(50% - 3px);background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px}
 .ferry-field select option{background:#17130f;color:#fff8ee}
+.token-listbox{position:relative;width:100%}
+.token-listbox-btn{width:100%;min-height:48px;box-sizing:border-box;padding:6px 30px 6px 10px;border-radius:12px;border:1px solid #4a3a28;background-color:#17130f;color:#fff8ee;font:600 15px/1.2 system-ui,sans-serif;display:flex;align-items:center;gap:8px;text-align:left;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,#d6b46a 50%),linear-gradient(135deg,#d6b46a 50%,transparent 50%);background-position:calc(100% - 16px) calc(50% - 3px),calc(100% - 11px) calc(50% - 3px);background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.token-listbox-btn .tic .ti{width:22px;height:22px}
+.token-listbox-btn .tic .ci,.token-listbox-btn .ci{width:12px;height:12px}
+.token-listbox-menu{position:absolute;z-index:40;left:0;right:0;top:calc(100% + 4px);max-height:240px;overflow:auto;margin:0;padding:4px;list-style:none;border-radius:12px;border:1px solid #4a3a28;background:#17130f;box-shadow:0 12px 28px rgba(0,0,0,.45)}
+.token-listbox-menu[hidden]{display:none}
+.token-opt{display:flex;align-items:center;gap:8px;min-height:40px;padding:4px 8px;border-radius:8px;cursor:pointer;color:#fff8ee}
+.token-opt.on,.token-opt[aria-selected=true]{background:rgba(226,179,91,.18)}
+.token-opt:hover,.token-opt.active{background:rgba(226,179,91,.28)}
+.token-opt .opt-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.token-opt .tic .ti{width:22px;height:22px}
+.chain-mark{display:inline-grid;flex:none}
+.chain-mark .ci{position:static;width:16px;height:16px;border-radius:50%;object-fit:cover}
+.tic .ci.coin{display:inline-grid;place-items:center;font:700 8px/1 system-ui,sans-serif;color:#f5d08a;border:1px solid #c98f4e}
 .ferry-field .amt-row{display:flex;align-items:center;gap:10px}
 .ferry-field .amt-row input{flex:1;min-width:0;border:0;background:transparent;color:#fff8ee;font:650 17px/1.2 system-ui,sans-serif;outline:none}
 /* Owner CTA: compact raised 3D gold buttons — not full-bleed fused bars */

@@ -14,7 +14,8 @@ import { DEED, controlAfterMove, metadataView, txUrl } from '/deed-control.js';
 import { teeResult, PROOF_HREF } from '/tee-view.js';
 import { pickBest, quoteLine, statusView } from '/ferry-catalog.js';
 import { mountShop } from '/panels/deep.js';
-import { pairClauseId, chainLabel } from '/panels/ferry-pair.js';
+import { pairClauseId } from '/panels/ferry-pair.js';
+import { pairHero } from '/panels/token-badge.js';
 import { depositPlan, explainQuoteMiss, mayCheckout, nearNative, nextFerryBeat, SESSION_SWAP } from '/panels/ferry-settle.js';
 import { armFerryDock, dispatchFerryDock, installFerryDock } from '/panels/ferry-dock.js';
 import { deedMarkup } from '/panels/deed.js';
@@ -455,14 +456,18 @@ const APPS = {
       return extra.fdone ? 'Get another quote' : 'Get quote';
     },
     hero: () => {
-      if (!extra.q) return null;
+      const pair = APPS.ferry.pairFromState();
       const q = extra.q;
-      const fromSym = q.from?.symbol || (extra.fromId || '').split('|')[0] || 'USDC';
-      const fromChain = chainLabel(q.from?.blockchain || q.from?.chain || (extra.fromId || '').split('|')[1] || 'base');
-      const toSym = q.to?.symbol || (extra.toId || 'ZEC|zec').split('|')[0] || 'ZEC';
-      const out = +Number(q.to?.amount || q.amountOut || 0);
-      const inn = +Number(q.from?.amount || extra.amt || 0);
-      return `<span class="tok"><b class="num">${esc(inn || extra.amt || '')}</b><span class="sym">${esc(fromSym)}</span></span><span class="arrow" aria-hidden="true">→</span><span class="tok"><b class="num">${esc(out ? out.toFixed(5) : '')}</b><span class="sym">${esc(toSym)}</span></span>`;
+      const fromSym = q?.from?.symbol || pair.fromSym;
+      const fromChain = q?.from?.blockchain || q?.from?.chain || pair.fromChain;
+      const toSym = q?.to?.symbol || pair.toSym;
+      const toChain = q?.to?.blockchain || q?.to?.chain || pair.toChain;
+      const inn = q ? (q.from?.amount ?? extra.amt ?? pair.amt) : (extra.amt || pair.amt);
+      const out = q ? (q.to?.amount || q.amountOut || '') : '';
+      return pairHero({
+        fromSym, fromChain, toSym, toChain, amt: inn, outAmt: out,
+        fromIcon: q?.from?.icon || '', toIcon: q?.to?.icon || '',
+      });
     },
     pairFromState: () => {
       const fromId = extra.fromId || SESSION_SWAP.fromId;

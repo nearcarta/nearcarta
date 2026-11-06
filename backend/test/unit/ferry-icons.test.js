@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { corridorCards, DEFAULT_ROUTES, ferryMarkup } from '../../../app/src/panels/deep.js';
-import { tokenStack, tokenBadge, parseRouteFrom, chainKey } from '../../../app/src/panels/token-badge.js';
+import { tokenStack, tokenBadge, parseRouteFrom, chainKey, resolveIcons, pairHero, pickerListbox } from '../../../app/src/panels/token-badge.js';
 
 const read = p => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 
@@ -138,6 +138,94 @@ test('Ferry tray sketch match: wide ~440px airy tray + AI Agent character (not e
   assert.doesNotMatch(html, /<span>Get<\/span>/);
   assert.doesNotMatch(html, /<span>Can<\/span>/);
   assert.match(html, /value="3"/);
+});
+
+test('USDC on Solana and USDC on Polygon resolve to library icons', () => {
+  for (const chain of ['sol', 'solana', 'pol', 'polygon']) {
+    const stack = tokenStack('USDC', chain);
+    assert.match(stack, /src="\/tokens\/usdc\.svg"/);
+    assert.match(stack, /\/tokens\/chains\/(sol|polygon)\.svg/);
+    assert.doesNotMatch(stack, /class="ti coin"/);
+    assert.doesNotMatch(stack, /\?/);
+  }
+  assert.match(tokenStack('USDC', 'sol'), /\/tokens\/chains\/sol\.svg/);
+  assert.match(tokenStack('USDC', 'polygon'), /\/tokens\/chains\/polygon\.svg/);
+  assert.match(tokenStack('USDC', 'pol'), /\/tokens\/chains\/polygon\.svg/);
+  assert.equal(chainKey('pol'), 'polygon');
+  assert.equal(chainKey('Polygon'), 'polygon');
+  const icons = resolveIcons('USDC', 'sol');
+  assert.equal(icons.tokenSrc, '/tokens/usdc.svg');
+  assert.equal(icons.chainSrc, '/tokens/chains/sol.svg');
+  const remote = tokenBadge('USDC', 'sol', { icon: 'https://cdn.example/usdc.svg' });
+  assert.match(remote, /src="https:\/\/cdn\.example\/usdc\.svg"/);
+  assert.doesNotMatch(remote, /src="\/tokens\/usdc\.svg"/);
+  assert.match(remote, /\/tokens\/chains\/sol\.svg/);
+  const hero = pairHero({ fromSym: 'USDC', fromChain: 'sol', toSym: 'USDC', toChain: 'polygon', amt: '3', outAmt: '2.9' });
+  assert.match(hero, /\/tokens\/chains\/sol\.svg/);
+  assert.match(hero, /\/tokens\/chains\/polygon\.svg/);
+  assert.match(hero, />3</);
+  assert.doesNotMatch(hero, /\?/);
+  const miss = tokenStack('NOTREAL', 'nope');
+  assert.match(miss, /class="ti coin"/);
+  assert.match(miss, />N</);
+  assert.doesNotMatch(miss, /\?/);
+  assert.match(read('app/src/tokens/chains/sol.svg'), /<svg\b/);
+  assert.match(read('app/src/tokens/chains/polygon.svg'), /<svg\b/);
+  assert.match(read('app/src/tokens/LICENSES.md'), /chains\/polygon\.svg/);
+  assert.match(read('app/src/tokens/LICENSES.md'), /MIT/);
+  const box = pickerListbox({
+    id: 'f-from',
+    testid: 'ferry-from',
+    selected: 'USDC|sol',
+    options: [
+      { value: 'USDC|sol', label: 'USDC on sol', symbol: 'USDC', chain: 'sol' },
+      { value: 'USDC|pol', label: 'USDC on pol', symbol: 'USDC', chain: 'pol' },
+    ],
+  });
+  assert.match(box, /role="listbox"/);
+  assert.match(box, /role="option"/);
+  assert.match(box, /data-value="USDC\|sol"/);
+  assert.match(box, /\/tokens\/usdc\.svg/);
+  assert.match(box, /\/tokens\/chains\/sol\.svg/);
+  assert.match(box, /\/tokens\/chains\/polygon\.svg/);
+  assert.doesNotMatch(box, /\?/);
+  assert.doesNotMatch(box, /\bonerror=/);
+});
+
+test('USDC sol to USDC pol updates the flow and both menus', () => {
+  const choices = [
+    { symbol: 'USDC', chain: 'sol', id: 'USDC|sol', label: 'USDC on sol' },
+    { symbol: 'USDC', chain: 'pol', id: 'USDC|pol', label: 'USDC on pol' },
+    { symbol: 'ETH', chain: 'eth', id: 'ETH|eth', label: 'ETH on eth' },
+    { symbol: 'USDC', chain: 'base', id: 'USDC|base', label: 'USDC on base' },
+    { symbol: 'USDC', chain: 'arb', id: 'USDC|arb', label: 'USDC on arb' },
+    { symbol: 'NEAR', chain: 'near', id: 'NEAR|near', label: 'NEAR on near' },
+    { symbol: 'BTC', chain: 'btc', id: 'BTC|btc', label: 'BTC on btc' },
+  ];
+  const html = ferryMarkup({ choices, fromId: 'USDC|sol', toId: 'USDC|pol', amt: '3' }, DEFAULT_ROUTES);
+  assert.equal((html.match(/role="listbox"/g) || []).length, 3);
+  assert.match(html, /data-testid="ferry-from"/);
+  assert.match(html, /data-testid="ferry-to"/);
+  assert.match(html, /data-testid="ferry-chain-filter"/);
+  assert.match(html, /data-value="USDC\|sol"/);
+  assert.match(html, /data-value="USDC\|pol"/);
+  const flow = html.slice(html.indexOf('data-testid="ferry-flow"'), html.indexOf('data-testid="ferry-token-search"'));
+  assert.match(flow, /\/tokens\/usdc\.svg/);
+  assert.match(flow, /\/tokens\/chains\/sol\.svg/);
+  assert.match(flow, /\/tokens\/chains\/polygon\.svg/);
+  assert.doesNotMatch(flow, /\?/);
+  assert.doesNotMatch(flow, /class="ti coin"/);
+  assert.doesNotMatch(html, /\bonerror=/);
+  const swapped = ferryMarkup({ choices, fromId: 'USDC|pol', toId: 'USDC|sol', amt: '3' }, DEFAULT_ROUTES);
+  const flow2 = swapped.slice(swapped.indexOf('data-testid="ferry-flow"'), swapped.indexOf('data-testid="ferry-token-search"'));
+  const polAt = flow2.indexOf('/tokens/chains/polygon.svg');
+  const solAt = flow2.indexOf('/tokens/chains/sol.svg');
+  assert.ok(polAt >= 0 && solAt > polAt);
+  for (const [sym, chain, file] of [['ETH', 'eth', 'eth'], ['USDC', 'base', 'base'], ['USDC', 'arb', 'arb'], ['NEAR', 'near', 'near'], ['BTC', 'btc', 'btc']]) {
+    const stack = tokenStack(sym, chain);
+    assert.match(stack, new RegExp('/tokens/chains/' + file + '\\.svg'));
+    assert.doesNotMatch(stack, /\?/);
+  }
 });
 
 test('defaultAmtFor prefers 3 for USDC and tiny for ETH', async () => {

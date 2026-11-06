@@ -203,6 +203,7 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #shopUI .tok { display: inline-flex; align-items: center; gap: 6px; }
 #shopUI .tok .tic { position: relative; display: inline-grid; }
 #shopUI .tok .ci { position: absolute; right: -3px; bottom: -3px; border-radius: 50%; box-shadow: 0 0 0 2px var(--raised); }
+#shopUI .tok .ti { border-radius: 50%; object-fit: cover; display: block; }
 #shopUI .hero .tok .ti { width: 32px; height: 32px; } #shopUI .hero .tok .ci { width: 14px; height: 14px; }
 #shopUI .hero .tok .sym { font-size: 20px; color: var(--muted); font-weight: 400; }
 #shopUI .t-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
