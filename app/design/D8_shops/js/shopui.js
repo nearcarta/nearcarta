@@ -1035,7 +1035,23 @@ const APPS = {
   house: {
     guest: true,
     label: 'Your House · your charter', idle: 'Your charter is the rule book your agent cannot break. It can only pay inside those rules.',
-    form: () => deedMarkup(),
+    form: () => '<div data-deep="house"></div>',
+    bind: () => {
+      document.body.classList.add('house-tray');
+      const dock = document.getElementById('house-agent-dock');
+      if (dock) dock.hidden = false;
+      mountShop('house', document.getElementById('t-form'), {
+        state: extra,
+        onDelivered: () => { sh?.hideSeal?.(); sh?.deliver?.(); },
+        onRefuse: () => sh?.showSeal?.(),
+        hideRefuse: () => sh?.hideSeal?.(),
+      });
+      A.readRules().then(() => {
+        const c = A.S.clauses?.pay;
+        const say = document.getElementById('t-say');
+        if (say && c?.per_action_cap) say.textContent = `Max ${fmt(c.per_action_cap)}. Nothing was signed.`;
+      }).catch(() => {});
+    },
     btn: 'See my rules & record',
     hero: () => A.S.charter ? `<span class="commit" title="${esc(A.S.charter)}">${esc(short(A.S.charter.split('.')[0], 8, 6))}</span>` : null,
     run: async () => {
@@ -1188,11 +1204,13 @@ function paint() {
   document.body.classList.toggle('guard-tray', cur === 'guard');
   document.body.classList.toggle('toll-tray', cur === 'toll');
   document.body.classList.toggle('payouts-tray', cur === 'payouts');
+  document.body.classList.toggle('house-tray', cur === 'house');
   const cdock = document.getElementById('chronicle-agent-dock');
   if (cdock) cdock.hidden = cur !== 'chronicle';
   const ferryDock = document.getElementById('ferry-agent-dock'); if (ferryDock) ferryDock.hidden = cur !== 'ferry';
   const guardDock = document.getElementById('guard-agent-dock'); if (guardDock) guardDock.hidden = cur !== 'guard';
   if (cur !== 'toll') { const td = document.getElementById('toll-agent-dock'); if (td) td.hidden = true; }
+  if (cur !== 'house') { const hd = document.getElementById('house-agent-dock'); if (hd) hd.hidden = true; }
   if (cur !== 'bank') hideBankDock();
   const pDock = document.getElementById('payouts-agent-dock');
   if (pDock) pDock.hidden = cur !== 'payouts';
@@ -1202,7 +1220,22 @@ function paint() {
   if (cur === 'toll') {
     document.body.classList.add('toll-tray');
     document.body.classList.remove('ferry-tray');
+    document.body.classList.remove('house-tray');
     const fd = document.getElementById('ferry-agent-dock'); if (fd) fd.hidden = true;
+    const hd = document.getElementById('house-agent-dock'); if (hd) hd.hidden = true;
+    if (phase === 'idle') say(app.idle);
+    hero(null);
+    form(app.form());
+    app.bind?.();
+    hideFerryPrimary();
+    return;
+  }
+  if (cur === 'house') {
+    document.body.classList.add('house-tray');
+    document.body.classList.remove('ferry-tray');
+    document.body.classList.remove('toll-tray');
+    const fd = document.getElementById('ferry-agent-dock'); if (fd) fd.hidden = true;
+    const td = document.getElementById('toll-agent-dock'); if (td) td.hidden = true;
     if (phase === 'idle') say(app.idle);
     hero(null);
     form(app.form());
@@ -1406,11 +1439,12 @@ export function boot() {
   return booted;
 }
 export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rules', 'chron']) watchTokens(document.getElementById(r)); setTimeout(maybeOnboard, 600);
-  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('guard-tray', id === 'guard'); document.body.classList.toggle('chronicle-tray', id === 'chronicle'); document.body.classList.toggle('toll-tray', id === 'toll'); document.body.classList.toggle('bank-tray', id === 'bank'); document.body.classList.toggle('payouts-tray', id === 'payouts'); document.body.classList.toggle('arena-tray', id === 'arena');
+  cur = id; sh = shop; runScene = scene; phase = 'idle'; extra = {}; lab = ''; rcpt(''); document.body.dataset.app = ''; document.body.classList.toggle('ferry-tray', id === 'ferry'); document.body.classList.toggle('guard-tray', id === 'guard'); document.body.classList.toggle('chronicle-tray', id === 'chronicle'); document.body.classList.toggle('toll-tray', id === 'toll'); document.body.classList.toggle('bank-tray', id === 'bank'); document.body.classList.toggle('payouts-tray', id === 'payouts'); document.body.classList.toggle('house-tray', id === 'house'); document.body.classList.toggle('arena-tray', id === 'arena');
   const dock0 = document.getElementById('ferry-agent-dock'); if (dock0) dock0.hidden = id !== 'ferry';
   const guardDock0 = document.getElementById('guard-agent-dock'); if (guardDock0) guardDock0.hidden = id !== 'guard';
   const cdock0 = document.getElementById('chronicle-agent-dock'); if (cdock0) cdock0.hidden = id !== 'chronicle';
   const tollDock0 = document.getElementById('toll-agent-dock'); if (tollDock0) tollDock0.hidden = id !== 'toll';
+  const houseDock0 = document.getElementById('house-agent-dock'); if (houseDock0) houseDock0.hidden = id !== 'house';
   if (id !== 'bank') hideBankDock();
   const pDock0 = document.getElementById('payouts-agent-dock'); if (pDock0) pDock0.hidden = id !== 'payouts';
   const arenaDock = document.getElementById('arena-agent-dock'); if (arenaDock) arenaDock.hidden = id !== 'arena';
@@ -1419,7 +1453,7 @@ export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rul
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
   if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
 }
-export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('guard-tray'); document.body.classList.remove('chronicle-tray'); document.body.classList.remove('toll-tray'); document.body.classList.remove('bank-tray'); document.body.classList.remove('payouts-tray'); document.body.classList.remove('arena-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const guardDock = document.getElementById('guard-agent-dock'); if (guardDock) guardDock.hidden = true; const cdock = document.getElementById('chronicle-agent-dock'); if (cdock) cdock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; hideBankDock(); const pDock = document.getElementById('payouts-agent-dock'); if (pDock) pDock.hidden = true; const arenaDock = document.getElementById('arena-agent-dock'); if (arenaDock) arenaDock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
+export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('guard-tray'); document.body.classList.remove('chronicle-tray'); document.body.classList.remove('toll-tray'); document.body.classList.remove('bank-tray'); document.body.classList.remove('payouts-tray'); document.body.classList.remove('house-tray'); document.body.classList.remove('arena-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const guardDock = document.getElementById('guard-agent-dock'); if (guardDock) guardDock.hidden = true; const cdock = document.getElementById('chronicle-agent-dock'); if (cdock) cdock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; const houseDock = document.getElementById('house-agent-dock'); if (houseDock) houseDock.hidden = true; hideBankDock(); const pDock = document.getElementById('payouts-agent-dock'); if (pDock) pDock.hidden = true; const arenaDock = document.getElementById('arena-agent-dock'); if (arenaDock) arenaDock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
 export { closeRules };
 window.__apps = { A, S: A.S, paint, primary, openRules, signRules, mount };

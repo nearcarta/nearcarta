@@ -283,7 +283,8 @@ test('T8 the house reads the board row', async ({ page }) => {
   for (const width of [1440, 390]) {
     await at(page, width);
     await openShop(page, 'house');
-    await (await readyAct(page, 'See my rules & record')).click();
+    await expect(page.getByTestId('house-cta')).toHaveText("I'm alive", { timeout: 20000 });
+    await expect(page.locator('#t-act')).toBeHidden();
     await expect(page.locator('#t-say')).toContainText(/Max 0\.005/, { timeout: 20000 });
     await expect(page.locator('#t-say')).not.toContainText('something did not load');
     await expect(page.locator('#t-say')).not.toContainText('Stopped:');

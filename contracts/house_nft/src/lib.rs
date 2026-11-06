@@ -3,8 +3,8 @@
 //! Whoever holds the deed controls the purse: `house_pay` is allowed only for the current owner, needs 1 yocto
 //! (a full wallet approval, never a function-call key) and stays under the deed's cap. Transfer the deed and the
 //! purse and the rule move with it; the old owner is refused from then on. Anyone may `house_fund` a deed.
-//! Any account may mint one deed (token_id = minter account id). No owner, no admin, no upgrade method; the account
-//! is deployed with no access key.
+//! Any account may mint one deed (token_id = minter account id). The deployer may upgrade, then migrate.
+//! The recorded shop has no access key. A successor account is created outside this contract.
 use near_contract_standards::non_fungible_token::metadata::{
     NFTContractMetadata, NonFungibleTokenMetadataProvider, TokenMetadata, NFT_METADATA_SPEC,
 };
@@ -12,7 +12,7 @@ use near_contract_standards::non_fungible_token::{NonFungibleToken, NonFungibleT
 use near_contract_standards::non_fungible_token::approval::NonFungibleTokenApproval;
 use near_contract_standards::non_fungible_token::core::{NonFungibleTokenCore, NonFungibleTokenResolver};
 use near_sdk::collections::{LazyOption, LookupMap};
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::{assert_one_yocto, env, log, near, require, AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue, PromiseResult};
 use std::collections::HashMap;
 
@@ -21,9 +21,59 @@ use std::collections::HashMap;
 #[derive(Clone)]
 pub struct Purse { pub balance: U128, pub cap: U128, pub paid: U128, pub pays: u32, pub refused_note: Option<String> }
 
+/// Inheritance on one deed. Time is `env::block_timestamp` nanoseconds. Nothing fires by itself.
+/// A demo may use a 60 second window. The owner can cancel until the wait ends.
+/// https://github.com/near/NEPs/blob/master/neps/nep-0171.md (the release is an nft transfer)
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Line {
+    pub heirs: Vec<AccountId>,
+    pub guardians: Vec<AccountId>,
+    pub threshold: u32,
+    pub last_check_in_ns: u64,
+    pub period_ns: u64,
+    pub wait_ns: u64,
+    pub pending_ns: u64,
+    pub approvals: Vec<AccountId>,
+    pub released: bool,
+}
+
+/// Shortest check-in or cancel window: 60 seconds. Longest: 366 days.
+const MIN_WINDOW_NS: u64 = 60 * 1_000_000_000;
+const MAX_WINDOW_NS: u64 = 366 * 24 * 60 * 60 * 1_000_000_000;
+
 #[derive(BorshStorageKey)]
 #[near]
-enum Key { Owner, Meta, Enum, Approval, ContractMeta, Purse }
+enum Key { Owner, Meta, Enum, Approval, ContractMeta, Purse, Line, Epoch, Vault, Prepared, Seen }
+
+/// A foreign vault bound to the deed, not to the current holder.
+/// The path stays put when the deed moves, so an heir reaches the same address.
+/// Toll owns the signer. This record does not sign or broadcast.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Vault {
+    pub chain: String,
+    pub path: String,
+    pub asset: String,
+    pub max_value: u128,
+    pub max_gas: u64,
+    pub receivers: Vec<String>,
+    pub funded: bool,
+}
+
+/// A send the contract checked and did not broadcast.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct PreparedSend {
+    pub action_id: String,
+    pub chain: String,
+    pub to: String,
+    pub asset: String,
+    pub value: u128,
+    pub gas_limit: u64,
+    pub epoch: u64,
+    pub live: bool,
+}
 
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
@@ -31,10 +81,25 @@ pub struct Contract {
     tokens: NonFungibleToken,
     metadata: LazyOption<NFTContractMetadata>,
     purses: LookupMap<TokenId, Purse>,
-    /// The deployer: may only close the contract, and only while no purse holds NEAR.
+    /// Inheritance line per deed. Absent until the holder calls house_set_line.
+    lines: LookupMap<TokenId, Line>,
+    /// Bumps when the deed moves. An in-flight pay from the previous epoch is refunded.
+    epochs: LookupMap<TokenId, u64>,
+    /// One foreign vault per deed. The path is the deed id, not the current holder.
+    vaults: LookupMap<TokenId, Vault>,
+    /// Last checked send. `live` stays false until a Toll signer exists.
+    prepared: LookupMap<TokenId, PreparedSend>,
+    /// Action ids already applied, so a repeated click does not pay twice.
+    seen: LookupMap<String, u8>,
+    /// The deployer: may only close or upgrade the contract, and only while no purse holds NEAR.
     owner: AccountId,
+    /// Board that may act for a row. The row owner is an argument, never the predecessor.
+    board: AccountId,
     /// Sum of every purse balance (user money); close() refuses while it is above 0.
     held: u128,
+    /// Vaults the holder has marked as holding foreign value. Close refuses while this is above 0.
+    foreign_open: u32,
+    version: u32,
 }
 
 /// Storage the minter pays for: the token, its metadata and the purse (about 1 KB; 0.02 NEAR covers it).
@@ -48,7 +113,7 @@ impl Contract {
     pub fn new(owner: Option<AccountId>) -> Self {
         let metadata = NFTContractMetadata {
             spec: NFT_METADATA_SPEC.to_string(),
-            name: "Nearcarta House deeds v2".to_string(),
+            name: "Nearcarta House deeds v3".to_string(),
             symbol: "DEED".to_string(),
             icon: None, base_uri: None, reference: None, reference_hash: None,
         };
@@ -56,8 +121,16 @@ impl Contract {
             tokens: NonFungibleToken::new(Key::Owner, env::current_account_id(), Some(Key::Meta), Some(Key::Enum), Some(Key::Approval)),
             metadata: LazyOption::new(Key::ContractMeta, Some(&metadata)),
             purses: LookupMap::new(Key::Purse),
+            lines: LookupMap::new(Key::Line),
+            epochs: LookupMap::new(Key::Epoch),
+            vaults: LookupMap::new(Key::Vault),
+            prepared: LookupMap::new(Key::Prepared),
+            seen: LookupMap::new(Key::Seen),
             owner: owner.unwrap_or_else(env::predecessor_account_id),
+            board: "board.nearcarta.near".parse().unwrap(),
             held: 0,
+            foreign_open: 0,
+            version: 3,
         }
     }
 
@@ -111,14 +184,16 @@ impl Contract {
         p.balance = U128(p.balance.0 - amount.0);
         self.held -= amount.0;
         self.purses.insert(&token_id, &p);
+        let epoch = self.epochs.get(&token_id).unwrap_or(0);
         Promise::new(receiver_id.clone()).transfer(NearToken::from_yoctonear(amount.0)).then(
-            Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(5)).on_house_pay(token_id, receiver_id, amount))
+            Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(5)).on_house_pay(token_id, receiver_id, amount, epoch))
     }
 
     #[private]
-    pub fn on_house_pay(&mut self, token_id: TokenId, receiver_id: AccountId, amount: U128) -> bool {
+    pub fn on_house_pay(&mut self, token_id: TokenId, receiver_id: AccountId, amount: U128, epoch: u64) -> bool {
         let mut p = self.purses.get(&token_id).unwrap();
-        let ok = matches!(env::promise_result_checked(0, 0), Ok(_));
+        let current = self.epochs.get(&token_id).unwrap_or(0);
+        let ok = current == epoch && matches!(env::promise_result_checked(0, 0), Ok(_));
         if ok {
             p.paid = U128(p.paid.0 + amount.0); p.pays += 1;
             log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_pay\",\"data\":[{{\"token_id\":\"{}\",\"to\":\"{}\",\"amount\":\"{}\"}}]}}", token_id, receiver_id, amount.0);
@@ -151,10 +226,396 @@ impl Contract {
         assert_one_yocto();
         require!(env::predecessor_account_id() == self.owner, "only the deployer may close");
         require!(self.held == 0, "purses still hold NEAR: holders must spend it first");
+        require!(self.foreign_open == 0, "a foreign vault still holds value");
         Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
 
     pub fn house_purse(&self, token_id: TokenId) -> Option<Purse> { self.purses.get(&token_id) }
+
+    /// The holder names heirs and guardians. One yocto, so a session key cannot call it.
+    /// https://docs.near.org/protocol/accounts-contracts/access-keys
+    #[payable]
+    pub fn house_set_line(&mut self, token_id: TokenId, heirs: Vec<AccountId>, guardians: Vec<AccountId>, threshold: u32, period_ns: U64, wait_ns: U64) {
+        assert_one_yocto();
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == owner, "only the deed holder");
+        require!((1..=4).contains(&heirs.len()), "name one heir");
+        require!((1..=4).contains(&guardians.len()), "name a guardian");
+        require!(threshold >= 1 && (threshold as usize) <= guardians.len(), "threshold");
+        require!(period_ns.0 >= MIN_WINDOW_NS && period_ns.0 <= MAX_WINDOW_NS, "window");
+        require!(wait_ns.0 >= MIN_WINDOW_NS && wait_ns.0 <= MAX_WINDOW_NS, "window");
+        require!(distinct(&heirs) && distinct(&guardians), "repeated name");
+        require!(!heirs.contains(&owner) && !guardians.contains(&owner), "the owner is not an heir or a guardian");
+        self.lines.insert(&token_id, &Line {
+            heirs, guardians, threshold,
+            last_check_in_ns: env::block_timestamp(),
+            period_ns: period_ns.0, wait_ns: wait_ns.0,
+            pending_ns: 0, approvals: Vec::new(), released: false,
+        });
+    }
+
+    /// The holder is here. Clears a pending release.
+    #[payable]
+    pub fn house_check_in(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == owner, "only the deed holder");
+        let mut line = self.line_of(&token_id);
+        require!(!line.released, "already released");
+        line.last_check_in_ns = env::block_timestamp();
+        line.pending_ns = 0;
+        line.approvals.clear();
+        self.lines.insert(&token_id, &line);
+        log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_check_in\",\"data\":[{{\"token_id\":\"{}\"}}]}}", token_id);
+    }
+
+    /// The holder stops a release that has not finished. The check-in clock stays where it was.
+    #[payable]
+    pub fn house_cancel_release(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == owner, "only the deed holder");
+        let mut line = self.line_of(&token_id);
+        require!(line.pending_ns > 0, "no release is waiting");
+        line.pending_ns = 0;
+        line.approvals.clear();
+        self.lines.insert(&token_id, &line);
+    }
+
+    /// A named guardian, after the check-in window. Threshold starts the wait.
+    #[payable]
+    pub fn house_guardian_approve(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        let who = env::predecessor_account_id();
+        let mut line = self.line_of(&token_id);
+        require!(!line.released, "already released");
+        require!(line.guardians.contains(&who), "not a guardian");
+        let now = env::block_timestamp();
+        require!(now > line.last_check_in_ns.saturating_add(line.period_ns), "still inside the check-in window");
+        if !line.approvals.contains(&who) { line.approvals.push(who); }
+        if line.approvals.len() as u32 >= line.threshold && line.pending_ns == 0 { line.pending_ns = now; }
+        self.lines.insert(&token_id, &line);
+    }
+
+    /// After the wait, the deed moves to the first heir. The purse stays on the token.
+    #[payable]
+    pub fn house_release(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        let mut line = self.line_of(&token_id);
+        require!(!line.released, "already released");
+        require!(line.pending_ns > 0, "no release is waiting");
+        require!(line.approvals.len() as u32 >= line.threshold, "not enough guardians");
+        let now = env::block_timestamp();
+        require!(now >= line.pending_ns.saturating_add(line.wait_ns), "the waiting period has not ended");
+        let owner = self.owner_of(&token_id);
+        let heir = line.heirs[0].clone();
+        require!(heir != owner, "the heir already holds the deed");
+        self.tokens.internal_transfer(&owner, &heir, &token_id, None, Some("inheritance release".into()));
+        let epoch = self.epochs.get(&token_id).unwrap_or(0).saturating_add(1);
+        self.epochs.insert(&token_id, &epoch);
+        line.released = true;
+        line.pending_ns = 0;
+        self.lines.insert(&token_id, &line);
+        log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_release\",\"data\":[{{\"token_id\":\"{}\",\"to\":\"{}\"}}]}}", token_id, heir);
+    }
+
+    pub fn house_line(&self, token_id: TokenId) -> Option<Line> { self.lines.get(&token_id) }
+
+    pub fn house_epoch(&self, token_id: TokenId) -> u64 { self.epochs.get(&token_id).unwrap_or(0) }
+
+    pub fn house_vault(&self, token_id: TokenId) -> Option<Vault> { self.vaults.get(&token_id) }
+
+    pub fn house_prepared(&self, token_id: TokenId) -> Option<PreparedSend> { self.prepared.get(&token_id) }
+
+    /// The board acts for `row_owner`. The predecessor is the board, never the holder.
+    /// https://docs.near.org/chain-abstraction/chain-signatures/tutorials/controlling-near-accounts/1-setup
+    #[payable]
+    pub fn house_session_mint(&mut self, row_owner: AccountId, cap: Option<U128>) -> Token {
+        self.require_board();
+        self.mint_for(row_owner, None, cap)
+    }
+
+    /// `row_owner` is the top-level argument the board writes. A nested `row_owner` is not a field here.
+    #[payable]
+    pub fn house_session_check_in(&mut self, row_owner: AccountId, token_id: TokenId) {
+        self.require_board();
+        self.require_holder(&token_id, &row_owner);
+        self.credit_attached(&token_id);
+        self.check_in_holder(&token_id);
+    }
+
+    /// A session may set a line, or tighten one. Changing heirs or loosening the wait needs the holder's own key.
+    #[payable]
+    pub fn house_session_set_line(&mut self, row_owner: AccountId, token_id: TokenId, heirs: Vec<AccountId>, guardians: Vec<AccountId>, threshold: u32, period_ns: U64, wait_ns: U64) {
+        self.require_board();
+        self.require_holder(&token_id, &row_owner);
+        self.credit_attached(&token_id);
+        if let Some(prev) = self.lines.get(&token_id) {
+            require!(prev.heirs == heirs && prev.guardians == guardians, "owner intent required");
+            require!(threshold >= prev.threshold, "owner intent required");
+            require!(period_ns.0 <= prev.period_ns && wait_ns.0 <= prev.wait_ns, "owner intent required");
+        }
+        self.write_line(&token_id, &row_owner, heirs, guardians, threshold, period_ns, wait_ns);
+    }
+
+    /// Purse payment for the row owner. Repeating `action_id` does not pay again.
+    #[payable]
+    pub fn house_session_pay(&mut self, row_owner: AccountId, token_id: TokenId, receiver_id: AccountId, amount: U128, action_id: String) -> Promise {
+        self.require_board();
+        self.require_holder(&token_id, &row_owner);
+        self.credit_attached(&token_id);
+        self.pay_from_purse(token_id, receiver_id, amount, action_id)
+    }
+
+    /// Check a foreign send. This does not call the signer and does not broadcast.
+    /// Bitcoin with a value is refused: signing-only until a real spend exists.
+    #[payable]
+    pub fn house_session_prepare_send(&mut self, row_owner: AccountId, token_id: TokenId, chain: String, to: String, asset: String, value: U128, gas_limit: u64, action_id: String) -> PreparedSend {
+        self.require_board();
+        self.require_holder(&token_id, &row_owner);
+        self.credit_attached(&token_id);
+        self.prepare_send(&token_id, chain, to, asset, value.0, gas_limit, action_id)
+    }
+
+    /// The holder's own key. One yocto, so a session cannot call it. This is the owner-intent path.
+    #[payable]
+    pub fn house_set_vault(&mut self, token_id: TokenId, chain: String, asset: String, max_value: U128, max_gas: u64, receivers: Vec<String>) {
+        assert_one_yocto();
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == owner, "only the deed holder");
+        require!(receivers.len() >= 1 && receivers.len() <= 4, "name a payee");
+        require!(max_value.0 > 0, "cap must be above 0");
+        let path = format!("{token_id}-{chain}-1");
+        let chain_l = chain.to_lowercase();
+        require!(chain_l == "base" || chain_l == "btc", "chain");
+        if chain_l == "btc" { require!(asset.to_uppercase() == "BTC", "bitcoin asset"); }
+        self.vaults.insert(&token_id, &Vault {
+            chain: chain_l, path, asset: asset.to_uppercase(), max_value: max_value.0, max_gas, receivers, funded: false,
+        });
+    }
+
+    /// The holder says this vault holds value. Close stays shut until the deployer records an evacuation.
+    #[payable]
+    pub fn house_mark_funded(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == owner, "only the deed holder");
+        let mut vault = self.vaults.get(&token_id).unwrap_or_else(|| env::panic_str("no vault"));
+        if !vault.funded {
+            vault.funded = true;
+            self.foreign_open = self.foreign_open.saturating_add(1);
+            self.vaults.insert(&token_id, &vault);
+        }
+    }
+
+    /// Deployer only, after the foreign coins have left the path.
+    #[payable]
+    pub fn house_declare_evacuated(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+        require!(env::predecessor_account_id() == self.owner, "only the deployer may clear a vault");
+        let mut vault = self.vaults.get(&token_id).unwrap_or_else(|| env::panic_str("no vault"));
+        if vault.funded {
+            vault.funded = false;
+            self.foreign_open = self.foreign_open.saturating_sub(1);
+            self.vaults.insert(&token_id, &vault);
+        }
+    }
+
+    /// Return the purse to the current holder. Not a payment to a stranger, and not a way to skip a funded vault.
+    #[payable]
+    pub fn house_withdraw(&mut self, token_id: TokenId) -> Promise {
+        assert_one_yocto();
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == owner, "only the deed holder");
+        let mut p = self.purses.get(&token_id).unwrap();
+        let amount = p.balance.0;
+        require!(amount > 0, "the purse is empty");
+        p.balance = U128(0);
+        self.held -= amount;
+        self.purses.insert(&token_id, &p);
+        Promise::new(owner).transfer(NearToken::from_yoctonear(amount))
+    }
+
+    /// The deployer replaces the code. State stays for `migrate`.
+    /// https://docs.near.org/smart-contracts/release/upgrade#migrating-the-state
+    #[payable]
+    pub fn upgrade(&mut self) -> Promise {
+        assert_one_yocto();
+        require!(env::predecessor_account_id() == self.owner, "only the deployer may upgrade");
+        let code = env::input().unwrap_or_else(|| env::panic_str("empty code"));
+        Promise::new(env::current_account_id()).deploy_contract(code).then(
+            Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(5)).migrate())
+    }
+
+    #[private]
+    pub fn migrate(&mut self) {
+        self.version = 3;
+    }
+
+    /// Read the live v2 state, send each purse to its current deed holder, then keep the deeds.
+    /// The new maps start empty. Call this in the same transaction as the code deploy.
+    #[init(ignore_state)]
+    pub fn migrate_from_v2() -> Self {
+        require!(env::predecessor_account_id() == env::current_account_id(), "only the contract may migrate");
+        let mut old: OldHouse = env::state_read().unwrap_or_else(|| env::panic_str("old house state"));
+        let supply = old.tokens.nft_total_supply().0;
+        let tokens = if supply == 0 { Vec::new() } else { old.tokens.nft_tokens(Some(U128(0)), Some(supply as u64)) };
+        for t in &tokens {
+            let Some(mut p) = old.purses.get(&t.token_id) else { continue; };
+            if p.balance.0 == 0 { continue; }
+            let _ = Promise::new(t.owner_id.clone()).transfer(NearToken::from_yoctonear(p.balance.0));
+            p.balance = U128(0);
+            old.purses.insert(&t.token_id, &p);
+        }
+        Self {
+            tokens: old.tokens,
+            metadata: old.metadata,
+            purses: old.purses,
+            lines: LookupMap::new(Key::Line),
+            epochs: LookupMap::new(Key::Epoch),
+            vaults: LookupMap::new(Key::Vault),
+            prepared: LookupMap::new(Key::Prepared),
+            seen: LookupMap::new(Key::Seen),
+            owner: old.owner,
+            board: "board.nearcarta.near".parse().unwrap(),
+            held: 0,
+            foreign_open: 0,
+            version: 3,
+        }
+    }
+
+    pub fn house_version(&self) -> u32 { self.version }
+
+    /// NEAR attached by the board lands on this contract. Count it on the deed, so it is not loose storage.
+    fn credit_attached(&mut self, token_id: &TokenId) {
+        let dep = env::attached_deposit().as_yoctonear();
+        if dep == 0 { return; }
+        let mut p = self.purses.get(token_id).unwrap_or_else(|| env::panic_str("no such deed"));
+        p.balance = U128(p.balance.0.checked_add(dep).expect("purse"));
+        self.held = self.held.checked_add(dep).expect("held");
+        self.purses.insert(token_id, &p);
+    }
+
+    fn require_board(&self) {
+        require!(env::predecessor_account_id() == self.board, "only the board may act for a row");
+    }
+
+    fn require_holder(&self, token_id: &TokenId, actor: &AccountId) {
+        require!(actor == &self.owner_of(token_id), "only the deed holder");
+    }
+
+    fn check_in_holder(&mut self, token_id: &TokenId) {
+        let mut line = self.line_of(token_id);
+        require!(!line.released, "already released");
+        line.last_check_in_ns = env::block_timestamp();
+        line.pending_ns = 0;
+        line.approvals.clear();
+        self.lines.insert(token_id, &line);
+    }
+
+    fn write_line(&mut self, token_id: &TokenId, owner: &AccountId, heirs: Vec<AccountId>, guardians: Vec<AccountId>, threshold: u32, period_ns: U64, wait_ns: U64) {
+        require!((1..=4).contains(&heirs.len()), "name one heir");
+        require!((1..=4).contains(&guardians.len()), "name a guardian");
+        require!(threshold >= 1 && (threshold as usize) <= guardians.len(), "threshold");
+        require!(period_ns.0 >= MIN_WINDOW_NS && period_ns.0 <= MAX_WINDOW_NS, "window");
+        require!(wait_ns.0 >= MIN_WINDOW_NS && wait_ns.0 <= MAX_WINDOW_NS, "window");
+        require!(distinct(&heirs) && distinct(&guardians), "repeated name");
+        require!(!heirs.contains(owner) && !guardians.contains(owner), "the owner is not an heir or a guardian");
+        self.lines.insert(token_id, &Line {
+            heirs, guardians, threshold,
+            last_check_in_ns: env::block_timestamp(),
+            period_ns: period_ns.0, wait_ns: wait_ns.0,
+            pending_ns: 0, approvals: Vec::new(), released: false,
+        });
+    }
+
+    fn pay_from_purse(&mut self, token_id: TokenId, receiver_id: AccountId, amount: U128, action_id: String) -> Promise {
+        require!(!action_id.is_empty() && action_id.len() <= 80, "action");
+        if self.seen.get(&action_id).is_some() {
+            env::panic_str("already done");
+        }
+        self.seen.insert(&action_id, &1);
+        let owner = self.owner_of(&token_id);
+        require!(env::predecessor_account_id() == self.board || env::predecessor_account_id() == owner, "only the deed holder");
+        let mut p = self.purses.get(&token_id).unwrap();
+        require!(amount.0 > 0, "amount must be above 0");
+        require!(amount.0 <= p.cap.0, "over the deed's cap per payment");
+        require!(amount.0 <= p.balance.0, "the house purse is too small");
+        p.balance = U128(p.balance.0 - amount.0);
+        self.held -= amount.0;
+        self.purses.insert(&token_id, &p);
+        let epoch = self.epochs.get(&token_id).unwrap_or(0);
+        Promise::new(receiver_id.clone()).transfer(NearToken::from_yoctonear(amount.0)).then(
+            Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(5)).on_house_pay(token_id, receiver_id, amount, epoch))
+    }
+
+    fn prepare_send(&mut self, token_id: &TokenId, chain: String, to: String, asset: String, value: u128, gas_limit: u64, action_id: String) -> PreparedSend {
+        require!(!action_id.is_empty(), "action");
+        if let Some(prev) = self.prepared.get(token_id) {
+            if prev.action_id == action_id { return prev; }
+        }
+        let vault = self.vaults.get(token_id).unwrap_or_else(|| env::panic_str("no vault"));
+        let chain_l = chain.to_lowercase();
+        require!(chain_l == vault.chain, "chain");
+        let asset_u = asset.to_uppercase();
+        require!(asset_u == vault.asset, "asset");
+        if chain_l == "btc" && value > 0 { env::panic_str("bitcoin is signing only"); }
+        require!(value > 0 || chain_l == "btc", "amount must be above 0");
+        require!(value <= vault.max_value, "over the vault cap");
+        require!(gas_limit <= vault.max_gas, "gas");
+        require!(vault.receivers.iter().any(|r| r.eq_ignore_ascii_case(&to)), "payee");
+        let prepared = PreparedSend {
+            action_id, chain: chain_l, to, asset: asset_u, value, gas_limit,
+            epoch: self.epochs.get(token_id).unwrap_or(0),
+            live: false,
+        };
+        self.prepared.insert(token_id, &prepared);
+        prepared
+    }
+
+    fn mint_for(&mut self, who: AccountId, house: Option<AccountId>, cap: Option<U128>) -> Token {
+        let dep = env::attached_deposit().as_yoctonear();
+        require!(dep >= MINT_STORAGE.as_yoctonear(), "attach at least 0.02 NEAR (storage); the rest fills the house purse");
+        require!(self.tokens.owner_by_id.get(&who.to_string()).is_none(), "this account already has a deed");
+        let cap = cap.map(|c| c.0).unwrap_or(10u128.pow(23));
+        require!(cap > 0 && cap <= MAX_CAP, "cap must be above 0 and at most 5 NEAR");
+        let title = format!("House of {who}");
+        let description = Some(match &house { Some(h) => format!("Charter: {h}. Holder of this deed controls the house purse."), None => "Holder of this deed controls the house purse.".to_string() });
+        let meta = TokenMetadata {
+            title: Some(title), description, media: None, media_hash: None, copies: Some(1),
+            issued_at: Some(env::block_timestamp_ms().to_string()), expires_at: None, starts_at: None,
+            updated_at: None, extra: None, reference: None, reference_hash: None,
+        };
+        let token = self.tokens.internal_mint(who.to_string(), who.clone(), Some(meta));
+        let purse = dep - MINT_STORAGE.as_yoctonear();
+        self.held += purse;
+        self.purses.insert(&who.to_string(), &Purse { balance: U128(purse), cap: U128(cap), paid: U128(0), pays: 0, refused_note: None });
+        self.epochs.insert(&who.to_string(), &0);
+        token
+    }
+
+    fn owner_of(&self, token_id: &TokenId) -> AccountId {
+        self.tokens.owner_by_id.get(token_id).unwrap_or_else(|| env::panic_str("no such deed"))
+    }
+
+    fn line_of(&self, token_id: &TokenId) -> Line {
+        self.lines.get(token_id).unwrap_or_else(|| env::panic_str("no inheritance line"))
+    }
+}
+
+/// The account as it is on mainnet today: deed, purse, owner, held. No inheritance maps.
+#[near(serializers = [borsh])]
+struct OldHouse {
+    tokens: NonFungibleToken,
+    metadata: LazyOption<NFTContractMetadata>,
+    purses: LookupMap<TokenId, Purse>,
+    owner: AccountId,
+    held: u128,
+}
+
+fn distinct(ids: &[AccountId]) -> bool {
+    let mut seen = std::collections::BTreeSet::new();
+    ids.iter().all(|id| seen.insert(id))
 }
 
 #[near]
@@ -331,7 +792,7 @@ mod tests {
         let start = c.house_purse(id.clone()).unwrap().balance.0;
         yocto(1, 1); let _ = c.house_pay(id.clone(), accounts(4), U128(PAY));
         yocto(1, 1); c.nft_transfer(accounts(2), id.clone(), None, None); // sold before the callback lands
-        callback(true); assert!(c.on_house_pay(id.clone(), accounts(4), U128(PAY)));
+        callback(true); assert!(c.on_house_pay(id.clone(), accounts(4), U128(PAY), 0));
         let p = c.house_purse(id.clone()).unwrap();
         assert_eq!(p.balance.0, start - PAY); assert_eq!(p.paid.0, PAY); assert_eq!(p.pays, 1);
         assert_eq!(c.nft_token(id.clone()).unwrap().owner_id, accounts(2));
@@ -348,7 +809,7 @@ mod tests {
         let start = c.house_purse(id.clone()).unwrap().balance.0;
         yocto(1, 1); let _ = c.house_pay(id.clone(), accounts(4), U128(PAY));
         yocto(1, 1); c.nft_transfer(accounts(2), id.clone(), None, None);
-        callback(false); assert!(!c.on_house_pay(id.clone(), accounts(4), U128(PAY)));
+        callback(false); assert!(!c.on_house_pay(id.clone(), accounts(4), U128(PAY), 0));
         let p = c.house_purse(id.clone()).unwrap();
         assert_eq!(p.balance.0, start); assert_eq!(p.paid.0, 0); assert_eq!(p.pays, 0); // back in the deed's purse, which the buyer now holds
     }
@@ -386,5 +847,289 @@ mod tests {
         ctx(1, 2 * 10u128.pow(22)); c.mint_deed(None, None);
         assert_eq!(c.house_held().0, 0);
         ctx(0, 1); let _ = c.close();
+    }
+
+    const SEC: u64 = 1_000_000_000;
+    fn at(who: usize, deposit: u128, ts: u64) {
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id(accounts(who)).attached_deposit(NearToken::from_yoctonear(deposit))
+            .block_timestamp(ts).build());
+    }
+    fn fresh() -> (Contract, String) {
+        ctx(0, 0);
+        let mut c = Contract::new(None);
+        let id = accounts(1).to_string();
+        at(1, 2 * 10u128.pow(22), SEC);
+        c.mint_deed(None, None);
+        at(1, 1, 2 * SEC);
+        c.house_set_line(id.clone(), vec![accounts(4)], vec![accounts(3)], 1, U64(60 * SEC), U64(60 * SEC));
+        (c, id)
+    }
+
+    #[test]
+    #[should_panic(expected = "still inside the check-in window")]
+    fn guardian_during_the_window_is_refused() {
+        let (mut c, id) = fresh();
+        at(3, 1, 30 * SEC);
+        c.house_guardian_approve(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "not a guardian")]
+    fn a_stranger_cannot_approve_a_release() {
+        let (mut c, id) = fresh();
+        at(5, 1, 70 * SEC);
+        c.house_guardian_approve(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "the waiting period has not ended")]
+    fn release_during_the_wait_is_refused() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        at(2, 1, 80 * SEC);
+        c.house_release(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "no release is waiting")]
+    fn a_cancelled_release_cannot_be_executed() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        at(1, 1, 80 * SEC);
+        c.house_cancel_release(id.clone());
+        at(2, 1, 200 * SEC);
+        c.house_release(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "still inside the check-in window")]
+    fn check_in_restarts_the_window() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        at(1, 1, 80 * SEC);
+        c.house_check_in(id.clone());
+        at(3, 1, 100 * SEC);
+        c.house_guardian_approve(id);
+    }
+
+    #[test]
+    fn one_guardian_does_not_start_the_wait_when_two_are_required() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        let id = accounts(1).to_string();
+        at(1, 2 * 10u128.pow(22), SEC);
+        c.mint_deed(None, None);
+        at(1, 1, 2 * SEC);
+        c.house_set_line(id.clone(), vec![accounts(4)], vec![accounts(3), accounts(5)], 2, U64(60 * SEC), U64(60 * SEC));
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        assert_eq!(c.house_line(id).unwrap().pending_ns, 0);
+    }
+
+    #[test]
+    fn release_after_the_wait_moves_the_deed() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        let started = c.house_line(id.clone()).unwrap().pending_ns;
+        at(2, 1, started + 60 * SEC);
+        c.house_release(id.clone());
+        assert_eq!(c.nft_token(id.clone()).unwrap().owner_id, accounts(4));
+        assert!(c.house_line(id).unwrap().released);
+    }
+
+    #[test]
+    #[should_panic(expected = "only the deed holder")]
+    fn the_previous_holder_cannot_pay_after_release() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        let started = c.house_line(id.clone()).unwrap().pending_ns;
+        at(2, 1, started + 60 * SEC);
+        c.house_release(id.clone());
+        at(1, 1, started + 61 * SEC);
+        let _ = c.house_pay(id, accounts(4), U128(10u128.pow(21)));
+    }
+
+    #[test]
+    fn close_still_returns_when_the_purse_is_empty_even_with_a_line() {
+        let (mut c, _) = fresh();
+        assert_eq!(c.house_held().0, 0);
+        at(0, 1, 10 * SEC);
+        let _ = c.close();
+    }
+
+    fn board_at(deposit: u128, ts: u64) {
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id("board.nearcarta.near".parse().unwrap())
+            .attached_deposit(NearToken::from_yoctonear(deposit))
+            .block_timestamp(ts).build());
+    }
+
+    #[test]
+    fn two_visitors_mint_through_the_board_not_as_its_predecessor() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        board_at(2 * 10u128.pow(22), SEC);
+        let a = c.house_session_mint(accounts(1), None);
+        board_at(2 * 10u128.pow(22), 2 * SEC);
+        let b = c.house_session_mint(accounts(2), None);
+        assert_eq!(a.owner_id, accounts(1));
+        assert_eq!(b.owner_id, accounts(2));
+        assert_ne!(a.token_id, b.token_id);
+    }
+
+    #[test]
+    #[should_panic(expected = "only the deed holder")]
+    fn a_session_for_someone_else_cannot_check_in() {
+        let (mut c, id) = fresh();
+        board_at(0, 90 * SEC);
+        c.house_session_check_in(accounts(2), id);
+    }
+
+    #[test]
+    #[should_panic(expected = "still inside the check-in window")]
+    fn a_session_check_in_restarts_the_window_for_the_row_owner() {
+        let (mut c, id) = fresh();
+        board_at(0, 90 * SEC);
+        c.house_session_check_in(accounts(1), id.clone());
+        at(3, 1, 100 * SEC);
+        c.house_guardian_approve(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "owner intent required")]
+    fn a_session_cannot_change_heirs() {
+        let (mut c, id) = fresh();
+        board_at(0, 30 * SEC);
+        c.house_session_set_line(accounts(1), id, vec![accounts(5)], vec![accounts(3)], 1, U64(60 * SEC), U64(60 * SEC));
+    }
+
+    #[test]
+    #[should_panic(expected = "over the vault cap")]
+    fn a_foreign_send_over_the_cap_is_refused() {
+        let (mut c, id) = fresh();
+        at(1, 1, 3 * SEC);
+        c.house_set_vault(id.clone(), "base".into(), "ETH".into(), U128(5), 100_000, vec!["0xabc".into()]);
+        board_at(0, 4 * SEC);
+        let _ = c.house_session_prepare_send(accounts(1), id, "base".into(), "0xabc".into(), "ETH".into(), U128(6), 21_000, "a1".into());
+    }
+
+    #[test]
+    #[should_panic(expected = "bitcoin is signing only")]
+    fn bitcoin_value_is_not_a_spend() {
+        let (mut c, id) = fresh();
+        at(1, 1, 3 * SEC);
+        c.house_set_vault(id.clone(), "btc".into(), "BTC".into(), U128(5), 0, vec!["bc1qexample".into()]);
+        board_at(0, 4 * SEC);
+        let _ = c.house_session_prepare_send(accounts(1), id, "btc".into(), "bc1qexample".into(), "BTC".into(), U128(1), 0, "btc1".into());
+    }
+
+    #[test]
+    fn a_bitcoin_signature_request_is_not_a_live_spend() {
+        let (mut c, id) = fresh();
+        at(1, 1, 3 * SEC);
+        c.house_set_vault(id.clone(), "btc".into(), "BTC".into(), U128(5), 0, vec!["bc1qexample".into()]);
+        board_at(0, 4 * SEC);
+        let prepared = c.house_session_prepare_send(accounts(1), id.clone(), "btc".into(), "bc1qexample".into(), "BTC".into(), U128(0), 0, "btc0".into());
+        assert!(!prepared.live);
+        assert_eq!(prepared.value, 0);
+        assert_eq!(c.house_prepared(id).unwrap().action_id, "btc0");
+    }
+
+    #[test]
+    #[should_panic(expected = "only the deed holder")]
+    fn the_previous_holder_session_cannot_send_after_release() {
+        let (mut c, id) = fresh();
+        at(3, 1, 70 * SEC);
+        c.house_guardian_approve(id.clone());
+        let started = c.house_line(id.clone()).unwrap().pending_ns;
+        at(2, 1, started + 60 * SEC);
+        c.house_release(id.clone());
+        assert_eq!(c.house_epoch(id.clone()), 1);
+        board_at(0, started + 61 * SEC);
+        let _ = c.house_session_pay(accounts(1), id, accounts(4), U128(1), "old".into());
+    }
+
+    #[test]
+    fn a_stale_pay_epoch_returns_the_purse() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        let id = accounts(1).to_string();
+        at(1, 3 * 10u128.pow(22), SEC);
+        c.mint_deed(None, None);
+        let before = c.house_purse(id.clone()).unwrap().balance.0;
+        at(1, 1, 2 * SEC);
+        let _ = c.house_pay(id.clone(), accounts(4), U128(10u128.pow(21)));
+        assert!(c.house_purse(id.clone()).unwrap().balance.0 < before);
+        c.epochs.insert(&id, &1);
+        callback(true);
+        assert!(!c.on_house_pay(id.clone(), accounts(4), U128(10u128.pow(21)), 0));
+        assert_eq!(c.house_purse(id).unwrap().balance.0, before);
+    }
+
+    #[test]
+    #[should_panic(expected = "a foreign vault still holds value")]
+    fn close_refuses_a_funded_foreign_vault() {
+        let (mut c, id) = fresh();
+        at(1, 1, 3 * SEC);
+        c.house_set_vault(id.clone(), "base".into(), "ETH".into(), U128(5), 100_000, vec!["0xabc".into()]);
+        at(1, 1, 4 * SEC);
+        c.house_mark_funded(id);
+        at(0, 1, 5 * SEC);
+        let _ = c.close();
+    }
+
+    #[test]
+    fn a_board_deposit_on_check_in_stays_on_the_purse() {
+        let (mut c, id) = fresh();
+        let before = c.house_purse(id.clone()).unwrap().balance.0;
+        board_at(7, 3 * SEC);
+        c.house_session_check_in(accounts(1), id.clone());
+        assert_eq!(c.house_purse(id).unwrap().balance.0, before + 7);
+        assert_eq!(c.house_held().0, before + 7);
+        assert_eq!(c.house_version(), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "old house state")]
+    fn migrate_from_v2_refuses_a_missing_v2_state() {
+        ctx(0, 0);
+        let _ = Contract::new(None);
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id("deeds.near".parse().unwrap()).build());
+        let _ = Contract::migrate_from_v2();
+    }
+
+    #[test]
+    fn migrate_keeps_the_line_and_a_stranger_cannot_upgrade() {
+        let (mut c, id) = fresh();
+        let line = c.house_line(id.clone()).unwrap();
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id("deeds.near".parse().unwrap()).build());
+        c.migrate();
+        assert_eq!(c.house_line(id).unwrap().heirs, line.heirs);
+    }
+
+    #[test]
+    #[should_panic(expected = "only the deployer may upgrade")]
+    fn a_stranger_cannot_upgrade() {
+        let (mut c, _) = fresh();
+        at(2, 1, 3 * SEC);
+        let _ = c.upgrade();
+    }
+
+    #[test]
+    #[should_panic(expected = "already done")]
+    fn the_same_purse_action_does_not_pay_twice() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        let id = accounts(1).to_string();
+        at(1, 3 * 10u128.pow(22), SEC);
+        c.mint_deed(None, Some(U128(10u128.pow(23))));
+        board_at(0, 2 * SEC);
+        let _ = c.house_session_pay(accounts(1), id.clone(), accounts(4), U128(10u128.pow(21)), "once".into());
+        board_at(0, 3 * SEC);
+        let _ = c.house_session_pay(accounts(1), id, accounts(4), U128(10u128.pow(21)), "once".into());
     }
 }

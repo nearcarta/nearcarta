@@ -673,6 +673,23 @@ body.arena-tray #shopUI .arena-agent-send{
   .ferry-agent-pop{width:min(240px,calc(100vw - 120px))}
 }
 
+/* House tray. Opaque card, tabs, raised actions. The city door stays the room. */
+body.house-tray #shopUI #tray{
+  width:min(440px,calc(100vw - 28px));
+  max-width:440px;
+  left:16px; bottom:18px;
+  top:auto;
+  height:auto;
+  max-height:calc(100dvh - 196px);
+  padding:24px 22px 22px;
+  box-sizing:border-box;
+  overflow-x:hidden;
+  overflow-y:auto;
+  background:#1f1a15;
+  border:1px solid #3a3128;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
 /* Toll Bridge tray: same mix as Ferry. The card owns the pass. */
 body.toll-tray #shopUI #tray{
   width:min(640px,calc(100vw - 140px));
@@ -689,7 +706,109 @@ body.toll-tray #shopUI #tray{
   border:1px solid #3a3128;
   box-shadow:0 16px 40px rgba(0,0,0,.45);
   backdrop-filter:none; -webkit-backdrop-filter:none;
-  z-index:20;
+}
+body.house-tray #shopUI .t-head,
+body.house-tray #shopUI .label,
+body.house-tray #shopUI .hero,
+body.house-tray #shopUI #t-who,
+body.house-tray #shopUI #t-track,
+body.house-tray #shopUI .shop-track,
+body.house-tray #shopUI .say,
+body.house-tray #shopUI .t-links,
+body.house-tray #shopUI .rcpt,
+body.house-tray #shopUI #t-cta{display:none!important}
+body.house-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
+body.house-tray #shopUI #t-act[hidden]{display:none!important}
+body.house-tray #shopUI .ferry-tab{min-height:44px;height:44px;border:0;border-radius:11px;background:transparent;color:#d4c4a8;font:700 15px/1 system-ui,sans-serif}
+body.house-tray #shopUI .ferry-tab.on,
+body.house-tray #shopUI .ferry-tab[aria-selected=true]{background:linear-gradient(180deg,#f5d08a,#e2b35b)!important;color:#2a1608!important}
+body.house-tray #shopUI #house-cta{justify-self:center;width:auto!important;min-width:min(220px,100%);min-height:44px}
+body.house-tray #shopUI .ferry-pane{gap:8px}
+body.house-tray #shopUI .ferry-field{gap:4px}
+body.house-tray #shopUI .ferry-flow{padding:8px 12px}
+body.house-tray #shopUI .ferry-card{gap:10px}
+@media (max-width:720px){
+  body.house-tray #shopUI #tray{
+    width:min(440px,calc(100vw - 120px));
+    max-height:calc(100dvh - 168px);
+    bottom:8px;
+    padding:14px 12px 12px;
+  }
+}
+body.house-tray #shopUI .house-record{margin-top:8px;color:#fff8ee}
+body.house-tray #shopUI .house-record summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:#f5d08a}
+body.house-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
+.house-tabs{display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap}
+.house-tab{
+  display:inline-flex;align-items:center;gap:8px;
+  min-height:44px;padding:0 14px;border-radius:12px;
+  border:1px solid #4a3a28;background:#2a221b;color:#fff8ee;
+  font:600 15px/1 system-ui,sans-serif;cursor:pointer;
+}
+.house-tab[aria-selected="true"]{background:#3a2e22;border-color:#d6b46a;color:#f5d08a}
+.house-tab .house-ico{display:block;flex:none}
+.house-panel{display:grid;gap:12px;color:#fff8ee;font:500 15px/1.45 system-ui,sans-serif}
+.house-panel[hidden]{display:none!important}
+.house-cta{
+  min-height:44px;padding:0 16px;border:0;border-radius:12px;cursor:pointer;
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;
+  font:700 15px/1 system-ui,sans-serif;
+  box-shadow:0 3px 0 #8a6a32,0 8px 16px rgba(0,0,0,.28);
+}
+.house-cta:disabled{opacity:.45;cursor:not-allowed}
+.house-fields{display:grid;gap:12px}
+.house-fields label{display:grid;gap:6px;color:#f5d08a;font:600 13px/1.2 system-ui,sans-serif}
+.house-fields input,.house-fields select{
+  min-height:44px;padding:0 12px;border-radius:10px;border:1px solid #4a3a28;
+  background:#17130f;color:#fff8ee;font:500 15px/1.2 system-ui,sans-serif;
+}
+.house-seal{
+  margin:0;padding:10px 12px;border-radius:12px;border:1px solid #8a3b36;
+  background:#2a1412;color:#fff8ee;font:700 14px/1.35 system-ui,sans-serif;
+}
+.house-hint{margin:0;color:#f5d08a;font:600 14px/1.4 system-ui,sans-serif}
+.house-notes{margin:0;padding-left:18px;display:grid;gap:8px}
+.house-key{margin:0;overflow-wrap:anywhere;color:#fff8ee;font:500 13px/1.4 ui-monospace,monospace}
+#house-agent-dock{
+  position:fixed;right:20px;bottom:22px;z-index:70;
+  display:flex;flex-direction:row;align-items:flex-end;gap:12px;pointer-events:none;
+}
+#house-agent-dock > *,
+#house-agent-dock .house-agent-send{pointer-events:auto}
+#house-agent-dock[hidden]{display:none!important}
+.house-agent-char{
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;
+  width:96px;padding:0;border:0;background:transparent;cursor:pointer;color:#fff8ee;
+}
+.house-agent-avatar{width:72px;height:72px;object-fit:contain;display:block;filter:drop-shadow(0 10px 18px rgba(0,0,0,.45))}
+.house-agent-name{margin:0;color:#f5d08a;font:700 11px/1.2 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+.house-agent-pop{
+  width:min(300px,calc(100vw - 140px));box-sizing:border-box;padding:10px;border-radius:14px;
+  border:1px solid #d6b46a66;background:#1f1a15;box-shadow:0 12px 28px rgba(0,0,0,.4);
+  display:grid;gap:8px;
+}
+.house-agent-log{margin:0;color:#f5d08a;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
+.house-agent-pop .house-agent-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px}
+.house-agent-pop input{
+  width:100%;min-width:0;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:10px;
+  border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:500 14px/1.2 system-ui,sans-serif;
+}
+.house-agent-pop .house-agent-send{
+  width:44px;min-width:44px;height:44px;border:0;border-radius:10px;cursor:pointer;
+  background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1 system-ui,sans-serif;
+}
+nav.all-shops a[data-city-shop]{color:#fff8ee;text-decoration:none}
+.house-room{padding-bottom:8px}
+@media (max-width:720px){
+  body.house-tray #shopUI #tray{
+    width:min(440px,calc(100vw - 120px));
+    left:8px;
+    bottom:8px;
+    max-height:calc(100dvh - 168px);
+    padding:14px 12px 12px;
+  }
+  #house-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
+  .house-agent-pop{width:min(240px,calc(100vw - 120px))}
 }
 body.toll-tray #shopUI .t-head,
 body.toll-tray #shopUI .label,
