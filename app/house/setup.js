@@ -20,6 +20,7 @@ import { proposalMessage } from '../../shared/board/message.js';
 import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, fittingShops, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
 import { HOUSE_CALLS, HOUSE_SHOP } from '../../shared/house/shop.js';
 import { pluginKeyName } from './board-key.js';
+import { confirmLS, confirmKeyFor, setConfirmKeyAction } from './confirm-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
 import { runAsk } from '../../shared/vault/run.js';
 import { LOOKS, DYES, OUTFITS, portraitHTML, writeHero, displayOk } from './hero.js';
@@ -732,6 +733,37 @@ function bindRefreshKey(wrap = job => job) {
   }));
   return true;
 }
+/**
+ * Register the visitor's confirm key. One wallet approval, one board call
+ * (`set_confirm_key`), no deposit. It is a separate key from the agent key, stored in its
+ * own slot, and it signs `confirm_hold` only. Without it a held Arena attack or Guard
+ * warning cannot be released by its owner.
+ * contracts/charter_board/src/v2.rs set_confirm_key. app/house/confirm-key.js.
+ */
+async function registerConfirmKey(deps = {}) {
+  const contract = MAIN.board.contract;
+  if (!me) throw new Error('Sign in first.');
+  const agentSecret = localStorage.getItem(agentLS(me)) || '';
+  // Reuse a key this browser already holds, or make a fresh one, never the agent's.
+  const made = keyFrom();
+  const secret = confirmKeyFor(me, { agentSecret, makeKey: () => made });
+  const publicKey = secret === made.secretKey ? made.publicKey : keyFrom(secret).publicKey;
+  paintRefreshStatus('Approve the confirm key in your wallet…');
+  const tx = { receiverId: contract, actions: [setConfirmKeyAction(publicKey)] };
+  let res;
+  if (deps.wallet || deps.signAll) {
+    // A stub keeps the behaviour honest: nothing was signed and nothing is stored.
+    paintRefreshStatus('Confirm key added (signer stub). No mainnet tx was sent.');
+    return { ok: true, stub: true, publicKey };
+  }
+  const w = deps.wallet ? await deps.wallet() : await mainnetWallet().wallet();
+  res = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: [tx] }) : [await w.signAndSendTransaction(tx)];
+  const hash = txHashOf(res?.[0]);
+  localStorage.setItem(confirmLS(me), secret);
+  paintRefreshStatus(`Confirm key registered${hash ? ` (${hash.slice(0, 8)}…)` : ''}. It releases a held attack and nothing else.`);
+  return { ok: true, tx: hash, publicKey };
+}
+if (typeof globalThis !== 'undefined') globalThis.__ncRegisterConfirmKey = registerConfirmKey;
 if (typeof globalThis !== 'undefined') globalThis.__ncRefreshAgentKey = refreshAgentKey;
 async function refreshKeyReady() {
   const sec = localStorage.getItem(agentLS(me));
