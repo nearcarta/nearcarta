@@ -16,6 +16,9 @@ createServer(async (req, res) => {
       res.writeHead(r.status, { 'content-type': r.headers.get('content-type') || 'application/json' }); return res.end(Buffer.from(await r.arrayBuffer()));
     } catch { res.writeHead(502, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'api down' })); }
   }
+  if (/^\/pay\/[A-Za-z0-9_]+$/.test(u.pathname)) {
+    u.pathname = '/pay/index.html';
+  }
   if (/^\/shops\/[a-z0-9-]+$/.test(u.pathname)) {
     res.writeHead(308, { location: u.pathname + '/' + u.search });
     return res.end();

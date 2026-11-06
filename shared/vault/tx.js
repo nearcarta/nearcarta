@@ -12,6 +12,15 @@ const str = s => { const b = enc.encode(s); return cat(u32(b.length), b); };
 function cat(...parts) { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; }
 const b64 = bytes => (typeof Buffer !== 'undefined' ? Buffer.from(bytes).toString('base64') : btoa(String.fromCharCode(...bytes)));
 
+/** The one browser slot for an account's agent secret. Every signer reads this at sign time. */
+export const AGENT_LS = account => 'nearcarta.vault.agent.' + account;
+
+/** Key from that slot, or null. `getItem` is read when this is called, never earlier. */
+export function storedAgentKey(getItem, account) {
+  const secret = account && typeof getItem === 'function' ? getItem(AGENT_LS(account)) : null;
+  return secret ? keyFrom(secret) : null;
+}
+
 /** ed25519 key from "ed25519:<base58 64-byte secret>" or a fresh one. */
 export function keyFrom(secret) {
   const kp = secret ? nacl.sign.keyPair.fromSecretKey(bs58.decode(secret.replace(/^ed25519:/, ''))) : nacl.sign.keyPair();

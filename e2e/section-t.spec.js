@@ -115,15 +115,14 @@ test('T1 a landed tx shows the receipt, not a load error', async ({ page }) => {
   for (const width of [1440, 390]) {
     await at(page, width);
     await openShop(page, 'chronicle');
-    await page.evaluate(() => { window.__NC_WALLET_SIGN = async () => 'GVFKTgzgKcepGTmLs318LzNzzrf3pjtYgquZBopLjeCY'; });
-    await (await readyAct(page, /Add today/)).click();
-    const link = page.locator('#t-rc a[data-testid="receipt"], #rc a[data-testid="receipt"], a.rc.tx').first();
-    await expect(link).toHaveAttribute('href', `https://nearblocks.io/txns/${CHRON}`, { timeout: 20000 });
-    await expect(page.locator('#t-say')).toContainText('Entry signed');
+    await page.evaluate(() => { window.__walletSigns = 0; window.__NC_WALLET_SIGN = async () => { window.__walletSigns += 1; return 'GVFKTgzgKcepGTmLs318LzNzzrf3pjtYgquZBopLjeCY'; }; });
+    await expect(page.locator('#t-act')).toBeHidden();
+    await page.getByRole('tab', { name: 'Statement' }).click();
+    await page.locator('#c-go').click();
+    await expect(page.getByTestId('chronicle-verify')).toContainText('Nothing was signed');
+    expect(await page.evaluate(() => window.__walletSigns)).toBe(0);
     await expect(page.locator('#t-say')).not.toContainText('something did not load');
     await expect(page.locator('#t-say')).not.toContainText('Stopped:');
-    await expect(page.locator(`[data-testid="chronicle-page"] li[data-hash="${CHRON}"]`).first()).toBeVisible();
-    await expect(page.locator(`#clist a[href*="${CHRON}"]`).first()).toHaveAttribute('href', `https://nearblocks.io/txns/${CHRON}`);
     await shot(page, 't1-chronicle-' + width);
 
     await page.evaluate(hash => { window.__NC_WALLET_SIGN = async () => hash; }, TOLL_TX);
@@ -161,15 +160,15 @@ test('T3 a new chronicle entry shows in the list and the corner', async ({ page 
   for (const width of [1440, 390]) {
     await at(page, width);
     await openShop(page, 'chronicle');
-    await (await readyAct(page, /Add today/)).click();
-    const row = page.locator(`[data-testid="chronicle-page"] li[data-hash="${CHRON}"]`);
+    await page.getByTestId('chronicle-account').fill('nearcarta.near');
+    await page.locator('#c-go').click();
+    const row = page.locator('[data-testid="chronicle-page"] li').filter({ hasText: 'toll' });
     await expect(row.first()).toBeVisible({ timeout: 20000 });
-    await expect(row.first()).toContainText('chronicle');
-    const corner = page.locator(`#clist a[href*="${CHRON}"]`);
-    await expect(corner.first()).toHaveAttribute('href', `https://nearblocks.io/txns/${CHRON}`);
-    await page.locator('#back').click();
-    await expect(page.locator('#chron')).toBeVisible();
-    await expect(page.locator('#chron')).toContainText(CHRON.slice(0, 6));
+    await expect(row.first().locator('a')).toHaveAttribute('href', /nearblocks\.io\/txns\//);
+    await page.getByRole('tab', { name: 'Statement' }).click();
+    await page.locator('#c-go').click();
+    await expect(page.getByTestId('chronicle-statement')).toContainText('Historic rules: missing');
+    await expect(page.getByTestId('chronicle-verify')).toContainText('Nothing was signed');
     await shot(page, 't3-chronicle-' + width);
   }
 });
@@ -314,9 +313,10 @@ test('T9 a propose-only key signs without opening the wallet', async ({ page }) 
     await at(page, width);
     await openShop(page, 'chronicle');
     await page.evaluate(() => { window.__walletCalls = 0; window.__NC_WALLET_SIGN = async () => { window.__walletCalls++; return 'should-not-run'; }; });
-    await (await readyAct(page, /Add today/)).click();
-    await expect(page.locator('a.rc.tx').first()).toHaveAttribute('href', /nearblocks\.io\/txns\//, { timeout: 20000 });
-    expect(sent).toBeGreaterThan(0);
+    await page.getByRole('tab', { name: 'Statement' }).click();
+    await page.locator('#c-go').click();
+    await expect(page.getByTestId('chronicle-verify')).toContainText('Nothing was signed');
+    expect(sent).toBe(0);
     expect(await page.evaluate(() => window.__walletCalls)).toBe(0);
     expect(popups).toEqual([]);
     await expect(page).not.toHaveURL(/\/sign/);
@@ -347,17 +347,17 @@ test('T10 the ferry quote says nothing is sent', async ({ page }) => {
   }
 });
 
-test('T11 payouts says it prepares a batch', async ({ page }) => {
+test('T11 payouts pays under the cap and does not send before setup', async ({ page }) => {
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/?mode=2d&nostory=1', { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => window.__skipTownIntro?.());
     const pin = page.locator('.fbpin[data-id="payouts"]');
-    await expect(pin).toContainText(/prepare a batch/i);
+    await expect(pin).toContainText(/pay under the cap/i);
     await expect(pin).not.toContainText(/pay many/i);
     await pin.click();
-    await expect(page.locator('#t-label')).toContainText(/prepare a batch/i, { timeout: 20000 });
-    await expect(page.locator('#t-say')).toContainText(/does not send/i);
+    await expect(page.locator('#t-label')).toContainText(/pay under the cap/i, { timeout: 20000 });
+    await expect(page.locator('#t-say')).toContainText(/nothing is sent until setup/i);
     await expect(page.locator('#shopUI')).not.toContainText(/pay many at once/i);
     await shot(page, 't11-payouts-' + width);
   }

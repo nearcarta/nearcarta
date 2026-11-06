@@ -9,6 +9,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { DEP, MAINNET_DEP, cfg, has, secret } from './config.js';
 import * as ferry from './ferry.js';
 import * as checkout from './ferry-checkout.js';
+import * as payoutsInvoice from './payouts-invoice.js';
 import { zcashRecipient } from './zcash.js';
 import * as guard from './guardhouse.js';
 import { attested } from './outlayer.js';
@@ -21,10 +22,15 @@ import { verifyPropose } from './board-tx.js';
 import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
 import * as ai from './ai.js';
+import * as bankProof from './bank-proof.js';
+import * as bankRate from './bank-rate.js';
+import * as bankModel from './bank-model.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as cp from './counterparty.js';
 import { view, viewAccount, txStatus, rpcStats } from './near.js';
+import { readLive } from './chronicle-live.js';
+import { signStatement } from './chronicle-statement.js';
 import { nearAccountOk } from '../../shared/net/accounts.js';
 import { txVerdict } from '../../shared/net/tx-verdict.js';
 import { limiter, clientIpSource, clientIdentity, proxyVerified, globalCap, edgeCache, leakGuard, onError, allowedOrigins, corsOrigin, OVERLOAD } from './http-guard.js';
@@ -275,9 +281,49 @@ export function makeApp() {
 
   // Guardhouse
   app.get('/api/payouts/usdc', limiter(30), edgeCache(15), c => c.json({
-    network: 'mainnet', mode: 'one at a time, not all-or-nothing', max_steps: 3, per_payment_near: '0.005', daily_near: '0.01', usdc: null,
-    note: 'No USDC payroll has been paid. Each payment is a board propose inside the row cap.',
+    network: 'mainnet', mode: 'reviewed rows', usdc: 'invoice',
+    ceiling: payoutsInvoice.hostedCeiling(process.env),
+    note: 'NEAR rows use the visitor row cap. An over-cap row is refused before any deposit. Foreign rows are held. An invoice is EXACT_OUTPUT and is not paid until 1Click says SUCCESS.',
   }));
+  // Durable invoices. Creating one does not call 1Click. Checkout may ask for a deposit address.
+  // Nothing here signs or sends the deposit. The receive account is the one stored on the invoice.
+  app.post('/api/payouts/invoices', limiter(10), async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const who = String(b.receive || b.recipient || '').trim();
+    if (who) {
+      const reg = await payoutsInvoice.registrationOf(who, { view, viewAccount });
+      if (reg.reason === 'missing_account') return c.json({ ok: false, depositAddress: null, invoice: null, ...reg }, 400);
+    }
+    const out = payoutsInvoice.createInvoice(b);
+    return c.json(out, out.ok ? 200 : 400);
+  });
+  app.get('/api/payouts/invoices/:id', limiter(30), c => {
+    const q = c.req.query();
+    const out = payoutsInvoice.readInvoice(c.req.param('id'), q);
+    return c.json(out, out.ok ? 200 : 404);
+  });
+  app.post('/api/payouts/invoices/:id/quote', limiter(10), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const parsed = payoutsInvoice.payerInput(b);
+    if (parsed.error) return bad(c, parsed.error);
+    const out = await payoutsInvoice.quoteStored(c.req.param('id'), parsed.value);
+    return c.json(out, out.ok ? 200 : 400);
+  });
+  app.post('/api/payouts/invoices/:id/checkout', limiter(6), oneClick, async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const parsed = payoutsInvoice.payerInput(b);
+    if (parsed.error) return bad(c, parsed.error);
+    const out = await payoutsInvoice.checkoutInvoice(c.req.param('id'), parsed.value);
+    return c.json(out, out.ok ? 200 : 400);
+  });
+  app.get('/api/payouts/invoices/:id/status', limiter(30), async c => {
+    try { return c.json(await payoutsInvoice.refreshInvoice(c.req.param('id'))); }
+    catch (e) { return c.json({ error: e.message, delivered: false }, e.status || 502); }
+  });
+  app.get('/api/payouts/registration', limiter(30), async c => {
+    const out = await payoutsInvoice.registrationOf(c.req.query('account'), { view, viewAccount });
+    return c.json(out, out.ok ? 200 : 400);
+  });
   app.get('/api/guardhouse', limiter(120), edgeCache(15), async c => c.json(await reads.guardhouse()));
   // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
   app.get('/api/house', limiter(20), async c => { const h = await houseView(); return h ? c.json(h) : c.json({ error: 'no house' }, 404); });
@@ -447,6 +493,22 @@ export function makeApp() {
   // Public ledger (/ledger): sales, payouts, refusals and today's inference cost, from the same live reads.
   app.get('/api/ledger', limiter(20), async c => c.json(await ledgerSwr()));
   app.get('/api/chronicle', limiter(120), edgeCache(15), async c => c.json(mainnetChronicle(c.req.query('owner') || '')));
+  app.get('/api/chronicle/live', limiter(30), async c => {
+    const account = String(c.req.query('account') || '').trim();
+    if (!nearAccountOk(account)) return bad(c, 'account must be a NEAR account id');
+    try { return c.json(await readLive(account)); }
+    catch (e) {
+      return c.json({ account, live: false, rows: [], gaps: [String(e.message || 'Live read failed.').slice(0, 160)], sources: [], label: 'No rows for this account. The live timeline did not answer.' });
+    }
+  });
+  app.post('/api/chronicle/statement', limiter(8), async c => {
+    const b = await jsonBody(c);
+    const account = String(b?.account || '').trim();
+    if (!nearAccountOk(account)) return bad(c, 'account must be a NEAR account id');
+    const rows = Array.isArray(b?.rows) ? b.rows.slice(0, 40) : [];
+    const out = await signStatement({ account, period: b?.period || {}, rows, totals: b?.totals || null });
+    return c.json(out);
+  });
   app.get('/api/chronicle/:account', limiter(120), edgeCache(15), async c => {
     const a = c.req.param('account');
     // Visitor charters made by the vault factory count too (B13 "What happened" feed): the id must sit under the
@@ -532,6 +594,27 @@ export function makeApp() {
     // Completions are billable. This demo route is off unless AI_PROVE_ENABLED=1; the agent (agent.js) has its own budget.
     if (process.env.AI_PROVE_ENABLED !== '1') return c.json({ error: 'completions disabled on this deployment (AI_PROVE_ENABLED!=1)' }, 403);
     return c.json(await ai.prove());
+  });
+  // Mist Bank: live hardware attestation, plus an envelope check when the body carries a receipt.
+  // Neither route refuses just because completions are off. The download has hashes and the summary.
+  app.get('/api/bank/proof', limiter(6), nearAi, async c => c.json(await bankProof.bankProve({ enabled: false })));
+  app.post('/api/bank/prove', limiter(6), nearAi, async c => {
+    let body = {};
+    const text = await c.req.text();
+    if (text) { try { body = JSON.parse(text); } catch { return bad(c, 'body'); } }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return bad(c, 'body');
+    return c.json(await bankProof.bankProve({ receipt: body.receipt || null }));
+  });
+  // Cap conversion only. The statement is not sent here.
+  app.get('/api/bank/rate', limiter(12), async c => c.json(await bankRate.nearRate(c.req.query('currency') || '')));
+  // One TEE audit completion. The rows are not stored and are not returned.
+  app.post('/api/bank/audit', limiter(4), nearAi, async c => {
+    let body = {};
+    const text = await c.req.text();
+    if (text) { try { body = JSON.parse(text); } catch { return bad(c, 'body'); } }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return bad(c, 'body');
+    const model = typeof body.model === 'string' ? body.model.slice(0, 120) : '';
+    return c.json(await bankModel.runModelAudit({ rows: body.rows, ...(model ? { model } : {}) }));
   });
   // Charters (factory) and Vault Arena: backend/src/vault.js
   vault.register(app, { limiter, globalCap });
