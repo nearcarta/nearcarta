@@ -4,7 +4,7 @@
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
 import { charterSetupCta } from './hall-ui.js';
-import { ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './hall.js';
+import { BOARD, ROW_WAIT_MS, nearOf, normalizeRow, rowWaitWhy, withRowWait } from './hall.js';
 import { DEED } from '../deed-control.js';
 import { runHouseTurn } from './house-agent.js';
 import { armHouseDock, ensureHouseDock, installHouseDock } from './house-dock.js';
@@ -169,6 +169,12 @@ export function mountHouseRoom(root, hooks = {}) {
       vault: state.tab === 'vaults' ? vaultFromFields() : state.vault,
       line: state.line,
       seen: state.seen,
+      account: id || '',
+      house: DEED.contract,
+      tokenId: state.token?.token_id || id || '',
+      board: BOARD,
+      nonce: state.row?.nonce,
+      epoch: state.row?.epoch ? state.row.epoch : undefined,
       showTab,
       showSeal,
       hideRefuse: hideSeal,

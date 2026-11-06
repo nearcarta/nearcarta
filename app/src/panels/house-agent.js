@@ -1,8 +1,10 @@
 // House commands. The gold button and the AI Agent both call runHouseTurn.
 // Neither one signs. A charter propose is not a spend from the deed.
-// A function-call key cannot attach NEAR:
+// A check-in or a foreign prepare is a propose_call_as on the board. The board
+// writes row_owner. This file only builds that call.
 // https://docs.near.org/protocol/accounts-contracts/access-keys
-// The board call that would act as the holder is not deployed. Live broadcast stays blocked.
+
+import { effectTokenOk, proposeCallAs, cancelHoldArgs, expireSentArgs } from '../house-board.js';
 
 const NAMED = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 const IMPLICIT = /^[0-9a-f]{64}$/;
@@ -59,6 +61,57 @@ function amountOf(line) {
 /** Same fields, same id. A second click does not prepare a second send. */
 export function houseActionId(plan) {
   return [plan.action, plan.chain || '', plan.asset || '', plan.value || '', plan.to || '', plan.receiver || '', plan.amountY || ''].join('|');
+}
+
+function planCheckIn(ctx) {
+  if (!ctx.row || !ctx.account || !ctx.house || !ctx.tokenId || !ctx.board) {
+    return {
+      ok: true, action: 'checkin', tab: 'deed', seal: false, signed: false, live: false, label: 'blocked',
+      hint: 'Blocked. Check-in needs 1 yocto from the holder, or the board acting as you. Nothing was signed.',
+    };
+  }
+  const row = ctx.row;
+  if (row.frozen) return refuse('Your row is frozen. Nothing was signed.', { tab: 'deed', action: 'checkin' });
+  const receivers = (row.receivers || []).map(String);
+  if (!receivers.some(r => r.toLowerCase() === String(ctx.house).toLowerCase())) {
+    return refuse('This house is not on your row. Nothing was signed.', { tab: 'deed', action: 'checkin' });
+  }
+  const deposit = big(row.min_amount) > 0n ? String(big(row.min_amount)) : '1';
+  if (big(deposit) > big(row.per_action_cap)) return refuse('That is over your cap. Nothing was signed.', { tab: 'deed' });
+  if (row.balance != null && row.balance !== '' && big(deposit) > big(row.balance)) {
+    return refuse('Your row does not hold that much. Nothing was signed.', { tab: 'deed' });
+  }
+  if (ctx.nonce == null || ctx.epoch == null) {
+    return {
+      ok: true, action: 'checkin', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
+      deposit, method: 'house_session_check_in',
+      hint: 'The check-in is house_session_check_in. Read the row nonce and epoch, then sign propose_call_as. Nothing was signed.',
+    };
+  }
+  let call;
+  try {
+    call = proposeCallAs({
+      network: ctx.network || 'mainnet',
+      board: ctx.board,
+      owner: ctx.account,
+      receiver: ctx.house,
+      method: 'house_session_check_in',
+      args: { token_id: ctx.tokenId },
+      deposit,
+      expiry: ctx.expiry || '60000000000',
+      nonce: ctx.nonce,
+      epoch: ctx.epoch,
+      effects: [],
+      hold: false,
+    });
+  } catch (e) {
+    return refuse(`${e.message || 'The board call could not be built.'} Nothing was signed.`, { tab: 'deed' });
+  }
+  return {
+    ok: true, action: 'checkin', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
+    call, deposit, method: 'house_session_check_in',
+    hint: 'Ready for propose_call_as. The board writes row_owner. hold is false, so check-in runs now. The agent key must include propose_call_as. Nothing was signed.',
+  };
 }
 
 function planNear(line, ctx) {
@@ -128,10 +181,43 @@ function planForeign(line, ctx) {
       return refuse('That payee is not on this vault. Nothing was signed.', { chain, asset, value: amt, to });
     }
   }
+  const value = btc ? '0' : amt;
+  const whole = /^\d+$/.test(String(value));
+  let call = null;
+  let hint = 'Prepared. Live broadcast is blocked. Nothing was signed.';
+  if (whole && ctx.account && ctx.house && ctx.tokenId && ctx.board && ctx.row && ctx.nonce != null && ctx.epoch != null) {
+    const receivers = (ctx.row.receivers || []).map(String);
+    if (!receivers.some(r => r.toLowerCase() === String(ctx.house).toLowerCase())) {
+      return refuse('This house is not on your row. Nothing was signed.', { chain, asset, value, to });
+    }
+    if (!effectTokenOk(chain) || !effectTokenOk(asset) || !effectTokenOk(to)) {
+      return refuse('The board rejects that payee. Nothing was signed.', { chain, asset, value, to });
+    }
+    const deposit = big(ctx.row.min_amount) > 0n ? String(big(ctx.row.min_amount)) : '1';
+    try {
+      call = proposeCallAs({
+        network: ctx.network || 'mainnet',
+        board: ctx.board,
+        owner: ctx.account,
+        receiver: ctx.house,
+        method: 'house_session_prepare_send',
+        args: { token_id: ctx.tokenId, chain, to, asset, value, gas_limit: gas, action_id: houseActionId({ action: 'prepare', chain, asset, value, to }) },
+        deposit,
+        expiry: ctx.expiry || '60000000000',
+        nonce: ctx.nonce,
+        epoch: ctx.epoch,
+        effects: [{ chain, asset, to, value, fee: '0' }],
+        hold: true,
+      });
+      hint = 'Prepared. propose_call_as holds it until confirm_hold. Live broadcast is blocked. Nothing was signed.';
+    } catch (e) {
+      return refuse(`${e.message || 'The board call could not be built.'} Nothing was signed.`, { chain, asset, value, to });
+    }
+  }
   return {
     ok: true, action: 'prepare', tab: 'vaults', seal: false, signed: false, live: false, label: 'prepared',
-    chain, asset, value: btc ? '0' : amt, to, gas,
-    hint: 'Prepared. Live broadcast is blocked. Nothing was signed.',
+    chain, asset, value, to, gas, call,
+    hint,
   };
 }
 
@@ -139,6 +225,24 @@ function planForeign(line, ctx) {
 export function planHouseLine(text, ctx = {}) {
   const line = String(text || '').replace(/\s+/g, ' ').trim();
   if (!line) return { ok: false, action: 'miss', hint: HOUSE_MISS };
+  if (/\bcancel\b/i.test(line) && /\bhold\b/i.test(line)) {
+    const id = String(ctx.actionId || '').trim();
+    if (!/^\d+$/.test(id)) return { ok: false, action: 'miss', hint: 'Name the hold id. Nothing was signed.' };
+    return {
+      ok: true, action: 'cancel_hold', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
+      call: cancelHoldArgs(id),
+      hint: 'Ready for cancel_hold. The row owner drops a hold that was never sent. Nothing was signed.',
+    };
+  }
+  if (/\bexpire\b/i.test(line) && /\bhold\b/i.test(line)) {
+    const id = String(ctx.actionId || '').trim();
+    if (!ctx.account || !/^\d+$/.test(id)) return { ok: false, action: 'miss', hint: 'Name the hold id. Nothing was signed.' };
+    return {
+      ok: true, action: 'expire_sent', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
+      call: expireSentArgs(ctx.account, id),
+      hint: 'Ready for expire_sent. After the hold was sent and its expiry passed, no NEAR comes back. Nothing was signed.',
+    };
+  }
   if (/\bcancel\b/i.test(line) && /\brelease\b/i.test(line)) {
     const waiting = !!ctx.line?.line?.pending_ns;
     return {
@@ -150,10 +254,7 @@ export function planHouseLine(text, ctx = {}) {
     };
   }
   if (/\b(i'm alive|i’m alive|im alive|check[\s-]?in)\b/i.test(line)) {
-    return {
-      ok: true, action: 'checkin', tab: 'deed', seal: false, signed: false, live: false, label: 'blocked',
-      hint: 'Blocked. Check-in needs 1 yocto from the holder, or the board acting as you. That board call is not live. Nothing was signed.',
-    };
+    return planCheckIn(ctx);
   }
   if (/\b(heir|guardian|threshold)\b/i.test(line) && !/\b(pay|send)\b/i.test(line)) {
     return {

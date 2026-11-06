@@ -3,8 +3,8 @@
 //! Whoever holds the deed controls the purse: `house_pay` is allowed only for the current owner, needs 1 yocto
 //! (a full wallet approval, never a function-call key) and stays under the deed's cap. Transfer the deed and the
 //! purse and the rule move with it; the old owner is refused from then on. Anyone may `house_fund` a deed.
-//! Any account may mint one deed (token_id = minter account id). No owner, no admin, no upgrade method; the account
-//! is deployed with no access key.
+//! Any account may mint one deed (token_id = minter account id). The deployer may upgrade, then migrate.
+//! The live account has no access key until one is added for that deploy.
 use near_contract_standards::non_fungible_token::metadata::{
     NFTContractMetadata, NonFungibleTokenMetadataProvider, TokenMetadata, NFT_METADATA_SPEC,
 };
@@ -335,10 +335,12 @@ impl Contract {
         self.mint_for(row_owner, None, cap)
     }
 
+    /// `row_owner` is the top-level argument the board writes. A nested `row_owner` is not a field here.
     #[payable]
     pub fn house_session_check_in(&mut self, row_owner: AccountId, token_id: TokenId) {
         self.require_board();
         self.require_holder(&token_id, &row_owner);
+        self.credit_attached(&token_id);
         self.check_in_holder(&token_id);
     }
 
@@ -347,6 +349,7 @@ impl Contract {
     pub fn house_session_set_line(&mut self, row_owner: AccountId, token_id: TokenId, heirs: Vec<AccountId>, guardians: Vec<AccountId>, threshold: u32, period_ns: U64, wait_ns: U64) {
         self.require_board();
         self.require_holder(&token_id, &row_owner);
+        self.credit_attached(&token_id);
         if let Some(prev) = self.lines.get(&token_id) {
             require!(prev.heirs == heirs && prev.guardians == guardians, "owner intent required");
             require!(threshold >= prev.threshold, "owner intent required");
@@ -360,6 +363,7 @@ impl Contract {
     pub fn house_session_pay(&mut self, row_owner: AccountId, token_id: TokenId, receiver_id: AccountId, amount: U128, action_id: String) -> Promise {
         self.require_board();
         self.require_holder(&token_id, &row_owner);
+        self.credit_attached(&token_id);
         self.pay_from_purse(token_id, receiver_id, amount, action_id)
     }
 
@@ -369,6 +373,7 @@ impl Contract {
     pub fn house_session_prepare_send(&mut self, row_owner: AccountId, token_id: TokenId, chain: String, to: String, asset: String, value: U128, gas_limit: u64, action_id: String) -> PreparedSend {
         self.require_board();
         self.require_holder(&token_id, &row_owner);
+        self.credit_attached(&token_id);
         self.prepare_send(&token_id, chain, to, asset, value.0, gas_limit, action_id)
     }
 
@@ -445,6 +450,50 @@ impl Contract {
     #[private]
     pub fn migrate(&mut self) {
         self.version = 3;
+    }
+
+    /// Read the live v2 state, send each purse to its current deed holder, then keep the deeds.
+    /// The new maps start empty. Call this in the same transaction as the code deploy.
+    #[init(ignore_state)]
+    pub fn migrate_from_v2() -> Self {
+        require!(env::predecessor_account_id() == env::current_account_id(), "only the contract may migrate");
+        let mut old: OldHouse = env::state_read().unwrap_or_else(|| env::panic_str("old house state"));
+        let supply = old.tokens.nft_total_supply().0;
+        let tokens = if supply == 0 { Vec::new() } else { old.tokens.nft_tokens(Some(U128(0)), Some(supply as u64)) };
+        for t in &tokens {
+            let Some(mut p) = old.purses.get(&t.token_id) else { continue; };
+            if p.balance.0 == 0 { continue; }
+            let _ = Promise::new(t.owner_id.clone()).transfer(NearToken::from_yoctonear(p.balance.0));
+            p.balance = U128(0);
+            old.purses.insert(&t.token_id, &p);
+        }
+        Self {
+            tokens: old.tokens,
+            metadata: old.metadata,
+            purses: old.purses,
+            lines: LookupMap::new(Key::Line),
+            epochs: LookupMap::new(Key::Epoch),
+            vaults: LookupMap::new(Key::Vault),
+            prepared: LookupMap::new(Key::Prepared),
+            seen: LookupMap::new(Key::Seen),
+            owner: old.owner,
+            board: "board.nearcarta.near".parse().unwrap(),
+            held: 0,
+            foreign_open: 0,
+            version: 3,
+        }
+    }
+
+    pub fn house_version(&self) -> u32 { self.version }
+
+    /// NEAR attached by the board lands on this contract. Count it on the deed, so it is not loose storage.
+    fn credit_attached(&mut self, token_id: &TokenId) {
+        let dep = env::attached_deposit().as_yoctonear();
+        if dep == 0 { return; }
+        let mut p = self.purses.get(token_id).unwrap_or_else(|| env::panic_str("no such deed"));
+        p.balance = U128(p.balance.0.checked_add(dep).expect("purse"));
+        self.held = self.held.checked_add(dep).expect("held");
+        self.purses.insert(token_id, &p);
     }
 
     fn require_board(&self) {
@@ -552,6 +601,16 @@ impl Contract {
     fn line_of(&self, token_id: &TokenId) -> Line {
         self.lines.get(token_id).unwrap_or_else(|| env::panic_str("no inheritance line"))
     }
+}
+
+/// The account as it is on mainnet today: deed, purse, owner, held. No inheritance maps.
+#[near(serializers = [borsh])]
+struct OldHouse {
+    tokens: NonFungibleToken,
+    metadata: LazyOption<NFTContractMetadata>,
+    purses: LookupMap<TokenId, Purse>,
+    owner: AccountId,
+    held: u128,
 }
 
 fn distinct(ids: &[AccountId]) -> bool {
@@ -1020,6 +1079,27 @@ mod tests {
         c.house_mark_funded(id);
         at(0, 1, 5 * SEC);
         let _ = c.close();
+    }
+
+    #[test]
+    fn a_board_deposit_on_check_in_stays_on_the_purse() {
+        let (mut c, id) = fresh();
+        let before = c.house_purse(id.clone()).unwrap().balance.0;
+        board_at(7, 3 * SEC);
+        c.house_session_check_in(accounts(1), id.clone());
+        assert_eq!(c.house_purse(id).unwrap().balance.0, before + 7);
+        assert_eq!(c.house_held().0, before + 7);
+        assert_eq!(c.house_version(), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "old house state")]
+    fn migrate_from_v2_refuses_a_missing_v2_state() {
+        ctx(0, 0);
+        let _ = Contract::new(None);
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id("deeds.near".parse().unwrap()).build());
+        let _ = Contract::migrate_from_v2();
     }
 
     #[test]
