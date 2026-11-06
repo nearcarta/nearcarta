@@ -589,11 +589,39 @@ body.ferry-tray #shopUI .rcpt:empty{display:none}
   font:700 16px/1 system-ui,sans-serif; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;
 }
+/* Arena mix tray: same air as Ferry, without hiding the scam result line. */
+body.arena-tray #shopUI #tray{
+  width:min(440px,calc(100vw - 28px));
+  max-width:440px;
+  left:16px; bottom:18px;
+  max-height:calc(100dvh - 200px);
+  padding:24px 22px 22px;
+  box-sizing:border-box;
+  overflow-x:hidden;
+  overflow-y:auto;
+  background:#1f1a15;
+  border:1px solid #3a3128;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+body.arena-tray #shopUI .t-head{display:none!important}
+body.arena-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
+body.arena-tray #shopUI [data-testid=arena-live]{gap:14px}
+
 @media (max-width:720px){
   body.ferry-tray #shopUI #tray{
     width:min(100vw - 16px,420px); max-width:none;
     left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
     max-height:min(58dvh,calc(100dvh - 108px)); padding:20px 18px;
+  }
+  body.arena-tray #shopUI #tray{
+    width:min(100vw - 16px,420px); max-width:none;
+    left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    max-height:min(46dvh,calc(100dvh - 220px)); padding:20px 18px;
+  }
+  body.arena-tray #arena-agent-dock{
+    top:auto; right:8px; gap:8px;
+    bottom:calc(46dvh + 20px + env(safe-area-inset-bottom,0px));
   }
   #ferry-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
   .ferry-agent-avatar{width:72px;height:72px}

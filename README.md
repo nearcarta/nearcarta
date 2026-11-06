@@ -53,7 +53,7 @@ Open the town, walk to a shop, and press the button. The Lamplighter asks. The c
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 501 backend unit tests (498 pass, 3 skipped), offline
+npm test                                   # 512 backend unit tests (509 pass, 3 skipped), offline
 (cd contracts/oath && cargo test --lib)    # 122 charter unit tests
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -151,7 +151,7 @@ An agent with a wallet key can be talked into paying anyone: a fake invoice, a p
 | Ferry | *Get quote* for about 0.05 wNEAR on NEAR to USDC on NEAR, then *Load cargo* | Fund NEAR once in `/setup`. Ask charter is the stamp [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV), not the swap. A session Load cargo settles with `propose_call` when the quote is at most 0.20 USD and the row cap holds the wrap. The boat says delivered only after SUCCESS. Guest Load cargo is a demo. Pay (`/ferry-widget`) is optional and you send that deposit yourself. This page does not claim a new SUCCESS swap |
 | Mist Bank | *Send 0.01 NEAR privately* (fixed note sizes), then *Verify the seal*; *Verify the TEE now* | The charter memo carries a commitment and the seal matches the chain; the send comes with a NEAR AI TEE check that uses the commitment as its nonce (*Verify the TEE now* uses a fresh random one). The ZEC payout is mainnet only |
 | Guardhouse | Type an account and press *Check this account* | Age, code hash, lookalike, denylist and any recorded refusal, each with a sentence. A recorded refusal links the mainnet tx |
-| Vault Arena | Write a scam, *Send the scam* | The NEAR AI model (`z-ai/glm-5.3-flash`) reads it and proposes a payment; a payment outside your rules is refused on chain. Six walls, points and a leaderboard |
+| Vault Arena | Write a scam, *Send the scam*, or ask the agent in the room | The NEAR AI model (`z-ai/glm-5.3-flash`) reads it and proposes a payment; a payment outside your rules is refused on chain. The Score tab counts `get_attempt` verdicts only. A cancelled signature adds no points. Market prices come from `app/src/panels/arena/pricing.rules.json`. *Simulate a week* does not sign |
 | Payouts | *Prepare the batch*, or paste a CSV | One receipt per row. Nothing is sent. A USDC row stays under 0.20 USD and is not sent. The live board signs `propose` only |
 | Town Hall | *Change my row* | `set_rules`, `set_frozen` and `set_seal` on your own row. Deposit 0. A preview reads the new cap back |
 
@@ -179,10 +179,28 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 - Games (Vault Arena): a recorded payment and an over-cap refusal.
 - Open (Your House): the house deed, and the visitor's rules on their row.
 
+### Vault Arena
+
+The city door is the way in. All shops → Vault Arena stays in the town, and that room is what signs. `/shops/arena/` shows the same tray. Signing still needs the city room after setup.
+
+Scam, Score, and Market sit in the tray. The AI Agent is on the other side. Send is inside the card. Enter and the arrow both send. A line the agent does not know leaves a hint and does not clear the box.
+
+Send the scam is a charter `propose` on `board.nearcarta.near`. The model read is `POST /api/vault/ask/plan`. Score is `GET /api/arena/score`, which reads `get_attempt` on `arena.nearcarta.near`. A cancelled signature is not an attempt and adds no points. Market prices are `app/src/panels/arena/pricing.rules.json` (`GET /api/arena/market`). A stall with no stock is closed. *Simulate a week* is labeled a simulation and has no transaction. A buy under the row cap is the same `propose`. The session amount stays at or below 0.06 NEAR. A larger price is refused in the tray before anything is signed. The coin animation runs only after an allowed transaction that has a hash. A refusal shows a seal, and the next action clears it.
+
+Recorded earlier: allow [AZWxqZns…](https://nearblocks.io/txns/AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht), refuse [25LpJRFF…](https://nearblocks.io/txns/25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V). A new buy or scam from this tray is not linked here.
+
+Teardown is the owner's `close` with 1 yoctoNEAR. The contract deletes the account and sends the balance to `nearcarta.near` (`contracts/arena/src/lib.rs`). `node backend/scripts/arena-close.js` prints that plan and does not sign.
+
+```
+npm test
+```
+
+The arena cases are in `backend/test/unit/arena-market.test.js`.
+
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 501 unit tests (498 pass, 3 skipped)
+npm test                 # 512 unit tests (509 pass, 3 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -205,7 +223,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | City tray (Skip to shop), session on, Get quote for about 0.05 wNEAR on NEAR, then Load cargo | Checkout at most 0.20 USD, then `propose_call` on `wrap.near` when the row cap holds it. No wallet. The boat says delivered only after SUCCESS. A quote 1Click rejects (bridge minimum, or over 0.20 USD) shows the reason, hides the refuse seal, and does not say delivered. Guest Load cargo stays a demo. Ask charter is the 0.005 NEAR stamp, not the swap. Code: `app/design/D8_shops/js/shopui.js`, `app/src/panels/deep.js`, `app/src/panels/ferry-settle.js` | unit `a session load plans a deposit and a guest load stays a demo`; unit `dock send quotes 0.05 wNEAR on NEAR to USDC and typing does not`; [Fy1BKPbr…](https://nearblocks.io/txns/Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV) |
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 
-# 501 unit tests (498 pass, 3 skipped):
+# 512 unit tests (509 pass, 3 skipped):
 Proof rows (54/54 expected).
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. The visitor board is `contracts/charter_board` (15 tests, rustc 1.86).
