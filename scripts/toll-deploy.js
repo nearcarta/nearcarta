@@ -27,6 +27,10 @@ const ONE = 10n ** 24n;
 const SLACK = 2n * ONE / 100n;
 const MAX_SLACK = 5n * ONE / 100n;
 const RECORDED_CODE = MAIN.toll.code_hash;
+// The live v6 account measured 253139 storage bytes with a 251969-byte wasm.
+// The remainder is the account record plus the empty maps, and a recreated
+// account pays it again.
+const ACCOUNT_OVERHEAD = BigInt((MAIN.toll.storage_bytes || 253139) - 251969);
 const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 function payee(id) {
@@ -100,42 +104,62 @@ let keys = [];
 let viewError = '';
 try {
   account = await viewAccount(SHOP);
-  ownerAccount = await viewAccount(OWNER);
-  policy = await viewCall(SHOP, 'policy', {}).catch(e => { viewError = e.message; return null; });
-  const listed = await rpc('query', { request_type: 'view_access_key_list', finality: 'final', account_id: SHOP });
-  keys = listed.keys || [];
 } catch (e) {
-  viewError = viewError || e.message;
+  viewError = e.message;
+}
+try {
+  ownerAccount = await viewAccount(OWNER);
+} catch (e) {
+  viewError = viewError ? viewError + '; ' + e.message : e.message;
+}
+if (account) {
+  policy = await viewCall(SHOP, 'policy', {}).catch(e => { viewError = viewError || e.message; return null; });
+  try {
+    const listed = await rpc('query', { request_type: 'view_access_key_list', finality: 'final', account_id: SHOP });
+    keys = listed.keys || [];
+  } catch { keys = []; }
 }
 
+const exists = !!account;
 const balanceBefore = account ? BigInt(account.amount) : null;
+const ownerBalance = ownerAccount ? BigInt(ownerAccount.amount) : null;
 const storageNow = account ? BigInt(account.storage_usage) * BYTE : null;
 const fullAccess = keys.filter(k => k.access_key?.permission === 'FullAccess').length;
 const serviceHeld = policy && policy.service_held != null ? BigInt(policy.service_held) : 0n;
 const openOrders = policy && policy.service_held != null ? 'service_held is the NEAR liability' : 'this wasm has no visitor service deposit';
 const codeMatchesRecorded = account && account.code_hash === RECORDED_CODE;
 const alreadyThisWasm = account && codeHash && account.code_hash === codeHash;
-const path = alreadyThisWasm ? 'view' : (codeMatchesRecorded ? 'close_then_create' : 'upgrade_then_migrate');
+const path = !exists ? 'create_only' : alreadyThisWasm ? 'view' : (codeMatchesRecorded ? 'close_then_create' : 'upgrade_then_migrate');
 
 const oldWasmFile = 'contracts/artifacts/toll.v6p86.wasm';
 const oldWasmBytes = existsSync(oldWasmFile) ? BigInt(readFileSync(oldWasmFile).length) : 0n;
-const usageNow = account ? BigInt(account.storage_usage) : BigInt(MAIN.toll.storage_bytes || 0);
-const usageAfter = wasm && oldWasmBytes > 0n ? usageNow - oldWasmBytes + BigInt(wasm.length) : (wasm ? BigInt(wasm.length) : 0n);
+const usageNow = account ? BigInt(account.storage_usage) : 0n;
+// Exact when this account already runs this wasm. Otherwise swap the code size
+// out of the measured usage. A fresh account pays this wasm plus its own record.
+const usageAfter = !wasm ? 0n
+  : alreadyThisWasm ? usageNow
+  : exists ? usageNow - (codeMatchesRecorded ? oldWasmBytes : 0n) + BigInt(wasm.length)
+  : BigInt(wasm.length) + ACCOUNT_OVERHEAD;
 const stakeAfter = usageAfter > 0n ? usageAfter * BYTE : null;
 const fund = stakeAfter == null ? null : stakeAfter + SLACK;
 const slack = fund == null ? null : fund - stakeAfter;
-const covered = balanceBefore != null && fund != null && balanceBefore >= fund;
-const shopAfter = covered ? slack : null;
-const shortfall = balanceBefore != null && fund != null && fund > balanceBefore ? fund - balanceBefore : 0n;
-const stays = covered ? balanceBefore - fund : null;
+const payer = path === 'create_only' ? ownerBalance : balanceBefore;
+const moving = path === 'close_then_create' || path === 'create_only';
+const covered = payer != null && fund != null && payer >= fund;
+const shopAfter = moving && covered ? slack : null;
+const shortfall = payer != null && fund != null && fund > payer ? fund - payer : 0n;
+const stays = moving && path === 'close_then_create' && covered ? balanceBefore - fund : null;
 
 const transfers = [];
 if (path === 'close_then_create' && balanceBefore != null && fund != null) {
   transfers.push({ step: 'close', method: 'delete_account', payee: payee(OWNER), amount_yocto: balanceBefore.toString(), amount_near: yocto(balanceBefore), note: 'The live wasm cannot upgrade. close() returns every yocto, storage included.' });
+}
+if ((path === 'close_then_create' || path === 'create_only') && fund != null) {
   transfers.push({
     step: 'create_account', payee: payee(SHOP), amount_yocto: fund.toString(), amount_near: yocto(fund),
     stake_near: yocto(stakeAfter), slack_near: yocto(slack),
-    note: `Stake ${yocto(stakeAfter)} NEAR is this wasm's storage. Slack is ${yocto(slack)} NEAR for order storage and the signer deposit. ${stays == null ? 'The balance does not cover this transfer.' : yocto(stays) + ' NEAR stays on nearcarta.near.'}`,
+    from: path === 'create_only' ? OWNER : 'the closed balance',
+    note: `Stake ${yocto(stakeAfter)} NEAR is this wasm's storage. Slack is ${yocto(slack)} NEAR for the account record, order storage and the signer deposit. ${stays == null ? (path === 'create_only' ? 'The owner balance pays this transfer.' : 'The balance does not cover this transfer.') : yocto(stays) + ' NEAR stays on nearcarta.near.'}`,
   });
 }
 
@@ -165,18 +189,21 @@ const smokeAmount = process.env.TOLL_SMOKE_AMOUNT || '1';
 const smokeOwner = process.env.TOLL_SMOKE_OWNER || OWNER;
 
 const pre = [
-  { check: 'account', ok: SHOP === 'toll.nearcarta.near' && !!account, detail: SHOP },
+  { check: 'account', ok: SHOP === 'toll.nearcarta.near' && (!!account || path === 'create_only'), detail: exists ? SHOP : SHOP + ' is absent; this run creates it' },
   { check: 'owner', ok: OWNER === 'nearcarta.near' && (!policy || policy.owner === OWNER), detail: policy?.owner || OWNER },
   { check: 'no full-access key', ok: fullAccess === 0, detail: String(fullAccess) },
   { check: 'no visitor NEAR to refund', ok: serviceHeld === 0n, detail: openOrders + ', service_held ' + serviceHeld.toString() },
-  { check: 'payees', ok: transfers.every(t => t.payee === OWNER || t.payee === SHOP), detail: transfers.map(t => t.payee).join(', ') || 'none until the path is close' },
+  { check: 'payees', ok: transfers.every(t => t.payee === OWNER || t.payee === SHOP), detail: transfers.map(t => t.payee).join(', ') || 'no transfer on this path' },
   { check: 'init has no allow list', ok: init.allow_to.length === 0, detail: 'allow_to empty' },
   { check: 'wasm', ok: !!wasm, detail: wasmFile || 'not built' },
+  { check: 'stake from the wasm', ok: !!stakeAfter, detail: !stakeAfter ? 'no wasm' : yocto(stakeAfter) + ' NEAR for ' + usageAfter.toString() + ' bytes' },
+  { check: 'slack', ok: slack != null && slack <= MAX_SLACK, detail: slack == null ? 'no stake' : yocto(slack) + ' NEAR, max 0.05' },
 ];
 if (path === 'close_then_create') {
   pre.push({ check: 'recorded code', ok: codeMatchesRecorded, detail: account?.code_hash || 'unread' });
-  pre.push({ check: 'balance covers the new stake', ok: covered, detail: stakeAfter ? yocto(stakeAfter) + ' NEAR stake from the wasm' : 'no wasm' });
-  pre.push({ check: 'slack', ok: slack != null && slack <= MAX_SLACK, detail: slack == null ? 'no stake' : yocto(slack) + ' NEAR, max 0.05' });
+}
+if (path === 'close_then_create' || path === 'create_only') {
+  pre.push({ check: 'balance covers the stake and slack', ok: !!covered, detail: !fund ? 'no wasm' : (path === 'create_only' ? OWNER + ' ' : 'the closed balance ') + yocto(fund) + ' NEAR' });
 }
 
 const report = {
@@ -189,13 +216,15 @@ const report = {
   wasm: wasm ? { file: wasmFile, bytes: wasm.length, sha256: sha.toString('hex'), code_hash: codeHash } : null,
   storage: {
     price_yocto_per_byte: BYTE.toString(),
-    usage_bytes: account ? account.storage_usage : MAIN.toll.storage_bytes,
-    stake_now_near: storageNow != null ? yocto(storageNow) : String(MAIN.toll.locked_near),
+    usage_bytes: usageAfter > 0n ? usageAfter.toString() : null,
+    usage_now_bytes: account ? account.storage_usage : null,
+    account_overhead_bytes: ACCOUNT_OVERHEAD.toString(),
+    stake_now_near: storageNow != null ? yocto(storageNow) : null,
     stake_after_near: stakeAfter != null ? yocto(stakeAfter) : null,
     stake_after_yocto: stakeAfter != null ? stakeAfter.toString() : null,
     slack_near: slack != null ? yocto(slack) : null,
     slack_yocto: slack != null ? slack.toString() : null,
-    stake_after_note: 'Current storage, minus the live wasm, plus this wasm. Computed from the wasm size at this run. The chain charges the real usage after deploy.',
+    stake_after_note: 'The wasm size at this run, plus the account record it is stored in. The chain charges the real usage after deploy.',
   },
   balance: {
     shop_before_near: balanceBefore != null ? yocto(balanceBefore) : null,
@@ -203,6 +232,7 @@ const report = {
     owner_before_near: ownerAccount ? yocto(ownerAccount.amount) : null,
     shop_after_liquid_near: shopAfter != null ? yocto(shopAfter) : null,
     stays_on_owner_near: stays != null ? yocto(stays) : null,
+    transfer_note: moving ? 'The amounts for the transfer this run would send.' : 'No transfer on this path. The shop balance is unchanged.',
     shortfall_near: shortfall > 0n ? yocto(shortfall) : '0',
     recorded_locked_near: MAIN.toll.locked_near,
     view_error: viewError || null,
@@ -244,7 +274,7 @@ if (failed.length) {
   console.error('Refusing: a pre-check failed. Nothing was signed.');
   process.exit(1);
 }
-if (path === 'close_then_create' && serviceHeld !== 0n) {
+if ((path === 'close_then_create' || path === 'create_only') && serviceHeld !== 0n) {
   console.error('Refusing: a visitor deposit is still held. Nothing was signed.');
   process.exit(1);
 }
@@ -270,6 +300,8 @@ if (path === 'close_then_create') {
     if (!still) break;
     await new Promise(r => setTimeout(r, 1500));
   }
+}
+if (path === 'close_then_create' || path === 'create_only') {
   const create = [
     A.createAccount(),
     A.transfer(fund),
@@ -287,8 +319,8 @@ if (path === 'close_then_create') {
 }
 
 const after = await viewAccount(SHOP);
-const viewed = await viewCall(SHOP, 'policy', {});
-const addr = await viewCall(SHOP, 'address_of', { row_owner: smokeOwner, chain: 'base' });
+const viewed = await viewCall(SHOP, 'policy', {}).catch(() => null);
+const addr = await viewCall(SHOP, 'address_of', { row_owner: smokeOwner, chain: 'base' }).catch(() => null);
 console.log(JSON.stringify({
   step: 'post_deploy',
   balance_near: yocto(after.amount),
