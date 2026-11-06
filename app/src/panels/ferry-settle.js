@@ -515,3 +515,14 @@ export function cityCheckoutBody({ pair, recipient, charter, amountYocto, refund
   if (session === 'board') body.board = true;
   return body;
 }
+
+/** The receipt with the latest `at`. A missing time sorts last. Ties keep the earlier row. */
+export function newestReceipt(rows) {
+  let best = null;
+  let bestAt = -1;
+  (rows || []).forEach(r => {
+    const at = Number(r?.at) || 0;
+    if (!best || at > bestAt) { best = r; bestAt = at; }
+  });
+  return best;
+}

@@ -94,8 +94,13 @@ export const txLine = (h, label = 'receipt') => h ? `<a class="rc tx" data-testi
 export const receipts = () => (S.charter ? JSON.parse(localStorage.getItem(LS_RCPT(S.charter)) || '[]') : []);
 function keep(h, shop, decision, reason, x = {}) {
   if (!S.charter || !h) return; const k = LS_RCPT(S.charter); const l = JSON.parse(localStorage.getItem(k) || '[]');
-  l.unshift({ h, shop, decision, reason, ...x, at: Date.now() }); localStorage.setItem(k, JSON.stringify(l.slice(0, 40)));
+  const row = { h, shop, decision, reason, ...x, at: Date.now() };
+  const i = l.findIndex(r => r && r.h === h && r.shop === shop);
+  if (i >= 0) l.splice(i, 1);
+  l.unshift(row); localStorage.setItem(k, JSON.stringify(l.slice(0, 40)));
 }
+/** A shop result for the side panel. The same tx replaces its older row and becomes the newest. */
+export function rememberReceipt(h, shop, decision, reason, x = {}) { keep(h, shop, decision, reason, x); }
 
 // ---------- boot + wallet ----------
 // Config: retry with backoff (429/503 from a busy room), keep the last good copy, never fail on a busy API.
