@@ -101,6 +101,18 @@ function walkJson(o, where, parent = null) {
   if (!o || typeof o !== 'object') return;
   // A planned account (the mainnet factory, until the owner deploys it) is not on chain yet.
   if (o.status === 'not_deployed') return;
+  // A staged upgrade record names code that is NOT on chain yet: `stage_upgrade` only stores a
+  // hash and an ETA, and the account keeps running the old wasm until the owner applies it. So
+  // its hash and bytes are a future claim, not a live one. The artifact it names must still
+  // exist on the ref, which is checked by the `artifact` path below.
+  if (/(^|\.)upgrade_staged$/.test(where)) {
+    const art = o.artifact;
+    if (typeof art === 'string' && art) add('file', art, `${where}.artifact`);
+    for (const k of ['tx', 'superseded_stage_tx']) {
+      if (typeof o[k] === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,}$/.test(o[k])) add('proof_tx', o[k], `${where}.${k}`);
+    }
+    return;
+  }
   // A retired or never-created account is recorded on purpose: the docs describe what it was,
   // not a live address. Its fields are a history, so they are not chain citations.
   if (o.status === 'reaped' || o.status === 'deleted' || o.status === 'unused' || typeof o.status_note === 'string' || typeof o.account_note === 'string') return;
