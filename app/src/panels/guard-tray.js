@@ -82,7 +82,7 @@ export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? ''
   // row here and Cancel stayed hidden. Give it a row of its own, with the button beside it.
   if (held && !holds.some(h => String(h.id) === String(state.holdId))) {
     rows.unshift(`<li data-testid="guard-hold-restored">Held on chain · id ${esc(String(state.holdId))} · waiting for you
-      <div class="guard-actions"><button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel">Cancel and refund</button></div></li>`);
+      <div class="guard-actions"><button type="button" class="guard-quiet" id="g-cancel-restored" data-testid="guard-cancel-restored">Cancel and refund</button></div></li>`);
   }
   const list = rows.length ? `<ul class="guard-blocks" data-testid="guard-blocks">${rows.join('')}</ul>` : '<p class="guard-status" data-testid="guard-blocks">No held payment.</p>';
   const rowLine = state.rowKnown
@@ -292,6 +292,8 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     if (confirm) confirm.onclick = () => runPlan({ ok: true, action: 'confirm', actor: 'human' });
     const cancel = q$(root, '#g-cancel');
     if (cancel) cancel.onclick = () => runPlan({ ok: true, action: 'cancel' });
+    const cancelRestored = q$(root, '#g-cancel-restored');
+    if (cancelRestored) cancelRestored.onclick = () => runPlan({ ok: true, action: 'cancel' });
     const freeze = q$(root, '#g-freeze');
     if (freeze) freeze.onclick = () => runPlan({ ok: true, action: 'freeze', frozen: true, approve: false });
     const approve = q$(root, '#g-approve');
