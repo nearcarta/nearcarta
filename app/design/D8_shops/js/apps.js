@@ -144,6 +144,9 @@ export const factories = () => [CFG.factory, ...(CFG.legacy || []).map(l => l.fa
 /** Only charters from the current visitor (R17) factory run propose_batch; R16 and older ones pay one action per tx (the UI says so). */
 export const canBatch = (c = S.charter) => !!c && c.endsWith('.' + CFG.factory);
 export async function refresh() {
+  // Open a room before the wallet layer finished booting: make sure the connector exists
+  // first. Without this, S.me stayed null and shops painted as if nobody was signed in.
+  if (!conn) await init(() => {}).catch(() => {});
   S.me = (await W.currentAccount(conn).catch(() => null)) || readSessionAccount();
   if (onMain()) {
     const board = S.mainnet?.board;
