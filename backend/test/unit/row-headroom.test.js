@@ -24,3 +24,14 @@ test('the rules step refuses a full row before the wallet opens', () => {
   // and it must come before the wallet work, i.e. inside the rules step validator
   assert.ok(setup.indexOf('This row is full') < setup.indexOf('function signBoard'));
 });
+
+test('the chain row is marked loaded only after it arrives', () => {
+  const setup = read('app/house/setup.js');
+  // Setting chainLoadedFor before the await made the next caller return early with
+  // chainRow still null, so a storage-full row was never refused.
+  const fn = setup.slice(setup.indexOf('async function ensureChainRow'), setup.indexOf('async function facts'));
+  const awaitAt = fn.indexOf('await viewFn');
+  const markAt = fn.indexOf('chainLoadedFor = owner');
+  assert.ok(awaitAt > 0 && markAt > awaitAt, 'the flag must be set after the read resolves');
+  assert.ok(!/chainLoadedFor = owner;[\s\S]{0,80}await viewFn/.test(fn), 'never before');
+});
