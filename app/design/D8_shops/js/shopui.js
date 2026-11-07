@@ -1568,7 +1568,11 @@ export function mount(id, shop, scene) { for (const r of ['tray', 'drawer', 'rul
   const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = '';
   { const d = $('#d-body'); lab = d && !d.querySelector('[data-guest]') ? d.innerHTML : ''; } boot(); paint(); proofDrawer();
   // a wallet connected elsewhere on the page (the town HUD) since the last room: pick it up
-  if (A.S.ready) A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
+  // Always refresh the session when a room opens, and repaint once it is known.
+  // This used to run only when `A.S.ready` was already true, so on a fresh city load the
+  // shops painted with an empty `S.me`: Toll showed "Sign in at /setup" to a signed-in
+  // visitor, and its Pay button had no owner to price a crossing for.
+  A.refresh().then(() => cur === id && phase !== 'busy' && paint()).catch(() => {});
 }
 export function unmount() { cur = null; sh = null; lab = ''; extra = {}; phase = 'idle'; stopFerryWatch(); closeRules(); document.body.classList.remove('ferry-tray'); document.body.classList.remove('guard-tray'); document.body.classList.remove('chronicle-tray'); document.body.classList.remove('toll-tray'); document.body.classList.remove('hall-tray'); document.body.classList.remove('bank-tray'); document.body.classList.remove('payouts-tray'); document.body.classList.remove('house-tray'); document.body.classList.remove('arena-tray'); const dock = document.getElementById('ferry-agent-dock'); if (dock) dock.hidden = true; const guardDock = document.getElementById('guard-agent-dock'); if (guardDock) guardDock.hidden = true; const cdock = document.getElementById('chronicle-agent-dock'); if (cdock) cdock.hidden = true; const tollDock = document.getElementById('toll-agent-dock'); if (tollDock) tollDock.hidden = true; const hallDock = document.getElementById('hall-agent-dock'); if (hallDock) hallDock.hidden = true; const houseDock = document.getElementById('house-agent-dock'); if (houseDock) houseDock.hidden = true; hideBankDock(); const pDock = document.getElementById('payouts-agent-dock'); if (pDock) pDock.hidden = true; const arenaDock = document.getElementById('arena-agent-dock'); if (arenaDock) arenaDock.hidden = true; const sayEl = $('#t-say'); if (sayEl) sayEl.textContent = ''; }
 export const rulesOpen = () => !!$('#rules')?.classList.contains('open');
