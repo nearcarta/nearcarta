@@ -195,7 +195,17 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
    what fixes the clipped gold button on phones (it sat at y=941 in an 844px viewport) and
    the "menu feels stuck" complaint: the one thing to press is always visible. */
 #shopUI #tray { position: fixed; left: var(--s3); bottom: var(--s3); width: 300px; max-height: calc(100dvh - 96px); overflow: hidden; padding: var(--s3); background: var(--raised); border: 1px solid var(--line); border-radius: var(--R); z-index: 4; animation: shup .24s var(--ease); display: flex; flex-direction: column; gap: 0; }
-#shopUI #tray > .t-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+/* The scrollbar has to be visible: an invisible one reads as "the menu is cut off", which is
+   exactly how the owner described it. Thin, gold, always shown. */
+#shopUI #tray > .t-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #c98f4e #24180f;
+  padding-right: 2px;
+}
+#shopUI #tray > .t-scroll::-webkit-scrollbar { width: 10px; }
+#shopUI #tray > .t-scroll::-webkit-scrollbar-track { background: #24180f; border-radius: 8px; }
+#shopUI #tray > .t-scroll::-webkit-scrollbar-thumb { background: #c98f4e; border-radius: 8px; border: 2px solid #24180f; }
+#shopUI #tray > .t-scroll::-webkit-scrollbar-thumb:hover { background: #f5d08a; }
 #shopUI #tray > .t-actions, #shopUI #tray > .t-row, #shopUI #tray > .rcpt, #shopUI #tray > .t-links { flex: 0 0 auto; }
 #shopUI .token-listbox { position: relative; width: 100%; }
 #shopUI .token-listbox-btn { width: 100%; min-height: 44px; box-sizing: border-box; padding: 6px 28px 6px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--base); color: var(--text); font: 600 14px/1.2 Inter, system-ui, sans-serif; display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer; }
@@ -498,6 +508,10 @@ body:has(#drawer.open) #back{visibility:hidden}
 #drawer .plain-line a { color: #f3d78f; text-decoration: underline; }
 
 /* A plain shop list for a visitor who cannot use the city. It does not restyle the canvas. */
+/* In a shop the tray starts at the same height, so "All shops" must sit above it or it lands
+   on the first tab (measured: it covered Arena's tab). Push the tray below the menu. */
+body.in-shop nav.all-shops { top: 64px; }
+body.in-shop #shopUI #tray { padding-top: calc(var(--s3) + 44px); }
 nav.all-shops{position:fixed;z-index:200;top:120px;left:12px;max-width:min(280px,calc(100vw - 24px));background:#1a140f;color:#fff8ee;border:1px solid #c98f4e;border-radius:12px;padding:8px 12px;font:600 16px/1.35 system-ui,sans-serif;pointer-events:auto}
 body.story nav.all-shops,body.intro-on nav.all-shops,body:not(.ready) nav.all-shops{opacity:1;visibility:visible;pointer-events:auto;z-index:200}
 nav.all-shops summary{list-style:none;cursor:pointer;color:#f5d08a}

@@ -52,3 +52,18 @@ test('every tray field meets the 44px tap floor', () => {
   const link = bank.slice(bank.indexOf('.bank-sample-link{'), bank.indexOf('}', bank.indexOf('.bank-sample-link{')));
   assert.match(link, /min-height:\s*44px/, 'the sample download link measured 70x18px');
 });
+
+test('the tray scrollbar is visible, so the menu does not look cut off', () => {
+  const css = read('app/design/D9_world/world.css');
+  const rule = css.slice(css.indexOf('#shopUI #tray > .t-scroll'), css.indexOf('}', css.indexOf('#shopUI #tray > .t-scroll')) + 1);
+  assert.match(rule, /scrollbar-width:\s*thin/, 'a hidden scrollbar reads as clipped content');
+  assert.match(rule, /scrollbar-color:/);
+  assert.match(css, /::-webkit-scrollbar-thumb/, 'and it must be styled, not left invisible');
+});
+
+test('All shops never lands on a shop tab', () => {
+  const css = read('app/design/D9_world/world.css');
+  // Measured: it covered Arena's first tab at 1280x800.
+  assert.match(css, /body\.in-shop nav\.all-shops\s*\{[^}]*top:/, 'in a shop the menu moves up');
+  assert.match(css, /body\.in-shop #shopUI #tray\s*\{[^}]*padding-top:/, 'and the tray clears it');
+});
