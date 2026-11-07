@@ -571,6 +571,28 @@ body.arena-tray .arena-modes{display:flex;flex-wrap:wrap;gap:8px}
 body.arena-tray .arena-mode,body.arena-tray .arena-next{min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:650 16px/1 system-ui,sans-serif;cursor:pointer}
 body.arena-tray .arena-mode[aria-pressed=true]{border-color:#f5d08a}
 body.arena-tray .arena-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center}
+/* Six single-column fields made the mint card 799px tall inside a 658px scroll region, so the
+   gold action sat below the fold (y=792 in an 800px viewport) while the form still felt cramped.
+   Two columns halve the height and give each field room. */
+body.arena-tray .ferry-pane[data-pane="guardians"]{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;align-items:start;
+}
+body.arena-tray .ferry-pane[data-pane="guardians"] > .ferry-tabs,
+body.arena-tray .ferry-pane[data-pane="guardians"] > .ferry-flow,
+body.arena-tray .ferry-pane[data-pane="guardians"] > .arena-flow-caption,
+body.arena-tray .ferry-pane[data-pane="guardians"] > .arena-modes,
+body.arena-tray .ferry-pane[data-pane="guardians"] > .arena-guardians,
+body.arena-tray .ferry-pane[data-pane="guardians"] > .arena-actions,
+body.arena-tray .ferry-pane[data-pane="guardians"] > .arena-lines{grid-column:1 / -1}
+@media (max-width:420px){
+  /* Keep two columns on phones too: switching back to one column added 170px and pushed the
+     gold action off a 844px screen (measured y=813 + 44). The gaps tighten instead. */
+  body.arena-tray .ferry-pane[data-pane="guardians"]{gap:10px 10px}
+  body.arena-tray .ferry-field{gap:4px}
+  body.arena-tray .ferry-field > input,body.arena-tray .ferry-field .amt-row{min-height:44px}
+}
+}
+
 body.arena-tray .arena-status,body.arena-tray .arena-flow-caption{margin:0;color:#fff8ee;font:600 14px/1.4 system-ui,sans-serif;overflow-wrap:anywhere}
 body.arena-tray .arena-lines{display:grid;gap:6px}
 body.arena-tray .arena-guardians{list-style:none;margin:0;padding:0;display:grid;gap:8px}

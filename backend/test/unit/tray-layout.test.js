@@ -90,3 +90,13 @@ test('the Bank sample link meets the tap floor in the rule that actually wins', 
   assert.match(specific, /min-height:44px/, 'the winning rule must set the tap floor');
   assert.doesNotMatch(specific, /min-height:0/, 'and must not reset it to zero');
 });
+
+test('Arena stacks fewer rows so its gold action never sits below the fold', () => {
+  const panels = read('app/src/panels/panels.css');
+  // Measured: six single-column fields made the card 799px inside a 658px region and the CTA
+  // landed at y=792 in an 800px viewport.
+  const pane = panels.slice(panels.indexOf('body.arena-tray .ferry-pane[data-pane="guardians"]{'));
+  const rule = pane.slice(0, pane.indexOf('}'));
+  assert.match(rule, /grid-template-columns:1fr 1fr/, 'the money fields sit in two columns');
+  assert.match(panels, /\.arena-actions[,\s][\s\S]{0,120}?grid-column:1 \/ -1\}|> \.arena-actions,\n/, 'the action spans the full row');
+});
