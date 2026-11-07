@@ -245,6 +245,23 @@ export async function buildCharter() {
   S.charter = id; keep(h, 'house', 'built', 'create_charter'); await readRules(); return { tx: h, id };
 }
 
+// ---------- house: mint the deed ----------
+/**
+ * Mint the visitor's deed. `mint_deed` reads `predecessor` and needs a 0.02 NEAR deposit
+ * attached, so a function-call session key cannot sign it (it may not attach a deposit).
+ * This is the one House action that costs a wallet approval, and it happens once per
+ * account: after the deed exists, check-in, vault sends and heirs all go through the
+ * session with no popup.
+ */
+export async function houseMint({ capYocto = '50000000000000000000000', depositYocto = '20000000000000000000000' } = {}) {
+  if (!S.me) throw new Error('Sign in first. Nothing was signed.');
+  const house = houseAccount();
+  if (!house) throw new Error('The house contract is not in the deployment record. Nothing was signed.');
+  const h = await sign(house, [fc('mint_deed', { house: null, cap: capYocto }, 100, depositYocto)]);
+  keep(h, 'house', 'minted', 'deed');
+  return { ok: true, tx: h, tokenId: S.me };
+}
+
 // ---------- rules: the visitor writes them, one approval signs them ----------
 export function rulesNow() {
   const D = DEFAULT_RULES;
@@ -1043,6 +1060,7 @@ async function guardRowNow() {
 
 /** The guard shop account, from the deployment record. Never guessed. */
 export const guardAccount = () => S.mainnet?.guard?.contract || '';
+export const houseAccount = () => S.mainnet?.house?.contract || 'house.nearcarta.near';
 /** A look-alike of any allowed payee, for the AI to reason about. Empty when there is no row. */
 export function guardExample() {
   const row = guardRow || S.boardRow;
