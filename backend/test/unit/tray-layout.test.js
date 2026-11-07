@@ -67,3 +67,26 @@ test('All shops never lands on a shop tab', () => {
   assert.match(css, /body\.in-shop nav\.all-shops\s*\{[^}]*top:/, 'in a shop the menu moves up');
   assert.match(css, /body\.in-shop #shopUI #tray\s*\{[^}]*padding-top:/, 'and the tray clears it');
 });
+
+test('the Bank tray is the approved size on a phone, not the smallest one in the city', () => {
+  const bank = read('app/src/panels/bank.css');
+  // Measured: 270px wide and 62dvh tall, so its gold button landed at y=821 in an 844px
+  // viewport and the whole card read as cramped.
+  assert.doesNotMatch(bank, /max-width:min\(270px/, 'the narrow cap is what shrank it');
+  assert.doesNotMatch(bank, /height:min\(62dvh/, 'a 62dvh cap leaves no room for the action row');
+  const phone = bank.slice(bank.indexOf('@media (max-width:720px)'));
+  const rule = phone.slice(phone.indexOf('body.bank-tray #shopUI #tray{'), phone.indexOf('}', phone.indexOf('body.bank-tray #shopUI #tray{')));
+  assert.match(rule, /max-height:calc\(100dvh - 76px\)/, 'it uses the viewport');
+});
+
+test('the Bank sample link meets the tap floor in the rule that actually wins', () => {
+  const bank = read('app/src/panels/bank.css');
+  // A higher-specificity rule set min-height:0 and padding:0, so the plain rule never applied
+  // and the link stayed 70x18px.
+  const at = bank.indexOf('body.bank-tray #shopUI #t-form button.bank-sample-link');
+  // Strip comments: the note explaining the old bug names `min-height:0` and would match itself.
+  const specific = bank.slice(at, bank.indexOf('}', bank.indexOf('min-height', at)))
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(specific, /min-height:44px/, 'the winning rule must set the tap floor');
+  assert.doesNotMatch(specific, /min-height:0/, 'and must not reset it to zero');
+});
