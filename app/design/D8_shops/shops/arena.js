@@ -1,6 +1,6 @@
 // Vault Arena (static): Guardians stand round the vault. Five real lab attacks marked where they struck; none got in.
 import { THREE, room, put, makeRobot, load, Char, C, CSS, radial } from '../js/core.js';
-import { M as PM, brassM, mesh, lantern } from './_props.js';
+import { M as PM, brassM, mesh, lantern, banner } from './_props.js';
 import { ATTACKS, LAB } from '../../D6_dashboards/src/data.js';
 import { row, h3, note, proof, acct, mainnet } from './_ui.js';
 import { livePrompts } from './arenalive.js';
