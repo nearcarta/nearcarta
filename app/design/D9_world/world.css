@@ -201,7 +201,11 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #c98f4e #24180f;
   padding-right: 2px;
+  /* A grid card inside can be taller than the region. Without this it grows to its content
+     and pushes the pinned action row out of the tray: Arena's CTA measured y=836 in 800px. */
+  contain: layout paint;
 }
+#shopUI #tray > .t-scroll > * { min-height: 0; max-width: 100%; }
 #shopUI #tray > .t-scroll::-webkit-scrollbar { width: 10px; }
 #shopUI #tray > .t-scroll::-webkit-scrollbar-track { background: #24180f; border-radius: 8px; }
 #shopUI #tray > .t-scroll::-webkit-scrollbar-thumb { background: #c98f4e; border-radius: 8px; border: 2px solid #24180f; }
