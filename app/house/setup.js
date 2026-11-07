@@ -17,7 +17,7 @@ import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf, storedAgentKey } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
-import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, FERRY_CALL_TARGETS, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, fittingShops, classifyBoardAgentKeys, payoutsCalls, renewAgentKeyActions, sessionExpiresAt, sessionLabel } from '../../shared/board/session.js';
+import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, FERRY_CALL_TARGETS, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, fittingShops, classifyBoardAgentKeys, payoutsCalls, renewAgentKeyActions, sessionExpiresAt, sessionLabel, rowHeadroomBytes } from '../../shared/board/session.js';
 import { HOUSE_CALLS, HOUSE_SHOP } from '../../shared/house/shop.js';
 import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
@@ -373,6 +373,20 @@ function wireRules() {
   wire(() => { const r = rules();
     if (!(r.cap > 0) || !(r.daily >= r.cap)) { msg = 'The daily budget must be at least the per-payment cap.'; return render(); }
     if (!r.receivers.length || r.receivers.some(a => !/^[a-z0-9._-]{2,64}$/.test(a))) { msg = 'Add at least one valid account id.'; return render(); }
+    // The row on chain reports how much of its 0.02 NEAR is already spent on storage. When
+    // there is no room left, ANY rule change panics ERR_ROW_TOO_BIG after the wallet has
+    // already approved it. Refuse here, with the real number, instead of modelling a fresh row.
+    if (boardLive() && !st.trial && chainRow) {
+      const room = rowHeadroomBytes(chainRow);
+      // A full row still accepts a change that does not add a receiver: the contract only
+      // charges when the encoded row grows. Blocking a cap-only edit would be wrong.
+      const known = new Set((chainRow.receivers || []).map(a => String(a)));
+      const adds = r.receivers.some(a => !known.has(String(a)));
+      if (room === 0 && adds) {
+        msg = 'This row is full: its 0.02 NEAR of storage is all used, so a new shop cannot be added. Close the row in Your House and open a new one to change the shop list. Changing a cap or the expiry still works.';
+        return render();
+      }
+    }
     if (boardLive() && !st.trial && !callsFitRow(callsFor(r, MAIN.board.contract), r.receivers.length)) {
       const keep = fittingShops(r.receivers, list => callsFor({ ...r, receivers: list }, MAIN.board.contract));
       msg = keep.length
