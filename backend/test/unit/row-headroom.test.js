@@ -35,3 +35,11 @@ test('the chain row is marked loaded only after it arrives', () => {
   assert.ok(awaitAt > 0 && markAt > awaitAt, 'the flag must be set after the read resolves');
   assert.ok(!/chainLoadedFor = owner;[\s\S]{0,80}await viewFn/.test(fn), 'never before');
 });
+
+test('the rules step reads the chain row itself', () => {
+  const setup = read('app/house/setup.js');
+  // ensureChainRow used to run only on the Sign step, so the rules guard had no row to look
+  // at and skipped itself. The rules step must trigger the read too.
+  assert.match(setup, /STEPS\[st\.step\]\[0\] === 'rules' && boardLive\(\) && !st\.trial && !chainRow/);
+  assert.match(setup, /ensureChainRow\(\)\.then\(\(\) => \{ if \(STEPS\[st\.step\]\[0\] === 'rules'\) render\(\); \}\)/);
+});
