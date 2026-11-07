@@ -1152,10 +1152,18 @@ export async function guardConfirm({ holdId, confirmKey } = {}) {  const guard =
 export async function guardCancel({ holdId } = {}) {
   const guard = guardAccount();
   if (!guard) return { ok: false, signed: false, tx: null, why: 'The guard contract is not in the deployment record. Nothing was signed.' };
-  const row = await guardRowNow();
-  const out = await guardSend({ action: 'cancel', holdId, row, owner: S.me, guard }, guardDeps());
-  if (out.ok && out.tx) keep(out.tx, 'guard', 'refunded', 'cancel', { amt: '', to: S.me });
-  return out;
+  // `cancel_hold` is OWNER-ONLY on chain: the board takes the row owner as predecessor and the
+  // session key deliberately does not carry it, so an agent can never cancel its own hold.
+  // The visitor's own button therefore signs with their wallet: one approval, only on press.
+  const id = holdId == null ? '' : String(holdId);
+  if (!/^\d+$/.test(id)) return { ok: false, signed: false, tx: null, why: 'No held payment to cancel. Nothing was signed.' };
+  try {
+    const h = await sign(S.board, [fc('cancel_hold', { action_id: id }, 40)]);
+    keep(h, 'guard', 'refunded', 'cancel', { amt: '', to: S.me });
+    return { ok: true, signed: true, tx: h, action: 'cancel', why: '' };
+  } catch (e) {
+    return { ok: false, signed: false, tx: e?.tx || null, why: String(e?.message || 'Cancel was refused.').slice(0, 160) };
+  }
 }
 
 /** After the hold expired and was sent: free it, no refund. */
