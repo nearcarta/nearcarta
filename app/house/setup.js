@@ -326,9 +326,14 @@ function rules() {
   const p = persona();
   const mainShops = DEFAULT_SHOPS;
   const fallback = st.trial ? (CFG?.arena?.merchants || []).slice(0, 2) : mainShops;
+  // The field is the source of truth when this step is on screen. A list typed or pasted
+  // without an `input` event used to be ignored and the row kept its old receivers.
+  const field = typeof document !== 'undefined' ? document.getElementById('rcv') : null;
+  const typed = field ? liveShops(String(field.value || '').split(/[\s,]+/), RETIRED_ACCOUNTS) : [];
   const saved = liveShops(st.receivers, RETIRED_ACCOUNTS);
+  const useTyped = typed.length > 0;
   const useSaved = saved.length > 0;
-  return { cap: st.cap ?? p.cap, daily: st.daily ?? p.daily, per: st.per ?? p.per, hours: SESSION_HOURS.includes(+st.hours) ? +st.hours : 1, receivers: useSaved ? saved : fallback };
+  return { cap: st.cap ?? p.cap, daily: st.daily ?? p.daily, per: st.per ?? p.per, hours: SESSION_HOURS.includes(+st.hours) ? +st.hours : 1, receivers: useTyped ? typed : (useSaved ? saved : fallback) };
 }
 function preview(r) {
   const until = sessionLabel(r.hours);
@@ -352,7 +357,16 @@ function sRules() {
 }
 function wireRules() {
   const upd = () => { st.cap = +$('#cap').value; st.daily = +$('#daily').value; st.per = +$('#per').value; st.hours = +$('#hours').value; st.receivers = liveShops($('#rcv').value.split(/[\s,]+/), RETIRED_ACCOUNTS); save(); $('#prev').innerHTML = preview(rules()); };
-  ['cap', 'daily', 'per', 'rcv'].forEach(id => $('#' + id).oninput = upd);
+  ['cap', 'daily', 'per', 'rcv'].forEach(id => {
+    const el = $('#' + id);
+    if (!el) return;
+    // `input` alone misses a programmatic set, an autofill, and any paste a browser delivers
+    // without key events. A shop list typed that way was silently ignored: the row kept the
+    // old receivers. `change` fires when the field is committed, so listen for both.
+    el.oninput = upd;
+    el.onchange = upd;
+    el.onblur = upd;
+  });
   const hours = $('#hours');
   const onHours = e => { if (+e.target.value !== +st.hours) st.hoursEdited = true; upd(); };
   if (hours) { hours.oninput = onHours; hours.onchange = onHours; }
