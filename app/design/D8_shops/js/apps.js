@@ -332,8 +332,7 @@ async function proposeAccessKey(key) {
 }
 
 /** The row the board has for this visitor right now, or null. Never a cached copy. */
-export async function boardRowNow() {
-  if (!S.board || !S.me) return S.boardRow || null;
+export async function boardRowNow() {  if (!S.board || !S.me) return S.boardRow || null;
   const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
   if (row) S.boardRow = row;
   return row || null;

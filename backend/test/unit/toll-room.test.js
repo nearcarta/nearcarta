@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   PASS_YOCTO, TOLL_HINT, TOLL_CHRONICLE_KEY,
-  yoctoNear, parseTollCommand, tollCapCheck, proofWords, addressWords, splitWords,
+  yoctoNear, parseTollCommand, tollCapCheck, effectBudgetFits, proofWords, addressWords, splitWords,
   assembleTollLive, rememberTollPass, tollChronicleRows, mergeTollChronicle, tollMarkup,
   passPaidCopy, nextRowBalance, policyWords, latestVisitorPass, describeVisitorPass, tollChronicleStore,
   policyQuote, relayDecision, formatWei,
@@ -464,4 +464,39 @@ test('cross enforces no contract-wide amount cap', () => {
   assert.match(cross, /row_budget/);
   // policy publishes null, so a client cannot read a cap back out.
   assert.match(src, /"max_per_tx": Value::Null/);
+});
+
+test('a row that cannot hold a Base effect budget is refused before the wallet opens', () => {
+  // The board reserves an effect budget before it calls the toll, and a row without one is
+  // refused ERR_EFFECT after the visitor has already approved. Measured on mainnet 2026-11-07:
+  // the first effect budget costs 351 bytes, and a four-shop row is exactly full at five pairs.
+  // The page must therefore refuse in words, not send and let the chain answer.
+  const fit = {
+    receivers: ['toll.nearcarta.near'],
+    capYocto: '20000000000000000000000',
+    balanceYocto: '6000000000000000000000',
+    spentYocto: '0',
+    dailyYocto: '50000000000000000000000',
+    minYocto: '100000000000000000000',
+    amountYocto: '1000000000000000000000',
+  };
+  assert.equal(tollCapCheck(fit), null, 'a healthy row passes every other check');
+  const why = tollCapCheck({ ...fit, effectsKnown: false });
+  assert.match(why, /no Base effect budget/);
+  assert.match(why, /351 bytes/);
+  assert.match(why, /Nothing was signed/);
+  // "Unknown" is not "no": a failed read must never become a refusal.
+  assert.equal(tollCapCheck({ ...fit, effectsKnown: null }), null);
+});
+
+test('effectBudgetFits reads the row storage the chain reports', () => {
+  // storage_locked is yocto; 1e19 per byte on mainnet, and the row allowance is 2000.
+  const at = bytes => ({ storage_locked: String(Math.round(bytes) * 1e19) });
+  assert.equal(effectBudgetFits(at(1594)), true, '406 free holds a 351-byte budget');
+  assert.equal(effectBudgetFits(at(1660)), false, '340 free does not');
+  assert.equal(effectBudgetFits(at(1649)), true, 'exactly 351 free is enough');
+  assert.equal(effectBudgetFits(at(1650)), false, '350 free is not');
+  // A row that does not report storage must not be judged.
+  assert.equal(effectBudgetFits({}), null);
+  assert.equal(effectBudgetFits(null), null);
 });
