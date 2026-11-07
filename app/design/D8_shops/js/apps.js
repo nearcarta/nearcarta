@@ -144,6 +144,9 @@ export const factories = () => [CFG.factory, ...(CFG.legacy || []).map(l => l.fa
 /** Only charters from the current visitor (R17) factory run propose_batch; R16 and older ones pay one action per tx (the UI says so). */
 export const canBatch = (c = S.charter) => !!c && c.endsWith('.' + CFG.factory);
 export async function refresh() {
+  // Open a room before the wallet layer finished booting: make sure the connector exists
+  // first. Without this, S.me stayed null and shops painted as if nobody was signed in.
+  if (!conn) await init(() => {}).catch(() => {});
   S.me = (await W.currentAccount(conn).catch(() => null)) || readSessionAccount();
   if (onMain()) {
     const board = S.mainnet?.board;
@@ -1078,7 +1081,7 @@ function guardDeps() {
     keyFor: (kind) => {
       if (kind === 'agent') return key;
       // Only the visitor's own button supplies a confirm key (see guardConfirm).
-      if (kind === 'confirm') return globalThis.__guardConfirmKey || null;
+      if (kind === 'confirm') return confirmKeyNow();
       if (kind === 'owner') return key; // cancel/expire are owner-only on chain; the wallet path below
       return null;
     },
@@ -1122,9 +1125,18 @@ export async function guardPay({ payee, amountYocto, invoice = '', verdict = 'wa
   return out;
 }
 
+/** The separate confirm key setup minted and registered with `set_confirm_key`. */
+function confirmKeyNow() {
+  if (globalThis.__guardConfirmKey) return globalThis.__guardConfirmKey;
+  try {
+    const sec = localStorage.getItem('nearcarta.vault.confirm.' + S.me);
+    if (!sec) return null;
+    return W.keyFrom(sec);
+  } catch { return null; }
+}
+
 /** The visitor's own button releases a WARN. The confirm key must be in this browser. */
-export async function guardConfirm({ holdId, confirmKey } = {}) {
-  const guard = guardAccount();
+export async function guardConfirm({ holdId, confirmKey } = {}) {  const guard = guardAccount();
   if (!guard) return { ok: false, signed: false, tx: null, why: 'The guard contract is not in the deployment record. Nothing was signed.' };
   const row = await guardRowNow();
   const prev = globalThis.__guardConfirmKey;

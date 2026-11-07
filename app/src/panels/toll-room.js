@@ -535,6 +535,12 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
   const state = hooks.state || (hooks.state = {});
   if (!state.tab) state.tab = 'pass';
   if (!state.derive) state.derive = checkDerived({ publicKey: TOLL_KEY, recorded: TOLL_ADDRESS });
+  // Read the visitor at mount, not only when an action asks for it. The Wallet tab renders
+  // from `state.owner`, so leaving it empty showed a signed-in visitor "Sign in at /setup".
+  if (typeof hooks.account === 'function') {
+    const who = String(hooks.account() || '');
+    if (who) state.owner = who;
+  }
   const apiBase = env.api ?? ((globalThis.NEARCARTA_API || '').replace(/\/$/, ''));
   const doc = env.doc || (typeof document !== 'undefined' ? document : null);
 

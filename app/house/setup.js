@@ -532,6 +532,22 @@ const ROW_FUND = YN / 100n, TOPUP = YN / 200n;
 // The measured numbers are in `contracts/charter_board_sandbox/tests/setup_calls_row_size.rs`
 // and `setup_calls_deposit.rs`.
 const addKeyAction = pk => ({ type: 'AddKey', params: { publicKey: pk, accessKey: { permission: { receiverId: MAIN.board.contract, methodNames: [...SESSION_METHODS], allowance: AGENT_ALLOW.toString() } } } });
+
+// A held WARN is released only by a key that is NOT the agent key: the contract stores a
+// separate confirm key and `confirm_hold` checks that. Without one a hold could never be
+// released from the UI, which made Guard one-way. It lives beside the agent key.
+const CONFIRM_LS = c => 'nearcarta.vault.confirm.' + c;
+const confirmKeyFor = id => {
+  const saved = localStorage.getItem(CONFIRM_LS(id));
+  if (saved) return keyFrom(saved);
+  const k = keyFrom();
+  localStorage.setItem(CONFIRM_LS(id), k.secretKey);
+  return k;
+};
+const setConfirmAction = key => ({
+  type: 'FunctionCall',
+  params: { methodName: 'set_confirm_key', args: { key: pubkeyHex(key) }, gas: '30000000000000', deposit: '0' },
+});
 // The login plugin stores its key here. Use it as the row agent when this browser has not made one yet.
 function adoptPluginKey(id) {
   if (!id || localStorage.getItem(agentLS(id))) return;
@@ -815,6 +831,9 @@ async function signBoard() {
       ...(existingKey || classified.board.some(k => k.publicKey === pk)
         ? [{ type: 'DeleteKey', params: { publicKey: pk } }] : []),
       addKeyAction(pk),
+      // One approval also registers the separate confirm key, so a held WARN can be released
+      // by the visitor and never by the agent. No deposit: the board charges the row.
+      setConfirmAction(confirmKeyFor(me)),
     ];
     return { receiverId: me, actions: keyActions };
   };
