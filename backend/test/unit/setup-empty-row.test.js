@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { AGENT_METHODS, SESSION_METHODS, CALLS_DEPOSIT_YOCTO, callPolicy, callsFitRow, stampCalls } from '../../../shared/board/session.js';
 import { openRowTransactions } from '../../../shared/setup/open-row.js';
+import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
 
 const src = readFileSync(new URL('../../../app/house/setup.js', import.meta.url), 'utf8');
 const section = (from, to) => src.slice(src.indexOf(from), src.indexOf(to));
@@ -133,4 +134,41 @@ test('the open batch fits the row for the default rules', () => {
   const calls = callPolicy(['toll.nearcarta.near'], (YN * 5n / 1000n).toString(), (YN * 10n / 1000n).toString(), 'ft_transfer', stampCalls('board.nearcarta.near', (YN * 5n / 1000n).toString())).calls;
   assert.equal(callsFitRow(calls), true);
   assert.ok(BigInt(CALLS_DEPOSIT_YOCTO) > 12n * YN / 1000n);
+});
+
+test('set_effects rides with set_calls only when the board build pays it from the reserve', () => {
+  // The older board charged `set_effects` against the row's own 2000 bytes, so sending it at
+  // setup would make opening a row fail for every visitor. The setup therefore reads the
+  // board's code hash and includes the action only when it is the build whose `charge_acts`
+  // spends the SIDE RESERVE that `set_calls` just charged (proven in
+  // contracts/charter_board_sandbox/tests/effects_on_a_full_row.rs).
+  const base = {
+    accountId: 'a.near', contract: 'board.nearcarta.near',
+    rules: { receivers: ['toll.nearcarta.near'], per_action_cap: '1', daily_budget: '2', max_actions_per_day: 4, window_start_min: 0, window_end_min: 0, min_amount: '1', expires_at: '0' },
+    agentPublicKey: 'ed25519:8StsEstNui7DqvkR8vPd63RmQDM6LXX7fDSegH4MyxdZ',
+    fundYocto: '1', rowDepositYocto: '2', callsDepositYocto: '3',
+    calls: [{ receiver: 'toll.nearcarta.near', method: 'cross', cap: '1' }],
+    gasOpen: '1', gasAgent: '1', allowance: '1',
+  };
+  const none = openRowTransactions(base);
+  assert.deepEqual(none.open.actions.map(a => a.params.methodName), ['open_charter', 'set_calls']);
+  const withEffects = openRowTransactions({ ...base, effects: [{ chain: 'base', asset: 'usdc', to: '0xabc', value: '1', fee: '1' }] });
+  // Order matters: set_calls is what charges the reserve the effect budget is spent from.
+  assert.deepEqual(withEffects.open.actions.map(a => a.params.methodName), ['open_charter', 'set_calls', 'set_effects']);
+  // No deposit: the board charges the row, and after the fix it charges the reserve.
+  assert.equal(withEffects.open.actions[2].params.deposit, '0');
+  // An empty list is the same as no list.
+  assert.deepEqual(openRowTransactions({ ...base, effects: [] }).open.actions.map(a => a.params.methodName), ['open_charter', 'set_calls']);
+});
+
+test('the setup gates set_effects on the board build actually deployed', () => {
+  const src = readFileSync(new URL('../../../app/house/setup.js', import.meta.url), 'utf8');
+  // The hash is read from the chain, not assumed.
+  assert.match(src, /view_account[\s\S]{0,160}code_hash/, 'the board code hash is read from the account');
+  // And compared with the recorded build before the action is added.
+  assert.match(src, /boardCode === EFFECTS_CODE_HASH \? effectsFor\(r\) : undefined/);
+  // The record carries the hash, so flipping it is a data change, not a code change.
+  assert.equal(MAIN.board.effects_code_hash, 'AXXsF2WgAGiGBfFLe9uW6hY7gZembLjYEnrgsV3Jf1DF');
+  // The live board today is a different build, so setup must NOT be sending it.
+  assert.notEqual(MAIN.board.code_hash, MAIN.board.effects_code_hash);
 });

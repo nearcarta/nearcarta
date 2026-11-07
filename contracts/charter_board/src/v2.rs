@@ -310,17 +310,20 @@ impl Board {
             return;
         }
         let cost = (after - before + STORAGE_MARGIN_BYTES) as u128 * price();
-        let attached = env::attached_deposit().as_yoctonear();
-        require!(attached >= cost, "ERR_DEPOSIT");
         let credit = self.credit.get(me).copied().unwrap_or(0);
         let from_reserve = credit.min(cost);
         let from_row = cost - from_reserve;
+        // The reserve was prepaid by `set_calls`, so only the part that comes out of the row's
+        // own room needs a deposit. Requiring the full cost made the setup batch fail
+        // ERR_DEPOSIT even though the reserve already covered it.
+        let attached = env::attached_deposit().as_yoctonear();
+        require!(attached >= from_row, "ERR_DEPOSIT");
         let row = self.rows.get_mut(me).unwrap();
         require!(row.storage_locked.saturating_add(from_row) <= MAX_ROW_YOCTO, "ERR_ROW_TOO_BIG");
         row.storage_locked += from_row;
         if from_reserve > 0 { *self.credit.get_mut(me).unwrap() -= from_reserve; }
         self.owe(cost as i128);
-        refund(me, attached - cost);
+        refund(me, attached - from_row);
     }
 
     pub fn call_as_message(&self, owner: AccountId, receiver: AccountId, method: String, args: String, deposit: U128, nonce: U64, expiry: U64, effects: Vec<EffectIn>, hold: bool) -> String {

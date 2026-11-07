@@ -64,6 +64,11 @@ const save = () => localStorage.setItem(SAVE, JSON.stringify(st));
 let CFG = null, rpc = null, me = null, bal = undefined, balTimer = 0, busy = false, busySince = 0, msg = '';
 const view = (c, m, a) => viewFn(rpc, c, m, a);
 const boardLive = () => PUBLIC_MAINNET && MAIN.board?.status === 'deployed' && !!MAIN.board.contract;
+// The board build whose `charge_acts` pays an effect budget from the side reserve instead of the
+// row's own bytes. `set_effects` is only sent while this is the code on chain: on the older
+// build it would make opening a row fail for everyone. Read from the record, which is updated
+// when the upgrade is applied.
+const EFFECTS_CODE_HASH = MAIN.board?.effects_code_hash || 'AXXsF2WgAGiGBfFLe9uW6hY7gZembLjYEnrgsV3Jf1DF';
 const journey = () => setupJourney(st.trial, { publicMainnet: PUBLIC_MAINNET, boardDeployed: boardLive() });
 const explorer = () => journey().explorer;
 const txA = h => h ? `<a href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" data-testid="setup-tx" aria-label="View transaction ${esc(h)} on nearblocks">View on nearblocks (${esc(h.slice(0, 4))}…)</a> <button type="button" class="btn link sm" data-copy="${esc(h)}" data-testid="setup-copy-tx" aria-label="Copy transaction hash">Copy</button>` : '';
@@ -566,6 +571,28 @@ function callsFor(r, contract) {
   const full = callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', payoutsCalls(extra, toY(r.cap)).calls).calls;
   return dropOptionalPairs(full, (r.receivers || []).length).calls;
 }
+
+/**
+ * The Base effect budgets this row starts with, so a ferry crossing is possible from the first
+ * visit. Without one the board refuses `propose_call_as` with ERR_EFFECT before the toll is
+ * ever called, and the visitor cannot pass however much NEAR the row holds.
+ *
+ * Both caps are written at the row's own per-payment cap, so the effect ceiling can never be
+ * looser than what the rules already allow. `set_effects` rides in the same approval as
+ * `set_calls` (see `openRowTransactions`), paid from the 600-byte side reserve.
+ */
+function effectsFor(r) {
+  const base = 'base';
+  const to = String(r.baseTo || '').trim().toLowerCase();
+  // One recipient, two assets: native ETH and USDC. A visitor who names a Base address gets
+  // both so either asset works; without one, only USDC, which needs no value in the unit a
+  // native transfer would.
+  const cap = { native: toY(r.cap), usdc: toY(r.cap) };
+  const rows = [];
+  if (to) rows.push({ chain: base, asset: 'native', to, value: cap.native, fee: cap.native });
+  if (to) rows.push({ chain: base, asset: 'usdc', to, value: cap.usdc, fee: cap.usdc });
+  return rows;
+}
 // The agent key is also added to the visitor's own account as a function-call access key.
 // It may call propose, propose_call, propose_call_as and anchor on the board, with a gas allowance
 // only. It cannot attach NEAR.
@@ -910,10 +937,19 @@ async function signBoard() {
   if (!row) {
     // open_charter and set_calls go to the board as one transaction. The key goes on the
     // visitor's own account afterwards, and only once the row is really there.
+    // The Base effect budget rides in the SAME transaction, but only when the board on chain
+    // is a build that pays it from the side reserve. On the older build `set_effects` charged
+    // the row's own bytes, so including it would make opening a row fail for everyone. The
+    // hash is read from the account, not assumed, and the list is simply left out when the
+    // board is not upgraded yet.
+    const boardCode = await readRpc('query', { request_type: 'view_account', finality: 'final', account_id: contract })
+      .then(a => a && a.code_hash).catch(() => null);
+    const effects = boardCode === EFFECTS_CODE_HASH ? effectsFor(r) : undefined;
+    st.effectsPending = !!(effects && effects.length) && effects.length > 0 && boardCode !== EFFECTS_CODE_HASH;
     const built = openRowTransactions({
       accountId: me, contract, rules: boardArgs(r, pk).rules, agentPublicKey: pk,
       fundYocto: ROW_FUND, rowDepositYocto: MAIN.board.max_row_yocto, callsDepositYocto: CALLS_DEPOSIT_YOCTO,
-      calls: callsFor(r, contract), gasOpen: (GAS.open * TG).toString(), gasAgent: (GAS.agent * TG).toString(),
+      calls: callsFor(r, contract), effects, gasOpen: (GAS.open * TG).toString(), gasAgent: (GAS.agent * TG).toString(),
       allowance: AGENT_ALLOW.toString(),
     });
     // A previous attempt may have landed the key without the row (that is exactly what

@@ -91,3 +91,58 @@ async fn a_four_shop_row_still_takes_an_effect_budget() -> anyhow::Result<()> {
 // The anchor test in anchor.rs runs against the same wasm, so this file plus that one prove the
 // build carries both the hydrate fix and the charge_acts fix. Run them together:
 //   cargo test --test anchor --test effects_on_a_full_row
+
+// The setup path: `set_effects` rides in the SAME transaction as `open_charter` + `set_calls`,
+// which is how /setup opens a row once the board is the fixed build. One approval, and the row
+// is ready to cross the toll from the first visit.
+#[tokio::test]
+async fn setup_can_open_a_row_that_is_ready_to_cross() -> anyhow::Result<()> {
+    let wasm = std::fs::read(WASM).expect("build target/near/charter_board.wasm first");
+    let worker = near_workspaces::sandbox().await?;
+    let owner = worker.create_tla("nearcarta".parse()?, SecretKey::from_random(KeyType::ED25519)).await?.into_result()?;
+    let board = owner.create_subaccount("board").initial_balance(NearToken::from_near(80)).transact().await?.into_result()?;
+    let deployed = board.deploy(&wasm).await?.into_result()?;
+    assert!(owner.call(deployed.id(), "new").gas(near_workspaces::types::Gas::from_tgas(50)).transact().await?.is_success());
+
+    let visitor = worker.dev_create_account().await?;
+    let key = SigningKey::from_bytes(&[13u8; 32]);
+    let shops = ["toll.nearcarta.near", "guard.nearcarta.near", "house.nearcarta.near", "arena.nearcarta.near"];
+    let cap = (NEAR / 50).to_string();
+    let calls = json!([
+        { "receiver": "toll.nearcarta.near", "method": "cross", "cap": cap.clone() },
+        { "receiver": "guard.nearcarta.near", "method": "pay", "cap": cap.clone() },
+        { "receiver": "house.nearcarta.near", "method": "house_session_check_in", "cap": cap.clone() },
+        { "receiver": "arena.nearcarta.near", "method": "ft_transfer", "cap": cap.clone() },
+        { "receiver": "wrap.near", "method": "near_deposit", "cap": cap.clone() },
+    ]);
+    let effects = json!([
+        { "chain": "base", "asset": "native", "to": "0x0000000000000000000000000000000000000001", "value": (NEAR / 1000).to_string(), "fee": (NEAR / 1000).to_string() },
+        { "chain": "base", "asset": "usdc", "to": "0x0000000000000000000000000000000000000001", "value": (NEAR / 1000).to_string(), "fee": (NEAR / 1000).to_string() },
+    ]);
+    // What /setup sends as one wallet approval: open_charter, set_calls, set_effects.
+    let out = visitor.call(deployed.id(), "open_charter")
+        .args_json(json!({ "rules": rules(&shops), "agent": hex32(key.verifying_key().as_bytes()), "fund": (NEAR / 100).to_string() }))
+        .deposit(NearToken::from_yoctonear(MAX_ROW))
+        .gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
+        .transact().await?;
+    assert!(out.is_success(), "open: {:?}", out.failures());
+    let set = visitor.call(deployed.id(), "set_calls")
+        .args_json(json!({ "calls": calls, "session_cap": (NEAR / 10).to_string() }))
+        .deposit(NearToken::from_yoctonear(15 * NEAR / 1000))
+        .gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
+        .transact().await?;
+    assert!(set.is_success(), "set_calls: {:?}", set.failures());
+    let eff = visitor.call(deployed.id(), "set_effects")
+        .args_json(json!({ "effects": effects }))
+        .deposit(NearToken::from_yoctonear(0))
+        .gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
+        .transact().await?;
+    assert!(eff.is_success(), "set_effects with no deposit, from the reserve: {:?}", eff.failures());
+
+    let row: Value = deployed.view("get_charter").args_json(json!({ "owner": visitor.id() })).await?.json()?;
+    let locked = row["storage_locked"].as_str().unwrap().parse::<u128>()? / 10u128.pow(19);
+    println!("row ready to cross: {locked} bytes locked, receivers {}", row["receivers"].as_array().unwrap().len());
+    assert!(locked <= 2000, "inside the allowance: {locked}");
+    assert_eq!(row["receivers"].as_array().unwrap().len(), 4);
+    Ok(())
+}
