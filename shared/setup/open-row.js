@@ -31,6 +31,7 @@ export function openRowTransactions({
   rowDepositYocto,
   callsDepositYocto,
   calls,
+  effects,
   gasOpen,
   gasAgent,
   methodNames = SESSION_METHODS,
@@ -62,6 +63,23 @@ export function openRowTransactions({
       },
     ],
   };
+  // A ferry crossing reserves an effect budget before the board calls the toll, so a row
+  // without one is refused ERR_EFFECT after the wallet has approved. `set_calls` has just
+  // charged the 600-byte SIDE RESERVE for exactly this kind of write, and a first cap costs
+  // 351 bytes of it, so this rides along in the same approval at no extra cost. It comes
+  // after `set_calls` because that is what creates the reserve.
+  // Left out when the caller passes no effects (a row that will never move a foreign asset).
+  if (Array.isArray(effects) && effects.length) {
+    open.actions.push({
+      type: 'FunctionCall',
+      params: {
+        methodName: 'set_effects',
+        args: { effects },
+        gas: String(gasAgent),
+        deposit: '0',
+      },
+    });
+  }
   const key = {
     receiverId: accountId,
     actions: [{
