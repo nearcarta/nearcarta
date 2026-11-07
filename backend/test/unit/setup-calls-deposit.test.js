@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { CALLS_DEPOSIT_YOCTO, MAX_PAIR_BYTES, callPairBytes, callPolicy, callsFitRow, pairBudgetBytes, stampCalls } from '../../../shared/board/session.js';
+import { CALLS_DEPOSIT_YOCTO, MAX_PAIR_BYTES, ROW_BYTES_PER_RECEIVER, ROW_FIXED_BYTES, callPairBytes, callPolicy, callsFitRow, dropOptionalPairs, pairBudgetBytes, stampCalls } from '../../../shared/board/session.js';
 import { HOUSE_CALLS } from '../../../shared/house/shop.js';
 import { plainRulesError } from '../../../shared/setup/rules-diff.js';
 
@@ -34,39 +34,41 @@ test('the set_calls deposit covers the default list and the widest that fits', (
   assert.ok(BigInt(CALLS_DEPOSIT_YOCTO) > 1160n * 10n ** 19n);
 });
 
-test('callsFitRow matches the row capacity measured in the sandbox', () => {
-  // name length -> most shops the row held, from setup_calls_deposit.rs. The House
-  // calls take two pairs of that budget, so these are lower than the pre-House figures.
-  // Each case there used a one-receiver row, so the count is passed explicitly.
-  for (const [len, fit] of [[19, 5], [25, 4], [32, 4], [40, 3], [48, 3], [56, 3]]) {
-    assert.equal(callsFitRow(policy(names(fit, len)), 1), true, `${fit} shops of ${len} bytes should fit`);
-    assert.equal(callsFitRow(policy(names(fit + 1, len)), 1), false, `${fit + 1} shops of ${len} bytes should not fit`);
+test('callsFitRow matches the row capacity measured on mainnet', () => {
+  // Measured on 2026-11-07 against the live visitor row, ONE fixed eight-pair list and only
+  // the receiver count moving: 1 -> 1916 locked, 2 -> 1940, 3 -> 1964. Slope 24 bytes per
+  // receiver, fixed 1490. Two four-receiver shapes were refused on the same row (ERR_ROW_TOO_BIG
+  // at 8 and 9 pairs) and the 7-pair shape landed at 1993, so the boundary is exercised on chain,
+  // not just in a model.
+  assert.equal(ROW_FIXED_BYTES, 1490);
+  assert.equal(ROW_BYTES_PER_RECEIVER, 24);
+  assert.equal(pairBudgetBytes(1), 2000 - 1490 - 24);
+  assert.equal(pairBudgetBytes(4), 2000 - 1490 - 24 * 4);
+  // The three live points must reproduce exactly from the constants.
+  for (const [receivers, locked] of [[1, 1916], [2, 1940], [3, 1964]]) {
+    assert.equal(ROW_FIXED_BYTES + ROW_BYTES_PER_RECEIVER * receivers + 402, locked, `${receivers} receivers`);
   }
 });
 
 test('a row with more receivers holds fewer pairs, which mainnet proved', () => {
-  // Tx 7H3H2HFiqPiGTPkF8gkkFLvbMecARWQdyG9DCdBPNnh9: six-receiver rules, then 11 pairs,
-  // ERR_ROW_TOO_BIG on set_calls. The old flat budget said those 11 pairs fit, because it
-  // was measured from a one-receiver row. Measured again in
-  // contracts/charter_board_sandbox/tests/setup_calls_row_size.rs:
-  //   one receiver, 10 pairs -> ok ; 11 -> refused
-  //   six receivers, 9 pairs -> ok ; 10 -> refused
-  const list = (k) => [
-    ['charter.nearcarta.near', 'ft_transfer'], ['toll.nearcarta.near', 'ft_transfer'],
-    ['arena.nearcarta.near', 'ft_transfer'], ['house.nearcarta.near', 'ft_transfer'],
-    ['townhall.nearcarta.near', 'ft_transfer'], ['wrap.near', 'near_deposit'],
-    ['wrap.near', 'ft_transfer'], ['wrap.near', 'storage_deposit'],
-    ['board.nearcarta.near', 'stamp'], ['house.nearcarta.near', 'house_session_check_in'],
-    ['house.nearcarta.near', 'house_session_prepare_send'],
-  ].slice(0, k).map(([receiver, method]) => ({ receiver, method }));
-  assert.equal(callsFitRow(list(10), 1), true, 'one receiver holds 10 pairs');
-  assert.equal(callsFitRow(list(11), 1), false, 'one receiver refuses 11');
-  assert.equal(callsFitRow(list(9), 6), true, 'six receivers hold 9 pairs');
-  assert.equal(callsFitRow(list(10), 6), false, 'six receivers refuse 10');
-  assert.equal(callsFitRow(list(11), 6), false, 'the exact failed list is refused, as the chain refused it');
-  // The budget shrinks by about 22 bytes per extra receiver.
-  assert.equal(pairBudgetBytes(1) - pairBudgetBytes(2), 22);
-  assert.equal(pairBudgetBytes(6), 2000 - 1380 - 22 * 6);
+  // The same live row, one fixed list and only the receiver count moving, held eight pairs
+  // next to one, two and three receivers (1916 / 1940 / 1964 bytes locked) and refused them
+  // next to four. Two four-receiver shapes were refused on chain: 8 pairs at 424 pair bytes
+  // and 9 pairs at 472. The 7-pair shape at 375 bytes landed with 1993 locked.
+  //
+  // The assertions below are the byte totals, because reconstructing an 8-pair list from
+  // account ids is how an earlier version of this test drifted 11 bytes off the chain.
+  const pairBudget = pairBudgetBytes(4);
+  assert.equal(pairBudget, 2000 - 1490 - 24 * 4);
+  assert.ok(375 <= pairBudget, 'the 7-pair list that landed (375 bytes) is inside the budget');
+  assert.ok(424 > pairBudget, 'the 8-pair list the chain refused (424 bytes) is outside it');
+  assert.ok(472 > pairBudget, 'the 9-pair list the chain refused (472 bytes) is outside it');
+  // Eight pairs fit next to three receivers and not next to four: the live boundary.
+  assert.ok(424 <= pairBudgetBytes(3), 'three receivers still hold the 424-byte list');
+  assert.ok(424 > pairBudgetBytes(4), 'four receivers do not');
+  // The budget shrinks by 24 bytes per extra receiver.
+  assert.equal(pairBudgetBytes(1) - pairBudgetBytes(2), 24);
+  assert.equal(pairBudgetBytes(6), 2000 - 1490 - 24 * 6);
 });
 
 test('the pair byte count is the same number the sandbox test computes', () => {
@@ -101,7 +103,7 @@ test('callPairBytes counts the receiver, the method and the 16-byte cap', () => 
   // The budget is the pairs a row may hold, next to MAX_ROW_YOCTO = 2000 bytes.
   // MAX_PAIR_BYTES is the one-receiver case; a row with more receivers has less.
   assert.equal(MAX_PAIR_BYTES, pairBudgetBytes(1));
-  assert.equal(MAX_PAIR_BYTES, 598);
+  assert.equal(MAX_PAIR_BYTES, 486);
   assert.ok(MAX_PAIR_BYTES < 2000);
 });
 
@@ -126,4 +128,48 @@ test('the page refuses an over-full list before the wallet opens, on both paths'
   assert.match(update, /callsFitRow\(callsFor\(r, contract\), r\.receivers\.length\)/);
   // A refused list says why, and names the receiver count.
   assert.match(update, /Update my rules would be refused on chain/);
+});
+
+test('the optional pairs go before a shop does, and the real limit is four shops', () => {
+  // A four-shop row was refused on mainnet with the full list and landed once two optional
+  // pairs were dropped. Dropping a shop would break something the visitor just asked for, so
+  // the optional pairs go first, and each one states what it costs.
+  const pairBytes = calls => calls.reduce((n, c) => n + callPairBytes(c.receiver, c.method), 0);
+  const houseIf = recv => (recv.includes('house.nearcarta.near') ? HOUSE_CALLS : []);
+  const build = shops => dropOptionalPairs(
+    callPolicy(shops, CAP, DAILY, 'ft_transfer', [...stampCalls(BOARD, CAP), ...houseIf(shops)]).calls,
+    shops.length,
+  );
+  const TOLL = 'toll.nearcarta.near', GUARD = 'guard.nearcarta.near', ARENA = 'arena.nearcarta.near';
+  const HOUSE = 'house.nearcarta.near', HALL = 'townhall.nearcarta.near';
+
+  // Every four-shop combination the city offers fits, and every named shop stays reachable.
+  const reach = { [TOLL]: 'cross', [GUARD]: 'pay', [ARENA]: 'ft_transfer', [HOUSE]: 'house_session_check_in', [HALL]: 'ft_transfer' };
+  for (const shops of [[TOLL, GUARD, ARENA, HOUSE], [TOLL, GUARD, ARENA, HALL], [TOLL, GUARD, HOUSE, HALL]]) {
+    const t = build(shops);
+    assert.equal(t.fits, true, `${shops.length} shops fit: ${shops.join(',')}`);
+    for (const shop of shops) {
+      assert.ok(t.calls.some(c => c.receiver === shop && c.method === reach[shop]), `${shop} is still reachable on ${reach[shop]}`);
+    }
+    // What was dropped is only ever an optional pair, and each says its cost.
+    for (const d of t.dropped) assert.ok(d.why && d.why.length > 10, `${d.method} states why it was droppable`);
+  }
+
+  // Five shops do NOT fit, and that is a contract limit rather than a page rule: 433 bytes of
+  // pairs next to five receivers against a 390-byte budget. The page must say so and refuse to
+  // sign, because the chain answers ERR_ROW_TOO_BIG after the wallet has already approved.
+  const five = build([TOLL, GUARD, ARENA, HOUSE, HALL]);
+  assert.equal(five.fits, false, 'five named shops do not fit one 0.02 NEAR row');
+  assert.equal(pairBytes(five.calls), 433);
+  assert.equal(pairBudgetBytes(5), 390);
+  assert.ok(pairBytes(five.calls) > pairBudgetBytes(5));
+
+  // The exact shape that landed on mainnet: four shops, seven pairs, 375 bytes, 1993 locked.
+  const landed = build([TOLL, GUARD, ARENA, HOUSE]);
+  assert.equal(landed.calls.length, 7);
+  assert.equal(pairBytes(landed.calls), 375);
+  assert.deepEqual(landed.dropped.map(d => d.method), ['storage_deposit', 'stamp']);
+  // The wrap legs a swap needs are never dropped.
+  assert.ok(landed.calls.some(c => c.receiver === 'wrap.near' && c.method === 'near_deposit'));
+  assert.ok(landed.calls.some(c => c.receiver === 'wrap.near' && c.method === 'ft_transfer'));
 });

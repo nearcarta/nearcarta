@@ -266,6 +266,50 @@
       "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
     },
     {
+      "shop": "board.visitor_run",
+      "label": "set_rules_set_calls_four_shops_house_in",
+      "hash": "3YoqVXCxxSDGj3t6CB5oXJxCEktfkRibEvHCB6JqQK5Y",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "house_deed_mint_for_row_owner",
+      "hash": "AQv5jjgW3dGHPvScvBoiLTgMUkYQGdXf4Xwj6Uxuxu3p",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "house_set_line_holder_key",
+      "hash": "DYc1ggreE2psTat56zcYHb9FkZWYFscmfJWJa1E7x5fL",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "house_session_check_in_through_board",
+      "hash": "DY9rqZGNdP9662xTWNoysgt2T3yrYVuPyRKvNh3YVtEa",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
       "shop": "charter",
       "label": "create_root",
       "hash": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",

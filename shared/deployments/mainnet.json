@@ -83,7 +83,11 @@
         "toll_cross_base_usdc_through_board": "FwXfnyddVoZ7u6zYrF5Y3mWq9K5aHxrGc25CzM6JzpPj",
         "guard_pay_allow_through_board": "862vGPD6PxA64RzD2hKNKb6tM2wLjpeoWXrrsWW7RoaV",
         "arena_agent_act_allow": "CMGyWtvy9ko2RH711p1Ao2fpWWVcUpFNWKPnkiR7pPVB",
-        "arena_agent_act_refused_over_cap": "HG5z6E8oFehNm9Xr9YTV1LT9XNLKi5AAi9QuM4Ka1oJv"
+        "arena_agent_act_refused_over_cap": "HG5z6E8oFehNm9Xr9YTV1LT9XNLKi5AAi9QuM4Ka1oJv",
+        "set_rules_set_calls_four_shops_house_in": "3YoqVXCxxSDGj3t6CB5oXJxCEktfkRibEvHCB6JqQK5Y",
+        "house_deed_mint_for_row_owner": "AQv5jjgW3dGHPvScvBoiLTgMUkYQGdXf4Xwj6Uxuxu3p",
+        "house_set_line_holder_key": "DYc1ggreE2psTat56zcYHb9FkZWYFscmfJWJa1E7x5fL",
+        "house_session_check_in_through_board": "DY9rqZGNdP9662xTWNoysgt2T3yrYVuPyRKvNh3YVtEa"
       }
     },
     "redeploy": {

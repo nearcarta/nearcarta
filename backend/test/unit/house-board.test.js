@@ -223,3 +223,38 @@ test('the city, the allow list and the denylist use the one shop id', () => {
   assert.match(readme, /legacy shop/);
   assert.doesNotMatch(readme, /house3\.nearcarta\.near/);
 });
+
+test('a check-in on a deed with no inheritance line is refused before it is signed', () => {
+  // Mainnet, 2026-11-07: `house_session_check_in` on a freshly minted deed panicked inside
+  // the contract, because `line_of` has no line to read yet. The chain reported it as a bare
+  // `WebAssembly trap: unreachable` after the NEAR had been reserved, so the visitor paid gas
+  // for an error with no name. The same call succeeded once the holder set the line first
+  // (mint AQv5jjgW…, set-line DYc1ggre…, check-in DY9rqZGN…).
+  //
+  // `/api/house/line/<id>` answers `line: null` in that state, so the plan must refuse.
+  const row = {
+    frozen: false,
+    receivers: ['house.nearcarta.near'],
+    min_amount: '100000000000000000000',   // 0.0001 NEAR, what a check-in attaches
+    per_action_cap: '20000000000000000000000', // 0.02 NEAR
+    balance: '8000000000000000000000',
+  };
+  const base = {
+    row, account: '8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9',
+    house: 'house.nearcarta.near', tokenId: 'deed', board: 'board.nearcarta.near',
+    nonce: '11', epoch: '0',
+  };
+  const noLine = planHouseLine("I'm alive", { ...base, line: { live: true, line: null } });
+  assert.equal(noLine.action, 'refuse');
+  assert.equal(noLine.signed, false);
+  assert.match(noLine.hint, /no inheritance line/);
+
+  // A line on the deed plans the real call.
+  const withLine = planHouseLine("I'm alive", { ...base, line: { live: true, line: { heirs: ['nearcarta.near'] } } });
+  assert.notEqual(withLine.action, 'refuse');
+  assert.equal(withLine.method, 'house_session_check_in');
+
+  // An unanswered read is not evidence of anything, so it must not be turned into a refusal.
+  const unknown = planHouseLine("I'm alive", { ...base, line: null });
+  assert.notEqual(unknown.action, 'refuse');
+});
