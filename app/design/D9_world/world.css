@@ -190,7 +190,13 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #shopUI .stag.hide { opacity: 0; visibility: hidden; pointer-events: none; }
 #shopUI .stag .tok .sym { display: none; }
 /* the tray: bottom-left counter slip, one primary action */
-#shopUI #tray { position: fixed; left: var(--s3); bottom: var(--s3); width: 300px; max-height: calc(100dvh - 96px); overflow-y: auto; padding: var(--s3); background: var(--raised); border: 1px solid var(--line); border-radius: var(--R); z-index: 4; animation: shup .24s var(--ease); }
+/* The primary action must never be able to scroll out of sight. The tray is a flex column:
+   the middle region scrolls, the action row and status stay pinned at the bottom. That is
+   what fixes the clipped gold button on phones (it sat at y=941 in an 844px viewport) and
+   the "menu feels stuck" complaint: the one thing to press is always visible. */
+#shopUI #tray { position: fixed; left: var(--s3); bottom: var(--s3); width: 300px; max-height: calc(100dvh - 96px); overflow: hidden; padding: var(--s3); background: var(--raised); border: 1px solid var(--line); border-radius: var(--R); z-index: 4; animation: shup .24s var(--ease); display: flex; flex-direction: column; gap: 0; }
+#shopUI #tray > .t-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+#shopUI #tray > .t-actions, #shopUI #tray > .t-row, #shopUI #tray > .rcpt, #shopUI #tray > .t-links { flex: 0 0 auto; }
 #shopUI .token-listbox { position: relative; width: 100%; }
 #shopUI .token-listbox-btn { width: 100%; min-height: 44px; box-sizing: border-box; padding: 6px 28px 6px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--base); color: var(--text); font: 600 14px/1.2 Inter, system-ui, sans-serif; display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer; }
 #shopUI .token-listbox-menu { position: relative; z-index: 2; max-height: min(240px, 42vh); overflow: auto; overscroll-behavior: contain; margin: 4px 0 0; padding: 4px; list-style: none; border-radius: 12px; border: 1px solid var(--line); background: var(--base); box-shadow: 0 12px 28px rgba(0,0,0,.45); }
@@ -366,7 +372,7 @@ body.apps #shopUI #t-act.busy::before{content:'';width:14px;height:14px;border-r
 #shopUI #r-sign{height:48px;justify-content:center;font-size:16px;flex:none}
 body.apps:has(#rules.open) #shopUI #tray{opacity:.35;pointer-events:none}
 body.apps:has(#rules.open) #back{visibility:hidden}
-@media (max-width:720px){ #shopUI #tray{left:8px;right:8px;bottom:8px;width:auto;padding:16px;max-height:62vh;overflow:auto} body.apps #shopUI .hero{font-size:26px;line-height:32px} }
+@media (max-width:720px){ #shopUI #tray{left:8px;right:8px;bottom:8px;width:auto;padding:16px;max-height:calc(100dvh - 84px);overflow:hidden} body.apps #shopUI .hero{font-size:26px;line-height:32px} }
 #shopUI .amt{box-sizing:border-box} #shopUI .form .to select{min-width:0;max-width:100%}
 #shopUI .feed li{grid-template-columns:56px minmax(0,1fr) minmax(0,40%)} #shopUI .feed:not(.checks):not(.tee) li{grid-template-columns:72px minmax(0,1fr) minmax(0,40%)}
 #shopUI .feed li>span{min-width:0;overflow:hidden;text-overflow:ellipsis} #shopUI .feed li>span:nth-child(3){white-space:nowrap;text-align:right}
@@ -508,7 +514,7 @@ body.ferry-tray #shopUI #tray{
   max-width:440px;
   left:16px; bottom:18px;
   /* stay clear of top badges / brand / HUD; taller for CTA breathing room */
-  max-height:calc(100dvh - 112px);
+  max-height:calc(100dvh - 96px);
   padding:24px 22px 22px;
   box-sizing:border-box;
   overflow-x:hidden;
@@ -601,7 +607,7 @@ body.arena-tray #shopUI #tray{
   width:min(440px,calc(100vw - 28px));
   max-width:440px;
   left:16px; bottom:18px;
-  max-height:calc(100dvh - 240px);
+  max-height:calc(100dvh - 96px);
   padding:24px 22px 22px;
   box-sizing:border-box;
   overflow-x:hidden;
@@ -656,12 +662,12 @@ body.arena-tray #shopUI .arena-agent-send{
   body.ferry-tray #shopUI #tray{
     width:min(100vw - 16px,420px); max-width:none;
     left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    max-height:min(58dvh,calc(100dvh - 108px)); padding:20px 18px;
+    max-height:calc(100dvh - 76px); padding:20px 18px;
   }
   body.arena-tray #shopUI #tray{
     width:min(100vw - 16px,420px); max-width:none;
     left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    max-height:min(46dvh,calc(100dvh - 220px)); padding:20px 18px;
+    max-height:calc(100dvh - 76px); padding:20px 18px;
   }
   body.arena-tray #arena-agent-dock{
     top:auto; right:8px; gap:8px;
@@ -697,7 +703,7 @@ body.toll-tray #shopUI #tray{
   left:16px; bottom:18px;
   height:auto;
   min-height:0;
-  max-height:calc(100dvh - 112px);
+  max-height:calc(100dvh - 96px);
   padding:28px 26px 26px;
   box-sizing:border-box;
   overflow-x:hidden;

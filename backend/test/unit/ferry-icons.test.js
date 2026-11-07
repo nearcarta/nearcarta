@@ -110,7 +110,10 @@ test('Ferry tray sketch match: wide ~440px airy tray + AI Agent character (not e
   assert.match(world, /max-width:\s*440px/);
   assert.match(world, /440px/);
   assert.doesNotMatch(world, /max-width:\s*268px/);
-  assert.match(world, /max-height:\s*calc\(100dvh - 112px\)/);
+  // The tray keeps the whole viewport minus the HUD instead of leaving a 112px gap that pushed
+  // the gold button off a phone screen (measured: CTA at y=941 in an 844px viewport).
+  assert.match(world, /max-height:\s*calc\(100dvh - 96px\)/);
+  assert.doesNotMatch(world, /max-height:\s*calc\(100dvh - 112px\)/);
   assert.match(world, /#t-who/);
   assert.match(world, /#t-track/);
   assert.match(world, /\.ferry-agent-char/);

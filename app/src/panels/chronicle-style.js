@@ -2,9 +2,9 @@
 
 export const CHRONICLE_CSS = `
 .chronicle-card{
-  display:flex; flex-direction:column; gap:8px; align-items:stretch; min-width:0; min-height:0; height:100%; max-width:100%;
-  box-sizing:border-box; padding:16px; border-radius:22px; background:#24180f;
-  border:1px solid rgba(214,180,106,.5); color:#fff8ee; overflow:hidden;
+  display:flex; flex-direction:column; gap:8px; align-items:stretch; min-width:0; min-height:0; max-width:100%;
+  box-sizing:border-box; padding:0; border-radius:0; background:transparent;
+  border:0; color:#fff8ee; overflow:visible;
 }
 .chronicle-tabs{display:flex; flex:none; flex-direction:row; gap:8px;}
 .chronicle-tab{
@@ -25,7 +25,10 @@ body.chronicle-tray #shopUI #t-form button.chronicle-tab[aria-selected=true]{
   background-image:linear-gradient(180deg,#ffe2a8 0%,rgb(245, 208, 138) 42%,#e2b35b 100%);
   color:rgb(42, 22, 8);
 }
-.c-scroll{flex:1 1 auto; min-height:0; overflow:auto}
+/* The tray itself scrolls now (see #tray > .t-scroll). A second scroll region inside the
+   card is what made Chronicle feel stuck: two nested scrollbars, a 310px content box in a
+   251px window, and controls that overlapped the gold button. */
+.c-scroll{flex:none; min-height:0; overflow:visible}
 .chronicle-pane{display:grid; gap:12px; min-width:0; overflow:visible}
 .chronicle-pane[hidden],.chronicle-card [hidden]{display:none !important}
 .c-filters{display:grid; grid-template-columns:1fr 1fr; gap:8px 12px}
