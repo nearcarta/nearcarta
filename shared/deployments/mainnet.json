@@ -94,16 +94,16 @@
       }
     },
     "upgrade_staged": {
-      "note": "Staged 2026-11-07 21:58 UTC with `stage_upgrade` (1 yocto, refunded). Carries BOTH fixes in one landing: the hydrate fix so `anchor` stops panicking ERR_NO_CHARTER, and the charge_acts fix so an effect budget is paid from the SIDE RESERVE instead of the row's own bytes. The previously staged hash 6299317b… was an older build with only the hydrate fix; waiting for it (4h) then staging this one would have cost 28h, so it was replaced at 24h. Re-staged once more at 22:03 UTC after the deposit requirement was found to be wrong for a reserve-paid write: the first build would have failed the setup batch with ERR_DEPOSIT. Proven in contracts/charter_board_sandbox/tests/effects_on_a_full_row.rs: the live wasm fails it ERR_ROW_TOO_BIG, this build passes.",
-      "code_hash": "8d8b81d6514535392cc79527199eba9ea53ed45bd314e1b08baf84c2ab8c3706",
+      "note": "Staged 2026-11-07 21:58 UTC with `stage_upgrade` (1 yocto, refunded). Carries BOTH fixes in one landing: the hydrate fix so `anchor` stops panicking ERR_NO_CHARTER, and the charge_acts fix so an effect budget is paid from the SIDE RESERVE instead of the row's own bytes. The previously staged hash 6299317b… was an older build with only the hydrate fix; waiting for it (4h) then staging this one would have cost 28h, so it was replaced at 24h. Re-staged once more at 22:03 UTC after the deposit requirement was found to be wrong for a reserve-paid write: the first build would have failed the setup batch with ERR_DEPOSIT. Staged a third time at 23:36 after the set/clear/set cycle was found to shrink `storage_locked` below what the row really used. Proven in contracts/charter_board_sandbox/tests/effects_on_a_full_row.rs: the live wasm fails it ERR_ROW_TOO_BIG, this build passes.",
+      "code_hash": "debcbfe23973cff5189c8d1013970eaf3b6d2ebe6e2663f85d4b1c9384829696",
       "artifact": "contracts/artifacts/charter_board.effects.wasm",
-      "wasm_bytes": 128185,
-      "tx": "3FFYNYiyhGnW5PRxLKC52Rtq85jKePdm4LrpX7Y4t3qZ",
-      "staged_eta_ns": "1794179034962400314",
-      "eta_utc": "2026-11-08 23:03",
-      "eta_cairo": "2026-11-09 01:03",
-      "superseded_stage_tx": "EgBR9ouR7AS61br7URvMHSi24QFHpzgJYinFf4x3EdqF",
-      "superseded_code_hash": "a4ed0546bb6be61ee6643436297f9af51a29d47e017ea1dd31b005670fd88009"
+      "wasm_bytes": 128624,
+      "tx": "CCTpHQ1YWng14j7gNvTr4QAfhus8NmmWxMJvK2UMcogW",
+      "staged_eta_ns": "1794180993216619462",
+      "eta_utc": "2026-11-08 23:36",
+      "eta_cairo": "2026-11-09 01:36",
+      "superseded_stage_tx": "3FFYNYiyhGnW5PRxLKC52Rtq85jKePdm4LrpX7Y4t3qZ",
+      "superseded_code_hash": "8d8b81d6514535392cc79527199eba9ea53ed45bd314e1b08baf84c2ab8c3706"
     },
     "redeploy": {
       "when_cairo": "2026-11-05 20:03 Africa/Cairo",
@@ -128,8 +128,8 @@
       "refused_receiver_not_allowlisted": "E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ",
       "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
     },
-    "effects_code_hash": "AXXsF2WgAGiGBfFLe9uW6hY7gZembLjYEnrgsV3Jf1DF",
-    "effects_code_hash_note": "Base58 of contracts/artifacts/charter_board.effects.wasm (sha256 8d8b81d6…). `set_effects` is sent at setup only while this is the code on chain, because the older build charges the row instead of the side reserve. The staged upgrade at board.upgrade_staged installs it.",
+    "effects_code_hash": "FzUSX26CnmveE2vPg4dcdczmBXFJv6mAx7YAuJPghZZf",
+    "effects_code_hash_note": "Base58 of contracts/artifacts/charter_board.effects.wasm (sha256 debcbfe2…). `set_effects` is sent at setup only while this is the code on chain, because the older build charges the row instead of the side reserve. The staged upgrade at board.upgrade_staged installs it.",
     "previous": {
       "code_hash": "Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C",
       "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",

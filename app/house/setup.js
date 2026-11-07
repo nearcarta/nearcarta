@@ -68,7 +68,7 @@ const boardLive = () => PUBLIC_MAINNET && MAIN.board?.status === 'deployed' && !
 // row's own bytes. `set_effects` is only sent while this is the code on chain: on the older
 // build it would make opening a row fail for everyone. Read from the record, which is updated
 // when the upgrade is applied.
-const EFFECTS_CODE_HASH = MAIN.board?.effects_code_hash || 'AXXsF2WgAGiGBfFLe9uW6hY7gZembLjYEnrgsV3Jf1DF';
+const EFFECTS_CODE_HASH = MAIN.board?.effects_code_hash || 'FzUSX26CnmveE2vPg4dcdczmBXFJv6mAx7YAuJPghZZf';
 const journey = () => setupJourney(st.trial, { publicMainnet: PUBLIC_MAINNET, boardDeployed: boardLive() });
 const explorer = () => journey().explorer;
 const txA = h => h ? `<a href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" data-testid="setup-tx" aria-label="View transaction ${esc(h)} on nearblocks">View on nearblocks (${esc(h.slice(0, 4))}…)</a> <button type="button" class="btn link sm" data-copy="${esc(h)}" data-testid="setup-copy-tx" aria-label="Copy transaction hash">Copy</button>` : '';
