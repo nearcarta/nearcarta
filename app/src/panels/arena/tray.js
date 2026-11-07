@@ -50,10 +50,13 @@ export function arenaHtml(state, attackAttr = 'data-testid="arena-attack"', boxA
       ? field('Earnings', `<span class="amt-row">${input('withdrawAmt', state.withdrawAmt, '0.001')}<span>NEAR</span></span>`)
       : field('Title', input('title', state.title, 'Lamp'))
         + field('Persona', input('persona', state.persona, 'Keeps the oath'))
-        + field('Oath cap', `<span class="amt-row">${input('cap', state.cap, '0.01')}<span>NEAR</span></span>`)
-        + field('Pot', `<span class="amt-row">${input('pot', state.pot, '0.04')}<span>NEAR</span></span>`)
-        + field('Entry fee', `<span class="amt-row">${input('fee', state.fee, '0.001')}<span>NEAR</span></span>`)
-        + field('Creator split', input('split', state.split, '2000'));
+        // Real values, not placeholders. These four used to render a placeholder that looked
+        // like a filled value while state kept them empty, so pressing Mint guardian refused
+        // with "Set a cap, a pot, and a fee" on a form that appeared complete.
+        + field('Oath cap', `<span class="amt-row">${input('cap', state.cap ?? '0.01', '0.01')}<span>NEAR</span></span>`)
+        + field('Pot', `<span class="amt-row">${input('pot', state.pot ?? '0.04', '0.04')}<span>NEAR</span></span>`)
+        + field('Entry fee', `<span class="amt-row">${input('fee', state.fee ?? '0.001', '0.001')}<span>NEAR</span></span>`)
+        + field('Creator split', input('split', state.split ?? '2000', '2000'));
   const cta = mode === 'feed' ? 'Feed guardian' : mode === 'withdraw' ? 'Withdraw earnings' : 'Mint guardian';
   const selected = guardians.find(g => String(g.id) === String(state.attackId)) || guardians[0] || null;
   const feeText = selected ? `${selected.fee} NEAR` : 'Set when a guardian exists';

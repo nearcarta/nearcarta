@@ -755,7 +755,8 @@ async function tollPay(quote) {
 /** Board session: one propose per NEAR row. Over the row cap still goes to the chain. USDC is not sent. */
 async function sendPayoutRows(rows, opts = {}) {
   sh?.hideRefuse?.();
-  const capNear = opts.capNear != null && opts.capNear !== '' ? Number(opts.capNear) : (A.S.clauses?.pay ? A.fromY(A.S.clauses.pay.per_action_cap) : null);
+  const capNear = opts.capNear != null && opts.capNear !== '' ? Number(opts.capNear)
+    : (A.S.boardRow?.per_action_cap ? A.fromY(A.S.boardRow.per_action_cap) : (A.S.clauses?.pay ? A.fromY(A.S.clauses.pay.per_action_cap) : null));
   const parts = splitAssets(rows);
   const usdcNote = parts.usdc.length ? `${parts.usdc.length} USDC ${parts.usdc.length === 1 ? 'row' : 'rows'} kept. Not sent.` : '';
   if (!A.S.board || A.stage() !== 'ready') {
@@ -987,8 +988,9 @@ const APPS = {
         sendCancel: (p) => A.guardCancel(p),
         row: () => !!(A.S.board && A.S.boardRow),
         frozen: () => !!A.S.state?.frozen,
-        capYocto: () => A.S.clauses?.pay?.per_action_cap || null,
-        minYocto: () => A.S.clauses?.pay?.min_amount || null,
+        // Same board-row blind spot as Arena: read the live row first.
+        capYocto: () => A.S.boardRow?.per_action_cap || A.S.clauses?.pay?.per_action_cap || null,
+        minYocto: () => A.S.boardRow?.min_amount || A.S.clauses?.pay?.min_amount || null,
         check: async (acct) => {
           const charter = (A.S.board && A.S.me) ? A.S.me : (A.S.charter || '');
           if (charter) return A.checkPayee(acct);
@@ -1015,11 +1017,19 @@ const APPS = {
       state: extra,
       goal: () => APPS.arena.lvl()?.goal || '',
       repaint: () => { if (cur === 'arena') proofDrawer(); },
+      // A board row has no `clauses.pay`: the visitor's limits live on the row itself.
+      // Reading the missing clause returned null, so Arena's mint asked for an allow list it
+      // had, and the cap check saw no cap at all.
       capNear: () => {
-        const cap = A.S.clauses?.pay?.per_action_cap;
+        const cap = A.S.boardRow?.per_action_cap ?? A.S.clauses?.pay?.per_action_cap;
         return cap == null || cap === '' ? null : A.fromY(cap);
       },
-      receivers: () => (Array.isArray(A.S.clauses?.pay?.receivers) ? A.S.clauses.pay.receivers : null),
+      receivers: () => {
+        const fromRow = A.S.boardRow?.receivers;
+        if (Array.isArray(fromRow) && fromRow.length) return fromRow;
+        const fromClause = A.S.clauses?.pay?.receivers;
+        return Array.isArray(fromClause) ? fromClause : null;
+      },
       player: () => A.S.me || '',
       arena: () => A.S.arena || '',
       board: () => A.S.board || '',
