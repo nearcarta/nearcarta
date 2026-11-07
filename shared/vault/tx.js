@@ -82,7 +82,12 @@ export async function viewFn(rpc, accountId, method, args = {}) {
   if (raw == null) return null;
   const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
   const txt = new TextDecoder().decode(bytes);
-  return txt ? JSON.parse(txt) : null;
+  if (!txt) return null;
+  // Several board views return a plain string, not JSON: `call_as_message` and
+  // `confirm_message` return the exact text the key signs (`board-call-as-v1|…`). Parsing
+  // that unconditionally threw "Unexpected token 'b'", which silently broke every guarded
+  // payment before it could sign.
+  try { return JSON.parse(txt); } catch { return txt; }
 }
 
 /** Decode the propose Outcome from a final tx result, or the failure text. */
