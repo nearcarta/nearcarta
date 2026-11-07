@@ -689,7 +689,7 @@ body.arena-tray #shopUI .arena-agent-send{
   }
   body.arena-tray #arena-agent-dock{
     top:auto; right:8px; gap:8px;
-    bottom:calc(46dvh + 20px + env(safe-area-inset-bottom,0px));
+    bottom:calc(100dvh - 76px + 96px);
   }
   #ferry-agent-dock{right:8px;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
   .ferry-agent-avatar{width:72px;height:72px}
