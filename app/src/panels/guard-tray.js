@@ -258,7 +258,10 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
       finally { state.holding = false; }
     };
     const pay = q$(root, '#g-pay');
-    if (pay) pay.onclick = () => runPlan({ ok: true, action: 'pay' });
+    // readForm() first, like every other handler here. Without it a payee typed on the Pay
+    // tab was never read into state, so Pay through guard refused with the generic "name a
+    // payee" hint while the fields on screen were filled.
+    if (pay) pay.onclick = () => { readForm(); return runPlan({ ok: true, action: 'pay' }); };
     const confirm = q$(root, '#g-confirm');
     if (confirm) confirm.onclick = () => runPlan({ ok: true, action: 'confirm', actor: 'human' });
     const cancel = q$(root, '#g-cancel');
