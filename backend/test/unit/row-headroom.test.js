@@ -43,3 +43,13 @@ test('the rules step reads the chain row itself', () => {
   assert.match(setup, /STEPS\[st\.step\]\[0\] === 'rules' && boardLive\(\) && !st\.trial && !chainRow/);
   assert.match(setup, /ensureChainRow\(\)\.then\(\(\) => \{ if \(STEPS\[st\.step\]\[0\] === 'rules'\) render\(\); \}\)/);
 });
+
+test('a full row rewrites the call list before the rules so a new shop can fit', () => {
+  const setup = read('app/house/setup.js');
+  // set_calls frees the old pairs; set_rules then spends the difference. Measured on the live
+  // row: 187 bytes freed, a receiver costs about 70.
+  assert.match(setup, /const shrinkFirst = roomFull && addingShop/);
+  assert.match(setup, /const rank = k => \(k === 'calls' \? 0 : k === 'rules' \? 1 : 2\)/);
+  // and the refusal must now be arithmetic, not "any add on a full row"
+  assert.match(setup, /if \(freed < need \+ 24\)/);
+});

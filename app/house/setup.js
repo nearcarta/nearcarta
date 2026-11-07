@@ -383,8 +383,20 @@ function wireRules() {
       const known = new Set((chainRow.receivers || []).map(a => String(a)));
       const adds = r.receivers.some(a => !known.has(String(a)));
       if (room === 0 && adds) {
-        msg = 'This row is full: its 0.02 NEAR of storage is all used, so a new shop cannot be added. Close the row in Your House and open a new one to change the shop list. Changing a cap or the expiry still works.';
-        return render();
+        // A full row can often still take a new shop: `set_calls` is rewritten before
+        // `set_rules`, and that rewrite can free far more than a receiver costs. Measured on
+        // the live row: held list 468 bytes, the list for the new shops 281, so shrinking
+        // frees 187 while a receiver costs about 70. Only refuse when the arithmetic says the
+        // new list still would not fit, instead of refusing every add on a full row.
+        const before = callsFor(chainRow.receivers ? { ...r, receivers: chainRow.receivers } : r, MAIN.board.contract);
+        const after = callsFor(r, MAIN.board.contract);
+        const used = calls => calls.reduce((n, c) => n + String(c.receiver).length + String(c.method).length + 24, 0);
+        const freed = Math.max(0, used(before) - used(after));
+        const need = r.receivers.reduce((n, a) => n + (!known.has(String(a)) ? 22 + String(a).length : 0), 0);
+        if (freed < need + 24) {
+          msg = 'This row is full: its 0.02 NEAR of storage is all used and this shop list would not fit even after the call list is rewritten. Close the row in Your House and open a new one to change the shop list. Changing a cap or the expiry still works.';
+          return render();
+        }
       }
     }
     if (boardLive() && !st.trial && !callsFitRow(callsFor(r, MAIN.board.contract), r.receivers.length)) {
@@ -809,12 +821,23 @@ function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursE
     rulesDepositYocto: RULES_DEPOSIT_YOCTO,
     callsDepositYocto: CALLS_DEPOSIT_YOCTO,
   });
-  return plan.map(step => {
+  // On a row at its 0.02 NEAR cap, an ADDED receiver only fits if the call list is rewritten
+  // first: `set_calls` frees the old pairs, `set_rules` then spends the difference. Measured
+  // on the live row, the rewrite freed 187 bytes and a receiver costs about 70. Without this
+  // order the visitor got ERR_ROW_TOO_BIG for a change the row could actually hold.
+  const roomFull = rowHeadroomBytes(chainRow) === 0;
+  const knownShops = new Set((chainRow?.receivers || []).map(a => String(a)));
+  const addingShop = r.receivers.some(a => !knownShops.has(String(a)));
+  const shrinkFirst = roomFull && addingShop;
+  const out = plan.map(step => {
     const args = step.method === 'set_agent' ? { agent: key.publicKey }
       : step.method === 'set_rules' ? { rules: ruleArgs(r, expiresAt) }
       : callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', payoutsCalls([...FERRY_CALL_TARGETS, { receiver: contract, method: 'stamp', cap: String(toY(r.cap)) }, ...HOUSE_CALLS], toY(r.cap)).calls);
     return [step.key, { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: step.method, args, gas: (GAS.agent * TG).toString(), deposit: step.deposit } }] }];
   });
+  if (!shrinkFirst) return out;
+  const rank = k => (k === 'calls' ? 0 : k === 'rules' ? 1 : 2);
+  return out.slice().sort((a, b) => rank(a[0]) - rank(b[0]));
 }
 async function signBoard() {
   const r = rules(), contract = MAIN.board.contract;
