@@ -73,7 +73,10 @@
         "fund_topup_0.005": "34QArpijENRcPPYhWPpvVhmbhxXr1jPaBpE6xGNAZ4Lj",
         "propose_allowed_0.001_agent_key_no_wallet": "BecizuUP6eN4eQnRtYajq6wTudY8pX4gRSVMZMticz1s",
         "propose_allowed_0.001_agent_key_no_wallet_2": "5A3QBy7Tp3q3tiJa9BQFP7Caniw54uBo5HVVr5MsWMe4",
-        "ferry_ask_charter_0.005": "Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV"
+        "ferry_ask_charter_0.005": "Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV",
+        "propose_allowed_0.001_to_wrap_same_day_4": "BBVJPesLZxjhSaasKgurFaAM5FG1SiVnm4SLqxiAoags",
+        "guard_hold_second_payment": "9qxsoyA8VrecsCh13yuUFhCk7QxEM4ueMVbicJvxyXwT",
+        "guard_cancel_hold_by_owner_wallet": "GWnPvGBcVe599hk6RQmxxUgRagtQc7CWWFJgmXL4VgYs"
       }
     },
     "redeploy": {
@@ -110,6 +113,8 @@
   "path": "base-1",
   "charter": {
     "contract": "charter.nearcarta.near",
+    "status": "reaped",
+    "status_note": "Reaped after the migration to one shared board. The account is gone on mainnet, so every field below is a record of what it was, not a live address. The live charter is board.nearcarta.near. See `retired` for the reap txs.",
     "owner": "nearcarta.near",
     "code_hash": "6fZBa6MbEJeKNHBEB9D7atvXa9ZaVmoWfYu38bjcRni2",
     "wasm": "oath.r18p86.wasm",
@@ -228,8 +233,9 @@
       "legacy": "house.nearcarta.near",
       "shop": "house.nearcarta.near",
       "fallback": {
-        "status": "unused",
-        "account": "house3.nearcarta.near"
+    "status": "unused",
+    "account": "house3.nearcarta.near",
+    "account_note": "Never created on mainnet. The fallback name was reserved in this record only; the live shop is house.nearcarta.near (v3)."
       },
       "next": {
         "status": "deployed_as_shop",
@@ -359,7 +365,8 @@
     "txs": {
       "house_pay_recover": "ddaVgHkMGQzHcquj94qMuWTywXY8X4B7bWhkJF7aJEQ",
       "house_close": "Eykw3LPZrDdCNbMxsZsGfpTVZogDmWmgkt3x3ykryzPv",
-      "house_v3_create_deploy_new": "9b5rS4do5bVisMYpcmfLBKgXJrxQCNuYoDi6hDDPsyLj"
+      "house_v3_create_deploy_new": "9b5rS4do5bVisMYpcmfLBKgXJrxQCNuYoDi6hDDPsyLj",
+      "house_deed_mint_visitor": "4W7bmUYoG3QfRUKF7yJSfELMUgWsrAP5GrL9d7VC5X33"
     },
     "note": "House v3 after PR #36. Recovered legacy ~2.50 via house_pay+close, recreated same name stake 3.75199. Locked, no FA keys."
   }
