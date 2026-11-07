@@ -224,6 +224,11 @@ export function mountHouseRoom(root, hooks = {}) {
   }
 
   function paintVault() {
+    // The CTA is renamed here too: minting changes which action the button means, and
+    // leaving the label on the mint after a successful mint is how a visitor ends up
+    // pressing it twice.
+    const ctaBtn = root.querySelector('[data-testid=house-cta]');
+    if (ctaBtn && state.tab === 'deed') ctaBtn.textContent = state.needsMint ? 'Mint my deed' : "I'm alive";
     const rows = state.derived?.rows || [];
     const eth = rows.find(r => r.chain === 'eth');
     const addr = root.querySelector('#house-address');
