@@ -65,8 +65,7 @@ export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? ''
       ${tab === 'check' ? gold('g-check', 'guard-check', 'Check payee') : ''}
       ${tab === 'check' ? status : ''}
     </div>`;
-  const held = state.pending === 'human' && state.holdId;
-  const payCta = held
+  const held = state.pending === 'human' && state.holdId;  const payCta = held
     ? gold('g-confirm', 'guard-confirm', 'Confirm this payment')
     : gold('g-pay', 'guard-pay', 'Pay through guard');
   const cancel = held ? '<button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel">Cancel</button>' : '';
@@ -103,6 +102,23 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
   if (!state.tab) state.tab = 'check';
   if (!state.chain) state.chain = 'near';
   if (!state.asset) state.asset = 'NEAR';
+  // Recover a held payment from the last visit, so its Cancel button is still there. Without
+  // this a reload orphaned the hold: it kept the row's NEAR and blocked close_charter with
+  // ERR_IN_FLIGHT, with no control on screen to clear it.
+  if (!state.holdId) {
+    try {
+      const saved = localStorage.getItem('nearcarta.guard.hold.' + (state.owner || state.row || ''));
+      if (saved) { state.holdId = saved; state.pending = 'human'; }
+    } catch { /* private mode */ }
+  }
+  // `state.owner` is filled by syncRow below, so also look under that key once it is known.
+  const restoreHold = () => {
+    if (state.holdId || !state.owner) return;
+    try {
+      const saved = localStorage.getItem('nearcarta.guard.hold.' + state.owner);
+      if (saved) { state.holdId = saved; state.pending = 'human'; }
+    } catch { /* private mode */ }
+  };
   const doc = root?.ownerDocument || (typeof document !== 'undefined' ? document : null);
 
   const readForm = () => {
@@ -217,6 +233,7 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
 
   const localPaint = () => {
     syncRow();
+    restoreHold();
     root.innerHTML = guardMarkup(state, [], esc);
     bind();
     bindTokenFallbacks(root);

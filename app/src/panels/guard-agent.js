@@ -198,6 +198,14 @@ export async function runGuardAction(plan, ctx = {}) {
     const result = bookOf(state).pay(state.bound);
     state.pending = result.needsHuman ? 'human' : null;
     state.holdId = result.hold?.id || state.holdId || null;
+    // A held payment must survive a page reload. `state` lives in memory only, so a visitor
+    // who refreshed lost the Cancel button and the refundable hold looked unreachable (and it
+    // blocked close_charter with ERR_IN_FLIGHT). Keep it beside the session in localStorage.
+    try {
+      const k = 'nearcarta.guard.hold.' + (state.owner || state.row || '');
+      if (state.holdId) localStorage.setItem(k, String(state.holdId));
+      else localStorage.removeItem(k);
+    } catch { /* private mode: the in-memory id still works for this page */ }
     const verdict = state.bound?.verdict === 'block' || result.status === 'refunded' ? 'block'
       : result.status === 'prepared' ? 'allow' : 'warn';
     // The live executor is the only thing that signs. It is shared with the gold CTA, so the
