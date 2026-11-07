@@ -310,6 +310,28 @@
       "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
     },
     {
+      "shop": "board.visitor_run",
+      "label": "townhall_post_bounty",
+      "hash": "8KQnVZhziwbTsF5UvbU16xen8tBdiJTMbbNoi1mSbVoA",
+      "contract": "board.nearcarta.near",
+      "signer": "nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "townhall_agent_reward_paid",
+      "hash": "5Dgoit85Zh2ANdRGxGU4sE6Ggwmxhu5X8fQaN221VvSo",
+      "contract": "board.nearcarta.near",
+      "signer": "nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
       "shop": "charter",
       "label": "create_root",
       "hash": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",

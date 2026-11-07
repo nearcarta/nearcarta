@@ -87,7 +87,9 @@
         "set_rules_set_calls_four_shops_house_in": "3YoqVXCxxSDGj3t6CB5oXJxCEktfkRibEvHCB6JqQK5Y",
         "house_deed_mint_for_row_owner": "AQv5jjgW3dGHPvScvBoiLTgMUkYQGdXf4Xwj6Uxuxu3p",
         "house_set_line_holder_key": "DYc1ggreE2psTat56zcYHb9FkZWYFscmfJWJa1E7x5fL",
-        "house_session_check_in_through_board": "DY9rqZGNdP9662xTWNoysgt2T3yrYVuPyRKvNh3YVtEa"
+        "house_session_check_in_through_board": "DY9rqZGNdP9662xTWNoysgt2T3yrYVuPyRKvNh3YVtEa",
+        "townhall_post_bounty": "8KQnVZhziwbTsF5UvbU16xen8tBdiJTMbbNoi1mSbVoA",
+        "townhall_agent_reward_paid": "5Dgoit85Zh2ANdRGxGU4sE6Ggwmxhu5X8fQaN221VvSo"
       }
     },
     "redeploy": {
