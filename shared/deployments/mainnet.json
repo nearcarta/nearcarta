@@ -93,6 +93,18 @@
         "board_refused_over_shop_cap_after_agent_asked": "8df5Zu8UGFsFvETbr99pMZBmEpP3ZFEeCnWePPKVZBqZ"
       }
     },
+    "upgrade_staged": {
+      "note": "Staged 2026-11-07 21:58 UTC with `stage_upgrade` (1 yocto, refunded). Carries BOTH fixes in one landing: the hydrate fix so `anchor` stops panicking ERR_NO_CHARTER, and the charge_acts fix so an effect budget is paid from the SIDE RESERVE instead of the row's own bytes. The previously staged hash 6299317b… was an older build with only the hydrate fix; waiting for it (4h) then staging this one would have cost 28h, so it was replaced at 24h. Proven in contracts/charter_board_sandbox/tests/effects_on_a_full_row.rs: the live wasm fails it ERR_ROW_TOO_BIG, this build passes.",
+      "code_hash": "a4ed0546bb6be61ee6643436297f9af51a29d47e017ea1dd31b005670fd88009",
+      "artifact": "contracts/artifacts/charter_board.effects.wasm",
+      "wasm_bytes": 128173,
+      "tx": "EgBR9ouR7AS61br7URvMHSi24QFHpzgJYinFf4x3EdqF",
+      "staged_eta_ns": "1794175096684283098",
+      "eta_utc": "2026-11-08 21:58",
+      "eta_cairo": "2026-11-08 23:58",
+      "superseded_stage_tx": "2DvgkUVrNuD6PCopkUFNA15e7jrXCyTWRVi1Z8aykiMh",
+      "superseded_code_hash": "6299317b035ef9062fb94b11d9ab8c431ce5b55777b05739295b51569248ea99"
+    },
     "redeploy": {
       "when_cairo": "2026-11-05 20:03 Africa/Cairo",
       "prev_code_hash": "6aBm6TugZzge9uHDpSsr6pG7XPfZm22JoZ8XZxknRGsa",
