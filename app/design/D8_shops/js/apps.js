@@ -499,10 +499,18 @@ export async function toll(quote) {
   const effects = [{ chain: 'base', asset: quote.asset, to: String(quote.to).toLowerCase(), value: units, fee: '0' }];
   const expiry = (BigInt(Date.now()) * 1_000_000n + 3_600_000_000_000n).toString();
   const deposit = String(quote.feeYocto);
-  const signature = W.signMessage(key, callAsMessage({
-    network: 'mainnet', contract: S.board, owner: S.me, receiver: shop, method: 'cross',
-    args, deposit, nonce, expiry, epoch: String(row.epoch ?? '0'), effects, hold: false,
-  }));
+  // Ask the board for the exact text it will rebuild, not a local guess. The board derives the
+  // policy epoch itself (`epoch_of(owner)` inside `call_as_message`) and `get_charter` does not
+  // return it, so `row.epoch ?? '0'` signed 0 for every visitor whose epoch had moved --
+  // set_rules bumps it during setup -- and the contract answered ERR_BAD_SIG on every toll pass
+  // from the gold CTA. Verified on mainnet: same args, the board's own text carried epoch 14.
+  // app/src/panels/guard-live.js already signs this way for the same reason.
+  const view = { owner: S.me, receiver: shop, method: 'cross', args, deposit, nonce, expiry, effects, hold: false };
+  const text = await view(S.board, 'call_as_message', view).catch(() => null);
+  if (typeof text !== 'string' || !text.startsWith('board-call-as-v1|')) {
+    throw new Error('The board did not return a call message. Nothing was signed.');
+  }
+  const signature = W.signMessage(key, text);
   const call = {
     owner: S.me, receiver: shop, method: 'cross', args, deposit, expiry, effects, hold: false, signature,
   };
@@ -600,10 +608,14 @@ export async function hallJob(step) {
   const effects = [];
   const expiry = String(step.expiry || (BigInt(Date.now()) * 1_000_000n + 3_600_000_000_000n));
   const nonce = String(row.nonce ?? '0').replace(/^0+(?=\d)/, '');
-  const signature = W.signMessage(key, callAsMessage({
-    network: 'mainnet', contract: S.board, owner: S.me, receiver: shop, method: step.method,
-    args, deposit: String(deposit), nonce, expiry, epoch: String(row.epoch ?? '0'), effects, hold: false,
-  }));
+  // Same rule as the toll: the board's own text carries the real epoch. `row.epoch` does not
+  // exist on `get_charter`, so a local message signs 0 and the board answers ERR_BAD_SIG.
+  const view = { owner: S.me, receiver: shop, method: step.method, args, deposit: String(deposit), nonce, expiry, effects, hold: false };
+  const text = await view(S.board, 'call_as_message', view).catch(() => null);
+  if (typeof text !== 'string' || !text.startsWith('board-call-as-v1|')) {
+    throw new Error('The board did not return a call message. Nothing was signed.');
+  }
+  const signature = W.signMessage(key, text);
   const call = {
     owner: S.me, receiver: shop, method: step.method, args, deposit: String(deposit), expiry, effects, hold: false, signature,
   };
@@ -912,20 +924,20 @@ export async function arenaCall(plan) {
   if (!ak || (names.length && !names.includes('propose_call_as'))) return stop();
   const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
   if (!row || W.pubkeyHex(key) !== String(row.agent || '')) return stop();
-  const msg = callAsMessage({
-    network: S.mainnet?.network || 'mainnet',
-    contract: S.board,
+  const view = {
     owner: S.me,
     receiver: S.arena,
     method: call.method,
     args: call.args,
-    deposit: call.deposit,
+    deposit: String(call.deposit),
     nonce: String(row.nonce),
-    expiry: call.expiry,
-    epoch: String(row.epoch ?? '0'),
+    expiry: String(call.expiry),
     effects: call.effects || [],
     hold: !!call.hold,
-  });
+  };
+  // The board fills in its own epoch. Signing a locally built text was ERR_BAD_SIG.
+  const msg = await view(S.board, 'call_as_message', view).catch(() => null);
+  if (typeof msg !== 'string' || !msg.startsWith('board-call-as-v1|')) return stop();
   const signature = W.signMessage(key, msg);
   const args = {
     owner: S.me, receiver: S.arena, method: call.method, args: call.args,
