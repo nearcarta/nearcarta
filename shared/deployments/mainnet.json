@@ -198,7 +198,7 @@
     "arena": "arena.nearcarta.near",
     "house": "house.nearcarta.near",
     "townhall": "townhall.nearcarta.near",
-    "note": "Shops the visitor row may be opened against. The old per-visitor `charter.nearcarta.near` is not here: it was reaped when the visitor path became one shared board (`board.nearcarta.near`)."
+    "note": "Shops the visitor row may be opened against. The old per-visitor charter account is not here: it was reaped when the visitor path became one shared board (`board.nearcarta.near`)."
   },
   "derived_public_key": "secp256k1:26swhQicqiPZBJamrbHX2icEjv8FbcPGw9Cox4c3fu36S2f8MB2d1ZvrocJp3mTcqVH9BQ6of3UXX2WRj2WFv59V",
   "foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a",
