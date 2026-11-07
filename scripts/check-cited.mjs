@@ -101,6 +101,19 @@ function walkJson(o, where, parent = null) {
   if (!o || typeof o !== 'object') return;
   // A planned account (the mainnet factory, until the owner deploys it) is not on chain yet.
   if (o.status === 'not_deployed') return;
+  // A retired or never-created account is recorded on purpose: the docs describe what it was,
+  // not a live address. Its fields are a history, so they are not chain citations.
+  if (o.status === 'reaped' || o.status === 'deleted' || o.status === 'unused' || typeof o.status_note === 'string' || typeof o.account_note === 'string') return;
+  // A `previous`/`prev`/`prior` block records a build that is no longer deployed. Its code hash
+  // and sha256 were true of that build and are kept so a judge can see the history; the ref
+  // cannot carry a wasm that was never committed. Keys named as a history are not live citations.
+  if (/(^|\.)(previous|prev|prior|txs_prior_wasm|redeploy)$/.test(where)) {
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v !== 'string') { walkJson(v, `${where}.${k}`, o); continue; }
+      if (/(^|_)(tx|txs)$/.test(k) && /^[1-9A-HJ-NP-Za-km-z]{32,}$/.test(v)) add('proof_tx', v, `${where}.${k}`);
+    }
+    return;
+  }
   const target = o.contract || o.oath || o.charter || null;
   if (o.factory && o.code_hash) RELEASES.push({ factory: o.factory, code_hash: o.code_hash, where });
   for (const [k, v] of Object.entries(o)) {
