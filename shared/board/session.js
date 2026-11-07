@@ -217,6 +217,21 @@ export const EFFECT_BUDGET_FIRST_BYTES = 351;
 export const EFFECT_BUDGET_MORE_BYTES = 34;
 
 /**
+ * The largest call list four receivers can hold, measured on mainnet 2026-11-07 by growing the
+ * list one pair at a time against a four-receiver row (order matters: grow the receivers while
+ * the list is short, then grow the list):
+ *
+ *   four receivers, 4 pairs -> 1762 locked
+ *   four receivers, 5 pairs -> 2000 locked, zero headroom (the largest that lands)
+ *   four receivers, 6 pairs -> ERR_ROW_TOO_BIG
+ *
+ * So a four-shop row is exactly full at five pairs, and the seventh pair the default list wants
+ * (both wrap legs, the House pair, the stamp and the optional storage_deposit) cannot join it.
+ * A row at 2000 bytes has NO room for an effect budget, a hold, or a sixth pair.
+ */
+export const FOUR_SHOP_MAX_PAIRS = 5;
+
+/**
  * Bytes a rule change can still add, from the CHAIN's own number.
  *
  * The formula below (`pairBudgetBytes`) models a row from scratch, and on 2026-11-07 it said

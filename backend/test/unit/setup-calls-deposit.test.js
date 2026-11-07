@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { CALLS_DEPOSIT_YOCTO, EFFECT_BUDGET_FIRST_BYTES, EFFECT_BUDGET_MORE_BYTES, MAX_PAIR_BYTES, ROW_BYTES_PER_RECEIVER, ROW_FIXED_BYTES, ROW_STORAGE_BYTES, callPairBytes, callPolicy, callsFitRow, dropOptionalPairs, pairBudgetBytes, stampCalls } from '../../../shared/board/session.js';
+import { CALLS_DEPOSIT_YOCTO, EFFECT_BUDGET_FIRST_BYTES, EFFECT_BUDGET_MORE_BYTES, FOUR_SHOP_MAX_PAIRS, MAX_PAIR_BYTES, ROW_BYTES_PER_RECEIVER, ROW_FIXED_BYTES, ROW_STORAGE_BYTES, callPairBytes, callPolicy, callsFitRow, dropOptionalPairs, pairBudgetBytes, stampCalls } from '../../../shared/board/session.js';
 import { HOUSE_CALLS } from '../../../shared/house/shop.js';
 import { plainRulesError } from '../../../shared/setup/rules-diff.js';
 
@@ -175,6 +175,11 @@ test('the optional pairs go before a shop does, and the real limit is four shops
 });
 
 test('a shop-bearing row cannot hold a foreign effect budget, which is a contract limit', () => {
+  // The four-shop ceiling, measured by growing the list against a four-receiver row:
+  //   4 receivers, 4 pairs -> 1762 locked; 5 pairs -> 2000 (full); 6 pairs -> ERR_ROW_TOO_BIG.
+  assert.equal(FOUR_SHOP_MAX_PAIRS, 5);
+  assert.ok(1762 + 238 <= 2000, 'the fifth pair still fits');
+  assert.ok(1762 + 285 > 2000, 'the sixth does not');
   // Measured on mainnet 2026-11-07 against one row, one cap at a time:
   //   toll-only (1 pair)     1594 locked
   //   + base/usdc cap        1945  (+351, creates the ACTS record)
