@@ -293,8 +293,34 @@ impl Board {
         refund(me, attached + call_freed - call_cost - reserve_need);
     }
 
+    /// `set_calls` charges a SIDE_RESERVE_BYTES cushion and stores it as `credit` for exactly
+    /// this kind of write: the small side records a row needs after its call list is settled
+    /// (an effect budget, a hold). Charging the row's own 2000 bytes instead was measured on
+    /// mainnet 2026-11-07 to refuse every shop-bearing row: a four-shop row is exactly full at
+    /// five pairs, so `set_effects` panicked ERR_ROW_TOO_BIG and no visitor could pass the toll.
+    /// Spend the reserve first, and only then the row's remaining room.
     fn charge_acts(&mut self, me: &AccountId, before: u64) {
-        self.charge(me, before);
+        self.flush_owner(me);
+        let after = env::storage_usage();
+        if after <= before {
+            let freed = (before - after) as u128 * price();
+            if let Some(row) = self.rows.get_mut(me) { row.storage_locked = row.storage_locked.saturating_sub(freed); }
+            self.owe(-(freed as i128));
+            refund(me, freed + env::attached_deposit().as_yoctonear());
+            return;
+        }
+        let cost = (after - before + STORAGE_MARGIN_BYTES) as u128 * price();
+        let attached = env::attached_deposit().as_yoctonear();
+        require!(attached >= cost, "ERR_DEPOSIT");
+        let credit = self.credit.get(me).copied().unwrap_or(0);
+        let from_reserve = credit.min(cost);
+        let from_row = cost - from_reserve;
+        let row = self.rows.get_mut(me).unwrap();
+        require!(row.storage_locked.saturating_add(from_row) <= MAX_ROW_YOCTO, "ERR_ROW_TOO_BIG");
+        row.storage_locked += from_row;
+        if from_reserve > 0 { *self.credit.get_mut(me).unwrap() -= from_reserve; }
+        self.owe(cost as i128);
+        refund(me, attached - cost);
     }
 
     pub fn call_as_message(&self, owner: AccountId, receiver: AccountId, method: String, args: String, deposit: U128, nonce: U64, expiry: U64, effects: Vec<EffectIn>, hold: bool) -> String {
