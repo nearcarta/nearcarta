@@ -55,7 +55,9 @@ function optimize(file) {
 function findWasm() {
   const named = process.env.TOLL_WASM;
   const built = 'contracts/toll/target/wasm32-unknown-unknown/release/oath_lab.wasm';
-  const artifact = 'contracts/artifacts/toll.v7.wasm';
+  // The newest recorded build. v8 has `upgrade`, so a different build is applied in place
+  // instead of by closing and recreating the account. The record names the live wasm.
+  const artifact = 'contracts/artifacts/' + (MAIN.toll.wasm || 'toll.v7.wasm');
   if (named && existsSync(named)) return optimize(named);
   if (existsSync(built) && existsSync(artifact) && statSync(built).mtimeMs > statSync(artifact).mtimeMs) return optimize(built);
   if (existsSync(artifact)) return artifact;
@@ -129,7 +131,11 @@ const serviceHeld = policy && policy.service_held != null ? BigInt(policy.servic
 const openOrders = policy && policy.service_held != null ? 'service_held is the NEAR liability' : 'this wasm has no visitor service deposit';
 const codeMatchesRecorded = account && account.code_hash === RECORDED_CODE;
 const alreadyThisWasm = account && codeHash && account.code_hash === codeHash;
-const path = !exists ? 'create_only' : alreadyThisWasm ? 'view' : (codeMatchesRecorded ? 'close_then_create' : 'upgrade_then_migrate');
+// A recorded wasm that carries `upgrade` can be replaced in place; the older one could not,
+// so it had to be closed and recreated. That is the only difference between the two paths.
+const recordedCanUpgrade = /toll\.v8\.wasm$/.test(String(MAIN.toll.wasm || ''));
+const path = !exists ? 'create_only' : alreadyThisWasm ? 'view'
+  : (codeMatchesRecorded && !recordedCanUpgrade ? 'close_then_create' : 'upgrade_then_migrate');
 
 const oldWasmFile = 'contracts/artifacts/toll.v6p86.wasm';
 const oldWasmBytes = existsSync(oldWasmFile) ? BigInt(readFileSync(oldWasmFile).length) : 0n;
