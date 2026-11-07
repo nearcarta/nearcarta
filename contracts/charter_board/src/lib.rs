@@ -2642,4 +2642,32 @@ mod tests {
         n.reverse();
         "1".repeat(zeros) + &n.into_iter().map(|d| A[d as usize] as char).collect::<String>()
     }
+    #[test]
+    fn a_row_that_carries_a_full_call_list_can_still_hold_an_effect_budget() {
+        // Measured on mainnet 2026-11-07: a four-shop row is exactly full at five pairs
+        // (2000/2000), so `set_effects` was refused ERR_ROW_TOO_BIG and no visitor could ever
+        // pass the toll. `set_calls` already charges a 600-byte SIDE_RESERVE_BYTES for exactly
+        // this kind of write and stores it as `credit`; `set_effects` charged the row again
+        // instead of spending it. The reserve is the room an effect budget is meant to use.
+        let (mut c, _, _) = boot();
+        let many: Vec<(AccountId, String, u128)> = vec![
+            (acc("toll.nearcarta.near"), "cross".into(), NEAR / 50),
+            (acc("guard.nearcarta.near"), "pay".into(), NEAR / 50),
+            (acc("house.nearcarta.near"), "house_session_check_in".into(), NEAR / 50),
+            (acc("house.nearcarta.near"), "house_session_prepare_send".into(), NEAR / 50),
+            (acc("arena.nearcarta.near"), "ft_transfer".into(), NEAR / 50),
+        ];
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(many, NEAR / 10);
+        let credit = c.side_credit(&acc(ALICE));
+        assert!(credit > 0, "set_calls leaves a side reserve to spend");
+        // The effect budget must come out of that reserve, not out of the row's own bytes.
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![effect("base", "usdc", "0x0000000000000000000000000000000000000001", 10_000, 1_000)]);
+        assert_eq!(c.effect_spent(&acc(ALICE), "base", "usdc", "0x0000000000000000000000000000000000000001"), (0, 0));
+        assert!(c.side_credit(&acc(ALICE)) < credit, "the effect record was paid from the reserve");
+        let row = c.get_charter(acc(ALICE)).unwrap();
+        assert!(row.storage_locked.0 <= MAX_ROW_YOCTO, "the row stays inside its 0.02 NEAR allowance");
+    }
+
 }
