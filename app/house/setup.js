@@ -1268,6 +1268,12 @@ function render() {
   c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; w();
   c.querySelectorAll('[data-testid=setup-step]').forEach(b => { if (!b.disabled) b.onclick = () => go(+b.dataset.step); });
   if (['character', 'sign', 'try'].includes(STEPS[st.step][0])) remember();
+  // The rules step now needs the chain row too: it refuses a new shop on a row whose 0.02
+  // NEAR of storage is already used, which only the chain can tell us. Reading it here means
+  // the guard has a row to look at instead of skipping itself.
+  if (STEPS[st.step][0] === 'rules' && boardLive() && !st.trial && !chainRow) {
+    ensureChainRow().then(() => { if (STEPS[st.step][0] === 'rules') render(); }).catch(() => {});
+  }
 }
 
 function paintShell() {
