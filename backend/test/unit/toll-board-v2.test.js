@@ -63,10 +63,11 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   const script = fileURLToPath(new URL('../../../scripts/toll-deploy.js', import.meta.url));
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const secret = 'ed25519:this-is-not-a-real-key-and-must-not-appear';
-  // The live account now runs the recorded wasm, so a plain run takes the read-only view path.
-  // A one-byte copy of the wasm plans the recreate without asking the chain which build is deployed.
+  // The toll now runs v8, which has `upgrade` and `migrate`, so a build that is not the live
+  // one plans `upgrade_then_migrate`: the account is not closed, no NEAR moves, and the state
+  // layout is kept. A one-byte change makes the wasm differ from the live code on purpose.
   const wasm = join(mkdtempSync(join(tmpdir(), 'toll-plan-')), 'toll.wasm');
-  const bytes = readFileSync(new URL('../../../contracts/artifacts/toll.v7.wasm', import.meta.url));
+  const bytes = readFileSync(new URL('../../../contracts/artifacts/toll.v8.wasm', import.meta.url));
   bytes[bytes.length - 1] ^= 0x01;
   writeFileSync(wasm, bytes);
   const dry = spawnSync(process.execPath, [script], {
@@ -85,10 +86,10 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   assert.ok(report.wasm.bytes > 0);
   assert.match(report.wasm.sha256, /^[0-9a-f]{64}$/);
   assert.ok(report.balance.shop_before_near || report.balance.recorded_locked_near);
-  assert.equal(report.path, 'close_then_create');
-  for (const t of report.transfers) {
-    assert.ok(t.payee === 'nearcarta.near' || t.payee === 'toll.nearcarta.near');
-  }
+  // The v8 wasm upgrades in place, so nothing is closed and no balance is carried between
+  // accounts. The check that matters is that no plan moves NEAR.
+  assert.equal(report.path, 'upgrade_then_migrate');
+  assert.deepEqual(report.transfers, []);
   // A view carries no init args; a create does, and they must name no allow list.
   if (report.init) assert.deepEqual(report.init.allow_to, []);
   else assert.equal(report.path, 'view');
@@ -109,7 +110,10 @@ test('toll-deploy is a dry-run and does not print a signer key', () => {
   // A view moves nothing. A create or a replace names its stake and its slack.
   const create = report.transfers.find(t => t.step === 'create_account');
   const close = report.transfers.find(t => t.step === 'close');
-  if (report.path === 'view') {
+  if (report.path === 'view' || report.path === 'upgrade_then_migrate') {
+    // In-place upgrade: the account keeps its balance, so there is no stake or slack to fund
+    // and nothing may be sent. `shop_after_liquid_near` is null on this path, so the check is
+    // that the plan moves nothing at all.
     assert.deepEqual(report.transfers, []);
   } else {
     assert.equal(report.balance.shortfall_near, '0');

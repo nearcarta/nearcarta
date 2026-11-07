@@ -76,7 +76,14 @@
         "ferry_ask_charter_0.005": "Fy1BKPbrWSJ2z9wgSazsrjGhXHm3Rk7YzEhfwhJ95bvV",
         "propose_allowed_0.001_to_wrap_same_day_4": "BBVJPesLZxjhSaasKgurFaAM5FG1SiVnm4SLqxiAoags",
         "guard_hold_second_payment": "9qxsoyA8VrecsCh13yuUFhCk7QxEM4ueMVbicJvxyXwT",
-        "guard_cancel_hold_by_owner_wallet": "GWnPvGBcVe599hk6RQmxxUgRagtQc7CWWFJgmXL4VgYs"
+        "guard_cancel_hold_by_owner_wallet": "GWnPvGBcVe599hk6RQmxxUgRagtQc7CWWFJgmXL4VgYs",
+        "close_charter_after_cancel": "8eNrPXFgn5EN87VrNYQERjaHpsp5Rcg8QnxT5pLaCrfZ",
+        "open_city_row_3_shops_toll_guard_arena": "FqPrTiM6fM1RSQ3x2JtrMYXKcUpMFRJuZpLreXcRPHye",
+        "add_session_key_to_visitor": "Gr4EK9gNL4BJL8UGNbANGxUDSCrRU4qCPmeyXhwVD8cv",
+        "toll_cross_base_usdc_through_board": "FwXfnyddVoZ7u6zYrF5Y3mWq9K5aHxrGc25CzM6JzpPj",
+        "guard_pay_allow_through_board": "862vGPD6PxA64RzD2hKNKb6tM2wLjpeoWXrrsWW7RoaV",
+        "arena_agent_act_allow": "CMGyWtvy9ko2RH711p1Ao2fpWWVcUpFNWKPnkiR7pPVB",
+        "arena_agent_act_refused_over_cap": "HG5z6E8oFehNm9Xr9YTV1LT9XNLKi5AAi9QuM4Ka1oJv"
       }
     },
     "redeploy": {
@@ -150,13 +157,15 @@
   "toll": {
     "contract": "toll.nearcarta.near",
     "owner": "nearcarta.near",
-    "code_hash": "6aAGdUhyub9wAGkWrd2ksZQZ7t4E8BqtbSBfnCwe4uDb",
-    "wasm": "toll.v7.wasm",
+    "code_hash": "FaNtiauDWfjzKYtK2bns79wUqZqcXFcLjz2Bzx7aVdL5",
+    "wasm": "toll.v8.wasm",
+    "upgrade_note": "Upgraded in place from v7 (6aAGdUhy…) with the owner-only `upgrade`, which deploys the code and then calls `migrate` itself. The account was not closed and no NEAR moved. v8 drops the contract-wide `max_per_tx`/`budget` caps that v7 still enforced: on v7 a visitor crossing of 1e18 yocto hit `max_per_tx` (1e13) and the refusal surfaced as a wasm trap instead of a reason.",
     "storage_bytes": 217747,
     "locked_near": 2.17747,
     "full_access_keys": 0,
     "foreign_address": "0x4c07c97812098f595ff1611d8cb3465e591ee38a",
     "txs": {
+      "toll_v8_upgrade_migrate": "CZEM7KEjYNK59jVgq1UgdAk7R9kFyM1UHFUkZ3AuLVNY",
       "fund_toll": "64HuNHJ8jKA4zBJyKNDdQkXasyvmgizbGT5wYBWVb2Fa",
       "toll_deploy_init_agentkey": "6KgwM4Q1VmLfvgK8vDBkWg92S65ZLcFsUb6NNXsAEWXc",
       "toll_sweep_surplus": "DVFgzmAx2My6cki1q6wXyNsm2VHQ3HzZo1KZHKwQtqEd",
