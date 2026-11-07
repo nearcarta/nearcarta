@@ -100,3 +100,10 @@ test('Arena stacks fewer rows so its gold action never sits below the fold', () 
   assert.match(rule, /grid-template-columns:1fr 1fr/, 'the money fields sit in two columns');
   assert.match(panels, /\.arena-actions[,\s][\s\S]{0,120}?grid-column:1 \/ -1\}|> \.arena-actions,\n/, 'the action spans the full row');
 });
+
+test('the tab strip fits however many tabs a shop has', () => {
+  const panels = read('app/src/panels/panels.css');
+  // Payouts has four tabs in a strip that was hardcoded to three columns.
+  assert.match(panels, /\.ferry-tabs\{display:grid;grid-auto-flow:column;grid-auto-columns:minmax\(0,1fr\)/);
+  assert.doesNotMatch(panels, /\.ferry-tabs\{display:grid;grid-template-columns:repeat\(3/);
+});

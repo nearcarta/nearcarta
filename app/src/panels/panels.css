@@ -318,7 +318,7 @@ label.amt input{width:9rem;flex:0 0 9rem;min-width:0;box-sizing:border-box}
 
 /* ---- Ferry mix sketch card (city tray): ~400px airy, opaque, tabs Swap|Routes|Rules ---- */
 .ferry-card{display:grid;gap:18px}
-.ferry-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28}
+.ferry-tabs{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28}
 .ferry-tab{min-height:44px;border:0;border-radius:11px;background:transparent;color:#d4c4a8;font:700 15px/1 system-ui,sans-serif;cursor:pointer}
 .ferry-tab.on,.ferry-tab[aria-selected=true]{background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608}
 .ferry-pane{display:grid;gap:16px}
@@ -481,7 +481,7 @@ body.ferry-tray #shopUI .btns .ghost{
 .house-room{padding-bottom:12px}
 .house-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 body.house-tray #shopUI .ferry-tabs,
-#house .ferry-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28}
+#house .ferry-tabs{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28}
 body.house-tray #shopUI .ferry-tab,
 #house .ferry-tab{min-height:44px;height:44px;border:0;border-radius:11px;background:transparent;color:#d4c4a8;font:700 15px/1 system-ui,sans-serif;cursor:pointer}
 body.house-tray #shopUI .ferry-tab.on,
