@@ -1027,12 +1027,15 @@ async function ensureChainRow() {
   if (!me || !boardLive() || st.trial) return;
   if (chainLoadedFor === me) return;
   const owner = me;
-  chainLoadedFor = owner;
   readError = false;
   const row = await viewFn(rpcClient([MAIN.rpc]), MAIN.board.contract, 'get_charter', { owner }).catch(() => { readError = true; return null; });
   if (owner !== me) return;
-    chainRow = row;
-    chainRead = true;
+  // Mark it loaded only AFTER the read resolves. Setting this before the await made the
+  // next caller return early with chainRow still null, so the rules step saw no row and a
+  // storage-full row was never refused.
+  chainRow = row;
+  chainLoadedFor = owner;
+  chainRead = true;
     // `get_charter` returns `null` for an account with no row. That is an answer, not
     // a failed read, and it is the normal state after a close or a force_close.
     chainError = row ? '' : (readError ? 'The chain did not answer. Refresh the page to try again.' : '');
