@@ -221,7 +221,10 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     bind();
     bindTokenFallbacks(root);
     const tray = root.closest('#tray');
-    if (tray) tray.scrollTop = 0;
+    // The scrollable region is now the inner wrapper, not #tray itself: reset that one so a
+    // new tab opens at its top instead of inheriting the previous tab's scroll offset.
+    const scroller = tray?.querySelector('.t-scroll') || tray;
+    if (scroller) scroller.scrollTop = 0;
   };
 
   const bind = () => {

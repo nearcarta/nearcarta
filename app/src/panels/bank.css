@@ -76,7 +76,7 @@ body.bank-tray #shopUI #t-form button.bank-again{
   flex:1 1 auto;overflow:hidden;display:flex;flex-direction:column;
 }
 .bank-format{margin:0;color:#e6d3b0;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
-.bank-sample-link{align-self:flex-start;padding:0;border:0;background:transparent;color:#f5d08a;font:700 14px/1.3 system-ui,sans-serif;text-decoration:underline;cursor:pointer}
+.bank-sample-link{align-self:flex-start;padding:10px 4px;min-height:44px;margin:-10px 0;border:0;background:transparent;color:#f5d08a;font:700 14px/1.3 system-ui,sans-serif;text-decoration:underline;cursor:pointer}
 .bank-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:start}
 .bank-split > div{min-width:0}
 .bank-meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;min-width:0}

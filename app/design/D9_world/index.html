@@ -99,12 +99,14 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
   <button id="back" type="button" data-testid="back-town" aria-label="Back to town"><span aria-hidden="true">&larr;</span> Back to town <kbd>Esc</kbd></button>
   <div id="stags"></div>
   <section id="tray" aria-live="polite">
-    <div class="t-head"><h1 id="t-title"></h1><span id="t-src" class="src"></span></div>
-    <p id="t-label" class="label"></p>
-    <p id="t-say" class="say" hidden></p>
-    <div id="t-hero" class="hero"></div>
-    <div id="t-form" class="form" hidden></div>
-    <a id="t-cta" class="act primary cta" hidden></a>
+    <div class="t-scroll">
+      <div class="t-head"><h1 id="t-title"></h1><span id="t-src" class="src"></span></div>
+      <p id="t-label" class="label"></p>
+      <p id="t-say" class="say" hidden></p>
+      <div id="t-hero" class="hero"></div>
+      <div id="t-form" class="form" hidden></div>
+      <a id="t-cta" class="act primary cta" hidden></a>
+    </div>
     <div class="t-row"><button id="t-act" type="button" class="act primary"></button></div>
     <p id="t-rcpt" class="rcpt"></p>
     <div class="t-links"><a id="t-more" class="link more" data-testid="hall-proposals" hidden></a><button id="t-rules" type="button" class="link" hidden>Your rules</button><button id="t-proof" type="button" class="link" aria-controls="drawer" aria-expanded="false">How it works</button></div>
