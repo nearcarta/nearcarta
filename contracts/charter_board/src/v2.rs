@@ -303,8 +303,19 @@ impl Board {
         self.flush_owner(me);
         let after = env::storage_usage();
         if after <= before {
+            // A shrinking write returns bytes. Anything it frees that came out of the ROW goes
+            // back to the row; anything that came out of the prepaid RESERVE must go back to
+            // the reserve instead. Crediting the row for both made `storage_locked` smaller
+            // than the row really used, so a later write could overrun the 0.02 NEAR cap.
             let freed = (before - after) as u128 * price();
-            if let Some(row) = self.rows.get_mut(me) { row.storage_locked = row.storage_locked.saturating_sub(freed); }
+            let credit = self.credit.get(me).copied().unwrap_or(0);
+            let want = SIDE_RESERVE_BYTES as u128 * price();
+            let to_reserve = want.saturating_sub(credit).min(freed);
+            let to_row = freed.saturating_sub(to_reserve);
+            if to_row > 0 {
+                if let Some(row) = self.rows.get_mut(me) { row.storage_locked = row.storage_locked.saturating_sub(to_row); }
+            }
+            if to_reserve > 0 { *self.credit.entry(me.clone()).or_insert(0) += to_reserve; }
             self.owe(-(freed as i128));
             refund(me, freed + env::attached_deposit().as_yoctonear());
             return;

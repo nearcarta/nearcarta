@@ -2670,4 +2670,40 @@ mod tests {
         assert!(row.storage_locked.0 <= MAX_ROW_YOCTO, "the row stays inside its 0.02 NEAR allowance");
     }
 
+    #[test]
+    fn clearing_and_re_setting_an_effect_budget_does_not_burn_the_reserve() {
+        // `set_effects([])` removes the record and frees the bytes, but the reserve it was paid
+        // from has to come back, or the next `set_effects` finds nothing to spend and fails
+        // ERR_DEPOSIT on a row that owes nothing. A visitor adding a Base address after a first
+        // visit is exactly this cycle.
+        let (mut c, _, _) = boot();
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "cross".into(), NEAR / 50)], NEAR / 10);
+        let credit0 = c.side_credit(&acc(ALICE));
+        assert!(credit0 > 0, "set_calls leaves a reserve");
+        let locked0 = c.get_charter(acc(ALICE)).unwrap().storage_locked.0;
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![effect("base", "usdc", "0xabc", 10, 1)]);
+        let credit1 = c.side_credit(&acc(ALICE));
+        assert!(credit1 < credit0, "the first budget spent the reserve");
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![]);
+        let credit2 = c.side_credit(&acc(ALICE));
+        // Clearing gives the bytes back to the reserve they came from, so the credit is
+        // restored toward what `set_calls` originally left, and the row's locked bytes are
+        // untouched because they never paid for the record.
+        assert!(credit2 > credit1, "clearing returns the reserved bytes");
+        assert!(credit2 <= credit0 + NEAR / 1_000_000, "and never more than was reserved");
+        // The record was paid from the reserve, so it never raised storage_locked. Freeing it
+        // must therefore not lower storage_locked either: the row's bytes are unchanged.
+        let locked2 = c.get_charter(acc(ALICE)).unwrap().storage_locked.0;
+        assert_eq!(locked2, locked0, "clearing a reserve-paid record must not lower the row's locked bytes");
+        // And the row can take a budget again without a deposit it does not owe.
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_effects(vec![effect("base", "native", "0xdef", 10, 1)]);
+        assert_eq!(c.effect_spent(&acc(ALICE), "base", "native", "0xdef"), (0, 0));
+        let row = c.get_charter(acc(ALICE)).unwrap();
+        assert!(row.storage_locked.0 <= MAX_ROW_YOCTO);
+    }
+
 }
