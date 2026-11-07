@@ -1102,6 +1102,7 @@ const APPS = {
       if (dock) dock.hidden = false;
       mountShop('house', document.getElementById('t-form'), {
         state: extra,
+        mintDeed: () => A.houseMint(),
         onDelivered: () => { sh?.hideSeal?.(); sh?.deliver?.(); },
         onRefuse: () => sh?.showSeal?.(),
         hideRefuse: () => sh?.hideSeal?.(),

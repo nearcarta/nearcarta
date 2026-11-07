@@ -90,6 +90,9 @@ export function mountHouseRoom(root, hooks = {}) {
   const params = new URLSearchParams(globalThis.location?.search || '');
   const id = params.get('owner') || who.accountId || '';
   const state = hooks.state || (hooks.state = {});
+  // The mint path is a wallet approval, so the page supplies it. Without it the room still
+  // reads the deed and never pretends it could mint.
+  const mintDeed = typeof hooks.mintDeed === 'function' ? hooks.mintDeed : () => { throw new Error('Minting needs the wallet. Open this shop from the city.'); };
   state.id = id;
   state.tab = state.tab || 'deed';
   state.seen = state.seen || new Set();
@@ -109,7 +112,10 @@ export function mountHouseRoom(root, hooks = {}) {
     });
     const cta = root.querySelector('[data-testid=house-cta]');
     if (cta) {
-      if (state.tab === 'vaults') cta.textContent = 'Send from house';
+      // No deed yet: the only useful action is minting one, and the mint plan came with
+      // the deed read, so the button names what the press will do.
+      if (state.needsMint && state.tab === 'deed') cta.textContent = 'Mint my deed';
+      else if (state.tab === 'vaults') cta.textContent = 'Send from house';
       else if (state.tab === 'heirs' && state.line?.line?.pending_ns) cta.textContent = 'Cancel release';
       else cta.textContent = "I'm alive";
     }
@@ -189,7 +195,25 @@ export function mountHouseRoom(root, hooks = {}) {
     btn.onclick = () => showTab(btn.dataset.tab);
   });
   const cta = root.querySelector('[data-testid=house-cta]');
-  if (cta) cta.onclick = () => turn(sentence());
+  if (cta) cta.onclick = async () => {
+    // mint_deed reads the predecessor and carries a 0.02 NEAR deposit, so a function-call
+    // session key cannot sign it. This is the one House action that needs a wallet approval,
+    // once per account; check-in, vault sends and heirs all use the session afterwards.
+    if (state.needsMint && state.tab === 'deed') {
+      cta.disabled = true;
+      setStatus('One approval mints your deed. After that the agent acts with no prompt.');
+      try {
+        const out = await mintDeed();
+        state.needsMint = false; state.token = out.tokenId; state.mintTx = out.tx;
+        setStatus(`Deed minted. tx ${String(out.tx).slice(0, 10)}…`);
+        paintVault();
+      } catch (e) {
+        setStatus(String(e?.message || 'The deed was not minted.').slice(0, 170));
+      } finally { cta.disabled = false; }
+      return;
+    }
+    return turn(sentence());
+  };
   showTab(state.tab);
 
   const dockDoc = typeof document !== 'undefined' ? document : null;
@@ -274,14 +298,19 @@ export function mountHouseRoom(root, hooks = {}) {
   start();
 
   fetch(api() + '/api/house/deed/' + encodeURIComponent(id), { cache: 'no-store' })
-    .then(r => r.ok ? r.json() : null)
+    // A 404 is a real state, not a failure: the visitor has no deed yet and the body carries
+    // the mint plan. Treating it as null left the tray on its "Still opening" fallback with a
+    // dead button, which is exactly what a first-time visitor sees.
+    .then(r => r.json().catch(() => null))
     .then(body => {
       const purses = body?.purses || {};
       state.purse = purses[id] || Object.values(purses)[0] || null;
       state.token = body?.token || null;
+      state.mintPlan = body?.mint || null;
+      if (!state.token) state.needsMint = true;
       paintVault();
     })
-    .catch(() => {});
+    .catch(() => { state.deedError = 'The deed did not answer. Nothing was signed.'; paintVault(); });
   fetch(api() + '/api/house/derived/' + encodeURIComponent(id), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : Promise.reject(new Error('signer did not answer')))
     .then(body => { state.derived = body; paintVault(); })
