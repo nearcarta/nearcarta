@@ -17,7 +17,7 @@ import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf, storedAgentKey } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
-import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, FERRY_CALL_TARGETS, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, fittingShops, classifyBoardAgentKeys, payoutsCalls, renewAgentKeyActions, sessionExpiresAt, sessionLabel, rowHeadroomBytes } from '../../shared/board/session.js';
+import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, FERRY_CALL_TARGETS, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, dropOptionalPairs, fittingShops, classifyBoardAgentKeys, payoutsCalls, renewAgentKeyActions, sessionExpiresAt, sessionLabel, rowHeadroomBytes } from '../../shared/board/session.js';
 import { HOUSE_CALLS, HOUSE_SHOP } from '../../shared/house/shop.js';
 import { pluginKeyName } from './board-key.js';
 import { refusalOf } from '../design/D8_shops/js/board.js';
@@ -548,13 +548,23 @@ function boardArgs(r, agent) {
 // the House pair (propose_call_as reaches the House shop), and the USDC storage_deposit
 // (a Payouts row registers a zero-NEAR issuer inside the visitor's own cap).
 // payoutsCalls in shared/board/session.js adds the USDC storage_deposit pair when the row has room,
+// and `dropOptionalPairs` there trims the optional pairs before a shop is ever dropped.
+// The optional pairs are never a shop's own call, so trimming them never removes a shop.
+// House's two session calls are added only when House is in the visitor's own list: adding
+// them otherwise charges the row for a shop it cannot reach, and that false weight made a
+// legitimate four-shop row look too big (toll+guard+arena+hall: 433 bytes against 414).
+function housePairsIfNamed(receivers) {
+  const named = new Set((receivers || []).map(a => String(a).toLowerCase()));
+  return HOUSE_CALLS.every(c => named.has(String(c.receiver).toLowerCase())) ? HOUSE_CALLS : [];
+}
 function callsFor(r, contract) {
   const extra = [
     ...FERRY_CALL_TARGETS,
     { receiver: contract, method: 'stamp', cap: String(toY(r.cap)) },
-    ...HOUSE_CALLS,
+    ...housePairsIfNamed(r.receivers),
   ];
-  return callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', payoutsCalls(extra, toY(r.cap)).calls).calls;
+  const full = callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', payoutsCalls(extra, toY(r.cap)).calls).calls;
+  return dropOptionalPairs(full, (r.receivers || []).length).calls;
 }
 // The agent key is also added to the visitor's own account as a function-call access key.
 // It may call propose, propose_call, propose_call_as and anchor on the board, with a gas allowance
@@ -832,7 +842,7 @@ function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursE
   const out = plan.map(step => {
     const args = step.method === 'set_agent' ? { agent: key.publicKey }
       : step.method === 'set_rules' ? { rules: ruleArgs(r, expiresAt) }
-      : callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', payoutsCalls([...FERRY_CALL_TARGETS, { receiver: contract, method: 'stamp', cap: String(toY(r.cap)) }, ...HOUSE_CALLS], toY(r.cap)).calls);
+      : callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', payoutsCalls([...FERRY_CALL_TARGETS, { receiver: contract, method: 'stamp', cap: String(toY(r.cap)) }, ...housePairsIfNamed(r.receivers)], toY(r.cap)).calls);
     return [step.key, { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: step.method, args, gas: (GAS.agent * TG).toString(), deposit: step.deposit } }] }];
   });
   if (!shrinkFirst) return out;

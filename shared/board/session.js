@@ -165,32 +165,35 @@ function wrapCap(named, capYocto) {
 export const MAX_CALLS = 24;
 
 // The row and its call list share one 0.02 NEAR of storage (MAX_ROW_YOCTO = 2000 bytes).
-// Two things were wrong in the earlier budget, and a mainnet transaction proved it:
+// The constants below are measured on mainnet, not modelled, because modelling refused
+// shapes the chain accepted and accepted shapes it refused.
 //
-//   Tx 7H3H2HFiqPiGTPkF8gkkFLvbMecARWQdyG9DCdBPNnh9 (2026-11-06) opened a six-receiver
-//   row with 60 Tgas attached and then panicked ERR_ROW_TOO_BIG on set_calls with 11
-//   pairs. Gas was fine (6.80 Tgas burnt of 60); the row was full.
+// 2026-11-07, visitor row `8ccd5d33…`, ONE fixed eight-pair list (402 pair bytes) and only
+// the receiver count moved, so the slope is the per-receiver cost by construction:
 //
-// The budget below used to be a flat 602 bytes measured from a ONE-receiver row. The row
-// itself is bigger when the rules name more receivers, and every one of those bytes comes
-// out of the same 2000. Measured on the committed wasm in
-// `contracts/charter_board_sandbox/tests/setup_calls_row_size.rs`, using that exact list:
+//   receivers=1 -> 1916 bytes locked
+//   receivers=2 -> 1940 bytes locked
+//   receivers=3 -> 1964 bytes locked
 //
-//   one receiver, 10 pairs -> 1911 bytes locked; 11 pairs -> refused
-//   six receivers,  9 pairs -> 1956 bytes locked; 10 pairs -> refused
-//   three receivers, 8 pairs (the default Toll + Guard + House list) -> 1842 bytes locked
-//   five receivers,  9 pairs (the failed list, retired charter dropped) -> 1948 bytes locked
+// slope 24 bytes per receiver; fixed = 1916 - 24 - 402 = 1490.
 //
-// That solves to a fixed 1380 bytes for the row plus about 22 bytes per receiver, so the
-// pair list gets 2000 - 1380 - 22 x receivers. `callsFitRow` now takes the receiver count.
-// The model runs about 21 bytes over what the trie actually locks on the shapes measured,
-// which is the direction that matters: it refuses slightly early rather than on chain.
+// The two shapes that failed on the same row, and why:
+//   four receivers, 9 pairs (472 bytes) -> ERR_ROW_TOO_BIG. The old model said 1940 of 2000.
+//   four receivers, 8 pairs (424 bytes) -> ERR_ROW_TOO_BIG. The old model said 1892 of 2000.
+// and the shape that landed:
+//   four receivers, 7 pairs (375 bytes) -> 1993 bytes locked, 7 left. The model says 1961.
+//
+// Those 32 bytes ARE the contract's own `STORAGE_MARGIN_BYTES`: `charge` adds the margin on
+// every write and never gives it back, so a row that is edited more than once carries it once
+// per edit. That is why the model is a floor and `rowHeadroomBytes` is the number to trust on
+// a live row. The margin is already inside the constants below, so a fresh row is budgeted
+// pessimistically, which is the direction that matters: refuse early rather than on chain.
 //
 // Each pair is the receiver, the method and a 16-byte cap: `receiver.length + method.length
 // + 24`. The list almost always carries the wrap.near trio, the board stamp and the House
 // shop's two calls, and those count too.
-export const ROW_FIXED_BYTES = 1380;
-export const ROW_BYTES_PER_RECEIVER = 22;
+export const ROW_FIXED_BYTES = 1490;
+export const ROW_BYTES_PER_RECEIVER = 24;
 /** The whole row's storage allowance, from contracts/charter_board MAX_ROW_YOCTO. */
 export const ROW_STORAGE_BYTES = 2000;
 
@@ -261,6 +264,41 @@ export function fittingShops(receivers, build) {
 }
 
 const callKey = (receiver, method) => `${String(receiver).toLowerCase()}\0${String(method)}`;
+
+/**
+ * The pairs a row can lose without losing a shop, in the order to lose them. Every entry
+ * names its cost to the visitor, because dropping one is a real trade and the page says so.
+ *
+ * The row is 2000 bytes and each shop takes a slice, so a visitor adding the fourth or fifth
+ * shop runs out of room. Dropping a shop breaks something they just asked for; dropping one
+ * of these does not. Measured on 2026-11-07: with this trim a four-shop row lands at 1993
+ * bytes locked, and without it the same row was refused ERR_ROW_TOO_BIG (see
+ * `ROW_FIXED_BYTES` for the four failed and successful shapes).
+ */
+export const OPTIONAL_CALL_PAIRS = [
+  { receiver: 'wrap.near', method: 'storage_deposit', why: 'registers the board to receive wNEAR' },
+  { receiver: 'board.nearcarta.near', method: 'stamp', why: 'Ask charter: the board returns that NEAR to your row' },
+  // No `townhall ft_transfer` here on purpose. It looks optional because it is a plain
+  // `ft_transfer`, but it is the only pair that reaches the Town Hall, so dropping it removes
+  // a shop the visitor named. A test pins that every named shop survives the trim.
+];
+
+/**
+ * Trim OPTIONAL_CALL_PAIRS until the list fits next to `receivers` receivers.
+ * Returns the kept list and what was dropped, so a page can say what it traded away.
+ */
+export function dropOptionalPairs(calls, receivers) {
+  let list = [...(calls || [])];
+  const dropped = [];
+  for (const opt of OPTIONAL_CALL_PAIRS) {
+    if (callsFitRow(list, receivers)) break;
+    const at = list.findIndex(c => String(c.receiver).toLowerCase() === opt.receiver && c.method === opt.method);
+    if (at < 0) continue;
+    list = [...list.slice(0, at), ...list.slice(at + 1)];
+    dropped.push(opt);
+  }
+  return { calls: list, dropped, fits: callsFitRow(list, receivers) };
+}
 
 /**
  * The method each shop is actually reached on through `propose_call_as`. Paying

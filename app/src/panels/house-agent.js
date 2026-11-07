@@ -81,6 +81,19 @@ function planCheckIn(ctx) {
   if (row.balance != null && row.balance !== '' && big(deposit) > big(row.balance)) {
     return refuse('Your row does not hold that much. Nothing was signed.', { tab: 'deed' });
   }
+  // A deed with no inheritance line makes `house_session_check_in` panic inside the contract
+  // (`line_of` has no line to read). The chain reports that as a bare wasm trap after the NEAR
+  // has already been reserved, so the visitor pays gas for an error nobody can read. Name the
+  // real cause before anything is signed: the holder sets the line first with their own key.
+  // Verified on mainnet 2026-11-07 against a deed whose `house_line` returns null.
+  // `ctx.line` is the /api/house/line payload. It is `null` when the request failed, and
+  // `{line: null}` when the deed answered with no line. Only the second case is proof that the
+  // deed has no line; a failed read must not be turned into a claim about the chain.
+  const lineKnown = ctx.line && typeof ctx.line === 'object';
+  const hasLine = ctx.hasLine != null ? ctx.hasLine : (lineKnown ? !!(ctx.line.line || ctx.line.heirs) : null);
+  if (hasLine === false) {
+    return refuse('This deed has no inheritance line yet, so a check-in would fail on chain. Set the heirs and guardians first, with your own wallet. Nothing was signed.', { tab: 'deed' });
+  }
   if (ctx.nonce == null || ctx.epoch == null) {
     return {
       ok: true, action: 'checkin', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
