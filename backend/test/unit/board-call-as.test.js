@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { callAsMessage, confirmMessage, injectRowOwner } from '../../../shared/board/call-as.js';
 import * as shared from '../../../shared/board/call-as.js';
 import * as browser from '../../../app/src/board-call-as.js';
@@ -158,4 +159,22 @@ test('the guard board module resolves inside the deploy root', async () => {
   assert.doesNotMatch(envelope, /^\s*import[^;]*from\s*'@noble/m);
   assert.match(envelope, /setSha256Hex/);
   assert.match(readFileSync(`${root}shared/board/call-as.js`, 'utf8'), /setSha256Hex/);
+});
+
+test('the city never signs a call-as text it built itself', () => {
+  // `get_charter` has no `epoch`, so `row.epoch ?? '0'` signed epoch 0 for any visitor whose
+  // epoch had moved (setup's set_rules bumps it). The board then refused with ERR_BAD_SIG.
+  // Measured on mainnet 2026-11-07: the gold toll CTA's own args produced board text carrying
+  // epoch 14, while the browser had signed 0 -> Efp2LRRf… ERR_BAD_SIG.
+  //
+  // Every path that signs `propose_call_as` must therefore ask the board for the text
+  // (`call_as_message`) instead of assembling it. This pins that for all three city paths.
+  const src = readFileSync(new URL('../../../app/design/D8_shops/js/apps.js', import.meta.url), 'utf8');
+  const guesses = [...src.matchAll(/callAsMessage\(\{/g)];
+  assert.equal(guesses.length, 0, 'apps.js must not build a call-as text locally');
+  const asked = [...src.matchAll(/call_as_message/g)];
+  assert.ok(asked.length >= 3, `apps.js asks the board for its text (found ${asked.length})`);
+  // And the epoch must not be invented anywhere on a signing path.
+  const code = src.replace(/\/\/[^\n]*/g, '');
+  assert.doesNotMatch(code, /row\.epoch\s*\?\?/, 'no `row.epoch ?? fallback` on a signing path');
 });
