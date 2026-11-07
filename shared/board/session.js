@@ -193,6 +193,23 @@ export const ROW_FIXED_BYTES = 1380;
 export const ROW_BYTES_PER_RECEIVER = 22;
 /** The whole row's storage allowance, from contracts/charter_board MAX_ROW_YOCTO. */
 export const ROW_STORAGE_BYTES = 2000;
+
+/**
+ * Bytes a rule change can still add, from the CHAIN's own number.
+ *
+ * The formula below (`pairBudgetBytes`) models a row from scratch, and on 2026-11-07 it said
+ * 554 bytes were free while the live row was already at its exact 0.02 NEAR cap: `set_rules`
+ * panicked ERR_ROW_TOO_BIG and the visitor's wallet had already approved the call. Modelling a
+ * row is a guess; `storage_locked` is the chain telling us. This returns the real headroom, or
+ * null when the row does not report it.
+ */
+export function rowHeadroomBytes(row, maxRowBytes = ROW_STORAGE_BYTES) {
+  const locked = row?.storage_locked;
+  if (locked == null || locked === '') return null;
+  const lockedBytes = Number(locked) / 1e19; // storage costs 1e19 yocto per byte on mainnet
+  if (!Number.isFinite(lockedBytes)) return null;
+  return Math.max(0, Math.floor(maxRowBytes - lockedBytes));
+}
 /** Room for the pair list when the rules name `receivers` receivers. */
 export function pairBudgetBytes(receivers = 1) {
   const n = Math.max(1, Number(receivers) || 1);
