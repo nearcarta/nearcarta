@@ -332,6 +332,17 @@
       "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
     },
     {
+      "shop": "board.visitor_run",
+      "label": "board_refused_over_shop_cap_after_agent_asked",
+      "hash": "8df5Zu8UGFsFvETbr99pMZBmEpP3ZFEeCnWePPKVZBqZ",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": false,
+      "failure": true,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
       "shop": "charter",
       "label": "create_root",
       "hash": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",

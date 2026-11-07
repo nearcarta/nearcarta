@@ -89,7 +89,8 @@
         "house_set_line_holder_key": "DYc1ggreE2psTat56zcYHb9FkZWYFscmfJWJa1E7x5fL",
         "house_session_check_in_through_board": "DY9rqZGNdP9662xTWNoysgt2T3yrYVuPyRKvNh3YVtEa",
         "townhall_post_bounty": "8KQnVZhziwbTsF5UvbU16xen8tBdiJTMbbNoi1mSbVoA",
-        "townhall_agent_reward_paid": "5Dgoit85Zh2ANdRGxGU4sE6Ggwmxhu5X8fQaN221VvSo"
+        "townhall_agent_reward_paid": "5Dgoit85Zh2ANdRGxGU4sE6Ggwmxhu5X8fQaN221VvSo",
+        "board_refused_over_shop_cap_after_agent_asked": "8df5Zu8UGFsFvETbr99pMZBmEpP3ZFEeCnWePPKVZBqZ"
       }
     },
     "redeploy": {
