@@ -89,14 +89,15 @@ test('a hall preview reads the new cap back and builds gas-only calls', () => {
   assert.doesNotMatch(read('app/shops/hall/main.js'), /add_proposal/);
 });
 
-test('a payout batch has one receipt per row and does not send USDC', () => {
+test('a payout batch keeps one receipt per row and splits the NEAR rows from the foreign ones', () => {
   const rows = parseCsv('cafe.near,0.001,NEAR\npay.near,0.2,USDC\n');
   const parts = splitAssets(rows);
   assert.equal(parts.near.length, 1);
-  assert.equal(parts.usdc[0].send, false);
-  assert.equal(parts.usdc[0].maxUsd, 0.2);
+  assert.equal(parts.usdc.length, 1);
+  assert.equal(parts.usdc[0].chain, 'base');
   const receipts = receiptsFor(rows);
   assert.equal(receipts.length, 2);
+  assert.equal(receipts[1].chain, 'base');
   assert.equal(receipts[0].url, '');
   assert.equal(receipts[1].asset, 'USDC');
 });

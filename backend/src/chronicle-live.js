@@ -15,6 +15,8 @@ const link = (h) => `https://nearblocks.io/txns/${h}`;
 
 const cache = new Map();
 const inflight = new Map();
+// Recent tx hashes per account, shared by the timeline and the anchor/rule rebuild.
+const hashCache = new Map();
 
 export function _resetLiveCache() {
   cache.clear();
@@ -560,6 +562,29 @@ async function load(account, deps) {
   body.nextCursor = nextCursor;
   body.ftCursor = nextFtCursor;
   return body;
+}
+
+/** Hashes of an account's recent transactions, for the rebuild. Same sources readLive tries. */
+export async function accountTxHashes(account, deps = {}) {
+  const id = String(account || '').trim();
+  const clock = deps.now || Date.now;
+  const hit = hashCache.get(id);
+  if (hit && clock() - hit.at < FRESH_MS) return hit.body;
+  const budget = deps.budget || makeBudget(BUDGET_MS);
+  const fetchFn = deps.fetch || fetch;
+  const key = deps.nearblocksKey != null ? deps.nearblocksKey : (process.env.NEARBLOCKS_API_KEY || '');
+  const headers = nbHeaders(key);
+  const out = { account: id, hashes: [], source: 'none', gap: '' };
+  const index = (deps.index || 'https://api.nearblocks.io').replace(/\/$/, '');
+  const first = await withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${encodeURIComponent(id)}/txns?per_page=${PAGE}`, { headers, timeout: 1100, budget }));
+  if (first.ok && Array.isArray(first.json?.txns)) {
+    out.source = 'nearblocks';
+    out.hashes = first.json.txns.map(t => t?.transaction_hash || t?.hash).filter(Boolean);
+    if (first.json.cursor && first.json.txns.length >= PAGE) out.cursor = String(first.json.cursor);
+  } else out.gap = 'The transaction index did not answer, so the rebuild has no hashes.';
+  hashCache.set(id, { at: clock(), body: out });
+  if (hashCache.size > 200) hashCache.delete(hashCache.keys().next().value);
+  return out;
 }
 
 function cacheKey(id, deps) {

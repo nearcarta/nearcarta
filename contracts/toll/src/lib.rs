@@ -1,7 +1,11 @@
 //! Visitor toll. Any Base address from the visitor's request. No address allow list.
-//! Safety is the contract's per-tx cap, the row budget on the call, and the gas limit.
+//! Safety comes from the visitor's own row: the board's per-action cap, daily budget and
+//! reserved effect budget, plus `row_budget` on the call and the fixed gas limit here.
+//! There is no contract-wide amount cap. The owner's `max_per_tx` and `max_token` are
+//! retired: v8 stopped enforcing them, and `policy` reports them as null so no client
+//! reintroduces a limit the visitor did not set.
 //! The board opens `cross`. The row owner calls `sign_cross`. A failed deposit is
-//! `refund_action` on the board. `upgrade` then `migrate` replaces this wasm later.
+//! `refund_action` on the board. `upgrade` then `migrate` replaces this wasm in place.
 mod rlp;
 use near_sdk::json_types::U128;
 use near_sdk::store::LookupMap;
@@ -95,13 +99,16 @@ impl Oath {
     pub fn policy(&self) -> Value {
         json!({"owner": self.owner, "mpc": self.mpc, "path": self.path, "chain_id": self.chain_id,
             "foreign_address": self.foreign_address, "allow_to": [],
-            "max_per_tx": self.max_per_tx.to_string(), "budget": self.budget.to_string(),
+            // Null means "no contract-wide limit". The visitor's /setup row is the cap.
+            "max_per_tx": Value::Null, "budget": Value::Null,
             "spent": "0", "max_fee_cap": self.max_fee_cap.to_string(),
             "next_nonce": self.next_nonce, "frozen": self.frozen, "verify_chain": "Base",
             "asset": "native", "dao": Value::Null, "gate": Value::Null, "cross": Value::Null,
             "recipients": "visitor", "price": self.price,
             "service_held": self.service_held.to_string(), "earned": self.earned.to_string(), "surplus": self.surplus.to_string()})
     }
+    /// The service price. `max_token` is retired: it is stored for the record but no
+    /// longer enforced, so a visitor's row is the only limit on a USDC crossing.
     pub fn set_price(&mut self, board: AccountId, fee: U128, cost: U128, splits: Vec<Split>, paused: bool, usdc: String, max_token: U128, hold_ns: u64) {
         self.assert_owner();
         require!(fee.0 > 0 && cost.0 <= fee.0, "cost must sit inside the fee");
@@ -132,8 +139,9 @@ impl Oath {
         require!(asset_l == "native" || asset_l == "usdc", "REFUSED: asset must be native or usdc");
         let to = evm_addr(&to);
         require!(amount.0 > 0, "REFUSED: amount must be set");
-        let cap = if asset_l == "native" { self.max_per_tx } else { price.max_token.0 };
-        require!(amount.0 <= cap, "REFUSED: value over per-tx cap");
+        // No contract-wide cap. The visitor's row is the only amount authority, and the
+        // board refuses a value over the effect budget it reserved before this call.
+        // `row_budget` is the visitor's own number for this crossing.
         require!(amount.0 <= row_budget.0, "REFUSED: value over the row budget");
         let key = action_key(&row_owner, action_id);
         require!(!self.actions.contains_key(&key), "REFUSED: this crossing was already opened");

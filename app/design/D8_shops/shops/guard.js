@@ -82,7 +82,7 @@ export default async function guard(ctx) {
   function setChains(on) { chains.visible = !!on; }
   return {
     rob, scene, camera, tags, hideRefuse, showSeal, lightLamps, setChains,
-    panel: { title: 'Guardhouse', src: 'split', srcNote: 'charter.nearcarta.near is on mainnet. Letting it knock here is the mainnet charter.', label: 'Invoice with a hidden instruction', hero: tok('0.001', 'NEAR'), action: 'Let it knock' },
+    panel: { title: 'Guardhouse', src: 'split', srcNote: 'board.nearcarta.near holds the visitor row that decides this. The retired charter is history; the board is what refuses.', label: 'Invoice with a hidden instruction', hero: tok('0.001', 'NEAR'), action: 'Let it knock' },
     proof: PROOF,
     *intro() { yield rob.walk([new THREE.Vector3(1.15, 0, 1.75)]); rob.lookAt(pane.position); },
     *act(opts = {}) {

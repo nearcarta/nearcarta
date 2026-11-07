@@ -50,7 +50,7 @@ function shell() {
     <div class="ferry-pane" data-panel="vaults" data-testid="house-panel-vaults" hidden>
       ${flow('ETH', 'base')}
       ${field('Chain', '<select id="house-chain" data-testid="house-chain"><option value="base">Base</option><option value="btc">Bitcoin · signing only</option></select>')}
-      ${field('Derived address', '<input id="house-address" data-testid="house-address" readonly value="Not live yet" title="The deed contract does not call the signer.">')}
+      ${field('Derived address', '<input id="house-address" data-testid="house-address" readonly value="Reading the signer…" title="The address Toll signs for on this row.">')}
       ${field('Payee', '<input id="house-payee" data-testid="house-payee" placeholder="0x… or a named payee" autocomplete="off">')}
       <div class="house-pair">
         ${field('Balance', '<input id="house-balance" data-testid="house-balance" readonly value="Not read">')}
@@ -206,7 +206,8 @@ export function mountHouseRoom(root, hooks = {}) {
     if (!addr) return;
     if (eth?.address) addr.value = eth.address;
     else if (state.derivedError) addr.value = 'Signer did not answer.';
-    else addr.value = 'Not live yet';
+    else if (state.derived && state.derived.live === false) addr.value = 'No key for this row yet';
+    else addr.value = 'Reading the signer…';
     const bal = root.querySelector('#house-balance');
     if (bal) {
       const purse = nearText(state.purse?.balance);

@@ -85,9 +85,16 @@ test('guard, chronicle, toll, house, ferry and the bank proof are usable', async
   await page.goto('/?mode=2d&nostory&shop=chronicle');
   await page.getByTestId('chronicle-account').fill('nearcarta.near');
   await page.locator('#c-go').click();
-  await expect(page.getByTestId('chronicle-page')).toContainText('toll', { timeout: 20_000 });
+  await expect(page.getByTestId('chronicle-verify')).toContainText(/Showing \d+ of \d+\.|\d+ rows?\./, { timeout: 20_000 });
+  // A page is one batch of six behind Show more, so the recorded rows are reached through it.
+  for (let i = 0; i < 4; i++) {
+    const more = page.locator('#c-more');
+    if (!(await more.isVisible().catch(() => false))) break;
+    await more.click();
+    await page.waitForTimeout(150);
+  }
   await page.getByTestId('chronicle-search').fill('toll');
-  await expect(page.getByTestId('chronicle-page')).toContainText('toll');
+  await expect(page.getByTestId('chronicle-page')).toContainText('toll', { timeout: 20_000 });
   await page.getByTestId('chronicle-filter').selectOption('denied');
   await page.getByRole('button', { name: 'Verify' }).first().click();
   await expect(page.getByTestId('chronicle-link')).toHaveAttribute('href', /nearblocks\.io/);

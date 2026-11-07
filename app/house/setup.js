@@ -17,7 +17,7 @@ import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 import { txHashOf } from '../shops/vault/wallet.js';
 import { rpcClient, viewFn, keyFrom, pubkeyHex, signMessage, sendPropose, signTx, functionCall, outcomeOf, storedAgentKey } from '../../shared/vault/tx.js';
 import { proposalMessage } from '../../shared/board/message.js';
-import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, fittingShops, classifyBoardAgentKeys, renewAgentKeyActions, sessionExpiresAt, sessionLabel, stampCalls } from '../../shared/board/session.js';
+import { SESSION_METHODS, BOARD_PROPOSE_TGAS, CALLS_DEPOSIT_YOCTO, FERRY_CALL_TARGETS, GAS_TOPUP_YOCTO, SESSION_HOURS, agentMethodsReady, callPolicy, callsFitRow, fittingShops, classifyBoardAgentKeys, payoutsCalls, renewAgentKeyActions, sessionExpiresAt, sessionLabel } from '../../shared/board/session.js';
 import { HOUSE_CALLS, HOUSE_SHOP } from '../../shared/house/shop.js';
 import { pluginKeyName } from './board-key.js';
 import { confirmLS, confirmKeyFor, setConfirmKeyAction } from './confirm-key.js';
@@ -402,13 +402,12 @@ function signItems(onBoard, live, changed) {
 }
 function sSign() {
   if (!st.trial && !boardLive()) {
-    const allowed = MAIN.charter?.txs?.['agent_propose_allowed_0.001'];
-    const refused = MAIN.charter?.txs?.['agent_propose_over_cap_0.003'];
-    return head('Sign', 'Your account is on mainnet.', 'A personal charter is a row on the mainnet board. That contract is not deployed yet, so this page will not send a transaction that pretends to create one. The town charter, toll, arena, house and town hall already run on mainnet.')
+    // The town charter (charter.nearcarta.near) was retired and its NEAR returned to
+    // nearcarta.near, so this page no longer names it or links its old txs. What is
+    // left is the honest state: the board holds the row, and this page will not
+    // pretend to create one.
+    return head('Sign', 'Your account is on mainnet.', 'A personal charter is a row on the mainnet board. That contract is not reachable right now, so this page will not send a transaction that pretends to create one. Toll, arena, house and town hall already run on mainnet.')
       + `<div class="agent">${portraitHTML(persona(), dyeOf(), st.outfit, st.displayName || persona().name)}<div><b>${esc(st.displayName || persona().name)}</b><br><span class="small muted">Saved in this browser</span></div></div>`
-      + `<div class="facts"><div class="fact"><small>Town charter</small><b>${acA(MAIN.charter.contract)}</b></div>
-         <div class="fact"><small>Allowed 0.001 NEAR</small><b>${txA(allowed)}</b></div>
-         <div class="fact"><small>Refused 0.003 NEAR</small><b>${txA(refused)}</b></div></div>`
       + errP() + nav(true, { label: 'Continue' });
   }
   const onBoard = boardLive() && !st.trial;
@@ -439,7 +438,7 @@ function sSign() {
         ? (update.changed
           ? 'Your saved rules differ from the chain. Update my rules writes them in one approval. The numbers below are what the chain has now.'
           : 'These limits are read back from the chain, not from this page.')
-        : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`);
+        : (onBoard ? `This opens your row, writes the shop allowlist, and adds your agent key, limited to <code>propose</code>, <code>propose_call</code>, <code>propose_call_as</code> and <code>anchor</code> on the board. Later tries need no wallet. At most ${stake} NEAR is attached. The contract keeps the row's storage and a small spendable balance, and sends the rest back. Closing the row returns both.` : `First the charter is made (${stake} NEAR goes into it, and comes back if the charter is deleted). Then one transaction writes your rule and adds a limited agent key that can only ask the charter to pay.`);
   // The facts panel always says what the board answered. A missing row is a state, not an error.
   // Without an account there is nothing to read, so the panel must not sit on "Reading…".
   const factsHtml = onChain
@@ -488,7 +487,7 @@ function sSign() {
       : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.015 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your row's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign" ${rowReady ? '' : 'disabled'}>${rowReady ? 'Open your row' : 'Reading the board'}</button>${help}`)
       : '')
     + (onChain && keyReady && !keyStale ? gasPanel() : '')
-    + (onChain && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key is missing one of <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code>. Ferry Load cargo needs <code>propose_call</code>; Toll and Guard call shops through <code>propose_call_as</code>. One wallet approval deletes the old board keys and adds a new one with all three (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : '')
+    + (onChain && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key is missing one of <code>propose</code>, <code>propose_call</code>, <code>propose_call_as</code> and <code>anchor</code>. Ferry Load cargo needs <code>propose_call</code>; Toll and Guard call shops through <code>propose_call_as</code>; the Chronicle anchors a statement with <code>anchor</code>. One wallet approval deletes the old board keys and adds a new one with all four (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : '')
     + errP() + nav(onChain && !keyStale, { label: 'Try your agent' });
 }
 async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
@@ -506,13 +505,20 @@ function boardArgs(r, agent) {
 }
 // The call list this row will carry. `callsFitRow` checks it against the row's storage.
 // One builder for both the fit check and the transaction, so they cannot disagree.
-// The stamp returns the Ask-charter NEAR to the row; the house pair lets the House
-// shop be reached through propose_call_as.
+// The wrap.near trio plus the board stamp (the stamp returns Ask-charter NEAR to the row),
+// the House pair (propose_call_as reaches the House shop), and the USDC storage_deposit
+// (a Payouts row registers a zero-NEAR issuer inside the visitor's own cap).
+// payoutsCalls in shared/board/session.js adds the USDC storage_deposit pair when the row has room,
 function callsFor(r, contract) {
-  return callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', [...stampCalls(contract, toY(r.cap)), ...HOUSE_CALLS]).calls;
+  const extra = [
+    ...FERRY_CALL_TARGETS,
+    { receiver: contract, method: 'stamp', cap: String(toY(r.cap)) },
+    ...HOUSE_CALLS,
+  ];
+  return callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', payoutsCalls(extra, toY(r.cap)).calls).calls;
 }
 // The agent key is also added to the visitor's own account as a function-call access key.
-// It may call propose, propose_call and propose_call_as on the board, with a gas allowance
+// It may call propose, propose_call, propose_call_as and anchor on the board, with a gas allowance
 // only. It cannot attach NEAR.
 // https://docs.near.org/protocol/accounts-contracts/access-keys
 // GAS_ALLOWANCE_YOCTO (0.05 NEAR) cannot prepay two Ferry propose_call steps.
@@ -566,7 +572,7 @@ async function renewAgentKey(deps = {}) {
     const sec = localStorage.getItem(agentLS(me));
     if (sec && await agentAccessKey(sec)) {
       keyReady = true; keyStale = false;
-      paintRenewStatus('This browser already has a key that can call propose, propose_call and propose_call_as.');
+      paintRenewStatus('This browser already has a key that can call propose, propose_call, propose_call_as and anchor.');
       return { ok: true, renewed: false };
     }
   }
@@ -794,7 +800,7 @@ function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursE
   return plan.map(step => {
     const args = step.method === 'set_agent' ? { agent: key.publicKey }
       : step.method === 'set_rules' ? { rules: ruleArgs(r, expiresAt) }
-      : callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', [...stampCalls(contract, toY(r.cap)), ...HOUSE_CALLS]);
+      : callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', payoutsCalls([...FERRY_CALL_TARGETS, { receiver: contract, method: 'stamp', cap: String(toY(r.cap)) }, ...HOUSE_CALLS], toY(r.cap)).calls);
     return [step.key, { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: step.method, args, gas: (GAS.agent * TG).toString(), deposit: step.deposit } }] }];
   });
 }
@@ -1178,7 +1184,7 @@ function sTry() {
      ${boardLive() && !st.trial ? `<div class="tiles" style="grid-template-columns:1fr 1fr;margin-top:12px"><button type="button" class="tile" id="t-freeze" data-testid="try-frozen"><i>❄</i><b>Freeze, then ask</b><span>One approval freezes the row. The ask is your agent key and should be refused. A second approval unfreezes it.</span></button>
        <button type="button" class="tile" id="t-expire" data-testid="try-expired"><i>⌛</i><b>Expire, then ask</b><span>One approval sets the session in the past. The ask is your agent key and should be refused. A second approval writes the session again.</span></button></div>` : ''}
      ${boardLive() && !st.trial && keyReady ? gasPanel() : ''}
-     ${boardLive() && !st.trial && keyReady === false && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key is missing one of <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code>. Ferry Load cargo needs <code>propose_call</code>; Toll and Guard call shops through <code>propose_call_as</code>. One wallet approval deletes the old board keys and adds a new one with all three (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code>, <code>propose_call</code> and <code>propose_call_as</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
+     ${boardLive() && !st.trial && keyReady === false && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key is missing one of <code>propose</code>, <code>propose_call</code>, <code>propose_call_as</code> and <code>anchor</code>. Ferry Load cargo needs <code>propose_call</code>; Toll and Guard call shops through <code>propose_call_as</code>; the Chronicle anchors a statement with <code>anchor</code>. One wallet approval deletes the old board keys and adds a new one with all four (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : boardLive() && !st.trial && keyReady === false ? `<div class="tabhelp" data-testid="try-needkey"><p class="small">Your agent key is not on your account yet, so each try would open your wallet. One approval adds it. It calls <code>propose</code>, <code>propose_call</code>, <code>propose_call_as</code> and <code>anchor</code> on your row. The town charter key calls <code>propose</code> and <code>propose_batch</code>. Neither key can move your NEAR on its own.</p><button type="button" class="btn" id="t-key" data-testid="try-addkey">Let the agent sign by itself</button></div>` : ''}
      ${boardLive() && !st.trial ? charterFundMarkup({ amountNear: fundChoice().near, lowBalance: !!lowBal(), rowNear: rowBal == null ? '?' : fmtN(nearOf(rowBal.toString())), hintNear: fmtN(nearOf(TOPUP.toString())), busy: topUpBusy, disabled: !fundChoice().ok, note: fundChoice().why }) : ''}
      ${signLog.filter(x => x.k === 'key' || x.k === 'topup').map(x => `<p class="small" data-testid="try-${x.k}-tx">${x.k === 'key' ? 'Agent key added' : 'Charter topped up'}: ${x.state === 'ok' ? '✓ confirmed' : 'confirming…'} ${txA(x.tx)}</p>`).join('')}
      ${pendingTry ? `<div class="verdict" data-testid="try-pending"><span class="tag">SENT</span><div><b>${fmtN(nearOf(pendingTry.amount))} NEAR</b><br><span class="muted small">Signed by your agent key. Confirming on NEAR… <span id="try-secs" data-testid="try-secs">${Math.floor((Date.now() - pendingTry.t0) / 1000)}s</span></span> ${txA(pendingTry.hash)}</div></div>` : ''}

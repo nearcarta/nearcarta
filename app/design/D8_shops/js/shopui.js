@@ -729,6 +729,13 @@ async function tollPay(quote) {
     return { ok: false, o, hint, refused: true, keep: true, kind: 'no', say: hint, rc: A.txLine(o?.tx) };
   }
   rememberTollPass({ h: o.tx, decision: 'allowed', reason: '', label: `${quote.feeNear} NEAR pass` });
+  // A stored order whose signature did not go out is not a signed crossing. Say so.
+  if (o.needsSignature) {
+    const hint = o.note || 'The board stored the crossing. The row owner still has to sign it.';
+    extra.seal = hint;
+    extra.passTx = o.tx;
+    return { ok: true, o, tx: o.tx, hint, success: false, needsSignature: true, keep: true, kind: 'ok', say: hint, rc: A.txLine(o.tx) };
+  }
   extra.seal = '';
   extra.passTx = o.tx;
   let fee;
@@ -938,6 +945,9 @@ const APPS = {
       mountShop('bank', document.getElementById('t-form'), {
         state: extra,
         capNear: () => bankCapNear(),
+        // The row the chain has now, and the one silent sender both the CTA and the AI use.
+        boardRow: () => A.boardRowNow(),
+        boardWrite: (call) => A.boardWriteOnRow(call),
         who: () => {
           let saved = null;
           try { saved = JSON.parse(localStorage.getItem('nearcarta.setup.v1') || 'null'); } catch { saved = null; }
@@ -1061,7 +1071,8 @@ const APPS = {
   payouts: {
     guest: true,
     label: 'Payouts · pay under the cap', idle: 'Pay reviewed rows with the session key. Nothing is sent until setup. An over-cap row is refused before any deposit.',
-    rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.slice(0, 3).map(to => ({ to, amt: '0.001' })); while (extra.rows.length < 2 && ps[0]) extra.rows.push({ to: ps[0], amt: '0.001' }); } return extra.rows.slice(0, 3); },
+    // Seed one row per payee the visitor's own rules name. The count and the cap are the visitor's, not this file's.
+    rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.map(to => ({ to, amt: '0.001', asset: 'NEAR', chain: 'near' })); if (!extra.rows.length) extra.rows.push({ to: '', amt: '', asset: 'NEAR', chain: 'near' }); } return extra.rows; },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => '<div data-deep="payouts"></div>',
     bind: () => mountShop('payouts', document.getElementById('t-form'), {
@@ -1069,6 +1080,8 @@ const APPS = {
       capNear: () => (A.S.clauses?.pay ? A.fromY(A.S.clauses.pay.per_action_cap) : null),
       account: () => A.S.me || '',
       onPay: (rows, opts) => sendPayoutRows(rows, opts),
+      onForeignPay: (row, opts) => A.payoutsForeign(row, opts),
+      onSponsor: (plan, opts) => A.payoutsSponsor(plan.account, plan.depositNear, opts),
       onCinema: (opts) => { if ((opts?.paid || opts?.refused) && sh?.act && runScene) runScene(sh.act(opts)); },
       hideRefuse: () => sh?.hideRefuse?.(),
       showRefuse: (text) => sh?.showRefuse?.(text),
@@ -1122,6 +1135,10 @@ const APPS = {
       repaint: () => paint(),
       onSeal: (text) => { if (text) sh?.showRefuse?.(text); else sh?.hideRefuse?.(); },
       rows: () => mergeTollChronicle([...(extra.feed?.local || []), ...RECORDED], tollPassRows()).map(x => ({ ...x, label: x.label || A.why(x.reason) })),
+      // The anchor runs on the visitor's own row through the session key. No wallet popup, no deposit.
+      onAnchor: (plan) => A.anchorStatement({ kind: plan?.args?.kind || 'statement', digest: plan?.args?.digest || '', salt: plan?.args?.salt || '' }),
+      board: () => A.S.board || '',
+      account: () => A.S.me || '',
     }),
     run: () => chronicleRead(),
   },

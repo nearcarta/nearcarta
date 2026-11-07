@@ -11,7 +11,8 @@ import { runHallCommand } from './hall-actions.js';
 import { armHallDock, ensureHallDock, installHallDock } from './hall-dock.js';
 import { jobTray } from './hall-panes.js';
 import { createLedger, statusLines } from '../../../shared/hall/job.js';
-import { HALL_SHOP_ID } from '../../../shared/hall/v2.js';
+// Served to the browser as-is, so it lives under app/src like the other raw modules.
+import { HALL_SHOP_ID } from './hall-v2.js';
 
 // The Hall shop account, read from the deployment record.
 const shopId = HALL_SHOP_ID;

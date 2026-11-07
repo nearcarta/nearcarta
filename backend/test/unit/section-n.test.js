@@ -109,16 +109,18 @@ test('a saved account with no live wallet needs one click', () => {
   assert.equal(restorePlan(memory(), '').needsClick, false);
 });
 
-test('a new payout row is blank and the third row is the daily count', () => {
+test('a new payout row is blank and the row limit is the visitor /setup count', () => {
   assert.equal(formatNear(''), '');
   assert.equal(formatNear('0.001'), '0.001');
   const first = addPayoutRow([]);
   assert.equal(first.added, true);
-  assert.deepEqual(first.rows, [{ to: '', amt: '' }]);
-  const full = addPayoutRow([{ to: 'a.near', amt: '0.001' }, { to: 'b.near', amt: '0.001' }, { to: 'c.near', amt: '0.001' }]);
+  assert.deepEqual(first.rows, [{ to: '', amt: '', asset: 'NEAR', chain: 'near' }]);
+  // No limit was passed, so nothing is invented: the row is added.
+  assert.equal(addPayoutRow([{ to: 'a.near', amt: '0.001' }, { to: 'b.near', amt: '0.001' }, { to: 'c.near', amt: '0.001' }]).added, true);
+  const full = addPayoutRow([{ to: 'a.near', amt: '0.001' }, { to: 'b.near', amt: '0.001' }, { to: 'c.near', amt: '0.001' }], 3);
   assert.equal(full.added, false);
   assert.equal(full.rows.length, 3);
-  assert.match(full.reason, /Three rows is the daily count/);
+  assert.match(full.reason, /Your \/setup allows 3 payments a day/);
   const deep = read('app/src/panels/payouts-tray.js');
   assert.match(deep, /data-testid="payout-add"/);
   assert.doesNotMatch(deep, /\{ to: '', amt: '0\.001' \}, \{ to: '', amt: '0\.001' \}/);

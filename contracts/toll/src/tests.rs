@@ -1,4 +1,5 @@
-//! Visitor crossings: any Base address, the contract cap, the row budget, and one refund.
+//! Visitor crossings: any Base address, the visitor's row budget, and one refund.
+//! There is no contract-wide amount cap: the row is the only amount authority.
 use super::*;
 use near_sdk::test_utils::VMContextBuilder;
 use near_sdk::{testing_env, Gas, NearToken};
@@ -36,11 +37,26 @@ fn open(o: &mut Oath, owner: &str, action: u64, asset: &str, to: &str, amount: u
 }
 
 #[test]
-fn policy_has_no_allow_list() {
+fn policy_reports_no_contract_wide_amount_cap() {
     let o = toll();
     assert_eq!(o.policy()["allow_to"], json!([]));
     assert_eq!(o.policy()["recipients"], json!("visitor"));
     assert_eq!(o.policy()["path"], json!("base-1"));
+    // Null, not a number: a client must not turn this into a cap the visitor did not set.
+    assert!(o.policy()["max_per_tx"].is_null());
+    assert!(o.policy()["budget"].is_null());
+}
+
+/// The live v7 limit was 0.00001 ETH and 10 USDC, enforced contract-wide. A visitor
+/// whose own row allowed more was refused. The row budget is now the only amount rule.
+#[test]
+fn an_amount_over_the_old_contract_cap_is_accepted_when_the_row_allows_it() {
+    let mut o = toll();
+    price(&mut o);
+    let native = open(&mut o, "visitor.test", 1, "native", OTHER, 50_000_000_000_000, 50_000_000_000_000);
+    assert_eq!(o.get_order(native).unwrap().amount.0, 50_000_000_000_000);
+    let usdc = open(&mut o, "visitor.test", 2, "usdc", OTHER, 250_000_000, 250_000_000);
+    assert_eq!(o.get_order(usdc).unwrap().amount.0, 250_000_000);
 }
 
 #[test]
@@ -104,11 +120,12 @@ fn two_rows_derive_two_paths_and_do_not_share_a_nonce() {
 }
 
 #[test]
-#[should_panic(expected = "REFUSED: value over per-tx cap")]
-fn an_excessive_foreign_value_fails_before_a_signature() {
+#[should_panic(expected = "REFUSED: value over the row budget")]
+fn the_row_budget_is_the_only_amount_cap() {
     let mut o = toll();
     price(&mut o);
-    let _ = open(&mut o, "visitor.test", 1, "native", OTHER, 101, 200);
+    // Well over the retired 0.00001 ETH contract cap, but over this row's own budget.
+    let _ = open(&mut o, "visitor.test", 1, "native", OTHER, 50_000_000_000_001, 50_000_000_000_000);
 }
 
 #[test]

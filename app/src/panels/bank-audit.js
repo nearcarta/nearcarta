@@ -359,7 +359,7 @@ export function biggestWaste(rows) {
   return { payee: pick.payee, amount: round6(pick.amount), currency: pick.currency || 'as written', why: 'It is the largest line.', count: 1 };
 }
 
-export const APPLY_NOTE = 'Apply tighter limits lowers the per-payment cap on your own /setup rules. Nothing is signed until the board can tighten.';
+export const APPLY_NOTE = 'Apply tighter limits lowers the per-payment cap on your own board row. The session key in this browser signs it, so no wallet opens. The board refuses any looser rule.';
 
 export function capFromSetup(liveCap, savedCap) {
   const live = Number(liveCap);
@@ -530,13 +530,14 @@ export function tightenDecision({ beforeCap, afterCap, resetSpent, unfreeze, swa
   if (!Number.isFinite(after) || after <= 0) return { ok: false, live: 'blocked', reason: 'The proposed cap is not a number. Nothing was signed.' };
   if (after > before) return { ok: false, live: 'blocked', reason: 'The proposed cap is higher than your current cap. Nothing was signed.' };
   if (after === before) return { ok: false, live: 'blocked', reason: 'The proposed cap matches the current cap. Nothing was signed.' };
-  // The live write waits for the board's tighten-only method. Nothing is signed here.
+  // The board's tighten_rules is shrink-only, so a lower cap is a real board write.
+  // The send is in bank-tray.js: it reads the live row, then signs with the session key.
   return {
     ok: true,
     before,
     after,
-    live: 'blocked',
-    reason: 'Live tighten is blocked. Nothing was signed.',
+    live: 'ready',
+    reason: `Ready to tighten: cap ${before} NEAR → ${after} NEAR on your own board row.`,
   };
 }
 

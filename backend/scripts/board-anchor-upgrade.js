@@ -1,0 +1,149 @@
+// Ship the board `anchor` fix to the live board, with a dry run by default.
+//
+//   node backend/scripts/board-anchor-upgrade.js
+//   node backend/scripts/board-anchor-upgrade.js --stage
+//   node backend/scripts/board-anchor-upgrade.js --apply
+//
+// Why this is needed: the deployed wasm has `anchor`, but `load()` on the live board returns
+// `read_head` (partial), and `anchor` read the row from memory without hydrating it. On the live
+// contract that panics ERR_NO_CHARTER, so the tray would have failed after the visitor pressed
+// Anchor. contracts/charter_board_sandbox/tests/anchor.rs reproduces it against the pinned
+// artifact and passes on the rebuilt one.
+//
+// The board has no upgrade-by-deploy method: `stage_upgrade(code_hash)` then, after
+// UPGRADE_DELAY_NS (24 h), `upgrade(code)` which checks sha256(code) and calls `migrate` in the
+// same receipt. This script follows exactly that. It never signs unless --stage or --apply is
+// passed with NEAR_MAINNET_SIGNER_KEY in the environment, and it never prints the key.
+import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
+
+const stage = process.argv.includes('--stage');
+const apply = process.argv.includes('--apply');
+const live = stage || apply;
+const board = MAIN.board?.contract || '';
+const root = MAIN.root || '';
+const wasmPath = process.env.BOARD_WASM || 'contracts/charter_board/target/near/charter_board.wasm';
+const rpc = MAIN.rpc || 'https://free.rpc.fastnear.com';
+
+if (!board || !root) {
+  console.error('shared/deployments/mainnet.json needs board.contract and root');
+  process.exit(2);
+}
+if (stage && apply) {
+  console.error('Pass one of --stage or --apply, not both.');
+  process.exit(2);
+}
+const file = new URL('../../' + wasmPath, import.meta.url);
+if (!existsSync(file)) {
+  console.error(`Missing wasm at ${wasmPath}.`);
+  console.error('Build it first: cd contracts/charter_board && cargo +1.86.0 build --target wasm32-unknown-unknown --release --lib');
+  process.exit(2);
+}
+const wasm = readFileSync(file);
+const sha = createHash('sha256').update(wasm).digest('hex');
+const recorded = MAIN.board?.wasm_sha256 || '';
+
+const post = async (method, params) => {
+  const res = await fetch(rpc, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'user-agent': 'nearcarta-board-upgrade' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 'board-upgrade', method, params }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (body.error) throw new Error(`${method}: ${body.error.cause?.name || body.error.name || 'error'}`);
+  return body.result;
+};
+
+const view = async (method, args = {}) => {
+  const out = await post('query', {
+    request_type: 'call_function', finality: 'final', account_id: board, method_name: method,
+    args_base64: Buffer.from(JSON.stringify(args)).toString('base64'),
+  });
+  const text = Buffer.from(out?.result || []).toString('utf8');
+  return text ? JSON.parse(text) : null;
+};
+
+let eta = null, etaError = '';
+try { eta = await view('upgrade_eta'); } catch (e) { etaError = e.message; }
+let code = null;
+try { code = Buffer.from((await post('query', { request_type: 'view_code', finality: 'final', account_id: board })).code_base64, 'base64'); }
+catch { code = null; }
+const liveSha = code ? createHash('sha256').update(code).digest('hex') : '';
+
+const report = {
+  dry_run: !live,
+  mode: stage ? 'stage' : apply ? 'apply' : 'plan',
+  network: 'mainnet',
+  board,
+  owner: root,
+  rpc,
+  wasm: {
+    path: wasmPath, bytes: wasm.length, sha256: sha,
+    recorded_sha256: recorded, recorded_matches_build: recorded === sha,
+    live_sha256: liveSha, live_matches_build: !!liveSha && liveSha === sha,
+  },
+  upgrade_eta_ns: eta,
+  upgrade_eta: eta ? new Date(Number(BigInt(eta) / 1_000_000n)).toISOString() : null,
+  eta_error: etaError || null,
+  sends: false,
+  steps: [],
+};
+report.prechecks = [
+  { check: 'built wasm is not the live one', ok: !report.wasm.live_matches_build, detail: report.wasm.live_matches_build ? 'the board already runs this build' : 'the board runs a different build' },
+  { check: 'wasm has anchor', ok: wasm.includes(Buffer.from('anchor', 'utf8')), detail: 'anchor must be in the deployed code' },
+  { check: 'stage is owner-only', ok: true, detail: `${root} must sign; the board refuses any other predecessor` },
+  { check: '24 h delay after staging', ok: true, detail: 'UPGRADE_DELAY_NS; upgrade before the eta is refused ERR_UPGRADE' },
+];
+
+// The order the owner has to follow. Printed in every mode so the dry run is the instruction.
+const now = Date.now();
+const etaAfterStage = now + 24 * 3600 * 1000;
+report.steps = [
+  { step: '1. stage_upgrade', when: apply ? 'not needed if already staged' : 'now', call: 'stage_upgrade({ code_hash: "' + sha + '" })', deposit: '1 yoctoNEAR', note: 'owner only; logs a stage_upgrade event' },
+  { step: '2. wait', when: new Date(etaAfterStage).toISOString(), note: 'the contract refuses upgrade before upgrade_eta' },
+  { step: '3. upgrade', when: 'after the eta', call: 'upgrade({ code: "<hex of the same wasm>" })', note: 'checks sha256(code) and calls migrate in the same receipt' },
+  { step: '4. verify', when: 'after upgrade', call: 'GET /api/mainnet and view_code sha256', note: 'must equal ' + sha },
+];
+
+if ((stage || apply) && !live) {
+  report.sends = false;
+}
+
+if (live) {
+  const key = process.env.NEAR_MAINNET_SIGNER_KEY || '';
+  if (!key.startsWith('ed25519:')) {
+    console.error('Refusing to sign: set NEAR_MAINNET_SIGNER_KEY to the ed25519 secret of ' + root + '. This script reads no key file.');
+    process.exit(1);
+  }
+  const { Account, JsonRpcProvider, KeyPairSigner, actions: A } = await import('near-api-js');
+  const signer = new Account(root, new JsonRpcProvider({ url: rpc }), KeyPairSigner.fromSecretKey(key));
+  const TG = 10n ** 12n;
+  report.sends = true;
+  if (stage) {
+    const r = await signer.signAndSendTransaction({
+      receiverId: board, waitUntil: 'FINAL', throwOnFailure: false,
+      actions: [A.functionCall('stage_upgrade', { code_hash: sha }, 30n * TG, 1n)],
+    });
+    const bad = r.status?.Failure || r.receipts_outcome?.find(x => x.outcome.status.Failure)?.outcome.status.Failure;
+    report.stage = { tx: r.transaction.hash, ok: !bad, failure: bad ? JSON.stringify(bad).slice(0, 200) : null };
+    if (bad) { console.log(JSON.stringify(report, null, 1)); process.exit(1); }
+  } else {
+    if (report.wasm.live_matches_build) { console.error('The board already runs this build.'); process.exit(1); }
+    if (!eta) { console.error('Nothing is staged: run --stage first. ' + (etaError || '')); process.exit(1); }
+    if (BigInt(eta) > BigInt(Date.now()) * 1_000_000n) {
+      console.error(`The staged upgrade is not due until ${report.upgrade_eta}. The board would refuse it.`);
+      process.exit(1);
+    }
+    const r = await signer.signAndSendTransaction({
+      receiverId: board, waitUntil: 'FINAL', throwOnFailure: false,
+      actions: [A.functionCall('upgrade', { code: Buffer.from(wasm).toString('hex') }, 300n * TG, 0n)],
+    });
+    const bad = r.status?.Failure || r.receipts_outcome?.find(x => x.outcome.status.Failure)?.outcome.status.Failure;
+    report.apply = { tx: r.transaction.hash, ok: !bad, failure: bad ? JSON.stringify(bad).slice(0, 200) : null };
+    if (bad) { console.log(JSON.stringify(report, null, 1)); process.exit(1); }
+  }
+}
+
+console.log(JSON.stringify(report, null, 1));
+if (!live) console.log('This command does not sign and does not send NEAR.');

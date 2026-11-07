@@ -43,10 +43,11 @@ test('payout messages name the whole account and keep 0.0025', () => {
   assert.equal(formatNear(0.001), '0.001');
   assert.equal(formatNear(0.0025), '0.0025');
   assert.equal(payoutIssues([{ to: '', amt: '0.001' }, { to: '', amt: '0.001' }]).length, 0);
-  const issues = payoutIssues([{ to: 'bob.near', amt: '0.0025' }, { to: 'bob.near', amt: '9' }]);
+  const issues = payoutIssues([{ to: 'bob.near', amt: '0.0025' }, { to: 'bob.near', amt: '9' }], null, 0.005);
   assert.equal(issueText(issues.filter(x => x.code === 'bad_account')), '');
-  assert.match(issueText(payoutIssues([{ to: 'not an account', amt: '0.001' }])), /^not an account is not a NEAR account$/);
-  const dup = issueText(payoutIssues([{ to: 'bad name', amt: '0.001' }, { to: 'bad name', amt: '0.001' }]));
+  assert.match(issueText(payoutIssues([{ to: 'not an account', amt: '0.001' }], null, 0.005)), /^not an account is not a NEAR account$/);
+  assert.match(issueText(payoutIssues([{ to: 'not an account', amt: '0.001' }])), /is not a NEAR account\. Your \/setup cap is unread/);
+  const dup = issueText(payoutIssues([{ to: 'bad name', amt: '0.001' }, { to: 'bad name', amt: '0.001' }], null, 0.005));
   assert.equal(dup, 'bad name is not a NEAR account');
 });
 

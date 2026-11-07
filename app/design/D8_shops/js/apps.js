@@ -24,6 +24,7 @@ import { callAsMessage, crossArgs, unitsOf, setSha256Hex } from '/board-call-as.
 setSha256Hex(W.sha256hex);
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
+const USDC_NEAR = '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
 const onMain = () => true;
 const explorer = () => 'https://nearblocks.io';
 const YN = 10n ** 24n, TG = 10n ** 12n;
@@ -164,8 +165,7 @@ export async function refresh() {
   if (S.charter) await readRules();
   return S;
 }
-export async function readRules() {
-  if (S.board && S.me) {
+export async function readRules() {  if (S.board && S.me) {
     const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
     if (!row) {
       // A failed re-read after a tx must not wipe a row we already have.
@@ -313,6 +313,63 @@ async function proposeAccessKey(key) {
   if (names.length && !names.includes('propose')) return null;
   return ak;
 }
+
+/** The row the board has for this visitor right now, or null. Never a cached copy. */
+export async function boardRowNow() {
+  if (!S.board || !S.me) return S.boardRow || null;
+  const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  if (row) S.boardRow = row;
+  return row || null;
+}
+
+/**
+ * One board write on the visitor's own row, signed by the session key in this browser.
+ * Mist Bank's gold CTA and its AI dock both call this, so they send the same transaction.
+ * No wallet popup: the key's allowance pays the gas, and the method list is checked here
+ * so a key that cannot call the method says so instead of failing on chain.
+ */
+export async function boardWriteOnRow({ method, args, gasTgas = 30 } = {}) {
+  if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  if (!S.me) throw new Error('Sign in first. Nothing was signed.');
+  if (!method) throw new Error('That is not a board method. Nothing was signed.');
+  const key = agent();
+  if (!key) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  const ak = await proposeAccessKey(key);
+  if (!ak) throw new Error('This browser has no session key for the board. Open /setup and add one. Nothing was signed.');
+  const names = ak.permission?.FunctionCall?.method_names || [];
+  if (names.length && !names.includes(method)) {
+    throw new Error(`This session key cannot call ${method}. Renew it in /setup. Nothing was signed.`);
+  }
+  const gas = BigInt(gasTgas) * 10n ** 12n;
+  const allowance = BigInt(ak.permission?.FunctionCall?.allowance || 0);
+  // Gas is bought at 0.001 NEAR/Tgas; the key must cover this call's own gas.
+  if (allowance && allowance < gas / 10n ** 12n * 10n ** 21n) {
+    throw new Error('The session key allowance cannot buy this call. Nothing was signed.');
+  }
+  const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  if (!row) throw new Error('no charter row yet: finish setup first');
+  if (W.pubkeyHex(key) !== String(row.agent || '')) {
+    throw new Error('This browser is not the agent on the row. Nothing was signed.');
+  }
+  const signed = W.signTx({
+    key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+    actions: [W.functionCall(method, args || {}, gas)],
+  });
+  const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+  const out = { tx: signed.hash, method, row, sent };
+  if (sent.ok) {
+    keep(signed.hash, 'bank', 'allowed', 'ok', { amt: '', to: S.me });
+    const after = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+    if (after) S.boardRow = after;
+    // Re-read the row so the header and every shop see the cap that is now on chain.
+    readRules().catch(() => {});
+    return { ...out, decision: 'allowed', reason: 'ok' };
+  }
+  const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+  keep(signed.hash, 'bank', 'denied', reason, { amt: '', to: S.me });
+  return { ...out, decision: 'denied', reason };
+}
+
 function settled(shop, out) {
   keep(out.tx, shop, out.decision, out.reason, { amt: out.amount, to: out.receiver });
   // The wallet path already refreshed the header inside sign(). The agent path never opens a wallet.
@@ -388,6 +445,11 @@ export async function toll(quote) {
   // The gold button and the agent call this. It signs propose_call_as on the board.
   // The session key never calls cross or sign_cross, and this does not open a wallet.
   // Paid on Base is a later Base receipt. This call only opens the order.
+  //
+  // The board forwards 30 Tgas to cross, which records the order and cannot start the
+  // MPC sign. The second step is sign_cross by the row owner at 150 Tgas. With a
+  // helper key this browser sends it; without one the order is already stored and the
+  // owner signs it from their own wallet. Neither step opens a wallet prompt.
   if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
   if (!quote?.payable || !quote.feeYocto) throw new Error(quote?.hint || 'The live policy has no visitor fee. Nothing was signed.');
   const miss = missingCross(quote);
@@ -412,12 +474,9 @@ export async function toll(quote) {
   let units;
   try { units = unitsOf(quote.amount, decimals); }
   catch (e) { throw new Error(e.message || 'Name the amount. Nothing was signed.'); }
-  if (quote.asset === 'native' && quote.maxPerTx && BigInt(units) > BigInt(quote.maxPerTx)) {
-    throw new Error('That is over the contract cap. Nothing was signed.');
-  }
-  if (quote.asset === 'usdc' && quote.maxToken && BigInt(units) > BigInt(quote.maxToken)) {
-    throw new Error('That is over the contract cap. Nothing was signed.');
-  }
+  // No contract-wide amount ceiling. The visitor's row is the only limit: the board
+  // refuses a value over its per-action cap, daily budget or reserved effect budget,
+  // before this call is sent. A hardcoded cap here would be a second, invented rule.
   const nonce = String(row.nonce ?? '0').replace(/^0+(?=\d)/, '');
   const args = crossArgs({ actionId: nonce, chain: 'base', asset: quote.asset, to: String(quote.to).toLowerCase(), amount: units, rowBudget: units });
   const effects = [{ chain: 'base', asset: quote.asset, to: String(quote.to).toLowerCase(), value: units, fee: '0' }];
@@ -440,13 +499,49 @@ export async function toll(quote) {
       const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
       return settled('toll', { tx: signed.hash, decision: 'denied', reason, action: nonce, amount: deposit, receiver: shop, fromChain: true, signer: 'agent' });
     }
-    return settled('toll', { tx: signed.hash, decision: 'allowed', reason: 'ok', action: nonce, amount: deposit, receiver: shop, signer: 'agent' });
+    // Step two: the row owner signs the stored order. This is what starts the MPC
+    // sign; the board's 30 Tgas call only recorded it. A failure here is reported as
+    // a stored order that still needs its signature, not a payment.
+    const orderId = await findOrder(shop, nonce);
+    let signedTx = null;
+    if (orderId != null) {
+      try { signedTx = await sign(shop, [fc('sign_cross', { id: orderId }, 150)]); }
+      catch (e) {
+        const why = String(e?.message || e).slice(0, 140);
+        return settled('toll', {
+          tx: signed.hash, decision: 'allowed', reason: 'stored', action: nonce, amount: deposit, receiver: shop, signer: 'agent',
+          needsSignature: true,
+          note: `The board stored the crossing. This browser could not sign it: ${why}`,
+        });
+      }
+    }
+    return settled('toll', {
+      tx: signed.hash, decision: 'allowed', reason: 'ok', action: nonce, amount: deposit,
+      receiver: shop, signer: 'agent', orderId, signTx: signedTx, needsSignature: orderId == null,
+    });
   } catch (e) {
     const code = refusalOf(e);
     if (code || e.tx) return settled('toll', { tx: e.tx || null, decision: 'denied', reason: code || String(e.message || e).slice(0, 160), action: nonce, amount: deposit, receiver: shop, fromChain: !!e.tx });
     throw e;
   }
 }
+
+
+/** The order the toll just recorded for this action id, so the row owner can sign it. */
+async function findOrder(shop, actionId) {
+  // `get_order` is keyed by the toll's own id, which the board's return value does not
+  // surface to the browser. Read the few ids past the live nonce and match the action.
+  try {
+    const live = await W.viewFn(rpc, shop, 'policy', {});
+    const n = Number(live?.next_nonce ?? 0);
+    for (let id = Math.max(0, n - 6); id < n + 3; id++) {
+      const o = await W.viewFn(rpc, shop, 'get_order', { id }).catch(() => null);
+      if (o && String(o.action_id) === String(actionId)) return id;
+    }
+  } catch { /* no order read: the caller reports that a signature is still needed */ }
+  return null;
+}
+
 /**
  * One Town Hall job move, signed by this browser's agent key and forwarded by the
  * board. The gold CTA and the AI dock both call this, so the two paths cannot drift.
@@ -747,6 +842,46 @@ export async function ferryProposeCalls(steps) {
 }
 
 // ---- Arena, live: the CTA and the agent both send through arena-live.js ----
+/**
+ * Anchor a statement commitment on the visitor's own board row.
+ * `anchor(kind, digest, salt)` stores nothing and logs one nearcarta-board v2 event
+ * (contracts/charter_board/src/v2.rs). The session key is a FunctionCall key on the
+ * visitor's account that names the board, so this needs no wallet popup and no deposit.
+ * The board takes no signature on `anchor`: the row is the predecessor's own, so the
+ * account that sends it is the authorisation. Never signs a payment.
+ */
+export async function anchorStatement({ kind = 'statement', digest = '', salt = '' } = {}) {
+  const you = (reason, extra = {}) => ({ ok: false, reason, ...extra });
+  if (!S.board || !S.me) return you('no_session');
+  if (!/^[0-9a-f]{64}$/.test(String(digest))) return you('no_digest');
+  if (!/^[A-Za-z0-9]{8,64}$/.test(String(salt))) return you('no_salt');
+  const key = agent();
+  if (!key) return you('no_key');
+  const ak = await proposeAccessKey(key);
+  if (!ak) return you('no_session_key');
+  const names = ak?.permission?.FunctionCall?.method_names || [];
+  if (names.length && !names.includes('anchor')) return you('key_cannot_anchor');
+  const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
+  if (!row) return you('no_row');
+  try {
+    const signed = W.signTx({
+      key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash,
+      actions: [W.functionCall('anchor', { kind, digest, salt }, BigInt(ANCHOR_TGAS) * TG)],
+    });
+    const result = await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' });
+    const sent = W.outcomeOf(result);
+    if (!sent.ok) return you(refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160), { tx: signed.hash });
+    // The board logs the commitment in this receipt. Read it back rather than trusting the send.
+    const logs = (result?.receipts_outcome || []).flatMap(r => r?.outcome?.logs || []);
+    return { ok: true, tx: signed.hash, logs, reason: '' };
+  } catch (e) {
+    return you(refusalOf(e) || String(e?.message || e).slice(0, 160));
+  }
+}
+
+/** One anchor is a single small call: 30 Tgas covers it with room for the event log. */
+export const ANCHOR_TGAS = 30;
+
 // 10 Tgas for propose_call_as, 30 Tgas to the shop, 20 Tgas for on_called_as.
 const ARENA_GAS = 60n * TG;
 const arenaLedger = createArenaLedger();
@@ -1288,7 +1423,12 @@ export const payoutLeft = () => P.leftToday(pay(), S.usage.pay);
 export async function payouts(rows, opts = {}) {
   const key = agent(); if (!key) throw new Error('no agent key in this browser: finish setup first');
   if (S.board) {
-    const plan = (rows || []).slice(0, 3).filter(r => String(r?.asset || 'NEAR').toUpperCase() !== 'USDC');
+    // NEAR rows only: a foreign row is paid by payoutsForeign (the 1Click rail), not by a transfer.
+    // The row count is the visitor's own /setup count, so nothing is sliced here.
+    const plan = (rows || []).filter(r => {
+      const asset = String(r?.asset || 'NEAR').toUpperCase();
+      return asset === 'NEAR' && String(r?.chain || 'near').toLowerCase() === 'near';
+    });
     if (plan.some(r => String(r?.to || '').trim() && !P.nearAccountOk(r.to))) throw new Error('Check the account name. Nothing was sent.');
     const capNear = opts.capNear == null ? null : Number(opts.capNear);
     const out = [];
@@ -1318,4 +1458,73 @@ export async function payouts(rows, opts = {}) {
   keep(signed.hash, 'payouts', v.decision, v.reason); readRules().catch(() => {});
   return { tx: signed.hash, ...v, n: b.n, total: b.total };
 }
+/**
+ * One foreign payroll row through the 1Click rail, paid by the visitor's own session.
+ * `row.depositAddress` comes from a live EXACT_OUTPUT quote and `row.near` is the wNEAR the quote named.
+ * The board's propose_call deposits that wNEAR to the deposit address: wrap.near near_deposit,
+ * storage_deposit for the address, then ft_transfer with the 1Click memo. No wallet opens.
+ * The row is paid on 1Click SUCCESS, never before; this returns the NEAR receipt, not the payout.
+ */
+export async function payoutsForeign(row, opts = {}) {
+  if (!S.board || !S.me) return { ok: false, reason: 'no_session', wallet: false };
+  const key = agent();
+  if (!key) return { ok: false, reason: 'no_key', wallet: false };
+  const ak0 = await proposeAccessKey(key);
+  const names = ak0?.permission?.FunctionCall?.method_names || [];
+  if (!ak0 || (names.length && !names.includes('propose_call'))) return { ok: false, reason: 'key_cannot_propose_call', wallet: false };
+  const depositAddress = String(row?.depositAddress || '');
+  const near = Number(row?.near);
+  if (!depositAddress || !(near > 0)) return { ok: false, reason: 'no_deposit_address', wallet: false };
+  const capNear = opts.capNear == null || opts.capNear === '' ? (pay()?.per_action_cap ? fromY(pay().per_action_cap) : null) : Number(opts.capNear);
+  if (capNear != null && near > capNear + 1e-12) return { ok: false, reason: 'over_per_action_cap', wallet: false };
+  let wrap = { registered: true, balanceYocto: '0' };
+  try { wrap = await wrapBoardState(); } catch { /* plan with a fresh deposit */ }
+  let depRegistered = null;
+  try {
+    const st = await wrapStorageOf(depositAddress);
+    depRegistered = !!(st && (st.total != null || st.available != null));
+  } catch { depRegistered = null; }
+  const spend = pickWrapSpend({ wantAmount: near, wrapBalanceYocto: wrap.balanceYocto });
+  const plan = depositPlan({
+    from: 'wNEAR@near',
+    amount: spend.amount,
+    depositAddress,
+    memo: row.depositMemo || null,
+    capYocto: pay()?.per_action_cap || null,
+    balanceYocto: S.boardRow?.balance || null,
+    wrapRegistered: wrap.registered,
+    wrapBalanceYocto: wrap.balanceYocto,
+    depositAccountRegistered: depRegistered,
+  });
+  if (plan.kind !== 'propose_call') return { ok: false, reason: plan.why || 'you_send', wallet: false, youSend: true };
+  const sent = await ferryProposeCalls(plan.steps);
+  if (!sent?.ok) return { ok: false, reason: sent?.reason || 'the deposit did not go', wallet: false, txs: sent?.txs || [], landed: sent?.landed || [] };
+  keep(sent.tx, 'payouts', 'allowed', 'payout_row', { amt: String(toY(near)), to: row.to, chain: row.chain, asset: row.asset, depositAddress });
+  readRules().catch(() => {});
+  return { ok: true, wallet: false, tx: sent.tx, txs: sent.txs, landed: sent.landed, depositAddress, near };
+}
+
+/**
+ * Bounded USDC storage sponsorship for a zero-NEAR issuer. The visitor's own row pays
+ * `storage_deposit` on native USDC through propose_call, capped by that row's per-payment cap.
+ * Only the storage_deposit method is opened in the row's call list, so this cannot move USDC.
+ * The amount is the contract's own storage_balance_bounds.min, never a number typed here.
+ */
+export async function payoutsSponsor(account, depositNear, opts = {}) {
+  if (!S.board || !S.me) return { ok: false, reason: 'no_session' };
+  const who = String(account || '').trim();
+  const amount = Number(depositNear);
+  if (!isNearAccountId(who)) return { ok: false, reason: 'bad_receive' };
+  if (!(amount > 0)) return { ok: false, reason: 'no_bounds' };
+  const capNear = opts.capNear == null || opts.capNear === '' ? (pay()?.per_action_cap ? fromY(pay().per_action_cap) : null) : Number(opts.capNear);
+  if (capNear == null) return { ok: false, reason: 'no_row' };
+  if (amount > capNear + 1e-12) return { ok: false, reason: 'over_per_action_cap' };
+  const args = JSON.stringify({ account_id: who, registration_only: true });
+  const sent = await ferryProposeCalls([{ receiver: USDC_NEAR, method: 'storage_deposit', args, deposit: toY(amount), gasTgas: 30 }]);
+  if (!sent?.ok) return { ok: false, reason: sent?.reason || 'the registration did not go', txs: sent?.txs || [] };
+  keep(sent.tx, 'payouts', 'allowed', 'storage_sponsor', { amt: String(toY(amount)), to: who });
+  readRules().catch(() => {});
+  return { ok: true, tx: sent.tx, account: who, near: amount };
+}
+
 export { fmt, esc, short, toY, fromY };
