@@ -78,6 +78,12 @@ export function guardMarkup(state = {}, _attacks = [], esc = s => String(s ?? ''
     ...holds.map(h => `<li data-testid="guard-hold">Held · ${esc(h.payee)} · ${esc(h.amount)} ${esc(h.asset)}</li>`),
     ...refunds.map(r => `<li data-testid="guard-refund">Refunded · ${esc(r.payee)} · ${esc(r.amount)} ${esc(r.asset)} · ${esc(r.why)}</li>`),
   ];
+  // The local ledger is empty after a reload, so a hold restored from storage would have no
+  // row here and Cancel stayed hidden. Give it a row of its own, with the button beside it.
+  if (held && !holds.some(h => String(h.id) === String(state.holdId))) {
+    rows.unshift(`<li data-testid="guard-hold-restored">Held on chain · id ${esc(String(state.holdId))} · waiting for you
+      <div class="guard-actions"><button type="button" class="guard-quiet" id="g-cancel" data-testid="guard-cancel">Cancel and refund</button></div></li>`);
+  }
   const list = rows.length ? `<ul class="guard-blocks" data-testid="guard-blocks">${rows.join('')}</ul>` : '<p class="guard-status" data-testid="guard-blocks">No held payment.</p>';
   const rowLine = state.rowKnown
     ? (state.frozen ? 'Your row is frozen.' : 'Your row is live.')
