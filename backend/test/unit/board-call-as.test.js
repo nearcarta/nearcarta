@@ -170,6 +170,10 @@ test('the city never signs a call-as text it built itself', () => {
   // Every path that signs `propose_call_as` must therefore ask the board for the text
   // (`call_as_message`) instead of assembling it. This pins that for all three city paths.
   const src = readFileSync(new URL('../../../app/design/D8_shops/js/apps.js', import.meta.url), 'utf8');
+  // A local `const view = {...}` shadows the module's `view()` RPC helper, and the call then
+  // reads an uninitialised binding: "Cannot access 'view' before initialization". That is how
+  // the first version of this fix failed silently in the browser.
+  assert.doesNotMatch(src, /const view = \{/, 'do not shadow the view() helper');
   const guesses = [...src.matchAll(/callAsMessage\(\{/g)];
   assert.equal(guesses.length, 0, 'apps.js must not build a call-as text locally');
   const asked = [...src.matchAll(/call_as_message/g)];

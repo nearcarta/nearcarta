@@ -505,8 +505,8 @@ export async function toll(quote) {
   // set_rules bumps it during setup -- and the contract answered ERR_BAD_SIG on every toll pass
   // from the gold CTA. Verified on mainnet: same args, the board's own text carried epoch 14.
   // app/src/panels/guard-live.js already signs this way for the same reason.
-  const view = { owner: S.me, receiver: shop, method: 'cross', args, deposit, nonce, expiry, effects, hold: false };
-  const text = await view(S.board, 'call_as_message', view).catch(() => null);
+  const ask = { owner: S.me, receiver: shop, method: 'cross', args, deposit, nonce, expiry, effects, hold: false };
+  const text = await view(S.board, 'call_as_message', ask).catch(() => null);
   if (typeof text !== 'string' || !text.startsWith('board-call-as-v1|')) {
     throw new Error('The board did not return a call message. Nothing was signed.');
   }
@@ -610,8 +610,8 @@ export async function hallJob(step) {
   const nonce = String(row.nonce ?? '0').replace(/^0+(?=\d)/, '');
   // Same rule as the toll: the board's own text carries the real epoch. `row.epoch` does not
   // exist on `get_charter`, so a local message signs 0 and the board answers ERR_BAD_SIG.
-  const view = { owner: S.me, receiver: shop, method: step.method, args, deposit: String(deposit), nonce, expiry, effects, hold: false };
-  const text = await view(S.board, 'call_as_message', view).catch(() => null);
+  const ask = { owner: S.me, receiver: shop, method: step.method, args, deposit: String(deposit), nonce, expiry, effects, hold: false };
+  const text = await view(S.board, 'call_as_message', ask).catch(() => null);
   if (typeof text !== 'string' || !text.startsWith('board-call-as-v1|')) {
     throw new Error('The board did not return a call message. Nothing was signed.');
   }
@@ -924,7 +924,7 @@ export async function arenaCall(plan) {
   if (!ak || (names.length && !names.includes('propose_call_as'))) return stop();
   const row = await view(S.board, 'get_charter', { owner: S.me }).catch(() => null);
   if (!row || W.pubkeyHex(key) !== String(row.agent || '')) return stop();
-  const view = {
+  const ask = {
     owner: S.me,
     receiver: S.arena,
     method: call.method,
@@ -936,7 +936,7 @@ export async function arenaCall(plan) {
     hold: !!call.hold,
   };
   // The board fills in its own epoch. Signing a locally built text was ERR_BAD_SIG.
-  const msg = await view(S.board, 'call_as_message', view).catch(() => null);
+  const msg = await view(S.board, 'call_as_message', ask).catch(() => null);
   if (typeof msg !== 'string' || !msg.startsWith('board-call-as-v1|')) return stop();
   const signature = W.signMessage(key, msg);
   const args = {
