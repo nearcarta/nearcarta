@@ -34,6 +34,44 @@ test('agentMethodsReady needs every session method entry, or an empty list', () 
   assert.deepEqual(SESSION_METHODS, ['propose', 'propose_call', 'propose_call_as', 'anchor', 'confirm_hold', 'tighten_rules']);
 });
 
+test('a key with the old three methods is stale, because the row needs anchor and tighten', () => {
+  // Real case, 2026-11-07: the visitor's key had propose, propose_call, propose_call_as and
+  // confirm_hold, so the old AGENT_METHODS check called it ready, /setup offered no renewal,
+  // and the Chronicle anchor failed on chain with `key_cannot_anchor`.
+  const old = [{
+    public_key: 'ed25519:OldThree',
+    access_key: { permission: { FunctionCall: { receiver_id: BOARD, method_names: ['propose', 'propose_call', 'propose_call_as', 'confirm_hold'], allowance: '1' } } },
+  }];
+  const c = classifyBoardAgentKeys(old, BOARD);
+  assert.equal(c.ready.length, 0, 'a key without anchor must not count as ready');
+  assert.equal(c.stale.length, 1);
+  assert.equal(c.needsRenew, true);
+  const full = [{
+    public_key: 'ed25519:FullSession',
+    access_key: { permission: { FunctionCall: { receiver_id: BOARD, method_names: [...SESSION_METHODS], allowance: '1' } } },
+  }];
+  assert.equal(classifyBoardAgentKeys(full, BOARD).needsRenew, false);
+});
+
+test('a key with the old three methods is stale, because the row needs anchor and tighten', () => {
+  // Real case, 2026-11-07: the visitor's key had propose, propose_call, propose_call_as and
+  // confirm_hold, so the old AGENT_METHODS check called it ready, /setup offered no renewal,
+  // and the Chronicle anchor failed on chain with `key_cannot_anchor`.
+  const old = [{
+    public_key: 'ed25519:OldThree',
+    access_key: { permission: { FunctionCall: { receiver_id: BOARD, method_names: ['propose', 'propose_call', 'propose_call_as', 'confirm_hold'], allowance: '1' } } },
+  }];
+  const c = classifyBoardAgentKeys(old, BOARD);
+  assert.equal(c.ready.length, 0, 'a key without anchor must not count as ready');
+  assert.equal(c.stale.length, 1);
+  assert.equal(c.needsRenew, true);
+  const full = [{
+    public_key: 'ed25519:FullSession',
+    access_key: { permission: { FunctionCall: { receiver_id: BOARD, method_names: [...SESSION_METHODS], allowance: '1' } } },
+  }];
+  assert.equal(classifyBoardAgentKeys(full, BOARD).needsRenew, false);
+});
+
 test('classifyBoardAgentKeys marks propose-only keys stale and flags renew', () => {
   const keys = [
     {

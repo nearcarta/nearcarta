@@ -333,7 +333,7 @@ export function agentMethodsReady(methodNames, required = SESSION_METHODS) {
 }
 
 /** Board FunctionCall keys from view_access_key_list, split into ready vs stale. */
-export function classifyBoardAgentKeys(keys, boardContract, required = AGENT_METHODS) {
+export function classifyBoardAgentKeys(keys, boardContract, required = SESSION_METHODS) {
   const board = [];
   for (const row of keys || []) {
     const fc = row?.access_key?.permission?.FunctionCall;
