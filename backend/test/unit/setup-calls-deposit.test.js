@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { CALLS_DEPOSIT_YOCTO, MAX_PAIR_BYTES, ROW_BYTES_PER_RECEIVER, ROW_FIXED_BYTES, callPairBytes, callPolicy, callsFitRow, dropOptionalPairs, pairBudgetBytes, stampCalls } from '../../../shared/board/session.js';
+import { CALLS_DEPOSIT_YOCTO, EFFECT_BUDGET_FIRST_BYTES, EFFECT_BUDGET_MORE_BYTES, MAX_PAIR_BYTES, ROW_BYTES_PER_RECEIVER, ROW_FIXED_BYTES, ROW_STORAGE_BYTES, callPairBytes, callPolicy, callsFitRow, dropOptionalPairs, pairBudgetBytes, stampCalls } from '../../../shared/board/session.js';
 import { HOUSE_CALLS } from '../../../shared/house/shop.js';
 import { plainRulesError } from '../../../shared/setup/rules-diff.js';
 
@@ -172,4 +172,26 @@ test('the optional pairs go before a shop does, and the real limit is four shops
   // The wrap legs a swap needs are never dropped.
   assert.ok(landed.calls.some(c => c.receiver === 'wrap.near' && c.method === 'near_deposit'));
   assert.ok(landed.calls.some(c => c.receiver === 'wrap.near' && c.method === 'ft_transfer'));
+});
+
+test('a shop-bearing row cannot hold a foreign effect budget, which is a contract limit', () => {
+  // Measured on mainnet 2026-11-07 against one row, one cap at a time:
+  //   toll-only (1 pair)     1594 locked
+  //   + base/usdc cap        1945  (+351, creates the ACTS record)
+  //   + base/native cap      1979  (+34, record already there)
+  assert.equal(EFFECT_BUDGET_FIRST_BYTES, 351);
+  assert.equal(EFFECT_BUDGET_MORE_BYTES, 34);
+  assert.equal(1945 - 1594, EFFECT_BUDGET_FIRST_BYTES);
+  assert.equal(1979 - 1945, EFFECT_BUDGET_MORE_BYTES);
+  // Every row shape that carries a shop is too full to accept even the first cap.
+  for (const [name, locked] of [['four shops', 1993], ['three shops', 1914], ['two pairs', 1683]]) {
+    assert.ok(ROW_STORAGE_BYTES - locked < EFFECT_BUDGET_FIRST_BYTES, `${name} has no room for an effect budget`);
+  }
+  // After the first cap the bare row has 55 bytes left, so exactly one more cap fits and the
+  // row is then full: 1979 locked, 21 free, and 34 needed for a third. That is why the toll CTA
+  // could not complete even with two caps reserved (`ERR_DEPOSIT` on the in-flight hold).
+  assert.equal(2000 - 1945, 55);
+  assert.ok(2000 - 1945 >= EFFECT_BUDGET_MORE_BYTES, 'a second cap still fits');
+  assert.equal(2000 - 1979, 21);
+  assert.ok(2000 - 1979 < EFFECT_BUDGET_MORE_BYTES, 'a third cap does not, and the hold has nothing left');
 });

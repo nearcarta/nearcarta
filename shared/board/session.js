@@ -198,6 +198,25 @@ export const ROW_BYTES_PER_RECEIVER = 24;
 export const ROW_STORAGE_BYTES = 2000;
 
 /**
+ * Bytes the FIRST effect budget costs a row. Measured on mainnet 2026-11-07 by writing the
+ * budgets one at a time against a bare toll row and reading `storage_locked` after each:
+ *
+ *   toll-only row, 1 pair              -> 1594 locked
+ *   + one base/usdc cap                -> 1945   (+351, this also creates the ACTS record)
+ *   + one base/native cap              -> 1979   (+34, the record already existed)
+ *
+ * The consequence is the ceiling the city actually hits: a row that reaches four shops leaves
+ * 7 bytes and a three-shop row leaves 86, so NO shop-bearing row can hold a foreign effect
+ * budget, and `propose_call_as` refuses every Base crossing with ERR_EFFECT before the shop is
+ * ever called. Nothing in the app calls `set_effects` today, so this is not a page bug: it is
+ * the 0.02 NEAR row limit meeting the effect design. Fixing it needs a contract change
+ * (a larger MAX_ROW_YOCTO, or the effect record charged outside the row), not a UI fix.
+ */
+export const EFFECT_BUDGET_FIRST_BYTES = 351;
+/** Each further asset cap on the same row, once the record exists. */
+export const EFFECT_BUDGET_MORE_BYTES = 34;
+
+/**
  * Bytes a rule change can still add, from the CHAIN's own number.
  *
  * The formula below (`pairBudgetBytes`) models a row from scratch, and on 2026-11-07 it said
