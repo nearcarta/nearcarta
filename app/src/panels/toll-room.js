@@ -87,7 +87,7 @@ export function mergeTollChronicle(base, extra = []) {
  */
 export function tollCapCheck({
   receivers, capYocto, balanceYocto, spentYocto, dailyYocto, minYocto,
-  expiresAtNs, nowNs, frozen, amountYocto = PASS_YOCTO,
+  expiresAtNs, nowNs, frozen, amountYocto = PASS_YOCTO, effectsKnown = null,
 } = {}) {
   if (frozen) return 'The row is frozen. Nothing was signed.';
   if (expiresAtNs != null && expiresAtNs !== '' && nowNs != null && nowNs !== '') {
@@ -121,7 +121,34 @@ export function tollCapCheck({
       if (BigInt(spentYocto) + amt > BigInt(dailyYocto)) return 'This pass would pass the daily budget. Nothing was signed.';
     } catch { /* skip a bad daily field */ }
   }
+  // A crossing reserves an effect budget on the row before the board calls the toll, and a
+  // row without one is refused `ERR_EFFECT` after the wallet has already approved. Saying so
+  // here is the difference between a refusal the visitor can act on and gas spent on a trap.
+  // Measured 2026-11-07: the first effect budget costs 351 bytes and no shop-bearing row has
+  // that much room (four shops is exactly full at five pairs), so this check refuses honestly
+  // rather than pretending a pass is possible.
+  if (effectsKnown === false) {
+    return 'This row has no Base effect budget, so the toll cannot open a crossing. It needs about 351 bytes of row storage that no shop-bearing row has left. Nothing was signed.';
+  }
   return null;
+}
+
+/**
+ * Whether a row can still hold a FIRST effect budget, from the chain's own `storage_locked`.
+ * The contract exposes no view that lists effect caps, so storage is the number to use.
+ * Returns null when the row does not report storage: "unknown" must never become a refusal.
+ */
+// A first effect budget costs 351 bytes and the row allowance is 2000; both are measured on
+// mainnet and pinned in shared/board/session.js. Repeated here because this module is served
+// to the browser raw and cannot import a shared path.
+export const EFFECT_BUDGET_BYTES = 351;
+export const ROW_ALLOWANCE_BYTES = 2000;
+export function effectBudgetFits(row, need = EFFECT_BUDGET_BYTES, maxRowBytes = ROW_ALLOWANCE_BYTES) {
+  const locked = row?.storage_locked;
+  if (locked == null || locked === '') return null;
+  const lockedBytes = Number(locked) / 1e19; // storage costs 1e19 yocto per byte on mainnet
+  if (!Number.isFinite(lockedBytes)) return null;
+  return Math.max(0, maxRowBytes - Math.floor(lockedBytes)) >= need;
 }
 
 export function capLine(row, quote) {

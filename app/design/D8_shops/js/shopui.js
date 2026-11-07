@@ -21,7 +21,7 @@ import { armGuardDock, dispatchGuardDock, ensureGuardDock, installGuardDock } fr
 import { hideBankDock } from '/panels/bank-tray.js';
 import { capFromSetup } from '/panels/bank-audit.js';
 import { armTollDock, dispatchTollDock, installTollDock } from '/panels/toll-dock.js';
-import { mergeTollChronicle, nextRowBalance, passPaidCopy, policyQuote, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
+import { effectBudgetFits, mergeTollChronicle, nextRowBalance, passPaidCopy, policyQuote, rememberTollPass, tollCapCheck, tollChronicleRows } from '/panels/toll-room.js';
 import { armHallDock, dispatchHallDock, ensureHallDock, installHallDock } from '/panels/hall-dock.js';
 import { deedMarkup } from '/panels/deed.js';
 import { receiptsFor, splitAssets, prepareRows } from './payouts.js';
@@ -696,6 +696,10 @@ async function tollPay(quote) {
     return { ok: false, hint, keep: true, kind: 'no', say: hint, refused: false };
   }
   const row = A.S.boardRow || {};
+  // A crossing needs an effect budget on the row, and a row that cannot hold one is refused
+  // ERR_EFFECT after the wallet has approved. Decide from the row's own storage before signing.
+  const effectsFit = effectBudgetFits(row);
+  const effectsKnown = effectsFit === false ? false : null;
   const why = tollCapCheck({
     receivers: row.receivers || A.S.clauses.pay?.receivers,
     capYocto: row.per_action_cap ?? A.S.clauses.pay?.per_action_cap,
@@ -707,6 +711,7 @@ async function tollPay(quote) {
     nowNs: (BigInt(Date.now()) * 1_000_000n).toString(),
     frozen: !!row.frozen,
     amountYocto: quote.feeYocto,
+    effectsKnown,
   });
   if (why) {
     extra.seal = why;

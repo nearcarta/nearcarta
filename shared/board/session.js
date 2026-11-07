@@ -216,6 +216,7 @@ export const EFFECT_BUDGET_FIRST_BYTES = 351;
 /** Each further asset cap on the same row, once the record exists. */
 export const EFFECT_BUDGET_MORE_BYTES = 34;
 
+
 /**
  * The largest call list four receivers can hold, measured on mainnet 2026-11-07 by growing the
  * list one pair at a time against a four-receiver row (order matters: grow the receivers while
