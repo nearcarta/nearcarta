@@ -473,24 +473,72 @@ export function makeApp() {
     const a = c.req.param('account');
     if (!nearAccountOk(a)) return bad(c, 'not an account id');
     if (!D) return c.json({ live: false, token_id: a, rows: [], count: 0, note: 'no deed contract' });
-    // nearblocks rate-limits an unkeyed caller (the first live call answered 429 and the panel
-    // said "no transactions", which was false). Retry with backoff and say so when it still
-    // fails, so a short list is never presented as a complete one.
-    const index = 'https://api.nearblocks.io';
+    // Two sources, because one is not enough: nearblocks rate-limits an unkeyed caller (the
+    // first live call answered 429 and the panel said "no transactions", which was false), and
+    // FastNEAR answers the same question with no key at all. Try the index first for its parsed
+    // methods, then FastNEAR, and only report a gap when BOTH fail.
     const key = process.env.NEARBLOCKS_API_KEY || '';
+    const fastTx = (process.env.FASTNEAR_TX_API || 'https://tx.main.fastnear.com').replace(/\/$/, '');
     let txns = [];
     let gap = '';
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      if (attempt) await new Promise(r => setTimeout(r, 350 * attempt));
+    for (let attempt = 0; attempt < 2 && !txns.length; attempt += 1) {
+      if (attempt) await new Promise(r => setTimeout(r, 300));
       try {
-        const r = await fetch(`${index}/v1/account/${encodeURIComponent(D.contract)}/txns?per_page=40`, {
+        const r = await fetch(`https://api.nearblocks.io/v1/account/${encodeURIComponent(D.contract)}/txns?per_page=40`, {
           headers: key ? { Authorization: `Bearer ${key}`, 'User-Agent': 'nearcarta' } : { 'User-Agent': 'nearcarta' },
           signal: AbortSignal.timeout(6000),
         });
-        if (r.ok) { txns = (await r.json())?.txns || []; gap = ''; break; }
-        gap = `the index answered ${r.status}`;
+        if (r.ok) txns = (await r.json())?.txns || [];
+        else gap = `the index answered ${r.status}`;
       } catch { gap = 'the index did not answer'; }
-      if (attempt === 2) gap += ' (after 3 tries)';
+    }
+    if (!txns.length) {
+      try {
+        const list = await fetch(`${fastTx}/v0/account`, {
+          method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ account_id: D.contract, limit: 40, desc: true }),
+          signal: AbortSignal.timeout(8000),
+        });
+        const rows = list.ok ? (await list.json())?.account_txs || [] : [];
+        const hashes = rows.map(t => t?.transaction_hash).filter(h => typeof h === 'string' && h.length >= 32);
+        if (hashes.length) {
+          // One packed call gives the actions, so the method names are real rather than guessed.
+          const packed = await fetch(`${fastTx}/v0/transactions`, {
+            method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
+            body: JSON.stringify({ tx_hashes: hashes.slice(0, 40) }),
+            signal: AbortSignal.timeout(8000),
+          });
+          const detail = packed.ok ? (await packed.json())?.transactions || [] : [];
+          const byHash = new Map();
+          for (const t of rows) byHash.set(t?.transaction_hash, t);
+          txns = detail.map(d => {
+            const tx = d?.transaction || {};
+            const meta = byHash.get(tx.hash) || {};
+            return {
+              transaction_hash: tx.hash,
+              signer_account_id: tx.signer_id,
+              block_timestamp: meta.tx_block_timestamp ? Number(meta.tx_block_timestamp) * 1e6 : null,
+              block: { block_height: meta.tx_block_height ?? null },
+              // A row's board call wraps the shop method in its args: the outer method is
+              // `propose_call_as` and the deed action is inside. Read the inner one so the
+              // history names what actually happened on the deed.
+              actions: (tx.actions || []).map(a => {
+                const fc = a?.FunctionCall || {};
+                let method = fc.method_name || null;
+                if (method === 'propose_call_as' && typeof fc.args === 'string') {
+                  try {
+                    const inner = JSON.parse(Buffer.from(fc.args, 'base64').toString('utf8'));
+                    if (inner && typeof inner.method === 'string') method = inner.method;
+                  } catch { /* keep the outer name */ }
+                }
+                return { method };
+              }),
+            };
+          }).filter(t => t.transaction_hash);
+          if (txns.length) gap = '';
+          else gap = gap || 'the transaction service returned no details';
+        } else gap = gap || 'the transaction service returned no transactions';
+      } catch { gap = gap || 'the transaction service did not answer'; }
     }
     const purse = await view(D.contract, 'house_purse', { token_id: a }).catch(() => null);
     const out = deedHistory(txns, a, purse, !!gap);

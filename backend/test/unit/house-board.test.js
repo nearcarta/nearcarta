@@ -353,3 +353,18 @@ test('the deed history lists only real transactions, named by the method that ra
   assert.match(failed.note, /not a claim that the deed did nothing/);
   assert.equal(deedHistory([], TOKEN, null, false).read_failed, false);
 });
+
+test('the deed history survives a rate-limited index by falling back, not by going quiet', () => {
+  // The first live call to the history route answered 429 from nearblocks and the panel said
+  // the deed had no transactions, which was false. The route now tries the index, then
+  // FastNEAR (which needs no key), and only reports a gap when BOTH fail.
+  const src = readFileSync(new URL('../../../backend/src/app.js', import.meta.url), 'utf8');
+  const route = src.slice(src.indexOf("app.get('/api/house/history/:account'"), src.indexOf("// Counterparty check before a payment"));
+  assert.match(route, /api\.nearblocks\.io/, 'the index is tried first');
+  assert.match(route, /tx\.main\.fastnear\.com|fastTx/, 'then FastNEAR');
+  assert.match(route, /v0\/account/); assert.match(route, /v0\/transactions/);
+  // Both must fail before a gap is reported.
+  assert.match(route, /gap = gap \|\|/, 'a gap is only kept when the fallback also failed');
+  // A board call wraps the shop method; the inner one is what happened on the deed.
+  assert.match(route, /propose_call_as[\s\S]{0,200}inner\.method/, 'the inner method is unwrapped');
+});
