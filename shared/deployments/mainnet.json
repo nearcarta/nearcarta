@@ -266,8 +266,11 @@
         "arena_attempt_2": "AuXzxGVjHmrBszQm55WobbpLzSenD9qW8SUaw4KANka6",
         "arena_agent_pay_refused_0.002": "25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V",
         "arena_sweep_surplus": "891qnrvY62ctc9NpZ7RwK37QJTNAeCEKyXo98yfyFdJG",
-        "arena_delete_fak": "FJLLSMqA7P3MwWowDbp1hnspomkpcEmfGcKjM9PrjJ8y"
-      }
+        "arena_delete_fak": "FJLLSMqA7P3MwWowDbp1hnspomkpcEmfGcKjM9PrjJ8y",
+        "arena_fund_pot_0.013_from_gold_cta": "EAchLuogBCqmY5JZbjoDG7hUzyyFmZtZzG2VogW9cwfL"
+      },
+      "live_crate": "contracts/arena",
+      "live_note": "The live arena is contracts/arena (v1), not contracts/arena_v2. Verified 2026-11-08: get_guardian and fund both respond on arena.nearcarta.near, and arena_v2 adds get_earnings/mint which are MethodNotFound there. arena_v2.wasm (222463 bytes) is built and never deployed."
     },
     "house": {
       "contract": "house.nearcarta.near",
