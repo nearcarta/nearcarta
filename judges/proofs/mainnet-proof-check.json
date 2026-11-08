@@ -365,6 +365,94 @@
       "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
     },
     {
+      "shop": "board.visitor_run",
+      "label": "hall_post_job_from_city_row",
+      "hash": "51UktPvyyQuf199eABmiKG1dVdWwUJLZn3vGrmp94jY4",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": false,
+      "failure": true,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "house_checkin_from_city_gold_cta_2026_11_08",
+      "hash": "3cNQyHrgi5Dp55Td7KXZU742b2cHfuva4RPDbLVzP3rs",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "arena_feed_on_a_clean_four_shop_row",
+      "hash": "6DAG7vn8W3ZFrgy9VBkcLQSbQRggy7RDvsv2BL1TxnWN",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "row_reopened_with_seven_pairs",
+      "hash": "7Sw5ADpuzxPf8mQyLwJnJXcX5x9TDNcjuNqqbBTWcw2b",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "arena_feed_after_the_copy_fix",
+      "hash": "EAchLuogBCqmY5JZbjoDG7hUzyyFmZtZzG2VogW9cwfL",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "arena_feed_from_ai_agent",
+      "hash": "F2VQxKK5AQJgQbZxurSkw6Rr3XJRXCHT9rNYAUPgsYoY",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "house_checkin_from_ai_agent",
+      "hash": "F9RU5PHYbUw6abr1NwN6zoLsBenzAjLcAw3jj58DJi7W",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "bank_apply_tighter_limits",
+      "hash": "9wxG5aErrrU72tH4oTt8dAdku3KXqWybJr7yXL32bFRY",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
       "shop": "charter",
       "label": "create_root",
       "hash": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",
@@ -684,6 +772,17 @@
       "sender": "nearcarta.near"
     },
     {
+      "shop": "extras.arena",
+      "label": "arena_fund_pot_0.013_from_gold_cta",
+      "hash": "EAchLuogBCqmY5JZbjoDG7hUzyyFmZtZzG2VogW9cwfL",
+      "contract": "arena.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "sender": "nearcarta.near"
+    },
+    {
       "shop": "extras.house",
       "label": "house_create_fund",
       "hash": "FeuBqYhuDY2S2EZW4C9u6o7cftyLFTQohvgrpXVZ1ycj",
@@ -868,6 +967,61 @@
       "success": true,
       "failure": false,
       "signer": "townhall.nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "extras.townhall",
+      "label": "refund_open_bounty_0.002",
+      "hash": "8KdwZNzy8zEMV8mCHvZwko44j5DKX6sh3jRYGezqvGm1",
+      "contract": "townhall.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "townhall.nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "extras.townhall",
+      "label": "hall_v2_deploy_migrate",
+      "hash": "DjzqHk2KcX2S6GfD1d4b9FQt5ypJiPdFdozXVPoYJrU3",
+      "contract": "townhall.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "townhall.nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "extras.townhall",
+      "label": "hall_v2_smoke_post_0.001",
+      "hash": "DTqpzuhNs5bSDoiSEQP4eAHizCNFHN7wcZcWpzRqAhjZ",
+      "contract": "townhall.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "townhall.nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "extras.townhall",
+      "label": "hall_v2_smoke_refund",
+      "hash": "JC9ojuNMVPkUY3o4zxdAQWYfmecy9B8MBrFexstVDHWj",
+      "contract": "townhall.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "townhall.nearcarta.near",
+      "sender": "nearcarta.near"
+    },
+    {
+      "shop": "extras.townhall",
+      "label": "topup_0.45",
+      "hash": "6LLLhMr9PnqRwn4kk4boMHU7YXe62mF6z8gDvfsRpBuf",
+      "contract": "townhall.nearcarta.near",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "signer": "nearcarta.near",
       "sender": "nearcarta.near"
     },
     {
