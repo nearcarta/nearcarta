@@ -53,9 +53,19 @@ export function nearToYocto(near) {
   return (BigInt(whole) * (10n ** 24n) + BigInt((frac + '0'.repeat(24)).slice(0, 24))).toString();
 }
 
+/**
+ * The token id as the contract takes it: ALWAYS a string.
+ *
+ * This used to turn digits into a Number, which half-worked: the tray's own input path built
+ * the call from a string and the AI dock went through here, so the same "Feed 0.001 to 1" fed
+ * the pot from the gold button and panicked from the agent. Measured on mainnet 2026-11-08:
+ * the agent sent {"token_id":1}, the arena answered "invalid type: integer `1`, expected a
+ * string", and the transaction had already landed and cost gas.
+ *
+ * Checked against the deployed arena: token_id as "0" answers, as 0 errors.
+ */
 function idArg(id) {
-  const s = String(id ?? '').trim();
-  return /^\d+$/.test(s) && s.length < 16 ? Number(s) : s;
+  return String(id ?? '').trim();
 }
 
 function rowReady(fields) {
@@ -190,7 +200,8 @@ export function planMint(fields = {}) {
 }
 
 export function planFeed(fields = {}) {
-  const id = String(fields.id || '').trim();
+  // `|| ''` would turn the number 0 into '', so the first guardian read as "none chosen".
+  const id = (fields.id ?? '').toString().trim();
   const amount = num(fields.amount);
   if (!id) return ask('Choose a guardian to feed. Nothing was signed.');
   if (!(amount > 0)) return ask('Name the NEAR to add to the pot. Nothing was signed.');
@@ -206,7 +217,7 @@ export function planFeed(fields = {}) {
 }
 
 export function planAttack(fields = {}) {
-  const id = String(fields.id || '').trim();
+  const id = (fields.id ?? '').toString().trim();
   const message = String(fields.message || '').trim();
   const fee = num(fields.fee);
   if (!id) return ask('Choose a guardian to attack. Nothing was signed.');
