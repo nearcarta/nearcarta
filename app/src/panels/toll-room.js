@@ -128,7 +128,7 @@ export function tollCapCheck({
   // that much room (four shops is exactly full at five pairs), so this check refuses honestly
   // rather than pretending a pass is possible.
   if (effectsKnown === false) {
-    return 'This row has no Base effect budget, so the toll cannot open a crossing. It needs about 351 bytes of row storage that no shop-bearing row has left. Nothing was signed.';
+    return 'This row has no Base effect budget and no room to write one, so the toll cannot open a crossing. Nothing was signed.';
   }
   return null;
 }
@@ -169,12 +169,30 @@ export function missingShopLine(shop, row) {
   return `${head} Your row has ${room} bytes free, so you can add it in /setup. ${tail}`;
 }
 
-export function effectBudgetFits(row, need = EFFECT_BUDGET_BYTES, maxRowBytes = ROW_ALLOWANCE_BYTES) {
+/**
+ * Whether the row can hold a FIRST effect budget. `true` means it already has one.
+ *
+ * Room alone is the wrong question, and asking only that refused a crossing the chain would
+ * have allowed. Measured on mainnet 2026-11-08: the row carried base/usdc/0x…01 (value cap
+ * 10000) written by `set_effects`, which cost 351 bytes and left 42 free. Reading only the
+ * remaining room said "no budget" and the gold CTA refused with "This row has no Base effect
+ * budget" while the budget was right there on chain — the visitor could not pass the toll at
+ * all. `hasEffect` is the contract's own answer, read before this check.
+ */
+export function effectBudgetFits(row, need = EFFECT_BUDGET_BYTES, maxRowBytes = ROW_ALLOWANCE_BYTES, hasEffect = null) {
+  // The chain's own answer beats arithmetic. A budget that is already written costs its 351
+  // bytes, so the row has little room left and room alone would say "no budget" while the
+  // budget is on chain. That is what refused a real crossing on mainnet 2026-11-08.
+  if (hasEffect === true) return true;
   const locked = row?.storage_locked;
   if (locked == null || locked === '') return null;
   const lockedBytes = Number(locked) / 1e19; // storage costs 1e19 yocto per byte on mainnet
   if (!Number.isFinite(lockedBytes)) return null;
-  return Math.max(0, maxRowBytes - Math.floor(lockedBytes)) >= need;
+  const room = Math.max(0, maxRowBytes - Math.floor(lockedBytes));
+  if (room >= need) return true;
+  // Not enough room for a FIRST budget. That is not proof there is none: the record may
+  // already be there. Only a chain answer of "no cap" may refuse, so this is unknown.
+  return null;
 }
 
 export function capLine(row, quote) {

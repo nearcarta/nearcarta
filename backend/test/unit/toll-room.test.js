@@ -471,6 +471,10 @@ test('a row that cannot hold a Base effect budget is refused before the wallet o
   // refused ERR_EFFECT after the visitor has already approved. Measured on mainnet 2026-11-07:
   // the first effect budget costs 351 bytes, and a four-shop row is exactly full at five pairs.
   // The page must therefore refuse in words, not send and let the chain answer.
+  //
+  // `effectsKnown: false` is only passed when the chain says there is no cap. Measured
+  // 2026-11-08: the row carried a real budget at 42 bytes of room, so short room is NOT
+  // evidence of a missing budget and must not become this refusal (see effectBudgetFits).
   const fit = {
     receivers: ['toll.nearcarta.near'],
     capYocto: '20000000000000000000000',
@@ -483,7 +487,7 @@ test('a row that cannot hold a Base effect budget is refused before the wallet o
   assert.equal(tollCapCheck(fit), null, 'a healthy row passes every other check');
   const why = tollCapCheck({ ...fit, effectsKnown: false });
   assert.match(why, /no Base effect budget/);
-  assert.match(why, /351 bytes/);
+  assert.match(why, /no room to write one/);
   assert.match(why, /Nothing was signed/);
   // "Unknown" is not "no": a failed read must never become a refusal.
   assert.equal(tollCapCheck({ ...fit, effectsKnown: null }), null);
@@ -493,9 +497,14 @@ test('effectBudgetFits reads the row storage the chain reports', () => {
   // storage_locked is yocto; 1e19 per byte on mainnet, and the row allowance is 2000.
   const at = bytes => ({ storage_locked: String(Math.round(bytes) * 1e19) });
   assert.equal(effectBudgetFits(at(1594)), true, '406 free holds a 351-byte budget');
-  assert.equal(effectBudgetFits(at(1660)), false, '340 free does not');
   assert.equal(effectBudgetFits(at(1649)), true, 'exactly 351 free is enough');
-  assert.equal(effectBudgetFits(at(1650)), false, '350 free is not');
+  // Not enough room for a FIRST budget is UNKNOWN, not false. Measured on mainnet 2026-11-08:
+  // a row at 1958 bytes (42 free) carried a live base/usdc cap written by set_effects, and
+  // answering `false` here refused a crossing the chain would have allowed.
+  assert.equal(effectBudgetFits(at(1660)), null, '340 free is unknown, not a refusal');
+  assert.equal(effectBudgetFits(at(1650)), null, '350 free is unknown, not a refusal');
+  // The chain's own answer wins, whatever the room says.
+  assert.equal(effectBudgetFits(at(1958), 351, 2000, true), true, 'a live cap passes at 42 free');
   // A row that does not report storage must not be judged.
   assert.equal(effectBudgetFits({}), null);
   assert.equal(effectBudgetFits(null), null);
