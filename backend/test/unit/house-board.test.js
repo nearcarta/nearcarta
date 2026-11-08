@@ -294,3 +294,27 @@ test('the House room hands its plan to a sender instead of stopping at a hint', 
   assert.doesNotMatch(fn, /houseAccount\(\)/, 'houseCall must not call a later const arrow');
   assert.match(fn, /S\.mainnet\?\.house\?\.contract/);
 });
+
+test('the attack demo stops every attack and prints real reasons, not placeholders', () => {
+  // Track 06 asks for "an attack demo: a script where a prompt-injected agent tries to pay a
+  // known-bad address and gets stopped. Show the log." The first version of this script printed
+  // `suspicious=undefined` and `[object Object]` because it read `parsed.by` (which lives on the
+  // result) and joined reason objects raw. A demo whose own log looks broken is worse than none.
+  const src = readFileSync(new URL('../../../backend/scripts/attack-demo.js', import.meta.url), 'utf8');
+  // Every layer is exercised, and named in the log.
+  for (const layer of ['model', 'check', 'charter']) assert.match(src, new RegExp(`\\b${layer}\\b`), `${layer} is reported`);
+  // The three attacks the track names.
+  assert.match(src, /invoice-swap/); assert.match(src, /over-cap/); assert.match(src, /denied-payee/);
+  // It never signs and never sends, so a judge can run it with no key.
+  assert.doesNotMatch(src, /signTx|send_tx|signAndSend/, 'the demo does not sign or send');
+  // Reason objects are rendered by their text, not by object coercion.
+  assert.match(src, /x\.text \|\| x\.code/, 'reasons are rendered as text');
+  // The mapped array is what gets joined: `reasons.slice(0,3).join('; ')` where `reasons` is
+  // already `.map(x => x.text || x.code)`. The presence of that map is the real check.
+  assert.ok(src.includes('const reasons = (cp.reasons || []).map'), 'reasons are mapped to text');
+  // `by` comes off the result, not off `parsed`.
+  assert.match(src, /via \$\{p\.by\}/);
+  // `parsed.by` must not be READ; the comment explaining why may name it.
+  const codeOnly = src.replace(/\/\/[^\n]*/g, '');
+  assert.doesNotMatch(codeOnly, /parsed\.by/, 'parsed has no `by` field');
+});
