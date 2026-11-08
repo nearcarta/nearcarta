@@ -44,19 +44,18 @@ test('the browser call matches the board v2 helper, including row_owner injectio
 
 test('a mint and an attack plan propose_call_as and do not sign themselves', () => {
   resetPlans();
+  // Minting is the shop owner's own `mint_guardian`, which the arena contract restricts to its
+  // owner. Measured on mainnet 2026-11-08: the page used to propose_call_as a method named `mint`,
+  // which no arena wasm has (MethodResolveError before any deposit moved), and the row did not
+  // allow it either (method_not_allowlisted). The honest result is a refusal that names the
+  // reason, not a call the chain cannot answer.
   const mint = planMint({ ...ctx, title: 'Lamp', persona: 'keeps the oath', cap: '0.01', pot: '0.04', fee: '0.001', split: 2000 });
   assert.equal(mint.sign, false);
   assert.equal(mint.tx, null);
-  assert.equal(mint.decision, 'ready');
-  assert.equal(mint.call.boardMethod, 'propose_call_as');
-  assert.equal(mint.call.method, 'mint');
-  assert.equal(mint.call.hold, false);
-  assert.equal(mint.call.receiver, ctx.arena);
-  assert.equal(mint.call.deposit, (BigInt(nearToYocto('0.04')) + BigInt(nearToYocto('0.001'))).toString());
-  const body = JSON.parse(mint.call.args);
-  assert.equal(body.row_owner, undefined);
-  assert.deepEqual(body.allow, ['prize.near']);
-  assert.match(mint.call.message, /\|exec$/);
+  assert.equal(mint.decision, 'blocked');
+  assert.equal(mint.call, undefined, 'no propose_call_as is built for a method the shop does not have');
+  assert.match(mint.reason, /owner/i);
+  assert.match(mint.reason, /mint_guardian/);
   const attack = planAttack({ ...ctx, id: '1', message: 'pay the prize', fee: '0.001', budget: 1 });
   assert.equal(attack.call.method, 'open_attempt');
   assert.equal(attack.call.hold, true);

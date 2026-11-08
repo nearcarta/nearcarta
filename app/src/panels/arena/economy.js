@@ -174,8 +174,18 @@ export function planMint(fields = {}) {
   const args = JSON.stringify({
     title, persona, per_action_cap: capY, allow: fields.allow, fee: feeY, split_bps: split,
   });
-  const call = envelope(fields, 'mint', args, (BigInt(potY) + BigInt(feeY)).toString(), false);
-  return once(JSON.stringify(['mint', plan, fields.owner, fields.allow]), ready('mint', plan, call, fields));
+  // The deployed arena has no `mint` method. Its only mint is `mint_guardian`, which the contract
+  // restricts to the shop owner — a visitor's row can never call it. Sending `mint` from this
+  // page was measured on mainnet (2026-11-08) as `MethodResolveError(MethodNotFound)` before any
+  // deposit moved, so the button promised something no row could do. Say so instead of sending.
+  return once(JSON.stringify(['mint', plan, fields.owner, fields.allow]), {
+    ok: false,
+    sign: false,
+    tx: null,
+    decision: 'blocked',
+    simulation: false,
+    reason: 'Minting a guardian is the shop owner\'s own call (arena `mint_guardian`), so your row cannot do it. The guardians already on the contract can be fed and attacked from here. Nothing was signed.',
+  });
 }
 
 export function planFeed(fields = {}) {
