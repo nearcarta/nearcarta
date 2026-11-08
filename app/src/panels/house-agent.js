@@ -94,11 +94,16 @@ function planCheckIn(ctx) {
   if (hasLine === false) {
     return refuse('This deed has no inheritance line yet, so a check-in would fail on chain. Set the heirs and guardians first, with your own wallet. Nothing was signed.', { tab: 'deed' });
   }
-  if (ctx.nonce == null || ctx.epoch == null) {
+  // Only the nonce has to be known in advance. The board fills the epoch itself inside
+  // `call_as_message`, and `get_charter` does not return one at all, so requiring an epoch
+  // here made every check-in stop at "planned" with nothing signed. Measured on mainnet
+  // 2026-11-08: pressing I'm alive in the deployed city produced no transaction and no
+  // message, because `state.row.epoch` was undefined and this returned early.
+  if (ctx.nonce == null) {
     return {
       ok: true, action: 'checkin', tab: 'deed', seal: false, signed: false, live: false, label: 'planned',
       deposit, method: 'house_session_check_in',
-      hint: 'The check-in is house_session_check_in. Read the row nonce and epoch, then sign propose_call_as. Nothing was signed.',
+      hint: 'The check-in is house_session_check_in. Read the row nonce, then sign propose_call_as. Nothing was signed.',
     };
   }
   let call;
