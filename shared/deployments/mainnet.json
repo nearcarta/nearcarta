@@ -96,16 +96,18 @@
       }
     },
     "upgrade_staged": {
-      "note": "Staged 2026-11-07 21:58 UTC with `stage_upgrade` (1 yocto, refunded). Carries BOTH fixes in one landing: the hydrate fix so `anchor` stops panicking ERR_NO_CHARTER, and the charge_acts fix so an effect budget is paid from the SIDE RESERVE instead of the row's own bytes. The previously staged hash 6299317b\u2026 was an older build with only the hydrate fix; waiting for it (4h) then staging this one would have cost 28h, so it was replaced at 24h. Re-staged once more at 22:03 UTC after the deposit requirement was found to be wrong for a reserve-paid write: the first build would have failed the setup batch with ERR_DEPOSIT. Staged a third time at 23:36 after the set/clear/set cycle was found to shrink `storage_locked` below what the row really used. Proven in contracts/charter_board_sandbox/tests/effects_on_a_full_row.rs: the live wasm fails it ERR_ROW_TOO_BIG, this build passes.",
-      "code_hash": "debcbfe23973cff5189c8d1013970eaf3b6d2ebe6e2663f85d4b1c9384829696",
-      "artifact": "contracts/artifacts/charter_board.effects.wasm",
-      "wasm_bytes": 128624,
-      "tx": "CCTpHQ1YWng14j7gNvTr4QAfhus8NmmWxMJvK2UMcogW",
-      "staged_eta_ns": "1794180993216619462",
-      "eta_utc": "2026-11-08 23:36",
-      "eta_cairo": "2026-11-09 01:36",
-      "superseded_stage_tx": "3FFYNYiyhGnW5PRxLKC52Rtq85jKePdm4LrpX7Y4t3qZ",
-      "superseded_code_hash": "8d8b81d6514535392cc79527199eba9ea53ed45bd314e1b08baf84c2ab8c3706"
+      "note": "Staged 2026-11-08 10:26 UTC with `stage_upgrade` (1 yocto, refunded). This is the build that must land: it carries FOUR fixes. (1) The hydrate fix, so `anchor` stops panicking ERR_NO_CHARTER. (2) The charge_acts fix, so an effect budget is paid from the side reserve instead of the row's own bytes. (3) The hold fix: `propose_call_as` charged the per-action hold record entirely against the reserve, and the call carries no deposit, so a row whose reserve was spent by /setup's own effect budget panicked ERR_DEPOSIT \u2014 pressing Post job sent 3sAWZghNXW9nph7vTKjGjBjWsdEHpsqfg88npgzQUrYt and the board refused it, and the same write blocks every held payment and the toll crossing. The hold is now paid from the reserve first, then from the row's own room. (4) The close fix: `release` refunded the side reserve but never subtracted it from `owed`, so after ANY row carrying a call list was closed the liability ledger stayed above zero forever and `reap` refused ERR_LIABILITY. Measured in contracts/charter_board_sandbox/tests/two_visitors.rs: owed read 0.00734 NEAR and never moved. Proved in tests/hold_on_a_hall_row.rs and tests/two_visitors.rs. Supersedes the 23:36 stage (CCTpHQ1Y\u2026), which had only fixes 1 and 2 and would have left hold and reap broken. Re-staging reset the 24 h ETA.",
+      "code_hash": "1372accadf34b38d1b6272e332b9cc24d7715de74cc7e5cda404e8c0e5d86376",
+      "artifact": "contracts/artifacts/charter_board.hold.wasm",
+      "wasm_bytes": 148675,
+      "tx": "744WdM3CT3AFFXMf9UZGCeqRpzgFNfASrhagz1uLGXh",
+      "staged_eta_ns": "1794219979742325692",
+      "eta_utc": "2026-11-09 10:26",
+      "eta_cairo": "2026-11-09 12:26",
+      "superseded_stage_tx": "CCTpHQ1YWng14j7gNvTr4QAfhus8NmmWxMJvK2UMcogW",
+      "superseded_code_hash": "debcbfe23973cff5189c8d1013970eaf3b6d2ebe6e2663f85d4b1c9384829696",
+      "row_cap_near": "0.03",
+      "side_reserve_bytes": 1400
     },
     "redeploy": {
       "when_cairo": "2026-11-05 20:03 Africa/Cairo",
@@ -136,14 +138,6 @@
       "code_hash": "Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C",
       "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
       "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4"
-    },
-    "pending_upgrade": {
-      "note": "Two builds are staged in sequence. `upgrade_staged` (CCTpHQ1Y\u2026) lands 2026-11-08 23:36 UTC with the hydrate fix and the charge_acts fix. This one adds the hold fix: `propose_call_as` charged the per-action hold record entirely against the prepaid side reserve, and the call carries no deposit, so a row whose reserve was already spent by a legitimate earlier write panicked ERR_DEPOSIT. Measured in the deployed city 2026-11-08: pressing Post job sent 3sAWZghNXW9nph7vTKjGjBjWsdEHpsqfg88npgzQUrYt and the board refused it. The hold is now paid from the reserve first and then from the row's own room, which open_charter already took a deposit for. Proven in contracts/charter_board_sandbox/tests/hold_on_a_hall_row.rs.",
-      "artifact": "contracts/artifacts/charter_board.hold.wasm",
-      "wasm_bytes": 148601,
-      "code_hash": "9cf5316b575abde3e7b5fd19730d6bd4fc2ea101a45fe712c3494c8ce0c9dfc7",
-      "row_cap_near": "0.03",
-      "side_reserve_bytes": 1400
     }
   },
   "mpc": "v1.signer",

@@ -1,7 +1,7 @@
 // How the row's own size reduces the room for its call list, against the committed wasm.
 //
 // `MAX_PAIR_BYTES` was measured with a one-receiver row. A visitor whose rules name six
-// receivers has a bigger row, so fewer pairs fit in the same 0.02 NEAR. This test uses the
+// receivers has a bigger row, so fewer pairs fit in the same 0.03 NEAR. This test uses the
 // exact list from the failed mainnet attempt 7H3H2HFiqPiGTPkF8gkkFLvbMecARWQdyG9DCdBPNnh9
 // (open_charter succeeded, set_calls panicked ERR_ROW_TOO_BIG) and measures both shapes.
 //
@@ -13,8 +13,9 @@ use serde_json::{json, Value};
 
 const WASM: &str = "../charter_board/target/near/charter_board.wasm";
 const NEAR: u128 = 1_000_000_000_000_000_000_000_000;
-const MAX_ROW: u128 = 20_000_000_000_000_000_000_000;
-const CALLS_DEPOSIT: u128 = 15 * NEAR / 1000;
+const MAX_ROW: u128 = 30_000_000_000_000_000_000_000;
+// 1400-byte side reserve plus the call list, at 0.001 NEAR per 100 bytes.
+const CALLS_DEPOSIT: u128 = 5 * NEAR / 100;
 const TGAS: u64 = 1_000_000_000_000;
 
 fn hex32(b: &[u8]) -> String {
@@ -195,7 +196,7 @@ async fn the_default_shop_list_fits_a_row() -> anyhow::Result<()> {
         println!("{label}: receivers={} pairs={} {} locked_bytes={locked} budget={}",
             receivers.len(), list.len(), why(&out), 2000usize.saturating_sub(1380 + 22 * receivers.len()));
         assert!(out.is_success(), "{label} set_calls: {:?}", out.failures());
-        assert!(locked <= 2000, "{label} locked {locked} bytes, over the 2000 a 0.02 NEAR row holds");
+        assert!(locked <= 3000, "{label} locked {locked} bytes, over the 3000 a 0.03 NEAR row holds");
         assert!(pair_bytes <= 2000 - 1380 - 22 * receivers.len(), "{label} pair bytes {pair_bytes} exceed the page's budget");
     }
     Ok(())

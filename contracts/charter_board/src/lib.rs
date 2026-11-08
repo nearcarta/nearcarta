@@ -420,6 +420,13 @@ impl Board {
             kv_del(b"h", &format!("{}/{}", who.as_str(), id));
         }
         let credit = self.credit.remove(&who).unwrap_or(0);
+        // The reserve is a liability: `set_calls` charged it to the row and recorded it in
+        // `owed`. Refunding it below without subtracting it here left `owed` permanently above
+        // zero after any row that carried a call list was closed, which makes `reap` refuse with
+        // ERR_LIABILITY and blocks the whole teardown. Measured 2026-11-08 in
+        // contracts/charter_board_sandbox/tests/two_visitors.rs: two rows closed, `owed` read
+        // 0.00734 NEAR and never moved again.
+        self.owe(-(credit as i128));
         self.confirm.remove(&who);
         self.epoch.remove(&who);
         self.count -= 1;

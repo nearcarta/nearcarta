@@ -11,8 +11,9 @@ use serde_json::{json, Value};
 
 const WASM: &str = "../charter_board/target/near/charter_board.wasm";
 const NEAR: u128 = 1_000_000_000_000_000_000_000_000;
-const MAX_ROW: u128 = 20_000_000_000_000_000_000_000;
-const CALLS_DEPOSIT: u128 = 15 * NEAR / 1000;
+const MAX_ROW: u128 = 30_000_000_000_000_000_000_000;
+// 1400-byte side reserve plus the call list, at 0.001 NEAR per 100 bytes.
+const CALLS_DEPOSIT: u128 = 5 * NEAR / 100;
 const RULES_DEPOSIT: u128 = NEAR / 1000;
 const TGAS: u64 = 1_000_000_000_000;
 const MAX_PAIR_BYTES: usize = 602;
