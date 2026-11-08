@@ -1023,6 +1023,28 @@ export async function arenaCall(plan) {
     return stop(String(e?.message || 'Nothing was signed.').slice(0, 160));
   }
 }
+/**
+ * Ask the board whether a call would be allowed, without sending anything.
+ *
+ * POST /api/board/simulate reads `charter_board.simulate`, which mirrors every rule
+ * `propose_call_as` enforces and answers in the same words. It exists so an agent — or a shop
+ * about to build a transaction — can plan before it spends. A board build without the view
+ * answers `ok: null`, and that is the value callers must treat as "cannot tell", never as
+ * permission. Returns null when nothing could be asked at all.
+ */
+export async function simulateCall({ receiver, method, deposit = '0', effects = [] } = {}) {
+  if (!S.me || !receiver || !method) return null;
+  try {
+    const r = await fetch(API + '/api/board/simulate', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ owner: S.me, receiver, method, deposit: String(deposit), effects }),
+    });
+    if (!r.ok) return null;
+    const body = await r.json();
+    return body && typeof body === 'object' ? body : null;
+  } catch { return null; }
+}
+
 export async function sessionAllowance() {
   const key = agent();
   if (!key || !S.me) return { yocto: null, near: null, low: true };

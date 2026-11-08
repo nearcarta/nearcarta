@@ -342,6 +342,26 @@ async function settleFerry(wantCharter) {
       rc: '<span class="rc" data-testid="ferry-order-state">order · demo</span><a class="rc" href="/ferry-widget">Optional Pay</a>',
     };
   }
+  // Ask the board whether this crossing would be allowed BEFORE building anything. The board
+  // exposes `simulate` for exactly this, and the ferry is where a refusal used to cost gas: the
+  // wrap was sent, then refused `receiver_not_allowlisted` or `below_min_amount`, with the
+  // money already in flight. A free read answers in the same words the send would use.
+  // A board build without the view answers ok:null, which is "cannot tell", never "allowed".
+  let pre = null;
+  if (wantCharter) {
+    pre = await A.simulateCall({ receiver: A.S.mainnet?.planned?.toll || '', method: 'cross', deposit: '0' }).catch(() => null);
+    // Only a definite refusal stops the press; unknown carries on the old path.
+    if (pre && pre.ok === false && pre.answer?.reason) {
+      const why = pre.answer.reason;
+      sh?.showRefuse?.(`The board would refuse this crossing: ${String(why).replaceAll('_', ' ')}. Nothing was signed.`);
+      return {
+        kind: 'no', hero: APPS.ferry.hero(),
+        say: `The board would refuse this crossing: ${String(why).replaceAll('_', ' ')}. Nothing was signed.`,
+        rc: '<span class="rc" data-testid="ferry-order-state">order · refused before signing</span>',
+        seal: `The board would refuse this crossing: ${String(why).replaceAll('_', ' ')}. Nothing was signed.`,
+      };
+    }
+  }
   sh?.applyPair?.({ ...pair, outAmt, order: 'loading' });
   hideFerryPrimary();
   const clause = A.ferryClauseForPair(pair.from, pair.to);
