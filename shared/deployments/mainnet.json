@@ -97,7 +97,8 @@
         "house_checkin_from_city_gold_cta_2026_11_08": "3cNQyHrgi5Dp55Td7KXZU742b2cHfuva4RPDbLVzP3rs",
         "arena_feed_on_a_clean_four_shop_row": "6DAG7vn8W3ZFrgy9VBkcLQSbQRggy7RDvsv2BL1TxnWN",
         "row_reopened_with_seven_pairs": "7Sw5ADpuzxPf8mQyLwJnJXcX5x9TDNcjuNqqbBTWcw2b",
-        "arena_feed_after_the_copy_fix": "EAchLuogBCqmY5JZbjoDG7hUzyyFmZtZzG2VogW9cwfL"
+        "arena_feed_after_the_copy_fix": "EAchLuogBCqmY5JZbjoDG7hUzyyFmZtZzG2VogW9cwfL",
+        "arena_feed_from_ai_agent": "F2VQxKK5AQJgQbZxurSkw6Rr3XJRXCHT9rNYAUPgsYoY"
       }
     },
     "upgrade_staged": {
@@ -449,8 +450,8 @@
       "wasm": "contracts/artifacts/attested_check.wasm",
       "wasm_sha256": "98c6766a0ffff63a11163f7481bc2984105d031c6e1c44f2f644afc088ae7986",
       "wasm_bytes": 167311,
-      "planned_account": "attested.nearcarta.near",
-      "NOT_DEPLOYED": "Not deployed on 2026-11-08: the stake for a 167 KB contract is ~1.673 NEAR and free NEAR across the whole city is 2.43 NEAR, so deploying it would commit 69% of every liquid yocto while the board upgrade is still pending. The stake is recoverable (the contract's close() deletes the account and returns every yocto), so this is a reversible step that waits for the upgrade rather than being abandoned. Deploy with: node .secrets/deploy-attested.mjs --send"
+      "NOT_DEPLOYED": "Not deployed on 2026-11-08: the stake for a 167 KB contract is ~1.673 NEAR and free NEAR across the whole city is 2.43 NEAR, so deploying it would commit 69% of every liquid yocto while the board upgrade is still pending. The stake is recoverable (the contract's close() deletes the account and returns every yocto), so this is a reversible step that waits for the upgrade rather than being abandoned. Deploy with: node .secrets/deploy-attested.mjs --send",
+      "deploy_command": "node .secrets/deploy-attested.mjs --send   # creates attested.nearcarta.near when run"
     },
     "note": "The Guardhouse can ask OutLayer to run this checker in a TDX enclave and resume the transaction with the result. It is NOT wired into the tray yet and NO attested decision has been produced on mainnet. The README says so in those words: the payee check the visitor sees is the server's, and it has no TEE signature."
   }
