@@ -169,7 +169,12 @@ export async function mountHall(root, hooks = {}) {
 
   async function run(text) {
     seal = '';
-    const result = await runHallCommand(text, {
+    // A refusal that THROWS (a shop not on the row, a key that cannot sign) used to escape as an
+    // unhandled rejection: the visitor saw nothing and the tray kept its idle line. Measured in
+    // the deployed city 2026-11-08 — the correct, detailed message never reached the screen.
+    let result;
+    try {
+      result = await runHallCommand(text, {
       row: async () => before,
       form: () => form,
       shop: shopId,
@@ -201,7 +206,14 @@ export async function mountHall(root, hooks = {}) {
         });
         return sign(calls);
       },
-    });
+      });
+    } catch (e) {
+      const why = String(e?.message || e).slice(0, 240) || 'That did not run. Nothing was signed.';
+      lines = [why];
+      seal = why;
+      paint();
+      return { ok: false, hint: why, seal: true, tx: null };
+    }
     if (result?.job) posted = result.job;
     if (result?.seal) seal = result.hint || 'Refused';
     else seal = '';

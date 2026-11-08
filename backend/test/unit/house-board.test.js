@@ -492,3 +492,16 @@ test('a shop that is not on the row says what to do, not just that it is missing
   // And it is imported from a module the city serves raw.
   assert.match(apps, /from '\/panels\/toll-room\.js'/);
 });
+
+test('a refusal the Hall throws reaches the screen instead of vanishing', () => {
+  // Measured 2026-11-08 in the deployed city: pressing Post job threw the (correct, detailed)
+  // "this shop is not on your row" error, and the tray kept its idle line. An escaping
+  // rejection is the same as no message at all.
+  const ui = readFileSync(new URL('../../../app/src/panels/hall-ui.js', import.meta.url), 'utf8');
+  const call = ui.slice(ui.indexOf('await runHallCommand(text, {') - 400, ui.indexOf('await runHallCommand(text, {') + 40);
+  assert.match(call, /try \{/, 'the call is guarded');
+  const after = ui.slice(ui.indexOf('await runHallCommand(text, {'), ui.indexOf('await runHallCommand(text, {') + 2200);
+  assert.match(after, /\} catch \(e\) \{/, 'and has a catch');
+  assert.match(after, /lines = \[why\]/, 'the reason is shown in the tray');
+  assert.match(after, /Nothing was signed/, 'and it says nothing was signed when the reason is empty');
+});
