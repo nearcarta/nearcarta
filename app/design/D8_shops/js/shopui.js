@@ -1127,10 +1127,17 @@ const APPS = {
         onRefuse: () => sh?.showSeal?.(),
         hideRefuse: () => sh?.hideSeal?.(),
       });
+      // A cap hint, not a result. This ran AFTER a press as well, because the read is async,
+      // and it overwrote whatever the house had just reported: measured 2026-11-08 in the city,
+      // pressing "I'm alive" ended with "Max 0.02 NEAR. Nothing was signed." even when the
+      // check-in had a tx. Write it only while the line is still empty, and never after a press.
       A.readRules().then(() => {
         const c = A.S.clauses?.pay;
         const say = document.getElementById('t-say');
-        if (say && c?.per_action_cap) say.textContent = `Max ${fmt(c.per_action_cap)}. Nothing was signed.`;
+        if (!say || say.dataset.pressed === '1') return;
+        if (c?.per_action_cap && !String(say.textContent || '').trim()) {
+          say.textContent = `Max ${fmt(c.per_action_cap)}. Your row sets the amount cap.`;
+        }
       }).catch(() => {});
     },
     btn: 'See my rules & record',
@@ -1435,6 +1442,10 @@ function paint() {
 }
 async function primary(auto = false) {
   if (phase === 'busy' || !cur) return; const st = A.stage(); if (!auto) sfx('click');
+  // Mark the status line as owned by a press, so an async READ that finishes later cannot
+  // overwrite the result with an idle hint. Measured 2026-11-08: the house cap read landed
+  // after the press and replaced the check-in result with "Max 0.02 NEAR. Nothing was signed."
+  { const el = $('#t-say'); if (el) el.dataset.pressed = '1'; }
   // A private bank audit signs nothing, so it never needs a wallet, a charter or a session key.
   // No state of /setup (missing account, missing row, a failed chain read) may route this shop there.
   if (cur === 'bank') {
