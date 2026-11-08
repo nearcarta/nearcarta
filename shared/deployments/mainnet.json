@@ -144,7 +144,7 @@
       "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
       "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4"
     },
-    "anchor_code_hash": "978347572fa446a1da7b1ccdb0693a19c4b8741233d884eee7b768a5db173317",
+    "anchor_code_hash": "BCSfd3Wd9w7KMaNC3rHwQ7Js3QnY6Cmcjg9JqKtyvQpE",
     "anchor_note": "`anchor` panics ERR_NO_CHARTER on the live build (code_hash BF1rQSrG\u2026): measured 2026-11-08, tx GaVEzhfvwG1bP8P6LMrmhuvJe5CzUdvBo2RX4dVnKoTH from a visitor row with four receivers. The hydrate fix is in the staged build, so the invoice anchor is offered only once that code hash is on chain."
   },
   "mpc": "v1.signer",
