@@ -379,6 +379,55 @@ impl Board {
         self.charge_acts(&me, before);
     }
 
+    /// Would this call be allowed right now? A free read that answers in the same words the
+    /// send would use, without moving anything.
+    ///
+    /// Why this exists: an agent that can only find out by sending learns refusal reasons by
+    /// burning gas, and every refusal in the live city was being discovered that way. The
+    /// strongest rival in our tracks (soldanoandrea/allowance) ships exactly this as `simulate`
+    /// and it is the one idea of theirs worth taking: the agent plans before it signs.
+    ///
+    /// It returns the FIRST rule that would refuse, plus the numbers that rule compared, so a
+    /// caller can say "0.03 is over your 0.02 cap" rather than just "denied". It never checks
+    /// the signature (that needs the message bytes) and never mutates state.
+    pub fn simulate(&self, owner: AccountId, receiver: AccountId, method: String, deposit: U128, effects: Vec<EffectIn>) -> String {
+        let deposit = deposit.0;
+        let Some(row) = self.rows.get(&owner) else { return sim("no_charter", "", 0, 0); };
+        let now = env::block_timestamp();
+        if row.frozen { return sim("frozen", "", deposit, 0); }
+        if row.rules.expires_at != 0 && now > row.rules.expires_at { return sim("clause_expired", "", deposit, 0); }
+        if !in_window(row.rules.window_start_min, row.rules.window_end_min) { return sim("outside_time_window", "", deposit, 0); }
+        if deposit > 0 && deposit < row.rules.min_amount { return sim("below_min_amount", "", deposit, row.rules.min_amount); }
+        if !row.rules.receivers.contains(&receiver) { return sim("receiver_not_allowlisted", "", deposit, 0); }
+        if !(1..=64).contains(&method.len()) { return sim("ERR_METHOD", "", deposit, 0); }
+        let Some(policy) = self.calls.get(&owner) else { return sim("method_not_allowlisted", "", deposit, 0); };
+        let Some(rule) = policy.rules.iter().find(|r| r.receiver == receiver && r.method == method) else {
+            return sim("method_not_allowlisted", "", deposit, 0);
+        };
+        if deposit > rule.cap { return sim("over_shop_cap", "", deposit, rule.cap); }
+        if policy.session_spent.saturating_add(deposit) > policy.session_cap { return sim("over_session_cap", "", deposit, policy.session_cap); }
+        if deposit > row.rules.per_action_cap { return sim("over_per_action_cap", "", deposit, row.rules.per_action_cap); }
+        let spent = if row.day == today() { row.spent } else { 0 };
+        if spent.saturating_add(deposit) > row.rules.daily_budget { return sim("over_daily_budget", "", deposit, row.rules.daily_budget); }
+        let count = if row.day == today() { row.count } else { 0 };
+        if count >= row.rules.max_actions_per_day { return sim("over_daily_action_count", "", deposit, row.rules.max_actions_per_day as u128); }
+        if row.balance < deposit { return sim("ERR_BALANCE", "", deposit, row.balance); }
+        if self.holds.keys().filter(|(o, _)| o == &owner).count() >= MAX_OPEN_HOLDS { return sim("ERR_HOLDS", "", deposit, 0); }
+        // Effects are checked against the stored caps exactly as reserve_effects would.
+        if !effects.is_empty() {
+            let Some(caps) = self.effects.get(&owner) else { return sim("ERR_EFFECT", "", deposit, 0); };
+            for e in &effects {
+                if e.value == 0 && e.fee == 0 { return sim("ERR_EFFECT", "", deposit, 0); }
+                let Some(cap) = caps.iter().find(|c| c.chain == e.chain && c.asset == e.asset && c.receiver == e.to) else {
+                    return sim("ERR_EFFECT", "", deposit, 0);
+                };
+                if cap.value_spent.saturating_add(e.value) > cap.value_cap { return sim("ERR_EFFECT", &e.asset, e.value, cap.value_cap); }
+                if cap.fee_spent.saturating_add(e.fee) > cap.fee_cap { return sim("ERR_EFFECT", &e.asset, e.fee, cap.fee_cap); }
+            }
+        }
+        sim("allowed", "", deposit, 0)
+    }
+
     /// Smaller budgets only. A counter that has already been spent cannot be erased.
     pub fn tighten_effects(&mut self, effects: Vec<EffectIn>) {
         let me = env::predecessor_account_id();
@@ -868,6 +917,23 @@ fn confirm_text(owner: &AccountId, action_id: u64, digest: &[u8; 32]) -> String 
     s
 }
 
+/// The shape `simulate` returns: the decision, the rule that decided it, and the two numbers
+/// that rule compared. JSON so a browser or an agent can read it without parsing prose.
+fn sim(reason: &str, asset: &str, asked: u128, limit: u128) -> String {
+    let mut o = String::from("{\"ok\":");
+    o.push_str(if reason == "allowed" { "true" } else { "false" });
+    o.push_str(",\"reason\":\"");
+    o.push_str(reason);
+    o.push('"');
+    if !asset.is_empty() { o.push_str(",\"asset\":\""); o.push_str(asset); o.push('"'); }
+    o.push_str(",\"asked\":\"");
+    push_u128(&mut o, asked);
+    o.push_str("\",\"limit\":\"");
+    push_u128(&mut o, limit);
+    o.push_str("\"}");
+    o
+}
+
 fn effects_json(v: &Val) -> Vec<EffectIn> {
     v.arr().iter().map(|item| {
         let o = item.obj();
@@ -891,6 +957,15 @@ pub extern "C" fn propose_call_as() {
         v.need("hold").bool(), v.need("signature").string(),
     );
     save(&b);
+}
+#[no_mangle]
+pub extern "C" fn simulate() {
+    let v = parse(&input_str());
+    let b = load();
+    ret(&b.simulate(
+        v.need("owner").account(), v.need("receiver").account(), v.need("method").string(),
+        U128(v.need("deposit").u128()), effects_json(v.need("effects")),
+    ));
 }
 #[no_mangle]
 pub extern "C" fn call_as_message() {

@@ -178,9 +178,10 @@ export function wrapProgressNote({ amount = '', landed = [], failedReason = '', 
   const receiverRefused = /receiver_not_allowlisted/i.test(reasonText);
   // `ft_transfer` on a NEP-141 token attaches 1 yoctoNEAR by convention, and the live board
   // applied the row's `min_amount` (0.0001 NEAR) to every deposit, so the last step of a wrap
-  // was refused `below_min_amount` after the token had already been registered and wrapped.
-  // Measured 2026-11-08, tx 8vz7EkU55ifNaFPARLSFJ6H8eEKAZTBbfTz1WxQqAf4f. The fix that exempts
-  // zero-value calls is staged; until it lands the ferry cannot finish on a row with a minimum.
+  // was refused `below_min_amount` after the token had already been wrapped and the deposit
+  // address registered. Measured 2026-11-08, tx 8vz7EkU55ifNaFPARLSFJ6H8eEKAZTBbfTz1WxQqAf4f.
+  // The fix that exempts zero-value calls is staged; until it lands the ferry cannot finish on
+  // a row with a minimum.
   const belowMin = /below_min_amount/i.test(reasonText);
   const amt = String(amount || '').trim() || '0.05';
   if (wrap) {

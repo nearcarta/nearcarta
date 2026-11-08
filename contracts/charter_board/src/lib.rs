@@ -2701,6 +2701,41 @@ mod tests {
     }
 
     #[test]
+    fn simulate_answers_in_the_same_words_the_send_would_use() {
+        // A free read so an agent plans before it signs. Every branch here mirrors a `require!`
+        // in propose_call_as; if one drifts, a caller gets told a call is fine and then refused.
+        let (mut c, _sk, _) = boot();
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "cross".into(), NEAR / 100)], NEAR / 10);
+        let cap = c.get_charter(acc(ALICE)).unwrap().per_action_cap.0;
+        // Allowed: inside every rule.
+        let ok = c.simulate(acc(ALICE), acc(SHOP), "cross".into(), U128(NEAR / 2000), vec![]);
+        assert!(ok.contains("\"ok\":true"), "{ok}");
+        assert!(ok.contains("allowed"), "{ok}");
+        // A pair that is not on the list.
+        let pair = c.simulate(acc(ALICE), acc(SHOP), "ft_transfer".into(), U128(NEAR / 2000), vec![]);
+        assert!(pair.contains("method_not_allowlisted"), "{pair}");
+        // A receiver that is not on the list.
+        let who = c.simulate(acc(ALICE), acc(OTHER), "cross".into(), U128(NEAR / 2000), vec![]);
+        assert!(who.contains("receiver_not_allowlisted"), "{who}");
+        // Over the per-action cap, and the numbers are reported.
+        let over = c.simulate(acc(ALICE), acc(SHOP), "cross".into(), U128(cap + NEAR / 1000), vec![]);
+        assert!(over.contains("over_per_action_cap"), "{over}");
+        assert!(over.contains(&cap.to_string()), "the limit is named: {over}");
+        // No row at all.
+        let none = c.simulate(acc(BOB), acc(SHOP), "cross".into(), U128(1), vec![]);
+        assert!(none.contains("no_charter"), "{none}");
+        // The read changed nothing.
+        let before = c.get_charter(acc(ALICE)).unwrap();
+        let _ = c.simulate(acc(ALICE), acc(SHOP), "cross".into(), U128(NEAR / 2000), vec![]);
+        let after = c.get_charter(acc(ALICE)).unwrap();
+        assert_eq!(before.nonce.0, after.nonce.0);
+        assert_eq!(before.spent_today.0, after.spent_today.0);
+        assert_eq!(before.actions_today, after.actions_today);
+        assert_eq!(before.balance.0, after.balance.0);
+    }
+
+    #[test]
     fn a_shop_call_with_no_value_is_not_held_to_the_smallest_payment() {
         // `min_amount` is the smallest payment the visitor allows. A Town Hall `bid`, `accept`,
         // `deliver`, `review` or `refund` carries no value at all, so measuring it against the

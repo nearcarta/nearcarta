@@ -101,18 +101,20 @@
       }
     },
     "upgrade_staged": {
-      "note": "Staged 2026-11-08 10:27 UTC with `stage_upgrade` (1 yocto, refunded). This is the build that must land: it carries FIVE fixes. (1) The hydrate fix, so `anchor` stops panicking ERR_NO_CHARTER. (2) The charge_acts fix, so an effect budget is paid from the side reserve instead of the row's own bytes. (3) The hold fix: `propose_call_as` charged the per-action hold record entirely against the reserve, and the call carries no deposit, so a row whose reserve was spent by /setup's own effect budget panicked ERR_DEPOSIT \u2014 pressing Post job sent 3sAWZghNXW9nph7vTKjGjBjWsdEHpsqfg88npgzQUrYt and the board refused it, and the same write blocks every held payment and the toll crossing. The hold is now paid from the reserve first, then from the row's own room. (4) The close fix: `release` refunded the side reserve but never subtracted it from `owed`, so after ANY row carrying a call list was closed the liability ledger stayed above zero forever and `reap` refused ERR_LIABILITY. Measured in contracts/charter_board_sandbox/tests/two_visitors.rs: owed read 0.00734 NEAR and never moved. Proved in tests/hold_on_a_hall_row.rs and tests/two_visitors.rs. Supersedes the 23:36 stage (CCTpHQ1Y\u2026), which had only fixes 1 and 2 and would have left hold and reap broken. Re-staging reset the 24 h ETA. (5) The min_amount fix: `min_amount` was applied to every `propose_call_as` deposit, so the zero-value steps of the Town Hall lifecycle (bid, accept, deliver, review, refund) were refused below_min_amount. Measured on mainnet 2026-11-08 after post_job landed: `bid` with a zero deposit was refused, and zero is the only deposit a bid can carry. It now applies only when the call moves value. Proved in contracts/charter_board/src/lib.rs a_shop_call_with_no_value_is_not_held_to_the_smallest_payment.",
-      "code_hash": "978347572fa446a1da7b1ccdb0693a19c4b8741233d884eee7b768a5db173317",
+      "note": "Staged 2026-11-08 10:27 UTC with `stage_upgrade` (1 yocto, refunded). This is the build that must land: it carries FIVE fixes. (1) The hydrate fix, so `anchor` stops panicking ERR_NO_CHARTER. (2) The charge_acts fix, so an effect budget is paid from the side reserve instead of the row's own bytes. (3) The hold fix: `propose_call_as` charged the per-action hold record entirely against the reserve, and the call carries no deposit, so a row whose reserve was spent by /setup's own effect budget panicked ERR_DEPOSIT \u2014 pressing Post job sent 3sAWZghNXW9nph7vTKjGjBjWsdEHpsqfg88npgzQUrYt and the board refused it, and the same write blocks every held payment and the toll crossing. The hold is now paid from the reserve first, then from the row's own room. (4) The close fix: `release` refunded the side reserve but never subtracted it from `owed`, so after ANY row carrying a call list was closed the liability ledger stayed above zero forever and `reap` refused ERR_LIABILITY. Measured in contracts/charter_board_sandbox/tests/two_visitors.rs: owed read 0.00734 NEAR and never moved. Proved in tests/hold_on_a_hall_row.rs and tests/two_visitors.rs. Supersedes the 23:36 stage (CCTpHQ1Y\u2026), which had only fixes 1 and 2 and would have left hold and reap broken. Re-staging reset the 24 h ETA. (5) The min_amount fix: `min_amount` was applied to every `propose_call_as` deposit, so the zero-value steps of the Town Hall lifecycle (bid, accept, deliver, review, refund) were refused below_min_amount. Measured on mainnet 2026-11-08 after post_job landed: `bid` with a zero deposit was refused, and zero is the only deposit a bid can carry. It now applies only when the call moves value. Proved in contracts/charter_board/src/lib.rs a_shop_call_with_no_value_is_not_held_to_the_smallest_payment. SIXTH fix, staged 2026-11-08 16:29 UTC after the field analysis: a free `simulate` view, so an agent can ask 'would this be allowed?' and get the same words the send would use, instead of learning refusal reasons by burning gas. Taken from the strongest rival in our tracks (soldanoandrea/allowance, which ships it as `simulate`). Exposed at POST /api/board/simulate, and a board build without it answers ok:null rather than ok:true. Re-staging reset the 24 h ETA from 2026-11-09 10:27 to 16:29 UTC; no further re-stage unless a money-losing bug appears.",
+      "code_hash": "CM6WA2gZDN17TRXQzFsrstgKPzsmiVLuArK7V6UkXLAf",
       "artifact": "contracts/artifacts/charter_board.hold.wasm",
-      "wasm_bytes": 148697,
-      "tx": "3hpmvSiScQ4o3GTZDaVe21jVCNJ8xvJb1bCsSSH48zFp",
+      "wasm_bytes": 150988,
+      "tx": "Ct4uwW5He8eaxNW5kDb6gU98ydE3A1UE4rm8gRPzPTVN",
       "staged_eta_ns": "1794220050000000000",
-      "eta_utc": "2026-11-09 10:27",
-      "eta_cairo": "2026-11-09 12:27",
-      "superseded_stage_tx": "744WdM3CT3AFFXMf9UZGCeqRpzgFNfASrhagz1uLGXh",
-      "superseded_code_hash": "1372accadf34b38d1b6272e332b9cc24d7715de74cc7e5cda404e8c0e5d86376",
+      "eta_utc": "2026-11-09 16:29",
+      "eta_cairo": "2026-11-09 18:29",
+      "superseded_stage_tx": "3hpmvSiScQ4o3GTZDaVe21jVCNJ8xvJb1bCsSSH48zFp",
+      "superseded_code_hash": "978347572fa446a1da7b1ccdb0693a19c4b8741233d884eee7b768a5db173317",
       "row_cap_near": "0.03",
-      "side_reserve_bytes": 1400
+      "side_reserve_bytes": 1400,
+      "wasm_sha256": "a89664ef45f16d429104b1b1d87d5dc83a79820a69bd22782f50a6b7c022315c",
+      "has_simulate": true
     },
     "redeploy": {
       "when_cairo": "2026-11-05 20:03 Africa/Cairo",
@@ -144,7 +146,7 @@
       "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
       "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4"
     },
-    "anchor_code_hash": "BCSfd3Wd9w7KMaNC3rHwQ7Js3QnY6Cmcjg9JqKtyvQpE",
+    "anchor_code_hash": "CM6WA2gZDN17TRXQzFsrstgKPzsmiVLuArK7V6UkXLAf",
     "anchor_note": "`anchor` panics ERR_NO_CHARTER on the live build (code_hash BF1rQSrG\u2026): measured 2026-11-08, tx GaVEzhfvwG1bP8P6LMrmhuvJe5CzUdvBo2RX4dVnKoTH from a visitor row with four receivers. The hydrate fix is in the staged build, so the invoice anchor is offered only once that code hash is on chain."
   },
   "mpc": "v1.signer",
