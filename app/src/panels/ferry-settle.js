@@ -176,6 +176,12 @@ export function wrapProgressNote({ amount = '', landed = [], failedReason = '', 
   const low = /not_enough_allowance|NotEnoughAllowance/i.test(reasonText)
     || (/\ballowance\b/i.test(reasonText) && !/allowlist/i.test(reasonText));
   const receiverRefused = /receiver_not_allowlisted/i.test(reasonText);
+  // `ft_transfer` on a NEP-141 token attaches 1 yoctoNEAR by convention, and the live board
+  // applied the row's `min_amount` (0.0001 NEAR) to every deposit, so the last step of a wrap
+  // was refused `below_min_amount` after the token had already been registered and wrapped.
+  // Measured 2026-11-08, tx 8vz7EkU55ifNaFPARLSFJ6H8eEKAZTBbfTz1WxQqAf4f. The fix that exempts
+  // zero-value calls is staged; until it lands the ferry cannot finish on a row with a minimum.
+  const belowMin = /below_min_amount/i.test(reasonText);
   const amt = String(amount || '').trim() || '0.05';
   if (wrap) {
     const why = low
@@ -193,6 +199,15 @@ export function wrapProgressNote({ amount = '', landed = [], failedReason = '', 
       lowGas: true,
       wrapped: true,
       text: 'Session gas is low. Your wNEAR is safe in your row and will be used on the next try. Refresh the agent key, then Load cargo again.',
+      links,
+    };
+  }
+  if (belowMin && wrap) {
+    return {
+      lowGas: false,
+      wrapped: true,
+      belowMin: true,
+      text: `Wrapped ${amt} NEAR and registered the deposit address, but the token send was refused below_min_amount: your row has a smallest payment (0.0001 NEAR) and a token transfer attaches 1 yocto. Your wNEAR is safe in your row. The board build that exempts zero-value calls is staged; until it lands, lower the smallest payment in /setup to its floor or use a row without one.`,
       links,
     };
   }
