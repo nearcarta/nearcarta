@@ -127,9 +127,14 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
     const cinema = cinemaFor(result);
     state.tx = cinema?.tx || null;
     state.status = seal.show ? seal.text : (result?.simulation ? result.label : (cinema?.text || ''));
-    state.status2 = result?.duplicate
+    // A duplicate note says nothing was signed, so it cannot sit next to a real tx. Measured
+    // 2026-11-08: feeding a guardian twice showed "The coin landed." AND "Already planned.
+    // Nothing was signed." on the same row, while tx 6DAG7vn8… had landed. A line that
+    // contradicts the one beside it is worse than no line.
+    state.status2 = result?.duplicate && !cinema?.tx
       ? 'Already planned. Nothing was signed.'
-      : (result?.note && result.note !== state.status ? result.note : '');
+      : (result?.duplicate ? 'Sent once. It was not sent again.'
+        : (result?.note && result.note !== state.status ? result.note : ''));
     if (state.status2 === state.status) state.status2 = '';
     globalThis.__arenaCoin = cinema?.tx || '';
     if (hooks.say) hooks.say([state.status, state.status2].filter(Boolean).slice(0, 2).join(' '));

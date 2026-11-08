@@ -6,6 +6,11 @@ const RULES = {
   over_daily_budget: (a, c) => [`Budget`, `It asked for ${n(a.amount)}; the clause budget is ${n(c?.budget)} and earlier actions already used part of it.`],
   receiver_not_allowlisted: (a, c) => [`Payee allowlist`, `The receiver is not on the clause's list (${(c?.payees || []).join(', ') || 'empty'}).`],
   frozen: () => [`Freeze`, `The owner froze the charter; nothing moves until they unfreeze it.`],
+  // The row holds a list of (shop, method) pairs. A shop can be on the receiver list and still
+  // be refused because the exact method is not in the call list, which reads as a bare code.
+  // Measured 2026-11-08: Arena's Feed sent `fund` and the board refused method_not_allowlisted,
+  // because the row had been reshaped down to five pairs and Arena's pair was the one dropped.
+  method_not_allowlisted: (a, c) => [`Shop allowlist`, `This shop is on your row but the exact call is not: ${a.shop || 'the shop'} was not given the method being asked for. Re-open /setup and add the shop again, or drop another shop to make room for it.`],
   over_cap_waiting_owner: (a, c) => [`Escalation`, `${n(a.amount)} is over the ${n(c?.cap)} cap, so it is held until ${c?.escalate?.by || 'the owner'} answers.`],
   escalation_timed_out: (a, c) => [`Escalation timeout`, `Nobody approved it within ${c?.escalate?.timeout || 'the window'}, so the held action was refused.`],
   receipt_required: () => [`Receipt`, `This clause only pays against a signed receipt, and none was attached.`],

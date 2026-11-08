@@ -3,6 +3,7 @@
 // A week advance clones the guardians it was given.
 
 import { callAsMessage, confirmMessage } from './call-as.js';
+import { explain as whyExplain } from '../../../design/D8_shops/js/why.js';
 
 export const SIM_LABEL = 'Simulation. No transaction was signed.';
 export const LIVE_BLOCKED = 'Live play is blocked. Nothing was signed.';
@@ -328,9 +329,27 @@ export function sealFor(result) {
   if (result.decision === 'allowed' && result.tx) return { show: false, text: '' };
   if (result.decision === 'held') return { show: true, text: result.reason || 'Held.' };
   if (result.sign === false || result.decision === 'denied' || result.decision === 'blocked' || result.decision === 'sleep' || result.decision === 'ask' || result.decision === 'refused' || result.fromRule) {
-    return { show: true, text: result.reason || 'Nothing was signed.' };
+    return { show: true, text: plainReason(result) || 'Nothing was signed.' };
   }
   return { show: false, text: '' };
+}
+
+/**
+ * A refusal code is not a sentence. `method_not_allowlisted` reached the visitor verbatim on
+ * 2026-11-08 when Arena's Feed sent `fund` to a row that had been reshaped down to five pairs
+ * and no longer carried Arena's. The explainer already knows how to say these in words, so
+ * use it, and keep anything it does not know as it came rather than inventing a meaning.
+ */
+function plainReason(result) {
+  const raw = String(result.reason || result.reasonCode || '').trim();
+  if (!raw) return '';
+  if (/\s/.test(raw)) return raw;                       // already a sentence
+  if (!/^[a-z_]+$|^ERR_/.test(raw)) return raw;          // a hash, a wasm trap, an RPC error
+  try {
+    const one = whyExplain({ reason: raw, shop: result.receiver || result.shop || '' }, result.clauses || []);
+    if (one && one.known) return one.plain;
+  } catch { /* fall through to the raw code */ }
+  return raw;
 }
 
 export function cinemaFor(result) {
