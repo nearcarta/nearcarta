@@ -425,3 +425,18 @@ test('the deed page opens only for the current holder, decided from the chain', 
     assert.equal(await deedOwner('t1', { view: makeView(HOLDER), contract: DEEDS }), HOLDER);
   })();
 });
+
+test('the deed page imports only modules published in the deploy root', () => {
+  // The first version imported `/shared/vault/tx.js` and `/shared/deployments/mainnet.json`,
+  // both 404 on the deployed site, so the page hung on "Reading the deed…" with no error the
+  // user could act on. A page served raw can only import what the build actually publishes.
+  const page = readFileSync(new URL('../../../app/src/deed-page.js', import.meta.url), 'utf8');
+  const imports = [...page.matchAll(/^import .* from '([^']+)';$/gm)].map(m => m[1]);
+  for (const spec of imports) {
+    assert.ok(!spec.startsWith('/shared/'), `${spec} is not served`);
+    assert.ok(!/deployments\/mainnet\.json/.test(spec), 'the deployment record is not in the deploy root');
+  }
+  // It reads ownership through the API instead, which is published.
+  assert.match(page, /\/api\/house\/deed\//);
+  assert.match(page, /\/api\/house\/history\//);
+});
