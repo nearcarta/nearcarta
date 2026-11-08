@@ -1118,6 +1118,8 @@ const APPS = {
       mountShop('house', document.getElementById('t-form'), {
         state: extra,
         mintDeed: () => A.houseMint(),
+        // The room plans, this sends. Without it "I'm alive" could never reach the chain.
+        houseSend: (plan) => A.houseCall(plan, { method: plan.method }),
         onDelivered: () => { sh?.hideSeal?.(); sh?.deliver?.(); },
         onRefuse: () => sh?.showSeal?.(),
         hideRefuse: () => sh?.hideSeal?.(),
