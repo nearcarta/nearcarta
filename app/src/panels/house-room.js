@@ -189,6 +189,23 @@ export function mountHouseRoom(root, hooks = {}) {
     if (result?.seal && result.hint) showSeal(result.hint);
     else setStatus(result?.hint || '');
     if (result?.tab) showTab(result.tab);
+    // A plan is only half the job: `runHouseTurn` builds the `propose_call_as` call and never
+    // sends it, so "I'm alive" used to end at a hint. When the page supplies an executor, hand
+    // the plan over and show what the chain said.
+    if (result?.ok && result.call && typeof hooks.houseSend === 'function') {
+      setStatus('Sending through the board…');
+      try {
+        const sent = await hooks.houseSend(result);
+        if (sent?.tx) {
+          setStatus(sent.ok ? `Sent · ${sent.tx.slice(0, 10)}…` : `${sent.hint || 'Refused.'}`);
+          if (sent.ok) hooks.onDelivered?.(sent);
+          else hooks.hideRefuse?.();
+        } else if (sent?.hint) setStatus(sent.hint);
+      } catch (e) {
+        setStatus(String(e?.message || e).slice(0, 180) || 'Nothing was signed.');
+      }
+      return result;
+    }
     return result;
   }
   root.querySelectorAll('[data-tab]').forEach(btn => {

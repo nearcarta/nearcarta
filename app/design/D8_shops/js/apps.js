@@ -265,6 +265,60 @@ export async function houseMint({ capYocto = '50000000000000000000000', depositY
   return { ok: true, tx: h, tokenId: S.me };
 }
 
+/**
+ * Run a House plan (check-in, or a session line change) for real.
+ *
+ * The room only ever *planned* these: `house-room.js` calls `runHouseTurn`, which builds a
+ * `call` and returns. Nothing signed it, so "I'm alive" in the city never produced a
+ * transaction. This is the missing half, and it signs the same way the toll does: ask the board
+ * for its own `call_as_message` text (which carries the policy epoch), sign it with the session
+ * key, and send `propose_call_as`.
+ */
+export async function houseCall(plan, { receiver, method } = {}) {
+  if (!plan || !plan.call) throw new Error('Nothing to send. Nothing was signed.');
+  if (!S.board) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  const key = agent();
+  const ak = key ? await proposeAccessKey(key) : null;
+  if (!key || !ak) throw new Error('Set up your agent in /setup. Nothing was signed.');
+  const names = ak.permission?.FunctionCall?.method_names || [];
+  if (names.length && !names.includes('propose_call_as')) {
+    throw new Error('This key cannot call propose_call_as. Renew it in /setup. Nothing was signed.');
+  }
+  const row = S.boardRow || (await boardRowNow());
+  if (!row) throw new Error('No charter row yet. Finish /setup. Nothing was signed.');
+  if (W.pubkeyHex(key) !== String(row.agent || '')) throw new Error('This browser is not the agent on the row. Nothing was signed.');
+  // `houseAccount` is declared further down (a `const` arrow), so calling it from here would hit
+  // the temporal dead zone. Read the record directly instead, through the same source.
+  const house = receiver || S.mainnet?.house?.contract || '';
+  if (!house) throw new Error('The house contract is not in the deployment record. Nothing was signed.');
+  if ((row.receivers || []).length && !row.receivers.includes(house)) {
+    throw new Error('Add house.nearcarta.near to your row in /setup. Nothing was signed.');
+  }
+  // The plan's own method and args, so the room and the chain agree on what was asked.
+  const methodName = method || plan.method;
+  const args = plan.args || plan.call.args || JSON.stringify({ token_id: plan.tokenId || S.me });
+  const deposit = String(plan.deposit || '0');
+  const nonce = String(row.nonce ?? '0').replace(/^0+(?=\d)/, '');
+  const expiry = (BigInt(Date.now()) * 1_000_000n + 600_000_000_000n).toString();
+  const ask = { owner: S.me, receiver: house, method: methodName, args, deposit, nonce, expiry, effects: [], hold: false };
+  const text = await view(S.board, 'call_as_message', ask).catch(() => null);
+  if (typeof text !== 'string' || !text.startsWith('board-call-as-v1|')) {
+    throw new Error('The board did not return a call message. Nothing was signed.');
+  }
+  const signature = W.signMessage(key, text);
+  const action = W.functionCall('propose_call_as', { ...ask, signature }, 150n * TG);
+  const signed = W.signTx({
+    key, signerId: S.me, receiverId: S.board, nonce: BigInt(ak.nonce) + 1n, blockHash: ak.block_hash, actions: [action],
+  });
+  const sent = W.outcomeOf(await rpc('send_tx', { signed_tx_base64: signed.base64, wait_until: 'FINAL' }));
+  if (!sent.ok) {
+    const reason = refusalOf(sent.error) || String(sent.error || 'refused').slice(0, 160);
+    return { ok: false, refused: true, tx: signed.hash, hint: `The board refused it: ${reason}`, reason };
+  }
+  await readRules().catch(() => {});
+  return { ok: true, tx: signed.hash, method: methodName, hint: 'Sent. The house recorded it on chain.' };
+}
+
 // ---------- rules: the visitor writes them, one approval signs them ----------
 export function rulesNow() {
   const D = DEFAULT_RULES;

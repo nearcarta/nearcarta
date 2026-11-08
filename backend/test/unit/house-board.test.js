@@ -258,3 +258,30 @@ test('a check-in on a deed with no inheritance line is refused before it is sign
   const unknown = planHouseLine("I'm alive", { ...base, line: null });
   assert.notEqual(unknown.action, 'refuse');
 });
+
+test('the House room hands its plan to a sender instead of stopping at a hint', () => {
+  // Found on mainnet 2026-11-07 driving the real city: "I'm alive" built a correct
+  // `propose_call_as` call and then only showed the plan's hint. `house-room.js` imported
+  // `runHouseTurn`, which plans and never sends, and no executor existed anywhere, so the
+  // House gold CTA could not produce a transaction at all.
+  const room = readFileSync(new URL('../../../app/src/panels/house-room.js', import.meta.url), 'utf8');
+  assert.match(room, /hooks\.houseSend/, 'the room calls a sender');
+  assert.match(room, /result\.call && typeof hooks\.houseSend === 'function'/, 'and only when the page supplies one');
+
+  // The city supplies it, and it resolves to the executor in apps.js.
+  const ui = readFileSync(new URL('../../../app/design/D8_shops/js/shopui.js', import.meta.url), 'utf8');
+  assert.match(ui, /houseSend: \(plan\) => A\.houseCall\(plan/, 'the city wires houseSend to houseCall');
+
+  // The executor signs the BOARD's own text, the same rule as the toll: a locally built
+  // message carries epoch 0 and the board answers ERR_BAD_SIG.
+  const apps = readFileSync(new URL('../../../app/design/D8_shops/js/apps.js', import.meta.url), 'utf8');
+  const fn = apps.slice(apps.indexOf('export async function houseCall'), apps.indexOf('// ---------- rules: the visitor writes them'));
+  assert.match(fn, /call_as_message/, 'houseCall asks the board for its text');
+  assert.doesNotMatch(fn, /callAsMessage\(/, 'and never builds one locally');
+  assert.match(fn, /propose_call_as/, 'then sends propose_call_as');
+  assert.match(fn, /W\.signMessage/, 'signed by the session key');
+  // The house account comes from the record, and is not read through a later `const` arrow
+  // (that is the temporal dead zone, which would throw on first use).
+  assert.doesNotMatch(fn, /houseAccount\(\)/, 'houseCall must not call a later const arrow');
+  assert.match(fn, /S\.mainnet\?\.house\?\.contract/);
+});
