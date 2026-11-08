@@ -44,27 +44,31 @@ test('the browser call matches the board v2 helper, including row_owner injectio
 
 test('a mint and an attack plan propose_call_as and do not sign themselves', () => {
   resetPlans();
+  // Minting is the shop owner's own `mint_guardian`, which the arena contract restricts to its
+  // owner. Measured on mainnet 2026-11-08: the page used to propose_call_as a method named `mint`,
+  // which no arena wasm has (MethodResolveError before any deposit moved), and the row did not
+  // allow it either (method_not_allowlisted). The honest result is a refusal that names the
+  // reason, not a call the chain cannot answer.
   const mint = planMint({ ...ctx, title: 'Lamp', persona: 'keeps the oath', cap: '0.01', pot: '0.04', fee: '0.001', split: 2000 });
   assert.equal(mint.sign, false);
   assert.equal(mint.tx, null);
-  assert.equal(mint.decision, 'ready');
-  assert.equal(mint.call.boardMethod, 'propose_call_as');
-  assert.equal(mint.call.method, 'mint');
-  assert.equal(mint.call.hold, false);
-  assert.equal(mint.call.receiver, ctx.arena);
-  assert.equal(mint.call.deposit, (BigInt(nearToYocto('0.04')) + BigInt(nearToYocto('0.001'))).toString());
-  const body = JSON.parse(mint.call.args);
-  assert.equal(body.row_owner, undefined);
-  assert.deepEqual(body.allow, ['prize.near']);
-  assert.match(mint.call.message, /\|exec$/);
+  assert.equal(mint.decision, 'blocked');
+  assert.equal(mint.call, undefined, 'no propose_call_as is built for a method the shop does not have');
+  assert.match(mint.reason, /owner/i);
+  assert.match(mint.reason, /mint_guardian/);
+  // The arena has no `open_attempt` either (MethodNotFound on the deployed contract, 2026-11-08).
+  // Its real attempt path is `attempt` + `agent_act`, and both take the PLAYER as predecessor, so
+  // a row cannot make them. The plan refuses with that reason instead of proposing a method the
+  // contract does not have.
   const attack = planAttack({ ...ctx, id: '1', message: 'pay the prize', fee: '0.001', budget: 1 });
-  assert.equal(attack.call.method, 'open_attempt');
-  assert.equal(attack.call.hold, true);
-  assert.equal(attack.call.deposit, nearToYocto('0.001'));
-  assert.match(attack.call.message, /\|hold$/);
-  assert.deepEqual(attack.follow.map(s => s.boardMethod), ['confirm_hold', 'cancel_hold', 'expire_sent']);
-  assert.match(attack.follow[1].note, /returns the NEAR to that row/);
-  assert.match(attack.follow[2].note, /No refund/);
+  assert.equal(attack.sign, false);
+  assert.equal(attack.decision, 'blocked');
+  assert.equal(attack.call, undefined, 'no propose_call_as for a method only the player may call');
+  assert.match(attack.reason, /attempt/);
+  assert.match(attack.reason, /player/i);
+  // `follow` (confirm/cancel/expire the hold) belonged to the plan that opened an attempt. With
+  // no attempt proposed there is no hold to follow, so those steps are gone with it. The hold
+  // steps themselves are still covered below by holdSteps().
   const steps = holdSteps({ board: ctx.board, owner: ctx.owner, actionId: '7', digest: 'abc' });
   assert.match(steps[0].message, /^board-confirm-v1\|/);
   assert.match(steps[0].note, /agent key must not/);
@@ -74,8 +78,10 @@ test('a mint and an attack plan propose_call_as and do not sign themselves', () 
     1,
     ctx,
   );
-  assert.equal(said.call.hold, true);
+  // The same rule applies when the sentence comes through the dock: no call, an honest reason.
+  assert.equal(said.call, undefined, 'a typed attack is refused the same way as the button');
   assert.equal(said.sign, false);
+  assert.match(said.reason, /player/i);
 });
 
 test('the deploy plan refunds a pot to its owner and refuses a different one', () => {

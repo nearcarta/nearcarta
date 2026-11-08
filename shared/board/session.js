@@ -349,7 +349,11 @@ export function dropOptionalPairs(calls, receivers) {
 export const SHOP_METHODS = {
   'toll.nearcarta.near': ['cross'],
   'guard.nearcarta.near': ['pay'],
+  // House needs both session calls; Arena needs `fund` (its real method for adding to a
+  // guardian's pot) as well as a plain pay. `fund` was missing, so pressing Feed in the city
+  // sent a real transaction the board refused with `method_not_allowlisted` (2026-11-08).
   'house.nearcarta.near': ['house_session_check_in', 'house_session_prepare_send'],
+  'arena.nearcarta.near': ['fund'],
 };
 /** The methods one allowed shop contributes to the call list. */
 export function methodsForShop(receiver, fallback = 'ft_transfer') {

@@ -52,10 +52,12 @@ test('a known shop contributes only the method its contract answers on', () => {
   assert.deepEqual(methodsForShop('toll.nearcarta.near'), ['cross']);
   assert.deepEqual(methodsForShop('guard.nearcarta.near'), ['pay']);
   assert.deepEqual(methodsForShop('house.nearcarta.near'), ['house_session_check_in', 'house_session_prepare_send']);
-  // Anything we do not know keeps the caller's method: townhall, arena, wrap.near.
+  // Arena answers on `fund` (the real method for adding to a guardian's pot).
+  assert.deepEqual(methodsForShop('arena.nearcarta.near'), ['fund']);
+  // Anything we do not know keeps the caller's method: townhall and a name we have never seen.
   assert.deepEqual(methodsForShop('townhall.nearcarta.near'), ['ft_transfer']);
   assert.deepEqual(methodsForShop('friend.near'), ['ft_transfer']);
-  assert.deepEqual(Object.keys(SHOP_METHODS).sort(), ['guard.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near']);
+  assert.deepEqual(Object.keys(SHOP_METHODS).sort(), ['arena.nearcarta.near', 'guard.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near']);
 });
 
 test('the shorter list is narrower than the one that failed, and the guard blocks it', () => {

@@ -60,7 +60,7 @@ test('a row with more receivers holds fewer pairs, which mainnet proved', () => 
   // account ids is how an earlier version of this test drifted 11 bytes off the chain.
   const pairBudget = pairBudgetBytes(4);
   assert.equal(pairBudget, 2000 - 1490 - 24 * 4);
-  assert.ok(375 <= pairBudget, 'the 7-pair list that landed (375 bytes) is inside the budget');
+  assert.ok(368 <= pairBudget, 'the 7-pair list that landed is inside the budget');
   assert.ok(424 > pairBudget, 'the 8-pair list the chain refused (424 bytes) is outside it');
   assert.ok(472 > pairBudget, 'the 9-pair list the chain refused (472 bytes) is outside it');
   // Eight pairs fit next to three receivers and not next to four: the live boundary.
@@ -144,7 +144,9 @@ test('the optional pairs go before a shop does, and the real limit is four shops
   const HOUSE = 'house.nearcarta.near', HALL = 'townhall.nearcarta.near';
 
   // Every four-shop combination the city offers fits, and every named shop stays reachable.
-  const reach = { [TOLL]: 'cross', [GUARD]: 'pay', [ARENA]: 'ft_transfer', [HOUSE]: 'house_session_check_in', [HALL]: 'ft_transfer' };
+  // Arena's real method is `fund` (adding to a guardian's pot). It is not `ft_transfer`: the
+  // deployed arena has no such method, which is why pressing Feed was refused on chain.
+  const reach = { [TOLL]: 'cross', [GUARD]: 'pay', [ARENA]: 'fund', [HOUSE]: 'house_session_check_in', [HALL]: 'ft_transfer' };
   for (const shops of [[TOLL, GUARD, ARENA, HOUSE], [TOLL, GUARD, ARENA, HALL], [TOLL, GUARD, HOUSE, HALL]]) {
     const t = build(shops);
     assert.equal(t.fits, true, `${shops.length} shops fit: ${shops.join(',')}`);
@@ -155,19 +157,21 @@ test('the optional pairs go before a shop does, and the real limit is four shops
     for (const d of t.dropped) assert.ok(d.why && d.why.length > 10, `${d.method} states why it was droppable`);
   }
 
-  // Five shops do NOT fit, and that is a contract limit rather than a page rule: 433 bytes of
-  // pairs next to five receivers against a 390-byte budget. The page must say so and refuse to
+  // Five shops do NOT fit, and that is a contract limit rather than a page rule: 426 bytes of
+  // pairs next to five receivers against a 390-byte budget. (Was 433 before Arena's pair became
+  // its real method `fund` instead of `ft_transfer`.) The page must say so and refuse to
   // sign, because the chain answers ERR_ROW_TOO_BIG after the wallet has already approved.
   const five = build([TOLL, GUARD, ARENA, HOUSE, HALL]);
   assert.equal(five.fits, false, 'five named shops do not fit one 0.02 NEAR row');
-  assert.equal(pairBytes(five.calls), 433);
+  assert.equal(pairBytes(five.calls), 426);
   assert.equal(pairBudgetBytes(5), 390);
   assert.ok(pairBytes(five.calls) > pairBudgetBytes(5));
 
-  // The exact shape that landed on mainnet: four shops, seven pairs, 375 bytes, 1993 locked.
+  // The exact shape that landed on mainnet (375 bytes with arena on ft_transfer). Arena's pair
+  // is now its real method `fund`, which is 7 bytes shorter, so the same seven-pair list is 368.
   const landed = build([TOLL, GUARD, ARENA, HOUSE]);
   assert.equal(landed.calls.length, 7);
-  assert.equal(pairBytes(landed.calls), 375);
+  assert.equal(pairBytes(landed.calls), 368);
   assert.deepEqual(landed.dropped.map(d => d.method), ['storage_deposit', 'stamp']);
   // The wrap legs a swap needs are never dropped.
   assert.ok(landed.calls.some(c => c.receiver === 'wrap.near' && c.method === 'near_deposit'));
