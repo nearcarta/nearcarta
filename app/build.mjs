@@ -86,6 +86,9 @@ if (PRIVY_ID) {
 await (await import('./shops/build.mjs')).buildShops(dist, await import('esbuild'));
 mkdirSync(dist + '/pay', { recursive: true });
 cpSync(here + 'pay/index.html', dist + '/pay/index.html');
+// /deed/<token>: a page only the current deed holder can open (app/src/deed-gate.js).
+mkdirSync(dist + '/deed', { recursive: true });
+cpSync(here + 'deed/index.html', dist + '/deed/index.html');
 // On Vercel the API is same origin (/api is proxied to Render in vercel.json), so no CORS and one origin in the CSP story.
 const api = process.env.NEARCARTA_API ?? (process.env.VERCEL ? '' : 'https://nearcarta-api.onrender.com');
 writeFileSync(dist + '/config.js', `window.NEARCARTA_API=${JSON.stringify(api)};globalThis.NEARCARTA_API=window.NEARCARTA_API;window.NEARCARTA_PUBLIC_MAINNET=${PUBLIC_MAINNET ? 'true' : 'false'};\n`);

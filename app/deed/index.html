@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nearcarta · your deed</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand/chrome.css">
+<link rel="stylesheet" href="/brand/brown.css">
+<link rel="stylesheet" href="/panels/panels.css">
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; min-height:100dvh; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(180deg,#2a2118 0%,#17130f 60%); color:#f3ead8; font:16px/1.5 system-ui,sans-serif; padding:20px; }
+  main { width:min(560px,100%); }
+  h2 { margin:0 0 8px; font-size:22px; }
+  .deed-gated, .deed-open { background:#1a140f; border:1px solid #4a3a28; border-radius:18px; padding:18px; display:grid; gap:12px; }
+  .deed-facts { display:grid; grid-template-columns:auto 1fr; gap:6px 16px; margin:0; }
+  .deed-facts dt { color:#b9ad95; }
+  .deed-facts dd { margin:0; font-weight:600; }
+  .btn { display:inline-flex; align-items:center; min-height:44px; padding:0 16px; border-radius:12px;
+    background:#d9b46a; color:#1b160f; text-decoration:none; font-weight:700; }
+  .small { font-size:13px; } .muted { color:#b9ad95; }
+  .err { color:#ff9b8a; }
+  code { font-family:ui-monospace,monospace; }
+</style>
+</head>
+<body>
+<main id="deed" data-testid="deed-page"><p class="muted">Reading the deed…</p></main>
+<script type="module" src="/deed-page.js"></script>
+</body>
+</html>
