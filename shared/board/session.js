@@ -165,6 +165,12 @@ function wrapCap(named, capYocto) {
 export const MAX_CALLS = 24;
 
 // The row and its call list share one 0.02 NEAR of storage (MAX_ROW_YOCTO = 2000 bytes).
+//
+// The contract source now raises this to 0.03 NEAR and prepays a 1400-byte side reserve, so a
+// shop row can write its per-action hold record. That build is STAGED, not live: until the
+// upgrade lands the chain still answers with 2000 bytes, and this model must keep saying what
+// the chain actually does. Measured 2026-11-08: a clean seven-pair Town Hall row locked 1858
+// bytes and the hold write then panicked ERR_DEPOSIT, which is why the raise exists.
 // The constants below are measured on mainnet, not modelled, because modelling refused
 // shapes the chain accepted and accepted shapes it refused.
 //
@@ -349,6 +355,12 @@ export function dropOptionalPairs(calls, receivers) {
 export const SHOP_METHODS = {
   'toll.nearcarta.near': ['cross'],
   'guard.nearcarta.near': ['pay'],
+  // The Town Hall answers on the job lifecycle, not on ft_transfer. Until Hall v2 was
+  // deployed (2026-11-08) the account ran the legacy bounty code, where `post_job` did not
+  // exist, so `ft_transfer` was the only honest pair. Pressing Post job in the city sent
+  // `post_job` and the board refused `method_not_allowlisted`: the row allowed a method the
+  // shop does not have, and the shop had a method the row did not allow.
+  'townhall.nearcarta.near': ['post_job', 'bid', 'counter', 'accept', 'deliver', 'review', 'refund'],
   // House needs both session calls; Arena needs `fund` (its real method for adding to a
   // guardian's pot) as well as a plain pay. `fund` was missing, so pressing Feed in the city
   // sent a real transaction the board refused with `method_not_allowlisted` (2026-11-08).

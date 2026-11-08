@@ -54,10 +54,16 @@ test('a known shop contributes only the method its contract answers on', () => {
   assert.deepEqual(methodsForShop('house.nearcarta.near'), ['house_session_check_in', 'house_session_prepare_send']);
   // Arena answers on `fund` (the real method for adding to a guardian's pot).
   assert.deepEqual(methodsForShop('arena.nearcarta.near'), ['fund']);
-  // Anything we do not know keeps the caller's method: townhall and a name we have never seen.
-  assert.deepEqual(methodsForShop('townhall.nearcarta.near'), ['ft_transfer']);
+  // The Town Hall answers on the job lifecycle, not on ft_transfer. Until Hall v2 was
+  // deployed on 2026-11-08 the account ran the legacy bounty code, where `post_job` did not
+  // exist; the row allowed `ft_transfer` and the tray sent `post_job`, so pressing Post job
+  // was refused method_not_allowlisted on chain.
+  assert.deepEqual(methodsForShop('townhall.nearcarta.near'),
+    ['post_job', 'bid', 'counter', 'accept', 'deliver', 'review', 'refund']);
+  // Anything we do not know keeps the caller's method.
   assert.deepEqual(methodsForShop('friend.near'), ['ft_transfer']);
-  assert.deepEqual(Object.keys(SHOP_METHODS).sort(), ['arena.nearcarta.near', 'guard.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near']);
+  assert.deepEqual(Object.keys(SHOP_METHODS).sort(),
+    ['arena.nearcarta.near', 'guard.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near', 'townhall.nearcarta.near']);
 });
 
 test('the shorter list is narrower than the one that failed, and the guard blocks it', () => {
@@ -68,7 +74,12 @@ test('the shorter list is narrower than the one that failed, and the guard block
     ['near_deposit', 'ft_transfer', 'storage_deposit'].map(m => ({ receiver: 'wrap.near', method: m })),
     [{ receiver: BOARD, method: 'stamp' }, ...HOUSE_CALLS.map(c => ({ receiver: c.receiver, method: c.method }))],
   );
-  assert.ok(bytesOf(calls) < bytesOf(oldStyle), 'cross/pay are narrower than ft_transfer on Toll and Guard');
+  // A shop's own method is not always narrower than `ft_transfer`: the Town Hall's
+  // `post_job` is eight bytes against ten, but seven Hall lifecycle methods outweigh the one
+  // `ft_transfer` the old list gave it. Measured 2026-11-08: 740 bytes now against 643 before,
+  // because the account that used to be reachable only by `ft_transfer` now really answers on
+  // `post_job`, `bid`, `counter`, `accept`, `deliver`, `review` and `refund`.
+  assert.ok(bytesOf(calls) > bytesOf(oldStyle), 'the Hall lifecycle is wider than one ft_transfer');
   // Still too much for one row at six receivers, so the page must refuse it.
   assert.equal(callsFitRow(calls, receivers.length), false, 'six receivers cannot hold this list');
   assert.ok(bytesOf(calls) > pairBudgetBytes(receivers.length));

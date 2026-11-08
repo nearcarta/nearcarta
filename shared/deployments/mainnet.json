@@ -96,7 +96,7 @@
       }
     },
     "upgrade_staged": {
-      "note": "Staged 2026-11-07 21:58 UTC with `stage_upgrade` (1 yocto, refunded). Carries BOTH fixes in one landing: the hydrate fix so `anchor` stops panicking ERR_NO_CHARTER, and the charge_acts fix so an effect budget is paid from the SIDE RESERVE instead of the row's own bytes. The previously staged hash 6299317b… was an older build with only the hydrate fix; waiting for it (4h) then staging this one would have cost 28h, so it was replaced at 24h. Re-staged once more at 22:03 UTC after the deposit requirement was found to be wrong for a reserve-paid write: the first build would have failed the setup batch with ERR_DEPOSIT. Staged a third time at 23:36 after the set/clear/set cycle was found to shrink `storage_locked` below what the row really used. Proven in contracts/charter_board_sandbox/tests/effects_on_a_full_row.rs: the live wasm fails it ERR_ROW_TOO_BIG, this build passes.",
+      "note": "Staged 2026-11-07 21:58 UTC with `stage_upgrade` (1 yocto, refunded). Carries BOTH fixes in one landing: the hydrate fix so `anchor` stops panicking ERR_NO_CHARTER, and the charge_acts fix so an effect budget is paid from the SIDE RESERVE instead of the row's own bytes. The previously staged hash 6299317b\u2026 was an older build with only the hydrate fix; waiting for it (4h) then staging this one would have cost 28h, so it was replaced at 24h. Re-staged once more at 22:03 UTC after the deposit requirement was found to be wrong for a reserve-paid write: the first build would have failed the setup batch with ERR_DEPOSIT. Staged a third time at 23:36 after the set/clear/set cycle was found to shrink `storage_locked` below what the row really used. Proven in contracts/charter_board_sandbox/tests/effects_on_a_full_row.rs: the live wasm fails it ERR_ROW_TOO_BIG, this build passes.",
       "code_hash": "debcbfe23973cff5189c8d1013970eaf3b6d2ebe6e2663f85d4b1c9384829696",
       "artifact": "contracts/artifacts/charter_board.effects.wasm",
       "wasm_bytes": 128624,
@@ -131,7 +131,7 @@
       "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
     },
     "effects_code_hash": "FzUSX26CnmveE2vPg4dcdczmBXFJv6mAx7YAuJPghZZf",
-    "effects_code_hash_note": "Base58 of contracts/artifacts/charter_board.effects.wasm (sha256 debcbfe2…). `set_effects` is sent at setup only while this is the code on chain, because the older build charges the row instead of the side reserve. The staged upgrade at board.upgrade_staged installs it.",
+    "effects_code_hash_note": "Base58 of contracts/artifacts/charter_board.effects.wasm (sha256 debcbfe2\u2026). `set_effects` is sent at setup only while this is the code on chain, because the older build charges the row instead of the side reserve. The staged upgrade at board.upgrade_staged installs it.",
     "previous": {
       "code_hash": "Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C",
       "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
@@ -182,7 +182,7 @@
     "owner": "nearcarta.near",
     "code_hash": "FaNtiauDWfjzKYtK2bns79wUqZqcXFcLjz2Bzx7aVdL5",
     "wasm": "toll.v8.wasm",
-    "upgrade_note": "Upgraded in place from v7 (6aAGdUhy…) with the owner-only `upgrade`, which deploys the code and then calls `migrate` itself. The account was not closed and no NEAR moved. v8 drops the contract-wide `max_per_tx`/`budget` caps that v7 still enforced: on v7 a visitor crossing of 1e18 yocto hit `max_per_tx` (1e13) and the refusal surfaced as a wasm trap instead of a reason.",
+    "upgrade_note": "Upgraded in place from v7 (6aAGdUhy\u2026) with the owner-only `upgrade`, which deploys the code and then calls `migrate` itself. The account was not closed and no NEAR moved. v8 drops the contract-wide `max_per_tx`/`budget` caps that v7 still enforced: on v7 a visitor crossing of 1e18 yocto hit `max_per_tx` (1e13) and the refusal surfaced as a wasm trap instead of a reason.",
     "storage_bytes": 217747,
     "locked_near": 2.17747,
     "full_access_keys": 0,
@@ -265,9 +265,9 @@
       "legacy": "house.nearcarta.near",
       "shop": "house.nearcarta.near",
       "fallback": {
-    "status": "unused",
-    "account": "house3.nearcarta.near",
-    "account_note": "Never created on mainnet. The fallback name was reserved in this record only; the live shop is house.nearcarta.near (v3)."
+        "status": "unused",
+        "account": "house3.nearcarta.near",
+        "account_note": "Never created on mainnet. The fallback name was reserved in this record only; the live shop is house.nearcarta.near (v3)."
       },
       "next": {
         "status": "deployed_as_shop",
@@ -300,11 +300,11 @@
     "townhall": {
       "contract": "townhall.nearcarta.near",
       "owner": "nearcarta.near",
-      "wasm": "townhall.p86.wasm",
-      "sha256": "9f5480d7e61c01566b081737b91a1a27b02cac84d377e40fb2fcfa09cc101b5f",
-      "code_hash": "BixZRmNsFTtHBBtDEqtz7tKfiDeU7eJodfEPpZMpxC2J",
-      "storage_bytes": 192231,
-      "locked_near": 1.92231,
+      "wasm": "hall.wasm",
+      "sha256": "d6141dd7502dd0f7a88baa9fb416eb14446a53d4a2a6ad7492a51bc9068c3020",
+      "code_hash": "FQg3EZdbEcjz44F5dckp9agpbsV9nYuToBQ4yUzXXWK9",
+      "storage_bytes": 231836,
+      "locked_near": 2.31836,
       "full_access_keys": 1,
       "teardown": "delete_account with the key in ~/.near-credentials/mainnet/townhall.nearcarta.near.json",
       "txs": {
@@ -314,8 +314,16 @@
         "townhall_reward_allowed_0.001": "6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h",
         "townhall_post_bounty_0.002": "Cq9ffD4ayWASwt3MJK4Y7XdmZkWthXsNfw7eCCqcUXS2",
         "townhall_reward_refused_0.002": "Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6",
-        "townhall_sweep_surplus": "F9A8pLz9LsTWE9fjSecAe4bxPcXibd9RTWJCt61gTq9E"
-      }
+        "townhall_sweep_surplus": "F9A8pLz9LsTWE9fjSecAe4bxPcXibd9RTWJCt61gTq9E",
+        "refund_open_bounty_0.002": "8KdwZNzy8zEMV8mCHvZwko44j5DKX6sh3jRYGezqvGm1",
+        "hall_v2_deploy_migrate": "DjzqHk2KcX2S6GfD1d4b9FQt5ypJiPdFdozXVPoYJrU3",
+        "hall_v2_smoke_post_0.001": "DTqpzuhNs5bSDoiSEQP4eAHizCNFHN7wcZcWpzRqAhjZ",
+        "hall_v2_smoke_refund": "JC9ojuNMVPkUY3o4zxdAQWYfmecy9B8MBrFexstVDHWj",
+        "topup_0.45": "6LLLhMr9PnqRwn4kk4boMHU7YXe62mF6z8gDvfsRpBuf"
+      },
+      "crate": "contracts/hall",
+      "deploy_tx": "DjzqHk2KcX2S6GfD1d4b9FQt5ypJiPdFdozXVPoYJrU3",
+      "note": "Hall v2 deployed in place on the same account (2026-11-08). The account had been running the legacy bounty code, so `post_job` did not exist and every Town Hall CTA died as method_not_allowlisted. The three legacy bounties are snapshotted in `legacy_paid`: two were already claimed and the third was refunded to its poster before the deploy."
     }
   },
   "root_balance_near": 3.2899,

@@ -9,7 +9,7 @@
 // Step 1 refunds each open bounty to the signer of the transaction that posted it.
 // Step 2 deploys contracts/hall and calls migrate (clean state).
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import MAIN from '../shared/deployments/mainnet.json' with { type: 'json' };
 import { hallDeployPlan, MIGRATE_TGAS, SMOKE_TGAS, SMOKE_YOCTO } from '../shared/hall/deploy-plan.js';
@@ -21,6 +21,16 @@ if (process.argv.some(a => String(a).includes('ed25519:'))) {
 }
 
 const shop = MAIN.extras.townhall.contract;
+// The legacy bounty code has no way to mark a bounty paid, so a run that sends the
+// refund and then stops leaves the bounty reading as open. This ledger is the only
+// record that the transfer went out; without it the next run pays it again.
+const refundLedgerPath = new URL('../shared/hall/refunds-sent.json', import.meta.url);
+function readRefundLedger() {
+  try { return JSON.parse(readFileSync(refundLedgerPath, 'utf8')) || {}; } catch { return {}; }
+}
+function writeRefundLedger(next) {
+  writeFileSync(refundLedgerPath, JSON.stringify(next, null, 2) + '\n');
+}
 const owner = MAIN.extras.townhall.owner;
 const board = MAIN.board.contract;
 // The Guardhouse clears a delivered part; without it no release path can run.
@@ -198,6 +208,8 @@ async function gather() {
   const rows = bounties.map(([hash, row]) => ({ hash, amount: row.amount, claimed_by: row.claimed_by }));
   return hallDeployPlan({
     shop, owner, board, dao: state.dao,
+    alreadyRefunded: Object.keys(readRefundLedger()),
+    legacyVersion: Number(state.version ?? 1),
     balanceYocto: acct.amount,
     storageBytes: acct.storage_usage,
     oldWasmBytes: old.length,
@@ -253,6 +265,11 @@ for (const t of plan.transfers) {
   const bad = r.status?.Failure || r.receipts_outcome?.find(x => x.outcome.status.Failure)?.outcome.status.Failure;
   console.log('Refund ' + (bad ? 'FAILED ' : 'OK ') + (r.transaction?.hash || '') + ' to ' + t.payee);
   if (bad) process.exit(1);
+  // Record it before the deploy. A ledger write that fails here is loud, and a ledger
+  // that records a refund which then failed is what a second read of this file catches.
+  const ledger = readRefundLedger();
+  ledger[t.hash] = { payee: t.payee, amount: t.amount, tx: r.transaction?.hash || '', sent_at: new Date().toISOString() };
+  writeRefundLedger(ledger);
 }
 const wasm = readFileSync(wasmFile);
 // Re-read the account after the refunds. The deploy is irreversible and its stake is
@@ -283,9 +300,12 @@ if (!guardNow || (guardExpectedCodeHash && guardNow.code_hash !== guardExpectedC
 // Re-read the obligations: a bounty posted between the dry-run and this send must
 // not be wiped by migrate.
 const [bountiesNow, stateNow] = await Promise.all([view('get_bounties', {}), view('get_state', {})]);
-const openNow = bountiesNow.filter(([, r]) => r.claimed_by == null || r.claimed_by === '');
+// The same exclusion the plan used: a bounty this script already refunded still reads as
+// open on the legacy code, so counting it again would abort every retry after a refund.
+const ledgerNow = readRefundLedger();
+const openNow = bountiesNow.filter(([hash, r]) => (r.claimed_by == null || r.claimed_by === '') && !ledgerNow[hash]);
 const owedNow = openNow.reduce((n, [, r]) => n + BigInt(r.amount), 0n);
-if (owedNow !== BigInt(plan.legacy.owedYocto) || Number(stateNow.version) !== Number(state.version ?? 1)) {
+if (owedNow !== BigInt(plan.legacy.owedYocto) || Number(stateNow.version) !== Number(plan.legacyVersion)) {
   console.error('Refusing to deploy: the legacy obligations changed since the dry-run (owed ' + owedNow.toString() + ' yoctoNEAR now, ' + plan.legacy.owedYocto + ' at plan time). Nothing else was signed.');
   process.exit(1);
 }
@@ -311,6 +331,9 @@ if (!Array.isArray(hall.legacy_paid) || hall.legacy_paid.length !== plan.legacy.
   console.error('The migrated state does not carry the legacy snapshot. Stop and read the account.');
   process.exit(1);
 }
+// The migrated state now carries the legacy snapshot, so the ledger is no longer the
+// only record of what was paid. Clear it so a later reader is not misled by it.
+writeRefundLedger({});
 console.log('get_hall matches: owner ' + owner + ', board ' + board + ', guard ' + guard + ', 0 jobs, ' + hall.legacy_paid.length + ' legacy rows recorded.');
 console.log('  legacy snapshot: ' + JSON.stringify(hall.legacy_paid));
 const workers = smokeWorkers().filter(id => id !== shop && id !== board);

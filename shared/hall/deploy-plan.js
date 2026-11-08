@@ -42,8 +42,16 @@ function deployGas(wasmLen, argBytes) {
     + RECEIPT_GAS;
 }
 
-export function refundTransfers({ shop, dao, bounties, posts }) {
-  const open = (bounties || []).filter(b => b.claimed_by == null || b.claimed_by === '');
+/**
+ * Open bounties still owed. `alreadyRefunded` names the bounties an earlier run of this
+ * script already transferred: the legacy code has no way to mark a bounty paid, so the
+ * account still reads it as open and a second run would pay it twice. Measured 2026-11-08:
+ * the first live run sent 0.002 NEAR and then stopped before the deploy, which is exactly
+ * the state that makes a blind retry a double payment.
+ */
+export function refundTransfers({ shop, dao, bounties, posts, alreadyRefunded = [] }) {
+  const done = new Set((alreadyRefunded || []).map(r => String(r && r.hash || r)));
+  const open = (bounties || []).filter(b => (b.claimed_by == null || b.claimed_by === '') && !done.has(b.hash));
   const transfers = [];
   for (const bounty of open) {
     const post = (posts || []).find(p => p.method === 'post_bounty' && p.bountyHash === bounty.hash && String(p.amount) === String(bounty.amount) && p.receiver === shop);
@@ -72,8 +80,10 @@ export function hallDeployPlan({
   shop, owner, board, dao, balanceYocto, storageBytes, oldWasmBytes, newWasmBytes, wasmSha256,
   bounties, posts, fullAccessKeys, codeHash, oldCodeHash, smokeWorkers,
   boardCodeHash, boardExpectedCodeHash, guard, guardCodeHash, guardExpectedCodeHash,
+  alreadyRefunded = [], legacyVersion = 1,
 }) {
-  const transfers = refundTransfers({ shop, dao, bounties, posts });
+  const transfers = refundTransfers({ shop, dao, bounties, posts, alreadyRefunded });
+  const paidBefore = new Set((alreadyRefunded || []).map(r => String(r && r.hash || r)));
   // Every bounty the legacy code records, owed or paid, is snapshotted here. The
   // audit row is what makes the migration checkable without reading the old STATE:
   // an open bounty must appear in `transfers`, a claimed one must not.
@@ -87,10 +97,10 @@ export function hallDeployPlan({
       owed: open,
       payee: t ? t.payee : (b.claimed_by || null),
       sourceTx: t ? t.sourceTx : null,
-      status: open ? 'refund_now' : 'already_paid',
+      status: open ? (paidBefore.has(b.hash) ? 'refunded_earlier' : 'refund_now') : 'already_paid',
     };
   });
-  const owedYocto = legacy.filter(l => l.owed).reduce((n, l) => n + BigInt(l.amount), 0n);
+  const owedYocto = legacy.filter(l => l.status === 'refund_now').reduce((n, l) => n + BigInt(l.amount), 0n);
   const paidYocto = legacy.filter(l => !l.owed).reduce((n, l) => n + BigInt(l.amount), 0n);
   const refund = transfers.reduce((n, t) => n + BigInt(t.amount), 0n);
   // The new state records exactly what this deploy paid out, so a later reader can
@@ -138,7 +148,7 @@ export function hallDeployPlan({
   need(legacyPaid.length === (bounties || []).length, 'every legacy bounty is in the snapshot');
   need(owedYocto === refund, 'the refund total equals the owed legacy bounties');
   need(balance > stakeNow, 'the balance covers the current storage stake');
-  need(refund > 0n || (bounties || []).every(b => b.claimed_by), 'every open bounty is in the refund list');
+  need(refund > 0n || legacy.every(l => l.status !== 'refund_now'), 'every open bounty is in the refund list');
   need(transfers.every(t => t.payee === dao || t.payee === shop), 'each refund payee is the posting signer');
   need(balance > refund + burnedRefund, 'the balance covers the refund and its gas');
   need(liquidAfter > 0n, 'after the refund and the new wasm, the storage stake still fits');
@@ -159,6 +169,7 @@ export function hallDeployPlan({
   return {
     shop, owner, board, guard, dao,
     wasm: { bytes: Number(nextWasm), sha256: wasmSha256 },
+    legacyVersion,
     legacy: {
       rows: legacy,
       owedYocto: owedYocto.toString(),
