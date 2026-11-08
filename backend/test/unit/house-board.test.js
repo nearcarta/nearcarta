@@ -461,3 +461,34 @@ test('every shop in the menu is a real target that says what the shop does', () 
   assert.match(css, /nav\.all-shops li a small\{[^}]*color:#b9ad95/);
   assert.match(css, /nav\.all-shops summary\{[^}]*min-height:44px/);
 });
+
+test('a shop that is not on the row says what to do, not just that it is missing', () => {
+  // Measured in the deployed city 2026-11-08: pressing Town Hall's gold CTA answered only
+  // "Add townhall.nearcarta.near in /setup. Nothing was signed." The row was at 1946 of its
+  // 2000 bytes, so /setup would have refused that edit too — the message told the visitor to do
+  // something that could not work. It now names the shop, says how much room is left, and says
+  // to swap rather than add when there is none.
+  const { missingShopLine } = require('../../../app/src/panels/toll-room.js');
+  const SHOP = 'townhall.nearcarta.near';
+  const full = missingShopLine(SHOP, { storage_locked: '19460000000000000000000' }); // 1946 bytes
+  assert.match(full, new RegExp(SHOP));
+  assert.match(full, /54 bytes free/);
+  assert.match(full, /swap a shop out/);
+  assert.match(full, /Nothing was signed/);
+
+  const roomy = missingShopLine(SHOP, { storage_locked: '15000000000000000000000' }); // 1500
+  assert.match(roomy, /500 bytes free/);
+  assert.match(roomy, /you can add it in \/setup/);
+  assert.doesNotMatch(roomy, /swap/);
+
+  const unknown = missingShopLine(SHOP, {});
+  assert.match(unknown, /Add it in \/setup/);
+  assert.doesNotMatch(unknown, /bytes free/, 'no invented headroom');
+
+  // The three city call sites use it rather than a bare string.
+  const apps = readFileSync(new URL('../../../app/design/D8_shops/js/apps.js', import.meta.url), 'utf8');
+  assert.equal([...apps.matchAll(/missingShopLine\(/g)].length, 3);
+  assert.doesNotMatch(apps, /Add ' \+ shop \+ ' in \/setup/, 'the bare message is gone');
+  // And it is imported from a module the city serves raw.
+  assert.match(apps, /from '\/panels\/toll-room\.js'/);
+});
