@@ -440,3 +440,24 @@ test('the deed page imports only modules published in the deploy root', () => {
   assert.match(page, /\/api\/house\/deed\//);
   assert.match(page, /\/api\/house\/history\//);
 });
+
+test('every shop in the menu is a real target that says what the shop does', () => {
+  // Measured in the deployed city: all 10 menu rows were 22px tall at 1280x800 AND at 390x844,
+  // and none carried a description, so the menu read as a list of names rather than a map of
+  // the town. A 44px target is the floor for a touch screen; a one-line "what it does" is what
+  // makes the entry navigable for someone who has not read the README.
+  const html = readFileSync(new URL('../../../app/design/D9_world/index.html', import.meta.url), 'utf8');
+  const list = html.slice(html.indexOf('data-testid="all-shops-list"'), html.indexOf('</ul>', html.indexOf('data-testid="all-shops-list"')));
+  const links = [...list.matchAll(/<a [^>]*>([\s\S]*?)<\/a>/g)].map(m => m[1]);
+  assert.ok(links.length >= 9, `every shop is in the menu (found ${links.length})`);
+  for (const inner of links) {
+    assert.match(inner, /<b>[^<]+<\/b>/, `a name: ${inner.slice(0, 40)}`);
+    assert.match(inner, /<small>[^<]{10,}<\/small>/, `and a line saying what it does: ${inner.slice(0, 60)}`);
+  }
+  // The CSS gives each row a 44px minimum and styles both parts.
+  const css = readFileSync(new URL('../../../app/design/D9_world/world.css', import.meta.url), 'utf8');
+  assert.match(css, /nav\.all-shops li\{min-height:44px\}/);
+  assert.match(css, /nav\.all-shops li a\{[^}]*min-height:44px/);
+  assert.match(css, /nav\.all-shops li a small\{[^}]*color:#b9ad95/);
+  assert.match(css, /nav\.all-shops summary\{[^}]*min-height:44px/);
+});
