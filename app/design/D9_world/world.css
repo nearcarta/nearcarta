@@ -555,9 +555,17 @@ nav.all-shops{position:fixed;
    explicit `top` keeps the menu above every tray even before that measurement lands, which is
    the property the layout test pins. */
 body.in-shop nav.all-shops { top: 64px; }
+/* A floor, not a sum. Every shop has its own `max-height` and they were all written as
+   `100dvh - <magic>`, so a tall tray could start above the rail and slide under the menu —
+   measured on Arena 2026-11-08: the menu ended at y=122 and the tray started at y=113. A `top`
+   floor cannot be beaten by any max-height, so it holds for every shop without touching
+   fourteen separate rules. `--rail` is the menu's measured height, set from js; the fallback
+   covers a first paint before that runs. */
 body.in-shop #shopUI #tray {
+  top: calc(var(--hudTop, 92px) + var(--rail, 60px) + 12px);
   padding-top: 20px;
-  max-height: calc(100dvh - var(--rail, 120px) - 40px);
+  max-height: none;
+  max-height: calc(100dvh - var(--hudTop, 92px) - var(--rail, 60px) - 12px - 18px);
 }
 body.story nav.all-shops,body.intro-on nav.all-shops,body:not(.ready) nav.all-shops{opacity:1;visibility:visible;pointer-events:auto;z-index:200}
 nav.all-shops summary{list-style:none;cursor:pointer;color:#f5d08a}
