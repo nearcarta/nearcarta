@@ -554,7 +554,11 @@ nav.all-shops{position:fixed;
    underneath it. `--rail` is the rail's own height, measured in js and set on body; the
    explicit `top` keeps the menu above every tray even before that measurement lands, which is
    the property the layout test pins. */
-body.in-shop nav.all-shops { top: 64px; }
+/* The menu sits BELOW the brand block, not on top of it. The brand is 18..107 (a title and a
+   one-line "not affiliated" note), so a menu at 64 covered the note and clipped it mid-word —
+   visible in the demo recording. 116 clears it with a 9px gap. The js measurement
+   (`setRail`) overrides this; this rule is the value before that runs. */
+body.in-shop nav.all-shops { top: 116px; }
 /* A floor, not a sum. Every shop has its own `max-height` and they were all written as
    `100dvh - <magic>`, so a tall tray could start above the rail and slide under the menu —
    measured on Arena 2026-11-08: the menu ended at y=122 and the tray started at y=113. A `top`
