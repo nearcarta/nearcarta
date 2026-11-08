@@ -177,7 +177,9 @@ export function mountPayouts(root, hooks) {
 
   function receiptHtml(list) {
     return (list || []).map(r => {
-      const tail = r.payoutText || r.status || (r.tx ? 'sent' : 'not sent');
+      // The reason the board gave, when there is one. A row that just says "refused" tells the
+      // visitor nothing about what to change.
+      const tail = r.payoutText || (r.status === 'refused' && r.reason ? `refused: ${r.reason}` : r.status) || (r.tx ? 'sent' : 'not sent');
       const chain = r.chain && r.chain !== 'near' ? ` on ${esc(chainName(r.chain))}` : '';
       const fee = r.feeUsd === '' || r.feeUsd == null ? '' : ` · fee about ${esc(r.feeUsd)} USD`;
       const near = r.chain !== 'near' && r.near ? ` · ${esc(formatNear(r.near))} NEAR deposit` : '';
@@ -350,7 +352,7 @@ export function mountPayouts(root, hooks) {
         if (step?.decision === 'allowed' && step.tx) {
           row.status = 'sent'; row.tx = step.tx; row.url = `https://nearblocks.io/txns/${step.tx}`;
           state.settled[payrollKey(r)] = step.tx;
-        } else if (step) row.status = 'refused';
+        } else if (step) { row.status = 'refused'; row.reason = step.reason || 'refused'; }
       });
     }
     const foreign = fresh.filter(r => r.chain !== 'near');
@@ -399,7 +401,10 @@ export function mountPayouts(root, hooks) {
     // and a sent row is never called paid before 1Click says so.
     const parts = [];
     if (paidRows) parts.push(`Sent ${paidRows} ${paidRows === 1 ? 'row' : 'rows'}.`);
-    if (refusedRows) parts.push(`${refusedRows} ${refusedRows === 1 ? 'row was' : 'rows were'} refused before any deposit.`);
+    // The board's own reason, not just "refused": measured 2026-11-08 in the city, a payee that
+    // was not on the row showed "refused" with an empty line and no reason anywhere.
+    const why = [...new Set(state.receipts.filter(x => x.status === 'refused' && x.reason).map(x => String(x.reason)))].slice(0, 2);
+    if (refusedRows) parts.push(`${refusedRows} ${refusedRows === 1 ? 'row was' : 'rows were'} refused before any deposit${why.length ? ` (${why.join(', ')})` : ''}.`);
     if (leftRows) parts.push(`${leftRows} ${leftRows === 1 ? 'row was' : 'rows were'} not sent.`);
     state.payLine = parts.length ? parts.join(' ') + (paidRows ? ' A foreign row is paid when 1Click says SUCCESS.' : '')
       : (result?.hint || 'Reviewed. Nothing was sent.');
