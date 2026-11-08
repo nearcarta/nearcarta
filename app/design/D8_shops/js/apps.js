@@ -3,6 +3,7 @@
 // the charter answers on chain. The proof is a one-line receipt after the action.
 import * as W from './wallet.bundle.js';
 import { readSessionAccount } from './session.js';
+import { missingShopLine } from '/panels/toll-room.js';
 import { $, sfx } from './core.js';
 import * as P from './payouts.js';
 import * as TS from './tollsplit.js';
@@ -292,7 +293,7 @@ export async function houseCall(plan, { receiver, method } = {}) {
   const house = receiver || S.mainnet?.house?.contract || '';
   if (!house) throw new Error('The house contract is not in the deployment record. Nothing was signed.');
   if ((row.receivers || []).length && !row.receivers.includes(house)) {
-    throw new Error('Add house.nearcarta.near to your row in /setup. Nothing was signed.');
+    throw new Error(missingShopLine(house, row));
   }
   // The plan's own method and args, so the room and the chain agree on what was asked.
   const methodName = method || plan.method;
@@ -548,7 +549,7 @@ export async function toll(quote) {
   if (W.pubkeyHex(key) !== String(row.agent || '')) throw new Error('This browser is not the agent on the row. Nothing was signed.');
   const shop = TS.TOLL_ACCT;
   const receivers = row.receivers || [];
-  if (receivers.length && !receivers.includes(shop)) throw new Error('Add toll.nearcarta.near in /setup. Nothing was signed.');
+  if (receivers.length && !receivers.includes(shop)) throw new Error(missingShopLine(shop, row));
   const decimals = quote.asset === 'usdc' ? 6 : 18;
   let units;
   try { units = unitsOf(quote.amount, decimals); }
@@ -655,7 +656,7 @@ export async function hallJob(step) {
   if (W.pubkeyHex(key) !== String(row.agent || '')) throw new Error('This browser is not the agent on the row. Nothing was signed.');
   const shop = String(step.receiver);
   const receivers = row.receivers || [];
-  if (receivers.length && !receivers.includes(shop)) throw new Error('Add ' + shop + ' in /setup. Nothing was signed.');
+  if (receivers.length && !receivers.includes(shop)) throw new Error(missingShopLine(shop, row));
   // The row's own limits decide the money. They are checked here so the button says
   // why, and again on chain so the answer does not depend on this page.
   const deposit = BigInt(step.deposit || 0);

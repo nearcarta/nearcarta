@@ -141,6 +141,29 @@ export function tollCapCheck({
 // A first effect budget costs 351 bytes and the row allowance is 2000; both are measured on
 // mainnet and pinned in shared/board/session.js. Repeated here because this module is served
 // to the browser raw and cannot import a shared path.
+/**
+ * The sentence a shop shows when its account is not on the visitor's row.
+ *
+ * Measured 2026-11-08 in the city: pressing Town Hall's gold CTA answered only "Add
+ * townhall.nearcarta.near in /setup", which is true but not enough to act on — the row was
+ * already at 1946 of its 2000 bytes, so /setup would have refused the change too. This says
+ * which shop is missing, what room is left, and that a swap is what is needed when there is
+ * no room. It never claims the edit will succeed.
+ */
+export function missingShopLine(shop, row) {
+  // The chain's own storage_locked, 1e19 yocto per byte, against the 2000-byte allowance —
+  // the same numbers effectBudgetFits uses, repeated here so this module stays importless.
+  const locked = row?.storage_locked;
+  const room = locked == null || locked === '' ? null
+    : Math.max(0, 2000 - Math.floor(Number(locked) / 1e19));
+  const head = `This shop (${shop}) is not on your row, so the charter would refuse the call.`;
+  const tail = 'Nothing was signed.';
+  if (room == null) return `${head} Add it in /setup. ${tail}`;
+  // One more receiver costs about 24 bytes, plus its pairs.
+  if (room < 60) return `${head} Your row has ${room} bytes free of its 2000 and another shop needs about 60, so swap a shop out rather than add one: /setup lets you edit the list. ${tail}`;
+  return `${head} Your row has ${room} bytes free, so you can add it in /setup. ${tail}`;
+}
+
 export const EFFECT_BUDGET_BYTES = 351;
 export const ROW_ALLOWANCE_BYTES = 2000;
 export function effectBudgetFits(row, need = EFFECT_BUDGET_BYTES, maxRowBytes = ROW_ALLOWANCE_BYTES) {
