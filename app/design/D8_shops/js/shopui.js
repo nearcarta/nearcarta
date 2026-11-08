@@ -793,7 +793,10 @@ async function sendPayoutRows(rows, opts = {}) {
   const receipts = parts.near.map((r, i) => {
     const step = steps[i];
     const tx = step?.tx || '';
-    return { n: i + 1, to: r.to, amount: r.amt, asset: 'NEAR', tx, url: tx ? `https://nearblocks.io/txns/${tx}` : '', status: step?.decision === 'allowed' ? 'sent' : (step ? 'refused' : 'not sent') };
+    // Carry the board's reason: the tray prints it on the row, and without it a refused row
+    // reads only "refused" while the chain said exactly why (measured in the city 2026-11-08).
+    const reason = step && step.decision !== 'allowed' ? (step.reason || 'refused') : '';
+    return { n: i + 1, to: r.to, amount: r.amt, asset: 'NEAR', tx, url: tx ? `https://nearblocks.io/txns/${tx}` : '', status: step?.decision === 'allowed' ? 'sent' : (step ? 'refused' : 'not sent'), ...(reason ? { reason } : {}) };
   });
   for (const r of parts.usdc) receipts.push({ n: receipts.length + 1, to: r.to, amount: r.amt, asset: 'USDC', tx: '', url: '', status: 'not sent' });
   extra.pay = o;
