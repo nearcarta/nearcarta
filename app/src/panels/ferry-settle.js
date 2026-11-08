@@ -168,7 +168,14 @@ export function wrapProgressNote({ amount = '', landed = [], failedReason = '', 
     label: `${s.method || 'tx'} ${shortTx(s.tx)}`,
   }));
   const wrap = rows.find(s => s.method === 'near_deposit');
-  const low = /not_enough_allowance|NotEnoughAllowance|allowance/i.test(String(failedReason || ''));
+  // "allowance" is the session key's gas budget. `receiver_not_allowlisted` contains
+  // "allowlist", which the old test also matched, so a payee problem was reported as a gas
+  // problem: measured 2026-11-08, the board refused wrap.near with receiver_not_allowlisted
+  // and the page said "Session gas is low ... Refresh the agent key", which would never fix it.
+  const reasonText = String(failedReason || '');
+  const low = /not_enough_allowance|NotEnoughAllowance/i.test(reasonText)
+    || (/\ballowance\b/i.test(reasonText) && !/allowlist/i.test(reasonText));
+  const receiverRefused = /receiver_not_allowlisted/i.test(reasonText);
   const amt = String(amount || '').trim() || '0.05';
   if (wrap) {
     const why = low
@@ -186,6 +193,15 @@ export function wrapProgressNote({ amount = '', landed = [], failedReason = '', 
       lowGas: true,
       wrapped: true,
       text: 'Session gas is low. Your wNEAR is safe in your row and will be used on the next try. Refresh the agent key, then Load cargo again.',
+      links,
+    };
+  }
+  if (receiverRefused) {
+    return {
+      lowGas: false,
+      wrapped: false,
+      receiverRefused: true,
+      text: 'This row may not pay wrap.near, so the wrap was not started and no NEAR left the row. Add wrap.near to your allowed shops in /setup if you want the ferry to wrap for you; the charter is the thing refusing, not the boat.',
       links,
     };
   }
