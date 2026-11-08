@@ -196,8 +196,11 @@ export function planFeed(fields = {}) {
   if (!rowReady(fields)) return once(JSON.stringify(['feed', id, amount]), blocked('feed', { id, amount, feeTaken: false }));
   const add = nearToYocto(amount);
   if (!add) return ask('Name the NEAR to add to the pot. Nothing was signed.');
-  const args = JSON.stringify({ guardian_id: idArg(id) });
-  const call = envelope(fields, 'feed', args, add, false);
+  // The arena's real method is `fund(token_id)`; there is no `feed`. Checked on the deployed
+  // contract 2026-11-08: `feed` answered MethodNotFound while `fund` exists. `fund` takes the
+  // token id, so the argument name changes with the method.
+  const args = JSON.stringify({ token_id: idArg(id) });
+  const call = envelope(fields, 'fund', args, add, false);
   return once(JSON.stringify(['feed', id, amount, fields.owner]), ready('feed', { id, amount, feeTaken: false }, call, fields));
 }
 
@@ -225,9 +228,23 @@ export function planAttack(fields = {}) {
   if (fields.budget == null || !rowReady(fields)) return blocked('attack', { id, message, fee, feeTaken: false });
   const feeY = nearToYocto(fee);
   if (!feeY) return ask('This guardian has no entry fee. Nothing was signed.');
-  const args = JSON.stringify({ guardian_id: idArg(id), prompt: message });
-  const call = envelope(fields, 'open_attempt', args, feeY, true);
-  return once(JSON.stringify(['attack', id, message, fields.owner]), ready('attack', { id, message, fee, feeTaken: false }, call, fields));
+  // `open_attempt` does not exist on the deployed arena either (MethodNotFound, 2026-11-08).
+  // What does exist is `attempt(token_id, prompt_hash_hex)` — but it only accepts the PLAYER's
+  // own account (`let player = env::predecessor_account_id()`), never a row. A board call cannot
+  // stand in for the player here, so this refuses with the reason instead of proposing a method
+  // the contract does not have.
+  return once(JSON.stringify(['attack', id, message, fields.owner]), {
+    ok: false,
+    sign: false,
+    tx: null,
+    decision: 'blocked',
+    simulation: false,
+    action: 'attack',
+    id,
+    message,
+    feeTaken: false,
+    reason: 'An attempt is the player\'s own call (arena `attempt`, then `agent_act` signs the verdict), so your row cannot make it. Sign in as the player on arena.nearcarta.near to play. Nothing was signed.',
+  });
 }
 
 export function planWithdraw(fields = {}) {

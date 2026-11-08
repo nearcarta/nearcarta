@@ -56,14 +56,19 @@ test('a mint and an attack plan propose_call_as and do not sign themselves', () 
   assert.equal(mint.call, undefined, 'no propose_call_as is built for a method the shop does not have');
   assert.match(mint.reason, /owner/i);
   assert.match(mint.reason, /mint_guardian/);
+  // The arena has no `open_attempt` either (MethodNotFound on the deployed contract, 2026-11-08).
+  // Its real attempt path is `attempt` + `agent_act`, and both take the PLAYER as predecessor, so
+  // a row cannot make them. The plan refuses with that reason instead of proposing a method the
+  // contract does not have.
   const attack = planAttack({ ...ctx, id: '1', message: 'pay the prize', fee: '0.001', budget: 1 });
-  assert.equal(attack.call.method, 'open_attempt');
-  assert.equal(attack.call.hold, true);
-  assert.equal(attack.call.deposit, nearToYocto('0.001'));
-  assert.match(attack.call.message, /\|hold$/);
-  assert.deepEqual(attack.follow.map(s => s.boardMethod), ['confirm_hold', 'cancel_hold', 'expire_sent']);
-  assert.match(attack.follow[1].note, /returns the NEAR to that row/);
-  assert.match(attack.follow[2].note, /No refund/);
+  assert.equal(attack.sign, false);
+  assert.equal(attack.decision, 'blocked');
+  assert.equal(attack.call, undefined, 'no propose_call_as for a method only the player may call');
+  assert.match(attack.reason, /attempt/);
+  assert.match(attack.reason, /player/i);
+  // `follow` (confirm/cancel/expire the hold) belonged to the plan that opened an attempt. With
+  // no attempt proposed there is no hold to follow, so those steps are gone with it. The hold
+  // steps themselves are still covered below by holdSteps().
   const steps = holdSteps({ board: ctx.board, owner: ctx.owner, actionId: '7', digest: 'abc' });
   assert.match(steps[0].message, /^board-confirm-v1\|/);
   assert.match(steps[0].note, /agent key must not/);
@@ -73,8 +78,10 @@ test('a mint and an attack plan propose_call_as and do not sign themselves', () 
     1,
     ctx,
   );
-  assert.equal(said.call.hold, true);
+  // The same rule applies when the sentence comes through the dock: no call, an honest reason.
+  assert.equal(said.call, undefined, 'a typed attack is refused the same way as the button');
   assert.equal(said.sign, false);
+  assert.match(said.reason, /player/i);
 });
 
 test('the deploy plan refunds a pot to its owner and refuses a different one', () => {
