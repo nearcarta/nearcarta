@@ -728,6 +728,32 @@ export function makeApp() {
       return c.json({ board, config: config || null, source: 'board' });
     } catch (e) { return c.json({ board, config: null, error: e.message }, 502); }
   });
+  // Would this call be allowed right now? A free read on the board that answers in the same
+  // words the send would use, so an agent plans before it signs instead of learning refusal
+  // reasons by burning gas. `POST` because the body carries the call; nothing is signed and
+  // nothing moves.
+  app.post('/api/board/simulate', limiter(30), async c => {
+    const b = await jsonBody(c); if (!b) return bad(c, 'body must be a JSON object');
+    const board = MAINNET_DEP?.board?.contract;
+    if (!board) return c.json({ error: 'no board' }, 404);
+    const owner = String(b.owner || ''); const receiver = String(b.receiver || ''); const method = String(b.method || '');
+    if (!nearAccountOk(owner) || !nearAccountOk(receiver)) return bad(c, 'owner and receiver must be account ids');
+    if (!/^[a-zA-Z0-9_]{1,64}$/.test(method)) return bad(c, 'method must be a method name');
+    const deposit = String(b.deposit ?? '0');
+    if (!/^[0-9]{1,40}$/.test(deposit)) return bad(c, 'deposit must be yocto as a string');
+    const effects = Array.isArray(b.effects) ? b.effects.slice(0, 8) : [];
+    try {
+      const out = await view(board, 'simulate', { owner, receiver, method, deposit, effects }, cfg.rpc);
+      // The view returns a JSON string. Older builds do not have it, and that must read as
+      // "cannot answer", never as "allowed".
+      if (typeof out !== 'string') return c.json({ ok: null, answer: null, note: 'This board build has no simulate view.' }, 200);
+      let answer = null; try { answer = JSON.parse(out); } catch { /* keep the raw text */ }
+      return c.json({ ok: answer?.ok === true, answer: answer || { raw: out }, board });
+    } catch (e) {
+      const missing = /MethodNotFound|no such method/i.test(String(e?.message || e));
+      return c.json({ ok: null, answer: null, note: missing ? 'This board build has no simulate view; a real send is the only check.' : 'The board did not answer.', error: String(e?.message || e).slice(0, 160) }, 200);
+    }
+  });
   app.get('/api/board/row/:owner', limiter(20), async c => {
     const owner = c.req.param('owner');
     if (!nearAccountOk(owner)) return bad(c, 'not a NEAR account');
