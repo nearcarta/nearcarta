@@ -473,20 +473,27 @@ export function makeApp() {
     const a = c.req.param('account');
     if (!nearAccountOk(a)) return bad(c, 'not an account id');
     if (!D) return c.json({ live: false, token_id: a, rows: [], count: 0, note: 'no deed contract' });
+    // nearblocks rate-limits an unkeyed caller (the first live call answered 429 and the panel
+    // said "no transactions", which was false). Retry with backoff and say so when it still
+    // fails, so a short list is never presented as a complete one.
     const index = 'https://api.nearblocks.io';
+    const key = process.env.NEARBLOCKS_API_KEY || '';
     let txns = [];
     let gap = '';
-    try {
-      const key = process.env.NEARBLOCKS_API_KEY || '';
-      const r = await fetch(`${index}/v1/account/${encodeURIComponent(D.contract)}/txns?per_page=40`, {
-        headers: key ? { Authorization: `Bearer ${key}`, 'User-Agent': 'nearcarta' } : { 'User-Agent': 'nearcarta' },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (r.ok) txns = (await r.json())?.txns || [];
-      else gap = `the index answered ${r.status}`;
-    } catch { gap = 'the index did not answer'; }
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt) await new Promise(r => setTimeout(r, 350 * attempt));
+      try {
+        const r = await fetch(`${index}/v1/account/${encodeURIComponent(D.contract)}/txns?per_page=40`, {
+          headers: key ? { Authorization: `Bearer ${key}`, 'User-Agent': 'nearcarta' } : { 'User-Agent': 'nearcarta' },
+          signal: AbortSignal.timeout(6000),
+        });
+        if (r.ok) { txns = (await r.json())?.txns || []; gap = ''; break; }
+        gap = `the index answered ${r.status}`;
+      } catch { gap = 'the index did not answer'; }
+      if (attempt === 2) gap += ' (after 3 tries)';
+    }
     const purse = await view(D.contract, 'house_purse', { token_id: a }).catch(() => null);
-    const out = deedHistory(txns, a, purse);
+    const out = deedHistory(txns, a, purse, !!gap);
     return c.json({ live: !gap, ...out, ...(gap ? { gap: `${gap}, so this history may be short.` } : {}) });
   });
   // Counterparty check before a payment: allow / warn / block with reasons (backend/src/counterparty.js).

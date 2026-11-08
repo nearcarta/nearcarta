@@ -29,7 +29,7 @@ const DEED_METHODS = {
  * @param {string} tokenId  the deed id (the holder's account)
  * @param {object} [purses] the contract's current purse record for this deed
  */
-export function deedHistory(txns, tokenId, purse = null) {
+export function deedHistory(txns, tokenId, purse = null, readFailed = false) {
   const rows = [];
   for (const t of txns || []) {
     const hash = t?.transaction_hash;
@@ -61,11 +61,14 @@ export function deedHistory(txns, tokenId, purse = null) {
     token_id: tokenId,
     rows: unique,
     count: unique.length,
+    // An empty list from a failed read is not the same as "this deed did nothing". The caller
+    // sets `readFailed` when the index did not answer, so the page can say which it is.
+    read_failed: !!readFailed,
     // What the contract says right now. These are the only numbers, because the event logs are
     // not readable back from any public source; the rows above are the audit trail.
     totals: purse
       ? { balance: String(purse.balance ?? '0'), cap: String(purse.cap ?? '0'), paid: String(purse.paid ?? '0'), pays: Number(purse.pays ?? 0) }
       : null,
-    note: unique.length ? '' : 'No transactions touch this deed yet.',
+    note: unique.length ? '' : (readFailed ? 'The transaction index did not answer, so this deed’s history could not be read. This is not a claim that the deed did nothing.' : 'No transactions touch this deed yet.'),
   };
 }
