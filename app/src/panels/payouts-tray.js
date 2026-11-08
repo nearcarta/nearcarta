@@ -156,8 +156,10 @@ export function mountPayouts(root, hooks) {
            restart and a payer can check that the link was not edited. Opt-in, because it is a
            transaction. -->
       <div class="payout-anchor">
-        <button type="button" id="p-anchor" data-testid="payout-anchor"${state.anchored ? ' disabled' : ''}>${state.anchored ? 'Anchored on chain' : 'Anchor this invoice on chain'}</button>
-        <p class="payout-calm" data-testid="payout-anchor-note">${state.anchored
+        <button type="button" id="p-anchor" data-testid="payout-anchor"${state.anchored || state.anchorBlocked ? ' disabled' : ''}>${state.anchored ? 'Anchored on chain' : (state.anchorBlocked ? 'Anchoring waits for the board upgrade' : 'Anchor this invoice on chain')}</button>
+        <p class="payout-calm" data-testid="payout-anchor-note">${state.anchorBlocked
+          ? esc(state.anchorBlocked)
+          : state.anchored
           ? `Anchored. tx ${esc(String(state.anchored).slice(0, 10))}… Anyone can read the commitment back from the board.`
           : 'This host keeps the invoice in a file, so a new host starts empty. Anchoring writes its digest on chain: the link then has a public record that does not depend on this server.'}</p>
       </div>

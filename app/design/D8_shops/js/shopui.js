@@ -1090,7 +1090,17 @@ const APPS = {
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.map(to => ({ to, amt: '0.001', asset: 'NEAR', chain: 'near' })); if (!extra.rows.length) extra.rows.push({ to: '', amt: '', asset: 'NEAR', chain: 'near' }); } return extra.rows; },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => '<div data-deep="payouts"></div>',
-    bind: () => mountShop('payouts', document.getElementById('t-form'), {
+    bind: () => {
+      // `anchor` panics ERR_NO_CHARTER on the live board build; the hydrate fix is in the
+      // staged one. Offer the action only when that code hash is the one on chain, so the
+      // button never promises a transaction the contract would refuse. Read from the
+      // deployment record, which is updated when the upgrade is applied.
+      const anchorHash = A.S.mainnet?.board?.anchor_code_hash || '';
+      const liveHash = A.S.mainnet?.board?.code_hash || '';
+      if (anchorHash && liveHash && anchorHash !== liveHash) {
+        extra.anchorBlocked = 'Anchoring needs the board build that fixes `anchor` (it answers ERR_NO_CHARTER today). It is staged and lands with the next upgrade; the invoice link itself works now.';
+      }
+      return mountShop('payouts', document.getElementById('t-form'), {
       state: extra, repaint: () => paint(), rows: () => APPS.payouts.rows(),
       capNear: () => (A.S.clauses?.pay ? A.fromY(A.S.clauses.pay.per_action_cap) : null),
       account: () => A.S.me || '',
@@ -1108,7 +1118,8 @@ const APPS = {
       hideRefuse: () => sh?.hideRefuse?.(),
       showRefuse: (text) => sh?.showRefuse?.(text),
       onReady: ok => { if (cur === 'payouts') return; btn(APPS.payouts.btn(), 'primary', !ok || !A.canBatch()); },
-    }),
+      });
+    },
     btn: () => payoutLabel(APPS.payouts.rows()),
     hero: () => extra.pay ? num(`${extra.pay.paid}/${extra.pay.n}`, 'paid') : num(APPS.payouts.rows().length, 'payouts'),
     run: async () => {
