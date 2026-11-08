@@ -1132,4 +1132,86 @@ mod tests {
         board_at(0, 3 * SEC);
         let _ = c.house_session_pay(accounts(1), id, accounts(4), U128(10u128.pow(21)), "once".into());
     }
+    // ---- Transfer is the whole point of this track: the wallet must move with the deed ----
+    //
+    // The NFT track asks, in its own words: "Explain how control passes on transfer and what
+    // stops the old owner from keeping access." Before these tests there was no transfer test
+    // at all, so that claim was unproven.
+
+    fn transfer(c: &mut Contract, from: usize, to: &str, token_id: &str) {
+        // nft_transfer is `#[payable]` and needs 1 yocto, and the predecessor must be the owner.
+        ctx(from, 1);
+        c.nft_transfer(to.parse().unwrap(), token_id.to_string(), None, None);
+    }
+
+    #[test]
+    fn the_deed_moves_with_its_purse_and_the_old_holder_loses_control() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        ctx(1, 20u128 * 10u128.pow(22));
+        let t = c.mint_deed(None, Some(U128(10u128.pow(22))));
+        let token = t.token_id.clone();
+        // Someone funds the purse, so there is real money to move with the deed.
+        ctx(2, 5u128 * 10u128.pow(22));
+        c.house_fund(token.clone());
+        let before = c.house_purse(token.clone()).unwrap();
+        assert!(before.balance.0 > t.metadata.as_ref().map(|_| 0).unwrap_or(0));
+
+        // Transfer to account 3.
+        transfer(&mut c, 1, accounts(3).as_str(), &token);
+
+        let after = c.nft_token(token.clone()).unwrap();
+        assert_eq!(after.owner_id, accounts(3), "the deed is now account 3's");
+        let purse = c.house_purse(token.clone()).unwrap();
+        assert_eq!(purse.balance, before.balance, "the purse balance travels with the deed");
+        assert_eq!(purse.cap, before.cap, "so does its cap");
+
+        // The old holder cannot spend any more.
+        ctx(1, 1);
+        let err = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            c.house_pay(token.clone(), "thief.near".parse().unwrap(), U128(1));
+        })).unwrap_err();
+        let msg = err.downcast_ref::<String>().cloned().unwrap_or_default();
+        assert!(msg.contains("only the deed holder"), "old holder refused: {msg}");
+
+        // Nor can they change the inheritance line, nor check in as the holder.
+        ctx(1, 1);
+        let err = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            c.house_set_line(token.clone(), vec!["a.near".parse().unwrap()], vec!["b.near".parse().unwrap()], 1, U64(60_000_000_000), U64(60_000_000_000));
+        })).unwrap_err();
+        let msg = err.downcast_ref::<String>().cloned().unwrap_or_default();
+        assert!(msg.contains("only the deed holder"), "old holder cannot name heirs: {msg}");
+    }
+
+    #[test]
+    fn the_new_holder_can_spend_the_purse_immediately() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        ctx(1, 20u128 * 10u128.pow(22));
+        let token = c.mint_deed(None, Some(U128(10u128.pow(22)))).token_id;
+        transfer(&mut c, 1, accounts(4).as_str(), &token);
+        // The new holder is the only one who may spend, and the purse kept its balance.
+        let p = c.house_purse(token.clone()).unwrap();
+        assert!(p.balance.0 > 0, "the purse still holds what was funded",);
+        ctx(4, 1);
+        let _ = c.house_pay(token.clone(), "shop.near".parse().unwrap(), U128(1));
+        let after = c.house_purse(token.clone()).unwrap();
+        assert_eq!(after.balance.0, p.balance.0 - 1, "the new holder spent from the same purse");
+        // `pays` is credited by `on_house_pay`, the callback after the transfer lands, so it is
+        // still 0 here. Asserting it in the same call was my mistake, not the contract's.
+    }
+
+    #[test]
+    fn a_stranger_cannot_take_the_deed() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        ctx(1, 20u128 * 10u128.pow(22));
+        let token = c.mint_deed(None, None).token_id;
+        // accounts(2) is not the owner and holds no approval.
+        ctx(2, 1);
+        let err = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            c.nft_transfer(accounts(9), token.clone(), None, None);
+        })).unwrap_err();
+        let msg = err.downcast_ref::<String>().cloned().unwrap_or_default();
+        assert!(!msg.is_empty(), "a transfer by a stranger is refused: {msg}");
+        assert_eq!(c.nft_token(token).unwrap().owner_id, accounts(1), "the deed did not move");
+    }
+
 }
