@@ -133,12 +133,17 @@ export function tollCapCheck({
   return null;
 }
 
+export const EFFECT_BUDGET_BYTES = 351;
+// The contract source raises the row to 3000 bytes and prepays 1400; that build is staged,
+// not live. The number here stays 2000 until the upgrade lands, because a page that promises
+// room the chain does not have is the bug this file exists to prevent.
+export const ROW_ALLOWANCE_BYTES = 2000;
 /**
  * Whether a row can still hold a FIRST effect budget, from the chain's own `storage_locked`.
  * The contract exposes no view that lists effect caps, so storage is the number to use.
  * Returns null when the row does not report storage: "unknown" must never become a refusal.
  */
-// A first effect budget costs 351 bytes and the row allowance is 2000; both are measured on
+// A first effect budget costs EFFECT_BUDGET_BYTES and the row allowance is ROW_ALLOWANCE_BYTES; both are on
 // mainnet and pinned in shared/board/session.js. Repeated here because this module is served
 // to the browser raw and cannot import a shared path.
 /**
@@ -151,21 +156,19 @@ export function tollCapCheck({
  * no room. It never claims the edit will succeed.
  */
 export function missingShopLine(shop, row) {
-  // The chain's own storage_locked, 1e19 yocto per byte, against the 2000-byte allowance —
+  // The chain's own storage_locked, 1e19 yocto per byte, against ROW_ALLOWANCE_BYTES —
   // the same numbers effectBudgetFits uses, repeated here so this module stays importless.
   const locked = row?.storage_locked;
   const room = locked == null || locked === '' ? null
-    : Math.max(0, 2000 - Math.floor(Number(locked) / 1e19));
+    : Math.max(0, ROW_ALLOWANCE_BYTES - Math.floor(Number(locked) / 1e19));
   const head = `This shop (${shop}) is not on your row, so the charter would refuse the call.`;
   const tail = 'Nothing was signed.';
   if (room == null) return `${head} Add it in /setup. ${tail}`;
   // One more receiver costs about 24 bytes, plus its pairs.
-  if (room < 60) return `${head} Your row has ${room} bytes free of its 2000 and another shop needs about 60, so swap a shop out rather than add one: /setup lets you edit the list. ${tail}`;
+  if (room < 60) return `${head} Your row has ${room} bytes free of its ${ROW_ALLOWANCE_BYTES} and another shop needs about 60, so swap a shop out rather than add one: /setup lets you edit the list. ${tail}`;
   return `${head} Your row has ${room} bytes free, so you can add it in /setup. ${tail}`;
 }
 
-export const EFFECT_BUDGET_BYTES = 351;
-export const ROW_ALLOWANCE_BYTES = 2000;
 export function effectBudgetFits(row, need = EFFECT_BUDGET_BYTES, maxRowBytes = ROW_ALLOWANCE_BYTES) {
   const locked = row?.storage_locked;
   if (locked == null || locked === '') return null;

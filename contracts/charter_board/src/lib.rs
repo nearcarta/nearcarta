@@ -93,12 +93,32 @@ impl<T: PartialEq> Set<T> {
     }
 }
 
-/// 0.02 NEAR. A row whose storage costs more than this is refused.
-pub const MAX_ROW_YOCTO: u128 = 20_000_000_000_000_000_000_000;
+/// 0.03 NEAR, 3000 bytes of trie per row.
+///
+/// It was 0.02 (2000 bytes), which the shops outgrew. Measured on mainnet 2026-11-08 with a
+/// clean seven-pair Town Hall row: 1858 bytes locked with the 600-byte side reserve, and the
+/// per-action hold `propose_call_as` writes needed more than the row had left, so Post job
+/// panicked ERR_DEPOSIT before the shop was ever reached. The same wall stops the toll
+/// crossing and every held payment. The cap is what the visitor deposits and gets back on
+/// close, so raising it costs a visitor nothing that is not returned.
+pub const MAX_ROW_YOCTO: u128 = 30_000_000_000_000_000_000_000;
 pub const MAX_RECEIVERS: usize = 8;
 /// `set_calls` dedupes (receiver, method) and stops at this many. Pay receivers stay at 8.
 pub const MAX_CALLS: usize = 24;
-pub const SIDE_RESERVE_BYTES: u64 = 600;
+/// The bytes `set_calls` prepays so the small side records a row needs LATER are already
+/// paid for: an effect budget, and the per-action hold `propose_call_as` writes.
+///
+/// Measured on mainnet 2026-11-08, row `8ccd5d33…`, with a clean seven-pair Hall row at
+/// 1858 bytes locked. Pressing Post job in the city wrote the hold record and panicked
+/// ERR_DEPOSIT: the write cost more than the 600-byte reserve the row had prepaid, and the
+/// board charges the excess to the row, which had 142 bytes of room and no attached deposit
+/// because `propose_call_as` runs from the session key. A visitor could therefore never post
+/// a job, cross the toll, or hold anything on a row that was not nearly empty.
+///
+/// The hold record is the largest side write: it carries the receiver, the method, the whole
+/// argument blob and the effect list. 1400 bytes covers a 600-byte reserve plus an 800-byte
+/// hold, and it is still paid out of the 0.02 NEAR row cap, so the row itself must have room.
+pub const SIDE_RESERVE_BYTES: u64 = 1400;
 /// Extra bytes on top of the measured `storage_usage` growth. A later trie
 /// record must not be paid from the contract's own stake.
 pub const STORAGE_MARGIN_BYTES: u64 = 32;
@@ -400,6 +420,13 @@ impl Board {
             kv_del(b"h", &format!("{}/{}", who.as_str(), id));
         }
         let credit = self.credit.remove(&who).unwrap_or(0);
+        // The reserve is a liability: `set_calls` charged it to the row and recorded it in
+        // `owed`. Refunding it below without subtracting it here left `owed` permanently above
+        // zero after any row that carried a call list was closed, which makes `reap` refuse with
+        // ERR_LIABILITY and blocks the whole teardown. Measured 2026-11-08 in
+        // contracts/charter_board_sandbox/tests/two_visitors.rs: two rows closed, `owed` read
+        // 0.00734 NEAR and never moved again.
+        self.owe(-(credit as i128));
         self.confirm.remove(&who);
         self.epoch.remove(&who);
         self.count -= 1;
@@ -2209,10 +2236,13 @@ mod tests {
         assert_eq!(c.call_count(&acc(ALICE)), 24);
         let bytes = c.calls_encoded_len();
         let locked = c.get_charter(acc(ALICE)).unwrap().storage_locked.0;
-        // 24 short pairs, plus the row and the 600-byte side reserve, stay inside 0.02 NEAR.
+        // 24 short pairs, plus the row and the side reserve, stay inside the row cap.
         // `bytes` is the in-memory encode. `locked` is the trie bytes the write actually used.
+        // The locked figure rose from 19.94 to 27.94 NEAR-worth when SIDE_RESERVE_BYTES went
+        // from 600 to 1400: the extra 800 bytes is exactly the hold record `propose_call_as`
+        // writes later, and 24 pairs is the contract's ceiling on a row.
         assert_eq!(bytes, 836);
-        assert_eq!(locked, 19_940_000_000_000_000_000_000);
+        assert_eq!(locked, 27_940_000_000_000_000_000_000);
         many.push((acc("s24.near"), "m".into(), NEAR / 500));
         go(ALICE, MAX_ROW_YOCTO, 0);
         let err = catch_unwind(AssertUnwindSafe(|| c.set_calls(many, NEAR / 100))).unwrap_err();
@@ -2668,6 +2698,62 @@ mod tests {
         assert!(c.side_credit(&acc(ALICE)) < credit, "the effect record was paid from the reserve");
         let row = c.get_charter(acc(ALICE)).unwrap();
         assert!(row.storage_locked.0 <= MAX_ROW_YOCTO, "the row stays inside its 0.02 NEAR allowance");
+    }
+
+    #[test]
+    fn a_shop_call_with_no_value_is_not_held_to_the_smallest_payment() {
+        // `min_amount` is the smallest payment the visitor allows. A Town Hall `bid`, `accept`,
+        // `deliver`, `review` or `refund` carries no value at all, so measuring it against the
+        // minimum refused every step after `post_job`. Measured on mainnet 2026-11-08: the row
+        // had min_amount 0.0001 NEAR and `bid` with a zero deposit answered below_min_amount.
+        let (mut c, sk, _) = boot();
+        let hall = ["post_job", "bid", "deliver", "review"].iter()
+            .map(|m| (acc(SHOP), (*m).to_string(), NEAR / 50)).collect::<Vec<_>>();
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(hall, NEAR / 10);
+        let expiry = 1_000_000u64;
+        // A zero-value call is allowed ...
+        go(ALICE, 0, 0);
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "bid", "{}", 0, expiry, Vec::new(), true);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "bid".into(), "{}".into(), U128(0), U64(expiry), Vec::new(), true, sig);
+        // ... while a real payment below the minimum is still refused.
+        go(ALICE, 0, 0);
+        let small = NEAR / 20_000;
+        let sig2 = sign_as(&sk, &c, ALICE, SHOP, "post_job", "{}", small, expiry, Vec::new(), true);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(ALICE), acc(SHOP), "post_job".into(), "{}".into(), U128(small), U64(expiry), Vec::new(), true, sig2);
+        })).unwrap_err();
+        assert!(refuse(err).contains("below_min_amount"), "a small payment is still refused");
+    }
+
+    #[test]
+    fn a_row_that_carries_a_shop_list_can_still_write_a_hold() {
+        // The failure this pins was measured in the deployed city on 2026-11-08: a clean
+        // seven-pair Town Hall row (1858 bytes, 142 spare) posted a job, `propose_call_as`
+        // wrote the per-action hold record, and the board panicked ERR_DEPOSIT. The write cost
+        // more than the side reserve the row had prepaid, and `propose_call_as` runs from the
+        // session key with no attached deposit, so there was nothing to charge the excess to.
+        // Every held payment, the toll crossing and the Town Hall post were blocked by this.
+        let (mut c, sk, _) = boot();
+        let hall: Vec<(AccountId, String, u128)> = ["post_job", "bid", "counter", "accept", "deliver", "review", "refund"]
+            .iter()
+            .map(|m| (acc(SHOP), (*m).to_string(), NEAR / 50))
+            .collect();
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(hall, NEAR / 10);
+        let locked = c.get_charter(acc(ALICE)).unwrap().storage_locked.0;
+        assert!(locked < MAX_ROW_YOCTO, "the shop list leaves room in the row");
+        let credit = c.side_credit(&acc(ALICE));
+        assert!(credit > 0, "set_calls prepaid the side reserve");
+        // A hold, not an effect budget: this is the write a shop makes per action.
+        let deposit = NEAR / 2000;
+        let expiry = 1_000_000u64;
+        go(ALICE, 0, 0);
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "post_job", "{}", deposit, expiry, Vec::new(), true);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "post_job".into(), "{}".into(), U128(deposit), U64(expiry), Vec::new(), true, sig);
+        assert!(c.side_credit(&acc(ALICE)) < credit, "the hold record was paid from the reserve");
+        let row = c.get_charter(acc(ALICE)).unwrap();
+        assert!(row.storage_locked.0 <= MAX_ROW_YOCTO, "the row stays inside its allowance");
     }
 
     #[test]

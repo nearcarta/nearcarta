@@ -871,10 +871,13 @@ function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursE
       : step.method === 'set_rules' ? { rules: ruleArgs(r, expiresAt) }
       : callPolicy(r.receivers, toY(r.cap), toY(r.daily), 'ft_transfer', payoutsCalls([...FERRY_CALL_TARGETS, { receiver: contract, method: 'stamp', cap: String(toY(r.cap)) }, ...housePairsIfNamed(r.receivers)], toY(r.cap)).calls);
     return [step.key, { receiverId: contract, actions: [{ type: 'FunctionCall', params: { methodName: step.method, args, gas: (GAS.agent * TG).toString(), deposit: step.deposit } }] }];
+  }).sort((a, b) => {
+    if (!shrinkFirst) return 0;
+    // set_calls before set_rules; everything else keeps its order.
+    const rank = k => (k === 'calls' ? 0 : k === 'rules' ? 1 : 2);
+    return rank(a[0]) - rank(b[0]);
   });
-  if (!shrinkFirst) return out;
-  const rank = k => (k === 'calls' ? 0 : k === 'rules' ? 1 : 2);
-  return out.slice().sort((a, b) => rank(a[0]) - rank(b[0]));
+  return out;
 }
 async function signBoard() {
   const r = rules(), contract = MAIN.board.contract;

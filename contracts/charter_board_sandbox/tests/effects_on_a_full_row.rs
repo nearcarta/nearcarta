@@ -64,7 +64,7 @@ async fn a_four_shop_row_still_takes_an_effect_budget() -> anyhow::Result<()> {
     ], "session_cap": (NEAR / 10).to_string() });
     let set = visitor.call(deployed.id(), "set_calls")
         .args_json(calls)
-        .deposit(NearToken::from_yoctonear(15 * NEAR / 1000))
+        .deposit(NearToken::from_yoctonear(5 * NEAR / 100))
         .gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
         .transact().await?;
     assert!(set.is_success(), "set_calls: {:?}", set.failures());
@@ -84,7 +84,7 @@ async fn a_four_shop_row_still_takes_an_effect_budget() -> anyhow::Result<()> {
     let locked_final = row2["storage_locked"].as_str().unwrap().parse::<u128>()? / 10u128.pow(19);
     println!("after set_effects: {} locked {locked_final} bytes", if effects.is_success() { "OK" } else { "REFUSED" });
     assert!(effects.is_success(), "a four-shop row must be able to hold an effect budget: {:?}", effects.failures());
-    assert!(locked_final <= 2000, "the row stays inside its allowance: {locked_final}");
+    assert!(locked_final <= 3000, "the row stays inside its 0.03 NEAR allowance: {locked_final}");
     Ok(())
 }
 
@@ -128,7 +128,7 @@ async fn setup_can_open_a_row_that_is_ready_to_cross() -> anyhow::Result<()> {
     assert!(out.is_success(), "open: {:?}", out.failures());
     let set = visitor.call(deployed.id(), "set_calls")
         .args_json(json!({ "calls": calls, "session_cap": (NEAR / 10).to_string() }))
-        .deposit(NearToken::from_yoctonear(15 * NEAR / 1000))
+        .deposit(NearToken::from_yoctonear(5 * NEAR / 100))
         .gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
         .transact().await?;
     assert!(set.is_success(), "set_calls: {:?}", set.failures());
@@ -142,7 +142,7 @@ async fn setup_can_open_a_row_that_is_ready_to_cross() -> anyhow::Result<()> {
     let row: Value = deployed.view("get_charter").args_json(json!({ "owner": visitor.id() })).await?.json()?;
     let locked = row["storage_locked"].as_str().unwrap().parse::<u128>()? / 10u128.pow(19);
     println!("row ready to cross: {locked} bytes locked, receivers {}", row["receivers"].as_array().unwrap().len());
-    assert!(locked <= 2000, "inside the allowance: {locked}");
+    assert!(locked <= 3000, "inside the 0.03 NEAR allowance: {locked}");
     assert_eq!(row["receivers"].as_array().unwrap().len(), 4);
     Ok(())
 }
@@ -175,7 +175,7 @@ async fn clearing_then_setting_another_budget_still_works() -> anyhow::Result<()
             { "receiver": "arena.nearcarta.near", "method": "ft_transfer", "cap": cap.clone() },
             { "receiver": "wrap.near", "method": "near_deposit", "cap": cap.clone() },
         ], "session_cap": (NEAR / 10).to_string() }))
-        .deposit(NearToken::from_yoctonear(15 * NEAR / 1000)).gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
+        .deposit(NearToken::from_yoctonear(5 * NEAR / 100)).gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
         .transact().await?.into_result()?;
 
     let locked = |v: &Value| v["storage_locked"].as_str().unwrap().parse::<u128>().unwrap();

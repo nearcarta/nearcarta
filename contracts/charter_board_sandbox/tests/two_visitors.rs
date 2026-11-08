@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 const WASM: &str = "../charter_board/target/near/charter_board.wasm";
 const NEAR: u128 = 1_000_000_000_000_000_000_000_000;
-const MAX_ROW: u128 = 20_000_000_000_000_000_000_000;
+const MAX_ROW: u128 = 30_000_000_000_000_000_000_000;
 
 fn hex32(b: &[u8]) -> String {
     const H: &[u8; 16] = b"0123456789abcdef";

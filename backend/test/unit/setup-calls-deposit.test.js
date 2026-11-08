@@ -143,11 +143,23 @@ test('the optional pairs go before a shop does, and the real limit is four shops
   const TOLL = 'toll.nearcarta.near', GUARD = 'guard.nearcarta.near', ARENA = 'arena.nearcarta.near';
   const HOUSE = 'house.nearcarta.near', HALL = 'townhall.nearcarta.near';
 
-  // Every four-shop combination the city offers fits, and every named shop stays reachable.
+  // Every four-shop combination the city offers fits, EXCEPT one that names the Town Hall
+  // beside three contracts that each need their own calls. That is a real limit measured on
+  // mainnet 2026-11-08, not a page rule: Hall v2 is reached on seven lifecycle methods
+  // (`post_job`, `bid`, `counter`, `accept`, `deliver`, `review`, `refund`), and seven Hall
+  // pairs beside Toll's `cross`, Guard's `pay` and House's two session calls come to 692 pair
+  // bytes against the 414 a four-receiver row allows. A Hall-only row locks 1858 bytes and
+  // fits fine; it is the combination that does not. The page must refuse and say so.
   // Arena's real method is `fund` (adding to a guardian's pot). It is not `ft_transfer`: the
   // deployed arena has no such method, which is why pressing Feed was refused on chain.
-  const reach = { [TOLL]: 'cross', [GUARD]: 'pay', [ARENA]: 'fund', [HOUSE]: 'house_session_check_in', [HALL]: 'ft_transfer' };
-  for (const shops of [[TOLL, GUARD, ARENA, HOUSE], [TOLL, GUARD, ARENA, HALL], [TOLL, GUARD, HOUSE, HALL]]) {
+  const reach = { [TOLL]: 'cross', [GUARD]: 'pay', [ARENA]: 'fund', [HOUSE]: 'house_session_check_in', [HALL]: 'post_job' };
+  // Hall's seven lifecycle methods do not share a 0.02 NEAR row with any other shop that
+  // needs calls of its own. Measured above: 692 pair bytes against 414 for Hall+House+Toll,
+  // and 693 for Hall+House+Arena. That is the contract's row cap, not a page preference, so
+  // the page must refuse the shape instead of signing a list the chain rejects.
+  assert.equal(build([TOLL, GUARD, HOUSE, HALL]).fits, false, 'Hall with three contract shops does not fit one row');
+  assert.equal(build([TOLL, ARENA, HOUSE, HALL]).fits, false, 'Hall with House and two more shops does not fit one row');
+  for (const shops of [[TOLL, GUARD, ARENA, HOUSE]]) {
     const t = build(shops);
     assert.equal(t.fits, true, `${shops.length} shops fit: ${shops.join(',')}`);
     for (const shop of shops) {
@@ -157,13 +169,14 @@ test('the optional pairs go before a shop does, and the real limit is four shops
     for (const d of t.dropped) assert.ok(d.why && d.why.length > 10, `${d.method} states why it was droppable`);
   }
 
-  // Five shops do NOT fit, and that is a contract limit rather than a page rule: 426 bytes of
-  // pairs next to five receivers against a 390-byte budget. (Was 433 before Arena's pair became
-  // its real method `fund` instead of `ft_transfer`.) The page must say so and refuse to
+  // Five shops do NOT fit, and that is a contract limit rather than a page rule. The exact
+  // count is now 740 pair bytes against a 390-byte budget, because the Town Hall contributes
+  // its seven lifecycle methods (it used to contribute one `ft_transfer` while the account ran
+  // the legacy bounty code and had no `post_job` at all). The page must say so and refuse to
   // sign, because the chain answers ERR_ROW_TOO_BIG after the wallet has already approved.
   const five = build([TOLL, GUARD, ARENA, HOUSE, HALL]);
   assert.equal(five.fits, false, 'five named shops do not fit one 0.02 NEAR row');
-  assert.equal(pairBytes(five.calls), 426);
+  assert.equal(pairBytes(five.calls), 740);
   assert.equal(pairBudgetBytes(5), 390);
   assert.ok(pairBytes(five.calls) > pairBudgetBytes(5));
 
