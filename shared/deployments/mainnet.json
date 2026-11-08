@@ -423,5 +423,35 @@
       "house_deed_mint_visitor": "4W7bmUYoG3QfRUKF7yJSfELMUgWsrAP5GrL9d7VC5X33"
     },
     "note": "House v3 after PR #36. Recovered legacy ~2.50 via house_pay+close, recreated same name stake 3.75199. Locked, no FA keys."
+  },
+  "outlayer": {
+    "contract": "outlayer.near",
+    "live_checked": "2026-11-08",
+    "stats": {
+      "executions": 2875,
+      "fees_yocto": "3572363365500000000000000"
+    },
+    "estimate_near": {
+      "call": "estimate_execution_cost",
+      "limits": "2e9 instructions, 64MB, 20s, 400-byte input",
+      "cost": "0.003"
+    },
+    "checker": {
+      "path": "outlayer/artifacts/charter_check.wasm",
+      "bytes": 114416,
+      "sha256": "17f860e5ef220e22adbd9b0bf2ea69500dc7eda74bb89177da530943838d21a5",
+      "url": "https://nearcarta.vercel.app/outlayer/charter_check.wasm",
+      "build_target": "wasm32-wasip1",
+      "verified": "Run locally with wasmtime 24 on 2026-11-08: an inside-clause payment answers allow:true with no reasons; an outside payment answers allow:false with three named reasons; unparseable input answers success:false and allow:false. The served URL returns these exact bytes."
+    },
+    "caller": {
+      "crate": "contracts/attested_check",
+      "wasm": "contracts/artifacts/attested_check.wasm",
+      "wasm_sha256": "98c6766a0ffff63a11163f7481bc2984105d031c6e1c44f2f644afc088ae7986",
+      "wasm_bytes": 167311,
+      "planned_account": "attested.nearcarta.near",
+      "NOT_DEPLOYED": "Not deployed on 2026-11-08: the stake for a 167 KB contract is ~1.673 NEAR and free NEAR across the whole city is 2.43 NEAR, so deploying it would commit 69% of every liquid yocto while the board upgrade is still pending. The stake is recoverable (the contract's close() deletes the account and returns every yocto), so this is a reversible step that waits for the upgrade rather than being abandoned. Deploy with: node .secrets/deploy-attested.mjs --send"
+    },
+    "note": "The Guardhouse can ask OutLayer to run this checker in a TDX enclave and resume the transaction with the result. It is NOT wired into the tray yet and NO attested decision has been produced on mainnet. The README says so in those words: the payee check the visitor sees is the server's, and it has no TEE signature."
   }
 }
