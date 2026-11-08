@@ -163,7 +163,29 @@ body:not(.explore) #modeBtn{display:none!important}
 #shopUI .icon{width:40px;height:40px;display:grid;place-items:center;border-radius:var(--r);background:var(--raised);border:1px solid var(--line);color:var(--muted)}
 .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 #curfewBtn:hover + #curfewHint, #curfewBtn:focus + #curfewHint, #curfewBtn:focus-visible + #curfewHint{position:fixed;width:auto;height:auto;margin:0;clip:auto;overflow:visible;left:16px;bottom:72px;z-index:40;max-width:36ch;padding:8px 10px;border-radius:8px;background:#1a140fe6;color:#f3ead8;border:1px solid #d6b46a;font:14px/1.35 system-ui,sans-serif}
-#back:hover{border-color:var(--accent)!important} #back kbd{font:600 10px/1 var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:2px 4px}
+/* The Back button had NO base rule at all — only a :hover and a mobile override — which is
+   exactly why it read as a dark rectangle pasted over the room. It is now the same pill as the
+   rest of the chrome: 36px tall, the tray's border and radius, an even gap between arrow, label
+   and the Esc key, and a real icon instead of a text arrow. */
+#back{
+  position:fixed; z-index:210; top:16px; right:16px;
+  display:inline-flex; align-items:center; gap:8px;
+  height:36px; padding:0 12px 0 10px; box-sizing:border-box;
+  background:rgba(26,20,15,.92); color:#f3ead8;
+  border:1px solid rgba(214,180,106,.45); border-radius:999px;
+  font:500 13px/1 Inter,system-ui,sans-serif;
+  box-shadow:0 6px 18px rgba(0,0,0,.32);
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  cursor:pointer; transition:background .18s,border-color .18s,color .18s;
+}
+#back > span[aria-hidden]{font-size:15px;line-height:1;color:#d6b46a;display:inline-block;transform:translateY(-.5px)}
+#back:hover,#back:focus-visible{background:rgba(40,31,22,.98);border-color:#d6b46a;color:#f5d08a;outline:none}
+#back:focus-visible{outline:2px solid #f5d08a;outline-offset:2px}
+#back kbd{
+  font:600 10px/1 var(--mono); color:#b9ad95;
+  border:1px solid rgba(243,234,216,.22); border-radius:6px;
+  padding:3px 6px; margin-left:2px; background:rgba(243,234,216,.06);
+}
 #shopUI .note.legal{margin-top:24px}
 body.in-shop #ctl,body.in-shop #chron,body.in-shop #zoom,body.in-shop #pins,body.in-shop #hint,body.in-shop #tag,body.in-shop #bubbles,body.in-shop #prompt,body.in-shop #title,body.in-shop #lb{display:none!important}
 body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt{opacity:0;pointer-events:none;transition:opacity .2s}
@@ -511,12 +533,32 @@ body:has(#drawer.open) #back{visibility:hidden}
 #drawer .plain-line.warn { color: #ffd88a; }
 #drawer .plain-line a { color: #f3d78f; text-decoration: underline; }
 
-/* A plain shop list for a visitor who cannot use the city. It does not restyle the canvas. */
-/* In a shop the tray starts at the same height, so "All shops" must sit above it or it lands
-   on the first tab (measured: it covered Arena's tab). Push the tray below the menu. */
+/* A plain shop list for a visitor who cannot use the city. It does not restyle the canvas.
+   ---------------------------------------------------------------------------------------
+   One rail, not three overlapping boxes. The town and the shops share a single top-left
+   column: "All shops" is the first item, the tray starts BELOW it, and nothing is positioned
+   by guesswork. Before this the menu was pushed with `top:64px` and the tray was padded by a
+   44px fudge, which is why the button sat on the first tab and looked pasted on. */
+nav.all-shops{position:fixed;
+  z-index:200;
+  top:var(--hudTop,92px); left:16px;
+  max-width:min(340px,calc(100vw - 32px));
+  background:rgba(26,20,15,.96); color:#fff8ee;
+  border:1px solid #c98f4e; border-radius:14px;
+  padding:6px 8px; font:600 16px/1.35 system-ui,sans-serif;
+  box-shadow:0 12px 30px rgba(0,0,0,.38);
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  pointer-events:auto;
+}
+/* In a shop the rail is the only left-hand chrome, so the tray starts clear of it rather than
+   underneath it. `--rail` is the rail's own height, measured in js and set on body; the
+   explicit `top` keeps the menu above every tray even before that measurement lands, which is
+   the property the layout test pins. */
 body.in-shop nav.all-shops { top: 64px; }
-body.in-shop #shopUI #tray { padding-top: calc(var(--s3) + 44px); }
-nav.all-shops{position:fixed;z-index:200;top:120px;left:12px;max-width:min(280px,calc(100vw - 24px));background:#1a140f;color:#fff8ee;border:1px solid #c98f4e;border-radius:12px;padding:8px 12px;font:600 16px/1.35 system-ui,sans-serif;pointer-events:auto}
+body.in-shop #shopUI #tray {
+  padding-top: 20px;
+  max-height: calc(100dvh - var(--rail, 120px) - 40px);
+}
 body.story nav.all-shops,body.intro-on nav.all-shops,body:not(.ready) nav.all-shops{opacity:1;visibility:visible;pointer-events:auto;z-index:200}
 nav.all-shops summary{list-style:none;cursor:pointer;color:#f5d08a}
 nav.all-shops summary::-webkit-details-marker{display:none}
