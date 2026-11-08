@@ -552,7 +552,14 @@ export function mountBankRoom(root, hooks = {}) {
       body = { ok: false, nonce, failure: e?.message || 'The attestation request failed' };
     }
     if (state.attestNonce !== nonce) return { ok: false, hint: 'Not checked yet.', say: 'Not checked yet.', keep: true, kind: 'no' };
-    let signature = { ok: false, checked: false, why: 'no completion was sent, so this step was not checked' };
+    // With no audit yet there is no completion to sign, so the signature step cannot be
+    // checked. Saying "failed" there is wrong: nothing failed, the step had nothing to check.
+    // Measured 2026-11-08: pressing Verify TEE now before any audit reported `failed` and
+    // "A listed step did not verify", which reads as a broken attestation.
+    let signature = {
+      ok: false, checked: false, absent: !state.statement?.length,
+      why: 'no completion was sent, so this step was not checked',
+    };
     if (state.statement?.length) {
       const model = await postAudit(state.statement, state.model);
       if (state.attestNonce !== nonce) return { ok: false, hint: 'Not checked yet.', say: 'Not checked yet.', keep: true, kind: 'no' };
@@ -569,10 +576,19 @@ export function mountBankRoom(root, hooks = {}) {
       f.id === 'nonce' ? { ...f, ok: f.ok && echoed === nonce, value: nonce, why: echoed === nonce ? f.why : 'The quote nonce does not match the one this page sent' } : f
     ));
     const failed = state.fields.filter(f => !f.ok);
+    // A step that had nothing to check is not a failure, and it should not be described as one.
+    const uncheckedOnly = failed.length > 0 && failed.every(f => f.id === 'signature' && signature.absent);
     state.attestPending = false;
     state.checkedNonce = nonce;
     state.eligibility = failed.length ? failed.map(f => `${f.label}: ${f.why}`).join(' ') : 'Every listed field was verified.';
-    if (body?.ok && !failed.length && echoed === nonce) {
+    if (uncheckedOnly && body?.ok && echoed === nonce) {
+      // Everything the server can attest passed; only the browser-side signature step was
+      // skipped because there was no completion. Say that, not "failed".
+      state.teeLabel = 'partial';
+      state.teeFail = '';
+      state.teeLive = 'The hardware checks passed. Run an audit first, then verify again to check the response signature. Nothing was signed.';
+      state.eligibility = state.teeLive;
+    } else if (body?.ok && !failed.length && echoed === nonce) {
       state.teeLabel = 'attested';
       state.teeLive = 'Live check passed.';
       state.teeFail = '';
