@@ -19,7 +19,9 @@ test('the city has exactly the nine shops the router knows', () => {
 });
 
 test('the All shops list has one entry per shop and no other shop link', () => {
-  const entries = [...list.matchAll(/<a href="([^"]+)"([^>]*)>([^<]+)<\/a>/g)].map(m => ({ href: m[1], attrs: m[2], text: m[3] }));
+  // Each entry now carries a name and a one-line description (`<b>` + `<small>`), so the text
+  // group may contain tags. The property under test is unchanged: one city entry per shop.
+  const entries = [...list.matchAll(/<a href="([^"]+)"([^>]*)>([\s\S]*?)<\/a>/g)].map(m => ({ href: m[1], attrs: m[2], text: m[3] }));
   const shopLinks = entries.filter(e => e.href !== '/shops/vault/');
   assert.equal(shopLinks.length, KEYS.length, 'one city entry per shop, plus the charter office');
 });
