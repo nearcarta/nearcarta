@@ -76,6 +76,7 @@ function shell() {
     <p class="ferry-quote-err" data-testid="house-status-2" hidden></p>
     <p class="note" data-testid="house-failures" hidden>A lost or hostile guardian cannot release this deed. The owner can cancel.</p>
     <details class="house-record" data-testid="house-record" open><summary>Recorded payments</summary>${deedMarkup()}<div data-testid="house-read"></div></details>
+    <details class="house-history" data-testid="house-history"><summary>Every transaction on this deed</summary><div data-testid="house-history-body" role="status">Reading the deed's history…</div></details>
   </div>`;
 }
 
@@ -341,6 +342,25 @@ export function mountHouseRoom(root, hooks = {}) {
     .then(r => r.json())
     .then(body => { state.line = body; paintHeirs(); })
     .catch(() => { state.line = { live: false, why: 'house_line is not on this deed. Nothing was signed.' }; paintHeirs(); });
+  // The NFT track asks for a history per deed. Every row here is a real transaction, linked.
+  fetch(api() + '/api/house/history/' + encodeURIComponent(id), { cache: 'no-store' })
+    .then(r => r.json())
+    .then(body => {
+      const box = root.querySelector('[data-testid=house-history-body]');
+      if (!box) return;
+      const rows = body?.rows || [];
+      if (!rows.length) {
+        box.innerHTML = esc(body?.note || body?.gap || 'No transactions touch this deed yet.');
+        return;
+      }
+      const when = (ms) => (ms ? new Date(ms).toISOString().slice(0, 10) : '');
+      box.innerHTML = `<ol class="house-hist-list">${rows.map(r => `<li data-testid="house-hist-row"><b>${esc(r.what)}</b> <span class="muted">${esc(when(r.at))}</span> <a href="https://nearblocks.io/txns/${esc(r.hash)}" target="_blank" rel="noopener" title="${esc(r.method)}">${esc(String(r.hash).slice(0, 10))}… ↗</a></li>`).join('')}</ol>`
+        + (body?.gap ? `<p class="small muted">${esc(body.gap)}</p>` : '');
+    })
+    .catch(() => {
+      const box = root.querySelector('[data-testid=house-history-body]');
+      if (box) box.innerHTML = 'The history did not answer. Nothing was signed.';
+    });
 
   state.contract = DEED.contract;
   return { turn, state };

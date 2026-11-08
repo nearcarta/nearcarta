@@ -44,6 +44,7 @@ import { readGuardians, removedMarket, scorePayload } from './arena-economy.js';
 import { receiptsBody } from '../../shared/rails/receipts.js';
 import { marketStatus, marketWorkers, readBounties } from './hall-market.js';
 import { derivedFor, lineFor } from './house-views.js';
+import { deedHistory } from './deed-history.js';
 import { HOUSE_LEGACY, HOUSE_SHOP } from '../../shared/house/shop.js';
 
 // Your House: a second charter on the same wasm, governed by its owner's wallet (no DAO).
@@ -465,6 +466,28 @@ export function makeApp() {
     if (!nearAccountOk(a)) return bad(c, 'not an account id');
     if (!D) return c.json({ live: false, line: null, why: 'house_line is not on this deed. Nothing was signed.' });
     return c.json(await lineFor(a, D.contract, view));
+  });
+  // Per-deed history: the transactions that touched this deed, newest first, plus the purse
+  // totals the contract reports now. A judge can open every hash. Read-only.
+  app.get('/api/house/history/:account', limiter(12), async c => {
+    const a = c.req.param('account');
+    if (!nearAccountOk(a)) return bad(c, 'not an account id');
+    if (!D) return c.json({ live: false, token_id: a, rows: [], count: 0, note: 'no deed contract' });
+    const index = 'https://api.nearblocks.io';
+    let txns = [];
+    let gap = '';
+    try {
+      const key = process.env.NEARBLOCKS_API_KEY || '';
+      const r = await fetch(`${index}/v1/account/${encodeURIComponent(D.contract)}/txns?per_page=40`, {
+        headers: key ? { Authorization: `Bearer ${key}`, 'User-Agent': 'nearcarta' } : { 'User-Agent': 'nearcarta' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (r.ok) txns = (await r.json())?.txns || [];
+      else gap = `the index answered ${r.status}`;
+    } catch { gap = 'the index did not answer'; }
+    const purse = await view(D.contract, 'house_purse', { token_id: a }).catch(() => null);
+    const out = deedHistory(txns, a, purse);
+    return c.json({ live: !gap, ...out, ...(gap ? { gap: `${gap}, so this history may be short.` } : {}) });
   });
   // Counterparty check before a payment: allow / warn / block with reasons (backend/src/counterparty.js).
   // ?charter= must be a Nearcarta charter: a known contract, a factory charter, or a row opened on the board.

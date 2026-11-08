@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -317,4 +319,30 @@ test('the attack demo stops every attack and prints real reasons, not placeholde
   // `parsed.by` must not be READ; the comment explaining why may name it.
   const codeOnly = src.replace(/\/\/[^\n]*/g, '');
   assert.doesNotMatch(codeOnly, /parsed\.by/, 'parsed has no `by` field');
+});
+
+test('the deed history lists only real transactions, named by the method that ran', () => {
+  // The NFT track asks for "a history view per NFT: what it earned, what it paid out, who held
+  // it". The deed contract emits events, but neither the public index nor
+  // EXPERIMENTAL_tx_status returns their logs, so the honest view names the METHOD that ran and
+  // links the transaction. A row exists only because that hash exists.
+  const { deedHistory } = require('../../../backend/src/deed-history.js');
+  const TOKEN = 'deed.near';
+  const txns = [
+    { transaction_hash: 'h1', signer_account_id: TOKEN, block_timestamp: 1000, actions: [{ method: 'mint_deed' }] },
+    { transaction_hash: 'h2', signer_account_id: 'row.near', block_timestamp: 2000, actions: [{ method: 'house_session_check_in' }] },
+    { transaction_hash: 'h3', signer_account_id: TOKEN, block_timestamp: 3000, actions: [{ method: 'house_pay' }] },
+    { transaction_hash: 'h4', signer_account_id: 'someone.else', block_timestamp: 4000, actions: [{ method: 'something_else' }] },
+    // A tx that mentions the same hash twice must not appear twice.
+    { transaction_hash: 'h3', signer_account_id: TOKEN, block_timestamp: 3000, actions: [{ method: 'house_pay' }] },
+  ];
+  const h = deedHistory(txns, TOKEN, { balance: '5', cap: '10', paid: '2', pays: 1 });
+  assert.equal(h.count, 3, 'three transactions touch this deed');
+  assert.deepEqual(h.rows.map(r => r.method), ['house_pay', 'house_session_check_in', 'mint_deed'], 'newest first');
+  assert.ok(h.rows.every(r => r.hash && r.hash.startsWith('h')), 'every row carries its hash');
+  assert.equal(h.rows[0].what, 'Paid out');
+  assert.ok(!h.rows.some(r => r.hash === 'h4'), 'an unrelated transaction is not this deed');
+  // Totals come from the contract, never from summing the rows (the events are unreadable).
+  assert.deepEqual(h.totals, { balance: '5', cap: '10', paid: '2', pays: 1 });
+  assert.equal(deedHistory([], TOKEN).note, 'No transactions touch this deed yet.');
 });
