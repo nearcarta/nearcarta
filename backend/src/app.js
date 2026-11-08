@@ -517,7 +517,10 @@ export function makeApp() {
             return {
               transaction_hash: tx.hash,
               signer_account_id: tx.signer_id,
-              block_timestamp: meta.tx_block_timestamp ? Number(meta.tx_block_timestamp) * 1e6 : null,
+              // FastNEAR already reports NANOSECONDS, not seconds. Multiplying by 1e6 made the
+              // date 1.79e24 ms, which threw RangeError: Invalid time value in the browser and
+              // took the whole panel down.
+              block_timestamp: meta.tx_block_timestamp ? Math.round(Number(meta.tx_block_timestamp) / 1e6) : null,
               block: { block_height: meta.tx_block_height ?? null },
               // A row's board call wraps the shop method in its args: the outer method is
               // `propose_call_as` and the deed action is inside. Read the inner one so the

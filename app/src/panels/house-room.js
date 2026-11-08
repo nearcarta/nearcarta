@@ -353,7 +353,14 @@ export function mountHouseRoom(root, hooks = {}) {
         box.innerHTML = esc(body?.note || body?.gap || 'No transactions touch this deed yet.');
         return;
       }
-      const when = (ms) => (ms ? new Date(ms).toISOString().slice(0, 10) : '');
+      // A bad timestamp must never take the panel down: `toISOString` throws RangeError on an
+      // invalid date, and that is exactly what happened when the units were wrong.
+      const when = (ms) => {
+        const n = Number(ms);
+        if (!Number.isFinite(n) || n <= 0) return '';
+        const d = new Date(n);
+        return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+      };
       box.innerHTML = `<ol class="house-hist-list">${rows.map(r => `<li data-testid="house-hist-row"><b>${esc(r.what)}</b> <span class="muted">${esc(when(r.at))}</span> <a href="https://nearblocks.io/txns/${esc(r.hash)}" target="_blank" rel="noopener" title="${esc(r.method)}">${esc(String(r.hash).slice(0, 10))}… ↗</a></li>`).join('')}</ol>`
         + (body?.gap ? `<p class="small muted">${esc(body.gap)}</p>` : '');
     })
