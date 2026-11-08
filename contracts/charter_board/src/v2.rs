@@ -517,7 +517,12 @@ impl Board {
         require!(!row.frozen, "frozen");
         if row.rules.expires_at != 0 { require!(now <= row.rules.expires_at, "clause_expired"); }
         require!(in_window(row.rules.window_start_min, row.rules.window_end_min), "outside_time_window");
-        require!(deposit >= row.rules.min_amount, "below_min_amount");
+        // `min_amount` is the smallest PAYMENT the visitor allows, not the smallest call. A
+        // shop method that carries no value (a bid, an accept, a deliver, a review, a refund)
+        // has no payment to measure, and refusing it below the minimum blocked the whole Town
+        // Hall lifecycle after `post_job`: measured on mainnet 2026-11-08, `bid` was refused
+        // `below_min_amount` with a zero deposit, which is the only deposit it can have.
+        if deposit > 0 { require!(deposit >= row.rules.min_amount, "below_min_amount"); }
         require!(row.rules.receivers.contains(&receiver), "receiver_not_allowlisted");
         require!((1..=64).contains(&method.len()), "ERR_METHOD");
         let Some(policy) = self.calls.get(&owner) else { env::panic_str("method_not_allowlisted"); };

@@ -2701,6 +2701,32 @@ mod tests {
     }
 
     #[test]
+    fn a_shop_call_with_no_value_is_not_held_to_the_smallest_payment() {
+        // `min_amount` is the smallest payment the visitor allows. A Town Hall `bid`, `accept`,
+        // `deliver`, `review` or `refund` carries no value at all, so measuring it against the
+        // minimum refused every step after `post_job`. Measured on mainnet 2026-11-08: the row
+        // had min_amount 0.0001 NEAR and `bid` with a zero deposit answered below_min_amount.
+        let (mut c, sk, _) = boot();
+        let hall = ["post_job", "bid", "deliver", "review"].iter()
+            .map(|m| (acc(SHOP), (*m).to_string(), NEAR / 50)).collect::<Vec<_>>();
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(hall, NEAR / 10);
+        let expiry = 1_000_000u64;
+        // A zero-value call is allowed ...
+        go(ALICE, 0, 0);
+        let sig = sign_as(&sk, &c, ALICE, SHOP, "bid", "{}", 0, expiry, Vec::new(), true);
+        c.propose_call_as(acc(ALICE), acc(SHOP), "bid".into(), "{}".into(), U128(0), U64(expiry), Vec::new(), true, sig);
+        // ... while a real payment below the minimum is still refused.
+        go(ALICE, 0, 0);
+        let small = NEAR / 20_000;
+        let sig2 = sign_as(&sk, &c, ALICE, SHOP, "post_job", "{}", small, expiry, Vec::new(), true);
+        let err = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call_as(acc(ALICE), acc(SHOP), "post_job".into(), "{}".into(), U128(small), U64(expiry), Vec::new(), true, sig2);
+        })).unwrap_err();
+        assert!(refuse(err).contains("below_min_amount"), "a small payment is still refused");
+    }
+
+    #[test]
     fn a_row_that_carries_a_shop_list_can_still_write_a_hold() {
         // The failure this pins was measured in the deployed city on 2026-11-08: a clean
         // seven-pair Town Hall row (1858 bytes, 142 spare) posted a job, `propose_call_as`
