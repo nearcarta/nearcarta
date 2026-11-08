@@ -1095,6 +1095,13 @@ const APPS = {
       capNear: () => (A.S.clauses?.pay ? A.fromY(A.S.clauses.pay.per_action_cap) : null),
       account: () => A.S.me || '',
       onPay: (rows, opts) => sendPayoutRows(rows, opts),
+      // The invoice lives in a file on the API host. `anchor` logs its digest on the board and
+      // stores no trie bytes, so the commitment outlives the host. Reuses the one sender the
+      // Chronicle already proved rather than a second implementation.
+      onAnchor: async ({ body, digest }) => {
+        const out = await A.anchorStatement({ kind: 'invoice', digest, salt: 'nearcarta2026' });
+        return out?.ok ? { ok: true, tx: out.tx, body } : { ok: false, hint: `The board refused the anchor: ${out?.reason || 'refused'}. Nothing was signed.` };
+      },
       onForeignPay: (row, opts) => A.payoutsForeign(row, opts),
       onSponsor: (plan, opts) => A.payoutsSponsor(plan.account, plan.depositNear, opts),
       onCinema: (opts) => { if ((opts?.paid || opts?.refused) && sh?.act && runScene) runScene(sh.act(opts)); },
