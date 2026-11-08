@@ -382,3 +382,46 @@ test('the deed history never takes the panel down over one bad timestamp', () =>
   const room = readFileSync(new URL('../../../app/src/panels/house-room.js', import.meta.url), 'utf8');
   assert.match(room, /Number\.isNaN\(d\.getTime\(\)\)/, 'the renderer rejects an invalid date instead of throwing');
 });
+
+test('the deed page opens only for the current holder, decided from the chain', () => {
+  // The NFT brief asks for "a gated page that only current holders can open". The gate must be
+  // `nft_token(id).owner_id`, read fresh, and an unanswered read must never be permission.
+  const { gateDeed, gatedHtml, deedOwner } = require('../../../app/src/deed-gate.js');
+  const DEEDS = 'house.nearcarta.near';
+  const HOLDER = 'holder.near';
+  const makeView = (owner) => async (contract, method) => {
+    if (contract !== DEEDS || method !== 'nft_token') return null;
+    return owner ? { token_id: 't1', owner_id: owner } : null;
+  };
+
+  return (async () => {
+    // The holder opens it.
+    const yes = await gateDeed('t1', HOLDER, { view: makeView(HOLDER), contract: DEEDS });
+    assert.equal(yes.open, true);
+    assert.equal(gatedHtml(yes), '', 'no refusal markup for the holder');
+
+    // Anyone else is refused, and told who holds it.
+    const no = await gateDeed('t1', 'stranger.near', { view: makeView(HOLDER), contract: DEEDS });
+    assert.equal(no.open, false);
+    // The refusal names the holder, truncated for display.
+    assert.match(no.reason, /belongs to holder\.nea/);
+    assert.equal(no.owner, 'holder.near', 'the full owner is returned for a caller that needs it');
+
+    // A sold deed refuses the seller immediately, because the owner is re-read.
+    const sold = await gateDeed('t1', HOLDER, { view: makeView('buyer.near'), contract: DEEDS });
+    assert.equal(sold.open, false, 'the seller loses the page the moment the deed moves');
+
+    // No deed, no account, and a failed read are all refusals, never permission.
+    assert.equal((await gateDeed('missing', HOLDER, { view: makeView(null), contract: DEEDS })).open, false);
+    assert.equal((await gateDeed('t1', '', { view: makeView(HOLDER), contract: DEEDS })).open, false);
+    const broke = await gateDeed('t1', HOLDER, { view: async () => { throw new Error('rpc down'); }, contract: DEEDS });
+    assert.equal(broke.open, false, 'a failed read is not permission');
+
+    // The refusal markup holds no deed data: it names the holder and offers the way in.
+    const html = gatedHtml(no);
+    assert.match(html, /deed holder/);
+    assert.match(html, /data-testid="deed-gated"/);
+    assert.ok(!/purse/i.test(html), 'the refusal shows nothing about the deed');
+    assert.equal(await deedOwner('t1', { view: makeView(HOLDER), contract: DEEDS }), HOLDER);
+  })();
+});
