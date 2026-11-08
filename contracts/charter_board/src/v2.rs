@@ -556,8 +556,21 @@ impl Board {
         self.flush_owner(&owner);
         let grown = env::storage_usage().saturating_sub(storage_before);
         let cost = grown as u128 * price();
+        // Pay for the hold record the way `charge_acts` pays for an effect budget: the side
+        // reserve first, then the row's own remaining room. The reserve alone is not enough —
+        // measured on mainnet 2026-11-08, a hall row at 1753 bytes locked still refused the
+        // hold, and the hold is the biggest side write a row makes (it carries the receiver,
+        // the method, the whole argument blob and the effect list).
+        //
+        // The row part is not a new charge: `open_charter` already took a deposit for the row's
+        // whole allowance, and `propose_call_as` runs from the session key with nothing
+        // attached. Requiring a deposit here is what made every held payment, the toll crossing
+        // and the Town Hall post impossible on a row that carried a shop list.
         let have = self.credit.get(&owner).copied().unwrap_or(0);
-        if cost > have {
+        let from_reserve = have.min(cost);
+        let from_row = cost - from_reserve;
+        let row_room = self.rows.get(&owner).map(|r| MAX_ROW_YOCTO.saturating_sub(r.storage_locked)).unwrap_or(0);
+        if from_row > row_room {
             self.holds.remove(&(owner.clone(), id));
             if self.partial { self.hold_count = self.hold_count.saturating_sub(1); }
             kv_del(b"h", &format!("{}/{}", owner.as_str(), id));
@@ -570,9 +583,14 @@ impl Board {
             }
             row.nonce -= 1;
             self.calls.get_mut(&owner).unwrap().session_spent = self.calls.get(&owner).unwrap().session_spent.saturating_sub(deposit);
-            env::panic_str("ERR_DEPOSIT");
+            env::panic_str("ERR_ROW_TOO_BIG");
         }
-        if cost > 0 { *self.credit.get_mut(&owner).unwrap() -= cost; }
+        if from_reserve > 0 { *self.credit.get_mut(&owner).unwrap() -= from_reserve; }
+        if from_row > 0 {
+            let row = self.rows.get_mut(&owner).unwrap();
+            row.storage_locked += from_row;
+        }
+        if cost > 0 { self.owe(cost as i128); }
         if hold { None } else { Some(self.send_call(&owner, id)) }
     }
 
