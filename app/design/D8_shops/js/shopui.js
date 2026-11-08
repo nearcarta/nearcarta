@@ -1090,18 +1090,36 @@ const APPS = {
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.map(to => ({ to, amt: '0.001', asset: 'NEAR', chain: 'near' })); if (!extra.rows.length) extra.rows.push({ to: '', amt: '', asset: 'NEAR', chain: 'near' }); } return extra.rows; },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
     form: () => '<div data-deep="payouts"></div>',
-    bind: () => mountShop('payouts', document.getElementById('t-form'), {
+    bind: () => {
+      // `anchor` panics ERR_NO_CHARTER on the live board build; the hydrate fix is in the
+      // staged one. Offer the action only when that code hash is the one on chain, so the
+      // button never promises a transaction the contract would refuse. Read from the
+      // deployment record, which is updated when the upgrade is applied.
+      const anchorHash = A.S.mainnet?.board?.anchor_code_hash || '';
+      const liveHash = A.S.mainnet?.board?.code_hash || '';
+      if (anchorHash && liveHash && anchorHash !== liveHash) {
+        extra.anchorBlocked = 'Anchoring needs the board build that fixes `anchor` (it answers ERR_NO_CHARTER today). It is staged and lands with the next upgrade; the invoice link itself works now.';
+      }
+      return mountShop('payouts', document.getElementById('t-form'), {
       state: extra, repaint: () => paint(), rows: () => APPS.payouts.rows(),
       capNear: () => (A.S.clauses?.pay ? A.fromY(A.S.clauses.pay.per_action_cap) : null),
       account: () => A.S.me || '',
       onPay: (rows, opts) => sendPayoutRows(rows, opts),
+      // The invoice lives in a file on the API host. `anchor` logs its digest on the board and
+      // stores no trie bytes, so the commitment outlives the host. Reuses the one sender the
+      // Chronicle already proved rather than a second implementation.
+      onAnchor: async ({ body, digest }) => {
+        const out = await A.anchorStatement({ kind: 'invoice', digest, salt: 'nearcarta2026' });
+        return out?.ok ? { ok: true, tx: out.tx, body } : { ok: false, hint: `The board refused the anchor: ${out?.reason || 'refused'}. Nothing was signed.` };
+      },
       onForeignPay: (row, opts) => A.payoutsForeign(row, opts),
       onSponsor: (plan, opts) => A.payoutsSponsor(plan.account, plan.depositNear, opts),
       onCinema: (opts) => { if ((opts?.paid || opts?.refused) && sh?.act && runScene) runScene(sh.act(opts)); },
       hideRefuse: () => sh?.hideRefuse?.(),
       showRefuse: (text) => sh?.showRefuse?.(text),
       onReady: ok => { if (cur === 'payouts') return; btn(APPS.payouts.btn(), 'primary', !ok || !A.canBatch()); },
-    }),
+      });
+    },
     btn: () => payoutLabel(APPS.payouts.rows()),
     hero: () => extra.pay ? num(`${extra.pay.paid}/${extra.pay.n}`, 'paid') : num(APPS.payouts.rows().length, 'payouts'),
     run: async () => {

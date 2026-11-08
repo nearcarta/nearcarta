@@ -151,6 +151,18 @@ export function mountPayouts(root, hooks) {
       <button type="button" id="p-copy" data-testid="payout-copy">Copy link</button>
       <div class="payout-qr" data-testid="payout-qr">${qr}</div>
       <p class="payout-calm">Creating an invoice signs nothing.</p>
+      <!-- The invoice lives in this host's file, and a new host starts empty. Anchoring its
+           digest on the board writes an event with no trie bytes, so the commitment survives a
+           restart and a payer can check that the link was not edited. Opt-in, because it is a
+           transaction. -->
+      <div class="payout-anchor">
+        <button type="button" id="p-anchor" data-testid="payout-anchor"${state.anchored || state.anchorBlocked ? ' disabled' : ''}>${state.anchored ? 'Anchored on chain' : (state.anchorBlocked ? 'Anchoring waits for the board upgrade' : 'Anchor this invoice on chain')}</button>
+        <p class="payout-calm" data-testid="payout-anchor-note">${state.anchorBlocked
+          ? esc(state.anchorBlocked)
+          : state.anchored
+          ? `Anchored. tx ${esc(String(state.anchored).slice(0, 10))}… Anyone can read the commitment back from the board.`
+          : 'This host keeps the invoice in a file, so a new host starts empty. Anchoring writes its digest on chain: the link then has a public record that does not depend on this server.'}</p>
+      </div>
     </div>`;
   }
 
@@ -468,6 +480,52 @@ export function mountPayouts(root, hooks) {
     } catch { /* the registration line stays */ }
   }
 
+
+  /**
+   * Write the invoice's digest on the board. `anchor` logs an event and stores no trie bytes,
+   * so this costs gas only and needs nothing from the row but a valid session key.
+   *
+   * Why: the invoice itself lives in a file on this host and a new host starts empty, which the
+   * API already says out loud. An anchor gives the link a public commitment that survives a
+   * restart and lets a payer check the terms were not edited after the fact. It does not make
+   * the invoice durable by itself; the digest is what stays.
+   */
+  async function anchorInvoice() {
+    const inv = state.invoice;
+    if (!inv || !inv.id) return { ok: false, hint: 'Create an invoice first. Nothing was signed.' };
+    if (state.fixture) return { ok: false, hint: 'Fixture. Not a live anchor.' };
+    if (typeof hooks.onAnchor !== 'function') {
+      state.payLine = 'Finish /setup in the city. Nothing was signed.';
+      render();
+      return { ok: false, hint: state.payLine };
+    }
+    const body = [inv.id, inv.usd, inv.receive, inv.memo || '', inv.due || '', inv.expiry || '', inv.destination || ''].join('|');
+    state.payLine = 'Anchoring the invoice digest on the board…';
+    render();
+    let sent;
+    try {
+      sent = await hooks.onAnchor({ id: inv.id, body, digest: await digestHex(body) });
+    } catch (e) {
+      sent = { ok: false, hint: String(e?.message || 'The anchor did not go.').slice(0, 160) };
+    }
+    if (sent?.ok && sent.tx) {
+      state.anchored = sent.tx;
+      state.payLine = `Anchored. tx ${String(sent.tx).slice(0, 10)}… The board logs this commitment; it stores nothing.`;
+    } else {
+      state.payLine = sent?.hint || 'The anchor did not go. Nothing was signed.';
+    }
+    state.payLine2 = '';
+    render();
+    return { ...sent, ok: !!sent?.ok, hint: state.payLine };
+  }
+
+  /** sha256 hex of a UTF-8 string, for the commitment. */
+  async function digestHex(text) {
+    const bytes = new TextEncoder().encode(text);
+    const buf = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
   async function createLink() {
     if (state.fixture) return { ok: false, hint: 'Fixture. Not a live payment.' };
     clearSeal();
@@ -768,6 +826,8 @@ export function mountPayouts(root, hooks) {
     if (pay) pay.onclick = () => payReviewed(state.rows);
     const create = q$(root, '#p-create');
     if (create) create.onclick = () => createLink();
+    const anchor = q$(root, '#p-anchor');
+    if (anchor) anchor.onclick = () => anchorInvoice();
     const copy = q$(root, '#p-copy');
     if (copy) copy.onclick = async () => {
       const url = state.payUrl || '';
