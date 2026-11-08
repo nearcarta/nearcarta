@@ -280,6 +280,9 @@ test('the House room hands its plan to a sender instead of stopping at a hint', 
   assert.doesNotMatch(fn, /callAsMessage\(/, 'and never builds one locally');
   assert.match(fn, /propose_call_as/, 'then sends propose_call_as');
   assert.match(fn, /W\.signMessage/, 'signed by the session key');
+  // `plan.call.args` is the whole propose_call_as payload; the shop's arguments are its `args`
+  // field. Passing the wrapper made the RPC answer "invalid type: null, expected a string".
+  assert.match(fn, /plan\.call\.args\?\.args/, 'houseCall unwraps the shop arguments');
   // The house account comes from the record, and is not read through a later `const` arrow
   // (that is the temporal dead zone, which would throw on first use).
   assert.doesNotMatch(fn, /houseAccount\(\)/, 'houseCall must not call a later const arrow');

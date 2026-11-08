@@ -296,7 +296,11 @@ export async function houseCall(plan, { receiver, method } = {}) {
   }
   // The plan's own method and args, so the room and the chain agree on what was asked.
   const methodName = method || plan.method;
-  const args = plan.args || plan.call.args || JSON.stringify({ token_id: plan.tokenId || S.me });
+  // `plan.call.args` is the whole propose_call_as payload; the shop's own arguments are its
+  // `args` field, which is already a string. Passing the wrapper made the RPC reject the call
+  // with "invalid type: null, expected a string".
+  const argsOut = plan.call.args?.args;
+  const args = typeof argsOut === 'string' ? argsOut : (typeof plan.args === 'string' ? plan.args : JSON.stringify(plan.args || { token_id: plan.tokenId || S.me }));
   const deposit = String(plan.deposit || '0');
   const nonce = String(row.nonce ?? '0').replace(/^0+(?=\d)/, '');
   const expiry = (BigInt(Date.now()) * 1_000_000n + 600_000_000_000n).toString();
