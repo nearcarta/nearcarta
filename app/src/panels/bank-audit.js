@@ -36,6 +36,21 @@ export const SAMPLES = [
     ],
   },
   {
+    // Small lines on purpose. Every other sample's largest line is 0.02 or more, and a row's
+    // per-payment cap is often 0.02, so the audit could never propose a lower cap and the
+    // shop's headline action — apply tighter limits — was unreachable for a real visitor.
+    // Measured 2026-11-08: "The proposed cap matches the current cap. Nothing was signed."
+    // on all three samples against a 0.02 row.
+    id: 'coffee',
+    name: 'Coffee month',
+    rows: [
+      { date: '2026-11-01', payee: 'roaster.near', near: 0.004, currency: 'NEAR' },
+      { date: '2026-11-02', payee: 'roaster.near', near: 0.004, currency: 'NEAR' },
+      { date: '2026-11-03', payee: 'kettle.near', near: 0.008, currency: 'NEAR' },
+      { date: '2026-11-04', payee: 'roaster.near', near: 0.004, currency: 'NEAR' },
+    ],
+  },
+  {
     id: 'payroll',
     name: 'Payroll week',
     rows: [

@@ -225,7 +225,7 @@ test('the proof log links a real artifact and says so plainly when there is none
 });
 
 test('a local audit drops the statement and a looser cap is refused', () => {
-  assert.equal(SAMPLES.length, 3);
+  assert.equal(SAMPLES.length, 4, 'a sample whose largest line is under a 0.02 cap, so tighten can fire');
   for (const sample of SAMPLES) {
     const report = auditStatement(sample.rows, { capNear: 0.05 });
     const dumped = JSON.stringify(report);
@@ -239,6 +239,13 @@ test('a local audit drops the statement and a looser cap is refused', () => {
   const cafe = auditStatement(SAMPLES[0].rows, { capNear: 0.05 });
   assert.equal(cafe.tighten, true);
   assert.ok(cafe.after < cafe.before);
+  // The coffee sample has to tighten against a 0.02 row, which is the commonest cap in the
+  // city. Before it existed, every built-in sample's largest line was 0.02 or more, so the
+  // shop's headline action could never fire for a real visitor.
+  const coffee = auditStatement(SAMPLES.find(s => s.id === 'coffee').rows, { capNear: 0.02 });
+  assert.equal(coffee.tighten, true, 'coffee tightens a 0.02 row');
+  assert.equal(coffee.after, 0.008);
+  assert.ok(coffee.after < coffee.before);
   const csv = parseStatementCsv('date,payee,near\n2026-11-01,cafe.near,0.01\n');
   assert.equal(csv.ok, true);
   assert.equal(parseStatementCsv('x'.repeat(6001)).ok, false);
