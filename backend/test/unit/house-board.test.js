@@ -505,3 +505,17 @@ test('a refusal the Hall throws reaches the screen instead of vanishing', () => 
   assert.match(after, /lines = \[why\]/, 'the reason is shown in the tray');
   assert.match(after, /Nothing was signed/, 'and it says nothing was signed when the reason is empty');
 });
+
+test('a refused Payouts row says why, on the row and in the line above it', () => {
+  // Measured in the deployed city 2026-11-08: paying a payee that was not on the row left the
+  // receipt saying only "refused" and the tray line empty, while the board had returned a real
+  // reason (receiver_not_allowlisted). A refusal the visitor cannot act on is only half a message.
+  const tray = readFileSync(new URL('../../../app/src/panels/payouts-tray.js', import.meta.url), 'utf8');
+  // The reason is kept on the receipt when the board refuses a NEAR row.
+  assert.match(tray, /row\.status = 'refused'; row\.reason = step\.reason \|\| 'refused';/);
+  // The receipt row prints it.
+  assert.match(tray, /refused: \$\{r\.reason\}/);
+  // And the line above the list names the distinct reasons.
+  assert.match(tray, /const why = \[\.\.\.new Set\(/);
+  assert.match(tray, /refused before any deposit\$\{why\.length \? ` \(\$\{why\.join\(', '\)\}\)` : ''\}/);
+});
