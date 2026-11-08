@@ -85,9 +85,17 @@ test('pay is disabled when the payout total is zero', () => {
 
 test('back to town sits above the title card', () => {
   const css = read('app/src/brand/brown.css');
-  assert.match(css, /#shopUI #back[\s\S]*z-index:\s*60/);
+  // The property is "above the chrome", not one particular number. It was 60; it is 210 now
+  // because the tray's own z-index is 200 and the pill has to stay reachable over it.
+  const m = css.match(/#shopUI #back[\s\S]*?z-index:\s*(\d+)/);
+  assert.ok(m, 'the block sets a z-index');
+  assert.ok(Number(m[1]) >= 60, `z-index ${m[1]} must clear the title card and the tray`);
   assert.match(css, /position:\s*fixed !important/);
   assert.match(css, /min-width:\s*44px/);
+  // The shape has to be stated in this block too, because it wins with !important; otherwise
+  // the old gradient and 4px shadow leak through and the pill looks pasted on.
+  assert.match(css, /border-radius:\s*999px !important/);
+  assert.match(css, /background:\s*rgba\(26,\s*20,\s*15/);
   assert.match(read('app/design/D9_world/js/shops.js'), /roomError/);
   const town = read('app/design/D9_world/index.html');
   assert.match(town, /aria-label="Sound off"/);
