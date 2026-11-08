@@ -345,4 +345,11 @@ test('the deed history lists only real transactions, named by the method that ra
   // Totals come from the contract, never from summing the rows (the events are unreadable).
   assert.deepEqual(h.totals, { balance: '5', cap: '10', paid: '2', pays: 1 });
   assert.equal(deedHistory([], TOKEN).note, 'No transactions touch this deed yet.');
+  // A FAILED read must never read as "this deed did nothing": the first live call answered 429
+  // from the index and the panel said the deed had no transactions, which was false.
+  const failed = deedHistory([], TOKEN, null, true);
+  assert.equal(failed.read_failed, true);
+  assert.match(failed.note, /did not answer/);
+  assert.match(failed.note, /not a claim that the deed did nothing/);
+  assert.equal(deedHistory([], TOKEN, null, false).read_failed, false);
 });
