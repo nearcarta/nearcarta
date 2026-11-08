@@ -282,7 +282,13 @@ test('the House room hands its plan to a sender instead of stopping at a hint', 
   assert.match(fn, /W\.signMessage/, 'signed by the session key');
   // `plan.call.args` is the whole propose_call_as payload; the shop's arguments are its `args`
   // field. Passing the wrapper made the RPC answer "invalid type: null, expected a string".
-  assert.match(fn, /plan\.call\.args\?\.args/, 'houseCall unwraps the shop arguments');
+  // The shop's arguments, the deposit and the expiry all live inside `plan.call.args`, and
+  // reading them off `plan.call` gave undefined — which the RPC refused with
+  // "invalid type: null, expected a string".
+  assert.match(fn, /const payload = plan\.call\.args/, 'houseCall reads the payload once');
+  assert.match(fn, /payload\.args/, 'the shop arguments come from the payload');
+  assert.match(fn, /payload\.deposit/, 'so does the deposit');
+  assert.doesNotMatch(fn, /String\(plan\.deposit/, 'and never off plan directly');
   // The house account comes from the record, and is not read through a later `const` arrow
   // (that is the temporal dead zone, which would throw on first use).
   assert.doesNotMatch(fn, /houseAccount\(\)/, 'houseCall must not call a later const arrow');
