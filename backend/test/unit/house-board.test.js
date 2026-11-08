@@ -368,3 +368,17 @@ test('the deed history survives a rate-limited index by falling back, not by goi
   // A board call wraps the shop method; the inner one is what happened on the deed.
   assert.match(route, /propose_call_as[\s\S]{0,200}inner\.method/, 'the inner method is unwrapped');
 });
+
+test('the deed history never takes the panel down over one bad timestamp', () => {
+  // FastNEAR reports nanoseconds. Multiplying by 1e6 gave 1.79e24 ms, `new Date()` threw
+  // RangeError: Invalid time value, and the whole history panel rendered as an error even
+  // though the API had returned 12 correct rows. Units are fixed at the source, and the
+  // renderer must survive anything it is handed anyway.
+  const api = readFileSync(new URL('../../../backend/src/app.js', import.meta.url), 'utf8');
+  const route = api.slice(api.indexOf("app.get('/api/house/history/:account'"), api.indexOf('// Counterparty check before a payment'));
+  assert.match(route, /\/ 1e6/, 'nanoseconds are divided, not multiplied');
+  assert.doesNotMatch(route, /tx_block_timestamp\) \* 1e6/, 'and never multiplied');
+
+  const room = readFileSync(new URL('../../../app/src/panels/house-room.js', import.meta.url), 'utf8');
+  assert.match(room, /Number\.isNaN\(d\.getTime\(\)\)/, 'the renderer rejects an invalid date instead of throwing');
+});
