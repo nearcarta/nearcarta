@@ -354,13 +354,37 @@ function fadeTo(a,dur,at){ return new Promise(r=>{ if(fadeWait){ const w=fadeWai
 const shopUI=$('#shopUI');
 let prevAU=true;
 function pinShop(on){ const pin=document.getElementById('rulesBtn'); if(pin) pin.inert=!!on; }
-function enterRoom(sh){ if(!body.classList.contains('in-shop')) prevAU=W.renderer.shadowMap.autoUpdate; room=sh; body.classList.add('in-shop'); pinShop(true); shopUI.hidden=false; W.renderer.shadowMap.autoUpdate=true; tagOff(); prompt(null);
+function enterRoom(sh){ if(!body.classList.contains('in-shop')) prevAU=W.renderer.shadowMap.autoUpdate; room=sh; body.classList.add('in-shop'); setRail(); pinShop(true); shopUI.hidden=false; W.renderer.shadowMap.autoUpdate=true; tagOff(); prompt(null);
   if(sh){ try{ dressRoom(sh); }catch(e){} const c=sh.camera; if(!c.userData.home0) c.userData.home0=c.position.clone(); const look=c.userData.look; roomLook=look; const fit=SL.frame(c), home=c.userData.home0.clone().sub(look).multiplyScalar(fit).add(look); const far=home.clone().sub(look).multiplyScalar(1.22).add(look); c.position.copy(far); c.lookAt(look);
     const o={k:0}; gsap.to(o,{k:1,duration:RM?.01:.9,ease:'power2.out',onUpdate:()=>{ c.position.lerpVectors(far,home,o.k); c.lookAt(look); }});
     if(sh.intro) setTimeoutSim(()=>{ if(room===sh) SL.L.C8.run(sh.intro()); },RM?.02:.5); } }
+/**
+ * Publish the shop menu's real geometry so the tray can start below it.
+ *
+ * The tray's `top` is `--hudTop + --rail + 12`, and those variables were never set, so the
+ * fallbacks (92 + 60) put the tray at y=72 while the menu actually ended at y=122 — the menu
+ * sat on the tray in six of nine shops. Measuring here means the number is always the truth,
+ * including after a font swap or a viewport change.
+ */
+function setRail(){
+  const measure=()=>{
+    const nav=document.querySelector('nav.all-shops');
+    if(!nav){ return; }
+    const navTop=Math.round(nav.getBoundingClientRect().top);
+    const navH=Math.round(nav.offsetHeight||nav.getBoundingClientRect().height);
+    body.style.setProperty('--hudTop', navTop+'px');
+    body.style.setProperty('--rail', navH+'px');
+  };
+  measure();
+  requestAnimationFrame(measure);
+  setTimeout(measure, 250);
+  setTimeout(measure, 900);
+}
 function leaveRoom(){ undressRoom(room); SL.clear(); room=null; body.classList.remove('in-shop'); pinShop(false); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
 addEventListener('resize',()=>{ if(!room) return; const c=room.camera, look=c.userData.look, fit=SL.frame(c); if(c.userData.home0){ c.position.copy(c.userData.home0).sub(look).multiplyScalar(fit).add(look); c.lookAt(look); } });
 $('#back').addEventListener('click',()=>world.exitShop());
+// The menu wraps differently at narrow widths, so its height is not a constant.
+addEventListener('resize',()=>{ if(body.classList.contains('in-shop')) setRail(); },{passive:true});
 $('#t-proof').addEventListener('click',()=>{ SL.drawer(true); sfx('page',{g:.3}); }); $('#d-close').addEventListener('click',()=>SL.drawer(false));
 $('#t-act').addEventListener('click',async e=>{ const b=e.currentTarget; if(b.dataset.retry){ const id=b.dataset.retry; delete b.dataset.retry; b.disabled=true; const r=await SL.load(id, Date.now()); if(inShop!==id) return; if(r.err) SL.showError(id,r.err); else { SL.show(r.sh); enterRoom(r.sh); } return; } if(SL.act()) sfx('click',{g:.3}); });
 // compile the room's shaders (parallel where the GPU allows) during the fly-in, so its first frame does not stall the fade
