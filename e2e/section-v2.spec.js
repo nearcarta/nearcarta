@@ -13,7 +13,7 @@ test('a board session is 1, 2 or 24 hours and the agent key names propose_call',
   await page.goto('/setup/?preview=1#sign');
   await expect(page.getByTestId('setup-key-scope')).toContainText('propose_call_as');
   await expect(page.getByTestId('setup-key-scope')).toContainText('propose_call');
-  await expect(page.getByTestId('sign-cost')).toContainText('0.015');
+  await expect(page.getByTestId('sign-cost')).toContainText('0.05 for the shop allowlist');
   // The caps are on the page before the wallet opens, not only inside the wallet.
   const caps = page.getByTestId('setup-caps');
   await expect(caps).toBeVisible();

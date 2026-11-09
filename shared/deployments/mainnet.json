@@ -18,16 +18,16 @@
     "owner": "nearcarta.near",
     "status": "deployed",
     "crate": "contracts/charter_board",
-    "wasm": "contracts/artifacts/charter_board.wasm",
-    "max_row_yocto": "20000000000000000000000",
-    "note": "Board v2 live (PR #52): propose_call_as, holds/effects, staged upgrade. One row per visitor, no access key. Old board force_closed (visitor refunded) and reaped to nearcarta.near, then recreated. See docs/MAINNET_BOARD.md.",
-    "code_hash": "BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g",
-    "wasm_sha256": "982bf6b6666e626d6af267c8a780cf5bb93cd73b2864a68b0c02dca4d07af9a1",
+    "wasm": "contracts/artifacts/charter_board.hold.wasm",
+    "max_row_yocto": "30000000000000000000000",
+    "note": "Board hold build live 2026-11-09 (all six staged fixes: hydrate/anchor, charge_acts, hold from reserve, close subtracts owed, min_amount only on value, simulate view). Installed by close-all + reap + recreate instead of the 24 h staged upgrade: rows closed, board reaped to nearcarta.near, recreated in one batch (create, transfer, deploy, new) with no access key ever added.",
+    "code_hash": "CM6WA2gZDN17TRXQzFsrstgKPzsmiVLuArK7V6UkXLAf",
+    "wasm_sha256": "a89664ef45f16d429104b1b1d87d5dc83a79820a69bd22782f50a6b7c022315c",
     "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --no-abi (wasm-opt -O); source includes PR#22 propose_call + force_close (5126bdb lineage)",
-    "storage_bytes": 132083,
-    "locked_near": 1.32325,
+    "storage_bytes": 151230,
+    "locked_near": 1.5123,
     "full_access_keys": 0,
-    "deploy_tx": "8dSvGGoW23wAVVEBVL2CEDBHXBJvoVKbN9nPxKJrAgPj",
+    "deploy_tx": "CdHZUvPVX8NXvvPT5nEueyAnvUsWpBdrw932U9bPefmp",
     "failed_deploy_tx": "4mq8P3jugnatzbbc9VzDbufCBpyj27TxwK4w3L7nTPCX",
     "proof": {
       "visitor": "nearcarta.near",
@@ -46,7 +46,10 @@
       "smoke_close_charter": "H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf",
       "v2_force_close_visitor": "DVRqkE2NaMLXYJY84EBKdcg4VbUzbL27iC2r5k53GeHZ",
       "v2_reap_old_board": "HmYjkCTFuvLYjso6TnEpvbgVB99DBZnhu5PHTC1HLGU5",
-      "v2_recreate": "8dSvGGoW23wAVVEBVL2CEDBHXBJvoVKbN9nPxKJrAgPj"
+      "v2_recreate": "8dSvGGoW23wAVVEBVL2CEDBHXBJvoVKbN9nPxKJrAgPj",
+      "v3_close_last_row": "5L7EvSKe7FAHxSmAdoEn9hTChDQTc8zwos5GUj1acnW5",
+      "v3_reap": "LQ2QLGExEXCRY4A3M67r7mSsVrkZFdnnJwBxy4LQEmG",
+      "v3_recreate": "CdHZUvPVX8NXvvPT5nEueyAnvUsWpBdrw932U9bPefmp"
     },
     "visitor_run": {
       "note": "A real visitor, start to finish, in the browser at nearcarta.vercel.app/setup: email sign-in made this implicit account, nearcarta.near funded it, the visitor opened a row and the agent's request inside the cap was paid; the one over the cap was refused by the contract.",
@@ -135,6 +138,13 @@
         "restage_tx": "A65fXQ1ev9R62tEwiyYBCPxndjvTqZsUNk7NkCU7ErUL",
         "board_balance_after_near": 1.54478,
         "lesson": "open_charter/upgrade args: the live board takes `code` as a HEX STRING. board-anchor-upgrade.js already did this correctly; my new script guessed a byte array."
+      },
+      "landed": {
+        "how": "reap and recreate, not upgrade()",
+        "close_last_row": "5L7EvSKe7FAHxSmAdoEn9hTChDQTc8zwos5GUj1acnW5",
+        "reap": "LQ2QLGExEXCRY4A3M67r7mSsVrkZFdnnJwBxy4LQEmG",
+        "recreate": "CdHZUvPVX8NXvvPT5nEueyAnvUsWpBdrw932U9bPefmp",
+        "when_cairo": "2026-11-09 19:20"
       }
     },
     "redeploy": {
@@ -160,15 +170,22 @@
       "refused_receiver_not_allowlisted": "E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ",
       "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
     },
-    "effects_code_hash": "FzUSX26CnmveE2vPg4dcdczmBXFJv6mAx7YAuJPghZZf",
-    "effects_code_hash_note": "Base58 of contracts/artifacts/charter_board.effects.wasm (sha256 debcbfe2…). `set_effects` is sent at setup only while this is the code on chain, because the older build charges the row instead of the side reserve. The staged upgrade at board.upgrade_staged installs it.",
+    "effects_code_hash": "CM6WA2gZDN17TRXQzFsrstgKPzsmiVLuArK7V6UkXLAf",
+    "effects_code_hash_note": "The hold build (CM6WA2gZ…) is a superset of the effects build: set_effects is paid from the side reserve. /setup sends set_effects only while this hash is the code on chain.",
     "previous": {
       "code_hash": "Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C",
       "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
       "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4"
     },
     "anchor_code_hash": "CM6WA2gZDN17TRXQzFsrstgKPzsmiVLuArK7V6UkXLAf",
-    "anchor_note": "`anchor` panics ERR_NO_CHARTER on the live build (code_hash BF1rQSrG…): measured 2026-11-08, tx GaVEzhfvwG1bP8P6LMrmhuvJe5CzUdvBo2RX4dVnKoTH from a visitor row with four receivers. The hydrate fix is in the staged build, so the invoice anchor is offered only once that code hash is on chain."
+    "anchor_note": "`anchor` panics ERR_NO_CHARTER on the live build (code_hash BF1rQSrG…): measured 2026-11-08, tx GaVEzhfvwG1bP8P6LMrmhuvJe5CzUdvBo2RX4dVnKoTH from a visitor row with four receivers. The hydrate fix is in the staged build, so the invoice anchor is offered only once that code hash is on chain.",
+    "previous_v2": {
+      "code_hash": "BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g",
+      "wasm_sha256": "982bf6b6666e626d6af267c8a780cf5bb93cd73b2864a68b0c02dca4d07af9a1",
+      "deploy_tx": "8dSvGGoW23wAVVEBVL2CEDBHXBJvoVKbN9nPxKJrAgPj",
+      "storage_bytes": 132083
+    },
+    "effects_code_hash_prior": "FzUSX26CnmveE2vPg4dcdczmBXFJv6mAx7YAuJPghZZf"
   },
   "mpc": "v1.signer",
   "chain_id": 8453,

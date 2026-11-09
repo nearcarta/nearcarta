@@ -220,7 +220,9 @@ const GAS = { open: 60n, agent: 60n, propose: BigInt(BOARD_PROPOSE_TGAS) };
 const GAS_NEAR = t => Number(t) * 0.001;
 // Both board actions are funded by the wallet up front, and the call allowlist deposit is
 // attached on top of the row deposit. A little is left for the wallet's own overhead.
-const SIGN_MIN = Math.round((0.02 + GAS_NEAR(GAS.open) + GAS_NEAR(GAS.agent) + 0.015 + 0.002) * 1000) / 1000;
+const ROW_NEAR = Number(BigInt(MAIN.board.max_row_yocto) / 10n ** 18n) / 1e6;
+const CALLS_NEAR = Number(BigInt(CALLS_DEPOSIT_YOCTO) / 10n ** 18n) / 1e6;
+const SIGN_MIN = Math.round((ROW_NEAR + GAS_NEAR(GAS.open) + GAS_NEAR(GAS.agent) + CALLS_NEAR + 0.002) * 1000) / 1000;
 const yToN = y => { try { return Number(BigInt(y) / 10n ** 18n) / 1e6; } catch { return NaN; } };
 // Wallet errors in plain words: yocto numbers become NEAR and a shortfall.
 function plainErr(e) {
@@ -528,7 +530,7 @@ function sSign() {
     // button stays enabled and the click asks for sign-in instead of waiting forever.
     + (rowMissing ? (onBoard && bal != null && nearOf(bal) < SIGN_MIN
       ? `<p class="small" data-testid="sign-short">This approval can cost up to <b>${fmtN(SIGN_MIN)} NEAR</b>. The account has ${fmtN(nearOf(bal))} NEAR. <a href="#fund" id="tofund">Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</a>.</p><button class="btn gold big" id="sign" data-testid="setup-sign" disabled>Add ${fmtN(Math.max(0.001, SIGN_MIN - nearOf(bal)))} NEAR first</button>`
-      : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (0.02 for the row, 0.015 for the shop allowlist, plus gas). Of the 0.02, 0.01 becomes your row's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign" ${rowReady ? '' : 'disabled'}>${rowReady ? 'Open your row' : 'Reading the board'}</button>${help}`)
+      : `${onBoard ? `<p class="small muted" data-testid="sign-cost">Needs ${fmtN(SIGN_MIN)} NEAR in your account (${fmtN(ROW_NEAR)} for the row, ${fmtN(CALLS_NEAR)} for the shop allowlist, plus gas). Of the ${fmtN(ROW_NEAR)}, 0.01 becomes your row's spending balance and about 0.004 pays row storage; the rest is refunded at once. Unused allowlist deposit is refunded the same way. Storage and any unspent balance come back when you close the row; unused gas comes back at once.</p>` : ''}<button class="btn gold big" id="sign" data-testid="setup-sign" ${rowReady ? '' : 'disabled'}>${rowReady ? 'Open your row' : 'Reading the board'}</button>${help}`)
       : '')
     + (onChain && keyReady && !keyStale ? gasPanel() : '')
     + (onChain && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key is missing one of <code>propose</code>, <code>propose_call</code>, <code>propose_call_as</code> and <code>anchor</code>. Ferry Load cargo needs <code>propose_call</code>; Toll and Guard call shops through <code>propose_call_as</code>; the Chronicle anchors a statement with <code>anchor</code>. One wallet approval deletes the old board keys and adds a new one with all four (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : '')
