@@ -371,8 +371,8 @@ All numbers measured the same way as the table; chain facts re-read live today.
 
 ## Which would beat us in a judging round, and why
 
-Blunt version: on the *NFTs That Do Something* rubric, two entries beat us on the exact axis that
-track is scored on, and they beat us for the same reason.
+Blunt version: on the *NFTs That Do Something* rubric, four entries beat us on the axis that track is
+scored on, and two of them beat us for the same reason.
 
 - **Handover beats us in nfts.** The track asks for an NFT that does something. Handover's answer is
   one sentence ("the NFT is the only key to an Ethereum address"), it is true on chain, and the
