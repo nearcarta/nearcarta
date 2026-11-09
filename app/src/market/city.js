@@ -5,6 +5,7 @@
 import * as S from '/shared/market/sim.js';
 import { whyHtml, yoctoToNear } from '/market/why.js';
 import { ICON, iconFor } from '/market/icons.js';
+import * as G from '/shared/market/guide.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -59,6 +60,7 @@ root.innerHTML = `
 <div class="md-toasts" aria-live="polite"></div>
 <div class="md-nodes" aria-label="Resource nodes"></div>
 <nav class="md-dock" aria-label="Market Day">
+  <button type="button" class="md-ask" data-v="ask" data-testid="md-ask" aria-label="Ask the Lamplighter"><span class="i">${ICON.lamp}</span><span class="l">Ask</span></button>
   <button type="button" data-v="bag" data-testid="md-bag"><span class="i">${ICON.bag}</span><span class="l">Bag</span><em data-k="bagn"></em></button>
   <button type="button" data-v="market" data-testid="md-market"><span class="i">${ICON.market}</span><span class="l">Market</span></button>
   <button type="button" data-v="quests" data-testid="md-quests"><span class="i">${ICON.quest}</span><span class="l">Orders</span><em data-k="qn"></em></button>
@@ -242,12 +244,13 @@ function vQuests() {
 
 function render() {
   const body = root.querySelector('.md-body');
-  body.innerHTML = view === 'market' ? vMarket() : view === 'counter' ? vCounter() : view === 'bag' ? vBag() : view === 'quests' ? vQuests() : '';
+  body.innerHTML = view === 'market' ? vMarket() : view === 'counter' ? vCounter() : view === 'bag' ? vBag() : view === 'quests' ? vQuests() : view === 'ask' ? vAsk() : '';
 }
 
 root.addEventListener('click', (ev) => {
   const b = ev.target.closest('[data-act],[data-v]'); if (!b || b.disabled) return;
-  if (b.dataset.v) { view === b.dataset.v ? close() : open(b.dataset.v); return; }
+  if (b.dataset.v) { if (guiding) return; view === b.dataset.v ? close() : open(b.dataset.v); if (view === 'ask') setTimeout(() => root.querySelector('.md-say input')?.focus(), 60); return; }
+  if (b.dataset.act === 'ask') { ask(b.dataset.text || root.querySelector('.md-say input')?.value || ''); return; }
   const a = b.dataset.act;
   try {
     if (a === 'close') close();
@@ -267,6 +270,57 @@ root.addEventListener('click', (ev) => {
 });
 function seal(b) { if (RM) return; b.animate?.([{ transform: 'scale(1)' }, { transform: 'scale(.97)' }, { transform: 'scale(1)' }], { duration: 220 }); }
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) { close(); e.stopPropagation(); } }, true);
+
+// ---------- the guide: talk to the Lamplighter; it walks to the right shop and acts ----------
+const API = () => (window.NEARCARTA_API || '').replace(/\/$/, '');
+let guiding = false;
+function chips() {
+  const p = me(); const out = [];
+  const g = Object.keys(S.GOODS).filter((k) => (p.bag[k] || 0) > 0).sort((a, b) => p.bag[b] - p.bag[a])[0];
+  if (g) out.push(`Sell my ${GOOD(g).toLowerCase()}`);
+  if (city.orders.some((o) => o.poster !== ME && (p.bag[o.good] || 0) > 0)) out.push('Fill an order');
+  if (Object.values(city.shops).some((s) => !S.isOpen(s))) out.push('Reopen a shop');
+  else if (Object.entries(S.ITEMS).some(([, r]) => Object.entries(r.inputs).every(([k, n]) => (p.bag[k] || 0) >= n))) out.push('Craft a tool');
+  if (out.length < 3) out.push('Buy 2 salt');
+  if (out.length < 3) out.push('Send 1 NEAR to stranger.near');
+  return out.slice(0, 3);
+}
+function vAsk() {
+  return head(ICON.lamp, 'Lamplighter', 'Say it. I walk there and do it.')
+    + `<form class="md-say" data-testid="md-say"><input type="text" maxlength="200" autocomplete="off" placeholder="Sell my iron" aria-label="What should the Lamplighter do?"><button type="submit" class="md-icon md-send" aria-label="Send">${ICON.send}</button></form>`
+    + `<div class="md-chips">${chips().map((c) => `<button type="button" class="md-ghost" data-act="ask" data-text="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
+}
+root.addEventListener('submit', (e) => { if (!e.target.closest('.md-say')) return; e.preventDefault(); ask(e.target.querySelector('input').value); });
+async function think(text) {
+  try {
+    const r = await fetch(API() + '/api/market/guide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }), signal: AbortSignal.timeout(12000) });
+    if (r.ok) { const j = await r.json(); if (j.intent) return j; }
+  } catch {}
+  return { intent: G.parseIntent(text), by: 'browser' };
+}
+const WD = () => window.world || {};
+async function ask(text) {
+  text = String(text || '').trim(); if (!text || guiding) return;
+  guiding = true; document.body.classList.add('md-guiding'); close();
+  const say = (t, o) => { try { WD().guideSay?.(t, o); } catch {} };
+  say('Let me see…', { style: 'think', dur: 1.6 });
+  const ans = await think(text);
+  const step = G.plan(city, ME, ans.intent);
+  const was = WD().zoom?.(innerWidth < 720 ? 0.34 : 0.3);
+  try {
+    if (step.shop && (step.ok || step.walk)) { say(step.say, { dur: 3.2 }); await WD().walkTo?.(step.shop); }
+    else { say(step.say, { dur: 3.4 }); toast(step.say, 'no'); return; }
+    if (!step.ok) { say(step.say, { style: 'warn', dur: 3.6 }); toast('Refused: not on the charter', 'no'); return; }
+    const line = G.act(city, ME, step);
+    save(); hud(); refresh();
+    say(line + '.', { tone: 'ok', dur: 3 });
+    toast(line + (ans.proof?.verified ? ' · TEE ✓' : ''), 'ok');
+  } catch (e) { say(WHY[e.code] || 'That did not work.', { style: 'warn', dur: 3 }); fail(e); }
+  finally {
+    window.__marketday.lastGuide = { text, by: ans.by, intent: ans.intent, step: { ...step, amount: step.amount?.toString() }, proof: ans.proof || null };
+    setTimeout(() => { if (was != null) WD().zoom?.(was); guiding = false; document.body.classList.remove('md-guiding'); }, 1400);
+  }
+}
 
 // ---------- play mode ----------
 let playing = false, timer = 0, raf = 0, lastT = 0;

@@ -20,6 +20,9 @@ export const ICON = {
   night: S('<path d="M20 14a8 8 0 1 1-10-10 6 6 0 0 0 10 10z"/>'),
   star: S('<path d="M12 4l2.4 5 5.6.8-4 3.9 1 5.5-5-2.7-5 2.7 1-5.5-4-3.9 5.6-.8z"/>'),
   info: S('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'),
+  lamp: S('<path d="M9 4h6M12 2v2"/><path d="M8 7h8l1 9H7z"/><path d="M10 16v3h4v-3"/><path d="M12 10v3"/>'),
+  send: S('<path d="M4 12l16-8-6 16-2-7z"/>'),
+  seal: S('<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>'),
   play: S('<path d="M7 5l12 7-12 7z"/>'),
 };
 export const GOOD_ICON = { 'good:iron': 'ore', 'good:timber': 'wood', 'good:herb': 'herb', 'good:salt': 'salt', 'item:tool': 'tool', 'item:tonic': 'tonic' };
