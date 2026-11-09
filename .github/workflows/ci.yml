@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [oath, arena, arena_v2, toll, townhall, hall, charter_factory, charter_factory_lock, charter_board, house_nft, attested_check, guard]
+        crate: [oath, arena, arena_v2, market, toll, townhall, hall, charter_factory, charter_factory_lock, charter_board, house_nft, attested_check, guard]
     steps:
       - uses: actions/checkout@v4
       # charter_board pins rustc 1.86 in rust-toolchain.toml (the wasm mainnet accepted).
@@ -123,6 +123,16 @@ jobs:
       - run: cd contracts/oath && cargo +1.86.0 near build non-reproducible-wasm --locked
       - run: cd contracts/reaper && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
       - run: cd contracts/oath && cargo test --locked --test sandbox --test exploits --test props --test adversarial --test teardown
+  market-sandbox:
+    # Market Day on a local near-sandbox with the committed market.wasm and the live board
+    # build: direct play, board spends at quantity 10 under 25 TGas, the con artist refused.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+      - run: test "$(sha256sum contracts/artifacts/market.wasm | cut -d' ' -f1)" = "$(node -p "require('./contracts/artifacts/market.json').sha256")"
+      - run: cd contracts/market_sandbox && cargo test --locked -- --nocapture
   board-sandbox:
     # One local board, two visitors, then reap. The wasm is rustc 1.86 / near-sdk 5.27.
     # The runner is a separate crate so the 1.86 unit job does not need OpenSSL.

@@ -18,21 +18,23 @@ test('js and rust pricing agree on every golden case', () => {
 });
 
 test('flooding a shop with iron lowers the iron price', () => {
-  const before = BigInt(quote(at()).buy);
-  const after = BigInt(quote(at({ stock: 60, sells_last_hour: 10 })).buy);
-  assert.ok(after * 4n < before);
+  const before = quote(at());
+  const after = quote(at({ stock: 60, sells_last_hour: 10 }));
+  assert.ok(BigInt(after.buy) * 2n < BigInt(before.buy));
+  assert.ok(BigInt(after.sell) * 4n < BigInt(before.sell), 'the shop pays far less while it is flooded');
 });
 
 test('the tooltip shows the quote reasons word for word', () => {
   const q = quote(at({ stock: 40, buys_last_hour: 2, sells_last_hour: 6 }));
   assert.deepEqual(whyLines(q), [
-    'scarcity ×0.5: 40 in stock, target 20',
-    'demand ×0.8: 2 bought, 6 sold in the last hour',
-    'mood ×1: till above floor',
+    'scarcity ×0.5: 40 on the shelf, the shop wants 20',
+    'demand ×0.8: last hour: 2 bought, 6 sold',
+    'mood ×1: open',
+    "margin ×0.8: the shop pays 80% of the next unit's price, with no demand bonus",
   ]);
   const html = whyHtml(q, 'iron');
-  for (const r of q.reasons) assert.ok(html.includes(r.why));
-  assert.ok(html.includes('You pay 0.0008 NEAR for iron'));
+  for (const r of q.reasons) assert.ok(html.includes(r.why.replace(/'/g, '&#39;')), r.why);
+  assert.ok(html.includes('You pay 0.001 NEAR for iron'));
 });
 
 test('the tooltip escapes a good name and formats factors and amounts', () => {
