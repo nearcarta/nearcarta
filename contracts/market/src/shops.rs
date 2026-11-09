@@ -339,7 +339,7 @@ impl Contract {
     /// Invests in a shop for `row_owner`: one share per milliNEAR, pending dividends paid first.
     /// The part of the deposit below a whole milliNEAR pays the storage; the rest comes back.
     #[payable]
-    pub fn invest(&mut self, row_owner: AccountId, shop: String) -> U128 {
+    pub fn invest(&mut self, row_owner: AccountId, shop: String, decision: Option<String>) -> U128 {
         let to = self.via_board(row_owner);
         let before = self.mark();
         let paid = env::attached_deposit().as_yoctonear();
@@ -362,14 +362,14 @@ impl Contract {
         self.share_debt.insert((to.clone(), shop.clone()), held * acc / ACC);
         let left = self.storage_from(&to, paid - amount, before);
         pay(&to, left);
-        Ev::new().s("investor", to.as_str()).s("shop", &shop).u("amount", amount).u("shares", units).market("invest");
+        Ev::new().s("investor", to.as_str()).s("shop", &shop).u("amount", amount).u("shares", units).s("decision", &decision_id(&decision)).market("invest");
         if reopened { Ev::new().s("shop", &shop).market("shop_reopened"); }
         U128(units)
     }
 
     /// The keeper of `shop` buys stock from another shop with NEAR from the keeper's row.
     #[payable]
-    pub fn restock(&mut self, row_owner: AccountId, shop: String, from_shop: String, good: String, qty: u32, max_total: U128) -> U128 {
+    pub fn restock(&mut self, row_owner: AccountId, shop: String, from_shop: String, good: String, qty: u32, max_total: U128, decision: Option<String>) -> U128 {
         let keeper = self.via_board(row_owner);
         let before = self.mark();
         let s = self.shop(&shop);
@@ -382,7 +382,7 @@ impl Contract {
         self.credit_sale(&from_shop, total);
         let left = self.storage_from(&keeper, paid - total, before);
         pay(&keeper, left);
-        Ev::new().s("shop", &shop).s("from", &from_shop).s("good", &good).n("qty", qty as u64).u("total", total).market("restock");
+        Ev::new().s("shop", &shop).s("from", &from_shop).s("good", &good).n("qty", qty as u64).u("total", total).s("decision", &decision_id(&decision)).market("restock");
         U128(total)
     }
 
@@ -549,3 +549,11 @@ impl Contract {
 
 #[allow(dead_code)]
 fn _unused(_: u32) -> u32 { today() }
+
+/// A keeper's or the council's decision id: the hash of the signed NEAR AI answer that chose
+/// this action, so the event on chain points at the decision that caused it. Empty when none.
+pub fn decision_id(d: &Option<String>) -> String {
+    let s = d.clone().unwrap_or_default();
+    require!(s.len() <= 100 && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_:.".contains(&b)), "ERR_DECISION");
+    s
+}
