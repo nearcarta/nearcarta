@@ -53,7 +53,10 @@
       "v4_close_row": "AWT1gyz8wUqqM9EnThUnU4KFfWZiu6dmzfWSpnAZCYkF",
       "v4_reap": "C1jW51UNQXatzYZwvnYQKTNk7ySuvQPVETDqHPbnm5gy",
       "v4_recreate": "GPdvDdsKJAobn2wBMGQSgAmJiphV15F5fz84w3NMyXgs",
-      "v4_reopen_row": "F6YdvHp9jPh9YN2SDPpU1Rb3sR1wpwv6ZUds5xHFcvPP"
+      "v4_reopen_row": "F6YdvHp9jPh9YN2SDPpU1Rb3sR1wpwv6ZUds5xHFcvPP",
+      "v5_close_row": "2AQEuXhwXqcpk5f74dirErXXrzX3ixwNnoCx956g3tqB",
+      "v5_topup_visitor": "42qPAD2R4BHbyLrTBDAuNocJtKSpueJwnpLcJ7HoYpok",
+      "v5_reopen_row": "F4TtBscSVRaKDCojZ4bWD67SkiTYiWDoT3yyv8okLwTS"
     },
     "visitor_run": {
       "note": "A real visitor, start to finish, in the browser at nearcarta.vercel.app/setup: email sign-in made this implicit account, nearcarta.near funded it, the visitor opened a row and the agent's request inside the cap was paid; the one over the cap was refused by the contract.",
@@ -216,7 +219,8 @@
           "arena",
           "house",
           "toll",
-          "guard"
+          "guard",
+          "wrap.near"
         ],
         "pairs": [
           "townhall post_job",
@@ -226,15 +230,30 @@
           "arena fund",
           "house house_session_check_in",
           "toll cross",
-          "guard pay"
+          "guard pay",
+          "wrap.near near_deposit",
+          "wrap.near ft_transfer",
+          "board stamp"
         ],
         "cap_each": "0.001",
         "per_action_cap": "0.001",
         "daily_budget": "0.01",
         "fund": "0.005",
-        "storage_locked": "0.02804"
+        "storage_locked": "0.02955",
+        "note": "Reopened 2026-11-09 after the guard fix. Every shop that calls through the board has its pair. It leaves out the Hall worker steps (bid, counter, deliver), House prepare-send, wrap storage_deposit, the USDC storage sponsor and a NEAR payee, because the full row locks 3423 B and the live cap is 3000 B. The 0.04 cap is merged (PR #176) and can only go live by an upgrade."
       }
-    }
+    },
+    "known_bugs": [
+      {
+        "bug": "phantom liability",
+        "detail": "charge_acts and the propose_call_as hold path add the full storage cost to `owed` even when the side reserve paid it, and that reserve was already counted. After the last row closed on 2026-11-09, get_liabilities read 0.00483 NEAR with 0 rows. reap refuses ERR_LIABILITY, so the board can no longer be torn down. It needs an upgrade that fixes the ledger and recomputes owed.",
+        "measured": "2AQEuXhw… close, then get_liabilities = 4830000000000000000000"
+      },
+      {
+        "bug": "simulate ignores the stamp exemption",
+        "detail": "propose_call lets `stamp` on the board itself through without the board being in receivers, but simulate answers receiver_not_allowlisted for it."
+      }
+    ]
   },
   "mpc": "v1.signer",
   "chain_id": 8453,
@@ -440,7 +459,24 @@
           "refund": "51XEPFxMGcgMN5kHRBBBZXJqno8jkuK86DKseEXdDme3"
         },
         "outcome": "refunded 0.0005 to the poster; paid 0",
-        "pay_blocked": "review(pass=true) requires guard_clear, which only guard.nearcarta.near may call. The deployed guard contract has no code path that calls it and the account has 0 keys, so a pass review can never release on mainnet. The lifecycle was closed with review(pass=false) and refund."
+        "pay_blocked": "Fixed the same evening: the guard was redeployed with clear(). See lifecycle_pass_2026_11_09."
+      },
+      "lifecycle_pass_2026_11_09": {
+        "job_id": 4,
+        "poster": "8ccd5d33… through the board row (propose_call_as)",
+        "worker": "nearcarta.near (direct)",
+        "budget": "0.0005",
+        "price": "0.0004",
+        "txs": {
+          "post_job": "GJDhV3C5iSuZzbdwJPMP6gjbHb8MUmRYPs49SJRh3hdd",
+          "bid": "7zQHjt9PGbreNnt5xaAHTwD4CeX24TiaCQTbm2KNEsfA",
+          "accept": "HZMwcUcFPECmDKd967PBqLMLseEbcBV3GRq7b818QNQH",
+          "deliver": "HqbLfPgnUk3xmU3X77iybQiekDypkPMoebvPaj1cwzQ8",
+          "guard_clear": "5PbAPsNZs2kmaJNSKFgJz8PUQGS9hY6aKgktFv2aJQ5R",
+          "review_pass": "3uSAuuj9MWymVM2w13BBszk97iRnJiyw184UeMm1WW6b"
+        },
+        "outcome": "The review receipt paid the worker 0.0004 NEAR (transfer receipt to nearcarta.near).",
+        "bug": "The 0.0001 spare (budget minus price) was not returned. The deployed hall (FQg3EZdb…, artifact d6141dd7) is older than the source spare refund, so job 4 still shows remaining 0.0001, refunded 0."
       }
     }
   },
@@ -499,14 +535,24 @@
     "status": "deployed",
     "crate": "contracts/guard",
     "wasm": "contracts/artifacts/guard.wasm",
-    "wasm_sha256": "ec6bbec2e09c53ca4115091e570d1d594c0340831a4ac5b3172ae26045494b89",
-    "storage_bytes": 33366,
-    "locked_near": 0.35366,
+    "wasm_sha256": "6687bbd1c9ce534bb0072b14ea9a696746b758ff33e3fec6815184a899f4202f",
+    "storage_bytes": 41153,
+    "locked_near": 0.41453,
     "full_access_keys": 0,
     "board": "board.nearcarta.near",
-    "deploy_tx": "CN3SKjNS7PRdvrNQsxRxQW45Ks2vChe3BDAHhehhxt65",
-    "note": "Guard live after PR #35. Stake 0.35366 from nearcarta.near. Locked, no FA keys. reap() from owner returns stake.",
-    "code_hash": "GutWQgGC7JuLiYq3Rf4HPn4yoD93aFYU19D5uWHZs2Fi"
+    "deploy_tx": "yW6QPZ2pEUK6x6u53nM9kPgT7mEQAuvuEMV7vVxo5od",
+    "note": "Guard with clear() live 2026-11-09 21:15 Africa/Cairo: reap, then recreate+deploy+init in one tx from nearcarta.near. clear() is owner-only and calls guard_clear on the stored hall. pay() is unchanged. Locked, no FA keys. reap() from owner returns stake.",
+    "code_hash": "7uEdU1JWdtY8VPhyGAr3T6GEy5XfCTBngNjnhZvX8XJ6",
+    "previous": {
+      "code_hash": "GutWQgGC7JuLiYq3Rf4HPn4yoD93aFYU19D5uWHZs2Fi",
+      "wasm_sha256": "ec6bbec2e09c53ca4115091e570d1d594c0340831a4ac5b3172ae26045494b89",
+      "storage_bytes": 33366,
+      "deploy_tx": "CN3SKjNS7PRdvrNQsxRxQW45Ks2vChe3BDAHhehhxt65",
+      "note": "No code path to the hall guard_clear; with 0 keys no review(pass) could ever pay."
+    },
+    "hall": "townhall.nearcarta.near",
+    "reap_tx": "7BLA7Z7kCsbnfGLq15s9J9JnEDSs1ith5qssKArbmsTq",
+    "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --locked --no-abi, then wasm-opt 108 -Oz (two local builds gave the same sha)."
   },
   "house": {
     "contract": "house.nearcarta.near",
