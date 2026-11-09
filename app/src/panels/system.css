@@ -1,0 +1,157 @@
+/* One system for every shop panel.
+   ---------------------------------------------------------------------------------------------
+   The owner's complaint was that the panels look inconsistent: different radii, different text
+   sizes, forms that do not line up, things sitting on top of each other. Measured on the deployed
+   site, one Bank panel alone used SIX border radii (8, 10, 11, 12, 14, 16) plus a pill, and three
+   pieces of text at 12.5px. That is not a styling detail; it is the absence of a system.
+
+   These tokens are the system. Rules taken from the design references the owner named, and from
+   the taste-skill system reference:
+   - a 4px spacing scale, and every gap/padding comes from it
+   - ONE radius family in four steps (control, panel, card, pill)
+   - readable text is 16px; 14px is labels only; nothing under 13px
+   - fields 48px tall with a visible label; tap targets at least 44px
+   - one button shape and one button height
+
+   Every panel stylesheet loads this first, so a shop that overrides something is overriding a
+   named token, not inventing a number. */
+
+#shopUI,
+#drawer,
+[id$='-agent-dock'] {
+  /* spacing */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* radius: four steps, nothing else */
+  --r-control: 10px;   /* inputs, small chips */
+  --r-panel: 14px;     /* the tray, cards inside a tray */
+  --r-card: 18px;      /* a card that sits alone */
+  --r-pill: 999px;     /* buttons and status pills only */
+
+  /* type: one scale */
+  --t-body: 16px;      /* anything a visitor reads */
+  --t-label: 14px;     /* field labels and meta, never a paragraph */
+  --t-small: 13px;     /* the floor; a note or a unit */
+  --t-h: 20px;         /* a panel heading */
+  --lh-body: 1.5;
+  --lh-tight: 1.25;
+
+  /* form */
+  --field-h: 48px;
+  --tap: 44px;
+
+  /* colour, already present in the palette; named here so panels stop hardcoding hex */
+  --ink: #f3ead8;
+  --ink-2: #cdbfa5;
+  --ink-3: #9c8f79;
+  --line: rgba(243, 234, 216, .14);
+  --line-strong: rgba(214, 180, 106, .45);
+  --brass: #d6b46a;
+  --brass-hi: #f5d08a;
+  --ground: #1f1a15;
+  --ground-2: #241c14;
+  --ok: #00ec97;
+  --no: #ff6b6b;
+}
+
+/* The three things every panel was getting wrong, fixed once. */
+
+/* 1. A note is 13px at the floor, never 12.5 or 11. */
+#shopUI .note,
+#shopUI [data-testid$='-note'],
+#shopUI .payout-calm,
+#drawer .note {
+  font-size: var(--t-small);
+  line-height: var(--lh-body);
+  color: var(--ink-2);
+}
+
+/* 2. Anything a visitor reads is 16px. Labels stay 14px; they are not a paragraph. */
+#shopUI .plain-line,
+#shopUI .guard-status,
+#shopUI .hall-line,
+#shopUI .payout-line,
+#shopUI .arena-status,
+#drawer .plain-line {
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+}
+
+/* 3. One button shape. The gold CTA is the only filled button in a panel; everything else is a
+   quiet control of the same height, so no shop invents a third style. */
+#shopUI #tray .primary,
+#shopUI #tray .ferry-cta,
+#shopUI #tray .hall-cta,
+#shopUI #tray .guard-cta,
+#shopUI #tray .bank-cta {
+  min-height: var(--tap);
+  border-radius: var(--r-pill);
+  font-size: var(--t-body);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+}
+#shopUI #tray button:not(.primary):not(.ferry-cta):not(.hall-cta):not(.guard-cta):not(.bank-cta):not(.ferry-tab):not(.guard-tab):not(.hall-tab),
+#shopUI #tray .link {
+  min-height: var(--tap);
+  font-size: var(--t-label);
+}
+
+/* 4. Fields are 48px with a visible label above, on the spacing scale. */
+#shopUI #tray input:not([type=checkbox]):not([type=radio]),
+#shopUI #tray select {
+  min-height: var(--field-h);
+  font-size: var(--t-body);
+  border-radius: var(--r-control);
+  padding: 0 var(--sp-3);
+  box-sizing: border-box;
+}
+#shopUI #tray textarea {
+  font-size: var(--t-body);
+  border-radius: var(--r-control);
+  padding: var(--sp-2) var(--sp-3);
+  box-sizing: border-box;
+}
+#shopUI #tray label,
+#shopUI #tray .field > span,
+#shopUI #tray .choice-label {
+  font-size: var(--t-label);
+  line-height: var(--lh-tight);
+  color: var(--ink-2);
+}
+
+/* 5. Every gap between siblings comes from the scale. Panels that hand-rolled 10px and 6px now
+   land on 8 or 12. */
+#shopUI #tray .form,
+#shopUI #tray .shop-stack,
+#shopUI #tray .guard-pane,
+#shopUI #tray .hall-pane {
+  gap: var(--sp-3);
+}
+
+/* 6. The "more below" pill must never sit on a control. It is a status strip at the tray's own
+   edge, in its own row, and it takes no space when hidden. */
+#shopUI #tray > .more-hint {
+  position: static;
+  transform: none;
+  align-self: center;
+  margin: var(--sp-1) 0 0;
+  font-size: var(--t-small);
+  line-height: 1;
+  height: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+#shopUI #tray > .t-scroll[data-more='1'] ~ .more-hint {
+  height: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--line-strong);
+  opacity: 1;
+}

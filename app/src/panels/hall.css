@@ -26,25 +26,25 @@ body.hall-tray #shopUI #t-act{display:none!important}
 body.hall-tray #shopUI #t-form{margin:0;min-width:0;max-width:100%}
 body[data-shop=hall] main.shop-page{padding-bottom:128px}
 .hall-card{display:grid;gap:18px;min-width:0;max-width:100%}
-.hall-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28}
+.hall-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:5px;border-radius:var(--r-panel);background:#17130f;border:1px solid #4a3a28}
 .hall-tab{
-  min-height:44px;padding:8px 6px;margin:0;border:0;border-radius:11px;
+  min-height:44px;padding:8px 6px;margin:0;border:0;border-radius:var(--r-control);
   background:transparent;color:#d4c4a8;cursor:pointer;
   font:700 15px/1 system-ui,sans-serif;
 }
 .hall-split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 body.hall-tray #shopUI .hall-tab.on,
 body.hall-tray #shopUI .hall-tab[aria-selected="true"]{background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608}
-.hall-flow{display:flex;align-items:center;justify-content:center;gap:16px;padding:16px 14px;border-radius:16px;background:#17130f;border:1px solid rgba(214,180,106,.35)}
+.hall-flow{display:flex;align-items:center;justify-content:center;gap:16px;padding:16px 14px;border-radius:var(--r-card);background:#17130f;border:1px solid rgba(214,180,106,.35)}
 .hall-flow-ico{width:48px;height:48px;display:flex}
-.hall-flow-ico svg{width:48px;height:48px;border-radius:12px}
+.hall-flow-ico svg{width:48px;height:48px;border-radius:var(--r-control)}
 .hall-flow-arrow{color:#c98f4e;font:700 22px/1 system-ui,sans-serif}
 .hall-flow-step{color:#fff8ee;font:700 14px/1.2 system-ui,sans-serif}
 .hall-pane{display:grid;gap:16px;min-width:0}
 .hall-pane[hidden]{display:none!important}
 .hall-field{display:flex;flex-direction:column;gap:8px;margin:0;color:#e8d7b8;font:650 13px/1.2 system-ui,sans-serif}
 .hall-field input,.hall-amt{
-  width:100%;min-height:48px;box-sizing:border-box;padding:0 12px;border-radius:12px;
+  width:100%;min-height:48px;box-sizing:border-box;padding:0 12px;border-radius:var(--r-control);
   border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:600 15px/1.2 system-ui,sans-serif;
 }
 .hall-amt{display:flex;align-items:center;gap:10px}
@@ -56,7 +56,7 @@ body.hall-tray #shopUI .hall-cta{
   display:inline-flex;align-items:center;justify-content:center;
   width:auto;min-width:min(220px,100%);max-width:100%;
   min-height:48px;padding:12px 22px;margin:0;justify-self:center;box-sizing:border-box;
-  border:1px solid #c9a05a;border-radius:14px;
+  border:1px solid #c9a05a;border-radius:var(--r-panel);
   background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
   color:#2a1608;font:700 15px/1.15 system-ui,sans-serif;cursor:pointer;
   box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 -2px 0 rgba(120,70,20,.22) inset,0 4px 0 #9a6f2e,0 8px 16px rgba(0,0,0,.28);
@@ -70,7 +70,7 @@ body.hall-tray #shopUI .hall-cta{
 .hall-rules{margin:0;text-align:center}
 .hall-rules a{color:#e8d7b8;font:600 13px/1.3 system-ui,sans-serif}
 .hall-note{margin:0;color:#f3ead8;font:600 14px/1.4 system-ui,sans-serif;overflow-wrap:anywhere}
-.hall-seal{display:flex;align-items:center;gap:8px;margin:0;padding:12px 14px;border-radius:12px;background:#3a1614;color:#ffd0d0;font:700 14px/1.35 system-ui,sans-serif}
+.hall-seal{display:flex;align-items:center;gap:8px;margin:0;padding:12px 14px;border-radius:var(--r-control);background:#3a1614;color:#ffd0d0;font:700 14px/1.35 system-ui,sans-serif}
 .hall-seal[hidden]{display:none}
 #hall-agent-dock{
   position:fixed;right:20px;bottom:22px;z-index:70;
@@ -89,7 +89,7 @@ body.hall-tray #shopUI .hall-cta{
 .hall-agent-pop[hidden]{display:none!important}
 .hall-agent-pop{
   width:min(300px,calc(100vw - 140px));
-  box-sizing:border-box;padding:10px;border-radius:14px;
+  box-sizing:border-box;padding:10px;border-radius:var(--r-panel);
   border:1px solid #d6b46a66;background:#1f1a15;
   box-shadow:0 12px 28px rgba(0,0,0,.4);
   display:grid;gap:8px;
@@ -97,15 +97,15 @@ body.hall-tray #shopUI .hall-cta{
 .hall-agent-log{margin:0;color:#f5d08a;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
 .hall-agent-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px}
 .hall-agent-pop input{
-  width:100%;min-width:0;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:10px;
+  width:100%;min-width:0;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:var(--r-control);
   border:1px solid #4a3a28;background:#17130f;color:#fff8ee;
 }
 .hall-agent-send{
-  width:44px;min-width:44px;height:44px;margin:0;padding:0;border:0;border-radius:10px;
+  width:44px;min-width:44px;height:44px;margin:0;padding:0;border:0;border-radius:var(--r-control);
   background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;font:700 16px/1 system-ui,sans-serif;cursor:pointer;
 }
 #shopUI #t-form button.hall-tab:not(.route-chip){
-  background:transparent;color:#d4c4a8;border:0;min-height:44px;border-radius:11px;
+  background:transparent;color:#d4c4a8;border:0;min-height:44px;border-radius:var(--r-control);
   box-shadow:none;padding:8px 6px;
 }
 #shopUI #t-form button.hall-tab.on:not(.route-chip),
@@ -113,7 +113,7 @@ body.hall-tray #shopUI .hall-cta{
   background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608;border:0;
 }
 #shopUI #t-form button.hall-cta{
-  min-height:48px;border:1px solid #c9a05a;border-radius:14px;color:#2a1608;
+  min-height:48px;border:1px solid #c9a05a;border-radius:var(--r-panel);color:#2a1608;
   background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
   box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 -2px 0 rgba(120,70,20,.22) inset,0 4px 0 #9a6f2e,0 8px 16px rgba(0,0,0,.28);
 }

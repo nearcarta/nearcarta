@@ -15,6 +15,9 @@
 <link rel="stylesheet" href="world.css">
 <link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="/brand/brown.css">
+<!-- The panel system loads FIRST so every panel stylesheet overrides a named token instead of
+     inventing a number. Measured before this: one panel used six radii and three sub-13px sizes. -->
+<link rel="stylesheet" href="/panels/system.css">
 <link rel="stylesheet" href="/panels/panels.css">
 <link rel="stylesheet" href="/panels/hall.css">
 <link rel="stylesheet" href="/shops/payouts/payouts.css">
