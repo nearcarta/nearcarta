@@ -20,7 +20,7 @@
       "crate": "contracts/guard",
       "artifact": "contracts/artifacts/guard.wasm",
       "build": "box",
-      "rev": "5a761c9e"
+      "rev": "1e1436b5"
     },
     {
       "account": "toll.nearcarta.near",

@@ -224,7 +224,7 @@ Every id below is a `contract` field in `shared/deployments/mainnet.json`. `npm 
 | `townhall.nearcarta.near` | Hall v2: job escrow, bids, counter, review digest (migrate hotfix, `contracts/hall/HOTFIX.md`) | `GgECZv7g1tSGvnXeMLuJrQKYcfjBVwdXHyS1TZn6T6N8` |
 | `arena.nearcarta.near` | Guardian NFTs and oath-scored attempts | `4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma` |
 | `house.nearcarta.near` | House v3: the NEP-171 deed, its purse and its line | `3ouAaAD1ccZ81CdLu26FoDxixYSynrmzPa58u1Focn66` |
-| `guard.nearcarta.near` | The keyless forwarder, and the only account that can clear a Hall part (`clear` → `guard_clear`) | `7uEdU1JWdtY8VPhyGAr3T6GEy5XfCTBngNjnhZvX8XJ6` |
+| `guard.nearcarta.near` | The keyless forwarder, and the only account that can clear a Hall part (`clear` → `guard_clear`, 1 yocto) | `9dkjuG4gA1vGWXwXKS5WyVb7opKePEC2BpCkyxb7WAaH` |
 | `nearcarta.near` | The root account: funder, owner of every shop, signer of every deploy | — |
 
 The city house is one account, `house.nearcarta.near` — the same account the legacy shop used, recreated on that name for v3 after the v2 wasm was closed. `extras.house` in that file is the record path for it and its `shop` field holds that id — the record path is not an account.
