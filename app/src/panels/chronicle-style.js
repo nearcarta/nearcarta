@@ -33,13 +33,19 @@ body.chronicle-tray #shopUI #t-form button.chronicle-tab[aria-selected=true]{
 .chronicle-pane[hidden],.chronicle-card [hidden]{display:none !important}
 .c-filters{display:grid; grid-template-columns:1fr 1fr; gap:8px 12px}
 .c-filters .wide{grid-column:1 / -1}
+/* The two marks (account → ledger) used to be a 54px band of their own: a decorative strip that
+   repeated what the tab above and the account field below already say. They keep their place and
+   their 36px size, but now share one 44px metadata line with Sources and Export CSV. That band
+   plus its gap is 62px the form gets back, and nothing is hidden: the marks, the disclosure and
+   the export button are all still here. */
+.c-meta{display:flex; align-items:flex-start; gap:12px; min-height:44px; flex:none}
 .c-flow{
-  display:flex; flex:none; align-items:center; justify-content:center; gap:16px; min-height:52px; padding:8px;
-  border-radius:16px; background:#140e09; border:1px solid rgba(214,180,106,.35);
+  display:flex; flex:none; align-items:center; gap:16px; min-height:0; padding:0;
+  border:0; background:none;
 }
 .c-flow img,.c-flow .c-mark-lg{width:36px; height:36px; display:block}
 .c-flow .c-mark-lg svg{width:36px; height:36px; display:block}
-.c-flow .c-arrow{color:#f5d08a; font:700 18px/1 system-ui,sans-serif}
+.c-flow .c-arrow{color:#f5d08a; font:700 15px/1 system-ui,sans-serif}
 .chronicle-field{display:flex; flex-direction:column; gap:4px; margin:0; color:#f3ead8; font:650 13px/1.2 system-ui,sans-serif}
 .chronicle-field input,.chronicle-field select,.chronicle-field textarea{
   width:100%; min-height:44px; height:44px; flex:0 0 auto; box-sizing:border-box; padding:10px 12px; border-radius:12px;
@@ -85,12 +91,12 @@ body.chronicle-tray #shopUI #t-form button.chronicle-gold{
   background-color:rgb(245, 208, 138); color:rgb(42, 22, 8); font:700 16px/1.15 system-ui,sans-serif; cursor:pointer;
   box-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 4px 0 #9a6f2e;
 }
-.c-sources{flex:none}
+.c-sources{flex:1 1 auto; min-width:0}
 .c-sources summary{cursor:pointer; color:#f5d08a; font:700 14px/44px system-ui,sans-serif; min-height:44px}
+/* Export CSV is an action, so it keeps its 44px line; it now sits beside Sources instead of
+   under it, which is the second 44px row the panel could not afford. */
+.chronicle-card .c-meta > .chronicle-quiet{align-self:flex-start; flex:none}
 .c-bundle{margin:0; color:#f3ead8; font:600 14px/1.45 system-ui,sans-serif; overflow-wrap:anywhere}
-.c-foot{display:flex; flex-direction:column; align-items:flex-end; gap:4px; min-height:44px; flex:none}
-.c-foot .c-status{min-width:0}
-.c-foot .chronicle-quiet{align-self:flex-end}
 .c-status{
   margin:0; color:#f3ead8; font:600 13px/1.45 system-ui,sans-serif; overflow-wrap:anywhere; white-space:normal;
 }
@@ -106,13 +112,13 @@ body.chronicle-tray #shopUI #t-rcpt,
 body.chronicle-tray #shopUI .t-links,
 body.chronicle-tray #shopUI #t-track{display:none !important}
 body.chronicle-tray nav.all-shops{top:16px; left:370px; right:auto}
-body.chronicle-tray #shopUI #tray{
-  display:flex; flex-direction:column;
-  width:min(440px, calc(100vw - 24px)); max-width:440px;
-  left:12px; bottom:16px; height:min(680px, calc(100dvh - 132px)); max-height:calc(100dvh - 132px);
-  padding:14px; box-sizing:border-box; overflow:hidden; background:#1a140f;
-  transition:height .18s ease;
-}
+/* The tray's box belongs to the shell (shop-shell.css, the #shopUI #tray rule), which fills the
+   slot between the menu and the viewport floor: 738px at 1440x900. This shop kept its pre-shell
+   height:min(680px, calc(100dvh - 132px)) and bottom:16px, which overrode that with 680px because
+   body.chronicle-tray #shopUI #tray outranks #shopUI #tray. Measured at 1440x900 that was 58px of
+   form the panel never saw, and it is why this room scrolled alone. Only the flex column is kept
+   here, so the card still fills the region the shell gives it. */
+body.chronicle-tray #shopUI #tray{display:flex; flex-direction:column}
 body.chronicle-tray #shopUI #t-form{display:flex; flex:1 1 auto; min-height:0; margin:0; min-width:0; max-width:100%; overflow:hidden}
 body.chronicle-tray #shopUI #t-form > *{flex:1 1 auto; min-height:0; display:flex; flex-direction:column}
 #chronicle-agent-dock{
@@ -148,17 +154,25 @@ body.chronicle-tray #shopUI #t-form > *{flex:1 1 auto; min-height:0; display:fle
   background:#17130f; color:#f5d08a; font:700 16px/1 system-ui,sans-serif;
 }
 @media (max-width:720px){
+  /* The box is the shell's on a phone too (left/right 8px, the viewport's height), except for
+     the bottom edge: the Lamplighter stands in the bottom-right corner and a full-height panel
+     would sit on top of him. The tray stops above the dock. This block used to pin it to
+     bottom:140px with height:auto, which left 132px of empty screen under it and gave the form a
+     468px region where its siblings get 596+. Only the inner padding is a shop decision: the card
+     had 12px of its own padding on top of the tray's, so the fields sat 24px in from the panel
+     edge on a 374px-wide screen. */
   body.chronicle-tray #shopUI #tray{
-    width:min(440px, calc(100vw - 16px)); max-width:none;
-    left:8px; top:52px; bottom:140px; height:auto; max-height:none; padding:8px;
+    /* The shell sets height, which wins over a top/bottom pair, so the box releases it here for
+       the two offsets to define the height. */
+    bottom:calc(104px + env(safe-area-inset-bottom, 0px));
+    height:auto;
   }
-  .chronicle-card{gap:6px; padding:10px}
+  .chronicle-card{gap:8px; padding:0}
   .chronicle-field{gap:2px}
   body.chronicle-tray #room button.chronicle-tab,
   body.chronicle-tray #shopUI #t-form button.chronicle-tab{min-height:40px; padding:6px 4px}
   body.chronicle-tray nav.all-shops{top:8px; left:8px; right:auto}
-  .chronicle-card{padding:12px; gap:8px}
-  .c-flow{min-height:44px; padding:4px}
+  .c-flow{padding:0}
   .c-filters{gap:8px 12px}
   .chronicle-tab{font-size:13px; padding:8px 6px}
   #chronicle-agent-dock{right:8px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); gap:8px}

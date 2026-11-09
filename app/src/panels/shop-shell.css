@@ -233,8 +233,11 @@ body.arena-tray #shopUI #tray .arena-mode {
   padding: 0 var(--sp-3);
 }
 
-/* Chronicle's filter grid: six fields at 68px each, single column. Two columns, with the account
-   and the words field spanning the row because they are wider than a filter. */
+/* Chronicle's filter grid: six fields. Account and Words are the two the visitor types into, so
+   they sit side by side on the first row and the four selects pair up under them: three rows of
+   68px rather than five. The old grid spanned Account and Words across the full width, which is
+   136px of the 332px the form had for everything else. Both are ordinary text inputs at 212px,
+   which still shows a full `name.near` and the words field is a filter, not prose. */
 #shopUI #tray .c-filters {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -252,8 +255,39 @@ body.arena-tray #shopUI #tray .arena-mode {
   overflow: visible !important;
   padding-right: 0 !important;
 }
-/* Chronicle's flow strip and tabs are one-line chrome. */
-#shopUI #tray .c-flow { min-height: 0; padding: var(--sp-2) var(--sp-3); }
+/* The statement and verify panes each stack four or five full-width fields under a 168px
+   textarea, which is 492px in a 475px region: the tab scrolled the moment you opened it. The
+   two account-shaped fields (Digest, Signature) are half-width values and pair up; the statement
+   textarea and the private note keep the full row because they hold prose. Same fields, same
+   handlers, two rows instead of four. */
+#shopUI #tray .chronicle-pane[data-pane='statement'],
+#shopUI #tray .chronicle-pane[data-pane='verify'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--sp-3);
+  align-items: start;
+}
+#shopUI #tray .chronicle-pane[data-pane='statement'] > .chronicle-field:first-child,
+#shopUI #tray .chronicle-pane[data-pane='statement'] > .chronicle-field:last-of-type,
+#shopUI #tray .chronicle-pane[data-pane='statement'] > .chronicle-check,
+#shopUI #tray .chronicle-pane[data-pane='verify'] > .c-bundle,
+#shopUI #tray .chronicle-pane[data-pane='verify'] > .chronicle-quiet,
+#shopUI #tray .chronicle-pane[data-pane='verify'] > .chronicle-field:first-of-type { grid-column: 1 / -1; }
+@media (max-width: 460px) {
+  #shopUI #tray .chronicle-pane[data-pane='statement'],
+  #shopUI #tray .chronicle-pane[data-pane='verify'] { grid-template-columns: minmax(0, 1fr); }
+}
+/* The statement is generated text the visitor reads and copies; it is not typed into. 168px was a
+   paragraph box, and on the statement tab it was the single reason the tab scrolled: measured 192
+   of a 406px pane in a 475px region. The field is resizable (resize:vertical), so a shorter
+   default costs no reach: the visitor can drag it taller. */
+#shopUI #tray .chronicle-pane[data-pane='statement'] #c-statement {
+  min-height: 132px;
+  height: 132px;
+}
+
+/* Chronicle's flow strip and tabs are one-line chrome. The marks live inside the meta row now
+   (see chronicle-style.js `.c-meta`), so the strip has no band of its own left to size. */
+#shopUI #tray .c-flow { min-height: 0; padding: 0; }
 #shopUI #tray .c-flow .tic .ti { width: 26px !important; height: 26px !important; }
 
 /* Hall: Task and Budget were two full-width fields above two already-paired rows, which made the
@@ -273,26 +307,54 @@ body.arena-tray #shopUI #tray .arena-mode {
 }
 
 /* Hall's flow strip is the same decorative banner as Arena's (NEAR -> Parts -> Review). One
-   compact row instead of an 82px block, which is the 55px Hall was over by. */
+   compact row instead of an 82px block, which is the 55px Hall was over by.
+   The icon rule used to name `.tic .ti`, which is Ferry's markup, not Hall's: Hall renders
+   `hall-flow-ico > svg` and kept its 48px icon, so the strip measured 66px rather than the 44
+   the rule was supposed to give it. Naming the real element is 22px of the 39px Hall was over
+   by at 1440x900. The strip is decorative (`aria-hidden`), so the icon is reduced, not removed. */
 #shopUI #tray .hall-flow {
   min-height: 0;
   padding: var(--sp-2) var(--sp-3);
   gap: var(--sp-2);
   border-radius: var(--r-control);
 }
+#shopUI #tray .hall-flow .hall-flow-ico,
+#shopUI #tray .hall-flow .hall-flow-ico svg { width: 26px !important; height: 26px !important; }
 #shopUI #tray .hall-flow .tic .ti { width: 26px !important; height: 26px !important; }
 #shopUI #tray .hall-flow-arrow { font-size: var(--t-label); }
+#shopUI #tray .hall-flow-step { font-size: var(--t-small); }
+/* The card is a stack of six rows. 18px between them was 30px more than the form could pay for
+   and three times the 10px the hall's own pane uses; 12 still overflowed by 7 once the rules link
+   took its 40px target, so the card now uses the same 10px rhythm as `.hall-pane` inside it. */
+#shopUI #tray .hall-card { gap: 10px; }
 
-/* c-sources and c-foot are two 44px metadata lines under the action. They are reference text, not
-   controls, so they read as one compact block instead of 88px of the panel. */
-#shopUI #tray .c-sources,
-#shopUI #tray .c-foot {
+/* The two metadata lines under the action. Sources was a 44px disclosure and Export CSV sat in
+   a second 44px row of its own; they are now one row (`.c-meta` in chronicle-view.js), so the
+   panel spends 44px instead of 88 on reference text and keeps both controls. */
+#shopUI #tray .c-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
   min-height: 0;
   margin: 0;
   padding: 0;
   font-size: var(--t-small);
   line-height: 1.35;
 }
+#shopUI #tray .c-sources {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  font-size: var(--t-small);
+  line-height: 1.35;
+}
+/* The open disclosure's own body keeps the panel's rhythm instead of stacking on the summary. */
+#shopUI #tray .c-sources > .c-health,
+#shopUI #tray .c-sources > .c-cover-list,
+#shopUI #tray .c-sources > .c-totals,
+#shopUI #tray .c-sources > .c-rules { margin: 0 0 var(--sp-1); }
 #shopUI #tray .c-out { min-height: 0; }
 
 /* ---- the form region -------------------------------------------------------------------- */
@@ -509,9 +571,14 @@ body #shopUI #tray > .t-links {
   padding: 0 var(--sp-4) var(--sp-3);
 }
 body #shopUI #tray > .t-links > .link {
-  min-height: 0;
+  /* The row is already 44px tall because "How it works" sits in it with a real target, so the
+     second link can meet the 40px floor for free: measured 98x24 beside a 44px sibling, which is
+     the same row and the same height. Costs no vertical space. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
   height: auto;
-  padding: 2px 0;
+  padding: 0;
   border: 0;
   background: none;
   color: var(--ink-3);

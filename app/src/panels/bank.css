@@ -259,7 +259,12 @@ body.bank-tray #shopUI #t-form button.bank-copy{
 
 @media (max-width:720px){
   body.bank-tray #shopUI #tray{
-    top:auto; left:8px; right:8px !important; bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    left:8px; right:8px !important;
+    /* The teller stands in the bottom-right corner and this panel is full width, so a tray that
+       reached the floor sat on him: measured at 390x844 a 70x77 overlap over the audit field.
+       The tray stops above the dock, the same rule Hall and Chronicle follow; the shell's top
+       edge and this bottom edge then define its height. */
+    bottom:calc(104px + env(safe-area-inset-bottom,0px));
     /* 270px wide and 62dvh tall made this the smallest tray in the city: it fit only a third
        of the screen and its gold button still landed at y=821. Same width as the approved
        Ferry tray, and tall enough to hold the scroll region plus the pinned action row. */

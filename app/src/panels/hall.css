@@ -6,8 +6,12 @@ body.hall-tray #shopUI #tray{
   max-height:calc(100dvh - 200px);
   padding:24px 22px 22px;
   box-sizing:border-box;
+  /* The tray is the frame, not the scroller: `#tray > .t-scroll` is the one region that scrolls
+     (world.css, and the "one scroll region" rule Chronicle follows). With overflow-y:auto here a
+     short screen got two nested scrollbars, and the pinned action row could scroll away with the
+     form because this box moved instead of the inner one. */
   overflow-x:hidden;
-  overflow-y:auto;
+  overflow-y:hidden;
   background:#1f1a15;
   border:1px solid #3a3128;
   box-shadow:0 16px 40px rgba(0,0,0,.45);
@@ -69,6 +73,10 @@ body.hall-tray #shopUI .hall-cta{
 .hall-status{margin:0;color:#f5d08a;font:650 14px/1.35 system-ui,sans-serif;text-align:center;overflow-wrap:break-word}
 .hall-rules{margin:0;text-align:center}
 .hall-rules a{color:#e8d7b8;font:600 13px/1.3 system-ui,sans-serif}
+/* "Personal rules" is the only link on its line, not a link inside a sentence, so it can have a
+   real target: measured 93x24 before this, under the 40px floor every other control here meets.
+   It is centred on its own row, so growing the box moves nothing sideways. */
+.hall-rules a{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 12px}
 .hall-note{margin:0;color:#f3ead8;font:600 14px/1.4 system-ui,sans-serif;overflow-wrap:anywhere}
 .hall-seal{display:flex;align-items:center;gap:8px;margin:0;padding:12px 14px;border-radius:var(--r-control);background:#3a1614;color:#ffd0d0;font:700 14px/1.35 system-ui,sans-serif}
 .hall-seal[hidden]{display:none}
@@ -127,10 +135,18 @@ body.hall-tray #shopUI .hall-cta{
   body.hall-tray #shopUI #tray{
     left:8px;
     right:8px!important;
-    bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    /* The Lamplighter stands in the bottom-right corner of the room on a phone, and a full-width
+       panel reaches the floor, so the two met: measured at 390x844 the dock covered 96x91 of the
+       last worker field and the gold action. The tray stops above the dock instead, which gives
+       the character its own strip of screen. The form scrolls a little more on a phone; nothing
+       is covered. */
+    bottom:calc(104px + env(safe-area-inset-bottom,0px));
+    /* `height` from the shell wins over `top`+`bottom`, so the box stayed 676px and reached the
+       floor anyway. With it released, the two offsets define the height. */
+    height:auto;
     width:auto!important;
     max-width:420px!important;
-    max-height:calc(100dvh - 168px);
+    max-height:none;
   }
   .hall-tab{font-size:13px}
   body.hall-tray #shopUI .hall-cta{min-width:min(200px,100%)}
