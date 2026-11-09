@@ -524,3 +524,12 @@ test('a refused Payouts row says why, on the row and in the line above it', () =
   assert.match(tray, /const why = \[\.\.\.new Set\(/);
   assert.match(tray, /refused before any deposit\$\{why\.length \? ` \(\$\{why\.join\(', '\)\}\)` : ''\}/);
 });
+
+test('signed-out house CTA names Sign in, and history does not stay on Reading', () => {
+  const room = readFileSync(new URL('../../../app/src/panels/house-room.js', import.meta.url), 'utf8');
+  assert.match(room, /Sign in at \/setup/);
+  assert.match(room, /Sign in to see this deed/);
+  assert.match(room, /Sign in to check in/);
+  // The gold button must not keep saying I'm alive when there is no account.
+  assert.match(room, /if \(!id\) cta\.textContent = 'Sign in at \/setup'/);
+});
