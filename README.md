@@ -65,7 +65,7 @@ Three properties. Each one is pinned by a test and by a transaction you can open
 | Over the board's cap | [CcPMX1Dt…](https://nearblocks.io/txns/CcPMX1DtMJ8UyCm4toUHossrFTrHhVKXrSe6L69s9ceF) | refused |
 | A Town Hall job posted from a visitor row | [51UktPvy…](https://nearblocks.io/txns/51UktPvyyQuf199eABmiKG1dVdWwUJLZn3vGrmp94jY4) | `below_min_amount` |
 
-A shop call that carries **no deposit** — a house check-in, an arena feed, a toll crossing — hits that same `below_min_amount` gate on the live board, before the call allowlist is even consulted. Reproduced on 2026-11-09 by signing a real `propose_call_as` for a zero-deposit `house_session_check_in`: the contract answered `below_min_amount`, not `method_not_allowlisted`. The source already has the guard that fixes it (`contracts/charter_board/src/v2.rs` — `if deposit > 0 { require!(deposit >= min_amount) }`), and that guard ships in the staged upgrade, not in the build that is live now.
+A shop call that carries **no deposit** — a house check-in, an arena feed, a toll crossing — hits that same `below_min_amount` gate on the live board, before the call allowlist is even consulted. Reproduced on 2026-11-09 by signing a real `propose_call_as` for a zero-deposit `house_session_check_in`: the contract answered `below_min_amount`, not `method_not_allowlisted`. The source already has the guard that fixes it (`contracts/charter_board/src/v2.rs` — `if deposit > 0 { require!(deposit >= min_amount) }`), and that guard is live since 2026-11-09 (code hash `CM6WA2gZ…`, recreate [CdHZUvPV…](https://nearblocks.io/txns/CdHZUvPVX8NXvvPT5nEueyAnvUsWpBdrw932U9bPefmp)); the table above was measured on the build before it.
 
 The message to sign is not reproduced by hand: `call_as_message` is an exposed view, so you ask the contract for the exact bytes it will verify and sign those. That is how the reproduction above signed correctly on the first attempt.
 
@@ -219,7 +219,7 @@ Every id below is a `contract` field in `shared/deployments/mainnet.json`. `npm 
 
 | Account | Runs | Code hash |
 |---|---|---|
-| `board.nearcarta.near` | The visitor's row: allowlist, caps, holds, per-shop calls, and an in-place `stage_upgrade` / `upgrade` / `migrate` path | `BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g` |
+| `board.nearcarta.near` | The visitor's row: allowlist, caps, holds, per-shop calls, and an in-place `stage_upgrade` / `upgrade` / `migrate` path | `CM6WA2gZDN17TRXQzFsrstgKPzsmiVLuArK7V6UkXLAf` |
 | `toll.nearcarta.near` | The pay-per-use gate and its MPC signature | `FaNtiauDWfjzKYtK2bns79wUqZqcXFcLjz2Bzx7aVdL5` |
 | `townhall.nearcarta.near` | Hall v2: job escrow, bids, counter, review digest | `FQg3EZdbEcjz44F5dckp9agpbsV9nYuToBQ4yUzXXWK9` |
 | `arena.nearcarta.near` | Guardian NFTs and oath-scored attempts | `4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma` |
