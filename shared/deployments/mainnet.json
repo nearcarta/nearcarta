@@ -63,7 +63,9 @@
       "v6_stranger_new_refused": "4SqPe9an7n7dGxmTf6YdAjqvarLbF3DRoNSwK9BK7Dzh",
       "v7_reap": "FBv1h1X9HRkPWiJzqrhceuzhxTd6xbWwfpUXYQTEh1bU",
       "v7_recreate_row_owner_refusal": "5Zp4i6nySszG8c41Up79ENFQjSsPRHrLMkc5dLREKdrV",
-      "v7_stranger_new_refused": "HwsAi5YUz2oh3aJu6f4UKaduwHGomkn94V3iVDVExzmd"
+      "v7_stranger_new_refused": "HwsAi5YUz2oh3aJu6f4UKaduwHGomkn94V3iVDVExzmd",
+      "v7_topup_visitor": "J8cR6rtZekhLUC34kQrFjL7RNLEtuLMJurkJo7j6VU86",
+      "v7_reopen_full_row": "Am4s8MXA2A3bAGd277EGUpJpV1RjJ5Loq9LRm4S8rPMp"
     },
     "visitor_run": {
       "note": "A real visitor, start to finish, in the browser at nearcarta.vercel.app/setup: email sign-in made this implicit account, nearcarta.near funded it, the visitor opened a row and the agent's request inside the cap was paid; the one over the cap was refused by the contract.",
@@ -227,28 +229,28 @@
           "house",
           "toll",
           "guard",
-          "wrap.near"
+          "wrap.near",
+          "native USDC (17208628…)",
+          "nearcarta.near (Payouts NEAR payee)"
         ],
         "pairs": [
-          "townhall post_job",
-          "townhall accept",
-          "townhall review",
-          "townhall refund",
+          "townhall post_job/bid/counter/accept/deliver/review/refund",
           "arena fund",
-          "house house_session_check_in",
+          "house house_session_check_in/house_session_prepare_send",
           "toll cross",
           "guard pay",
-          "wrap.near near_deposit",
-          "wrap.near ft_transfer",
+          "wrap.near near_deposit/ft_transfer/storage_deposit",
+          "USDC storage_deposit",
           "board stamp"
         ],
         "cap_each": "0.001",
         "per_action_cap": "0.001",
         "daily_budget": "0.01",
         "fund": "0.005",
-        "storage_locked": "0.02955",
-        "note": "Reopened 2026-11-09 after the guard fix. Every shop that calls through the board has its pair. It leaves out the Hall worker steps (bid, counter, deliver), House prepare-send, wrap storage_deposit, the USDC storage sponsor and a NEAR payee, because the full row locks 3423 B and the live cap is 3000 B. The 0.04 cap is merged (PR #176) and can only go live by an upgrade.",
-        "status": "closed 2026-11-09 21:26 (2q7VgbLQ…) for the guarded redeploy"
+        "storage_locked": "0.0342",
+        "simulate": "all 17 pairs answer allowed; post_job 0.002 answers over_shop_cap; other.near answers receiver_not_allowlisted",
+        "not_through_board": "Bank calls anchor and tighten_rules on the board itself, with no shop pair. Chronicle only reads. Ferry and Payouts send their cross-chain leg through 1Click intents after the board: the board caps the wNEAR it deposits (near_deposit/ft_transfer at 0.001 each, the per-action cap and the daily budget), and the intent can only spend what that deposit put there.",
+        "opened": "2026-11-09 21:37 Africa/Cairo, Am4s8MXA…"
       }
     },
     "known_bugs": [
