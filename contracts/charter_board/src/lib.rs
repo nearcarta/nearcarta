@@ -431,6 +431,12 @@ impl Board {
         self.confirm.remove(&who);
         self.epoch.remove(&who);
         self.count -= 1;
+        // With no row left nothing can be owed: every balance, stake and reserve went back at
+        // its own close. The running `owed` can drift above that, because a side record the
+        // reserve paid for was added to it a second time. On mainnet 2026-11-09 it read
+        // 0.00483 NEAR with 0 rows, and `reap` refused ERR_LIABILITY. Settle it to the truth here.
+        let holds_clear = if self.partial { self.hold_count == 0 } else { self.holds.is_empty() };
+        if self.count == 0 && holds_clear { self.owed = 0; }
         self.flush_owner(&who);
         let freed_bytes = before.saturating_sub(env::storage_usage());
         // The margin charged on the way in is not stored, so it is not in this
@@ -1501,6 +1507,31 @@ mod tests {
         let v = c.get_charter(acc(owner)).unwrap();
         assert!(v.storage_locked.0 <= MAX_ROW_YOCTO, "row {}", v.storage_locked.0);
         eprintln!("every-shop row storage_locked {}", v.storage_locked.0);
+    }
+
+    /// A drifted `owed` cannot block the teardown: closing the last row settles it to zero.
+    #[test]
+    fn closing_the_last_row_settles_a_drifted_ledger_and_reap_runs() {
+        let (mut c, _sk, _pk) = boot();
+        c.owed += 4_830_000_000_000_000_000_000;
+        go(ALICE, 0, 0);
+        c.close_charter();
+        assert_eq!(c.owed, 0);
+        go("nearcarta.near", 1, 0);
+        c.reap();
+    }
+
+    /// `simulate` answers a board stamp the way the send path treats it.
+    #[test]
+    fn simulate_lets_the_board_stamp_through_without_a_payee_entry() {
+        let (mut c, _sk, _pk) = boot();
+        go(ALICE, 5 * NEAR / 100, 0);
+        c.set_calls(vec![(acc("charters.nearcarta.near"), "stamp".to_string(), NEAR / 1000)], NEAR / 100);
+        go(ALICE, 0, 0);
+        let a = c.simulate(acc(ALICE), acc("charters.nearcarta.near"), "stamp".into(), U128(NEAR / 2000), vec![]);
+        assert!(a.contains("\"allowed\""), "{a}");
+        let b = c.simulate(acc(ALICE), acc(OTHER), "stamp".into(), U128(NEAR / 2000), vec![]);
+        assert!(b.contains("receiver_not_allowlisted"), "{b}");
     }
 
     fn boot() -> (Board, SigningKey, String) {
