@@ -31,6 +31,10 @@ export function installGuardDock(doc) {
     const enter = e.type === 'keydown' && e.key === 'Enter' && t.closest('#g-agent');
     if (!click && !enter) return;
     if (enter) e.preventDefault();
+    // Mark the event: the shop shell also binds onclick/onkeydown on the same controls, and a
+    // fast answer resolves before that handler runs, so it used to send again with the cleared
+    // input and overwrite the real answer with the "Try:" hint.
+    e.__nearcartaDockSent = true;
     dispatchGuardDock(doc);
   };
   doc.addEventListener('click', onEvent, true);

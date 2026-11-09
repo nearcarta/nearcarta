@@ -10,7 +10,6 @@
 //! verification write-up does not pin an ecrecover scheme we have tested with
 //! a signed fixture. The contract binds the oath, the pot, and the envelope.
 //! It does not pretend a model signature was checked.
-pub mod pricing;
 
 use near_sdk::json_types::U128;
 use near_sdk::serde::Serialize;
