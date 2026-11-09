@@ -159,7 +159,7 @@ button.md-row:hover { border-color: var(--md-soft); }
 body.md-guiding .md-dock > button { opacity: .55; pointer-events: none; }
 body.md-guiding .md-dock .md-ask .i { animation: md-lamp 1.2s ease-in-out infinite; }
 @keyframes md-lamp { 50% { transform: translateY(-2px) rotate(-6deg); } }
-body.md-guiding #prompt { display: none !important; }
+body.md-play #prompt { display: none !important; }
 
 /* ---------- the strip in a shop panel: one line, one gold button, the reward ---------- */
 #tray .qs { --qs-gold: #e2a83c; --qs-hi: #f7d57e; --qs-ink: #2a1a0e; --qs-cream: #f5e6c8; --qs-muted: #b9a88a;

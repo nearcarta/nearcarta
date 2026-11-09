@@ -216,8 +216,8 @@ function crierDye(root){ root.traverse(m=>{ if(!m.isMesh||!m.material||m.userDat
   mm.onBeforeCompile=(sh,r)=>{ prev&&prev.call(mm,sh,r); sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
   { vec3 c=diffuseColor.rgb; float mx=max(c.r,max(c.g,c.b)), mn=min(c.r,min(c.g,c.b)); float l=dot(c,vec3(.299,.587,.114));
     bool green=c.g>=c.r&&c.g>=c.b&&mx-mn>.04; bool cool=c.b>=c.r&&mx-mn<.25; bool grey=mx-mn<.06;
-    vec3 brown=mix(vec3(.16,.09,.05),vec3(.62,.38,.17),clamp(l*1.6,0.,1.)); vec3 gold=mix(vec3(.45,.3,.1),vec3(1.,.82,.45),clamp(l*1.4,0.,1.));
-    if(green) diffuseColor.rgb=brown; else if(cool||grey) diffuseColor.rgb=l>.45?gold:brown*1.15; }`); };
+    vec3 brown=mix(vec3(.13,.07,.035),vec3(.42,.24,.11),clamp(l*1.5,0.,1.)); vec3 gold=mix(vec3(.55,.36,.1),vec3(.98,.76,.34),clamp(l*1.3,0.,1.));
+    if(green) diffuseColor.rgb=brown; else if(cool||grey) diffuseColor.rgb=l>.4?gold:brown*1.3; }`); };
   mm.customProgramCacheKey=()=> 'crier'+(prev?'r':''); mm.needsUpdate=true; }); }
 export async function buildCast(){
   const loaded=await Promise.all([P.has('rorig')?'../chars/RobotExpressive':'RobotExpressive','Knight','Rogue_Hooded','Barbarian','Mage','Rogue'].map(n=>load('chars9/'+n+'.glb').catch(()=>null)));
@@ -258,7 +258,7 @@ export async function buildCast(){
   // the town crier: a hooded merchant in brown and gold who carries the Lamplighter's lantern in Market Day.
   // Built as a Char so it has the KayKit walk/run/idle clips, then held aside until a reskin swaps it in.
   if(hooded?.scene && hooded.animations?.length){ const cr=new Char(hooded,{scale:.235,name:'Town Crier',keep:[],voice:1.05,height:.66});
-    chars.splice(chars.indexOf(cr),1); W.scene.remove(cr.obj); rimify(cr.root,0xffd890,.8); outline(cr.root,0x1e1208,.03); crierDye(cr.root); CAST.crierBody=cr; }
+    chars.splice(chars.indexOf(cr),1); W.scene.remove(cr.obj); rimify(cr.root,0xffd890,.45); outline(cr.root,0x1e1208,.03); crierDye(cr.root); CAST.crierBody=cr; }
   for(const c of chars) rimify(c.root, c===R?0xffe2b0:0xffd2a0, c===R?.75:.6);
   for(const c of chars) outline(c.root, c===R?0x1e1208:0x2a1a10, c===R?.03:.02);
   return CAST;

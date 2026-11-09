@@ -406,7 +406,7 @@ function setRail(){
   setTimeout(measure, 250);
   setTimeout(measure, 900);
 }
-function leaveRoom(){ undressRoom(room); SL.clear(); room=null; body.classList.remove('in-shop'); pinShop(false); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
+function leaveRoom(){ undressRoom(room); SL.clear(); room=null; body.classList.remove('in-shop'); ['--hudTop','--railTop','--rail'].forEach(k=>body.style.removeProperty(k)); /* a shop's measured rail must not pin the town menu onto the brand */ pinShop(false); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
 addEventListener('resize',()=>{ if(!room) return; const c=room.camera, look=c.userData.look, fit=SL.frame(c); if(c.userData.home0){ c.position.copy(c.userData.home0).sub(look).multiplyScalar(fit).add(look); c.lookAt(look); } });
 $('#back').addEventListener('click',()=>world.exitShop());
 // The menu wraps differently at narrow widths, so its height is not a constant.
