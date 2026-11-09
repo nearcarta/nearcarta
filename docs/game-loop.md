@@ -114,6 +114,60 @@ Every few minutes (or on demand from `/judge`) the con artist pitches a shopkeep
 
 One page with one button per proof, each sending a real mainnet transaction and printing its nearblocks link: gather, sell into a falling price, buy, craft, a broke shop refusing a sale, invest to reopen it, and the con artist refused. A run of fast-forward sits beside them, labelled as a simulation.
 
+## The guide: a character who walks you through the town
+
+The headline of Market Day is a guide you can see. The Lamplighter walks the 3D island next to the player. The player talks to it in plain words; it answers, walks to the right shop, explains, and does the action for them inside the player's board caps.
+
+| The player says | The guide does | What the player sees |
+|---|---|---|
+| "Sell my iron where it pays most" | Reads `quote` at every shop, picks the best, walks there | The camera glides to the smithy, the `Why this price?` card opens, then the sale |
+| "Buy two salt for the tavern order" | Buys at the cheapest shop, then fills the order | Two steps, each with its tx |
+| "Fill the Town Hall order for tools" | Crafts if needed, then delivers to the Town Hall job | The Hall's job card moves from open to delivered to paid |
+| "Put 0.05 into the closed apothecary" | Calls `invest` | The windows light up again, a `share:apothecary` lands in the bag |
+| "Swap 1 NEAR to USDC" | Asks the Ferry for quotes through NEAR Intents and checks out | Quotes side by side, the larger output marked |
+| "Pay this stranger 0.5 for silk" | Proposes it; the row has no allowance for him | `Charter said no` with the refusal tx |
+
+How it is wired:
+
+- Brain: the NEAR AI Cloud model in a TEE that the town already uses (`backend/src/agent.js`). The chat is private to the player. Each answer carries its attestation, shown behind a small `verified` mark.
+- Hands: the guide never holds money. It proposes one action at a time through the player's row (`propose_call` on `board.nearcarta.near`). The row decides.
+- The moment: every action ends on one card, `Charter said yes` or `Charter said no`, with the reason and the nearblocks link. It is the same card for buy, sell, invest, a Hall order and a swap.
+- Walking: the guide walks a path between shop doors. The camera eases to the shop in about 1.2 s, and the dialog sits in a fixed panel so it never covers the shop's counter.
+
+## One connected loop
+
+Every part feeds another, so a session is one story, not a list of features:
+
+```
+gather goods (NEP-245 mint)
+   -> sell at a shop; its price moves (pricing.rs)
+   -> the shop's till grows, or it overbuys and goes broke
+   -> a broke shop closes; a player invests (share token) and it reopens
+   -> shops restock from each other through their own board rows
+   -> the Town Hall posts orders for goods; filling one pays the player
+   -> the con artist pitches a shopkeeper; the charter refuses on chain
+   -> the guide does any of these on request, under the player's caps
+   -> /judge replays each step as one real mainnet tx
+```
+
+## Look and feel
+
+- The existing 3D scenes stay: the island at dusk, the nine buildings, the dark brown and gold palette.
+- Motion: camera eases to a shop, prices tick with a short count-up, a closed shop dims and relights, goods fly into the bag, the charter card stamps `yes` or `no`.
+- Layout rules: one panel at a time on the right, the guide's chat at the bottom, no panel over another, no nested scroll areas. A panel that is taller than the screen scrolls the page, not the panel.
+- Every tx link opens in a new tab; nothing leaves the game screen.
+
+## Town Hall: the pass that cannot pay today
+
+On mainnet a Town Hall `review(pass)` refuses, because the Hall waits for `guard_clear` from `guard.nearcarta.near`, and that account has no key and no method that calls it. So a delivered order can never be paid. The fix, kept out of `charter_board`:
+
+1. Add an owner-only `set_guard(guard)` to `contracts/hall` (state-compatible, no migrate, so open jobs survive), with a unit test that only the owner can call it and that a pass still needs a clear.
+2. Redeploy the Hall wasm on `townhall.nearcarta.near` with its existing full-access key, then `set_guard` to a guard signer.
+3. The guard signer is a function-call key that can call only `guard_clear` on `townhall.nearcarta.near`. The backend Guardhouse uses it after the model's verdict is ALLOW; a BLOCK never calls it.
+4. Prove it with tiny real txs: post a 0.001 NEAR job, bid, deliver, `guard_clear`, `review(pass)` pays the worker.
+
+This is coordinated with the worker on `contracts/charter_board`; neither change touches the other's files.
+
 ## Requirement map
 
 | Games prompt requirement | Where in the design | File (planned) | Test (planned) |
@@ -129,16 +183,22 @@ One page with one button per proof, each sending a real mainnet transaction and 
 | Merchant reasoning in a tooltip | `quote` returns reasons; tooltip prints them | `app/src/market/why.js` | `the tooltip shows the contract's reasons word for word` |
 | Fast-forward: a week in a minute | 168 ticks in 60 s, labelled simulation | `app/src/market/fastforward.js`, `shared/market/sim.js` | `a simulated week runs 168 ticks and closes then reopens a shop` |
 | Loop designed on paper first | This page | `docs/game-loop.md` | n/a |
+| Agent NPCs (Lean on) | Shopkeepers, the con artist and the guide are agents | `backend/src/market/keeper.js`, `backend/src/agent.js` | `the guide proposes through the row and never holds money` |
+| NEAR Intents (Lean on) | The guide's swap goes through the Ferry's 1Click checkout | `backend/src/ferry-checkout.js` | existing ferry tests |
 | Bonus: players never notice the chain | No popups, no gas, chain shown only as optional tx links in the ledger | as above | as above |
 
 ## Build plan (in impact order)
 
-1. Pricing module and `Why this price?` tooltip.
-2. NEP-245 goods on the arena code, shopkeeper sub-accounts spending through their rows.
-3. Fast-forward.
-4. Con artist refused by the charter on mainnet.
-5. `/judge` with one-click mainnet transactions.
-6. README Games section: prompt line, file, test, tx.
-7. Relayer for market methods.
+| # | PR | Mainnet cost |
+|---|---|---|
+| 1 | Pricing module and `Why this price?` tooltip | none |
+| 2 | NEP-245 goods on the arena code (`gather`, `buy`, `sell`, `craft`, `invest`, `quote`), shopkeeper sub-accounts that spend through their rows | needs approval: the arena redeploy |
+| 3 | The guide: chat, walking, camera, `Charter said yes/no` card for buy, sell, invest, Hall order, swap | tiny txs |
+| 4 | Town Hall `set_guard` fix and the guard signer | under 0.05 NEAR |
+| 5 | Fast-forward | none |
+| 6 | Con artist refused by the charter on mainnet | tiny txs |
+| 7 | `/judge` with one-click mainnet txs | tiny txs |
+| 8 | README Games section: prompt line, file, test, tx | none |
+| 9 | Relayer for market methods | small float for gas |
 
 The existing 3D scenes stay. Market UI is new files under `app/src/market/`.
