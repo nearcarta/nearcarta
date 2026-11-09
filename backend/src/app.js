@@ -61,7 +61,7 @@ async function houseView() {
       owner: H.owner || null,
       code_hash: H.code_hash || null,
       txs: H.txs || null,
-      note: 'The city shop is extras.house.shop. extras.house.legacy is the recorded shop. A visitor charter is a board row, read with get_charter.',
+      note: 'The city shop is house.nearcarta.near (the extras.house record in mainnet.json). House legacy is the recorded shop. A visitor charter is a board row, read with get_charter.',
     };
   }
   const [snap, pending] = await Promise.all([guard.snapshot(H.oath), view(H.oath, 'get_pending')]);
@@ -433,7 +433,7 @@ export function makeApp() {
   // House deed (NEP-171): the deed is the house. Its purse and cap live in the shop contract and only the
   // current holder may spend (1 yocto, full wallet approval). The server never signs: /mint returns the unsigned
   // call for the visitor's wallet (NEAR Connect signAndSendTransaction); token_id is the minter's account id.
-  // The live shop is extras.house.shop. house_deed was never a key in mainnet.json, so these routes used to 404
+  // The live shop is house.nearcarta.near (extras.house in mainnet.json). house_deed was never a key in mainnet.json, so these routes used to 404
   // and the city could never load a deed. Contracts/house_nft mint_deed takes {house, cap} and 0.02 NEAR minimum.
   const D = DEP.house_deed || { contract: HOUSE_SHOP, mint: { gas: '100000000000000', deposit_yocto: '20000000000000000000000' } };
   const deedTx = (house) => ({ receiverId: D.contract, actions: [{ type: 'FunctionCall', params: { methodName: 'mint_deed',

@@ -101,7 +101,14 @@ export function mountHouseRoom(root, hooks = {}) {
   bindTokenFallbacks(root);
   const slot = root.querySelector('[data-testid=house-read]');
   const holder = root.querySelector('#house-holder');
-  if (holder) holder.value = id || 'Sign in';
+  if (holder) {
+    holder.value = id || 'Sign in';
+    // A 64-char account id cannot fit a 360px field. Without this the value was cut mid-character
+    // with no ellipsis and no way to see the end, so the one identity on the deed was unreadable.
+    // The input still holds the full value (selectable and copyable); this only makes the cut visible
+    // and puts the whole id in the native tooltip.
+    if (id) holder.title = id;
+  }
 
   function showTab(name) {
     state.tab = name || 'deed';

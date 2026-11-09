@@ -243,6 +243,18 @@ body #shopUI #tray [role='tablist'] > [role='tab']:focus-visible {
 #shopUI #tray textarea { max-width: 100%; box-sizing: border-box; }
 #shopUI #tray textarea { min-height: 76px; resize: vertical; }
 
+/* A read-only field holding an account id or a hash. 64 characters cannot fit 360px, so the cut
+   has to be legible: ellipsis rather than a hard chop through the middle of the last glyph, and
+   the value stays selectable so it can be copied. Two ids in the selector because the generic
+   field rules in panels.css are id-heavy and set the family with a `font` shorthand. */
+#shopUI #tray input[readonly],
+#shopUI #tray #t-form input[readonly] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--t-label);
+  text-overflow: ellipsis;
+}
+#shopUI #tray input[readonly]:focus { text-overflow: clip; }
+
 /* Two fields side by side where the shop already groups them; one column when there is no room. */
 #shopUI #tray .hall-split,
 #shopUI #tray .guard-split,

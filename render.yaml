@@ -15,7 +15,7 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: NEAR_RPC
-        value: https://test.rpc.fastnear.com
+        value: https://free.rpc.fastnear.com
       - key: ONECLICK_PARTNER_KEY
         sync: false
       - key: NEARAI_CLOUD_API_KEY

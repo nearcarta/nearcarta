@@ -135,7 +135,10 @@
 }
 
 /* 6. The "more below" pill must never sit on a control. It is a status strip at the tray's own
-   edge, in its own row, and it takes no space when hidden. */
+   edge, in its own row, and it takes no space when hidden.
+   `line-height: 1` on 13px text made a 13px line box in a box with 3px padding: measured
+   scrollHeight 19 / clientHeight 16, so the descenders were shaved. It is also a status, not a
+   control, so it must not offer a pointer. */
 #shopUI #tray > .more-hint {
   position: static;
   transform: none;
@@ -143,12 +146,13 @@
   flex: 0 0 auto;
   margin: 0 0 var(--sp-2);
   font-size: var(--t-small);
-  line-height: 1;
+  line-height: 1.35;
   height: 0;
   padding: 0;
   border: 0;
   opacity: 0;
   overflow: hidden;
+  pointer-events: none;
 }
 #shopUI #tray > .t-scroll[data-more='1'] ~ .more-hint {
   height: auto;
