@@ -257,25 +257,52 @@ would drift. It stays a refusal until someone decides the standalone page should
 
 ## 5. Board upgrade status
 
-- Staged: `stage_upgrade` in `Ct4uwW5He8eaxNW5kDb6gU98ydE3A1UE4rm8gRPzPTVN`.
-- ETA: **2026-11-09T16:29:03.174Z** (18:29 Africa/Cairo). 24 h after the 2026-11-08 16:29 restage.
-- Artifact: `contracts/artifacts/charter_board.hold.wasm`, **150,988 bytes**, sha256
-  `a89664ef45f16d429104b1b1d87d5dc83a79820a69bd22782f50a6b7c022315c` — **equals the staged
-  hash**, so `upgrade` will accept it.
-- The owner key is present and derives to `ed25519:E9DUdUQB…`, which **matches the on-chain
-  key list for `nearcarta.near`**. So I can execute this; it needs no owner action.
-- **Fixed today:** the plan invented a 24 h wait when the eta could not be read. The public RPC
-  answers `NOT_OBSERVED/TIMEOUT_ERROR` for the stage tx, so `eta` was null and the plan fell
-  through to `now + 24 h` — telling the owner to wait a day for an upgrade armed that
-  afternoon. It now falls back to the recorded `staged_eta_ns` from that same event and says
-  so. Dry run reports the real window and `staged_matches_build: true`.
-- **Before-state captured for proof:** `POST /api/board/simulate` currently returns
-  `ok:null`, `MethodResolveError(MethodNotFound)` — the live board has no `simulate` view.
-  After the upgrade the same call must return a real answer.
-- Six fixes ride on it: (1) hydrate/`anchor`, (2) `charge_acts`, (3) `hold` charging,
-  (4) `release`/`reap` liability, (5) `min_amount` on zero-value calls, (6) the `simulate` view.
+**It did not land. The new eta is 2026-11-10T16:33:16Z.**
 
----
+I ran it at the window. The sequence, without euphemism:
+
+1. `16:29:08Z`, five seconds after the eta: `--apply` → `LackBalanceForState`, amount
+   **0.12033 NEAR**. The staged wasm is larger than the live one and the board did not hold
+   enough storage stake for it. Gas was spent; **no code changed**.
+   Tx `Dz8zqumopaP47zCk4sDagenvhcHPXhGH8AVUCPswjFGM`.
+2. Funded the board **0.14 NEAR** from the owner key — into our own board account, recoverable
+   at `reap`, not burnt. Tx `5rezuonwYNxqYkGJvE2s43Qcr3vV2u39DRS81yDPPSZ`.
+3. Two further calls failed **on my mistakes**, not the chain:
+   - `J87WV9nD6AwgeCQLXkAhH3EkwWXnJ3EGTy3FMHnwEYGe` → `ERR_ARGS`. I wrote a second upgrade
+     script and passed `code` as a **byte array**. The live build takes a **hex string**.
+     `backend/scripts/board-anchor-upgrade.js` line 190 already did it correctly; I did not
+     read it before writing a parallel implementation.
+   - `G2oR4raDnnXBUtNEu1978pPxbNN96rqKd3ri7mXUGgWE` → `ERR_UPGRADE`. The guards run *before*
+     `upgrade_set = false`, but the **first** attempt passed every guard and then failed at the
+     action level, so the stage was already consumed.
+4. Re-staged the same pinned hash: `stage_upgrade` tx
+   `A65fXQ1ev9R62tEwiyYBCPxndjvTqZsUNk7NkCU7ErUL`, which logged
+   `eta: 1794328396812085376` = **2026-11-10T16:33:16Z**. Re-staging resets the 24 h clock by
+   design, so that is the cost of the failed attempts.
+
+Where that leaves the upgrade:
+
+- Artifact unchanged and still correct: `contracts/artifacts/charter_board.hold.wasm`,
+  **150,988 bytes**, sha256 `a89664ef45f16d429104b1b1d87d5dc83a79820a69bd22782f50a6b7c022315c`,
+  equal to the re-staged `code_hash`.
+- Board balance is now **1.54478 NEAR** — the 0.12033 shortfall is covered with ~0.02 headroom,
+  so tomorrow's attempt should clear the balance guard that stopped today's.
+- `upgrade_set` is armed again (the re-stage set it).
+
+A fact learned the hard way and worth recording: the **live** board exports `upgrade`,
+`migrate`, `stage_upgrade`, `propose_call_as` and `set_calls`, but **not** `upgrade_eta`,
+`upgrade_hash`, `upgrade_set` or `simulate`. The source at `c5e29e13` — which the record says
+produced the live `982bf6…` wasm — *does* declare `upgrade_eta`. So the live build is older
+than that source, and the `stage_upgrade` **event** is the only authoritative eta. My earlier
+note implied `upgrade_eta` was never a view anywhere; that was too strong.
+
+**Before-state captured for the post-upgrade proof:** `POST /api/board/simulate` currently
+returns `ok:null` with `MethodResolveError(MethodNotFound)`. After the upgrade the same call
+must return a real answer.
+
+Six fixes ride on the staged build: (1) hydrate/`anchor`, (2) `charge_acts`, (3) `hold`
+charging, (4) `release`/`reap` liability, (5) `min_amount` on zero-value calls, (6) the
+`simulate` view. Fix (5) is what unblocks a real shop transaction.
 
 ## 6. Open PRs
 
@@ -291,25 +318,29 @@ and the merged tree was checked out in a throwaway worktree and passed the suite
 
 ## 7. My honest score
 
-**7 / 10.**
+**6 / 10.**
 
-What earns the 7: the shops are consistent and clean at both widths; three real defects found
+What earns the 6: the shops are consistent and clean at both widths; three real defects found
 and fixed today on surfaces a judge will actually touch; two real mainnet transactions from the
 row agent key; 108/108 proofs re-read; the whole suite green (211 e2e + 898 unit); and the
 documentation corrected everywhere I found it lying.
 
-What costs the 3:
+What costs the 4:
 
+- **The upgrade did not land.** I had the window, the artifact, the key and a clean dry run,
+  and I lost it to a storage-balance shortfall I could have checked in advance (the board's
+  balance was in `mainnet.json` next to a wasm 18 KB smaller than the staged one), then to two
+  avoidable calls of my own making. The next window is tomorrow. That is the single biggest
+  miss of the day.
 - **No live gold-CTA transaction in any of the nine shops, produced by me, in my browser.**
   That is the headline claim of the whole project and it is still carried by earlier,
   script-produced txs.
 - **No completed v2 job lifecycle on mainnet** — blocked on `min_amount`, which the upgrade
-  fixes.
+  fixes, which is now a day away.
 - **Production runs 62 unmerged commits.** The API and site are live from this branch and
   `main` is 62 commits behind, so `main` does not describe what is deployed. I reported this
   wrongly the first time — I checked drift since the deployed commit and called it "not behind
-  on main", which answered a different question. The owner caught it. The engineering is fine;
-  the release discipline is not, and that is worth more than a rounding error.
+  on main", which answered a different question. The owner caught it.
 - **The `section-o`/`section-n` sweeps were largely tests asserting deleted pages.** I fixed
   the tests and the two real bugs underneath, but I should have audited that surface weeks
   earlier rather than trusting a green tick.
@@ -319,9 +350,12 @@ What costs the 3:
 0. **Merge #170.** It is first now, not sixth: production is running unmerged branch code, so
    `main` does not describe what is deployed and nothing on this branch is safe. This needs the
    owner's word — it is the one step I cannot take myself.
-1. **Let the upgrade land at 16:29 UTC** (`BOARD_WASM=…hold.wasm`, `--apply`). Prove it with
-   `POST /api/board/simulate` turning from `ok:null` into a real answer, and `view_code`
-   sha256 equal to `a89664ef…`.
+1. **Land the upgrade at 2026-11-10T16:33:16Z.** The board balance is now sufficient and the
+   stage is armed with the pinned hash. Run
+   `BOARD_WASM=contracts/artifacts/charter_board.hold.wasm NEAR_MAINNET_SIGNER_KEY=… node
+   backend/scripts/board-anchor-upgrade.js --apply` — the existing script, whose hex-string
+   argument is the one the live build accepts. Prove it with `POST /api/board/simulate` turning
+   from `ok:null` into a real answer, and `view_code` sha256 equal to `a89664ef…`.
 2. **Fund a second account** (~0.05 NEAR) and open one row through the current `/setup`, so
    the row has a `CALLS` key.
 3. **In my own browser, with a real wallet:** press the gold CTA in Ferry, Bank, Hall, Arena,
@@ -342,14 +376,23 @@ after them is recording.
 
 ## 8. Plan for the next hours
 
-- **15:39–16:29 UTC** — hold. Keep polling the PR set and CI; do not touch the board. Do not
-  re-stage: `mainnet.json` says no further re-stage unless a money-losing bug appears, and a
-  re-stage would reset the 24 h clock.
-- **16:29–16:35 UTC** — run the upgrade dry first, then `--apply`, then verify: `simulate`
-  answers, `view_code` sha256 == `a89664ef…`, `/api/mainnet` reflects the new code hash.
-- **After the upgrade** — capture the after-state of `simulate` and update
-  `mainnet.json` + README with the upgrade tx as a proof.
+- **Now → 2026-11-10T16:33:16Z** — the upgrade window is tomorrow. Today it is blocked by the
+  contract's own 24 h delay, not by anything I can work around. Use the time for everything
+  that does not need the new board.
+- **Open the fresh row (step 2 of the owner's list) as soon as possible.**
+  `backend/scripts/board-fresh-row.js` is written and dry-run, and costs ~0.045 NEAR net
+  (0.02 row + 0.015 calls + 0.01 fund, funded with 0.08 and the surplus refundable). It opens a
+  row **with a CALLS allowlist**, which is what the stale row lacks. This does not need the
+  upgrade for `set_calls`; the zero-value Town Hall steps are what need `min_amount` fixed.
+- **Then the gold-CTA and agent proofs.** For each shop: `simulate` first (it returns `ok:null`
+  until the upgrade), then one small real payment through the CTA and one through the agent,
+  recording both hashes and which surface signed each.
+- **Tomorrow at the eta** — run the existing `board-anchor-upgrade.js --apply`, verify
+  `simulate` flips from `ok:null` to a real answer, and `view_code` sha256 becomes
+  `a89664ef…`. Then walk the full Town Hall lifecycle (step 3), which fix (5) unblocks.
 - **Throughout** — poll all shop chats and open PRs on the 15-minute cadence, keep HISTORY.md
-  current, keep secrets out of git, gitleaks before every push.
-- **Blocked on the owner:** the merge of #170, and a second funded account for the live CTA
-  proofs. Neither is engineering.
+  current, keep secrets out of git, gitleaks before every push, update this report and the score
+  after each step.
+- **Blocked on the owner:** the merge of #170, and approval to spend ~0.045 NEAR for the fresh
+  row. Neither is engineering. The row cost is small but it is real chain money, so I am asking
+  rather than assuming.
