@@ -252,7 +252,7 @@ const report = {
   // reads init.allow_to the same way.
   init,
   set_price: fee ? {
-    board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
+    board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: String(process.env.TOLL_HOLD_NS || 0),
     note: 'usdc is the token contract, not a recipient. No visitor address is stored.',
   } : { skipped: true, note: 'Set TOLL_FEE_YOCTO and TOLL_MAX_TOKEN to publish a fee. Until then the card stays disabled.' },
   post_deploy_view: ['policy', 'address_of'],
@@ -321,8 +321,8 @@ if (path === 'close_then_create' || path === 'create_only') {
   ];
   if (fee && maxToken) {
     create.push(A.functionCall('set_price', {
-      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
-    }, 30n * TG, 0n));
+      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: String(process.env.TOLL_HOLD_NS || 0),
+    }, 30n * TG, 1n)); // set_price needs 1 yocto (a full-access key)
   }
   await send('create', SHOP, create);
 } else if (path === 'create_only') {
@@ -334,12 +334,12 @@ if (path === 'close_then_create' || path === 'create_only') {
   ];
   if (fee && maxToken) {
     create.push(A.functionCall('set_price', {
-      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: Number(process.env.TOLL_HOLD_NS || 0),
-    }, 30n * TG, 0n));
+      board: BOARD, fee, cost, splits: [], paused: false, usdc, max_token: maxToken, hold_ns: String(process.env.TOLL_HOLD_NS || 0),
+    }, 30n * TG, 1n)); // set_price needs 1 yocto (a full-access key)
   }
   await send('create', SHOP, create);
 } else if (path === 'upgrade_then_migrate') {
-  await send('upgrade', SHOP, [A.functionCall('upgrade', { code: Buffer.from(wasm).toString('base64') }, 200n * TG, 0n)]);
+  await send('upgrade', SHOP, [A.functionCall('upgrade', { code: Buffer.from(wasm).toString('base64') }, 200n * TG, BigInt(process.env.TOLL_UPGRADE_YOCTO ?? '1'))]);
 }
 
 const after = await viewAccount(SHOP);
