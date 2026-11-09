@@ -38,13 +38,13 @@ export function ensureBankDock(doc) {
   dock.innerHTML = `<div id="bank-agent-pop" class="bank-agent-pop" data-testid="bank-agent" hidden>
       <p id="bank-agent-log" class="bank-agent-log" data-testid="bank-agent-log" hidden></p>
       <div class="bank-agent-row">
-        <input id="bank-agent" data-testid="bank-agent-input" placeholder="Audit the cafe sample" autocomplete="off" aria-label="Ask the AI Agent">
+        <input id="bank-agent" data-testid="bank-agent-input" placeholder="Audit the cafe sample" autocomplete="off" aria-label="Ask the shop commands">
         <button type="button" class="bank-agent-send" id="bank-agent-go" data-testid="bank-agent-go" aria-label="Send">➤</button>
       </div>
     </div>
-    <button type="button" class="bank-agent-char" data-testid="bank-agent-toggle" aria-expanded="false" aria-controls="bank-agent-pop" title="AI Agent">
+    <button type="button" class="bank-agent-char" data-testid="bank-agent-toggle" aria-expanded="false" aria-controls="bank-agent-pop" title="Shop commands">
       <img class="bank-agent-avatar" src="/setup/chars/robotexpressive.webp" width="72" height="72" alt="" decoding="async">
-      <span class="bank-agent-name">AI Agent</span>
+      <span class="bank-agent-name">Commands</span>
     </button>`;
   (d.getElementById('shopUI') || d.body).appendChild(dock);
   const toggle = dock.querySelector('[data-testid=bank-agent-toggle]');

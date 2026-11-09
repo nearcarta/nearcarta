@@ -54,14 +54,14 @@ export function payoutsDockHtml() {
     <div id="payouts-agent-pop" class="payouts-agent-pop" data-testid="payouts-agent" hidden>
       <p id="p-agent-log" class="payouts-agent-log" data-testid="payouts-agent-log" hidden></p>
       <div class="payouts-agent-row">
-        <input id="p-agent" data-testid="payouts-agent-input" placeholder="bill alice.near 0.3 USDC for the April article" autocomplete="off" aria-label="Ask the AI Agent">
+        <input id="p-agent" data-testid="payouts-agent-input" placeholder="bill alice.near 0.3 USDC for the April article" autocomplete="off" aria-label="Ask the shop commands">
         <button type="button" class="payouts-agent-send" id="p-agent-go" data-testid="payouts-agent-go" aria-label="Send">➤</button>
       </div>
     </div>
-    <button type="button" class="payouts-agent-char" data-testid="payouts-agent-toggle" aria-expanded="false" aria-controls="payouts-agent-pop" title="AI Agent">
+    <button type="button" class="payouts-agent-char" data-testid="payouts-agent-toggle" aria-expanded="false" aria-controls="payouts-agent-pop" title="Shop commands">
       <span class="payouts-agent-badge" aria-hidden="true">⋯</span>
       <img class="payouts-agent-avatar" src="/setup/chars/robotexpressive.webp" width="72" height="72" alt="" decoding="async">
-      <span class="payouts-agent-name">AI Agent</span>
+      <span class="payouts-agent-name">Commands</span>
     </button>
   </div>`;
 }
