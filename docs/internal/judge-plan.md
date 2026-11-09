@@ -10,7 +10,7 @@ Sources: `docs/internal/source-pack.md`, `docs/internal/research/` (judges-minds
 - The only published judging lines: Autonomous Business "Humans only set the constraints." AI Security "Give AI money without giving it the keys to everything." Games "Judged on the game loop, not the token." Real-World Money "Something a normal company could use tomorrow." Open Innovation "Something we haven't seen."
 - Lens per shop: track-prompt fit, NEAR-native (the winners-patterns test), real value moved for the visitor with a verifiable tx, originality against the archetypes in `source-pack.md` section 7, design in the city tray, reproducibility from the README.
 - Jury signals used (`research/judges-x-signals.md` 3.3, `research/judges-minds.md`):
-  - Illia: verifiable and private AI, "every interaction hashed and signed with attestation", a provenance log; "turn judgement into code via verifiable AI"; agents that earn by working for others; idea list: AI Tamagotchi NFT that pays its own inference, universal checkout, private trading with viewing keys, Swarm-for-Hire "with guardrails or governance AI review".
+  - Illia: verifiable and private AI, "every interaction hashed and signed with attestation", a provenance log; "turn judgement into code via verifiable AI"; agents that earn by working for others; idea list: AI Tamagotchi NFT that pays its own inference, universal checkout, private trading with viewing keys, hire-a-swarm "with guardrails or governance AI review".
   - Kain: a smart contract that controls a wallet address on another network via chain signatures; seed phrases are a filter.
   - Haseeb: agents are the users; a human click on every tx is the wrong design.
   - Eddy: the counterparty only needs an address on a network NEAR Intents supports; token-first thinking fails.
@@ -248,7 +248,7 @@ Every shop uses the approved tray (section 7) and the shared agent (5.2). "No co
 
 ### Town Hall: Agent Economy
 
-- Concept: hire a crew under a budget. This is Illia's Swarm-for-Hire with AI review.
+- Concept: hire a crew under a budget. This is Illia's hire-a-swarm with AI review.
   - A visitor posts a job with a budget escrowed from the session.
   - Any visitor can register an agent row with a small NEAR bond.
   - The poster's own Lamplighter acts as general contractor. It splits the job, makes one counter-offer and awards the parts.
@@ -257,7 +257,7 @@ Every shop uses the approved tray (section 7) and the shared agent (5.2). "No co
   - Each part gets a receipt: what, from whom, the price and pass or fail.
   - The Lamplighter is listed on Agent Market. Make one real Market hire if the API allows it; otherwise the README says there is no public hire API.
 - Who gets the money: the agents whose parts pass. Unspent escrow returns to the poster, and the city takes nothing.
-- Why it wins: the Agents prompt asks for a budget, a split, a hire, a counter-offer and receipts. Signals: Illia's Nov 4 Swarm-for-Hire "with governance AI review", Stepan (manager agents and verifiable work receipts), Haseeb.
+- Why it wins: the Agents prompt asks for a budget, a split, a hire, a counter-offer and receipts. Signals: Illia's Nov 4 hire-a-swarm "with governance AI review", Stepan (manager agents and verifiable work receipts), Haseeb.
 - Primitives: https://docs.market.near.ai/list-your-agent, https://market.near.ai/skill/SKILL.md, the verifier (5.3), function-call keys.
 - Contract: deploy in place on `townhall.nearcarta.near` with its existing full-access key and `migrate` (ignore_state), so no new account. Delete that key right after.
   - Methods: `post_job`, `register_agent`, `bid`, `counter`, `award`, `deliver(part, result_sha256)`, `release(part, verdict, sig)`, and `refund` after the deadline.

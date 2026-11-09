@@ -39,7 +39,7 @@
 
 ## Competitors
 
-NEAR Business / Trezu treasuries (do **not** claim Social Money). Shore. Intents any-token pay. Beat with: tiny live pass + MPC proof + Chronicle line in &lt;2 minutes.
+Kept in private notes on the box, not in this repo.
 
 ## Sources
 

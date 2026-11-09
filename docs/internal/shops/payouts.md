@@ -39,7 +39,7 @@
 
 ## Competitors
 
-Settle https://github.com/MFrancis-dev/settle (200) — any-token invoices to dollars. Scrim payment links. Beat with: on-chain cap refuses + city agent session + CSV matching txs. Do not claim exact-dollar if not built.
+Kept in private notes on the box, not in this repo.
 
 ## Sources
 
