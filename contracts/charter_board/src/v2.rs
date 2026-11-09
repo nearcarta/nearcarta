@@ -165,7 +165,7 @@ fn effects_canon(effects: &[EffectIn]) -> String {
     s
 }
 
-fn json_string(s: &str) -> String {
+pub(crate) fn json_string(s: &str) -> String {
     let mut o = String::from("\"");
     for c in s.chars() {
         match c {
@@ -316,8 +316,13 @@ impl Board {
                 if let Some(row) = self.rows.get_mut(me) { row.storage_locked = row.storage_locked.saturating_sub(to_row); }
             }
             if to_reserve > 0 { *self.credit.entry(me.clone()).or_insert(0) += to_reserve; }
-            self.owe(-(freed as i128));
-            refund(me, freed + env::attached_deposit().as_yoctonear());
+            // Only the row's share leaves as cash. The reserve's share went back to the reserve
+            // above; paying it out as well paid the visitor twice for the same bytes, and a
+            // set/clear loop drained the board (measured in
+            // `an_effect_set_and_clear_cycle_pays_nothing_out`: 0.01266 NEAR over six cycles).
+            // The reserve is already inside `storage_locked`, so only `to_row` leaves `owed`.
+            self.owe(-(to_row as i128));
+            refund(me, to_row + env::attached_deposit().as_yoctonear());
             return;
         }
         let cost = (after - before + STORAGE_MARGIN_BYTES) as u128 * price();
@@ -333,7 +338,11 @@ impl Board {
         require!(row.storage_locked.saturating_add(from_row) <= MAX_ROW_YOCTO, "ERR_ROW_TOO_BIG");
         row.storage_locked += from_row;
         if from_reserve > 0 { *self.credit.get_mut(me).unwrap() -= from_reserve; }
-        self.owe(cost as i128);
+        // `set_calls` already put the reserve into `storage_locked` and `owed`. Spending it
+        // moves NEAR inside the row, so only the part the row adds is a new liability. Adding
+        // the whole cost counted the reserve twice: the phantom `owed` measured on mainnet
+        // 2026-11-09 (0.00483, then 0.00548 NEAR with 0 rows) that made `reap` refuse.
+        self.owe(from_row as i128);
         refund(me, attached - from_row);
     }
 
@@ -369,6 +378,7 @@ impl Board {
 
     /// Owner setup. Raises or adds budgets. Spent counters carry over.
     pub fn set_effects(&mut self, effects: Vec<EffectIn>) {
+        crate::full_key();
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         require!(self.rows.contains_key(&me), "ERR_NO_CHARTER");
@@ -384,8 +394,7 @@ impl Board {
     ///
     /// Why this exists: an agent that can only find out by sending learns refusal reasons by
     /// burning gas, and every refusal in the live city was being discovered that way. The
-    /// strongest rival in our tracks (soldanoandrea/allowance) ships exactly this as `simulate`
-    /// and it is the one idea of theirs worth taking: the agent plans before it signs.
+    /// agent plans before it signs.
     ///
     /// It returns the FIRST rule that would refuse, plus the numbers that rule compared, so a
     /// caller can say "0.03 is over your 0.02 cap" rather than just "denied". It never checks
@@ -398,7 +407,10 @@ impl Board {
         if row.rules.expires_at != 0 && now > row.rules.expires_at { return sim("clause_expired", "", deposit, 0); }
         if !in_window(row.rules.window_start_min, row.rules.window_end_min) { return sim("outside_time_window", "", deposit, 0); }
         if deposit > 0 && deposit < row.rules.min_amount { return sim("below_min_amount", "", deposit, row.rules.min_amount); }
-        if !row.rules.receivers.contains(&receiver) { return sim("receiver_not_allowlisted", "", deposit, 0); }
+        // `stamp` on the board itself needs no payee entry: the send path exempts it the same
+        // way (propose_call), and without this the Ferry stamp read as refused on mainnet.
+        let stamp = receiver == env::current_account_id() && method == "stamp";
+        if !stamp && !row.rules.receivers.contains(&receiver) { return sim("receiver_not_allowlisted", "", deposit, 0); }
         if !(1..=64).contains(&method.len()) { return sim("ERR_METHOD", "", deposit, 0); }
         let Some(policy) = self.calls.get(&owner) else { return sim("method_not_allowlisted", "", deposit, 0); };
         let Some(rule) = policy.rules.iter().find(|r| r.receiver == receiver && r.method == method) else {
@@ -466,6 +478,7 @@ impl Board {
     }
 
     pub fn set_confirm_key(&mut self, key: String) {
+        crate::full_key();
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         let agent = self.rows.get(&me).expect("ERR_NO_CHARTER").agent;
@@ -623,8 +636,13 @@ impl Board {
         let have = self.credit.get(&owner).copied().unwrap_or(0);
         let from_reserve = have.min(cost);
         let from_row = cost - from_reserve;
-        let row_room = self.rows.get(&owner).map(|r| MAX_ROW_YOCTO.saturating_sub(r.storage_locked)).unwrap_or(0);
-        if from_row > row_room {
+        // The part past the reserve is paid from the row's own balance. Nothing is attached
+        // here (the session key signs), and taking it from nowhere let the board pay for the
+        // bytes: they came back to the visitor as reserve credit when the hold was dropped, and
+        // as cash at the next shrink or at close (`side_writes_pay_each_storage_byte_once`).
+        let (row_room, row_cash) = self.rows.get(&owner).map(|r| (MAX_ROW_YOCTO.saturating_sub(r.storage_locked), r.balance)).unwrap_or((0, 0));
+        if from_row > row_room || from_row > row_cash {
+            let too_big = from_row > row_room;
             self.holds.remove(&(owner.clone(), id));
             if self.partial { self.hold_count = self.hold_count.saturating_sub(1); }
             kv_del(b"h", &format!("{}/{}", owner.as_str(), id));
@@ -637,14 +655,16 @@ impl Board {
             }
             row.nonce -= 1;
             self.calls.get_mut(&owner).unwrap().session_spent = self.calls.get(&owner).unwrap().session_spent.saturating_sub(deposit);
-            env::panic_str("ERR_ROW_TOO_BIG");
+            env::panic_str(if too_big { "ERR_ROW_TOO_BIG" } else { "ERR_BALANCE" });
         }
         if from_reserve > 0 { *self.credit.get_mut(&owner).unwrap() -= from_reserve; }
         if from_row > 0 {
             let row = self.rows.get_mut(&owner).unwrap();
             row.storage_locked += from_row;
+            row.balance -= from_row;
         }
-        if cost > 0 { self.owe(cost as i128); }
+        // Both shares were already liabilities: the reserve sits in `storage_locked` and the
+        // row part moved over from `balance`, so `owed` does not change.
         if hold { None } else { Some(self.send_call(&owner, id)) }
     }
 
@@ -713,8 +733,7 @@ impl Board {
         let h = self.holds.get(&(owner.clone(), action_id.0)).cloned().expect("ERR_ACTION");
         require!(!h.pending, "ERR_ACTION");
         require!(env::block_timestamp() > h.expires, "ERR_EXPIRY");
-        let freed = self.free_hold(&owner, action_id.0);
-        if freed > 0 { *self.credit.entry(owner).or_insert(0) += freed; }
+        self.free_hold(&owner, action_id.0);
         self.owe(-(h.amount as i128));
     }
 
@@ -744,27 +763,30 @@ impl Board {
         let h = self.holds.get(&(owner.clone(), action_id.0)).cloned().expect("ERR_ACTION");
         require!(!h.pending, "ERR_SETTLE");
         require!(env::predecessor_account_id() == h.receiver, "ERR_SETTLE");
-        let freed = self.free_hold(&owner, action_id.0);
-        if freed > 0 { *self.credit.entry(owner).or_insert(0) += freed; }
+        self.free_hold(&owner, action_id.0);
         self.owe(-(h.amount as i128));
     }
 
-    fn free_hold(&mut self, owner: &AccountId, id: u64) -> u128 {
+    /// Drops the hold record. Its bytes go back to the row's side reserve: they are already
+    /// inside `storage_locked` and were paid for (the reserve was prepaid by `set_calls`, and
+    /// the part past it came out of the row's balance in `propose_call_as`), so no cash moves
+    /// and the row's locked total does not change. The reserve is paid out once, at close.
+    fn free_hold(&mut self, owner: &AccountId, id: u64) {
         let before = self.baseline(owner);
         self.holds.remove(&(owner.clone(), id));
         if self.partial { self.hold_count = self.hold_count.saturating_sub(1); }
         kv_del(b"h", &format!("{}/{}", owner.as_str(), id));
         self.flush_owner(owner);
         let after = env::storage_usage();
-        if before > after { (before - after) as u128 * price() } else { 0 }
+        let freed = if before > after { (before - after) as u128 * price() } else { 0 };
+        if freed > 0 { *self.credit.entry(owner.clone()).or_insert(0) += freed; }
     }
 
     fn finish(&mut self, owner: &AccountId, id: u64, from_callback: bool) {
         let key = (owner.clone(), id);
         let Some(h) = self.holds.get(&key).cloned() else { return; };
         if from_callback && h.pending { return; }
-        let freed = self.free_hold(owner, id);
-        if freed > 0 { *self.credit.entry(owner.clone()).or_insert(0) += freed; }
+        self.free_hold(owner, id);
         let restore = if from_callback { !near_sdk::is_promise_success() } else { true };
         if !restore { self.owe(-(h.amount as i128)); return; }
         self.restore_row(owner, h.amount, h.day);
@@ -861,6 +883,7 @@ impl Board {
     pub fn upgrade_eta(&self) -> u64 { self.upgrade_eta }
 
     pub fn upgrade(&mut self, code: Vec<u8>) -> Promise {
+        crate::full_key();
         require!(env::predecessor_account_id() == self.owner, "ERR_NOT_OWNER");
         require!(self.upgrade_set, "ERR_UPGRADE");
         require!(env::block_timestamp() >= self.upgrade_eta, "ERR_UPGRADE");
@@ -961,9 +984,13 @@ pub extern "C" fn propose_call_as() {
 #[no_mangle]
 pub extern "C" fn simulate() {
     let v = parse(&input_str());
-    let b = load();
+    // `load()` on a HEAD board is partial: no row is in memory until it is hydrated, so without
+    // this every answer was `no_charter` on mainnet (measured 2026-11-09 on CM6WA2gZ…).
+    let mut b = load();
+    let owner = v.need("owner").account();
+    b.hydrate(&owner);
     ret(&b.simulate(
-        v.need("owner").account(), v.need("receiver").account(), v.need("method").string(),
+        owner, v.need("receiver").account(), v.need("method").string(),
         U128(v.need("deposit").u128()), effects_json(v.need("effects")),
     ));
 }

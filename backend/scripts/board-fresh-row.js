@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, openSync, writeSync, fsyncSync, closeSync, readF
 import { dirname } from 'node:path';
 import { Account, JsonRpcProvider, KeyPair, KeyPairSigner, actions } from 'near-api-js';
 import { openRowTransactions } from '../../shared/setup/open-row.js';
+import { CALLS_DEPOSIT_YOCTO } from '../../shared/board/session.js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 
 const apply = process.argv.includes('--apply');
@@ -33,32 +34,58 @@ const NEAR = 10n ** 24n;
 const BYTE = 10n ** 19n;              // storage price per byte
 const ACCOUNT_BYTES = 182n;           // a bare implicit account with one full-access key
 
-const SHOP = 'townhall.nearcarta.near';
-const CALLS = [
-  { receiver: SHOP, method: 'post_job', cap: String(NEAR / 50n) },
-  { receiver: SHOP, method: 'bid', cap: String(NEAR / 1000n) },
-  { receiver: SHOP, method: 'accept', cap: String(NEAR / 1000n) },
-  { receiver: SHOP, method: 'deliver', cap: String(NEAR / 1000n) },
-  { receiver: SHOP, method: 'review', cap: String(NEAR / 1000n) },
+// Every shop that sends a contract call through the board, with tiny caps (contracts/charter_board
+// a_row_with_every_board_shop_fits_the_row_cap measures this exact row):
+//   Town Hall  every lifecycle step (the visitor can post or work a job)
+//   Arena fund, House check-in + prepare-send, Toll cross, Guard pay
+//   Ferry      wrap.near near_deposit / ft_transfer / storage_deposit and the board's own stamp
+//   Payouts    a NEAR payee (nearcarta.near here) by plain propose, the wrap.near pairs for a
+//              foreign invoice, and the native-USDC storage_deposit sponsor
+//   Bank       anchor and tighten_rules are board methods on the row itself, no pair needed
+//   Chronicle  reads only
+// The 1Click leg of Ferry/Payouts happens after the board: the row caps the wNEAR the board
+// deposits, and the intent can only spend what that deposit put there.
+const TH = 'townhall.nearcarta.near';
+const USDC = '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
+const CAP = NEAR / 1000n;                // 0.001 per call
+const PAIRS = [
+  ...['post_job', 'bid', 'counter', 'accept', 'deliver', 'review', 'refund'].map(m => [TH, m]),
+  ['arena.nearcarta.near', 'fund'],
+  ['house.nearcarta.near', 'house_session_check_in'], ['house.nearcarta.near', 'house_session_prepare_send'],
+  ['toll.nearcarta.near', 'cross'], ['guard.nearcarta.near', 'pay'],
+  ['wrap.near', 'near_deposit'], ['wrap.near', 'ft_transfer'], ['wrap.near', 'storage_deposit'],
+  [USDC, 'storage_deposit'], ['board.nearcarta.near', 'stamp'],
 ];
+// The live board (max_row 0.03) cannot hold every pair: 8 receivers / 17 pairs locks 3423 B.
+// Until the 0.04 build is live, keep one pair per shop plus the poster's Hall steps and the
+// Ferry pair (2958 B in the same unit test with this list). The worker-side Hall steps, House
+// prepare-send, wrap storage_deposit, the USDC sponsor and the NEAR payee wait for the 0.04 row.
+const LIVE_FIT = new Set(['post_job', 'accept', 'review', 'refund', 'fund', 'house_session_check_in', 'cross', 'pay', 'near_deposit', 'ft_transfer', 'stamp']);
+const FULL = BigInt(MAIN.board?.max_row_yocto || 0) >= 40_000_000_000_000_000_000_000n;
+const PLAN = FULL ? PAIRS : PAIRS.filter(([r, m]) => LIVE_FIT.has(m) && r !== USDC);
+const CALLS = PLAN.map(([receiver, method]) => ({ receiver, method, cap: String(CAP) }));
 const RULES = {
-  receivers: [SHOP],
-  per_action_cap: String(NEAR / 100n),   // 0.01
-  daily_budget: String(NEAR / 20n),      // 0.05
+  receivers: FULL
+    ? [TH, 'arena.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near', 'guard.nearcarta.near', 'wrap.near', USDC, 'nearcarta.near']
+    : [TH, 'arena.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near', 'guard.nearcarta.near', 'wrap.near'],
+  per_action_cap: String(CAP),           // 0.001
+  daily_budget: String(NEAR / 100n),     // 0.01
   max_actions_per_day: 8,
   window_start_min: 0,                   // 0/0 = always open, what /setup sends
   window_end_min: 0,
   min_amount: String(NEAR / 10000n),     // 0.0001, what /setup sends; the board refuses 0 (ERR_MIN)
   expires_at: '0',
 };
-const fundYocto = NEAR / 100n;                                        // spendable in the row
+const fundYocto = NEAR / 200n;                                        // 0.005 spendable in the row
 const rowDepositYocto = BigInt(MAIN.board?.max_row_yocto || 2n * 10n ** 22n);
-const callsDepositYocto = 15n * 10n ** 21n;
+const callsDepositYocto = BigInt(CALLS_DEPOSIT_YOCTO);
 const GAS_OPEN = 100n * TG, GAS_CALLS = 100n * TG, GAS_CLOSE = 50n * TG, GAS_TRANSFER = 1n * TG;
-// Measured on an identical row (1 receiver, 5 calls) on 2026-11-09: open+set_calls burnt
-// 0.0023619 NEAR and the board kept 0.0175100 storage + the 0.01 fund; 0.00749 came back.
-const MEASURED_BURN_OPEN = 2_361_889_958_294_400_000_000n;
-const MEASURED_ROW_STORAGE = 17_510_000_000_000_000_000_000n;
+// Hold build (CM6WA2gZ… and later): open+set_calls burnt 0.0024163 NEAR on mainnet
+// (FeUwnaZK…, 1 receiver / 5 pairs, storage 0.02551 — the unit test reproduces that exactly).
+// This row (8 receivers / 17 pairs) locks 0.03423 in contracts/charter_board
+// a_row_with_every_board_shop_fits_the_row_cap, under the 0.04 cap.
+const MEASURED_BURN_OPEN = 2_416_337_386_732_800_000_000n;
+const MEASURED_ROW_STORAGE = FULL ? 34_230_000_000_000_000_000_000n : 29_580_000_000_000_000_000_000n;
 
 export function checkRules(r, calls) {
   const bad = [];
@@ -68,7 +95,8 @@ export function checkRules(r, calls) {
   if (!r.receivers?.length) bad.push('no receivers');
   for (const c of calls) {
     if (typeof c !== 'object' || Array.isArray(c) || !c.receiver || !c.method || !c.cap) bad.push('ERR_ARGS: calls must be {receiver, method, cap} objects');
-    else if (!r.receivers.includes(c.receiver)) bad.push(`call receiver ${c.receiver} is not in rules.receivers`);
+    // `stamp` is a call on the board itself and returns its NEAR to the row; the board exempts it.
+    else if (!(c.method === 'stamp' && c.receiver === MAIN.board?.contract) && !r.receivers.includes(c.receiver)) bad.push(`call receiver ${c.receiver} is not in rules.receivers`);
   }
   return bad;
 }

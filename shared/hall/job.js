@@ -1,7 +1,7 @@
 // Budget ledger for a Town Hall job. No network and no signing.
 // Escrow identity: budget = paid + remaining + refunded.
 // A pass is held, not paid on chain, until a migrated contract can release to the named worker.
-// townhall.nearcarta.near is not a payee. Source: docs/internal/source-pack.md §12.4 and §12.5.
+// townhall.nearcarta.near is not a payee. Source: internal source pack §12.4 and §12.5.
 import { nearOf, yoctoOf } from './plan.js';
 
 export const CHAIN_RELEASE = Object.freeze({
@@ -14,7 +14,8 @@ export const CHAIN_RELEASE = Object.freeze({
 export const MARKET_HIRE_GAP = Object.freeze({
   live: false,
   blocked: 'market_hire_unavailable',
-  hint: 'Market hire is not available. The jobs board is not public, and a worker token cannot hire. Nothing was listed or paid.',
+  // Honest: there is no public Agent Market hire path yet. Do not pretend a gold button can hire.
+  hint: 'No public market hire yet. Post a job on this desk, or open Change my row for your board caps. Nothing was listed or paid.',
 });
 
 const OWN = new Set(['townhall.nearcarta.near', 'board.nearcarta.near']);

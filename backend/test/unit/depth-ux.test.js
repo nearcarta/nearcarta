@@ -39,6 +39,35 @@ test('a chronicle row with no result value does not throw', () => {
   assert.equal(shapeBank({ built: true, payout: {}, street: {}, oath: {} }).street.txid, undefined);
 });
 
+test('board-era chronicle rows paint the crier scroll, not the sample', () => {
+  const live = shapeActions({
+    txs: [
+      { hash: 'AAA', shop: 'board', payee: 'board.nearcarta.near', decision: 'opened', note: 'row opened' },
+      { hash: 'BBB', shop: 'charter', payee: 'charter.nearcarta.near', decision: 'allowed', note: '0.001 NEAR allowed' },
+      { hash: 'CCC', shop: 'charter', payee: 'charter.nearcarta.near', decision: 'refused', note: 'over the per-payment cap' },
+    ],
+  }, [{ id: 'sample', kind: 'action', decision: 'allowed', tx: 'S' }]);
+  assert.equal(live.length, 3);
+  assert.equal(live[0].kind, 'policy');
+  assert.equal(live[0].tx, 'AAA');
+  assert.equal(live[1].kind, 'action');
+  assert.equal(live[1].decision, 'allowed');
+  assert.equal(live[1].tx, 'BBB');
+  assert.equal(live[2].decision, 'denied');
+  assert.equal(live[2].tx, 'CCC');
+  assert.equal(live[2].src, 'mainnet');
+  // Propose path still wins when present.
+  const mixed = shapeActions({
+    txs: [
+      { hash: 'BOARD', decision: 'allowed', note: 'board' },
+      { method: 'propose', result: { ok: true, value: { decision: 'denied', reason: 'cap' } }, at: '2026-11-05T12:00:00Z', hash: 'PROP', events: [{ data: [{ clause_id: 'pay', amount: '1000000000000000000000', receiver: 'a.near' }] }] },
+    ],
+  }, ['sample']);
+  assert.equal(mixed.length, 1);
+  assert.equal(mixed[0].tx, 'PROP');
+  assert.equal(mixed[0].decision, 'denied');
+});
+
 test('a room error never shows the engine text', () => {
   const msg = roomError(new TypeError("Cannot read properties of undefined (reading 'code_hash')"));
   assert.equal(showsRawEngineText(msg), false);

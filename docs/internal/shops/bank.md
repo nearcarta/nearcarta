@@ -40,7 +40,7 @@
 
 ## Competitors
 
-NEAR AI Cloud demos; Laurel https://github.com/agadape/laurel (200); Scrim private balance (internal forensic). Beat with: downloadable attestation + on-chain seal; do not claim custody of keys in TEE like OutLayer.
+Kept in private notes on the box, not in this repo.
 
 ## Sources
 

@@ -5,21 +5,36 @@ import { askPlan, askReceivers, sharedAsk } from '../../src/vault.js';
 delete process.env.NEARAI_CLOUD_API_KEY;
 
 const merchant = 'cafe.nearcarta.near';
+const BOARD = 'board.nearcarta.near';
 const clauses = { pay: { asset: 'Native', receivers: [merchant, 'cafe-1.near'], per_action_cap: '20000000000000000000000' } };
-const viewF = async (_a, m) => (m === 'get_clauses' ? clauses : { next_nonce: '7', policy_version: 3 });
+// A legacy oath at x.near: answers get_clauses/get_state; the board has no row for x.near.
+const viewF = async (acct, m) => {
+  if (acct === BOARD) return null;
+  return m === 'get_clauses' ? clauses : { next_nonce: '7', policy_version: 3 };
+};
+// The live board: rows are read ON THE BOARD with get_charter({ owner }); a visitor account has no contract.
+const ROW = { owner: 'visitor.near', receivers: ['townhall.nearcarta.near'], per_action_cap: '10000000000000000000000',
+  daily_budget: '50000000000000000000000', min_amount: '100000000000000000000', max_actions_per_day: 8, nonce: '4',
+  balance: '10000000000000000000000', spent_today: '0', actions_today: 0, frozen: false, expires_at: '0' };
+const calls = [];
+const boardView = async (acct, m, args) => {
+  calls.push([acct, m, args?.owner]);
+  if (acct === BOARD && m === 'get_charter') return args?.owner === 'visitor.near' ? ROW : null;
+  throw new Error(`view ${m}: wasm execution failed with error: MethodResolveError(MethodNotFound)`);
+};
 
-test('askReceivers: charter allowlist first, then arena merchants, no duplicates', async () => {
+test('askReceivers: legacy oath clauses only, no duplicates, no arena merchants mixed in', async () => {
   const r = await askReceivers('x.near', viewF);
-  assert.equal(r[0], merchant); assert.ok(r.includes('cafe-1.near'));
-  assert.equal(new Set(r).size, r.length);
+  assert.deepEqual(r, [merchant, 'cafe-1.near']);
 });
 
-test('askPlan: plain words -> the unsigned proposal, nonce and policy from chain state', async () => {
+test('askPlan: legacy oath -> the unsigned proposal, nonce and policy from chain state', async () => {
   const p = await askPlan('pay the cafe 0.01 NEAR for coffee', 'x.near', { viewF, nowMs: 0 });
-  assert.equal(p.parsed.receiver, merchant); // the arena cafe (first allowlisted 'cafe' account)
+  assert.equal(p.parsed.receiver, merchant);
   assert.equal(p.proposal.amount, '10000000000000000000000');
   assert.deepEqual([p.proposal.shop, p.proposal.clause_id, p.proposal.nonce, p.proposal.policy_version, p.proposal.memo], ['ask', 'pay', '7', 3, 'ask:mine:coffee']);
   assert.equal(p.on_allowlist, true);
+  assert.equal(p.allowlist_source, 'oath');
 });
 
 test('askPlan: an off-allowlist payee is parsed as asked (the charter refuses it on chain)', async () => {
@@ -27,22 +42,28 @@ test('askPlan: an off-allowlist payee is parsed as asked (the charter refuses it
   assert.equal(p.parsed.receiver, 'evil.near'); assert.equal(p.on_allowlist, false);
 });
 
-test('askPlan: the live visitor board has no clauses, and must still propose', async () => {
-  // The live board is board v2: a single row read with get_charter(owner). It has no `get_clauses`
-  // and no `get_state` at all, and asking for them fails MethodNotFound. Every test above stubs
-  // `get_clauses`, so none of them covered the shape the deployed board actually has — and
-  // /api/vault/ask/plan answered a bare `internal` 500 on it, which killed the only real-model
-  // path in the product (measured against board.nearcarta.near on 2026-11-09).
-  const boardView = async (_a, m) => {
-    if (m === 'get_charter') return { owner: 'x.near', receivers: [merchant], per_action_cap: '20000000000000000000000', next_nonce: 4, policy_version: 2 };
-    throw new Error(`view ${m}: wasm execution failed with error: MethodResolveError(MethodNotFound)`);
-  };
-  const p = await askPlan('pay the cafe 0.01 NEAR for coffee', 'x.near', { viewF: boardView, nowMs: 0 });
-  assert.equal(p.parsed.receiver, merchant);
-  assert.equal(p.on_allowlist, true, 'the row allowlist decides on_allowlist when there are no clauses');
-  assert.equal(p.per_action_cap, '20000000000000000000000');
-  assert.equal(p.clause_id, null, 'a row has no clause id');
-  assert.deepEqual([p.proposal.nonce, p.proposal.policy_version], ['4', 2], 'nonce and policy come from the row');
+test('askPlan: a visitor id reads its row on the BOARD with owner = the visitor', async () => {
+  calls.length = 0;
+  const p = await askPlan('pay townhall.nearcarta.near 0.001 NEAR', 'visitor.near', { viewF: boardView, nowMs: 0 });
+  assert.deepEqual(calls[0], [BOARD, 'get_charter', 'visitor.near'], 'get_charter is asked of the board, not the visitor account');
+  assert.equal(p.allowlist_source, 'board');
+  assert.deepEqual(p.allowlist, ['townhall.nearcarta.near']);
+  assert.equal(p.on_allowlist, true);
+  assert.equal(p.charter, BOARD); assert.equal(p.owner, 'visitor.near');
+  assert.equal(p.proposal.nonce, '4', 'the row field is `nonce`');
+  assert.equal(p.per_action_cap, ROW.per_action_cap); assert.equal(p.min_amount, ROW.min_amount);
+  assert.equal(p.clause_id, null);
+});
+
+test('askPlan: the board named with an owner reads the same row', async () => {
+  const p = await askPlan('pay townhall.nearcarta.near 0.001 NEAR', BOARD, { viewF: boardView, owner: 'visitor.near', nowMs: 0 });
+  assert.equal(p.owner, 'visitor.near'); assert.deepEqual(p.allowlist, ['townhall.nearcarta.near']);
+  await assert.rejects(askPlan('pay townhall.nearcarta.near 0.001 NEAR', BOARD, { viewF: boardView }), e => e.status === 400);
+});
+
+test('askPlan: an account with no row and no charter is a plain 404, never the arena merchants', async () => {
+  await assert.rejects(askPlan('pay the cafe 0.01 NEAR', 'stranger.near', { viewF: boardView }), e => e.status === 404 && /no board row/.test(e.message));
+  await assert.rejects(askReceivers('stranger.near', boardView), e => e.status === 404);
 });
 
 test('askPlan: bad input is a 400 with a plain message', async () => {

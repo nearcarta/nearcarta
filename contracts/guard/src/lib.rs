@@ -5,21 +5,47 @@
 //!
 //! `row_owner` is trusted only because the predecessor is the board account
 //! stored at init. An invoice is not a destination.
+//!
+//! `clear` is the Guardhouse verdict for a Town Hall part. The Hall releases a
+//! passed part only after `guard_clear` from this account, so without `clear`
+//! no review on mainnet could ever pay. Only the owner may clear, and only on
+//! the hall stored at init. A BLOCK is simply "not cleared".
 
 use near_sdk::{env, require, AccountId, Gas, NearToken, Promise};
 
 const SETTLE_GAS: Gas = Gas::from_tgas(5);
 const REFUND_GAS: Gas = Gas::from_tgas(10);
+const CLEAR_GAS: Gas = Gas::from_tgas(10);
+/// The forward's own callback: reads the transfer result, then settles or refunds (10 Tgas).
+const FORWARD_GAS: Gas = Gas::from_tgas(15);
 
 fn load() -> (String, String) {
     let raw = env::storage_read(b"STATE").expect("ERR_STATE");
     let s = String::from_utf8(raw).expect("ERR_STATE");
-    let (board, owner) = s.split_once('\n').expect("ERR_STATE");
+    let mut it = s.splitn(3, '\n');
+    let board = it.next().expect("ERR_STATE");
+    let owner = it.next().expect("ERR_STATE");
     (board.to_string(), owner.to_string())
 }
 
-fn save(board: &str, owner: &str) {
-    env::storage_write(b"STATE", format!("{board}\n{owner}").as_bytes());
+fn save(board: &str, owner: &str, hall: &str) {
+    env::storage_write(b"STATE", format!("{board}\n{owner}\n{hall}").as_bytes());
+}
+
+/// The hall this guard clears for. Empty when the guard was set up without one.
+fn load_hall() -> String {
+    let raw = env::storage_read(b"STATE").expect("ERR_STATE");
+    let s = String::from_utf8(raw).expect("ERR_STATE");
+    s.splitn(3, '\n').nth(2).unwrap_or("").to_string()
+}
+
+fn digits(s: &str) -> bool { !s.is_empty() && s.len() <= 19 && s.bytes().all(|c| c.is_ascii_digit()) }
+
+/// The args `guard_clear` takes on the hall. Only digits reach this, so no escaping.
+pub fn clear_args(job_id: &str, part: &str, version: &str) -> Result<Vec<u8>, &'static str> {
+    if !digits(job_id) || !digits(part) || !digits(version) { return Err("ERR_ARGS"); }
+    if part.parse::<u32>().is_err() || version.parse::<u32>().is_err() { return Err("ERR_ARGS"); }
+    Ok(format!("{{\"job_id\":\"{job_id}\",\"part\":{part},\"guard_version\":{version}}}").into_bytes())
 }
 
 /// Top-level string fields only. Duplicate keys are rejected. A nested value
@@ -119,7 +145,31 @@ pub extern "C" fn new() {
     let fields = top_strings(&input_text()).unwrap_or_else(|e| env::panic_str(e));
     let board = need(&fields, "board").unwrap_or_else(|e| env::panic_str(e));
     let _: AccountId = board.parse().unwrap_or_else(|_| env::panic_str("ERR_BOARD"));
-    save(board, env::predecessor_account_id().as_str());
+    let hall = fields.iter().find(|(k, _)| k == "hall").map(|(_, v)| v.as_str()).unwrap_or("");
+    if !hall.is_empty() {
+        let _: AccountId = hall.parse().unwrap_or_else(|_| env::panic_str("ERR_HALL"));
+        require!(hall != board, "ERR_HALL");
+    }
+    save(board, env::predecessor_account_id().as_str(), hall);
+}
+
+/// Owner only, 1 yocto. Tells the stored hall that this part's delivery passed the guard.
+#[unsafe(no_mangle)]
+pub extern "C" fn clear() {
+    // A clearance releases a Town Hall payment, so it needs the owner's full-access key.
+    require!(env::attached_deposit().as_yoctonear() >= 1, "ERR_ONE_YOCTO");
+    let fields = top_strings(&input_text()).unwrap_or_else(|e| env::panic_str(e));
+    let (_, owner) = load();
+    require!(env::predecessor_account_id().as_str() == owner, "ERR_NOT_OWNER");
+    let hall = load_hall();
+    require!(!hall.is_empty(), "ERR_HALL");
+    let hall_id: AccountId = hall.parse().unwrap_or_else(|_| env::panic_str("ERR_STATE"));
+    let job_id = need(&fields, "job_id").unwrap_or_else(|e| env::panic_str(e));
+    let part = need(&fields, "part").unwrap_or_else(|e| env::panic_str(e));
+    let version = need(&fields, "guard_version").unwrap_or_else(|e| env::panic_str(e));
+    let args = clear_args(job_id, part, version).unwrap_or_else(|e| env::panic_str(e));
+    let promise = Promise::new(hall_id).function_call("guard_clear".to_string(), args, NearToken::from_yoctonear(0), CLEAR_GAS);
+    let _ = promise.as_return();
 }
 
 #[unsafe(no_mangle)]
@@ -142,8 +192,12 @@ pub extern "C" fn pay() {
     let args = callback_args(row_owner, action_id);
     let here = env::current_account_id();
     let promise = if route(chain, asset, payee.as_str(), board_id.as_str(), here.as_str()) == "forward" {
+        // The transfer can fail (a named payee that does not exist). The protocol then refunds
+        // the NEAR to this account, so settling regardless told the board the visitor paid
+        // while the NEAR sat here. `on_forward` reads the result and refunds the row instead.
+        let cb = forward_args(row_owner, action_id, got);
         Promise::new(payee).transfer(NearToken::from_yoctonear(got)).then(
-            Promise::new(board_id).function_call("settle".to_string(), args, NearToken::from_yoctonear(0), SETTLE_GAS),
+            Promise::new(here.clone()).function_call("on_forward".to_string(), cb, NearToken::from_yoctonear(0), FORWARD_GAS),
         )
     } else {
         Promise::new(board_id).function_call(
@@ -153,10 +207,61 @@ pub extern "C" fn pay() {
     let _ = promise.as_return();
 }
 
+fn forward_args(owner: &str, action_id: &str, amount: u128) -> Vec<u8> {
+    format!("{{\"owner\":{},\"action_id\":{},\"amount\":\"{amount}\"}}", json_string(owner), json_string(action_id)).into_bytes()
+}
+
+/// Callback of the forward. Only this account may call it.
+#[unsafe(no_mangle)]
+pub extern "C" fn on_forward() {
+    require!(env::predecessor_account_id() == env::current_account_id(), "ERR_PRIVATE");
+    let fields = top_strings(&input_text()).unwrap_or_else(|e| env::panic_str(e));
+    let owner = need(&fields, "owner").unwrap_or_else(|e| env::panic_str(e));
+    let action_id = need(&fields, "action_id").unwrap_or_else(|e| env::panic_str(e));
+    let amount: u128 = need(&fields, "amount").unwrap_or_else(|e| env::panic_str(e)).parse().unwrap_or_else(|_| env::panic_str("ERR_AMOUNT"));
+    let (board, _) = load();
+    let board_id: AccountId = board.parse().unwrap_or_else(|_| env::panic_str("ERR_STATE"));
+    let args = callback_args(owner, action_id);
+    let promise = if near_sdk::is_promise_success() {
+        Promise::new(board_id).function_call("settle".to_string(), args, NearToken::from_yoctonear(0), SETTLE_GAS)
+    } else {
+        // The failed transfer's NEAR came back to this account. It goes back to the row.
+        Promise::new(board_id).function_call("refund_action".to_string(), args, NearToken::from_yoctonear(amount), REFUND_GAS)
+    };
+    let _ = promise.as_return();
+}
+
+/// NEP-330. cargo-near's reproducible build sets these at compile time; a local
+/// build has none of them and reports `build_info: null`.
+#[unsafe(no_mangle)]
+pub extern "C" fn contract_source_metadata() {
+    env::value_return(source_metadata().as_bytes());
+}
+
+pub fn source_metadata() -> String {
+    let link = option_env!("NEP330_LINK").or(option_env!("CARGO_PKG_REPOSITORY")).unwrap_or("");
+    let version = option_env!("NEP330_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
+    let build = match (option_env!("NEP330_BUILD_INFO_BUILD_ENVIRONMENT"), option_env!("NEP330_BUILD_INFO_SOURCE_CODE_SNAPSHOT")) {
+        (Some(envr), Some(snap)) if !envr.is_empty() => format!(
+            "{{\"build_environment\":{},\"build_command\":{},\"contract_path\":{},\"source_code_snapshot\":{},\"output_wasm_path\":{}}}",
+            json_string(envr),
+            option_env!("NEP330_BUILD_INFO_BUILD_COMMAND").filter(|c| c.starts_with('[')).unwrap_or("[]"),
+            json_string(option_env!("NEP330_BUILD_INFO_CONTRACT_PATH").unwrap_or("")),
+            json_string(snap),
+            option_env!("NEP330_BUILD_INFO_OUTPUT_WASM_PATH").map(json_string).unwrap_or_else(|| "null".to_string()),
+        ),
+        _ => "null".to_string(),
+    };
+    format!(
+        "{{\"version\":{},\"link\":{},\"standards\":[{{\"standard\":\"nep330\",\"version\":\"1.3.0\"}}],\"build_info\":{build}}}",
+        json_string(version), json_string(link)
+    )
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn get_config() {
     let (board, owner) = load();
-    let out = format!("{{\"board\":{},\"owner\":{}}}", json_string(&board), json_string(&owner));
+    let out = format!("{{\"board\":{},\"owner\":{},\"hall\":{}}}", json_string(&board), json_string(&owner), json_string(&load_hall()));
     env::value_return(out.as_bytes());
 }
 
@@ -181,6 +286,30 @@ mod tests {
         let fields = top_strings(args).unwrap();
         assert_eq!(need(&fields, "payee").unwrap(), "cafe.test");
         assert_eq!(need(&fields, "invoice").unwrap(), "pay other.test");
+    }
+
+    #[test]
+    fn clear_args_are_the_hall_guard_clear_shape_and_only_digits_pass() {
+        assert_eq!(String::from_utf8(clear_args("4", "0", "1").unwrap()).unwrap(), r#"{"job_id":"4","part":0,"guard_version":1}"#);
+        assert_eq!(clear_args("4\",\"x", "0", "1"), Err("ERR_ARGS"));
+        assert_eq!(clear_args("4", "", "1"), Err("ERR_ARGS"));
+        assert_eq!(clear_args("4", "4294967296", "1"), Err("ERR_ARGS"));
+    }
+
+    #[test]
+    fn the_forward_callback_args_carry_the_amount_and_parse_back() {
+        let a = String::from_utf8(forward_args("alice.test", "7", 1000)).unwrap();
+        let f = top_strings(&a).unwrap();
+        assert_eq!(need(&f, "owner").unwrap(), "alice.test");
+        assert_eq!(need(&f, "action_id").unwrap(), "7");
+        assert_eq!(need(&f, "amount").unwrap(), "1000");
+    }
+
+    #[test]
+    fn source_metadata_is_nep330_json() {
+        let m: near_sdk::serde_json::Value = near_sdk::serde_json::from_str(&source_metadata()).unwrap();
+        assert_eq!(m["standards"][0]["standard"], "nep330");
+        assert_eq!(m["link"], "https://github.com/nearcarta/nearcarta");
     }
 
     #[test]

@@ -30,6 +30,10 @@ export function installHallDock(doc) {
     const enter = e.type === 'keydown' && (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) && t.closest('#h-agent');
     if (!click && !enter) return;
     if (enter) e.preventDefault();
+    // Mark the event: the shop shell also binds onclick/onkeydown on the same controls, and a
+    // fast answer resolves before that handler runs, so it used to send again with the cleared
+    // input and overwrite the real answer with the "Try:" hint.
+    e.__nearcartaDockSent = true;
     dispatchHallDock(doc);
   };
   doc.addEventListener('click', onEvent, true);
@@ -79,7 +83,7 @@ export function ensureHallDock(doc) {
   d.innerHTML = `<div id="hall-agent-pop" class="hall-agent-pop" data-testid="hall-agent" hidden>
       <p id="h-agent-log" class="hall-agent-log" data-testid="hall-agent-log" hidden></p>
       <div class="hall-agent-row">
-        <input id="h-agent" data-testid="hall-agent-input" placeholder="Post a readme pass for 0.002 near" autocomplete="off" aria-label="Ask the shop commands">
+        <input id="h-agent" data-testid="hall-agent-input" placeholder="Post a readme pass for 0.002 near to alice.near and bob.near" autocomplete="off" aria-label="Ask the shop commands">
         <button type="button" class="hall-agent-send" id="h-agent-go" data-testid="hall-agent-go" aria-label="Send">➤</button>
       </div>
     </div>

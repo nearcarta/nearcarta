@@ -4,10 +4,11 @@ import { readFileSync } from 'node:fs';
 import { makeApp } from '../../src/app.js';
 import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
 import {
-  LAMPLIGHTER_REGISTER, asRow, nearOf, parseHallCommand, payPlan, rulesPlan, yoctoOf,
+  HALL_HINT, LAMPLIGHTER_REGISTER, asRow, nearOf, parseHallCommand, payPlan, rulesPlan, yoctoOf,
 } from '../../../shared/hall/plan.js';
 import {
   acceptPart, conserved, createLedger, postJob, quotePart, refundJob, reviewPart,
+  MARKET_HIRE_GAP,
 } from '../../../shared/hall/job.js';
 import {
   assignmentRows, bountyRows, marketStatus, marketWorkers, readBounties,
@@ -388,4 +389,33 @@ test('the retired charter is not on the public denylist or in the sign screen', 
   const setup = readFileSync(fileURLToPath(new URL('../../../app/house/setup.js', import.meta.url)), 'utf8');
   assert.doesNotMatch(setup, /acA\(MAIN\.charter\.contract\)/, 'no link to the retired charter');
   assert.doesNotMatch(setup, /town charter, toll, arena, house and town hall already run/);
+});
+
+test('the hint example posts as typed: two workers named in the sentence are used', () => {
+  const cmd = parseHallCommand('Post a readme pass for 0.002 near to alice.near and bob.near.');
+  assert.equal(cmd.kind, 'post');
+  assert.equal(cmd.task, 'readme pass');
+  assert.deepEqual(cmd.workers, ['alice.near', 'bob.near']);
+  assert.equal(parseHallCommand('post a readme pass for 0.002 near').workers, undefined);
+  assert.match(HALL_HINT, /to alice\.near and bob\.near/);
+  const ledger = createLedger();
+  const posted = postJob(ledger, { task: cmd.task, budgetNear: cmd.near, workers: cmd.workers, maxParts: 2, nowMs: 1_000 });
+  assert.equal(posted.ok, true);
+});
+
+test('Agents tab does not show Post job, and the market gap is honest', () => {
+  const tray = jobTray({
+    tab: 'agents',
+    form: { task: '', budget: '', deadline: '24', parts: '2', workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '' },
+  });
+  assert.doesNotMatch(tray, /data-action="post"/);
+  assert.doesNotMatch(tray, /hall-cta[^>]*>Post job</);
+  assert.match(tray, /hall-market-gap/);
+  assert.match(MARKET_HIRE_GAP.hint, /No public market hire/);
+  assert.doesNotMatch(MARKET_HIRE_GAP.hint, /worker token cannot hire/);
+  const post = jobTray({
+    tab: 'post',
+    form: { task: '', budget: '', deadline: '24', parts: '2', workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '' },
+  });
+  assert.match(post, /data-action="post"/);
 });

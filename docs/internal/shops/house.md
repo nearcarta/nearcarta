@@ -39,7 +39,7 @@
 
 ## Competitors
 
-near-policy-vault https://github.com/Alan021011/near-policy-vault (200) — unfinished spending policy. Beat with live allow/refuse txs + clear inheritance timers in minutes for the demo.
+Kept in private notes on the box, not in this repo.
 
 ## Sources
 

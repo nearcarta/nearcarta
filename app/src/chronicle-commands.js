@@ -50,6 +50,10 @@ export function parseChronicleCommand(text) {
   const raw = String(text || '').trim();
   const line = norm(raw);
   if (!line) return { ok: false, action: 'miss', hint: `Type a command. ${MISS_HINT}` };
+  // "What can you do" / "show me the safest…" contain "show", which used to hit an empty filter → "Nothing matches".
+  if (/\bwhat can you\b/.test(line) || /\bhelp\b/.test(line) || /\bsafest (first )?step\b/.test(line)) {
+    return { ok: false, action: 'miss', hint: MISS_HINT };
+  }
   const today = /\btodays?\b/.test(line);
   const account = parseAccountId(raw);
   const span = spanOf(line);
@@ -141,7 +145,7 @@ export async function runChronicleCommand({
     bag.cp = 1;
     bag.tab = 'timeline';
     const q = queryFeed(rows || [], { q: bag.cq, decision: bag.cd, day: bag.day, page: 1 });
-    const hint = q.total ? `Showing ${q.total}.` : (cmd.today ? 'No rows are dated today.' : 'Nothing matches.');
+    const hint = q.total ? `Showing ${q.total}.` : (cmd.today ? 'No rows are dated today.' : ((cmd.decision || cmd.q) ? 'Nothing matches that filter.' : MISS_HINT));
     return { ok: true, action: 'filter', hint, clearSeal: true, paint: true };
   }
   if (cmd.action === 'export') {

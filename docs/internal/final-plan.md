@@ -413,7 +413,7 @@ Fail handoff for stacked unlabeled white text, overflow/hidden fields, absent fl
 1. **User gain:** Buy specialist work without entrusting worker/contractor with whole wallet; evidence-linked receipt for every part.
 2. **Money and why:** Actual workers for accepted parts; unused escrow back to poster. Registration stake stays withdrawable liability, not city revenue.
 3. **What is new:** Budget-bound multi-agent procurement with signed work review and guarded recipients, beyond single-hire escrow. No fake public API integration.
-4. **Judge/partner fit:** Source-pack §2 guarded swarm-for-hire and §3 decomposition/counter-once/pay/receipts. Agent Market integration only if documented API permits and real hire proves it.
+4. **Judge/partner fit:** Source-pack §2 guarded hire-a-swarm and §3 decomposition/counter-once/pay/receipts. Agent Market integration only if documented API permits and real hire proves it.
 5. **Any user:** Typed visitor parameters plus that visitor's current setup/session; two unrelated users pass without wallet-specific contract changes.
 
 **Sources:** [source pack](source-pack.md) §1 agents earning/manager; §2 guarded swarm; §3 Agents; §4 Market/API; §7 ecosystem; §8 P2/P4; §11 hall; §12; [original deep brief](shops/hall-deep.md); [winner patterns](research/winners-patterns.md); [judge signals](research/judges-x-signals.md). Signals are sourced hypotheses, not endorsements.

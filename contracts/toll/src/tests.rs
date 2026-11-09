@@ -27,9 +27,9 @@ fn deposit(pred: &str, yocto: u128) {
     testing_env!(b.build());
 }
 fn price(o: &mut Oath) {
-    set("owner.test");
+    deposit("owner.test", 1);
     o.set_price(acc("board.test"), U128(5), U128(2), vec![Split { account: acc("contributor.test"), bps: 2500 }], false,
-        "0x3333333333333333333333333333333333333333".into(), U128(1000), 0);
+        "0x3333333333333333333333333333333333333333".into(), U128(1000), near_sdk::json_types::U64(0));
 }
 fn open(o: &mut Oath, owner: &str, action: u64, asset: &str, to: &str, amount: u128, budget: u128) -> u64 {
     deposit("board.test", 5);
@@ -240,8 +240,8 @@ fn sign_cross_needs_gas_for_the_signer() {
 #[test]
 #[should_panic(expected = "only owner")]
 fn a_stranger_cannot_upgrade() {
-    let o = toll();
-    set("mallory.test");
+    let mut o = toll();
+    deposit("mallory.test", 1);
     let _ = o.upgrade(near_sdk::json_types::Base64VecU8(vec![1]));
 }
 
@@ -284,4 +284,33 @@ fn a_failed_crossing_promises_refund_action_for_that_row() {
     assert_eq!(args["owner"], json!("visitor.test"));
     assert_eq!(args["action_id"], json!("9"));
     assert!(args.get("row_owner").is_none());
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn unfreezing_needs_a_full_access_key() {
+    let mut o = toll();
+    o.freeze();
+    set("owner.test");
+    o.unfreeze();
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn changing_the_price_needs_a_full_access_key() {
+    let mut o = toll();
+    set("owner.test");
+    o.set_price(acc("board.test"), U128(5), U128(2), vec![], false,
+        "0x3333333333333333333333333333333333333333".into(), U128(1000), near_sdk::json_types::U64(0));
+}
+
+#[test]
+fn an_order_reports_its_open_time_as_a_string() {
+    let mut o = toll();
+    price(&mut o);
+    let id = open(&mut o, "alice.test", 1, "native", OTHER, 10, 100);
+    let v = serde_json::to_value(o.get_order(id).unwrap()).unwrap();
+    assert!(v["opened_at"].is_string());
+    deposit("owner.test", 1);
+    o.unfreeze();
 }
