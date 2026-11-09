@@ -178,6 +178,14 @@ export function mountHouseRoom(root, hooks = {}) {
   }
   async function turn(text) {
     hideSeal();
+    // Signed out there is no row owner, so no plan can be built or sent. Say that, in the words a
+    // visitor understands, instead of returning a hint about `propose_call_as` — which is what a
+    // visitor saw when they pressed the only button on this page.
+    if (!id) {
+      const hint = 'Sign in first. A deed belongs to an account, and your check-in is sent from your own charter row. Open /setup, sign in, then come back.';
+      setStatus(hint);
+      return { ok: false, hint };
+    }
     const result = await runHouseTurn(text, {
       row: state.row,
       vault: state.tab === 'vaults' ? vaultFromFields() : state.vault,
