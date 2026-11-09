@@ -38,6 +38,10 @@ export function installFerryDock(doc) {
     const submit = e.type === 'submit' && t.closest('#f-agent-form');
     if (!click && !enter && !submit) return;
     if (enter || submit) e.preventDefault();
+    // Mark the event: the shop shell also binds onclick/onkeydown on the same controls, and a
+    // fast answer resolves before that handler runs, so it used to send again with the cleared
+    // input and overwrite the real answer with the "Try:" hint.
+    e.__nearcartaDockSent = true;
     dispatchFerryDock(doc);
   };
   doc.addEventListener('click', onEvent, true);
