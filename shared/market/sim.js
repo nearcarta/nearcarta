@@ -24,12 +24,15 @@ export const ITEMS = {
   'item:tool': { name: 'Tool', inputs: { 'good:iron': 2, 'good:timber': 1 }, use: '2 per gather, lasts 10' },
   'item:tonic': { name: 'Tonic', inputs: { 'good:herb': 2, 'good:salt': 1 }, use: 'Night orders want it' },
 };
-// Resource nodes on the island: [id, good, q, r] (hex tiles outside the shop blocks).
+// Goods come from shops: each berth is a gather node named after the shop that produces it: [id, good, shop].
+// On chain these are the market's `set_node` ids, so `gather(node: "ferry-1")` is "unload salt at the Ferry".
 export const NODES = [
-  ['ore-1', 'good:iron', -3, 2], ['ore-2', 'good:iron', 2, 1],
-  ['wood-1', 'good:timber', -4, 4], ['wood-2', 'good:timber', 1, -2],
-  ['herb-1', 'good:herb', -1, 2], ['salt-1', 'good:salt', 3, -1],
+  ['ferry-1', 'good:salt', 'ferry'], ['ferry-2', 'good:salt', 'ferry'], ['ferry-3', 'good:salt', 'ferry'],
+  ['house-1', 'good:herb', 'house'], ['house-2', 'good:herb', 'house'],
+  ['toll-1', 'good:timber', 'toll'], ['toll-2', 'good:timber', 'toll'],
+  ['guard-1', 'good:iron', 'guard'], ['guard-2', 'good:iron', 'guard'],
 ];
+export const nodesAt = (shop) => NODES.filter((n) => n[2] === shop);
 // The nine locations, the goods each counter trades, and the opening till.
 export const SHOP_GOODS = {
   arena: ['good:iron', 'good:timber', 'good:herb', 'good:salt'],
