@@ -57,7 +57,7 @@ export default async function payouts() {
   const showRefuse = () => { sealOn = true; if (disc) disc.material = waxIdle; };
   return {
     rob, scene, camera, tags: [], hideRefuse, showRefuse,
-    panel: { title: 'Payouts', src: 'mainnet', label: 'One propose per row, under the cap', hero: '<b class="num">3</b><span class="unit">rows</span>', action: null },
+    panel: { title: 'Invoice Shop', src: 'mainnet', label: 'One propose per row, under the cap', hero: '<b class="num">3</b><span class="unit">rows</span>', action: null },
     proof: PROOF,
     *act(opts = {}) {
       if (opts.paid && !opts.refused) {

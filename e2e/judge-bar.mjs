@@ -73,6 +73,12 @@ for (const W of [1440, 390]) {
           trayScroll: tray.scrollHeight > tray.clientHeight + 1,
           innerScroll: sc ? sc.scrollHeight > sc.clientHeight + 1 : false,
           sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+          // The review asked for these three by name, so they are measured, not assumed.
+          hasBadge: !!document.querySelector('#shopUI #tray #t-title .panel-badge'),
+          hasArt: !!document.querySelector('#shopUI #tray #t-title .panel-art'),
+          // Two scrollers at once is the nested-scroll defect: on desktop neither may scroll,
+          // on a phone exactly one may.
+          scrollers: [tray, sc].filter(el => el && el.scrollHeight > el.clientHeight + 2).length,
         };
       });
       const key = `${shop}${tab ? '.' + tab.replace(/^[a-z]+-tab-|^[a-z]+-mode-?/, '') : ''}`;
@@ -81,7 +87,11 @@ for (const W of [1440, 390]) {
       if (v.smallCount) bad.push(`SMALL×${v.smallCount}`);
       if (v.tinyCount) bad.push(`TINY×${v.tinyCount}`);
       if (W === 1440 && (v.trayScroll || v.innerScroll)) bad.push('SCROLL');
+      if (W === 1440 && v.scrollers > 0) bad.push('DESKTOP-SCROLL');
+      if (W === 390 && v.scrollers > 1) bad.push('NESTED-SCROLL');
       if (v.sideways) bad.push('SIDEWAYS');
+      if (!v.hasBadge) bad.push('NO-BADGE');
+      if (!v.hasArt) bad.push('NO-ART');
       console.log(`${String(W).padEnd(5)} ${key.padEnd(26)} ${bad.length ? 'FAIL ' + bad.join(' ') : 'ok'}`);
       if (bad.length) {
         if (v.smallCount) console.log('        small:', JSON.stringify(v.small));

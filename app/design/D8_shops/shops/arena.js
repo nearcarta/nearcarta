@@ -35,7 +35,7 @@ export default async function arena() {
   let flash = 0;
   const ROOM = {
     rob, scene, camera, tags: [],
-    panel: { title: 'Vault Arena', src: 'split', srcNote: 'arena.nearcarta.near is on mainnet. The shared arena you can try is the mainnet charter.', label: `${ATTACKS.length} attacks on the lab oath`, hero: `<b class="num">0</b><span class="unit">breaches</span>`, action: null },
+    panel: { title: 'Guardians Shop', src: 'split', srcNote: 'arena.nearcarta.near is on mainnet. The shared arena you can try is the mainnet charter.', label: `${ATTACKS.length} attacks on the lab oath`, hero: `<b class="num">0</b><span class="unit">breaches</span>`, action: null },
     // The past prompts arrive after the room is up: the town drawer reads sh.proof when it opens.
     proof: PROOF,
     update(dt) {

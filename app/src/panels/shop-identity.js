@@ -35,6 +35,30 @@ export function badge(id, size = 44) {
   return `<span class="panel-badge panel-badge-letter" aria-hidden="true">${letter}</span>`;
 }
 
+/**
+ * The 48px decorative illustration on the right of the header, as in both reference images.
+ * It must NOT be the same picture as the badge or the header reads as a duplicated icon, so it
+ * is a different icon from the same set, chosen per shop to say something about the function.
+ * It is decorative and aria-hidden: the title already names the shop.
+ */
+const ART = {
+  hall: 'file-text',
+  payouts: 'money-bag',
+  guard: 'shield',
+  arena: 'medal',
+  ferry: 'rocket',
+  bank: 'chart',
+  chronicle: 'map-pin',
+  toll: 'link',
+  house: 'key',
+};
+
+export function headerArt(id) {
+  const name = ART[id];
+  if (!name) return '';
+  return `<img class="panel-art" src="${ICON_BASE}/${name}-premium.webp" alt="" width="48" height="48" decoding="async" aria-hidden="true">`;
+}
+
 /** A token chip for the flow card, using the sprite the shops already ship. */
 const tok = (sym, label) => `<span class="flow-tok" title="${label || sym}"><img src="/tokens/${sym}.svg" alt="${label || sym}" width="22" height="22" decoding="async"></span>`;
 

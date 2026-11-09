@@ -78,7 +78,7 @@ export default async function hall(ctx) {
   const hideSeal = () => { if (sealMesh) sealMesh.visible = false; };
   return {
     rob, scene, camera, tags: [], showSeal, hideSeal,
-    panel: { title: 'Town Hall', src: 'split', srcNote: 'townhall.nearcarta.near is on mainnet. The two payments below are real mainnet transactions.', label: 'Reward paid', hero: tok('0.001', 'NEAR'), action: 'Show the payments', more: MORE },
+    panel: { title: 'Jobs Shop', src: 'split', srcNote: 'townhall.nearcarta.near is on mainnet. The two payments below are real mainnet transactions.', label: 'Reward paid', hero: tok('0.001', 'NEAR'), action: 'Show the payments', more: MORE },
     proof: (await liveP) + PROOF,
   // intro: the robot walks to beside the table, not behind it
     *intro() { setCap(v2.cap); yield rob.walk([new THREE.Vector3(1.95, 0, -.35)]); rob.lookAt(slab.position); },

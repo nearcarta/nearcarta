@@ -1069,3 +1069,320 @@ body #shopUI #tray [data-testid='restore-session'] {
     height: 48px !important;
   }
 }
+
+/* ============================================================================================
+   16. The 48px header illustration (reference: every shop header has one on the right)
+   --------------------------------------------------------------------------------------------
+   The badge names the shop; the illustration is the picture beside the name, as in both
+   reference images. It is decorative and aria-hidden, so it adds no noise to a screen reader.
+   48px per the brief, and it never squeezes the title: the title truncates instead.
+   ============================================================================================ */
+
+body #shopUI #tray #t-title .panel-art {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  margin-left: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .45));
+  pointer-events: none;
+}
+
+/* The mainnet tag sits after the illustration when both are present. */
+body #shopUI #tray > .t-scroll > .t-head #t-src { order: 3; }
+
+@media (max-width: 720px) {
+  body #shopUI #tray #t-title .panel-art { width: 40px; height: 40px; }
+}
+
+/* ============================================================================================
+   17. The Swap Shop (reference: ref-swap-shop.png)
+   --------------------------------------------------------------------------------------------
+   From and To are two equal cards with the token selector and the amount on one line, a balance
+   at the card's top right, and a circular flip control sitting on the seam between them. The
+   chain row carries a Live dot, and the quote is its own card with a Best route badge. Every
+   control that existed before still exists; this is the arrangement.
+   ============================================================================================ */
+
+body #shopUI #tray #t-form .swap-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--p3);
+  border-radius: var(--r-card);
+  background: var(--c-well);
+  border: 1px solid var(--c-border-soft);
+  box-sizing: border-box;
+}
+
+body #shopUI #tray #t-form .swap-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--p2);
+  font: var(--f-label);
+  color: var(--c-muted);
+}
+
+body #shopUI #tray #t-form .swap-bal { font-size: 12px; color: var(--c-muted); }
+
+/* The selector and the amount share one line, as in the reference. */
+body #shopUI #tray #t-form .swap-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--p2);
+}
+
+body #shopUI #tray #t-form .swap-line .amt-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+body #shopUI #tray #t-form .swap-line .amt-row input {
+  width: 84px;
+  text-align: right;
+  border: 0;
+  background: transparent;
+  font: 600 16px/20px var(--font-ui);
+  color: var(--c-cream);
+  padding: 0;
+  min-height: 0;
+  height: 28px;
+}
+
+body #shopUI #tray #t-form .swap-line .amt-sym { font: var(--f-label); color: var(--c-muted); }
+body #shopUI #tray #t-form .swap-est { font: 600 15px/20px var(--font-ui); color: var(--c-cream); }
+
+body #shopUI #tray #t-form .swap-max {
+  min-height: var(--tap) !important;
+  height: var(--tap) !important;
+  padding: 0 var(--p3) !important;
+  border-radius: var(--r-pill) !important;
+  border: 1px solid var(--c-border) !important;
+  background: rgba(226, 168, 60, .14) !important;
+  color: var(--c-gold-1) !important;
+  font: 600 12px/1 var(--font-ui) !important;
+  cursor: pointer;
+  /* A phone tap target has to be 40px even when it reads as a small chip. */
+  box-sizing: border-box;
+}
+
+/* The flip sits on the seam, centred, and is a control not a decoration. */
+body #shopUI #tray #t-form .swap-flip {
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  margin: -14px 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--c-border);
+  background: var(--c-panel-top);
+  color: var(--c-gold-1);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  box-sizing: border-box;
+}
+
+body #shopUI #tray #t-form .swap-flip:hover { border-color: var(--c-gold-2); }
+
+body #shopUI #tray #t-form .swap-chain-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--p3);
+}
+
+body #shopUI #tray #t-form .swap-chain-row .field { flex: 1 1 auto; min-width: 0; }
+
+body #shopUI #tray #t-form .swap-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding-bottom: 10px;
+  font: var(--f-small);
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+body #shopUI #tray #t-form .swap-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-ok);
+  box-shadow: 0 0 6px rgba(34, 197, 94, .8);
+}
+
+body #shopUI #tray #t-form .swap-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--p3);
+  border-radius: var(--r-card);
+  background: rgba(0, 0, 0, .22);
+  border: 1px solid var(--c-border);
+  box-sizing: border-box;
+}
+
+body #shopUI #tray #t-form .swap-quote-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: var(--f-label);
+  color: var(--c-cream);
+}
+
+body #shopUI #tray #t-form .swap-best {
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: rgba(226, 168, 60, .16);
+  color: var(--c-gold-1);
+  font-size: 11px;
+}
+
+/* ============================================================================================
+   18. Review round 2: the four remaining per-shop defects
+   ============================================================================================ */
+
+/* (a) Arena Guardians had TWO gold elements: the small Mint pill and "Mint guardian". The pill is
+   a mode switch, not a second action, so it becomes an outlined tab-like control; the one gold
+   action stays "Mint guardian". */
+body #shopUI #tray #t-form .arena-mint-pill,
+body #shopUI #tray #t-form #a-mint-pill,
+body #shopUI #tray #t-form .arena-mode:not([aria-pressed='true']) {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--c-cream) !important;
+  border: 1px solid var(--c-border) !important;
+  box-shadow: none !important;
+}
+
+/* (b) Arena Attack was 7px over on desktop. Reclaim it from the pane's own rhythm rather than
+   from a field: the status lines there are the tallest small block. */
+body #shopUI #tray #t-form .arena-status,
+body #shopUI #tray #t-form .arena-attack-box {
+  margin: 0;
+  padding: var(--p2) var(--p3);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+body #shopUI #tray #t-form .arena-attack-box { min-height: 0; }
+
+/* (c) The Guardhouse checklist is the reference's green-check list, not neutral bullets. */
+body #shopUI #tray #t-form .guard-status,
+body #shopUI #tray #t-form [data-testid='guard-attested'] {
+  display: block;
+  padding: var(--p3);
+  border-radius: var(--r-card);
+  background: rgba(0, 0, 0, .2);
+  border: 1px solid var(--c-border-soft);
+  font: var(--f-small);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--c-muted);
+}
+
+body #shopUI #tray #t-form .guard-status::before,
+body #shopUI #tray #t-form [data-testid='guard-attested']::before {
+  content: '✓';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, .18);
+  color: var(--c-ok);
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: -3px;
+}
+
+/* (d) Toll Pay had no gold primary at all: its action was a dark "Open your row in /setup".
+   The panel's own action row is the one gold element in every other shop, so the toll gets the
+   same treatment instead of a bare dark button. */
+body #shopUI #tray > .t-row > #t-act:not([hidden]) {
+  background: linear-gradient(180deg, var(--c-gold-1) 0%, var(--c-gold-2) 100%) !important;
+  color: var(--c-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 6px 18px rgba(226, 168, 60, .22) !important;
+  font: var(--f-cta) !important;
+  min-height: var(--h-cta) !important;
+  border-radius: var(--r-cta) !important;
+}
+
+/* ============================================================================================
+   19. One scroll area on a phone, never two
+   --------------------------------------------------------------------------------------------
+   Measured on Ferry Routes at 390x844: `.t-scroll` was 88px over while the panel itself was 0px
+   over, which is exactly the nested scroll the brief forbids — the visitor would drag one area
+   and the other would stay put. On a phone the shell's inner column keeps its content height and
+   the PANEL is the only scroller; on desktop the column is `visible` and the panel is sized to
+   its content, so neither scrolls.
+   ============================================================================================ */
+
+@media (max-width: 720px) {
+  body #shopUI #tray > .t-scroll {
+    overflow: visible !important;
+    max-height: none !important;
+    flex: 0 0 auto !important;
+    min-height: 0;
+  }
+  body #shopUI #tray {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* The action row scrolls with the content on a phone rather than floating over it. */
+  body #shopUI #tray > .t-row,
+  body #shopUI #tray > .t-links { flex: 0 0 auto; }
+}
+
+/* The "more below" hint is a real status, not a dead label: it reads the panel's own overflow
+   and only appears when there is something below. */
+body #shopUI #tray > .more-hint[data-live='1'] {
+  height: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  opacity: 1;
+  pointer-events: none;
+}
+
+/* A label that exists for a screen reader and not for the eye. The swap cards name their sides
+   "From" and "To" in the card head, so the field label must not repeat it on screen — but the
+   control still needs an accessible name. */
+body #shopUI #tray .sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The Arena attack textarea must stay tall: it is where the visitor writes the injected
+   instruction, and O3 pins it above 100px. The 7px the Attack tab was over comes out of the
+   pane's own gaps instead, never out of that box. */
+body #shopUI #tray #t-form #a-txt {
+  min-height: 104px !important;
+  height: auto !important;
+}
+
+body #shopUI #tray #t-form .arena-attack-box { min-height: 0; }
+
+/* The Arena Attack pane: 8px rhythm between its blocks. */
+body #shopUI #tray #t-form .ferry-pane[data-pane='attack'],
+body #shopUI #tray #t-form .arena-attack {
+  gap: var(--p2);
+}

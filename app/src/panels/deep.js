@@ -225,14 +225,29 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       : `<p class="ferry-deposit" data-testid="ferry-deposit">Send at most ${esc(state.depositUsd || '0.20')} USD yourself to <code data-testid="ferry-deposit-address">${esc(state.depositAddress)}</code>.</p><p data-testid="ferry-status">${esc(state.depositHelp || 'Waiting for the deposit. The boat has not delivered.')}</p>`)
     : '';
   const swap = `<div class="ferry-pane ferry-picker" data-pane="swap" data-testid="ferry-picker" ${tab === 'swap' ? '' : 'hidden'}>
+      <div class="swap-card">
+        <div class="swap-card-head"><span>From</span><span class="swap-bal" data-testid="ferry-balance-from">${esc(state.fromBal || '')}</span></div>
+        <label class="field ferry-field swap-line"><span class="sr-only">You pay</span>${fromBox}
+          <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(amtVal)}" aria-label="Amount"><button type="button" class="swap-max" id="f-max" data-testid="ferry-max">Max</button><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
+        </label>
+      </div>
+      <button type="button" class="swap-flip" id="f-flip" data-testid="ferry-flip" aria-label="Swap direction">⇅</button>
+      <div class="swap-card">
+        <div class="swap-card-head"><span>To</span><span class="swap-bal" data-testid="ferry-balance-to">${esc(state.toBal || '')}</span></div>
+        <label class="field ferry-field swap-line"><span class="sr-only">You get</span>${toBox}
+          <span class="amt-row"><span class="swap-est" data-testid="ferry-est">${esc(q && !state.sample ? '≈ ' + (q.to?.amount || q.amountOut || '') : '')}</span><span class="amt-sym">${esc(toSym)}</span></span>
+        </label>
+      </div>
+      <div class="swap-chain-row">
+        <label class="field ferry-field"><span>Chain</span>${chainBox}</label>
+        <span class="swap-live" data-testid="ferry-live"><i aria-hidden="true"></i>Live</span>
+      </div>
+      ${q && !state.sample ? `<div class="swap-quote" data-testid="ferry-quote-card">
+        <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
+        ${rateLine}
+      </div>` : ''}
       ${flow}
       <label class="field ferry-field"><span>Find a token</span><input id="f-find" data-testid="ferry-token-search" placeholder="ZEC, USDC, near" value="${esc(state.tq || '')}" autocomplete="off"></label>
-      <label class="field ferry-field"><span>Chain</span>${chainBox}</label>
-      <label class="field ferry-field"><span>You pay</span>${fromBox}</label>
-      <label class="field ferry-field"><span>You get</span>${toBox}</label>
-      <label class="field ferry-field amt-field"><span>Amount</span>
-        <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(amtVal)}" aria-label="Amount"><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
-      </label>
       ${(() => {
         const foreign = String(toChain || '').toLowerCase() !== 'near';
         if (!foreign) return '';
@@ -242,14 +257,13 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
           : '';
         return `<label class="field ferry-field" data-testid="ferry-receive-field"><span>Receive at</span><input id="f-receive" data-testid="ferry-receive" placeholder="Address on ${esc(toChain || 'this chain')}" value="${esc(state.receiveAt || '')}" autocomplete="off" spellcheck="false"></label>${bad}`;
       })()}
-      <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote" ${acted ? 'hidden' : ''}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Get quote</button>
-      ${rateLine}
+      <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote" ${acted ? 'hidden' : ''}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Review swap</button>
       ${errLine}
       <div class="ferry-cargo-actions" data-testid="ferry-cargo-actions" ${showCargo ? '' : 'hidden'}>
-        <button type="button" class="primary ferry-cta" id="f-cargo" data-testid="ferry-load-cargo"${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Load cargo</button>
-        <button type="button" class="primary ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Ask charter · load cargo</button>
+        <button type="button" class="ferry-cta" id="f-cargo" data-testid="ferry-load-cargo"${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Load cargo</button>
+        <button type="button" class="ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Ask charter · load cargo</button>
       </div>
-      <button type="button" class="primary ferry-cta" id="f-again" data-testid="ferry-again" ${showAgain ? '' : 'hidden'}>Get another quote</button>
+      <button type="button" class="ferry-cta" id="f-again" data-testid="ferry-again" ${showAgain ? '' : 'hidden'}>Get another quote</button>
       ${deposit}
       ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}${state.renewSetup ? ` <a href="/setup" data-testid="${/refresh/i.test(state.renewLabel || '') ? 'ferry-refresh-key' : 'ferry-renew-setup'}">${esc(state.renewLabel || 'Renew agent key once in Setup')}</a>` : ''}${(state.landedLinks || []).map(l => ` <a class="tx" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('')}</p>` : ''}
     </div>`;
@@ -484,6 +498,24 @@ function mountFerry(root, hooks) {
     if (to) bindPickerListbox(to, onTo);
     const amt = q$(root, '#f-amt');
     if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
+    // The reference has a Max chip inside the From box. It fills the amount from the balance the
+    // panel already reads; when no balance is known it says so instead of inventing a number.
+    const maxBtn = q$(root, '#f-max');
+    if (maxBtn) maxBtn.onclick = () => {
+      const bal = String(state.fromBal || '').replace(/[^0-9.]/g, '');
+      if (!bal) { state.charterNote = 'No balance read yet. Sign in and this fills itself.'; paint(); return; }
+      state.amt = bal; state.amtEdited = true; state.q = null; state.quoteError = ''; state.acted = false; state.sample = false;
+      paint();
+    };
+    // The circular swap-direction control between the two cards. Same as choosing the other side.
+    const flip = q$(root, '#f-flip');
+    if (flip) flip.onclick = () => {
+      const a = state.fromId || '', b = state.toId || '';
+      if (!a || !b) return;
+      state.fromId = b; state.toId = a;
+      state.q = null; state.quoteError = ''; state.acted = false; state.sample = false;
+      paint();
+    };
     const recv = q$(root, '#f-receive');
     if (recv) recv.oninput = (e) => {
       const pos = e.target.selectionStart;

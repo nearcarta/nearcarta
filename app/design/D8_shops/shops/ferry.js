@@ -140,7 +140,7 @@ export default async function ferry(ctx) {
     rob.play('ThumbsUp', { once: true });
     speak('');
   };
-  const panel = { title: 'Ferry', src: 'quote', srcNote: 'A real mainnet price quote. Nothing is sent and nothing is spent.', label: LABEL, hero: heroOf(), action: 'Load the cargo' };
+  const panel = { title: 'Swap Shop', src: 'quote', srcNote: 'A real mainnet price quote. Nothing is sent and nothing is spent.', label: LABEL, hero: heroOf(), action: 'Load the cargo' };
   return {
     rob, scene, camera, tags, applyPair, hideRefuse, setOrder: paintOrder, deliver, cargo,
     panel,

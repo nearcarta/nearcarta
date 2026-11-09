@@ -105,28 +105,26 @@ test('token badges never use inline onerror (CSP)', () => {
   assert.match(tokenStack('ETH', 'eth'), /data-ti-fallback/);
 });
 
-test('Ferry tray sketch match: wide ~440px airy tray + AI Agent character (not emoji dock)', () => {
+test('Ferry tray matches the panel design system (one shell, one CTA, no 440px tray)', () => {
+  // This used to pin the old 440px tray and 18px gaps. The owner's reference replaced that shell
+  // with one system for all nine shops, so the assertions now guard the new contract: one shared
+  // stylesheet owns the box, the panel is 320-380px, and the old widths cannot come back.
+  const shell = read('app/src/panels/panel-ref.css');
+  assert.match(shell, /clamp\(320px,\s*360px,\s*380px\)/);
+  assert.match(shell, /--r-panel:\s*20px/);
+  assert.match(shell, /--h-cta:\s*48px/);
+  assert.match(shell, /--tap:\s*40px/);
+  assert.doesNotMatch(shell, /width:\s*min\(480px/);
+  // The world still carries the agent character the panel must not cover.
   const world = read('app/design/D9_world/world.css');
-  assert.match(world, /max-width:\s*440px/);
-  assert.match(world, /440px/);
-  assert.doesNotMatch(world, /max-width:\s*268px/);
-  // The tray keeps the whole viewport minus the HUD instead of leaving a 112px gap that pushed
-  // the gold button off a phone screen (measured: CTA at y=941 in an 844px viewport).
-  assert.match(world, /max-height:\s*calc\(100dvh - 96px\)/);
-  assert.doesNotMatch(world, /max-height:\s*calc\(100dvh - 112px\)/);
   assert.match(world, /#t-who/);
   assert.match(world, /#t-track/);
   assert.match(world, /\.ferry-agent-char/);
   assert.match(world, /\.ferry-agent-avatar/);
-  assert.match(world, /width:\s*72px/);
   assert.match(world, /\.ferry-agent-send/);
+  // The old body's other assertions still guard real markup, so they stay:
   const panels = read('app/src/panels/panels.css');
-  assert.match(panels, /\.ferry-card\{display:grid;gap:18px\}/);
-  assert.match(panels, /\.ferry-pane\{display:grid;gap:16px\}/);
-  assert.match(panels, /width:48px!important/);
-  assert.match(panels, /0 4px 0 #9a6f2e/);
   assert.match(panels, /width:auto/);
-  assert.match(panels, /gap:14px/);
   const ui = read('app/design/D8_shops/js/shopui.js');
   assert.match(ui, /AI Agent/);
   assert.match(ui, /ferry-agent-char/);

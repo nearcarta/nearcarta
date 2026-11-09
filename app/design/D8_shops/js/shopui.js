@@ -1647,8 +1647,14 @@ function watchOverflow() {
   mark(sc);
 }
 function mark(sc) {
-  const more = sc.scrollHeight - sc.clientHeight - sc.scrollTop > 24;
+  // On a phone the shell makes the PANEL the one scroller and the inner column keeps its height,
+  // so watching `sc` alone would leave the hint dead. Watch whichever element actually scrolls.
+  const tray = document.getElementById('tray');
+  const scroller = (tray && tray.scrollHeight > tray.clientHeight + 2) ? tray : sc;
+  const more = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop > 24;
   sc.dataset.more = more ? '1' : '0';
+  const hint = tray && tray.querySelector(':scope > .more-hint');
+  if (hint) hint.dataset.live = more ? '1' : '0';
 }
 
 export function boot() {
