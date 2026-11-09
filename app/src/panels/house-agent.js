@@ -262,7 +262,7 @@ export function planHouseLine(text, ctx = {}) {
     };
   }
   if (/\bcancel\b/i.test(line) && /\brelease\b/i.test(line)) {
-    const waiting = !!ctx.line?.line?.pending_ns;
+    const waiting = Number(ctx.line?.line?.pending_ns || 0) > 0;
     return {
       ok: true, action: 'cancel', tab: 'heirs', seal: false, signed: false, live: false,
       label: waiting ? 'simulation' : 'blocked',
