@@ -102,7 +102,7 @@ A round trip always loses: buying the unit at shelf `s` costs at least `base * s
 `quote(shop, good)` returns the prices and the reasons as data. The tooltip prints them word for word:
 
 ```json
-{ "buy": "1000000000000000000000", "sell": "780487804878048780487", "reasons": [
+{ "buy": "1000000000000000000000", "sell": "624384000000000000000", "reasons": [
   { "rule": "scarcity", "factor_bps": 5000, "why": "40 on the shelf, the shop wants 20" },
   { "rule": "demand",   "factor_bps": 8000, "why": "last hour: 2 bought, 6 sold" },
   { "rule": "mood",     "factor_bps": 10000, "why": "open" },
