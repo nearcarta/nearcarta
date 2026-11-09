@@ -130,7 +130,9 @@ impl Hall {
     #[init(ignore_state)]
     pub fn migrate(owner: AccountId, board: AccountId, guard: AccountId, legacy_paid: Vec<String>) -> Self {
         let pred = env::predecessor_account_id();
-        require!(pred == env::current_account_id() || pred == owner, "ERR_MIGRATE");
+        // Only this account's own key. `owner` is an argument, so accepting `pred == owner`
+        // let any caller name itself owner, wipe the jobs and `close` the account (2026-11-09).
+        require!(pred == env::current_account_id(), "ERR_MIGRATE");
         require!(legacy_paid.len() <= 64, "ERR_LEGACY");
         let mut s = Self::empty(owner, board, guard);
         s.legacy_paid = legacy_paid;
@@ -552,6 +554,13 @@ mod tests {
         assert_eq!(h.get_hall()["board"], "board.test");
         assert_eq!(h.get_hall()["guard"], "guard.test");
         assert_eq!(h.get_hall()["legacy_paid"][0], "legacy");
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_MIGRATE")]
+    fn a_stranger_naming_itself_owner_cannot_migrate() {
+        ctx("mallory.test", 0);
+        let _ = Hall::migrate(acc("mallory.test"), acc("board.test"), acc("guard.test"), vec![]);
     }
 
     #[test]

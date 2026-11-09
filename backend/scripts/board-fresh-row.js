@@ -56,9 +56,18 @@ const PAIRS = [
   ['wrap.near', 'near_deposit'], ['wrap.near', 'ft_transfer'], ['wrap.near', 'storage_deposit'],
   [USDC, 'storage_deposit'], ['board.nearcarta.near', 'stamp'],
 ];
-const CALLS = PAIRS.map(([receiver, method]) => ({ receiver, method, cap: String(CAP) }));
+// The live board (max_row 0.03) cannot hold every pair: 8 receivers / 17 pairs locks 3423 B.
+// Until the 0.04 build is live, keep one pair per shop plus the poster's Hall steps and the
+// Ferry pair (2958 B in the same unit test with this list). The worker-side Hall steps, House
+// prepare-send, wrap storage_deposit, the USDC sponsor and the NEAR payee wait for the 0.04 row.
+const LIVE_FIT = new Set(['post_job', 'accept', 'review', 'refund', 'fund', 'house_session_check_in', 'cross', 'pay', 'near_deposit', 'ft_transfer', 'stamp']);
+const FULL = BigInt(MAIN.board?.max_row_yocto || 0) >= 40_000_000_000_000_000_000_000n;
+const PLAN = FULL ? PAIRS : PAIRS.filter(([r, m]) => LIVE_FIT.has(m) && r !== USDC);
+const CALLS = PLAN.map(([receiver, method]) => ({ receiver, method, cap: String(CAP) }));
 const RULES = {
-  receivers: [TH, 'arena.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near', 'guard.nearcarta.near', 'wrap.near', USDC, 'nearcarta.near'],
+  receivers: FULL
+    ? [TH, 'arena.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near', 'guard.nearcarta.near', 'wrap.near', USDC, 'nearcarta.near']
+    : [TH, 'arena.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near', 'guard.nearcarta.near', 'wrap.near'],
   per_action_cap: String(CAP),           // 0.001
   daily_budget: String(NEAR / 100n),     // 0.01
   max_actions_per_day: 8,
@@ -76,7 +85,7 @@ const GAS_OPEN = 100n * TG, GAS_CALLS = 100n * TG, GAS_CLOSE = 50n * TG, GAS_TRA
 // This row (8 receivers / 17 pairs) locks 0.03423 in contracts/charter_board
 // a_row_with_every_board_shop_fits_the_row_cap, under the 0.04 cap.
 const MEASURED_BURN_OPEN = 2_416_337_386_732_800_000_000n;
-const MEASURED_ROW_STORAGE = 34_230_000_000_000_000_000_000n;
+const MEASURED_ROW_STORAGE = FULL ? 34_230_000_000_000_000_000_000n : 29_580_000_000_000_000_000_000n;
 
 export function checkRules(r, calls) {
   const bad = [];

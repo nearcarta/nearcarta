@@ -384,8 +384,7 @@ impl Board {
     ///
     /// Why this exists: an agent that can only find out by sending learns refusal reasons by
     /// burning gas, and every refusal in the live city was being discovered that way. The
-    /// strongest rival in our tracks (soldanoandrea/allowance) ships exactly this as `simulate`
-    /// and it is the one idea of theirs worth taking: the agent plans before it signs.
+    /// agent plans before it signs.
     ///
     /// It returns the FIRST rule that would refuse, plus the numbers that rule compared, so a
     /// caller can say "0.03 is over your 0.02 cap" rather than just "denied". It never checks
@@ -398,7 +397,10 @@ impl Board {
         if row.rules.expires_at != 0 && now > row.rules.expires_at { return sim("clause_expired", "", deposit, 0); }
         if !in_window(row.rules.window_start_min, row.rules.window_end_min) { return sim("outside_time_window", "", deposit, 0); }
         if deposit > 0 && deposit < row.rules.min_amount { return sim("below_min_amount", "", deposit, row.rules.min_amount); }
-        if !row.rules.receivers.contains(&receiver) { return sim("receiver_not_allowlisted", "", deposit, 0); }
+        // `stamp` on the board itself needs no payee entry: the send path exempts it the same
+        // way (propose_call), and without this the Ferry stamp read as refused on mainnet.
+        let stamp = receiver == env::current_account_id() && method == "stamp";
+        if !stamp && !row.rules.receivers.contains(&receiver) { return sim("receiver_not_allowlisted", "", deposit, 0); }
         if !(1..=64).contains(&method.len()) { return sim("ERR_METHOD", "", deposit, 0); }
         let Some(policy) = self.calls.get(&owner) else { return sim("method_not_allowlisted", "", deposit, 0); };
         let Some(rule) = policy.rules.iter().find(|r| r.receiver == receiver && r.method == method) else {
