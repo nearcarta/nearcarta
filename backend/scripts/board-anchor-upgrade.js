@@ -43,6 +43,14 @@ if (!existsSync(file)) {
 const wasm = readFileSync(file);
 const sha = createHash('sha256').update(wasm).digest('hex');
 const recorded = MAIN.board?.wasm_sha256 || '';
+// A staged upgrade is a DIFFERENT artifact from the live one, and `upgrade(code_hash)` must be
+// handed exactly the code the owner staged. Comparing only against the live build (as this script
+// did) says "the board runs a different build" and says nothing about whether the local wasm is the
+// one the pending upgrade expects — which is the only question that matters at the eta. Measured on
+// 2026-11-09: the live build is 982bf6b6, the staged build is a89664ef, and a fresh local build
+// produced b22b34aa, so none of the three matched and the check looked like a board problem.
+const staged = MAIN.board?.upgrade_staged || {};
+const stagedSha = staged.wasm_sha256 || staged.sha256 || '';
 
 const post = async (method, params) => {
   const res = await fetch(rpc, {
@@ -82,6 +90,14 @@ const report = {
     path: wasmPath, bytes: wasm.length, sha256: sha,
     recorded_sha256: recorded, recorded_matches_build: recorded === sha,
     live_sha256: liveSha, live_matches_build: !!liveSha && liveSha === sha,
+    // The question that decides whether `upgrade` can run: is this the artifact that was staged?
+    staged_sha256: stagedSha || null,
+    staged_matches_build: stagedSha ? stagedSha === sha : null,
+    staged_note: stagedSha
+      ? (stagedSha === sha
+        ? 'this wasm IS the staged artifact; upgrade will accept it after the eta'
+        : 'this wasm is NOT the staged artifact; upgrade checks sha256 and will refuse it — point BOARD_WASM at the pinned build the owner staged')
+      : 'no staged upgrade recorded in mainnet.json',
   },
   upgrade_eta_ns: eta,
   upgrade_eta: eta ? new Date(Number(BigInt(eta) / 1_000_000n)).toISOString() : null,
