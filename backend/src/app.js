@@ -583,7 +583,11 @@ export function makeApp() {
     }
     const k = `${a}|${charter || ''}`, hit = cpCache.get(k);
     if (hit && Date.now() - hit.at < 20_000) return c.json(hit.v);
-    const v = await cp.check(a, { charter, row: found?.row || null });
+    // The board itself has no get_clauses: reading it only added a charter_unreadable line to every
+    // guest check. A guest check against the board is the deny list plus the account signals.
+    const boardOnly = charter === BOARD_ID && !found?.row;
+    const v = await cp.check(a, { charter: boardOnly ? null : charter, row: found?.row || null });
+    if (boardOnly) { v.charter = charter; v.signals.charter = charter; }
     if (!charter) v.no_allowlist = 'no charter was named, so no allowlist was read';
     cpCache.set(k, { at: Date.now(), v }); if (cpCache.size > 500) cpCache.delete(cpCache.keys().next().value);
     return c.json(v);
