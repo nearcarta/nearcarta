@@ -124,7 +124,7 @@ export function mountHouseRoom(root, hooks = {}) {
       // the deed read, so the button names what the press will do.
       if (state.needsMint && state.tab === 'deed') cta.textContent = 'Mint my deed';
       else if (state.tab === 'vaults') cta.textContent = 'Send from house';
-      else if (state.tab === 'heirs' && state.line?.line?.pending_ns) cta.textContent = 'Cancel release';
+      else if (state.tab === 'heirs' && Number(state.line?.line?.pending_ns || 0) > 0) cta.textContent = 'Cancel release';
       else cta.textContent = "I'm alive";
     }
     setStatus('');
@@ -173,7 +173,7 @@ export function mountHouseRoom(root, hooks = {}) {
       const who = payee ? ` to ${payee}` : '';
       return `Send ${amt} ${asset} on ${chain}${who} gas ${gas}`;
     }
-    if (state.tab === 'heirs' && state.line?.line?.pending_ns) return 'Cancel the release';
+    if (state.tab === 'heirs' && Number(state.line?.line?.pending_ns || 0) > 0) return 'Cancel the release';
     return "I'm alive";
   }
   async function turn(text) {
@@ -291,7 +291,7 @@ export function mountHouseRoom(root, hooks = {}) {
     set('#house-period', String(line.period_ns ?? '—'));
     set('#house-wait', String(line.wait_ns ?? '—'));
     set('#house-approvals', String((line.approvals || []).length));
-    set('#house-countdown', line.pending_ns ? `Waiting since ${line.pending_ns}` : 'No release waiting');
+    set('#house-countdown', Number(line.pending_ns || 0) > 0 ? `Waiting since ${line.pending_ns}` : 'No release waiting');
     showTab(state.tab);
   }
 
