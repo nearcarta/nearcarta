@@ -1,5 +1,13 @@
 name: ci
 on: [push, pull_request]
+# One run per branch. Without this, every push queued its own 30 jobs and none were cancelled:
+# measured on 2026-11-09 with four runs stacked, each spending ~20 minutes on the sandbox suites,
+# so a branch with a handful of commits waited over an hour for a verdict on its own head commit.
+# A newer push supersedes an older one; `pull_request` is grouped by the PR head ref so a push to
+# a branch does not cancel the run that is already reporting on it.
+concurrency:
+  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   node:
     runs-on: ubuntu-latest
