@@ -94,7 +94,7 @@ fn old_holder_loses_oath_after_sale() {
     ctx("alice.near", 1); c.nft_transfer(a("dave.near"), "g1".into(), None, None);
     let g = c.get_guardian("g1".into()).unwrap();
     assert!(g.frozen && g.oath.allow.is_empty() && g.holder_epoch == 1);
-    ctx("alice.near", 0); c.set_oath("g1".into(), oath());
+    ctx("alice.near", 1); c.set_oath("g1".into(), oath());
 }
 
 #[test]
@@ -103,7 +103,7 @@ fn new_holder_controls_and_old_allowlist_cannot_drain() {
     ctx("alice.near", 1); c.nft_transfer(a("dave.near"), "g1".into(), None, None);
     let i = att(&mut c, "bob.near", "old friend");
     assert_eq!(act(&mut c, i, Act::Pay { to: a("bob.near"), amount: U128(1) }), "C0_FROZEN");
-    ctx("dave.near", 0); c.set_frozen("g1".into(), false);
+    ctx("dave.near", 1); c.set_frozen("g1".into(), false);
     let i = att(&mut c, "bob.near", "old friend 2");
     assert_eq!(act(&mut c, i, Act::Pay { to: a("bob.near"), amount: U128(1) }), "C3_ALLOWLIST");
 }
@@ -212,4 +212,32 @@ fn nep245_transfer_call_needs_balance() {
     let mut c = setup();
     ctx("bob.near", 1);
     let _ = c.mt_transfer_call(a("shop.near"), "key:brass".into(), U128(1), None, None, "".into());
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn a_function_call_key_cannot_name_a_new_agent() {
+    let mut c = setup();
+    ctx("alice.near", 0); c.set_agent("g1".into(), a("mallory.near"));
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn a_function_call_key_cannot_rewrite_the_oath() {
+    let mut c = setup();
+    ctx("alice.near", 0); c.set_oath("g1".into(), oath());
+}
+
+#[test]
+fn freezing_works_from_any_key_of_the_holder() {
+    let mut c = setup();
+    ctx("alice.near", 0); c.set_frozen("g1".into(), true);
+    assert!(c.get_guardian("g1".into()).unwrap().frozen);
+}
+
+#[test]
+#[should_panic(expected = "ERR_OWNER_ONLY")]
+fn only_the_owner_funds_a_pot_because_close_returns_pots_to_the_owner() {
+    let mut c = setup();
+    ctx("bob.near", NEAR); c.fund("g1".into());
 }
