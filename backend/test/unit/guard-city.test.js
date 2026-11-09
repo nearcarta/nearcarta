@@ -291,7 +291,13 @@ test('city wiring keeps the guard door in town and cinema on a real tx', () => {
 test('the live plan does not sign and does not name a fixed trick', () => {
   assert.match(GUARD_LIVE_STEPS, /set_frozen/);
   assert.match(GUARD_LIVE_STEPS, /deposit 0/);
-  assert.match(GUARD_LIVE_STEPS, /not on mainnet/);
+  // This used to require the words "not on mainnet". The guard account IS deployed (code
+  // GutWQgGC, 0.35366 NEAR locked, pay exported — read from the account), so asserting that
+  // sentence pinned a false claim. What is true and worth pinning: the plan says the tray does
+  // not call the contract, so pressing Pay moves nothing.
+  assert.match(GUARD_LIVE_STEPS, /IS deployed on mainnet/);
+  assert.match(GUARD_LIVE_STEPS, /it does not call the guard contract/);
+  assert.doesNotMatch(GUARD_LIVE_STEPS, /is not on mainnet/);
   assert.doesNotMatch(GUARD_LIVE_STEPS, /poisoned invoice/i);
   const src = read('backend/scripts/guard-live-plan.js');
   assert.doesNotMatch(src, /signAndSendTransaction|ed25519:|private key/i);

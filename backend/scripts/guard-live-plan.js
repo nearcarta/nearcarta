@@ -6,7 +6,7 @@ export const GUARD_LIVE_STEPS = [
   'Press Confirm yourself. The agent line must not release a warning.',
   'The check is server-side: age, code hash, lookalike, deny list. There is no TEE signature.',
   'Allow prepares propose_call_as with hold false. A warning prepares it with hold true. Confirm is confirm_hold. Cancel is cancel_hold.',
-  'Until scripts/guard-deploy.js --live has run, the guard account is not on mainnet, so Pay does not sign.',
+  'guard.nearcarta.near IS deployed on mainnet (code GutWQgGC, 0.35366 NEAR locked, no full-access key, pay exported). What is not wired is the tray: pressing Pay builds the board call, it does not call the guard contract, so no NEAR moves from here.',
   'Freeze my row is set_frozen with deposit 0. Do not unfreeze from this shop.',
   'Do not call request_execution on outlayer.near.',
 ].join('\n');
