@@ -32,6 +32,9 @@ cpSync(here + '../backend/src/ferry-guard.js', dist + '/live/ferry-guard.js');
 await (await import('esbuild')).build({ entryPoints: [here + 'src/ferry-pay.js'], bundle: true, format: 'iife', target: 'es2022', outfile: dist + '/ferry-pay.js', logLevel: 'warning' });
 // Town Hall filing caps by reputation tier: the shop room uses the same module as /shops/hall.
 cpSync(here + '../shared/townhall/reputation.js', dist + '/live/townhall-reputation.js');
+// Market Day: the city game layer (app/src/market) and the rules it runs in practice rounds.
+mkdirSync(dist + '/shared/market', { recursive: true });
+for (const f of ['pricing.js', 'sim.js']) cpSync(here + '../shared/market/' + f, dist + '/shared/market/' + f);
 // The city tray and /shops/hall/ import these as raw modules. The URL lands on /shared/.
 mkdirSync(dist + '/shared/hall', { recursive: true });
 mkdirSync(dist + '/shared/rails', { recursive: true });
@@ -119,7 +122,10 @@ const a=document.getElementById('acct'),w=document.querySelector('#brand .what')
 const f=()=>{const ph=innerWidth<=600;if(ph&&w.parentElement!==a)a.append(w);if(!ph&&w.parentElement===a&&b)b.before(w);document.documentElement.style.setProperty('--hudTop',Math.round(a.getBoundingClientRect().bottom)+'px');};
 if('ResizeObserver'in window)new ResizeObserver(f).observe(a);addEventListener('resize',f);f();})();</script>
 <script type="module">const mc=()=>import('/house.bundle.js').then(m=>m.mountConnect(document.getElementById('wallet'))).catch(()=>{});mc();addEventListener('nearcarta:wallet',mc);</script>
+<link rel="stylesheet" href="/market/market.css"><script type="module" src="/market/city.js"></script>
 </body>`));
+// Market Day: the city game layer mounts on the town page.
+if (!readFileSync(dist + '/index.html', 'utf8').includes('src="/market/city.js"')) throw new Error('Market Day layer not injected');
 if (!readFileSync(dist + '/index.html', 'utf8').includes('id="wallet"')) throw new Error('wallet slot not injected');
 // The town has no confirm card any more (#inCard): its HUD CTA #rulesBtn links to the Charter office.
 if (!/id="rulesBtn"[^>]*href="\/setup\/"/.test(readFileSync(dist + '/index.html', 'utf8'))) throw new Error('rules CTA to /setup/ missing');

@@ -1,5 +1,5 @@
 // Market Day end to end on a local near-sandbox: the live board build
-// (`charter_board.sim.wasm`, the code on board.nearcarta.near) and the market
+// (`charter_board.guarded.wasm`, the code on board.nearcarta.near) and the market
 // build that would go on arena.nearcarta.near (`market.wasm`).
 //
 // Calls that spend no NEAR (gather, sell, craft, fill an order) go straight to
@@ -15,7 +15,7 @@ use near_workspaces::types::{Gas, KeyType, NearToken, SecretKey};
 use near_workspaces::{Account, Contract};
 use serde_json::{json, Value};
 
-const BOARD_WASM: &str = "../artifacts/charter_board.sim.wasm";
+const BOARD_WASM: &str = "../artifacts/charter_board.guarded.wasm";
 const MARKET_WASM: &str = "../artifacts/market.wasm";
 const NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 const MILLI: u128 = NEAR / 1_000;
@@ -179,7 +179,7 @@ async fn market_day_runs_with_direct_play_and_board_spends() -> anyhow::Result<(
 
     // Buy ten timber at the smith through the row: the largest quantity fits the board's forward.
     let before = amount(&market.view("quote").args_json(json!({ "shop": "smith", "good": "good:timber" })).await?.json::<Value>()?["buy"]);
-    let (ok, f, gas) = act(&board, &row, &m, "buy", json!({ "row_owner": p, "shop": "smith", "good": "good:timber", "qty": 10, "max_total": (20 * MILLI).to_string() }), 20 * MILLI).await?;
+    let (ok, f, gas) = act(&board, &row, &m, "buy", json!({ "shop": "smith", "good": "good:timber", "qty": 10, "max_total": (20 * MILLI).to_string() }), 20 * MILLI).await?;
     assert!(ok, "buy x10: {f}");
     println!("buy x10 (board): {gas} TGas burnt");
     assert!(gas < 25, "buy x10 under 25 TGas, burnt {gas}");
@@ -202,13 +202,13 @@ async fn market_day_runs_with_direct_play_and_board_spends() -> anyhow::Result<(
     assert!(!ok && f.contains("ERR_BALANCE"), "{f}");
 
     // Invest in the tavern through the row: whole milli shares arrive.
-    let (ok, f, gas) = act(&board, &row, &m, "invest", json!({ "row_owner": p, "shop": "tavern" }), 10 * MILLI).await?;
+    let (ok, f, gas) = act(&board, &row, &m, "invest", json!({ "shop": "tavern" }), 10 * MILLI).await?;
     assert!(ok, "invest: {f}");
     println!("invest (board): {gas} TGas burnt");
     assert_eq!(bal(&market, &p, "share:tavern").await?, 10);
 
     // An order on the city board, filled by gathering.
-    let (ok, f, gas) = act(&board, &row, &m, "post_order", json!({ "row_owner": p, "good": "good:timber", "qty": 1, "reward": MILLI.to_string(), "note": "planks for the bridge" }), 2 * MILLI).await?;
+    let (ok, f, gas) = act(&board, &row, &m, "post_order", json!({ "good": "good:timber", "qty": 1, "reward": MILLI.to_string(), "note": "planks for the bridge" }), 2 * MILLI).await?;
     assert!(ok, "post_order: {f}");
     println!("post_order (board): {gas} TGas burnt");
     let (ok, f, _) = direct(&visitor, &market, "fill_order", json!({ "order_id": "1", "qty": 1 })).await?;
@@ -223,7 +223,7 @@ async fn market_day_runs_with_direct_play_and_board_spends() -> anyhow::Result<(
     // The tavern keeper restocks five iron from the smith through its own row.
     let tavern_row = open_row(&board, tavern, 42, &[&m], &["restock"], &m).await?;
     let tk = tavern_row.who.id().to_string();
-    let (ok, f, gas) = act(&board, &tavern_row, &m, "restock", json!({ "row_owner": tk, "shop": "tavern", "from_shop": "smith", "good": "good:iron", "qty": 5, "max_total": (20 * MILLI).to_string() }), 20 * MILLI).await?;
+    let (ok, f, gas) = act(&board, &tavern_row, &m, "restock", json!({ "shop": "tavern", "from_shop": "smith", "good": "good:iron", "qty": 5, "max_total": (20 * MILLI).to_string(), "decision": "sha256:tavern-day1" }), 20 * MILLI).await?;
     assert!(ok, "restock x5: {f}");
     println!("restock x5 (board): {gas} TGas burnt");
     assert!(gas < 25, "restock burnt {gas}");

@@ -3045,6 +3045,53 @@ mod tests {
         assert!(row.storage_locked.0 <= MAX_ROW_YOCTO, "the row stays inside its allowance");
     }
 
+    /// Storage bytes must be paid for once and paid back once. Cycle every side write a row
+    /// makes (effect budgets set and cleared, holds that spill past the reserve into the row's
+    /// own room, held calls dropped), then close: the board must keep at least the bytes still
+    /// stored, so no visitor can turn a byte into cash twice.
+    #[test]
+    fn side_writes_pay_each_storage_byte_once() {
+        go("nearcarta.near", 0, 0);
+        let mut c = Board::new();
+        let (sk, pk) = keypair(7);
+        go(ALICE, MAX_ROW_YOCTO + NEAR / 100, 0);
+        c.open_charter(rules((0, 0), 40), pk, U128(NEAR / 100));
+        let mut net: i128 = (MAX_ROW_YOCTO + NEAR / 100) as i128 - transfers_to(ALICE).iter().sum::<u128>() as i128;
+        let hall: Vec<(AccountId, String, u128)> = ["post_job", "bid", "counter", "accept", "deliver", "review", "refund"]
+            .iter().map(|m| (acc(SHOP), (*m).to_string(), NEAR / 50)).collect();
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(hall, NEAR / 10);
+        net += MAX_ROW_YOCTO as i128 - transfers_to(ALICE).iter().sum::<u128>() as i128;
+        let big = format!("{{\"task\":\"{}\"}}", "x".repeat(1200));
+        for i in 0..5u64 {
+            go(ALICE, 1, 0);
+            c.set_effects(vec![effect("base", "usdc", &format!("0x{:040x}", i), 10, 1)]);
+            net += 1 - transfers_to(ALICE).iter().sum::<u128>() as i128;
+            go(ALICE, 0, 0);
+            let args = if i % 2 == 0 { big.clone() } else { "{}".to_string() };
+            let sig = sign_as(&sk, &c, ALICE, SHOP, "post_job", &args, NEAR / 2000, 1_000_000, Vec::new(), true);
+            c.propose_call_as(acc(ALICE), acc(SHOP), "post_job".into(), args, U128(NEAR / 2000), U64(1_000_000), Vec::new(), true, sig);
+            net -= transfers_to(ALICE).iter().sum::<u128>() as i128;
+            let row = c.get_charter(acc(ALICE)).unwrap();
+            assert!(row.storage_locked.0 <= MAX_ROW_YOCTO, "cycle {i}: the row stays inside its allowance");
+            assert!(c.side_credit(&acc(ALICE)) <= row.storage_locked.0, "cycle {i}: the reserve is part of the locked bytes");
+            let id = c.holds.keys().next().unwrap().1;
+            go(ALICE, 0, 0);
+            c.cancel_hold(U64(id));
+            net -= transfers_to(ALICE).iter().sum::<u128>() as i128;
+            go(ALICE, 1, 0);
+            c.set_effects(vec![]);
+            net += 1 - transfers_to(ALICE).iter().sum::<u128>() as i128;
+        }
+        let held = c.get_charter(acc(ALICE)).unwrap().balance.0 as i128;
+        assert!(net >= held, "before close the board still holds the balance: net {net} held {held}");
+        go(ALICE, 0, 0);
+        c.close_charter();
+        net -= transfers_to(ALICE).iter().sum::<u128>() as i128;
+        assert!(net >= 0, "the visitor took out {} yocto more than they put in", -net);
+        assert!(net <= (64 * 4 * price()) as i128, "and only the write margins stay with the board: {net}");
+    }
+
     #[test]
     fn clearing_and_re_setting_an_effect_budget_does_not_burn_the_reserve() {
         // `set_effects([])` removes the record and frees the bytes, but the reserve it was paid
