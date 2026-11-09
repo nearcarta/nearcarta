@@ -565,11 +565,13 @@ nav.all-shops{position:fixed;
    underneath it. `--rail` is the rail's own height, measured in js and set on body; the
    explicit `top` keeps the menu above every tray even before that measurement lands, which is
    the property the layout test pins. */
-/* The menu sits BELOW the brand block, not on top of it. The brand is 18..107 (a title and a
-   one-line "not affiliated" note), so a menu at 64 covered the note and clipped it mid-word —
-   visible in the demo recording. 116 clears it with a 9px gap. The js measurement
-   (`setRail`) overrides this; this rule is the value before that runs. */
-body.in-shop nav.all-shops { top: 116px; }
+/* The menu sits BELOW the brand block, not on top of it. The brand used to be 18..107 because it
+   carried a second line ("independent, not affiliated with NEAR Foundation"), so a menu at 64
+   covered it and 116 was needed to clear it. That line is gone from the header, the brand is now
+   18..62, and 74 clears it with a 12px gap. The reclaimed 42px goes to the shop panel, which is
+   what lets Arena's form fit without a scrollbar. The js measurement (`setRail`) overrides this;
+   this rule is the value before that runs. */
+body.in-shop nav.all-shops { top: 74px; }
 /* The tray's own top must come from the menu's real bottom, not from a height calculation that
    can round under it. Measured: menu 116..174, tray top 142 — 32px of the menu sat on the tray's
    top-left corner, which reads as a badge stuck onto the panel. --railTop is set from js. */

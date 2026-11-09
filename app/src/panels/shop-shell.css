@@ -29,15 +29,29 @@
    Palette stays the project's dark brown and gold; each shop only shifts its accent. */
 
 /* ---- the box ---------------------------------------------------------------------------- */
-/* One width for every shop, so the panel does not jump when you walk between doors. 420px is
-   wide enough for a two-column pair of fields and narrow enough to leave the room visible. */
+/* One width for every shop, so the panel does not jump when you walk between doors.
+   480px rather than 420: measured at 1440x900 six of the nine shops needed more height than the
+   space under the menu (Arena 801px of content in 605px), so the form scrolled. The reference
+   cards are wider than they are tall and the extra 60px lets the two-column field pairs breathe,
+   which is what removes most of the overflow. The panel is also anchored to the top of its slot
+   and allowed to use the whole of it, instead of being pinned to the bottom of the viewport. */
 #shopUI #tray {
   left: var(--s3);
   bottom: var(--s3);
-  width: min(420px, calc(100vw - 24px)) !important;
-  max-width: 420px !important;
-  max-height: calc(100dvh - 24px) !important;
-  height: auto;
+  /* From the menu's real bottom. 116 used to be right because the brand carried a second line;
+     with that line gone the menu starts at 74, so the constant wasted 42px that the form needed. */
+  top: calc(var(--railTop, 74px) + var(--rail, 58px) + 12px) !important;
+  width: min(480px, calc(100vw - 24px)) !important;
+  max-width: 480px !important;
+  max-height: none !important;
+  /* Fill the slot between the menu and the viewport floor. Measured before this: Arena needed
+     801px of content, the tray was 696px tall because `height:auto` shrink-wrapped it against
+     both `top` and `bottom`, and the form got 583px — so it scrolled. Taking the slot height
+     gives the scroll region whatever is left, which on a 900px screen is 640px of form instead
+     of 583. Shops whose content is shorter end at their content because the inner column is a
+     flex box that does not stretch its own children. */
+  height: calc(100dvh - (var(--railTop, 74px) + var(--rail, 58px) + 12px) - var(--s3));
+  min-height: 0;
   padding: 0 !important;
   gap: 0;
   border: 1px solid rgba(214, 180, 106, .26);
@@ -54,13 +68,15 @@
 /* Seven shops used to hide this because the form beneath it overflowed the panel. With the box
    capped to the viewport and the form scrolling, the header fits, and a visitor who walks into a
    room can see which room it is. The icon is the shop's own 3D asset, already rendered by the
-   title; no new asset, no new text. */
+   title; no new asset, no new text.
+   Kept deliberately short: 48px of header plus a 20px purpose line is 68px, and every pixel here
+   is a pixel the form loses. The reference cards use one compact block, not a tall masthead. */
 body #shopUI #tray > .t-scroll > .t-head {
   display: flex !important;
   align-items: center;
   gap: var(--sp-2);
   margin: 0 !important;
-  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
   border-bottom: 1px solid rgba(243, 234, 216, .06);
 }
 body #shopUI #tray > .t-scroll > .t-head #t-title {
@@ -82,10 +98,16 @@ body #shopUI #tray > .t-scroll > .t-head #t-title .i3 {
 body #shopUI #tray > .t-scroll > .t-label {
   display: block !important;
   margin: 0 !important;
-  padding: 0 var(--sp-4) var(--sp-3);
+  padding: 2px var(--sp-4) var(--sp-2);
   color: var(--ink-3);
-  font: 500 var(--t-small)/1.45 Inter, system-ui, sans-serif;
+  font: 500 var(--t-small)/1.4 Inter, system-ui, sans-serif;
   border-bottom: 1px solid rgba(243, 234, 216, .06);
+  /* One line only. The purpose sentence is a subtitle, not a paragraph: a long shop sentence
+     wrapping to three lines cost 24px that the form needed. */
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 body #shopUI #tray > .t-scroll > .t-label:empty { display: none !important; }
 /* The session line ("you are signed in as …"), when a shop sets one. */
@@ -136,22 +158,28 @@ body #shopUI #tray > .t-scroll > #t-track {
 #shopUI #tray > .t-scroll::-webkit-scrollbar-thumb:hover { background: var(--brass-hi); }
 
 /* ---- the form region -------------------------------------------------------------------- */
+/* The form region. `gap` is 10px rather than the 12px scale step: with a 690px slot, a 797px
+   form and a pinned action row, the difference between 12 and 10 across eight gaps is 16px, and
+   the reference cards are tighter than our old default. Field height drops from 48 to 44 in the
+   same spirit — still a comfortable target, 4px less per field. */
 body #shopUI #tray > .t-scroll > #t-form {
   display: grid;
-  gap: var(--sp-3);
+  gap: 10px;
   margin: 0 !important;
-  padding: var(--sp-3) var(--sp-4) 0 !important;
+  padding: var(--sp-2) var(--sp-4) 0 !important;
   min-width: 0;
   max-width: 100%;
 }
-/* The big number at the top of a shop (a quote, a cap) is a display value, not a heading. */
+/* The big number at the top of a shop (a quote, a cap) is a display value, not a heading. Kept
+   tight: 34px of type plus its margins is 60px of the panel, and the reference cards show the
+   number inline with the form rather than as a banner. */
 #shopUI #tray .hero {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: var(--sp-2);
-  margin: var(--sp-2) var(--sp-4) var(--sp-3);
-  font-size: 34px;
+  margin: var(--sp-1) var(--sp-4) var(--sp-1);
+  font-size: 26px;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
@@ -168,7 +196,7 @@ body #shopUI #tray [role='tablist'] {
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 2px;
-  margin: var(--sp-3) var(--sp-4) 0;
+  margin: var(--sp-2) var(--sp-4) 0;
   padding: 3px;
   border-radius: var(--r-pill);
   background: rgba(0, 0, 0, .3);
@@ -241,7 +269,14 @@ body #shopUI #tray [role='tablist'] > [role='tab']:focus-visible {
 #shopUI #tray input:not([type='checkbox']):not([type='radio']),
 #shopUI #tray select,
 #shopUI #tray textarea { max-width: 100%; box-sizing: border-box; }
-#shopUI #tray textarea { min-height: 76px; resize: vertical; }
+#shopUI #tray textarea { min-height: 68px; resize: vertical; }
+/* 44px controls with 6px to their label: enough to hit, and the saved vertical space is what lets
+   a shop's whole form sit in the panel without a scrollbar. 48/8 measured 797px of content in a
+   690px slot on Arena. */
+#shopUI #tray input:not([type='checkbox']):not([type='radio']),
+#shopUI #tray select { min-height: 44px; }
+#shopUI #tray label,
+#shopUI #tray .ferry-field { gap: 6px; }
 
 /* A read-only field holding an account id or a hash. 64 characters cannot fit 360px, so the cut
    has to be legible: ellipsis rather than a hard chop through the middle of the last glyph, and
