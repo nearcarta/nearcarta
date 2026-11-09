@@ -51,6 +51,7 @@ const recorded = MAIN.board?.wasm_sha256 || '';
 // produced b22b34aa, so none of the three matched and the check looked like a board problem.
 const staged = MAIN.board?.upgrade_staged || {};
 const stagedSha = staged.wasm_sha256 || staged.sha256 || '';
+let stagedShaFromEvent = '';
 
 const post = async (method, params) => {
   const res = await fetch(rpc, {
@@ -73,7 +74,25 @@ const view = async (method, args = {}) => {
 };
 
 let eta = null, etaError = '';
-try { eta = await view('upgrade_eta'); } catch (e) { etaError = e.message; }
+// `upgrade_eta` is NOT a contract view: v2.rs has no `#[near]` block, so calling it as one always
+// answers MethodNotFound and the pre-flight reported "no eta" for a healthy staged upgrade. The
+// authoritative record is the `stage_upgrade` EVENT_JSON the contract logs, which carries both the
+// eta and the staged code hash. Read that from the recorded stage transaction instead.
+try {
+  const stageTx = staged.tx;
+  if (stageTx) {
+    const t = await post('tx', { tx_hash: stageTx, sender_account_id: root, wait_until: 'FINAL' });
+    for (const out of t?.receipts_outcome || []) {
+      for (const line of out?.outcome?.logs || []) {
+        if (!line.includes('stage_upgrade')) continue;
+        const body = JSON.parse(line.replace(/^EVENT_JSON:/, ''));
+        if (body.eta) eta = String(body.eta);
+        if (body.code_hash) stagedShaFromEvent = String(body.code_hash);
+      }
+    }
+  }
+  if (!eta) etaError = 'no stage_upgrade event in the recorded stage transaction';
+} catch (e) { etaError = e.message; }
 let code = null;
 try { code = Buffer.from((await post('query', { request_type: 'view_code', finality: 'final', account_id: board })).code_base64, 'base64'); }
 catch { code = null; }
@@ -114,7 +133,10 @@ report.prechecks = [
 
 // The order the owner has to follow. Printed in every mode so the dry run is the instruction.
 const now = Date.now();
-const etaAfterStage = now + 24 * 3600 * 1000;
+// If an upgrade is ALREADY staged, the wait is until that eta, not 24 hours from now. The old line
+// always added 24 hours to the moment you ran it, so the plan told the owner to wait a day for an
+// upgrade that was already 8 hours away.
+const etaAfterStage = eta ? Number(BigInt(eta) / 1_000_000n) : now + 24 * 3600 * 1000;
 report.steps = [
   { step: '1. stage_upgrade', when: apply ? 'not needed if already staged' : 'now', call: 'stage_upgrade({ code_hash: "' + sha + '" })', deposit: '1 yoctoNEAR', note: 'owner only; logs a stage_upgrade event' },
   { step: '2. wait', when: new Date(etaAfterStage).toISOString(), note: 'the contract refuses upgrade before upgrade_eta' },
