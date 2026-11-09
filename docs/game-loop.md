@@ -16,17 +16,19 @@ The city loads at street height. The crier stands at the Chronicle with a lit la
 
 Each step happens inside the shop. The shop's panel opens with a quest strip on top: one line saying what you need here, one gold button, and the reward. The shop's own tools stay below it, unchanged.
 
-| # | Shop | You need here | Gold button | Reward | The real feature it uses |
+| # | Shop | The strip says | Gold button | Reward | The real feature behind it |
 |---|---|---|---|---|---|
-| 1 | Town Hall | an order | `Take order` | Order: 3 salt to the Square | The job board (`contracts/hall`): the clerk's posted job, accepted by your row |
-| 2 | Ferry | salt from abroad | `Bring salt` | +3 salt | NEAR Intents 1Click: a live quote for the cargo, then `gather` at the Ferry |
-| 3 | Toll Bridge | your cargo across | `Pay toll` | Cargo across | The toll gate under its live policy; a refusal pays nothing |
-| 4 | Guardhouse | a buyer you can trust | `Check buyer` | Buyer cleared · con artist refused | The payee check; the con artist's pitch is refused on chain, with the tx |
-| 5 | Vault Arena square | a sale | `Sell 3 salt` | +NEAR, the price moves | NEP-245 `sell` on the market contract, with `Why this price?` |
-| 6 | Mist Bank | your profit out of sight | `Seal profit` | Sealed ledger | The private statement audit in a TEE; only "check passed" is public |
-| 7 | Payouts | your porter paid | `Pay porter` | Invoice paid | Payouts under your cap, with the invoice |
-| 8 | Your House (council) | a dark shop relit | `Invest` | `share:<shop>`, the shop lights up | `invest` through your row; 20% of its sales until 110% is repaid |
-| 9 | Chronicle | your day in history | `Write the day` | Day seal, level 2 | The NEP-297 statement: every step with its tx link |
+| 1 | Town Hall | Take today's order | `Take order` | 3 salt to the Square | The job board (`contracts/hall`) |
+| 2 | Ferry | Unload salt from abroad | `Unload salt` | +3 salt (three berths, `gather`) | NEAR Intents 1Click; the strip links the recorded mainnet swap |
+| 3 | Toll Bridge | Get your cargo across | `Cross` | Toll 0.0001, paid from the sale | The toll gate under its live policy; links a recorded crossing |
+| 4 | Guardhouse | Check your buyers | `Check buyers` | The con artist is refused | The payee check; links the recorded `receiver_not_allowlisted` refusal |
+| 5 | Vault Arena | Sell your salt | `Sell 3 salt` | NEAR at the shelf price, the price before and after | NEP-245 `sell`, with `Why this price?` |
+| 6 | Mist Bank | Hide your profit | `Seal profit` | Amount hidden (the purse shows ••••) | The private statement audit, below the strip |
+| 7 | Payouts | Pay your porter | `Pay 0.0003` | Invoice paid, under your cap | Payouts with an invoice |
+| 8 | Your House | Relight the Ferry | `Invest 0.001` | `share:ferry`, the Ferry reopens | `invest` (the Ferry spent its till on your cargo in step 2) |
+| 9 | Chronicle | Write your day | `Write the day` | Day seal, level 2 | The NEP-297 statement |
+
+The rules are `shared/market/story.js`, tested end to end in `backend/test/unit/market-story.test.js`: a new merchant ends day 1 with about 0.0012 NEAR, one Ferry share and level 2.
 
 The route crosses the whole island (Hall, Ferry, Toll, Guard, Arena, Bank, Payouts, House, Chronicle), so one day shows every district. From day 2 the Hall rotates the order (goods, quantity, buyer) and the chain shortens to the steps the order needs.
 
@@ -48,14 +50,15 @@ There are no floating resource nodes and no counters grid. Goods are produced at
 | timber | Toll Bridge (from the mainland) | tools, bridge orders |
 | iron | Guardhouse forge | tools, watch orders |
 
-On chain each producing shop is a `set_node` id equal to the shop id, so `gather(node: "ferry")` is "take salt at the Ferry". The contract does not change.
+Each producing shop has berths: `ferry-1..3`, `house-1..2`, `toll-1..2`, `guard-1..2` (`NODES` in `shared/market/sim.js`). On chain they are the market's `set_node` ids, so `gather(node: "ferry-1")` is "unload salt at the Ferry". The contract does not change. Off the story path, the strip at a producing shop offers `Collect`, and the Arena's strip offers `Sell` for whatever is in the bag.
 
-The market is the Vault Arena's square itself. Its panel shows the shelves of every keeper with `Why this price?`; selling and buying happen there, not in a side list.
+The market is the Vault Arena's square itself: selling happens in the Arena's strip, with `Why this price?`, not in a side list.
 
 ## The quest in the world
 
 - **Next shop glows**: a warm light on its door and a soft beam above its roof.
-- **Lit path**: the road tiles from you to that door glow in sequence, like lamps being lit, along the same path the crier walks (`walkPath`).
+- **Lit path**: studs and a soft band on the road from the crier to that door light up in sequence, along the same path the crier walks (`walkPath`). Real 3D in the town scene (`app/design/D9_world/js/quest.js`), with a point light at the door and a beam over the roof.
+- **Framing**: the camera stands behind the crier looking down the lit road and backs off until both the crier and the door are on screen, portrait included.
 - **HUD**: `Market Day` with nine dots (done, now, next) and `n/9`. Nothing else.
 - **First visit to a shop**: one line from its keeper, 1–2 lines total, then the strip.
 - **Done step**: the dot fills, a short chime, the path relights toward the next shop.
@@ -68,7 +71,7 @@ Press `Go` and the crier walks the lit path to the next door, the camera followi
 
 ## The strip component
 
-`app/src/market/quest-strip.js` renders the strip from the step table. Each shop panel mounts it with one line above its body; no panel file changes beyond that mount. While a step is open, the panel's own primary button turns outline, so the view has one gold button.
+`app/src/market/quest-strip.js` mounts the strip in the panel's `.shop-quest` slot, directly under the header. When a panel has no slot yet, it goes at the top of the panel body, after the header block; if the panel re-renders, it is put back. No panel file changes. While the strip carries the gold button, the panel's own primary turns outline, so the view has one gold button.
 
 ## Characters
 
@@ -176,8 +179,8 @@ In-game moves (gather, sell, craft, fill) are contract-internal and gasless for 
 | 1 | Pricing file and tooltip | merged #175 |
 | 2 | Market contract: NEP-245 goods, shops, orders, shares, caps, storage | merged #183, #190 |
 | 3 | Playable city: bag, `Why this price?`, day timer | merged #188 |
-| 4 | The guide answers on NEAR AI, signed, and walks to the shop | #199 |
-| 5 | The day as a quest chain: strip, glow, lit path, HUD, shop-made goods, the Arena square, the crier | next |
+| 4 | The guide answers on NEAR AI, signed, and walks to the shop | merged #199 |
+| 5 | The day as a quest chain: strip, glow, lit path, HUD, shop-made goods, the Arena square, the crier | building |
 | 6 | Relayer and function-call key: email to first sale with no NEAR | |
 | 7 | Keeper agents and the con artist on NEAR AI, signed | |
 | 8 | Fast-forward, `/judge`, README Games section | |
