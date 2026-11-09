@@ -353,8 +353,10 @@ impl Contract {
 
     /// First call after a code deploy onto an account that still has the old
     /// arena state. The old bytes are not read. Pots have to be refunded first.
+    /// Only this account's own key: anyone else could wipe the arena and name itself owner.
     #[init(ignore_state)]
     pub fn clean(board: AccountId, owner: AccountId) -> Self {
+        require!(env::predecessor_account_id() == env::current_account_id(), "ERR_CLEAN");
         Self::new(board, owner, U128(0), U128(0))
     }
 
@@ -781,7 +783,19 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "ERR_CLEAN")]
+    fn a_stranger_cannot_clean_and_take_the_arena() {
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(id("arena.nearcarta.near")).predecessor_account_id(id("mallory.near"));
+        testing_env!(b.build());
+        let _ = Contract::clean(board(), id("mallory.near"));
+    }
+
+    #[test]
     fn clean_starts_from_an_empty_state() {
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(id("arena.nearcarta.near")).predecessor_account_id(id("arena.nearcarta.near"));
+        testing_env!(b.build());
         let c = Contract::clean(board(), owner());
         assert_eq!(c.get_config().version, 2);
         assert_eq!(c.get_config().verifier, "unverified");
