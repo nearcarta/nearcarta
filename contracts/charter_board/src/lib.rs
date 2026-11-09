@@ -1463,6 +1463,32 @@ impl J<'_> {
     fn arr(&mut self) -> Val { self.eat(b'['); let mut a = Vec::new(); if self.peek() != b']' { loop { a.push(self.val()); if self.peek() != b',' { break; } self.i += 1; } } self.eat(b']'); Val::Arr(a) }
     fn obj(&mut self) -> Val { self.eat(b'{'); let mut o = Vec::new(); if self.peek() != b'}' { loop { let k = self.str(); self.eat(b':'); o.push((k, self.val())); if self.peek() != b',' { break; } self.i += 1; } } self.eat(b'}'); Val::Obj(o) }
 }
+/// NEP-330. cargo-near's reproducible build sets these at compile time; a local
+/// build has none of them and reports `build_info: null`.
+#[no_mangle]
+pub extern "C" fn contract_source_metadata() { ret(&source_metadata()); }
+
+pub fn source_metadata() -> String {
+    let js = v2::json_string;
+    let link = option_env!("NEP330_LINK").or(option_env!("CARGO_PKG_REPOSITORY")).unwrap_or("");
+    let version = option_env!("NEP330_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
+    let build = match (option_env!("NEP330_BUILD_INFO_BUILD_ENVIRONMENT"), option_env!("NEP330_BUILD_INFO_SOURCE_CODE_SNAPSHOT")) {
+        (Some(envr), Some(snap)) if !envr.is_empty() => format!(
+            "{{\"build_environment\":{},\"build_command\":{},\"contract_path\":{},\"source_code_snapshot\":{},\"output_wasm_path\":{}}}",
+            js(envr),
+            option_env!("NEP330_BUILD_INFO_BUILD_COMMAND").filter(|c| c.starts_with('[')).unwrap_or("[]"),
+            js(option_env!("NEP330_BUILD_INFO_CONTRACT_PATH").unwrap_or("")),
+            js(snap),
+            option_env!("NEP330_BUILD_INFO_OUTPUT_WASM_PATH").map(js).unwrap_or_else(|| "null".into()),
+        ),
+        _ => "null".into(),
+    };
+    format!(
+        "{{\"version\":{},\"link\":{},\"standards\":[{{\"standard\":\"nep330\",\"version\":\"1.3.0\"}}],\"build_info\":{build}}}",
+        js(version), js(link)
+    )
+}
+
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
