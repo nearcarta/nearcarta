@@ -25,7 +25,7 @@ export function clear(){ for(const b of live) b.el.remove(); live.length=0; }
 // layout: every visible bubble gets a box that touches no other bubble, no HUD control and no screen edge.
 // Each bubble tries slots near its head (above, then stepped up, then sideways); if no slot is free it waits hidden.
 let hudR=[], hudT=-1;
-const HUDQ='.hud,.pill,#prompt:not([hidden]),.pin,#ctl,#zoom'; // pins too: a line never covers a shop label
+const HUDQ='.hud,.pill,#prompt:not([hidden]),.pin,#ctl,#zoom,.md-hud,.md-dock,.md-sheet.open,.md-node'; // pins and Market Day too: a line never covers a shop label, a spot or the game sheet
 function huds(){ if(hudT===clock.T) return hudR; hudT=clock.T; hudR=[];
   for(const e of document.querySelectorAll(HUDQ)){ const r=e.getBoundingClientRect(); if(r.width<2||r.height<2||r.bottom<0||r.top>innerHeight) continue; let o=1; for(let n=e;n&&n.nodeType===1;n=n.parentElement){ const cs=getComputedStyle(n); if(cs.display==='none'||cs.visibility==='hidden'){ o=0; break; } o*=+cs.opacity; } if(o>.1) hudR.push({x:r.left,y:r.top,w:r.width,h:r.height}); }
   return hudR; }
