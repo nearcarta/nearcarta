@@ -25,9 +25,9 @@
     {
       "account": "toll.nearcarta.near",
       "crate": "contracts/toll",
-      "artifact": "contracts/artifacts/toll.v8.wasm",
-      "build": "none",
-      "reason": "built from 5c2b1ee3 before the toolchain was pinned; the next toll upgrade is a nep330 build"
+      "artifact": "contracts/artifacts/toll.v9.wasm",
+      "build": "box",
+      "rev": "1e1436b5"
     },
     {
       "account": "house.nearcarta.near",
