@@ -133,7 +133,7 @@ const codeMatchesRecorded = account && account.code_hash === RECORDED_CODE;
 const alreadyThisWasm = account && codeHash && account.code_hash === codeHash;
 // A recorded wasm that carries `upgrade` can be replaced in place; the older one could not,
 // so it had to be closed and recreated. That is the only difference between the two paths.
-const recordedCanUpgrade = /toll\.v8\.wasm$/.test(String(MAIN.toll.wasm || ''));
+const recordedCanUpgrade = /toll\.v([89]|[1-9][0-9])\.wasm$/.test(String(MAIN.toll.wasm || ''));
 const path = !exists ? 'create_only' : alreadyThisWasm ? 'view'
   : (codeMatchesRecorded && !recordedCanUpgrade ? 'close_then_create' : 'upgrade_then_migrate');
 
