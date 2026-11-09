@@ -113,7 +113,10 @@ export function bankMarkup(state) {
   const who = state.who;
   const session = who?.account
     ? (who.name && who.name !== who.account ? `Signed in as ${esc(who.name)} · ${esc(who.account)}` : `Signed in as ${esc(who.account)}`)
-    : 'Finish setup to read your cap.';
+    // This line is the first thing in the tray. It used to read "Finish setup to read your cap",
+    // which opens with an instruction and a term ("cap") a first-time visitor has no reason to
+    // know. The audit works with no wallet at all, so say that first.
+    : 'No sign-in needed: press Audit privately and this browser reads the sample statement.';
   const tabBtn = (id, label) => `<button type="button" role="tab" class="bank-tab${tab === id ? ' on' : ''}" data-tab="${id}" aria-selected="${tab === id ? 'true' : 'false'}" data-testid="bank-tab-${id}">${label}</button>`;
   const review = state.review;
   const cta = review ? 'Apply tighter limits' : 'Audit privately';
