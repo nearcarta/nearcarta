@@ -214,23 +214,34 @@ The fix is in the staged artifact and in source; its test passes [SANDBOX by car
 
 So the upgrade is not housekeeping — **it is what unblocks a real shop transaction.**
 
-### 4c. Render is not behind on main (the premise is wrong, and I can show it)
+### 4c. Production runs unmerged branch code
 
-The deployed API reports its own commit: `GET /api/health` → `git: ea072cf2489f4e…`. Render's
-live deploy is an **image** deploy finished `2026-11-09T10:04:05Z`, *after* `ea072cf`
-(`2026-11-09 10:02:48Z`).
+This is the accurate statement, and it replaces an earlier version of this section that said
+only that Render was not behind on main. The owner was right to push on it.
 
-Diffing `ea072cf..HEAD` for `backend/` and `shared/`:
+Facts:
 
-```
-backend/scripts/board-anchor-upgrade.js
-```
+- `GET /api/health` reports `git: ea072cf2489f4e…`, and Render's live image deploy finished
+  `2026-11-09T10:04:05Z`.
+- **`ea072cf` is NOT on `origin/main`.** Checked with
+  `git merge-base --is-ancestor ea072cf origin/main` -> **NO**. It exists only on
+  `cursor/panel-system-b2d4`. `origin/main` is `9dba923f`, and this branch is **62 commits
+  ahead** of it. Nothing on this branch has been merged.
+- So the deployed API runs code that has never been merged. No API behaviour on production is
+  backed by `main` right now.
 
-That is the **only** change, and it is a script, not the API server.
-`shared/hall/job.js` and `shared/deployments/mainnet.json` have **not changed** since
-`ea072cf` — neither on this branch nor on `main`. So the concern about Render missing those
-two files does not apply; it already has them. Vercel **is** ahead (9 `app/` files changed)
-and was redeployed and verified today.
+What I had checked, and what it does and does not mean:
+
+- `git diff ea072cf..HEAD -- backend shared` lists exactly one file,
+  `backend/scripts/board-anchor-upgrade.js`, a script and not the API server. That bounds the
+  drift **since the deployed commit**; there is no further API change to deploy.
+- It says nothing about `main`. Because `ea072cf` is unmerged, every `backend/` and `shared/`
+  change on this branch is live in production while existing only on this branch. Vercel is
+  likewise 9 `app/` files ahead, deployed from this branch today.
+
+**Consequence:** merging PR #170 is not bookkeeping. Until it lands, production depends on a
+branch that could be abandoned, and `main` does not describe what is running. That puts the
+merge above every remaining engineering task in this report.
 
 ### 4d. The standalone Town Hall cannot post jobs
 
@@ -294,12 +305,20 @@ What costs the 3:
   script-produced txs.
 - **No completed v2 job lifecycle on mainnet** — blocked on `min_amount`, which the upgrade
   fixes.
+- **Production runs 62 unmerged commits.** The API and site are live from this branch and
+  `main` is 62 commits behind, so `main` does not describe what is deployed. I reported this
+  wrongly the first time — I checked drift since the deployed commit and called it "not behind
+  on main", which answered a different question. The owner caught it. The engineering is fine;
+  the release discipline is not, and that is worth more than a rounding error.
 - **The `section-o`/`section-n` sweeps were largely tests asserting deleted pages.** I fixed
   the tests and the two real bugs underneath, but I should have audited that surface weeks
   earlier rather than trusting a green tick.
 
 ### Exact steps to 10
 
+0. **Merge #170.** It is first now, not sixth: production is running unmerged branch code, so
+   `main` does not describe what is deployed and nothing on this branch is safe. This needs the
+   owner's word — it is the one step I cannot take myself.
 1. **Let the upgrade land at 16:29 UTC** (`BOARD_WASM=…hold.wasm`, `--apply`). Prove it with
    `POST /api/board/simulate` turning from `ok:null` into a real answer, and `view_code`
    sha256 equal to `a89664ef…`.
@@ -312,11 +331,12 @@ What costs the 3:
    `min_amount` fixed (step 1) and a fresh row (step 2). Record the lifecycle hashes.
 5. **Feed each hash back into `shared/deployments/mainnet.json`, README and `judges/VERIFY.md`**,
    so `verify:mainnet` goes from 108 to 108+n and every claim links to a tx.
-6. **Merge #170** once the owner says so.
-7. **Decide on the standalone Town Hall**: either port `hallJob` or keep the refusal. Right now
+6. **Decide on the standalone Town Hall**: either port `hallJob` or keep the refusal. Right now
    it is a sentence, which is honest but not a feature.
 
-Steps 1 and 2 are the whole ballgame. Everything after them is recording.
+Steps 1 and 2 are the whole ballgame for the *shop* score. Step 0 is the whole ballgame for
+whether anything here survives a branch cleanup. Nothing after them is optional, but everything
+after them is recording.
 
 ---
 
