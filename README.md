@@ -64,6 +64,8 @@ Three properties, and each one is pinned by a test and a transaction.
 
 **The model cannot move the money either.** `backend/src/agent.js` `propose` asks the model for a reading, then refuses any answer that names a payee the visitor did not write or an amount above the one they typed. Tests: `a model that invents a payee is discarded for the words`, `a model that raises the amount is kept to the amount in the message`.
 
+**Any visitor gets their own row on the same contract.** There is no per-user contract and no owner-operated queue: one deployed board holds every visitor's row, keyed by their account. `contracts/charter_board_sandbox/tests/two_visitors.rs` deploys one board into a local near-sandbox, opens two unrelated rows, and checks each can only act inside its own rules and that teardown pays the owner — test `two_visitors_share_one_board_and_teardown_pays_the_owner`, run by `board-sandbox` on every push. Opening a row is one wallet approval on `/setup`; the gas is measured against the committed wasm in `setup_open_gas.rs` (`open_charter` with six receivers burns 4.01 Tgas, `set_calls` 5.09, together 8.53).
+
 ---
 
 ## What you can do in sixty seconds, and what you should see
