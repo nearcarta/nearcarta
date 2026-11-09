@@ -19,8 +19,8 @@ A visitor writes their agent's rules into one row on `board.nearcarta.near`: who
 | # | Do this | You should see |
 |---|---|---|
 | 1 | Open **https://nearcarta.vercel.app** and press **Start here** | `/setup`, step 1 of 7, a mainnet account field — no faucet, no testnet |
-| 2 | Open **https://nearcarta.vercel.app/?shop=ferry** and press **Get quote** | Two 1Click quotes with USD, fee and ETA; the larger amount out is marked. Nothing is sent |
-| 3 | Open **https://nearcarta.vercel.app/?shop=bank** and press **Audit privately** | A sample statement read in the browser: `3 lines · 3 counted · NEAR`, and one anomaly naming `cafe.near, 0.01 NEAR. It appears twice in November` |
+| 2 | Open **https://nearcarta.vercel.app/?shop=ferry** and press **Get quote**, then the compare button | A quote line with the amount out, the USD value, the ETA and the fee, and on the compare the larger amount out marked `best rate`. Nothing is sent |
+| 3 | Open **https://nearcarta.vercel.app/?shop=bank** and press **Audit privately** | A sample statement read in the browser: `3 lines · 3 counted · NEAR`, and one anomaly reading `cafe.near, 0.01 NEAR. It appears twice in November.` |
 | 4 | Open **https://nearcarta.vercel.app/ferry-widget** and press **Pay** | The visitor's row is read first. A deposit address appears only when that row allows the recipient and the amount |
 | 5 | `curl -s https://nearcarta-api.onrender.com/api/receipts` | One object shape for four rails — `near`, `chain-signatures`, `intents`, `near-ai` — keys `rail`, `network`, `what`, `to`, `amount`, `asset`, `decision`, `reason`, `decided_by`, `tx`, `url`, `checks` |
 | 6 | `curl -s https://nearcarta-api.onrender.com/api/health` | `"network":{"contracts":"mainnet","journey":"mainnet"}`, `"near":{"chain_id":"mainnet"}`, `"features":{"signing":false}` |
@@ -197,7 +197,7 @@ The Guardhouse dock is model-backed end to end: a typed sentence goes to the mod
 
 A visitor opens `/setup` and signs in with a mainnet account. Seven steps later they own a row: a cap, a daily budget, a payment count, the shops they allow, and an expiry. The page adds a session key scoped to the board, and after that no wallet popup is needed inside the row's rules.
 
-One row drove the whole city on mainnet: three shops allowlisted and a session key added in one approval [FqPrTiM6…](https://nearblocks.io/txns/FqPrTiM6fM1RSQ3x2JtrMYXKcUpMFRJuZpLreXcRPHye), then a Base crossing through the board [FwXfnydd…](https://nearblocks.io/txns/FwXfnyddVoZ7u6zYrF5Y3mWq9K5aHxrGc25CzM6JzpPj), a guarded payment [862vGPD6…](https://nearblocks.io/txns/862vGPD6PxA64RzD2hKNKb6tM2wLjpeoWXrrsWW7RoaV), and an arena attempt the oath allowed [CMGyWtv…](https://nearblocks.io/txns/CMGyWtvy9ko2RH711p1Ao2fpWWVcUpFNWKPnkiR7pPVB). Four rooms on the same row fit in 1993 of 2000 bytes [3YoqVXCx…](https://nearblocks.io/txns/3YoqVXCxxSDGj3t6CB5oXJxCEktfkRibEvHCB6JqQK5Y), and `/setup` refuses a list the row cannot hold before the wallet opens (`T16 Open your row refuses a shop list the row cannot hold, before the wallet opens`).
+One row drove the whole city on mainnet: three shops allowlisted and a session key added in one approval [FqPrTiM6…](https://nearblocks.io/txns/FqPrTiM6fM1RSQ3x2JtrMYXKcUpMFRJuZpLreXcRPHye), then a Base crossing through the board [FwXfnydd…](https://nearblocks.io/txns/FwXfnyddVoZ7u6zYrF5Y3mWq9K5aHxrGc25CzM6JzpPj), a guarded payment [862vGPD6…](https://nearblocks.io/txns/862vGPD6PxA64RzD2hKNKb6tM2wLjpeoWXrrsWW7RoaV), and an arena attempt the oath allowed [CMGyWtv…](https://nearblocks.io/txns/CMGyWtvy9ko2RH711p1Ao2fpWWVcUpFNWKPnkiR7pPVB). Four shops on one row fit in 1993 of the row's 2000 bytes [3YoqVXCx…](https://nearblocks.io/txns/3YoqVXCxxSDGj3t6CB5oXJxCEktfkRibEvHCB6JqQK5Y), and `/setup` refuses a shop list the row cannot hold before the wallet opens (`T16 Open your row refuses a shop list the row cannot hold, before the wallet opens`; `the optional pairs go before a shop does, and the real limit is four shops`).
 
 A shop's gold button and its dock share one sender. The House check-in from the button [BW3BtvbL…](https://nearblocks.io/txns/BW3BtvbLvj2bAoqNfyvkfXX8c8dhPZwFDzKu8hbMTkPh) and from the AI dock [F9RU5PHY…](https://nearblocks.io/txns/F9RU5PHYbUw6abr1NwN6zoLsBenzAjLcAw3jj58DJi7W) both ran `house_session_check_in` through the board; the Arena dock's `Feed 0.001 to g-visitor-1` fed the pot [F2VQxKK5…](https://nearblocks.io/txns/F2VQxKK5AQJgQbZxurSkw6Rr3XJRXCHT9rNYAUPgsYoY). Tests: `the House room hands its plan to a sender instead of stopping at a hint`, `a check-in on a deed with no inheritance line is refused before it is signed`.
 
@@ -238,11 +238,11 @@ The token id is the holder's account at mint, so after a transfer the id no long
 | It can call | It cannot call |
 |---|---|
 | `propose`, `propose_call`, `propose_call_as` | `cancel_hold`, `expire_sent` (owner-only, `shared/board/session.js` `OWNER_ONLY_METHODS`) |
-| `confirm_hold` — useless alone: the contract stores a separate confirm key and `set_confirm_key` refuses the agent key | `set_rules` widening, `set_agent`, `close_charter`, `reap` |
+| `confirm_hold` — useless alone: the contract stores a separate confirm key and `set_confirm_key` refuses the agent key (`ERR_CONFIRM`) | `set_rules` widening, `set_agent`, `close_charter`, `reap` |
 | `tighten_rules` — shrink-only: `ERR_LOOSEN` on any field that is not at least as tight | Any method on any account other than the row's allowlisted shops |
 | `anchor` — writes nothing; a salted commitment and one event | A NEAR transfer. It cannot attach a deposit, and `propose_call_as` refunds any that arrives |
 
-Tests: `cancel and expire are owner-only and never travel with the agent`, `/setup writes the session scope, not the agent methods, and never an owner-only method`, `agentCanConfirmAlone` and `scopeHasOwnerOnly` (`backend/test/unit/session-hold-scope.test.js`).
+Tests: `cancel and expire are owner-only and never travel with the agent`, `/setup writes the session scope, not the agent methods, and never an owner-only method`, `agentCanConfirmAlone` and `scopeHasOwnerOnly` (`backend/test/unit/session-hold-scope.test.js`); `a_confirm_key_is_not_the_agent_and_a_refund_cannot_be_spoofed` (`contracts/charter_board/src/lib.rs`); `near_forwards_and_anything_else_refunds` (`contracts/guard/src/lib.rs`).
 
 ---
 
