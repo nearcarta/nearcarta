@@ -19,7 +19,7 @@ A visitor writes their agent's rules into one row on `board.nearcarta.near`: who
 | # | Do this | You should see |
 |---|---|---|
 | 1 | Open **https://nearcarta.vercel.app** and press **Start here** | `/setup`, step 1 of 7, a mainnet account field — no faucet, no testnet |
-| 2 | Open **https://nearcarta.vercel.app/?shop=ferry** and press **Get quote**, then the compare button | A quote line with the amount out, the USD value, the ETA and the fee, and on the compare the larger amount out marked `best rate`. Nothing is sent |
+| 2 | Open **https://nearcarta.vercel.app/?shop=ferry** and press **Get quote** | A quote line with the amount out, its USD value, the ETA and the fee, and on the compare the larger amount out marked `best rate` — after sign-in. Signed out the shop says exactly what it needs: *"A NEAR destination needs your NEAR account as the recipient. Sign in, then get the quote again. No deposit address. Nothing was sent."* Nothing is ever sent from this button |
 | 3 | Open **https://nearcarta.vercel.app/?shop=bank** and press **Audit privately** | A sample statement read in the browser: `3 lines · 3 counted · NEAR`, and one anomaly reading `cafe.near, 0.01 NEAR. It appears twice in November.` |
 | 4 | Open **https://nearcarta.vercel.app/ferry-widget** and press **Pay** | The visitor's row is read first. A deposit address appears only when that row allows the recipient and the amount |
 | 5 | `curl -s https://nearcarta-api.onrender.com/api/receipts` | One object shape for four rails — `near`, `chain-signatures`, `intents`, `near-ai` — keys `rail`, `network`, `what`, `to`, `amount`, `asset`, `decision`, `reason`, `decided_by`, `tx`, `url`, `checks` |
@@ -38,7 +38,7 @@ Each track is a shop and a room in the town. Open any room with `/?shop=<id>`. E
 | DeFi | Ferry | A cross-chain swap through NEAR Intents: quotes compared with the larger output marked, and 1Click asked for a deposit address only after the visitor's row allows the recipient and the amount | `backend/src/ferry-checkout.js` `openCheckout`, `app/src/ferry-catalog.js` `pickBest` | `a refused recipient never asks 1Click, and an allowed one returns a deposit address`; `two ferry quotes mark the larger amount out` | swap [HzgUr618…](https://nearblocks.io/txns/HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw) |
 | Privacy | Mist Bank | A statement audited in the browser, and the model asks a fresh nonce per question so a report is bound to that one question; the audit can then tighten the visitor's own cap | `app/src/panels/bank-audit.js` `auditStatement`, `backend/src/tee.js` | `a card csv keeps its currency and names the biggest waste`; `an ecdsa receipt is recovered in the browser, and a wrong algorithm is never claimed as a pass` | tighten [9wxG5aEr…](https://nearblocks.io/txns/9wxG5aErrrU72tH4oTt8dAdku3KXqWybJr7yXL32bFRY) |
 | AI Security | Guardhouse | A payee checked on age, code hash, look-alike and deny list; a warning becomes a hold that only the owner's key can release | `app/src/panels/guard-agent.js`, `contracts/guard` | `the guard dock asks the model, and falls back to the parser when the model cannot answer`; `a guarded pay holds a warning until a person confirms` | hold [9qxsoyA8…](https://nearblocks.io/txns/9qxsoyA8VrecsCh13yuUFhCk7QxEM4ueMVbicJvxyXwT) |
-| Agent Economy | Town Hall | A job splits a budget across parts, takes real bids, counters once, and holds a pass until the delivered digest clears | `contracts/hall`, `shared/hall/job.js` | `a_pass_without_a_guard_clear_cannot_release`, `a_swapped_review_is_refused` (`contracts/hall/src/lib.rs`); `the gold button and the dock share one runner, and a move goes through one sender` | post [8KQnVZhz…](https://nearblocks.io/txns/8KQnVZhziwbTsF5UvbU16xen8tBdiJTMbbNoi1mSbVoA), reward [5Dgoit85…](https://nearblocks.io/txns/5Dgoit85Zh2ANdRGxGU4sE6Ggwmxhu5X8fQaN221VvSo) |
+| Agent Economy | Town Hall | A job splits a budget across parts, takes real bids, counters once, and holds a pass until the delivered digest clears | `contracts/hall`, `shared/hall/job.js` | `a_pass_without_a_guard_clear_cannot_release`, `a_swapped_review_is_refused` (`contracts/hall/src/lib.rs`); `the gold button and the dock share one runner, and a move goes through one sender` | v1 era: post [8KQnVZhz…](https://nearblocks.io/txns/8KQnVZhziwbTsF5UvbU16xen8tBdiJTMbbNoi1mSbVoA), reward [5Dgoit85…](https://nearblocks.io/txns/5Dgoit85Zh2ANdRGxGU4sE6Ggwmxhu5X8fQaN221VvSo). The live contract is Hall v2 — it answers `post_job` (and refuses `post_bounty`, which the v1 txs above used), so these record the earlier API, not the v2 job lifecycle |
 | Real-World Money | Payouts | One `propose` per reviewed in-cap NEAR row, an over-cap row refused before any deposit, and an invoice whose receive account and amount a payer query cannot change | `app/src/panels/payouts-plan.js` `classifyPayroll`, `backend/src/payouts-invoice.js` | `plan: classifyPayroll sends the in-cap rows, refuses the big one before deposit, prices the foreign row`; `an invoice with line items sums them and ignores a conflicting total` | allowed [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia), refused [AsZUd9mZ…](https://nearblocks.io/txns/AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx) |
 | Autonomous Business | Toll Bridge | A pay-per-use gate whose fee and chains come from the live policy, and whose signature comes from the NEAR MPC signer | `contracts/toll` `cross`, `sign_cross` | `a_failed_crossing_promises_refund_action_for_that_row` | allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz), refusal [B9FFjcSA…](https://nearblocks.io/txns/B9FFjcSA9djgn2cWotwZJdag2bHJDSJGNLMLtML6BWtR) |
 | Autonomous Business | Chronicle | One account read across board, Ferry, Toll, foreign and Guard rails, with a statement, a CSV export, and a digest that a changed statement fails | `app/src/chronicle-loop.js` `accountRows`, `app/src/chronicle-audit.js` | `an unrelated account keeps its own live rows and does not borrow the owner feed`; `a statement digest rejects tampering and a private note stays salted`; `chronicle merges toll, ferry SUCCESS, payouts and guard refusals` | allow [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR) |
@@ -86,7 +86,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 ```bash
 npm ci
 npm test                 # 899 unit tests (898 pass, 1 skipped)
-npm run verify:mainnet   # 106/106 mainnet txs found
+npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
 npm run e2e   # 127 browser tests
@@ -99,7 +99,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 | Command | What it prints | What it proves |
 |---|---|---|
 | `npm test` | `# pass 898`, `# fail 0`, `# skipped 1` | The unit suites, offline. The one skip would sign a real transaction |
-| `npm run verify:mainnet` | `106/106 mainnet txs found`, then rewrites `judges/proofs/mainnet-proof-check.json` | Every proof transaction in `shared/deployments/mainnet.json` exists on mainnet, allowed or refused |
+| `npm run verify:mainnet` | `108/108 mainnet txs found`, then rewrites `judges/proofs/mainnet-proof-check.json` | Every proof transaction in `shared/deployments/mainnet.json` exists on mainnet, allowed or refused |
 | `npm run check-cited` | `MISSES: none` | Every file, account, code hash and sha256 this README, `judges/VERIFY.md` and the live `/api/deployments` name resolves |
 | `npm run build && npm run e2e` | Playwright, writing `judges/proofs/e2e-results.json` | The town, the shops and `/setup` in a real browser |
 | `cargo +1.95.0 test --lib` in `contracts/oath` | `122 passed` | The charter's own logic. `+1.95.0` is required: the crate needs edition2024 |
@@ -272,7 +272,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 ```bash
 npm ci
 npm test                 # 899 unit tests (898 pass, 1 skipped)
-npm run verify:mainnet   # 106/106 mainnet txs found
+npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current
 npm run start            # API on :8787
