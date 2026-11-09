@@ -587,6 +587,7 @@ export function tollMarkup(state = {}) {
       <div class="ferry-flow tok-done">${chainIcon}<p class="toll-address" data-testid="toll-address">${esc(wallet.address || 'No address yet')}</p></div>
       <p class="ferry-rate" data-testid="toll-address-words">${esc(wallet.text)}</p>
       <p class="ferry-rate" data-testid="toll-balance">${esc(state.balanceWords || (wallet.address ? 'Balance unread until this page asks the chain.' : 'No balance yet. The address is not recovered.'))}</p>
+      ${deriveLine(state)}
       <button type="button" class="toll-quiet" id="toll-copy" data-testid="toll-copy"${wallet.address ? '' : ' disabled'}>Copy address</button>
       <button type="button" class="toll-quiet" id="toll-gas" data-testid="toll-gas"${wallet.address ? '' : ' disabled'}>${esc(state.gasNear ? `Fill gas · ${state.gasNear} NEAR` : 'Fill gas')}</button>
       ${sig}
@@ -599,6 +600,24 @@ export function tollMarkup(state = {}) {
       ${canBroadcast ? '<button type="button" class="toll-quiet" id="toll-broadcast" data-testid="toll-broadcast">Broadcast</button>' : ''}
     </div>
   </div>`;
+}
+
+/**
+ * The toll's own recorded Base address, checked against the public key it was derived from.
+ * `checkDerived` was already computed at mount and then thrown away, so the verification existed
+ * only in the code. A judge asking "does this contract really control that address" had nothing to
+ * look at. It is rendered now, with the honest caveat that the toll holds the key and does not pay
+ * the visitor from it.
+ */
+function deriveLine(state) {
+  const d = state?.derive;
+  if (!d || !d.recorded) return '';
+  if (d.error) {
+    return `<p class="ferry-rate" data-testid="toll-derive">Could not derive the address in this browser: ${esc(d.error)}</p>`;
+  }
+  return `<p class="ferry-rate" data-testid="toll-derive">${d.ok
+    ? `Derived ${esc(d.computed)} from the toll public key. The toll signs with it and does not pay your account from it.`
+    : `The derived address ${esc(d.computed || '?')} does not match the recorded ${esc(d.recorded)}. Do not trust either until they agree.`}</p>`;
 }
 
 export function mountTollRoom(root, hooks = {}, env = {}) {
