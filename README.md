@@ -2,6 +2,8 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
+<!-- # 899 backend unit tests (898 pass, 1 skipped) -->
+
 **An AI agent can be talked into paying the wrong person. Nearcarta puts the payment rules in a NEAR contract the agent cannot change, so a fooled agent produces a refused transaction instead of a loss.**
 
 A visitor writes their agent's rules into one row on `board.nearcarta.near`: who it may pay, how much per payment, how much per day, how many payments a day, and when the row expires. The agent holds a function-call key with no authority beyond asking. Every payment is checked on chain and is allowed, refused with a reason, or held until the owner confirms. The refusal is a transaction you can open. The town is how you see it: a 3D island at dusk with nine shops, each one a real mainnet dApp behind the same charter.
@@ -74,7 +76,7 @@ Three properties. Each one is pinned by a test and by a transaction you can open
 ## How to run and verify
 
 ```bash
-npm ci && npm test                            # 899 unit tests: 898 pass, 1 skipped
+npm ci && npm test                            # 899 unit tests (898 pass, 1 skipped)
 npm run verify:mainnet                        # 106/106 mainnet txs found
 npm run check-cited                           # MISSES: none
 npm run build && npm run e2e                  # 127 browser tests
@@ -93,6 +95,14 @@ cd contracts/arena && cargo +1.95.0 test --lib # 17 passed
 | `npm run readme-numbers -- --check` | `README.md: up to date` | The counts above are generated from the last full run, not typed |
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
+
+# 899 unit tests (898 pass, 1 skipped):
+Proof rows (106/106 expected).
+
+`judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
+`contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. `contracts/charter_board` is the live visitor board. `contracts/arena` holds 17.
+
+These four lines are written by `npm run readme-numbers`, which reads the last full run and refuses to write if a unit test fails. Do not edit them by hand.
 
 ---
 
@@ -205,7 +215,7 @@ Every id below is a `contract` field in `shared/deployments/mainnet.json`. `npm 
 | `guard.nearcarta.near` | The keyless forwarder | `GutWQgGC7JuLiYq3Rf4HPn4yoD93aFYU19D5uWHZs2Fi` |
 | `nearcarta.near` | The root account: funder, owner of every shop, signer of every deploy | — |
 
-The city house is one account, `house.nearcarta.near`. `extras.house` in that file is the record path for it and its `shop` field holds that id — the record path is not an account.
+The city house is one account, `house.nearcarta.near` — the same account the legacy shop used, recreated on that name for v3 after the v2 wasm was closed. `extras.house` in that file is the record path for it and its `shop` field holds that id — the record path is not an account.
 
 ---
 
@@ -249,11 +259,12 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                                       # 899 unit tests (898 pass, 1 skipped)
+npm test                 # 899 unit tests (898 pass, 1 skipped)
 npm run verify:mainnet                         # 106/106 mainnet txs found
 npm run check-cited                            # MISSES: none
 npm run readme-numbers -- --check              # the counts in this file are current
-npm run build && npm run e2e                   # 127 browser tests
+npm run build && node app/serve.mjs &          # UI on :5173
+npx playwright install chromium && npm run e2e   # 127 browser tests
 npm run start                                  # API on :8787
 npm run test:contracts                         # every crate, including the sandbox suites
 npm run attack-demo                            # the attack set, with the chain's own reasons
