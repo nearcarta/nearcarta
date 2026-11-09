@@ -1469,6 +1469,33 @@ mod tests {
         }
     }
 
+    /// The mainnet test row: an implicit owner, five shops and eight pairs. It must fit the
+    /// 0.03 NEAR row with the 1400-byte side reserve, or the reopen would fail after gas.
+    #[test]
+    fn a_five_shop_eight_pair_row_fits_the_row_cap() {
+        let owner = "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9";
+        go("nearcarta.near", 0, 0);
+        let mut c = Board::new();
+        let (_sk, pk) = keypair(9);
+        let shops = ["townhall.nearcarta.near", "arena.nearcarta.near", "house.nearcarta.near", "toll.nearcarta.near", "guard.nearcarta.near"];
+        let mut r = rules((0, 0), 8);
+        r.receivers = shops.iter().map(|s| acc(s)).collect();
+        r.per_action_cap = U128(NEAR / 1000);
+        r.daily_budget = U128(NEAR / 100);
+        go(owner, MAX_ROW_YOCTO, 0);
+        c.open_charter(r, pk, U128(NEAR / 200));
+        let pairs = [
+            ("townhall.nearcarta.near", "post_job"), ("townhall.nearcarta.near", "accept"), ("townhall.nearcarta.near", "review"),
+            ("townhall.nearcarta.near", "refund"), ("arena.nearcarta.near", "fund"), ("house.nearcarta.near", "house_session_check_in"),
+            ("toll.nearcarta.near", "cross"), ("guard.nearcarta.near", "pay"),
+        ];
+        go(owner, 5 * NEAR / 100, 0);
+        c.set_calls(pairs.iter().map(|(a, m)| (acc(a), m.to_string(), NEAR / 1000)).collect(), NEAR / 100);
+        let v = c.get_charter(acc(owner)).unwrap();
+        assert!(v.storage_locked.0 <= MAX_ROW_YOCTO, "row {}", v.storage_locked.0);
+        eprintln!("eight-pair row storage_locked {}", v.storage_locked.0);
+    }
+
     fn boot() -> (Board, SigningKey, String) {
         go("nearcarta.near", 0, 0);
         let mut c = Board::new();
