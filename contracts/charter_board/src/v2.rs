@@ -961,9 +961,13 @@ pub extern "C" fn propose_call_as() {
 #[no_mangle]
 pub extern "C" fn simulate() {
     let v = parse(&input_str());
-    let b = load();
+    // `load()` on a HEAD board is partial: no row is in memory until it is hydrated, so without
+    // this every answer was `no_charter` on mainnet (measured 2026-11-09 on CM6WA2gZ…).
+    let mut b = load();
+    let owner = v.need("owner").account();
+    b.hydrate(&owner);
     ret(&b.simulate(
-        v.need("owner").account(), v.need("receiver").account(), v.need("method").string(),
+        owner, v.need("receiver").account(), v.need("method").string(),
         U128(v.need("deposit").u128()), effects_json(v.need("effects")),
     ));
 }

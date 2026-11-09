@@ -34,32 +34,41 @@ const NEAR = 10n ** 24n;
 const BYTE = 10n ** 19n;              // storage price per byte
 const ACCOUNT_BYTES = 182n;           // a bare implicit account with one full-access key
 
-const SHOP = 'townhall.nearcarta.near';
+// Every shop the API/agent can drive by script, with tiny caps. Town Hall carries the poster's
+// side of the job lifecycle (post, accept, review, refund); bid and deliver are the worker's own
+// calls and do not go through this row. One method per other shop, as SHOP_METHODS lists them.
+const TH = 'townhall.nearcarta.near';
+const CAP = NEAR / 1000n;                // 0.001 per call
 const CALLS = [
-  { receiver: SHOP, method: 'post_job', cap: String(NEAR / 50n) },
-  { receiver: SHOP, method: 'bid', cap: String(NEAR / 1000n) },
-  { receiver: SHOP, method: 'accept', cap: String(NEAR / 1000n) },
-  { receiver: SHOP, method: 'deliver', cap: String(NEAR / 1000n) },
-  { receiver: SHOP, method: 'review', cap: String(NEAR / 1000n) },
+  { receiver: TH, method: 'post_job', cap: String(CAP) },
+  { receiver: TH, method: 'accept', cap: String(CAP) },
+  { receiver: TH, method: 'review', cap: String(CAP) },
+  { receiver: TH, method: 'refund', cap: String(CAP) },
+  { receiver: 'arena.nearcarta.near', method: 'fund', cap: String(CAP) },
+  { receiver: 'house.nearcarta.near', method: 'house_session_check_in', cap: String(CAP) },
+  { receiver: 'toll.nearcarta.near', method: 'cross', cap: String(CAP) },
+  { receiver: 'guard.nearcarta.near', method: 'pay', cap: String(CAP) },
 ];
 const RULES = {
-  receivers: [SHOP],
-  per_action_cap: String(NEAR / 100n),   // 0.01
-  daily_budget: String(NEAR / 20n),      // 0.05
+  receivers: [TH, 'arena.nearcarta.near', 'house.nearcarta.near', 'toll.nearcarta.near', 'guard.nearcarta.near'],
+  per_action_cap: String(CAP),           // 0.001
+  daily_budget: String(NEAR / 100n),     // 0.01
   max_actions_per_day: 8,
   window_start_min: 0,                   // 0/0 = always open, what /setup sends
   window_end_min: 0,
   min_amount: String(NEAR / 10000n),     // 0.0001, what /setup sends; the board refuses 0 (ERR_MIN)
   expires_at: '0',
 };
-const fundYocto = NEAR / 100n;                                        // spendable in the row
+const fundYocto = NEAR / 200n;                                        // 0.005 spendable in the row
 const rowDepositYocto = BigInt(MAIN.board?.max_row_yocto || 2n * 10n ** 22n);
 const callsDepositYocto = BigInt(CALLS_DEPOSIT_YOCTO);
 const GAS_OPEN = 100n * TG, GAS_CALLS = 100n * TG, GAS_CLOSE = 50n * TG, GAS_TRANSFER = 1n * TG;
-// Measured on an identical row (1 receiver, 5 calls) on 2026-11-09: open+set_calls burnt
-// 0.0023619 NEAR and the board kept 0.0175100 storage + the 0.01 fund; 0.00749 came back.
-const MEASURED_BURN_OPEN = 2_361_889_958_294_400_000_000n;
-const MEASURED_ROW_STORAGE = 17_510_000_000_000_000_000_000n;
+// Hold build (CM6WA2gZ… and later): open+set_calls burnt 0.0024163 NEAR on mainnet
+// (FeUwnaZK…, 1 receiver / 5 pairs, storage 0.02551 — the unit test reproduces that exactly).
+// This row (5 receivers / 8 pairs) locks 0.02804 in contracts/charter_board
+// a_five_shop_eight_pair_row_fits_the_row_cap, under the 0.03 cap.
+const MEASURED_BURN_OPEN = 2_416_337_386_732_800_000_000n;
+const MEASURED_ROW_STORAGE = 28_040_000_000_000_000_000_000n;
 
 export function checkRules(r, calls) {
   const bad = [];
