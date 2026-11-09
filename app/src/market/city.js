@@ -124,7 +124,7 @@ async function go() {
   const s = Q.current(city); walking = true; close(); quest();
   try {
     WD().guideSay?.(`To the ${NAME[s.shop]}.`, { dur: 1.8 });
-    await WD().walkTo?.(s.shop);
+    await WD().walkTo?.(s.shop); WD().guideWave?.();
     if (Q.firstVisit(city, s.shop)) { save(); if (!WD().keeperSay?.(s.shop, s.intro, { dur: 2.6 })) WD().guideSay?.(s.intro, { dur: 2.6 }); await new Promise((r) => setTimeout(r, 2000)); }
     WD().quest?.clear();
     await WD().enterShop?.(s.shop);
@@ -132,7 +132,7 @@ async function go() {
 }
 
 // ---------- the strip inside each shop ----------
-let inShop = null, lastDone = null, whyOpen = false;
+let inShop = null, lastDone = null, whyOpen = false, flash = null;
 const strip = createStrip({ onClick: stripClick });
 const num = (i) => `<span class="qs-n">${i}</span>`;
 const okMark = `<span class="qs-n ok">${ICON.seal}</span>`;
@@ -147,7 +147,7 @@ function stripHtml(id) {
   if (lastDone && lastDone.shop === id) {
     const r = lastDone.res, nx = Q.current(city);
     let sub = proofLink(lastDone.step.proof);
-    if (lastDone.step.id === 'sell') sub = `${near(r.total)} NEAR · price ${near(r.before)} → ${near(r.after)}`;
+    if (lastDone.step.id === 'sell') sub = `+${near(r.total)} NEAR · price ${near(r.before)} → ${near(r.after)}`;
     if (lastDone.step.id === 'write') sub = `Level ${r.level} · your purse keeps ${near(p.near)} NEAR`;
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
     return { gold: true, html: row(okMark, r.line, sub, gold('next', nx ? `Next: ${NAME[nx.shop]}` : 'Back to town')) + extra };
@@ -167,22 +167,22 @@ function stripHtml(id) {
 function paintStrip() {
   if (!playing || !inShop) { strip.hide(); return; }
   const v = stripHtml(inShop); if (!v) { strip.hide(); return; }
+  if (flash && flash.shop === inShop) v.html = v.html.replace(/<small>[\s\S]*?<\/small>/, `<small class="qs-flash${flash.no ? ' no' : ''}">${esc(flash.text)}</small>`);
   strip.show(v.html, { gold: v.gold });
 }
 async function stripClick(a, b) {
   try {
     if (a === 'act') {
       const step = Q.current(city); const res = Q.act(city, inShop); lastDone = { shop: inShop, step, res };
-      save(); hud(); quest(); seal(b); whyOpen = false;
-      toast(res.line + (step.id === 'sell' ? ` · ${near(res.total)} NEAR` : ''));
+      save(); hud(); quest(); seal(b); whyOpen = false; flash = null;
     } else if (a === 'why') whyOpen = !whyOpen;
-    else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); toast(`Sold for ${near(t)} NEAR`); save(); hud(); }
-    else if (a === 'collect') { let got = 0, good = null; for (const [n, g] of S.nodesAt(inShop)) { try { got += S.gather(city, Q.ME, n); good = g; } catch {} } if (got) toast(`+${got} ${GOOD(good).toLowerCase()}`); save(); hud(); }
+    else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); flash = { shop: inShop, text: `Sold for ${near(t)} NEAR` }; save(); hud(); }
+    else if (a === 'collect') { let got = 0, good = null; for (const [n, g] of S.nodesAt(inShop)) { try { got += S.gather(city, Q.ME, n); good = g; } catch {} } if (got) flash = { shop: inShop, text: `+${got} ${GOOD(good).toLowerCase()} in your bag` }; save(); hud(); }
     else if (a === 'next' || a === 'there') { lastDone = null; strip.hide(); await WD().exitShop?.(); if (Q.current(city)) setTimeout(go, 350); return; }
     paintStrip();
-  } catch (e) { fail(e); }
+  } catch (e) { flash = { shop: inShop, text: WHY[e.code] || e.message, no: true }; paintStrip(); }
 }
-addEventListener('world:interior-ready', (e) => { inShop = e.detail?.id || null; if (lastDone && lastDone.shop !== inShop) lastDone = null; whyOpen = false; setTimeout(paintStrip, 30); });
+addEventListener('world:interior-ready', (e) => { inShop = e.detail?.id || null; flash = null; if (lastDone && lastDone.shop !== inShop) lastDone = null; whyOpen = false; setTimeout(paintStrip, 30); });
 addEventListener('world:exterior-ready', () => { inShop = null; lastDone = null; strip.hide(); aim(); });
 setInterval(() => { if (playing && inShop && !lastDone && S.nodesAt(inShop).length) paintStrip(); }, 1000);
 

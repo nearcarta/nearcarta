@@ -65,7 +65,7 @@ The market is the Vault Arena's square itself: selling happens in the Arena's st
 
 ## The guide: the town crier
 
-The robot is replaced by a town crier in the city's low-poly style: a hooded merchant from the existing character set, retinted brown and gold, carrying the brass lantern. Rigged walk, run and idle loops, a lantern sway, a bell wave on arrival. The speech bubble is a cream card with the name in small caps and one or two lines; it avoids the HUD and panels.
+The robot is replaced by a town crier in the city's low-poly style: a hooded merchant from the existing character set, retinted brown and gold, carrying the brass lantern. Rigged walk, run and idle loops, a lantern that swings on a spring, a gesture at each door. The speech bubble is a cream card with the name in small caps and one or two lines; it avoids the HUD and panels.
 
 Press `Go` and the crier walks the lit path to the next door, the camera following at street height, and opens the shop with its step ready. Asking still works (`Ask`, from PR #199): the crier's answer comes from NEAR AI in an attested TEE, signed, and a request to pay an unknown account walks to the Guardhouse and is refused.
 

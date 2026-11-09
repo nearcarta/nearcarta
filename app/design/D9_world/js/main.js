@@ -244,6 +244,7 @@ function doorSpot(id){ const s=SHOPS[id], c=hx(s.q,s.r), st=hx(...s.door); const
   const hit=W.B[id]?dray.intersectObject(W.B[id],true)[0]:null; return { p:(hit?hit.point.clone():c.clone().lerp(st,.45)).setY(0), out }; }
 const quest=Quest({ guide:()=>R, doorAt:doorSpot });
 world.quest={ target:id=>{ quest.target(id); PC.focus=id?doorSpot(id).p:null; if(id&&mode!=='explore'&&!inShop) explore(true); }, clear:()=>{ quest.clear(); PC.focus=null; }, get id(){ return quest.id; }, points:()=>quest.points };
+world.guideWave=()=>{ try{ R.play(R.A.interact?'interact':'wave',{rate:1.1}); }catch(_){ } };
 world.keeperSay=(id,text,opt={})=>{ const k=CAST.keepers?.[id]||(id==='ferry'?CAST.ferryman:null); if(!k) return false; k.lookAt(R,1); SP.say(k,text,{name:k.name,dur:3,...opt}); return true; };
 world.focus=id=>{ PC.focus=id?doorSpot(id).p:null; };
 let robotBody=null;

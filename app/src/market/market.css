@@ -182,6 +182,8 @@ body.md-play #prompt { display: none !important; }
 #tray .qs .qs-ghost { flex: none; height: 40px; min-width: 72px; padding: 0 16px; margin: 0; border-radius: 12px; cursor: pointer; white-space: nowrap;
   font: 600 14px/38px Inter, sans-serif !important; color: var(--qs-hi) !important; background: transparent !important; border: 1px solid rgba(226,168,60,.55) !important; box-shadow: none !important; }
 #tray .qs .qs-ghost:disabled { color: var(--qs-muted) !important; border-color: rgba(226,168,60,.22) !important; opacity: 1 !important; cursor: default; }
+#tray .qs .qs-flash { color: var(--qs-hi); }
+#tray .qs .qs-flash.no { color: #ff8a7a; }
 #tray .qs .qs-proof { color: var(--qs-hi); text-decoration: none; font-size: 13px; }
 #tray .qs .qs-proof:hover { text-decoration: underline; }
 #tray .qs .qs-more { margin: 8px 0 0 44px; }
@@ -191,7 +193,7 @@ body.md-play #prompt { display: none !important; }
 #tray .qs .qs-why p { margin: 0 0 8px; } #tray .qs .qs-why ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; color: var(--qs-muted); }
 #tray .qs .qs-why b { color: var(--qs-cream); text-transform: capitalize; } #tray .qs .qs-why .why-f { color: var(--qs-hi); }
 /* one gold button per view: while the strip carries the gold, the panel's own primary steps back to outline */
-body.qs-gold #tray .primary:not(.qs-go), body.qs-gold #tray .cta:not(.qs-go), body.qs-gold #tray [data-primary]:not(.qs-go) {
+body.qs-gold #tray .primary:not(.qs-go), body.qs-gold #tray .cta:not(.qs-go), body.qs-gold #tray [data-primary]:not(.qs-go), body.qs-gold #tray .qs-demoted {
   background: transparent !important; background-image: none !important; color: #f7d57e !important; border: 1px solid rgba(226,168,60,.55) !important; box-shadow: none !important; }
 
 @media (max-width: 720px) {
@@ -201,7 +203,10 @@ body.qs-gold #tray .primary:not(.qs-go), body.qs-gold #tray .cta:not(.qs-go), bo
   .md-day { gap: 8px; padding-right: 8px; } .md-dots { gap: 6px; } .md-dots i { width: 9px; height: 9px; }
   .md-toasts { top: 120px; }
   .md-dock { left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); transform: none; }
-  .md-quest { flex: 1; min-width: 0; }
+  .md-quest { flex: 1; min-width: 0; padding-left: 12px; gap: 8px; }
+  .md-qn { display: none; }
+  #marketday .md-go { min-width: 64px; padding: 0 16px; }
+  .md-quest.walking .md-go { display: none; }
   .md-sheet { top: auto; left: 8px; right: 8px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: calc(100vh - 220px); border-radius: 20px; padding: 8px 16px 16px; overflow-y: auto; overscroll-behavior: contain; transform: translateY(16px); }
   .md-sheet.open { transform: none; }
   .md-grab { display: block; width: 40px; height: 4px; margin: 0 auto 12px; border-radius: 2px; background: rgba(255,255,255,.18); }
