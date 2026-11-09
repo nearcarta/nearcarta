@@ -455,10 +455,10 @@
       "contract": "townhall.nearcarta.near",
       "owner": "nearcarta.near",
       "wasm": "hall.wasm",
-      "sha256": "e8ebe14e760d2fa0658237a6d75393bb4eff23e7a7fa824fa2040024f215bffd",
-      "code_hash": "GgECZv7g1tSGvnXeMLuJrQKYcfjBVwdXHyS1TZn6T6N8",
-      "storage_bytes": "220874",
-      "locked_near": 2.31836,
+      "sha256": "4f49b235e406f5ace0e1fd0b8ac5e31cf24a4c18e63996c5da4e9fef1a3ab7f5",
+      "code_hash": "6LWPMM3HzbwaySAWYH9Xu7HZCHDPjYya2cXfXHGxAtVz",
+      "storage_bytes": "230307",
+      "locked_near": 2.30307,
       "full_access_keys": 1,
       "teardown": "delete_account with the key in ~/.near-credentials/mainnet/townhall.nearcarta.near.json",
       "txs": {
@@ -473,7 +473,9 @@
         "hall_v2_deploy_migrate": "DjzqHk2KcX2S6GfD1d4b9FQt5ypJiPdFdozXVPoYJrU3",
         "hall_v2_smoke_post_0.001": "DTqpzuhNs5bSDoiSEQP4eAHizCNFHN7wcZcWpzRqAhjZ",
         "hall_v2_smoke_refund": "JC9ojuNMVPkUY3o4zxdAQWYfmecy9B8MBrFexstVDHWj",
-        "topup_0.45": "6LLLhMr9PnqRwn4kk4boMHU7YXe62mF6z8gDvfsRpBuf"
+        "topup_0.45": "6LLLhMr9PnqRwn4kk4boMHU7YXe62mF6z8gDvfsRpBuf",
+        "hall_w4_deploy_in_place": "3MXkc17fSMx9SHMdY5RttVJ4rmuZ2hRTsD9yqy1S3x3A",
+        "hall_w4_smoke_stranger_prune_refused": "8RZQCTzB12aKjoRxSYDZRodY7T2uVfbm3tiQVF5zEoKk"
       },
       "crate": "contracts/hall",
       "deploy_tx": "DjzqHk2KcX2S6GfD1d4b9FQt5ypJiPdFdozXVPoYJrU3",
@@ -515,7 +517,8 @@
       "previous_code_hash": "FQg3EZdbEcjz44F5dckp9agpbsV9nYuToBQ4yUzXXWK9",
       "hotfix": "contracts/hall/HOTFIX.md: migrate() accepted pred == owner (an argument), so anyone could wipe and close the hall.",
       "hotfix_deploy_tx": "71QKJYqcxquc2Ku8Vqy8osRMBpCxRKHNSQ3dhBcVrk3s",
-      "hotfix_proof_tx": "A5jtjqhCGH8Qn2GWodeAEiExDz3nkbTC4gSb7f8N5X4v"
+      "hotfix_proof_tx": "A5jtjqhCGH8Qn2GWodeAEiExDz3nkbTC4gSb7f8N5X4v",
+      "upgrade_note": "Hall code from main 1e1436b5 (W2-W4: #[private] callbacks, U64/U128 JSON, ERR_FLOAT, prune) deployed in place with the account key, no migrate: the state layout is unchanged. +9,433 B (0.0943 NEAR) paid from the hall's own spare."
     }
   },
   "root_balance_near": 3.2899,
@@ -573,24 +576,26 @@
     "status": "deployed",
     "crate": "contracts/guard",
     "wasm": "contracts/artifacts/guard.wasm",
-    "wasm_sha256": "6687bbd1c9ce534bb0072b14ea9a696746b758ff33e3fec6815184a899f4202f",
-    "storage_bytes": 41153,
-    "locked_near": 0.41453,
+    "wasm_sha256": "8047dc73e43d15c325932b29e610df526f1d149906c6412cfa40dccfa0f6aab6",
+    "storage_bytes": 43400,
+    "locked_near": 0.434,
     "full_access_keys": 0,
     "board": "board.nearcarta.near",
-    "deploy_tx": "yW6QPZ2pEUK6x6u53nM9kPgT7mEQAuvuEMV7vVxo5od",
-    "note": "Guard with clear() live 2026-11-09 21:15 Africa/Cairo: reap, then recreate+deploy+init in one tx from nearcarta.near. clear() is owner-only and calls guard_clear on the stored hall. pay() is unchanged. Locked, no FA keys. reap() from owner returns stake.",
-    "code_hash": "7uEdU1JWdtY8VPhyGAr3T6GEy5XfCTBngNjnhZvX8XJ6",
+    "deploy_tx": "GjETJMoE2eiFpPMvHmSBe95XQXBmSvWKovKFqh37F2P4",
+    "note": "Guard from main 1e1436b5 (G1: pay forwards then on_forward settles, or refunds the row through refund_action if the transfer fails; G2: clear needs 1 yocto). Reaped (0.41453 back to nearcarta.near), then recreate+fund 0.437+deploy+new{board,hall} in one tx from nearcarta.near. Locked, no FA keys. reap() from owner with 1 yocto returns stake.",
+    "code_hash": "9dkjuG4gA1vGWXwXKS5WyVb7opKePEC2BpCkyxb7WAaH",
     "previous": {
-      "code_hash": "GutWQgGC7JuLiYq3Rf4HPn4yoD93aFYU19D5uWHZs2Fi",
-      "wasm_sha256": "ec6bbec2e09c53ca4115091e570d1d594c0340831a4ac5b3172ae26045494b89",
-      "storage_bytes": 33366,
-      "deploy_tx": "CN3SKjNS7PRdvrNQsxRxQW45Ks2vChe3BDAHhehhxt65",
-      "note": "No code path to the hall guard_clear; with 0 keys no review(pass) could ever pay."
+      "code_hash": "7uEdU1JWdtY8VPhyGAr3T6GEy5XfCTBngNjnhZvX8XJ6",
+      "wasm_sha256": "6687bbd1c9ce534bb0072b14ea9a696746b758ff33e3fec6815184a899f4202f",
+      "storage_bytes": 41153,
+      "deploy_tx": "yW6QPZ2pEUK6x6u53nM9kPgT7mEQAuvuEMV7vVxo5od",
+      "reap_tx": "7BLA7Z7kCsbnfGLq15s9J9JnEDSs1ith5qssKArbmsTq",
+      "note": "Guard with clear() (rev 5a761c9e). Reaped 2026-11-10 for G1/G2."
     },
     "hall": "townhall.nearcarta.near",
-    "reap_tx": "7BLA7Z7kCsbnfGLq15s9J9JnEDSs1ith5qssKArbmsTq",
-    "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --locked --no-abi, then wasm-opt 108 -Oz (two local builds gave the same sha)."
+    "reap_tx": "Br2J4hkASHss6zL1Jdzp5N2soJQXcEBNMpeRXphQDiQ2",
+    "build": "box: rustc 1.86.0, cargo-near 0.22.0 non-reproducible-wasm --no-abi, wasm-opt version_108 -Oz, rev 1e1436b5",
+    "smoke_stranger_clear_refused_tx": "4MBtoxWuBFaxEPhGpXtEtnmDGVQovqqvvE6yj5kYy7FD"
   },
   "house": {
     "contract": "house.nearcarta.near",

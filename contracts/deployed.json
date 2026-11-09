@@ -13,14 +13,14 @@
       "crate": "contracts/hall",
       "artifact": "contracts/artifacts/hall.wasm",
       "build": "box",
-      "rev": "ce6bff5a"
+      "rev": "1e1436b5"
     },
     {
       "account": "guard.nearcarta.near",
       "crate": "contracts/guard",
       "artifact": "contracts/artifacts/guard.wasm",
       "build": "box",
-      "rev": "5a761c9e"
+      "rev": "1e1436b5"
     },
     {
       "account": "toll.nearcarta.near",
