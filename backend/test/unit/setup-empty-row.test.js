@@ -168,7 +168,7 @@ test('the setup gates set_effects on the board build actually deployed', () => {
   // And compared with the recorded build before the action is added.
   assert.match(src, /boardCode === EFFECTS_CODE_HASH \? effectsFor\(r\) : undefined/);
   // The record carries the hash, so flipping it is a data change, not a code change.
-  assert.equal(MAIN.board.effects_code_hash, 'Bfx6fDuYcZNQTF36ZhZAVB3LSNQGELfNvsWNzSCA3uJD');
+  assert.equal(MAIN.board.effects_code_hash, 'DYjXmYTLHCwSGJzwXPNc3ZAUjX7d1ewsR3sEJsp5ZkBS');
   // The hold build is live and carries the effects fix, so setup sends set_effects now.
   assert.equal(MAIN.board.code_hash, MAIN.board.effects_code_hash);
 });
