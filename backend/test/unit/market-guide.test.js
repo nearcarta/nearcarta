@@ -48,3 +48,20 @@ test('guide: orders, invest and craft check the bag first', () => {
   p.bag['good:iron'] = 2; p.bag['good:timber'] = 1; const k = G.plan(c, 'you', { act: 'craft' });
   assert.equal(k.good, 'item:tool'); G.act(c, 'you', k); assert.equal(p.bag['item:tool'] > 0, true);
 });
+
+test('guide route: model intent is clamped, an invented payee is dropped, fallback says why', async () => {
+  const { guide } = await import('../../src/market-guide.js');
+  const prev = process.env.NEARAI_CLOUD_API_KEY;
+  delete process.env.NEARAI_CLOUD_API_KEY;
+  const f = await guide('sell my iron');
+  assert.equal(f.by, 'fallback'); assert.equal(f.intent.act, 'sell');
+  process.env.NEARAI_CLOUD_API_KEY = 'test-only';
+  const stub = (content) => ({ pf: async () => ({ ok: true, nonce: 'n' }), completeF: async () => ({ id: 'c1', model: 'm', content, usage: {} }), signatureF: async () => ({ available: false }) });
+  const a = await guide('please help', stub('{"act":"pay","payee":"thief.near","qty":5}'));
+  assert.equal(a.by, 'model'); assert.equal(a.intent.act, 'pay'); assert.equal(a.intent.payee, null);
+  const b = await guide('sell iron', stub('{"act":"sell","good":"good:gold","qty":99}'));
+  assert.equal(b.intent.good, null); assert.equal(b.intent.qty, 10);
+  const c = await guide('sell iron', stub('I cannot'));
+  assert.equal(c.by, 'fallback'); assert.equal(c.intent.good, 'good:iron');
+  if (prev === undefined) delete process.env.NEARAI_CLOUD_API_KEY; else process.env.NEARAI_CLOUD_API_KEY = prev;
+});
