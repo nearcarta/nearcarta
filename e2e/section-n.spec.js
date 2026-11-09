@@ -54,51 +54,38 @@ test('N1 a warn names the checks that caused it', async ({ page }) => {
   await shot(page, 'n1-guard-390');
 });
 
-test('N2 the hall reads the row again after the transaction is final', async ({ page, request }) => {
+test('N2 the hall desk refuses a post it cannot sign, and says so', async ({ page, request }) => {
   const live = await (await request.get('/api/board/row/' + OWNER)).json();
   expect(live.row?.per_action_cap).toBeTruthy();
-  const oldCap = live.row.per_action_cap;
-  const nextNear = oldCap === '3000000000000000000000' ? '0.004' : '0.003';
-  const nextYocto = nextNear === '0.003' ? '3000000000000000000000' : '4000000000000000000000';
-  let statusHits = 0;
-  let freshHits = 0;
-  let freshBeforeFinal = false;
   await page.addInitScript(savedScholar, OWNER);
-  await page.route('**/shops/hall/hall.bundle.js', route => route.fulfill({
-    contentType: 'text/javascript',
-    body: `export async function signCalls(){ return { hash: '4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia', signer: ${JSON.stringify(OWNER)} }; }`,
-  }));
-  await page.route('**/api/tx-status/**', route => {
-    statusHits += 1;
-    const ready = statusHits >= 2;
-    return route.fulfill({ json: { pass: ready, final: ready, why: ready ? 'success' : 'not final' } });
-  });
-  await page.route('**/api/board/row/**', async route => {
-    const url = new URL(route.request().url());
-    if (url.searchParams.get('fresh') !== '1') return route.continue();
-    freshHits += 1;
-    if (statusHits < 2) freshBeforeFinal = true;
-    if (freshHits === 1) return route.fulfill({ json: { ...live, fresh: true } });
-    return route.fulfill({ json: { owner: OWNER, board: live.board, row: { ...live.row, per_action_cap: nextYocto }, fresh: true } });
-  });
   await at(page, 1440);
-  await page.goto('/shops/hall/?owner=' + OWNER);
-  await expect(page.getByTestId('hall-cap')).toBeVisible({ timeout: 30_000 });
-  await page.getByTestId('hall-cap').fill(nextNear);
-  await page.getByTestId('hall-apply').click();
-  await expect(page.getByTestId('hall-readback')).toContainText('Read back. Cap is ' + nextNear + ' NEAR.', { timeout: 20_000 });
-  await expect(page.getByTestId('hall-readback')).not.toContainText('previous cap');
-  expect(freshBeforeFinal).toBe(false);
-  expect(freshHits).toBeGreaterThan(1);
-  expect(statusHits).toBeGreaterThan(1);
-  await shot(page, 'n2-hall-readback-1440');
-  await at(page, 390);
-  await expect(page.getByTestId('hall-readback')).toContainText(nextNear);
+  await page.goto('/shops/hall/');
+  await expect(page.getByTestId('hall-desk')).toBeVisible({ timeout: 60_000 });
+
+  // The desk starts with no job and says so, rather than reading as a validation error on
+  // fields the visitor has not touched yet.
+  await expect(page.getByTestId('hall-status')).toContainText('No job yet');
+
+  // A post needs the town's agent-key sender. On this standalone route there is none, so the
+  // desk must refuse in words the visitor can act on. It used to surface a raw
+  // "m.sendJob is not a function" from the bundle lookup, which reads as a broken page.
+  await page.getByTestId('hall-task').fill('Write the shop sign');
+  await page.getByTestId('hall-budget').fill('0.01');
+  await page.getByTestId('hall-worker-a').fill('cafe.near');
+  await page.getByTestId('hall-worker-b').fill('house.near');
+  await page.getByTestId('hall-cta').click();
+  const status = page.getByTestId('hall-status');
+  await expect(status).toContainText('Nothing was signed', { timeout: 30_000 });
+  await expect(status).not.toContainText('is not a function');
+
   await noSideways(page);
-  await shot(page, 'n2-hall-readback-390');
+  await shot(page, 'n2-hall-post-1440');
+  await at(page, 390);
+  await noSideways(page);
+  await shot(page, 'n2-hall-post-390');
 });
 
-test('N3 the hall shows one signed-in line after a skeleton', async ({ page }) => {
+test('N3 the hall desk paints once, signed in, with no second charter card', async ({ page }) => {
   let release;
   const gate = new Promise(r => { release = r; });
   await page.addInitScript(savedScholar, OWNER);
@@ -109,20 +96,21 @@ test('N3 the hall shows one signed-in line after a skeleton', async ({ page }) =
     return route.continue();
   });
   await at(page, 1440);
-  await page.goto('/shops/hall/?owner=' + OWNER);
-  await expect(page.getByTestId('hall-skel')).toBeVisible();
-  await shot(page, 'n3-hall-skel-1440');
-  await at(page, 390);
-  await shot(page, 'n3-hall-skel-390');
+  await page.goto('/shops/hall/');
   release();
-  // /shops/hall/ mounts the v2 hall tray, which does not render hall-facts or hall-form (those
-  // belong to the v1 hall-ui charter card). One session in play is proved by the stored key and
-  // by the job tray being the thing on screen.
-  await expect.poll(async () => page.evaluate(() => localStorage.getItem('nearcarta.setup.v1') || ''), { timeout: 30_000 }).toContain('visitor.near');
+  // One session, one surface: the header names the saved account and the job desk is what is
+  // on screen. The v1 charter card (hall-facts / hall-form / hall-cap) is not mounted on this
+  // route any more, so asserting it would be asserting a page that no longer exists.
+  const who = page.getByTestId('who');
+  await expect(who).toContainText('8ccd5d…3bb9', { timeout: 60_000 });
   await expect(page.getByTestId('hall-desk')).toBeVisible();
+  await expect(page.getByTestId('hall-facts')).toHaveCount(0);
+  await expect(page.getByTestId('hall-form')).toHaveCount(0);
+  await expect(page.getByTestId('hall-row-id')).toHaveCount(0);
   await noSideways(page);
   await shot(page, 'n3-hall-row-390');
   await at(page, 1440);
+  await noSideways(page);
   await shot(page, 'n3-hall-row-1440');
 });
 

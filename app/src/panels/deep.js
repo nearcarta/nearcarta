@@ -9,6 +9,7 @@ import { PROOF_HREF, TEE_PLAN, TEE_TIMEOUT_MS, liveTee, teeTimeoutWhy, teeView }
 import { mountArenaTray } from './arena/tray.js';
 import { mountPayouts } from './payouts-tray.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
+import { lookalike } from '../guard-lookalike.js';
 import { houseCharterMarkup, mountHouseRoom } from './house-room.js';
 import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
@@ -704,7 +705,17 @@ function mountFerry(root, hooks) {
 
 function mountGuard(root, hooks) {
   if (root?.ownerDocument?.body) root.ownerDocument.body.classList.add('guard-tray');
-  return mountGuardTray(root, hooks, { esc, holdButton, api, q$ });
+  // The city tray derives the example from the visitor's own account. This route mounts the
+  // same tray without the city's hooks, so without this the example button could never fill
+  // the field: it asked for a session it was never given. Same rule, same source, no fixed name.
+  const withExample = {
+    ...hooks,
+    injected: hooks?.injected || (() => {
+      const me = visitor().accountId;
+      return me ? lookalike(me) : '';
+    }),
+  };
+  return mountGuardTray(root, withExample, { esc, holdButton, api, q$ });
 }
 
 function mountToll(root, hooks) {

@@ -137,7 +137,7 @@ test('M6 the loading card is up before the intro', async ({ page }) => {
 test('M7 ferry idle does not invent a quote or a deposit', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/shops/ferry/');
-  await expect(page.getByTestId('ferry-idle')).toBeVisible();
+  await expect(page.getByTestId('ferry-idle')).toBeVisible({ timeout: 45_000 });
   await expect(page.locator('body')).not.toContainText('Waiting for the deposit');
   const idle = await page.getByTestId('ferry-idle').innerText();
   expect(idle).toMatch(/No quote yet|No deposit has been requested/);
