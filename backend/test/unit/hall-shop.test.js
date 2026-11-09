@@ -8,6 +8,7 @@ import {
 } from '../../../shared/hall/plan.js';
 import {
   acceptPart, conserved, createLedger, postJob, quotePart, refundJob, reviewPart,
+  MARKET_HIRE_GAP,
 } from '../../../shared/hall/job.js';
 import {
   assignmentRows, bountyRows, marketStatus, marketWorkers, readBounties,
@@ -400,4 +401,21 @@ test('the hint example posts as typed: two workers named in the sentence are use
   const ledger = createLedger();
   const posted = postJob(ledger, { task: cmd.task, budgetNear: cmd.near, workers: cmd.workers, maxParts: 2, nowMs: 1_000 });
   assert.equal(posted.ok, true);
+});
+
+test('Agents tab does not show Post job, and the market gap is honest', () => {
+  const tray = jobTray({
+    tab: 'agents',
+    form: { task: '', budget: '', deadline: '24', parts: '2', workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '' },
+  });
+  assert.doesNotMatch(tray, /data-action="post"/);
+  assert.doesNotMatch(tray, /hall-cta[^>]*>Post job</);
+  assert.match(tray, /hall-market-gap/);
+  assert.match(MARKET_HIRE_GAP.hint, /No public market hire/);
+  assert.doesNotMatch(MARKET_HIRE_GAP.hint, /worker token cannot hire/);
+  const post = jobTray({
+    tab: 'post',
+    form: { task: '', budget: '', deadline: '24', parts: '2', workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '' },
+  });
+  assert.match(post, /data-action="post"/);
 });
