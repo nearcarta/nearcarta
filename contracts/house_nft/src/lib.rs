@@ -104,6 +104,14 @@ pub struct Contract {
 
 /// Storage the minter pays for: the token, its metadata and the purse (about 1 KB; 0.02 NEAR covers it).
 const MINT_STORAGE: NearToken = NearToken::from_millinear(20);
+
+/// Every write that adds bytes must leave the purses payable. Purse NEAR (`held`) sits in the same
+/// balance the storage stake comes from, so a holder who could add bytes for free (a payment's
+/// `seen` id, a long vault payee) could stake other holders' purses away until a payout failed.
+fn check_float(held: u128) {
+    let stake = env::storage_usage() as u128 * env::storage_byte_cost().as_yoctonear();
+    require!(env::account_balance().as_yoctonear() >= stake.saturating_add(held), "ERR_FLOAT");
+}
 const MAX_CAP: u128 = 10u128.pow(24) * 5; // 5 NEAR per payment at most
 
 #[near]
@@ -184,6 +192,7 @@ impl Contract {
         p.balance = U128(p.balance.0 - amount.0);
         self.held -= amount.0;
         self.purses.insert(&token_id, &p);
+        check_float(self.held);
         let epoch = self.epochs.get(&token_id).unwrap_or(0);
         Promise::new(receiver_id.clone()).transfer(NearToken::from_yoctonear(amount.0)).then(
             Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(5)).on_house_pay(token_id, receiver_id, amount, epoch))
@@ -255,6 +264,7 @@ impl Contract {
             period_ns, wait_ns,
             pending_ns: U64(0), approvals: Vec::new(), released: false,
         });
+        check_float(self.held);
     }
 
     /// The holder is here. Clears a pending release.
@@ -298,6 +308,7 @@ impl Contract {
         if !line.approvals.contains(&who) { line.approvals.push(who); }
         if line.approvals.len() as u32 >= line.threshold && line.pending_ns.0 == 0 { line.pending_ns = U64(now); }
         self.lines.insert(&token_id, &line);
+        check_float(self.held);
     }
 
     /// After the wait, the deed moves to the first heir. The purse stays on the token.
@@ -387,6 +398,8 @@ impl Contract {
         let owner = self.owner_of(&token_id);
         require!(env::predecessor_account_id() == owner, "only the deed holder");
         require!(receivers.len() >= 1 && receivers.len() <= 4, "name a payee");
+        require!(receivers.iter().all(|r| !r.is_empty() && r.len() <= 100), "payee");
+        require!(!asset.is_empty() && asset.len() <= 16, "asset");
         require!(max_value.0 > 0, "cap must be above 0");
         let path = format!("{token_id}-{chain}-1");
         let chain_l = chain.to_lowercase();
@@ -395,6 +408,7 @@ impl Contract {
         self.vaults.insert(&token_id, &Vault {
             chain: chain_l, path, asset: asset.to_uppercase(), max_value, max_gas, receivers, funded: false,
         });
+        check_float(self.held);
     }
 
     /// The holder says this vault holds value. Close stays shut until the deployer records an evacuation.
@@ -530,6 +544,7 @@ impl Contract {
             period_ns, wait_ns,
             pending_ns: U64(0), approvals: Vec::new(), released: false,
         });
+        check_float(self.held);
     }
 
     fn pay_from_purse(&mut self, token_id: TokenId, receiver_id: AccountId, amount: U128, action_id: String) -> Promise {
@@ -547,13 +562,14 @@ impl Contract {
         p.balance = U128(p.balance.0 - amount.0);
         self.held -= amount.0;
         self.purses.insert(&token_id, &p);
+        check_float(self.held);
         let epoch = self.epochs.get(&token_id).unwrap_or(0);
         Promise::new(receiver_id.clone()).transfer(NearToken::from_yoctonear(amount.0)).then(
             Self::ext(env::current_account_id()).with_static_gas(Gas::from_tgas(5)).on_house_pay(token_id, receiver_id, amount, epoch))
     }
 
     fn prepare_send(&mut self, token_id: &TokenId, chain: String, to: String, asset: String, value: u128, gas_limit: u64, action_id: String) -> PreparedSend {
-        require!(!action_id.is_empty(), "action");
+        require!(!action_id.is_empty() && action_id.len() <= 80, "action");
         if let Some(prev) = self.prepared.get(token_id) {
             if prev.action_id == action_id { return prev; }
         }
@@ -573,6 +589,7 @@ impl Contract {
             live: false,
         };
         self.prepared.insert(token_id, &prepared);
+        check_float(self.held);
         prepared
     }
 
@@ -692,6 +709,35 @@ mod tests {
     fn ctx(who: usize, deposit: u128) {
         testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
             .predecessor_account_id(accounts(who)).attached_deposit(NearToken::from_yoctonear(deposit)).build());
+    }
+
+    /// Each paid `action_id` stays in `seen`, and nothing pays for those bytes. Once only the
+    /// purses are left over the storage stake, the next payment is refused instead of staking
+    /// another holder's purse away.
+    #[test]
+    fn free_writes_cannot_stake_away_the_purses() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        ctx(1, 2 * 10u128.pow(22) + 10u128.pow(23));
+        c.mint_deed(None, None);
+        let price = env::storage_byte_cost().as_yoctonear();
+        let mut b = VMContextBuilder::new();
+        b.current_account_id("deeds.near".parse().unwrap()).predecessor_account_id("board.nearcarta.near".parse().unwrap());
+        testing_env!(b.build());
+        let usage = env::storage_usage() as u128;
+        b.account_balance(NearToken::from_yoctonear(usage * price + c.house_held().0 + 1000 * price));
+        testing_env!(b.build());
+        let mut paid = 0;
+        let refused = loop {
+            let id = format!("{paid:0>80}");
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let _ = c.house_session_pay(accounts(1), accounts(1).to_string(), accounts(2), U128(1), id);
+            }));
+            if r.is_err() { break true; }
+            paid += 1;
+            if paid > 50 { break false; }
+        };
+        assert!(refused, "the float check stops the stream of payments");
+        assert!(paid < 12, "within the spare bytes ({paid} went through)");
     }
 
     #[test]
