@@ -1,0 +1,47 @@
+{
+  "note": "Every contract live on mainnet. `artifact` must hash to the account's on-chain code. `build` says how CI rebuilds it: `nep330` reads build_info from the contract's own contract_source_metadata and rebuilds that commit in the pinned image; `box` rebuilds `rev` with rustc 1.86.0, cargo-near 0.22.0 and binaryen version_108 wasm-opt; `none` has no reproducible build yet and gives the reason.",
+  "contracts": [
+    {
+      "account": "board.nearcarta.near",
+      "crate": "contracts/charter_board",
+      "artifact": "contracts/artifacts/charter_board.guarded.wasm",
+      "build": "box",
+      "rev": "82bcda89"
+    },
+    {
+      "account": "townhall.nearcarta.near",
+      "crate": "contracts/hall",
+      "artifact": "contracts/artifacts/hall.wasm",
+      "build": "box",
+      "rev": "ce6bff5a"
+    },
+    {
+      "account": "guard.nearcarta.near",
+      "crate": "contracts/guard",
+      "artifact": "contracts/artifacts/guard.wasm",
+      "build": "none",
+      "reason": "built before the toolchain was pinned; the next guard deploy is a nep330 build"
+    },
+    {
+      "account": "toll.nearcarta.near",
+      "crate": "contracts/toll",
+      "artifact": "contracts/artifacts/toll.v8.wasm",
+      "build": "none",
+      "reason": "built from 5c2b1ee3 before the toolchain was pinned; the next toll upgrade is a nep330 build"
+    },
+    {
+      "account": "house.nearcarta.near",
+      "crate": "contracts/house_nft",
+      "artifact": "contracts/artifacts/house_nft.v3.oz.wasm",
+      "build": "none",
+      "reason": "built from 0365e68f before the toolchain was pinned; the next house upgrade is a nep330 build"
+    },
+    {
+      "account": "arena.nearcarta.near",
+      "crate": "contracts/arena",
+      "artifact": "contracts/artifacts/arena.p86.wasm",
+      "build": "none",
+      "reason": "built from e406abb6 on near-sdk 5.30 before the toolchain was pinned; the next arena deploy is a nep330 build"
+    }
+  ]
+}

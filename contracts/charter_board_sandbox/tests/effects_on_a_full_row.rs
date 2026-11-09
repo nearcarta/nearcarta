@@ -134,10 +134,10 @@ async fn setup_can_open_a_row_that_is_ready_to_cross() -> anyhow::Result<()> {
     assert!(set.is_success(), "set_calls: {:?}", set.failures());
     let eff = visitor.call(deployed.id(), "set_effects")
         .args_json(json!({ "effects": effects }))
-        .deposit(NearToken::from_yoctonear(0))
+        .deposit(NearToken::from_yoctonear(1))
         .gas(near_workspaces::types::Gas::from_gas(60 * TGAS))
         .transact().await?;
-    assert!(eff.is_success(), "set_effects with no deposit, from the reserve: {:?}", eff.failures());
+    assert!(eff.is_success(), "set_effects with only the full-key yocto, from the reserve: {:?}", eff.failures());
 
     let row: Value = deployed.view("get_charter").args_json(json!({ "owner": visitor.id() })).await?.json()?;
     let locked = row["storage_locked"].as_str().unwrap().parse::<u128>()? / 10u128.pow(19);
@@ -187,20 +187,20 @@ async fn clearing_then_setting_another_budget_still_works() -> anyhow::Result<()
 
     let one = json!([{ "chain": "base", "asset": "usdc", "to": "0x0000000000000000000000000000000000000001", "value": (NEAR / 1000).to_string(), "fee": (NEAR / 1000).to_string() }]);
     let set1 = visitor.call(deployed.id(), "set_effects").args_json(json!({ "effects": one }))
-        .deposit(NearToken::from_yoctonear(0)).gas(near_workspaces::types::Gas::from_gas(60 * TGAS)).transact().await?;
+        .deposit(NearToken::from_yoctonear(1)).gas(near_workspaces::types::Gas::from_gas(60 * TGAS)).transact().await?;
     assert!(set1.is_success(), "first budget from the reserve: {:?}", set1.failures());
     let l1 = read().await;
     assert_eq!(l1, l0, "a reserve-paid record must not raise the row's locked bytes");
 
     let cleared = visitor.call(deployed.id(), "set_effects").args_json(json!({ "effects": serde_json::json!([]) }))
-        .deposit(NearToken::from_yoctonear(0)).gas(near_workspaces::types::Gas::from_gas(60 * TGAS)).transact().await?;
+        .deposit(NearToken::from_yoctonear(1)).gas(near_workspaces::types::Gas::from_gas(60 * TGAS)).transact().await?;
     assert!(cleared.is_success(), "clear: {:?}", cleared.failures());
     let l2 = read().await;
     assert_eq!(l2, l0, "clearing must not shrink the row's accounting either");
 
     let native = json!([{ "chain": "base", "asset": "native", "to": "0x0000000000000000000000000000000000000002", "value": (NEAR / 1000).to_string(), "fee": (NEAR / 1000).to_string() }]);
     let set2 = visitor.call(deployed.id(), "set_effects").args_json(json!({ "effects": native }))
-        .deposit(NearToken::from_yoctonear(0)).gas(near_workspaces::types::Gas::from_gas(60 * TGAS)).transact().await?;
+        .deposit(NearToken::from_yoctonear(1)).gas(near_workspaces::types::Gas::from_gas(60 * TGAS)).transact().await?;
     assert!(set2.is_success(), "second budget after a clear: {:?}", set2.failures());
     println!("cycle ok: locked stayed {} bytes across set / clear / set", l0 / 10u128.pow(19));
     Ok(())

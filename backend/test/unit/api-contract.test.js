@@ -137,3 +137,10 @@ test('/api/vault/config returns tasks and attacks arrays the House page maps ove
   assert.ok(j.tasks.every(t => t.id && t.name), 'task shape');
   assert.ok(j.attacks.every(a => a.id && a.name), 'attack shape');
 });
+
+test('a guest check against the board does not read get_clauses on the board', () => {
+  const src = readFileSync(new URL('../../src/app.js', import.meta.url), 'utf8');
+  const route = src.slice(src.indexOf("'/api/guardhouse/check/:account'"), src.indexOf("'/api/guardhouse/attested'"));
+  assert.match(route, /const boardOnly = charter === BOARD_ID && !found\?\.row;/);
+  assert.match(route, /cp\.check\(a, \{ charter: boardOnly \? null : charter, row: found\?\.row \|\| null \}\)/);
+});

@@ -62,7 +62,7 @@ export async function runHallCommand(text, ctx = {}) {
       asset: 'NEAR',
       deadlineHours: form.deadline,
       maxParts: form.parts,
-      workers: form.workers,
+      workers: cmd.workers?.length ? cmd.workers : form.workers,
       nowMs: ctx.nowMs,
     });
     if (!posted.ok) return { ...posted, clearInput: false };

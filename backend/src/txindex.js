@@ -1,11 +1,14 @@
-// One gate for the FastNEAR tx index (tx.test.fastnear.com), shared by every caller in this process.
+// One gate for the FastNEAR tx index (tx.main.fastnear.com), shared by every caller in this process.
 // The index rate-limits per IP and Render's egress IP is shared, so callers must not compete blindly:
 //  - every request has a deadline (a hung connection once stalled a whole board rebuild);
 //  - a 429/5xx sets one shared cooldown (exponential, capped) that every caller waits out, instead of each
 //    caller hammering the index on its own schedule;
 //  - 'high' callers (a page's chronicle feed) go first: 'low' callers (the board rebuild) wait while any high
 //    request is queued or in flight, and give up early so they never hold the IP's quota.
-export const INDEX_URL = process.env.FASTNEAR_TX_API || 'https://tx.test.fastnear.com';
+// Mainnet. The default used to be the testnet index, so a mainnet payee's age, first-seen and history
+// were read from testnet: cafe.near came back with no history and wrap.near's "first seen" was the
+// day its name first appeared on testnet.
+export const INDEX_URL = process.env.FASTNEAR_TX_API || 'https://tx.main.fastnear.com';
 const TIMEOUT_MS = Number(process.env.TX_INDEX_TIMEOUT_MS || 8_000);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

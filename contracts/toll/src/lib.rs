@@ -7,7 +7,7 @@
 //! The board opens `cross`. The row owner calls `sign_cross`. A failed deposit is
 //! `refund_action` on the board. `upgrade` then `migrate` replaces this wasm in place.
 mod rlp;
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::store::LookupMap;
 use near_sdk::{env, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseError};
 use serde_json::{json, Value};
@@ -37,10 +37,10 @@ pub struct Oath {
 pub struct Split { pub account: AccountId, pub bps: u16 }
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
-pub struct Price { pub board: AccountId, pub fee: U128, pub cost: U128, pub splits: Vec<Split>, pub paused: bool, pub usdc: String, pub max_token: U128, pub hold_ns: u64 }
+pub struct Price { pub board: AccountId, pub fee: U128, pub cost: U128, pub splits: Vec<Split>, pub paused: bool, pub usdc: String, pub max_token: U128, pub hold_ns: U64 }
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
-pub struct Order { pub id: u64, pub action_id: u64, pub row_owner: AccountId, pub chain: String, pub path: String, pub asset: String, pub to: String, pub amount: U128, pub fee: U128, pub status: String, pub evm_nonce: u64, pub tx_nonce: Option<u64>, pub opened_at: u64 }
+pub struct Order { pub id: u64, pub action_id: u64, pub row_owner: AccountId, pub chain: String, pub path: String, pub asset: String, pub to: String, pub amount: U128, pub fee: U128, pub status: String, pub evm_nonce: u64, pub tx_nonce: Option<u64>, pub opened_at: U64 }
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
 pub struct Liab { pub row_owner: AccountId, pub amount: U128, pub refunded: bool }
@@ -83,17 +83,17 @@ impl Oath {
     }
     fn assert_owner(&self) { require!(env::predecessor_account_id() == self.owner, "only owner"); }
     pub fn freeze(&mut self) { self.assert_owner(); self.frozen = true; }
-    pub fn unfreeze(&mut self) { self.assert_owner(); self.frozen = false; }
+    /// Unfreezing reopens crossings, so it needs the owner's full-access key (1 yocto).
+    #[payable]
+    pub fn unfreeze(&mut self) { near_sdk::assert_one_yocto(); self.assert_owner(); self.frozen = false; }
     #[payable]
     pub fn close(&mut self) -> Promise {
         near_sdk::assert_one_yocto();
         self.assert_owner();
+        // Every open or signing crossing holds its fee in `service_held` (`cross` refuses a fee
+        // below the price, and the price is above 0), so this one check covers them all. The
+        // loop over every order it replaces grew with each crossing and could outgrow the gas.
         require!(self.service_held == 0, "REFUSED: service deposits are still held");
-        for id in 0..self.next_order {
-            if let Some(order) = self.orders.get(&id) {
-                require!(order.status != "open" && order.status != "signing", "REFUSED: a crossing is still open");
-            }
-        }
         Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
     pub fn policy(&self) -> Value {
@@ -109,7 +109,9 @@ impl Oath {
     }
     /// The service price. `max_token` is retired: it is stored for the record but no
     /// longer enforced, so a visitor's row is the only limit on a USDC crossing.
-    pub fn set_price(&mut self, board: AccountId, fee: U128, cost: U128, splits: Vec<Split>, paused: bool, usdc: String, max_token: U128, hold_ns: u64) {
+    #[payable]
+    pub fn set_price(&mut self, board: AccountId, fee: U128, cost: U128, splits: Vec<Split>, paused: bool, usdc: String, max_token: U128, hold_ns: U64) {
+        near_sdk::assert_one_yocto();
         self.assert_owner();
         require!(fee.0 > 0 && cost.0 <= fee.0, "cost must sit inside the fee");
         let mut bps = 0u32;
@@ -154,7 +156,7 @@ impl Oath {
         self.actions.insert(key, id);
         self.row_spent.insert(spent_key, spent + amount.0);
         self.service_held += dep;
-        self.orders.insert(id, Order { id, action_id, row_owner, chain: "base".into(), path, asset: asset_l, to, amount, fee: U128(dep), status: "open".into(), evm_nonce: 0, tx_nonce: None, opened_at: env::block_timestamp() });
+        self.orders.insert(id, Order { id, action_id, row_owner, chain: "base".into(), path, asset: asset_l, to, amount, fee: U128(dep), status: "open".into(), evm_nonce: 0, tx_nonce: None, opened_at: U64(env::block_timestamp()) });
         id
     }
     pub fn sign_cross(&mut self, id: u64) -> Promise {
@@ -182,7 +184,7 @@ impl Oath {
         require!(env::predecessor_account_id() == price.board, "REFUSED: only the board can cancel a crossing");
         let order = self.orders.get(&id).cloned().unwrap_or_else(|| env::panic_str("REFUSED: no such crossing"));
         require!(order.status == "open", "REFUSED: this crossing was already signed");
-        require!(env::block_timestamp() >= order.opened_at.saturating_add(price.hold_ns), "REFUSED: the hold has not ended");
+        require!(env::block_timestamp() >= order.opened_at.0.saturating_add(price.hold_ns.0), "REFUSED: the hold has not ended");
         self.fail_order(id);
     }
     /// One refund of a failed service deposit. The promise is `refund_action` on the board.
@@ -201,7 +203,9 @@ impl Oath {
         if let Some(mut order) = self.orders.get(&id).cloned() { order.status = "refunded".into(); self.orders.insert(id, order); }
         Promise::new(price.board).function_call("refund_action".to_string(), json!({"owner": liab.row_owner, "action_id": action_id.to_string()}).to_string().into_bytes(), NearToken::from_yoctonear(liab.amount.0), Gas::from_tgas(20))
     }
+    #[payable]
     pub fn withdraw_surplus(&mut self, amount: U128) -> Promise {
+        near_sdk::assert_one_yocto();
         self.assert_owner();
         require!(amount.0 > 0 && amount.0 <= self.surplus, "REFUSED: that is more than the surplus");
         self.surplus -= amount.0;
@@ -232,7 +236,9 @@ impl Oath {
         order.status = "failed".into();
         self.orders.insert(id, order);
     }
-    pub fn upgrade(&self, code: near_sdk::json_types::Base64VecU8) -> Promise {
+    #[payable]
+    pub fn upgrade(&mut self, code: near_sdk::json_types::Base64VecU8) -> Promise {
+        near_sdk::assert_one_yocto();
         self.assert_owner();
         require!(!code.0.is_empty(), "empty code");
         Promise::new(env::current_account_id()).deploy_contract(code.0)

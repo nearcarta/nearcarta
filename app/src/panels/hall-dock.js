@@ -83,7 +83,7 @@ export function ensureHallDock(doc) {
   d.innerHTML = `<div id="hall-agent-pop" class="hall-agent-pop" data-testid="hall-agent" hidden>
       <p id="h-agent-log" class="hall-agent-log" data-testid="hall-agent-log" hidden></p>
       <div class="hall-agent-row">
-        <input id="h-agent" data-testid="hall-agent-input" placeholder="Post a readme pass for 0.002 near" autocomplete="off" aria-label="Ask the shop commands">
+        <input id="h-agent" data-testid="hall-agent-input" placeholder="Post a readme pass for 0.002 near to alice.near and bob.near" autocomplete="off" aria-label="Ask the shop commands">
         <button type="button" class="hall-agent-send" id="h-agent-go" data-testid="hall-agent-go" aria-label="Send">➤</button>
       </div>
     </div>
