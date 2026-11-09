@@ -746,8 +746,9 @@ export function makeApp() {
       const out = await view(board, 'simulate', { owner, receiver, method, deposit, effects }, cfg.rpc);
       // The view returns a JSON string. Older builds do not have it, and that must read as
       // "cannot answer", never as "allowed".
-      if (typeof out !== 'string') return c.json({ ok: null, answer: null, note: 'This board build has no simulate view.' }, 200);
-      let answer = null; try { answer = JSON.parse(out); } catch { /* keep the raw text */ }
+      // `view` already JSON-parses the bytes, so the hold build's answer arrives as an object.
+      if (out == null || (typeof out !== 'string' && typeof out !== 'object')) return c.json({ ok: null, answer: null, note: 'This board build has no simulate view.' }, 200);
+      let answer = null; if (typeof out === 'object') answer = out; else { try { answer = JSON.parse(out); } catch { /* keep the raw text */ } }
       return c.json({ ok: answer?.ok === true, answer: answer || { raw: out }, board });
     } catch (e) {
       const missing = /MethodNotFound|no such method/i.test(String(e?.message || e));
