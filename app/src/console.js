@@ -34,7 +34,11 @@ function show(t) {
   document.title = 'Nearcarta · for judges';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('on', s.id === t));
-  history.replaceState(null, '', '#' + t);
+  // `history.replaceState` with a new hash triggers a same-document navigation, so the browser
+  // jumps to that section. On /console that meant the page opened at scrollY 331 with the Ferry
+  // heading at y = -0.09 — scrolled past its own header. Only write a hash when the visitor
+  // actually asked for one (a deep link or a tab click); the default view keeps a clean URL.
+  if (location.hash || t !== 'ferry') history.replaceState(null, '', '#' + t);
   const deepHost = document.querySelector(`#${CSS.escape(t)} .deep`);
   if (deepHost && !deepHost.dataset.ready) {
     deepHost.dataset.ready = '1';
