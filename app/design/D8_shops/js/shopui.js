@@ -1310,12 +1310,38 @@ if (!globalThis.__dzBound && globalThis.document) { globalThis.__dzBound = true;
     if (e.target.closest?.('[data-drawer-go]')) { const t = $('#t-act'); $('#d-close')?.click(); if (t && !t.disabled && !t.hidden) t.click(); }
   }); }
 function syncGo() { const g = $('[data-drawer-go]'), t = $('#t-act'); if (!g || !t) return; const on = !t.hidden && !t.disabled && t.textContent.trim(); g.hidden = !on; if (on) g.textContent = t.textContent.trim(); }
+// One short How-it-works line per shop. Caps live on the board row from /setup; say that plainly when the visitor has no row yet.
+const SHOP_HOW = {
+  bank: 'Mist Bank audits a statement in this browser and can tighten your board caps. No payment is sent from this room.',
+  ferry: 'Ferry swaps under your board cap via Intents. Open /setup once so the session key can pay wrap.near.',
+  guard: 'Guard screens a payee, then pays only inside your board cap. Open /setup to fund the row.',
+  hall: 'Town Hall posts a job from your board row. Caps and allowlisted shops are set in /setup.',
+  toll: 'Toll pays a NEAR pass under your board cap, then a Chain Signature path. Open /setup for the row.',
+  payouts: 'Payouts invoice and payroll under your board USDC/NEAR caps. Open /setup to set receivers and limits.',
+  house: 'House check-ins and sends use your board row. Open /setup so the deed can act under your cap.',
+  chronicle: 'Chronicle is a read-only timeline. Type an account and Show timeline for live rows; nothing is signed here.',
+  arena: 'Arena spends go through your board row when a pot is live. Open /setup for the visitor cap.',
+};
+function shopHowLine(id) {
+  return SHOP_HOW[id] || 'Spends use your board row from /setup. Caps bind on chain.';
+}
+function shopCapLine(id) {
+  return 'Your board cap (per action and per day) is set in /setup. This shop cannot raise it.';
+}
+
 function proofDrawer() {
   const d = $('#d-body'); if (!d || !cur) return; const S = A.S, c = S.clauses?.pay;
   const details = []; { const t = $('#d-title'); if (t) t.textContent = t.textContent.replace(/ · proof$/, ''); }
   // 1. your status
   let h = '<section class="dz me"><h3>You</h3>';
-  if (!S.charter) { const copy = signedCopy(S.me || readSessionAccount(), false); h += `<p class="lead">${esc(copy.lead)}</p><p class="sub">${esc(copy.sub)}</p>`; }
+  if (!S.charter) {
+    const copy = signedCopy(S.me || readSessionAccount(), false);
+    // Bank used to show only "Look around first" with no shop explanation.
+    h += `<p class="lead">${esc(cur === 'bank' ? 'Mist Bank' : copy.lead)}</p>`;
+    h += `<p class="sub" data-testid="shop-how">${esc(shopHowLine(cur))}</p>`;
+    h += `<p class="sub" data-testid="shop-cap">${esc(shopCapLine(cur))}</p>`;
+    if (cur !== 'bank') h += `<p class="sub">${esc(copy.sub)}</p>`;
+  }
   else {
     h += `<div class="lead">${idChip(S.charter)}</div><div class="chips">`
       + (S.state ? `<span class="chip ${S.state.frozen ? 'ice' : 'ok'}">${S.state.frozen ? 'Frozen' : 'Live'} · v${esc(S.state.policy_version)}</span>` : '')
@@ -1323,6 +1349,7 @@ function proofDrawer() {
       + (c && cur === 'payouts' ? `<span class="chip">Your /setup cap ${fmt(c.per_action_cap)}</span><span class="chip">Your /setup day ${fmt(c.daily_budget)}</span>` : c ? `<span class="chip">Max ${fmt(c.per_action_cap)}</span><span class="chip">${fmt(c.daily_budget)} / day</span>` : '') + '</div>';
     details.push(kv('Charter', idChip(S.charter)) + (S.me ? kv('Owner', idChip(S.me)) : '') + (c?.receivers?.length ? kv('Payees', c.receivers.map(r => idChip(r)).join(' ')) : ''));
   }
+  if (S.charter) h += `<p class="sub" data-testid="shop-how">${esc(shopHowLine(cur))}</p>`;
   h += '</section>';
   // 2. one action
   let latest = '';

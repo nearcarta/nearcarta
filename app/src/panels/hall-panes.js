@@ -102,7 +102,8 @@ function receiptsPane(job, tab) {
 
 export function jobTray({ tab = 'post', form = {}, job = null, market = null, seal = '', lines = [] }) {
   const cta = activeCta(job);
-  const showCta = cta && (cta.tab === tab || !job);
+  // Post job belongs on the Post job tab only. Agents used to show the same gold CTA with the market-hire dead end.
+  const showCta = !!(cta && cta.tab === tab);
   const status = (lines.length ? lines : statusLines(job)).slice(0, 2);
   const gold = showCta
     ? `<button type="button" class="hall-cta primary" data-testid="hall-cta" data-action="${esc(cta.action)}" data-part="${cta.partId || ''}">${esc(cta.label)}</button>`
