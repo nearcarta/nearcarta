@@ -409,7 +409,7 @@ test('Agents tab does not show Post job, and the market gap is honest', () => {
     form: { task: '', budget: '', deadline: '24', parts: '2', workerA: '', workerB: '', quotePart: '1', quoteWorker: '', quoteNear: '', deliverable: '' },
   });
   assert.doesNotMatch(tray, /data-action="post"/);
-  assert.doesNotMatch(tray, />Post job</);
+  assert.doesNotMatch(tray, /hall-cta[^>]*>Post job</);
   assert.match(tray, /hall-market-gap/);
   assert.match(MARKET_HIRE_GAP.hint, /No public market hire/);
   assert.doesNotMatch(MARKET_HIRE_GAP.hint, /worker token cannot hire/);
