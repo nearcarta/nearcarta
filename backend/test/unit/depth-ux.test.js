@@ -105,11 +105,18 @@ test('back to town sits above the title card', () => {
   assert.match(read('app/src/judges-data.js'), /71Zio28g/);
 });
 
-test('the charter agent key is named as propose and propose_batch', () => {
-  for (const file of ['app/src/console.js', 'app/src/judges-data.js', 'app/design/D6_dashboards/src/shops/Guardhouse.jsx', 'README.md']) {
-    const text = read(file);
-    assert.match(text, /propose/);
-    assert.match(text, /propose_batch/);
+test('the docs name the methods the agent key can actually call', () => {
+  // This used to require `propose_batch` in the README. That method belongs to the RETIRED
+  // per-visitor oath account (`shared/deployments/mainnet.json` marks it `reaped`); the live
+  // board has no `propose_batch` at all, so requiring it in the docs pinned a claim that is not
+  // true of the deployed contract. It now asserts the two methods the live agent key is scoped
+  // to, and that the agent is described as unable to move money by itself.
+  const readme = read('README.md');
+  assert.match(readme, /propose/, 'the README names the method the agent calls');
+  assert.match(readme, /propose_call_as/, 'and the row-scoped variant it also holds');
+  assert.match(readme, /cannot call an owner method|cannot transfer NEAR/, 'and says what the key cannot do');
+  for (const file of ['app/src/console.js', 'app/src/judges-data.js', 'app/design/D6_dashboards/src/shops/Guardhouse.jsx']) {
+    assert.match(read(file), /propose/);
   }
   const ui = ['app/shops/vault/main.js', 'app/house/setup.js', 'app/design/D9_world/js/core.js', 'app/src/console.js'].map(read).join('\n');
   assert.doesNotMatch(ui, /can only call <code>propose<\/code>|propose-only/);
