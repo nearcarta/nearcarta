@@ -226,6 +226,16 @@ function goIn(id){ if(CLOSED.has(id)) return; const s=SHOPS[id]; R.steer=null; k
   if(far<1.6) R.go([end],{arrive:go}); else if(!R.goHex(s.door,{end,run:far>4,arrive:go})) R.go([end],{arrive:go});
   setTimeoutSim(go,Math.min(6,.9+far/(far>4?R.runSpd:R.walkSpd)*1.25)); }
 window.__enterToll = () => goIn('toll');
+// The guide: walk the Lamplighter to a shop's door step and stop there (no entry). Resolves true on arrival.
+// Market Day uses it when the player asks the guide for something; the camera follows at street height.
+world.walkTo=(id)=>new Promise(res=>{ const s=SHOPS[id]; if(!s||inShop){ res(false); return; } if(mode==='story') endStory(); if(mode!=='explore') explore(true);
+  R.steer=null; keys.clear(); prompt(null); R.release(.2); let done=false; const fin=()=>{ if(done) return; done=true; R.stop(); R.faceTo(hx(s.q,s.r)); res(true); };
+  const end=hx(...s.door).lerp(hx(s.q,s.r),-.12); const far=R.pos.distanceTo(end);
+  if(far<.4){ fin(); return; } if(far<1.6) R.go([end],{arrive:fin}); else if(!R.goHex(s.door,{end,run:far>3,arrive:fin})) R.go([end],{arrive:fin});
+  setTimeoutSim(fin,Math.min(14,1.2+far/(far>3?R.runSpd:R.walkSpd)*1.4)); });
+world.zoom=z=>{ const was=PC.z; if(z!=null) setZoom(z); return was; };
+world.guideSay=(text,opt={})=>SP.say(R,text,{name:'Lamplighter',dur:3,...opt});
+world.guideScreen=()=>screenOf(R.pos.clone().setY((R.height||.6)+.1));
 // walking straight into a door (keys held toward the shop, on its step) goes in, no button needed
 let pushT=0; function walkInto(dt){ const r=_nearDoor(); if(!r.id||!R.steer||r.d>.6){ pushT=0; return; } const c=hx(SHOPS[r.id].q,SHOPS[r.id].r); const tx=c.x-R.pos.x, tz=c.z-R.pos.z, l=Math.hypot(tx,tz)||1, sl=R.steer.length()||1;
   if((tx*R.steer.x+tz*R.steer.y)/(l*sl)>.55){ pushT+=dt; if(pushT>.3){ pushT=0; goIn(r.id); } } else pushT=0; }

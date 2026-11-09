@@ -34,7 +34,7 @@ await (await import('esbuild')).build({ entryPoints: [here + 'src/ferry-pay.js']
 cpSync(here + '../shared/townhall/reputation.js', dist + '/live/townhall-reputation.js');
 // Market Day: the city game layer (app/src/market) and the rules it runs in practice rounds.
 mkdirSync(dist + '/shared/market', { recursive: true });
-for (const f of ['pricing.js', 'sim.js']) cpSync(here + '../shared/market/' + f, dist + '/shared/market/' + f);
+for (const f of ['pricing.js', 'sim.js', 'guide.js']) cpSync(here + '../shared/market/' + f, dist + '/shared/market/' + f);
 // The city tray and /shops/hall/ import these as raw modules. The URL lands on /shared/.
 mkdirSync(dist + '/shared/hall', { recursive: true });
 mkdirSync(dist + '/shared/rails', { recursive: true });

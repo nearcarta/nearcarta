@@ -32,9 +32,9 @@
     {
       "account": "house.nearcarta.near",
       "crate": "contracts/house_nft",
-      "artifact": "contracts/artifacts/house_nft.v3.oz.wasm",
-      "build": "none",
-      "reason": "built from 0365e68f before the toolchain was pinned; the next house upgrade is a nep330 build"
+      "artifact": "contracts/artifacts/house_nft.v4.wasm",
+      "build": "box",
+      "rev": "1e1436b5"
     },
     {
       "account": "arena.nearcarta.near",

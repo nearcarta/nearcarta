@@ -73,6 +73,21 @@ body.md-play #pins .pin.md-under { opacity: 0 !important; visibility: hidden; po
 .md-dock em { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; font: 700 12px/20px Inter, sans-serif; font-style: normal; color: var(--md-ink); background: var(--md-gold-hi); }
 .md-dock em[hidden], .md-dock button.on em { display: none; }
 @keyframes md-bump { 40% { transform: scale(1.08); } }
+/* the guide: the Ask button is the lantern, the one gold control in the dock */
+.md-dock .md-ask { color: var(--md-ink); border-color: transparent; background: linear-gradient(180deg, var(--md-gold-hi), var(--md-gold)); box-shadow: 0 4px 14px rgba(247,213,126,.25); }
+.md-dock .md-ask:hover { background: linear-gradient(180deg, #ffe7a8, var(--md-gold-hi)); border-color: transparent; }
+.md-dock .md-ask.on { color: var(--md-ink); background: linear-gradient(180deg, #ffe7a8, var(--md-gold-hi)); }
+body.md-guiding .md-dock button:not(.md-exit) { opacity: .55; pointer-events: none; }
+body.md-guiding .md-dock .md-ask .i { animation: md-lamp 1.2s ease-in-out infinite; }
+@keyframes md-lamp { 50% { transform: translateY(-2px) rotate(-6deg); } }
+body.md-guiding #prompt { display: none !important; }
+.md-say { display: flex; gap: 8px; margin: 4px 0 12px; }
+.md-say input { flex: 1; min-width: 0; height: 48px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--md-line); background: rgba(10,7,5,.45); color: inherit; font: 500 15px Inter, sans-serif; outline: none; }
+.md-say input:focus { border-color: var(--md-gold); box-shadow: 0 0 0 3px rgba(247,213,126,.15); }
+.md-say input::placeholder { color: var(--md-muted); }
+#marketday .md-say .md-send, .md-say .md-send { width: 48px; height: 48px; border: 0; border-radius: 14px; color: var(--md-ink); background: linear-gradient(180deg, var(--md-gold-hi), var(--md-gold)); }
+.md-chips { display: flex; flex-direction: column; gap: 8px; }
+.md-chips .md-ghost { height: 44px; text-align: left; padding: 0 14px; font-weight: 500; }
 
 /* sheet: right panel on desktop, bottom sheet on mobile */
 .md-sheet { position: fixed; z-index: 24; top: 80px; right: 20px; width: clamp(320px, 25vw, 380px); max-height: calc(100vh - 180px); padding: 16px; box-sizing: border-box; border-radius: 20px;
@@ -162,7 +177,9 @@ button.md-row:hover { border-color: var(--md-soft); }
   .md-toasts { top: 116px; }
   .md-dock { left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); transform: none; justify-content: space-between; }
   .md-dock button { flex: 1; min-width: 0; padding: 0 8px; }
-  .md-dock .md-exit { flex: none; }
+  .md-dock .md-exit, .md-dock .md-ask { flex: none; width: 48px; min-width: 48px; padding: 0; }
+  .md-dock .md-ask .l { display: none; }
+  .md-dock { gap: 6px; }
   .md-sheet { top: auto; left: 8px; right: 8px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: calc(100vh - 200px); border-radius: 20px; padding: 8px 16px 16px; overflow-y: auto; overscroll-behavior: contain; transform: translateY(24px); }
   .md-grab { display: block; width: 40px; height: 4px; margin: 0 auto 12px; border-radius: 2px; background: rgba(255,255,255,.18); }
 }

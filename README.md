@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 927 backend unit tests (926 pass, 1 skipped) -->
+<!-- # 934 backend unit tests (933 pass, 1 skipped) -->
 
 **An AI agent can be talked into paying the wrong person. Nearcarta puts the payment rules in a NEAR contract the agent cannot change, so a fooled agent produces a refused transaction instead of a loss.**
 
@@ -85,7 +85,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 927 unit tests (926 pass, 1 skipped)
+npm test                 # 934 unit tests (933 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -108,7 +108,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 927 unit tests (926 pass, 1 skipped):
+# 934 unit tests (933 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -223,7 +223,7 @@ Every id below is a `contract` field in `shared/deployments/mainnet.json`. `npm 
 | `toll.nearcarta.near` | The pay-per-use gate and its MPC signature | `FaNtiauDWfjzKYtK2bns79wUqZqcXFcLjz2Bzx7aVdL5` |
 | `townhall.nearcarta.near` | Hall v2: job escrow, bids, counter, review digest, prune (main 1e1436b5; earlier hotfix in `contracts/hall/HOTFIX.md`) | `6LWPMM3HzbwaySAWYH9Xu7HZCHDPjYya2cXfXHGxAtVz` |
 | `arena.nearcarta.near` | Guardian NFTs and oath-scored attempts | `4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma` |
-| `house.nearcarta.near` | House v3: the NEP-171 deed, its purse and its line | `3ouAaAD1ccZ81CdLu26FoDxixYSynrmzPa58u1Focn66` |
+| `house.nearcarta.near` | House v3 state on v4 code: the NEP-171 deed, its purse and its line | `3z6dbex9mkz6BQ4fQRYcut9TPMvzKPArjbY9HKMLreHi` |
 | `guard.nearcarta.near` | The keyless forwarder, and the only account that can clear a Hall part (`clear` → `guard_clear`) | `7uEdU1JWdtY8VPhyGAr3T6GEy5XfCTBngNjnhZvX8XJ6` |
 | `nearcarta.near` | The root account: funder, owner of every shop, signer of every deploy | — |
 
@@ -271,7 +271,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 927 unit tests (926 pass, 1 skipped)
+npm test                 # 934 unit tests (933 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current
