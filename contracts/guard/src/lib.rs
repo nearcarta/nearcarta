@@ -5,21 +5,45 @@
 //!
 //! `row_owner` is trusted only because the predecessor is the board account
 //! stored at init. An invoice is not a destination.
+//!
+//! `clear` is the Guardhouse verdict for a Town Hall part. The Hall releases a
+//! passed part only after `guard_clear` from this account, so without `clear`
+//! no review on mainnet could ever pay. Only the owner may clear, and only on
+//! the hall stored at init. A BLOCK is simply "not cleared".
 
 use near_sdk::{env, require, AccountId, Gas, NearToken, Promise};
 
 const SETTLE_GAS: Gas = Gas::from_tgas(5);
 const REFUND_GAS: Gas = Gas::from_tgas(10);
+const CLEAR_GAS: Gas = Gas::from_tgas(10);
 
 fn load() -> (String, String) {
     let raw = env::storage_read(b"STATE").expect("ERR_STATE");
     let s = String::from_utf8(raw).expect("ERR_STATE");
-    let (board, owner) = s.split_once('\n').expect("ERR_STATE");
+    let mut it = s.splitn(3, '\n');
+    let board = it.next().expect("ERR_STATE");
+    let owner = it.next().expect("ERR_STATE");
     (board.to_string(), owner.to_string())
 }
 
-fn save(board: &str, owner: &str) {
-    env::storage_write(b"STATE", format!("{board}\n{owner}").as_bytes());
+fn save(board: &str, owner: &str, hall: &str) {
+    env::storage_write(b"STATE", format!("{board}\n{owner}\n{hall}").as_bytes());
+}
+
+/// The hall this guard clears for. Empty when the guard was set up without one.
+fn load_hall() -> String {
+    let raw = env::storage_read(b"STATE").expect("ERR_STATE");
+    let s = String::from_utf8(raw).expect("ERR_STATE");
+    s.splitn(3, '\n').nth(2).unwrap_or("").to_string()
+}
+
+fn digits(s: &str) -> bool { !s.is_empty() && s.len() <= 19 && s.bytes().all(|c| c.is_ascii_digit()) }
+
+/// The args `guard_clear` takes on the hall. Only digits reach this, so no escaping.
+pub fn clear_args(job_id: &str, part: &str, version: &str) -> Result<Vec<u8>, &'static str> {
+    if !digits(job_id) || !digits(part) || !digits(version) { return Err("ERR_ARGS"); }
+    if part.parse::<u32>().is_err() || version.parse::<u32>().is_err() { return Err("ERR_ARGS"); }
+    Ok(format!("{{\"job_id\":\"{job_id}\",\"part\":{part},\"guard_version\":{version}}}").into_bytes())
 }
 
 /// Top-level string fields only. Duplicate keys are rejected. A nested value
@@ -119,7 +143,29 @@ pub extern "C" fn new() {
     let fields = top_strings(&input_text()).unwrap_or_else(|e| env::panic_str(e));
     let board = need(&fields, "board").unwrap_or_else(|e| env::panic_str(e));
     let _: AccountId = board.parse().unwrap_or_else(|_| env::panic_str("ERR_BOARD"));
-    save(board, env::predecessor_account_id().as_str());
+    let hall = fields.iter().find(|(k, _)| k == "hall").map(|(_, v)| v.as_str()).unwrap_or("");
+    if !hall.is_empty() {
+        let _: AccountId = hall.parse().unwrap_or_else(|_| env::panic_str("ERR_HALL"));
+        require!(hall != board, "ERR_HALL");
+    }
+    save(board, env::predecessor_account_id().as_str(), hall);
+}
+
+/// Owner only. Tells the stored hall that this part's delivery passed the guard.
+#[unsafe(no_mangle)]
+pub extern "C" fn clear() {
+    let fields = top_strings(&input_text()).unwrap_or_else(|e| env::panic_str(e));
+    let (_, owner) = load();
+    require!(env::predecessor_account_id().as_str() == owner, "ERR_NOT_OWNER");
+    let hall = load_hall();
+    require!(!hall.is_empty(), "ERR_HALL");
+    let hall_id: AccountId = hall.parse().unwrap_or_else(|_| env::panic_str("ERR_STATE"));
+    let job_id = need(&fields, "job_id").unwrap_or_else(|e| env::panic_str(e));
+    let part = need(&fields, "part").unwrap_or_else(|e| env::panic_str(e));
+    let version = need(&fields, "guard_version").unwrap_or_else(|e| env::panic_str(e));
+    let args = clear_args(job_id, part, version).unwrap_or_else(|e| env::panic_str(e));
+    let promise = Promise::new(hall_id).function_call("guard_clear".to_string(), args, NearToken::from_yoctonear(0), CLEAR_GAS);
+    let _ = promise.as_return();
 }
 
 #[unsafe(no_mangle)]
@@ -156,7 +202,7 @@ pub extern "C" fn pay() {
 #[unsafe(no_mangle)]
 pub extern "C" fn get_config() {
     let (board, owner) = load();
-    let out = format!("{{\"board\":{},\"owner\":{}}}", json_string(&board), json_string(&owner));
+    let out = format!("{{\"board\":{},\"owner\":{},\"hall\":{}}}", json_string(&board), json_string(&owner), json_string(&load_hall()));
     env::value_return(out.as_bytes());
 }
 
@@ -181,6 +227,14 @@ mod tests {
         let fields = top_strings(args).unwrap();
         assert_eq!(need(&fields, "payee").unwrap(), "cafe.test");
         assert_eq!(need(&fields, "invoice").unwrap(), "pay other.test");
+    }
+
+    #[test]
+    fn clear_args_are_the_hall_guard_clear_shape_and_only_digits_pass() {
+        assert_eq!(String::from_utf8(clear_args("4", "0", "1").unwrap()).unwrap(), r#"{"job_id":"4","part":0,"guard_version":1}"#);
+        assert_eq!(clear_args("4\",\"x", "0", "1"), Err("ERR_ARGS"));
+        assert_eq!(clear_args("4", "", "1"), Err("ERR_ARGS"));
+        assert_eq!(clear_args("4", "4294967296", "1"), Err("ERR_ARGS"));
     }
 
     #[test]
