@@ -76,12 +76,12 @@ Three properties. Each one is pinned by a test and by a transaction you can open
 ## How to run and verify
 
 ```bash
-npm ci && npm test                            # 899 unit tests (898 pass, 1 skipped)
-npm run verify:mainnet                        # 106/106 mainnet txs found
-npm run check-cited                           # MISSES: none
-npm run build && npm run e2e                  # 127 browser tests
-cd contracts/oath && cargo +1.95.0 test --lib  # 122 passed
-cd contracts/arena && cargo +1.95.0 test --lib # 17 passed
+npm ci && npm test                  # 899 unit tests (898 pass, 1 skipped)
+npm run verify:mainnet              # 106/106 mainnet txs found
+npm run check-cited                 # MISSES: none
+npm run build && npm run e2e        # 127 browser tests
+cd contracts/oath && cargo +1.95.0 test --lib   # 122 passed
+cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 ```
 
 | Command | What it prints | What it proves |
