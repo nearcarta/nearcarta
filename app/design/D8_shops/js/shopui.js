@@ -1340,6 +1340,9 @@ function proofDrawer() {
 // ---------- gate: wallet → charter → rules → shop ----------
 function paint() {
   const app = APPS[cur]; if (!app) return; const st = A.S.ready ? A.stage() : 'load';
+  // After this repaint paints, refresh the overflow hint. A microtask is enough: the DOM is
+  // updated synchronously below and layout is readable immediately after.
+  queueMicrotask(() => { try { watchOverflow(); } catch { /* a missing tray is not an error */ } });
   document.body.classList.toggle('chronicle-tray', cur === 'chronicle');
   document.body.classList.toggle('bank-tray', cur === 'bank');
   document.body.classList.toggle('ferry-tray', cur === 'ferry');
@@ -1601,6 +1604,41 @@ async function signRules() {
 
 // ---------- wiring ----------
 let booted = null;
+/**
+ * Tell the visitor when the panel has more below the fold.
+ *
+ * The tray scrolls (the Bank's content is 903px in a 594px region) but nothing announced it, and
+ * a reviewer watching a recording read the bottom edge as text cut through the middle of the
+ * letters. A scrollbar alone was not enough, so this sets `data-more` which the stylesheet turns
+ * into a gradient edge and a "more" pill. It re-runs on scroll and whenever the content changes,
+ * because every shop repaints into the same element.
+ */
+function watchOverflow() {
+  const tray = $('#tray');
+  const sc = tray?.querySelector(':scope > .t-scroll');
+  if (!sc) return;
+  if (!sc.dataset.watched) {
+    sc.dataset.watched = '1';
+    // The pill lives beside the scroll region, not inside it, so `contain: paint` cannot hide it.
+    if (!tray.querySelector(':scope > .more-hint')) {
+      const hint = document.createElement('div');
+      hint.className = 'more-hint';
+      hint.textContent = 'more below';
+      hint.setAttribute('aria-hidden', 'true');
+      sc.after(hint);
+    }
+    sc.addEventListener('scroll', () => mark(sc), { passive: true });
+    if (typeof ResizeObserver === 'function') {
+      try { new ResizeObserver(() => mark(sc)).observe(sc.firstElementChild || sc); } catch { /* older browsers */ }
+    }
+  }
+  mark(sc);
+}
+function mark(sc) {
+  const more = sc.scrollHeight - sc.clientHeight - sc.scrollTop > 24;
+  sc.dataset.more = more ? '1' : '0';
+}
+
 export function boot() {
   if (booted) return booted;
   const shop = document.getElementById('shopUI');
