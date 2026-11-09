@@ -18,16 +18,16 @@
     "owner": "nearcarta.near",
     "status": "deployed",
     "crate": "contracts/charter_board",
-    "wasm": "contracts/artifacts/charter_board.sim.wasm",
-    "max_row_yocto": "30000000000000000000000",
-    "note": "Simulate build live 2026-11-09 20:24 Africa/Cairo: the hold build plus one fix, simulate() hydrates the row before reading it. Every other export was checked and already hydrated. Teardown path: close the last row, reap, then recreate+deploy+init in one tx (0 keys ever).",
-    "code_hash": "Bfx6fDuYcZNQTF36ZhZAVB3LSNQGELfNvsWNzSCA3uJD",
-    "wasm_sha256": "9e8f3d30f6f0ec8b93750a7af55d154926b6896fbabdc4137965ab9d53b260b6",
-    "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --locked --no-abi, wasm-opt -Oz from ubuntu apt binaryen. The exact bytes are the CI artifact charter_board-wasm of run 42668637899 (board-sandbox job, which also ran tests/simulate.rs on them). 135657 B.",
-    "storage_bytes": "135899",
-    "locked_near": "1.35899",
+    "wasm": "contracts/artifacts/charter_board.guarded.wasm",
+    "max_row_yocto": "40000000000000000000000",
+    "note": "Guarded build live 2026-11-09 21:30 Africa/Cairo. Fixes: (1) the extern new() refuses when state exists; before, anyone could rewrite HEAD with themselves as owner and reap the balance. (2) propose_call refuses a top-level row_owner in args (ERR_ROW_OWNER), so a row can no longer act as another visitor at a shop that trusts row_owner from the board. (3) Closing the last row settles owed to 0. (4) simulate passes the board stamp. (5) The row cap is 0.04.",
+    "code_hash": "DYjXmYTLHCwSGJzwXPNc3ZAUjX7d1ewsR3sEJsp5ZkBS",
+    "wasm_sha256": "ba6d566acd0c71a9b695508c2208c6a27279a3e9772f97e9d8c74c7530fafd09",
+    "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --locked --no-abi, wasm-opt 108 -Oz --strip-debug --strip-producers (sign-ext, mutable-globals, bulk-memory). Built on the deploy box; two builds gave the same sha. 136452 B.",
+    "storage_bytes": "136694",
+    "locked_near": "1.36694",
     "full_access_keys": 0,
-    "deploy_tx": "GPdvDdsKJAobn2wBMGQSgAmJiphV15F5fz84w3NMyXgs",
+    "deploy_tx": "5Zp4i6nySszG8c41Up79ENFQjSsPRHrLMkc5dLREKdrV",
     "failed_deploy_tx": "4mq8P3jugnatzbbc9VzDbufCBpyj27TxwK4w3L7nTPCX",
     "proof": {
       "visitor": "nearcarta.near",
@@ -53,7 +53,19 @@
       "v4_close_row": "AWT1gyz8wUqqM9EnThUnU4KFfWZiu6dmzfWSpnAZCYkF",
       "v4_reap": "C1jW51UNQXatzYZwvnYQKTNk7ySuvQPVETDqHPbnm5gy",
       "v4_recreate": "GPdvDdsKJAobn2wBMGQSgAmJiphV15F5fz84w3NMyXgs",
-      "v4_reopen_row": "F6YdvHp9jPh9YN2SDPpU1Rb3sR1wpwv6ZUds5xHFcvPP"
+      "v4_reopen_row": "F6YdvHp9jPh9YN2SDPpU1Rb3sR1wpwv6ZUds5xHFcvPP",
+      "v5_close_row": "2AQEuXhwXqcpk5f74dirErXXrzX3ixwNnoCx956g3tqB",
+      "v5_topup_visitor": "42qPAD2R4BHbyLrTBDAuNocJtKSpueJwnpLcJ7HoYpok",
+      "v5_reopen_row": "F4TtBscSVRaKDCojZ4bWD67SkiTYiWDoT3yyv8okLwTS",
+      "v6_close_row": "2q7VgbLQkBmsJbTpQ1G7QD4HVXEdgsHGwArGzVGhq9pC",
+      "v6_owner_new_reap": "2oDuHfnQ4g3pCzrh7pbuXyTyTva14LEuUQpiWdnpxdoa",
+      "v6_recreate_guarded": "EKpHfGTGmZQhKYdndjku9R8uhtJ7TDiMRGrczNcqzm32",
+      "v6_stranger_new_refused": "4SqPe9an7n7dGxmTf6YdAjqvarLbF3DRoNSwK9BK7Dzh",
+      "v7_reap": "FBv1h1X9HRkPWiJzqrhceuzhxTd6xbWwfpUXYQTEh1bU",
+      "v7_recreate_row_owner_refusal": "5Zp4i6nySszG8c41Up79ENFQjSsPRHrLMkc5dLREKdrV",
+      "v7_stranger_new_refused": "HwsAi5YUz2oh3aJu6f4UKaduwHGomkn94V3iVDVExzmd",
+      "v7_topup_visitor": "J8cR6rtZekhLUC34kQrFjL7RNLEtuLMJurkJo7j6VU86",
+      "v7_reopen_full_row": "Am4s8MXA2A3bAGd277EGUpJpV1RjJ5Loq9LRm4S8rPMp"
     },
     "visitor_run": {
       "note": "A real visitor, start to finish, in the browser at nearcarta.vercel.app/setup: email sign-in made this implicit account, nearcarta.near funded it, the visitor opened a row and the agent's request inside the cap was paid; the one over the cap was refused by the contract.",
@@ -174,14 +186,14 @@
       "refused_receiver_not_allowlisted": "E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ",
       "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
     },
-    "effects_code_hash": "Bfx6fDuYcZNQTF36ZhZAVB3LSNQGELfNvsWNzSCA3uJD",
-    "effects_code_hash_note": "The simulate build (Bfx6fDuY…) is the hold build plus the simulate hydrate, so it carries set_effects too.",
+    "effects_code_hash": "DYjXmYTLHCwSGJzwXPNc3ZAUjX7d1ewsR3sEJsp5ZkBS",
+    "effects_code_hash_note": "The guarded build carries set_effects.",
     "previous": {
       "code_hash": "Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C",
       "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
       "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4"
     },
-    "anchor_code_hash": "Bfx6fDuYcZNQTF36ZhZAVB3LSNQGELfNvsWNzSCA3uJD",
+    "anchor_code_hash": "DYjXmYTLHCwSGJzwXPNc3ZAUjX7d1ewsR3sEJsp5ZkBS",
     "anchor_note": "`anchor` panics ERR_NO_CHARTER on the live build (code_hash BF1rQSrG…): measured 2026-11-08, tx GaVEzhfvwG1bP8P6LMrmhuvJe5CzUdvBo2RX4dVnKoTH from a visitor row with four receivers. The hydrate fix is in the staged build, so the invoice anchor is offered only once that code hash is on chain.",
     "previous_v2": {
       "code_hash": "BF1rQSrGWMdY5FCizTpSe1qi1JTdYeY786ny8qdpVg4g",
@@ -216,24 +228,60 @@
           "arena",
           "house",
           "toll",
-          "guard"
+          "guard",
+          "wrap.near",
+          "native USDC (17208628…)",
+          "nearcarta.near (Payouts NEAR payee)"
         ],
         "pairs": [
-          "townhall post_job",
-          "townhall accept",
-          "townhall review",
-          "townhall refund",
+          "townhall post_job/bid/counter/accept/deliver/review/refund",
           "arena fund",
-          "house house_session_check_in",
+          "house house_session_check_in/house_session_prepare_send",
           "toll cross",
-          "guard pay"
+          "guard pay",
+          "wrap.near near_deposit/ft_transfer/storage_deposit",
+          "USDC storage_deposit",
+          "board stamp"
         ],
         "cap_each": "0.001",
         "per_action_cap": "0.001",
         "daily_budget": "0.01",
         "fund": "0.005",
-        "storage_locked": "0.02804"
+        "storage_locked": "0.0342",
+        "simulate": "all 17 pairs answer allowed; post_job 0.002 answers over_shop_cap; other.near answers receiver_not_allowlisted",
+        "not_through_board": "Bank calls anchor and tighten_rules on the board itself, with no shop pair. Chronicle only reads. Ferry and Payouts send their cross-chain leg through 1Click intents after the board: the board caps the wNEAR it deposits (near_deposit/ft_transfer at 0.001 each, the per-action cap and the daily budget), and the intent can only spend what that deposit put there.",
+        "opened": "2026-11-09 21:37 Africa/Cairo, Am4s8MXA…"
       }
+    },
+    "known_bugs": [
+      {
+        "bug": "phantom liability",
+        "detail": "charge_acts and the propose_call_as hold path add the full storage cost to `owed` even when the side reserve paid it, and that reserve was already counted. After the last row closed on 2026-11-09, get_liabilities read 0.00483 NEAR with 0 rows. reap refuses ERR_LIABILITY, so the board can no longer be torn down. It needs an upgrade that fixes the ledger and recomputes owed.",
+        "measured": "2AQEuXhw… close, then get_liabilities = 4830000000000000000000",
+        "status": "fixed in the guarded build (DYjXmYTL…)"
+      },
+      {
+        "bug": "simulate ignores the stamp exemption",
+        "detail": "propose_call lets `stamp` on the board itself through without the board being in receivers, but simulate answers receiver_not_allowlisted for it.",
+        "status": "fixed in the guarded build (DYjXmYTL…)"
+      },
+      {
+        "bug": "public re-init",
+        "detail": "extern new() had no state check; any account could become owner and reap. The 21:27 reap went through exactly that path, from the owner, to clear the drifted owed.",
+        "status": "fixed, stranger new refused ERR_INIT on chain"
+      },
+      {
+        "bug": "row_owner spoof via propose_call",
+        "detail": "legacy propose_call forwarded args verbatim, so a row could send row_owner=<victim> to a shop that trusts row_owner from the board (hall, arena).",
+        "status": "fixed: ERR_ROW_OWNER; unit test a_spoofed_row_owner_through_propose_call_is_refused"
+      }
+    ],
+    "previous_sim": {
+      "code_hash": "Bfx6fDuYcZNQTF36ZhZAVB3LSNQGELfNvsWNzSCA3uJD",
+      "wasm": "contracts/artifacts/charter_board.sim.wasm",
+      "wasm_sha256": "9e8f3d30f6f0ec8b93750a7af55d154926b6896fbabdc4137965ab9d53b260b6",
+      "storage_bytes": "135899",
+      "deploy_tx": "GPdvDdsKJAobn2wBMGQSgAmJiphV15F5fz84w3NMyXgs"
     }
   },
   "mpc": "v1.signer",
@@ -402,9 +450,9 @@
       "contract": "townhall.nearcarta.near",
       "owner": "nearcarta.near",
       "wasm": "hall.wasm",
-      "sha256": "d6141dd7502dd0f7a88baa9fb416eb14446a53d4a2a6ad7492a51bc9068c3020",
-      "code_hash": "FQg3EZdbEcjz44F5dckp9agpbsV9nYuToBQ4yUzXXWK9",
-      "storage_bytes": 231836,
+      "sha256": "e8ebe14e760d2fa0658237a6d75393bb4eff23e7a7fa824fa2040024f215bffd",
+      "code_hash": "GgECZv7g1tSGvnXeMLuJrQKYcfjBVwdXHyS1TZn6T6N8",
+      "storage_bytes": "220874",
       "locked_near": 2.31836,
       "full_access_keys": 1,
       "teardown": "delete_account with the key in ~/.near-credentials/mainnet/townhall.nearcarta.near.json",
@@ -440,8 +488,29 @@
           "refund": "51XEPFxMGcgMN5kHRBBBZXJqno8jkuK86DKseEXdDme3"
         },
         "outcome": "refunded 0.0005 to the poster; paid 0",
-        "pay_blocked": "review(pass=true) requires guard_clear, which only guard.nearcarta.near may call. The deployed guard contract has no code path that calls it and the account has 0 keys, so a pass review can never release on mainnet. The lifecycle was closed with review(pass=false) and refund."
-      }
+        "pay_blocked": "Fixed the same evening: the guard was redeployed with clear(). See lifecycle_pass_2026_11_09."
+      },
+      "lifecycle_pass_2026_11_09": {
+        "job_id": 4,
+        "poster": "8ccd5d33… through the board row (propose_call_as)",
+        "worker": "nearcarta.near (direct)",
+        "budget": "0.0005",
+        "price": "0.0004",
+        "txs": {
+          "post_job": "GJDhV3C5iSuZzbdwJPMP6gjbHb8MUmRYPs49SJRh3hdd",
+          "bid": "7zQHjt9PGbreNnt5xaAHTwD4CeX24TiaCQTbm2KNEsfA",
+          "accept": "HZMwcUcFPECmDKd967PBqLMLseEbcBV3GRq7b818QNQH",
+          "deliver": "HqbLfPgnUk3xmU3X77iybQiekDypkPMoebvPaj1cwzQ8",
+          "guard_clear": "5PbAPsNZs2kmaJNSKFgJz8PUQGS9hY6aKgktFv2aJQ5R",
+          "review_pass": "3uSAuuj9MWymVM2w13BBszk97iRnJiyw184UeMm1WW6b"
+        },
+        "outcome": "The review receipt paid the worker 0.0004 NEAR (transfer receipt to nearcarta.near).",
+        "bug": "The 0.0001 spare (budget minus price) was not returned. The deployed hall (FQg3EZdb…, artifact d6141dd7) is older than the source spare refund, so job 4 still shows remaining 0.0001, refunded 0."
+      },
+      "previous_code_hash": "FQg3EZdbEcjz44F5dckp9agpbsV9nYuToBQ4yUzXXWK9",
+      "hotfix": "contracts/hall/HOTFIX.md: migrate() accepted pred == owner (an argument), so anyone could wipe and close the hall.",
+      "hotfix_deploy_tx": "71QKJYqcxquc2Ku8Vqy8osRMBpCxRKHNSQ3dhBcVrk3s",
+      "hotfix_proof_tx": "A5jtjqhCGH8Qn2GWodeAEiExDz3nkbTC4gSb7f8N5X4v"
     }
   },
   "root_balance_near": 3.2899,
@@ -499,14 +568,24 @@
     "status": "deployed",
     "crate": "contracts/guard",
     "wasm": "contracts/artifacts/guard.wasm",
-    "wasm_sha256": "ec6bbec2e09c53ca4115091e570d1d594c0340831a4ac5b3172ae26045494b89",
-    "storage_bytes": 33366,
-    "locked_near": 0.35366,
+    "wasm_sha256": "6687bbd1c9ce534bb0072b14ea9a696746b758ff33e3fec6815184a899f4202f",
+    "storage_bytes": 41153,
+    "locked_near": 0.41453,
     "full_access_keys": 0,
     "board": "board.nearcarta.near",
-    "deploy_tx": "CN3SKjNS7PRdvrNQsxRxQW45Ks2vChe3BDAHhehhxt65",
-    "note": "Guard live after PR #35. Stake 0.35366 from nearcarta.near. Locked, no FA keys. reap() from owner returns stake.",
-    "code_hash": "GutWQgGC7JuLiYq3Rf4HPn4yoD93aFYU19D5uWHZs2Fi"
+    "deploy_tx": "yW6QPZ2pEUK6x6u53nM9kPgT7mEQAuvuEMV7vVxo5od",
+    "note": "Guard with clear() live 2026-11-09 21:15 Africa/Cairo: reap, then recreate+deploy+init in one tx from nearcarta.near. clear() is owner-only and calls guard_clear on the stored hall. pay() is unchanged. Locked, no FA keys. reap() from owner returns stake.",
+    "code_hash": "7uEdU1JWdtY8VPhyGAr3T6GEy5XfCTBngNjnhZvX8XJ6",
+    "previous": {
+      "code_hash": "GutWQgGC7JuLiYq3Rf4HPn4yoD93aFYU19D5uWHZs2Fi",
+      "wasm_sha256": "ec6bbec2e09c53ca4115091e570d1d594c0340831a4ac5b3172ae26045494b89",
+      "storage_bytes": 33366,
+      "deploy_tx": "CN3SKjNS7PRdvrNQsxRxQW45Ks2vChe3BDAHhehhxt65",
+      "note": "No code path to the hall guard_clear; with 0 keys no review(pass) could ever pay."
+    },
+    "hall": "townhall.nearcarta.near",
+    "reap_tx": "7BLA7Z7kCsbnfGLq15s9J9JnEDSs1ith5qssKArbmsTq",
+    "build": "near-sdk 5.27.0, rustc 1.86.0, cargo near build non-reproducible-wasm --locked --no-abi, then wasm-opt 108 -Oz (two local builds gave the same sha)."
   },
   "house": {
     "contract": "house.nearcarta.near",
