@@ -558,6 +558,10 @@ impl Board {
         let stamp = receiver == env::current_account_id() && method == "stamp";
         require!(stamp || row.rules.receivers.contains(&receiver), "receiver_not_allowlisted");
         require!(args.len() <= 2048, "ERR_ARGS");
+        // Shops trust a top-level `row_owner` when the predecessor is this board. This path
+        // forwards `args` as signed, so a row could name ANOTHER visitor (or a keeper) there and
+        // act as them. `propose_call_as` overwrites the field; here it is refused outright.
+        refuse_row_owner(&args);
         require!((1..=64).contains(&method.len()), "ERR_METHOD");
         let Some(policy) = self.calls.get(&owner) else { env::panic_str("method_not_allowlisted"); };
         let Some(rule) = policy.rules.iter().find(|r| r.receiver == receiver && r.method == method) else { env::panic_str("method_not_allowlisted"); };
@@ -750,6 +754,17 @@ fn push_u128(s: &mut String, mut n: u128) {
     let mut i = 40;
     while n > 0 { i -= 1; buf[i] = b'0' + (n % 10) as u8; n /= 10; }
     s.push_str(core::str::from_utf8(&buf[i..]).unwrap());
+}
+
+/// JSON object args may not carry a top-level `row_owner` (any spelling the parser decodes
+/// to that key). Non-JSON args carry no field a shop could read as the row owner.
+fn refuse_row_owner(args: &[u8]) {
+    let first = args.iter().copied().find(|b| !b.is_ascii_whitespace());
+    if first != Some(b'{') { return; }
+    let text = core::str::from_utf8(args).unwrap_or_else(|_| env::panic_str("ERR_ARGS"));
+    if let Val::Obj(pairs) = parse(text) {
+        require!(!pairs.iter().any(|(k, _)| k == "row_owner"), "ERR_ROW_OWNER");
+    }
 }
 
 fn call_text(owner: &AccountId, receiver: &AccountId, method: &str, args: &[u8], deposit: u128, nonce: u64) -> String {
@@ -1167,7 +1182,12 @@ fn input_str() -> String {
 fn ret(s: &str) { env::value_return(s.as_bytes()); }
 
 #[no_mangle]
-pub extern "C" fn new() { save(&Board::new()); }
+pub extern "C" fn new() {
+    // Without this, anyone could call `new` on the live board: it rewrote HEAD with the caller as
+    // owner and zero rows and zero liabilities, and `reap` then paid the whole balance to them.
+    require!(!env::storage_has_key(b"HEAD") && !env::storage_has_key(b"STATE"), "ERR_INIT");
+    save(&Board::new());
+}
 
 #[no_mangle]
 pub extern "C" fn open_charter() {
@@ -1969,6 +1989,22 @@ mod tests {
         let sig = sign_call(sk, c, method, args, deposit);
         c.propose_call(acc(ALICE), acc(SHOP), method.into(), args.to_vec(), U128(deposit), sig.clone());
         sig
+    }
+
+    #[test]
+    fn a_spoofed_row_owner_through_propose_call_is_refused() {
+        let (mut c, sk, _) = boot();
+        allow(&mut c, NEAR / 1000, NEAR / 100);
+        let bad = br#"{"x":"1","row_owner":"bob.near"}"#;
+        go(ALICE, 0, 0);
+        let sig = sign_call(&sk, &c, "near_deposit", bad, NEAR / 2000);
+        let r = catch_unwind(AssertUnwindSafe(|| {
+            c.propose_call(acc(ALICE), acc(SHOP), "near_deposit".into(), bad.to_vec(), U128(NEAR / 2000), sig.clone());
+        }));
+        assert!(r.is_err(), "a top-level row_owner must be refused");
+        // A nested row_owner and plain args still go through.
+        call(&mut c, &sk, "near_deposit", br#"{"memo":{"row_owner":"bob.near"}}"#, NEAR / 2000);
+        call(&mut c, &sk, "near_deposit", b"{}", NEAR / 2000);
     }
 
     #[test]
