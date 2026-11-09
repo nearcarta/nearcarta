@@ -845,6 +845,10 @@ body.house-tray #shopUI .ferry-card{gap:10px}
 }
 body.house-tray #shopUI .house-record{margin-top:8px;color:#fff8ee}
 body.house-tray #shopUI .house-record summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:#f5d08a}
+/* "Every transaction on this deed" is the other disclosure in this room and it is a control like
+   the one above: measured 20px tall, under the 40px floor, because only .house-record's summary
+   carried the height. Same treatment, no new box. */
+body.house-tray #shopUI .house-history summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:#f5d08a}
 body.house-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
 .house-tabs{display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap}
 .house-tab{

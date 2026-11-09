@@ -121,20 +121,15 @@ export function chronicleMarkup(state) {
       ${tabBtn('statement', 'Statement')}
       ${tabBtn('verify', 'Verify')}
     </div>
-    <div class="c-flow" data-testid="chronicle-flow" aria-label="Account to ledger">
-      <span class="c-mark-lg" title="Account">${ACCOUNT_MARK}</span>
-      <span class="c-arrow" aria-hidden="true">→</span>
-      <span class="c-mark-lg" title="Ledger">${LEDGER_MARK}</span>
-    </div>
     <div class="c-scroll" data-testid="chronicle-scroll">
       <div class="chronicle-pane" data-pane="timeline"${tab === 'timeline' ? '' : ' hidden'}>
         <div class="c-filters">
-          <label class="chronicle-field wide">Account <input id="c-account" data-testid="chronicle-account" value="${esc(state.accountDraft ?? state.account ?? '')}" autocomplete="off" spellcheck="false" placeholder="name.near"></label>
+          <label class="chronicle-field">Account <input id="c-account" data-testid="chronicle-account" value="${esc(state.accountDraft ?? state.account ?? '')}" autocomplete="off" spellcheck="false" placeholder="name.near"></label>
+          <label class="chronicle-field">Words <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}" autocomplete="off"></label>
           <label class="chronicle-field">Period <select id="c-span" data-testid="chronicle-period">${opt('all', 'All', state.span || 'all')}${opt('today', 'Today', state.span || 'all')}${opt('7d', '7 days', state.span || 'all')}</select></label>
           <label class="chronicle-field">Shop <select id="c-shop" data-testid="chronicle-shop">${opt('', 'All', state.shop || '')}${['toll', 'ferry', 'guard', 'payouts', 'house', 'board'].map(s => opt(s, s, state.shop || '')).join('')}</select></label>
           <label class="chronicle-field">Chain <select id="c-chain" data-testid="chronicle-chain">${opt('', 'All', state.chain || '')}${opt('NEAR', 'NEAR', state.chain || '')}${opt('NEAR Intents', 'NEAR Intents', state.chain || '')}</select></label>
           <label class="chronicle-field">Decision <select id="c-d" data-testid="chronicle-filter">${opt('', 'All', state.cd || '')}${opt('allowed', 'Allowed', state.cd || '')}${opt('denied', 'Refused', state.cd || '')}${opt('failed', 'Failed on chain', state.cd || '')}</select></label>
-          <label class="chronicle-field wide">Words <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}" autocomplete="off"></label>
         </div>
         <ol class="feed" data-testid="chronicle-page"${rows.length ? '' : ' hidden'}>${list}</ol>
         <p class="c-empty-line" data-testid="chronicle-empty"${rows.length ? ' hidden' : ''}>${esc(emptyText)}</p>
@@ -157,14 +152,19 @@ export function chronicleMarkup(state) {
     </div>
     <button type="button" class="chronicle-gold" id="c-go" data-testid="chronicle-go">${cta}</button>
     <p class="c-status${attest ? ' c-attest' : ''}" id="c-out" data-testid="chronicle-verify">${verifyHtml}</p>
-    <details class="c-sources" data-testid="chronicle-sources">
-      <summary>Sources</summary>
-      <p class="c-health" data-testid="chronicle-health">${esc(state.health || '')}</p>
-      <ul class="c-cover-list" data-testid="chronicle-coverage">${cover}</ul>
-      <p class="c-totals" data-testid="chronicle-totals">${esc(state.totals ? totalsLine(state.totals) : '')}</p>
-      <p class="c-rules" data-testid="chronicle-rules">${esc(state.rules?.version ? `Rules version ${state.rules.version} (${state.rules.versions.length} readable).` : (state.rules?.why || ''))}</p>
-    </details>
-    <div class="c-foot">
+    <div class="c-meta">
+      <span class="c-flow" data-testid="chronicle-flow" aria-label="Account to ledger">
+        <span class="c-mark-lg" title="Account">${ACCOUNT_MARK}</span>
+        <span class="c-arrow" aria-hidden="true">→</span>
+        <span class="c-mark-lg" title="Ledger">${LEDGER_MARK}</span>
+      </span>
+      <details class="c-sources" data-testid="chronicle-sources">
+        <summary>Sources</summary>
+        <p class="c-health" data-testid="chronicle-health">${esc(state.health || '')}</p>
+        <ul class="c-cover-list" data-testid="chronicle-coverage">${cover}</ul>
+        <p class="c-totals" data-testid="chronicle-totals">${esc(state.totals ? totalsLine(state.totals) : '')}</p>
+        <p class="c-rules" data-testid="chronicle-rules">${esc(state.rules?.version ? `Rules version ${state.rules.version} (${state.rules.versions.length} readable).` : (state.rules?.why || ''))}</p>
+      </details>
       <button type="button" class="chronicle-quiet" id="c-csv" data-testid="chronicle-export"${state.exportCount ? '' : ' disabled'}>Export CSV</button>
     </div>
     <p id="c-seal" class="chronicle-seal" data-testid="chronicle-seal" hidden>${esc(state.seal || '')}</p>
