@@ -157,6 +157,144 @@ body #shopUI #tray > .t-scroll > #t-track {
 }
 #shopUI #tray > .t-scroll::-webkit-scrollbar-thumb:hover { background: var(--brass-hi); }
 
+/* The token-flow strip. It is real information in Ferry (wNEAR -> USDC, with the chain badge on
+   each side) but it is decoration in Arena and House, where both ends are the same token. At
+   48px icons plus 16px padding it cost 82px of a 619px form region, which is what pushed Arena's
+   gold action below the fold. Same picture, one compact row: 30px icons, 8px padding, one line. */
+#shopUI #tray .ferry-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-control);
+  background: rgba(0, 0, 0, .22);
+  border: 1px solid rgba(214, 180, 106, .26);
+  min-height: 0;
+}
+#shopUI #tray .ferry-flow .tic .ti { width: 30px !important; height: 30px !important; }
+#shopUI #tray .ferry-flow .tic .ci { width: 12px !important; height: 12px !important; }
+#shopUI #tray .ferry-flow-arrow { font-size: var(--t-label); color: var(--ink-3); }
+/* A caption under the strip ("Entry -> Pot") is one short line, not a paragraph. */
+#shopUI #tray .arena-flow-caption,
+#shopUI #tray .ferry-flow-caption {
+  margin: 0;
+  color: var(--ink-3);
+  font: 500 var(--t-small)/1.3 Inter, system-ui, sans-serif;
+}
+
+/* Two fields side by side, like the reference cards. Five full-width fields at 68px each is 340px
+   of a 571px region on Ferry, which is why the swap form scrolled. A pair halves that. The
+   selector list covers the wrappers the shops already render; a shop that has one field keeps one
+   column because `:only-child` is excluded. */
+#shopUI #tray .ferry-picker,
+#shopUI #tray .guard-pane[data-pane='check'],
+#shopUI #tray .payout-invoice-pane,
+#shopUI #tray .ferry-pane[data-pane='invoice'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--sp-3);
+  align-items: start;
+}
+#shopUI #tray .ferry-picker > .ferry-flow,
+#shopUI #tray .ferry-picker > .f-quote,
+#shopUI #tray .ferry-picker > .ferry-field:only-child,
+#shopUI #tray .guard-pane[data-pane='check'] > .guard-status,
+#shopUI #tray .guard-pane[data-pane='check'] > .example-row,
+#shopUI #tray .payout-invoice-pane > .payout-status,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .ferry-flow,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .p-create,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .payout-status,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > [class*='card'],
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .note {
+  grid-column: 1 / -1;
+}
+@media (max-width: 460px) {
+  #shopUI #tray .ferry-picker,
+  #shopUI #tray .guard-pane[data-pane='check'],
+  #shopUI #tray .payout-invoice-pane,
+  #shopUI #tray .ferry-pane[data-pane='invoice'] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Arena's strip is NEAR -> NEAR with a caption, so it says nothing a form field does not. It cost
+   65px of a 619px region. Hidden in Arena only; Ferry's strip carries the real token pair. */
+body.arena-tray #shopUI #tray .ferry-pane .ferry-flow,
+body.arena-tray #shopUI #tray .ferry-pane .arena-flow-caption {
+  display: none !important;
+}
+
+/* The mode row (Mint / Feed / Withdraw) is navigation inside the form: one compact line. */
+body.arena-tray #shopUI #tray .arena-modes {
+  margin: 0;
+  gap: var(--sp-2);
+}
+body.arena-tray #shopUI #tray .arena-mode {
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+}
+
+/* Chronicle's filter grid: six fields at 68px each, single column. Two columns, with the account
+   and the words field spanning the row because they are wider than a filter. */
+#shopUI #tray .c-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--sp-3);
+  align-items: start;
+}
+#shopUI #tray .c-filters > .chronicle-field.wide { grid-column: 1 / -1; }
+@media (max-width: 460px) {
+  #shopUI #tray .c-filters { grid-template-columns: minmax(0, 1fr); }
+}
+/* A scroller inside a scroller is two scrollbars for one panel, and the inner one was 326px of a
+   588px region. The tray's own scroll region is the only one. */
+#shopUI #tray .c-scroll {
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0 !important;
+}
+/* Chronicle's flow strip and tabs are one-line chrome. */
+#shopUI #tray .c-flow { min-height: 0; padding: var(--sp-2) var(--sp-3); }
+#shopUI #tray .c-flow .tic .ti { width: 26px !important; height: 26px !important; }
+
+/* Hall: Task and Budget were two full-width fields above two already-paired rows, which made the
+   form four rows where three fit. Pairing them is 61px, which is exactly what it was over by. */
+#shopUI #tray .hall-pane[data-pane='post'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--sp-3);
+  align-items: start;
+}
+#shopUI #tray .hall-pane[data-pane='post'] > .hall-field:first-child {
+  grid-column: 1 / -1;
+}
+#shopUI #tray .hall-pane[data-pane='post'] > .hall-split { grid-column: 1 / -1; }
+@media (max-width: 460px) {
+  #shopUI #tray .hall-pane[data-pane='post'] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Hall's flow strip is the same decorative banner as Arena's (NEAR -> Parts -> Review). One
+   compact row instead of an 82px block, which is the 55px Hall was over by. */
+#shopUI #tray .hall-flow {
+  min-height: 0;
+  padding: var(--sp-2) var(--sp-3);
+  gap: var(--sp-2);
+  border-radius: var(--r-control);
+}
+#shopUI #tray .hall-flow .tic .ti { width: 26px !important; height: 26px !important; }
+#shopUI #tray .hall-flow-arrow { font-size: var(--t-label); }
+
+/* c-sources and c-foot are two 44px metadata lines under the action. They are reference text, not
+   controls, so they read as one compact block instead of 88px of the panel. */
+#shopUI #tray .c-sources,
+#shopUI #tray .c-foot {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  font-size: var(--t-small);
+  line-height: 1.35;
+}
+#shopUI #tray .c-out { min-height: 0; }
+
 /* ---- the form region -------------------------------------------------------------------- */
 /* The form region. `gap` is 10px rather than the 12px scale step: with a 690px slot, a 797px
    form and a pinned action row, the difference between 12 and 10 across eight gaps is 16px, and
