@@ -103,7 +103,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
 # 899 unit tests (898 pass, 1 skipped):
-Proof rows (106/106 expected).
+Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
 `contracts/oath` is the agent charter (Rust, near-sdk). 122 unit tests live in its source. `contracts/charter_board` is the live visitor board. `contracts/arena` holds 17.

@@ -453,6 +453,28 @@
       "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
     },
     {
+      "shop": "board.visitor_run",
+      "label": "visitor_agent_propose_allowed_1",
+      "hash": "AC1j6vLSmrvGDTbF7JBbgyuru4XH3NtU2oWf7Ervmk1Y",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
+      "shop": "board.visitor_run",
+      "label": "visitor_agent_propose_allowed_2",
+      "hash": "BEndDsRe3YU4e6hjXA2J23ceWDi4ikDseMaTZUDxWL28",
+      "contract": "board.nearcarta.near",
+      "signer": "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9",
+      "found": true,
+      "success": true,
+      "failure": false,
+      "sender": "8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8"
+    },
+    {
       "shop": "charter",
       "label": "create_root",
       "hash": "AFFEjpLXiA3jREsGwpUBs8Pj3EBwWKnSv2vLe6HircNF",
