@@ -20,6 +20,9 @@ const MAX_PARTS: u32 = 8;
 const DAY_NS: u64 = 86_400_000_000_000;
 /// `prune` takes at most this many records per call, so one call stays inside its gas.
 const MAX_PRUNE: usize = 32;
+/// Raw key holding the NEAR the hall owes (every job's `remaining` plus every stake). It sits
+/// outside the contract struct, so the deployed state layout does not change.
+const HELD_KEY: &[u8] = b"held";
 
 #[derive(Clone)]
 #[near(serializers = [borsh])]
@@ -98,6 +101,33 @@ impl Hall {
     fn not_shop(&self, id: &AccountId) {
         require!(id != &self.board && id != &env::current_account_id(), "ERR_WORKER");
     }
+
+    /// NEAR the hall owes: escrow still in jobs plus registration stakes. Read from `HELD_KEY`;
+    /// a state written before that key existed is summed once (the live hall has a few jobs).
+    fn held(&self) -> u128 {
+        match env::storage_read(HELD_KEY) {
+            Some(v) => u128::from_le_bytes(v.try_into().unwrap_or_else(|_| env::panic_str("ERR_STATE"))),
+            None => self.jobs.values().map(|j| j.remaining).sum::<u128>() + self.stakes.values().sum::<u128>(),
+        }
+    }
+
+    fn move_held(&self, add: u128, sub: u128) {
+        let next = self.held().checked_add(add).and_then(|v| v.checked_sub(sub)).unwrap_or_else(|| env::panic_str("ERR_STATE"));
+        env::storage_write(HELD_KEY, &next.to_le_bytes());
+    }
+
+    /// Every write that adds bytes must leave the hall able to pay everything it owes. Storage
+    /// is staked from the account balance, and escrow sits in that same balance, so a caller
+    /// who could add bytes for free (a 1-yocto job, a 1-yocto stake) could stake the hall's
+    /// spare NEAR away until a worker's payout or a refund failed for lack of balance.
+    fn check_float(&mut self) {
+        self.jobs.flush();
+        self.stakes.flush();
+        self.keys.flush();
+        let stake = env::storage_usage() as u128 * env::storage_byte_cost().as_yoctonear();
+        let need = stake.checked_add(self.held()).unwrap_or_else(|| env::panic_str("ERR_STATE"));
+        require!(env::account_balance().as_yoctonear() >= need, "ERR_FLOAT");
+    }
 }
 
 fn conserved(job: &Job) {
@@ -118,6 +148,7 @@ impl Hall {
     pub fn new(owner: AccountId, board: AccountId, guard: AccountId) -> Self {
         let pred = env::predecessor_account_id();
         require!(pred == owner || pred == env::current_account_id(), "ERR_INIT");
+        env::storage_write(HELD_KEY, &0u128.to_le_bytes());
         Self::empty(owner, board, guard)
     }
 
@@ -134,6 +165,7 @@ impl Hall {
         require!(legacy_paid.len() <= 64, "ERR_LEGACY");
         let mut s = Self::empty(owner, board, guard);
         s.legacy_paid = legacy_paid;
+        env::storage_write(HELD_KEY, &0u128.to_le_bytes());
         s
     }
 
@@ -180,6 +212,8 @@ impl Hall {
         conserved(&job);
         self.jobs.insert(id, job);
         if let Some(key) = idempotency.filter(|k| !k.is_empty()) { self.keys.insert(key, id); }
+        self.move_held(budget, 0);
+        self.check_float();
         U64(id)
     }
 
@@ -191,6 +225,8 @@ impl Hall {
         require!(add > 0, "ERR_STAKE");
         let next = self.stakes.get(&who).copied().unwrap_or(0).saturating_add(add);
         self.stakes.insert(who, next);
+        self.move_held(add, 0);
+        self.check_float();
     }
 
     pub fn withdraw_stake(&mut self, row_owner: AccountId) -> Promise {
@@ -199,6 +235,7 @@ impl Hall {
         require!(n > 0, "ERR_STAKE");
         // Removed, not zeroed: `close` then checks an empty map instead of walking every entry.
         self.stakes.remove(&who);
+        self.move_held(0, n);
         Promise::new(who).transfer(NearToken::from_yoctonear(n))
     }
 
@@ -215,6 +252,7 @@ impl Hall {
         p.phase = QUOTED;
         conserved(&job);
         self.jobs.insert(job_key(job_id), job);
+        self.check_float();
     }
 
     pub fn counter(&mut self, row_owner: AccountId, job_id: U128, part: u32, price: U128) {
@@ -267,6 +305,7 @@ impl Hall {
         p.guard_ok = false;
         conserved(&job);
         self.jobs.insert(job_key(job_id), job);
+        self.check_float();
     }
 
     /// The Guardhouse clears this part. Only the guard account may call it, and only
@@ -317,6 +356,7 @@ impl Hall {
             require!(amount > 0 && job.remaining >= amount, "ERR_ESCROW");
             job.remaining -= amount;
             job.paid += amount;
+            self.move_held(0, amount);
             conserved(&job);
             self.jobs.insert(job_key(job_id), job);
             Promise::new(worker).transfer(NearToken::from_yoctonear(amount))
@@ -346,6 +386,7 @@ impl Hall {
         require!(released > 0 && job.remaining >= released, "ERR_ESCROW");
         job.remaining -= released;
         job.refunded += released;
+        self.move_held(0, released);
         conserved(&job);
         self.jobs.insert(job_key(job_id), job);
         Promise::new(owner).transfer(NearToken::from_yoctonear(released))
@@ -366,6 +407,7 @@ impl Hall {
             if p.phase == OPEN || p.phase == QUOTED || p.phase == COUNTERED { p.phase = REFUNDED; }
         }
         job.refunded += back;
+        self.move_held(0, back);
         conserved(&job);
         self.jobs.insert(job_key(job_id), job);
         Promise::new(owner).transfer(NearToken::from_yoctonear(back))
@@ -453,6 +495,8 @@ mod tests {
 
     fn acc(s: &str) -> AccountId { s.parse().unwrap() }
 
+    const NEAR: u128 = 1_000_000_000_000_000_000_000_000;
+
     fn ctx(pred: &str, deposit: u128) {
         let mut b = VMContextBuilder::new();
         b.current_account_id(acc("hall.test"))
@@ -488,6 +532,44 @@ mod tests {
     fn post(h: &mut Hall, pred: &str, row: &str, budget: u128, workers: &[&str]) -> u64 {
         ctx(pred, budget);
         h.post_job(acc(row), "readme pass".into(), 2, deadline(), workers.iter().map(|s| acc(s)).collect(), None).0
+    }
+
+    /// A 1-yocto-per-part job still writes a few hundred bytes. Without the float check a
+    /// stranger could post them until the storage stake ate the escrow, and the next payout
+    /// failed for lack of balance. With it, the post that would cut into what the hall owes is
+    /// refused, and the escrow already held stays payable.
+    #[test]
+    fn junk_jobs_cannot_stake_away_the_escrow() {
+        let mut h = hall();
+        let id = post(&mut h, "alice.test", "alice.test", NEAR / 100, &[]);
+        let price = env::storage_byte_cost().as_yoctonear();
+        // A balance with exactly 3000 spare bytes over the stake and what the hall owes.
+        let spare = 3000u128 * price;
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(acc("hall.test")).predecessor_account_id(acc("mallory.test")).signer_account_id(acc("mallory.test"))
+            .attached_deposit(NearToken::from_yoctonear(8)).block_timestamp(1_000_000_000_000_000)
+            .prepaid_gas(near_sdk::Gas::from_tgas(300));
+        testing_env!(b.build());
+        let usage = env::storage_usage() as u128;
+        b.account_balance(NearToken::from_yoctonear(usage * price + h.held() + spare + 8));
+        testing_env!(b.build());
+        let mut posted = 0;
+        let refused = loop {
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                h.post_job(acc("mallory.test"), "junk ".repeat(36), 8, deadline(), vec![], None);
+            }));
+            if r.is_err() { break true; }
+            // Every post that went through left the hall able to pay all it owes.
+            assert!(env::account_balance().as_yoctonear() >= env::storage_usage() as u128 * price + h.held());
+            posted += 1;
+            if posted > 50 { break false; }
+        };
+        assert!(refused, "the float check stops the flood");
+        assert!(posted < 10, "within the spare bytes ({posted} posted)");
+        // The refused call reverts on chain (a unit test keeps its writes, so nothing is checked
+        // after it). The escrow posted before the flood is still owed in full.
+        let job = h.get_job(U128(id as u128)).unwrap();
+        assert_eq!(job["remaining"], (NEAR / 100).to_string());
     }
 
     #[test]
