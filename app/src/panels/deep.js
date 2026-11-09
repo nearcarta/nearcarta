@@ -708,14 +708,17 @@ function mountGuard(root, hooks) {
   // The city tray derives the example from the visitor's own account. This route mounts the
   // same tray without the city's hooks, so without this the example button could never fill
   // the field: it asked for a session it was never given. Same rule, same source, no fixed name.
-  const withExample = {
-    ...hooks,
-    injected: hooks?.injected || (() => {
+  // The tray publishes runAgent and trayCtx on the hooks object it is given, and the city dock
+  // reads them back from the SAME object. A copy here hid both from the dock, so a typed
+  // "Check cafe.near" reached runGuardAction with no check and answered "The check is not wired."
+  const h = hooks || {};
+  if (typeof h.injected !== 'function') {
+    h.injected = () => {
       const me = visitor().accountId;
       return me ? lookalike(me) : '';
-    }),
-  };
-  return mountGuardTray(root, withExample, { esc, holdButton, api, q$ });
+    };
+  }
+  return mountGuardTray(root, h, { esc, holdButton, api, q$ });
 }
 
 function mountToll(root, hooks) {
