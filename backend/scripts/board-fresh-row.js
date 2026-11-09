@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, openSync, writeSync, fsyncSync, closeSync, readF
 import { dirname } from 'node:path';
 import { Account, JsonRpcProvider, KeyPair, KeyPairSigner, actions } from 'near-api-js';
 import { openRowTransactions } from '../../shared/setup/open-row.js';
+import { CALLS_DEPOSIT_YOCTO } from '../../shared/board/session.js';
 import MAIN from '../../shared/deployments/mainnet.json' with { type: 'json' };
 
 const apply = process.argv.includes('--apply');
@@ -53,7 +54,7 @@ const RULES = {
 };
 const fundYocto = NEAR / 100n;                                        // spendable in the row
 const rowDepositYocto = BigInt(MAIN.board?.max_row_yocto || 2n * 10n ** 22n);
-const callsDepositYocto = 15n * 10n ** 21n;
+const callsDepositYocto = BigInt(CALLS_DEPOSIT_YOCTO);
 const GAS_OPEN = 100n * TG, GAS_CALLS = 100n * TG, GAS_CLOSE = 50n * TG, GAS_TRANSFER = 1n * TG;
 // Measured on an identical row (1 receiver, 5 calls) on 2026-11-09: open+set_calls burnt
 // 0.0023619 NEAR and the board kept 0.0175100 storage + the 0.01 fund; 0.00749 came back.
