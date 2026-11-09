@@ -32,13 +32,18 @@ the total. Where that matters it is called out.
 | **Meridian** | games, nfts, social, agents, swarms | `efeaizesogie/meridian-town` | 14 | 3,807 | 62 | no (testnet only) | yes, 200 | **no video** | NEP-171 deeds + NEP-141 MERI + NEP-245 goods + Sputnik DAO + NEAR AI | **Partly.** The deed holder appoints the shop agent and takes dividends; the shop's own sub-account holds the capital | Strongest game economy. Deed is an authority object, not a vault |
 | **Bazaar Sovereign** | games, nfts, swarms, agents | `Automationbot24x7/bazaar-sovereign` | 1 | 1,125 | 20 | no (testnet only) | yes, 200 | yes (mp4 in repo) | NEP-171 charter + NEAR vault inside the contract + NEP-245 goods + NEP-413 intents | **Yes.** `vault_withdraw` requires `predecessor == owner`; the charter carries net worth and absorbed houses | Best "NFT is the business" framing in games. One 1,125-line contract does all of it |
 | **OneUp** | nfts, defi, agents | `ethboi/oneup` | 34 | **9,913** | **239** | no, explicitly "nothing is on mainnet" | yes, 200 | yes (X) | NEP-171 Life NFT + NEP-141 USDC claim + Intents verifier + Sputnik DAO + NEP-366 | **Yes.** Life NFT holds a USDC claim and a share of future house profit; `claim` requires `owner_by_id == caller` | Biggest build in the field by code and tests. Perps venue, NFT is a claim ticket |
-| **Veridom Pay** | realworld, nfts, privacy | `khrisdidukh/veridom-pay` | 4 | 950 | 12 | only `intents.near` swaps; own contract is testnet | flaky (000 from here, README says Render free tier) | yes (X, 1:05) | NEP-171 receivable + **ed25519 TEE signature verified in the contract** | **Yes.** Escrow pays `tokens.owner_by_id` holder after the review window | The only entry that verifies a model's signature on chain. This is the one idea we do not have |
+| **Veridom Pay** | realworld, nfts, privacy | `khrisdidukh/veridom-pay` | 4 | 950 | 12 | no — own contract is testnet `vp-vpay-2158.testnet` (code hash `GQVU2E2M…`, recomputed from the deployed wasm); only `intents.near` swaps are mainnet | flaky (000 from here; README says Render free tier) | yes (X, 1:05) | NEP-171 receivable + **ed25519 TEE signature verified in the contract** | **Yes.** Escrow pays `tokens.owner_by_id` holder after the review window | Verifies a model's signature on chain. One of two ideas in this file we do not have |
 | **Torch (inheritance)** | nfts, open | `itachi-exe/torch` | 3 | 1,418 | 36 | no (testnet only) | yes (2 sites), 200 | yes (X) | NEP-171 estate + Chain Signatures BTC/ETH + check-in/grace clock | **Yes.** Estate NFT gates future MPC signatures; claim moves the NFT and the derived addresses stay | Direct overlap with our `house_set_line` heir/guardian line. Fewer moving parts than ours |
 | **Heir** | realworld, open | `ZSP111/Heir` | 3 | 1,654 | 64 | no (testnet only) | yes, 200 | yes (X) | Dead-man's-switch vault (**no NFT**) + Chain Signatures ETH payouts | **No NFT at all.** Vault keyed by owner account, heirs are a list | The cleanest dead-man's-switch. No transferable asset, so it dodges the resale problem entirely |
+| **Jurat** | realworld, privacy | `nftkingiii/jurat` | 3 | 873 | 23 | **yes** — `juratapp.near`, code hash `7AEdAAvC…` matches the built wasm | yes, 200 | yes (X) | Empty NEP-413 intent + Intel TDX enclave on OutLayer + on-chain statement registry | n/a — no NFT. Proves a confidential balance ≥ X without revealing it | **The only rival with its own contract on mainnet.** And it makes a model verdict authoritative on chain |
 | **Chaperone** | security, agents, realworld, defi, business | `techafreshh/chaperone` | 6 | 2,624 | 69 | **no deployment found** | yes, 200 (app) | yes (X) | Rust guard contract + purpose verdict + TEE verifier + NEP-366 relay | n/a — no NFT. Guard holds/checks/pays | Best *idea* for our Guard: amount caps are not enough, verify what the payment is FOR |
 
 `NFT controls anything real?` is answered against the contract, not the README. The method is named
 in each cell; the four-line quotes are in the per-project notes below.
+
+**17, not 16.** The brief asked for the 16 strongest. I picked 16 and then found Jurat while
+verifying mainnet claims. It displaces nothing: it is the one rival in these four tracks with its own
+contract on mainnet, and the finding changed a conclusion in this file, so it stays.
 
 ---
 
@@ -199,7 +204,7 @@ generated from its state. `claim` requires `owner_by_id == caller` and revokes a
 claim, so a listing cannot be drained before it sells. Deposits go through the official Intents
 verifier unchanged, the house is owned by a Sputnik DAO running mainnet v2 code, and one-tap trading
 uses a session key limited to the house's trading methods with an NEP-366 relayer paying gas.
-**9,913 Rust lines and 239 tests** — the largest and best-tested build among the sixteen I profiled
+**9,913 Rust lines and 239 tests** — the largest and best-tested build among the seventeen here
 (Dragons Market is bigger and better tested, but it is not judgeable; see the next tier). It is also
 explicit that nothing is on mainnet and the NFTs/claims/market run on testnet with mock USDC. The
 weakness is conceptual: a Life NFT is a lottery ticket on the house's future profit, not ownership of
@@ -212,12 +217,31 @@ signature itself**, checks the request is exactly the on-chain inspection prompt
 (only photos may vary), and reads the verdict. An approved milestone mints a NEP-171 receivable; the
 contractor can sell it at a discount, and after the review window `settle` pays
 `tokens.owner_by_id` — the current holder, whoever that is. 950 Rust lines, 12 tests, only 430 JS
-lines. This is the single most important entry in this file for us: it is the only project that
-proves a model's output on chain, and our TEE story today checks an attestation without ever letting
-a model verdict move value. Limits it states: escrow is testnet `vp-vpay-2158.testnet`, the live
-Render URL was not reachable from here, and a dispute can be overridden by the contract owner.
+lines. This is one of two entries here that prove a model's output on chain; the other is Jurat, and
+Jurat's proof is stronger. Our TEE story today checks an attestation without ever letting a model
+verdict move value. Limits it states: escrow is testnet `vp-vpay-2158.testnet` (I recomputed its code
+hash from the deployed wasm: `GQVU2E2M4RReKxH6NfjKMeeXNo5MNwo73f6iiYYL5Y8E`), the live Render URL
+returned no response from here, and a dispute can be overridden by the contract owner.
 
-### 16. Chaperone — `techafreshh/chaperone`
+### 16. Jurat — `nftkingiii/jurat`
+Proves a confidential balance is at least X without revealing it. The holder signs an **empty**
+NEP-413 intent for `intents.near` whose nonce carries `sha256(request)[0..7]`, so the signature
+answers one request and moves nothing. One transaction goes to `outlayer.near` `request_execution`
+with a pinned enclave release (URL + sha256); inside the TDX enclave the program refuses a non-empty
+or mismatched intent *before any network call*, logs in to 1Click with the signed intent, reads the
+balance, and prints only the verdict. Anyone can re-check the whole thing in a browser: the tx, the
+DCAP signature on the TDX quote, debug mode off, five measurements approved on `worker.outlayer.near`,
+and the task hash bound in REPORTDATA.
+
+This one is different from every other entry, and it matters for us: **`juratapp.near` is a real
+mainnet contract** (code hash `7AEdAAvC9nc856UEijAgfUzabJMdWtCSNhSSoFXExYEw`, matching the built
+wasm's sha256 per its README), I resolved four of its mainnet txs myself, and the attestor is a real
+TEE rather than a claim. 873 Rust lines, 23 tests, 1,856 JS lines. `EPSQKGKG…` is
+`juratapp.near → juratapp.near` `prove` at block 222,101,860; `3VRG1t33…` is
+`juratapp.near → intents.near` `add_public_key`; `6FP7Pqoj…` is another `prove`. One weakness: the
+deployed contract keeps a `FullAccess` key today, and `set_wasm` lets the owner repoint the enclave.
+
+### 17. Chaperone — `techafreshh/chaperone`
 A guard contract for a fleet of money-handling agents. Deterministic on-chain checks first
 (allowance, per-payment cap, payee allowlist, and a **purpose reference that must resolve to a real
 invoice in the books**), then a signed purpose verdict, then a human decision on anything that does
@@ -263,9 +287,11 @@ Ordered by how much it would cost us in a judging round.
    `judges/proofs/mainnet-proof-check.json` (7 of 106 rows are expected failures) but no page that
    runs an attack and shows the chain's own sentence.
 3. **Contract-verified model output.** Veridom checks an ed25519 signature over request and response
-   hashes inside the contract and refuses a request that is not the exact on-chain prompt. Our TEE
-   check proves an attestation exists; per our own README "the model call does not move NEAR". If a
-   judge asks "can the agent's reasoning be forged", Veridom has a better answer than we do.
+   hashes inside the contract and refuses a request that is not the exact on-chain prompt. Jurat goes
+   further and makes the *verification* public: DCAP quote, five measurements, debug flag off, task
+   hash in REPORTDATA, all re-checked in the browser. Our TEE check proves an attestation exists and
+   links `/tee-public.json`; per our own README "the model call does not move NEAR". If a judge asks
+   "can the agent's reasoning be forged", both of them have a better answer than we do.
 4. **Purpose, not just amount.** Chaperone's purpose reference must resolve to a real invoice. Our
    charter checks payee, cap and daily budget — all *how much* and *to whom*, never *for what*. This
    is a one-field idea (`purpose_ref` on a proposal, checked against an invoice record) and it is the
@@ -300,12 +326,13 @@ Ordered by how much it would cost us in a judging round.
 
 All numbers measured the same way as the table; chain facts re-read live today.
 
-1. **Nobody in these four tracks is on mainnet.** Fifteen of the sixteen have a contract on testnet and
-   I confirmed each with `view_account` on `rpc.testnet.fastnear.com` (the sixteenth, Chaperone, has
-   no deployment at all). The only mainnet links in the whole set point at `intents.near`
-   (Veridom `8nmeStkt…` and `2fS5sb3K…` — both resolved to `intents.near → intents.near`; Presafe
-   `94gPxba…`, same), not at a contract the team wrote. Writ's single `nearblocks.io` link is the
-   literal string `nearblocks.io/txns/hash`. We have `board.nearcarta.near`, `house.nearcarta.near`,
+1. **Almost nobody in these four tracks is on mainnet.** Fifteen of the sixteen are testnet-only and
+   I confirmed each with `view_account` on `rpc.testnet.fastnear.com`; Chaperone has no deployment at
+   all. The exceptions: **Jurat** runs its own statement contract at `juratapp.near` on mainnet
+   (`prove` at block 222,101,860) and I verified four of its txs; **Presafe** has one real mainnet
+   Intents transfer (`94gPxba…`, `intents.near` → `intents.near`); Veridom and Writ link
+   `intents.near` txs they did not write. Writ's own `nearblocks.io` link is the literal string
+   `nearblocks.io/txns/hash`. We have `board.nearcarta.near`, `house.nearcarta.near`,
    `toll.nearcarta.near`, `arena.nearcarta.near` and `townhall.nearcarta.near` live on mainnet, and
    `view_access_key_list` returns `[]` for board, house and charter today. A judge can check this in
    one curl and cannot check it for any rival.
@@ -344,8 +371,8 @@ All numbers measured the same way as the table; chain facts re-read live today.
 
 ## Which would beat us in a judging round, and why
 
-Blunt version: on the *NFTs That Do Something* rubric, two entries beat us on the exact axis that
-track is scored on, and they beat us for the same reason.
+Blunt version: on the *NFTs That Do Something* rubric, four entries beat us on the axis that track is
+scored on, and two of them beat us for the same reason.
 
 - **Handover beats us in nfts.** The track asks for an NFT that does something. Handover's answer is
   one sentence ("the NFT is the only key to an Ethereum address"), it is true on chain, and the
@@ -373,6 +400,14 @@ track is scored on, and they beat us for the same reason.
   Our arena is a pot with a guardian and a cap: correct, but a judge looking for a game will not find
   a loop. Meridian's `/judge` page — every action one button, real tx, real link — is exactly what
   our Games entry needs.
+- **Jurat beats us in realworld and privacy on the axis we claim most loudly.** We say "mainnet, and
+  a TEE we can point at". Jurat says the same thing about a harder problem: it proves a confidential
+  balance is at least X without revealing it, and it verifies Intel's DCAP signature on the enclave
+  quote in the judge's own browser, with the task hash bound into REPORTDATA. Its contract is on
+  mainnet and I resolved its `prove` transaction myself. If a judge asks either of us "prove your TEE
+  claim", Jurat's answer is cryptographically stronger than ours: we check that an attestation
+  exists, Jurat checks the quote, the measurements, the debug flag and the input/output binding. It is
+  much smaller than us and has no NFT — but on the one claim we both make, it wins.
 - **Chaperone would beat us in realworld and security if it were deployed.** Its thesis attacks our
   Guard's core assumption: caps and allowlists do not stop a poisoned invoice paid to a real vendor
   under the limit. It has no contract on chain, so today it loses on delivery. If its team deploys
@@ -385,10 +420,12 @@ track is scored on, and they beat us for the same reason.
   is a claim ticket, and Dragons Market is 44k lines that its own README says has no live funding or
   trading. Neither is a threat in a head-to-head on "NFT that owns something".
 
-**Where we win every one of these head-to-heads: mainnet.** Not one of the sixteen has a contract a
-judge can query on mainnet, and we have five, with no access keys, and a checker that re-reads 106
-transactions. Lead with that, and with the refusal reason on chain. Do not lead with the deed, because
-Deed and Handover win that frame.
+**Where we win almost every one of these head-to-heads: mainnet breadth.** Fifteen of the sixteen
+testnet entries have nothing of their own on mainnet; Jurat is the exception and it is one small
+contract. We have five mainnet contracts with no access keys and a checker that re-reads 106
+transactions. Lead with that, and with the refusal reason on chain. Do not lead with the deed,
+because Deed and Handover win that frame, and do not claim "we are the only mainnet entry" — Jurat
+is on mainnet and its proof is better than ours for the thing it proves.
 
 ---
 
@@ -399,7 +436,8 @@ Deed and Handover win that frame.
    state check. Deed's `buy(token_id, expected_nonce)` plus `pending == 0` is the fix, and it is
    about 60 lines. Until then we should not describe the house deed as "safe to buy".
 2. Our TEE check proves an attestation; it does not verify a model's signature over a specific
-   request inside a contract. Veridom does. The gap is visible as soon as a judge asks what the
+   request inside a contract, and it does not re-verify the DCAP quote. Veridom does the first;
+   Jurat does both, on mainnet, in the browser. The gap is visible as soon as a judge asks what the
    attested model is allowed to authorise.
 
 Both are honest weaknesses in an internal doc. Neither is in the public README.
