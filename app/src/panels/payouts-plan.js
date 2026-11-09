@@ -414,9 +414,30 @@ function fnv(text) {
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
-/** Immutable invoice fields. The payer cannot replace these later. */
-export function canonicalInvoice({ usd, receive, memo = '', due = '', expiry = '' } = {}) {
-  const n = Number(usd);
+/** One invoice line: what it was for and what it cost. */
+export function invoiceItem({ label = '', qty = 1, usd = '' } = {}) {
+  const text = String(label || '').trim().slice(0, 80);
+  const q = Number(qty);
+  const price = Number(usd);
+  if (!text) return null;
+  if (!Number.isFinite(q) || q <= 0 || q > 100000) return null;
+  if (!Number.isFinite(price) || price < 0) return null;
+  const each = Math.round(price * 1e6) / 1e6;
+  return { label: text, qty: Math.round(q * 1000) / 1000, usd: Math.round(each * q * 1e6) / 1e6, each };
+}
+
+/**
+ * Immutable invoice fields. The payer cannot replace these later.
+ *
+ * `items` is the line-item list a normal company expects. When items are given the total is
+ * SUMMED FROM THEM and any `usd` passed alongside is ignored, so a bill can never show lines that
+ * do not add up to the amount being charged. With no items this is the same single-amount invoice
+ * it always was.
+ */
+export function canonicalInvoice({ usd, receive, memo = '', due = '', expiry = '', items } = {}) {
+  const lines = Array.isArray(items) ? items.map(invoiceItem).filter(Boolean).slice(0, 20) : [];
+  const lineTotal = lines.length ? Math.round(lines.reduce((a, l) => a + l.usd, 0) * 1e6) / 1e6 : null;
+  const n = lineTotal != null ? lineTotal : Number(usd);
   if (!Number.isFinite(n) || n <= 0) return { ok: false, reason: 'bad_usd', value: null };
   const who = String(receive || '').trim();
   if (!nearAccountOk(who)) return { ok: false, reason: 'bad_receive', value: null };
@@ -427,13 +448,15 @@ export function canonicalInvoice({ usd, receive, memo = '', due = '', expiry = '
   return {
     ok: true,
     reason: null,
-    value: { usd: rounded, receive: who, memo: memoS, due: dueS, expiry: expS, destination: 'USDC@near', asset: 'USDC' },
+    value: { usd: rounded, receive: who, memo: memoS, due: dueS, expiry: expS, destination: 'USDC@near', asset: 'USDC', items: lines },
   };
 }
 
 /** Same invoice fields always produce the same id, so a second click does not open a second bill. */
 export function invoiceRecordId(value) {
-  const key = [value.usd, String(value.receive).toLowerCase(), value.memo, value.due, value.expiry].join('\n');
+  // Items join the key: two bills for the same total but different work are different bills.
+  const lines = Array.isArray(value.items) ? value.items.map(l => `${l.label}x${l.qty}@${l.each}`).join(',') : '';
+  const key = [value.usd, String(value.receive).toLowerCase(), value.memo, value.due, value.expiry, lines].join('\n');
   return 'inv_' + fnv(key) + fnv(key.split('').reverse().join(''));
 }
 
@@ -455,6 +478,8 @@ export function publicInvoice(record, query = {}) {
     memo: record.memo || '',
     due: record.due || '',
     expiry: record.expiry || '',
+    // What the payer is buying. Empty for a plain one-amount invoice, so old invoices read the same.
+    items: Array.isArray(record.items) ? record.items : [],
     destination: 'USDC@near',
     asset: 'USDC',
     status: record.status || 'UNPAID',

@@ -74,7 +74,7 @@ Everything else is read-only or signed by a session key with no popup.
 ### Verify it yourself in 5 minutes
 ```
 git clone https://github.com/nearcarta/nearcarta && cd nearcarta && npm ci
-npm test                                   # 896 backend unit tests (895 pass, 1 skipped), offline
+npm test                                   # 899 backend unit tests (898 pass, 1 skipped), offline
 (cd contracts/oath && cargo +1.95.0 test --lib)   # 122 charter unit tests (the crate needs edition2024)
 npm run verify:mainnet                     # re-reads the proof txs in shared/deployments/mainnet.json
 ```
@@ -318,7 +318,7 @@ The arena cases are in `backend/test/unit/arena-market.test.js` and `backend/tes
 ## Run it (2 minutes)
 ```
 npm ci
-npm test                 # 896 unit tests (895 pass, 1 skipped)
+npm test                 # 899 unit tests (898 pass, 1 skipped)
 npm run verify:mainnet   # re-reads the proof txs in shared/deployments/mainnet.json
 npm start &              # API on :8787; without ARENA_AGENT_KEY no route signs
 NEARCARTA_API= npm run build && node app/serve.mjs &   # UI on :5173; empty NEARCARTA_API = same-origin /api (a plain build points at the hosted API, which CORS blocks from localhost)
@@ -346,7 +346,7 @@ The payments below are in `shared/deployments/mainnet.json`, re-read by `npm run
 | Ferry | Set the recipient to `t1Nk7gi97dKeY7WAU3ryJnSDCoqp7VDaXzC` | "public on Zcash" warning | e2e "ferry: a transparent Zcash address is flagged as public" |
 | Town Hall | Open `/?shop=hall` in the city. Tabs are Post job, Agents, and Receipts. Type a task, a budget, and two worker accounts, then press Post job. One gold button sends the quote, the counter, the pass, or the refund | The CTA and the AI dock share one sender and sign the same board call, so both send real mainnet txs: post_job with its escrow, bid, one counter, accept, deliver with the worker's digest, review, refund. A chain refusal is reported as a refusal. `contracts/hall` refuses a pass review until the guard account clears the part, so a Guard BLOCK can never release, and the review must present the delivered digest, so a swapped review cannot pay. Hall v2 is deployed on that account (`scripts/hall-deploy.js --live`, 2026-11-08). A Post job from a visitor's own row is **not** yet proved on mainnet: the row's own `post` was refused `below_min_amount` ([51UktPvy…](https://nearblocks.io/txns/51UktPvyyQuf199eABmiKG1dVdWwUJLZn3vGrmp94jY4)), and the refusal is the recorded result. Market hire needs a buyer session token; public `GET /v1/agents` needs none. Personal rules link to `/setup/`. Code: `shared/hall/job.js`, `shared/hall/v2.js`, `app/src/panels/hall-actions.js`, `contracts/hall/src/lib.rs` | unit `a job conserves escrow, counters once, and does not pay on a swapped or blocked review`; unit `the gold button and the dock share one runner, and a move goes through one sender`; unit `the plan snapshots every legacy bounty and refuses a guard that is not the live one`; contract `a_pass_without_a_guard_clear_cannot_release`, `a_swapped_review_is_refused`, `two_workers_split_one_job_and_only_the_passed_part_is_paid` Earlier reward [6UxwRmoE…](https://nearblocks.io/txns/6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h) and refusal [Cp2rWatn…](https://nearblocks.io/txns/Cp2rWatnDBHRhbmGdrNqFbr14tg42TW4cAMTjp4Bsnu6) are not this job |
 
-# 896 unit tests (895 pass, 1 skipped):
+# 899 unit tests (898 pass, 1 skipped):
 Proof rows (106/106 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
