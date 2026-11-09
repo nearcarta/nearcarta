@@ -140,7 +140,8 @@
   position: static;
   transform: none;
   align-self: center;
-  margin: var(--sp-1) 0 0;
+  flex: 0 0 auto;
+  margin: 0 0 var(--sp-2);
   font-size: var(--t-small);
   line-height: 1;
   height: 0;

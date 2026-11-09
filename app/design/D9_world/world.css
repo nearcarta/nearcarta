@@ -570,6 +570,10 @@ nav.all-shops{position:fixed;
    visible in the demo recording. 116 clears it with a 9px gap. The js measurement
    (`setRail`) overrides this; this rule is the value before that runs. */
 body.in-shop nav.all-shops { top: 116px; }
+/* The tray's own top must come from the menu's real bottom, not from a height calculation that
+   can round under it. Measured: menu 116..174, tray top 142 — 32px of the menu sat on the tray's
+   top-left corner, which reads as a badge stuck onto the panel. --railTop is set from js. */
+body.in-shop #shopUI #tray { top: calc(var(--railTop, 116px) + var(--rail, 58px) + 12px); }
 /* A floor, not a sum. Every shop has its own `max-height` and they were all written as
    `100dvh - <magic>`, so a tall tray could start above the rail and slide under the menu —
    measured on Arena 2026-11-08: the menu ended at y=122 and the tray started at y=113. A `top`

@@ -373,6 +373,7 @@ function setRail(){
     const navTop=Math.round(nav.getBoundingClientRect().top);
     const navH=Math.round(nav.offsetHeight||nav.getBoundingClientRect().height);
     body.style.setProperty('--hudTop', navTop+'px');
+    body.style.setProperty('--railTop', navTop+'px');
     body.style.setProperty('--rail', navH+'px');
   };
   measure();
