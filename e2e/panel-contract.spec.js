@@ -105,19 +105,13 @@ test.describe('shop panel design contract', () => {
 
         // 4. Touch targets are at least 40px.
         expect(m.small, `${id} ${tab || 'default'}: controls under 40px`).toEqual([]);
+
+        // 5. The panel is a card of the brief's width, not a full-height drawer.
+        expect(m.width, `${id} ${tab || 'default'}: panel width`).toBeGreaterThanOrEqual(320);
+        expect(m.width, `${id} ${tab || 'default'}: panel width`).toBeLessThanOrEqual(380);
       }
     });
   }
-
-  test('the panel is 320-380px wide on desktop, as the brief specifies', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    for (const id of SHOPS) {
-      await openShop(page, id);
-      const w = await page.evaluate(() => Math.round(document.querySelector('#shopUI #tray').getBoundingClientRect().width));
-      expect(w, `${id} panel width`).toBeGreaterThanOrEqual(320);
-      expect(w, `${id} panel width`).toBeLessThanOrEqual(380);
-    }
-  });
 
   test('390x844: one column, no nested scroll, no sideways overflow', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });

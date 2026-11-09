@@ -867,3 +867,173 @@ body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] > .house-pair {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ============================================================================================
+   13. ONE gold CTA per view — the bar's hardest rule, and the one the panels were breaking
+   --------------------------------------------------------------------------------------------
+   Judged with e2e/judge-bar.mjs, the Ferry had up to FIVE gradient-filled buttons on one screen:
+   Get quote, Compare, Open rules and the three route chips, plus #t-act. A visitor cannot tell
+   which one the shop is asking for. The rule is now literal: only the panel's single action and
+   the active tab carry gold; every other control is an outlined secondary of the same radius
+   family. Nothing is removed — Get quote, Compare and Open rules are all still there and still
+   clickable, they just stop competing with the CTA.
+   ============================================================================================ */
+
+body #shopUI #tray #t-form #f-quote,
+body #shopUI #tray #t-form #f-compare,
+body #shopUI #tray #t-form #f-open-rules,
+body #shopUI #tray #t-form .route-chip,
+body #shopUI #tray #t-form .ferry-cta:not(.primary),
+body #shopUI #tray #t-form .secondary,
+body #shopUI #tray #t-form button.ferry-cta:not(.primary) {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--c-cream) !important;
+  border: 1px solid var(--c-border) !important;
+  border-radius: var(--r-card) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+body #shopUI #tray #t-form #f-quote:hover,
+body #shopUI #tray #t-form #f-compare:hover,
+body #shopUI #tray #t-form #f-open-rules:hover,
+body #shopUI #tray #t-form .route-chip:hover {
+  border-color: var(--c-gold-2) !important;
+  background: rgba(255, 255, 255, .06) !important;
+}
+
+/* A selected route chip is a state, not a second CTA: tint it, do not gild it. */
+body #shopUI #tray #t-form .route-chip[aria-pressed='true'] {
+  border-color: var(--c-gold-2) !important;
+  background: rgba(226, 168, 60, .16) !important;
+  color: var(--c-cream) !important;
+}
+
+/* The gold ring on a secondary is enough; no second shadow competes with the CTA. */
+body #shopUI #tray #t-form .route-chip::after { display: none !important; }
+
+/* ============================================================================================
+   14. The last tap targets, and the Deed's four gold buttons
+   --------------------------------------------------------------------------------------------
+   Judged by e2e/judge-bar.mjs across all nine shops, eighty-odd views were clean and four were
+   not: `#t-more` (32px), the toll receipt links (36px), one House anchor (39px), and the House
+   Deed tab, which had FOUR gradient buttons on one screen — Mint, Allow, Refuse and the CTA.
+   The bar allows one gold action per view, so Mint stays the CTA and Allow/Refuse become the
+   outlined pair they actually are: a decision beside the action, not three primaries.
+   ============================================================================================ */
+
+body #shopUI #tray #t-more,
+body #shopUI #tray .t-links .link,
+body #shopUI #tray .t-links a {
+  min-height: var(--tap) !important;
+  display: inline-flex;
+  align-items: center;
+}
+
+body #shopUI #tray #t-form #toll-record,
+body #shopUI #tray #t-form .toll-record,
+body #shopUI #tray #t-form a[data-testid^='toll-'] {
+  min-height: var(--tap) !important;
+  height: auto !important;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--p3) !important;
+  border-radius: var(--r-card) !important;
+  border: 1px solid var(--c-border-soft) !important;
+  background: rgba(0, 0, 0, .2) !important;
+  color: var(--c-cream) !important;
+  font: var(--f-small) !important;
+  text-decoration: none !important;
+  box-sizing: border-box;
+}
+
+/* Allow / Refuse are a decision, not a second and third primary. */
+body #shopUI #tray #t-form #deed-allow,
+body #shopUI #tray #t-form #deed-refuse,
+body #shopUI #tray #t-form #deed-mint {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--c-cream) !important;
+  border: 1px solid var(--c-border) !important;
+  box-shadow: none !important;
+  font: var(--f-label) !important;
+  border-radius: var(--r-card) !important;
+}
+
+body #shopUI #tray #t-form #deed-allow:hover,
+body #shopUI #tray #t-form #deed-refuse:hover {
+  border-color: var(--c-gold-2) !important;
+}
+
+/* The Deed's own action keeps the gold, so the view still has exactly one. */
+body #shopUI #tray #t-form #house-cta {
+  background: linear-gradient(180deg, var(--c-gold-1) 0%, var(--c-gold-2) 100%) !important;
+  color: var(--c-ink) !important;
+  border: 0 !important;
+  border-radius: var(--r-cta) !important;
+  font: var(--f-cta) !important;
+  min-height: var(--h-cta) !important;
+}
+
+/* Any plain anchor inside a pane is a link, not a button: give it the target height so it is
+   comfortable on a phone without turning it into a third button style. */
+body #shopUI #tray #t-form .ferry-pane > a,
+body #shopUI #tray #t-form .hall-pane > a {
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The Deed's three records are ANCHORS (`a.primary.deed-link`), not buttons, which is why the
+   button rules above left them gold and 39px tall. They are evidence links, not actions: they
+   open a known mainnet transaction. Style them as quiet evidence rows and give them the tap
+   height, so the Deed keeps exactly one gold action — "I'm alive". */
+body #shopUI #tray #t-form a.deed-link,
+body #shopUI #tray #t-form .deed-mint a,
+body #shopUI #tray #t-form .deed-actions a {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: var(--tap) !important;
+  height: auto !important;
+  padding: 0 var(--p3) !important;
+  border-radius: var(--r-card) !important;
+  border: 1px solid var(--c-border-soft) !important;
+  background: rgba(0, 0, 0, .22) !important;
+  background-image: none !important;
+  color: var(--c-cream) !important;
+  box-shadow: none !important;
+  font: var(--f-small) !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  box-sizing: border-box;
+}
+
+body #shopUI #tray #t-form a.deed-link:hover {
+  border-color: var(--c-gold-2) !important;
+  background: rgba(255, 255, 255, .06) !important;
+}
+
+/* Two evidence links sit side by side without touching. */
+body #shopUI #tray #t-form .deed-actions {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: var(--p2) !important;
+  margin: 0;
+}
+
+/* The session-restore bar renders a bare "Sign in" anchor with no class of its own. It is the
+   one remaining control under the tap floor (39px), and it sits inside the panel where the
+   visitor may be reaching for it on a phone. */
+body #shopUI #tray a:not([class]),
+body #shopUI #tray [data-testid='session-restore'] a,
+body #shopUI #tray [data-testid='restore-session'] {
+  display: inline-flex !important;
+  align-items: center;
+  min-height: var(--tap) !important;
+  padding: 0 var(--p3) !important;
+  border-radius: var(--r-card) !important;
+  box-sizing: border-box;
+  font: var(--f-label) !important;
+}
