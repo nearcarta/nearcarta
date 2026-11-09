@@ -3,7 +3,8 @@
 # The recipe comes from contracts/deployed.json:
 #   nep330  the rev in the contract's own contract_source_metadata, built in the image pinned
 #           in that rev's Cargo.toml, with the same docker call `cargo near build reproducible-wasm` makes
-#   box     the manifest rev, with rustc 1.86.0, cargo-near 0.22.0 and binaryen version_108 wasm-opt
+#   box     the manifest rev, with rustc 1.86.0, cargo-near 0.22.0, binaryen version_108 wasm-opt and
+#           CARGO_HOME=/home/box/.cargo (the registry path is inside the panic strings)
 set -euo pipefail
 ACC=$1; OUT=${2:-/tmp/rebuilt}; ROOT=$(git rev-parse --show-toplevel); mkdir -p "$OUT"
 read -r BUILD CRATE REV < <(node -e '
@@ -32,6 +33,7 @@ if [ "$BUILD" = nep330 ]; then
 elif [ "$BUILD" = box ]; then
   WASM_OPT=${WASM_OPT:-wasm-opt}
   "$WASM_OPT" --version | grep -q "version 108" || { echo "need binaryen version_108 wasm-opt (WASM_OPT=...)"; exit 4; }
+  [ "${CARGO_HOME:-$HOME/.cargo}" = /home/box/.cargo ] || [ "$HOME" = /home/box ] || { echo "box builds need CARGO_HOME=/home/box/.cargo"; exit 5; }
   git -C "$ROOT" archive "$REV" | tar x -C "$W"
   (cd "$W/$CRATE" && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi)
   "$WASM_OPT" --enable-sign-ext --enable-mutable-globals --enable-bulk-memory -Oz --strip-debug --strip-producers \

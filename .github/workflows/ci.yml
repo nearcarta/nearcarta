@@ -271,6 +271,10 @@ jobs:
           tar -xzf /tmp/binaryen.tgz -C /tmp
           echo "WASM_OPT=/tmp/binaryen-version_108/bin/wasm-opt" >> "$GITHUB_ENV"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          # Legacy builds embed the crate registry path in panic strings, and they were built with
+          # CARGO_HOME=/home/box/.cargo. Same path here, or the bytes differ.
+          sudo mkdir -p /home/box && sudo chown "$USER" /home/box && ln -s "$HOME/.cargo" /home/box/.cargo
+          echo "CARGO_HOME=/home/box/.cargo" >> "$GITHUB_ENV"
       - run: contracts/scripts/rebuild.sh ${{ matrix.account }} /tmp/rebuilt
       - if: steps.kind.outputs.build != 'none'
         run: |
