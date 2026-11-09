@@ -313,7 +313,11 @@ test('a card csv keeps its currency and names the biggest waste', async () => {
   const bankCss = read('app/src/panels/bank.css');
   assert.match(bankCss, /#shopUI #t-form button\.bank-tab\.on/);
   assert.match(bankCss, /linear-gradient\(180deg,#f5d08a,#e2b35b\)/);
-  assert.match(bankCss, /grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
+  // One column. This used to pin two equal columns; a native <input type=file> cannot render its
+  // filename in a 190px half-column and showed "N...n", which reads as broken text. The property
+  // worth protecting is that the file control gets the full width, not the column count.
+  assert.match(bankCss, /\.bank-split\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(bankCss, /\.bank-split #bank-file\{width:100%/);
   assert.match(bankCss, /button\.bank-tab\[aria-selected="true"\]/);
   assert.match(bankCss, /inset 0 -4px 0 #8b5e2b/);
   const tray = read('app/src/panels/bank-tray.js');
