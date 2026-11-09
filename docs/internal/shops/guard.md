@@ -43,7 +43,7 @@
 
 ## Competitors to beat (internal)
 
-From `docs/internal/competitors.md`: OutLayer (TEE custody + policy order), Shore (scoped key), Countersign https://github.com/Thiago-spart/countersign (200), Halter https://github.com/Arashrahmaniii/halter (200). Beat with **on-chain** caps + mainnet refuse txs; do not claim TEE custody we do not have.
+Kept in private notes on the box, not in this repo.
 
 ## Sources (every plan point)
 

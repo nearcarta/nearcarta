@@ -45,7 +45,7 @@ Full verbatim quotes: `docs/internal/research/judges-x-signals.md`. Per-judge pu
 | Link | Ideas → our shop |
 |---|---|
 | https://x.com/ilblackdragon/status/2106269343881519444 (3 Oct) | AI Tamagotchi NFT that pays its own inference (Arena guardians) · Universal checkout via Intents (Payouts) · Private OTC (Bank) · Never-liquidated positions · Event escrow / Kickback (Hall) · Private code review · Cap table · Delta neutral · Sell viewing keys for copy trading (Bank) · Private medical second opinion · Private transcription · Private benchmark (Guard/Arena) |
-| https://x.com/ilblackdragon/status/2118027843980366222 (4 Nov, during the hackathon) | AI encyclopedia + prediction markets · Private trading with sold viewing keys · Universal checkout widget · **Swarm-for-Hire with guardrails or AI governance review** (Hall + Guard) |
+| https://x.com/ilblackdragon/status/2118027843980366222 (4 Nov, during the hackathon) | AI encyclopedia + prediction markets · Private trading with sold viewing keys · Universal checkout widget · **hire-a-swarm with guardrails or AI governance review** (Hall + Guard) |
 | https://x.com/ThePiVortex/status/2112537588687044697 (amplified by NEARProtocol) | Confidential x402 merchant revenue (Toll, Payouts) · Cross-chain micropayments with Intents rebalancing (Toll) · Agent auditing TEE measurements (Guard) · Zcash merchant gateway (Bank) · Contracts that accept Intents assets and any wallet signature · ERC-8004 agent identity on NEAR (Hall) · Wallet connector producing chain signatures + 1Click (Toll) |
 | `docs/internal/illia-ideas-2026-11-04.md` | Our mapping of the 4 Nov list to shops |
 
@@ -180,7 +180,7 @@ Internal register with links: `docs/internal/competitors.md` (note: it names riv
 | toll | Autonomous Business | §1 (Kain, Eddy), §2 ThePiVortex list, §3 Business row, §4 Chain Signatures (proxy path tutorial), §5 near-multichain, §8 P1, §12 |
 | chronicle | Autonomous Business | §1 Illia provenance log, §3 Business, §4 NEAR AI verification, §8 P4, §12 |
 | arena | Games | §2 AI Tamagotchi, §3 Games, §4 NEAR AI + NEP-245, §7 R8, §8 P6, §12 |
-| hall | Agent Economy | §1 Illia earn / cyntro manager agents, §2 Swarm-for-Hire, §3 Agents, §4 Agent Market + Agent API, §12 |
+| hall | Agent Economy | §1 Illia earn / cyntro manager agents, §2 hire-a-swarm, §3 Agents, §4 Agent Market + Agent API, §12 |
 | guard | AI Security | §1 SHIELD, judgement-as-code, §3 Security, §4 OutLayer, §7 R5 R6, §12 |
 | bank | Privacy | §1 Mert/Haseeb/DevHub TEE, §2 viewing keys, §3 Privacy, §4 Confidential swaps + NEAR AI verification, §7 R1, §12 |
 | payouts | Real-World Money | §1 Eddy, §2 universal checkout, §3 RWM, §4 1Click + meta tx, §7 R7, §12 |

@@ -1,7 +1,7 @@
 // Budget ledger for a Town Hall job. No network and no signing.
 // Escrow identity: budget = paid + remaining + refunded.
 // A pass is held, not paid on chain, until a migrated contract can release to the named worker.
-// townhall.nearcarta.near is not a payee. Source: docs/internal/source-pack.md §12.4 and §12.5.
+// townhall.nearcarta.near is not a payee. Source: internal source pack §12.4 and §12.5.
 import { nearOf, yoctoOf } from './plan.js';
 
 export const CHAIN_RELEASE = Object.freeze({

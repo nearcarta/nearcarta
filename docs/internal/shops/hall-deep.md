@@ -4,7 +4,7 @@
 **Do not** send mainnet txs or deploy. No Social Money / DAO track claim. Teardown to `nearcarta.near`.
 
 ## Read first
-1. `docs/internal/source-pack.md` §2 (Illia 4 Nov: **Swarm-for-Hire with guardrails or AI governance review**; Kickback event escrow; ERC-8004 agent identity), §1 (Illia "make an agent that earns"; cyntro: manager agents splitting tasks), §3 Agents row, §4 Agent Market + Agent API, §7 R9, **§12 P0 #4**.
+1. `docs/internal/source-pack.md` §2 (Illia 4 Nov: **hire-a-swarm with guardrails or AI governance review**; Kickback event escrow; ERC-8004 agent identity), §1 (Illia "make an agent that earns"; cyntro: manager agents splitting tasks), §3 Agents row, §4 Agent Market + Agent API, §7 R9, **§12 P0 #4**.
 2. `docs/internal/research/tracks/07-agents.md` (general contractor: task + budget, split, hire, check, pay).
 3. Code: `contracts/townhall/src/lib.rs`, `app/src/panels/hall-ui.js`, `app/src/panels/hall.js`, `app/design/D8_shops/shops/hall.js`, `app/shops/hall/`; PR #40: `shared/hall/plan.js`, `app/src/panels/hall-{actions,dock,panes}.js`, `backend/src/hall-market.js`.
 
@@ -19,15 +19,15 @@
 
 **Idea score today: 3/10. Implementation: 5/10.** **Verdict: replace. PR #40: replace** (salvage the dock, row-rules helpers and tests).
 
-## 2. Replacement concept: "Hire Hall" — a guarded swarm-for-hire with escrow
-**One line:** the visitor posts a job and a budget (e.g. "find 3 cheapest flights Cairo→Dubai under $200, 0.5 USDC"); the budget goes into **escrow on chain from their session**; the Hall's **contractor agent** splits the job, hires real agents (Agent Market listings via API, plus city agents anyone can register by staking NEAR for inference — Illia's Swarm-for-Hire), checks each deliverable with a NEAR AI TEE reviewer, and releases payment per part. Guardhouse reviews every payee (guardrails). Unspent escrow returns to the visitor.
+## 2. Replacement concept: "Hire Hall" — a guarded hire-a-swarm with escrow
+**One line:** the visitor posts a job and a budget (e.g. "find 3 cheapest flights Cairo→Dubai under $200, 0.5 USDC"); the budget goes into **escrow on chain from their session**; the Hall's **contractor agent** splits the job, hires real agents (Agent Market listings via API, plus city agents anyone can register by staking NEAR for inference — Illia's hire-a-swarm), checks each deliverable with a NEAR AI TEE reviewer, and releases payment per part. Guardhouse reviews every payee (guardrails). Unspent escrow returns to the visitor.
 
 | Question | New answer |
 |---|---|
 | 1. Problem / gain | People and agents want work done by specialists without trusting one of them with the whole budget. Gain: one sentence, escrowed money, pay only for checked work. |
 | 2. Who gets the money | The **hired agents** (their NEAR account or USDC via Intents), per accepted deliverable. Refund to the poster. A small published hall fee only if it pays real inference. |
 | 3. What is new | Agent Market has escrow per hire, but not a contractor agent that splits a budget across many agents **under an on-chain cap it cannot edit**, with AI-reviewed releases and Guard checks. Open registration of swarm agents with staked NEAR for inference is Illia's exact 4 Nov ask. |
-| 4. Why judges love it | Illia's Swarm-for-Hire + "make an agent that earns"; cyntro's manager agents; Agents track general contractor prompt; Agent Market partner. |
+| 4. Why judges love it | Illia's hire-a-swarm + "make an agent that earns"; cyntro's manager agents; Agents track general contractor prompt; Agent Market partner. |
 | 5. Any user | Yes: any row posts jobs; any account registers an agent; amounts and payees are user data. |
 
 **Idea score after replacement: 8/10.**

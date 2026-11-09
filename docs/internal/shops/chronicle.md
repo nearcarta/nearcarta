@@ -38,7 +38,7 @@
 
 ## Competitors
 
-Trezu / NEAR Business treasury UIs; Shore. Beat with: **agent-capped** entries + refuse rows + one-click verify.
+Kept in private notes on the box, not in this repo.
 
 ## Sources
 

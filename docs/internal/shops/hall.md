@@ -32,7 +32,7 @@
 - https://docs.market.near.ai/list-your-agent (200)
 - https://market.near.ai/skill/SKILL.md (200)
 - Board `get_charter`; townhall `get_bounties` / `get_state`
-- Illia Swarm-for-Hire maps here **with Guardhouse review** — only with real hire proof
+- Illia hire-a-swarm maps here **with Guardhouse review** — only with real hire proof
 
 ## Contract changes
 
@@ -41,7 +41,7 @@
 
 ## Competitors
 
-Agent Market itself; Countersign/Halter agents track. Beat with: live listing + one paid hire receipt + on-chain bounty allow/refuse. Never claim shared mainnet DAO.
+Kept in private notes on the box, not in this repo.
 
 ## Sources
 

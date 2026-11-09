@@ -40,7 +40,7 @@
 
 ## Competitors
 
-Hearthmarket https://github.com/nguyenkhangph/hearthmarket (200) — six NPCs on earlier network. Beat with **mainnet** attempt+refuse proofs + clear sim labeling; do not claim six agents without proof.
+Kept in private notes on the box, not in this repo.
 
 ## Sources
 
