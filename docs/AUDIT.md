@@ -27,6 +27,7 @@ Every High and Medium below is fixed in source with a unit test that fails on th
 | W1 | hall | High | `migrate` trusted an `owner` argument (fixed on chain earlier, see `contracts/hall/HOTFIX.md`). | Live since `71QKJYqc…`. |
 | W2 | hall | Medium | After `refund`, an open part could still be awarded and paid from another part's escrow. | Refund closes unawarded parts; `accept` requires unlocked escrow. |
 | W3 | hall | Low | Jobs and stakes were never removed, so `close` could not stay bounded. | `prune` for finished jobs and zero stakes; `close` requires both maps empty. |
+| W4 | hall | High | Any account could post 1-yocto-per-part jobs or 1-yocto stakes. Each adds a few hundred bytes that the hall stakes from its own balance, and that balance also holds the escrow. About 0.19 NEAR of junk (live spare on 2026-11-09) and a worker payout or refund fails for lack of balance. | The hall tracks what it owes (escrow plus stakes) under a raw `held` key outside the state struct, so the layout is unchanged, and every write that adds bytes requires balance >= storage stake + owed (`ERR_FLOAT`). `junk_jobs_cannot_stake_away_the_escrow`. Source only. |
 
 Not findings after checking: reentrancy (every callback contract writes its state before the
 promise), init macros (`#[init]` / `PanicOnDefault` everywhere; house `migrate_from_v2` refuses any
