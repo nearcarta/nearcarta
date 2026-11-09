@@ -2,7 +2,7 @@
 
 This is a plan for the owner. Nothing in this file was sent to mainnet. No account was created, no wasm was deployed, and no row was closed.
 
-The source adds `propose_call_as`, effect budgets, a second confirm key, monotonic `tighten_*`, salted anchors, and a delayed `stage_upgrade` / `upgrade` / `migrate`. The account `board.nearcarta.near` is still the 2026-11-05 wasm. That wasm has no upgrade method and the account has no access key, so the new code cannot be deployed onto it. The path is refund, then `reap`, then create the same name again.
+The source adds `propose_call_as`, effect budgets, a second confirm key, monotonic `tighten_*`, salted anchors, and a delayed `stage_upgrade` / `upgrade` / `migrate`. This document described the 2026-11-05 board; the live account has since moved to board v2 (code hash `BF1rQSrG…`, which does expose `stage_upgrade`, `upgrade` and `migrate`). The account still has no access key, so new code can only arrive through those owner-driven methods. Read `docs/MAINNET_BOARD.md` for the current state and treat the refund/reap path below as the history of how the account got here.
 
 ## What is live
 
