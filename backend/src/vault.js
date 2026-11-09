@@ -267,54 +267,81 @@ export async function sharedTask(taskId, tag) {
   });
 }
 
-/** Payees a request may name: the charter's Native allowlists (when readable), then the arena merchants.
- *  Two charter shapes exist. `get_clauses` is the legacy per-visitor oath; the live visitor board is
- *  a single row read with `get_charter(owner)` and its receivers sit at `receivers`. Only `get_clauses`
- *  was read here, so on the live board the lookup failed with MethodNotFound and every real-model
- *  proposal died before it reached the model (measured: /api/vault/ask/plan answered `internal`
- *  with `wasm execution failed ... MethodResolveError(MethodNotFound)`). */
-export async function askReceivers(charter, viewF = view) {
-  const out = new Set();
-  if (charter) {
-    const cl = await viewF(charter, 'get_clauses').catch(() => null);
-    for (const c of Object.values(cl || {})) if (c?.asset === 'Native') for (const r of c.receivers || []) out.add(r);
-    const row = await viewF(charter, 'get_charter', { owner: charter }).catch(() => null);
-    for (const r of row?.receivers || []) out.add(r);
+const BOARD = () => MAINNET_DEP?.board?.contract || DEP?.board?.contract || null;
+
+/** Where a request's allowlist lives. Three shapes, read explicitly, no silent fallback:
+ *  - a board row: `charter` is the visitor's own account (what the city sends as S.charter) or the
+ *    board itself with `owner` named; the row is `get_charter({ owner })` ON THE BOARD.
+ *  - a legacy per-visitor oath: `charter` is the oath contract and answers `get_clauses`.
+ *  - the shared arena: no charter at all; its merchants are the payees.
+ *  The old code called `get_charter` on the visitor's own account with owner = that account (no
+ *  contract there), always got nothing, and quietly offered the arena merchants instead. */
+export async function askSource(charter, owner = null, viewF = view) {
+  const board = BOARD();
+  if (!charter) {
+    // The shared arena charter: its own Native clauses, then the arena merchants it was built for.
+    const id = V?.arena?.charter || null;
+    const clauses = id ? await viewF(id, 'get_clauses').catch(() => null) : null;
+    const out = new Set();
+    for (const c of Object.values(clauses || {})) if (c?.asset === 'Native') for (const r of c.receivers || []) out.add(r);
+    for (const r of V?.arena?.merchants || []) out.add(r);
+    return { kind: 'arena', id, clauses: clauses && Object.keys(clauses).length ? clauses : null, receivers: [...out] };
   }
-  for (const r of V?.arena?.merchants || []) out.add(r);
-  return [...out];
+  if (board && charter === board) {
+    if (!owner || !isAccount(owner)) throw bad('owner: the visitor account whose board row to read');
+    const row = await viewF(board, 'get_charter', { owner }).catch(() => null);
+    if (!row) throw bad(`no row on ${board} for ${owner}`, 404);
+    return { kind: 'board', id: board, owner, row, receivers: [...(row.receivers || [])] };
+  }
+  if (board) {
+    const row = await viewF(board, 'get_charter', { owner: charter }).catch(() => null);
+    if (row) return { kind: 'board', id: board, owner: charter, row, receivers: [...(row.receivers || [])] };
+  }
+  const clauses = await viewF(charter, 'get_clauses').catch(() => null);
+  if (clauses && Object.keys(clauses).length) {
+    const out = new Set();
+    for (const c of Object.values(clauses)) if (c?.asset === 'Native') for (const r of c.receivers || []) out.add(r);
+    return { kind: 'oath', id: charter, clauses, receivers: [...out] };
+  }
+  throw bad(`${charter} has no board row and is not a charter`, 404);
+}
+
+/** Payees a request may name, from exactly one source (see askSource). */
+export async function askReceivers(charter, viewF = view, owner = null) {
+  return (await askSource(charter, owner, viewF)).receivers;
 }
 
 /** "Ask the agent to pay" without signing: the parsed request and the proposal the owner's agent key would sign. */
-export async function askPlan(text, charter = null, { viewF = view, nowMs = Date.now(), propose = agent.propose, tag = 'mine' } = {}) {
+export async function askPlan(text, charter = null, { viewF = view, nowMs = Date.now(), propose = agent.propose, tag = 'mine', owner = null } = {}) {
   if (!charter && !V) throw bad('vault not deployed', 503);
   if (charter !== null && !isAccount(charter)) throw bad('charter: a NEAR account id');
-  const id = charter || V.arena.charter;
-  // `.catch(() => null)` on both reads: the legacy per-visitor oath exposes `get_clauses` and
-  // `get_state`, the live visitor board is a row read with `get_charter(owner)` and has no
-  // `get_state`. An unguarded read threw MethodNotFound on the live board, which surfaced as a
-  // bare `internal` 500 instead of a proposal.
-  const clauses = await viewF(id, 'get_clauses').catch(() => null);
-  const receivers = await askReceivers(id, viewF);
+  const src = await askSource(charter, owner, viewF);
+  const receivers = src.receivers;
   let a;
-  try { a = await propose(text, { clauses, receivers, tag }); } catch (e) { throw bad(e.message, e.status && e.status < 500 ? e.status : 400); }
+  try { a = await propose(text, { clauses: src.clauses || null, receivers, tag }); } catch (e) { throw bad(e.message, e.status && e.status < 500 ? e.status : 400); }
   const q = a.parsed;
-  // A legacy oath answers `get_clauses`; the live visitor board has no clauses at all, so fall back
-  // to the row instead of calling a picker that refuses an empty map.
-  const st = await viewF(id, 'get_state').catch(() => null);
-  const row = st ? null : await viewF(id, 'get_charter', { owner: id }).catch(() => null);
-  const picked = clauses && Object.keys(clauses).length ? pickClause(clauses) : { id: null, clause: null };
-  const clauseId = picked.id;
-  const nonce = st?.next_nonce ?? row?.next_nonce ?? 0;
-  const policyVersion = st?.policy_version ?? row?.policy_version ?? 1;
-  const allowlist = picked.clause?.receivers || row?.receivers || [];
-  return { charter: id, parsed: q, clause_id: clauseId,
-    on_allowlist: allowlist.includes(q.receiver), per_action_cap: picked.clause?.per_action_cap ?? row?.per_action_cap ?? null,
-    proposal: { shop: 'ask', clause_id: clauseId, receiver: q.receiver, amount: q.amount, nonce: String(nonce),
-      policy_version: policyVersion, expires_at: String(BigInt(nowMs + 10 * 60_000) * 1_000_000n), memo: q.memo, receipt: null },
-    sign: 'call `propose` on the charter with {"p": proposal} using your agent function-call key; the charter decides',
+  const common = { parsed: q, on_allowlist: receivers.includes(q.receiver), allowlist: receivers, allowlist_source: src.kind,
     by: a.by, model: a.model, parser: a.by === 'model' ? `NEAR AI model ${a.model} in a TEE (proposes only; the charter decides)` : a.parser,
     fallback_why: a.fallback_why || null, verification: a.verification || null, tee: a.tee || null, cost: a.cost || null };
+  const expires = String(BigInt(nowMs + 10 * 60_000) * 1_000_000n);
+  if (src.kind === 'board') {
+    const r = src.row;
+    // Board rows carry `nonce` (the next proposal nonce) and their limits; there is no clause id
+    // and no policy version on a row.
+    return { charter: src.id, owner: src.owner, clause_id: null, ...common,
+      per_action_cap: r.per_action_cap ?? null, daily_budget: r.daily_budget ?? null, min_amount: r.min_amount ?? null,
+      max_actions_per_day: r.max_actions_per_day ?? null, spent_today: r.spent_today ?? null, actions_today: r.actions_today ?? null,
+      row_balance: r.balance ?? null, frozen: !!r.frozen, expires_at: r.expires_at ?? null,
+      proposal: { shop: 'ask', owner: src.owner, receiver: q.receiver, amount: q.amount, nonce: String(r.nonce ?? '0'),
+        expires_at: expires, memo: q.memo, receipt: null },
+      sign: `the row's agent key signs the proposal and propose is sent to ${src.id} for owner ${src.owner}; the board decides` };
+  }
+  const st = await viewF(src.id, 'get_state').catch(() => null);
+  const picked = src.clauses ? pickClause(src.clauses) : { id: null, clause: null };
+  return { charter: src.id, clause_id: picked.id, ...common, per_action_cap: picked.clause?.per_action_cap ?? null,
+    proposal: { shop: 'ask', clause_id: picked.id, receiver: q.receiver, amount: q.amount, nonce: String(st?.next_nonce ?? 0),
+      policy_version: st?.policy_version ?? null, expires_at: expires, memo: q.memo, receipt: null },
+    sign: 'call `propose` on the charter with {"p": proposal} using your agent function-call key; the charter decides' };
 }
 
 /** The oath "action" event a propose tx logged (non-phantom), or null. */
@@ -833,7 +860,7 @@ export function register(app, { limiter, globalCap }) {
   app.post('/api/vault/ask/plan', limiter(8), askPerDay, agentCap, async c => {
     const b = await c.req.json().catch(() => ({}));
     const tag = String(b.nickname || '').toLowerCase() || 'mine';
-    return c.json(await askPlan(String(b.text || ''), b.charter == null || b.charter === '' ? null : String(b.charter), { tag }));
+    return c.json(await askPlan(String(b.text || ''), b.charter == null || b.charter === '' ? null : String(b.charter), { tag, owner: b.owner ? String(b.owner) : null }));
   });
   app.post('/api/vault/ask', limiter(6), askPerDay, agentCap, globalCap('vault-attack', 30), async c => {
     const b = await c.req.json().catch(() => ({}));
