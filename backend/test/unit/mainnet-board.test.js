@@ -11,14 +11,14 @@ import { setupJourney } from '../../../shared/setup/path.js';
 import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
 import { otherNet, otherEvm, retiredNet } from '../../../shared/net/word-scan.js';
 
-const wasm = readFileSync(new URL('../../../contracts/artifacts/charter_board.hold.wasm', import.meta.url));
+const wasm = readFileSync(new URL('../../../' + MAIN.board.wasm, import.meta.url));
 
 // Live figures (2026-11-05 redeploy, /workspace/audit/board-redeploy-final.json):
 // wasm 108955 B, sha256 910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29,
 // code_hash Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C, deploy tx CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4.
 test('the board wasm deploys for at most 2.1 NEAR and the state size matches the contract', () => {
-  assert.equal(wasm.length, 150988);
-  assert.equal(createHash('sha256').update(wasm).digest('hex'), 'a89664ef45f16d429104b1b1d87d5dc83a79820a69bd22782f50a6b7c022315c');
+  assert.equal(wasm.length, 135657);
+  assert.equal(createHash('sha256').update(wasm).digest('hex'), '9e8f3d30f6f0ec8b93750a7af55d154926b6896fbabdc4137965ab9d53b260b6');
   assert.ok(deployCost(wasm.length, 'nearcarta.near').stakeYocto > 10n ** 24n, 'storage stake is over 1 NEAR on this wasm');
   assert.equal(initStateBytes('nearcarta.near'), 30);
   const cost = deployCost(wasm.length, 'nearcarta.near');
@@ -31,9 +31,9 @@ test('the board wasm deploys for at most 2.1 NEAR and the state size matches the
   assert.equal(MAIN.board.full_access_keys, 0);
   // close_charter on the live wasm: smoke close H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf (nearblocks).
   assert.equal(MAIN.board.txs.smoke_close_charter, 'H4RE9oEuELfVQr4C7tcihuNb5Ysh6n2gRYmS8ugL2Vtf');
-  // The hold build is live: recreate CdHZUvPVX8NXvvPT5nEueyAnvUsWpBdrw932U9bPefmp (151230 B, 0 keys). The live hash is the artifact.
-  assert.equal(MAIN.board.code_hash, 'CM6WA2gZDN17TRXQzFsrstgKPzsmiVLuArK7V6UkXLAf');
-  assert.equal(deployCost(wasm.length, 'nearcarta.near').storageBytes, 151230n, 'the recreate measured exactly this');
+  // The simulate build is live: recreate GPdvDdsKJAobn2wBMGQSgAmJiphV15F5fz84w3NMyXgs (135899 B, 0 keys). The live hash is the artifact.
+  assert.equal(MAIN.board.code_hash, 'Bfx6fDuYcZNQTF36ZhZAVB3LSNQGELfNvsWNzSCA3uJD');
+  assert.equal(deployCost(wasm.length, 'nearcarta.near').storageBytes, 135899n, 'the recreate measured exactly this');
   assert.equal(MAIN.board.wasm_sha256, createHash('sha256').update(wasm).digest('hex'));
   assert.equal(MAIN.board.previous.code_hash, 'Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C');
   assert.equal(MAIN.board.owner, MAIN.root);
