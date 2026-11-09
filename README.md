@@ -223,7 +223,7 @@ Every id below is a `contract` field in `shared/deployments/mainnet.json`. `npm 
 | `toll.nearcarta.near` | The pay-per-use gate and its MPC signature | `FaNtiauDWfjzKYtK2bns79wUqZqcXFcLjz2Bzx7aVdL5` |
 | `townhall.nearcarta.near` | Hall v2: job escrow, bids, counter, review digest (migrate hotfix, `contracts/hall/HOTFIX.md`) | `GgECZv7g1tSGvnXeMLuJrQKYcfjBVwdXHyS1TZn6T6N8` |
 | `arena.nearcarta.near` | Guardian NFTs and oath-scored attempts | `4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma` |
-| `house.nearcarta.near` | House v3: the NEP-171 deed, its purse and its line | `3ouAaAD1ccZ81CdLu26FoDxixYSynrmzPa58u1Focn66` |
+| `house.nearcarta.near` | House v3 state on v4 code: the NEP-171 deed, its purse and its line | `3z6dbex9mkz6BQ4fQRYcut9TPMvzKPArjbY9HKMLreHi` |
 | `guard.nearcarta.near` | The keyless forwarder, and the only account that can clear a Hall part (`clear` → `guard_clear`) | `7uEdU1JWdtY8VPhyGAr3T6GEy5XfCTBngNjnhZvX8XJ6` |
 | `nearcarta.near` | The root account: funder, owner of every shop, signer of every deploy | — |
 

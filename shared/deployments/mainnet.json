@@ -426,11 +426,11 @@
         "sha256": "29bb13027fd672d0b666d04ae23ab248371a03ad21738d0732b8d2f6f559e093"
       },
       "owner": "nearcarta.near",
-      "wasm": "contracts/artifacts/house_nft.v3.oz.wasm",
-      "sha256": "29bb13027fd672d0b666d04ae23ab248371a03ad21738d0732b8d2f6f559e093",
-      "code_hash": "3ouAaAD1ccZ81CdLu26FoDxixYSynrmzPa58u1Focn66",
-      "storage_bytes": 373476,
-      "locked_near": 3.75199,
+      "wasm": "contracts/artifacts/house_nft.v4.wasm",
+      "sha256": "2c57d8d1d8c028cdfbc8e64b4922d423f89736dd9b5b5e85a8e3a7419b6c82d5",
+      "code_hash": "3z6dbex9mkz6BQ4fQRYcut9TPMvzKPArjbY9HKMLreHi",
+      "storage_bytes": 361948,
+      "locked_near": 3.61948,
       "full_access_keys": 0,
       "teardown": "owner close() with 1 yocto after house_pay empties purse",
       "txs": {
@@ -443,10 +443,13 @@
         "house_delete_fak": "DxZXKNx3SvcGQSVooJwwNrgVMhp5CRdPHEsfxnWny8jB",
         "house_pay_recover": "ddaVgHkMGQzHcquj94qMuWTywXY8X4B7bWhkJF7aJEQ",
         "house_close": "Eykw3LPZrDdCNbMxsZsGfpTVZogDmWmgkt3x3ykryzPv",
-        "house_v3_create_deploy_new": "9b5rS4do5bVisMYpcmfLBKgXJrxQCNuYoDi6hDDPsyLj"
+        "house_v3_create_deploy_new": "9b5rS4do5bVisMYpcmfLBKgXJrxQCNuYoDi6hDDPsyLj",
+        "house_v4_upgrade_migrate": "23fZdcGcx3LeiwsYMXguoVXM6gEXnMEcLuUbGxh8rWLh",
+        "house_v4_smoke_stranger_close_refused": "89UN5LrBbcjwgBumuzWWooR1tKNSCruNz5HzmDUBGthT"
       },
       "status": "deployed",
-      "house_version": 3
+      "house_version": 3,
+      "upgrade_note": "House v4 code (main 1e1436b5, H1-H4): owner upgrade in place, state layout kept, house_version stays 3. Freed 14,244 B."
     },
     "townhall": {
       "contract": "townhall.nearcarta.near",
@@ -594,20 +597,23 @@
     "owner": "nearcarta.near",
     "status": "deployed",
     "crate": "contracts/house_nft",
-    "wasm": "contracts/artifacts/house_nft.v3.oz.wasm",
-    "wasm_sha256": "29bb13027fd672d0b666d04ae23ab248371a03ad21738d0732b8d2f6f559e093",
-    "code_hash": "3ouAaAD1ccZ81CdLu26FoDxixYSynrmzPa58u1Focn66",
-    "storage_bytes": 373476,
-    "locked_near": 3.75199,
+    "wasm": "contracts/artifacts/house_nft.v4.wasm",
+    "wasm_sha256": "2c57d8d1d8c028cdfbc8e64b4922d423f89736dd9b5b5e85a8e3a7419b6c82d5",
+    "code_hash": "3z6dbex9mkz6BQ4fQRYcut9TPMvzKPArjbY9HKMLreHi",
+    "storage_bytes": 361948,
+    "locked_near": 3.61948,
     "full_access_keys": 0,
     "house_version": 3,
     "txs": {
       "house_pay_recover": "ddaVgHkMGQzHcquj94qMuWTywXY8X4B7bWhkJF7aJEQ",
       "house_close": "Eykw3LPZrDdCNbMxsZsGfpTVZogDmWmgkt3x3ykryzPv",
       "house_v3_create_deploy_new": "9b5rS4do5bVisMYpcmfLBKgXJrxQCNuYoDi6hDDPsyLj",
-      "house_deed_mint_visitor": "4W7bmUYoG3QfRUKF7yJSfELMUgWsrAP5GrL9d7VC5X33"
+      "house_deed_mint_visitor": "4W7bmUYoG3QfRUKF7yJSfELMUgWsrAP5GrL9d7VC5X33",
+      "house_v4_upgrade_migrate": "23fZdcGcx3LeiwsYMXguoVXM6gEXnMEcLuUbGxh8rWLh",
+      "house_v4_smoke_stranger_close_refused": "89UN5LrBbcjwgBumuzWWooR1tKNSCruNz5HzmDUBGthT"
     },
-    "note": "House v3 after PR #36. Recovered legacy ~2.50 via house_pay+close, recreated same name stake 3.75199. Locked, no FA keys."
+    "note": "House v3 after PR #36. Recovered legacy ~2.50 via house_pay+close, recreated same name stake 3.75199. Locked, no FA keys.",
+    "upgrade_note": "House v4 code (main 1e1436b5, H1-H4): owner upgrade in place, state layout kept, house_version stays 3. Freed 14,244 B."
   },
   "outlayer": {
     "contract": "outlayer.near",
