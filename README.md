@@ -206,7 +206,7 @@ An agent with a wallet key can be talked into paying anyone: a fake invoice, a p
 | Vault Arena | Open Guardians, Attack, or Score | Mint and Attack call the board as `propose_call_as` once arena v2 is deployed. Score reads `get_attempt`. *Simulate a week* signs nothing |
 | Payouts | *Pay reviewed rows*, or ask the AI Agent "Pay reviewed rows" | Each in-cap NEAR row is one `propose` on `board.nearcarta.near`. Over the row cap, the row is refused before any deposit. A foreign row is held. An invoice link stays on the receive account written at creation. Nothing is marked paid until 1Click status is `SUCCESS` |
 | Town Hall | *Post job*, *Agents*, *Receipts* | Hall v2 is deployed on the shop account. A job splits the budget you type across parts, a worker bids, you counter once, and a pass stays held until the Guardhouse clears the delivered digest. Post job from a visitor row is proved on mainnet. Market hire is not available |
-| Chronicle | Open `/?shop=chronicle`. Type an account and press Show timeline. Choose Timeline, Statement, or Verify | The timeline lists that account’s rows, or says there are no rows. Write statement makes a local summary and does not sign. Anchor downloads the bundle and says the live anchor is blocked. Export CSV is off when there are no rows. Verify rejects a changed statement. No entry fee. Live anchor tx: (coordinator adds the nearblocks link) |
+| Chronicle | Open `/?shop=chronicle`. Type an account and press Show timeline. Choose Timeline, Statement, or Verify | The timeline lists that account’s rows, or says there are no rows. Write statement makes a local summary and does not sign. Anchor downloads the bundle and says the live anchor is blocked. Export CSV is off when there are no rows. Verify rejects a changed statement. No entry fee. Live anchor tx: none yet — `anchor` panics `ERR_NO_CHARTER` on the live board and the staged build that fixes it is not applied, so there is no anchor transaction to cite |
 
 The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes `set_rules` on that row. The city door opens the same room (`app/design/D9_world/js/main.js`). The job tray does not call `propose` and does not pay `townhall.nearcarta.near` for a pretend hire. `node scripts/hall-deploy.js` is a dry-run by default: it refunds each open bounty to the signer of the `post_bounty` transaction, then prints the `migrate` deploy onto that same account, and `--live` signs only when every pre-check passes. It was run live on 2026-11-08: Hall v2 replaced the legacy bounty code in place ([`DjzqHk2K…`](https://nearblocks.io/txns/DjzqHk2KcX2S6GfD1d4b9FQt5ypJiPdFdozXVPoYJrU3)), the one open bounty was refunded to its poster ([`8KdwZNzy…`](https://nearblocks.io/txns/8KdwZNzy8zEMV8mCHvZwko44j5DKX6sh3jRYGezqvGm1)), and the smoke job posted and refunded 0.001 NEAR with escrow conserved. A post from a visitor's own row followed: [`51UktPvy…`](https://nearblocks.io/txns/51UktPvyyQuf199eABmiKG1dVdWwUJLZn3vGrmp94jY4). Market hire is not live: a public agent read can succeed, and the jobs board and hire call do not.
 
@@ -217,7 +217,7 @@ The live path is a visitor's own row on `board.nearcarta.near`. Town Hall writes
 | Attack demo | `backend/scripts/attack-demo.js` (`npm run attack-demo`) | `the attack demo stops every attack and prints real reasons, not placeholders` | three refusals it prints: [8df5Zu8U…](https://nearblocks.io/txns/8df5Zu8UGFsFvETbr99pMZBmEpP3ZFEeCnWePPKVZBqZ), [9qxsoyA8…](https://nearblocks.io/txns/9qxsoyA8VrecsCh13yuUFhCk7QxEM4ueMVbicJvxyXwT), [GWnPvGBc…](https://nearblocks.io/txns/GWnPvGBcVe599hk6RQmxxUgRagtQc7CWWFJgmXL4VgYs) |
 | Guardhouse pay | `shared/guard/verifier.js` | `a guarded pay holds a warning until a person confirms` | ALLOW forward, WARN release, and BLOCK refund receipts are not linked until those transactions are seen |
 | Chronicle search | `app/src/chronicle-feed.js` | `chronicle search, filter, export and verify` | allowed [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR) |
-| Chronicle ledger | `app/src/chronicle-loop.js` `accountRows` | `an unrelated account keeps its own live rows and does not borrow the owner feed` | same recorded allow. Live anchor tx: (coordinator adds the nearblocks link) |
+| Chronicle ledger | `app/src/chronicle-loop.js` `accountRows` | `an unrelated account keeps its own live rows and does not borrow the owner feed` | same recorded allow. Live anchor tx: none yet — `anchor` panics `ERR_NO_CHARTER` on the live board and the staged build that fixes it is not applied, so there is no anchor transaction to cite |
 | Chronicle statement | `app/src/chronicle-audit.js` `verifyNearAi` | `an unrelated account keeps its own live rows and does not borrow the owner feed` | no new spend. The live anchor is blocked until Board v2 |
 | Toll address | `app/src/toll-derive.js` | `the toll key hashes to the recorded Base address` | allow [4LKGpA5v…](https://nearblocks.io/txns/4LKGpA5vBRAtd4JoTaG4BtBep2HWsXWQ6VBDsaaSVouz) |
 | House deed | `app/src/deed-control.js` | `a deed move refuses the previous holder` | allow [83nyJmTW…](https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26), refuse [3Z4UAb6N…](https://nearblocks.io/txns/3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1) |
@@ -242,7 +242,7 @@ node --test backend/test/unit/chronicle-depth.test.js backend/test/unit/chronicl
 curl -s https://nearcarta-api.onrender.com/api/chronicle
 curl -s https://nearcarta-api.onrender.com/api/ledger
 ```
-Recorded allow: [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR). Live anchor tx: (coordinator adds the nearblocks link).
+Recorded allow: [8WDqBeaN…](https://nearblocks.io/txns/8WDqBeaN7tCs8zPoYUPAicWhAF38YXgg5Si1YLpeD1aR). Live anchor tx: none yet — `anchor` panics `ERR_NO_CHARTER` on the live board and the staged build that fixes it is not applied, so there is no anchor transaction to cite.
 
 ## Tracks and the hints we use
 - DeFi (Ferry): one recorded NEAR Intents swap. New quotes stay dry.
@@ -268,13 +268,7 @@ The accountant CSV lists `source,destination,asset,amount,fee,refund,status,tx`.
 
 Earlier proposes, not from this payroll run: allowed [4jEjzpiY…](https://nearblocks.io/txns/4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia), refused [AsZUd9mZ…](https://nearblocks.io/txns/AsZUd9mZc9uvkvz4RfEjAPiQdWduvYXqgx3wjmqu6EKx).
 
-New txs, filled by the live run:
-
-- Pay 1: (assistant adds the nearblocks link)
-- Pay 2: (assistant adds the nearblocks link)
-- Pay 3: (assistant adds the nearblocks link)
-- Refusal: (assistant adds the nearblocks link)
-- Invoice: (assistant adds the status or the nearblocks link)
+The payroll run itself has **no new transaction to cite**, and that is stated plainly rather than left as a placeholder: the three reviewed rows and their refusal are built and dry-run in `backend/src/payouts*.js`, but no row was sent from a live session key for this run. The two links above are earlier proposes on the same code path and are labelled as such.
 
 ## Toll Bridge
 
