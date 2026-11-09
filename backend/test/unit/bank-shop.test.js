@@ -149,7 +149,12 @@ test('a message that names rows is audited on those rows', () => {
   assert.doesNotMatch(tray, /location\.assign|location\.href/);
   const css = read('app/src/panels/bank.css');
   assert.match(css, /\.bank-scroll\{/);
-  assert.match(css, /height:min\(640px,calc\(100dvh - 120px\)\)/);
+  // The property is "the panel's height is capped by the room it actually has", not the literal
+  // 120px guess. A fixed viewport subtraction let the panel reach up into the shop menu by 32px
+  // (measured 2026-11-09: menu 116..174, tray top 142). The cap now reserves the menu's real
+  // bottom plus its gap, so the button stays on screen and the panel stays off the menu.
+  assert.match(css, /height:min\(640px, calc\(100dvh - \(var\(--railTop/, 'height is capped by the menu, not a constant');
+  assert.match(css, /--rail\\?/);
   assert.match(css, /\.bank-foot\{/);
   assert.match(css, /\.bank-cta:active/);
   assert.doesNotMatch(css, /height:fit-content/);

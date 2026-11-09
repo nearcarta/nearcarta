@@ -3,8 +3,12 @@ body.bank-tray #shopUI #tray{
   width:min(400px,calc(100vw - 28px)) !important;
   max-width:400px !important;
   left:16px; right:auto !important; top:auto; bottom:18px;
-  height:min(640px,calc(100dvh - 120px));
-  max-height:min(640px,calc(100dvh - 120px));
+  /* Bank is anchored to the bottom and grows UPWARD, so a tall panel reached into the shop menu:
+     measured 116..174 for the menu and a tray top of 142, a 32px overlap that reads as a badge
+     stuck on the panel's corner. The height is capped by the room actually left under the menu
+     (its bottom plus the 12px gap), not by a fixed 640 or a viewport guess. */
+  height:min(640px, calc(100dvh - (var(--railTop, 116px) + var(--rail, 58px) + 12px) - 18px));
+  max-height:min(640px, calc(100dvh - (var(--railTop, 116px) + var(--rail, 58px) + 12px) - 18px));
   padding:12px 14px 14px;
   box-sizing:border-box;
   overflow:hidden;
