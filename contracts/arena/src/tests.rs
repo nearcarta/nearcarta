@@ -235,9 +235,3 @@ fn freezing_works_from_any_key_of_the_holder() {
     assert!(c.get_guardian("g1".into()).unwrap().frozen);
 }
 
-#[test]
-#[should_panic(expected = "ERR_OWNER_ONLY")]
-fn only_the_owner_funds_a_pot_because_close_returns_pots_to_the_owner() {
-    let mut c = setup();
-    ctx("bob.near", NEAR); c.fund("g1".into());
-}

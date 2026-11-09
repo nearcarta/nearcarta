@@ -137,11 +137,10 @@ impl Contract {
         Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
 
-    /// The owner funds a Guardian's pot. Only the owner, because `close` sends every pot back to the
-    /// owner: NEAR from anyone else would leave with it.
+    /// Anyone may add NEAR to a Guardian's pot (board rows do). A pot is prize money: it only leaves
+    /// as an oath-approved payout, or to the owner at `close`. Funding is a gift to the game, not a deposit.
     #[payable]
     pub fn fund(&mut self, token_id: TokenId) -> U128 {
-        require!(env::predecessor_account_id() == self.owner, "ERR_OWNER_ONLY");
         let mut g = self.g(&token_id);
         g.pot = U128(g.pot.0 + env::attached_deposit().as_yoctonear());
         self.guardians.insert(&token_id, &g);
