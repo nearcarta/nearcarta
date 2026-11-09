@@ -316,8 +316,13 @@ impl Board {
                 if let Some(row) = self.rows.get_mut(me) { row.storage_locked = row.storage_locked.saturating_sub(to_row); }
             }
             if to_reserve > 0 { *self.credit.entry(me.clone()).or_insert(0) += to_reserve; }
-            self.owe(-(freed as i128));
-            refund(me, freed + env::attached_deposit().as_yoctonear());
+            // Only the row's share leaves as cash. The reserve's share went back to the reserve
+            // above; paying it out as well paid the visitor twice for the same bytes, and a
+            // set/clear loop drained the board (measured in
+            // `an_effect_set_and_clear_cycle_pays_nothing_out`: 0.01266 NEAR over six cycles).
+            // The reserve is already inside `storage_locked`, so only `to_row` leaves `owed`.
+            self.owe(-(to_row as i128));
+            refund(me, to_row + env::attached_deposit().as_yoctonear());
             return;
         }
         let cost = (after - before + STORAGE_MARGIN_BYTES) as u128 * price();
@@ -333,7 +338,11 @@ impl Board {
         require!(row.storage_locked.saturating_add(from_row) <= MAX_ROW_YOCTO, "ERR_ROW_TOO_BIG");
         row.storage_locked += from_row;
         if from_reserve > 0 { *self.credit.get_mut(me).unwrap() -= from_reserve; }
-        self.owe(cost as i128);
+        // `set_calls` already put the reserve into `storage_locked` and `owed`. Spending it
+        // moves NEAR inside the row, so only the part the row adds is a new liability. Adding
+        // the whole cost counted the reserve twice: the phantom `owed` measured on mainnet
+        // 2026-11-09 (0.00483, then 0.00548 NEAR with 0 rows) that made `reap` refuse.
+        self.owe(from_row as i128);
         refund(me, attached - from_row);
     }
 
@@ -369,6 +378,7 @@ impl Board {
 
     /// Owner setup. Raises or adds budgets. Spent counters carry over.
     pub fn set_effects(&mut self, effects: Vec<EffectIn>) {
+        crate::full_key();
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         require!(self.rows.contains_key(&me), "ERR_NO_CHARTER");
@@ -468,6 +478,7 @@ impl Board {
     }
 
     pub fn set_confirm_key(&mut self, key: String) {
+        crate::full_key();
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         let agent = self.rows.get(&me).expect("ERR_NO_CHARTER").agent;
@@ -646,7 +657,9 @@ impl Board {
             let row = self.rows.get_mut(&owner).unwrap();
             row.storage_locked += from_row;
         }
-        if cost > 0 { self.owe(cost as i128); }
+        // The reserve's share was already a liability (it sits in `storage_locked`); only the
+        // row's new room adds to `owed`. This was the second half of the phantom `owed`.
+        if from_row > 0 { self.owe(from_row as i128); }
         if hold { None } else { Some(self.send_call(&owner, id)) }
     }
 
@@ -863,6 +876,7 @@ impl Board {
     pub fn upgrade_eta(&self) -> u64 { self.upgrade_eta }
 
     pub fn upgrade(&mut self, code: Vec<u8>) -> Promise {
+        crate::full_key();
         require!(env::predecessor_account_id() == self.owner, "ERR_NOT_OWNER");
         require!(self.upgrade_set, "ERR_UPGRADE");
         require!(env::block_timestamp() >= self.upgrade_eta, "ERR_UPGRADE");

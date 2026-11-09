@@ -340,6 +340,7 @@ impl Board {
     }
 
     pub fn set_rules(&mut self, rules: RulesIn) {
+        full_key();
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         let rules = rules_from(rules);
@@ -350,6 +351,7 @@ impl Board {
     }
 
     pub fn set_frozen(&mut self, frozen: bool) {
+        if !frozen { full_key(); }
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         self.rows.get_mut(&me).expect("ERR_NO_CHARTER").frozen = frozen;
@@ -359,6 +361,7 @@ impl Board {
     /// Store sha256 of the hidden rule. The rule text is not stored.
     /// Empty clears it. The text is `oath-hidden-v1` with clause id `pay`.
     pub fn set_seal(&mut self, commitment: String) {
+        full_key();
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         let seal = if commitment.is_empty() { None } else { Some(parse_hex32(&commitment)) };
@@ -368,6 +371,7 @@ impl Board {
     }
 
     pub fn set_agent(&mut self, agent: String) {
+        full_key();
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         let pk = parse_pk(&agent);
@@ -400,6 +404,7 @@ impl Board {
     /// Owner closes one visitor's row. The stake and the unspent balance go to
     /// that visitor, the same as `close_charter`. After the last row, `reap` can run.
     pub fn force_close(&mut self, visitor: AccountId) -> Promise {
+        full_key();
         require!(env::predecessor_account_id() == self.owner, "ERR_NOT_OWNER");
         self.hydrate(&visitor);
         self.release(visitor)
@@ -420,14 +425,11 @@ impl Board {
             self.holds.remove(&(who.clone(), *id));
             kv_del(b"h", &format!("{}/{}", who.as_str(), id));
         }
+        // The unspent reserve is refunded below. It is part of `storage_locked` (`set_calls`
+        // adds it there), so the line above already took it out of `owed`. Subtracting it a
+        // second time only hid the double count in `charge_acts` and the hold path, and with a
+        // second row open it would push `owed` under what that row is really owed.
         let credit = self.credit.remove(&who).unwrap_or(0);
-        // The reserve is a liability: `set_calls` charged it to the row and recorded it in
-        // `owed`. Refunding it below without subtracting it here left `owed` permanently above
-        // zero after any row that carried a call list was closed, which makes `reap` refuse with
-        // ERR_LIABILITY and blocks the whole teardown. Measured 2026-11-08 in
-        // contracts/charter_board_sandbox/tests/two_visitors.rs: two rows closed, `owed` read
-        // 0.00734 NEAR and never moved again.
-        self.owe(-(credit as i128));
         self.confirm.remove(&who);
         self.epoch.remove(&who);
         self.count -= 1;
@@ -495,7 +497,10 @@ impl Board {
         )
     }
 
+    /// Callback. Only this board may call it (the export checks too), so a stranger cannot
+    /// put spent NEAR back on a row.
     pub fn on_paid(&mut self, owner: AccountId, amount: U128, day: U64) {
+        require!(env::predecessor_account_id() == env::current_account_id(), "ERR_PRIVATE");
         self.hydrate(&owner);
         if near_sdk::is_promise_success() { return; }
         let found = if let Some(row) = self.rows.get_mut(&owner) {
@@ -512,6 +517,7 @@ impl Board {
     /// The visitor names which (receiver, method) pairs the agent may call, and the session ceiling.
     /// `propose` is unchanged. An empty list clears the policy.
     pub fn set_calls(&mut self, rules: Vec<(AccountId, String, u128)>, session_cap: u128) {
+        full_key();
         let me = env::predecessor_account_id();
         self.hydrate(&me);
         require!(self.rows.contains_key(&me), "ERR_NO_CHARTER");
@@ -609,7 +615,10 @@ impl Board {
         self.owe(add as i128);
     }
 
+    /// Callback. Only this board may call it (the export checks too), so a stranger cannot
+    /// put spent NEAR back on a row.
     pub fn on_called(&mut self, owner: AccountId, amount: U128, day: U64) {
+        require!(env::predecessor_account_id() == env::current_account_id(), "ERR_PRIVATE");
         self.hydrate(&owner);
         if near_sdk::is_promise_success() { return; }
         let found = if let Some(row) = self.rows.get_mut(&owner) {
@@ -836,6 +845,14 @@ fn in_window(start: u16, end: u16) -> bool {
     if start == end { return true; }
     let minute = ((env::block_timestamp() / NS_PER_MIN) % 1440) as u16;
     if start < end { minute >= start && minute < end } else { minute >= start || minute < end }
+}
+
+/// Changes that loosen a row, swap its keys, or move the owner's NEAR need a full-access key:
+/// a function-call key cannot attach a deposit, so a leaked browser session key cannot
+/// rewrite a row's receivers or caps. Tightening (`tighten_*`, freezing) stays key-free so a
+/// kill switch never waits for a wallet. The yocto is refunded with the rest of the deposit.
+fn full_key() {
+    require!(env::attached_deposit().as_yoctonear() >= 1, "ERR_ONE_YOCTO");
 }
 
 fn price() -> u128 { env::storage_byte_cost().as_yoctonear() }
@@ -1554,6 +1571,116 @@ mod tests {
         assert!(b.contains("receiver_not_allowlisted"), "{b}");
     }
 
+    /// Setting an effect budget and clearing it again must never pay out more than went in.
+    /// Before the fix, the bytes a reserve-paid record freed went back to the reserve AND to
+    /// the visitor as cash, so each set/clear cycle paid the row free NEAR from the board.
+    #[test]
+    fn an_effect_set_and_clear_cycle_pays_nothing_out() {
+        let (mut c, _, _) = boot();
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        c.set_calls(vec![(acc(SHOP), "cross".into(), NEAR / 50)], NEAR / 10);
+        let credit0 = c.side_credit(&acc(ALICE));
+        let mut paid = 0u128;
+        for i in 0..6 {
+            go(ALICE, 1, 0);
+            c.set_effects(vec![effect("base", "usdc", &format!("0x{:040x}", i), 10, 1)]);
+            paid += transfers_to(ALICE).iter().sum::<u128>();
+            go(ALICE, 1, 0);
+            c.set_effects(vec![]);
+            paid += transfers_to(ALICE).iter().sum::<u128>();
+        }
+        // Each call attached the full-key yocto and got exactly that back, nothing more.
+        assert_eq!(paid, 12, "a reserve-paid record that is freed goes back to the reserve, not to the visitor");
+        assert!(c.side_credit(&acc(ALICE)) <= credit0, "and the reserve never grows past what was prepaid");
+    }
+
+    /// The running `owed` of a partially loaded board must equal what the rows really hold,
+    /// after every kind of write, not only after the last row closes.
+    #[test]
+    fn the_partial_ledger_matches_the_rows_after_effects_and_holds() {
+        let (c, sk, _) = boot();
+        save(&c);
+        let truth = |b: &Board| b.rows.values().fold(0u128, |a, r| a + r.balance + r.storage_locked)
+            + b.holds.values().fold(0u128, |a, h| a + h.amount);
+        go(ALICE, MAX_ROW_YOCTO, 0);
+        let mut b = load();
+        b.hydrate(&acc(ALICE));
+        b.owed = truth(&b);
+        let hall: Vec<(AccountId, String, u128)> = ["post_job", "refund"].iter().map(|m| (acc(SHOP), (*m).to_string(), NEAR / 50)).collect();
+        b.set_calls(hall, NEAR / 10);
+        assert_eq!(b.owed, truth(&b), "after set_calls");
+        save(&b);
+        go(ALICE, 1, 0);
+        let mut b = load();
+        b.hydrate(&acc(ALICE));
+        b.set_effects(vec![effect("base", "usdc", "0xabc", 10, 1)]);
+        assert_eq!(b.owed, truth(&b), "after a reserve-paid effect budget");
+        save(&b);
+        go(ALICE, 1, 0);
+        let mut b = load();
+        b.hydrate(&acc(ALICE));
+        b.set_effects(vec![]);
+        assert_eq!(b.owed, truth(&b), "after clearing it");
+        save(&b);
+        go(ALICE, 0, 0);
+        let mut b = load();
+        b.hydrate(&acc(ALICE));
+        let deposit = NEAR / 2000;
+        let sig = sign_as(&sk, &b, ALICE, SHOP, "post_job", "{}", deposit, 1_000_000, Vec::new(), true);
+        b.propose_call_as(acc(ALICE), acc(SHOP), "post_job".into(), "{}".into(), U128(deposit), U64(1_000_000), Vec::new(), true, sig);
+        assert_eq!(b.owed, truth(&b), "after a held call");
+        let id = b.holds.keys().next().unwrap().1;
+        b.cancel_hold(U64(id));
+        assert_eq!(b.owed, truth(&b), "after the hold is dropped");
+        save(&b);
+        go(ALICE, 0, 0);
+        let mut b = load();
+        b.hydrate(&acc(ALICE));
+        assert_eq!(b.owed, truth(&b), "before close");
+        save(&b);
+        // A second row stays open, so the count==0 settle cannot hide a drift: the close
+        // must leave `owed` at exactly what the other row holds.
+        go(BOB, MAX_ROW_YOCTO, 0);
+        let mut b = load();
+        let (_, pk2) = keypair(9);
+        b.open_charter(rules((0, 0), 4), pk2, U128(NEAR / 1000));
+        b.set_calls(vec![(acc(SHOP), "post_job".into(), NEAR / 50)], NEAR / 10);
+        save(&b);
+        go(ALICE, 0, 0);
+        let mut b = load();
+        b.hydrate(&acc(ALICE));
+        b.hydrate(&acc(BOB));
+        b.close_charter();
+        assert_eq!(b.owed, truth(&b), "close drops exactly what the closed row held");
+        assert!(b.owed > 0, "and the open row is still owed");
+    }
+
+    #[test]
+    fn a_stranger_cannot_call_the_payment_callbacks() {
+        let (mut c, _, _) = boot();
+        go(OTHER, 0, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.on_paid(acc(ALICE), U128(NEAR), U64(0)); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_PRIVATE"));
+        let err = catch_unwind(AssertUnwindSafe(|| { c.on_called(acc(ALICE), U128(NEAR), U64(0)); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_PRIVATE"));
+    }
+
+    #[test]
+    fn loosening_a_row_needs_a_full_access_key_and_freezing_does_not() {
+        let (mut c, _, _) = boot();
+        go(ALICE, 0, 0);
+        c.set_frozen(true);
+        let err = catch_unwind(AssertUnwindSafe(|| { c.set_frozen(false); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_ONE_YOCTO"));
+        let err = catch_unwind(AssertUnwindSafe(|| { c.set_rules(rules((0, 0), 9)); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_ONE_YOCTO"));
+        let err = catch_unwind(AssertUnwindSafe(|| { c.set_calls(vec![(acc(OTHER), "x".into(), NEAR)], NEAR); })).unwrap_err();
+        assert!(refuse(err).contains("ERR_ONE_YOCTO"));
+        go(ALICE, 1, 0);
+        c.set_frozen(false);
+        assert_eq!(transfers_to(ALICE), vec![1], "the yocto comes back");
+    }
+
     fn boot() -> (Board, SigningKey, String) {
         go("nearcarta.near", 0, 0);
         let mut c = Board::new();
@@ -1736,7 +1863,7 @@ mod tests {
         let (_, sig) = sign(&sk, &c, ALICE, SHOP, amount);
         c.propose(acc(ALICE), acc(SHOP), U128(amount), sig, None);
         assert_eq!(c.get_charter(acc(ALICE)).unwrap().actions_today, 1);
-        go(ALICE, 0, NS_PER_DAY);
+        go(ALICE, 1, NS_PER_DAY);
         c.set_rules(RulesIn { max_actions_per_day: 1, per_action_cap: U128(amount), daily_budget: U128(NEAR / 100), ..rules((0, 0), 1) });
         go(ALICE, 0, NS_PER_DAY);
         let (_, sig) = sign(&sk, &c, ALICE, SHOP, amount);
@@ -1754,7 +1881,7 @@ mod tests {
         })).unwrap_err();
         let msg = refuse(err);
         assert!(msg.contains("frozen"), "{msg}");
-        go(ALICE, 0, 0);
+        go(ALICE, 1, 0);
         c.set_frozen(false);
         let mut expiring = rules((0, 0), 4);
         expiring.expires_at = U64(50);
@@ -1876,26 +2003,26 @@ mod tests {
         let bob_locked = c.get_charter(acc(BOB)).unwrap().storage_locked.0;
         let before = encode(&c);
         assert_eq!(decode(&before).get_charter(acc(ALICE)).unwrap().balance.0, NEAR / 1000);
-        go(ALICE, 0, 0);
+        go(ALICE, 1, 0);
         let err = catch_unwind(AssertUnwindSafe(|| { c.force_close(acc(BOB)); })).unwrap_err();
         let msg = refuse(err);
         assert!(msg.contains("ERR_NOT_OWNER"), "{msg}");
         assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, NEAR / 1000);
         assert_eq!(c.get_charter(acc(BOB)).unwrap().storage_locked.0, bob_locked);
-        go("nearcarta.near", 0, 0);
+        go("nearcarta.near", 1, 0);
         c.force_close(acc(ALICE));
         assert!(c.get_charter(acc(ALICE)).is_none());
         let margin = STORAGE_MARGIN_BYTES as u128 * price();
-        assert_eq!(transfers_to(ALICE).last().copied(), Some(locked - margin + NEAR / 1000));
+        assert_eq!(transfers_to(ALICE).last().copied(), Some(locked - margin + NEAR / 1000 + 1), "the owner's yocto rides along");
         let bob = c.get_charter(acc(BOB)).unwrap();
         assert_eq!(bob.balance.0, NEAR / 500);
         assert_eq!(bob.storage_locked.0, bob_locked);
         go("nearcarta.near", 1, 0);
         let err = catch_unwind(AssertUnwindSafe(|| { c.reap(); })).unwrap_err();
         assert!(refuse(err).contains("ERR_NONEMPTY"));
-        go("nearcarta.near", 0, 0);
+        go("nearcarta.near", 1, 0);
         c.force_close(acc(BOB));
-        assert_eq!(transfers_to(BOB).last().copied(), Some(bob_locked - margin + NEAR / 500));
+        assert_eq!(transfers_to(BOB).last().copied(), Some(bob_locked - margin + NEAR / 500 + 1));
         assert_eq!(c.count, 0);
         go("nearcarta.near", 1, 0);
         c.reap();
@@ -2134,7 +2261,7 @@ mod tests {
         let msg = refuse(err);
         assert!(msg.contains("over_session_cap"), "{msg}");
 
-        go(ALICE, 0, 0);
+        go(ALICE, 1, 0);
         c.set_rules(RulesIn { expires_at: U64(1), ..rules((0, 0), 4) });
         go(ALICE, 0, 50);
         allow(&mut c, NEAR / 500, NEAR / 100);
@@ -2145,7 +2272,7 @@ mod tests {
         })).unwrap_err();
         assert!(refuse(err).contains("clause_expired"));
 
-        go(ALICE, 0, 0);
+        go(ALICE, 1, 0);
         c.set_rules(rules((0, 0), 4));
         go(ALICE, 0, 0);
         c.set_frozen(true);
@@ -2155,7 +2282,7 @@ mod tests {
             c.propose_call(acc(ALICE), acc(SHOP), "near_deposit".into(), args.to_vec(), U128(deposit), sig);
         })).unwrap_err();
         assert!(refuse(err).contains("frozen"));
-        go(ALICE, 0, 0);
+        go(ALICE, 1, 0);
         c.set_frozen(false);
 
         allow(&mut c, NEAR / 500, NEAR / 100);
@@ -2374,10 +2501,10 @@ mod tests {
         assert!(row.frozen);
         assert_eq!(row.nonce.0, nonce);
         assert_eq!(row.expires_at.0, 10);
-        go(ALICE, 0, 0);
+        go(ALICE, 1, 0);
         c.set_rules(rules((0, 0), 4));
         assert!(c.get_charter(acc(ALICE)).unwrap().frozen, "tighten's freeze stays through a rules edit");
-        go(ALICE, 0, 0);
+        go(ALICE, 1, 0);
         c.set_frozen(false);
         assert!(!c.get_charter(acc(ALICE)).unwrap().frozen);
         let _ = sk;
@@ -2388,7 +2515,7 @@ mod tests {
         let (mut c, agent, _) = boot();
         open_bob(&mut c);
         let (confirm, confirm_pk) = keypair(11);
-        go(ALICE, 0, 0);
+        go(ALICE, 1, 0);
         let err = catch_unwind(AssertUnwindSafe(|| c.set_confirm_key(keypair(7).1))).unwrap_err();
         assert!(refuse(err).contains("ERR_CONFIRM"));
         go(ALICE, MAX_ROW_YOCTO, 0);
@@ -2547,14 +2674,14 @@ mod tests {
         assert!(staged.iter().any(|l| l.contains("\"event\":\"stage_upgrade\"")), "{staged:?}");
         let eta = c.upgrade_eta();
         assert_eq!(eta, UPGRADE_DELAY_NS, "the delay is one day");
-        go("nearcarta.near", 0, eta - 1);
+        go("nearcarta.near", 1, eta - 1);
         let err = catch_unwind(AssertUnwindSafe(|| { c.upgrade(code.clone()); })).unwrap_err();
         assert!(refuse(err).contains("ERR_UPGRADE"), "too early");
-        go("nearcarta.near", 0, eta);
+        go("nearcarta.near", 1, eta);
         let err = catch_unwind(AssertUnwindSafe(|| { c.upgrade(vec![0x22]); })).unwrap_err();
         assert!(refuse(err).contains("ERR_UPGRADE"), "hash");
         assert_eq!(c.get_charter(acc(ALICE)).unwrap().balance.0, alice_bal);
-        go("nearcarta.near", 0, eta);
+        go("nearcarta.near", 1, eta);
         c.upgrade(code.clone());
         assert!(!c.upgrade_set, "the staged hash cannot be replayed");
         let receipts = get_created_receipts();
@@ -2709,14 +2836,14 @@ mod tests {
         let present = sign_confirm(&confirm.0, &c, ALICE, 0);
         let err = catch_unwind(AssertUnwindSafe(|| { c.confirm_hold(acc(ALICE), U64(0), present.clone()); })).unwrap_err();
         assert!(refuse(err).contains("frozen"));
-        go(ALICE, 0, 0);
+        go(ALICE, 1, 0);
         c.set_frozen(false);
         c.rows.get_mut(&acc(ALICE)).unwrap().rules.expires_at = 10;
         go(ALICE, 0, 11);
         let err = catch_unwind(AssertUnwindSafe(|| { c.confirm_hold(acc(ALICE), U64(0), present.clone()); })).unwrap_err();
         assert!(refuse(err).contains("clause_expired"));
         c.rows.get_mut(&acc(ALICE)).unwrap().rules.expires_at = 0;
-        go(ALICE, 0, 11);
+        go(ALICE, 1, 11);
         let (agent2, pk2) = keypair(8);
         c.set_agent(pk2);
         let err = catch_unwind(AssertUnwindSafe(|| { c.confirm_hold(acc(ALICE), U64(0), present.clone()); })).unwrap_err();
