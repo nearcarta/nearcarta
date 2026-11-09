@@ -27,6 +27,18 @@ for (const width of [1440, 390]) {
   test(`every shop opens twice at ${width}`, async ({ page }) => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    // A shop can render perfectly while the network is on fire: Your House shipped four HTTP 400s
+    // per visit (get_clauses/get_state with account_id null) and looked fine, because the failure
+    // was only visible in devtools. Collect 4xx/5xx for the whole loop and assert at the end.
+    //
+    // 503 is EXCLUDED on purpose, and narrowly: /api/ferry/quote answers 503 when the deployed API
+    // has no signing key, which is documented behaviour and reaches the panel as an honest refusal.
+    // The bug this guards against is a 400 from a malformed request, not a service that says no.
+    const netFailures = [];
+    page.on('response', r => {
+      const s = r.status();
+      if (s >= 400 && s !== 503) netFailures.push(`${s} ${new URL(r.url()).pathname}`);
+    });
     for (const [id, name] of shops) {
       for (let n = 0; n < 2; n++) {
         await page.goto(`/?mode=2d&nostory&shop=${id}`);
@@ -38,6 +50,9 @@ for (const width of [1440, 390]) {
       await page.screenshot({ path: `${shots}/shop-${id}-${width}.png` });
       await axeContrast(page);
     }
+    // The evidence for the whole loop, asserted once so the message names the shop is not needed:
+    // an empty list is the pass condition, and any entry prints its status and path.
+    expect(netFailures, `shops must not fail requests: ${netFailures.join(', ')}`).toEqual([]);
   });
 }
 
