@@ -287,7 +287,7 @@ function chips() {
 }
 function vAsk() {
   return head(ICON.lamp, 'Lamplighter', 'Say it. I walk there and do it.')
-    + `<form class="md-say" data-testid="md-say"><input type="text" maxlength="200" autocomplete="off" placeholder="Sell my iron" aria-label="What should the Lamplighter do?"><button type="submit" class="md-icon md-send" aria-label="Send">${ICON.send}</button></form>`
+    + `<form class="md-say" data-testid="md-say"><input type="text" maxlength="200" autocomplete="off" placeholder="Tell me what to do" aria-label="What should the Lamplighter do?"><button type="submit" class="md-icon md-send" aria-label="Send">${ICON.send}</button></form>`
     + `<div class="md-chips">${chips().map((c) => `<button type="button" class="md-ghost" data-act="ask" data-text="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
 }
 root.addEventListener('submit', (e) => { if (!e.target.closest('.md-say')) return; e.preventDefault(); ask(e.target.querySelector('input').value); });
