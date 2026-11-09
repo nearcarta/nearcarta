@@ -194,7 +194,7 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #fade{position:fixed;inset:0;z-index:30;opacity:0;pointer-events:none;display:none;background:radial-gradient(circle at var(--fx,50%) var(--fy,50%),#fff0cf 0,#f4c27a 14%,#c98a4a 34%,#5a3a22 70%,#2a1f16 100%)}
 #fade.on{display:block;pointer-events:auto} #fade .ring{position:absolute;left:50%;top:50%;width:28px;height:28px;margin:-14px;border-radius:50%;border:2px solid rgba(23,19,15,.25);border-top-color:#17130f;opacity:0;transition:opacity .3s;animation:spin .8s linear infinite}
 #fade.wait .ring{opacity:.8} @keyframes spin{to{transform:rotate(360deg)}}
-#shopUI .src { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 var(--s1); border-radius: 999px; font-size: 12px; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+#shopUI .src { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 var(--s1); border-radius: 999px; font-size: var(--t-small, 13px); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
 #shopUI .src::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
 #shopUI .src.live::before { background: none; border: 1.5px solid var(--muted); width: 5px; height: 5px; }
 #shopUI .src.split { color: #e6c98a; border-color: #d6b46a66; }
