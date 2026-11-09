@@ -173,7 +173,15 @@ body #shopUI #tray > .t-scroll > #t-track {
   min-height: 0;
 }
 #shopUI #tray .ferry-flow .tic .ti { width: 30px !important; height: 30px !important; }
-#shopUI #tray .ferry-flow .tic .ci { width: 12px !important; height: 12px !important; }
+/* The chain badge is a small circle over the token icon. Its inner mark is 22px inside a 14px
+   box on purpose: `object-fit: cover` crops it to a clean disc, which is what the badge should
+   look like. A clipping audit reports that as "22px of content in a 14px box", so it is noted
+   here rather than "fixed" — shrinking the inner mark would blur it, and enlarging the badge
+   would cover the token it sits on. */
+#shopUI #tray .ferry-flow .tic .ci {
+  width: 14px !important; height: 14px !important;
+  overflow: hidden;
+}
 #shopUI #tray .ferry-flow-arrow { font-size: var(--t-label); color: var(--ink-3); }
 /* A caption under the strip ("Entry -> Pot") is one short line, not a paragraph. */
 #shopUI #tray .arena-flow-caption,
@@ -615,8 +623,10 @@ body #shopUI #tray > .rcpt {
 body #shopUI #tray > .rcpt:empty { display: none !important; }
 
 /* Inline links inside a shop's prose ("Sign in", "Personal rules", "/setup"). They are part of a
-   sentence, so a 44px box would break the paragraph; they get a real touch slop instead, and the
-   gold underline the rest of the city uses so they read as links rather than bold text. */
+   sentence, so a 44px block would break the paragraph. `inline-block` with vertical padding grows
+   the hit area without changing the line height around it, and the gold underline the rest of the
+   city uses keeps them reading as links rather than bold text. Measured before: two of these were
+   24 and 26px tall, which is under a comfortable thumb target. */
 #shopUI #tray #t-form a:not(.act):not(.link),
 #shopUI #tray .note a,
 #shopUI #tray p a {
@@ -624,7 +634,9 @@ body #shopUI #tray > .rcpt:empty { display: none !important; }
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-color: rgba(214, 180, 106, .55);
-  padding: 3px 0;
+  display: inline-block;
+  padding: 8px 0;
+  min-height: 36px;
 }
 #shopUI #tray #t-form a:not(.act):not(.link):hover,
 #shopUI #tray .note a:hover { text-decoration-color: var(--brass-hi); }
