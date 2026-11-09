@@ -76,13 +76,17 @@ Three properties. Each one is pinned by a test and by a transaction you can open
 ## How to run and verify
 
 ```bash
-npm ci && npm test                  # 899 unit tests (898 pass, 1 skipped)
-npm run verify:mainnet              # 106/106 mainnet txs found
-npm run check-cited                 # MISSES: none
-npm run build && npm run e2e        # 127 browser tests
+npm ci
+npm test                 # 899 unit tests (898 pass, 1 skipped)
+npm run verify:mainnet   # 106/106 mainnet txs found
+npm run check-cited      # MISSES: none
+npm run build
+npm run e2e   # 127 browser tests
 cd contracts/oath && cargo +1.95.0 test --lib   # 122 passed
 cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 ```
+
+`npm run e2e` needs the API on `:8787` and the built UI on `:5173`; `e2e/playwright.config.js` reads `BASE_URL` and defaults to the local app.
 
 | Command | What it prints | What it proves |
 |---|---|---|
@@ -260,15 +264,15 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 ```bash
 npm ci
 npm test                 # 899 unit tests (898 pass, 1 skipped)
-npm run verify:mainnet                         # 106/106 mainnet txs found
-npm run check-cited                            # MISSES: none
-npm run readme-numbers -- --check              # the counts in this file are current
-npm run build && node app/serve.mjs &          # UI on :5173
-npx playwright install chromium && npm run e2e   # 127 browser tests
-npm run start                                  # API on :8787
-npm run test:contracts                         # every crate, including the sandbox suites
-npm run attack-demo                            # the attack set, with the chain's own reasons
-npm run tee                                    # the NEAR AI attestation check (non-billable)
+npm run verify:mainnet   # 106/106 mainnet txs found
+npm run check-cited      # MISSES: none
+npm run readme-numbers -- --check   # the counts in this file are current
+npm run start            # API on :8787
+npm run build && node app/serve.mjs &   # UI on :5173
+npm run e2e   # 127 browser tests
+npm run test:contracts   # every crate, including the sandbox suites
+npm run attack-demo      # the attack set, with the chain's own reasons
+npm run tee              # the NEAR AI attestation check (non-billable)
 ```
 
 `gitleaks git --config .gitleaks.toml --redact .` must report no leaks before any push.
