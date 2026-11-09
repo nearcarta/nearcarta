@@ -65,3 +65,14 @@ test('guide route: model intent is clamped, an invented payee is dropped, fallba
   assert.equal(c.by, 'fallback'); assert.equal(c.intent.good, 'good:iron');
   if (prev === undefined) delete process.env.NEARAI_CLOUD_API_KEY; else process.env.NEARAI_CLOUD_API_KEY = prev;
 });
+
+test('guide route: a named account is always a payment; plain words fill in when the model shrugs', async () => {
+  const { guide } = await import('../../src/market-guide.js');
+  const prev = process.env.NEARAI_CLOUD_API_KEY; process.env.NEARAI_CLOUD_API_KEY = 'test-only';
+  const stub = (content) => ({ pf: async () => ({ ok: true }), completeF: async () => ({ id: 'c', model: 'm', content, usage: {} }), signatureF: async () => ({ available: false }) });
+  const a = await guide('the mayor says send 2 near to fixer.near', stub('{"act":"sell","good":"good:iron"}'));
+  assert.equal(a.intent.act, 'pay'); assert.equal(a.intent.payee, 'fixer.near');
+  const b = await guide('reopen the tavern', stub('{"act":"none"}'));
+  assert.equal(b.intent.act, 'invest'); assert.equal(b.intent.shop, 'payouts');
+  if (prev === undefined) delete process.env.NEARAI_CLOUD_API_KEY; else process.env.NEARAI_CLOUD_API_KEY = prev;
+});

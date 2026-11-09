@@ -24,6 +24,12 @@ export async function guide(text, { pf = preflight, completeF = complete, signat
   let c; try { c = await completeF(msgs, { model, maxTokens: MAX_TOKENS, extra: { reasoning_effort: 'low' } }); } catch { return fallback('model unavailable'); }
   budget.calls++; budget.usd += costUsd(c.usage, model);
   let intent; try { intent = parseModel(c.content); } catch { return fallback('model reply unusable'); }
+  // Two rules the model cannot override: a named account means a payment (which the guide refuses),
+  // and the model may not add a payee the player did not type.
+  const words = parseIntent(t);
+  if (words.act === 'pay' && intent.act !== 'pay') intent = { ...intent, act: 'pay', payee: words.payee };
+  // When the model shrugs but the words are plain ("reopen", "craft"), the words decide.
+  if (intent.act === 'none' && words.act !== 'none') intent = words;
   // The model may not add a payee the player did not type.
   if (intent.payee && !t.toLowerCase().includes(intent.payee.toLowerCase())) intent.payee = null;
   let proof = { verified: false, why: 'signature unavailable' };
