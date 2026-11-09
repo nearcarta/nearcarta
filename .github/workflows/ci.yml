@@ -41,14 +41,30 @@ jobs:
       # install is verified, because a network blip used to fail the job as
       # "no such command: near" from the NEXT step, which reads like a code error.
       - run: |
-          for i in 1 2 3 4; do
-            curl -sSL --retry 3 --retry-delay 2 -o /tmp/cargo-near-installer.sh \
-              https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
-              && sh /tmp/cargo-near-installer.sh && break
-            echo "cargo-near install attempt $i failed, retrying"; sleep 3
+          # Retried hard on purpose. On 2026-11-09 all four sandbox jobs failed here, not in
+          # our code: the release asset answered HTTP 504 ten times in a row and the next step
+          # then reported "no such command: near", which reads like a broken repo. Backoff up to
+          # ~2 minutes, then a source build as the last resort, then a hard failure that says
+          # which step failed.
+          ok=0
+          for i in 1 2 3 4 5 6; do
+            if curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 120 \
+                 -o /tmp/cargo-near-installer.sh \
+                 https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
+               && sh /tmp/cargo-near-installer.sh; then ok=1; break; fi
+            echo "cargo-near installer attempt $i failed (HTTP or install); backing off"
+            sleep $((i * 10))
           done
+          if [ "$ok" = 0 ]; then
+            echo "::warning::cargo-near release asset unavailable; building it from source"
+            cargo install cargo-near --version 0.22.0 --locked || true
+          fi
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          cargo near --version
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! cargo near --version; then
+            echo "::error::cargo-near is not installed; the previous step was a network failure, not a code failure"
+            exit 1
+          fi
       - run: cd contracts/charter_factory && cargo near build non-reproducible-wasm --locked
       - run: cd contracts/charter_factory && cargo test --test sandbox --locked
   oath-sandbox:
@@ -64,14 +80,30 @@ jobs:
       # install is verified, because a network blip used to fail the job as
       # "no such command: near" from the NEXT step, which reads like a code error.
       - run: |
-          for i in 1 2 3 4; do
-            curl -sSL --retry 3 --retry-delay 2 -o /tmp/cargo-near-installer.sh \
-              https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
-              && sh /tmp/cargo-near-installer.sh && break
-            echo "cargo-near install attempt $i failed, retrying"; sleep 3
+          # Retried hard on purpose. On 2026-11-09 all four sandbox jobs failed here, not in
+          # our code: the release asset answered HTTP 504 ten times in a row and the next step
+          # then reported "no such command: near", which reads like a broken repo. Backoff up to
+          # ~2 minutes, then a source build as the last resort, then a hard failure that says
+          # which step failed.
+          ok=0
+          for i in 1 2 3 4 5 6; do
+            if curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 120 \
+                 -o /tmp/cargo-near-installer.sh \
+                 https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
+               && sh /tmp/cargo-near-installer.sh; then ok=1; break; fi
+            echo "cargo-near installer attempt $i failed (HTTP or install); backing off"
+            sleep $((i * 10))
           done
+          if [ "$ok" = 0 ]; then
+            echo "::warning::cargo-near release asset unavailable; building it from source"
+            cargo install cargo-near --version 0.22.0 --locked || true
+          fi
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          cargo near --version
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! cargo near --version; then
+            echo "::error::cargo-near is not installed; the previous step was a network failure, not a code failure"
+            exit 1
+          fi
       # near-sdk 5.x targets protocol < 84, so cargo-near requires rustc <= 1.86 for the wasm.
       - run: cd contracts/oath && cargo +1.86.0 near build non-reproducible-wasm --locked
       - run: cd contracts/reaper && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
@@ -90,14 +122,30 @@ jobs:
       # install is verified, because a network blip used to fail the job as
       # "no such command: near" from the NEXT step, which reads like a code error.
       - run: |
-          for i in 1 2 3 4; do
-            curl -sSL --retry 3 --retry-delay 2 -o /tmp/cargo-near-installer.sh \
-              https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
-              && sh /tmp/cargo-near-installer.sh && break
-            echo "cargo-near install attempt $i failed, retrying"; sleep 3
+          # Retried hard on purpose. On 2026-11-09 all four sandbox jobs failed here, not in
+          # our code: the release asset answered HTTP 504 ten times in a row and the next step
+          # then reported "no such command: near", which reads like a broken repo. Backoff up to
+          # ~2 minutes, then a source build as the last resort, then a hard failure that says
+          # which step failed.
+          ok=0
+          for i in 1 2 3 4 5 6; do
+            if curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 120 \
+                 -o /tmp/cargo-near-installer.sh \
+                 https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
+               && sh /tmp/cargo-near-installer.sh; then ok=1; break; fi
+            echo "cargo-near installer attempt $i failed (HTTP or install); backing off"
+            sleep $((i * 10))
           done
+          if [ "$ok" = 0 ]; then
+            echo "::warning::cargo-near release asset unavailable; building it from source"
+            cargo install cargo-near --version 0.22.0 --locked || true
+          fi
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          cargo near --version
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! cargo near --version; then
+            echo "::error::cargo-near is not installed; the previous step was a network failure, not a code failure"
+            exit 1
+          fi
       - run: cd contracts/charter_board && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
       - run: wasm-opt --enable-sign-ext --enable-mutable-globals --enable-bulk-memory -Oz --strip-debug --strip-producers -o /tmp/charter_board.wasm contracts/charter_board/target/near/charter_board.wasm && mv /tmp/charter_board.wasm contracts/charter_board/target/near/charter_board.wasm
       - run: cd contracts/charter_board_sandbox && cargo test --locked
