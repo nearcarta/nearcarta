@@ -120,9 +120,12 @@ export function mountHouseRoom(root, hooks = {}) {
     });
     const cta = root.querySelector('[data-testid=house-cta]');
     if (cta) {
+      // Signed out: the gold button used to say "I'm alive" and only then admit Sign in.
+      // Name the real next step so the press matches the label.
+      if (!id) cta.textContent = 'Sign in at /setup';
       // No deed yet: the only useful action is minting one, and the mint plan came with
       // the deed read, so the button names what the press will do.
-      if (state.needsMint && state.tab === 'deed') cta.textContent = 'Mint my deed';
+      else if (state.needsMint && state.tab === 'deed') cta.textContent = 'Mint my deed';
       else if (state.tab === 'vaults') cta.textContent = 'Send from house';
       else if (state.tab === 'heirs' && Number(state.line?.line?.pending_ns || 0) > 0) cta.textContent = 'Cancel release';
       else cta.textContent = "I'm alive";
@@ -229,6 +232,10 @@ export function mountHouseRoom(root, hooks = {}) {
   });
   const cta = root.querySelector('[data-testid=house-cta]');
   if (cta) cta.onclick = async () => {
+    if (!id) {
+      globalThis.location.href = '/setup/?next=' + encodeURIComponent('/?shop=house');
+      return;
+    }
     // mint_deed reads the predecessor and carries a 0.02 NEAR deposit, so a function-call
     // session key cannot sign it. This is the one House action that needs a wallet approval,
     // once per account; check-in, vault sends and heirs all use the session afterwards.
@@ -261,7 +268,10 @@ export function mountHouseRoom(root, hooks = {}) {
     // leaving the label on the mint after a successful mint is how a visitor ends up
     // pressing it twice.
     const ctaBtn = root.querySelector('[data-testid=house-cta]');
-    if (ctaBtn && state.tab === 'deed') ctaBtn.textContent = state.needsMint ? 'Mint my deed' : "I'm alive";
+    if (ctaBtn && state.tab === 'deed') {
+      if (!id) ctaBtn.textContent = 'Sign in at /setup';
+      else ctaBtn.textContent = state.needsMint ? 'Mint my deed' : "I'm alive";
+    }
     const rows = state.derived?.rows || [];
     const eth = rows.find(r => r.chain === 'eth');
     const addr = root.querySelector('#house-address');
@@ -297,6 +307,12 @@ export function mountHouseRoom(root, hooks = {}) {
 
   if (!id) {
     if (slot) slot.innerHTML = houseCharterMarkup({});
+    const hist = root.querySelector('[data-testid=house-history-body]');
+    if (hist) hist.textContent = 'Sign in to see this deed\'s history. Nothing was signed.';
+    const check = root.querySelector('#house-check');
+    if (check) check.value = 'Sign in to check in';
+    const ctaBtn = root.querySelector('[data-testid=house-cta]');
+    if (ctaBtn) ctaBtn.textContent = 'Sign in at /setup';
     return { turn, state };
   }
 

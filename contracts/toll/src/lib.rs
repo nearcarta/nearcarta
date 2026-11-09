@@ -12,6 +12,9 @@ use near_sdk::store::LookupMap;
 use near_sdk::{env, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseError};
 use serde_json::{json, Value};
 
+/// Room `sign_cross` keeps for the signed transaction and derived address `on_signed` stores.
+const SIGNED_TX_BYTES: u64 = 512;
+
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
 pub struct TxRec {
@@ -82,6 +85,17 @@ impl Oath {
             service_held: 0, earned: 0, surplus: 0, price: None }
     }
     fn assert_owner(&self) { require!(env::predecessor_account_id() == self.owner, "only owner"); }
+    /// Writes that add bytes, and the surplus payout, must leave the held service deposits
+    /// refundable. The bytes are staked from the same balance, so a crossing whose records cost
+    /// more than its fee, or a surplus payout that took the stake's cover, could leave a
+    /// `refund_order` without balance. `out` is NEAR about to leave or bytes still to come.
+    fn check_float(&mut self, out: u128) {
+        self.txs.flush(); self.orders.flush(); self.row_nonce.flush(); self.row_spent.flush();
+        self.derived.flush(); self.liabilities.flush(); self.actions.flush(); self.tx_order.flush();
+        let stake = env::storage_usage() as u128 * env::storage_byte_cost().as_yoctonear();
+        let need = stake.saturating_add(self.service_held).saturating_add(out);
+        require!(env::account_balance().as_yoctonear() >= need, "ERR_FLOAT");
+    }
     pub fn freeze(&mut self) { self.assert_owner(); self.frozen = true; }
     /// Unfreezing reopens crossings, so it needs the owner's full-access key (1 yocto).
     #[payable]
@@ -157,6 +171,7 @@ impl Oath {
         self.row_spent.insert(spent_key, spent + amount.0);
         self.service_held += dep;
         self.orders.insert(id, Order { id, action_id, row_owner, chain: "base".into(), path, asset: asset_l, to, amount, fee: U128(dep), status: "open".into(), evm_nonce: 0, tx_nonce: None, opened_at: U64(env::block_timestamp()) });
+        self.check_float(0);
         id
     }
     pub fn sign_cross(&mut self, id: u64) -> Promise {
@@ -177,6 +192,8 @@ impl Oath {
         let tx = self.sign(order.to.clone(), order.amount, fee, prio, gas, order.path.clone(), evm_nonce, order.asset.clone(), caller.to_string(), token, id);
         order.tx_nonce = Some(self.next_nonce - 1);
         self.orders.insert(id, order);
+        // `on_signed` writes the signed transaction later and must not fail for lack of balance.
+        self.check_float(SIGNED_TX_BYTES as u128 * env::storage_byte_cost().as_yoctonear());
         tx
     }
     pub fn cancel_order(&mut self, id: u64) {
@@ -218,6 +235,7 @@ impl Oath {
         }
         let rest = amount.0 - assigned;
         if rest > 0 { parts.push((self.owner.clone(), rest)); }
+        self.check_float(amount.0);
         let mut it = parts.into_iter();
         let (account, yocto) = it.next().expect("a surplus has a payee");
         let mut p = Promise::new(account).transfer(NearToken::from_yoctonear(yocto));

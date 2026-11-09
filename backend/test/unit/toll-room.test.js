@@ -321,7 +321,13 @@ test('a paid pass names the payment, the new balance, and the visitor receipt', 
   assert.match(words.text, new RegExp(hash));
   assert.equal(describeVisitorPass({ ok: true, decision: 'allowed', receiver: 'other.near', amount: ONE }, { hash }).ok, false);
   assert.equal(latestVisitorPass({ rows: [{ h: hash, decision: 'denied' }, { h: 'CwcBGcw9FUt7FmpaVdgSPVKK1d9krWt4TE1z46WUfHez', decision: 'allowed' }] }).h, 'CwcBGcw9FUt7FmpaVdgSPVKK1d9krWt4TE1z46WUfHez');
-  assert.match(policyWords({ ok: true, contract: 'toll.nearcarta.near', path: 'base-1', chain_id: 8453 }), /base-1/);
+  const plain = policyWords({
+    ok: true, contract: 'toll.nearcarta.near', path: 'base-1', chain_id: 8453, verify_chain: 'Base',
+    quote: { payable: true, feeNear: '0.001' },
+  });
+  assert.match(plain, /base-1/);
+  assert.match(plain, /board row|\/setup/);
+  assert.doesNotMatch(plain, /row:\{account\}/);
   assert.match(policyWords({ ok: false }), /did not answer/);
   assert.equal(tollPendingLine('Pay the toll'), 'Asking the charter under your cap…');
   assert.equal(tollPendingLine('cross'), 'Asking the charter under your cap…');
@@ -508,4 +514,22 @@ test('effectBudgetFits reads the row storage the chain reports', () => {
   // A row that does not report storage must not be judged.
   assert.equal(effectBudgetFits({}), null);
   assert.equal(effectBudgetFits(null), null);
+});
+
+test('visitor ledger hides operator deploy hashes and policy words stay plain', () => {
+  const html = tollMarkup({
+    tab: 'ledger',
+    live: { ok: true, contract: 'toll.nearcarta.near', path: 'base-1', chain_id: 8453, verify_chain: 'Base', quote: { payable: true, feeNear: '0.001' } },
+    recorded: {
+      txs: {
+        allow_pass: '3frACAL1EU4APBcAME8gNg1xw4uKSnXc81hj2c56Jdon',
+        toll_v8_upgrade_migrate: 'CwcBGcw9FUt7FmpaVdgSPVKK1d9krWt4TE1z46WUfHez',
+        fund_toll: 'JChWxmANwWiUqh7au1VrjCzPp8pdjHP46EnadmJsrdTy',
+      },
+    },
+  });
+  assert.match(html, /Allowed on NEAR/);
+  assert.doesNotMatch(html, /toll_v8_upgrade_migrate/);
+  assert.doesNotMatch(html, /fund_toll/);
+  assert.doesNotMatch(policyWords({ ok: true, contract: 'toll.nearcarta.near', path: 'base-1', chain_id: 8453 }), /row:\{account\}/);
 });
