@@ -484,6 +484,12 @@ body.intro-on #fbimg{animation:introCam 22s linear both}
 #drawer .dz .go[disabled]{opacity:.6;cursor:progress}
 #drawer .dz .ghost{appearance:none;min-height:44px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--text);font:500 14px Inter,system-ui,sans-serif;padding:0 14px;cursor:pointer}
 #drawer .dz .btns{display:grid;grid-template-columns:1fr auto;gap:8px}
+/* Two buttons in one drawer action: stack them full width. The 1fr/auto grid let a nowrap label
+   take the row and squeezed "Run it live" into a one-letter column. One gold button per view: the
+   second action is the outlined one. */
+#drawer .dz .btns{grid-template-columns:minmax(0,1fr)}
+#drawer .dz .btns > button{width:100%;min-width:0;white-space:normal}
+#drawer .dz .btns .redteam-next{background:transparent!important;background-image:none!important;color:var(--text)!important;border:1px solid var(--line)!important;box-shadow:none!important;animation:none}
 #drawer .dz.act1:has(.go[hidden]):not(:has(h3)){display:none}
 #drawer .quote{margin:0;font-size:14px;line-height:20px;color:var(--text);font-style:italic;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 #drawer .card{border-radius:10px;padding:12px 14px;display:grid;gap:4px;border:1px solid var(--line);border-left:4px solid var(--muted);background:var(--base)}
@@ -1028,3 +1034,8 @@ body.toll-tray #shopUI .tokw img.tok{width:22px;height:22px;flex:none;display:bl
   .toll-agent-char{width:88px}
   .toll-agent-pop{width:min(240px,calc(100vw - 120px))}
 }
+
+/* Reading the proof is its own view: the town menu pill sat on the drawer title on a phone
+   ("All shops" over "Mist Bank"), and an open AI dock covered the drawer's last card on desktop. */
+@media (max-width:720px){ body:has(#drawer.open) nav.all-shops{display:none} }
+body:has(#drawer.open) [id$="-agent-dock"]{display:none!important}
