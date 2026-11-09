@@ -452,10 +452,10 @@
       "contract": "townhall.nearcarta.near",
       "owner": "nearcarta.near",
       "wasm": "hall.wasm",
-      "sha256": "e8ebe14e760d2fa0658237a6d75393bb4eff23e7a7fa824fa2040024f215bffd",
-      "code_hash": "GgECZv7g1tSGvnXeMLuJrQKYcfjBVwdXHyS1TZn6T6N8",
-      "storage_bytes": "220874",
-      "locked_near": 2.31836,
+      "sha256": "4f49b235e406f5ace0e1fd0b8ac5e31cf24a4c18e63996c5da4e9fef1a3ab7f5",
+      "code_hash": "6LWPMM3HzbwaySAWYH9Xu7HZCHDPjYya2cXfXHGxAtVz",
+      "storage_bytes": "230307",
+      "locked_near": 2.30307,
       "full_access_keys": 1,
       "teardown": "delete_account with the key in ~/.near-credentials/mainnet/townhall.nearcarta.near.json",
       "txs": {
@@ -470,7 +470,9 @@
         "hall_v2_deploy_migrate": "DjzqHk2KcX2S6GfD1d4b9FQt5ypJiPdFdozXVPoYJrU3",
         "hall_v2_smoke_post_0.001": "DTqpzuhNs5bSDoiSEQP4eAHizCNFHN7wcZcWpzRqAhjZ",
         "hall_v2_smoke_refund": "JC9ojuNMVPkUY3o4zxdAQWYfmecy9B8MBrFexstVDHWj",
-        "topup_0.45": "6LLLhMr9PnqRwn4kk4boMHU7YXe62mF6z8gDvfsRpBuf"
+        "topup_0.45": "6LLLhMr9PnqRwn4kk4boMHU7YXe62mF6z8gDvfsRpBuf",
+        "hall_w4_deploy_in_place": "3MXkc17fSMx9SHMdY5RttVJ4rmuZ2hRTsD9yqy1S3x3A",
+        "hall_w4_smoke_stranger_prune_refused": "8RZQCTzB12aKjoRxSYDZRodY7T2uVfbm3tiQVF5zEoKk"
       },
       "crate": "contracts/hall",
       "deploy_tx": "DjzqHk2KcX2S6GfD1d4b9FQt5ypJiPdFdozXVPoYJrU3",
@@ -512,7 +514,8 @@
       "previous_code_hash": "FQg3EZdbEcjz44F5dckp9agpbsV9nYuToBQ4yUzXXWK9",
       "hotfix": "contracts/hall/HOTFIX.md: migrate() accepted pred == owner (an argument), so anyone could wipe and close the hall.",
       "hotfix_deploy_tx": "71QKJYqcxquc2Ku8Vqy8osRMBpCxRKHNSQ3dhBcVrk3s",
-      "hotfix_proof_tx": "A5jtjqhCGH8Qn2GWodeAEiExDz3nkbTC4gSb7f8N5X4v"
+      "hotfix_proof_tx": "A5jtjqhCGH8Qn2GWodeAEiExDz3nkbTC4gSb7f8N5X4v",
+      "upgrade_note": "Hall code from main 1e1436b5 (W2-W4: #[private] callbacks, U64/U128 JSON, ERR_FLOAT, prune) deployed in place with the account key, no migrate: the state layout is unchanged. +9,433 B (0.0943 NEAR) paid from the hall's own spare."
     }
   },
   "root_balance_near": 3.2899,
