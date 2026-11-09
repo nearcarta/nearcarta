@@ -93,7 +93,8 @@ impl<T: PartialEq> Set<T> {
     }
 }
 
-/// 0.03 NEAR, 3000 bytes of trie per row.
+/// 0.04 NEAR, 4000 bytes of trie per row. 3000 could not hold a row that covers every shop
+/// the city drives through the board (8 receivers, 17 pairs locks 3423 B with the 1400 B reserve).
 ///
 /// It was 0.02 (2000 bytes), which the shops outgrew. Measured on mainnet 2026-11-08 with a
 /// clean seven-pair Town Hall row: 1858 bytes locked with the 600-byte side reserve, and the
@@ -101,7 +102,7 @@ impl<T: PartialEq> Set<T> {
 /// panicked ERR_DEPOSIT before the shop was ever reached. The same wall stops the toll
 /// crossing and every held payment. The cap is what the visitor deposits and gets back on
 /// close, so raising it costs a visitor nothing that is not returned.
-pub const MAX_ROW_YOCTO: u128 = 30_000_000_000_000_000_000_000;
+pub const MAX_ROW_YOCTO: u128 = 40_000_000_000_000_000_000_000;
 pub const MAX_RECEIVERS: usize = 8;
 /// `set_calls` dedupes (receiver, method) and stops at this many. Pay receivers stay at 8.
 pub const MAX_CALLS: usize = 24;
@@ -1469,15 +1470,19 @@ mod tests {
         }
     }
 
-    /// The mainnet test row: an implicit owner, five shops and eight pairs. It must fit the
-    /// 0.03 NEAR row with the 1400-byte side reserve, or the reopen would fail after gas.
+    /// The mainnet test row: an implicit owner, every receiver the city drives through the board
+    /// (Hall, Arena, House, Toll, Guard, wrap.near for Ferry/Payouts, native USDC for the Payouts
+    /// storage sponsor, and one NEAR payee) and every pair those shops send, plus the board stamp.
+    /// It must fit the row with the 1400-byte side reserve, or the reopen would fail after gas.
     #[test]
-    fn a_five_shop_eight_pair_row_fits_the_row_cap() {
+    fn a_row_with_every_board_shop_fits_the_row_cap() {
         let owner = "8ccd5d33d2e8eb2d27eef13a7a0c88ae2ea9209c002fa7f27ed6021592393bb9";
         go("nearcarta.near", 0, 0);
         let mut c = Board::new();
         let (_sk, pk) = keypair(9);
-        let shops = ["townhall.nearcarta.near", "arena.nearcarta.near", "house.nearcarta.near", "toll.nearcarta.near", "guard.nearcarta.near"];
+        let usdc = "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
+        let (th, ar, ho) = ("townhall.nearcarta.near", "arena.nearcarta.near", "house.nearcarta.near");
+        let shops = [th, ar, ho, "toll.nearcarta.near", "guard.nearcarta.near", "wrap.near", usdc, "nearcarta.near"];
         let mut r = rules((0, 0), 8);
         r.receivers = shops.iter().map(|s| acc(s)).collect();
         r.per_action_cap = U128(NEAR / 1000);
@@ -1485,15 +1490,17 @@ mod tests {
         go(owner, MAX_ROW_YOCTO, 0);
         c.open_charter(r, pk, U128(NEAR / 200));
         let pairs = [
-            ("townhall.nearcarta.near", "post_job"), ("townhall.nearcarta.near", "accept"), ("townhall.nearcarta.near", "review"),
-            ("townhall.nearcarta.near", "refund"), ("arena.nearcarta.near", "fund"), ("house.nearcarta.near", "house_session_check_in"),
+            (th, "post_job"), (th, "bid"), (th, "counter"), (th, "accept"), (th, "deliver"), (th, "review"), (th, "refund"),
+            (ar, "fund"), (ho, "house_session_check_in"), (ho, "house_session_prepare_send"),
             ("toll.nearcarta.near", "cross"), ("guard.nearcarta.near", "pay"),
+            ("wrap.near", "near_deposit"), ("wrap.near", "ft_transfer"), ("wrap.near", "storage_deposit"),
+            (usdc, "storage_deposit"), ("charters.nearcarta.near", "stamp"),
         ];
         go(owner, 5 * NEAR / 100, 0);
         c.set_calls(pairs.iter().map(|(a, m)| (acc(a), m.to_string(), NEAR / 1000)).collect(), NEAR / 100);
         let v = c.get_charter(acc(owner)).unwrap();
         assert!(v.storage_locked.0 <= MAX_ROW_YOCTO, "row {}", v.storage_locked.0);
-        eprintln!("eight-pair row storage_locked {}", v.storage_locked.0);
+        eprintln!("every-shop row storage_locked {}", v.storage_locked.0);
     }
 
     fn boot() -> (Board, SigningKey, String) {
