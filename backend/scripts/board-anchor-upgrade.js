@@ -93,6 +93,18 @@ try {
   }
   if (!eta) etaError = 'no stage_upgrade event in the recorded stage transaction';
 } catch (e) { etaError = e.message; }
+// The RPC read can time out (it did on 2026-11-09). The staged eta is also recorded in
+// mainnet.json from that same event, and falling back to it is the difference between "wait
+// until 16:29 today" and the old behaviour of inventing now + 24 h, which told the owner to
+// wait a day for an upgrade that was hours away. The record is a cache of the event, not a
+// second source of truth, so it is only used when the event could not be read.
+if (!eta) {
+  const recordedEta = staged.staged_eta_ns;
+  if (recordedEta) {
+    eta = String(recordedEta);
+    etaError = `${etaError} (used staged_eta_ns from mainnet.json)`;
+  }
+}
 let code = null;
 try { code = Buffer.from((await post('query', { request_type: 'view_code', finality: 'final', account_id: board })).code_base64, 'base64'); }
 catch { code = null; }
