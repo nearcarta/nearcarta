@@ -1,0 +1,10 @@
+{
+  "file": "market.wasm",
+  "bytes": 359160,
+  "sha256": "6c1a02fae15af10b97fbd3322d46d858794f30479dd545444bf40330ec3fc88b",
+  "storage_bytes_after_new": 359597,
+  "stake_yocto": "3595970000000000000000000",
+  "slack_yocto": "50000000000000000000000",
+  "measured": "local near-sandbox: account storage_usage right after new(), one full-access key",
+  "build": "cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi, near-sdk 5.27.0, wasm-opt 124 -Oz --strip-debug --strip-producers"
+}

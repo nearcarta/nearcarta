@@ -350,3 +350,12 @@ test('the guard tray prefers the model reader the shell supplies, and the shell 
   assert.match(shell, /runAgent: \(text, context\) => A\.runGuardAgentWithModel/, 'the Guardhouse supplies the model reader');
   assert.match(shell, /context \|\| hooks\.trayCtx\?\.\(\)/, 'the later arm passes the tray context through');
 });
+
+test('the city guard mount hands the tray the shell hooks object, so the dock can read its context back', () => {
+  const src = read('app/src/panels/deep.js');
+  const body = src.slice(src.indexOf('function mountGuard('), src.indexOf('function mountGuard(') + 1200);
+  assert.doesNotMatch(body, /\{\s*\.\.\.hooks/, 'a copy hides hooks.trayCtx and hooks.runAgent from the dock');
+  assert.match(body, /mountGuardTray\(root, h,/);
+  const shell = read('app/design/D8_shops/js/shopui.js');
+  assert.match(shell, /hooks\.runAgent\(text, context \|\| hooks\.trayCtx\?\.\(\)\)/);
+});

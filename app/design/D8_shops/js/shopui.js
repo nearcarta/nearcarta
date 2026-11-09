@@ -125,7 +125,7 @@ function wireTollDock(hooks) {
   });
   const go = d.querySelector('#t-agent-go');
   const input = d.querySelector('#t-agent');
-  const send = (e) => { e?.preventDefault?.(); return dispatchTollDock(document); };
+  const send = (e) => { e?.preventDefault?.(); if (e?.__nearcartaDockSent) return undefined; return dispatchTollDock(document); };
   if (go) go.onclick = send;
   if (input) input.onkeydown = (e) => { if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) { e.preventDefault(); send(e); } };
 }
@@ -151,7 +151,7 @@ function wireFerryDock(hooks) {
   const go = d.querySelector('#f-agent-go');
   const input = d.querySelector('#f-agent');
   const form = d.querySelector('#f-agent-form');
-  const send = (e) => { e?.preventDefault?.(); return dispatchFerryDock(document); };
+  const send = (e) => { e?.preventDefault?.(); if (e?.__nearcartaDockSent) return undefined; return dispatchFerryDock(document); };
   if (go) go.onclick = send;
   if (form) form.onsubmit = send;
   if (input) input.onkeydown = (e) => { if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) { e.preventDefault(); send(e); } };
@@ -167,7 +167,7 @@ function wireHallDock(hooks) {
   });
   const go = d.querySelector('#h-agent-go');
   const input = d.querySelector('#h-agent');
-  const send = (e) => { e?.preventDefault?.(); return dispatchHallDock(document); };
+  const send = (e) => { e?.preventDefault?.(); if (e?.__nearcartaDockSent) return undefined; return dispatchHallDock(document); };
   if (go) go.onclick = send;
   if (input) input.onkeydown = (e) => { if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) { e.preventDefault(); send(e); } };
 }
@@ -195,7 +195,7 @@ function wireGuardDock(hooks) {
   });
   const go = d.querySelector('#g-agent-go');
   const input = d.querySelector('#g-agent');
-  const send = (e) => { e?.preventDefault?.(); return dispatchGuardDock(document); };
+  const send = (e) => { e?.preventDefault?.(); if (e?.__nearcartaDockSent) return undefined; return dispatchGuardDock(document); };
   if (go) go.onclick = send;
   if (input) input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); send(e); } };
 }
