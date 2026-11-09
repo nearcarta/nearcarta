@@ -30,10 +30,10 @@ pub struct Line {
     pub heirs: Vec<AccountId>,
     pub guardians: Vec<AccountId>,
     pub threshold: u32,
-    pub last_check_in_ns: u64,
-    pub period_ns: u64,
-    pub wait_ns: u64,
-    pub pending_ns: u64,
+    pub last_check_in_ns: U64,
+    pub period_ns: U64,
+    pub wait_ns: U64,
+    pub pending_ns: U64,
     pub approvals: Vec<AccountId>,
     pub released: bool,
 }
@@ -55,7 +55,7 @@ pub struct Vault {
     pub chain: String,
     pub path: String,
     pub asset: String,
-    pub max_value: u128,
+    pub max_value: U128,
     pub max_gas: u64,
     pub receivers: Vec<String>,
     pub funded: bool,
@@ -69,7 +69,7 @@ pub struct PreparedSend {
     pub chain: String,
     pub to: String,
     pub asset: String,
-    pub value: u128,
+    pub value: U128,
     pub gas_limit: u64,
     pub epoch: u64,
     pub live: bool,
@@ -192,8 +192,11 @@ impl Contract {
     #[private]
     pub fn on_house_pay(&mut self, token_id: TokenId, receiver_id: AccountId, amount: U128, epoch: u64) -> bool {
         let mut p = self.purses.get(&token_id).unwrap();
-        let current = self.epochs.get(&token_id).unwrap_or(0);
-        let ok = current == epoch && matches!(env::promise_result_checked(0, 0), Ok(_));
+        // The epoch only labels the event. A transfer that landed is paid, even if the deed moved
+        // while it was in flight: crediting it back here would hand the purse NEAR it no longer has.
+        let moved = self.epochs.get(&token_id).unwrap_or(0) != epoch;
+        let ok = matches!(env::promise_result_checked(0, 0), Ok(_));
+        if moved { log!("house_pay landed after the deed moved (epoch {})", epoch); }
         if ok {
             p.paid = U128(p.paid.0 + amount.0); p.pays += 1;
             log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_pay\",\"data\":[{{\"token_id\":\"{}\",\"to\":\"{}\",\"amount\":\"{}\"}}]}}", token_id, receiver_id, amount.0);
@@ -248,9 +251,9 @@ impl Contract {
         require!(!heirs.contains(&owner) && !guardians.contains(&owner), "the owner is not an heir or a guardian");
         self.lines.insert(&token_id, &Line {
             heirs, guardians, threshold,
-            last_check_in_ns: env::block_timestamp(),
-            period_ns: period_ns.0, wait_ns: wait_ns.0,
-            pending_ns: 0, approvals: Vec::new(), released: false,
+            last_check_in_ns: U64(env::block_timestamp()),
+            period_ns, wait_ns,
+            pending_ns: U64(0), approvals: Vec::new(), released: false,
         });
     }
 
@@ -262,8 +265,8 @@ impl Contract {
         require!(env::predecessor_account_id() == owner, "only the deed holder");
         let mut line = self.line_of(&token_id);
         require!(!line.released, "already released");
-        line.last_check_in_ns = env::block_timestamp();
-        line.pending_ns = 0;
+        line.last_check_in_ns = U64(env::block_timestamp());
+        line.pending_ns = U64(0);
         line.approvals.clear();
         self.lines.insert(&token_id, &line);
         log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_check_in\",\"data\":[{{\"token_id\":\"{}\"}}]}}", token_id);
@@ -276,8 +279,8 @@ impl Contract {
         let owner = self.owner_of(&token_id);
         require!(env::predecessor_account_id() == owner, "only the deed holder");
         let mut line = self.line_of(&token_id);
-        require!(line.pending_ns > 0, "no release is waiting");
-        line.pending_ns = 0;
+        require!(line.pending_ns.0 > 0, "no release is waiting");
+        line.pending_ns = U64(0);
         line.approvals.clear();
         self.lines.insert(&token_id, &line);
     }
@@ -291,9 +294,9 @@ impl Contract {
         require!(!line.released, "already released");
         require!(line.guardians.contains(&who), "not a guardian");
         let now = env::block_timestamp();
-        require!(now > line.last_check_in_ns.saturating_add(line.period_ns), "still inside the check-in window");
+        require!(now > line.last_check_in_ns.0.saturating_add(line.period_ns.0), "still inside the check-in window");
         if !line.approvals.contains(&who) { line.approvals.push(who); }
-        if line.approvals.len() as u32 >= line.threshold && line.pending_ns == 0 { line.pending_ns = now; }
+        if line.approvals.len() as u32 >= line.threshold && line.pending_ns.0 == 0 { line.pending_ns = U64(now); }
         self.lines.insert(&token_id, &line);
     }
 
@@ -303,10 +306,10 @@ impl Contract {
         assert_one_yocto();
         let mut line = self.line_of(&token_id);
         require!(!line.released, "already released");
-        require!(line.pending_ns > 0, "no release is waiting");
+        require!(line.pending_ns.0 > 0, "no release is waiting");
         require!(line.approvals.len() as u32 >= line.threshold, "not enough guardians");
         let now = env::block_timestamp();
-        require!(now >= line.pending_ns.saturating_add(line.wait_ns), "the waiting period has not ended");
+        require!(now >= line.pending_ns.0.saturating_add(line.wait_ns.0), "the waiting period has not ended");
         let owner = self.owner_of(&token_id);
         let heir = line.heirs[0].clone();
         require!(heir != owner, "the heir already holds the deed");
@@ -314,7 +317,7 @@ impl Contract {
         let epoch = self.epochs.get(&token_id).unwrap_or(0).saturating_add(1);
         self.epochs.insert(&token_id, &epoch);
         line.released = true;
-        line.pending_ns = 0;
+        line.pending_ns = U64(0);
         self.lines.insert(&token_id, &line);
         log!("EVENT_JSON:{{\"standard\":\"nearcarta_deed\",\"version\":\"1.0.0\",\"event\":\"house_release\",\"data\":[{{\"token_id\":\"{}\",\"to\":\"{}\"}}]}}", token_id, heir);
     }
@@ -353,7 +356,7 @@ impl Contract {
         if let Some(prev) = self.lines.get(&token_id) {
             require!(prev.heirs == heirs && prev.guardians == guardians, "owner intent required");
             require!(threshold >= prev.threshold, "owner intent required");
-            require!(period_ns.0 <= prev.period_ns && wait_ns.0 <= prev.wait_ns, "owner intent required");
+            require!(period_ns.0 <= prev.period_ns.0 && wait_ns.0 <= prev.wait_ns.0, "owner intent required");
         }
         self.write_line(&token_id, &row_owner, heirs, guardians, threshold, period_ns, wait_ns);
     }
@@ -390,7 +393,7 @@ impl Contract {
         require!(chain_l == "base" || chain_l == "btc", "chain");
         if chain_l == "btc" { require!(asset.to_uppercase() == "BTC", "bitcoin asset"); }
         self.vaults.insert(&token_id, &Vault {
-            chain: chain_l, path, asset: asset.to_uppercase(), max_value: max_value.0, max_gas, receivers, funded: false,
+            chain: chain_l, path, asset: asset.to_uppercase(), max_value, max_gas, receivers, funded: false,
         });
     }
 
@@ -507,8 +510,8 @@ impl Contract {
     fn check_in_holder(&mut self, token_id: &TokenId) {
         let mut line = self.line_of(token_id);
         require!(!line.released, "already released");
-        line.last_check_in_ns = env::block_timestamp();
-        line.pending_ns = 0;
+        line.last_check_in_ns = U64(env::block_timestamp());
+        line.pending_ns = U64(0);
         line.approvals.clear();
         self.lines.insert(token_id, &line);
     }
@@ -523,9 +526,9 @@ impl Contract {
         require!(!heirs.contains(owner) && !guardians.contains(owner), "the owner is not an heir or a guardian");
         self.lines.insert(token_id, &Line {
             heirs, guardians, threshold,
-            last_check_in_ns: env::block_timestamp(),
-            period_ns: period_ns.0, wait_ns: wait_ns.0,
-            pending_ns: 0, approvals: Vec::new(), released: false,
+            last_check_in_ns: U64(env::block_timestamp()),
+            period_ns, wait_ns,
+            pending_ns: U64(0), approvals: Vec::new(), released: false,
         });
     }
 
@@ -561,11 +564,11 @@ impl Contract {
         require!(asset_u == vault.asset, "asset");
         if chain_l == "btc" && value > 0 { env::panic_str("bitcoin is signing only"); }
         require!(value > 0 || chain_l == "btc", "amount must be above 0");
-        require!(value <= vault.max_value, "over the vault cap");
+        require!(value <= vault.max_value.0, "over the vault cap");
         require!(gas_limit <= vault.max_gas, "gas");
         require!(vault.receivers.iter().any(|r| r.eq_ignore_ascii_case(&to)), "payee");
         let prepared = PreparedSend {
-            action_id, chain: chain_l, to, asset: asset_u, value, gas_limit,
+            action_id, chain: chain_l, to, asset: asset_u, value: U128(value), gas_limit,
             epoch: self.epochs.get(token_id).unwrap_or(0),
             live: false,
         };
@@ -592,6 +595,15 @@ impl Contract {
         self.purses.insert(&who.to_string(), &Purse { balance: U128(purse), cap: U128(cap), paid: U128(0), pays: 0, refused_note: None });
         self.epochs.insert(&who.to_string(), &0);
         token
+    }
+
+    /// A deed that changes hands drops the seller's inheritance line and checked send, and bumps the
+    /// epoch. Otherwise the seller's guardians could release the sold deed to the seller's heir.
+    fn on_sale(&mut self, token_id: &TokenId) {
+        self.lines.remove(token_id);
+        self.prepared.remove(token_id);
+        let epoch = self.epochs.get(token_id).unwrap_or(0).saturating_add(1);
+        self.epochs.insert(token_id, &epoch);
     }
 
     fn owner_of(&self, token_id: &TokenId) -> AccountId {
@@ -622,10 +634,12 @@ fn distinct(ids: &[AccountId]) -> bool {
 impl NonFungibleTokenCore for Contract {
     #[payable]
     fn nft_transfer(&mut self, receiver_id: AccountId, token_id: TokenId, approval_id: Option<u64>, memo: Option<String>) {
-        self.tokens.nft_transfer(receiver_id, token_id, approval_id, memo)
+        self.tokens.nft_transfer(receiver_id, token_id.clone(), approval_id, memo);
+        self.on_sale(&token_id);
     }
     #[payable]
     fn nft_transfer_call(&mut self, receiver_id: AccountId, token_id: TokenId, approval_id: Option<u64>, memo: Option<String>, msg: String) -> PromiseOrValue<bool> {
+        self.on_sale(&token_id);
         self.tokens.nft_transfer_call(receiver_id, token_id, approval_id, memo, msg)
     }
     fn nft_token(&self, token_id: TokenId) -> Option<Token> { self.tokens.nft_token(token_id) }
@@ -926,7 +940,7 @@ mod tests {
         c.house_set_line(id.clone(), vec![accounts(4)], vec![accounts(3), accounts(5)], 2, U64(60 * SEC), U64(60 * SEC));
         at(3, 1, 70 * SEC);
         c.house_guardian_approve(id.clone());
-        assert_eq!(c.house_line(id).unwrap().pending_ns, 0);
+        assert_eq!(c.house_line(id).unwrap().pending_ns.0, 0);
     }
 
     #[test]
@@ -934,7 +948,7 @@ mod tests {
         let (mut c, id) = fresh();
         at(3, 1, 70 * SEC);
         c.house_guardian_approve(id.clone());
-        let started = c.house_line(id.clone()).unwrap().pending_ns;
+        let started = c.house_line(id.clone()).unwrap().pending_ns.0;
         at(2, 1, started + 60 * SEC);
         c.house_release(id.clone());
         assert_eq!(c.nft_token(id.clone()).unwrap().owner_id, accounts(4));
@@ -947,7 +961,7 @@ mod tests {
         let (mut c, id) = fresh();
         at(3, 1, 70 * SEC);
         c.house_guardian_approve(id.clone());
-        let started = c.house_line(id.clone()).unwrap().pending_ns;
+        let started = c.house_line(id.clone()).unwrap().pending_ns.0;
         at(2, 1, started + 60 * SEC);
         c.house_release(id.clone());
         at(1, 1, started + 61 * SEC);
@@ -1035,7 +1049,7 @@ mod tests {
         board_at(0, 4 * SEC);
         let prepared = c.house_session_prepare_send(accounts(1), id.clone(), "btc".into(), "bc1qexample".into(), "BTC".into(), U128(0), 0, "btc0".into());
         assert!(!prepared.live);
-        assert_eq!(prepared.value, 0);
+        assert_eq!(prepared.value.0, 0);
         assert_eq!(c.house_prepared(id).unwrap().action_id, "btc0");
     }
 
@@ -1045,7 +1059,7 @@ mod tests {
         let (mut c, id) = fresh();
         at(3, 1, 70 * SEC);
         c.house_guardian_approve(id.clone());
-        let started = c.house_line(id.clone()).unwrap().pending_ns;
+        let started = c.house_line(id.clone()).unwrap().pending_ns.0;
         at(2, 1, started + 60 * SEC);
         c.house_release(id.clone());
         assert_eq!(c.house_epoch(id.clone()), 1);
@@ -1054,7 +1068,9 @@ mod tests {
     }
 
     #[test]
-    fn a_stale_pay_epoch_returns_the_purse() {
+    fn a_pay_that_landed_after_the_deed_moved_is_not_credited_back() {
+        // The NEAR already left. Crediting the purse again would let the next holder
+        // withdraw NEAR that belongs to other purses.
         ctx(0, 0); let mut c = Contract::new(None);
         let id = accounts(1).to_string();
         at(1, 3 * 10u128.pow(22), SEC);
@@ -1062,11 +1078,49 @@ mod tests {
         let before = c.house_purse(id.clone()).unwrap().balance.0;
         at(1, 1, 2 * SEC);
         let _ = c.house_pay(id.clone(), accounts(4), U128(10u128.pow(21)));
-        assert!(c.house_purse(id.clone()).unwrap().balance.0 < before);
         c.epochs.insert(&id, &1);
         callback(true);
+        assert!(c.on_house_pay(id.clone(), accounts(4), U128(10u128.pow(21)), 0));
+        assert_eq!(c.house_purse(id.clone()).unwrap().balance.0, before - 10u128.pow(21));
+        assert_eq!(c.house_held().0, before - 10u128.pow(21));
+    }
+
+    #[test]
+    fn a_pay_that_bounced_returns_to_the_purse_whatever_the_epoch() {
+        ctx(0, 0); let mut c = Contract::new(None);
+        let id = accounts(1).to_string();
+        at(1, 3 * 10u128.pow(22), SEC);
+        c.mint_deed(None, None);
+        let before = c.house_purse(id.clone()).unwrap().balance.0;
+        at(1, 1, 2 * SEC);
+        let _ = c.house_pay(id.clone(), accounts(4), U128(10u128.pow(21)));
+        c.epochs.insert(&id, &1);
+        callback(false);
         assert!(!c.on_house_pay(id.clone(), accounts(4), U128(10u128.pow(21)), 0));
         assert_eq!(c.house_purse(id).unwrap().balance.0, before);
+        assert_eq!(c.house_held().0, before);
+    }
+
+    #[test]
+    #[should_panic(expected = "no inheritance line")]
+    fn a_sold_deed_drops_the_sellers_line_so_the_sellers_guardians_cannot_release_it() {
+        let (mut c, id) = fresh();
+        at(1, 1, 3 * SEC);
+        c.nft_transfer(accounts(2), id.clone(), None, None);
+        assert!(c.house_line(id.clone()).is_none());
+        assert_eq!(c.house_epoch(id.clone()), 1);
+        // the seller's guardian waits out the window and tries anyway
+        at(3, 1, 200 * SEC);
+        c.house_guardian_approve(id);
+    }
+
+    #[test]
+    fn line_times_and_vault_amounts_are_strings_in_json() {
+        let (mut c, id) = fresh();
+        at(1, 1, 3 * SEC);
+        c.house_set_vault(id.clone(), "base".into(), "ETH".into(), U128(5), 100_000, vec!["0xabc".into()]);
+        let v = near_sdk::serde_json::to_value(c.house_vault(id).unwrap()).unwrap();
+        assert!(v["max_value"].is_string());
     }
 
     #[test]

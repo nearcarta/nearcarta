@@ -16,6 +16,8 @@ use near_sdk::{env, require, AccountId, Gas, NearToken, Promise};
 const SETTLE_GAS: Gas = Gas::from_tgas(5);
 const REFUND_GAS: Gas = Gas::from_tgas(10);
 const CLEAR_GAS: Gas = Gas::from_tgas(10);
+/// The forward's own callback: reads the transfer result, then settles or refunds (10 Tgas).
+const FORWARD_GAS: Gas = Gas::from_tgas(15);
 
 fn load() -> (String, String) {
     let raw = env::storage_read(b"STATE").expect("ERR_STATE");
@@ -151,9 +153,11 @@ pub extern "C" fn new() {
     save(board, env::predecessor_account_id().as_str(), hall);
 }
 
-/// Owner only. Tells the stored hall that this part's delivery passed the guard.
+/// Owner only, 1 yocto. Tells the stored hall that this part's delivery passed the guard.
 #[unsafe(no_mangle)]
 pub extern "C" fn clear() {
+    // A clearance releases a Town Hall payment, so it needs the owner's full-access key.
+    require!(env::attached_deposit().as_yoctonear() >= 1, "ERR_ONE_YOCTO");
     let fields = top_strings(&input_text()).unwrap_or_else(|e| env::panic_str(e));
     let (_, owner) = load();
     require!(env::predecessor_account_id().as_str() == owner, "ERR_NOT_OWNER");
@@ -188,8 +192,12 @@ pub extern "C" fn pay() {
     let args = callback_args(row_owner, action_id);
     let here = env::current_account_id();
     let promise = if route(chain, asset, payee.as_str(), board_id.as_str(), here.as_str()) == "forward" {
+        // The transfer can fail (a named payee that does not exist). The protocol then refunds
+        // the NEAR to this account, so settling regardless told the board the visitor paid
+        // while the NEAR sat here. `on_forward` reads the result and refunds the row instead.
+        let cb = forward_args(row_owner, action_id, got);
         Promise::new(payee).transfer(NearToken::from_yoctonear(got)).then(
-            Promise::new(board_id).function_call("settle".to_string(), args, NearToken::from_yoctonear(0), SETTLE_GAS),
+            Promise::new(here.clone()).function_call("on_forward".to_string(), cb, NearToken::from_yoctonear(0), FORWARD_GAS),
         )
     } else {
         Promise::new(board_id).function_call(
@@ -197,6 +205,57 @@ pub extern "C" fn pay() {
         )
     };
     let _ = promise.as_return();
+}
+
+fn forward_args(owner: &str, action_id: &str, amount: u128) -> Vec<u8> {
+    format!("{{\"owner\":{},\"action_id\":{},\"amount\":\"{amount}\"}}", json_string(owner), json_string(action_id)).into_bytes()
+}
+
+/// Callback of the forward. Only this account may call it.
+#[unsafe(no_mangle)]
+pub extern "C" fn on_forward() {
+    require!(env::predecessor_account_id() == env::current_account_id(), "ERR_PRIVATE");
+    let fields = top_strings(&input_text()).unwrap_or_else(|e| env::panic_str(e));
+    let owner = need(&fields, "owner").unwrap_or_else(|e| env::panic_str(e));
+    let action_id = need(&fields, "action_id").unwrap_or_else(|e| env::panic_str(e));
+    let amount: u128 = need(&fields, "amount").unwrap_or_else(|e| env::panic_str(e)).parse().unwrap_or_else(|_| env::panic_str("ERR_AMOUNT"));
+    let (board, _) = load();
+    let board_id: AccountId = board.parse().unwrap_or_else(|_| env::panic_str("ERR_STATE"));
+    let args = callback_args(owner, action_id);
+    let promise = if near_sdk::is_promise_success() {
+        Promise::new(board_id).function_call("settle".to_string(), args, NearToken::from_yoctonear(0), SETTLE_GAS)
+    } else {
+        // The failed transfer's NEAR came back to this account. It goes back to the row.
+        Promise::new(board_id).function_call("refund_action".to_string(), args, NearToken::from_yoctonear(amount), REFUND_GAS)
+    };
+    let _ = promise.as_return();
+}
+
+/// NEP-330. cargo-near's reproducible build sets these at compile time; a local
+/// build has none of them and reports `build_info: null`.
+#[unsafe(no_mangle)]
+pub extern "C" fn contract_source_metadata() {
+    env::value_return(source_metadata().as_bytes());
+}
+
+pub fn source_metadata() -> String {
+    let link = option_env!("NEP330_LINK").or(option_env!("CARGO_PKG_REPOSITORY")).unwrap_or("");
+    let version = option_env!("NEP330_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
+    let build = match (option_env!("NEP330_BUILD_INFO_BUILD_ENVIRONMENT"), option_env!("NEP330_BUILD_INFO_SOURCE_CODE_SNAPSHOT")) {
+        (Some(envr), Some(snap)) if !envr.is_empty() => format!(
+            "{{\"build_environment\":{},\"build_command\":{},\"contract_path\":{},\"source_code_snapshot\":{},\"output_wasm_path\":{}}}",
+            json_string(envr),
+            option_env!("NEP330_BUILD_INFO_BUILD_COMMAND").filter(|c| c.starts_with('[')).unwrap_or("[]"),
+            json_string(option_env!("NEP330_BUILD_INFO_CONTRACT_PATH").unwrap_or("")),
+            json_string(snap),
+            option_env!("NEP330_BUILD_INFO_OUTPUT_WASM_PATH").map(json_string).unwrap_or_else(|| "null".to_string()),
+        ),
+        _ => "null".to_string(),
+    };
+    format!(
+        "{{\"version\":{},\"link\":{},\"standards\":[{{\"standard\":\"nep330\",\"version\":\"1.3.0\"}}],\"build_info\":{build}}}",
+        json_string(version), json_string(link)
+    )
 }
 
 #[unsafe(no_mangle)]
@@ -235,6 +294,22 @@ mod tests {
         assert_eq!(clear_args("4\",\"x", "0", "1"), Err("ERR_ARGS"));
         assert_eq!(clear_args("4", "", "1"), Err("ERR_ARGS"));
         assert_eq!(clear_args("4", "4294967296", "1"), Err("ERR_ARGS"));
+    }
+
+    #[test]
+    fn the_forward_callback_args_carry_the_amount_and_parse_back() {
+        let a = String::from_utf8(forward_args("alice.test", "7", 1000)).unwrap();
+        let f = top_strings(&a).unwrap();
+        assert_eq!(need(&f, "owner").unwrap(), "alice.test");
+        assert_eq!(need(&f, "action_id").unwrap(), "7");
+        assert_eq!(need(&f, "amount").unwrap(), "1000");
+    }
+
+    #[test]
+    fn source_metadata_is_nep330_json() {
+        let m: near_sdk::serde_json::Value = near_sdk::serde_json::from_str(&source_metadata()).unwrap();
+        assert_eq!(m["standards"][0]["standard"], "nep330");
+        assert_eq!(m["link"], "https://github.com/nearcarta/nearcarta");
     }
 
     #[test]

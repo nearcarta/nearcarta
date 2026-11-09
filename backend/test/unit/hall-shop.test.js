@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { makeApp } from '../../src/app.js';
 import MAIN from '../../../shared/deployments/mainnet.json' with { type: 'json' };
 import {
-  LAMPLIGHTER_REGISTER, asRow, nearOf, parseHallCommand, payPlan, rulesPlan, yoctoOf,
+  HALL_HINT, LAMPLIGHTER_REGISTER, asRow, nearOf, parseHallCommand, payPlan, rulesPlan, yoctoOf,
 } from '../../../shared/hall/plan.js';
 import {
   acceptPart, conserved, createLedger, postJob, quotePart, refundJob, reviewPart,
@@ -388,4 +388,16 @@ test('the retired charter is not on the public denylist or in the sign screen', 
   const setup = readFileSync(fileURLToPath(new URL('../../../app/house/setup.js', import.meta.url)), 'utf8');
   assert.doesNotMatch(setup, /acA\(MAIN\.charter\.contract\)/, 'no link to the retired charter');
   assert.doesNotMatch(setup, /town charter, toll, arena, house and town hall already run/);
+});
+
+test('the hint example posts as typed: two workers named in the sentence are used', () => {
+  const cmd = parseHallCommand('Post a readme pass for 0.002 near to alice.near and bob.near.');
+  assert.equal(cmd.kind, 'post');
+  assert.equal(cmd.task, 'readme pass');
+  assert.deepEqual(cmd.workers, ['alice.near', 'bob.near']);
+  assert.equal(parseHallCommand('post a readme pass for 0.002 near').workers, undefined);
+  assert.match(HALL_HINT, /to alice\.near and bob\.near/);
+  const ledger = createLedger();
+  const posted = postJob(ledger, { task: cmd.task, budgetNear: cmd.near, workers: cmd.workers, maxParts: 2, nowMs: 1_000 });
+  assert.equal(posted.ok, true);
 });

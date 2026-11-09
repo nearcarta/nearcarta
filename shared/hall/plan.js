@@ -13,7 +13,7 @@ export const LAMPLIGHTER_REGISTER = {
   category: 'operations',
 };
 
-export const HALL_HINT = 'Try: Post a readme pass for 0.002 near. Quote part 1 from worker.near at 0.001. Accept part 1. Walk part 1. Pass part 1. Fail part 2. Refund.';
+export const HALL_HINT = 'Try: Post a readme pass for 0.002 near to alice.near and bob.near. Quote part 1 from worker.near at 0.001. Accept part 1. Walk part 1. Pass part 1. Fail part 2. Refund.';
 
 const PLAIN = {
   over_per_action_cap: 'That is more than your max per payment.',
@@ -226,8 +226,15 @@ export function parseHallCommand(text) {
   if (/\btighten\b/.test(t) && /\bcap\b/.test(t)) rules.tighter = true;
   if (/\bloosen\b/.test(t) && /\bcap\b/.test(t)) rules.looser = true;
   if (rules.tighter || rules.looser || rules.frozen != null) return { ok: true, kind: 'rules', ...rules };
-  const post = raw.match(/\bpost\b(?:\s+a)?\s+(.+?)\s+for\s+(\d+(?:\.\d+)?)\s*near\b/i);
-  if (post) return { ok: true, kind: 'post', task: post[1].trim(), near: post[2] };
+  // "Post a readme pass for 0.002 near to alice.near and bob.near": the two workers may ride in the
+  // same sentence. Without them the job reads the worker fields, and a fresh visitor who typed the
+  // hint's own example was told to "Name two worker accounts".
+  const post = raw.match(/\bpost\b(?:\s+a)?\s+(.+?)\s+for\s+(\d+(?:\.\d+)?)\s*near\b(.*)$/i);
+  if (post) {
+    const workers = [...(post[3] || '').matchAll(/(?:^|[\s,])([a-z0-9][a-z0-9_-]*(?:\.[a-z0-9_-]+)*\.(?:near|tg)|[0-9a-f]{64})(?=$|[\s,.;])/gi)]
+      .map(m => m[1].toLowerCase());
+    return { ok: true, kind: 'post', task: post[1].trim(), near: post[2], ...(workers.length ? { workers } : {}) };
+  }
   if (/\blist\b/.test(t) && /\b(lamplighter|agent|market)\b/.test(t)) return { ok: true, kind: 'list' };
   if (/\b(bounty|hire)\b/.test(t)) {
     return { ok: false, kind: 'miss', hint: 'This tray does not pay townhall.nearcarta.near. Post a job and name two workers. Nothing was signed.' };

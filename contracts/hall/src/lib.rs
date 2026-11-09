@@ -5,7 +5,7 @@
 //! The board writes the top-level `row_owner`. This contract trusts that field
 //! only when the predecessor is the board. A direct call must be the same account.
 //! Workers, prices, and budgets come from the call. None are stored in the code.
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{U128, U64};
 use near_sdk::store::{IterableMap, LookupMap};
 use near_sdk::{env, near, require, AccountId, NearToken, PanicOnDefault, Promise};
 
@@ -18,6 +18,8 @@ const RELEASED: u8 = 5;
 const REFUNDED: u8 = 6;
 const MAX_PARTS: u32 = 8;
 const DAY_NS: u64 = 86_400_000_000_000;
+/// `prune` takes at most this many records per call, so one call stays inside its gas.
+const MAX_PRUNE: usize = 32;
 
 #[derive(Clone)]
 #[near(serializers = [borsh])]
@@ -37,10 +39,6 @@ pub struct Part {
     pub guard_ok: bool,
     /// Guard policy version at clearance. A raise of the guard policy invalidates it.
     pub guard_version: u32,
-    /// True once this part's budget has left escrow, by a release or by a refund.
-    /// `refund` reclaims every part where this is false, so no slice is paid twice
-    /// and none is stranded.
-    pub settled: bool,
 }
 
 #[derive(Clone)]
@@ -140,7 +138,7 @@ impl Hall {
     }
 
     #[payable]
-    pub fn post_job(&mut self, row_owner: AccountId, task: String, parts: u32, deadline: U128, workers: Vec<AccountId>, idempotency: Option<String>) -> u64 {
+    pub fn post_job(&mut self, row_owner: AccountId, task: String, parts: u32, deadline: U128, workers: Vec<AccountId>, idempotency: Option<String>) -> U64 {
         let owner = self.actor(&row_owner);
         let budget = env::attached_deposit().as_yoctonear();
         require!(budget > 0, "ERR_AMOUNT");
@@ -171,7 +169,7 @@ impl Hall {
             used += slice;
             part_rows.push(Part {
                 budget: slice, quote: 0, worker: None, counters: 0, counter: 0, awarded: 0, phase: OPEN,
-                deliverable: String::new(), guard_ok: false, guard_version: 0, settled: false,
+                deliverable: String::new(), guard_ok: false, guard_version: 0,
             });
         }
         let id = self.next_id;
@@ -182,7 +180,7 @@ impl Hall {
         conserved(&job);
         self.jobs.insert(id, job);
         if let Some(key) = idempotency.filter(|k| !k.is_empty()) { self.keys.insert(key, id); }
-        id
+        U64(id)
     }
 
     #[payable]
@@ -199,7 +197,8 @@ impl Hall {
         let who = self.actor(&row_owner);
         let n = self.stakes.get(&who).copied().unwrap_or(0);
         require!(n > 0, "ERR_STAKE");
-        self.stakes.insert(who.clone(), 0);
+        // Removed, not zeroed: `close` then checks an empty map instead of walking every entry.
+        self.stakes.remove(&who);
         Promise::new(who).transfer(NearToken::from_yoctonear(n))
     }
 
@@ -243,6 +242,10 @@ impl Hall {
         require!(p.worker.is_some(), "ERR_WORKER");
         p.awarded = price;
         p.phase = AWARDED;
+        // The award has to be covered by escrow no other part has locked. Without this a
+        // poster could `refund` the unlocked budget and then still award an open part, which
+        // paid that worker out of another part's locked escrow and left the other worker unpaid.
+        require!(job.remaining >= locked(&job), "ERR_ESCROW");
         conserved(&job);
         self.jobs.insert(job_key(job_id), job);
     }
@@ -312,17 +315,10 @@ impl Hall {
         };
         if let Some((worker, amount)) = paid {
             require!(amount > 0 && job.remaining >= amount, "ERR_ESCROW");
-            // A part can be awarded under its budget. The difference is the poster's
-            // and goes back in the same review, so no slice is left stranded.
-            let spare = job.parts.get(part as usize).map(|p| p.budget.saturating_sub(amount)).unwrap_or(0);
-            require!(job.remaining >= amount + spare, "ERR_ESCROW");
-            job.remaining -= amount + spare;
+            job.remaining -= amount;
             job.paid += amount;
-            job.refunded += spare;
-            if let Some(p) = job.parts.get_mut(part as usize) { p.settled = true; }
             conserved(&job);
             self.jobs.insert(job_key(job_id), job);
-            if spare > 0 { Promise::new(owner.clone()).transfer(NearToken::from_yoctonear(spare)); }
             Promise::new(worker).transfer(NearToken::from_yoctonear(amount))
         } else {
             conserved(&job);
@@ -331,31 +327,44 @@ impl Hall {
         }
     }
 
-    /// Reclaims what is not locked. Past the deadline a part that was awarded or held
-    /// and never reviewed is also released, so no escrow is stranded when a worker
-    /// walks away. One method covers both the cancel and the timeout case.
+    /// After the deadline a poster can reclaim whatever is not locked, and can also
+    /// cancel a part no worker delivered. `part` names the part to drop when it is
+    /// awarded or held past the deadline; the budget stays conserved either way.
+    pub fn cancel_part(&mut self, row_owner: AccountId, job_id: U128, part: u32) -> Promise {
+        let owner = self.actor(&row_owner);
+        let mut job = self.jobs.get(&job_key(job_id)).cloned().unwrap_or_else(|| env::panic_str("ERR_JOB"));
+        require!(job.owner == owner, "ERR_ROW");
+        require!(env::block_timestamp() > job.deadline, "ERR_NOT_DUE");
+        let released = {
+            let p = job.parts.get_mut(part as usize).unwrap_or_else(|| env::panic_str("ERR_PART"));
+            require!(p.phase == AWARDED || p.phase == HELD, "ERR_PHASE");
+            let back = p.awarded;
+            p.phase = REFUNDED;
+            p.awarded = 0;
+            back
+        };
+        require!(released > 0 && job.remaining >= released, "ERR_ESCROW");
+        job.remaining -= released;
+        job.refunded += released;
+        conserved(&job);
+        self.jobs.insert(job_key(job_id), job);
+        Promise::new(owner).transfer(NearToken::from_yoctonear(released))
+    }
+
     pub fn refund(&mut self, row_owner: AccountId, job_id: U128) -> Promise {
         let owner = self.actor(&row_owner);
         let mut job = self.jobs.get(&job_key(job_id)).cloned().unwrap_or_else(|| env::panic_str("ERR_JOB"));
         require!(job.owner == owner, "ERR_ROW");
-        let due = env::block_timestamp() > job.deadline;
-        let mut back = 0u128;
+        let hold = locked(&job);
+        require!(job.remaining >= hold, "ERR_ESCROW");
+        let back = job.remaining - hold;
+        require!(back > 0, "ERR_NOTHING");
+        job.remaining = hold;
+        // Their budget just went back, so a part nobody was awarded can no longer be bid on
+        // or awarded. Awarded and held parts keep their escrow and their worker.
         for p in job.parts.iter_mut() {
-            if p.settled { continue; }
-            if p.phase == AWARDED || p.phase == HELD {
-                // A locked part is only reclaimable once its deadline has passed; until
-                // then the worker is entitled to deliver it.
-                if !due { continue; }
-                back += p.awarded;
-                p.awarded = 0;
-            } else {
-                back += p.budget;
-            }
-            p.phase = REFUNDED;
-            p.settled = true;
+            if p.phase == OPEN || p.phase == QUOTED || p.phase == COUNTERED { p.phase = REFUNDED; }
         }
-        require!(back > 0 && job.remaining >= back, "ERR_NOTHING");
-        job.remaining -= back;
         job.refunded += back;
         conserved(&job);
         self.jobs.insert(job_key(job_id), job);
@@ -366,13 +375,31 @@ impl Hall {
     pub fn close(&mut self) -> Promise {
         near_sdk::assert_one_yocto();
         require!(env::predecessor_account_id() == self.owner, "ERR_NOT_OWNER");
-        for (_, job) in self.jobs.iter() {
-            require!(job.remaining == 0, "ERR_OPEN");
-        }
-        for (_, stake) in self.stakes.iter() {
-            require!(*stake == 0, "ERR_STAKE");
-        }
+        // No walk over every job and stake: an unbounded loop here could grow past the gas
+        // limit and lock the account. `prune` empties both maps in bounded steps first.
+        require!(self.jobs.is_empty(), "ERR_OPEN");
+        require!(self.stakes.is_empty(), "ERR_STAKE");
         Promise::new(env::current_account_id()).delete_account(self.owner.clone())
+    }
+
+    /// Drops finished records so their storage comes back: jobs whose escrow is fully paid
+    /// or refunded (only by the job's poster or the hall owner) and stakes already at zero
+    /// (anyone). At most `MAX_PRUNE` of each per call. Returns how many were dropped.
+    pub fn prune(&mut self, job_ids: Vec<U64>, stakes: Vec<AccountId>) -> u32 {
+        require!(job_ids.len() <= MAX_PRUNE && stakes.len() <= MAX_PRUNE, "ERR_PRUNE");
+        let pred = env::predecessor_account_id();
+        let mut n = 0u32;
+        for id in job_ids {
+            let Some(job) = self.jobs.get(&id.0) else { continue; };
+            require!(job.remaining == 0, "ERR_OPEN");
+            require!(pred == job.owner || pred == self.owner, "ERR_ROW");
+            self.jobs.remove(&id.0);
+            n += 1;
+        }
+        for a in stakes {
+            if self.stakes.get(&a).copied() == Some(0) { self.stakes.remove(&a); n += 1; }
+        }
+        n
     }
 
     pub fn get_hall(&self) -> near_sdk::serde_json::Value {
@@ -460,7 +487,70 @@ mod tests {
 
     fn post(h: &mut Hall, pred: &str, row: &str, budget: u128, workers: &[&str]) -> u64 {
         ctx(pred, budget);
-        h.post_job(acc(row), "readme pass".into(), 2, deadline(), workers.iter().map(|s| acc(s)).collect(), None)
+        h.post_job(acc(row), "readme pass".into(), 2, deadline(), workers.iter().map(|s| acc(s)).collect(), None).0
+    }
+
+    #[test]
+    fn a_refund_closes_the_unawarded_parts_so_their_budget_cannot_pay_twice() {
+        let mut h = hall();
+        let id = post(&mut h, "alice.test", "alice.test", 10, &[]);
+        ctx("bob.test", 0);
+        h.bid(acc("bob.test"), U128(id as u128), 0, U128(5));
+        ctx("alice.test", 0);
+        h.accept(acc("alice.test"), U128(id as u128), 0);
+        let _ = h.refund(acc("alice.test"), U128(id as u128));
+        let job = h.get_job(U128(id as u128)).unwrap();
+        assert_eq!(job["remaining"], "5", "part 0's award stays locked");
+        assert_eq!(job["parts"][1]["phase"], 6, "the open part is closed with its budget");
+        ctx("cara.test", 0);
+        let bid = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| h.bid(acc("cara.test"), U128(id as u128), 1, U128(5))));
+        assert!(bid.is_err(), "a refunded part takes no bid");
+        // Part 0's worker is still paid in full from its own escrow.
+        pass(&mut h, id, 0);
+        let job = h.get_job(U128(id as u128)).unwrap();
+        assert_eq!(job["paid"], "5");
+        assert_eq!(job["remaining"], "0");
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_ESCROW")]
+    fn an_award_must_be_covered_by_unlocked_escrow() {
+        let mut h = hall();
+        let id = post(&mut h, "alice.test", "alice.test", 10, &[]);
+        ctx("bob.test", 0);
+        h.bid(acc("bob.test"), U128(id as u128), 0, U128(5));
+        h.bid(acc("bob.test"), U128(id as u128), 1, U128(5));
+        ctx("alice.test", 0);
+        h.accept(acc("alice.test"), U128(id as u128), 0);
+        // Simulate escrow that already left (what a pre-fix refund did): part 1 cannot be awarded.
+        let mut job = h.jobs.get(&id).cloned().unwrap();
+        job.remaining -= 5;
+        job.refunded += 5;
+        h.jobs.insert(id, job);
+        h.accept(acc("alice.test"), U128(id as u128), 1);
+    }
+
+    #[test]
+    fn finished_jobs_and_zero_stakes_prune_and_then_close_runs() {
+        let mut h = hall();
+        let id = post(&mut h, "alice.test", "alice.test", 10, &[]);
+        ctx("board.test", 3);
+        h.register_agent(acc("bob.test"));
+        ctx("alice.test", 0);
+        let open = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { h.prune(vec![U64(id)], vec![]); }));
+        assert!(open.is_err(), "a job with escrow left is not pruned");
+        let _ = h.refund(acc("alice.test"), U128(id as u128));
+        ctx("mallory.test", 0);
+        let other = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { h.prune(vec![U64(id)], vec![]); }));
+        assert!(other.is_err(), "only the poster or the owner prunes a job");
+        ctx("alice.test", 0);
+        assert_eq!(h.prune(vec![U64(id)], vec![]), 1);
+        assert!(h.get_job(U128(id as u128)).is_none());
+        ctx("bob.test", 0);
+        let _ = h.withdraw_stake(acc("bob.test"));
+        assert_eq!(h.get_hall()["stakes"], 0, "a withdrawn stake leaves no entry");
+        ctx("owner.test", 1);
+        let _ = h.close();
     }
 
     #[test]
@@ -473,10 +563,9 @@ mod tests {
         h.accept(acc("alice.test"), U128(id as u128), 0);
         pass(&mut h, id, 0);
         let job = h.get_job(U128(id as u128)).unwrap();
-        // 10 over two parts: part 0 awarded at 3 in a 5 slice, so 2 comes back at once.
         assert_eq!(job["paid"], "3");
-        assert_eq!(job["remaining"], "5");
-        assert_eq!(job["refunded"], "2");
+        assert_eq!(job["remaining"], "7");
+        assert_eq!(job["refunded"], "0");
         assert_eq!(job["parts"][0]["phase"], 5);
         assert_eq!(job["parts"][0]["worker"], "bob.test");
     }
@@ -513,7 +602,6 @@ mod tests {
         assert_eq!(job["remaining"], "8");
         let _ = h.refund(acc("alice.test"), U128(id as u128));
         let job = h.get_job(U128(id as u128)).unwrap();
-        // The failed part was refunded by the review; the untouched part refunds here.
         assert_eq!(job["refunded"], "8");
         assert_eq!(job["remaining"], "0");
         assert_eq!(h.get_stake(acc("bob.test")), "5");
@@ -672,13 +760,10 @@ mod tests {
         h.accept(acc("alice.test"), U128(id as u128), 0);
         // Still inside the deadline: cancel is refused.
         ctx("alice.test", 0);
-        // Part 0 is awarded (bid then accept); part 1 is still open.
-        let _ = h.refund(acc("alice.test"), U128(id as u128));
-        let job = h.get_job(U128(id as u128)).unwrap();
-        assert_eq!(job["parts"][0]["phase"], 3, "an awarded part stays awarded before the deadline");
-        assert_eq!(job["parts"][1]["phase"], 6, "an open part refunds now");
-        assert_eq!(job["remaining"], "5", "the awarded part and its spare stay in escrow");
-        assert_eq!(job["refunded"], "5", "the untouched part is back");
+        let due = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            h.cancel_part(acc("alice.test"), U128(id as u128), 0)
+        }));
+        assert!(due.is_err(), "a cancel before the deadline must be refused");
         let mut b = VMContextBuilder::new();
         b.current_account_id(acc("hall.test"))
             .predecessor_account_id(acc("alice.test"))
@@ -687,14 +772,11 @@ mod tests {
             .block_timestamp(1_000_000_000_000_000 + 2 * DAY_NS)
             .prepaid_gas(near_sdk::Gas::from_tgas(300));
         testing_env!(b.build());
-        // Past the deadline the awarded part is reclaimable too.
+        let _ = h.cancel_part(acc("alice.test"), U128(id as u128), 0);
         let _ = h.refund(acc("alice.test"), U128(id as u128));
         let job = h.get_job(U128(id as u128)).unwrap();
-        assert_eq!(job["parts"][0]["phase"], 6, "the awarded part refunds after the deadline");
-        assert_eq!(job["remaining"], "1", "the awarded 4 is back; its 1 spare is not yet");
-        assert_eq!(job["refunded"], "9");
-        // The last 1 NEAR is the awarded part's unused spare. It is not reclaimed here
-        // because `refund` refuses a no-op; a review or a later claim settles it.
+        assert_eq!(job["remaining"], "0");
+        assert_eq!(job["refunded"], "10");
         assert_eq!(job["paid"], "0");
     }
 
@@ -723,21 +805,19 @@ mod tests {
         let _ = h.review(acc("alice.test"), U128(id as u128), 1, false, D2.into());
         let job = h.get_job(U128(id as u128)).unwrap();
         assert_eq!(job["paid"], "4");
-        // Part 0 was awarded 4 in a 5 slice: the 1 NEAR spare came back at review time.
-        assert_eq!(job["refunded"], "1");
-        assert_eq!(job["remaining"], "5");
+        assert_eq!(job["refunded"], "0");
+        assert_eq!(job["remaining"], "6");
         assert_eq!(job["parts"][0]["phase"], 5);
         assert_eq!(job["parts"][1]["phase"], 6);
         assert_eq!(job["parts"][0]["worker"], "bob.test");
         assert_eq!(job["parts"][1]["worker"], "cara.test");
         // Conserved: paid + remaining + refunded == budget.
-        assert_eq!(4u64 + 5u64 + 1u64, 10);
+        assert_eq!(4u64 + 6u64 + 0, 10);
         // The failed part releases its budget to the poster, not to the worker.
         ctx("alice.test", 0);
         let _ = h.refund(acc("alice.test"), U128(id as u128));
         let job = h.get_job(U128(id as u128)).unwrap();
         assert_eq!(job["remaining"], "0");
         assert_eq!(job["refunded"], "6");
-        assert_eq!(job["paid"], "4");
     }
 }

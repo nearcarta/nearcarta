@@ -137,7 +137,8 @@ impl Contract {
         Promise::new(env::current_account_id()).delete_account(self.owner.clone())
     }
 
-    /// Anyone may add NEAR to a Guardian's pot. Player deposits are not taken.
+    /// Anyone may add NEAR to a Guardian's pot (board rows do). A pot is prize money: it only leaves
+    /// as an oath-approved payout, or to the owner at `close`. Funding is a gift to the game, not a deposit.
     #[payable]
     pub fn fund(&mut self, token_id: TokenId) -> U128 {
         let mut g = self.g(&token_id);
@@ -161,7 +162,10 @@ impl Contract {
         require!(env::predecessor_account_id() == self.holder(token_id), "ERR_NOT_HOLDER");
     }
     /// Only the CURRENT NFT holder may rewrite the oath. Blocked while a payout is in flight.
+    /// 1 yocto: a function-call key cannot rewrite the oath.
+    #[payable]
     pub fn set_oath(&mut self, token_id: TokenId, oath: Oath) {
+        assert_one_yocto();
         self.assert_holder(&token_id);
         let mut g = self.g(&token_id);
         require!(g.in_flight == 0, "ERR_INFLIGHT_PAYOUT");
@@ -169,12 +173,18 @@ impl Contract {
         self.guardians.insert(&token_id, &g);
         self.emit_oath(&token_id, "oath_set");
     }
+    /// Freezing works from any key. Unfreezing needs 1 yocto (a full-access key).
+    #[payable]
     pub fn set_frozen(&mut self, token_id: TokenId, frozen: bool) {
+        if !frozen { assert_one_yocto(); }
         self.assert_holder(&token_id);
         let mut g = self.g(&token_id); g.frozen = frozen; self.guardians.insert(&token_id, &g);
         self.emit_oath(&token_id, if frozen { "frozen" } else { "unfrozen" });
     }
+    /// 1 yocto: a function-call key cannot name a new agent.
+    #[payable]
     pub fn set_agent(&mut self, token_id: TokenId, agent: AccountId) {
+        assert_one_yocto();
         self.assert_holder(&token_id);
         let mut g = self.g(&token_id); g.agent = agent; self.guardians.insert(&token_id, &g);
         self.emit_oath(&token_id, "agent_set");
