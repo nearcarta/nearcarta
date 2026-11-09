@@ -1,204 +1,169 @@
-# Market Day: the game loop
+# Market Day in Nearcarta: the game loop
 
-Status: design. Nothing on this page is built until a row in the build plan below names a merged PR. The loop was written before any market code, as the Games prompt asks.
+Status: design, revised 9 November 2026. A row in the build plan becomes true when it names a merged PR. The loop was written before the game code, as the Games prompt asks.
 
-Market Day runs on the town that already exists: the island, the nine shop buildings, and the board rows behind them. The new parts are goods, merchants that price them, and a clock.
+The whole city is the game. The nine shops that already run on mainnet are its locations. Each keeps its real function and gets a game role. Nothing is a mock shop.
 
-## The idea in one paragraph
+## One line
 
-A player walks the island, gathers raw goods (iron, timber, salt, herbs), and sells or trades them at the shops. Each shopkeeper is an agent with its own NEAR sub-account, its own stock and its own row on `board.nearcarta.near`. A shopkeeper prices every good from its stock and the last hour of trades, so if players flood the smithy with iron, iron gets cheap there. A shopkeeper that cannot pay for what it buys runs out of money and closes. Its building goes dark until a player invests in it. A con artist walks the market and tries to talk shopkeepers into paying him. On mainnet the charter refuses him, and the refusal is a transaction anyone can open.
+You are a citizen of Nearcarta. You get your own AI agent: a character that walks the 3D city, talks with you, and does the work, with a wallet whose spending the city's law (the charter on `board.nearcarta.near`) caps on chain. Every shopkeeper is an agent too. The hook: **NPCs that can't lie or overspend.** Each keeper decision is made by a NEAR AI model in an attested TEE and signed. Each NEAR it spends goes through its own capped row, and a refused spend is a transaction anyone can open.
+
+## The city as the game
+
+| Location | Its real function today | Its role on Market Day |
+|---|---|---|
+| Town Hall | Jobs with bids, counters and reviewed delivery (`contracts/hall`) | The quest board. Each city day posts orders ("12 iron for the bridge"). NPC agents bid; your agent takes or posts jobs |
+| Arena | NEP-245 items and guardian pots | The market square. Goods are NEP-245 tokens. Shopkeepers set prices with `pricing.rs`, and `Why this price?` explains them |
+| Ferry | Cross-chain swaps through NEAR Intents (1Click) | The port. Cash out your earnings or buy cargo on another chain with a real swap |
+| Payouts | Invoices and payroll | Payday. Wages for filled orders and completed jobs, with the invoice |
+| Guard | Payee checks, holds, deny list | The city watch. When the con artist pitches a keeper, the watch checks the payee and the charter refuses the payment on chain |
+| Mist Bank | Private statement audit in a TEE | The vault. Your savings statement is audited privately |
+| House | A deed with a purse, a check-in clock and an heir | The council. It funds a broke shop back to life from a shared purse |
+| Toll Bridge | Pay-per-use gate, signed by the NEAR MPC signer | The bridge toll on every cross-chain move |
+| Chronicle | One statement across every rail | The history book. Every action with its tx, and your reputation |
 
 ## The loop on paper
 
-### Every 30 seconds: gather, sell, buy
+A city day lasts 20 real minutes: dawn, market, dusk, night. Orders refresh at dawn. Prices use the last completed real hour of trades. Daily caps reset at 00:00 UTC.
 
-| Player does | What they see | What happens on chain |
+### Every 30 seconds: gather, trade, talk
+
+| You do | You see | On chain |
 |---|---|---|
-| Walks to a node (ore rock, woodpile, salt pan, herb bed) and presses Gather | The good lands in their bag with a short pickup sound | `gather` mints one unit of a NEP-245 token to the player, limited to one unit per node per 30 s per player |
-| Walks into a shop and opens the counter | Today's price for each good, an arrow for the last hour, and a `Why this price?` link | View `quote(shop, good)`: no tx |
-| Sells 3 iron | The price on the next unit already reads lower | `sell`: the player's 3 iron move to the shop by `mt_transfer`, and the shop pays from its own account |
-| Buys a tool | The tool appears in the bag | `buy`: NEAR from the player's session, the good moves by `mt_transfer` |
+| Tap a resource node on the island (ore, timber, salt pans, herb beds) | The good flies into your bag | `gather`: one NEP-245 unit, at most once per node per 30 s, within a daily cap. With a tool, two units |
+| Open a counter in the market square | Prices, a five-minute sparkline, `Why this price?` | `quote` view: no tx |
+| Sell or buy | The next unit's price moves in front of you | `sell` is a direct call (your key on the market contract, gas paid by the relayer). `buy` spends NEAR, so it goes through your row |
+| Tell your agent "sell my iron where it pays most" | It walks to the best counter, explains, acts, and shows `Charter said yes` or `no` with the tx | The same calls, proposed by the agent |
 
-No wallet popup, no seed phrase, no gas prompt in any of these four. The player signed in once with email or Google. The relayer pays gas for market methods only. See "Login and gas" below.
+### Every 5 minutes: quests and the city
 
-### Every 5 minutes: read the market and react
-
-| Player does | Why it matters |
+| You do | Why it matters |
 |---|---|
-| Opens the market board in the square: price and stock per shop, with a five-minute sparkline | Iron is cheap at the smithy because the last ten players dumped ore. Salt is dear at the tavern because the cellar is empty |
-| Carries goods between shops to profit on the spread | The cheap shop's price rises as its stock drains, so the spread closes. That is the economy working, not a bug |
-| Crafts: 2 iron + 1 timber at the smithy becomes 1 tool | Turns gathered goods into a higher-value good, burning the inputs (NEP-245 `mt_burn` event) |
-| Watches the con artist try a shopkeeper | A refusal line appears in the shop's ledger with a tx link |
+| Read the Town Hall board and take an order | Orders are the main sink: filling one burns the goods and pays wages from the order's escrow |
+| Craft at the market (2 iron + 1 timber = a tool) | A tool doubles your gather. Tonic (herbs + salt) is what the night orders ask for |
+| Carry cargo between counters for the spread | The cheap counter's price rises as its shelf drains, so the spread closes. That is the economy at work |
+| Watch the con artist at dusk | He pitches a keeper. The keeper's model may agree. The watch flags the payee and the keeper's row refuses: a real refused tx in the Chronicle |
 
-### Every session (10–20 minutes): own a piece of the town
+### Every session: earn, invest, rise
 
-| Player does | Result |
+| You do | Result |
 |---|---|
-| Finds a shop closed (dark windows, `Closed: out of funds`) | The shop's account balance is below its floor. It cannot buy until someone invests |
-| Invests NEAR in the shop | The shop reopens. The investor gets a share token (`share:<shop>`, NEP-245) and a cut of that shop's margin until it is repaid |
-| Checks the ledger at the end of the session | Every buy, sell, craft, investment and refusal, each with its tx |
-| Leaves | The economy keeps moving. Shopkeepers restock from each other on a timer. The next session finds new prices |
+| Collect your wages on Payday | NEAR paid for each order you filled, with a statement |
+| Find a dark shop (`Closed: out of funds`) and invest, or ask the council | The shop reopens. You hold `share:<shop>` tokens and get 20% of its sales until 110% is repaid |
+| Cash out at the port | A real NEAR Intents swap of your earnings, the toll shown before you confirm |
+| Check your level in the Chronicle | Reputation rises with every order you fill. Levels unlock bigger orders |
 
 ### Fast-forward: a week in a minute
 
-A `Fast-forward` button on the market board runs seven days of trading in 60 seconds: 168 hourly ticks, a fixed crowd of simulated players with seeded behaviour (miners dump iron, traders chase spreads, one investor). It uses the same pricing rules as the contract. The screen shows prices, stock, and shops closing and reopening. A label stays on the screen the whole time: `Simulation. No transactions.` At the end, one button sends a single real mainnet trade at the price the live contract quotes, so a judge sees the rules and the chain agree.
+On the market board, `Fast-forward` runs seven days: 168 hourly ticks in 60 seconds, with a seeded crowd (miners dump ore, traders chase spreads, an investor, the council, the con artist). It uses the same pricing rules through the pinned JavaScript mirror. You watch prices, shops closing and reopening, and the leak bound holding. A label stays on screen: `Simulation. No transactions.` At the end, one button sends one real trade at the price the live contract quotes.
 
-## Who is in the town
+## Characters
 
-| Character | Account | Holds | Spends through |
+| Character | Account | Decides with | Spends through |
 |---|---|---|---|
-| Player | their own account, made by the email or Google login | goods, shares, NEAR | their own board row (session key, caps, allowlist) |
-| Nine shopkeepers (smith, tavern, apothecary, carpenter, ferryman, banker, scribe, guard captain, innkeeper) | one sub-account each under the market account | stock (NEP-245 balances), NEAR till | each shopkeeper's own board row: allowlist of the market contract and the other shops, per-action cap, daily budget |
-| Con artist | an agent with no row allowance to anyone but itself | nothing | tries to make a shopkeeper pay him; the shopkeeper's row refuses on chain |
+| You, the citizen | your own account (email or Google login, no seed phrase) | you | your row: allowlist, caps, daily budget |
+| Your agent, the guide | acts on your row only, never holds money | NEAR AI model in an attested TEE, each answer signed | your row |
+| Nine keepers, one per location | a keeper sub-account per shop | NEAR AI model in a TEE: price notes, restock, accept a job, answer a pitch; each decision signed and stored with its tx | the keeper's own board row |
+| Town Hall clerk | posts the daily orders | the same model, signed | the Hall's escrow |
+| The con artist | an outside account with no allowance from any keeper | the model, prompted to persuade | nothing: refused on chain |
 
-A shopkeeper's agent proposes every payment it wants to make (restock from another shop, repay an investor) through `propose_call` on its row. The row decides. So a shopkeeper fooled by the con artist produces a refused transaction, not a loss. This is the same charter story the rest of the town tells, used as a game rule.
+## Who may call what (the security model)
 
-## Pricing: one readable file
+| Calls | Caller | Why |
+|---|---|---|
+| `gather`, `sell`, `craft`, `fill_order`, `claim` | the player directly, with a function-call key on the market contract (methods limited to these) | They move no NEAR out of the player, so no row is needed. This keeps the 30-second loop from hitting the row's daily action count |
+| `buy`, `invest`, `post_order`, keeper `restock` | the player's or keeper's board row (`propose_call_as`) | They spend NEAR, so the charter caps them. Through the board, `row_owner` only names who **receives** the goods, shares or order, never whose goods are taken, so a forged `row_owner` can only give gifts |
+| `keeper_take` | the keeper directly | It can never take investor money still owed or go below twice the floor |
+| `open_shop`, `stock_shop`, `set_node`, `set_caps`, `pause` | the owner | Setup and the kill switch |
 
-All merchant pricing lives in `contracts/arena_v2/src/pricing.rs`. The rule, per shop and good:
-
-```
-base    = the good's base price
-scarcity = target_stock / max(stock, 1)          clamped to [0.25, 4]
-demand  = 1 + (buys_last_hour - sells_last_hour) / 20   clamped to [0.5, 2]
-mood    = 0.9 if the shop is short of NEAR (it sells cheaper to raise cash)
-          1.0 otherwise
-buy price  (player pays)    = base * scarcity * demand * mood
-sell price (player receives) = buy price * 0.8   (the shop's margin)
-```
-
-`quote(shop, good)` returns the price and the reasons as data:
-
-```json
-{ "price": "0.0021", "reasons": [
-  { "rule": "scarcity", "factor": 0.5, "why": "40 iron in stock, target 20" },
-  { "rule": "demand",   "factor": 0.8, "why": "2 bought, 6 sold in the last hour" },
-  { "rule": "mood",     "factor": 1.0, "why": "till above floor" } ] }
-```
-
-The `Why this price?` tooltip renders those reasons word for word. It does not compute anything itself. The fast-forward runs a JavaScript copy of the same rule (`shared/market/pricing.js`). A test feeds both the Rust and the JS rule the same table of cases and requires the same prices, so the two cannot drift.
-
-## Items: NEP-245 in one contract
-
-Every good, every crafted item and every investor share is a token id in one NEP-245 contract: the market contract on `arena.nearcarta.near`. The arena's live code already implements NEP-245; the market reuses that module.
-
-| NEP-245 piece | Where it is used |
-|---|---|
-| `mt_transfer`, `mt_batch_transfer` | sell, buy, a basket sale in one call |
-| `mt_transfer_call` + `mt_resolve_transfer` | sending goods to another contract (for example an investor share to a vault) |
-| `mt_balance_of`, `mt_batch_balance_of` | the bag, the shop counter, the market board |
-| `mt_supply`, `mt_batch_supply` | total iron in the world, shown on the board |
-| `mt_token` / metadata | name, icon and kind (`good`, `item`, `share`, `badge`) |
-| Events `mt_mint`, `mt_transfer`, `mt_burn` (`EVENT_JSON`, standard `nep245`, version `1.0.0`) | gather, trade, craft; indexers and the ledger read these |
-
-Token ids: `good:iron`, `good:timber`, `good:salt`, `good:herb`, `item:tool`, `share:smith`, and the arena's existing `case:<clause>` and `trophy:<id>` badges.
-
-## A shop goes broke, and comes back
-
-1. A shopkeeper's till falls below its floor (it bought too much iron that nobody buys back).
-2. `sell` to that shop is refused with `ERR_SHOP_CLOSED`. The building goes dark in 3D and the counter reads `Closed: out of funds`.
-3. A player presses Invest and attaches NEAR. `invest(shop)` reopens the shop and mints `share:<shop>` to the investor.
-4. Each later sale at that shop pays a share of its margin to share holders until the investment plus 10% is repaid. The payout is a `propose_call` on the shopkeeper's row, so the row's caps also bind repayments.
-
-## The con artist
-
-Every few minutes (or on demand from `/judge`) the con artist pitches a shopkeeper: "pay me 0.5 NEAR for a shipment of silk". The shopkeeper's model may even agree. The shopkeeper's row on the board has no allowance for the con artist's account, so `propose_call` is refused on chain with a reason. The shop ledger shows the attempt and the refusal tx. The first refusal at each shop mints a `case:` badge to the player who watched it, reusing the arena's badge rule.
+No re-init: the contract has no public `init(ignore_state)`. Upgrades are owner-only and read state by version.
 
 ## Login and gas
 
-- Sign-in: email or Google through the Privy option already offered in NEAR Connect (`app/house/privy.js`). No seed phrase.
-- Session: one approval at sign-in opens the player's row and adds a function-call key scoped to the board. After that, no popups inside the row's rules.
-- Gas: a relayer (NEP-366 meta transactions) pays gas for the market methods only: `gather`, `buy`, `sell`, `craft`, `invest`, and the board's `propose_call` when its receiver is the market contract. Any other receiver or method is refused by the relayer before it signs. A per-player daily cap and a global daily cap bound what the relayer can spend.
+- Sign-in: email or Google through Privy in NEAR Connect. No seed phrase.
+- First session: the relayer sponsors a new player once (account creation, storage for the bag, gas), capped per player and per day. Gather and sell earn the first NEAR, and that NEAR opens the player's row later. A judge goes from email to a first sale with no NEAR and no prompt.
+- Gas: a NEP-366 relayer pays gas only for the market methods listed above, on the market contract. Any other receiver or method is refused before it signs. It has its own daily caps.
+- Chat privacy, stated exactly: inference runs in an attested TEE, and the answer is signed by the model's key. Our server relays the chat and does not store it. It is not end-to-end encrypted unless the browser uses the NEAR AI E2EE flow.
 
-## /judge
+## Pricing: one readable file
 
-One page with one button per proof, each sending a real mainnet transaction and printing its nearblocks link: gather, sell into a falling price, buy, craft, a broke shop refusing a sale, invest to reopen it, and the con artist refused. A run of fast-forward sits beside them, labelled as a simulation.
-
-## The guide: a character who walks you through the town
-
-The headline of Market Day is a guide you can see. The Lamplighter walks the 3D island next to the player. The player talks to it in plain words; it answers, walks to the right shop, explains, and does the action for them inside the player's board caps.
-
-| The player says | The guide does | What the player sees |
-|---|---|---|
-| "Sell my iron where it pays most" | Reads `quote` at every shop, picks the best, walks there | The camera glides to the smithy, the `Why this price?` card opens, then the sale |
-| "Buy two salt for the tavern order" | Buys at the cheapest shop, then fills the order | Two steps, each with its tx |
-| "Fill the Town Hall order for tools" | Crafts if needed, then delivers to the Town Hall job | The Hall's job card moves from open to delivered to paid |
-| "Put 0.05 into the closed apothecary" | Calls `invest` | The windows light up again, a `share:apothecary` lands in the bag |
-| "Swap 1 NEAR to USDC" | Asks the Ferry for quotes through NEAR Intents and checks out | Quotes side by side, the larger output marked |
-| "Pay this stranger 0.5 for silk" | Proposes it; the row has no allowance for him | `Charter said no` with the refusal tx |
-
-How it is wired:
-
-- Brain: the NEAR AI Cloud model in a TEE that the town already uses (`backend/src/agent.js`). The chat is private to the player. Each answer carries its attestation, shown behind a small `verified` mark.
-- Hands: the guide never holds money. It proposes one action at a time through the player's row (`propose_call` on `board.nearcarta.near`). The row decides.
-- The moment: every action ends on one card, `Charter said yes` or `Charter said no`, with the reason and the nearblocks link. It is the same card for buy, sell, invest, a Hall order and a swap.
-- Walking: the guide walks a path between shop doors. The camera eases to the shop in about 1.2 s, and the dialog sits in a fixed panel so it never covers the shop's counter.
-
-## One connected loop
-
-Every part feeds another, so a session is one story, not a list of features:
+All merchant pricing lives in `contracts/market/src/pricing.rs`. With `s` units on the shelf:
 
 ```
-gather goods (NEP-245 mint)
-   -> sell at a shop; its price moves (pricing.rs)
-   -> the shop's till grows, or it overbuys and goes broke
-   -> a broke shop closes; a player invests (share token) and it reopens
-   -> shops restock from each other through their own board rows
-   -> the Town Hall posts orders for goods; filling one pays the player
-   -> the con artist pitches a shopkeeper; the charter refuses on chain
-   -> the guide does any of these on request, under the player's caps
-   -> /judge replays each step as one real mainnet tx
+scarcity(s) = target / s                  clamped to [0.25, 4]
+demand      = 1 + (buys - sells) / 20      from the last completed hour, clamped to [0.5, 2]
+mood        = 0.9 when the shop is closed (it sells cheaper to raise cash), else 1
+buy  = base * scarcity(s)   * max(1, demand) * mood
+sell = base * scarcity(s+1) * min(1, demand) * mood * 0.8
 ```
 
-## Look and feel
+A round trip always loses: buying the unit at shelf `s` costs at least `base * scarcity(s) * mood`, and selling it back pays at most 80% of that. Property tests in Rust and JavaScript run thousands of random buy and sell sequences that end where they started and require the player never to gain.
 
-- The existing 3D scenes stay: the island at dusk, the nine buildings, the dark brown and gold palette.
-- Motion: camera eases to a shop, prices tick with a short count-up, a closed shop dims and relights, goods fly into the bag, the charter card stamps `yes` or `no`.
-- Layout rules: one panel at a time on the right, the guide's chat at the bottom, no panel over another, no nested scroll areas. A panel that is taller than the screen scrolls the page, not the panel.
-- Every tx link opens in a new tab; nothing leaves the game screen.
+`quote(shop, good)` returns the prices and the reasons as data. The tooltip prints them word for word:
 
-## Town Hall: the pass that cannot pay today
+```json
+{ "buy": "1000000000000000000000", "sell": "780487804878048780487", "reasons": [
+  { "rule": "scarcity", "factor_bps": 5000, "why": "40 on the shelf, the shop wants 20" },
+  { "rule": "demand",   "factor_bps": 8000, "why": "last hour: 2 bought, 6 sold" },
+  { "rule": "mood",     "factor_bps": 10000, "why": "open" },
+  { "rule": "margin",   "factor_bps": 8000, "why": "the shop pays 80% of the next unit's price, with no demand bonus" } ] }
+```
 
-On mainnet a Town Hall `review(pass)` refuses, because the Hall waits for `guard_clear` from `guard.nearcarta.near`, and that account has no key and no method that calls it. So a delivered order can never be paid. The fix, kept out of `charter_board`:
+## Items: NEP-245 in one contract
 
-1. Add an owner-only `set_guard(guard)` to `contracts/hall` (state-compatible, no migrate, so open jobs survive), with a unit test that only the owner can call it and that a pass still needs a clear.
-2. Redeploy the Hall wasm on `townhall.nearcarta.near` with its existing full-access key, then `set_guard` to a guard signer.
-3. The guard signer is a function-call key that can call only `guard_clear` on `townhall.nearcarta.near`. The backend Guardhouse uses it after the model's verdict is ALLOW; a BLOCK never calls it.
-4. Prove it with tiny real txs: post a 0.001 NEAR job, bid, deliver, `guard_clear`, `review(pass)` pays the worker.
+Every good, item and share is a token id in one NEP-245 contract on `arena.nearcarta.near`: `good:iron`, `good:timber`, `good:salt`, `good:herb`, `item:tool`, `item:tonic`, `share:<shop>`.
 
-This is coordinated with the worker on `contracts/charter_board`; neither change touches the other's files.
+| NEP-245 piece | Use |
+|---|---|
+| `mt_transfer`, `mt_batch_transfer` (batch ≤ 16) | moving goods between accounts; a batch emits one event |
+| `mt_transfer_call`, `mt_resolve_transfer` (private, gas checked) | sending goods to another contract |
+| `mt_balance_of`, `mt_batch_balance_of`, `mt_supply`, `mt_batch_supply` | the bag, shelves, the market board |
+| `mt_token`, metadata (`mt_metadata_contract`, `mt_metadata_token_all`, `..._by_token_id`, `..._base_by_token_id`) | name, icon, kind |
+| Enumeration (`mt_tokens`, `mt_tokens_for_owner`) | wallets and explorers can list the bag |
+| Events `mt_mint`, `mt_transfer`, `mt_burn` | gather, trade, craft, order fills |
+
+In-game moves (gather, sell, craft, fill) are contract-internal and gasless for the player. A player-to-player `mt_transfer` is a normal signed transaction. Shares cannot be transferred: they carry a dividend position.
+
+## Economy bounds
+
+- Per player per day: a gather cap and a NEAR payout cap on sales.
+- City-wide per day: a maximum NEAR paid out by all shops (the most the game can leak in a day), shown on `/judge`.
+- `pause`: the owner's kill switch for every player method.
+- Storage: every new balance or record is charged to the player's storage deposit (NEP-145 style), sponsored once at sign-up.
+- Sinks: orders burn goods, crafting burns inputs, tools wear out.
+- A shop below its floor is closed to player sales. Player buys still work at mood 0.9, so a closed shop can recover by itself. Investment reopens it at once.
 
 ## Requirement map
 
-| Games prompt requirement | Where in the design | File (planned) | Test (planned) |
+| Games prompt requirement | Where | File | Test |
 |---|---|---|---|
-| Market-town game: gather and trade with NPC merchants | The 30 s loop | `contracts/arena_v2/src/market.rs`, `app/src/market/` | `gather_then_sell_moves_goods_and_pays_the_player` |
-| Each merchant is an agent with its own wallet and inventory | Nine shopkeeper sub-accounts with stock as NEP-245 balances and rows on the board | `contracts/arena_v2/src/market.rs`, `backend/src/market/keeper.js` | `a_shopkeeper_pays_only_through_its_row` |
-| Prices from stock and recent demand | `pricing.rs`: scarcity and demand factors | `contracts/arena_v2/src/pricing.rs` | `flooding_a_shop_with_iron_lowers_the_iron_price` |
-| A broke merchant closes until someone invests | Floor, `ERR_SHOP_CLOSED`, `invest` | `contracts/arena_v2/src/market.rs` | `a_broke_shop_refuses_sales_until_an_investment_reopens_it` |
-| Items are NEP-245, one contract for every item type | Token ids `good:`, `item:`, `share:`, `case:` on one contract | `contracts/arena_v2/src/mt.rs` | `every_item_kind_lives_in_one_contract_and_emits_nep245_events` |
-| Social or email login, no seed phrase | Privy in NEAR Connect | `app/house/privy.js` | existing login tests plus `market sign-in opens a row with one approval` |
-| No wallet popups or gas prompts in the loop | Session key plus relayer for market methods | `backend/src/relayer.js` | `the relayer signs market methods and refuses any other receiver` |
-| Pricing rules in one readable file | `pricing.rs` | `contracts/arena_v2/src/pricing.rs` | `js and rust pricing agree on every golden case` |
-| Merchant reasoning in a tooltip | `quote` returns reasons; tooltip prints them | `app/src/market/why.js` | `the tooltip shows the contract's reasons word for word` |
-| Fast-forward: a week in a minute | 168 ticks in 60 s, labelled simulation | `app/src/market/fastforward.js`, `shared/market/sim.js` | `a simulated week runs 168 ticks and closes then reopens a shop` |
-| Loop designed on paper first | This page | `docs/game-loop.md` | n/a |
-| Agent NPCs (Lean on) | Shopkeepers, the con artist and the guide are agents | `backend/src/market/keeper.js`, `backend/src/agent.js` | `the guide proposes through the row and never holds money` |
-| NEAR Intents (Lean on) | The guide's swap goes through the Ferry's 1Click checkout | `backend/src/ferry-checkout.js` | existing ferry tests |
-| Bonus: players never notice the chain | No popups, no gas, chain shown only as optional tx links in the ledger | as above | as above |
+| Market-town game: gather, trade with NPC merchants | The 30 s loop on the real city | `contracts/market/src/lib.rs`, `app/src/market/` | `gather_then_sell_moves_goods_and_pays_the_player` |
+| Each merchant is an agent with its own wallet and inventory | Nine keeper sub-accounts, shelves as NEP-245 balances, a row each, decisions on NEAR AI | `contracts/market`, `backend/src/market/keeper.js` | `a_keeper_restocks_only_through_its_row` |
+| Prices from stock and recent demand | `pricing.rs` | `contracts/market/src/pricing.rs` | `flooding_a_shop_with_iron_lowers_the_iron_price`, `a_round_trip_never_gains_over_random_sequences` |
+| A broke merchant closes until someone invests | Floor, `ERR_SHOP_CLOSED`, `invest`, the council | `contracts/market` | `a_broke_shop_refuses_sales_until_an_investment_reopens_it` |
+| Items are NEP-245, one contract for every type | Goods, items and shares in one contract | `contracts/market/src/mt.rs` | `every_item_kind_lives_in_one_contract_and_emits_nep245_events` |
+| Social or email login, no seed phrase | Privy in NEAR Connect | `app/house/privy.js` | `market sign-in needs no NEAR` |
+| No wallet popups or gas prompts in the loop | Function-call key on the market plus the NEP-366 relayer | `backend/src/relayer.js` | `the relayer signs market methods and refuses any other receiver` |
+| Pricing rules in one readable file | `pricing.rs` (JS is a pinned mirror) | `contracts/market/src/pricing.rs` | `js and rust pricing agree on every golden case` |
+| Merchant reasoning in a tooltip | `quote` reasons, printed as they are | `app/src/market/why.js` | `the tooltip shows the quote reasons word for word` |
+| Fast-forward: a week in a minute | 168 ticks in 60 s, labelled | `shared/market/sim.js`, `app/src/market/fastforward.js` | `a simulated week closes and reopens a shop and stays inside the leak bound` |
+| Loop on paper first | This page | `docs/game-loop.md` | n/a |
+| Agent NPCs (lean on) | Keepers, clerk, con artist, your guide | `backend/src/market/` | `a keeper decision carries its model signature` |
+| NEAR Intents (lean on) | The port: cash out through 1Click, with `deposit/submit` | `backend/src/ferry-checkout.js` | `a ferry checkout submits the deposit tx` |
+| Bonus: players never notice the chain | No popups, no gas; tx links only in the Chronicle | as above | as above |
 
-## Build plan (in impact order)
+## Build plan (playable first)
 
-| # | PR | Mainnet cost |
+| # | PR | State |
 |---|---|---|
-| 1 | Pricing module and `Why this price?` tooltip | none |
-| 2 | NEP-245 goods on the arena code (`gather`, `buy`, `sell`, `craft`, `invest`, `quote`), shopkeeper sub-accounts that spend through their rows | needs approval: the arena redeploy |
-| 3 | The guide: chat, walking, camera, `Charter said yes/no` card for buy, sell, invest, Hall order, swap | tiny txs |
-| 4 | Town Hall `set_guard` fix and the guard signer | under 0.05 NEAR |
-| 5 | Fast-forward | none |
-| 6 | Con artist refused by the charter on mainnet | tiny txs |
-| 7 | `/judge` with one-click mainnet txs | tiny txs |
-| 8 | README Games section: prompt line, file, test, tx | none |
-| 9 | Relayer for market methods | small float for gas |
+| 1 | Pricing file and tooltip | merged #175 (rule revised in 2) |
+| 2 | Market contract: NEP-245 goods, shops on the nine locations, orders, shares, caps, storage, no-arbitrage pricing, sandbox test through the live board build | building |
+| 3 | Playable city: bag, counters, nodes, Town Hall orders, `Why this price?`, day/night timer | next |
+| 4 | Relayer and function-call key: email to first sale with no NEAR | |
+| 5 | Your agent: chat, walking, camera glide, `Charter said yes/no` | |
+| 6 | Keeper agents and the con artist on NEAR AI, signed; the watch and the refused tx | |
+| 7 | Fast-forward | |
+| 8 | `/judge` with one-click mainnet txs and the leak bound | |
+| 9 | Port cash-out through Intents; README Games section | |
 
-The existing 3D scenes stay. Market UI is new files under `app/src/market/`.
+Every existing shop keeps its real function. Market Day adds a role to each, not a replacement.
