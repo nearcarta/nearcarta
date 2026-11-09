@@ -128,7 +128,14 @@ addEventListener('resize', () => playing && measureSafe());
 function placeNodes() {
   const cam = window.W?.camera; if (!cam || !THREE) return;
   const v = new THREE.Vector3(); const w = innerWidth, hh = innerHeight;
-  const bans = [...document.querySelectorAll('#pins .pin.on .ban')].map((e) => e.getBoundingClientRect()).filter((r) => r.width);
+  // A shop's name tag never peeks out from under the open sheet: hide it while the sheet covers it.
+  const sh = view ? sheet().getBoundingClientRect() : null;
+  const under = (r) => sh && sh.width && r.right + 8 > sh.left && r.left - 8 < sh.right && r.bottom + 8 > sh.top && r.top - 8 < sh.bottom;
+  for (const pin of document.querySelectorAll('#pins .pin')) {
+    const tag = pin.querySelector('.ban'); pin.classList.remove('md-under');
+    if (tag && pin.classList.contains('on') && under(tag.getBoundingClientRect())) pin.classList.add('md-under');
+  }
+  const bans = [...document.querySelectorAll('#pins .pin.on:not(.md-under) .ban')].map((e) => e.getBoundingClientRect()).filter((r) => r.width);
   for (const p of pins) {
     v.copy(p.pos).project(cam);
     const x = (v.x * 0.5 + 0.5) * w; let y = (-v.y * 0.5 + 0.5) * hh;
@@ -137,7 +144,7 @@ function placeNodes() {
     const hit = () => bans.find((r) => x + 30 > r.left && x - 30 < r.right && y + 26 > r.top && y - 50 < r.bottom);
     for (let k = 0, r; k < 3 && (r = hit()); k++) y = r.bottom + 54;
     // Keep spots clear of the HUD, the dock, the screen edges and shop tags, so none is half hidden.
-    const on = !hit() && v.z < 1 && x > 32 && x < w - 32 && y > safeTop + 56 && y < hh - safeBottom && !document.body.classList.contains('in-shop');
+    const on = !hit() && !under({ left: x - 30, right: x + 30, top: y - 50, bottom: y + 26 }) && v.z < 1 && x > 32 && x < w - 32 && y > safeTop + 56 && y < hh - safeBottom && !document.body.classList.contains('in-shop');
     p.el.style.display = on ? '' : 'none'; if (!on) continue;
     p.el.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px) translate(-50%,-100%)`;
     const cd = S.cooldown(city, ME, p.id);
@@ -226,7 +233,7 @@ function vQuests() {
   const p = me(); const list = city.orders.filter((o) => o.poster !== ME);
   const first = list.find((o) => (p.bag[o.good] || 0) >= 1);
   const rows = list.map((o) => { const n = Math.min(o.qty, p.bag[o.good] || 0);
-    return `<div class="md-order"><span class="md-tok">${iconFor(o.good)}</span><div class="md-nm"><b>${esc(o.text)}</b><small>${o.qty} ${esc(GOOD(o.good))} · ${near(o.reward)} each · +1 rep</small></div>
+    return `<div class="md-order"><span class="md-tok">${iconFor(o.good)}</span><div class="md-nm"><b>${esc(o.text)}</b><small>${o.qty} ${esc(GOOD(o.good))} · ${near(o.reward)} · +1 rep</small></div>
     ${o === first ? '' : `<button type="button" class="md-ghost sm" data-act="fill" data-id="${o.id}" ${n ? '' : 'disabled'}>${n ? `Deliver ${n}` : `Need ${esc(GOOD(o.good))}`}</button>`}</div>`; }).join('');
   const cta = first ? `<button type="button" class="md-cta" data-act="fill" data-id="${first.id}" data-testid="md-fill">Deliver ${Math.min(first.qty, p.bag[first.good])} ${esc(GOOD(first.good))} · ${near(first.reward * BigInt(Math.min(first.qty, p.bag[first.good])))}</button>` : '';
   return head(ICON.quest, 'Town Hall orders', 'New orders at dawn. Goods are used up.')

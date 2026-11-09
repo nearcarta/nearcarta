@@ -42,6 +42,7 @@ body.md-play #ctl, body.md-play #acct, body.md-play #rulesBtn, body.md-play #chr
 /* in play, shop tags show the name only: less to read over the island */
 body.md-play #pins .pin small { display: none; }
 body.md-sheet-open #zoom { opacity: 0; pointer-events: none; }
+body.md-play #pins .pin.md-under { opacity: 0 !important; visibility: hidden; pointer-events: none; }
 
 .md-toasts { position: fixed; z-index: 23; top: 76px; left: 50%; transform: translateX(-50%); width: min(420px, calc(100vw - 32px)); pointer-events: none; }
 .md-toast { margin: 0 auto 8px; width: fit-content; max-width: 100%; padding: 8px 12px; border-radius: 12px; font-size: 13px; background: rgba(27,18,12,.95); border: 1px solid var(--md-line); box-shadow: 0 8px 20px rgba(0,0,0,.3); transition: opacity .4s, transform .4s; }
@@ -70,7 +71,7 @@ body.md-sheet-open #zoom { opacity: 0; pointer-events: none; }
 .md-dock button.bump { animation: md-bump .35s ease; }
 .md-dock .md-exit { min-width: 48px; width: 48px; padding: 0; }
 .md-dock em { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; font: 700 12px/20px Inter, sans-serif; font-style: normal; color: var(--md-ink); background: var(--md-gold-hi); }
-.md-dock em[hidden] { display: none; }
+.md-dock em[hidden], .md-dock button.on em { display: none; }
 @keyframes md-bump { 40% { transform: scale(1.08); } }
 
 /* sheet: right panel on desktop, bottom sheet on mobile */
@@ -147,7 +148,9 @@ button.md-row:hover { border-color: var(--md-soft); }
 .md-rtxt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .md-rtxt b { font-size: 14px; }
 .md-rtxt small { font-size: 12px; color: var(--md-muted); line-height: 16px; }
-.md-order { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; border-radius: 12px; background: rgba(10,7,5,.35); border: 1px solid rgba(255,255,255,.06); }
+.md-order .md-nm b { white-space: normal; line-height: 1.25; }
+.md-order .md-nm small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-order { box-sizing: border-box; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; border-radius: 12px; background: rgba(10,7,5,.35); border: 1px solid rgba(255,255,255,.06); }
 .md-hint { margin: 16px 0 0; font-size: 13px; color: var(--md-muted); text-align: center; }
 
 @media (max-width: 720px) {

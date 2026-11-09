@@ -20,6 +20,15 @@ const checks = (p) => p.evaluate(() => {
     const a = boxes[i][1].getBoundingClientRect(), c = boxes[j][1].getBoundingClientRect();
     if (a.left < c.right && c.left < a.right && a.top < c.bottom && c.top < a.bottom) out.overlap.push(boxes[i][0] + '×' + boxes[j][0]);
   }
+  // No shop name tag may peek out from under the open sheet.
+  if (sheet) { const s = sheet.getBoundingClientRect(); for (const t of document.querySelectorAll('#pins .pin.on .ban')) {
+    const r = t.getBoundingClientRect(); if (!r.width || (getComputedStyle(t.closest('.pin')).opacity === '0' || getComputedStyle(t).visibility === 'hidden')) continue;
+    if (r.left < s.right && s.left < r.right && r.top < s.bottom && s.top < r.bottom) out.overlap.push('tag:' + t.textContent.trim().slice(0, 20) + '×sheet');
+  } }
+  // Town chatter never sits on the game's HUD, dock, sheet or spots.
+  const game = ['.md-hud', '.md-dock', '.md-sheet.open', '.md-node'].flatMap((q) => [...document.querySelectorAll(q)]).filter((e) => getComputedStyle(e).display !== 'none').map((e) => e.getBoundingClientRect()).filter((r) => r.width);
+  for (const bub of document.querySelectorAll('#bubbles .bub')) { if (+getComputedStyle(bub).opacity < 0.1) continue; const r = bub.getBoundingClientRect();
+    if (game.some((g) => r.left < g.right && g.left < r.right && r.top < g.bottom && g.top < r.bottom)) out.overlap.push('bubble:' + bub.textContent.slice(0, 20)); }
   return out;
 });
 for (const [W, H] of [[1440, 900], [390, 844]]) {
@@ -29,7 +38,7 @@ for (const [W, H] of [[1440, 900], [390, 844]]) {
   await p.goto(BASE + '/?play');
   await p.waitForFunction(() => document.body.classList.contains('md-play'), null, { timeout: 120e3 });
   await p.waitForTimeout(+(process.env.SETTLE || 9000));
-  const shot = async (name) => { await p.waitForTimeout(500); await p.screenshot({ path: `${OUT}/${TAG}-${name}-${W}.png` }); report[`${name}-${W}`] = await checks(p); };
+  const shot = async (name) => { await p.waitForTimeout(500); await p.waitForFunction(() => { const s = document.querySelector('.md-sheet.open'); return !s || getComputedStyle(s).opacity === '1'; }, null, { timeout: 15e3 }).catch(() => {}); await p.screenshot({ path: `${OUT}/${TAG}-${name}-${W}.png` }); report[`${name}-${W}`] = await checks(p); };
   await shot('town');
   // gather from every visible node, twice where a tool is not yet made
   const nodes = await p.locator('.md-node:visible').all();
