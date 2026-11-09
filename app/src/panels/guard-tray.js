@@ -286,9 +286,18 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     const checkBtn = q$(root, '#g-check');
     if (checkBtn) checkBtn.onclick = async () => {
       readForm();
+      // An empty payee used to be sent to the check as an empty account and came back as a real
+      // verdict ("Warn because: account missing"), which reads as the shop judging nothing.
+      const acct = (state.acct || '').trim();
+      if (!acct) {
+        const hint = 'Type a payee first, for example cafe.near. Nothing was signed.';
+        agentLog(hint, true);
+        paint();
+        return;
+      }
       state.holding = true;
       if (holdButton) holdButton(checkBtn, 'Checking this account.');
-      try { await runPlan({ ok: true, action: 'check', account: (state.acct || '').trim() }); }
+      try { await runPlan({ ok: true, action: 'check', account: acct }); }
       finally { state.holding = false; }
     };
     const pay = q$(root, '#g-pay');
