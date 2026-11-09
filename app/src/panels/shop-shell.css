@@ -209,7 +209,7 @@ body #shopUI #tray > .t-scroll > #t-track {
 #shopUI #tray .ferry-pane[data-pane='invoice'] > .note {
   grid-column: 1 / -1;
 }
-@media (max-width: 460px) {
+@media (max-width: 359px) {
   #shopUI #tray .ferry-picker,
   #shopUI #tray .guard-pane[data-pane='check'],
   #shopUI #tray .payout-invoice-pane,
@@ -245,7 +245,7 @@ body.arena-tray #shopUI #tray .arena-mode {
   align-items: start;
 }
 #shopUI #tray .c-filters > .chronicle-field.wide { grid-column: 1 / -1; }
-@media (max-width: 460px) {
+@media (max-width: 359px) {
   #shopUI #tray .c-filters { grid-template-columns: minmax(0, 1fr); }
 }
 /* A scroller inside a scroller is two scrollbars for one panel, and the inner one was 326px of a
@@ -272,7 +272,7 @@ body.arena-tray #shopUI #tray .arena-mode {
 #shopUI #tray .chronicle-pane[data-pane='verify'] > .c-bundle,
 #shopUI #tray .chronicle-pane[data-pane='verify'] > .chronicle-quiet,
 #shopUI #tray .chronicle-pane[data-pane='verify'] > .chronicle-field:first-of-type { grid-column: 1 / -1; }
-@media (max-width: 460px) {
+@media (max-width: 359px) {
   #shopUI #tray .chronicle-pane[data-pane='statement'],
   #shopUI #tray .chronicle-pane[data-pane='verify'] { grid-template-columns: minmax(0, 1fr); }
 }
@@ -302,7 +302,7 @@ body.arena-tray #shopUI #tray .arena-mode {
   grid-column: 1 / -1;
 }
 #shopUI #tray .hall-pane[data-pane='post'] > .hall-split { grid-column: 1 / -1; }
-@media (max-width: 460px) {
+@media (max-width: 359px) {
   #shopUI #tray .hall-pane[data-pane='post'] { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -502,7 +502,7 @@ body #shopUI #tray [role='tablist'] > [role='tab']:focus-visible {
   gap: var(--sp-3);
   min-width: 0;
 }
-@media (max-width: 460px) {
+@media (max-width: 359px) {
   #shopUI #tray .hall-split,
   #shopUI #tray .guard-split,
   #shopUI #tray .payout-split,
@@ -653,12 +653,18 @@ body #shopUI #tray #t-title .i3 { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .3
     max-width: none !important;
     max-height: calc(100dvh - 76px) !important;
   }
-  body #shopUI #tray > .t-scroll > .t-head { padding: var(--sp-3) var(--sp-3) var(--sp-2); }
-  body #shopUI #tray > .t-scroll > .t-label { padding: 0 var(--sp-3) var(--sp-2); }
-  body #shopUI #tray > .t-scroll > #t-form { padding: var(--sp-2) var(--sp-3) 0 !important; }
-  body #shopUI #tray [role='tablist'] { margin: var(--sp-3) var(--sp-3) 0; }
-  body #shopUI #tray > .t-row { padding: var(--sp-3); }
-  body #shopUI #tray > .t-links { padding: 0 var(--sp-3) var(--sp-3); }
+  /* A phone has no room to spare, so the form's own rhythm tightens: 8px between fields and 4px
+     between a label and its control, and the header loses a step of padding. Measured on Hall at
+     390x844 this is 44px of the 141px it was over by; the rest is the field count, which is what
+     a phone costs. */
+  body #shopUI #tray > .t-scroll > #t-form { gap: 8px; padding: var(--sp-2) var(--sp-3) 0 !important; }
+  body #shopUI #tray .ferry-field,
+  body #shopUI #tray label { gap: 4px; }
+  body #shopUI #tray > .t-scroll > .t-head { padding: var(--sp-2) var(--sp-3) !important; }
+  body #shopUI #tray > .t-scroll > #t-track { padding: var(--sp-1) var(--sp-3) 0; }
+  body #shopUI #tray [role='tablist'] { margin: var(--sp-2) var(--sp-3) 0; }
+  body #shopUI #tray > .t-row { padding: var(--sp-2) var(--sp-3); }
+  body #shopUI #tray > .t-links { padding: 0 var(--sp-3) var(--sp-2); }
   body #shopUI #tray > .rcpt { padding: 0 var(--sp-3) var(--sp-3); }
   body #shopUI #tray > .t-row > #t-act { min-height: 48px; }
 }
