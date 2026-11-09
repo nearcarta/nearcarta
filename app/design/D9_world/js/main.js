@@ -11,6 +11,7 @@ import { mountIntro } from './intro-dom.js';
 import { beginEnter } from './room-lock.js';
 import { createRouter, shopKey, shopQuery } from './city-route.js';
 import { icon } from '../d7/js/d7.js';
+import { Quest } from './quest.js';
 const $=s=>document.querySelector(s); const body=document.body; const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 window.__alog=[]; // audio event log (t in story seconds) for the offline video mix
 let storyT0=0; // set before boot: a character cue during the cast build must not touch this before it exists
@@ -191,8 +192,12 @@ function occlusion(dt){ const hd=R.pos.clone().add(V(0,.6,0)); const dir=hd.clon
   for(const [id,ms] of Object.entries(occM)){ const g=hit.has(id)&&!inShop?.2:1; const v=fadeV[id]??1; const n=v+(g-v)*Math.min(1,dt*7); if(Math.abs(n-v)<1e-4&&n===g) continue; fadeV[id]=n;
     for(const m of ms){ const mm=m.material; mm.transparent=n<.99; mm.opacity=n; mm.depthWrite=n>.99; } } }
 let occM=null;
-function playCam(dt){ PC.zs+=(PC.z-PC.zs)*Math.min(1,dt*7); const z=PC.zs; const tg=R.pos.clone().add(V(0,.5,0)); const ahead=V(Math.sin(R.yaw),0,Math.cos(R.yaw)).multiplyScalar(Math.min(1.2,R.speed)*.55*(1-z)); tg.add(ahead);
-  tg.lerp(ZC,sstep(.18,.8,z)); const dist=zDist(z), pitch=zPitch(z);
+// Market Day framing: with a focus (the next shop's door), the camera stands behind the guide looking down the lit
+// road, and backs off until both the guide and the door are on screen, portrait included.
+function focusZ(){ const f=PC.focus; if(!f) return 0; const d=Math.hypot(f.x-R.pos.x,f.z-R.pos.z); const need=(PORT()?2.3:1.45)*d+2.2; let z=0; while(z<1&&zDist(z)<need) z+=.02; return z; }
+function playCam(dt){ const fz=PC.focus?focusZ():0; if(PC.focus&&!down){ const f=PC.focus; const want=Math.atan2(R.pos.x-f.x,R.pos.z-f.z); PC.yaw+=Math.atan2(Math.sin(want-PC.yaw),Math.cos(want-PC.yaw))*Math.min(1,dt*1.6); }
+  PC.zs+=(Math.max(PC.z,fz)-PC.zs)*Math.min(1,dt*(PC.focus?2.2:7)); const z=PC.zs; const tg=R.pos.clone().add(V(0,.5,0)); const ahead=V(Math.sin(R.yaw),0,Math.cos(R.yaw)).multiplyScalar(Math.min(1.2,R.speed)*.55*(1-z)); tg.add(ahead);
+  if(PC.focus){ tg.lerp(PC.focus.clone().setY(.5),.45); } else tg.lerp(ZC,sstep(.18,.8,z)); const dist=zDist(z), pitch=zPitch(z);
   const cp=Math.cos(pitch), p=tg.clone().add(V(Math.sin(PC.yaw)*cp*dist,Math.sin(pitch)*dist,Math.cos(PC.yaw)*cp*dist));
   if(!PC.init){ PC.t.copy(D.cur.t); PC.p.copy(cam.position); PC.init=true; PC.blend=0; }
   PC.blend=Math.min(1,(PC.blend||0)+dt*2.6); const k=Math.min(1,dt*(3+PC.blend*6));
@@ -234,7 +239,17 @@ world.walkTo=(id)=>new Promise(res=>{ const s=SHOPS[id]; if(!s||inShop){ res(fal
   if(far<.4){ fin(); return; } if(far<1.6) R.go([end],{arrive:fin}); else if(!R.goHex(s.door,{end,run:far>3,arrive:fin})) R.go([end],{arrive:fin});
   setTimeoutSim(fin,Math.min(14,1.2+far/(far>3?R.runSpd:R.walkSpd)*1.4)); });
 world.zoom=z=>{ const was=PC.z; if(z!=null) setZoom(z); return was; };
-world.guideSay=(text,opt={})=>SP.say(R,text,{name:'Lamplighter',dur:3,...opt});
+// Market Day: the door of a shop (where the building's front face is), its outward direction, for the quest light.
+function doorSpot(id){ const s=SHOPS[id], c=hx(s.q,s.r), st=hx(...s.door); const out=st.clone().sub(c).setY(0).normalize(); const o=st.clone().setY(.3); dray.set(o,out.clone().negate()); dray.far=3;
+  const hit=W.B[id]?dray.intersectObject(W.B[id],true)[0]:null; return { p:(hit?hit.point.clone():c.clone().lerp(st,.45)).setY(0), out }; }
+const quest=Quest({ guide:()=>R, doorAt:doorSpot });
+world.quest={ target:id=>{ quest.target(id); PC.focus=id?doorSpot(id).p:null; if(id&&mode!=='explore'&&!inShop) explore(true); }, clear:()=>{ quest.clear(); PC.focus=null; }, get id(){ return quest.id; }, points:()=>quest.points };
+world.keeperSay=(id,text,opt={})=>{ const k=CAST.keepers?.[id]||(id==='ferry'?CAST.ferryman:null); if(!k) return false; k.lookAt(R,1); SP.say(k,text,{name:k.name,dur:3,...opt}); return true; };
+world.focus=id=>{ PC.focus=id?doorSpot(id).p:null; };
+let robotBody=null;
+world.guideLook=look=>{ if(look==='crier'&&!robotBody&&CAST.crierBody){ robotBody=R.reskin(CAST.crierBody); R.name='Town Crier'; R.voice=1.05; }
+  else if(look!=='crier'&&robotBody){ CAST.crierBody.root=R.root; const back=robotBody; robotBody=null; const cr=R.reskin(back); Object.assign(CAST.crierBody,cr); R.name='Lamplighter'; R.voice=1.25; } return robotBody?'crier':'robot'; };
+world.guideSay=(text,opt={})=>SP.say(R,text,{name:R.name||'Lamplighter',dur:3,...opt});
 world.guideScreen=()=>screenOf(R.pos.clone().setY((R.height||.6)+.1));
 // walking straight into a door (keys held toward the shop, on its step) goes in, no button needed
 let pushT=0; function walkInto(dt){ const r=_nearDoor(); if(!r.id||!R.steer||r.d>.6){ pushT=0; return; } const c=hx(SHOPS[r.id].q,SHOPS[r.id].r); const tx=c.x-R.pos.x, tz=c.z-R.pos.z, l=Math.hypot(tx,tz)||1, sl=R.steer.length()||1;
@@ -434,7 +449,7 @@ world.freeze=on=>freeze(on); world.mode=()=>mode; world.skip=()=>endStory();
 // ---------- loop ----------
 let last=performance.now(), fpsS=[], lpDone=LP;
 function draw(){ if(!room){ render(); return; } const r=W.renderer, e=r.toneMappingExposure; r.setRenderTarget(null); r.toneMappingExposure=1.08; r.render(room.scene,room.camera); r.toneMappingExposure=e; SL.placeTags(); }
-function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(dt); if(room){ SP.update(); return; } tickRoutines(); updateCast(dt); if(mode!=='story'&&LIFE) tickLife(dt,{sky:SKYRUN||skyM!=='auto'}); update(dt);
+function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(dt); if(room){ SP.update(); return; } tickRoutines(); updateCast(dt); quest.update(dt); if(mode!=='story'&&LIFE) tickLife(dt,{sky:SKYRUN||skyM!=='auto'}); update(dt);
   // lamp flare when the Lamplighter lights it
   for(const l of W.lamps){ if(l.flare>0) l.flare=Math.max(0,l.flare-dt*1.6); }
   if(window.__camLock){} else if(mode==='explore'&&!inShop&&!D.shot){ steerFromKeys(); playCam(dt); prompt(PC.zs<.44?nearDoor():null); placePrompt(); walkInto(dt); } else { prompt(null); applyCam(dt); }
