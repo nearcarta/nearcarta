@@ -27,6 +27,24 @@ test('askPlan: an off-allowlist payee is parsed as asked (the charter refuses it
   assert.equal(p.parsed.receiver, 'evil.near'); assert.equal(p.on_allowlist, false);
 });
 
+test('askPlan: the live visitor board has no clauses, and must still propose', async () => {
+  // The live board is board v2: a single row read with get_charter(owner). It has no `get_clauses`
+  // and no `get_state` at all, and asking for them fails MethodNotFound. Every test above stubs
+  // `get_clauses`, so none of them covered the shape the deployed board actually has — and
+  // /api/vault/ask/plan answered a bare `internal` 500 on it, which killed the only real-model
+  // path in the product (measured against board.nearcarta.near on 2026-11-09).
+  const boardView = async (_a, m) => {
+    if (m === 'get_charter') return { owner: 'x.near', receivers: [merchant], per_action_cap: '20000000000000000000000', next_nonce: 4, policy_version: 2 };
+    throw new Error(`view ${m}: wasm execution failed with error: MethodResolveError(MethodNotFound)`);
+  };
+  const p = await askPlan('pay the cafe 0.01 NEAR for coffee', 'x.near', { viewF: boardView, nowMs: 0 });
+  assert.equal(p.parsed.receiver, merchant);
+  assert.equal(p.on_allowlist, true, 'the row allowlist decides on_allowlist when there are no clauses');
+  assert.equal(p.per_action_cap, '20000000000000000000000');
+  assert.equal(p.clause_id, null, 'a row has no clause id');
+  assert.deepEqual([p.proposal.nonce, p.proposal.policy_version], ['4', 2], 'nonce and policy come from the row');
+});
+
 test('askPlan: bad input is a 400 with a plain message', async () => {
   await assert.rejects(askPlan('', 'x.near', { viewF }), e => e.status === 400);
   await assert.rejects(askPlan('pay the cafe', 'x.near', { viewF }), e => e.status === 400 && /how much/.test(e.message));

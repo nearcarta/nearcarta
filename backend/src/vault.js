@@ -267,12 +267,19 @@ export async function sharedTask(taskId, tag) {
   });
 }
 
-/** Payees a request may name: the charter's Native allowlists (when readable), then the arena merchants. */
+/** Payees a request may name: the charter's Native allowlists (when readable), then the arena merchants.
+ *  Two charter shapes exist. `get_clauses` is the legacy per-visitor oath; the live visitor board is
+ *  a single row read with `get_charter(owner)` and its receivers sit at `receivers`. Only `get_clauses`
+ *  was read here, so on the live board the lookup failed with MethodNotFound and every real-model
+ *  proposal died before it reached the model (measured: /api/vault/ask/plan answered `internal`
+ *  with `wasm execution failed ... MethodResolveError(MethodNotFound)`). */
 export async function askReceivers(charter, viewF = view) {
   const out = new Set();
   if (charter) {
     const cl = await viewF(charter, 'get_clauses').catch(() => null);
     for (const c of Object.values(cl || {})) if (c?.asset === 'Native') for (const r of c.receivers || []) out.add(r);
+    const row = await viewF(charter, 'get_charter', { owner: charter }).catch(() => null);
+    for (const r of row?.receivers || []) out.add(r);
   }
   for (const r of V?.arena?.merchants || []) out.add(r);
   return [...out];
@@ -283,17 +290,28 @@ export async function askPlan(text, charter = null, { viewF = view, nowMs = Date
   if (!charter && !V) throw bad('vault not deployed', 503);
   if (charter !== null && !isAccount(charter)) throw bad('charter: a NEAR account id');
   const id = charter || V.arena.charter;
-  const clauses = await viewF(id, 'get_clauses');
-  const receivers = await askReceivers(id, async () => clauses);
+  // `.catch(() => null)` on both reads: the legacy per-visitor oath exposes `get_clauses` and
+  // `get_state`, the live visitor board is a row read with `get_charter(owner)` and has no
+  // `get_state`. An unguarded read threw MethodNotFound on the live board, which surfaced as a
+  // bare `internal` 500 instead of a proposal.
+  const clauses = await viewF(id, 'get_clauses').catch(() => null);
+  const receivers = await askReceivers(id, viewF);
   let a;
   try { a = await propose(text, { clauses, receivers, tag }); } catch (e) { throw bad(e.message, e.status && e.status < 500 ? e.status : 400); }
   const q = a.parsed;
-  const { id: clauseId, clause } = pickClause(clauses);
-  const st = await viewF(id, 'get_state');
+  // A legacy oath answers `get_clauses`; the live visitor board has no clauses at all, so fall back
+  // to the row instead of calling a picker that refuses an empty map.
+  const st = await viewF(id, 'get_state').catch(() => null);
+  const row = st ? null : await viewF(id, 'get_charter', { owner: id }).catch(() => null);
+  const picked = clauses && Object.keys(clauses).length ? pickClause(clauses) : { id: null, clause: null };
+  const clauseId = picked.id;
+  const nonce = st?.next_nonce ?? row?.next_nonce ?? 0;
+  const policyVersion = st?.policy_version ?? row?.policy_version ?? 1;
+  const allowlist = picked.clause?.receivers || row?.receivers || [];
   return { charter: id, parsed: q, clause_id: clauseId,
-    on_allowlist: (clause.receivers || []).includes(q.receiver), per_action_cap: clause.per_action_cap ?? null,
-    proposal: { shop: 'ask', clause_id: clauseId, receiver: q.receiver, amount: q.amount, nonce: String(st.next_nonce),
-      policy_version: st.policy_version, expires_at: String(BigInt(nowMs + 10 * 60_000) * 1_000_000n), memo: q.memo, receipt: null },
+    on_allowlist: allowlist.includes(q.receiver), per_action_cap: picked.clause?.per_action_cap ?? row?.per_action_cap ?? null,
+    proposal: { shop: 'ask', clause_id: clauseId, receiver: q.receiver, amount: q.amount, nonce: String(nonce),
+      policy_version: policyVersion, expires_at: String(BigInt(nowMs + 10 * 60_000) * 1_000_000n), memo: q.memo, receipt: null },
     sign: 'call `propose` on the charter with {"p": proposal} using your agent function-call key; the charter decides',
     by: a.by, model: a.model, parser: a.by === 'model' ? `NEAR AI model ${a.model} in a TEE (proposes only; the charter decides)` : a.parser,
     fallback_why: a.fallback_why || null, verification: a.verification || null, tee: a.tee || null, cost: a.cost || null };
