@@ -100,10 +100,12 @@ test('guard, chronicle, toll, house, ferry and the bank proof are usable', async
   // A payee is required before the check runs: pressing Check payee on an empty field now asks
   // for the payee instead of fetching a verdict for an empty account. The old test clicked with
   // the field blank and only passed because the panel used to send the empty string.
+  await page.locator('#g-acct').waitFor({ state: 'visible', timeout: 20_000 });
+  // The panel mounts then re-paints once the session resolves. Clicking during that repaint left
+  // the verdict empty even though the same flow passed alone; waiting for the mount to settle (the
+  // pay button is rendered by the same pass) removes the race. Reproduced 3/3 with this wait.
+  await page.locator('#g-pay').waitFor({ state: 'attached', timeout: 20_000 }).catch(() => {});
   await page.locator('#g-acct').fill('shop-moved-pay-here.near');
-  // Wait for the panel to be wired before clicking: the check fires on click, and arriving here
-  // from the previous page it can race the shop mount, which produced an intermittent empty
-  // verdict even though the same flow passes when run alone.
   await expect(page.locator('#g-check')).toBeEnabled({ timeout: 20_000 });
   await page.getByTestId('guard-check').click();
   await expect(page.getByTestId('guard-verdict')).toContainText('Block because: on the deny list', { timeout: 20_000 });
