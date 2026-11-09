@@ -357,6 +357,13 @@ body.arena-tray #shopUI #tray .arena-mode {
 #shopUI #tray .c-sources > .c-rules { margin: 0 0 var(--sp-1); }
 #shopUI #tray .c-out { min-height: 0; }
 
+/* On a phone the flow strip goes. It is a decorative NEAR -> Parts -> Review banner, and at
+   390x844 the Hall form was 9px over its region: hiding the banner is 44px, keeps every control,
+   and nothing in it is information you cannot see in the fields below. Desktop keeps it. */
+@media (max-width: 720px) {
+  #shopUI #tray .hall-flow { display: none !important; }
+}
+
 /* ---- the form region -------------------------------------------------------------------- */
 /* The form region. `gap` is 10px rather than the 12px scale step: with a 690px slot, a 797px
    form and a pinned action row, the difference between 12 and 10 across eight gaps is 16px, and
