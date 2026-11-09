@@ -326,9 +326,9 @@ label.amt input{width:9rem;flex:0 0 9rem;min-width:0;box-sizing:border-box}
 .ferry-flow .tic .ti{width:48px!important;height:48px!important}
 .ferry-flow .tic .ci{width:16px!important;height:16px!important}
 .ferry-flow-arrow{color:#c98f4e;font:700 22px/1 system-ui,sans-serif}
-.ferry-field{display:flex;flex-direction:column;gap:8px;margin:0;color:#e8d7b8;font:650 13px/1.2 system-ui,sans-serif}
+.ferry-field{display:flex;flex-direction:column;gap:8px;margin:0;min-width:0;color:#e8d7b8;font:650 13px/1.2 system-ui,sans-serif}
 .ferry-field > input,.ferry-field select,.ferry-field .amt-row{
-  width:100%;min-height:48px;box-sizing:border-box;padding:0 12px;border-radius:var(--r-control);
+  width:100%;max-width:100%;min-width:0;min-height:48px;box-sizing:border-box;padding:0 12px;border-radius:var(--r-control);
   border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:600 15px/1.2 system-ui,sans-serif;
   -webkit-appearance:none;appearance:none;
 }
@@ -575,7 +575,7 @@ body.arena-tray .arena-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:
    gold action sat below the fold (y=792 in an 800px viewport) while the form still felt cramped.
    Two columns halve the height and give each field room. */
 body.arena-tray .ferry-pane[data-pane="guardians"]{
-  display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;align-items:start;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;align-items:start;
 }
 body.arena-tray .ferry-pane[data-pane="guardians"] > .ferry-tabs,
 body.arena-tray .ferry-pane[data-pane="guardians"] > .ferry-flow,
@@ -591,11 +591,11 @@ body.arena-tray .ferry-pane[data-pane="guardians"] > .arena-lines{grid-column:1 
   body.arena-tray .ferry-field{gap:4px}
   body.arena-tray .ferry-field > input,body.arena-tray .ferry-field .amt-row{min-height:44px}
 }
-}
 
 body.arena-tray .arena-status,body.arena-tray .arena-flow-caption{margin:0;color:#fff8ee;font:600 14px/1.4 system-ui,sans-serif;overflow-wrap:anywhere}
 body.arena-tray .arena-lines{display:grid;gap:6px}
-body.arena-tray .arena-guardians{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+body.arena-tray .arena-guardians{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+body.arena-tray .arena-guardians > li{min-width:0;overflow-wrap:anywhere}
 body.arena-tray .arena-attack{margin:0;color:#e8d7b8;font:600 15px/1.4 system-ui,sans-serif}
 body[data-shop=arena] header.shop-page,body[data-shop=arena] main.shop-page{width:min(640px,calc(100% - 380px));margin-left:24px;margin-right:auto}
 @media (max-width:899px){

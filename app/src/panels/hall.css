@@ -119,12 +119,18 @@ body.hall-tray #shopUI .hall-cta{
 }
 #shopUI #t-form button.hall-text:not(.route-chip){background:transparent;border:0;box-shadow:none;color:#f5d08a;min-height:44px}
 @media (max-width:720px){
+  /* The panel stays full width like every other shop. It used to be narrowed to
+     `100vw - 112px` so the agent's 96px avatar had room beside it; measured on a 390px phone
+     that made this the only shop with a 278px panel (the rest are 374px) and the form's fields
+     then overflowed it. The avatar sits above the panel's bottom edge instead, where it does not
+     cover a field. */
   body.hall-tray #shopUI #tray{
-    width:min(calc(100vw - 112px),420px)!important;
-    right:auto!important;
-    left:8px; bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    max-height:min(68dvh,calc(100dvh - 188px));
-    padding:16px 14px;
+    left:8px;
+    right:8px!important;
+    bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    width:auto!important;
+    max-width:420px!important;
+    max-height:calc(100dvh - 168px);
   }
   .hall-tab{font-size:13px}
   body.hall-tray #shopUI .hall-cta{min-width:min(200px,100%)}

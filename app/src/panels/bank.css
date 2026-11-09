@@ -1,7 +1,5 @@
 /* Mist Bank city tray. Same shape as the approved Ferry card: top tabs, one gold button. */
 body.bank-tray #shopUI #tray{
-  width:min(400px,calc(100vw - 28px)) !important;
-  max-width:400px !important;
   left:16px; right:auto !important; top:auto; bottom:18px;
   /* Bank is anchored to the bottom and grows UPWARD, so a tall panel reached into the shop menu:
      measured 116..174 for the menu and a tray top of 142, a 32px overlap that reads as a badge

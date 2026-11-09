@@ -97,7 +97,12 @@ test('Arena stacks fewer rows so its gold action never sits below the fold', () 
   // landed at y=792 in an 800px viewport.
   const pane = panels.slice(panels.indexOf('body.arena-tray .ferry-pane[data-pane="guardians"]{'));
   const rule = pane.slice(0, pane.indexOf('}'));
-  assert.match(rule, /grid-template-columns:1fr 1fr/, 'the money fields sit in two columns');
+  // Two columns, on a track that can shrink. `1fr 1fr` is also two columns but its minimum is
+  // the content's intrinsic width: measured on Arena, the NEAR amount field demanded 318px
+  // inside a 183px column, painted past the panel edge and was clipped by the scroll region.
+  // `minmax(0, 1fr)` is the same two columns with a zero floor.
+  assert.match(rule, /grid-template-columns:(repeat\(2,\s*minmax\(0,\s*1fr\)\)|1fr 1fr)/, 'the money fields sit in two columns');
+  assert.doesNotMatch(rule, /grid-template-columns:1fr 1fr/, 'the columns may shrink below their content');
   assert.match(panels, /\.arena-actions[,\s][\s\S]{0,120}?grid-column:1 \/ -1\}|> \.arena-actions,\n/, 'the action spans the full row');
 });
 
