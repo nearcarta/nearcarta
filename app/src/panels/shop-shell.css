@@ -645,6 +645,11 @@ body #shopUI #tray #t-title .i3 { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .3
 /* ---- phone ------------------------------------------------------------------------------ */
 /* The same shell on a phone: full width minus a small gutter, header kept, action pinned. */
 @media (max-width: 720px) {
+  /* On a phone the brand block is hidden (`#brand small` and the wordmark both go), so the menu
+     does not need to clear it: at 390x844 the brand measured 0px tall while the menu still started
+     at 74px, wasting most of a field's height above the panel. The menu moves to the top gutter
+     and the panel takes the reclaimed 62px. */
+  body.in-shop nav.all-shops { top: 12px; }
   #shopUI #tray {
     left: 8px;
     right: 8px;
@@ -652,6 +657,7 @@ body #shopUI #tray #t-title .i3 { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .3
     width: auto !important;
     max-width: none !important;
     max-height: calc(100dvh - 76px) !important;
+    top: calc(var(--railTop, 12px) + var(--rail, 58px) + 8px) !important;
   }
   /* A phone has no room to spare, so the form's own rhythm tightens: 8px between fields and 4px
      between a label and its control, and the header loses a step of padding. Measured on Hall at
