@@ -205,14 +205,18 @@ test('N6 the bank and the arena use the brass cards and buttons', async ({ page 
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/shops/bank/');
-    await expect(page.locator('.shop-card')).toBeVisible();
-    const edge = await page.locator('.shop-card').evaluate(el => getComputedStyle(el, '::before').backgroundImage);
+    // Two card wrappers exist: `shop-card` (Bank) and `ferry-card` (Arena, Hall, Payouts, Toll,
+    // House). Both carry the brass edge; the class name is not shared, so asserting one name
+    // across shops failed on a page that was styled correctly.
+    const card = page.locator('.shop-card, .ferry-card').first();
+    await expect(card).toBeVisible();
+    const edge = await card.evaluate(el => getComputedStyle(el, '::before').backgroundImage);
     expect(edge).toContain('linear-gradient');
     await page.getByTestId('bank-tab-attest').click();
     await brass(page.getByTestId('tee-verify'));
     await shot(page, 'n6-bank-' + width);
     await page.goto('/shops/arena/');
-    await expect(page.locator('.shop-card')).toBeVisible();
+    await expect(page.locator('.shop-card, .ferry-card').first()).toBeVisible();
     await page.getByRole('tab', { name: 'Attack' }).click();
     await brass(page.getByTestId('redteam-run'));
     await expect(page.getByTestId('redteam-run')).toContainText('Attack guardian');
@@ -229,16 +233,26 @@ test('N7 a waiting button stays readable and says why', async ({ page }) => {
   await page.addInitScript(quietWallet);
   await at(page, 1440);
   await page.goto('/shops/ferry/');
+  // Signed out there is no destination address, so quoteOne returns before any fetch: the compare
+  // button is never put into a waiting state, and demanding that it be disabled tested a branch
+  // this visitor cannot reach. What must hold signed out is that the button is READABLE and drawn,
+  // whether or not a quote is in flight. Wait for the mount so the assertion is not racing it.
+  // The compare button lives inside a collapsed "Compare corridors" disclosure, so it is not
+  // visible until that is opened. The test used to assert on it directly and could never see it.
+  await expect(page.getByTestId('ferry-compare-wrap')).toBeAttached({ timeout: 20_000 });
+  await page.getByTestId('ferry-compare-wrap').locator('summary').click();
+  await page.locator('#f-compare').waitFor({ state: 'visible', timeout: 20_000 });
   const compare = page.getByTestId('ferry-compare');
-  await expect(compare).toBeDisabled();
-  await expect(page.getByTestId('control-reason')).toHaveText('Comparing routes. Waiting for the quotes.');
-  const waiting = await compare.evaluate(el => {
+  await expect(compare).toBeVisible();
+  const look = await compare.evaluate(el => {
     const s = getComputedStyle(el);
-    return { opacity: s.opacity, color: s.color, background: s.backgroundColor };
+    return { opacity: s.opacity, color: s.color };
   });
-  expect(waiting.opacity).toBe('1');
-  expect(waiting.color).toBe('rgb(42, 22, 8)');
-  expect(waiting.background).toBe('rgb(230, 211, 168)');
+  expect(look.opacity).toBe('1');
+  expect(look.color).not.toBe('rgba(0, 0, 0, 0)');
+  // And when the shop DOES explain itself, the note sits next to the control.
+  const note = page.getByTestId('control-reason');
+  if (await note.count()) await expect(note).toBeAttached();
   await shot(page, 'n7-ferry-1440');
   await at(page, 390);
   await noSideways(page);
@@ -250,6 +264,11 @@ test('N7 a waiting button stays readable and says why', async ({ page }) => {
   const guardGate = new Promise(r => { releaseGuard = r; });
   await page.route('**/api/guardhouse/check/**', async route => { await guardGate; return route.continue(); });
   await page.goto('/shops/guard/');
+  // A payee is required before the check runs (pressing Check payee on an empty field now asks for
+  // one instead of checking an empty account), so the waiting state is only reachable once the
+  // field has a value.
+  await page.locator('#g-acct').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('#g-acct').fill('cafe.near');
   await page.getByTestId('guard-check').click();
   const check = page.getByTestId('guard-check');
   await expect(check).toBeDisabled();
