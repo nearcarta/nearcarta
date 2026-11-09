@@ -438,3 +438,11 @@ test('a real board anchor event rebuilds the index and proves the commitment', (
   assert.equal(both.byCommitment[plan.commitment].nonce, '9');
   assert.equal(both.byCommitment[plan.commitment].tx, 'TX3');
 });
+
+test('what can you do returns the try-hint, not Nothing matches', () => {
+  const parsed = parseChronicleCommand('What can you do in this shop? Show me the safest first step.');
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.action, 'miss');
+  assert.match(parsed.hint, /Try/i);
+  assert.doesNotMatch(parsed.hint, /Nothing matches/);
+});
