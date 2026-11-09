@@ -142,7 +142,7 @@ export function bankMarkup(state) {
       <div class="bank-scroll" data-testid="bank-scroll">
       ${review ? `<button type="button" class="bank-again" data-testid="bank-again">Audit another statement</button>` : `<p class="bank-format" data-testid="bank-format">Accepted format: ${esc(FORMAT_LINE)}.</p>
       <div class="bank-row">
-        <label class="choice-label" for="bank-sample">Sample</label>
+        <label class="choice-label" for="bank-sample" data-testid="bank-sample-label">Sample</label>
         <select id="bank-sample" data-testid="bank-sample">${SAMPLES.map(s => `<option value="${s.id}"${state.sample === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
         <button type="button" class="bank-sample-link" data-testid="bank-sample-file">Download</button>
       </div>

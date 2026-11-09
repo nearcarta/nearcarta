@@ -158,9 +158,14 @@ body.bank-tray #shopUI #t-form .bank-meta input{
 .bank-status:empty{display:none}
 .bank-where{margin:0;color:#d4c4a8;font:500 12px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
 .bank-note{margin:0;color:#e6d3b0;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
-.bank-row{display:flex;gap:8px;align-items:center;min-width:0}
-.bank-row select{flex:1 1 auto;min-width:0}
-.bank-row .bank-sample-link{flex:0 0 auto}
+/* The sample control: label above, then the select and Download on one line. It used to be a single
+   row of three flex children with `align-items:center`, which put the label BESIDE the select and
+   vertically off it (measured: label x=289 y=321, select x=345 y=305). A label that sits beside a
+   control instead of over it reads as a stray word, and the field looks unlabelled. */
+.bank-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;align-items:center;min-width:0}
+.bank-row .choice-label{grid-column:1 / -1;margin:0}
+.bank-row select{grid-column:1;flex:1 1 auto;min-width:0}
+.bank-row .bank-sample-link{grid-column:2;flex:0 0 auto}
 .bank-plain{color:#a08e74;font:600 12px/1.2 system-ui,sans-serif}
 .bank-art{color:#f5d08a;font:700 12px/1.2 system-ui,sans-serif}
 .bank-signer-line{
