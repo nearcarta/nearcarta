@@ -61,7 +61,8 @@ export function shapeClauses(guard, sample) {
 
 export function shapeActions(chronicle, sample) {
   const txs = Array.isArray(chronicle?.txs) ? chronicle.txs : [];
-  const acts = txs.filter(t => t && t.method === 'propose' && t.result?.ok && t.result?.value).reverse().map((t, i) => {
+  // Old charter propose receipts (method + result.value).
+  const fromPropose = txs.filter(t => t && t.method === 'propose' && t.result?.ok && t.result?.value).reverse().map((t, i) => {
     const e = t.events?.[0]?.data?.[0] || {};
     const value = t.result.value;
     return {
@@ -77,7 +78,42 @@ export function shapeActions(chronicle, sample) {
       src: 'mainnet',
     };
   });
-  return acts.length ? acts : sample;
+  if (fromPropose.length) return fromPropose;
+  // Board-era /api/chronicle rows: { hash, shop, payee, decision, note } with no method/result.
+  // Map refused → denied so the crier scroll keeps its red/green marks. "opened" stays policy.
+  const fromBoard = [];
+  for (const t of txs) {
+    if (!t || !t.hash || t.method) continue;
+    const raw = String(t.decision || '').toLowerCase();
+    if (!raw) continue;
+    if (raw === 'opened') {
+      fromBoard.push({
+        id: 'B' + (fromBoard.length + 1),
+        time: 'mainnet',
+        what: t.note || 'Visitor opened a board row',
+        kind: 'policy',
+        tx: t.hash,
+        src: 'mainnet',
+      });
+      continue;
+    }
+    const decision = raw === 'refused' || raw === 'denied' ? 'denied' : (raw === 'allowed' ? 'allowed' : raw);
+    if (decision !== 'allowed' && decision !== 'denied') continue;
+    fromBoard.push({
+      id: 'B' + (fromBoard.length + 1),
+      time: 'mainnet',
+      what: t.note || `${t.shop || 'board'} → ${t.payee || '?'}`,
+      kind: 'action',
+      decision,
+      reason: decision === 'denied' ? (t.note || 'refused') : undefined,
+      amount: undefined,
+      clause: t.shop || 'pay',
+      tx: t.hash,
+      src: 'mainnet',
+    });
+  }
+  const acts = fromBoard.filter(a => a.kind === 'action');
+  return acts.length ? fromBoard : sample;
 }
 
 export function shapeBank(mb) {

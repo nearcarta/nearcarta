@@ -208,18 +208,28 @@ fn a_spoofed_row_owner_can_only_give_and_never_take() {
     // Spending methods refuse a direct caller: the charter must see them.
     ctx(alice(), NEAR, t + 3);
     assert!(fails(|| c.buy(alice(), "arena".into(), "good:iron".into(), 1, U128(NEAR))).contains("ERR_BOARD_ONLY"));
-    assert!(fails(|| c.invest(alice(), "arena".into())).contains("ERR_BOARD_ONLY"));
+    assert!(fails(|| c.invest(alice(), "arena".into(), None)).contains("ERR_BOARD_ONLY"));
+}
+
+#[test]
+fn a_keeper_decision_id_rides_on_the_restock_event() {
+    let mut c = town();
+    ctx(board(), NEAR, 5);
+    c.restock(ferry_keeper(), "ferry".into(), "arena".into(), "good:iron".into(), 1, U128(NEAR), Some("sha256:ab12".into()));
+    assert!(get_logs().iter().any(|l| l.contains("\"event\":\"restock\"") && l.contains("\"decision\":\"sha256:ab12\"")));
+    ctx(board(), NEAR, 6);
+    assert!(fails(|| c.restock(ferry_keeper(), "ferry".into(), "arena".into(), "good:iron".into(), 1, U128(NEAR), Some("x\"y".into()))).contains("ERR_DECISION"));
 }
 
 #[test]
 fn a_keeper_restocks_only_through_its_row() {
     let mut c = town();
     ctx(board(), NEAR, 5);
-    let total = c.restock(ferry_keeper(), "ferry".into(), "arena".into(), "good:iron".into(), 2, U128(NEAR)).0;
+    let total = c.restock(ferry_keeper(), "ferry".into(), "arena".into(), "good:iron".into(), 2, U128(NEAR), None).0;
     assert_eq!(c.mt_balance_of(ferry_keeper(), "good:iron".into()).0, 22);
     assert_eq!(till(&c, "arena"), 100 * MILLI + total);
     ctx(board(), NEAR, 6);
-    assert!(fails(|| c.restock(alice(), "ferry".into(), "arena".into(), "good:iron".into(), 1, U128(NEAR))).contains("ERR_NOT_KEEPER"));
+    assert!(fails(|| c.restock(alice(), "ferry".into(), "arena".into(), "good:iron".into(), 1, U128(NEAR), None)).contains("ERR_NOT_KEEPER"));
 }
 
 fn tiny_shop(c: &mut Contract) {
@@ -241,7 +251,7 @@ fn a_broke_shop_refuses_sales_until_an_investment_reopens_it() {
     ctx(alice(), 0, t + 2);
     assert!(fails(|| c.sell("toll".into(), "good:iron".into(), 1, U128(0))).contains("ERR_SHOP_CLOSED"));
     ctx(board(), 3 * MILLI + MILLI / 2, t + 3);
-    assert_eq!(c.invest(bob(), "toll".into()).0, 3);
+    assert_eq!(c.invest(bob(), "toll".into(), None).0, 3);
     assert!(c.market_board().iter().find(|s| s.id == "toll").unwrap().open);
     assert!(get_logs().iter().any(|l| l.contains("shop_reopened")));
     assert_eq!(c.mt_balance_of(bob(), "share:toll".into()).0, 3);
@@ -265,7 +275,7 @@ fn a_closed_shop_still_sells_cheaper_and_recovers() {
 fn investors_get_a_fifth_of_sales_until_110_percent_is_back() {
     let mut c = town();
     ctx(board(), 2 * MILLI + MILLI / 2, 2);
-    c.invest(bob(), "arena".into());
+    c.invest(bob(), "arena".into(), None);
     assert_eq!(c.shops.get("arena").unwrap().owed.0, 2 * MILLI * 11 / 10);
     let mut t = 3;
     let mut total_cut = 0;
@@ -290,7 +300,7 @@ fn investors_get_a_fifth_of_sales_until_110_percent_is_back() {
 fn keeper_take_never_touches_the_floor_or_what_investors_are_owed() {
     let mut c = town();
     ctx(board(), 10 * MILLI + MILLI / 2, 2);
-    c.invest(bob(), "arena".into());
+    c.invest(bob(), "arena".into(), None);
     let s = c.shops.get("arena").unwrap().clone();
     let free = s.till.0 - 2 * s.floor.0 - s.owed.0;
     ctx(arena_keeper(), 0, 3);
@@ -343,7 +353,7 @@ fn every_item_kind_lives_in_one_contract_and_emits_nep245_events() {
     ctx(alice(), 0, t + 1);
     c.craft("item:tool".into());
     ctx(board(), MILLI + MILLI / 2, t + 2);
-    c.invest(alice(), "ferry".into());
+    c.invest(alice(), "ferry".into(), None);
     assert!(get_logs().iter().any(|l| l.starts_with("EVENT_JSON:{\"standard\":\"nep245\",\"version\":\"1.0.0\",\"event\":\"mt_mint\"") && l.contains("share:ferry")));
     let held = c.mt_batch_balance_of(alice(), vec!["item:tool".into(), "share:ferry".into(), "good:timber".into()]);
     assert_eq!(held, vec![U128(1), U128(1), U128(1)]);

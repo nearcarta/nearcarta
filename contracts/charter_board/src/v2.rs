@@ -636,8 +636,13 @@ impl Board {
         let have = self.credit.get(&owner).copied().unwrap_or(0);
         let from_reserve = have.min(cost);
         let from_row = cost - from_reserve;
-        let row_room = self.rows.get(&owner).map(|r| MAX_ROW_YOCTO.saturating_sub(r.storage_locked)).unwrap_or(0);
-        if from_row > row_room {
+        // The part past the reserve is paid from the row's own balance. Nothing is attached
+        // here (the session key signs), and taking it from nowhere let the board pay for the
+        // bytes: they came back to the visitor as reserve credit when the hold was dropped, and
+        // as cash at the next shrink or at close (`side_writes_pay_each_storage_byte_once`).
+        let (row_room, row_cash) = self.rows.get(&owner).map(|r| (MAX_ROW_YOCTO.saturating_sub(r.storage_locked), r.balance)).unwrap_or((0, 0));
+        if from_row > row_room || from_row > row_cash {
+            let too_big = from_row > row_room;
             self.holds.remove(&(owner.clone(), id));
             if self.partial { self.hold_count = self.hold_count.saturating_sub(1); }
             kv_del(b"h", &format!("{}/{}", owner.as_str(), id));
@@ -650,16 +655,16 @@ impl Board {
             }
             row.nonce -= 1;
             self.calls.get_mut(&owner).unwrap().session_spent = self.calls.get(&owner).unwrap().session_spent.saturating_sub(deposit);
-            env::panic_str("ERR_ROW_TOO_BIG");
+            env::panic_str(if too_big { "ERR_ROW_TOO_BIG" } else { "ERR_BALANCE" });
         }
         if from_reserve > 0 { *self.credit.get_mut(&owner).unwrap() -= from_reserve; }
         if from_row > 0 {
             let row = self.rows.get_mut(&owner).unwrap();
             row.storage_locked += from_row;
+            row.balance -= from_row;
         }
-        // The reserve's share was already a liability (it sits in `storage_locked`); only the
-        // row's new room adds to `owed`. This was the second half of the phantom `owed`.
-        if from_row > 0 { self.owe(from_row as i128); }
+        // Both shares were already liabilities: the reserve sits in `storage_locked` and the
+        // row part moved over from `balance`, so `owed` does not change.
         if hold { None } else { Some(self.send_call(&owner, id)) }
     }
 
@@ -728,8 +733,7 @@ impl Board {
         let h = self.holds.get(&(owner.clone(), action_id.0)).cloned().expect("ERR_ACTION");
         require!(!h.pending, "ERR_ACTION");
         require!(env::block_timestamp() > h.expires, "ERR_EXPIRY");
-        let freed = self.free_hold(&owner, action_id.0);
-        if freed > 0 { *self.credit.entry(owner).or_insert(0) += freed; }
+        self.free_hold(&owner, action_id.0);
         self.owe(-(h.amount as i128));
     }
 
@@ -759,27 +763,30 @@ impl Board {
         let h = self.holds.get(&(owner.clone(), action_id.0)).cloned().expect("ERR_ACTION");
         require!(!h.pending, "ERR_SETTLE");
         require!(env::predecessor_account_id() == h.receiver, "ERR_SETTLE");
-        let freed = self.free_hold(&owner, action_id.0);
-        if freed > 0 { *self.credit.entry(owner).or_insert(0) += freed; }
+        self.free_hold(&owner, action_id.0);
         self.owe(-(h.amount as i128));
     }
 
-    fn free_hold(&mut self, owner: &AccountId, id: u64) -> u128 {
+    /// Drops the hold record. Its bytes go back to the row's side reserve: they are already
+    /// inside `storage_locked` and were paid for (the reserve was prepaid by `set_calls`, and
+    /// the part past it came out of the row's balance in `propose_call_as`), so no cash moves
+    /// and the row's locked total does not change. The reserve is paid out once, at close.
+    fn free_hold(&mut self, owner: &AccountId, id: u64) {
         let before = self.baseline(owner);
         self.holds.remove(&(owner.clone(), id));
         if self.partial { self.hold_count = self.hold_count.saturating_sub(1); }
         kv_del(b"h", &format!("{}/{}", owner.as_str(), id));
         self.flush_owner(owner);
         let after = env::storage_usage();
-        if before > after { (before - after) as u128 * price() } else { 0 }
+        let freed = if before > after { (before - after) as u128 * price() } else { 0 };
+        if freed > 0 { *self.credit.entry(owner.clone()).or_insert(0) += freed; }
     }
 
     fn finish(&mut self, owner: &AccountId, id: u64, from_callback: bool) {
         let key = (owner.clone(), id);
         let Some(h) = self.holds.get(&key).cloned() else { return; };
         if from_callback && h.pending { return; }
-        let freed = self.free_hold(owner, id);
-        if freed > 0 { *self.credit.entry(owner.clone()).or_insert(0) += freed; }
+        self.free_hold(owner, id);
         let restore = if from_callback { !near_sdk::is_promise_success() } else { true };
         if !restore { self.owe(-(h.amount as i128)); return; }
         self.restore_row(owner, h.amount, h.day);
