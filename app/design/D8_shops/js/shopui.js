@@ -186,8 +186,11 @@ function wireGuardDock(hooks) {
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
   }
-  armGuardDock((text) => {
-    if (typeof hooks?.runAgent === 'function') return hooks.runAgent(text);
+  armGuardDock((text, context) => {
+    // This runs after mountShop, so it is the arm that actually fires. The context (state, check,
+    // caps, send functions) belongs to the mounted tray, which exposes it as `hooks.trayCtx`; the
+    // model reader needs it because it routes through the same runGuardAction as a typed command.
+    if (typeof hooks?.runAgent === 'function') return hooks.runAgent(text, context || hooks.trayCtx?.());
     return { ok: false, hint: 'The agent is not ready. Open the Guardhouse and press Send again.' };
   });
   const go = d.querySelector('#g-agent-go');
@@ -1029,6 +1032,15 @@ const APPS = {
         },
         freeze: (opts) => A.guardFreeze({ ...opts, frozen: true }),
         onScene: applyGuardScene,
+        // A sentence goes to the model, which proposes the payee and amount; the same
+        // runGuardAction that the typed command uses then holds or refuses it. The model never
+        // signs and the charter is still the thing that decides.
+        runAgent: (text, context) => A.runGuardAgentWithModel({
+          text,
+          ...(context || {}),
+          api: (globalThis.NEARCARTA_API || '').replace(/\/$/, ''),
+          charter: typeof hooks.charter === 'function' ? hooks.charter() : '',
+        }).catch(() => ({ ok: false, by: 'parser', hint: 'The agent could not read that. Try: Check cafe.near', propose: false })),
       };
       mountShop('guard', document.getElementById('t-form'), hooks);
       wireGuardDock(hooks);

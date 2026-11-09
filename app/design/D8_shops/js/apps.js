@@ -10,7 +10,7 @@ import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
 import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCallTgas, quoteRecipient, stepsAllowanceYocto, WRAP } from '/panels/ferry-settle.js';
-import { freezePlan } from '/panels/guard-agent.js';
+import { freezePlan, runGuardAgentWithModel } from '/panels/guard-agent.js';
 import { lookalike as lookalikeName } from '/guard-lookalike.js';
 import { createGuardLedger, guardSend } from '/panels/guard-live.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
@@ -1601,3 +1601,6 @@ export async function payoutsSponsor(account, depositNear, opts = {}) {
 }
 
 export { fmt, esc, short, toY, fromY };
+// The Guardhouse agent hook lives in /panels/guard-agent.js; re-exported here so the shop shell
+// can reach it without a second copy of the model call.
+export { runGuardAgentWithModel };
