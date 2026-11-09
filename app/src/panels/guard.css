@@ -45,7 +45,11 @@ body.guard-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
 }
 .guard-tab.on,.guard-tab[aria-selected=true]{background:linear-gradient(180deg,#f5d08a,#e2b35b);color:#2a1608}
 .guard-ico{display:block;object-fit:contain;flex:none}
-.guard-pane{display:grid;gap:10px;min-width:0}
+/* The track, not the item. A grid with no template gets ONE `auto` track, which sizes to the
+   widest content — so a long verdict made the column 548px inside a 440px tray, and min-width:0
+   on the paragraph could not help because the TRACK was oversized, not the item.
+   `minmax(0,1fr)` is the same fix `.shop-stack` already carries in panels.css. */
+.guard-pane{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;min-width:0}
 .guard-pane[hidden]{display:none!important}
 .guard-field{display:flex;flex-direction:column;gap:8px;margin:0;color:#e8d7b8;font:650 13px/1.2 system-ui,sans-serif}
 .guard-field input,.guard-field select,.guard-field textarea{
