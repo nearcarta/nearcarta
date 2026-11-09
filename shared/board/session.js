@@ -86,7 +86,10 @@ export function boardProposeAllowanceYocto(tgas = BOARD_PROPOSE_TGAS, numBytes =
 // estimate and is refused with ERR_DEPOSIT now. A full default list measured
 // 0.0116 NEAR in the sandbox, and the widest list the row cap allows measured
 // 0.01494 (`contracts/charter_board_sandbox/tests/setup_calls_deposit.rs`).
-export const CALLS_DEPOSIT_YOCTO = (15n * 10n ** 21n).toString();
+// The hold build keeps a 1400-byte side reserve (0.014 NEAR) on top of the pairs, so 0.015 is
+// refused ERR_DEPOSIT. 0.05 is what contracts/charter_board_sandbox/tests/setup_calls_deposit.rs
+// sends; everything the write does not use is refunded in the same receipt.
+export const CALLS_DEPOSIT_YOCTO = (5n * 10n ** 22n).toString();
 
 export function sessionExpiresAt(hours, nowMs = Date.now()) {
   const h = SESSION_HOURS.includes(Number(hours)) ? Number(hours) : SESSION_HOURS[0];
@@ -201,7 +204,7 @@ export const MAX_CALLS = 24;
 export const ROW_FIXED_BYTES = 1490;
 export const ROW_BYTES_PER_RECEIVER = 24;
 /** The whole row's storage allowance, from contracts/charter_board MAX_ROW_YOCTO. */
-export const ROW_STORAGE_BYTES = 2000;
+export const ROW_STORAGE_BYTES = 2000; // conservative: the hold build allows 3000 with a 1400-byte reserve (+200 B of pair room); kept at the measured 2000/600 budget
 
 /**
  * Bytes the FIRST effect budget costs a row. Measured on mainnet 2026-11-07 by writing the

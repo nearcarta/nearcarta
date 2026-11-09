@@ -28,7 +28,7 @@ test('a live row with different rules shows On chain → New and Update my rules
   assert.deepEqual(saved.receivers, ['charter.nearcarta.near', 'toll.nearcarta.near']);
   assert.equal(chain.per_action_cap, '5000000000000000000000');
   assert.equal(RULES_DEPOSIT_YOCTO, nearToYocto(0.001));
-  assert.equal(formatNear(CALLS_DEPOSIT_YOCTO), '0.015 NEAR');
+  assert.equal(formatNear(CALLS_DEPOSIT_YOCTO), '0.05 NEAR');
   const { changed, html } = signRulesUpdate({ live: true, local: edited, row: chain });
   assert.equal(changed, true);
   assert.match(html, /<b>On chain → New<\/b>/);
@@ -40,7 +40,7 @@ test('a live row with different rules shows On chain → New and Update my rules
   assert.match(html, /data-testid="diff-receivers">Allowed shops: charter\.nearcarta\.near, toll\.nearcarta\.near → charter\.nearcarta\.near, toll\.nearcarta\.near, wrap\.near</);
   const calls = formatNear(CALLS_DEPOSIT_YOCTO).replace(/ NEAR$/, '');
   assert.equal(updateCostLine(), `Attaches 0.001 NEAR to set_rules and ${calls} NEAR to set_calls. Unused deposit is refunded.`);
-  assert.match(html, /data-testid="sign-update-cost">Attaches 0\.001 NEAR to set_rules and 0\.015 NEAR to set_calls\. Unused deposit is refunded\.</);
+  assert.match(html, /data-testid="sign-update-cost">Attaches 0\.001 NEAR to set_rules and 0\.05 NEAR to set_calls\. Unused deposit is refunded\.</);
   assert.doesNotMatch(html, /0\.02/);
   const capOnly = signRulesUpdate({
     live: true,

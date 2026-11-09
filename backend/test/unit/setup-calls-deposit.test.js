@@ -25,10 +25,10 @@ const names = (n, len) => Array.from({ length: n }, (_, i) => {
 test('the set_calls deposit covers the default list and the widest that fits', () => {
   // The page attaches this to set_calls. The sandbox refused 0.005 with ERR_DEPOSIT
   // for the default one-shop list and accepted 0.012 for it, so anything at or below
-  // 0.005 must not come back. 0.015 leaves room for the whole list plus the margin.
-  assert.equal(CALLS_DEPOSIT_YOCTO, (15n * 10n ** 21n).toString(), '0.015 NEAR');
-  assert.ok(BigInt(CALLS_DEPOSIT_YOCTO) > YN / 1000n * 12n, 'above the measured 0.012 NEAR');
-  assert.ok(BigInt(CALLS_DEPOSIT_YOCTO) < YN / 1000n * 20n, 'still under the 0.02 NEAR row deposit');
+  // 0.005 must not come back. The hold build adds a 1400-byte side reserve (0.014 NEAR) on top
+  // of the pairs, so 0.015 is refused; 0.05 is what the sandbox test sends, and the rest is refunded.
+  assert.equal(CALLS_DEPOSIT_YOCTO, (5n * 10n ** 22n).toString(), '0.05 NEAR');
+  assert.ok(BigInt(CALLS_DEPOSIT_YOCTO) > 1400n * 10n ** 19n + YN / 1000n * 12n, 'above reserve + the measured pairs');
   // What actually refuses 0.005 is the write: the side record is 895 bytes and the
   // default list is 240 more, so the deposit has to clear about 0.0116 NEAR.
   assert.ok(BigInt(CALLS_DEPOSIT_YOCTO) > 1160n * 10n ** 19n);
