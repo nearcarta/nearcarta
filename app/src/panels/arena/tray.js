@@ -37,8 +37,11 @@ export function arenaHtml(state, attackAttr = 'data-testid="arena-attack"', boxA
   const mode = state.mode || 'mint';
   const tabBtn = (id, label) => `<button type="button" class="ferry-tab" role="tab" data-tab="${id}" aria-selected="${tab === id ? 'true' : 'false'}">${label}</button>`;
   const guardians = Array.isArray(state.guardians) ? state.guardians : [];
+  // A creator is a 64-hex account id. Printed whole in a 340px list it wraps to two lines and
+  // reads as noise; the full value is still the option value, so nothing is lost.
+  const shortId = s => { const t = String(s || ''); return t.length > 18 ? `${t.slice(0, 8)}…${t.slice(-6)}` : t; };
   const brief = g => (g.pot == null || g.pot === '—')
-    ? esc(g.creator || 'on the deployed contract')
+    ? esc(shortId(g.creator) || 'on the deployed contract')
     : `pot ${esc(g.pot)} NEAR · fee ${esc(g.fee)} NEAR`;
   const options = guardians.length
     ? guardians.map(g => `<option value="${esc(g.id)}"${String(state.attackId || state.feedId || '') === String(g.id) ? ' selected' : ''}>${esc(g.title || ('Guardian ' + g.id))} · ${brief(g)}</option>`).join('')

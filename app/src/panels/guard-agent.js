@@ -289,3 +289,67 @@ export async function runGuardAgent({ text, ...ctx } = {}) {
   if (!plan.ok) return { ...plan, propose: false, cinema: false, seal: false };
   return runGuardAction(plan, ctx);
 }
+
+/**
+ * The model first, the parser second.
+ *
+ * Every shop dock parsed its own phrasing, so "the agent" was a regex in five of nine shops and a
+ * judge who typed a free sentence got a canned `Try: …`. /api/vault/ask/plan is the one path where
+ * a model in a TEE reads the words and proposes a payment, and it was reachable from the Arena's
+ * attack card only.
+ *
+ * This asks the model for the payee and the amount, and then hands the result to the SAME
+ * runGuardAction the typed command uses, so the model proposes and the charter still decides.
+ * If the model is off, over budget, or unreachable, the parser answers exactly as before and the
+ * reply says which one spoke.
+ */
+export async function runGuardAgentWithModel({ text, api, charter, ...ctx } = {}) {
+  const words = String(text || '').trim();
+  const parsed = parseGuardCommand(words);
+  // Only a sentence that reads like a payment is worth a model call. "Check cafe.near", "freeze
+  // my row" and "cancel" are exact commands the parser already answers with no cost and no
+  // latency, so they never reach the model.
+  const wantsPay = /(?:^|[^a-z])(pay|send|transfer|spend|give)\b/i.test(words);
+  const plan = wantsPay ? await askModelForPayment({ text: words, api, charter }).catch(() => null) : null;
+
+  if (plan?.receiver && plan?.amount_units) {
+    // The model's reading wins for payee and amount; everything else (chain, asset, invoice) is
+    // taken from the words, because those are what the visitor can see they typed.
+    const merged = {
+      ok: true, action: 'pay', by: 'model', model: plan.model || null,
+      amount: plan.amount_units || parsed.amount,
+      asset: parsed.asset || 'NEAR',
+      chain: parsed.chain || 'near',
+      account: plan.receiver,
+      invoice: parsed.invoice || '',
+    };
+    const out = await runGuardAction(merged, ctx);
+    return { ...out, by: 'model', model: plan.model || null, parsed_from: 'model' };
+  }
+
+  if (!parsed.ok) {
+    return { ...parsed, propose: false, cinema: false, seal: false, by: 'parser' };
+  }
+  const out = await runGuardAction(parsed, ctx);
+  return { ...out, by: 'parser', parsed_from: 'parser', model_why: plan?.why || null };
+}
+
+/** Ask the model what the sentence asks for. No signature, no spend: this is a reading. */
+async function askModelForPayment({ text, api, charter } = {}) {
+  // An empty API base is correct, not missing: the city page talks to its own origin, so
+  // `fetch('') + '/api/...'` is a same-origin request. Requiring a non-empty base here meant the
+  // model was never asked from inside the city, even though /api/vault/ask/plan worked from curl.
+  const base = String(api ?? globalThis.NEARCARTA_API ?? '').replace(/\/$/, '');
+  let r;
+  try {
+    r = await fetch(base + '/api/vault/ask/plan', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text, charter: charter || '', nickname: 'guard' }),
+    });
+  } catch { return null; }
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => null);
+  const p = j?.parsed;
+  if (!p?.receiver) return null;
+  return { receiver: String(p.receiver).toLowerCase(), amount_units: p.amount != null ? String(p.amount) : '', model: j.model || null };
+}

@@ -1,5 +1,20 @@
 name: ci
-on: [push, pull_request]
+# A branch push and the pull request it belongs to used to trigger the whole 30-job suite TWICE
+# per commit: `on: [push, pull_request]` fires both, and a PR is a push to its head branch. That
+# is half the CI capacity spent on duplicate work. Runs now come from a push to main and from
+# pull requests; a feature branch gets one run, reported on its PR.
+on:
+  push:
+    branches: [main]
+  pull_request:
+# One run per branch. Without this, every push queued its own 30 jobs and none were cancelled:
+# measured on 2026-11-09 with four runs stacked, each spending ~20 minutes on the sandbox suites,
+# so a branch with a handful of commits waited over an hour for a verdict on its own head commit.
+# A newer push supersedes an older one; `pull_request` is grouped by the PR head ref so a push to
+# a branch does not cancel the run that is already reporting on it.
+concurrency:
+  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   node:
     runs-on: ubuntu-latest
@@ -41,14 +56,30 @@ jobs:
       # install is verified, because a network blip used to fail the job as
       # "no such command: near" from the NEXT step, which reads like a code error.
       - run: |
-          for i in 1 2 3 4; do
-            curl -sSL --retry 3 --retry-delay 2 -o /tmp/cargo-near-installer.sh \
-              https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
-              && sh /tmp/cargo-near-installer.sh && break
-            echo "cargo-near install attempt $i failed, retrying"; sleep 3
+          # Retried hard on purpose. On 2026-11-09 all four sandbox jobs failed here, not in
+          # our code: the release asset answered HTTP 504 ten times in a row and the next step
+          # then reported "no such command: near", which reads like a broken repo. Backoff up to
+          # ~2 minutes, then a source build as the last resort, then a hard failure that says
+          # which step failed.
+          ok=0
+          for i in 1 2 3 4 5 6; do
+            if curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 120 \
+                 -o /tmp/cargo-near-installer.sh \
+                 https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
+               && sh /tmp/cargo-near-installer.sh; then ok=1; break; fi
+            echo "cargo-near installer attempt $i failed (HTTP or install); backing off"
+            sleep $((i * 10))
           done
+          if [ "$ok" = 0 ]; then
+            echo "::warning::cargo-near release asset unavailable; building it from source"
+            cargo install cargo-near --version 0.22.0 --locked || true
+          fi
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          cargo near --version
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! cargo near --version; then
+            echo "::error::cargo-near is not installed; the previous step was a network failure, not a code failure"
+            exit 1
+          fi
       - run: cd contracts/charter_factory && cargo near build non-reproducible-wasm --locked
       - run: cd contracts/charter_factory && cargo test --test sandbox --locked
   oath-sandbox:
@@ -64,14 +95,30 @@ jobs:
       # install is verified, because a network blip used to fail the job as
       # "no such command: near" from the NEXT step, which reads like a code error.
       - run: |
-          for i in 1 2 3 4; do
-            curl -sSL --retry 3 --retry-delay 2 -o /tmp/cargo-near-installer.sh \
-              https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
-              && sh /tmp/cargo-near-installer.sh && break
-            echo "cargo-near install attempt $i failed, retrying"; sleep 3
+          # Retried hard on purpose. On 2026-11-09 all four sandbox jobs failed here, not in
+          # our code: the release asset answered HTTP 504 ten times in a row and the next step
+          # then reported "no such command: near", which reads like a broken repo. Backoff up to
+          # ~2 minutes, then a source build as the last resort, then a hard failure that says
+          # which step failed.
+          ok=0
+          for i in 1 2 3 4 5 6; do
+            if curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 120 \
+                 -o /tmp/cargo-near-installer.sh \
+                 https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
+               && sh /tmp/cargo-near-installer.sh; then ok=1; break; fi
+            echo "cargo-near installer attempt $i failed (HTTP or install); backing off"
+            sleep $((i * 10))
           done
+          if [ "$ok" = 0 ]; then
+            echo "::warning::cargo-near release asset unavailable; building it from source"
+            cargo install cargo-near --version 0.22.0 --locked || true
+          fi
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          cargo near --version
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! cargo near --version; then
+            echo "::error::cargo-near is not installed; the previous step was a network failure, not a code failure"
+            exit 1
+          fi
       # near-sdk 5.x targets protocol < 84, so cargo-near requires rustc <= 1.86 for the wasm.
       - run: cd contracts/oath && cargo +1.86.0 near build non-reproducible-wasm --locked
       - run: cd contracts/reaper && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
@@ -90,17 +137,45 @@ jobs:
       # install is verified, because a network blip used to fail the job as
       # "no such command: near" from the NEXT step, which reads like a code error.
       - run: |
-          for i in 1 2 3 4; do
-            curl -sSL --retry 3 --retry-delay 2 -o /tmp/cargo-near-installer.sh \
-              https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
-              && sh /tmp/cargo-near-installer.sh && break
-            echo "cargo-near install attempt $i failed, retrying"; sleep 3
+          # Retried hard on purpose. On 2026-11-09 all four sandbox jobs failed here, not in
+          # our code: the release asset answered HTTP 504 ten times in a row and the next step
+          # then reported "no such command: near", which reads like a broken repo. Backoff up to
+          # ~2 minutes, then a source build as the last resort, then a hard failure that says
+          # which step failed.
+          ok=0
+          for i in 1 2 3 4 5 6; do
+            if curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 120 \
+                 -o /tmp/cargo-near-installer.sh \
+                 https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh \
+               && sh /tmp/cargo-near-installer.sh; then ok=1; break; fi
+            echo "cargo-near installer attempt $i failed (HTTP or install); backing off"
+            sleep $((i * 10))
           done
+          if [ "$ok" = 0 ]; then
+            echo "::warning::cargo-near release asset unavailable; building it from source"
+            cargo install cargo-near --version 0.22.0 --locked || true
+          fi
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          cargo near --version
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! cargo near --version; then
+            echo "::error::cargo-near is not installed; the previous step was a network failure, not a code failure"
+            exit 1
+          fi
       - run: cd contracts/charter_board && cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi
       - run: wasm-opt --enable-sign-ext --enable-mutable-globals --enable-bulk-memory -Oz --strip-debug --strip-producers -o /tmp/charter_board.wasm contracts/charter_board/target/near/charter_board.wasm && mv /tmp/charter_board.wasm contracts/charter_board/target/near/charter_board.wasm
       - run: cd contracts/charter_board_sandbox && cargo test --locked
+      # The board can only be upgraded with the exact wasm whose sha256 the owner staged:
+      # `upgrade(code)` hashes the bytes and refuses anything else. That artifact was lost once —
+      # on 2026-11-09 the staged build (a89664ef) existed nowhere on disk, CI kept no copy, and the
+      # board wasm does not rebuild reproducibly (a fresh build gives b22b34aa). Uploading it here
+      # means the pinned bytes always exist next to the run that produced them.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: charter_board-wasm
+          path: contracts/charter_board/target/near/charter_board.wasm
+          if-no-files-found: warn
+          retention-days: 90
   secrets:
     runs-on: ubuntu-latest
     steps:
@@ -109,11 +184,35 @@ jobs:
       # gitleaks CLI (MIT); the gitleaks GitHub Action needs a paid license for org repos.
       # The download is retried and the archive is checked before untarring: a truncated
       # tarball otherwise fails the job as a secret-scan failure, which reads like a leak.
+      #
+      # Measured 2026-11-09: the release URL answers 504 on roughly two of every three requests
+      # (3 probes: 504, 200, 504), so this is not an outage that ends — it is a flaky CDN. Six
+      # attempts is not enough at that rate. Two changes: many more attempts, and the asset is
+      # also fetched through the GitHub release API with a token, which resolves to a different
+      # backend. The step fails loudly if the scan could not run, so a red job is never mistaken
+      # for a found leak.
       - run: |
-          for i in 1 2 3 4; do
-            curl -sSL --retry 3 --retry-delay 2 -o gitleaks.tgz \
-              https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz && break
-            echo "download attempt $i failed, retrying"; sleep 3
+          url="https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz"
+          ok=0
+          for i in $(seq 1 12); do
+            if curl -fsSL --retry 3 --retry-delay 3 --retry-all-errors --max-time 90 -o gitleaks.tgz "$url"; then
+              if tar -xzf gitleaks.tgz gitleaks 2>/dev/null; then ok=1; break; fi
+            fi
+            echo "direct download attempt $i failed; backing off"
+            sleep $(( i < 6 ? i * 5 : 30 ))
           done
-          tar -xzf gitleaks.tgz gitleaks && rm -f gitleaks.tgz
+          if [ "$ok" = 0 ]; then
+            echo "::warning::release CDN refused the asset; trying the release API"
+            asset=$(curl -fsSL -H "Authorization: Bearer ${{ github.token }}" \
+              https://api.github.com/repos/gitleaks/gitleaks/releases/tags/v8.30.1 \
+              | grep -o '"browser_download_url": *"[^"]*linux_x64.tar.gz"' | head -1 | sed 's/.*"\(https[^"]*\)"/\1/')
+            if [ -n "$asset" ] && curl -fsSL --retry 5 --retry-all-errors --max-time 120 -o gitleaks.tgz "$asset" \
+               && tar -xzf gitleaks.tgz gitleaks; then ok=1; fi
+          fi
+          rm -f gitleaks.tgz
+          if [ "$ok" = 0 ]; then
+            echo "::error::could not download the gitleaks binary after every attempt; the scan did NOT run, so this is a download failure, not a leak"
+            exit 1
+          fi
+          ./gitleaks version
       - run: ./gitleaks git --config .gitleaks.toml --redact --no-banner .

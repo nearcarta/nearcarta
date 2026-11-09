@@ -273,7 +273,11 @@ export function activeCta(job) {
 }
 
 export function statusLines(job) {
-  if (!job) return ['Name the task, the budget, and two workers.'];
+  // With no job yet this used to print "Name the task, the budget, and two workers." — which reads
+  // as a validation error on the fields. A visitor who had just filled all six fields was told to
+  // fill them, which is the worst possible moment for that sentence. It is not a validation
+  // message at all: it is the empty-state line, so it now says what the empty state is.
+  if (!job) return ['No job yet. Fill the form and press Post job; nothing is signed until you do.'];
   const lines = [`Escrow ${job.budgetNear} NEAR. Paid ${nearOf(job.paidY)}. Remaining ${nearOf(job.remainingY)}. Refunded ${nearOf(job.refundedY)}.`];
   const held = job.parts.filter(p => p.settlement === 'held').length;
   if (held) lines.push(`${held} part${held === 1 ? '' : 's'} held. Chain release is blocked.`);

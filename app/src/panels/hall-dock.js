@@ -79,13 +79,13 @@ export function ensureHallDock(doc) {
   d.innerHTML = `<div id="hall-agent-pop" class="hall-agent-pop" data-testid="hall-agent" hidden>
       <p id="h-agent-log" class="hall-agent-log" data-testid="hall-agent-log" hidden></p>
       <div class="hall-agent-row">
-        <input id="h-agent" data-testid="hall-agent-input" placeholder="Post a readme pass for 0.002 near" autocomplete="off" aria-label="Ask the AI Agent">
+        <input id="h-agent" data-testid="hall-agent-input" placeholder="Post a readme pass for 0.002 near" autocomplete="off" aria-label="Ask the shop commands">
         <button type="button" class="hall-agent-send" id="h-agent-go" data-testid="hall-agent-go" aria-label="Send">➤</button>
       </div>
     </div>
-    <button type="button" class="hall-agent-char" data-testid="hall-agent-toggle" aria-expanded="false" aria-controls="hall-agent-pop" title="AI Agent">
+    <button type="button" class="hall-agent-char" data-testid="hall-agent-toggle" aria-expanded="false" aria-controls="hall-agent-pop" title="Shop commands">
       <img class="hall-agent-avatar" src="/setup/chars/robotexpressive.webp" width="72" height="72" alt="" decoding="async">
-      <span class="hall-agent-name">AI Agent</span>
+      <span class="hall-agent-name">Commands</span>
     </button>`;
   host.appendChild(d);
   const toggle = d.querySelector('[data-testid=hall-agent-toggle]');

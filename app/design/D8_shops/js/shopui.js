@@ -186,8 +186,11 @@ function wireGuardDock(hooks) {
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
   }
-  armGuardDock((text) => {
-    if (typeof hooks?.runAgent === 'function') return hooks.runAgent(text);
+  armGuardDock((text, context) => {
+    // This runs after mountShop, so it is the arm that actually fires. The context (state, check,
+    // caps, send functions) belongs to the mounted tray, which exposes it as `hooks.trayCtx`; the
+    // model reader needs it because it routes through the same runGuardAction as a typed command.
+    if (typeof hooks?.runAgent === 'function') return hooks.runAgent(text, context || hooks.trayCtx?.());
     return { ok: false, hint: 'The agent is not ready. Open the Guardhouse and press Send again.' };
   });
   const go = d.querySelector('#g-agent-go');
@@ -845,7 +848,7 @@ async function sendPayoutRows(rows, opts = {}) {
 
 const APPS = {
   toll: {
-    label: 'Toll Bridge · pay-per-use gate', idle: 'The fee, the chain and the recipient come from the live policy. A refusal pays nothing.',
+    label: 'Toll Bridge · charge per use across chains', idle: 'The fee, the chain and the recipient come from the live policy. A refusal pays nothing.',
     btn: () => 'Pay the policy fee',
     hero: () => null,
     guest: true,
@@ -869,7 +872,7 @@ const APPS = {
     run: async () => tollPay(extra.live?.quote || policyQuote(extra.live?.ok ? extra.live : { ok: false })),
   },
   ferry: {
-    label: 'Ferry · cross-chain swap', idle: 'Fund NEAR once in /setup. Swap about 0.05 wNEAR on NEAR. Guest Load cargo is a demo.',
+    label: 'Ferry · move value between chains', idle: 'Fund NEAR once in /setup. Swap about 0.05 wNEAR on NEAR. Guest Load cargo is a demo.',
     guest: true,
     form: () => '<div data-deep="ferry"></div>',
     bind: () => {
@@ -968,7 +971,7 @@ const APPS = {
   },
   bank: {
     guest: true,
-    label: 'Mist Bank · private audit', idle: 'This audit does not send a payment. A card file is read in this browser.',
+    label: 'Mist Bank · check a statement without uploading it', idle: 'This audit does not send a payment. A card file is read in this browser.',
     form: () => '<div data-deep="bank"></div>',
     bind: () => {
       mountShop('bank', document.getElementById('t-form'), {
@@ -993,7 +996,7 @@ const APPS = {
     run: async () => (extra.runAgent ? extra.runAgent('Audit privately') : { ok: false, hint: 'Open the card. Nothing was signed.', say: 'Open the card. Nothing was signed.', keep: true, kind: 'no' }),
   },
   guard: {
-    label: 'Guardhouse · pay through a check', idle: 'Type the payee and the amount. Check first. Pay through the guard uses that payment. A warning stays held until you press Confirm.',
+    label: 'Guardhouse · check who you pay before you pay', idle: 'Type the payee and the amount. Check first. Pay through the guard uses that payment. A warning stays held until you press Confirm.',
     guest: true,
     form: () => '<div data-deep="guard"></div>',
     bind: () => {
@@ -1029,6 +1032,15 @@ const APPS = {
         },
         freeze: (opts) => A.guardFreeze({ ...opts, frozen: true }),
         onScene: applyGuardScene,
+        // A sentence goes to the model, which proposes the payee and amount; the same
+        // runGuardAction that the typed command uses then holds or refuses it. The model never
+        // signs and the charter is still the thing that decides.
+        runAgent: (text, context) => A.runGuardAgentWithModel({
+          text,
+          ...(context || {}),
+          api: (globalThis.NEARCARTA_API || '').replace(/\/$/, ''),
+          charter: typeof hooks.charter === 'function' ? hooks.charter() : '',
+        }).catch(() => ({ ok: false, by: 'parser', hint: 'The agent could not read that. Try: Check cafe.near', propose: false })),
       };
       mountShop('guard', document.getElementById('t-form'), hooks);
       wireGuardDock(hooks);
@@ -1038,7 +1050,7 @@ const APPS = {
   },
   arena: {
     guest: true,
-    label: 'Vault Arena · guardian pets', idle: 'Mint a guardian, or attack one. Live play waits for the board.',
+    label: 'Vault Arena · a pet that can only spend inside its oath', idle: 'Mint a guardian, or attack one. Live play waits for the board.',
     lvl: () => { const g = A.game(); return A.WALLS.find(w => !g.walls.includes(w.reason)) || null; },
     form: () => '<div data-deep="arena"></div>',
     bind: () => mountShop('arena', document.getElementById('t-form'), {
@@ -1076,7 +1088,7 @@ const APPS = {
   },
   hall: {
     guest: true,
-    label: 'Town Hall · a job', idle: 'Post a job, then one quote. A pass stays held. Nothing is signed here.',
+    label: 'Town Hall · hire someone to do a piece of work', idle: 'Post a job, then one quote. A pass stays held. Nothing is signed here.',
     form: () => '<div data-deep="hall"></div>',
     bind: () => {
       const hooks = {
@@ -1105,7 +1117,7 @@ const APPS = {
   },
   payouts: {
     guest: true,
-    label: 'Payouts · pay under the cap', idle: 'Pay reviewed rows with the session key. Nothing is sent until setup. An over-cap row is refused before any deposit.',
+    label: 'Payouts · pay several people, each inside your limit', idle: 'Pay reviewed rows with the session key. Nothing is sent until setup. An over-cap row is refused before any deposit.',
     // Seed one row per payee the visitor's own rules name. The count and the cap are the visitor's, not this file's.
     rows: () => { if (!extra.rows) { const ps = A.bankPayees(); extra.rows = ps.map(to => ({ to, amt: '0.001', asset: 'NEAR', chain: 'near' })); if (!extra.rows.length) extra.rows.push({ to: '', amt: '', asset: 'NEAR', chain: 'near' }); } return extra.rows; },
     total: () => Math.round(APPS.payouts.rows().reduce((t, r) => t + (Number(r.amt) > 0 ? Number(r.amt) : 0), 0) * 1e6) / 1e6,
@@ -1150,7 +1162,7 @@ const APPS = {
   },
   house: {
     guest: true,
-    label: 'Your House · your charter', idle: 'Your charter is the rule book your agent cannot break. It can only pay inside those rules.',
+    label: 'Your House · the rules your agent cannot break', idle: 'Your charter is the rule book your agent cannot break. It can only pay inside those rules.',
     form: () => '<div data-deep="house"></div>',
     bind: () => {
       document.body.classList.add('house-tray');
@@ -1190,7 +1202,7 @@ const APPS = {
   },
   chronicle: {
     guest: true,
-    label: 'Chronicle · account audit', idle: 'Type an account. Nothing was signed from this tray.',
+    label: 'Chronicle · everything one account did, in one place', idle: 'Type an account. Nothing was signed from this tray.',
     btn: '',
     form: () => '<div data-deep="chronicle"></div>',
     bind: () => mountShop('chronicle', document.getElementById('t-form'), {
@@ -1340,6 +1352,9 @@ function proofDrawer() {
 // ---------- gate: wallet → charter → rules → shop ----------
 function paint() {
   const app = APPS[cur]; if (!app) return; const st = A.S.ready ? A.stage() : 'load';
+  // After this repaint paints, refresh the overflow hint. A microtask is enough: the DOM is
+  // updated synchronously below and layout is readable immediately after.
+  queueMicrotask(() => { try { watchOverflow(); } catch { /* a missing tray is not an error */ } });
   document.body.classList.toggle('chronicle-tray', cur === 'chronicle');
   document.body.classList.toggle('bank-tray', cur === 'bank');
   document.body.classList.toggle('ferry-tray', cur === 'ferry');
@@ -1601,6 +1616,41 @@ async function signRules() {
 
 // ---------- wiring ----------
 let booted = null;
+/**
+ * Tell the visitor when the panel has more below the fold.
+ *
+ * The tray scrolls (the Bank's content is 903px in a 594px region) but nothing announced it, and
+ * a reviewer watching a recording read the bottom edge as text cut through the middle of the
+ * letters. A scrollbar alone was not enough, so this sets `data-more` which the stylesheet turns
+ * into a gradient edge and a "more" pill. It re-runs on scroll and whenever the content changes,
+ * because every shop repaints into the same element.
+ */
+function watchOverflow() {
+  const tray = $('#tray');
+  const sc = tray?.querySelector(':scope > .t-scroll');
+  if (!sc) return;
+  if (!sc.dataset.watched) {
+    sc.dataset.watched = '1';
+    // The pill lives beside the scroll region, not inside it, so `contain: paint` cannot hide it.
+    if (!tray.querySelector(':scope > .more-hint')) {
+      const hint = document.createElement('div');
+      hint.className = 'more-hint';
+      hint.textContent = 'more below';
+      hint.setAttribute('aria-hidden', 'true');
+      sc.after(hint);
+    }
+    sc.addEventListener('scroll', () => mark(sc), { passive: true });
+    if (typeof ResizeObserver === 'function') {
+      try { new ResizeObserver(() => mark(sc)).observe(sc.firstElementChild || sc); } catch { /* older browsers */ }
+    }
+  }
+  mark(sc);
+}
+function mark(sc) {
+  const more = sc.scrollHeight - sc.clientHeight - sc.scrollTop > 24;
+  sc.dataset.more = more ? '1' : '0';
+}
+
 export function boot() {
   if (booted) return booted;
   const shop = document.getElementById('shopUI');

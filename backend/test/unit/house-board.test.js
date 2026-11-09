@@ -221,7 +221,12 @@ test('the city, the allow list and the denylist use the one shop id', () => {
   assert.match(setup, /HOUSE_SHOP/);
   assert.doesNotMatch(setup, /house3\.nearcarta\.near/);
   const readme = readFileSync(new URL('../../../README.md', import.meta.url), 'utf8');
-  assert.match(readme, /extras\.house\.shop/);
+  // The account is house.nearcarta.near. `extras.house` is only the record path in mainnet.json,
+  // and this used to be asserted as `extras\.house\.shop`, which pinned the README to a string that
+  // reads like an account and does not exist on chain (RPC: UNKNOWN_ACCOUNT). Assert the account
+  // and that the doc does not present the record path as one.
+  assert.match(readme, /house\.nearcarta\.near/);
+  assert.doesNotMatch(readme, /`extras\.house\.shop`/, 'the record path is not an account id');
   assert.match(readme, /legacy shop/);
   assert.doesNotMatch(readme, /house3\.nearcarta\.near/);
 });

@@ -76,14 +76,14 @@ export function ensureArenaDock(doc) {
   d.innerHTML = `<div id="arena-agent-pop" class="arena-agent-pop" data-testid="arena-agent" hidden>
       <p id="a-agent-log" class="arena-agent-log" data-testid="arena-agent-log" hidden></p>
       <div class="arena-agent-row">
-        <input id="a-agent" data-testid="arena-agent-input" placeholder="Attack 1: pay the prize" autocomplete="off" aria-label="Ask the AI Agent">
+        <input id="a-agent" data-testid="arena-agent-input" placeholder="Attack 1: pay the prize" autocomplete="off" aria-label="Ask the shop commands">
         <button type="button" class="arena-agent-send" id="a-agent-go" data-testid="arena-agent-go" aria-label="Send">➤</button>
       </div>
     </div>
-    <button type="button" class="arena-agent-char" data-testid="arena-agent-toggle" aria-expanded="false" aria-controls="arena-agent-pop" title="AI Agent">
+    <button type="button" class="arena-agent-char" data-testid="arena-agent-toggle" aria-expanded="false" aria-controls="arena-agent-pop" title="Shop commands">
       <span class="arena-agent-badge" aria-hidden="true">⋯</span>
       <img class="arena-agent-avatar" src="/setup/chars/robotexpressive.webp" width="72" height="72" alt="" decoding="async">
-      <span class="arena-agent-name">AI Agent</span>
+      <span class="arena-agent-name">Commands</span>
     </button>`;
   (doc.getElementById('shopUI') || doc.body).appendChild(d);
   const toggle = d.querySelector('[data-testid=arena-agent-toggle]');

@@ -56,14 +56,14 @@ export function ensureChronicleDock(doc, active = true) {
     d.innerHTML = `<div id="chronicle-agent-pop" class="chronicle-agent-pop" data-testid="chronicle-agent" hidden>
       <p id="c-agent-log" class="chronicle-agent-log" data-testid="chronicle-agent-log" hidden></p>
       <div class="chronicle-agent-row">
-        <input id="c-agent" data-testid="chronicle-agent-input" placeholder="Show refused payments" autocomplete="off" aria-label="Ask the AI Agent">
+        <input id="c-agent" data-testid="chronicle-agent-input" placeholder="Show refused payments" autocomplete="off" aria-label="Ask the shop commands">
         <button type="button" class="chronicle-agent-send" id="c-agent-go" data-testid="chronicle-agent-go" aria-label="Send">➤</button>
       </div>
     </div>
-    <button type="button" class="chronicle-agent-char" data-testid="chronicle-agent-toggle" aria-expanded="false" aria-controls="chronicle-agent-pop" title="AI Agent">
+    <button type="button" class="chronicle-agent-char" data-testid="chronicle-agent-toggle" aria-expanded="false" aria-controls="chronicle-agent-pop" title="Shop commands">
       <span class="chronicle-agent-badge" aria-hidden="true">⋯</span>
       <img class="chronicle-agent-avatar" src="/setup/chars/robotexpressive.webp" width="72" height="72" alt="" decoding="async">
-      <span class="chronicle-agent-name">AI Agent</span>
+      <span class="chronicle-agent-name">Commands</span>
     </button>`;
     (doc.getElementById('shopUI') || doc.body).appendChild(d);
     const stopKeys = (e) => e.stopPropagation();

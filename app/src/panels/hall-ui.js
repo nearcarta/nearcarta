@@ -195,6 +195,13 @@ export async function mountHall(root, hooks = {}) {
       sendJob: async (step) => {
         const send = hooks.sendJob || (async (one) => {
           const m = await import('/shops/hall/hall.bundle.js');
+          // The standalone bundle signs row edits (signCalls). It has no job sender: that
+          // lives in the town's hallJob, which holds the agent key and the board row. Calling
+          // m.sendJob here used to throw "m.sendJob is not a function" at the visitor. Say the
+          // real thing instead: this page cannot post a job, and nothing was signed.
+          if (typeof m.sendJob !== 'function') {
+            throw new Error('Posting a job needs the town\'s signer. Open Town Hall in the city. Nothing was signed.');
+          }
           return m.sendJob(one);
         });
         return send(step);

@@ -38,13 +38,13 @@ export function ensureBankDock(doc) {
   dock.innerHTML = `<div id="bank-agent-pop" class="bank-agent-pop" data-testid="bank-agent" hidden>
       <p id="bank-agent-log" class="bank-agent-log" data-testid="bank-agent-log" hidden></p>
       <div class="bank-agent-row">
-        <input id="bank-agent" data-testid="bank-agent-input" placeholder="Audit the cafe sample" autocomplete="off" aria-label="Ask the AI Agent">
+        <input id="bank-agent" data-testid="bank-agent-input" placeholder="Audit the cafe sample" autocomplete="off" aria-label="Ask the shop commands">
         <button type="button" class="bank-agent-send" id="bank-agent-go" data-testid="bank-agent-go" aria-label="Send">➤</button>
       </div>
     </div>
-    <button type="button" class="bank-agent-char" data-testid="bank-agent-toggle" aria-expanded="false" aria-controls="bank-agent-pop" title="AI Agent">
+    <button type="button" class="bank-agent-char" data-testid="bank-agent-toggle" aria-expanded="false" aria-controls="bank-agent-pop" title="Shop commands">
       <img class="bank-agent-avatar" src="/setup/chars/robotexpressive.webp" width="72" height="72" alt="" decoding="async">
-      <span class="bank-agent-name">AI Agent</span>
+      <span class="bank-agent-name">Commands</span>
     </button>`;
   (d.getElementById('shopUI') || d.body).appendChild(dock);
   const toggle = dock.querySelector('[data-testid=bank-agent-toggle]');
@@ -113,7 +113,10 @@ export function bankMarkup(state) {
   const who = state.who;
   const session = who?.account
     ? (who.name && who.name !== who.account ? `Signed in as ${esc(who.name)} · ${esc(who.account)}` : `Signed in as ${esc(who.account)}`)
-    : 'Finish setup to read your cap.';
+    // This line is the first thing in the tray. It used to read "Finish setup to read your cap",
+    // which opens with an instruction and a term ("cap") a first-time visitor has no reason to
+    // know. The audit works with no wallet at all, so say that first.
+    : 'No sign-in needed: press Audit privately and this browser reads the sample statement.';
   const tabBtn = (id, label) => `<button type="button" role="tab" class="bank-tab${tab === id ? ' on' : ''}" data-tab="${id}" aria-selected="${tab === id ? 'true' : 'false'}" data-testid="bank-tab-${id}">${label}</button>`;
   const review = state.review;
   const cta = review ? 'Apply tighter limits' : 'Audit privately';
@@ -139,7 +142,7 @@ export function bankMarkup(state) {
       <div class="bank-scroll" data-testid="bank-scroll">
       ${review ? `<button type="button" class="bank-again" data-testid="bank-again">Audit another statement</button>` : `<p class="bank-format" data-testid="bank-format">Accepted format: ${esc(FORMAT_LINE)}.</p>
       <div class="bank-row">
-        <label class="choice-label" for="bank-sample">Sample</label>
+        <label class="choice-label" for="bank-sample" data-testid="bank-sample-label">Sample</label>
         <select id="bank-sample" data-testid="bank-sample">${SAMPLES.map(s => `<option value="${s.id}"${state.sample === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
         <button type="button" class="bank-sample-link" data-testid="bank-sample-file">Download</button>
       </div>

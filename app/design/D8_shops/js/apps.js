@@ -10,7 +10,7 @@ import * as TS from './tollsplit.js';
 import { DEFAULT_RULES } from './rules-default.js';
 import { pairClauseId, isFerryClauseId, parsePairClauseId, ferryStampYocto } from '/panels/ferry-pair.js';
 import { boardCallText, cityCheckoutBody, isNearAccountId, nearAmount, proposeCallTgas, quoteRecipient, stepsAllowanceYocto, WRAP } from '/panels/ferry-settle.js';
-import { freezePlan } from '/panels/guard-agent.js';
+import { freezePlan, runGuardAgentWithModel } from '/panels/guard-agent.js';
 import { lookalike as lookalikeName } from '/guard-lookalike.js';
 import { createGuardLedger, guardSend } from '/panels/guard-live.js';
 import { proposalMessage, refusalOf, REFUSALS } from './board.js';
@@ -182,9 +182,17 @@ export async function readRules() {  if (S.board && S.me) {
     S.agentLive = !!(k && W.pubkeyHex(k) === row.agent);
     return S;
   }
+  // Legacy per-visitor oath account. Only read it when we actually have one: signed out, S.charter
+  // is null and these two calls went out with account_id: null, which the RPC answers 400 for. The
+  // House page fired four of them on every visit (two calls, twice over) and the panel then showed
+  // empty Holder and Check-in fields, which reads as a broken shop. The live board path above does
+  // not need this at all.
+  if (!S.charter) {
+    S.clauses = {}; S.state = null; S.pending = {}; S.usage = {}; S.agentLive = false;
+    return S;
+  }
   const [cl, st] = await Promise.all([view(S.charter, 'get_clauses'), view(S.charter, 'get_state')]);
-  S.clauses = cl || {}; S.state = st;
-  S.pending = st?.pending_changes ? await view(S.charter, 'get_pending').catch(() => ({})) : {};
+  S.clauses = cl || {}; S.state = st;  S.pending = st?.pending_changes ? await view(S.charter, 'get_pending').catch(() => ({})) : {};
   S.usage = {}; for (const id of Object.keys(S.clauses)) S.usage[id] = await view(S.charter, 'get_usage', { clause_id: id }).catch(() => null);
   // Judge A10: a key saved as pending before signing is promoted once the chain shows it (redirect wallets, closed tabs)
   const pk = S.charter && localStorage.getItem(LS_AGENT(S.charter) + '.pending');
@@ -1601,3 +1609,6 @@ export async function payoutsSponsor(account, depositNear, opts = {}) {
 }
 
 export { fmt, esc, short, toY, fromY };
+// The Guardhouse agent hook lives in /panels/guard-agent.js; re-exported here so the shop shell
+// can reach it without a second copy of the model call.
+export { runGuardAgentWithModel };

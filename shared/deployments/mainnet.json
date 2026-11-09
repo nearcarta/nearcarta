@@ -100,24 +100,42 @@
         "arena_feed_after_the_copy_fix": "EAchLuogBCqmY5JZbjoDG7hUzyyFmZtZzG2VogW9cwfL",
         "arena_feed_from_ai_agent": "F2VQxKK5AQJgQbZxurSkw6Rr3XJRXCHT9rNYAUPgsYoY",
         "house_checkin_from_ai_agent": "F9RU5PHYbUw6abr1NwN6zoLsBenzAjLcAw3jj58DJi7W",
-        "bank_apply_tighter_limits": "9wxG5aErrrU72tH4oTt8dAdku3KXqWybJr7yXL32bFRY"
-      }
+        "bank_apply_tighter_limits": "9wxG5aErrrU72tH4oTt8dAdku3KXqWybJr7yXL32bFRY",
+        "visitor_agent_propose_allowed_1": "AC1j6vLSmrvGDTbF7JBbgyuru4XH3NtU2oWf7Ervmk1Y",
+        "visitor_agent_propose_allowed_2": "BEndDsRe3YU4e6hjXA2J23ceWDi4ikDseMaTZUDxWL28"
+      },
+      "visitor_agent_propose_note": "Two real proposes signed by the row agent key (public 6ea3f958) from account 8ccd5d33, each 0.0001 NEAR to house.nearcarta.near, both final and successful. The charter allowed both: after them get_charter shows nonce 19->21, balance 0.0092->0.0090, spent_today 0.0108->0.0110, actions_today 17->19. Sent 2026-11-09 09:00 UTC from this repo own test wallet."
     },
     "upgrade_staged": {
-      "note": "Staged 2026-11-08 10:27 UTC with `stage_upgrade` (1 yocto, refunded). This is the build that must land: it carries FIVE fixes. (1) The hydrate fix, so `anchor` stops panicking ERR_NO_CHARTER. (2) The charge_acts fix, so an effect budget is paid from the side reserve instead of the row's own bytes. (3) The hold fix: `propose_call_as` charged the per-action hold record entirely against the reserve, and the call carries no deposit, so a row whose reserve was spent by /setup's own effect budget panicked ERR_DEPOSIT \u2014 pressing Post job sent 3sAWZghNXW9nph7vTKjGjBjWsdEHpsqfg88npgzQUrYt and the board refused it, and the same write blocks every held payment and the toll crossing. The hold is now paid from the reserve first, then from the row's own room. (4) The close fix: `release` refunded the side reserve but never subtracted it from `owed`, so after ANY row carrying a call list was closed the liability ledger stayed above zero forever and `reap` refused ERR_LIABILITY. Measured in contracts/charter_board_sandbox/tests/two_visitors.rs: owed read 0.00734 NEAR and never moved. Proved in tests/hold_on_a_hall_row.rs and tests/two_visitors.rs. Supersedes the 23:36 stage (CCTpHQ1Y\u2026), which had only fixes 1 and 2 and would have left hold and reap broken. Re-staging reset the 24 h ETA. (5) The min_amount fix: `min_amount` was applied to every `propose_call_as` deposit, so the zero-value steps of the Town Hall lifecycle (bid, accept, deliver, review, refund) were refused below_min_amount. Measured on mainnet 2026-11-08 after post_job landed: `bid` with a zero deposit was refused, and zero is the only deposit a bid can carry. It now applies only when the call moves value. Proved in contracts/charter_board/src/lib.rs a_shop_call_with_no_value_is_not_held_to_the_smallest_payment. SIXTH fix, staged 2026-11-08 16:29 UTC after the field analysis: a free `simulate` view, so an agent can ask 'would this be allowed?' and get the same words the send would use, instead of learning refusal reasons by burning gas. Taken from the strongest rival in our tracks (soldanoandrea/allowance, which ships it as `simulate`). Exposed at POST /api/board/simulate, and a board build without it answers ok:null rather than ok:true. Re-staging reset the 24 h ETA from 2026-11-09 10:27 to 16:29 UTC; no further re-stage unless a money-losing bug appears.",
+      "note": "Staged 2026-11-08 10:27 UTC with `stage_upgrade` (1 yocto, refunded). This is the build that must land: it carries FIVE fixes. (1) The hydrate fix, so `anchor` stops panicking ERR_NO_CHARTER. (2) The charge_acts fix, so an effect budget is paid from the side reserve instead of the row's own bytes. (3) The hold fix: `propose_call_as` charged the per-action hold record entirely against the reserve, and the call carries no deposit, so a row whose reserve was spent by /setup's own effect budget panicked ERR_DEPOSIT — pressing Post job sent 3sAWZghNXW9nph7vTKjGjBjWsdEHpsqfg88npgzQUrYt and the board refused it, and the same write blocks every held payment and the toll crossing. The hold is now paid from the reserve first, then from the row's own room. (4) The close fix: `release` refunded the side reserve but never subtracted it from `owed`, so after ANY row carrying a call list was closed the liability ledger stayed above zero forever and `reap` refused ERR_LIABILITY. Measured in contracts/charter_board_sandbox/tests/two_visitors.rs: owed read 0.00734 NEAR and never moved. Proved in tests/hold_on_a_hall_row.rs and tests/two_visitors.rs. Supersedes the 23:36 stage (CCTpHQ1Y…), which had only fixes 1 and 2 and would have left hold and reap broken. Re-staging reset the 24 h ETA. (5) The min_amount fix: `min_amount` was applied to every `propose_call_as` deposit, so the zero-value steps of the Town Hall lifecycle (bid, accept, deliver, review, refund) were refused below_min_amount. Measured on mainnet 2026-11-08 after post_job landed: `bid` with a zero deposit was refused, and zero is the only deposit a bid can carry. It now applies only when the call moves value. Proved in contracts/charter_board/src/lib.rs a_shop_call_with_no_value_is_not_held_to_the_smallest_payment. SIXTH fix, staged 2026-11-08 16:29 UTC after the field analysis: a free `simulate` view, so an agent can ask 'would this be allowed?' and get the same words the send would use, instead of learning refusal reasons by burning gas. Exposed at POST /api/board/simulate, and a board build without it answers ok:null rather than ok:true. Re-staging reset the 24 h ETA from 2026-11-09 10:27 to 16:29 UTC; no further re-stage unless a money-losing bug appears.",
       "code_hash": "CM6WA2gZDN17TRXQzFsrstgKPzsmiVLuArK7V6UkXLAf",
       "artifact": "contracts/artifacts/charter_board.hold.wasm",
       "wasm_bytes": 150988,
-      "tx": "Ct4uwW5He8eaxNW5kDb6gU98ydE3A1UE4rm8gRPzPTVN",
-      "staged_eta_ns": "1794220050000000000",
-      "eta_utc": "2026-11-09 16:29",
-      "eta_cairo": "2026-11-09 18:29",
+      "tx": "A65fXQ1ev9R62tEwiyYBCPxndjvTqZsUNk7NkCU7ErUL",
+      "staged_eta_ns": "1794328396812085376",
+      "eta_utc": "2026-11-10 16:33",
+      "eta_cairo": "2026-11-10 18:33",
       "superseded_stage_tx": "3hpmvSiScQ4o3GTZDaVe21jVCNJ8xvJb1bCsSSH48zFp",
       "superseded_code_hash": "978347572fa446a1da7b1ccdb0693a19c4b8741233d884eee7b768a5db173317",
       "row_cap_near": "0.03",
       "side_reserve_bytes": 1400,
       "wasm_sha256": "a89664ef45f16d429104b1b1d87d5dc83a79820a69bd22782f50a6b7c022315c",
-      "has_simulate": true
+      "has_simulate": true,
+      "eta_note": "Read from the stage_upgrade event of Ct4uwW5H8eaxNW5kDb6gU98ydE3A1UE4rm8gRPzPTVN: eta 1794241743174130905, code_hash a89664ef. The previous staged_eta_ns here (1794220050000000000 = 10:27 UTC) was six hours early and would have made an upgrade attempt fail ERR_UPGRADE. upgrade_eta is NOT a contract view (v2.rs has no #[near] block), so the event log is the only authoritative record.",
+      "superseded_stage_tx_2": "Ct4uwW5He8eaxNW5kDb6gU98ydE3A1UE4rm8gRPzPTVN",
+      "superseded_eta_ns": "1794241743174130905",
+      "attempt_2026_11_09": {
+        "note": "First attempt at the 16:29 UTC window failed LackBalanceForState: the staged wasm needs 0.12033 NEAR more storage stake than the board held. Gas was spent, no code changed. Funded the board 0.14 NEAR (tx 5rezuonwYNxqYkGJvE2s43Qcr3vV2u39DRS81yDPPSZ), then two probe calls failed: ERR_ARGS while passing code as a byte array (the live build wants a HEX STRING) and ERR_UPGRADE because upgrade_set had already been consumed by the first attempt. Re-staged the same pinned hash, which resets the 24 h clock to 2026-11-10T16:33:16Z.",
+        "failed_upgrade_txs": [
+          "Dz8zqumopaP47zCk4sDagenvhcHPXhGH8AVUCPswjFGM",
+          "J87WV9nD6AwgeCQLXkAhH3EkwWXnJ3EGTy3FMHnwEYGe",
+          "G2oR4raDnnXBUtNEu1978pPxbNN96rqKd3ri7mXUGgWE"
+        ],
+        "fund_tx": "5rezuonwYNxqYkGJvE2s43Qcr3vV2u39DRS81yDPPSZ",
+        "restage_tx": "A65fXQ1ev9R62tEwiyYBCPxndjvTqZsUNk7NkCU7ErUL",
+        "board_balance_after_near": 1.54478,
+        "lesson": "open_charter/upgrade args: the live board takes `code` as a HEX STRING. board-anchor-upgrade.js already did this correctly; my new script guessed a byte array."
+      }
     },
     "redeploy": {
       "when_cairo": "2026-11-05 20:03 Africa/Cairo",
@@ -143,14 +161,14 @@
       "close_charter": "7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf"
     },
     "effects_code_hash": "FzUSX26CnmveE2vPg4dcdczmBXFJv6mAx7YAuJPghZZf",
-    "effects_code_hash_note": "Base58 of contracts/artifacts/charter_board.effects.wasm (sha256 debcbfe2\u2026). `set_effects` is sent at setup only while this is the code on chain, because the older build charges the row instead of the side reserve. The staged upgrade at board.upgrade_staged installs it.",
+    "effects_code_hash_note": "Base58 of contracts/artifacts/charter_board.effects.wasm (sha256 debcbfe2…). `set_effects` is sent at setup only while this is the code on chain, because the older build charges the row instead of the side reserve. The staged upgrade at board.upgrade_staged installs it.",
     "previous": {
       "code_hash": "Am4FLfphc4JF7ZZLRrs3j1otwyKyiQZqygBJ8nnZs78C",
       "wasm_sha256": "910268dab146a99f766ebf400c464672bdb46adc3c914a91594a768b1b2e0f29",
       "deploy_tx": "CfdUppnLoLmFhcvLcgqE93XDygXCpwfPKdL7DHPUqV4"
     },
     "anchor_code_hash": "CM6WA2gZDN17TRXQzFsrstgKPzsmiVLuArK7V6UkXLAf",
-    "anchor_note": "`anchor` panics ERR_NO_CHARTER on the live build (code_hash BF1rQSrG\u2026): measured 2026-11-08, tx GaVEzhfvwG1bP8P6LMrmhuvJe5CzUdvBo2RX4dVnKoTH from a visitor row with four receivers. The hydrate fix is in the staged build, so the invoice anchor is offered only once that code hash is on chain."
+    "anchor_note": "`anchor` panics ERR_NO_CHARTER on the live build (code_hash BF1rQSrG…): measured 2026-11-08, tx GaVEzhfvwG1bP8P6LMrmhuvJe5CzUdvBo2RX4dVnKoTH from a visitor row with four receivers. The hydrate fix is in the staged build, so the invoice anchor is offered only once that code hash is on chain."
   },
   "mpc": "v1.signer",
   "chain_id": 8453,
@@ -196,7 +214,7 @@
     "owner": "nearcarta.near",
     "code_hash": "FaNtiauDWfjzKYtK2bns79wUqZqcXFcLjz2Bzx7aVdL5",
     "wasm": "toll.v8.wasm",
-    "upgrade_note": "Upgraded in place from v7 (6aAGdUhy\u2026) with the owner-only `upgrade`, which deploys the code and then calls `migrate` itself. The account was not closed and no NEAR moved. v8 drops the contract-wide `max_per_tx`/`budget` caps that v7 still enforced: on v7 a visitor crossing of 1e18 yocto hit `max_per_tx` (1e13) and the refusal surfaced as a wasm trap instead of a reason.",
+    "upgrade_note": "Upgraded in place from v7 (6aAGdUhy…) with the owner-only `upgrade`, which deploys the code and then calls `migrate` itself. The account was not closed and no NEAR moved. v8 drops the contract-wide `max_per_tx`/`budget` caps that v7 still enforced: on v7 a visitor crossing of 1e18 yocto hit `max_per_tx` (1e13) and the refusal surfaced as a wasm trap instead of a reason.",
     "storage_bytes": 217747,
     "locked_near": 2.17747,
     "full_access_keys": 0,

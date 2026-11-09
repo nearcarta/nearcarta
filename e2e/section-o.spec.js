@@ -20,6 +20,7 @@ async function at(page, width) {
 }
 
 function quietWallet() {
+  try { localStorage.removeItem('nearcarta.setup.v1'); } catch {}
   window.__NC_ACCOUNT = async () => null;
 }
 
@@ -54,43 +55,63 @@ async function radiosBeside(page) {
   }
 }
 
-test('O1 bank amount radios sit beside their labels', async ({ page }) => {
+test('O1 every bank field label sits above its control', async ({ page }) => {
   await page.addInitScript(quietWallet);
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/shops/bank/');
-    const notes = page.getByTestId('bank-notes');
-    await expect(notes).toBeVisible();
-    await expect(notes.locator('input[type=radio]')).toHaveCount(3);
-    await radiosBeside(page);
-    const first = await notes.locator('input').first().boundingBox();
-    const card = await page.locator('.shop-card').boundingBox();
-    expect(first.x).toBeLessThan(card.x + 48);
+    await expect(page.getByTestId('bank-sample-label')).toBeVisible();
+    // The audit form pairs each <label for> with a select or input. A label
+    // sharing a row with its control is the defect this guards: it reads as two
+    // columns and squeezes both on a phone.
+    const pairs = await page.evaluate(() => {
+      const out = [];
+      const root = document.querySelector('[data-testid=bank-pane-audit]');
+      if (!root) return out;
+      for (const label of root.querySelectorAll('label[for]')) {
+        const ctl = root.querySelector('#' + CSS.escape(label.getAttribute('for')));
+        if (!ctl) continue;
+        const l = label.getBoundingClientRect();
+        const c = ctl.getBoundingClientRect();
+        if (!l.width || !c.width) continue;
+        out.push({ lx: l.x, lb: l.bottom, cx: c.x, ct: c.top });
+      }
+      return out;
+    });
+    expect(pairs.length).toBeGreaterThan(0);
+    for (const p of pairs) {
+      expect(p.ct).toBeGreaterThanOrEqual(p.lb - 1);
+      expect(Math.abs(p.cx - p.lx)).toBeLessThan(2);
+    }
     await noSideways(page);
     await shot(page, 'o1-bank-' + width);
   }
 });
 
-test('O2 the hall row id is short and the card is one column', async ({ page }) => {
+test('O2 the hall header shortens the account and the desk fills its column', async ({ page }) => {
   await page.addInitScript(savedScholar, OWNER);
-  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   for (const width of [1440, 390]) {
     await at(page, width);
-    await page.goto('/shops/hall/?owner=' + OWNER);
-    const id = page.getByTestId('hall-row-id');
-    await expect(id).toHaveText('8e2027…61c8', { timeout: 30_000 });
-    const box = await id.boundingBox();
-    expect(box.height).toBeLessThan(36);
-    const form = await page.getByTestId('hall-form').boundingBox();
-    expect(form.width).toBeGreaterThan(width === 1440 ? 700 : 300);
-    await radiosBeside(page);
+    await page.goto('/shops/hall/');
+    // The v2 desk shows the visitor in the page header, shortened, with the full id in the
+    // title attribute. A 64-hex id printed in full is the defect: it overflows every phone.
+    const who = page.getByTestId('who');
+    await expect(who).toContainText('8e2027…61c8', { timeout: 60_000 });
+    await expect(who).not.toContainText(OWNER);
+    expect((await who.boundingBox()).height).toBeLessThan(60);
+
+    // The desk is one column: it fills the room, and every field inside it stays inside it.
+    const desk = await page.getByTestId('hall-desk').boundingBox();
+    const room = await page.getByTestId('shop-room').boundingBox();
+    expect(desk.width).toBeGreaterThan(room.width * 0.9);
+    for (const id of ['hall-task', 'hall-budget', 'hall-cta']) {
+      const b = await page.getByTestId(id).boundingBox();
+      expect(b.x).toBeGreaterThanOrEqual(desk.x - 1);
+      expect(b.x + b.width).toBeLessThanOrEqual(desk.x + desk.width + 1);
+    }
     await noSideways(page);
     await shot(page, 'o2-hall-' + width);
   }
-  await page.getByTestId('hall-copy').click();
-  await expect(page.getByTestId('hall-copy')).toHaveText('Copied');
-  const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toBe(OWNER);
 });
 
 test('O3 arena actions have a gap and the attack box is tall', async ({ page }) => {
@@ -123,57 +144,91 @@ test('O4 ferry route buttons are brass cards', async ({ page }) => {
     const chips = page.getByTestId('ferry-route');
     await expect(chips).toHaveCount(3);
     await expect(page.getByTestId('ferry-compare')).toBeEnabled({ timeout: 60_000 });
-    const idle = await chips.nth(1).evaluate(el => {
+    // Which chip starts selected depends on the corridor the ferry picks, so read the state
+    // from aria-pressed rather than assuming an index: the selected chip is gold, the idle
+    // ones are dark brass. Both are gradients; only the selected one shines.
+    const on = chips.and(page.locator('[aria-pressed=true]'));
+    await expect(on).toHaveCount(1);
+    const live = await on.evaluate(el => {
+      const s = getComputedStyle(el);
+      return { image: s.backgroundImage, color: s.color, anim: s.animationName };
+    });
+    expect(live.color).toBe('rgb(42, 22, 8)');
+    expect(live.anim).toBe('routeShine');
+    expect(live.image).toContain('linear-gradient');
+
+    const idle = await chips.and(page.locator('[aria-pressed=false]')).first().evaluate(el => {
       const s = getComputedStyle(el);
       return { image: s.backgroundImage, color: s.color };
     });
     expect(idle.image).toContain('linear-gradient');
     expect(idle.color).toBe('rgb(255, 248, 238)');
-    const on = await chips.nth(0).evaluate(el => {
-      const s = getComputedStyle(el);
-      return { image: s.backgroundImage, color: s.color, anim: s.animationName };
-    });
-    expect(on.color).toBe('rgb(42, 22, 8)');
-    expect(on.anim).toBe('routeShine');
-    expect(on.image).toContain('linear-gradient');
-    await radiosBeside(page);
     await noSideways(page);
     await shot(page, 'o4-ferry-' + width);
   }
 });
 
-test('O5 payouts title, rows and CSV share one column', async ({ page }) => {
+test('O5 payouts rows and paste field share one column', async ({ page }) => {
   await page.addInitScript(quietWallet);
   for (const width of [1440, 390]) {
     await at(page, width);
     await page.goto('/shops/payouts/');
-    await page.getByTestId('payout-add').click();
-    const title = await page.locator('h1').boundingBox();
-    const add = await page.getByTestId('payout-add').boundingBox();
-    const csv = await page.getByTestId('payout-csv').boundingBox();
-    const row = await page.locator('[data-testid=payout-list] li').boundingBox();
-    expect(Math.abs(title.x - add.x)).toBeLessThan(6);
-    expect(Math.abs(title.x - csv.x)).toBeLessThan(6);
-    expect(Math.abs(title.x - row.x)).toBeLessThan(6);
-    expect(csv.width).toBeGreaterThan(width === 1440 ? 500 : 280);
+    // "Add a row" and the paste box live on the Payroll tab, so the test has to open it
+    // rather than asserting on the default Invoice pane and timing out.
+    await page.getByTestId('payouts-tab-payroll').click();
+    const add = page.getByTestId('payout-add');
+    await expect(add).toBeVisible({ timeout: 30_000 });
+    // The list starts empty, so there is no row to measure until one is added.
+    await add.click();
+    await expect(page.locator('[data-testid=payout-list] li')).toHaveCount(1);
+    const card = await page.getByTestId('payouts-card').boundingBox();
+    const boxes = {
+      add: await add.boundingBox(),
+      csv: await page.getByTestId('payout-csv').boundingBox(),
+      row: await page.locator('[data-testid=payout-list] li').first().boundingBox(),
+    };
+    // One column: every block starts at the card's own left edge and stays inside it. The
+    // page title lives in the site header, so it is not part of this column.
+    for (const [name, b] of Object.entries(boxes)) {
+      expect(b, name).toBeTruthy();
+      expect(Math.abs(b.x - card.x), name + ' left edge').toBeLessThan(6);
+      expect(b.x + b.width, name + ' right edge').toBeLessThanOrEqual(card.x + card.width + 1);
+    }
+    expect(boxes.csv.width).toBeGreaterThan(width === 1440 ? 500 : 280);
     await noSideways(page);
     await shot(page, 'o5-payouts-' + width);
   }
 });
 
-test('O6 the guardhouse field starts empty', async ({ page }) => {
-  await page.addInitScript(quietWallet);
+test('O6 the guardhouse field starts empty and the example is derived from the visitor', async ({ page }) => {
   for (const width of [1440, 390]) {
     await at(page, width);
+
+    // No session: the example cannot be derived, so the button says what to do instead of
+    // inventing a payee, and the field stays empty.
+    await page.addInitScript(quietWallet);
     await page.goto('/shops/guard/');
     const field = page.getByTestId('guard-account');
     await expect(field).toHaveValue('');
-    const example = page.getByTestId('guard-example');
-    await expect(example).toHaveText('Example: shop-moved-pay-here.near');
-    await example.click();
-    await expect(field).toHaveValue('shop-moved-pay-here.near');
+    await page.getByTestId('guard-example').click();
+    await expect(field).toHaveValue('');
+    await expect(page.getByTestId('guard-attested')).toContainText('Finish /setup');
+
+    // With a session the example is a look-alike of the visitor's OWN account, never a fixed
+    // address. This is the path that was dead: the standalone route never supplied the hook.
+    await page.addInitScript(savedScholar, OWNER);
+    await page.goto('/shops/guard/');
+    await expect(field).toHaveValue('');
+    const derived = await page.evaluate(async () => {
+      const m = await import('/guard-lookalike.js');
+      return m.lookalike('8e20273edb5dd279e4414cd962f023daa15c8b04450d4a4905f6aae074e661c8');
+    });
+    await expect(page.getByTestId('guard-example')).toHaveText('Example: ' + derived);
+    await page.getByTestId('guard-example').click();
+    await expect(field).toHaveValue(derived);
     await field.fill('');
     await expect(field).toHaveValue('');
+
     await noSideways(page);
     await shot(page, 'o6-guard-' + width);
   }

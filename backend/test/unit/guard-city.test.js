@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   GUARD_MISS, capHolds, checkUrl, freezePlan, lampsFor, parseGuardCommand, runGuardAction, runGuardAgent,
+  runGuardAgentWithModel,
 } from '../../../app/src/panels/guard-agent.js';
 import {
   DOCK_NOT_READY, armGuardDock, dispatchGuardDock, installGuardDock, lastGuardDockSend,
@@ -290,8 +291,62 @@ test('city wiring keeps the guard door in town and cinema on a real tx', () => {
 test('the live plan does not sign and does not name a fixed trick', () => {
   assert.match(GUARD_LIVE_STEPS, /set_frozen/);
   assert.match(GUARD_LIVE_STEPS, /deposit 0/);
-  assert.match(GUARD_LIVE_STEPS, /not on mainnet/);
+  // This used to require the words "not on mainnet". The guard account IS deployed (code
+  // GutWQgGC, 0.35366 NEAR locked, pay exported — read from the account), so asserting that
+  // sentence pinned a false claim. What is true and worth pinning: the plan says the tray does
+  // not call the contract, so pressing Pay moves nothing.
+  assert.match(GUARD_LIVE_STEPS, /IS deployed on mainnet/);
+  assert.match(GUARD_LIVE_STEPS, /it does not call the guard contract/);
+  assert.doesNotMatch(GUARD_LIVE_STEPS, /is not on mainnet/);
   assert.doesNotMatch(GUARD_LIVE_STEPS, /poisoned invoice/i);
   const src = read('backend/scripts/guard-live-plan.js');
   assert.doesNotMatch(src, /signAndSendTransaction|ed25519:|private key/i);
+});
+
+// The Guardhouse dock used to be a regex only. The shop shell now supplies a model-backed reader,
+// and three separate things silently made it a no-op: `guard-tray` overwrote hooks.runAgent after
+// the shell set it, the shell's arm called it without the tray's context (so `check` was missing),
+// and askModelForPayment required a non-empty API base — but the city talks to its own origin, so
+// the base is '' by design and the model was never asked from inside the page.
+test('the guard dock asks the model, and falls back to the parser when the model cannot answer', async () => {
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  try {
+    globalThis.fetch = async (url, opts) => {
+      calls.push({ url: String(url), body: opts?.body });
+      return { ok: true, json: async () => ({ parsed: { receiver: 'cafe.near', amount: '1000000000000000000' }, model: 'test-model' }) };
+    };
+    const r = await runGuardAgentWithModel({ text: 'send 0.001 NEAR to cafe.near', api: '', charter: 'board.nearcarta.near', state: {}, check: async () => ({ verdict: 'warn' }) });
+    assert.equal(r.by, 'model', 'the model reading is used when it answers');
+    assert.equal(r.parsed_from, 'model');
+    assert.equal(calls.length, 1, 'one model call');
+    assert.match(calls[0].url, /\/api\/vault\/ask\/plan$/, 'an empty base is same-origin, not missing');
+    assert.equal(JSON.parse(calls[0].body).receiver, undefined, 'the request sends words, not a parsed receiver');
+  } finally { globalThis.fetch = realFetch; }
+
+  // Model unreachable: the parser still answers, and says so.
+  try {
+    globalThis.fetch = async () => { throw new Error('offline'); };
+    const r = await runGuardAgentWithModel({ text: 'send 0.001 NEAR to cafe.near', api: '', state: {}, check: async () => ({ verdict: 'warn' }) });
+    assert.equal(r.by, 'parser', 'no model means the parser decides');
+  } finally { globalThis.fetch = realFetch; }
+
+  // An exact command never spends a model call.
+  let asked = 0;
+  try {
+    globalThis.fetch = async () => { asked += 1; return { ok: true, json: async () => ({}) }; };
+    await runGuardAgentWithModel({ text: 'check cafe.near', api: '', state: {}, check: async () => ({ verdict: 'warn' }) });
+    assert.equal(asked, 0, '"check" is a command, not a payment to read');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('the guard tray prefers the model reader the shell supplies, and the shell passes its context', () => {
+  const tray = read('app/src/panels/guard-tray.js');
+  // The old line overwrote hooks.runAgent unconditionally, so the model was unreachable.
+  assert.match(tray, /const modelAgent = typeof hooks\.runAgent === 'function'/, 'the tray looks for a supplied reader');
+  assert.match(tray, /modelAgent \? await modelAgent\(text, ctx\(\)\)/, 'and calls it with this tray context');
+  assert.match(tray, /hooks\.trayCtx = ctx/, 'the context is published for the shell arm that runs later');
+  const shell = read('app/design/D8_shops/js/shopui.js');
+  assert.match(shell, /runAgent: \(text, context\) => A\.runGuardAgentWithModel/, 'the Guardhouse supplies the model reader');
+  assert.match(shell, /context \|\| hooks\.trayCtx\?\.\(\)/, 'the later arm passes the tray context through');
 });

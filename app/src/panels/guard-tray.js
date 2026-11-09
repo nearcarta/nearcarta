@@ -209,10 +209,18 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     sendCancel: hooks.sendCancel,
   });
 
+  // The shop shell may supply a model-backed reader (Guardhouse does: a sentence goes to the
+  // model, which proposes the payee and amount). That hook is set on the hooks object BEFORE this
+  // file runs, and the old line here overwrote it unconditionally, so the dock always ran the
+  // parser and the only real-model path in the product was unreachable from the city.
+  // It is called WITH this file's context, because the model still routes through the same
+  // runGuardAction that needs `check`, the caps and the send functions.
+  const modelAgent = typeof hooks.runAgent === 'function' ? hooks.runAgent : null;
+
   async function runAgent(text) {
     scene({ clear: true, seal: false });
     readForm();
-    const result = await runGuardAgent({ text, ...ctx() });
+    const result = modelAgent ? await modelAgent(text, ctx()) : await runGuardAgent({ text, ...ctx() });
     if (result?.ok) state.agentText = '';
     agentLog(result?.hint || (result?.ok ? '' : 'That line did not run.'), true);
     scene(result);
@@ -278,9 +286,18 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     const checkBtn = q$(root, '#g-check');
     if (checkBtn) checkBtn.onclick = async () => {
       readForm();
+      // An empty payee used to be sent to the check as an empty account and came back as a real
+      // verdict ("Warn because: account missing"), which reads as the shop judging nothing.
+      const acct = (state.acct || '').trim();
+      if (!acct) {
+        const hint = 'Type a payee first, for example cafe.near. Nothing was signed.';
+        agentLog(hint, true);
+        paint();
+        return;
+      }
       state.holding = true;
       if (holdButton) holdButton(checkBtn, 'Checking this account.');
-      try { await runPlan({ ok: true, action: 'check', account: (state.acct || '').trim() }); }
+      try { await runPlan({ ok: true, action: 'check', account: acct }); }
       finally { state.holding = false; }
     };
     const pay = q$(root, '#g-pay');
@@ -339,6 +356,9 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
   }
 
   hooks.runAgent = (text) => runAgent(text);
+  // The dock is re-armed by the shop shell after this file mounts, so it loses this closure's
+  // context. Publish it, and the shell's arm can pass it back in.
+  hooks.trayCtx = ctx;
   hooks.localPaint = localPaint;
   localPaint();
   loadLive();

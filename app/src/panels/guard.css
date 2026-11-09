@@ -36,10 +36,10 @@ body.guard-tray #shopUI select,
 body.guard-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
 
 .guard-card{display:grid;gap:12px;min-width:0}
-.guard-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28;position:sticky;top:0;z-index:2}
+.guard-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:5px;border-radius:var(--r-panel);background:#17130f;border:1px solid #4a3a28;position:sticky;top:0;z-index:2}
 .guard-tab{
   display:flex;align-items:center;justify-content:center;
-  min-height:44px;padding:8px 4px;border:0;border-radius:11px;
+  min-height:44px;padding:8px 4px;border:0;border-radius:var(--r-control);
   background:transparent;color:#d4c4a8;font:700 14px/1.1 system-ui,sans-serif;cursor:pointer;
   white-space:nowrap;
 }
@@ -53,14 +53,14 @@ body.guard-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
 .guard-pane[hidden]{display:none!important}
 .guard-field{display:flex;flex-direction:column;gap:8px;margin:0;color:#e8d7b8;font:650 13px/1.2 system-ui,sans-serif}
 .guard-field input,.guard-field select,.guard-field textarea{
-  width:100%;min-height:48px;box-sizing:border-box;padding:0 12px;border-radius:12px;
+  width:100%;min-height:48px;box-sizing:border-box;padding:0 12px;border-radius:var(--r-control);
   border:1px solid #4a3a28;background:#17130f;color:#fff8ee;font:600 15px/1.2 system-ui,sans-serif;
 }
 .guard-field textarea{min-height:48px;padding:12px;resize:vertical}
 .guard-split{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-width:0}
 .guard-flow{
   display:flex;align-items:center;justify-content:center;gap:16px;
-  padding:10px 14px;border-radius:16px;background:#17130f;border:1px solid rgba(214,180,106,.35);
+  padding:10px 14px;border-radius:var(--r-card);background:#17130f;border:1px solid rgba(214,180,106,.35);
 }
 .guard-flow .tic{position:relative;display:inline-flex}
 .guard-flow .ti{width:48px;height:48px;border-radius:50%;display:block}
@@ -96,7 +96,7 @@ body.guard-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
   display:inline-flex;align-items:center;justify-content:center;
   width:auto;min-width:min(220px,100%);max-width:100%;
   min-height:44px;padding:10px 22px;margin:0;box-sizing:border-box;
-  border:1px solid #c9a05a;border-radius:14px;
+  border:1px solid #c9a05a;border-radius:var(--r-panel);
   background:linear-gradient(180deg,#ffe2a8 0%,#f5d08a 42%,#e2b35b 100%);
   color:#2a1608;font:700 15px/1.15 system-ui,sans-serif;cursor:pointer;
   box-shadow:
@@ -137,7 +137,7 @@ button.guard-cta[disabled]{opacity:1;cursor:progress}
 }
 .guard-agent-pop{
   width:min(300px,calc(100vw - 140px));
-  box-sizing:border-box; padding:12px; border-radius:14px;
+  box-sizing:border-box; padding:12px; border-radius:var(--r-panel);
   border:1px solid #d6b46a66; background:#1f1a15;
   box-shadow:0 12px 28px rgba(0,0,0,.4);
   display:grid; gap:12px;
@@ -149,12 +149,12 @@ body[data-shop="guard"] #room{padding-bottom:140px}
 .guard-agent-pop .guard-agent-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:12px;align-items:stretch}
 .guard-agent-pop input{
   width:100%; min-width:0; box-sizing:border-box; min-height:44px;
-  padding:0 12px; border-radius:10px; border:1px solid #4a3a28;
+  padding:0 12px; border-radius:var(--r-control); border:1px solid #4a3a28;
   background:#17130f; color:#fff8ee; font:500 14px/1.2 system-ui,sans-serif;
 }
 .guard-agent-pop .guard-agent-send{
   width:44px; min-width:44px; height:44px; margin:0; padding:0;
-  border:0; border-radius:10px;
+  border:0; border-radius:var(--r-control);
   background:linear-gradient(180deg,#f5d08a,#e2b35b); color:#2a1608;
   font:700 16px/1 system-ui,sans-serif; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;

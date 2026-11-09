@@ -15,8 +15,14 @@
 <link rel="stylesheet" href="world.css">
 <link rel="stylesheet" href="/brand/chrome.css">
 <link rel="stylesheet" href="/brand/brown.css">
+<!-- The panel system loads FIRST so every panel stylesheet overrides a named token instead of
+     inventing a number. Measured before this: one panel used six radii and three sub-13px sizes. -->
+<link rel="stylesheet" href="/panels/system.css">
+<!-- The shop shell loads after the per-shop stylesheets so one box, one header and one action
+     row win over the nine shells that grew one shop at a time. -->
 <link rel="stylesheet" href="/panels/panels.css">
 <link rel="stylesheet" href="/panels/hall.css">
+<link rel="stylesheet" href="/panels/shop-shell.css">
 <link rel="stylesheet" href="/shops/payouts/payouts.css">
 <style>
 html,body{margin:0;background:#17130f;color:#f3ead8}
@@ -43,7 +49,7 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
 
 <header id="brand" class="hud">
   <img class="mark" src="/brand/mark.svg" alt="" width="26" height="26">
-  <div><b>Nearcarta</b><small>independent, not affiliated with NEAR Foundation</small></div>
+  <div><b>Nearcarta</b></div>
 </header>
 <nav class="all-shops" aria-label="All shops" data-testid="all-shops">
   <details>

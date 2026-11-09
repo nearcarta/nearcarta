@@ -1,0 +1,702 @@
+/* One shop panel, nine shops.
+   ---------------------------------------------------------------------------------------------
+   The nine shops were built one at a time, so each grew its own shell. Measured in the city at
+   1440x900 they were 400, 440 and 460px wide, 501 to 786px tall, with radii of 16 and 18, and
+   seven of the nine hid their own header (`display:none!important`) because the form was stacked
+   under it and the panel ran off the screen. Walk from the Ferry to the Bank and it reads as nine
+   products.
+
+   This file gives them one shell, so the shops feel like rooms in one building:
+
+     ┌──────────────────────────────────┐
+     │ [icon]  Shop name          mainnet│   header: which shop you are in
+     │         one line of purpose       │
+     ├──────────────────────────────────┤
+     │ ( Swap )( Routes )( Rules )       │   tabs: one segmented look
+     ├──────────────────────────────────┤
+     │  the shop's own form              │   scrolls, with a visible bar
+     │                                   │
+     ├──────────────────────────────────┤
+     │ [        the one action        ]  │   pinned: never scrolls away
+     │  quiet links                      │
+     └──────────────────────────────────┘
+
+   Presentation only. No handler, no data read and no API call changes here: the markup is the
+   one the shops already render, and the per-shop CSS still owns each form's insides. What this
+   file fixes is the shell around them, plus the three things that were actually broken:
+   varying width, varying radius, and a hidden header that left the visitor without a shop name.
+
+   Palette stays the project's dark brown and gold; each shop only shifts its accent. */
+
+/* ---- the box ---------------------------------------------------------------------------- */
+/* One width for every shop, so the panel does not jump when you walk between doors.
+   480px rather than 420: measured at 1440x900 six of the nine shops needed more height than the
+   space under the menu (Arena 801px of content in 605px), so the form scrolled. The reference
+   cards are wider than they are tall and the extra 60px lets the two-column field pairs breathe,
+   which is what removes most of the overflow. The panel is also anchored to the top of its slot
+   and allowed to use the whole of it, instead of being pinned to the bottom of the viewport. */
+#shopUI #tray {
+  left: var(--s3);
+  bottom: var(--s3);
+  /* From the menu's real bottom. 116 used to be right because the brand carried a second line;
+     with that line gone the menu starts at 74, so the constant wasted 42px that the form needed. */
+  top: calc(var(--railTop, 74px) + var(--rail, 58px) + 12px) !important;
+  width: min(480px, calc(100vw - 24px)) !important;
+  max-width: 480px !important;
+  max-height: none !important;
+  /* Fill the slot between the menu and the viewport floor. Measured before this: Arena needed
+     801px of content, the tray was 696px tall because `height:auto` shrink-wrapped it against
+     both `top` and `bottom`, and the form got 583px — so it scrolled. Taking the slot height
+     gives the scroll region whatever is left, which on a 900px screen is 640px of form instead
+     of 583. Shops whose content is shorter end at their content because the inner column is a
+     flex box that does not stretch its own children. */
+  height: calc(100dvh - (var(--railTop, 74px) + var(--rail, 58px) + 12px) - var(--s3));
+  min-height: 0;
+  padding: 0 !important;
+  gap: 0;
+  border: 1px solid rgba(214, 180, 106, .26);
+  border-radius: var(--r-card) !important;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(214, 180, 106, .09) 0%, rgba(214, 180, 106, 0) 62%),
+    linear-gradient(180deg, #241d17 0%, #1b1510 100%);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .5), 0 1px 0 rgba(245, 208, 138, .08) inset;
+  overflow: hidden;
+  animation: shup .24s var(--ease);
+}
+
+/* ---- the header: every shop shows its name ---------------------------------------------- */
+/* Seven shops used to hide this because the form beneath it overflowed the panel. With the box
+   capped to the viewport and the form scrolling, the header fits, and a visitor who walks into a
+   room can see which room it is. The icon is the shop's own 3D asset, already rendered by the
+   title; no new asset, no new text.
+   Kept deliberately short: 48px of header plus a 20px purpose line is 68px, and every pixel here
+   is a pixel the form loses. The reference cards use one compact block, not a tall masthead. */
+body #shopUI #tray > .t-scroll > .t-head {
+  display: flex !important;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 !important;
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid rgba(243, 234, 216, .06);
+}
+body #shopUI #tray > .t-scroll > .t-head #t-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font: 600 var(--t-h)/var(--lh-tight) Fraunces, Georgia, serif;
+  letter-spacing: -.005em;
+  color: #fff8ee;
+}
+body #shopUI #tray > .t-scroll > .t-head #t-title .i3 {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+/* The one-line purpose. 13px so a long shop sentence still fits on two lines without pushing the
+   form down; it sits under the name, never beside it. */
+body #shopUI #tray > .t-scroll > .t-label {
+  display: block !important;
+  margin: 0 !important;
+  padding: 2px var(--sp-4) var(--sp-2);
+  color: var(--ink-3);
+  font: 500 var(--t-small)/1.4 Inter, system-ui, sans-serif;
+  border-bottom: 1px solid rgba(243, 234, 216, .06);
+  /* One line only. The purpose sentence is a subtitle, not a paragraph: a long shop sentence
+     wrapping to three lines cost 24px that the form needed. */
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+body #shopUI #tray > .t-scroll > .t-label:empty { display: none !important; }
+/* The session line ("you are signed in as …"), when a shop sets one. */
+body #shopUI #tray > .t-scroll > #t-who {
+  display: block !important;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4);
+  color: var(--ink-3);
+  font: 500 var(--t-small)/1.4 Inter, system-ui, sans-serif;
+  border-bottom: 1px solid rgba(243, 234, 216, .05);
+}
+/* The track chip ("DeFi", "Privacy") is navigation, not a field: keep it quiet. */
+body #shopUI #tray > .t-scroll > #t-track {
+  display: block !important;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4) 0;
+  color: var(--brass);
+  font: 600 var(--t-small)/1.3 Inter, system-ui, sans-serif;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* ---- the scroll region ------------------------------------------------------------------ */
+/* The form scrolls; the action does not. A visible gold bar is the only honest way to say
+   "there is more below" without adding a control. */
+#shopUI #tray > .t-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #c98f4e #24180f;
+  padding: 0 0 var(--sp-2);
+  border-radius: 0;
+}
+/* A soft cut at the bottom edge, so content reads as continuing rather than clipped. */
+#shopUI #tray > .t-scroll[data-more='1'] {
+  box-shadow: inset 0 -20px 16px -16px rgba(20, 15, 11, .9);
+}
+#shopUI #tray > .t-scroll::-webkit-scrollbar { width: 8px; }
+#shopUI #tray > .t-scroll::-webkit-scrollbar-track { background: transparent; }
+#shopUI #tray > .t-scroll::-webkit-scrollbar-thumb {
+  background: rgba(201, 143, 78, .55);
+  border-radius: var(--r-pill);
+}
+#shopUI #tray > .t-scroll::-webkit-scrollbar-thumb:hover { background: var(--brass-hi); }
+
+/* The token-flow strip. It is real information in Ferry (wNEAR -> USDC, with the chain badge on
+   each side) but it is decoration in Arena and House, where both ends are the same token. At
+   48px icons plus 16px padding it cost 82px of a 619px form region, which is what pushed Arena's
+   gold action below the fold. Same picture, one compact row: 30px icons, 8px padding, one line. */
+#shopUI #tray .ferry-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-control);
+  background: rgba(0, 0, 0, .22);
+  border: 1px solid rgba(214, 180, 106, .26);
+  min-height: 0;
+}
+#shopUI #tray .ferry-flow .tic .ti { width: 30px !important; height: 30px !important; }
+/* The chain badge is a small circle over the token icon. Its inner mark is 22px inside a 14px
+   box on purpose: `object-fit: cover` crops it to a clean disc, which is what the badge should
+   look like. A clipping audit reports that as "22px of content in a 14px box", so it is noted
+   here rather than "fixed" — shrinking the inner mark would blur it, and enlarging the badge
+   would cover the token it sits on. */
+#shopUI #tray .ferry-flow .tic .ci {
+  width: 14px !important; height: 14px !important;
+  overflow: hidden;
+}
+#shopUI #tray .ferry-flow-arrow { font-size: var(--t-label); color: var(--ink-3); }
+/* A caption under the strip ("Entry -> Pot") is one short line, not a paragraph. */
+#shopUI #tray .arena-flow-caption,
+#shopUI #tray .ferry-flow-caption {
+  margin: 0;
+  color: var(--ink-3);
+  font: 500 var(--t-small)/1.3 Inter, system-ui, sans-serif;
+}
+
+/* Two fields side by side, like the reference cards. Five full-width fields at 68px each is 340px
+   of a 571px region on Ferry, which is why the swap form scrolled. A pair halves that. The
+   selector list covers the wrappers the shops already render; a shop that has one field keeps one
+   column because `:only-child` is excluded. */
+#shopUI #tray .ferry-picker,
+#shopUI #tray .guard-pane[data-pane='check'],
+#shopUI #tray .payout-invoice-pane,
+#shopUI #tray .ferry-pane[data-pane='invoice'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--sp-3);
+  align-items: start;
+}
+#shopUI #tray .ferry-picker > .ferry-flow,
+#shopUI #tray .ferry-picker > .f-quote,
+#shopUI #tray .ferry-picker > .ferry-field:only-child,
+#shopUI #tray .guard-pane[data-pane='check'] > .guard-status,
+#shopUI #tray .guard-pane[data-pane='check'] > .example-row,
+#shopUI #tray .payout-invoice-pane > .payout-status,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .ferry-flow,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .p-create,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .payout-status,
+#shopUI #tray .ferry-pane[data-pane='invoice'] > [class*='card'],
+#shopUI #tray .ferry-pane[data-pane='invoice'] > .note {
+  grid-column: 1 / -1;
+}
+@media (max-width: 359px) {
+  #shopUI #tray .ferry-picker,
+  #shopUI #tray .guard-pane[data-pane='check'],
+  #shopUI #tray .payout-invoice-pane,
+  #shopUI #tray .ferry-pane[data-pane='invoice'] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Arena's strip is NEAR -> NEAR with a caption, so it says nothing a form field does not. It cost
+   65px of a 619px region. Hidden in Arena only; Ferry's strip carries the real token pair. */
+body.arena-tray #shopUI #tray .ferry-pane .ferry-flow,
+body.arena-tray #shopUI #tray .ferry-pane .arena-flow-caption {
+  display: none !important;
+}
+
+/* The mode row (Mint / Feed / Withdraw) is navigation inside the form: one compact line. */
+body.arena-tray #shopUI #tray .arena-modes {
+  margin: 0;
+  gap: var(--sp-2);
+}
+body.arena-tray #shopUI #tray .arena-mode {
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+}
+
+/* Chronicle's filter grid: six fields. Account and Words are the two the visitor types into, so
+   they sit side by side on the first row and the four selects pair up under them: three rows of
+   68px rather than five. The old grid spanned Account and Words across the full width, which is
+   136px of the 332px the form had for everything else. Both are ordinary text inputs at 212px,
+   which still shows a full `name.near` and the words field is a filter, not prose. */
+#shopUI #tray .c-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--sp-3);
+  align-items: start;
+}
+#shopUI #tray .c-filters > .chronicle-field.wide { grid-column: 1 / -1; }
+@media (max-width: 359px) {
+  #shopUI #tray .c-filters { grid-template-columns: minmax(0, 1fr); }
+}
+/* A scroller inside a scroller is two scrollbars for one panel, and the inner one was 326px of a
+   588px region. The tray's own scroll region is the only one. */
+#shopUI #tray .c-scroll {
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0 !important;
+}
+/* The statement and verify panes each stack four or five full-width fields under a 168px
+   textarea, which is 492px in a 475px region: the tab scrolled the moment you opened it. The
+   two account-shaped fields (Digest, Signature) are half-width values and pair up; the statement
+   textarea and the private note keep the full row because they hold prose. Same fields, same
+   handlers, two rows instead of four. */
+#shopUI #tray .chronicle-pane[data-pane='statement'],
+#shopUI #tray .chronicle-pane[data-pane='verify'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--sp-3);
+  align-items: start;
+}
+#shopUI #tray .chronicle-pane[data-pane='statement'] > .chronicle-field:first-child,
+#shopUI #tray .chronicle-pane[data-pane='statement'] > .chronicle-field:last-of-type,
+#shopUI #tray .chronicle-pane[data-pane='statement'] > .chronicle-check,
+#shopUI #tray .chronicle-pane[data-pane='verify'] > .c-bundle,
+#shopUI #tray .chronicle-pane[data-pane='verify'] > .chronicle-quiet,
+#shopUI #tray .chronicle-pane[data-pane='verify'] > .chronicle-field:first-of-type { grid-column: 1 / -1; }
+@media (max-width: 359px) {
+  #shopUI #tray .chronicle-pane[data-pane='statement'],
+  #shopUI #tray .chronicle-pane[data-pane='verify'] { grid-template-columns: minmax(0, 1fr); }
+}
+/* The statement is generated text the visitor reads and copies; it is not typed into. 168px was a
+   paragraph box, and on the statement tab it was the single reason the tab scrolled: measured 192
+   of a 406px pane in a 475px region. The field is resizable (resize:vertical), so a shorter
+   default costs no reach: the visitor can drag it taller. */
+#shopUI #tray .chronicle-pane[data-pane='statement'] #c-statement {
+  min-height: 132px;
+  height: 132px;
+}
+
+/* Chronicle's flow strip and tabs are one-line chrome. The marks live inside the meta row now
+   (see chronicle-style.js `.c-meta`), so the strip has no band of its own left to size. */
+#shopUI #tray .c-flow { min-height: 0; padding: 0; }
+#shopUI #tray .c-flow .tic .ti { width: 26px !important; height: 26px !important; }
+
+/* Hall: Task and Budget were two full-width fields above two already-paired rows, which made the
+   form four rows where three fit. Pairing them is 61px, which is exactly what it was over by. */
+#shopUI #tray .hall-pane[data-pane='post'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--sp-3);
+  align-items: start;
+}
+#shopUI #tray .hall-pane[data-pane='post'] > .hall-field:first-child {
+  grid-column: 1 / -1;
+}
+#shopUI #tray .hall-pane[data-pane='post'] > .hall-split { grid-column: 1 / -1; }
+@media (max-width: 359px) {
+  #shopUI #tray .hall-pane[data-pane='post'] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Hall's flow strip is the same decorative banner as Arena's (NEAR -> Parts -> Review). One
+   compact row instead of an 82px block, which is the 55px Hall was over by.
+   The icon rule used to name `.tic .ti`, which is Ferry's markup, not Hall's: Hall renders
+   `hall-flow-ico > svg` and kept its 48px icon, so the strip measured 66px rather than the 44
+   the rule was supposed to give it. Naming the real element is 22px of the 39px Hall was over
+   by at 1440x900. The strip is decorative (`aria-hidden`), so the icon is reduced, not removed. */
+#shopUI #tray .hall-flow {
+  min-height: 0;
+  padding: var(--sp-2) var(--sp-3);
+  gap: var(--sp-2);
+  border-radius: var(--r-control);
+}
+#shopUI #tray .hall-flow .hall-flow-ico,
+#shopUI #tray .hall-flow .hall-flow-ico svg { width: 26px !important; height: 26px !important; }
+#shopUI #tray .hall-flow .tic .ti { width: 26px !important; height: 26px !important; }
+#shopUI #tray .hall-flow-arrow { font-size: var(--t-label); }
+#shopUI #tray .hall-flow-step { font-size: var(--t-small); }
+/* The card is a stack of six rows. 18px between them was 30px more than the form could pay for
+   and three times the 10px the hall's own pane uses; 12 still overflowed by 7 once the rules link
+   took its 40px target, so the card now uses the same 10px rhythm as `.hall-pane` inside it. */
+#shopUI #tray .hall-card { gap: 10px; }
+
+/* The two metadata lines under the action. Sources was a 44px disclosure and Export CSV sat in
+   a second 44px row of its own; they are now one row (`.c-meta` in chronicle-view.js), so the
+   panel spends 44px instead of 88 on reference text and keeps both controls. */
+#shopUI #tray .c-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  font-size: var(--t-small);
+  line-height: 1.35;
+}
+#shopUI #tray .c-sources {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  font-size: var(--t-small);
+  line-height: 1.35;
+}
+/* The open disclosure's own body keeps the panel's rhythm instead of stacking on the summary. */
+#shopUI #tray .c-sources > .c-health,
+#shopUI #tray .c-sources > .c-cover-list,
+#shopUI #tray .c-sources > .c-totals,
+#shopUI #tray .c-sources > .c-rules { margin: 0 0 var(--sp-1); }
+#shopUI #tray .c-out { min-height: 0; }
+
+/* On a phone the flow strip goes. It is a decorative NEAR -> Parts -> Review banner, and at
+   390x844 the Hall form was 9px over its region: hiding the banner is 44px, keeps every control,
+   and nothing in it is information you cannot see in the fields below. Desktop keeps it. */
+@media (max-width: 720px) {
+  #shopUI #tray .hall-flow { display: none !important; }
+}
+
+/* ---- the form region -------------------------------------------------------------------- */
+/* The form region. `gap` is 10px rather than the 12px scale step: with a 690px slot, a 797px
+   form and a pinned action row, the difference between 12 and 10 across eight gaps is 16px, and
+   the reference cards are tighter than our old default. Field height drops from 48 to 44 in the
+   same spirit — still a comfortable target, 4px less per field. */
+body #shopUI #tray > .t-scroll > #t-form {
+  display: grid;
+  gap: 10px;
+  margin: 0 !important;
+  padding: var(--sp-2) var(--sp-4) 0 !important;
+  min-width: 0;
+  max-width: 100%;
+}
+/* The big number at the top of a shop (a quote, a cap) is a display value, not a heading. Kept
+   tight: 34px of type plus its margins is 60px of the panel, and the reference cards show the
+   number inline with the form rather than as a banner. */
+#shopUI #tray .hero {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-1) var(--sp-4) var(--sp-1);
+  font-size: 26px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+#shopUI #tray .hero .num { font-weight: 650; }
+#shopUI #tray .hero .unit { font-size: var(--t-label); color: var(--ink-3); font-weight: 500; }
+#shopUI #tray .hero .arrow { color: var(--ink-3); font-size: var(--t-h); }
+
+/* ---- tabs ------------------------------------------------------------------------------- */
+/* Every shop renders its tabs with its own class (ferry-tab, guard-tab, hall-tab, bank-tab,
+   chronicle-tab, house-tab, arena's ferry-tab), all inside a `[role=tablist]`. One rule gives
+   them all the segmented shape, so the nine rooms agree on what a tab looks like. */
+body #shopUI #tray [role='tablist'] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin: var(--sp-2) var(--sp-4) 0;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, .3);
+  border: 1px solid rgba(243, 234, 216, .07);
+}
+body #shopUI #tray [role='tablist'] > [role='tab'] {
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-3);
+  font: 600 var(--t-label)/1 Inter, system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+body #shopUI #tray [role='tablist'] > [role='tab']:hover { color: var(--ink); background: rgba(243, 234, 216, .06); }
+/* Selected, whichever way the shop marks it. */
+body #shopUI #tray [role='tablist'] > [role='tab'].on,
+body #shopUI #tray [role='tablist'] > [role='tab'][aria-selected='true'],
+body #shopUI #tray [role='tablist'] > [role='tab'][aria-pressed='true'] {
+  background: linear-gradient(180deg, #f4d493 0%, #d9ae63 100%);
+  color: #1a1410;
+  box-shadow: 0 1px 8px rgba(214, 180, 106, .24);
+}
+body #shopUI #tray [role='tablist'] > [role='tab']:focus-visible {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 2px;
+}
+
+/* ---- fields ----------------------------------------------------------------------------- */
+/* A field is label above, control below, 8px apart. The panel's own CSS still styles the
+   control; this only sets the rhythm and the frame, so forms stop having their own spacing.
+   The single column must be `minmax(0,1fr)`: left as `auto` it sizes to the input's intrinsic
+   width (measured 318px inside a 183px half-column on Arena), and the control then paints
+   outside the panel with the row clipped. */
+#shopUI #tray label,
+#shopUI #tray .ferry-field,
+#shopUI #tray .guard-field,
+#shopUI #tray .hall-field,
+#shopUI #tray .payout-field,
+#shopUI #tray .house-field,
+#shopUI #tray .bank-field,
+#shopUI #tray .arena-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  min-width: 0;
+}
+#shopUI #tray label > span,
+#shopUI #tray .ferry-field > span,
+#shopUI #tray .guard-field > span,
+#shopUI #tray .hall-field > span,
+#shopUI #tray .payout-field > span {
+  color: var(--ink-2);
+  font: 600 var(--t-label)/1.3 Inter, system-ui, sans-serif;
+}
+/* One focus ring for every control in every shop. The brown-and-gold ring is the same one the
+   console uses, so a focused field looks the same in the city as on a standalone page. */
+#shopUI #tray input:not([type='checkbox']):not([type='radio']):focus-visible,
+#shopUI #tray select:focus-visible,
+#shopUI #tray textarea:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 1px;
+}
+#shopUI #tray input:not([type='checkbox']):not([type='radio']),
+#shopUI #tray select,
+#shopUI #tray textarea { max-width: 100%; box-sizing: border-box; }
+#shopUI #tray textarea { min-height: 68px; resize: vertical; }
+/* 44px controls with 6px to their label: enough to hit, and the saved vertical space is what lets
+   a shop's whole form sit in the panel without a scrollbar. 48/8 measured 797px of content in a
+   690px slot on Arena. */
+#shopUI #tray input:not([type='checkbox']):not([type='radio']),
+#shopUI #tray select { min-height: 44px; }
+#shopUI #tray label,
+#shopUI #tray .ferry-field { gap: 6px; }
+
+/* A read-only field holding an account id or a hash. 64 characters cannot fit 360px, so the cut
+   has to be legible: ellipsis rather than a hard chop through the middle of the last glyph, and
+   the value stays selectable so it can be copied. Two ids in the selector because the generic
+   field rules in panels.css are id-heavy and set the family with a `font` shorthand. */
+#shopUI #tray input[readonly],
+#shopUI #tray #t-form input[readonly] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--t-label);
+  text-overflow: ellipsis;
+}
+#shopUI #tray input[readonly]:focus { text-overflow: clip; }
+
+/* Two fields side by side where the shop already groups them; one column when there is no room. */
+#shopUI #tray .hall-split,
+#shopUI #tray .guard-split,
+#shopUI #tray .payout-split,
+#shopUI #tray .bank-split,
+#shopUI #tray .house-split,
+#shopUI #tray .arena-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+  min-width: 0;
+}
+@media (max-width: 359px) {
+  #shopUI #tray .hall-split,
+  #shopUI #tray .guard-split,
+  #shopUI #tray .payout-split,
+  #shopUI #tray .bank-split,
+  #shopUI #tray .house-split,
+  #shopUI #tray .arena-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- the action row --------------------------------------------------------------------- */
+/* The one filled button, pinned outside the scroll region so it can never scroll away.
+   Eight of the nine shops hide `#t-act` because their primary action lives inside their own
+   pane. Left alone that produced an empty 21px band across the bottom of the panel — a dead
+   strip under the last field that reads as clipped content. So the row collapses when the
+   button is display:none, and the panel ends on its own content. */
+body #shopUI #tray > .t-row {
+  display: block;
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  border-top: 1px solid rgba(243, 234, 216, .07);
+  background: linear-gradient(180deg, rgba(0, 0, 0, .06), rgba(0, 0, 0, .22));
+}
+body #shopUI #tray > .t-row:not(:has(> #t-act:not([hidden]))) {
+  display: none;
+}
+body #shopUI #tray > .t-row > #t-act[hidden] { display: none !important; }
+body #shopUI #tray > .t-row > #t-act,
+body #shopUI #tray > .t-row > .act {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 46px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-pill);
+  border: 0;
+  background: linear-gradient(180deg, #f4d493 0%, #d8ac60 100%);
+  color: #1a1410;
+  font: 700 var(--t-body)/1.2 Inter, system-ui, sans-serif;
+  letter-spacing: .005em;
+  box-shadow: 0 4px 14px rgba(214, 180, 106, .22), 0 1px 0 rgba(255, 255, 255, .3) inset;
+  cursor: pointer;
+  transition: filter .15s ease, transform .1s ease, box-shadow .15s ease;
+}
+body #shopUI #tray > .t-row > #t-act:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 6px 20px rgba(214, 180, 106, .3), 0 1px 0 rgba(255, 255, 255, .3) inset;
+}
+body #shopUI #tray > .t-row > #t-act:active:not(:disabled) { transform: translateY(1px); }
+body #shopUI #tray > .t-row > #t-act:disabled { filter: grayscale(.45) brightness(.72); box-shadow: none; cursor: not-allowed; }
+body #shopUI #tray > .t-row > #t-act:focus-visible { outline: 2px solid #f4d493; outline-offset: 3px; }
+/* A result ("Refused", "Held") is a status, not a second call to action: no gradient. */
+body #shopUI #tray > .t-row > #t-act.res {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  box-shadow: none;
+  font-weight: 600;
+}
+body #shopUI #tray > .t-row > #t-act.res.ok { color: var(--ok); border-color: rgba(0, 236, 151, .4); }
+body #shopUI #tray > .t-row > #t-act.res.no { color: var(--no); border-color: rgba(255, 107, 107, .4); }
+
+/* ---- the quiet links under the action --------------------------------------------------- */
+body #shopUI #tray > .t-links {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-4);
+  padding: 0 var(--sp-4) var(--sp-3);
+}
+body #shopUI #tray > .t-links > .link {
+  /* The row is already 44px tall because "How it works" sits in it with a real target, so the
+     second link can meet the 40px floor for free: measured 98x24 beside a 44px sibling, which is
+     the same row and the same height. Costs no vertical space. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font: 500 var(--t-small)/1.5 Inter, system-ui, sans-serif;
+  text-decoration: none;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+body #shopUI #tray > .t-links > .link:hover {
+  color: var(--brass-hi);
+  text-decoration: underline;
+  text-decoration-color: var(--brass);
+}
+
+/* ---- the result line -------------------------------------------------------------------- */
+body #shopUI #tray > .rcpt {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--sp-4) var(--sp-3);
+  color: var(--ink-3);
+  font: 500 var(--t-small)/1.5 Inter, system-ui, sans-serif;
+}
+body #shopUI #tray > .rcpt:empty { display: none !important; }
+
+/* Inline links inside a shop's prose ("Sign in", "Personal rules", "/setup"). They are part of a
+   sentence, so a 44px block would break the paragraph. `inline-block` with vertical padding grows
+   the hit area without changing the line height around it, and the gold underline the rest of the
+   city uses keeps them reading as links rather than bold text. Measured before: two of these were
+   24 and 26px tall, which is under a comfortable thumb target. */
+#shopUI #tray #t-form a:not(.act):not(.link),
+#shopUI #tray .note a,
+#shopUI #tray p a {
+  color: var(--brass-hi);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(214, 180, 106, .55);
+  display: inline-block;
+  padding: 8px 0;
+  min-height: 36px;
+}
+#shopUI #tray #t-form a:not(.act):not(.link):hover,
+#shopUI #tray .note a:hover { text-decoration-color: var(--brass-hi); }
+
+/* ---- per-shop accent -------------------------------------------------------------------- */
+/* The nine shops share the brown-and-gold shell; the accent is the only thing that changes, and
+   it echoes what the room does. Kept to the icon, the tab selection and the focus ring, so the
+   palette stays the project's. */
+body.toll-tray      { --shop-accent: #e0b872; }  /* the bridge's brass       */
+body.ferry-tray     { --shop-accent: #7fc4d6; }  /* the jetty's water        */
+body.bank-tray      { --shop-accent: #b9c9a4; }  /* the vault's ledger green */
+body.guard-tray     { --shop-accent: #e3a2a2; }  /* the watch's shield red   */
+body.arena-tray     { --shop-accent: #c6a2e0; }  /* the arena's violet       */
+body.hall-tray      { --shop-accent: #e0c68f; }  /* the hall's civic gold    */
+body.payouts-tray   { --shop-accent: #9fd6b6; }  /* the ledger's mint        */
+body.house-tray     { --shop-accent: #d9b6a2; }  /* the hearth's clay        */
+body.chronicle-tray { --shop-accent: #a7b6d8; }  /* the record's indigo      */
+
+body #shopUI #tray .src {
+  color: var(--shop-accent, var(--ink-3));
+  border-color: color-mix(in srgb, var(--shop-accent, var(--ink-3)) 34%, transparent);
+}
+body #shopUI #tray #t-title .i3 { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35)); }
+
+/* ---- phone ------------------------------------------------------------------------------ */
+/* The same shell on a phone: full width minus a small gutter, header kept, action pinned. */
+@media (max-width: 720px) {
+  /* On a phone the brand block is hidden (`#brand small` and the wordmark both go), so the menu
+     does not need to clear it: at 390x844 the brand measured 0px tall while the menu still started
+     at 74px, wasting most of a field's height above the panel. The menu moves to the top gutter
+     and the panel takes the reclaimed 62px. */
+  body.in-shop nav.all-shops { top: 12px; }
+  #shopUI #tray {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 76px) !important;
+    top: calc(var(--railTop, 12px) + var(--rail, 58px) + 8px) !important;
+  }
+  /* A phone has no room to spare, so the form's own rhythm tightens: 8px between fields and 4px
+     between a label and its control, and the header loses a step of padding. Measured on Hall at
+     390x844 this is 44px of the 141px it was over by; the rest is the field count, which is what
+     a phone costs. */
+  body #shopUI #tray > .t-scroll > #t-form { gap: 8px; padding: var(--sp-2) var(--sp-3) 0 !important; }
+  body #shopUI #tray .ferry-field,
+  body #shopUI #tray label { gap: 4px; }
+  body #shopUI #tray > .t-scroll > .t-head { padding: var(--sp-2) var(--sp-3) !important; }
+  body #shopUI #tray > .t-scroll > #t-track { padding: var(--sp-1) var(--sp-3) 0; }
+  body #shopUI #tray [role='tablist'] { margin: var(--sp-2) var(--sp-3) 0; }
+  body #shopUI #tray > .t-row { padding: var(--sp-2) var(--sp-3); }
+  body #shopUI #tray > .t-links { padding: 0 var(--sp-3) var(--sp-2); }
+  body #shopUI #tray > .rcpt { padding: 0 var(--sp-3) var(--sp-3); }
+  body #shopUI #tray > .t-row > #t-act { min-height: 48px; }
+}
+
+/* Short screens: keep the header and the action, let the form take the squeeze. */
+@media (max-height: 620px) {
+  body #shopUI #tray > .t-scroll > .t-head { padding-top: var(--sp-2); padding-bottom: var(--sp-1); }
+  body #shopUI #tray > .t-scroll > .t-label { display: none !important; }
+  body #shopUI #tray .hero { font-size: 26px; margin: var(--sp-1) var(--sp-3); }
+}

@@ -526,3 +526,35 @@ test('invoice: the list is per visitor and names Unpaid, Paid, or Expired', () =
   assert.equal(again.replayed, true);
   assert.equal(listInvoices('guest-2', { store: book, now }).invoices.length, 1);
 });
+
+// A freelancer invoice needs line items before a normal company can use it. The total is SUMMED
+// from the lines, so a bill can never show work that does not add up to the amount charged — and
+// an `usd` passed next to items cannot override them.
+test('an invoice with line items sums them and ignores a conflicting total', () => {
+  const inv = canonicalInvoice({ receive: 'alice.near', usd: 999, items: [
+    { label: 'Article', qty: 2, usd: 0.15 },
+    { label: 'Edit pass', qty: 1, usd: 0.05 },
+  ] });
+  assert.equal(inv.ok, true);
+  assert.equal(inv.value.usd, 0.35, 'the lines decide the total');
+  assert.equal(inv.value.items.length, 2);
+  assert.equal(inv.value.items[0].usd, 0.3, 'qty multiplies the unit price');
+  assert.deepEqual(inv.value.items[1], { label: 'Edit pass', qty: 1, usd: 0.05, each: 0.05 });
+});
+
+test('items that cannot be read fall back to the single amount, and never silently to zero', () => {
+  const kept = canonicalInvoice({ receive: 'alice.near', usd: 0.2, items: [{ label: '', usd: 5 }] });
+  assert.equal(kept.value.usd, 0.2, 'a line with no label is dropped, so the amount stands');
+  assert.deepEqual(kept.value.items, []);
+  const none = canonicalInvoice({ receive: 'alice.near', items: [{ label: '', usd: 5 }] });
+  assert.equal(none.ok, false, 'no readable line and no amount is refused, not billed at 0');
+  assert.equal(none.reason, 'bad_usd');
+});
+
+test('two invoices with the same total but different work are different bills', () => {
+  const a = canonicalInvoice({ receive: 'alice.near', items: [{ label: 'Article', qty: 1, usd: 1 }] });
+  const b = canonicalInvoice({ receive: 'alice.near', items: [{ label: 'Illustration', qty: 1, usd: 1 }] });
+  assert.notEqual(invoiceRecordId(a.value), invoiceRecordId(b.value));
+  const again = canonicalInvoice({ receive: 'alice.near', items: [{ label: 'Article', qty: 1, usd: 1 }] });
+  assert.equal(invoiceRecordId(a.value), invoiceRecordId(again.value), 'the same bill is still idempotent');
+});

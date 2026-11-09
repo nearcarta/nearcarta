@@ -69,7 +69,7 @@ export function resetInvoices(store = MEMORY) {
 
 export function invoiceInput(b) {
   if (!b || typeof b !== 'object') return { error: 'body must be a JSON object' };
-  const canon = canonicalInvoice({ usd: b.usd ?? b.amount, receive: b.receive || b.recipient, memo: b.memo, due: b.due, expiry: b.expiry });
+  const canon = canonicalInvoice({ usd: b.usd ?? b.amount, receive: b.receive || b.recipient, memo: b.memo, due: b.due, expiry: b.expiry, items: b.items });
   if (!canon.ok) return { error: canon.reason };
   return { ok: true, value: canon.value };
 }

@@ -30,13 +30,13 @@ export function ensureHouseDock(doc) {
   d.innerHTML = `<div id="house-agent-pop" class="house-agent-pop" data-testid="house-agent" hidden>
       <p id="h-agent-log" class="house-agent-log" data-testid="house-agent-log" hidden></p>
       <div class="house-agent-row">
-        <input id="h-agent" data-testid="house-agent-input" placeholder="I'm alive, or send from the house" autocomplete="off" aria-label="Ask the AI Agent">
+        <input id="h-agent" data-testid="house-agent-input" placeholder="I'm alive, or send from the house" autocomplete="off" aria-label="Ask the shop commands">
         <button type="button" class="house-agent-send" id="h-agent-go" data-testid="house-agent-go" aria-label="Send">➤</button>
       </div>
     </div>
-    <button type="button" class="house-agent-char" data-testid="house-agent-toggle" aria-expanded="false" aria-controls="house-agent-pop" title="AI Agent">
+    <button type="button" class="house-agent-char" data-testid="house-agent-toggle" aria-expanded="false" aria-controls="house-agent-pop" title="Shop commands">
       <img class="house-agent-avatar" src="/setup/chars/robotexpressive.webp" width="72" height="72" alt="" decoding="async">
-      <span class="house-agent-name">AI Agent</span>
+      <span class="house-agent-name">Commands</span>
     </button>`;
   (doc.getElementById('shopUI') || doc.body).appendChild(d);
   const toggle = d.querySelector('[data-testid=house-agent-toggle]');

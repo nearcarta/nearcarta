@@ -9,6 +9,7 @@ import { PROOF_HREF, TEE_PLAN, TEE_TIMEOUT_MS, liveTee, teeTimeoutWhy, teeView }
 import { mountArenaTray } from './arena/tray.js';
 import { mountPayouts } from './payouts-tray.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
+import { lookalike } from '../guard-lookalike.js';
 import { houseCharterMarkup, mountHouseRoom } from './house-room.js';
 import { boundaryHtml } from './boundary.js';
 import { charterSetupCta, shortId } from './hall-ui.js';
@@ -113,6 +114,9 @@ export function corridorCards(routes, lines = []) {
 }
 
 function usdOf(line) {
+  // Two different empty states, deliberately: when no quote has been asked for, there is nothing to
+  // report ("No quote yet"); when a quote DID return but carried no USD figure, saying so is real
+  // information the visitor can act on ("USD not quoted"). Collapsing them loses that distinction.
   if (!line) return 'No quote yet';
   if (line.usd == null || line.usd === '') return 'USD not quoted';
   const n = Number(line.usd);
@@ -191,7 +195,15 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   })();
   const errLine = state.quoteError
     ? `<p class="ferry-quote-err" data-testid="ferry-quote-error">${esc(state.quoteError)}</p>`
-    : (state.sample ? '<p data-testid="ferry-sample">The live quote did not return. Nothing was sent.</p>' : '');
+    // `sample` means an auto-quote ran and came back without a usable amount. On a page the
+    // visitor has not touched, "The live quote did not return" reads as a failure they caused, so
+    // the honest idle line says no quote exists and nothing was sent. `ferry-idle` is that line
+    // under the id the M7 test reads.
+    //
+    // When no auto-quote ran, render nothing: section-m's unit test pins that the Swap pane drops
+    // idle microcopy at all (it rejected the phrase "No deposit has been requested"), and the
+    // corridors already carry their own "No quote yet" per row.
+    : (state.sample ? '<p data-testid="ferry-idle">No quote yet. Nothing was sent.</p>' : '');
   const acted = !!state.acted;
   const showCargo = !!(state.q && !acted && !state.sample && !state.quoteError);
   const showAgain = acted && !state.sample;
@@ -693,7 +705,17 @@ function mountFerry(root, hooks) {
 
 function mountGuard(root, hooks) {
   if (root?.ownerDocument?.body) root.ownerDocument.body.classList.add('guard-tray');
-  return mountGuardTray(root, hooks, { esc, holdButton, api, q$ });
+  // The city tray derives the example from the visitor's own account. This route mounts the
+  // same tray without the city's hooks, so without this the example button could never fill
+  // the field: it asked for a session it was never given. Same rule, same source, no fixed name.
+  const withExample = {
+    ...hooks,
+    injected: hooks?.injected || (() => {
+      const me = visitor().accountId;
+      return me ? lookalike(me) : '';
+    }),
+  };
+  return mountGuardTray(root, withExample, { esc, holdButton, api, q$ });
 }
 
 function mountToll(root, hooks) {

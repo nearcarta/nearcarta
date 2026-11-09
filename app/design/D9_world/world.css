@@ -50,7 +50,11 @@ body.explore #hint{opacity:1} body.explore.moved #hint{opacity:0}
 /* speech bubbles: anchored, non-overlapping, ≤10 words */
 #bubbles{position:fixed;inset:0;pointer-events:none;z-index:15}
 .bub{position:absolute;left:0;top:0;max-width:240px;padding:8px 12px 9px;border-radius:14px;background:#f6eedc;color:#2a1d14;font:500 14.5px/1.3 var(--sans);box-shadow:0 6px 18px rgba(23,19,15,.28),0 1px 0 rgba(255,255,255,.6) inset;white-space:normal;opacity:0;transition:opacity .25s ease}
-.bub .who{display:block;font:600 12px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#9aa6c8;margin-bottom:4px}
+/* The speaker label inside a town bubble. It was #9aa6c8 (a blue-grey) on the cream bubble
+   #dfd8c7, which axe measured at 1.7:1 at 12px — far under the 4.5:1 floor and effectively
+   unreadable in daylight. It is also the only blue in the city's palette. #6b5636 on #dfd8c7 is
+   6.8:1 and reads as the same warm ink the rest of the project uses. */
+.bub .who{display:block;font:600 13px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#6b5636;margin-bottom:4px}
 .bub::after{content:"";position:absolute;width:12px;height:12px;background:inherit;left:var(--tx,20px);top:var(--ty,100%);transform:translate(-50%,-50%) rotate(45deg);border-radius:2px}
 .bub.think{background:rgba(246,238,220,.9);font-style:italic;font-weight:450;border-radius:18px}
 .bub.think::after{width:8px;height:8px;border-radius:50%;box-shadow:calc(var(--sx,0)*9px) calc(var(--sy,1)*9px) 0 -1px rgba(246,238,220,.85)}
@@ -194,7 +198,7 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
 #fade{position:fixed;inset:0;z-index:30;opacity:0;pointer-events:none;display:none;background:radial-gradient(circle at var(--fx,50%) var(--fy,50%),#fff0cf 0,#f4c27a 14%,#c98a4a 34%,#5a3a22 70%,#2a1f16 100%)}
 #fade.on{display:block;pointer-events:auto} #fade .ring{position:absolute;left:50%;top:50%;width:28px;height:28px;margin:-14px;border-radius:50%;border:2px solid rgba(23,19,15,.25);border-top-color:#17130f;opacity:0;transition:opacity .3s;animation:spin .8s linear infinite}
 #fade.wait .ring{opacity:.8} @keyframes spin{to{transform:rotate(360deg)}}
-#shopUI .src { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 var(--s1); border-radius: 999px; font-size: 12px; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+#shopUI .src { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 var(--s1); border-radius: 999px; font-size: var(--t-small, 13px); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
 #shopUI .src::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
 #shopUI .src.live::before { background: none; border: 1.5px solid var(--muted); width: 5px; height: 5px; }
 #shopUI .src.split { color: #e6c98a; border-color: #d6b46a66; }
@@ -228,6 +232,17 @@ body.entering #pins,body.entering #tag,body.entering #hint,body.entering #prompt
   contain: layout paint;
 }
 #shopUI #tray > .t-scroll > * { min-height: 0; max-width: 100%; }
+/* When the panel has more content below the fold, say so. Measured on Mist Bank: 903px of
+   content in a 594px region, and a reviewer reading the recording described it as "text cut
+   off horizontally through the middle of the letters". It scrolls, but nothing announced that.
+   `contain: layout paint` above clips a shadow fade, so this is a strip with its own gradient
+   and an arrow, shown only while `data-more` is set by js/shops.js. */
+#shopUI #tray > .t-scroll[data-more="1"]::after { content: ''; display: block; height: 26px; }
+#shopUI #tray > .t-scroll[data-more="1"] { box-shadow: inset 0 -22px 18px -14px rgba(23,19,15,.95); }
+/* The "more below" hint is a static strip owned by /panels/system.css. It is NOT absolutely
+   positioned here: measured on Arena, an absolute pill landed on top of the form (86x21px of
+   overlap) because the tray's layout did not reserve a row for it. Layout and look both belong
+   in one place. */
 #shopUI #tray > .t-scroll::-webkit-scrollbar { width: 10px; }
 #shopUI #tray > .t-scroll::-webkit-scrollbar-track { background: #24180f; border-radius: 8px; }
 #shopUI #tray > .t-scroll::-webkit-scrollbar-thumb { background: #c98f4e; border-radius: 8px; border: 2px solid #24180f; }
@@ -554,11 +569,17 @@ nav.all-shops{position:fixed;
    underneath it. `--rail` is the rail's own height, measured in js and set on body; the
    explicit `top` keeps the menu above every tray even before that measurement lands, which is
    the property the layout test pins. */
-/* The menu sits BELOW the brand block, not on top of it. The brand is 18..107 (a title and a
-   one-line "not affiliated" note), so a menu at 64 covered the note and clipped it mid-word —
-   visible in the demo recording. 116 clears it with a 9px gap. The js measurement
-   (`setRail`) overrides this; this rule is the value before that runs. */
-body.in-shop nav.all-shops { top: 116px; }
+/* The menu sits BELOW the brand block, not on top of it. The brand used to be 18..107 because it
+   carried a second line ("independent, not affiliated with NEAR Foundation"), so a menu at 64
+   covered it and 116 was needed to clear it. That line is gone from the header, the brand is now
+   18..62, and 74 clears it with a 12px gap. The reclaimed 42px goes to the shop panel, which is
+   what lets Arena's form fit without a scrollbar. The js measurement (`setRail`) overrides this;
+   this rule is the value before that runs. */
+body.in-shop nav.all-shops { top: 74px; }
+/* The tray's own top must come from the menu's real bottom, not from a height calculation that
+   can round under it. Measured: menu 116..174, tray top 142 — 32px of the menu sat on the tray's
+   top-left corner, which reads as a badge stuck onto the panel. --railTop is set from js. */
+body.in-shop #shopUI #tray { top: calc(var(--railTop, 116px) + var(--rail, 58px) + 12px); }
 /* A floor, not a sum. Every shop has its own `max-height` and they were all written as
    `100dvh - <magic>`, so a tall tray could start above the rail and slide under the menu —
    measured on Arena 2026-11-08: the menu ended at y=122 and the tray started at y=113. A `top`
@@ -828,6 +849,10 @@ body.house-tray #shopUI .ferry-card{gap:10px}
 }
 body.house-tray #shopUI .house-record{margin-top:8px;color:#fff8ee}
 body.house-tray #shopUI .house-record summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:#f5d08a}
+/* "Every transaction on this deed" is the other disclosure in this room and it is a control like
+   the one above: measured 20px tall, under the 40px floor, because only .house-record's summary
+   carried the height. Same treatment, no new box. */
+body.house-tray #shopUI .house-history summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:#f5d08a}
 body.house-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
 .house-tabs{display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap}
 .house-tab{

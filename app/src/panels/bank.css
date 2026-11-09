@@ -1,10 +1,12 @@
 /* Mist Bank city tray. Same shape as the approved Ferry card: top tabs, one gold button. */
 body.bank-tray #shopUI #tray{
-  width:min(400px,calc(100vw - 28px)) !important;
-  max-width:400px !important;
   left:16px; right:auto !important; top:auto; bottom:18px;
-  height:min(640px,calc(100dvh - 120px));
-  max-height:min(640px,calc(100dvh - 120px));
+  /* Bank is anchored to the bottom and grows UPWARD, so a tall panel reached into the shop menu:
+     measured 116..174 for the menu and a tray top of 142, a 32px overlap that reads as a badge
+     stuck on the panel's corner. The height is capped by the room actually left under the menu
+     (its bottom plus the 12px gap), not by a fixed 640 or a viewport guess. */
+  height:min(640px, calc(100dvh - (var(--railTop, 116px) + var(--rail, 58px) + 12px) - 18px));
+  max-height:min(640px, calc(100dvh - (var(--railTop, 116px) + var(--rail, 58px) + 12px) - 18px));
   padding:12px 14px 14px;
   box-sizing:border-box;
   overflow:hidden;
@@ -12,7 +14,11 @@ body.bank-tray #shopUI #tray{
   flex-direction:column;
   background:#241c14;
   border:1px solid #6b5430;
-  border-radius:22px;
+  /* A panel is a rounded rectangle, never a stadium. This was 22px, then a blanket radius
+     mapping sent it to the pill token — 999px on a 400px box clamps to a 200px corner, and with
+     overflow:hidden the curve then cut the panel's own header, its footer text and the gold CTA.
+     That single line is most of what "everything is cut off" meant. */
+  border-radius:var(--r-card);
   box-shadow:0 16px 40px rgba(0,0,0,.45);
   backdrop-filter:none; -webkit-backdrop-filter:none;
   color:#f3e6cf;
@@ -38,21 +44,21 @@ body.bank-tray #shopUI #t-act[hidden]{display:none!important}
 body.bank-tray #shopUI .t-row{max-width:100%;min-width:0;justify-content:center}
 body[data-shop=bank] #room{padding-bottom:120px}
 
-.bank-card{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0;flex:1 1 auto;color:#f3e6cf;font:500 15px/1.35 system-ui,sans-serif}
+.bank-card{display:flex;flex-direction:column;gap:var(--sp-3);min-width:0;min-height:0;flex:1 1 auto;color:#f3e6cf;font:500 var(--t-body)/var(--lh-body) system-ui,sans-serif}
 .bank-session{margin:0;color:#e6d3b0;font:600 14px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
 .bank-tabs{
   display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;
-  padding:5px;border-radius:14px;background:#17130f;border:1px solid #4a3a28;
+  padding:5px;border-radius:var(--r-panel);background:#17130f;border:1px solid #4a3a28;
 }
 .bank-tab{
-  min-height:44px;min-width:0;padding:0 8px;border-radius:11px;cursor:pointer;
+  min-height:44px;min-width:0;padding:0 8px;border-radius:var(--r-control);cursor:pointer;
   background:transparent;color:#d4c4a8;border:0;
   font:700 14px/1 system-ui,sans-serif;
 }
 /* #shopUI #t-form button:not(.primary) paints every control brass. These two beat it. */
 body.bank-tray #shopUI #t-form button.bank-tab{
   appearance:none;-webkit-appearance:none;
-  width:auto;min-height:44px;padding:0 8px;border:0;border-radius:11px;
+  width:auto;min-height:44px;padding:0 8px;border:0;border-radius:var(--r-control);
   background:#17130f!important;background-image:none!important;box-shadow:none!important;animation:none;
   color:#d4c4a8!important;border:0!important;font:700 14px/1 system-ui,sans-serif;
 }
@@ -74,13 +80,28 @@ body.bank-tray #shopUI #t-form button.bank-again{
   font:700 14px/1.3 system-ui,sans-serif;
 }
 .bank-card .shop-card{
-  margin:0;padding:8px;background:#1c1612;border-radius:16px;min-width:0;min-height:0;
+  margin:0;padding:8px;background:#1c1612;border-radius:var(--r-card);min-width:0;min-height:0;
   flex:1 1 auto;overflow:hidden;display:flex;flex-direction:column;
 }
 .bank-format{margin:0;color:#e6d3b0;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
 .bank-sample-link{align-self:flex-start;padding:10px 4px;min-height:44px;margin:-10px 0;border:0;background:transparent;color:#f5d08a;font:700 14px/1.3 system-ui,sans-serif;text-decoration:underline;cursor:pointer}
-.bank-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:start}
+/* One column, not two. A native <input type=file> renders its own filename text and cannot
+   shrink: in a half-width 190px column it displayed "N...n", which a reviewer read as text cut
+   off by the layout. Measured 2026-11-09: the input was 157px wide inside a 400px tray.
+   Stacking gives the file control the full width and the paste box the room it needs. */
+.bank-split{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-3);align-items:start}
 .bank-split > div{min-width:0}
+/* The label was touching its control (measured 0.25px gap), so a labelled field read as one
+   blob. 8px above the control, on the scale. */
+.bank-split label{display:block;margin-bottom:var(--sp-2)}
+.bank-split > div > * + *{margin-top:var(--sp-2)}
+.bank-split #bank-file{width:100%;max-width:100%;min-height:var(--field-h);box-sizing:border-box;
+  font-size:var(--t-label);color:var(--ink-2)}
+.bank-split #bank-file::file-selector-button{min-height:40px;margin-right:var(--sp-3);
+  border-radius:var(--r-control);border:1px solid var(--line-strong);
+  background:var(--ground-2);color:var(--ink);font:600 var(--t-label)/1 system-ui,sans-serif;
+  padding:0 var(--sp-4);cursor:pointer}
+.bank-split #bank-file::file-selector-button:hover{background:#2f2519;border-color:var(--brass)}
 .bank-meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;min-width:0}
 .bank-meta .choice-label{margin:0}
 body.bank-tray #shopUI #t-form .bank-meta input{
@@ -89,12 +110,12 @@ body.bank-tray #shopUI #t-form .bank-meta input{
 }
 .bank-card textarea{
   width:100%;min-height:52px;box-sizing:border-box;margin:0;resize:vertical;
-  padding:8px 12px;border-radius:12px;border:1px solid #6b5430;
+  padding:8px 12px;border-radius:var(--r-control);border:1px solid #6b5430;
   background:#1a140f;color:#f3e6cf;font:600 15px/1.35 system-ui,sans-serif;
 }
 .bank-flow{
   display:flex;align-items:center;justify-content:center;gap:14px;
-  min-height:32px;margin:0;padding:2px;border-radius:14px;
+  min-height:32px;margin:0;padding:2px;border-radius:var(--r-panel);
   background:#14110e;border:1px solid #3a3128;
 }
 .bank-flow .ti{width:36px;height:36px;border-radius:50%}
@@ -104,7 +125,7 @@ body.bank-tray #shopUI #t-form .bank-meta input{
 .bank-pane[hidden]{display:none!important}
 .bank-scroll{
   flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;
-  display:flex;flex-direction:column;gap:6px;
+  display:flex;flex-direction:column;gap:var(--sp-3);
   padding-right:2px;
   overscroll-behavior:contain;
 }
@@ -123,28 +144,33 @@ body.bank-tray #shopUI #t-form .bank-meta input{
 }
 .bank-foot-rows > p{
   margin:0;height:34px;min-height:34px;max-height:34px;overflow:hidden;flex:0 0 auto;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-  text-align:center;color:#f3e6cf;font:600 12.5px/1.25 system-ui,sans-serif;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+  text-align:center;color:#f3e6cf;font:600 var(--t-small)/1.35 system-ui,sans-serif;overflow-wrap:anywhere;
 }
 .bank-foot-rows > p[hidden]{display:none}
 .bank-line{
   margin:0;max-height:34px;overflow:hidden;flex:0 0 auto;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
   text-align:center;color:#f3e6cf;font:600 13px/1.25 system-ui,sans-serif;overflow-wrap:anywhere;
 }
-.bank-status{margin:0;min-height:0;max-height:34px;overflow:hidden;flex:0 0 auto;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+.bank-status{margin:0;min-height:0;max-height:34px;overflow:hidden;flex:0 0 auto;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
   text-align:center;color:#f3e6cf;font:600 13px/1.25 system-ui,sans-serif;overflow-wrap:anywhere}
 .bank-status:empty{display:none}
 .bank-where{margin:0;color:#d4c4a8;font:500 12px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
 .bank-note{margin:0;color:#e6d3b0;font:600 13px/1.35 system-ui,sans-serif;overflow-wrap:anywhere}
-.bank-row{display:flex;gap:8px;align-items:center;min-width:0}
-.bank-row select{flex:1 1 auto;min-width:0}
-.bank-row .bank-sample-link{flex:0 0 auto}
+/* The sample control: label above, then the select and Download on one line. It used to be a single
+   row of three flex children with `align-items:center`, which put the label BESIDE the select and
+   vertically off it (measured: label x=289 y=321, select x=345 y=305). A label that sits beside a
+   control instead of over it reads as a stray word, and the field looks unlabelled. */
+.bank-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;align-items:center;min-width:0}
+.bank-row .choice-label{grid-column:1 / -1;margin:0}
+.bank-row select{grid-column:1;flex:1 1 auto;min-width:0}
+.bank-row .bank-sample-link{grid-column:2;flex:0 0 auto}
 .bank-plain{color:#a08e74;font:600 12px/1.2 system-ui,sans-serif}
 .bank-art{color:#f5d08a;font:700 12px/1.2 system-ui,sans-serif}
 .bank-signer-line{
   display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;
-  margin:0;padding:8px 10px;border-radius:12px;border:1px solid #6b5430;background:#1a140f;
+  margin:0;padding:8px 10px;border-radius:var(--r-control);border:1px solid #6b5430;background:#1a140f;
 }
 .bank-kicker{color:#e6d3b0;font:700 13px/1.2 system-ui,sans-serif}
 .bank-signer{
@@ -153,7 +179,7 @@ body.bank-tray #shopUI #t-form .bank-meta input{
 }
 body.bank-tray #shopUI #t-form button.bank-copy{
   appearance:none;-webkit-appearance:none;
-  width:auto;min-height:32px;padding:0 10px;border-radius:8px;
+  width:auto;min-height:32px;padding:0 10px;border-radius:var(--r-control);
   background:#2a2118;background-image:none;box-shadow:none;animation:none;
   color:#f5d08a;border:1px solid #6b5430;
   font:700 13px/1 system-ui,sans-serif;cursor:pointer;
@@ -164,16 +190,16 @@ body.bank-tray #shopUI #t-form button.bank-copy{
 .bank-card input:not([type="checkbox"]):not([type="file"]),
 .bank-card input[type="file"]{
   width:100%;min-height:44px;box-sizing:border-box;margin:0;
-  padding:6px 12px;border-radius:12px;border:1px solid #6b5430;
+  padding:6px 12px;border-radius:var(--r-control);border:1px solid #6b5430;
   background:#1a140f;color:#f3e6cf;font:600 16px/1.25 system-ui,sans-serif;
 }
 .bank-card input[type="file"]{color:transparent;font-size:0}
 .bank-card input[type="file"]::file-selector-button{
-  min-height:32px;margin-right:0;padding:0 12px;border:0;border-radius:8px;
+  min-height:32px;margin-right:0;padding:0 12px;border:0;border-radius:var(--r-control);
   background:#2a2118;color:#f5d08a;font:700 14px/1 system-ui,sans-serif;cursor:pointer;
 }
 .bank-field{
-  margin:0;min-height:44px;box-sizing:border-box;padding:10px 12px;border-radius:12px;
+  margin:0;min-height:44px;box-sizing:border-box;padding:10px 12px;border-radius:var(--r-control);
   border:1px solid #6b5430;background:#1a140f;color:#f3e6cf;font:600 16px/1.25 system-ui,sans-serif;
 }
 .bank-consent{display:flex;align-items:center;gap:12px;min-height:44px;color:#f3e6cf;font:600 14px/1.3 system-ui,sans-serif}
@@ -206,7 +232,7 @@ body.bank-tray #shopUI #t-form button.bank-copy{
 #bank-agent-dock .bank-agent-send{pointer-events:auto}
 #bank-agent-dock[hidden]{display:none!important}
 #bank-agent-dock .bank-agent-char{
-  display:flex; flex-direction:column; align-items:center; gap:6px;
+  display:flex; flex-direction:column; align-items:center; gap:var(--sp-2);
   width:96px; padding:0; border:0; background:transparent; cursor:pointer; color:#f3e6cf;
   order:2;
 }
@@ -220,7 +246,7 @@ body.bank-tray #shopUI #t-form button.bank-copy{
 }
 .bank-agent-pop{
   order:1; width:min(300px,calc(100vw - 140px)); min-width:220px;
-  box-sizing:border-box; padding:14px; border-radius:16px;
+  box-sizing:border-box; padding:14px; border-radius:var(--r-card);
   border:1px solid #6b5430; background:#1c1612;
   box-shadow:0 12px 28px rgba(0,0,0,.4);
   display:flex; flex-direction:column; gap:10px;
@@ -228,17 +254,22 @@ body.bank-tray #shopUI #t-form button.bank-copy{
 .bank-agent-pop[hidden]{display:none}
 .bank-agent-pop .bank-agent-row{display:flex; align-items:stretch; gap:10px; min-width:0}
 .bank-agent-pop .bank-agent-row input{
-  flex:1; min-width:0; min-height:44px; box-sizing:border-box; padding:0 12px; border-radius:12px;
+  flex:1; min-width:0; min-height:44px; box-sizing:border-box; padding:0 12px; border-radius:var(--r-control);
   border:1px solid #6b5430; background:#1a140f; color:#f3e6cf; font:600 15px/1.2 system-ui,sans-serif;
 }
 .bank-agent-pop .bank-agent-send{
-  flex:0 0 44px; width:44px; min-height:44px; border-radius:12px; cursor:pointer;
+  flex:0 0 44px; width:44px; min-height:44px; border-radius:var(--r-control); cursor:pointer;
   border:1px solid #6b5430; background:#1a140f; color:#f5d08a; font:700 18px/1 system-ui,sans-serif;
 }
 
 @media (max-width:720px){
   body.bank-tray #shopUI #tray{
-    top:auto; left:8px; right:8px !important; bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    left:8px; right:8px !important;
+    /* The teller stands in the bottom-right corner and this panel is full width, so a tray that
+       reached the floor sat on him: measured at 390x844 a 70x77 overlap over the audit field.
+       The tray stops above the dock, the same rule Hall and Chronicle follow; the shell's top
+       edge and this bottom edge then define its height. */
+    bottom:calc(104px + env(safe-area-inset-bottom,0px));
     /* 270px wide and 62dvh tall made this the smallest tray in the city: it fit only a third
        of the screen and its gold button still landed at y=821. Same width as the approved
        Ferry tray, and tall enough to hold the scroll region plus the pinned action row. */
@@ -248,7 +279,7 @@ body.bank-tray #shopUI #t-form button.bank-copy{
     max-height:calc(100dvh - 76px);
     overflow:hidden;
   }
-  body.bank-tray #shopUI #t-form button.bank-tab{font-size:12px;padding:0 2px}
+  body.bank-tray #shopUI #t-form button.bank-tab{font-size:var(--t-small);padding:0 var(--sp-2)}
   #bank-agent-dock{right:6px; bottom:calc(12px + env(safe-area-inset-bottom,0px))}
   #bank-agent-dock .bank-agent-char{width:72px}
   #bank-agent-dock .bank-agent-pop{

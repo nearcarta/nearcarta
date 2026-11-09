@@ -48,6 +48,11 @@ const n = {
 
 const edits = {
   'README.md': [
+    // The proof count appears three times in this file — the commands block, the verify table and
+    // the run block. Without this rule none of them was ever checked, so the README still claimed
+    // 106 in all three places after the proof set grew to 108. It is first because the other rules
+    // must not be able to mask it.
+    [/\d+\/\d+ mainnet txs found/, `${n.proofsFound}/${n.proofs} mainnet txs found`],
     [/# \d+ backend unit tests \(\d+ pass, \d+ skipped\)/, `# ${n.unit + unitSkip} backend unit tests (${n.unit} pass, ${unitSkip} skipped)`],
     [/npm test\s+# \d+ unit tests \(\d+ pass, \d+ skipped\)/, `npm test                 # ${n.unit + unitSkip} unit tests (${n.unit} pass, ${unitSkip} skipped)`],
     [/# \d+ unit tests \(\d+ pass, \d+ skipped\):/, `# ${n.unit + unitSkip} unit tests (${n.unit} pass, ${unitSkip} skipped):`],
@@ -67,7 +72,12 @@ for (const [file, list] of Object.entries(edits)) {
   let after = before;
   for (const [re, to] of list) {
     if (!re.test(after)) throw new Error(`${file}: pattern not found: ${re}`);
-    after = after.replace(re, to);
+    // Global on purpose. `String.replace` with a non-global regex rewrites only the FIRST match,
+    // so a count that appears three times in a file (README says "108/108 mainnet txs found" in the
+    // commands block, the verify table and the run block) was corrected once and left stale twice.
+    // Measured: the README still claimed 106 in three places after the proof set grew to 108.
+    const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+    after = after.replace(g, to);
   }
   if (after !== before) { changed = true; if (!process.argv.includes('--check')) writeFileSync(join(root, file), after); }
   console.log(`${file}: ${after === before ? 'up to date' : (process.argv.includes('--check') ? 'OUT OF DATE' : 'updated')}`);

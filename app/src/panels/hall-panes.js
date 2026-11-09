@@ -116,6 +116,5 @@ export function jobTray({ tab = 'post', form = {}, job = null, market = null, se
     ${gold}
     ${status.map(line => `<p class="hall-status" data-testid="hall-status">${esc(line)}</p>`).join('')}
     ${sealMarkup(seal)}
-    <p class="hall-rules"><a href="/setup/">Personal rules</a></p>
   </div>`;
 }
