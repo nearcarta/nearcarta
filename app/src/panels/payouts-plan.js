@@ -316,6 +316,10 @@ export function agentCommand(text, now = new Date()) {
   const raw = String(text || '').trim();
   const t = raw.toLowerCase().replace(/\s+/g, ' ');
   if (!t) return { ok: false, hint: MISS_HINT };
+  // Open questions used to fall through with no kind; answer with the try-hint, not silence.
+  if (/\bwhat can you\b/.test(t) || /\bhelp\b/.test(t) || /\bsafest (first )?step\b/.test(t)) {
+    return { ok: false, hint: MISS_HINT };
+  }
   if (/\bexport\b/.test(t) && /\bcsv\b/.test(t)) return { ok: true, kind: 'csv', hint: 'CSV ready. A row without a tx says not sent.' };
   if (/\b(status|overdue)\b/.test(t) && !amountsIn(raw).length) return { ok: true, kind: 'status', hint: '' };
   const one = t.match(/(?:send|pay)\s+payout\s+(\d+)/);

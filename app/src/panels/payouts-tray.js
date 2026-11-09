@@ -183,8 +183,12 @@ export function mountPayouts(root, hooks) {
 
   function capSentence() {
     const cap = liveCap();
-    if (cap == null || !Number.isFinite(cap)) return 'Your /setup cap is unread. A NEAR payment waits.';
-    return `Your /setup cap: ${formatNear(cap)} NEAR per payment.`;
+    if (cap == null || !Number.isFinite(cap)) {
+      return accountId()
+        ? 'Your board cap is unread. Open /setup, then come back — a NEAR payroll waits on that cap.'
+        : 'Sign in and open /setup so this desk can read your board cap. Invoice links still create without a row.';
+    }
+    return `Your board cap: ${formatNear(cap)} NEAR per payment (from /setup).`;
   }
 
   function receiptHtml(list) {
@@ -729,6 +733,7 @@ export function mountPayouts(root, hooks) {
       <label class="field ferry-field"><span>Memo</span><input id="p-memo" data-testid="payout-memo" value="${esc(state.memo || '')}" maxlength="140" placeholder="what this is for"></label>
       <label class="field ferry-field"><span>Due</span><input id="p-due" data-testid="payout-due" type="date" value="${esc(state.due || '')}"></label>
       <label class="field ferry-field"><span>Expiry</span><input id="p-expiry" data-testid="payout-expiry" type="datetime-local" value="${esc(state.expiry || '')}"></label>
+      <p class="ferry-rate" data-testid="payout-invoice-cap">${esc(capSentence())}</p>
       <button type="button" class="primary ferry-cta" id="p-create" data-testid="payout-create">Create invoice link</button>
       ${lines()}
       ${sponsorCard()}
