@@ -71,7 +71,13 @@ body.guard-tray #shopUI input{max-width:100%;min-width:0;box-sizing:border-box}
    "...Lookalike · Recorded refusals A first-seen time is not ava is empty, so this account
    has no contract. · not on your li". Wrapping is the correct behaviour for text a visitor is
    meant to read and act on; only the decorative lines get a clamp. */
-.guard-status{margin:0;color:#f3ead8;font:600 14px/1.35 system-ui,sans-serif;display:block;overflow:visible;overflow-wrap:anywhere;word-break:normal;white-space:normal}
+.guard-status{margin:0;color:#f3ead8;font:600 14px/1.35 system-ui,sans-serif;display:block;
+  overflow:visible;overflow-wrap:anywhere;word-break:break-word;white-space:normal;
+  /* `.guard-pane` is a GRID, and a grid child defaults to min-width:auto, so this paragraph's
+     min-content width — the longest unbroken run in it — widened the column to 548px inside a
+     440px tray. min-width:0 lets the column stay the tray's width and the text wrap inside it.
+     Measured 2026-11-09: p=548px, pane=382px, tray=440px. */
+  min-width:0;max-width:100%}
 .guard-quiet{
   justify-self:center;min-height:44px;min-width:44px;padding:8px 12px;border:0;background:transparent;
   color:#d6b46a;font:700 14px/1 system-ui,sans-serif;cursor:pointer;
