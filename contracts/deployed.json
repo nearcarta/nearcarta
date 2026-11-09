@@ -19,8 +19,8 @@
       "account": "guard.nearcarta.near",
       "crate": "contracts/guard",
       "artifact": "contracts/artifacts/guard.wasm",
-      "build": "none",
-      "reason": "built before the toolchain was pinned; the next guard deploy is a nep330 build"
+      "build": "box",
+      "rev": "5a761c9e"
     },
     {
       "account": "toll.nearcarta.near",
