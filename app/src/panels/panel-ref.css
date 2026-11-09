@@ -1037,3 +1037,35 @@ body #shopUI #tray [data-testid='restore-session'] {
   box-sizing: border-box;
   font: var(--f-label) !important;
 }
+
+/* ============================================================================================
+   15. The AI dock must not sit on the panel
+   --------------------------------------------------------------------------------------------
+   Measured at 390x844: the Guardhouse's agent dock overlapped the panel by 96x91px, so the
+   character and its speech bubble covered the shop's own fields. The panel is a bottom sheet on
+   a phone, so the dock moves above it and keeps a clear gap; when the sheet is tall, the dock
+   shrinks to its bubble instead of the full character.
+   ============================================================================================ */
+
+@media (max-width: 720px) {
+  /* Give the dock its own lane above the sheet. The sheet's own bottom edge is 8px, and the
+     panel's height is content-driven, so the safe fix is to raise the dock above the tallest
+     the sheet can get and let it ride at the panel's top edge. */
+  body #shopUI [id$='-agent-dock'] {
+    position: fixed !important;
+    right: 12px !important;
+    left: auto !important;
+    top: calc(var(--railTop, 12px) + var(--rail, 58px) + 12px) !important;
+    bottom: auto !important;
+    z-index: 80;
+    transform: scale(.86);
+    transform-origin: top right;
+  }
+
+  /* The character image is what makes the dock tall; at this size it is decoration, so the
+     dock keeps its toggle and shrinks its bubble. Nothing is removed from the DOM. */
+  body #shopUI [id$='-agent-dock'] img {
+    width: 48px !important;
+    height: 48px !important;
+  }
+}

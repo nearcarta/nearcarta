@@ -109,6 +109,22 @@ test.describe('shop panel design contract', () => {
         // 5. The panel is a card of the brief's width, not a full-height drawer.
         expect(m.width, `${id} ${tab || 'default'}: panel width`).toBeGreaterThanOrEqual(320);
         expect(m.width, `${id} ${tab || 'default'}: panel width`).toBeLessThanOrEqual(380);
+
+        // 6. The agent dock stays reachable and never covers the panel. Measured before this:
+        //    at 390x844 the Guardhouse dock covered it by 96x91px.
+        const clash = await page.evaluate(() => {
+          const tray = document.querySelector('#shopUI #tray').getBoundingClientRect();
+          return [...document.querySelectorAll("[id$='-agent-dock']")]
+            .filter(d => !d.hidden && d.getBoundingClientRect().width > 1)
+            .map(d => {
+              const a = d.getBoundingClientRect();
+              const ox = Math.min(tray.right, a.right) - Math.max(tray.left, a.left);
+              const oy = Math.min(tray.bottom, a.bottom) - Math.max(tray.top, a.top);
+              return { id: d.id, ox: Math.round(ox), oy: Math.round(oy) };
+            })
+            .filter(x => x.ox > 1 && x.oy > 1);
+        });
+        expect(clash, `${id} ${tab || 'default'}: the agent dock covers the panel`).toEqual([]);
       }
     });
   }
@@ -126,4 +142,5 @@ test.describe('shop panel design contract', () => {
       expect(m.innerScroll, `${id} mobile nested scroll`).toBe(false);
     }
   });
+
 });
