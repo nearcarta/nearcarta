@@ -566,5 +566,5 @@ test('what can you do returns the try-hint, and the invoice pane names the board
   const tray = readFileSync(new URL('../../../app/src/panels/payouts-tray.js', import.meta.url), 'utf8');
   assert.match(tray, /data-testid="payout-invoice-cap"/);
   assert.match(tray, /Your board cap/);
-  assert.match(tray, /Sign in and open \/setup so this desk can read your board cap/);
+  assert.match(tray, /Sign in to set your spend limit/);
 });

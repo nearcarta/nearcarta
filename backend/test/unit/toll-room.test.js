@@ -446,7 +446,7 @@ test('the pay line names the fee and the row, never an invented cap', () => {
   const live = { ok: true, price: { fee: '1000000000000000000000' }, verify_chain: 'Base', chain_id: 8453 };
   const html = tollMarkup({ live, row: rowOk, tab: 'pass' });
   assert.match(html, /Fee 0\.001 NEAR/);
-  assert.match(html, /Your row sets the amount cap/);
+  assert.match(html, /Your spend limit caps the amount/);
   assert.doesNotMatch(html, /Caps left/);
 });
 
