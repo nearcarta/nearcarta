@@ -21,7 +21,10 @@ export const conf = () => ({
   board: process.env.BOARD_ACCOUNT || 'board.nearcarta.near',
   dailyNear: toYocto(process.env.RELAY_DAILY_NEAR || '0.05'),
   sessionFund: toYocto(process.env.SESSION_FUND_NEAR || '0.003'),
-  sessionStorage: toYocto(process.env.SESSION_STORAGE_NEAR || '0.008'),
+  // A whole Market Day (bag, purse, a stall, a share) stores about 0.011 NEAR of data on the market.
+  sessionStorage: toYocto(process.env.SESSION_STORAGE_NEAR || '0.012'),
+  // Below this, a returning visitor's market storage is topped back up to sessionStorage (same caps).
+  storageLow: toYocto(process.env.SESSION_STORAGE_LOW_NEAR || '0.003'),
   // Sponsored gas one visitor may burn per UTC day.
   visitorNear: toYocto(process.env.RELAY_VISITOR_NEAR || '0.003'),
 });
@@ -92,21 +95,22 @@ export async function session(accountId, { acc = () => relayer(), viewAcc = view
   let exists = true; try { await viewAcc(id); } catch { exists = false; }
   if (!exists && !implicit) return refuse('ERR_NO_ACCOUNT');
   const stored = storageOf ? await storageOf(id) : BigInt(await view(c.market, 'storage_balance_of', { account_id: id }).catch(() => '0'));
-  const needFund = !exists, needStorage = BigInt(stored) === 0n;
+  const needFund = !exists, needStorage = BigInt(stored) < c.storageLow;
   if (!needFund && !needStorage) return { ok: true, already: true, account: id, txs: [] };
-  const cost = (needFund ? c.sessionFund : 0n) + (needStorage ? c.sessionStorage : 0n) + 2n * 10n ** 21n;
+  const add = needStorage ? c.sessionStorage - BigInt(stored) : 0n;
+  const cost = (needFund ? c.sessionFund : 0n) + add + 2n * 10n ** 21n;
   if (ledger.spent + cost > c.dailyNear * 2n) return refuse('ERR_DAILY_BUDGET', 429);
   const cap = counters.session(); if (cap) return refuse(cap, 429);
   const a = acc(); const txs = [];
   try {
     if (needFund) { const r = await a.transfer({ receiverId: id, amount: c.sessionFund }); txs.push(hashOf(r)); ledger.spent += c.sessionFund + burnt(r); }
     if (needStorage) {
-      const r = await a.callFunction({ contractId: c.market, methodName: 'storage_deposit', args: { account_id: id }, deposit: c.sessionStorage, gas: 30n * 10n ** 12n });
-      txs.push(hashOf(r) || null); ledger.spent += c.sessionStorage;
+      const r = await a.callFunction({ contractId: c.market, methodName: 'storage_deposit', args: { account_id: id }, deposit: add, gas: 10n * 10n ** 12n });
+      txs.push(hashOf(r) || null); ledger.spent += add;
     }
   } catch (e) { return { ...refuse('ERR_SEND: ' + String(e.message || e).slice(0, 160), 502), txs }; }
   ledger.sessions++;
-  return { ok: true, account: id, funded: needFund ? yoctoToNear(c.sessionFund.toString()) : '0', storage: needStorage ? yoctoToNear(c.sessionStorage.toString()) : '0', txs };
+  return { ok: true, account: id, funded: needFund ? yoctoToNear(c.sessionFund.toString()) : '0', storage: needStorage ? yoctoToNear(add.toString()) : '0', txs };
 }
 
 export function register(app, { limiter, globalCap }) {

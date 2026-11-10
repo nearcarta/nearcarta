@@ -47,15 +47,18 @@ test('relayer: a board row move aimed at the market is relayed', async () => {
   const r = await relay(b64, deps(fcKey(BOARD))); assert.equal(r.ok, true);
 });
 
-test('relayer: sponsored first session funds a new implicit account once, then is a no-op', async () => {
+test('relayer: sponsored first session funds a new implicit account once, tops up low storage, else a no-op', async () => {
   const calls = [];
   const acc = () => ({ transfer: async (a) => { calls.push(['transfer', a.receiverId, a.amount]); return { transaction_outcome: { id: 'F1', outcome: { tokens_burnt: '0' } } }; },
     callFunction: async (a) => { calls.push(['call', a.methodName, a.args.account_id, a.deposit]); return { transaction_outcome: { id: 'S1', outcome: { tokens_burnt: '0' } } }; } });
   const id = 'a'.repeat(64);
   const r = await session(id, { acc, viewAcc: async () => { throw new Error('missing'); }, storageOf: async () => 0n });
   assert.equal(r.ok, true); assert.deepEqual(r.txs, ['F1', 'S1']); assert.equal(calls[0][0], 'transfer'); assert.equal(calls[1][1], 'storage_deposit');
-  const again = await session(id, { acc, viewAcc: async () => ({}), storageOf: async () => 10n });
+  const again = await session(id, { acc, viewAcc: async () => ({}), storageOf: async () => 5n * 10n ** 21n });
   assert.equal(again.already, true);
+  // Low after a day of play: topped back up to the session amount, no second transfer.
+  const low = await session(id, { acc, viewAcc: async () => ({}), storageOf: async () => 7n * 10n ** 20n });
+  assert.equal(low.ok, true); assert.equal(calls.length, 3); assert.equal(calls[2][1], 'storage_deposit'); assert.equal(calls[2][3], 12n * 10n ** 21n - 7n * 10n ** 20n);
   const named = await session('nobody-here.near', { acc, viewAcc: async () => { throw new Error('missing'); }, storageOf: async () => 0n });
   assert.equal(named.why, 'ERR_NO_ACCOUNT');
 });
