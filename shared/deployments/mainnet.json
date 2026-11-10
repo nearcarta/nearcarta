@@ -728,5 +728,117 @@
       "daily_near": 0.05,
       "sessions_per_day": 4
     }
+  },
+  "keepers": {
+    "note": "Each shop's keeper is a real sub-account with a board row (market restock + invest only, caps 0.005 per action / 0.01 per day, fund 0.005) and an agent function-call key limited to the board. Keys are kept chmod 600 on the operator box. Purse ≈ 0.015 NEAR each; the send float was swept back to nearcarta.near.",
+    "rules": {
+      "receivers": [
+        "arena.nearcarta.near"
+      ],
+      "calls": [
+        "restock",
+        "invest"
+      ],
+      "per_action_cap": "5000000000000000000000",
+      "daily_budget": "10000000000000000000000"
+    },
+    "accounts": {
+      "arena": {
+        "account": "keeper-arena.nearcarta.near",
+        "shop": "arena",
+        "txs": {
+          "create": "85oaJV3EAeyUGbudy47N2TwYERo1EPRSJBqbMX1JhTzS",
+          "agent_key": "6qteoiZXG4KH1NYnhW5TfNVR2JGyEX6pufn8cVbpWcer",
+          "row": "FfGrvMeDbUmyaKuTrugmVyCNBPUk38f7ypEMeJ3pRxTX",
+          "sweep": "52Ye5CDczEvPvBM9wqysBiL41wcP3QdWXRjsCArqRHES"
+        }
+      },
+      "hall": {
+        "account": "keeper-hall.nearcarta.near",
+        "shop": "hall",
+        "txs": {
+          "create": "Cku3WpL24TynfJGr5uwtxpPwPLhJXgXLx8N7oyWeUbJG",
+          "agent_key": "CXiRgc8j4SbxoUmtrXLrAJS4Ld9yMw1TPZw6nAjd7nyq",
+          "row": "MMWcYjccpWNV3Nc5cujbJKV2wgZFZtJevN81BuP5Uwj",
+          "sweep": "7NkMQCCG6KRYzzx2PwRu9vVN1G323efMbACBpWYA5vqQ"
+        }
+      },
+      "ferry": {
+        "account": "keeper-ferry.nearcarta.near",
+        "shop": "ferry",
+        "txs": {
+          "create": "21mQrHATY9kegpMd1AipYp941yZYreZLfc3uVCj3mZYA",
+          "agent_key": "DafPb6VQt1ykuGWL3f9eXhnipPCp5k2BYFnxnxz3yESJ",
+          "row": "2Wg3xPohDnAgcD2Z7HSav9Kt5mfEcqKeiXyxVe8RZL3P",
+          "sweep": "8RA8T93YrZJYBiaCA3SEZxkgD1Po75aJSj1edkZMyJNn"
+        }
+      },
+      "toll": {
+        "account": "keeper-toll.nearcarta.near",
+        "shop": "toll",
+        "txs": {
+          "create": "DTBhch9oeQjfcDzN35dRDE3o6yByLPNUMLwR8hbeDByL",
+          "agent_key": "EFuBEpS6fDSGwyXxDMnt4iqNYxD3JMQB1NePYj99RjfN",
+          "row": "9Eyotv5BofMZLeBuFCRdoC3d6mztdWCqmg45D6Esrpzk",
+          "sweep": "DmGKZEE2fjW22em9aabFASKPXRGWy1Y5P7uiizA6cfTg"
+        }
+      },
+      "guard": {
+        "account": "keeper-guard.nearcarta.near",
+        "shop": "guard",
+        "txs": {
+          "create": "A5TM4GjHjjGRLQmGy5RcfZZRaNuDtAYh3gPTon9pynBC",
+          "agent_key": "9NTXkGZbcppYn7NzB8iNqkbrAu4csRbDppgMYKQnQojB",
+          "row": "7cywgKeNo6yiH1UsJRjoNvRM5373YAhC6js9AN81UMc7",
+          "sweep": "F7QRs2vpmDc14mwdYREjXiqQPLbvwo3WD7Txvi4zV9PK"
+        }
+      },
+      "bank": {
+        "account": "keeper-bank.nearcarta.near",
+        "shop": "bank",
+        "txs": {
+          "create": "GkjygcNGy6aMxdSgSqYNbWGWiHQuYat2hUYTjsA2V7tv",
+          "agent_key": "CkYUouf4DrhCpdsuCTXLabSYAPAyaEqavaopN7btsvXN",
+          "row": "8HoVwiCPd6FqxA1GbKQv3Xby8wDb4ejT6g9Bg8yyViFs",
+          "sweep": "Cj7c5GdZGX8RLQwZ7Gt3QCeWJXJcxrmp844MJVjxNwRp"
+        }
+      },
+      "house": {
+        "account": "keeper-house.nearcarta.near",
+        "shop": "house",
+        "txs": {
+          "create": "Cr8hn38WNkt7PsFzDr5MiM3VxD5CJtJsxwLGeKjEweRA",
+          "agent_key": "CMYwLhz1NNZaDUTcBVJYDHHPPBMMFX6wfbwiPXYX1R4d",
+          "row": "4xxF7Mtt32tHsPG4oA9T5L1AZ6aFZGPxnvWaPKDAmuDf",
+          "sweep": "8HdGs4Gu7g99LFt386qLxHdCALHXsafbQxVYku1uCBun"
+        }
+      },
+      "payouts": {
+        "account": "keeper-payouts.nearcarta.near",
+        "shop": "payouts",
+        "txs": {
+          "create": "5Js4yQyiz4xbPrCMf2ynQVgC4cbyS1ta6jDpkRPopHfb",
+          "agent_key": "8oyT9Mcpy5eYhuTPshWPERQcVmY594D71CCM63jzijQa",
+          "row": "4H7sHJeLcSVmNUFUnZVNCDrHBUct6VNoLHejhe3JiQex",
+          "sweep": "71Lzd2auHuXrsDrGRHHQaivdtEcrCP5kWkhzKGVT7YRv"
+        }
+      },
+      "chronicle": {
+        "account": "keeper-chronicle.nearcarta.near",
+        "shop": "chronicle",
+        "txs": {
+          "create": "HoQsgR8bcNTdYuwTtac9ehd2jyRmezzUYXwNDLhogAL5",
+          "agent_key": "HEJvQdnST6FNELjZBE8JHB7oM6pBSdL5GVniuo1h9xrc",
+          "row": "HsZqdzY7Yxj9N8KPKp3e6wHYUQTxAx5cMQrBmDhPdvfn",
+          "sweep": "H2NHuZdy7Suz1Bpi98FadHpQ9i1jLRkydSpBoBAaD8Zr"
+        }
+      }
+    },
+    "smoke": {
+      "stranger_open_shop_refused": "8DTCyQaGH4EbFbLmsnqqDnt8EPf2nPGXdQBSrLWhFNp1",
+      "stranger_keeper_take_refused": "EHeFmKV5QeqCgwF7Bj32mi8Jcx8eVk3Ph17yRx5jxXCj",
+      "stranger_force_close_keeper_row_refused": "6yF1boVNxiQ88gfJWpBueVKrP1oMnF2jTAGKFXXhvp5r",
+      "owner_stock_shop": "35XNia6ySrocYncgb1ZzujWfpoHbrrK1GpUwJSwuZKP2"
+    }
   }
 }

@@ -70,7 +70,9 @@ async function keys(mint) {
 
 export async function plan() {
   const gasPrice = BigInt((await rpc('gas_price', [null])).gas_price);
-  const sendNeed = ROW_DEPOSIT + CALLS_DEPOSIT + (GAS_OPEN + GAS_CALLS + 10n * TG) * gasPrice;
+  // Attached gas is bought at max(gas price, 10^9 yocto) while in flight; the unused part comes back.
+  const buy = gasPrice > 10n ** 9n ? gasPrice : 10n ** 9n;
+  const sendNeed = ROW_DEPOSIT + CALLS_DEPOSIT + (GAS_OPEN + GAS_CALLS + 10n * TG) * buy;
   const fund = ACCOUNT_STAKE + sendNeed + PURSE;
   const rows = [];
   const board = await view(MARKET, 'market_board');
