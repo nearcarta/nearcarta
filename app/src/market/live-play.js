@@ -81,6 +81,7 @@ export async function demo(id) {
   const api = (window.NEARCARTA_API || '').replace(/\/$/, '');
   try {
     const r = await (await fetch(`${api}/api/merchant/step`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ step: id }) })).json();
+    if (r.why === 'ERR_MERCHANT_PURSE') return { saving: true, have: r.have };
     if (!r.ok || !r.hash) return null;
     return { ...r, demo: true, total: r.total != null ? BigInt(r.total) : null };
   } catch { return null; }

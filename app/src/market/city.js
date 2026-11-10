@@ -165,7 +165,8 @@ function stripHtml(id) {
     const r = lastDone.res, nx = Q.current(city);
     let sub = receiptLine(lastDone.step, r);
     if (lastDone.step.id === 'sell') sub = `+${coins(r.total)} coins · price ${coins(r.before)} → ${coins(r.after)}<br>Your sale pushed the price down: the shelf has more salt now.<br>${receiptLine(lastDone.step, r)}`;
-    if (lastDone.step.id === 'invest') sub = `${r.real?.demo ? '1 Ferry share bought by the demo purse for 10 coins (0.001 NEAR)' : '1 Ferry share for 10 coins (0.001 NEAR) · it pays you a part of the Ferry’s sales'}<br>${receiptLine(lastDone.step, r)}`;
+    if (lastDone.step.id === 'invest' && r.real?.saving) sub = `The city’s demo purse is saving up: ${coins(BigInt(r.real.have || 0))} of 10 coins for its next share<br><span class="qs-chip">Practice, no spend</span>`;
+    else if (lastDone.step.id === 'invest') sub = `${r.real?.demo ? '1 Ferry share bought by the demo purse for 10 coins (0.001 NEAR)' : '1 Ferry share for 10 coins (0.001 NEAR) · it pays you a part of the Ferry’s sales'}<br>${receiptLine(lastDone.step, r)}`;
     const ex = (pf) => (pf ? ` · <a class="qs-proof" href="${pf.url}" target="_blank" rel="noopener">Example on chain ↗</a>` : '');
     const done = lastDone.step.id, pr0 = lastDone.step.proof;
     if (done === 'cargo') sub = `3 salt from the berths, no swap needed<br>${receiptLine(lastDone.step, r)}`;

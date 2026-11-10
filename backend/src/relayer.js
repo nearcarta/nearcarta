@@ -107,7 +107,7 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
  * exist and hold one session key, and give it a small market storage deposit. Counted against the
  * daily session cap and the daily budget.
  */
-export async function session(accountId, { acc = () => relayer(), viewAcc = viewAccount, storageOf } = {}) {
+export async function session(accountId, { acc = () => relayer(), viewAcc = viewAccount, storageOf, sponsor = null } = {}) {
   roll(); const c = conf();
   if (!hasKey() && !storageOf) return refuse('ERR_RELAYER_OFF', 503);
   const id = String(accountId || '').trim().toLowerCase();
@@ -121,7 +121,7 @@ export async function session(accountId, { acc = () => relayer(), viewAcc = view
   const add = needStorage ? c.sessionStorage - BigInt(stored) : 0n;
   const cost = (needFund ? c.sessionFund : 0n) + add + 2n * 10n ** 21n;
   if (ledger.spent + cost > c.dailyNear * 2n) return refuse('ERR_DAILY_BUDGET', 429);
-  const cap = counters.session(); if (cap) return refuse(cap, 429);
+  if (!sponsor) { const cap = counters.session(); if (cap) return refuse(cap, 429); } // the demo purse has its own caps
   const a = acc(); const txs = [];
   try {
     if (needFund) { const r = await a.transfer({ receiverId: id, amount: c.sessionFund }); txs.push(hashOf(r)); ledger.spent += c.sessionFund + burnt(r); }
