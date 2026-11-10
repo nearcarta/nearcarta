@@ -151,7 +151,7 @@ const whyBlock = (good) => { const q = S.quoteAt(city, 'arena', good); return `<
 
 // What each step costs, said before the press, and what it cost after, with THIS action's receipt.
 // Only the steps with a market move are real; the rest say so: practice, no spend.
-const REAL_STEP = { cargo: 'Free: 3 salt from the berths', sell: 'Coins go into your purse', invest: 'Spends 10 coins (0.001 NEAR) from your purse' };
+const REAL_STEP = { seal: 'The Bank seals it for you and pays the gas', cargo: 'Free: 3 salt from the berths', sell: 'Coins go into your purse', invest: 'Spends 10 coins (0.001 NEAR) from your purse' };
 const nearTxt = (y) => { const v = Number(BigInt(y || 0) / 10n ** 18n) / 1e6; return `${v.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} NEAR`; };
 const costLine = (s) => (R.on() && REAL_STEP[s.id] ? `${REAL_STEP[s.id]} · no gas, the city pays it` : '<span class="qs-chip">Practice, no spend</span>');
 const receiptLine = (step, r) => {
@@ -170,7 +170,8 @@ function stripHtml(id) {
     if (done === 'cargo') sub = `3 salt from the berths, no swap needed<br>${receiptLine(lastDone.step, r)}`;
     if (done === 'cross') sub = `Toll: 1 coin, taken at the sale<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
     if (done === 'check') sub = `✓ Square keeper: cleared<br>✗ Stranger: refused, not on your list<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
-    if (done === 'seal') sub = `Check passed · the amount stays hidden<br>On chain the Bank logs only a fingerprint: <a class="qs-proof" href="${pr0.url}" target="_blank" rel="noopener">Bank anchor ↗</a> · ${pr0.cost} NEAR gas, paid by the Bank<br><span class="qs-chip">Your seal: practice, no spend</span>`;
+    if (done === 'seal' && r.real?.hash) sub = `Check passed · the amount stays hidden<br>The Bank sealed it for you: <a class="qs-proof" href="https://nearblocks.io/txns/${esc(r.real.hash)}" target="_blank" rel="noopener">Receipt ↗</a> · ${esc(r.real.burnt_near)} NEAR gas, paid by the Bank<br>Your reveal key stays in this browser`;
+    else if (done === 'seal') sub = `Check passed · the amount stays hidden<br>On chain the Bank logs only a fingerprint: <a class="qs-proof" href="${pr0.url}" target="_blank" rel="noopener">Bank anchor ↗</a> · ${pr0.cost} NEAR gas, paid by the Bank<br><span class="qs-chip">Your seal: practice, no spend</span>`;
     if (done === 'pay') sub = `Paid to: your porter · 3 coins from your purse · invoice #${Q.state(city).day} kept<br><span class="qs-chip">Practice, no spend</span>`;
     if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';

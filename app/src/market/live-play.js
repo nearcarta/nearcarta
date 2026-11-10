@@ -69,7 +69,23 @@ export async function step(id, ctx = {}) {
     const r = check(await send(L, { method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 }));
     return record(id, `Invested 10 coins in the ${shop}`, r);
   }
+  if (id === 'seal') return sealProfit();
   return null;
+}
+
+// Mist Bank seal: the Bank keeper's board row anchors a fingerprint of (account, purse, salt). Only the
+// fingerprint leaves this browser; the salt and the amount stay here, so the visitor can reveal them later.
+const SEALS = 'nearcarta.bank.seals';
+const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+async function sealProfit() {
+  const amount = String((await purse()) ?? 0n);
+  const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const digest = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${live.account}:${amount}:${salt}`)));
+  const api = (window.NEARCARTA_API || '').replace(/\/$/, '');
+  const r = await (await fetch(`${api}/api/bank/seal`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: live.account, digest }) })).json().catch(() => ({ ok: false }));
+  if (!r.ok) return null; // the story step still runs as practice
+  try { const all = JSON.parse(localStorage.getItem(SEALS) || '[]'); all.push({ account: live.account, amount, salt, digest, board_salt: r.board_salt, commitment: r.commitment, hash: r.hash, at: Date.now() }); localStorage.setItem(SEALS, JSON.stringify(all)); } catch {}
+  return record('seal', 'The Bank sealed your purse', { ...r, by_bank: true });
 }
 
 /** Rent a stall in the Arena square from the purse. */

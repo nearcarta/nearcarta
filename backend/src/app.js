@@ -27,6 +27,7 @@ import { mainnetChronicle } from './board-chronicle.js';
 import { previewOwner } from './board-guard.js';
 import * as ai from './ai.js';
 import * as bankProof from './bank-proof.js';
+import * as bankSeal from './bank-seal.js';
 import * as bankRate from './bank-rate.js';
 import * as bankModel from './bank-model.js';
 import * as tee from './tee.js';
@@ -962,6 +963,7 @@ export function makeApp() {
   // Charters (factory) and Vault Arena: backend/src/vault.js
   vault.register(app, { limiter, globalCap });
   relayer.register(app, { limiter, globalCap });
+  bankSeal.register(app, { limiter, globalCap });
   marketGuide.register(app, { limiter, globalCap });
   marketLive.register(app, { limiter, globalCap });
   marketHistory.register(app, { limiter, globalCap });

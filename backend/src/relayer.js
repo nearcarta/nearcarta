@@ -122,7 +122,7 @@ export async function session(accountId, { acc = () => relayer(), viewAcc = view
   try {
     if (needFund) { const r = await a.transfer({ receiverId: id, amount: c.sessionFund }); txs.push(hashOf(r)); ledger.spent += c.sessionFund + burnt(r); }
     if (needStorage) {
-      const r = await a.callFunction({ contractId: c.market, methodName: 'storage_deposit', args: { account_id: id }, deposit: add, gas: 10n * 10n ** 12n });
+      const r = await (a.callFunctionRaw || a.callFunction).call(a, { contractId: c.market, methodName: 'storage_deposit', args: { account_id: id }, deposit: add, gas: 10n * 10n ** 12n });
       txs.push(hashOf(r) || null); ledger.spent += add;
     }
   } catch (e) { return { ...refuse('ERR_SEND: ' + String(e.message || e).slice(0, 160), 502), txs }; }
