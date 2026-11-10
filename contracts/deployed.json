@@ -4,9 +4,9 @@
     {
       "account": "board.nearcarta.near",
       "crate": "contracts/charter_board",
-      "artifact": "contracts/artifacts/charter_board.guarded.wasm",
-      "build": "box",
-      "rev": "82bcda89"
+      "artifact": "contracts/artifacts/charter_board.wasm",
+      "build": "nep330",
+      "rev": "f44da703"
     },
     {
       "account": "townhall.nearcarta.near",
