@@ -39,7 +39,7 @@
     {
       "account": "arena.nearcarta.near",
       "crate": "contracts/market",
-      "artifact": "contracts/artifacts/market.wasm",
+      "artifact": "contracts/artifacts/market.v1.wasm",
       "build": "nep330",
       "rev": "f44da703"
     }
