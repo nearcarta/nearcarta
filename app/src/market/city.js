@@ -194,7 +194,11 @@ addEventListener('world:exterior-ready', (e) => { const was = inShop || e.detail
   if (playing && lastDeed && lastDeed.shop === was) { const d = lastDeed; lastDeed = null; setTimeout(() => WD().keeperSay?.(d.shop, d.text), 400); } });
 // tap a keeper: their card (name, mood, purse, what they did today)
 let keeperId = null;
-addEventListener('world:keeper-tap', (e) => { if (!playing || walking || guiding) return; keeperId = e.detail.id; open('keeper'); });
+addEventListener('world:keeper-tap', (e) => { if (!playing || walking || guiding) return; keeperId = e.detail.id; open('keeper'); liveMarket(); });
+// The keepers are real: their purse, till and shelf come from the market and their own wallets (GET /api/market/live).
+let live = null, liveAt = 0;
+async function liveMarket() { if (Date.now() - liveAt < 15000) return; liveAt = Date.now();
+  try { const r = await fetch(API() + '/api/market/live', { signal: AbortSignal.timeout(8000) }); if (r.ok) { live = await r.json(); if (view === 'keeper') render(); } } catch { /* the practice values stay */ } }
 setInterval(() => { if (playing && inShop && !lastDone && S.nodesAt(inShop).length) paintStrip(); }, 1000);
 
 // ---------- sheet: the bag and the guide ----------
@@ -228,10 +232,14 @@ function vReceipt() {
 }
 function mood(sh) { if (!S.isOpen(sh)) return ['Worried', 'The till is under the floor. The shop is dark.']; if (sh.till >= sh.floor * 2n) return ['Cheerful', 'A full till and steady trade.']; return ['Steady', 'Enough in the till to trade.']; }
 function vKeeper() {
-  const id = keeperId, sh = city.shops[id]; const st = Q.STEPS.find((x) => x.shop === id); const name = st?.keeper || 'Keeper';
+  const id = keeperId, st = Q.STEPS.find((x) => x.shop === id); const name = st?.keeper || 'Keeper';
+  const ls = live?.shops?.find((x) => x.id === id), lk = live?.keepers?.[id];
+  const sh = ls ? { till: BigInt(ls.till), floor: BigInt(ls.floor), trades: Number(ls.trades) } : city.shops[id];
   if (!sh) return head(ICON.lamp, name, NAME[id] || '');
   const [m, why] = mood(sh); const done = Q.progress(city).done > Q.STEPS.indexOf(st);
-  const rows = [['Mood', `${m}`, why], ['Purse', `${coins(sh.till)} coins`, 'Their own till. They buy and sell from it'], ['Trades today', String(sh.trades), done && st ? DEED[st.id] : 'Waiting for you']];
+  const shelf = ls ? ls.goods.map((g) => `${S.GOODS[g.good]?.name || g.good} ${coins(BigInt(g.buy || 0))} · ${g.stock} left`).join(', ') : '';
+  const rows = [['Mood', `${m}`, why], ['Purse', `${coins(lk ? BigInt(lk.purse) : sh.till)} coins`, lk ? 'Their own wallet' : 'Their own till. They buy and sell from it'],
+    ...(ls ? [['Till', `${coins(sh.till)} coins`, shelf]] : []), ['Trades today', String(sh.trades), done && st ? DEED[st.id] : 'Waiting for you']];
   return head(ICON.lamp, name, NAME[id]) + `<div class="md-list">${rows.map(([k, v, sub]) => `<div class="md-row static"><span class="md-nm"><b>${esc(k)}</b><small>${esc(sub)}</small></span><b class="md-val">${esc(v)}</b></div>`).join('')}</div>`;
 }
 // Fast-forward: a week of the city in a minute. The crowd trades, prices follow the shelves, a con artist is refused,

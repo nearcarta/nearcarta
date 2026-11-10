@@ -95,13 +95,12 @@ export class Char {
     if (this.faceGoal !== undefined) { let df = this.faceGoal - this.face; df = Math.atan2(Math.sin(df), Math.cos(df)); this.face += df * Math.min(1, dt * 8); this.g.rotation.y = this.face; }
   }
 }
-// No guide stands in the rooms any more: the Town Crier walks the town, and inside a shop the panel and the quest strip
-// speak. Shop scripts still call makeRobot() for a position, gestures and speech anchors, so it returns a Char that is
-// never drawn. Old clip names map onto the KayKit rig it carries.
+// makeRobot() returns the town guide's own mesh with its original material: the Toll uses it as the walker at the boom.
+// Its meshes are marked ink so the room adds no outline shell. Old clip names map onto the KayKit rig it carries.
 const ALIAS = { Walking: 'Walking_A', Running: 'Running_A', Yes: 'Cheer', ThumbsUp: 'Cheer', No: 'Block', Wave: 'Interact' };
 export async function makeRobot(scene) {
   const g = await load('chars/Rogue_Hooded.glb'); const c = new Char(g, scene, { h: .8, outline: null });
-  c.root.visible = false; c.root.traverse(m => { if (m.isMesh) { m.userData.ink = true; m.castShadow = false; } }); c.quiet = true; c.play('Idle'); return c;
+  c.root.traverse(m => { if (m.isMesh) { m.userData.ink = true; m.castShadow = false; } }); c.quiet = true; c.play('Idle'); return c;
 }
 
 // tokens and icons (D7 files; every amount gets its icon)
