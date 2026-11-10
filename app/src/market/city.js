@@ -1,11 +1,14 @@
-// Market Day: the city-level game layer over the 3D town. It owns the HUD (clock, level, purse),
-// the bag, the market and quest sheet, and the resource nodes on the island. The shop panels stay
-// with the shops. Until a player signs in, the round is practice: the rules run in the browser
-// from shared/market/sim.js (the same rules as contracts/market) and no transaction is sent.
+// Market Day: the city is the game. A new merchant's first day runs through all nine shops, one step
+// each (shared/market/story.js). This layer owns the HUD (day progress, purse), the quest bar, the
+// strip inside each shop panel (./quest-strip.js), the bag and the guide. The 3D cues (glowing door,
+// lit road, the Town Crier) live in the world (design/D9_world/js/quest.js). Until a player signs in,
+// the round is practice: the rules run in the browser and no transaction is sent.
 import * as S from '/shared/market/sim.js';
 import { whyHtml, yoctoToNear } from '/market/why.js';
 import { ICON, iconFor } from '/market/icons.js';
 import * as G from '/shared/market/guide.js';
+import * as Q from '/shared/market/story.js';
+import { createStrip } from '/market/quest-strip.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -13,8 +16,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ME = 'you';
 const KEY = 'nearcarta.marketday.v1';
-const SHORT = { arena: 'Square', hall: 'Hall', ferry: 'Port', toll: 'Bridge', guard: 'Watch', bank: 'Bank', house: 'Council', payouts: 'Tavern', chronicle: 'Chronicle' };
-const NAME = { arena: 'Market Square', hall: 'Town Hall', ferry: 'Port', toll: 'Toll Bridge', guard: 'City Watch', bank: 'Mist Bank', house: 'Council House', payouts: 'Payday Tavern', chronicle: 'Chronicle' };
+const NAME = { arena: 'Vault Arena', hall: 'Town Hall', ferry: 'Ferry', toll: 'Toll Bridge', guard: 'Guardhouse', bank: 'Mist Bank', house: 'Your House', payouts: 'Payouts', chronicle: 'Chronicle' };
 const GOOD = (g) => S.GOODS[g]?.name || S.ITEMS[g]?.name || (g.startsWith('share:') ? `${NAME[g.slice(6)] || g.slice(6)} share` : g);
 const near = (y) => { const s = yoctoToNear(String(y)); const [a, b = ''] = s.split('.'); return b ? `${a}.${b.slice(0, 4).padEnd(4, '0')}` : `${a}.0000`; };
 
@@ -51,20 +53,17 @@ function dawnOrders() {
 const root = h('div', 'md', '');
 root.id = 'marketday';
 root.innerHTML = `
-<button class="md-enter" type="button" data-testid="md-enter"><span class="i">${ICON.play}</span><span>Play Market Day</span></button>
+<button class="md-enter" type="button" data-testid="md-enter"><span class="i">${ICON.play}</span><span>Market Day</span></button>
 <div class="md-hud" role="status" aria-live="polite" data-testid="md-hud">
-  <div class="md-clock"><span class="i" data-k="phase"></span><span class="t"><b data-k="day"></b><small data-k="time"></small></span><i class="md-dayb"><i data-k="dayf"></i></i></div>
-  <div class="md-lvl" title="Reputation: one point for every order you fill"><b data-k="lvl"></b><small data-k="rep"></small></div>
-  <div class="md-purse" title="Practice round: the city's rules run in your browser. No transaction is sent."><span class="i">${ICON.coin}</span><span class="t"><b data-k="near"></b><small>NEAR · practice</small></span></div>
+  <div class="md-day" title="Market Day: one step at each shop"><span class="i" data-k="phase"></span><span class="md-dots" data-k="dots"></span><b data-k="prog"></b></div>
+  <div class="md-purse" title="Practice round: the city's rules run in your browser. No transaction is sent."><span class="i" data-k="pi">${ICON.coin}</span><b data-k="near"></b></div>
+  <button type="button" class="md-exit" data-testid="md-exit" aria-label="Leave Market Day"><span class="i">${ICON.close}</span></button>
 </div>
 <div class="md-toasts" aria-live="polite"></div>
-<div class="md-nodes" aria-label="Resource nodes"></div>
 <nav class="md-dock" aria-label="Market Day">
-  <button type="button" class="md-ask" data-v="ask" data-testid="md-ask" aria-label="Ask the Lamplighter"><span class="i">${ICON.lamp}</span><span class="l">Ask</span></button>
-  <button type="button" data-v="bag" data-testid="md-bag"><span class="i">${ICON.bag}</span><span class="l">Bag</span><em data-k="bagn"></em></button>
-  <button type="button" data-v="market" data-testid="md-market"><span class="i">${ICON.market}</span><span class="l">Market</span></button>
-  <button type="button" data-v="quests" data-testid="md-quests"><span class="i">${ICON.quest}</span><span class="l">Orders</span><em data-k="qn"></em></button>
-  <button type="button" class="md-exit" data-testid="md-exit" aria-label="Leave Market Day"><span class="i">${ICON.close}</span></button>
+  <button type="button" class="md-ask" data-v="ask" data-testid="md-ask" aria-label="Ask the Town Crier"><span class="i">${ICON.lamp}</span></button>
+  <div class="md-quest" data-testid="md-quest"><span class="md-qn" data-k="qn"></span><span class="md-qt"><b data-k="qshop"></b><small data-k="qneed"></small></span><button type="button" class="md-go" data-act="go" data-testid="md-go" data-k="qgo">Go</button></div>
+  <button type="button" data-v="bag" data-testid="md-bag" aria-label="Your bag"><span class="i">${ICON.bag}</span><em data-k="bagn"></em></button>
 </nav>
 <section class="md-sheet" aria-hidden="true" data-testid="md-sheet"><div class="md-grab" aria-hidden="true"></div><div class="md-body"></div></section>`;
 const K = (k) => root.querySelector(`[data-k="${k}"]`);
@@ -83,20 +82,18 @@ const WHY = {
 const fail = (e) => toast(WHY[e.code] || e.message, 'no');
 
 // ---------- HUD ----------
-const PH = { dawn: ['dawn', 'Dawn'], market: ['sun', 'Market'], dusk: ['dusk', 'Dusk'], night: ['night', 'Night'] };
+const PH = { dawn: 'dawn', market: 'sun', dusk: 'dusk', night: 'night' };
 let lastPhase = null;
+const purse = () => (Q.state(city).sealed ? '••••' : near(me().near));
 function hud() {
-  const c = S.cityClock(city.t), p = me();
-  K('phase').innerHTML = ICON[PH[c.phase][0]];
-  K('day').textContent = `Day ${c.day} · ${PH[c.phase][1]}`;
-  K('time').textContent = `${c.hh}:${c.mm}`;
-  K('dayf').style.width = (c.f * 100).toFixed(1) + '%';
-  K('lvl').textContent = 'Lv ' + S.level(p.rep);
-  K('rep').textContent = p.rep + ' rep';
-  K('near').textContent = near(p.near);
+  const c = S.cityClock(city.t), p = me(), pr = Q.progress(city);
+  K('phase').innerHTML = ICON[PH[c.phase]];
+  K('dots').innerHTML = Q.STEPS.map((s, i) => `<i class="${i < pr.done ? 'done' : i === pr.done ? 'now' : ''}" title="${esc(NAME[s.shop])}"></i>`).join('');
+  K('prog').textContent = `${pr.done}/${pr.total}`;
+  K('near').textContent = purse();
+  K('pi').innerHTML = Q.state(city).sealed ? ICON.seal : ICON.coin;
   const n = Object.entries(p.bag).filter(([g]) => !g.startsWith('share:')).reduce((a, [, v]) => a + v, 0);
   K('bagn').textContent = n || ''; K('bagn').hidden = !n;
-  const q = city.orders.filter((o) => o.poster !== ME).length; K('qn').textContent = q || ''; K('qn').hidden = !q;
   if (c.phase !== lastPhase) { lastPhase = c.phase; sky(c.phase); if (c.phase === 'dawn') dawnOrders(); }
 }
 let lifeMod = null;
@@ -106,117 +103,96 @@ function sky(phase) {
   (lifeMod ||= import('/design/D9_world/js/life.js').catch(() => null)).then((L) => L?.setSky?.(m));
 }
 
-// ---------- nodes on the island ----------
-let THREE = null, core = null;
-const pins = [];
-async function nodes() {
-  if (pins.length) return;
-  try { [THREE, core] = await Promise.all([import('three'), import('/design/D9_world/js/core.js')]); } catch { return; }
-  const box = root.querySelector('.md-nodes');
-  for (const [id, good, q, r] of S.NODES) {
-    const b = h('button', 'md-node', `<span class="ring"></span><span class="i">${iconFor(good)}</span><span class="nm">${esc(GOOD(good))}</span>`);
-    b.type = 'button'; b.dataset.node = id; b.dataset.testid = 'md-node-' + id; b.setAttribute('aria-label', `Gather ${GOOD(good)}`);
-    b.addEventListener('click', () => gatherAt(id, b));
-    box.append(b);
-    pins.push({ id, good, el: b, pos: core.hx(q, r).setY(0.9) });
-  }
+// ---------- the quest bar and the world cues ----------
+let walking = false;
+function quest() {
+  const s = Q.current(city), pr = Q.progress(city);
+  K('qn').textContent = s ? String(pr.done + 1) : '✓';
+  K('qshop').textContent = s ? NAME[s.shop] : `Day ${Q.state(city).day} done`;
+  K('qneed').textContent = s ? s.need : 'Your first coin is in the purse';
+  const go = K('qgo'); go.textContent = walking ? 'On the way' : s ? 'Go' : `Day ${Q.state(city).day + 1}`; go.disabled = walking || guiding;
+  root.querySelector('.md-quest').classList.toggle('walking', walking);
 }
-let safeTop = 0, safeBottom = 0;
-function measureSafe() {
-  safeTop = root.querySelector('.md-hud').getBoundingClientRect().bottom || 64;
-  const d = root.querySelector('.md-dock').getBoundingClientRect(); safeBottom = d.height ? innerHeight - d.top + 8 : 96;
+// Light the road to the next shop and frame the guide and its door together.
+function aim() {
+  if (!playing || document.body.classList.contains('in-shop')) return;
+  const s = Q.current(city); try { if (s) WD().quest?.target(s.shop); else WD().quest?.clear(); } catch {}
 }
-addEventListener('resize', () => playing && measureSafe());
-function placeNodes() {
-  const cam = window.W?.camera; if (!cam || !THREE) return;
-  const v = new THREE.Vector3(); const w = innerWidth, hh = innerHeight;
-  // A shop's name tag never peeks out from under the open sheet: hide it while the sheet covers it.
-  const sh = view ? sheet().getBoundingClientRect() : null;
-  const under = (r) => sh && sh.width && r.right + 8 > sh.left && r.left - 8 < sh.right && r.bottom + 8 > sh.top && r.top - 8 < sh.bottom;
-  for (const pin of document.querySelectorAll('#pins .pin')) {
-    const tag = pin.querySelector('.ban'); pin.classList.remove('md-under');
-    if (tag && pin.classList.contains('on') && under(tag.getBoundingClientRect())) pin.classList.add('md-under');
-  }
-  const bans = [...document.querySelectorAll('#pins .pin.on:not(.md-under) .ban')].map((e) => e.getBoundingClientRect()).filter((r) => r.width);
-  for (const p of pins) {
-    v.copy(p.pos).project(cam);
-    const x = (v.x * 0.5 + 0.5) * w; let y = (-v.y * 0.5 + 0.5) * hh;
-    // A spot never sits on a shop's name tag: step it just below the tag instead.
-    // The spot is 48 px tall above its anchor and its name runs 24 px below it.
-    const hit = () => bans.find((r) => x + 30 > r.left && x - 30 < r.right && y + 26 > r.top && y - 50 < r.bottom);
-    for (let k = 0, r; k < 3 && (r = hit()); k++) y = r.bottom + 54;
-    // Keep spots clear of the HUD, the dock, the screen edges and shop tags, so none is half hidden.
-    const on = !hit() && !under({ left: x - 30, right: x + 30, top: y - 50, bottom: y + 26 }) && v.z < 1 && x > 32 && x < w - 32 && y > safeTop + 56 && y < hh - safeBottom && !document.body.classList.contains('in-shop');
-    p.el.style.display = on ? '' : 'none'; if (!on) continue;
-    p.el.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px) translate(-50%,-100%)`;
-    const cd = S.cooldown(city, ME, p.id);
-    p.el.classList.toggle('rest', cd > 0);
-    p.el.style.setProperty('--cd', ((cd / S.GATHER_S) * 360).toFixed(0) + 'deg');
-  }
-}
-function gatherAt(id, el) {
+async function go() {
+  if (walking || guiding) return;
+  if (Q.finished(city)) { Q.nextDay(city); save(); hud(); quest(); aim(); WD().guideSay?.('A new day. The Hall has work.', { dur: 2.6 }); return; }
+  const s = Q.current(city); walking = true; close(); quest();
   try {
-    const n = S.gather(city, ME, id); const good = S.NODES.find((x) => x[0] === id)[1];
-    fly(el, good, n); save(); hud(); refresh();
-  } catch (e) { fail(e); }
-}
-function fly(from, good, n) {
-  const bag = root.querySelector('[data-v=bag]'); const a = from.getBoundingClientRect(), b = bag.getBoundingClientRect();
-  const chip = h('div', 'md-fly', `<span class="i">${iconFor(good)}</span>+${n}`);
-  document.body.append(chip);
-  chip.style.left = a.left + a.width / 2 + 'px'; chip.style.top = a.top + 'px';
-  if (RM) { setTimeout(() => chip.remove(), 600); bag.classList.add('bump'); setTimeout(() => bag.classList.remove('bump'), 400); return; }
-  chip.animate([{ transform: 'translate(-50%,-50%) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${b.left + b.width / 2 - a.left - a.width / 2}px), calc(-50% + ${b.top - a.top}px)) scale(.6)`, opacity: 0.2 }], { duration: 700, easing: 'cubic-bezier(.5,0,.3,1)' }).finished.then(() => { chip.remove(); bag.classList.add('bump'); setTimeout(() => bag.classList.remove('bump'), 400); });
+    WD().guideSay?.(`To the ${NAME[s.shop]}.`, { dur: 1.8 });
+    await WD().walkTo?.(s.shop); WD().guideWave?.();
+    if (Q.firstVisit(city, s.shop)) { save(); if (!WD().keeperSay?.(s.shop, s.intro, { dur: 2.6 })) WD().guideSay?.(s.intro, { dur: 2.6 }); await new Promise((r) => setTimeout(r, 2000)); }
+    WD().quest?.clear();
+    await WD().enterShop?.(s.shop);
+  } finally { walking = false; quest(); }
 }
 
-// ---------- sheet ----------
-let view = null, viewArg = null, why = null, qty = 1;
+// ---------- the strip inside each shop ----------
+let inShop = null, lastDone = null, whyOpen = false, flash = null;
+const strip = createStrip({ onClick: stripClick });
+const num = (i) => `<span class="qs-n">${i}</span>`;
+const okMark = `<span class="qs-n ok">${ICON.seal}</span>`;
+const row = (lead, title, sub, btn) => `<div class="qs-row">${lead}<div class="qs-t"><b>${esc(title)}</b>${sub ? `<small>${sub}</small>` : ''}</div>${btn || ''}</div>`;
+const gold = (act, label, extra = '') => `<button type="button" class="qs-go" data-qs="${act}" data-testid="qs-${act}" ${extra}>${esc(label)}</button>`;
+const ghost = (act, label, extra = '') => `<button type="button" class="qs-ghost" data-qs="${act}" data-testid="qs-${act}" ${extra}>${esc(label)}</button>`;
+const proofLink = (p) => (p ? `<a class="qs-proof" href="${p.url}" target="_blank" rel="noopener">${esc(p.label)} ↗</a>` : '');
+const whyBlock = (good) => { const q = S.quoteAt(city, 'arena', good); return `<button type="button" class="qs-link" data-qs="why" aria-expanded="${whyOpen}">${ICON.info}<span>Why this price?</span></button>${whyOpen ? `<div class="qs-why md-why">${whyHtml(q, GOOD(good))}</div>` : ''}`; };
+
+function stripHtml(id) {
+  const s = Q.current(city), pr = Q.progress(city), p = me();
+  if (lastDone && lastDone.shop === id) {
+    const r = lastDone.res, nx = Q.current(city);
+    let sub = proofLink(lastDone.step.proof);
+    if (lastDone.step.id === 'sell') sub = `+${near(r.total)} NEAR · price ${near(r.before)} → ${near(r.after)}`;
+    if (lastDone.step.id === 'write') sub = `Level ${r.level} · your purse keeps ${near(p.near)} NEAR`;
+    const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
+    return { gold: true, html: row(okMark, r.line, sub, gold('next', nx ? `Next: ${NAME[nx.shop]}` : 'Back to town')) + extra };
+  }
+  if (s && s.shop === id) {
+    let reward = esc(s.reward), extra = '';
+    if (s.id === 'sell') { const pv = Q.salePreview(city); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', 'good:salt', pv.n); } catch {} reward = `+${near(t)} NEAR · ${near(pv.before)} each`; extra = `<div class="qs-more">${whyBlock('good:salt')}</div>`; }
+    return { gold: true, html: row(num(pr.done + 1), s.need, reward, gold('act', s.btn)) + extra };
+  }
+  // off the story path: the Square is still the market and producing shops still make goods
+  if (id === 'arena') { const g = Object.keys(S.GOODS).find((k) => p.bag[k] && city.shops.arena.goods[k]); if (g) { const n = Math.min(p.bag[g], S.MAX_QTY); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', g, n); } catch {} return { gold: true, html: row(`<span class="qs-n tok">${iconFor(g)}</span>`, `Sell ${n} ${GOOD(g).toLowerCase()}`, `+${near(t)} NEAR`, gold('sell', 'Sell', `data-good="${g}" data-n="${n}"`)) + `<div class="qs-more">${whyBlock(g)}</div>` }; } }
+  const berths = S.nodesAt(id);
+  if (berths.length) { const good = berths[0][1]; const wait = Math.min(...berths.map(([n]) => S.cooldown(city, Q.ME, n))); return { gold: !wait, html: row(`<span class="qs-n tok">${iconFor(good)}</span>`, `${NAME[id]} makes ${GOOD(good).toLowerCase()}`, wait ? `Ready in ${wait}s` : '+1 each berth', wait ? ghost('collect', 'Collect', 'disabled') : gold('collect', 'Collect')) }; }
+  if (s) return { gold: false, html: row(`<span class="qs-n dim">${pr.done + 1}</span>`, `Next stop: ${NAME[s.shop]}`, esc(s.need), ghost('there', 'Go')) };
+  return null;
+}
+function paintStrip() {
+  if (!playing || !inShop) { strip.hide(); return; }
+  const v = stripHtml(inShop); if (!v) { strip.hide(); return; }
+  if (flash && flash.shop === inShop) v.html = v.html.replace(/<small>[\s\S]*?<\/small>/, `<small class="qs-flash${flash.no ? ' no' : ''}">${esc(flash.text)}</small>`);
+  strip.show(v.html, { gold: v.gold });
+}
+async function stripClick(a, b) {
+  try {
+    if (a === 'act') {
+      const step = Q.current(city); const res = Q.act(city, inShop); lastDone = { shop: inShop, step, res };
+      save(); hud(); quest(); seal(b); whyOpen = false; flash = null;
+    } else if (a === 'why') whyOpen = !whyOpen;
+    else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); flash = { shop: inShop, text: `Sold for ${near(t)} NEAR` }; save(); hud(); }
+    else if (a === 'collect') { let got = 0, good = null; for (const [n, g] of S.nodesAt(inShop)) { try { got += S.gather(city, Q.ME, n); good = g; } catch {} } if (got) flash = { shop: inShop, text: `+${got} ${GOOD(good).toLowerCase()} in your bag` }; save(); hud(); }
+    else if (a === 'next' || a === 'there') { lastDone = null; strip.hide(); await WD().exitShop?.(); if (Q.current(city)) setTimeout(go, 350); return; }
+    paintStrip();
+  } catch (e) { flash = { shop: inShop, text: WHY[e.code] || e.message, no: true }; paintStrip(); }
+}
+addEventListener('world:interior-ready', (e) => { inShop = e.detail?.id || null; flash = null; if (lastDone && lastDone.shop !== inShop) lastDone = null; whyOpen = false; setTimeout(paintStrip, 30); });
+addEventListener('world:exterior-ready', () => { inShop = null; lastDone = null; strip.hide(); aim(); });
+setInterval(() => { if (playing && inShop && !lastDone && S.nodesAt(inShop).length) paintStrip(); }, 1000);
+
+// ---------- sheet: the bag and the guide ----------
+let view = null;
 const sheet = () => root.querySelector('.md-sheet');
-function open(v, arg) { document.body.classList.add('md-sheet-open'); view = v; viewArg = arg; why = null; if (v !== 'counter') qty = 1; render(); sheet().classList.add('open'); sheet().setAttribute('aria-hidden', 'false'); root.querySelectorAll('.md-dock [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (v === 'counter' ? 'market' : v))); }
+function open(v) { document.body.classList.add('md-sheet-open'); view = v; render(); sheet().classList.add('open'); sheet().setAttribute('aria-hidden', 'false'); root.querySelectorAll('.md-dock [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === v)); }
 function close() { document.body.classList.remove('md-sheet-open'); view = null; sheet().classList.remove('open'); sheet().setAttribute('aria-hidden', 'true'); root.querySelectorAll('.md-dock [data-v]').forEach((b) => b.classList.remove('on')); }
 const refresh = () => { if (view) render(); };
-const head = (icon, title, sub, back) => `<header class="md-head">${back ? `<button type="button" class="md-icon md-back" data-act="back" aria-label="Back">${ICON.back}</button>` : `<span class="md-badge">${icon}</span>`}<div><h2>${esc(title)}</h2><p>${esc(sub)}</p></div><button type="button" class="md-icon" data-act="close" aria-label="Close">${ICON.close}</button></header>`;
-
-function best(good) {
-  let lo = null, hi = null;
-  for (const [id, s] of Object.entries(city.shops)) {
-    if (!s.goods[good]) continue; const q = S.quoteAt(city, id, good);
-    if (s.goods[good].stock > 0 && (!lo || BigInt(q.buy) < lo.p)) lo = { id, p: BigInt(q.buy) };
-    if (S.isOpen(s) && (!hi || BigInt(q.sell) > hi.p)) hi = { id, p: BigInt(q.sell) };
-  }
-  return { lo, hi };
-}
-
-function vMarket() {
-  const rows = Object.keys(S.GOODS).map((g) => { const { lo, hi } = best(g); const have = me().bag[g] || 0;
-    return `<button type="button" class="md-row" data-act="counter" data-shop="${hi?.id || lo?.id}" data-good="${g}" data-testid="md-good-${g.slice(5)}">
-      <span class="md-tok">${iconFor(g)}</span><span class="md-nm"><b>${GOOD(g)}</b><small>${have ? `You have ${have}` : 'None in your bag'}</small></span>
-      <span class="md-px"><small>Best sell</small><b>${hi ? near(hi.p) : '—'}</b><small>${hi ? esc(NAME[hi.id]) : 'all closed'}</small></span></button>`; }).join('');
-  const shops = Object.entries(city.shops).map(([id, s]) => `<button type="button" class="md-shop ${S.isOpen(s) ? '' : 'dark'}" data-act="counter" data-shop="${id}" data-testid="md-shop-${id}" title="${esc(NAME[id])}${S.isOpen(s) ? '' : ': closed, out of funds'}"><i></i>${esc(SHORT[id])}</button>`).join('');
-  return head(ICON.market, 'Market', 'Prices move with every trade.') + `<div class="md-list">${rows}</div><h3 class="md-sub">Counters</h3><div class="md-shops">${shops}</div>`;
-}
-
-function vCounter() {
-  const id = viewArg.shop, s = city.shops[id]; const goods = Object.keys(s.goods);
-  const sel = viewArg.good && s.goods[viewArg.good] ? viewArg.good : goods[0]; viewArg.good = sel;
-  const open_ = S.isOpen(s); const have = me().bag[sel] || 0;
-  const rows = goods.map((g) => { const q = S.quoteAt(city, id, g); return `<button type="button" class="md-row ${g === sel ? 'sel' : ''}" data-act="pick" data-good="${g}" aria-pressed="${g === sel}">
-    <span class="md-tok">${iconFor(g)}</span><span class="md-nm"><b>${GOOD(g)}</b><small>${s.goods[g].stock} on the shelf</small></span>
-    <span class="md-px two"><span><small>Sell</small><b>${open_ ? near(q.sell) : '—'}</b></span><span><small>Buy</small><b>${near(q.buy)}</b></span></span></button>`; }).join('');
-  const q = S.quoteAt(city, id, sel);
-  const sellN = Math.min(qty, have), canSell = open_ && sellN > 0;
-  let sellTotal = 0n; if (canSell) { const c2 = structuredClone(city); try { sellTotal = S.sell(c2, ME, id, sel, sellN); } catch {} }
-  const status = open_ ? `<span class="md-pill ok">Open</span>` : `<span class="md-pill no">Closed: out of funds</span>`;
-  const whyBox = why === sel ? `<div class="md-why">${whyHtml(q, GOOD(sel))}</div>` : '';
-  const cta = !open_
-    ? `<button type="button" class="md-cta" data-act="invest" data-testid="md-invest">Invest 0.0100 to reopen</button>`
-    : canSell ? `<button type="button" class="md-cta" data-act="sell" data-testid="md-sell">Sell ${sellN} ${esc(GOOD(sel))} · ${near(sellTotal)}</button>`
-    : `<p class="md-hint" data-testid="md-sell-hint">Gather ${esc(GOOD(sel).toLowerCase())} on the island to sell it here.</p>`;
-  return head(null, NAME[id], open_ ? 'Sell what you gather. Buy for orders.' : 'Out of funds. It still sells.', true)
-    + `<div class="md-stat">${status}<button type="button" class="md-link" data-act="why" aria-expanded="${why === sel}" data-testid="md-why">${ICON.info}<span>Why this price?</span></button></div>${whyBox}<div class="md-list">${rows}</div>
-    <div class="md-trade"><div class="md-step" role="group" aria-label="Quantity"><button type="button" data-act="qty" data-d="-1" aria-label="One less">−</button><b data-testid="md-qty">${qty}</b><button type="button" data-act="qty" data-d="1" aria-label="One more">+</button></div>
-    <button type="button" class="md-ghost grow" data-act="buy" data-testid="md-buy">Buy ${qty} ${esc(GOOD(sel))} · ${near(BigInt(q.buy) * BigInt(qty))}</button></div>${cta}`;
-}
+const head = (icon, title, sub) => `<header class="md-head"><span class="md-badge">${icon}</span><div><h2>${esc(title)}</h2><p>${esc(sub)}</p></div><button type="button" class="md-icon" data-act="close" aria-label="Close">${ICON.close}</button></header>`;
 
 function vBag() {
   const p = me(); const tiles = [...Object.keys(S.GOODS), ...Object.keys(S.ITEMS)].map((g) => `<div class="md-tile ${p.bag[g] ? '' : 'empty'}"><span class="md-tok">${iconFor(g)}</span><b>${p.bag[g] || 0}</b><small>${GOOD(g)}</small></div>`).join('');
@@ -225,53 +201,34 @@ function vBag() {
   const recipes = Object.entries(S.ITEMS).map(([item, r]) => { const ok = Object.entries(r.inputs).every(([g, n]) => (p.bag[g] || 0) >= n);
     const ins = Object.entries(r.inputs).map(([g, n]) => `<span class="md-in ${(p.bag[g] || 0) >= n ? '' : 'miss'}"><span class="md-tok xs">${iconFor(g)}</span>${n}</span>`).join('<span class="md-plus">+</span>');
     return `<div class="md-recipe"><div class="md-ins">${ins}<span class="md-arrow">→</span><span class="md-tok">${iconFor(item)}</span></div><div class="md-rtxt"><b>${GOOD(item)}</b><small>${esc(r.use)}</small></div><button type="button" class="md-ghost sm" data-act="craft" data-item="${item}" ${ok ? '' : 'disabled'} data-testid="md-craft-${item.slice(5)}">Craft</button></div>`; }).join('');
-  const sellable = Object.keys(S.GOODS).find((g) => p.bag[g]);
-  return head(ICON.bag, 'Your bag', `${near(p.near)} NEAR` + (p.bag['item:tool'] ? ` · tool: ${S.TOOL_LIFE - p.toolUses} gathers left` : ''))
+  const sellable = Object.keys(S.GOODS).some((g) => p.bag[g]);
+  return head(ICON.bag, 'Your bag', `${purse()} NEAR` + (p.bag['item:tool'] ? ` · tool: ${S.TOOL_LIFE - p.toolUses} gathers left` : ''))
     + `<div class="md-grid">${tiles}</div>${sh}<h3 class="md-sub">Craft</h3>${recipes}`
-    + (sellable ? `<button type="button" class="md-cta" data-act="counter" data-good="${sellable}" data-shop="${best(sellable).hi?.id || 'arena'}">Sell ${esc(GOOD(sellable))} at the best counter</button>` : `<p class="md-hint">Tap a glowing spot on the island to gather.</p>`);
-}
-
-function vQuests() {
-  const p = me(); const list = city.orders.filter((o) => o.poster !== ME);
-  const first = list.find((o) => (p.bag[o.good] || 0) >= 1);
-  const rows = list.map((o) => { const n = Math.min(o.qty, p.bag[o.good] || 0);
-    return `<div class="md-order"><span class="md-tok">${iconFor(o.good)}</span><div class="md-nm"><b>${esc(o.text)}</b><small>${o.qty} ${esc(GOOD(o.good))} · ${near(o.reward)} · +1 rep</small></div>
-    ${o === first ? '' : `<button type="button" class="md-ghost sm" data-act="fill" data-id="${o.id}" ${n ? '' : 'disabled'}>${n ? `Deliver ${n}` : `Need ${esc(GOOD(o.good))}`}</button>`}</div>`; }).join('');
-  const cta = first ? `<button type="button" class="md-cta" data-act="fill" data-id="${first.id}" data-testid="md-fill">Deliver ${Math.min(first.qty, p.bag[first.good])} ${esc(GOOD(first.good))} · ${near(first.reward * BigInt(Math.min(first.qty, p.bag[first.good])))}</button>` : '';
-  return head(ICON.quest, 'Town Hall orders', 'New orders at dawn. Goods are used up.')
-    + (rows ? `<div class="md-list">${rows}</div>` : `<p class="md-hint">No orders right now. New ones come at dawn.</p>`) + cta;
+    + `<p class="md-hint">${sellable ? 'Sell at the Vault Arena square.' : 'Shops make goods: the Ferry, the Toll Bridge, the Guardhouse and your House.'}</p>`;
 }
 
 function render() {
   const body = root.querySelector('.md-body');
-  body.innerHTML = view === 'market' ? vMarket() : view === 'counter' ? vCounter() : view === 'bag' ? vBag() : view === 'quests' ? vQuests() : view === 'ask' ? vAsk() : '';
+  body.innerHTML = view === 'bag' ? vBag() : view === 'ask' ? vAsk() : '';
 }
 
 root.addEventListener('click', (ev) => {
   const b = ev.target.closest('[data-act],[data-v]'); if (!b || b.disabled) return;
-  if (b.dataset.v) { if (guiding) return; view === b.dataset.v ? close() : open(b.dataset.v); if (view === 'ask') setTimeout(() => root.querySelector('.md-say input')?.focus(), 60); return; }
+  if (b.dataset.v) { if (guiding || walking) return; view === b.dataset.v ? close() : open(b.dataset.v); if (view === 'ask') setTimeout(() => root.querySelector('.md-say input')?.focus(), 60); return; }
   if (b.dataset.act === 'ask') { ask(b.dataset.text || root.querySelector('.md-say input')?.value || ''); return; }
   const a = b.dataset.act;
   try {
     if (a === 'close') close();
-    else if (a === 'back') open('market');
-    else if (a === 'counter') open('counter', { shop: b.dataset.shop, good: b.dataset.good });
-    else if (a === 'pick') { viewArg.good = b.dataset.good; why = null; render(); }
-    else if (a === 'qty') { qty = Math.max(1, Math.min(S.MAX_QTY, qty + +b.dataset.d)); render(); }
-    else if (a === 'why') { why = why === viewArg.good ? null : viewArg.good; render(); }
-    else if (a === 'sell') { const n = Math.min(qty, me().bag[viewArg.good] || 0); const t = S.sell(city, ME, viewArg.shop, viewArg.good, n); toast(`Sold ${n} ${GOOD(viewArg.good)} for ${near(t)} NEAR`); seal(b); }
-    else if (a === 'buy') { const t = S.buy(city, ME, viewArg.shop, viewArg.good, qty); toast(`Bought ${qty} ${GOOD(viewArg.good)} for ${near(t)} NEAR`); }
-    else if (a === 'invest') { const u = S.invest(city, ME, viewArg.shop, 10n * S.MILLI); toast(`You own ${u} shares. 20% of sales come back until 110% is repaid.`); }
+    else if (a === 'go') go();
     else if (a === 'claim') toast(`Claimed ${near(S.claim(city, ME, b.dataset.shop))} NEAR`);
     else if (a === 'craft') { S.craft(city, ME, b.dataset.item); toast(`Crafted a ${GOOD(b.dataset.item).toLowerCase()}`); }
-    else if (a === 'fill') { const o = city.orders.find((x) => x.id === +b.dataset.id); const n = Math.min(o.qty, me().bag[o.good] || 0); const w = S.fillOrder(city, ME, o.id, n); toast(`Delivered. Wage ${near(w)} NEAR, +1 rep`); }
     save(); hud(); refresh();
   } catch (e) { fail(e); }
 });
 function seal(b) { if (RM) return; b.animate?.([{ transform: 'scale(1)' }, { transform: 'scale(.97)' }, { transform: 'scale(1)' }], { duration: 220 }); }
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) { close(); e.stopPropagation(); } }, true);
 
-// ---------- the guide: talk to the Lamplighter; it walks to the right shop and acts ----------
+// ---------- the guide: talk to the Town Crier; it walks to the right shop and acts ----------
 const API = () => (window.NEARCARTA_API || '').replace(/\/$/, '');
 let guiding = false;
 function chips() {
@@ -286,8 +243,8 @@ function chips() {
   return out.slice(0, 3);
 }
 function vAsk() {
-  return head(ICON.lamp, 'Lamplighter', 'Say it. I walk there and do it.')
-    + `<form class="md-say" data-testid="md-say"><input type="text" maxlength="200" autocomplete="off" placeholder="Tell me what to do" aria-label="What should the Lamplighter do?"><button type="submit" class="md-icon md-send" aria-label="Send">${ICON.send}</button></form>`
+  return head(ICON.lamp, 'Town Crier', 'Say it. I walk there and do it.')
+    + `<form class="md-say" data-testid="md-say"><input type="text" maxlength="200" autocomplete="off" placeholder="Tell me what to do" aria-label="What should the Town Crier do?"><button type="submit" class="md-icon md-send" aria-label="Send">${ICON.send}</button></form>`
     + `<div class="md-chips">${chips().map((c) => `<button type="button" class="md-ghost" data-act="ask" data-text="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
 }
 root.addEventListener('submit', (e) => { if (!e.target.closest('.md-say')) return; e.preventDefault(); ask(e.target.querySelector('input').value); });
@@ -301,7 +258,7 @@ async function think(text) {
 const WD = () => window.world || {};
 async function ask(text) {
   text = String(text || '').trim(); if (!text || guiding) return;
-  guiding = true; document.body.classList.add('md-guiding'); close();
+  guiding = true; document.body.classList.add('md-guiding'); close(); quest();
   const say = (t, o) => { try { WD().guideSay?.(t, o); } catch {} };
   say('Let me see…', { style: 'think', dur: 1.6 });
   const ans = await think(text);
@@ -318,25 +275,25 @@ async function ask(text) {
   } catch (e) { say(WHY[e.code] || 'That did not work.', { style: 'warn', dur: 3 }); fail(e); }
   finally {
     window.__marketday.lastGuide = { text, by: ans.by, intent: ans.intent, step: { ...step, amount: step.amount?.toString() }, proof: ans.proof || null };
-    setTimeout(() => { if (was != null) WD().zoom?.(was); guiding = false; document.body.classList.remove('md-guiding'); }, 1400);
+    setTimeout(() => { if (was != null) WD().zoom?.(was); guiding = false; document.body.classList.remove('md-guiding'); quest(); aim(); }, 1400);
   }
 }
 
 // ---------- play mode ----------
-let playing = false, timer = 0, raf = 0, lastT = 0;
+let playing = false, timer = 0;
+let lastT = 0;
 function enter() {
   playing = true; document.body.classList.add('md-play');
   try { window.__skipTownIntro?.(); } catch {}
-  // Pull the camera back to the town view so the resource spots on the island are in sight.
-  setTimeout(() => { const out = document.querySelector('#zoom .zb[data-d="1"]'); for (let i = 0; i < (innerWidth < 720 ? 5 : 3); i++) out?.click(); }, 400);
   history.replaceState(null, '', location.pathname + (location.search.includes('play') ? location.search : (location.search ? location.search + '&' : '?') + 'play'));
-  nodes().then(() => { const tick = () => { placeNodes(); raf = requestAnimationFrame(tick); }; cancelAnimationFrame(raf); tick(); });
-  lastT = performance.now(); lastPhase = null; dawnOrders(); hud(); requestAnimationFrame(measureSafe);
-  clearInterval(timer); timer = setInterval(() => { const now = performance.now(); S.advance(city, Math.round((now - lastT) / 1000)); lastT += Math.round((now - lastT) / 1000) * 1000; hud(); if (view === 'quests' || view === 'counter') { /* prices and orders keep their place */ } save(); }, 1000);
-  if (!localStorage.getItem(KEY + '.seen')) { localStorage.setItem(KEY + '.seen', '1'); toast('Tap a glowing spot to gather. Sell at a counter. Fill orders for wages.'); }
+  try { WD().guideLook?.('crier'); } catch {}
+  lastT = performance.now(); lastPhase = null; dawnOrders(); hud(); quest();
+  setTimeout(() => { aim(); if (!Q.state(city).met.intro) { Q.state(city).met.intro = 1; save(); WD().guideSay?.('New merchant? Earn your first coin by dusk.', { dur: 4.2 }); } }, 500);
+  clearInterval(timer); timer = setInterval(() => { const now = performance.now(); S.advance(city, Math.round((now - lastT) / 1000)); lastT += Math.round((now - lastT) / 1000) * 1000; hud(); save(); }, 1000);
 }
 function leave() {
-  playing = false; document.body.classList.remove('md-play'); close(); clearInterval(timer); cancelAnimationFrame(raf);
+  playing = false; document.body.classList.remove('md-play'); close(); clearInterval(timer); strip.hide();
+  try { WD().quest?.clear(); WD().guideLook?.('robot'); } catch {}
   history.replaceState(null, '', location.pathname + location.search.replace(/([?&])play(&|$)/, '$1').replace(/[?&]$/, ''));
   (lifeMod ||= import('/design/D9_world/js/life.js').catch(() => null)).then((L) => L?.setSky?.('auto'));
 }
@@ -345,8 +302,8 @@ root.querySelector('.md-exit').addEventListener('click', leave);
 
 function mount() {
   document.body.append(root);
-  hud();
-  if (/[?&]play\b/.test(location.search)) { const go = () => (window.__ready ? enter() : setTimeout(go, 300)); go(); }
+  hud(); quest();
+  if (/[?&]play\b/.test(location.search)) { const go_ = () => (window.__ready ? enter() : setTimeout(go_, 300)); go_(); }
 }
 if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mount); else mount();
-window.__marketday = { get city() { return city; }, enter, leave, open, reset() { city = S.createCity(); save(); hud(); refresh(); } };
+window.__marketday = { get city() { return city; }, enter, leave, open, go, story: Q, reset() { city = S.createCity(); save(); hud(); quest(); refresh(); aim(); } };

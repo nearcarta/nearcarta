@@ -20,7 +20,6 @@ for (const [W, H] of [[1440, 900], [390, 844]]) {
   await p.waitForFunction(() => document.body.classList.contains('md-play'), null, { timeout: 120e3 });
   await p.waitForTimeout(+(process.env.SETTLE || 9000));
   await p.evaluate(() => { const c = window.__marketday.city; const me = c.players.you || (c.players.you = { near: 0n, bag: {}, rep: 0, lastGather: {}, paid: 0n, paidDay: 0 }); });
-  for (const n of await p.locator('.md-node:visible').all()) await n.click({ force: true }).catch(() => {});
   const shot = async (name) => { await p.waitForFunction(() => { const s = document.querySelector('.md-sheet.open'); return !s || getComputedStyle(s).opacity === '1'; }, null, { timeout: 15e3 }).catch(() => {}); await p.screenshot({ path: `${OUT}/guide-${name}-${W}.png` }); report[`${name}-${W}`] = await checks(p); };
   await p.locator('[data-testid=md-ask]').click(); await p.waitForTimeout(600); await shot('ask');
   await p.locator('.md-chips button').first().click();
