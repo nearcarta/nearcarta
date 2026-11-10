@@ -1274,3 +1274,87 @@ body.in-shop nav.all-shops {
 @media (max-width: 720px) {
   body.in-shop nav.all-shops { left: 8px !important; }
 }
+
+/* ============================================================================================
+   11. Icons on the tabs and the CTA, from the reference
+   --------------------------------------------------------------------------------------------
+   Every tab in the references carries a small icon, and the primary button carries the shop's
+   own symbol. Adding markup to nine shops would be nine chances to diverge, so the glyph is a
+   CSS ::before drawn from the same 3D icon set, keyed off the tab's data-testid. A tab with no
+   mapping simply has no icon, never a broken one.
+   ============================================================================================ */
+
+body #shopUI #tray [role='tab']::before,
+body #shopUI #tray .ferry-tab::before,
+body #shopUI #tray .guard-tab::before,
+body #shopUI #tray .hall-tab::before,
+body #shopUI #tray .bank-tab::before,
+body #shopUI #tray .payouts-tab::before,
+body #shopUI #tray .arena-mode::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: currentColor;
+  opacity: .55;
+  -webkit-mask: var(--tab-ico) center / contain no-repeat;
+  mask: var(--tab-ico) center / contain no-repeat;
+}
+
+/* Active tabs paint their icon in the dark ink of the gold pill. */
+body #shopUI #tray .ferry-tab.on::before,
+body #shopUI #tray .guard-tab.on::before,
+body #shopUI #tray .hall-tab.on::before,
+body #shopUI #tray .bank-tab.on::before,
+body #shopUI #tray .payouts-tab.on::before,
+body #shopUI #tray .arena-mode.on::before,
+body #shopUI #tray [role='tab'][aria-selected='true']::before { opacity: .8; }
+
+/* One icon per known tab, by its testid. Ferry. */
+body #shopUI #tray [data-testid$='-tab-swap']::before      { --tab-ico: url('/tokens/near.svg'); }
+body #shopUI #tray [data-testid$='-tab-routes']::before    { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/link-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-rules']::before     { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/file-text-premium.webp'); }
+/* Guard. */
+body #shopUI #tray [data-testid$='-tab-check']::before     { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/zoom-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-pay']::before       { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/shield-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-blocks']::before    { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/lock-premium.webp'); }
+/* Town Hall. */
+body #shopUI #tray [data-testid$='-tab-post']::before      { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/file-text-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-agents']::before    { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/chat-bubble-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-receipts']::before  { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/tick-premium.webp'); }
+/* Payouts. */
+body #shopUI #tray [data-testid$='-tab-invoice']::before   { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/file-text-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-payroll']::before   { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/money-bag-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-csv']::before       { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/card-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-invoices']::before  { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/wallet-premium.webp'); }
+/* Arena modes. */
+body #shopUI #tray [data-testid$='-mode-mint']::before     { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/shield-premium.webp'); }
+body #shopUI #tray [data-testid$='-mode-feed']::before     { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/gift-premium.webp'); }
+body #shopUI #tray [data-testid$='-mode-withdraw']::before { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/money-bag-premium.webp'); }
+/* Bank. */
+body #shopUI #tray [data-testid$='-tab-audit']::before     { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/chart-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-attest']::before    { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/tick-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-log']::before       { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/file-text-premium.webp'); }
+/* Toll. */
+body #shopUI #tray [data-testid$='-tab-pass']::before      { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/link-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-proof']::before     { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/wallet-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-split']::before     { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/chart-premium.webp'); }
+/* House. */
+body #shopUI #tray [data-testid$='-tab-deed']::before      { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/file-text-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-vaults']::before    { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/lock-premium.webp'); }
+body #shopUI #tray [data-testid$='-tab-heirs']::before     { --tab-ico: url('/design/D2_game/d7/assets/3dicons/192/key-premium.webp'); }
+
+/* The primary CTA carries a leading glyph in the reference. It is a small arrow: the same mark
+   on every shop, so the button reads as one control across the town. */
+body #shopUI #tray > .t-row > #t-act.primary::before,
+body #shopUI #tray #t-form > .primary::before,
+body #shopUI #tray #t-form #f-quote::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  -webkit-mask: url('/design/D2_game/d7/assets/3dicons/192/tick-premium.webp') center / contain no-repeat;
+  mask: url('/design/D2_game/d7/assets/3dicons/192/tick-premium.webp') center / contain no-repeat;
+}

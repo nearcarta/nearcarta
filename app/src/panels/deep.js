@@ -507,6 +507,15 @@ function mountFerry(root, hooks) {
       state.amt = bal; state.amtEdited = true; state.q = null; state.quoteError = ''; state.acted = false; state.sample = false;
       paint();
     };
+    // The balance the reference shows at each card's top right. It comes from the session the
+    // shop already has; when there is no session the card simply shows nothing rather than a
+    // number nobody read.
+    if (state.fromBal == null) {
+      try {
+        const v = visitor();
+        state.fromBal = v?.signedIn && v.balanceNear != null ? `Balance: ${v.balanceNear} NEAR` : '';
+      } catch { state.fromBal = ''; }
+    }
     // The circular swap-direction control between the two cards. Same as choosing the other side.
     const flip = q$(root, '#f-flip');
     if (flip) flip.onclick = () => {
