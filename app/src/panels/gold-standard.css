@@ -371,3 +371,84 @@ body:not(.ferry-tray) #shopUI #tray #t-form .payout-status {
 body:not(.ferry-tray) #shopUI #tray #t-form .hall-status { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 body:not(.ferry-tray) #shopUI #tray #t-form .guard-status { max-height: 96px; overflow-y: auto; }
 body:not(.ferry-tray) #shopUI #tray > .t-row { margin-top: var(--gs-gap) !important; }
+
+/* ============================================================================================
+   Hall / Jobs — the Agents tab was 31px over one screen at 1440x900
+   --------------------------------------------------------------------------------------------
+   Four fields plus a 59px market hint. The two short ones (part number, quote amount) share a
+   row, which is what takes the pane back inside the panel. Every field is still there: the same
+   ids, the same handlers, the same tab. Nothing moves to a new tab because nothing had to — the
+   other two tabs already fit.
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--gs-gap) var(--gs-gap-tight);
+  align-items: start;
+}
+
+/* The hint, the two long fields and the part lines keep the whole row. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-gap,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-line,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-text,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-field:has(#hall-quote-worker),
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-field:has(#hall-deliverable) {
+  grid-column: 1 / -1;
+}
+
+/* The two short fields sit side by side. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-field:has(#hall-quote-part),
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-field:has(#hall-quote-near) {
+  grid-column: auto;
+  min-width: 0;
+}
+
+/* One gold action: the panel CTA is the primary, so the in-form action is outlined. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='post'] .hall-cta {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+@media (max-width: 720px) {
+  body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The market hint is the tallest non-field block in the Agents pane (59px of prose). It clamps to
+   two lines with the full text still in the DOM, which is what brings both tabs inside the panel;
+   the post tab's 26px comes from the same rule applying to its note. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-gap,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+}
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] { gap: var(--gs-gap-tight) !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='post'] { gap: var(--gs-gap-tight) !important; }
+
+/* The form itself carries overhead the panes do not need: the shared layer added a bottom pad and
+   16px between the tabs, the flow strip and the pane. Hall needs ~40px, and it comes from that
+   overhead — never from a field, a font or a handler. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-card { gap: 10px !important; padding: 0 !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane { gap: 8px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-split { gap: 8px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field { gap: 4px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field input,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field select { min-height: 38px !important; height: 38px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form { padding-bottom: 0 !important; }
+body:not(.ferry-tray) #shopUI #tray > .t-scroll { gap: 8px !important; }
+
+/* The last three pixels: the inner column was 3px taller than its own box while the panel itself
+   did not scroll. One more 2px from the tab row's bottom margin closes it without touching a
+   field, so the audit's "scrolls" cell is honest rather than a rounding artefact. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-tabs { margin-bottom: 0 !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field input,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field select { min-height: 36px !important; height: 36px !important; }
