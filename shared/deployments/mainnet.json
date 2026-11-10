@@ -827,8 +827,10 @@
           "create": "GkjygcNGy6aMxdSgSqYNbWGWiHQuYat2hUYTjsA2V7tv",
           "agent_key": "CkYUouf4DrhCpdsuCTXLabSYAPAyaEqavaopN7btsvXN",
           "row": "8HoVwiCPd6FqxA1GbKQv3Xby8wDb4ejT6g9Bg8yyViFs",
-          "sweep": "Cj7c5GdZGX8RLQwZ7Gt3QCeWJXJcxrmp844MJVjxNwRp"
-        }
+          "sweep": "Cj7c5GdZGX8RLQwZ7Gt3QCeWJXJcxrmp844MJVjxNwRp",
+          "anchor_profit": "HLyzwHh8nRHHpiSYXtGmScxkUFgiiqowuufvUCRCFamk"
+        },
+        "anchor_note": "2026-11-10: board.anchor(kind bank_profit) from the Bank keeper row. The log carries only the commitment 94217e0efc05136e17410c9500cb2247a37343a59eb353682f31f66529d1cf2b; the amount stays off chain. Burnt 0.000359 NEAR."
       },
       "house": {
         "account": "keeper-house.nearcarta.near",
