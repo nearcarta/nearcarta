@@ -464,12 +464,40 @@ function mountFerry(root, hooks) {
       hooks.onPair({ from, to, amt: state.amt, fromSym: fs, fromChain: fc, toSym: ts, toChain: tc, order });
     };
     const clearQuote = () => { state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
-    // BALANCES STAY OFF. readBalance and its tests work, but inside the panel the read comes
-    // back empty: the two sides are settled after the catalogue load, and by then the rpc
-    // client or the token object still does not line up. A wrong number is worse than none, so
-    // the line stays empty. Two attempts, then stop and report — the blocker is timing/plumbing,
-    // not the reader.
-    const refreshBalances = async () => { state.fromBal = ""; state.toBal = ""; };
+    // The balances the swap cards show. The token is taken from the RENDERED pill's own
+    // `data-value` ("wNEAR|near"), not from panel state, so it cannot disagree with what the
+    // visitor sees. The result is written only if the pill still holds the same value when it
+    // comes back, so a slow read for a token they have already changed cannot land on the card.
+    let balSeq = 0;
+    const sideToken = (pillId) => {
+      const el = root.querySelector('#' + pillId);
+      const value = el?.dataset?.value || '';
+      const choice = (state.choices || []).find(c => c.id === value) || null;
+      return { value, choice };
+    };
+    const refreshBalances = async () => {
+      const seq = ++balSeq;
+      const who = (() => { try { return visitor()?.accountId || ''; } catch { return ''; } })();
+      if (!who) { state.fromBal = ''; state.toBal = ''; return; }
+      const from = sideToken('f-from');
+      const to = sideToken('f-to');
+      if (!from.choice && !to.choice) { state.fromBal = ''; state.toBal = ''; return; }
+      const { readBalance, balanceLine } = await import('./balance.js');
+      const { ferryRpc } = await import('./ferry-rpc.js');
+      const rpc = ferryRpc();
+      const [ra, rb] = await Promise.all([
+        from.choice ? readBalance(who, from.choice, { rpc }).catch(() => null) : null,
+        to.choice ? readBalance(who, to.choice, { rpc }).catch(() => null) : null,
+      ]);
+      // A later read has started: this answer is about a token that is no longer chosen.
+      if (seq !== balSeq) return;
+      // And the pill must still hold the value this read was for.
+      if (sideToken('f-from').value !== from.value) return;
+      if (sideToken('f-to').value !== to.value) return;
+      state.fromBal = ra ? balanceLine(ra) : '';
+      state.toBal = rb ? balanceLine(rb) : '';
+      localPaint();
+    };
     const onFrom = (value) => {
       state.fromEdited = true;
       state.fromId = value;

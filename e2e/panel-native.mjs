@@ -39,13 +39,22 @@ const info = await page.evaluate(async ({ shop }) => {
   const deep = await import('/panels/deep.js');
   const id = await import('/panels/shop-identity.js');
   const form = document.getElementById('t-form');
-  deep.mountShop(shop, form, { auto: false });
+  // `auto` is what the city passes: it asks for the quote on load, which is what fills Rate,
+  // Fee and Route before sign-in. The harness used to pass false, so the crop showed an empty
+  // quote card even though the panel works.
+  deep.mountShop(shop, form, { auto: true, tokens: async () => (await fetch('/api/ferry/tokens')).json() });
   document.getElementById('t-title').innerHTML = `${id.badge(shop)}<span class="t-name">${id.titleOf(shop)}</span>${id.headerArt(shop)}`;
   document.getElementById('t-sub').textContent = id.subtitleOf(shop);
   document.getElementById('t-hero').innerHTML = id.flowStrip(shop);
   const act = document.getElementById('t-act');
   act.textContent = 'Sign in'; act.hidden = false;
-  await new Promise(r => setTimeout(r, 400));
+  // Wait for the dry quote to come back, so the crop shows the filled card.
+  for (let i = 0; i < 40 && !document.querySelector('.swap-quote p span:last-child')?.textContent?.match(/[0-9]/); i++) {
+    await new Promise(r => setTimeout(r, 250));
+  }
+  // The panel may open on Routes; the swap view is what the reference shows.
+  document.querySelector('[data-testid=ferry-tab-swap]')?.click();
+  await new Promise(r => setTimeout(r, 600));
   const tray = document.getElementById('tray').getBoundingClientRect();
   return { w: Math.round(tray.width), h: Math.round(tray.height) };
 }, { shop });
