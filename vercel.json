@@ -13,6 +13,10 @@
       "destination": "/ledger.html"
     },
     {
+      "source": "/judge",
+      "destination": "/judges.html"
+    },
+    {
       "source": "/console",
       "destination": "/console.html"
     },

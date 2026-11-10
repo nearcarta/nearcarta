@@ -12,12 +12,16 @@
 <body>
 <header>
   <p><a class="back-town" href="/" data-testid="back-town">Back to town</a></p>
-  <h1>Five checks on mainnet</h1>
+  <h1>For judges</h1>
   <p class="links"><a href="/console">Live shops</a> <a href="https://github.com/nearcarta/nearcarta#readme">README</a> <a href="/llms.txt">llms.txt</a></p>
 </header>
+<h2 class="judge-sec">Games: Market Day</h2>
+<main id="games-steps" class="judge-grid"></main>
+<h2 class="judge-sec">Five checks on mainnet</h2>
 <main id="judge-steps" class="judge-grid"></main>
 <script type="module">
-import { renderJudges } from './judges-data.js';
+import { renderJudges, renderGames } from './judges-data.js';
+document.getElementById('games-steps').innerHTML = renderGames();
 document.getElementById('judge-steps').innerHTML = renderJudges();
 </script>
 </body>

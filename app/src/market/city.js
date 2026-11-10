@@ -313,7 +313,7 @@ root.querySelector('.md-exit').addEventListener('click', leave);
 function mount() {
   document.body.append(root);
   hud(); quest();
-  if (/[?&]play\b/.test(location.search)) { const go_ = () => (window.__ready ? enter() : setTimeout(go_, 300)); go_(); }
+  if (/[?&]play\b/.test(location.search)) { const go_ = () => (window.__ready ? (enter(), /[?&]receipt\b/.test(location.search) && setTimeout(() => open('receipt'), 600)) : setTimeout(go_, 300)); go_(); }
 }
 if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mount); else mount();
 window.__marketday = { get city() { return city; }, enter, leave, open, go, story: Q, reset() { city = S.createCity(); save(); hud(); quest(); refresh(); aim(); } };
