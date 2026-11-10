@@ -124,12 +124,12 @@ export function chronicleMarkup(state) {
     <div class="c-scroll" data-testid="chronicle-scroll">
       <div class="chronicle-pane" data-pane="timeline"${tab === 'timeline' ? '' : ' hidden'}>
         <div class="c-filters">
-          <label class="chronicle-field">Account <input id="c-account" data-testid="chronicle-account" value="${esc(state.accountDraft ?? state.account ?? '')}" autocomplete="off" spellcheck="false" placeholder="name.near"></label>
-          <label class="chronicle-field">Words <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}" autocomplete="off"></label>
-          <label class="chronicle-field">Period <select id="c-span" data-testid="chronicle-period">${opt('all', 'All', state.span || 'all')}${opt('today', 'Today', state.span || 'all')}${opt('7d', '7 days', state.span || 'all')}</select></label>
+          <label class="chronicle-field"><span class="lbl">Account</span> <input id="c-account" data-testid="chronicle-account" value="${esc(state.accountDraft ?? state.account ?? '')}" autocomplete="off" spellcheck="false" placeholder="name.near"></label>
+          <label class="chronicle-field"><span class="lbl">Words</span> <input id="c-q" data-testid="chronicle-search" value="${esc(state.cq || '')}" autocomplete="off"></label>
+          <label class="chronicle-field"><span class="lbl">Period</span> <select id="c-span" data-testid="chronicle-period">${opt('all', 'All', state.span || 'all')}${opt('today', 'Today', state.span || 'all')}${opt('7d', '7 days', state.span || 'all')}</select></label>
           <label class="chronicle-field">Shop <select id="c-shop" data-testid="chronicle-shop">${opt('', 'All', state.shop || '')}${['toll', 'ferry', 'guard', 'payouts', 'house', 'board'].map(s => opt(s, s, state.shop || '')).join('')}</select></label>
-          <label class="chronicle-field">Chain <select id="c-chain" data-testid="chronicle-chain">${opt('', 'All', state.chain || '')}${opt('NEAR', 'NEAR', state.chain || '')}${opt('NEAR Intents', 'NEAR Intents', state.chain || '')}</select></label>
-          <label class="chronicle-field">Decision <select id="c-d" data-testid="chronicle-filter">${opt('', 'All', state.cd || '')}${opt('allowed', 'Allowed', state.cd || '')}${opt('denied', 'Refused', state.cd || '')}${opt('failed', 'Failed on chain', state.cd || '')}</select></label>
+          <label class="chronicle-field"><span class="lbl">Chain</span> <select id="c-chain" data-testid="chronicle-chain">${opt('', 'All', state.chain || '')}${opt('NEAR', 'NEAR', state.chain || '')}${opt('NEAR Intents', 'NEAR Intents', state.chain || '')}</select></label>
+          <label class="chronicle-field"><span class="lbl">Decision</span> <select id="c-d" data-testid="chronicle-filter">${opt('', 'All', state.cd || '')}${opt('allowed', 'Allowed', state.cd || '')}${opt('denied', 'Refused', state.cd || '')}${opt('failed', 'Failed on chain', state.cd || '')}</select></label>
         </div>
         <ol class="feed" data-testid="chronicle-page"${rows.length ? '' : ' hidden'}>${list}</ol>
         <p class="c-empty-line" data-testid="chronicle-empty"${rows.length ? ' hidden' : ''}>${esc(emptyText)}</p>

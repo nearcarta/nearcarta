@@ -496,6 +496,19 @@ body:not(.ferry-tray) #shopUI #tray #t-form .toll-cta {
   border-radius: var(--r-cta) !important;
 }
 
+/* Chronicle uses the same label span. */
+body:not(.ferry-tray) #shopUI #tray #t-form .chronicle-field { display: flex; flex-direction: column; gap: 6px; }
+body:not(.ferry-tray) #shopUI #tray #t-form .chronicle-field > .lbl { display: block; font-size: 12px; line-height: 16px; color: var(--gs-muted); }
+/* Chronicle has no in-form action, so the panel CTA is its one gold button. */
+body.chronicle-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]) {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+}
+
 /* Arena: the field groups take the Swap rhythm, and the label span above is now a real box. */
 body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field { gap: 6px !important; }
 body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field > .lbl {

@@ -63,7 +63,7 @@ for (const shop of SHOPS) {
       && inactive.every(t => (parseFloat(getComputedStyle(t).borderTopWidth) || 0) >= 1);
 
     // field groups: label above control, and a consistent gap between groups
-    const groups = [...document.querySelectorAll('#t-form .field, #t-form label.field, #t-form .ferry-field, #t-form .hall-field, #t-form .guard-field')].filter(vis);
+    const groups = [...document.querySelectorAll('#t-form .field, #t-form label.field, #t-form .ferry-field, #t-form .hall-field, #t-form .guard-field, #t-form .chronicle-field')].filter(vis);
     const labelAbove = groups.every(g => {
       const l = g.querySelector('span, label');
       const c = g.querySelector('input, select, textarea');
