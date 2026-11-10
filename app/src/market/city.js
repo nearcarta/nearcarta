@@ -149,20 +149,30 @@ const ghost = (act, label, extra = '') => `<button type="button" class="qs-ghost
 const proofLink = (p) => (p ? `<a class="qs-proof" href="${p.url}" target="_blank" rel="noopener">${esc(p.label)} ↗</a>` : '');
 const whyBlock = (good) => { const q = S.quoteAt(city, 'arena', good); return `<button type="button" class="qs-link" data-qs="why" aria-expanded="${whyOpen}">${ICON.info}<span>Why this price?</span></button>${whyOpen ? `<div class="qs-why md-why">${whyHtml(q, GOOD(good), (y) => `${coins(y)} coins`)}</div>` : ''}`; };
 
+// What each step costs, said before the press, and what it cost after, with THIS action's receipt.
+// Only the steps with a market move are real; the rest say so: practice, no spend.
+const REAL_STEP = { cargo: 'Free: 3 salt from the berths', sell: 'Coins go into your purse', invest: 'Spends 10 coins (0.001 NEAR) from your purse' };
+const nearTxt = (y) => { const v = Number(BigInt(y || 0) / 10n ** 18n) / 1e6; return `${v.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} NEAR`; };
+const costLine = (s) => (R.on() && REAL_STEP[s.id] ? `${REAL_STEP[s.id]} · no gas, the city pays it` : '<span class="qs-chip">Practice, no spend</span>');
+const receiptLine = (step, r) => {
+  if (r.real?.hash) return `<a class="qs-proof" href="https://nearblocks.io/txns/${esc(r.real.hash)}" target="_blank" rel="noopener">Receipt ↗</a> · you paid 0 NEAR${r.real.burnt_near ? `, the city paid ${esc(r.real.burnt_near)} NEAR gas` : ''}`;
+  return '<span class="qs-chip">Practice, no spend</span>';
+};
 function stripHtml(id) {
   const s = Q.current(city), pr = Q.progress(city), p = me();
   if (lastDone && lastDone.shop === id) {
     const r = lastDone.res, nx = Q.current(city);
-    let sub = lastDone.step.proof || r.real ? '<span class="qs-rc">Kept in your receipt</span>' : '';
-    if (lastDone.step.id === 'sell') sub = `+${coins(r.total)} coins · price ${coins(r.before)} → ${coins(r.after)}`;
-    if (lastDone.step.id === 'write') sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins`;
+    let sub = receiptLine(lastDone.step, r);
+    if (lastDone.step.id === 'sell') sub = `+${coins(r.total)} coins · price ${coins(r.before)} → ${coins(r.after)}<br>Your sale pushed the price down: the shelf has more salt now.<br>${receiptLine(lastDone.step, r)}`;
+    if (lastDone.step.id === 'invest') sub = `1 Ferry share for 10 coins (0.001 NEAR) · it pays you a part of the Ferry’s sales<br>${receiptLine(lastDone.step, r)}`;
+    if (lastDone.step.id === 'write') sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>${receiptLine(lastDone.step, r)}`;
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
     return { gold: true, html: row(okMark, r.line, sub, gold('next', nx ? `Next: ${NAME[nx.shop]}` : 'Back to town')) + extra };
   }
   if (s && s.shop === id) {
     let reward = esc(s.reward), extra = '';
     if (s.id === 'sell') { const pv = Q.salePreview(city); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', 'good:salt', pv.n); } catch {} reward = `+${coins(t)} coins · ${coins(pv.before)} each`; extra = `<div class="qs-more">${whyBlock('good:salt')}</div>`; }
-    return { gold: true, html: row(num(pr.done + 1), s.need, reward, gold('act', s.btn)) + extra };
+    return { gold: true, html: row(num(pr.done + 1), s.need, `${reward}<br>${costLine(s)}`, gold('act', s.btn)) + extra };
   }
   // off the story path: the Square is still the market and producing shops still make goods
   if (id === 'arena' && R.on() && !s && !R.live.stall) return { gold: true, html: row(`<span class="qs-n tok">${ICON.bag}</span>`, 'Rent a stall', '10 coins a week, from your purse', gold('stall', 'Rent')) };
@@ -387,7 +397,7 @@ async function ask(text) {
   try {
     if (step.shop && (step.ok || step.walk)) { say(step.say, { dur: 3.2 }); await WD().walkTo?.(step.shop); }
     else { say(step.say, { dur: 3.4 }); toast(step.say, 'no'); return; }
-    if (!step.ok) { say(step.say, { style: 'warn', dur: 3.6 }); toast('Refused: not on the charter', 'no'); return; }
+    if (!step.ok) { say(step.say, { style: 'warn', dur: 3.6 }); toast('Refused: not on your list', 'no'); return; }
     const line = G.act(city, ME, step);
     save(); hud(); refresh();
     say(line + '.', { tone: 'ok', dur: 3 });

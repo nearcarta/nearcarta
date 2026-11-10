@@ -70,7 +70,7 @@ export function plan(city, who, raw) {
   const i = cleanIntent(raw); const p = S.player(city, who);
   const no = (say, code) => ({ ok: false, act: i.act, say, code });
   const name = (g) => S.GOODS[g]?.name || S.ITEMS[g]?.name || g;
-  if (i.act === 'pay') return { ok: false, act: 'pay', shop: 'guard', say: 'Paying a stranger is not on my charter. The Watch would refuse it.', code: 'ERR_NOT_ON_CHARTER', walk: true };
+  if (i.act === 'pay') return { ok: false, act: 'pay', shop: 'guard', say: 'Paying a stranger is not on my list. The Watch would refuse it.', code: 'ERR_NOT_ON_CHARTER', walk: true };
   if (i.act === 'sell') {
     const goods = i.good ? [i.good] : Object.keys(S.GOODS).filter((g) => (p.bag[g] || 0) > 0);
     let pick = null;
