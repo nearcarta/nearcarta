@@ -314,3 +314,43 @@ fn an_order_reports_its_open_time_as_a_string() {
     deposit("owner.test", 1);
     o.unfreeze();
 }
+
+/// The surplus is the owner's, but the storage stake and the held service deposits come out
+/// of the same balance. A payout that would leave either uncovered is refused.
+#[test]
+fn a_surplus_payout_cannot_take_the_stake_or_held_deposits() {
+    let mut o = toll();
+    price(&mut o);
+    let _ = open(&mut o, "visitor.test", 1, "native", OTHER, 10, 10);
+    let price_b = env::storage_byte_cost().as_yoctonear();
+    let usage = env::storage_usage() as u128;
+    o.surplus = 1_000;
+    let mut b = ctx("owner.test");
+    b.attached_deposit(NearToken::from_yoctonear(1)).storage_usage(usage as u64)
+        // The attached yocto lands in the balance too, so this leaves exactly 999 spare.
+        .account_balance(NearToken::from_yoctonear(usage * price_b + o.service_held + 998));
+    testing_env!(b.build());
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| { let _ = o.withdraw_surplus(U128(1_000)); }));
+    assert!(r.is_err(), "999 yocto of spare cannot pay a 1000 yocto surplus");
+    o.surplus = 999;
+    let _ = o.withdraw_surplus(U128(999));
+}
+
+/// A crossing whose records cost more than the spare is refused, so the deposits already
+/// held stay refundable.
+#[test]
+fn a_crossing_cannot_stake_away_the_held_deposits() {
+    let mut o = toll();
+    price(&mut o);
+    let price_b = env::storage_byte_cost().as_yoctonear();
+    let mut b = ctx("board.test");
+    b.attached_deposit(NearToken::from_yoctonear(5));
+    testing_env!(b.build());
+    let usage = env::storage_usage() as u128;
+    b.account_balance(NearToken::from_yoctonear(usage * price_b + 5 + 50 * price_b));
+    testing_env!(b.build());
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        o.cross(acc("visitor.test"), 1, "base".into(), "native".into(), OTHER.into(), U128(10), U128(10));
+    }));
+    assert!(r.is_err(), "an order record does not fit in 50 spare bytes");
+}

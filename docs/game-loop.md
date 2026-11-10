@@ -1,71 +1,91 @@
 # Market Day in Nearcarta: the game loop
 
-Status: design, revised 9 November 2026. A row in the build plan becomes true when it names a merged PR. The loop was written before the game code, as the Games prompt asks.
+Status: design, revised 10 November 2026 (quest chain). A row in the build plan becomes true when it names a merged PR. The loop was written before the game code, as the Games prompt asks.
 
-The whole city is the game. The nine shops that already run on mainnet are its locations. Each keeps its real function and gets a game role. Nothing is a mock shop.
+The whole city is the game. The nine shops that already run on mainnet are the nine steps of one day. Each step's action is that shop's real feature, so playing the day is using the city. Nothing is a mock shop.
 
 ## One line
 
-You are a citizen of Nearcarta. You get your own AI agent: a character that walks the 3D city, talks with you, and does the work, with a wallet whose spending the city's law (the charter on `board.nearcarta.near`) caps on chain. Every shopkeeper is an agent too. The hook: **NPCs that can't lie or overspend.** Each keeper decision is made by a NEAR AI model in an attested TEE and signed. Each NEAR it spends goes through its own capped row, and a refused spend is a transaction anyone can open.
+**You're a new merchant. Market Day: earn your first coin.** A town crier with a lantern meets you at the Chronicle and walks you, shop by shop, through one trading day: take an order, import the goods, cross the bridge, check the buyer, sell, hide the profit, pay your helper, back a broke shop, and write the day into history. Every NPC that touches money is an agent whose spending the charter on `board.nearcarta.near` caps on chain. The hook: **NPCs that can't lie or overspend.**
 
-## The city as the game
+## The first second
 
-| Location | Its real function today | Its role on Market Day |
+The city loads at street height. The crier stands at the Chronicle with a lit lantern. One bubble, two lines at most: `New merchant? Earn your first coin by dusk.` The Town Hall door glows, a lit path runs along the roads to it, and the HUD at the top shows `Market Day ○○○○○○○○○ 0/9`. One gold button at the bottom: `Go`. No menus, no list, no wallet prompt.
+
+## The day: nine shops, nine steps
+
+Each step happens inside the shop. The shop's panel opens with a quest strip on top: one line saying what you need here, one gold button, and the reward. The shop's own tools stay below it, unchanged.
+
+| # | Shop | The strip says | Gold button | Reward | The real feature behind it |
+|---|---|---|---|---|---|
+| 1 | Town Hall | Take today's order | `Take order` | 3 salt to the Square | The job board (`contracts/hall`) |
+| 2 | Ferry | Unload salt from abroad | `Unload salt` | +3 salt (three berths, `gather`) | NEAR Intents 1Click; the strip links the recorded mainnet swap |
+| 3 | Toll Bridge | Get your cargo across | `Cross` | Toll 0.0001, paid from the sale | The toll gate under its live policy; links a recorded crossing |
+| 4 | Guardhouse | Check your buyers | `Check buyers` | The con artist is refused | The payee check; links the recorded `receiver_not_allowlisted` refusal |
+| 5 | Vault Arena | Sell your salt | `Sell 3 salt` | NEAR at the shelf price, the price before and after | NEP-245 `sell`, with `Why this price?` |
+| 6 | Mist Bank | Hide your profit | `Seal profit` | Amount hidden (the purse shows ••••) | The private statement audit, below the strip |
+| 7 | Payouts | Pay your porter | `Pay 0.0003` | Invoice paid, under your cap | Payouts with an invoice |
+| 8 | Your House | Relight the Ferry | `Invest 0.001` | `share:ferry`, the Ferry reopens | `invest` (the Ferry spent its till on your cargo in step 2) |
+| 9 | Chronicle | Write your day | `Write the day` | Day seal, level 2 | The NEP-297 statement |
+
+The rules are `shared/market/story.js`, tested end to end in `backend/test/unit/market-story.test.js`: a new merchant ends day 1 with about 0.0012 NEAR, one Ferry share and level 2.
+
+The route crosses the whole island (Hall, Ferry, Toll, Guard, Arena, Bank, Payouts, House, Chronicle), so one day shows every district. From day 2 the Hall rotates the order (goods, quantity, buyer) and the chain shortens to the steps the order needs.
+
+### Real and practice
+
+Both modes run the same nine steps with the same screens.
+
+- **Practice** (default, no sign-in): steps run on the pinned JavaScript mirror (`shared/market/sim.js`) and each shop's dry path. Where a step has a recorded mainnet transaction (the con artist's refusal, the ferry swap), the strip links it. A small `Practice` tag sits in the HUD.
+- **Real** (signed in): each gold button sends the shop's real call. The strip's reward line shows the cost before the press, and the tx link after.
+
+## Goods come from shops
+
+There are no floating resource nodes and no counters grid. Goods are produced at shops and needed by shops, so you collect them by visiting:
+
+| Good | Produced at | Needed by |
 |---|---|---|
-| Town Hall | Jobs with bids, counters and reviewed delivery (`contracts/hall`) | The quest board. Each city day posts orders ("12 iron for the bridge"). NPC agents bid; your agent takes or posts jobs |
-| Arena | NEP-245 items and guardian pots | The market square. Goods are NEP-245 tokens. Shopkeepers set prices with `pricing.rs`, and `Why this price?` explains them |
-| Ferry | Cross-chain swaps through NEAR Intents (1Click) | The port. Cash out your earnings or buy cargo on another chain with a real swap |
-| Payouts | Invoices and payroll | Payday. Wages for filled orders and completed jobs, with the invoice |
-| Guard | Payee checks, holds, deny list | The city watch. When the con artist pitches a keeper, the watch checks the payee and the charter refuses the payment on chain |
-| Mist Bank | Private statement audit in a TEE | The vault. Your savings statement is audited privately |
-| House | A deed with a purse, a check-in clock and an heir | The council. It funds a broke shop back to life from a shared purse |
-| Toll Bridge | Pay-per-use gate, signed by the NEAR MPC signer | The bridge toll on every cross-chain move |
-| Chronicle | One statement across every rail | The history book. Every action with its tx, and your reputation |
+| salt | Ferry (imported) | Hall orders, tonic |
+| herb | Your House garden | tonic, night orders |
+| timber | Toll Bridge (from the mainland) | tools, bridge orders |
+| iron | Guardhouse forge | tools, watch orders |
 
-## The loop on paper
+Each producing shop has berths: `ferry-1..3`, `house-1..2`, `toll-1..2`, `guard-1..2` (`NODES` in `shared/market/sim.js`). On chain they are the market's `set_node` ids, so `gather(node: "ferry-1")` is "unload salt at the Ferry". The contract does not change. Off the story path, the strip at a producing shop offers `Collect`, and the Arena's strip offers `Sell` for whatever is in the bag.
 
-A city day lasts 20 real minutes: dawn, market, dusk, night. Orders refresh at dawn. Prices use the last completed real hour of trades. Daily caps reset at 00:00 UTC.
+The market is the Vault Arena's square itself: selling happens in the Arena's strip, with `Why this price?`, not in a side list.
 
-### Every 30 seconds: gather, trade, talk
+## The quest in the world
 
-| You do | You see | On chain |
-|---|---|---|
-| Tap a resource node on the island (ore, timber, salt pans, herb beds) | The good flies into your bag | `gather`: one NEP-245 unit, at most once per node per 30 s, within a daily cap. With a tool, two units |
-| Open a counter in the market square | Prices, a five-minute sparkline, `Why this price?` | `quote` view: no tx |
-| Sell or buy | The next unit's price moves in front of you | `sell` is a direct call (your key on the market contract, gas paid by the relayer). `buy` spends NEAR, so it goes through your row |
-| Tell your agent "sell my iron where it pays most" | It walks to the best counter, explains, acts, and shows `Charter said yes` or `no` with the tx | The same calls, proposed by the agent |
+- **Next shop glows**: a warm light on its door and a soft beam above its roof.
+- **Lit path**: studs and a soft band on the road from the crier to that door light up in sequence, along the same path the crier walks (`walkPath`). Real 3D in the town scene (`app/design/D9_world/js/quest.js`), with a point light at the door and a beam over the roof.
+- **Framing**: the camera stands behind the crier looking down the lit road and backs off until both the crier and the door are on screen, portrait included.
+- **HUD**: `Market Day` with nine dots (done, now, next) and `n/9`. Nothing else.
+- **First visit to a shop**: one line from its keeper, 1–2 lines total, then the strip.
+- **Done step**: the dot fills, a short chime, the path relights toward the next shop.
 
-### Every 5 minutes: quests and the city
+## The guide: the town crier
 
-| You do | Why it matters |
-|---|---|
-| Read the Town Hall board and take an order | Orders are the main sink: filling one burns the goods and pays wages from the order's escrow |
-| Craft at the market (2 iron + 1 timber = a tool) | A tool doubles your gather. Tonic (herbs + salt) is what the night orders ask for |
-| Carry cargo between counters for the spread | The cheap counter's price rises as its shelf drains, so the spread closes. That is the economy at work |
-| Watch the con artist at dusk | He pitches a keeper. The keeper's model may agree. The watch flags the payee and the keeper's row refuses: a real refused tx in the Chronicle |
+The robot is replaced by a town crier in the city's low-poly style: a hooded merchant from the existing character set, retinted brown and gold, carrying the brass lantern. Rigged walk, run and idle loops, a lantern that swings on a spring, a gesture at each door. The speech bubble is a cream card with the name in small caps and one or two lines; it avoids the HUD and panels.
 
-### Every session: earn, invest, rise
+Press `Go` and the crier walks the lit path to the next door, the camera following at street height, and opens the shop with its step ready. Asking still works (`Ask`, from PR #199): the crier's answer comes from NEAR AI in an attested TEE, signed, and a request to pay an unknown account walks to the Guardhouse and is refused.
 
-| You do | Result |
-|---|---|
-| Collect your wages on Payday | NEAR paid for each order you filled, with a statement |
-| Find a dark shop (`Closed: out of funds`) and invest, or ask the council | The shop reopens. You hold `share:<shop>` tokens and get 20% of its sales until 110% is repaid |
-| Cash out at the port | A real NEAR Intents swap of your earnings, the toll shown before you confirm |
-| Check your level in the Chronicle | Reputation rises with every order you fill. Levels unlock bigger orders |
+## The strip component
 
-### Fast-forward: a week in a minute
-
-On the market board, `Fast-forward` runs seven days: 168 hourly ticks in 60 seconds, with a seeded crowd (miners dump ore, traders chase spreads, an investor, the council, the con artist). It uses the same pricing rules through the pinned JavaScript mirror. You watch prices, shops closing and reopening, and the leak bound holding. A label stays on screen: `Simulation. No transactions.` At the end, one button sends one real trade at the price the live contract quotes.
+`app/src/market/quest-strip.js` mounts the strip in the panel's `.shop-quest` slot, directly under the header. When a panel has no slot yet, it goes at the top of the panel body, after the header block; if the panel re-renders, it is put back. No panel file changes. While the strip carries the gold button, the panel's own primary turns outline, so the view has one gold button.
 
 ## Characters
 
 | Character | Account | Decides with | Spends through |
 |---|---|---|---|
-| You, the citizen | your own account (email or Google login, no seed phrase) | you | your row: allowlist, caps, daily budget |
-| Your agent, the guide | acts on your row only, never holds money | NEAR AI model in an attested TEE, each answer signed | your row |
-| Nine keepers, one per location | a keeper sub-account per shop | NEAR AI model in a TEE: price notes, restock, accept a job, answer a pitch; each decision signed and stored with its tx | the keeper's own board row |
-| Town Hall clerk | posts the daily orders | the same model, signed | the Hall's escrow |
+| You, the merchant | your own account (email or Google login, no seed phrase) | you | your row: allowlist, caps, daily budget |
+| The crier, your guide | acts on your row only, never holds money | NEAR AI model in an attested TEE, each answer signed | your row |
+| Nine keepers, one per shop | a keeper sub-account per shop | NEAR AI model in a TEE: price notes, restock, accept a job, answer a pitch; each decision signed and stored with its tx | the keeper's own board row |
+| Town Hall clerk | posts the day's orders | the same model, signed | the Hall's escrow |
 | The con artist | an outside account with no allowance from any keeper | the model, prompted to persuade | nothing: refused on chain |
+
+### Fast-forward: a week in a minute
+
+On the Arena square, `Fast-forward` runs seven days: 168 hourly ticks in 60 seconds, with a seeded crowd (miners dump ore, traders chase spreads, an investor, the council, the con artist). It uses the same pricing rules through the pinned JavaScript mirror. A label stays on screen: `Simulation. No transactions.` At the end, one button sends one real trade at the price the live contract quotes.
 
 ## Who may call what (the security model)
 
@@ -137,7 +157,7 @@ In-game moves (gather, sell, craft, fill) are contract-internal and gasless for 
 
 | Games prompt requirement | Where | File | Test |
 |---|---|---|---|
-| Market-town game: gather, trade with NPC merchants | The 30 s loop on the real city | `contracts/market/src/lib.rs`, `app/src/market/` | `gather_then_sell_moves_goods_and_pays_the_player` |
+| Market-town game: gather, trade with NPC merchants | The nine-step day across the real city | `contracts/market/src/lib.rs`, `app/src/market/` | `gather_then_sell_moves_goods_and_pays_the_player` |
 | Each merchant is an agent with its own wallet and inventory | Nine keeper sub-accounts, shelves as NEP-245 balances, a row each, decisions on NEAR AI | `contracts/market`, `backend/src/market/keeper.js` | `a_keeper_restocks_only_through_its_row` |
 | Prices from stock and recent demand | `pricing.rs` | `contracts/market/src/pricing.rs` | `flooding_a_shop_with_iron_lowers_the_iron_price`, `a_round_trip_never_gains_over_random_sequences` |
 | A broke merchant closes until someone invests | Floor, `ERR_SHOP_CLOSED`, `invest`, the council | `contracts/market` | `a_broke_shop_refuses_sales_until_an_investment_reopens_it` |
@@ -156,14 +176,14 @@ In-game moves (gather, sell, craft, fill) are contract-internal and gasless for 
 
 | # | PR | State |
 |---|---|---|
-| 1 | Pricing file and tooltip | merged #175 (rule revised in 2) |
-| 2 | Market contract: NEP-245 goods, shops on the nine locations, orders, shares, caps, storage, no-arbitrage pricing, sandbox test through the live board build | building |
-| 3 | Playable city: bag, counters, nodes, Town Hall orders, `Why this price?`, day/night timer | next |
-| 4 | Relayer and function-call key: email to first sale with no NEAR | |
-| 5 | Your agent: chat, walking, camera glide, `Charter said yes/no` | |
-| 6 | Keeper agents and the con artist on NEAR AI, signed; the watch and the refused tx | |
-| 7 | Fast-forward | |
-| 8 | `/judge` with one-click mainnet txs and the leak bound | |
-| 9 | Port cash-out through Intents; README Games section | |
+| 1 | Pricing file and tooltip | merged #175 |
+| 2 | Market contract: NEP-245 goods, shops, orders, shares, caps, storage | merged #183, #190 |
+| 3 | Playable city: bag, `Why this price?`, day timer | merged #188 |
+| 4 | The guide answers on NEAR AI, signed, and walks to the shop | merged #199 |
+| 5 | The day as a quest chain: strip, glow, lit path, HUD, shop-made goods, the Arena square, the crier | building |
+| 6 | Relayer and function-call key: email to first sale with no NEAR | |
+| 7 | Keeper agents and the con artist on NEAR AI, signed | |
+| 8 | Fast-forward, `/judge`, README Games section | |
+| 9 | Mainnet: market, keeper rows, relayer float | |
 
-Every existing shop keeps its real function. Market Day adds a role to each, not a replacement.
+Every existing shop keeps its real function. Market Day adds a step to each, not a replacement.

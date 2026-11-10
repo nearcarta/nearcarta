@@ -6,7 +6,7 @@ import { policy, nonce, withNonce } from '../csp.mjs';
 const root = new URL('./dist', import.meta.url).pathname;
 const api = process.env.API_ORIGIN || 'http://127.0.0.1:8787';
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.txt': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav' };
-export const REWRITES = { '/design/D6_dashboards/src/data.js': '/live/data.js', '/console': '/console.html', '/ledger': '/ledger.html', '/loop': '/loop.html', '/ferry-widget': '/ferry-widget.html' };
+export const REWRITES = { '/design/D6_dashboards/src/data.js': '/live/data.js', '/console': '/console.html', '/judge': '/judges.html', '/ledger': '/ledger.html', '/loop': '/loop.html', '/ferry-widget': '/ferry-widget.html' };
 createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname.startsWith('/api/')) {

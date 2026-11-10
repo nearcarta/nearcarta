@@ -94,10 +94,33 @@ fn ev(standard: &str, version: &str, event: &str, data: serde_json::Value) {
     env::log_str(&format!("EVENT_JSON:{}", json!({"standard":standard,"version":version,"event":event,"data":[data]})));
 }
 
+/// Raw key with the NEAR every pot holds. It sits outside the contract struct, so the state
+/// layout does not change.
+const POTS_KEY: &[u8] = b"pots";
+
+fn pots() -> u128 {
+    env::storage_read(POTS_KEY).map(|v| u128::from_le_bytes(v.try_into().unwrap_or_else(|_| env::panic_str("ERR_STATE")))).unwrap_or(0)
+}
+
+fn move_pots(add: u128, sub: u128) {
+    let next = pots().checked_add(add).and_then(|v| v.checked_sub(sub)).unwrap_or_else(|| env::panic_str("ERR_STATE"));
+    env::storage_write(POTS_KEY, &next.to_le_bytes());
+}
+
+/// Every write that adds bytes must leave the pots payable. Attempts, refusal badges and NEP-245
+/// moves cost the caller nothing, and the bytes are staked from the same balance that holds the
+/// pots, so without this a stream of attempts could stake the prize money away until a payout
+/// failed for lack of balance.
+fn check_float() {
+    let stake = env::storage_usage() as u128 * env::storage_byte_cost().as_yoctonear();
+    require!(env::account_balance().as_yoctonear() >= stake.saturating_add(pots()), "ERR_FLOAT");
+}
+
 #[near]
 impl Contract {
     #[init]
     pub fn new(owner: AccountId) -> Self {
+        env::storage_write(POTS_KEY, &0u128.to_le_bytes());
         let meta = NFTContractMetadata {
             spec: NFT_METADATA_SPEC.to_string(), name: "Vault Arena Guardians".into(),
             symbol: "GUARD".into(), icon: None, base_uri: None, reference: None, reference_hash: None,
@@ -144,6 +167,8 @@ impl Contract {
         let mut g = self.g(&token_id);
         g.pot = U128(g.pot.0 + env::attached_deposit().as_yoctonear());
         self.guardians.insert(&token_id, &g);
+        move_pots(env::attached_deposit().as_yoctonear(), 0);
+        check_float();
         g.pot
     }
 
@@ -202,6 +227,7 @@ impl Contract {
             block: env::block_height(), verdict: None, revealed: false });
         self.open.insert(&player, &id);
         ev("vaultarena", "0.1.0", "attempt", json!({"attempt_id": id, "player": player, "token_id": token_id, "prompt_hash": prompt_hash_hex}));
+        check_float();
         id
     }
 
@@ -257,6 +283,7 @@ impl Contract {
             "prompt_hash": a.prompt_hash_hex, "action": kind, "detail": detail, "verdict": if clause == "ALLOW" {"allow"} else {"refuse"},
             "clause": clause, "oath_version": g.oath_version, "oath_hash": h(&near_sdk::borsh::to_vec(&g.oath).unwrap()),
             "holder_epoch": g.holder_epoch}));
+        check_float();
         clause
     }
 
@@ -265,7 +292,7 @@ impl Contract {
         let ok = env::promise_result_checked(0, 64).is_ok();
         let mut g = self.g(&token_id);
         g.in_flight -= 1; g.reserved = U128(g.reserved.0 - amount.0);
-        if ok { g.spent = U128(g.spent.0 + amount.0); g.pot = U128(g.pot.0 - amount.0); }
+        if ok { g.spent = U128(g.spent.0 + amount.0); g.pot = U128(g.pot.0 - amount.0); move_pots(0, amount.0); }
         self.guardians.insert(&token_id, &g);
         ev("vaultarena", "0.1.0", "settled", json!({"attempt_id": attempt_id, "token_id": token_id, "amount": amount, "ok": ok, "bounty": bounty}));
         ok
@@ -303,6 +330,7 @@ impl Contract {
         require!(approval.is_none(), "ERR_MT_APPROVALS_UNSUPPORTED");
         let s = env::predecessor_account_id();
         self.mt_move(&s, &receiver_id, &token_id, amount.0, memo.as_deref());
+        check_float();
     }
     #[payable]
     pub fn mt_batch_transfer(&mut self, receiver_id: AccountId, token_ids: Vec<String>, amounts: Vec<U128>, approvals: Option<Vec<Option<(AccountId, u64)>>>, memo: Option<String>) {
@@ -311,6 +339,7 @@ impl Contract {
         require!(approvals.map(|v| v.iter().all(|a| a.is_none())).unwrap_or(true), "ERR_MT_APPROVALS_UNSUPPORTED");
         let s = env::predecessor_account_id();
         for (t, a) in token_ids.iter().zip(amounts.iter()) { self.mt_move(&s, &receiver_id, t, a.0, memo.as_deref()); }
+        check_float();
     }
     pub fn mt_balance_of(&self, account_id: AccountId, token_id: String) -> U128 { self.bal.get(&k(&token_id, &account_id)).unwrap_or(U128(0)) }
     pub fn mt_batch_balance_of(&self, account_id: AccountId, token_ids: Vec<String>) -> Vec<U128> {
@@ -430,6 +459,7 @@ impl Contract {
         require!(!token_ids.is_empty(), "ERR_EMPTY");
         let s = env::predecessor_account_id();
         for (t, a) in token_ids.iter().zip(amounts.iter()) { self.mt_move(&s, &receiver_id, t, a.0, memo.as_deref()); }
+        check_float();
         let prev: Vec<AccountId> = token_ids.iter().map(|_| s.clone()).collect();
         let on = Promise::new(receiver_id.clone()).function_call("mt_on_transfer".to_string(),
             serde_json::to_vec(&json!({"sender_id": s, "previous_owner_ids": prev, "token_ids": token_ids, "amounts": amounts, "msg": msg})).unwrap(),

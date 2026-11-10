@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 916 backend unit tests (915 pass, 1 skipped) -->
+<!-- # 958 backend unit tests (957 pass, 1 skipped) -->
 
 **An AI agent can be talked into paying the wrong person. Nearcarta puts the payment rules in a NEAR contract the agent cannot change, so a fooled agent produces a refused transaction instead of a loss.**
 
@@ -49,6 +49,50 @@ Chronicle runs on the board's own records rather than a contract of its own, so 
 
 ---
 
+## Games: Market Day in Nearcarta
+
+The city is the game. Press **Market Day** on **https://nearcarta.vercel.app**, and the Town Crier walks you through nine shops: Town Hall, Ferry, Toll Bridge, Guardhouse, Vault Arena, Mist Bank, Payouts, Your House, Chronicle. Each step is that shop's real feature. Today's round is a practice round: the market rules (`shared/market/sim.js`, `shared/market/story.js`) run in the browser, and each step with a mainnet record links it in the Receipt. Tests: `story: nine steps, one per shop, every shop once`, `story: a new merchant earns a first coin in one day`.
+
+### NPCs with wallets
+
+| Do | See |
+|---|---|
+| Walk to the Guardhouse and press **Check buyers** | The Captain clears the square keeper and refuses the con artist. The Receipt links the real refusal on chain |
+| Walk into any shop for the first time | Its keeper greets you by role: Clerk, Ferryman, Toll warden, Captain, Arena marshal, Banker, Paymaster, Housekeeper, Archivist |
+| Tap a keeper standing at a shop door | Their card: name, mood (Worried, Steady, Cheerful from their till), purse in coins, and what they traded today. Step out of a shop and its keeper says what they just did |
+
+Status: live. The nine keepers are NEAR sub-accounts with board rows. Keepers restock on NEAR AI decisions that are TEE-signed and checked before anything is sent. The completion id is written on chain in the move. Proof: keeper-hall bought 2 iron from the Arena on decision `a9bfe9d523204ff4898c527a14ee3d61`, tx [6YiRK25TR8…](https://nearblocks.io/txns/6YiRK25TR8m84LcE7PpxXtB55W6CNxLGE7xApsFYNt55) (`scripts/keepers-round.js`, `backend/src/keepers.js`).
+
+### Player-owned markets
+
+| Do | See |
+|---|---|
+| At Your House press **Invest 10** | The Ferry, dark after spending its till on your cargo, lights up again, and a Ferry share goes into your bag |
+| Open the bag after the Ferry sells | The share row shows a **Claim** button for your part of its sales |
+
+Status: live. A player rents an Arena stall from their purse and holds it on chain for 7 days (`stall` on arena.nearcarta.near). Proof: a fresh account sold 3 salt into its purse ([GecJPUaL…](https://nearblocks.io/txns/GecJPUaLsbXfKbjHSRQJAUj2BFzQ1iPpVqaovGNxg6M7)), rented stall 1 ([8JxnSuDg…](https://nearblocks.io/txns/8JxnSuDgv3C2ghkcPFqRmS3AuP8JQqwDWaeNafuzFkun)) and bought a Ferry share from the purse ([3BFDcPwr…](https://nearblocks.io/txns/3BFDcPwrfu64LATzbUyh868e6jWMaJTHDEPHxm7mfaeq)).
+
+### Economy evolves without a dev patch
+
+| Do | See |
+|---|---|
+| At the Vault Arena press **Sell 3 salt**, then **Why this price?** | The price moves with the shelf: `price A → B`, and the reasons (stock, demand) behind it |
+| Finish the day and press **Day 2** | The shelf you sold into, the tills and your share carry over: the price you moved stays moved |
+| Finish the day and press **Week** | A week in a minute: the salt price follows the shelves, a con artist is refused each day, dark shops reopen, and on day 4 a council vote lowers the floor that keeps shops open (`councilVote` in `shared/market/sim.js`, test `a council vote changes a market rule mid-week, with no code change`) |
+
+Status: live. The nine keepers form the market council on chain (quorum 5). Each vote carries a NEAR AI decision. Proposal 1 (floor 90%) was voted down 2 to 5. Proposal 2 passed 5 to 0, and the market's `floor_bps` went from 10000 to 9000 with no code change. The `rule_changed` event is in tx [Gub1q247gy…](https://nearblocks.io/txns/Gub1q247gyT2RNZHSGCwCKNJi1uNVRVGmyRs4piSNYJb). **Week** first replays the real moves from the chain, marked Real, and then offers a next week marked Practice.
+
+### Players never notice the chain
+
+| Do | See |
+|---|---|
+| Play the whole day | Coins, a purse, a stall, a share. No wallet popup, no hash, no gas prompt in the main flow |
+| Tap the purse in the top bar | The Receipt: each finished step, and a quiet **Record** link to its real mainnet transaction for those who want proof |
+
+Status: sponsored gas is live. Each real move is signed by the player and sent by relayer.nearcarta.near, which pays the gas within caps per visitor and per day. In the prod run above, the player's NEAR stayed at 0.003 from the first move to the last ([2TXeZ4hR…](https://nearblocks.io/txns/2TXeZ4hRu2EB4zw9cG6zdq9jgfswKRQs6BwRu1K1uPRM) gather, sell, stall, invest). Email sign-in (Privy) is built and is being confirmed with a real inbox. Judges: every proof is on `/judge`.
+
+---
+
 ## The safety story
 
 Three properties. Each one is pinned by a test and by a transaction you can open.
@@ -85,7 +129,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 916 unit tests (915 pass, 1 skipped)
+npm test                 # 958 unit tests (957 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -108,7 +152,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 916 unit tests (915 pass, 1 skipped):
+# 958 unit tests (957 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -221,10 +265,10 @@ Every id below is a `contract` field in `shared/deployments/mainnet.json`. `npm 
 |---|---|---|
 | `board.nearcarta.near` | The visitor's row: allowlist, caps, holds, per-shop calls, and an in-place `stage_upgrade` / `upgrade` / `migrate` path | `DYjXmYTLHCwSGJzwXPNc3ZAUjX7d1ewsR3sEJsp5ZkBS` |
 | `toll.nearcarta.near` | The pay-per-use gate and its MPC signature | `FaNtiauDWfjzKYtK2bns79wUqZqcXFcLjz2Bzx7aVdL5` |
-| `townhall.nearcarta.near` | Hall v2: job escrow, bids, counter, review digest (migrate hotfix, `contracts/hall/HOTFIX.md`) | `GgECZv7g1tSGvnXeMLuJrQKYcfjBVwdXHyS1TZn6T6N8` |
+| `townhall.nearcarta.near` | Hall v2: job escrow, bids, counter, review digest, prune (main 1e1436b5; earlier hotfix in `contracts/hall/HOTFIX.md`) | `6LWPMM3HzbwaySAWYH9Xu7HZCHDPjYya2cXfXHGxAtVz` |
 | `arena.nearcarta.near` | Guardian NFTs and oath-scored attempts | `4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma` |
-| `house.nearcarta.near` | House v3: the NEP-171 deed, its purse and its line | `3ouAaAD1ccZ81CdLu26FoDxixYSynrmzPa58u1Focn66` |
-| `guard.nearcarta.near` | The keyless forwarder, and the only account that can clear a Hall part (`clear` → `guard_clear`) | `7uEdU1JWdtY8VPhyGAr3T6GEy5XfCTBngNjnhZvX8XJ6` |
+| `house.nearcarta.near` | House v3 state on v4 code: the NEP-171 deed, its purse and its line | `3z6dbex9mkz6BQ4fQRYcut9TPMvzKPArjbY9HKMLreHi` |
+| `guard.nearcarta.near` | The keyless forwarder, and the only account that can clear a Hall part (`clear` → `guard_clear`, 1 yocto) | `9dkjuG4gA1vGWXwXKS5WyVb7opKePEC2BpCkyxb7WAaH` |
 | `nearcarta.near` | The root account: funder, owner of every shop, signer of every deploy | — |
 
 The city house is one account, `house.nearcarta.near` — the same account the legacy shop used, recreated on that name for v3 after the v2 wasm was closed. `extras.house` in that file is the record path for it and its `shop` field holds that id — the record path is not an account.
@@ -271,7 +315,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 916 unit tests (915 pass, 1 skipped)
+npm test                 # 958 unit tests (957 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current

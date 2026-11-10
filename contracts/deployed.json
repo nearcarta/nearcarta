@@ -4,44 +4,44 @@
     {
       "account": "board.nearcarta.near",
       "crate": "contracts/charter_board",
-      "artifact": "contracts/artifacts/charter_board.guarded.wasm",
-      "build": "box",
-      "rev": "82bcda89"
+      "artifact": "contracts/artifacts/charter_board.wasm",
+      "build": "nep330",
+      "rev": "f44da703"
     },
     {
       "account": "townhall.nearcarta.near",
       "crate": "contracts/hall",
       "artifact": "contracts/artifacts/hall.wasm",
       "build": "box",
-      "rev": "ce6bff5a"
+      "rev": "1e1436b5"
     },
     {
       "account": "guard.nearcarta.near",
       "crate": "contracts/guard",
       "artifact": "contracts/artifacts/guard.wasm",
       "build": "box",
-      "rev": "5a761c9e"
+      "rev": "1e1436b5"
     },
     {
       "account": "toll.nearcarta.near",
       "crate": "contracts/toll",
-      "artifact": "contracts/artifacts/toll.v8.wasm",
-      "build": "none",
-      "reason": "built from 5c2b1ee3 before the toolchain was pinned; the next toll upgrade is a nep330 build"
+      "artifact": "contracts/artifacts/toll.v9.wasm",
+      "build": "box",
+      "rev": "1e1436b5"
     },
     {
       "account": "house.nearcarta.near",
       "crate": "contracts/house_nft",
-      "artifact": "contracts/artifacts/house_nft.v3.oz.wasm",
-      "build": "none",
-      "reason": "built from 0365e68f before the toolchain was pinned; the next house upgrade is a nep330 build"
+      "artifact": "contracts/artifacts/house_nft.v4.wasm",
+      "build": "box",
+      "rev": "1e1436b5"
     },
     {
       "account": "arena.nearcarta.near",
-      "crate": "contracts/arena",
-      "artifact": "contracts/artifacts/arena.p86.wasm",
-      "build": "none",
-      "reason": "built from e406abb6 on near-sdk 5.30 before the toolchain was pinned; the next arena deploy is a nep330 build"
+      "crate": "contracts/market",
+      "artifact": "contracts/artifacts/market.wasm",
+      "build": "nep330",
+      "rev": "5f9d9cd1"
     }
   ]
 }

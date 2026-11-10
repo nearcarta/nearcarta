@@ -20,9 +20,9 @@ export function whyLines(q) {
   return q.reasons.map((r) => `${r.rule} ${factorText(r.factor_bps)}: ${r.why}`);
 }
 
-export function whyHtml(q, good = 'this good') {
+export function whyHtml(q, good = 'this good', money = (y) => `${yoctoToNear(y)} NEAR`) {
   const rows = q.reasons
     .map((r) => `<li><b>${esc(r.rule)}</b> <span class="why-f">${esc(factorText(r.factor_bps))}</span> ${esc(r.why)}</li>`)
     .join('');
-  return `<div class="why" role="tooltip"><p>You pay ${esc(yoctoToNear(q.buy))} NEAR for ${esc(good)}. The shop pays ${esc(yoctoToNear(q.sell))} NEAR to buy it from you.</p><ul>${rows}</ul></div>`;
+  return `<div class="why" role="tooltip"><p>You pay ${esc(money(q.buy))} for ${esc(good)}. The shop pays ${esc(money(q.sell))} to buy it from you.</p><ul>${rows}</ul></div>`;
 }

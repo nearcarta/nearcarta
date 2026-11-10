@@ -1,10 +1,21 @@
 {
   "file": "market.wasm",
-  "bytes": 360510,
-  "sha256": "3cc5856e1a683a4b66a0db2c3f6f9382e7c38bec9268b3c8ce8546fcbd9c7292",
-  "storage_bytes_after_new": 360947,
-  "stake_yocto": "3609470000000000000000000",
-  "slack_yocto": "50000000000000000000000",
-  "measured": "local near-sandbox: account storage_usage right after new(), one full-access key",
-  "build": "cargo +1.86.0 near build non-reproducible-wasm --locked --no-abi, near-sdk 5.27.0, wasm-opt 124 -Oz --strip-debug --strip-producers"
+  "bytes": 403188,
+  "sha256": "0fa00ba7de5ddf38fdc08bf0583b54d6dcf708470b8305a35c1a1e9e14c1063c",
+  "code_hash": "23zfK5CDKSAe8vtvxUoVBnZPkMGJmgBBze1ew4xKQerP",
+  "account": "arena.nearcarta.near",
+  "storage_bytes_after_new": 364861,
+  "stake_yocto": "3700410000000000000000000",
+  "measured": "mainnet: storage_usage right after create+deploy+new, no keys",
+  "build": "nep330 reproducible build of 5f9d9cd1 in sourcescan/cargo-near:0.20.3-rust-1.86.0 (pinned digest)",
+  "state_version": 2,
+  "upgrade_from": {
+    "file": "market.v1.wasm",
+    "bytes": 364496,
+    "sha256": "9b3d09cc5adfae367428cdd9e504216d4e965e087f8f15824ea876d52d23bafc",
+    "code_hash": "BSzBC6b8DLAKERTF5jx4coELhQ5mnx3k3ZmeAVL1Se7d",
+    "build": "nep330 reproducible build of f44da703 in sourcescan/cargo-near:0.20.3-rust-1.86.0 (pinned digest)",
+    "note": "state version 1, on arena.nearcarta.near until the in-place upgrade; upgrade_v2 sandbox test starts from it"
+  },
+  "upgrade_storage_delta_bytes": 38692
 }

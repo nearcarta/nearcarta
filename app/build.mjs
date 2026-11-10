@@ -32,6 +32,11 @@ cpSync(here + '../backend/src/ferry-guard.js', dist + '/live/ferry-guard.js');
 await (await import('esbuild')).build({ entryPoints: [here + 'src/ferry-pay.js'], bundle: true, format: 'iife', target: 'es2022', outfile: dist + '/ferry-pay.js', logLevel: 'warning' });
 // Town Hall filing caps by reputation tier: the shop room uses the same module as /shops/hall.
 cpSync(here + '../shared/townhall/reputation.js', dist + '/live/townhall-reputation.js');
+// Market Day: the city game layer (app/src/market) and the rules it runs in practice rounds.
+mkdirSync(dist + '/shared/market', { recursive: true });
+for (const f of ['pricing.js', 'sim.js', 'guide.js', 'story.js']) cpSync(here + '../shared/market/' + f, dist + '/shared/market/' + f);
+mkdirSync(dist + '/shared/relay', { recursive: true });
+cpSync(here + '../shared/relay/precheck.js', dist + '/shared/relay/precheck.js');
 // The city tray and /shops/hall/ import these as raw modules. The URL lands on /shared/.
 mkdirSync(dist + '/shared/hall', { recursive: true });
 mkdirSync(dist + '/shared/rails', { recursive: true });
@@ -82,6 +87,12 @@ if (PRIVY_ID) {
   cpSync(nm('@radix-ui/themes/styles.css'), dist + '/sign/radix.css');
   cpSync(nm('@peerfolio/privy-near-connect/dist/sign-page-plugin/theme.css'), dist + '/sign/theme.css');
 }
+// Market Day for real: Privy email login inline and relayed moves (no popup, no gas). Loaded by /market/city.js on demand.
+if (PRIVY_ID) {
+  mkdirSync(dist + '/market', { recursive: true });
+  await (await import('esbuild')).build({ entryPoints: [here + 'house/play.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
+    outfile: dist + '/market/play.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis', __PRIVY_APP_ID__: JSON.stringify(PRIVY_ID), __PRIVY_CLIENT_ID__: JSON.stringify(PRIVY_CLIENT) }, logLevel: 'warning' });
+}
 // Shop modules (charter office + Vault Arena): app/shops, see app/shops/INTEGRATION.md
 await (await import('./shops/build.mjs')).buildShops(dist, await import('esbuild'));
 mkdirSync(dist + '/pay', { recursive: true });
@@ -119,7 +130,10 @@ const a=document.getElementById('acct'),w=document.querySelector('#brand .what')
 const f=()=>{const ph=innerWidth<=600;if(ph&&w.parentElement!==a)a.append(w);if(!ph&&w.parentElement===a&&b)b.before(w);document.documentElement.style.setProperty('--hudTop',Math.round(a.getBoundingClientRect().bottom)+'px');};
 if('ResizeObserver'in window)new ResizeObserver(f).observe(a);addEventListener('resize',f);f();})();</script>
 <script type="module">const mc=()=>import('/house.bundle.js').then(m=>m.mountConnect(document.getElementById('wallet'))).catch(()=>{});mc();addEventListener('nearcarta:wallet',mc);</script>
+<link rel="stylesheet" href="/market/market.css"><script type="module" src="/market/city.js"></script>
 </body>`));
+// Market Day: the city game layer mounts on the town page.
+if (!readFileSync(dist + '/index.html', 'utf8').includes('src="/market/city.js"')) throw new Error('Market Day layer not injected');
 if (!readFileSync(dist + '/index.html', 'utf8').includes('id="wallet"')) throw new Error('wallet slot not injected');
 // The town has no confirm card any more (#inCard): its HUD CTA #rulesBtn links to the Charter office.
 if (!/id="rulesBtn"[^>]*href="\/setup\/"/.test(readFileSync(dist + '/index.html', 'utf8'))) throw new Error('rules CTA to /setup/ missing');

@@ -31,13 +31,15 @@ export default async function toll() {
   const stones = 6;
   for (let i = 0; i < stones; i++) { const a = Math.PI * .55 + (i / (stones - 1)) * Math.PI * .9, r = .95; mesh(scene, new THREE.CylinderGeometry(.06, .075, .16, 6), lit, [bx - .15 + Math.cos(a) * r, .08, bz + Math.sin(a) * r]); }
   lantern(scene, 1.75, 1.2, { h: 1.1 });
-  // The robot is the slow mesh. The tray opens on the grass; the figure walks in when the file arrives.
-  const rob = { play() {}, update() {}, g: { rotation: { y: 0 } } };
+  // The walker is the town guide's own mesh and material. It waits at the boom, and crosses once the toll is paid.
+  const rob = { play() {}, update() {}, home() {}, cross() { return () => true; }, g: { rotation: { y: 0 } } };
   makeRobot(scene).then(real => {
     real.at(1.75, -.95);
     real.g.rotation.y = -.35;
     rob.play = (...args) => real.play(...args);
     rob.update = dt => real.update(dt);
+    rob.home = () => { real.path = []; real.at(1.75, -.95); real.face = real.faceGoal = -.35; real.g.rotation.y = -.35; real.play('Idle'); };
+    rob.cross = () => real.walk([new THREE.Vector3(1.5, 0, -.2), new THREE.Vector3(2.6, 0, .35), new THREE.Vector3(3.6, 0, .3)]);
     rob.g = real.g;
   }).catch(() => null);
   const tags = [
@@ -64,6 +66,7 @@ export default async function toll() {
     *act(opts = {}) {
       if (!opts.success && !opts.basePaid) return;
       const mine = ++actGen;
+      rob.home();
       hideRefuse();
       boom.rotation.x = 0;
       yield tween(1.1, k => { if (mine === actGen) boom.rotation.x = -1.15 * k; });
@@ -71,7 +74,8 @@ export default async function toll() {
       try { rob.play('Yes', { once: true }); } catch { /* the boom still lifts */ }
       yield wait(.8);
       if (mine !== actGen) return;
-      try { rob.play('Idle'); } catch { /* pose is optional */ }
+      const done = rob.cross();
+      yield done;
     },
     update(dt) { rob.update(dt); },
   };

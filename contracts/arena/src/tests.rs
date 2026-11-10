@@ -235,3 +235,34 @@ fn freezing_works_from_any_key_of_the_holder() {
     assert!(c.get_guardian("g1".into()).unwrap().frozen);
 }
 
+
+/// Attempts and refusal badges are free to the player, and their bytes are staked from the
+/// balance that holds the pots. Once only the pots are left, the next write is refused instead
+/// of eating the prize money.
+#[test]
+fn free_writes_cannot_stake_away_the_pots() {
+    let mut c = setup();
+    assert_eq!(pots(), NEAR, "fund counted into the pots");
+    let price = env::storage_byte_cost().as_yoctonear();
+    let mut b = VMContextBuilder::new();
+    b.current_account_id(a("arena.near"));
+    testing_env!(b.build());
+    let usage = env::storage_usage() as u128;
+    let mut posted = 0;
+    let refused = loop {
+        let who = format!("p{posted}.near");
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(a("arena.near")).predecessor_account_id(a(&who)).signer_account_id(a(&who))
+            .storage_usage(usage as u64 + posted as u64 * 400)
+            .account_balance(NearToken::from_yoctonear(usage * price + NEAR + 2000 * price));
+        testing_env!(b.build());
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            c.attempt("g1".into(), hex::encode(env::sha256(who.as_bytes())));
+        }));
+        if r.is_err() { break true; }
+        posted += 1;
+        if posted > 50 { break false; }
+    };
+    assert!(refused, "the float check stops the stream of attempts");
+    assert!(posted < 10, "within the spare bytes ({posted} went through)");
+}

@@ -15,6 +15,7 @@ const TALK={
   night:[["Quiet night.","The ward is up. Sleep well."],["Late for a walk.","The lamps make it easy."],["Curfew tonight?","Only if the owner says so."],["Stars are out.","And every lamp in town."]],
 };
 const GREET={day:['Morning, Lamplighter.','Off early today?','Good day to you.'],dusk:['Evening, Lamplighter.','Lamps first, eh?','Evening!'],night:['Late round tonight?','Still lighting lamps?','Night, Lamplighter.']};
+const CRIER={day:['Morning, merchant.','Salt today?','Good day to you.'],dusk:['Evening, merchant.','Sold out yet?','Evening!'],night:['Late trading?','Still at it?','Night, merchant.']};
 export const phase=()=>W.tod<.5?'day':W.tod<1.5?'dusk':'night';
 
 let chat=null, nextChat=5, greetCD=4; const greeted=new Map();
@@ -31,7 +32,7 @@ function tickChat(dt){ const c=chat; c.t+=dt; const {a,b}=c;
   if(c.t>=c.next){ if(c.i>=c.lines.length){ endChat(); return; } const who=c.i%2?b:a; SP.say(who,c.lines[c.i],{dur:2.6,name:who.name}); if(who.A.interact&&rr()<.6) who.play('interact',{rate:.9}); c.i++; c.next=c.t+2.9; } }
 function tickGreet(dt){ const R=CAST.robot; for(const c of chars) if(c._lookOff&&clock.T>c._lookOff){ c._lookOff=0; if(!c._chat) c.lookAt(null); } greetCD-=dt; if(!R||greetCD>0||R.speed<.2) return;
   for(const c of chars){ if(c===R||!(c.wanderer||c.sitter)||c._chat||(c.emote&&!c.sitter)||!c.root.visible) continue; const d=c.pos.distanceTo(R.pos); const last=greeted.get(c)??-1e9;
-    if(d<1.5&&clock.T-last>40){ greeted.set(c,clock.T); greetCD=7; c.lookAt(R,1); SP.say(c,pick(GREET[phase()]),{dur:2.2,name:c.name}); if(R.A.yes&&rr()<.5&&!R.emote) R.play('yes',{rate:1.2}); c._lookOff=clock.T+2.6; return; } } }
+    if(d<1.5&&clock.T-last>40){ greeted.set(c,clock.T); greetCD=7; c.lookAt(R,1); SP.say(c,pick((R.name==='Town Crier'?CRIER:GREET)[phase()]),{dur:2.2,name:c.name}); if(R.A.yes&&rr()<.5&&!R.emote) R.play('yes',{rate:1.2}); c._lookOff=clock.T+2.6; return; } } }
 
 // the sky clock: seconds per stretch (hold, then blend). Starts at dusk, where the story is set.
 const LOOP=[[1,40],[2,18],[2,55],[0,22],[0,80],[1,22]]; // [target tod, seconds to reach and hold]
