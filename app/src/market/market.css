@@ -261,3 +261,6 @@ body.md-play.qs-on #tray .shop-quest ~ *,
 body.md-play.qs-on #tray .t-row,
 body.md-play.qs-on #tray #t-rcpt,
 body.md-play.qs-on #tray #t-src { display: none !important; }
+/* ...and the panel shrinks to that card: no empty dark slab under it. */
+@media (min-width: 721px) { body.md-play.qs-on #shopUI #tray { bottom: auto !important; height: auto !important; } }
+@media (max-width: 720px) { body.md-play.qs-on #shopUI #tray { top: auto !important; height: auto !important; } }
