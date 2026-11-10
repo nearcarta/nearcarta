@@ -26,11 +26,13 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
 
 // A signed-out visitor has no destination address, but the quote card still has to say what the
-// swap would cost. 1Click requires a recipient even for a dry quote, so the panel names the
-// town's own account, read from the deployment record the page already loads. It is a
-// display-only value: the reply is marked dry, no deposit address is created from it, and
-// nothing is ever signed for it.
-const displayRecipient = () => globalThis.NEARCARTA_ROOT || '';
+// swap would cost. 1Click requires a recipient even for a dry quote and rejects a contract id as
+// one, so the panel names the town's own account. It is read from the deployment record the page
+// already loads (/api/mainnet) and cached here; it is display-only — the reply is marked dry, no
+// deposit address is created from it, and nothing is ever signed for it.
+let rootAccount = globalThis.NEARCARTA_ROOT || '';
+export const setRootAccount = (id) => { if (id) rootAccount = String(id); };
+const displayRecipient = () => rootAccount;
 const q$ = (root, sel) => root.querySelector(sel);
 
 /** A disabled control stays readable and says why it is waiting. */
@@ -154,9 +156,13 @@ function quoteRateText(q, state, pickSym, toSym) {
   return `${inn} ${fs} ≈ ${out} ${ts}`.trim();
 }
 function quoteFeeText(q) {
-  const usd = q?.fee?.usd ?? q?.feeUsd ?? q?.checks?.echo?.protocolFeeBps;
-  if (usd == null) return '—';
-  return typeof usd === 'number' ? `≈ ${usd.toFixed(3)}` : String(usd);
+  // A fee in dollars when the reply carries one. `protocolFeeBps` is a RATE, not money, so it
+  // must never be rendered as "≈ $20" — that would read as twenty dollars of fee.
+  const usd = q?.fee?.usd ?? q?.feeUsd;
+  if (typeof usd === 'number') return `≈ $${usd.toFixed(3)}`;
+  const bps = q?.checks?.echo?.protocolFeeBps;
+  if (typeof bps === 'number') return `${bps} bps`;
+  return '—';
 }
 function quoteRouteText(q) {
   const hops = q?.route?.hops ?? q?.hops ?? (q?.route ? 1 : null);
@@ -487,39 +493,6 @@ function mountFerry(root, hooks) {
     };
     const clearQuote = () => { state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
     // The balances the swap cards show. The token is taken from the RENDERED pill's own
-    // `data-value` ("wNEAR|near"), not from panel state, so it cannot disagree with what the
-    // visitor sees. The result is written only if the pill still holds the same value when it
-    // comes back, so a slow read for a token they have already changed cannot land on the card.
-    let balSeq = 0;
-    const sideToken = (pillId) => {
-      const el = root.querySelector('#' + pillId);
-      const value = el?.dataset?.value || '';
-      const choice = (state.choices || []).find(c => c.id === value) || null;
-      return { value, choice };
-    };
-    const refreshBalances = async () => {
-      const seq = ++balSeq;
-      const who = (() => { try { return visitor()?.accountId || ''; } catch { return ''; } })();
-      if (!who) { state.fromBal = ''; state.toBal = ''; return; }
-      const from = sideToken('f-from');
-      const to = sideToken('f-to');
-      if (!from.choice && !to.choice) { state.fromBal = ''; state.toBal = ''; return; }
-      const { readBalance, balanceLine } = await import('./balance.js');
-      const { ferryRpc } = await import('./ferry-rpc.js');
-      const rpc = ferryRpc();
-      const [ra, rb] = await Promise.all([
-        from.choice ? readBalance(who, from.choice, { rpc }).catch(() => null) : null,
-        to.choice ? readBalance(who, to.choice, { rpc }).catch(() => null) : null,
-      ]);
-      // A later read has started: this answer is about a token that is no longer chosen.
-      if (seq !== balSeq) return;
-      // And the pill must still hold the value this read was for.
-      if (sideToken('f-from').value !== from.value) return;
-      if (sideToken('f-to').value !== to.value) return;
-      state.fromBal = ra ? balanceLine(ra) : '';
-      state.toBal = rb ? balanceLine(rb) : '';
-      localPaint();
-    };
     const onFrom = (value) => {
       state.fromEdited = true;
       state.fromId = value;
@@ -695,9 +668,52 @@ function mountFerry(root, hooks) {
     if (!result?.loaded) paint();
     return result;
   }
+  // `data-value` ("wNEAR|near"), not from panel state, so it cannot disagree with what the
+  // visitor sees. The result is written only if the pill still holds the same value when it
+  // comes back, so a slow read for a token they have already changed cannot land on the card.
+  let balSeq = 0;
+  const sideToken = (pillId) => {
+    const el = root.querySelector('#' + pillId);
+    const value = el?.dataset?.value || '';
+    const choice = (state.choices || []).find(c => c.id === value) || null;
+    return { value, choice };
+  };
+  const refreshBalances = async () => {
+    const seq = ++balSeq;
+    const who = (() => { try { return visitor()?.accountId || ''; } catch { return ''; } })();
+    if (!who) { state.fromBal = ''; state.toBal = ''; return; }
+    const from = sideToken('f-from');
+    const to = sideToken('f-to');
+    if (!from.choice && !to.choice) { state.fromBal = ''; state.toBal = ''; return; }
+    const { readBalance, balanceLine } = await import('./balance.js');
+    const { ferryRpc } = await import('./ferry-rpc.js');
+    const rpc = ferryRpc();
+    const [ra, rb] = await Promise.all([
+      from.choice ? readBalance(who, from.choice, { rpc }).catch(() => null) : null,
+      to.choice ? readBalance(who, to.choice, { rpc }).catch(() => null) : null,
+    ]);
+    // A later read has started: this answer is about a token that is no longer chosen.
+    if (seq !== balSeq) return;
+    // And the pill must still hold the value this read was for.
+    if (sideToken('f-from').value !== from.value) return;
+    if (sideToken('f-to').value !== to.value) return;
+    state.fromBal = ra ? balanceLine(ra) : '';
+    state.toBal = rb ? balanceLine(rb) : '';
+    localPaint();
+  };
+
   async function ensureTokens() {
     if (state.choices?.length || state.tokensTried) return;
     state.tokensTried = true;
+    // The town's own account, for the display-only recipient a signed-out dry quote needs.
+    // /api/mainnet is the same deployment record every shop reads; a failure just leaves the
+    // quote quiet rather than sending a request the API would refuse.
+    if (!displayRecipient()) {
+      fetch(api() + '/api/mainnet').then(r => r.json()).then(j => {
+        const root = j?.root || j?.deployments?.root || j?.board?.owner || '';
+        if (root) { setRootAccount(root); scheduleSwapQuote(); }
+      }).catch(() => {});
+    }
     try {
       const rows = hooks.tokens ? await hooks.tokens() : await fetch(api() + '/api/ferry/tokens').then(r => r.json());
       state.choices = tokenChoices(Array.isArray(rows) ? rows : rows?.tokens || []);
