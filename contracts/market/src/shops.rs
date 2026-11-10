@@ -221,18 +221,19 @@ impl Contract {
     }
 
     /// Sells `qty` of `good` to an open shop, paid from its till, within the daily caps.
-    pub fn sell(&mut self, shop: String, good: String, qty: u32, min_total: U128) -> U128 {
+    /// `keep: true` leaves the NEAR in the player's purse here instead of paying it out.
+    pub fn sell(&mut self, shop: String, good: String, qty: u32, min_total: U128, keep: Option<bool>) -> U128 {
         let me = self.me();
         let before = self.mark();
         let mut s = self.shop(&shop);
-        require!(s.till.0 >= s.floor.0, "ERR_SHOP_CLOSED");
+        require!(s.till.0 >= self.floor_of(s.floor.0), "ERR_SHOP_CLOSED");
         require!((1..=MAX_QTY).contains(&qty), "ERR_QTY");
         let cfg = cfg(&s, &good);
         let mut d = self.demand_now(&shop, &good);
         let mut stock = self.bal(&s.keeper, &good);
         let mut total = 0u128;
         for _ in 0..qty {
-            total += pricing::quote(&market_of(&s, &cfg, stock, &d)).sell.0;
+            total += pricing::quote(&market_of(&s, &cfg, stock, &d, self.floor_of(s.floor.0))).sell.0;
             stock += 1;
         }
         require!(total >= min_total.0, "ERR_PRICE_MOVED");
@@ -242,11 +243,12 @@ impl Contract {
         d.sells += qty;
         s.till = U128(s.till.0 - total);
         s.trades = U64(s.trades.0 + 1);
-        let closed = s.till.0 < s.floor.0;
+        let closed = s.till.0 < self.floor_of(s.floor.0);
         self.shops.insert(shop.clone(), s);
         self.demand.insert((shop.clone(), good.clone()), d);
+        if keep == Some(true) { self.credit_purse(&me, total) }
         self.settle_storage(&me, before);
-        pay(&me, total);
+        if keep != Some(true) { pay(&me, total) }
         Ev::new().s("player", me.as_str()).s("shop", &shop).s("good", &good).n("qty", qty as u64).u("total", total).market("sell");
         if closed { Ev::new().s("shop", &shop).market("shop_closed"); }
         U128(total)
@@ -266,7 +268,7 @@ impl Contract {
     }
 
     /// Delivers goods to an order: they are burned and the order's escrow pays wages.
-    pub fn fill_order(&mut self, order_id: U64, qty: u32) -> U128 {
+    pub fn fill_order(&mut self, order_id: U64, qty: u32, keep: Option<bool>) -> U128 {
         let me = self.me();
         let before = self.mark();
         let mut o = self.orders.get(&order_id.0).cloned().unwrap_or_else(|| env::panic_str("ERR_ORDER"));
@@ -285,8 +287,9 @@ impl Contract {
         let mut c = self.citizens.get(&me).cloned().unwrap_or_default();
         c.reputation += 1;
         self.citizens.insert(me.clone(), c);
+        if keep == Some(true) { self.credit_purse(&me, wage) }
         self.settle_storage(&me, before);
-        pay(&me, wage);
+        if keep != Some(true) { pay(&me, wage) }
         Ev::new().s("player", me.as_str()).n("order", order_id.0).n("qty", qty as u64).u("wage", wage).market("order_filled");
         U128(wage)
     }
@@ -312,7 +315,7 @@ impl Contract {
         let me = self.me();
         let mut s = self.shop(&shop);
         require!(s.keeper == me, "ERR_NOT_KEEPER");
-        require!(amount.0 > 0 && s.till.0 >= amount.0 + 2 * s.floor.0 + s.owed.0, "ERR_TILL");
+        require!(amount.0 > 0 && s.till.0 >= amount.0 + 2 * self.floor_of(s.floor.0) + s.owed.0, "ERR_TILL");
         s.till = U128(s.till.0 - amount.0);
         self.shops.insert(shop.clone(), s);
         pay(&me, amount.0);
@@ -346,24 +349,9 @@ impl Contract {
         let units = paid / SHARE_UNIT;
         require!(units > 0, "ERR_INVEST_MIN");
         let amount = units * SHARE_UNIT;
-        self.pay_dividends(&to, &shop);
-        let mut s = self.shop(&shop);
-        let was_closed = s.till.0 < s.floor.0;
-        s.till = U128(s.till.0 + amount);
-        s.shares = U128(s.shares.0 + units);
-        s.invested = U128(s.invested.0 + amount);
-        s.owed = U128(s.owed.0 + amount * REPAY_BPS / 10_000);
-        let reopened = was_closed && s.till.0 >= s.floor.0;
-        let acc = s.acc.0;
-        self.shops.insert(shop.clone(), s);
-        let token = format!("{SHARE}{shop}");
-        self.mint(&to, &token, units, "invest");
-        let held = self.bal(&to, &token);
-        self.share_debt.insert((to.clone(), shop.clone()), held * acc / ACC);
+        self.add_shares(&to, &shop, units, decision);
         let left = self.storage_from(&to, paid - amount, before);
         pay(&to, left);
-        Ev::new().s("investor", to.as_str()).s("shop", &shop).u("amount", amount).u("shares", units).s("decision", &decision_id(&decision)).market("invest");
-        if reopened { Ev::new().s("shop", &shop).market("shop_reopened"); }
         U128(units)
     }
 
@@ -411,7 +399,7 @@ impl Contract {
     pub fn quote(&self, shop: String, good: String) -> Quote {
         let s = self.shop(&shop);
         let c = cfg(&s, &good);
-        pricing::quote(&market_of(&s, &c, self.bal(&s.keeper, &good), &self.demand_now(&shop, &good)))
+        pricing::quote(&market_of(&s, &c, self.bal(&s.keeper, &good), &self.demand_now(&shop, &good), self.floor_of(s.floor.0)))
     }
 
     pub fn market_board(&self) -> Vec<ShopView> {
@@ -435,7 +423,7 @@ fn cfg(s: &Shop, good: &str) -> GoodCfg {
     s.goods.iter().find(|g| g.good == good).cloned().unwrap_or_else(|| env::panic_str("ERR_GOOD"))
 }
 
-fn market_of(s: &Shop, c: &GoodCfg, stock: u128, d: &Demand) -> pricing::Market {
+fn market_of(s: &Shop, c: &GoodCfg, stock: u128, d: &Demand, floor: u128) -> pricing::Market {
     pricing::Market {
         base: c.base,
         stock: U64(stock.min(u64::MAX as u128) as u64),
@@ -443,11 +431,33 @@ fn market_of(s: &Shop, c: &GoodCfg, stock: u128, d: &Demand) -> pricing::Market 
         buys_last_hour: d.prev_buys,
         sells_last_hour: d.prev_sells,
         till: s.till,
-        floor: s.floor,
+        floor: U128(floor),
     }
 }
 
 impl Contract {
+    /// Shares for `units` milliNEAR already received: pending dividends paid first, the till grows.
+    pub(crate) fn add_shares(&mut self, to: &AccountId, shop: &str, units: u128, decision: Option<String>) -> U128 {
+        let amount = units * SHARE_UNIT;
+        self.pay_dividends(to, shop);
+        let mut s = self.shop(shop);
+        let was_closed = s.till.0 < self.floor_of(s.floor.0);
+        s.till = U128(s.till.0 + amount);
+        s.shares = U128(s.shares.0 + units);
+        s.invested = U128(s.invested.0 + amount);
+        s.owed = U128(s.owed.0 + amount * REPAY_BPS / 10_000);
+        let reopened = was_closed && s.till.0 >= self.floor_of(s.floor.0);
+        let acc = s.acc.0;
+        self.shops.insert(shop.to_string(), s);
+        let token = format!("{SHARE}{shop}");
+        self.mint(to, &token, units, "invest");
+        let held = self.bal(to, &token);
+        self.share_debt.insert((to.clone(), shop.to_string()), held * acc / ACC);
+        Ev::new().s("investor", to.as_str()).s("shop", shop).u("amount", amount).u("shares", units).s("decision", &decision_id(&decision)).market("invest");
+        if reopened { Ev::new().s("shop", shop).market("shop_reopened"); }
+        U128(units)
+    }
+
     pub(crate) fn shop(&self, id: &str) -> Shop {
         self.shops.get(id).cloned().unwrap_or_else(|| env::panic_str("ERR_SHOP"))
     }
@@ -465,10 +475,10 @@ impl Contract {
     pub(crate) fn view(&self, s: &Shop) -> ShopView {
         let goods = s.goods.iter().map(|g| {
             let stock = self.bal(&s.keeper, &g.good);
-            GoodView { good: g.good.clone(), stock: U128(stock), quote: pricing::quote(&market_of(s, g, stock, &self.demand_now(&s.id, &g.good))) }
+            GoodView { good: g.good.clone(), stock: U128(stock), quote: pricing::quote(&market_of(s, g, stock, &self.demand_now(&s.id, &g.good), self.floor_of(s.floor.0))) }
         }).collect();
         ShopView {
-            id: s.id.clone(), keeper: s.keeper.clone(), open: s.till.0 >= s.floor.0, till: s.till, floor: s.floor,
+            id: s.id.clone(), keeper: s.keeper.clone(), open: s.till.0 >= self.floor_of(s.floor.0), till: s.till, floor: U128(self.floor_of(s.floor.0)),
             shares: s.shares, invested: s.invested, owed: s.owed, trades: s.trades, goods,
         }
     }
@@ -483,7 +493,7 @@ impl Contract {
         require!(stock >= qty as u128, "ERR_OUT_OF_STOCK");
         let mut total = 0u128;
         for _ in 0..qty {
-            total += pricing::quote(&market_of(&s, &c, stock, &d)).buy.0;
+            total += pricing::quote(&market_of(&s, &c, stock, &d, self.floor_of(s.floor.0))).buy.0;
             stock -= 1;
         }
         d.buys += qty;

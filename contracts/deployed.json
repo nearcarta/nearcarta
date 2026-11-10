@@ -41,7 +41,7 @@
       "crate": "contracts/market",
       "artifact": "contracts/artifacts/market.wasm",
       "build": "nep330",
-      "rev": "f44da703"
+      "rev": "5f9d9cd1"
     }
   ]
 }

@@ -677,12 +677,12 @@
     "status": "deployed",
     "crate": "contracts/market",
     "build": "nep330",
-    "source_rev": "f44da703afae6940f37c4bbf28a5de272b231808",
+    "source_rev": "5f9d9cd1174f8ff3f634481bbd9e9928f27e384e",
     "image": "sourcescan/cargo-near:0.20.3-rust-1.86.0",
-    "wasm_bytes": 364496,
-    "wasm_sha256": "9b3d09cc5adfae367428cdd9e504216d4e965e087f8f15824ea876d52d23bafc",
-    "code_hash": "BSzBC6b8DLAKERTF5jx4coELhQ5mnx3k3ZmeAVL1Se7d",
-    "storage_bytes": 364861,
+    "wasm_bytes": 403188,
+    "wasm_sha256": "0fa00ba7de5ddf38fdc08bf0583b54d6dcf708470b8305a35c1a1e9e14c1063c",
+    "code_hash": "23zfK5CDKSAe8vtvxUoVBnZPkMGJmgBBze1ew4xKQerP",
+    "storage_bytes": 414231,
     "stake_near": 3.70041,
     "full_access_keys": 0,
     "caps": {
@@ -697,9 +697,12 @@
       "smoke_owner_set_caps": "TvJisZ6VNJFA4zoKTiB4U37aFTGtYGdEKVG4xrPfYYj",
       "register_tokens": "D1SJrRePPEK5wyBZbi2TNwfb1Y5cQQ9MNSFzdmCMqoK2",
       "set_nodes": "2piULmURgh3kAPstpRSMJfxNX453ay4XuvReshZdJFat",
-      "storage_topup_0.07": "HhPAVjQGqWaoLswofyPMs3Ygk5mhZD4SJ9WobnDXT3S8"
+      "storage_topup_0.07": "HhPAVjQGqWaoLswofyPMs3Ygk5mhZD4SJ9WobnDXT3S8",
+      "storage_topup_v2": "2QDfKyzt9h3CkLNdrZ8hbzQERbQ55mJdQHGrKqEznez9",
+      "upgrade_v2": "97ckbVTHuvxSnhZ5HE5uiauxN4rEkvf7pSJ5TBpa3b1z",
+      "set_council": "9mwKVavP8E7cBigyC8PDuv3jZz34MhXQE8sMGAEBUv4Z"
     },
-    "note": "The Arena square is the market. No keys; owner-only upgrade.",
+    "note": "The Arena square is the market. No keys; owner-only upgrade. v2 adds purses, rentable stalls and a keeper council that changes rules on-chain.",
     "shops": {
       "till_near": 0.01,
       "floor_near": 0.003,
@@ -716,6 +719,21 @@
         "chronicle": "HU2gRHow17jwv9bGW2MzRPY5i2UsMoVCkZ3g2fpHupq9"
       },
       "keepers": "keeper-<shop>.nearcarta.near"
+    },
+    "state_version": 2,
+    "council": {
+      "members": [
+        "keeper-arena.nearcarta.near",
+        "keeper-hall.nearcarta.near",
+        "keeper-ferry.nearcarta.near",
+        "keeper-toll.nearcarta.near",
+        "keeper-guard.nearcarta.near",
+        "keeper-bank.nearcarta.near",
+        "keeper-house.nearcarta.near",
+        "keeper-payouts.nearcarta.near",
+        "keeper-chronicle.nearcarta.near"
+      ],
+      "quorum": 5
     }
   },
   "relayer": {
