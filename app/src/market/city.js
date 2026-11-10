@@ -9,6 +9,7 @@ import { ICON, iconFor } from '/market/icons.js';
 import * as G from '/shared/market/guide.js';
 import * as Q from '/shared/market/story.js';
 import { createStrip } from '/market/quest-strip.js';
+import * as R from '/market/live-play.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -86,7 +87,10 @@ const fail = (e) => toast(WHY[e.code] || e.message, 'no');
 // ---------- HUD ----------
 const PH = { dawn: 'dawn', market: 'sun', dusk: 'dusk', night: 'night' };
 let lastPhase = null;
-const purse = () => (Q.state(city).sealed ? '••••' : coins(me().near));
+// Signed in: the purse is the real one, read from the market.
+let realPurse = null;
+const purse = () => (Q.state(city).sealed ? '••••' : coins(R.on() && realPurse != null ? realPurse : me().near));
+async function readPurse() { if (!R.on()) return; const v = await R.coins(); if (v != null) { realPurse = v; hud(); } }
 function hud() {
   const c = S.cityClock(city.t), p = me(), pr = Q.progress(city);
   K('phase').innerHTML = ICON[PH[c.phase]];
@@ -135,7 +139,7 @@ async function go() {
 }
 
 // ---------- the strip inside each shop ----------
-let inShop = null, lastDone = null, whyOpen = false, flash = null;
+let inShop = null, lastDone = null, whyOpen = false, flash = null, busy = false;
 const strip = createStrip({ onClick: stripClick });
 const num = (i) => `<span class="qs-n">${i}</span>`;
 const okMark = `<span class="qs-n ok">${ICON.seal}</span>`;
@@ -149,7 +153,7 @@ function stripHtml(id) {
   const s = Q.current(city), pr = Q.progress(city), p = me();
   if (lastDone && lastDone.shop === id) {
     const r = lastDone.res, nx = Q.current(city);
-    let sub = lastDone.step.proof ? '<span class="qs-rc">Kept in your receipt</span>' : '';
+    let sub = lastDone.step.proof || r.real ? '<span class="qs-rc">Kept in your receipt</span>' : '';
     if (lastDone.step.id === 'sell') sub = `+${coins(r.total)} coins · price ${coins(r.before)} → ${coins(r.after)}`;
     if (lastDone.step.id === 'write') sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins`;
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
@@ -161,6 +165,7 @@ function stripHtml(id) {
     return { gold: true, html: row(num(pr.done + 1), s.need, reward, gold('act', s.btn)) + extra };
   }
   // off the story path: the Square is still the market and producing shops still make goods
+  if (id === 'arena' && R.on() && !s && !R.live.stall) return { gold: true, html: row(`<span class="qs-n tok">${ICON.bag}</span>`, 'Rent a stall', '10 coins a week, from your purse', gold('stall', 'Rent')) };
   if (id === 'arena') { const g = Object.keys(S.GOODS).find((k) => p.bag[k] && city.shops.arena.goods[k]); if (g) { const n = Math.min(p.bag[g], S.MAX_QTY); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', g, n); } catch {} return { gold: true, html: row(`<span class="qs-n tok">${iconFor(g)}</span>`, `Sell ${n} ${GOOD(g).toLowerCase()}`, `+${coins(t)} coins`, gold('sell', 'Sell', `data-good="${g}" data-n="${n}"`)) + `<div class="qs-more">${whyBlock(g)}</div>` }; } }
   const berths = S.nodesAt(id);
   if (berths.length) { const good = berths[0][1]; const wait = Math.min(...berths.map(([n]) => S.cooldown(city, Q.ME, n))); return { gold: !wait, html: row(`<span class="qs-n tok">${iconFor(good)}</span>`, `${NAME[id]} makes ${GOOD(good).toLowerCase()}`, wait ? `Ready in ${wait}s` : '+1 each berth', wait ? ghost('collect', 'Collect', 'disabled') : gold('collect', 'Collect')) }; }
@@ -176,9 +181,14 @@ function paintStrip() {
 async function stripClick(a, b) {
   try {
     if (a === 'act') {
-      const step = Q.current(city); const res = Q.act(city, inShop); lastDone = { shop: inShop, step, res }; lastDeed = { shop: inShop, text: DEED[step.id] };
-      save(); hud(); quest(); seal(b); whyOpen = false; flash = null;
+      if (busy) return;
+      const step = Q.current(city); let real = null;
+      if (R.on()) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.step(step.id, { shop: Q.state(city).dark || 'ferry' }); } finally { busy = false; } }
+      const res = Q.act(city, inShop); if (real) { res.real = real; if (step.id === 'sell' && real.total != null) res.total = real.total; }
+      lastDone = { shop: inShop, step, res }; lastDeed = { shop: inShop, text: DEED[step.id] };
+      save(); hud(); quest(); seal(b); whyOpen = false; flash = null; readPurse();
     } else if (a === 'why') whyOpen = !whyOpen;
+    else if (a === 'stall') { if (busy) return; busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { await R.rentStall(1); R.live.stall = 1; flash = { shop: inShop, text: 'Stall 1 is yours for a week' }; readPurse(); } finally { busy = false; } }
     else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); flash = { shop: inShop, text: `Sold for ${coins(t)} coins` }; save(); hud(); }
     else if (a === 'collect') { let got = 0, good = null; for (const [n, g] of S.nodesAt(inShop)) { try { got += S.gather(city, Q.ME, n); good = g; } catch {} } if (got) flash = { shop: inShop, text: `+${got} ${GOOD(good).toLowerCase()} in your bag` }; save(); hud(); }
     else if (a === 'next' || a === 'there') { lastDone = null; strip.hide(); await WD().exitShop?.(); if (Q.current(city)) setTimeout(go, 350); return; }
@@ -226,9 +236,13 @@ function vBag() {
 function vReceipt() {
   const done = Q.STEPS.slice(0, Q.progress(city).done);
   const rows = done.map((x) => `<div class="md-row static"><span class="md-tok">${ICON.seal}</span><span class="md-nm"><b>${esc(NAME[x.shop])}</b><small>${esc(x.done)}</small></span>${x.proof ? `<a class="md-ghost sm" href="${x.proof.url}" target="_blank" rel="noopener" title="${esc(x.proof.label)}">Record ↗</a>` : ''}</div>`).join('');
+  const txs = R.on() ? (R.live.txs || []) : [];
+  const real = txs.map((t) => `<div class="md-row static"><span class="md-tok">${ICON.coin}</span><span class="md-nm"><b>${esc(t.what)}</b><small>${esc(t.hash.slice(0, 10))}…${t.burnt ? ` · gas ${esc(t.burnt)} NEAR, paid by the city` : ''}</small></span><a class="md-ghost sm" href="https://nearblocks.io/txns/${encodeURIComponent(t.hash)}" target="_blank" rel="noopener">Tx ↗</a></div>`).join('');
   return head(ICON.seal, 'Receipt', `${purse()} coins · ${done.length}/9 steps`)
+    + (real ? `<h3 class="md-sub">Your moves on NEAR mainnet</h3><div class="md-list" data-testid="md-real-txs">${real}</div>` : '')
     + (rows ? `<div class="md-list">${rows}</div>` : '<p class="md-hint">Nothing yet. Your first stop is the Town Hall.</p>')
-    + '<p class="md-hint">Practice round: the city’s rules run here. Each Record is a real mainnet transaction of the same action. 1 coin = 0.0001 NEAR. All proofs: <a href="/judge">/judge</a>.</p>';
+    + (R.on() ? `<p class="md-hint">Real round as ${esc(R.live.account.slice(0, 8))}…: market moves are mainnet transactions from your wallet, gas paid by the city. Other steps link the recorded transaction of the same action. 1 coin = 0.0001 NEAR. All proofs: <a href="/judge">/judge</a>.</p>`
+      : '<p class="md-hint">Practice round: the city’s rules run here. Each Record is a real mainnet transaction of the same action. 1 coin = 0.0001 NEAR. All proofs: <a href="/judge">/judge</a>.</p>');
 }
 function mood(sh) { if (!S.isOpen(sh)) return ['Worried', 'The till is under the floor. The shop is dark.']; if (sh.till >= sh.floor * 2n) return ['Cheerful', 'A full till and steady trade.']; return ['Steady', 'Enough in the till to trade.']; }
 function vKeeper() {
@@ -266,9 +280,28 @@ function vWeek() {
   <div class="md-list" data-w="feed"></div><p class="md-hint" data-w="end" hidden>A week passed. No patch, no developer: prices followed the shelves, and the council changed a rule.</p>
   <button type="button" class="md-ghost sm" data-act="wskip">Skip to the end</button></div>`;
 }
+let signStage = 'email', signEmail = '', signErr = '';
+function vSign() {
+  const f = signStage === 'email'
+    ? `<input type="email" required autocomplete="email" placeholder="you@example.com" aria-label="Email" data-testid="md-email" value="${esc(signEmail)}"><button type="submit" class="md-gold" data-testid="md-send">Send code</button>`
+    : signStage === 'code' ? `<input inputmode="numeric" required autocomplete="one-time-code" placeholder="Code from your email" aria-label="Code" data-testid="md-code"><button type="submit" class="md-gold" data-testid="md-login">Start</button>`
+    : '<p class="md-hint" role="status">One moment…</p>';
+  return head(ICON.coin, 'Play for real', 'Your email opens your purse. No wallet, no fees.')
+    + `<form class="md-sign" data-testid="md-sign">${f}</form>${signErr ? `<p class="md-hint no" role="alert">${esc(signErr)}</p>` : ''}`
+    + '<button type="button" class="md-ghost sm" data-act="practice" data-testid="md-practice">Practice first</button>';
+}
+root.addEventListener('submit', async (e) => {
+  if (!e.target.closest('.md-sign')) return; e.preventDefault(); signErr = '';
+  const v = e.target.querySelector('input')?.value || '';
+  try {
+    if (signStage === 'email') { signEmail = v; signStage = 'sending'; render(); await R.sendCode(v); signStage = 'code'; }
+    else if (signStage === 'code') { signStage = 'opening'; render(); await R.login(signEmail, v); signStage = 'email'; close(); toast('Your purse is open'); readPurse(); return; }
+  } catch (x) { signStage = signStage === 'opening' ? 'code' : 'email'; signErr = x?.message || 'That did not work. Try again.'; }
+  if (view === 'signin') render();
+});
 function render() {
   const body = root.querySelector('.md-body');
-  body.innerHTML = view === 'bag' ? vBag() : view === 'ask' ? vAsk() : view === 'receipt' ? vReceipt() : view === 'keeper' ? vKeeper() : view === 'week' ? vWeek() : '';
+  body.innerHTML = view === 'signin' ? vSign() : view === 'bag' ? vBag() : view === 'ask' ? vAsk() : view === 'receipt' ? vReceipt() : view === 'keeper' ? vKeeper() : view === 'week' ? vWeek() : '';
   if (view === 'week') { cancelAnimationFrame(week?.raf || 0); if (!week || week.done) weekStart(); else weekTick(); }
 }
 
@@ -279,6 +312,7 @@ root.addEventListener('click', (ev) => {
   const a = b.dataset.act;
   try {
     if (a === 'close') close();
+    else if (a === 'practice') { R.live.practice = 1; try { localStorage.setItem('nearcarta.marketday.live', JSON.stringify(R.live)); } catch {} close(); }
     else if (a === 'go') go();
     else if (a === 'wskip') { if (week) { week.t0 = performance.now() - 60000; weekTick(); } return; }
     else if (a === 'claim') toast(`Claimed ${coins(S.claim(city, ME, b.dataset.shop))} coins`);
@@ -349,6 +383,7 @@ function enter() {
   history.replaceState(null, '', location.pathname + (location.search.includes('play') ? location.search : (location.search ? location.search + '&' : '?') + 'play'));
   try { WD().guideLook?.('crier'); } catch {}
   lastT = performance.now(); lastPhase = null; dawnOrders(); hud(); quest();
+  R.resume().then(() => { readPurse(); if (!R.on() && !R.live.practice && Q.progress(city).done === 0) setTimeout(() => { if (playing && !view) open('signin'); }, 900); });
   setTimeout(() => { aim(); if (!Q.state(city).met.intro) { Q.state(city).met.intro = 1; save(); WD().guideSay?.('New merchant? Earn your first coin by dusk.', { dur: 4.2 }); } }, 500);
   clearInterval(timer); timer = setInterval(() => { const now = performance.now(); S.advance(city, Math.round((now - lastT) / 1000)); lastT += Math.round((now - lastT) / 1000) * 1000; hud(); save(); }, 1000);
 }
@@ -367,4 +402,4 @@ function mount() {
   if (/[?&]play\b/.test(location.search)) { const go_ = () => (window.__ready ? (enter(), /[?&]receipt\b/.test(location.search) && setTimeout(() => open('receipt'), 600)) : setTimeout(go_, 300)); go_(); }
 }
 if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mount); else mount();
-window.__marketday = { get city() { return city; }, enter, leave, open, go, story: Q, reset() { city = S.createCity(); save(); hud(); quest(); refresh(); aim(); } };
+window.__marketday = { get city() { return city; }, live: R, enter, leave, open, go, story: Q, reset() { city = S.createCity(); save(); hud(); quest(); refresh(); aim(); } };
