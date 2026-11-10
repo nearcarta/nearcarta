@@ -37,7 +37,7 @@ test('an unverified answer never moves a keeper', async () => {
 test('restock call carries the decision and a capped deposit', () => {
   const c = restockCall('ferry', { from: 'bank', good: 'good:salt', qty: 2, price: '1000' }, 'chatcmpl-1');
   const a = JSON.parse(c.args);
-  assert.equal(a.decision, 'chatcmpl-1'); assert.equal(a.max_total, '2100'); assert.equal(c.deposit, '2100');
+  assert.equal(a.decision, 'chatcmpl-1'); assert.equal(a.max_total, '2100'); assert.equal(c.deposit, String(2100n + 10n ** 21n));
 });
 
 test('council: a keeper sees the rule change in plain numbers before voting', async () => {

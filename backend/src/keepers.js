@@ -13,6 +13,7 @@ import { cfg, secret } from './config.js';
 import { restockChoices, restockMessages, councilMessages, parseRestock, parseVote } from '../../shared/market/keeper-ai.js';
 
 const MAX_TOKENS = 200;
+export const STORAGE_ALLOWANCE = 10n ** 21n; // 0.001 NEAR, about 100 bytes
 
 /** Ask once. Returns { reply, completion_id, proof } or { reply: null, why } when no signed answer is possible. */
 // NEAR-hosted models serve a TEE report; the first one that answers is used.
@@ -62,6 +63,9 @@ export async function decideVote(shop, proposal, deps) {
 /** The args and deposit for a restock the board forwards to the market. */
 export function restockCall(shop, r, decision) {
   const total = BigInt(r.price) * BigInt(r.qty);
-  const max = total + total / 20n; // 5% slippage, the rest is refunded
-  return { method: 'restock', args: JSON.stringify({ shop, from_shop: r.from, good: r.good, qty: r.qty, max_total: String(max), decision }), deposit: String(max) };
+  const max = total + total / 20n; // 5% slippage
+  // The market takes storage for the move from what is left of the deposit, so carry a small allowance;
+  // whatever is not used goes back to the keeper.
+  const deposit = max + STORAGE_ALLOWANCE;
+  return { method: 'restock', args: JSON.stringify({ shop, from_shop: r.from, good: r.good, qty: r.qty, max_total: String(max), decision }), deposit: String(deposit) };
 }

@@ -55,6 +55,7 @@ if (cmd === 'restock') {
   if (d.reply) {
     const call = restockCall(shop, d.reply, d.completion_id);
     const row = await view(BOARD, 'get_charter', { owner: acct });
+    if (BigInt(call.deposit) > BigInt(row.per_action_cap)) throw new Error('restock is over the row cap per action');
     const expiry = BigInt(Date.now()) * 1_000_000n + 600_000_000_000n;
     // The row's epoch has no view of its own: read the board's own text for this call, take the epoch
     // from it, rebuild the text here and sign only if both agree.
