@@ -674,8 +674,39 @@
     "txs": {
       "create_deploy_new": "Dv6CNQoqrYCdLHEirz7Hq36kPMaL3z2xZP4zsPFq8Zkg",
       "smoke_stranger_refused": "21wnzVagqk6wiANZLg65BbzuiJHRdMDjxi9zRKWgJKJP",
-      "smoke_owner_set_caps": "TvJisZ6VNJFA4zoKTiB4U37aFTGtYGdEKVG4xrPfYYj"
+      "smoke_owner_set_caps": "TvJisZ6VNJFA4zoKTiB4U37aFTGtYGdEKVG4xrPfYYj",
+      "register_tokens": "D1SJrRePPEK5wyBZbi2TNwfb1Y5cQQ9MNSFzdmCMqoK2",
+      "set_nodes": "2piULmURgh3kAPstpRSMJfxNX453ay4XuvReshZdJFat",
+      "storage_topup_0.07": "HhPAVjQGqWaoLswofyPMs3Ygk5mhZD4SJ9WobnDXT3S8"
     },
-    "note": "The Arena square is the market. No keys; owner-only upgrade."
+    "note": "The Arena square is the market. No keys; owner-only upgrade.",
+    "shops": {
+      "till_near": 0.01,
+      "floor_near": 0.003,
+      "stock_per_good": 20,
+      "txs": {
+        "arena": "AsjjDmKrvXu8UCZRhqNF1JEo9dDtBfxuJZVD26353ddz",
+        "hall": "4zR48hrftCPb3PUt5asnTjHYNVhK5jXgjcVTBc4GL6M8",
+        "ferry": "4BFumHrjuQydEdaShwdD9kQhJAbX2To7mj8Ww5NMhJiL",
+        "toll": "HfP8LbC4PLjdxu4QU73VRL8Mue2YaxrTp4t4zrfRpUye",
+        "guard": "GwvvTNDQUSFGpYHm2HPNnifVKNK8T2pqP1XcgeXHBL49",
+        "bank": "CisF2fKbemy8tFmzZ8xxAuxThrH3aovo2ZbLjQ8RWoc4",
+        "house": "Fsj36NdGpGCvYhxRMoTbPVSak57qP2C2xCx3hDqQqYje",
+        "payouts": "EDNPozrz2CX6FrgSZVoQXDMPvas6MxBrrHVcdG4ugsis",
+        "chronicle": "HU2gRHow17jwv9bGW2MzRPY5i2UsMoVCkZ3g2fpHupq9"
+      },
+      "keepers": "keeper-<shop>.nearcarta.near"
+    }
+  },
+  "relayer": {
+    "account": "relayer.nearcarta.near",
+    "float_near": 0.1,
+    "create_tx": "HufMbUbtoXWkmVwsE2qStfzLw3DCexYYMXf6vrUs7zcp",
+    "caps": {
+      "per_visitor_gas_near_per_day": 0.003,
+      "per_visitor_relays_per_day": 40,
+      "daily_near": 0.05,
+      "sessions_per_day": 4
+    }
   }
 }
