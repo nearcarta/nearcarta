@@ -72,6 +72,7 @@ if (!done('sell')) await move(`sell: ${qty} salt at the Arena into the purse`, [
 log.purse_after_sell = near((await view('square', { account_id: id })).purse);
 const sq = await view('square', { account_id: id });
 const free = [1, 2, 3, 4].find((n) => !sq.stalls.some((x) => x.id === n && x.holder && Number(x.until) > Date.now() * 1e6)) || 1;
+{ const t = await post('/api/relay/session', { account_id: id }); log.topups = [...(log.topups || []), t]; save(); console.log('session top-up', JSON.stringify(t)); await sleep(3000); }
 if (!done('stall')) await move(`stall: rent stall ${free} for ${near(sq.rules.stall_rent)} NEAR`, [{ method: 'stall', args: { stall: free, action: 'rent' }, tgas: 20 }]);
 if (!done('invest')) await move('invest: 0.001 NEAR from the purse into the ferry', [{ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop: 'ferry' }, tgas: 20 }]);
 

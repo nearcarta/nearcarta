@@ -52,6 +52,7 @@ export async function step(id, ctx = {}) {
   }
   if (id === 'invest') {
     const shop = ctx.shop || 'ferry';
+    await L.ensureSession(); // tops the market storage back up if the day used it
     const r = check(await L.move({ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 }));
     return record(id, `Invested 10 coins in the ${shop}`, r);
   }
@@ -61,6 +62,7 @@ export async function step(id, ctx = {}) {
 /** Rent a stall in the Arena square from the purse. */
 export async function rentStall(stall = 1) {
   const L = await lib();
+  await L.ensureSession();
   const r = check(await L.move({ method: 'stall', args: { stall, action: 'rent' }, tgas: 20 }));
   return record('stall', `Rented stall ${stall} in the Arena`, r);
 }
