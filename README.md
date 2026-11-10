@@ -49,6 +49,48 @@ Chronicle runs on the board's own records rather than a contract of its own, so 
 
 ---
 
+## Games: Market Day in Nearcarta
+
+The city is the game. Press **Market Day** on **https://nearcarta.vercel.app**, and the Town Crier walks you through nine shops: Town Hall, Ferry, Toll Bridge, Guardhouse, Vault Arena, Mist Bank, Payouts, Your House, Chronicle. Each step is that shop's real feature. Today's round is a practice round: the market rules (`shared/market/sim.js`, `shared/market/story.js`) run in the browser, and each step with a mainnet record links it in the Receipt. Tests: `story: nine steps, one per shop, every shop once`, `story: a new merchant earns a first coin in one day`.
+
+### NPCs with wallets
+
+| Do | See |
+|---|---|
+| Walk to the Guardhouse and press **Check buyers** | The Captain clears the square keeper and refuses the con artist. The Receipt links the real refusal on chain |
+| Walk into any shop for the first time | Its keeper greets you by role: Clerk, Ferryman, Toll warden, Captain, Arena marshal, Banker, Paymaster, Housekeeper, Archivist |
+
+Status: the nine keepers as their own NEAR sub-accounts with board rows (approved), and tapping a keeper to see name, mood and purse, are next on this branch. Until they ship, keepers trade inside the practice round.
+
+### Player-owned markets
+
+| Do | See |
+|---|---|
+| At Your House press **Invest 10** | The Ferry, dark after spending its till on your cargo, lights up again, and a Ferry share goes into your bag |
+| Open the bag after the Ferry sells | The share row shows a **Claim** button for your part of its sales |
+
+Status: owning a stall in the Arena square is next.
+
+### Economy evolves without a dev patch
+
+| Do | See |
+|---|---|
+| At the Vault Arena press **Sell 3 salt**, then **Why this price?** | The price moves with the shelf: `price A → B`, and the reasons (stock, demand) behind it |
+| Finish the day and press **Day 2** | The shelf you sold into, the tills and your share carry over: the price you moved stays moved |
+
+Status: orders drawn from contract state and keeper needs, prices read from the market contract's on-chain supply and demand, a House council vote that changes a market rule on chain, and fast-forward (a week in a minute) are next.
+
+### Players never notice the chain
+
+| Do | See |
+|---|---|
+| Play the whole day | Coins, a purse, a stall, a share. No wallet popup, no hash, no gas prompt in the main flow |
+| Tap the purse in the top bar | The Receipt: each finished step, and a quiet **Record** link to its real mainnet transaction for those who want proof |
+
+Status: email sign-in and relayer-sponsored gas for real (non-practice) moves are next. Judges: every proof is on `/judge`.
+
+---
+
 ## The safety story
 
 Three properties. Each one is pinned by a test and by a transaction you can open.

@@ -18,6 +18,8 @@ const ME = 'you';
 const KEY = 'nearcarta.marketday.v1';
 const NAME = { arena: 'Vault Arena', hall: 'Town Hall', ferry: 'Ferry', toll: 'Toll Bridge', guard: 'Guardhouse', bank: 'Mist Bank', house: 'Your House', payouts: 'Payouts', chronicle: 'Chronicle' };
 const GOOD = (g) => S.GOODS[g]?.name || S.ITEMS[g]?.name || (g.startsWith('share:') ? `${NAME[g.slice(6)] || g.slice(6)} share` : g);
+// Plain game words: the purse counts coins (1 coin = 0.0001 NEAR). The chain shows only in the Receipt.
+const coins = (y) => { const t = (BigInt(y) * 10n) / Q.COIN; const w = t / 10n, f = t % 10n; return f ? `${w}.${f}` : `${w}`; };
 const near = (y) => { const s = yoctoToNear(String(y)); const [a, b = ''] = s.split('.'); return b ? `${a}.${b.slice(0, 4).padEnd(4, '0')}` : `${a}.0000`; };
 
 // ---------- state (practice) ----------
@@ -56,7 +58,7 @@ root.innerHTML = `
 <button class="md-enter" type="button" data-testid="md-enter"><span class="i">${ICON.play}</span><span>Market Day</span></button>
 <div class="md-hud" role="status" aria-live="polite" data-testid="md-hud">
   <div class="md-day" title="Market Day: one step at each shop"><span class="i" data-k="phase"></span><span class="md-dots" data-k="dots"></span><b data-k="prog"></b></div>
-  <div class="md-purse" title="Practice round: the city's rules run in your browser. No transaction is sent."><span class="i" data-k="pi">${ICON.coin}</span><b data-k="near"></b></div>
+  <button type="button" class="md-purse" data-v="receipt" data-testid="md-receipt" aria-label="Purse and receipt"><span class="i" data-k="pi">${ICON.coin}</span><b data-k="near"></b></button>
   <button type="button" class="md-exit" data-testid="md-exit" aria-label="Leave Market Day"><span class="i">${ICON.close}</span></button>
 </div>
 <div class="md-toasts" aria-live="polite"></div>
@@ -75,16 +77,16 @@ function toast(text, kind = 'ok') {
 }
 const WHY = {
   ERR_TOO_SOON: 'This spot is resting. Try another one.', ERR_SHOP_CLOSED: 'Closed: out of funds. It still sells, or invest to reopen it.',
-  ERR_BALANCE: 'Not enough in your bag.', ERR_FUNDS: 'Not enough NEAR. Sell something first.', ERR_STOCK: 'The shelf is empty.',
+  ERR_BALANCE: 'Not enough in your bag.', ERR_FUNDS: 'Not enough coins. Sell something first.', ERR_STOCK: 'The shelf is empty.',
   ERR_TILL: 'The till cannot pay that much.', ERR_PLAYER_DAILY_CAP: 'Daily limit reached: you can earn more tomorrow.',
-  ERR_CITY_DAILY_CAP: 'The city has paid its daily limit. Back tomorrow.', ERR_OWN_ORDER: 'That is your own order.', ERR_SMALL: 'Invest at least 0.001 NEAR.',
+  ERR_CITY_DAILY_CAP: 'The city has paid its daily limit. Back tomorrow.', ERR_OWN_ORDER: 'That is your own order.', ERR_SMALL: 'Invest at least 10 coins.',
 };
 const fail = (e) => toast(WHY[e.code] || e.message, 'no');
 
 // ---------- HUD ----------
 const PH = { dawn: 'dawn', market: 'sun', dusk: 'dusk', night: 'night' };
 let lastPhase = null;
-const purse = () => (Q.state(city).sealed ? '••••' : near(me().near));
+const purse = () => (Q.state(city).sealed ? '••••' : coins(me().near));
 function hud() {
   const c = S.cityClock(city.t), p = me(), pr = Q.progress(city);
   K('phase').innerHTML = ICON[PH[c.phase]];
@@ -140,25 +142,25 @@ const row = (lead, title, sub, btn) => `<div class="qs-row">${lead}<div class="q
 const gold = (act, label, extra = '') => `<button type="button" class="qs-go" data-qs="${act}" data-testid="qs-${act}" ${extra}>${esc(label)}</button>`;
 const ghost = (act, label, extra = '') => `<button type="button" class="qs-ghost" data-qs="${act}" data-testid="qs-${act}" ${extra}>${esc(label)}</button>`;
 const proofLink = (p) => (p ? `<a class="qs-proof" href="${p.url}" target="_blank" rel="noopener">${esc(p.label)} ↗</a>` : '');
-const whyBlock = (good) => { const q = S.quoteAt(city, 'arena', good); return `<button type="button" class="qs-link" data-qs="why" aria-expanded="${whyOpen}">${ICON.info}<span>Why this price?</span></button>${whyOpen ? `<div class="qs-why md-why">${whyHtml(q, GOOD(good))}</div>` : ''}`; };
+const whyBlock = (good) => { const q = S.quoteAt(city, 'arena', good); return `<button type="button" class="qs-link" data-qs="why" aria-expanded="${whyOpen}">${ICON.info}<span>Why this price?</span></button>${whyOpen ? `<div class="qs-why md-why">${whyHtml(q, GOOD(good), (y) => `${coins(y)} coins`)}</div>` : ''}`; };
 
 function stripHtml(id) {
   const s = Q.current(city), pr = Q.progress(city), p = me();
   if (lastDone && lastDone.shop === id) {
     const r = lastDone.res, nx = Q.current(city);
-    let sub = proofLink(lastDone.step.proof);
-    if (lastDone.step.id === 'sell') sub = `+${near(r.total)} NEAR · price ${near(r.before)} → ${near(r.after)}`;
-    if (lastDone.step.id === 'write') sub = `Level ${r.level} · your purse keeps ${near(p.near)} NEAR`;
+    let sub = lastDone.step.proof ? '<span class="qs-rc">Kept in your receipt</span>' : '';
+    if (lastDone.step.id === 'sell') sub = `+${coins(r.total)} coins · price ${coins(r.before)} → ${coins(r.after)}`;
+    if (lastDone.step.id === 'write') sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins`;
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
     return { gold: true, html: row(okMark, r.line, sub, gold('next', nx ? `Next: ${NAME[nx.shop]}` : 'Back to town')) + extra };
   }
   if (s && s.shop === id) {
     let reward = esc(s.reward), extra = '';
-    if (s.id === 'sell') { const pv = Q.salePreview(city); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', 'good:salt', pv.n); } catch {} reward = `+${near(t)} NEAR · ${near(pv.before)} each`; extra = `<div class="qs-more">${whyBlock('good:salt')}</div>`; }
+    if (s.id === 'sell') { const pv = Q.salePreview(city); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', 'good:salt', pv.n); } catch {} reward = `+${coins(t)} coins · ${coins(pv.before)} each`; extra = `<div class="qs-more">${whyBlock('good:salt')}</div>`; }
     return { gold: true, html: row(num(pr.done + 1), s.need, reward, gold('act', s.btn)) + extra };
   }
   // off the story path: the Square is still the market and producing shops still make goods
-  if (id === 'arena') { const g = Object.keys(S.GOODS).find((k) => p.bag[k] && city.shops.arena.goods[k]); if (g) { const n = Math.min(p.bag[g], S.MAX_QTY); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', g, n); } catch {} return { gold: true, html: row(`<span class="qs-n tok">${iconFor(g)}</span>`, `Sell ${n} ${GOOD(g).toLowerCase()}`, `+${near(t)} NEAR`, gold('sell', 'Sell', `data-good="${g}" data-n="${n}"`)) + `<div class="qs-more">${whyBlock(g)}</div>` }; } }
+  if (id === 'arena') { const g = Object.keys(S.GOODS).find((k) => p.bag[k] && city.shops.arena.goods[k]); if (g) { const n = Math.min(p.bag[g], S.MAX_QTY); const c2 = structuredClone(city); let t = 0n; try { t = S.sell(c2, Q.ME, 'arena', g, n); } catch {} return { gold: true, html: row(`<span class="qs-n tok">${iconFor(g)}</span>`, `Sell ${n} ${GOOD(g).toLowerCase()}`, `+${coins(t)} coins`, gold('sell', 'Sell', `data-good="${g}" data-n="${n}"`)) + `<div class="qs-more">${whyBlock(g)}</div>` }; } }
   const berths = S.nodesAt(id);
   if (berths.length) { const good = berths[0][1]; const wait = Math.min(...berths.map(([n]) => S.cooldown(city, Q.ME, n))); return { gold: !wait, html: row(`<span class="qs-n tok">${iconFor(good)}</span>`, `${NAME[id]} makes ${GOOD(good).toLowerCase()}`, wait ? `Ready in ${wait}s` : '+1 each berth', wait ? ghost('collect', 'Collect', 'disabled') : gold('collect', 'Collect')) }; }
   if (s) return { gold: false, html: row(`<span class="qs-n dim">${pr.done + 1}</span>`, `Next stop: ${NAME[s.shop]}`, esc(s.need), ghost('there', 'Go')) };
@@ -176,7 +178,7 @@ async function stripClick(a, b) {
       const step = Q.current(city); const res = Q.act(city, inShop); lastDone = { shop: inShop, step, res };
       save(); hud(); quest(); seal(b); whyOpen = false; flash = null;
     } else if (a === 'why') whyOpen = !whyOpen;
-    else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); flash = { shop: inShop, text: `Sold for ${near(t)} NEAR` }; save(); hud(); }
+    else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); flash = { shop: inShop, text: `Sold for ${coins(t)} coins` }; save(); hud(); }
     else if (a === 'collect') { let got = 0, good = null; for (const [n, g] of S.nodesAt(inShop)) { try { got += S.gather(city, Q.ME, n); good = g; } catch {} } if (got) flash = { shop: inShop, text: `+${got} ${GOOD(good).toLowerCase()} in your bag` }; save(); hud(); }
     else if (a === 'next' || a === 'there') { lastDone = null; strip.hide(); await WD().exitShop?.(); if (Q.current(city)) setTimeout(go, 350); return; }
     paintStrip();
@@ -202,14 +204,22 @@ function vBag() {
     const ins = Object.entries(r.inputs).map(([g, n]) => `<span class="md-in ${(p.bag[g] || 0) >= n ? '' : 'miss'}"><span class="md-tok xs">${iconFor(g)}</span>${n}</span>`).join('<span class="md-plus">+</span>');
     return `<div class="md-recipe"><div class="md-ins">${ins}<span class="md-arrow">→</span><span class="md-tok">${iconFor(item)}</span></div><div class="md-rtxt"><b>${GOOD(item)}</b><small>${esc(r.use)}</small></div><button type="button" class="md-ghost sm" data-act="craft" data-item="${item}" ${ok ? '' : 'disabled'} data-testid="md-craft-${item.slice(5)}">Craft</button></div>`; }).join('');
   const sellable = Object.keys(S.GOODS).some((g) => p.bag[g]);
-  return head(ICON.bag, 'Your bag', `${purse()} NEAR` + (p.bag['item:tool'] ? ` · tool: ${S.TOOL_LIFE - p.toolUses} gathers left` : ''))
+  return head(ICON.bag, 'Your bag', `${purse()} coins` + (p.bag['item:tool'] ? ` · tool: ${S.TOOL_LIFE - p.toolUses} gathers left` : ''))
     + `<div class="md-grid">${tiles}</div>${sh}<h3 class="md-sub">Craft</h3>${recipes}`
     + `<p class="md-hint">${sellable ? 'Sell at the Vault Arena square.' : 'Shops make goods: the Ferry, the Toll Bridge, the Guardhouse and your House.'}</p>`;
 }
 
+// The Receipt: the only place the chain shows. Quiet, for the curious and for judges.
+function vReceipt() {
+  const done = Q.STEPS.slice(0, Q.progress(city).done);
+  const rows = done.map((x) => `<div class="md-row static"><span class="md-tok">${ICON.seal}</span><span class="md-nm"><b>${esc(NAME[x.shop])}</b><small>${esc(x.done)}</small></span>${x.proof ? `<a class="md-ghost sm" href="${x.proof.url}" target="_blank" rel="noopener" title="${esc(x.proof.label)}">Record ↗</a>` : ''}</div>`).join('');
+  return head(ICON.seal, 'Receipt', `${purse()} coins · ${done.length}/9 steps`)
+    + (rows ? `<div class="md-list">${rows}</div>` : '<p class="md-hint">Nothing yet. Your first stop is the Town Hall.</p>')
+    + '<p class="md-hint">Practice round: the city’s rules run here. Each Record is a real mainnet transaction of the same action. 1 coin = 0.0001 NEAR. All proofs: <a href="/judge">/judge</a>.</p>';
+}
 function render() {
   const body = root.querySelector('.md-body');
-  body.innerHTML = view === 'bag' ? vBag() : view === 'ask' ? vAsk() : '';
+  body.innerHTML = view === 'bag' ? vBag() : view === 'ask' ? vAsk() : view === 'receipt' ? vReceipt() : '';
 }
 
 root.addEventListener('click', (ev) => {
@@ -220,7 +230,7 @@ root.addEventListener('click', (ev) => {
   try {
     if (a === 'close') close();
     else if (a === 'go') go();
-    else if (a === 'claim') toast(`Claimed ${near(S.claim(city, ME, b.dataset.shop))} NEAR`);
+    else if (a === 'claim') toast(`Claimed ${coins(S.claim(city, ME, b.dataset.shop))} coins`);
     else if (a === 'craft') { S.craft(city, ME, b.dataset.item); toast(`Crafted a ${GOOD(b.dataset.item).toLowerCase()}`); }
     save(); hud(); refresh();
   } catch (e) { fail(e); }
@@ -239,7 +249,7 @@ function chips() {
   if (Object.values(city.shops).some((s) => !S.isOpen(s))) out.push('Reopen a shop');
   else if (Object.entries(S.ITEMS).some(([, r]) => Object.entries(r.inputs).every(([k, n]) => (p.bag[k] || 0) >= n))) out.push('Craft a tool');
   if (out.length < 3) out.push('Buy 2 salt');
-  if (out.length < 3) out.push('Send 1 NEAR to stranger.near');
+  if (out.length < 3) out.push('Is the stranger safe to pay?');
   return out.slice(0, 3);
 }
 function vAsk() {
@@ -303,7 +313,7 @@ root.querySelector('.md-exit').addEventListener('click', leave);
 function mount() {
   document.body.append(root);
   hud(); quest();
-  if (/[?&]play\b/.test(location.search)) { const go_ = () => (window.__ready ? enter() : setTimeout(go_, 300)); go_(); }
+  if (/[?&]play\b/.test(location.search)) { const go_ = () => (window.__ready ? (enter(), /[?&]receipt\b/.test(location.search) && setTimeout(() => open('receipt'), 600)) : setTimeout(go_, 300)); go_(); }
 }
 if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mount); else mount();
 window.__marketday = { get city() { return city; }, enter, leave, open, go, story: Q, reset() { city = S.createCity(); save(); hud(); quest(); refresh(); aim(); } };
