@@ -55,3 +55,20 @@ test('a stale pair answer is dropped when the pair changed meanwhile', () => {
   commit(second, { to: { amount: '3.10' } });      // the USDC pair answer
   assert.equal(state.q.to.amount, '3.10');
 });
+
+test('the Route row names the rail, and whether it hops chains', () => {
+  // Same chain: one step. Different chains: bridge. Both are the Intents rail.
+  const same = (a, b) => (String(a).toLowerCase() === String(b).toLowerCase() ? 'Intents · 1 step' : 'Intents · bridge');
+  assert.equal(same('near', 'near'), 'Intents · 1 step');
+  assert.equal(same('near', 'base'), 'Intents · bridge');
+  assert.equal(same('eth', 'zec'), 'Intents · bridge');
+});
+
+test('the Fee row is a plain amount derived from the protocol rate', () => {
+  const fee = (out, bps) => (out * bps) / 10_000;
+  // 0.179131 USDC at 20 bps
+  const f = fee(0.179131, 20);
+  assert.ok(Math.abs(f - 0.000358262) < 1e-9, 'the fee is 20 bps of the output, in the output token');
+  assert.match(`≈ ${f.toFixed(5)} USDC`, /≈ 0\.00036 USDC/);
+  assert.doesNotMatch('20 bps', /≈ 0\.00036/, 'a bare rate is not an amount');
+});

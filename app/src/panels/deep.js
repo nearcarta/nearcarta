@@ -156,18 +156,36 @@ function quoteRateText(q, state, pickSym, toSym) {
   return `${inn} ${fs} ≈ ${out} ${ts}`.trim();
 }
 function quoteFeeText(q) {
-  // A fee in dollars when the reply carries one. `protocolFeeBps` is a RATE, not money, so it
-  // must never be rendered as "≈ $20" — that would read as twenty dollars of fee.
+  // A fee as a plain amount. When the reply names it in dollars, show that; otherwise derive it
+  // from the protocol rate (bps) against the OUTPUT amount, so "20 bps" reads as the money it is
+  // ("≈ 0.0004 USDC") rather than as a bare rate.
   const usd = q?.fee?.usd ?? q?.feeUsd;
-  if (typeof usd === 'number') return `≈ $${usd.toFixed(3)}`;
+  if (typeof usd === 'number') return `≈ $${usd.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}`;
   const bps = q?.checks?.echo?.protocolFeeBps;
+  const out = Number(q?.to?.amount ?? q?.amountOut ?? 0);
+  const sym = q?.to?.symbol || q?.symbolOut || '';
+  if (typeof bps === 'number' && out > 0) {
+    const fee = (out * bps) / 10_000;
+    if (fee > 0) return `≈ ${trimAmount(fee)} ${sym}`.trim();
+  }
   if (typeof bps === 'number') return `${bps} bps`;
   return '—';
 }
-function quoteRouteText(q) {
+/** A small amount without trailing zeros: 0.000358 -> "0.0004", 0.5 -> "0.5". */
+function trimAmount(n) {
+  if (!Number.isFinite(n) || n <= 0) return '0';
+  if (n >= 0.01) return String(Number(n.toFixed(4)));
+  const dp = Math.min(8, Math.max(2, Math.ceil(-Math.log10(n)) + 1));
+  return String(Number(n.toFixed(dp)));
+}
+function quoteRouteText(q, fromChain = '', toChain = '') {
+  // Intents is the rail either way; what changes is whether it hops chains.
+  const a = String(fromChain || q?.from?.chain || '').toLowerCase();
+  const b = String(toChain || q?.to?.chain || '').toLowerCase();
+  if (a && b) return a === b ? 'Intents · 1 step' : 'Intents · bridge';
   const hops = q?.route?.hops ?? q?.hops ?? (q?.route ? 1 : null);
   if (hops == null) return '—';
-  return hops === 1 ? '1 hop' : `${hops} hops`;
+  return hops === 1 ? 'Intents · 1 step' : `Intents · ${hops} steps`;
 }
 
 function chainOpts(choices, selectedChain = '') {
@@ -298,7 +316,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
         <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
         <p data-testid="swap-row-rate"><span>Rate</span><span>${esc(quoteRateText(q, state, pickSym, toSym))}</span></p>
         <p data-testid="swap-row-fee"><span>Fee (est.)</span><span>${esc(quoteFeeText(q))}</span></p>
-        <p data-testid="swap-row-route"><span>Route</span><span>${esc(quoteRouteText(q))}</span></p>
+        <p data-testid="swap-row-route"><span>Route</span><span>${esc(quoteRouteText(q, pickChain, toChain))}</span></p>
       </div>` : `<div class="swap-quote" data-testid="ferry-quote-card" data-empty="1">
         <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
         <p data-testid="swap-row-rate"><span>Rate</span><span>Enter an amount</span></p>
