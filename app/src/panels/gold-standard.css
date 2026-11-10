@@ -1144,25 +1144,108 @@ body #shopUI #tray #t-form [data-testid='payout-status'] p:empty { display: none
   body #shopUI [id$='-agent-dock'] span { white-space: nowrap !important; overflow: visible !important; }
 }
 
-/* 6. The composer sheet needs a visible close control. */
-@media (max-width: 720px) {
-  body #shopUI [id$='-agent-pop']:not([hidden])::before {
-    content: '✕';
-    position: absolute;
-    top: 6px;
-    right: 10px;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    border: 1px solid var(--gs-line-gold);
-    color: var(--gs-cream);
-    font-size: 13px;
-    line-height: 1;
-    cursor: pointer;
-    z-index: 2;
-  }
-  body #shopUI [id$='-agent-pop'] { position: fixed !important; }
 }
+
+/* ============================================================================================
+   Measured at 0ff7b1c2 in the real city — the six remaining defects
+   ============================================================================================ */
+
+/* 1. Bank: the file row sat in the 2-column split, so the name had 48px and ellipsised. The row
+      spans the whole width, "Or paste" drops to its own line, and the name wraps instead of
+      being cut. */
+body #shopUI #tray #t-form .bank-split { grid-template-columns: minmax(0, 1fr) !important; }
+body #shopUI #tray #t-form .bank-file-row { grid-column: 1 / -1 !important; width: 100% !important; }
+body #shopUI #tray #t-form .bank-file-row .bank-file-name {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere;
+  line-height: 15px;
+}
+
+/* 2 + 3. Payouts and Arena: a 117px and 98px hole above "Sign in". The tall tray's flex was
+      pushing #t-act to the floor. The action follows the content, as it does on Swap (25px). */
+body.payouts-tray #shopUI #tray > .t-scroll,
+body.arena-tray #shopUI #tray > .t-scroll { flex: 0 0 auto !important; }
+body.payouts-tray #shopUI #tray > .t-row,
+body.arena-tray #shopUI #tray > .t-row { margin-top: 25px !important; }
+body.payouts-tray #shopUI #tray #t-form,
+body.arena-tray #shopUI #tray #t-form { margin-bottom: 0 !important; padding-bottom: 0 !important; }
+/* Nothing inside may add a trailing auto margin either. */
+body.payouts-tray #shopUI #tray #t-form > *,
+body.arena-tray #shopUI #tray #t-form > * { margin-bottom: 0 !important; }
+
+/* 4. The 390 bar: Back to town gets its short label and no ellipsis; the chip sizes to its own
+      content; All shops is one 36px line; the tray starts below the whole bar. */
+@media (max-width: 480px) {
+  body.in-shop #shopUI #back {
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    font-size: 0 !important;
+    padding: 0 10px !important;
+  }
+  body.in-shop #shopUI #back::before {
+    content: '← Town';
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  body.in-shop #shopUI [id$='-agent-dock'] [class*='badge'],
+  body.in-shop #shopUI [id$='-agent-dock'] [class*='⋯'] { display: none !important; }
+  body.in-shop #shopUI [id$='-agent-dock'] [class*='agent-char'],
+  body.in-shop #shopUI [id$='-agent-dock'] > button {
+    min-height: 28px !important;
+    padding: 0 8px !important;
+    font-size: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+  body.in-shop nav.all-shops {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    display: flex !important;
+    align-items: center;
+    top: 4px !important;
+    right: 8px !important;
+    margin: 0 !important;
+  }
+  body.in-shop nav.all-shops summary { height: 36px; display: flex; align-items: center; }
+  /* The tray clears the bar: bar (36) + top offset (4) + 8px gap. */
+  body.in-shop #shopUI #tray { top: 48px !important; }
+}
+
+/* 6. Hall at 390 scrolled ("more below"). Its two tightest blocks give back the few pixels. */
+@media (max-width: 720px) {
+  body.hall-tray #shopUI #tray #t-form .hall-tabs { margin-bottom: -6px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-pane { gap: 7px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-field { gap: 3px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-gap { -webkit-line-clamp: 2; }
+  body.hall-tray #shopUI #tray > .t-scroll { gap: 7px !important; }
+}
+
+/* The agent sheet's close control is a real button now, so it is styled as one and sits in the
+   sheet's top-right corner where the unclickable ::before used to be. */
+body #shopUI .agent-pop-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--gs-line-gold);
+  background: rgba(0, 0, 0, .35);
+  color: var(--gs-cream);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 3;
+}
+body #shopUI .agent-pop-close:hover { border-color: var(--gs-gold-2); color: #fff; }
+body #shopUI [id$='-agent-pop'] { position: relative; }

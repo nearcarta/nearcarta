@@ -998,8 +998,44 @@ function mountHouse(root, hooks = {}) {
 
 const ALIAS = { guardhouse: 'guard', townhall: 'hall', mist: 'bank', mistbank: 'bank' };
 
+function installAgentSheetClose(root) {
+  const doc = root?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+  if (!doc) return;
+  const pop = doc.querySelector("[id$='-agent-pop']");
+  if (!pop || pop.dataset.closeWired === '1') return;
+  pop.dataset.closeWired = '1';
+
+  const btn = doc.createElement('button');
+  btn.type = 'button';
+  btn.className = 'agent-pop-close';
+  btn.setAttribute('aria-label', 'Close');
+  btn.dataset.testid = 'agent-pop-close';
+  btn.textContent = '✕';
+  const close = () => {
+    pop.hidden = true;
+    // Focus goes back to the dock toggle, so the keyboard user is not dropped at the top.
+    const id = pop.id.replace(/-pop$/, '-toggle');
+    const toggle = doc.getElementById(id) || doc.querySelector("[id$='-agent-toggle']");
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', 'false');
+      try { toggle.focus(); } catch { /* not focusable in this state */ }
+    }
+  };
+  btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); close(); });
+  pop.appendChild(btn);
+
+  doc.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !pop.hidden) { e.preventDefault(); close(); }
+  }, true);
+}
+
 export function mountShop(id, root, hooks = {}) {
   if (!root) return;
+  // One close control for every shop's agent sheet. Each shop builds its own popup, so adding a
+  // button to nine files would be nine chances to diverge: this attaches to whichever
+  // [id$='-agent-pop'] the shop rendered, and gives it a real button (the CSS ::before was a
+  // pseudo-element and could not be clicked), Escape, and focus back to the dock toggle.
+  try { installAgentSheetClose(root); } catch { /* a shop without a dock is fine */ }
   const key = ALIAS[id] || id;
   const fn = {
     ferry: mountFerry,
