@@ -1028,6 +1028,18 @@ function installAgentSheetClose(root) {
     pop.appendChild(btn);
   };
 
+  // nav.all-shops is a sibling of #shopUI, so a flex row cannot place the dock beside it. Publish
+  // its real width as a CSS var; the dock reserves that width plus a gutter at phone sizes.
+  try {
+    const nav = doc.querySelector("nav.all-shops");
+    if (nav && typeof ResizeObserver === "function" && !globalThis.__NC_ALLSHOPS_OBS) {
+      const setW = () => doc.documentElement.style.setProperty("--allshops-w", Math.ceil(nav.getBoundingClientRect().width) + "px");
+      globalThis.__NC_ALLSHOPS_OBS = new ResizeObserver(setW);
+      globalThis.__NC_ALLSHOPS_OBS.observe(nav);
+      setW();
+    }
+  } catch { /* no nav on this surface */ }
+
   const scan = () => doc.querySelectorAll("[id$='-agent-pop']").forEach(wire);
   scan();
 

@@ -1363,3 +1363,39 @@ body.bank-tray #shopUI #tray .bank-file-name {
   body.bank-tray #shopUI #tray .choice-label { margin-bottom: 2px !important; font-size: 11px !important; }
   body.bank-tray #shopUI #tray > .t-row { margin-top: 10px !important; }
 }
+
+/* ============================================================================================
+   Measured at 0a10497c — the last two, both at 390 only
+   ============================================================================================ */
+
+/* 1. nav.all-shops is NOT a child of #shopUI (index.html: it is a sibling, line 60 vs 110), so it
+      stays position:fixed and the dock's `margin-left:auto` ran underneath it — 94px of overlap.
+      The dock now reserves the All shops width plus a 16px gutter, from a var JS keeps measured
+      (deep.js sets --allshops-w from a ResizeObserver), so any label length fits. */
+@media (max-width: 480px) {
+  body.in-shop #shopUI > [id$='-agent-dock'] {
+    margin-left: auto !important;
+    margin-right: calc(var(--allshops-w, 96px) + 16px) !important;
+    right: auto !important;
+    left: auto !important;
+  }
+  body.in-shop nav.all-shops { right: 8px !important; }
+}
+
+/* 2. Bank at 390 scrolled by 4px (the footer's bottom at 848 in an 844 viewport). 16px comes out
+      of the paste box and the gaps, so the footer fits with room to spare. */
+@media (max-width: 480px) {
+  body.bank-tray #shopUI #tray #bank-paste,
+  body.bank-tray #shopUI #tray textarea[data-testid='bank-paste'] {
+    min-height: 34px !important;
+    height: 34px !important;
+    padding: 4px 8px !important;
+  }
+  body.bank-tray #shopUI #tray .bank-split { gap: 6px !important; }
+  body.bank-tray #shopUI #tray .field { gap: 2px !important; }
+  body.bank-tray #shopUI #tray .note,
+  body.bank-tray #shopUI #tray .bank-format { font-size: 11px !important; line-height: 14px !important; }
+  body.bank-tray #shopUI #tray > .t-links { margin-top: 4px !important; }
+  body.bank-tray #shopUI #tray > .t-links .link,
+  body.bank-tray #shopUI #tray > .t-links a { min-height: 28px !important; }
+}
