@@ -144,6 +144,26 @@ function tokenOpts(choices, { q = '', chain = '', selected = '' } = {}) {
   return opts;
 }
 
+/** The three Swap Quote rows, from the one quote the panel keeps. */
+function quoteRateText(q, state, pickSym, toSym) {
+  const inn = q?.from?.amount || state?.amt || '';
+  const out = q?.to?.amount || q?.amountOut || '';
+  const fs = q?.from?.symbol || pickSym || '';
+  const ts = q?.to?.symbol || toSym || '';
+  if (!inn && !out) return 'Enter an amount';
+  return `${inn} ${fs} ≈ ${out} ${ts}`.trim();
+}
+function quoteFeeText(q) {
+  const usd = q?.fee?.usd ?? q?.feeUsd ?? q?.checks?.echo?.protocolFeeBps;
+  if (usd == null) return '—';
+  return typeof usd === 'number' ? `≈ ${usd.toFixed(3)}` : String(usd);
+}
+function quoteRouteText(q) {
+  const hops = q?.route?.hops ?? q?.hops ?? (q?.route ? 1 : null);
+  if (hops == null) return '—';
+  return hops === 1 ? '1 hop' : `${hops} hops`;
+}
+
 function chainOpts(choices, selectedChain = '') {
   // "All" first, then every chain the catalog has. When the source chain is known it is labelled
   // with its full name so the closed control reads "NEAR Mainnet", as the reference does.
@@ -270,7 +290,9 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       </div>
       ${q && !state.sample ? `<div class="swap-quote" data-testid="ferry-quote-card">
         <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
-        ${rateLine}
+        <p data-testid="swap-row-rate"><span>Rate</span><span>${esc(quoteRateText(q, state, pickSym, toSym))}</span></p>
+        <p data-testid="swap-row-fee"><span>Fee (est.)</span><span>${esc(quoteFeeText(q))}</span></p>
+        <p data-testid="swap-row-route"><span>Route</span><span>${esc(quoteRouteText(q))}</span></p>
       </div>` : `<div class="swap-quote" data-testid="ferry-quote-card" data-empty="1">
         <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
         <p data-testid="swap-row-rate"><span>Rate</span><span>Enter an amount</span></p>
@@ -506,6 +528,7 @@ function mountFerry(root, hooks) {
       emitPair('jetty');
       localPaint();
       refreshBalances();
+      scheduleSwapQuote();
     };
     const onTo = (value) => {
       state.toEdited = true;
@@ -514,6 +537,7 @@ function mountFerry(root, hooks) {
       emitPair('jetty');
       localPaint();
       refreshBalances();
+      scheduleSwapQuote();
     };
     const swapBox = (sel, html) => {
       const el = q$(root, sel);
@@ -564,7 +588,7 @@ function mountFerry(root, hooks) {
     const to = q$(root, '#f-to');
     if (to) bindPickerListbox(to, onTo);
     const amt = q$(root, '#f-amt');
-    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
+    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; scheduleSwapQuote(); };
     // The reference has a Max chip inside the From box. It fills the amount from the balance the
     // panel already reads; when no balance is known it says so instead of inventing a number.
     const maxBtn = q$(root, '#f-max');
@@ -704,7 +728,7 @@ function mountFerry(root, hooks) {
     }
     // Only now are the two sides settled, so this is the first moment the balances can be read
     // for the tokens the pickers actually show.
-    if (state.choices.length) refreshBalances();
+    if (state.choices.length) { refreshBalances(); scheduleSwapQuote(); }
     paint();
   }
   async function runOne(btn) {
@@ -820,6 +844,40 @@ function mountFerry(root, hooks) {
   localPaint();
   ensureTokens();
   if (hooks.auto && !state.quoted) runQuotes(q$(root, '#f-compare'));
+  // The Swap tab quotes its OWN pair, not the three ZEC corridors. One function, used by the
+  // signed-out dry path and by the debounce below, so there is never a second quote call.
+  function scheduleSwapQuote() {
+    if (state.swapQuoteTimer) clearTimeout(state.swapQuoteTimer);
+    state.swapQuoteTimer = setTimeout(() => { runSwapQuote().catch(() => {}); }, 400);
+  }
+  async function runSwapQuote() {
+    const from = idToFrom(q$(root, '#f-from')?.dataset.value) || idToFrom(state.fromId) || SESSION_SWAP.from;
+    const to = idToFrom(q$(root, '#f-to')?.dataset.value) || idToFrom(state.toId) || SESSION_SWAP.to;
+    const amt = String(state.amt || defaultAmtFor(String(from).split('@')[0]) || SESSION_SWAP.amt);
+    if (!from || !to || !amt) return;
+    const seq = (state.swapQuoteSeq = (state.swapQuoteSeq || 0) + 1);
+    const visitor = hooks.visitor?.() || state.me || '';
+    const recipient = quotePayee(to, visitor, state.receiveAt);
+    const display = recipient || displayRecipient() || (state.mainnet?.root || '');
+    try {
+      const res = await fetch(api() + '/api/ferry/quote', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          from, to, amount: amt, recipient: display,
+          refundTo: recipient ? refundForChain(String(from).split('@')[1] || '', visitor) : display,
+          privacy: 'basic', dry: true,
+        }),
+      });
+      const q = await res.json();
+      // A newer request started: this answer is about a pair or amount that is no longer shown.
+      if (seq !== state.swapQuoteSeq) return;
+      state.q = q && q.ok !== false ? q : null;
+      if (!q || q.ok === false) state.quoteError = explainQuoteMiss(q?.error || '');
+      else state.quoteError = '';
+      state.sample = !(q && (q.to?.amount || q.amountOut));
+      localPaint();
+    } catch { /* the card says nothing rather than a guess */ }
+  }
 }
 
 function mountGuard(root, hooks) {
