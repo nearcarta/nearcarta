@@ -32,7 +32,7 @@ export const status = () => ({ on: hasKey(), account: conf().account || null, ru
 export function callsFor(step, { bag = 0, quote = 0n, purse = 0n, shop = 'ferry' } = {}) {
   if (step === 'cargo') return { calls: ['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node }, tgas: 15 })) };
   if (step === 'sell') { const qty = Math.min(3, Number(bag)); if (!qty) return { why: 'ERR_MERCHANT_BAG' }; return { calls: [{ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty, min_total: String((BigInt(quote) * BigInt(qty) * 8n) / 10n), keep: true }, tgas: 20 }] }; }
-  if (step === 'invest') { if (BigInt(purse) < MILLI) return { why: 'ERR_MERCHANT_PURSE' }; return { calls: [{ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 }] }; }
+  if (step === 'invest') { if (BigInt(purse) < MILLI) return { why: 'ERR_MERCHANT_PURSE', have: String(purse) }; return { calls: [{ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 }] }; }
   return { why: 'ERR_STEP' };
 }
 /** The limits, as a pure check. */
@@ -53,12 +53,12 @@ export async function demoStep(step, ctx = {}) {
       fv(rc.market, 'get_citizen', { account_id: me }), fv(rc.market, 'mt_balance_of', { account_id: me, token_id: 'good:salt' }),
       fv(rc.market, 'quote', { shop: 'arena', good: 'good:salt' }), fv(rc.market, 'square', { account_id: me }), rpc('query', { request_type: 'view_account', finality: 'final', account_id: rc.account }, undefined, F)]);
     const built = callsFor(step, { bag: Number(bag), quote: BigInt(q.sell), purse: BigInt(sq.purse), shop: 'ferry' });
-    if (built.why) return { ok: false, why: built.why, status: 409 };
+    if (built.why) return { ok: false, why: built.why, have: built.have, status: 409 };
     const why = limits({ step, calls: built.calls, gathersToday: cit.gathers_today, relayerYocto: rel.amount }, c);
     if (why) return { ok: false, why, status: 429 };
     if (step === 'cargo') { const wait = last + GATHER_MS + 1500 - Date.now(); if (wait > 0) await sleep(Math.min(wait, GATHER_MS + 1500)); }
     // The demo purse reuses its own market storage; when a share would not fit, the relayer tops it up once.
-    if (step === 'invest') { const st = BigInt(await fv(rc.market, 'storage_balance_of', { account_id: me })); if (st < 6n * MILLI) await session(me); }
+    if (step === 'invest') { const st = BigInt(await fv(rc.market, 'storage_balance_of', { account_id: me })); if (st < 6n * MILLI) await session(me, { sponsor: 'merchant' }); }
     const signer = KeyPairSigner.fromSecretKey(process.env.MERCHANT_PRIVATE_KEY.trim());
     const pk = await signer.getPublicKey();
     const key = await rpc('query', { request_type: 'view_access_key', finality: 'optimistic', account_id: me, public_key: pk.toString() }, undefined, F);
