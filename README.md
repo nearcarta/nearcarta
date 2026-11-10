@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 944 backend unit tests (943 pass, 1 skipped) -->
+<!-- # 953 backend unit tests (952 pass, 1 skipped) -->
 
 **An AI agent can be talked into paying the wrong person. Nearcarta puts the payment rules in a NEAR contract the agent cannot change, so a fooled agent produces a refused transaction instead of a loss.**
 
@@ -61,7 +61,7 @@ The city is the game. Press **Market Day** on **https://nearcarta.vercel.app**, 
 | Walk into any shop for the first time | Its keeper greets you by role: Clerk, Ferryman, Toll warden, Captain, Arena marshal, Banker, Paymaster, Housekeeper, Archivist |
 | Tap a keeper standing at a shop door | Their card: name, mood (Worried, Steady, Cheerful from their till), purse in coins, and what they traded today. Step out of a shop and its keeper says what they just did |
 
-Status: the nine keepers as their own NEAR sub-accounts with board rows (approved) are next. Until they ship, keepers and their purses live in the practice round.
+Status: live. The nine keepers are NEAR sub-accounts with board rows. Keepers restock on NEAR AI decisions that are TEE-signed and checked before anything is sent. The completion id is written on chain in the move. Proof: keeper-hall bought 2 iron from the Arena on decision `a9bfe9d523204ff4898c527a14ee3d61`, tx [6YiRK25TR8…](https://nearblocks.io/txns/6YiRK25TR8m84LcE7PpxXtB55W6CNxLGE7xApsFYNt55) (`scripts/keepers-round.js`, `backend/src/keepers.js`).
 
 ### Player-owned markets
 
@@ -80,7 +80,7 @@ Status: owning a stall in the Arena square is next.
 | Finish the day and press **Day 2** | The shelf you sold into, the tills and your share carry over: the price you moved stays moved |
 | Finish the day and press **Week** | A week in a minute: the salt price follows the shelves, a con artist is refused each day, dark shops reopen, and on day 4 a council vote lowers the floor that keeps shops open (`councilVote` in `shared/market/sim.js`, test `a council vote changes a market rule mid-week, with no code change`) |
 
-Status: the week runs in the practice round. Orders drawn from contract state and keeper needs, prices read from the market contract's on-chain supply and demand, and the council vote as an on-chain rule change are next.
+Status: live. The nine keepers form the market council on chain (quorum 5). Each vote carries a NEAR AI decision. Proposal 1 (floor 90%) was voted down 2 to 5. Proposal 2 passed 5 to 0, and the market's `floor_bps` went from 10000 to 9000 with no code change. The `rule_changed` event is in tx [Gub1q247gy…](https://nearblocks.io/txns/Gub1q247gyT2RNZHSGCwCKNJi1uNVRVGmyRs4piSNYJb). **Week** first replays the real moves from the chain, marked Real, and then offers a next week marked Practice.
 
 ### Players never notice the chain
 
@@ -129,7 +129,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 944 unit tests (943 pass, 1 skipped)
+npm test                 # 953 unit tests (952 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -152,7 +152,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 944 unit tests (943 pass, 1 skipped):
+# 953 unit tests (952 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -315,7 +315,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 944 unit tests (943 pass, 1 skipped)
+npm test                 # 953 unit tests (952 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current

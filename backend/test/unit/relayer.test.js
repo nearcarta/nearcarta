@@ -69,3 +69,19 @@ test('relayer: one visitor stops at the per-visitor sponsored gas cap, others st
   assert.equal((await relay(other.b64, deps())).ok, true);
   assert.equal(ledger.by.get('polite.near'), 300000000000000000000n);
 });
+
+test('relayer: an email-login wallet signs with its one full key, only for its own implicit account', async () => {
+  const kp = KeyPair.fromRandom('ed25519');
+  const hexId = Buffer.from(kp.getPublicKey().data).toString('hex');
+  const full = { nonce: 1, permission: 'FullAccess' };
+  const ok = await signed({ kp, senderId: hexId, acts: [actions.functionCall('stall', { stall: 1, action: 'rent' }, 30n * T, 0n)] });
+  assert.equal((await relay(ok.b64, deps(full))).ok, true);
+  // the same full key on a named account, or on another implicit id, is refused
+  const named = await signed({ kp, senderId: 'player.near' });
+  assert.equal((await relay(named.b64, deps(full))).why, 'ERR_FULL_ACCESS_KEY');
+  const other = await signed({ kp, senderId: 'ab'.repeat(32) });
+  assert.equal((await relay(other.b64, deps(full))).why, 'ERR_FULL_ACCESS_KEY');
+  // and it still cannot move NEAR
+  const pay = await signed({ kp, senderId: hexId, acts: [actions.transfer(1n)] });
+  assert.equal((await relay(pay.b64, deps(full))).why, 'ERR_ACTION_KIND');
+});

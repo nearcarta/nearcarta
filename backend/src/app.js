@@ -34,6 +34,7 @@ import * as vault from './vault.js';
 import * as relayer from './relayer.js';
 import * as marketGuide from './market-guide.js';
 import * as marketLive from './market-live.js';
+import * as marketHistory from './market-history.js';
 import * as cp from './counterparty.js';
 import { view, viewAccount, txStatus, rpcStats } from './near.js';
 import { accountTxHashes, readLive } from './chronicle-live.js';
@@ -963,5 +964,6 @@ export function makeApp() {
   relayer.register(app, { limiter, globalCap });
   marketGuide.register(app, { limiter, globalCap });
   marketLive.register(app, { limiter, globalCap });
+  marketHistory.register(app, { limiter, globalCap });
   return app;
 }

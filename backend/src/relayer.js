@@ -65,7 +65,7 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
   const p = checkDelegate(sd, policy(c), { height }); if (!p.ok) return refuse(p.why);
   if (!verifySig(sd)) return refuse('ERR_SIGNATURE');
   const key = keyOf ? await keyOf(d.senderId, d.publicKey) : await rpc('query', { request_type: 'view_access_key', finality: 'final', account_id: d.senderId, public_key: b58pk(d.publicKey) }).catch(() => null);
-  const k = checkKey(key, d); if (!k.ok) return refuse(k.why);
+  const k = checkKey(key, d, Buffer.from(Uint8Array.from(d.publicKey.ed25519Key.data)).toString('hex')); if (!k.ok) return refuse(k.why);
   // Worst case for this move: all attached gas burnt at 0.1 NEAR per 1000 Tgas (100M yocto per gas).
   const worst = p.gas * 100_000_000n;
   if (ledger.spent + worst > c.dailyNear) return refuse('ERR_DAILY_BUDGET', 429);

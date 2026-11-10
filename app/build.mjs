@@ -85,6 +85,12 @@ if (PRIVY_ID) {
   cpSync(nm('@radix-ui/themes/styles.css'), dist + '/sign/radix.css');
   cpSync(nm('@peerfolio/privy-near-connect/dist/sign-page-plugin/theme.css'), dist + '/sign/theme.css');
 }
+// Market Day for real: Privy email login inline and relayed moves (no popup, no gas). Loaded by /market/city.js on demand.
+if (PRIVY_ID) {
+  mkdirSync(dist + '/market', { recursive: true });
+  await (await import('esbuild')).build({ entryPoints: [here + 'house/play.js'], bundle: true, format: 'esm', minify: true, target: 'es2022',
+    outfile: dist + '/market/play.bundle.js', define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis', __PRIVY_APP_ID__: JSON.stringify(PRIVY_ID), __PRIVY_CLIENT_ID__: JSON.stringify(PRIVY_CLIENT) }, logLevel: 'warning' });
+}
 // Shop modules (charter office + Vault Arena): app/shops, see app/shops/INTEGRATION.md
 await (await import('./shops/build.mjs')).buildShops(dist, await import('esbuild'));
 mkdirSync(dist + '/pay', { recursive: true });

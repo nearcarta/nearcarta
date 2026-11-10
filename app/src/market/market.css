@@ -235,3 +235,19 @@ body.qs-gold #tray .primary:not(.qs-go), body.qs-gold #tray .cta:not(.qs-go), bo
 #marketday .md-quest .md-week.on, #marketday .md-quest .md-week:hover { background: rgba(247,213,126,.1) !important; color: var(--md-gold-hi, #f7d57e) !important; box-shadow: none !important; border-color: rgba(247,213,126,.45) !important; }
 .md-wk .md-row .md-nm b { white-space: normal; }
 @media (max-width: 640px) { .md-quest .md-week { min-width: 40px; width: 40px; padding: 0; margin-right: 4px; } .md-quest .md-week .t { display: none; } }
+/* Play for real: email, then the code. One gold button. */
+.md-sign { display: flex; gap: 8px; margin: 16px 0 0; }
+.md-sign input { flex: 1; min-width: 0; height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--md-line); background: #1b120c; color: var(--md-cream); font-size: 16px; }
+.md-sign input:focus { outline: 2px solid var(--md-gold-hi); outline-offset: 1px; }
+#marketday .md-gold { flex: none; height: 44px; padding: 0 16px; border-radius: 10px; border: 0; background: var(--md-gold); color: var(--md-ink); font-weight: 700; font-size: 14px; }
+#marketday .md-gold:hover { background: var(--md-gold-hi); }
+.md-sheet [data-act="practice"] { display: block; margin: 12px auto 0; }
+.md-hint.no { color: #f0a08a; }
+/* Fast-forward: the real history first, then a practice tail that says so */
+.md-chip { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 12px; font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.md-chip.real { background: rgba(120,190,120,.16); color: #a8dca0; border: 1px solid rgba(168,220,160,.4); }
+.md-chip.practice { background: rgba(247,213,126,.1); color: var(--md-gold-hi); border: 1px dashed var(--md-gold); }
+.md-row.no b { color: #f0a08a; }
+.md-wk [data-act="wnext"] { align-self: stretch; margin-top: 12px; }
+/* One gold button per view: while a sheet is open, the dock's Go steps back. */
+body.md-sheet-open #marketday .md-go { background: transparent !important; color: var(--md-gold-hi); box-shadow: inset 0 0 0 1px var(--md-line); animation: none !important; }
