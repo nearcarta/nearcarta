@@ -63,11 +63,11 @@ export function renderJudges(rows) {
 // Games track: the four lines of the track brief, each with one click to its proof. Status says what is still practice.
 export const GAMES = [
   { h: 'NPCs with wallets', href: 'https://nearblocks.io/txns/E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ', go: 'Open the refusal',
-    see: 'The Guardhouse step: the board refuses a payee that is not on its list, on mainnet. In Market Day, tap a keeper for their name, mood and purse.', status: 'Live: nine keeper sub-accounts with board rows and market shops; the card reads their wallets. TEE-signed restocks: next.' },
+    see: 'The Guardhouse step: the board refuses a payee that is not on its list, on mainnet. In Market Day, tap a keeper for their name, mood and purse.', status: 'Live: nine keeper sub-accounts with board rows and market shops. Keepers restock on TEE-signed NEAR AI decisions; the decision id is on chain (tx 6YiRK25TR8…).' },
   { h: 'Player-owned markets', href: 'https://nearblocks.io/txns/83nyJmTWVnYfnBX6SkwyMhcZptis8Kktmc1UatkZYe26', go: 'Open the deed sale',
     see: 'Your House: the deed moves with its purse, so what a player owns is theirs on chain. In Market Day, Invest 10 buys a Ferry share that claims its part of sales.', status: 'Arena stalls: next.' },
   { h: 'Economy evolves without a dev patch', href: '/?play', go: 'Play Market Day',
-    see: 'Sell 3 salt, then Why this price? The price moves with the shelf (price A → B). Finish the day and press Week: a week in a minute, and on day 4 a council vote changes a rule.', status: 'Live: market prices from on-chain stock and demand (a keeper’s shelf). The week and council vote: practice round; on chain: next.' },
+    see: 'Sell 3 salt, then Why this price? The price moves with the shelf (price A → B). Finish the day and press Week: a week in a minute, and on day 4 a council vote changes a rule.', status: 'Live: market prices from on-chain stock and demand. The keeper council changed floor_bps 10000 → 9000 on chain by a 5–0 vote, with no code change (tx Gub1q247gy…). Week replays the real moves, then a practice week clearly marked.' },
   { h: 'Players never notice the chain', href: '/?play&receipt', go: 'Open the Receipt',
     see: 'The whole day says coins, purse, share. The chain lives only in the Receipt behind the purse: each step and its real mainnet record.', status: 'Email sign-in and sponsored gas for real moves: next.' },
 ];
