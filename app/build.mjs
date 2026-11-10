@@ -35,6 +35,8 @@ cpSync(here + '../shared/townhall/reputation.js', dist + '/live/townhall-reputat
 // Market Day: the city game layer (app/src/market) and the rules it runs in practice rounds.
 mkdirSync(dist + '/shared/market', { recursive: true });
 for (const f of ['pricing.js', 'sim.js', 'guide.js', 'story.js']) cpSync(here + '../shared/market/' + f, dist + '/shared/market/' + f);
+mkdirSync(dist + '/shared/relay', { recursive: true });
+cpSync(here + '../shared/relay/precheck.js', dist + '/shared/relay/precheck.js');
 // The city tray and /shops/hall/ import these as raw modules. The URL lands on /shared/.
 mkdirSync(dist + '/shared/hall', { recursive: true });
 mkdirSync(dist + '/shared/rails', { recursive: true });

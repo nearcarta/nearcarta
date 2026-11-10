@@ -469,7 +469,10 @@ function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(
 // clamp .1 s (not .05): sim time, gsap and the door/fade beats all run on it, so a slow GPU keeps close to real time
 function shopFieldFocused(){ const el=document.activeElement; return !!(el&&el.closest&&el.closest('#shopUI')&&el.closest('input,textarea,select')); }
 let uiDraw=0;
-function frame(now){ if(stopped) return; if(shopFieldFocused()&&now-uiDraw<150){ requestAnimationFrame(frame); return; } if(shopFieldFocused()) uiDraw=now; const dt=Math.min(.1,(now-last)/1000); last=now; step(dt); draw();
+// While a Market Day sheet is open (sign-in, receipt, week) the town is a backdrop: redraw it every few seconds so a
+// slow GPU leaves the main thread free for typing and taps (a full-rate software draw starved the email field).
+const sheetOpen=()=>document.body.classList.contains('md-sheet-open');
+function frame(now){ if(stopped) return; const gap=sheetOpen()?4000:(shopFieldFocused()?150:0); if(gap&&now-uiDraw<gap){ requestAnimationFrame(frame); return; } if(gap) uiDraw=now; const dt=Math.min(.1,(now-last)/1000); last=now; step(dt); draw();
   // auto low-power: if the first seconds run under ~24 fps, drop the post chain and shadows
   if(!lpDone){ fpsS.push(dt); if(fpsS.length>90){ const avg=fpsS.slice(30).reduce((a,b)=>a+b,0)/(fpsS.length-30); if(1/avg<8&&!P.has('full')&&!P.has('3d')&&!window.__gl?.soft){ fallback(`3D too slow here (${(1/avg).toFixed(1)} fps)`); return; } if(1/avg<24&&!P.has('full')){ W.composer=null; W.renderer.shadowMap.enabled=false; W.renderer.setPixelRatio(1); body.classList.add('lowpower'); } else if(1/avg>50&&!SHM) setShadowMode(true); lpDone=true; } }
   requestAnimationFrame(frame); }

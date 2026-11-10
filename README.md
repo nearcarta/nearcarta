@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 954 backend unit tests (953 pass, 1 skipped) -->
+<!-- # 958 backend unit tests (957 pass, 1 skipped) -->
 
 **An AI agent can be talked into paying the wrong person. Nearcarta puts the payment rules in a NEAR contract the agent cannot change, so a fooled agent produces a refused transaction instead of a loss.**
 
@@ -70,7 +70,7 @@ Status: live. The nine keepers are NEAR sub-accounts with board rows. Keepers re
 | At Your House press **Invest 10** | The Ferry, dark after spending its till on your cargo, lights up again, and a Ferry share goes into your bag |
 | Open the bag after the Ferry sells | The share row shows a **Claim** button for your part of its sales |
 
-Status: owning a stall in the Arena square is next.
+Status: live. A player rents an Arena stall from their purse and holds it on chain for 7 days (`stall` on arena.nearcarta.near). Proof: a fresh account sold 3 salt into its purse ([GecJPUaL…](https://nearblocks.io/txns/GecJPUaLsbXfKbjHSRQJAUj2BFzQ1iPpVqaovGNxg6M7)), rented stall 1 ([8JxnSuDg…](https://nearblocks.io/txns/8JxnSuDgv3C2ghkcPFqRmS3AuP8JQqwDWaeNafuzFkun)) and bought a Ferry share from the purse ([3BFDcPwr…](https://nearblocks.io/txns/3BFDcPwrfu64LATzbUyh868e6jWMaJTHDEPHxm7mfaeq)).
 
 ### Economy evolves without a dev patch
 
@@ -89,7 +89,7 @@ Status: live. The nine keepers form the market council on chain (quorum 5). Each
 | Play the whole day | Coins, a purse, a stall, a share. No wallet popup, no hash, no gas prompt in the main flow |
 | Tap the purse in the top bar | The Receipt: each finished step, and a quiet **Record** link to its real mainnet transaction for those who want proof |
 
-Status: email sign-in and relayer-sponsored gas for real (non-practice) moves are next. Judges: every proof is on `/judge`.
+Status: sponsored gas is live. Each real move is signed by the player and sent by relayer.nearcarta.near, which pays the gas within caps per visitor and per day. In the prod run above, the player's NEAR stayed at 0.003 from the first move to the last ([2TXeZ4hR…](https://nearblocks.io/txns/2TXeZ4hRu2EB4zw9cG6zdq9jgfswKRQs6BwRu1K1uPRM) gather, sell, stall, invest). Email sign-in (Privy) is built and is being confirmed with a real inbox. Judges: every proof is on `/judge`.
 
 ---
 
@@ -129,7 +129,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 954 unit tests (953 pass, 1 skipped)
+npm test                 # 958 unit tests (957 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -152,7 +152,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 954 unit tests (953 pass, 1 skipped):
+# 958 unit tests (957 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -315,7 +315,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 954 unit tests (953 pass, 1 skipped)
+npm test                 # 958 unit tests (957 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current

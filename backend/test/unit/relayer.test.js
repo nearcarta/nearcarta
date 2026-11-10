@@ -88,3 +88,12 @@ test('relayer: an email-login wallet signs with its one full key, only for its o
   const pay = await signed({ kp, senderId: hexId, acts: [actions.transfer(1n)] });
   assert.equal((await relay(pay.b64, deps(full))).why, 'ERR_ACTION_KIND');
 });
+
+test('relayer: an invest the purse cannot cover is refused before sending (no gas burnt)', async () => {
+  const before = sent.length;
+  const { b64 } = await signed({ acts: [actions.functionCall('purse', { action: 'invest', amount: String(10n ** 21n), shop: 'ferry' }, 20n * T, 0n)] });
+  const r = await relay(b64, { ...deps(), stateOf: async () => ({ purse: 960n * 10n ** 18n, bag: {}, rules: {}, stalls: [], now_ns: 0n, me: 'player.near' }) });
+  assert.equal(r.ok, false); assert.equal(r.why, 'ERR_PRECHECK_PURSE'); assert.equal(sent.length, before);
+  const ok = await relay((await signed({ acts: [actions.functionCall('purse', { action: 'invest', amount: String(10n ** 21n), shop: 'ferry' }, 20n * T, 0n)] })).b64, { ...deps(), stateOf: async () => ({ purse: 2n * 10n ** 21n, me: 'player.near' }) });
+  assert.equal(ok.ok, true);
+});

@@ -11,6 +11,7 @@ import { Account, JsonRpcProvider, KeyPairSigner, SCHEMA, encodeDelegateAction }
 import { cfg } from './config.js';
 import { rpc, view, viewAccount } from './near.js';
 import { policy, checkDelegate, checkKey, caps as makeCaps } from '../../shared/relay/policy.js';
+import { precheck, goodsOf } from '../../shared/relay/precheck.js';
 
 const NEAR = 10n ** 24n;
 const yoctoToNear = (y) => { const v = BigInt(y); const w = v / NEAR, f = (v % NEAR).toString().padStart(24, '0').slice(0, 6).replace(/0+$/, ''); return f ? `${w}.${f}` : `${w}`; };
@@ -59,7 +60,17 @@ const hashOf = (r) => r?.transaction_outcome?.id || r?.transaction?.hash || null
 const failure = (r) => { for (const o of [r?.transaction_outcome, ...(r?.receipts_outcome || [])]) { const f = o?.outcome?.status?.Failure; if (f) return JSON.stringify(f).slice(0, 300); } return null; };
 
 /** Relay one move. deps are injectable for tests. */
-export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction(sd), keyOf, heightOf, now = Date.now } = {}) {
+/** The sender's market state for the balance pre-check. Null when it cannot be read (the move then goes). */
+export async function marketState(c, me, calls) {
+  try {
+    const goods = goodsOf(calls);
+    const [sq, bals] = await Promise.all([view(c.market, 'square', { account_id: me }), goods.length ? view(c.market, 'mt_batch_balance_of', { account_id: me, token_ids: goods }) : []]);
+    return { purse: sq.purse, rules: sq.rules, stalls: sq.stalls, me, now_ns: BigInt(Date.now()) * 1_000_000n, bag: Object.fromEntries(goods.map((g, i) => [g, Number(bals[i] || 0)])) };
+  } catch { return null; }
+}
+const callsOf = (d) => d.actions.map((a) => { let args = {}; try { args = JSON.parse(Buffer.from(Uint8Array.from(a.functionCall.args)).toString('utf8')); } catch {} return { method: a.functionCall.methodName, args }; });
+
+export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction(sd), keyOf, heightOf, now = Date.now, stateOf } = {}) {
   roll(); const c = conf();
   if (!hasKey() && !send.__test) return refuse('ERR_RELAYER_OFF', 503);
   const sd = decode(b64); if (!sd) return refuse('ERR_DECODE');
@@ -69,6 +80,12 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
   if (!verifySig(sd)) return refuse('ERR_SIGNATURE');
   const key = keyOf ? await keyOf(d.senderId, d.publicKey) : await rpc('query', { request_type: 'view_access_key', finality: 'final', account_id: d.senderId, public_key: b58pk(d.publicKey) }).catch(() => null);
   const k = checkKey(key, d, Buffer.from(Uint8Array.from(d.publicKey.ed25519Key.data)).toString('hex')); if (!k.ok) return refuse(k.why);
+  // A move the market would refuse for a balance is stopped here, so it never burns relayer gas.
+  if (d.receiverId === c.market) {
+    const calls = callsOf(d);
+    const st = stateOf ? await stateOf(d.senderId, calls) : (send.__test ? null : await marketState(c, d.senderId, calls));
+    if (st) { const pc = precheck(calls, st); if (!pc.ok) return { ...refuse(pc.why), need: pc.need, have: pc.have }; }
+  }
   // Worst case for this move: all attached gas burnt at 0.1 NEAR per 1000 Tgas (100M yocto per gas).
   const worst = p.gas * 100_000_000n;
   if (ledger.spent + worst > c.dailyNear) return refuse('ERR_DAILY_BUDGET', 429);
