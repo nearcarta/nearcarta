@@ -73,6 +73,19 @@ export async function step(id, ctx = {}) {
   return null;
 }
 
+// Not signed in: the Ferry, the sale and the invest still run for real, on the city's demo purse (one shared
+// account, server-signed, relayer-paid). Any refusal falls back to the practice step, said as practice.
+export const DEMO_STEPS = ['cargo', 'sell', 'invest'];
+export async function demo(id) {
+  if (live.account || !DEMO_STEPS.includes(id)) return null;
+  const api = (window.NEARCARTA_API || '').replace(/\/$/, '');
+  try {
+    const r = await (await fetch(`${api}/api/merchant/step`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ step: id }) })).json();
+    if (!r.ok || !r.hash) return null;
+    return { ...r, demo: true, total: r.total != null ? BigInt(r.total) : null };
+  } catch { return null; }
+}
+
 // Mist Bank seal: the Bank keeper's board row anchors a fingerprint of (account, purse, salt). Only the
 // fingerprint leaves this browser; the salt and the amount stay here, so the visitor can reveal them later.
 const SEALS = 'nearcarta.bank.seals';
