@@ -15,6 +15,11 @@ import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.BASE || 'http://localhost:5173';
 const OUT = process.env.OUT || '/tmp/ref-check';
+// --native mounts the panel on the town page without building the 3D room. The city page builds
+// the room first and paints the panel only after it starts, so on a machine where the room cannot
+// start (no GPU, or the quote API is down) every panel measurement would report "no tray". This
+// mode measures the panel itself, which is what these checks are about.
+const NATIVE = process.argv.includes('--native');
 const shops = process.argv.slice(2).filter(a => !a.startsWith('--'));
 const LIST = shops.length ? shops : ['ferry', 'guard', 'hall', 'payouts', 'arena', 'bank', 'chronicle', 'toll', 'house'];
 mkdirSync(OUT, { recursive: true });
@@ -22,16 +27,51 @@ mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 let fail = 0, total = 0;
 
+/** Mount the panel in a bare shell on the town page, without the 3D room. */
+async function mountNative(page, shop) {
+  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1800);
+  await page.evaluate((shop) => {
+    document.body.classList.add('in-shop', shop + '-tray');
+    let ui = document.getElementById('shopUI');
+    if (!ui) { ui = document.createElement('div'); ui.id = 'shopUI'; document.body.appendChild(ui); }
+    ui.hidden = false;
+    ui.innerHTML = `<section id="tray"><div class="t-scroll">
+        <div class="t-head"><h1 id="t-title"></h1><span id="t-src" class="src"></span></div>
+        <p id="t-sub" class="t-sub"></p><p id="t-label" class="label"></p>
+        <div id="t-hero" class="hero"></div><div id="shop-quest" class="shop-quest"></div>
+        <div id="t-form" class="form"></div></div>
+      <div class="t-row"><button id="t-act" type="button" class="act primary"></button></div>
+      <p id="t-rcpt" class="rcpt"></p>
+      <div class="t-links"><button id="t-proof" class="link">How it works</button></div>
+    </section>`;
+  }, shop);
+  await page.evaluate(async ({ shop }) => {
+    const d = await import('/panels/deep.js');
+    const id = await import('/panels/shop-identity.js');
+    d.mountShop(shop, document.getElementById('t-form'), { auto: false });
+    document.getElementById('t-title').innerHTML = `${id.badge(shop)}<span class="t-name">${id.titleOf(shop)}</span>${id.headerArt(shop)}`;
+    document.getElementById('t-sub').textContent = id.subtitleOf(shop);
+    document.getElementById('t-hero').innerHTML = id.flowStrip(shop);
+    const act = document.getElementById('t-act');
+    act.textContent = 'Sign in'; act.hidden = false;
+    await new Promise(r => setTimeout(r, 350));
+  }, { shop });
+}
+
 for (const W of [1440, 390]) {
   const H = W === 390 ? 844 : 900;
   const ctx = await browser.newContext({ viewport: { width: W, height: H } });
   const page = await ctx.newPage();
   for (const shop of LIST) {
-    await page.goto(`${BASE}/design/D9_world/?shop=${shop}`, { waitUntil: 'domcontentloaded' });
-    await page.locator('#t-proof').waitFor({ state: 'visible', timeout: 90000 });
-    await page.waitForTimeout(2600);
-    // Close the proof drawer: it covers the panel and blocks tab clicks.
-    await page.evaluate(() => document.getElementById('drawer')?.classList.remove('open'));
+    if (NATIVE) {
+      await mountNative(page, shop);
+    } else {
+      await page.goto(`${BASE}/design/D9_world/?shop=${shop}`, { waitUntil: 'domcontentloaded' });
+      await page.locator('#t-proof').waitFor({ state: 'visible', timeout: 90000 });
+      await page.waitForTimeout(2600);
+      await page.evaluate(() => document.getElementById('drawer')?.classList.remove('open'));
+    }
 
     const tabs = await page.evaluate(() => [...document.querySelectorAll('#shopUI #tray [role=tab]')].map(e => e.dataset.testid).filter(Boolean));
     for (const tab of tabs.length ? tabs : [null]) {
@@ -159,6 +199,107 @@ for (const W of [1440, 390]) {
         for (const t of inactive) {
           const bw = parseFloat(getComputedStyle(t).borderTopWidth) || 0;
           if (bw < 1) { problems.push('TAB-NO-BORDER'); break; }
+        }
+
+        // --- the seven ferry items, each its own failing condition -----------------------------
+
+        // Only the VISIBLE pane counts: a hidden tab has no layout and would report 0px.
+        const amtEl = [...tray.querySelectorAll('#f-amt')].find(e => e.getBoundingClientRect().width > 2);
+        if (amtEl) {
+          const pillEl = [...tray.querySelectorAll('.swap-line .token-listbox')].find(e => e.getBoundingClientRect().width > 2);
+          const maxEl = [...tray.querySelectorAll('.swap-line .swap-max')].find(e => e.getBoundingClientRect().width > 2);
+          const symEl = [...tray.querySelectorAll('.swap-line .amt-row .amt-sym')].find(e => e.getBoundingClientRect().width > 2);
+          const lineW = (amtEl.closest('.swap-line') || { getBoundingClientRect: () => ({ width: 0 }) }).getBoundingClientRect().width;
+
+          // (1a) the amount is wide enough to show its value, and takes the space after the pill
+          if (amtEl.getBoundingClientRect().width < 56) problems.push(`AMOUNT-NARROW ${Math.round(amtEl.getBoundingClientRect().width)}px`);
+          if (amtEl.scrollWidth > amtEl.clientWidth + 1) problems.push('AMOUNT-CLIPPED');
+          if (pillEl && lineW) {
+            const pct = pillEl.getBoundingClientRect().width / lineW * 100;
+            if (pct < 32 || pct > 50) problems.push(`PILL-WIDTH ${Math.round(pct)}%`);
+          }
+          if (maxEl && amtEl.getBoundingClientRect().right > maxEl.getBoundingClientRect().left + 1) problems.push('MAX-OVERLAPS-AMOUNT');
+          // (1b) no duplicate unit after Max
+          if (symEl && vis(symEl)) problems.push('DUPLICATE-UNIT');
+        }
+
+        const chainSel = [...tray.querySelectorAll('#f-chain .token-listbox-btn, #f-chain select')].find(e => e.getBoundingClientRect().width > 2);
+        if (chainSel) {
+          // (2) the chain control names a chain, never just "All", and the Live badge is last
+          const t = (chainSel.textContent || '').trim();
+          if (/^All$/i.test(t)) problems.push('CHAIN-DEFAULTS-ALL');
+          const live = tray.querySelector('.swap-chain-row .swap-live');
+          if (live) {
+            const row = live.closest('.swap-chain-row');
+            const rowR = row.getBoundingClientRect();
+            const liveR = live.getBoundingClientRect();
+            // The badge sits at the row's right end, not beside the select.
+            if (rowR.right - liveR.right > 8) problems.push('LIVE-NOT-RIGHT');
+          }
+        }
+
+        // (3) the To value is not an em dash
+        const est = [...tray.querySelectorAll('.swap-est')].find(e => e.getBoundingClientRect().width > 2);
+        if (est) {
+          const shown = (est.textContent || '').trim();
+          if (!shown) {
+            const after = getComputedStyle(est, '::before').content || '';
+            if (/[—–]/.test(after)) problems.push('TO-VALUE-DASH');
+          }
+        }
+
+        const ctaF = [...tray.querySelectorAll('#f-quote')].find(e => e.getBoundingClientRect().width > 2);
+        if (ctaF) {
+          const cs = getComputedStyle(ctaF);
+          // (4) 48px tall and at least 16px clear of the quote card
+          if (ctaF.getBoundingClientRect().height < 46) problems.push(`REVIEW-H ${Math.round(ctaF.getBoundingClientRect().height)}`);
+          const quoteEl = [...tray.querySelectorAll('.swap-quote')].find(q => q.getBoundingClientRect().width > 2);
+          if (quoteEl) {
+            const g = ctaF.getBoundingClientRect().top - quoteEl.getBoundingClientRect().bottom;
+            if (g < 15) problems.push(`REVIEW-GAP ${Math.round(g)}px`);
+          }
+          // A real gradient with more than one stop, not a flat fill.
+          if (!/linear-gradient/.test(cs.backgroundImage)) problems.push('REVIEW-NO-GRADIENT');
+        }
+
+        const quoteR = [...tray.querySelectorAll('.swap-quote')].find(q => q.getBoundingClientRect().width > 2);
+        if (quoteR) {
+          // (5) header has an icon and the Best route pill is a pill
+          const head = quoteR.querySelector('.swap-quote-head');
+          if (head) {
+            const m = getComputedStyle(head, '::before').maskImage || getComputedStyle(head, '::before').webkitMaskImage || 'none';
+            if (m === 'none') problems.push('QUOTE-NO-ICON');
+          }
+          const best = quoteR.querySelector('.swap-best');
+          if (best) {
+            const br = parseFloat(getComputedStyle(best).borderTopWidth) || 0;
+            const rad = getComputedStyle(best).borderRadius || '';
+            if (br < 1 && !/px/.test(rad)) problems.push('BEST-NOT-PILL');
+          }
+          // 8px between rows
+          const rows = [...quoteR.querySelectorAll('p')].map(e => e.getBoundingClientRect());
+          for (let i = 1; i < rows.length; i++) {
+            const gap = rows[i].top - rows[i - 1].bottom;
+            if (gap < 6 || gap > 10) { problems.push(`QUOTE-ROWS ${Math.round(gap)}px`); break; }
+          }
+        }
+
+        // (6) no "mainnet quote" words beside the header icon
+        const src = tray.querySelector('.t-head #t-src');
+        if (src) {
+          const fs = parseFloat(getComputedStyle(src).fontSize) || 0;
+          const txt = (src.textContent || '').trim();
+          if (txt && fs > 6) problems.push('SRC-TEXT-VISIBLE');
+        }
+
+        // (7) the flip button sits on the seam between the two swap cards
+        const cards = [...tray.querySelectorAll('.swap-card')].filter(vis);
+        const flipEl = [...tray.querySelectorAll('.swap-flip')].find(e => e.getBoundingClientRect().width > 2);
+        if (cards.length >= 2 && flipEl) {
+          const seam = cards[0].getBoundingClientRect().bottom;
+          const c = flipEl.getBoundingClientRect();
+          const centre = c.top + c.height / 2;
+          if (Math.abs(centre - seam) > 8) problems.push(`FLIP-OFF-SEAM ${Math.round(centre - seam)}px`);
         }
 
         // The one gold CTA: the widest gradient-filled control that is NOT a tab. An active tab

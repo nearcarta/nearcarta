@@ -2018,3 +2018,187 @@ body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > [data-testid='payo
   width: 18px !important; height: 18px !important;
 }
 body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > .ferry-flow .flow-cap { font-size: 10px !important; }
+
+/* ============================================================================================
+   23. Round 4 — the seven ferry items, from the native-size render
+   ============================================================================================ */
+
+/* (1) The amount needs real width: pill ~40%, amount fills, then Max. The duplicate unit after
+   Max goes: the pill already says which token it is. */
+body #shopUI #tray #t-form .swap-line .token-listbox {
+  flex: 0 0 40% !important;
+  width: 40% !important;
+  min-width: 0 !important;
+  max-width: 40% !important;
+}
+body #shopUI #tray #t-form .swap-line .amt-row {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  gap: 6px !important;
+  justify-content: flex-end;
+}
+body #shopUI #tray #t-form .swap-line .amt-row input {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 44px !important;
+  max-width: none !important;
+  text-align: right;
+}
+/* The trailing "wNEAR" inside the amount row duplicates the pill. */
+body #shopUI #tray #t-form .swap-line .amt-row .amt-sym { display: none !important; }
+/* The To side keeps its estimate but not a second unit chip. */
+body #shopUI #tray #t-form .swap-line .amt-row .swap-est { display: inline !important; }
+
+/* (2) The chain row is ONE wide select with the Live badge at the far right. */
+body #shopUI #tray #t-form .swap-chain-row {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: var(--p2) !important;
+}
+body #shopUI #tray #t-form .swap-chain-row > .field {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+body #shopUI #tray #t-form .swap-chain-row > .field > span:first-child {
+  flex: 0 0 auto !important;
+  font-size: 12px !important;
+  color: var(--c-muted) !important;
+}
+body #shopUI #tray #t-form .swap-chain-row .token-listbox {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+}
+body #shopUI #tray #t-form .swap-chain-row .token-listbox-btn {
+  width: 100% !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  position: relative;
+  padding: 0 26px 0 8px !important;
+  font-size: 12px !important;
+}
+body #shopUI #tray #t-form .swap-chain-row .swap-live { margin-left: auto !important; flex: 0 0 auto !important; }
+
+/* (3) Before a quote the To value is a muted 0.00, not an em dash. */
+body #shopUI #tray #t-form .swap-est:empty::before { content: '0.00'; color: var(--c-muted); opacity: .75; }
+
+/* (4) A 16px gap above Review swap, a richer gradient, 48px tall. */
+body #shopUI #tray #t-form #f-quote {
+  margin-top: var(--p4) !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  background: linear-gradient(180deg, #ffb54a 0%, #e2831f 100%) !important;
+  background-image: linear-gradient(180deg, #ffb54a 0%, #e2831f 100%) !important;
+  color: #2a1a0e !important;
+  border: 0 !important;
+  border-radius: var(--r-cta) !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .28) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+/* (5) Quote rows: an icon in the header and 8px between rows. */
+body #shopUI #tray #t-form .swap-quote { padding: var(--p3) !important; gap: var(--p2) !important; }
+body #shopUI #tray #t-form .swap-quote-head {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 13px !important;
+  padding-bottom: 2px;
+}
+body #shopUI #tray #t-form .swap-quote-head::before {
+  content: '';
+  width: 14px; height: 14px;
+  flex: 0 0 auto;
+  background: currentColor;
+  opacity: .8;
+  -webkit-mask: url('/design/D2_game/d7/assets/3dicons/192/bulb-premium.webp') center / contain no-repeat;
+  mask: url('/design/D2_game/d7/assets/3dicons/192/bulb-premium.webp') center / contain no-repeat;
+}
+body #shopUI #tray #t-form .swap-quote-head > span:first-child { flex: 1 1 auto; text-align: left; }
+body #shopUI #tray #t-form .swap-quote p,
+body #shopUI #tray #t-form .swap-quote .ferry-rate {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: var(--p2) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-top: 0 !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+/* A real 8px between consecutive rows, not a hairline. */
+body #shopUI #tray #t-form .swap-quote p + p { margin-top: var(--p2) !important; }
+/* The Best route pill is a pill, not plain text. */
+body #shopUI #tray #t-form .swap-best {
+  padding: 2px 8px !important;
+  border-radius: var(--r-pill) !important;
+  background: rgba(226, 168, 60, .18) !important;
+  border: 1px solid var(--c-gold-2) !important;
+  color: var(--c-gold-1) !important;
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+
+/* (6) The "mainnet quote" text beside the header icon is clutter: keep the dot, drop the words. */
+body #shopUI #tray > .t-scroll > .t-head #t-src {
+  font-size: 0 !important;
+  width: 8px !important;
+  height: 8px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+body #shopUI #tray > .t-scroll > .t-head #t-src::before { width: 8px; height: 8px; }
+
+/* (7) The flip button sits ON the seam between the two cards. */
+body #shopUI #tray #t-form .swap-flip {
+  margin: calc(-1 * var(--p3) - 12px) auto !important;
+  position: relative;
+  z-index: 3;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .5);
+}
+
+/* The reference's own increments: 8px between the quote rows, 16px from the quote card to the
+   action. Measured before this they were 16 and 24 — comfortable, but not the reference. */
+body #shopUI #tray #t-form .swap-quote p + p { margin-top: var(--p2) !important; }
+body #shopUI #tray #t-form #f-quote { margin-top: var(--p4) !important; }
+body #shopUI #tray #t-form .swap-quote { gap: 0 !important; }
+body #shopUI #tray #t-form .swap-quote-head { padding-bottom: var(--p2) !important; }
+
+/* The pane's own 8px gap added to the CTA's 16px margin, giving 24. The 16 is the reference's
+   number, so the gap before the action is zeroed and the margin does the whole job. */
+body #shopUI #tray #t-form #f-quote { margin-top: var(--p4) !important; }
+body #shopUI #tray #t-form > #f-quote,
+body #shopUI #tray #t-form .ferry-picker > #f-quote { margin-block-start: calc(var(--p4) - var(--p2)) !important; }
+
+/* Guard Pay: the checklist's last line met the action row in the native mount, where the panel
+   has no 3D room behind it and sits a few pixels higher. The pane and the action need a real
+   gap, not an accident of margins. */
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] { padding-bottom: var(--p2) !important; }
+body #shopUI #tray > .t-row { margin-top: var(--p4) !important; }
+body #shopUI #tray #t-form .guard-pane > .guard-status { margin-bottom: 0 !important; }
+
+/* THE GUARD, take four. `.guard-pane[data-pane='pay']{display:grid!important}` is more specific
+   than a bare `[hidden]`, so the hidden check pane kept painting at 354px and its content met the
+   action row. This matches on the same attributes AND the attribute selector, which wins: */
+body #shopUI #tray #t-form .guard-pane[data-pane][hidden],
+body #shopUI #tray #t-form .guard-pane[data-pane='check'][hidden],
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'][hidden],
+body #shopUI #tray #t-form .guard-pane[data-pane='blocks'][hidden],
+body #shopUI #tray > .t-scroll > .shop-quest[hidden] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hall Agents: its status line met the action row in the native mount. The pane and the action
+   need a real gap, the same 16px the reference uses before a CTA. */
+body #shopUI #tray #t-form .hall-pane,
+body #shopUI #tray #t-form .hall-card { padding-bottom: 0 !important; }
+body #shopUI #tray #t-form .hall-pane > .hall-status:last-child { margin-bottom: 0 !important; }
+body #shopUI #tray > .t-row { margin-top: var(--p4) !important; }

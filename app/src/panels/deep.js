@@ -135,8 +135,21 @@ function tokenOpts(choices, { q = '', chain = '', selected = '' } = {}) {
   return opts;
 }
 
-function chainOpts(choices) {
-  return [{ value: '', label: 'All', kind: 'chain' }].concat(chainsOf(choices).map(c => ({ value: c, label: c, kind: 'chain' })));
+function chainOpts(choices, selectedChain = '') {
+  // "All" first, then every chain the catalog has. When the source chain is known it is labelled
+  // with its full name so the closed control reads "NEAR Mainnet", as the reference does.
+  const NICE = { near: 'NEAR Mainnet', eth: 'Ethereum', base: 'Base', arbitrum: 'Arbitrum', sol: 'Solana', pol: 'Polygon', zec: 'Zcash', btc: 'Bitcoin' };
+  const opts = [{ value: '', label: 'All', kind: 'chain' }];
+  const seen = new Set();
+  for (const c of chainsOf(choices)) {
+    if (!c || seen.has(c)) continue;
+    seen.add(c);
+    opts.push({ value: c, label: NICE[c] || c, kind: 'chain' });
+  }
+  // The selected chain must be present even when the catalog is still loading, or the control
+  // would fall back to its first option and read "All" again.
+  if (selectedChain && !seen.has(selectedChain)) opts.push({ value: selectedChain, label: NICE[selectedChain] || selectedChain, kind: 'chain' });
+  return opts;
 }
 
 export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
@@ -158,7 +171,9 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const tab = state.tab || 'swap';
   const defaultFromId = state.fromId || SESSION_SWAP.fromId;
   const defaultToId = state.toId || SESSION_SWAP.toId;
-  const chainBox = pickerListbox({ id: 'f-chain', testid: 'ferry-chain-filter', options: chainOpts(choices), selected: state.chainFilter || '' });
+  // The chain row defaults to the SOURCE chain, as the reference shows ("NEAR Mainnet"), not to
+  // "All". "All" stays available as the unfiltered choice.
+  const chainBox = pickerListbox({ id: 'f-chain', testid: 'ferry-chain-filter', options: chainOpts(choices, String(state.fromId || SESSION_SWAP.fromId || '').split('|')[1] || ''), selected: state.chainFilter || String(state.fromId || SESSION_SWAP.fromId || '').split('|')[1] || '' });
   // The pill shows the token's NAME, as the reference does ("wNEAR"), not "wNEAR on near": the
   // chain is already the next row's job and the suffix is what forced the ellipsis.
   const fromBox = pickerListbox({ id: 'f-from', testid: 'ferry-from', options: tokenOpts(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId }).map(o => ({ ...o, label: o.symbol || o.label })), selected: defaultFromId });
