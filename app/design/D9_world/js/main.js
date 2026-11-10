@@ -525,7 +525,7 @@ route.arm();
 // warm every room while the town idles: each shop module and the room props it puts (D8 core caches both), one per idle slot,
 // so the first door at any width opens at warm speed instead of waiting on cold fetches
 // arena's Knight.glb (1.1 MB) is left cold to keep first-load wire under budget
-const WARM={ toll:['tiles/base/hex_grass','tiles/base/hex_water','buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A','chars/RobotExpressive.glb'], chronicle:['tiles/base/hex_grass','decoration/props/crate_A_big'], bank:['decoration/props/crate_B_small','decoration/props/sack'], guard:['buildings/neutral/wall_straight_gate','decoration/props/barrel','decoration/props/bucket_arrows','decoration/props/target','decoration/props/weaponrack'],
+const WARM={ toll:['tiles/base/hex_grass','tiles/base/hex_water','buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A','chars/Rogue_Hooded.glb'], chronicle:['tiles/base/hex_grass','decoration/props/crate_A_big'], bank:['decoration/props/crate_B_small','decoration/props/sack'], guard:['buildings/neutral/wall_straight_gate','decoration/props/barrel','decoration/props/bucket_arrows','decoration/props/target','decoration/props/weaponrack'],
   ferry:['decoration/props/crate_A_small'], arena:[], hall:['decoration/props/flag_blue'], house:[], payouts:[] };
 function warmRooms(){ if(navigator.connection?.saveData) return; const D8=new URL('../../D8_shops/',import.meta.url).href; const q=Object.entries(WARM).filter(([id])=>OPEN[id]);
   const idle=f=>setTimeout(f,350);
@@ -538,7 +538,7 @@ let warmed=null; const warmGPU=()=>warmed||(warmed=(async()=>{ if(inShop) return
 window.__render=draw; window.__shopsLayer='d9';
 // Toll's floor, robot and policy start with the page so the first door is not a cold 20s fetch.
 setTimeout(()=>{ const D8=new URL('../../D8_shops/',import.meta.url).href; import(D8+'js/core.js').then(C8=>{
-  for (const p of ['hex/tiles/base/hex_grass','hex/tiles/base/hex_water','hex/buildings/neutral/building_bridge_A','hex/buildings/blue/building_tower_base_blue','chars/RobotExpressive.glb']) C8.load(p).catch(()=>null);
+  for (const p of ['hex/tiles/base/hex_grass','hex/tiles/base/hex_water','hex/buildings/neutral/building_bridge_A','hex/buildings/blue/building_tower_base_blue','chars/Rogue_Hooded.glb']) C8.load(p).catch(()=>null);
 }).catch(()=>{}); const api=(globalThis.NEARCARTA_API||'').replace(/\/$/,''); fetch(api+'/api/toll/live').catch(()=>{}); fetch(api+'/api/toll').catch(()=>{}); },0);
 setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE){ setTimeout(()=>warmGPU().then(warmRooms),300); } }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
 if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,SP,setSky,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
