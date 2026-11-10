@@ -196,12 +196,17 @@ let occM=null;
 // road, and backs off until both the guide and the door are on screen, portrait included.
 function focusZ(){ const f=PC.focus; if(!f) return 0; const d=Math.hypot(f.x-R.pos.x,f.z-R.pos.z); const need=(PORT()?2.3:1.45)*d+2.2; let z=0; while(z<1&&zDist(z)<need) z+=.02; return z; }
 function playCam(dt){ const fz=PC.focus?focusZ():0; if(PC.focus&&!down){ const f=PC.focus; const want=Math.atan2(R.pos.x-f.x,R.pos.z-f.z); PC.yaw+=Math.atan2(Math.sin(want-PC.yaw),Math.cos(want-PC.yaw))*Math.min(1,dt*1.6); }
-  PC.zs+=(Math.max(PC.z,fz)-PC.zs)*Math.min(1,dt*(PC.focus?2.2:7)); const z=PC.zs; const tg=R.pos.clone().add(V(0,.5,0)); const ahead=V(Math.sin(R.yaw),0,Math.cos(R.yaw)).multiplyScalar(Math.min(1.2,R.speed)*.55*(1-z)); tg.add(ahead);
+  PC.zs+=(Math.max(PC.z,Math.min(1,fz+(PC.fit||0)))-PC.zs)*Math.min(1,dt*(PC.focus?2.2:7)); const z=PC.zs; const tg=R.pos.clone().add(V(0,.5,0)); const ahead=V(Math.sin(R.yaw),0,Math.cos(R.yaw)).multiplyScalar(Math.min(1.2,R.speed)*.55*(1-z)); tg.add(ahead);
   if(PC.focus){ tg.lerp(PC.focus.clone().setY(.5),.45); } else tg.lerp(ZC,sstep(.18,.8,z)); const dist=zDist(z), pitch=zPitch(z);
   const cp=Math.cos(pitch), p=tg.clone().add(V(Math.sin(PC.yaw)*cp*dist,Math.sin(pitch)*dist,Math.cos(PC.yaw)*cp*dist));
   if(!PC.init){ PC.t.copy(D.cur.t); PC.p.copy(cam.position); PC.init=true; PC.blend=0; }
   PC.blend=Math.min(1,(PC.blend||0)+dt*2.6); const k=Math.min(1,dt*(3+PC.blend*6));
   PC.t.lerp(tg,k); PC.p.lerp(p,k); cam.position.copy(PC.p); D.cur.t.copy(PC.t); cam.fov+=(34-cam.fov)*Math.min(1,dt*3); cam.updateProjectionMatrix(); cam.lookAt(PC.t);
+  // fit check: both the guide and the next door must sit inside the free screen (between the HUD and the dock).
+  // Out of frame pushes the zoom back; comfortably inside lets it ease in again.
+  if(PC.focus&&!down){ const pt=PORT(), YL=pt?-.6:-.7, YH=pt?.56:.8, XL=pt?.82:.88; const a=R.pos.clone().add(V(0,.7,0)).project(cam), b=PC.focus.clone().setY(PC.focus.y+.9).project(cam);
+    const out=[a,b].some(v=>v.z>1||v.x<-XL||v.x>XL||v.y<YL||v.y>YH), snug=[a,b].every(v=>v.z<1&&Math.abs(v.x)<XL-.25&&v.y>YL+.18&&v.y<YH-.18);
+    PC.fit=Math.max(0,Math.min(.7,(PC.fit||0)+(out?dt*.7:snug?-dt*.12:0))); } else if(!PC.focus) PC.fit=Math.max(0,(PC.fit||0)-dt*.5);
   if(W.fin){ W.fin.uniforms.focus.value=.52; W.fin.uniforms.band.value=.2+z*.12; W.fin.uniforms.tilt.value=.85-z*.35; } }
 // keyboard steering, relative to the camera
 const KM={w:[0,1],arrowup:[0,1],s:[0,-1],arrowdown:[0,-1],a:[-1,0],arrowleft:[-1,0],d:[1,0],arrowright:[1,0]};
@@ -306,7 +311,7 @@ function separatePins(){ const live=PINS.filter(p=>p.el.classList.contains('on')
       if(a.l<=b.l){ a.l-=shift/2; b.l+=shift/2; } else { b.l-=shift/2; a.l+=shift/2; } moved=true; }
     if(!moved) break; }
   for(const b of boxes){ const x=b.l+b.w/2, y=b.t+b.h; b.p.el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; } }
-function updPins(){ const z=mode==='explore'&&!inShop?PC.zs:0; const a=sstep(.42,.62,z); body.classList.toggle('ov',a>.5); for(const p of PINS){ const v=p.top.clone().project(cam); const on=a>.05&&v.z<1;
+function updPins(){ const z=mode==='explore'&&!inShop&&!PC.focus?PC.zs:0; /* no map pins while the camera frames a quest walk */ const a=sstep(.42,.62,z); body.classList.toggle('ov',a>.5); for(const p of PINS){ const v=p.top.clone().project(cam); const on=a>.05&&v.z<1;
     p.el.style.opacity=on?a.toFixed(2):'0'; p.el.classList.toggle('on',on&&a>.5); p.el.tabIndex=on&&a>.5?0:-1; if(on){ const hw=Math.min(90,p.el.offsetWidth/2||70)+8, x=Math.max(hw,Math.min(innerWidth-hw-(innerWidth<720?44:64),(v.x*.5+.5)*innerWidth)), y=Math.max(innerWidth<720?150:110,Math.min(innerHeight-(innerWidth<720?150:120),(-v.y*.5+.5)*innerHeight)); p.el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; } }
   if(a>.5) separatePins(); }
 // ---------- hover: shop names in any view, character names on hover only ----------
