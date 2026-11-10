@@ -74,6 +74,15 @@ const sq = await view('square', { account_id: id });
 const free = [1, 2, 3, 4].find((n) => !sq.stalls.some((x) => x.id === n && x.holder && Number(x.until) > Date.now() * 1e6)) || 1;
 { const t = await post('/api/relay/session', { account_id: id }); log.topups = [...(log.topups || []), t]; save(); console.log('session top-up', JSON.stringify(t)); await sleep(3000); }
 if (!done('stall')) await move(`stall: rent stall ${free} for ${near(sq.rules.stall_rent)} NEAR`, [{ method: 'stall', args: { stall: free, action: 'rent' }, tgas: 20 }]);
+// One share costs 0.001 from the purse. If the day's sales have not covered it yet, work one more round.
+if (!done('invest') && BigInt((await view('square', { account_id: id })).purse) < MILLI) {
+  await sleep(31000); // a node can be gathered again after 30 s
+  if (!done('cargo 2')) await move('cargo 2: gather 3 more salt', ['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node }, tgas: 15 })));
+  const n = Number(await view('mt_balance_of', { account_id: id, token_id: 'good:salt' }));
+  const q2 = await view('quote', { shop: 'arena', good: 'good:salt' });
+  if (!done('sell 2') && n) await move(`sell 2: ${Math.min(3, n)} salt into the purse`, [{ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty: Math.min(3, n), min_total: String((BigInt(q2.sell) * BigInt(Math.min(3, n)) * 8n) / 10n), keep: true }, tgas: 20 }]);
+  { const t = await post('/api/relay/session', { account_id: id }); log.topups = [...(log.topups || []), t]; save(); }
+}
 if (!done('invest')) await move('invest: 0.001 NEAR from the purse into the ferry', [{ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop: 'ferry' }, tgas: 20 }]);
 
 await sleep(3000);
