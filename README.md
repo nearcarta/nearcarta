@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 937 backend unit tests (936 pass, 1 skipped) -->
+<!-- # 938 backend unit tests (937 pass, 1 skipped) -->
 
 **An AI agent can be talked into paying the wrong person. Nearcarta puts the payment rules in a NEAR contract the agent cannot change, so a fooled agent produces a refused transaction instead of a loss.**
 
@@ -59,8 +59,9 @@ The city is the game. Press **Market Day** on **https://nearcarta.vercel.app**, 
 |---|---|
 | Walk to the Guardhouse and press **Check buyers** | The Captain clears the square keeper and refuses the con artist. The Receipt links the real refusal on chain |
 | Walk into any shop for the first time | Its keeper greets you by role: Clerk, Ferryman, Toll warden, Captain, Arena marshal, Banker, Paymaster, Housekeeper, Archivist |
+| Tap a keeper standing at a shop door | Their card: name, mood (Worried, Steady, Cheerful from their till), purse in coins, and what they traded today. Step out of a shop and its keeper says what they just did |
 
-Status: the nine keepers as their own NEAR sub-accounts with board rows (approved), and tapping a keeper to see name, mood and purse, are next on this branch. Until they ship, keepers trade inside the practice round.
+Status: the nine keepers as their own NEAR sub-accounts with board rows (approved) are next. Until they ship, keepers and their purses live in the practice round.
 
 ### Player-owned markets
 
@@ -77,8 +78,9 @@ Status: owning a stall in the Arena square is next.
 |---|---|
 | At the Vault Arena press **Sell 3 salt**, then **Why this price?** | The price moves with the shelf: `price A → B`, and the reasons (stock, demand) behind it |
 | Finish the day and press **Day 2** | The shelf you sold into, the tills and your share carry over: the price you moved stays moved |
+| Finish the day and press **Week** | A week in a minute: the salt price follows the shelves, a con artist is refused each day, dark shops reopen, and on day 4 a council vote lowers the floor that keeps shops open (`councilVote` in `shared/market/sim.js`, test `a council vote changes a market rule mid-week, with no code change`) |
 
-Status: orders drawn from contract state and keeper needs, prices read from the market contract's on-chain supply and demand, a House council vote that changes a market rule on chain, and fast-forward (a week in a minute) are next.
+Status: the week runs in the practice round. Orders drawn from contract state and keeper needs, prices read from the market contract's on-chain supply and demand, and the council vote as an on-chain rule change are next.
 
 ### Players never notice the chain
 
@@ -127,7 +129,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 937 unit tests (936 pass, 1 skipped)
+npm test                 # 938 unit tests (937 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -150,7 +152,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 937 unit tests (936 pass, 1 skipped):
+# 938 unit tests (937 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -313,7 +315,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 937 unit tests (936 pass, 1 skipped)
+npm test                 # 938 unit tests (937 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current

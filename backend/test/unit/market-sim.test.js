@@ -88,6 +88,14 @@ test('fast-forward replays the same week from a seed, and dark shops come back',
   assert.ok(a.city.log.some((e) => e.kind === 'refused'));
 });
 
+test('a council vote changes a market rule mid-week, with no code change', () => {
+  const w = S.runWeek({ seed: 11 });
+  const vote = w.events.find((e) => e.kind === 'rule');
+  assert.ok(vote && vote.hour === 84);
+  assert.equal(w.city.shops.arena.floor, (S.FLOOR * 7_500n) / 10_000n);
+  assert.ok(w.events.some((e) => e.kind === 'refused'));
+});
+
 test('the daily caps bound what one player and the whole city can take out', () => {
   const c = S.createCity({ caps: { playerDay: 5n * S.MILLI, cityDay: 5n * S.MILLI } });
   for (let i = 0; i < 6; i++) { S.gather(c, 'a', 'guard-1'); S.gather(c, 'b', 'guard-1'); S.advance(c, 30); }
