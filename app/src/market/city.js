@@ -79,7 +79,7 @@ const WHY = {
   ERR_TOO_SOON: 'This spot is resting. Try another one.', ERR_SHOP_CLOSED: 'Closed: out of funds. It still sells, or invest to reopen it.',
   ERR_BALANCE: 'Not enough in your bag.', ERR_FUNDS: 'Not enough coins. Sell something first.', ERR_STOCK: 'The shelf is empty.',
   ERR_TILL: 'The till cannot pay that much.', ERR_PLAYER_DAILY_CAP: 'Daily limit reached: you can earn more tomorrow.',
-  ERR_CITY_DAILY_CAP: 'The city has paid its daily limit. Back tomorrow.', ERR_OWN_ORDER: 'That is your own order.', ERR_SMALL: 'Invest at least 0.001 NEAR.',
+  ERR_CITY_DAILY_CAP: 'The city has paid its daily limit. Back tomorrow.', ERR_OWN_ORDER: 'That is your own order.', ERR_SMALL: 'Invest at least 10 coins.',
 };
 const fail = (e) => toast(WHY[e.code] || e.message, 'no');
 
