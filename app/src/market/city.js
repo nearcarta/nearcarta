@@ -175,7 +175,7 @@ function paintStrip() {
 async function stripClick(a, b) {
   try {
     if (a === 'act') {
-      const step = Q.current(city); const res = Q.act(city, inShop); lastDone = { shop: inShop, step, res };
+      const step = Q.current(city); const res = Q.act(city, inShop); lastDone = { shop: inShop, step, res }; lastDeed = { shop: inShop, text: DEED[step.id] };
       save(); hud(); quest(); seal(b); whyOpen = false; flash = null;
     } else if (a === 'why') whyOpen = !whyOpen;
     else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); flash = { shop: inShop, text: `Sold for ${coins(t)} coins` }; save(); hud(); }
@@ -185,7 +185,15 @@ async function stripClick(a, b) {
   } catch (e) { flash = { shop: inShop, text: WHY[e.code] || e.message, no: true }; paintStrip(); }
 }
 addEventListener('world:interior-ready', (e) => { inShop = e.detail?.id || null; flash = null; if (lastDone && lastDone.shop !== inShop) lastDone = null; whyOpen = false; setTimeout(paintStrip, 30); });
-addEventListener('world:exterior-ready', () => { inShop = null; lastDone = null; strip.hide(); aim(); });
+// what a keeper did while you were inside, said in the street as you step out: the world shows them buying, selling, refusing
+const DEED = { order: 'Order posted: 3 salt.', cargo: 'Salt unloaded. My till paid for it.', cross: 'Toll noted. Paid at the sale.', check: 'Refused the stranger. A con artist.',
+  sell: 'Bought your salt. My shelf is fuller now.', seal: 'Your profit is hidden.', pay: 'Porter paid, under your cap.', invest: 'Lights are back on. Thank you, partner.', write: 'Day written in the book.' };
+let lastDeed = null;
+addEventListener('world:exterior-ready', (e) => { const was = inShop || e.detail?.id; inShop = null; lastDone = null; strip.hide(); aim();
+  if (playing && lastDeed && lastDeed.shop === was) { const d = lastDeed; lastDeed = null; setTimeout(() => WD().keeperSay?.(d.shop, d.text), 400); } });
+// tap a keeper: their card (name, mood, purse, what they did today)
+let keeperId = null;
+addEventListener('world:keeper-tap', (e) => { if (!playing || walking || guiding) return; keeperId = e.detail.id; open('keeper'); });
 setInterval(() => { if (playing && inShop && !lastDone && S.nodesAt(inShop).length) paintStrip(); }, 1000);
 
 // ---------- sheet: the bag and the guide ----------
@@ -217,9 +225,17 @@ function vReceipt() {
     + (rows ? `<div class="md-list">${rows}</div>` : '<p class="md-hint">Nothing yet. Your first stop is the Town Hall.</p>')
     + '<p class="md-hint">Practice round: the city’s rules run here. Each Record is a real mainnet transaction of the same action. 1 coin = 0.0001 NEAR. All proofs: <a href="/judge">/judge</a>.</p>';
 }
+function mood(sh) { if (!S.isOpen(sh)) return ['Worried', 'The till is under the floor. The shop is dark.']; if (sh.till >= sh.floor * 2n) return ['Cheerful', 'A full till and steady trade.']; return ['Steady', 'Enough in the till to trade.']; }
+function vKeeper() {
+  const id = keeperId, sh = city.shops[id]; const st = Q.STEPS.find((x) => x.shop === id); const name = st?.keeper || 'Keeper';
+  if (!sh) return head(ICON.lamp, name, NAME[id] || '');
+  const [m, why] = mood(sh); const done = Q.progress(city).done > Q.STEPS.indexOf(st);
+  const rows = [['Mood', `${m}`, why], ['Purse', `${coins(sh.till)} coins`, 'Their own till. They buy and sell from it'], ['Trades today', String(sh.trades), done && st ? DEED[st.id] : 'Waiting for you']];
+  return head(ICON.lamp, name, NAME[id]) + `<div class="md-list">${rows.map(([k, v, sub]) => `<div class="md-row static"><span class="md-nm"><b>${esc(k)}</b><small>${esc(sub)}</small></span><b class="md-val">${esc(v)}</b></div>`).join('')}</div>`;
+}
 function render() {
   const body = root.querySelector('.md-body');
-  body.innerHTML = view === 'bag' ? vBag() : view === 'ask' ? vAsk() : view === 'receipt' ? vReceipt() : '';
+  body.innerHTML = view === 'bag' ? vBag() : view === 'ask' ? vAsk() : view === 'receipt' ? vReceipt() : view === 'keeper' ? vKeeper() : '';
 }
 
 root.addEventListener('click', (ev) => {

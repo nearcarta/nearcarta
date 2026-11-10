@@ -338,11 +338,14 @@ function pick(e){ const r=cv.getBoundingClientRect(); ndc.set((e.clientX-r.left)
 cv.addEventListener('pointerdown',e=>{ down={x:e.clientX,y:e.clientY,yaw:PC.yaw,po:PC.po,t:performance.now()}; });
 cv.addEventListener('pointermove',e=>{ if(down&&mode==='explore'&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>6){ PC.yaw=down.yaw-(e.clientX-down.x)*.006; PC.po=Math.max(-.1,Math.min(.3,down.po+(e.clientY-down.y)*.003)); tagOff(); return; } if(mode==='story'||down||inShop) return; hover(e); });
 cv.addEventListener('pointerup',e=>{ const d=down; down=null; if(inShop) return; if(!d||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6) return; if(storyEnd>d.t-80) return; if(mode!=='explore') explore(true);
-  sm.hidden=true; const id=pickOpen(e); if(id){ if(play==='jump') jump(id); else goIn(id); return; }
+  sm.hidden=true; const kp=keeperAt(e); if(kp){ kp.lookAt(R,1); dispatchEvent(new CustomEvent('world:keeper-tap',{detail:{id:kp.keeper||'ferry',name:kp.name}})); return; }
+  const id=pickOpen(e); if(id){ if(play==='jump') jump(id); else goIn(id); return; }
   if(play!=='walk') return; body.classList.add('moved');
   const now=performance.now(), dbl=now-(lastClick||0)<320; lastClick=now;
   const p=V(); ray.ray.intersectPlane(ground,p); const t=toHex(p.x,p.z); if(walkable(...t)){ R.steer=null; R.goHex(t,{end:p,run:dbl||p.distanceTo(R.pos)>7}); marker(p,dbl); } });
 let lastClick=0;
+// a tap within reach of a shopkeeper's head picks that keeper (Market Day shows their card: name, mood, purse)
+function keeperAt(e){ const r=cv.getBoundingClientRect(); let best=null,bd=40; for(const k of [...Object.values(CAST.keepers||{}),CAST.ferryman].filter(Boolean)){ const v=k.pos.clone().setY(.4).project(cam); if(v.z>1) continue; const x=(v.x+1)/2*r.width+r.left, y=(1-v.y)/2*r.height+r.top; const d=Math.hypot(x-e.clientX,y-e.clientY); if(d<bd){ bd=d; best=k; } } return best; }
 cv.addEventListener('wheel',e=>{ if(mode==='story'||inShop) return; e.preventDefault(); setZoom(PC.z+Math.sign(e.deltaY)*.075*Math.min(2,Math.abs(e.deltaY)/100||1)); },{passive:false});
 // pinch to zoom (touch): spreading the fingers moves toward the street, pinching pulls out to the overview
 { let pz=null; const dd=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
