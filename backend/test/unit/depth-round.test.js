@@ -78,11 +78,11 @@ test('a tee result names attested or failed and links the proof file', () => {
   assert.equal(pub.label, 'attested');
 });
 
-test('a hall preview reads the new cap back and builds gas-only calls', () => {
+test('a hall preview reads the new cap back; set_rules carries 1 yocto and freezing carries none', () => {
   const draft = draftFrom(PREVIEW_ROW, { capNear: '0.003', frozen: true });
   const calls = callsFor(PREVIEW_ROW, draft);
   assert.deepEqual(calls.map(c => c.method), ['set_rules', 'set_frozen']);
-  assert.ok(calls.every(c => c.deposit === '0'));
+  assert.deepEqual(calls.map(c => c.deposit), ['1', '0']);
   const back = readBack(draft);
   assert.equal(nearOf(back.per_action_cap), 0.003);
   assert.equal(diffCharter(PREVIEW_ROW, back).some(d => d.field === 'per_action_cap'), true);

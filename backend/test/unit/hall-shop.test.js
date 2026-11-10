@@ -130,7 +130,8 @@ test('tightening a cap keeps the live expiry and does not repeat a method', () =
   assert.equal(plan.ok, true);
   assert.deepEqual(plan.calls.map(c => c.method), ['set_rules', 'set_frozen']);
   assert.equal(plan.calls[0].args.rules.expires_at, live.expires_at);
-  assert.equal(plan.calls[0].deposit, '0');
+  assert.equal(plan.calls[0].deposit, '1');
+  assert.equal(plan.calls[1].deposit, '0');
   assert.notEqual(plan.calls[0].args.rules.per_action_cap, live.per_action_cap);
   const same = rulesPlan(live, { frozen: false });
   assert.equal(same.calls.length, 0);

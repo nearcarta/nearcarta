@@ -37,7 +37,7 @@ const ACCOUNT_BYTES = 182n;           // a bare implicit account with one full-a
 // Every shop that sends a contract call through the board, with tiny caps (contracts/charter_board
 // a_row_with_every_board_shop_fits_the_row_cap measures this exact row):
 //   Town Hall  every lifecycle step (the visitor can post or work a job)
-//   Arena fund, House check-in + prepare-send, Toll cross, Guard pay
+//   Market buy + invest (the Arena square), House check-in + prepare-send, Toll cross, Guard pay
 //   Ferry      wrap.near near_deposit / ft_transfer / storage_deposit and the board's own stamp
 //   Payouts    a NEAR payee (nearcarta.near here) by plain propose, the wrap.near pairs for a
 //              foreign invoice, and the native-USDC storage_deposit sponsor
@@ -50,7 +50,7 @@ const USDC = '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
 const CAP = NEAR / 1000n;                // 0.001 per call
 const PAIRS = [
   ...['post_job', 'bid', 'counter', 'accept', 'deliver', 'review', 'refund'].map(m => [TH, m]),
-  ['arena.nearcarta.near', 'fund'],
+  ['arena.nearcarta.near', 'buy'], ['arena.nearcarta.near', 'invest'],
   ['house.nearcarta.near', 'house_session_check_in'], ['house.nearcarta.near', 'house_session_prepare_send'],
   ['toll.nearcarta.near', 'cross'], ['guard.nearcarta.near', 'pay'],
   ['wrap.near', 'near_deposit'], ['wrap.near', 'ft_transfer'], ['wrap.near', 'storage_deposit'],
@@ -60,7 +60,7 @@ const PAIRS = [
 // Until the 0.04 build is live, keep one pair per shop plus the poster's Hall steps and the
 // Ferry pair (2958 B in the same unit test with this list). The worker-side Hall steps, House
 // prepare-send, wrap storage_deposit, the USDC sponsor and the NEAR payee wait for the 0.04 row.
-const LIVE_FIT = new Set(['post_job', 'accept', 'review', 'refund', 'fund', 'house_session_check_in', 'cross', 'pay', 'near_deposit', 'ft_transfer', 'stamp']);
+const LIVE_FIT = new Set(['post_job', 'accept', 'review', 'refund', 'buy', 'invest', 'house_session_check_in', 'cross', 'pay', 'near_deposit', 'ft_transfer', 'stamp']);
 const FULL = BigInt(MAIN.board?.max_row_yocto || 0) >= 40_000_000_000_000_000_000_000n;
 const PLAN = FULL ? PAIRS : PAIRS.filter(([r, m]) => LIVE_FIT.has(m) && r !== USDC);
 const CALLS = PLAN.map(([receiver, method]) => ({ receiver, method, cap: String(CAP) }));
