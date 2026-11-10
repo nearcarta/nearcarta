@@ -149,7 +149,11 @@ export function bankMarkup(state) {
       <div class="bank-split">
         <div class="field">
           <label class="choice-label" for="bank-file">Statement file</label>
-          <input id="bank-file" data-testid="bank-file" type="file" accept=".csv,text/csv,text/plain">
+          <div class="bank-file-row">
+            <input id="bank-file" data-testid="bank-file" type="file" accept=".csv,text/csv,text/plain">
+            <label class="bank-file-btn" for="bank-file">Choose file</label>
+            <span class="bank-file-name" data-testid="bank-file-name">No file chosen</span>
+          </div>
         </div>
         <div class="field">
           <label class="choice-label" for="bank-paste">Or paste</label>
@@ -769,6 +773,10 @@ export function mountBankRoom(root, hooks = {}) {
     const file = root.querySelector('#bank-file');
     if (file) file.addEventListener('change', () => {
       const picked = file.files && file.files[0];
+      // The visible name, since the native control is sr-only: the file's own name, or the
+      // unchanged "No file chosen" when the picker was dismissed.
+      const nameEl = root.querySelector('[data-testid=bank-file-name]');
+      if (nameEl) nameEl.textContent = picked ? picked.name : 'No file chosen';
       if (!picked) return;
       if (picked.size > 6000) {
         state.pendingRows = null;

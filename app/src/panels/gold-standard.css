@@ -934,26 +934,6 @@ body.house-tray #shopUI #tray #t-form .house-history {
    LAST RESORT — the rules here win on specificity, so nothing above can demote what they set
    ============================================================================================ */
 
-/* Chronicle: "Show timeline" must be the gold action, exactly like Swap's Review swap. Three
-   ids and the body class beat every rule earlier in this file and in the per-shop sheets. */
-body.chronicle-tray #shopUI #tray #t-act,
-body.chronicle-tray #shopUI #tray #t-act.act,
-body.chronicle-tray #shopUI #tray #t-act.primary {
-  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
-  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
-  color: var(--gs-ink) !important;
-  border: 0 !important;
-  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
-  font-weight: 600 !important;
-  min-height: 48px !important;
-  height: 48px !important;
-  border-radius: var(--r-cta) !important;
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
-  width: 100% !important;
-}
-
 /* Bank: the file name was clipped to "N…en". The field is a line of its own, the picker button
    keeps its space, and only the NAME is allowed to ellipsis — "No file chosen" fits in full. */
 body #shopUI #tray #t-form input[type='file'] {
@@ -1045,3 +1025,144 @@ body #shopUI #tray #t-form [data-testid$='-status']:empty { display: none !impor
 
 /* "All shops" must not touch the tray's corner. */
 body.in-shop nav.all-shops { margin: 8px !important; }
+
+/* ============================================================================================
+   Measured in the real city at 8b7d9cae — the rules that actually land
+   ============================================================================================ */
+
+/* 1. Chronicle's action is `#c-go` (class .chronicle-gold), NOT #t-act. Its computed background
+      was rgba(0,0,0,.24). This is the Swap gradient on the real element. */
+body #shopUI #tray #t-form #c-go,
+body #shopUI #tray #t-form button.chronicle-gold,
+body #shopUI #tray #t-form button[data-testid='chronicle-go'] {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-cta) !important;
+}
+
+/* 2. Bank: the native file input cannot show a long name, so it becomes an sr-only input with a
+      real label as the button and a span for the name. Markup adds .bank-file-row. */
+body #shopUI #tray #t-form input[type='file'] {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  border: 0 !important;
+}
+body #shopUI #tray #t-form .bank-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 8px 6px 6px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--gs-line);
+  background: var(--gs-card);
+  box-sizing: border-box;
+}
+body #shopUI #tray #t-form .bank-file-row .bank-file-btn {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gs-line-gold);
+  background: rgba(0, 0, 0, .3);
+  color: var(--gs-cream);
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+body #shopUI #tray #t-form .bank-file-row .bank-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--gs-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 3. Invoice expiry on a narrow phone: its own full line, smaller type so the minutes fit. */
+@media (max-width: 480px) {
+  body #shopUI #tray #t-form label:has(input[type='datetime-local']),
+  body #shopUI #tray #t-form .field:has(input[type='datetime-local']) { grid-column: 1 / -1 !important; width: 100% !important; }
+  body #shopUI #tray #t-form input[type='datetime-local'] { font-size: 12px !important; width: 100% !important; }
+}
+
+/* 4. The empty slot above Sign in is [data-testid='payout-status']: a div with two children, the
+      second empty, so :empty never matched. Hide the whole block until it has real text. */
+body #shopUI #tray #t-form [data-testid='payout-status']:not(:has(p:not(:empty))) { display: none !important; }
+body #shopUI #tray #t-form [data-testid='payout-status'] p:empty { display: none !important; }
+
+/* 5. Phone top bar: Back to town left, the agent chip next, All shops far right, 8px apart, one
+      row, no overlap. The chip keeps its full label. */
+@media (max-width: 720px) {
+  body.in-shop #shopUI #back {
+    position: fixed !important;
+    left: 8px !important;
+    right: auto !important;
+    top: 6px !important;
+    max-width: 132px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    z-index: 47;
+  }
+  body.in-shop #shopUI [id$='-agent-dock'] {
+    position: fixed !important;
+    left: 148px !important;
+    right: auto !important;
+    top: 6px !important;
+    z-index: 47;
+    transform: none !important;
+  }
+  body.in-shop nav.all-shops {
+    position: fixed !important;
+    left: auto !important;
+    right: 8px !important;
+    top: 6px !important;
+    margin: 0 !important;
+    z-index: 47;
+  }
+  body.in-shop #shopUI #tray { top: 46px !important; }
+  /* The chip label is never clipped. */
+  body #shopUI [id$='-agent-dock'] [class*='agent-name'],
+  body #shopUI [id$='-agent-dock'] span { white-space: nowrap !important; overflow: visible !important; }
+}
+
+/* 6. The composer sheet needs a visible close control. */
+@media (max-width: 720px) {
+  body #shopUI [id$='-agent-pop']:not([hidden])::before {
+    content: '✕';
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid var(--gs-line-gold);
+    color: var(--gs-cream);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 2;
+  }
+  body #shopUI [id$='-agent-pop'] { position: fixed !important; }
+}
