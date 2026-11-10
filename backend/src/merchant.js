@@ -69,7 +69,9 @@ export async function demoStep(step, ctx = {}) {
     const before = BigInt(sq.purse);
     const r = await relay(Buffer.from(encodeSignedDelegate(signedDelegate)).toString('base64'), { sponsor: 'merchant' });
     if (step === 'cargo' && r.ok) last = Date.now();
-    if (r.ok && step === 'sell') { try { r.total = (BigInt((await fv(rc.market, 'square', { account_id: me })).purse) - before).toString(); } catch {} }
+    if (r.ok && step === 'sell') { try { // read right after the move: optimistic, not final, or the sale is not in it yet
+      const q2 = await rpc('query', { request_type: 'call_function', finality: 'optimistic', account_id: rc.market, method_name: 'square', args_base64: Buffer.from(JSON.stringify({ account_id: me })).toString('base64') }, undefined, F);
+      r.total = (BigInt(JSON.parse(Buffer.from(q2.result).toString()).purse) - before).toString(); } catch {} }
     return { ...r, demo: true, account: me };
   });
 }

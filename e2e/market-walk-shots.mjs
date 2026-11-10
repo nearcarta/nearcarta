@@ -6,6 +6,8 @@ const BASE = process.env.BASE || 'http://127.0.0.1:5185', TAG = process.env.TAG 
 const W = Number(process.env.W || 1440), H = Number(process.env.H || 900);
 const dir = `/workspace/near/shots/games/walk/${TAG}`; mkdirSync(dir, { recursive: true });
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: W, height: H } });
+const runs = [];
+p.on('response', async (r) => { if (r.url().includes('/api/merchant/step') || r.url().includes('/api/bank/seal')) { const t = await r.text().catch(() => ''); runs.push(t); console.log('api', r.status(), t.slice(0, 400)); } });
 const shot = (n) => p.screenshot({ path: `${dir}/${n}-${W}.png` });
 await p.goto(BASE + '/?play', { waitUntil: 'domcontentloaded', timeout: 90000 });
 await p.locator('[data-testid="md-practice"]').click({ timeout: 90000 });
