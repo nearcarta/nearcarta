@@ -1370,3 +1370,651 @@ body #shopUI #tray #t-form .swap-quote .ferry-rate { font-size: 11px; line-heigh
 body #shopUI #tray #t-form .swap-quote p + p { padding-top: 3px; }
 body #shopUI #tray #t-form .swap-quote-head { font-size: 11px; }
 body #shopUI #tray #t-form .ferry-picker > .field { gap: 4px; }
+
+/* ============================================================================================
+   20. Review round 3 — the fixes the side-by-sides exposed
+   --------------------------------------------------------------------------------------------
+   Measured, not guessed:
+     - #tray computed padding was 0px (shop-shell.css:55 sets `padding:0 !important`), so the
+       header's 48px illustration sat 1px below the panel's top edge and every control looked
+       pasted to the border instead of inset by 16px. That single override is the root of the
+       "loose pieces" and "illustration overlaps the top edge" complaints.
+     - the token pill's label was 70px wide inside a 112px scroll box, so 'wNEAR on near'
+       ellipsised to 'M…NEAR…'.
+     - the quote card measured 159px wide with 11px text.
+   ============================================================================================ */
+
+body #shopUI #tray {
+  padding: var(--p4) !important;
+}
+
+/* The header row sits INSIDE the padding: illustration on the right, badge and title on the
+   left, all on one line, nothing crossing the border. */
+body #shopUI #tray > .t-scroll > .t-head { padding-top: 0 !important; margin-top: 0 !important; }
+body #shopUI #tray #t-title .panel-art { align-self: center; margin-top: 0; }
+
+/* (a) The token pill: icon, the full name, then a chevron. It must not ellipsis the name.
+   The pill is allowed the width the name needs; the amount takes what is left. */
+body #shopUI #tray #t-form .swap-line .token-listbox { width: auto !important; min-width: 128px !important; max-width: 56% !important; flex: 0 1 auto !important; }
+body #shopUI #tray #t-form .swap-line .token-listbox-btn {
+  padding-right: 24px;
+  font-size: 12px;
+  gap: 5px;
+  overflow: visible;
+}
+body #shopUI #tray #t-form .swap-line .token-listbox-btn .opt-label {
+  /* The name is what matters; the chain suffix is the part that may go. */
+  min-width: 0;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+/* The chevron, drawn with borders, always visible at the pill's right edge. */
+body #shopUI #tray #t-form .swap-line .token-listbox-btn::after {
+  content: '';
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -4px;
+  border-right: 1.5px solid var(--c-muted);
+  border-bottom: 1.5px solid var(--c-muted);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* (b) One bordered card around pill + amount + Max. The pieces share the row but the card owns
+   the border, so it reads as one control, not three loose ones. */
+body #shopUI #tray #t-form .swap-card {
+  border: 1px solid var(--c-border-soft) !important;
+  background: var(--c-well) !important;
+  padding: var(--p3) !important;
+  gap: var(--p2) !important;
+}
+body #shopUI #tray #t-form .swap-line {
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-ctrl);
+  background: rgba(0, 0, 0, .3);
+  padding: 4px 6px;
+  gap: 6px;
+}
+body #shopUI #tray #t-form .swap-line .token-listbox-btn {
+  border: 0 !important;
+  background: transparent !important;
+  padding-left: 4px;
+}
+body #shopUI #tray #t-form .swap-line .amt-row input {
+  border: 0;
+  background: transparent;
+  text-align: right;
+  font-weight: 600;
+}
+
+/* (c) The To value shows the estimate once a quote exists and an em dash-free hint before. */
+body #shopUI #tray #t-form .swap-est { font-size: 13px; color: var(--c-cream); }
+body #shopUI #tray #t-form .swap-est:empty::before { content: '—'; color: var(--c-muted); }
+
+/* (d) The chain row is ONE line: label, a real select with the chain name, then the Live badge. */
+body #shopUI #tray #t-form .swap-chain-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--p2) !important;
+  flex-wrap: nowrap;
+}
+body #shopUI #tray #t-form .swap-chain-row > .field { flex: 1 1 auto; min-width: 0; flex-direction: row; align-items: center; gap: var(--p2); }
+body #shopUI #tray #t-form .swap-chain-row > .field > span:first-child {
+  flex: 0 0 auto; font-size: 12px; color: var(--c-muted); margin: 0;
+}
+body #shopUI #tray #t-form .swap-chain-row .token-listbox { flex: 1 1 auto; min-width: 0; }
+body #shopUI #tray #t-form .swap-chain-row .token-listbox-btn {
+  height: 36px; min-height: 36px; font-size: 12px; padding: 0 26px 0 8px; position: relative;
+}
+body #shopUI #tray #t-form .swap-chain-row .token-listbox-btn::after {
+  content: ''; position: absolute; right: 9px; top: 50%; width: 6px; height: 6px; margin-top: -4px;
+  border-right: 1.5px solid var(--c-muted); border-bottom: 1.5px solid var(--c-muted);
+  transform: rotate(45deg); pointer-events: none;
+}
+body #shopUI #tray #t-form .swap-live { padding-bottom: 0 !important; flex: 0 0 auto; font-size: 12px; }
+
+/* (e) The quote card is full width with the reference's type size, and says what to do when it
+   has no quote rather than showing dashes. */
+body #shopUI #tray #t-form .swap-quote {
+  width: 100% !important;
+  align-self: stretch;
+  padding: var(--p3) !important;
+  gap: 6px !important;
+}
+body #shopUI #tray #t-form .swap-quote-head { font-size: 13px !important; }
+body #shopUI #tray #t-form .swap-quote p,
+body #shopUI #tray #t-form .swap-quote .ferry-rate {
+  font-size: 13px !important;
+  line-height: 18px !important;
+  color: var(--c-cream) !important;
+}
+body #shopUI #tray #t-form .swap-quote p > span:first-child { color: var(--c-muted); }
+body #shopUI #tray #t-form .swap-quote p > span:last-child { color: var(--c-cream); font-weight: 500; }
+
+/* (f) The token search belongs inside the picker; it does not sit in the swap view. */
+body #shopUI #tray #t-form .ferry-picker > .field:has(> input#f-find),
+body #shopUI #tray #t-form .ferry-picker > label:has(> input#f-find) { display: none !important; }
+
+/* (g) Review swap is the dominant gold action at the reference's size; Sign in is outlined. */
+body #shopUI #tray #t-form #f-quote { min-height: 48px !important; height: 48px !important; font-size: 15px !important; }
+body #shopUI #tray:has(#t-form #f-quote) > .t-row > #t-act.primary {
+  min-height: 44px !important; height: 44px !important;
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--c-cream) !important;
+  border: 1px solid var(--c-border) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+/* (k) The Guardhouse checklist: 13px at a readable contrast. */
+body #shopUI #tray #t-form .guard-status { font-size: 13px !important; line-height: 19px !important; color: var(--c-cream) !important; }
+body #shopUI #tray #t-form .guard-check > span:last-child { color: var(--c-cream); }
+body #shopUI #tray #t-form .guard-tick { width: 18px; height: 18px; font-size: 11px; }
+
+/* (j) The badge in the Guard header is a badge, not an illustration: it stays inside the row. */
+body #shopUI #tray #t-title .panel-badge { margin-top: 0; align-self: center; }
+
+/* (i) The Guardhouse pane was a two-column grid, so the flow strip and the Payee field each got
+   171px and the field floated to the right of the icon row. The reference stacks them: the icon
+   row full width, then the labelled Payee input full width beneath it, then the example chip,
+   then the action. */
+body #shopUI #tray #t-form .guard-pane,
+body #shopUI #tray #t-form .guard-pane[data-pane='check'] {
+  display: flex !important;
+  flex-direction: column !important;
+  grid-template-columns: none !important;
+  gap: var(--p3) !important;
+  align-items: stretch;
+}
+
+body #shopUI #tray #t-form .guard-pane > * {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+}
+
+body #shopUI #tray #t-form .guard-pane .guard-flow {
+  width: auto !important;
+  align-self: flex-start;
+  padding: var(--p2) var(--p3);
+  border-radius: var(--r-card);
+  background: rgba(0, 0, 0, .22);
+  border: 1px solid var(--c-border-soft);
+}
+
+body #shopUI #tray #t-form .guard-pane .guard-field { display: flex; flex-direction: column; gap: 6px; }
+body #shopUI #tray #t-form .guard-pane .guard-field > span:first-child { font: var(--f-label); font-size: 12px; color: var(--c-cream); }
+body #shopUI #tray #t-form .guard-pane .guard-field input { width: 100%; box-sizing: border-box; }
+
+body #shopUI #tray #t-form .guard-pane .example-row { margin: 0; }
+body #shopUI #tray #t-form .guard-pane .example-row .example {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  min-height: var(--tap);
+  height: auto;
+  padding: var(--p2) var(--p3);
+  border-radius: var(--r-card);
+  border: 1px solid var(--c-border-soft) !important;
+  background: rgba(0, 0, 0, .2) !important;
+  color: var(--c-muted) !important;
+  font: var(--f-small) !important;
+  font-size: 12px !important;
+}
+
+body #shopUI #tray #t-form .guard-pane #g-check {
+  width: 100% !important;
+  min-width: 100% !important;
+  background: linear-gradient(180deg, var(--c-gold-1) 0%, var(--c-gold-2) 100%) !important;
+  color: var(--c-ink) !important;
+  border: 0 !important;
+  font: var(--f-cta) !important;
+  font-weight: 600 !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  border-radius: var(--r-cta) !important;
+  box-shadow: 0 6px 18px rgba(226, 168, 60, .22) !important;
+}
+
+/* Guard Pay safely holds five fields and a checklist: 90px over one screen at 1440. The short
+   pairs share a row — the same fields, same ids, two-up — and the checklist keeps its 13px. */
+@media (min-width: 721px) {
+  body #shopUI #tray #t-form .guard-pane[data-pane='pay'],
+  body #shopUI #tray #t-form .guard-pane[data-pane='check'] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: var(--p2) var(--p3) !important;
+    align-items: start;
+  }
+  /* The icon row, the example chip, the action and the checklist always span the panel. */
+  body #shopUI #tray #t-form .guard-pane > .guard-flow,
+  body #shopUI #tray #t-form .guard-pane > .example-row,
+  body #shopUI #tray #t-form .guard-pane > .guard-actions,
+  body #shopUI #tray #t-form .guard-pane > .guard-status,
+  body #shopUI #tray #t-form .guard-pane > #g-check { grid-column: 1 / -1; }
+  body #shopUI #tray #t-form .guard-pane > .guard-field { min-width: 0; }
+}
+
+/* ============================================================================================
+   21. Per-shop CTA glyphs, Arena's gold secondary, and the reference tab pills
+   --------------------------------------------------------------------------------------------
+   One check mark on all nine buttons reads as a placeholder. Each shop's action now carries its
+   own symbol from the icon set, keyed off the panel's own body class.
+   ============================================================================================ */
+
+body #shopUI #tray > .t-row > #t-act.primary::before,
+body #shopUI #tray #t-form > .primary::before,
+body #shopUI #tray #t-form #f-quote::before,
+body #shopUI #tray #t-form #g-check::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 16px; height: 16px;
+  background: currentColor;
+  -webkit-mask: var(--cta-ico, url('/design/D2_game/d7/assets/3dicons/192/tick-premium.webp')) center / contain no-repeat;
+  mask: var(--cta-ico, url('/design/D2_game/d7/assets/3dicons/192/tick-premium.webp')) center / contain no-repeat;
+}
+
+/* Ferry: the swap mark. */
+body.ferry-tray #shopUI #tray #t-form #f-quote::before { --cta-ico: url('/design/D2_game/d7/assets/3dicons/192/flash-premium.webp'); }
+/* Guard: the shield that checked the payee. */
+body.guard-tray #shopUI #tray #t-form #g-check::before { --cta-ico: url('/design/D2_game/d7/assets/3dicons/192/shield-premium.webp'); }
+/* Town Hall: the scroll it posts. */
+body.hall-tray #shopUI #tray > .t-row > #t-act.primary::before,
+body.hall-tray #shopUI #tray #t-form > .primary::before { --cta-ico: url('/design/D2_game/d7/assets/3dicons/192/file-text-premium.webp'); }
+/* Payouts: the invoice. */
+body.payouts-tray #shopUI #tray > .t-row > #t-act.primary::before,
+body.payouts-tray #shopUI #tray #t-form > .primary::before { --cta-ico: url('/design/D2_game/d7/assets/3dicons/192/card-premium.webp'); }
+/* Arena: the guardian's shield. */
+body.arena-tray #shopUI #tray > .t-row > #t-act.primary::before,
+body.arena-tray #shopUI #tray #t-form > .primary::before { --cta-ico: url('/design/D2_game/d7/assets/3dicons/192/shield-premium.webp'); }
+/* Bank: the audit chart. */
+body.bank-tray #shopUI #tray > .t-row > #t-act.primary::before,
+body.bank-tray #shopUI #tray #t-form > .primary::before { --cta-ico: url('/design/D2_game/d7/assets/3dicons/192/chart-premium.webp'); }
+/* Toll: the crossing. */
+body.toll-tray #shopUI #tray > .t-row > #t-act.primary::before,
+body.toll-tray #shopUI #tray #t-form > .primary::before { --cta-ico: url('/design/D2_game/d7/assets/3dicons/192/link-premium.webp'); }
+/* House: the key to it. */
+body.house-tray #shopUI #tray > .t-row > #t-act.primary::before,
+body.house-tray #shopUI #tray #t-form > .primary::before { --cta-ico: url('/design/D2_game/d7/assets/3dicons/192/key-premium.webp'); }
+/* Chronicle: the record. */
+body.chronicle-tray #shopUI #tray > .t-row > #t-act.primary::before,
+body.chronicle-tray #shopUI #tray #t-form > .primary::before { --cta-ico: url('/design/D2_game/d7/assets/3dicons/192/explorer-premium.webp'); }
+
+/* Arena Guardians keeps ONE gold primary (the create action) and gets the reference's gold
+   SECONDARY: the Mint/Feed/Withdraw row is an outlined segmented control with the selected one
+   in a gold tint, not a second solid gold button. */
+body.arena-tray #shopUI #tray #t-form .arena-modes {
+  display: grid !important;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--p2) !important;
+  padding: 4px;
+  border-radius: var(--r-card);
+  background: rgba(0, 0, 0, .2);
+  border: 1px solid var(--c-border-soft);
+  box-sizing: border-box;
+}
+body.arena-tray #shopUI #tray #t-form .arena-mode {
+  min-height: 36px !important;
+  height: 36px !important;
+  border-radius: var(--r-ctrl) !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--c-muted) !important;
+  font: var(--f-label) !important;
+  font-size: 12px !important;
+}
+body.arena-tray #shopUI #tray #t-form .arena-mode[aria-pressed='true'],
+body.arena-tray #shopUI #tray #t-form .arena-mode.on {
+  background: rgba(226, 168, 60, .18) !important;
+  border-color: var(--c-gold-2) !important;
+  color: var(--c-gold-1) !important;
+  font-weight: 600 !important;
+}
+
+/* Tabs: the reference's pills — icon plus label, solid gold when active, dark with a visible
+   border when not. */
+body #shopUI #tray .ferry-tab,
+body #shopUI #tray .guard-tab,
+body #shopUI #tray .hall-tab,
+body #shopUI #tray .bank-tab,
+body #shopUI #tray .house-tab,
+body #shopUI #tray .payouts-tab,
+body #shopUI #tray .chronicle-tab,
+body #shopUI #tray .toll-tab,
+body #shopUI #tray [role='tablist'] > button {
+  border: 1px solid var(--c-border) !important;
+  background: rgba(0, 0, 0, .28) !important;
+  color: var(--c-cream) !important;
+  border-radius: var(--r-pill) !important;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+body #shopUI #tray .ferry-tab.on,
+body #shopUI #tray .guard-tab.on,
+body #shopUI #tray .hall-tab.on,
+body #shopUI #tray .bank-tab.on,
+body #shopUI #tray .house-tab.on,
+body #shopUI #tray .payouts-tab.on,
+body #shopUI #tray .chronicle-tab.on,
+body #shopUI #tray .toll-tab.on,
+body #shopUI #tray [role='tab'][aria-selected='true'],
+body #shopUI #tray [role='tablist'] > button[aria-selected='true'] {
+  background: linear-gradient(180deg, var(--c-gold-1) 0%, var(--c-gold-2) 100%) !important;
+  border-color: transparent !important;
+  color: var(--c-ink) !important;
+  font-weight: 600;
+}
+
+/* (i) cont. The pay pane also had to become one column of full-width fields; the grid above only
+   matched the check pane's data-pane value. Full width for the payee, whatever the pane. */
+body #shopUI #tray #t-form .guard-pane .guard-field,
+body #shopUI #tray #t-form .guard-pane .guard-field input,
+body #shopUI #tray #t-form .guard-pane #g-acct {
+  width: 100% !important;
+  min-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* (f) cont. The token search is part of the picker, not the swap view. Hiding its row by the
+   input's own id, with and without the :has() support, so it cannot leak back in. */
+body #shopUI #tray #t-form #f-find { display: none !important; }
+body #shopUI #tray #t-form label:has(#f-find),
+body #shopUI #tray #t-form .field:has(#f-find),
+body #shopUI #tray #t-form .ferry-field:has(#f-find) { display: none !important; }
+
+/* The review action is the reference's 48px dominant button. */
+body #shopUI #tray #t-form #f-quote { min-height: 48px !important; height: 48px !important; }
+
+@media (max-width: 720px) {
+  /* The illustration stays >= 48px on a phone too: it is the header's own picture. */
+  body #shopUI #tray #t-title .panel-art { width: 48px !important; height: 48px !important; }
+}
+
+/* On a phone the pill and the amount share a narrower row, so the pill's name was still being
+   ellipsised. The pill keeps enough width for the name and the chain suffix is what gives way:
+   the name is short enough to survive at this size. */
+@media (max-width: 720px) {
+  body #shopUI #tray #t-form .swap-line { gap: 4px; padding: 4px; }
+  body #shopUI #tray #t-form .swap-line .token-listbox { min-width: 104px !important; max-width: 48% !important; }
+  body #shopUI #tray #t-form .swap-line .token-listbox-btn { padding: 0 20px 0 4px; gap: 4px; font-size: 11px; }
+  body #shopUI #tray #t-form .swap-line .token-listbox-btn .opt-label { font-size: 11px; }
+  body #shopUI #tray #t-form .swap-line .token-listbox-btn .tic { width: 18px; height: 18px; }
+  body #shopUI #tray #t-form .swap-line .swap-max { padding: 0 8px !important; }
+  body #shopUI #tray #t-form .swap-line .amt-row input { min-width: 28px; }
+}
+
+/* (e) cont. Before a quote exists the card tells the visitor what to do. The empty state is a
+   real line with the reference's words, not a row of dashes. */
+body #shopUI #tray #t-form .swap-quote[data-empty='1'] p[data-testid='swap-row-rate'] > span:last-child { color: var(--c-muted); font-weight: 400; }
+
+/* The swap line's accessible label must be off-flow. Inside a flex row it took a slot and its
+   text sat under the pill. */
+body #shopUI #tray #t-form .swap-line > .sr-only,
+body #shopUI #tray #t-form .swap-line > .sr-only * {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+}
+
+/* The Guardhouse pay pane is a grid, and a grid cell's min-width is auto: the Payee field
+   refused to fill its column. It spans the row instead, which is what the reference shows. */
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-field,
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > label,
+body #shopUI #tray #t-form .guard-pane > .guard-field:has(#g-acct),
+body #shopUI #tray #t-form .guard-pane label:has(#g-acct) {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+body #shopUI #tray #t-form .guard-pane #g-acct { width: 100% !important; min-width: 0 !important; }
+
+/* Only the Payee needs the full row. The short fields after it pair two-up, as the reference
+   does for Chain/Asset and Amount/Gas, which is what brings the pay pane back inside the panel. */
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-field { grid-column: auto !important; }
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-field:has(#g-acct) { grid-column: 1 / -1 !important; }
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-split { grid-column: 1 / -1 !important; }
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-field { min-width: 0 !important; }
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-field input,
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-field select { width: 100% !important; min-width: 0 !important; }
+/* The tall field (a textarea or a long input) keeps its own row. */
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-field:has(textarea) { grid-column: 1 / -1 !important; }
+
+/* The header row's alignment: the illustration was 4px above the header box because the title's
+   line-height (48px) exceeded the badge's 44px. Centre every child on the row. */
+body #shopUI #tray > .t-scroll > .t-head { align-items: center !important; }
+body #shopUI #tray > .t-scroll > .t-head #t-title { align-items: center !important; height: auto !important; }
+body #shopUI #tray #t-title .panel-art { align-self: center !important; margin-top: 0 !important; }
+
+/* Two short guard fields share one row; the tall one (a textarea or the payee) keeps its own. */
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-field:not(:has(#g-acct)):not(:has(textarea)) {
+  grid-column: auto !important;
+}
+/* A field immediately followed by another short field pairs with it. */
+body #shopUI #tray #t-form .guard-pane[data-pane='pay'] > .guard-field + .guard-field {
+  grid-column: auto !important;
+}
+
+/* The Bank's tabs are .bank-tab and my tab rule listed it, but the Bank sheet sets its own
+   border to none with higher weight. Every inactive tab carries a visible border. */
+body #shopUI #tray #t-form .bank-tabs > .bank-tab,
+body #shopUI #tray .bank-tabs > .bank-tab {
+  border: 1px solid var(--c-border) !important;
+  background: rgba(0, 0, 0, .28) !important;
+  border-radius: var(--r-pill) !important;
+  color: var(--c-cream) !important;
+}
+body #shopUI #tray #t-form .bank-tabs > .bank-tab.on,
+body #shopUI #tray .bank-tabs > .bank-tab.on {
+  background: linear-gradient(180deg, var(--c-gold-1) 0%, var(--c-gold-2) 100%) !important;
+  border-color: transparent !important;
+  color: var(--c-ink) !important;
+}
+
+/* The header row holds its children on one line: the illustration never sits above it. */
+body #shopUI #tray > .t-scroll > .t-head,
+body #shopUI #tray > .t-scroll > .t-head #t-title {
+  align-items: center !important;
+  height: auto !important;
+  min-height: 48px;
+}
+body #shopUI #tray > .t-scroll > .t-head #t-title .panel-art { position: static !important; }
+
+/* Payouts Payroll and House heirs: their own lists pushed the last block over the action row.
+   The list scrolls inside itself, capped so the pane cannot grow past the panel. */
+body #shopUI #tray #t-form .plist { max-height: 176px; overflow-y: auto; overscroll-behavior: contain; }
+body #shopUI #tray #t-form .payout-row .field { min-width: 0; }
+
+/* A row inside a capped list must be shorter than the cap, or its last field paints past the
+   list's bottom edge and lands on whatever follows. The payroll row is one 62px field plus a
+   36px split; the heirs pane's note is clamped. Both now fit inside their own box. */
+body #shopUI #tray #t-form .plist li.payout-row {
+  padding: 6px 0 !important;
+  box-sizing: border-box;
+}
+body #shopUI #tray #t-form .plist .payout-split { margin-top: 5px !important; }
+body #shopUI #tray #t-form .plist li.payout-row .field { gap: 3px !important; }
+body #shopUI #tray #t-form .plist li.payout-row .field > span:first-child { font-size: 10px !important; line-height: 12px !important; }
+body #shopUI #tray #t-form .plist li.payout-row input,
+body #shopUI #tray #t-form .plist li.payout-row select { min-height: 32px !important; height: 32px !important; }
+
+/* The heirs pane's explanatory note: two lines maximum, so the pane's last block stays inside. */
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] .note,
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+}
+
+/* House heirs: four short readonly fields plus a 2x2 pair in one column came to 88px over the
+   panel. The pane is a two-column grid, the pair and the flow keep the full width, and the
+   explanatory note below is clamped to two lines. Same fields, same ids. */
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: var(--p2) var(--p3) !important;
+  align-items: start;
+}
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] > .ferry-flow,
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] > .house-pair { grid-column: 1 / -1 !important; }
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] > .field { min-width: 0 !important; }
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] > .field input { width: 100% !important; min-width: 0 !important; }
+
+/* The house pair is itself a 2x2 grid: tighten it so the whole pane fits. */
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] .house-pair { gap: 6px var(--p3) !important; }
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] .house-pair > .field { gap: 3px !important; }
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] .house-pair > .field > span:first-child { font-size: 11px !important; line-height: 13px !important; }
+body #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] .house-pair input { min-height: 34px !important; height: 34px !important; }
+
+/* The heirs compaction above is scoped to that pane; Deed and Vaults keep the roomy pair they
+   had. Their own pairs are restored here so nothing leaks between panes. */
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] .house-pair,
+body #shopUI #tray #t-form .ferry-pane[data-panel='vaults'] .house-pair {
+  gap: var(--p2) var(--p3) !important;
+}
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] .house-pair > .field,
+body #shopUI #tray #t-form .ferry-pane[data-panel='vaults'] .house-pair > .field { gap: 6px !important; }
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] .house-pair input,
+body #shopUI #tray #t-form .ferry-pane[data-panel='vaults'] .house-pair input { height: var(--h-field) !important; min-height: var(--h-field) !important; }
+
+/* Deed and Vaults were tight even before this pass; they pair their short fields too. */
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] > .field + .field,
+body #shopUI #tray #t-form .ferry-pane[data-panel='vaults'] > .field + .field { margin-top: 0; }
+
+/* Deed and Vaults get the same two-column treatment as heirs, and the deed's metadata block —
+   four lines of contract description — is clamped, because it was the tall block that pushed the
+   action out of the panel. The full text stays in the DOM. */
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'],
+body #shopUI #tray #t-form .ferry-pane[data-panel='vaults'] {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: var(--p2) var(--p3) !important;
+  align-items: start;
+}
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] > .ferry-flow,
+body #shopUI #tray #t-form .ferry-pane[data-panel='vaults'] > .ferry-flow,
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] > .house-pair,
+body #shopUI #tray #t-form .ferry-pane[data-panel='vaults'] > .house-pair,
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] > [data-testid='deed-meta'] { grid-column: 1 / -1 !important; }
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] > .field,
+body #shopUI #tray #t-form .ferry-pane[data-panel='vaults'] > .field { min-width: 0 !important; }
+body #shopUI #tray #t-form .ferry-pane[data-panel='deed'] > .field input,
+body #shopUI #tray #t-form .ferry-pane[data-panel='vaults'] > .field input { width: 100% !important; min-width: 0 !important; }
+
+/* The deed's metadata: the name and contract are enough at a glance; the description clamps. */
+body #shopUI #tray #t-form [data-testid='deed-meta'] { margin: 0; }
+body #shopUI #tray #t-form [data-testid='deed-meta'] p { margin: 0 0 2px; font-size: 11px; line-height: 15px; }
+body #shopUI #tray #t-form [data-testid='deed-meta'] p:last-child {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+body #shopUI #tray #t-form [data-testid='deed-meta'] .deed-mint a { margin-top: 4px; }
+
+/* ============================================================================================
+   22. THE HIDDEN GUARD — the one rule this file kept forgetting
+   --------------------------------------------------------------------------------------------
+   Three times now a layout rule in this file set `display` with !important on a pane and beat
+   the `hidden` attribute, so a hidden pane painted on top of the visible one. This is the last
+   rule in the file and the most specific, so nothing above it can win:
+       [data-pane][hidden]  and  [data-panel][hidden]  and any [hidden] inside the panel.
+   A hidden element is not rendered. That is a fact about the document, not a style choice.
+   ============================================================================================ */
+
+body #shopUI #tray [hidden],
+body #shopUI #tray [data-pane][hidden],
+body #shopUI #tray [data-panel][hidden],
+body #shopUI #tray .ferry-pane[hidden],
+body #shopUI #tray .guard-pane[hidden],
+body #shopUI #tray #t-form [hidden],
+body #shopUI #tray #t-form > *[hidden],
+body #shopUI #tray #t-form .ferry-pane[data-panel][hidden] {
+  display: none !important;
+}
+
+/* Payouts Payroll: "Add a row" sat at y=486 while the row's own content ran to 525, because the
+   button and the list are siblings inside the pane with no separation and the list's last row
+   extended past it. The list and the button are now separate blocks with a real gap. */
+body #shopUI #tray #t-form .plist { margin: 0 0 var(--p3) !important; }
+body #shopUI #tray #t-form #p-add { position: static !important; margin: 0 0 var(--p2) !important; }
+body #shopUI #tray #t-form [data-testid='payout-add-note'] { margin: 0 0 var(--p2) !important; }
+
+/* A list never paints over its own next sibling: the cap is the list's, and the row inside it is
+   always shorter than the cap. */
+body #shopUI #tray #t-form .plist li.payout-row { min-height: 0; }
+body #shopUI #tray #t-form .plist li.payout-row .payout-split { margin-bottom: 0; }
+
+/* The Payroll pane carried nine hardcoded grid rows (80/40/42/44/8/80/44/44/28) that no longer
+   matched its children after this pass, so the list and "Add a row" were placed in overlapping
+   rows. The pane sizes its own rows from its content, which is what a grid is for. */
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] {
+  grid-auto-rows: auto !important;
+  grid-template-rows: none !important;
+  align-items: start;
+  gap: var(--p2) !important;
+}
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > .plist { align-self: start; }
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > #p-add { align-self: start; }
+
+/* With the row compact, the list no longer needs its own cap: it is as tall as the rows it
+   holds, and the pane's grid places every sibling below it. A scroll area inside a scrolling
+   panel was the last thing making the list and the button disagree. */
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > .plist {
+  max-height: none !important;
+  overflow: visible !important;
+  height: auto !important;
+}
+
+/* Payroll holds six blocks: flow, status, the row list, Add a row, the paste field, and the two
+   actions. Compacting the paste field and the two actions is what brings it inside the panel at
+   1440 without hiding anything. */
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > #p-csv {
+  min-height: 40px !important;
+  height: 40px !important;
+  padding: 8px var(--p3) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > .field { gap: 3px !important; }
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > .field > span:first-child { font-size: 11px !important; line-height: 13px !important; }
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > button {
+  min-height: 40px !important;
+  height: 40px !important;
+  font-size: 13px !important;
+}
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > [data-testid='payout-status'] {
+  padding: 0 !important;
+  font-size: 11px !important;
+  line-height: 15px !important;
+}
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > .ferry-flow { padding: var(--p2) !important; }
+
+/* The Payroll pane's own last button ran 27px past the pane's bottom. The 80px flow strip is the
+   block to take it from: it is a summary, not a control, and the reference's strips are ~56px. */
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > .ferry-flow,
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > [data-testid='payout-flow'] {
+  padding: 6px var(--p3) !important;
+  min-height: 0 !important;
+  height: auto !important;
+  gap: 6px !important;
+}
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > .ferry-flow img,
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > [data-testid='payout-flow'] img {
+  width: 18px !important; height: 18px !important;
+}
+body #shopUI #tray #t-form .ferry-pane[data-pane='payroll'] > .ferry-flow .flow-cap { font-size: 10px !important; }

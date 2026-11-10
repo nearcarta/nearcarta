@@ -51,6 +51,116 @@ for (const W of [1440, 390]) {
 
         const vis = el => { const r = el.getBoundingClientRect(); return r.width > 2 && r.height > 2 && getComputedStyle(el).visibility !== 'hidden'; };
 
+        // --- the owner's round-3 items, each one a failing condition on its own ----------------
+
+        const problems = [];
+
+        // (a)(c) A token pill must show its full name and a chevron, never "M…NEAR…".
+        for (const pill of tray.querySelectorAll('.swap-line .token-listbox-btn, .swap-chain-row .token-listbox-btn')) {
+          if (!vis(pill)) continue;
+          const lab = pill.querySelector('.opt-label');
+          if (lab && lab.scrollWidth > lab.clientWidth + 1) problems.push(`PILL-TRUNCATED "${lab.textContent.trim()}"`);
+          const cs = getComputedStyle(pill, '::after');
+          const chev = cs.borderRightWidth !== '0px' && cs.transform !== 'none';
+          if (!chev) problems.push('PILL-NO-CHEVRON');
+        }
+
+        // (b) The From row is one bordered card: the pill, the amount and Max share a border.
+        const line = tray.querySelector('.swap-line');
+        if (line) {
+          const bw = parseFloat(getComputedStyle(line).borderTopWidth) || 0;
+          if (bw < 1) problems.push('FROM-NOT-ONE-CARD');
+          const pill = line.querySelector('.token-listbox');
+          const amt = line.querySelector('input');
+          const mx = line.querySelector('.swap-max');
+          for (const [name, el] of [['pill', pill], ['amount', amt], ['max', mx]]) {
+            if (!el) { problems.push(`FROM-MISSING-${name.toUpperCase()}`); continue; }
+            const r = el.getBoundingClientRect(), lr = line.getBoundingClientRect();
+            if (r.left < lr.left - 1 || r.right > lr.right + 1) problems.push(`FROM-${name.toUpperCase()}-OUTSIDE-CARD`);
+          }
+        }
+
+        // (d) The chain row is one line with a select and a Live badge, not a pill stack.
+        const chainRow = tray.querySelector('.swap-chain-row');
+        if (chainRow) {
+          const sel = chainRow.querySelector('select, .token-listbox-btn');
+          const live = chainRow.querySelector('.swap-live');
+          if (!sel) problems.push('CHAIN-NO-SELECT');
+          if (!live) problems.push('CHAIN-NO-LIVE');
+          if (sel && live) {
+            const a = sel.getBoundingClientRect(), b = live.getBoundingClientRect();
+            if (Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) > 14) problems.push('CHAIN-NOT-ONE-LINE');
+          }
+        }
+
+        // (e) The quote card is full width, readable, and says "Enter an amount" when empty.
+        const quote = [...tray.querySelectorAll('.swap-quote')].find(q => q.getBoundingClientRect().width > 2);
+        if (quote) {
+          const qr = quote.getBoundingClientRect();
+          const inner = tr.width - pad * 2;
+          if (qr.width < inner * 0.9) problems.push(`QUOTE-NARROW ${Math.round(qr.width / inner * 100)}%`);
+          const fs = parseFloat(getComputedStyle(quote.querySelector('p') || quote).fontSize) || 0;
+          if (fs < 12) problems.push(`QUOTE-TEXT ${fs}px`);
+          const txt = quote.textContent.replace(/\s+/g, ' ').trim();
+          if (quote.dataset.empty === '1' && !/enter an amount/i.test(txt)) problems.push('QUOTE-EMPTY-NOT-ASKING');
+        }
+
+        // (f) No token-search field in the main view.
+        { const f = tray.querySelector('#f-find'); if (f && f.getBoundingClientRect().width > 2) problems.push('FIND-TOKEN-IN-VIEW'); }
+
+        // (g) Review swap is the dominant gold; the sign-in control under it is outlined.
+        const review = [...tray.querySelectorAll('#f-quote')].find(q => q.getBoundingClientRect().width > 2);
+        const act = document.getElementById('t-act');
+        if (review && act && !act.hidden) {
+          const gold = (el) => /linear-gradient/.test(getComputedStyle(el).backgroundImage);
+          if (!gold(review)) problems.push('REVIEW-NOT-GOLD');
+          if (gold(act)) problems.push('SIGNIN-ALSO-GOLD');
+          if (review.getBoundingClientRect().height < 44) problems.push('REVIEW-TOO-SHORT');
+        }
+
+        // (h)(j) The header illustration sits inside the header row, never above the panel's top.
+        const art = tray.querySelector('#t-title .panel-art');
+        if (art) {
+          const ar = art.getBoundingClientRect();
+          const hr = (tray.querySelector('.t-head') || tray).getBoundingClientRect();
+          if (ar.top < hr.top - 1) problems.push('ART-ABOVE-HEADER');
+          if (ar.top < tr.top + 4) problems.push('ART-ON-PANEL-EDGE');
+          if (ar.width < 48) problems.push(`ART-${Math.round(ar.width)}px`);
+        }
+
+        // (i) The Payee field is full width and below the icon row.
+        const payee = tray.querySelector('#g-acct');
+        if (payee) {
+          const pr = payee.getBoundingClientRect();
+          const flow = tray.querySelector('#guard-flow');
+          const inner = tr.width - pad * 2;
+          if (pr.width < inner * 0.9) problems.push(`PAYEE-NARROW ${Math.round(pr.width / inner * 100)}%`);
+          if (flow) {
+            const fr = flow.getBoundingClientRect();
+            if (pr.top < fr.bottom - 2) problems.push('PAYEE-NOT-BELOW-FLOW');
+          }
+        }
+
+        // (k) The three checks read at 13px, not 11.
+        const checkItems = [...tray.querySelectorAll('.guard-check')];
+        if (checkItems.length) {
+          if (checkItems.length < 3) problems.push(`GUARD-CHECKS ${checkItems.length}`);
+          const fs = parseFloat(getComputedStyle(checkItems[0]).fontSize) || 0;
+          if (fs < 13) problems.push(`GUARD-TEXT ${fs}px`);
+        }
+
+        // ALL SHOPS: the CTA carries the shop's own glyph, not one check mark everywhere.
+        const glyph = [...tray.querySelectorAll('.primary')].map(el => getComputedStyle(el, '::before').maskImage || getComputedStyle(el, '::before').webkitMaskImage).filter(Boolean);
+        if (glyph.length && glyph.every(g => /tick-premium/.test(g))) problems.push('CTA-GLYPH-GENERIC');
+
+        // ALL SHOPS: inactive tabs are dark with a visible border; the active one is solid gold.
+        const tabsAll = [...tray.querySelectorAll('[role=tablist] > button, [role=tab]')].filter(vis);
+        const inactive = tabsAll.filter(t => t.getAttribute('aria-selected') !== 'true' && !t.classList.contains('on') && t.getAttribute('aria-pressed') !== 'true');
+        for (const t of inactive) {
+          const bw = parseFloat(getComputedStyle(t).borderTopWidth) || 0;
+          if (bw < 1) { problems.push('TAB-NO-BORDER'); break; }
+        }
+
         // The one gold CTA: the widest gradient-filled control that is NOT a tab. An active tab
         // legitimately carries the gold gradient, so counting it made the check fail on tabs
         // whose action is hidden (Hall Agents has nothing to sign, so it has no CTA at all).
@@ -99,12 +209,14 @@ for (const W of [1440, 390]) {
           hasQuest: !!document.getElementById('shop-quest'),
           hasFlow: !!document.querySelector('#shopUI #tray .flow-strip, #shopUI #tray #t-hero .flow-strip'),
           scrolls: tray.scrollHeight > tray.clientHeight + 1,
+          problems,
         };
       });
 
       total++;
       const bad = [];
       if (v.err) bad.push(v.err);
+      if (v.problems?.length) bad.push(...v.problems);
       if (v.truncated) bad.push('TRUNCATED');
       if (v.hasAction && v.primaryPct < 90) bad.push(`PRIMARY ${v.primaryPct}%`);
       if (v.overlaps?.length) bad.push('OVERLAP ' + v.overlaps.join(' | '));

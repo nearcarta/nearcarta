@@ -159,8 +159,10 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const defaultFromId = state.fromId || SESSION_SWAP.fromId;
   const defaultToId = state.toId || SESSION_SWAP.toId;
   const chainBox = pickerListbox({ id: 'f-chain', testid: 'ferry-chain-filter', options: chainOpts(choices), selected: state.chainFilter || '' });
-  const fromBox = pickerListbox({ id: 'f-from', testid: 'ferry-from', options: tokenOpts(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId }), selected: defaultFromId });
-  const toBox = pickerListbox({ id: 'f-to', testid: 'ferry-to', options: tokenOpts(choices, { q: state.tq || '', chain: '', selected: defaultToId }), selected: defaultToId });
+  // The pill shows the token's NAME, as the reference does ("wNEAR"), not "wNEAR on near": the
+  // chain is already the next row's job and the suffix is what forced the ellipsis.
+  const fromBox = pickerListbox({ id: 'f-from', testid: 'ferry-from', options: tokenOpts(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId }).map(o => ({ ...o, label: o.symbol || o.label })), selected: defaultFromId });
+  const toBox = pickerListbox({ id: 'f-to', testid: 'ferry-to', options: tokenOpts(choices, { q: state.tq || '', chain: '', selected: defaultToId }).map(o => ({ ...o, label: o.symbol || o.label })), selected: defaultToId });
   const pickFrom = String(defaultFromId).split('|');
   const pickSym = pickFrom[0] || meta.sym;
   const pickChain = pickFrom[1] || meta.chain;
@@ -247,7 +249,7 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
         ${rateLine}
       </div>` : `<div class="swap-quote" data-testid="ferry-quote-card" data-empty="1">
         <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
-        <p data-testid="swap-row-rate"><span>Rate</span><span>Press Review swap</span></p>
+        <p data-testid="swap-row-rate"><span>Rate</span><span>Enter an amount</span></p>
         <p data-testid="swap-row-fee"><span>Fee (est.)</span><span>—</span></p>
         <p data-testid="swap-row-route"><span>Route</span><span>—</span></p>
       </div>`}
