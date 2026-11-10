@@ -14,6 +14,9 @@ export function normalizeToken(row) {
     decimals: row.decimals ?? null,
     price: row.price ?? null,
     icon: typeof row.icon === 'string' ? row.icon.trim() : '',
+    // The NEP-141 id ("nep141:wrap.near"). A balance read needs the contract, and without this
+    // the panel could not tell which token to ask about.
+    assetId: typeof row.assetId === 'string' ? row.assetId : '',
   };
 }
 

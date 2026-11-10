@@ -125,7 +125,9 @@ function usdOf(line) {
 
 function tokenOpts(choices, { q = '', chain = '', selected = '' } = {}) {
   const list = filterTokens(choices || [], { q, chain });
-  const opts = list.map(t => ({ value: t.id, label: t.label, symbol: t.symbol, chain: t.chain, icon: t.icon || '' }));
+  // `assetId` is the NEP-141 id ("nep141:wrap.near"); a balance read needs it to know which
+  // contract to ask. It rides on the option and never shows in the pill.
+  const opts = list.map(t => ({ value: t.id, label: t.label, symbol: t.symbol, chain: t.chain, icon: t.icon || '', assetId: t.assetId || '' }));
   // A fallback row only when the catalog itself is empty. A search that hides the
   // current id must not paint that id back into the closed button.
   if (!opts.length && selected && !(choices || []).length) {
@@ -455,6 +457,15 @@ function mountFerry(root, hooks) {
       hooks.onPair({ from, to, amt: state.amt, fromSym: fs, fromChain: fc, toSym: ts, toChain: tc, order });
     };
     const clearQuote = () => { state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
+    // BALANCES ARE OFF. The reader and its tests work (app/src/panels/balance.js,
+    // backend/test/unit/balance.test.js), but the panel cannot reach a token's contract here:
+    // the catalogue entry that reaches this function carries no `assetId`, so every read fell
+    // through to the native-NEAR branch and the From card showed the NEAR balance labelled
+    // "wNEAR". A wrong number is worse than none, so the line stays empty until that is fixed.
+    const refreshBalances = async () => {
+      state.fromBal = '';
+      state.toBal = '';
+    };
     const onFrom = (value) => {
       state.fromEdited = true;
       state.fromId = value;
@@ -462,6 +473,7 @@ function mountFerry(root, hooks) {
       clearQuote();
       emitPair('jetty');
       localPaint();
+      refreshBalances();
     };
     const onTo = (value) => {
       state.toEdited = true;
@@ -469,6 +481,7 @@ function mountFerry(root, hooks) {
       clearQuote();
       emitPair('jetty');
       localPaint();
+      refreshBalances();
     };
     const swapBox = (sel, html) => {
       const el = q$(root, sel);
@@ -632,6 +645,9 @@ function mountFerry(root, hooks) {
     try {
       const rows = hooks.tokens ? await hooks.tokens() : await fetch(api() + '/api/ferry/tokens').then(r => r.json());
       state.choices = tokenChoices(Array.isArray(rows) ? rows : rows?.tokens || []);
+      // Now that the catalogue is here, the balances can be read for the side each picker shows:
+      // this is the first moment the panel knows which contracts to ask about.
+      refreshBalances();
       const fromUntouched = !state.fromEdited && (!state.fromId || state.fromId === 'USDC|base' || state.fromId === SESSION_SWAP.fromId);
       if (fromUntouched) {
         const pref = state.choices.find(t => t.id === SESSION_SWAP.fromId)
