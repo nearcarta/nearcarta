@@ -32,6 +32,7 @@ import * as bankModel from './bank-model.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as marketGuide from './market-guide.js';
+import * as marketLive from './market-live.js';
 import * as cp from './counterparty.js';
 import { view, viewAccount, txStatus, rpcStats } from './near.js';
 import { accountTxHashes, readLive } from './chronicle-live.js';
@@ -959,5 +960,6 @@ export function makeApp() {
   // Charters (factory) and Vault Arena: backend/src/vault.js
   vault.register(app, { limiter, globalCap });
   marketGuide.register(app, { limiter, globalCap });
+  marketLive.register(app, { limiter, globalCap });
   return app;
 }
