@@ -274,10 +274,34 @@ function weekTick() { if (!week || view !== 'week') return; const H = week.w.row
   const vote = week.w.events.find((e) => e.kind === 'rule'); const vm = body.querySelector('.md-wk-vote'); if (vote && vm) { vm.style.display = week.h >= vote.hour ? '' : 'none'; vm.setAttribute('x1', X(vote.hour - 1)); vm.setAttribute('x2', X(vote.hour - 1)); }
   const done = week.h >= H; body.querySelector('[data-w=end]').hidden = !done; body.querySelector('[data-act=wskip]').hidden = done;
   if (!done) week.raf = requestAnimationFrame(weekTick); }
+// First the real thing: the market's own history from the chain, replayed. Then a practice tail.
+let replay = null;
+const ago = (t) => { const m = Math.max(1, Math.round((Date.now() - t) / 60000)); return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+async function replayStart() {
+  replay = { events: null, i: 0, t0: performance.now(), raf: 0, err: '' };
+  try { const r = await fetch(API() + '/api/market/history', { signal: AbortSignal.timeout(9000) }); const j = await r.json(); replay.events = j.events || []; } catch { replay.events = []; replay.err = 'The history did not load.'; }
+  if (view === 'week') render();
+}
+function replayTick() {
+  if (!replay?.events || view !== 'week' || week) return; const body = root.querySelector('.md-body'); const feed = body.querySelector('[data-w=real]'); if (!feed) return;
+  const n = replay.events.length; replay.i = Math.min(n, Math.floor((performance.now() - replay.t0) / 350) + 1);
+  const shown = replay.events.slice(0, replay.i).slice(-5).reverse();
+  feed.innerHTML = shown.map((e) => `<div class="md-row static ${e.kind === 'refused' ? 'no' : ''}"><span class="md-nm"><b>${esc(e.line)}</b><small>${ago(e.t)}</small></span></div>`).join('');
+  body.querySelector('[data-w=count]').textContent = `${replay.i}/${n}`;
+  const done = replay.i >= n; body.querySelector('[data-act=wnext]').hidden = !done; body.querySelector('[data-act=wskip]').hidden = done;
+  if (!done) replay.raf = requestAnimationFrame(replayTick);
+}
+function vReplay() {
+  const ev = replay?.events;
+  return head(ICON.star, 'The market so far', 'Replayed from the chain') + `<div class="md-wk"><div class="md-wk-top"><span class="md-chip real">Real</span><span>Moves <b data-w="count">${ev ? `0/${ev.length}` : '…'}</b></span></div>
+  <div class="md-list" data-w="real">${ev ? '' : '<p class="md-hint" role="status">Reading the market…</p>'}</div>${replay?.err ? `<p class="md-hint no">${esc(replay.err)}</p>` : ''}
+  <button type="button" class="md-ghost sm" data-act="wskip" ${ev?.length ? '' : 'hidden'}>Skip to now</button><button type="button" class="md-gold" data-act="wnext" hidden data-testid="md-wnext">Practice the next week</button></div>`;
+}
 function vWeek() {
-  return head(ICON.star, 'A week in a minute', 'The city runs itself') + `<div class="md-wk"><div class="md-wk-top"><b data-w="clock">Day 1</b><span>Salt <b data-w="price"></b></span><span>Open <b data-w="open"></b></span></div>
+  if (!week) return vReplay();
+  return head(ICON.star, 'Practice: the next week', 'A preview. Nothing here is sent') + `<div class="md-wk"><div class="md-wk-top"><span class="md-chip practice">Practice</span><b data-w="clock">Day 1</b><span>Salt <b data-w="price"></b></span><span>Open <b data-w="open"></b></span></div>
   <svg class="md-wk-chart" viewBox="0 0 300 96" preserveAspectRatio="none" aria-label="Salt price over the week"><line class="md-wk-vote" x1="0" x2="0" y1="4" y2="92" style="display:none"/><polyline class="md-wk-line" points=""/></svg>
-  <div class="md-list" data-w="feed"></div><p class="md-hint" data-w="end" hidden>A week passed. No patch, no developer: prices followed the shelves, and the council changed a rule.</p>
+  <div class="md-list" data-w="feed"></div><p class="md-hint" data-w="end" hidden>Practice: a week passed. No patch, no developer: prices followed the shelves, and the council changed a rule.</p>
   <button type="button" class="md-ghost sm" data-act="wskip">Skip to the end</button></div>`;
 }
 let signStage = 'email', signEmail = '', signErr = '';
@@ -302,19 +326,20 @@ root.addEventListener('submit', async (e) => {
 function render() {
   const body = root.querySelector('.md-body');
   body.innerHTML = view === 'signin' ? vSign() : view === 'bag' ? vBag() : view === 'ask' ? vAsk() : view === 'receipt' ? vReceipt() : view === 'keeper' ? vKeeper() : view === 'week' ? vWeek() : '';
-  if (view === 'week') { cancelAnimationFrame(week?.raf || 0); if (!week || week.done) weekStart(); else weekTick(); }
+  if (view === 'week') { cancelAnimationFrame(week?.raf || 0); cancelAnimationFrame(replay?.raf || 0); if (!week) { if (!replay) replayStart(); else replayTick(); } else weekTick(); }
 }
 
 root.addEventListener('click', (ev) => {
   const b = ev.target.closest('[data-act],[data-v]'); if (!b || b.disabled) return;
-  if (b.dataset.v) { if (guiding || walking) return; if (b.dataset.v === 'week') week = null; view === b.dataset.v ? close() : open(b.dataset.v); if (view === 'ask') setTimeout(() => root.querySelector('.md-say input')?.focus(), 60); return; }
+  if (b.dataset.v) { if (guiding || walking) return; if (b.dataset.v === 'week') { week = null; replay = null; } view === b.dataset.v ? close() : open(b.dataset.v); if (view === 'ask') setTimeout(() => root.querySelector('.md-say input')?.focus(), 60); return; }
   if (b.dataset.act === 'ask') { ask(b.dataset.text || root.querySelector('.md-say input')?.value || ''); return; }
   const a = b.dataset.act;
   try {
     if (a === 'close') close();
     else if (a === 'practice') { R.live.practice = 1; try { localStorage.setItem('nearcarta.marketday.live', JSON.stringify(R.live)); } catch {} close(); }
     else if (a === 'go') go();
-    else if (a === 'wskip') { if (week) { week.t0 = performance.now() - 60000; weekTick(); } return; }
+    else if (a === 'wskip') { if (week) { week.t0 = performance.now() - 60000; weekTick(); } else if (replay) { replay.t0 = -1e9; replayTick(); } return; }
+    else if (a === 'wnext') { weekStart(); render(); return; }
     else if (a === 'claim') toast(`Claimed ${coins(S.claim(city, ME, b.dataset.shop))} coins`);
     else if (a === 'craft') { S.craft(city, ME, b.dataset.item); toast(`Crafted a ${GOOD(b.dataset.item).toLowerCase()}`); }
     save(); hud(); refresh();

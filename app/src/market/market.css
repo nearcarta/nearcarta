@@ -243,3 +243,11 @@ body.qs-gold #tray .primary:not(.qs-go), body.qs-gold #tray .cta:not(.qs-go), bo
 #marketday .md-gold:hover { background: var(--md-gold-hi); }
 .md-sheet [data-act="practice"] { display: block; margin: 12px auto 0; }
 .md-hint.no { color: #f0a08a; }
+/* Fast-forward: the real history first, then a practice tail that says so */
+.md-chip { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 12px; font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.md-chip.real { background: rgba(120,190,120,.16); color: #a8dca0; border: 1px solid rgba(168,220,160,.4); }
+.md-chip.practice { background: rgba(247,213,126,.1); color: var(--md-gold-hi); border: 1px dashed var(--md-gold); }
+.md-row.no b { color: #f0a08a; }
+.md-wk [data-act="wnext"] { align-self: stretch; margin-top: 12px; }
+/* One gold button per view: while a sheet is open, the dock's Go steps back. */
+body.md-sheet-open #marketday .md-go { background: transparent !important; color: var(--md-gold-hi); box-shadow: inset 0 0 0 1px var(--md-line); animation: none !important; }
