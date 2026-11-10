@@ -170,8 +170,8 @@ function stripHtml(id) {
     if (done === 'cargo') sub = `3 salt from the berths, no swap needed<br>${receiptLine(lastDone.step, r)}`;
     if (done === 'cross') sub = `Toll: 1 coin, taken at the sale<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
     if (done === 'check') sub = `✓ Square keeper: cleared<br>✗ Stranger: refused, not on your list<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
-    if (done === 'seal') sub = `Check passed · the amount stays hidden<br><span class="qs-chip">Practice, no spend</span>`;
-    if (done === 'pay') sub = `3 coins to your porter · invoice #${Q.state(city).day} kept<br><span class="qs-chip">Practice, no spend</span>`;
+    if (done === 'seal') sub = `Check passed · the amount stays hidden<br>On chain the Bank logs only a fingerprint: <a class="qs-proof" href="${pr0.url}" target="_blank" rel="noopener">Bank anchor ↗</a> · ${pr0.cost} NEAR gas, paid by the Bank<br><span class="qs-chip">Your seal: practice, no spend</span>`;
+    if (done === 'pay') sub = `Paid to: your porter · 3 coins from your purse · invoice #${Q.state(city).day} kept<br><span class="qs-chip">Practice, no spend</span>`;
     if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
     return { gold: true, html: row(okMark, r.line, sub, gold('next', nx ? `Next: ${NAME[nx.shop]}` : 'Back to town')) + extra };

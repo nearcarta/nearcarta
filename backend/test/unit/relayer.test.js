@@ -54,7 +54,7 @@ test('relayer: sponsored first session funds a new implicit account once, tops u
   const id = 'a'.repeat(64);
   const r = await session(id, { acc, viewAcc: async () => { throw new Error('missing'); }, storageOf: async () => 0n });
   assert.equal(r.ok, true); assert.deepEqual(r.txs, ['F1', 'S1']); assert.equal(calls[0][0], 'transfer'); assert.equal(calls[1][1], 'storage_deposit');
-  const again = await session(id, { acc, viewAcc: async () => ({}), storageOf: async () => 5n * 10n ** 21n });
+  const again = await session(id, { acc, viewAcc: async () => ({}), storageOf: async () => 8n * 10n ** 21n });
   assert.equal(again.already, true);
   // Low after a day of play: topped back up to the session amount, no second transfer.
   const low = await session(id, { acc, viewAcc: async () => ({}), storageOf: async () => 7n * 10n ** 20n });

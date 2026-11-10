@@ -19,3 +19,11 @@ test('precheck: selling needs the goods, unless they are gathered in the same ba
   assert.equal(precheck([{ method: 'sell', args: { good: 'good:salt', qty: 4 } }], base).why, 'ERR_PRECHECK_BAG');
   assert.equal(precheck([{ method: 'sell', args: { good: 'good:salt', qty: 3, keep: true } }, { method: 'purse', args: { action: 'invest', amount: String(M) } }], base).ok, true);
 });
+test('precheck: an invest or a stall with too little market storage is never sent', () => {
+  const rich = { ...base, purse: 5n * M };
+  const inv = [{ method: 'purse', args: { action: 'invest', amount: String(M), shop: 'ferry' } }];
+  assert.equal(precheck(inv, { ...rich, storage: 3240n * 10n ** 18n }).why, 'ERR_PRECHECK_STORAGE');
+  assert.equal(precheck(inv, { ...rich, storage: 12n * M }).ok, true);
+  assert.equal(precheck(inv, rich).ok, true); // storage unread: the move goes
+  assert.equal(precheck([{ method: 'stall', args: { stall: 1, action: 'rent' } }], { ...rich, storage: M }).why, 'ERR_PRECHECK_STORAGE');
+});

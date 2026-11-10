@@ -25,7 +25,7 @@ export const conf = () => ({
   // A whole Market Day (bag, purse, a stall, a share) stores about 0.011 NEAR of data on the market.
   sessionStorage: toYocto(process.env.SESSION_STORAGE_NEAR || '0.012'),
   // Below this, a returning visitor's market storage is topped back up to sessionStorage (same caps).
-  storageLow: toYocto(process.env.SESSION_STORAGE_LOW_NEAR || '0.003'),
+  storageLow: toYocto(process.env.SESSION_STORAGE_LOW_NEAR || '0.006'),
   // Sponsored gas one visitor may burn per UTC day.
   visitorNear: toYocto(process.env.RELAY_VISITOR_NEAR || '0.003'),
 });
@@ -64,8 +64,8 @@ const failure = (r) => { for (const o of [r?.transaction_outcome, ...(r?.receipt
 export async function marketState(c, me, calls) {
   try {
     const goods = goodsOf(calls);
-    const [sq, bals] = await Promise.all([view(c.market, 'square', { account_id: me }), goods.length ? view(c.market, 'mt_batch_balance_of', { account_id: me, token_ids: goods }) : []]);
-    return { purse: sq.purse, rules: sq.rules, stalls: sq.stalls, me, now_ns: BigInt(Date.now()) * 1_000_000n, bag: Object.fromEntries(goods.map((g, i) => [g, Number(bals[i] || 0)])) };
+    const [sq, bals, storage] = await Promise.all([view(c.market, 'square', { account_id: me }), goods.length ? view(c.market, 'mt_batch_balance_of', { account_id: me, token_ids: goods }) : [], view(c.market, 'storage_balance_of', { account_id: me }).catch(() => null)]);
+    return { purse: sq.purse, storage, rules: sq.rules, stalls: sq.stalls, me, now_ns: BigInt(Date.now()) * 1_000_000n, bag: Object.fromEntries(goods.map((g, i) => [g, Number(bals[i] || 0)])) };
   } catch { return null; }
 }
 const callsOf = (d) => d.actions.map((a) => { let args = {}; try { args = JSON.parse(Buffer.from(Uint8Array.from(a.functionCall.args)).toString('utf8')); } catch {} return { method: a.functionCall.methodName, args }; });

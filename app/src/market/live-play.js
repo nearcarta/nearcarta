@@ -33,7 +33,7 @@ export async function coins() { return live.account ? purse() : null; }
 async function bal(token) { try { return BigInt(await (await lib()).view('mt_balance_of', { account_id: live.account, token_id: token })); } catch { return 0n; } }
 const record = (step, what, r) => { live.txs ||= []; live.txs.push({ step, what, hash: r.hash, burnt: r.burnt_near }); save(); return r; };
 // Same balance pre-check as the relayer: a move the market would refuse is never sent.
-const PRE = { ERR_PRECHECK_PURSE: 'Not enough coins in your purse yet. Sell more first.', ERR_PRECHECK_BAG: 'Not enough goods in your bag.', ERR_PRECHECK_STALL_TAKEN: 'Someone holds that stall.', ERR_PRECHECK_NOT_HOLDER: 'Rent the stall first.' };
+const PRE = { ERR_PRECHECK_PURSE: 'Not enough coins in your purse yet. Sell more first.', ERR_PRECHECK_BAG: 'Not enough goods in your bag.', ERR_PRECHECK_STALL_TAKEN: 'Someone holds that stall.', ERR_PRECHECK_STORAGE: 'Getting your market space ready. Press again in a moment.', ERR_PRECHECK_NOT_HOLDER: 'Rent the stall first.' };
 async function guard(L, calls) {
   const list = Array.isArray(calls) ? calls : [calls]; const goods = goodsOf(list);
   let st; try {
