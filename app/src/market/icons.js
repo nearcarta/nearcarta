@@ -8,7 +8,7 @@ export const ICON = {
   tool: S('<path d="M14 6l4 4-9 9-4-4z"/><path d="M14 6l2-2 4 4-2 2"/>'),
   tonic: S('<path d="M10 3h4M10 3v5l-4 8a3 3 0 0 0 3 5h6a3 3 0 0 0 3-5l-4-8V3"/><path d="M8 15h8"/>'),
   share: S('<path d="M4 20V10l8-6 8 6v10z"/><path d="M9 20v-6h6v6"/>'),
-  coin: S('<circle cx="12" cy="12" r="8"/><path d="M9 15V9l6 6V9"/>'),
+  coin: S('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.5"/>'),
   bag: S('<path d="M5 8h14l-1 12H6z"/><path d="M9 8a3 3 0 0 1 6 0"/>'),
   market: S('<path d="M3 9l2-5h14l2 5"/><path d="M4 9v11h16V9"/><path d="M3 9h18M9 20v-6h6v6"/>'),
   quest: S('<path d="M6 3h10l3 3v15H6z"/><path d="M9 9h7M9 13h7M9 17h4"/>'),

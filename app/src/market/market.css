@@ -218,3 +218,4 @@ body.qs-gold #tray .primary:not(.qs-go), body.qs-gold #tray .cta:not(.qs-go), bo
 .md-hud .md-purse { height: 40px; padding: 0 12px; border: 0; border-radius: 20px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .md-hud .md-purse:hover, .md-hud .md-purse.on { background: rgba(247,213,126,.08); }
 #tray .qs .qs-rc { color: var(--md-muted, #b9a27a); }
+.md-sheet .md-hint a { color: var(--md-gold-hi, #f7d57e); }
