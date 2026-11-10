@@ -599,3 +599,7 @@ body:not(.ferry-tray) #shopUI #tray #t-form #house-cta {
   height: 48px !important;
   width: 100% !important;
 }
+
+/* Hall's last 6px. The two content tabs were 2px and 6px taller than their column; the tabs row's
+   own bottom gap covers it without touching a field, a font or a handler. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-tabs { margin-bottom: -8px !important; }

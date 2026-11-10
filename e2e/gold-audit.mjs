@@ -8,7 +8,8 @@ const SHOPS = process.argv.slice(2).length ? process.argv.slice(2)
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 
 for (const shop of SHOPS) {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const VW = Number(process.env.VW || 1440), VH = VW === 390 ? 844 : 900;
+  const page = await browser.newPage({ viewport: { width: VW, height: VH } });
   await page.goto('http://localhost:5173/', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1600);
   await page.evaluate((shop) => {
