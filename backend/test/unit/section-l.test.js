@@ -24,7 +24,7 @@ test('a missing charter list and a missing account do not throw', () => {
   assert.equal(Array.isArray(null) ? null : [].length, 0);
 });
 
-test('the hall form prefills the row cap and signs set_rules with no deposit', () => {
+test('the hall form prefills the row cap and signs set_rules with 1 yocto', () => {
   const y = yoctoOf(0.005);
   const row = normalizeRow({ owner: 'visitor.near', row: { owner: 'visitor.near', per_action_cap: y, daily_budget: yoctoOf(0.02), max_actions_per_day: 3, receivers: ['cafe.near'], frozen: false, sealed: false } });
   assert.equal(nearOf(row.per_action_cap), 0.005);
@@ -34,7 +34,7 @@ test('the hall form prefills the row cap and signs set_rules with no deposit', (
   const next = draftFrom(row, { capNear: '0.003' });
   const calls = callsFor(row, next);
   assert.equal(calls[0].method, 'set_rules');
-  assert.equal(calls[0].deposit, '0');
+  assert.equal(calls[0].deposit, '1');
   assert.equal(rowOwner({ preview: true, owner: 'visitor.near' }).owner, 'visitor.near');
   assert.equal(rowOwner({ preview: true }).owner, null);
 });

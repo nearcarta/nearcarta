@@ -28,7 +28,7 @@ if [ "$BUILD" = nep330 ]; then
     --env NEP330_BUILD_INFO_SOURCE_CODE_SNAPSHOT="git+https://github.com/nearcarta/nearcarta?rev=$REV" \
     --env NEP330_BUILD_INFO_CONTRACT_PATH="$CP" \
     --env NEP330_LINK="https://github.com/nearcarta/nearcarta/tree/$REV" \
-    --env RUST_LOG=info "$IMG@$DIG" /bin/bash -c "$CMD"
+    --env RUST_LOG=info "$IMG@$DIG" /bin/bash -c "$CMD && chmod -R a+rX target/near"
   cp "$(ls "$W/$CP"/target/near/*.wasm | head -1)" "$OUT/$ACC.wasm"
 elif [ "$BUILD" = box ]; then
   WASM_OPT=${WASM_OPT:-wasm-opt}

@@ -1,6 +1,6 @@
 # Next board deploy
 
-The board source on main carries B1–B5 from `docs/AUDIT.md`. It is not deployed yet: it ships with the
+The board source on main carries B1–B5 from `docs/AUDIT.md`. **Deployed 2026-11-10 (nep330 build of f44da703).** It shipped with the
 next board deploy the game work needs, so the board is redeployed once.
 
 Until then the live board still has B1 (an effects set/clear cycle can draw down the board's free
