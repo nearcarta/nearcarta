@@ -1291,3 +1291,75 @@ body.bank-tray #shopUI #tray .bank-file-name {
   body.hall-tray #shopUI #tray > .t-row { margin-top: 10px !important; }
   body.hall-tray #shopUI #tray > .t-links { margin-top: 6px !important; }
 }
+
+/* ============================================================================================
+   Measured at 89267bd3 — the last three
+   ============================================================================================ */
+
+/* 1. The 390 bar as ONE flex row. The hardcoded `right: 92px` put the dock's edge at 298 while
+      All shops started at 288, a 10px overlap on every shop. These three take their widths from
+      their own content in a single row with an 8px gap, so no label length can collide. */
+@media (max-width: 480px) {
+  body.in-shop #shopUI {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px 0;
+    box-sizing: border-box;
+  }
+  body.in-shop #shopUI > #back,
+  body.in-shop #shopUI > [id$='-agent-dock'],
+  body.in-shop #shopUI > nav.all-shops,
+  body.in-shop #shopUI > #shopUI > * { position: static !important; }
+
+  /* Order and shrink: Back, then the dock, then All shops; each keeps its own width. */
+  body.in-shop #shopUI > #back { order: 1; flex: 0 0 auto; width: auto !important; }
+  body.in-shop #shopUI > [id$='-agent-dock'] { order: 2; flex: 0 0 auto; margin-left: auto; right: auto !important; left: auto !important; top: auto !important; }
+  body.in-shop #shopUI > nav.all-shops { order: 3; flex: 0 0 auto; width: auto !important; top: auto !important; right: auto !important; left: auto !important; margin: 0 !important; }
+
+  /* The tray is the only thing that takes the remaining height. */
+  body.in-shop #shopUI > #tray {
+    position: fixed !important;
+    top: 48px !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    width: auto !important;
+  }
+}
+
+/* 2. Bank at 390 scrolled once the file row went full width. The button and the name share one
+      line inside the row, "Or paste" is a compact two-row box, and the gaps tighten — so the
+      footer is visible with no internal scroll. */
+@media (max-width: 480px) {
+  body.bank-tray #shopUI #tray .bank-file-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px !important;
+    min-height: 40px;
+  }
+  body.bank-tray #shopUI #tray .bank-file-row .bank-file-btn { flex: 0 0 auto; height: 28px; padding: 0 10px; }
+  body.bank-tray #shopUI #tray .bank-file-row .bank-file-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 11px;
+  }
+  body.bank-tray #shopUI #tray #bank-paste,
+  body.bank-tray #shopUI #tray textarea[data-testid='bank-paste'] {
+    min-height: 40px !important;
+    height: 40px !important;
+    font-size: 12px !important;
+    line-height: 16px !important;
+    padding: 6px 8px !important;
+  }
+  body.bank-tray #shopUI #tray .bank-split { gap: 8px !important; }
+  body.bank-tray #shopUI #tray .field { gap: 3px !important; }
+  body.bank-tray #shopUI #tray .choice-label { margin-bottom: 2px !important; font-size: 11px !important; }
+  body.bank-tray #shopUI #tray > .t-row { margin-top: 10px !important; }
+}

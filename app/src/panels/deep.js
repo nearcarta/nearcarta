@@ -1031,10 +1031,39 @@ function installAgentSheetClose(root) {
   const scan = () => doc.querySelectorAll("[id$='-agent-pop']").forEach(wire);
   scan();
 
+  // Docks render their popups lazily, so watch #shopUI for any that appear after mount.
   const host = doc.getElementById('shopUI') || doc.body;
   if (host && typeof MutationObserver === 'function' && !globalThis.__NC_AGENT_CLOSE_OBS) {
     globalThis.__NC_AGENT_CLOSE_OBS = new MutationObserver(scan);
     globalThis.__NC_AGENT_CLOSE_OBS.observe(host, { childList: true, subtree: true });
+  }
+
+  // ONE Escape listener, on window, in the capture phase, registered as soon as the first shop
+  // mounts — so it runs before city.js's "leave the shop" handler. Whether a sheet is open is
+  // decided by what is actually on screen, not by the `hidden` attribute alone: some docks hide
+  // theirs with a class or `display`, and that is why the earlier check missed them. When a
+  // sheet is open, Escape goes through the very same button.agent-pop-close the visitor clicks.
+  if (typeof window !== 'undefined' && !globalThis.__NC_AGENT_ESC) {
+    globalThis.__NC_AGENT_ESC = true;
+    const isShown = (el) => {
+      if (!el || el.hidden) return false;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+      return el.offsetParent !== null || cs.position === 'fixed';
+    };
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const pops = [...doc.querySelectorAll("[id$='-agent-pop']")].filter(isShown);
+      if (!pops.length) return;            // nothing open: city.js may leave the shop
+      const pop = pops[pops.length - 1];
+      const btn = pop.querySelector('button.agent-pop-close');
+      if (btn) btn.click();
+      else pop.hidden = true;
+      // Swallow it completely: neither the sheet's own handler nor the leave-the-shop one runs.
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+    }, true);
   }
 }
 
