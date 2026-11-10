@@ -4,8 +4,9 @@
 //   node scripts/keepers-round.js restock <shop> --live             send it through the keeper's board row
 //   node scripts/keepers-round.js propose <shop> <rule> <value> "<why>" [--live]
 //   node scripts/keepers-round.js vote <shop> [--live]
-// restock: propose_call_as signed by the row's agent key and sent with that key (a function-call key
-// on the board). council: a direct market call by the keeper, signed with its account key.
+// restock: propose_call_as signed by the row's agent key. Anyone may submit it (the signature is the
+// authority), so the city account sends it and pays the gas; the keeper's row pays the stock.
+// council: a direct market call by the keeper, signed with its account key.
 // Keys come from KEY_DIR (chmod 600 files) and are never printed. Stops when a cost runs >10% over.
 import { readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -58,9 +59,9 @@ if (cmd === 'restock') {
     const expiry = BigInt(Date.now()) * 1_000_000n + 600_000_000_000n;
     const agent = keyFrom(agentOf(acct).private_key);
     const signature = signMessage(agent, callAsMessage({ network: 'mainnet', contract: BOARD, owner: acct, receiver: MARKET, method: call.method, args: call.args, deposit: call.deposit, nonce: row.nonce, expiry, epoch, effects: [], hold: false }));
-    const gas = 150n * TG; const c = await costCheck(gas, 0n);
-    out.call = { ...call, row_nonce: row.nonce, epoch, gas: '150 Tgas', worst_gas_near: near(c.worst), paid_from_row_near: near(call.deposit) };
-    if (live) out.tx = await send(acct, agentOf(acct).private_key, BOARD, [A.functionCall('propose_call_as', { owner: acct, receiver: MARKET, method: call.method, args: call.args, deposit: call.deposit, expiry: String(expiry), effects: [], hold: false, signature }, gas, 0n)], c.worst);
+    const gas = 100n * TG; const c = await costCheck(gas, 0n);
+    out.call = { ...call, row_nonce: row.nonce, epoch, gas: '100 Tgas', submitter: ROOT, worst_gas_near: near(c.worst), paid_from_row_near: near(call.deposit) };
+    if (live) out.tx = await send(ROOT, process.env.NEAR_MAIN_PRIVATE_KEY, BOARD, [A.functionCall('propose_call_as', { owner: acct, receiver: MARKET, method: call.method, args: call.args, deposit: call.deposit, expiry: String(expiry), effects: [], hold: false, signature }, gas, 0n)], c.worst);
   }
 } else if (cmd === 'propose' || cmd === 'vote') {
   const sq = await view(MARKET, 'square', {});
@@ -78,7 +79,7 @@ if (cmd === 'restock') {
     if (d.reply) msg = { yes: d.reply.yes, decision: d.completion_id };
   }
   if (msg) {
-    const gas = 30n * TG; const c = await costCheck(gas, 0n);
+    const gas = 10n * TG; const c = await costCheck(gas, 0n);
     out.call = { method: 'council', args: msg, worst_gas_near: near(c.worst) };
     if (live) out.tx = await send(acct, keeperKey(acct), MARKET, [A.functionCall('council', msg, gas, 0n)], c.worst);
   }
