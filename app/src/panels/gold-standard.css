@@ -452,3 +452,57 @@ body:not(.ferry-tray) #shopUI #tray > .t-scroll { gap: 8px !important; }
 body:not(.ferry-tray) #shopUI #tray #t-form .hall-tabs { margin-bottom: 0 !important; }
 body:not(.ferry-tray) #shopUI #tray #t-form .hall-field input,
 body:not(.ferry-tray) #shopUI #tray #t-form .hall-field select { min-height: 36px !important; height: 36px !important; }
+
+/* ============================================================================================
+   The one gold action is the SHOP's own action, as Swap has Review swap gold and Sign in
+   outlined. The shared layer had this inverted: it demoted each shop's in-form action and left
+   the panel CTA gold. On every shop the shop action keeps the gradient; the panel CTA — which is
+   "Sign in" whenever nobody is signed in — becomes the outlined secondary.
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]) {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  border-radius: var(--r-cta) !important;
+}
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]):hover {
+  border-color: var(--gs-gold-2) !important;
+  background: rgba(255, 255, 255, .06) !important;
+  filter: none;
+}
+
+/* And the shop's own action is the gold one, wherever a shop declares it. */
+body:not(.ferry-tray) #shopUI #tray #t-form .primary,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-pane #g-check,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form #p-create,
+body:not(.ferry-tray) #shopUI #tray #t-form #p-prep,
+body:not(.ferry-tray) #shopUI #tray #t-form .arena-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form .bank-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form .toll-cta {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  width: 100% !important;
+  border-radius: var(--r-cta) !important;
+}
+
+/* Arena: the field groups take the Swap rhythm, and the label span above is now a real box. */
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field { gap: 6px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field > .lbl {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--gs-muted);
+}
+body:not(.ferry-tray) #shopUI #tray #t-form .arena-modes + * { margin-top: 0; }

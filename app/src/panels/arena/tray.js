@@ -25,7 +25,9 @@ function flow(left, right) {
 }
 
 function field(label, control) {
-  return `<label class="ferry-field">${esc(label)}${control}</label>`;
+  // The label is its own element, the way Swap's labels are, so the shared field rule can put it
+  // above the control. A bare text node had no box for that rule to measure.
+  return `<label class="ferry-field"><span class="lbl">${esc(label)}</span>${control}</label>`;
 }
 
 function input(name, value, placeholder) {
