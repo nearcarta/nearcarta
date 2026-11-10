@@ -2,7 +2,7 @@
 // API and the tests. The rule: only zero-deposit Market Day moves, and NEAR spends only through a board
 // row, so the relayer can never be used to move anyone's NEAR or to call anything else.
 export const TGAS = 10n ** 12n;
-export const MARKET_DIRECT = ['gather', 'sell', 'craft', 'fill_order', 'cancel_order', 'claim'];
+export const MARKET_DIRECT = ['gather', 'sell', 'craft', 'fill_order', 'cancel_order', 'claim', 'purse', 'stall'];
 export const MARKET_VIA_BOARD = ['buy', 'invest', 'post_order', 'restock'];
 
 export function policy({ market, board }) {
@@ -38,13 +38,22 @@ export function checkDelegate(sd, pol, { height } = {}) {
   return { ok: true, gas };
 }
 
-/** The access key the delegate names must be a function-call key on the same receiver, and the nonce fresh. */
-export function checkKey(key, d) {
+/**
+ * The access key the delegate names must be fresh (nonce) and either a function-call key on the same
+ * receiver, or the one full-access key of an implicit account (an email-login wallet: the account id is
+ * the hex of that key). The full key is accepted only because checkDelegate already limits the actions to
+ * zero-deposit market moves, so it can spend no NEAR here either.
+ */
+export function checkKey(key, d, pkHex) {
   if (!key) return { ok: false, why: 'ERR_NO_KEY' };
   const p = key.permission;
-  if (p === 'FullAccess' || !p?.FunctionCall) return { ok: false, why: 'ERR_FULL_ACCESS_KEY' };
-  if (p.FunctionCall.receiver_id !== d.receiverId) return { ok: false, why: 'ERR_KEY_RECEIVER' };
   if (BigInt(d.nonce) <= BigInt(key.nonce)) return { ok: false, why: 'ERR_NONCE' };
+  if (p === 'FullAccess') {
+    if (pkHex && /^[0-9a-f]{64}$/.test(d.senderId) && d.senderId === pkHex) return { ok: true, implicit: true };
+    return { ok: false, why: 'ERR_FULL_ACCESS_KEY' };
+  }
+  if (!p?.FunctionCall) return { ok: false, why: 'ERR_FULL_ACCESS_KEY' };
+  if (p.FunctionCall.receiver_id !== d.receiverId) return { ok: false, why: 'ERR_KEY_RECEIVER' };
   return { ok: true };
 }
 
