@@ -70,7 +70,7 @@ Status: live. The nine keepers are NEAR sub-accounts with board rows. Keepers re
 | At Your House press **Invest 10** | The Ferry, dark after spending its till on your cargo, lights up again, and a Ferry share goes into your bag |
 | Open the bag after the Ferry sells | The share row shows a **Claim** button for your part of its sales |
 
-Status: owning a stall in the Arena square is next.
+Status: live. A player rents an Arena stall from their purse and holds it on chain for 7 days (`stall` on arena.nearcarta.near). Proof: a fresh account sold 3 salt into its purse ([GecJPUaL…](https://nearblocks.io/txns/GecJPUaLsbXfKbjHSRQJAUj2BFzQ1iPpVqaovGNxg6M7)), rented stall 1 ([8JxnSuDg…](https://nearblocks.io/txns/8JxnSuDgv3C2ghkcPFqRmS3AuP8JQqwDWaeNafuzFkun)) and bought a Ferry share from the purse ([3BFDcPwr…](https://nearblocks.io/txns/3BFDcPwrfu64LATzbUyh868e6jWMaJTHDEPHxm7mfaeq)).
 
 ### Economy evolves without a dev patch
 
@@ -89,7 +89,7 @@ Status: live. The nine keepers form the market council on chain (quorum 5). Each
 | Play the whole day | Coins, a purse, a stall, a share. No wallet popup, no hash, no gas prompt in the main flow |
 | Tap the purse in the top bar | The Receipt: each finished step, and a quiet **Record** link to its real mainnet transaction for those who want proof |
 
-Status: email sign-in and relayer-sponsored gas for real (non-practice) moves are next. Judges: every proof is on `/judge`.
+Status: sponsored gas is live. Each real move is signed by the player and sent by relayer.nearcarta.near, which pays the gas within caps per visitor and per day. In the prod run above, the player's NEAR stayed at 0.003 from the first move to the last ([2TXeZ4hR…](https://nearblocks.io/txns/2TXeZ4hRu2EB4zw9cG6zdq9jgfswKRQs6BwRu1K1uPRM) gather, sell, stall, invest). Email sign-in (Privy) is built and is being confirmed with a real inbox. Judges: every proof is on `/judge`.
 
 ---
 
