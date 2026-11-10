@@ -122,7 +122,7 @@ export function mountHouseRoom(root, hooks = {}) {
     if (cta) {
       // Signed out: the gold button used to say "I'm alive" and only then admit Sign in.
       // Name the real next step so the press matches the label.
-      if (!id) cta.textContent = 'Sign in at /setup';
+      if (!id) cta.textContent = 'Sign in to act';
       // No deed yet: the only useful action is minting one, and the mint plan came with
       // the deed read, so the button names what the press will do.
       else if (state.needsMint && state.tab === 'deed') cta.textContent = 'Mint my deed';
@@ -269,7 +269,7 @@ export function mountHouseRoom(root, hooks = {}) {
     // pressing it twice.
     const ctaBtn = root.querySelector('[data-testid=house-cta]');
     if (ctaBtn && state.tab === 'deed') {
-      if (!id) ctaBtn.textContent = 'Sign in at /setup';
+      if (!id) ctaBtn.textContent = 'Sign in to act';
       else ctaBtn.textContent = state.needsMint ? 'Mint my deed' : "I'm alive";
     }
     const rows = state.derived?.rows || [];
@@ -312,7 +312,7 @@ export function mountHouseRoom(root, hooks = {}) {
     const check = root.querySelector('#house-check');
     if (check) check.value = 'Sign in to check in';
     const ctaBtn = root.querySelector('[data-testid=house-cta]');
-    if (ctaBtn) ctaBtn.textContent = 'Sign in at /setup';
+    if (ctaBtn) ctaBtn.textContent = 'Sign in to act';
     return { turn, state };
   }
 

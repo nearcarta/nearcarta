@@ -95,7 +95,7 @@ if (root) {
         out.append(`${j.error || 'No row on the board for this account yet.'} `);
         const a = document.createElement('a');
         a.href = (j.next && j.next.href) || '/setup/#sign';
-        a.textContent = (j.next && j.next.label) || 'Open your row in /setup';
+        a.textContent = (j.next && j.next.label) || 'Sign in to pay';
         out.append(a, '. Nothing was sent.');
         return;
       }

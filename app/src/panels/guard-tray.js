@@ -21,7 +21,7 @@ function statusBlock(state, esc) {
     const bits = [];
     if (state.denyCount != null) bits.push(`${state.denyCount} on the live deny list.`);
     bits.push(attLine || 'Server-side: age, code hash, lookalike, deny list.');
-    bits.push('The row cap is on chain.');
+    bits.push('Your spend limit is enforced.');
     if (state.notice) bits.push(state.notice);
     // The reference shows a checklist: one line per fact, each with its own tick. The same
     // sentences as before, one per row, so the panel reads at a glance instead of as a paragraph.

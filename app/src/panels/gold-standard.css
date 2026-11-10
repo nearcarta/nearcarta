@@ -689,66 +689,6 @@ body #shopUI #tray #t-form .guard-check > span { white-space: normal !important;
    control, and the shop's action takes the gradient.
    ============================================================================================ */
 
-/* Chronicle: Show timeline is the action. */
-body.chronicle-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]) {
-  background: rgba(0, 0, 0, .24) !important;
-  background-image: none !important;
-  color: var(--gs-cream) !important;
-  border: 1px solid var(--gs-line-gold) !important;
-  box-shadow: none !important;
-  font-weight: 500 !important;
-}
-body.chronicle-tray #shopUI #tray #t-form #c-show,
-body.chronicle-tray #shopUI #tray #t-form .chronicle-show,
-body.chronicle-tray #shopUI #tray #t-form button[data-testid='chronicle-show'] {
-  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
-  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
-  color: var(--gs-ink) !important;
-  border: 0 !important;
-  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
-  font-weight: 600 !important;
-  min-height: 48px !important;
-  height: 48px !important;
-  width: 100% !important;
-}
-
-/* House and Toll: the /setup link is a helper, not the action. Small outlined pill. */
-body #shopUI #tray a[href='/setup'],
-body #shopUI #tray a[href^='/setup'],
-body #shopUI #tray [data-testid='toll-setup-link'],
-body #shopUI #tray [data-testid$='-setup'] {
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px !important;
-  height: 36px !important;
-  padding: 0 12px !important;
-  border-radius: var(--r-pill) !important;
-  border: 1px solid var(--gs-line-gold) !important;
-  background: rgba(0, 0, 0, .24) !important;
-  background-image: none !important;
-  color: var(--gs-cream) !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  text-decoration: none !important;
-  box-shadow: none !important;
-  width: auto !important;
-}
-
-/* The shop's own action keeps the gradient in House and Toll. */
-body.house-tray #shopUI #tray #t-form #house-cta,
-body.toll-tray #shopUI #tray #t-form #toll-pay,
-body.toll-tray #shopUI #tray #t-form .toll-cta {
-  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
-  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
-  color: var(--gs-ink) !important;
-  border: 0 !important;
-  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
-  font-weight: 600 !important;
-  min-height: 48px !important;
-  height: 48px !important;
-  width: 100% !important;
-}
 /* And "Sign in" is the outlined secondary in both. */
 body.house-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]),
 body.toll-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]) {
@@ -823,4 +763,169 @@ body #shopUI #tray #t-form .hall-flow-step {
   color: var(--gs-muted);
   text-transform: none;
   letter-spacing: 0;
+}
+
+/* ============================================================================================
+   Owner city-review pass — the selectors that actually exist in the city DOM
+   ============================================================================================ */
+
+/* 1. Chronicle: its CTA is the panel's own #t-act ("Show timeline"), so it keeps the gradient.
+      Any shop whose CTA is the panel action stays gold; only the ones with an in-form action
+      hand the gold over. */
+body #shopUI #tray > .t-row > #t-act.primary:not([hidden]) {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+}
+/* ...except the shops whose real action lives in the form: there Sign in is the secondary. */
+body.house-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]),
+body.toll-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]),
+body.chronicle-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden])[data-secondary='1'] {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+/* Toll and House: the setup link is helper text, never the action. */
+body #shopUI #tray #t-form a[href='/setup/'],
+body #shopUI #tray #t-form a[href^='/setup'],
+body #shopUI #tray #t-form [data-testid='toll-setup-link'] {
+  display: inline-flex !important;
+  align-items: center;
+  min-height: 32px !important;
+  height: auto !important;
+  padding: 0 10px !important;
+  border-radius: var(--r-pill) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  background: rgba(0, 0, 0, .22) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+}
+/* The shop's own Pay / check-in action is the gold. */
+body.toll-tray #shopUI #tray #t-form #toll-pay,
+body.house-tray #shopUI #tray #t-form #house-cta {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  width: 100% !important;
+}
+
+/* 2. The robot: hidden at EVERY size, not only on a phone. A small chip with the full words
+      stays, outside the panel box. */
+body #shopUI [id$='-agent-dock'] img,
+body #shopUI [id$='-agent-dock'] [class*='avatar'] { display: none !important; }
+body #shopUI [id$='-agent-dock'] [class*='agent-name'] {
+  display: inline !important;
+  white-space: nowrap !important;
+  font-size: 11px !important;
+  letter-spacing: 0;
+}
+body #shopUI [id$='-agent-dock'] [class*='agent-char'],
+body #shopUI [id$='-agent-dock'] > button {
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  border-radius: var(--r-pill) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  background: rgba(27, 18, 12, .95) !important;
+  color: var(--gs-cream) !important;
+  font: 600 11px/1 Inter, system-ui, sans-serif !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+/* 3. "Back to town" and the panel header must not share space: the back link gets its own slim
+      bar above the panel, so it cannot cover the shop's icon. */
+@media (max-width: 720px) {
+  body.in-shop #shopUI #back {
+    position: fixed !important;
+    top: 6px !important;
+    left: 8px !important;
+    right: auto !important;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 10px !important;
+    border-radius: var(--r-pill) !important;
+    font-size: 12px !important;
+    z-index: 45;
+  }
+  body.in-shop #shopUI #back kbd { display: none; }
+  body.in-shop #shopUI #tray { top: 46px !important; }
+  body.in-shop nav.all-shops { top: 6px !important; right: 8px !important; left: auto !important; }
+}
+
+/* 4. Bank: the native file input cut its name to "N…en". A drop zone with the picker behind it. */
+body #shopUI #tray #t-form input[type='file'] {
+  display: block;
+  width: 100% !important;
+  min-height: 68px !important;
+  height: auto !important;
+  padding: 12px !important;
+  border-radius: var(--r-card) !important;
+  border: 1px dashed var(--gs-line-gold) !important;
+  background: rgba(0, 0, 0, .22) !important;
+  color: var(--gs-muted) !important;
+  font-size: 12px !important;
+  box-sizing: border-box !important;
+  cursor: pointer;
+}
+body #shopUI #tray #t-form input[type='file']::file-selector-button {
+  margin-right: 10px;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gs-line-gold);
+  background: rgba(0, 0, 0, .32);
+  color: var(--gs-cream);
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+/* 5. Invoice: date and time inputs need room for their own text, or the minutes vanish. */
+body #shopUI #tray #t-form input[type='datetime-local'],
+body #shopUI #tray #t-form input[type='date'] {
+  min-width: 0 !important;
+  width: 100% !important;
+  padding-right: 6px !important;
+  font-size: 12.5px !important;
+  font-variant-numeric: tabular-nums;
+}
+body #shopUI #tray #t-form .hall-split { gap: 10px !important; }
+/* No stray empty slot between the gold button and Sign in. */
+body #shopUI #tray > .rcpt:empty,
+body #shopUI #tray #t-form > *:empty:not(input):not(textarea) { display: none !important; }
+
+/* 6. House: the lower half was empty. The deed card and history take the room, spaced the way
+      Swap's quote card is, so the panel reads full rather than half-blank. */
+body.house-tray #shopUI #tray #t-form .ferry-pane[data-panel='deed'],
+body.house-tray #shopUI #tray #t-form .ferry-pane[data-panel='vaults'],
+body.house-tray #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] {
+  flex: 1 1 auto;
+  align-content: start;
+  row-gap: 14px !important;
+}
+body.house-tray #shopUI #tray #t-form [data-testid='deed-meta'],
+body.house-tray #shopUI #tray #t-form .house-history {
+  padding: 12px !important;
+  border-radius: var(--r-card) !important;
+  background: rgba(0, 0, 0, .22) !important;
+  border: 1px solid var(--gs-line) !important;
 }
