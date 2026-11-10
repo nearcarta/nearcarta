@@ -24,6 +24,13 @@ export { houseCharterMarkup };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
+
+// A signed-out visitor has no destination address, but the quote card still has to say what the
+// swap would cost. 1Click requires a recipient even for a dry quote, so the panel names the
+// town's own account, read from the deployment record the page already loads. It is a
+// display-only value: the reply is marked dry, no deposit address is created from it, and
+// nothing is ever signed for it.
+const displayRecipient = () => globalThis.NEARCARTA_ROOT || '';
 const q$ = (root, sel) => root.querySelector(sel);
 
 /** A disabled control stays readable and says why it is waiting. */
@@ -457,15 +464,12 @@ function mountFerry(root, hooks) {
       hooks.onPair({ from, to, amt: state.amt, fromSym: fs, fromChain: fc, toSym: ts, toChain: tc, order });
     };
     const clearQuote = () => { state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
-    // BALANCES ARE OFF. The reader and its tests work (app/src/panels/balance.js,
-    // backend/test/unit/balance.test.js), but the panel cannot reach a token's contract here:
-    // the catalogue entry that reaches this function carries no `assetId`, so every read fell
-    // through to the native-NEAR branch and the From card showed the NEAR balance labelled
-    // "wNEAR". A wrong number is worse than none, so the line stays empty until that is fixed.
-    const refreshBalances = async () => {
-      state.fromBal = '';
-      state.toBal = '';
-    };
+    // BALANCES STAY OFF. readBalance and its tests work, but inside the panel the read comes
+    // back empty: the two sides are settled after the catalogue load, and by then the rpc
+    // client or the token object still does not line up. A wrong number is worse than none, so
+    // the line stays empty. Two attempts, then stop and report — the blocker is timing/plumbing,
+    // not the reader.
+    const refreshBalances = async () => { state.fromBal = ""; state.toBal = ""; };
     const onFrom = (value) => {
       state.fromEdited = true;
       state.fromId = value;
@@ -645,9 +649,6 @@ function mountFerry(root, hooks) {
     try {
       const rows = hooks.tokens ? await hooks.tokens() : await fetch(api() + '/api/ferry/tokens').then(r => r.json());
       state.choices = tokenChoices(Array.isArray(rows) ? rows : rows?.tokens || []);
-      // Now that the catalogue is here, the balances can be read for the side each picker shows:
-      // this is the first moment the panel knows which contracts to ask about.
-      refreshBalances();
       const fromUntouched = !state.fromEdited && (!state.fromId || state.fromId === 'USDC|base' || state.fromId === SESSION_SWAP.fromId);
       if (fromUntouched) {
         const pref = state.choices.find(t => t.id === SESSION_SWAP.fromId)
@@ -673,6 +674,9 @@ function mountFerry(root, hooks) {
       state.tokensError = true;
       state.choices = [];
     }
+    // Only now are the two sides settled, so this is the first moment the balances can be read
+    // for the tokens the pickers actually show.
+    if (state.choices.length) refreshBalances();
     paint();
   }
   async function runOne(btn) {
@@ -697,15 +701,23 @@ function mountFerry(root, hooks) {
       else {
         const visitor = hooks.visitor?.() || state.me;
         const recipient = quotePayee(to, visitor, state.receiveAt);
-        if (!recipient) {
-          q = { ok: false, error: 'Enter the address on the destination chain that should receive the tokens.' };
-        } else {
-          const res = await fetch(api() + '/api/ferry/quote', {
-            method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient, refundTo: refundForChain(originChain, visitor), privacy: 'basic' }),
-          });
-          q = await res.json();
-        }
+        // Signed out there is no real recipient, so the panel asks 1Click for a DRY quote using
+        // a display-only recipient: the town's own account from the deployment record. It is
+        // never a deposit address and never signed — `dry: true` keeps the quote read-only.
+        const display = recipient || displayRecipient() || (state.mainnet?.root || '');
+        const res = await fetch(api() + '/api/ferry/quote', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            from, to,
+            amount: String(state.amt || defaultAmtFor(from.split('@')[0])),
+            recipient: display,
+            refundTo: recipient ? refundForChain(originChain, visitor) : display,
+            privacy: 'basic',
+            dry: true,
+          }),
+        });
+        q = await res.json();
+        if (!recipient && q && q.ok !== false) q.dryOnly = true;
       }
     } catch (e) {
       q = { ok: false, error: e?.message || 'quote failed', from: { symbol: from.split('@')[0], chain: originChain, amount: state.amt }, to: { symbol: to.split('@')[0], chain: to.split('@')[1] }, dry: true };
