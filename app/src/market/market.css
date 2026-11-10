@@ -214,3 +214,7 @@ body.qs-gold #tray .primary:not(.qs-go), body.qs-gold #tray .cta:not(.qs-go), bo
   #tray .qs .qs-more { margin-left: 0; }
 }
 @media (max-width: 380px) { .md-dots { gap: 4px; } .md-qt small { display: none; } }
+/* purse doubles as the Receipt button: the chain lives behind it, never in the main flow */
+.md-hud .md-purse { height: 40px; padding: 0 12px; border: 0; border-radius: 20px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.md-hud .md-purse:hover, .md-hud .md-purse.on { background: rgba(247,213,126,.08); }
+#tray .qs .qs-rc { color: var(--md-muted, #b9a27a); }

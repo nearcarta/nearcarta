@@ -4,6 +4,8 @@
 import * as S from './sim.js';
 
 export const ME = 'you';
+// 1 coin = 0.0001 NEAR in the practice round; the main flow only ever says coins.
+export const COIN = S.MILLI / 10n;
 export const TOLL = S.MILLI / 10n; // 0.0001 NEAR, paid from the sale
 export const WAGE = (3n * S.MILLI) / 10n; // 0.0003 NEAR to the porter
 export const STAKE = S.MILLI; // 0.001 NEAR into the dark shop
@@ -17,21 +19,21 @@ export const STEPS = [
     need: 'Take today’s order', btn: 'Take order', reward: '3 salt to the Square', done: 'Order taken: 3 salt' },
   { id: 'cargo', shop: 'ferry', keeper: 'Ferryman', intro: 'Your salt came in from across the sea.',
     need: 'Unload salt from abroad', btn: 'Unload salt', reward: '+3 salt', done: '3 salt in your bag',
-    proof: { label: 'A real swap through NEAR Intents', ...TX('A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz') } },
+    proof: { label: 'Ferry: cross-chain swap (NEAR Intents)', ...TX('A6pqkcd3onJcAbJ2gCBNByejDkThARRkVshoXFB8zGkz') } },
   { id: 'cross', shop: 'toll', keeper: 'Toll warden', intro: 'Every crate pays to cross.',
-    need: 'Get your cargo across', btn: 'Cross', reward: 'Toll 0.0001, paid from the sale', done: 'Across. The toll is due at the sale',
-    proof: { label: 'A real crossing through the charter', ...TX('FwXfnyddVoZ7u6zYrF5Y3mWq9K5aHxrGc25CzM6JzpPj') } },
+    need: 'Get your cargo across', btn: 'Cross', reward: 'Toll 1 coin, paid from the sale', done: 'Across. The toll is due at the sale',
+    proof: { label: 'Toll Bridge: crossing under the charter cap', ...TX('FwXfnyddVoZ7u6zYrF5Y3mWq9K5aHxrGc25CzM6JzpPj') } },
   { id: 'check', shop: 'guard', keeper: 'Captain', intro: 'Two buyers want your salt. One is lying.',
     need: 'Check your buyers', btn: 'Check buyers', reward: 'The con artist is refused', done: 'Square keeper cleared. Stranger refused',
-    proof: { label: 'The refusal, on mainnet', ...TX('E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ') } },
+    proof: { label: 'Guardhouse: con artist refused on chain', ...TX('E7KMexjSGrD81BQuxVHWinyzvur63m6TGiw7bWjs1ubZ') } },
   { id: 'sell', shop: 'arena', keeper: 'Arena marshal', intro: 'The shelf decides the price. Watch it move.',
-    need: 'Sell your salt', btn: 'Sell 3 salt', reward: 'NEAR, at the shelf price', done: 'Sold' },
+    need: 'Sell your salt', btn: 'Sell 3 salt', reward: 'Coins, at the shelf price', done: 'Sold' },
   { id: 'seal', shop: 'bank', keeper: 'Banker', intro: 'Profit is nobody’s business but yours.',
     need: 'Hide your profit', btn: 'Seal profit', reward: 'Amount hidden', done: 'Sealed. Only “check passed” shows' },
   { id: 'pay', shop: 'payouts', keeper: 'Paymaster', intro: 'Your porter carried every crate.',
-    need: 'Pay your porter', btn: 'Pay 0.0003', reward: 'Invoice paid, under your cap', done: 'Porter paid. Invoice kept' },
+    need: 'Pay your porter', btn: 'Pay 3 coins', reward: 'Invoice paid, under your cap', done: 'Porter paid. Invoice kept' },
   { id: 'invest', shop: 'house', keeper: 'Housekeeper', intro: 'The Ferry spent its till on your cargo. It went dark.',
-    need: 'Relight the Ferry', btn: 'Invest 0.001', reward: 'Ferry share, lights back on', done: 'The Ferry is open again' },
+    need: 'Relight the Ferry', btn: 'Invest 10', reward: '10 coins for a Ferry share', done: 'The Ferry is open again' },
   { id: 'write', shop: 'chronicle', keeper: 'Archivist', intro: 'Every merchant’s day goes in the book.',
     need: 'Write your day', btn: 'Write the day', reward: 'Day seal · level 2', done: 'Day 1, written' },
 ];
@@ -69,7 +71,7 @@ export function act(city, shop) {
       mark(city, s, { qty: got }); return { line: s.done, proof: s.proof };
     }
     case 'cross': st.toll = TOLL; mark(city, s, { total: TOLL }); return { line: s.done, proof: s.proof };
-    case 'check': mark(city, s, { refused: 'stranger.near' }); return { line: s.done, proof: s.proof };
+    case 'check': mark(city, s, { refused: 'stranger' }); return { line: s.done, proof: s.proof };
     case 'sell': {
       const before = BigInt(S.quoteAt(city, 'arena', ORDER.good).sell);
       const n = Math.min(ORDER.qty, p.bag[ORDER.good] || 0); if (!n) throw err('ERR_BALANCE');
