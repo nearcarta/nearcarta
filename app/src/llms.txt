@@ -13,10 +13,12 @@ A refusal because the payee is not on the list: https://nearblocks.io/txns/E7KMe
 
 One recorded swap: 0.045 wNEAR became 0.177937 USDC. https://nearblocks.io/txns/HzgUr618CQqxECR88QKW93yGbDoFU176vWQfWM3yZaUw
 
-The API does not sign mainnet. New quotes stay dry. A Pay checkout is at most 0.20 USD and does not send the deposit.
+The API signs mainnet in two places only. The relayer (relayer.nearcarta.near) sends Market Day moves that the player signed and pays their gas, within caps per visitor and per day. The box sends keeper restocks that a keeper's agent key signed after a verified NEAR AI decision. New quotes stay dry. A Pay checkout is at most 0.20 USD and does not send the deposit.
 
 The board wasm has no access key.
 
 Tracks: Ferry is DeFi, Mist Bank is Privacy, Chronicle and Toll Bridge are Autonomous Business, Guardhouse is AI Security, Town Hall is Agent Economy, Payouts is Real-World Money, Vault Arena is Games, Your House is Open.
 
 Payouts run one at a time. Each payment is at most 0.005 NEAR. The daily budget on a visitor row is 0.01 NEAR.
+
+This file says the same thing to people and to agents. Nothing on the site is hidden from people.
