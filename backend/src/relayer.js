@@ -22,14 +22,16 @@ export const conf = () => ({
   dailyNear: toYocto(process.env.RELAY_DAILY_NEAR || '0.05'),
   sessionFund: toYocto(process.env.SESSION_FUND_NEAR || '0.003'),
   sessionStorage: toYocto(process.env.SESSION_STORAGE_NEAR || '0.008'),
+  // Sponsored gas one visitor may burn per UTC day.
+  visitorNear: toYocto(process.env.RELAY_VISITOR_NEAR || '0.003'),
 });
 const hasKey = () => !!(process.env.RELAYER_PRIVATE_KEY || '').trim() && !!conf().account;
 
 const day = () => new Date().toISOString().slice(0, 10);
-export const ledger = { day: day(), spent: 0n, relays: 0, sessions: 0, refused: {} };
-function roll() { if (ledger.day !== day()) Object.assign(ledger, { day: day(), spent: 0n, relays: 0, sessions: 0, refused: {} }); }
-export const counters = makeCaps({ perSender: Number(process.env.RELAY_PER_SENDER || 300), perDay: Number(process.env.RELAY_PER_DAY || 4000), sessionsPerDay: Number(process.env.SESSIONS_PER_DAY || 4) });
-export function status() { roll(); const c = conf(); return { on: hasKey(), relayer: c.account || null, market: c.market, board: c.board, day: ledger.day, spent_near: yoctoToNear(ledger.spent.toString()), budget_near: yoctoToNear(c.dailyNear.toString()), relays: ledger.relays, sessions: ledger.sessions, refused: ledger.refused, caps: counters.status() }; }
+export const ledger = { day: day(), spent: 0n, relays: 0, sessions: 0, refused: {}, by: new Map() };
+function roll() { if (ledger.day !== day()) Object.assign(ledger, { day: day(), spent: 0n, relays: 0, sessions: 0, refused: {}, by: new Map() }); }
+export const counters = makeCaps({ perSender: Number(process.env.RELAY_PER_SENDER || 40), perDay: Number(process.env.RELAY_PER_DAY || 4000), sessionsPerDay: Number(process.env.SESSIONS_PER_DAY || 4) });
+export function status() { roll(); const c = conf(); return { on: hasKey(), relayer: c.account || null, market: c.market, board: c.board, day: ledger.day, spent_near: yoctoToNear(ledger.spent.toString()), budget_near: yoctoToNear(c.dailyNear.toString()), visitor_near: yoctoToNear(c.visitorNear.toString()), relays: ledger.relays, sessions: ledger.sessions, refused: ledger.refused, caps: counters.status() }; }
 const refuse = (why, status = 400) => { roll(); ledger.refused[why] = (ledger.refused[why] || 0) + 1; return { ok: false, why, status }; };
 
 export function decode(b64) {
@@ -67,9 +69,11 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
   // Worst case for this move: all attached gas burnt at 0.1 NEAR per 1000 Tgas (100M yocto per gas).
   const worst = p.gas * 100_000_000n;
   if (ledger.spent + worst > c.dailyNear) return refuse('ERR_DAILY_BUDGET', 429);
+  if ((ledger.by.get(d.senderId) || 0n) >= c.visitorNear) return refuse('ERR_VISITOR_GAS_CAP', 429);
   const cap = counters.take(d.senderId); if (cap) return refuse(cap, 429);
   let r; try { r = await send(sd); } catch (e) { return refuse('ERR_SEND: ' + String(e.message || e).slice(0, 160), 502); }
   const y = burnt(r); ledger.spent += y; ledger.relays++;
+  ledger.by.set(d.senderId, (ledger.by.get(d.senderId) || 0n) + y);
   const f = failure(r);
   return { ok: !f, hash: hashOf(r), sender: d.senderId, receiver: d.receiverId, methods: d.actions.map((a) => a.functionCall.methodName), burnt_near: yoctoToNear(y.toString()), failure: f, explorer: hashOf(r) ? `https://nearblocks.io/txns/${hashOf(r)}` : null };
 }

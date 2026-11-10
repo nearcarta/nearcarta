@@ -59,3 +59,13 @@ test('relayer: sponsored first session funds a new implicit account once, then i
   const named = await session('nobody-here.near', { acc, viewAcc: async () => { throw new Error('missing'); }, storageOf: async () => 0n });
   assert.equal(named.why, 'ERR_NO_ACCOUNT');
 });
+
+test('relayer: one visitor stops at the per-visitor sponsored gas cap, others still go through', async () => {
+  ledger.by.set('greedy.near', 3n * 10n ** 21n);
+  const { b64 } = await signed({ senderId: 'greedy.near' });
+  const r = await relay(b64, deps());
+  assert.equal(r.ok, false); assert.equal(r.why, 'ERR_VISITOR_GAS_CAP');
+  const other = await signed({ senderId: 'polite.near' });
+  assert.equal((await relay(other.b64, deps())).ok, true);
+  assert.equal(ledger.by.get('polite.near'), 300000000000000000000n);
+});
