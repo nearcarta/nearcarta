@@ -534,7 +534,7 @@ export function tollMarkup(state = {}) {
   const feeLine = live.ok === false
     ? 'The live policy did not answer.'
     : (quote.payable
-      ? `Fee ${quote.feeNear} NEAR. Your row sets the amount cap.`
+      ? `Fee ${quote.feeNear} NEAR. Your spend limit caps the amount.`
       : 'The live policy has no visitor fee.');
   const status = state.seal || '';
   // A visitor with no board row cannot pass: the board has nothing to spend.
