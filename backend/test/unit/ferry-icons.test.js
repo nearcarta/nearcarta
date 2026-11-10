@@ -110,9 +110,11 @@ test('Ferry tray matches the panel design system (one shell, one CTA, no 440px t
   // with one system for all nine shops, so the assertions now guard the new contract: one shared
   // stylesheet owns the box, the panel is 320-380px, and the old widths cannot come back.
   const shell = read('app/src/panels/panel-ref.css');
-  assert.match(shell, /clamp\(320px,\s*360px,\s*380px\)/);
+  // The reference is a 420px panel (clamp 380-440). The earlier 320-380 clamp truncated the shop
+  // titles, which is what the second review caught.
+  assert.match(shell, /clamp\(380px,\s*420px,\s*440px\)/);
   assert.match(shell, /--r-panel:\s*20px/);
-  assert.match(shell, /--h-cta:\s*48px/);
+  assert.match(shell, /--h-cta:\s*44px/);
   assert.match(shell, /--tap:\s*40px/);
   assert.doesNotMatch(shell, /width:\s*min\(480px/);
   // The world still carries the agent character the panel must not cover.

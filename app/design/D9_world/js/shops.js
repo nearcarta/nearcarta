@@ -19,7 +19,7 @@ export const srcLabel=(id,src)=>NETMAIN[id]||SRC[src]||'mainnet';
 import { NAME as NAMES, paintTrack } from '../../D8_shops/js/names.js';
 // The reference header: a round gold-ringed icon badge beside the shop name. The badge is
 // presentation only — the same title text, with the shop's own 3D icon in front of it.
-import { badge as shopBadge, headerArt } from '/panels/shop-identity.js';
+import { badge as shopBadge, headerArt, titleOf, subtitleOf, flowStrip } from '/panels/shop-identity.js';
 import { roomError } from '/room-error.js';
 export function setResult(kind,text){ const b=$('#t-act'); b.classList.remove('busy'); b.className='act res '+kind; b.disabled=true; b.innerHTML=`<span class="glyph" aria-hidden="true">${kind==='no'?'✕':kind==='ok'?'✓':'○'}</span>`; b.append(text); b.setAttribute('aria-live','polite'); }
 export function setHero(html){ const h=$('#t-hero'); h.innerHTML=html; h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); }
@@ -47,9 +47,18 @@ const CTA={ house:"Set your agent's rules →", guard:'Write a rule like this fo
 const CTA_APP={ house:'Open the charter office →' };
 export function cta(id){ const a=$('#t-cta'); const t=(APP?CTA_APP:CTA)[id]; a.hidden=!t; a.className=APP?'link cta8':'act primary cta'; if(t){ a.textContent=t; a.href='/shops/vault/'; a.dataset.testid='vault-link'; } }
 const visitorNote=note=>note||'';
-export function skeleton(id){ $('#t-title').innerHTML=`${shopBadge(id)}<span>${NAMES[id]||id}</span>${headerArt(id)}`; paintTrack(id); $('#t-label').textContent='Loading this room…'; $('#t-hero').innerHTML='<span class="skel" data-testid="room-skel"></span>'; const say=$('#t-say'); if(say) say.textContent=''; }
-export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; const titleText=p.title||NAMES[sh.id]; $('#t-title').innerHTML=`${shopBadge(sh.id)}<span>${titleText}</span>${headerArt(sh.id)}`; const s=$('#t-src'); s.textContent=srcLabel(sh.id,p.src); s.className='src '+p.src; s.title=visitorNote(p.srcNote);
-  $('#t-label').textContent=p.label; paintTrack(sh.id); $('#t-hero').innerHTML=p.hero; const b=$('#t-act'); b.className='act primary'; b.disabled=false; b.hidden=!p.action; b.textContent=p.action||'';
+// The reference header: badge, title, one line of subtitle, illustration. The category line
+// ("DEFI", "AI SECURITY") and the mainnet pill are gone from the title row; network state is a
+// small dot on the badge instead. `.shop-quest` stays empty for the Market Day step.
+function paintHeader(id, titleText) {
+  const t = titleText || titleOf(id) || NAMES[id] || id;
+  $('#t-title').innerHTML = `${shopBadge(id)}<span class="t-name">${t}</span>${headerArt(id)}`;
+  const sub = $('#t-sub'); if (sub) sub.textContent = subtitleOf(id) || '';
+  paintTrack(id);
+}
+export function skeleton(id){ paintHeader(id); $('#t-label').textContent='Loading this room…'; $('#t-hero').innerHTML='<span class="skel" data-testid="room-skel"></span>'; const say=$('#t-say'); if(say) say.textContent=''; }
+export function show(sh){ L.sh=sh; cta(sh.id); const p=sh.panel; paintHeader(sh.id, p.title); const s=$('#t-src'); s.textContent=srcLabel(sh.id,p.src); s.className='src '+p.src; s.title=visitorNote(p.srcNote);
+  $('#t-label').textContent=p.label; $('#t-hero').innerHTML=flowStrip(sh.id)||p.hero; const b=$('#t-act'); b.className='act primary'; b.disabled=false; b.hidden=!p.action; b.textContent=p.action||'';
   { const m=$('#t-more'); m.hidden=!p.more; if(p.more){ m.href=p.more.href; m.textContent=p.more.text; } }
   $('#d-title').textContent=(p.title||NAMES[sh.id]); $('#d-body').innerHTML=sh.proof+'<p class="note legal">Nearcarta is independent, not affiliated with NEAR Foundation.</p>';
   sh.tags?.forEach(t=>{ if(t.html){ t.el=document.createElement('div'); t.el.className='stag '+(t.cls||''); t.el.innerHTML=t.html; $('#stags').appendChild(t.el); } }); frame(sh.camera);

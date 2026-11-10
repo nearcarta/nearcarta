@@ -110,9 +110,11 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
   <section id="tray" aria-live="polite">
     <div class="t-scroll">
       <div class="t-head"><h1 id="t-title"></h1><span id="t-src" class="src"></span></div>
+      <p id="t-sub" class="t-sub"></p>
       <p id="t-label" class="label"></p>
       <p id="t-say" class="say" hidden></p>
       <div id="t-hero" class="hero"></div>
+      <div id="shop-quest" class="shop-quest" data-testid="shop-quest"></div>
       <div id="t-form" class="form" hidden></div>
       <a id="t-cta" class="act primary cta" hidden></a>
     </div>
