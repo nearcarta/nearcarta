@@ -1,5 +1,5 @@
 // Town Hall row editor. The city tray, /shops/hall/ and the console mount this.
-// Sign sends set_rules / set_frozen / set_seal with deposit 0, then reads get_charter back.
+// Sign sends set_rules / set_frozen / set_seal (1 yocto on loosening, refunded), then reads get_charter back.
 // This file does not sign until the visitor presses Sign.
 
 import { readSession, readSessionAccount, sessionPill, visitor } from '../../design/D8_shops/js/session.js';
@@ -75,7 +75,7 @@ export function hallMarkup(row, person = null) {
     <label class="field">Max per payment (NEAR) <input id="cap" data-testid="hall-cap" inputmode="decimal" value="${esc(cap)}"></label>
     <label class="check"><input id="frozen" data-testid="hall-frozen" type="checkbox" ${row?.frozen ? 'checked' : ''}> <span>Freeze the row. The agent key cannot undo this.</span></label>
     <label class="check"><input id="sealed" data-testid="hall-seal" type="checkbox" ${row?.sealed ? 'checked' : ''}> <span>Store a seal. The rule text stays off the row.</span></label>
-    <p class="muted" id="bond">Deposit 0. The calls are set_rules, set_frozen and set_seal on your own row.</p>
+    <p class="muted" id="bond">1 yoctoNEAR, refunded. The calls are set_rules, set_frozen and set_seal on your own row.</p>
     <button class="primary" id="apply" data-testid="hall-apply" type="submit">Sign</button>
     <div id="result" data-testid="result" aria-live="polite"></div>
     <div id="list" data-testid="hall-diff"></div>

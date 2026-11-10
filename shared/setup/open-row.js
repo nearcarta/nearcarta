@@ -58,7 +58,7 @@ export function openRowTransactions({
           methodName: 'set_calls',
           args: { calls, session_cap: String(rules.daily_budget) },
           gas: String(gasAgent),
-          deposit: String(callsDepositYocto),
+          deposit: BigInt(callsDepositYocto || 0) > 0n ? String(callsDepositYocto) : '1', // board B4: never 0
         },
       },
     ],
@@ -76,7 +76,7 @@ export function openRowTransactions({
         methodName: 'set_effects',
         args: { effects },
         gas: String(gasAgent),
-        deposit: '0',
+        deposit: '1', // the board refuses 0 on loosening calls (B4); the yocto is refunded
       },
     });
   }

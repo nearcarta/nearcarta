@@ -1329,20 +1329,20 @@ export async function hallChange(kind) {
   if (!plan.ok) throw new Error(plan.hint);
   if (!plan.calls.length) return { tx: null, applied: false, dao: false, what: plan.hint };
   const target = S.board || HALL.contract;
-  const h = await sign(target, plan.calls.map(c => fc(c.method, c.args, 40)));
+  const h = await sign(target, plan.calls.map(c => fc(c.method, c.args, 40, String(c.deposit ?? '0'))));
   keep(h, 'hall', 'applied', plan.calls[0].method);
   return { tx: h, applied: true, dao: false, what: plan.capNear ? `max per payment ${plan.capNear} NEAR` : plan.hint };
 }
 
-/** Wallet sign for set_rules, set_frozen and set_seal. Deposit stays 0. */
+/** Wallet sign for set_rules, set_frozen and set_seal. Loosening calls carry 1 yocto (refunded); freezing carries 0. */
 export async function hallSign(calls) {
   const list = Array.isArray(calls) ? calls : [];
   if (!list.length) return { hash: null, tx: null };
-  if (list.some(c => !['set_rules', 'set_frozen', 'set_seal'].includes(c.method) || String(c.deposit ?? '0') !== '0')) {
-    throw new Error('Only set_rules, set_frozen and set_seal are signed here. Deposit stays 0.');
+  if (list.some(c => !['set_rules', 'set_frozen', 'set_seal'].includes(c.method) || !['0', '1'].includes(String(c.deposit ?? '0')))) {
+    throw new Error('Only set_rules, set_frozen and set_seal are signed here, with at most 1 yocto.');
   }
   const target = S.board || HALL.contract;
-  const h = await sign(target, list.map(c => fc(c.method, c.args, 40, '0')));
+  const h = await sign(target, list.map(c => fc(c.method, c.args, 40, String(c.deposit ?? '0'))));
   keep(h, 'hall', 'applied', list[0].method);
   return { hash: h, tx: h };
 }

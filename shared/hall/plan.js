@@ -172,7 +172,7 @@ export function rulesPlan(row, patch = {}) {
     }
     calls.push({
       method: 'set_rules',
-      deposit: '0',
+      deposit: '1', // loosening calls need a full-access key: 1 yocto, refunded (board B4)
       args: {
         rules: {
           receivers: next.receivers,
@@ -187,7 +187,7 @@ export function rulesPlan(row, patch = {}) {
       },
     });
   }
-  if (!!live.frozen !== !!next.frozen) calls.push({ method: 'set_frozen', deposit: '0', args: { frozen: !!next.frozen } });
+  if (!!live.frozen !== !!next.frozen) calls.push({ method: 'set_frozen', deposit: next.frozen ? '0' : '1', args: { frozen: !!next.frozen } });
   const seen = new Set();
   for (const c of calls) {
     const k = c.method;

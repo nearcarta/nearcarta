@@ -156,7 +156,7 @@ test('set_effects rides with set_calls only when the board build pays it from th
   // Order matters: set_calls is what charges the reserve the effect budget is spent from.
   assert.deepEqual(withEffects.open.actions.map(a => a.params.methodName), ['open_charter', 'set_calls', 'set_effects']);
   // No deposit: the board charges the row, and after the fix it charges the reserve.
-  assert.equal(withEffects.open.actions[2].params.deposit, '0');
+  assert.equal(withEffects.open.actions[2].params.deposit, '1');
   // An empty list is the same as no list.
   assert.deepEqual(openRowTransactions({ ...base, effects: [] }).open.actions.map(a => a.params.methodName), ['open_charter', 'set_calls']);
 });

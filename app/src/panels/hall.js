@@ -107,7 +107,7 @@ export function callsFor(before, draft) {
   if (ruleKeys.some(k => JSON.stringify(before[k]) !== JSON.stringify(draft[k]))) {
     calls.push({
       method: 'set_rules',
-      deposit: '0',
+      deposit: '1', // loosening: 1 yocto, refunded (board B4)
       args: {
         rules: {
           receivers: draft.receivers,
@@ -122,8 +122,8 @@ export function callsFor(before, draft) {
       },
     });
   }
-  if (!!before.frozen !== !!draft.frozen) calls.push({ method: 'set_frozen', deposit: '0', args: { frozen: !!draft.frozen } });
-  if (!!before.sealed !== !!draft.sealed) calls.push({ method: 'set_seal', deposit: '0', args: { commitment: draft.sealed ? (draft.sealCommitment || '') : '' } });
+  if (!!before.frozen !== !!draft.frozen) calls.push({ method: 'set_frozen', deposit: draft.frozen ? '0' : '1', args: { frozen: !!draft.frozen } });
+  if (!!before.sealed !== !!draft.sealed) calls.push({ method: 'set_seal', deposit: '1', args: { commitment: draft.sealed ? (draft.sealCommitment || '') : '' } });
   return calls;
 }
 
