@@ -55,10 +55,16 @@ if (cmd === 'restock') {
   if (d.reply) {
     const call = restockCall(shop, d.reply, d.completion_id);
     const row = await view(BOARD, 'get_charter', { owner: acct });
-    const epoch = String(await view(BOARD, 'epoch_of', { owner: acct }).catch(() => 0) ?? 0);
     const expiry = BigInt(Date.now()) * 1_000_000n + 600_000_000_000n;
+    // The row's epoch has no view of its own: read the board's own text for this call, take the epoch
+    // from it, rebuild the text here and sign only if both agree.
+    const base = { owner: acct, receiver: MARKET, method: call.method, args: call.args, deposit: call.deposit, nonce: String(row.nonce), expiry: String(expiry), effects: [], hold: false };
+    const onChain = await view(BOARD, 'call_as_message', base);
+    const epoch = onChain.split('|')[11];
+    const msg = callAsMessage({ network: 'mainnet', contract: BOARD, ...base, epoch });
+    if (msg !== onChain) throw new Error('call text differs from the board');
     const agent = keyFrom(agentOf(acct).private_key);
-    const signature = signMessage(agent, callAsMessage({ network: 'mainnet', contract: BOARD, owner: acct, receiver: MARKET, method: call.method, args: call.args, deposit: call.deposit, nonce: row.nonce, expiry, epoch, effects: [], hold: false }));
+    const signature = signMessage(agent, msg);
     const gas = 100n * TG; const c = await costCheck(gas, 0n);
     out.call = { ...call, row_nonce: row.nonce, epoch, gas: '100 Tgas', submitter: ROOT, worst_gas_near: near(c.worst), paid_from_row_near: near(call.deposit) };
     if (live) out.tx = await send(ROOT, process.env.NEAR_MAIN_PRIVATE_KEY, BOARD, [A.functionCall('propose_call_as', { owner: acct, receiver: MARKET, method: call.method, args: call.args, deposit: call.deposit, expiry: String(expiry), effects: [], hold: false, signature }, gas, 0n)], c.worst);
