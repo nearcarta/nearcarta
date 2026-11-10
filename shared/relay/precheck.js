@@ -11,9 +11,16 @@ const lowStorage = (s) => s.storage != null && B(s.storage) < STORAGE_NEED;
 export function precheck(calls, s) {
   let purse = B(s.purse); const bag = { ...(s.bag || {}) }; let soldIntoPurse = false, gathered = false;
   for (const { method, args = {} } of calls) {
-    if (method === 'gather') { gathered = true; continue; }
+    if (method === 'gather') {
+      // The market's per-player day caps (get_config caps, get_citizen counters), when the caller read them.
+      if (s.caps && s.citizen && Number(s.citizen.gathers_today) + 1 > Number(s.caps.gathers_per_day)) return { ok: false, why: 'ERR_PRECHECK_GATHER_CAP' };
+      if (s.citizen) s.citizen = { ...s.citizen, gathers_today: Number(s.citizen.gathers_today) + 1 };
+      gathered = true; continue;
+    }
     if (method === 'sell') {
       if (!gathered && Number(bag[args.good] || 0) < Number(args.qty || 0)) return { ok: false, why: 'ERR_PRECHECK_BAG', need: String(args.qty), have: String(bag[args.good] || 0) };
+      // min_total is 80% of the quote, so quote*qty is about min_total*10/8: the payout this sale would add today.
+      if (s.caps && s.citizen && B(s.citizen.paid_today) + (B(args.min_total) * 10n) / 8n > B(s.caps.player_payout_per_day)) return { ok: false, why: 'ERR_PRECHECK_PAYOUT_CAP' };
       bag[args.good] = Number(bag[args.good] || 0) - Number(args.qty || 0); if (args.keep) soldIntoPurse = true; continue;
     }
     if (method === 'purse') {

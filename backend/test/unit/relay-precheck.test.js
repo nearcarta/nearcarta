@@ -27,3 +27,12 @@ test('precheck: an invest or a stall with too little market storage is never sen
   assert.equal(precheck(inv, rich).ok, true); // storage unread: the move goes
   assert.equal(precheck([{ method: 'stall', args: { stall: 1, action: 'rent' } }], { ...rich, storage: M }).why, 'ERR_PRECHECK_STORAGE');
 });
+test('precheck: the market day caps stop a gather or a sale the market would refuse', () => {
+  const caps = { gathers_per_day: 40, player_payout_per_day: String(5n * M) };
+  const g = [1, 2, 3].map((i) => ({ method: 'gather', args: { node: `ferry-${i}` } }));
+  assert.equal(precheck(g, { ...base, caps, citizen: { gathers_today: 38, paid_today: '0' } }).why, 'ERR_PRECHECK_GATHER_CAP');
+  assert.equal(precheck(g, { ...base, caps, citizen: { gathers_today: 37, paid_today: '0' } }).ok, true);
+  const sell = [{ method: 'sell', args: { good: 'good:salt', qty: 3, min_total: String(8n * 10n ** 20n), keep: true } }];
+  assert.equal(precheck(sell, { ...base, caps, citizen: { gathers_today: 0, paid_today: String(48n * 10n ** 20n) } }).why, 'ERR_PRECHECK_PAYOUT_CAP');
+  assert.equal(precheck(sell, { ...base, caps, citizen: { gathers_today: 0, paid_today: '0' } }).ok, true);
+});

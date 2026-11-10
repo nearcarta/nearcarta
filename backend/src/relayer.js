@@ -65,7 +65,8 @@ export async function marketState(c, me, calls) {
   try {
     const goods = goodsOf(calls);
     const [sq, bals, storage] = await Promise.all([view(c.market, 'square', { account_id: me }, undefined, { fresh: true }), goods.length ? view(c.market, 'mt_batch_balance_of', { account_id: me, token_ids: goods }, undefined, { fresh: true }) : [], view(c.market, 'storage_balance_of', { account_id: me }, undefined, { fresh: true }).catch(() => null)]);
-    return { purse: sq.purse, storage, rules: sq.rules, stalls: sq.stalls, me, now_ns: BigInt(Date.now()) * 1_000_000n, bag: Object.fromEntries(goods.map((g, i) => [g, Number(bals[i] || 0)])) };
+    const [cfgv, citizen] = await Promise.all([view(c.market, 'get_config', {}).catch(() => null), view(c.market, 'get_citizen', { account_id: me }, undefined, { fresh: true }).catch(() => null)]);
+    return { purse: sq.purse, storage, caps: cfgv?.caps || null, citizen, rules: sq.rules, stalls: sq.stalls, me, now_ns: BigInt(Date.now()) * 1_000_000n, bag: Object.fromEntries(goods.map((g, i) => [g, Number(bals[i] || 0)])) };
   } catch { return null; }
 }
 const callsOf = (d) => d.actions.map((a) => { let args = {}; try { args = JSON.parse(Buffer.from(Uint8Array.from(a.functionCall.args)).toString('utf8')); } catch {} return { method: a.functionCall.methodName, args }; });
