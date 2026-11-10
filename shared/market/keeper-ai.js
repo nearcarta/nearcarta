@@ -13,18 +13,19 @@ export function restockChoices(board, shop) {
     for (const o of board) {
       if (o.id === shop || !o.open) continue;
       const og = o.goods.find((x) => x.good === g.good);
-      if (og && Number(og.stock) > Number(g.stock)) out.push({ good: g.good, from: o.id, price: og.quote.buy, my_stock: Number(g.stock), their_stock: Number(og.stock) });
+      if (og && Number(og.stock) > Number(g.stock)) out.push({ good: g.good, from: o.id, price: og.quote.buy, my_price: g.quote?.buy, my_stock: Number(g.stock), their_stock: Number(og.stock) });
     }
   }
   return out.slice(0, 8);
 }
 
+const milli = (y) => (Number(BigInt(y || 0) / 10n ** 18n) / 1000).toString();
 export function restockMessages(shop, board, choices) {
   const me = board.find((s) => s.id === shop);
-  const lines = choices.map((c, i) => `${i + 1}. buy ${c.good.slice(5)} from ${c.from} at ${c.price} yocto each (my shelf ${c.my_stock}, theirs ${c.their_stock})`);
+  const lines = choices.map((c, i) => `${i + 1}. buy ${c.good.slice(5)} from ${c.from} at ${milli(c.price)} milliNEAR each; my own shop sells it at ${c.my_price ? milli(c.my_price) : '?'} (my shelf ${c.my_stock}, theirs ${c.their_stock})`);
   return [
-    { role: 'system', content: 'You keep one shop in a city market. Reply with JSON only: {"pick": <number or 0>, "qty": <1 or 2>, "why": "<under 80 chars>"}. Pick 0 to do nothing. Restock only when your shelf is low and your till can afford it.' },
-    { role: 'user', content: `Shop ${shop}. Till ${me.till} yocto, floor ${me.floor} yocto. Shelf: ${me.goods.map((g) => `${g.good.slice(5)} ${g.stock}`).join(', ')}.\nChoices:\n${lines.join('\n') || '(none)'}` },
+    { role: 'system', content: 'You keep one shop in a city market. Reply with JSON only: {"pick": <number or 0>, "qty": <1 or 2>, "why": "<under 80 chars>"}. Pick 0 to do nothing. Restock when it pays: the buy price is below what your own shop sells it at, and your till stays above its floor. Otherwise pick 0.' },
+    { role: 'user', content: `Shop ${shop}. Till ${milli(me.till)} milliNEAR, floor ${milli(me.floor)} milliNEAR. Shelf: ${me.goods.map((g) => `${g.good.slice(5)} ${g.stock}`).join(', ')}.\nChoices:\n${lines.join('\n') || '(none)'}` },
   ];
 }
 

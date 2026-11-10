@@ -47,3 +47,11 @@ test('council: a keeper sees the rule change in plain numbers before voting', as
   assert.match(m, /today it closes below 0\.003 NEAR; after the change, below 0\.0027 NEAR/);
   assert.match(m, /Reason given: slow days/);
 });
+
+test('restock: a keeper sees the price it would pay next to its own selling price', async () => {
+  const { restockMessages } = await import('../../../shared/market/keeper-ai.js');
+  const board = [{ id: 'hall', till: '10000000000000000000000', floor: '2700000000000000000000', goods: [{ good: 'good:iron', stock: '20', quote: { buy: '2000000000000000000000' } }] }];
+  const m = restockMessages('hall', board, [{ good: 'good:iron', from: 'arena', price: '1904600000000000000000', my_price: '2000000000000000000000', my_stock: 20, their_stock: 21 }])[1].content;
+  assert.match(m, /buy iron from arena at 1\.904 milliNEAR each; my own shop sells it at 2 /);
+  assert.match(m, /Till 10 milliNEAR, floor 2\.7 milliNEAR/);
+});
