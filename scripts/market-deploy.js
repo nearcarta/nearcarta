@@ -57,7 +57,7 @@ export async function plan() {
     const unspent = BigInt(pot.pot) - BigInt(pot.spent) - BigInt(pot.reserved);
     out.steps.push({ step: 'repay', to: VISITOR, yocto: String(unspent), near: near(unspent), gas_prepaid_near: near(5n * TG * GAS_PREPAY) });
   }
-  if (arena && arena.code_hash === MAIN.extras.arena.code_hash) {
+  if (arena && arena.code_hash === MAIN.retired['arena.nearcarta.near (v1)']?.code_hash) {
     out.steps.push({ step: 'close', recovers_near: near(arena.amount), deposit_yocto: '1', gas_prepaid_near: near(30n * TG * GAS_PREPAY) });
   }
   const w = wasm();

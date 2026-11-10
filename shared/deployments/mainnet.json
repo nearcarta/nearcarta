@@ -385,32 +385,6 @@
   "agent_allowance_near": 0.25,
   "reaper_link_check_tx": "6mdu5icACvP7F5zRE38Dfe7GyqBKtYfYZzehUMhQC2RR",
   "extras": {
-    "arena": {
-      "contract": "arena.nearcarta.near",
-      "owner": "nearcarta.near",
-      "wasm": "arena.p86.wasm",
-      "sha256": "3b44499233443610e268b21ad89613ee1f98cb0b7cfc5b2428ced7b145154a69",
-      "code_hash": "4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma",
-      "storage_bytes": 369926,
-      "locked_near": 3.69926,
-      "full_access_keys": 0,
-      "teardown": "owner close() with 1 yocto",
-      "txs": {
-        "arena_create_fund": "68A7yYMYA8HecYS1kfDzPwBWTHv3iyN8fapggRRmy3ga",
-        "arena_deploy_init": "EVbtt3wKS5QUfRWbkPYWNAftwoGV13RXL2h9nKGnXuUg",
-        "arena_mint_guardian": "8NqFTf8beQf4KQQSotT1pgsbacCAsQghM76rSCFLDayP",
-        "arena_fund_pot_0.002": "H6ScgfHkXfgpw1CDoae3C7SP7DSG55UpQpm4yV7aVcNq",
-        "arena_attempt_1": "HtDJtYxJ6UGYy3VP7n3GgFyh4Zr97WvQRcRxEyzZSiNm",
-        "arena_agent_pay_allowed_0.001": "AZWxqZnsv47WFjerjw4J8PB2SEiaYZfm6mfquYJ9xPht",
-        "arena_attempt_2": "AuXzxGVjHmrBszQm55WobbpLzSenD9qW8SUaw4KANka6",
-        "arena_agent_pay_refused_0.002": "25LpJRFF6ugmRdF8eH7Rw7dpkMthQjG6XWXFyx9mqa6V",
-        "arena_sweep_surplus": "891qnrvY62ctc9NpZ7RwK37QJTNAeCEKyXo98yfyFdJG",
-        "arena_delete_fak": "FJLLSMqA7P3MwWowDbp1hnspomkpcEmfGcKjM9PrjJ8y",
-        "arena_fund_pot_0.013_from_gold_cta": "EAchLuogBCqmY5JZbjoDG7hUzyyFmZtZzG2VogW9cwfL"
-      },
-      "live_crate": "contracts/arena",
-      "live_note": "The live arena is contracts/arena (v1), not contracts/arena_v2. Verified 2026-11-08: get_guardian and fund both respond on arena.nearcarta.near, and arena_v2 adds get_earnings/mint which are MethodNotFound there. arena_v2.wasm (222463 bytes) is built and never deployed."
-    },
     "house": {
       "contract": "house.nearcarta.near",
       "legacy": "house.nearcarta.near",
@@ -519,6 +493,22 @@
       "hotfix_deploy_tx": "71QKJYqcxquc2Ku8Vqy8osRMBpCxRKHNSQ3dhBcVrk3s",
       "hotfix_proof_tx": "A5jtjqhCGH8Qn2GWodeAEiExDz3nkbTC4gSb7f8N5X4v",
       "upgrade_note": "Hall code from main 1e1436b5 (W2-W4: #[private] callbacks, U64/U128 JSON, ERR_FLOAT, prune) deployed in place with the account key, no migrate: the state layout is unchanged. +9,433 B (0.0943 NEAR) paid from the hall's own spare."
+    },
+    "arena": {
+      "contract": "arena.nearcarta.near",
+      "owner": "nearcarta.near",
+      "kind": "market",
+      "code_hash": "BSzBC6b8DLAKERTF5jx4coELhQ5mnx3k3ZmeAVL1Se7d",
+      "wasm_sha256": "9b3d09cc5adfae367428cdd9e504216d4e965e087f8f15824ea876d52d23bafc",
+      "storage_bytes": 364861,
+      "locked_near": 3.64861,
+      "full_access_keys": 0,
+      "txs": {
+        "create_deploy_new": "Dv6CNQoqrYCdLHEirz7Hq36kPMaL3z2xZP4zsPFq8Zkg",
+        "smoke_stranger_refused": "21wnzVagqk6wiANZLg65BbzuiJHRdMDjxi9zRKWgJKJP",
+        "smoke_owner_set_caps": "TvJisZ6VNJFA4zoKTiB4U37aFTGtYGdEKVG4xrPfYYj"
+      },
+      "note": "Arena v1 was closed; the same name now runs the market contract. See market and retired."
     }
   },
   "root_balance_near": 3.2899,
@@ -568,6 +558,16 @@
       },
       "recovered_to": "nearcarta.near",
       "note": "Legacy house wasm closed; account recreated as v3 on same name."
+    },
+    "arena.nearcarta.near (v1)": {
+      "status": "deleted",
+      "closed": "2026-11-10 Africa/Cairo",
+      "code_hash": "4zMSyfcWisWgjP6YL8pL1G1K3TzCRAwNVT7LXqpV67Ma",
+      "txs": {
+        "repay_visitor_pot_0.017": "7J6oovpHXaRz9kCfvyK64x3wJHYa86D6yGDEScxjdK3S",
+        "close": "EirB1a5d63Cb9FPdpiCKJuSk9pkPMt4X26CJLtnryDoX"
+      },
+      "note": "Unspent pot of g-visitor-1 (0.017) repaid to the visitor wallet that funded it; close returned 3.755315 to nearcarta.near."
     }
   },
   "guard": {
@@ -649,5 +649,33 @@
       "deploy_command": "node .secrets/deploy-attested.mjs --send (creates the caller account when run)"
     },
     "note": "The Guardhouse can ask OutLayer to run this checker in a TDX enclave and resume the transaction with the result. It is NOT wired into the tray yet and NO attested decision has been produced on mainnet. The README says so in those words: the payee check the visitor sees is the server's, and it has no TEE signature."
+  },
+  "market": {
+    "contract": "arena.nearcarta.near",
+    "owner": "nearcarta.near",
+    "board": "board.nearcarta.near",
+    "status": "deployed",
+    "crate": "contracts/market",
+    "build": "nep330",
+    "source_rev": "f44da703afae6940f37c4bbf28a5de272b231808",
+    "image": "sourcescan/cargo-near:0.20.3-rust-1.86.0",
+    "wasm_bytes": 364496,
+    "wasm_sha256": "9b3d09cc5adfae367428cdd9e504216d4e965e087f8f15824ea876d52d23bafc",
+    "code_hash": "BSzBC6b8DLAKERTF5jx4coELhQ5mnx3k3ZmeAVL1Se7d",
+    "storage_bytes": 364861,
+    "stake_near": 3.70041,
+    "full_access_keys": 0,
+    "caps": {
+      "gathers_per_day": 40,
+      "player_payout_per_day": "5000000000000000000000",
+      "city_payout_per_day": "50000000000000000000000",
+      "storage_min": "5000000000000000000000"
+    },
+    "txs": {
+      "create_deploy_new": "Dv6CNQoqrYCdLHEirz7Hq36kPMaL3z2xZP4zsPFq8Zkg",
+      "smoke_stranger_refused": "21wnzVagqk6wiANZLg65BbzuiJHRdMDjxi9zRKWgJKJP",
+      "smoke_owner_set_caps": "TvJisZ6VNJFA4zoKTiB4U37aFTGtYGdEKVG4xrPfYYj"
+    },
+    "note": "The Arena square is the market. No keys; owner-only upgrade."
   }
 }

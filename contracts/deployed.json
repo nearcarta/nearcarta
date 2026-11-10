@@ -38,10 +38,10 @@
     },
     {
       "account": "arena.nearcarta.near",
-      "crate": "contracts/arena",
-      "artifact": "contracts/artifacts/arena.p86.wasm",
-      "build": "none",
-      "reason": "built from e406abb6 on near-sdk 5.30 before the toolchain was pinned; the next arena deploy is a nep330 build"
+      "crate": "contracts/market",
+      "artifact": "contracts/artifacts/market.wasm",
+      "build": "nep330",
+      "rev": "f44da703"
     }
   ]
 }
