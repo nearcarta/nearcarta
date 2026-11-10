@@ -245,7 +245,12 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       ${q && !state.sample ? `<div class="swap-quote" data-testid="ferry-quote-card">
         <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
         ${rateLine}
-      </div>` : ''}
+      </div>` : `<div class="swap-quote" data-testid="ferry-quote-card" data-empty="1">
+        <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
+        <p data-testid="swap-row-rate"><span>Rate</span><span>Press Review swap</span></p>
+        <p data-testid="swap-row-fee"><span>Fee (est.)</span><span>—</span></p>
+        <p data-testid="swap-row-route"><span>Route</span><span>—</span></p>
+      </div>`}
       ${flow}
       <label class="field ferry-field"><span>Find a token</span><input id="f-find" data-testid="ferry-token-search" placeholder="ZEC, USDC, near" value="${esc(state.tq || '')}" autocomplete="off"></label>
       ${(() => {

@@ -1358,3 +1358,15 @@ body #shopUI #tray #t-form #f-quote::before {
   -webkit-mask: url('/design/D2_game/d7/assets/3dicons/192/tick-premium.webp') center / contain no-repeat;
   mask: url('/design/D2_game/d7/assets/3dicons/192/tick-premium.webp') center / contain no-repeat;
 }
+
+/* The quote card is always present, as in the reference, and costs 44px. It comes out of the
+   swap pane's own rhythm and the redundant token preview, not out of a field. */
+body #shopUI #tray #t-form .ferry-picker > .ferry-flow { display: none !important; }
+body #shopUI #tray #t-form .ferry-picker { gap: var(--p2) !important; }
+body #shopUI #tray #t-form .swap-card { padding: var(--p2) var(--p3); gap: 4px; }
+body #shopUI #tray #t-form .swap-quote { padding: var(--p2) var(--p3); gap: 3px; }
+body #shopUI #tray #t-form .swap-quote p,
+body #shopUI #tray #t-form .swap-quote .ferry-rate { font-size: 11px; line-height: 15px; }
+body #shopUI #tray #t-form .swap-quote p + p { padding-top: 3px; }
+body #shopUI #tray #t-form .swap-quote-head { font-size: 11px; }
+body #shopUI #tray #t-form .ferry-picker > .field { gap: 4px; }
