@@ -41,7 +41,7 @@ export function advanceAttack() { rt.i += 1; rt.out = null; return attackAt(); }
 // The side panel's parts: one action (run the attack), the result as a card, the raw event under Details.
 export function redteamParts() {
   const r = rt.out, atk = ATTACKS[rt.i % ATTACKS.length];
-  const action = `<section class="dz act1 card"><h3>Try an attack</h3><p class="quote">“${esc(atk)}”</p>
+  const action = `<section class="dz act1 card"><h3>Guard demo: a trick the shop refuses</h3><p class="note">A fake order sent to the shop’s agent. The shop’s rules refuse it on chain; no money moves.</p><p class="quote">“${esc(atk)}”</p>
     <div class="btns"><button type="button" class="primary go redteam-run" ${rt.busy ? 'disabled data-reason="Running the attack."' : ''}>${rt.busy ? 'Running…' : RUN_LABEL}</button>
     <button type="button" class="primary redteam-next" ${rt.busy ? 'disabled data-reason="Wait for this attack to finish."' : ''}>${NEXT_LABEL}</button></div>
     ${rt.busy ? '<p class="control-reason" data-testid="control-reason">Running the attack.</p>' : ''}</section>`;

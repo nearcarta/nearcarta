@@ -165,7 +165,14 @@ function stripHtml(id) {
     let sub = receiptLine(lastDone.step, r);
     if (lastDone.step.id === 'sell') sub = `+${coins(r.total)} coins · price ${coins(r.before)} → ${coins(r.after)}<br>Your sale pushed the price down: the shelf has more salt now.<br>${receiptLine(lastDone.step, r)}`;
     if (lastDone.step.id === 'invest') sub = `1 Ferry share for 10 coins (0.001 NEAR) · it pays you a part of the Ferry’s sales<br>${receiptLine(lastDone.step, r)}`;
-    if (lastDone.step.id === 'write') sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>${receiptLine(lastDone.step, r)}`;
+    const ex = (pf) => (pf ? ` · <a class="qs-proof" href="${pf.url}" target="_blank" rel="noopener">Example on chain ↗</a>` : '');
+    const done = lastDone.step.id, pr0 = lastDone.step.proof;
+    if (done === 'cargo') sub = `3 salt from the berths, no swap needed<br>${receiptLine(lastDone.step, r)}`;
+    if (done === 'cross') sub = `Toll: 1 coin, taken at the sale<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
+    if (done === 'check') sub = `✓ Square keeper: cleared<br>✗ Stranger: refused, not on your list<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
+    if (done === 'seal') sub = `Check passed · the amount stays hidden<br><span class="qs-chip">Practice, no spend</span>`;
+    if (done === 'pay') sub = `3 coins to your porter · invoice #${Q.state(city).day} kept<br><span class="qs-chip">Practice, no spend</span>`;
+    if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
     return { gold: true, html: row(okMark, r.line, sub, gold('next', nx ? `Next: ${NAME[nx.shop]}` : 'Back to town')) + extra };
   }
