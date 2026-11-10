@@ -180,6 +180,12 @@ export class Char{
     this.blob.scale.setScalar(1+this.speed*.15); this.blob.material.opacity=.5*(1-Math.min(.6,(this.pos.y)*2));
     this.lantern && this.updLantern(dt);
   }
+  // swap this character's body for another rig in place (same path, speech, lantern and camera follow).
+  // Used for the Market Day town crier: the Lamplighter's role, a hooded merchant's body.
+  reskin(body){ const keepF=['root','rig','kind','mixer','A','head','fl','fr','handL','handR','armL','armR','face','wv','rv','walkSpd','runSpd','height'];
+    const cur={}; keepF.forEach(f=>cur[f]=this[f]); const next=body; this.obj.remove(this.root); this.obj.add(next.root);
+    keepF.forEach(f=>this[f]=next[f]); this.emote=null; this._bw=null; this.footMin=[9,9]; this.lastFoot=[1,1];
+    for(const k of ['idle','walk','run']) this.A[k]?.setEffectiveWeight(k==='idle'?1:0); return cur; }
   // the Lamplighter's lantern: brass frame + glass + halo, hangs from the left palm on a spring
   addLantern(){ const g=new THREE.Group(); const brass=new THREE.MeshLambertMaterial({color:0xb88a46}); const top=new THREE.Mesh(new THREE.ConeGeometry(.05,.045,6),brass); top.position.y=.055; const base=new THREE.Mesh(new THREE.CylinderGeometry(.04,.045,.016,6),brass); base.position.y=-.045;
     const glass=new THREE.Mesh(new THREE.CylinderGeometry(.034,.034,.075,6),new THREE.MeshBasicMaterial({color:0xffc27a})); const ring=new THREE.Mesh(new THREE.TorusGeometry(.018,.004,4,10),brass); ring.position.y=.09;
@@ -204,9 +210,19 @@ export function smooth(pts){ let p=pts; for(let n=0;n<2;n++){ if(p.length<3) bre
 // ---------- cast ----------
 export const CAST={};
 function bodyOf(gltf){ if(gltf?.scene) return gltf; const g=new THREE.Group(); const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(.22,.55,4,8), new THREE.MeshStandardMaterial({color:0xd6b46a})); mesh.name='stand-in'; g.add(mesh); return {scene:g, animations:[]}; }
+// the crier's colours: the hooded rogue's greens and greys become the city's brown and gold; skin stays as it is.
+// A hue remap in the fragment shader (after the texture read), chained after the rim light.
+function crierDye(root){ root.traverse(m=>{ if(!m.isMesh||!m.material||m.userData.ink) return; const mm=m.material; const prev=mm.onBeforeCompile;
+  mm.onBeforeCompile=(sh,r)=>{ prev&&prev.call(mm,sh,r); sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+  { vec3 c=diffuseColor.rgb; float mx=max(c.r,max(c.g,c.b)), mn=min(c.r,min(c.g,c.b)); float l=dot(c,vec3(.299,.587,.114));
+    bool green=c.g>=c.r&&c.g>=c.b&&mx-mn>.04; bool cool=c.b>=c.r&&mx-mn<.25; bool grey=mx-mn<.06;
+    vec3 brown=mix(vec3(.13,.07,.035),vec3(.42,.24,.11),clamp(l*1.5,0.,1.)); vec3 gold=mix(vec3(.55,.36,.1),vec3(.98,.76,.34),clamp(l*1.3,0.,1.));
+    if(green) diffuseColor.rgb=brown; else if(cool||grey) diffuseColor.rgb=l>.4?gold:brown*1.3; }`); };
+  mm.customProgramCacheKey=()=> 'crier'+(prev?'r':''); mm.needsUpdate=true; }); }
 export async function buildCast(){
   const loaded=await Promise.all([P.has('rorig')?'../chars/RobotExpressive':'RobotExpressive','Knight','Rogue_Hooded','Barbarian','Mage','Rogue'].map(n=>load('chars9/'+n+'.glb').catch(()=>null)));
   const [robot,knight,hooded,barb,mage,rogue]=loaded.map(bodyOf);
+  CAST.bodies={robot,hooded};
   const R=CAST.robot=new Char(robot,{rig:'robot',scale:.135,name:'Lamplighter',voice:1.25,height:.7}); R.addLantern(); R.lights=true; R.immune=false;
   // the Lamplighter's palette: brass body instead of the stock yellow, so it reads as a lantern-bearer, not a toy
   R.root.traverse(m=>{ if(m.isMesh&&m.material){ m.material=m.material.clone(); const c=m.material.color; const hsl={}; c.getHSL(hsl); if(hsl.s>.4&&hsl.h>.08&&hsl.h<.2) c.set(0xd9a441); } });
@@ -239,6 +255,10 @@ export async function buildCast(){
   const { SHOPS }=await import('./core.js'); CAST.keepers={};
   for(const [id,[gk,o]] of Object.entries(KEEP)){ if(!gk||!SHOPS[id]) continue; const s=SHOPS[id], c0=hx(s.q,s.r), d=hx(...s.door); const out=d.clone().sub(c0).setY(0).normalize(); const side=new THREE.Vector3(-out.z,0,out.x);
     const p=c0.clone().lerp(d,.58).addScaledVector(side,.62); const k=new Char(gk,{...o,height:.6}); k.place(p.x,p.z,Math.atan2(out.x,out.z)); k.noAlt=false; k.keeper=id; k.home=k.yaw; k.waveCD=0; CAST.keepers[id]=k; }
+  // the town crier: a hooded merchant in brown and gold who carries the Lamplighter's lantern in Market Day.
+  // Built as a Char so it has the KayKit walk/run/idle clips, then held aside until a reskin swaps it in.
+  if(hooded?.scene && hooded.animations?.length){ const cr=new Char(hooded,{scale:.235,name:'Town Crier',keep:[],voice:1.05,height:.66});
+    chars.splice(chars.indexOf(cr),1); W.scene.remove(cr.obj); rimify(cr.root,0xffd890,.45); outline(cr.root,0x1e1208,.03); crierDye(cr.root); CAST.crierBody=cr; }
   for(const c of chars) rimify(c.root, c===R?0xffe2b0:0xffd2a0, c===R?.75:.6);
   for(const c of chars) outline(c.root, c===R?0x1e1208:0x2a1a10, c===R?.03:.02);
   return CAST;

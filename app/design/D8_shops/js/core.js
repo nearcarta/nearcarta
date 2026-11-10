@@ -63,7 +63,7 @@ export function readTokens() { const cs = getComputedStyle(document.documentElem
   for (const k of Object.keys(C)) { const raw = cs.getPropertyValue('--' + k).trim(); if (!raw) continue; probe.style.color = raw; const m = getComputedStyle(probe).color.match(/[\d.]+/g); if (!m) continue; const [r, g, b] = m.map(Number); C[k] = (r << 16) | (g << 8) | b; CSS[k] = '#' + C[k].toString(16).padStart(6, '0'); }
   probe.remove(); return C; }
 
-// the Lamplighter (RobotExpressive, CC0), tinted gold like D2, with a lantern in the accent colour
+// the character class every room uses (the Town Crier guide and any room cast)
 export class Char {
   constructor(g, scene, { h = 1.05, tint = null, outline = 0x241810 } = {}) {
     this.scene = scene;
@@ -80,7 +80,7 @@ export class Char {
     this.mixer = new THREE.AnimationMixer(this.root); this.act = {}; g.animations.forEach(c => this.act[c.name] = this.mixer.clipAction(c));
     this.path = []; this.speed = 1.6; this.face = 0; this.onStep = null; this.stepAcc = 0;
   }
-  play(n, { once = false, fade = .25, ts = 1 } = {}) { const a = this.act[n]; if (!a) return; if (this.cur === a && !once) return; a.reset(); a.setEffectiveTimeScale(ts); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once; a.enabled = true; a.setEffectiveWeight(1); if (this.cur) this.cur.crossFadeTo(a, fade, false); a.play(); this.cur = a; }
+  play(n, { once = false, fade = .25, ts = 1 } = {}) { const a = this.act[n] || this.act[ALIAS[n]]; if (!a) return; if (this.cur === a && !once) return; a.reset(); a.setEffectiveTimeScale(ts); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once; a.enabled = true; a.setEffectiveWeight(1); if (this.cur) this.cur.crossFadeTo(a, fade, false); a.play(); this.cur = a; }
   at(x, z) { this.g.position.set(x, 0, z); return this; }
   walk(pts) { if (RM) { const l = pts[pts.length - 1]; this.g.position.set(l.x, 0, l.z); const p = pts.length > 1 ? pts[pts.length - 2] : null; if (p) this.faceGoal = Math.atan2(l.x - p.x, l.z - p.z); this.play('Idle'); return () => true; } this.path = pts.map(p => p.clone()); this.play('Walking'); return () => this.path.length === 0; }
   // in a shop (room() puts its camera on the scene) the character turns half-way to the viewer, so we see a face, not a back
@@ -95,10 +95,13 @@ export class Char {
     if (this.faceGoal !== undefined) { let df = this.faceGoal - this.face; df = Math.atan2(Math.sin(df), Math.cos(df)); this.face += df * Math.min(1, dt * 8); this.g.rotation.y = this.face; }
   }
 }
+// No guide stands in the rooms any more: the Town Crier walks the town, and inside a shop the panel and the quest strip
+// speak. Shop scripts still call makeRobot() for a position, gestures and speech anchors, so it returns a Char that is
+// never drawn. Old clip names map onto the KayKit rig it carries.
+const ALIAS = { Walking: 'Walking_A', Running: 'Running_A', Yes: 'Cheer', ThumbsUp: 'Cheer', No: 'Block', Wave: 'Interact' };
 export async function makeRobot(scene) {
-  const g = await load('chars/RobotExpressive.glb'); const c = new Char(g, scene, { tint: ['Main', 0xd9a441, 0x4a2a00] });
-  const lan = new THREE.Sprite(new THREE.SpriteMaterial({ map: radial(CSS.accent || '#e2b35b'), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: .38, fog: false })); lan.scale.setScalar(.26); lan.position.set(.46, .5, .18); c.g.add(lan); c.lan = lan;
-  const L = new THREE.PointLight(C.accent, .6, 2.0, 1.6); L.position.set(.5, .5, .35); c.g.add(L); c.play('Idle'); return c; // lantern low and to the side: lights the floor, not a blown-out head
+  const g = await load('chars/Rogue_Hooded.glb'); const c = new Char(g, scene, { h: .8, outline: null });
+  c.root.visible = false; c.root.traverse(m => { if (m.isMesh) { m.userData.ink = true; m.castShadow = false; } }); c.quiet = true; c.play('Idle'); return c;
 }
 
 // tokens and icons (D7 files; every amount gets its icon)

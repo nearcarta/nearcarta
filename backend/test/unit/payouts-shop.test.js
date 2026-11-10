@@ -349,7 +349,7 @@ test('source: the tray keeps amount empty, reserves status, and stops key events
   assert.match(tray, /Amount \(USDC\)/);
   assert.match(tray, /relativeInvoiceDates/);
   assert.match(tray, /data-tab="invoices"/);
-  assert.match(tray, /Your \/setup cap/);
+  assert.match(tray, /Your board cap/);
   assert.match(tray, /type="date"/);
   assert.match(tray, /type="datetime-local"/);
   assert.match(tray, /Creating an invoice signs nothing/);
@@ -557,4 +557,14 @@ test('two invoices with the same total but different work are different bills', 
   assert.notEqual(invoiceRecordId(a.value), invoiceRecordId(b.value));
   const again = canonicalInvoice({ receive: 'alice.near', items: [{ label: 'Article', qty: 1, usd: 1 }] });
   assert.equal(invoiceRecordId(a.value), invoiceRecordId(again.value), 'the same bill is still idempotent');
+});
+
+test('what can you do returns the try-hint, and the invoice pane names the board cap', () => {
+  const miss = agentCommand('What can you do in this shop? Show me the safest first step.');
+  assert.equal(miss.ok, false);
+  assert.match(miss.hint, /bill alice\.near|Try:/i);
+  const tray = readFileSync(new URL('../../../app/src/panels/payouts-tray.js', import.meta.url), 'utf8');
+  assert.match(tray, /data-testid="payout-invoice-cap"/);
+  assert.match(tray, /Your board cap/);
+  assert.match(tray, /Sign in and open \/setup so this desk can read your board cap/);
 });

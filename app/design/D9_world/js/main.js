@@ -11,6 +11,7 @@ import { mountIntro } from './intro-dom.js';
 import { beginEnter } from './room-lock.js';
 import { createRouter, shopKey, shopQuery } from './city-route.js';
 import { icon } from '../d7/js/d7.js';
+import { Quest } from './quest.js';
 const $=s=>document.querySelector(s); const body=document.body; const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 window.__alog=[]; // audio event log (t in story seconds) for the offline video mix
 let storyT0=0; // set before boot: a character cue during the cast build must not touch this before it exists
@@ -191,12 +192,21 @@ function occlusion(dt){ const hd=R.pos.clone().add(V(0,.6,0)); const dir=hd.clon
   for(const [id,ms] of Object.entries(occM)){ const g=hit.has(id)&&!inShop?.2:1; const v=fadeV[id]??1; const n=v+(g-v)*Math.min(1,dt*7); if(Math.abs(n-v)<1e-4&&n===g) continue; fadeV[id]=n;
     for(const m of ms){ const mm=m.material; mm.transparent=n<.99; mm.opacity=n; mm.depthWrite=n>.99; } } }
 let occM=null;
-function playCam(dt){ PC.zs+=(PC.z-PC.zs)*Math.min(1,dt*7); const z=PC.zs; const tg=R.pos.clone().add(V(0,.5,0)); const ahead=V(Math.sin(R.yaw),0,Math.cos(R.yaw)).multiplyScalar(Math.min(1.2,R.speed)*.55*(1-z)); tg.add(ahead);
-  tg.lerp(ZC,sstep(.18,.8,z)); const dist=zDist(z), pitch=zPitch(z);
+// Market Day framing: with a focus (the next shop's door), the camera stands behind the guide looking down the lit
+// road, and backs off until both the guide and the door are on screen, portrait included.
+function focusZ(){ const f=PC.focus; if(!f) return 0; const d=Math.hypot(f.x-R.pos.x,f.z-R.pos.z); const need=(PORT()?2.3:1.45)*d+2.2; let z=0; while(z<1&&zDist(z)<need) z+=.02; return z; }
+function playCam(dt){ const fz=PC.focus?focusZ():0; if(PC.focus&&!down){ const f=PC.focus; const want=Math.atan2(R.pos.x-f.x,R.pos.z-f.z); PC.yaw+=Math.atan2(Math.sin(want-PC.yaw),Math.cos(want-PC.yaw))*Math.min(1,dt*1.6); }
+  PC.zs+=(Math.max(PC.z,Math.min(1,fz+(PC.fit||0)))-PC.zs)*Math.min(1,dt*(PC.focus?2.2:7)); const z=PC.zs; const tg=R.pos.clone().add(V(0,.5,0)); const ahead=V(Math.sin(R.yaw),0,Math.cos(R.yaw)).multiplyScalar(Math.min(1.2,R.speed)*.55*(1-z)); tg.add(ahead);
+  if(PC.focus){ tg.lerp(PC.focus.clone().setY(.5),.45); } else tg.lerp(ZC,sstep(.18,.8,z)); const dist=zDist(z), pitch=zPitch(z);
   const cp=Math.cos(pitch), p=tg.clone().add(V(Math.sin(PC.yaw)*cp*dist,Math.sin(pitch)*dist,Math.cos(PC.yaw)*cp*dist));
   if(!PC.init){ PC.t.copy(D.cur.t); PC.p.copy(cam.position); PC.init=true; PC.blend=0; }
   PC.blend=Math.min(1,(PC.blend||0)+dt*2.6); const k=Math.min(1,dt*(3+PC.blend*6));
   PC.t.lerp(tg,k); PC.p.lerp(p,k); cam.position.copy(PC.p); D.cur.t.copy(PC.t); cam.fov+=(34-cam.fov)*Math.min(1,dt*3); cam.updateProjectionMatrix(); cam.lookAt(PC.t);
+  // fit check: both the guide and the next door must sit inside the free screen (between the HUD and the dock).
+  // Out of frame pushes the zoom back; comfortably inside lets it ease in again.
+  if(PC.focus&&!down){ const pt=PORT(), YL=pt?-.6:-.7, YH=pt?.56:.8, XL=pt?.82:.88; const a=R.pos.clone().add(V(0,.7,0)).project(cam), b=PC.focus.clone().setY(PC.focus.y+.9).project(cam);
+    const out=[a,b].some(v=>v.z>1||v.x<-XL||v.x>XL||v.y<YL||v.y>YH), snug=[a,b].every(v=>v.z<1&&Math.abs(v.x)<XL-.25&&v.y>YL+.18&&v.y<YH-.18);
+    PC.fit=Math.max(0,Math.min(.7,(PC.fit||0)+(out?dt*.7:snug?-dt*.12:0))); } else if(!PC.focus) PC.fit=Math.max(0,(PC.fit||0)-dt*.5);
   if(W.fin){ W.fin.uniforms.focus.value=.52; W.fin.uniforms.band.value=.2+z*.12; W.fin.uniforms.tilt.value=.85-z*.35; } }
 // keyboard steering, relative to the camera
 const KM={w:[0,1],arrowup:[0,1],s:[0,-1],arrowdown:[0,-1],a:[-1,0],arrowleft:[-1,0],d:[1,0],arrowright:[1,0]};
@@ -226,6 +236,27 @@ function goIn(id){ if(CLOSED.has(id)) return; const s=SHOPS[id]; R.steer=null; k
   if(far<1.6) R.go([end],{arrive:go}); else if(!R.goHex(s.door,{end,run:far>4,arrive:go})) R.go([end],{arrive:go});
   setTimeoutSim(go,Math.min(6,.9+far/(far>4?R.runSpd:R.walkSpd)*1.25)); }
 window.__enterToll = () => goIn('toll');
+// The guide: walk the Lamplighter to a shop's door step and stop there (no entry). Resolves true on arrival.
+// Market Day uses it when the player asks the guide for something; the camera follows at street height.
+world.walkTo=(id)=>new Promise(res=>{ const s=SHOPS[id]; if(!s||inShop){ res(false); return; } if(mode==='story') endStory(); if(mode!=='explore') explore(true);
+  R.steer=null; keys.clear(); prompt(null); R.release(.2); let done=false; const fin=()=>{ if(done) return; done=true; R.stop(); R.faceTo(hx(s.q,s.r)); res(true); };
+  const end=hx(...s.door).lerp(hx(s.q,s.r),-.12); const far=R.pos.distanceTo(end);
+  if(far<.4){ fin(); return; } if(far<1.6) R.go([end],{arrive:fin}); else if(!R.goHex(s.door,{end,run:far>3,arrive:fin})) R.go([end],{arrive:fin});
+  setTimeoutSim(fin,Math.min(14,1.2+far/(far>3?R.runSpd:R.walkSpd)*1.4)); });
+world.zoom=z=>{ const was=PC.z; if(z!=null) setZoom(z); return was; };
+// Market Day: the door of a shop (where the building's front face is), its outward direction, for the quest light.
+function doorSpot(id){ const s=SHOPS[id], c=hx(s.q,s.r), st=hx(...s.door); const out=st.clone().sub(c).setY(0).normalize(); const o=st.clone().setY(.3); dray.set(o,out.clone().negate()); dray.far=3;
+  const hit=W.B[id]?dray.intersectObject(W.B[id],true)[0]:null; return { p:(hit?hit.point.clone():c.clone().lerp(st,.45)).setY(0), out }; }
+const quest=Quest({ guide:()=>R, doorAt:doorSpot });
+world.quest={ target:id=>{ quest.target(id); PC.focus=id?doorSpot(id).p:null; if(id&&mode!=='explore'&&!inShop) explore(true); }, clear:()=>{ quest.clear(); PC.focus=null; }, get id(){ return quest.id; }, points:()=>quest.points };
+world.guideWave=()=>{ try{ R.play(R.A.interact?'interact':'wave',{rate:1.1}); }catch(_){ } };
+world.keeperSay=(id,text,opt={})=>{ const k=CAST.keepers?.[id]||(id==='ferry'?CAST.ferryman:null); if(!k) return false; k.lookAt(R,1); SP.say(k,text,{name:k.name,dur:3,...opt}); return true; };
+world.focus=id=>{ PC.focus=id?doorSpot(id).p:null; };
+let robotBody=null;
+world.guideLook=look=>{ if(look==='crier'&&!robotBody&&CAST.crierBody){ robotBody=R.reskin(CAST.crierBody); R.name='Town Crier'; R.voice=1.05; }
+  else if(look!=='crier'&&robotBody){ CAST.crierBody.root=R.root; const back=robotBody; robotBody=null; const cr=R.reskin(back); Object.assign(CAST.crierBody,cr); R.name='Lamplighter'; R.voice=1.25; } return robotBody?'crier':'robot'; };
+world.guideSay=(text,opt={})=>SP.say(R,text,{name:R.name||'Lamplighter',dur:3,...opt});
+world.guideScreen=()=>screenOf(R.pos.clone().setY((R.height||.6)+.1));
 // walking straight into a door (keys held toward the shop, on its step) goes in, no button needed
 let pushT=0; function walkInto(dt){ const r=_nearDoor(); if(!r.id||!R.steer||r.d>.6){ pushT=0; return; } const c=hx(SHOPS[r.id].q,SHOPS[r.id].r); const tx=c.x-R.pos.x, tz=c.z-R.pos.z, l=Math.hypot(tx,tz)||1, sl=R.steer.length()||1;
   if((tx*R.steer.x+tz*R.steer.y)/(l*sl)>.55){ pushT+=dt; if(pushT>.3){ pushT=0; goIn(r.id); } } else pushT=0; }
@@ -280,7 +311,7 @@ function separatePins(){ const live=PINS.filter(p=>p.el.classList.contains('on')
       if(a.l<=b.l){ a.l-=shift/2; b.l+=shift/2; } else { b.l-=shift/2; a.l+=shift/2; } moved=true; }
     if(!moved) break; }
   for(const b of boxes){ const x=b.l+b.w/2, y=b.t+b.h; b.p.el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; } }
-function updPins(){ const z=mode==='explore'&&!inShop?PC.zs:0; const a=sstep(.42,.62,z); body.classList.toggle('ov',a>.5); for(const p of PINS){ const v=p.top.clone().project(cam); const on=a>.05&&v.z<1;
+function updPins(){ const z=mode==='explore'&&!inShop&&!PC.focus?PC.zs:0; /* no map pins while the camera frames a quest walk */ const a=sstep(.42,.62,z); body.classList.toggle('ov',a>.5); for(const p of PINS){ const v=p.top.clone().project(cam); const on=a>.05&&v.z<1;
     p.el.style.opacity=on?a.toFixed(2):'0'; p.el.classList.toggle('on',on&&a>.5); p.el.tabIndex=on&&a>.5?0:-1; if(on){ const hw=Math.min(90,p.el.offsetWidth/2||70)+8, x=Math.max(hw,Math.min(innerWidth-hw-(innerWidth<720?44:64),(v.x*.5+.5)*innerWidth)), y=Math.max(innerWidth<720?150:110,Math.min(innerHeight-(innerWidth<720?150:120),(-v.y*.5+.5)*innerHeight)); p.el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; } }
   if(a>.5) separatePins(); }
 // ---------- hover: shop names in any view, character names on hover only ----------
@@ -307,11 +338,14 @@ function pick(e){ const r=cv.getBoundingClientRect(); ndc.set((e.clientX-r.left)
 cv.addEventListener('pointerdown',e=>{ down={x:e.clientX,y:e.clientY,yaw:PC.yaw,po:PC.po,t:performance.now()}; });
 cv.addEventListener('pointermove',e=>{ if(down&&mode==='explore'&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>6){ PC.yaw=down.yaw-(e.clientX-down.x)*.006; PC.po=Math.max(-.1,Math.min(.3,down.po+(e.clientY-down.y)*.003)); tagOff(); return; } if(mode==='story'||down||inShop) return; hover(e); });
 cv.addEventListener('pointerup',e=>{ const d=down; down=null; if(inShop) return; if(!d||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6) return; if(storyEnd>d.t-80) return; if(mode!=='explore') explore(true);
-  sm.hidden=true; const id=pickOpen(e); if(id){ if(play==='jump') jump(id); else goIn(id); return; }
+  sm.hidden=true; const kp=keeperAt(e); if(kp){ kp.lookAt(R,1); dispatchEvent(new CustomEvent('world:keeper-tap',{detail:{id:kp.keeper||'ferry',name:kp.name}})); return; }
+  const id=pickOpen(e); if(id){ if(play==='jump') jump(id); else goIn(id); return; }
   if(play!=='walk') return; body.classList.add('moved');
   const now=performance.now(), dbl=now-(lastClick||0)<320; lastClick=now;
   const p=V(); ray.ray.intersectPlane(ground,p); const t=toHex(p.x,p.z); if(walkable(...t)){ R.steer=null; R.goHex(t,{end:p,run:dbl||p.distanceTo(R.pos)>7}); marker(p,dbl); } });
 let lastClick=0;
+// a tap within reach of a shopkeeper's head picks that keeper (Market Day shows their card: name, mood, purse)
+function keeperAt(e){ const r=cv.getBoundingClientRect(); let best=null,bd=40; for(const k of [...Object.values(CAST.keepers||{}),CAST.ferryman].filter(Boolean)){ const v=k.pos.clone().setY(.4).project(cam); if(v.z>1) continue; const x=(v.x+1)/2*r.width+r.left, y=(1-v.y)/2*r.height+r.top; const d=Math.hypot(x-e.clientX,y-e.clientY); if(d<bd){ bd=d; best=k; } } return best; }
 cv.addEventListener('wheel',e=>{ if(mode==='story'||inShop) return; e.preventDefault(); setZoom(PC.z+Math.sign(e.deltaY)*.075*Math.min(2,Math.abs(e.deltaY)/100||1)); },{passive:false});
 // pinch to zoom (touch): spreading the fingers moves toward the street, pinching pulls out to the overview
 { let pz=null; const dd=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
@@ -381,7 +415,7 @@ function setRail(){
   setTimeout(measure, 250);
   setTimeout(measure, 900);
 }
-function leaveRoom(){ undressRoom(room); SL.clear(); room=null; body.classList.remove('in-shop'); pinShop(false); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
+function leaveRoom(){ undressRoom(room); SL.clear(); room=null; body.classList.remove('in-shop'); ['--hudTop','--railTop','--rail'].forEach(k=>body.style.removeProperty(k)); /* a shop's measured rail must not pin the town menu onto the brand */ pinShop(false); shopUI.hidden=true; const r=W.renderer; r.shadowMap.autoUpdate=prevAU; r.shadowMap.needsUpdate=true; }
 addEventListener('resize',()=>{ if(!room) return; const c=room.camera, look=c.userData.look, fit=SL.frame(c); if(c.userData.home0){ c.position.copy(c.userData.home0).sub(look).multiplyScalar(fit).add(look); c.lookAt(look); } });
 $('#back').addEventListener('click',()=>world.exitShop());
 // The menu wraps differently at narrow widths, so its height is not a constant.
@@ -424,7 +458,7 @@ world.freeze=on=>freeze(on); world.mode=()=>mode; world.skip=()=>endStory();
 // ---------- loop ----------
 let last=performance.now(), fpsS=[], lpDone=LP;
 function draw(){ if(!room){ render(); return; } const r=W.renderer, e=r.toneMappingExposure; r.setRenderTarget(null); r.toneMappingExposure=1.08; r.render(room.scene,room.camera); r.toneMappingExposure=e; SL.placeTags(); }
-function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(dt); if(room){ SP.update(); return; } tickRoutines(); updateCast(dt); if(mode!=='story'&&LIFE) tickLife(dt,{sky:SKYRUN||skyM!=='auto'}); update(dt);
+function step(dt){ clock.T+=dt; gsap.updateRoot(clock.T); tickTimers(); SL.tick(dt); if(room){ SP.update(); return; } tickRoutines(); updateCast(dt); quest.update(dt); if(mode!=='story'&&LIFE) tickLife(dt,{sky:SKYRUN||skyM!=='auto'}); update(dt);
   // lamp flare when the Lamplighter lights it
   for(const l of W.lamps){ if(l.flare>0) l.flare=Math.max(0,l.flare-dt*1.6); }
   if(window.__camLock){} else if(mode==='explore'&&!inShop&&!D.shot){ steerFromKeys(); playCam(dt); prompt(PC.zs<.44?nearDoor():null); placePrompt(); walkInto(dt); } else { prompt(null); applyCam(dt); }
@@ -494,7 +528,7 @@ route.arm();
 // warm every room while the town idles: each shop module and the room props it puts (D8 core caches both), one per idle slot,
 // so the first door at any width opens at warm speed instead of waiting on cold fetches
 // arena's Knight.glb (1.1 MB) is left cold to keep first-load wire under budget
-const WARM={ toll:['tiles/base/hex_grass','tiles/base/hex_water','buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A','chars/RobotExpressive.glb'], chronicle:['tiles/base/hex_grass','decoration/props/crate_A_big'], bank:['decoration/props/crate_B_small','decoration/props/sack'], guard:['buildings/neutral/wall_straight_gate','decoration/props/barrel','decoration/props/bucket_arrows','decoration/props/target','decoration/props/weaponrack'],
+const WARM={ toll:['tiles/base/hex_grass','tiles/base/hex_water','buildings/blue/building_tower_base_blue','buildings/neutral/building_bridge_A','chars/Rogue_Hooded.glb'], chronicle:['tiles/base/hex_grass','decoration/props/crate_A_big'], bank:['decoration/props/crate_B_small','decoration/props/sack'], guard:['buildings/neutral/wall_straight_gate','decoration/props/barrel','decoration/props/bucket_arrows','decoration/props/target','decoration/props/weaponrack'],
   ferry:['decoration/props/crate_A_small'], arena:[], hall:['decoration/props/flag_blue'], house:[], payouts:[] };
 function warmRooms(){ if(navigator.connection?.saveData) return; const D8=new URL('../../D8_shops/',import.meta.url).href; const q=Object.entries(WARM).filter(([id])=>OPEN[id]);
   const idle=f=>setTimeout(f,350);
@@ -507,7 +541,7 @@ let warmed=null; const warmGPU=()=>warmed||(warmed=(async()=>{ if(inShop) return
 window.__render=draw; window.__shopsLayer='d9';
 // Toll's floor, robot and policy start with the page so the first door is not a cold 20s fetch.
 setTimeout(()=>{ const D8=new URL('../../D8_shops/',import.meta.url).href; import(D8+'js/core.js').then(C8=>{
-  for (const p of ['hex/tiles/base/hex_grass','hex/tiles/base/hex_water','hex/buildings/neutral/building_bridge_A','hex/buildings/blue/building_tower_base_blue','chars/RobotExpressive.glb']) C8.load(p).catch(()=>null);
+  for (const p of ['hex/tiles/base/hex_grass','hex/tiles/base/hex_water','hex/buildings/neutral/building_bridge_A','hex/buildings/blue/building_tower_base_blue','chars/Rogue_Hooded.glb']) C8.load(p).catch(()=>null);
 }).catch(()=>{}); const api=(globalThis.NEARCARTA_API||'').replace(/\/$/,''); fetch(api+'/api/toll/live').catch(()=>{}); fetch(api+'/api/toll').catch(()=>{}); },0);
 setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE){ setTimeout(()=>warmGPU().then(warmRooms),300); } }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
 if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,SP,setSky,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 

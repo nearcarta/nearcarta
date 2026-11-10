@@ -463,10 +463,14 @@ export function passPaidCopy({ balanceNear, feeNear, to } = {}) {
 export function policyWords(live) {
   if (!live || live.ok === false) return 'The live policy did not answer. Nothing was signed.';
   const q = live.quote || policyQuote(live);
-  const fee = q.payable ? ` Visitor fee ${q.feeNear} NEAR.` : ' The live policy has no visitor fee.';
-  const chain = live.chain_id == null || live.chain_id === '' ? 'unread' : String(live.chain_id);
-  const recorded = live.path || 'unread';
-  return `Policy on ${live.contract || TOLL_ACCT}. A visitor row is row:{account}:base, chain id ${chain}.${fee} The recorded path ${recorded} is not this visitor's wallet. This is not a Base payment.`;
+  const fee = q.payable
+    ? `Visitor fee ${q.feeNear} NEAR, paid from your board row under your /setup caps.`
+    : 'This gate has no visitor fee right now.';
+  const chain = live.verify_chain
+    || (live.chain_id === 8453 ? 'Base' : (live.chain_id == null || live.chain_id === '' ? '' : `chain ${live.chain_id}`));
+  const path = live.path ? ` The gate's recorded path (${live.path}) is not your wallet.` : '';
+  const where = chain ? ` Crossings target ${chain}.` : '';
+  return `Toll on ${live.contract || TOLL_ACCT}. ${fee}${where}${path} The NEAR fee opens the crossing; it is not itself a Base payment.`;
 }
 
 /** Newest allowed pass from this browser. The recorded owner allow is not the visitor's pass. */
@@ -507,7 +511,10 @@ function txLinks(txs) {
   const bits = [];
   for (const [k, h] of Object.entries(txs)) {
     if (!/^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(String(h || ''))) continue;
-    const label = /not_allow|refus/i.test(k) ? 'Refused on NEAR' : /allow|pay/i.test(k) ? 'Allowed on NEAR' : k;
+    // Visitor ledger: only Allowed / Refused. Operator deploy/migrate hashes used to fill the
+    // Ledger tab with method names (toll_v8_upgrade_migrate, fund_toll, …) that are not a pass.
+    const label = /not_allow|refus/i.test(k) ? 'Refused on NEAR' : /allow|pay/i.test(k) ? 'Allowed on NEAR' : null;
+    if (!label) continue;
     bits.push(`<a class="rc tx" data-testid="toll-record" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">${esc(label)}</a>`);
   }
   return bits.join(' ');
