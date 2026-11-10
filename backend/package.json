@@ -18,6 +18,7 @@
     "@noble/hashes": "^1.8.0",
     "@phala/dcap-qvl": "^0.7.0",
     "@scure/base": "^2.4.0",
+    "borsh": "2.0.0",
     "bs58": "^6.0.0",
     "hono": "^4.13.14",
     "near-api-js": "^7.2.0",
