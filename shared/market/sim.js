@@ -239,8 +239,14 @@ export function rng(seed = 7) {
 const CROWD = ['miner-1', 'miner-2', 'miner-3', 'trader-1', 'trader-2', 'investor', 'council'];
 
 // Fast-forward: seven days as 168 hourly ticks with a seeded crowd. Returns one row per hour.
-export function runWeek({ seed = 7, hours = 168, city = createCity() } = {}) {
-  const r = rng(seed); const rows = [];
+// The council: a rule change voted by the city, not shipped by a developer. Here it lowers the floor a shop must hold
+// to stay open, so fewer shops go dark. On chain this is a set_rules call on the market; in the practice round it is this.
+export function councilVote(city, { floorBps = 7_500n } = {}) {
+  for (const s of Object.values(city.shops)) s.floor = (s.floor * floorBps) / 10_000n;
+  note(city, { who: 'council', kind: 'rule', rule: 'floor', bps: String(floorBps) });
+}
+export function runWeek({ seed = 7, hours = 168, city = createCity(), councilAt = 84 } = {}) {
+  const r = rng(seed); const rows = []; const events = [];
   for (const who of CROWD) player(city, who).near = 200n * MILLI;
   const shops = Object.keys(city.shops);
   const pick = (a) => a[Math.floor(r() * a.length)];
@@ -261,8 +267,9 @@ export function runWeek({ seed = 7, hours = 168, city = createCity() } = {}) {
     }
     // A dark shop: the council reopens it, or the investor buys shares.
     const dark = shops.filter((s) => !isOpen(city.shops[s]));
-    if (dark.length) { const s = dark[0]; tryIt(() => invest(city, h % 2 ? 'council' : 'investor', s, 25n * MILLI)); }
-    if (h % 24 === 18) note(city, { who: 'con-artist', kind: 'refused', shop: pick(shops), why: 'receiver_not_allowlisted' });
+    if (dark.length) { const s = dark[0]; if (tryIt(() => invest(city, h % 2 ? 'council' : 'investor', s, 25n * MILLI)) !== null) events.push({ hour: h + 1, kind: 'reopen', shop: s }); }
+    if (h % 24 === 18) { const s = pick(shops); note(city, { who: 'con-artist', kind: 'refused', shop: s, why: 'receiver_not_allowlisted' }); events.push({ hour: h + 1, kind: 'refused', shop: s }); }
+    if (councilAt != null && h + 1 === councilAt) { councilVote(city); events.push({ hour: h + 1, kind: 'rule', rule: 'floor' }); }
     city.t = (h + 1) * HOUR_S;
     const avg = {};
     for (const g of Object.keys(GOODS)) {
@@ -271,5 +278,5 @@ export function runWeek({ seed = 7, hours = 168, city = createCity() } = {}) {
     }
     rows.push({ hour: h + 1, avg, open: shops.filter((s) => isOpen(city.shops[s])).length, tills: shops.reduce((a, s) => a + city.shops[s].till, 0n) });
   }
-  return { city, rows };
+  return { city, rows, events };
 }

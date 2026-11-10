@@ -64,7 +64,7 @@ root.innerHTML = `
 <div class="md-toasts" aria-live="polite"></div>
 <nav class="md-dock" aria-label="Market Day">
   <button type="button" class="md-ask" data-v="ask" data-testid="md-ask" aria-label="Ask the Town Crier"><span class="i">${ICON.lamp}</span></button>
-  <div class="md-quest" data-testid="md-quest"><span class="md-qn" data-k="qn"></span><span class="md-qt"><b data-k="qshop"></b><small data-k="qneed"></small></span><button type="button" class="md-go" data-act="go" data-testid="md-go" data-k="qgo">Go</button></div>
+  <div class="md-quest" data-testid="md-quest"><span class="md-qn" data-k="qn"></span><span class="md-qt"><b data-k="qshop"></b><small data-k="qneed"></small></span><button type="button" class="md-week" data-v="week" data-testid="md-week" data-k="qweek" aria-label="A week in a minute" hidden><span class="i">${ICON.star}</span><span class="t">Week</span></button><button type="button" class="md-go" data-act="go" data-testid="md-go" data-k="qgo">Go</button></div>
   <button type="button" data-v="bag" data-testid="md-bag" aria-label="Your bag"><span class="i">${ICON.bag}</span><em data-k="bagn"></em></button>
 </nav>
 <section class="md-sheet" aria-hidden="true" data-testid="md-sheet"><div class="md-grab" aria-hidden="true"></div><div class="md-body"></div></section>`;
@@ -113,6 +113,7 @@ function quest() {
   K('qshop').textContent = s ? NAME[s.shop] : `Day ${Q.state(city).day} done`;
   K('qneed').textContent = s ? s.need : 'Your first coin is in the purse';
   const go = K('qgo'); go.textContent = walking ? 'On the way' : s ? 'Go' : `Day ${Q.state(city).day + 1}`; go.disabled = walking || guiding;
+  K('qweek').hidden = !!s || walking;
   root.querySelector('.md-quest').classList.toggle('walking', walking);
 }
 // Light the road to the next shop and frame the guide and its door together.
@@ -175,7 +176,7 @@ function paintStrip() {
 async function stripClick(a, b) {
   try {
     if (a === 'act') {
-      const step = Q.current(city); const res = Q.act(city, inShop); lastDone = { shop: inShop, step, res };
+      const step = Q.current(city); const res = Q.act(city, inShop); lastDone = { shop: inShop, step, res }; lastDeed = { shop: inShop, text: DEED[step.id] };
       save(); hud(); quest(); seal(b); whyOpen = false; flash = null;
     } else if (a === 'why') whyOpen = !whyOpen;
     else if (a === 'sell') { const t = S.sell(city, Q.ME, 'arena', b.dataset.good, +b.dataset.n); flash = { shop: inShop, text: `Sold for ${coins(t)} coins` }; save(); hud(); }
@@ -185,7 +186,15 @@ async function stripClick(a, b) {
   } catch (e) { flash = { shop: inShop, text: WHY[e.code] || e.message, no: true }; paintStrip(); }
 }
 addEventListener('world:interior-ready', (e) => { inShop = e.detail?.id || null; flash = null; if (lastDone && lastDone.shop !== inShop) lastDone = null; whyOpen = false; setTimeout(paintStrip, 30); });
-addEventListener('world:exterior-ready', () => { inShop = null; lastDone = null; strip.hide(); aim(); });
+// what a keeper did while you were inside, said in the street as you step out: the world shows them buying, selling, refusing
+const DEED = { order: 'Order posted: 3 salt.', cargo: 'Salt unloaded. My till paid for it.', cross: 'Toll noted. Paid at the sale.', check: 'Refused the stranger. A con artist.',
+  sell: 'Bought your salt. My shelf is fuller now.', seal: 'Your profit is hidden.', pay: 'Porter paid, under your cap.', invest: 'Lights are back on. Thank you, partner.', write: 'Day written in the book.' };
+let lastDeed = null;
+addEventListener('world:exterior-ready', (e) => { const was = inShop || e.detail?.id; inShop = null; lastDone = null; strip.hide(); aim();
+  if (playing && lastDeed && lastDeed.shop === was) { const d = lastDeed; lastDeed = null; setTimeout(() => WD().keeperSay?.(d.shop, d.text), 400); } });
+// tap a keeper: their card (name, mood, purse, what they did today)
+let keeperId = null;
+addEventListener('world:keeper-tap', (e) => { if (!playing || walking || guiding) return; keeperId = e.detail.id; open('keeper'); });
 setInterval(() => { if (playing && inShop && !lastDone && S.nodesAt(inShop).length) paintStrip(); }, 1000);
 
 // ---------- sheet: the bag and the guide ----------
@@ -217,19 +226,53 @@ function vReceipt() {
     + (rows ? `<div class="md-list">${rows}</div>` : '<p class="md-hint">Nothing yet. Your first stop is the Town Hall.</p>')
     + '<p class="md-hint">Practice round: the city’s rules run here. Each Record is a real mainnet transaction of the same action. 1 coin = 0.0001 NEAR. All proofs: <a href="/judge">/judge</a>.</p>';
 }
+function mood(sh) { if (!S.isOpen(sh)) return ['Worried', 'The till is under the floor. The shop is dark.']; if (sh.till >= sh.floor * 2n) return ['Cheerful', 'A full till and steady trade.']; return ['Steady', 'Enough in the till to trade.']; }
+function vKeeper() {
+  const id = keeperId, sh = city.shops[id]; const st = Q.STEPS.find((x) => x.shop === id); const name = st?.keeper || 'Keeper';
+  if (!sh) return head(ICON.lamp, name, NAME[id] || '');
+  const [m, why] = mood(sh); const done = Q.progress(city).done > Q.STEPS.indexOf(st);
+  const rows = [['Mood', `${m}`, why], ['Purse', `${coins(sh.till)} coins`, 'Their own till. They buy and sell from it'], ['Trades today', String(sh.trades), done && st ? DEED[st.id] : 'Waiting for you']];
+  return head(ICON.lamp, name, NAME[id]) + `<div class="md-list">${rows.map(([k, v, sub]) => `<div class="md-row static"><span class="md-nm"><b>${esc(k)}</b><small>${esc(sub)}</small></span><b class="md-val">${esc(v)}</b></div>`).join('')}</div>`;
+}
+// Fast-forward: a week of the city in a minute. The crowd trades, prices follow the shelves, a con artist is refused,
+// dark shops reopen, and mid-week the council changes a rule. Nobody ships code. Practice round: a preview, your day is kept.
+let week = null;
+const DAYH = (h) => `Day ${Math.floor((h - 1) / 24) + 1}`;
+const evText = (e) => e.kind === 'refused' ? `Con artist refused at ${NAME[e.shop] || e.shop}` : e.kind === 'rule' ? 'Council vote: a lower floor keeps shops open' : `${NAME[e.shop] || e.shop} reopened`;
+function weekStart() { const w = S.runWeek({ seed: 7 + Q.state(city).day, city: structuredClone(city) }); const g = 'good:salt';
+  const ys = w.rows.map((r) => Number(r.avg[g] / (Q.COIN / 10n)) / 10); week = { w, ys, min: Math.min(...ys), max: Math.max(...ys), h: 0, t0: performance.now(), raf: 0 }; weekTick(); }
+function weekTick() { if (!week || view !== 'week') return; const H = week.w.rows.length; week.h = Math.min(H, Math.max(1, Math.floor(((performance.now() - week.t0) / 60000) * H)));
+  const body = root.querySelector('.md-body'); const sv = body.querySelector('.md-wk-line'); if (!sv) return;
+  const X = (i) => (i / (H - 1)) * 300, Y = (v) => 88 - ((v - week.min) / Math.max(.1, week.max - week.min)) * 76;
+  sv.setAttribute('points', week.ys.slice(0, week.h).map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' '));
+  const r = week.w.rows[week.h - 1]; body.querySelector('[data-w=clock]').textContent = `${DAYH(week.h)} · ${String((week.h - 1) % 24).padStart(2, '0')}:00`;
+  body.querySelector('[data-w=price]').textContent = `${week.ys[week.h - 1].toFixed(1)} coins`; body.querySelector('[data-w=open]').textContent = `${r.open}/9`;
+  const seen = week.w.events.filter((e) => e.hour <= week.h), rule = seen.find((e) => e.kind === 'rule'); const evs = [...(rule ? [rule] : []), ...seen.filter((e) => e !== rule).slice(rule ? -1 : -2).reverse()];
+  body.querySelector('[data-w=feed]').innerHTML = evs.map((e) => `<div class="md-row static"><span class="md-nm"><b>${esc(evText(e))}</b><small>${DAYH(e.hour)}</small></span></div>`).join('');
+  const vote = week.w.events.find((e) => e.kind === 'rule'); const vm = body.querySelector('.md-wk-vote'); if (vote && vm) { vm.style.display = week.h >= vote.hour ? '' : 'none'; vm.setAttribute('x1', X(vote.hour - 1)); vm.setAttribute('x2', X(vote.hour - 1)); }
+  const done = week.h >= H; body.querySelector('[data-w=end]').hidden = !done; body.querySelector('[data-act=wskip]').hidden = done;
+  if (!done) week.raf = requestAnimationFrame(weekTick); }
+function vWeek() {
+  return head(ICON.star, 'A week in a minute', 'The city runs itself') + `<div class="md-wk"><div class="md-wk-top"><b data-w="clock">Day 1</b><span>Salt <b data-w="price"></b></span><span>Open <b data-w="open"></b></span></div>
+  <svg class="md-wk-chart" viewBox="0 0 300 96" preserveAspectRatio="none" aria-label="Salt price over the week"><line class="md-wk-vote" x1="0" x2="0" y1="4" y2="92" style="display:none"/><polyline class="md-wk-line" points=""/></svg>
+  <div class="md-list" data-w="feed"></div><p class="md-hint" data-w="end" hidden>A week passed. No patch, no developer: prices followed the shelves, and the council changed a rule.</p>
+  <button type="button" class="md-ghost sm" data-act="wskip">Skip to the end</button></div>`;
+}
 function render() {
   const body = root.querySelector('.md-body');
-  body.innerHTML = view === 'bag' ? vBag() : view === 'ask' ? vAsk() : view === 'receipt' ? vReceipt() : '';
+  body.innerHTML = view === 'bag' ? vBag() : view === 'ask' ? vAsk() : view === 'receipt' ? vReceipt() : view === 'keeper' ? vKeeper() : view === 'week' ? vWeek() : '';
+  if (view === 'week') { cancelAnimationFrame(week?.raf || 0); if (!week || week.done) weekStart(); else weekTick(); }
 }
 
 root.addEventListener('click', (ev) => {
   const b = ev.target.closest('[data-act],[data-v]'); if (!b || b.disabled) return;
-  if (b.dataset.v) { if (guiding || walking) return; view === b.dataset.v ? close() : open(b.dataset.v); if (view === 'ask') setTimeout(() => root.querySelector('.md-say input')?.focus(), 60); return; }
+  if (b.dataset.v) { if (guiding || walking) return; if (b.dataset.v === 'week') week = null; view === b.dataset.v ? close() : open(b.dataset.v); if (view === 'ask') setTimeout(() => root.querySelector('.md-say input')?.focus(), 60); return; }
   if (b.dataset.act === 'ask') { ask(b.dataset.text || root.querySelector('.md-say input')?.value || ''); return; }
   const a = b.dataset.act;
   try {
     if (a === 'close') close();
     else if (a === 'go') go();
+    else if (a === 'wskip') { if (week) { week.t0 = performance.now() - 60000; weekTick(); } return; }
     else if (a === 'claim') toast(`Claimed ${coins(S.claim(city, ME, b.dataset.shop))} coins`);
     else if (a === 'craft') { S.craft(city, ME, b.dataset.item); toast(`Crafted a ${GOOD(b.dataset.item).toLowerCase()}`); }
     save(); hud(); refresh();
