@@ -64,13 +64,13 @@ const failure = (r) => { for (const o of [r?.transaction_outcome, ...(r?.receipt
 export async function marketState(c, me, calls) {
   try {
     const goods = goodsOf(calls);
-    const [sq, bals, storage] = await Promise.all([view(c.market, 'square', { account_id: me }), goods.length ? view(c.market, 'mt_batch_balance_of', { account_id: me, token_ids: goods }) : [], view(c.market, 'storage_balance_of', { account_id: me }).catch(() => null)]);
+    const [sq, bals, storage] = await Promise.all([view(c.market, 'square', { account_id: me }, undefined, { fresh: true }), goods.length ? view(c.market, 'mt_batch_balance_of', { account_id: me, token_ids: goods }, undefined, { fresh: true }) : [], view(c.market, 'storage_balance_of', { account_id: me }, undefined, { fresh: true }).catch(() => null)]);
     return { purse: sq.purse, storage, rules: sq.rules, stalls: sq.stalls, me, now_ns: BigInt(Date.now()) * 1_000_000n, bag: Object.fromEntries(goods.map((g, i) => [g, Number(bals[i] || 0)])) };
   } catch { return null; }
 }
 const callsOf = (d) => d.actions.map((a) => { let args = {}; try { args = JSON.parse(Buffer.from(Uint8Array.from(a.functionCall.args)).toString('utf8')); } catch {} return { method: a.functionCall.methodName, args }; });
 
-export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction(sd), keyOf, heightOf, now = Date.now, stateOf } = {}) {
+export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction(sd), keyOf, heightOf, now = Date.now, stateOf, sponsor = null } = {}) {
   roll(); const c = conf();
   if (!hasKey() && !send.__test) return refuse('ERR_RELAYER_OFF', 503);
   const sd = decode(b64); if (!sd) return refuse('ERR_DECODE');
@@ -88,9 +88,13 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
   }
   // Worst case for this move: all attached gas burnt at 0.1 NEAR per 1000 Tgas (100M yocto per gas).
   const worst = p.gas * 100_000_000n;
-  if (ledger.spent + worst > c.dailyNear) return refuse('ERR_DAILY_BUDGET', 429);
-  if ((ledger.by.get(d.senderId) || 0n) >= c.visitorNear) return refuse('ERR_VISITOR_GAS_CAP', 429);
-  const cap = counters.take(d.senderId); if (cap) return refuse(cap, 429);
+  // The city's demo purse (backend/src/merchant.js) has its own caps: runs a day read on chain, a gas cap per
+  // move and a relayer balance floor. Visitor caps apply to everyone else.
+  if (!sponsor) {
+    if (ledger.spent + worst > c.dailyNear) return refuse('ERR_DAILY_BUDGET', 429);
+    if ((ledger.by.get(d.senderId) || 0n) >= c.visitorNear) return refuse('ERR_VISITOR_GAS_CAP', 429);
+    const cap = counters.take(d.senderId); if (cap) return refuse(cap, 429);
+  }
   let r; try { r = await send(sd); } catch (e) { return refuse('ERR_SEND: ' + String(e.message || e).slice(0, 160), 502); }
   const y = burnt(r); ledger.spent += y; ledger.relays++;
   ledger.by.set(d.senderId, (ledger.by.get(d.senderId) || 0n) + y);
