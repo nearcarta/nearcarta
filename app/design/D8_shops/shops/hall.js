@@ -25,7 +25,7 @@ export async function liveProposals(_fetchFn, _base, bare = false) {
   const parts = [h3('Recorded payments'), row({ k: 'Reward paid', why: '0.001 NEAR allowed', st: 'ok', stText: 'allowed', tx: '6UxwRmoEd6x5g28jwEY6DeSMiX6stRqAjat59iPJ3G9h' }), note('set_rules, set_frozen and set_seal. Gas only. A shared council is not on this page.')];
   return bare ? parts.join('') : proof(...parts);
 }
-export const MORE = { href: '/setup/?next=%2Fshops%2Fhall%2F', text: 'Change my row' };
+export const MORE = { href: '/setup/?next=%2Fshops%2Fhall%2F', text: 'Change my spend limit' };
 export default async function hall(ctx) {
   const liveP = liveProposals();
   const { scene, camera } = await room({ cam: [0, 4.4, 8.6], look: [0, .8, 0] });

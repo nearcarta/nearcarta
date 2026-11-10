@@ -929,3 +929,119 @@ body.house-tray #shopUI #tray #t-form .house-history {
   background: rgba(0, 0, 0, .22) !important;
   border: 1px solid var(--gs-line) !important;
 }
+
+/* ============================================================================================
+   LAST RESORT — the rules here win on specificity, so nothing above can demote what they set
+   ============================================================================================ */
+
+/* Chronicle: "Show timeline" must be the gold action, exactly like Swap's Review swap. Three
+   ids and the body class beat every rule earlier in this file and in the per-shop sheets. */
+body.chronicle-tray #shopUI #tray #t-act,
+body.chronicle-tray #shopUI #tray #t-act.act,
+body.chronicle-tray #shopUI #tray #t-act.primary {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  border-radius: var(--r-cta) !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 100% !important;
+}
+
+/* Bank: the file name was clipped to "N…en". The field is a line of its own, the picker button
+   keeps its space, and only the NAME is allowed to ellipsis — "No file chosen" fits in full. */
+body #shopUI #tray #t-form input[type='file'] {
+  width: 100% !important;
+  min-width: 100% !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  line-height: 44px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  border-style: solid !important;
+  border-width: 1px !important;
+  background: var(--gs-card) !important;
+}
+body #shopUI #tray #t-form input[type='file']::file-selector-button {
+  margin-right: 12px;
+  padding: 0 12px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  flex: 0 0 auto;
+}
+
+/* Invoice: Expiry gets its own full-width line on a phone so the minutes survive. */
+@media (max-width: 720px) {
+  body #shopUI #tray #t-form .hall-split { grid-template-columns: minmax(0, 1fr) !important; }
+  body #shopUI #tray #t-form input[type='datetime-local'],
+  body #shopUI #tray #t-form input[type='date'] {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 13px !important;
+    padding: 0 8px !important;
+  }
+}
+/* ...and at 1440 the pair is wide enough for the whole value. */
+@media (min-width: 721px) {
+  body #shopUI #tray #t-form .hall-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; gap: 12px !important; }
+  body #shopUI #tray #t-form input[type='datetime-local'] { min-width: 172px !important; }
+}
+/* The empty black slot above Sign in was a status/result div with no text. */
+body #shopUI #tray #t-form > div:empty,
+body #shopUI #tray #t-form > p:empty,
+body #shopUI #tray #t-rcpt:empty,
+body #shopUI #tray #t-form [data-testid$='-status']:empty { display: none !important; }
+
+/* Phone: the agent chip moves into the top bar beside Back to town, and the composer opens as a
+   bottom sheet that is meant to cover the panel, with its own close control. */
+@media (max-width: 720px) {
+  body #shopUI [id$='-agent-dock'] {
+    position: fixed !important;
+    top: 6px !important;
+    right: 8px !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: 46;
+    transform: none !important;
+  }
+  body #shopUI [id$='-agent-dock'] [class*='agent-name'] { font-size: 11px !important; }
+  body #shopUI #back { right: auto !important; max-width: calc(100vw - 150px); }
+
+  /* The composer: full width, pinned to the bottom, above the panel on purpose. */
+  body #shopUI [id$='-agent-pop']:not([hidden]) {
+    position: fixed !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 46dvh;
+    z-index: 90;
+    padding: 12px !important;
+    border-radius: var(--r-panel) !important;
+    background: #1b120c !important;
+    border: 1px solid var(--gs-line-gold) !important;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, .55);
+    box-sizing: border-box;
+  }
+  body #shopUI [id$='-agent-pop'] input {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 13px !important;
+    text-overflow: ellipsis;
+  }
+  body #shopUI [id$='-agent-pop'] input::placeholder { font-size: 12px; }
+}
+
+/* "All shops" must not touch the tray's corner. */
+body.in-shop nav.all-shops { margin: 8px !important; }

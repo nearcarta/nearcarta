@@ -16,7 +16,7 @@ export const USDC_PROOF = proof(
 export const PROOF = BATCH_PROOF + USDC_PROOF;
 export const MORE = null;
 // For the 2D fallback (js/flat.js and the town's fb.js)
-export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'Pay under the row cap', hero: '<b class="num">3</b><span class="unit">rows, one propose each</span>' };
+export const FLAT = { src: 'mainnet', cls: 'mainnet', label: 'Pay under your spend limit', hero: '<b class="num">3</b><span class="unit">payments, one at a time</span>' };
 export default async function payouts() {
   const { scene, camera } = await room({ cam: [.4, 3.9, 8.0], look: [0, .85, 0] });
   // the counting desk
