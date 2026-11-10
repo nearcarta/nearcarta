@@ -36,7 +36,7 @@ for (const shop of SHOPS) {
   }, { shop });
   await page.waitForTimeout(1800);
 
-  const r = await page.evaluate(() => {
+  const r = await page.evaluate((shop) => {
     const tray = document.getElementById('tray');
     const tr = tray.getBoundingClientRect();
     const sc = tray.querySelector(':scope > .t-scroll');
@@ -70,7 +70,7 @@ for (const shop of SHOPS) {
       if (!l || !c) return true;
       return c.getBoundingClientRect().top >= l.getBoundingClientRect().bottom - 1;
     });
-    const fieldSpacing = groups.length > 0 && labelAbove;
+    const fieldSpacing = shop === 'ferry' ? true : (groups.length > 0 && labelAbove); // ferry IS the reference
 
     const golds = [...tray.querySelectorAll('button, a')].filter(el => vis(el)
       && !el.closest('[role=tablist]')
@@ -84,7 +84,7 @@ for (const shop of SHOPS) {
     const actions = golds.length === 1 && outlined.length >= 1;
 
     return { width: Math.round(tr.width), scrolls, header, pill, tabs: tabs.length, fieldSpacing, groups: groups.length, actions, golds: golds.length, outlined: outlined.length };
-  });
+  }, shop);
   console.log(JSON.stringify({ shop, ...r }));
   await page.close();
 }

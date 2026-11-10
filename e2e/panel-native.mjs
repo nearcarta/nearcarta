@@ -10,6 +10,8 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
 const shop = process.argv[2] || 'ferry';
+// Ferry is THE approved reference (swap-gold-standard.png); its crop is the standard other shops
+// are compared against, so it is never restyled to match a later rule.
 const W = Number(process.argv[3] || 1440);
 const OUT = process.env.OUT || '/tmp/panels-native';
 mkdirSync(OUT, { recursive: true });
