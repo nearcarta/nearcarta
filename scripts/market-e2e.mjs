@@ -3,7 +3,7 @@
 // signed delegate action through the prod relayer (the visitor pays no gas). Every tx is recorded.
 //   node scripts/market-e2e.mjs [--base https://nearcarta.vercel.app] [--out file.json]
 import { KeyPair, KeyPairSigner, JsonRpcProvider, actions, buildDelegateAction, encodeSignedDelegate } from 'near-api-js';
-import { writeFileSync, mkdirSync, chmodSync, statSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,15 +19,24 @@ const balance = async (id) => { try { return (await p.viewAccount({ accountId: i
 const post = async (path, body) => (await fetch(BASE + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const kp = KeyPair.fromRandom('ed25519');
+// --resume <key file>: carry on with the same account after an interrupted run (no second session).
+const resume = arg('--resume');
+let kp, file;
+if (resume) {
+  if ((statSync(resume).mode & 0o077) !== 0) throw new Error('key file not 600');
+  kp = KeyPair.fromString(JSON.parse(readFileSync(resume, 'utf8')).private_key); file = resume;
+} else {
+  kp = KeyPair.fromRandom('ed25519');
+  const dir = join(homedir(), '.near-credentials', 'mainnet'); mkdirSync(dir, { recursive: true });
+  file = join(dir, `e2e-${Buffer.from(kp.getPublicKey().data).toString('hex').slice(0, 12)}.json`);
+  writeFileSync(file, JSON.stringify({ account_id: Buffer.from(kp.getPublicKey().data).toString('hex'), public_key: kp.getPublicKey().toString(), private_key: kp.toString() }), { mode: 0o600 });
+  chmodSync(file, 0o600); if ((statSync(file).mode & 0o777) !== 0o600) throw new Error('key file not 600');
+}
 const id = Buffer.from(kp.getPublicKey().data).toString('hex');
-const dir = join(homedir(), '.near-credentials', 'mainnet'); mkdirSync(dir, { recursive: true });
-const file = join(dir, `e2e-${id.slice(0, 12)}.json`);
-writeFileSync(file, JSON.stringify({ account_id: id, public_key: kp.getPublicKey().toString(), private_key: kp.toString() }), { mode: 0o600 });
-chmodSync(file, 0o600); if ((statSync(file).mode & 0o777) !== 0o600) throw new Error('key file not 600');
 const signer = KeyPairSigner.fromSecretKey(kp.toString());
-const log = { base: BASE, account: id, key_file: file, started: new Date().toISOString(), txs: [], balances: {} };
 const out = arg('--out', `/workspace/near/e2e/market-e2e-${id.slice(0, 8)}.json`);
+const log = resume && existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : { base: BASE, account: id, key_file: file, started: new Date().toISOString(), txs: [], balances: {} };
+const done = (step) => log.txs.some((t) => t.ok && t.step.startsWith(step));
 mkdirSync(join(out, '..'), { recursive: true });
 const save = () => writeFileSync(out, JSON.stringify(log, null, 1));
 log.balances.relayer_before = near(await balance('relayer.nearcarta.near'));
@@ -46,23 +55,26 @@ async function move(step, calls) {
   await sleep(2500); return r;
 }
 
-const s = await post('/api/relay/session', { account_id: id });
-log.session = s; save(); console.log('session', JSON.stringify(s));
-if (!s.ok) throw new Error('session refused');
-for (let i = 0; i < 20 && BigInt(await balance(id)) === 0n; i++) await sleep(1500);
-await sleep(2500);
-log.balances.player_after_session = near(await balance(id));
+if (!resume) {
+  const s = await post('/api/relay/session', { account_id: id });
+  log.session = s; save(); console.log('session', JSON.stringify(s));
+  if (!s.ok) throw new Error('session refused');
+  for (let i = 0; i < 20 && BigInt(await balance(id)) === 0n; i++) await sleep(1500);
+  await sleep(2500);
+  log.balances.player_after_session = near(await balance(id));
+}
 
-await move('cargo: gather 3 salt at the Ferry', ['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node } })));
+if (!done('cargo')) await move('cargo: gather 3 salt at the Ferry', ['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node }, tgas: 15 })));
 const salt = Number(await view('mt_balance_of', { account_id: id, token_id: 'good:salt' }));
 const q = await view('quote', { shop: 'arena', good: 'good:salt' });
 const qty = Math.min(3, salt); const min = (BigInt(q.sell) * BigInt(qty) * 8n) / 10n;
-await move(`sell: ${qty} salt at the Arena into the purse`, [{ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty, min_total: String(min), keep: true }, tgas: 60 }]);
+if (!done('sell')) await move(`sell: ${qty} salt at the Arena into the purse`, [{ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty, min_total: String(min), keep: true }, tgas: 20 }]);
 log.purse_after_sell = near((await view('square', { account_id: id })).purse);
 const sq = await view('square', { account_id: id });
 const free = [1, 2, 3, 4].find((n) => !sq.stalls.some((x) => x.id === n && x.holder && Number(x.until) > Date.now() * 1e6)) || 1;
-await move(`stall: rent stall ${free} for ${near(sq.rules.stall_rent)} NEAR`, [{ method: 'stall', args: { stall: free, action: 'rent' }, tgas: 40 }]);
-await move('invest: 0.001 NEAR from the purse into the ferry', [{ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop: 'ferry' }, tgas: 60 }]);
+{ const t = await post('/api/relay/session', { account_id: id }); log.topups = [...(log.topups || []), t]; save(); console.log('session top-up', JSON.stringify(t)); await sleep(3000); }
+if (!done('stall')) await move(`stall: rent stall ${free} for ${near(sq.rules.stall_rent)} NEAR`, [{ method: 'stall', args: { stall: free, action: 'rent' }, tgas: 20 }]);
+if (!done('invest')) await move('invest: 0.001 NEAR from the purse into the ferry', [{ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop: 'ferry' }, tgas: 20 }]);
 
 await sleep(3000);
 const end = await view('square', { account_id: id });

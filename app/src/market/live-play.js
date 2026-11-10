@@ -38,7 +38,7 @@ export async function step(id, ctx = {}) {
   if (!live.account) return null;
   const L = await lib();
   if (id === 'cargo') {
-    const r = check(await L.move(['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node } }))));
+    const r = check(await L.move(['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node }, tgas: 15 }))));
     return record(id, 'Unloaded 3 salt at the Ferry', r);
   }
   if (id === 'sell') {
@@ -46,13 +46,14 @@ export async function step(id, ctx = {}) {
     const q = await L.view('quote', { shop: 'arena', good: 'good:salt' });
     const qty = Math.min(3, n); const min = (BigInt(q.sell) * BigInt(qty) * 8n) / 10n;
     const before = await purse();
-    const r = check(await L.move({ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty, min_total: String(min), keep: true }, tgas: 60 }));
+    const r = check(await L.move({ method: 'sell', args: { shop: 'arena', good: 'good:salt', qty, min_total: String(min), keep: true }, tgas: 20 }));
     const after = await purse(); r.total = before != null && after != null ? after - before : null;
     return record(id, `Sold ${qty} salt at the Arena`, r);
   }
   if (id === 'invest') {
     const shop = ctx.shop || 'ferry';
-    const r = check(await L.move({ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 60 }));
+    await L.ensureSession(); // tops the market storage back up if the day used it
+    const r = check(await L.move({ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 }));
     return record(id, `Invested 10 coins in the ${shop}`, r);
   }
   return null;
@@ -61,12 +62,13 @@ export async function step(id, ctx = {}) {
 /** Rent a stall in the Arena square from the purse. */
 export async function rentStall(stall = 1) {
   const L = await lib();
-  const r = check(await L.move({ method: 'stall', args: { stall, action: 'rent' }, tgas: 40 }));
+  await L.ensureSession();
+  const r = check(await L.move({ method: 'stall', args: { stall, action: 'rent' }, tgas: 20 }));
   return record('stall', `Rented stall ${stall} in the Arena`, r);
 }
 export async function listStall(stall, good, qty, price) {
   const L = await lib();
-  const r = check(await L.move({ method: 'stall', args: { stall, action: 'list', good, qty, price: String(price) }, tgas: 40 }));
+  const r = check(await L.move({ method: 'stall', args: { stall, action: 'list', good, qty, price: String(price) }, tgas: 20 }));
   return record('stall', `Put ${qty} ${good.slice(5)} on stall ${stall}`, r);
 }
 export async function square() { try { return await (await lib()).view('square', { account_id: live.account }); } catch { return null; } }

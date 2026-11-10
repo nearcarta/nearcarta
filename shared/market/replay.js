@@ -6,6 +6,8 @@ const good = (g) => String(g || '').replace(/^(good|item):/, '');
 const coins = (y) => { try { return `${(Number(BigInt(y) / 10n ** 19n) / 10).toFixed(1).replace(/\.0$/, '')} coins`; } catch { return ''; } };
 const who = (a) => (/^[0-9a-f]{64}$/.test(a) ? 'A visitor' : a?.startsWith('keeper-') ? `The ${shop(a.slice(7).split('.')[0])} keeper` : a === 'board.nearcarta.near' ? 'A charter row' : a === 'nearcarta.near' ? 'The city' : 'Someone');
 
+const ruleText = (rule, v) => rule === 'floor_bps' ? `let shops stay open down to ${Number(v) / 100}% of their floor`
+  : rule === 'stall_rent' ? `stall rent of ${coins(v)}` : rule === 'stall_days' ? `stalls rented for ${v} days` : 'a rule change';
 /** One receipt into the market -> { line, kind } or null when it is not worth a line. */
 export function lineFor({ method, args, ok, by }) {
   let a = {}; try { a = typeof args === 'string' ? JSON.parse(args) : args || {}; } catch {}
@@ -23,7 +25,7 @@ export function lineFor({ method, args, ok, by }) {
     case 'purse': return { kind: 'invest', line: a.action === 'invest' ? `${who(by)} invested in the ${shop(a.shop)} from the purse` : `${who(by)} took coins home` };
     case 'restock': return { kind: 'keeper', line: `The ${shop(a.shop)} keeper restocked ${a.qty} ${good(a.good)} from the ${shop(a.from_shop)}` };
     case 'stall': return { kind: 'stall', line: a.action === 'rent' ? `${who(by)} rented stall ${a.stall}` : a.action === 'buy' ? `${who(by)} bought at stall ${a.stall}` : `${who(by)} stocked stall ${a.stall}` };
-    case 'council': return { kind: 'rule', line: a.rule ? `${who(by)} proposed ${a.rule} = ${a.value}` : `${who(by)} voted ${a.yes ? 'yes' : 'no'}` };
+    case 'council': return { kind: 'rule', line: a.rule ? `${who(by)} asked the council: ${ruleText(a.rule, a.value)}` : `${who(by)} voted ${a.yes ? 'yes' : 'no'}` };
     case 'set_council': return { kind: 'rule', line: 'The keepers took their council seats' };
     case 'upgrade': return { kind: 'setup', line: 'The market learned stalls and the council' };
     case 'fill_order': return { kind: 'trade', line: `${who(by)} filled an order` };
