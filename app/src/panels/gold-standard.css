@@ -506,3 +506,48 @@ body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field > .lbl {
   color: var(--gs-muted);
 }
 body:not(.ferry-tray) #shopUI #tray #t-form .arena-modes + * { margin-top: 0; }
+
+/* ============================================================================================
+   Bank — labels were siblings of their controls, not wrappers, so no group existed
+   --------------------------------------------------------------------------------------------
+   The audit found zero field groups on the Bank: it renders `<label class="choice-label">` next to
+   a `<p class="bank-field">` or an input. They are paired here by making the pair a column, which
+   is the same "label above control" shape Swap has. No markup, no id, no handler changes.
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray #t-form label.choice-label {
+  display: block;
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--gs-muted);
+}
+
+body:not(.ferry-tray) #shopUI #tray #t-form .bank-field {
+  margin: 0 0 var(--gs-gap-tight);
+  min-height: 20px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--gs-cream);
+}
+
+/* A control that follows its label is the group's body: give it the Swap field shape. */
+body:not(.ferry-tray) #shopUI #tray #t-form label.choice-label + input,
+body:not(.ferry-tray) #shopUI #tray #t-form label.choice-label + select,
+body:not(.ferry-tray) #shopUI #tray #t-form label.choice-label + textarea {
+  display: block;
+  width: 100%;
+  min-height: var(--gs-field-h);
+  border-radius: var(--r-ctrl);
+  border: 1px solid var(--gs-line);
+  background: var(--gs-card);
+  color: var(--gs-cream);
+  font-size: 14px;
+  padding: 0 var(--p3);
+  margin: 0 0 var(--gs-gap);
+  box-sizing: border-box;
+}
+
+/* The last pair in a card does not add a trailing gap. */
+body:not(.ferry-tray) #shopUI #tray #t-form .bank-field:last-child { margin-bottom: 0; }
