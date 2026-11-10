@@ -39,3 +39,11 @@ test('restock call carries the decision and a capped deposit', () => {
   const a = JSON.parse(c.args);
   assert.equal(a.decision, 'chatcmpl-1'); assert.equal(a.max_total, '2100'); assert.equal(c.deposit, '2100');
 });
+
+test('council: a keeper sees the rule change in plain numbers before voting', async () => {
+  const { councilMessages } = await import('../../../shared/market/keeper-ai.js');
+  const m = councilMessages('ferry', 'floor_bps', '9000', 'slow days', { rules: { floor_bps: 10000 }, floor: '3000000000000000000000' })[1].content;
+  assert.match(m, /Now 10000 \(100%\), proposed 9000 \(90%\)/);
+  assert.match(m, /today it closes below 0\.003 NEAR; after the change, below 0\.0027 NEAR/);
+  assert.match(m, /Reason given: slow days/);
+});

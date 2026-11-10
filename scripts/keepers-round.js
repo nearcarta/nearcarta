@@ -3,7 +3,7 @@
 //   node scripts/keepers-round.js restock <shop>                    dry: the decision and the exact cost
 //   node scripts/keepers-round.js restock <shop> --live             send it through the keeper's board row
 //   node scripts/keepers-round.js propose <shop> <rule> <value> "<why>" [--live]
-//   node scripts/keepers-round.js vote <shop> [--live]
+//   node scripts/keepers-round.js vote <shop> [--why "<reason given>"] [--live]
 // restock: propose_call_as signed by the row's agent key. Anyone may submit it (the signature is the
 // authority), so the city account sends it and pays the gas; the keeper's row pays the stock.
 // council: a direct market call by the keeper, signed with its account key.
@@ -64,17 +64,24 @@ if (cmd === 'restock') {
     if (live) out.tx = await send(ROOT, process.env.NEAR_MAIN_PRIVATE_KEY, BOARD, [A.functionCall('propose_call_as', { owner: acct, receiver: MARKET, method: call.method, args: call.args, deposit: call.deposit, expiry: String(expiry), effects: [], hold: false, signature }, gas, 0n)], c.worst);
   }
 } else if (cmd === 'propose' || cmd === 'vote') {
+  // The keeper sees the rule's effect on its own shop in plain numbers (base floor = effective / bps).
+  async function ruleCtx(shop, sq) {
+    const me = (await view(MARKET, 'market_board')).find((x) => x.id === shop);
+    const floor = me ? (BigInt(me.floor) * 10000n) / BigInt(sq.rules.floor_bps) : undefined;
+    return { rules: sq.rules, floor: floor?.toString() };
+  }
   const sq = await view(MARKET, 'square', {});
   let msg;
   if (cmd === 'propose') {
     const [rule, value, why] = rest.filter((x) => x !== '--live');
     if (!checkRule(rule, value)) throw new Error('rule out of range');
-    const d = await decideVote(shop, { rule, value, why });
+    const d = await decideVote(shop, { rule, value, why, ...(await ruleCtx(shop, sq)) });
     out.decision = { completion_id: d.completion_id || null, reply: d.reply, why: d.why || null, verified: d.proof?.verified || false, verify_url: d.proof?.verify_url || null };
     if (d.reply?.yes) msg = { yes: true, rule, value: String(value), decision: d.completion_id };
   } else {
     const p = sq.council.open; if (!p) throw new Error('no open proposal');
-    const d = await decideVote(shop, { rule: p.rule, value: p.value, why: 'open proposal ' + p.id });
+    const wi = rest.indexOf('--why'); const why = wi >= 0 ? rest[wi + 1] : '';
+    const d = await decideVote(shop, { rule: p.rule, value: p.value, why, ...(await ruleCtx(shop, sq)) });
     out.decision = { completion_id: d.completion_id || null, reply: d.reply, why: d.why || null, verified: d.proof?.verified || false, verify_url: d.proof?.verify_url || null };
     if (d.reply) msg = { yes: d.reply.yes, decision: d.completion_id };
   }

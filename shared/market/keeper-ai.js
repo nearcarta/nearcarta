@@ -28,10 +28,22 @@ export function restockMessages(shop, board, choices) {
   ];
 }
 
-export function councilMessages(shop, rule, value, why) {
+// What a rule change means in plain numbers, so a keeper votes on the effect and not on the label.
+const nearOf = (y) => (Number(BigInt(y) / 10n ** 18n) / 1e6).toString();
+export function ruleEffect(rule, value, rules = {}, floorYocto) {
+  if (rule === 'floor_bps') {
+    const now = Number(rules.floor_bps ?? 10000), next = Number(value);
+    const base = floorYocto ? ` A shop's base floor is ${nearOf(floorYocto)} NEAR: today it closes below ${nearOf((BigInt(floorYocto) * BigInt(now)) / 10000n)} NEAR; after the change, below ${nearOf((BigInt(floorYocto) * BigInt(next)) / 10000n)} NEAR.` : '';
+    return `floor_bps is the share of its base floor a shop's till must keep to stay open. Now ${now} (${now / 100}%), proposed ${next} (${next / 100}%). ${next < now ? 'Lower means shops close less often but run on thinner tills.' : 'Higher means shops close sooner to protect their tills.'}${base}`;
+  }
+  if (rule === 'stall_rent') return `stall_rent is what a player pays to rent an Arena stall. Now ${nearOf(rules.stall_rent ?? '0')} NEAR, proposed ${nearOf(value)} NEAR.`;
+  if (rule === 'stall_days') return `stall_days is how long a stall rental lasts. Now ${rules.stall_days ?? '?'} days, proposed ${value} days.`;
+  return '';
+}
+export function councilMessages(shop, rule, value, why, ctx = {}) {
   return [
     { role: 'system', content: 'You keep one shop in a city market and sit on its council. Reply with JSON only: {"yes": true|false, "why": "<under 80 chars>"}.' },
-    { role: 'user', content: `Shop ${shop}. Proposal: set ${rule} to ${value}. Reason given: ${why}. floor_bps lowers the till floor below which shops close (10000 = 100%). Vote.` },
+    { role: 'user', content: `Shop ${shop}. Proposal: set ${rule} to ${value}. Reason given: ${why || 'none'}. ${ruleEffect(rule, value, ctx.rules, ctx.floor)} Vote.` },
   ];
 }
 

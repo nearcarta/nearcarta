@@ -56,7 +56,7 @@ export async function decideRestock(shop, board, deps) {
 }
 
 export async function decideVote(shop, proposal, deps) {
-  return ask(councilMessages(shop, proposal.rule, proposal.value, proposal.why || ''), parseVote, deps);
+  return ask(councilMessages(shop, proposal.rule, proposal.value, proposal.why || '', { rules: proposal.rules, floor: proposal.floor }), parseVote, deps);
 }
 
 /** The args and deposit for a restock the board forwards to the market. */
