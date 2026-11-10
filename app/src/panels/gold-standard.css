@@ -41,8 +41,8 @@
 
 /* A group is a card. Shops that already wrap their fields in a card keep it; the selector covers
    the label+control pairs that are not inside one. */
-body #shopUI #tray #t-form .shop-field-group,
-body #shopUI #tray #t-form .field-group {
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-field-group,
+body:not(.ferry-tray) #shopUI #tray #t-form .field-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -55,11 +55,11 @@ body #shopUI #tray #t-form .field-group {
 }
 
 /* Every labelled field: label above, control below, 6px between them — the From card's rhythm. */
-body #shopUI #tray #t-form label.field,
-body #shopUI #tray #t-form .field,
-body #shopUI #tray #t-form .ferry-field,
-body #shopUI #tray #t-form .guard-field,
-body #shopUI #tray #t-form .hall-field {
+body:not(.ferry-tray) #shopUI #tray #t-form label.field,
+body:not(.ferry-tray) #shopUI #tray #t-form .field,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-field,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -67,11 +67,11 @@ body #shopUI #tray #t-form .hall-field {
   margin: 0;
 }
 
-body #shopUI #tray #t-form .field > span:first-child,
-body #shopUI #tray #t-form .ferry-field > span:first-child,
-body #shopUI #tray #t-form .guard-field > span:first-child,
-body #shopUI #tray #t-form .hall-field > span:first-child,
-body #shopUI #tray #t-form .choice-label {
+body:not(.ferry-tray) #shopUI #tray #t-form .field > span:first-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field > span:first-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-field > span:first-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field > span:first-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .choice-label {
   font-size: var(--gs-label);
   line-height: 16px;
   font-weight: 500;
@@ -79,13 +79,13 @@ body #shopUI #tray #t-form .choice-label {
 }
 
 /* The control: 40px, dark well, one radius, the same focus ring Swap uses. */
-body #shopUI #tray #t-form .field input:not([type='checkbox']):not([type='radio']),
-body #shopUI #tray #t-form .field select,
-body #shopUI #tray #t-form .ferry-field input:not([type='checkbox']):not([type='radio']),
-body #shopUI #tray #t-form .ferry-field select,
-body #shopUI #tray #t-form .guard-field input,
-body #shopUI #tray #t-form .hall-field input,
-body #shopUI #tray #t-form .hall-field select {
+body:not(.ferry-tray) #shopUI #tray #t-form .field input:not([type='checkbox']):not([type='radio']),
+body:not(.ferry-tray) #shopUI #tray #t-form .field select,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field input:not([type='checkbox']):not([type='radio']),
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field select,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-field input,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field input,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field select {
   width: 100%;
   min-height: var(--gs-field-h);
   height: var(--gs-field-h);
@@ -100,27 +100,27 @@ body #shopUI #tray #t-form .hall-field select {
   transition: border-color .14s ease, box-shadow .14s ease;
 }
 
-body #shopUI #tray #t-form .field input:focus,
-body #shopUI #tray #t-form .field select:focus,
-body #shopUI #tray #t-form .ferry-field input:focus,
-body #shopUI #tray #t-form .guard-field input:focus,
-body #shopUI #tray #t-form .hall-field input:focus {
+body:not(.ferry-tray) #shopUI #tray #t-form .field input:focus,
+body:not(.ferry-tray) #shopUI #tray #t-form .field select:focus,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field input:focus,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-field input:focus,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field input:focus {
   border-color: var(--gs-gold-2);
   box-shadow: 0 0 0 3px rgba(226, 168, 60, .18);
 }
 
 /* 16px between groups, 12 inside one — Swap's own rhythm. */
-body #shopUI #tray #t-form { gap: var(--gs-gap); }
-body #shopUI #tray #t-form .shop-stack,
-body #shopUI #tray #t-form .hall-card,
-body #shopUI #tray #t-form .ferry-card { gap: var(--gs-gap); }
+body:not(.ferry-tray) #shopUI #tray #t-form { gap: var(--gs-gap); }
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-stack,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-card,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-card { gap: var(--gs-gap); }
 
 /* ============================================================================================
    2. Inline gold chips — the "Max" shape, for any unit or quick-fill inside a field
    ============================================================================================ */
 
-body #shopUI #tray #t-form .unit > span:last-child,
-body #shopUI #tray #t-form .hall-amt > span:last-child {
+body:not(.ferry-tray) #shopUI #tray #t-form .unit > span:last-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-amt > span:last-child {
   background: rgba(226, 168, 60, .14);
   color: var(--gs-gold-1);
   border-radius: var(--r-pill);
@@ -133,11 +133,11 @@ body #shopUI #tray #t-form .hall-amt > span:last-child {
    3. The summary card — "Swap quote" with key/value rows and a gold badge
    ============================================================================================ */
 
-body #shopUI #tray #t-form .shop-summary,
-body #shopUI #tray #t-form .flow-strip,
-body #shopUI #tray #t-form .guard-status,
-body #shopUI #tray #t-form .hall-status,
-body #shopUI #tray #t-form .payout-status {
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary,
+body:not(.ferry-tray) #shopUI #tray #t-form .flow-strip,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-status,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-status,
+body:not(.ferry-tray) #shopUI #tray #t-form .payout-status {
   border-radius: var(--r-card);
   background: var(--gs-card-lift);
   border: 1px solid var(--gs-line-gold);
@@ -146,8 +146,8 @@ body #shopUI #tray #t-form .payout-status {
 }
 
 /* Key/value rows in a summary read like the quote: key left in muted, value right in cream. */
-body #shopUI #tray #t-form .shop-summary .row,
-body #shopUI #tray #t-form .shop-summary p {
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary .row,
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary p {
   display: flex;
   justify-content: space-between;
   gap: var(--p2);
@@ -156,17 +156,17 @@ body #shopUI #tray #t-form .shop-summary p {
   line-height: 16px;
   color: var(--gs-cream);
 }
-body #shopUI #tray #t-form .shop-summary .row + .row,
-body #shopUI #tray #t-form .shop-summary p + p { margin-top: var(--p2); }
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary .row + .row,
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary p + p { margin-top: var(--p2); }
 
 /* ============================================================================================
    4. Actions — one orange gradient primary, one outlined secondary, a clear gap
    ============================================================================================ */
 
-body #shopUI #tray > .t-row > #t-act.primary:not([hidden]),
-body #shopUI #tray #t-form > .primary,
-body #shopUI #tray #t-form .bank-cta,
-body #shopUI #tray #t-form .toll-cta {
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]),
+body:not(.ferry-tray) #shopUI #tray #t-form > .primary,
+body:not(.ferry-tray) #shopUI #tray #t-form .bank-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form .toll-cta {
   background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
   background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
   color: var(--gs-ink) !important;
@@ -186,28 +186,28 @@ body #shopUI #tray #t-form .toll-cta {
   transition: filter .14s ease, transform .1s ease, box-shadow .14s ease;
 }
 
-body #shopUI #tray > .t-row > #t-act.primary:not([hidden]):hover,
-body #shopUI #tray #t-form > .primary:hover {
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]):hover,
+body:not(.ferry-tray) #shopUI #tray #t-form > .primary:hover {
   filter: brightness(1.06);
   box-shadow: 0 10px 26px rgba(226, 131, 31, .34) !important;
 }
-body #shopUI #tray > .t-row > #t-act.primary:not([hidden]):active,
-body #shopUI #tray #t-form > .primary:active {
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]):active,
+body:not(.ferry-tray) #shopUI #tray #t-form > .primary:active {
   transform: translateY(1px);
   box-shadow: 0 4px 12px rgba(226, 131, 31, .22) !important;
 }
 
 /* The secondary: full width, dark, gold outline, 16px under the primary — "Sign in" here. */
-body #shopUI #tray > .t-row + .t-links,
-body #shopUI #tray > .t-row { margin: 0; }
-body #shopUI #tray > .t-row { margin-top: var(--gs-gap) !important; }
-body #shopUI #tray > .t-links { margin-top: var(--gs-gap) !important; }
+body:not(.ferry-tray) #shopUI #tray > .t-row + .t-links,
+body:not(.ferry-tray) #shopUI #tray > .t-row { margin: 0; }
+body:not(.ferry-tray) #shopUI #tray > .t-row { margin-top: var(--gs-gap) !important; }
+body:not(.ferry-tray) #shopUI #tray > .t-links { margin-top: var(--gs-gap) !important; }
 
 /* ============================================================================================
    5. Tabs — three pills, active solid gold, the others outlined
    ============================================================================================ */
 
-body #shopUI #tray [role='tablist'] {
+body:not(.ferry-tray) #shopUI #tray [role='tablist'] {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
@@ -217,7 +217,7 @@ body #shopUI #tray [role='tablist'] {
   box-sizing: border-box;
 }
 
-body #shopUI #tray [role='tab'] {
+body:not(.ferry-tray) #shopUI #tray [role='tab'] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -239,14 +239,14 @@ body #shopUI #tray [role='tab'] {
   transition: background .14s ease, border-color .14s ease, color .14s ease;
 }
 
-body #shopUI #tray [role='tab']:hover:not([aria-selected='true']) {
+body:not(.ferry-tray) #shopUI #tray [role='tab']:hover:not([aria-selected='true']) {
   background: rgba(255, 255, 255, .06);
   border-color: var(--gs-gold-2);
 }
 
-body #shopUI #tray [role='tab'][aria-selected='true'],
-body #shopUI #tray [role='tab'].on,
-body #shopUI #tray .arena-mode[aria-pressed='true'] {
+body:not(.ferry-tray) #shopUI #tray [role='tab'][aria-selected='true'],
+body:not(.ferry-tray) #shopUI #tray [role='tab'].on,
+body:not(.ferry-tray) #shopUI #tray .arena-mode[aria-pressed='true'] {
   background: linear-gradient(180deg, var(--gs-gold-1) 0%, var(--gs-gold-2) 100%) !important;
   border-color: transparent !important;
   color: var(--gs-ink) !important;
@@ -278,9 +278,9 @@ body #shopUI #tray .arena-mode[aria-pressed='true'] {
    7. Text that is too long: clamp, never clip a control
    ============================================================================================ */
 
-body #shopUI #tray #t-form .note,
-body #shopUI #tray #t-form .shop-summary p { overflow-wrap: anywhere; }
-body #shopUI #tray #t-form .note {
+body:not(.ferry-tray) #shopUI #tray #t-form .note,
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary p { overflow-wrap: anywhere; }
+body:not(.ferry-tray) #shopUI #tray #t-form .note {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -314,11 +314,11 @@ body #shopUI #tray #t-form .note {
    gold on screen.
    ============================================================================================ */
 
-body #shopUI #tray #t-form .guard-pane #g-check,
-body #shopUI #tray #t-form .hall-cta,
-body #shopUI #tray #t-form #p-create,
-body #shopUI #tray #t-form #p-prep,
-body #shopUI #tray #t-form .arena-cta {
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-pane #g-check,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form #p-create,
+body:not(.ferry-tray) #shopUI #tray #t-form #p-prep,
+body:not(.ferry-tray) #shopUI #tray #t-form .arena-cta {
   background: rgba(0, 0, 0, .24) !important;
   background-image: none !important;
   color: var(--gs-cream) !important;
@@ -328,16 +328,16 @@ body #shopUI #tray #t-form .arena-cta {
   font-weight: 500 !important;
 }
 
-body #shopUI #tray #t-form .guard-pane #g-check:hover,
-body #shopUI #tray #t-form .hall-cta:hover {
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-pane #g-check:hover,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-cta:hover {
   border-color: var(--gs-gold-2) !important;
   background: rgba(255, 255, 255, .06) !important;
 }
 
 /* When the in-form action IS the only action — no panel CTA is shown — it keeps the gold, so a
    shop is never left without a primary. */
-body #shopUI #tray:has(> .t-row > #t-act[hidden]) #t-form #g-check,
-body #shopUI #tray:has(> .t-row > #t-act[hidden]) #t-form .hall-cta {
+body:not(.ferry-tray) #shopUI #tray:has(> .t-row > #t-act[hidden]) #t-form #g-check,
+body:not(.ferry-tray) #shopUI #tray:has(> .t-row > #t-act[hidden]) #t-form .hall-cta {
   background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
   background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
   color: var(--gs-ink) !important;
@@ -351,23 +351,23 @@ body #shopUI #tray:has(> .t-row > #t-act[hidden]) #t-form .hall-cta {
    1440x900 (Hall by 13, Ferry's swap by a few). The reclaim comes from the header's own slack —
    the subtitle sits tight under the title, which is still within the standard's 16-20px band —
    and from the gap above the hero, not from any field. */
-body #shopUI #tray > .t-scroll { gap: var(--gs-gap-tight) !important; }
-body #shopUI #tray > .t-scroll > #t-sub { margin-top: -4px !important; }
-body #shopUI #tray #t-form { gap: var(--gs-gap-tight) !important; }
-body #shopUI #tray #t-form .shop-stack,
-body #shopUI #tray #t-form .hall-card,
-body #shopUI #tray #t-form .ferry-card { gap: var(--gs-gap-tight) !important; }
+body:not(.ferry-tray) #shopUI #tray > .t-scroll { gap: var(--gs-gap-tight) !important; }
+body:not(.ferry-tray) #shopUI #tray > .t-scroll > #t-sub { margin-top: -4px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form { gap: var(--gs-gap-tight) !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-stack,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-card,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-card { gap: var(--gs-gap-tight) !important; }
 
 /* The action row must sit clear of the form even when the form's last line is a wrapped note.
    Measured in the checker's mount (real header, real links row): Hall's status ended 17px above
    the button but the status WRAPPED to two lines in the two-column pane, which the one-line probe
    did not show. The form reserves the gap itself, so a wrapped note can never reach the action. */
-body #shopUI #tray > .t-scroll > #t-form { padding-bottom: 4px; }
-body #shopUI #tray #t-form .hall-status,
-body #shopUI #tray #t-form .guard-status,
-body #shopUI #tray #t-form .payout-status {
+body:not(.ferry-tray) #shopUI #tray > .t-scroll > #t-form { padding-bottom: 4px; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-status,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-status,
+body:not(.ferry-tray) #shopUI #tray #t-form .payout-status {
   margin-bottom: 0 !important;
 }
-body #shopUI #tray #t-form .hall-status { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-body #shopUI #tray #t-form .guard-status { max-height: 96px; overflow-y: auto; }
-body #shopUI #tray > .t-row { margin-top: var(--gs-gap) !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-status { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-status { max-height: 96px; overflow-y: auto; }
+body:not(.ferry-tray) #shopUI #tray > .t-row { margin-top: var(--gs-gap) !important; }
