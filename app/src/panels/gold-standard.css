@@ -564,3 +564,38 @@ body:not(.ferry-tray) #shopUI #tray #t-form label.choice-label + textarea {
 
 /* The last pair in a card does not add a trailing gap. */
 body:not(.ferry-tray) #shopUI #tray #t-form .bank-field:last-child { margin-bottom: 0; }
+
+/* House has four gradient buttons: "I'm alive" (the shop's action) and three deed links. Only the
+   action keeps the gold; the links are evidence, so they become outlined rows of the same size. */
+body:not(.ferry-tray) #shopUI #tray #t-form a.deed-link,
+body:not(.ferry-tray) #shopUI #tray #t-form [data-testid='deed-mint'],
+body:not(.ferry-tray) #shopUI #tray #t-form [data-testid='deed-allow'],
+body:not(.ferry-tray) #shopUI #tray #t-form [data-testid='deed-refuse'] {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  min-height: var(--tap) !important;
+  height: auto !important;
+  border-radius: var(--r-card) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--p3) !important;
+  text-decoration: none !important;
+}
+
+/* The shop's own action is the one gold. */
+body:not(.ferry-tray) #shopUI #tray #t-form #house-cta {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  width: 100% !important;
+}
