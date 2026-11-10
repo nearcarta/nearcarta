@@ -700,7 +700,10 @@
       "storage_topup_0.07": "HhPAVjQGqWaoLswofyPMs3Ygk5mhZD4SJ9WobnDXT3S8",
       "storage_topup_v2": "2QDfKyzt9h3CkLNdrZ8hbzQERbQ55mJdQHGrKqEznez9",
       "upgrade_v2": "97ckbVTHuvxSnhZ5HE5uiauxN4rEkvf7pSJ5TBpa3b1z",
-      "set_council": "9mwKVavP8E7cBigyC8PDuv3jZz34MhXQE8sMGAEBUv4Z"
+      "set_council": "9mwKVavP8E7cBigyC8PDuv3jZz34MhXQE8sMGAEBUv4Z",
+      "council_p1_rejected_2_5": "7Fo9Koj7JjwB4HYCaqRCR6Vp2JsDr4UD7jnw8U8RykS2",
+      "council_p2_propose_floor_bps_9000": "38VXRauHvJAeTeuFmTCdUCAR4Tku6aCVHeh4kksCm4xx",
+      "council_p2_rule_changed_floor_bps_9000": "Gub1q247gyT2RNZHSGCwCKNJi1uNVRVGmyRs4piSNYJb"
     },
     "note": "The Arena square is the market. No keys; owner-only upgrade. v2 adds purses, rentable stalls and a keeper council that changes rules on-chain.",
     "shops": {
@@ -733,7 +736,13 @@
         "keeper-payouts.nearcarta.near",
         "keeper-chronicle.nearcarta.near"
       ],
-      "quorum": 5
+      "quorum": 5,
+      "rules_now": {
+        "floor_bps": 9000,
+        "stall_rent": "1000000000000000000000",
+        "stall_days": 7
+      },
+      "decisions": "Each vote carries its NEAR AI completion id (TEE-signed, verified before sending) in the council_vote event."
     }
   },
   "relayer": {
