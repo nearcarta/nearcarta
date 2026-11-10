@@ -15,6 +15,7 @@
 //!   or NEAR are taken, so a forged `row_owner` can only give a gift.
 //! - Setup, caps and the kill switch: the owner.
 //! There is no public re-init. `migrate` is private and reads state by version.
+pub mod council;
 pub mod mt;
 pub mod pricing;
 pub mod shops;
@@ -23,7 +24,7 @@ use near_sdk::json_types::{U128, U64};
 use near_sdk::store::{IterableMap, LookupMap};
 use near_sdk::{env, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise};
 
-pub const STATE_VERSION: u32 = 1;
+pub const STATE_VERSION: u32 = 2;
 pub const DAY_NS: u64 = 86_400_000_000_000;
 pub const HOUR_NS: u64 = 3_600_000_000_000;
 pub const MILLI: u128 = 1_000_000_000_000_000_000_000;
@@ -88,7 +89,14 @@ pub struct Contract {
     pub orders: IterableMap<u64, shops::Order>,
     pub citizens: LookupMap<AccountId, Citizen>,
     pub days: LookupMap<AccountId, PlayerDay>,
+    pub rules: council::Rules,
+    pub council: council::Council,
+    pub purses: LookupMap<AccountId, u128>,
+    pub stalls: IterableMap<u32, council::Stall>,
 }
+
+pub fn fresh_rules() -> council::Rules { council::Rules { floor_bps: 10_000, stall_rent: U128(MILLI), stall_days: 7 } }
+pub fn fresh_council() -> council::Council { council::Council { members: vec![], quorum: 1, next: 1, open: None } }
 
 #[near]
 impl Contract {
@@ -116,6 +124,10 @@ impl Contract {
             orders: IterableMap::new(b"o"),
             citizens: LookupMap::new(b"c"),
             days: LookupMap::new(b"y"),
+            rules: fresh_rules(),
+            council: fresh_council(),
+            purses: LookupMap::new(b"p"),
+            stalls: IterableMap::new(b"a"),
         }
     }
 
@@ -156,6 +168,14 @@ impl Contract {
         let version = u32::from_le_bytes([raw[0], raw[1], raw[2], raw[3]]);
         match version {
             STATE_VERSION => near_sdk::borsh::from_slice::<Contract>(&raw).expect("ERR_STATE"),
+            // Version 1 is version 2 without the four fields appended at the end.
+            1 => {
+                let mut v2 = raw.clone();
+                v2[..4].copy_from_slice(&STATE_VERSION.to_le_bytes());
+                let tail = (fresh_rules(), fresh_council(), LookupMap::<AccountId, u128>::new(b"p"), IterableMap::<u32, council::Stall>::new(b"a"));
+                v2.extend(near_sdk::borsh::to_vec(&tail).expect("ERR_STATE"));
+                near_sdk::borsh::from_slice::<Contract>(&v2).expect("ERR_STATE")
+            }
             _ => env::panic_str("ERR_VERSION"),
         }
     }
@@ -284,6 +304,8 @@ impl Contract {
         self.orders.flush();
         self.citizens.flush();
         self.days.flush();
+        self.purses.flush();
+        self.stalls.flush();
     }
 
     /// Flushes pending writes and returns the bytes used, the start mark for a charge.
