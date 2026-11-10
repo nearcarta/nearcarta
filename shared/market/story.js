@@ -31,7 +31,7 @@ export const STEPS = [
   { id: 'seal', shop: 'bank', keeper: 'Banker', intro: 'Profit is nobody’s business but yours.',
     need: 'Hide your profit', btn: 'Seal profit', reward: 'Amount hidden', done: 'Sealed. Only “check passed” shows' },
   { id: 'pay', shop: 'payouts', keeper: 'Paymaster', intro: 'Your porter carried every crate.',
-    need: 'Pay your porter', btn: 'Pay 3 coins', reward: 'Invoice paid, under your cap', done: 'Porter paid. Invoice kept' },
+    need: 'Pay your porter', btn: 'Pay 3 coins', reward: 'Invoice paid', done: 'Porter paid. Invoice kept' },
   { id: 'invest', shop: 'house', keeper: 'Housekeeper', intro: 'The Ferry spent its till on your cargo. It went dark.',
     need: 'Relight the Ferry', btn: 'Invest 10', reward: '10 coins for a Ferry share', done: 'The Ferry is open again' },
   { id: 'write', shop: 'chronicle', keeper: 'Archivist', intro: 'Every merchant’s day goes in the book.',
