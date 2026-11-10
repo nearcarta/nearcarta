@@ -121,7 +121,7 @@ const ownerText = String(reaperOwner).replace(/"/g, '');
 if (ownerText !== ROOT) fail('reaper owner is ' + ownerText);
 await send('charter reap', CHARTER, [A.functionCall('reap', {}, 80n * TG, 1n)]);
 
-await send('board force_close', BOARD, [A.functionCall('force_close', { visitor: VISITOR }, 80n * TG, 0n)]);
+await send('board force_close', BOARD, [A.functionCall('force_close', { visitor: VISITOR }, 80n * TG, 1n)]);
 const after = await view(BOARD, 'get_config', {});
 if (String(after?.rows) !== '0') fail('a row is still open');
 await send('board reap', BOARD, [A.functionCall('reap', {}, 80n * TG, 1n)]);

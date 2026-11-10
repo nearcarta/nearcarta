@@ -5,7 +5,7 @@ import { BOARD, callsFor } from './row.js';
 
 const GAS = '80000000000000';
 
-/** Sends the list from callsFor. A changed cap is set_rules. Deposit stays 0. */
+/** Sends the list from callsFor. A changed cap is set_rules. Loosening calls carry 1 yocto (refunded). */
 export async function signCalls(calls) {
   const list = Array.isArray(calls) ? calls : callsFor({}, {});
   if (!list.length) return { hash: null, signer: null };
@@ -23,7 +23,7 @@ export async function signCalls(calls) {
     receiverId: BOARD,
     actions: list.map(c => ({
       type: 'FunctionCall',
-      params: { methodName: c.method, args: c.args, gas: GAS, deposit: '0' },
+      params: { methodName: c.method, args: c.args, gas: GAS, deposit: String(c.deposit ?? '0') },
     })),
   });
   return { hash: txHashOf(res), signer: id };
