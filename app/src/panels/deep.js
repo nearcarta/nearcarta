@@ -1001,32 +1001,41 @@ const ALIAS = { guardhouse: 'guard', townhall: 'hall', mist: 'bank', mistbank: '
 function installAgentSheetClose(root) {
   const doc = root?.ownerDocument || (typeof document !== 'undefined' ? document : null);
   if (!doc) return;
-  const pop = doc.querySelector("[id$='-agent-pop']");
-  if (!pop || pop.dataset.closeWired === '1') return;
-  pop.dataset.closeWired = '1';
 
-  const btn = doc.createElement('button');
-  btn.type = 'button';
-  btn.className = 'agent-pop-close';
-  btn.setAttribute('aria-label', 'Close');
-  btn.dataset.testid = 'agent-pop-close';
-  btn.textContent = '✕';
-  const close = () => {
-    pop.hidden = true;
-    // Focus goes back to the dock toggle, so the keyboard user is not dropped at the top.
-    const id = pop.id.replace(/-pop$/, '-toggle');
-    const toggle = doc.getElementById(id) || doc.querySelector("[id$='-agent-toggle']");
-    if (toggle) {
-      toggle.setAttribute('aria-expanded', 'false');
-      try { toggle.focus(); } catch { /* not focusable in this state */ }
-    }
+  // Docks render their popups lazily — hall, payouts and arena build theirs after mountShop has
+  // returned — so a one-shot lookup missed them. This watches #shopUI and wires every popup that
+  // appears, exactly once (the dataset guard), however late it arrives.
+  const wire = (pop) => {
+    if (!pop || pop.dataset.closeWired === '1') return;
+    pop.dataset.closeWired = '1';
+    const btn = doc.createElement('button');
+    btn.type = 'button';
+    btn.className = 'agent-pop-close';
+    btn.setAttribute('aria-label', 'Close');
+    btn.dataset.testid = 'agent-pop-close';
+    btn.textContent = '✕';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      pop.hidden = true;
+      const toggle = doc.getElementById(pop.id.replace(/-pop$/, '-toggle'))
+        || doc.querySelector("[id$='-agent-toggle']");
+      if (toggle) {
+        toggle.setAttribute('aria-expanded', 'false');
+        try { toggle.focus(); } catch { /* not focusable */ }
+      }
+    });
+    pop.appendChild(btn);
   };
-  btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); close(); });
-  pop.appendChild(btn);
 
-  doc.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !pop.hidden) { e.preventDefault(); close(); }
-  }, true);
+  const scan = () => doc.querySelectorAll("[id$='-agent-pop']").forEach(wire);
+  scan();
+
+  const host = doc.getElementById('shopUI') || doc.body;
+  if (host && typeof MutationObserver === 'function' && !globalThis.__NC_AGENT_CLOSE_OBS) {
+    globalThis.__NC_AGENT_CLOSE_OBS = new MutationObserver(scan);
+    globalThis.__NC_AGENT_CLOSE_OBS.observe(host, { childList: true, subtree: true });
+  }
 }
 
 export function mountShop(id, root, hooks = {}) {

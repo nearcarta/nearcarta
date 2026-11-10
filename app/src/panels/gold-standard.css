@@ -1249,3 +1249,45 @@ body #shopUI .agent-pop-close {
 }
 body #shopUI .agent-pop-close:hover { border-color: var(--gs-gold-2); color: #fff; }
 body #shopUI [id$='-agent-pop'] { position: relative; }
+
+/* ============================================================================================
+   Measured at a8d4d74b — the five remaining defects
+   ============================================================================================ */
+
+/* 1. Bank: the split is `#shopUI #tray .bank-split`, NOT under #t-form, so my earlier rule never
+      matched. This is the real path, and it beats shop-shell.css (which keeps 2 columns until
+      359px). The file row then spans the width and the name is never cut. */
+body.bank-tray #shopUI #tray .bank-split { grid-template-columns: minmax(0, 1fr) !important; }
+body.bank-tray #shopUI #tray .bank-file-row { width: 100% !important; grid-column: 1 / -1 !important; }
+body.bank-tray #shopUI #tray .bank-file-name {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere;
+  line-height: 15px;
+}
+
+/* 2. The 390 bar, as one row: Back to town (no Esc pill), the chip, then All shops — each sized
+      to its own content with an 8px gap, so nothing overlaps. */
+@media (max-width: 480px) {
+  body.in-shop #shopUI #back kbd,
+  body.in-shop #shopUI #back kbd * { display: none !important; }
+  body.in-shop #shopUI #back { width: auto !important; min-width: 0 !important; }
+  /* The dock sits after Back's real width rather than at a guessed 148px. */
+  body.in-shop #shopUI [id$='-agent-dock'] { left: auto !important; right: 92px !important; }
+  body.in-shop nav.all-shops { right: 6px !important; }
+}
+
+/* 3. Hall at 390 still scrolled. Its pane padding and the two-line description give back the
+      room the footer needs; no field, tab or handler changes. */
+@media (max-width: 480px) {
+  body.hall-tray #shopUI #tray #t-form .hall-card { padding: 0 !important; gap: 6px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-pane { gap: 6px !important; padding: 0 !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-field { gap: 2px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-field input,
+  body.hall-tray #shopUI #tray #t-form .hall-field select { min-height: 34px !important; height: 34px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-gap { -webkit-line-clamp: 1; font-size: 11px; line-height: 15px; }
+  body.hall-tray #shopUI #tray #t-form .hall-tabs { margin-bottom: -8px !important; }
+  body.hall-tray #shopUI #tray > .t-row { margin-top: 10px !important; }
+  body.hall-tray #shopUI #tray > .t-links { margin-top: 6px !important; }
+}
