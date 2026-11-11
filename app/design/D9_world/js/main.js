@@ -515,7 +515,9 @@ addEventListener('nearcarta:chronicle',e=>{ const d=e.detail||{}; if(!d.hash) re
   const li=document.createElement('li'); li.className=d.decision==='denied'?'no':'ok'; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
   li.querySelector('.w').textContent=d.decision==='denied'?'refused · new entry':'new entry'; const a=li.querySelector('a'); const exp=globalThis.NEARCARTA_NET?.explorer||'https://nearblocks.io'; a.href=exp+'/txns/'+d.hash; a.textContent=d.hash.slice(0,6)+'…'+d.hash.slice(-4); a.title='Open on the explorer';
   l.prepend(li); while(l.children.length>3) l.lastChild.remove(); $('#chron').hidden=false; });
-const startStory=!P.has('nostory') && !(P.has('explore')) && !P.has('shop');
+// The town is the front door: the cinematic story is opt-in (`?story=1` or the Watch the story button),
+// not something a first visitor has to sit through. Everything else about the town is unchanged.
+const startStory=P.has('story') && !P.has('nostory') && !P.has('explore') && !P.has('shop');
 let introCtl=null;
 window.__skipTownIntro = () => { introCtl?.skip(); if (mode === 'story') endStory(); };
 for(let i=0;i<12;i++) step(1/30);

@@ -4,6 +4,24 @@
 
 <!-- # 983 backend unit tests (982 pass, 1 skipped) -->
 
+## The game
+
+Nearcarta is a game. You are the Lamplighter's keeper in a small town on a hex island, and your job is
+to keep an AI agent from being talked into paying the wrong person. The town is a Market Day: you take an
+order at the Town Hall, unload salt at the Ferry, pay a toll to cross, check your buyers at the
+Guardhouse, sell at the Arena, seal your profit at the Bank, pay your porter, buy a share of the Ferry and
+write the day into the Chronicle. Nine shops, one day, one loop.
+
+**Play free** starts you on the NEAR test network in seconds: your own account, real testnet
+transactions, no money and no sign-up. **Play for real** opens the mainnet path, where the same shops move
+real NEAR under a charter you sign.
+
+- Play: **https://nearcarta.vercel.app**
+- The charter, in plain words: **https://nearcarta.vercel.app/setup**
+
+The rest of this file is the engineering record behind those two buttons: what is on chain, what the
+operator runs, and what the game simulates.
+
 **An AI agent can be talked into paying the wrong person. Nearcarta puts the payment rules in a NEAR contract the agent cannot change, so a fooled agent produces a refused transaction instead of a loss.**
 
 A visitor writes their agent's rules into one row on `board.nearcarta.near`: who it may pay, how much per payment, how much per day, how many payments a day, and when the row expires. The agent holds a function-call key with no authority beyond asking. Every payment is checked on chain and is allowed, refused with a reason, or held until the owner confirms. The refusal is a transaction you can open. The town is how you see it: a 3D island at dusk with nine shops, each one a real mainnet dApp behind the same charter.

@@ -172,3 +172,33 @@ test('the town entry offers a free testnet account and a real-money sign-in', as
   assert.match(css, /\.net-badge\.test\{[^}]*#2f9a8c/, 'the testnet pill is teal');
   assert.match(css, /\.net-badge\.main\{[^}]*#c98f4e/, 'the mainnet pill is gold');
 });
+
+// The game is the front door. A first visit lands in the playable town with the gold action in front of
+// them; the cinematic is one press away, not a gate.
+test('the game is the front door and the story is a press away', async () => {
+  const { readFileSync } = await import('node:fs');
+  const html = readFileSync(new URL('../../../app/design/D9_world/index.html', import.meta.url), 'utf8');
+  const readme = readFileSync(new URL('../../../README.md', import.meta.url), 'utf8');
+  const chrome = readFileSync(new URL('../../../app/src/net/chrome.js', import.meta.url), 'utf8');
+  const plan = readFileSync(new URL('../../../app/design/D9_world/js/intro-plan.js', import.meta.url), 'utf8');
+  const main = readFileSync(new URL('../../../app/design/D9_world/js/main.js', import.meta.url), 'utf8');
+  // The first screen says it is a game, and the two real actions are there before any script runs.
+  assert.match(html, /<meta name="description" content="Nearcarta is a game/);
+  assert.match(html, /data-testid="try-free"/);
+  assert.match(html, /data-testid="sign-in"/);
+  assert.match(html, /data-testid="watch-story"/);
+  // The cinematic does not start on a fresh visit; it starts when asked.
+  assert.match(plan, /return p\.has\('story'\)/);
+  assert.match(main, /const startStory=P\.has\('story'\)/);
+  // One gold main action. `#rulesBtn` is the town's existing gold CTA (the Gold rule), so Try free is
+  // gold too but the town keeps exactly one gold pill above the fold; Play for real is outlined.
+  assert.match(html, /id="rulesBtn" class="hud pill go"/);
+  assert.match(chrome, /class="btn-gold" data-testid="try-free"/);
+  assert.match(chrome, /class="btn-outline" data-testid="sign-in"/);
+  // The README opens with the game, before the engineering record.
+  const gameAt = readme.indexOf('## The game');
+  const whyAt = readme.indexOf('An AI agent can be talked into paying the wrong person');
+  assert.ok(gameAt > 0 && gameAt < whyAt, 'the Games section is the first thing a reader sees');
+  assert.match(readme.slice(gameAt, gameAt + 1200), /Play free/);
+  assert.match(readme.slice(gameAt, gameAt + 1200), /Play for real/);
+});

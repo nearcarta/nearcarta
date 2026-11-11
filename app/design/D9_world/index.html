@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nearcarta</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<meta name="description" content="Nearcarta: a small charter town where every payment your agent proposes is checked by the oath. Independent, not affiliated with NEAR Foundation.">
+<meta name="description" content="Nearcarta is a game: a small town where every payment your agent proposes is checked by a charter on NEAR. Play free on the test network, or play for real. Independent, not affiliated with NEAR Foundation.">
 <meta property="og:title" content="Nearcarta">
-<meta property="og:description" content="The agent proposes. The charter decides.">
+<meta property="og:description" content="A game about an agent that cannot overspend. The agent proposes. The charter decides.">
 <meta property="og:image" content="/brand/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preload" href="assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -81,6 +81,7 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
 <aside id="netChrome" class="hud net-chrome" data-testid="net-chrome">
   <a id="tryFree" class="btn-gold" data-testid="try-free" href="#" role="button"><span class="k" aria-hidden="true">&#10022;</span><span class="lab">Try free</span></a>
   <a id="signIn" class="btn-outline" data-testid="sign-in" href="/setup/" title="Sign in with email and set the rules your agent cannot break">Play for real</a>
+  <a class="btn-quiet" data-testid="watch-story" href="/?story=1" title="Watch the thirty-second opening story">Watch the story</a>
   <button id="netBadge" class="net-badge main" type="button" data-testid="net-badge" aria-haspopup="dialog"><span class="dot" aria-hidden="true"></span>MAINNET</button>
   <p id="tryFreeNote" class="try-note" data-testid="try-free-note" aria-live="polite"></p>
 </aside>
