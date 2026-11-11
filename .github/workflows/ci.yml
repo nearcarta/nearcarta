@@ -7,6 +7,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 # One run per branch. Without this, every push queued its own 30 jobs and none were cancelled:
 # measured on 2026-11-09 with four runs stacked, each spending ~20 minutes on the sandbox suites,
 # so a branch with a handful of commits waited over an hour for a verdict on its own head commit.
