@@ -5,7 +5,7 @@
 // https://github.com/near/mpc/blob/main/crates/contract/README.md
 // Broadcast is a separate step. Paid on Base only after a success receipt.
 // https://docs.near.org/chain-abstraction/chain-signatures
-import { API_PATH, txUrl } from '../../../shared/net/net.js';
+import { API_PATH, txUrl, NET } from '../../../shared/net/net.js';
 import { checkDerived, TOLL_ADDRESS, TOLL_KEY } from '../toll-derive.js';
 import { tokenStack, bindTokenFallbacks } from './token-badge.js';
 import { armTollDock, installTollDock } from './toll-dock.js';
@@ -262,7 +262,11 @@ export function formatWei(wei) {
 
 export function foreignExplorer(chain, hash) {
   if (!/^0x[0-9a-fA-F]{64}$/.test(String(hash || ''))) return '';
-  const host = /arbitrum/i.test(String(chain || '')) ? 'https://arbiscan.io/tx/' : 'https://basescan.org/tx/';
+  // A Sepolia chain (84532, 421614 or the word) or a page on testnet links the Sepolia explorer.
+  const c = String(chain || '');
+  const test = /sepolia|84532|421614/i.test(c) || NET === 'testnet';
+  const arb = /arbitrum|421614|42161/i.test(c);
+  const host = arb ? (test ? 'https://sepolia.arbiscan.io/tx/' : 'https://arbiscan.io/tx/') : (test ? 'https://sepolia.basescan.org/tx/' : 'https://basescan.org/tx/');
   return host + hash;
 }
 
