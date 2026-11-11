@@ -3,6 +3,7 @@
 import { DEP, cfg } from './config.js';
 import { view } from './near.js';
 import { formatUnits } from '../../app/src/chronicle-amount.js';
+import { txRange, ftRange, cursorOf, accountTxPath, accountFtPath } from '../../shared/net/nearblocks.js';
 
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 const PAGE = 25;
@@ -11,7 +12,10 @@ const FRESH_MS = 60_000;
 const BUDGET_MS = 5200;
 const WRAP = 'wrap.near';
 const INTENTS = 'intents.near';
-const link = (h) => `https://nearblocks.io/txns/${h}`;
+// Recorded mainnet proofs keep nearblocks.io on every network; a live testnet row uses the record's
+// explorer. The caller passes which one it is.
+const link = (h) => `${DEP.explorer || 'https://nearblocks.io'}/txns/${h}`;
+const v3 = () => cfg.explorerApiV3 === true;
 
 const cache = new Map();
 const inflight = new Map();
@@ -423,9 +427,10 @@ async function load(account, deps) {
   const fetchFn = deps.fetch || fetch;
   const viewFn = deps.view || view;
   const boardContract = deps.board || DEP.board?.contract || '';
-  const index = (deps.index || 'https://api.nearblocks.io').replace(/\/$/, '');
-  const fastTx = (deps.fastnearTx || 'https://tx.main.fastnear.com').replace(/\/$/, '');
+  const index = (deps.index || cfg.explorerApi || 'https://api.nearblocks.io').replace(/\/$/, '');
+  const fastTx = (deps.fastnearTx || cfg.fastnearTx || 'https://tx.main.fastnear.com').replace(/\/$/, '');
   const fastApi = (deps.fastnear || 'https://api.fastnear.com').replace(/\/$/, '');
+  const useV3 = deps.v3 != null ? deps.v3 === true : v3();
   const rpcUrls = [deps.rpc || cfg.rpc, deps.archival || cfg.archivalRpc].filter(Boolean);
   const key = deps.nearblocksKey != null ? deps.nearblocksKey : (process.env.NEARBLOCKS_API_KEY || '');
   const headers = nbHeaders(key);
@@ -436,8 +441,8 @@ async function load(account, deps) {
   const ftCursor = String(deps.ftCursor || '');
   const wantTx = !more || !!txCursor;
   const wantFt = !more || !!ftCursor;
-  const txQuery = `per_page=${PAGE}${txCursor ? `&cursor=${encodeURIComponent(txCursor)}` : ''}`;
-  const ftQuery = `per_page=${PAGE}${ftCursor ? `&cursor=${encodeURIComponent(ftCursor)}` : ''}`;
+  const txPath = accountTxPath(index, account, { v3: useV3, limit: PAGE, cursor: txCursor });
+  const ftPath = accountFtPath(index, account, { v3: useV3, limit: PAGE, cursor: ftCursor });
 
   const boardPromise = (async () => {
     if (!boardContract) return { ok: false, row: null };
@@ -451,10 +456,10 @@ async function load(account, deps) {
 
   const [txNear, ftNear] = await Promise.all([
     wantTx
-      ? withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${id}/txns?${txQuery}`, { headers, timeout: 1100, budget }))
+      ? withRetry(budget, () => fetchJson(fetchFn, txPath, { headers, timeout: 1100, budget }))
       : Promise.resolve({ ok: false, status: 0, json: null, skipped: true }),
     wantFt
-      ? withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${id}/ft-txns?${ftQuery}`, { headers, timeout: 1100, budget }))
+      ? withRetry(budget, () => fetchJson(fetchFn, ftPath, { headers, timeout: 1100, budget }))
       : Promise.resolve({ ok: false, status: 0, json: null, skipped: true }),
   ]);
 
@@ -471,11 +476,13 @@ async function load(account, deps) {
   if (!wantTx) {
     txSource = 'page';
     txGap = '';
-  } else if (txNear.ok && Array.isArray(txNear.json?.txns)) {
+  } else if (txNear.ok && txRange(txNear.json).length) {
+    // v1 and v3 both arrive here in one shape; the page cursor is read from whichever field answered.
     txSource = 'nearblocks';
-    const grouped = groupReceipts(txNear.json.txns);
+    const rows = txRange(txNear.json);
+    const grouped = groupReceipts(rows);
     indexedCount = grouped.length;
-    if (txNear.json.txns.length >= PAGE && txNear.json.cursor) nextCursor = String(txNear.json.cursor);
+    if (rows.length >= PAGE && cursorOf(txNear.json)) nextCursor = cursorOf(txNear.json);
     receipts = await mapLimit(grouped, 4, async (group) => {
       if (group.predecessor && budget.left() < 800) return describe(group, null);
       const detail = group.predecessor ? { ok: false } : await fetchJson(fetchFn, `${index}/v1/txns/${group.hash}`, { headers, timeout: 700, budget });
@@ -519,10 +526,11 @@ async function load(account, deps) {
   if (!wantFt) {
     ftSource = 'page';
     ftGap = '';
-  } else if (ftNear.ok && Array.isArray(ftNear.json?.txns)) {
+  } else if (ftNear.ok && ftRange(ftNear.json).length) {
     ftSource = 'nearblocks';
-    fts = ftNear.json.txns.map(t => mapFt(t, account));
-    if (ftNear.json.txns.length >= PAGE && ftNear.json.cursor) nextFtCursor = String(ftNear.json.cursor);
+    const ftRows = ftRange(ftNear.json);
+    fts = ftRows.map(t => mapFt(t, account));
+    if (ftRows.length >= PAGE && cursorOf(ftNear.json)) nextFtCursor = cursorOf(ftNear.json);
   } else {
     const bal = await withRetry(budget, () => fetchJson(fetchFn, `${fastApi}/v1/account/${id}/ft`, { headers: { accept: 'application/json' }, timeout: 900, budget }));
     const fromTx = receipts.map(r => ftFromDetail({
@@ -575,12 +583,13 @@ export async function accountTxHashes(account, deps = {}) {
   const key = deps.nearblocksKey != null ? deps.nearblocksKey : (process.env.NEARBLOCKS_API_KEY || '');
   const headers = nbHeaders(key);
   const out = { account: id, hashes: [], source: 'none', gap: '' };
-  const index = (deps.index || 'https://api.nearblocks.io').replace(/\/$/, '');
-  const first = await withRetry(budget, () => fetchJson(fetchFn, `${index}/v1/account/${encodeURIComponent(id)}/txns?per_page=${PAGE}`, { headers, timeout: 1100, budget }));
-  if (first.ok && Array.isArray(first.json?.txns)) {
+  const index = (deps.index || cfg.explorerApi || 'https://api.nearblocks.io').replace(/\/$/, '');
+  const useV3 = deps.v3 != null ? deps.v3 === true : v3();
+  const first = await withRetry(budget, () => fetchJson(fetchFn, accountTxPath(index, id, { v3: useV3, limit: PAGE }), { headers, timeout: 1100, budget }));
+  if (first.ok && txRange(first.json).length) {
     out.source = 'nearblocks';
-    out.hashes = first.json.txns.map(t => t?.transaction_hash || t?.hash).filter(Boolean);
-    if (first.json.cursor && first.json.txns.length >= PAGE) out.cursor = String(first.json.cursor);
+    out.hashes = txRange(first.json).map(t => t.transaction_hash).filter(Boolean);
+    if (cursorOf(first.json) && out.hashes.length >= PAGE) out.cursor = cursorOf(first.json);
   } else out.gap = 'The transaction index did not answer, so the rebuild has no hashes.';
   hashCache.set(id, { at: clock(), body: out });
   if (hashCache.size > 200) hashCache.delete(hashCache.keys().next().value);

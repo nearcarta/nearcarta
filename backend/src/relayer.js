@@ -8,7 +8,7 @@ import nacl from 'tweetnacl';
 import { deserialize } from 'borsh';
 import bs58 from 'bs58';
 import { Account, JsonRpcProvider, KeyPairSigner, SCHEMA, encodeDelegateAction } from 'near-api-js';
-import { cfg } from './config.js';
+import { cfg, DEP } from './config.js';
 import { rpc, view, viewAccount } from './near.js';
 import { policy, checkDelegate, checkKey, caps as makeCaps } from '../../shared/relay/policy.js';
 import { precheck, goodsOf } from '../../shared/relay/precheck.js';
@@ -30,6 +30,9 @@ export const conf = () => ({
   visitorNear: toYocto(process.env.RELAY_VISITOR_NEAR || '0.003'),
 });
 const hasKey = () => !!(process.env.RELAYER_PRIVATE_KEY || '').trim() && !!conf().account;
+// The suffix of a guest account on this service. The record names the parent, so nothing is hardcoded:
+// `play.<root>` on testnet, empty on mainnet (there are no guests there).
+export const guestSuffix = DEP.guest?.suffix || '';
 
 const day = () => new Date().toISOString().slice(0, 10);
 export const ledger = { day: day(), spent: 0n, relays: 0, sessions: 0, refused: {}, by: new Map() };
@@ -107,17 +110,28 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
  * A capped sponsored first session: once per account, fund a brand-new implicit account just enough to
  * exist and hold one session key, and give it a small market storage deposit. Counted against the
  * daily session cap and the daily budget.
+ *
+ * A guest account (`<name>.play.<root>`) is already funded by the guest funder, so the NEAR transfer is
+ * skipped for it and only the market storage top-up is sent. Detecting it by suffix, not by a name,
+ * means a renamed testnet parent still works.
+ * Docs: https://docs.near.org/protocol/transactions/meta-tx · https://github.com/near/NEPs/blob/master/neps/nep-0366.md
  */
-export async function session(accountId, { acc = () => relayer(), viewAcc = viewAccount, storageOf, sponsor = null } = {}) {
+export async function session(accountId, { acc = () => relayer(), viewAcc = viewAccount, storageOf, sponsor = null, guestOf = guestSuffix } = {}) {
   roll(); const c = conf();
   if (!hasKey() && !storageOf) return refuse('ERR_RELAYER_OFF', 503);
   const id = String(accountId || '').trim().toLowerCase();
   if (!/^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(id)) return refuse('ERR_ACCOUNT');
   const implicit = /^[0-9a-f]{64}$/.test(id);
+  const isGuest = !!guestOf && id.endsWith(guestOf);
+  // A guest must exist: anyone can type a name under the guest parent, and a storage deposit for a name
+  // nobody created would spend the relayer's float on nothing.
   let exists = true; try { await viewAcc(id); } catch { exists = false; }
+  if (isGuest && !exists) return refuse('ERR_NO_ACCOUNT');
   if (!exists && !implicit) return refuse('ERR_NO_ACCOUNT');
   const stored = storageOf ? await storageOf(id) : BigInt(await view(c.market, 'storage_balance_of', { account_id: id }).catch(() => '0'));
-  const needFund = !exists, needStorage = BigInt(stored) < c.storageLow;
+  // A guest already holds NEAR from its funder: only its market storage is topped up here.
+  const needFund = !exists && !isGuest;
+  const needStorage = BigInt(stored) < c.storageLow;
   if (!needFund && !needStorage) return { ok: true, already: true, account: id, txs: [] };
   const add = needStorage ? c.sessionStorage - BigInt(stored) : 0n;
   const cost = (needFund ? c.sessionFund : 0n) + add + 2n * 10n ** 21n;

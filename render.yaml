@@ -1,6 +1,11 @@
 # Render Blueprint: the read-only API. The live service is a paid Starter instance so it does not sleep.
 # It runs the image built from ./Dockerfile (pushed to a private GHCR package), so Render
 # needs no access to the repo. Server keys are set on the service, never in the image.
+#
+# A second service, nearcarta-api-testnet, runs the same image with NEAR_NETWORK=testnet. It reads
+# shared/deployments/testnet.json and is the only service that can create a guest account, so a wrong
+# flag cannot sign on one network with the other network's keys: each service holds only its own.
+# Docs: https://render.com/docs/blueprint-spec
 services:
   - type: web
     name: nearcarta-api
@@ -14,8 +19,66 @@ services:
           name: nearcarta-ghcr
     healthCheckPath: /api/health
     envVars:
+      - key: NEAR_NETWORK
+        value: mainnet
       - key: NEAR_RPC
         value: https://free.rpc.fastnear.com
+      - key: ONECLICK_PARTNER_KEY
+        sync: false
+      - key: NEARAI_CLOUD_API_KEY
+        sync: false
+      - key: NEARAI_MODEL
+        value: z-ai/glm-5.3-flash
+
+  - type: web
+    name: nearcarta-api-testnet
+    runtime: image
+    plan: starter
+    region: frankfurt
+    image:
+      url: ghcr.io/nearcarta/nearcarta-api:latest
+      creds:
+        fromRegistryCreds:
+          name: nearcarta-ghcr
+    healthCheckPath: /api/health
+    envVars:
+      - key: NEAR_NETWORK
+        value: testnet
+      - key: NEAR_RPC
+        value: https://rpc.testnet.fastnear.com
+      - key: NEAR_RPC_FALLBACKS
+        value: https://rpc.testnet.near.org,https://near-testnet.drpc.org
+      - key: NEAR_ARCHIVAL_RPC
+        value: https://archival-rpc.testnet.fastnear.com
+      - key: FASTNEAR_TX_API
+        value: https://tx.test.fastnear.com
+      - key: NEARBLOCKS_API
+        value: https://api-testnet.nearblocks.io
+      # The funder that creates a guest account. Its key is set on the service only, never in the image,
+      # and it is a different key from the one that owns the testnet contracts.
+      - key: GUEST_FUNDER_ACCOUNT
+        value: play.nearcarta.testnet
+      - key: GUEST_FUNDER_PRIVATE_KEY
+        sync: false
+      - key: GUEST_PER_IP_DAY
+        value: "3"
+      - key: GUEST_GLOBAL_DAY
+        value: "400"
+      - key: GUEST_FUNDER_FLOOR_NEAR
+        value: "10"
+      - key: GUEST_FUND_NEAR
+        value: "0.25"
+      # The NEP-366 relayer that pays the gas for a guest's market moves.
+      - key: RELAYER_ACCOUNT
+        value: relayer.nearcarta.testnet
+      - key: RELAYER_PRIVATE_KEY
+        sync: false
+      - key: MARKET_ACCOUNT
+        value: arena.nearcarta.testnet
+      - key: BOARD_ACCOUNT
+        value: board.nearcarta.testnet
+      # The shared keys. Quotes stay dry and model calls are capped per guest, so a guest flood cannot
+      # eat the mainnet quota in one go.
       - key: ONECLICK_PARTNER_KEY
         sync: false
       - key: NEARAI_CLOUD_API_KEY
