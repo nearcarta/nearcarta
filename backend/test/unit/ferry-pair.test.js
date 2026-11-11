@@ -235,8 +235,11 @@ test('live-quote Load cargo is moved into the Sign in row (keeps the gold Review
   const css = read('app/src/panels/gold-standard.css');
   assert.match(css, /body\.ferry-tray #shopUI #tray > \.t-row\.ferry-secondary-row/);
   assert.match(css, /display: contents/);
-  assert.match(css, /flex: 1 1 calc\(50% - 6px\)/);
+  assert.match(css, /flex: 1 1 calc\(50% - 6px\) !important/);
+  assert.match(css, /width: auto !important/);
+  assert.match(css, /display: contents !important/);
   assert.match(css, /background: rgba\(0, 0, 0, \.24\) !important/);
+  assert.match(css, /@media \(max-width: 370px\)/);
   // Review swap stays the 48px gold primary — the fit must not shrink it.
   const ref = read('app/src/panels/panel-ref.css');
   assert.match(ref, /body #shopUI #tray #t-form #f-quote \{ min-height: 48px !important/);

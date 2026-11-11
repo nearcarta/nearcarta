@@ -1407,27 +1407,31 @@ body.bank-tray #shopUI #tray .bank-file-name {
    Load cargo (and Ask charter, when it is shown) now share the Sign in
    row, with a 12px gap. Review swap stays the 48px gold primary. */
 body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
   flex-wrap: wrap;
   align-items: stretch;
   gap: 12px;
   width: 100%;
 }
 body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row .ferry-cargo-actions {
-  display: contents;
+  display: contents !important;
+  margin: 0 !important;
+  width: auto !important;
 }
 body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row > #t-act:not([hidden]),
 body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row .ferry-cta {
-  flex: 1 1 calc(50% - 6px);
-  min-width: 132px;
-  width: auto;
-  max-width: 100%;
-  margin: 0;
-  min-height: 44px;
-  height: 44px;
+  flex: 1 1 calc(50% - 6px) !important;
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: calc(50% - 6px) !important;
+  margin: 0 !important;
+  min-height: 44px !important;
+  height: 44px !important;
   box-sizing: border-box;
   /* Stay outlined secondaries. Moving Load cargo out of #t-form would otherwise
-     fall back to the raised gold .ferry-cta in panels.css. */
+     fall back to the raised gold .ferry-cta in panels.css. shop-shell pins
+     #t-act to width: 100% !important, which had forced the shared row to wrap. */
   background: rgba(0, 0, 0, .24) !important;
   background-image: none !important;
   color: var(--c-cream) !important;
@@ -1439,11 +1443,51 @@ body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row .ferry-cta {
 }
 /* When Sign in is hidden, Load cargo keeps the full row. */
 body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row:not(:has(#t-act:not([hidden]))) .ferry-cta {
-  flex: 1 1 100%;
+  flex: 1 1 100% !important;
+  max-width: 100% !important;
 }
 /* A little tighter quote padding on a phone, without touching Review swap. */
 @media (max-width: 480px) {
   body.ferry-tray #shopUI #tray #t-form .swap-quote {
     padding: 8px 10px !important;
+  }
+}
+/* 360×780: the live quote already fits at 390, but the 64px-shorter tray plus the
+   "more below" hint (26px) and the row/footer margins overflowed by ~86px. Tighten
+   only below 370px so the 390 layout stays as reviewed. Review swap stays 48px gold. */
+@media (max-width: 370px) {
+  body.ferry-tray #shopUI #tray {
+    padding: 8px 12px !important;
+  }
+  body.ferry-tray #shopUI #tray > .t-scroll {
+    gap: 4px !important;
+  }
+  body.ferry-tray #shopUI #tray > .t-scroll > .t-head {
+    padding-bottom: 4px !important;
+  }
+  body.ferry-tray #shopUI #tray #t-form {
+    padding-top: 4px !important;
+    gap: 6px !important;
+  }
+  body.ferry-tray #shopUI #tray #t-form .shop-stack,
+  body.ferry-tray #shopUI #tray #t-form .ferry-card {
+    gap: 6px !important;
+  }
+  body.ferry-tray #shopUI #tray #t-form .swap-quote {
+    padding: 6px 8px !important;
+  }
+  body.ferry-tray #shopUI #tray > .more-hint {
+    margin: 0 !important;
+  }
+  body.ferry-tray #shopUI #tray > .t-row {
+    margin-top: 6px !important;
+  }
+  body.ferry-tray #shopUI #tray > .t-links {
+    margin-top: 4px !important;
+  }
+  body.ferry-tray #shopUI #tray > .t-links .link,
+  body.ferry-tray #shopUI #tray > .t-links a,
+  body.ferry-tray #shopUI #tray > .t-links #t-proof {
+    min-height: 28px !important;
   }
 }
