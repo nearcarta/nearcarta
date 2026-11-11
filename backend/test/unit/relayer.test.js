@@ -97,3 +97,30 @@ test('relayer: an invest the purse cannot cover is refused before sending (no ga
   const ok = await relay((await signed({ acts: [actions.functionCall('purse', { action: 'invest', amount: String(10n ** 21n), shop: 'ferry' }, 20n * T, 0n)] })).b64, { ...deps(), stateOf: async () => ({ purse: 2n * 10n ** 21n, me: 'player.near' }) });
   assert.equal(ok.ok, true);
 });
+
+test('relayer: a guest account is already funded, so the session tops up only its market storage', async () => {
+  // A guest holds 0.25 test NEAR from the funder. Sending it another NEAR from the relayer would
+  // spend the float twice for one visitor and make the guest look like an implicit wallet.
+  // Docs: https://docs.near.org/protocol/transactions/meta-tx
+  const calls = [];
+  const acc = () => ({
+    transfer: async (a) => { calls.push(['transfer', a.receiverId, a.amount]); return { transaction_outcome: { id: 'F1', outcome: { tokens_burnt: '0' } } }; },
+    callFunction: async (a) => { calls.push(['call', a.methodName, a.args.account_id, a.deposit]); return { transaction_outcome: { id: 'S1', outcome: { tokens_burnt: '0' } } }; },
+  });
+  const guestId = 'x7k2m9pqrs.play.nearcarta.testnet';
+  const r = await session(guestId, {
+    acc, guestOf: '.play.nearcarta.testnet',
+    viewAcc: async () => { throw new Error('missing'); }, // never consulted: a guest is known to exist
+    storageOf: async () => 0n,
+  });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.txs, ['S1'], 'only the storage deposit is sent');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'call');
+  assert.equal(calls[0][1], 'storage_deposit');
+  assert.equal(r.funded, '0');
+  // The same account on a service with no guest suffix is treated as an ordinary named account: it
+  // does not exist, so it is refused rather than funded.
+  const plain = await session(guestId, { acc, guestOf: '', viewAcc: async () => { throw new Error('missing'); }, storageOf: async () => 0n });
+  assert.equal(plain.why, 'ERR_NO_ACCOUNT');
+});

@@ -6,7 +6,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { bodyLimit } from 'hono/body-limit';
-import { DEP, MAINNET_DEP, cfg, has, secret } from './config.js';
+import { DEP, MAINNET_DEP, NET, cfg, has, secret } from './config.js';
 import * as ferry from './ferry.js';
 import * as checkout from './ferry-checkout.js';
 import * as payoutsInvoice from './payouts-invoice.js';
@@ -34,6 +34,7 @@ import * as bankModel from './bank-model.js';
 import * as tee from './tee.js';
 import * as vault from './vault.js';
 import * as relayer from './relayer.js';
+import * as guestRoutes from './guest-routes.js';
 import * as marketGuide from './market-guide.js';
 import * as marketLive from './market-live.js';
 import * as marketHistory from './market-history.js';
@@ -240,7 +241,9 @@ export function makeApp() {
   // each one's status and time, plus the RPC retry/fallback/stale counters.
   app.get('/api/health', (c, next) => c.req.query('deep') ? deepLimit(c, next) : next(), limiter(60), async c => {
     const near = c.req.query('deep') ? await shops.health() : shops.healthCached();
-    return c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: { contracts: MAINNET_DEP?.status === 'deployed' ? 'mainnet' : null, journey: 'mainnet' }, near,
+    // `network` names the service: the testnet image answers "testnet" here, so an operator can see at a
+    // glance which record this process is reading. The mainnet service keeps saying "mainnet".
+    return c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: { name: NET, contracts: NET === 'testnet' ? (DEP.status === 'deployed' ? 'testnet' : null) : (MAINNET_DEP?.status === 'deployed' ? 'mainnet' : null), journey: NET }, near,
       features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: { enabled: false, charter: MAINNET_DEP?.extras?.arena?.contract || null }, git: process.env.GIT_SHA || null });
   });
   // Shows the caller how Render keys their own request, with no address in the answer: which header decides
@@ -964,6 +967,7 @@ export function makeApp() {
   // Charters (factory) and Vault Arena: backend/src/vault.js
   vault.register(app, { limiter, globalCap });
   relayer.register(app, { limiter, globalCap });
+  guestRoutes.register(app, { limiter, globalCap });
   bankSeal.register(app, { limiter, globalCap });
   merchant.register(app, { limiter, globalCap });
   marketGuide.register(app, { limiter, globalCap });
