@@ -223,6 +223,12 @@ export async function step(id, ctx = {}) {
     const r = await move({ method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 });
     return record(id, `Bought a ${shop} share (testnet)`, r);
   }
+  // The steps that act through the guest's own board row open it first, once. openRow is a no-op when
+  // the row exists, and a refusal comes back as this step's receipt instead of a silent practice step.
+  if (['seal', 'order', 'cross', 'check', 'write'].includes(id)) {
+    const row = await openRow({ signer: s }).catch((e) => ({ hash: null, failure: String(e?.message || e) }));
+    if (row?.failure || row?.refused) return { hash: row.hash || null, failure: row.failure || row.refused, row_hash: row.hash || null };
+  }
   if (id === 'seal') return sealProfit(s);
   if (id === 'pay') return payPorter(s);
   if (id === 'order') return postOrder(s);
