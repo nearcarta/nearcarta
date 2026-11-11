@@ -19,7 +19,7 @@ import { createHash } from 'node:crypto';
 import bs58 from 'bs58';
 import { Account, JsonRpcProvider, KeyPairSigner, actions as A } from 'near-api-js';
 import { cfg, DEP, NET } from './config.js';
-import { rpc, viewAccount } from './near.js';
+import { rpc, view, viewAccount } from './near.js';
 
 const NEAR = 10n ** 24n;
 const BASE32 = 'abcdefghijklmnopqrstuvwxyz234567';
@@ -186,18 +186,38 @@ export async function createWithKey(accountId, publicKeyRaw, fund, send) {
   else r = await funder().signAndSendTransaction({ receiverId: accountId, actions: acts, waitUntil: 'FINAL', throwOnFailure: false });
   return { tx: hashOf(r), failure: failureOf(r) };
 }
+// One crate per guest. The route is public, so without this a caller could ask for the same crate again
+// and again and spend the funder's float on storage deposits. The chain is the record: a guest that
+// already holds market storage or test dollars has had its crate, and a name that does not exist gets none.
+const crated = new Set();
+export async function crateState(accountId, deps = {}) {
+  const cfgG = { ...guestCfg(), ...(deps.cfg || {}) };
+  const exists = deps.exists ? await deps.exists(accountId) : await viewAccount(accountId).then(() => true, () => false);
+  if (!exists) return { exists: false };
+  const viewF = deps.view || view;
+  const usdc = cfgG.tusdc ? BigInt(await viewF(cfgG.tusdc, 'ft_balance_of', { account_id: accountId }).catch(() => '0') || '0') : 0n;
+  const st = cfgG.market ? await viewF(cfgG.market, 'storage_balance_of', { account_id: accountId }).catch(() => null) : null;
+  const stored = BigInt((st && typeof st === 'object' ? st.total : st) || '0');
+  return { exists: true, hasUsdc: usdc > 0n, hasStorage: stored > 0n };
+}
+
 export async function welcome(accountId, deps = {}) {
-  if (NET !== 'testnet') return refuse('ERR_NOT_TESTNET', 404);
-  const cfgG = guestCfg();
+  if ((deps.net || NET) !== 'testnet') return refuse('ERR_NOT_TESTNET', 404);
+  const cfgG = { ...guestCfg(), ...(deps.cfg || {}) };
+  if (crated.has(accountId)) return { ok: true, already: true, account: accountId, items: [] };
+  const state = await crateState(accountId, deps);
+  if (!state.exists) return refuse('ERR_NO_ACCOUNT', 404);
+  if (state.hasUsdc && state.hasStorage) { crated.add(accountId); return { ok: true, already: true, account: accountId, items: [] }; }
+  crated.add(accountId);
   const call = async (receiverId, acts) => (deps.send
     ? deps.send(receiverId, acts)
     : funder().signAndSendTransaction({ receiverId, actions: acts, waitUntil: 'FINAL', throwOnFailure: false }));
   const out = [];
-  if (cfgG.tusdc) {
+  if (cfgG.tusdc && !state.hasUsdc) {
     const r = await call(cfgG.tusdc, [A.functionCall('mint', { account_id: accountId, amount: cfgG.welcomeUsdc }, 30n * 10n ** 12n, 0n)]);
     out.push({ item: 'tusdc', amount: cfgG.welcomeUsdc, symbol: 'tUSDC', tx: hashOf(r), failure: failureOf(r), link: txUrl(hashOf(r)) });
   }
-  if (cfgG.market) {
+  if (cfgG.market && !state.hasStorage) {
     const r = await call(cfgG.market, [A.functionCall('storage_deposit', { account_id: accountId }, 20n * 10n ** 12n, cfgG.marketStorage)]);
     out.push({ item: 'market_space', tx: hashOf(r), failure: failureOf(r), link: txUrl(hashOf(r)) });
   }
