@@ -42,7 +42,7 @@ export async function runLoop({ onStep = () => {}, doc = document } = {}) {
   if (!s) { push({ id: 'signer', label: 'The key did not load', state: 'failed' }); return { ok: false, why: 'ERR_NO_GUEST', steps }; }
 
   // 3. The guest's own board row, from the record.
-  const { openRow } = await import('./live-guest.js');
+  const { openRow } = await import('./market/live-guest.js');
   const row = await openRow({ signer: s }).catch((e) => ({ failure: String(e?.message || e) }));
   push({ id: 'row', label: row?.already ? 'Row already open' : 'Opened the board row', state: row?.failure ? 'failed' : 'ok', hash: row?.hash, url: row?.hash ? txUrl(row.hash) : '' });
 
@@ -52,7 +52,7 @@ export async function runLoop({ onStep = () => {}, doc = document } = {}) {
     ['sell', 'Sold 3 salt at the Arena'],
     ['invest', 'Bought a Ferry share'],
   ];
-  const live = await import('./live-guest.js');
+  const live = await import('./market/live-guest.js');
   for (const [id, label] of marketSteps) {
     try {
       const r = await live.step(id, { shop: 'ferry' });

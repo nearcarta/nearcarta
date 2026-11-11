@@ -46,3 +46,17 @@ test('every step row links its hash on the testnet explorer', () => {
   // The bank row says the amount is not on chain.
   assert.match(run, /the amount is not on chain/);
 });
+
+test('the one click and the scam errand load the guest story module from where the build puts it', async () => {
+  const { existsSync } = await import('node:fs');
+  const { posix } = await import('node:path');
+  for (const file of ['app/src/judges-run.js', 'app/src/net/scam.js']) {
+    const specs = [...read(file).matchAll(/import\('(\.[^']+)'\)/g)].map((m) => m[1]);
+    assert.ok(specs.length, `${file} imports the guest story`);
+    for (const s of specs) {
+      // The page serves app/src at the site root, so resolve as the browser would.
+      const target = posix.join(posix.dirname(file), s);
+      assert.ok(existsSync(root + target), `${file} imports ${s}, which is missing (${target})`);
+    }
+  }
+});

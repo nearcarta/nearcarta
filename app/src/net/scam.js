@@ -42,7 +42,7 @@ export async function runScamErrand({ text, onStep = () => {} } = {}) {
   const signer = await guestSigner();
   if (!signer) return { ok: false, why: 'ERR_NO_GUEST', ticks: false };
 
-  const { scamAsk, scamForce } = await import('./live-guest.js');
+  const { scamAsk, scamForce } = await import('../market/live-guest.js');
 
   // 1. Ask, and anchor the signed refusal.
   say({ id: 'ask', state: 'running', label: 'Asking the keeper…' });
@@ -164,7 +164,7 @@ export function installScamErrand({ doc = document } = {}) {
   forceBtn.addEventListener('click', async () => {
     forceBtn.disabled = true;
     note.textContent = 'Sending the over-limit intent. The charter should refuse it…';
-    const { scamForce } = await import('./live-guest.js');
+    const { scamForce } = await import('../market/live-guest.js');
     const signer = await guestSigner();
     const forced = await scamForce({ signer }).catch((e) => ({ failure: String(e?.message || e), refused: false }));
     last = { ...(last || {}), forced };
