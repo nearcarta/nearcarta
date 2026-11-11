@@ -1399,3 +1399,51 @@ body.bank-tray #shopUI #tray .bank-file-name {
   body.bank-tray #shopUI #tray > .t-links .link,
   body.bank-tray #shopUI #tray > .t-links a { min-height: 28px !important; }
 }
+
+/* ── Ferry live-quote fit ───────────────────────────────────────────────────
+   A filled Swap quote reveals Load cargo as a full-width button between
+   Review swap and Sign in. That added a row of height, so 1440 showed
+   "more below" and 390 tray-scrolled (~36px) and clipped How it works.
+   Load cargo (and Ask charter, when it is shown) now share the Sign in
+   row, with a 12px gap. Review swap stays the 48px gold primary. */
+body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+}
+body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row .ferry-cargo-actions {
+  display: contents;
+}
+body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row > #t-act:not([hidden]),
+body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row .ferry-cta {
+  flex: 1 1 calc(50% - 6px);
+  min-width: 132px;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  min-height: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  /* Stay outlined secondaries. Moving Load cargo out of #t-form would otherwise
+     fall back to the raised gold .ferry-cta in panels.css. */
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--c-cream) !important;
+  border: 1px solid var(--c-border) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border-radius: var(--r-cta);
+}
+/* When Sign in is hidden, Load cargo keeps the full row. */
+body.ferry-tray #shopUI #tray > .t-row.ferry-secondary-row:not(:has(#t-act:not([hidden]))) .ferry-cta {
+  flex: 1 1 100%;
+}
+/* A little tighter quote padding on a phone, without touching Review swap. */
+@media (max-width: 480px) {
+  body.ferry-tray #shopUI #tray #t-form .swap-quote {
+    padding: 8px 10px !important;
+  }
+}

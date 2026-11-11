@@ -5,7 +5,7 @@ import {
   toAsset, pairClauseId, isFerryClauseId, parsePairClauseId,
   parseAgentFerry, orderChipHtml, ORDER_STATES, chainLabel, ferryStampYocto,
 } from '../../../app/src/panels/ferry-pair.js';
-import { ferryMarkup, DEFAULT_ROUTES } from '../../../app/src/panels/deep.js';
+import { ferryMarkup, DEFAULT_ROUTES, placeFerrySecondaryRow } from '../../../app/src/panels/deep.js';
 
 const read = p => readFileSync(new URL('../../../' + p, import.meta.url), 'utf8');
 
@@ -225,4 +225,161 @@ test('ferryPayee falls back to pay/board receivers on board sessions (source)', 
   assert.match(css, /min-width:min\(220px/);
   assert.match(css, /\.ferry-cta\{[\s\S]*?\bwidth:auto/);
   assert.match(css, /justify-self:center/);
+});
+
+test('live-quote Load cargo is moved into the Sign in row (keeps the gold Review swap)', () => {
+  const deep = read('app/src/panels/deep.js');
+  assert.match(deep, /export function placeFerrySecondaryRow/);
+  assert.match(deep, /placeFerrySecondaryRow\(root\)/);
+  assert.match(deep, /ferry-secondary-row/);
+  const css = read('app/src/panels/gold-standard.css');
+  assert.match(css, /body\.ferry-tray #shopUI #tray > \.t-row\.ferry-secondary-row/);
+  assert.match(css, /display: contents/);
+  assert.match(css, /flex: 1 1 calc\(50% - 6px\)/);
+  assert.match(css, /background: rgba\(0, 0, 0, \.24\) !important/);
+  // Review swap stays the 48px gold primary — the fit must not shrink it.
+  const ref = read('app/src/panels/panel-ref.css');
+  assert.match(ref, /body #shopUI #tray #t-form #f-quote \{ min-height: 48px !important/);
+  assert.doesNotMatch(css, /#f-quote[^{]*\{[^}]*min-height:\s*(4[0-7]|3\d)px/);
+});
+
+// Tiny DOM so the move helper can be unit-tested without adding a browser kit.
+function el(tag, attrs = {}, kids = []) {
+  const node = {
+    tagName: String(tag).toUpperCase(),
+    id: attrs.id || '',
+    className: attrs.class || '',
+    hidden: !!attrs.hidden,
+    attrs: { ...attrs },
+    children: [],
+    parent: null,
+    ownerDocument: null,
+  };
+  node.classList = {
+    contains: (c) => node.className.split(/\s+/).includes(c),
+    add: (c) => {
+      const p = node.className.split(/\s+/).filter(Boolean);
+      if (!p.includes(c)) p.push(c);
+      node.className = p.join(' ');
+    },
+    remove: (c) => { node.className = node.className.split(/\s+/).filter(x => x && x !== c).join(' '); },
+  };
+  node.hasAttribute = (n) => n in node.attrs || (n === 'hidden' && node.hidden);
+  node.matches = (sel) => {
+    if (sel.startsWith('#')) return node.id === sel.slice(1);
+    if (sel.startsWith('.')) return node.classList.contains(sel.slice(1));
+    return node.tagName === sel.toUpperCase();
+  };
+  node.closest = (sel) => {
+    let n = node;
+    while (n) {
+      if (n.matches(sel)) return n;
+      n = n.parent;
+    }
+    return null;
+  };
+  node.querySelector = (sel) => {
+    const all = [];
+    const walk = (n) => { for (const c of n.children) { all.push(c); walk(c); } };
+    walk(node);
+    if (sel.startsWith('#')) return all.find(c => c.id === sel.slice(1)) || null;
+    if (sel.startsWith('.')) return all.find(c => c.classList.contains(sel.slice(1))) || null;
+    return all.find(c => c.tagName === sel.toUpperCase()) || null;
+  };
+  node.insertBefore = (child, ref) => {
+    if (child.parent) child.parent.removeChild(child);
+    const i = ref ? node.children.indexOf(ref) : node.children.length;
+    node.children.splice(i < 0 ? node.children.length : i, 0, child);
+    child.parent = node;
+  };
+  node.removeChild = (child) => {
+    node.children = node.children.filter(c => c !== child);
+    child.parent = null;
+  };
+  node.remove = () => { if (node.parent) node.parent.removeChild(node); };
+  for (const k of kids) {
+    node.children.push(k);
+    k.parent = node;
+  }
+  return node;
+}
+
+function makeTray({ cargoHidden = false, alreadyInRow = false } = {}) {
+  const cargo = el('div', { class: 'ferry-cargo-actions', ...(cargoHidden ? { hidden: true } : {}) }, [
+    el('button', { id: 'f-cargo', class: 'ferry-cta' }),
+  ]);
+  const act = el('button', { id: 't-act', class: 'primary' });
+  const formKids = alreadyInRow ? [el('button', { id: 'f-quote', class: 'primary ferry-cta' })] : [
+    el('button', { id: 'f-quote', class: 'primary ferry-cta' }),
+    cargo,
+  ];
+  const form = el('div', { id: 't-form' }, formKids);
+  const rowKids = alreadyInRow ? [cargo, act] : [act];
+  const row = el('div', { class: alreadyInRow ? 't-row ferry-secondary-row' : 't-row' }, rowKids);
+  const scroll = el('div', { class: 't-scroll' }, [form]);
+  const tray = el('div', { id: 'tray' }, [scroll, row, el('div', { class: 't-links' })]);
+  const shop = el('div', { id: 'shopUI' }, [tray]);
+  const doc = {
+    getElementById: (id) => {
+      const all = [];
+      const walk = (n) => { all.push(n); for (const c of n.children) walk(c); };
+      walk(shop);
+      return all.find(n => n.id === id) || null;
+    },
+    querySelector: (sel) => shop.querySelector(sel),
+  };
+  const stamp = (n) => { n.ownerDocument = doc; n.children.forEach(stamp); };
+  stamp(shop);
+  return { form, tray, row, cargo, act };
+}
+
+test('placeFerrySecondaryRow moves a visible Load cargo into the Sign in row', () => {
+  const { form, row, cargo, act } = makeTray();
+  const res = placeFerrySecondaryRow(form);
+  assert.equal(res.moved, true);
+  assert.equal(cargo.parent, row);
+  assert.equal(row.children[0], cargo);
+  assert.equal(row.children[1], act);
+  assert.ok(row.classList.contains('ferry-secondary-row'));
+});
+
+test('placeFerrySecondaryRow leaves a hidden cargo in the form and clears a stale row copy', () => {
+  const hidden = el('div', { class: 'ferry-cargo-actions', hidden: true }, [
+    el('button', { id: 'f-cargo', class: 'ferry-cta' }),
+  ]);
+  const stale = el('div', { class: 'ferry-cargo-actions' }, [
+    el('button', { id: 'f-cargo-stale', class: 'ferry-cta' }),
+  ]);
+  const act = el('button', { id: 't-act', class: 'primary' });
+  const form = el('div', { id: 't-form' }, [hidden]);
+  const row = el('div', { class: 't-row ferry-secondary-row' }, [stale, act]);
+  const tray = el('div', { id: 'tray' }, [el('div', { class: 't-scroll' }, [form]), row]);
+  const shop = el('div', { id: 'shopUI' }, [tray]);
+  const doc = {
+    getElementById: (id) => id === 't-form' ? form : (id === 'tray' ? tray : null),
+    querySelector: () => tray,
+  };
+  const stamp = (n) => { n.ownerDocument = doc; n.children.forEach(stamp); };
+  stamp(shop);
+  const res = placeFerrySecondaryRow(form);
+  assert.equal(res.moved, false);
+  assert.equal(hidden.parent, form);
+  assert.equal(row.children.length, 1);
+  assert.equal(row.children[0], act);
+  assert.equal(row.classList.contains('ferry-secondary-row'), false);
+});
+
+test('placeFerrySecondaryRow replaces a stale row copy on a later paint', () => {
+  const first = makeTray();
+  placeFerrySecondaryRow(first.form);
+  const second = el('div', { class: 'ferry-cargo-actions' }, [
+    el('button', { id: 'f-cargo', class: 'ferry-cta' }),
+  ]);
+  first.form.children.push(second);
+  second.parent = first.form;
+  const res = placeFerrySecondaryRow(first.form);
+  assert.equal(res.moved, true);
+  assert.equal(second.parent, first.row);
+  assert.equal(first.row.children.filter(c => c.classList.contains('ferry-cargo-actions')).length, 1);
+  assert.ok(first.row.children.includes(first.act));
 });
