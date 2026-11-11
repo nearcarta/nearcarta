@@ -109,7 +109,6 @@ function planCheckIn(ctx) {
   let call;
   try {
     call = proposeCallAs({
-      network: ctx.network || 'mainnet',
       board: ctx.board,
       owner: ctx.account,
       receiver: ctx.house,
@@ -214,7 +213,6 @@ function planForeign(line, ctx) {
     const deposit = big(ctx.row.min_amount) > 0n ? String(big(ctx.row.min_amount)) : '1';
     try {
       call = proposeCallAs({
-        network: ctx.network || 'mainnet',
         board: ctx.board,
         owner: ctx.account,
         receiver: ctx.house,

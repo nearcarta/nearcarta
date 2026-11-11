@@ -45,12 +45,25 @@ export function effectsCanon(effects) {
   return effects.map(e => `${e.chain}|${e.asset}|${e.to}|${e.value}|${e.fee}`).join(';');
 }
 
+/** The network word the board signs, read from the board's own account id. A board on a
+ * `.testnet` account signs "testnet"; every other account signs "mainnet". Mirrors
+ * `network_of` in contracts/charter_board/src/lib.rs.
+ * Docs: https://docs.near.org/protocol/accounts-contracts/account-id */
+export function boardNetwork(contract) {
+  return String(contract || '').endsWith('.testnet') ? 'testnet' : 'mainnet';
+}
+
 export function callAsMessage({ network, contract, owner, receiver, method, args, deposit, nonce, expiry, epoch, effects, hold }) {
   if (typeof sha256hex !== 'function') throw new Error('sha256 is not configured');
+  // The board writes its own network word into the text it checks. A caller may pass it, but it
+  // can only ever agree with the board's account: a literal that disagrees is refused here, before
+  // a signature exists, instead of failing on chain with ERR_BAD_SIG.
+  const word = boardNetwork(contract);
+  if (network != null && network !== word) throw new Error('ERR_NETWORK');
   const injected = injectRowOwner(args, owner);
   const hash = sha256hex(injected);
   return [
-    'board-call-as-v1', network, contract, CALL_AS_VERSION, owner, receiver, method, hash,
+    'board-call-as-v1', word, contract, CALL_AS_VERSION, owner, receiver, method, hash,
     String(deposit), String(nonce), String(expiry), String(epoch), effectsCanon(effects),
     hold ? 'hold' : 'exec',
   ].join('|');

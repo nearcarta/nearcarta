@@ -289,11 +289,19 @@ pub struct Board {
 fn blank(owner: AccountId) -> Board {
     board_from(owner, Map::new(), Map::new(), 0, Map::new())
 }
+/// The network this board signs for, read from the account it lives on. `call_as_text` writes this
+/// word into every `propose_call_as` message, so a client that rebuilds the message must use the
+/// same word. A board on `<id>.testnet` signs "testnet"; every other account signs "mainnet".
+/// Docs: https://docs.near.org/protocol/accounts-contracts/account-id
+fn network_of(id: &AccountId) -> String {
+    if id.as_str().ends_with(".testnet") { "testnet".into() } else { "mainnet".into() }
+}
+
 fn board_from(owner: AccountId, rows: Map<AccountId, Row>, keys: Map<[u8; 32], AccountId>, count: u32, calls: Map<AccountId, CallPolicy>) -> Board {
     Board {
         owner, rows, keys, count, calls,
         effects: Map::new(), holds: Map::new(), credit: Map::new(),
-        confirm: Map::new(), epoch: Map::new(), network: "mainnet".into(),
+        confirm: Map::new(), epoch: Map::new(), network: network_of(&env::current_account_id()),
         upgrade_hash: [0; 32], upgrade_eta: 0, upgrade_set: false,
         owed: 0, hold_count: 0, partial: false, dropped_rows: Vec::new(), dropped_keys: Vec::new(),
         seen_holds: Vec::new(),
@@ -1520,6 +1528,19 @@ mod tests {
         testing_env!(b.build());
     }
 
+    /// The same context with the board living on `me`, for the network-word test.
+    fn go_on(me: &str, pred: &str, deposit: u128) {
+        let mut b = VMContextBuilder::new();
+        b.current_account_id(acc(me))
+            .predecessor_account_id(acc(pred))
+            .signer_account_id(acc(pred))
+            .attached_deposit(NearToken::from_yoctonear(deposit))
+            .prepaid_gas(Gas::from_tgas(200))
+            .account_balance(NearToken::from_near(30))
+            .block_timestamp(0);
+        testing_env!(b.build());
+    }
+
     fn keypair(byte: u8) -> (SigningKey, String) {
         let sk = SigningKey::from_bytes(&[byte; 32]);
         let pk = hex32(sk.verifying_key().as_bytes());
@@ -2357,6 +2378,27 @@ mod tests {
             let err = catch_unwind(AssertUnwindSafe(|| inject_row_owner(bad, &acc(ALICE)))).unwrap_err();
             assert!(refuse(err).contains("ERR_ARGS"), "{bad}");
         }
+    }
+
+    /// A board on a testnet account must sign "testnet" into the envelope. A client that rebuilds the
+    /// message from the account id then matches what the contract checks. The same code on a mainnet
+    /// account still signs "mainnet", so the live board's text does not change.
+    #[test]
+    fn the_signed_network_word_comes_from_the_account_the_board_lives_on() {
+        for (me, word) in [("board.nearcarta.testnet", "testnet"), ("charters.nearcarta.near", "mainnet")] {
+            go_on(me, ALICE, 0);
+            let c = Board::new();
+            assert_eq!(c.network, word);
+            // A message can be built before a row exists: `epoch_of` answers 0 for an unknown owner.
+            let msg = c.call_as_message(acc(ALICE), acc(SHOP), "ft_transfer".into(), r#"{"amount":"1"}"#.into(), U128(1), U64(0), U64(99), vec![], false);
+            let parts: Vec<&str> = msg.split('|').collect();
+            assert_eq!(parts[0], "board-call-as-v1");
+            assert_eq!(parts[1], word, "{me}");
+            assert_eq!(parts[2], me, "the board names itself");
+        }
+        assert_eq!(network_of(&"play.nearcarta.testnet".parse().unwrap()), "testnet");
+        assert_eq!(network_of(&"near".parse().unwrap()), "mainnet");
+        assert_eq!(network_of(&"testnet.near".parse().unwrap()), "mainnet", "only a .testnet suffix, not a name that starts with it");
     }
 
     #[test]

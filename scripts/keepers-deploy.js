@@ -5,13 +5,23 @@
 //   NEAR_IMPLICIT_PRIVATE_KEY  the held visitor wallet, the stranger in the smoke test
 import { existsSync, openSync, writeSync, fsyncSync, closeSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import MAIN from '../shared/deployments/mainnet.json' with { type: 'json' };
+import { deployContext, liveHint } from './lib/deploy-net.js';
 import { GOODS, ITEMS, NODES, SHOP_GOODS, TARGET } from '../shared/market/sim.js';
 import { openRowTransactions } from '../shared/setup/open-row.js';
 import { CALLS_DEPOSIT_YOCTO, SESSION_METHODS } from '../shared/board/session.js';
 
-const RPC = MAIN.rpc, ROOT = MAIN.root, BOARD = MAIN.board.contract, MARKET = MAIN.market.contract, STRANGER = MAIN.root_funder;
-const DIR = process.env.KEY_DIR || `${homedir()}/.near-credentials/mainnet`;
+// Network from NEAR_NETWORK, addresses from shared/deployments/<network>.json. Unset means mainnet.
+// The nine keepers are real sub-accounts of the record's root, each with a board row and a market
+// shop, so the NPC work a guest sees is a real transaction on the same network as the guest.
+// Keys are minted into a chmod 600 directory per network and never printed.
+// Docs: https://docs.near.org/tools/cli · https://docs.near.org/smart-contracts/release/deploy
+const net = deployContext(process.argv);
+const MAIN = net.dep;
+const NETWORK = net.network;
+const RPC = MAIN.rpc, ROOT = MAIN.root, BOARD = MAIN.board.contract, MARKET = MAIN.market?.contract || MAIN.planned.arena;
+// Only the mainnet record has a held stranger wallet for the refusal smoke test.
+const STRANGER = MAIN.root_funder || '';
+const DIR = process.env.KEY_DIR || `${homedir()}/.near-credentials/${NETWORK}`;
 const AGENTS = `${DIR}/keeper-agents.json`;
 const TG = 10n ** 12n, NEAR = 10n ** 24n, MILLI = 10n ** 21n, BYTE = 10n ** 19n;
 export const KEEPERS = Object.keys(SHOP_GOODS).map(shop => ({ shop, account: `keeper-${shop}.${ROOT}` }));
@@ -151,6 +161,7 @@ async function live(step, p) {
   }
   if (step === 'smoke') {
     const owner = await acc(ROOT, ownerKey());
+    if (!STRANGER) throw new Error('the ' + NETWORK + ' record names no stranger wallet, so there is nothing to refuse in this step. Use the guest account as the stranger instead.');
     const stranger = await acc(STRANGER, process.env.NEAR_IMPLICIT_PRIVATE_KEY || '');
     const k0 = KEEPERS[0];
     out.push({ step: 'stranger_open_shop', expect: 'ERR_OWNER', ...(await send(stranger, MARKET, [A.functionCall('open_shop', { id: 'fake', keeper: STRANGER, floor: '1', goods: [] }, 20n * TG, 0n)])) });
@@ -163,6 +174,11 @@ async function live(step, p) {
 export { live, keys };
 
 if (process.argv[1]?.endsWith('keepers-deploy.js')) {
+  console.log('keepers deploy');
+  console.log('network: ' + NETWORK + '  record: shared/deployments/' + NETWORK + '.json');
+  console.log('live command: ' + liveHint('keepers-deploy.js', NETWORK) + '   (steps: keys, accounts, rows, market, smoke)');
+  for (const r of net.refusals) console.error('refused: ' + r);
+  if (net.refusals.length) process.exit(1);
   const p = await plan();
   const { _fund, _gasPrice, ...shown } = p;
   console.log(JSON.stringify(shown, null, 1));

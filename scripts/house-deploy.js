@@ -16,7 +16,14 @@ import {
   ACCOUNT_BYTES, ACCOUNT_CREATION_YOCTO, BYTE_YOCTO, GAS_PRICE_YOCTO, GAS_PURCHASE_YOCTO, deployGas,
 } from '../shared/board/cost.js';
 import { HOUSE_FALLBACK, HOUSE_LEGACY, HOUSE_OWNER, HOUSE_SHOP, HOUSE_WASM_PATH, HOUSE_WASM_SHA256 } from '../shared/house/shop.js';
-import MAIN from '../shared/deployments/mainnet.json' with { type: 'json' };
+import { deployContext, liveHint } from './lib/deploy-net.js';
+
+// Network from NEAR_NETWORK, addresses from shared/deployments/<network>.json. This script
+// recreates the mainnet shop after house-recover.js; the testnet house is a fresh account and
+// scripts/testnet-deploy.js --step house creates it.
+// Docs: https://docs.near.org/smart-contracts/release/deploy · https://docs.near.org/tools/cli
+const net = deployContext(process.argv);
+const MAIN = net.dep;
 
 export const HOUSE_STATE_SLACK = 2048n;
 export const MAX_STAKE_NEAR = '3.8';
@@ -207,7 +214,16 @@ async function accountOf(id) {
 }
 
 async function main() {
-  const live = process.argv.includes('--live');
+  const live = net.live;
+  console.log('house deploy');
+  console.log('network: ' + net.network + '  record: shared/deployments/' + net.network + '.json');
+  console.log('live command: ' + liveHint('house-deploy.js', net.network));
+  for (const r of net.refusals) console.error('refused: ' + r);
+  if (net.refusals.length) process.exit(1);
+  if (net.network !== 'mainnet') {
+    console.error('refused: this script recreates the mainnet shop after a close. On ' + net.network + ' run scripts/testnet-deploy.js --step house instead. Nothing was signed.');
+    process.exit(1);
+  }
   if (HOUSE_SHOP !== HOUSE_LEGACY || HOUSE_OWNER !== MAIN.root) {
     console.error('extras.house.shop must be the shop account ' + HOUSE_LEGACY);
     process.exit(1);

@@ -15,9 +15,18 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import bs58 from 'bs58';
-import MAIN from '../shared/deployments/mainnet.json' with { type: 'json' };
+import { deployContext, liveHint } from './lib/deploy-net.js';
 
-const live = process.argv.includes('--live');
+// Network from NEAR_NETWORK, addresses from shared/deployments/<network>.json. Unset means mainnet.
+// The toll is the one contract whose foreign side changes with the network (chain_id 8453 on
+// mainnet, 84532 on testnet) and whose MPC account differs (v1.signer / v1.signer-prod.testnet).
+// --live refuses a signer whose suffix is not on the chosen network.
+// Docs: https://docs.near.org/chain-abstraction/chain-signatures/implementation
+//       https://docs.near.org/smart-contracts/release/deploy
+const net = deployContext(process.argv);
+const MAIN = net.dep;
+const NETWORK = net.network;
+const live = net.live;
 const SHOP = MAIN.toll.contract;
 const OWNER = MAIN.toll.owner;
 const BOARD = MAIN.board.contract;
@@ -31,7 +40,7 @@ const RECORDED_CODE = MAIN.toll.code_hash;
 // The remainder is the account record plus the empty maps, and a recreated
 // account pays it again.
 const ACCOUNT_OVERHEAD = BigInt((MAIN.toll.storage_bytes || 253139) - 251969);
-const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const USDC = MAIN.base?.usdc || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 function payee(id) {
   if (id !== OWNER && id !== SHOP) throw new Error('Refusing a transfer to ' + id);
@@ -172,9 +181,9 @@ if ((path === 'close_then_create' || path === 'create_only') && fund != null) {
 
 const init = {
   owner: OWNER,
-  mpc: policy?.mpc || 'v1.signer',
-  path: policy?.path || 'base-1',
-  chain_id: policy?.chain_id || 8453,
+  mpc: policy?.mpc || MAIN.mpc || 'v1.signer',
+  path: policy?.path || MAIN.path || 'base-1',
+  chain_id: policy?.chain_id || MAIN.chain_id || 8453,
   foreign_address: policy?.foreign_address || MAIN.toll.foreign_address,
   fx_root_key: MAIN.fx_root_key,
   allow_to: [],
@@ -196,8 +205,8 @@ const smokeAmount = process.env.TOLL_SMOKE_AMOUNT || '1';
 const smokeOwner = process.env.TOLL_SMOKE_OWNER || OWNER;
 
 const pre = [
-  { check: 'account', ok: SHOP === 'toll.nearcarta.near' && (!!account || path === 'create_only'), detail: exists ? SHOP : SHOP + ' is absent; this run creates it' },
-  { check: 'owner', ok: OWNER === 'nearcarta.near' && (!policy || policy.owner === OWNER), detail: policy?.owner || OWNER },
+  { check: 'account', ok: SHOP === (MAIN.toll?.contract || 'toll.nearcarta.near') && (!!account || path === 'create_only'), detail: exists ? SHOP : SHOP + ' is absent; this run creates it' },
+  { check: 'owner', ok: OWNER === MAIN.root && (!policy || policy.owner === OWNER), detail: policy?.owner || OWNER },
   { check: 'no full-access key', ok: fullAccess === 0, detail: String(fullAccess) },
   { check: 'no visitor NEAR to refund', ok: serviceHeld === 0n, detail: openOrders + ', service_held ' + serviceHeld.toString() },
   { check: 'payees', ok: transfers.every(t => t.payee === OWNER || t.payee === SHOP), detail: transfers.map(t => t.payee).join(', ') || 'no transfer on this path' },
@@ -216,7 +225,7 @@ if (path === 'close_then_create' || path === 'create_only') {
 
 const report = {
   dry_run: !live,
-  network: 'mainnet',
+  network: NETWORK,
   account: SHOP,
   owner: OWNER,
   board: BOARD,
@@ -270,12 +279,16 @@ const report = {
 };
 
 const failed = pre.filter(p => !p.ok);
+console.log('network: ' + NETWORK + '  record: shared/deployments/' + NETWORK + '.json  chain_id: ' + init.chain_id + '  mpc: ' + init.mpc);
+console.log('live command: ' + liveHint('toll-deploy.js', NETWORK));
 console.log(JSON.stringify(report, null, 2));
 if (!live) {
   console.log('This command does not sign and does not send NEAR.');
   process.exit(failed.some(p => p.check === 'wasm' || p.check === 'slack') ? 1 : 0);
 }
 
+for (const r of net.refusals) console.error('refused: ' + r);
+if (net.refusals.length) process.exit(1);
 const key = process.env.TOLL_SIGNER_KEY || '';
 if (!key.startsWith('ed25519:') || key.length < 20) {
   console.error('Refusing: set TOLL_SIGNER_KEY. This script does not read a key file.');

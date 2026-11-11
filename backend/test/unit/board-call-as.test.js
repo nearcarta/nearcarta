@@ -182,3 +182,38 @@ test('the city never signs a call-as text it built itself', () => {
   const code = src.replace(/\/\/[^\n]*/g, '');
   assert.doesNotMatch(code, /row\.epoch\s*\?\?/, 'no `row.epoch ?? fallback` on a signing path');
 });
+
+// The board writes the network word for its own account into every propose_call_as text
+// (contracts/charter_board/src/lib.rs `network_of`). A client that builds the same text has to
+// agree with it. Before this check, a literal `network: 'mainnet'` in the city signed "mainnet"
+// against a testnet board and the board refused ERR_BAD_SIG with no hint why.
+test('the call-as network word comes from the board account, and a wrong literal is refused', () => {
+  for (const mod of [shared, browser]) {
+    assert.equal(mod.boardNetwork('board.nearcarta.testnet'), 'testnet');
+    assert.equal(mod.boardNetwork('board.nearcarta.near'), 'mainnet');
+    assert.equal(mod.boardNetwork(''), 'mainnet');
+    const args = { network: 'testnet', contract: 'board.nearcarta.testnet', owner: 'alice.near', receiver: 'shop.nearcarta.testnet', method: 'ft_transfer', args: '{"amount":"1"}', deposit: '1', nonce: '0', expiry: '99', epoch: '0', effects: [], hold: false };
+    assert.match(mod.callAsMessage(args), /^board-call-as-v1\|testnet\|board\.nearcarta\.testnet\|/);
+    // Omitting the word is allowed: the board account decides.
+    const { network, ...rest } = args;
+    assert.equal(mod.callAsMessage(rest), mod.callAsMessage(args));
+    // A literal that disagrees never reaches a signature.
+    assert.throws(() => mod.callAsMessage({ ...args, network: 'mainnet' }), /ERR_NETWORK/);
+    assert.throws(() => mod.callAsMessage({ ...args, contract: 'board.nearcarta.near', network: 'testnet' }), /ERR_NETWORK/);
+  }
+});
+
+test('no caller chooses the network word: it is read from the board account at every site', () => {
+  // `network: 'mainnet'` on a call-as path is the bug this pins shut. The two modules that build
+  // the text derive the word themselves, so a literal on those paths cannot be right for both nets.
+  const root = new URL('../../../', import.meta.url).pathname;
+  const sites = ['app/src/panels/arena/economy.js', 'app/src/panels/arena/tray.js', 'app/src/panels/house-agent.js', 'app/src/panels/hall-v2.js', 'app/src/panels/toll-room.js'];
+  for (const f of sites) {
+    const src = readFileSync(root + f, 'utf8').replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.doesNotMatch(src, /network:\s*'mainnet'/, `${f} must not name a network`);
+  }
+  // The house envelope derives the word too, and refuses a caller that disagrees.
+  const house = readFileSync(root + 'app/src/house-board.js', 'utf8');
+  assert.match(house, /endsWith\('\.testnet'\)/, 'house-board reads the suffix from the board id');
+  assert.match(house, /ERR_NETWORK/);
+});
