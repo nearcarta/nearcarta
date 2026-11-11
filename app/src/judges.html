@@ -16,14 +16,18 @@
   <h1>For judges</h1>
   <p class="links"><a href="/console">Live shops</a> <a href="https://github.com/nearcarta/nearcarta#readme">README</a> <a href="/llms.txt">llms.txt</a></p>
 </header>
+<h2 class="judge-sec">One click: the whole loop, live on chain</h2>
+<main id="judge-runner" data-testid="judge-runner-host"></main>
 <h2 class="judge-sec">Games: Market Day</h2>
 <main id="games-steps" class="judge-grid"></main>
 <h2 class="judge-sec">Five checks on mainnet</h2>
 <main id="judge-steps" class="judge-grid"></main>
 <script type="module">
 import { renderJudges, renderGames } from './judges-data.js';
+import { installJudgeRunner } from './judges-run.js';
 document.getElementById('games-steps').innerHTML = renderGames();
 document.getElementById('judge-steps').innerHTML = renderJudges();
+installJudgeRunner();
 </script>
 </body>
 </html>

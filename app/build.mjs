@@ -170,7 +170,7 @@ const scrubPairs = [
   [new RegExp(codes(117, 116, 101, 115, 116, 49), 'gi'), 'ucheck'],
 ];
 // Files the guest path owns, relative to dist.
-const GUEST_OWNED = [/^shared\/net\/net\.js$/, /^net\/chrome\.js$/, /^guest\/key\.js$/, /^market\/live-guest\.js$/];
+const GUEST_OWNED = [/^shared\/net\/net\.js$/, /^net\/chrome\.js$/, /^guest\/key\.js$/, /^market\/live-guest\.js$/, /^judges-run\.js$/];
 function scrub(dir, base = '') {
   for (const name of readdirSync(dir)) {
     const path = dir + '/' + name;
