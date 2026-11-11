@@ -141,7 +141,12 @@ document.getElementById('c').addEventListener('pointerdown',()=>{ if(performance
 const a=document.getElementById('acct'),w=document.querySelector('#brand .what'),b=document.querySelector('#brand small');if(!a||!w)return;
 const f=()=>{const ph=innerWidth<=600;if(ph&&w.parentElement!==a)a.append(w);if(!ph&&w.parentElement===a&&b)b.before(w);document.documentElement.style.setProperty('--hudTop',Math.round(a.getBoundingClientRect().bottom)+'px');};
 if('ResizeObserver'in window)new ResizeObserver(f).observe(a);addEventListener('resize',f);f();})();</script>
-<script type="module">const mc=()=>import('/house.bundle.js').then(m=>m.mountConnect(document.getElementById('wallet'))).catch(()=>{});mc();addEventListener('nearcarta:wallet',mc);</script>
+<script type="module">/* The wallet bundle is ~166 KB and nothing needs it until a visitor signs in: load it on the first
+intent (a press on the wallet slot or Play for real), not on first paint. */
+const mc=()=>import('/house.bundle.js').then(m=>m.mountConnect(document.getElementById('wallet'))).catch(()=>{});
+addEventListener('nearcarta:wallet',mc);
+for(const sel of ['#wallet','#signIn']){ document.querySelector(sel)?.addEventListener('pointerdown',()=>{mc();},{once:true}); }
+</script>
 <link rel="stylesheet" href="/market/market.css"><script type="module" src="/market/city.js"></script>
 </body>`));
 // Market Day: the city game layer mounts on the town page.

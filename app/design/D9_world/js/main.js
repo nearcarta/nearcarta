@@ -517,6 +517,9 @@ addEventListener('nearcarta:chronicle',e=>{ const d=e.detail||{}; if(!d.hash) re
   l.prepend(li); while(l.children.length>3) l.lastChild.remove(); $('#chron').hidden=false; });
 // The town is the front door: the cinematic story is opt-in (`?story=1` or the Watch the story button),
 // not something a first visitor has to sit through. Everything else about the town is unchanged.
+// The chrome is HTML, not the scene: show it as soon as this script runs so the two real actions are
+// usable while the town is still loading. Everything else stays hidden until the first lit frame.
+body.classList.add('chrome-ready');
 const startStory=P.has('story') && !P.has('nostory') && !P.has('explore') && !P.has('shop');
 let introCtl=null;
 window.__skipTownIntro = () => { introCtl?.skip(); if (mode === 'story') endStory(); };

@@ -85,6 +85,9 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
   <button id="netBadge" class="net-badge main" type="button" data-testid="net-badge" aria-haspopup="dialog"><span class="dot" aria-hidden="true"></span>MAINNET</button>
   <p id="tryFreeNote" class="try-note" data-testid="try-free-note" aria-live="polite"></p>
 </aside>
+<script>/* The entry row is markup, not the scene. Mark it usable at parse time so a visitor can press
+   Play free while the town is still downloading, instead of waiting on 3.5 MB of models. */
+document.documentElement.classList.add('chrome-ready');</script>
 <p class="net-pitch" data-testid="net-pitch">Play the whole city on the NEAR test network. Real transactions, no money, no sign-up.</p>
 
 <nav id="ctl" class="hud" aria-label="Controls">
@@ -200,7 +203,9 @@ window.__gl=cap; const go2d=why=>import('./js/fb.js').then(m=>m.fallback(why));
 const script=src=>new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
 const pre=h=>{ const l=document.createElement('link'); l.rel='preload'; l.as='fetch'; l.crossOrigin='anonymous'; l.href=h; document.head.appendChild(l); };
 if(q.get('mode')==='2d'||!cap.ok){ if(!q.has('t')) go2d(q.get('mode')==='2d'?'':cap.why); }
-else { ['assets/hex_bundle.glb','assets/chars9/kay.glb','assets/chars9/RobotExpressive.glb'].forEach(pre);
+// Only the town mesh is preloaded. The two character rigs (kay and the Lamplighter) are ~770 KB and
+// are fetched by the cast builder as it needs them, so the first frame does not wait on them.
+else { ['assets/hex_bundle.glb'].forEach(pre);
   script('vendor/gsap/gsap.min.js').then(()=>import(q.has('t')?'./js/test_main.js':'./js/main.js')).catch(e=>{ console.error('[Nearcarta] 3D failed to load',e); go2d('3D failed to load'); });
   if(!force && !cap.soft) setTimeout(()=>{ if(!document.body.classList.contains('ready')&&!document.body.classList.contains('fb')){ window.__3dStop='slow start'; go2d('3D did not start within 25 s'); } },25000); }
 </script>
