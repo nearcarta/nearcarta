@@ -171,6 +171,59 @@ export async function step(id, ctx = {}) {
 }
 
 /**
+ * The scam errand, step 1: ask the keeper, then anchor the signed refusal on chain.
+ *
+ * The refusal is TEE-signed by NEAR AI Cloud; the digest of that signature text is what the guest's own
+ * row writes with `board.anchor`, so a "no" becomes a transaction instead of an API field. Only the digest
+ * goes on chain. Returns `{ ask, hash, failure }` where `ask` is everything the card shows.
+ * Docs: https://docs.near.ai/cloud/verification/reference/response-signature-verification
+ *       https://docs.near.org/protocol/accounts-contracts/access-keys
+ */
+export async function scamAsk(text, { signer } = {}) {
+  const s = signer || (await guestSigner());
+  if (!s) return { refusal: 'ERR_NO_GUEST' };
+  const res = await fetch(api('/api/scam/ask'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+  const ask = await res.json().catch(() => ({ ok: false, why: 'ERR_ASK' }));
+  if (!ask?.ok) return { ask, refusal: ask?.why || 'ERR_ASK' };
+  const board = cfg.shops.board || 'board.nearcarta.testnet';
+  const r = await s.call(board, 'anchor', { kind: 'keeper_refusal', digest: ask.digest, salt: '' }, { deposit: 0n, gas: 40n * TG });
+  return record('refusal', 'The keeper refused, and the refusal is on chain (testnet)', { ask, hash: r.hash, failure: r.failure, url: r.hash ? txUrl(r.hash) : null });
+}
+
+/**
+ * The scam errand, step 2: submit the over-limit intent ANYWAY, and let the charter refuse it.
+ *
+ * The server does not trim the amount. This builds the intent the keeper refused and posts it through the
+ * board; the board's caps reject it, so the card can link a failed receipt and name the reason. A successful
+ * send here would be a bug in the charter, and the card says that too.
+ * Docs: https://docs.near.org/protocol/transactions (a failed outcome is a real transaction)
+ */
+export async function scamForce({ signer } = {}) {
+  const s = signer || (await guestSigner());
+  if (!s) return { refusal: 'ERR_NO_GUEST' };
+  const board = cfg.shops.board || 'board.nearcarta.testnet';
+  const guard = cfg.shops.guard || 'guard.nearcarta.testnet';
+  const limit = (cfg.scamLimit || {}).amount_near || '0.5';
+  const yocto = BigInt(Math.round(Number(limit) * 1e6)) * 10n ** 18n;
+  const r = await s.call(board, 'propose_call_as', {
+    owner: s.accountId,
+    receiver: guard,
+    method: 'pay',
+    args: JSON.stringify({ payee: cfg.shops['keeper-guard'] || 'keeper-guard.nearcarta.testnet', amount: String(yocto) }),
+    deposit: String(yocto),
+    expiry: String(BigInt(Date.now()) * 1_000_000n + 600_000_000_000n),
+    effects: [],
+    hold: false,
+    signature: '',
+  }, { deposit: 0n, gas: 100n * TG });
+  // A refusal is the expected, correct outcome: the card shows it as refused, not as an error.
+  const refused = !!r.failure;
+  return record('force', refused ? 'The charter refused an over-limit payment (testnet)' : 'The charter allowed an over-limit payment (testnet)', {
+    hash: r.hash, failure: r.failure, refused, amount_near: limit, url: r.hash ? txUrl(r.hash) : null,
+  });
+}
+
+/**
  * Bank seal: the guest's own row anchors a fingerprint of the purse. Only sha256(salt‖digest) goes on
  * chain through `board.anchor`; the salt and the amount stay in this browser, so the reveal is the
  * guest's to make. The board writes the commitment into its log, not the amount.

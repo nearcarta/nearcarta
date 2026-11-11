@@ -88,6 +88,9 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
 <script>/* The entry row is markup, not the scene. Mark it usable at parse time so a visitor can press
    Play free while the town is still downloading, instead of waiting on 3.5 MB of models. */
 document.documentElement.classList.add('chrome-ready');</script>
+<!-- The scam errand: a visitor tries to talk a keeper past its cap, and the refusal is proved on chain.
+     Empty until app/src/net/scam.js fills it, so the page never shows a half-built card. -->
+<section id="scam-errand" class="hud scam-host" data-testid="scam-errand-host" hidden></section>
 <p class="net-pitch" data-testid="net-pitch">Play the whole city on the NEAR test network. Real transactions, no money, no sign-up.</p>
 
 <nav id="ctl" class="hud" aria-label="Controls">
@@ -159,35 +162,49 @@ document.documentElement.classList.add('chrome-ready');</script>
 </div>
 
 <script type="module">
-// Try free, the real-money sign-in, and the network badge. This is the first module the page loads
-// and it is the only one that decides which network everything else is on.
-import('/shared/net/net.js').then(async (m) => {
-  try {
-    // Publish the shop names from the record the API serves, so no page hardcodes an account id.
-    const res = await fetch(m.api('/api/deployments'), { cache: 'no-store' });
-    if (res.ok) {
-      const dep = await res.json();
-      // `dep.guest.row` is the guest's own /setup: receivers from the record, 0.005 per action,
-      // 0.02 a day, 8 actions. Nothing is hardcoded here.
-      m.setShops({
-        market: dep.market?.contract || dep.planned?.arena,
-        board: dep.board?.contract,
-        house: dep.house?.contract || dep.extras?.house?.contract,
-        townhall: dep.townhall?.contract || dep.extras?.townhall?.contract,
-        guard: dep.guard?.contract,
-        toll: dep.toll?.contract,
-        tusdc: dep.tusdc?.contract || dep.ft?.tusdc,
-        'keeper-hall': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'hall') : `keeper-hall.${dep.root}`,
-        'keeper-guard': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'guard') : `keeper-guard.${dep.root}`,
-        'keeper-payouts': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'payouts') : `keeper-payouts.${dep.root}`,
-        'keeper-toll': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'toll') : `keeper-toll.${dep.root}`,
-        lookalike: dep.guest?.row?.lookalike || '',
-        tollTo: dep.toll?.foreign_address || '',
-      }, dep.guest?.row || null);
-    }
-  } catch { /* the record did not answer: the published fallbacks stay */ }
-  const chrome = await import('/net/chrome.js');
-  chrome.installNetChrome();
+// Try free, the real-money sign-in, the network badge and the scam errand. This is the first module the
+// page loads, and shared/net/net.js inside it is the only place that decides which network everything
+// else is on.
+//
+// The order matters and was measured: the chrome and the errand are MOUNTED FIRST, because they are
+// markup, and only then is the deployments record read. Waiting for the record before mounting made a
+// throttled phone take 5.6 s to show the errand; it is now ~150 ms warm and under the 5 s budget cold.
+import('/shared/net/net.js').then((m) => {
+  // Both front-door beats in parallel, so neither waits on the other.
+  Promise.all([import('/net/chrome.js'), import('/net/scam.js')]).then(([chrome, scam]) => {
+    try { chrome.installNetChrome(); } catch { /* the town still opens */ }
+    try {
+      const host = document.querySelector('[data-testid="scam-errand-host"]');
+      if (host) { host.hidden = false; scam.installScamErrand(); }
+    } catch { /* the errand stays hidden; the town still opens */ }
+    // The over-limit amount the forced step uses. The card already works without it (the module has a
+    // default), so this is a slow improvement and never a blocker.
+    fetch(m.api('/api/scam/limit'), { cache: 'no-store' }).then((r) => r.json()).then((limit) => {
+      if (limit?.ok) m.cfg.scamLimit = limit.over_limit;
+    }).catch(() => {});
+  }).catch(() => { /* the town still opens without the guest path */ });
+
+  // Then the shop names, from the record the API serves, so no page hardcodes an account id.
+  fetch(m.api('/api/deployments'), { cache: 'no-store' }).then((res) => (res.ok ? res.json() : null)).then((dep) => {
+    if (!dep) return;
+    // `dep.guest.row` is the guest's own /setup: receivers from the record, 0.005 per action,
+    // 0.02 a day, 8 actions. Nothing is hardcoded here.
+    m.setShops({
+      market: dep.market?.contract || dep.planned?.arena,
+      board: dep.board?.contract,
+      house: dep.house?.contract || dep.extras?.house?.contract,
+      townhall: dep.townhall?.contract || dep.extras?.townhall?.contract,
+      guard: dep.guard?.contract,
+      toll: dep.toll?.contract,
+      tusdc: dep.tusdc?.contract || dep.ft?.tusdc,
+      'keeper-hall': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'hall') : `keeper-hall.${dep.root}`,
+      'keeper-guard': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'guard') : `keeper-guard.${dep.root}`,
+      'keeper-payouts': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'payouts') : `keeper-payouts.${dep.root}`,
+      'keeper-toll': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'toll') : `keeper-toll.${dep.root}`,
+      lookalike: dep.guest?.row?.lookalike || '',
+      tollTo: dep.toll?.foreign_address || '',
+    }, dep.guest?.row || null);
+  }).catch(() => { /* the published fallbacks stay */ });
 }).catch(() => { /* the town still opens without the guest path */ });
 </script>
 <script type="module">

@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 1027 backend unit tests (1026 pass, 1 skipped) -->
+<!-- # 1047 backend unit tests (1046 pass, 1 skipped) -->
 
 ## The game
 
@@ -137,6 +137,36 @@ city, a funder floor of 10 test NEAR, and 0.25 test NEAR per guest. Every refusa
 honest line, and Practice mode is always the floor. Tests: `guest: every cap answers its own ERR_ code`,
 `guest: the day counters enforce a per-IP limit and a shared limit, and roll over at midnight`.
 
+### Talk a keeper past its limit
+
+The front door of Try free. Type anything at a keeper, including an instruction to ignore its rules. The
+refusal is not a sentence on a screen: it is signed inside a TEE, and then **written on chain**, and you
+can force the over-limit payment and watch the charter refuse it.
+
+| Beat | What really happens | Test |
+|---|---|---|
+| **Ask the keeper** | NEAR AI Cloud answers in character. The attestation report is fetched with our own nonce **before** the question, and the reply's signature must cover the model name and the hashes of the exact request and response bytes, and name the signer that report attests | `the keeper refusal is TEE-signed and the check is reported field by field` |
+| **The refusal is on chain** | The guest's own row calls `board.anchor` with a digest over the signed text and the signer. Only the digest is published; the words stay off chain | `the refusal anchor and the forced attempt are both testnet explorer links` |
+| **Submit the over-limit intent anyway** | Nothing is clamped. The exact intent the keeper refused goes through `propose_call_as`, and the board's caps reject it. The card links the **failed** receipt and names the reason | `the forced submit is a real call the charter can refuse, not a pre-check` |
+| **A charter that allowed it** | Reported as a **failure of the demo**, never as a pass: a cap that lets the payment through is a bug in the cap | `it requires a digest, an anchor tx and a forced tx, and refuses a missing one` |
+| **No TEE signature available** | The card says the reply is unsigned and only its digest is anchored. It never claims a seal it did not check | `a signature that does not verify is not claimed as sealed` |
+
+There is one honest line for each of the four ways the model can be unavailable (no key, over budget, a
+failed attestation, no answer): the reply is the fixed refusal, and the card says in words that it is fixed
+and only anchored. A visitor is never shown a seal that was not checked.
+
+Reproduce it: `node scripts/scam-e2e.mjs --base https://nearcarta.vercel.app`. It prints both hashes and
+their testnet links and **exits non-zero if either is missing, or if the charter allowed the payment**.
+
+### What the chain saw
+
+Every shop carries the same card under its header: **contract, method, signed by, gas burnt, amount, what
+the chain said**, and whether a TEE signature was checked. A field with nothing in it says "not in this
+step" rather than showing a plausible number, a step with no transaction says nothing was signed, and a
+recorded mainnet proof keeps its `nearblocks.io` link and is labelled. Tests:
+`the card shows the six facts a judge checks, in the same order everywhere`,
+`an absent field says so in words instead of inventing a value`.
+
 ### What is on chain, what the operator runs, what is simulated
 
 | Thing | Where it lives | Test that pins it |
@@ -194,7 +224,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 1027 unit tests (1026 pass, 1 skipped)
+npm test                 # 1047 unit tests (1046 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -217,7 +247,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 1027 unit tests (1026 pass, 1 skipped):
+# 1047 unit tests (1046 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -380,7 +410,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 1027 unit tests (1026 pass, 1 skipped)
+npm test                 # 1047 unit tests (1046 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current
