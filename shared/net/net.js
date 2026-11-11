@@ -41,6 +41,7 @@ const D = {
     // The same image answers /api on mainnet and /tapi on testnet, so one page can reach either.
     api: '/api',
     mpc: 'v1.signer',
+    guestRow: null,
     base: { chainId: 8453, rpc: 'https://mainnet.base.org', explorer: 'https://basescan.org', usdc: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913' },
     // The city's shops. Read from the record at build time; these are the names the page falls back to
     // when a field is missing, so a broken record shows nothing rather than a wrong address.
@@ -55,6 +56,7 @@ const D = {
     explorerApi: 'https://api-testnet.nearblocks.io',
     api: '/tapi',
     mpc: 'v1.signer-prod.testnet',
+    guestRow: null,
     base: { chainId: 84532, rpc: 'https://sepolia.base.org', explorer: 'https://sepolia.basescan.org', usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' },
     shops: {},
   },
@@ -63,9 +65,12 @@ const D = {
 /** The chosen network's settings. `cfg.shops` is filled by `setShops` from the record. */
 export const cfg = { ...D[NET], net: NET };
 
-/** Install the shop names for the chosen network, from the deployments record. */
-export function setShops(shops = {}) {
+/** Install the shop names and the guest row defaults for the chosen network, from the record. */
+export function setShops(shops = {}, guestRow = null) {
   cfg.shops = { ...shops };
+  if (guestRow) cfg.guestRow = { ...guestRow };
+  // Re-publish so a module that only reads the global (a page served from app/design) sees them too.
+  try { globalThis.NEARCARTA_NET.shops = { ...shops }; globalThis.NEARCARTA_NET.guestRow = cfg.guestRow; } catch { /* nothing to publish to */ }
   return cfg;
 }
 
@@ -164,6 +169,8 @@ try {
     base: cfg.base,
     market: cfg.shops.market || (NET === 'testnet' ? 'arena.nearcarta.testnet' : 'arena.nearcarta.near'),
     board: cfg.shops.board || (NET === 'testnet' ? 'board.nearcarta.testnet' : 'board.nearcarta.near'),
+    shops: cfg.shops,
+    guestRow: cfg.guestRow,
     txUrl,
     addrUrl,
     api,

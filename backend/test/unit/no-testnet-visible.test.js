@@ -21,6 +21,7 @@ const OWNERS = [
   /^shared\/net\/net\.js$/,
   /^net\/chrome\.js$/,
   /^guest\/key\.js$/,
+  /^market\/live-guest\.js$/,
   /^shared\/deployments\/testnet\.json$/,
 ];
 

@@ -163,6 +163,8 @@ import('/shared/net/net.js').then(async (m) => {
     const res = await fetch(m.api('/api/deployments'), { cache: 'no-store' });
     if (res.ok) {
       const dep = await res.json();
+      // `dep.guest.row` is the guest's own /setup: receivers from the record, 0.005 per action,
+      // 0.02 a day, 8 actions. Nothing is hardcoded here.
       m.setShops({
         market: dep.market?.contract || dep.planned?.arena,
         board: dep.board?.contract,
@@ -170,7 +172,14 @@ import('/shared/net/net.js').then(async (m) => {
         townhall: dep.townhall?.contract || dep.extras?.townhall?.contract,
         guard: dep.guard?.contract,
         toll: dep.toll?.contract,
-      });
+        tusdc: dep.tusdc?.contract || dep.ft?.tusdc,
+        'keeper-hall': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'hall') : `keeper-hall.${dep.root}`,
+        'keeper-guard': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'guard') : `keeper-guard.${dep.root}`,
+        'keeper-payouts': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'payouts') : `keeper-payouts.${dep.root}`,
+        'keeper-toll': dep.keepers?.pattern ? dep.keepers.pattern.replace('<shop>', 'toll') : `keeper-toll.${dep.root}`,
+        lookalike: dep.guest?.row?.lookalike || '',
+        tollTo: dep.toll?.foreign_address || '',
+      }, dep.guest?.row || null);
     }
   } catch { /* the record did not answer: the published fallbacks stay */ }
   const chrome = await import('/net/chrome.js');

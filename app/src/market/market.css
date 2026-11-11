@@ -264,3 +264,7 @@ body.md-play.qs-on #tray #t-src { display: none !important; }
 /* ...and the panel shrinks to that card: no empty dark slab under it. */
 @media (min-width: 721px) { body.md-play.qs-on #shopUI #tray { bottom: auto !important; height: auto !important; } }
 @media (max-width: 720px) { body.md-play.qs-on #shopUI #tray { top: auto !important; height: auto !important; } }
+
+/* The TESTNET pill on a real guest step. Teal, small, and never hidden: a judge must be able to tell a
+   testnet receipt from a mainnet one at a glance, on the card itself. */
+.qs-net-pill{display:inline-flex;align-items:center;height:17px;padding:0 6px;margin-right:6px;border-radius:9px;background:rgba(9,42,40,.9);color:#7fe3d4;border:1px solid #2f9a8c;font:700 9.5px var(--sans,Inter,system-ui,sans-serif);letter-spacing:.09em;vertical-align:1px;white-space:nowrap}
