@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 983 backend unit tests (982 pass, 1 skipped) -->
+<!-- # 1019 backend unit tests (1018 pass, 1 skipped) -->
 
 ## The game
 
@@ -194,11 +194,11 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 983 unit tests (982 pass, 1 skipped)
+npm test                 # 1019 unit tests (1018 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
-npm run e2e   # 127 browser tests
+npm run e2e   # 21 browser tests
 cd contracts/oath && cargo +1.95.0 test --lib   # 122 passed
 cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 ```
@@ -217,7 +217,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 983 unit tests (982 pass, 1 skipped):
+# 1019 unit tests (1018 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -380,13 +380,13 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 983 unit tests (982 pass, 1 skipped)
+npm test                 # 1019 unit tests (1018 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current
 npm run start            # API on :8787
 npm run build && node app/serve.mjs &   # UI on :5173
-npm run e2e   # 127 browser tests
+npm run e2e   # 21 browser tests
 npm run test:contracts   # every crate, including the sandbox suites
 npm run attack-demo      # the attack set, with the chain's own reasons
 npm run tee              # the NEAR AI attestation check (non-billable)

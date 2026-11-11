@@ -28,6 +28,28 @@ jobs:
       - run: npm run readme-numbers -- --check
       - run: npm run verify
       - run: npm run build
+  price-parity:
+    # The market's price is computed twice: once in Rust (contracts/market/src/pricing.rs, the contract)
+    # and once in JS (shared/market/pricing.js, the fast-forward and the tooltip). Both read the same
+    # golden file, so this job proves they cannot drift and that the game cannot be gamed by moving goods
+    # back and forth. A drift on either side fails here before it reaches a player.
+    # Docs: https://docs.near.org/primitives/dex
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      # The JS side: every golden case, plus the round-trip and two-shop wash-trade properties.
+      - run: node --test backend/test/unit/market-pricing.test.js backend/test/unit/economy-integrity.test.js
+      # The Rust side against the same file. A JS-only change to pricing.js that a case does not cover
+      # still fails the property tests; a change to pricing.rs that a case does not cover fails here.
+      - uses: dtolnay/rust-toolchain@1.86.0
+      - run: cd contracts/market && cargo test --lib --locked pricing
+      # Both sides must agree on the case COUNT too, so deleting a case is not a silent way to pass.
+      - name: the golden file exists and has every case
+        run: node -e "const c=require('./shared/market/pricing-cases.json'); if(c.length<17) { console.error('only', c.length, 'cases'); process.exit(1); } console.log(c.length, 'golden cases');"
   contracts:
     # Unit tests of every crate whose wasm is deployed or shown (near-sdk unit-testing dev-feature).
     runs-on: ubuntu-latest
