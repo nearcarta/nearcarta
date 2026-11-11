@@ -245,7 +245,7 @@ export function makeApp() {
     // `network` names the service: the testnet image answers "testnet" here, so an operator can see at a
     // glance which record this process is reading. The mainnet service keeps saying "mainnet".
     return c.json({ ...(c.req.query('deep') ? await deepHealth() : {}), ok: true, client_ip_from: clientIpSource(c)[0], network: { name: NET, contracts: NET === 'testnet' ? (DEP.status === 'deployed' ? 'testnet' : null) : (MAINNET_DEP?.status === 'deployed' ? 'mainnet' : null), journey: NET }, near,
-      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: { enabled: false, charter: MAINNET_DEP?.extras?.arena?.contract || null }, git: process.env.GIT_SHA || null });
+      features: { confidentialQuotes: has.oneClick(), nearAi: has.nearAi(), signing: false }, vault_runner: { enabled: false, charter: NET === 'testnet' ? null : (MAINNET_DEP?.extras?.arena?.contract || null) }, git: process.env.GIT_SHA || null });
   });
   // Shows the caller how Render keys their own request, with no address in the answer: which header decides
   // the client key, a short keyed tag of that key (the same client gets the same tag until the process

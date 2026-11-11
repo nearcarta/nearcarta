@@ -159,5 +159,6 @@ function failureText(f) {
   return e || JSON.stringify(f).slice(0, 300);
 }
 
-export const explorerTx = h => `https://nearblocks.io/txns/${h}`;
-export const explorerAcct = a => `https://nearblocks.io/address/${a}`;
+// The explorer of this service's own network (cfg.explorer): testnet.nearblocks.io on the testnet service.
+export const explorerTx = h => `${cfg.explorer || 'https://nearblocks.io'}/txns/${h}`;
+export const explorerAcct = a => `${cfg.explorer || 'https://nearblocks.io'}/address/${a}`;

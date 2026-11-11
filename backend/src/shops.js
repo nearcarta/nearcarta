@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 // Read-only live views for Town Hall, Arena and Toll, plus the Chronicle indexer.
-import { cfg, DEP, MAINNET_DEP } from './config.js';
+import { cfg, DEP, MAINNET_DEP, NET } from './config.js';
 import { view, viewAccount, txStatus, eventsFromOutcome, txResult, explorerTx, rpc } from './near.js';
 import { snapshot } from './guardhouse.js';
 import { indexPost } from './txindex.js';
@@ -274,13 +274,14 @@ function cached(status, error, chain) {
   return { chain_id: chain, height: null, ...(error ? { error } : { warming: true }) };
 }
 // /api/health answers from this cache (no RPC on the request path); the warm loop refreshes it.
-export function healthCached() { return cached(journeyStatus, journeyError, 'mainnet'); }
+export function healthCached() { return cached(journeyStatus, journeyError, NET); }
 async function pullStatus(url, setStatus, setError) {
   try { setStatus(statusOf(await rpc('status', [], url))); setError(null); }
   catch (e) { setError(String(e.message).slice(0, 120)); }
 }
 export async function refreshHealth() {
-  await pullStatus(cfg.mainnetRpc, s => { journeyStatus = s; }, e => { journeyError = e; });
+  // The journey runs on this service's own network: the testnet service reports testnet's head.
+  await pullStatus(NET === 'testnet' ? cfg.rpc : cfg.mainnetRpc, s => { journeyStatus = s; }, e => { journeyError = e; });
 }
 export async function health() {
   try {

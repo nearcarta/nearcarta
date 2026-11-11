@@ -105,7 +105,7 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
   const y = burnt(r); ledger.spent += y; ledger.relays++;
   ledger.by.set(d.senderId, (ledger.by.get(d.senderId) || 0n) + y);
   const f = failure(r);
-  return { ok: !f, hash: hashOf(r), sender: d.senderId, receiver: d.receiverId, methods: d.actions.map((a) => a.functionCall.methodName), burnt_near: yoctoToNear(y.toString()), failure: f, explorer: hashOf(r) ? `https://nearblocks.io/txns/${hashOf(r)}` : null };
+  return { ok: !f, hash: hashOf(r), sender: d.senderId, receiver: d.receiverId, methods: d.actions.map((a) => a.functionCall.methodName), burnt_near: yoctoToNear(y.toString()), failure: f, explorer: hashOf(r) ? `${cfg.explorer || 'https://nearblocks.io'}/txns/${hashOf(r)}` : null };
 }
 
 /**

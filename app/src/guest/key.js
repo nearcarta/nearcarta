@@ -136,6 +136,16 @@ export async function guestSigner({ store = globalThis.localStorage, net = NET, 
       const r = await account.signAndSendTransaction({ receiverId: contractId, waitUntil: 'FINAL', throwOnFailure: false, actions: [A.functionCall(method, args, gas, deposit)] });
       return { hash: r?.transaction?.hash || null, failure: failureOf(r), raw: r };
     },
+    /**
+     * Sign a text with the guest key, hex encoded (64 bytes -> 128 hex). The board checks this against the
+     * row's agent key, which is this key, so a `propose_call_as` is authorised from this browser alone.
+     * Docs: https://docs.near.org/protocol/accounts-contracts/access-keys
+     */
+    async sign(text) {
+      const { KeyPair } = await import('near-api-js');
+      const sig = KeyPair.fromString(v.secretKey).sign(new TextEncoder().encode(String(text))).signature;
+      return Array.from(sig, (b) => b.toString(16).padStart(2, '0')).join('');
+    },
     /** The account's balance in yoctoNEAR, or null when it cannot be read. */
     async balance() {
       try { const a = await account.provider.viewAccount({ accountId: v.account, blockQuery: { finality: 'final' } }); return String(a.amount); } catch { return null; }
