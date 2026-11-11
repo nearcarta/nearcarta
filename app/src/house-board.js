@@ -42,9 +42,13 @@ export function effectsCanon(effects) {
 }
 
 export function callAsText({ network, board, owner, receiver, method, argsOut, deposit, nonce, expiry, epoch, effects, hold }) {
+  // The board signs the word for the network it lives on, so a caller cannot choose it.
+  // Docs: https://docs.near.org/protocol/accounts-contracts/account-id
+  const word = String(board || '').endsWith('.testnet') ? 'testnet' : 'mainnet';
+  if (network != null && network !== word) throw new Error('ERR_NETWORK');
   return [
     'board-call-as-v1',
-    network,
+    word,
     board,
     CALL_AS_VERSION,
     owner,

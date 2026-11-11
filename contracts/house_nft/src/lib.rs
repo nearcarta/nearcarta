@@ -119,6 +119,23 @@ impl Contract {
     #[init]
     /// `owner`: who may close the contract (all its NEAR goes there); defaults to the caller.
     pub fn new(owner: Option<AccountId>) -> Self {
+        Self::init_with(owner, "board.nearcarta.near".parse().unwrap())
+    }
+
+    /// The same contract, with the board named at init. A testnet deploy uses this so the board is
+    /// an argument from shared/deployments/testnet.json instead of a name baked into the wasm.
+    /// The predecessor must be the owner or the account itself, so a stranger cannot point a fresh
+    /// deed contract at their own board.
+    /// Docs: https://docs.near.org/smart-contracts/anatomy/actions
+    #[init]
+    pub fn new_with_board(owner: Option<AccountId>, board: AccountId) -> Self {
+        let pred = env::predecessor_account_id();
+        require!(Some(pred.clone()) == owner || pred == env::current_account_id(), "ERR_INIT");
+        require!(board != env::current_account_id(), "ERR_BOARD");
+        Self::init_with(owner, board)
+    }
+
+    fn init_with(owner: Option<AccountId>, board: AccountId) -> Self {
         let metadata = NFTContractMetadata {
             spec: NFT_METADATA_SPEC.to_string(),
             name: "Nearcarta House deeds v3".to_string(),
@@ -135,7 +152,7 @@ impl Contract {
             prepared: LookupMap::new(Key::Prepared),
             seen: LookupMap::new(Key::Seen),
             owner: owner.unwrap_or_else(env::predecessor_account_id),
-            board: "board.nearcarta.near".parse().unwrap(),
+            board,
             held: 0,
             foreign_open: 0,
             version: 3,
@@ -709,6 +726,31 @@ mod tests {
     fn ctx(who: usize, deposit: u128) {
         testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
             .predecessor_account_id(accounts(who)).attached_deposit(NearToken::from_yoctonear(deposit)).build());
+    }
+
+    /// The testnet deploy names its board at init. The mainnet `new({owner})` keeps the board it
+    /// always had, so the live account's state is unchanged by this method existing.
+    #[test]
+    fn a_deploy_may_name_its_own_board_and_a_stranger_may_not() {
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id(accounts(0)).build());
+        let mainnet = Contract::new(None);
+        assert_eq!(mainnet.board.as_str(), "board.nearcarta.near");
+        let own = Contract::new_with_board(Some(accounts(0)), "board.nearcarta.testnet".parse().unwrap());
+        assert_eq!(own.board.as_str(), "board.nearcarta.testnet");
+        // The account itself may initialise with any board it likes (its own deploy).
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id("deeds.near".parse().unwrap()).build());
+        let by_self = Contract::new_with_board(None, "board.nearcarta.testnet".parse().unwrap());
+        assert_eq!(by_self.board.as_str(), "board.nearcarta.testnet");
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_INIT")]
+    fn a_stranger_cannot_point_a_fresh_deed_contract_at_its_own_board() {
+        testing_env!(VMContextBuilder::new().current_account_id("deeds.near".parse().unwrap())
+            .predecessor_account_id(accounts(1)).build());
+        let _ = Contract::new_with_board(Some(accounts(0)), "mallory.near".parse().unwrap());
     }
 
     /// Each paid `action_id` stays in `seen`, and nothing pays for those bytes. Once only the

@@ -76,7 +76,7 @@ function envelope(fields, method, args, deposit, hold) {
   const owner = String(fields.owner).trim();
   const effects = [];
   const message = callAsMessage({
-    network: fields.network || 'mainnet',
+    // The network word is the board's own account suffix, never a literal here.
     contract: String(fields.board).trim(),
     owner,
     receiver: String(fields.arena).trim(),

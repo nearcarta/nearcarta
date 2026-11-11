@@ -11,16 +11,22 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import MAIN from '../shared/deployments/mainnet.json' with { type: 'json' };
+import { deployContext, liveHint } from './lib/deploy-net.js';
 import { hallDeployPlan, MIGRATE_TGAS, SMOKE_TGAS, SMOKE_YOCTO } from '../shared/hall/deploy-plan.js';
 
-const live = process.argv.includes('--live');
+// Network from NEAR_NETWORK, addresses from shared/deployments/<network>.json. Unset means mainnet
+// and the old behaviour. --live refuses a key whose account suffix is not on that network.
+// Docs: https://docs.near.org/smart-contracts/release/upgrade · https://docs.near.org/tools/cli
+const net = deployContext(process.argv);
+const MAIN = net.dep;
+const NETWORK = net.network;
+const live = net.live;
 if (process.argv.some(a => String(a).includes('ed25519:'))) {
   console.error('Refusing: a key was passed on the command line.');
   process.exit(1);
 }
 
-const shop = MAIN.extras.townhall.contract;
+const shop = MAIN.townhall?.contract || MAIN.extras.townhall.contract;
 // The legacy bounty code has no way to mark a bounty paid, so a run that sends the
 // refund and then stops leaves the bounty reading as open. This ledger is the only
 // record that the transfer went out; without it the next run pays it again.
@@ -31,10 +37,10 @@ function readRefundLedger() {
 function writeRefundLedger(next) {
   writeFileSync(refundLedgerPath, JSON.stringify(next, null, 2) + '\n');
 }
-const owner = MAIN.extras.townhall.owner;
+const owner = MAIN.townhall?.owner || MAIN.extras.townhall.owner;
 const board = MAIN.board.contract;
 // The Guardhouse clears a delivered part; without it no release path can run.
-const guard = MAIN.guard?.contract || 'guard.nearcarta.near';
+const guard = MAIN.guard?.contract || ('guard.' + MAIN.root);
 const guardExpectedCodeHash = MAIN.guard?.code_hash || '';
 const rpcUrl = MAIN.rpc;
 const oldWasmPath = new URL('../contracts/artifacts/townhall.p86.wasm', import.meta.url);
@@ -189,12 +195,18 @@ function printPlan(plan) {
   for (const check of plan.checks) console.log((check.ok ? 'ok ' : 'NO ') + check.label);
 }
 
+console.log('hall deploy');
+console.log('network: ' + NETWORK + '  record: shared/deployments/' + NETWORK + '.json');
+console.log('live command: ' + liveHint('hall-deploy.js', NETWORK));
+for (const r of net.refusals) console.error('refused: ' + r);
+if (net.refusals.length) process.exit(1);
+
 async function gather() {
   const wasmFile = ensureWasm();
   const wasm = readFileSync(wasmFile);
   const old = readFileSync(oldWasmPath);
   const oldSha = createHash('sha256').update(old).digest('hex');
-  if (oldSha !== MAIN.extras.townhall.sha256) {
+  if (MAIN.extras?.townhall?.sha256 && oldSha !== MAIN.extras.townhall.sha256) {
     console.error('The stored oath wasm does not match mainnet.json.');
     process.exit(1);
   }
@@ -202,7 +214,7 @@ async function gather() {
     account(), accessKeys(), view('get_state', {}), view('get_bounties', {}), boardAccount(), guardAccount(),
   ]);
   const full = (keys.keys || []).filter(k => k.access_key?.permission === 'FullAccess');
-  const labels = Object.entries(MAIN.extras.townhall.txs).filter(([name]) => name.includes('post_bounty'));
+  const labels = Object.entries(MAIN.extras?.townhall?.txs || {}).filter(([name]) => name.includes('post_bounty'));
   const posts = [];
   for (const [, hash] of labels) posts.push(await postingTx(hash));
   const rows = bounties.map(([hash, row]) => ({ hash, amount: row.amount, claimed_by: row.claimed_by }));
@@ -219,7 +231,7 @@ async function gather() {
     posts,
     fullAccessKeys: full.length || (keys.keys || []).filter(k => k.access_key?.permission === 'FullAccess').length,
     codeHash: acct.code_hash,
-    oldCodeHash: MAIN.extras.townhall.code_hash,
+    oldCodeHash: MAIN.extras?.townhall?.code_hash || '',
     smokeWorkers: smokeWorkers().filter(id => id !== shop && id !== board),
     boardCodeHash: boardAcct?.code_hash || '',
     boardExpectedCodeHash: MAIN.board?.code_hash || '',
@@ -240,6 +252,10 @@ if (!live) {
   process.exit(0);
 }
 
+if (NETWORK !== 'mainnet' && !MAIN.extras?.townhall?.txs) {
+  console.error('refused: this script redeploys the mainnet Town Hall in place (legacy bounty refunds, then migrate). On ' + NETWORK + ' a fresh account is created by scripts/testnet-deploy.js --step townhall. Nothing was signed.');
+  process.exit(1);
+}
 const key = process.env.HALL_SIGNER_KEY || '';
 if (!key.startsWith('ed25519:')) {
   console.error('Refusing to sign: set HALL_SIGNER_KEY to the ed25519 secret of ' + shop + '. This script does not read a key file.');

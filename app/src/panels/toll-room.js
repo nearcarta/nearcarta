@@ -369,7 +369,8 @@ export function assembleTollLive({ contract, policy, txs = [] } = {}) {
   const cross = policy?.cross || null;
   const shaped = {
     ok: !!policy,
-    network: 'mainnet',
+    // The network follows the toll account, never a literal: the panel shows the same row on both.
+    network: String(contract || '').endsWith('.testnet') ? 'testnet' : 'mainnet',
     contract: contract || '',
     mpc: policy?.mpc || null,
     path: policy?.path || '',

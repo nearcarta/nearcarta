@@ -1,0 +1,198 @@
+{
+  "network": "testnet",
+  "status": "planned",
+  "note": "Placeholders only. The owner claims these accounts, funds them and deploys the wasm on the operator box; the keys stay there. Every account below is a sub-account of nearcarta.testnet, which the faucet creates first. Scripts read this file through shared/deployments/net.js, so a name is written once. Nothing here is a live address until the deploy steps below have run and their hashes are recorded.",
+  "rpc": "https://rpc.testnet.fastnear.com",
+  "rpc_fallbacks": [
+    "https://rpc.testnet.near.org",
+    "https://near-testnet.drpc.org"
+  ],
+  "archival_rpc": "https://archival-rpc.testnet.fastnear.com",
+  "tx_index": "https://tx.test.fastnear.com",
+  "explorer_api": "https://api-testnet.nearblocks.io/v3",
+  "explorer": "https://testnet.nearblocks.io",
+  "root": "nearcarta.testnet",
+  "registrar": "testnet",
+  "layout": "named",
+  "keepalive": "Testnet contracts are left in place. Testnet NEAR has no value and the guest float is capped by the funding amount and the per-IP rate, not by reaping.",
+  "play": {
+    "account": "play.nearcarta.testnet",
+    "status": "not_deployed",
+    "role": "Guest funder and parent of every guest account. Holds a key separate from the root, so a leaked funder key can only spend the funder float.",
+    "fund_near": 50,
+    "note": "Created with `near account create-account fund-myself play.nearcarta.testnet '\u2026 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as nearcarta.testnet network-config testnet sign-with-legacy-keychain send`. Docs: https://docs.near.org/tools/cli"
+  },
+  "relayer": {
+    "account": "relayer.nearcarta.testnet",
+    "status": "not_deployed",
+    "role": "NEP-366 relayer float for the guest market moves.",
+    "float_near": 2,
+    "caps": {
+      "per_visitor_gas_near_per_day": 0.003,
+      "per_visitor_relays_per_day": 40,
+      "daily_near": 0.05,
+      "sessions_per_day": 4
+    }
+  },
+  "board": {
+    "contract": "board.nearcarta.testnet",
+    "owner": "nearcarta.testnet",
+    "status": "not_deployed",
+    "crate": "contracts/charter_board",
+    "wasm": "contracts/artifacts/charter_board.wasm",
+    "init": "new() with no args",
+    "max_row_yocto": "40000000000000000000000",
+    "note": "Built with the pinned toolchain in contracts/scripts/rebuild.sh (cargo-near 0.22.0). The board signs \"testnet\" into every propose_call_as message because its own account id ends in .testnet (contracts/charter_board/src/lib.rs `network_of`)."
+  },
+  "market": {
+    "contract": "arena.nearcarta.testnet",
+    "owner": "nearcarta.testnet",
+    "board": "board.nearcarta.testnet",
+    "status": "not_deployed",
+    "crate": "contracts/market",
+    "wasm": "contracts/artifacts/market.wasm",
+    "init": "new({owner, board, caps})",
+    "caps": {
+      "gathers_per_day": 200,
+      "player_payout_per_day": "70000000000000000000000",
+      "city_payout_per_day": "2000000000000000000000000",
+      "storage_min": "5000000000000000000000"
+    },
+    "caps_note": "city_payout_per_day is 2 NEAR, not the mainnet 0.08, because every guest sells to the same keeper shops: at 0.08 the city float would run out after about 40 guests. set_caps is owner-only and needs no redeploy."
+  },
+  "guard": {
+    "contract": "guard.nearcarta.testnet",
+    "owner": "nearcarta.testnet",
+    "status": "not_deployed",
+    "crate": "contracts/guard",
+    "wasm": "contracts/artifacts/guard.wasm",
+    "init": "new({board, hall})"
+  },
+  "townhall": {
+    "contract": "townhall.nearcarta.testnet",
+    "owner": "nearcarta.testnet",
+    "status": "not_deployed",
+    "crate": "contracts/hall",
+    "wasm": "contracts/artifacts/hall.wasm",
+    "init": "new({owner, board, guard})"
+  },
+  "house": {
+    "contract": "house.nearcarta.testnet",
+    "owner": "nearcarta.testnet",
+    "status": "not_deployed",
+    "crate": "contracts/house_nft",
+    "wasm": "contracts/artifacts/house_nft.v4.wasm",
+    "init": "new_with_board({owner, board})",
+    "init_note": "The mainnet init `new({owner})` keeps its hardcoded board and is not touched. The testnet record names the board through `new_with_board`, so no name is hardcoded for a network."
+  },
+  "tusdc": {
+    "contract": "tusdc.nearcarta.testnet",
+    "owner": "nearcarta.testnet",
+    "status": "not_deployed",
+    "crate": "contracts/mock_ft",
+    "wasm": "contracts/artifacts/mock_ft.wasm",
+    "init": "new()",
+    "decimals": 6,
+    "note": "NEP-141 test dollars for the welcome crate and the Payouts step. `mint` is open, so the funder can fill a guest's balance in one call."
+  },
+  "toll": {
+    "contract": "toll.nearcarta.testnet",
+    "owner": "nearcarta.testnet",
+    "status": "not_deployed",
+    "crate": "contracts/toll",
+    "wasm": "contracts/artifacts/toll.v9.wasm",
+    "init": "new({owner, mpc, path, chain_id, foreign_address, fx_root_key, allow_to, max_per_tx, budget, max_fee_cap, verify_chain, token, dao, gate}) then set_price({board, fee, cost, splits, paused, usdc, max_token, hold_ns})",
+    "mpc": "v1.signer-prod.testnet",
+    "chain_id": 84532,
+    "path": "base-1",
+    "derived_public_key": "",
+    "foreign_address": "",
+    "fx_root_key": "",
+    "price": {
+      "board": "board.nearcarta.testnet",
+      "fee": "1000000000000000000000",
+      "cost": "1000000000000000000000",
+      "max_token": "10000000",
+      "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "hold_ns": "0",
+      "paused": false,
+      "splits": []
+    },
+    "note": "The three empty fields are filled from `v1.signer-prod.testnet` `derived_public_key` with path base-1 and predecessor toll.nearcarta.testnet, read with a view call before the deploy. chain_id 84532 is Base Sepolia; contracts/toll/src/lib.rs `new` accepts 8453 or 84532.",
+    "broadcast": false,
+    "broadcast_note": "`toll.cross` and `toll.sign_cross` run a real Chain Signatures request against v1.signer-prod.testnet and store the signature on chain. The backend does not send it to Base Sepolia: there is no funded Base Sepolia key, and the UI says the transaction is signed and not broadcast. Everything on the NEAR side is real and linked on testnet nearblocks."
+  },
+  "mpc": "v1.signer-prod.testnet",
+  "chain_id": 84532,
+  "path": "base-1",
+  "base": {
+    "name": "Base Sepolia",
+    "chain_id": 84532,
+    "rpc": "https://sepolia.base.org",
+    "explorer": "https://sepolia.basescan.org",
+    "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    "broadcast": false,
+    "note": "No Base Sepolia ETH is held, so a crossing in the guest story is signed by the MPC network and NOT broadcast. The signed EIP-1559 transaction is shown with its hash and the exact basescan URL it would appear at. Docs: https://docs.base.org/base-chain/quickstart/connecting-to-base"
+  },
+  "ft": {
+    "tusdc": "tusdc.nearcarta.testnet",
+    "wnear": "wrap.testnet",
+    "usdc_testnet": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af"
+  },
+  "keepers": {
+    "status": "not_deployed",
+    "pattern": "keeper-<shop>.nearcarta.testnet",
+    "shops": [
+      "arena",
+      "hall",
+      "ferry",
+      "toll",
+      "guard",
+      "bank",
+      "house",
+      "payouts",
+      "chronicle"
+    ],
+    "note": "Seeded by scripts/keepers-deploy.js with NEAR_NETWORK=testnet. Each keeper is a real testnet account with a board row and a market shop, so the NPC work in the guest story is a real transaction."
+  },
+  "planned": {
+    "board": "board.nearcarta.testnet",
+    "arena": "arena.nearcarta.testnet",
+    "guard": "guard.nearcarta.testnet",
+    "townhall": "townhall.nearcarta.testnet",
+    "house": "house.nearcarta.testnet",
+    "toll": "toll.nearcarta.testnet",
+    "tusdc": "tusdc.nearcarta.testnet",
+    "note": "The shops a guest row may be opened against. shared/setup/open-row.js builds the receiver list from this file, so no account name is hardcoded in the guest defaults."
+  },
+  "guest": {
+    "parent": "play.nearcarta.testnet",
+    "suffix": ".play.nearcarta.testnet",
+    "fund_near": "0.25",
+    "welcome": {
+      "tusdc": "100000000",
+      "market_storage_near": "0.012",
+      "deed_deposit_near": "0.03"
+    },
+    "caps": {
+      "per_ip_day": 3,
+      "global_day": 400,
+      "funder_floor_near": 10
+    },
+    "note": "The account name is base32(sha256(public_key))[0..10] plus the parent, so a retry is idempotent. The secret key never leaves the browser."
+  },
+  "oneclick": "https://1click.chaindefuser.com",
+  "intents_note": "NEAR Intents has no testnet deployment, so every Intents call from the guest story is a live dry quote against mainnet prices and says so in the UI.",
+  "deploy_order": [
+    "nearcarta.testnet (faucet)",
+    "play.nearcarta.testnet, relayer.nearcarta.testnet",
+    "board.nearcarta.testnet",
+    "arena.nearcarta.testnet",
+    "guard.nearcarta.testnet",
+    "townhall.nearcarta.testnet",
+    "house.nearcarta.testnet",
+    "tusdc.nearcarta.testnet",
+    "toll.nearcarta.testnet",
+    "keeper-*.nearcarta.testnet (keepers-deploy.js)"
+  ]
+}

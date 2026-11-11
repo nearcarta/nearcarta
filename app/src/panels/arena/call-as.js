@@ -6,6 +6,7 @@ export {
   BOARD_V2,
   effectsCanon,
   injectRowOwner,
+  boardNetwork,
   callAsMessage,
   confirmMessage,
   refundActionArgs,
