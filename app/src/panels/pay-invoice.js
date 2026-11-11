@@ -1,5 +1,6 @@
 // Payer page for /pay/<id>. Dry quote, then a deposit address. This page does not send the deposit.
 import { CHAIN_FILE } from './icon-map.js';
+import { apiFetch } from '../../../shared/net/net.js';
 import { addressOk, invoiceStatusLine, quoteLine, usdcChoices } from './payouts-plan.js';
 
 const $ = s => document.querySelector(s);
@@ -49,7 +50,7 @@ function paintChain() {
 
 async function loadChains() {
   try {
-    const res = await fetch('/api/ferry/tokens');
+    const res = await apiFetch('/api/ferry/tokens');
     const body = await res.json();
     fillChains(usdcChoices(body.tokens || body));
   } catch {
@@ -72,7 +73,7 @@ function paint(inv) {
 async function load() {
   if (!id || id === 'pay' || id === 'index.html') { setLine('Missing invoice link.', ''); return; }
   try {
-    const res = await fetch('/api/payouts/invoices/' + encodeURIComponent(id) + location.search);
+    const res = await apiFetch('/api/payouts/invoices/' + encodeURIComponent(id) + location.search);
     const body = await res.json();
     paint(body.invoice || null);
     if (body.invoice?.depositAddress) showDeposit(body.invoice.depositAddress);
@@ -89,7 +90,7 @@ async function refreshQuote() {
   if (typed) payload.refundTo = typed;
   else payload.indicative = true;
   try {
-    const res = await fetch('/api/payouts/invoices/' + encodeURIComponent(record.id) + '/quote', {
+    const res = await apiFetch('/api/payouts/invoices/' + encodeURIComponent(record.id) + '/quote', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     });
@@ -136,7 +137,7 @@ function paintLive(body) {
 async function poll() {
   if (!record) return;
   try {
-    const res = await fetch('/api/payouts/invoices/' + encodeURIComponent(record.id) + '/status');
+    const res = await apiFetch('/api/payouts/invoices/' + encodeURIComponent(record.id) + '/status');
     const body = await res.json();
     if (paintLive(body)) return;
   } catch { setLine('Not paid.', 'Status could not be read. Still waiting.'); }
@@ -158,7 +159,7 @@ $('#pay-go')?.addEventListener('click', async () => {
   if (!addressOk(chain(), refundTo)) { setLine('Not paid.', 'That refund address does not match this chain.'); return; }
   setLine('Asking for a deposit address. Not paid.', '');
   try {
-    const res = await fetch('/api/payouts/invoices/' + encodeURIComponent(record.id) + '/checkout', {
+    const res = await apiFetch('/api/payouts/invoices/' + encodeURIComponent(record.id) + '/checkout', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ from: fromRef(), chain: chain(), refundTo, recipientType: 'DESTINATION_CHAIN' }),
     });

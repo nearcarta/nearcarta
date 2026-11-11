@@ -1,5 +1,6 @@
 // Payouts tray. Same card as the Ferry: tabs, icon flow, labelled fields, one gold button.
 // The gold button and the agent call the same functions. Nothing here signs.
+import { API_PATH, txUrl } from '../../../shared/net/net.js';
 import { PAY_ASSETS, PAY_CHAINS, addPayoutRow, formatNear, parseCsv, prepareRows, receiptsFor, splitAssets } from '../../design/D8_shops/js/payouts.js';
 import { downloadCsv } from '../chronicle-feed.js';
 import { payoutFlow } from './payout-marks.js';
@@ -126,7 +127,7 @@ export function mountPayouts(root, hooks) {
     if (out?.ok && out.tx) {
       state.sponsorDone = true;
       state.sponsorNote = `Registered ${sp.account} for USDC. ${formatNear(sp.depositNear)} NEAR came from your session cap.`;
-      state.sponsorUrl = `https://nearblocks.io/txns/${out.tx}`;
+      state.sponsorUrl = txUrl(out.tx);
       lookUpRegistration(sp.account);
     } else if (/method_not_allowlisted/i.test(String(out?.reason || ''))) {
       state.sponsorNote = 'Your row does not allow storage_deposit yet. Open /setup and press Update my rules once. Nothing was sent.';
@@ -172,7 +173,7 @@ export function mountPayouts(root, hooks) {
     if (!id) return;
     state.capLoaded = true;
     try {
-      const body = await fetch(api() + '/api/board/row/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json());
+      const body = await fetch(api() + API_PATH + '/board/row/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json());
       const y = body?.row?.per_action_cap;
       if (y != null && y !== '') state.capNear = nearFromYocto(y);
       const per = Number(body?.row?.max_actions_per_day);
@@ -240,7 +241,7 @@ export function mountPayouts(root, hooks) {
       const key = payrollKey(r);
       if (state.quotes[key] && state.quotes[key].ok) { out[key] = state.quotes[key]; continue; }
       try {
-        const body = await fetch(api() + '/api/payouts/payroll/quote', {
+        const body = await fetch(api() + API_PATH + '/payouts/payroll/quote', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ to: r.to, amt: String(r.amt), asset: r.asset, chain: r.chain }),
         }).then(x => x.json());
@@ -301,7 +302,7 @@ export function mountPayouts(root, hooks) {
 
   /** What a session needs for one foreign row after the quote returns a deposit address. */
   async function payForeignRow(r, cap) {
-    const body = await fetch(api() + '/api/payouts/payroll/checkout', {
+    const body = await fetch(api() + API_PATH + '/payouts/payroll/checkout', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         owner: accountId(), to: r.to, amt: String(r.amt), asset: r.asset, chain: r.chain,
@@ -332,7 +333,7 @@ export function mountPayouts(root, hooks) {
     state.receipts = rowsFromPlan(plan);
     for (const r of replayed) {
       const hit = state.receipts.find(x => x.to === r.to && String(x.amount) === String(r.amt) && x.chain === r.chain);
-      if (hit) { hit.status = 'sent'; hit.tx = state.settled[payrollKey(r)]; hit.url = `https://nearblocks.io/txns/${hit.tx}`; }
+      if (hit) { hit.status = 'sent'; hit.tx = state.settled[payrollKey(r)]; hit.url = txUrl(hit.tx); }
     }
     if (!fresh.length) {
       const hint = plan.refused.length ? 'Refused before any deposit. Nothing was sent.'
@@ -366,7 +367,7 @@ export function mountPayouts(root, hooks) {
         const row = state.receipts.find(x => x.to === r.to && String(x.amount) === String(r.amt) && x.chain === 'near');
         if (!row) return;
         if (step?.decision === 'allowed' && step.tx) {
-          row.status = 'sent'; row.tx = step.tx; row.url = `https://nearblocks.io/txns/${step.tx}`;
+          row.status = 'sent'; row.tx = step.tx; row.url = txUrl(step.tx);
           state.settled[payrollKey(r)] = step.tx;
         } else if (step) { row.status = 'refused'; row.reason = step.reason || 'refused'; }
       });
@@ -387,7 +388,7 @@ export function mountPayouts(root, hooks) {
       if (sent?.ok && sent.tx) {
         foreignSent += 1;
         if (row) {
-          row.status = 'sent'; row.tx = sent.tx; row.url = `https://nearblocks.io/txns/${sent.tx}`;
+          row.status = 'sent'; row.tx = sent.tx; row.url = txUrl(sent.tx);
           row.depositAddress = opened.depositAddress; row.payoutStatus = 'PENDING_DEPOSIT';
           row.payoutText = 'Waiting for the deposit.';
         }
@@ -439,7 +440,7 @@ export function mountPayouts(root, hooks) {
     const tick = async () => {
       if (!root.isConnected) { clearInterval(state.watchers[key]); delete state.watchers[key]; return; }
       let st;
-      try { st = await fetch(api() + '/api/payouts/payroll/status?depositAddress=' + encodeURIComponent(depositAddress)).then(x => x.json()); }
+      try { st = await fetch(api() + API_PATH + '/payouts/payroll/status?depositAddress=' + encodeURIComponent(depositAddress)).then(x => x.json()); }
       catch { return; }
       const row = (state.receipts || []).find(x => x.to === r.to && String(x.amount) === String(r.amt) && x.chain === r.chain);
       if (row) {
@@ -464,7 +465,7 @@ export function mountPayouts(root, hooks) {
    */
   async function lookUpSponsor(account) {
     try {
-      const body = await fetch(api() + '/api/payouts/sponsor?account=' + encodeURIComponent(account)).then(r => r.json());
+      const body = await fetch(api() + API_PATH + '/payouts/sponsor?account=' + encodeURIComponent(account)).then(r => r.json());
       const plan = sponsorshipPlan({
         enabled: body?.enabled === true,
         account,
@@ -549,7 +550,7 @@ export function mountPayouts(root, hooks) {
     }
     let j;
     try {
-      const res = await fetch(api() + '/api/payouts/invoices', {
+      const res = await fetch(api() + API_PATH + '/payouts/invoices', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ usd, receive, memo: state.memo || '', due: state.due || '', expiry: expiryIso(state.expiry), visitor: visitorId() }),
       });
@@ -581,7 +582,7 @@ export function mountPayouts(root, hooks) {
     const visitor = visitorId();
     if (!visitor) { state.invoices = []; return; }
     try {
-      const res = await fetch(api() + '/api/payouts/invoices?visitor=' + encodeURIComponent(visitor));
+      const res = await fetch(api() + API_PATH + '/payouts/invoices?visitor=' + encodeURIComponent(visitor));
       const body = await res.json();
       const rows = Array.isArray(body?.invoices) ? body.invoices : [];
       const next = [];
@@ -589,7 +590,7 @@ export function mountPayouts(root, hooks) {
         let listStatus = inv.listStatus || 'Unpaid';
         if (listStatus !== 'Expired') {
           try {
-            const st = await fetch(api() + '/api/payouts/invoices/' + encodeURIComponent(inv.id) + '/status').then(r => r.json());
+            const st = await fetch(api() + API_PATH + '/payouts/invoices/' + encodeURIComponent(inv.id) + '/status').then(r => r.json());
             if (st?.status === 'SUCCESS' || st?.delivered === true) listStatus = 'Paid';
             else if (st?.reason === 'expired') listStatus = 'Expired';
           } catch { /* the stored status stays */ }
@@ -614,7 +615,7 @@ export function mountPayouts(root, hooks) {
 
   async function lookUpRegistration(account) {
     try {
-      const res = await fetch(api() + '/api/payouts/registration?account=' + encodeURIComponent(account));
+      const res = await fetch(api() + API_PATH + '/payouts/registration?account=' + encodeURIComponent(account));
       const body = await res.json();
       if (body?.reason === 'missing_account' || body?.claim === 'missing') {
         state.line2 = body.text || `${account} does not exist on NEAR.`;
@@ -646,7 +647,7 @@ export function mountPayouts(root, hooks) {
 
   async function commandFor(text) {
     try {
-      const res = await fetch(api() + '/api/payouts/intent', {
+      const res = await fetch(api() + API_PATH + '/payouts/intent', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text }),
       });

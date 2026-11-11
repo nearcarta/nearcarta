@@ -20,7 +20,7 @@ import { deedMarkup } from '../src/panels/deed.js';
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const txl = h => `<a data-testid="house-tx" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(h).slice(0, 10))}…</a>`;
+const txl = h => `<a data-testid="house-tx" href="${globalThis.NEARCARTA_NET?.explorer || 'https://nearblocks.io'}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(String(h).slice(0, 10))}…</a>`;
 const near = y => (y == null ? '–' : (Number(BigInt(y) / 10n ** 18n) / 1e6).toString() + ' NEAR');
 const short = a => { const s = String(a ?? ''); return s.length > 28 ? s.slice(0, 12) + '…' + s.slice(-10) : s; };
 export const FAUCET = 'https://docs.near.org/getting-started/faucet';
@@ -159,7 +159,7 @@ export async function mountConnect(el) {
 }
 
 async function load() {
-  const r = await fetch(API + '/api/house'); house = await r.json();
+  const r = await fetch(API + (globalThis.NEARCARTA_NET?.apiPath || '/api') + '/house'); house = await r.json();
   if (!r.ok) throw new Error(house.error || 'http ' + r.status);
   return house;
 }

@@ -14,9 +14,9 @@ export const DEED = {
   refuse: '3Z4UAb6NRMwguLDBJHhAvMgtckKxEacvewc7g5MCFmb1',
 };
 
-export function txUrl(hash) {
-  return hash ? `https://nearblocks.io/txns/${hash}` : '';
-}
+// `txUrl` is re-exported so every deed link follows the record's explorer, including the recorded
+// hashes in `DEED`, which are mainnet proofs and keep the mainnet label on the card.
+export { txUrl } from '../../shared/net/net.js';
 
 /** After a transfer, only the new holder may call house_pay. */
 export function controlAfterMove({ holder, payer }) {

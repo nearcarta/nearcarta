@@ -96,8 +96,9 @@ test('browser modules the city imports raw resolve without a bundler', async () 
   // build.mjs also copies whole directories to the deploy root (shared/hall -> /shared/hall).
   // A path there is reachable even though it is not under app/src.
   // Chronicle's rules and receipts are copied the same way; v2.js is bundled by build.mjs,
-  // so it is generated rather than a plain copy.
-  const COPIES = [['/shared/hall/', `${root}shared/hall/`], ['/shared/chronicle/', `${root}shared/chronicle/`]];
+  // so it is generated rather than a plain copy. shared/net/net.js is the one module that knows
+  // the network, and every page imports it, so build.mjs publishes it at /shared/net/net.js.
+  const COPIES = [['/shared/hall/', `${root}shared/hall/`], ['/shared/chronicle/', `${root}shared/chronicle/`], ['/shared/net/', `${root}shared/net/`], ['/shared/market/', `${root}shared/market/`]];
   const onDisk = (url) => {
     const copy = COPIES.find(([prefix]) => url.startsWith(prefix));
     if (copy) return copy[1] + url.slice(copy[0].length);

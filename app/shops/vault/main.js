@@ -20,8 +20,11 @@ const short = h => h ? h.slice(0, 6) + '…' + h.slice(-4) : '';
 let lastRules = null;
 let CFG, rpc, connector, me = null, charter = null, ready = false, target = 'shared';
 
+// A path is written `/api/...` here and turned into the network's prefix (`/api`, or `/tapi` on
+// testnet) so the same page can read either service.
+const apiPath = () => globalThis.NEARCARTA_NET?.apiPath || '/api';
 async function api(path, opts, retry = !opts) {
-  const r = await fetch(API + path, opts);
+  const r = await fetch(API + String(path).replace(/^\/api/, apiPath()), opts);
   // a read that hits a brief gateway hiccup (502/503/504) is tried once more before it shows as an error
   if (retry && r.status >= 502 && r.status <= 504) { await new Promise(ok => setTimeout(ok, 1500)); return api(path, opts, false); }
   const j = await r.json().catch(() => ({}));
@@ -616,7 +619,7 @@ async function main() {
   $('#ask-form').onsubmit = e => ask(e).catch(fail);
   const badge = $('#net'); if (badge) { badge.textContent = window.NEARCARTA_PUBLIC_MAINNET ? 'mainnet' : ((CFG.network === 'mainnet' ? 'mainnet' : (CFG.network || 'mainnet') + ' trial')); badge.classList.toggle('trial', !window.NEARCARTA_PUBLIC_MAINNET && CFG.network !== 'mainnet'); }
   api('/api/agent/budget').then(b => { const el = $('#infer'); if (!el || !b?.limit_usd) return; el.textContent = `Model jobs today: ${b.calls} of ${b.limit_calls}, $${b.usd} of $${b.limit_usd}. Each job is at most ${b.max_tokens} tokens and is not sent past the cap. The NEAR it can move is the charter's cap.`; }).catch(() => {});
-  fetch((API) + '/api/mainnet').then(r => r.json()).then(m => {
+  fetch((API) + apiPath() + '/mainnet').then(r => r.json()).then(m => {
     window.__ncBoard = m?.board || null;
     const c = m?.charter?.contract; const note = $('#netnote'); if (!note || !c) return;
     if (window.NEARCARTA_PUBLIC_MAINNET) {

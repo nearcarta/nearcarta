@@ -1,9 +1,14 @@
 // Guardhouse tray: Check / Pay safely / Blocks. One gold button.
 // The city door mounts this. Icons are the shipped token set (web3icons / token svgs).
 
+import { API_PATH, txUrl } from '../../../shared/net/net.js';
 import { bindTokenFallbacks, tokenStack } from './token-badge.js';
 import { checkUrl, runGuardAction, runGuardAgent } from './guard-agent.js';
 import { armGuardDock, dispatchGuardDock, ensureGuardDock, installGuardDock } from './guard-dock.js';
+
+// A RECORDED mainnet refusal proof. The hash only exists on mainnet, so the link stays there and the
+// card labels it. A live hash on this page goes through txUrl() like every other live link.
+const recordedProofUrl = (h) => `https://nearblocks.io/txns/${h}`;
 
 function statusBlock(state, esc) {
   const score = state.score;
@@ -34,10 +39,11 @@ function statusBlock(state, esc) {
   if (titles.includes('Lookalike')) bits.push('Lookalike');
   if (titles.includes('Recorded refusals')) bits.push('Recorded refusals');
   const link = (score.lines || []).find(l => l.tx);
-  const href = link?.tx ? ` <a class="guard-tx" href="https://nearblocks.io/txns/${esc(link.tx)}">Recorded refusal</a>` : '';
+  // A recorded mainnet refusal. It keeps nearblocks.io and says so; a live tx below follows the network.
+  const href = link?.tx ? ` <a class="guard-tx" data-net="mainnet" href="${recordedProofUrl(esc(link.tx))}" title="Recorded on mainnet">Recorded refusal</a>` : '';
   // A real send shows its receipt here, as one labelled link, never a bare hash.
   const sent = state.liveTx
-    ? ` <a class="guard-tx" data-testid="guard-live-tx" href="https://nearblocks.io/txns/${esc(state.liveTx)}" target="_blank" rel="noopener">${esc(state.liveLabel || 'payment')} receipt ↗</a>`
+    ? ` <a class="guard-tx" data-testid="guard-live-tx" href="${txUrl(esc(state.liveTx))}" target="_blank" rel="noopener">${esc(state.liveLabel || 'payment')} receipt ↗</a>`
     : '';
   const extra = state.notice ? ` ${esc(state.notice)}` : '';
   return `<p class="guard-status" data-testid="guard-verdict">${esc(score.summary || '')}</p><p class="guard-status" data-testid="guard-score">${bits.join(' · ')}${reasons ? ' ' + reasons : ''}${href}${sent}${extra}</p>`;
@@ -331,7 +337,7 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
     if (state.liveTried) return;
     state.liveTried = true;
     try {
-      const deny = await fetch(api() + '/api/guardhouse/denylist').then(r => r.json());
+      const deny = await fetch(api() + API_PATH + '/guardhouse/denylist').then(r => r.json());
       state.denyCount = Array.isArray(deny?.entries) ? deny.entries.length : null;
     } catch { state.denyCount = null; }
     if (state.holding) return;
@@ -352,7 +358,7 @@ export function mountGuardTray(root, hooks = {}, deps = {}) {
         payee: fields.payee || '', chain: fields.chain || 'near', asset: fields.asset || 'NEAR',
         amount: fields.amount || '', invoice: fields.invoice || '', row: fields.row || '',
       });
-      const att = await fetch(api() + '/api/guardhouse/attested?' + qs).then(r => r.json());
+      const att = await fetch(api() + API_PATH + '/guardhouse/attested?' + qs).then(r => r.json());
       state.attested = att && typeof att === 'object' ? att : { enabled: false };
     } catch { state.attested = { enabled: false, error: true, reason: 'the server did not answer' }; }
     if (root?.isConnected !== false) paint();

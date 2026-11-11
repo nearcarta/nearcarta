@@ -1,6 +1,7 @@
 // One shop surface for the city tray, /shops/<name>/ and the console.
 // Quote, check, search and prepare only. Nothing here signs a payment.
 
+import { API_PATH } from '../../../shared/net/net.js';
 import { roomError } from '../room-error.js';
 import { pickBest, quoteLine, tokenChoices, chainsOf, filterTokens } from '../ferry-catalog.js';
 import { mountGuardTray } from './guard-tray.js';
@@ -375,7 +376,7 @@ async function quoteOne(route, amount, hooks, receiveAt) {
   const visitor = hooks.visitor?.() || '';
   const recipient = quotePayee({ chain: 'zec' }, visitor, receiveAt);
   if (!recipient) return { ok: false, error: 'Enter the address on the destination chain that should receive the tokens.', dry: true };
-  const res = await fetch(api() + '/api/ferry/quote', {
+  const res = await fetch(api() + API_PATH + '/ferry/quote', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ from: route.from, to: 'ZEC@zec', amount: String(amount || route.amt), recipient, refundTo: refundForChain(route.chain || parseRouteFrom(route.from).chain, visitor), privacy: 'basic' }),
   });
@@ -697,7 +698,7 @@ function mountFerry(root, hooks) {
         const visitor = hooks.visitor?.() || hooks.state?.me;
         const recipient = quotePayee(to, visitor, receiveAt);
         if (!recipient) return Promise.resolve({ ok: false, error: 'Enter the address on the destination chain that should receive the tokens.' });
-        return fetch(api() + '/api/ferry/quote', {
+        return fetch(api() + API_PATH + '/ferry/quote', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ from, to, amount: String(amt || SESSION_SWAP.amt), recipient, refundTo: refundForChain(originChain, visitor), privacy: 'basic' }),
         }).then(r => r.json());
@@ -755,13 +756,13 @@ function mountFerry(root, hooks) {
     // /api/mainnet is the same deployment record every shop reads; a failure just leaves the
     // quote quiet rather than sending a request the API would refuse.
     if (!displayRecipient()) {
-      fetch(api() + '/api/mainnet').then(r => r.json()).then(j => {
+      fetch(api() + API_PATH + '/mainnet').then(r => r.json()).then(j => {
         const root = j?.root || j?.deployments?.root || j?.board?.owner || '';
         if (root) { setRootAccount(root); scheduleSwapQuote(); }
       }).catch(() => {});
     }
     try {
-      const rows = hooks.tokens ? await hooks.tokens() : await fetch(api() + '/api/ferry/tokens').then(r => r.json());
+      const rows = hooks.tokens ? await hooks.tokens() : await fetch(api() + API_PATH + '/ferry/tokens').then(r => r.json());
       state.choices = tokenChoices(Array.isArray(rows) ? rows : rows?.tokens || []);
       const fromUntouched = !state.fromEdited && (!state.fromId || state.fromId === 'USDC|base' || state.fromId === SESSION_SWAP.fromId);
       if (fromUntouched) {
@@ -819,7 +820,7 @@ function mountFerry(root, hooks) {
         // a display-only recipient: the town's own account from the deployment record. It is
         // never a deposit address and never signed — `dry: true` keeps the quote read-only.
         const display = recipient || displayRecipient() || (state.mainnet?.root || '');
-        const res = await fetch(api() + '/api/ferry/quote', {
+        const res = await fetch(api() + API_PATH + '/ferry/quote', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             from, to,
@@ -922,7 +923,7 @@ function mountFerry(root, hooks) {
     const recipient = quotePayee(to, visitor, state.receiveAt);
     const display = recipient || displayRecipient() || (state.mainnet?.root || '');
     try {
-      const res = await fetch(api() + '/api/ferry/quote', {
+      const res = await fetch(api() + API_PATH + '/ferry/quote', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           from, to, amount: amt, recipient: display,

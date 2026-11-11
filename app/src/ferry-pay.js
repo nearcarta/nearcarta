@@ -1,6 +1,7 @@
 // Embeddable Pay button. A host page includes this script; it renders into #nearcarta-pay
 // (or the element named by data-root) and talks to this origin's /api. The charter is read
 // before a deposit address is asked for. This file never sends the deposit.
+import { API_PATH } from '../../shared/net/net.js';
 import { tokenChoices, chainsOf, filterTokens, quoteView, pickBest, statusView } from './ferry-catalog.js';
 import { pickerListbox, bindPickerListbox, bindTokenFallbacks } from './panels/token-badge.js';
 
@@ -71,7 +72,7 @@ if (root) {
   };
   search.oninput = renderPay;
   let rules = null;
-  const api = p => fetch(origin + p).then(r => r.json().then(j => ({ ok: r.ok, j })));
+  const api = p => fetch(origin + p.replace(/^\/api/, API_PATH)).then(r => r.json().then(j => ({ ok: r.ok, j })));
   async function loadTokens() {
     const { ok, j } = await api('/api/ferry/tokens');
     choices = tokenChoices(Array.isArray(j) ? j : j?.tokens || []);
@@ -117,7 +118,7 @@ if (root) {
   }
   async function dryQuote(privacy) {
     const body = { ...pair(), amount: String(amount.value), recipient: recipient.value, refundTo: String(new FormData(form).get('refundTo') || '0x561E8eF0FEcB621469dA30250dC6CdCD1E47A66e'), privacy };
-    const r = await fetch(origin + '/api/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(origin + API_PATH + '/ferry/quote', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     return quoteView({ ...j, privacy, dry: true, checks: j.checks });
   }
@@ -177,7 +178,7 @@ if (root) {
     if (!rules || !rules.ok || !rules.settlement_yocto) { out.textContent = 'The charter has not allowed a payment.'; return; }
     const { from, to } = pair();
     out.textContent = 'Asking the charter, then 1Click…';
-    const r = await fetch(origin + '/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+    const r = await fetch(origin + API_PATH + '/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
       from, to,
       amount: String(amount.value), recipient: recipient.value, refundTo: String(new FormData(form).get('refundTo')),
       charter: form.dataset.charter, clause_id: preset.clause, amount_yocto: rules.settlement_yocto, privacy: 'public',

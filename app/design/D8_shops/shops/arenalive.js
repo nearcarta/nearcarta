@@ -18,7 +18,7 @@ export function promptRows(ps = [], max = 31) {
 }
 export async function livePrompts(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, ''), bare = false) {
   try { const c = new AbortController(), t = setTimeout(() => c.abort(), 8000);
-    const r = await fetchFn(base + '/api/arena/prompts', { signal: c.signal }).finally(() => clearTimeout(t)); if (!r.ok) throw new Error('HTTP ' + r.status);
+    const r = await fetchFn(base + (globalThis.NEARCARTA_NET?.apiPath || '/api') + '/arena/prompts', { signal: c.signal }).finally(() => clearTimeout(t)); if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     const parts = [h3(`Past prompts · live read · ${d.shown} of ${d.count} shown`), promptRows(d.prompts),
       note('Seeded rows were written by our own scripts with a scripted agent, not a model. Live model runs are the “Run it live” attacks above. Each prompt is shown only when its sha256 matches the commitment on chain. The first link is the decision tx; the second is the reveal.')];
@@ -71,7 +71,7 @@ export function bindRedteam(render, fetchFn = globalThis.fetch, base = (globalTh
     if (!e.target.closest?.('.redteam-run') || rt.busy) return;
     rt.busy = true; rt.out = null; rerender();
     try {
-      const r = await fetchFn(base + '/api/vault/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: ATTACKS[rt.i % ATTACKS.length], nickname: 'redteam' }) });
+      const r = await fetchFn(base + (globalThis.NEARCARTA_NET?.apiPath || '/api') + '/vault/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: ATTACKS[rt.i % ATTACKS.length], nickname: 'redteam' }) });
       const d = await r.json().catch(() => ({}));
       rt.out = r.ok ? d : { error: d.error || 'HTTP ' + r.status };
     } catch (err) { rt.out = { error: err.message }; }

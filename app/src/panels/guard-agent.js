@@ -40,8 +40,13 @@ export function parseGuardCommand(text) {
   return { ok: false, hint: GUARD_MISS };
 }
 
+// The API path prefix, published by the page at boot (`/api` on mainnet, `/tapi` on testnet).
+// A panel reads it from the global instead of importing shared/, because the city serves panels
+// straight from app/src and a shared import there is a module the build never publishes.
+const apiPath = () => String(globalThis.NEARCARTA_API_PATH || '/api');
+
 export function checkUrl(account, charter) {
-  const path = '/api/guardhouse/check/' + encodeURIComponent(account);
+  const path = apiPath() + '/guardhouse/check/' + encodeURIComponent(account);
   if (!charter) return path;
   return path + '?charter=' + encodeURIComponent(charter);
 }
@@ -342,7 +347,7 @@ async function askModelForPayment({ text, api, charter } = {}) {
   const base = String(api ?? globalThis.NEARCARTA_API ?? '').replace(/\/$/, '');
   let r;
   try {
-    r = await fetch(base + '/api/vault/ask/plan', {
+    r = await fetch(base + apiPath() + '/vault/ask/plan', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text, charter: charter || '', nickname: 'guard' }),
     });

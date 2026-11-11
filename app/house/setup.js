@@ -306,7 +306,7 @@ function wireCharacter() {
   wire(async () => { if (!displayOk(st.displayName)) { msg = 'Give your agent a name, 2–24 letters.'; return render(); }
     remember(); if (!holdsForCharter()) { done(st.step); go(st.step + 1); return; }
     const id = `${st.agentName}.${CFG.factory}`; const b = $('#next');
-    await act(b, async () => { if (PREVIEW) return; const r = await fetch(API + '/api/vault/charter/' + encodeURIComponent(id)).then(r => r.json()).catch(() => ({}));
+    await act(b, async () => { if (PREVIEW) return; const r = await fetch(API + (globalThis.NEARCARTA_NET?.apiPath || '/api') + '/vault/charter/' + encodeURIComponent(id)).then(r => r.json()).catch(() => ({}));
       if (r?.exists && r?.owner && r.owner !== me) throw new Error(`${id} is taken. Pick another name.`); done(st.step); go(st.step + 1); }); });
 }
 
@@ -536,7 +536,7 @@ function sSign() {
     + (onChain && keyStale ? `<div class="tabhelp" data-testid="setup-renew-key"><p class="small">This agent key is missing one of <code>propose</code>, <code>propose_call</code>, <code>propose_call_as</code> and <code>anchor</code>. Ferry Load cargo needs <code>propose_call</code>; Toll and Guard call shops through <code>propose_call_as</code>; the Chronicle anchors a statement with <code>anchor</code>. One wallet approval deletes the old board keys and adds a new one with all four (0.25 NEAR gas allowance). It cannot move your NEAR.</p><p class="small" data-testid="setup-renew-status" role="status"${renewStatus ? '' : ' hidden'}>${esc(renewStatus)}</p><button type="button" class="btn gold" id="renew-key" data-testid="setup-renew-key-btn">Renew agent key</button></div>` : '')
     + errP() + nav(onChain && !keyStale, { label: 'Try your agent' });
 }
-async function charterState(id) { return fetch(API + '/api/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
+async function charterState(id) { return fetch(API + (globalThis.NEARCARTA_NET?.apiPath || '/api') + '/vault/charter/' + encodeURIComponent(id) + '?fresh=1').then(r => r.json()).catch(() => ({})); }
 async function accountOn(id, network) {
   if (network !== 'mainnet') return (await charterState(id)).exists;
   const r = await fetch(MAIN.rpc, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'query', params: { request_type: 'view_account', finality: 'final', account_id: id } }) });
@@ -1363,7 +1363,7 @@ async function boot() {
   paintShell();
   // The API host from config.js, else this origin's /api rewrite.
   try {
-    CFG = await fetch(API + '/api/vault/config').then(r => r.json()).catch(() => { API = ''; return fetch('/api/vault/config').then(r => r.json()); });
+    CFG = await fetch(API + (globalThis.NEARCARTA_NET?.apiPath || '/api') + '/vault/config').then(r => r.json()).catch(() => { API = ''; return fetch((globalThis.NEARCARTA_NET?.apiPath || '/api') + '/vault/config').then(r => r.json()); });
   } catch (e) {
     if (!PREVIEW) throw e;
     CFG = { factory: 'preview.near', network: 'mainnet', arena: { merchants: ['cafe.preview.near'] }, rpc: 'https://free.rpc.fastnear.com', rpc_fallbacks: [] };

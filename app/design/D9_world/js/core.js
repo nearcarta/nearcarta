@@ -91,4 +91,7 @@ export const TX={
   F1:{h:'6xMQyXcczLjxymmrYfBhFDuRy9MpFV62CviqdYHrnTdQ', what:'row opened', ev:'open', cls:'ok'},
   F2:{h:'7XtAUzNqmqQLNCC3Hrm2JXqTVciyrfvX918dnTWfXXcf', what:'row closed', ev:'closed', cls:'ok'},
 };
-export const txUrl=h=>'https://nearblocks.io/txns/'+h;
+// The network answer, published by shared/net/net.js. A fallback keeps a page that has not loaded
+// that module yet on mainnet.
+export const netCfg=()=>globalThis.NEARCARTA_NET||{explorer:'https://nearblocks.io',apiPath:'/api'};
+export const txUrl=h=>netCfg().explorer+'/txns/'+h;

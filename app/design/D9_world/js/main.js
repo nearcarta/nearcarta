@@ -505,14 +505,15 @@ world.toCharter=toCharter;
 // ---------- Chronicle HUD: the last three real transactions on the guardhouse oath, hidden until they arrive ----------
 (async()=>{ if(CAPTURE&&!P.has('live')) return; const API=window.NEARCARTA_API||'';
   try{
-    const mn=await (await fetch(API+'/api/mainnet')).json(), t=mn?.board?.visitor_run?.txs||{}; const rows=[['propose_allowed_0.001_agent_key_no_wallet','ok','agent paid 0.001 · allowed'],['propose_refused_0.01_over_per_action_cap','no','asked 0.01 over the cap · refused'],['open_charter','pd','visitor opened a charter']].filter(r=>t[r[0]]);
+    const mn=await (await fetch(API+(globalThis.NEARCARTA_NET?.apiPath||'/api')+'/mainnet')).json(), t=mn?.board?.visitor_run?.txs||{}; const rows=[['propose_allowed_0.001_agent_key_no_wallet','ok','agent paid 0.001 · allowed'],['propose_refused_0.01_over_per_action_cap','no','asked 0.01 over the cap · refused'],['open_charter','pd','visitor opened a charter']].filter(r=>t[r[0]]);
     if(!rows.length) return; const l=$('#clist'); l.innerHTML='';
     for(const [k,cls,w] of rows){ const h=t[k], li=document.createElement('li'); li.className=cls; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>'; li.querySelector('.w').textContent=w;
-      const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+h; a.textContent=h.slice(0,6)+'…'+h.slice(-4); a.title='Open on the explorer'; l.append(li); }
+      // Recorded mainnet proofs: they keep nearblocks.io on every network and say so.
+      const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+h; a.dataset.net='mainnet'; a.textContent=h.slice(0,6)+'…'+h.slice(-4); a.title='Recorded on mainnet'; l.append(li); }
     $('#chron').hidden=false; $('#chron').dataset.live='1'; }catch(e){ console.warn('[Nearcarta] Chronicle feed unavailable',e?.message||e); } })();
 addEventListener('nearcarta:chronicle',e=>{ const d=e.detail||{}; if(!d.hash) return; const l=$('#clist'); if(!l||[...l.querySelectorAll('a')].some(a=>a.href.includes(d.hash))) return;
   const li=document.createElement('li'); li.className=d.decision==='denied'?'no':'ok'; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
-  li.querySelector('.w').textContent=d.decision==='denied'?'refused · new entry':'new entry'; const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+d.hash; a.textContent=d.hash.slice(0,6)+'…'+d.hash.slice(-4); a.title='Open on the explorer';
+  li.querySelector('.w').textContent=d.decision==='denied'?'refused · new entry':'new entry'; const a=li.querySelector('a'); const exp=globalThis.NEARCARTA_NET?.explorer||'https://nearblocks.io'; a.href=exp+'/txns/'+d.hash; a.textContent=d.hash.slice(0,6)+'…'+d.hash.slice(-4); a.title='Open on the explorer';
   l.prepend(li); while(l.children.length>3) l.lastChild.remove(); $('#chron').hidden=false; });
 const startStory=!P.has('nostory') && !(P.has('explore')) && !P.has('shop');
 let introCtl=null;
@@ -545,7 +546,7 @@ window.__render=draw; window.__shopsLayer='d9';
 // Toll's floor, robot and policy start with the page so the first door is not a cold 20s fetch.
 setTimeout(()=>{ const D8=new URL('../../D8_shops/',import.meta.url).href; import(D8+'js/core.js').then(C8=>{
   for (const p of ['hex/tiles/base/hex_grass','hex/tiles/base/hex_water','hex/buildings/neutral/building_bridge_A','hex/buildings/blue/building_tower_base_blue','chars/Rogue_Hooded.glb']) C8.load(p).catch(()=>null);
-}).catch(()=>{}); const api=(globalThis.NEARCARTA_API||'').replace(/\/$/,''); fetch(api+'/api/toll/live').catch(()=>{}); fetch(api+'/api/toll').catch(()=>{}); },0);
+}).catch(()=>{}); const api=(globalThis.NEARCARTA_API||'').replace(/\/$/,''); const pth=globalThis.NEARCARTA_NET?.apiPath||'/api'; fetch(api+pth+'/toll/live').catch(()=>{}); fetch(api+pth+'/toll').catch(()=>{}); },0);
 setTimeout(()=>SL.preload().then(()=>{ if(!CAPTURE){ setTimeout(()=>warmGPU().then(warmRooms),300); } }),CAPTURE?0:2500); window.__boot={ms:Math.round(performance.now()-t0)};
 if(CAPTURE){ window.__dbg={doorPoint,cam,PC,R,SHOPS,land,toCharter,endStory,setZoom,setPlay,jump,PINS,screenOf,CAST,W,SL,SP,setSky,state:()=>({inShop,exiting,room:room?.id||null,fade:+getComputedStyle(fade).opacity})}; 
   // demo cursor driven on the sim clock (capture only)

@@ -220,7 +220,9 @@ test('chronicle icons, brass and city wiring stay on the ledger path', () => {
   assert.match(view, /data-testid="chronicle-search"/);
   assert.match(view, /data-testid="chronicle-export"/);
   assert.match(view, /aria-label="Account to ledger"/);
-  assert.match(view, /\/api\/chronicle\/live/);
+  // The path prefix follows the network (API_PATH is /api on mainnet, /tapi on testnet).
+  assert.match(view, /\$\{API_PATH\}\/chronicle\/live/);
+  assert.match(view, /API_PATH/);
   assert.doesNotMatch(view, /usdc\.svg/);
   assert.doesNotMatch(view, /tokens\/near\.svg/);
   const room = read('app/design/D8_shops/shops/chronicle.js');

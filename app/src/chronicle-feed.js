@@ -1,6 +1,7 @@
 // Search, filter, page, export and an on-chain status check for the chronicle list.
 // A hash of the right shape is not a pass. The pass comes from a transaction status.
 
+import { txUrl } from '../../shared/net/net.js';
 const HASH = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 
 export function txVerdict(body) {
@@ -38,7 +39,7 @@ export function queryFeed(rows, { q = '', decision = '', page = 1, pageSize = 4,
   return { rows: all.slice((p - 1) * size, p * size), page: p, pages, total: all.length };
 }
 
-const nearblocks = h => (h ? `https://nearblocks.io/txns/${h}` : '');
+const nearblocks = h => (h ? txUrl(h) : '');
 
 export function categoryOf(row) {
   const blob = `${row?.reason || ''} ${row?.label || ''} ${row?.note || ''}`.toLowerCase();
@@ -88,7 +89,7 @@ export function downloadCsv(csv, name = 'chronicle.csv', doc = globalThis.docume
 export function verifyEntry(row, chain) {
   const h = String(row?.h || '');
   const shaped = HASH.test(h);
-  const url = shaped ? `https://nearblocks.io/txns/${h}` : '';
+  const url = shaped ? txUrl(h) : '';
   if (!chain) return { ok: false, pending: true, url, text: shaped ? 'Hash shape only. The chain has not been checked yet.' : 'This row has no transaction hash to check.' };
   const v = txVerdict(chain);
   return { ok: v.pass === true, pending: false, url, text: v.pass ? 'On chain: this transaction succeeded.' : `On chain: this transaction did not succeed (${v.why}).` };

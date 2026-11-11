@@ -721,7 +721,7 @@ test('the anchor runs only after the cap it commits to is on chain', () => {
   // The foot keeps two short lines: the result, then one note. Tx links go to the proof log.
   assert.doesNotMatch(apply, /state\.status = line/);
   assert.match(apply, /Cap on your row is now \$\{call\.after\} NEAR \(was \$\{call\.before\}\)/);
-  assert.match(apply, /evidence: sent\.tx \? \[\{ label: 'tighten_rules', url: txUrl\(sent\.tx\) \}\] : \[\]/);
+  assert.match(apply, /evidence: sent\.tx \? \[\{ label: 'tighten_rules', url: proofUrl\(sent\.tx\) \}\] : \[\]/);
 });
 
 test('the audit response never echoes the statement, and an outage says so', async () => {

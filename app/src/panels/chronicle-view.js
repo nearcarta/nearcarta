@@ -1,4 +1,6 @@
 // Chronicle tray: Timeline, Statement, Verify. One gold action. No entry fee.
+import { API_PATH } from '../../../shared/net/net.js';
+import { txUrl } from '../../../shared/net/net.js';
 import { downloadCsv, exportCsv, queryFeed, verifyEntry } from '../chronicle-feed.js';
 import { csvTotals } from '../chronicle-feed.js';
 import { presentAmount } from '../chronicle-amount.js';
@@ -83,7 +85,7 @@ export async function sharedJson(url, key = url, { now = Date.now(), ttl = SHARE
 }
 
 function rowHtml(x) {
-  const href = x.url || (x.h ? `https://nearblocks.io/txns/${x.h}` : '');
+  const href = x.url || (x.h ? txUrl(x.h) : '');
   const amount = presentAmount(x.amount);
   return `<li class="${rowClass(x.decision)}" data-hash="${esc(x.h || '')}">
       <span class="c-mark">${iconFor(x.shop, x.decision)}</span>
@@ -359,14 +361,14 @@ export function mountChronicleTray(root, hooks = {}) {
     if (ftCursor) liveQuery.set('ftCursor', ftCursor);
     let board = null, ledger = null, mainnet = null, live = null;
     try {
-      const livePromise = fetch(`${base}/api/chronicle/live?${liveQuery}`, { signal: AbortSignal.timeout(8000) }).catch(() => null);
+      const livePromise = fetch(`${base}${API_PATH}/chronicle/live?${liveQuery}`, { signal: AbortSignal.timeout(8000) }).catch(() => null);
       // The public ledger and the deployment record are the same answer for every account, so they
       // are read once per page and shared. A second account read (or Show more) must not re-ask them:
       // that fan-out is what the ledger/mainnet 429 reports were about.
       [board, ledger, mainnet] = await Promise.all([
         get('/api/chronicle?owner=' + encodeURIComponent(id)),
-        sharedJson(`${base}/api/ledger`, 'ledger'),
-        sharedJson(`${base}/api/mainnet`, 'mainnet'),
+        sharedJson(`${base}${API_PATH}/ledger`, 'ledger'),
+        sharedJson(`${base}${API_PATH}/mainnet`, 'mainnet'),
       ]);
       if (mine !== state.ticket) return;
       const liveRes = await livePromise;
@@ -404,7 +406,7 @@ export function mountChronicleTray(root, hooks = {}) {
 
   async function chainOf(row) {
     if (hooks.verify) return hooks.verify(row);
-    const res = await fetch(`${api()}/api/tx-status/${encodeURIComponent(row.h)}?sender=${encodeURIComponent(row.signer || '')}`);
+    const res = await fetch(`${api()}${API_PATH}/tx-status/${encodeURIComponent(row.h)}?sender=${encodeURIComponent(row.signer || '')}`);
     return res.json();
   }
 
@@ -436,7 +438,7 @@ export function mountChronicleTray(root, hooks = {}) {
     if (state.rules && state.rules.account === state.account && !state.rules.refresh) return state.rules;
     const out = { account: state.account, version: '', why: 'The rules were not read yet.', versions: [] };
     try {
-      const res = await fetch(`${api()}/api/chronicle/anchors?account=${encodeURIComponent(state.account)}`, { signal: AbortSignal.timeout(9000) });
+      const res = await fetch(`${api()}${API_PATH}/chronicle/anchors?account=${encodeURIComponent(state.account)}`, { signal: AbortSignal.timeout(9000) });
       if (res.ok) {
         const body = await res.json();
         const built = reconstructRules({
@@ -469,7 +471,7 @@ export function mountChronicleTray(root, hooks = {}) {
     showOut();
     let proof = null;
     try {
-      const res = await fetch(`${api()}/api/chronicle/statement`, {
+      const res = await fetch(`${api()}${API_PATH}/chronicle/statement`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -542,7 +544,7 @@ export function mountChronicleTray(root, hooks = {}) {
     if (!sent?.ok) {
       const why = sent?.reason || 'refused';
       state.verify = `The board did not log the anchor: ${why}. Nothing was stored, and the bundle is still downloadable.`;
-      state.verifyUrl = sent?.tx ? `https://nearblocks.io/txns/${sent.tx}` : '';
+      state.verifyUrl = sent?.tx ? txUrl(sent.tx) : '';
       clearSeal();
       showOut();
       return { status: state.verify, signed: false };
@@ -553,7 +555,7 @@ export function mountChronicleTray(root, hooks = {}) {
     state.verify = proof.ok
       ? `Anchored on the board. ${proof.why}`
       : 'The board accepted the call but this receipt did not carry the anchor event. Check the transaction.';
-    state.verifyUrl = `https://nearblocks.io/txns/${sent.tx}`;
+    state.verifyUrl = txUrl(sent.tx);
     const file = JSON.stringify({ manifest: state.manifest, plan: { method: plan.method, args: plan.args, commitment: plan.commitment }, tx: sent.tx, events }, null, 2);
     try {
       if (hooks.downloadJson) hooks.downloadJson(file, 'chronicle-anchor.json');

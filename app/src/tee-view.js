@@ -1,6 +1,7 @@
 // Shape a TEE check for the Mist Bank button. The proof file is a recorded public summary.
 // A failed check always names the step and the reason. The pass rule is unchanged.
 
+import { API_PATH } from '../../shared/net/net.js';
 export const PROOF_HREF = '/tee-public.json';
 export const TEE_TIMEOUT_MS = 8000;
 export const TEE_PLAN = [
@@ -103,7 +104,7 @@ export async function liveTee({ fetchImpl = globalThis.fetch, api = '', nonce, m
   const fail = (why) => ({ ok: false, nonce: n, error: why, failure: `NEAR AI attestation: ${why}`, steps: [step('request', 'NEAR AI attestation', false, why)] });
   try {
     const res = await Promise.race([
-      Promise.resolve(fetchImpl(`${base}/api/ai/tee?nonce=${encodeURIComponent(n)}${modelQ}`, { signal: ctrl.signal })),
+      Promise.resolve(fetchImpl(`${base}${API_PATH}/ai/tee?nonce=${encodeURIComponent(n)}${modelQ}`, { signal: ctrl.signal })),
       new Promise((_, reject) => {
         ctrl.signal.addEventListener('abort', () => {
           const err = new Error('aborted');

@@ -1,7 +1,8 @@
 // One public ledger from the board feed, the ledger route, and the deployments payload.
 // Hashes come from those payloads. This module does not invent a transaction.
 
-const link = h => `https://nearblocks.io/txns/${h}`;
+import { txUrl } from '../../shared/net/net.js';
+const link = h => txUrl(h);
 
 const SHOP_ID = {
   'toll bridge': 'toll', toll: 'toll',

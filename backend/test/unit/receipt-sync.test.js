@@ -8,8 +8,12 @@ test('browser receipt.js is the same file as shared/vault/receipt.js', () => {
 test('arena status links a real transaction and does not invent one', () => {
   const tray = r('../../../app/src/panels/arena/tray.js');
   const shop = r('../../../app/design/D8_shops/js/shopui.js');
-  assert.match(tray, /nearblocks\.io\/txns\//);
+  // The link goes through the network module, so the same tray serves both networks: on testnet it
+  // points at the testnet explorer, on mainnet at nearblocks.io. No hash is invented either way.
+  assert.match(tray, /txUrl\(h\)/);
+  assert.match(tray, /shared\/net\/net\.js/);
   assert.match(tray, /Nothing was signed/);
   assert.match(shop, /Nothing was signed/);
+  assert.match(shop, /netCfg\(\)\.explorer/);
   assert.doesNotMatch(shop, /A\.scam\(/);
 });

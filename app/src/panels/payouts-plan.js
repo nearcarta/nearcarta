@@ -8,6 +8,7 @@
 // https://docs.near-intents.org/integration/distribution-channels/1click-api/swap-types
 // https://docs.near.org/protocol/transactions/meta-tx
 // https://github.com/near/NEPs/blob/master/neps/nep-0141.md
+import { txUrl } from '../../../shared/net/net.js';
 import { foreignAddressOk, nearAccountOk } from '../../design/D8_shops/js/payouts.js';
 
 export const MISS_HINT = 'Try: bill alice.near 0.3 USDC for the April article, Pay these rows, or Export CSV.';
@@ -740,7 +741,7 @@ const EXPLORER = {
 export function paymentLinks({ destinationTx, nearTx, originTx, chain } = {}) {
   const links = [];
   const dest = destinationTx || nearTx || '';
-  if (dest) links.push({ label: 'Delivered on NEAR', href: `https://nearblocks.io/txns/${dest}` });
+  if (dest) links.push({ label: 'Delivered on NEAR', href: txUrl(dest) });
   if (originTx) {
     const base = EXPLORER[String(chain || '').toLowerCase()];
     links.push({ label: 'Your deposit', href: base ? base + originTx : '', hash: originTx });
