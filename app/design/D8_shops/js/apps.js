@@ -22,9 +22,12 @@ import { callAsMessage, crossArgs, unitsOf, setSha256Hex } from '/board-call-as.
 setSha256Hex(W.sha256hex);
 
 const API = (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
+// The network answer, published by shared/net/net.js which every page loads as a module. A fallback
+// keeps this file working on a page that has not loaded it yet.
+const NETCFG = () => globalThis.NEARCARTA_NET || { explorer: 'https://nearblocks.io', apiPath: '/api', net: 'mainnet' };
 const USDC_NEAR = '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
 const onMain = () => true;
-const explorer = () => 'https://nearblocks.io';
+const explorer = () => NETCFG().explorer;
 const YN = 10n ** 24n, TG = 10n ** 12n;
 const toY = n => (BigInt(Math.round(Number(n) * 1e6)) * 10n ** 18n).toString();
 const fromY = y => Number(BigInt(y || 0) / 10n ** 18n) / 1e6;
@@ -92,7 +95,8 @@ export function plainError(e) {
 
 let CFG = null, rpc = null, conn = null;
 export const S = { me: null, charter: null, clauses: {}, usage: {}, state: null, ready: false };
-const api = async (p, o) => { const r = await fetch(API + p, o); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'http ' + r.status); return j; };
+// A path is written `/api/...` here and turned into the network's prefix (`/api` or `/tapi`).
+const api = async (p, o) => { const r = await fetch(API + String(p).replace(/^\/api/, NETCFG().apiPath), o); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'http ' + r.status); return j; };
 const view = (c, m, a) => W.viewFn(rpc, c, m, a);
 // Read the one stored secret at call time. A key captured before Refresh agent key is never reused.
 const agent = () => W.storedAgentKey(k => globalThis.localStorage?.getItem(k) ?? null, S.charter);
@@ -100,7 +104,9 @@ const pay = () => S.clauses.pay;
 // every signed result shows its tx as one visible link (round-2 judges: a collapsed "details" read as no link at all)
 // One real mainnet payment by a visitor's agent on board.nearcarta.near (shared/deployments/mainnet.json visitor_run).
 export const MAIN_PROOF_TX = '4jEjzpiYxZYu1UmLhn3C1roYQ95pUQDrFkc6vRfiYbia';
-export const mainProof = (h = MAIN_PROOF_TX, what = 'a 0.001 NEAR payment on board.nearcarta.near') => `<a class="tx" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener" title="Open on the NEAR mainnet explorer">${what} ↗</a>`;
+// A recorded mainnet proof. It stays on nearblocks.io on every network and says so in the title,
+// because the hash only exists on mainnet.
+export const mainProof = (h = MAIN_PROOF_TX, what = 'a 0.001 NEAR payment on board.nearcarta.near') => `<a class="tx" data-net="mainnet" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener" title="Recorded on mainnet">${what} ↗</a>`;
 export const txLine = (h, label = 'receipt') => h ? `<a class="rc tx" data-testid="receipt" href="${explorer()}/txns/${esc(h)}" target="_blank" rel="noopener" title="${esc(label)} on chain">${label === '↗' ? '↗' : `tx ${esc(short(h))} ↗`}</a>` : '';
 export const receipts = () => (S.charter ? JSON.parse(localStorage.getItem(LS_RCPT(S.charter)) || '[]') : []);
 function keep(h, shop, decision, reason, x = {}) {
@@ -847,14 +853,14 @@ export async function openFerryCheckout(q, pair) {
       depositAddress: null,
     };
   }
-  const r = await fetch(API + '/api/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await fetch(API + NETCFG().apiPath + '/ferry/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) return { ok: false, reason: j.error || j.reason || ('http ' + r.status), depositAddress: null, error: j.error || j.reason || null };
   return j;
 }
 
 export async function ferryStatus(depositAddress) {
-  const r = await fetch(API + '/api/ferry/status?depositAddress=' + encodeURIComponent(depositAddress));
+  const r = await fetch(API + NETCFG().apiPath + '/ferry/status?depositAddress=' + encodeURIComponent(depositAddress));
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'status ' + r.status);
   return j;
@@ -1043,7 +1049,7 @@ export async function arenaCall(plan) {
 export async function simulateCall({ receiver, method, deposit = '0', effects = [] } = {}) {
   if (!S.me || !receiver || !method) return null;
   try {
-    const r = await fetch(API + '/api/board/simulate', {
+    const r = await fetch(API + NETCFG().apiPath + '/board/simulate', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ owner: S.me, receiver, method, deposit: String(deposit), effects }),
     });

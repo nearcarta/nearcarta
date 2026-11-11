@@ -1,6 +1,7 @@
 // The Pay page's token list, quote comparison and status words.
 // The page asks 1Click for the list. This module only shapes what came back.
 
+import { txUrl } from '../../shared/net/net.js';
 export function normalizeToken(row) {
   if (!row || typeof row !== 'object') return null;
   const symbol = String(row.symbol || '').trim();
@@ -133,6 +134,6 @@ export function statusView(body) {
     terminal: DONE.has(status),
     refund: REFUND.has(status),
     tx: body?.tx || '',
-    explorer: body?.tx ? `https://nearblocks.io/txns/${body.tx}` : '',
+    explorer: body?.tx ? txUrl(body.tx) : '',
   };
 }

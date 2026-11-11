@@ -9,6 +9,7 @@
 // browser: this module is served as a plain file from the deploy root, so it can only import
 // modules that are published there. Importing `/shared/...` 404s, which is how the first
 // version of this page hung on "Reading the deed…".
+import { API_PATH } from '../../shared/net/net.js';
 import { gateDeed, gatedHtml } from './deed-gate.js';
 import { visitor } from '../design/D8_shops/js/session.js';
 
@@ -29,7 +30,7 @@ function esc(s) {
 // failure is a failure rather than a silent empty.
 const apiView = (contract, method, args) => {
   if (method !== 'nft_token') return Promise.resolve(null);
-  return fetch(api() + '/api/house/deed/' + encodeURIComponent(args?.token_id || ''), { cache: 'no-store' })
+  return fetch(api() + API_PATH + '/house/deed/' + encodeURIComponent(args?.token_id || ''), { cache: 'no-store' })
     .then(r => (r.ok || r.status === 404 ? r.json() : Promise.reject(new Error('the API answered ' + r.status))))
     .then(body => body?.token || null);
 };
@@ -47,9 +48,9 @@ async function main() {
 
   document.title = 'Nearcarta · your deed';
   const [deed, line, history] = await Promise.all([
-    fetch(api() + '/api/house/deed/' + encodeURIComponent(token), { cache: 'no-store' }).then(r => r.json()).catch(() => null),
-    fetch(api() + '/api/house/line/' + encodeURIComponent(token), { cache: 'no-store' }).then(r => r.json()).catch(() => null),
-    fetch(api() + '/api/house/history/' + encodeURIComponent(token), { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+    fetch(api() + API_PATH + '/house/deed/' + encodeURIComponent(token), { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+    fetch(api() + API_PATH + '/house/line/' + encodeURIComponent(token), { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+    fetch(api() + API_PATH + '/house/history/' + encodeURIComponent(token), { cache: 'no-store' }).then(r => r.json()).catch(() => null),
   ]);
   const purse = deed?.purses?.[token] || Object.values(deed?.purses || {})[0] || null;
   const y = (v) => (v == null ? '—' : (Number(v) / 1e24).toFixed(4));
@@ -68,7 +69,7 @@ async function main() {
       </dl>
       <h3 id="deed-h">Every transaction on this deed</h3>
       ${rows.length
-        ? `<ol class="deed-hist">${rows.map(r => `<li data-testid="deed-hist-row"><b>${esc(r.what)}</b> <a href="https://nearblocks.io/txns/${esc(r.hash)}" target="_blank" rel="noopener">${esc(String(r.hash).slice(0, 10))}… ↗</a></li>`).join('')}</ol>`
+        ? `<ol class="deed-hist">${rows.map(r => `<li data-testid="deed-hist-row"><b>${esc(r.what)}</b> <a href="${txUrl(esc(r.hash))}" target="_blank" rel="noopener">${esc(String(r.hash).slice(0, 10))}… ↗</a></li>`).join('')}</ol>`
         : `<p class="small muted">${esc(history?.gap || history?.note || 'No transactions yet.')}</p>`}
       <p><a class="btn" href="/?shop=house">Open the House</a></p>
       <p class="small muted">Sell or transfer the deed and this page moves with it: the next owner is read from the chain, not from this tab.</p>

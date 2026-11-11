@@ -18,7 +18,7 @@ export function tollRecordRows(d, { hideExpired = false } = {}) {
 }
 export async function liveTollRecords(fetchFn = globalThis.fetch, base = (globalThis.window?.NEARCARTA_API || '').replace(/\/$/, ''), bare = false) {
   try { const c = new AbortController(), t = setTimeout(() => c.abort(), 8000);
-    const r = await fetchFn(base + '/api/toll', { signal: c.signal }).finally(() => clearTimeout(t)); if (!r.ok) throw new Error('HTTP ' + r.status);
+    const r = await fetchFn(base + (globalThis.NEARCARTA_NET?.apiPath || '/api') + '/toll', { signal: c.signal }).finally(() => clearTimeout(t)); if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json(), all = [{ recent: d.recent || [] }, ...(d.instances || [])].flatMap(t => t.recent || []), gone = all.filter(x => x.status === 'expired').length;
     const parts = [h3('Toll records · live read'), bare ? MAIN_ROWS : '', tollRecordRows(d, { hideExpired: bare }),
       bare && gone ? note(`${gone} expired mainnet record${gone > 1 ? 's' : ''} hidden: signed on NEAR, never landed on the foreign chain.`) : '', note('A record signed on NEAR but never seen on its foreign chain shows as expired once it can no longer land.')];

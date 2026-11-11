@@ -1039,3 +1039,62 @@ body.toll-tray #shopUI .tokw img.tok{width:22px;height:22px;flex:none;display:bl
    ("All shops" over "Mist Bank"), and an open AI dock covered the drawer's last card on desktop. */
 @media (max-width:720px){ body:has(#drawer.open) nav.all-shops{display:none} }
 body:has(#drawer.open) [id$="-agent-dock"]{display:none!important}
+
+/* Try free, the real-money sign-in, and the network badge.
+   One gold action (the Gold rule) and one outlined action. The row is a flex box with a 16px gap and
+   sits clear of All shops, so at 390px it wraps under the brand instead of overlapping Back, the dock
+   or the menu. The badge is always visible: a judge must never mistake a testnet receipt for a mainnet
+   one. */
+.net-chrome{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+/* Inside the town's top bar it is one item in that row, not a second fixed strip. Two fixed strips at
+   the top is what overlapped at 390px. */
+.net-chrome.in-topbar{position:static;max-width:none}
+.net-chrome .btn-gold,.net-chrome .btn-outline{display:inline-flex;align-items:center;gap:6px;height:38px;border-radius:19px;padding:0 18px;font:600 14px var(--sans);letter-spacing:.01em;text-decoration:none;cursor:pointer}
+.net-chrome .btn-gold{background:linear-gradient(180deg,#f5d08a,#d9a24c);color:#221a10;border:1px solid #b3823c;box-shadow:0 6px 18px rgba(23,19,15,.36)}
+.net-chrome .btn-gold:hover{filter:brightness(1.06)}
+.net-chrome .btn-outline{background:rgba(26,20,15,.72);color:var(--parch);border:1px solid #d6b46a}
+.net-chrome .btn-outline:hover{background:rgba(40,31,23,.9)}
+.net-chrome .btn-gold .k{font-size:13px}
+.net-badge{display:inline-flex;align-items:center;gap:7px;height:30px;border-radius:15px;padding:0 12px;font:700 11px var(--sans);letter-spacing:.09em;cursor:pointer}
+.net-badge .dot{width:7px;height:7px;border-radius:50%}
+.net-badge.main{background:rgba(26,20,15,.8);color:#f5d08a;border:1px solid #c98f4e}
+.net-badge.main .dot{background:#f5d08a}
+.net-badge.test{background:rgba(9,42,40,.85);color:#7fe3d4;border:1px solid #2f9a8c}
+.net-badge.test .dot{background:#42d6bf;box-shadow:0 0 8px #42d6bf}
+.net-chrome .try-note{margin:0;flex-basis:100%;text-align:right;font:500 12px/1.4 var(--sans);color:var(--parch2);min-height:0}
+.try-note:empty{display:none}
+.net-pitch{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;margin:0;font:500 12px/1.4 var(--sans);color:var(--parch2);text-align:center;max-width:min(520px,calc(100vw - 32px));pointer-events:none}
+body.in-shop .net-pitch,body.story .net-pitch{display:none}
+/* The badge sheet. A small card under the top bar, not a modal that blocks the town. */
+.net-sheet{position:fixed;inset:0;z-index:400;background:rgba(12,9,7,.5);display:flex;align-items:flex-start;justify-content:flex-end;padding:72px 16px 16px}
+.nb-card{background:#1c1611;color:var(--parch);border:1px solid #c98f4e;border-radius:14px;padding:16px 18px;max-width:min(380px,calc(100vw - 32px));font:500 14px/1.5 var(--sans);box-shadow:0 18px 40px rgba(0,0,0,.5)}
+.nb-card p{margin:0 0 10px}
+.nb-card .nb-net{font-size:12.5px;color:var(--parch2)}
+.nb-card b{word-break:break-all}
+.nb-card a,.nb-card .nb-link{color:#f5d08a;background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;text-align:left}
+.nb-card .nb-close{background:rgba(245,208,138,.12);border:1px solid #d6b46a;color:var(--parch);border-radius:10px;padding:6px 14px;font:600 13px var(--sans);cursor:pointer}
+/* The welcome crate card. */
+.welcome-wrap{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:420;width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto}
+.welcome{background:#1c1611;color:var(--parch);border:1px solid #c98f4e;border-radius:16px;padding:20px 22px;box-shadow:0 24px 60px rgba(0,0,0,.55);font:500 14px/1.55 var(--sans)}
+.welcome .w-title{margin:0 0 6px;font:600 19px var(--serif)}
+.welcome .w-acct{margin:0 0 12px;font-size:12.5px;color:var(--parch2);word-break:break-all}
+.welcome .w-acct a{color:#f5d08a}
+.welcome .w-items{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:7px}
+.welcome .w-items li{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;border-left:2px solid #c98f4e;padding-left:10px}
+.welcome .crate-note{color:var(--parch2);font-size:12px}
+.welcome .crate-tx{color:#f5d08a;font-size:12px}
+.welcome .w-line{margin:0 0 14px;font-size:12.5px;color:var(--parch2)}
+.welcome .btn-gold{width:100%;height:44px;border-radius:22px;background:linear-gradient(180deg,#f5d08a,#d9a24c);color:#221a10;border:1px solid #b3823c;font:600 15px var(--sans);cursor:pointer}
+.welcome .w-note{margin:10px 0 0;font-size:12.5px;color:var(--parch2);min-height:0}
+.welcome .w-note:empty{display:none}
+@media (max-width:900px){
+  .net-chrome{gap:8px}
+  .net-chrome .btn-gold,.net-chrome .btn-outline{height:36px;padding:0 14px;font-size:13px}
+  .net-pitch{bottom:calc(96px + env(safe-area-inset-bottom,0px));font-size:11.5px}
+}
+@media (max-width:720px){
+  .net-chrome{gap:6px;order:-1;flex-basis:100%}
+  .net-chrome .btn-gold .lab{white-space:nowrap}
+  .net-badge{height:28px;padding:0 10px;font-size:10.5px}
+  .net-pitch{display:none}
+}

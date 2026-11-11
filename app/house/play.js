@@ -9,18 +9,21 @@ import Privy, { LocalStorage, create as createWallet, rawSign } from '@privy-io/
 import { Signer, PublicKey, actions, buildDelegateAction, encodeSignedDelegate } from 'near-api-js';
 import bs58 from 'bs58';
 
-const MARKET = 'arena.nearcarta.near';
-const RPC = 'https://free.rpc.fastnear.com';
+// The network answer, published by shared/net/net.js (a /shared/net/net.js module the page loads).
+// A fallback keeps this bundle working if it is loaded before that module.
+const NETCFG = () => globalThis.NEARCARTA_NET || { net: 'mainnet', explorer: 'https://nearblocks.io', apiPath: '/api' };
+const MARKET = () => (globalThis.NEARCARTA_NET?.market || (NETCFG().net === 'testnet' ? 'arena.nearcarta.testnet' : 'arena.nearcarta.near'));
+const RPC = () => (NETCFG().net === 'testnet' ? 'https://rpc.testnet.fastnear.com' : 'https://free.rpc.fastnear.com');
 const TG = 10n ** 12n;
 const API = () => (typeof window !== 'undefined' && window.NEARCARTA_API) || '';
 const privy = new Privy({ appId: __PRIVY_APP_ID__, ...(__PRIVY_CLIENT_ID__ ? { clientId: __PRIVY_CLIENT_ID__ } : {}), storage: new LocalStorage() });
 const isNear = (a) => a?.type === 'wallet' && a.chain_type === 'near' && typeof a.address === 'string';
 
 async function rpc(method, params) {
-  const r = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+  const r = await fetch(RPC(), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
   const j = await r.json(); if (j.error) throw new Error(j.error.cause?.name || j.error.name || 'rpc'); return j.result;
 }
-export async function view(method, args = {}, contract = MARKET) {
+export async function view(method, args = {}, contract = MARKET()) {
   const r = await rpc('query', { request_type: 'call_function', finality: 'final', account_id: contract, method_name: method, args_base64: Buffer.from(JSON.stringify(args)).toString('base64') });
   return JSON.parse(Buffer.from(r.result).toString());
 }
@@ -78,7 +81,7 @@ async function post(path, body) {
 /** First visit: the relayer opens the wallet and pays its market storage. Safe to call again. */
 export async function ensureSession() {
   if (!wallet) throw new Error('Sign in first.');
-  return post('/api/relay/session', { account_id: wallet.address });
+  return post((globalThis.NEARCARTA_NET?.apiPath || '/api') + '/relay/session', { account_id: wallet.address });
 }
 
 /** One move (or up to three in one go) on the market, signed silently and sent by the relayer. */
@@ -91,11 +94,11 @@ export async function move(calls) {
     rpc('block', { finality: 'final' }),
   ]);
   const da = buildDelegateAction({
-    senderId: wallet.address, receiverId: MARKET, publicKey: pk, nonce: BigInt(key.nonce) + 1n, maxBlockHeight: BigInt(block.header.height) + 200n,
+    senderId: wallet.address, receiverId: MARKET(), publicKey: pk, nonce: BigInt(key.nonce) + 1n, maxBlockHeight: BigInt(block.header.height) + 200n,
     actions: list.map((c) => actions.functionCall(c.method, c.args || {}, (c.tgas ? BigInt(c.tgas) : 30n) * TG, 0n)),
   });
   const { signedDelegate } = await signer.signDelegateAction(da);
-  return post('/api/relay', { signed_delegate: Buffer.from(encodeSignedDelegate(signedDelegate)).toString('base64') });
+  return post((globalThis.NEARCARTA_NET?.apiPath || '/api') + '/relay', { signed_delegate: Buffer.from(encodeSignedDelegate(signedDelegate)).toString('base64') });
 }
 
 export const account = () => wallet?.address || null;

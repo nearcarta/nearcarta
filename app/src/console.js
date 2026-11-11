@@ -3,6 +3,7 @@ import { FERRY_BUTTON, FERRY_PASS, PRIVACY, chronicleRowsFromMainnet, chronicleS
 import { mountShop } from './panels/deep.js';
 import { roomError } from './room-error.js';
 import { installBoundary } from './panels/boundary.js';
+import { API_PATH } from '../../shared/net/net.js';
 // Live console: every value below is fetched from the Nearcarta API, which reads NEAR RPC,
 // 1Click (dry) and NEAR AI Cloud. Nothing here signs or spends; only the Your House tab asks your own wallet to sign.
 const API = (window.NEARCARTA_API || '').replace(/\/$/, '');
@@ -21,7 +22,8 @@ function plainErr(e) { return roomError(e); }
 installBoundary(document.querySelector('main'));
 
 async function get(path, opts) {
-  const r = await fetch(API + path, opts);
+  // `path` starts /api/ on every call site; API_PATH makes it /tapi on testnet.
+  const r = await fetch(API + path.replace(/^\/api/, API_PATH), opts);
   const j = await r.json().catch(() => ({ error: `http ${r.status}` }));
   if (!r.ok) throw new Error(j.error || `http ${r.status}`);
   return j;

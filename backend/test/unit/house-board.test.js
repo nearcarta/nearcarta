@@ -435,15 +435,20 @@ test('the deed page imports only modules published in the deploy root', () => {
   // The first version imported `/shared/vault/tx.js` and `/shared/deployments/mainnet.json`,
   // both 404 on the deployed site, so the page hung on "Reading the deed…" with no error the
   // user could act on. A page served raw can only import what the build actually publishes.
+  // shared/net/net.js IS published (app/build.mjs copies it to /shared/net/net.js), so it is allowed
+  // and the record file is still not: it is the file that must never leave the deploy root.
   const page = readFileSync(new URL('../../../app/src/deed-page.js', import.meta.url), 'utf8');
   const imports = [...page.matchAll(/^import .* from '([^']+)';$/gm)].map(m => m[1]);
+  const PUBLISHED = /shared\/net\/net\.js$/;
   for (const spec of imports) {
+    if (PUBLISHED.test(spec)) continue;
     assert.ok(!spec.startsWith('/shared/'), `${spec} is not served`);
     assert.ok(!/deployments\/mainnet\.json/.test(spec), 'the deployment record is not in the deploy root');
   }
-  // It reads ownership through the API instead, which is published.
-  assert.match(page, /\/api\/house\/deed\//);
-  assert.match(page, /\/api\/house\/history\//);
+  // It reads ownership through the API instead, which is published. The path prefix follows the
+  // network (`/api` on mainnet, `/tapi` on testnet), so the routes are named below the prefix.
+  assert.match(page, /\/house\/deed\//);
+  assert.match(page, /\/house\/history\//);
 });
 
 test('every shop in the menu is a real target that says what the shop does', () => {

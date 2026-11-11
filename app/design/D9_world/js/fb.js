@@ -12,7 +12,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 let started=false;
 function pushChron(d){ if(!d?.hash) return; const l=$('#clist'); if(!l||[...l.querySelectorAll('a')].some(a=>a.href.includes(d.hash))) return;
   const li=document.createElement('li'); li.className=d.decision==='denied'?'no':'ok'; li.innerHTML='<i></i><span class="w"></span><a target="_blank" rel="noopener"></a>';
-  li.querySelector('.w').textContent=d.decision==='denied'?'refused · new entry':'new entry'; const a=li.querySelector('a'); a.href='https://nearblocks.io/txns/'+d.hash; a.textContent=d.hash.slice(0,6)+'…'+d.hash.slice(-4); a.title='Open on the explorer';
+  li.querySelector('.w').textContent=d.decision==='denied'?'refused · new entry':'new entry'; const a=li.querySelector('a'); a.href=(globalThis.NEARCARTA_NET?.explorer||'https://nearblocks.io')+'/txns/'+d.hash; a.textContent=d.hash.slice(0,6)+'…'+d.hash.slice(-4); a.title='Open on the explorer';
   l.prepend(li); while(l.children.length>3) l.lastChild.remove(); const box=$('#chron'); if(box) box.hidden=false; }
 addEventListener('nearcarta:chronicle',e=>pushChron(e.detail));
 export async function fallback(why){ if(started) return; started=true; body.classList.add('fb','ready'); $('#fb2d').hidden=false; $('#loading').classList.add('done'); $('#c').style.display='none';

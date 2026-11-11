@@ -5,6 +5,7 @@
 // https://github.com/near/mpc/blob/main/crates/contract/README.md
 // Broadcast is a separate step. Paid on Base only after a success receipt.
 // https://docs.near.org/chain-abstraction/chain-signatures
+import { API_PATH, txUrl } from '../../../shared/net/net.js';
 import { checkDerived, TOLL_ADDRESS, TOLL_KEY } from '../toll-derive.js';
 import { tokenStack, bindTokenFallbacks } from './token-badge.js';
 import { armTollDock, installTollDock } from './toll-dock.js';
@@ -486,7 +487,7 @@ export function latestVisitorPass({ passTx, rows } = {}) {
 }
 
 export function describeVisitorPass(judged, { hash } = {}) {
-  const link = hash && /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(String(hash)) ? ` https://nearblocks.io/txns/${hash}` : '';
+  const link = hash && /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(String(hash)) ? ` ${txUrl(hash)}` : '';
   if (!judged || judged.ok === false || judged.receiver !== TOLL_ACCT || judged.decision !== 'allowed') {
     return { ok: false, text: 'This hash is not your pass to toll.nearcarta.near. Nothing moved on Base.' };
   }
@@ -501,8 +502,8 @@ export function prefetchTollPolicy(apiBase) {
   if (typeof fetch !== 'function') return null;
   const base = String(apiBase ?? (globalThis.NEARCARTA_API || '')).replace(/\/$/, '');
   policyPrefetch = Promise.all([
-    fetch(base + '/api/toll/live').then(r => r.json()).catch(() => null),
-    fetch(base + '/api/toll').then(r => r.json()).catch(() => null),
+    fetch(base + API_PATH + '/toll/live').then(r => r.json()).catch(() => null),
+    fetch(base + API_PATH + '/toll').then(r => r.json()).catch(() => null),
   ]).then(([live, recorded]) => ({ live, recorded }));
   return policyPrefetch;
 }
@@ -516,7 +517,7 @@ function txLinks(txs) {
     // Ledger tab with method names (toll_v8_upgrade_migrate, fund_toll, …) that are not a pass.
     const label = /not_allow|refus/i.test(k) ? 'Refused on NEAR' : /allow|pay/i.test(k) ? 'Allowed on NEAR' : null;
     if (!label) continue;
-    bits.push(`<a class="rc tx" data-testid="toll-record" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">${esc(label)}</a>`);
+    bits.push(`<a class="rc tx" data-testid="toll-record" href="${txUrl(esc(h))}" target="_blank" rel="noopener">${esc(label)}</a>`);
   }
   return bits.join(' ');
 }
@@ -548,7 +549,7 @@ export function tollMarkup(state = {}) {
   const ctaBlocked = state.pending || (needsRow ? false : !quote.payable);
   const ctaText = needsRow ? 'Sign in to pay' : payLabel;
   const passTx = state.passTx
-    ? `<a class="rc tx" data-testid="toll-pass-tx" href="https://nearblocks.io/txns/${esc(state.passTx)}" target="_blank" rel="noopener">NEAR pass</a>`
+    ? `<a class="rc tx" data-testid="toll-pass-tx" href="${txUrl(esc(state.passTx))}" target="_blank" rel="noopener">NEAR pass</a>`
     : '';
   const sig = state.sig ? `<p id="toll-sig-out" data-testid="check-signature-out">${esc(state.sig)}</p>` : '<p id="toll-sig-out" data-testid="check-signature-out"></p>';
   const recent = (live.recent || []).map(r => {
@@ -650,7 +651,7 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
     if (!owner) { state.rowAddress = null; state.balanceWords = ''; return; }
     state.walletOwner = owner;
     let got = null;
-    try { got = await fetch(apiBase + '/api/toll/address/' + encodeURIComponent(owner)).then(r => r.json()); }
+    try { got = await fetch(apiBase + API_PATH + '/toll/address/' + encodeURIComponent(owner)).then(r => r.json()); }
     catch { got = null; }
     state.rowAddress = got?.address || null;
     state.balanceWords = got?.address
@@ -697,7 +698,7 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
       return state.sig;
     }
     try {
-      const st = await fetch(apiBase + '/api/toll/pass/' + encodeURIComponent(mine.h) + '?sender=' + encodeURIComponent(sender)).then(r => r.json());
+      const st = await fetch(apiBase + API_PATH + '/toll/pass/' + encodeURIComponent(mine.h) + '?sender=' + encodeURIComponent(sender)).then(r => r.json());
       const words = describeVisitorPass(st, { hash: mine.h });
       state.sig = st?.text || words.text;
     } catch {

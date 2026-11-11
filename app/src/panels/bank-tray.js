@@ -1,6 +1,8 @@
 // Mist Bank city tray. One gold button per tab.
 // A card file is read here. A model audit sends those lines to NEAR AI and the server does not store them.
 
+import { API_PATH } from '../../../shared/net/net.js';
+import { txUrl } from '../../../shared/net/net.js';
 import { installBankDock, armBankDock, bankDockLog } from './bank-dock.js';
 import { parseBankAgent } from './bank-agent.js';
 import { liveTee } from '../tee-view.js';
@@ -82,10 +84,10 @@ function absUrl(path) {
   return base.replace(/\/$/, '') + path;
 }
 
-/** A mainnet tx on the explorer, for a proof-log row that names a real transaction. */
-function txUrl(hash) {
+/** A transaction on the explorer for a proof-log row that names a real hash, or nothing. */
+function proofUrl(hash) {
   const h = String(hash || '');
-  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(h) ? `https://nearblocks.io/txns/${h}` : '';
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(h) ? txUrl(h) : '';
 }
 
 function flow(right) {
@@ -264,7 +266,7 @@ export function bankMarkup(state) {
 async function readRate(currency) {
   if (!currency || currency === 'NEAR') return null;
   try {
-    const res = await fetch(`${apiBase()}/api/bank/rate?currency=${encodeURIComponent(currency)}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    const res = await fetch(`${apiBase()}${API_PATH}/bank/rate?currency=${encodeURIComponent(currency)}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, source: body.source || body.error || `The cap was not converted. Price desk HTTP ${res.status}.` };
     return body;
@@ -284,7 +286,7 @@ async function postAudit(rows, model) {
     })),
   };
   try {
-    const res = await fetch(`${apiBase()}/api/bank/audit`, {
+    const res = await fetch(`${apiBase()}${API_PATH}/bank/audit`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
@@ -500,7 +502,7 @@ export function mountBankRoom(root, hooks = {}) {
       anomalyCount: review.anomalies.length,
       nonce: state.nonce,
       eligible: okChain,
-      evidence: sent.tx ? [{ label: 'tighten_rules', url: txUrl(sent.tx) }] : [],
+      evidence: sent.tx ? [{ label: 'tighten_rules', url: proofUrl(sent.tx) }] : [],
     }));
 
     // The opt-in salted commitment is anchored only after the cap it commits to is on chain.
@@ -525,7 +527,7 @@ export function mountBankRoom(root, hooks = {}) {
             anomalyCount: review.anomalies.length,
             nonce: state.nonce,
             eligible: anchored,
-            evidence: a.tx ? [{ label: 'anchor', url: txUrl(a.tx) }] : [],
+            evidence: a.tx ? [{ label: 'anchor', url: proofUrl(a.tx) }] : [],
           }));
         } catch (e) {
           state.status2 = `Commitment not anchored: ${boardRefusal(e)}.`;
@@ -620,7 +622,7 @@ export function mountBankRoom(root, hooks = {}) {
     state.tab = 'log';
     paint();
     try {
-      const r = await fetch(`${apiBase()}/api/bank/proof`, { cache: 'no-store' });
+      const r = await fetch(`${apiBase()}${API_PATH}/bank/proof`, { cache: 'no-store' });
       const j = await r.json();
       const note = j.retention || j.proof?.retention || 'Request and response bytes are not stored.';
       state.fileNote = note;

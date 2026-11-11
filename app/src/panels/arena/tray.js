@@ -1,5 +1,6 @@
 // City tray for Vault Arena. Guardians, Attack, and Score use the Ferry card.
 // Mint and Attack call the same planner as the agent dock. Neither signs.
+import { API_PATH } from '../../../../shared/net/net.js';
 import { attackAt, advanceAttack } from '../../../design/D8_shops/shops/arenalive.js';
 import { NEXT_LABEL } from '../../../design/D8_shops/shops/arena-labels.js';
 import { tokenStack } from '../token-badge.js';
@@ -16,7 +17,7 @@ const near = () => tokenStack('NEAR', 'near', { size: 48, chainSize: 16 });
 function txHref(tx) {
   const h = String(tx || '');
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,}$/.test(h)) return '';
-  return 'https://nearblocks.io/txns/' + h;
+  return txUrl(h);
 }
 
 function flow(left, right) {
@@ -184,7 +185,7 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
 
   async function loadGuardians() {
     try {
-      const res = await fetch(api() + '/api/arena/guardians', { cache: 'no-store' });
+      const res = await fetch(api() + API_PATH + '/arena/guardians', { cache: 'no-store' });
       const body = await res.json();
       state.listError = false;
       state.guardians = Array.isArray(body.guardians) ? body.guardians : [];
@@ -205,7 +206,7 @@ export function mountArenaTray(root, hooks = {}, attackAttr, boxAttr) {
       return;
     }
     try {
-      const res = await fetch(api() + '/api/arena/score?player=' + encodeURIComponent(player), { cache: 'no-store' });
+      const res = await fetch(api() + API_PATH + '/arena/score?player=' + encodeURIComponent(player), { cache: 'no-store' });
       state.score = await res.json();
     } catch {
       state.score = { points: 0, source: 'get_attempt', error: 'The score did not answer.' };

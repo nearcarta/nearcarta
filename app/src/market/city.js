@@ -3,6 +3,7 @@
 // strip inside each shop panel (./quest-strip.js), the bag and the guide. The 3D cues (glowing door,
 // lit road, the Town Crier) live in the world (design/D9_world/js/quest.js). Until a player signs in,
 // the round is practice: the rules run in the browser and no transaction is sent.
+import { API_PATH, txUrl } from '../../../shared/net/net.js';
 import * as S from '/shared/market/sim.js';
 import { whyHtml, yoctoToNear } from '/market/why.js';
 import { ICON, iconFor } from '/market/icons.js';
@@ -155,8 +156,8 @@ const REAL_STEP = { seal: 'The Bank seals it for you and pays the gas', cargo: '
 const nearTxt = (y) => { const v = Number(BigInt(y || 0) / 10n ** 18n) / 1e6; return `${v.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} NEAR`; };
 const costLine = (s) => (!R.on() && R.DEMO_STEPS.includes(s.id) ? 'Real move, played with the city’s demo purse · the city pays the gas' : R.on() && REAL_STEP[s.id] ? `${REAL_STEP[s.id]} · no gas, the city pays it` : '<span class="qs-chip">Practice, no spend</span>');
 const receiptLine = (step, r) => {
-  if (r.real?.hash && r.real.demo) return `Played with the city’s demo purse · <a class="qs-proof" href="https://nearblocks.io/txns/${esc(r.real.hash)}" target="_blank" rel="noopener">Receipt ↗</a> · the city paid ${esc(r.real.burnt_near)} NEAR gas`;
-  if (r.real?.hash) return `<a class="qs-proof" href="https://nearblocks.io/txns/${esc(r.real.hash)}" target="_blank" rel="noopener">Receipt ↗</a> · you paid 0 NEAR${r.real.burnt_near ? `, the city paid ${esc(r.real.burnt_near)} NEAR gas` : ''}`;
+  if (r.real?.hash && r.real.demo) return `Played with the city’s demo purse · <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · the city paid ${esc(r.real.burnt_near)} NEAR gas`;
+  if (r.real?.hash) return `<a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · you paid 0 NEAR${r.real.burnt_near ? `, the city paid ${esc(r.real.burnt_near)} NEAR gas` : ''}`;
   return '<span class="qs-chip">Practice, no spend</span>';
 };
 function stripHtml(id) {
@@ -172,7 +173,7 @@ function stripHtml(id) {
     if (done === 'cargo') sub = `3 salt from the berths, no swap needed<br>${receiptLine(lastDone.step, r)}`;
     if (done === 'cross') sub = `Toll: 1 coin, taken at the sale<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
     if (done === 'check') sub = `✓ Square keeper: cleared<br>✗ Stranger: refused, not on your list<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
-    if (done === 'seal' && r.real?.hash) sub = `Check passed · the amount stays hidden<br>The Bank sealed it for you: <a class="qs-proof" href="https://nearblocks.io/txns/${esc(r.real.hash)}" target="_blank" rel="noopener">Receipt ↗</a> · ${esc(r.real.burnt_near)} NEAR gas, paid by the Bank<br>Your reveal key stays in this browser`;
+    if (done === 'seal' && r.real?.hash) sub = `Check passed · the amount stays hidden<br>The Bank sealed it for you: <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · ${esc(r.real.burnt_near)} NEAR gas, paid by the Bank<br>Your reveal key stays in this browser`;
     else if (done === 'seal') sub = `Check passed · the amount stays hidden<br>On chain the Bank logs only a fingerprint: <a class="qs-proof" href="${pr0.url}" target="_blank" rel="noopener">Bank anchor ↗</a> · ${pr0.cost} NEAR gas, paid by the Bank<br><span class="qs-chip">Your seal: practice, no spend</span>`;
     if (done === 'pay') sub = `Paid to: your porter · 3 coins from your purse · invoice #${Q.state(city).day} kept<br><span class="qs-chip">Practice, no spend</span>`;
     if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
@@ -229,7 +230,7 @@ addEventListener('world:keeper-tap', (e) => { if (!playing || walking || guiding
 // The keepers are real: their purse, till and shelf come from the market and their own wallets (GET /api/market/live).
 let live = null, liveAt = 0;
 async function liveMarket() { if (Date.now() - liveAt < 15000) return; liveAt = Date.now();
-  try { const r = await fetch(API() + '/api/market/live', { signal: AbortSignal.timeout(8000) }); if (r.ok) { live = await r.json(); if (view === 'keeper') render(); } } catch { /* the practice values stay */ } }
+  try { const r = await fetch(API() + API_PATH + '/market/live', { signal: AbortSignal.timeout(8000) }); if (r.ok) { live = await r.json(); if (view === 'keeper') render(); } } catch { /* the practice values stay */ } }
 setInterval(() => { if (playing && inShop && !lastDone && S.nodesAt(inShop).length) paintStrip(); }, 1000);
 
 // ---------- sheet: the bag and the guide ----------
@@ -258,7 +259,7 @@ function vReceipt() {
   const done = Q.STEPS.slice(0, Q.progress(city).done);
   const rows = done.map((x) => `<div class="md-row static"><span class="md-tok">${ICON.seal}</span><span class="md-nm"><b>${esc(NAME[x.shop])}</b><small>${esc(x.done)}</small></span>${x.proof ? `<a class="md-ghost sm" href="${x.proof.url}" target="_blank" rel="noopener" title="${esc(x.proof.label)}">Record ↗</a>` : ''}</div>`).join('');
   const txs = R.on() ? (R.live.txs || []) : [];
-  const real = txs.map((t) => `<div class="md-row static"><span class="md-tok">${ICON.coin}</span><span class="md-nm"><b>${esc(t.what)}</b><small>${esc(t.hash.slice(0, 10))}…${t.burnt ? ` · gas ${esc(t.burnt)} NEAR, paid by the city` : ''}</small></span><a class="md-ghost sm" href="https://nearblocks.io/txns/${encodeURIComponent(t.hash)}" target="_blank" rel="noopener">Tx ↗</a></div>`).join('');
+  const real = txs.map((t) => `<div class="md-row static"><span class="md-tok">${ICON.coin}</span><span class="md-nm"><b>${esc(t.what)}</b><small>${esc(t.hash.slice(0, 10))}…${t.burnt ? ` · gas ${esc(t.burnt)} NEAR, paid by the city` : ''}</small></span><a class="md-ghost sm" href="${txUrl(encodeURIComponent(t.hash))}" target="_blank" rel="noopener">Tx ↗</a></div>`).join('');
   return head(ICON.seal, 'Receipt', `${purse()} coins · ${done.length}/9 steps`)
     + (real ? `<h3 class="md-sub">Your moves on NEAR mainnet</h3><div class="md-list" data-testid="md-real-txs">${real}</div>` : '')
     + (rows ? `<div class="md-list">${rows}</div>` : '<p class="md-hint">Nothing yet. Your first stop is the Town Hall.</p>')
@@ -300,7 +301,7 @@ let replay = null;
 const ago = (t) => { const m = Math.max(1, Math.round((Date.now() - t) / 60000)); return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
 async function replayStart() {
   replay = { events: null, i: 0, t0: performance.now(), raf: 0, err: '' };
-  try { const r = await fetch(API() + '/api/market/history', { signal: AbortSignal.timeout(9000) }); const j = await r.json(); replay.events = j.events || []; } catch { replay.events = []; replay.err = 'The history did not load.'; }
+  try { const r = await fetch(API() + API_PATH + '/market/history', { signal: AbortSignal.timeout(9000) }); const j = await r.json(); replay.events = j.events || []; } catch { replay.events = []; replay.err = 'The history did not load.'; }
   if (view === 'week') render();
 }
 function replayTick() {
@@ -406,7 +407,7 @@ function vAsk() {
 root.addEventListener('submit', (e) => { if (!e.target.closest('.md-say')) return; e.preventDefault(); ask(e.target.querySelector('input').value); });
 async function think(text) {
   try {
-    const r = await fetch(API() + '/api/market/guide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }), signal: AbortSignal.timeout(12000) });
+    const r = await fetch(API() + API_PATH + '/market/guide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }), signal: AbortSignal.timeout(12000) });
     if (r.ok) { const j = await r.json(); if (j.intent) return j; }
   } catch {}
   return { intent: G.parseIntent(text), by: 'browser' };

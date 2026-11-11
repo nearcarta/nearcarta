@@ -1,8 +1,11 @@
 // Records shown in the dashboards. Every hash is in shared/deployments/mainnet.json.
 export const PROJECT_NAME = 'the Town';
 export const AGENT_NAME = 'the Lamplighter';
-export const NB = (h) => `https://nearblocks.io/txns/${h}`;
-export const NBA = (a) => `https://nearblocks.io/address/${a}`;
+// Recorded mainnet proofs. Every hash below is on mainnet, so these two stay nearblocks.io on every
+// network and the page labels them "Recorded on mainnet". A live link goes through NEARCARTA_NET.
+const MAIN_NB = 'https://nearblocks.io';
+export const NB = (h) => `${MAIN_NB}/txns/${h}`;
+export const NBA = (a) => `${MAIN_NB}/address/${a}`;
 
 export const CORE = {
   // The retired oath account is history. Every city read is the visitor board now:

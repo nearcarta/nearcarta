@@ -1,6 +1,7 @@
 // City and /shops/house/ tray. Deed, Vaults, Heirs.
 // One gold button. The AI Agent calls the same runHouseTurn. Neither signs.
 
+import { API_PATH } from '../../../shared/net/net.js';
 import { visitor } from '../../design/D8_shops/js/session.js';
 import { deedMarkup } from './deed.js';
 import { charterSetupCta } from './hall-ui.js';
@@ -317,7 +318,7 @@ export function mountHouseRoom(root, hooks = {}) {
   }
 
   let gen = 0;
-  const readRow = () => fetch(api() + '/api/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
+  const readRow = () => fetch(api() + API_PATH + '/board/row/' + encodeURIComponent(id), { cache: 'no-store' })
     .then(r => r.json())
     .then(body => normalizeRow(body));
   function start() {
@@ -351,7 +352,7 @@ export function mountHouseRoom(root, hooks = {}) {
   }
   start();
 
-  fetch(api() + '/api/house/deed/' + encodeURIComponent(id), { cache: 'no-store' })
+  fetch(api() + API_PATH + '/house/deed/' + encodeURIComponent(id), { cache: 'no-store' })
     // A 404 is a real state, not a failure: the visitor has no deed yet and the body carries
     // the mint plan. Treating it as null left the tray on its "Still opening" fallback with a
     // dead button, which is exactly what a first-time visitor sees.
@@ -365,16 +366,16 @@ export function mountHouseRoom(root, hooks = {}) {
       paintVault();
     })
     .catch(() => { state.deedError = 'The deed did not answer. Nothing was signed.'; paintVault(); });
-  fetch(api() + '/api/house/derived/' + encodeURIComponent(id), { cache: 'no-store' })
+  fetch(api() + API_PATH + '/house/derived/' + encodeURIComponent(id), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : Promise.reject(new Error('signer did not answer')))
     .then(body => { state.derived = body; paintVault(); })
     .catch(() => { state.derivedError = 'The signer did not answer. Nothing was signed.'; paintVault(); });
-  fetch(api() + '/api/house/line/' + encodeURIComponent(id), { cache: 'no-store' })
+  fetch(api() + API_PATH + '/house/line/' + encodeURIComponent(id), { cache: 'no-store' })
     .then(r => r.json())
     .then(body => { state.line = body; paintHeirs(); })
     .catch(() => { state.line = { live: false, why: 'house_line is not on this deed. Nothing was signed.' }; paintHeirs(); });
   // The NFT track asks for a history per deed. Every row here is a real transaction, linked.
-  fetch(api() + '/api/house/history/' + encodeURIComponent(id), { cache: 'no-store' })
+  fetch(api() + API_PATH + '/house/history/' + encodeURIComponent(id), { cache: 'no-store' })
     .then(r => r.json())
     .then(body => {
       const box = root.querySelector('[data-testid=house-history-body]');
@@ -392,7 +393,7 @@ export function mountHouseRoom(root, hooks = {}) {
         const d = new Date(n);
         return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
       };
-      box.innerHTML = `<ol class="house-hist-list">${rows.map(r => `<li data-testid="house-hist-row"><b>${esc(r.what)}</b> <span class="muted">${esc(when(r.at))}</span> <a href="https://nearblocks.io/txns/${esc(r.hash)}" target="_blank" rel="noopener" title="${esc(r.method)}">${esc(String(r.hash).slice(0, 10))}… ↗</a></li>`).join('')}</ol>`
+      box.innerHTML = `<ol class="house-hist-list">${rows.map(r => `<li data-testid="house-hist-row"><b>${esc(r.what)}</b> <span class="muted">${esc(when(r.at))}</span> <a href="${txUrl(esc(r.hash))}" target="_blank" rel="noopener" title="${esc(r.method)}">${esc(String(r.hash).slice(0, 10))}… ↗</a></li>`).join('')}</ol>`
         + (body?.gap ? `<p class="small muted">${esc(body.gap)}</p>` : '');
     })
     .catch(() => {

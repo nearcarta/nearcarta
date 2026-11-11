@@ -3,6 +3,7 @@
 // Re-arm the runner after every toll paint via armTollDock.
 // Sources: app/design/D8_shops/js/shopui.js wireTollDock; app/src/panels/toll-room.js runAgent.
 
+import { txUrl } from '../../../shared/net/net.js';
 let runner = null;
 let busy = false;
 let inflight = null;
@@ -26,7 +27,7 @@ export function tollDockLog(doc, text, extra = {}) {
   if (!el) return false;
   const msg = String(text || '');
   const tx = String(extra.tx || '');
-  const href = TX_HASH.test(tx) ? 'https://nearblocks.io/txns/' + tx : '';
+  const href = TX_HASH.test(tx) ? txUrl(tx) : '';
   el.hidden = !msg && !href;
   const docu = typeof document !== 'undefined' ? document : null;
   if (href && docu?.createElement && typeof el.replaceChildren === 'function') {

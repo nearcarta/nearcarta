@@ -2,6 +2,7 @@
 // moves go to the market contract on mainnet through the relayer; the rest stay as they are, with the
 // recorded transaction of the same action. The chain shows only in the Receipt. The signing code
 // (Privy and the delegate actions) loads only when the visitor asks to sign in: /market/play.bundle.js.
+import { API_PATH } from '../../../shared/net/net.js';
 import { precheck, goodsOf } from '/shared/relay/precheck.js';
 const KEY = 'nearcarta.marketday.live';
 const MILLI = 10n ** 21n;
@@ -80,7 +81,7 @@ export async function demo(id) {
   if (live.account || !DEMO_STEPS.includes(id)) return null;
   const api = (window.NEARCARTA_API || '').replace(/\/$/, '');
   try {
-    const r = await (await fetch(`${api}/api/merchant/step`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ step: id }) })).json();
+    const r = await (await fetch(`${api}${API_PATH}/merchant/step`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ step: id }) })).json();
     if (r.why === 'ERR_MERCHANT_PURSE') return { saving: true, have: r.have };
     if (!r.ok || !r.hash) return null;
     return { ...r, demo: true, total: r.total != null ? BigInt(r.total) : null };
@@ -96,7 +97,7 @@ async function sealProfit() {
   const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
   const digest = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${live.account}:${amount}:${salt}`)));
   const api = (window.NEARCARTA_API || '').replace(/\/$/, '');
-  const r = await (await fetch(`${api}/api/bank/seal`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: live.account, digest }) })).json().catch(() => ({ ok: false }));
+  const r = await (await fetch(`${api}${API_PATH}/bank/seal`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: live.account, digest }) })).json().catch(() => ({ ok: false }));
   if (!r.ok) return null; // the story step still runs as practice
   try { const all = JSON.parse(localStorage.getItem(SEALS) || '[]'); all.push({ account: live.account, amount, salt, digest, board_salt: r.board_salt, commitment: r.commitment, hash: r.hash, at: Date.now() }); localStorage.setItem(SEALS, JSON.stringify(all)); } catch {}
   return record('seal', 'The Bank sealed your purse', { ...r, by_bank: true });

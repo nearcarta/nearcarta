@@ -75,6 +75,16 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
   </details>
 </nav>
 <a id="rulesBtn" class="hud pill go" href="/setup/" data-testid="rules-cta" title="Sign in, fund, and sign the rules your agent cannot break"><span class="k" aria-hidden="true">&#9873;</span><span class="lab">Set your agent&rsquo;s rules</span><span class="cue" aria-hidden="true">Start here</span></a>
+<!-- Try free and the network badge. The gold action starts a free testnet account; the outlined one
+     opens the real-money sign-in. Both are filled in by app/src/net/chrome.js, which is the only place
+     that decides which network the page is on. -->
+<aside id="netChrome" class="hud net-chrome" data-testid="net-chrome">
+  <a id="tryFree" class="btn-gold" data-testid="try-free" href="#" role="button"><span class="k" aria-hidden="true">&#10022;</span><span class="lab">Try free</span></a>
+  <a id="signIn" class="btn-outline" data-testid="sign-in" href="/setup/" title="Sign in with email and set the rules your agent cannot break">Play for real</a>
+  <button id="netBadge" class="net-badge main" type="button" data-testid="net-badge" aria-haspopup="dialog"><span class="dot" aria-hidden="true"></span>MAINNET</button>
+  <p id="tryFreeNote" class="try-note" data-testid="try-free-note" aria-live="polite"></p>
+</aside>
+<p class="net-pitch" data-testid="net-pitch">Play the whole city on the NEAR test network. Real transactions, no money, no sign-up.</p>
 
 <nav id="ctl" class="hud" aria-label="Controls">
   <div id="playSeg" role="radiogroup" aria-label="How to get around">
@@ -144,6 +154,29 @@ try { if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.fo
   <div id="fbpins"></div>
 </div>
 
+<script type="module">
+// Try free, the real-money sign-in, and the network badge. This is the first module the page loads
+// and it is the only one that decides which network everything else is on.
+import('/shared/net/net.js').then(async (m) => {
+  try {
+    // Publish the shop names from the record the API serves, so no page hardcodes an account id.
+    const res = await fetch(m.api('/api/deployments'), { cache: 'no-store' });
+    if (res.ok) {
+      const dep = await res.json();
+      m.setShops({
+        market: dep.market?.contract || dep.planned?.arena,
+        board: dep.board?.contract,
+        house: dep.house?.contract || dep.extras?.house?.contract,
+        townhall: dep.townhall?.contract || dep.extras?.townhall?.contract,
+        guard: dep.guard?.contract,
+        toll: dep.toll?.contract,
+      });
+    }
+  } catch { /* the record did not answer: the published fallbacks stay */ }
+  const chrome = await import('/net/chrome.js');
+  chrome.installNetChrome();
+}).catch(() => { /* the town still opens without the guest path */ });
+</script>
 <script type="module">
 // Boot: decide 2D vs 3D first, so the 2D path never downloads three.js, GSAP or the models.
 // 3D needs a WebGL2 context. Software rasterisers (SwiftShader, llvmpipe) still run the town so the camera and walkers are visible.

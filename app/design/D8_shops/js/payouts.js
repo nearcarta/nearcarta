@@ -167,7 +167,7 @@ export function receiptsFor(rows, tx = '') {
       refund: r.refund ?? '',
       tx: tx || r.tx || '',
       destinationTx: r.destinationTx || '',
-      url: (tx || r.tx) ? `https://nearblocks.io/txns/${tx || r.tx}` : '',
+      url: (tx || r.tx) ? `${globalThis.NEARCARTA_NET?.explorer || 'https://nearblocks.io'}/txns/${tx || r.tx}` : '',
     };
   });
 }

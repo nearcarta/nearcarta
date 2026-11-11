@@ -634,7 +634,9 @@ function teePanel(t, again = true) {
 }
 
 // Toll: one step of a gate visit, read live from /api/toll/gate/<nonce> (gate record on NEAR + receipt on Base)
-const BSC = h => h ? `<a class="rc tx" data-testid="base-tx" href="https://nearblocks.io/txns/${esc(h)}" target="_blank" rel="noopener">${esc(short(h, 8, 4))} ↗</a>` : '';
+// The network answer, published on the page by shared/net/net.js.
+const netCfg = () => globalThis.NEARCARTA_NET || { explorer: 'https://nearblocks.io', apiPath: '/api' };
+const BSC = h => h ? `<a class="rc tx" data-testid="base-tx" href="${netCfg().explorer}/txns/${esc(h)}" target="_blank" rel="noopener">${esc(short(h, 8, 4))} ↗</a>` : '';
 const mins = s => Math.max(1, Math.round(s / 60));
 async function tollStep(v, act, o) {
   let st = await A.tollStatus(v.nonce);
@@ -819,7 +821,7 @@ async function sendPayoutRows(rows, opts = {}) {
     // Carry the board's reason: the tray prints it on the row, and without it a refused row
     // reads only "refused" while the chain said exactly why (measured in the city 2026-11-08).
     const reason = step && step.decision !== 'allowed' ? (step.reason || 'refused') : '';
-    return { n: i + 1, to: r.to, amount: r.amt, asset: 'NEAR', tx, url: tx ? `https://nearblocks.io/txns/${tx}` : '', status: step?.decision === 'allowed' ? 'sent' : (step ? 'refused' : 'not sent'), ...(reason ? { reason } : {}) };
+    return { n: i + 1, to: r.to, amount: r.amt, asset: 'NEAR', tx, url: tx ? `${netCfg().explorer}/txns/${tx}` : '', status: step?.decision === 'allowed' ? 'sent' : (step ? 'refused' : 'not sent'), ...(reason ? { reason } : {}) };
   });
   for (const r of parts.usdc) receipts.push({ n: receipts.length + 1, to: r.to, amount: r.amt, asset: 'USDC', tx: '', url: '', status: 'not sent' });
   extra.pay = o;
@@ -861,7 +863,7 @@ const APPS = {
         account: () => A.S.me || '',
         passes: () => tollPassRows(),
         onPay: (quote) => tollPay(quote),
-        onBroadcast: () => fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + '/api/toll/broadcast', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, text: 'The broadcast did not answer. Nothing moved on Base.' })),
+        onBroadcast: () => fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + netCfg().apiPath + '/toll/broadcast', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, text: 'The broadcast did not answer. Nothing moved on Base.' })),
         onBasePaid: () => { if (sh?.act && runScene) runScene(sh.act({ basePaid: true })); },
         hideRefuse: () => sh?.hideRefuse?.(),
         showRefuse: (text) => sh?.showRefuse?.(text),
@@ -1025,7 +1027,7 @@ const APPS = {
         check: async (acct) => {
           const charter = (A.S.board && A.S.me) ? A.S.me : (A.S.charter || '');
           if (charter) return A.checkPayee(acct);
-          const r = await fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + '/api/guardhouse/check/' + encodeURIComponent(acct));
+          const r = await fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + netCfg().apiPath + '/guardhouse/check/' + encodeURIComponent(acct));
           const j = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(j.error || 'The check did not answer.');
           return j;
@@ -1254,7 +1256,7 @@ function attestedLine() {
   }
   const c = a.checks?.[0], ok = c?.decision === 'allow';
   const tag = c ? `<span class="st ${ok ? 'ok' : 'no'}" data-testid="attested-decision">${ok ? '✓ allow' : '✕ ' + esc(c.decision)}</span>${!ok && c.reasons?.[0] ? ` <span class="why">${esc(c.reasons[0])}</span>` : ''}` : '<span class="note">No checks yet</span>';
-  const proofs = (a.runs || []).map(r => `<a class="tx" href="${esc(r.attestation)}" target="_blank" rel="noopener" aria-label="TEE attestation for the ${esc(r.label)} check">${r.decision === 'allow' ? '✓' : '✕'} ${esc(String(r.label || '').replace('_', ' '))} proof ↗</a> <a class="tx" href="https://nearblocks.io/txns/${esc(r.tx)}" target="_blank" rel="noopener" aria-label="Open the ${esc(String(r.label || ''))} check">${esc(short(r.tx, 6, 4))} ↗</a>`).join('<br>');
+  const proofs = (a.runs || []).map(r => `<a class="tx" href="${esc(r.attestation)}" target="_blank" rel="noopener" aria-label="TEE attestation for the ${esc(r.label)} check">${r.decision === 'allow' ? '✓' : '✕'} ${esc(String(r.label || '').replace('_', ' '))} proof ↗</a> <a class="tx" href="${netCfg().explorer}/txns/${esc(r.tx)}" target="_blank" rel="noopener" aria-label="Open the ${esc(String(r.label || ''))} check">${esc(short(r.tx, 6, 4))} ↗</a>`).join('<br>');
   const wasm = String(a.wasm_sha256 || '');
   return `<div data-testid="attested-check">` + kv('Attested check', tag) + kv('Checker', `OutLayer TEE · wasm <code title="${esc(wasm)}">${esc(wasm ? wasm.slice(0, 12) + '…' : '—')}</code>`)
     + kv('Proof', proofs) + kv('Proxy', idChip(a.proxy)) + `<p class="note">The row cap still decides on chain. This is an extra, independent check.</p></div>`;
@@ -1290,7 +1292,7 @@ function list(title, rows, empty = 'Nothing yet.') {
 
 // ---------- side panel: 1 your status, 2 one action, 3 the latest result, 4 history; everything technical under Details ----------
 let lab = '';
-const NBA = a => `https://nearblocks.io/address/${esc(a)}`;
+const NBA = a => `${netCfg().explorer}/address/${esc(a)}`;
 const prow = (k, why = '', v = '') => `<div class="row"><div class="k">${k}${why ? `<span class="why">${why}</span>` : ''}</div><div class="v">${v}</div></div>`;
 const kv = (k, v) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`;
 // a long account id, cut in the middle, with copy and explorer buttons (24 px targets)

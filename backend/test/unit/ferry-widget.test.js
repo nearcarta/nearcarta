@@ -15,9 +15,12 @@ test('the pay widget quotes a checkout and shows an embed snippet', () => {
   assert.doesNotMatch(html, /0\.20 USD/);
   assert.match(html, /The limit is your own row/);
   assert.match(js, /Your row sets the limit/);
-  assert.match(js, /\/api\/ferry\/checkout/);
-  assert.match(js, /\/api\/ferry\/rules/);
-  assert.match(js, /\/api\/ferry\/status/);
+  // The routes are named below the network's path prefix. ferry-pay.js turns `/api/...` into
+  // `${API_PATH}/...` (that is `/tapi` on testnet), so one file serves both services.
+  assert.match(js, /ferry\/checkout/);
+  assert.match(js, /ferry\/rules/);
+  assert.match(js, /ferry\/status/);
+  assert.match(js, /API_PATH/);
   assert.match(js, /data-testid="widget-pay"/);
   assert.match(js, /You send the tokens yourself/);
   assert.ok(vercel.rewrites.some(r => r.source === '/ferry-widget'));

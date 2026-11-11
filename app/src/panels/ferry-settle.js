@@ -8,6 +8,7 @@
 // https://docs.near.org/protocol/accounts-contracts/access-keys
 // https://github.com/near/NEPs/blob/master/neps/nep-0141.md
 
+import { txUrl } from '../../../shared/net/net.js';
 export const WRAP = 'wrap.near';
 // Primary session settle. The row cap decides whether this fits; when it does not,
 // depositPlan falls back to the you-send wallet path instead of a hardcoded USD limit.
@@ -164,7 +165,7 @@ export function wrapProgressNote({ amount = '', landed = [], failedReason = '', 
   const links = rows.map(s => ({
     hash: s.tx,
     method: s.method || '',
-    url: `https://nearblocks.io/txns/${s.tx}`,
+    url: txUrl(s.tx),
     label: `${s.method || 'tx'} ${shortTx(s.tx)}`,
   }));
   const wrap = rows.find(s => s.method === 'near_deposit');
@@ -255,7 +256,7 @@ export function agentDeliveredNote({ amount, symbol, txs, destTx, destChain } = 
   const text = amt ? `Delivered ${amt} ${sym}.` : `Delivered ${sym}.`;
   const links = hashes.map(hash => ({
     hash,
-    url: `https://nearblocks.io/txns/${hash}`,
+    url: txUrl(hash),
     label: `tx ${hash.slice(0, 8)}…`,
   }));
   const dest = destExplorer(destChain, destTx);
@@ -486,7 +487,7 @@ export function ferryStatusView({ status, amount, symbol, txs, destTx, destChain
   const hashes = (Array.isArray(txs) ? txs : []).filter(h => typeof h === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,88}$/.test(h));
   const links = hashes.map(hash => ({
     hash,
-    url: `https://nearblocks.io/txns/${hash}`,
+    url: txUrl(hash),
     label: `tx ${hash.slice(0, 8)}…`,
   }));
   const dest = destExplorer(destChain, destTx);

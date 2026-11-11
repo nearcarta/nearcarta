@@ -2,6 +2,7 @@
 // Sign sends set_rules / set_frozen / set_seal (1 yocto on loosening, refunded), then reads get_charter back.
 // This file does not sign until the visitor presses Sign.
 
+import { API_PATH } from '../../../shared/net/net.js';
 import { readSession, readSessionAccount, sessionPill, visitor } from '../../design/D8_shops/js/session.js';
 import { roomError } from '../room-error.js';
 import {
@@ -184,7 +185,7 @@ export async function mountHall(root, hooks = {}) {
       market: async () => {
         if (hooks.market) return hooks.market();
         try {
-          const m = await fetch(apiBase() + '/api/hall/market', { cache: 'no-store' }).then(r => r.json());
+          const m = await fetch(apiBase() + API_PATH + '/hall/market', { cache: 'no-store' }).then(r => r.json());
           if (m && typeof m === 'object') market = m;
         } catch { market = { ...market, blocked: 'market_unread' }; }
         return market;
@@ -240,7 +241,7 @@ export async function mountHall(root, hooks = {}) {
 
   async function readRow(id, { fresh = false } = {}) {
     const q = fresh ? `?fresh=1&t=${Date.now()}` : '';
-    const body = await fetch(apiBase() + '/api/board/row/' + encodeURIComponent(id) + q, { cache: 'no-store' }).then(r => r.json());
+    const body = await fetch(apiBase() + API_PATH + '/board/row/' + encodeURIComponent(id) + q, { cache: 'no-store' }).then(r => r.json());
     return normalizeRow(body) || (body?.row ? normalizeRow(body.row) : null);
   }
 
@@ -282,7 +283,7 @@ export async function mountHall(root, hooks = {}) {
       const box = () => root.querySelector('#result');
       if (sent?.hash) {
         if (box()) box().innerHTML = '<p data-testid="hall-pending">Waiting until the transaction is final…</p>';
-        await waitForFinal(() => fetch(apiBase() + '/api/tx-status/' + encodeURIComponent(sent.hash) + '?sender=' + encodeURIComponent(sent.signer || before.owner), { cache: 'no-store' }).then(r => r.json()).catch(() => ({ final: false, pass: false })));
+        await waitForFinal(() => fetch(apiBase() + API_PATH + '/tx-status/' + encodeURIComponent(sent.hash) + '?sender=' + encodeURIComponent(sent.signer || before.owner), { cache: 'no-store' }).then(r => r.json()).catch(() => ({ final: false, pass: false })));
       }
       if (box()) box().innerHTML = '<p data-testid="hall-pending">Reading the row again…</p>';
       const outcome = await readUntilChange({
@@ -343,7 +344,7 @@ export async function mountHall(root, hooks = {}) {
   async function loadLive() {
     const base = apiBase();
     try {
-      const m = hooks.market ? await hooks.market() : await fetch(base + '/api/hall/market', { cache: 'no-store' }).then(r => r.json());
+      const m = hooks.market ? await hooks.market() : await fetch(base + API_PATH + '/hall/market', { cache: 'no-store' }).then(r => r.json());
       if (m && typeof m === 'object') market = m;
     } catch {
       market = { ...market, blocked: 'market_unread' };

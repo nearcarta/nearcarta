@@ -113,9 +113,12 @@ export function tok(amount, sym, { chain = null, cls = '' } = {}) {
 }
 export const i3 = (n, size = 32) => `<img class="i3" src="${D7}assets/3dicons/192/${n}-premium.webp" alt="" width="${size}" height="${size}" decoding="async">`;
 export const onMainnet = () => true;
-export const NB = h => `https://nearblocks.io/txns/${h}`;
-export const NBM = h => `https://nearblocks.io/txns/${h}`;
-export const nbAddr = a => 'https://nearblocks.io/address/' + a;
+// The network answer, published on the page by shared/net/net.js. A fallback keeps a page that has
+// not loaded that module yet working on mainnet.
+const netCfg = () => globalThis.NEARCARTA_NET || { explorer: 'https://nearblocks.io', apiPath: '/api' };
+export const NB = h => `${netCfg().explorer}/txns/${h}`;
+export const NBM = h => `${netCfg().explorer}/txns/${h}`;
+export const nbAddr = a => `${netCfg().explorer}/address/${a}`;
 export const short = h => h.length > 14 ? h.slice(0, 6) + '…' + h.slice(-4) : h;
 export const txLink = h => `<a class="tx" href="${NB(h)}" target="_blank" rel="noopener">${short(h)} ↗</a>`;
 
