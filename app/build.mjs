@@ -35,6 +35,13 @@ await (await import('esbuild')).build({
   outfile: dist + '/market/live-guest.js', logLevel: 'warning',
   define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' },
 });
+// guest/key.js imports near-api-js through guest/near.js. The raw copy of that file names a bare package a
+// browser cannot resolve, so it is replaced by its bundle.
+await (await import('esbuild')).build({
+  entryPoints: [here + 'src/guest/near.js'], bundle: true, format: 'esm', target: 'es2022',
+  outfile: dist + '/guest/near.js', allowOverwrite: true, logLevel: 'warning',
+  define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' },
+});
 // The Ferry checks quotes with the server's own guard (dependency-free module), so the two cannot drift.
 cpSync(here + '../backend/src/ferry-guard.js', dist + '/live/ferry-guard.js');
 await (await import('esbuild')).build({ entryPoints: [here + 'src/ferry-pay.js'], bundle: true, format: 'iife', target: 'es2022', outfile: dist + '/ferry-pay.js', logLevel: 'warning' });
@@ -170,7 +177,7 @@ const scrubPairs = [
   [new RegExp(codes(117, 116, 101, 115, 116, 49), 'gi'), 'ucheck'],
 ];
 // Files the guest path owns, relative to dist.
-const GUEST_OWNED = [/^shared\/net\/net\.js$/, /^net\/chrome\.js$/, /^guest\/key\.js$/, /^market\/live-guest\.js$/, /^judges-run\.js$/, /^net\/scam\.js$/];
+const GUEST_OWNED = [/^shared\/net\/net\.js$/, /^net\/chrome\.js$/, /^guest\/key\.js$/, /^guest\/near\.js$/, /^market\/live-guest\.js$/, /^judges-run\.js$/, /^net\/scam\.js$/];
 function scrub(dir, base = '') {
   for (const name of readdirSync(dir)) {
     const path = dir + '/' + name;

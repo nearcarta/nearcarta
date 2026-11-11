@@ -14,9 +14,15 @@
 //       https://docs.near.org/tools/near-api · https://docs.near.org/protocol/accounts-contracts/access-keys
 //       https://docs.near.org/chain-abstraction/chain-signatures (the Toll's MPC signature)
 //       https://api-testnet.nearblocks.io/api-docs (the timeline v3 reads)
-import { NET, cfg, api, txUrl } from '../../../shared/net/net.js';
+import { NET, cfg, api, txUrl, setShops } from '../../../shared/net/net.js';
+import TESTNET from '../../../shared/deployments/testnet.json' with { type: 'json' };
 import { guestRecord, guestSigner, guestSecret, welcomeCrate, hasGuest } from '../guest/key.js';
 import { crossArgs } from '../board-call-as.js';
+
+// The shop accounts and the guest row defaults come from the testnet record. Nothing else on the page
+// installs them, and without them a row would open with no receivers. A page or harness that already
+// installed its own keeps them.
+if (NET === 'testnet' && !cfg.shops?.board) setShops(TESTNET.shops || {}, TESTNET.guest?.row || null);
 
 const TG = 10n ** 12n;
 const MILLI = 10n ** 21n;
