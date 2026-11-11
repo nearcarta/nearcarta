@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { KeyPair, KeyPairSigner, buildDelegateAction, actions, encodeSignedDelegate } from 'near-api-js';
 import { relay, decode, verifySig, session, ledger } from '../../src/relayer.js';
+import { checkKey } from '../../../shared/relay/policy.js';
 
 const MARKET = 'arena.nearcarta.near', BOARD = 'board.nearcarta.near';
 const T = 10n ** 12n;
@@ -123,4 +124,24 @@ test('relayer: a guest account is already funded, so the session tops up only it
   // does not exist, so it is refused rather than funded.
   const plain = await session(guestId, { acc, guestOf: '', viewAcc: async () => { throw new Error('missing'); }, storageOf: async () => 0n });
   assert.equal(plain.why, 'ERR_NO_ACCOUNT');
+});
+
+test('relayer: a guest key is full-access, and only a guest suffix makes that acceptable', async () => {
+  // A guest's key is the account's only key and it is FullAccess, so there is no function-call key to
+  // name instead. The relayer accepts it ONLY for an account whose name ends in the configured guest
+  // suffix, and only because checkDelegate has already confined the actions to zero-deposit market moves.
+  // Docs: https://docs.near.org/protocol/accounts-contracts/access-keys
+  const guestId = 'x7k2m9pqrs.play.nearcarta.testnet';
+  const { b64 } = await signed({ senderId: guestId });
+  const full = { nonce: 1, permission: 'FullAccess' };
+  // With the suffix configured, the guest's own full key is accepted.
+  assert.equal(checkKey(full, { senderId: guestId, nonce: 2 }, '', { guestSuffix: '.play.nearcarta.testnet' }).ok, true);
+  // Without it (a mainnet service), the same account is refused: the relayer will not act as a wallet.
+  assert.equal(checkKey(full, { senderId: guestId, nonce: 2 }, '').why, 'ERR_FULL_ACCESS_KEY');
+  // A named account that is NOT a guest is refused even when a suffix is configured.
+  assert.equal(checkKey(full, { senderId: 'someone.near', nonce: 2 }, '', { guestSuffix: '.play.nearcarta.testnet' }).why, 'ERR_FULL_ACCESS_KEY');
+  // The implicit-account case is unchanged.
+  const hex = 'ab'.repeat(32);
+  assert.equal(checkKey(full, { senderId: hex, nonce: 2 }, hex).implicit, true);
+  void b64;
 });

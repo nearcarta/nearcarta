@@ -83,7 +83,9 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
   const p = checkDelegate(sd, policy(c), { height }); if (!p.ok) return refuse(p.why);
   if (!verifySig(sd)) return refuse('ERR_SIGNATURE');
   const key = keyOf ? await keyOf(d.senderId, d.publicKey) : await rpc('query', { request_type: 'view_access_key', finality: 'final', account_id: d.senderId, public_key: b58pk(d.publicKey) }).catch(() => null);
-  const k = checkKey(key, d, Buffer.from(Uint8Array.from(d.publicKey.ed25519Key.data)).toString('hex')); if (!k.ok) return refuse(k.why);
+  // A guest key is FullAccess (its funder added it as the account's only key), so the policy is told
+  // which suffix marks a guest on this service. On mainnet that suffix is empty and nothing changes.
+  const k = checkKey(key, d, Buffer.from(Uint8Array.from(d.publicKey.ed25519Key.data)).toString('hex'), { guestSuffix }); if (!k.ok) return refuse(k.why);
   // A move the market would refuse for a balance is stopped here, so it never burns relayer gas.
   if (d.receiverId === c.market) {
     const calls = callsOf(d);
