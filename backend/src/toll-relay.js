@@ -1,6 +1,7 @@
 // Broadcast a toll raw transaction that is already signed on NEAR. This file does not sign NEAR.
 // https://docs.near.org/chain-abstraction/chain-signatures/implementation
 import { assembleTollLive, foreignExplorer, relayDecision } from '../../app/src/panels/toll-room.js';
+import { DEP } from './config.js';
 
 export function pickSigned(live) {
   const rows = live?.recent || [];
@@ -40,7 +41,15 @@ export async function relayById({ id, policy, txs, fetchImpl, rpc } = {}) {
 }
 
 /** Broadcast the newest signed raw tx the toll contract stored. Does not sign NEAR. */
-export async function broadcastLatest({ policy, txs, fetchImpl = fetch, rpc } = {}) {
+/**
+ * Whether this deployment broadcasts the signed foreign transaction. `false` on the guest network: there is
+ * no funded Base Sepolia key, and the signed transaction is shown instead. A mainnet deployment keeps `true`,
+ * so nothing about the mainnet path changes.
+ */
+export const BROADCAST_OFF = DEP?.base?.broadcast === false;
+
+/** A caller (or a test) may state it explicitly; the deployment's own record is the default. */
+export async function broadcastLatest({ policy, txs, fetchImpl = fetch, rpc, broadcastOff = BROADCAST_OFF } = {}) {
   const rows = txs || policy?.recent || [];
   const record = pickSigned({ recent: rows });
   const allow = (policy?.allow_to || []).map(s => String(s).toLowerCase());
@@ -53,6 +62,17 @@ export async function broadcastLatest({ policy, txs, fetchImpl = fetch, rpc } = 
   const receipt = record.tx_hash ? await receiptStatus(record.tx_hash, { fetchImpl, rpc }).catch(() => null) : null;
   if (receipt && Number(receipt.status) === 1 && explorer) {
     return { ok: true, step: 'paid', claim: 'paid', explorer, text: `Paid on Base. ${explorer}` };
+  }
+  // The network's own record says whether this service broadcasts at all. On the guest network there is no
+  // funded Base Sepolia key, so a signed transaction is SHOWN and NOT sent, and the answer says so in the
+  // same words the card uses. Nothing here can send it either way: the sender below is never called.
+  // Docs: https://docs.base.org/base-chain/quickstart/connecting-to-base
+  //       https://docs.near.org/chain-abstraction/chain-signatures
+  if (broadcastOff) {
+    return {
+      ok: false, step: 'signed', claim: 'signed', explorer, broadcast: { ok: false, skipped: true },
+      text: `Signed by NEAR's MPC network. This city does not broadcast ${chain || 'foreign'} transactions, so it was not sent. ${explorer ? explorer : ''}`.trim(),
+    };
   }
   const sent = await sendRawTransaction(record.raw_signed, { fetchImpl, rpc });
   return {
@@ -76,6 +96,17 @@ export async function relaySigned({ judged, policy, txs, fetchImpl, rpc }) {
   if (record?.tx_hash) receipt = await receiptStatus(record.tx_hash, { fetchImpl, rpc }).catch(() => null);
   const decision = relayDecision({ judged, quote, record, receipt });
   if (decision.step !== 'broadcast' || !record?.raw_signed) return { ...decision, broadcast: null };
+  // The network's own record says whether this service broadcasts at all. On the guest network there is no
+  // funded Base Sepolia key, so a signed transaction is SHOWN and NOT sent, and the answer says so in the
+  // same words the card uses. Nothing here can send it either way: the sender below is never called.
+  // Docs: https://docs.base.org/base-chain/quickstart/connecting-to-base
+  //       https://docs.near.org/chain-abstraction/chain-signatures
+  if (broadcastOff) {
+    return {
+      ok: false, step: 'signed', claim: 'signed', explorer, broadcast: { ok: false, skipped: true },
+      text: `Signed by NEAR's MPC network. This city does not broadcast ${chain || 'foreign'} transactions, so it was not sent. ${explorer ? explorer : ''}`.trim(),
+    };
+  }
   const sent = await sendRawTransaction(record.raw_signed, { fetchImpl, rpc });
   return {
     ...decision,
