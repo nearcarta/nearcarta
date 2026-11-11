@@ -25,7 +25,9 @@ function flow(left, right) {
 }
 
 function field(label, control) {
-  return `<label class="ferry-field">${esc(label)}${control}</label>`;
+  // The label is its own element, the way Swap's labels are, so the shared field rule can put it
+  // above the control. A bare text node had no box for that rule to measure.
+  return `<label class="ferry-field"><span class="lbl">${esc(label)}</span>${control}</label>`;
 }
 
 function input(name, value, placeholder) {
@@ -75,7 +77,7 @@ export function arenaHtml(state, attackAttr = 'data-testid="arena-attack"', boxA
     ? ''
     : guardians.length
       ? `<ul class="arena-guardians">${guardians.map(g => `<li><b>${esc(g.title || g.id)}</b> · ${brief(g)}</li>`).join('')}</ul>`
-      : '<p class="arena-status">No guardian is on this contract yet.</p>';
+      : '<p class="arena-status">No guardian yet. Create one to start.</p>';
   return `<div class="ferry-card" data-testid="arena-live">
     <div class="ferry-tabs" role="tablist">${tabBtn('guardians', 'Guardians')}${tabBtn('attack', 'Attack')}${tabBtn('score', 'Score')}</div>
     <div class="ferry-pane" data-pane="guardians" ${tab === 'guardians' ? '' : 'hidden'}>

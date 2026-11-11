@@ -20,9 +20,12 @@ function statusBlock(state, esc) {
   if (!score) {
     const bits = [];
     if (state.denyCount != null) bits.push(`${state.denyCount} on the live deny list.`);
-    bits.push(attLine || 'Server-side: age, code hash, lookalike, deny list. The row cap is on chain.');
+    bits.push(attLine || 'Server-side: age, code hash, lookalike, deny list.');
+    bits.push('Your spend limit is enforced.');
     if (state.notice) bits.push(state.notice);
-    return `<p class="guard-status" data-testid="guard-attested">${esc(bits.join(' '))}</p>`;
+    // The reference shows a checklist: one line per fact, each with its own tick. The same
+    // sentences as before, one per row, so the panel reads at a glance instead of as a paragraph.
+    return `<div class="guard-status" data-testid="guard-attested">${bits.map(b => `<p class="guard-check"><span class="guard-tick" aria-hidden="true">✓</span><span>${esc(b)}</span></p>`).join('')}</div>`;
   }
   const flagged = (score.lines || []).filter(l => l.level === 'warn' || l.level === 'block' || l.level === 'unknown');
   const reasons = flagged.map(l => `<span data-testid="guard-reason">${esc(l.text)}</span>`).join(' · ');

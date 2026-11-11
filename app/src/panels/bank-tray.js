@@ -141,17 +141,21 @@ export function bankMarkup(state) {
   const audit = `<section class="bank-pane" data-pane="audit" data-testid="bank-pane-audit" ${tab === 'audit' ? '' : 'hidden'}>
       <div class="bank-scroll" data-testid="bank-scroll">
       ${review ? `<button type="button" class="bank-again" data-testid="bank-again">Audit another statement</button>` : `<p class="bank-format" data-testid="bank-format">Accepted format: ${esc(FORMAT_LINE)}.</p>
-      <div class="bank-row">
+      <div class="bank-row field">
         <label class="choice-label" for="bank-sample" data-testid="bank-sample-label">Sample</label>
         <select id="bank-sample" data-testid="bank-sample">${SAMPLES.map(s => `<option value="${s.id}"${state.sample === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
         <button type="button" class="bank-sample-link" data-testid="bank-sample-file">Download</button>
       </div>
       <div class="bank-split">
-        <div>
+        <div class="field">
           <label class="choice-label" for="bank-file">Statement file</label>
-          <input id="bank-file" data-testid="bank-file" type="file" accept=".csv,text/csv,text/plain">
+          <div class="bank-file-row">
+            <input id="bank-file" data-testid="bank-file" type="file" accept=".csv,text/csv,text/plain">
+            <label class="bank-file-btn" for="bank-file">Choose file</label>
+            <span class="bank-file-name" data-testid="bank-file-name">No file chosen</span>
+          </div>
         </div>
-        <div>
+        <div class="field">
           <label class="choice-label" for="bank-paste">Or paste</label>
           <textarea id="bank-paste" data-testid="bank-paste" rows="2" placeholder="merchant, amount">${esc(state.paste || '')}</textarea>
         </div>
@@ -769,6 +773,10 @@ export function mountBankRoom(root, hooks = {}) {
     const file = root.querySelector('#bank-file');
     if (file) file.addEventListener('change', () => {
       const picked = file.files && file.files[0];
+      // The visible name, since the native control is sr-only: the file's own name, or the
+      // unchanged "No file chosen" when the picker was dismissed.
+      const nameEl = root.querySelector('[data-testid=bank-file-name]');
+      if (nameEl) nameEl.textContent = picked ? picked.name : 'No file chosen';
       if (!picked) return;
       if (picked.size > 6000) {
         state.pendingRows = null;

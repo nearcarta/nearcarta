@@ -129,7 +129,11 @@ test('O3 arena actions have a gap and the attack box is tall', async ({ page }) 
     const sameRow = b.y < a.y + a.height;
     const gap = sameRow ? b.x - (a.x + a.width) : b.y - (a.y + a.height);
     expect(gap).toBeGreaterThanOrEqual(10);
-    const box = await page.locator('#a-txt').boundingBox();
+    // The textarea is created by the tab's own paint, which can land a frame after the tab
+    // reports selected; waiting for it is the difference between a real failure and a race.
+    const boxEl = page.locator('#a-txt');
+    await expect(boxEl).toBeVisible();
+    const box = await boxEl.boundingBox();
     expect(box.height).toBeGreaterThan(100);
     await noSideways(page);
     await shot(page, 'o3-arena-' + width);

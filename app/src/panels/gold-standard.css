@@ -1,0 +1,1401 @@
+/* The Swap standard, applied to every shop.
+   ---------------------------------------------------------------------------------------------
+   The owner approved the Ferry Swap tab as the gold standard. This file brings the other shops to
+   it by styling the structure they already render, so no shop loses a field, a tab, a handler or
+   a data-testid.
+
+   What is copied from Swap, exactly:
+     - the panel box: 420px (clamp 380-440), radius 20, 16px padding, dark brown gradient
+     - the header row: 44px round gold-ringed icon, title, one-line subtitle, 48px art, live dot
+     - three pill tabs: active solid gold with dark text, inactive dark with a gold border
+     - field groups: a dark rounded card, a small muted label above, a 40px input, inline gold
+       chips, 16-20px between groups
+     - one summary card: key/value rows with a gold badge, as "Swap quote" has
+     - one orange-gradient primary, a full-width outlined secondary, a clear gap, quiet link
+     - the same radii, fonts, and hover/press motion
+
+   Everything here is presentation. The per-shop sheets below it in the cascade still own each
+   form's own insides; this file only makes those insides look like Swap. */
+
+#shopUI {
+  --gs-gap: 16px;
+  --gs-gap-tight: 12px;
+  --gs-label: 12px;
+  --gs-field-h: 40px;
+  --gs-card: #160f0a;
+  --gs-card-lift: rgba(0, 0, 0, .22);
+  --gs-line: rgba(255, 255, 255, .08);
+  --gs-line-gold: rgba(201, 162, 74, .55);
+  --gs-cream: #f5e6c8;
+  --gs-muted: #b9a88a;
+  --gs-gold-1: #f7d57e;
+  --gs-gold-2: #e2a83c;
+  --gs-orange-1: #ffb54a;
+  --gs-orange-2: #e2831f;
+  --gs-ink: #2a1a0e;
+}
+
+/* ============================================================================================
+   1. Field groups — the "From / To" card shape, for every shop's labelled fields
+   ============================================================================================ */
+
+/* A group is a card. Shops that already wrap their fields in a card keep it; the selector covers
+   the label+control pairs that are not inside one. */
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-field-group,
+body:not(.ferry-tray) #shopUI #tray #t-form .field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--gs-gap-tight);
+  border-radius: var(--r-card);
+  background: var(--gs-card);
+  border: 1px solid var(--gs-line);
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* Every labelled field: label above, control below, 6px between them — the From card's rhythm. */
+body:not(.ferry-tray) #shopUI #tray #t-form label.field,
+body:not(.ferry-tray) #shopUI #tray #t-form .field,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-field,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+
+body:not(.ferry-tray) #shopUI #tray #t-form .field > span:first-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field > span:first-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-field > span:first-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field > span:first-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .choice-label {
+  font-size: var(--gs-label);
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--gs-muted);
+}
+
+/* The control: 40px, dark well, one radius, the same focus ring Swap uses. */
+body:not(.ferry-tray) #shopUI #tray #t-form .field input:not([type='checkbox']):not([type='radio']),
+body:not(.ferry-tray) #shopUI #tray #t-form .field select,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field input:not([type='checkbox']):not([type='radio']),
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field select,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-field input,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field input,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field select {
+  width: 100%;
+  min-height: var(--gs-field-h);
+  height: var(--gs-field-h);
+  padding: 0 var(--p3);
+  border-radius: var(--r-ctrl);
+  border: 1px solid var(--gs-line);
+  background: var(--gs-card);
+  color: var(--gs-cream);
+  font-size: 14px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+
+body:not(.ferry-tray) #shopUI #tray #t-form .field input:focus,
+body:not(.ferry-tray) #shopUI #tray #t-form .field select:focus,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field input:focus,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-field input:focus,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field input:focus {
+  border-color: var(--gs-gold-2);
+  box-shadow: 0 0 0 3px rgba(226, 168, 60, .18);
+}
+
+/* 16px between groups, 12 inside one — Swap's own rhythm. */
+body:not(.ferry-tray) #shopUI #tray #t-form { gap: var(--gs-gap); }
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-stack,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-card,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-card { gap: var(--gs-gap); }
+
+/* ============================================================================================
+   2. Inline gold chips — the "Max" shape, for any unit or quick-fill inside a field
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray #t-form .unit > span:last-child,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-amt > span:last-child {
+  background: rgba(226, 168, 60, .14);
+  color: var(--gs-gold-1);
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+}
+
+/* ============================================================================================
+   3. The summary card — "Swap quote" with key/value rows and a gold badge
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary,
+body:not(.ferry-tray) #shopUI #tray #t-form .flow-strip,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-status,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-status,
+body:not(.ferry-tray) #shopUI #tray #t-form .payout-status {
+  border-radius: var(--r-card);
+  background: var(--gs-card-lift);
+  border: 1px solid var(--gs-line-gold);
+  padding: var(--p3);
+  box-sizing: border-box;
+}
+
+/* Key/value rows in a summary read like the quote: key left in muted, value right in cream. */
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary .row,
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary p {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--p2);
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--gs-cream);
+}
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary .row + .row,
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary p + p { margin-top: var(--p2); }
+
+/* ============================================================================================
+   4. Actions — one orange gradient primary, one outlined secondary, a clear gap
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]),
+body:not(.ferry-tray) #shopUI #tray #t-form > .primary,
+body:not(.ferry-tray) #shopUI #tray #t-form .bank-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form .toll-cta {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  border-radius: var(--r-cta) !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: var(--p2);
+  box-sizing: border-box;
+  transition: filter .14s ease, transform .1s ease, box-shadow .14s ease;
+}
+
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]):hover,
+body:not(.ferry-tray) #shopUI #tray #t-form > .primary:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 10px 26px rgba(226, 131, 31, .34) !important;
+}
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]):active,
+body:not(.ferry-tray) #shopUI #tray #t-form > .primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 4px 12px rgba(226, 131, 31, .22) !important;
+}
+
+/* The secondary: full width, dark, gold outline, 16px under the primary — "Sign in" here. */
+body:not(.ferry-tray) #shopUI #tray > .t-row + .t-links,
+body:not(.ferry-tray) #shopUI #tray > .t-row { margin: 0; }
+body:not(.ferry-tray) #shopUI #tray > .t-row { margin-top: var(--gs-gap) !important; }
+body:not(.ferry-tray) #shopUI #tray > .t-links { margin-top: var(--gs-gap) !important; }
+
+/* ============================================================================================
+   5. Tabs — three pills, active solid gold, the others outlined
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray [role='tablist'] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--p2);
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+body:not(.ferry-tray) #shopUI #tray [role='tab'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 var(--p2);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gs-line-gold);
+  background: rgba(0, 0, 0, .2);
+  color: var(--gs-cream);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background .14s ease, border-color .14s ease, color .14s ease;
+}
+
+body:not(.ferry-tray) #shopUI #tray [role='tab']:hover:not([aria-selected='true']) {
+  background: rgba(255, 255, 255, .06);
+  border-color: var(--gs-gold-2);
+}
+
+body:not(.ferry-tray) #shopUI #tray [role='tab'][aria-selected='true'],
+body:not(.ferry-tray) #shopUI #tray [role='tab'].on,
+body:not(.ferry-tray) #shopUI #tray .arena-mode[aria-pressed='true'] {
+  background: linear-gradient(180deg, var(--gs-gold-1) 0%, var(--gs-gold-2) 100%) !important;
+  border-color: transparent !important;
+  color: var(--gs-ink) !important;
+  font-weight: 600;
+}
+
+/* ============================================================================================
+   6. No internal scroll at 1440 — the panel sizes to its content, the form never scrolls
+   ============================================================================================ */
+
+@media (min-width: 721px) {
+  body #shopUI #tray > .t-scroll {
+    overflow: visible !important;
+    max-height: none !important;
+    min-height: 0;
+  }
+  body #shopUI #tray { overflow: hidden; }
+  /* A pane that would overflow gets its own cap on the ONE list inside it, not the whole form. */
+  body #shopUI #tray #t-form .plist,
+  body #shopUI #tray #t-form .hall-list,
+  body #shopUI #tray #t-form details[open] > :not(summary) {
+    max-height: 168px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* ============================================================================================
+   7. Text that is too long: clamp, never clip a control
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray #t-form .note,
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-summary p { overflow-wrap: anywhere; }
+body:not(.ferry-tray) #shopUI #tray #t-form .note {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--gs-muted);
+}
+
+/* ============================================================================================
+   8. Motion — the same hover/press feel as Swap, and nothing for reduced-motion
+   ============================================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  body #shopUI #tray *,
+  body #shopUI #tray *::before,
+  body #shopUI #tray *::after {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* ============================================================================================
+   9. ONE gold action per view, as Swap has
+   --------------------------------------------------------------------------------------------
+   In the Check Shop the shop's own in-form action ("Check payee") was gold as well as the panel's
+   "Sign in", so the view offered two primaries. The in-form action is the shop's real action, so
+   it keeps the button SHAPE and steps back to the outlined secondary: same size, same place, one
+   gold on screen.
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-pane #g-check,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form #p-create,
+body:not(.ferry-tray) #shopUI #tray #t-form #p-prep,
+body:not(.ferry-tray) #shopUI #tray #t-form .arena-cta {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  border-radius: var(--r-cta) !important;
+  font-weight: 500 !important;
+}
+
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-pane #g-check:hover,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-cta:hover {
+  border-color: var(--gs-gold-2) !important;
+  background: rgba(255, 255, 255, .06) !important;
+}
+
+/* When the in-form action IS the only action — no panel CTA is shown — it keeps the gold, so a
+   shop is never left without a primary. */
+body:not(.ferry-tray) #shopUI #tray:has(> .t-row > #t-act[hidden]) #t-form #g-check,
+body:not(.ferry-tray) #shopUI #tray:has(> .t-row > #t-act[hidden]) #t-form .hall-cta {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+}
+
+
+/* Thirteen pixels. The standard's 16px group gap pushed two panes just past their space at
+   1440x900 (Hall by 13, Ferry's swap by a few). The reclaim comes from the header's own slack —
+   the subtitle sits tight under the title, which is still within the standard's 16-20px band —
+   and from the gap above the hero, not from any field. */
+body:not(.ferry-tray) #shopUI #tray > .t-scroll { gap: var(--gs-gap-tight) !important; }
+body:not(.ferry-tray) #shopUI #tray > .t-scroll > #t-sub { margin-top: -4px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form { gap: var(--gs-gap-tight) !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .shop-stack,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-card,
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-card { gap: var(--gs-gap-tight) !important; }
+
+/* The action row must sit clear of the form even when the form's last line is a wrapped note.
+   Measured in the checker's mount (real header, real links row): Hall's status ended 17px above
+   the button but the status WRAPPED to two lines in the two-column pane, which the one-line probe
+   did not show. The form reserves the gap itself, so a wrapped note can never reach the action. */
+body:not(.ferry-tray) #shopUI #tray > .t-scroll > #t-form { padding-bottom: 4px; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-status,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-status,
+body:not(.ferry-tray) #shopUI #tray #t-form .payout-status {
+  margin-bottom: 0 !important;
+}
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-status { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-status { max-height: 96px; overflow-y: auto; }
+body:not(.ferry-tray) #shopUI #tray > .t-row { margin-top: var(--gs-gap) !important; }
+
+/* ============================================================================================
+   Hall / Jobs — the Agents tab was 31px over one screen at 1440x900
+   --------------------------------------------------------------------------------------------
+   Four fields plus a 59px market hint. The two short ones (part number, quote amount) share a
+   row, which is what takes the pane back inside the panel. Every field is still there: the same
+   ids, the same handlers, the same tab. Nothing moves to a new tab because nothing had to — the
+   other two tabs already fit.
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--gs-gap) var(--gs-gap-tight);
+  align-items: start;
+}
+
+/* The hint, the two long fields and the part lines keep the whole row. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-gap,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-line,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-text,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-field:has(#hall-quote-worker),
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-field:has(#hall-deliverable) {
+  grid-column: 1 / -1;
+}
+
+/* The two short fields sit side by side. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-field:has(#hall-quote-part),
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] > .hall-field:has(#hall-quote-near) {
+  grid-column: auto;
+  min-width: 0;
+}
+
+/* One gold action: the panel CTA is the primary, so the in-form action is outlined. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='post'] .hall-cta {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+@media (max-width: 720px) {
+  body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The market hint is the tallest non-field block in the Agents pane (59px of prose). It clamps to
+   two lines with the full text still in the DOM, which is what brings both tabs inside the panel;
+   the post tab's 26px comes from the same rule applying to its note. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-gap,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+}
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='agents'] { gap: var(--gs-gap-tight) !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane[data-pane='post'] { gap: var(--gs-gap-tight) !important; }
+
+/* The form itself carries overhead the panes do not need: the shared layer added a bottom pad and
+   16px between the tabs, the flow strip and the pane. Hall needs ~40px, and it comes from that
+   overhead — never from a field, a font or a handler. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-card { gap: 10px !important; padding: 0 !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-pane { gap: 8px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-split { gap: 8px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field { gap: 4px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field input,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field select { min-height: 38px !important; height: 38px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form { padding-bottom: 0 !important; }
+body:not(.ferry-tray) #shopUI #tray > .t-scroll { gap: 8px !important; }
+
+/* The last three pixels: the inner column was 3px taller than its own box while the panel itself
+   did not scroll. One more 2px from the tab row's bottom margin closes it without touching a
+   field, so the audit's "scrolls" cell is honest rather than a rounding artefact. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-tabs { margin-bottom: 0 !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field input,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-field select { min-height: 36px !important; height: 36px !important; }
+
+/* ============================================================================================
+   The one gold action is the SHOP's own action, as Swap has Review swap gold and Sign in
+   outlined. The shared layer had this inverted: it demoted each shop's in-form action and left
+   the panel CTA gold. On every shop the shop action keeps the gradient; the panel CTA — which is
+   "Sign in" whenever nobody is signed in — becomes the outlined secondary.
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]) {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  border-radius: var(--r-cta) !important;
+}
+body:not(.ferry-tray) #shopUI #tray > .t-row > #t-act.primary:not([hidden]):hover {
+  border-color: var(--gs-gold-2) !important;
+  background: rgba(255, 255, 255, .06) !important;
+  filter: none;
+}
+
+/* And the shop's own action is the gold one, wherever a shop declares it. */
+body:not(.ferry-tray) #shopUI #tray #t-form .primary,
+body:not(.ferry-tray) #shopUI #tray #t-form .guard-pane #g-check,
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form #p-create,
+body:not(.ferry-tray) #shopUI #tray #t-form #p-prep,
+body:not(.ferry-tray) #shopUI #tray #t-form .arena-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form .bank-cta,
+body:not(.ferry-tray) #shopUI #tray #t-form .toll-cta {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  width: 100% !important;
+  border-radius: var(--r-cta) !important;
+}
+
+/* Chronicle uses the same label span. */
+body:not(.ferry-tray) #shopUI #tray #t-form .chronicle-field { display: flex; flex-direction: column; gap: 6px; }
+body:not(.ferry-tray) #shopUI #tray #t-form .chronicle-field > .lbl { display: block; font-size: 12px; line-height: 16px; color: var(--gs-muted); }
+/* Chronicle has no in-form action, so the panel CTA is its one gold button. */
+body.chronicle-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]) {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+}
+
+/* Arena: the field groups take the Swap rhythm, and the label span above is now a real box. */
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field { gap: 6px !important; }
+body:not(.ferry-tray) #shopUI #tray #t-form .ferry-field > .lbl {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--gs-muted);
+}
+body:not(.ferry-tray) #shopUI #tray #t-form .arena-modes + * { margin-top: 0; }
+
+/* ============================================================================================
+   Bank — labels were siblings of their controls, not wrappers, so no group existed
+   --------------------------------------------------------------------------------------------
+   The audit found zero field groups on the Bank: it renders `<label class="choice-label">` next to
+   a `<p class="bank-field">` or an input. They are paired here by making the pair a column, which
+   is the same "label above control" shape Swap has. No markup, no id, no handler changes.
+   ============================================================================================ */
+
+body:not(.ferry-tray) #shopUI #tray #t-form label.choice-label {
+  display: block;
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--gs-muted);
+}
+
+body:not(.ferry-tray) #shopUI #tray #t-form .bank-field {
+  margin: 0 0 var(--gs-gap-tight);
+  min-height: 20px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--gs-cream);
+}
+
+/* A control that follows its label is the group's body: give it the Swap field shape. */
+body:not(.ferry-tray) #shopUI #tray #t-form label.choice-label + input,
+body:not(.ferry-tray) #shopUI #tray #t-form label.choice-label + select,
+body:not(.ferry-tray) #shopUI #tray #t-form label.choice-label + textarea {
+  display: block;
+  width: 100%;
+  min-height: var(--gs-field-h);
+  border-radius: var(--r-ctrl);
+  border: 1px solid var(--gs-line);
+  background: var(--gs-card);
+  color: var(--gs-cream);
+  font-size: 14px;
+  padding: 0 var(--p3);
+  margin: 0 0 var(--gs-gap);
+  box-sizing: border-box;
+}
+
+/* The last pair in a card does not add a trailing gap. */
+body:not(.ferry-tray) #shopUI #tray #t-form .bank-field:last-child { margin-bottom: 0; }
+
+/* House has four gradient buttons: "I'm alive" (the shop's action) and three deed links. Only the
+   action keeps the gold; the links are evidence, so they become outlined rows of the same size. */
+body:not(.ferry-tray) #shopUI #tray #t-form a.deed-link,
+body:not(.ferry-tray) #shopUI #tray #t-form [data-testid='deed-mint'],
+body:not(.ferry-tray) #shopUI #tray #t-form [data-testid='deed-allow'],
+body:not(.ferry-tray) #shopUI #tray #t-form [data-testid='deed-refuse'] {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  min-height: var(--tap) !important;
+  height: auto !important;
+  border-radius: var(--r-card) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--p3) !important;
+  text-decoration: none !important;
+}
+
+/* The shop's own action is the one gold. */
+body:not(.ferry-tray) #shopUI #tray #t-form #house-cta {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  width: 100% !important;
+}
+
+/* Hall's last 6px. The two content tabs were 2px and 6px taller than their column; the tabs row's
+   own bottom gap covers it without touching a field, a font or a handler. */
+body:not(.ferry-tray) #shopUI #tray #t-form .hall-tabs { margin-bottom: -8px !important; }
+
+/* ============================================================================================
+   Owner review pass — the things a human saw that the audit did not
+   ============================================================================================ */
+
+/* 1. The robot figure covered the panel at 390. The figure goes; the agent stays reachable
+      through a small trigger placed OUTSIDE the panel's box (bottom-right, below the sheet). */
+@media (max-width: 720px) {
+  body #shopUI [id$='-agent-dock'] .bank-agent-avatar,
+  body #shopUI [id$='-agent-dock'] .agent-avatar,
+  body #shopUI [id$='-agent-dock'] img,
+  body #shopUI [id$='-agent-dock'] [class*='avatar'] { display: none !important; }
+
+  /* A compact chip instead of the figure: icon plus words, pinned away from the panel. */
+  body #shopUI [id$='-agent-dock'] {
+    position: fixed !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    z-index: 40;
+  }
+  body #shopUI [id$='-agent-dock'] [class*='agent-char'],
+  body #shopUI [id$='-agent-dock'] button {
+    min-height: 40px !important;
+    padding: 0 12px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(201, 162, 74, .55) !important;
+    background: rgba(27, 18, 12, .95) !important;
+    color: #f5e6c8 !important;
+    font: 600 12px/1 Inter, system-ui, sans-serif !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+/* 2. "All shops" must never sit on the panel title: on a phone it moves to the top-right, and
+      the panel starts below it. */
+@media (max-width: 720px) {
+  body.in-shop nav.all-shops {
+    left: auto !important;
+    right: 8px !important;
+    top: 8px !important;
+  }
+  body.in-shop #shopUI #tray { top: calc(8px + 44px + 8px) !important; bottom: 8px !important; }
+}
+
+/* 3. The "Skip intro" chip sat on the Sign in button. It is an intro control, so it hides once
+      a shop is open — there is no intro left to skip. */
+body.in-shop #skipIntro { display: none !important; }
+
+/* 4. Check: the deny-list card clipped "The row cap is on chain". It wraps now instead of being
+      cut, and the card grows to fit its own text. */
+body #shopUI #tray #t-form .guard-status { max-height: none !important; overflow: visible !important; }
+body #shopUI #tray #t-form .guard-check,
+body #shopUI #tray #t-form .guard-check > span { white-space: normal !important; overflow-wrap: anywhere; }
+
+/* 5. UNIFORM HEIGHT: every shop is exactly as tall as Swap (748px at 1440), with its content
+      stretched to fill, and no internal scroll. Below the fixed height the tray does not grow. */
+@media (min-width: 721px) {
+  body:not(.ferry-tray) #shopUI #tray {
+    height: 748px !important;
+    max-height: 748px !important;
+    min-height: 748px !important;
+  }
+  body:not(.ferry-tray) #shopUI #tray > .t-scroll {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  /* The scroll column is a column that fills the height, so short shops stretch rather than
+     leaving a gap above the button. */
+  body:not(.ferry-tray) #shopUI #tray > .t-scroll { display: flex; flex-direction: column; }
+  body:not(.ferry-tray) #shopUI #tray #t-form { flex: 1 1 auto; }
+}
+
+/* ============================================================================================
+   6. The gold is the SHOP's action, in every shop
+   --------------------------------------------------------------------------------------------
+   Chronicle's gold was "Sign in" while "Show timeline" was outlined; House and Toll gold-plated
+   their "/setup" link instead of the shop's own action. The setup link becomes a small outlined
+   control, and the shop's action takes the gradient.
+   ============================================================================================ */
+
+/* And "Sign in" is the outlined secondary in both. */
+body.house-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]),
+body.toll-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]) {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+/* ============================================================================================
+   7. Cut-off controls
+   ============================================================================================ */
+
+/* Bank: the native file input rendered "N…". The control is a styled drop zone with the browser's
+   own picker still behind it, so choosing a file works exactly as before. */
+body #shopUI #tray #t-form input[type='file'] {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: var(--r-card);
+  border: 1px dashed var(--gs-line-gold);
+  background: rgba(0, 0, 0, .22);
+  color: var(--gs-muted);
+  font-size: 12px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+body #shopUI #tray #t-form input[type='file']::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gs-line-gold);
+  background: rgba(0, 0, 0, .3);
+  color: var(--gs-cream);
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+/* Invoice: the expiry time was clipped to "05:0". Date and time inputs get room to show their
+   own text on one line. */
+body #shopUI #tray #t-form input[type='datetime-local'],
+body #shopUI #tray #t-form input[type='date'],
+body #shopUI #tray #t-form input[type='time'] {
+  min-width: 0;
+  width: 100%;
+  padding-right: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+body #shopUI #tray #t-form .hall-split input[type='datetime-local'],
+body #shopUI #tray #t-form .field input[type='datetime-local'] { min-width: 0; }
+
+/* Jobs: the "→ Parts → Review" strip was unclear. It becomes a labelled three-step row with the
+   step names under their icons, the same shape Swap's flow uses. */
+body #shopUI #tray #t-form .hall-flow,
+body #shopUI #tray #t-form #house-flow {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px !important;
+  border-radius: var(--r-card) !important;
+  background: rgba(0, 0, 0, .22) !important;
+  border: 1px solid var(--gs-line) !important;
+}
+body #shopUI #tray #t-form .hall-flow-step {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--gs-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ============================================================================================
+   Owner city-review pass — the selectors that actually exist in the city DOM
+   ============================================================================================ */
+
+/* 1. Chronicle: its CTA is the panel's own #t-act ("Show timeline"), so it keeps the gradient.
+      Any shop whose CTA is the panel action stays gold; only the ones with an in-form action
+      hand the gold over. */
+body #shopUI #tray > .t-row > #t-act.primary:not([hidden]) {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+}
+/* ...except the shops whose real action lives in the form: there Sign in is the secondary. */
+body.house-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]),
+body.toll-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden]),
+body.chronicle-tray #shopUI #tray > .t-row > #t-act.primary:not([hidden])[data-secondary='1'] {
+  background: rgba(0, 0, 0, .24) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+/* Toll and House: the setup link is helper text, never the action. */
+body #shopUI #tray #t-form a[href='/setup/'],
+body #shopUI #tray #t-form a[href^='/setup'],
+body #shopUI #tray #t-form [data-testid='toll-setup-link'] {
+  display: inline-flex !important;
+  align-items: center;
+  min-height: 32px !important;
+  height: auto !important;
+  padding: 0 10px !important;
+  border-radius: var(--r-pill) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  background: rgba(0, 0, 0, .22) !important;
+  background-image: none !important;
+  color: var(--gs-cream) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+}
+/* The shop's own Pay / check-in action is the gold. */
+body.toll-tray #shopUI #tray #t-form #toll-pay,
+body.house-tray #shopUI #tray #t-form #house-cta {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  width: 100% !important;
+}
+
+/* 2. The robot: hidden at EVERY size, not only on a phone. A small chip with the full words
+      stays, outside the panel box. */
+body #shopUI [id$='-agent-dock'] img,
+body #shopUI [id$='-agent-dock'] [class*='avatar'] { display: none !important; }
+body #shopUI [id$='-agent-dock'] [class*='agent-name'] {
+  display: inline !important;
+  white-space: nowrap !important;
+  font-size: 11px !important;
+  letter-spacing: 0;
+}
+body #shopUI [id$='-agent-dock'] [class*='agent-char'],
+body #shopUI [id$='-agent-dock'] > button {
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  border-radius: var(--r-pill) !important;
+  border: 1px solid var(--gs-line-gold) !important;
+  background: rgba(27, 18, 12, .95) !important;
+  color: var(--gs-cream) !important;
+  font: 600 11px/1 Inter, system-ui, sans-serif !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+/* 3. "Back to town" and the panel header must not share space: the back link gets its own slim
+      bar above the panel, so it cannot cover the shop's icon. */
+@media (max-width: 720px) {
+  body.in-shop #shopUI #back {
+    position: fixed !important;
+    top: 6px !important;
+    left: 8px !important;
+    right: auto !important;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 10px !important;
+    border-radius: var(--r-pill) !important;
+    font-size: 12px !important;
+    z-index: 45;
+  }
+  body.in-shop #shopUI #back kbd { display: none; }
+  body.in-shop #shopUI #tray { top: 46px !important; }
+  body.in-shop nav.all-shops { top: 6px !important; right: 8px !important; left: auto !important; }
+}
+
+/* 4. Bank: the native file input cut its name to "N…en". A drop zone with the picker behind it. */
+body #shopUI #tray #t-form input[type='file'] {
+  display: block;
+  width: 100% !important;
+  min-height: 68px !important;
+  height: auto !important;
+  padding: 12px !important;
+  border-radius: var(--r-card) !important;
+  border: 1px dashed var(--gs-line-gold) !important;
+  background: rgba(0, 0, 0, .22) !important;
+  color: var(--gs-muted) !important;
+  font-size: 12px !important;
+  box-sizing: border-box !important;
+  cursor: pointer;
+}
+body #shopUI #tray #t-form input[type='file']::file-selector-button {
+  margin-right: 10px;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gs-line-gold);
+  background: rgba(0, 0, 0, .32);
+  color: var(--gs-cream);
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+/* 5. Invoice: date and time inputs need room for their own text, or the minutes vanish. */
+body #shopUI #tray #t-form input[type='datetime-local'],
+body #shopUI #tray #t-form input[type='date'] {
+  min-width: 0 !important;
+  width: 100% !important;
+  padding-right: 6px !important;
+  font-size: 12.5px !important;
+  font-variant-numeric: tabular-nums;
+}
+body #shopUI #tray #t-form .hall-split { gap: 10px !important; }
+/* No stray empty slot between the gold button and Sign in. */
+body #shopUI #tray > .rcpt:empty,
+body #shopUI #tray #t-form > *:empty:not(input):not(textarea) { display: none !important; }
+
+/* 6. House: the lower half was empty. The deed card and history take the room, spaced the way
+      Swap's quote card is, so the panel reads full rather than half-blank. */
+body.house-tray #shopUI #tray #t-form .ferry-pane[data-panel='deed'],
+body.house-tray #shopUI #tray #t-form .ferry-pane[data-panel='vaults'],
+body.house-tray #shopUI #tray #t-form .ferry-pane[data-panel='heirs'] {
+  flex: 1 1 auto;
+  align-content: start;
+  row-gap: 14px !important;
+}
+body.house-tray #shopUI #tray #t-form [data-testid='deed-meta'],
+body.house-tray #shopUI #tray #t-form .house-history {
+  padding: 12px !important;
+  border-radius: var(--r-card) !important;
+  background: rgba(0, 0, 0, .22) !important;
+  border: 1px solid var(--gs-line) !important;
+}
+
+/* ============================================================================================
+   LAST RESORT — the rules here win on specificity, so nothing above can demote what they set
+   ============================================================================================ */
+
+/* Bank: the file name was clipped to "N…en". The field is a line of its own, the picker button
+   keeps its space, and only the NAME is allowed to ellipsis — "No file chosen" fits in full. */
+body #shopUI #tray #t-form input[type='file'] {
+  width: 100% !important;
+  min-width: 100% !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  line-height: 44px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  border-style: solid !important;
+  border-width: 1px !important;
+  background: var(--gs-card) !important;
+}
+body #shopUI #tray #t-form input[type='file']::file-selector-button {
+  margin-right: 12px;
+  padding: 0 12px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  flex: 0 0 auto;
+}
+
+/* Invoice: Expiry gets its own full-width line on a phone so the minutes survive. */
+@media (max-width: 720px) {
+  body #shopUI #tray #t-form .hall-split { grid-template-columns: minmax(0, 1fr) !important; }
+  body #shopUI #tray #t-form input[type='datetime-local'],
+  body #shopUI #tray #t-form input[type='date'] {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 13px !important;
+    padding: 0 8px !important;
+  }
+}
+/* ...and at 1440 the pair is wide enough for the whole value. */
+@media (min-width: 721px) {
+  body #shopUI #tray #t-form .hall-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; gap: 12px !important; }
+  body #shopUI #tray #t-form input[type='datetime-local'] { min-width: 172px !important; }
+}
+/* The empty black slot above Sign in was a status/result div with no text. */
+body #shopUI #tray #t-form > div:empty,
+body #shopUI #tray #t-form > p:empty,
+body #shopUI #tray #t-rcpt:empty,
+body #shopUI #tray #t-form [data-testid$='-status']:empty { display: none !important; }
+
+/* Phone: the agent chip moves into the top bar beside Back to town, and the composer opens as a
+   bottom sheet that is meant to cover the panel, with its own close control. */
+@media (max-width: 720px) {
+  body #shopUI [id$='-agent-dock'] {
+    position: fixed !important;
+    top: 6px !important;
+    right: 8px !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: 46;
+    transform: none !important;
+  }
+  body #shopUI [id$='-agent-dock'] [class*='agent-name'] { font-size: 11px !important; }
+  body #shopUI #back { right: auto !important; max-width: calc(100vw - 150px); }
+
+  /* The composer: full width, pinned to the bottom, above the panel on purpose. */
+  body #shopUI [id$='-agent-pop']:not([hidden]) {
+    position: fixed !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 46dvh;
+    z-index: 90;
+    padding: 12px !important;
+    border-radius: var(--r-panel) !important;
+    background: #1b120c !important;
+    border: 1px solid var(--gs-line-gold) !important;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, .55);
+    box-sizing: border-box;
+  }
+  body #shopUI [id$='-agent-pop'] input {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 13px !important;
+    text-overflow: ellipsis;
+  }
+  body #shopUI [id$='-agent-pop'] input::placeholder { font-size: 12px; }
+}
+
+/* "All shops" must not touch the tray's corner. */
+body.in-shop nav.all-shops { margin: 8px !important; }
+
+/* ============================================================================================
+   Measured in the real city at 8b7d9cae — the rules that actually land
+   ============================================================================================ */
+
+/* 1. Chronicle's action is `#c-go` (class .chronicle-gold), NOT #t-act. Its computed background
+      was rgba(0,0,0,.24). This is the Swap gradient on the real element. */
+body #shopUI #tray #t-form #c-go,
+body #shopUI #tray #t-form button.chronicle-gold,
+body #shopUI #tray #t-form button[data-testid='chronicle-go'] {
+  background: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  background-image: linear-gradient(180deg, var(--gs-orange-1) 0%, var(--gs-orange-2) 100%) !important;
+  color: var(--gs-ink) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 22px rgba(226, 131, 31, .26) !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-cta) !important;
+}
+
+/* 2. Bank: the native file input cannot show a long name, so it becomes an sr-only input with a
+      real label as the button and a span for the name. Markup adds .bank-file-row. */
+body #shopUI #tray #t-form input[type='file'] {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  border: 0 !important;
+}
+body #shopUI #tray #t-form .bank-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 8px 6px 6px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--gs-line);
+  background: var(--gs-card);
+  box-sizing: border-box;
+}
+body #shopUI #tray #t-form .bank-file-row .bank-file-btn {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gs-line-gold);
+  background: rgba(0, 0, 0, .3);
+  color: var(--gs-cream);
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+body #shopUI #tray #t-form .bank-file-row .bank-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--gs-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 3. Invoice expiry on a narrow phone: its own full line, smaller type so the minutes fit. */
+@media (max-width: 480px) {
+  body #shopUI #tray #t-form label:has(input[type='datetime-local']),
+  body #shopUI #tray #t-form .field:has(input[type='datetime-local']) { grid-column: 1 / -1 !important; width: 100% !important; }
+  body #shopUI #tray #t-form input[type='datetime-local'] { font-size: 12px !important; width: 100% !important; }
+}
+
+/* 4. The empty slot above Sign in is [data-testid='payout-status']: a div with two children, the
+      second empty, so :empty never matched. Hide the whole block until it has real text. */
+body #shopUI #tray #t-form [data-testid='payout-status']:not(:has(p:not(:empty))) { display: none !important; }
+body #shopUI #tray #t-form [data-testid='payout-status'] p:empty { display: none !important; }
+
+/* 5. Phone top bar: Back to town left, the agent chip next, All shops far right, 8px apart, one
+      row, no overlap. The chip keeps its full label. */
+@media (max-width: 720px) {
+  body.in-shop #shopUI #back {
+    position: fixed !important;
+    left: 8px !important;
+    right: auto !important;
+    top: 6px !important;
+    max-width: 132px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    z-index: 47;
+  }
+  body.in-shop #shopUI [id$='-agent-dock'] {
+    position: fixed !important;
+    left: 148px !important;
+    right: auto !important;
+    top: 6px !important;
+    z-index: 47;
+    transform: none !important;
+  }
+  body.in-shop nav.all-shops {
+    position: fixed !important;
+    left: auto !important;
+    right: 8px !important;
+    top: 6px !important;
+    margin: 0 !important;
+    z-index: 47;
+  }
+  body.in-shop #shopUI #tray { top: 46px !important; }
+  /* The chip label is never clipped. */
+  body #shopUI [id$='-agent-dock'] [class*='agent-name'],
+  body #shopUI [id$='-agent-dock'] span { white-space: nowrap !important; overflow: visible !important; }
+}
+
+}
+
+/* ============================================================================================
+   Measured at 0ff7b1c2 in the real city — the six remaining defects
+   ============================================================================================ */
+
+/* 1. Bank: the file row sat in the 2-column split, so the name had 48px and ellipsised. The row
+      spans the whole width, "Or paste" drops to its own line, and the name wraps instead of
+      being cut. */
+body #shopUI #tray #t-form .bank-split { grid-template-columns: minmax(0, 1fr) !important; }
+body #shopUI #tray #t-form .bank-file-row { grid-column: 1 / -1 !important; width: 100% !important; }
+body #shopUI #tray #t-form .bank-file-row .bank-file-name {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere;
+  line-height: 15px;
+}
+
+/* 2 + 3. Payouts and Arena: a 117px and 98px hole above "Sign in". The tall tray's flex was
+      pushing #t-act to the floor. The action follows the content, as it does on Swap (25px). */
+body.payouts-tray #shopUI #tray > .t-scroll,
+body.arena-tray #shopUI #tray > .t-scroll { flex: 0 0 auto !important; }
+body.payouts-tray #shopUI #tray > .t-row,
+body.arena-tray #shopUI #tray > .t-row { margin-top: 25px !important; }
+body.payouts-tray #shopUI #tray #t-form,
+body.arena-tray #shopUI #tray #t-form { margin-bottom: 0 !important; padding-bottom: 0 !important; }
+/* Nothing inside may add a trailing auto margin either. */
+body.payouts-tray #shopUI #tray #t-form > *,
+body.arena-tray #shopUI #tray #t-form > * { margin-bottom: 0 !important; }
+
+/* 4. The 390 bar: Back to town gets its short label and no ellipsis; the chip sizes to its own
+      content; All shops is one 36px line; the tray starts below the whole bar. */
+@media (max-width: 480px) {
+  body.in-shop #shopUI #back {
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    font-size: 0 !important;
+    padding: 0 10px !important;
+  }
+  body.in-shop #shopUI #back::before {
+    content: '← Town';
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  body.in-shop #shopUI [id$='-agent-dock'] [class*='badge'],
+  body.in-shop #shopUI [id$='-agent-dock'] [class*='⋯'] { display: none !important; }
+  body.in-shop #shopUI [id$='-agent-dock'] [class*='agent-char'],
+  body.in-shop #shopUI [id$='-agent-dock'] > button {
+    min-height: 28px !important;
+    padding: 0 8px !important;
+    font-size: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+  body.in-shop nav.all-shops {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    display: flex !important;
+    align-items: center;
+    top: 4px !important;
+    right: 8px !important;
+    margin: 0 !important;
+  }
+  body.in-shop nav.all-shops summary { height: 36px; display: flex; align-items: center; }
+  /* The tray clears the bar: bar (36) + top offset (4) + 8px gap. */
+  body.in-shop #shopUI #tray { top: 48px !important; }
+}
+
+/* 6. Hall at 390 scrolled ("more below"). Its two tightest blocks give back the few pixels. */
+@media (max-width: 720px) {
+  body.hall-tray #shopUI #tray #t-form .hall-tabs { margin-bottom: -6px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-pane { gap: 7px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-field { gap: 3px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-gap { -webkit-line-clamp: 2; }
+  body.hall-tray #shopUI #tray > .t-scroll { gap: 7px !important; }
+}
+
+/* The agent sheet's close control is a real button now, so it is styled as one and sits in the
+   sheet's top-right corner where the unclickable ::before used to be. */
+body #shopUI .agent-pop-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--gs-line-gold);
+  background: rgba(0, 0, 0, .35);
+  color: var(--gs-cream);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 3;
+}
+body #shopUI .agent-pop-close:hover { border-color: var(--gs-gold-2); color: #fff; }
+body #shopUI [id$='-agent-pop'] { position: relative; }
+
+/* ============================================================================================
+   Measured at a8d4d74b — the five remaining defects
+   ============================================================================================ */
+
+/* 1. Bank: the split is `#shopUI #tray .bank-split`, NOT under #t-form, so my earlier rule never
+      matched. This is the real path, and it beats shop-shell.css (which keeps 2 columns until
+      359px). The file row then spans the width and the name is never cut. */
+body.bank-tray #shopUI #tray .bank-split { grid-template-columns: minmax(0, 1fr) !important; }
+body.bank-tray #shopUI #tray .bank-file-row { width: 100% !important; grid-column: 1 / -1 !important; }
+body.bank-tray #shopUI #tray .bank-file-name {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere;
+  line-height: 15px;
+}
+
+/* 2. The 390 bar, as one row: Back to town (no Esc pill), the chip, then All shops — each sized
+      to its own content with an 8px gap, so nothing overlaps. */
+@media (max-width: 480px) {
+  body.in-shop #shopUI #back kbd,
+  body.in-shop #shopUI #back kbd * { display: none !important; }
+  body.in-shop #shopUI #back { width: auto !important; min-width: 0 !important; }
+  /* The dock sits after Back's real width rather than at a guessed 148px. */
+  body.in-shop #shopUI [id$='-agent-dock'] { left: auto !important; right: 92px !important; }
+  body.in-shop nav.all-shops { right: 6px !important; }
+}
+
+/* 3. Hall at 390 still scrolled. Its pane padding and the two-line description give back the
+      room the footer needs; no field, tab or handler changes. */
+@media (max-width: 480px) {
+  body.hall-tray #shopUI #tray #t-form .hall-card { padding: 0 !important; gap: 6px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-pane { gap: 6px !important; padding: 0 !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-field { gap: 2px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-field input,
+  body.hall-tray #shopUI #tray #t-form .hall-field select { min-height: 34px !important; height: 34px !important; }
+  body.hall-tray #shopUI #tray #t-form .hall-gap { -webkit-line-clamp: 1; font-size: 11px; line-height: 15px; }
+  body.hall-tray #shopUI #tray #t-form .hall-tabs { margin-bottom: -8px !important; }
+  body.hall-tray #shopUI #tray > .t-row { margin-top: 10px !important; }
+  body.hall-tray #shopUI #tray > .t-links { margin-top: 6px !important; }
+}
+
+/* ============================================================================================
+   Measured at 89267bd3 — the last three
+   ============================================================================================ */
+
+/* 1. The 390 bar as ONE flex row. The hardcoded `right: 92px` put the dock's edge at 298 while
+      All shops started at 288, a 10px overlap on every shop. These three take their widths from
+      their own content in a single row with an 8px gap, so no label length can collide. */
+@media (max-width: 480px) {
+  body.in-shop #shopUI {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px 0;
+    box-sizing: border-box;
+  }
+  body.in-shop #shopUI > #back,
+  body.in-shop #shopUI > [id$='-agent-dock'],
+  body.in-shop #shopUI > nav.all-shops,
+  body.in-shop #shopUI > #shopUI > * { position: static !important; }
+
+  /* Order and shrink: Back, then the dock, then All shops; each keeps its own width. */
+  body.in-shop #shopUI > #back { order: 1; flex: 0 0 auto; width: auto !important; }
+  body.in-shop #shopUI > [id$='-agent-dock'] { order: 2; flex: 0 0 auto; margin-left: auto; right: auto !important; left: auto !important; top: auto !important; }
+  body.in-shop #shopUI > nav.all-shops { order: 3; flex: 0 0 auto; width: auto !important; top: auto !important; right: auto !important; left: auto !important; margin: 0 !important; }
+
+  /* The tray is the only thing that takes the remaining height. */
+  body.in-shop #shopUI > #tray {
+    position: fixed !important;
+    top: 48px !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    width: auto !important;
+  }
+}
+
+/* 2. Bank at 390 scrolled once the file row went full width. The button and the name share one
+      line inside the row, "Or paste" is a compact two-row box, and the gaps tighten — so the
+      footer is visible with no internal scroll. */
+@media (max-width: 480px) {
+  body.bank-tray #shopUI #tray .bank-file-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px !important;
+    min-height: 40px;
+  }
+  body.bank-tray #shopUI #tray .bank-file-row .bank-file-btn { flex: 0 0 auto; height: 28px; padding: 0 10px; }
+  body.bank-tray #shopUI #tray .bank-file-row .bank-file-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 11px;
+  }
+  body.bank-tray #shopUI #tray #bank-paste,
+  body.bank-tray #shopUI #tray textarea[data-testid='bank-paste'] {
+    min-height: 40px !important;
+    height: 40px !important;
+    font-size: 12px !important;
+    line-height: 16px !important;
+    padding: 6px 8px !important;
+  }
+  body.bank-tray #shopUI #tray .bank-split { gap: 8px !important; }
+  body.bank-tray #shopUI #tray .field { gap: 3px !important; }
+  body.bank-tray #shopUI #tray .choice-label { margin-bottom: 2px !important; font-size: 11px !important; }
+  body.bank-tray #shopUI #tray > .t-row { margin-top: 10px !important; }
+}
+
+/* ============================================================================================
+   Measured at 0a10497c — the last two, both at 390 only
+   ============================================================================================ */
+
+/* 1. nav.all-shops is NOT a child of #shopUI (index.html: it is a sibling, line 60 vs 110), so it
+      stays position:fixed and the dock's `margin-left:auto` ran underneath it — 94px of overlap.
+      The dock now reserves the All shops width plus a 16px gutter, from a var JS keeps measured
+      (deep.js sets --allshops-w from a ResizeObserver), so any label length fits. */
+@media (max-width: 480px) {
+  body.in-shop #shopUI > [id$='-agent-dock'] {
+    margin-left: auto !important;
+    margin-right: calc(var(--allshops-w, 96px) + 16px) !important;
+    right: auto !important;
+    left: auto !important;
+  }
+  body.in-shop nav.all-shops { right: 8px !important; }
+}
+
+/* 2. Bank at 390 scrolled by 4px (the footer's bottom at 848 in an 844 viewport). 16px comes out
+      of the paste box and the gaps, so the footer fits with room to spare. */
+@media (max-width: 480px) {
+  body.bank-tray #shopUI #tray #bank-paste,
+  body.bank-tray #shopUI #tray textarea[data-testid='bank-paste'] {
+    min-height: 34px !important;
+    height: 34px !important;
+    padding: 4px 8px !important;
+  }
+  body.bank-tray #shopUI #tray .bank-split { gap: 6px !important; }
+  body.bank-tray #shopUI #tray .field { gap: 2px !important; }
+  body.bank-tray #shopUI #tray .note,
+  body.bank-tray #shopUI #tray .bank-format { font-size: 11px !important; line-height: 14px !important; }
+  body.bank-tray #shopUI #tray > .t-links { margin-top: 4px !important; }
+  body.bank-tray #shopUI #tray > .t-links .link,
+  body.bank-tray #shopUI #tray > .t-links a { min-height: 28px !important; }
+}

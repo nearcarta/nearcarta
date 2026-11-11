@@ -222,11 +222,13 @@ test('typing ZEC or USDC filters both lists and keeps the chain filter', () => {
   assert.match(html, /value="zec"/);
   assert.match(html, /data-testid="ferry-chain-filter"/);
   assert.match(html, /4 live tokens/);
-  assert.match(html, /ZEC on zec/);
-  assert.doesNotMatch(html, /USDC on base/);
+  // The closed pill shows the token NAME only ("ZEC"), as the reference does; the full
+  // "SYMBOL on chain" text is the option's value, which is what filtering and the menu use.
+  assert.match(html, /data-value="ZEC\|zec"/);
+  assert.doesNotMatch(html, /data-value="USDC\|base"/);
   const usdc = ferryMarkup({ tq: 'usdc', choices, fromId: 'USDC|base', toId: 'ZEC|zec' });
-  assert.match(usdc, /USDC on base/);
-  assert.doesNotMatch(usdc, /ZEC on zec/);
+  assert.match(usdc, /data-value="USDC\|base"/);
+  assert.doesNotMatch(usdc, /data-value="ZEC\|zec"/);
 });
 
 test('a successful seal hides Downgrade refused, and a new quote hides it again', () => {
@@ -424,9 +426,10 @@ test('a failed quote and Get another quote both hide the refuse seal', () => {
   const fail = ui.slice(ui.indexOf('function fail'), ui.indexOf('function openRules'));
   assert.match(fail, /hideRefuse/);
   const idle = ferryMarkup({});
-  assert.match(idle, /wNEAR on near/);
+  // The pills show the token NAME, as the reference does; the option value keeps the pair.
+  assert.match(idle, /data-value="wNEAR\|near"/);
+  assert.match(idle, /data-value="USDC\|near"/);
   assert.match(idle, /value="0.05"/);
-  assert.match(idle, /USDC on near/);
 });
 
 test('0.05 wNEAR within a 0.06 cap is propose_call on wrap.near', () => {

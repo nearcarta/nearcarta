@@ -197,7 +197,7 @@ export function effectBudgetFits(row, need = EFFECT_BUDGET_BYTES, maxRowBytes = 
 
 export function capLine(row, quote) {
   if (!row || row.per_action_cap == null || row.per_action_cap === '') {
-    return 'Sign in at /setup so this pass can use your row. Nothing is signed from here until then.';
+    return 'Sign in so this pass can use your spend limit. Nothing is signed until then.';
   }
   const cap = yoctoNear(row.per_action_cap);
   const bal = row.balance == null || row.balance === '' ? '' : yoctoNear(row.balance);
@@ -234,7 +234,7 @@ export function proofWords(rec, { baseReceipt } = {}) {
 
 export function walletWords({ owner = '', address = null } = {}) {
   const path = rowPath(owner, 'base');
-  if (!path) return { path: '', address: '', text: 'Sign in at /setup to see this row. Nothing was signed.' };
+  if (!path) return { path: '', address: '', text: 'Sign in to see your spend limit. Nothing was signed.' };
   if (!address) return { path, address: '', text: `Path ${path}. No address yet. The signer has not returned one. The old shared path is not this wallet.` };
   return { path, address, text: `Path ${path}. Address ${address}.` };
 }
@@ -534,18 +534,18 @@ export function tollMarkup(state = {}) {
   const feeLine = live.ok === false
     ? 'The live policy did not answer.'
     : (quote.payable
-      ? `Fee ${quote.feeNear} NEAR. Your row sets the amount cap.`
+      ? `Fee ${quote.feeNear} NEAR. Your spend limit caps the amount.`
       : 'The live policy has no visitor fee.');
   const status = state.seal || '';
   // A visitor with no board row cannot pass: the board has nothing to spend.
   // That is a setup step, not an error, so it gets its own line and link.
   const needsRow = !!state.needsRow;
   const rowNote = needsRow
-    ? `<p class="toll-needs-row" data-testid="toll-needs-row" role="status">Open your row in <a href="/setup/" data-testid="toll-setup-link">/setup</a> first. The toll spends from that row, under your caps. Nothing was signed.</p>`
+    ? `<p class="toll-needs-row" data-testid="toll-needs-row" role="status">Sign in first. The toll spends from your spend limit. Nothing was signed.</p>`
     : '';
   // With no row the button is the way to /setup, so it stays pressable.
   const ctaBlocked = state.pending || (needsRow ? false : !quote.payable);
-  const ctaText = needsRow ? 'Open your row in /setup' : payLabel;
+  const ctaText = needsRow ? 'Sign in to pay' : payLabel;
   const passTx = state.passTx
     ? `<a class="rc tx" data-testid="toll-pass-tx" href="https://nearblocks.io/txns/${esc(state.passTx)}" target="_blank" rel="noopener">NEAR pass</a>`
     : '';

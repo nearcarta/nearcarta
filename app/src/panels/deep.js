@@ -24,6 +24,15 @@ export { houseCharterMarkup };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = () => (globalThis.NEARCARTA_API || '').replace(/\/$/, '');
+
+// A signed-out visitor has no destination address, but the quote card still has to say what the
+// swap would cost. 1Click requires a recipient even for a dry quote and rejects a contract id as
+// one, so the panel names the town's own account. It is read from the deployment record the page
+// already loads (/api/mainnet) and cached here; it is display-only — the reply is marked dry, no
+// deposit address is created from it, and nothing is ever signed for it.
+let rootAccount = globalThis.NEARCARTA_ROOT || '';
+export const setRootAccount = (id) => { if (id) rootAccount = String(id); };
+const displayRecipient = () => rootAccount;
 const q$ = (root, sel) => root.querySelector(sel);
 
 /** A disabled control stays readable and says why it is waiting. */
@@ -125,7 +134,9 @@ function usdOf(line) {
 
 function tokenOpts(choices, { q = '', chain = '', selected = '' } = {}) {
   const list = filterTokens(choices || [], { q, chain });
-  const opts = list.map(t => ({ value: t.id, label: t.label, symbol: t.symbol, chain: t.chain, icon: t.icon || '' }));
+  // `assetId` is the NEP-141 id ("nep141:wrap.near"); a balance read needs it to know which
+  // contract to ask. It rides on the option and never shows in the pill.
+  const opts = list.map(t => ({ value: t.id, label: t.label, symbol: t.symbol, chain: t.chain, icon: t.icon || '', assetId: t.assetId || '' }));
   // A fallback row only when the catalog itself is empty. A search that hides the
   // current id must not paint that id back into the closed button.
   if (!opts.length && selected && !(choices || []).length) {
@@ -135,8 +146,63 @@ function tokenOpts(choices, { q = '', chain = '', selected = '' } = {}) {
   return opts;
 }
 
-function chainOpts(choices) {
-  return [{ value: '', label: 'All', kind: 'chain' }].concat(chainsOf(choices).map(c => ({ value: c, label: c, kind: 'chain' })));
+/** The three Swap Quote rows, from the one quote the panel keeps. */
+function quoteRateText(q, state, pickSym, toSym) {
+  const inn = q?.from?.amount || state?.amt || '';
+  const out = q?.to?.amount || q?.amountOut || '';
+  const fs = q?.from?.symbol || pickSym || '';
+  const ts = q?.to?.symbol || toSym || '';
+  if (!inn && !out) return 'Enter an amount';
+  return `${inn} ${fs} ≈ ${out} ${ts}`.trim();
+}
+function quoteFeeText(q) {
+  // A fee as a plain amount. When the reply names it in dollars, show that; otherwise derive it
+  // from the protocol rate (bps) against the OUTPUT amount, so "20 bps" reads as the money it is
+  // ("≈ 0.0004 USDC") rather than as a bare rate.
+  const usd = q?.fee?.usd ?? q?.feeUsd;
+  if (typeof usd === 'number') return `≈ $${usd.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}`;
+  const bps = q?.checks?.echo?.protocolFeeBps;
+  const out = Number(q?.to?.amount ?? q?.amountOut ?? 0);
+  const sym = q?.to?.symbol || q?.symbolOut || '';
+  if (typeof bps === 'number' && out > 0) {
+    const fee = (out * bps) / 10_000;
+    if (fee > 0) return `≈ ${trimAmount(fee)} ${sym}`.trim();
+  }
+  if (typeof bps === 'number') return `${bps} bps`;
+  return '—';
+}
+/** A small amount without trailing zeros: 0.000358 -> "0.0004", 0.5 -> "0.5". */
+function trimAmount(n) {
+  if (!Number.isFinite(n) || n <= 0) return '0';
+  if (n >= 0.01) return String(Number(n.toFixed(4)));
+  const dp = Math.min(8, Math.max(2, Math.ceil(-Math.log10(n)) + 1));
+  return String(Number(n.toFixed(dp)));
+}
+function quoteRouteText(q, fromChain = '', toChain = '') {
+  // Intents is the rail either way; what changes is whether it hops chains.
+  const a = String(fromChain || q?.from?.chain || '').toLowerCase();
+  const b = String(toChain || q?.to?.chain || '').toLowerCase();
+  if (a && b) return a === b ? 'Intents · 1 step' : 'Intents · bridge';
+  const hops = q?.route?.hops ?? q?.hops ?? (q?.route ? 1 : null);
+  if (hops == null) return '—';
+  return hops === 1 ? 'Intents · 1 step' : `Intents · ${hops} steps`;
+}
+
+function chainOpts(choices, selectedChain = '') {
+  // "All" first, then every chain the catalog has. When the source chain is known it is labelled
+  // with its full name so the closed control reads "NEAR Mainnet", as the reference does.
+  const NICE = { near: 'NEAR Mainnet', eth: 'Ethereum', base: 'Base', arbitrum: 'Arbitrum', sol: 'Solana', pol: 'Polygon', zec: 'Zcash', btc: 'Bitcoin' };
+  const opts = [{ value: '', label: 'All', kind: 'chain' }];
+  const seen = new Set();
+  for (const c of chainsOf(choices)) {
+    if (!c || seen.has(c)) continue;
+    seen.add(c);
+    opts.push({ value: c, label: NICE[c] || c, kind: 'chain' });
+  }
+  // The selected chain must be present even when the catalog is still loading, or the control
+  // would fall back to its first option and read "All" again.
+  if (selectedChain && !seen.has(selectedChain)) opts.push({ value: selectedChain, label: NICE[selectedChain] || selectedChain, kind: 'chain' });
+  return opts;
 }
 
 export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
@@ -158,9 +224,13 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
   const tab = state.tab || 'swap';
   const defaultFromId = state.fromId || SESSION_SWAP.fromId;
   const defaultToId = state.toId || SESSION_SWAP.toId;
-  const chainBox = pickerListbox({ id: 'f-chain', testid: 'ferry-chain-filter', options: chainOpts(choices), selected: state.chainFilter || '' });
-  const fromBox = pickerListbox({ id: 'f-from', testid: 'ferry-from', options: tokenOpts(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId }), selected: defaultFromId });
-  const toBox = pickerListbox({ id: 'f-to', testid: 'ferry-to', options: tokenOpts(choices, { q: state.tq || '', chain: '', selected: defaultToId }), selected: defaultToId });
+  // The chain row defaults to the SOURCE chain, as the reference shows ("NEAR Mainnet"), not to
+  // "All". "All" stays available as the unfiltered choice.
+  const chainBox = pickerListbox({ id: 'f-chain', testid: 'ferry-chain-filter', options: chainOpts(choices, String(state.fromId || SESSION_SWAP.fromId || '').split('|')[1] || ''), selected: state.chainFilter || String(state.fromId || SESSION_SWAP.fromId || '').split('|')[1] || '' });
+  // The pill shows the token's NAME, as the reference does ("wNEAR"), not "wNEAR on near": the
+  // chain is already the next row's job and the suffix is what forced the ellipsis.
+  const fromBox = pickerListbox({ id: 'f-from', testid: 'ferry-from', options: tokenOpts(choices, { q: state.tq || '', chain: state.chainFilter || '', selected: defaultFromId }).map(o => ({ ...o, label: o.symbol || o.label })), selected: defaultFromId });
+  const toBox = pickerListbox({ id: 'f-to', testid: 'ferry-to', options: tokenOpts(choices, { q: state.tq || '', chain: '', selected: defaultToId }).map(o => ({ ...o, label: o.symbol || o.label })), selected: defaultToId });
   const pickFrom = String(defaultFromId).split('|');
   const pickSym = pickFrom[0] || meta.sym;
   const pickChain = pickFrom[1] || meta.chain;
@@ -225,14 +295,36 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
       : `<p class="ferry-deposit" data-testid="ferry-deposit">Send at most ${esc(state.depositUsd || '0.20')} USD yourself to <code data-testid="ferry-deposit-address">${esc(state.depositAddress)}</code>.</p><p data-testid="ferry-status">${esc(state.depositHelp || 'Waiting for the deposit. The boat has not delivered.')}</p>`)
     : '';
   const swap = `<div class="ferry-pane ferry-picker" data-pane="swap" data-testid="ferry-picker" ${tab === 'swap' ? '' : 'hidden'}>
+      <div class="swap-card">
+        <div class="swap-card-head"><span>From</span><span class="swap-bal" data-testid="ferry-balance-from">${esc(state.fromBal || '')}</span></div>
+        <label class="field ferry-field swap-line"><span class="sr-only">You pay</span>${fromBox}
+          <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(amtVal)}" aria-label="Amount"><button type="button" class="swap-max" id="f-max" data-testid="ferry-max">Max</button><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
+        </label>
+      </div>
+      <button type="button" class="swap-flip" id="f-flip" data-testid="ferry-flip" aria-label="Swap direction">⇅</button>
+      <div class="swap-card">
+        <div class="swap-card-head"><span>To</span><span class="swap-bal" data-testid="ferry-balance-to">${esc(state.toBal || '')}</span></div>
+        <label class="field ferry-field swap-line"><span class="sr-only">You get</span>${toBox}
+          <span class="amt-row"><span class="swap-est" data-testid="ferry-est">${esc(q && !state.sample ? '≈ ' + (q.to?.amount || q.amountOut || '') : '')}</span><span class="amt-sym">${esc(toSym)}</span></span>
+        </label>
+      </div>
+      <div class="swap-chain-row">
+        <label class="field ferry-field"><span>Chain</span>${chainBox}</label>
+        <span class="swap-live" data-testid="ferry-live"><i aria-hidden="true"></i>Live</span>
+      </div>
+      ${q && !state.sample ? `<div class="swap-quote" data-testid="ferry-quote-card">
+        <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
+        <p data-testid="swap-row-rate"><span>Rate</span><span>${esc(quoteRateText(q, state, pickSym, toSym))}</span></p>
+        <p data-testid="swap-row-fee"><span>Fee (est.)</span><span>${esc(quoteFeeText(q))}</span></p>
+        <p data-testid="swap-row-route"><span>Route</span><span>${esc(quoteRouteText(q, pickChain, toChain))}</span></p>
+      </div>` : `<div class="swap-quote" data-testid="ferry-quote-card" data-empty="1">
+        <div class="swap-quote-head"><span>Swap quote</span><span class="swap-best" data-testid="ferry-best">Best route</span></div>
+        <p data-testid="swap-row-rate"><span>Rate</span><span>Enter an amount</span></p>
+        <p data-testid="swap-row-fee"><span>Fee (est.)</span><span>—</span></p>
+        <p data-testid="swap-row-route"><span>Route</span><span>—</span></p>
+      </div>`}
       ${flow}
       <label class="field ferry-field"><span>Find a token</span><input id="f-find" data-testid="ferry-token-search" placeholder="ZEC, USDC, near" value="${esc(state.tq || '')}" autocomplete="off"></label>
-      <label class="field ferry-field"><span>Chain</span>${chainBox}</label>
-      <label class="field ferry-field"><span>You pay</span>${fromBox}</label>
-      <label class="field ferry-field"><span>You get</span>${toBox}</label>
-      <label class="field ferry-field amt-field"><span>Amount</span>
-        <span class="amt-row"><input id="f-amt" type="number" min="0" step="any" value="${esc(amtVal)}" aria-label="Amount"><span id="f-sym" class="amt-sym">${esc(pickSym)}</span></span>
-      </label>
       ${(() => {
         const foreign = String(toChain || '').toLowerCase() !== 'near';
         if (!foreign) return '';
@@ -242,14 +334,13 @@ export function ferryMarkup(state = {}, routes = DEFAULT_ROUTES) {
           : '';
         return `<label class="field ferry-field" data-testid="ferry-receive-field"><span>Receive at</span><input id="f-receive" data-testid="ferry-receive" placeholder="Address on ${esc(toChain || 'this chain')}" value="${esc(state.receiveAt || '')}" autocomplete="off" spellcheck="false"></label>${bad}`;
       })()}
-      <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote" ${acted ? 'hidden' : ''}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Get quote</button>
-      ${rateLine}
+      <button type="button" class="primary ferry-cta" id="f-quote" data-testid="ferry-quote" ${acted ? 'hidden' : ''}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Review swap</button>
       ${errLine}
       <div class="ferry-cargo-actions" data-testid="ferry-cargo-actions" ${showCargo ? '' : 'hidden'}>
-        <button type="button" class="primary ferry-cta" id="f-cargo" data-testid="ferry-load-cargo"${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Load cargo</button>
-        <button type="button" class="primary ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Ask charter · load cargo</button>
+        <button type="button" class="ferry-cta" id="f-cargo" data-testid="ferry-load-cargo"${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Load cargo</button>
+        <button type="button" class="ferry-cta ferry-cta-charter" id="f-charter" data-testid="ferry-ask-charter" ${charterReady ? '' : 'hidden'}${String(toChain || '').toLowerCase() !== 'near' && !validateDestAddress(toChain, state.receiveAt).ok ? ' disabled' : ''}>Ask charter · load cargo</button>
       </div>
-      <button type="button" class="primary ferry-cta" id="f-again" data-testid="ferry-again" ${showAgain ? '' : 'hidden'}>Get another quote</button>
+      <button type="button" class="ferry-cta" id="f-again" data-testid="ferry-again" ${showAgain ? '' : 'hidden'}>Get another quote</button>
       ${deposit}
       ${state.charterNote ? `<p class="ferry-charter-note" data-testid="ferry-charter-note" role="status">${esc(state.charterNote)}${state.renewSetup ? ` <a href="/setup" data-testid="${/refresh/i.test(state.renewLabel || '') ? 'ferry-refresh-key' : 'ferry-renew-setup'}">${esc(state.renewLabel || 'Renew agent key once in Setup')}</a>` : ''}${(state.landedLinks || []).map(l => ` <a class="tx" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('')}</p>` : ''}
     </div>`;
@@ -419,6 +510,7 @@ function mountFerry(root, hooks) {
       hooks.onPair({ from, to, amt: state.amt, fromSym: fs, fromChain: fc, toSym: ts, toChain: tc, order });
     };
     const clearQuote = () => { state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
+    // The balances the swap cards show. The token is taken from the RENDERED pill's own
     const onFrom = (value) => {
       state.fromEdited = true;
       state.fromId = value;
@@ -426,6 +518,8 @@ function mountFerry(root, hooks) {
       clearQuote();
       emitPair('jetty');
       localPaint();
+      refreshBalances();
+      scheduleSwapQuote();
     };
     const onTo = (value) => {
       state.toEdited = true;
@@ -433,6 +527,8 @@ function mountFerry(root, hooks) {
       clearQuote();
       emitPair('jetty');
       localPaint();
+      refreshBalances();
+      scheduleSwapQuote();
     };
     const swapBox = (sel, html) => {
       const el = q$(root, sel);
@@ -483,7 +579,34 @@ function mountFerry(root, hooks) {
     const to = q$(root, '#f-to');
     if (to) bindPickerListbox(to, onTo);
     const amt = q$(root, '#f-amt');
-    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; };
+    if (amt) amt.oninput = (e) => { state.amt = e.target.value; state.amtEdited = true; state.q = null; state.quoteError = ''; state.charterNote = ''; state.renewSetup = false; state.acted = false; state.sample = false; scheduleSwapQuote(); };
+    // The reference has a Max chip inside the From box. It fills the amount from the balance the
+    // panel already reads; when no balance is known it says so instead of inventing a number.
+    const maxBtn = q$(root, '#f-max');
+    if (maxBtn) maxBtn.onclick = () => {
+      const bal = String(state.fromBal || '').replace(/[^0-9.]/g, '');
+      if (!bal) { state.charterNote = 'No balance read yet. Sign in and this fills itself.'; paint(); return; }
+      state.amt = bal; state.amtEdited = true; state.q = null; state.quoteError = ''; state.acted = false; state.sample = false;
+      paint();
+    };
+    // The balance the reference shows at each card's top right. It comes from the session the
+    // shop already has; when there is no session the card simply shows nothing rather than a
+    // number nobody read.
+    if (state.fromBal == null) {
+      try {
+        const v = visitor();
+        state.fromBal = v?.signedIn && v.balanceNear != null ? `Balance: ${v.balanceNear} NEAR` : '';
+      } catch { state.fromBal = ''; }
+    }
+    // The circular swap-direction control between the two cards. Same as choosing the other side.
+    const flip = q$(root, '#f-flip');
+    if (flip) flip.onclick = () => {
+      const a = state.fromId || '', b = state.toId || '';
+      if (!a || !b) return;
+      state.fromId = b; state.toId = a;
+      state.q = null; state.quoteError = ''; state.acted = false; state.sample = false;
+      paint();
+    };
     const recv = q$(root, '#f-receive');
     if (recv) recv.oninput = (e) => {
       const pos = e.target.selectionStart;
@@ -563,9 +686,52 @@ function mountFerry(root, hooks) {
     if (!result?.loaded) paint();
     return result;
   }
+  // `data-value` ("wNEAR|near"), not from panel state, so it cannot disagree with what the
+  // visitor sees. The result is written only if the pill still holds the same value when it
+  // comes back, so a slow read for a token they have already changed cannot land on the card.
+  let balSeq = 0;
+  const sideToken = (pillId) => {
+    const el = root.querySelector('#' + pillId);
+    const value = el?.dataset?.value || '';
+    const choice = (state.choices || []).find(c => c.id === value) || null;
+    return { value, choice };
+  };
+  const refreshBalances = async () => {
+    const seq = ++balSeq;
+    const who = (() => { try { return visitor()?.accountId || ''; } catch { return ''; } })();
+    if (!who) { state.fromBal = ''; state.toBal = ''; return; }
+    const from = sideToken('f-from');
+    const to = sideToken('f-to');
+    if (!from.choice && !to.choice) { state.fromBal = ''; state.toBal = ''; return; }
+    const { readBalance, balanceLine } = await import('./balance.js');
+    const { ferryRpc } = await import('./ferry-rpc.js');
+    const rpc = ferryRpc();
+    const [ra, rb] = await Promise.all([
+      from.choice ? readBalance(who, from.choice, { rpc }).catch(() => null) : null,
+      to.choice ? readBalance(who, to.choice, { rpc }).catch(() => null) : null,
+    ]);
+    // A later read has started: this answer is about a token that is no longer chosen.
+    if (seq !== balSeq) return;
+    // And the pill must still hold the value this read was for.
+    if (sideToken('f-from').value !== from.value) return;
+    if (sideToken('f-to').value !== to.value) return;
+    state.fromBal = ra ? balanceLine(ra) : '';
+    state.toBal = rb ? balanceLine(rb) : '';
+    localPaint();
+  };
+
   async function ensureTokens() {
     if (state.choices?.length || state.tokensTried) return;
     state.tokensTried = true;
+    // The town's own account, for the display-only recipient a signed-out dry quote needs.
+    // /api/mainnet is the same deployment record every shop reads; a failure just leaves the
+    // quote quiet rather than sending a request the API would refuse.
+    if (!displayRecipient()) {
+      fetch(api() + '/api/mainnet').then(r => r.json()).then(j => {
+        const root = j?.root || j?.deployments?.root || j?.board?.owner || '';
+        if (root) { setRootAccount(root); scheduleSwapQuote(); }
+      }).catch(() => {});
+    }
     try {
       const rows = hooks.tokens ? await hooks.tokens() : await fetch(api() + '/api/ferry/tokens').then(r => r.json());
       state.choices = tokenChoices(Array.isArray(rows) ? rows : rows?.tokens || []);
@@ -594,6 +760,9 @@ function mountFerry(root, hooks) {
       state.tokensError = true;
       state.choices = [];
     }
+    // Only now are the two sides settled, so this is the first moment the balances can be read
+    // for the tokens the pickers actually show.
+    if (state.choices.length) { refreshBalances(); scheduleSwapQuote(); }
     paint();
   }
   async function runOne(btn) {
@@ -618,15 +787,23 @@ function mountFerry(root, hooks) {
       else {
         const visitor = hooks.visitor?.() || state.me;
         const recipient = quotePayee(to, visitor, state.receiveAt);
-        if (!recipient) {
-          q = { ok: false, error: 'Enter the address on the destination chain that should receive the tokens.' };
-        } else {
-          const res = await fetch(api() + '/api/ferry/quote', {
-            method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ from, to, amount: String(state.amt || defaultAmtFor(from.split('@')[0])), recipient, refundTo: refundForChain(originChain, visitor), privacy: 'basic' }),
-          });
-          q = await res.json();
-        }
+        // Signed out there is no real recipient, so the panel asks 1Click for a DRY quote using
+        // a display-only recipient: the town's own account from the deployment record. It is
+        // never a deposit address and never signed — `dry: true` keeps the quote read-only.
+        const display = recipient || displayRecipient() || (state.mainnet?.root || '');
+        const res = await fetch(api() + '/api/ferry/quote', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            from, to,
+            amount: String(state.amt || defaultAmtFor(from.split('@')[0])),
+            recipient: display,
+            refundTo: recipient ? refundForChain(originChain, visitor) : display,
+            privacy: 'basic',
+            dry: true,
+          }),
+        });
+        q = await res.json();
+        if (!recipient && q && q.ok !== false) q.dryOnly = true;
       }
     } catch (e) {
       q = { ok: false, error: e?.message || 'quote failed', from: { symbol: from.split('@')[0], chain: originChain, amount: state.amt }, to: { symbol: to.split('@')[0], chain: to.split('@')[1] }, dry: true };
@@ -701,6 +878,40 @@ function mountFerry(root, hooks) {
   localPaint();
   ensureTokens();
   if (hooks.auto && !state.quoted) runQuotes(q$(root, '#f-compare'));
+  // The Swap tab quotes its OWN pair, not the three ZEC corridors. One function, used by the
+  // signed-out dry path and by the debounce below, so there is never a second quote call.
+  function scheduleSwapQuote() {
+    if (state.swapQuoteTimer) clearTimeout(state.swapQuoteTimer);
+    state.swapQuoteTimer = setTimeout(() => { runSwapQuote().catch(() => {}); }, 400);
+  }
+  async function runSwapQuote() {
+    const from = idToFrom(q$(root, '#f-from')?.dataset.value) || idToFrom(state.fromId) || SESSION_SWAP.from;
+    const to = idToFrom(q$(root, '#f-to')?.dataset.value) || idToFrom(state.toId) || SESSION_SWAP.to;
+    const amt = String(state.amt || defaultAmtFor(String(from).split('@')[0]) || SESSION_SWAP.amt);
+    if (!from || !to || !amt) return;
+    const seq = (state.swapQuoteSeq = (state.swapQuoteSeq || 0) + 1);
+    const visitor = hooks.visitor?.() || state.me || '';
+    const recipient = quotePayee(to, visitor, state.receiveAt);
+    const display = recipient || displayRecipient() || (state.mainnet?.root || '');
+    try {
+      const res = await fetch(api() + '/api/ferry/quote', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          from, to, amount: amt, recipient: display,
+          refundTo: recipient ? refundForChain(String(from).split('@')[1] || '', visitor) : display,
+          privacy: 'basic', dry: true,
+        }),
+      });
+      const q = await res.json();
+      // A newer request started: this answer is about a pair or amount that is no longer shown.
+      if (seq !== state.swapQuoteSeq) return;
+      state.q = q && q.ok !== false ? q : null;
+      if (!q || q.ok === false) state.quoteError = explainQuoteMiss(q?.error || '');
+      else state.quoteError = '';
+      state.sample = !(q && (q.to?.amount || q.amountOut));
+      localPaint();
+    } catch { /* the card says nothing rather than a guess */ }
+  }
 }
 
 function mountGuard(root, hooks) {
@@ -787,8 +998,94 @@ function mountHouse(root, hooks = {}) {
 
 const ALIAS = { guardhouse: 'guard', townhall: 'hall', mist: 'bank', mistbank: 'bank' };
 
+function installAgentSheetClose(root) {
+  const doc = root?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+  if (!doc) return;
+
+  // Docks render their popups lazily — hall, payouts and arena build theirs after mountShop has
+  // returned — so a one-shot lookup missed them. This watches #shopUI and wires every popup that
+  // appears, exactly once (the dataset guard), however late it arrives.
+  const wire = (pop) => {
+    if (!pop || pop.dataset.closeWired === '1') return;
+    pop.dataset.closeWired = '1';
+    const btn = doc.createElement('button');
+    btn.type = 'button';
+    btn.className = 'agent-pop-close';
+    btn.setAttribute('aria-label', 'Close');
+    btn.dataset.testid = 'agent-pop-close';
+    btn.textContent = '✕';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      pop.hidden = true;
+      const toggle = doc.getElementById(pop.id.replace(/-pop$/, '-toggle'))
+        || doc.querySelector("[id$='-agent-toggle']");
+      if (toggle) {
+        toggle.setAttribute('aria-expanded', 'false');
+        try { toggle.focus(); } catch { /* not focusable */ }
+      }
+    });
+    pop.appendChild(btn);
+  };
+
+  // nav.all-shops is a sibling of #shopUI, so a flex row cannot place the dock beside it. Publish
+  // its real width as a CSS var; the dock reserves that width plus a gutter at phone sizes.
+  try {
+    const nav = doc.querySelector("nav.all-shops");
+    if (nav && typeof ResizeObserver === "function" && !globalThis.__NC_ALLSHOPS_OBS) {
+      const setW = () => doc.documentElement.style.setProperty("--allshops-w", Math.ceil(nav.getBoundingClientRect().width) + "px");
+      globalThis.__NC_ALLSHOPS_OBS = new ResizeObserver(setW);
+      globalThis.__NC_ALLSHOPS_OBS.observe(nav);
+      setW();
+    }
+  } catch { /* no nav on this surface */ }
+
+  const scan = () => doc.querySelectorAll("[id$='-agent-pop']").forEach(wire);
+  scan();
+
+  // Docks render their popups lazily, so watch #shopUI for any that appear after mount.
+  const host = doc.getElementById('shopUI') || doc.body;
+  if (host && typeof MutationObserver === 'function' && !globalThis.__NC_AGENT_CLOSE_OBS) {
+    globalThis.__NC_AGENT_CLOSE_OBS = new MutationObserver(scan);
+    globalThis.__NC_AGENT_CLOSE_OBS.observe(host, { childList: true, subtree: true });
+  }
+
+  // ONE Escape listener, on window, in the capture phase, registered as soon as the first shop
+  // mounts — so it runs before city.js's "leave the shop" handler. Whether a sheet is open is
+  // decided by what is actually on screen, not by the `hidden` attribute alone: some docks hide
+  // theirs with a class or `display`, and that is why the earlier check missed them. When a
+  // sheet is open, Escape goes through the very same button.agent-pop-close the visitor clicks.
+  if (typeof window !== 'undefined' && !globalThis.__NC_AGENT_ESC) {
+    globalThis.__NC_AGENT_ESC = true;
+    const isShown = (el) => {
+      if (!el || el.hidden) return false;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+      return el.offsetParent !== null || cs.position === 'fixed';
+    };
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const pops = [...doc.querySelectorAll("[id$='-agent-pop']")].filter(isShown);
+      if (!pops.length) return;            // nothing open: city.js may leave the shop
+      const pop = pops[pops.length - 1];
+      const btn = pop.querySelector('button.agent-pop-close');
+      if (btn) btn.click();
+      else pop.hidden = true;
+      // Swallow it completely: neither the sheet's own handler nor the leave-the-shop one runs.
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+    }, true);
+  }
+}
+
 export function mountShop(id, root, hooks = {}) {
   if (!root) return;
+  // One close control for every shop's agent sheet. Each shop builds its own popup, so adding a
+  // button to nine files would be nine chances to diverge: this attaches to whichever
+  // [id$='-agent-pop'] the shop rendered, and gives it a real button (the CSS ::before was a
+  // pseudo-element and could not be clicked), Escape, and focus back to the dock toggle.
+  try { installAgentSheetClose(root); } catch { /* a shop without a dock is fine */ }
   const key = ALIAS[id] || id;
   const fn = {
     ferry: mountFerry,

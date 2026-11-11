@@ -186,7 +186,7 @@ export function mountPayouts(root, hooks) {
     if (cap == null || !Number.isFinite(cap)) {
       return accountId()
         ? 'Your board cap is unread. Open /setup, then come back — a NEAR payroll waits on that cap.'
-        : 'Sign in and open /setup so this desk can read your board cap. Invoice links still create without a row.';
+        : 'Sign in to set your spend limit. Invoice links still work without signing in.';
     }
     return `Your board cap: ${formatNear(cap)} NEAR per payment (from /setup).`;
   }

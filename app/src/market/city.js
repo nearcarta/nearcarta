@@ -367,7 +367,22 @@ root.addEventListener('click', (ev) => {
   } catch (e) { fail(e); }
 });
 function seal(b) { if (RM) return; b.animate?.([{ transform: 'scale(1)' }, { transform: 'scale(.97)' }, { transform: 'scale(1)' }], { duration: 220 }); }
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) { close(); e.stopPropagation(); } }, true);
+// Escape closes an open agent sheet first and stays in the shop; only when no sheet is open does
+// it leave. A capture-phase listener runs before the sheet's own, so this must know about it.
+addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !view) return;
+  const pop = document.querySelector("[id$='-agent-pop']:not([hidden])");
+  if (pop) {
+    pop.hidden = true;
+    const toggle = document.getElementById(pop.id.replace(/-pop$/, '-toggle'));
+    if (toggle) { toggle.setAttribute('aria-expanded', 'false'); try { toggle.focus(); } catch {} }
+    e.stopPropagation();
+    e.preventDefault();
+    return;
+  }
+  close();
+  e.stopPropagation();
+}, true);
 
 // ---------- the guide: talk to the Town Crier; it walks to the right shop and acts ----------
 const API = () => (window.NEARCARTA_API || '').replace(/\/$/, '');
