@@ -64,6 +64,18 @@ if (!resume) {
   log.balances.player_after_session = near(await balance(id));
 }
 
+// The balance pre-check: an invest with an empty purse must be refused before anything is sent.
+if (!log.precheck_probe) {
+  const key = await p.viewAccessKey({ accountId: id, publicKey: kp.getPublicKey(), blockQuery: bq });
+  const block = await p.viewBlock(bq);
+  const da = buildDelegateAction({ senderId: id, receiverId: MARKET, publicKey: kp.getPublicKey(), nonce: BigInt(key.nonce) + 1n, maxBlockHeight: BigInt(block.header.height) + 200n,
+    actions: [actions.functionCall('purse', { action: 'invest', amount: String(MILLI), shop: 'ferry' }, 20n * TG, 0n)] });
+  const { signedDelegate } = await signer.signDelegateAction(da);
+  const r = await post('/api/relay', { signed_delegate: Buffer.from(encodeSignedDelegate(signedDelegate)).toString('base64') });
+  log.precheck_probe = { refused: !r.ok && !r.hash, error: r.error || r.failure || null, hash: r.hash || null }; save();
+  console.log('precheck probe', JSON.stringify(log.precheck_probe));
+  if (r.hash) throw new Error('pre-check let an empty-purse invest through');
+}
 if (!done('cargo')) await move('cargo: gather 3 salt at the Ferry', ['ferry-1', 'ferry-2', 'ferry-3'].map((node) => ({ method: 'gather', args: { node }, tgas: 15 })));
 const salt = Number(await view('mt_balance_of', { account_id: id, token_id: 'good:salt' }));
 const q = await view('quote', { shop: 'arena', good: 'good:salt' });

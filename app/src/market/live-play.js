@@ -33,7 +33,7 @@ export async function coins() { return live.account ? purse() : null; }
 async function bal(token) { try { return BigInt(await (await lib()).view('mt_balance_of', { account_id: live.account, token_id: token })); } catch { return 0n; } }
 const record = (step, what, r) => { live.txs ||= []; live.txs.push({ step, what, hash: r.hash, burnt: r.burnt_near }); save(); return r; };
 // Same balance pre-check as the relayer: a move the market would refuse is never sent.
-const PRE = { ERR_PRECHECK_PURSE: 'Not enough coins in your purse yet. Sell more first.', ERR_PRECHECK_BAG: 'Not enough goods in your bag.', ERR_PRECHECK_STALL_TAKEN: 'Someone holds that stall.', ERR_PRECHECK_NOT_HOLDER: 'Rent the stall first.' };
+const PRE = { ERR_PRECHECK_PURSE: 'Not enough coins in your purse yet. Sell more first.', ERR_PRECHECK_BAG: 'Not enough goods in your bag.', ERR_PRECHECK_STALL_TAKEN: 'Someone holds that stall.', ERR_PRECHECK_GATHER_CAP: 'The berths are done for you today. Come back tomorrow.', ERR_PRECHECK_PAYOUT_CAP: 'The market has paid you all it pays one merchant today.', ERR_PRECHECK_STORAGE: 'Getting your market space ready. Press again in a moment.', ERR_PRECHECK_NOT_HOLDER: 'Rent the stall first.' };
 async function guard(L, calls) {
   const list = Array.isArray(calls) ? calls : [calls]; const goods = goodsOf(list);
   let st; try {
@@ -69,7 +69,37 @@ export async function step(id, ctx = {}) {
     const r = check(await send(L, { method: 'purse', args: { action: 'invest', amount: String(MILLI), shop }, tgas: 20 }));
     return record(id, `Invested 10 coins in the ${shop}`, r);
   }
+  if (id === 'seal') return sealProfit();
   return null;
+}
+
+// Not signed in: the Ferry, the sale and the invest still run for real, on the city's demo purse (one shared
+// account, server-signed, relayer-paid). Any refusal falls back to the practice step, said as practice.
+export const DEMO_STEPS = ['cargo', 'sell', 'invest'];
+export async function demo(id) {
+  if (live.account || !DEMO_STEPS.includes(id)) return null;
+  const api = (window.NEARCARTA_API || '').replace(/\/$/, '');
+  try {
+    const r = await (await fetch(`${api}/api/merchant/step`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ step: id }) })).json();
+    if (r.why === 'ERR_MERCHANT_PURSE') return { saving: true, have: r.have };
+    if (!r.ok || !r.hash) return null;
+    return { ...r, demo: true, total: r.total != null ? BigInt(r.total) : null };
+  } catch { return null; }
+}
+
+// Mist Bank seal: the Bank keeper's board row anchors a fingerprint of (account, purse, salt). Only the
+// fingerprint leaves this browser; the salt and the amount stay here, so the visitor can reveal them later.
+const SEALS = 'nearcarta.bank.seals';
+const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+async function sealProfit() {
+  const amount = String((await purse()) ?? 0n);
+  const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const digest = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${live.account}:${amount}:${salt}`)));
+  const api = (window.NEARCARTA_API || '').replace(/\/$/, '');
+  const r = await (await fetch(`${api}/api/bank/seal`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: live.account, digest }) })).json().catch(() => ({ ok: false }));
+  if (!r.ok) return null; // the story step still runs as practice
+  try { const all = JSON.parse(localStorage.getItem(SEALS) || '[]'); all.push({ account: live.account, amount, salt, digest, board_salt: r.board_salt, commitment: r.commitment, hash: r.hash, at: Date.now() }); localStorage.setItem(SEALS, JSON.stringify(all)); } catch {}
+  return record('seal', 'The Bank sealed your purse', { ...r, by_bank: true });
 }
 
 /** Rent a stall in the Arena square from the purse. */

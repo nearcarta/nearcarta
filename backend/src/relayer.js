@@ -25,7 +25,7 @@ export const conf = () => ({
   // A whole Market Day (bag, purse, a stall, a share) stores about 0.011 NEAR of data on the market.
   sessionStorage: toYocto(process.env.SESSION_STORAGE_NEAR || '0.012'),
   // Below this, a returning visitor's market storage is topped back up to sessionStorage (same caps).
-  storageLow: toYocto(process.env.SESSION_STORAGE_LOW_NEAR || '0.003'),
+  storageLow: toYocto(process.env.SESSION_STORAGE_LOW_NEAR || '0.006'),
   // Sponsored gas one visitor may burn per UTC day.
   visitorNear: toYocto(process.env.RELAY_VISITOR_NEAR || '0.003'),
 });
@@ -64,13 +64,14 @@ const failure = (r) => { for (const o of [r?.transaction_outcome, ...(r?.receipt
 export async function marketState(c, me, calls) {
   try {
     const goods = goodsOf(calls);
-    const [sq, bals] = await Promise.all([view(c.market, 'square', { account_id: me }), goods.length ? view(c.market, 'mt_batch_balance_of', { account_id: me, token_ids: goods }) : []]);
-    return { purse: sq.purse, rules: sq.rules, stalls: sq.stalls, me, now_ns: BigInt(Date.now()) * 1_000_000n, bag: Object.fromEntries(goods.map((g, i) => [g, Number(bals[i] || 0)])) };
+    const [sq, bals, storage] = await Promise.all([view(c.market, 'square', { account_id: me }, undefined, { fresh: true }), goods.length ? view(c.market, 'mt_batch_balance_of', { account_id: me, token_ids: goods }, undefined, { fresh: true }) : [], view(c.market, 'storage_balance_of', { account_id: me }, undefined, { fresh: true }).catch(() => null)]);
+    const [cfgv, citizen] = await Promise.all([view(c.market, 'get_config', {}).catch(() => null), view(c.market, 'get_citizen', { account_id: me }, undefined, { fresh: true }).catch(() => null)]);
+    return { purse: sq.purse, storage, caps: cfgv?.caps || null, citizen, rules: sq.rules, stalls: sq.stalls, me, now_ns: BigInt(Date.now()) * 1_000_000n, bag: Object.fromEntries(goods.map((g, i) => [g, Number(bals[i] || 0)])) };
   } catch { return null; }
 }
 const callsOf = (d) => d.actions.map((a) => { let args = {}; try { args = JSON.parse(Buffer.from(Uint8Array.from(a.functionCall.args)).toString('utf8')); } catch {} return { method: a.functionCall.methodName, args }; });
 
-export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction(sd), keyOf, heightOf, now = Date.now, stateOf } = {}) {
+export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction(sd), keyOf, heightOf, now = Date.now, stateOf, sponsor = null } = {}) {
   roll(); const c = conf();
   if (!hasKey() && !send.__test) return refuse('ERR_RELAYER_OFF', 503);
   const sd = decode(b64); if (!sd) return refuse('ERR_DECODE');
@@ -88,9 +89,13 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
   }
   // Worst case for this move: all attached gas burnt at 0.1 NEAR per 1000 Tgas (100M yocto per gas).
   const worst = p.gas * 100_000_000n;
-  if (ledger.spent + worst > c.dailyNear) return refuse('ERR_DAILY_BUDGET', 429);
-  if ((ledger.by.get(d.senderId) || 0n) >= c.visitorNear) return refuse('ERR_VISITOR_GAS_CAP', 429);
-  const cap = counters.take(d.senderId); if (cap) return refuse(cap, 429);
+  // The city's demo purse (backend/src/merchant.js) has its own caps: runs a day read on chain, a gas cap per
+  // move and a relayer balance floor. Visitor caps apply to everyone else.
+  if (!sponsor) {
+    if (ledger.spent + worst > c.dailyNear) return refuse('ERR_DAILY_BUDGET', 429);
+    if ((ledger.by.get(d.senderId) || 0n) >= c.visitorNear) return refuse('ERR_VISITOR_GAS_CAP', 429);
+    const cap = counters.take(d.senderId); if (cap) return refuse(cap, 429);
+  }
   let r; try { r = await send(sd); } catch (e) { return refuse('ERR_SEND: ' + String(e.message || e).slice(0, 160), 502); }
   const y = burnt(r); ledger.spent += y; ledger.relays++;
   ledger.by.set(d.senderId, (ledger.by.get(d.senderId) || 0n) + y);
@@ -103,7 +108,7 @@ export async function relay(b64, { send = (sd) => relayer().relayMetaTransaction
  * exist and hold one session key, and give it a small market storage deposit. Counted against the
  * daily session cap and the daily budget.
  */
-export async function session(accountId, { acc = () => relayer(), viewAcc = viewAccount, storageOf } = {}) {
+export async function session(accountId, { acc = () => relayer(), viewAcc = viewAccount, storageOf, sponsor = null } = {}) {
   roll(); const c = conf();
   if (!hasKey() && !storageOf) return refuse('ERR_RELAYER_OFF', 503);
   const id = String(accountId || '').trim().toLowerCase();
@@ -117,12 +122,12 @@ export async function session(accountId, { acc = () => relayer(), viewAcc = view
   const add = needStorage ? c.sessionStorage - BigInt(stored) : 0n;
   const cost = (needFund ? c.sessionFund : 0n) + add + 2n * 10n ** 21n;
   if (ledger.spent + cost > c.dailyNear * 2n) return refuse('ERR_DAILY_BUDGET', 429);
-  const cap = counters.session(); if (cap) return refuse(cap, 429);
+  if (!sponsor) { const cap = counters.session(); if (cap) return refuse(cap, 429); } // the demo purse has its own caps
   const a = acc(); const txs = [];
   try {
     if (needFund) { const r = await a.transfer({ receiverId: id, amount: c.sessionFund }); txs.push(hashOf(r)); ledger.spent += c.sessionFund + burnt(r); }
     if (needStorage) {
-      const r = await a.callFunction({ contractId: c.market, methodName: 'storage_deposit', args: { account_id: id }, deposit: add, gas: 10n * 10n ** 12n });
+      const r = await (a.callFunctionRaw || a.callFunction).call(a, { contractId: c.market, methodName: 'storage_deposit', args: { account_id: id }, deposit: add, gas: 10n * 10n ** 12n });
       txs.push(hashOf(r) || null); ledger.spent += add;
     }
   } catch (e) { return { ...refuse('ERR_SEND: ' + String(e.message || e).slice(0, 160), 502), txs }; }

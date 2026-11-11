@@ -19,3 +19,20 @@ test('precheck: selling needs the goods, unless they are gathered in the same ba
   assert.equal(precheck([{ method: 'sell', args: { good: 'good:salt', qty: 4 } }], base).why, 'ERR_PRECHECK_BAG');
   assert.equal(precheck([{ method: 'sell', args: { good: 'good:salt', qty: 3, keep: true } }, { method: 'purse', args: { action: 'invest', amount: String(M) } }], base).ok, true);
 });
+test('precheck: an invest or a stall with too little market storage is never sent', () => {
+  const rich = { ...base, purse: 5n * M };
+  const inv = [{ method: 'purse', args: { action: 'invest', amount: String(M), shop: 'ferry' } }];
+  assert.equal(precheck(inv, { ...rich, storage: 3240n * 10n ** 18n }).why, 'ERR_PRECHECK_STORAGE');
+  assert.equal(precheck(inv, { ...rich, storage: 12n * M }).ok, true);
+  assert.equal(precheck(inv, rich).ok, true); // storage unread: the move goes
+  assert.equal(precheck([{ method: 'stall', args: { stall: 1, action: 'rent' } }], { ...rich, storage: M }).why, 'ERR_PRECHECK_STORAGE');
+});
+test('precheck: the market day caps stop a gather or a sale the market would refuse', () => {
+  const caps = { gathers_per_day: 40, player_payout_per_day: String(5n * M) };
+  const g = [1, 2, 3].map((i) => ({ method: 'gather', args: { node: `ferry-${i}` } }));
+  assert.equal(precheck(g, { ...base, caps, citizen: { gathers_today: 38, paid_today: '0' } }).why, 'ERR_PRECHECK_GATHER_CAP');
+  assert.equal(precheck(g, { ...base, caps, citizen: { gathers_today: 37, paid_today: '0' } }).ok, true);
+  const sell = [{ method: 'sell', args: { good: 'good:salt', qty: 3, min_total: String(8n * 10n ** 20n), keep: true } }];
+  assert.equal(precheck(sell, { ...base, caps, citizen: { gathers_today: 0, paid_today: String(48n * 10n ** 20n) } }).why, 'ERR_PRECHECK_PAYOUT_CAP');
+  assert.equal(precheck(sell, { ...base, caps, citizen: { gathers_today: 0, paid_today: '0' } }).ok, true);
+});

@@ -29,7 +29,9 @@ export const STEPS = [
   { id: 'sell', shop: 'arena', keeper: 'Arena marshal', intro: 'The shelf decides the price. Watch it move.',
     need: 'Sell your salt', btn: 'Sell 3 salt', reward: 'Coins, at the shelf price', done: 'Sold' },
   { id: 'seal', shop: 'bank', keeper: 'Banker', intro: 'Profit is nobody’s business but yours.',
-    need: 'Hide your profit', btn: 'Seal profit', reward: 'Amount hidden', done: 'Sealed. Only “check passed” shows' },
+    need: 'Hide your profit', btn: 'Seal profit', reward: 'Amount hidden', done: 'Sealed. Only “check passed” shows',
+    // The Bank's own anchor on the board: only sha256(salt||digest) is logged, the amount is not. 0.000359 NEAR gas.
+    proof: { label: 'Bank anchor: amount hidden', cost: '0.00036', ...TX('HLyzwHh8nRHHpiSYXtGmScxkUFgiiqowuufvUCRCFamk') } },
   { id: 'pay', shop: 'payouts', keeper: 'Paymaster', intro: 'Your porter carried every crate.',
     need: 'Pay your porter', btn: 'Pay 3 coins', reward: 'Invoice paid', done: 'Porter paid. Invoice kept' },
   { id: 'invest', shop: 'house', keeper: 'Housekeeper', intro: 'The Ferry spent its till on your cargo. It went dark.',

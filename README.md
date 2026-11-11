@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nearcarta/nearcarta/actions/workflows/ci.yml)
 
-<!-- # 958 backend unit tests (957 pass, 1 skipped) -->
+<!-- # 964 backend unit tests (963 pass, 1 skipped) -->
 
 **An AI agent can be talked into paying the wrong person. Nearcarta puts the payment rules in a NEAR contract the agent cannot change, so a fooled agent produces a refused transaction instead of a loss.**
 
@@ -129,7 +129,7 @@ The message to sign is not reproduced by hand: `call_as_message` is an exposed v
 
 ```bash
 npm ci
-npm test                 # 958 unit tests (957 pass, 1 skipped)
+npm test                 # 964 unit tests (963 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run build
@@ -152,7 +152,7 @@ cd contracts/arena && cargo +1.95.0 test --lib  # 17 passed
 
 `CI` (`.github/workflows/ci.yml`) runs the backend units, the proof verify, the build, every crate's unit tests, the oath and factory sandbox suites, and gitleaks. `npm run test:contracts` runs the sandbox suites locally against `near-sandbox`, with no keys.
 
-# 958 unit tests (957 pass, 1 skipped):
+# 964 unit tests (963 pass, 1 skipped):
 Proof rows (108/108 expected).
 
 `judges/proofs/e2e-vercel.json`: 20 passed, 1 skipped.
@@ -315,7 +315,7 @@ Tests: `cancel and expire are owner-only and never travel with the agent`, `/set
 
 ```bash
 npm ci
-npm test                 # 958 unit tests (957 pass, 1 skipped)
+npm test                 # 964 unit tests (963 pass, 1 skipped)
 npm run verify:mainnet   # 108/108 mainnet txs found
 npm run check-cited      # MISSES: none
 npm run readme-numbers -- --check   # the counts in this file are current

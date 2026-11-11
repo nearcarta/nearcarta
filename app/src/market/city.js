@@ -151,10 +151,11 @@ const whyBlock = (good) => { const q = S.quoteAt(city, 'arena', good); return `<
 
 // What each step costs, said before the press, and what it cost after, with THIS action's receipt.
 // Only the steps with a market move are real; the rest say so: practice, no spend.
-const REAL_STEP = { cargo: 'Free: 3 salt from the berths', sell: 'Coins go into your purse', invest: 'Spends 10 coins (0.001 NEAR) from your purse' };
+const REAL_STEP = { seal: 'The Bank seals it for you and pays the gas', cargo: 'Free: 3 salt from the berths', sell: 'Coins go into your purse', invest: 'Spends 10 coins (0.001 NEAR) from your purse' };
 const nearTxt = (y) => { const v = Number(BigInt(y || 0) / 10n ** 18n) / 1e6; return `${v.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} NEAR`; };
-const costLine = (s) => (R.on() && REAL_STEP[s.id] ? `${REAL_STEP[s.id]} · no gas, the city pays it` : '<span class="qs-chip">Practice, no spend</span>');
+const costLine = (s) => (!R.on() && R.DEMO_STEPS.includes(s.id) ? 'Real move, played with the city’s demo purse · the city pays the gas' : R.on() && REAL_STEP[s.id] ? `${REAL_STEP[s.id]} · no gas, the city pays it` : '<span class="qs-chip">Practice, no spend</span>');
 const receiptLine = (step, r) => {
+  if (r.real?.hash && r.real.demo) return `Played with the city’s demo purse · <a class="qs-proof" href="https://nearblocks.io/txns/${esc(r.real.hash)}" target="_blank" rel="noopener">Receipt ↗</a> · the city paid ${esc(r.real.burnt_near)} NEAR gas`;
   if (r.real?.hash) return `<a class="qs-proof" href="https://nearblocks.io/txns/${esc(r.real.hash)}" target="_blank" rel="noopener">Receipt ↗</a> · you paid 0 NEAR${r.real.burnt_near ? `, the city paid ${esc(r.real.burnt_near)} NEAR gas` : ''}`;
   return '<span class="qs-chip">Practice, no spend</span>';
 };
@@ -164,14 +165,16 @@ function stripHtml(id) {
     const r = lastDone.res, nx = Q.current(city);
     let sub = receiptLine(lastDone.step, r);
     if (lastDone.step.id === 'sell') sub = `+${coins(r.total)} coins · price ${coins(r.before)} → ${coins(r.after)}<br>Your sale pushed the price down: the shelf has more salt now.<br>${receiptLine(lastDone.step, r)}`;
-    if (lastDone.step.id === 'invest') sub = `1 Ferry share for 10 coins (0.001 NEAR) · it pays you a part of the Ferry’s sales<br>${receiptLine(lastDone.step, r)}`;
+    if (lastDone.step.id === 'invest' && r.real?.saving) sub = `The city’s demo purse is saving up: ${coins(BigInt(r.real.have || 0))} of 10 coins for its next share<br><span class="qs-chip">Practice, no spend</span>`;
+    else if (lastDone.step.id === 'invest') sub = `${r.real?.demo ? '1 Ferry share bought by the demo purse for 10 coins (0.001 NEAR)' : '1 Ferry share for 10 coins (0.001 NEAR) · it pays you a part of the Ferry’s sales'}<br>${receiptLine(lastDone.step, r)}`;
     const ex = (pf) => (pf ? ` · <a class="qs-proof" href="${pf.url}" target="_blank" rel="noopener">Example on chain ↗</a>` : '');
     const done = lastDone.step.id, pr0 = lastDone.step.proof;
     if (done === 'cargo') sub = `3 salt from the berths, no swap needed<br>${receiptLine(lastDone.step, r)}`;
     if (done === 'cross') sub = `Toll: 1 coin, taken at the sale<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
     if (done === 'check') sub = `✓ Square keeper: cleared<br>✗ Stranger: refused, not on your list<br><span class="qs-chip">Practice, no spend</span>${ex(pr0)}`;
-    if (done === 'seal') sub = `Check passed · the amount stays hidden<br><span class="qs-chip">Practice, no spend</span>`;
-    if (done === 'pay') sub = `3 coins to your porter · invoice #${Q.state(city).day} kept<br><span class="qs-chip">Practice, no spend</span>`;
+    if (done === 'seal' && r.real?.hash) sub = `Check passed · the amount stays hidden<br>The Bank sealed it for you: <a class="qs-proof" href="https://nearblocks.io/txns/${esc(r.real.hash)}" target="_blank" rel="noopener">Receipt ↗</a> · ${esc(r.real.burnt_near)} NEAR gas, paid by the Bank<br>Your reveal key stays in this browser`;
+    else if (done === 'seal') sub = `Check passed · the amount stays hidden<br>On chain the Bank logs only a fingerprint: <a class="qs-proof" href="${pr0.url}" target="_blank" rel="noopener">Bank anchor ↗</a> · ${pr0.cost} NEAR gas, paid by the Bank<br><span class="qs-chip">Your seal: practice, no spend</span>`;
+    if (done === 'pay') sub = `Paid to: your porter · 3 coins from your purse · invoice #${Q.state(city).day} kept<br><span class="qs-chip">Practice, no spend</span>`;
     if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
     return { gold: true, html: row(okMark, r.line, sub, gold('next', nx ? `Next: ${NAME[nx.shop]}` : 'Back to town')) + extra };
@@ -201,7 +204,8 @@ async function stripClick(a, b) {
       if (busy) return;
       const step = Q.current(city); let real = null;
       if (R.on()) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.step(step.id, { shop: Q.state(city).dark || 'ferry' }); } finally { busy = false; } }
-      const res = Q.act(city, inShop); if (real) { res.real = real; if (step.id === 'sell' && real.total != null) res.total = real.total; }
+      else if (R.DEMO_STEPS.includes(step.id)) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.demo(step.id); } finally { busy = false; } }
+      const res = Q.act(city, inShop); if (real) { res.real = real; if (step.id === 'sell' && real.total != null && BigInt(real.total) > 0n) res.total = BigInt(real.total); }
       lastDone = { shop: inShop, step, res }; lastDeed = { shop: inShop, text: DEED[step.id] };
       save(); hud(); quest(); seal(b); whyOpen = false; flash = null; readPurse();
     } else if (a === 'why') whyOpen = !whyOpen;
