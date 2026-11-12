@@ -847,14 +847,23 @@ export function mountTollRoom(root, hooks = {}, env = {}) {
       });
     });
     const finish = root.querySelector('#toll-finish');
-    if (finish) finish.onclick = () => {
+    // F61d: Finish crossing finishes THIS order by id (sign_cross, MPC wait, relay). It used to
+    // go through the pay line, which could cross again and write a new budget.
+    if (finish) finish.onclick = async () => {
       const o = state.openOrder;
-      if (!o) return;
+      if (!o || state.pending || typeof hooks.onFinish !== 'function') return;
       state.to = o.to;
       state.amount = unitsWords(o.amount, o.asset === 'usdc' ? 6 : 18);
       state.asset = o.asset === 'usdc' ? 'USDC' : 'ETH';
-      Promise.resolve(runAgent(`pay ${state.amount} ${state.asset} to ${state.to} on Base`))
-        .finally(() => loadOrders().then(() => { if (root.isConnected !== false) paint(); }));
+      state.pending = 'Finishing… approve sign_cross in your wallet';
+      paint();
+      let res = null;
+      try { res = await hooks.onFinish(o.id); } catch (e) { res = { ok: false, hint: String(e?.message || e).slice(0, 160) }; }
+      state.pending = '';
+      state.seal = res?.hint || '';
+      if (res?.baseTx) state.baseTx = res.baseTx;
+      await loadOrders().catch(() => {});
+      if (root.isConnected !== false) paint();
     };
     const tabs = root.querySelector('.ferry-tabs');
     if (tabs) tabs.addEventListener('keydown', (e) => {

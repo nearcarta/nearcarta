@@ -699,6 +699,25 @@ function tollPassRows() {
   } catch { mine = []; }
   return [...saved, ...mine];
 }
+/**
+ * F61d: Finish crossing on a stored, paid order. Only `finishOrder`: sign_cross, the MPC wait,
+ * the relay. No pass, no cross, no set_effects, whatever the form says.
+ */
+async function tollFinish(id) {
+  sh?.hideRefuse?.();
+  let o;
+  try { o = await A.finishOrder(id); }
+  catch (e) {
+    const hint = String(A.plainError(e) || e.message || 'The crossing did not finish.').slice(0, 200);
+    extra.seal = hint;
+    return { ok: false, hint, keep: true, kind: 'no', say: hint, crossing: true };
+  }
+  const hint = o.needsSignature ? (o.note || 'Not signed yet. Press Finish crossing again. No second pass is charged.') : (o.relay?.text || 'The relay did not answer. Nothing moved on Base.');
+  extra.seal = hint;
+  const paid = !!o.relay?.ok || o.relay?.claim === 'paid';
+  if (paid) { if (sh?.act && runScene) runScene(sh.act({ success: true })); }
+  return { ok: paid, o, tx: o.tx, hint, success: paid, crossing: true, baseTx: o.relay?.explorer || '', needsSignature: !!o.needsSignature, keep: true, kind: paid ? 'ok' : 'no', say: hint, rc: o.tx ? A.txLine(o.tx) : '' };
+}
 async function tollPay(quote) {
   sh?.hideRefuse?.();
   const ready = !!(A.S.ready && A.stage() === 'ready' && A.S.board);
@@ -883,6 +902,7 @@ const APPS = {
         orders: () => A.rowOrders(A.tollAcct(), A.S.me),
         rowAddress: () => A.tollRowAddress(),
         onPay: (quote) => tollPay(quote),
+        onFinish: (id) => tollFinish(id),
         onBroadcast: () => fetch(((globalThis.NEARCARTA_API || '').replace(/\/$/, '')) + netCfg().apiPath + '/toll/broadcast', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, text: 'The broadcast did not answer. Nothing moved on Base.' })),
         onBasePaid: () => { if (sh?.act && runScene) runScene(sh.act({ basePaid: true })); },
         hideRefuse: () => sh?.hideRefuse?.(),
