@@ -882,6 +882,34 @@ function ruleUpdateTransactions(row, r, sec, expiresAt = expiresToWrite({ hoursE
   });
   return out;
 }
+// F23 (film 2026-11-12): after the wallet confirmed open_charter the page kept painting 'No row open'
+// with Try it disabled until a reload, because the row the poll found was never put in `chainRow`.
+// Every path that writes the row now reads it back and adopts it, so the page moves on by itself.
+function adoptRow(row) {
+  if (!row) return null;
+  chainRow = row; chainLoadedFor = me; chainRead = true; readError = false; chainError = '';
+  return row;
+}
+const ROW_POLL_MS = 1500, ROW_POLL_TRIES = 40, ROW_LATE_POLL_MS = 3000, ROW_LATE_TRIES = 60;
+async function pollRow(readRpc, contract, { tries = ROW_POLL_TRIES, gap = ROW_POLL_MS, until = () => true } = {}) {
+  const owner = me;
+  for (let i = 0; i < tries; i += 1) {
+    if (i) await wait(gap);
+    if (owner !== me) return null;
+    const row = await viewFn(readRpc, contract, 'get_charter', { owner }).catch(() => null);
+    if (row && until(row)) return adoptRow(row);
+  }
+  return null;
+}
+/** A slow chain is not a failure: keep reading in the background and repaint when the row lands. */
+function pollRowLate(readRpc, contract) {
+  pollRow(readRpc, contract, { tries: ROW_LATE_TRIES, gap: ROW_LATE_POLL_MS }).then(async (row) => {
+    if (!row) return;
+    msg = ''; done(5);
+    keyReady = !!(await agentAccessKey(localStorage.getItem(agentLS(me))).catch(() => null));
+    render();
+  }).catch(() => {});
+}
 async function signBoard() {
   const r = rules(), contract = MAIN.board.contract;
   // The Rules step refuses an over-full list, but a visitor can reach #sign by URL or by
@@ -965,20 +993,19 @@ async function signBoard() {
     const out = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: [built.open] }) : [await w.signAndSendTransaction(built.open)];
     mark('create', 'run', txHashOf(out?.[0]));
     // A failed board call must not be followed by the key swap. The row is the only proof.
-    let opened = null;
-    for (let i = 0; i < 20 && !opened; i += 1) {
-      if (i) await wait(1500);
-      opened = await viewFn(readRpc, contract, 'get_charter', { owner: me }).catch(() => null);
-    }
+    const opened = await pollRow(readRpc, contract);
     if (!opened) {
       const failure = out?.find(o => o?.status && !('SuccessValue' in o.status));
+      if (!failure) pollRowLate(readRpc, contract);
       const why = failure ? (refusalOf(JSON.stringify(failure.status)) || 'the call failed') : '';
       throw new Error(failure
         ? `The board did not open the row (${why}). Your agent key was not changed. Open your row tries again.`
         : 'The row did not appear yet. Wait a few seconds and press Open your row again.');
     }
     row = opened;
-    mark('create', 'ok'); st.charter = me; save();
+    // The expiry just written is the chain's now. A stale 'hours edited' flag would recompute now + hours
+    // on every reload and report the rules as different (F24).
+    st.charter = me; st.hoursEdited = false; save(); mark('create', 'ok');
     // Only swap the key when it is missing or stale. An already valid key needs no approval.
     if (await agentAccessKey(sec)) { keyReady = true; keyStale = false; mark('key', 'ok'); }
     else await sendKey();
@@ -992,8 +1019,10 @@ async function signBoard() {
     const out = w.signAndSendTransactions ? await w.signAndSendTransactions({ transactions: txs.map(t => t[1]) }) : [];
     let res = out; if (!w.signAndSendTransactions) { res = []; for (const t of txs) res.push(await w.signAndSendTransaction(t[1])); }
     txs.forEach(([k], i) => mark(k, 'run', txHashOf(res?.[i])));
+    await pollRow(readRpc, contract, { tries: 20 });
   }
   done(5); await refreshBal();
+  render();
 }
 function noteSign(k, state, tx) {
   const s = signLog.find(x => x.k === k);
