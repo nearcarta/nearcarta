@@ -246,7 +246,7 @@ function stripHtml(id) {
       const what = { cross: 'Toll: the fee paid from your row', check: '✓ Square keeper: paid<br>✗ Look-alike: refused, not on your list', pay: 'Porter paid 3 test dollars, under your cap', seal: 'Check passed · the amount stays hidden<br>Your own row anchored only a fingerprint; the reveal key stays in this browser' }[done];
       sub = `${what}<br>${guestReceipt(r)}`;
     }
-    if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
+    if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level}${GT.on() ? '' : ` · your purse keeps ${coins(p.near)} coins`}<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
     return { gold: true, html: row(okMark, r.line, sub, gold('next', nx ? `Next: ${NAME[nx.shop]}` : 'Back to town')) + extra };
   }
