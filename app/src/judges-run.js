@@ -8,7 +8,7 @@
 //
 // Docs: https://docs.near.org/protocol/transactions/meta-tx · https://docs.near.org/tools/near-api
 //       https://api-testnet.nearblocks.io/api-docs
-import { NET, txUrl, addrUrl } from '../../../shared/net/net.js';
+import { NET, txUrl, addrUrl, switchUrl } from '../../../shared/net/net.js';
 import { startGuest, welcomeCrate, guestSigner, forgetGuest, whyText } from '../guest/key.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -42,7 +42,7 @@ export async function runLoop({ onStep = () => {}, doc = document } = {}) {
   if (!s) { push({ id: 'signer', label: 'The key did not load', state: 'failed' }); return { ok: false, why: 'ERR_NO_GUEST', steps }; }
 
   // 3. The guest's own board row, from the record.
-  const { openRow } = await import('./live-guest.js');
+  const { openRow } = await import('./market/live-guest.js');
   const row = await openRow({ signer: s }).catch((e) => ({ failure: String(e?.message || e) }));
   push({ id: 'row', label: row?.already ? 'Row already open' : 'Opened the board row', state: row?.failure ? 'failed' : 'ok', hash: row?.hash, url: row?.hash ? txUrl(row.hash) : '' });
 
@@ -52,7 +52,7 @@ export async function runLoop({ onStep = () => {}, doc = document } = {}) {
     ['sell', 'Sold 3 salt at the Arena'],
     ['invest', 'Bought a Ferry share'],
   ];
-  const live = await import('./live-guest.js');
+  const live = await import('./market/live-guest.js');
   for (const [id, label] of marketSteps) {
     try {
       const r = await live.step(id, { shop: 'ferry' });
@@ -74,6 +74,20 @@ export async function runLoop({ onStep = () => {}, doc = document } = {}) {
   return { ok, account: start.account, steps, why: ok ? null : steps.find((x) => x.state === 'failed')?.id };
 }
 
+/** Why the loop stopped, in the failed step's own words. */
+export function stoppedText(r) {
+  const bad = (r.steps || []).find((x) => x.state === 'failed');
+  if (!bad || bad.id === 'account') return `Stopped: ${whyText(r.why)} Nothing else was sent.`;
+  return `Stopped at “${bad.label}”${bad.note ? `: ${bad.note}` : ''}. The steps marked ✓ are real testnet transactions.`;
+}
+
+/** This page on testnet, asking it to start the loop on arrival (one click from a mainnet page). */
+export function runUrl() {
+  const u = new URL(switchUrl('testnet'), 'https://x.invalid');
+  u.searchParams.set('run', '1');
+  return u.pathname + u.search + u.hash;
+}
+
 /** The markup for the runner: one button, then one row per step. */
 export function judgeRunnerMarkup() {
   const net = NET === 'testnet' ? 'TESTNET' : 'MAINNET';
@@ -82,8 +96,10 @@ export function judgeRunnerMarkup() {
     <p class="jr-net"><span class="qs-net-pill" data-testid="judge-pill">${net}</span>
       ${canRun()
         ? 'One click makes a throwaway testnet account and runs the whole loop with real transactions. Every hash below opens on the testnet explorer.'
-        : 'This page is on mainnet, so the free loop is off. Add <code>?net=testnet</code> to the URL to run it on the test network.'}</p>
-    <button type="button" class="btn-gold" data-testid="run-loop"${disabled}>Run the loop on testnet</button>
+        : 'This page is on mainnet, so the free loop runs on the test network instead. The button opens this page on testnet (<code>?net=testnet</code>) and starts it.'}</p>
+    ${canRun()
+      ? `<button type="button" class="btn-gold" data-testid="run-loop"${disabled}>Run the loop on testnet</button>`
+      : `<a class="btn-gold" data-testid="run-loop-switch" href="${esc(runUrl())}">Run the loop on testnet</a>`}
     <p class="jr-note" data-testid="run-loop-note" aria-live="polite"></p>
     <ol class="jr-steps" data-testid="run-steps"></ol>
   </div>`;
@@ -97,14 +113,16 @@ export function installJudgeRunner({ doc = document } = {}) {
   const list = host.querySelector('[data-testid="run-steps"]');
   const note = host.querySelector('[data-testid="run-loop-note"]');
   const paint = (s) => {
+    // A step that was 'running' is replaced by its result, so each step is one line.
+    const prev = list.querySelector(`[data-testid="run-step-${s.id}"]`);
     const li = doc.createElement('li');
     li.className = `jr-step ${s.state}`;
     li.setAttribute('data-testid', `run-step-${s.id}`);
     const word = s.state === 'running' ? '…' : s.state === 'ok' ? '✓' : '✕';
     li.innerHTML = `<b aria-hidden="true">${word}</b> <span>${esc(s.label)}</span>${s.account ? ` <code>${esc(s.account)}</code>` : ''}${s.url ? ` <a href="${esc(s.url)}" target="_blank" rel="noopener">open ↗</a>` : ''}${s.note ? ` <small>${esc(s.note)}</small>` : ''}`;
-    list.append(li);
+    if (prev) prev.replaceWith(li); else list.append(li);
   };
-  host.querySelector('[data-testid="run-loop"]').addEventListener('click', async (e) => {
+  host.querySelector('[data-testid="run-loop"]')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
     list.innerHTML = '';
@@ -112,8 +130,17 @@ export function installJudgeRunner({ doc = document } = {}) {
     const r = await runLoop({ doc, onStep: paint });
     note.textContent = r.ok
       ? `Done. ${r.steps.filter((s) => s.hash).length} transactions on testnet, under ${r.account}. Nothing was spent: test NEAR has no value.`
-      : `Stopped: ${whyText(r.why)} Nothing else was sent.`;
+      : stoppedText(r);
     btn.disabled = false;
   });
+  // Arrived from the mainnet page's button: run once, then drop the flag so a reload does not rerun.
+  try {
+    const u = new URL(globalThis.location.href);
+    if (canRun() && u.searchParams.get('run') === '1') {
+      u.searchParams.delete('run');
+      globalThis.history?.replaceState(null, '', u.pathname + u.search + u.hash);
+      host.querySelector('[data-testid="run-loop"]')?.click();
+    }
+  } catch { /* not a browser */ }
   return host;
 }

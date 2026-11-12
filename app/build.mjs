@@ -27,12 +27,22 @@ const shops = dist + '/design/D8_shops';
 cpSync(here + 'design/D8_shops/data/live.js', shops + '/data/live.snapshot.js');
 cpSync(here + 'src/live/shops-live.js', shops + '/data/live.js');
 rmSync(dist + '/live/shops-live.js');
+// near-api-js pulls a node `util` shim (through is-my-json-valid) that reads `process` when it loads. A
+// browser has none, so the guest bundles get a module-local one; nothing global changes.
+const NODE_SHIM = { js: "const process = globalThis.process ?? { env: { NODE_ENV: 'production' }, browser: true, version: '', versions: {}, nextTick: (f, ...a) => queueMicrotask(() => f(...a)) };" };
 // The guest's real testnet path. It imports near-api-js lazily and only when a guest presses a step, so
 // a visitor who never presses Try free never downloads it.
 mkdirSync(dist + '/market', { recursive: true });
 await (await import('esbuild')).build({
   entryPoints: [here + 'src/market/live-guest.js'], bundle: true, format: 'esm', target: 'es2022',
-  outfile: dist + '/market/live-guest.js', logLevel: 'warning',
+  outfile: dist + '/market/live-guest.js', logLevel: 'warning', banner: NODE_SHIM,
+  define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' },
+});
+// guest/key.js imports near-api-js through guest/near.js. The raw copy of that file names a bare package a
+// browser cannot resolve, so it is replaced by its bundle.
+await (await import('esbuild')).build({
+  entryPoints: [here + 'src/guest/near.js'], bundle: true, format: 'esm', target: 'es2022',
+  outfile: dist + '/guest/near.js', allowOverwrite: true, logLevel: 'warning', banner: NODE_SHIM,
   define: { 'process.env.NODE_ENV': '"production"', global: 'globalThis' },
 });
 // The Ferry checks quotes with the server's own guard (dependency-free module), so the two cannot drift.
@@ -170,7 +180,7 @@ const scrubPairs = [
   [new RegExp(codes(117, 116, 101, 115, 116, 49), 'gi'), 'ucheck'],
 ];
 // Files the guest path owns, relative to dist.
-const GUEST_OWNED = [/^shared\/net\/net\.js$/, /^net\/chrome\.js$/, /^guest\/key\.js$/, /^market\/live-guest\.js$/, /^judges-run\.js$/, /^net\/scam\.js$/];
+const GUEST_OWNED = [/^shared\/net\/net\.js$/, /^net\/chrome\.js$/, /^guest\/key\.js$/, /^guest\/near\.js$/, /^market\/live-guest\.js$/, /^market\/city\.js$/, /^judges-run\.js$/, /^net\/scam\.js$/];
 function scrub(dir, base = '') {
   for (const name of readdirSync(dir)) {
     const path = dir + '/' + name;

@@ -114,7 +114,7 @@ const fail = (e) => toast(WHY[e.code] || e.message, 'no');
 // demo purse and a guest all end here; only the receipt line under it differs.
 const REWARD_LINE = () => {
   const st = Q.state(city);
-  const coinsEarned = Q.STEPS.length * Q.COIN;
+  const coinsEarned = BigInt(Q.STEPS.length) * BigInt(Q.COIN);
   return `you keep ${coins(coinsEarned)} coins${st.toll ? ` after ${coins(st.toll)} toll` : ''}${GT.on() ? ' · every step is a testnet receipt' : ''}`;
 };
 
@@ -209,7 +209,13 @@ const guestReceipt = (r) => {
   if (r.real?.broadcast === false) {
     // No Base Sepolia ETH: the MPC signature is real, the foreign transaction is not sent.
     const signed = r.real.raw_signed ? ` Signed transaction: <code>${esc(String(r.real.raw_signed).slice(0, 22))}…</code>` : '';
-    return `${pill} Signed by NEAR's MPC network on testnet, not sent to Base Sepolia.${signed}${r.real.hash ? ` <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Signature ↗</a>` : ''}`;
+    const evm = r.real.evm_hash ? ` Base Sepolia hash <code>${esc(String(r.real.evm_hash).slice(0, 14))}…</code> (never broadcast, so no explorer page).` : '';
+    if (r.real.failure && !r.real.evm_hash) return `${pill} The MPC signature did not come back this time: ${esc(String(r.real.failure).slice(0, 90))}${r.real.hash ? ` · <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a>` : ''}`;
+    return `${pill} Signed by NEAR's MPC network on testnet, not sent to Base Sepolia.${signed}${evm}${r.real.hash ? ` <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Signature ↗</a>` : ''}`;
+  }
+  if (r.real?.failure) {
+    const why = (/panicked: ([^"\\]+)/.exec(String(r.real.failure)) || [])[1] || String(r.real.failure).slice(0, 90);
+    return `${pill} The testnet transaction was refused: ${esc(why)}${r.real.hash ? ` · <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a>` : ''}`;
   }
   if (r.real?.hash) return `${pill} <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · a real testnet transaction`;
   return `${pill} No transaction this time. Practice mode still works.`;
@@ -236,7 +242,11 @@ function stripHtml(id) {
     if (done === 'seal' && r.real?.hash) sub = `Check passed · the amount stays hidden<br>The Bank sealed it for you: <a class="qs-proof" href="${txUrl(esc(r.real.hash))}" target="_blank" rel="noopener">Receipt ↗</a> · ${esc(r.real.burnt_near)} NEAR gas, paid by the Bank<br>Your reveal key stays in this browser`;
     else if (done === 'seal') sub = `Check passed · the amount stays hidden<br>On chain the Bank logs only a fingerprint: <a class="qs-proof" href="${pr0.url}" target="_blank" rel="noopener">Bank anchor ↗</a> · ${pr0.cost} NEAR gas, paid by the Bank<br><span class="qs-chip">Your seal: practice, no spend</span>`;
     if (done === 'pay') sub = `Paid to: your porter · 3 coins from your purse · invoice #${Q.state(city).day} kept<br><span class="qs-chip">Practice, no spend</span>`;
-    if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level} · your purse keeps ${coins(p.near)} coins<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
+    if (GT.on() && r.real && (done === 'cross' || done === 'check' || done === 'pay' || done === 'seal')) {
+      const what = { cross: 'Toll: the fee paid from your row', check: '✓ Square keeper: paid<br>✗ Look-alike: refused, not on your list', pay: 'Porter paid 3 test dollars, under your cap', seal: 'Check passed · the amount stays hidden<br>Your own row anchored only a fingerprint; the reveal key stays in this browser' }[done];
+      sub = `${what}<br>${guestReceipt(r)}`;
+    }
+    if (done === 'write') { const today = Q.state(city).log.map((e) => `${NAME[e.shop]}: ${esc(Q.STEP[e.id].done)}`); sub = `Level ${r.level}${GT.on() ? '' : ` · your purse keeps ${coins(p.near)} coins`}<br>Today, ${today.length} entries:<br>${today.join('<br>')}<br>${receiptLine(lastDone.step, r)}`; }
     const extra = lastDone.step.id === 'sell' ? `<div class="qs-more">${whyBlock('good:salt')}</div>` : '';
     return { gold: true, html: row(okMark, r.line, sub, gold('next', nx ? `Next: ${NAME[nx.shop]}` : 'Back to town')) + extra };
   }
@@ -267,7 +277,7 @@ async function stripClick(a, b) {
       if (GT.on()) { busy = true; flash = { shop: inShop, text: 'Sending one testnet transaction…' }; paintStrip(); try { real = await GT.step(step.id, { shop: Q.state(city).dark || 'ferry' }); } finally { busy = false; } }
       else if (R.on()) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.step(step.id, { shop: Q.state(city).dark || 'ferry' }); } finally { busy = false; } }
       else if (R.DEMO_STEPS.includes(step.id)) { busy = true; flash = { shop: inShop, text: 'One moment…' }; paintStrip(); try { real = await R.demo(step.id); } finally { busy = false; } }
-      const res = Q.act(city, inShop); if (real) { res.real = real; if (step.id === 'sell' && real.total != null && BigInt(real.total) > 0n) res.total = BigInt(real.total); }
+      const res = Q.act(city, inShop); if (real) { res.real = real; if (step.id === 'sell' && real.total != null && BigInt(real.total) > 0n) res.total = BigInt(real.total); if (step.id === 'sell' && real.before != null && real.after != null) { res.before = BigInt(real.before); res.after = BigInt(real.after); } }
       lastDone = { shop: inShop, step, res }; lastDeed = { shop: inShop, text: DEED[step.id] };
       save(); hud(); quest(); seal(b); whyOpen = false; flash = null; readPurse();
     } else if (a === 'why') whyOpen = !whyOpen;
@@ -506,7 +516,7 @@ function enter() {
   history.replaceState(null, '', location.pathname + (location.search.includes('play') ? location.search : (location.search ? location.search + '&' : '?') + 'play'));
   try { WD().guideLook?.('crier'); } catch {}
   lastT = performance.now(); lastPhase = null; dawnOrders(); hud(); quest();
-  R.resume().then(() => { readPurse(); if (!R.on() && !R.live.practice && Q.progress(city).done === 0) setTimeout(() => { if (playing && !view) open('signin'); }, 900); });
+  R.resume().then(() => { readPurse(); if (!R.on() && !GT.on() && !R.live.practice && Q.progress(city).done === 0) setTimeout(() => { if (playing && !view) open('signin'); }, 900); });
   setTimeout(() => { aim(); if (!Q.state(city).met.intro) { Q.state(city).met.intro = 1; save(); WD().guideSay?.('New merchant? Earn your first coin by dusk.', { dur: 4.2 }); } }, 500);
   clearInterval(timer); timer = setInterval(() => { const now = performance.now(); S.advance(city, Math.round((now - lastT) / 1000)); lastT += Math.round((now - lastT) / 1000) * 1000; hud(); save(); }, 1000);
 }

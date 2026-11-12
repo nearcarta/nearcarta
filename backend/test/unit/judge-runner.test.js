@@ -46,3 +46,47 @@ test('every step row links its hash on the testnet explorer', () => {
   // The bank row says the amount is not on chain.
   assert.match(run, /the amount is not on chain/);
 });
+
+test('the one click and the scam errand load the guest story module from where the build puts it', async () => {
+  const { existsSync } = await import('node:fs');
+  const { posix } = await import('node:path');
+  for (const file of ['app/src/judges-run.js', 'app/src/net/scam.js']) {
+    const specs = [...read(file).matchAll(/import\('(\.[^']+)'\)/g)].map((m) => m[1]);
+    assert.ok(specs.length, `${file} imports the guest story`);
+    for (const s of specs) {
+      // The page serves app/src at the site root, so resolve as the browser would.
+      const target = posix.join(posix.dirname(file), s);
+      assert.ok(existsSync(root + target), `${file} imports ${s}, which is missing (${target})`);
+    }
+  }
+});
+
+test('a mainnet page never shows a dead button: Try free, the loop and the errand each lead to testnet', () => {
+  const run = read('app/src/judges-run.js');
+  const chrome = read('app/src/net/chrome.js');
+  // The loop: on mainnet the button is a link to the same page on testnet with run=1, which starts it.
+  assert.match(run, /data-testid="run-loop-switch" href="\$\{esc\(runUrl\(\)\)\}"/);
+  assert.match(run, /searchParams\.set\('run', '1'\)/);
+  assert.match(run, /searchParams\.get\('run'\) === '1'/);
+  // Try free from a mainnet page moves to testnet with try=1 and starts there, instead of practice mode.
+  assert.match(chrome, /if \(NET !== 'testnet'\) \{ globalThis\.location\?\.assign\(tryFreeUrl\(\)\)/);
+  assert.match(chrome, /searchParams\.set\('try', '1'\)/);
+  assert.match(chrome, /wantsTryFree\(\)\) \{ dropTryParam\(\); startTryFree/);
+  // Play for real is pinned to mainnet.
+  assert.match(chrome, /data-testid="sign-in" href="\/setup\/\?net=mainnet"/);
+  // The errand on mainnet links to itself on testnet.
+  assert.match(read('app/src/net/scam.js'), /data-testid="scam-switch" href=/);
+});
+
+test('a guest invest tops the purse up to one share first, and says so when the Arena pays too little', () => {
+  const g = read('app/src/market/live-guest.js');
+  const inv = g.slice(g.indexOf("if (id === 'invest')"), g.indexOf("if (id === 'invest')") + 900);
+  // One share is one milliNEAR from the purse; the top-up runs before the invest move.
+  assert.ok(inv.indexOf('topUpPurse()') > 0 && inv.indexOf('topUpPurse()') < inv.indexOf("action: 'invest'"));
+  assert.match(inv, /ERR_PURSE_SHORT/);
+  // Bounded: at most three rounds, each gather spaced past the node's 30 s gap.
+  assert.match(g, /async function topUpPurse\(\{ rounds = 3 \}/);
+  assert.match(g, /GATHER_GAP_MS = 31_000/);
+  // The sell line shows the real quote before and after, not the practice price.
+  assert.match(g, /before: BigInt\(q\.sell\), after: BigInt\(q2\.sell\)/);
+});

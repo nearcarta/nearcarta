@@ -51,7 +51,7 @@ export function guestSecret(store = globalThis.localStorage) {
  * `near-api-js` is imported lazily so a page that never presses Try free never downloads it.
  */
 export async function createGuestKey({ store = globalThis.localStorage, net = NET } = {}) {
-  const { KeyPair } = await import('near-api-js');
+  const { KeyPair } = await import('./near.js');
   const kp = KeyPair.fromRandom('ed25519');
   const rec = { v: GUEST_VERSION, net, account: null, secretKey: kp.toString(), publicKey: kp.getPublicKey().toString(), createdAt: now() };
   if (!write(store, rec)) throw new Error('ERR_STORAGE');
@@ -120,7 +120,7 @@ export function failureOf(r) {
 export async function guestSigner({ store = globalThis.localStorage, net = NET, rpc = cfg.rpc[0] } = {}) {
   const v = read(store);
   if (!v || v.net !== net || !v.secretKey || !v.account) return null;
-  const { Account, JsonRpcProvider, KeyPairSigner, actions: A } = await import('near-api-js');
+  const { Account, JsonRpcProvider, KeyPairSigner, actions: A } = await import('./near.js');
   const account = new Account(v.account, new JsonRpcProvider({ url: rpc }), KeyPairSigner.fromSecretKey(v.secretKey));
   return {
     kind: 'guest',
@@ -135,6 +135,16 @@ export async function guestSigner({ store = globalThis.localStorage, net = NET, 
     async call(contractId, method, args = {}, { deposit = 0n, gas = 100n * 10n ** 12n } = {}) {
       const r = await account.signAndSendTransaction({ receiverId: contractId, waitUntil: 'FINAL', throwOnFailure: false, actions: [A.functionCall(method, args, gas, deposit)] });
       return { hash: r?.transaction?.hash || null, failure: failureOf(r), raw: r };
+    },
+    /**
+     * Sign a text with the guest key, hex encoded (64 bytes -> 128 hex). The board checks this against the
+     * row's agent key, which is this key, so a `propose_call_as` is authorised from this browser alone.
+     * Docs: https://docs.near.org/protocol/accounts-contracts/access-keys
+     */
+    async sign(text) {
+      const { KeyPair } = await import('./near.js');
+      const sig = KeyPair.fromString(v.secretKey).sign(new TextEncoder().encode(String(text))).signature;
+      return Array.from(sig, (b) => b.toString(16).padStart(2, '0')).join('');
     },
     /** The account's balance in yoctoNEAR, or null when it cannot be read. */
     async balance() {
