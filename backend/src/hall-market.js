@@ -145,8 +145,27 @@ export async function marketStatus({ token, fetchImpl = fetch, handle = 'lamplig
   }
 }
 
+/** Jobs on the hall crate (the live townhall account): `get_hall` then `get_job` for the newest ids. */
+export async function readHallJobs({ view, contract, limit = 20 }) {
+  const hall = await view(contract, 'get_hall', {});
+  const next = Number(hall?.next_id || 0);
+  const ids = Array.from({ length: Math.min(limit, next) }, (_, k) => next - 1 - k);
+  const jobs = (await Promise.all(ids.map(id => view(contract, 'get_job', { job_id: String(id) }).then(j => (j ? { id, ...j } : null)).catch(() => null)))).filter(Boolean);
+  return { hall, jobs };
+}
+
 export async function readBounties({ view, contract = 'townhall.nearcarta.near' } = {}) {
   if (typeof view !== 'function') return { contract, state: null, bounties: [], error: 'no view' };
+  // The account now runs the hall crate, which has jobs instead of bounties (get_bounties is
+  // MethodNotFound there). Report its jobs in the same row shape; fall back to the legacy views.
+  try {
+    const { hall, jobs } = await readHallJobs({ view, contract });
+    return {
+      contract, kind: 'hall', state: { owner: hall?.owner || null, next_id: hall?.next_id || '0', jobs: hall?.jobs ?? jobs.length },
+      jobs,
+      bounties: jobs.map(j => ({ hash: `job-${j.id}`, amount: yoctoDigits(j.budget) || '0', remaining: yoctoDigits(j.remaining) || '0', task: j.task || '', claimedBy: (j.parts || []).find(p => p.worker)?.worker || null, policyVersion: null })),
+    };
+  } catch { /* legacy bounty code below */ }
   try {
     const [state, raw] = await Promise.all([
       view(contract, 'get_state', {}),
