@@ -61,7 +61,7 @@ services:
       - key: GUEST_FUNDER_PRIVATE_KEY
         sync: false
       - key: GUEST_PER_IP_DAY
-        value: "3"
+        value: "20"
       - key: GUEST_GLOBAL_DAY
         value: "400"
       - key: GUEST_FUNDER_FLOOR_NEAR

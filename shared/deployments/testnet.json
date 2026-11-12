@@ -192,7 +192,7 @@
       "deed_deposit_near": "0.03"
     },
     "caps": {
-      "per_ip_day": 3,
+      "per_ip_day": 20,
       "global_day": 400,
       "funder_floor_near": 2
     },
