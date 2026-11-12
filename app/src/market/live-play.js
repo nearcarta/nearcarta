@@ -96,6 +96,40 @@ export async function step(id, ctx = {}) {
     return record(id, `Invested 10 coins in the ${shop}`, r);
   }
   if (id === 'seal') return sealProfit();
+  if (id === 'order' || id === 'write') return rowStep(id, ctx);
+  return null;
+}
+
+// The visitor's own board row (opened on /setup) acts for the steps that are not market moves. The
+// agent key in this browser signs; no wallet opens. Any miss returns null and the step stays practice.
+const APPS = '/design/D8_shops/js/apps.js';
+let AP = null;
+const apps = () => (AP ||= import(APPS).then(async (A) => { await A.init(() => {}); await A.refresh(); return A; }).catch((e) => { AP = null; throw e; }));
+export async function rowReady() {
+  if (!live.account || onTestnet()) return null;
+  try { const A = await apps(); if (A.S.me !== live.account) await A.refresh(); return A.S.board && A.S.me === live.account && A.S.agentLive ? A : null; } catch { return null; }
+}
+const HALL = 'townhall.nearcarta.near';
+const saltText = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
+async function rowStep(id, ctx = {}) {
+  const A = await rowReady(); if (!A) return null;
+  try {
+    if (id === 'order') {
+      // Town Hall escrow: 0.001 NEAR, refundable, inside the row's per-payment cap.
+      const deadline = String((BigInt(Date.now()) + 24n * 3_600_000n) * 1_000_000n);
+      const o = await A.hallJob({ receiver: HALL, method: 'post_job', deposit: String(MILLI), args: { task: 'Market Day: bring 3 salt to the Ferry', parts: 1, deadline, workers: [], idempotency: null }, expiry: null, signature: null });
+      if (!o?.tx) return null;
+      return record(id, 'Posted an order at the Town Hall', { hash: o.tx, ok: o.decision === 'allowed', failure: o.decision === 'allowed' ? null : o.reason });
+    }
+    if (id === 'write') {
+      // The day's book: only a fingerprint goes on chain, anchored on the visitor's own row.
+      const day = JSON.stringify({ account: live.account, txs: (live.txs || []).map((t) => t.hash).filter(Boolean), log: ctx.log || null });
+      const digest = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(day)));
+      const o = await A.anchorStatement({ kind: 'statement', digest, salt: saltText() });
+      if (!o?.tx) return null;
+      return record(id, 'Wrote the day in the Chronicle', { hash: o.tx, ok: !!o.ok, failure: o.ok ? null : o.reason });
+    }
+  } catch { return null; }
   return null;
 }
 
@@ -128,6 +162,16 @@ async function sealProfit() {
   return record('seal', 'The Bank sealed your purse', { ...r, by_bank: true });
 }
 
+/** The first stall (1..4) nobody holds, or the one this visitor already holds. null when all are held. */
+export async function freeStall(now = Date.now()) {
+  const sq = await square(); if (!sq) return null;
+  const nowNs = BigInt(now) * 1_000_000n;
+  for (let id = 1; id <= 4; id++) {
+    const s = (sq.stalls || []).find((x) => Number(x.id) === id);
+    if (!s || !s.holder || BigInt(s.until || 0) < nowNs || s.holder === live.account) return id;
+  }
+  return null;
+}
 /** Rent a stall in the Arena square from the purse. */
 export async function rentStall(stall = 1) {
   const L = await lib();
