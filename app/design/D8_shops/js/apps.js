@@ -1238,7 +1238,11 @@ export async function boardEffectCaps(owner = S.me) {
     const raw = await boardRecord('e', owner);
     if (!raw.length) return [];
     const dv = new DataView(raw.buffer);
-    let i = 0;
+    // F50 (film 2026-11-12): the board keeps this record in a `LookupMap<String, Vec<u8>>`, so
+    // the stored value is borsh `Vec<u8>`: a u32 byte length, then the `encode_acts` bytes. The
+    // length was read as the owner count, the walk ran off the end, and every read after the
+    // first budget existed came back null ("The board did not answer for your Base budget").
+    let i = raw.length >= 4 && dv.getUint32(0, true) === raw.length - 4 ? 4 : 0;
     const u32 = () => { const v = dv.getUint32(i, true); i += 4; return v; };
     const str = () => { const n = u32(); const t = new TextDecoder().decode(raw.subarray(i, i + n)); i += n; return t; };
     const u128 = () => { const lo = dv.getBigUint64(i, true), hi = dv.getBigUint64(i + 8, true); i += 16; return (hi << 64n) + lo; };
@@ -1279,19 +1283,26 @@ async function ensureTollEffect({ asset, to, units }) {
     // The first budget costs about 383 bytes, paid from the side reserve `set_calls` prepaid.
     // The deposit only covers a reserve that is short, and every unused yocto is refunded
     // in the same call (`charge_acts`). Signed by the row owner: the agent cannot raise its own budget.
-    try { await sign(S.board, [fc('set_effects', { effects }, 50, String(4n * 10n ** 21n))]); }
+    let budgetTx = null;
+    try { budgetTx = await sign(S.board, [fc('set_effects', { effects }, 50, String(4n * 10n ** 21n))]); }
     catch (e) {
       if (userCancelled(e)) { const err = new Error('Cancelled in the wallet. Nothing was signed.'); err.cancelled = true; throw err; }
       throw new Error(`Your Base budget for this address was not written: ${String(e?.message || e).slice(0, 120)}. Nothing was signed.`);
     }
+    // F49: the budget read is `final`, so it can trail the wallet's answer by a few blocks.
+    // Poll for up to about 15 s, then go on to the crossing in the same press.
     let ok = false;
-    for (let i = 0; i < 8 && !ok; i++) {
-      if (i) await new Promise(r => setTimeout(r, 1200));
+    for (let i = 0; i < 12 && !ok; i++) {
+      if (i) await new Promise(r => setTimeout(r, 1300));
       const now = await boardEffectCaps().catch(() => null);
       const c = now?.find(x => x.chain === 'base' && x.asset === asset && x.receiver === to);
       ok = !!c && c.value_spent + amt <= c.value_cap;
     }
-    if (!ok) throw new Error('Your Base budget was sent but the board does not show it yet. Press Pay on Base again in a moment. Nothing else was signed.');
+    // F49: the budget write is a receipt of its own, so "What the chain saw" lists its link.
+    if (budgetTx) keep(budgetTx, 'toll', 'allowed', 'set_effects', { amt: '', to: S.board });
+    // The wallet answered for a successful write, so a slow read does not stop the press: the
+    // board checks the budget itself when the crossing arrives.
+    void ok;
   }
   return next.filter(e => e.chain === 'base' && e.asset === asset).reduce((a, e) => a + BigInt(e.value), 0n).toString();
 }
